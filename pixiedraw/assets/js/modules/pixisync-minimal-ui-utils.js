@@ -56,6 +56,7 @@
     let slotStatus = null;
     let slotQuantity = 1;
     let ownedOpenRooms = [];
+    let retainedRoomIds = new Set();
     let slotStatusLoading = false;
     let enabled = false;
     let externalDrawLocked = false;
@@ -240,42 +241,10 @@
     }
 
     function confirmShareStart() {
-      const message = getResumeNoticeMessage();
-      const dialog = elements.startConfirmDialog;
-      if (!dialog || typeof dialog.showModal !== 'function') {
-        return Promise.resolve(window.confirm(message));
-      }
-      return new Promise(resolve => {
-        let settled = false;
-        const finish = result => {
-          if (settled) return;
-          settled = true;
-          elements.startConfirmCancel?.removeEventListener?.('click', onCancel);
-          elements.startConfirmConfirm?.removeEventListener?.('click', onConfirm);
-          dialog.removeEventListener?.('cancel', onDialogCancel);
-          dialog.removeEventListener?.('close', onDialogClose);
-          resolve(result);
-        };
-        const close = returnValue => {
-          finish(returnValue === 'confirm');
-          if (dialog.open) dialog.close?.(returnValue);
-        };
-        const onCancel = () => close('cancel');
-        const onConfirm = () => close('confirm');
-        const onDialogCancel = event => {
-          event?.preventDefault?.();
-          close('cancel');
-        };
-        const onDialogClose = () => finish(dialog.returnValue === 'confirm');
-        elements.startConfirmCancel?.addEventListener?.('click', onCancel, { once: true });
-        elements.startConfirmConfirm?.addEventListener?.('click', onConfirm, { once: true });
-        dialog.addEventListener?.('cancel', onDialogCancel, { once: true });
-        dialog.addEventListener?.('close', onDialogClose, { once: true });
-        dialog.showModal();
-        window.requestAnimationFrame?.(() => {
-          elements.startConfirmConfirm?.focus?.({ preventScroll: true });
-        });
-      });
+      // The return notice is the only PiXiSYNC dialog. Starting is immediate:
+      // WebKit/PWA native backdrops can outlive a confirmation dialog and
+      // leave the editor dimmed and untappable.
+      return Promise.resolve(true);
     }
 
     function setActiveView(nextView) {
@@ -387,7 +356,8 @@
       renderParticipants(snapshot);
       renderComments();
       const slotCommandsAvailable = typeof commands.getProjectSlotStatus === 'function';
-      setHidden(elements.slotCard, !(enabled && slotCommandsAvailable));
+      const shouldShowSlotCard = Boolean(slotStatus?.overLimitProjects > 0);
+      setHidden(elements.slotCard, !(enabled && slotCommandsAvailable && shouldShowSlotCard));
       setText(elements.slotSummary, slotStatus
         ? (slotStatus.overLimitProjects > 0
           ? `利用中${slotStatus.openOwnedProjects}件・${slotStatus.overLimitProjects}件整理が必要`
@@ -441,6 +411,16 @@
           !enabled || busyAction || typeof commands.createProjectSlotCheckout !== 'function'
         );
         elements.slotPurchaseConfirm.setAttribute('aria-busy', busyAction === 'purchaseSlot' ? 'true' : 'false');
+      }
+      if (elements.localizeUnselected) {
+        const retainCount = Math.max(0, Number(slotStatus?.allowedSlots) || 0);
+        elements.localizeUnselected.disabled = Boolean(
+          !enabled
+          || busyAction
+          || typeof commands.localizeOwnedRooms !== 'function'
+          || retainedRoomIds.size !== retainCount
+          || ownedOpenRooms.length <= retainCount
+        );
       }
       if (elements.accessCode) {
         elements.accessCode.disabled = Boolean(
@@ -502,32 +482,33 @@
     }
 
     function renderOwnedOpenRooms() {
-      setHidden(elements.slotResolution, ownedOpenRooms.length === 0);
+      const retainCount = Math.max(0, Number(slotStatus?.allowedSlots) || 0);
+      retainedRoomIds = new Set([...retainedRoomIds].filter(roomId => (
+        ownedOpenRooms.some(room => room.roomId === roomId)
+      )));
+      setHidden(elements.slotResolution, !(slotStatus?.overLimitProjects > 0 && ownedOpenRooms.length > 0));
+      setText(elements.slotRetainGuide, retainedRoomIds.size === retainCount
+        ? `残す共有プロジェクトを${retainCount}件選択済みです。選択外${Math.max(0, ownedOpenRooms.length - retainCount)}件を順にローカル専用へ変更します。`
+        : `残す共有プロジェクトを${retainCount}件選んでください（現在${retainedRoomIds.size}件）。選択外をローカル専用へ変更します。`);
       if (!elements.slotRoomList?.replaceChildren) return;
       const documentRef = getDocument();
       const rows = ownedOpenRooms.map(room => {
         const row = documentRef.createElement('div');
+        const checkbox = documentRef.createElement('input');
         const name = documentRef.createElement('span');
-        const button = documentRef.createElement('button');
         row.className = 'pixisync-slot-purchase__room';
-        name.textContent = `${room.title}（参加者${room.memberCount}人）`;
-        button.type = 'button';
-        button.className = 'button button--ghost';
-        button.textContent = room.localAvailable ? '開いて整理' : '端末へ復元して整理';
-        button.disabled = typeof commands.openOwnedRoomForLocalization !== 'function';
-        button.addEventListener('click', async () => {
-          const opened = await runAction('openLocalizationTarget', () => (
-            commands.openOwnedRoomForLocalization(room.roomId)
-          ), {
-            pendingMessage: room.localAvailable
-              ? '選択したシェアプロジェクトを開いています…'
-              : '共有プロジェクトを端末へ復元しています…',
-            successMessage: '内容を確認し、共有解除ボタンを押してください。',
-            failureMessage: '選択したプロジェクトを開けませんでした。',
-          });
-          if (opened) elements.slotPurchaseDialog?.close?.('localization-target');
+        checkbox.type = 'checkbox';
+        checkbox.checked = retainedRoomIds.has(room.roomId);
+        checkbox.disabled = !checkbox.checked && retainedRoomIds.size >= retainCount;
+        checkbox.setAttribute('aria-label', `${room.title}を共有のまま残す`);
+        checkbox.addEventListener('change', () => {
+          if (checkbox.checked) retainedRoomIds.add(room.roomId);
+          else retainedRoomIds.delete(room.roomId);
+          renderOwnedOpenRooms();
+          render();
         });
-        row.append(name, button);
+        name.textContent = `${room.title}（参加者${room.memberCount}人）`;
+        row.append(checkbox, name);
         return row;
       });
       elements.slotRoomList.replaceChildren(...rows);
@@ -542,6 +523,7 @@
         ownedOpenRooms = [];
       }
       renderOwnedOpenRooms();
+      render();
       return ownedOpenRooms;
     }
 
@@ -570,9 +552,9 @@
 
     function showSlotPurchaseDialog(message = '') {
       const dialog = elements.slotPurchaseDialog;
-      if (!dialog || typeof dialog.showModal !== 'function') return false;
+      if (!dialog || typeof dialog.show !== 'function') return false;
       setText(elements.slotPurchaseNotice, message);
-      if (!dialog.open) dialog.showModal();
+      if (!dialog.open) dialog.show();
       void refreshProjectSlotStatus({ quiet: true });
       void refreshOwnedOpenRooms();
       return true;
@@ -678,19 +660,14 @@
         let inviteCode = await commands.createInviteCode();
         try {
           if (typeof inviteCode !== 'string' || !inviteCode) throw new Error('invite-code-unavailable');
-          const shareText = `PiXiSYNC参加コード\n${inviteCode}`;
-          if (typeof navigatorRef?.share === 'function') {
-            await navigatorRef.share({ title: 'PiXiSYNC', text: shareText });
-          } else {
-            await navigatorRef?.clipboard?.writeText?.(shareText);
-          }
+          await navigatorRef?.clipboard?.writeText?.(inviteCode);
         } finally {
           inviteCode = '';
         }
       }, {
         pendingMessage: '参加コードを用意しています…',
-        successMessage: '参加コードを共有しました。',
-        failureMessage: '参加コードを共有できませんでした。',
+        successMessage: '参加コードをコピーしました。',
+        failureMessage: '参加コードをコピーできませんでした。',
       }),
       localize: async () => {
         if (!window.confirm('このプロジェクトの共有を終了し、この端末ではローカル専用として保存します。参加者は各自の端末へ保存した後、共有データがサーバーから削除されます。続けますか？')) return false;
@@ -698,6 +675,29 @@
           pendingMessage: '最終状態を保存して、ローカル専用へ変更しています…',
           successMessage: '共有を終了し、ローカル専用プロジェクトとして保存しました。',
           failureMessage: 'ローカル保存を確認できなかったため、共有データは削除していません。',
+        });
+      },
+      localizeUnselected: () => {
+        const retainCount = Math.max(0, Number(slotStatus?.allowedSlots) || 0);
+        if (retainedRoomIds.size !== retainCount) {
+          setText(elements.slotPurchaseNotice, `残す共有プロジェクトを${retainCount}件選んでください。`);
+          return false;
+        }
+        const targets = ownedOpenRooms
+          .filter(room => !retainedRoomIds.has(room.roomId))
+          .map(room => room.roomId);
+        if (!targets.length) return false;
+        return runAction('localizeUnselected', () => commands.localizeOwnedRooms(targets), {
+          pendingMessage: `選択外${targets.length}件を順にローカル専用へ変更しています…`,
+          successMessage: '選択外の共有プロジェクトをローカル専用へ変更しました。',
+          failureMessage: '一部をローカル専用へ変更できませんでした。共有データは残しているため、後で再試行できます。',
+        }).then(async localized => {
+          if (localized) {
+            retainedRoomIds.clear();
+            await refreshProjectSlotStatus({ quiet: true });
+            await refreshOwnedOpenRooms();
+          }
+          return localized;
         });
       },
       joinCode: () => {
@@ -795,6 +795,7 @@
     elements.slotPurchaseRefresh?.addEventListener?.('click', slotHandlers.refresh);
     elements.slotPurchaseClose?.addEventListener?.('click', slotHandlers.close);
     elements.slotPurchaseConfirm?.addEventListener?.('click', slotHandlers.confirm);
+    elements.localizeUnselected?.addEventListener?.('click', handlers.localizeUnselected);
     elements.slotQuantity?.addEventListener?.('input', slotQuantityHandler);
     elements.slotQuantity?.addEventListener?.('change', slotQuantityHandler);
     elements.resumeNoticeClose?.addEventListener?.('click', closeResumeNotice);

@@ -1207,7 +1207,7 @@
 <header class="landscape-panel-window__header" data-landscape-window-drag-handle="">
 <h2>シェアモード</h2>
 <div class="pixisync-header-actions">
-<button aria-label="参加コードを共有" class="landscape-panel-window__share" hidden="" id="pixisyncCopyInviteCode" title="参加コードを共有" type="button">↗</button>
+<button aria-label="参加コードをコピー" class="landscape-panel-window__share" hidden="" id="pixisyncCopyInviteCode" title="参加コードをコピー" type="button">⧉</button>
 <button aria-label="シェアモードを閉じる" class="landscape-panel-window__close" data-close-right-flyout="" type="button">×</button>
 </div>
 </header>
@@ -1774,8 +1774,9 @@
 <p class="pixisync-slot-purchase__status" id="pixisyncSlotPurchaseStatus">現在の作成枠を確認しています…</p>
 <section class="pixisync-slot-purchase__resolution" hidden="" id="pixisyncSlotResolution">
 <h3>共有中のプロジェクトを整理</h3>
-<p class="help-text">この端末に保存済みのプロジェクトを選ぶと、そのプロジェクトを開きます。内容を確認して「共有を解除してローカル専用にする」を押してください。</p>
+<p class="help-text" id="pixisyncSlotRetainGuide">残す共有プロジェクトを作成枠の数だけ選んでください。選ばなかったプロジェクトは、順にローカル専用へ変更します。</p>
 <div class="pixisync-slot-purchase__rooms" id="pixisyncSlotRoomList"></div>
+<button class="button button--ghost" disabled="" id="pixisyncLocalizeUnselected" type="button">選択外をローカル専用にする</button>
 </section>
 <ul class="pixisync-slot-purchase__points">
 <li>1枠100円で、購入数をまとめて選べます。</li>
@@ -2073,8 +2074,8 @@
 	<script defer="" src="assets/js/modules/pixisync-collaboration-controller-utils.js?v=20260802-pixisync-lazy-cell1"></script>
 	<script defer="" src="assets/js/modules/pixisync-session-state.js?v=20260731-checkpoint-diagnostics1"></script>
 	<script defer="" src="assets/js/modules/pixisync-project-switch-utils.js?v=20260803-pixisync-code-only1"></script>
-	<script defer="" src="assets/js/modules/pixisync-minimal-ui-utils.js?v=20260803-pixisync-panel-restore1"></script>
-	<script defer="" src="assets/js/modules/pixisync-runtime-adapter-utils.js?v=20260803-pixisync-panel-restore1"></script>
+	<script defer="" src="assets/js/modules/pixisync-minimal-ui-utils.js?v=20260803-pixisync-bulk-localize1"></script>
+	<script defer="" src="assets/js/modules/pixisync-runtime-adapter-utils.js?v=20260803-pixisync-bulk-localize1"></script>
 	<script defer="" src="assets/js/modules/pixieed-account-workflow-utils.js?v=20260803-pixisync-code-only1"></script>
 	<script defer="" src="assets/js/modules/startup-tail-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 	<script defer="" src="assets/js/modules/controls-mirror.js?v=20260803-mobile-window-reset1"></script>
@@ -2083,7 +2084,7 @@
 	<script defer="" src="assets/js/modules/local-project-v2-migration-utils.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/pre-update-checkpoint-utils.js?v=20260712-pre-update-checkpoint-u3"></script>
 	<script defer="" src="assets/js/active-project-session-utils.js?v=20260715-local-true-v2-cleanup1"></script>
-    <script defer="" src="assets/js/app.js?v=20260803-pixisync-panel-restore1"></script>
+    <script defer="" src="assets/js/app.js?v=20260803-pixisync-bulk-localize1"></script>
 	<script defer="" src="assets/js/modules/update-detection-utils.js?v=20260719-file-protocol1"></script>
   <script>
     (function initPanelAdDocking() {

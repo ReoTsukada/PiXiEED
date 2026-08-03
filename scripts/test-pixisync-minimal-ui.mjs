@@ -140,7 +140,9 @@ const createElements = () => {
     slotTotal: new FakeElement(),
     slotPurchaseStatus: new FakeElement(),
     slotResolution: new FakeElement(),
+    slotRetainGuide: new FakeElement(),
     slotRoomList: new FakeElement(fakeDocument),
+    localizeUnselected: new FakeElement(),
     slotPurchaseNotice: new FakeElement(),
     slotPurchaseRefresh: new FakeElement(),
     slotPurchaseClose: new FakeElement(),
@@ -228,10 +230,8 @@ assert.equal(elements.panel.hidden, false);
 assert.equal(elements.start.hidden, false);
 assert.equal(elements.drawLock.hidden, true);
 const firstStart = elements.start.click();
-assert.equal(elements.startConfirmDialog.open, true);
-assert.equal(startCount, 0);
-elements.startConfirmConfirm.click();
 await Promise.resolve();
+assert.equal(elements.startConfirmDialog.open, false);
 const secondStart = elements.start.click();
 assert.equal(startCount, 1);
 assert.equal(await secondStart, false);
@@ -243,6 +243,7 @@ assert.equal(elements.start.disabled, false);
 // The database quota error is explained without exposing an internal RPC name.
 const limitedElements = createElements();
 const limitedUi = createUi({ elements: limitedElements, body: fakeDocument.body });
+let localizedRoomIds = [];
 limitedUi.configure({
   enabled: true,
   session: createSession({ role: 'owner' }),
@@ -263,13 +264,17 @@ limitedUi.configure({
       title: '共同制作A',
       memberCount: 3,
       localAvailable: true,
+    }, {
+      roomId: '22222222-2222-4222-8222-222222222222',
+      title: '共同制作B',
+      memberCount: 1,
+      localAvailable: false,
     }]),
-    openOwnedRoomForLocalization: async () => true,
+    localizeOwnedRooms: async roomIds => { localizedRoomIds = roomIds; },
   },
 });
 const limitedStart = limitedElements.start.click();
-assert.equal(limitedElements.startConfirmDialog.open, true);
-limitedElements.startConfirmConfirm.click();
+assert.equal(limitedElements.startConfirmDialog.open, false);
 assert.equal(await limitedStart, false);
 assert.equal(
   limitedElements.notice.textContent,
@@ -284,7 +289,13 @@ await Promise.resolve();
 await Promise.resolve();
 assert.equal(limitedElements.slotSummary.textContent, '利用中18件・17件整理が必要');
 assert.equal(limitedElements.slotResolution.hidden, false);
-assert.equal(limitedElements.slotRoomList.children.length, 1);
+assert.equal(limitedElements.slotRoomList.children.length, 2);
+const retainedRoomCheckbox = limitedElements.slotRoomList.children[0].children[0];
+retainedRoomCheckbox.checked = true;
+retainedRoomCheckbox.dispatch('change');
+assert.equal(limitedElements.localizeUnselected.disabled, false);
+await limitedElements.localizeUnselected.click();
+assert.deepEqual(localizedRoomIds, ['22222222-2222-4222-8222-222222222222']);
 limitedUi.dispose();
 
 // The slot purchase UI shows server-owned quota and redirects only to the returned Stripe URL.
@@ -362,20 +373,16 @@ assert.equal(returnElements.slotSummary.textContent, '利用中 1 / 2枠');
 assert.match(returnElements.slotPurchaseNotice.textContent, /1枠追加しました/);
 returnUi.dispose();
 
-// Active owner shares a participant code, but permanent sharing has no end action.
+// Active owner copies a participant code, but permanent sharing has no end action.
 const ownerSession = createSession({ role: 'owner' });
 activate(ownerSession);
 let copied = '';
-let shared = null;
 let localized = false;
 const ownerElements = createElements();
 const ownerUi = createUi({
   elements: ownerElements,
   body: fakeDocument.body,
-  navigatorRef: {
-    share: async value => { shared = value; },
-    clipboard: { writeText: async value => { copied = value; } },
-  },
+  navigatorRef: { clipboard: { writeText: async value => { copied = value; } } },
 });
 ownerUi.configure({
   enabled: true,
@@ -398,9 +405,7 @@ assert.equal(ownerElements.drawLockLabel.textContent, '別のタブで編集中�
 ownerUi.setExternalDrawLock(false);
 assert.equal(ownerElements.drawLock.hidden, true);
 await ownerElements.copyInviteCode.click();
-assert.equal(shared?.title, 'PiXiSYNC');
-assert.match(shared?.text || '', /AAAA-/);
-assert.equal(copied, '');
+assert.match(copied, /^AAAA-/);
 assert.equal(await ownerElements.localize.click(), true);
 assert.equal(localized, true);
 assert.equal(ownerElements.accessCode.value, '');
@@ -559,6 +564,8 @@ for (const id of [
   'pixisyncBuySlot',
   'pixisyncSlotPurchaseDialog',
   'pixisyncSlotPurchaseStatus',
+  'pixisyncSlotRetainGuide',
+  'pixisyncLocalizeUnselected',
   'pixisyncSlotPurchaseNotice',
   'pixisyncSlotPurchaseRefresh',
   'pixisyncSlotPurchaseClose',
@@ -574,15 +581,16 @@ for (const id of [
   'pixisyncDrawLock',
 ]) assert.match(html, new RegExp(`id="${id}"`));
 assert.doesNotMatch(html, /id="pixisyncLeave"|id="pixisyncArchive"|id="pixisyncCopyInvite"/);
-assert.match(html, /pixisync-minimal-ui-utils\.js\?v=20260803-pixisync-panel-restore1/);
+assert.match(html, /pixisync-minimal-ui-utils\.js\?v=20260803-pixisync-bulk-localize1/);
 assert.match(html, /<dialog[^>]*id="pixisyncResumeNoticeDialog"[^>]*data-pixisync-resume-notice-version="20260803-v2"|<dialog[^>]*data-pixisync-resume-notice-version="20260803-v2"[^>]*id="pixisyncResumeNoticeDialog"/);
-assert.match(html, /pixisync-runtime-adapter-utils\.js\?v=20260803-pixisync-panel-restore1/);
+assert.match(html, /pixisync-runtime-adapter-utils\.js\?v=20260803-pixisync-bulk-localize1/);
 assert.match(html, /static-content\.js\?v=20260803-pixisync-code-only1/);
-assert.match(html, /app\.js\?v=20260803-pixisync-panel-restore1/);
+assert.match(html, /app\.js\?v=20260803-pixisync-bulk-localize1/);
 assert.match(html, /PiXiSYNCが復活しました/);
 assert.match(html, /シェアプロジェクトが復活しました/);
 assert.match(html, /シェアプロジェクトを楽しんでください/);
 assert.match(app, /startConfirmDialog: dom\.controls\.pixisyncStartConfirmDialog/);
+assert.match(app, /localizeUnselected: dom\.controls\.pixisyncLocalizeUnselected/);
 assert.match(app, /pixisyncMinimalUi\?\.showResumeNoticeOnce/);
 assert.match(staticContent, /id: 'pixisync-share-project'/);
 assert.match(staticContent, /id: '2026-08-03-pixisync-return'/);

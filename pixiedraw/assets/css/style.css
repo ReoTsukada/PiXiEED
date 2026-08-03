@@ -907,8 +907,7 @@ body.is-mobile-layout.is-unified-left-tools-color:not(.is-unified-left-color-foc
   display: none;
 }
 
-/* PiXiSYNC keeps its one primary share action beside a visible close control
-   at every panel size, not only in the resizable desktop flyout. */
+/* PiXiSYNC keeps its compact header in the resizable landscape flyout. */
 #panelMulti .landscape-panel-window__header {
   display: flex;
   flex: 0 0 auto;
@@ -922,6 +921,14 @@ body.is-mobile-layout.is-unified-left-tools-color:not(.is-unified-left-color-foc
 #panelMulti .landscape-panel-window__header h2 {
   margin: 0;
   font-size: 0.88rem;
+}
+
+/* Portrait drawers already have their own navigation. Do not spend vertical
+   space on redundant close/copy controls. */
+@media (orientation: portrait) {
+  #panelMulti .landscape-panel-window__header {
+    display: none;
+  }
 }
 
 #panelMulti .panel-section__body {
@@ -5557,8 +5564,9 @@ input[type='range']::-moz-focus-outer {
 
 .pixisync-slot-purchase__room {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: 18px minmax(0, 1fr);
   gap: 8px;
+  align-items: center;
   align-items: center;
   padding: 8px;
   border: 1px solid rgba(var(--ui-rgb), 0.12);
@@ -5569,6 +5577,13 @@ input[type='range']::-moz-focus-outer {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.pixisync-slot-purchase__room input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--accent);
 }
 
 .pixisync-slot-purchase__status {
@@ -16258,12 +16273,44 @@ body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelMulti .pixisync-pan
 }
 
 body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelMulti .pixisync-start-hero {
-  min-height: 116px;
-  padding: 8px;
+  min-height: 0;
+  padding: 4px 0;
 }
 
 body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelMulti .pixisync-start-hero #pixisyncStart {
-  min-height: 52px;
+  width: 100%;
+  min-height: 42px;
+}
+
+/* Before sharing starts, the half drawer is an entry point: keep the large
+   start action and participant-code entry reachable together. Participant
+   lists and slot management become useful after a session has started (or
+   after expanding the drawer), so they must not push the primary action off
+   the bottom edge. */
+body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelMulti .pixisync-panel:has(.pixisync-start-hero:not([hidden])) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) 34px;
+  gap: 2px;
+}
+
+body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelMulti .pixisync-panel:has(.pixisync-start-hero:not([hidden])) > :not(.pixisync-start-hero, .multi-project-key-field) {
+  display: none;
+}
+
+body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelMulti .pixisync-panel:has(.pixisync-start-hero:not([hidden])) .pixisync-start-hero {
+  grid-area: auto;
+  grid-row: 1;
+  grid-column: 1;
+  width: 100%;
+}
+
+body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelMulti .pixisync-panel:has(.pixisync-start-hero:not([hidden])) .multi-project-key-field {
+  position: static;
+  grid-area: auto;
+  grid-row: 2;
+  grid-column: 1;
+  margin: 0;
 }
 
 body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelMulti .multi-participants-panel,

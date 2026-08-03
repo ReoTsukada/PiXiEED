@@ -130,6 +130,7 @@
       getProjectSlotStatus,
       listOwnedOpenRooms,
       openOwnedRoomForLocalization,
+      localizeOwnedRooms,
       createProjectSlotCheckout,
       reconcileProjectSlotPurchase,
       sendComment,
@@ -1576,6 +1577,27 @@
       const roomId = assertRoomId(targetRoomId);
       if (await openLocalOwnedRoom(roomId)) return true;
       return restoreMissingOwnedRoom(roomId);
+    }
+
+    async function localizeOwnedRooms(targetRoomIds = []) {
+      const roomIds = [...new Set((Array.isArray(targetRoomIds) ? targetRoomIds : [])
+        .map(value => assertRoomId(value).toLowerCase()))];
+      const results = [];
+      for (const targetRoomId of roomIds) {
+        let targetRuntime = window.__PIXISYNC_V1_RUNTIME__ || null;
+        const activeRoomId = String(targetRuntime?.snapshot?.().roomId || '').toLowerCase();
+        if (activeRoomId !== targetRoomId) {
+          const opened = await openOwnedRoomForLocalization(targetRoomId);
+          if (!opened) throw new Error('PiXiSYNC runtime: localization-target-open-failed');
+          targetRuntime = window.__PIXISYNC_V1_RUNTIME__ || null;
+        }
+        const resolvedRoomId = String(targetRuntime?.snapshot?.().roomId || '').toLowerCase();
+        if (resolvedRoomId !== targetRoomId || typeof targetRuntime?.archive !== 'function') {
+          throw new Error('PiXiSYNC runtime: localization-target-unavailable');
+        }
+        results.push(await targetRuntime.archive());
+      }
+      return Object.freeze(results);
     }
 
     async function invokeSlotFunction(name, body = {}) {
