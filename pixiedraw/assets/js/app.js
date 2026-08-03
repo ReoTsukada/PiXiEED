@@ -352,7 +352,6 @@
       pixisyncStartConfirmConfirm: document.getElementById('pixisyncStartConfirmConfirm'),
       pixisyncResumeNoticeDialog: document.getElementById('pixisyncResumeNoticeDialog'),
       pixisyncResumeNoticeClose: document.getElementById('pixisyncResumeNoticeClose'),
-      pixisyncCopyInvite: document.getElementById('pixisyncCopyInvite'),
       pixisyncCopyInviteCode: document.getElementById('pixisyncCopyInviteCode'),
       pixisyncLocalize: document.getElementById('pixisyncLocalize'),
       pixisyncSlotCard: document.getElementById('pixisyncSlotCard'),
@@ -13106,7 +13105,6 @@
         startConfirmConfirm: dom.controls.pixisyncStartConfirmConfirm,
         resumeNoticeDialog: dom.controls.pixisyncResumeNoticeDialog,
         resumeNoticeClose: dom.controls.pixisyncResumeNoticeClose,
-        copyInvite: dom.controls.pixisyncCopyInvite,
         copyInviteCode: dom.controls.pixisyncCopyInviteCode,
         localize: dom.controls.pixisyncLocalize,
         slotCard: dom.controls.pixisyncSlotCard,
@@ -13136,6 +13134,10 @@
         canvasViewport: dom.canvasViewport,
       },
     }) || null;
+  window.addEventListener('pixieed:account-authenticated', () => {
+    if (!pixisyncMinimalUi?.hasPendingInvite?.()) return;
+    void pixisyncMinimalUi.consumePendingInvite?.();
+  });
   if (pixisyncCollaborationController) {
     window.PiXiEEDrawModules.pixisyncRuntimeBridge = Object.freeze({
       configure: runtime => {
@@ -13160,15 +13162,17 @@
         }
         pixisyncMinimalUi?.configure?.({
           session: runtime?.session,
-          commands: runtime?.commands,
+          commands: runtime?.commands && {
+            ...runtime.commands,
+            // Joining from the project list must create or reuse a durable
+            // local card before the runtime binds it to the shared room.
+            join: joinPiXiSyncFromStartupWorkspace,
+          },
           participants: runtime?.participants,
           enabled: runtime?.uiEnabled === true,
           externalDrawLocked: pixisyncLocalReadOnly,
           externalDrawLockMessage: runtime?.localReadOnlyMessage,
         });
-        if (runtime?.uiEnabled === true && runtime?.consumeInviteFromUrl !== false) {
-          void pixisyncMinimalUi?.consumeInviteFromUrl?.();
-        }
       },
       clear: () => {
         pixisyncInputLocked = false;
@@ -13227,7 +13231,6 @@
       refreshUi: () => pixisyncMinimalUi?.render?.(),
       updateParticipants: participants => pixisyncMinimalUi?.updateParticipants?.(participants),
       receiveComment: comment => pixisyncMinimalUi?.receiveComment?.(comment),
-      consumeInviteFromUrl: () => pixisyncMinimalUi?.consumeInviteFromUrl?.(),
     });
   }
 
@@ -27811,13 +27814,64 @@
     return true;
   }
 
+  async function ensurePiXiSyncPendingInviteProject(inviteValue) {
+    const inviteToken = window.PiXiEEDrawModules?.pixisyncProjectSwitchUtils?.parseInviteToken?.(inviteValue) || '';
+    if (!inviteToken) return '';
+    const entries = await loadRecentProjectsMetadata();
+    const existing = entries.find(candidate => (
+      String(candidate?.pixisync?.pendingInviteToken || '').toLowerCase() === inviteToken
+    ));
+    if (existing?.id) {
+      const existingProjectId = normalizeAutosaveProjectId(existing.id);
+      if (existingProjectId && existingProjectId !== normalizeAutosaveProjectId(autosaveProjectId || '')) {
+        const opened = await openRecentProject(existing, {
+          hideStartup: false,
+          silent: true,
+          allowProjectMismatchLoad: true,
+          replaceOpenProjectTabs: true,
+        });
+        if (opened !== true) return '';
+      }
+      return existingProjectId;
+    }
+    const created = await createNewProject({
+      name: localizeText('参加待ちシェアプロジェクト', 'Shared project awaiting join'),
+      width: DEFAULT_CANVAS_SIZE,
+      height: DEFAULT_CANVAS_SIZE,
+    });
+    const projectId = created === true ? normalizeAutosaveProjectId(autosaveProjectId || '') : '';
+    if (!projectId) return '';
+    const updatedEntries = await loadRecentProjectsMetadata();
+    const nextEntries = updatedEntries.map(candidate => candidate?.id === projectId
+      ? {
+        ...candidate,
+        pixisync: {
+          version: 2,
+          roomId: '',
+          role: 'participant',
+          pendingInviteToken: inviteToken,
+        },
+        updatedAt: new Date().toISOString(),
+      }
+      : candidate);
+    await saveRecentProjectsList(updatedEntries, nextEntries);
+    await refreshRecentProjectsUI().catch(error => {
+      console.warn('[pixisync:pending-invite] recent project refresh deferred', error);
+    });
+    return projectId;
+  }
+
   async function joinPiXiSyncFromStartupWorkspace(inviteValue) {
     const switchUtils = window.PiXiEEDrawModules?.pixisyncProjectSwitchUtils;
     if (typeof switchUtils?.runSafeProjectJoin !== 'function') {
       return { ok: false, reason: 'runtime-unavailable' };
     }
+    const inviteToken = switchUtils.parseInviteToken?.(inviteValue) || '';
+    if (!inviteToken) return { ok: false, reason: 'invalid-invite-code' };
+    const pendingProjectId = await ensurePiXiSyncPendingInviteProject(inviteToken);
+    if (!pendingProjectId) return { ok: false, reason: 'pending-project-unavailable' };
     const result = await switchUtils.runSafeProjectJoin({
-      inviteValue,
+      inviteValue: inviteToken,
       locationHref: window.location.href,
       ensureAuthenticated: () => ensureSharedProjectAuthenticatedStart({ requireLogin: true }),
       captureCurrentProject: async () => {
@@ -27841,6 +27895,16 @@
         return await disposePiXiSyncRuntimeForProjectSwitch();
       },
       createSharedWorkingProject: async () => {
+        const currentProjectId = normalizeAutosaveProjectId(autosaveProjectId || '');
+        const currentEntry = currentProjectId
+          ? await loadRecentProjectMetadataById(currentProjectId)
+          : null;
+        if (
+          currentProjectId === pendingProjectId
+          && String(currentEntry?.pixisync?.pendingInviteToken || '').toLowerCase() === inviteToken
+        ) {
+          return { ok: true, projectId: currentProjectId, reuseExisting: true };
+        }
         const created = await createNewProject({
           name: localizeText('シェアプロジェクト', 'Shared project'),
           width: DEFAULT_CANVAS_SIZE,
@@ -28710,24 +28774,15 @@
         return false;
       });
       setupPiXiSyncShareMode();
-      let openedPixiSyncInvite = false;
+      const openedPixiSyncPendingCode = pixisyncMinimalUi?.hasPendingInvite?.() === true;
       let openedPixiSyncPurchaseReturn = false;
-      // 招待URLで開いた受信側は、設定ボタンのゲート操作を要求せず
-      // V1シェアランタイムを先に起動してリンクを消費する。
-      // これにより送信先でも現在のローカルプロジェクトへ参加バインドを作成できる。
       try {
         const pixisyncUrl = new URL(window.location.href);
-        const inviteToken = window.PiXiEEDrawModules?.pixisyncProjectSwitchUtils?.parseInviteToken?.(window.location.href, {
-          locationHref: window.location.href,
-        }) || '';
-        if (inviteToken || pixisyncMinimalUi?.hasPendingInvite?.()) {
-          openedPixiSyncInvite = true;
-        }
         openedPixiSyncPurchaseReturn = ['success', 'cancelled'].includes(
           pixisyncUrl.searchParams.get('pixisync_slot_purchase') || ''
         );
       } catch (error) {
-        console.warn('PiXiSYNC invite bootstrap failed', error);
+        console.warn('PiXiSYNC purchase bootstrap failed', error);
       }
       console.info('[pixiedraw:startup]', { phase: 'startup-session-restore-skipped', reason: 'always-start-from-home' });
       let openedExternalImportProject = false;
@@ -28757,14 +28812,17 @@
           console.warn('Requested project bootstrap failed', error);
         }
       }
-      if (openedPixiSyncInvite || openedPixiSyncPurchaseReturn) {
+      if (openedPixiSyncPendingCode || openedPixiSyncPurchaseReturn) {
         try {
           // Startup project selection must finish before the runtime captures
           // or restores a checkpoint; otherwise the normal bootstrap can
           // replace the shared canvas with a fresh local document.
           await initializePiXiSyncRuntime();
+          if (openedPixiSyncPendingCode) {
+            await pixisyncMinimalUi?.consumePendingInvite?.();
+          }
         } catch (error) {
-          console.warn('PiXiSYNC invite bootstrap failed', error);
+          console.warn('PiXiSYNC purchase bootstrap failed', error);
         }
       }
       setStartupProgressLabel(localizeText('起動を完了しています…', 'Finalizing startup...'));
@@ -28776,14 +28834,14 @@
       refreshLocalizedUi();
       scheduleDeferredUiSetup();
       hideProjectHomeScreen();
-      if (openedExternalImportProject || openedRequestedProject || openedPixiSyncInvite) {
+      if (openedExternalImportProject || openedRequestedProject) {
         // External imports and explicit My Page requests already opened a
         // project. Do not cover it with the normal project chooser.
         hideStartupScreen();
       } else {
         showStartupScreen({ refreshWorkspace: false });
       }
-      if (!openedPixiSyncInvite && !openedPixiSyncPurchaseReturn) {
+      if (!openedPixiSyncPendingCode && !openedPixiSyncPurchaseReturn) {
         shouldShowPiXiSyncResumeNotice = true;
       }
     } finally {

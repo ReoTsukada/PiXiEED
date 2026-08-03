@@ -130,7 +130,6 @@ const createElements = () => {
     startConfirmConfirm: new FakeElement(),
     resumeNoticeDialog: new FakeDialog(),
     resumeNoticeClose: new FakeElement(),
-    copyInvite: new FakeElement(),
     copyInviteCode: new FakeElement(),
     localize: new FakeElement(),
     slotCard: new FakeElement(),
@@ -363,7 +362,7 @@ assert.equal(returnElements.slotSummary.textContent, '利用中 1 / 2枠');
 assert.match(returnElements.slotPurchaseNotice.textContent, /1枠追加しました/);
 returnUi.dispose();
 
-// Active owner can issue invites, but permanent sharing has no end action.
+// Active owner shares a participant code, but permanent sharing has no end action.
 const ownerSession = createSession({ role: 'owner' });
 activate(ownerSession);
 let copied = '';
@@ -378,7 +377,6 @@ ownerUi.configure({
   enabled: true,
   session: ownerSession,
   commands: {
-    createInviteLink: async () => `https://example.test/pixiedraw/?pixisync_invite=${'a'.repeat(64)}`,
     createInviteCode: async () => 'AAAA-AAAA-AAAA-AAAA-AAAA-AAAA-AAAA-AAAA-AAAA-AAAA-AAAA-AAAA-AAAA-AAAA-AAAA-AAAA',
     localize: async () => { localized = true; },
   },
@@ -387,7 +385,6 @@ ownerUi.configure({
     { id: 'editor', name: 'Editor', role: 'editor', connection: 'online' },
   ],
 });
-assert.equal(ownerElements.copyInvite.hidden, false);
 assert.equal(ownerElements.copyInviteCode.hidden, false);
 assert.equal(ownerElements.localize.hidden, false);
 assert.equal(ownerElements.participantCount.textContent, '2');
@@ -396,14 +393,12 @@ assert.equal(ownerElements.drawLock.hidden, false);
 assert.equal(ownerElements.drawLockLabel.textContent, '別のタブで編集中です。閲覧専用です。');
 ownerUi.setExternalDrawLock(false);
 assert.equal(ownerElements.drawLock.hidden, true);
-await ownerElements.copyInvite.click();
-assert.match(copied, /pixisync_invite=/);
 await ownerElements.copyInviteCode.click();
 assert.match(copied, /^AAAA-/);
 assert.equal(await ownerElements.localize.click(), true);
 assert.equal(localized, true);
 assert.equal(ownerElements.accessCode.value, '');
-assert.equal(ownerElements.accessCode.placeholder, '招待リンク / コード');
+assert.equal(ownerElements.accessCode.placeholder, '参加者コード');
 
 // Reconnecting is rendered from session state and immediately locks drawing.
 ownerSession.dispatch({ type: 'SOCKET_OFFLINE', epoch: ownerSession.getSnapshot().epoch });
@@ -427,7 +422,7 @@ assert.equal(participantElements.drawLock.hidden, true);
 const inviteToken = 'b'.repeat(64);
 let manualJoinToken = '';
 let sentComment = '';
-participantElements.accessCode.value = `https://example.test/pixiedraw/?pixisync_invite=${inviteToken}`;
+participantElements.accessCode.value = inviteToken.toUpperCase().match(/.{1,4}/g).join('-');
 participantUi.configure({
   enabled: true,
   session: participantSession,
@@ -455,7 +450,7 @@ manualUi.configure({
   commands: { join: async token => { manualJoinToken = token; } },
 });
 assert.equal(manualElements.joinCode.textContent, '参加');
-manualElements.accessCode.value = `https://example.test/pixiedraw/?pixisync_invite=${inviteToken}`;
+manualElements.accessCode.value = inviteToken.toUpperCase().match(/.{1,4}/g).join('-');
 assert.equal(await manualElements.joinCode.click(), true);
 assert.equal(manualJoinToken, inviteToken);
 manualElements.accessCode.value = inviteToken.toUpperCase().match(/.{1,4}/g).join('-');
@@ -486,46 +481,15 @@ assert.equal(participantElements.commentList.children.length, 2);
 assert.equal(participantElements.commentsTab.classList.contains('has-notification'), true);
 manualUi.dispose();
 
-// Raw invite tokens are removed from the URL before the join command executes.
-const invitedSession = createSession({ role: 'participant' });
-const inviteElements = createElements();
-const inviteSessionStorage = createSessionStorage();
-let replacedUrl = '';
-let joinSawSanitizedUrl = false;
-const inviteUi = createUi({
-  elements: inviteElements,
-  body: fakeDocument.body,
-  locationRef: { href: `https://example.test/pixiedraw/?pixisync_invite=${inviteToken}&keep=1` },
-  historyRef: {
-    state: { preserved: true },
-    replaceState: (_state, _title, url) => { replacedUrl = url; },
-  },
-  sessionStorageRef: inviteSessionStorage,
-});
-inviteUi.configure({
-  enabled: true,
-  session: invitedSession,
-  commands: {
-    join: async token => {
-      joinSawSanitizedUrl = !replacedUrl.includes('pixisync_invite');
-      assert.equal(token, inviteToken);
-    },
-  },
-});
-assert.equal(await inviteUi.consumeInviteFromUrl(), true);
-assert.equal(joinSawSanitizedUrl, true);
-assert.equal(replacedUrl, '/pixiedraw/?keep=1');
-assert.equal(inviteUi.hasPendingInvite(), false);
-
-// Logged-out URL recipients keep the invite across account navigation and retry it after login.
+// Logged-out code recipients keep the code across account navigation and retry it after login.
 const pendingSessionStorage = createSessionStorage();
+const loggedOutInviteElements = createElements();
 const loggedOutInviteUi = createUi({
-  elements: createElements(),
+  elements: loggedOutInviteElements,
   body: fakeDocument.body,
-  locationRef: { href: `https://example.test/pixiedraw/?pixisync_invite=${inviteToken}` },
-  historyRef: { state: null, replaceState: () => {} },
   sessionStorageRef: pendingSessionStorage,
 });
+loggedOutInviteElements.accessCode.value = inviteToken.toUpperCase().match(/.{1,4}/g).join('-');
 loggedOutInviteUi.configure({
   enabled: true,
   session: createSession({ role: 'participant' }),
@@ -533,15 +497,14 @@ loggedOutInviteUi.configure({
     join: async () => { throw new Error('PiXiSYNC runtime: authentication-required'); },
   },
 });
-assert.equal(await loggedOutInviteUi.consumeInviteFromUrl(), false);
+assert.equal(await loggedOutInviteElements.joinCode.click(), false);
+assert.equal(pendingSessionStorage.getItem('pixiedraw:pixisync:v1:pending-invite'), inviteToken);
 assert.equal(loggedOutInviteUi.hasPendingInvite(), true);
 
 let resumedToken = '';
 const resumedInviteUi = createUi({
   elements: createElements(),
   body: fakeDocument.body,
-  locationRef: { href: 'https://example.test/pixiedraw/' },
-  historyRef: { state: null, replaceState: () => {} },
   sessionStorageRef: pendingSessionStorage,
 });
 resumedInviteUi.configure({
@@ -550,7 +513,7 @@ resumedInviteUi.configure({
   commands: { join: async token => { resumedToken = token; } },
 });
 assert.equal(resumedInviteUi.hasPendingInvite(), true);
-assert.equal(await resumedInviteUi.consumeInviteFromUrl(), true);
+assert.equal(await resumedInviteUi.consumePendingInvite(), true);
 assert.equal(resumedToken, inviteToken);
 assert.equal(resumedInviteUi.hasPendingInvite(), false);
 
@@ -584,7 +547,6 @@ for (const id of [
   'pixisyncStartConfirmConfirm',
   'pixisyncResumeNoticeDialog',
   'pixisyncResumeNoticeClose',
-  'pixisyncCopyInvite',
   'pixisyncCopyInviteCode',
   'pixisyncSlotCard',
   'pixisyncSlotSummary',
@@ -605,12 +567,12 @@ for (const id of [
   'pixisyncQuickOpen',
   'pixisyncDrawLock',
 ]) assert.match(html, new RegExp(`id="${id}"`));
-assert.doesNotMatch(html, /id="pixisyncLeave"|id="pixisyncArchive"/);
-assert.match(html, /pixisync-minimal-ui-utils\.js\?v=20260803-pixisync-no-unauth-slot-request1/);
+assert.doesNotMatch(html, /id="pixisyncLeave"|id="pixisyncArchive"|id="pixisyncCopyInvite"/);
+assert.match(html, /pixisync-minimal-ui-utils\.js\?v=20260803-pixisync-code-only1/);
 assert.match(html, /<dialog[^>]*id="pixisyncResumeNoticeDialog"[^>]*data-pixisync-resume-notice-version="20260803-v2"|<dialog[^>]*data-pixisync-resume-notice-version="20260803-v2"[^>]*id="pixisyncResumeNoticeDialog"/);
-assert.match(html, /pixisync-runtime-adapter-utils\.js\?v=20260803-pixisync-auth-cleanup3/);
-assert.match(html, /static-content\.js\?v=20260803-pixisync-localize1/);
-assert.match(html, /app\.js\?v=20260803-project-list-panel-reset-resume-notice4/);
+assert.match(html, /pixisync-runtime-adapter-utils\.js\?v=20260803-pixisync-code-only1/);
+assert.match(html, /static-content\.js\?v=20260803-pixisync-code-only1/);
+assert.match(html, /app\.js\?v=20260803-pixisync-code-only1/);
 assert.match(html, /PiXiSYNCが復活しました/);
 assert.match(html, /シェアプロジェクトが復活しました/);
 assert.match(html, /シェアプロジェクトを楽しんでください/);
@@ -641,13 +603,18 @@ assert.ok(
 assert.match(app, /runtime\?\.uiEnabled === true/);
 assert.match(app, /function setupPiXiSyncShareMode\(\)/);
 assert.doesNotMatch(app, /PIXISYNC_INITIAL_GATE_TAP_COUNT|PIXISYNC_SHARE_START_UNLOCKED|pixisyncInitialGate/);
-assert.match(app, /pixisyncMinimalUi\?\.consumeInviteFromUrl/);
+assert.match(app, /pixisyncMinimalUi\.consumePendingInvite/);
 assert.match(app, /pixisyncMinimalUi\?\.hasPendingInvite\?\.\(\)/);
+assert.match(app, /pixieed:account-authenticated/);
+assert.match(app, /function ensurePiXiSyncPendingInviteProject/);
+assert.match(app, /pendingInviteToken: inviteToken/);
+assert.doesNotMatch(app, /pixisync_invite/);
 assert.match(app, /resolveProjectBindingTarget:[\s\S]*?resolvePiXiSyncRecentProjectTarget/);
 assert.match(app, /candidate\?\.id !== replacedProjectKey/);
 assert.match(app, /String\(candidate\?\.pixisync\?\.roomId \|\| ''\)[\s\S]*?!== normalizedRoomId/);
 assert.match(app, /collectPiXiSyncRecentProjectCleanupEntries[\s\S]*?removeAutosaveV2ProjectData\(removed\.id\)/);
 assert.match(startupWorkflow, /const isPiXiSyncCard = Boolean\([\s\S]*?entry\.pixisync\.roomId/);
+assert.match(startupWorkflow, /const isPendingPiXiSyncCard = Boolean\([\s\S]*?pendingInviteToken/);
 assert.match(startupWorkflow, /className = 'startup-workspace__project-share-badge'/);
 assert.match(sharedTabBar, /id: 'pixisync', label: 'PiXiSYNC', selector: '#pixisyncQuickOpen'/);
 assert.match(html, /aria-disabled="false"[^>]*id="pixisyncQuickOpen"/);

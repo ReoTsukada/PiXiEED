@@ -447,6 +447,12 @@
       accountState.isAnonymous = false;
       accountState.profile = { nickname: '', avatarId: '', xUrl: '' };
       disconnectActiveSharedProjectRealtimeChannel().catch(() => {});
+    } else if (!accountState.isAnonymous) {
+      // PiXiSYNC URL recipients can arrive before authentication completes,
+      // especially when a Safari standalone app returns from the account
+      // page. Notify the live PiXiEEDraw runtime to retry its persisted URL
+      // invite after this authenticated session becomes available.
+      window.dispatchEvent?.(new CustomEvent('pixieed:account-authenticated'));
     }
     setRecentProjectsCache([]);
   }

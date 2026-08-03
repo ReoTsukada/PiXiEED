@@ -1625,10 +1625,15 @@
       const entryIndex = startupWorkspaceEntries.indexOf(entry);
       const needsLegacyV2Migration = entry?.deviceLocalProject === true
         && Number(entry?.autosaveSchemaVersion) !== 2;
+      const isPendingPiXiSyncCard = Boolean(
+        entry?.pixisync
+        && typeof entry.pixisync === 'object'
+        && entry.pixisync.pendingInviteToken
+      );
       const isPiXiSyncCard = Boolean(
         entry?.pixisync
         && typeof entry.pixisync === 'object'
-        && entry.pixisync.roomId
+        && (entry.pixisync.roomId || isPendingPiXiSyncCard)
       );
       const card = document.createElement('article');
       card.className = 'startup-workspace__project';
@@ -1641,8 +1646,12 @@
       if (isPiXiSyncCard) {
         const shareBadge = document.createElement('span');
         shareBadge.className = 'startup-workspace__project-share-badge';
-        shareBadge.title = localizeText('シェア中のプロジェクト', 'Shared project');
-        shareBadge.setAttribute('aria-label', localizeText('シェア中', 'Shared'));
+        shareBadge.title = isPendingPiXiSyncCard
+          ? localizeText('ログイン後に参加するシェアプロジェクト', 'Shared project awaiting sign-in')
+          : localizeText('シェア中のプロジェクト', 'Shared project');
+        shareBadge.setAttribute('aria-label', isPendingPiXiSyncCard
+          ? localizeText('参加待ち', 'Awaiting sign-in')
+          : localizeText('シェア中', 'Shared'));
         const shareIcon = document.createElement('img');
         shareIcon.src = '../pixisync.png?v=20260731-pixisync-icon2';
         shareIcon.alt = '';
@@ -1700,7 +1709,9 @@
       meta.textContent = entry?.migrationRecovery === true
         ? `${modified} / ${localizeText('端末内・V2移行待ち', 'On device · awaiting V2 migration')}`
         : isPiXiSyncCard
-          ? `${modified} / ${localizeText('シェア中', 'Shared')}`
+          ? `${modified} / ${isPendingPiXiSyncCard
+            ? localizeText('ログイン後に参加', 'Join after sign-in')
+            : localizeText('シェア中', 'Shared')}`
         : needsLegacyV2Migration
           ? `${modified} / ${localizeText('V1・選択時に自動変換', 'V1 · convert on selection')}`
         : entry?.deviceLocalProject === true

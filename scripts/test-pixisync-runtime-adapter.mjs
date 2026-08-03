@@ -533,11 +533,10 @@ const sentComment = await owner.adapter.commands.sendComment(' owner message ');
 assert.equal(sentComment.text, 'owner message');
 assert.equal(server.broadcasts.at(-1).event, 'pixisync-comment');
 
-const inviteUrl = await owner.adapter.createInviteLink();
-assert.equal(new URL(inviteUrl).searchParams.get('pixisync_invite'), INVITE_TOKEN);
-assert.equal(await owner.adapter.createInviteLink(), inviteUrl, 'an active room must reuse its persistent invite URL');
-assert.equal(await owner.adapter.createInviteCode(), INVITE_TOKEN.toUpperCase().match(/.{1,4}/g).join('-'));
-assert.equal(server.inviteCreateCalls, 1, 'copying an invite twice must not create a second server invite');
+const inviteCode = await owner.adapter.createInviteCode();
+assert.equal(inviteCode, INVITE_TOKEN.toUpperCase().match(/.{1,4}/g).join('-'));
+assert.equal(await owner.adapter.createInviteCode(), inviteCode, 'an active room must reuse its persistent participant code');
+assert.equal(server.inviteCreateCalls, 1, 'copying a participant code twice must not create a second server invite');
 assert.deepEqual(ownerBindings.get('project-owner'), {
   roomId: ROOM_ID,
   role: 'owner',

@@ -5,7 +5,7 @@
   const PHASE_COPY = Object.freeze({
     disabled: ['未接続', '共同編集は現在利用できません。', 'オフライン'],
     local: ['未接続', '通常プロジェクトとして編集中です。', '未接続'],
-    invited: ['招待あり', '招待リンクから同期用の作業コピーを開けます。', '未接続'],
+    invited: ['招待あり', '参加者コードを入力して同期用の作業コピーを開けます。', '未接続'],
     creating: ['シェアを作成中', '最初のチェックポイントを安全に保存しています。', '処理中'],
     joining: ['参加処理中', '参加権限を確認しています。', '確認中'],
     syncing: ['同期中', 'チェックポイントと最新の変更を同期しています。', '同期中'],
@@ -17,7 +17,6 @@
     closing: ['終了処理中', '保留操作と最終状態を確認しています。', '終了中'],
     archived: ['共同編集終了', 'このセッションには新しい変更を送信できません。', '終了済み'],
   });
-  const INVITE_QUERY_KEY = 'pixisync_invite';
   const PENDING_INVITE_STORAGE_KEY = 'pixiedraw:pixisync:v1:pending-invite';
   const RESUME_NOTICE_STORAGE_KEY = 'pixieedraw:pixisync:resume-notice:20260803-v2';
   const RESUME_NOTICE_UI_VERSION = '20260803-v2';
@@ -69,7 +68,6 @@
 
     const actionButtons = Object.freeze({
       start: elements.start,
-      copyInvite: elements.copyInvite,
       copyInviteCode: elements.copyInviteCode,
       localize: elements.localize,
       joinCode: elements.joinCode,
@@ -214,9 +212,7 @@
     }
 
     function parseInviteToken(value) {
-      return root.pixisyncProjectSwitchUtils?.parseInviteToken?.(value, {
-        locationHref: locationRef.href,
-      }) || '';
+      return root.pixisyncProjectSwitchUtils?.parseInviteToken?.(value) || '';
     }
 
     function readPendingInviteToken() {
@@ -417,7 +413,6 @@
       if (actionButtons.start) {
         actionButtons.start.textContent = 'シェアモードを開始';
       }
-      setHidden(actionButtons.copyInvite, !(owner && active && typeof commands.createInviteLink === 'function'));
       setHidden(actionButtons.copyInviteCode, !(owner && active && typeof commands.createInviteCode === 'function'));
       setHidden(actionButtons.localize, !(owner && active && typeof commands.localize === 'function'));
       setHidden(actionButtons.joinCode, !(
@@ -455,11 +450,11 @@
         );
         elements.accessCode.placeholder = commentMode
           ? 'コメントを入力'
-          : '招待リンク / コード';
+          : '参加者コード';
         elements.accessCode.setAttribute('aria-label', commentMode
           ? 'コメント'
-          : '招待リンクまたは招待コード');
-        elements.accessCode.maxLength = commentMode ? COMMENT_MAX_LENGTH : 2048;
+          : '参加者コード');
+        elements.accessCode.maxLength = commentMode ? COMMENT_MAX_LENGTH : 79;
       }
       if (actionButtons.joinCode && commentMode) {
         actionButtons.joinCode.disabled = Boolean(
@@ -676,19 +671,6 @@
           },
         });
       },
-      copyInvite: () => runAction('copyInvite', async () => {
-        let inviteLink = await commands.createInviteLink();
-        try {
-          if (typeof inviteLink !== 'string' || !inviteLink) throw new Error('invite-link-unavailable');
-          await navigatorRef?.clipboard?.writeText?.(inviteLink);
-        } finally {
-          inviteLink = '';
-        }
-      }, {
-        pendingMessage: '招待リンクを発行しています…',
-        successMessage: '招待リンクをコピーしました。',
-        failureMessage: '招待リンクをコピーできませんでした。',
-      }),
       copyInviteCode: () => runAction('copyInviteCode', async () => {
         let inviteCode = await commands.createInviteCode();
         try {
@@ -727,9 +709,11 @@
         }
         let token = parseInviteToken(elements.accessCode?.value);
         if (!token) {
-          setNotice('招待リンクまたは64文字の招待コードを確認してください。');
+          setNotice('64文字の参加者コードを確認してください。');
           return false;
         }
+        writePendingInviteToken(token);
+        let actionError = null;
         return runAction('joinCode', async () => {
           try {
             await commands.join(token);
@@ -739,8 +723,14 @@
           }
         }, {
           pendingMessage: '招待を確認しています…',
-        successMessage: 'PiXiSYNCに参加しました。',
+          successMessage: 'PiXiSYNCに参加しました。',
           failureMessage: '招待を確認できませんでした。',
+          onFailure: error => { actionError = error; },
+        }).then(joined => {
+          if (joined || !/authentication-required/.test(String(actionError?.message || actionError || ''))) {
+            clearPendingInviteToken();
+          }
+          return joined;
         });
       },
       buySlot: () => showSlotPurchaseDialog(),
@@ -807,41 +797,15 @@
     };
     elements.resumeNoticeDialog?.addEventListener?.('close', handleResumeNoticeClosed);
 
-    function removeInviteTokenFromUrl(url) {
-      url.searchParams.delete(INVITE_QUERY_KEY);
-      if (url.hash.startsWith('#')) {
-        const hashParams = new URLSearchParams(url.hash.slice(1));
-        if (hashParams.has(INVITE_QUERY_KEY)) {
-          hashParams.delete(INVITE_QUERY_KEY);
-          const nextHash = hashParams.toString();
-          url.hash = nextHash ? `#${nextHash}` : '';
-        }
-      }
-      historyRef?.replaceState?.(historyRef.state, '', `${url.pathname}${url.search}${url.hash}`);
-    }
-
-    async function consumeInviteFromUrl() {
+    async function consumePendingInvite() {
       if (!enabled || typeof commands.join !== 'function') return false;
-      const url = new URL(locationRef.href);
-      let token = url.searchParams.get(INVITE_QUERY_KEY) || '';
-      if (!token && url.hash.startsWith('#')) {
-        token = new URLSearchParams(url.hash.slice(1)).get(INVITE_QUERY_KEY) || '';
-      }
-      const hasUrlToken = Boolean(token);
-      if (!token) token = readPendingInviteToken();
+      let token = readPendingInviteToken();
       if (!token) return false;
       token = parseInviteToken(token);
       if (!token) {
         clearPendingInviteToken();
-        if (hasUrlToken) removeInviteTokenFromUrl(url);
-        setNotice('招待リンクが正しくありません。');
+        setNotice('参加者コードが正しくありません。');
         return false;
-      }
-      const pendingStored = writePendingInviteToken(token);
-      let urlSanitized = false;
-      if (hasUrlToken && pendingStored) {
-        removeInviteTokenFromUrl(url);
-        urlSanitized = true;
       }
       let actionError = null;
       const joined = await runAction('joinCode', async () => {
@@ -858,7 +822,6 @@
       });
       if (joined) {
         clearPendingInviteToken();
-        if (hasUrlToken && !urlSanitized) removeInviteTokenFromUrl(url);
       } else if (!/authentication-required/.test(String(actionError?.message || actionError || ''))) {
         clearPendingInviteToken();
       }
@@ -944,7 +907,7 @@
     return Object.freeze({
       configure,
       render,
-      consumeInviteFromUrl,
+      consumePendingInvite,
       consumeSlotPurchaseReturn,
       refreshProjectSlotStatus,
       showResumeNoticeOnce,

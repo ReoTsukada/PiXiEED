@@ -22,8 +22,8 @@ const {
 const token = 'a'.repeat(64);
 assert.equal(parseInviteToken(token.toUpperCase()), token);
 assert.equal(parseInviteToken(token.match(/.{1,8}/g).join('-')), token);
-assert.equal(parseInviteToken(`https://pixieed.jp/pixiedraw/?pixisync_invite=${token}`), token);
-assert.equal(parseInviteToken(`https://pixieed.jp/pixiedraw/#pixisync_invite=${token}`), token);
+assert.equal(parseInviteToken(`https://pixieed.jp/pixiedraw/?pixisync_invite=${token}`), '');
+assert.equal(parseInviteToken(`https://pixieed.jp/pixiedraw/#pixisync_invite=${token}`), '');
 assert.equal(parseInviteToken('ordinary project search'), '');
 
 {
@@ -77,6 +77,22 @@ assert.equal(parseInviteToken('ordinary project search'), '');
   assert.equal(result.disposed, true);
   assert.equal(result.kept, false);
   assert.deepEqual(events, ['clear', 'dispose', 'clear']);
+}
+
+{
+  const events = [];
+  const runtime = { join: async value => { events.push(`join:${value}`); return 'room-reused'; } };
+  const result = await runSafeProjectJoin({
+    inviteValue: token,
+    ensureAuthenticated: async () => true,
+    captureCurrentProject: async () => ({ id: 'pending-card' }),
+    disconnectCurrentRuntime: async () => { events.push('disconnect'); },
+    createSharedWorkingProject: async () => ({ ok: true, projectId: 'pending-card', reuseExisting: true }),
+    initializeRuntime: async () => runtime,
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.projectId, 'pending-card');
+  assert.deepEqual(events, ['disconnect', `join:${token}`]);
 }
 
 {

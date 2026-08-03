@@ -2,25 +2,14 @@
   'use strict';
 
   const root = window.PiXiEEDrawModules = window.PiXiEEDrawModules || {};
-  const INVITE_QUERY_KEY = 'pixisync_invite';
   const INVITE_TOKEN_PATTERN = /^[0-9a-f]{64}$/;
 
-  function parseInviteToken(value, { locationHref = window.location?.href || '' } = {}) {
+  function parseInviteToken(value) {
     const raw = String(value || '').trim();
     if (INVITE_TOKEN_PATTERN.test(raw)) return raw.toLowerCase();
     const compactCode = raw.replace(/[\s-]/g, '').toLowerCase();
     if (INVITE_TOKEN_PATTERN.test(compactCode)) return compactCode;
-    try {
-      const url = new URL(raw, locationHref || 'https://pixieed.jp/pixiedraw/');
-      let token = url.searchParams.get(INVITE_QUERY_KEY) || '';
-      if (!token && url.hash.startsWith('#')) {
-        token = new URLSearchParams(url.hash.slice(1)).get(INVITE_QUERY_KEY) || '';
-      }
-      token = token.trim().toLowerCase();
-      return INVITE_TOKEN_PATTERN.test(token) ? token : '';
-    } catch (_error) {
-      return '';
-    }
+    return '';
   }
 
   function createJoinFailure(reason, error = null, details = {}) {
@@ -129,7 +118,11 @@
       stage = 'create-working-project';
       const created = await createSharedWorkingProject(previousProject);
       workingProjectId = String(created?.projectId || '');
-      if (created?.ok !== true || !workingProjectId || workingProjectId === previousProjectId) {
+      if (
+        created?.ok !== true
+        || !workingProjectId
+        || (workingProjectId === previousProjectId && created?.reuseExisting !== true)
+      ) {
         throw new Error('PiXiSYNC project switch: shared-working-project-unavailable');
       }
 

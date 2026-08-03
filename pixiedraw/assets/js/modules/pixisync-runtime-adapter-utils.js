@@ -125,7 +125,6 @@
       start,
       join,
       resumeBoundProject,
-      createInviteLink,
       createInviteCode,
       getProjectSlotStatus,
       listOwnedOpenRooms,
@@ -753,7 +752,6 @@
         localReadOnly,
         localReadOnlyMessage: localReadOnly ? 'このプロジェクトは別のタブで編集中です。この画面は閲覧専用です。' : '',
         uiEnabled,
-        consumeInviteFromUrl: false,
       });
       return true;
     }
@@ -1491,7 +1489,7 @@
       }
     }
 
-    async function createInviteLink() {
+    async function createInviteCode() {
       if (!session?.canDraw?.() || role !== 'owner') throw new Error('PiXiSYNC runtime: active-owner-required');
       if (
         TOKEN_PATTERN.test(reusableInviteToken)
@@ -1503,9 +1501,7 @@
           )
         )
       ) {
-        const reusableUrl = new URL(locationRef.href);
-        reusableUrl.searchParams.set('pixisync_invite', reusableInviteToken);
-        return reusableUrl.toString();
+        return reusableInviteToken.toUpperCase().match(/.{1,4}/g).join('-');
       }
       const invite = firstRow(await rpc('pixisync_create_invite', {
         p_room_id: roomId,
@@ -1519,18 +1515,7 @@
       reusableInviteExpiresAt = String(invite?.expires_at || '');
       reusableInvitePersistent = true;
       await persistProjectBinding();
-      const url = new URL(locationRef.href);
-      url.searchParams.set('pixisync_invite', reusableInviteToken);
-      return url.toString();
-    }
-
-    async function createInviteCode() {
-      const link = await createInviteLink();
-      const token = new URL(link, locationRef.href).searchParams.get('pixisync_invite') || '';
-      if (!TOKEN_PATTERN.test(token)) throw new Error('PiXiSYNC runtime: invalid-invite-code');
-      // This is the same durable credential as the URL, formatted only for
-      // human entry. The join parser removes separators before validation.
-      return token.toUpperCase().match(/.{1,4}/g).join('-');
+      return reusableInviteToken.toUpperCase().match(/.{1,4}/g).join('-');
     }
 
     async function getProjectSlotStatus() {
@@ -1877,7 +1862,6 @@
       reusableInvitePersistent = binding?.role === 'owner' && binding.invitePersistent === true;
       installSession(binding?.role || 'owner', { resumeAvailable: Boolean(binding) });
       configureBridge({ collaboration: false });
-      await runtimeBridge.consumeInviteFromUrl?.();
       if (disposed) runtimeBridge.clear?.();
       return snapshot();
     }
@@ -1935,7 +1919,6 @@
       handleLifecycleResume,
       leave,
       archive,
-      createInviteLink,
       createInviteCode,
       sendComment,
       prepareCheckpointOperation,
