@@ -13150,7 +13150,15 @@
         // but every visible frame/layer must be composed before the UI is
         // announced as active. Do this once at the sync barrier rather than
         // waiting for a later layer/frame operation to cause a redraw.
-        flushPiXiSyncDeferredCells();
+        const deferredCells = flushPiXiSyncDeferredCells();
+        if (deferredCells.ok === false) {
+          console.warn('[pixisync:checkpoint]', {
+            phase: 'checkpoint-final-deferred-cells-incomplete',
+            ...deferredCells,
+          });
+          void pixisyncAuthoritativeRecoveryRequester?.('checkpoint-final-deferred-cells-incomplete');
+          return false;
+        }
         invalidateActiveCanvasCompositeRenderState();
         clearPlaybackFrameCache();
         renderFrameList();

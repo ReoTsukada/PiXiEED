@@ -1208,12 +1208,21 @@
           // render at that barrier so a participant sees the current frames
           // and layers immediately, rather than waiting for a later structure
           // edit to happen to refresh the viewport.
-          await runtimeBridge.finishAuthoritativeSync?.({
+          const finishedAuthoritativeSync = await runtimeBridge.finishAuthoritativeSync?.({
             roomId,
             role,
             projectKey: boundProjectKey,
             revision: currentSnapshot()?.appliedRevision,
           });
+          // `active` is only meaningful after every deferred cell has been
+          // materialized into the restored document.  Previously a failed
+          // final flush was ignored, which acknowledged the revision while
+          // leaving the joining participant with the blank pre-join surface.
+          // Treat it as a sync failure so the normal authoritative retry path
+          // remains locked instead of presenting incomplete artwork.
+          if (finishedAuthoritativeSync === false) {
+            throw new Error('PiXiSYNC runtime: authoritative-initial-render-incomplete');
+          }
           clearReconnectRetry();
           // Session subscribers observe the `active` transition before this
           // effect finishes installing the collaboration controller. Expose a

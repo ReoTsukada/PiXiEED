@@ -265,7 +265,10 @@ function createBridge() {
     receiveComment: comment => comments.push(comment),
     updateParticipants: next => { participants = next; },
     setInputLocked: next => { inputLocked = next === true; },
-    finishAuthoritativeSync: () => { authoritativeSyncCount += 1; },
+    finishAuthoritativeSync: () => {
+      authoritativeSyncCount += 1;
+      return true;
+    },
     snapshot: () => ({ configured: Boolean(runtime), collaboration: Boolean(runtime?.realtimeClient) }),
     comments,
     get participants() { return participants; },
