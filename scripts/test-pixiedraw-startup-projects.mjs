@@ -31,7 +31,7 @@ for (const html of [index]) {
 assert.match(index, /startup-workflow-utils\.js\?v=[^"\s]+/);
 assert.match(index, /document-model\.js\?v=20260724-legacy-cow-migration1/);
 assert.match(index, /app\.js\?v=[^"\s]+/);
-assert.match(index, /dialog-setup-utils\.js\?v=20260803-dialog-auto-dismiss10s1/);
+assert.match(index, /dialog-setup-utils\.js\?v=20260803-safari-safe-dialogs1/);
 assert.match(index, /timeline-layers\.js\?v=[^"\s]+/);
 assert.match(index, /retired-collaboration-compat\.js\?v=[^"\s]+/);
 for (const source of [startup]) {
@@ -119,6 +119,9 @@ assert.doesNotMatch(app, /legacyProjectMigration|requestLegacyV2MigrationConsent
 assert.match(documentSession, /選択したプロジェクトをV2へ自動変換しています/);
 assert.match(dialogSetup, /setupDialogAutoDismiss\(\{ delayMs = 10_000 \} = \{\}\)/);
 assert.match(dialogSetup, /dialog\.close\('timeout'\)/);
+assert.match(dialogSetup, /function setupSafariSafeDialogs\(\)/);
+assert.match(dialogSetup, /dialogPrototype\.showModal = function showSafariSafeModal\(\)/);
+assert.match(dialogSetup, /dialogPrototype\.close = function closeSafariSafeModal/);
 assert.match(app, /setupDialogAutoDismiss\?\.\(\)/);
 assert.match(startup, /startup-workspace__project-share-badge/);
 assert.match(startup, /シェア中/);

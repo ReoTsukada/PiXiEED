@@ -31,7 +31,67 @@
 
     return ((scope) => {
       with (scope) {
+  function setupSafariSafeDialogs() {
+    const documentRef = window.document;
+    const dialogPrototype = window.HTMLDialogElement?.prototype;
+    if (!documentRef || !dialogPrototype || dialogPrototype.__pixieedSafariSafeShowModal) return false;
+    if (typeof dialogPrototype.showModal !== 'function' || typeof dialogPrototype.show !== 'function') return false;
+
+    const userAgent = String(window.navigator?.userAgent || '');
+    const usesWebKit = /AppleWebKit\//.test(userAgent) && !/Android/i.test(userAgent);
+    if (!usesWebKit) return false;
+
+    const backdrop = documentRef.createElement('div');
+    backdrop.className = 'pixiedraw-dialog-safe-backdrop';
+    backdrop.hidden = true;
+    backdrop.setAttribute('aria-hidden', 'true');
+    documentRef.body?.append(backdrop);
+
+    const nativeShow = dialogPrototype.show;
+    const nativeClose = dialogPrototype.close;
+    let activeDialog = null;
+    const boundDialogs = new WeakSet();
+    const dismissBackdrop = dialog => {
+      if (activeDialog !== dialog) return;
+      activeDialog = null;
+      backdrop.hidden = true;
+    };
+    const bind = dialog => {
+      if (boundDialogs.has(dialog)) return;
+      boundDialogs.add(dialog);
+      dialog.addEventListener('close', () => dismissBackdrop(dialog));
+    };
+
+    Object.defineProperty(dialogPrototype, '__pixieedSafariSafeShowModal', {
+      configurable: true,
+      value: true,
+    });
+    dialogPrototype.close = function closeSafariSafeModal(...args) {
+      const result = nativeClose.call(this, ...args);
+      // WebKit may dispatch the close event after the next rendering update.
+      // Remove our document backdrop synchronously, instead of leaving a
+      // temporary or persistent dark layer above the editor.
+      dismissBackdrop(this);
+      return result;
+    };
+    dialogPrototype.showModal = function showSafariSafeModal() {
+      if (this.open) return;
+      if (activeDialog && activeDialog !== this && activeDialog.open) activeDialog.close('replaced');
+      bind(this);
+      activeDialog = this;
+      backdrop.hidden = false;
+      try {
+        return nativeShow.call(this);
+      } catch (error) {
+        dismissBackdrop(this);
+        throw error;
+      }
+    };
+    return true;
+  }
+
   function setupDialogAutoDismiss({ delayMs = 10_000 } = {}) {
+    setupSafariSafeDialogs();
     const documentRef = window.document;
     const normalizedDelayMs = Math.max(1, Number(delayMs) || 10_000);
     const timers = new Map();

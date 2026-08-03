@@ -116,7 +116,7 @@ for (const id of [
 ]) assert.match(html, new RegExp(`id="${id}"`));
 assert.match(html, /1枠追加・100円/);
 assert.match(html, /Stripeで100円を支払う/);
-assert.match(html, /style\.css\?v=20260803-pixisync-resume-dialog-fix1/);
+assert.match(html, /style\.css\?v=20260803-pixisync-start-confirm-safe1/);
 assert.match(html, /href="\.\.\/terms\/"/);
 assert.match(html, /href="\.\.\/legal\/"/);
 assert.match(legal, /PiXiSYNC シェアプロジェクト作成枠：1枠100円（税込・買い切り）/);
