@@ -58,13 +58,14 @@ serve(async (request) => {
         `/checkout/sessions/${encodeURIComponent(existingSessionId)}?expand[]=payment_intent.latest_charge`,
         { method: "GET" },
       );
-      if (existing.status === "open" && stringValue(existing.url)) {
+      const existingQuantity = Number(intent.quantity) || 1;
+      if (existing.status === "open" && stringValue(existing.url) && existingQuantity === quantity) {
         return jsonResponse(request, {
           ok: true,
           url: existing.url,
           purchase_id: purchaseId,
-          quantity: Number(intent.quantity) || quantity,
-          gross_amount_yen: Number(intent.gross_amount_yen) || quantity * SLOT_PRICE_YEN,
+          quantity: existingQuantity,
+          gross_amount_yen: Number(intent.gross_amount_yen) || existingQuantity * SLOT_PRICE_YEN,
         });
       }
       if (existing.status === "complete" && existing.payment_status === "paid") {
