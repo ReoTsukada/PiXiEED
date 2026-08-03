@@ -84,7 +84,7 @@
 </script>
 <script>window.__PIXIEEDRAW_BUILD_EDITION__ = 'web-free';</script>
 <script src="assets/js/modules/edition-capabilities-utils.js?v=20260719-file-no-ads1"></script>
-<script src="assets/js/build-info.js?v=20260803-174"></script>
+<script src="assets/js/build-info.js?v=20260803-175"></script>
 <script>
   (function configurePixieedAds() {
     const shouldShowAds = typeof window.__PIXIEEDRAW_SHOULD_SHOW_ADS__ === 'function'
@@ -476,7 +476,7 @@
 
 
 
-<link href="assets/css/style.css?v=20260803-ad-responsive2-file-icons2" rel="stylesheet"/>
+<link href="assets/css/style.css?v=20260803-ad-responsive2-file-icons2-timelapse-panel1" rel="stylesheet"/>
 <link rel="icon" type="image/png" sizes="192x192" href="../icon/icon-192-4.png"/>
 <link rel="icon" type="image/png" sizes="512x512" href="../icon/icon-512-4.png"/>
 <style>
@@ -1464,10 +1464,10 @@
 </header>
 <div class="modal__body">
 <p class="help-text">Undoした操作は再生に含まれません。</p>
-<canvas aria-label="タイムラプス再生" id="timelapseCanvas" style="display:block;width:min(100%,560px);height:auto;margin:0 auto;image-rendering:pixelated;background:transparent;border:1px solid var(--border-color, #667);border-radius:8px"></canvas>
+<canvas aria-label="タイムラプス再生" id="timelapseCanvas"></canvas>
 <label class="field" for="timelapsePosition"><span>操作位置 <output id="timelapseStepCount">0 / 0</output></span><input id="timelapsePosition" min="0" step="1" type="range" value="0"/></label>
 <label class="field" for="timelapseSpeed"><span>再生速度 <output id="timelapseSpeedValue">1.0×</output></span><input id="timelapseSpeed" max="4" min="0.25" step="0.25" type="range" value="1"/></label>
-<div class="field-group"><button class="button button--primary" id="playTimelapse" type="button">再生</button><button class="button" disabled="" id="stopTimelapse" type="button">停止</button><button class="button" id="restartTimelapse" type="button">最初へ</button><button class="button" id="exportTimelapse" type="button">GIF出力</button></div>
+<div class="field-group timelapse-actions"><button class="button button--primary" id="playTimelapse" type="button">再生</button><button class="button" disabled="" id="stopTimelapse" type="button">停止</button><button class="button" id="restartTimelapse" type="button">最初へ</button><button class="button" id="exportTimelapse" type="button">GIF出力</button></div>
 <p aria-live="polite" class="help-text" id="timelapseStatus"></p>
 </div>
 </form>
