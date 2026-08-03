@@ -317,11 +317,11 @@ slotUi.configure({
     },
   },
 });
+assert.equal(slotElements.buySlot.click(), true);
+assert.equal(slotElements.slotPurchaseDialog.open, true);
 await Promise.resolve();
 await Promise.resolve();
 assert.equal(slotElements.slotSummary.textContent, '利用中 1 / 2枠');
-assert.equal(slotElements.buySlot.click(), true);
-assert.equal(slotElements.slotPurchaseDialog.open, true);
 assert.match(slotElements.slotPurchaseStatus.textContent, /上限2枠/);
 slotElements.slotQuantity.value = '3';
 slotElements.slotQuantity.dispatch('change', { target: slotElements.slotQuantity });
@@ -606,9 +606,9 @@ for (const id of [
   'pixisyncDrawLock',
 ]) assert.match(html, new RegExp(`id="${id}"`));
 assert.doesNotMatch(html, /id="pixisyncLeave"|id="pixisyncArchive"/);
-assert.match(html, /pixisync-minimal-ui-utils\.js\?v=20260803-pixisync-resume-notice4/);
+assert.match(html, /pixisync-minimal-ui-utils\.js\?v=20260803-pixisync-no-unauth-slot-request1/);
 assert.match(html, /<dialog[^>]*id="pixisyncResumeNoticeDialog"[^>]*data-pixisync-resume-notice-version="20260803-v2"|<dialog[^>]*data-pixisync-resume-notice-version="20260803-v2"[^>]*id="pixisyncResumeNoticeDialog"/);
-assert.match(html, /pixisync-runtime-adapter-utils\.js\?v=20260803-pixisync-localize1/);
+assert.match(html, /pixisync-runtime-adapter-utils\.js\?v=20260803-pixisync-auth-cleanup3/);
 assert.match(html, /static-content\.js\?v=20260803-pixisync-localize1/);
 assert.match(html, /app\.js\?v=20260803-project-list-panel-reset-resume-notice4/);
 assert.match(html, /PiXiSYNCが復活しました/);

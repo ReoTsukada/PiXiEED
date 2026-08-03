@@ -868,7 +868,6 @@
     function configure(runtime = {}) {
       unsubscribeSession?.();
       unsubscribeSession = null;
-      const previousCommands = commands;
       session = runtime.session || null;
       commands = runtime.commands && typeof runtime.commands === 'object' ? runtime.commands : {};
       participants = Array.isArray(runtime.participants) ? runtime.participants.slice() : [];
@@ -880,8 +879,6 @@
       render();
       if (enabled && readSlotPurchaseReturn()) {
         void consumeSlotPurchaseReturn();
-      } else if (enabled && commands !== previousCommands) {
-        void refreshProjectSlotStatus({ quiet: true });
       }
       return enabled;
     }

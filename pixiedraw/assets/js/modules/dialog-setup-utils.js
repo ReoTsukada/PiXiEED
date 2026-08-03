@@ -41,49 +41,21 @@
     const usesWebKit = /AppleWebKit\//.test(userAgent) && !/Android/i.test(userAgent);
     if (!usesWebKit) return false;
 
-    const backdrop = documentRef.createElement('div');
-    backdrop.className = 'pixiedraw-dialog-safe-backdrop';
-    backdrop.hidden = true;
-    backdrop.setAttribute('aria-hidden', 'true');
-    documentRef.body?.append(backdrop);
-
     const nativeShow = dialogPrototype.show;
-    const nativeClose = dialogPrototype.close;
     let activeDialog = null;
-    const boundDialogs = new WeakSet();
-    const dismissBackdrop = dialog => {
-      if (activeDialog !== dialog) return;
-      activeDialog = null;
-      backdrop.hidden = true;
-    };
-    const bind = dialog => {
-      if (boundDialogs.has(dialog)) return;
-      boundDialogs.add(dialog);
-      dialog.addEventListener('close', () => dismissBackdrop(dialog));
-    };
 
     Object.defineProperty(dialogPrototype, '__pixieedSafariSafeShowModal', {
       configurable: true,
       value: true,
     });
-    dialogPrototype.close = function closeSafariSafeModal(...args) {
-      const result = nativeClose.call(this, ...args);
-      // WebKit may dispatch the close event after the next rendering update.
-      // Remove our document backdrop synchronously, instead of leaving a
-      // temporary or persistent dark layer above the editor.
-      dismissBackdrop(this);
-      return result;
-    };
     dialogPrototype.showModal = function showSafariSafeModal() {
       if (this.open) return;
       if (activeDialog && activeDialog !== this && activeDialog.open) activeDialog.close('replaced');
-      bind(this);
       activeDialog = this;
-      backdrop.hidden = false;
       try {
         return nativeShow.call(this);
       } catch (error) {
-        dismissBackdrop(this);
+        if (activeDialog === this) activeDialog = null;
         throw error;
       }
     };

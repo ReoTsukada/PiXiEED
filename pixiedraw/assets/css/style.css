@@ -11872,19 +11872,8 @@ body.is-project-home-active .modal[open] {
   background: rgba(0, 0, 0, 0.6);
 }
 
-/* Safari uses this ordinary document layer instead of the unstable native
- * dialog backdrop. It is always torn down by the dialog close event. */
-.pixiedraw-dialog-safe-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 2147483646;
-  background: rgba(0, 0, 0, 0.6);
-}
-
-.pixiedraw-dialog-safe-backdrop[hidden] {
-  display: none;
-}
-
+/* Safari presents dialogs as non-modal panels. Never add a backdrop there:
+ * WebKit can leave native backdrops behind and make the whole app untappable. */
 dialog.modal[open] {
   z-index: 2147483647;
 }

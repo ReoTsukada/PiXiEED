@@ -47,6 +47,9 @@ for (const contract of [
 assert.doesNotMatch(correction, /included_slots\s*=\s*(?:count|max)/i);
 assert.match(cleanup, /collectObjectPaths/);
 assert.match(cleanup, /pixisync_finalize_localized_room_cleanup_v1/);
+assert.match(runtime, /async function getProjectSlotStatus\(\) \{\s+if \(await ensureAuthenticatedStart\(\{ requireLogin: true \}\) !== true\)/);
+assert.match(runtime, /async function listOwnedOpenRooms\(\) \{\s+if \(await ensureAuthenticatedStart\(\{ requireLogin: true \}\) !== true\)/);
+assert.doesNotMatch(runtime, /await ensureSupabase\(\);\s+void retryPendingLocalizedCleanups\(\);/);
 
 for (const contract of [
   /requireUser\(request\)/,
@@ -116,7 +119,7 @@ for (const id of [
 ]) assert.match(html, new RegExp(`id="${id}"`));
 assert.match(html, /1枠追加・100円/);
 assert.match(html, /Stripeで100円を支払う/);
-assert.match(html, /style\.css\?v=20260803-pixisync-start-confirm-safe1/);
+assert.match(html, /style\.css\?v=20260803-safari-no-modal-backdrop1/);
 assert.match(html, /href="\.\.\/terms\/"/);
 assert.match(html, /href="\.\.\/legal\/"/);
 assert.match(legal, /PiXiSYNC シェアプロジェクト作成枠：1枠100円（税込・買い切り）/);

@@ -1534,6 +1534,9 @@
     }
 
     async function getProjectSlotStatus() {
+      if (await ensureAuthenticatedStart({ requireLogin: true }) !== true) {
+        throw new Error('PiXiSYNC runtime: authentication-required');
+      }
       await ensureSupabase();
       const status = firstRow(await rpc('pixisync_get_project_slot_status', {}));
       const includedSlots = Number(status?.included_slots);
@@ -1567,6 +1570,9 @@
     }
 
     async function listOwnedOpenRooms() {
+      if (await ensureAuthenticatedStart({ requireLogin: true }) !== true) {
+        throw new Error('PiXiSYNC runtime: authentication-required');
+      }
       await ensureSupabase();
       const rows = await rpc('pixisync_list_owned_open_rooms', {});
       const localRooms = new Set((await listLocalOwnedRooms()).map(value => String(value || '').toLowerCase()));
@@ -1861,7 +1867,6 @@
     async function initialize() {
       if (disposed) return snapshot();
       await ensureSupabase();
-      void retryPendingLocalizedCleanups();
       if (disposed) return snapshot();
       const binding = normalizeProjectBinding(await readProjectBinding(String(getProjectKey() || '')));
       if (disposed) return snapshot();
