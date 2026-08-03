@@ -1663,8 +1663,8 @@
         );
       } else if (needsLegacyV2Migration) {
         openButton.title = localizeText(
-          'このプロジェクトを選ぶと、このプロジェクトだけをV2へ移行して開きます。',
-          'Selecting this project migrates only this project to V2 before opening it.'
+          'このプロジェクトを選ぶと、このプロジェクトだけを自動でV2へ変換して開きます。',
+          'Selecting this project automatically converts only this project to V2 before opening it.'
         );
       }
       const thumbnail = document.createElement('span');
@@ -1702,7 +1702,7 @@
         : isPiXiSyncCard
           ? `${modified} / ${localizeText('シェア中', 'Shared')}`
         : needsLegacyV2Migration
-          ? `${modified} / ${localizeText('V1・選択時にV2へ移行', 'V1 · migrate to V2 on selection')}`
+          ? `${modified} / ${localizeText('V1・選択時に自動変換', 'V1 · convert on selection')}`
         : entry?.deviceLocalProject === true
           ? `${modified} / ${localizeText('端末内保存', 'On-device storage')}`
           : modified;
@@ -1813,8 +1813,8 @@
     renderStartupWorkspaceProjects(localEntries);
     setStartupWorkspaceStatus(
       localizeText(
-        `端末内プロジェクト ${localEntries.length}件。プロジェクトを選ぶと、そのプロジェクトだけを必要に応じてV2へ移行します。`,
-        `${localEntries.length} on-device project(s). Select a project to migrate only that project to V2 when needed.`
+        `端末内プロジェクト ${localEntries.length}件。プロジェクトを選ぶと、そのプロジェクトだけを必要に応じて自動変換します。`,
+        `${localEntries.length} on-device project(s). Select a project to automatically convert only that project when needed.`
       ),
       'info'
     );
@@ -1919,8 +1919,8 @@
         if (entry?.deviceLocalProject === true && Number(entry?.autosaveSchemaVersion) !== 2) {
           updateAutosaveStatus(
             localizeText(
-              '選択したプロジェクトをV2へ移行しています。ほかのプロジェクトは変更しません。',
-              'Migrating the selected project to V2. Other projects will not be changed.'
+              '選択したプロジェクトをV2へ自動変換しています。ほかのプロジェクトは変更しません。',
+              'Automatically converting the selected project to V2. Other projects will not be changed.'
             ),
             'info'
           );

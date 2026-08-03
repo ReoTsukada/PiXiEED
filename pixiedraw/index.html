@@ -1822,21 +1822,6 @@
 </footer>
 </form>
 </dialog>
-<dialog aria-labelledby="legacyProjectMigrationTitle" class="modal" id="legacyProjectMigrationDialog">
-<form class="modal__form" method="dialog">
-<header class="modal__header">
-<h2 class="modal__title" id="legacyProjectMigrationTitle">選択したプロジェクトをV2へ移行</h2>
-</header>
-<div class="modal__body">
-<p id="legacyProjectMigrationMessage">このファイルは旧形式です。選択したプロジェクトだけをPiXiEEDraw用の単一プロジェクトV2へ移行します。</p>
-<p class="help-text" id="legacyProjectMigrationDetail">元データは削除・上書きせず、変換に失敗しても他のプロジェクトや新規作成には影響しません。</p>
-</div>
-<footer class="modal__footer">
-<button class="button button--ghost" id="legacyProjectMigrationCancel" type="button">キャンセル</button>
-<button class="button button--primary" id="legacyProjectMigrationConfirm" type="button">このプロジェクトだけをV2へ移行</button>
-</footer>
-</form>
-</dialog>
 <dialog aria-labelledby="shortcutHelpTitle" class="modal shortcut-help-modal" id="shortcutHelpDialog">
 <form class="modal__form" method="dialog">
 <header class="modal__header">
@@ -2061,7 +2046,7 @@
 	<script defer="" src="assets/js/modules/open-import-workflow-utils.js?v=20260802-project-share-scope1"></script>
 	<script defer="" src="assets/js/modules/export-format-workflow-utils.js?v=20260720-export-grid-format1"></script>
 	<script defer="" src="assets/js/modules/export-dialog-workflow-utils.js?v=20260729-timelapse-export1"></script>
-		<script defer="" src="assets/js/modules/startup-workflow-utils.js?v=20260803-project-list-panel-reset1"></script>
+		<script defer="" src="assets/js/modules/startup-workflow-utils.js?v=20260803-project-list-panel-reset2"></script>
 		<script defer="" src="assets/js/modules/recent-project-workflow-utils.js?v=20260803-pixisync-delete1"></script>
 		<script defer="" src="assets/js/modules/project-package-workflow-utils.js?v=20260728-autosave-delta1"></script>
 		<script defer="" src="assets/js/modules/project-storage-adapter-utils.js?v=20260715-legacy-project-card-recovery1"></script>
@@ -2070,7 +2055,7 @@
 		<script defer="" src="assets/js/modules/project-storage-v2-worker-bridge.js?v=20260720-file-guard1"></script>
 		<script defer="" src="assets/js/modules/project-storage-v2-zip-adapter.js?v=20260720-pxd2"></script>
 		<script defer="" src="assets/js/modules/document-serialization-utils.js?v=20260724-cow-raster1"></script>
-	<script defer="" src="assets/js/modules/document-session-workflow-utils.js?v=20260802-project-share-scope1"></script>
+	<script defer="" src="assets/js/modules/document-session-workflow-utils.js?v=20260803-project-conversion-no-dialog1"></script>
 	<script defer="" src="assets/js/modules/recent-account-workflow-utils.js?v=2026.07.03-safe-helper-split-v1"></script>
 	<script defer="" src="assets/js/modules/pixieed-profile-local-utils.js?v=2026.07.03-safe-helper-split-v1"></script>
 	<script defer="" src="assets/js/modules/retired-collaboration-compat.js?v=20260724-timeline-selection2"></script>
@@ -2097,7 +2082,7 @@
 	<script defer="" src="assets/js/modules/local-project-v2-migration-utils.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/pre-update-checkpoint-utils.js?v=20260712-pre-update-checkpoint-u3"></script>
 	<script defer="" src="assets/js/active-project-session-utils.js?v=20260715-local-true-v2-cleanup1"></script>
-    <script defer="" src="assets/js/app.js?v=20260803-project-list-panel-reset-resume-notice2"></script>
+    <script defer="" src="assets/js/app.js?v=20260803-project-list-panel-reset-resume-notice3"></script>
 	<script defer="" src="assets/js/modules/update-detection-utils.js?v=20260719-file-protocol1"></script>
   <script>
     (function initPanelAdDocking() {

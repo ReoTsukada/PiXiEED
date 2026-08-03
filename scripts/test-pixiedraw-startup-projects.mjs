@@ -4,7 +4,7 @@ import vm from 'node:vm';
 
 const root = new URL('../', import.meta.url);
 const read = path => readFile(new URL(path, root), 'utf8');
-const [index, css, app, startup, lifecycle, workflow, lensIndex] = await Promise.all([
+const [index, css, app, startup, lifecycle, workflow, lensIndex, documentSession] = await Promise.all([
   read('pixiedraw/index.html'),
   read('pixiedraw/assets/css/style.css'),
   read('pixiedraw/assets/js/app.js'),
@@ -12,6 +12,7 @@ const [index, css, app, startup, lifecycle, workflow, lensIndex] = await Promise
   read('pixiedraw/assets/js/modules/open-project-tab-lifecycle.js'),
   read('pixiedraw/assets/js/modules/open-project-tab-workflow-utils.js'),
   read('pixiee-lens/index.html'),
+  read('pixiedraw/assets/js/modules/document-session-workflow-utils.js'),
 ]);
 
 assert.match(index, /id="startupScreen"[\s\S]*id="startupScreenTitle">プロジェクト</);
@@ -108,10 +109,12 @@ for (const source of [workflow]) {
 assert.match(css, /\.startup-screen__content\s*\{[\s\S]*?width: min\(1440px, 100%\)/);
 assert.match(css, /\.startup-workspace__project-thumbnail\s*\{[\s\S]*?aspect-ratio: 1 \/ 1/);
 assert.match(startup, /isPiXiSyncCard = Boolean\([\s\S]{0,220}entry\?\.pixisync/);
-assert.match(startup, /プロジェクトを選ぶと、そのプロジェクトだけを必要に応じてV2へ移行します/);
+assert.match(startup, /プロジェクトを選ぶと、そのプロジェクトだけを必要に応じて自動変換します/);
 assert.doesNotMatch(startup, /V1・旧V2プロジェクトが\$\{count\}件あります/);
 assert.doesNotMatch(startup, /migrateLegacyLocalProjectsToTrueV2/);
-assert.match(app, /選択したプロジェクトだけを単一のV2プロジェクトへ移行します/);
+assert.doesNotMatch(index, /legacyProjectMigrationDialog/);
+assert.doesNotMatch(app, /legacyProjectMigration|requestLegacyV2MigrationConsent/);
+assert.match(documentSession, /選択したプロジェクトをV2へ自動変換しています/);
 assert.match(startup, /startup-workspace__project-share-badge/);
 assert.match(startup, /シェア中/);
 assert.match(css, /\.startup-workspace__project-share-badge\s*\{[\s\S]*?position: absolute;[\s\S]*?top: 14px;[\s\S]*?left: 14px;/);

@@ -621,13 +621,6 @@
       cancel: document.getElementById('recentProjectDeleteConfirmCancel'),
       confirm: document.getElementById('recentProjectDeleteConfirmConfirm'),
     },
-    legacyProjectMigration: {
-      dialog: /** @type {HTMLDialogElement|null} */ (document.getElementById('legacyProjectMigrationDialog')),
-      message: document.getElementById('legacyProjectMigrationMessage'),
-      detail: document.getElementById('legacyProjectMigrationDetail'),
-      cancel: document.getElementById('legacyProjectMigrationCancel'),
-      confirm: document.getElementById('legacyProjectMigrationConfirm'),
-    },
     shareStartConfirm: {
       dialog: /** @type {HTMLDialogElement|null} */ (document.getElementById('shareStartConfirmDialog')),
       title: document.getElementById('shareStartConfirmTitle'),
@@ -5783,8 +5776,6 @@
   set extractDocumentBaseName(value) { extractDocumentBaseName = value; },
   get isProjectCommandLocked() { return isProjectCommandLocked; },
   set isProjectCommandLocked(value) { isProjectCommandLocked = value; },
-  get requestLegacyV2MigrationConsent() { return requestLegacyV2MigrationConsent; },
-  set requestLegacyV2MigrationConsent(value) { requestLegacyV2MigrationConsent = value; },
   get acquireProjectCommandLock() { return acquireProjectCommandLock; },
   set acquireProjectCommandLock(value) { acquireProjectCommandLock = value; },
   get releaseProjectCommandLock() { return releaseProjectCommandLock; },
@@ -6895,8 +6886,6 @@
   set preserveCanvasSelectionClipboard(value) { preserveCanvasSelectionClipboard = value; },
   get recentProjectsCache() { return recentProjectsCache; },
   set recentProjectsCache(value) { recentProjectsCache = value; },
-  get requestLegacyV2MigrationConsent() { return requestLegacyV2MigrationConsent; },
-  set requestLegacyV2MigrationConsent(value) { requestLegacyV2MigrationConsent = value; },
   get requestImmediateAutosaveSnapshot() { return requestImmediateAutosaveSnapshot; },
   set requestImmediateAutosaveSnapshot(value) { requestImmediateAutosaveSnapshot = value; },
   get renderOpenProjectTabs() { return renderOpenProjectTabs; },
@@ -16382,53 +16371,6 @@
 
   async function openRecentProjectDeleteConfirmDialog(...args) {
     return startupWorkflowUtilsModule.openRecentProjectDeleteConfirmDialog(...args);
-  }
-
-  async function requestLegacyV2MigrationConsent({ sourceFileName = '', sourceAdapterId = '', projectCount = 1, multiCanvasCount = 1 } = {}) {
-    const dialog = dom.legacyProjectMigration?.dialog;
-    const normalizedCount = Math.max(1, Math.round(Number(projectCount) || 1));
-    const name = typeof sourceFileName === 'string' && sourceFileName.trim()
-      ? sourceFileName.trim()
-      : '選択したプロジェクト';
-    const isV1 = sourceAdapterId === 'pixieedraw-v1-json';
-    const normalizedCanvasCount = Math.max(1, Math.round(Number(multiCanvasCount) || 1));
-    const migrationMessage = normalizedCanvasCount > 1
-      ? `「${name}」には ${normalizedCanvasCount} 枚の旧マルチキャンバスがあります。選択したプロジェクトだけを単一のV2プロジェクトへ分割します。`
-      : normalizedCount > 1
-      ? `「${name}」には ${normalizedCount} 件の旧プロジェクトがあります。選択したプロジェクトだけを単一のV2プロジェクトへ分割します。`
-      : `「${name}」は${isV1 ? 'V1' : '旧V2'}形式です。選択したプロジェクトだけを単一のV2プロジェクトへ移行します。`;
-    const migrationDetail = '移行するのは今回選択したプロジェクトだけです。元データは削除・上書きせず、変換に失敗しても他のプロジェクトや新規作成には影響しません。';
-    if (!dialog || typeof dialog.showModal !== 'function') {
-      return window.confirm(`${migrationMessage}\n\n${migrationDetail}\n\n移行を開始しますか？`);
-    }
-    if (dom.legacyProjectMigration.message) {
-      dom.legacyProjectMigration.message.textContent = migrationMessage;
-    }
-    if (dom.legacyProjectMigration.detail) {
-      dom.legacyProjectMigration.detail.textContent = migrationDetail;
-    }
-    return await new Promise(resolve => {
-      let settled = false;
-      const finish = (accepted) => {
-        if (settled) return;
-        settled = true;
-        dialog.removeEventListener('cancel', onCancel);
-        dom.legacyProjectMigration.cancel?.removeEventListener('click', onCancel);
-        dom.legacyProjectMigration.confirm?.removeEventListener('click', onConfirm);
-        if (dialog.open) dialog.close();
-        resolve(accepted);
-      };
-      const onCancel = (event) => {
-        event?.preventDefault?.();
-        finish(false);
-      };
-      const onConfirm = () => finish(true);
-      dialog.addEventListener('cancel', onCancel, { once: true });
-      dom.legacyProjectMigration.cancel?.addEventListener('click', onCancel, { once: true });
-      dom.legacyProjectMigration.confirm?.addEventListener('click', onConfirm, { once: true });
-      dialog.showModal();
-      dom.legacyProjectMigration.confirm?.focus();
-    });
   }
 
   function setupRecentProjectDeleteConfirmDialog(...args) {

@@ -154,7 +154,7 @@
       };
   }
 
-  function needsLegacyV2MigrationConsent(parsedDocument = null) {
+  function needsLegacyV2Migration(parsedDocument = null) {
     const adapterId = typeof parsedDocument?.storageAdapterId === 'string'
       ? parsedDocument.storageAdapterId
       : '';
@@ -167,24 +167,15 @@
     return adapterId === 'pixieedraw-v1-json' || packagedProjectCount > 1 || canvasCount > 1;
   }
 
-  async function confirmLegacyV2MigrationIfNeeded(parsedDocument, options = {}) {
-    if (!needsLegacyV2MigrationConsent(parsedDocument)) return true;
-    if (typeof requestLegacyV2MigrationConsent !== 'function') return false;
-    const accepted = await requestLegacyV2MigrationConsent({
-      sourceFileName: options?.sourceFileName || options?.fileName || parsedDocument?.document?.documentName || '',
-      sourceAdapterId: parsedDocument?.storageAdapterId || '',
-      projectCount: Math.max(
-        Array.isArray(parsedDocument?.sheets) ? parsedDocument.sheets.length : 1,
-        Array.isArray(parsedDocument?.snapshot?.canvases) ? parsedDocument.snapshot.canvases.length : 1
-      ),
-      multiCanvasCount: Array.isArray(parsedDocument?.snapshot?.canvases)
-        ? parsedDocument.snapshot.canvases.length
-        : 1,
-    });
-    if (!accepted && !options?.suppressAutosaveStatus) {
-      updateAutosaveStatus('V2への移行をキャンセルしました', 'warn');
+  async function prepareLegacyV2MigrationIfNeeded(parsedDocument, options = {}) {
+    if (!needsLegacyV2Migration(parsedDocument)) return true;
+    if (!options?.suppressAutosaveStatus) {
+      updateAutosaveStatus(
+        '選択したプロジェクトをV2へ自動変換しています。ほかのプロジェクトは変更しません。',
+        'info'
+      );
     }
-    return accepted;
+    return true;
   }
 
   async function loadDocumentFromText(text, handle, options = {}) {
@@ -220,10 +211,10 @@
       updateAutosaveStatus('ドキュメントの読み込みに失敗しました', 'error');
       return false;
     }
-    if (!await confirmLegacyV2MigrationIfNeeded(parsedDocument, options)) {
+    if (!await prepareLegacyV2MigrationIfNeeded(parsedDocument, options)) {
       return false;
     }
-    const forceV2WorkingCopy = needsLegacyV2MigrationConsent(parsedDocument)
+    const forceV2WorkingCopy = needsLegacyV2Migration(parsedDocument)
       || options?.forceV2WorkingCopy === true
       || options?.fileLoad === true;
     const sourcePersistenceState = buildLoadedProjectPersistenceState(parsedDocument, handle, {
@@ -288,13 +279,13 @@
         return false;
       }
     }
-    if (!await confirmLegacyV2MigrationIfNeeded(parsedDocument, options)) {
+    if (!await prepareLegacyV2MigrationIfNeeded(parsedDocument, options)) {
       if (openPerformanceId) {
         openPerformance?.abort?.(openPerformanceId, { reason: 'migration-declined' });
       }
       return false;
     }
-    const forceV2WorkingCopy = needsLegacyV2MigrationConsent(parsedDocument)
+    const forceV2WorkingCopy = needsLegacyV2Migration(parsedDocument)
       || options?.forceV2WorkingCopy === true
       || options?.fileLoad === true;
     const sourcePersistenceState = buildLoadedProjectPersistenceState(parsedDocument, handle, {
@@ -402,10 +393,10 @@
     ) {
       parsedDocument.storageAdapterId = '';
     }
-    if (!await confirmLegacyV2MigrationIfNeeded(parsedDocument, options)) {
+    if (!await prepareLegacyV2MigrationIfNeeded(parsedDocument, options)) {
       return false;
     }
-    const forceV2WorkingCopy = needsLegacyV2MigrationConsent(parsedDocument) || options?.forceV2WorkingCopy === true;
+    const forceV2WorkingCopy = needsLegacyV2Migration(parsedDocument) || options?.forceV2WorkingCopy === true;
     const sourcePersistenceState = options?.sourcePersistenceState && typeof options.sourcePersistenceState === 'object'
       ? buildLoadedProjectPersistenceState(parsedDocument, null, {
         ...options,
