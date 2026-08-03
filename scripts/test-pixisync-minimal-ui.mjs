@@ -581,6 +581,8 @@ for (const id of [
   'pixisyncDrawLock',
 ]) assert.match(html, new RegExp(`id="${id}"`));
 assert.doesNotMatch(html, /id="pixisyncLeave"|id="pixisyncArchive"|id="pixisyncCopyInvite"/);
+assert.match(html, /id="pixisyncAccessCodeField"[\s\S]*id="pixisyncCopyInviteCode"[\s\S]*id="pixisyncAccessCode"[\s\S]*id="pixisyncJoinCode"/);
+assert.doesNotMatch(html, /pixisync-header-actions[\s\S]*id="pixisyncCopyInviteCode"/);
 assert.match(html, /pixisync-minimal-ui-utils\.js\?v=20260803-pixisync-bulk-localize1/);
 assert.match(html, /<dialog[^>]*id="pixisyncResumeNoticeDialog"[^>]*data-pixisync-resume-notice-version="20260803-v2"|<dialog[^>]*data-pixisync-resume-notice-version="20260803-v2"[^>]*id="pixisyncResumeNoticeDialog"/);
 assert.match(html, /pixisync-runtime-adapter-utils\.js\?v=20260803-pixisync-bulk-localize1/);

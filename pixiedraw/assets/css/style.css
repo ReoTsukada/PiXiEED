@@ -16136,8 +16136,17 @@ body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelFile .file-danger-z
 }
 
 #panelMulti .multi-project-key-row {
+  grid-template-columns: 34px minmax(0, 1fr) auto;
   align-items: stretch;
   background: transparent;
+}
+
+#panelMulti .multi-project-key-row .landscape-panel-window__share {
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  border-radius: 4px;
+  font-size: 1rem;
 }
 
 #panelMulti #pixisyncJoinCode {
@@ -16334,6 +16343,24 @@ body.is-mobile-layout .mobile-drawer[data-mode='full'] #panelMulti .multi-partic
 }
 
 @media (orientation: portrait) {
+  /* Keep the participant/comment scroller inside the remaining drawer space.
+     The code/comment field is a normal final row, never a sticky overlay. */
+  body.is-mobile-layout .mobile-drawer #panelMulti .pixisync-panel:not(:has(.pixisync-start-hero:not([hidden]))) {
+    min-height: 0;
+  }
+
+  body.is-mobile-layout .mobile-drawer #panelMulti .pixisync-panel:not(:has(.pixisync-start-hero:not([hidden]))) .multi-participants-panel {
+    flex: 1 1 0;
+    height: auto;
+    min-height: 0;
+  }
+
+  body.is-mobile-layout .mobile-drawer #panelMulti .pixisync-panel:not(:has(.pixisync-start-hero:not([hidden]))) .multi-project-key-field {
+    position: static;
+    flex: 0 0 auto;
+    margin-top: 0;
+  }
+
   /* Portrait has its own share-mode tab. */
   body #mobileTabMulti {
     display: inline-flex !important;
