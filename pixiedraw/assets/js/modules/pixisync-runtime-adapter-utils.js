@@ -1203,6 +1203,17 @@
         case 'SYNC_ACTIVE':
           await persistProjectBinding();
           configureBridge();
+          // A checkpoint restore updates the document model before the final
+          // tail/read-head barrier closes.  Do one explicit whole-document
+          // render at that barrier so a participant sees the current frames
+          // and layers immediately, rather than waiting for a later structure
+          // edit to happen to refresh the viewport.
+          await runtimeBridge.finishAuthoritativeSync?.({
+            roomId,
+            role,
+            projectKey: boundProjectKey,
+            revision: currentSnapshot()?.appliedRevision,
+          });
           clearReconnectRetry();
           // Session subscribers observe the `active` transition before this
           // effect finishes installing the collaboration controller. Expose a

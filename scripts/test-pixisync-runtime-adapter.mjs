@@ -256,6 +256,7 @@ function createBridge() {
   const comments = [];
   let participants = [];
   let inputLocked = false;
+  let authoritativeSyncCount = 0;
   return {
     configure: next => { runtime = next; },
     clear: () => { runtime = null; },
@@ -264,10 +265,12 @@ function createBridge() {
     receiveComment: comment => comments.push(comment),
     updateParticipants: next => { participants = next; },
     setInputLocked: next => { inputLocked = next === true; },
+    finishAuthoritativeSync: () => { authoritativeSyncCount += 1; },
     snapshot: () => ({ configured: Boolean(runtime), collaboration: Boolean(runtime?.realtimeClient) }),
     comments,
     get participants() { return participants; },
     get inputLocked() { return inputLocked; },
+    get authoritativeSyncCount() { return authoritativeSyncCount; },
     get runtime() { return runtime; },
   };
 }
@@ -498,6 +501,8 @@ const editor = createAdapter({
 await editor.adapter.initialize();
 assert.equal(await editor.adapter.join(INVITE_TOKEN), ROOM_ID);
 assert.equal(editor.adapter.snapshot().session.phase, 'active');
+assert.equal(editor.restored, 'checkpoint-owner', 'joining must restore the authoritative checkpoint before reporting active');
+assert.equal(editor.bridge.authoritativeSyncCount, 1, 'joining must finish the full document render before join resolves');
 assert.deepEqual(editorBindings.get('project-editor-existing-room-card'), {
   roomId: ROOM_ID,
   role: 'participant',

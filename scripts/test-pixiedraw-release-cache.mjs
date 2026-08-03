@@ -63,8 +63,8 @@ for (const assetName of [
 ]) {
   assert.match(indexHtml, new RegExp(`${assetName}\\?v=20260802-project-share-scope1`));
 }
-assert.match(indexHtml, /assets\/js\/modules\/pixisync-runtime-adapter-utils\.js\?v=20260803-pixisync-structure-controls1/);
-assert.match(indexHtml, /assets\/js\/app\.js\?v=20260803-pixisync-production1/);
+assert.match(indexHtml, /assets\/js\/modules\/pixisync-runtime-adapter-utils\.js\?v=20260803-pixisync-initial-sync1/);
+assert.match(indexHtml, /assets\/js\/app\.js\?v=20260803-pixisync-initial-sync1/);
 assert.match(serviceWorker, /fetch\(request, \{ cache: 'no-store' \}\)/);
 assert.match(app, /serviceWorker\.register\(swUrl, \{ updateViaCache: 'none' \}\)/);
 assert.match(app, /!startupReady && !controllerChangeReloaded && !isProjectCommandLocked\(\)/);

@@ -13144,6 +13144,23 @@
       reapplyPendingAfterResync: () => (
         pixisyncCollaborationController.reapplyPendingAfterResync()
       ),
+      finishAuthoritativeSync: () => {
+        // The checkpoint is the authoritative completed document for a newly
+        // joined card. Pixel deltas for offscreen cells may still be deferred,
+        // but every visible frame/layer must be composed before the UI is
+        // announced as active. Do this once at the sync barrier rather than
+        // waiting for a later layer/frame operation to cause a redraw.
+        flushPiXiSyncDeferredCells();
+        invalidateActiveCanvasCompositeRenderState();
+        clearPlaybackFrameCache();
+        renderFrameList();
+        renderLayerList();
+        renderTimelineMatrix();
+        renderAllProjectCanvasSurfaces();
+        requestRender();
+        requestOverlayRender();
+        return true;
+      },
       snapshot: () => pixisyncCollaborationController.snapshot(),
       refreshUi: () => pixisyncMinimalUi?.render?.(),
       updateParticipants: participants => pixisyncMinimalUi?.updateParticipants?.(participants),
