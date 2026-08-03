@@ -11962,7 +11962,13 @@
         );
         if (targetsActiveCell) {
           markDirtyRect(x0, y0, x1, y1);
-        } else if (!targetsActiveCanvas) {
+        } else {
+          // The primary viewport only redraws the selected frame through its
+          // dirty region. A remote patch can instead target another frame of
+          // the same project canvas (for example immediately after joining a
+          // share). Refresh those canvas surfaces now so the receiver never
+          // has to navigate to the changed cell before its completed pixels
+          // become visible.
           renderAllProjectCanvasSurfaces();
         }
       },
