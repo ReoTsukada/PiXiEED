@@ -63,6 +63,7 @@ class FakeDialog extends FakeElement {
     super(ownerDocument);
     this.open = false;
     this.returnValue = '';
+    this.dataset.pixisyncResumeNoticeVersion = '20260803-v2';
   }
 
   showModal() {
@@ -88,6 +89,7 @@ globalThis.window = {
   history: {},
   requestAnimationFrame: callback => callback(),
   confirm: () => true,
+  alert: () => {},
 };
 
 const createSessionStorage = () => {
@@ -170,6 +172,21 @@ resumeNoticeElements.resumeNoticeClose.click();
 assert.equal(resumeNoticeElements.resumeNoticeDialog.open, false);
 assert.equal(resumeNoticeUi.showResumeNoticeOnce(), false);
 resumeNoticeUi.dispose();
+
+// Browsers without native <dialog>.showModal() still receive the notice via
+// the alert fallback instead of silently losing the startup message.
+let fallbackAlertMessage = '';
+window.alert = message => { fallbackAlertMessage = String(message || ''); };
+const fallbackNoticeElements = createElements();
+fallbackNoticeElements.resumeNoticeDialog = new FakeElement();
+const fallbackNoticeUi = createUi({
+  elements: fallbackNoticeElements,
+  body: fakeDocument.body,
+  localStorageRef: createSessionStorage(),
+});
+assert.equal(fallbackNoticeUi.showResumeNoticeOnce(), true);
+assert.match(fallbackAlertMessage, /シェアプロジェクト.*PiXiSYNC/);
+fallbackNoticeUi.dispose();
 
 function activate(session, { role = 'owner', head = 0 } = {}) {
   let result = session.dispatch(role === 'owner'
@@ -585,10 +602,11 @@ for (const id of [
   'pixisyncDrawLock',
 ]) assert.match(html, new RegExp(`id="${id}"`));
 assert.doesNotMatch(html, /id="pixisyncLeave"|id="pixisyncArchive"/);
-assert.match(html, /pixisync-minimal-ui-utils\.js\?v=20260803-pixisync-localize1/);
+assert.match(html, /pixisync-minimal-ui-utils\.js\?v=20260803-pixisync-resume-notice2/);
+assert.match(html, /<dialog[^>]*id="pixisyncResumeNoticeDialog"[^>]*data-pixisync-resume-notice-version="20260803-v2"|<dialog[^>]*data-pixisync-resume-notice-version="20260803-v2"[^>]*id="pixisyncResumeNoticeDialog"/);
 assert.match(html, /pixisync-runtime-adapter-utils\.js\?v=20260803-pixisync-localize1/);
 assert.match(html, /static-content\.js\?v=20260803-pixisync-localize1/);
-assert.match(html, /app\.js\?v=20260803-pixisync-localize1/);
+assert.match(html, /app\.js\?v=20260803-project-list-panel-reset-resume-notice2/);
 assert.match(html, /PiXiSYNCが復活しました/);
 assert.match(html, /シェアプロジェクトが復活しました/);
 assert.match(html, /シェアプロジェクトを楽しんでください/);

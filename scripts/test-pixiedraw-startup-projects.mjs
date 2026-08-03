@@ -86,9 +86,11 @@ function verifyStartupDismissFocus(source) {
 
 verifyStartupDismissFocus(startup);
 assert.match(app, /showLocalProjects[\s\S]{0,900}showStartupScreen\(\{ refreshWorkspace: true \}\)/);
+assert.match(app, /function closeEditorPanelsForProjectList\(\)[\s\S]{0,700}setCompactRightFlyoutOpen\(false\)[\s\S]{0,700}setRightTab\('frames'\)/);
+assert.match(startup, /closeEditorPanelsForProjectList\?\.\(\);/);
 assert.match(app, /upgradeLegacyRasterDocumentsToCopyOnWrite[\s\S]{0,900}legacyRasterMigrationResult/);
 assert.match(app, /LEGACY_PROJECT_REOPEN_NOTICE_SEEN_KEY[\s\S]{0,1200}window\.alert\([\s\S]{0,900}プロジェクトを一度開き直してください[\s\S]{0,450}色の調整をもう一度行っていただく場合がございます/);
-assert.match(app, /startupReady = true;[\s\S]{0,100}scheduleLegacyProjectReopenNotice\(\)/);
+assert.match(app, /startupReady = true;[\s\S]{0,350}scheduleLegacyProjectReopenNotice\(\)/);
 assert.match(app, /timelineMatrixViewportPan = \{[\s\S]{0,120}startedOnControl: false/);
 assert.match(await read('pixiedraw\/assets\/js\/modules\/timeline-layers.js'), /activationThreshold[\s\S]{0,220}startedOnControl/);
 assert.match(startup, /startupWorkspaceSearchQuery/);
@@ -106,6 +108,10 @@ for (const source of [workflow]) {
 assert.match(css, /\.startup-screen__content\s*\{[\s\S]*?width: min\(1440px, 100%\)/);
 assert.match(css, /\.startup-workspace__project-thumbnail\s*\{[\s\S]*?aspect-ratio: 1 \/ 1/);
 assert.match(startup, /isPiXiSyncCard = Boolean\([\s\S]{0,220}entry\?\.pixisync/);
+assert.match(startup, /プロジェクトを選ぶと、そのプロジェクトだけを必要に応じてV2へ移行します/);
+assert.doesNotMatch(startup, /V1・旧V2プロジェクトが\$\{count\}件あります/);
+assert.doesNotMatch(startup, /migrateLegacyLocalProjectsToTrueV2/);
+assert.match(app, /選択したプロジェクトだけを単一のV2プロジェクトへ移行します/);
 assert.match(startup, /startup-workspace__project-share-badge/);
 assert.match(startup, /シェア中/);
 assert.match(css, /\.startup-workspace__project-share-badge\s*\{[\s\S]*?position: absolute;[\s\S]*?top: 14px;[\s\S]*?left: 14px;/);

@@ -1118,6 +1118,7 @@
     if (!container) {
       return;
     }
+    closeEditorPanelsForProjectList?.();
     const refreshWorkspace = options?.refreshWorkspace !== false;
     hideProjectHomeScreen();
     const nextMode = normalizeStartupScreenMode(options?.mode);
@@ -1481,7 +1482,6 @@
 
   let startupWorkspaceEntries = [];
   let startupWorkspaceSearchQuery = '';
-  let startupWorkspaceMigrationPrompted = false;
   let startupWorkspaceJoinBusy = false;
 
   function setStartupWorkspaceStatus(message, tone = 'info') {
@@ -1623,6 +1623,8 @@
     const cards = [];
     visibleEntries.forEach((entry) => {
       const entryIndex = startupWorkspaceEntries.indexOf(entry);
+      const needsLegacyV2Migration = entry?.deviceLocalProject === true
+        && Number(entry?.autosaveSchemaVersion) !== 2;
       const isPiXiSyncCard = Boolean(
         entry?.pixisync
         && typeof entry.pixisync === 'object'
@@ -1659,6 +1661,11 @@
           `V2移行を完了できませんでした。元データは削除されていません。\n${entry?.migrationErrorCode || ''}: ${entry?.migrationErrorMessage || ''}`,
           `V2 migration could not be completed. The original data was not deleted.\n${entry?.migrationErrorCode || ''}: ${entry?.migrationErrorMessage || ''}`
         );
+      } else if (needsLegacyV2Migration) {
+        openButton.title = localizeText(
+          'このプロジェクトを選ぶと、このプロジェクトだけをV2へ移行して開きます。',
+          'Selecting this project migrates only this project to V2 before opening it.'
+        );
       }
       const thumbnail = document.createElement('span');
       thumbnail.className = 'startup-workspace__project-thumbnail';
@@ -1694,6 +1701,8 @@
         ? `${modified} / ${localizeText('端末内・V2移行待ち', 'On device · awaiting V2 migration')}`
         : isPiXiSyncCard
           ? `${modified} / ${localizeText('シェア中', 'Shared')}`
+        : needsLegacyV2Migration
+          ? `${modified} / ${localizeText('V1・選択時にV2へ移行', 'V1 · migrate to V2 on selection')}`
         : entry?.deviceLocalProject === true
           ? `${modified} / ${localizeText('端末内保存', 'On-device storage')}`
           : modified;
@@ -1797,57 +1806,17 @@
   }
 
   async function refreshStartupWorkspaceProjects() {
-    let migration = { migrated: 0, created: 0, failed: 0, declined: false, failedEntries: [] };
-    if (!startupWorkspaceMigrationPrompted && typeof migrateLegacyLocalProjectsToTrueV2 === 'function') {
-      migration = await migrateLegacyLocalProjectsToTrueV2({
-        confirmMigration: ({ count, candidates }) => {
-          startupWorkspaceMigrationPrompted = true;
-          const hasSplit = Array.isArray(candidates) && candidates.some(candidate => candidate?.needsSplit === true);
-          return window.confirm(localizeText(
-            `端末内にV1・旧V2プロジェクトが${count}件あります。\n\n真V2の単一プロジェクトへ変換します。${hasSplit ? '\n複数タブ・複数キャンバスは、それぞれ独立した真V2プロジェクトへ分割します。' : ''}\n変換先を端末内へ完全保存できた後だけ、元のV1・旧V2データを削除します。\n変換中は画面を閉じないでください。\n\n変換を開始しますか？`,
-            `${count} V1 or legacy V2 on-device project(s) were found.\n\nThey will be converted to true V2 single projects.${hasSplit ? '\nMultiple tabs and canvases will be split into independent true V2 projects.' : ''}\nThe original V1/legacy V2 data is deleted only after its on-device true V2 replacement is fully committed.\nKeep this page open during conversion.\n\nStart conversion?`
-          ));
-        },
-        onProgress: ({ index, total }) => {
-          setStartupWorkspaceStatus(localizeText(
-            `端末内プロジェクトを真V2へ変換しています… ${index}/${total}`,
-            `Converting on-device projects to true V2... ${index}/${total}`
-          ));
-        },
-      });
-    }
-    const failuresById = new Map((migration.failedEntries || [])
-      .filter(failure => failure?.entry?.id)
-      .map(failure => [failure.entry.id, failure]));
-    const localEntries = (await loadDeviceLocalWorkspaceEntries()).map(entry => {
-      const failure = failuresById.get(entry.id);
-      return failure
-        ? {
-            ...entry,
-            migrationRecovery: true,
-            migrationErrorCode: failure.code || 'ERR_TRUE_V2_MIGRATION_FAILED',
-            migrationErrorMessage: failure.message || '',
-          }
-        : entry;
-    });
+    // Legacy projects are intentionally not migrated during startup. The
+    // selected card is migrated by the existing per-project load flow, so a
+    // large or broken V1 entry cannot block the chooser or new-project flow.
+    const localEntries = await loadDeviceLocalWorkspaceEntries();
     renderStartupWorkspaceProjects(localEntries);
-    const migrationSummary = migration.migrated > 0
-      ? localizeText(
-          ` 真V2移行: 元${migration.migrated}件→${migration.created}件。`,
-          ` True V2 migration: ${migration.migrated} source(s) to ${migration.created} project(s).`
-        )
-      : '';
     setStartupWorkspaceStatus(
-      migration.failed > 0
-        ? localizeText(
-            `端末内プロジェクト${localEntries.length}件。真V2移行の未完了が${migration.failed}件あります。元データは削除していません。`,
-            `${localEntries.length} on-device project(s). ${migration.failed} true V2 migration(s) remain incomplete; original data was retained.`
-          )
-        : localizeText(
-            `端末内プロジェクト ${localEntries.length}件。${migrationSummary}`,
-            `${localEntries.length} on-device project(s).${migrationSummary}`
-          ),
-      migration.failed > 0 ? 'warn' : 'info'
+      localizeText(
+        `端末内プロジェクト ${localEntries.length}件。プロジェクトを選ぶと、そのプロジェクトだけを必要に応じてV2へ移行します。`,
+        `${localEntries.length} on-device project(s). Select a project to migrate only that project to V2 when needed.`
+      ),
+      'info'
     );
     return true;
   }
@@ -1947,6 +1916,15 @@
       if (entry?.deviceLocalProject !== true && entry?.migrationRecovery !== true) return;
       target.disabled = true;
       try {
+        if (entry?.deviceLocalProject === true && Number(entry?.autosaveSchemaVersion) !== 2) {
+          updateAutosaveStatus(
+            localizeText(
+              '選択したプロジェクトをV2へ移行しています。ほかのプロジェクトは変更しません。',
+              'Migrating the selected project to V2. Other projects will not be changed.'
+            ),
+            'info'
+          );
+        }
         const opened = await openRecentProject(entry, {
           hideStartup: true,
           silent: false,
@@ -1961,7 +1939,16 @@
         target.disabled = false;
       }
     });
-    void refreshStartupWorkspaceProjects();
+    void refreshStartupWorkspaceProjects().catch(error => {
+      console.warn('[PiXiEEDraw workspace] initial project list refresh failed', error);
+      setStartupWorkspaceStatus(
+        localizeText(
+          'プロジェクト一覧の移行確認を完了できませんでした。新規作成や通常の編集はそのまま利用できます。',
+          'The project-list migration check could not finish. New projects and normal editing remain available.'
+        ),
+        'warn'
+      );
+    });
   }
 
   function setupStartupScreen() {

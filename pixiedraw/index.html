@@ -1713,7 +1713,7 @@
 </footer>
 </form>
 </dialog>
-<dialog aria-labelledby="pixisyncResumeNoticeTitle" class="modal" id="pixisyncResumeNoticeDialog">
+<dialog aria-labelledby="pixisyncResumeNoticeTitle" class="modal" data-pixisync-resume-notice-version="20260803-v2" id="pixisyncResumeNoticeDialog">
 <form class="modal__form" method="dialog">
 <header class="modal__header">
 <div>
@@ -1825,15 +1825,15 @@
 <dialog aria-labelledby="legacyProjectMigrationTitle" class="modal" id="legacyProjectMigrationDialog">
 <form class="modal__form" method="dialog">
 <header class="modal__header">
-<h2 class="modal__title" id="legacyProjectMigrationTitle">V2プロジェクトへ移行</h2>
+<h2 class="modal__title" id="legacyProjectMigrationTitle">選択したプロジェクトをV2へ移行</h2>
 </header>
 <div class="modal__body">
-<p id="legacyProjectMigrationMessage">このファイルは旧形式です。PiXiEEDraw用の単一プロジェクトV2へ移行します。</p>
-<p class="help-text" id="legacyProjectMigrationDetail">移行後はV2だけを端末内プロジェクトとして使用します。選択した元ファイルは削除・上書きしません。</p>
+<p id="legacyProjectMigrationMessage">このファイルは旧形式です。選択したプロジェクトだけをPiXiEEDraw用の単一プロジェクトV2へ移行します。</p>
+<p class="help-text" id="legacyProjectMigrationDetail">元データは削除・上書きせず、変換に失敗しても他のプロジェクトや新規作成には影響しません。</p>
 </div>
 <footer class="modal__footer">
 <button class="button button--ghost" id="legacyProjectMigrationCancel" type="button">キャンセル</button>
-<button class="button button--primary" id="legacyProjectMigrationConfirm" type="button">V2へ移行する</button>
+<button class="button button--primary" id="legacyProjectMigrationConfirm" type="button">このプロジェクトだけをV2へ移行</button>
 </footer>
 </form>
 </dialog>
@@ -2061,7 +2061,7 @@
 	<script defer="" src="assets/js/modules/open-import-workflow-utils.js?v=20260802-project-share-scope1"></script>
 	<script defer="" src="assets/js/modules/export-format-workflow-utils.js?v=20260720-export-grid-format1"></script>
 	<script defer="" src="assets/js/modules/export-dialog-workflow-utils.js?v=20260729-timelapse-export1"></script>
-		<script defer="" src="assets/js/modules/startup-workflow-utils.js?v=20260803-pixisync-delete1"></script>
+		<script defer="" src="assets/js/modules/startup-workflow-utils.js?v=20260803-project-list-panel-reset1"></script>
 		<script defer="" src="assets/js/modules/recent-project-workflow-utils.js?v=20260803-pixisync-delete1"></script>
 		<script defer="" src="assets/js/modules/project-package-workflow-utils.js?v=20260728-autosave-delta1"></script>
 		<script defer="" src="assets/js/modules/project-storage-adapter-utils.js?v=20260715-legacy-project-card-recovery1"></script>
@@ -2087,7 +2087,7 @@
 	<script defer="" src="assets/js/modules/pixisync-collaboration-controller-utils.js?v=20260802-pixisync-lazy-cell1"></script>
 	<script defer="" src="assets/js/modules/pixisync-session-state.js?v=20260731-checkpoint-diagnostics1"></script>
 	<script defer="" src="assets/js/modules/pixisync-project-switch-utils.js?v=20260802-project-share-scope1"></script>
-	<script defer="" src="assets/js/modules/pixisync-minimal-ui-utils.js?v=20260803-pixisync-localize1"></script>
+	<script defer="" src="assets/js/modules/pixisync-minimal-ui-utils.js?v=20260803-pixisync-resume-notice2"></script>
 	<script defer="" src="assets/js/modules/pixisync-runtime-adapter-utils.js?v=20260803-pixisync-localize1"></script>
 	<script defer="" src="assets/js/modules/pixieed-account-workflow-utils.js?v=20260730-remove-legacy-share-card1"></script>
 	<script defer="" src="assets/js/modules/startup-tail-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
@@ -2097,7 +2097,7 @@
 	<script defer="" src="assets/js/modules/local-project-v2-migration-utils.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/pre-update-checkpoint-utils.js?v=20260712-pre-update-checkpoint-u3"></script>
 	<script defer="" src="assets/js/active-project-session-utils.js?v=20260715-local-true-v2-cleanup1"></script>
-    <script defer="" src="assets/js/app.js?v=20260803-pixisync-localize1"></script>
+    <script defer="" src="assets/js/app.js?v=20260803-project-list-panel-reset-resume-notice2"></script>
 	<script defer="" src="assets/js/modules/update-detection-utils.js?v=20260719-file-protocol1"></script>
   <script>
     (function initPanelAdDocking() {

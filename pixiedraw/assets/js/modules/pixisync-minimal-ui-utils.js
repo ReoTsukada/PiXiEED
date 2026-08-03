@@ -19,21 +19,36 @@
   });
   const INVITE_QUERY_KEY = 'pixisync_invite';
   const PENDING_INVITE_STORAGE_KEY = 'pixiedraw:pixisync:v1:pending-invite';
-  const RESUME_NOTICE_STORAGE_KEY = 'pixieedraw:pixisync:resume-notice:20260803-v1';
+  const RESUME_NOTICE_STORAGE_KEY = 'pixieedraw:pixisync:resume-notice:20260803-v2';
+  const RESUME_NOTICE_UI_VERSION = '20260803-v2';
   const COMMENT_MAX_LENGTH = 140;
   const COMMENT_MAX_ITEMS = 50;
   const SLOT_PRICE_YEN = 100;
   const MAX_SLOT_QUANTITY = 20;
+
+  function getWindowStorage(name) {
+    try {
+      return typeof window !== 'undefined' ? window[name] || null : null;
+    } catch (error) {
+      console.warn('[pixisync:v1-ui] browser storage unavailable', {
+        storage: name,
+        error: String(error?.message || error || ''),
+      });
+      return null;
+    }
+  }
 
   function createPiXiSyncMinimalUi({
     elements = {},
     navigatorRef = window.navigator,
     locationRef = window.location,
     historyRef = window.history,
-    sessionStorageRef = window.sessionStorage,
-    localStorageRef = window.localStorage,
+    sessionStorageRef,
+    localStorageRef,
     body = window.document?.body || null,
   } = {}) {
+    if (sessionStorageRef === undefined) sessionStorageRef = getWindowStorage('sessionStorage');
+    if (localStorageRef === undefined) localStorageRef = getWindowStorage('localStorage');
     let session = null;
     let commands = {};
     let participants = [];
@@ -109,18 +124,71 @@
       closeResumeNotice();
     }
 
+    function getResumeNoticeMessage() {
+      return 'シェアプロジェクト（PiXiSYNC）が復活しました。\n無料の作成枠は1枠で、必要な場合は1枠100円の買い切りで追加できます。\nシェアプロジェクトを楽しんでください。';
+    }
+
+    function getResumeNoticeDiagnostics(dialog, reason = '', error = null) {
+      const scripts = Array.from(window.document?.scripts || [])
+        .map(script => String(script?.src || ''))
+        .filter(src => /pixisync-minimal-ui-utils|\/app\.js/.test(src));
+      return {
+        reason,
+        dialogPresent: Boolean(dialog),
+        dialogOpen: Boolean(dialog?.open),
+        showModal: typeof dialog?.showModal === 'function',
+        markupVersion: String(dialog?.dataset?.pixisyncResumeNoticeVersion || ''),
+        expectedVersion: RESUME_NOTICE_UI_VERSION,
+        scripts,
+        error: error ? String(error?.message || error || '') : '',
+      };
+    }
+
+    function showResumeNoticeFallback(reason, error = null) {
+      const message = getResumeNoticeMessage();
+      console.warn('[pixisync:v1-ui] resume notice fallback', getResumeNoticeDiagnostics(
+        elements.resumeNoticeDialog,
+        reason,
+        error
+      ));
+      try {
+        if (typeof window.alert === 'function') {
+          window.alert(message);
+          rememberResumeNotice();
+          return true;
+        }
+      } catch (fallbackError) {
+        console.warn('[pixisync:v1-ui] resume notice alert fallback failed', {
+          ...getResumeNoticeDiagnostics(elements.resumeNoticeDialog, 'alert-threw', fallbackError),
+        });
+      }
+      setNotice(message.split('\n').join(' '));
+      return false;
+    }
+
     function showResumeNoticeOnce() {
       const dialog = elements.resumeNoticeDialog;
-      if (!dialog || typeof dialog.showModal !== 'function') return false;
       try {
         if (localStorageRef?.getItem?.(RESUME_NOTICE_STORAGE_KEY) === 'seen') return false;
       } catch (_) {}
+      if (!dialog || typeof dialog.showModal !== 'function') {
+        return showResumeNoticeFallback(
+          !dialog ? 'dialog-missing' : 'showModal-unsupported'
+        );
+      }
+      if (String(dialog.dataset?.pixisyncResumeNoticeVersion || '') !== RESUME_NOTICE_UI_VERSION) {
+        return showResumeNoticeFallback('markup-version-mismatch');
+      }
       if (dialog.open) return true;
-      dialog.showModal();
-      window.requestAnimationFrame?.(() => {
-        elements.resumeNoticeClose?.focus?.({ preventScroll: true });
-      });
-      return true;
+      try {
+        dialog.showModal();
+        window.requestAnimationFrame?.(() => {
+          elements.resumeNoticeClose?.focus?.({ preventScroll: true });
+        });
+        return true;
+      } catch (error) {
+        return showResumeNoticeFallback('showModal-threw', error);
+      }
     }
 
     function parseInviteToken(value) {
@@ -154,7 +222,7 @@
     }
 
     function confirmShareStart() {
-      const message = 'シェアプロジェクト（PiXiSYNC）が復活しました。\n無料の作成枠は1枠で、必要な場合は1枠100円の買い切りで追加できます。\nシェアプロジェクトを楽しんでください。';
+      const message = getResumeNoticeMessage();
       const dialog = elements.startConfirmDialog;
       if (!dialog || typeof dialog.showModal !== 'function') {
         return Promise.resolve(window.confirm(message));

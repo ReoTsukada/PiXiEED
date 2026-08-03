@@ -6182,6 +6182,7 @@
   get clamp() { return clamp; },
   set clamp(value) { clamp = value; },
   get clearActiveSharedProjectSession() { return clearActiveSharedProjectSession; },
+  closeEditorPanelsForProjectList: (...args) => closeEditorPanelsForProjectList(...args),
   set clearActiveSharedProjectSession(value) { clearActiveSharedProjectSession = value; },
   get clearReloadTargetProjectId() { return clearReloadTargetProjectId; },
   set clearReloadTargetProjectId(value) { clearReloadTargetProjectId = value; },
@@ -6267,8 +6268,6 @@
   set markAutosaveDirty(value) { markAutosaveDirty = value; },
   get migrateLegacyMultiProjectPackage() { return migrateLegacyMultiProjectPackage; },
   set migrateLegacyMultiProjectPackage(value) { migrateLegacyMultiProjectPackage = value; },
-  get migrateLegacyLocalProjectsToTrueV2() { return migrateLegacyLocalProjectsToTrueV2; },
-  set migrateLegacyLocalProjectsToTrueV2(value) { migrateLegacyLocalProjectsToTrueV2 = value; },
   get newProjectAdRequested() { return newProjectAdRequested; },
   set newProjectAdRequested(value) { newProjectAdRequested = value; },
   get newProjectPalettePresetId() { return newProjectPalettePresetId; },
@@ -6347,6 +6346,8 @@
   set generateSnapshotThumbnail(value) { generateSnapshotThumbnail = value; },
   get scheduleSessionPersist() { return scheduleSessionPersist; },
   set scheduleSessionPersist(value) { scheduleSessionPersist = value; },
+  get setLeftTab() { return setLeftTab; },
+  set setLeftTab(value) { setLeftTab = value; },
   get setActiveAutosaveProjectId() { return setActiveAutosaveProjectId; },
   set setActiveAutosaveProjectId(value) { setActiveAutosaveProjectId = value; },
   get setCurrentPalettePresetId() { return setCurrentPalettePresetId; },
@@ -7997,6 +7998,25 @@
     }
     element.dataset[datasetKey] = 'true';
     element.addEventListener('click', handler);
+  }
+
+  // The project chooser owns the app surface. Close any editor-side panel
+  // before it opens so the previous file/settings/share window cannot remain
+  // active when the user returns to the editor.
+  function closeEditorPanelsForProjectList() {
+    setLeftTab('tools', { persist: false });
+    setCompactRightFlyoutOpen(false);
+    setRightUtilityMenuOpen(false);
+    setCompactToolFlyoutOpen(false);
+    if (typeof setFloatingPreviewEnabled === 'function') {
+      setFloatingPreviewEnabled(false);
+    }
+    setRightTab('frames');
+    updateRightTabVisibility();
+    if (layoutMode === 'mobilePortrait') {
+      activateMobileTab('tools', { ensureDrawer: false });
+      setMobileDrawerMode(MOBILE_DRAWER_DEFAULT_MODE, { persist: false });
+    }
   }
 
   function bindCoreProjectActionButtons() {
@@ -15323,6 +15343,10 @@
     return railToolUiUtilsModule.updateLeftTabUI(...args);
   }
 
+  function setLeftTab(...args) {
+    return railToolUiUtilsModule.setLeftTab(...args);
+  }
+
   function updateLeftTabVisibility(...args) {
     return railToolUiUtilsModule.updateLeftTabVisibility(...args);
   }
@@ -16362,22 +16386,26 @@
 
   async function requestLegacyV2MigrationConsent({ sourceFileName = '', sourceAdapterId = '', projectCount = 1, multiCanvasCount = 1 } = {}) {
     const dialog = dom.legacyProjectMigration?.dialog;
-    if (!dialog || typeof dialog.showModal !== 'function') return false;
     const normalizedCount = Math.max(1, Math.round(Number(projectCount) || 1));
     const name = typeof sourceFileName === 'string' && sourceFileName.trim()
       ? sourceFileName.trim()
       : '選択したプロジェクト';
     const isV1 = sourceAdapterId === 'pixieedraw-v1-json';
     const normalizedCanvasCount = Math.max(1, Math.round(Number(multiCanvasCount) || 1));
+    const migrationMessage = normalizedCanvasCount > 1
+      ? `「${name}」には ${normalizedCanvasCount} 枚の旧マルチキャンバスがあります。選択したプロジェクトだけを単一のV2プロジェクトへ分割します。`
+      : normalizedCount > 1
+      ? `「${name}」には ${normalizedCount} 件の旧プロジェクトがあります。選択したプロジェクトだけを単一のV2プロジェクトへ分割します。`
+      : `「${name}」は${isV1 ? 'V1' : '旧V2'}形式です。選択したプロジェクトだけを単一のV2プロジェクトへ移行します。`;
+    const migrationDetail = '移行するのは今回選択したプロジェクトだけです。元データは削除・上書きせず、変換に失敗しても他のプロジェクトや新規作成には影響しません。';
+    if (!dialog || typeof dialog.showModal !== 'function') {
+      return window.confirm(`${migrationMessage}\n\n${migrationDetail}\n\n移行を開始しますか？`);
+    }
     if (dom.legacyProjectMigration.message) {
-      dom.legacyProjectMigration.message.textContent = normalizedCanvasCount > 1
-        ? `「${name}」には ${normalizedCanvasCount} 枚の旧マルチキャンバスがあります。各キャンバスを単一のV2プロジェクトへ分割します。`
-        : normalizedCount > 1
-        ? `「${name}」には ${normalizedCount} 件の旧プロジェクトがあります。各プロジェクトを単一のV2プロジェクトへ分割します。`
-        : `「${name}」は${isV1 ? 'V1' : '旧V2'}形式です。単一のV2プロジェクトへ移行します。`;
+      dom.legacyProjectMigration.message.textContent = migrationMessage;
     }
     if (dom.legacyProjectMigration.detail) {
-      dom.legacyProjectMigration.detail.textContent = '移行後はV2だけを端末内プロジェクトとして使用します。選択した元ファイル、PNG、GIFなどの元データは削除・上書きせず、PiXiEEDrawからも参照を保持しません。';
+      dom.legacyProjectMigration.detail.textContent = migrationDetail;
     }
     return await new Promise(resolve => {
       let settled = false;
