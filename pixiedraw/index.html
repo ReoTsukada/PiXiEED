@@ -476,7 +476,7 @@
 
 
 
-<link href="assets/css/style.css?v=20260803-safari-no-modal-backdrop1" rel="stylesheet"/>
+<link href="assets/css/style.css?v=20260803-pixisync-panel-restore1" rel="stylesheet"/>
 <link rel="icon" type="image/png" sizes="192x192" href="../icon/icon-192-4.png"/>
 <link rel="icon" type="image/png" sizes="512x512" href="../icon/icon-512-4.png"/>
 <style>
@@ -1206,7 +1206,10 @@
 <section class="panel-section" data-section="multi" hidden="" id="panelMulti">
 <header class="landscape-panel-window__header" data-landscape-window-drag-handle="">
 <h2>シェアモード</h2>
+<div class="pixisync-header-actions">
+<button aria-label="参加コードを共有" class="landscape-panel-window__share" hidden="" id="pixisyncCopyInviteCode" title="参加コードを共有" type="button">↗</button>
 <button aria-label="シェアモードを閉じる" class="landscape-panel-window__close" data-close-right-flyout="" type="button">×</button>
+</div>
 </header>
 <div class="panel-section__body">
 <section aria-labelledby="pixisyncPanelTitle" class="pixisync-panel" hidden="" id="pixisyncPanel">
@@ -1222,10 +1225,8 @@
 <span><strong id="pixisyncParticipantCount">1</strong> 人</span>
 <span id="pixisyncConnectionLabel">未接続</span>
 </div>
-<div aria-label="共同編集操作" class="pixisync-actions">
+<div aria-label="共有を開始" class="pixisync-start-hero">
 <button class="button button--primary" id="pixisyncStart" type="button">シェアモードを開始</button>
-<button class="button" hidden="" id="pixisyncCopyInviteCode" type="button">参加コードをコピー</button>
-<button class="button button--ghost" hidden="" id="pixisyncLocalize" type="button">共有を解除してローカル専用にする</button>
 </div>
 <div aria-label="シェアプロジェクト作成枠" class="pixisync-slot-card" id="pixisyncSlotCard">
 <div>
@@ -1254,6 +1255,7 @@
 <button class="button" id="pixisyncJoinCode" type="button">参加</button>
 </div>
 </div>
+<button class="button button--ghost pixisync-localize-action" hidden="" id="pixisyncLocalize" type="button">共有を終了してローカル専用にする</button>
 </section>
 </div>
 </section>
@@ -2071,8 +2073,8 @@
 	<script defer="" src="assets/js/modules/pixisync-collaboration-controller-utils.js?v=20260802-pixisync-lazy-cell1"></script>
 	<script defer="" src="assets/js/modules/pixisync-session-state.js?v=20260731-checkpoint-diagnostics1"></script>
 	<script defer="" src="assets/js/modules/pixisync-project-switch-utils.js?v=20260803-pixisync-code-only1"></script>
-	<script defer="" src="assets/js/modules/pixisync-minimal-ui-utils.js?v=20260803-pixisync-code-only1"></script>
-	<script defer="" src="assets/js/modules/pixisync-runtime-adapter-utils.js?v=20260803-pixisync-code-only1"></script>
+	<script defer="" src="assets/js/modules/pixisync-minimal-ui-utils.js?v=20260803-pixisync-panel-restore1"></script>
+	<script defer="" src="assets/js/modules/pixisync-runtime-adapter-utils.js?v=20260803-pixisync-panel-restore1"></script>
 	<script defer="" src="assets/js/modules/pixieed-account-workflow-utils.js?v=20260803-pixisync-code-only1"></script>
 	<script defer="" src="assets/js/modules/startup-tail-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 	<script defer="" src="assets/js/modules/controls-mirror.js?v=20260803-mobile-window-reset1"></script>
@@ -2081,7 +2083,7 @@
 	<script defer="" src="assets/js/modules/local-project-v2-migration-utils.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/pre-update-checkpoint-utils.js?v=20260712-pre-update-checkpoint-u3"></script>
 	<script defer="" src="assets/js/active-project-session-utils.js?v=20260715-local-true-v2-cleanup1"></script>
-    <script defer="" src="assets/js/app.js?v=20260803-pixisync-code-only1"></script>
+    <script defer="" src="assets/js/app.js?v=20260803-pixisync-panel-restore1"></script>
 	<script defer="" src="assets/js/modules/update-detection-utils.js?v=20260719-file-protocol1"></script>
   <script>
     (function initPanelAdDocking() {

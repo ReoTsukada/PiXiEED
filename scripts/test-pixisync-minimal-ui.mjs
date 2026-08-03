@@ -366,12 +366,16 @@ returnUi.dispose();
 const ownerSession = createSession({ role: 'owner' });
 activate(ownerSession);
 let copied = '';
+let shared = null;
 let localized = false;
 const ownerElements = createElements();
 const ownerUi = createUi({
   elements: ownerElements,
   body: fakeDocument.body,
-  navigatorRef: { clipboard: { writeText: async value => { copied = value; } } },
+  navigatorRef: {
+    share: async value => { shared = value; },
+    clipboard: { writeText: async value => { copied = value; } },
+  },
 });
 ownerUi.configure({
   enabled: true,
@@ -394,7 +398,9 @@ assert.equal(ownerElements.drawLockLabel.textContent, '別のタブで編集中�
 ownerUi.setExternalDrawLock(false);
 assert.equal(ownerElements.drawLock.hidden, true);
 await ownerElements.copyInviteCode.click();
-assert.match(copied, /^AAAA-/);
+assert.equal(shared?.title, 'PiXiSYNC');
+assert.match(shared?.text || '', /AAAA-/);
+assert.equal(copied, '');
 assert.equal(await ownerElements.localize.click(), true);
 assert.equal(localized, true);
 assert.equal(ownerElements.accessCode.value, '');
@@ -568,11 +574,11 @@ for (const id of [
   'pixisyncDrawLock',
 ]) assert.match(html, new RegExp(`id="${id}"`));
 assert.doesNotMatch(html, /id="pixisyncLeave"|id="pixisyncArchive"|id="pixisyncCopyInvite"/);
-assert.match(html, /pixisync-minimal-ui-utils\.js\?v=20260803-pixisync-code-only1/);
+assert.match(html, /pixisync-minimal-ui-utils\.js\?v=20260803-pixisync-panel-restore1/);
 assert.match(html, /<dialog[^>]*id="pixisyncResumeNoticeDialog"[^>]*data-pixisync-resume-notice-version="20260803-v2"|<dialog[^>]*data-pixisync-resume-notice-version="20260803-v2"[^>]*id="pixisyncResumeNoticeDialog"/);
-assert.match(html, /pixisync-runtime-adapter-utils\.js\?v=20260803-pixisync-code-only1/);
+assert.match(html, /pixisync-runtime-adapter-utils\.js\?v=20260803-pixisync-panel-restore1/);
 assert.match(html, /static-content\.js\?v=20260803-pixisync-code-only1/);
-assert.match(html, /app\.js\?v=20260803-pixisync-code-only1/);
+assert.match(html, /app\.js\?v=20260803-pixisync-panel-restore1/);
 assert.match(html, /PiXiSYNCが復活しました/);
 assert.match(html, /シェアプロジェクトが復活しました/);
 assert.match(html, /シェアプロジェクトを楽しんでください/);

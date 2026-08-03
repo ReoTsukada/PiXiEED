@@ -53,6 +53,7 @@
     clearProjectBinding = async () => {},
     listLocalOwnedRooms = async () => [],
     openLocalOwnedRoom = async () => false,
+    restoreMissingOwnedRoom = async () => false,
     resolveProjectBindingTarget = async ({ projectKey } = {}) => projectKey,
     acquireProjectLease = async () => ({ acquired: true, release: async () => {} }),
     getClientId,
@@ -1572,7 +1573,9 @@
     }
 
     async function openOwnedRoomForLocalization(targetRoomId) {
-      return openLocalOwnedRoom(assertRoomId(targetRoomId));
+      const roomId = assertRoomId(targetRoomId);
+      if (await openLocalOwnedRoom(roomId)) return true;
+      return restoreMissingOwnedRoom(roomId);
     }
 
     async function invokeSlotFunction(name, body = {}) {

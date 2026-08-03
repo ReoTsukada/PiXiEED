@@ -410,6 +410,7 @@
       ));
 
       setHidden(actionButtons.start, !(phase === 'local' && typeof commands.start === 'function'));
+      setHidden(elements.startHero, !(phase === 'local' && typeof commands.start === 'function'));
       if (actionButtons.start) {
         actionButtons.start.textContent = 'シェアモードを開始';
       }
@@ -512,13 +513,15 @@
         name.textContent = `${room.title}（参加者${room.memberCount}人）`;
         button.type = 'button';
         button.className = 'button button--ghost';
-        button.textContent = room.localAvailable ? '開いて整理' : 'この端末に保存なし';
-        button.disabled = !room.localAvailable || typeof commands.openOwnedRoomForLocalization !== 'function';
+        button.textContent = room.localAvailable ? '開いて整理' : '端末へ復元して整理';
+        button.disabled = typeof commands.openOwnedRoomForLocalization !== 'function';
         button.addEventListener('click', async () => {
           const opened = await runAction('openLocalizationTarget', () => (
             commands.openOwnedRoomForLocalization(room.roomId)
           ), {
-            pendingMessage: '選択したシェアプロジェクトを開いています…',
+            pendingMessage: room.localAvailable
+              ? '選択したシェアプロジェクトを開いています…'
+              : '共有プロジェクトを端末へ復元しています…',
             successMessage: '内容を確認し、共有解除ボタンを押してください。',
             failureMessage: '選択したプロジェクトを開けませんでした。',
           });
@@ -675,14 +678,19 @@
         let inviteCode = await commands.createInviteCode();
         try {
           if (typeof inviteCode !== 'string' || !inviteCode) throw new Error('invite-code-unavailable');
-          await navigatorRef?.clipboard?.writeText?.(inviteCode);
+          const shareText = `PiXiSYNC参加コード\n${inviteCode}`;
+          if (typeof navigatorRef?.share === 'function') {
+            await navigatorRef.share({ title: 'PiXiSYNC', text: shareText });
+          } else {
+            await navigatorRef?.clipboard?.writeText?.(shareText);
+          }
         } finally {
           inviteCode = '';
         }
       }, {
         pendingMessage: '参加コードを用意しています…',
-        successMessage: '参加コードをコピーしました。',
-        failureMessage: '参加コードをコピーできませんでした。',
+        successMessage: '参加コードを共有しました。',
+        failureMessage: '参加コードを共有できませんでした。',
       }),
       localize: async () => {
         if (!window.confirm('このプロジェクトの共有を終了し、この端末ではローカル専用として保存します。参加者は各自の端末へ保存した後、共有データがサーバーから削除されます。続けますか？')) return false;

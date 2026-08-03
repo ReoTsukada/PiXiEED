@@ -346,6 +346,7 @@
       pixisyncParticipantCount: document.getElementById('pixisyncParticipantCount'),
       pixisyncParticipantList: document.getElementById('pixisyncParticipantList'),
       pixisyncConnectionLabel: document.getElementById('pixisyncConnectionLabel'),
+      pixisyncStartHero: document.querySelector('#panelMulti .pixisync-start-hero'),
       pixisyncStart: document.getElementById('pixisyncStart'),
       pixisyncStartConfirmDialog: document.getElementById('pixisyncStartConfirmDialog'),
       pixisyncStartConfirmCancel: document.getElementById('pixisyncStartConfirmCancel'),
@@ -13099,6 +13100,7 @@
         participantCount: dom.controls.pixisyncParticipantCount,
         participantList: dom.controls.pixisyncParticipantList,
         connectionLabel: dom.controls.pixisyncConnectionLabel,
+        startHero: dom.controls.pixisyncStartHero,
         start: dom.controls.pixisyncStart,
         startConfirmDialog: dom.controls.pixisyncStartConfirmDialog,
         startConfirmCancel: dom.controls.pixisyncStartConfirmCancel,
@@ -27786,16 +27788,37 @@
       throw new Error('PiXiSYNC project deletion: authentication-required');
     }
 
-    const runtime = window.__PIXISYNC_V1_RUNTIME__ || null;
+    let runtime = window.__PIXISYNC_V1_RUNTIME__ || null;
     const switchUtils = window.PiXiEEDrawModules?.pixisyncProjectSwitchUtils;
-    if (
+    const runtimeMatchesDeletedProject = Boolean(
       runtime
       && typeof switchUtils?.runtimeMatchesProjectBinding === 'function'
       && switchUtils.runtimeMatchesProjectBinding(runtime, projectKey, binding)
-    ) {
-      if (binding?.role === 'owner') {
-        await runtime.localize?.();
+    );
+    if (binding?.role === 'owner' && !runtimeMatchesDeletedProject) {
+      // The detach RPC deliberately refuses to archive an owner room before
+      // localization. A project-list deletion can target a card that is not
+      // open, so resume that exact card before making its local copy.
+      const opened = await openRecentProject(entry, {
+        hideStartup: true,
+        silent: true,
+        allowProjectMismatchLoad: true,
+        replaceOpenProjectTabs: true,
+      });
+      if (opened !== true || !(await resumePiXiSyncProjectCard(entry))) {
+        throw new Error('PiXiSYNC project deletion: owner-localization-open-required');
       }
+      runtime = window.__PIXISYNC_V1_RUNTIME__ || null;
+    }
+    if (binding?.role === 'owner') {
+      if (!runtime || typeof runtime.localize !== 'function') {
+        throw new Error('PiXiSYNC project deletion: owner-localization-unavailable');
+      }
+      await runtime.localize();
+      await disposePiXiSyncRuntimeForProjectSwitch(runtime);
+      return true;
+    }
+    if (runtimeMatchesDeletedProject) {
       await disposePiXiSyncRuntimeForProjectSwitch(runtime);
     }
 
@@ -28601,6 +28624,38 @@
           allowProjectMismatchLoad: true,
           replaceOpenProjectTabs: true,
         });
+      },
+      restoreMissingOwnedRoom: async roomId => {
+        const normalizedRoomId = String(roomId || '').toLowerCase();
+        if (!/^[0-9a-f-]{36}$/.test(normalizedRoomId)) return false;
+        const created = await createNewProject({
+          name: localizeText('復元したシェアプロジェクト', 'Restored shared project'),
+          width: DEFAULT_CANVAS_SIZE,
+          height: DEFAULT_CANVAS_SIZE,
+        });
+        const projectId = created === true ? normalizeAutosaveProjectId(autosaveProjectId || '') : '';
+        if (!projectId) return false;
+        const entries = await loadRecentProjectsMetadata();
+        const nextEntries = entries.map(entry => entry?.id === projectId
+          ? {
+            ...entry,
+            pixisync: {
+              version: 2,
+              roomId: normalizedRoomId,
+              role: 'owner',
+              inviteToken: '',
+              inviteExpiresAt: '',
+              invitePersistent: false,
+            },
+            updatedAt: new Date().toISOString(),
+          }
+          : entry);
+        await saveRecentProjectsList(entries, nextEntries);
+        setRecentProjectsCache(nextEntries);
+        const restoredEntry = nextEntries.find(entry => entry?.id === projectId) || null;
+        if (!restoredEntry || !(await resumePiXiSyncProjectCard(restoredEntry))) return false;
+        await refreshRecentProjectsUI().catch(() => {});
+        return true;
       },
       acquireProjectLease,
       ensureAuthenticatedStart: options => ensureSharedProjectAuthenticatedStart(options),
