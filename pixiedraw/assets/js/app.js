@@ -11961,7 +11961,12 @@
           && target.frame.id === activeFrame?.id
         );
         if (targetsActiveCell) {
-          markDirtyRect(x0, y0, x1, y1);
+          // A confirmed remote patch can arrive while the local viewport is
+          // presenting a previously composited partial region. Recompose the
+          // displayed cell as a whole instead of relying on that partial
+          // region so a live peer edit is visible immediately in the same
+          // frame/layer cell as well.
+          markDirtyRect(0, 0, target.canvasDoc.width - 1, target.canvasDoc.height - 1);
         } else {
           // The primary viewport only redraws the selected frame through its
           // dirty region. A remote patch can instead target another frame of
