@@ -22,6 +22,8 @@
   const RESUME_NOTICE_STORAGE_KEY = 'pixieedraw:pixisync:resume-notice:20260803-v1';
   const COMMENT_MAX_LENGTH = 140;
   const COMMENT_MAX_ITEMS = 50;
+  const SLOT_PRICE_YEN = 100;
+  const MAX_SLOT_QUANTITY = 20;
 
   function createPiXiSyncMinimalUi({
     elements = {},
@@ -37,6 +39,8 @@
     let participants = [];
     let comments = [];
     let slotStatus = null;
+    let slotQuantity = 1;
+    let ownedOpenRooms = [];
     let slotStatusLoading = false;
     let enabled = false;
     let externalDrawLocked = false;
@@ -50,6 +54,7 @@
       start: elements.start,
       copyInvite: elements.copyInvite,
       copyInviteCode: elements.copyInviteCode,
+      localize: elements.localize,
       joinCode: elements.joinCode,
       buySlot: elements.buySlot,
     });
@@ -76,6 +81,12 @@
       if (element) element.textContent = String(value ?? '');
     };
     const setNotice = message => setText(elements.notice, message);
+    const normalizeSlotQuantity = value => {
+      const quantity = Number(value);
+      return Number.isSafeInteger(quantity) && quantity >= 1 && quantity <= MAX_SLOT_QUANTITY
+        ? quantity
+        : 1;
+    };
     const getDocument = () => (
       elements.panel?.ownerDocument
       || elements.participantList?.ownerDocument
@@ -292,11 +303,18 @@
       const slotCommandsAvailable = typeof commands.getProjectSlotStatus === 'function';
       setHidden(elements.slotCard, !(enabled && slotCommandsAvailable));
       setText(elements.slotSummary, slotStatus
-        ? `利用中 ${slotStatus.openOwnedProjects} / ${slotStatus.allowedSlots}枠`
+        ? (slotStatus.overLimitProjects > 0
+          ? `利用中${slotStatus.openOwnedProjects}件・${slotStatus.overLimitProjects}件整理が必要`
+          : `利用中 ${slotStatus.openOwnedProjects} / ${slotStatus.allowedSlots}枠`)
         : (slotStatusLoading ? '確認中…' : '枠を確認'));
       setText(elements.slotPurchaseStatus, slotStatus
-        ? `現在は${slotStatus.allowedSlots}枠（利用中${slotStatus.openOwnedProjects}枠・追加購入${slotStatus.purchasedSlots}枠）です。`
+        ? (slotStatus.overLimitProjects > 0
+          ? `無料枠は1枠、購入枠は${slotStatus.purchasedSlots}枠です。現在${slotStatus.openOwnedProjects}件が共有中のため、${slotStatus.overLimitProjects}件をローカル専用に戻すか、同数の枠を追加してください。`
+          : `無料1枠＋購入${slotStatus.purchasedSlots}枠＝上限${slotStatus.allowedSlots}枠（利用中${slotStatus.openOwnedProjects}枠）です。`)
         : (slotStatusLoading ? '現在の作成枠を確認しています…' : '作成枠を再確認してください。'));
+      if (elements.slotQuantity) elements.slotQuantity.value = String(slotQuantity);
+      setText(elements.slotTotal, `合計${slotQuantity * SLOT_PRICE_YEN}円`);
+      setText(elements.slotPurchaseConfirm, `Stripeで${slotQuantity * SLOT_PRICE_YEN}円を支払う`);
       setHidden(elements.quickOpen, false);
       setHidden(elements.mobileTab, false);
       setHidden(elements.accessCodeField, !(
@@ -311,6 +329,7 @@
       }
       setHidden(actionButtons.copyInvite, !(owner && active && typeof commands.createInviteLink === 'function'));
       setHidden(actionButtons.copyInviteCode, !(owner && active && typeof commands.createInviteCode === 'function'));
+      setHidden(actionButtons.localize, !(owner && active && typeof commands.localize === 'function'));
       setHidden(actionButtons.joinCode, !(
         phase === 'disabled'
         || commentMode
@@ -378,6 +397,7 @@
         allowedSlots: Number(value?.allowedSlots),
         openOwnedProjects: Number(value?.openOwnedProjects),
         availableSlots: Number(value?.availableSlots),
+        overLimitProjects: Number(value?.overLimitProjects),
       };
       if (
         !Number.isSafeInteger(normalized.includedSlots)
@@ -389,8 +409,52 @@
         || normalized.openOwnedProjects < 0
         || !Number.isSafeInteger(normalized.availableSlots)
         || normalized.availableSlots < 0
+        || !Number.isSafeInteger(normalized.overLimitProjects)
+        || normalized.overLimitProjects < 0
       ) return null;
       return Object.freeze(normalized);
+    }
+
+    function renderOwnedOpenRooms() {
+      setHidden(elements.slotResolution, ownedOpenRooms.length === 0);
+      if (!elements.slotRoomList?.replaceChildren) return;
+      const documentRef = getDocument();
+      const rows = ownedOpenRooms.map(room => {
+        const row = documentRef.createElement('div');
+        const name = documentRef.createElement('span');
+        const button = documentRef.createElement('button');
+        row.className = 'pixisync-slot-purchase__room';
+        name.textContent = `${room.title}（参加者${room.memberCount}人）`;
+        button.type = 'button';
+        button.className = 'button button--ghost';
+        button.textContent = room.localAvailable ? '開いて整理' : 'この端末に保存なし';
+        button.disabled = !room.localAvailable || typeof commands.openOwnedRoomForLocalization !== 'function';
+        button.addEventListener('click', async () => {
+          const opened = await runAction('openLocalizationTarget', () => (
+            commands.openOwnedRoomForLocalization(room.roomId)
+          ), {
+            pendingMessage: '選択したシェアプロジェクトを開いています…',
+            successMessage: '内容を確認し、共有解除ボタンを押してください。',
+            failureMessage: '選択したプロジェクトを開けませんでした。',
+          });
+          if (opened) elements.slotPurchaseDialog?.close?.('localization-target');
+        });
+        row.append(name, button);
+        return row;
+      });
+      elements.slotRoomList.replaceChildren(...rows);
+    }
+
+    async function refreshOwnedOpenRooms() {
+      if (typeof commands.listOwnedOpenRooms !== 'function') return [];
+      try {
+        ownedOpenRooms = await commands.listOwnedOpenRooms();
+      } catch (error) {
+        console.warn('[pixisync:v1-ui] owned rooms failed', error?.message || 'unknown');
+        ownedOpenRooms = [];
+      }
+      renderOwnedOpenRooms();
+      return ownedOpenRooms;
     }
 
     async function refreshProjectSlotStatus({ quiet = false } = {}) {
@@ -401,6 +465,9 @@
         const nextStatus = normalizeSlotStatus(await commands.getProjectSlotStatus());
         if (!nextStatus) throw new Error('invalid-project-slot-status');
         slotStatus = nextStatus;
+        if (slotStatus.availableSlots === 0 || slotStatus.overLimitProjects > 0) {
+          void refreshOwnedOpenRooms();
+        }
         if (!quiet) setText(elements.slotPurchaseNotice, '作成枠を更新しました。');
         return slotStatus;
       } catch (error) {
@@ -419,6 +486,7 @@
       setText(elements.slotPurchaseNotice, message);
       if (!dialog.open) dialog.showModal();
       void refreshProjectSlotStatus({ quiet: true });
+      void refreshOwnedOpenRooms();
       return true;
     }
 
@@ -544,6 +612,14 @@
         successMessage: '参加コードをコピーしました。',
         failureMessage: '参加コードをコピーできませんでした。',
       }),
+      localize: async () => {
+        if (!window.confirm('このプロジェクトの共有を終了し、この端末ではローカル専用として保存します。参加者は各自の端末へ保存した後、共有データがサーバーから削除されます。続けますか？')) return false;
+        return runAction('localize', commands.localize, {
+          pendingMessage: '最終状態を保存して、ローカル専用へ変更しています…',
+          successMessage: '共有を終了し、ローカル専用プロジェクトとして保存しました。',
+          failureMessage: 'ローカル保存を確認できなかったため、共有データは削除していません。',
+        });
+      },
       joinCode: () => {
         const snapshot = getSnapshot();
         if (snapshot.phase === 'active' && typeof commands.sendComment === 'function') {
@@ -610,7 +686,7 @@
       close: () => elements.slotPurchaseDialog?.close?.('close'),
       confirm: () => runAction('purchaseSlot', async () => {
         setText(elements.slotPurchaseNotice, 'Stripeの購入画面を準備しています…');
-        const checkoutUrl = await commands.createProjectSlotCheckout();
+        const checkoutUrl = await commands.createProjectSlotCheckout(slotQuantity);
         if (typeof locationRef.assign === 'function') locationRef.assign(checkoutUrl);
         else locationRef.href = checkoutUrl;
       }, {
@@ -624,9 +700,15 @@
         ),
       }),
     };
+    const slotQuantityHandler = event => {
+      slotQuantity = normalizeSlotQuantity(event?.target?.value ?? elements.slotQuantity?.value);
+      render();
+    };
     elements.slotPurchaseRefresh?.addEventListener?.('click', slotHandlers.refresh);
     elements.slotPurchaseClose?.addEventListener?.('click', slotHandlers.close);
     elements.slotPurchaseConfirm?.addEventListener?.('click', slotHandlers.confirm);
+    elements.slotQuantity?.addEventListener?.('input', slotQuantityHandler);
+    elements.slotQuantity?.addEventListener?.('change', slotQuantityHandler);
     elements.resumeNoticeClose?.addEventListener?.('click', closeResumeNotice);
     elements.resumeNoticeDialog?.addEventListener?.('cancel', cancelResumeNotice);
     elements.resumeNoticeDialog?.addEventListener?.('close', rememberResumeNotice);
@@ -758,6 +840,8 @@
       elements.slotPurchaseRefresh?.removeEventListener?.('click', slotHandlers.refresh);
       elements.slotPurchaseClose?.removeEventListener?.('click', slotHandlers.close);
       elements.slotPurchaseConfirm?.removeEventListener?.('click', slotHandlers.confirm);
+      elements.slotQuantity?.removeEventListener?.('input', slotQuantityHandler);
+      elements.slotQuantity?.removeEventListener?.('change', slotQuantityHandler);
       elements.resumeNoticeClose?.removeEventListener?.('click', closeResumeNotice);
       elements.resumeNoticeDialog?.removeEventListener?.('cancel', cancelResumeNotice);
       elements.resumeNoticeDialog?.removeEventListener?.('close', rememberResumeNotice);

@@ -3,6 +3,7 @@ import {
   createAdminClient,
   errorMessage,
   jsonResponse,
+  readJson,
   requireUser,
   siteUrl,
   stringValue,
@@ -10,6 +11,15 @@ import {
 } from "../_shared/market-stripe.ts";
 
 const SLOT_PRICE_YEN = 100;
+const MAX_SLOT_QUANTITY = 20;
+
+function parseSlotQuantity(value: unknown): number {
+  const quantity = Number(value);
+  if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > MAX_SLOT_QUANTITY) {
+    throw new Error(`購入数は1〜${MAX_SLOT_QUANTITY}枠で指定してください`);
+  }
+  return quantity;
+}
 
 function firstRow(value: unknown): Record<string, unknown> {
   const row = Array.isArray(value) ? value[0] : value;
@@ -26,10 +36,13 @@ serve(async (request) => {
 
   try {
     const { user } = await requireUser(request);
+    const body = await readJson(request);
+    const quantity = parseSlotQuantity(body.quantity ?? 1);
     const admin = createAdminClient();
     const createIntent = async () => {
       const { data, error } = await admin.rpc("pixisync_create_slot_purchase_intent_v1", {
         input_user_id: user.id,
+        input_quantity: quantity,
       });
       if (error) throw error;
       return firstRow(data);
@@ -46,7 +59,13 @@ serve(async (request) => {
         { method: "GET" },
       );
       if (existing.status === "open" && stringValue(existing.url)) {
-        return jsonResponse(request, { ok: true, url: existing.url, purchase_id: purchaseId });
+        return jsonResponse(request, {
+          ok: true,
+          url: existing.url,
+          purchase_id: purchaseId,
+          quantity: Number(intent.quantity) || quantity,
+          gross_amount_yen: Number(intent.gross_amount_yen) || quantity * SLOT_PRICE_YEN,
+        });
       }
       if (existing.status === "complete" && existing.payment_status === "paid") {
         const paymentIntent = typeof existing.payment_intent === "string"
@@ -94,15 +113,15 @@ serve(async (request) => {
     params.set("expires_at", String(expiresAt));
     params.set("locale", "ja");
     if (user.email) params.set("customer_email", user.email);
-    params.set("line_items[0][quantity]", "1");
+    params.set("line_items[0][quantity]", String(quantity));
     params.set("line_items[0][price_data][currency]", "jpy");
     params.set("line_items[0][price_data][unit_amount]", String(SLOT_PRICE_YEN));
     params.set("line_items[0][price_data][product_data][name]", "PiXiSYNC シェアプロジェクト作成枠");
-    params.set("line_items[0][price_data][product_data][description]", "買い切りでシェアプロジェクトの同時作成枠を1枠追加します。");
+    params.set("line_items[0][price_data][product_data][description]", "買い切りでシェアプロジェクトの同時作成枠を1枠追加します（1枠100円）。");
     params.set("metadata[pixieed_product_key]", "pixisync_project_slot");
     params.set("metadata[pixieed_purchase_id]", purchaseId);
     params.set("metadata[pixieed_user_id]", user.id);
-    params.set("metadata[pixieed_slot_quantity]", "1");
+    params.set("metadata[pixieed_slot_quantity]", String(quantity));
     params.set("payment_intent_data[metadata][pixieed_product_key]", "pixisync_project_slot");
     params.set("payment_intent_data[metadata][pixieed_purchase_id]", purchaseId);
     params.set("payment_intent_data[metadata][pixieed_user_id]", user.id);
@@ -122,7 +141,13 @@ serve(async (request) => {
       input_expires_at: new Date(expiresAt * 1000).toISOString(),
     });
     if (bindError) throw bindError;
-    return jsonResponse(request, { ok: true, url: checkoutUrl, purchase_id: purchaseId });
+    return jsonResponse(request, {
+      ok: true,
+      url: checkoutUrl,
+      purchase_id: purchaseId,
+      quantity,
+      gross_amount_yen: quantity * SLOT_PRICE_YEN,
+    });
   } catch (error) {
     return jsonResponse(request, {
       ok: false,

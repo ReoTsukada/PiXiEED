@@ -87,6 +87,7 @@ globalThis.window = {
   location: { href: 'https://example.test/pixiedraw/' },
   history: {},
   requestAnimationFrame: callback => callback(),
+  confirm: () => true,
 };
 
 const createSessionStorage = () => {
@@ -125,11 +126,16 @@ const createElements = () => {
     resumeNoticeClose: new FakeElement(),
     copyInvite: new FakeElement(),
     copyInviteCode: new FakeElement(),
+    localize: new FakeElement(),
     slotCard: new FakeElement(),
     slotSummary: new FakeElement(),
     buySlot: new FakeElement(),
     slotPurchaseDialog: new FakeDialog(),
+    slotQuantity: new FakeElement(),
+    slotTotal: new FakeElement(),
     slotPurchaseStatus: new FakeElement(),
+    slotResolution: new FakeElement(),
+    slotRoomList: new FakeElement(fakeDocument),
     slotPurchaseNotice: new FakeElement(),
     slotPurchaseRefresh: new FakeElement(),
     slotPurchaseClose: new FakeElement(),
@@ -224,6 +230,21 @@ limitedUi.configure({
     start: async () => {
       throw new Error('pixisync_owner_room_limit_reached');
     },
+    getProjectSlotStatus: async () => ({
+      includedSlots: 1,
+      purchasedSlots: 0,
+      allowedSlots: 1,
+      openOwnedProjects: 18,
+      availableSlots: 0,
+      overLimitProjects: 17,
+    }),
+    listOwnedOpenRooms: async () => ([{
+      roomId: '11111111-1111-4111-8111-111111111111',
+      title: '共同制作A',
+      memberCount: 3,
+      localAvailable: true,
+    }]),
+    openOwnedRoomForLocalization: async () => true,
   },
 });
 const limitedStart = limitedElements.start.click();
@@ -239,6 +260,11 @@ assert.equal(
   limitedElements.slotPurchaseNotice.textContent,
   '作成枠を追加すると、このプロジェクトをシェアできます。'
 );
+await Promise.resolve();
+await Promise.resolve();
+assert.equal(limitedElements.slotSummary.textContent, '利用中18件・17件整理が必要');
+assert.equal(limitedElements.slotResolution.hidden, false);
+assert.equal(limitedElements.slotRoomList.children.length, 1);
 limitedUi.dispose();
 
 // The slot purchase UI shows server-owned quota and redirects only to the returned Stripe URL.
@@ -262,8 +288,12 @@ slotUi.configure({
       allowedSlots: 2,
       openOwnedProjects: 1,
       availableSlots: 1,
+      overLimitProjects: 0,
     }),
-    createProjectSlotCheckout: async () => 'https://checkout.stripe.com/c/pay/test',
+    createProjectSlotCheckout: async quantity => {
+      assert.equal(quantity, 3);
+      return 'https://checkout.stripe.com/c/pay/test';
+    },
   },
 });
 await Promise.resolve();
@@ -271,7 +301,11 @@ await Promise.resolve();
 assert.equal(slotElements.slotSummary.textContent, '利用中 1 / 2枠');
 assert.equal(slotElements.buySlot.click(), true);
 assert.equal(slotElements.slotPurchaseDialog.open, true);
-assert.match(slotElements.slotPurchaseStatus.textContent, /現在は2枠/);
+assert.match(slotElements.slotPurchaseStatus.textContent, /上限2枠/);
+slotElements.slotQuantity.value = '3';
+slotElements.slotQuantity.dispatch('change', { target: slotElements.slotQuantity });
+assert.equal(slotElements.slotTotal.textContent, '合計300円');
+assert.equal(slotElements.slotPurchaseConfirm.textContent, 'Stripeで300円を支払う');
 assert.equal(await slotElements.slotPurchaseConfirm.click(), true);
 assert.equal(assignedCheckoutUrl, 'https://checkout.stripe.com/c/pay/test');
 slotUi.dispose();
@@ -292,11 +326,11 @@ returnUi.configure({
   session: createSession({ role: 'owner' }),
   commands: {
     getProjectSlotStatus: async () => ({
-      includedSlots: 1, purchasedSlots: 0, allowedSlots: 1, openOwnedProjects: 1, availableSlots: 0,
+      includedSlots: 1, purchasedSlots: 0, allowedSlots: 1, openOwnedProjects: 1, availableSlots: 0, overLimitProjects: 0,
     }),
     reconcileProjectSlotPurchase: async sessionId => {
       reconciledSessionId = sessionId;
-      return { includedSlots: 1, purchasedSlots: 1, allowedSlots: 2, openOwnedProjects: 1, availableSlots: 1 };
+      return { includedSlots: 1, purchasedSlots: 1, allowedSlots: 2, openOwnedProjects: 1, availableSlots: 1, overLimitProjects: 0 };
     },
   },
 });
@@ -312,6 +346,7 @@ returnUi.dispose();
 const ownerSession = createSession({ role: 'owner' });
 activate(ownerSession);
 let copied = '';
+let localized = false;
 const ownerElements = createElements();
 const ownerUi = createUi({
   elements: ownerElements,
@@ -324,6 +359,7 @@ ownerUi.configure({
   commands: {
     createInviteLink: async () => `https://example.test/pixiedraw/?pixisync_invite=${'a'.repeat(64)}`,
     createInviteCode: async () => 'AAAA-AAAA-AAAA-AAAA-AAAA-AAAA-AAAA-AAAA-AAAA-AAAA-AAAA-AAAA-AAAA-AAAA-AAAA-AAAA',
+    localize: async () => { localized = true; },
   },
   participants: [
     { id: 'owner', name: 'Owner', role: 'owner', connection: 'online' },
@@ -332,6 +368,7 @@ ownerUi.configure({
 });
 assert.equal(ownerElements.copyInvite.hidden, false);
 assert.equal(ownerElements.copyInviteCode.hidden, false);
+assert.equal(ownerElements.localize.hidden, false);
 assert.equal(ownerElements.participantCount.textContent, '2');
 ownerUi.setExternalDrawLock(true, '別のタブで編集中です。閲覧専用です。');
 assert.equal(ownerElements.drawLock.hidden, false);
@@ -342,6 +379,8 @@ await ownerElements.copyInvite.click();
 assert.match(copied, /pixisync_invite=/);
 await ownerElements.copyInviteCode.click();
 assert.match(copied, /^AAAA-/);
+assert.equal(await ownerElements.localize.click(), true);
+assert.equal(localized, true);
 assert.equal(ownerElements.accessCode.value, '');
 assert.equal(ownerElements.accessCode.placeholder, '招待リンク / コード');
 
@@ -535,6 +574,9 @@ for (const id of [
   'pixisyncSlotPurchaseRefresh',
   'pixisyncSlotPurchaseClose',
   'pixisyncSlotPurchaseConfirm',
+  'pixisyncLocalize',
+  'pixisyncSlotResolution',
+  'pixisyncSlotRoomList',
   'pixisyncAccessCode',
   'pixisyncJoinCode',
   'panelMulti',
@@ -543,10 +585,10 @@ for (const id of [
   'pixisyncDrawLock',
 ]) assert.match(html, new RegExp(`id="${id}"`));
 assert.doesNotMatch(html, /id="pixisyncLeave"|id="pixisyncArchive"/);
-assert.match(html, /pixisync-minimal-ui-utils\.js\?v=20260803-pixisync-resume1/);
-assert.match(html, /pixisync-runtime-adapter-utils\.js\?v=20260803-pixisync-slots1/);
-assert.match(html, /static-content\.js\?v=20260803-pixisync-slots1/);
-assert.match(html, /app\.js\?v=20260803-pixisync-resume-delete1/);
+assert.match(html, /pixisync-minimal-ui-utils\.js\?v=20260803-pixisync-localize1/);
+assert.match(html, /pixisync-runtime-adapter-utils\.js\?v=20260803-pixisync-localize1/);
+assert.match(html, /static-content\.js\?v=20260803-pixisync-localize1/);
+assert.match(html, /app\.js\?v=20260803-pixisync-localize1/);
 assert.match(html, /PiXiSYNCが復活しました/);
 assert.match(html, /シェアプロジェクトが復活しました/);
 assert.match(html, /シェアプロジェクトを楽しんでください/);
@@ -559,8 +601,10 @@ new Function(staticContent)();
 const staticContentApi = window.PiXiEEDrawModules.staticContent.createStaticContent();
 const pixisyncHelp = staticContentApi.HELP_GUIDE_ITEMS.find(entry => entry.id === 'pixisync-share-project');
 const pixisyncUpdate = staticContentApi.BUILTIN_UPDATE_HISTORY_ENTRIES.find(entry => entry.id === '2026-08-03-pixisync-return');
-assert.ok(pixisyncHelp?.points?.ja?.some(point => point.includes('1枠追加・100円')));
+assert.ok(pixisyncHelp?.points?.ja?.some(point => point.includes('1枠100円')));
 assert.ok(pixisyncHelp?.points?.ja?.some(point => point.includes('参加コード')));
+assert.ok(pixisyncHelp?.points?.ja?.some(point => point.includes('ローカル専用')));
+assert.ok(pixisyncHelp?.points?.ja?.some(point => point.includes('参加者全員のローカル保存')));
 assert.ok(pixisyncUpdate?.details?.some(point => point.includes('シェアプロジェクトを楽しんでください')));
 assert.doesNotMatch(html, /pixisyncStatusDetail|pixisyncCommentInput|pixisyncCommentSend/);
 assert.doesNotMatch(html, /受け取ったリンクまたはコード|コメントは共同編集中/);

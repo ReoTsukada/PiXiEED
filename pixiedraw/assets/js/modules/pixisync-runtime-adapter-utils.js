@@ -44,12 +44,15 @@
     refreshSupabaseClient = null,
     captureCheckpoint,
     restoreCheckpoint,
+    persistLocalProject = async () => true,
     getProjectKey = () => '',
     getProjectTitle = () => '',
     getParticipantIdentity = () => ({}),
     readProjectBinding = async () => null,
     writeProjectBinding = async () => {},
     clearProjectBinding = async () => {},
+    listLocalOwnedRooms = async () => [],
+    openLocalOwnedRoom = async () => false,
     resolveProjectBindingTarget = async ({ projectKey } = {}) => projectKey,
     acquireProjectLease = async () => ({ acquired: true, release: async () => {} }),
     getClientId,
@@ -67,6 +70,7 @@
       || typeof getSupabase !== 'function'
       || typeof captureCheckpoint !== 'function'
       || typeof restoreCheckpoint !== 'function'
+      || typeof persistLocalProject !== 'function'
       || typeof getClientId !== 'function'
     ) {
       throw new Error('PiXiSYNC runtime: missing dependencies');
@@ -115,6 +119,7 @@
     const intentionallyStoppedRealtimeClients = new WeakSet();
     const attestationWaiters = new Map();
     const preparedDocumentCheckpoints = new Map();
+    let localizationPromise = null;
 
     const commands = Object.freeze({
       start,
@@ -123,11 +128,14 @@
       createInviteLink,
       createInviteCode,
       getProjectSlotStatus,
+      listOwnedOpenRooms,
+      openOwnedRoomForLocalization,
       createProjectSlotCheckout,
       reconcileProjectSlotPurchase,
       sendComment,
       leave,
       archive,
+      localize: archive,
       handleLifecycleResume,
       prepareCheckpointOperation,
     });
@@ -973,7 +981,10 @@
         onBroadcast: (event, payload) => {
           if (realtimeClient !== createdRealtime) return;
           if (event === 'session-archived') {
-            void enqueue({ type: 'ROOM_ARCHIVED', epoch: currentEpoch() });
+            void localizeParticipantCopy().catch(error => {
+              reportRuntimeError(error);
+              void enqueue({ type: 'ROOM_ARCHIVED', epoch: currentEpoch() });
+            });
           } else if (event === 'pixisync-comment') {
             const comment = normalizeComment(payload);
             if (comment && comment.senderClientId !== clientId) {
@@ -1466,6 +1477,11 @@
         await dispatchNow(event);
         return roomId;
       } catch (error) {
+        try {
+          if (await restoreArchivedLocalCopy(roomId)) return roomId;
+        } catch (localizationError) {
+          reportRuntimeError(localizationError);
+        }
         // A persisted card is still a shared project when the first reopen
         // attempt fails. Reset the incomplete open transaction, keep the
         // persisted card draw-locked, and retry the complete bound-card open.
@@ -1525,6 +1541,7 @@
       const allowedSlots = Number(status?.allowed_slots);
       const openOwnedProjects = Number(status?.open_owned_projects);
       const availableSlots = Number(status?.available_slots);
+      const overLimitProjects = Number(status?.over_limit_projects);
       if (
         !Number.isSafeInteger(includedSlots)
         || includedSlots < 1
@@ -1536,6 +1553,8 @@
         || openOwnedProjects < 0
         || !Number.isSafeInteger(availableSlots)
         || availableSlots < 0
+        || !Number.isSafeInteger(overLimitProjects)
+        || overLimitProjects < 0
       ) throw new Error('PiXiSYNC runtime: invalid-project-slot-status');
       return Object.freeze({
         includedSlots,
@@ -1543,7 +1562,26 @@
         allowedSlots,
         openOwnedProjects,
         availableSlots,
+        overLimitProjects,
       });
+    }
+
+    async function listOwnedOpenRooms() {
+      await ensureSupabase();
+      const rows = await rpc('pixisync_list_owned_open_rooms', {});
+      const localRooms = new Set((await listLocalOwnedRooms()).map(value => String(value || '').toLowerCase()));
+      return Object.freeze((Array.isArray(rows) ? rows : []).map(row => Object.freeze({
+        roomId: assertRoomId(row?.room_id),
+        title: String(row?.title || '名称未設定'),
+        status: String(row?.room_status || ''),
+        memberCount: Math.max(1, Number(row?.member_count) || 1),
+        createdAt: String(row?.created_at || ''),
+        localAvailable: localRooms.has(String(row?.room_id || '').toLowerCase()),
+      })));
+    }
+
+    async function openOwnedRoomForLocalization(targetRoomId) {
+      return openLocalOwnedRoom(assertRoomId(targetRoomId));
     }
 
     async function invokeSlotFunction(name, body = {}) {
@@ -1565,8 +1603,14 @@
       return response.data;
     }
 
-    async function createProjectSlotCheckout() {
-      const data = await invokeSlotFunction('pixisync-create-slot-checkout');
+    async function createProjectSlotCheckout(quantity = 1) {
+      const normalizedQuantity = Number(quantity);
+      if (!Number.isSafeInteger(normalizedQuantity) || normalizedQuantity < 1 || normalizedQuantity > 20) {
+        throw new Error('PiXiSYNC runtime: invalid-slot-quantity');
+      }
+      const data = await invokeSlotFunction('pixisync-create-slot-checkout', {
+        quantity: normalizedQuantity,
+      });
       const checkoutUrl = new URL(String(data?.url || ''));
       if (checkoutUrl.protocol !== 'https:' || checkoutUrl.hostname !== 'checkout.stripe.com') {
         throw new Error('PiXiSYNC runtime: invalid-slot-checkout-url');
@@ -1659,7 +1703,110 @@
       return true;
     }
 
+    async function invokeLocalizedRoomCleanup(targetRoomId) {
+      try {
+        const response = await invokeSlotFunction('pixisync-cleanup-localized-room', {
+          room_id: targetRoomId,
+        });
+        return response?.ok === true;
+      } catch (error) {
+        report({
+          phase: 'localization-cleanup-deferred',
+          roomId: targetRoomId,
+          error: error?.message || String(error),
+        });
+        return false;
+      }
+    }
+
+    async function retryPendingLocalizedCleanups() {
+      const serverReady = await rpc('pixisync_list_ready_localized_room_cleanups', {}).catch(() => []);
+      const rooms = new Set((Array.isArray(serverReady) ? serverReady : [])
+        .map(row => String(row?.room_id || ''))
+        .filter(value => ROOM_ID_PATTERN.test(value)));
+      for (const targetRoomId of rooms) {
+        await invokeLocalizedRoomCleanup(targetRoomId);
+      }
+    }
+
+    async function completeLocalCopy(targetRoomId) {
+      const firstSave = await persistLocalProject();
+      if (firstSave !== true) throw new Error('PiXiSYNC runtime: local-project-save-failed');
+      await removeProjectBinding();
+      try {
+        const localizedSave = await persistLocalProject();
+        if (localizedSave !== true) throw new Error('PiXiSYNC runtime: local-project-save-failed');
+      } catch (error) {
+        await persistProjectBinding().catch(() => {});
+        throw error;
+      }
+      const ack = firstRow(await rpc('pixisync_ack_room_localized', {
+        p_room_id: targetRoomId,
+      }));
+      if (ack?.cleanup_ready === true) {
+        void invokeLocalizedRoomCleanup(targetRoomId);
+      }
+      if (realtimeClient) {
+        intentionallyStoppedRealtimeClients.add(realtimeClient);
+        await realtimeClient.stop?.().catch(() => {});
+        realtimeClient = null;
+      }
+      await releaseProjectLease();
+      roomId = '';
+      manifest = null;
+      reusableInviteToken = '';
+      reusableInviteExpiresAt = '';
+      reusableInvitePersistent = false;
+      installSession('owner');
+      configureBridge({ collaboration: false });
+      return Object.freeze({
+        expectedMembers: Number(ack?.expected_members) || 0,
+        localizedMembers: Number(ack?.localized_members) || 0,
+        cleanupReady: ack?.cleanup_ready === true,
+      });
+    }
+
+    async function localizeParticipantCopy() {
+      if (localizationPromise) return localizationPromise;
+      const targetRoomId = assertRoomId(roomId);
+      localizationPromise = completeLocalCopy(targetRoomId);
+      try {
+        return await localizationPromise;
+      } finally {
+        localizationPromise = null;
+      }
+    }
+
+    async function restoreArchivedLocalCopy(targetRoomId) {
+      const localized = firstRow(await rpc('pixisync_open_localization_snapshot', {
+        p_room_id: targetRoomId,
+      }));
+      if (!localized?.storage_path) return false;
+      const blob = await downloadCheckpoint(String(localized.storage_path));
+      if (
+        blob.size !== Number(localized.encoded_bytes)
+        || await sha256Hex(blob) !== assertHash(localized.state_sha256_hex)
+      ) throw new Error('PiXiSYNC runtime: localization-checkpoint-mismatch');
+      await restoreCheckpoint(blob, {
+        projectKey: boundProjectKey,
+        role,
+        preserveProjectIdentity: true,
+      });
+      await completeLocalCopy(targetRoomId);
+      return true;
+    }
+
     async function archive() {
+      if (localizationPromise) return localizationPromise;
+      localizationPromise = localizeOwnerCopy();
+      try {
+        return await localizationPromise;
+      } finally {
+        localizationPromise = null;
+      }
+    }
+
+    async function localizeOwnerCopy() {
       if (!session?.canDraw?.() || role !== 'owner') throw new Error('PiXiSYNC runtime: active-owner-required');
       if (realtimeClient?.pendingOperationCount) throw new Error('PiXiSYNC runtime: pending-operations-remain');
       const blob = await captureCheckpoint();
@@ -1699,22 +1846,22 @@
         }));
       }
       if (attested?.status !== 'verified') throw new Error('PiXiSYNC runtime: checkpoint-attestation-incomplete');
-      await rpc('pixisync_archive_session', {
+      await rpc('pixisync_begin_room_localization', {
         p_room_id: roomId,
         p_final_checkpoint_id: checkpointId,
       });
-      await realtimeClient.sendBroadcast('session-archived', { roomId, checkpointId }).catch(() => {});
-      const closing = session.dispatch({ type: 'CLOSE_REQUEST' });
-      runtimeBridge.refreshUi?.();
-      for (const effect of closing.effects) await runEffect(effect);
-      await removeProjectBinding();
-      await releaseProjectLease();
-      await dispatchNow({ type: 'CLOSED', epoch: closing.state.epoch });
+      const targetRoomId = roomId;
+      await realtimeClient.sendBroadcast('session-archived', {
+        roomId: targetRoomId,
+        checkpointId,
+      }).catch(() => {});
+      return completeLocalCopy(targetRoomId);
     }
 
     async function initialize() {
       if (disposed) return snapshot();
       await ensureSupabase();
+      void retryPendingLocalizedCleanups();
       if (disposed) return snapshot();
       const binding = normalizeProjectBinding(await readProjectBinding(String(getProjectKey() || '')));
       if (disposed) return snapshot();

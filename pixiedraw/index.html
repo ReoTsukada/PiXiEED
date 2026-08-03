@@ -476,7 +476,7 @@
 
 
 
-<link href="assets/css/style.css?v=20260803-pixisync-slots3" rel="stylesheet"/>
+<link href="assets/css/style.css?v=20260803-pixisync-localize1" rel="stylesheet"/>
 <link rel="icon" type="image/png" sizes="192x192" href="../icon/icon-192-4.png"/>
 <link rel="icon" type="image/png" sizes="512x512" href="../icon/icon-512-4.png"/>
 <style>
@@ -1226,6 +1226,7 @@
 <button class="button button--primary" id="pixisyncStart" type="button">シェアモードを開始</button>
 <button class="button" hidden="" id="pixisyncCopyInvite" type="button">シェアURLをコピー</button>
 <button class="button" hidden="" id="pixisyncCopyInviteCode" type="button">参加コードをコピー</button>
+<button class="button button--ghost" hidden="" id="pixisyncLocalize" type="button">共有を解除してローカル専用にする</button>
 </div>
 <div aria-label="シェアプロジェクト作成枠" class="pixisync-slot-card" id="pixisyncSlotCard">
 <div>
@@ -1741,11 +1742,42 @@
 <div class="modal__body pixisync-slot-purchase__body">
 <div class="pixisync-slot-purchase__price">
 <strong>100円</strong>
-<span>1枠・有効期限なし</span>
+<span>1枠あたり・有効期限なし</span>
 </div>
+<label class="pixisync-slot-purchase__quantity" for="pixisyncSlotQuantity">
+<span>購入数</span>
+<select aria-describedby="pixisyncSlotTotal" id="pixisyncSlotQuantity">
+<option value="1">1枠</option>
+<option value="2">2枠</option>
+<option value="3">3枠</option>
+<option value="4">4枠</option>
+<option value="5">5枠</option>
+<option value="6">6枠</option>
+<option value="7">7枠</option>
+<option value="8">8枠</option>
+<option value="9">9枠</option>
+<option value="10">10枠</option>
+<option value="11">11枠</option>
+<option value="12">12枠</option>
+<option value="13">13枠</option>
+<option value="14">14枠</option>
+<option value="15">15枠</option>
+<option value="16">16枠</option>
+<option value="17">17枠</option>
+<option value="18">18枠</option>
+<option value="19">19枠</option>
+<option value="20">20枠</option>
+</select>
+<strong aria-live="polite" id="pixisyncSlotTotal">合計100円</strong>
+</label>
 <p class="pixisync-slot-purchase__status" id="pixisyncSlotPurchaseStatus">現在の作成枠を確認しています…</p>
+<section class="pixisync-slot-purchase__resolution" hidden="" id="pixisyncSlotResolution">
+<h3>共有中のプロジェクトを整理</h3>
+<p class="help-text">この端末に保存済みのプロジェクトを選ぶと、そのプロジェクトを開きます。内容を確認して「共有を解除してローカル専用にする」を押してください。</p>
+<div class="pixisync-slot-purchase__rooms" id="pixisyncSlotRoomList"></div>
+</section>
 <ul class="pixisync-slot-purchase__points">
-<li>購入するたび、同時に作成・保持できる枠が1つ増えます。</li>
+<li>1枠100円で、購入数をまとめて選べます。</li>
 <li>他の人のシェアプロジェクトへの参加は枠を消費しません。</li>
 <li>返金時もプロジェクトは削除されず、新規作成だけが上限まで停止します。</li>
 </ul>
@@ -1987,7 +2019,7 @@
 	<script defer="" src="assets/js/modules/canvas-wheel-zoom-workflow-utils.js?v=2026.07.12-wheel-visibility-surface-fix1"></script>
 	<script defer="" src="assets/js/modules/ios-snapshot-utils.js?v=2026.07.01-pixfind-mode-split-v1"></script>
 	<script defer="" src="assets/js/modules/update-history-utils.js?v=2026.06.28-file-split-step7"></script>
-	<script defer="" src="assets/js/modules/static-content.js?v=20260803-pixisync-slots1"></script>
+	<script defer="" src="assets/js/modules/static-content.js?v=20260803-pixisync-localize1"></script>
 	<script defer="" src="assets/js/modules/binary-codecs.js?v=20260719-open-typed1"></script>
 	<script defer="" src="assets/js/modules/export-codecs.js?v=2026.06.28-file-split-step1"></script>
 	<script defer="" src="assets/vendor/jsQR.min.js?v=1.4.0"></script>
@@ -2055,8 +2087,8 @@
 	<script defer="" src="assets/js/modules/pixisync-collaboration-controller-utils.js?v=20260802-pixisync-lazy-cell1"></script>
 	<script defer="" src="assets/js/modules/pixisync-session-state.js?v=20260731-checkpoint-diagnostics1"></script>
 	<script defer="" src="assets/js/modules/pixisync-project-switch-utils.js?v=20260802-project-share-scope1"></script>
-	<script defer="" src="assets/js/modules/pixisync-minimal-ui-utils.js?v=20260803-pixisync-resume1"></script>
-	<script defer="" src="assets/js/modules/pixisync-runtime-adapter-utils.js?v=20260803-pixisync-slots1"></script>
+	<script defer="" src="assets/js/modules/pixisync-minimal-ui-utils.js?v=20260803-pixisync-localize1"></script>
+	<script defer="" src="assets/js/modules/pixisync-runtime-adapter-utils.js?v=20260803-pixisync-localize1"></script>
 	<script defer="" src="assets/js/modules/pixieed-account-workflow-utils.js?v=20260730-remove-legacy-share-card1"></script>
 	<script defer="" src="assets/js/modules/startup-tail-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
 	<script defer="" src="assets/js/modules/controls-mirror.js?v=20260803-mobile-window-reset1"></script>
@@ -2065,7 +2097,7 @@
 	<script defer="" src="assets/js/modules/local-project-v2-migration-utils.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/pre-update-checkpoint-utils.js?v=20260712-pre-update-checkpoint-u3"></script>
 	<script defer="" src="assets/js/active-project-session-utils.js?v=20260715-local-true-v2-cleanup1"></script>
-    <script defer="" src="assets/js/app.js?v=20260803-pixisync-resume-delete1"></script>
+    <script defer="" src="assets/js/app.js?v=20260803-pixisync-localize1"></script>
 	<script defer="" src="assets/js/modules/update-detection-utils.js?v=20260719-file-protocol1"></script>
   <script>
     (function initPanelAdDocking() {
@@ -2710,7 +2742,7 @@
   </script>
 
 	<script src="../scripts/tool-fullscreen.js?v=2026.07.20-pixiedraw-fullscreen-ad1"></script>
-	<script src="../scripts/shared-bottom-nav.js?v=20260803-details-ad-responsive2"></script>
+	<script src="../scripts/shared-bottom-nav.js?v=20260803-tools-panel1"></script>
 	<script>
     (function initOperationHelpAd() {
       if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.('operation-help-dialog')) return;

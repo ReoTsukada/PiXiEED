@@ -14,6 +14,14 @@ function recordValue(value: unknown): JsonRecord {
   return value && typeof value === "object" ? value as JsonRecord : {};
 }
 
+function parseSlotQuantity(value: unknown): number {
+  const quantity = Number(value ?? 1);
+  if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > 20) {
+    throw new Error("Stripe決済の購入数を確認できません。");
+  }
+  return quantity;
+}
+
 serve(async (request) => {
   if (request.method === "OPTIONS") return jsonResponse(request, { ok: true });
   if (request.method !== "POST") return jsonResponse(request, { ok: false, error: "method not allowed" }, 405);
@@ -31,13 +39,14 @@ serve(async (request) => {
       { method: "GET" },
     );
     const metadata = recordValue(session.metadata);
+    const quantity = parseSlotQuantity(metadata.pixieed_slot_quantity);
     const purchaseId = stringValue(metadata.pixieed_purchase_id) || stringValue(session.client_reference_id);
     if (
       metadata.pixieed_product_key !== "pixisync_project_slot"
       || stringValue(metadata.pixieed_user_id) !== user.id
       || session.mode !== "payment"
       || session.payment_status !== "paid"
-      || Number(session.amount_total) !== 100
+      || Number(session.amount_total) !== quantity * 100
       || !purchaseId
     ) {
       throw new Error("Stripe決済内容が作成枠の購入と一致しません");

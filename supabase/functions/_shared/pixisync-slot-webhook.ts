@@ -15,19 +15,28 @@ function objectId(value: JsonRecord): string {
   return stringValue(value.id);
 }
 
+function parseSlotQuantity(value: unknown): number {
+  const quantity = Number(value ?? 1);
+  if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > 20) {
+    throw new Error("Stripe checkout slot quantity is invalid");
+  }
+  return quantity;
+}
+
 async function completeCheckout(
   admin: ReturnType<typeof createAdminClient>,
   eventId: string,
   session: JsonRecord,
 ) {
   const metadata = recordValue(session.metadata);
+  const quantity = parseSlotQuantity(metadata.pixieed_slot_quantity);
   const purchaseId = stringValue(metadata.pixieed_purchase_id) || stringValue(session.client_reference_id);
   const userId = stringValue(metadata.pixieed_user_id);
   if (
     metadata.pixieed_product_key !== "pixisync_project_slot"
     || session.mode !== "payment"
     || session.payment_status !== "paid"
-    || Number(session.amount_total) !== 100
+    || Number(session.amount_total) !== quantity * 100
     || !purchaseId
     || !userId
   ) throw new Error("Stripe checkout does not match a PiXiSYNC slot purchase");

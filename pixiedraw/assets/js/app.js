@@ -354,11 +354,16 @@
       pixisyncResumeNoticeClose: document.getElementById('pixisyncResumeNoticeClose'),
       pixisyncCopyInvite: document.getElementById('pixisyncCopyInvite'),
       pixisyncCopyInviteCode: document.getElementById('pixisyncCopyInviteCode'),
+      pixisyncLocalize: document.getElementById('pixisyncLocalize'),
       pixisyncSlotCard: document.getElementById('pixisyncSlotCard'),
       pixisyncSlotSummary: document.getElementById('pixisyncSlotSummary'),
       pixisyncBuySlot: document.getElementById('pixisyncBuySlot'),
       pixisyncSlotPurchaseDialog: document.getElementById('pixisyncSlotPurchaseDialog'),
+      pixisyncSlotQuantity: document.getElementById('pixisyncSlotQuantity'),
+      pixisyncSlotTotal: document.getElementById('pixisyncSlotTotal'),
       pixisyncSlotPurchaseStatus: document.getElementById('pixisyncSlotPurchaseStatus'),
+      pixisyncSlotResolution: document.getElementById('pixisyncSlotResolution'),
+      pixisyncSlotRoomList: document.getElementById('pixisyncSlotRoomList'),
       pixisyncSlotPurchaseNotice: document.getElementById('pixisyncSlotPurchaseNotice'),
       pixisyncSlotPurchaseRefresh: document.getElementById('pixisyncSlotPurchaseRefresh'),
       pixisyncSlotPurchaseClose: document.getElementById('pixisyncSlotPurchaseClose'),
@@ -13093,11 +13098,16 @@
         resumeNoticeClose: dom.controls.pixisyncResumeNoticeClose,
         copyInvite: dom.controls.pixisyncCopyInvite,
         copyInviteCode: dom.controls.pixisyncCopyInviteCode,
+        localize: dom.controls.pixisyncLocalize,
         slotCard: dom.controls.pixisyncSlotCard,
         slotSummary: dom.controls.pixisyncSlotSummary,
         buySlot: dom.controls.pixisyncBuySlot,
         slotPurchaseDialog: dom.controls.pixisyncSlotPurchaseDialog,
+        slotQuantity: dom.controls.pixisyncSlotQuantity,
+        slotTotal: dom.controls.pixisyncSlotTotal,
         slotPurchaseStatus: dom.controls.pixisyncSlotPurchaseStatus,
+        slotResolution: dom.controls.pixisyncSlotResolution,
+        slotRoomList: dom.controls.pixisyncSlotRoomList,
         slotPurchaseNotice: dom.controls.pixisyncSlotPurchaseNotice,
         slotPurchaseRefresh: dom.controls.pixisyncSlotPurchaseRefresh,
         slotPurchaseClose: dom.controls.pixisyncSlotPurchaseClose,
@@ -27809,6 +27819,9 @@
       && typeof switchUtils?.runtimeMatchesProjectBinding === 'function'
       && switchUtils.runtimeMatchesProjectBinding(runtime, projectKey, binding)
     ) {
+      if (binding?.role === 'owner') {
+        await runtime.localize?.();
+      }
       await disposePiXiSyncRuntimeForProjectSwitch(runtime);
     }
 
@@ -27821,7 +27834,7 @@
     });
     if (error) throw error;
     const result = Array.isArray(data) ? data[0] : data;
-    if (!['owner_archived', 'participant_left', 'already_detached'].includes(String(result?.action || ''))) {
+    if (!['owner_localized', 'participant_left', 'already_detached'].includes(String(result?.action || ''))) {
       throw new Error('PiXiSYNC project deletion: remote-detach-unconfirmed');
     }
     return true;
@@ -28412,6 +28425,11 @@
         });
         return true;
       },
+      persistLocalProject: async () => {
+        const saved = await writeAutosaveSnapshot(true);
+        if (saved !== true) throw new Error('PiXiSYNC local project save failed');
+        return true;
+      },
       getProjectKey: () => normalizeAutosaveProjectId?.(autosaveProjectId || '') || '',
       getProjectTitle: () => state.documentName || DEFAULT_DOCUMENT_NAME,
       getParticipantIdentity: () => ({
@@ -28527,6 +28545,27 @@
         });
         await saveRecentProjectsList(entries, nextEntries);
         setRecentProjectsCache(nextEntries);
+      },
+      listLocalOwnedRooms: async () => (await loadRecentProjectsMetadata())
+        .filter(entry => entry?.pixisync?.role === 'owner')
+        .map(entry => String(entry.pixisync.roomId || '').toLowerCase())
+        .filter(Boolean),
+      openLocalOwnedRoom: async roomId => {
+        const normalizedRoomId = String(roomId || '').toLowerCase();
+        const entries = await loadRecentProjectsMetadata();
+        const entry = entries.find(candidate => (
+          candidate?.pixisync?.role === 'owner'
+          && String(candidate.pixisync.roomId || '').toLowerCase() === normalizedRoomId
+        ));
+        if (!entry) return false;
+        const saved = await writeAutosaveSnapshot(true);
+        if (saved !== true) throw new Error('PiXiSYNC project switch: local-project-save-failed');
+        return openRecentProject(entry, {
+          hideStartup: true,
+          silent: false,
+          allowProjectMismatchLoad: true,
+          replaceOpenProjectTabs: true,
+        });
       },
       acquireProjectLease,
       ensureAuthenticatedStart: options => ensureSharedProjectAuthenticatedStart(options),

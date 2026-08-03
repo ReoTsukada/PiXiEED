@@ -16,6 +16,9 @@ verify_jwt = false
 [functions.pixisync-reconcile-slot-purchase]
 verify_jwt = false
 
+[functions.pixisync-cleanup-localized-room]
+verify_jwt = false
+
 [functions.pixisync-stripe-webhook]
 verify_jwt = false
 

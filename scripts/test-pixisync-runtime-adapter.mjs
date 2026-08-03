@@ -114,6 +114,7 @@ class LifecycleServer {
               allowed_slots: 1 + this.slotPurchased,
               open_owned_projects: this.status === 'active' || this.status === 'initializing' ? 1 : 0,
               available_slots: Math.max(0, 1 + this.slotPurchased - (this.status === 'active' || this.status === 'initializing' ? 1 : 0)),
+              over_limit_projects: 0,
             }], error: null };
           }
           if (name === 'pixisync_activate_initial_checkpoint') {
@@ -194,10 +195,13 @@ class LifecycleServer {
             assert.equal(String(params.p_state_sha256).slice(2), this.checkpointHash);
             return { data: [{ checkpoint_id: this.checkpointId, status: 'verified', attested_user_count: 1, required_user_count: 1 }], error: null };
           }
-          if (name === 'pixisync_archive_session') {
+          if (name === 'pixisync_begin_room_localization') {
             this.status = 'archived';
             this.generation += 1;
             return { data: [{ status: 'archived', head_revision: String(this.head), active_checkpoint_id: this.checkpointId, session_generation: String(this.generation) }], error: null };
+          }
+          if (name === 'pixisync_ack_room_localized') {
+            return { data: [{ expected_members: 2, localized_members: 1, cleanup_ready: false }], error: null };
           }
           throw new Error(`unexpected RPC ${name}`);
         } catch (error) {
@@ -418,17 +422,26 @@ assert.deepEqual(await owner.adapter.commands.getProjectSlotStatus(), {
   allowedSlots: 1,
   openOwnedProjects: 0,
   availableSlots: 1,
+  overLimitProjects: 0,
 });
 assert.equal(
   await owner.adapter.commands.createProjectSlotCheckout(),
   'https://checkout.stripe.com/c/pay/cs_test_slot'
 );
+assert.equal(server.slotFunctionCalls.at(-1).name, 'pixisync-create-slot-checkout');
+assert.deepEqual(server.slotFunctionCalls.at(-1).body, { quantity: 1 });
+assert.equal(
+  await owner.adapter.commands.createProjectSlotCheckout(3),
+  'https://checkout.stripe.com/c/pay/cs_test_slot'
+);
+assert.deepEqual(server.slotFunctionCalls.at(-1).body, { quantity: 3 });
 assert.deepEqual(await owner.adapter.commands.reconcileProjectSlotPurchase('cs_test_slot_123'), {
   includedSlots: 1,
   purchasedSlots: 1,
   allowedSlots: 2,
   openOwnedProjects: 0,
   availableSlots: 2,
+  overLimitProjects: 0,
 });
 assert.equal(await owner.adapter.start(), ROOM_ID);
 assert.equal(owner.adapter.snapshot().session.phase, 'active');
@@ -593,7 +606,7 @@ assert.equal(server.members.has('editor'), false);
 assert.equal(editorBindings.has('project-editor-existing-room-card'), false);
 
 await owner.adapter.archive();
-assert.equal(owner.adapter.snapshot().session.phase, 'archived');
+assert.equal(owner.adapter.snapshot().session.phase, 'local');
 assert.equal(server.status, 'archived');
 assert.equal(server.checkpointHash, await sha256(server.objects.get(server.checkpointPath)));
 assert.equal(ownerBindings.has('project-owner'), false);

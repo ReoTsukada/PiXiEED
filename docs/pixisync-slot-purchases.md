@@ -1,15 +1,23 @@
 # PiXiSYNC 作成枠販売
 
-PiXiSYNCのシェアプロジェクト作成枠を、Stripe Checkoutで1枠100円の買い切りとして販売する実装メモです。無料枠は1アカウント1枠で、購入ごとに永久枠を1つ追加します。
+PiXiSYNCのシェアプロジェクト作成枠を、Stripe Checkoutで1枠100円の買い切りとして販売する実装メモです。無料枠は1アカウント1枠で、購入画面から1〜20枠をまとめて選択できます。
 
 ## 安全性の前提
 
 - ブラウザの完了画面だけでは枠を付与しない。
 - `checkout.session.completed` の署名済みWebhook、またはログイン済み購入者によるStripe Session再照合で決済を確認する。
-- `amount_total = 100`、商品キー、購入ID、ユーザーID、Checkout Session IDがすべて一致した場合だけ付与する。
+- `amount_total = 購入数 × 100`、商品キー、購入ID、ユーザーID、Checkout Session IDがすべて一致した場合だけ付与する。
 - WebhookイベントはイベントIDで冪等化し、同じイベントを再送しても枠を重複付与しない。
 - Stripe秘密鍵とWebhook署名SecretはEdge FunctionsのSecretに置き、ブラウザやGitへ含めない。本番は既存の`market-stripe-webhook`と`STRIPE_WEBHOOK_SECRET`を再利用する。
 - 返金またはチャージバック時は購入枠を差し引くが、既存のシェアプロジェクトは削除しない。
+- 無料枠は既存の共有件数にかかわらず常に1枠。既存の上限超過データは残すが、超過件数を無料枠へ繰り入れない。
+
+## 上限到達時とローカル化
+
+- 上限に達した共有開始画面では、共有中のプロジェクトを選んで開き、内容を確認してローカル専用へ戻すか、Stripeで1枠100円の追加枠を必要な数だけ購入できる。
+- 共有解除時は最終チェックポイントを固定し、各参加者の端末でローカル保存が成功した後に、参加者単位で完了確認を記録する。
+- 全参加者がローカル保存を完了するまでサーバー上の最終状態は保持する。最後の完了確認後にStorageオブジェクトを削除し、続いてDBのルーム関連レコードを削除する。
+- オフラインの参加者が戻らない場合は自動削除を待つ。容量削減を理由に未保存データを期限削除しない。
 
 ## 決済手段
 
@@ -27,7 +35,7 @@ PiXiSYNCのシェアプロジェクト作成枠を、Stripe Checkoutで1枠100�
    - `charge.refunded`
    - `charge.dispute.created`
    - `charge.dispute.closed`
-4. テストカードで100円を購入し、戻り画面で作成枠が1つ増えることを確認する。
+4. テストカードで数量を選んで購入し、戻り画面で選択した数だけ作成枠が増えることを確認する。
 5. 同じWebhookを再送しても購入枠が重複しないことを確認する。
 6. 全額返金で購入枠が1つ減り、既存プロジェクトが削除されないことを確認する。
 
@@ -43,6 +51,7 @@ supabase db push --yes
 supabase migration list
 supabase functions deploy pixisync-create-slot-checkout --use-api
 supabase functions deploy pixisync-reconcile-slot-purchase --use-api
+supabase functions deploy pixisync-cleanup-localized-room --use-api
 supabase functions deploy market-stripe-webhook --use-api
 ```
 
