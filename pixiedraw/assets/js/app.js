@@ -9,12 +9,10 @@
   const APP_BUILD_VERSION = String(APP_BUILD_INFO.buildId || 'unknown-build');
   const APP_SW_VERSION = APP_BUILD_VERSION;
   // Keep the retired legacy shared-project flow disabled. PiXiSYNC v1 has its
-  // own runtime and initial gesture gate, so it must not re-enable legacy
+  // own runtime, so enabling its ordinary UI must not re-enable legacy
   // project-loading branches.
   const SHARED_PROJECTS_ENABLED = false;
   const PIXISYNC_V1_ENABLED = true;
-  const PIXISYNC_INITIAL_GATE_TAP_COUNT = 10;
-  const PIXISYNC_INITIAL_GATE_RESET_MS = 1800;
   const SHARED_PROJECT_REMOTE_DRAW_CONFIRMED_ONLY = true;
   const PWA_CONTROLLER_CHANGE_RELOAD_SUPPRESS_MS = 8000;
 
@@ -21315,9 +21313,9 @@
   }
 
   function maybeApplyInviteAutoJoin() {
-    // The initial production rollout must not auto-start collaboration from an
-    // invite URL.  The same-tab settings gesture unlocks PiXiSYNC explicitly.
-    if (!SHARED_PROJECTS_ENABLED || !pixisyncInitialGateUnlocked) {
+    // This is the retired shared-project flow. PiXiSYNC V1 invite handling is
+    // initialized separately below and is available through normal UI actions.
+    if (!SHARED_PROJECTS_ENABLED) {
       multiInviteAutoJoinHandled = true;
       clearPendingSharedInvite();
       clearMultiInviteQueryParamsFromUrl();
@@ -27806,10 +27804,6 @@
       return result;
     }
 
-    pixisyncInitialGateUnlocked = true;
-    window.__PIXISYNC_SHARE_START_UNLOCKED__ = true;
-    document.body?.setAttribute('data-pixisync-initial-gate', 'unlocked');
-    setPiXiSyncInitialGateButtonsEnabled(true);
     try {
       const saved = await writeAutosaveSnapshot(true);
       if (!saved) scheduleAutosaveSnapshot();
@@ -28491,12 +28485,8 @@
     );
     if (!isExpectedProjectActive()) return false;
     try {
-      // A bound card is an explicit PiXiSYNC entry point. Unlike the initial
-      // discovery gesture, reopening it must expose the sync panel at once.
-      pixisyncInitialGateUnlocked = true;
-      window.__PIXISYNC_SHARE_START_UNLOCKED__ = true;
-      document.body?.setAttribute('data-pixisync-initial-gate', 'unlocked');
-      setPiXiSyncInitialGateButtonsEnabled(true);
+      // A bound card is an explicit PiXiSYNC entry point and resumes through
+      // the same normal share-mode path as a newly opened panel.
       let runtime = window.__PIXISYNC_V1_RUNTIME__ || await initializePiXiSyncRuntime();
       if (!runtime && isExpectedProjectActive()) {
         runtime = await initializePiXiSyncRuntime();
@@ -28522,11 +28512,7 @@
     }
   }
 
-  let pixisyncInitialGateUnlocked = false;
-  let pixisyncInitialGateTapCount = 0;
-  let pixisyncInitialGateResetTimer = 0;
-
-  function setPiXiSyncInitialGateButtonsEnabled(enabled) {
+  function setPiXiSyncButtonsEnabled(enabled) {
     const active = enabled === true;
     [dom.controls.pixisyncQuickOpen, dom.controls.pixisyncMobileTab].forEach(button => {
       if (!(button instanceof HTMLButtonElement)) return;
@@ -28537,19 +28523,8 @@
     });
   }
 
-  function setupPiXiSyncInitialGate() {
-    window.__PIXISYNC_SHARE_START_UNLOCKED__ = false;
-    const settingsButtons = Array.from(new Set([
-      document.querySelector('[data-quick-right-tab="settings"]'),
-      document.getElementById('mobileTabSettings'),
-    ].filter(button => button instanceof HTMLButtonElement)));
-    const resetTapCount = () => {
-      pixisyncInitialGateTapCount = 0;
-      pixisyncInitialGateResetTimer = 0;
-    };
-    // 参加者は設定ボタンの隠しゲートを経由せず、シェアモード入口から
-    // 招待リンク／コードを通常操作できるようにする。
-    setPiXiSyncInitialGateButtonsEnabled(true);
+  function setupPiXiSyncShareMode() {
+    setPiXiSyncButtonsEnabled(true);
     [dom.controls.pixisyncQuickOpen, dom.controls.pixisyncMobileTab].forEach(button => {
       button?.addEventListener?.('click', () => {
         if (window.__PIXISYNC_V1_RUNTIME__) return;
@@ -28558,35 +28533,6 @@
         });
       }, { once: false });
     });
-    const unlock = async () => {
-      if (pixisyncInitialGateUnlocked) return;
-      pixisyncInitialGateTapCount += 1;
-      if (pixisyncInitialGateResetTimer) window.clearTimeout(pixisyncInitialGateResetTimer);
-      pixisyncInitialGateResetTimer = window.setTimeout(resetTapCount, PIXISYNC_INITIAL_GATE_RESET_MS);
-      if (pixisyncInitialGateTapCount < PIXISYNC_INITIAL_GATE_TAP_COUNT) return;
-
-      resetTapCount();
-      pixisyncInitialGateUnlocked = true;
-      window.__PIXISYNC_SHARE_START_UNLOCKED__ = true;
-      document.body?.setAttribute('data-pixisync-initial-gate', 'unlocked');
-      setPiXiSyncInitialGateButtonsEnabled(true);
-      try {
-        const runtime = await initializePiXiSyncRuntime();
-        if (!runtime) throw new Error('PiXiSYNC runtime is unavailable');
-        if (layoutMode === 'mobilePortrait') {
-          activateMobileTab('multi', { ensureDrawer: true });
-        } else {
-          dom.controls.pixisyncQuickOpen?.click();
-        }
-      } catch (error) {
-        pixisyncInitialGateUnlocked = false;
-        document.body?.removeAttribute('data-pixisync-initial-gate');
-        setPiXiSyncInitialGateButtonsEnabled(false);
-        window.PiXiEEDrawModules?.pixisyncRuntimeBridge?.clear?.();
-        console.warn('PiXiSYNC initial gate bootstrap failed', error);
-      }
-    };
-    settingsButtons.forEach(button => button.addEventListener('click', () => { void unlock(); }));
   }
 
   async function init() {
@@ -28654,7 +28600,7 @@
         console.warn('Account bootstrap failed', error);
         return false;
       });
-      setupPiXiSyncInitialGate();
+      setupPiXiSyncShareMode();
       let openedPixiSyncInvite = false;
       // 招待URLで開いた受信側は、設定ボタンのゲート操作を要求せず
       // V1シェアランタイムを先に起動してリンクを消費する。
@@ -28663,10 +28609,6 @@
         const inviteUrl = new URL(window.location.href);
         if (inviteUrl.searchParams.has('pixisync_invite')) {
           openedPixiSyncInvite = true;
-          pixisyncInitialGateUnlocked = true;
-          window.__PIXISYNC_SHARE_START_UNLOCKED__ = true;
-          document.body?.setAttribute('data-pixisync-initial-gate', 'unlocked');
-          setPiXiSyncInitialGateButtonsEnabled(true);
         }
       } catch (error) {
         console.warn('PiXiSYNC invite bootstrap failed', error);

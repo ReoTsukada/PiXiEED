@@ -53,7 +53,7 @@ assert.match(indexHtml, /pixisync-document-operation-utils\.js\?v=20260801-adapt
 for (const assetName of [
   'assets\/js\/modules\/pixisync-minimal-ui-utils.js',
 ]) {
-  assert.match(indexHtml, new RegExp(`${assetName}\\?v=20260801-startup-code1`));
+  assert.match(indexHtml, new RegExp(`${assetName}\\?v=20260803-pixisync-production1`));
 }
 for (const assetName of [
   'assets\/js\/modules\/open-project-tab-workflow-utils.js',
@@ -64,7 +64,7 @@ for (const assetName of [
   assert.match(indexHtml, new RegExp(`${assetName}\\?v=20260802-project-share-scope1`));
 }
 assert.match(indexHtml, /assets\/js\/modules\/pixisync-runtime-adapter-utils\.js\?v=20260803-pixisync-structure-controls1/);
-assert.match(indexHtml, /assets\/js\/app\.js\?v=20260803-pixisync-structure-controls1/);
+assert.match(indexHtml, /assets\/js\/app\.js\?v=20260803-pixisync-production1/);
 assert.match(serviceWorker, /fetch\(request, \{ cache: 'no-store' \}\)/);
 assert.match(app, /serviceWorker\.register\(swUrl, \{ updateViaCache: 'none' \}\)/);
 assert.match(app, /!startupReady && !controllerChangeReloaded && !isProjectCommandLocked\(\)/);

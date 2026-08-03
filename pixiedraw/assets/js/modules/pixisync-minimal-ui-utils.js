@@ -278,21 +278,11 @@
     }
 
     const handlers = {
-      start: () => {
-        if (
-          typeof window !== 'undefined'
-          && window.__PIXISYNC_SHARE_START_UNLOCKED__ !== true
-        ) {
-          setNotice('テスト中のため、シェアモード開始には設定ボタンを10回連打してください。');
-          render();
-          return false;
-        }
-        return runAction('start', commands.start, {
+      start: () => runAction('start', commands.start, {
         pendingMessage: '共有を作成しています…',
         successMessage: '共有セッションを開始しました。',
         failureMessage: '共有を開始できませんでした。',
-        });
-      },
+      }),
       copyInvite: () => runAction('copyInvite', async () => {
         let inviteLink = await commands.createInviteLink();
         try {

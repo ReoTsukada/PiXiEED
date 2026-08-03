@@ -64,7 +64,6 @@ const fakeDocument = {
 };
 globalThis.window = {
   PiXiEEDrawModules: {},
-  __PIXISYNC_SHARE_START_UNLOCKED__: true,
   document: fakeDocument,
   navigator: {},
   location: { href: 'https://example.test/pixiedraw/' },
@@ -346,6 +345,8 @@ assert.ok(
   'the shared invite/comment input must stay below the viewport',
 );
 assert.match(app, /runtime\?\.uiEnabled === true/);
+assert.match(app, /function setupPiXiSyncShareMode\(\)/);
+assert.doesNotMatch(app, /PIXISYNC_INITIAL_GATE_TAP_COUNT|PIXISYNC_SHARE_START_UNLOCKED|pixisyncInitialGate/);
 assert.match(app, /pixisyncMinimalUi\?\.consumeInviteFromUrl/);
 assert.match(app, /resolveProjectBindingTarget:[\s\S]*?resolvePiXiSyncRecentProjectTarget/);
 assert.match(app, /candidate\?\.id !== replacedProjectKey/);
