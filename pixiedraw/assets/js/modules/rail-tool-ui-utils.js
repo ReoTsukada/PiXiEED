@@ -918,11 +918,21 @@
       return;
     }
     windowElement.dataset.landscapeWindowBoundsBound = 'true';
-    const keepReachable = () => applyLandscapeWindowOffset(
-      windowElement,
-      Number(windowElement.dataset.landscapeWindowOffsetX || 0) || 0,
-      Number(windowElement.dataset.landscapeWindowOffsetY || 0) || 0
-    );
+    const keepReachable = () => {
+      const remainsFloatingWindow = windowElement.id === 'timelapseDialog'
+        || windowElement.classList.contains('is-compact-flyout');
+      if (!remainsFloatingWindow) {
+        delete windowElement.dataset.landscapeWindowOffsetX;
+        delete windowElement.dataset.landscapeWindowOffsetY;
+        windowElement.style.removeProperty('transform');
+        return;
+      }
+      applyLandscapeWindowOffset(
+        windowElement,
+        Number(windowElement.dataset.landscapeWindowOffsetX || 0) || 0,
+        Number(windowElement.dataset.landscapeWindowOffsetY || 0) || 0
+      );
+    };
     if (typeof ResizeObserver === 'function') {
       new ResizeObserver(keepReachable).observe(windowElement);
     }

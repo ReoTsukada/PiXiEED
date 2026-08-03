@@ -379,6 +379,17 @@
       dom.leftRail.dataset.collapsed = 'true';
       dom.rightRail.dataset.collapsed = 'true';
       setMobileDrawerMode(MOBILE_DRAWER_DEFAULT_MODE, { persist: false });
+      // Desktop workspace windows can be dragged and retain an inline
+      // translate offset. Once the section is moved into a mobile drawer that
+      // desktop coordinate would pull controls underneath the fixed top ad.
+      Object.values(dom.sections || {}).forEach(section => {
+        if (!(section instanceof HTMLElement)) return;
+        delete section.dataset.landscapeWindowOffsetX;
+        delete section.dataset.landscapeWindowOffsetY;
+        section.style.removeProperty('transform');
+        section.style.removeProperty('height');
+        section.style.removeProperty('z-index');
+      });
     } else {
       endMobileDrawerDrag({ persist: false });
       dom.leftRail.dataset.collapsed = 'false';

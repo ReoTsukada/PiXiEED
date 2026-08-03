@@ -84,7 +84,7 @@
 </script>
 <script>window.__PIXIEEDRAW_BUILD_EDITION__ = 'web-free';</script>
 <script src="assets/js/modules/edition-capabilities-utils.js?v=20260719-file-no-ads1"></script>
-<script src="assets/js/build-info.js?v=20260803-172"></script>
+<script src="assets/js/build-info.js?v=20260803-173"></script>
 <script>
   (function configurePixieedAds() {
     const shouldShowAds = typeof window.__PIXIEEDRAW_SHOULD_SHOW_ADS__ === 'function'
@@ -193,7 +193,7 @@
       if (!(slot instanceof HTMLElement)) {
         return null;
       }
-      return slot.closest('.panel-ad, .export-ad, .startup-recent-card--ad, .pixieed-shared-top-ad, .ad-block')
+      return slot.closest('.panel-ad, .export-ad, .startup-recent-card--ad, .pixieed-shared-top-ad, .pixieed-common-details__ad, .ad-block')
         || slot.parentElement;
     }
 
@@ -206,7 +206,7 @@
         || slot.getAttribute('data-adsbygoogle-status')
         || ''
       ).trim().toLowerCase();
-      const isUnfilled = status === 'unfilled';
+      const isUnfilled = status === 'unfilled' || status === 'unfill-optimized';
       const visualHost = getAdVisualHost(slot);
       const mount = visualHost?.closest?.('.panel-ad-mount') || null;
       const reserveSpace = visualHost?.dataset?.pixieedReserveAdSpace === 'true'
@@ -296,6 +296,7 @@
       const ratio = width / height;
       const isProjectCardAd = slot.dataset.pixieedAdCard === 'true';
       const isSharedBannerAd = slot.dataset.pixieedSharedBanner === 'true';
+      const isPanelContextAd = Boolean(slot.closest('.panel-ad--owned, .pixieed-common-details__ad'));
       const isMobileContext = Boolean(document.body?.classList.contains('is-mobile-layout'))
         || Boolean(window.matchMedia?.('(max-width: 767px)').matches);
       // A project-list card is a near-square thumbnail. Letting the mobile
@@ -304,6 +305,8 @@
         ? 'horizontal'
         : isProjectCardAd
         ? 'rectangle'
+        : isPanelContextAd
+        ? 'auto'
         : isMobileContext
         ? 'auto'
         : (ratio >= 2.1
@@ -311,7 +314,7 @@
           : (ratio <= 0.72 ? 'vertical' : 'rectangle'));
       slot.setAttribute('data-ad-format', format);
       slot.dataset.pixiedAdFormat = format;
-      if (isMobileContext && !isProjectCardAd && !isSharedBannerAd) {
+      if ((isMobileContext || isPanelContextAd) && !isProjectCardAd && !isSharedBannerAd) {
         slot.setAttribute('data-full-width-responsive', 'true');
       } else {
         slot.setAttribute('data-full-width-responsive', 'false');
@@ -435,15 +438,15 @@
     window.__PIXIEEDRAW_RENDER_AD_SLOT__ = renderAdSlot;
     // The shared mobile chrome calls this after page lifecycle and orientation
     // changes. The same slot gate prevents it from pushing an existing ins twice.
-    window.pixieedObserveAds = root => {
+    window.pixieedObserveAds = (root, options = {}) => {
       const slots = [];
       if (root instanceof HTMLElement && root.matches('ins.adsbygoogle, ins.ad-seed')) {
         slots.push(root);
       }
       root?.querySelectorAll?.('ins.adsbygoogle, ins.ad-seed').forEach(slot => slots.push(slot));
-      slots.forEach(slot => renderAdSlot(slot, {
-        owner: 'shared-mobile-top-ad',
-        reason: 'shared-mobile-observer',
+      return slots.map(slot => renderAdSlot(slot, {
+        owner: String(options.owner || 'shared-mobile-top-ad'),
+        reason: String(options.reason || 'shared-mobile-observer'),
       }));
     };
   })();
@@ -473,7 +476,7 @@
 
 
 
-<link href="assets/css/style.css?v=20260803-ad-placement1" rel="stylesheet"/>
+<link href="assets/css/style.css?v=20260803-ad-responsive2" rel="stylesheet"/>
 <link rel="icon" type="image/png" sizes="192x192" href="../icon/icon-192-4.png"/>
 <link rel="icon" type="image/png" sizes="512x512" href="../icon/icon-512-4.png"/>
 <style>
@@ -1261,9 +1264,9 @@
 <button class="button" id="openTimelapse" type="button">タイムラプスを見る</button>
 </div>
 <div class="panel-ad-mount panel-ad-mount--context panel-ad-mount--owned" data-panel-ad-mount="right">
-<div aria-label="広告" class="panel-ad panel-ad--context panel-ad--owned" data-pixieed-owned-panel-ad="file" data-pixieed-reserve-ad-space="true" id="rightPanelContextAd">
+<div aria-label="広告" class="panel-ad panel-ad--context panel-ad--owned" data-pixieed-owned-panel-ad="file" id="rightPanelContextAd">
 <div class="ad-box" id="rightPanelContextAdSlot">
-<ins class="ad-seed" data-ad-client="ca-pub-9801602250480253" data-ad-format="horizontal" data-ad-slot="1180252398" data-full-width-responsive="false" style="display:block"></ins>
+<ins class="ad-seed" data-ad-client="ca-pub-9801602250480253" data-ad-format="auto" data-ad-slot="2141591954" data-full-width-responsive="true" style="display:block"></ins>
 </div>
 </div>
 </div>
@@ -1279,7 +1282,6 @@
 <button class="button button--danger" id="clearCanvas" type="button">キャンバスをクリア</button>
 </div>
 </details>
-<div class="panel-ad-mount" data-panel-ad-mount="left"></div>
 </div>
 </section>
 <div hidden="" id="pixieedDetailActionSources">
@@ -1315,9 +1317,9 @@
 </div>
 </div>
 <div class="panel-ad-mount panel-ad-mount--context panel-ad-mount--owned" data-panel-ad-mount="right">
-<div aria-label="広告" class="panel-ad panel-ad--context panel-ad--owned" data-pixieed-owned-panel-ad="settings" data-pixieed-reserve-ad-space="true" id="settingsPanelContextAd">
+<div aria-label="広告" class="panel-ad panel-ad--context panel-ad--owned" data-pixieed-owned-panel-ad="settings" id="settingsPanelContextAd">
 <div class="ad-box" id="settingsPanelContextAdSlot">
-<ins class="ad-seed" data-ad-client="ca-pub-9801602250480253" data-ad-format="horizontal" data-ad-slot="1180252398" data-full-width-responsive="false" style="display:block"></ins>
+<ins class="ad-seed" data-ad-client="ca-pub-9801602250480253" data-ad-format="auto" data-ad-slot="2141591954" data-full-width-responsive="true" style="display:block"></ins>
 </div>
 </div>
 </div>
@@ -1416,7 +1418,6 @@
 <p class="settings-history__empty">履歴はまだありません。</p>
 </div>
 </details>
-<div class="panel-ad-mount" data-panel-ad-mount="left"></div>
 </div>
 </section>
 <section class="panel-section" data-section="help" id="panelHelp"></section>
@@ -1945,7 +1946,7 @@
 	<script defer="" src="assets/js/modules/selection-move-workflow-utils.js?v=20260801-pixisync-document-checkpoint1"></script>
 	<script defer="" src="assets/js/modules/snapshot-integer-scale-utils.js?v=2026.07.19-visual-scale3"></script>
 	<script defer="" src="assets/js/modules/layout-viewport.js?v=20260730-timeline-compact-first-frame1"></script>
-	<script defer="" src="assets/js/modules/rail-tool-ui-utils.js?v=2026.07.17-common-details4"></script>
+	<script defer="" src="assets/js/modules/rail-tool-ui-utils.js?v=20260803-mobile-window-reset1"></script>
 	<script defer="" src="assets/js/modules/control-ui-utils.js?v=2026.07.01-control-ui-split-v1"></script>
 	<script defer="" src="assets/js/modules/ui-action-buttons-workflow-utils.js?v=20260721-icons1"></script>
 	<script defer="" src="assets/js/modules/ui-action-router-workflow-utils.js?v=2026.07.17-global-help22"></script>
@@ -1989,7 +1990,7 @@
 	<script defer="" src="assets/js/modules/pixisync-runtime-adapter-utils.js?v=20260803-pixisync-structure-controls1"></script>
 	<script defer="" src="assets/js/modules/pixieed-account-workflow-utils.js?v=20260730-remove-legacy-share-card1"></script>
 	<script defer="" src="assets/js/modules/startup-tail-workflow-utils.js?v=2026.07.02-reload-startup-selection-v1"></script>
-	<script defer="" src="assets/js/modules/controls-mirror.js?v=20260728-mirror-state-reuse1"></script>
+	<script defer="" src="assets/js/modules/controls-mirror.js?v=20260803-mobile-window-reset1"></script>
 	<script defer="" src="assets/js/modules/external-tool-workflow-utils.js?v=2026.07.02-external-tool-workflow-split-v1"></script>
 	<script defer="" src="assets/js/modules/canonical-v2-project-utils.js?v=20260714-originality-v1"></script>
 	<script defer="" src="assets/js/modules/local-project-v2-migration-utils.js?v=20260715-local-true-v2-cleanup1"></script>
@@ -2009,8 +2010,9 @@
       };
       const sideSections = {
         left: ['panelColor', 'panelTools', 'panelFrames'],
-        right: ['panelFile'],
+        right: [],
       };
+      let contextAdLoadPromise = null;
       const mobileMountOrigins = new WeakMap();
       if (!(ads.left instanceof HTMLElement) && !(ads.right instanceof HTMLElement)) return;
 
@@ -2067,7 +2069,7 @@
         // the visual end of that drawer, so it owns the common inline ad.
         // This keeps the ad after the palette rather than interrupting tools.
         const ids = side === 'left' && isMobile
-          ? ['panelColor', 'panelTools', 'panelFrames', 'panelFile', 'panelSettings']
+          ? ['panelColor', 'panelTools', 'panelFrames']
           : (sideSections[side] || []);
         let fallback = null;
         let firstMount = null;
@@ -2116,6 +2118,22 @@
       }
 
       function queueContextAdRender() {
+        if (window.__PIXIEEDRAW_AD_RENDER_ENABLED__ !== true
+          && typeof window.__PIXIEEDRAW_LOAD_ADS__ === 'function') {
+          if (!contextAdLoadPromise) {
+            contextAdLoadPromise = Promise.resolve(window.__PIXIEEDRAW_LOAD_ADS__())
+              .catch(() => false)
+              .finally(() => {
+                contextAdLoadPromise = null;
+              });
+          }
+          contextAdLoadPromise.then(loaded => {
+            if (loaded && window.__PIXIEEDRAW_AD_RENDER_ENABLED__ === true) {
+              queueContextAdRender();
+            }
+          });
+          return;
+        }
         const contextAds = Array.from(new Set([
           ads.right,
           ...document.querySelectorAll('[data-pixieed-owned-panel-ad]'),
@@ -2623,7 +2641,7 @@
   </script>
 
 	<script src="../scripts/tool-fullscreen.js?v=2026.07.20-pixiedraw-fullscreen-ad1"></script>
-	<script src="../scripts/shared-bottom-nav.js?v=20260803-details-ad-placement1"></script>
+	<script src="../scripts/shared-bottom-nav.js?v=20260803-details-ad-responsive2"></script>
 	<script>
     (function initOperationHelpAd() {
       if (!window.__PIXIEEDRAW_SHOULD_SHOW_MODAL_ADS__?.('operation-help-dialog')) return;

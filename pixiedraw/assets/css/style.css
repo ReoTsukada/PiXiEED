@@ -5440,14 +5440,33 @@ input[type='range']::-moz-focus-outer {
   min-width: 28px;
   border: 1px solid rgba(var(--ui-rgb), 0.36);
   background: rgba(var(--ui-rgb), 0.14);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 21px 21px;
   color: rgba(225, 245, 250, 0.96);
   font: 700 0.9rem/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  image-rendering: pixelated;
 }
 
-#panelFile #newProject::before { content: '+'; }
-#panelFile #openDocument::before { content: '□'; }
-#panelFile #showLocalProjects::before { content: '▣'; }
-#panelFile #exportProject::before { content: '↓'; }
+#panelFile #newProject::before {
+  content: '';
+  background-image: url('../icons/file-new.png');
+}
+
+#panelFile #openDocument::before {
+  content: '';
+  background-image: url('../icons/file-open.png');
+}
+
+#panelFile #showLocalProjects::before {
+  content: '';
+  background-image: url('../icons/file-projects.png');
+}
+
+#panelFile #exportProject::before {
+  content: '';
+  background-image: url('../icons/file-export.png');
+}
 
 #panelDetails .panel-section__body {
   gap: 8px;
@@ -9703,7 +9722,7 @@ body.is-mobile-layout #panelSettings .canvas-resize-control-grid .canvas-resize-
 }
 
 .panel-ad-mount--context {
-  margin: 12px 0 4px;
+  margin: 14px 0 4px;
 }
 
 /* AdSense marks a final no-fill response on the ins node. Eligible placements
@@ -9743,6 +9762,7 @@ html[data-pixieed-ad-free-account='true'] .startup-recent-card--ad {
 
 .panel-ad.is-ad-unfilled,
 .panel-ad-mount.is-ad-unfilled,
+.pixieed-common-details__ad.is-ad-unfilled,
 .export-ad.is-ad-unfilled,
 .startup-recent-card--ad.is-ad-unfilled,
 .pixieed-shared-top-ad.is-ad-unfilled,
@@ -9766,9 +9786,9 @@ html[data-pixieed-ad-free-account='true'] .startup-recent-card--ad {
 
 .panel-ad--context {
   width: 100%;
-  min-height: clamp(48px, 8vh, 84px);
-  height: clamp(48px, 8vh, 84px);
-  max-height: clamp(48px, 8vh, 84px);
+  min-height: clamp(90px, 12vh, 100px);
+  height: clamp(90px, 12vh, 100px);
+  max-height: clamp(90px, 12vh, 100px);
   margin-top: 0;
 }
 
@@ -9857,9 +9877,9 @@ html[data-pixieed-ad-free-account='true'] .startup-recent-card--ad {
    Settings and Details. Keep it inside the panel instead of reserving a rail. */
 .panel-ad--context {
   width: 100% !important;
-  min-height: clamp(48px, 8vh, 84px) !important;
-  height: clamp(48px, 8vh, 84px) !important;
-  max-height: clamp(48px, 8vh, 84px) !important;
+  min-height: clamp(90px, 12vh, 100px) !important;
+  height: clamp(90px, 12vh, 100px) !important;
+  max-height: clamp(90px, 12vh, 100px) !important;
   margin-top: 0 !important;
 }
 
@@ -15454,8 +15474,6 @@ body.is-mobile-layout .mobile-panel .panel-ad-mount[data-panel-ad-mount='left'] 
 
 body.is-mobile-layout .mobile-drawer[data-mode='full'] .mobile-panel.is-active #panelColor .panel-ad-mount[data-panel-ad-mount='left'],
 body.is-mobile-layout .mobile-drawer[data-mode='full'] .mobile-panel.is-active #panelFrames .panel-ad-mount[data-panel-ad-mount='left'],
-body.is-mobile-layout .mobile-drawer[data-mode='full'] .mobile-panel.is-active #panelFile .panel-ad-mount[data-panel-ad-mount='left'],
-body.is-mobile-layout .mobile-drawer[data-mode='full'] .mobile-panel.is-active #panelSettings .panel-ad-mount[data-panel-ad-mount='left'],
 body.is-mobile-layout .mobile-drawer[data-mode='full'] .mobile-panel.is-active #panelDetails .panel-ad-mount[data-panel-ad-mount='left'] {
   display: block !important;
   position: static !important;
@@ -15520,7 +15538,7 @@ body.is-mobile-layout .mobile-drawer[data-mode='full'] .mobile-panel.is-active .
   min-height: 108px !important;
   height: auto !important;
   max-height: none !important;
-  margin: 16px 0 4px !important;
+  margin: 14px 0 4px !important;
   padding: 0 0 8px !important;
   overflow: hidden !important;
 }
@@ -15544,6 +15562,23 @@ body.is-mobile-layout .mobile-drawer[data-mode='full'] .mobile-panel.is-active .
 
 body.is-mobile-layout .mobile-drawer[data-mode='full'] .mobile-panel.is-active .panel-ad-mount--owned .ad-box > ins {
   display: block !important;
+}
+
+/* No-fill must win over the full-drawer dimensions above. */
+body.is-mobile-layout .mobile-drawer[data-mode='full'] .mobile-panel.is-active .panel-ad-mount--owned.is-ad-unfilled,
+body.is-mobile-layout .mobile-drawer[data-mode='full'] .mobile-panel.is-active .panel-ad-mount--owned.is-ad-unfilled .panel-ad--owned,
+body.is-mobile-layout .mobile-drawer[data-mode='full'] .mobile-panel.is-active .panel-ad-mount--owned.is-ad-unfilled .ad-box,
+body.is-mobile-layout .mobile-drawer[data-mode='full'] .mobile-panel.is-active .panel-ad-mount--owned.is-ad-unfilled .ad-box > ins {
+  display: none !important;
+  width: 0 !important;
+  min-width: 0 !important;
+  max-width: 0 !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  max-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
 }
 
 body.is-mobile-layout .mobile-drawer:not([data-mode='full']) .panel-ad-mount[data-panel-ad-mount='left'],
@@ -15642,6 +15677,39 @@ body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelFile .panel-section
 body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelSettings .panel-section__body {
   overflow: hidden !important;
   overscroll-behavior: none;
+}
+
+/* Five file actions must fit in the quick half drawer without falling behind
+   the drawer edge or the shared navigation. Full mode keeps the roomier grid. */
+body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelFile .field-group--file-actions {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelFile .field-group--file-actions .button {
+  min-height: 51px;
+  padding: 5px 4px;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 0.68rem;
+  line-height: 1.05;
+  white-space: normal;
+}
+
+body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelFile .field-group--file-actions .button::before {
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+}
+
+body.is-mobile-layout .mobile-drawer[data-mode='half'] .panel-ad-mount--owned,
+body.is-mobile-layout .mobile-drawer[data-mode='half'] .panel-ad--owned {
+  display: none !important;
+  min-height: 0 !important;
+  height: 0 !important;
+  max-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
 }
 
 body.is-mobile-layout .mobile-drawer[data-mode='half'] #panelFile .file-panel-summary,

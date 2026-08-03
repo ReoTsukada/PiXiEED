@@ -293,10 +293,10 @@
     ad.className = 'pixieed-common-details__ad';
     ad.setAttribute('aria-label', '広告');
     ad.innerHTML = `
-      <ins class="adsbygoogle"
+      <ins class="ad-seed"
            style="display:block"
            data-ad-client="ca-pub-9801602250480253"
-           data-ad-slot="4859859838"
+           data-ad-slot="2141591954"
            data-ad-format="auto"
            data-full-width-responsive="true"></ins>
     `;
@@ -622,7 +622,7 @@
 
   function initializeDetailsAd(currentUi) {
     const adContainer = currentUi?.ad;
-    const ad = adContainer?.querySelector('ins.adsbygoogle');
+    const ad = adContainer?.querySelector('ins.ad-seed, ins.adsbygoogle');
     if (!(adContainer instanceof HTMLElement) || !(ad instanceof HTMLElement)) return;
     window.PiXiEEDAdAccountControl?.refresh?.();
     if (window.__PIXIEED_ADS_DISABLED__ || window.__PIXIEED_AD_FREE_ACCOUNT__) {
@@ -640,9 +640,30 @@
         delete ad.dataset.pixieedDetailsAdRequested;
         return;
       }
+      if (typeof window.__PIXIEEDRAW_RENDER_AD_SLOT__ === 'function') {
+        const result = window.__PIXIEEDRAW_RENDER_AD_SLOT__(ad, {
+          owner: 'common-details',
+          reason: 'details-panel-open',
+        });
+        if (result?.ok) {
+          ad.dataset.pixieedDetailsAdRequested = '1';
+        } else {
+          delete ad.dataset.pixieedDetailsAdRequested;
+        }
+        return;
+      }
+      ad.classList.add('adsbygoogle');
+      ad.classList.remove('ad-seed');
       if (typeof window.pixieedObserveAds === 'function') {
-        ad.dataset.pixieedDetailsAdRequested = '1';
-        window.pixieedObserveAds(adContainer);
+        const results = window.pixieedObserveAds(adContainer, {
+          owner: 'common-details',
+          reason: 'details-panel-open',
+        });
+        if (!Array.isArray(results) || results.some(result => result?.ok)) {
+          ad.dataset.pixieedDetailsAdRequested = '1';
+        } else {
+          delete ad.dataset.pixieedDetailsAdRequested;
+        }
         return;
       }
       try {
@@ -797,18 +818,26 @@
       .pixieed-notification-badge{display:none;position:absolute;top:9px;left:35px;width:9px;height:9px;border-radius:50%;background:#ff3b54;box-shadow:0 0 0 2px rgba(7,13,27,.96)}
       [data-common-action="notifications"][data-has-unread="true"] .pixieed-notification-badge{display:block}
       .pixieed-common-details__ad{
-        width:calc(100% + 20px);min-height:100px;margin:12px -10px -10px;overflow:hidden;background:#050a14;
+        --pixieed-common-details-ad-height:clamp(88px,14vh,100px);
+        position:static;width:calc(100% + 20px);min-height:var(--pixieed-common-details-ad-height);
+        height:var(--pixieed-common-details-ad-height);max-height:var(--pixieed-common-details-ad-height);
+        margin:12px -10px -10px;overflow:hidden;background:#050a14;flex:none;
       }
       .pixieed-common-details__links>.pixieed-common-details__ad.is-inline-after-primary-actions{
         grid-column:1/-1;width:100%;min-width:0;margin:4px 0;align-self:stretch;
       }
       .pixieed-common-details__ad[hidden]{display:none!important}
+      .pixieed-common-details__ad ins.ad-seed,
       .pixieed-common-details__ad ins.adsbygoogle{
-        display:block!important;width:100%!important;min-width:0!important;max-width:100%!important;min-height:100px!important;
+        position:static!important;display:block!important;width:100%!important;min-width:0!important;max-width:100%!important;
+        min-height:100%!important;height:100%!important;max-height:100%!important;overflow:hidden!important;
       }
+      .pixieed-common-details__ad ins.ad-seed > div,
       .pixieed-common-details__ad ins.adsbygoogle > div,
+      .pixieed-common-details__ad ins.ad-seed iframe,
       .pixieed-common-details__ad ins.adsbygoogle iframe{
-        display:block!important;width:100%!important;min-width:0!important;max-width:100%!important;
+        position:static!important;display:block!important;width:100%!important;min-width:0!important;max-width:100%!important;
+        min-height:100%!important;height:100%!important;max-height:100%!important;overflow:hidden!important;
       }
       body.is-pixieed-common-details-open{overflow:hidden!important}
       body.has-pixieed-common-tabbar > .site-header,
