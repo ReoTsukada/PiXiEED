@@ -318,6 +318,7 @@ function createAdapter({
   operationTimeoutMs,
   acquireProjectLease,
   initialProjectKey = `project-${actor}`,
+  persistLocalProject,
   resolveProjectBindingTarget,
   readProjectBinding,
   getSupabase,
@@ -346,6 +347,7 @@ function createAdapter({
       restored = await blob.text();
       restoreContext = context;
     },
+    persistLocalProject,
     getProjectKey: () => currentProjectKey,
     getProjectTitle: () => `Project ${actor}`,
     readProjectBinding: async projectKey => (
@@ -609,6 +611,52 @@ assert.equal(owner.adapter.snapshot().session.phase, 'local');
 assert.equal(server.status, 'archived');
 assert.equal(server.checkpointHash, await sha256(server.objects.get(server.checkpointPath)));
 assert.equal(ownerBindings.has('project-owner'), false);
+
+// An owner must not archive the server room until a local copy has been
+// confirmed. Transient save failures retry; persistent failures leave the
+// room active and its binding intact so the user can retry safely.
+const localSaveFailureServer = new LifecycleServer();
+let localSaveFailureAttempts = 0;
+const localSaveFailureOwner = createAdapter({
+  server: localSaveFailureServer,
+  actor: 'owner',
+  clientId: OWNER_CLIENT,
+  storage: createStorage(),
+  bindings: new Map(),
+  checkpointText: 'checkpoint-local-save-failure',
+  persistLocalProject: async () => {
+    localSaveFailureAttempts += 1;
+    return false;
+  },
+});
+await localSaveFailureOwner.adapter.initialize();
+await localSaveFailureOwner.adapter.start();
+await assert.rejects(localSaveFailureOwner.adapter.archive(), /local-project-save-unconfirmed/);
+assert.equal(localSaveFailureAttempts, 3);
+assert.equal(localSaveFailureServer.status, 'active');
+assert.equal(localSaveFailureOwner.adapter.snapshot().session.phase, 'active');
+
+const localSaveRetryServer = new LifecycleServer();
+let localSaveRetryAttempts = 0;
+const localSaveRetryBindings = new Map();
+const localSaveRetryOwner = createAdapter({
+  server: localSaveRetryServer,
+  actor: 'owner',
+  clientId: OWNER_CLIENT,
+  storage: createStorage(),
+  bindings: localSaveRetryBindings,
+  checkpointText: 'checkpoint-local-save-retry',
+  persistLocalProject: async () => {
+    localSaveRetryAttempts += 1;
+    return localSaveRetryAttempts > 1;
+  },
+});
+await localSaveRetryOwner.adapter.initialize();
+await localSaveRetryOwner.adapter.start();
+await localSaveRetryOwner.adapter.archive();
+assert.equal(localSaveRetryServer.status, 'archived');
+assert.ok(localSaveRetryAttempts >= 4, 'the initial transient save failure is retried before localization');
+assert.equal(localSaveRetryBindings.has('project-owner'), false);
 
 // A persisted shared card never degrades to editable local data when its
 // first network reopen fails; it stays locked and queued for reconnect.

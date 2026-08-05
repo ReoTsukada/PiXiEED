@@ -16563,3 +16563,37 @@ body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom
   display: flex;
   grid-row: 1 !important;
 }
+
+/* PiXiSYNC keeps its copy control, input, and action in a single row. This
+   comes last so retired multi-project rules cannot split them into columns. */
+#panelMulti .multi-project-key-field .pixisync-input-row {
+  display: grid !important;
+  grid-template-columns: 34px minmax(0, 1fr) 64px !important;
+  align-items: center !important;
+  gap: 8px !important;
+  width: 100%;
+  min-width: 0;
+}
+
+#panelMulti .multi-project-key-field .pixisync-input-row:has(#pixisyncCopyInviteCode[hidden]) {
+  grid-template-columns: minmax(0, 1fr) 64px !important;
+}
+
+#panelMulti .multi-project-key-field .pixisync-input-row > [hidden] {
+  display: none !important;
+}
+
+#panelMulti .multi-project-key-field .pixisync-input-row #pixisyncAccessCode {
+  min-width: 0;
+  height: 38px;
+  min-height: 38px;
+}
+
+#panelMulti .multi-project-key-field .pixisync-input-row #pixisyncCopyInviteCode,
+#panelMulti .multi-project-key-field .pixisync-input-row #pixisyncJoinCode {
+  align-self: stretch;
+  height: 38px;
+  min-height: 38px;
+  margin: 0;
+  white-space: nowrap;
+}

@@ -581,13 +581,16 @@ for (const id of [
   'pixisyncDrawLock',
 ]) assert.match(html, new RegExp(`id="${id}"`));
 assert.doesNotMatch(html, /id="pixisyncLeave"|id="pixisyncArchive"|id="pixisyncCopyInvite"/);
-assert.match(html, /id="pixisyncAccessCodeField"[\s\S]*id="pixisyncCopyInviteCode"[\s\S]*id="pixisyncAccessCode"[\s\S]*id="pixisyncJoinCode"/);
+assert.match(html, /class="multi-project-key-row pixisync-input-row"[\s\S]*id="pixisyncCopyInviteCode"[\s\S]*id="pixisyncAccessCode"[\s\S]*id="pixisyncJoinCode"/);
 assert.doesNotMatch(html, /pixisync-header-actions[\s\S]*id="pixisyncCopyInviteCode"/);
 assert.match(html, /pixisync-minimal-ui-utils\.js\?v=20260803-pixisync-bulk-localize1/);
 assert.match(html, /<dialog[^>]*id="pixisyncResumeNoticeDialog"[^>]*data-pixisync-resume-notice-version="20260803-v2"|<dialog[^>]*data-pixisync-resume-notice-version="20260803-v2"[^>]*id="pixisyncResumeNoticeDialog"/);
-assert.match(html, /pixisync-runtime-adapter-utils\.js\?v=20260803-pixisync-bulk-localize1/);
+assert.match(html, /pixisync-runtime-adapter-utils\.js\?v=20260805-pixisync-localize-layout2/);
+assert.match(html, /style\.css\?v=20260805-pixisync-localize-layout2/);
+assert.match(style, /\.pixisync-input-row \{[\s\S]*?grid-template-columns: 34px minmax\(0, 1fr\) 64px !important;/);
+assert.match(style, /\.pixisync-input-row:has\(#pixisyncCopyInviteCode\[hidden\]\) \{[\s\S]*?grid-template-columns: minmax\(0, 1fr\) 64px !important;/);
 assert.match(html, /static-content\.js\?v=20260803-pixisync-code-only1/);
-assert.match(html, /app\.js\?v=20260803-pixisync-bulk-localize1/);
+assert.match(html, /app\.js\?v=20260805-pixisync-delete-localize-fix1/);
 assert.match(html, /PiXiSYNCが復活しました/);
 assert.match(html, /シェアプロジェクトが復活しました/);
 assert.match(html, /シェアプロジェクトを楽しんでください/);

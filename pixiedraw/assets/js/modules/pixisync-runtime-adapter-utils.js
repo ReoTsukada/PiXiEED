@@ -8,6 +8,7 @@
   const CHECKPOINT_BUCKET = 'pixisync-checkpoints';
   const MAX_CHECKPOINT_BYTES = 52428800;
   const COMMENT_MAX_LENGTH = 140;
+  const LOCAL_COPY_PERSIST_ATTEMPTS = 3;
 
   function resolvePiXiSyncRecentProjectTarget(entries = [], roomId = '', fallbackProjectKey = '') {
     const normalizedRoomId = String(roomId || '').trim().toLowerCase();
@@ -1749,13 +1750,27 @@
       }
     }
 
+    async function persistVerifiedLocalProject() {
+      let lastError = null;
+      for (let attempt = 1; attempt <= LOCAL_COPY_PERSIST_ATTEMPTS; attempt += 1) {
+        try {
+          if (await persistLocalProject() === true) return true;
+          lastError = new Error('PiXiSYNC runtime: local-project-save-unconfirmed');
+        } catch (error) {
+          lastError = error;
+        }
+        if (attempt < LOCAL_COPY_PERSIST_ATTEMPTS) {
+          await new Promise(resolve => window.setTimeout(resolve, 40 * attempt));
+        }
+      }
+      throw lastError || new Error('PiXiSYNC runtime: local-project-save-failed');
+    }
+
     async function completeLocalCopy(targetRoomId) {
-      const firstSave = await persistLocalProject();
-      if (firstSave !== true) throw new Error('PiXiSYNC runtime: local-project-save-failed');
+      await persistVerifiedLocalProject();
       await removeProjectBinding();
       try {
-        const localizedSave = await persistLocalProject();
-        if (localizedSave !== true) throw new Error('PiXiSYNC runtime: local-project-save-failed');
+        await persistVerifiedLocalProject();
       } catch (error) {
         await persistProjectBinding().catch(() => {});
         throw error;
@@ -1870,6 +1885,9 @@
         }));
       }
       if (attested?.status !== 'verified') throw new Error('PiXiSYNC runtime: checkpoint-attestation-incomplete');
+      // Confirm a local snapshot before archiving the remote room. A transient
+      // IndexedDB or tab-lock race must leave the room active and retryable.
+      await persistVerifiedLocalProject();
       await rpc('pixisync_begin_room_localization', {
         p_room_id: roomId,
         p_final_checkpoint_id: registeredCheckpointId,
