@@ -28528,8 +28528,9 @@
       getProjectKey: () => normalizeAutosaveProjectId?.(autosaveProjectId || '') || '',
       getProjectTitle: () => state.documentName || DEFAULT_DOCUMENT_NAME,
       getParticipantIdentity: () => ({
-        name: getLocalMultiParticipantName?.() || state.profile?.nickname || '参加者',
-        avatarId: getLocalMultiParticipantAvatarId?.() || state.profile?.avatarId || 'mao',
+        userId: accountState.userId || '',
+        name: readPixieedAccountNickname?.() || getLocalMultiParticipantName?.() || '参加者',
+        avatarId: readPixieedAccountAvatarId?.() || getLocalMultiParticipantAvatarId?.() || 'mao',
       }),
       readProjectBinding: async projectKey => {
         const normalizedProjectKey = normalizeAutosaveProjectId(projectKey || '');
@@ -28545,6 +28546,7 @@
           inviteToken: binding.inviteToken,
           inviteExpiresAt: binding.inviteExpiresAt,
           invitePersistent: binding.invitePersistent === true,
+          projectTitle: binding.projectTitle,
         };
       },
       resolveProjectBindingTarget: async ({ roomId = '', projectKey = '' } = {}) => {
@@ -28595,8 +28597,13 @@
             : '',
           inviteExpiresAt: binding.role === 'owner' ? String(binding.inviteExpiresAt || '') : '',
           invitePersistent: binding.role === 'owner' && binding.invitePersistent === true,
+          projectTitle: String(binding.projectTitle || '').trim().slice(0, 120),
         };
         const normalizedRoomId = nextBinding.roomId.trim().toLowerCase();
+        const canonicalProjectTitle = nextBinding.projectTitle;
+        const canonicalProjectFileName = canonicalProjectTitle
+          ? normalizeDocumentName(canonicalProjectTitle)
+          : '';
         const nextEntries = entries
           .filter(candidate => (
             candidate?.id !== replacedProjectKey
@@ -28606,7 +28613,15 @@
             )
           ))
           .map(candidate => candidate?.id === normalizedProjectKey
-            ? { ...candidate, pixisync: nextBinding, updatedAt: new Date().toISOString() }
+            ? {
+              ...candidate,
+              ...(canonicalProjectTitle ? {
+                name: canonicalProjectTitle,
+                fileName: canonicalProjectFileName || candidate.fileName,
+              } : {}),
+              pixisync: nextBinding,
+              updatedAt: new Date().toISOString(),
+            }
             : candidate);
         const cleanupEntries = window.PiXiEEDrawModules?.pixisyncRuntimeAdapterUtils
           ?.collectPiXiSyncRecentProjectCleanupEntries?.(

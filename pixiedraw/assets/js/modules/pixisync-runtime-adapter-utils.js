@@ -83,8 +83,13 @@
     let realtimeClient = null;
     let manifest = null;
     let roomId = '';
+    let roomTitle = '';
     let role = 'owner';
     let clientId = '';
+    let participants = [];
+    let roomMembers = [];
+    let presenceEntries = [];
+    const participantIdentityByClientId = new Map();
     let boundProjectKey = '';
     let preserveInitialOwnerDocument = false;
     let initialOwnerBootstrapRevision = null;
@@ -175,7 +180,9 @@
         || /^jerin[1-8]$/.test(rawAvatarId)
         || /^jellnall(?:[1-9]|1[0-9])$/.test(rawAvatarId)
       ) ? rawAvatarId : 'mao';
-      return Object.freeze({ name, avatarId });
+      const rawUserId = String(value?.userId || '').trim().toLowerCase();
+      const userId = ROOM_ID_PATTERN.test(rawUserId) ? rawUserId : '';
+      return Object.freeze({ userId, name, avatarId });
     };
     const currentParticipantIdentity = () => normalizeParticipantIdentity(getParticipantIdentity?.());
     const presencePayload = () => ({
@@ -184,6 +191,79 @@
       ...currentParticipantIdentity(),
       onlineAt: new Date().toISOString(),
     });
+    const normalizeRoomMember = value => {
+      const userId = String(value?.user_id || '').trim().toLowerCase();
+      if (!ROOM_ID_PATTERN.test(userId)) return null;
+      const memberRole = value?.member_role === 'owner' ? 'owner' : 'editor';
+      return Object.freeze({
+        id: userId,
+        userId,
+        name: String(value?.nickname || '').trim().slice(0, 32)
+          || (memberRole === 'owner' ? 'Owner' : 'Editor'),
+        avatarId: String(value?.avatar || '').trim().toLowerCase() || 'mao',
+        role: memberRole,
+        connection: 'offline',
+      });
+    };
+    const refreshParticipants = () => {
+      const seenIds = new Set();
+      const seenUserIds = new Set();
+      const nextParticipants = [];
+      participantIdentityByClientId.clear();
+      const presenceByUserId = new Map();
+      for (const entry of Array.isArray(presenceEntries) ? presenceEntries : []) {
+        const participantClientId = String(entry?.clientId || '').trim().toLowerCase();
+        if (!ROOM_ID_PATTERN.test(participantClientId)) continue;
+        const identity = normalizeParticipantIdentity(entry);
+        const normalizedEntry = {
+          ...identity,
+          clientId: participantClientId,
+          role: entry?.role === 'owner' ? 'owner' : 'editor',
+          connection: 'online',
+        };
+        participantIdentityByClientId.set(participantClientId, normalizedEntry);
+        if (identity.userId) presenceByUserId.set(identity.userId, normalizedEntry);
+      }
+      for (const member of roomMembers) {
+        const online = presenceByUserId.get(member.userId);
+        const participantId = online?.clientId || member.id;
+        if (seenIds.has(participantId) || seenUserIds.has(member.userId)) continue;
+        seenIds.add(participantId);
+        seenUserIds.add(member.userId);
+        nextParticipants.push({
+          id: participantId,
+          userId: member.userId,
+          name: online?.clientId === clientId
+            ? `${online.name}（自分）`
+            : String(online?.name || member.name),
+          avatarId: online?.avatarId || member.avatarId,
+          role: online?.role || member.role,
+          connection: online ? 'online' : 'offline',
+        });
+      }
+      for (const entry of Array.isArray(presenceEntries) ? presenceEntries : []) {
+        const participantClientId = String(entry?.clientId || '').trim().toLowerCase();
+        if (!ROOM_ID_PATTERN.test(participantClientId) || seenIds.has(participantClientId)) continue;
+        const identity = participantIdentityByClientId.get(participantClientId)
+          || normalizeParticipantIdentity(entry);
+        const participantRole = entry?.role === 'owner' ? 'owner' : 'editor';
+        seenIds.add(participantClientId);
+        nextParticipants.push({
+          id: participantClientId,
+          userId: identity.userId,
+          name: participantClientId === clientId
+            ? `${identity.name}（自分）`
+            : identity.name,
+          avatarId: identity.avatarId,
+          role: participantRole,
+          connection: 'online',
+        });
+      }
+      participants = nextParticipants;
+      runtimeBridge.updateParticipants?.(participants);
+      runtimeBridge.refreshUi?.();
+      return participants;
+    };
     const sha256Hex = async blob => {
       const bytes = new Uint8Array(await blob.arrayBuffer());
       const digest = new Uint8Array(await window.crypto.subtle.digest('SHA-256', bytes));
@@ -267,6 +347,7 @@
           ? value.inviteExpiresAt
           : '',
         invitePersistent: value.invitePersistent === true,
+        projectTitle: String(value.projectTitle || '').trim().slice(0, 120),
         replacedProjectKey: String(value.replacedProjectKey || '').trim(),
       });
     };
@@ -278,6 +359,7 @@
         inviteToken: role === 'owner' ? reusableInviteToken : '',
         inviteExpiresAt: role === 'owner' ? reusableInviteExpiresAt : '',
         invitePersistent: role === 'owner' && reusableInvitePersistent,
+        projectTitle: roomTitle,
         replacedProjectKey,
       });
       if (!binding) throw new Error('PiXiSYNC runtime: project-binding-unavailable');
@@ -755,7 +837,7 @@
         prepareDocumentRasterAsset,
         prepareRasterRegionAsset,
         requestAuthoritativeRecovery,
-        participants: [],
+        participants,
         localReadOnly,
         localReadOnlyMessage: localReadOnly ? 'このプロジェクトは別のタブで編集中です。この画面は閲覧専用です。' : '',
         uiEnabled,
@@ -766,6 +848,12 @@
     function installSession(nextRole, { resumeAvailable = false } = {}) {
       if (disposed) throw new Error('PiXiSYNC runtime: disposed');
       unsubscribeSession?.();
+      participants = [];
+      roomMembers = [];
+      presenceEntries = [];
+      participantIdentityByClientId.clear();
+      roomTitle = '';
+      runtimeBridge.updateParticipants?.(participants);
       role = nextRole === 'owner' ? 'owner' : 'participant';
       session = createSession({ role, resumeAvailable });
       const applySessionSnapshot = snapshot => {
@@ -817,7 +905,35 @@
       }
       manifest = row;
       roomId = String(row.room_id);
+      await loadRoomMembers(roomId);
       return row;
+    }
+
+    async function loadRoomMembers(targetRoomId) {
+      try {
+        const rows = await rpc('pixisync_list_room_members', {
+          p_room_id: assertRoomId(targetRoomId),
+        });
+        const normalizedRows = (Array.isArray(rows) ? rows : [])
+          .map(normalizeRoomMember)
+          .filter(Boolean);
+        roomTitle = String(rows?.[0]?.room_title || '').trim().slice(0, 120);
+        roomMembers = normalizedRows;
+        refreshParticipants();
+        return roomMembers;
+      } catch (error) {
+        // The RPC is introduced with the current PiXiSYNC schema. Keep an
+        // already-open room usable during a staggered frontend/DB rollout;
+        // Realtime Presence still supplies online members in that window.
+        console.warn('[pixisync:v1-runtime] room member metadata unavailable', {
+          roomId: String(targetRoomId || ''),
+          error: String(error?.message || error || ''),
+        });
+        roomTitle = '';
+        roomMembers = [];
+        refreshParticipants();
+        return [];
+      }
     }
 
     async function dispatchNow(event) {
@@ -1007,24 +1123,8 @@
         },
         onPresenceChange: entries => {
           if (realtimeClient !== createdRealtime) return;
-          const seen = new Set();
-          const participants = [];
-          for (const entry of Array.isArray(entries) ? entries : []) {
-            const participantClientId = String(entry?.clientId || '');
-            if (!ROOM_ID_PATTERN.test(participantClientId) || seen.has(participantClientId)) continue;
-            seen.add(participantClientId);
-            const participantRole = entry?.role === 'owner' ? 'owner' : 'editor';
-            participants.push({
-              id: participantClientId,
-              name: participantClientId === clientId
-                ? `${String(entry?.name || currentParticipantIdentity().name)}（自分）`
-                : String(entry?.name || (participantRole === 'owner' ? 'Owner' : 'Editor')),
-              avatarId: String(entry?.avatarId || 'mao'),
-              role: participantRole,
-              connection: 'online',
-            });
-          }
-          runtimeBridge.updateParticipants?.(participants);
+          presenceEntries = Array.isArray(entries) ? entries.slice() : [];
+          refreshParticipants();
         },
         onRecoveryRequired: details => {
           if (realtimeClient !== createdRealtime) return;
@@ -1706,6 +1806,12 @@
       const senderRole = payload?.senderRole === 'owner' ? 'owner' : 'editor';
       const text = String(payload?.text || '').trim();
       const sentAt = String(payload?.sentAt || '');
+      const knownIdentity = participantIdentityByClientId.get(senderClientId) || {};
+      const identity = normalizeParticipantIdentity({
+        userId: payload?.senderUserId || knownIdentity.userId,
+        name: payload?.senderName || knownIdentity.name,
+        avatarId: payload?.senderAvatarId || knownIdentity.avatarId,
+      });
       if (
         !ROOM_ID_PATTERN.test(id)
         || !ROOM_ID_PATTERN.test(senderClientId)
@@ -1715,7 +1821,16 @@
       ) {
         return null;
       }
-      return Object.freeze({ id, senderClientId, senderRole, text, sentAt });
+      return Object.freeze({
+        id,
+        senderClientId,
+        senderUserId: identity.userId,
+        senderRole,
+        senderName: identity.name,
+        senderAvatarId: identity.avatarId,
+        text,
+        sentAt,
+      });
     }
 
     async function sendComment(value) {
@@ -1727,7 +1842,10 @@
       const comment = normalizeComment({
         id: window.crypto.randomUUID(),
         senderClientId: clientId,
+        senderUserId: currentParticipantIdentity().userId,
         senderRole: role,
+        senderName: currentParticipantIdentity().name,
+        senderAvatarId: currentParticipantIdentity().avatarId,
         text,
         sentAt: new Date().toISOString(),
       });
@@ -2028,6 +2146,8 @@
       snapshot,
       get session() { return session; },
       get realtimeClient() { return realtimeClient; },
+      get participants() { return participants.slice(); },
+      get projectTitle() { return roomTitle; },
     });
   }
 

@@ -5673,6 +5673,24 @@ input[type='range']::-moz-focus-outer {
   border-bottom: 1px solid rgba(var(--ui-rgb), 0.12);
 }
 
+#panelMulti .multi-comment-log > li:not(.is-empty) {
+  grid-template-columns: 24px minmax(0, 1fr);
+  column-gap: 8px;
+}
+
+#panelMulti .pixisync-comment__avatar {
+  grid-row: span 2;
+  width: 24px;
+  height: 24px;
+  image-rendering: pixelated;
+  object-fit: contain;
+}
+
+#panelMulti .multi-comment-log > li > p {
+  grid-column: 2;
+  margin: 0;
+}
+
 #panelMulti .multi-comment-log > li:last-child {
   border-bottom: 0;
 }

@@ -163,19 +163,22 @@
       async function start() {
         if (started && channel) return channel;
         started = true;
+        const emitPresenceState = () => {
+          const state = channel?.presenceState?.() || {};
+          const values = Object.values(state)
+            .flatMap(entry => Array.isArray(entry) ? entry : [])
+            .filter(entry => entry && typeof entry === 'object');
+          onPresenceChange(values);
+        };
         channel = supabase.channel(`pixisync:room:${roomId}`, { config: { private: true, broadcast: { ack: true, self: false }, presence: { key: clientId } } })
           .on('broadcast', { event: 'operation-hint' }, () => recover('broadcast-hint'))
           .on('broadcast', { event: 'checkpoint-attestation-request' }, message => onBroadcast('checkpoint-attestation-request', message?.payload))
           .on('broadcast', { event: 'checkpoint-attested' }, message => onBroadcast('checkpoint-attested', message?.payload))
           .on('broadcast', { event: 'pixisync-comment' }, message => onBroadcast('pixisync-comment', message?.payload))
           .on('broadcast', { event: 'session-archived' }, message => onBroadcast('session-archived', message?.payload))
-          .on('presence', { event: 'sync' }, () => {
-            const state = channel?.presenceState?.() || {};
-            const values = Object.values(state)
-              .flatMap(entry => Array.isArray(entry) ? entry : [])
-              .filter(entry => entry && typeof entry === 'object');
-            onPresenceChange(values);
-          });
+          .on('presence', { event: 'sync' }, emitPresenceState)
+          .on('presence', { event: 'join' }, emitPresenceState)
+          .on('presence', { event: 'leave' }, emitPresenceState);
         await new Promise((resolve, reject) => {
           channel.subscribe(status => {
             onChannelStatus(status);

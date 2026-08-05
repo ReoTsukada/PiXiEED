@@ -263,6 +263,18 @@
       }
     }
 
+    function resolveAvatarSource(value) {
+      const avatarId = String(value || 'mao').trim().toLowerCase();
+      if (avatarId === 'baburin') return '../character-dots/baburinpng.png';
+      if (/^jerin[1-8]$/.test(avatarId)) {
+        return `../character-dots/Jerin${avatarId.slice(5)}.png`;
+      }
+      if (/^jellnall(?:[1-9]|1[0-9])$/.test(avatarId)) {
+        return `../character-dots/${avatarId.toUpperCase()}.png`;
+      }
+      return '../character-dots/mao1.png';
+    }
+
     function renderParticipants(snapshot) {
       const normalized = participants.length
         ? participants
@@ -275,16 +287,8 @@
         const avatar = documentRef.createElement('img');
         const name = documentRef.createElement('span');
         const meta = documentRef.createElement('small');
-        const avatarId = String(participant?.avatarId || 'mao').toLowerCase();
-        const avatarSrc = avatarId === 'baburin'
-          ? '../character-dots/baburinpng.png'
-          : /^jerin[1-8]$/.test(avatarId)
-            ? `../character-dots/Jerin${avatarId.slice(5)}.png`
-            : /^jellnall(?:[1-9]|1[0-9])$/.test(avatarId)
-              ? `../character-dots/${avatarId.toUpperCase()}.png`
-              : '../character-dots/mao1.png';
         avatar.className = 'pixisync-participant__avatar';
-        avatar.src = avatarSrc;
+        avatar.src = resolveAvatarSource(participant?.avatarId);
         avatar.alt = '';
         avatar.width = 24;
         avatar.height = 24;
@@ -301,12 +305,19 @@
       const documentRef = getDocument();
       const items = comments.map(comment => {
         const item = documentRef.createElement('li');
+        const avatar = documentRef.createElement('img');
         const header = documentRef.createElement('span');
         const bodyText = documentRef.createElement('p');
-        const sender = comment?.self ? '自分' : '参加者';
+        avatar.className = 'pixisync-comment__avatar';
+        avatar.src = resolveAvatarSource(comment?.senderAvatarId);
+        avatar.alt = '';
+        avatar.width = 24;
+        avatar.height = 24;
+        const sender = String(comment?.senderName || '').trim()
+          || (comment?.self ? '自分' : '参加者');
         header.textContent = `${sender}・${String(comment?.sentAt || '').slice(11, 16) || '--:--'}`;
         bodyText.textContent = String(comment?.text || '');
-        item.append(header, bodyText);
+        item.append(avatar, header, bodyText);
         return item;
       });
       if (!items.length) {

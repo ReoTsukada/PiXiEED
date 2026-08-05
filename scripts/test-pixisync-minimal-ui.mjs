@@ -445,6 +445,8 @@ participantUi.configure({
         id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
         senderClientId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
         senderRole: 'editor',
+        senderName: 'マイページ名',
+        senderAvatarId: 'jerin2',
         text,
         sentAt: '2026-07-30T15:00:00.000Z',
       };
@@ -479,12 +481,16 @@ assert.equal(await participantElements.joinCode.click(), true);
 assert.equal(sentComment, 'hello');
 assert.equal(participantElements.accessCode.value, '');
 assert.equal(participantElements.commentList.children.length, 1);
+assert.equal(participantElements.commentList.children[0].children[0].src, '../character-dots/Jerin2.png');
+assert.match(participantElements.commentList.children[0].children[1].textContent, /^マイページ名・/);
 participantElements.participantsTab.click();
 assert.equal(participantElements.accessCodeField.hidden, false);
 participantUi.receiveComment({
   id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
   senderClientId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
   senderRole: 'owner',
+  senderName: 'オーナー名',
+  senderAvatarId: 'baburin',
   text: 'received',
   sentAt: '2026-07-30T15:01:00.000Z',
 });
@@ -583,14 +589,14 @@ for (const id of [
 assert.doesNotMatch(html, /id="pixisyncLeave"|id="pixisyncArchive"|id="pixisyncCopyInvite"/);
 assert.match(html, /class="multi-project-key-row pixisync-input-row"[\s\S]*id="pixisyncCopyInviteCode"[\s\S]*id="pixisyncAccessCode"[\s\S]*id="pixisyncJoinCode"/);
 assert.doesNotMatch(html, /pixisync-header-actions[\s\S]*id="pixisyncCopyInviteCode"/);
-assert.match(html, /pixisync-minimal-ui-utils\.js\?v=20260803-pixisync-bulk-localize1/);
+assert.match(html, /pixisync-minimal-ui-utils\.js\?v=20260805-pixisync-members-profile1/);
 assert.match(html, /<dialog[^>]*id="pixisyncResumeNoticeDialog"[^>]*data-pixisync-resume-notice-version="20260803-v2"|<dialog[^>]*data-pixisync-resume-notice-version="20260803-v2"[^>]*id="pixisyncResumeNoticeDialog"/);
-assert.match(html, /pixisync-runtime-adapter-utils\.js\?v=20260805-pixisync-missing-room-local1/);
-assert.match(html, /style\.css\?v=20260805-pixisync-localize-layout2/);
+assert.match(html, /pixisync-runtime-adapter-utils\.js\?v=20260805-pixisync-members-profile1/);
+assert.match(html, /style\.css\?v=20260805-pixisync-members-profile1/);
 assert.match(style, /\.pixisync-input-row \{[\s\S]*?grid-template-columns: 34px minmax\(0, 1fr\) 64px !important;/);
 assert.match(style, /\.pixisync-input-row:has\(#pixisyncCopyInviteCode\[hidden\]\) \{[\s\S]*?grid-template-columns: minmax\(0, 1fr\) 64px !important;/);
 assert.match(html, /static-content\.js\?v=20260803-pixisync-code-only1/);
-assert.match(html, /app\.js\?v=20260805-pixisync-missing-room-local1/);
+assert.match(html, /app\.js\?v=20260805-pixisync-members-profile1/);
 assert.match(html, /PiXiSYNCが復活しました/);
 assert.match(html, /シェアプロジェクトが復活しました/);
 assert.match(html, /シェアプロジェクトを楽しんでください/);

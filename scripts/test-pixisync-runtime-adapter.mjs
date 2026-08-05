@@ -30,6 +30,8 @@ for (const relativePath of [
 const ROOM_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const OWNER_CLIENT = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const EDITOR_CLIENT = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+const OWNER_USER = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+const EDITOR_USER = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
 const INVITE_TOKEN = 'de'.repeat(32);
 const resolveRecentProjectTarget = window.PiXiEEDrawModules.pixisyncRuntimeAdapterUtils
   .resolvePiXiSyncRecentProjectTarget;
@@ -130,6 +132,17 @@ class LifecycleServer {
             assert.equal(this.status, 'active');
             assert.ok(this.members.has(actor));
             return { data: this.manifest(actor === 'owner' ? 'owner' : 'editor'), error: null };
+          }
+          if (name === 'pixisync_list_room_members') {
+            return { data: [...this.members].map(member => ({
+              room_id: ROOM_ID,
+              room_title: 'Project owner',
+              user_id: member === 'owner' ? OWNER_USER : EDITOR_USER,
+              member_role: member === 'owner' ? 'owner' : 'editor',
+              nickname: member === 'owner' ? 'Owner Profile' : 'Editor Profile',
+              avatar: member === 'owner' ? 'jerin2' : 'baburin',
+              joined_at: member === 'owner' ? '2026-08-05T00:00:00.000Z' : '2026-08-05T00:01:00.000Z',
+            })), error: null };
           }
           if (name === 'pixisync_open_localization_snapshot') {
             return { data: [], error: null };
@@ -330,6 +343,7 @@ function createAdapter({
   refreshSupabaseClient,
   onStatus,
   onError,
+  participantIdentity = {},
 }) {
   const bridge = createBridge();
   let restored = '';
@@ -355,6 +369,7 @@ function createAdapter({
     persistLocalProject,
     getProjectKey: () => currentProjectKey,
     getProjectTitle: () => `Project ${actor}`,
+    getParticipantIdentity: () => participantIdentity,
     readProjectBinding: async projectKey => (
       typeof readProjectBinding === 'function'
         ? await readProjectBinding(projectKey)
@@ -392,7 +407,15 @@ const ownerStorage = createStorage();
 const editorStorage = createStorage();
 const ownerBindings = new Map();
 const editorBindings = new Map();
-let owner = createAdapter({ server, actor: 'owner', clientId: OWNER_CLIENT, storage: ownerStorage, bindings: ownerBindings, checkpointText: 'checkpoint-owner' });
+let owner = createAdapter({
+  server,
+  actor: 'owner',
+  clientId: OWNER_CLIENT,
+  storage: ownerStorage,
+  bindings: ownerBindings,
+  checkpointText: 'checkpoint-owner',
+  participantIdentity: { userId: OWNER_USER, name: 'Owner Profile', avatarId: 'jerin2' },
+});
 
 // Disposing while initialize() is awaiting persistent metadata must never let
 // that stale initialization reinstall its document bridge afterward.
@@ -461,6 +484,7 @@ assert.deepEqual(ownerBindings.get('project-owner'), {
   inviteToken: '',
   inviteExpiresAt: '',
   invitePersistent: false,
+  projectTitle: 'Project owner',
   replacedProjectKey: '',
 });
 assert.equal(owner.restored, '');
@@ -523,7 +547,15 @@ assert.equal(owner.restored, 'checkpoint-owner');
 assert.equal(owner.restoreContext.documentCheckpoint, true);
 assert.equal(server.checkpointHash, await sha256(server.objects.get(server.checkpointPath)));
 await owner.adapter.dispose();
-owner = createAdapter({ server, actor: 'owner', clientId: OWNER_CLIENT, storage: ownerStorage, bindings: ownerBindings, checkpointText: 'checkpoint-owner' });
+owner = createAdapter({
+  server,
+  actor: 'owner',
+  clientId: OWNER_CLIENT,
+  storage: ownerStorage,
+  bindings: ownerBindings,
+  checkpointText: 'checkpoint-owner',
+  participantIdentity: { userId: OWNER_USER, name: 'Owner Profile', avatarId: 'jerin2' },
+});
 await owner.adapter.initialize();
 assert.equal(owner.adapter.snapshot().session.phase, 'invited');
 assert.equal(owner.bridge.inputLocked, true, 'a persisted shared card must stay locked until resume is active');
@@ -538,6 +570,8 @@ assert.deepEqual(owner.restoreContext, {
 });
 const sentComment = await owner.adapter.commands.sendComment(' owner message ');
 assert.equal(sentComment.text, 'owner message');
+assert.equal(sentComment.senderName, 'Owner Profile');
+assert.equal(sentComment.senderAvatarId, 'jerin2');
 assert.equal(server.broadcasts.at(-1).event, 'pixisync-comment');
 
 const inviteCode = await owner.adapter.createInviteCode();
@@ -551,6 +585,7 @@ assert.deepEqual(ownerBindings.get('project-owner'), {
   inviteToken: INVITE_TOKEN,
   inviteExpiresAt: 'infinity',
   invitePersistent: true,
+  projectTitle: 'Project owner',
   replacedProjectKey: '',
 });
 
@@ -562,6 +597,7 @@ const editor = createAdapter({
   bindings: editorBindings,
   checkpointText: 'checkpoint-editor',
   resolveProjectBindingTarget: ({ roomId }) => roomId === ROOM_ID ? 'project-editor-existing-room-card' : '',
+  participantIdentity: { userId: EDITOR_USER, name: 'Editor Profile', avatarId: 'baburin' },
 });
 await editor.adapter.initialize();
 assert.equal(await editor.adapter.join(INVITE_TOKEN), ROOM_ID);
@@ -575,11 +611,21 @@ assert.deepEqual(editorBindings.get('project-editor-existing-room-card'), {
   inviteToken: '',
   inviteExpiresAt: '',
   invitePersistent: false,
+  projectTitle: 'Project owner',
   replacedProjectKey: '',
 });
 assert.equal(editor.restoreContext.projectKey, 'project-editor-existing-room-card');
 await editor.adapter.dispose();
-const resumedEditor = createAdapter({ server, actor: 'editor', clientId: EDITOR_CLIENT, storage: editorStorage, bindings: editorBindings, checkpointText: 'checkpoint-editor', initialProjectKey: 'project-editor-existing-room-card' });
+const resumedEditor = createAdapter({
+  server,
+  actor: 'editor',
+  clientId: EDITOR_CLIENT,
+  storage: editorStorage,
+  bindings: editorBindings,
+  checkpointText: 'checkpoint-editor',
+  initialProjectKey: 'project-editor-existing-room-card',
+  participantIdentity: { userId: EDITOR_USER, name: 'Editor Profile', avatarId: 'baburin' },
+});
 await resumedEditor.adapter.initialize();
 assert.equal(resumedEditor.adapter.snapshot().session.phase, 'invited');
 assert.equal(resumedEditor.bridge.inputLocked, true, 'a participant card must not reopen as editable local data');
@@ -602,10 +648,11 @@ server.realtimeOptions.at(-1).onBroadcast('pixisync-comment', sentComment);
 assert.equal(activeEditor.bridge.comments.length, 1);
 assert.equal(activeEditor.bridge.comments[0].text, 'owner message');
 server.realtimeOptions.at(-1).onPresenceChange([
-  { clientId: OWNER_CLIENT, role: 'owner' },
-  { clientId: EDITOR_CLIENT, role: 'editor' },
+  { clientId: OWNER_CLIENT, userId: OWNER_USER, role: 'owner', name: 'Owner Profile', avatarId: 'jerin2' },
+  { clientId: EDITOR_CLIENT, userId: EDITOR_USER, role: 'editor', name: 'Editor Profile', avatarId: 'baburin' },
 ]);
-assert.deepEqual(activeEditor.bridge.participants.map(item => item.name), ['Owner', '参加者（自分）']);
+assert.deepEqual(activeEditor.bridge.participants.map(item => item.name), ['Owner Profile', 'Editor Profile（自分）']);
+assert.deepEqual(activeEditor.bridge.participants.map(item => item.avatarId), ['jerin2', 'baburin']);
 await activeEditor.adapter.leave();
 assert.equal(activeEditor.adapter.snapshot().session.phase, 'left');
 assert.equal(server.members.has('editor'), false);
