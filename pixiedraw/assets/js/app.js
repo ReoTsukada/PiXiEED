@@ -27815,10 +27815,15 @@
       runtime = window.__PIXISYNC_V1_RUNTIME__ || null;
     }
     if (binding?.role === 'owner') {
-      if (!runtime || typeof runtime.localize !== 'function') {
+      const localizeRuntime = runtime && typeof runtime.archive === 'function'
+        ? runtime.archive.bind(runtime)
+        : runtime && typeof runtime.localize === 'function'
+          ? runtime.localize.bind(runtime)
+          : null;
+      if (!localizeRuntime) {
         throw new Error('PiXiSYNC project deletion: owner-localization-unavailable');
       }
-      await runtime.localize();
+      await localizeRuntime();
       await disposePiXiSyncRuntimeForProjectSwitch(runtime);
       return true;
     }

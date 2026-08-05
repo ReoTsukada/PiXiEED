@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-03T15:22:34.694Z",
+  "generatedAt": "2026-08-05T01:01:01.412Z",
   "projects": [
     {
       "id": "site",
@@ -62,6 +62,12 @@
       "url": "/projects/pixiedraw/",
       "entries": [
         {
+          "date": "2026-08-04",
+          "items": [
+            "スタイル / 画面を更新"
+          ]
+        },
+        {
           "date": "2026-08-03",
           "items": [
             "スタイル / 機能 / 画面 / 設定を更新"
@@ -101,12 +107,6 @@
           "date": "2026-07-27",
           "items": [
             "スタイル / 機能 / 画面を更新"
-          ]
-        },
-        {
-          "date": "2026-07-26",
-          "items": [
-            "機能 / 画面 / スタイル / 画像を更新"
           ]
         }
       ]
@@ -224,6 +224,17 @@
   ],
   "recentByDate": [
     {
+      "date": "2026-08-04",
+      "updates": [
+        {
+          "id": "pixiedraw",
+          "name": "PiXiEEDraw",
+          "url": "/projects/pixiedraw/",
+          "summary": "スタイル / 画面を更新"
+        }
+      ]
+    },
+    {
       "date": "2026-08-03",
       "updates": [
         {
@@ -309,23 +320,6 @@
           "name": "PiXiEEDraw",
           "url": "/projects/pixiedraw/",
           "summary": "スタイル / 機能 / 画面を更新"
-        }
-      ]
-    },
-    {
-      "date": "2026-07-26",
-      "updates": [
-        {
-          "id": "site",
-          "name": "PiXiEED 全体",
-          "url": "/index.html",
-          "summary": "画面を更新"
-        },
-        {
-          "id": "pixiedraw",
-          "name": "PiXiEEDraw",
-          "url": "/projects/pixiedraw/",
-          "summary": "機能 / 画面 / スタイル / 画像を更新"
         }
       ]
     }

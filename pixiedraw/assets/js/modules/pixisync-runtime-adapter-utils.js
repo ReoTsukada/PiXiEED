@@ -876,19 +876,23 @@
           // revision while uploading, registration rejects this snapshot
           // instead of installing a stale owner document.
           await uploadCheckpoint(String(prepared?.storage_path || ''), ownerRecoveryBlob);
-          await rpc('pixisync_register_checkpoint', {
+          const registered = firstRow(await rpc('pixisync_register_checkpoint', {
             p_room_id: roomId,
             p_checkpoint_id: checkpointId,
-          });
+          }));
+          const registeredCheckpointId = String(registered?.checkpoint_id || checkpointId);
+          if (!ROOM_ID_PATTERN.test(registeredCheckpointId)) {
+            throw new Error('PiXiSYNC runtime: registered-checkpoint-unavailable');
+          }
           let attested = firstRow(await rpc('pixisync_attest_checkpoint', {
-            p_checkpoint_id: checkpointId,
+            p_checkpoint_id: registeredCheckpointId,
             p_client_id: clientId,
             p_state_sha256: toHexBytes(stateHash),
           }));
           if (attested?.status !== 'verified') {
-            const waitForPeer = waitForAttestation(checkpointId);
+            const waitForPeer = waitForAttestation(registeredCheckpointId);
             await realtimeClient?.sendBroadcast?.('checkpoint-attestation-request', {
-              checkpointId,
+              checkpointId: registeredCheckpointId,
               storagePath: prepared.storage_path,
               stateSha256: stateHash,
               encodedBytes: ownerRecoveryBlob.size,
@@ -896,7 +900,7 @@
             });
             await waitForPeer;
             attested = firstRow(await rpc('pixisync_attest_checkpoint', {
-              p_checkpoint_id: checkpointId,
+              p_checkpoint_id: registeredCheckpointId,
               p_client_id: clientId,
               p_state_sha256: toHexBytes(stateHash),
             }));
@@ -904,7 +908,7 @@
           if (attested?.status !== 'verified') throw new Error('PiXiSYNC runtime: recovery-checkpoint-attestation-incomplete');
           const activated = firstRow(await rpc('pixisync_activate_verified_checkpoint', {
             p_room_id: roomId,
-            p_checkpoint_id: checkpointId,
+            p_checkpoint_id: registeredCheckpointId,
           }));
           manifest = {
             ...(manifest || {}),
@@ -1836,19 +1840,23 @@
         p_codec_version: 1,
       }));
       await uploadCheckpoint(String(prepared?.storage_path || ''), blob);
-      await rpc('pixisync_register_checkpoint', {
+      const registered = firstRow(await rpc('pixisync_register_checkpoint', {
         p_room_id: roomId,
         p_checkpoint_id: checkpointId,
-      });
+      }));
+      const registeredCheckpointId = String(registered?.checkpoint_id || checkpointId);
+      if (!ROOM_ID_PATTERN.test(registeredCheckpointId)) {
+        throw new Error('PiXiSYNC runtime: registered-checkpoint-unavailable');
+      }
       let attested = firstRow(await rpc('pixisync_attest_checkpoint', {
-        p_checkpoint_id: checkpointId,
+        p_checkpoint_id: registeredCheckpointId,
         p_client_id: clientId,
         p_state_sha256: toHexBytes(stateHash),
       }));
       if (attested?.status !== 'verified') {
-        const waitForPeer = waitForAttestation(checkpointId);
+        const waitForPeer = waitForAttestation(registeredCheckpointId);
         await realtimeClient.sendBroadcast('checkpoint-attestation-request', {
-          checkpointId,
+          checkpointId: registeredCheckpointId,
           storagePath: prepared.storage_path,
           stateSha256: stateHash,
           encodedBytes: blob.size,
@@ -1856,7 +1864,7 @@
         });
         await waitForPeer;
         attested = firstRow(await rpc('pixisync_attest_checkpoint', {
-          p_checkpoint_id: checkpointId,
+          p_checkpoint_id: registeredCheckpointId,
           p_client_id: clientId,
           p_state_sha256: toHexBytes(stateHash),
         }));
@@ -1864,12 +1872,12 @@
       if (attested?.status !== 'verified') throw new Error('PiXiSYNC runtime: checkpoint-attestation-incomplete');
       await rpc('pixisync_begin_room_localization', {
         p_room_id: roomId,
-        p_final_checkpoint_id: checkpointId,
+        p_final_checkpoint_id: registeredCheckpointId,
       });
       const targetRoomId = roomId;
       await realtimeClient.sendBroadcast('session-archived', {
         roomId: targetRoomId,
-        checkpointId,
+        checkpointId: registeredCheckpointId,
       }).catch(() => {});
       return completeLocalCopy(targetRoomId);
     }
