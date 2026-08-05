@@ -70,6 +70,7 @@ class LifecycleServer {
     this.syncFromCalls = [];
     this.emitClosedOnStop = false;
     this.failOpen = false;
+    this.openError = null;
     this.inviteCreateCalls = 0;
     this.slotPurchased = 0;
     this.slotFunctionCalls = [];
@@ -123,11 +124,15 @@ class LifecycleServer {
             return { data: [{ room_id: ROOM_ID, status: 'active', head_revision: '0', active_checkpoint_id: this.checkpointId, session_generation: '1' }], error: null };
           }
           if (name === 'pixisync_open_session') {
+            if (this.openError) throw this.openError;
             if (this.failOpen) throw new Error('temporary-network-failure');
             assert.equal(params.p_room_id, ROOM_ID);
             assert.equal(this.status, 'active');
             assert.ok(this.members.has(actor));
             return { data: this.manifest(actor === 'owner' ? 'owner' : 'editor'), error: null };
+          }
+          if (name === 'pixisync_open_localization_snapshot') {
+            return { data: [], error: null };
           }
           if (name === 'pixisync_create_invite') {
             assert.equal(actor, 'owner');
@@ -692,6 +697,67 @@ assert.equal(await reopenFailureOwner.adapter.resumeBoundProject(), ROOM_ID);
 assert.equal(reopenFailureOwner.adapter.snapshot().session.phase, 'active');
 assert.equal(reopenFailureOwner.bridge.inputLocked, false);
 await reopenFailureOwner.adapter.dispose();
+
+// When the remote room was explicitly deleted, the active local document is
+// confirmed twice around clearing its stale binding. This is intentionally
+// distinct from a temporary connection failure, which remains draw-locked and
+// retryable above.
+const unavailableRoomServer = new LifecycleServer();
+const unavailableRoomError = new Error('active_session_not_available');
+unavailableRoomError.code = 'P0001';
+unavailableRoomServer.openError = unavailableRoomError;
+const unavailableRoomBindings = new Map([['project-owner', {
+  roomId: ROOM_ID,
+  role: 'owner',
+  projectKey: 'project-owner',
+}]]);
+let unavailableRoomLocalSaves = 0;
+const unavailableRoomOwner = createAdapter({
+  server: unavailableRoomServer,
+  actor: 'owner',
+  clientId: OWNER_CLIENT,
+  storage: createStorage(),
+  bindings: unavailableRoomBindings,
+  checkpointText: 'checkpoint-unavailable-room',
+  persistLocalProject: async () => {
+    unavailableRoomLocalSaves += 1;
+    return true;
+  },
+});
+await unavailableRoomOwner.adapter.initialize();
+assert.equal(await unavailableRoomOwner.adapter.resumeBoundProject(), '');
+assert.equal(unavailableRoomOwner.adapter.snapshot().session.phase, 'local');
+assert.equal(unavailableRoomOwner.bridge.inputLocked, false);
+assert.equal(unavailableRoomBindings.has('project-owner'), false);
+assert.equal(unavailableRoomLocalSaves, 2);
+await unavailableRoomOwner.adapter.dispose();
+
+// A missing room never clears the binding when the local persistence check
+// cannot be confirmed. The card remains locked and retryable in that case.
+const unavailableRoomSaveFailureServer = new LifecycleServer();
+unavailableRoomSaveFailureServer.openError = unavailableRoomError;
+const unavailableRoomSaveFailureBindings = new Map([['project-owner', {
+  roomId: ROOM_ID,
+  role: 'owner',
+  projectKey: 'project-owner',
+}]]);
+const unavailableRoomSaveFailureOwner = createAdapter({
+  server: unavailableRoomSaveFailureServer,
+  actor: 'owner',
+  clientId: OWNER_CLIENT,
+  storage: createStorage(),
+  bindings: unavailableRoomSaveFailureBindings,
+  checkpointText: 'checkpoint-unavailable-room-save-failure',
+  persistLocalProject: async () => false,
+});
+await unavailableRoomSaveFailureOwner.adapter.initialize();
+await assert.rejects(
+  unavailableRoomSaveFailureOwner.adapter.resumeBoundProject(),
+  /local-project-save-unconfirmed/
+);
+assert.equal(unavailableRoomSaveFailureOwner.bridge.inputLocked, true);
+assert.equal(unavailableRoomSaveFailureBindings.has('project-owner'), true);
+await unavailableRoomSaveFailureOwner.adapter.dispose();
 
 // A failed Realtime subscription must return the owner to local mode instead
 // of leaving the start button in the creating state forever.

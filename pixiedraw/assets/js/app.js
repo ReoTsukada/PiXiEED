@@ -18598,6 +18598,7 @@
         // screen or overwrite the current project's status message.
         if (pixisyncProjectState?.stale === true) return false;
         const isPiXiSyncCard = pixisyncProjectState?.bound === true;
+        const localizedUnavailablePiXiSyncCard = pixisyncProjectState?.localized === true;
         const sharedSessionResumed = pixisyncProjectState?.kept === true
           || pixisyncProjectState?.resumed === true;
         if (!silent) {
@@ -18611,7 +18612,12 @@
             );
           } else {
             updateAutosaveStatus(
-              isPiXiSyncCard
+              localizedUnavailablePiXiSyncCard
+                ? localizeText(
+                    '共有が終了していたため、端末内プロジェクトとして開きました',
+                    'The shared room had ended, so this project is now local.'
+                  )
+                : isPiXiSyncCard
                 ? localizeText('シェアプロジェクトへ再接続しました', 'Reconnected to the shared project')
                 : message,
               'success'
@@ -27776,6 +27782,28 @@
       }
     }
     const resumed = await resumePiXiSyncProjectCard(entry);
+    const refreshedEntry = await loadRecentProjectMetadataById(targetProjectKey);
+    const refreshedBinding = refreshedEntry?.pixisync && typeof refreshedEntry.pixisync === 'object'
+      ? refreshedEntry.pixisync
+      : null;
+    if (!refreshedBinding) {
+      const activeRuntime = window.__PIXISYNC_V1_RUNTIME__ || null;
+      if (activeRuntime) {
+        await disposePiXiSyncRuntimeForProjectSwitch(activeRuntime);
+      } else {
+        window.PiXiEEDrawModules?.pixisyncRuntimeBridge?.clear?.();
+      }
+      await refreshRecentProjectsUI().catch(error => {
+        console.warn('[pixisync:project-card] local recovery UI refresh deferred', error);
+      });
+      return {
+        bound: false,
+        kept: false,
+        resumed: false,
+        localized: true,
+        projectKey: targetProjectKey,
+      };
+    }
     return { bound: true, kept: false, resumed, projectKey: targetProjectKey };
   }
 

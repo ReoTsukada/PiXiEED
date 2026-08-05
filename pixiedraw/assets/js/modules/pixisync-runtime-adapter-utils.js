@@ -162,6 +162,10 @@
       if (!ROOM_ID_PATTERN.test(normalized)) throw new Error('PiXiSYNC runtime: invalid-client-id');
       return normalized;
     };
+    const isUnavailableActiveSessionError = error => (
+      String(error?.code || '') === 'P0001'
+      && /active_session_not_available/i.test(String(error?.message || ''))
+    );
     const normalizeParticipantIdentity = value => {
       const name = String(value?.name || '').trim().slice(0, 32) || '参加者';
       const rawAvatarId = String(value?.avatarId || '').trim().toLowerCase();
@@ -1485,14 +1489,62 @@
         try {
           if (await restoreArchivedLocalCopy(roomId)) return roomId;
         } catch (localizationError) {
-          reportRuntimeError(localizationError);
+          // A room deleted after the local card was written has neither an
+          // active manifest nor an archived-localization snapshot. That is an
+          // expected part of the explicit missing-room recovery below, not a
+          // second runtime fault to surface to the user.
+          if (!isUnavailableActiveSessionError(error)) {
+            reportRuntimeError(localizationError);
+          }
+        }
+        await dispatchNow({ type: 'FAIL', epoch, reason: error?.message || 'open-failed' });
+        let unavailableRoomRecoveryError = null;
+        if (isUnavailableActiveSessionError(error)) {
+          try {
+            // The active document has already been restored before its card
+            // is resumed. Confirm it twice around removing the stale binding:
+            // a failed IndexedDB save must keep this project recoverable as a
+            // shared card, while a confirmed save may safely become local.
+            await persistVerifiedLocalProject();
+            await removeProjectBinding();
+            try {
+              await persistVerifiedLocalProject();
+            } catch (localSaveError) {
+              await persistProjectBinding().catch(() => {});
+              throw localSaveError;
+            }
+            const unavailableRoomId = roomId;
+            clearReconnectRetry();
+            manifest = null;
+            roomId = '';
+            reusableInviteToken = '';
+            reusableInviteExpiresAt = '';
+            reusableInvitePersistent = false;
+            await releaseProjectLease().catch(releaseError => {
+              report({
+                phase: 'localization-lease-release-deferred',
+                roomId: unavailableRoomId,
+                error: releaseError?.message || String(releaseError),
+              });
+            });
+            runtimeBridge.setInputLocked?.(false);
+            report({
+              phase: 'local',
+              roomId: '',
+              previousRoomId: unavailableRoomId,
+              reason: 'active_session_not_available',
+            });
+            return '';
+          } catch (localizationError) {
+            reportRuntimeError(localizationError);
+            unavailableRoomRecoveryError = localizationError;
+          }
         }
         // A persisted card is still a shared project when the first reopen
         // attempt fails. Reset the incomplete open transaction, keep the
         // persisted card draw-locked, and retry the complete bound-card open.
-        await dispatchNow({ type: 'FAIL', epoch, reason: error?.message || 'open-failed' });
         scheduleBoundProjectResumeRetry(error?.message || 'open-failed');
-        throw error;
+        throw unavailableRoomRecoveryError || error;
       }
     }
 

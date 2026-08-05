@@ -298,6 +298,8 @@ assert.equal(parseInviteToken('ordinary project search'), '');
   assert.match(appSource, /ERR_PIXISYNC_PROJECT_SWITCH_SUPERSEDED/);
   assert.match(appSource, /if \(pixisyncProjectState\?\.stale === true\) return false/);
   assert.match(appSource, /finishRecentProjectOpen[\s\S]{0,500}reconcilePiXiSyncProjectForActivatedProject\(latestEntry\)/);
+  assert.match(appSource, /const refreshedEntry = await loadRecentProjectMetadataById\(targetProjectKey\);/);
+  assert.match(appSource, /localized: true,[\s\S]{0,180}projectKey: targetProjectKey/);
   assert.match(documentSessionSource, /await preparePiXiSyncProjectSwitch\?\.\(requestedProjectId,[\s\S]{0,200}preserveMatchingRuntime:[\s\S]{0,300}applyHistorySnapshot\(snapshot/);
   assert.match(tabWorkflowSource, /await reconcilePiXiSyncProjectForActivatedProject\?\.\(targetProjectId\);[\s\S]{0,200}queueProjectTabViewportReset/);
   assert.match(startupWorkflowSource, /await preparePiXiSyncProjectSwitch\?\.\(newProjectId\);[\s\S]{0,200}applyHistorySnapshot\(snapshot\)/);
