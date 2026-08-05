@@ -632,8 +632,8 @@ assert.match(app, /resolveProjectBindingTarget:[\s\S]*?resolvePiXiSyncRecentProj
 assert.match(app, /candidate\?\.id !== replacedProjectKey/);
 assert.match(app, /String\(candidate\?\.pixisync\?\.roomId \|\| ''\)[\s\S]*?!== normalizedRoomId/);
 assert.match(app, /collectPiXiSyncRecentProjectCleanupEntries[\s\S]*?removeAutosaveV2ProjectData\(removed\.id\)/);
-assert.match(startupWorkflow, /const isPiXiSyncCard = Boolean\([\s\S]*?entry\.pixisync\.roomId/);
-assert.match(startupWorkflow, /const isPendingPiXiSyncCard = Boolean\([\s\S]*?pendingInviteToken/);
+assert.match(startupWorkflow, /const isPiXiSyncCard = Boolean\([\s\S]*?String\(entry\.pixisync\.roomId \|\| ''\)\.trim\(\)/);
+assert.doesNotMatch(startupWorkflow, /const isPendingPiXiSyncCard = Boolean\([\s\S]*?pendingInviteToken/);
 assert.match(startupWorkflow, /className = 'startup-workspace__project-share-badge'/);
 assert.match(sharedTabBar, /id: 'pixisync', label: 'PiXiSYNC', selector: '#pixisyncQuickOpen'/);
 assert.match(html, /aria-disabled="false"[^>]*id="pixisyncQuickOpen"/);

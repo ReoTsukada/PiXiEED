@@ -110,7 +110,12 @@ for (const source of [workflow]) {
 }
 assert.match(css, /\.startup-screen__content\s*\{[\s\S]*?width: min\(1440px, 100%\)/);
 assert.match(css, /\.startup-workspace__project-thumbnail\s*\{[\s\S]*?aspect-ratio: 1 \/ 1/);
-assert.match(startup, /isPiXiSyncCard = Boolean\([\s\S]{0,220}entry\?\.pixisync/);
+const shareCardStateSource = startup.slice(
+  startup.indexOf('const isPiXiSyncCard = Boolean'),
+  startup.indexOf('const card = document.createElement', startup.indexOf('const isPiXiSyncCard = Boolean'))
+);
+assert.match(shareCardStateSource, /String\(entry\.pixisync\.roomId \|\| ''\)\.trim\(\)/);
+assert.doesNotMatch(shareCardStateSource, /pendingInviteToken/);
 assert.match(startup, /プロジェクトを選ぶと、そのプロジェクトだけを必要に応じて自動変換します/);
 assert.doesNotMatch(startup, /V1・旧V2プロジェクトが\$\{count\}件あります/);
 assert.doesNotMatch(startup, /migrateLegacyLocalProjectsToTrueV2/);
