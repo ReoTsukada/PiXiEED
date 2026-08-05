@@ -592,9 +592,11 @@ assert.doesNotMatch(html, /pixisync-header-actions[\s\S]*id="pixisyncCopyInviteC
 assert.match(html, /pixisync-minimal-ui-utils\.js\?v=20260805-pixisync-members-profile1/);
 assert.match(html, /<dialog[^>]*id="pixisyncResumeNoticeDialog"[^>]*data-pixisync-resume-notice-version="20260803-v2"|<dialog[^>]*data-pixisync-resume-notice-version="20260803-v2"[^>]*id="pixisyncResumeNoticeDialog"/);
 assert.match(html, /pixisync-runtime-adapter-utils\.js\?v=20260805-pixisync-members-profile1/);
-assert.match(html, /style\.css\?v=20260805-pixisync-members-profile1/);
+assert.match(html, /style\.css\?v=20260805-pixisync-avatar-fixed1/);
 assert.match(style, /\.pixisync-input-row \{[\s\S]*?grid-template-columns: 34px minmax\(0, 1fr\) 64px !important;/);
 assert.match(style, /\.pixisync-input-row:has\(#pixisyncCopyInviteCode\[hidden\]\) \{[\s\S]*?grid-template-columns: minmax\(0, 1fr\) 64px !important;/);
+assert.match(style, /\.pixisync-participant__avatar,[\s\S]*?width: 24px !important;[\s\S]*?height: 24px !important;[\s\S]*?min-width: 24px !important;[\s\S]*?max-width: 24px !important;[\s\S]*?min-height: 24px !important;[\s\S]*?max-height: 24px !important;/);
+assert.match(style, /\.multi-participant-item__avatar,[\s\S]*?width: 28px !important;[\s\S]*?height: 28px !important;[\s\S]*?min-width: 28px !important;[\s\S]*?max-width: 28px !important;[\s\S]*?min-height: 28px !important;[\s\S]*?max-height: 28px !important;/);
 assert.match(html, /static-content\.js\?v=20260803-pixisync-code-only1/);
 assert.match(html, /app\.js\?v=20260805-pixisync-members-profile1/);
 assert.match(html, /PiXiSYNCが復活しました/);

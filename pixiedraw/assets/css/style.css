@@ -16615,3 +16615,35 @@ body.is-right-tool-rail.is-bottom-timeline-docked:not(.is-mobile-layout) .bottom
   margin: 0;
   white-space: nowrap;
 }
+
+/* Shared avatars use a fixed frame so natural image dimensions cannot resize
+   participant or comment rows. Keep the existing 24px/28px variants intact. */
+#panelMulti .pixisync-participant__avatar,
+#panelMulti .pixisync-comment__avatar {
+  display: block;
+  width: 24px !important;
+  height: 24px !important;
+  min-width: 24px !important;
+  max-width: 24px !important;
+  min-height: 24px !important;
+  max-height: 24px !important;
+  aspect-ratio: 1 / 1;
+  object-fit: contain;
+  object-position: center;
+  flex: 0 0 24px;
+}
+
+#panelMulti .multi-participant-item__avatar,
+#panelMulti .multi-comment-avatar {
+  display: block;
+  width: 28px !important;
+  height: 28px !important;
+  min-width: 28px !important;
+  max-width: 28px !important;
+  min-height: 28px !important;
+  max-height: 28px !important;
+  aspect-ratio: 1 / 1;
+  object-fit: contain;
+  object-position: center;
+  flex: 0 0 28px;
+}
