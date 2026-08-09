@@ -796,7 +796,10 @@
     const mimeType = match[1] || 'application/octet-stream';
     const base64Data = match[2] || '';
     try {
-      const binary = atob(base64Data);
+      // This module runs inside a `with (scope)` adapter. Calling the bare
+      // global function makes Chromium bind `this` to that adapter instead of
+      // the Window object, which throws "Illegal invocation" for QR returns.
+      const binary = window.atob(base64Data);
       const length = binary.length;
       const bytes = new Uint8Array(length);
       for (let i = 0; i < length; i += 1) {
