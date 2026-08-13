@@ -1,0 +1,33 @@
+{
+  "artifactDigest": "e9b42e1af03674c49872a7d6b8c53f201e813bde9a23418aedbbf92c5719140a",
+  "documentId": "PIXIEED-FP007-JSR-LICENSE-RECEIPTS-001",
+  "receipts": [
+    {
+      "integrity": "692aba48a8aa15d9d6921b3fa11c6ce0242c48d6eb489674e18bb245bd2abad5",
+      "licenseSpdx": "MIT",
+      "lockfilePath": "supabase/functions/market-reconcile-my-sales/deno.lock",
+      "lockfileSha256": "9e7191fc81771313c77519664519e165986b14145c70f490198c19da01162c9e",
+      "packageName": "@supabase/functions-js",
+      "receiptDigest": "a93f1b3796c7345166379d92a9e69be576ad058c1edbbccd5b43a68e298f2196",
+      "reviewDate": "2026-08-11",
+      "schemaVersion": "1",
+      "sourceKind": "official-jsr-metadata",
+      "specifier": "jsr:@supabase/functions-js@2.112.2",
+      "version": "2.112.2"
+    },
+    {
+      "integrity": "692aba48a8aa15d9d6921b3fa11c6ce0242c48d6eb489674e18bb245bd2abad5",
+      "licenseSpdx": "MIT",
+      "lockfilePath": "supabase/functions/market-reconcile-purchase/deno.lock",
+      "lockfileSha256": "9e7191fc81771313c77519664519e165986b14145c70f490198c19da01162c9e",
+      "packageName": "@supabase/functions-js",
+      "receiptDigest": "e93ae0c1a47a59a98575a212dfc25ef2d1e688b635ccbe2f1093ee3b5e1aee78",
+      "reviewDate": "2026-08-11",
+      "schemaVersion": "1",
+      "sourceKind": "official-jsr-metadata",
+      "specifier": "jsr:@supabase/functions-js@2.112.2",
+      "version": "2.112.2"
+    }
+  ],
+  "schemaVersion": "1.0.0"
+}

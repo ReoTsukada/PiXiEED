@@ -1,0 +1,156 @@
+{
+  "documentId": "PIXIEED-FP007-TRACK3-BUILD-INVENTORY-001",
+  "schemaVersion": "1.0.0",
+  "package": "FP-007",
+  "track": "TRACK-3-DETERMINISTIC-BUILD-DIST-ARTIFACT-PROVENANCE",
+  "status": "IMPLEMENTED_ISOLATED_REFERENCE",
+  "contextSha256": "1456bdd0593538d1f454f3f20c494ba9151914ced8bee1619f16ca7b5b1da200",
+  "canonicalManifest": {
+    "requiredFields": [
+      "buildCommand",
+      "entries",
+      "initialChunks",
+      "lazyChunks",
+      "sourceMapPolicy",
+      "sourceFiles",
+      "declaredArtifacts",
+      "schemaRegistryDigest",
+      "dependencyGraphHash",
+      "lockfileHash",
+      "toolchainHash",
+      "allowlistedEnvironmentHash"
+    ],
+    "excludedAmbientInputs": [
+      "generatedAt",
+      "timestamp",
+      "absolutePath",
+      "host",
+      "locale",
+      "random",
+      "userPath",
+      "cacheState",
+      "networkState"
+    ],
+    "hashAlgorithm": "SHA-256",
+    "canonicalJson": "sorted object keys, preserved declared arrays after path normalization, UTF-8, finite numbers only"
+  },
+  "artifactInventory": {
+    "fields": [
+      "repoRelativePath",
+      "bytes",
+      "size",
+      "sha256",
+      "compression",
+      "role"
+    ],
+    "roles": [
+      "SOURCE",
+      "ENTRY",
+      "INITIAL_CHUNK",
+      "LAZY_CHUNK",
+      "SOURCE_MAP",
+      "ASSET",
+      "GENERATED"
+    ],
+    "compressions": ["NONE", "GZIP", "BROTLI"]
+  },
+  "sourceDistPolicy": {
+    "includedSourceMap": "requires SOURCE_MAP proof and a declared map artifact/hash",
+    "excludedSourceMap": "requires DIRECT_SOURCE_DIGEST_CHAIN or EMBEDDED_SOURCE_REFERENCES plus explicit source references and evidence digest",
+    "missingMapping": "FAIL",
+    "initialLazyOverlap": "FAIL",
+    "undeclaredArtifact": "FAIL"
+  },
+  "repeatBuildPolicy": {
+    "compared": [
+      "inputHash",
+      "buildManifestHash",
+      "manifestCanonicalJson",
+      "toolchainHash",
+      "artifactManifestHash",
+      "artifact bytes",
+      "artifact sizes",
+      "artifact hashes",
+      "compression"
+    ],
+    "isolatedFixture": "PASS is permitted when all compared values match",
+    "realCleanCheckout": "PASS only after a real clean checkout run",
+    "realDirtyWorktree": "BLOCKED",
+    "unknownEnvironment": "UNTESTED"
+  },
+  "buildInputManifest": {
+    "schemaVersion": 1,
+    "artifactInputs": "declared staging entries from the canonical build manifest",
+    "buildControlInputs": [
+      ".nvmrc",
+      "app-shell/pixieed-capacitor/capacitor.config.json",
+      "app-shell/pixieed-capacitor/package-lock.json",
+      "app-shell/pixieed-capacitor/package.json",
+      "app-shell/pixieed-capacitor/scripts/stage-web-assets.mjs",
+      "docs/inventory/fp-007-build.json",
+      "package-lock.json",
+      "package.json",
+      "scripts/fp007-build-input-manifest.json",
+      "scripts/qualify-fp007-real-distribution.mjs"
+    ],
+    "recordFields": ["path", "bytes", "sha256", "gitBlobOid"],
+    "trustAnchor": "GIT_HEAD; each working-tree byte sequence must match HEAD blob identity",
+    "inputHash": "SHA-256(canonicalJson({artifactInputs, buildControlInputs}))",
+    "serialization": "UTF-8 canonical JSON; code-unit sorted object keys; declared arrays preserved"
+  },
+  "filesystemSafety": {
+    "output": {
+      "workingRoot": "runner-owned private child under a private temporary parent",
+      "publish": "same-parent atomic rename after no-follow boundary and identity checks",
+      "publishHook": "beforeOutputPublish runs after ordinary boundary/parent checks and immediately before final boundary/parent/working-root rechecks and rename",
+      "replacementFixture": "PASS in focused synthetic test",
+      "sameUidArbitraryProcessRace": "P2/UNTESTED; Node standard API has no openat directory-handle primitive here"
+    },
+    "cleanup": {
+      "ownership": "target and parent device/inode/realpath identity",
+      "deleteOrder": "tombstone rename, revalidate, then delete",
+      "renameHook": "beforeCleanupRename runs after ordinary ownership checks and before final target/parent checks and rename",
+      "deleteHook": "beforeCleanupDelete runs after tombstone identity validation and before final parent/tombstone checks and rm",
+      "replacementFixtures": "PASS in focused synthetic test",
+      "failurePolicy": "fail closed; preserve safe temporary evidence"
+    }
+  },
+  "existingRepositoryFindings": [
+    {
+      "path": "app-shell/pixieed-capacitor/scripts/stage-web-assets.mjs",
+      "finding": "generatedAt and absolute appRoot/repoRoot/webRoot values are produced by the existing staging path",
+      "status": "RESOLVED_BY_CURRENT_SOURCE",
+      "resolution": "Historical finding retained. Current source evidence shows a repository-relative sourceRoot/outputRoot manifest with no generatedAt, timestamp, or absolute path fields. This source inspection does not qualify a real distribution build, which remains UNTESTED."
+    },
+    {
+      "path": "repository working tree",
+      "finding": "The worktree is dirty, so a real clean-checkout repeat build cannot be qualified here",
+      "status": "BLOCKED",
+      "resolution": "Isolated fixture repeatability is kept separate from repository qualification"
+    }
+  ],
+  "measurementDefinition": {
+    "input": {
+      "manifest": "docs/inventory/fp-007-build.json",
+      "entrySource": "pixiedraw2/src/draw2-entry.ts",
+      "normalizationOrder": [
+        "resolve fixed repository-relative entry path",
+        "read file bytes unchanged",
+        "hash raw bytes",
+        "gzip raw bytes",
+        "Brotli-compress raw bytes"
+      ],
+      "newlineNormalization": "NONE",
+      "encoding": "UTF-8 source bytes as stored"
+    },
+    "raw": "existing FP-007 entry source byte length",
+    "minified": "PRESENT_NOT_MEASURED; no minification was generated",
+    "gzip": "Node built-in zlib.gzipSync, level 9, mtime 0",
+    "brotli": "Node built-in zlib.brotliCompressSync, TEXT, quality 11, lgwin 22, sizeHint=input bytes",
+    "referenceOnly": true,
+    "realDistributionQualification": "UNTESTED",
+    "productionClaim": false,
+    "browserOrDeviceClaim": false
+  },
+  "integrationBoundary": "Track 3 interim evidence; schema/dependency tracks and final FP-007 integration evidence remain coordinator-owned"
+}

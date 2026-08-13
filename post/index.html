@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,follow">
+  <title>作品 | PiXiEED</title>
+  <link rel="icon" type="image/png" href="/icon/icon-512-4.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/site/landing.css?v=2026.07.19-home-centered3">
+  <link rel="stylesheet" href="/post/post.css?v=20260803-social-seo-comments1">
+</head>
+<body>
+  <div class="page post-page">
+    <main class="post-detail" id="postDetail" aria-live="polite">
+      <p class="post-detail__status" id="postStatus">作品を読み込んでいます。</p>
+      <article id="postContent" hidden>
+        <header class="post-detail__author">
+          <img id="postAuthorAvatar" src="/character-dots/maousama.png" alt="">
+          <strong id="postAuthorName">PiXiEEDクリエイター</strong>
+        </header>
+        <div class="post-detail__intro">
+          <h1 id="postTitle">ドット絵作品</h1>
+          <span class="post-detail__kind" id="postKindBadge">完成作品</span>
+          <div class="post-detail__tags" id="postTags" aria-label="作品タグ" hidden></div>
+        </div>
+        <figure class="post-detail__media"><img id="postImage" src="/icon/icon-512-4.png" alt="作品画像"></figure>
+        <div class="post-detail__actions">
+          <button class="post-detail__like" id="postLike" type="button" aria-pressed="false"><span id="postLikeIcon" aria-hidden="true">♡</span><span id="postLikeCount">0</span></button>
+        </div>
+        <p class="post-detail__caption" id="postCaption" hidden></p>
+        <section class="post-detail__distribution" aria-labelledby="postDistributionTitle">
+          <p id="postDistributionTitle">この作品について</p>
+          <strong id="postDistributionLabel">作品公開のみ</strong>
+          <p id="postDistributionNote"></p>
+          <a class="post-detail__primary" id="postPrimaryAction" href="#" hidden></a>
+        </section>
+        <section class="post-comments" id="postCommentsSection" aria-labelledby="postCommentsTitle">
+          <header class="post-comments__header">
+            <h2 id="postCommentsTitle">コメント</h2>
+            <span id="postCommentCount">0</span>
+          </header>
+          <form class="post-comments__form" id="postCommentForm">
+            <label for="postCommentBody">作品へのコメント</label>
+            <textarea id="postCommentBody" maxlength="200" rows="3" placeholder="200文字・4行まで（URLは投稿できません）"></textarea>
+            <div class="post-comments__form-footer">
+              <small id="postCommentLength">0 / 200</small>
+              <button id="postCommentSubmit" type="submit">コメントする</button>
+            </div>
+          </form>
+          <p class="post-comments__notice" id="postCommentNotice" role="status"></p>
+          <div class="post-comments__list" id="postCommentList"></div>
+        </section>
+      </article>
+    </main>
+  </div>
+  <script src="/scripts/social-posts.js?v=20260803-social-seo-comments1"></script>
+  <script src="/post/post.js?v=20260803-social-seo-comments1"></script>
+  <script src="/scripts/shared-profile-header.js"></script>
+  <script src="/scripts/shared-bottom-nav.js?v=20260803-tools-panel1"></script>
+  <script src="/scripts/pixel-art-fit.js"></script>
+</body>
+</html>

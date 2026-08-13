@@ -1,0 +1,16 @@
+{
+  "manifestId": "PIXIEED-FP007-BUILD-INPUT-MANIFEST-001",
+  "schemaVersion": 1,
+  "buildControlEntries": [
+    ".nvmrc",
+    "app-shell/pixieed-capacitor/capacitor.config.json",
+    "app-shell/pixieed-capacitor/package-lock.json",
+    "app-shell/pixieed-capacitor/package.json",
+    "app-shell/pixieed-capacitor/scripts/stage-web-assets.mjs",
+    "docs/inventory/fp-007-build.json",
+    "package-lock.json",
+    "package.json",
+    "scripts/fp007-build-input-manifest.json",
+    "scripts/qualify-fp007-real-distribution.mjs"
+  ]
+}

@@ -1,0 +1,400 @@
+{
+  "documentId": "PIXIEED-FP007-INTEGRATION-EVIDENCE-001",
+  "schemaVersion": "1.0.0",
+  "package": "FP-007",
+  "evidenceScope": "CROSS_TRACK_COORDINATOR_INTEGRATION",
+  "contextSha256": "1456bdd0593538d1f454f3f20c494ba9151914ced8bee1619f16ca7b5b1da200",
+  "status": "BLOCKED",
+  "statusReason": "The bounded exact JSR vulnerability receipt chain is independently approved with external blockers: it clears the two VULNERABILITY_REVIEW_UNKNOWN findings and binds the locked artifact to an immutable source revision with a revision-scoped zero-vulnerability OSV receipt. The fixed WP-000 baseline runner executed successfully with 63/77 successful, the 14 inherited failures matching, and zero new failures. Dirty-tree, clean-checkout, real distribution, current-system, and production qualification blockers remain.",
+  "acceptances": [
+    {
+      "id": "FP007-SCHEMA-001",
+      "analyzer": {
+        "status": "PASS",
+        "execution": "PASS",
+        "findingCount": 0
+      },
+      "isolatedFixture": {
+        "status": "PASS",
+        "evidenceLevel": "ISOLATED_REFERENCE"
+      },
+      "realRepoQualification": {
+        "status": "UNTESTED",
+        "evidenceLevel": "UNTESTED",
+        "reason": "No production/current schema provider qualification was run."
+      },
+      "status": "UNTESTED"
+    },
+    {
+      "id": "FP007-DEP-001",
+      "analyzer": {
+        "status": "PASS",
+        "execution": "PASS",
+        "findingCount": 0
+      },
+      "isolatedFixture": {
+        "status": "PASS",
+        "evidenceLevel": "ISOLATED_REFERENCE"
+      },
+      "realRepoQualification": {
+        "status": "PASS",
+        "evidenceLevel": "REAL_REPOSITORY",
+        "reason": "Fresh offline inventory measured 7 projects with 0 FAIL, 0 LICENSE_UNKNOWN, and 0 VULNERABILITY_REVIEW_UNKNOWN. The exact JSR receipt is bound to the locked package integrity and validated Rekor/source/OSV commit identity."
+      },
+      "status": "PASS"
+    },
+    {
+      "id": "FP007-BUILD-001",
+      "analyzer": {
+        "status": "PASS",
+        "execution": "PASS",
+        "findingCount": 0
+      },
+      "isolatedFixture": {
+        "status": "PASS",
+        "evidenceLevel": "ISOLATED_REFERENCE"
+      },
+      "realRepoQualification": {
+        "status": "BLOCKED",
+        "evidenceLevel": "REAL_REPOSITORY",
+        "reason": "Dirty worktree prevents real clean-checkout repeat-build qualification."
+      },
+      "status": "BLOCKED"
+    },
+    {
+      "id": "FP007-DIST-001",
+      "analyzer": {
+        "status": "PASS",
+        "execution": "PASS",
+        "findingCount": 0
+      },
+      "isolatedFixture": {
+        "status": "PASS",
+        "evidenceLevel": "ISOLATED_REFERENCE"
+      },
+      "realRepoQualification": {
+        "status": "UNTESTED",
+        "evidenceLevel": "UNTESTED",
+        "reason": "Real distribution artifacts and browser build identity were not qualified."
+      },
+      "status": "UNTESTED"
+    },
+    {
+      "id": "FP007-PROVENANCE-001",
+      "analyzer": {
+        "status": "PASS",
+        "execution": "PASS",
+        "findingCount": 0
+      },
+      "isolatedFixture": {
+        "status": "PASS",
+        "evidenceLevel": "ISOLATED_REFERENCE"
+      },
+      "realRepoQualification": {
+        "status": "UNTESTED",
+        "evidenceLevel": "UNTESTED",
+        "reason": "Real distribution provenance and clean-build source mapping were not qualified."
+      },
+      "status": "UNTESTED"
+    }
+  ],
+  "commands": [
+    {
+      "command": "deno check --no-remote pixiedraw2/src/fp-007/*.ts pixiedraw2/tests/fp-007/*.ts pixiedraw2/benchmarks/fp-007/*.ts",
+      "exitCode": 0,
+      "testCount": null,
+      "status": "PASS"
+    },
+    {
+      "command": "deno test -A pixiedraw2/tests/fp-007",
+      "exitCode": 0,
+      "testCount": 94,
+      "status": "PASS"
+    },
+    {
+      "command": "deno run --no-remote --allow-read pixiedraw2/benchmarks/fp-007/repeat-build.ts",
+      "exitCode": 0,
+      "testCount": null,
+      "status": "PASS"
+    },
+    {
+      "command": "deno fmt --check pixiedraw2/src/fp-007/*.ts pixiedraw2/tests/fp-007/*.ts pixiedraw2/benchmarks/fp-007/*.ts",
+      "exitCode": 0,
+      "testCount": null,
+      "status": "PASS"
+    },
+    {
+      "command": "jq -e type pixiedraw2/tests/fp-007/fixtures/*.json docs/inventory/fp-007-*.json",
+      "exitCode": 0,
+      "testCount": null,
+      "status": "PASS"
+    },
+    {
+      "command": "deno eval --no-remote '<load docs/inventory/fp-007-npm-audit-receipts.json and docs/inventory/fp-007-jsr-license-receipts.json; scanRepository(root, { npmAuditReceipts }) twice; canonicalize and SHA-256 each inventory>'",
+      "exitCode": 0,
+      "testCount": null,
+      "status": "PASS"
+    },
+    {
+      "command": "(root) npm_config_offline=true npm ci --dry-run --ignore-scripts --no-audit --no-fund",
+      "exitCode": 0,
+      "testCount": null,
+      "status": "PASS"
+    },
+    {
+      "command": "(app-shell/pixieed-capacitor) npm_config_offline=true npm ci --dry-run --ignore-scripts --no-audit --no-fund",
+      "exitCode": 0,
+      "testCount": null,
+      "status": "PASS"
+    },
+    {
+      "command": "(tools/screenshots) npm_config_offline=true npm ci --dry-run --ignore-scripts --no-audit --no-fund",
+      "exitCode": 0,
+      "testCount": null,
+      "status": "PASS"
+    },
+    {
+      "command": "(16_IMPLEMENTATION_STARTER/reference-core) npm_config_offline=true npm ci --dry-run --ignore-scripts --no-audit --no-fund",
+      "exitCode": 0,
+      "testCount": null,
+      "status": "PASS"
+    },
+    {
+      "command": "git diff --check",
+      "exitCode": 0,
+      "testCount": null,
+      "status": "PASS"
+    },
+    {
+      "command": "node scripts/test-baseline-failure-identity-wp080.mjs",
+      "exitCode": 0,
+      "testCount": 14,
+      "status": "PASS",
+      "identityMatches": 14,
+      "newFailureCount": 0
+    },
+    {
+      "command": "node scripts/test-baseline-suite-wp000.mjs",
+      "exitCode": 0,
+      "testCount": 77,
+      "status": "PASS",
+      "passedCount": 63,
+      "inheritedFailureCount": 14,
+      "newFailureCount": 0,
+      "newFailureTests": [],
+      "detail": "Fixed 77-test suite passed: 63 successful tests and 14 inherited failures matching test, target, and major error signature; new failures: 0."
+    },
+    {
+      "command": "node scripts/test-shared-page-chrome.mjs",
+      "exitCode": 0,
+      "testCount": null,
+      "status": "PASS",
+      "detail": "Shared page chrome guard passed with only the three explicitly listed isolated HTML entries exempted."
+    }
+  ],
+  "verificationExceptions": [],
+  "totalTestCount": 94,
+  "inventoryDeterminism": {
+    "status": "PASS",
+    "runs": 2,
+    "projectsPerRun": 7,
+    "findingsPerRun": 0,
+    "canonicalHashesMatch": true,
+    "canonicalSha256": "93a5539b9d8c8e52aaaed0bcd578015e5870f57bf0791a8ed5e7046428a01073",
+    "findingCounts": {
+      "PASS": 0,
+      "FAIL": 0,
+      "BLOCKED": 0,
+      "UNKNOWN": 0,
+      "UNTESTED": 0
+    },
+    "findingCodes": {
+      "VULNERABILITY_REVIEW_UNKNOWN": 0
+    }
+  },
+  "repeatBuild": {
+    "status": "PASS",
+    "evidenceLevel": "ISOLATED_REFERENCE",
+    "scope": "ISOLATED_FIXTURE",
+    "comparison": "PASS",
+    "reason": "Identical isolated fixture inputs produced identical canonical and artifact identities.",
+    "manifestHash": "0f852b6b5ac413c6fe2e55761dbe40be6042d7cb92976f1ebf5c034428ca64f4",
+    "artifactManifestHash": "0b484792d3e219f3821c8e2495646100d35719644fd5e309ec0bd00d5cc124f5",
+    "provenanceHash": "8f146028f63601c03f936ea9ef571541e70acd618dfa18b99dc3b97539d48ade",
+    "brotli": "UNTESTED"
+  },
+  "currentRepositoryFindings": [
+    {
+      "code": "NPM_DEPENDENCY_EXACT_PIN",
+      "status": "PASS",
+      "count": 7,
+      "detail": "7/7 direct npm declarations are exact-pinned and have matching offline lock resolution."
+    },
+    {
+      "code": "TOOLCHAIN_EXACT_PIN",
+      "status": "PASS",
+      "count": 3,
+      "detail": "The three shared Node scopes resolve Node 22.19.0 and npm 10.9.3 from the exact root declaration; no toolchain-related finding remains."
+    },
+    {
+      "code": "JSR_VULNERABILITY_REVIEW_EXACT",
+      "status": "PASS",
+      "count": 2,
+      "detail": "Exact JSR receipt validates package integrity, Rekor identity, SET/DSSE/inclusion/checkpoint states, immutable source commit, and OSV commit result with zero vulnerabilities for both lockfile scopes."
+    },
+    {
+      "code": "DIRTY_WORKTREE",
+      "status": "BLOCKED",
+      "count": 1
+    },
+    {
+      "code": "REAL_CLEAN_CHECKOUT_NOT_RUN",
+      "status": "BLOCKED",
+      "count": 1
+    },
+    {
+      "code": "REAL_DIST_PROVENANCE_NOT_QUALIFIED",
+      "status": "UNTESTED",
+      "count": 1
+    }
+  ],
+  "baseline": {
+    "priorFailureCount": 14,
+    "priorIdentity": "test-target-signature",
+    "identityCommand": "node scripts/test-baseline-failure-identity-wp080.mjs",
+    "identityCommandExitCode": 0,
+    "identityMatches": 14,
+    "currentIdentityVerification": "PASS",
+    "newFailureCount": 0,
+    "fullSuiteManifestPath": "docs/inventory/baseline-suite-wp000.json",
+    "fullSuiteVerifierCommand": "node scripts/test-baseline-suite-wp000.mjs",
+    "fullSuiteExpectedTotal": 77,
+    "fullSuiteExpectedPassCount": 63,
+    "fullSuiteExpectedFailureCount": 14,
+    "fullSuiteVerificationStatus": "PASS",
+    "fullSuiteNewFailureIdentities": "ZERO",
+    "full63Of77Executed": true,
+    "full63Of77Rerun": "PASS",
+    "full63Of77Reason": "Executed with exit 0: 63/77 successful, 14 inherited failures matched test, target, and major error signature, and new failure identities: 0."
+  },
+  "secretExclusion": {
+    "status": "PASS",
+    "excluded": [
+      "datetime",
+      "absolutePath",
+      "host",
+      "user",
+      "JWT",
+      "email",
+      "secret",
+      "projectContent"
+    ]
+  },
+  "serverNonIntrusionAuthority": {
+    "status": "FAIL_CLOSED_CLIENT_REFERENCE",
+    "opaqueProofRequired": true,
+    "distributedProofCreation": "ABSENT",
+    "publicReceiptDigestAuthority": "REJECTED",
+    "publicIndexExportsProofCreation": false,
+    "distributedBoundaryExportsProofCreation": false,
+    "copyAndBrowserShapedProofs": "REJECTED",
+    "scopeSwapDigestReuseDirtyAndUnexecuted": "REJECTED",
+    "rehashedReceipt": "UNTESTED_NOT_AUTHORITY",
+    "futureServerAdapter": "UNTESTED_SEPARATE_NON_DISTRIBUTED_ROOT",
+    "productionProvider": "UNTESTED"
+  },
+  "reviewStatus": "APPROVED_WITH_EXTERNAL_BLOCKERS",
+  "independentProvenanceAudit": {
+    "decision": "APPROVED_WITH_EXTERNAL_BLOCKERS",
+    "status": "BOUNDED_PASS_EXTERNAL_BLOCKERS",
+    "lockToJsrArtifact": "PASS",
+    "jsrArtifactToImmutableSourceRevision": "PASS",
+    "revisionScopedOsvCommitReceipt": "PASS_ZERO_VULNERABILITIES",
+    "jsrEcosystemOsvQuery": "UNSUPPORTED_NOT_USED",
+    "candidateSourceTagOsvZeroFindings": "NOT_USED",
+    "rawNetworkDetailsExcluded": true,
+    "requiredExternalEvidence": [
+      "DIRTY_WORKTREE",
+      "REAL_CLEAN_CHECKOUT_NOT_RUN",
+      "REAL_DIST_PROVENANCE_NOT_QUALIFIED",
+      "CURRENT_SYSTEM_QUALIFICATION_UNTESTED",
+      "PRODUCTION_QUALIFICATION_UNTESTED"
+    ]
+  },
+  "independentReviewQuestions": [
+    "Does the schema digest cover every registered canonical record and reject forged or unknown identities?",
+    "Are dependency, lockfile, toolchain, and environment hashes recomputed from the same canonical inputs?",
+    "Are current-repository blockers preserved instead of hidden by isolated PASS evidence?",
+    "Are initial/lazy artifacts mapped exactly once and source-map policy explicit?",
+    "Does the evidence contain only sanitized stable values?",
+    "Are the 14 prior baseline identities checked independently before release qualification?"
+  ],
+  "currentSystemImpact": {
+    "currentRoutes": "UNTESTED",
+    "currentPiXiEEDraw": "UNTESTED",
+    "pxd": "UNTESTED",
+    "pixiSYNC": "UNTESTED",
+    "market": "UNTESTED",
+    "productionData": "NOT_ACCESSED",
+    "productionAction": "NONE"
+  },
+  "dependencyRefresh": {
+    "status": "MEASURED_OFFLINE",
+    "scanner": "pixiedraw2/src/fp-007/dependency-inventory.ts",
+    "mode": "offline-read-only",
+    "network": "disabled",
+    "runs": 2,
+    "projects": 7,
+    "findings": {
+      "total": 0,
+      "fail": 0,
+      "blocked": 0,
+      "unknown": 0,
+      "untested": 0
+    },
+    "npm": {
+      "directDeclarations": 7,
+      "exactPinned": 7,
+      "lockResolvedExactPinned": 7,
+      "manifestLockIntegrity": "PASS"
+    },
+    "remainingReasons": {
+      "floatingJsrRanges": 0,
+      "licenseUnknown": 0,
+      "vulnerabilityReviewUnknown": 0,
+      "vulnerabilityConfirmedHigh": 0,
+      "lockfilesMissing": 0,
+      "jsrLockResolutionMissing": 0,
+      "toolchainUnknown": 0
+    },
+    "qualification": "BLOCKED",
+    "qualificationBlockers": [
+      "DIRTY_WORKTREE",
+      "REAL_CLEAN_CHECKOUT_NOT_RUN",
+      "REAL_DIST_PROVENANCE_NOT_QUALIFIED"
+    ],
+    "securityReview": {
+      "status": "PASS_ZERO_VULNERABILITIES",
+      "network": "disabled",
+      "externalNetworkQuery": "NOT_PERFORMED",
+      "jsrEcosystemOsvQuery": "UNSUPPORTED_NOT_USED",
+      "osvCommitQuery": "PASS_ZERO_VULNERABILITIES",
+      "revisionScopedOsvCommitReceipt": "PASS_ZERO_VULNERABILITIES",
+      "confirmed": [
+        "JSR_LICENSE_RECEIPT_EXACT_MATCH=MIT (2 resolved dependencies)"
+      ],
+      "unknownRemaining": 0,
+      "unknownBreakdown": {
+        "npm": 0,
+        "jsr": 0
+      },
+      "jsrFunctions": {
+        "exactIdentity": "PASS_EXACT_RECEIPT",
+        "integrity": "PASS_EXACT_RECEIPT",
+        "license": "MIT_EXACT_LOCK_BOUND_RECEIPT",
+        "lock": "PASS_EXACT_LOCK_BOUND_RECEIPT",
+        "functions": 2
+      }
+    }
+  }
+}

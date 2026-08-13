@@ -1,0 +1,38 @@
+{
+  "name": "core.project",
+  "exactVersion": "2.0.0",
+  "digest": "28622a3d852de88799f4bd7723e59a9cf6b4529e8cb4981341e17a78f3b9c876",
+  "owner": "core",
+  "status": "ACTIVE",
+  "compatibilityMode": "backward",
+  "migrationOrAdapterId": null,
+  "fixtureSet": ["project.empty.v2", "project.valid.v2"],
+  "fields": {
+    "count": {
+      "type": "integer",
+      "required": true,
+      "nullable": false,
+      "hasDefault": false
+    },
+    "description": {
+      "type": "string",
+      "required": false,
+      "nullable": false,
+      "hasDefault": false
+    },
+    "id": {
+      "type": "string",
+      "required": true,
+      "nullable": false,
+      "hasDefault": false
+    },
+    "title": {
+      "type": "string",
+      "required": false,
+      "nullable": false,
+      "hasDefault": false
+    }
+  },
+  "schemaFamily": "CANONICAL",
+  "legacyOf": null
+}

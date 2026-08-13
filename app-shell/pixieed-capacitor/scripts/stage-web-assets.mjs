@@ -1,70 +1,113 @@
-import { cp, mkdir, rm, stat, writeFile } from 'node:fs/promises';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import {
+  cp,
+  lstat,
+  mkdir,
+  mkdtemp,
+  readdir,
+  realpath,
+  rename,
+  rmdir,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
-const appRoot = path.resolve(scriptDir, '..');
-const repoRoot = path.resolve(appRoot, '../..');
-const webRoot = path.join(appRoot, 'dist', 'web');
-const buildManifestPath = path.join(appRoot, 'dist', 'build-manifest.json');
-const shouldCheckOnly = process.argv.includes('--check');
+const appRoot = path.resolve(scriptDir, "..");
+const repoRoot = path.resolve(appRoot, "../..");
+const canonicalDistRoot = path.join(appRoot, "dist");
+const webRoot = path.join(canonicalDistRoot, "web");
+const shouldCheckOnly = process.argv.includes("--check");
+const BUILD_MANIFEST_SCHEMA_VERSION = 1;
+const REPOSITORY_RELATIVE_SOURCE_ROOT = ".";
+const REPOSITORY_RELATIVE_OUTPUT_ROOT = "app-shell/pixieed-capacitor/dist/web";
+const REFUSE_EXTERNAL_OUTPUT_DELETE = "REFUSE_EXTERNAL_OUTPUT_DELETE";
+const EXTERNAL_OUTPUT_NOT_EMPTY = "EXTERNAL_OUTPUT_NOT_EMPTY";
+const EXTERNAL_OUTPUT_BOUNDARY_REQUIRED = "EXTERNAL_OUTPUT_BOUNDARY_REQUIRED";
+const OUTPUT_BOUNDARY_INVALID = "OUTPUT_BOUNDARY_INVALID";
+const OUTPUT_PATH_SYMLINK = "OUTPUT_PATH_SYMLINK";
+const OUTPUT_RACE_DETECTED = "OUTPUT_RACE_DETECTED";
+const PRIVATE_OUTPUT_REQUIRED = "PRIVATE_OUTPUT_REQUIRED";
 
-const includeEntries = [
-  'account',
-  'account-deletion',
-  'assets',
-  'character-dots',
-  'contact',
-  'data',
-  'events',
-  'glossary',
-  'help',
-  'icon',
-  'images',
-  'index.html',
-  'maoitu',
-  'market',
-  'manifest.webmanifest',
-  'notes',
-  'notice',
-  'pixiedraw',
-  'pixfind',
-  'pixiee-lens',
-  'PiXiEEDogp.png',
-  'portfolio',
-  'privacy',
-  'projects',
-  'qr',
-  'qr-maker',
-  'robots.txt',
-  'scripts',
-  'scripts.js',
-  'site',
-  'sitemap.xml',
-  'styles.css',
-  'terms',
-];
+const includeEntries = Object.freeze([
+  "account",
+  "account-deletion",
+  "assets",
+  "character-dots",
+  "contact",
+  "data",
+  "events",
+  "glossary",
+  "help",
+  "icon",
+  "images",
+  "index.html",
+  "maoitu",
+  "market",
+  "manifest.webmanifest",
+  "notes",
+  "notice",
+  "pixiedraw",
+  "pixfind",
+  "pixiee-lens",
+  "PiXiEEDogp.png",
+  "portfolio",
+  "post",
+  "privacy",
+  "projects",
+  "qr",
+  "qr-maker",
+  "robots.txt",
+  "scripts",
+  "scripts.js",
+  "site",
+  "sitemap.xml",
+  "styles.css",
+  "terms",
+]);
 
 async function pathExists(targetPath) {
   try {
     await stat(targetPath);
     return true;
   } catch (error) {
-    if (error && error.code === 'ENOENT') {
+    if (error && error.code === "ENOENT") {
       return false;
     }
     throw error;
   }
 }
 
-function getBuildSummary(entries) {
+function createBuildManifest(entries = includeEntries) {
   return {
-    generatedAt: new Date().toISOString(),
-    appRoot,
-    repoRoot,
-    webRoot,
-    entries
+    schemaVersion: BUILD_MANIFEST_SCHEMA_VERSION,
+    sourceRoot: REPOSITORY_RELATIVE_SOURCE_ROOT,
+    outputRoot: REPOSITORY_RELATIVE_OUTPUT_ROOT,
+    entries: [...entries],
   };
+}
+
+function canonicalBuildManifestJson(manifest) {
+  return JSON.stringify({
+    schemaVersion: manifest.schemaVersion,
+    sourceRoot: manifest.sourceRoot,
+    outputRoot: manifest.outputRoot,
+    entries: [...manifest.entries],
+  });
+}
+
+function createCopyPlan(
+  entries = includeEntries,
+  sourceRoot = repoRoot,
+  outputRoot = webRoot,
+) {
+  return entries.map((entry) => ({
+    entry,
+    sourcePath: path.join(sourceRoot, entry),
+    targetPath: path.join(outputRoot, entry),
+  }));
 }
 
 function buildLauncherHtml() {
@@ -207,50 +250,411 @@ function buildLauncherHtml() {
 `;
 }
 
-async function copyEntry(entry) {
-  const sourcePath = path.join(repoRoot, entry);
-  const targetPath = path.join(webRoot, entry);
+function directoryIdentityFromStat(targetPath, targetStat, resolvedPath) {
+  return {
+    path: path.resolve(targetPath),
+    resolvedPath,
+    device: targetStat.dev,
+    inode: targetStat.ino,
+    uid: targetStat.uid ?? null,
+    mode: targetStat.mode & 0o777,
+  };
+}
+
+function sameDirectoryIdentity(left, right) {
+  return left && right && left.path === right.path &&
+    left.resolvedPath === right.resolvedPath &&
+    left.device === right.device && left.inode === right.inode &&
+    left.uid === right.uid;
+}
+
+async function assertPrivateDirectory(targetPath, code = PRIVATE_OUTPUT_REQUIRED) {
+  let targetStat;
+  try {
+    targetStat = await lstat(targetPath);
+  } catch (error) {
+    throw new Error(`${code}: directory unavailable`, { cause: error });
+  }
+  if (!targetStat.isDirectory() || targetStat.isSymbolicLink()) {
+    throw new Error(`${code}: directory must be a real directory`);
+  }
+  if ((targetStat.mode & 0o077) !== 0) {
+    throw new Error(`${code}: directory permissions are not private`);
+  }
+  if (typeof process.getuid === "function" && targetStat.uid !== process.getuid()) {
+    throw new Error(`${code}: directory owner mismatch`);
+  }
+  const resolvedPath = await realpath(targetPath);
+  return directoryIdentityFromStat(targetPath, targetStat, resolvedPath);
+}
+
+async function assertExternalOutputBoundary({
+  distRoot,
+  externalOutputBoundary,
+}) {
+  if (typeof externalOutputBoundary !== "string") {
+    throw new Error(EXTERNAL_OUTPUT_BOUNDARY_REQUIRED);
+  }
+  const resolvedBoundary = path.resolve(externalOutputBoundary);
+  const resolvedDistRoot = path.resolve(distRoot);
+  const boundaryIdentity = await assertPrivateDirectory(
+    resolvedBoundary,
+    OUTPUT_BOUNDARY_INVALID,
+  );
+  const boundaryRealPath = boundaryIdentity.resolvedPath;
+  const relativeDist = path.relative(resolvedBoundary, resolvedDistRoot);
+  if (
+    relativeDist.length === 0 || relativeDist.startsWith(`..${path.sep}`) ||
+    relativeDist === ".." || path.isAbsolute(relativeDist)
+  ) {
+    throw new Error(
+      `${OUTPUT_BOUNDARY_INVALID}: output must be a strict descendant`,
+    );
+  }
+
+  let currentPath = resolvedBoundary;
+  for (const segment of relativeDist.split(path.sep)) {
+    currentPath = path.join(currentPath, segment);
+    try {
+      const currentStat = await lstat(currentPath);
+      if (currentStat.isSymbolicLink()) {
+        throw new Error(`${OUTPUT_PATH_SYMLINK}: ${currentPath}`);
+      }
+      if (!currentStat.isDirectory()) {
+        throw new Error(`${OUTPUT_BOUNDARY_INVALID}: non-directory component`);
+      }
+      const currentRealPath = await realpath(currentPath);
+      const relativeReal = path.relative(boundaryRealPath, currentRealPath);
+      if (
+        relativeReal.length === 0 || relativeReal.startsWith(`..${path.sep}`) ||
+        relativeReal === ".." || path.isAbsolute(relativeReal)
+      ) {
+        throw new Error(`${OUTPUT_BOUNDARY_INVALID}: canonical path escaped`);
+      }
+    } catch (error) {
+      if (error && error.code === "ENOENT") break;
+      throw error;
+    }
+  }
+  return boundaryIdentity;
+}
+
+async function copyEntry(
+  entry,
+  sourceRoot = repoRoot,
+  outputRoot = webRoot,
+  externalOutputBoundary,
+) {
+  if (externalOutputBoundary !== undefined) {
+    await assertExternalOutputBoundary({
+      distRoot: path.dirname(outputRoot),
+      externalOutputBoundary,
+    });
+  }
+  const sourcePath = path.join(sourceRoot, entry);
+  const targetPath = path.join(outputRoot, entry);
   await mkdir(path.dirname(targetPath), { recursive: true });
   await cp(sourcePath, targetPath, {
     recursive: true,
     force: true,
-    filter: (source) => !source.endsWith('.DS_Store')
+    filter: (source) => !source.endsWith(".DS_Store"),
   });
 }
 
-async function validateEntries() {
+async function copyEntries(
+  entries = includeEntries,
+  sourceRoot = repoRoot,
+  outputRoot = webRoot,
+  externalOutputBoundary,
+) {
+  for (const entry of entries) {
+    await copyEntry(
+      entry,
+      sourceRoot,
+      outputRoot,
+      externalOutputBoundary,
+    );
+  }
+}
+
+function validateEntryName(entry) {
+  if (
+    typeof entry !== "string" || entry.length === 0 || path.isAbsolute(entry)
+  ) {
+    throw new Error(`INVALID_SOURCE_ENTRY: ${String(entry)}`);
+  }
+  const segments = entry.split(/[\\/]+/);
+  if (
+    segments.includes("..") || segments.some((segment) => segment.length === 0)
+  ) {
+    throw new Error(`INVALID_SOURCE_ENTRY: ${entry}`);
+  }
+}
+
+async function validateEntries(
+  entries = includeEntries,
+  sourceRoot = repoRoot,
+) {
   const missing = [];
-  for (const entry of includeEntries) {
-    const sourcePath = path.join(repoRoot, entry);
+  for (const entry of entries) {
+    validateEntryName(entry);
+    const sourcePath = path.join(sourceRoot, entry);
     if (!(await pathExists(sourcePath))) {
       missing.push(entry);
     }
   }
   if (missing.length) {
-    throw new Error(`Missing source entries: ${missing.join(', ')}`);
+    throw new Error(`Missing source entries: ${missing.join(", ")}`);
   }
 }
 
+async function assertExternalOutputIsEmpty(distRoot) {
+  try {
+    const outputStat = await lstat(distRoot);
+    if (outputStat.isSymbolicLink()) {
+      throw new Error(`${OUTPUT_PATH_SYMLINK}: ${distRoot}`);
+    }
+    if (!outputStat.isDirectory()) {
+      throw new Error(`${EXTERNAL_OUTPUT_NOT_EMPTY}: ${distRoot}`);
+    }
+    const children = await readdir(distRoot);
+    if (children.length > 0) {
+      throw new Error(`${EXTERNAL_OUTPUT_NOT_EMPTY}: ${distRoot}`);
+    }
+  } catch (error) {
+    if (error && error.code === "ENOENT") {
+      return;
+    }
+    throw error;
+  }
+}
+
+async function removeEmptyOutputDirectory(distRoot) {
+  try {
+    const outputStat = await lstat(distRoot);
+    if (outputStat.isSymbolicLink() || !outputStat.isDirectory()) {
+      throw new Error(`${OUTPUT_PATH_SYMLINK}: output target changed`);
+    }
+    const children = await readdir(distRoot);
+    if (children.length > 0) {
+      throw new Error(`${EXTERNAL_OUTPUT_NOT_EMPTY}: ${distRoot}`);
+    }
+    await rmdir(distRoot);
+  } catch (error) {
+    if (error && error.code === "ENOENT") return;
+    throw error;
+  }
+}
+
+async function writeStagedAssets({ entries, sourceRoot, outputRoot }) {
+  const outputWebRoot = path.join(outputRoot, "web");
+  const manifestPath = path.join(outputRoot, "build-manifest.json");
+  await mkdir(outputWebRoot, { recursive: true });
+  await copyEntries(entries, sourceRoot, outputWebRoot);
+  const manifest = createBuildManifest(entries);
+  await writeFile(
+    manifestPath,
+    `${JSON.stringify(manifest, null, 2)}\n`,
+    "utf8",
+  );
+  return { distRoot: outputRoot, manifest, manifestPath, outputWebRoot };
+}
+
+async function stageExternalWebAssets({
+  entries,
+  sourceRoot,
+  distRoot,
+  externalOutputBoundary,
+  safetyHooks,
+}) {
+  const resolvedDistRoot = path.resolve(distRoot);
+  const initialBoundary = await assertExternalOutputBoundary({
+    distRoot: resolvedDistRoot,
+    externalOutputBoundary,
+  });
+  const parentPath = path.dirname(resolvedDistRoot);
+  const parentIdentity = await assertPrivateDirectory(parentPath);
+  const parentRealPath = parentIdentity.resolvedPath;
+  const relativeParent = path.relative(
+    initialBoundary.resolvedPath,
+    parentRealPath,
+  );
+  if (
+    relativeParent.startsWith(`..${path.sep}`) || relativeParent === ".." ||
+    path.isAbsolute(relativeParent)
+  ) {
+    throw new Error(`${OUTPUT_BOUNDARY_INVALID}: output parent escaped`);
+  }
+  await assertExternalOutputIsEmpty(resolvedDistRoot);
+
+  let workingRoot;
+  let workingRootRealPath;
+  try {
+    // The working child is created inside the verified private parent. The
+    // final publish is a same-parent rename; Node does not expose openat(2)
+    // for directory handles, so the parent is revalidated at each boundary.
+    workingRoot = await mkdtemp(path.join(parentPath, ".pixiedeed-stage-"));
+    workingRootRealPath = await realpath(workingRoot);
+    const createdParent = await assertPrivateDirectory(parentPath);
+    if (!sameDirectoryIdentity(parentIdentity, createdParent)) {
+      throw new Error(`${OUTPUT_RACE_DETECTED}: output parent changed`);
+    }
+
+    await writeStagedAssets({ entries, sourceRoot, outputRoot: workingRoot });
+    await assertExternalOutputBoundary({
+      distRoot: workingRoot,
+      externalOutputBoundary,
+    });
+    await assertPrivateDirectory(workingRoot);
+
+    const currentBoundary = await assertExternalOutputBoundary({
+      distRoot: resolvedDistRoot,
+      externalOutputBoundary,
+    });
+    if (!sameDirectoryIdentity(initialBoundary, currentBoundary)) {
+      throw new Error(`${OUTPUT_RACE_DETECTED}: output boundary changed`);
+    }
+    const currentParent = await assertPrivateDirectory(parentPath);
+    if (!sameDirectoryIdentity(parentIdentity, currentParent)) {
+      throw new Error(`${OUTPUT_RACE_DETECTED}: output parent changed`);
+    }
+    await removeEmptyOutputDirectory(resolvedDistRoot);
+    const publishParent = await assertPrivateDirectory(parentPath);
+    if (!sameDirectoryIdentity(parentIdentity, publishParent)) {
+      throw new Error(`${OUTPUT_RACE_DETECTED}: output parent changed`);
+    }
+
+    // This hook is intentionally an exported-function test seam only. It is
+    // placed after the last ordinary boundary check and immediately before a
+    // final recheck plus the publish syscall. The production CLI never reads
+    // or accepts it from argv/env/browser input.
+    if (typeof safetyHooks?.beforeOutputPublish === "function") {
+      await safetyHooks.beforeOutputPublish({
+        boundary: externalOutputBoundary,
+        distRoot: resolvedDistRoot,
+        workingRoot,
+      });
+    }
+    const finalBoundary = await assertExternalOutputBoundary({
+      distRoot: resolvedDistRoot,
+      externalOutputBoundary,
+    });
+    if (!sameDirectoryIdentity(initialBoundary, finalBoundary)) {
+      throw new Error(`${OUTPUT_RACE_DETECTED}: output boundary changed`);
+    }
+    const finalParent = await assertPrivateDirectory(parentPath);
+    if (!sameDirectoryIdentity(parentIdentity, finalParent)) {
+      throw new Error(`${OUTPUT_RACE_DETECTED}: output parent changed`);
+    }
+    const finalWorkingRoot = await assertPrivateDirectory(workingRoot);
+    if (finalWorkingRoot.resolvedPath !== workingRootRealPath) {
+      throw new Error(`${OUTPUT_RACE_DETECTED}: working output changed`);
+    }
+    await rename(workingRoot, resolvedDistRoot);
+    workingRoot = undefined;
+    await assertExternalOutputBoundary({
+      distRoot: resolvedDistRoot,
+      externalOutputBoundary,
+    });
+    return {
+      distRoot: resolvedDistRoot,
+      manifest: createBuildManifest(entries),
+      manifestPath: path.join(resolvedDistRoot, "build-manifest.json"),
+      outputWebRoot: path.join(resolvedDistRoot, "web"),
+    };
+  } finally {
+    if (workingRoot) {
+      // Use the pre-publish real path. If a test replacement changed the
+      // boundary to a symlink, cleaning the original path string could touch
+      // the replacement target. Leaving a private temp behind is safer than
+      // following an untrusted path.
+      await rm(workingRootRealPath ?? workingRoot, {
+        recursive: true,
+        force: true,
+      }).catch(() => {});
+    }
+  }
+}
+
+async function stageWebAssets({
+  entries = includeEntries,
+  sourceRoot = repoRoot,
+  distRoot = canonicalDistRoot,
+  cleanOutput = true,
+  externalOutputBoundary,
+  safetyHooks,
+} = {}) {
+  const resolvedDistRoot = path.resolve(distRoot);
+  const resolvedCanonicalDistRoot = path.resolve(canonicalDistRoot);
+
+  await validateEntries(entries, sourceRoot);
+
+  if (!cleanOutput) {
+    return stageExternalWebAssets({
+      entries,
+      sourceRoot,
+      distRoot: resolvedDistRoot,
+      externalOutputBoundary,
+      safetyHooks,
+    });
+  }
+
+  if (resolvedDistRoot !== resolvedCanonicalDistRoot) {
+    throw new Error(REFUSE_EXTERNAL_OUTPUT_DELETE);
+  }
+  await rm(resolvedCanonicalDistRoot, { recursive: true, force: true });
+  return writeStagedAssets({
+    entries,
+    sourceRoot,
+    outputRoot: resolvedDistRoot,
+  });
+}
+
 async function main() {
-  await validateEntries();
+  await validateEntries(includeEntries, repoRoot);
   if (shouldCheckOnly) {
-    console.log(`OK: ${includeEntries.length} entries are available for staging.`);
+    console.log(
+      `OK: ${includeEntries.length} entries are available for staging.`,
+    );
     return;
   }
 
-  await rm(path.join(appRoot, 'dist'), { recursive: true, force: true });
-  await mkdir(webRoot, { recursive: true });
-
-  for (const entry of includeEntries) {
-    await copyEntry(entry);
-  }
-
-  await writeFile(buildManifestPath, `${JSON.stringify(getBuildSummary(includeEntries), null, 2)}\n`, 'utf8');
+  await stageWebAssets({
+    entries: includeEntries,
+    sourceRoot: repoRoot,
+    distRoot: canonicalDistRoot,
+    cleanOutput: true,
+  });
 
   console.log(`Staged ${includeEntries.length} entries into ${webRoot}`);
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : error);
-  process.exitCode = 1;
-});
+export {
+  assertExternalOutputBoundary,
+  BUILD_MANIFEST_SCHEMA_VERSION,
+  canonicalBuildManifestJson,
+  copyEntries,
+  createBuildManifest,
+  createCopyPlan,
+  EXTERNAL_OUTPUT_BOUNDARY_REQUIRED,
+  EXTERNAL_OUTPUT_NOT_EMPTY,
+  includeEntries,
+  OUTPUT_BOUNDARY_INVALID,
+  OUTPUT_PATH_SYMLINK,
+  OUTPUT_RACE_DETECTED,
+  PRIVATE_OUTPUT_REQUIRED,
+  REFUSE_EXTERNAL_OUTPUT_DELETE,
+  REPOSITORY_RELATIVE_OUTPUT_ROOT,
+  REPOSITORY_RELATIVE_SOURCE_ROOT,
+  stageWebAssets,
+  validateEntries,
+};
+
+const isMainModule = process.argv[1] &&
+  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isMainModule) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : error);
+    process.exitCode = 1;
+  });
+}

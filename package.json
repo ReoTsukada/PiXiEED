@@ -2,7 +2,18 @@
   "name": "pixieed-site-tools",
   "private": true,
   "type": "module",
+  "pixieedToolchain": {
+    "nodeMajor": 22,
+    "nodeVersion": "22.19.0",
+    "packageManager": "npm",
+    "npmVersion": "10.9.3",
+    "lockfileVersion": 3,
+    "inheritsTo": [
+      "tools/screenshots",
+      "16_IMPLEMENTATION_STARTER/reference-core"
+    ]
+  },
   "devDependencies": {
-    "sharp": "^0.34.5"
+    "sharp": "0.35.3"
   }
 }

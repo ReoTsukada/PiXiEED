@@ -1,0 +1,43 @@
+{
+  "documentId": "PIXIEED-FP007-REAL-DISTRIBUTION-QUALIFICATION-20260813",
+  "schemaVersion": 1,
+  "package": "FP-007",
+  "status": "PASS_WITH_EXTERNAL_BLOCKERS",
+  "qualificationStatus": "PASS",
+  "scope": "REAL_CLEAN_CHECKOUT",
+  "snapshotCommit": "aee6eb58a72ce47a0befc33293f5589c73a4b858",
+  "staging": {
+    "entryCount": 34,
+    "runCount": 2,
+    "cleanOutput": false,
+    "identicalSecondRun": true,
+    "artifactFileCount": 743,
+    "artifactTotalBytes": 74428670
+  },
+  "buildInputs": {
+    "manifestPath": "scripts/fp007-build-input-manifest.json",
+    "manifestSha256": "b94093b49d5ee36b28e1f15f56d81045919a36c89a7ded83ed3bfdbaea4255e3",
+    "trustAnchor": "GIT_HEAD",
+    "fileCount": 10,
+    "allFilesHaveGitBlobOid": true
+  },
+  "identity": {
+    "inputHash": "4bcd63ad97eb5c5bcc5bd63b0652c6a288a67b58fd092939fe506d7ce3f2feff",
+    "artifactTreeHash": "17984fe32022cf1f8bdba51e50aa8a95ff920f86f11a45f323ccffe45d592f40",
+    "buildManifestHash": "261ef5b768f357db32b1cde7a4d649a89042e96b052ec2609a913265663027e2",
+    "sourceToDistProvenanceHash": "975a7d4e12c201697b45a8d34b3f08d4879cd4a0baf9617b5d4ed06a04b4e356"
+  },
+  "toolchain": {
+    "nodeVersion": "22.19.0",
+    "npmVersion": "10.9.3"
+  },
+  "mainRepositoryStatus": "BLOCKED_DIRTY_WORKTREE",
+  "productionQualification": "UNTESTED",
+  "currentSystemImpact": "NOT_ACCESSED",
+  "releaseClaim": false,
+  "notes": [
+    "The snapshot retained the existing post route instead of excluding it from staging.",
+    "This evidence does not clean, commit, push, deploy, or publish the main worktree.",
+    "FP-007 overall status remains blocked until the main qualification boundary and later production-equivalent gates are separately resolved."
+  ]
+}

@@ -27,13 +27,13 @@
     "ios:export:appstore": "bash scripts/ios-export-appstore.sh"
   },
   "dependencies": {
-    "@capacitor/core": "latest",
-    "@capacitor/filesystem": "^8.1.2"
+    "@capacitor/core": "8.2.0",
+    "@capacitor/filesystem": "8.1.2"
   },
   "devDependencies": {
-    "@capacitor/android": "latest",
-    "@capacitor/cli": "latest",
-    "@capacitor/ios": "latest"
+    "@capacitor/android": "8.2.0",
+    "@capacitor/cli": "8.2.0",
+    "@capacitor/ios": "8.2.0"
   },
   "engines": {
     "node": ">=18"
