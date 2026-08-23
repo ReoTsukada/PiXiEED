@@ -1,0 +1,213 @@
+{
+  "schemaVersion": "AGENT_PACKAGE_PREFLIGHT_V1",
+  "fixtureId": "agent-package-preflight-boundary-matrix-v1",
+  "classification": "FIXED_SYNTHETIC",
+  "network": false,
+  "productionAccess": false,
+  "realData": false,
+  "max_fix_rounds": 2,
+  "executionPolicy": {
+    "mode": "BALANCED",
+    "contract": "required-before-implementation",
+    "changeBudget": {
+      "maxChangedLines": 500,
+      "maxFiles": 4,
+      "maxRetries": 2,
+      "maxFullAudits": 1,
+      "maxFullEvidenceRuns": 1
+    },
+    "testTiers": {
+      "specialistMax": 1,
+      "integratorMax": 2,
+      "finalMax": 4
+    },
+    "maxAffectedDiffReviews": 1,
+    "maxReleaseGateFullAudits": 1,
+    "maxFullEvidenceRuns": 1,
+    "evidenceRuns": 1,
+    "terraMode": "READ_ONLY_FINAL",
+    "specialistPolicy": "DISJOINT_ONLY",
+    "integratorTier": 2,
+    "sameCategoryEscalation": "SOL"
+  },
+  "timebox_minutes": 20,
+  "checkpoint_every_minutes": 10,
+  "requiredRiskClasses": [
+    "authority",
+    "security",
+    "privacy",
+    "lifecycle"
+  ],
+  "boundaryMatrix": [
+    {
+      "id": "AUTHORITY-ROOT-001",
+      "riskClass": "authority",
+      "boundary": "composition-root",
+      "substitutedInput": "public export, caller resolver, constructor, factory, or capability injection",
+      "expectedOutcome": "REJECT",
+      "reasonCode": "CALLER_INJECTION_REJECTED"
+    },
+    {
+      "id": "RESOLVER-IDENTITY-001",
+      "riskClass": "security",
+      "boundary": "canonical-resolver",
+      "substitutedInput": "returned resource ID, type, tenant, version, revision, or content identity mismatch",
+      "expectedOutcome": "REJECT",
+      "reasonCode": "CANONICAL_IDENTITY_MISMATCH"
+    },
+    {
+      "id": "CALLER-STATE-001",
+      "riskClass": "privacy",
+      "boundary": "command-and-read-handler",
+      "substitutedInput": "caller current visibility, lifecycle, moderation, membership, or locked state",
+      "expectedOutcome": "REJECT",
+      "reasonCode": "CALLER_STATE_NOT_AUTHORITY"
+    },
+    {
+      "id": "EVENT-ID-001",
+      "riskClass": "lifecycle",
+      "boundary": "event-consumer",
+      "substitutedInput": "direct Event object or resolver Event ID with a different returned ID",
+      "expectedOutcome": "REJECT",
+      "reasonCode": "CANONICAL_EVENT_ID_REQUIRED"
+    },
+    {
+      "id": "REPLAY-REVOKE-001",
+      "riskClass": "lifecycle",
+      "boundary": "projection-lifecycle",
+      "substitutedInput": "replay, stale lifecycle event, or revoke without server event and authorization",
+      "expectedOutcome": "REJECT",
+      "reasonCode": "LIFECYCLE_TRANSITION_NOT_AUTHORIZED"
+    }
+  ],
+  "boundaryProbes": [
+    {
+      "id": "AUTHORITY-ROOT-001",
+      "input": {
+        "publicExportSource": "caller",
+        "authoritySource": "caller",
+        "resolverSource": "caller",
+        "factorySource": "caller"
+      },
+      "expectedOutcome": "REJECT",
+      "expectedReasonCode": "CALLER_INJECTION_REJECTED"
+    },
+    {
+      "id": "RESOLVER-IDENTITY-001",
+      "input": {
+        "lookupId": "resource-1",
+        "returnedId": "resource-other",
+        "lookupType": "ASSET",
+        "returnedType": "PROJECT",
+        "lookupTenant": "tenant-1",
+        "returnedTenant": "tenant-other",
+        "lookupVersion": "v1",
+        "returnedVersion": "v2",
+        "lookupRevision": "revision-1",
+        "returnedRevision": "revision-other",
+        "lookupContent": "content-a",
+        "returnedContent": "content-b"
+      },
+      "expectedOutcome": "REJECT",
+      "expectedReasonCode": "CANONICAL_IDENTITY_MISMATCH"
+    },
+    {
+      "id": "CALLER-STATE-001",
+      "input": {
+        "stateSource": "caller",
+        "canonicalVisibility": "PRIVATE",
+        "callerVisibility": "PUBLIC",
+        "canonicalLifecycle": "ACTIVE",
+        "callerLifecycle": "ARCHIVED",
+        "canonicalModeration": "CLEAR",
+        "callerModeration": "APPROVED",
+        "canonicalMembership": "OWNER",
+        "callerMembership": "MEMBER",
+        "canonicalLocked": true,
+        "callerLocked": false
+      },
+      "expectedOutcome": "REJECT",
+      "expectedReasonCode": "CALLER_STATE_NOT_AUTHORITY"
+    },
+    {
+      "id": "EVENT-ID-001",
+      "input": {
+        "eventSource": "caller-object",
+        "lookupEventId": "event-1",
+        "returnedEventId": "event-substituted"
+      },
+      "expectedOutcome": "REJECT",
+      "expectedReasonCode": "CANONICAL_EVENT_ID_REQUIRED"
+    },
+    {
+      "id": "REPLAY-REVOKE-001",
+      "input": {
+        "transitionSource": "caller",
+        "operation": "revoke",
+        "replayed": true,
+        "stale": true,
+        "serverEventId": null,
+        "authorizationSource": "caller"
+      },
+      "expectedOutcome": "REJECT",
+      "expectedReasonCode": "LIFECYCLE_TRANSITION_NOT_AUTHORIZED"
+    }
+  ],
+  "terraReviewChecklist": [
+    "public contract has no authority object, constructor, factory, or caller injection surface",
+    "composition root keeps the capability in a server-only closure",
+    "resolver returned ID, type, tenant, version, revision, and content identity are compared",
+    "caller current-state fields cannot replace canonical resolution",
+    "event consumer accepts a canonical Event ID only and rejects substituted returned IDs",
+    "replay, stale lifecycle, and revoke paths fail closed",
+    "Evidence schema validity and semantic acceptance are reported separately",
+    "network, production, and real-data access are absent"
+  ],
+  "evidenceSeparation": {
+    "schemaStatus": "PASS",
+    "semanticAcceptanceStatus": "PENDING",
+    "independentReviewer": "Terra High",
+    "lunaSelfApproval": false
+  },
+  "requiredCommands": [
+    "node scripts/test-agent-package-preflight.mjs --manifest scripts/fixtures/agent-package-preflight-synthetic-package-manifest-v1.json --self-test",
+    "node scripts/test-qualification-evidence-v1.mjs",
+    "node scripts/validate-qualification-evidence.mjs <generated-evidence.json>"
+  ],
+  "forbiddenOperations": [
+    "network",
+    "production",
+    "real-data",
+    "real-account",
+    "real-user-data",
+    "production-db",
+    "production-storage",
+    "provider-write",
+    "secrets",
+    "ad-hoc-eval",
+    "deploy",
+    "publish",
+    "commit",
+    "push",
+    "migrate",
+    "route-cutover",
+    "cutover",
+    "real-payment",
+    "real-payout",
+    "store-submit",
+    "production-signing",
+    "auto-start-next-package"
+  ],
+  "terminology": {
+    "preferred": [
+      "boundary validation",
+      "invalid-input rejection",
+      "substituted input"
+    ],
+    "forbidden": [
+      "\u0061ttack",
+      "\u0061ttacker",
+      "\u0066orged"
+    ]
+  }
+}

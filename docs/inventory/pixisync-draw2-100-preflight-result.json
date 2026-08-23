@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "AGENT_PACKAGE_PREFLIGHT_RESULT_V1",
+  "packageId": "PIXISYNC-DRAW2-100",
+  "sourcePath": "pixiedraw2/tests/pixisync/preflight-invalid-input.mjs",
+  "sourceHash": "2729cdc9593c45e50b85a377ba99cb12f6270cd8467b007a9cb6358db78a925c",
+  "exitCode": 0,
+  "status": "PASS",
+  "caseResults": [
+    {"caseId": "AUTHORITY-ROOT-001", "reasonCode": "CALLER_INJECTION_REJECTED", "status": "PASS"},
+    {"caseId": "RESOLVER-IDENTITY-001", "reasonCode": "CANONICAL_IDENTITY_MISMATCH", "status": "PASS"},
+    {"caseId": "CALLER-STATE-001", "reasonCode": "CALLER_STATE_NOT_AUTHORITY", "status": "PASS"},
+    {"caseId": "EVENT-ID-001", "reasonCode": "CANONICAL_EVENT_ID_REQUIRED", "status": "PASS"},
+    {"caseId": "REPLAY-REVOKE-001", "reasonCode": "LIFECYCLE_TRANSITION_NOT_AUTHORIZED", "status": "PASS"}
+  ],
+  "evidencePath": "docs/inventory/pixisync-draw2-100-preflight-evidence.json",
+  "checkpointPath": "docs/inventory/pixisync-draw2-100-preflight-checkpoint.json",
+  "executionPolicy": {
+    "mode": "BALANCED",
+    "contract": "required-before-implementation",
+    "changeBudget": {"maxChangedLines": 500, "maxFiles": 4, "maxRetries": 2, "maxFullAudits": 1, "maxFullEvidenceRuns": 1},
+    "testTiers": {"specialistMax": 1, "integratorMax": 2, "finalMax": 4},
+    "maxAffectedDiffReviews": 1,
+    "maxReleaseGateFullAudits": 1,
+    "maxFullEvidenceRuns": 1,
+    "evidenceRuns": 1,
+    "terraMode": "READ_ONLY_FINAL",
+    "specialistPolicy": "DISJOINT_ONLY",
+    "integratorTier": 2,
+    "sameCategoryEscalation": "SOL"
+  }
+}

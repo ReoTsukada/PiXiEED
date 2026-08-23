@@ -1,0 +1,64 @@
+{
+  "schemaVersion": "AGENT_PACKAGE_PREFLIGHT_MANIFEST_V1",
+  "packageId": "PIXISYNC-DRAW2-110",
+  "classification": "FIXED_SYNTHETIC",
+  "network": false,
+  "productionAccess": false,
+  "realData": false,
+  "staticOnly": true,
+  "executionPolicy": {
+    "mode": "BALANCED",
+    "contract": "required-before-implementation",
+    "changeBudget": { "maxChangedLines": 500, "maxFiles": 4, "maxRetries": 2, "maxFullAudits": 1, "maxFullEvidenceRuns": 1 },
+    "testTiers": { "specialistMax": 1, "integratorMax": 2, "finalMax": 4 },
+    "maxAffectedDiffReviews": 1,
+    "maxReleaseGateFullAudits": 1,
+    "maxFullEvidenceRuns": 1,
+    "evidenceRuns": 1,
+    "terraMode": "READ_ONLY_FINAL",
+    "specialistPolicy": "DISJOINT_ONLY",
+    "integratorTier": 2,
+    "sameCategoryEscalation": "SOL"
+  },
+  "requiredRiskClasses": ["authority", "security", "privacy", "lifecycle"],
+  "publicEntrypoints": ["pixiedraw2/src/pixisync/adapters.ts"],
+  "serverOnlyCompositionRoots": ["pixiedraw2/src/pixisync/composition-root.ts"],
+  "forbiddenPublicExports": ["PixisyncServerAuthority", "createSupabasePixisync", "resolveServerProject"],
+  "forbiddenPublicConstructors": ["PixisyncServerAuthority", "SupabasePixisync"],
+  "forbiddenPublicFactories": ["createSupabasePixisync", "createServerPixisync"],
+  "resolverBindings": [{
+    "name": "draw2-110-canonical-revision",
+    "requested": {"id": "revision-a", "type": "DRAW2_REVISION", "tenant": "tenant-a", "version": "1", "cardType": "DRAW2"},
+    "returned": {"id": "revision-substituted", "type": "DRAW2_REVISION", "tenant": "tenant-b", "version": "2", "cardType": "GAME"},
+    "expectedOutcome": "REJECT",
+    "reasonCode": "CANONICAL_IDENTITY_MISMATCH"
+  }],
+  "eventBindings": [{
+    "name": "draw2-110-operation-envelope",
+    "lookup": {"eventId": "operation-a", "payloadHash": "hash-a", "aggregate": "draw", "version": 1},
+    "resolved": {"eventId": "operation-b", "payloadHash": "hash-b", "aggregate": "game", "version": 2},
+    "expectedOutcome": "REJECT",
+    "reasonCode": "CANONICAL_EVENT_ID_REQUIRED"
+  }],
+  "invalidInputCases": [
+    {"id": "AUTHORITY-ROOT-001", "riskClass": "authority", "expectedOutcome": "REJECT", "reasonCode": "CALLER_INJECTION_REJECTED"},
+    {"id": "RESOLVER-IDENTITY-001", "riskClass": "security", "expectedOutcome": "REJECT", "reasonCode": "CANONICAL_IDENTITY_MISMATCH"},
+    {"id": "CALLER-STATE-001", "riskClass": "privacy", "expectedOutcome": "REJECT", "reasonCode": "CALLER_STATE_NOT_AUTHORITY"},
+    {"id": "EVENT-ID-001", "riskClass": "lifecycle", "expectedOutcome": "REJECT", "reasonCode": "CANONICAL_EVENT_ID_REQUIRED"},
+    {"id": "REPLAY-REVOKE-001", "riskClass": "lifecycle", "expectedOutcome": "REJECT", "reasonCode": "LIFECYCLE_TRANSITION_NOT_AUTHORIZED"}
+  ],
+  "expectedReasonCodes": ["CALLER_INJECTION_REJECTED", "CANONICAL_IDENTITY_MISMATCH", "CALLER_STATE_NOT_AUTHORITY", "CANONICAL_EVENT_ID_REQUIRED", "LIFECYCLE_TRANSITION_NOT_AUTHORIZED"],
+  "invalidInputTest": {
+    "mode": "STATIC_MANIFEST_AND_RESULT_ARTIFACT",
+    "testSource": "pixiedraw2/tests/pixisync/pixisync-draw2-110-adapters.test.ts",
+    "resultArtifact": "docs/inventory/pixisync-draw2-110-preflight-result.json"
+  },
+  "evidencePath": "docs/inventory/pixisync-draw2-110-preflight-evidence.json",
+  "checkpointPath": "docs/inventory/pixisync-draw2-110-preflight-checkpoint.json",
+  "evidenceSeparation": {"schemaStatus": "PASS", "semanticAcceptanceStatus": "PENDING", "independentReviewer": "Terra High", "lunaSelfApproval": false},
+  "harnessRegistryPath": "docs/inventory/harness-registry.json",
+  "harnessId": "core-security-boundary-validation",
+  "legacyHarnessAlias": "core-security-attack",
+  "fixRound": {"currentRound": 1, "max_fix_rounds": 2, "timebox_minutes": 20, "checkpoint_every_minutes": 10, "sameClassFinding": {"class": "composition-root-boundary", "occurrence": 1, "decision": "CONTINUE"}},
+  "forbiddenOperations": ["network", "production", "real-data", "real-account", "real-user-data", "production-db", "production-storage", "provider-write", "secrets", "ad-hoc-eval", "deploy", "publish", "commit", "push", "migrate", "route-cutover", "cutover", "real-payment", "real-payout", "store-submit", "production-signing", "auto-start-next-package"]
+}

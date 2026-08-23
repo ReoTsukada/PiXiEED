@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "AGENT_PACKAGE_PREFLIGHT_RESULT_V1",
+  "packageId": "SYNTHETIC-BOUNDARY-PACKAGE-001",
+  "sourcePath": "scripts/fixtures/agent-package-preflight-synthetic-tests.mjs",
+  "sourceHash": "ff91f4158c4003ac9491f09302aff03dfa27d8e9f483ea593a10bc47a3ff878d",
+  "exitCode": 0,
+  "status": "PASS",
+  "executionPolicy": {
+    "mode": "BALANCED",
+    "contract": "required-before-implementation",
+    "changeBudget": {
+      "maxChangedLines": 500,
+      "maxFiles": 4,
+      "maxRetries": 2,
+      "maxFullAudits": 1,
+      "maxFullEvidenceRuns": 1
+    },
+    "testTiers": {
+      "specialistMax": 1,
+      "integratorMax": 2,
+      "finalMax": 4
+    },
+    "maxAffectedDiffReviews": 1,
+    "maxReleaseGateFullAudits": 1,
+    "maxFullEvidenceRuns": 1,
+    "evidenceRuns": 1,
+    "terraMode": "READ_ONLY_FINAL",
+    "specialistPolicy": "DISJOINT_ONLY",
+    "integratorTier": 2,
+    "sameCategoryEscalation": "SOL"
+  },
+  "caseResults": [
+    {"caseId": "AUTHORITY-ROOT-001", "reasonCode": "CALLER_INJECTION_REJECTED", "status": "PASS"},
+    {"caseId": "RESOLVER-IDENTITY-001", "reasonCode": "CANONICAL_IDENTITY_MISMATCH", "status": "PASS"},
+    {"caseId": "CALLER-STATE-001", "reasonCode": "CALLER_STATE_NOT_AUTHORITY", "status": "PASS"},
+    {"caseId": "EVENT-ID-001", "reasonCode": "CANONICAL_EVENT_ID_REQUIRED", "status": "PASS"},
+    {"caseId": "REPLAY-REVOKE-001", "reasonCode": "LIFECYCLE_TRANSITION_NOT_AUTHORIZED", "status": "PASS"}
+  ],
+  "evidencePath": "scripts/fixtures/agent-package-preflight-synthetic-evidence-v1.json",
+  "checkpointPath": "scripts/fixtures/agent-package-preflight-synthetic-checkpoint-v1.json"
+}

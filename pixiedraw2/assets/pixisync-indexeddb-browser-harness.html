@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex,nofollow">
+    <title>PiXiSYNC Draw2 140 IndexedDB browser fixture</title>
+    <style>
+      :root { color-scheme: dark; font-family: ui-sans-serif, system-ui, sans-serif; background: #0c111b; color: #e8eef7; }
+      body { margin: 0; padding: 24px; }
+      main { max-width: 900px; margin: 0 auto; }
+      h1 { font-size: 22px; margin: 0 0 8px; }
+      p { color: #a9b5c8; }
+      button { min-height: 40px; border: 1px solid #5de1d0; border-radius: 8px; padding: 0 14px; background: #173a3b; color: #e8eef7; cursor: pointer; }
+      pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #111a28; border: 1px solid #33445e; border-radius: 8px; padding: 16px; }
+      [data-state="PASS"] { color: #75e3bf; }
+      [data-state="FAIL"] { color: #ff9d9d; }
+      [data-state="UNTESTED"] { color: #f2d58b; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>PIXISYNC-DRAW2-140 IndexedDB browser fixture</h1>
+      <p id="status" data-state="UNTESTED">実ブラウザ fixture を実行中…</p>
+      <button id="reset" type="button">このfixtureのIndexedDBをリセット</button>
+      <pre id="result">結果を取得中…</pre>
+    </main>
+    <script type="module">
+      const resetButton = document.querySelector("#reset");
+      const statusElement = document.querySelector("#status");
+      const resultElement = document.querySelector("#result");
+      const query = new URL(window.location.href).searchParams;
+      const databaseName = /^[A-Za-z0-9._-]{1,48}$/u.test(query.get("db") || "")
+        ? query.get("db")
+        : "pixisync-draw2-140-browser-harness-v1";
+      const databaseNames = [databaseName, `${databaseName}-tamper`, `${databaseName}-ordering`, `${databaseName}-failure-source`];
+      const deleteDatabase = (name) => new Promise((resolve, reject) => {
+        const request = indexedDB.deleteDatabase(name);
+        request.onerror = () => reject(request.error || new Error("delete failed"));
+        request.onblocked = () => reject(new Error("delete blocked"));
+        request.onsuccess = () => resolve();
+      });
+      async function resetFixture() {
+        for (const name of databaseNames) await deleteDatabase(name);
+        window.localStorage.removeItem(`PIXISYNC-DRAW2-140-BROWSER-HARNESS-V1:prepared:${databaseName}`);
+        window.location.reload();
+      }
+      resetButton.addEventListener("click", () => { void resetFixture(); });
+      async function loadHarness() {
+        const source = await fetch("./pixisync-indexeddb-browser-harness.js", { cache: "no-store" }).then((response) => {
+          if (!response.ok) throw new Error(`fixture bundle load failed: ${response.status}`);
+          return response.text();
+        });
+        const moduleUrl = URL.createObjectURL(new Blob([source], { type: "text/javascript" }));
+        try {
+          return await import(moduleUrl);
+        } finally {
+          URL.revokeObjectURL(moduleUrl);
+        }
+      }
+      try {
+        const harness = await loadHarness();
+        const result = await harness.runPixisyncIndexedDbBrowserHarness(databaseName);
+        window.__pixisyncDraw2BrowserResult = result;
+        resultElement.textContent = JSON.stringify(result, null, 2);
+        statusElement.dataset.state = result.allPass ? "PASS" : (result.phase === "INITIAL_SETUP" ? "UNTESTED" : "FAIL");
+        statusElement.textContent = result.allPass ? "PASS: ブラウザ検証結果を取得しました。" : (result.phase === "INITIAL_SETUP" ? "初回セットアップ完了。ページを再読み込みしてreload-recoveryを確認してください。" : "FAIL: 結果JSONを確認してください。");
+      } catch (error) {
+        const result = { harness: "PIXISYNC-DRAW2-140-BROWSER-HARNESS-V1", allPass: false, checks: [{ id: "fixture-runtime", status: "FAIL", detail: String(error) }], untested: ["all"], error: String(error) };
+        window.__pixisyncDraw2BrowserResult = result;
+        resultElement.textContent = JSON.stringify(result, null, 2);
+        statusElement.dataset.state = "FAIL";
+        statusElement.textContent = "FAIL: fixtureの実行に失敗しました。";
+      }
+    </script>
+  </body>
+</html>

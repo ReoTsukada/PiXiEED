@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "PIXISYNC_DRAW2_BROWSER_EVIDENCE_V1",
+  "packageId": "PIXISYNC-DRAW2-140",
+  "executedAt": "2026-08-23",
+  "target": "http://localhost:8000/pixiedraw2/assets/pixisync-indexeddb-browser-harness.html",
+  "browserFamily": "Chromium",
+  "browserUserAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+  "indexedDB": true,
+  "initialPhase": "INITIAL_SETUP",
+  "reloadPhase": "RELOAD_RECOVERY",
+  "status": "PASS",
+  "checks": [
+    { "id": "project-isolation", "status": "PASS" },
+    { "id": "reload-recovery", "status": "PASS" },
+    { "id": "save-failure-surface", "status": "PASS", "qualification": "synthetic injected failure" },
+    { "id": "tamper-rejection", "status": "PASS" },
+    { "id": "same-instance-ordering", "status": "PASS" }
+  ],
+  "untested": [
+    "Safari",
+    "physical device",
+    "multi-tab concurrency",
+    "cross-process concurrency",
+    "quota exhaustion",
+    "Supabase transport",
+    "staging",
+    "production"
+  ],
+  "sideEffects": {
+    "network": false,
+    "productionData": false,
+    "supabase": false,
+    "commit": false,
+    "push": false,
+    "deploy": false
+  }
+}

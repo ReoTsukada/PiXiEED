@@ -1,0 +1,155 @@
+{
+  "schemaVersion": 1,
+  "registryId": "PIXIEED-HARNESS-REGISTRY-001",
+  "status": "CANONICAL_INVENTORY",
+  "updatedAt": "2026-08-16",
+  "authority": {
+    "packageState": "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+    "executionOrder": "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+    "evidenceContract": "docs/contracts/QUALIFICATION-EVIDENCE-V1.md",
+    "contextValidator": "scripts/verify_work_package_context.py",
+    "evidenceValidator": "scripts/validate-qualification-evidence.mjs"
+  },
+  "creationPolicy": "REUSE_EXTEND_COMPOSE_THEN_NEW",
+  "entries": [
+    {
+      "id": "baseline-wp000",
+      "class": "baseline",
+      "purpose": "63/77 successful and inherited failure identity",
+      "paths": ["scripts/test-baseline-suite-wp000.mjs", "scripts/test-baseline-failure-identity-wp080.mjs", "docs/inventory/baseline-results.json", "docs/inventory/baseline-failure-identity-wp080.json"],
+      "reuseWhen": "Any package must compare test name, target file, and major Error Signature",
+      "evidenceLevel": "ISOLATED",
+      "owner": "coordinator"
+    },
+    {
+      "id": "qualification-evidence-v1",
+      "class": "evidence",
+      "purpose": "Fail-closed acceptance evidence, exit codes, hashes, reviewers, and evidence levels",
+      "paths": ["docs/contracts/QUALIFICATION-EVIDENCE-V1.md", "scripts/validate-qualification-evidence.mjs", "scripts/test-qualification-evidence-v1.mjs"],
+      "reuseWhen": "Every qualification or package evidence record",
+      "evidenceLevel": "ISOLATED",
+      "owner": "coordinator"
+    },
+    {
+      "id": "context-integrity",
+      "class": "context",
+      "purpose": "Registry definition, dependency, write glob, and Context SHA integrity",
+      "paths": ["scripts/verify_work_package_context.py", "scripts/build_work_package_context.py", ".codex/context/"],
+      "reuseWhen": "Before every package qualification and after canonical source changes",
+      "evidenceLevel": "ISOLATED",
+      "owner": "coordinator"
+    },
+    {
+      "id": "core-security-boundary-validation",
+      "class": "security",
+      "purpose": "Authorization, authority, tenant, stale object, and cross-record boundary validation",
+      "paths": ["scripts/test-core-authorization-proof-fp001.mjs", "scripts/test-core-authorization-adoption-fp001.mjs", "scripts/audit-fp003aa-finalization.mjs", "pixiedraw2/tests/core-*/"],
+      "aliases": ["core-security-attack"],
+      "reuseWhen": "Any authority, registry, commerce, notification, or admin boundary; reject substituted input before implementation",
+      "evidenceLevel": "ISOLATED",
+      "owner": "security-specialist"
+    },
+    {
+      "id": "agent-package-preflight-boundary-matrix",
+      "class": "coordination_security",
+      "purpose": "Repository-bound static manifest, export/import graph, fixed boundary matrix, result hash, and read-only Terra final-review checklist before authority, security, privacy, or lifecycle implementation",
+      "paths": ["scripts/test-agent-package-preflight.mjs", "scripts/fixtures/agent-package-preflight-boundary-matrix-v1.json", "scripts/fixtures/agent-package-preflight-synthetic-package-manifest-v1.json", "scripts/fixtures/agent-package-preflight-synthetic-public-entry.mjs", "scripts/fixtures/agent-package-preflight-synthetic-composition-root.mjs", "scripts/fixtures/agent-package-preflight-synthetic-tests.mjs", "scripts/fixtures/agent-package-preflight-synthetic-results-v1.json", "scripts/fixtures/agent-package-preflight-synthetic-evidence-v1.json", "scripts/fixtures/agent-package-preflight-synthetic-checkpoint-v1.json", "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md", "MODEL_ROUTING.md", ".codex/prompts/AGENT_OPERATING_PROTOCOL.md"],
+      "reuseWhen": "Before every authority, security, privacy, or lifecycle package; pass a repository-bound manifest and result artifact, especially after a repeated P0/P1 boundary finding",
+      "evidenceLevel": "ISOLATED",
+      "owner": "coordinator+security-specialist"
+    },
+    {
+      "id": "durable-event",
+      "class": "lifecycle",
+      "purpose": "Inbox/outbox, duplicate, replay, ordering, crash recovery, and idempotency",
+      "paths": ["pixiedraw2/tests/fp-004/", "pixiedraw2/src/fp-004/", "docs/contracts/FP-004-*.md"],
+      "reuseWhen": "Any event, notification, payment, royalty, sync, or lifecycle change",
+      "evidenceLevel": "ISOLATED",
+      "owner": "core-specialist"
+    },
+    {
+      "id": "draw2-package-suite",
+      "class": "product",
+      "purpose": "Draw2 command, raster, selection, timeline, export, PXD-owned Asset Definitions, Registry Bridge, legacy, and workspace contracts",
+      "paths": ["pixiedraw2/tests/draw-*/", "pixiedraw2/benchmarks/draw-*/", "scripts/test-pixiedraw2-*.mjs", "docs/contracts/DRAW-*.md"],
+      "reuseWhen": "Draw2 changes, PXD round-trip, PXD Asset Definition materialization, Registry Bridge, or shared Draw Asset revision",
+      "evidenceLevel": "ISOLATED",
+      "owner": "draw-performance-specialist"
+    },
+    {
+      "id": "draw2-browser-visual",
+      "class": "browser_visual",
+      "purpose": "Responsive Workspace, accessibility, overflow, menu, panels, and visual regression",
+      "paths": ["scripts/test-core-shell-browser-*.mjs", "scripts/test-pixiedraw2-browser-wp100.mjs", "docs/visual-regression/", "docs/inventory/WP-090-UI-PERFORMANCE-BASELINE.json"],
+      "reuseWhen": "Browser UI or Workspace presentation changes",
+      "evidenceLevel": "BROWSER",
+      "owner": "ui-ux-specialist"
+    },
+    {
+      "id": "site400-browser-proof-architecture",
+      "class": "integration_browser",
+      "purpose": "One isolated noindex App Shell to Lazy Entry to deterministic Auth/Tenant fixture to server-authorized Provider to REGISTERED_ASSET metadata proof path, including reopen and fail-closed cases",
+      "paths": ["core-shell/local-test.html", "core-shell/assets/site400-local-test-entry.js", "core-shell/assets/routes/draw2-route.js", "core-shell/assets/core-shell.js", "pixiedraw2/src/platform/site-400/", "pixiedraw2/tests/site-400/", "docs/inventory/site-400-evidence.json"],
+      "reuseWhen": "Any server-authorized local App Shell, Lazy Entry, Registry Provider, or Asset Resolve browser integration; preserve one authority chain and do not create a second fixture path",
+      "evidenceLevel": "BROWSER",
+      "owner": "site-integration-specialist"
+    },
+    {
+      "id": "creator-workspace-boundary",
+      "class": "product_boundary",
+      "purpose": "One Project/Workspace across modes, single heavy presentation, unavailable-mode honesty, and LOCAL_DRAFT separation",
+      "paths": ["docs/contracts/DRAW2-CREATOR-WORKSPACE-ASSET-UX.md", "pixiedraw2/src/draw2-creator-workspace.ts", "pixiedraw2/tests/draw2-creator-workspace.test.ts", "pixiedraw2/tests/wp180-workspace.test.ts"],
+      "reuseWhen": "Any Creator Workspace mode switch, Asset draft, Game/Audio placeholder, or panel lifecycle change",
+      "evidenceLevel": "ISOLATED",
+      "owner": "coordinator+draw-performance-specialist"
+    },
+    {
+      "id": "draw2-performance",
+      "class": "performance",
+      "purpose": "Bundle, input-to-visible, Long Task, memory, tile, and renderer measurements",
+      "paths": ["pixiedraw2/benchmarks/", "05_PERFORMANCE/", "scripts/measure-pixiedraw2-bundle-baseline.mjs"],
+      "reuseWhen": "Any Draw2 hot path, renderer, worker, Timeline, or Workspace lifecycle change",
+      "evidenceLevel": "ISOLATED",
+      "owner": "draw-performance-specialist"
+    },
+    {
+      "id": "audio-game-package",
+      "class": "cross_tool",
+      "purpose": "Audio/Game project, revision, runtime, package, and bridge contracts",
+      "paths": ["pixiedraw2/tests/audio-*/", "pixiedraw2/tests/game-*/", "pixiedraw2/benchmarks/audio-*/", "pixiedraw2/benchmarks/game-*/", "docs/contracts/AUDIO-*.md", "docs/contracts/GAME-*.md"],
+      "reuseWhen": "Audio, Game, Runtime, Package, or Asset Graph changes",
+      "evidenceLevel": "ISOLATED",
+      "owner": "audio-game-specialists"
+    },
+    {
+      "id": "market-pixisync-baseline",
+      "class": "compatibility",
+      "purpose": "Preserve current Market, PiXiSYNC, URLs, purchases, entitlements, licenses, and data",
+      "paths": ["docs/inventory/market-current-baseline.md", "docs/inventory/pixisync-current-baseline.md", "scripts/test-market-*.mjs", "scripts/test-pixisync-*.mjs"],
+      "reuseWhen": "Any site, package, commerce, sync, route, or migration-adjacent change",
+      "evidenceLevel": "ISOLATED",
+      "owner": "compatibility-reviewer"
+    },
+    {
+      "id": "agent-execution-routing",
+      "class": "coordination",
+      "purpose": "Resident read-only SOL contract/root-cause/DAG orchestration, bounded Luna implementation, disjoint specialists, Integrator Tier 2, read-only Terra final review, and agent lifecycle closure",
+      "paths": ["09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md", "MODEL_ROUTING.md", "docs/inventory/harness-registry.json"],
+      "reuseWhen": "Every package dispatch, parallelism decision, escalation decision, independent review, or agent closeout",
+      "evidenceLevel": "ISOLATED",
+      "owner": "coordinator"
+    },
+    {
+      "id": "ai-development-harness-optimization",
+      "class": "coordination",
+      "purpose": "Canonical execution optimization: BALANCED default, Contract First and DAG planning, Change Budget, Tier 0-4 validation, Incremental Evidence, Cost Governor, Rework Detector, local synthetic-only security, and bounded read-only Terra review",
+      "paths": [".codex/prompts/AI_DEVELOPMENT_HARNESS_OPTIMIZATION.md", "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md", "MODEL_ROUTING.md", ".codex/prompts/AGENT_OPERATING_PROTOCOL.md", "docs/inventory/harness-registry.json"],
+      "reuseWhen": "Every new implementation, integration, or release-gate package before dispatch",
+      "evidenceLevel": "ISOLATED",
+      "owner": "coordinator"
+    }
+  ],
+  "newHarnessRule": "A new Harness must document why an existing entry cannot be reused, extended, or composed.",
+  "unknownCandidates": "KEEP_AND_CLASSIFY",
+  "productionActions": "FORBIDDEN"
+}
