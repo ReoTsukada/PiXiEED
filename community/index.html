@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#080c14">
+  <meta name="robots" content="index,follow">
+  <title>PiXiEEDコミュニティ｜作品を見つけて共有する</title>
+  <meta name="description" content="PiXiEEDで作られたドット絵、アニメーション、素材、ゲーム作品を見つけて共有できるコミュニティです。">
+  <link rel="canonical" href="https://pixieed.jp/community/">
+  <link rel="icon" type="image/png" href="../icon/icon-512-4.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../site/landing.css?v=2026.07.19-home-centered3">
+  <link rel="stylesheet" href="../market/market.css?v=20260730-row-ad-reserve1">
+  <link rel="stylesheet" href="../site/home-social.css?v=20260803-social-seo-comments1">
+  <link rel="stylesheet" href="../site/home-shell.css?v=20260824-home-shell1">
+</head>
+<body class="draw2-home-body draw2-community-body">
+  <header class="site-header draw2-home-header" aria-label="PiXiEEDメインナビゲーション">
+    <div class="header-inner header-inner--app">
+      <a class="brand draw2-home-brand" href="../index.html" aria-label="PiXiEED ホーム">
+        <span class="brand-icon"><img src="../pixiedraw2/assets/brand/pixieed-logo-48.png" alt="PiXiEED"></span>
+        <div class="brand-text">
+          <p class="brand-title">PiXiEED</p>
+          <p class="brand-sub">CREATIVE WORKSPACE</p>
+        </div>
+      </a>
+      <nav class="draw2-home-header__nav" aria-label="主要ページ">
+        <a href="../pixiedraw2/index.html">Draw2</a>
+        <a href="../market/">マーケット</a>
+        <a href="../account/index.html">ライブラリ</a>
+        <a class="is-active" href="./">コミュニティ</a>
+      </nav>
+      <div class="draw2-home-header__actions">
+        <a class="draw2-home-header__account" href="../account/index.html">ログイン</a>
+        <a class="draw2-home-header__start" href="../pixiedraw2/index.html">今すぐ作る <span aria-hidden="true">↗</span></a>
+      </div>
+    </div>
+  </header>
+
+  <div class="page market-page social-home-page draw2-home__community">
+    <main class="market-shell social-home" aria-labelledby="socialHomeTitle">
+      <header class="market-titlebar social-home__header">
+        <div class="market-titlebar__title"><img src="../assets/icons/HOME.png?v=2026.07.19-ui-icons1" alt=""><h1 id="socialHomeTitle">コミュニティ</h1></div>
+      </header>
+      <p class="draw2-home__community-intro">PiXiEEDで作られた作品を見つけたり、制作途中の作品を共有できます。</p>
+      <p class="social-home__status" id="socialFeedStatus" role="status">作品を読み込んでいます。</p>
+      <section class="market-section market-grid social-feed" id="socialFeed" aria-label="作品投稿" aria-live="polite"></section>
+    </main>
+
+    <div class="market-quick-actions social-home__quick-actions">
+      <button class="market-quick-actions__toggle social-home__compose" id="socialComposeOpen" type="button" aria-haspopup="dialog" aria-label="作品を投稿する">+</button>
+    </div>
+
+    <dialog class="social-compose" id="socialComposeDialog" aria-labelledby="socialComposeTitle">
+      <form class="social-compose__form" id="socialComposeForm" method="dialog">
+        <header><div><small>NEW POST</small><h2 id="socialComposeTitle">画像を投稿</h2></div><button id="socialComposeClose" type="button" aria-label="閉じる">×</button></header>
+        <label class="social-compose__picker" for="socialComposeFile">
+          <input id="socialComposeFile" type="file" accept="image/png,image/webp,image/gif,image/jpeg" required>
+          <img id="socialComposePreview" alt="選択した画像のプレビュー" hidden>
+          <span id="socialComposePickerLabel">PNG・WebP・GIF・JPEGを選択</span>
+        </label>
+        <label class="social-compose__caption">作品の種類
+          <select id="socialComposeContentKind" aria-describedby="socialComposeContentKindHint">
+            <option value="finished">完成作品</option>
+            <option value="wip">制作途中</option>
+            <option value="material">素材</option>
+            <option value="game">ゲーム作品</option>
+          </select>
+          <small id="socialComposeContentKindHint" class="social-compose__hint">あとから詳細設定で公開方法を変更できます。</small>
+        </label>
+        <label class="social-compose__caption social-compose__caption--short">ひとこと（任意）<textarea id="socialComposeCaption" maxlength="300" placeholder="作品について一言（300文字まで）"></textarea></label>
+        <details class="social-compose__details">
+          <summary>詳細設定（任意）</summary>
+          <div class="social-compose__details-body">
+            <label class="social-compose__caption">作品タイトル（任意）<input id="socialComposeTitleInput" maxlength="50" placeholder="未入力なら作品の種類から自動設定"></label>
+            <label class="social-compose__caption">タグ<input id="socialComposeTags" maxlength="124" placeholder="例：街, 夜, 16x16（5個まで）"></label>
+            <label class="social-compose__option"><input id="socialComposeComments" type="checkbox" checked><span><strong>コメントを許可</strong><small>詳細画面で200文字までのコメントを受け付けます</small></span></label>
+          </div>
+        </details>
+        <p class="social-compose__status" id="socialComposeStatus" role="status"></p>
+        <button class="social-compose__submit" id="socialComposeSubmit" type="submit">投稿する</button>
+      </form>
+    </dialog>
+  </div>
+
+  <footer>
+    <p>© <span id="year">2026</span> PiXiEED. All rights reserved.</p>
+    <div class="footer-links">
+      <a href="../pixiedraw2/index.html">PiXiEEDraw2</a>
+      <a href="./">コミュニティ</a>
+      <a href="../market/">マーケット</a>
+      <a href="../account/index.html">マイページ</a>
+      <a href="../pixiee-lens/index.html">PiXiEELENS</a>
+      <a href="../pixfind/index.html">PiXFiND</a>
+      <a href="../glossary/">用語集</a>
+      <a href="../terms/">利用規約</a>
+      <a href="../privacy/">プライバシーポリシー</a>
+      <a href="../legal/">特定商取引法に基づく表記</a>
+    </div>
+  </footer>
+
+  <nav class="bottom-nav" aria-label="下部ナビ">
+    <a class="bottom-nav__item" data-tab="home" href="../index.html"><span class="icon"><img src="../assets/icons/HOME.png?v=2026.07.19-ui-icons1" alt=""></span><span>ホーム</span></a>
+    <a class="bottom-nav__item" data-tab="market" href="../market/"><span class="icon"><img src="../assets/icons/Market.png" alt=""></span><span>マーケット</span></a>
+    <a class="bottom-nav__item bottom-nav__item--primary" data-tab="draw" href="../pixiedraw2/index.html"><span class="icon"><img src="../assets/icons/Draw.png?v=2026.07.19-ui-icons1" alt=""></span><span>PiXiEEDraw2</span></a>
+    <a class="bottom-nav__item" data-tab="camera" href="../pixiee-lens/index.html"><span class="icon"><img src="../assets/icons/Camera.png" alt=""></span><span>カメラ</span></a>
+    <a class="bottom-nav__item" data-tab="account" href="../account/index.html"><span class="icon"><img src="../pixiedraw/assets/icons/ecticon_frame_01.png" alt=""></span><span>マイページ</span></a>
+  </nav>
+
+  <script src="../scripts/ad-account-control.js?v=20260719-no-ad-fallback1"></script>
+  <script src="../scripts/card-feed-ads.js?v=20260730-progressive-feed1"></script>
+  <script src="../scripts/social-posts.js?v=20260803-social-seo-comments1"></script>
+  <script src="../scripts/home-social-feed.js?v=20260803-social-seo-comments1"></script>
+  <script src="../scripts/ads-lazy.js?v=20260719-no-ad-fallback1"></script>
+  <script src="../scripts/shared-profile-header.js"></script>
+  <script src="../scripts/shared-bottom-nav.js?v=20260803-tools-panel1"></script>
+  <script src="../scripts/pixel-art-fit.js"></script>
+  <script>const year = document.getElementById('year'); if (year) year.textContent = new Date().getFullYear();</script>
+</body>
+</html>
