@@ -19,6 +19,7 @@ import {
   createMemoryGameEditorPersistenceStore,
   validateGameEditorPersistenceRecord,
 } from "../../src/workspace/game-persistence.ts";
+import { asBehaviorId } from "../../src/game/game-300/core.ts";
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
@@ -193,6 +194,25 @@ Deno.test("GAME-PERSISTENCE keeps editor state scoped to the parent Project", as
     [{ id: "hero", label: "Hero", kind: "SPRITE", filled: [0, 2] }],
     1,
     "2026-08-18T00:00:00.000Z",
+    undefined,
+    [],
+    [{
+      behaviorId: asBehaviorId("behavior:pixiedraw-game:hero"),
+      version: 1,
+      ownership: "CANONICAL_IR",
+      rules: [{
+        ruleId: "hero-event",
+        enabled: true,
+        trigger: { type: "ACTION", actionId: "rpg.interact" },
+        conditions: [{ kind: "ALWAYS" }],
+        actions: [{
+          kind: "SET_VARIABLE",
+          targetId: "hero",
+          property: "dialogue",
+          value: "saved",
+        }],
+      }],
+    }],
   );
   const saved = await store.save(record);
   assert(saved.ok, "Game subdocument was not saved.");
@@ -201,6 +221,11 @@ Deno.test("GAME-PERSISTENCE keeps editor state scoped to the parent Project", as
   assert(
     await validateGameEditorPersistenceRecord(loaded),
     "Game subdocument checksum validation failed.",
+  );
+  assert(
+    loaded.behaviors?.[0]?.rules[0]?.actions[0]?.kind === "SET_VARIABLE" &&
+      loaded.behaviors[0].rules[0].actions[0].value === "saved",
+    "Game Behavior IR was not restored with the Project subdocument.",
   );
   assert(
     (await store.load("workspace:other-project")) === null,

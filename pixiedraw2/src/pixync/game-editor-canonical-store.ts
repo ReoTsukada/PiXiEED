@@ -7,24 +7,27 @@ import {
   appendJournalCommand,
   asAssetId,
   asAssetRevisionId,
+  asBehaviorId,
   asComponentId,
   asEntityId,
   asOwnerId,
   asProjectId,
   asRevisionId,
-  asSha256,
   asSceneId,
+  asSha256,
   type CallerContext,
+  type Component,
   createGameProject,
   createJournal,
   type Entity,
-  type Component,
+  type GameComponentState,
   type GameProject,
   type JournalCommand,
   type JournalState,
   type Scene,
   sha256,
 } from "../game/game-300/core.ts";
+import { DEFAULT_GAME_RUNTIME_PROFILE_ID } from "../game/game-350/runtime-core.ts";
 
 const EDITOR_SCENE_PREFIX = "scene:pixieed-game:";
 const EDITOR_ENTITY_PREFIX = "entity:pixieed-game:";
@@ -42,32 +45,80 @@ function editorTransformId(trackId: string) {
   return asComponentId(`${EDITOR_TRANSFORM_PREFIX}${trackId}`);
 }
 
+function canonicalComponentFromEditorState(
+  component: GameComponentState,
+): Component | undefined {
+  switch (component.type) {
+    case "TRANSFORM":
+    case "TILEMAP":
+    case "COLLIDER":
+    case "RIGIDBODY":
+    case "CHARACTER_CONTROLLER":
+    case "CAMERA":
+      return component;
+    case "SPRITE":
+    case "AUDIO_SOURCE":
+    case "BEHAVIOR":
+      // Asset and behavior components are completed from their canonical
+      // bindings/Behavior IR below. The editor state only controls flags.
+      return undefined;
+  }
+}
+
 function sceneFromEditorTracks(
   projectId: string,
   tracks: GameEditorPersistenceRecord["tracks"],
   bindings: readonly GameEditorBinding[],
+  behaviors: GameEditorPersistenceRecord["behaviors"],
   previous: Scene | undefined,
 ): Scene {
-  const bindingsByTrack = new Map(bindings.map((binding) => [binding.trackId, binding]));
+  const bindingsByTrack = new Map(
+    bindings.map((binding) => [binding.trackId, binding]),
+  );
+  const behaviorIds = new Set(
+    (behaviors ?? []).map((behavior) => String(behavior.behaviorId)),
+  );
   const previousById = new Map(
-    (previous?.entities ?? []).map((entity) => [String(entity.entityId), entity]),
+    (previous?.entities ?? []).map((
+      entity,
+    ) => [String(entity.entityId), entity]),
   );
   const entities: Entity[] = tracks.map((track, index) => {
     const entityId = editorEntityId(track.id);
     const prior = previousById.get(String(entityId));
-    const transform = prior?.components.find((component) => component.type === "TRANSFORM") ?? {
+    const configuredTransform = track.components?.find((component) =>
+      component.type === "TRANSFORM"
+    );
+    const transform = configuredTransform ??
+      prior?.components.find((component) => component.type === "TRANSFORM") ?? {
       type: "TRANSFORM" as const,
       componentId: editorTransformId(track.id),
-      x: 0,
-      y: 0,
+      x: track.id === "hero" ? 1 : track.id === "enemy" ? 5 : 0,
+      y: track.id === "hero" ? 1 : track.id === "enemy" ? 3 : 0,
       rotation: 0,
       scaleX: 1,
       scaleY: 1,
     };
     const binding = bindingsByTrack.get(track.id);
-    const nonAssetComponents = (prior?.components ?? []).filter((component) =>
-      component.type !== "TRANSFORM" && component.type !== "SPRITE" && component.type !== "AUDIO_SOURCE"
-    );
+    const nonAssetComponents = track.components === undefined
+      ? (prior?.components ?? []).filter((component) =>
+        component.type !== "TRANSFORM" && component.type !== "SPRITE" &&
+        component.type !== "AUDIO_SOURCE" &&
+        (component.type !== "BEHAVIOR" ||
+          !String(component.behaviorId).startsWith("behavior:pixiedraw-game:"))
+      )
+      : track.components
+        .filter((component) => component.type !== "TRANSFORM")
+        .map(canonicalComponentFromEditorState)
+        .filter((component): component is Component => component !== undefined);
+    const behaviorId = `behavior:pixiedraw-game:${track.id}`;
+    const behaviorComponent: Component | undefined = behaviorIds.has(behaviorId)
+      ? {
+        type: "BEHAVIOR",
+        componentId: asComponentId(`component:pixiedraw-behavior:${track.id}`),
+        behaviorId: asBehaviorId(behaviorId),
+      }
+      : undefined;
     const boundComponent: Component | undefined = binding === undefined
       ? undefined
       : binding.kind === "DRAW"
@@ -102,7 +153,12 @@ function sceneFromEditorTracks(
       ...(prior ?? {}),
       entityId,
       name: track.label.trim() || `Object ${index + 1}`,
-      components: [transform, ...nonAssetComponents, ...(boundComponent === undefined ? [] : [boundComponent])],
+      components: [
+        transform,
+        ...nonAssetComponents,
+        ...(behaviorComponent === undefined ? [] : [behaviorComponent]),
+        ...(boundComponent === undefined ? [] : [boundComponent]),
+      ],
     };
   });
   return {
@@ -117,12 +173,23 @@ function reconcileEditorScene(
   projectId: string,
   tracks: GameEditorPersistenceRecord["tracks"],
   bindings: readonly GameEditorBinding[],
+  behaviors: GameEditorPersistenceRecord["behaviors"],
   previousScenes: readonly Scene[] | undefined,
 ): readonly Scene[] {
   const id = String(editorSceneId(projectId));
-  const existing = previousScenes?.find((scene) => String(scene.sceneId) === id);
-  const next = sceneFromEditorTracks(projectId, tracks, bindings, existing);
-  const retained = (previousScenes ?? []).filter((scene) => String(scene.sceneId) !== id);
+  const existing = previousScenes?.find((scene) =>
+    String(scene.sceneId) === id
+  );
+  const next = sceneFromEditorTracks(
+    projectId,
+    tracks,
+    bindings,
+    behaviors,
+    existing,
+  );
+  const retained = (previousScenes ?? []).filter((scene) =>
+    String(scene.sceneId) !== id
+  );
   return [next, ...retained];
 }
 
@@ -138,10 +205,17 @@ async function revisionId(
       id: track.id,
       label: track.label,
       kind: track.kind,
-        filled: [...track.filled].sort((left, right) => left - right),
-      })),
+      filled: [...track.filled].sort((left, right) => left - right),
+      ...(track.role === undefined ? {} : { role: track.role }),
+      ...(track.components === undefined ? {} : {
+        components: track.components.map((component) => ({ ...component })),
+      }),
+    })),
     bindings: [...(record.bindings ?? [])].sort((left, right) =>
       left.trackId.localeCompare(right.trackId)
+    ),
+    behaviors: [...(record.behaviors ?? [])].sort((left, right) =>
+      String(left.behaviorId).localeCompare(String(right.behaviorId))
     ),
   });
   return `game-editor-revision:${record.revision}:${
@@ -180,13 +254,23 @@ async function projectFromRecord(
         ? {}
         : { parentRevisionId: previous.revision.revisionId }),
     },
-    scenes: reconcileEditorScene(projectId, record.tracks, record.bindings ?? [], previous?.scenes),
+    scenes: reconcileEditorScene(
+      projectId,
+      record.tracks,
+      record.bindings ?? [],
+      record.behaviors ?? previous?.behaviors ?? [],
+      previous?.scenes,
+    ),
     prefabs: previous?.prefabs ?? [],
     dependencies: previous?.dependencies.map((dependency) => ({
       ...dependency,
       ownerRevisionId: nextRevisionId,
     })) ?? [],
-    behaviors: previous?.behaviors ?? [],
+    behaviors: record.behaviors ?? previous?.behaviors ?? [],
+    runtimeProfile: previous?.runtimeProfile ?? {
+      schemaVersion: 1,
+      profileId: DEFAULT_GAME_RUNTIME_PROFILE_ID,
+    },
     editorTimeline: {
       frameCount: 16,
       tracks: record.tracks.map((track) => ({
@@ -194,6 +278,10 @@ async function projectFromRecord(
         label: track.label,
         kind: track.kind,
         activeFrames: [...track.filled],
+        ...(track.role === undefined ? {} : { role: track.role }),
+        ...(track.components === undefined ? {} : {
+          components: track.components.map((component) => ({ ...component })),
+        }),
       })),
     },
   }, {

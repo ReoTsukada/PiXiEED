@@ -10,7 +10,7 @@
     <title>PiXiEEDstudio — iDRAW Workspace</title>
     <link
       rel="stylesheet"
-      href="./assets/draw2-shell.css?v=20260825-game-right-rail-v73"
+      href="./assets/draw2-shell.css?v=20260825-game-studio-systems-v82"
     >
   </head>
   <body>
@@ -5038,13 +5038,38 @@
           >
             <div class="draw2-panel-shell">
               <div class="draw2-panel-heading">
-                <div>
+              <div>
                   <span class="draw2-eyebrow">GAME</span><strong>Scene</strong>
-                </div><span class="draw2-panel-badge">Local</span>
+                </div><span class="draw2-panel-badge">GAME ONLY</span>
               </div>
               <p class="draw2-panel-note">
-                Gameの下部TrackをSceneオブジェクトとして確認・選択します。
+                GameはScene・GameObject・Component・イベントを編集します。iDRAW / iAUDIOの原素材は参照専用で、原素材そのものは変更しません。
               </p>
+              <section
+                class="draw2-game-creation-guide"
+                id="draw2GameCreationGuide"
+                aria-labelledby="draw2GameCreationGuideHeading"
+              >
+                <div class="draw2-game-guide-heading">
+                  <div>
+                    <span class="draw2-eyebrow">START HERE</span>
+                    <strong id="draw2GameCreationGuideHeading">Gameの作り方</strong>
+                  </div>
+                  <span class="draw2-panel-badge">GAME ONLY</span>
+                </div>
+                <p
+                  class="draw2-panel-status"
+                  id="draw2GameCreationGuideStatus"
+                  aria-live="polite"
+                >
+                  スターター → イベント → 素材参照 → Playの順で進めます。
+                </p>
+                <div
+                  class="draw2-game-creation-guide-list"
+                  id="draw2GameCreationGuideSteps"
+                  role="list"
+                ></div>
+              </section>
               <div
                 class="draw2-game-scene-list"
                 id="draw2GameSceneList"
@@ -5058,10 +5083,10 @@
               >
                 <svg class="draw2-ui-icon" aria-hidden="true" focusable="false">
                   <use href="./assets/icons/draw2-icons.svg#icon-add"></use>
-                </svg><span class="draw2-button-label">Scene Track</span>
+                </svg><span class="draw2-button-label">Game Trackを追加</span>
               </button>
               <p class="draw2-panel-status" id="draw2GameSceneStatus">
-                Project別に自動保存されます。
+                GameのScene変更はProject別に自動保存されます。
               </p>
             </div>
           </section>
@@ -5078,10 +5103,13 @@
                 <div>
                   <span class="draw2-eyebrow">GAME</span><strong
                   >Inspector</strong>
-                </div><span class="draw2-panel-badge">Local</span>
+                </div><span class="draw2-panel-badge">GAME ONLY</span>
               </div>
               <p class="draw2-panel-status" id="draw2GameInspectorSelection">
                 Trackを選択してください。
+              </p>
+              <p class="draw2-panel-note">
+                UnityのGameObject / UnrealのActorに相当するGame Objectです。ここではGame側の名前・役割・Component・イベントを編集します。Drawの絵やAudioの音源は参照専用です。
               </p>
               <label class="draw2-panel-field">名前<input
                   id="draw2GameInspectorName"
@@ -5095,6 +5123,19 @@
                   <option value="TILEMAP">Tilemap</option>
                   <option value="AUDIO">Audio</option>
                   <option value="EVENT">Event</option>
+                  <option value="CAMERA">Camera</option>
+                </select></label>
+              <label class="draw2-panel-field">役割<select
+                  id="draw2GameInspectorRole"
+                >
+                  <option value="PLAYER">Player</option>
+                  <option value="NPC">NPC</option>
+                  <option value="PROP">Prop / Environment</option>
+                  <option value="TRIGGER">Trigger</option>
+                  <option value="TILEMAP">Tilemap / Map</option>
+                  <option value="CAMERA">Camera</option>
+                  <option value="AUDIO">Audio Emitter</option>
+                  <option value="CUSTOM">Custom</option>
                 </select></label>
               <div class="draw2-panel-action-row">
                 <button
@@ -5115,6 +5156,85 @@
               <p class="draw2-panel-status" id="draw2GameInspectorStatus">
                 Track名・種類をProjectへ保存できます。
               </p>
+              <section
+                class="draw2-game-components"
+                aria-labelledby="draw2GameComponentsHeading"
+              >
+                <div class="draw2-game-subheading">
+                  <div>
+                    <span class="draw2-eyebrow">OBJECT MODEL</span>
+                    <strong id="draw2GameComponentsHeading">Components</strong>
+                  </div>
+                  <span class="draw2-panel-badge">GAME ONLY</span>
+                </div>
+                <p class="draw2-panel-note">
+                  Objectに機能を追加します。Colliderは当たり判定、Triggerは通過検知、Rigidbodyは重力・物理、Character Controllerは固定ステップ移動です。
+                </p>
+                <div
+                  id="draw2GameComponents"
+                  class="draw2-game-component-list"
+                  role="list"
+                ></div>
+                <div class="draw2-game-component-add-row">
+                  <label class="draw2-panel-field">Componentを追加<select
+                      id="draw2GameComponentType"
+                    >
+                      <option value="TRANSFORM">Transform</option>
+                      <option value="SPRITE">Sprite Renderer</option>
+                      <option value="TILEMAP">Tilemap</option>
+                      <option value="COLLIDER">Collider</option>
+                      <option value="RIGIDBODY">Rigidbody</option>
+                      <option value="CHARACTER_CONTROLLER">Character Controller</option>
+                      <option value="CAMERA">Camera</option>
+                      <option value="AUDIO_SOURCE">Audio Source</option>
+                      <option value="BEHAVIOR">Behavior / Event</option>
+                    </select></label>
+                  <button
+                    id="draw2GameComponentAdd"
+                    class="draw2-button draw2-button-secondary"
+                    type="button"
+                  >追加</button>
+                </div>
+                <p class="draw2-panel-status" id="draw2GameComponentsStatus">
+                  Componentを追加すると、このObjectの役割が明確になります。
+                </p>
+              </section>
+              <div class="draw2-game-event-editor">
+                <p class="draw2-panel-note">
+                  ノーコードイベント。Trackの隣でInteractすると会話を再生します。
+                </p>
+                <label class="draw2-panel-field">トリガー<select
+                    id="draw2GameEventTrigger"
+                  >
+                    <option value="rpg.interact">Interact / Enter</option>
+                    <option value="rpg.tap">Tap</option>
+                  </select></label>
+                <label class="draw2-panel-field">会話<textarea
+                    id="draw2GameEventMessage"
+                    rows="3"
+                    maxlength="240"
+                  ></textarea></label>
+                <div class="draw2-panel-action-row">
+                  <button
+                    id="draw2GameEventApply"
+                    class="draw2-button"
+                    type="button"
+                  >
+                    イベントを適用
+                  </button>
+                  <button
+                    id="draw2GameEventClear"
+                    class="draw2-button draw2-button-secondary"
+                    type="button"
+                  >
+                    解除
+                  </button>
+                </div>
+                <div id="draw2GameEventList" class="draw2-game-event-list" role="list"></div>
+                <p class="draw2-panel-status" id="draw2GameEventStatus">
+                  Trackを選択するとイベントを編集できます。
+                </p>
+              </div>
             </div>
           </section>
           <section
@@ -5129,8 +5249,11 @@
               <div class="draw2-panel-heading">
                 <div>
                   <span class="draw2-eyebrow">GAME</span><strong>Assets</strong>
-                </div><span class="draw2-panel-badge">Local</span>
+                </div><span class="draw2-panel-badge">REFERENCE ONLY</span>
               </div>
+              <p class="draw2-panel-note">
+                iDRAW / iAUDIO素材はGameから参照・配置できますが、原素材の編集・削除はできません。
+              </p>
               <div
                 class="draw2-game-assets-list"
                 id="draw2GameAssetsList"
@@ -5149,14 +5272,14 @@
                     id="draw2GameBindDraw"
                     class="draw2-button draw2-button-secondary"
                     type="button"
-                  >iDRAWを接続</button>
+                  >iDRAW参照を追加</button>
                   <button
                     id="draw2GameBindAudio"
                     class="draw2-button draw2-button-secondary"
                     type="button"
-                  >iAUDIOを接続</button>
+                  >iAUDIO参照を追加</button>
                 </div>
-                <label class="draw2-panel-field">iAUDIO素材<select
+                <label class="draw2-panel-field">参照するiAUDIO素材（原素材は編集不可）<select
                     id="draw2GameAudioAsset"
                   >
                     <option value="">Audio Projectを読み込み中…</option>
@@ -5174,10 +5297,10 @@
               >
                 <svg class="draw2-ui-icon" aria-hidden="true" focusable="false">
                   <use href="./assets/icons/draw2-icons.svg#icon-add"></use>
-                </svg><span class="draw2-button-label">Game Asset</span>
+                </svg><span class="draw2-button-label">Game配置を追加</span>
               </button>
               <p class="draw2-panel-status" id="draw2GameAssetsStatus">
-                Draw Assetとは分離したGame用参照です。
+                Game側の配置だけを編集できます。iDRAW / iAUDIOは参照専用です。
               </p>
             </div>
           </section>
@@ -5938,7 +6061,7 @@
           <section
             class="draw2-mode-timeline-deck"
             id="draw2ModeTimelineDeck"
-            aria-label="Mode timeline deck"
+            aria-label="Mode lower deck"
             hidden
           >
             <header class="draw2-mode-timeline-deck-heading">
@@ -5953,14 +6076,14 @@
             <nav
               class="draw2-mode-timeline-deck-tabs"
               id="draw2ModeTimelineDeckTabs"
-              aria-label="Mode timeline views"
+              aria-label="Mode deck views"
               role="tablist"
             >
               <button
                 class="draw2-mode-timeline-deck-tab is-active"
                 type="button"
                 role="tab"
-                aria-label="Game timeline Scene view"
+                aria-label="Game Scene systems view"
                 aria-selected="true"
                 data-mode-deck-tab="game-scene"
               >
@@ -5970,21 +6093,21 @@
                 class="draw2-mode-timeline-deck-tab"
                 type="button"
                 role="tab"
-                aria-label="Game timeline Assets view"
+                aria-label="Game object references view"
                 aria-selected="false"
                 data-mode-deck-tab="game-assets"
               >
-                Assets
+                References
               </button>
               <button
                 class="draw2-mode-timeline-deck-tab"
                 type="button"
                 role="tab"
-                aria-label="Game timeline Tracks view"
+                aria-label="Game logic systems view"
                 aria-selected="false"
                 data-mode-deck-tab="game-tracks"
               >
-                Tracks
+                Systems
               </button>
               <button
                 class="draw2-mode-timeline-deck-tab"
@@ -6064,19 +6187,19 @@
               id="draw2ModeDeckGame"
               class="draw2-mode-deck-surface"
               data-mode-deck-surface="game"
-              aria-label="Game scene and asset timeline"
+              aria-label="Game systems and event sheet"
               hidden
             >
               <div
                 class="draw2-mode-deck-toolbar"
                 role="toolbar"
-                aria-label="Game timeline actions"
+                aria-label="Game creation actions"
               >
                 <button
                   id="draw2GameDeckAddAsset"
                   class="draw2-button draw2-button-icon"
                   type="button"
-                  aria-label="Add game asset"
+                  aria-label="Add game object"
                 >
                   <svg
                     class="draw2-ui-icon"
@@ -6084,13 +6207,13 @@
                     focusable="false"
                   >
                     <use href="./assets/icons/draw2-icons.svg#icon-add"></use>
-                  </svg><span class="draw2-button-label">Asset</span>
+                  </svg><span class="draw2-button-label">Object</span>
                 </button>
                 <button
                   id="draw2GameDeckAddTrack"
                   class="draw2-button draw2-button-secondary draw2-button-icon"
                   type="button"
-                  aria-label="Add game track"
+                  aria-label="Add game event"
                 >
                   <svg
                     class="draw2-ui-icon"
@@ -6098,7 +6221,7 @@
                     focusable="false"
                   >
                     <use href="./assets/icons/draw2-icons.svg#icon-add"></use>
-                  </svg><span class="draw2-button-label">Track</span>
+                  </svg><span class="draw2-button-label">Event</span>
                 </button>
                 <button
                   id="draw2GameDeckPlay"
@@ -6115,20 +6238,22 @@
                     <use href="./assets/icons/draw2-icons.svg#icon-play"></use>
                   </svg><span class="draw2-button-label">Play</span>
                 </button>
-                <label class="draw2-mode-deck-select">Snap<select
-                    id="draw2GameDeckSnap"
-                    aria-label="Game timeline snap"
-                  >
-                    <option value="1">1 frame</option>
-                    <option value="4" selected>4 frames</option>
-                    <option value="8">8 frames</option>
-                  </select></label>
+                <button
+                  id="draw2GameDeckRestart"
+                  class="draw2-button draw2-button-secondary draw2-button-icon"
+                  type="button"
+                  aria-label="Restart game preview"
+                >
+                  <svg class="draw2-ui-icon" aria-hidden="true" focusable="false">
+                    <use href="./assets/icons/draw2-icons.svg#icon-rollback"></use>
+                  </svg><span class="draw2-button-label">Restart</span>
+                </button>
               </div>
               <div
-                class="draw2-game-deck-grid"
+                class="draw2-game-systems-grid"
                 id="draw2GameAssetTracks"
                 role="grid"
-                aria-label="Game asset tracks"
+                aria-label="Game systems"
               >
               </div>
               <p
@@ -6137,7 +6262,7 @@
                 role="status"
                 aria-live="polite"
               >
-                Scene ready · select an asset or track cell
+                Game systems ready · select an object or system card
               </p>
             </section>
             <section
@@ -7138,6 +7263,20 @@
             Load / Start Preview
           </button>
           <button
+            id="draw2GamePreviewStop"
+            class="draw2-button draw2-button-secondary"
+            type="button"
+          >
+            Stop
+          </button>
+          <button
+            id="draw2GamePreviewRestart"
+            class="draw2-button draw2-button-secondary"
+            type="button"
+          >
+            Restart
+          </button>
+          <button
             id="draw2GamePreviewPin"
             class="draw2-button draw2-button-secondary"
             type="button"
@@ -7159,6 +7298,7 @@
             id="draw2GamePreviewCanvas"
             width="160"
             height="96"
+            tabindex="0"
             aria-label="Isolated Runtime preview projection"
           ></canvas>
         </div>
@@ -9032,7 +9172,7 @@
     <script src="../scripts/pixieed-account-supabase-client.js?v=20260824-pixync-root-1"></script>
     <script
       type="module"
-      src="./dist/draw2-entry.js?v=20260825-igame-market-handoff-v78"
+      src="./dist/draw2-entry.js?v=20260825-game-studio-systems-v82"
     ></script>
     <script
       type="module"

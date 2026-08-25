@@ -1829,8 +1829,8 @@ function record(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value) ? value : void 0;
 }
 function entityId(payload, entityKey, idKey) {
-  const entity = record(payload[entityKey]);
-  const value = entity?.[idKey];
+  const entity2 = record(payload[entityKey]);
+  const value = entity2?.[idKey];
   return typeof value === "string" && value.length > 0 ? value : void 0;
 }
 function audioChangedAssetIds(command) {
@@ -4612,15 +4612,23 @@ var PixyncProductionCompositionRoot = class _PixyncProductionCompositionRoot {
 // src/game/game-300/core.ts
 var GAME_PROJECT_SCHEMA_VERSION = 1;
 var BEHAVIOR_IR_VERSION = 1;
+var GAME_RUNTIME_PROFILE_SCHEMA_VERSION = 1;
 function asId(value, label) {
-  if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(value)) throw new Error(`${label} must be a stable identifier.`);
+  if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(value)) {
+    throw new Error(`${label} must be a stable identifier.`);
+  }
   return value;
 }
 var asProjectId = (value) => asId(value, "ProjectId");
 var asOwnerId = (value) => asId(value, "OwnerId");
+var asSceneId = (value) => asId(value, "SceneId");
+var asEntityId = (value) => asId(value, "EntityId");
+var asComponentId = (value) => asId(value, "ComponentId");
 var asRevisionId = (value) => asId(value, "RevisionId");
 var asSha2562 = (value) => {
-  if (!/^[a-f0-9]{64}$/u.test(value)) throw new Error("Sha256 must be lowercase hexadecimal SHA-256.");
+  if (!/^[a-f0-9]{64}$/u.test(value)) {
+    throw new Error("Sha256 must be lowercase hexadecimal SHA-256.");
+  }
   return value;
 };
 function isRecord5(value) {
@@ -4638,16 +4646,24 @@ function duplicateDiagnostics(values, path) {
   const seen = /* @__PURE__ */ new Set();
   const diagnostics = [];
   for (const value of values) {
-    if (seen.has(value)) diagnostics.push(diagnostic2("DUPLICATE_ID", path, `Duplicate id: ${value}`));
+    if (seen.has(value)) {
+      diagnostics.push(diagnostic2("DUPLICATE_ID", path, `Duplicate id: ${value}`));
+    }
     seen.add(value);
   }
   return diagnostics;
 }
 function validateCaller(project, caller) {
   const diagnostics = [];
-  if (project.projectId !== caller.projectId || project.revision.projectId !== caller.projectId) diagnostics.push(diagnostic2("PROJECT_ID_MISMATCH", "projectId", "Caller project identity does not match the project revision."));
-  if (project.ownerId !== caller.ownerId || project.revision.ownerId !== caller.ownerId) diagnostics.push(diagnostic2("CALLER_OWNER_MISMATCH", "ownerId", "Caller owner is not the project/revision owner."));
-  if (project.revision.revisionId !== caller.revisionId) diagnostics.push(diagnostic2("CALLER_REVISION_MISMATCH", "revision.revisionId", "Caller revision is not the current project revision."));
+  if (project.projectId !== caller.projectId || project.revision.projectId !== caller.projectId) {
+    diagnostics.push(diagnostic2("PROJECT_ID_MISMATCH", "projectId", "Caller project identity does not match the project revision."));
+  }
+  if (project.ownerId !== caller.ownerId || project.revision.ownerId !== caller.ownerId) {
+    diagnostics.push(diagnostic2("CALLER_OWNER_MISMATCH", "ownerId", "Caller owner is not the project/revision owner."));
+  }
+  if (project.revision.revisionId !== caller.revisionId) {
+    diagnostics.push(diagnostic2("CALLER_REVISION_MISMATCH", "revision.revisionId", "Caller revision is not the current project revision."));
+  }
   return diagnostics;
 }
 function validateAssetReference(reference, path, ownerId, diagnostics) {
@@ -4658,15 +4674,23 @@ function validateAssetReference(reference, path, ownerId, diagnostics) {
     diagnostics.push(diagnostic2("INVALID_REFERENCE", path, "Asset reference must declare DRAW or AUDIO."));
     return;
   }
-  if (reference.ownerId !== ownerId) diagnostics.push(diagnostic2("INVALID_REFERENCE", `${path}.ownerId`, "Asset owner must match the Game Project owner."));
+  if (reference.ownerId !== ownerId) {
+    diagnostics.push(diagnostic2("INVALID_REFERENCE", `${path}.ownerId`, "Asset owner must match the Game Project owner."));
+  }
   for (const key of [
     "assetId",
     "revisionId",
     "ownerId",
     "contentHash",
     "mode"
-  ]) if (typeof reference[key] !== "string") diagnostics.push(diagnostic2("INVALID_REFERENCE", `${path}.${key}`, "Asset revision reference field is invalid."));
-  if (typeof reference.contentHash === "string" && !/^[a-f0-9]{64}$/u.test(reference.contentHash)) diagnostics.push(diagnostic2("INVALID_REFERENCE", `${path}.contentHash`, "Asset content hash must be lowercase SHA-256."));
+  ]) {
+    if (typeof reference[key] !== "string") {
+      diagnostics.push(diagnostic2("INVALID_REFERENCE", `${path}.${key}`, "Asset revision reference field is invalid."));
+    }
+  }
+  if (typeof reference.contentHash === "string" && !/^[a-f0-9]{64}$/u.test(reference.contentHash)) {
+    diagnostics.push(diagnostic2("INVALID_REFERENCE", `${path}.contentHash`, "Asset content hash must be lowercase SHA-256."));
+  }
 }
 function validateComponent(component, path, ownerId, knownBehaviorIds, diagnostics) {
   if (!isRecord5(component) || typeof component.type !== "string" || typeof component.componentId !== "string") {
@@ -4678,27 +4702,199 @@ function validateComponent(component, path, ownerId, knownBehaviorIds, diagnosti
     "SPRITE",
     "AUDIO_SOURCE",
     "BEHAVIOR",
-    "CAMERA"
+    "CAMERA",
+    "TILEMAP",
+    "COLLIDER",
+    "RIGIDBODY",
+    "CHARACTER_CONTROLLER"
   ].includes(component.type)) {
     diagnostics.push(diagnostic2("INVALID_COMPONENT", path, `Unknown component type: ${component.type}`));
     return;
   }
-  if (typeof component.componentId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(component.componentId)) diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.componentId`, "Component id is invalid."));
+  if (typeof component.componentId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(component.componentId)) {
+    diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.componentId`, "Component id is invalid."));
+  }
   if (component.type === "TRANSFORM" && ![
     "x",
     "y",
     "rotation",
     "scaleX",
     "scaleY"
-  ].every((key) => typeof component[key] === "number" && Number.isFinite(component[key]))) diagnostics.push(diagnostic2("INVALID_COMPONENT", path, "Transform component contains a non-finite value."));
-  if (component.type === "SPRITE") validateAssetReference(component.asset, `${path}.asset`, ownerId, diagnostics);
+  ].every((key) => typeof component[key] === "number" && Number.isFinite(component[key]))) {
+    diagnostics.push(diagnostic2("INVALID_COMPONENT", path, "Transform component contains a non-finite value."));
+  }
+  if (component.type === "SPRITE") {
+    validateAssetReference(component.asset, `${path}.asset`, ownerId, diagnostics);
+  }
   if (component.type === "AUDIO_SOURCE") {
     validateAssetReference(component.asset, `${path}.asset`, ownerId, diagnostics);
-    if (!isRecord5(component.asset) || component.asset.kind !== "AUDIO") diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.asset`, "Audio Source requires an AUDIO asset revision."));
-    if (typeof component.volume !== "number" || !Number.isFinite(component.volume) || component.volume < 0 || component.volume > 1) diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.volume`, "Audio volume must be between 0 and 1."));
+    if (!isRecord5(component.asset) || component.asset.kind !== "AUDIO") {
+      diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.asset`, "Audio Source requires an AUDIO asset revision."));
+    }
+    if (typeof component.volume !== "number" || !Number.isFinite(component.volume) || component.volume < 0 || component.volume > 1) {
+      diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.volume`, "Audio volume must be between 0 and 1."));
+    }
   }
-  if (component.type === "BEHAVIOR" && (typeof component.behaviorId !== "string" || !knownBehaviorIds.has(component.behaviorId))) diagnostics.push(diagnostic2("MISSING_REFERENCE", `${path}.behaviorId`, "Behavior component references an unknown behavior."));
-  if (component.type === "CAMERA" && (typeof component.zoom !== "number" || !Number.isFinite(component.zoom) || component.zoom <= 0)) diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.zoom`, "Camera zoom must be a positive finite number."));
+  if (component.type === "BEHAVIOR" && (typeof component.behaviorId !== "string" || !knownBehaviorIds.has(component.behaviorId))) {
+    diagnostics.push(diagnostic2("MISSING_REFERENCE", `${path}.behaviorId`, "Behavior component references an unknown behavior."));
+  }
+  if (component.type === "CAMERA" && (typeof component.zoom !== "number" || !Number.isFinite(component.zoom) || component.zoom <= 0)) {
+    diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.zoom`, "Camera zoom must be a positive finite number."));
+  }
+  if (component.type === "TILEMAP") {
+    if (typeof component.mapId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(component.mapId)) {
+      diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.mapId`, "Tilemap map id is invalid."));
+    }
+    if (typeof component.tileSize !== "number" || !Number.isSafeInteger(component.tileSize) || component.tileSize < 1) {
+      diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.tileSize`, "Tilemap tile size must be a positive integer."));
+    }
+    if (typeof component.collisionEnabled !== "boolean") {
+      diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.collisionEnabled`, "Tilemap collisionEnabled must be boolean."));
+    }
+  }
+  if (component.type === "COLLIDER") {
+    if (![
+      "BOX",
+      "CIRCLE",
+      "CAPSULE"
+    ].includes(component.shape)) {
+      diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.shape`, "Collider shape is unsupported."));
+    }
+    for (const key of [
+      "width",
+      "height",
+      "radius"
+    ]) {
+      if (typeof component[key] !== "number" || !Number.isFinite(component[key]) || component[key] <= 0) {
+        diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.${key}`, "Collider dimensions must be positive finite numbers."));
+      }
+    }
+    if (typeof component.isTrigger !== "boolean") {
+      diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.isTrigger`, "Collider isTrigger must be boolean."));
+    }
+    if (![
+      "DEFAULT",
+      "WORLD",
+      "PLAYER",
+      "NPC",
+      "SENSOR",
+      "PROJECTILE"
+    ].includes(component.layer)) {
+      diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.layer`, "Collider layer is unsupported."));
+    }
+    if (typeof component.enabled !== "boolean") {
+      diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.enabled`, "Collider enabled must be boolean."));
+    }
+  }
+  if (component.type === "RIGIDBODY") {
+    if (![
+      "STATIC",
+      "DYNAMIC",
+      "KINEMATIC"
+    ].includes(component.bodyType)) {
+      diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.bodyType`, "Rigidbody body type is unsupported."));
+    }
+    if (typeof component.mass !== "number" || !Number.isFinite(component.mass) || component.mass <= 0) {
+      diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.mass`, "Rigidbody mass must be positive."));
+    }
+    if (typeof component.gravityScale !== "number" || !Number.isFinite(component.gravityScale)) {
+      diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.gravityScale`, "Rigidbody gravity scale must be finite."));
+    }
+    if (typeof component.fixedRotation !== "boolean" || typeof component.enabled !== "boolean") {
+      diagnostics.push(diagnostic2("INVALID_COMPONENT", path, "Rigidbody flags are invalid."));
+    }
+  }
+  if (component.type === "CHARACTER_CONTROLLER") {
+    if (typeof component.moveSpeed !== "number" || !Number.isFinite(component.moveSpeed) || component.moveSpeed <= 0) {
+      diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.moveSpeed`, "Character Controller move speed must be positive."));
+    }
+    if (typeof component.stepHeight !== "number" || !Number.isFinite(component.stepHeight) || component.stepHeight < 0) {
+      diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.stepHeight`, "Character Controller step height must be non-negative."));
+    }
+    if (typeof component.fixedStep !== "number" || !Number.isSafeInteger(component.fixedStep) || component.fixedStep < 1) {
+      diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.fixedStep`, "Character Controller fixed step must be a positive integer."));
+    }
+    if (typeof component.enabled !== "boolean") {
+      diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.enabled`, "Character Controller enabled must be boolean."));
+    }
+  }
+}
+function validateGameComponentState(component, path, diagnostics) {
+  if (!isRecord5(component) || typeof component.type !== "string" || typeof component.componentId !== "string") {
+    diagnostics.push(diagnostic2("INVALID_PROJECT", path, "Game editor component state is invalid."));
+    return;
+  }
+  if (![
+    "TRANSFORM",
+    "SPRITE",
+    "AUDIO_SOURCE",
+    "BEHAVIOR",
+    "CAMERA",
+    "TILEMAP",
+    "COLLIDER",
+    "RIGIDBODY",
+    "CHARACTER_CONTROLLER"
+  ].includes(component.type)) {
+    diagnostics.push(diagnostic2("INVALID_PROJECT", `${path}.type`, `Unknown Game editor component state: ${component.type}`));
+    return;
+  }
+  if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(component.componentId)) {
+    diagnostics.push(diagnostic2("INVALID_PROJECT", `${path}.componentId`, "Game editor component id is invalid."));
+  }
+  if (component.type === "TRANSFORM" && ![
+    "x",
+    "y",
+    "rotation",
+    "scaleX",
+    "scaleY"
+  ].every((key) => typeof component[key] === "number" && Number.isFinite(component[key]))) {
+    diagnostics.push(diagnostic2("INVALID_PROJECT", path, "Game editor Transform state contains a non-finite value."));
+  }
+  if (component.type === "SPRITE" && typeof component.visible !== "boolean") {
+    diagnostics.push(diagnostic2("INVALID_PROJECT", path, "Game editor Sprite state requires visible."));
+  }
+  if (component.type === "BEHAVIOR" && typeof component.enabled !== "boolean") {
+    diagnostics.push(diagnostic2("INVALID_PROJECT", path, "Game editor Behavior state requires enabled."));
+  }
+  if (component.type === "AUDIO_SOURCE" && (typeof component.loop !== "boolean" || typeof component.volume !== "number" || !Number.isFinite(component.volume) || component.volume < 0 || component.volume > 1)) {
+    diagnostics.push(diagnostic2("INVALID_PROJECT", path, "Game editor Audio Source state is invalid."));
+  }
+  if (component.type === "CAMERA" && (typeof component.active !== "boolean" || typeof component.zoom !== "number" || !Number.isFinite(component.zoom) || component.zoom <= 0)) {
+    diagnostics.push(diagnostic2("INVALID_PROJECT", path, "Game editor Camera state is invalid."));
+  }
+  if (component.type === "TILEMAP" && (typeof component.mapId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(component.mapId) || typeof component.tileSize !== "number" || !Number.isSafeInteger(component.tileSize) || component.tileSize < 1 || typeof component.collisionEnabled !== "boolean")) {
+    diagnostics.push(diagnostic2("INVALID_PROJECT", path, "Game editor Tilemap state is invalid."));
+  }
+  if (component.type === "COLLIDER") {
+    if (![
+      "BOX",
+      "CIRCLE",
+      "CAPSULE"
+    ].includes(component.shape) || [
+      "width",
+      "height",
+      "radius"
+    ].some((key) => typeof component[key] !== "number" || !Number.isFinite(component[key]) || component[key] <= 0) || typeof component.isTrigger !== "boolean" || ![
+      "DEFAULT",
+      "WORLD",
+      "PLAYER",
+      "NPC",
+      "SENSOR",
+      "PROJECTILE"
+    ].includes(component.layer) || typeof component.enabled !== "boolean") {
+      diagnostics.push(diagnostic2("INVALID_PROJECT", path, "Game editor Collider state is invalid."));
+    }
+  }
+  if (component.type === "RIGIDBODY" && (![
+    "STATIC",
+    "DYNAMIC",
+    "KINEMATIC"
+  ].includes(component.bodyType) || typeof component.mass !== "number" || !Number.isFinite(component.mass) || component.mass <= 0 || typeof component.gravityScale !== "number" || !Number.isFinite(component.gravityScale) || typeof component.fixedRotation !== "boolean" || typeof component.enabled !== "boolean")) {
+    diagnostics.push(diagnostic2("INVALID_PROJECT", path, "Game editor Rigidbody state is invalid."));
+  }
+  if (component.type === "CHARACTER_CONTROLLER" && (typeof component.moveSpeed !== "number" || !Number.isFinite(component.moveSpeed) || component.moveSpeed <= 0 || typeof component.stepHeight !== "number" || !Number.isFinite(component.stepHeight) || component.stepHeight < 0 || typeof component.fixedStep !== "number" || !Number.isSafeInteger(component.fixedStep) || component.fixedStep < 1 || typeof component.enabled !== "boolean")) {
+    diagnostics.push(diagnostic2("INVALID_PROJECT", path, "Game editor Character Controller state is invalid."));
+  }
 }
 function validateDependencyCycles(dependencies, diagnostics) {
   const byId = new Map(dependencies.map((dependency) => [
@@ -4719,40 +4915,63 @@ function validateDependencyCycles(dependencies, diagnostics) {
       return;
     }
     visiting.add(id);
-    for (const target of dependency.dependsOn) visit(target, `${path}.dependsOn`);
+    for (const target of dependency.dependsOn) {
+      visit(target, `${path}.dependsOn`);
+    }
     visiting.delete(id);
     visited.add(id);
   };
-  for (const dependency of dependencies) visit(dependency.dependencyId, "dependencies");
+  for (const dependency of dependencies) {
+    visit(dependency.dependencyId, "dependencies");
+  }
 }
 function validateGameProject(value, caller) {
   const diagnostics = [];
-  if (!isRecord5(value)) return {
-    valid: false,
-    diagnostics: [
-      diagnostic2("INVALID_PROJECT", "project", "Game Project must be an object.")
-    ]
-  };
-  if (value.schemaVersion !== GAME_PROJECT_SCHEMA_VERSION) diagnostics.push(diagnostic2("UNKNOWN_SCHEMA", "schemaVersion", "Unsupported Game Project schema version."));
-  if (typeof value.projectId !== "string" || typeof value.ownerId !== "string" || typeof value.name !== "string" || !isRecord5(value.revision)) return {
-    valid: false,
-    diagnostics: [
-      ...diagnostics,
-      diagnostic2("INVALID_PROJECT", "project", "Required Game Project identity is missing.")
-    ]
-  };
+  if (!isRecord5(value)) {
+    return {
+      valid: false,
+      diagnostics: [
+        diagnostic2("INVALID_PROJECT", "project", "Game Project must be an object.")
+      ]
+    };
+  }
+  if (value.schemaVersion !== GAME_PROJECT_SCHEMA_VERSION) {
+    diagnostics.push(diagnostic2("UNKNOWN_SCHEMA", "schemaVersion", "Unsupported Game Project schema version."));
+  }
+  if (typeof value.projectId !== "string" || typeof value.ownerId !== "string" || typeof value.name !== "string" || !isRecord5(value.revision)) {
+    return {
+      valid: false,
+      diagnostics: [
+        ...diagnostics,
+        diagnostic2("INVALID_PROJECT", "project", "Required Game Project identity is missing.")
+      ]
+    };
+  }
   const project = value;
   if (caller) diagnostics.push(...validateCaller(project, caller));
-  if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(project.projectId) || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(project.ownerId)) diagnostics.push(diagnostic2("INVALID_PROJECT", "projectId/ownerId", "Project and owner ids must be stable identifiers."));
-  if (!project.name.trim()) diagnostics.push(diagnostic2("INVALID_PROJECT", "name", "Project name is required."));
-  if (project.revision.projectId !== project.projectId || project.revision.ownerId !== project.ownerId || !Number.isSafeInteger(project.revision.sequence) || project.revision.sequence < 1) diagnostics.push(diagnostic2("INVALID_REVISION", "revision", "Revision is not bound to the project owner or sequence."));
-  if (!Array.isArray(project.scenes) || !Array.isArray(project.prefabs) || !Array.isArray(project.dependencies) || !Array.isArray(project.behaviors)) return {
-    valid: false,
-    diagnostics: [
-      ...diagnostics,
-      diagnostic2("INVALID_PROJECT", "project", "Project collections are invalid.")
-    ]
-  };
+  if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(project.projectId) || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(project.ownerId)) {
+    diagnostics.push(diagnostic2("INVALID_PROJECT", "projectId/ownerId", "Project and owner ids must be stable identifiers."));
+  }
+  if (!project.name.trim()) {
+    diagnostics.push(diagnostic2("INVALID_PROJECT", "name", "Project name is required."));
+  }
+  if (project.revision.projectId !== project.projectId || project.revision.ownerId !== project.ownerId || !Number.isSafeInteger(project.revision.sequence) || project.revision.sequence < 1) {
+    diagnostics.push(diagnostic2("INVALID_REVISION", "revision", "Revision is not bound to the project owner or sequence."));
+  }
+  if (!Array.isArray(project.scenes) || !Array.isArray(project.prefabs) || !Array.isArray(project.dependencies) || !Array.isArray(project.behaviors)) {
+    return {
+      valid: false,
+      diagnostics: [
+        ...diagnostics,
+        diagnostic2("INVALID_PROJECT", "project", "Project collections are invalid.")
+      ]
+    };
+  }
+  if (project.runtimeProfile !== void 0) {
+    if (!isRecord5(project.runtimeProfile) || project.runtimeProfile.schemaVersion !== GAME_RUNTIME_PROFILE_SCHEMA_VERSION || typeof project.runtimeProfile.profileId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(project.runtimeProfile.profileId)) {
+      diagnostics.push(diagnostic2("INVALID_RUNTIME_PROFILE", "runtimeProfile", "Runtime profile reference is invalid."));
+    }
+  }
   diagnostics.push(...duplicateDiagnostics(project.scenes.map((scene) => String(scene.sceneId)), "scenes.sceneId"));
   diagnostics.push(...duplicateDiagnostics(project.prefabs.map((prefab) => String(prefab.prefabId)), "prefabs.prefabId"));
   diagnostics.push(...duplicateDiagnostics(project.dependencies.map((dependency) => String(dependency.dependencyId)), "dependencies.dependencyId"));
@@ -4765,28 +4984,36 @@ function validateGameProject(value, caller) {
       diagnostics.push(diagnostic2("INVALID_PROJECT", `scenes[${sceneIndex}]`, "Scene shape is invalid."));
       continue;
     }
-    const sceneEntityIds = new Set(scene.entities.map((entity) => String(entity.entityId)));
-    for (const rootId of scene.rootEntityIds) if (!sceneEntityIds.has(String(rootId))) diagnostics.push(diagnostic2("MISSING_REFERENCE", `scenes[${sceneIndex}].rootEntityIds`, `Root Entity ${String(rootId)} is missing.`));
-    diagnostics.push(...duplicateDiagnostics(scene.entities.map((entity) => String(entity.entityId)), `scenes[${sceneIndex}].entities.entityId`));
-    for (const [entityIndex, entity] of scene.entities.entries()) {
-      if (!isRecord5(entity) || typeof entity.entityId !== "string" || !Array.isArray(entity.components)) {
+    const sceneEntityIds = new Set(scene.entities.map((entity2) => String(entity2.entityId)));
+    for (const rootId of scene.rootEntityIds) {
+      if (!sceneEntityIds.has(String(rootId))) {
+        diagnostics.push(diagnostic2("MISSING_REFERENCE", `scenes[${sceneIndex}].rootEntityIds`, `Root Entity ${String(rootId)} is missing.`));
+      }
+    }
+    diagnostics.push(...duplicateDiagnostics(scene.entities.map((entity2) => String(entity2.entityId)), `scenes[${sceneIndex}].entities.entityId`));
+    for (const [entityIndex, entity2] of scene.entities.entries()) {
+      if (!isRecord5(entity2) || typeof entity2.entityId !== "string" || !Array.isArray(entity2.components)) {
         diagnostics.push(diagnostic2("INVALID_PROJECT", `scenes[${sceneIndex}].entities[${entityIndex}]`, "Entity shape is invalid."));
         continue;
       }
-      allEntityIds.push(entity.entityId);
-      if (entity.parentEntityId !== void 0 && !sceneEntityIds.has(String(entity.parentEntityId))) diagnostics.push(diagnostic2("MISSING_REFERENCE", `scenes[${sceneIndex}].entities[${entityIndex}].parentEntityId`, "Parent Entity is missing."));
-      diagnostics.push(...duplicateDiagnostics(entity.components.map((component) => String(isRecord5(component) ? component.componentId : "<invalid>")), `scenes[${sceneIndex}].entities[${entityIndex}].components.componentId`));
-      for (const [componentIndex, component] of entity.components.entries()) {
-        if (isRecord5(component) && typeof component.componentId === "string") allComponentIds.push(component.componentId);
+      allEntityIds.push(entity2.entityId);
+      if (entity2.parentEntityId !== void 0 && !sceneEntityIds.has(String(entity2.parentEntityId))) {
+        diagnostics.push(diagnostic2("MISSING_REFERENCE", `scenes[${sceneIndex}].entities[${entityIndex}].parentEntityId`, "Parent Entity is missing."));
+      }
+      diagnostics.push(...duplicateDiagnostics(entity2.components.map((component) => String(isRecord5(component) ? component.componentId : "<invalid>")), `scenes[${sceneIndex}].entities[${entityIndex}].components.componentId`));
+      for (const [componentIndex, component] of entity2.components.entries()) {
+        if (isRecord5(component) && typeof component.componentId === "string") {
+          allComponentIds.push(component.componentId);
+        }
         validateComponent(component, `scenes[${sceneIndex}].entities[${entityIndex}].components[${componentIndex}]`, project.ownerId, behaviorIds, diagnostics);
       }
     }
-    for (const entity of scene.entities) {
+    for (const entity2 of scene.entities) {
       const seen = /* @__PURE__ */ new Set();
-      let parentId = entity.parentEntityId;
+      let parentId = entity2.parentEntityId;
       while (parentId !== void 0) {
-        if (seen.has(String(parentId)) || parentId === entity.entityId) {
-          diagnostics.push(diagnostic2("DEPENDENCY_CYCLE", `scenes[${sceneIndex}].entities`, `Entity parent cycle includes ${String(entity.entityId)}.`));
+        if (seen.has(String(parentId)) || parentId === entity2.entityId) {
+          diagnostics.push(diagnostic2("DEPENDENCY_CYCLE", `scenes[${sceneIndex}].entities`, `Entity parent cycle includes ${String(entity2.entityId)}.`));
           break;
         }
         seen.add(String(parentId));
@@ -4797,23 +5024,58 @@ function validateGameProject(value, caller) {
   diagnostics.push(...duplicateDiagnostics(allEntityIds, "project.entities.entityId"));
   diagnostics.push(...duplicateDiagnostics(allComponentIds, "project.components.componentId"));
   for (const dependency of project.dependencies) {
-    if (!isRecord5(dependency) || typeof dependency.dependencyId !== "string" || !Array.isArray(dependency.dependsOn)) diagnostics.push(diagnostic2("INVALID_PROJECT", "dependencies", "Dependency shape is invalid."));
-    else if (dependency.ownerId !== project.ownerId || dependency.ownerRevisionId !== project.revision.revisionId) diagnostics.push(diagnostic2("INVALID_REFERENCE", `dependencies.${dependency.dependencyId}`, "Dependency owner/revision is not the current project revision."));
+    if (!isRecord5(dependency) || typeof dependency.dependencyId !== "string" || !Array.isArray(dependency.dependsOn)) {
+      diagnostics.push(diagnostic2("INVALID_PROJECT", "dependencies", "Dependency shape is invalid."));
+    } else if (dependency.ownerId !== project.ownerId || dependency.ownerRevisionId !== project.revision.revisionId) {
+      diagnostics.push(diagnostic2("INVALID_REFERENCE", `dependencies.${dependency.dependencyId}`, "Dependency owner/revision is not the current project revision."));
+    }
   }
   validateDependencyCycles(project.dependencies, diagnostics);
   for (const behavior of project.behaviors) {
-    if (behavior.version !== BEHAVIOR_IR_VERSION || behavior.ownership !== "CANONICAL_IR" || !Array.isArray(behavior.rules)) diagnostics.push(diagnostic2("UNKNOWN_SCHEMA", `behaviors.${String(behavior.behaviorId)}`, "Behavior IR schema is unsupported."));
+    if (behavior.version !== BEHAVIOR_IR_VERSION || behavior.ownership !== "CANONICAL_IR" || !Array.isArray(behavior.rules)) {
+      diagnostics.push(diagnostic2("UNKNOWN_SCHEMA", `behaviors.${String(behavior.behaviorId)}`, "Behavior IR schema is unsupported."));
+    }
   }
   if (project.editorTimeline !== void 0) {
     const timeline = project.editorTimeline;
-    if (!Number.isSafeInteger(timeline.frameCount) || timeline.frameCount < 1) diagnostics.push(diagnostic2("INVALID_PROJECT", "editorTimeline.frameCount", "Editor timeline frame count must be a positive integer."));
-    if (!Array.isArray(timeline.tracks)) diagnostics.push(diagnostic2("INVALID_PROJECT", "editorTimeline.tracks", "Editor timeline tracks must be an array."));
-    else {
+    if (!Number.isSafeInteger(timeline.frameCount) || timeline.frameCount < 1) {
+      diagnostics.push(diagnostic2("INVALID_PROJECT", "editorTimeline.frameCount", "Editor timeline frame count must be a positive integer."));
+    }
+    if (!Array.isArray(timeline.tracks)) {
+      diagnostics.push(diagnostic2("INVALID_PROJECT", "editorTimeline.tracks", "Editor timeline tracks must be an array."));
+    } else {
       diagnostics.push(...duplicateDiagnostics(timeline.tracks.map((track) => track.trackId), "editorTimeline.tracks.trackId"));
       for (const [index, track] of timeline.tracks.entries()) {
-        if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(track.trackId) || track.label.trim().length === 0 || track.kind.trim().length === 0) diagnostics.push(diagnostic2("INVALID_PROJECT", `editorTimeline.tracks[${index}]`, "Editor timeline track identity is invalid."));
-        if (!Array.isArray(track.activeFrames) || track.activeFrames.some((frame2) => !Number.isSafeInteger(frame2) || frame2 < 0 || frame2 >= timeline.frameCount)) diagnostics.push(diagnostic2("INVALID_PROJECT", `editorTimeline.tracks[${index}].activeFrames`, "Editor timeline frames must be in range."));
-        else if (new Set(track.activeFrames).size !== track.activeFrames.length) diagnostics.push(diagnostic2("DUPLICATE_ID", `editorTimeline.tracks[${index}].activeFrames`, "Editor timeline frames must be unique."));
+        if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(track.trackId) || track.label.trim().length === 0 || track.kind.trim().length === 0) {
+          diagnostics.push(diagnostic2("INVALID_PROJECT", `editorTimeline.tracks[${index}]`, "Editor timeline track identity is invalid."));
+        }
+        if (!Array.isArray(track.activeFrames) || track.activeFrames.some((frame2) => !Number.isSafeInteger(frame2) || frame2 < 0 || frame2 >= timeline.frameCount)) {
+          diagnostics.push(diagnostic2("INVALID_PROJECT", `editorTimeline.tracks[${index}].activeFrames`, "Editor timeline frames must be in range."));
+        } else if (new Set(track.activeFrames).size !== track.activeFrames.length) {
+          diagnostics.push(diagnostic2("DUPLICATE_ID", `editorTimeline.tracks[${index}].activeFrames`, "Editor timeline frames must be unique."));
+        }
+        if (track.role !== void 0 && ![
+          "PLAYER",
+          "NPC",
+          "PROP",
+          "TRIGGER",
+          "TILEMAP",
+          "CAMERA",
+          "AUDIO",
+          "CUSTOM"
+        ].includes(track.role)) {
+          diagnostics.push(diagnostic2("INVALID_PROJECT", `editorTimeline.tracks[${index}].role`, "Game object role is unsupported."));
+        }
+        if (track.components !== void 0) {
+          if (!Array.isArray(track.components)) {
+            diagnostics.push(diagnostic2("INVALID_PROJECT", `editorTimeline.tracks[${index}].components`, "Game editor components must be an array."));
+          } else {
+            diagnostics.push(...duplicateDiagnostics(track.components.map((component) => String(component.componentId)), `editorTimeline.tracks[${index}].components.componentId`));
+            for (const [componentIndex, component] of track.components.entries()) {
+              validateGameComponentState(component, `editorTimeline.tracks[${index}].components[${componentIndex}]`, diagnostics);
+            }
+          }
+        }
       }
     }
   }
@@ -4842,9 +5104,9 @@ function canonicalProjectPayload(project) {
     revision,
     scenes: sortById(project.scenes, "sceneId").map((scene) => ({
       ...scene,
-      entities: sortById(scene.entities, "entityId").map((entity) => ({
-        ...entity,
-        components: sortById(entity.components, "componentId")
+      entities: sortById(scene.entities, "entityId").map((entity2) => ({
+        ...entity2,
+        components: sortById(entity2.components, "componentId")
       }))
     })),
     prefabs: sortById(project.prefabs, "prefabId"),
@@ -4858,6 +5120,9 @@ function canonicalProjectPayload(project) {
       ...behavior,
       rules: sortById(behavior.rules, "ruleId")
     })),
+    ...project.runtimeProfile === void 0 ? {} : {
+      runtimeProfile: project.runtimeProfile
+    },
     ...project.editorTimeline === void 0 ? {} : {
       editorTimeline: {
         frameCount: project.editorTimeline.frameCount,
@@ -4874,7 +5139,9 @@ function canonicalProjectPayload(project) {
 function canonicalJson3(value) {
   if (value === null || typeof value === "boolean" || typeof value === "number" || typeof value === "string") return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(canonicalJson3).join(",")}]`;
-  if (isRecord5(value)) return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson3(value[key])}`).join(",")}}`;
+  if (isRecord5(value)) {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson3(value[key])}`).join(",")}}`;
+  }
   throw new Error("Unsupported canonical value.");
 }
 async function sha256(value) {
@@ -4885,7 +5152,9 @@ async function sha256(value) {
 }
 async function createGameProject(draft, caller) {
   const validation = validateGameProject(draft, caller);
-  if (!validation.valid) throw new Error(validation.diagnostics.map((item) => `${item.code}:${item.path}`).join("; "));
+  if (!validation.valid) {
+    throw new Error(validation.diagnostics.map((item) => `${item.code}:${item.path}`).join("; "));
+  }
   const snapshotHash = await sha256(canonicalProjectPayload(draft));
   return {
     ...draft,
@@ -4893,6 +5162,17 @@ async function createGameProject(draft, caller) {
       ...draft.revision,
       snapshotHash
     }
+  };
+}
+function createJournal(initial, caller) {
+  const validation = validateGameProject(initial, caller);
+  if (!validation.valid) throw new Error("Cannot journal an invalid project.");
+  return {
+    current: initial,
+    sequence: 0,
+    past: [],
+    future: [],
+    checkpoints: []
   };
 }
 
@@ -5041,13 +5321,13 @@ function validateSnapshot(state2, asset, snapshot) {
   }
   return diagnostics;
 }
-function validateTransform(transform) {
+function validateTransform(transform2) {
   const diagnostics = [];
-  if (!isInteger(transform.dx) || !isInteger(transform.dy)) diagnostics.push(error("TRANSFORM_TRANSLATION_INVALID", "Transform translation must use integer coordinates.", "transform"));
-  if (transform.interpolationPolicy !== "NEAREST_NEIGHBOR") diagnostics.push(error("TRANSFORM_INTERPOLATION_UNSUPPORTED", "Only deterministic nearest-neighbor transform is supported.", "transform.interpolationPolicy"));
-  if (transform.outOfBoundsPolicy === "EXPAND_CANVAS_CANDIDATE") diagnostics.push(error("TRANSFORM_CANVAS_EXPANSION_UNSUPPORTED", "Canvas expansion is a future candidate and cannot mutate this Project.", "transform.outOfBoundsPolicy"));
-  if (transform.operation === "SCALE_INTEGER" && (!isInteger(transform.factor) || transform.factor < 1 || transform.factor > 8)) diagnostics.push(error("TRANSFORM_SCALE_INVALID", "Integer scale factor must be between 1 and 8.", "transform.factor"));
-  if (transform.operation === "SCALE_NEAREST" && (!Number.isFinite(transform.factor) || transform.factor < 0.125 || transform.factor > 8)) diagnostics.push(error("TRANSFORM_SCALE_INVALID", "Nearest-neighbor scale factor must be between 0.125 and 8.", "transform.factor"));
+  if (!isInteger(transform2.dx) || !isInteger(transform2.dy)) diagnostics.push(error("TRANSFORM_TRANSLATION_INVALID", "Transform translation must use integer coordinates.", "transform"));
+  if (transform2.interpolationPolicy !== "NEAREST_NEIGHBOR") diagnostics.push(error("TRANSFORM_INTERPOLATION_UNSUPPORTED", "Only deterministic nearest-neighbor transform is supported.", "transform.interpolationPolicy"));
+  if (transform2.outOfBoundsPolicy === "EXPAND_CANVAS_CANDIDATE") diagnostics.push(error("TRANSFORM_CANVAS_EXPANSION_UNSUPPORTED", "Canvas expansion is a future candidate and cannot mutate this Project.", "transform.outOfBoundsPolicy"));
+  if (transform2.operation === "SCALE_INTEGER" && (!isInteger(transform2.factor) || transform2.factor < 1 || transform2.factor > 8)) diagnostics.push(error("TRANSFORM_SCALE_INVALID", "Integer scale factor must be between 1 and 8.", "transform.factor"));
+  if (transform2.operation === "SCALE_NEAREST" && (!Number.isFinite(transform2.factor) || transform2.factor < 0.125 || transform2.factor > 8)) diagnostics.push(error("TRANSFORM_SCALE_INVALID", "Nearest-neighbor scale factor must be between 0.125 and 8.", "transform.factor"));
   return diagnostics;
 }
 function validateClipboard(clipboard2, asset) {
@@ -5104,11 +5384,11 @@ function createRectangleSelectionSnapshot(state2, bounds, selectionId = `selecti
     pixels
   };
 }
-function transformedPixels(snapshot, transform) {
+function transformedPixels(snapshot, transform2) {
   const bounds = boundsFromRegions(snapshot.mask.regions);
   const pixels = [];
-  if (transform.operation === "SCALE_INTEGER" || transform.operation === "SCALE_NEAREST") {
-    const factor = transform.factor;
+  if (transform2.operation === "SCALE_INTEGER" || transform2.operation === "SCALE_NEAREST") {
+    const factor = transform2.factor;
     const outputWidth = Math.max(1, Math.round(bounds.width * factor));
     const outputHeight = Math.max(1, Math.round(bounds.height * factor));
     const originX = Math.floor((bounds.width - outputWidth) / 2);
@@ -5122,8 +5402,8 @@ function transformedPixels(snapshot, transform) {
         const source = sourceByLocalPoint.get(`${sourceX}:${sourceY}`);
         if (source === void 0) continue;
         pixels.push({
-          x: bounds.x + originX + targetX + transform.dx,
-          y: bounds.y + originY + targetY + transform.dy,
+          x: bounds.x + originX + targetX + transform2.dx,
+          y: bounds.y + originY + targetY + transform2.dy,
           colorIndex: source.colorIndex
         });
       }
@@ -5133,67 +5413,67 @@ function transformedPixels(snapshot, transform) {
   for (const pixel of snapshot.pixels) {
     const localX = pixel.x - bounds.x;
     const localY = pixel.y - bounds.y;
-    if (transform.operation === "MOVE") pixels.push({
-      x: pixel.x + transform.dx,
-      y: pixel.y + transform.dy,
+    if (transform2.operation === "MOVE") pixels.push({
+      x: pixel.x + transform2.dx,
+      y: pixel.y + transform2.dy,
       colorIndex: pixel.colorIndex
     });
-    else if (transform.operation === "FLIP_HORIZONTAL") pixels.push({
-      x: bounds.x + bounds.width - 1 - localX + transform.dx,
-      y: pixel.y + transform.dy,
+    else if (transform2.operation === "FLIP_HORIZONTAL") pixels.push({
+      x: bounds.x + bounds.width - 1 - localX + transform2.dx,
+      y: pixel.y + transform2.dy,
       colorIndex: pixel.colorIndex
     });
-    else if (transform.operation === "FLIP_VERTICAL") pixels.push({
-      x: pixel.x + transform.dx,
-      y: bounds.y + bounds.height - 1 - localY + transform.dy,
+    else if (transform2.operation === "FLIP_VERTICAL") pixels.push({
+      x: pixel.x + transform2.dx,
+      y: bounds.y + bounds.height - 1 - localY + transform2.dy,
       colorIndex: pixel.colorIndex
     });
-    else if (transform.operation === "ROTATE_90_CW") pixels.push({
-      x: bounds.x + bounds.height - 1 - localY + transform.dx,
-      y: bounds.y + localX + transform.dy,
+    else if (transform2.operation === "ROTATE_90_CW") pixels.push({
+      x: bounds.x + bounds.height - 1 - localY + transform2.dx,
+      y: bounds.y + localX + transform2.dy,
       colorIndex: pixel.colorIndex
     });
-    else if (transform.operation === "ROTATE_90_CCW") pixels.push({
-      x: bounds.x + localY + transform.dx,
-      y: bounds.y + bounds.width - 1 - localX + transform.dy,
+    else if (transform2.operation === "ROTATE_90_CCW") pixels.push({
+      x: bounds.x + localY + transform2.dx,
+      y: bounds.y + bounds.width - 1 - localX + transform2.dy,
       colorIndex: pixel.colorIndex
     });
-    else if (transform.operation === "ROTATE_180") pixels.push({
-      x: bounds.x + bounds.width - 1 - localX + transform.dx,
-      y: bounds.y + bounds.height - 1 - localY + transform.dy,
+    else if (transform2.operation === "ROTATE_180") pixels.push({
+      x: bounds.x + bounds.width - 1 - localX + transform2.dx,
+      y: bounds.y + bounds.height - 1 - localY + transform2.dy,
       colorIndex: pixel.colorIndex
     });
   }
   return pixels;
 }
-function estimatedTransformBounds(snapshot, transform) {
+function estimatedTransformBounds(snapshot, transform2) {
   const bounds = boundsFromRegions(snapshot.mask.regions);
-  if (transform.operation === "ROTATE_90_CW" || transform.operation === "ROTATE_90_CCW") return {
+  if (transform2.operation === "ROTATE_90_CW" || transform2.operation === "ROTATE_90_CCW") return {
     ...bounds,
     width: bounds.height,
     height: bounds.width
   };
-  if (transform.operation === "SCALE_INTEGER" || transform.operation === "SCALE_NEAREST") {
+  if (transform2.operation === "SCALE_INTEGER" || transform2.operation === "SCALE_NEAREST") {
     return {
       ...bounds,
-      width: Math.max(1, Math.round(bounds.width * transform.factor)),
-      height: Math.max(1, Math.round(bounds.height * transform.factor))
+      width: Math.max(1, Math.round(bounds.width * transform2.factor)),
+      height: Math.max(1, Math.round(bounds.height * transform2.factor))
     };
   }
   return bounds;
 }
-function destinationBounds(snapshot, transform) {
-  const pixels = transformedPixels(snapshot, transform);
+function destinationBounds(snapshot, transform2) {
+  const pixels = transformedPixels(snapshot, transform2);
   return regionForPoints(pixels) ?? boundsFromRegions(snapshot.mask.regions);
 }
-function createTransformSession(snapshot, transform, sessionId = `transform-${snapshot.selectionId}-${snapshot.mask.selectionVersion}`) {
-  const destination = destinationBounds(snapshot, transform);
+function createTransformSession(snapshot, transform2, sessionId = `transform-${snapshot.selectionId}-${snapshot.mask.selectionVersion}`) {
+  const destination = destinationBounds(snapshot, transform2);
   return {
     sessionId,
     sourceSelectionVersion: snapshot.mask.selectionVersion,
     sourceRasterRevision: snapshot.sourceRasterRevision,
     sourceStructureEpoch: snapshot.sourceStructureEpoch,
-    transform,
+    transform: transform2,
     previewBounds: boundsFromRegions(snapshot.mask.regions),
     destinationBounds: destination,
     status: "PREVIEW"
@@ -5232,9 +5512,9 @@ function createClipboardSelectionSnapshot(state2, clipboard2) {
     }))
   };
 }
-function createClipboardPasteSession(state2, clipboard2, transform, sessionId = `paste-${state2.projectId}-${clipboard2.sourceSelectionVersion}`) {
+function createClipboardPasteSession(state2, clipboard2, transform2, sessionId = `paste-${state2.projectId}-${clipboard2.sourceSelectionVersion}`) {
   const snapshot = createClipboardSelectionSnapshot(state2, clipboard2);
-  return createTransformSession(snapshot, transform, sessionId);
+  return createTransformSession(snapshot, transform2, sessionId);
 }
 function previewTransform(snapshot, session) {
   return {
@@ -10538,11 +10818,11 @@ function sampleAnimation(clip, elapsedMs) {
   if (clip.frames.length === 0) return void 0;
   for (const frame2 of clip.frames) if (!Number.isFinite(frame2.durationMs) || frame2.durationMs <= 0) throw new Error("Animation frame durations must be positive.");
   const duration = clip.frames.reduce((sum, frame2) => sum + frame2.durationMs, 0);
-  const position = clip.loop ? (Math.max(0, elapsedMs) % duration + duration) % duration : Math.min(Math.max(0, elapsedMs), duration - Number.EPSILON);
+  const position2 = clip.loop ? (Math.max(0, elapsedMs) % duration + duration) % duration : Math.min(Math.max(0, elapsedMs), duration - Number.EPSILON);
   let cursor = 0;
   for (const frame2 of clip.frames) {
     cursor += frame2.durationMs;
-    if (position < cursor) return frame2.frameId;
+    if (position2 < cursor) return frame2.frameId;
   }
   return clip.frames[clip.frames.length - 1]?.frameId;
 }
@@ -10674,8 +10954,8 @@ function referenceKey(reference) {
 function collectReferences(project) {
   const references = [];
   for (const scene of project.scenes) {
-    for (const entity of scene.entities) {
-      for (const component of entity.components) {
+    for (const entity2 of scene.entities) {
+      for (const component of entity2.components) {
         if (component.type === "SPRITE" || component.type === "ANIMATION" || component.type === "AUDIO_SOURCE") references.push(component.asset);
       }
     }
@@ -10730,18 +11010,18 @@ function validateGameProject2(project) {
     }
     if (sceneIds.has(scene.sceneId)) diagnostics.push(diagnostic5("PACKAGE_INVALID", `Duplicate Game Scene ${scene.sceneId}.`, false));
     sceneIds.add(scene.sceneId);
-    const sceneEntityIds = new Set(scene.entities.map((entity) => entity.entityId));
+    const sceneEntityIds = new Set(scene.entities.map((entity2) => entity2.entityId));
     for (const rootId of scene.rootEntityIds) if (!sceneEntityIds.has(rootId)) diagnostics.push(diagnostic5("MISSING_REQUIRED_ASSET", `Scene root Entity ${rootId} is missing.`, false));
-    for (const entity of scene.entities) {
+    for (const entity2 of scene.entities) {
       try {
-        safeText(entity.entityId, "GameEntityId");
+        safeText(entity2.entityId, "GameEntityId");
       } catch (error2) {
         diagnostics.push(diagnostic5("PACKAGE_INVALID", error2 instanceof Error ? error2.message : "Entity ID is invalid.", false));
       }
-      if (entityIds.has(entity.entityId)) diagnostics.push(diagnostic5("PACKAGE_INVALID", `Duplicate Game Entity ${entity.entityId}.`, false));
-      entityIds.add(entity.entityId);
-      if (entity.parentEntityId !== void 0 && !sceneEntityIds.has(entity.parentEntityId)) diagnostics.push(diagnostic5("PACKAGE_INVALID", `Entity parent ${entity.parentEntityId} is missing.`, false));
-      for (const component of entity.components) {
+      if (entityIds.has(entity2.entityId)) diagnostics.push(diagnostic5("PACKAGE_INVALID", `Duplicate Game Entity ${entity2.entityId}.`, false));
+      entityIds.add(entity2.entityId);
+      if (entity2.parentEntityId !== void 0 && !sceneEntityIds.has(entity2.parentEntityId)) diagnostics.push(diagnostic5("PACKAGE_INVALID", `Entity parent ${entity2.parentEntityId} is missing.`, false));
+      for (const component of entity2.components) {
         try {
           safeText(component.componentId, "GameComponentId");
         } catch (error2) {
@@ -10757,12 +11037,12 @@ function validateGameProject2(project) {
         if (component.type === "AUDIO_SOURCE" && (component.volume < 0 || component.volume > 1)) diagnostics.push(diagnostic5("BUILD_INVALID_REQUEST", `Audio volume for ${component.componentId} must be between 0 and 1.`, false));
       }
     }
-    for (const entity of scene.entities) {
+    for (const entity2 of scene.entities) {
       const seenParents = /* @__PURE__ */ new Set();
-      let parentId = entity.parentEntityId;
+      let parentId = entity2.parentEntityId;
       while (parentId !== void 0) {
-        if (seenParents.has(parentId) || parentId === entity.entityId) {
-          diagnostics.push(diagnostic5("PACKAGE_INVALID", `Entity parent cycle includes ${entity.entityId}.`, false));
+        if (seenParents.has(parentId) || parentId === entity2.entityId) {
+          diagnostics.push(diagnostic5("PACKAGE_INVALID", `Entity parent cycle includes ${entity2.entityId}.`, false));
           break;
         }
         seenParents.add(parentId);
@@ -11046,7 +11326,7 @@ function resolveRuntimeIdentity(request) {
   if (!manifest.ok || manifest.value === void 0) return failure2(...manifest.diagnostics);
   const scene = project.scenes.find((candidate) => candidate.sceneId === request.sceneId);
   if (!scene) return failure2(diagnostic7("MISSING_SCENE", "sceneId", "Requested Scene is not part of the canonical Project."));
-  if (request.entityId !== void 0 && !scene.entities.some((entity) => entity.entityId === request.entityId)) {
+  if (request.entityId !== void 0 && !scene.entities.some((entity2) => entity2.entityId === request.entityId)) {
     return failure2(diagnostic7("WRONG_ENTITY", "entityId", "Requested Entity is not a member of the requested canonical Scene."));
   }
   return success2({
@@ -11224,9 +11504,9 @@ function prepareGame350Composition(request) {
   if (!identity.ok || identity.value === void 0) return failure2(...identity.diagnostics);
   const project = identity.value.project;
   const scene = project.scenes.find((item) => item.sceneId === identity.value.sceneId);
-  const entity = identity.value.entityId === void 0 ? void 0 : scene.entities.find((item) => item.entityId === identity.value.entityId);
-  const references = (entity ? [
-    entity
+  const entity2 = identity.value.entityId === void 0 ? void 0 : scene.entities.find((item) => item.entityId === identity.value.entityId);
+  const references = (entity2 ? [
+    entity2
   ] : scene.entities).flatMap((item) => item.components.flatMap((component) => {
     if (component.type !== "SPRITE" && component.type !== "ANIMATION" && component.type !== "AUDIO_SOURCE") return [];
     return [
@@ -11429,6 +11709,744 @@ async function startGame350ProductPreview(options) {
   } catch (error2) {
     return failure3(errorDiagnostic(error2 instanceof Error ? error2.message : "GAME-350 Runtime preview could not start."));
   }
+}
+
+// src/game/game-310/core.ts
+var asActionId = (value) => asIdentifier(value, "actionId");
+function asIdentifier(value, label) {
+  if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(value)) throw new Error(`${label} must be a stable identifier.`);
+  return value;
+}
+
+// src/game/game-350/runtime-core.ts
+var GAME_RUNTIME_CORE_SCHEMA_VERSION = 1;
+var GAME_RUNTIME_PROFILE_SCHEMA_VERSION2 = 1;
+var GAME_RUNTIME_PROFILE_IDS = Object.freeze({
+  TOP_DOWN_RPG: "top-down-rpg",
+  ACTION_2D: "action-2d",
+  SHOOTER_2D: "shooter-2d",
+  RACING_2D: "racing-2d",
+  RHYTHM: "rhythm",
+  ACTION_3D: "action-3d",
+  OPEN_WORLD_3D: "open-world-3d",
+  INTERACTIVE_3D: "interactive-3d"
+});
+var BUILT_IN_PROFILES = Object.freeze([
+  {
+    schemaVersion: GAME_RUNTIME_PROFILE_SCHEMA_VERSION2,
+    profileId: GAME_RUNTIME_PROFILE_IDS.TOP_DOWN_RPG,
+    genre: "TOP_DOWN_RPG",
+    label: "Top-down RPG",
+    dimension: "2D",
+    executionModel: "FIXED_STEP",
+    status: "AVAILABLE",
+    capabilities: [
+      "SCENE",
+      "ENTITY_COMPONENT",
+      "INPUT_ACTIONS",
+      "CAMERA",
+      "COLLISION_2D",
+      "SAVE_STATE",
+      "UI_OVERLAY"
+    ]
+  },
+  {
+    schemaVersion: GAME_RUNTIME_PROFILE_SCHEMA_VERSION2,
+    profileId: GAME_RUNTIME_PROFILE_IDS.ACTION_2D,
+    genre: "ACTION_2D",
+    label: "2D Action",
+    dimension: "2D",
+    executionModel: "FIXED_STEP",
+    status: "FOUNDATION",
+    capabilities: [
+      "SCENE",
+      "ENTITY_COMPONENT",
+      "INPUT_ACTIONS",
+      "CAMERA",
+      "PHYSICS_2D",
+      "SAVE_STATE",
+      "UI_OVERLAY"
+    ]
+  },
+  {
+    schemaVersion: GAME_RUNTIME_PROFILE_SCHEMA_VERSION2,
+    profileId: GAME_RUNTIME_PROFILE_IDS.SHOOTER_2D,
+    genre: "SHOOTER_2D",
+    label: "2D Shooter",
+    dimension: "2D",
+    executionModel: "FIXED_STEP",
+    status: "PLANNED",
+    capabilities: [
+      "SCENE",
+      "ENTITY_COMPONENT",
+      "INPUT_ACTIONS",
+      "CAMERA",
+      "PHYSICS_2D",
+      "SAVE_STATE",
+      "UI_OVERLAY"
+    ]
+  },
+  {
+    schemaVersion: GAME_RUNTIME_PROFILE_SCHEMA_VERSION2,
+    profileId: GAME_RUNTIME_PROFILE_IDS.RACING_2D,
+    genre: "RACING_2D",
+    label: "2D Racing",
+    dimension: "2D",
+    executionModel: "CONTINUOUS_PHYSICS",
+    status: "PLANNED",
+    capabilities: [
+      "SCENE",
+      "ENTITY_COMPONENT",
+      "INPUT_ACTIONS",
+      "CAMERA",
+      "PHYSICS_2D",
+      "VEHICLE_PHYSICS",
+      "SAVE_STATE",
+      "UI_OVERLAY"
+    ]
+  },
+  {
+    schemaVersion: GAME_RUNTIME_PROFILE_SCHEMA_VERSION2,
+    profileId: GAME_RUNTIME_PROFILE_IDS.RHYTHM,
+    genre: "RHYTHM",
+    label: "Rhythm",
+    dimension: "2D",
+    executionModel: "AUDIO_CLOCK",
+    status: "PLANNED",
+    capabilities: [
+      "SCENE",
+      "ENTITY_COMPONENT",
+      "INPUT_ACTIONS",
+      "AUDIO_TIMELINE",
+      "SAVE_STATE",
+      "UI_OVERLAY"
+    ]
+  },
+  {
+    schemaVersion: GAME_RUNTIME_PROFILE_SCHEMA_VERSION2,
+    profileId: GAME_RUNTIME_PROFILE_IDS.ACTION_3D,
+    genre: "ACTION_3D",
+    label: "3D Action",
+    dimension: "3D",
+    executionModel: "CONTINUOUS_PHYSICS",
+    status: "PLANNED",
+    capabilities: [
+      "SCENE",
+      "ENTITY_COMPONENT",
+      "INPUT_ACTIONS",
+      "CAMERA",
+      "PHYSICS_3D",
+      "SAVE_STATE",
+      "SCRIPT_EXTENSION",
+      "UI_OVERLAY"
+    ]
+  },
+  {
+    schemaVersion: GAME_RUNTIME_PROFILE_SCHEMA_VERSION2,
+    profileId: GAME_RUNTIME_PROFILE_IDS.OPEN_WORLD_3D,
+    genre: "OPEN_WORLD_3D",
+    label: "Open World 3D",
+    dimension: "3D",
+    executionModel: "NETWORK_AUTHORITATIVE",
+    status: "PLANNED",
+    capabilities: [
+      "SCENE",
+      "ENTITY_COMPONENT",
+      "INPUT_ACTIONS",
+      "CAMERA",
+      "PHYSICS_3D",
+      "WORLD_STREAMING",
+      "NETWORK_REPLICATION",
+      "SAVE_STATE",
+      "SCRIPT_EXTENSION",
+      "UI_OVERLAY"
+    ]
+  },
+  {
+    schemaVersion: GAME_RUNTIME_PROFILE_SCHEMA_VERSION2,
+    profileId: GAME_RUNTIME_PROFILE_IDS.INTERACTIVE_3D,
+    genre: "INTERACTIVE_3D",
+    label: "Interactive 3D",
+    dimension: "3D",
+    executionModel: "CUSTOM",
+    status: "PLANNED",
+    capabilities: [
+      "SCENE",
+      "ENTITY_COMPONENT",
+      "INPUT_ACTIONS",
+      "CAMERA",
+      "AUDIO_TIMELINE",
+      "UI_OVERLAY",
+      "SCRIPT_EXTENSION"
+    ]
+  }
+]);
+function stable2(value) {
+  return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(value);
+}
+function diagnostic8(code, path, message) {
+  return {
+    code,
+    path,
+    message
+  };
+}
+function validateGameRuntimeProfile(profile) {
+  const diagnostics = [];
+  if (profile.schemaVersion !== GAME_RUNTIME_PROFILE_SCHEMA_VERSION2) {
+    diagnostics.push(diagnostic8("INVALID_PROFILE", "schemaVersion", "Runtime profile schema is unsupported."));
+  }
+  if (!stable2(profile.profileId)) {
+    diagnostics.push(diagnostic8("INVALID_PROFILE", "profileId", "Runtime profile id is not stable."));
+  }
+  if (!profile.label.trim()) {
+    diagnostics.push(diagnostic8("INVALID_PROFILE", "label", "Runtime profile label is required."));
+  }
+  if (profile.genre === "CUSTOM" && profile.profileId.length === 0) {
+    diagnostics.push(diagnostic8("INVALID_PROFILE", "profileId", "Custom runtime profile id is required."));
+  }
+  if (profile.dimension !== "2D" && profile.dimension !== "3D") {
+    diagnostics.push(diagnostic8("INVALID_PROFILE", "dimension", "Runtime profile dimension is unsupported."));
+  }
+  if (!Array.isArray(profile.capabilities) || profile.capabilities.length === 0) {
+    diagnostics.push(diagnostic8("INVALID_PROFILE", "capabilities", "Runtime profile must declare capabilities."));
+  } else if (new Set(profile.capabilities).size !== profile.capabilities.length) {
+    diagnostics.push(diagnostic8("INVALID_PROFILE", "capabilities", "Runtime profile capabilities must be unique."));
+  }
+  if (profile.status !== "AVAILABLE" && profile.status !== "FOUNDATION" && profile.status !== "PLANNED") {
+    diagnostics.push(diagnostic8("INVALID_PROFILE", "status", "Runtime profile status is unsupported."));
+  }
+  return {
+    valid: diagnostics.length === 0,
+    diagnostics
+  };
+}
+function assertProfile(profile) {
+  const validation = validateGameRuntimeProfile(profile);
+  if (!validation.valid) {
+    throw new Error(validation.diagnostics.map((item) => `${item.code}:${item.path}`).join(", "));
+  }
+}
+function freezeProfile(profile) {
+  return Object.freeze({
+    ...profile,
+    capabilities: Object.freeze([
+      ...profile.capabilities
+    ])
+  });
+}
+function createRegistry(profiles) {
+  const byId = /* @__PURE__ */ new Map();
+  for (const profile of profiles) {
+    assertProfile(profile);
+    if (byId.has(profile.profileId)) {
+      throw new Error(`DUPLICATE_PROFILE:${profile.profileId}`);
+    }
+    byId.set(profile.profileId, freezeProfile(profile));
+  }
+  const ordered = Object.freeze([
+    ...byId.values()
+  ]);
+  return {
+    profiles: ordered,
+    resolve(profileId) {
+      return byId.get(profileId);
+    },
+    register(profile) {
+      return createRegistry([
+        ...ordered,
+        profile
+      ]);
+    }
+  };
+}
+var GAME_RUNTIME_PROFILES = createRegistry(BUILT_IN_PROFILES);
+var DEFAULT_GAME_RUNTIME_PROFILE_ID = GAME_RUNTIME_PROFILE_IDS.TOP_DOWN_RPG;
+function assertModule(module) {
+  assertProfile(module.profile);
+  if (!Number.isSafeInteger(module.fixedStepTicks) || module.fixedStepTicks < 1) {
+    throw new Error("Runtime fixed step must be a positive safe integer.");
+  }
+  if (module.profile.status === "PLANNED") {
+    throw new Error(`Runtime profile is not available: ${module.profile.profileId}`);
+  }
+}
+function createGameRuntimeState(input) {
+  assertModule(input.module);
+  return {
+    schemaVersion: GAME_RUNTIME_CORE_SCHEMA_VERSION,
+    profileId: input.module.profile.profileId,
+    journal: input.journal,
+    snapshot: input.snapshot,
+    input: {
+      lastSequence: 0,
+      lastAction: null
+    },
+    runtime: input.module.createInitialRuntime(input.snapshot)
+  };
+}
+function cloneGameRuntimeState(state2, module) {
+  return {
+    ...state2,
+    input: {
+      ...state2.input
+    },
+    runtime: module.cloneRuntime(state2.runtime)
+  };
+}
+function playGameRuntimeState(state2) {
+  return {
+    ...state2,
+    runtime: {
+      ...state2.runtime,
+      mode: "PLAYING"
+    }
+  };
+}
+function stopGameRuntimeState(state2, module) {
+  const stopped = module.stopRuntime === void 0 ? state2.runtime : module.stopRuntime(state2.runtime);
+  return {
+    ...state2,
+    input: {
+      lastSequence: 0,
+      lastAction: null
+    },
+    runtime: {
+      ...stopped,
+      mode: "STOPPED"
+    }
+  };
+}
+function restartGameRuntimeState(state2, module) {
+  const mode = state2.runtime.mode;
+  const initial = module.createInitialRuntime(state2.snapshot);
+  return {
+    ...state2,
+    input: {
+      lastSequence: 0,
+      lastAction: null
+    },
+    runtime: {
+      ...initial,
+      mode
+    }
+  };
+}
+function stepGameRuntimeState(state2, input, module) {
+  if (state2.runtime.mode !== "PLAYING" || !Number.isSafeInteger(input.sequence) || input.sequence <= state2.input.lastSequence || !module.isValidAction(input.action)) return cloneGameRuntimeState(state2, module);
+  const stepped = module.step(state2.snapshot, state2.runtime, input.action);
+  return {
+    ...state2,
+    input: {
+      lastSequence: input.sequence,
+      lastAction: input.action
+    },
+    runtime: {
+      ...stepped,
+      mode: "PLAYING",
+      tick: state2.runtime.tick + module.fixedStepTicks
+    }
+  };
+}
+
+// src/game/game-350/playable-slice.ts
+var GAME351_PLAYABLE_SCHEMA_VERSION = 1;
+var GAME351_FIXED_STEP_TICKS = 1;
+var GAME351_INPUT_ACTIONS = Object.freeze({
+  MOVE_UP: asActionId("rpg.move.up"),
+  MOVE_DOWN: asActionId("rpg.move.down"),
+  MOVE_LEFT: asActionId("rpg.move.left"),
+  MOVE_RIGHT: asActionId("rpg.move.right")
+});
+var GAME351_INTERACT_ACTION = asActionId("rpg.interact");
+var GAME351_TAP_ACTION = asActionId("rpg.tap");
+function freezeDeep(value) {
+  if (value !== null && typeof value === "object" && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    for (const child of Object.values(value)) {
+      freezeDeep(child);
+    }
+  }
+  return value;
+}
+function position(x, y) {
+  return {
+    x,
+    y
+  };
+}
+function clonePosition(value) {
+  return position(value.x, value.y);
+}
+function cellKey(value) {
+  return `${value.x},${value.y}`;
+}
+function defaultMap() {
+  const bounds = {
+    minX: 0,
+    minY: 0,
+    maxX: 7,
+    maxY: 5
+  };
+  const solidCells = [];
+  for (let y = bounds.minY; y <= bounds.maxY; y += 1) {
+    for (let x = bounds.minX; x <= bounds.maxX; x += 1) {
+      if (x === bounds.minX || x === bounds.maxX || y === bounds.minY || y === bounds.maxY || x === 3 && y === 2 || x === 4 && y === 2) {
+        solidCells.push(position(x, y));
+      }
+    }
+  }
+  return freezeDeep({
+    width: bounds.maxX - bounds.minX + 1,
+    height: bounds.maxY - bounds.minY + 1,
+    bounds,
+    solidCells
+  });
+}
+function transform(componentId, x, y) {
+  return {
+    type: "TRANSFORM",
+    componentId: asComponentId(componentId),
+    x,
+    y,
+    rotation: 0,
+    scaleX: 1,
+    scaleY: 1
+  };
+}
+function camera(componentId) {
+  return {
+    type: "CAMERA",
+    componentId: asComponentId(componentId),
+    active: true,
+    zoom: 1
+  };
+}
+function collider(componentId, layer2) {
+  return {
+    type: "COLLIDER",
+    componentId: asComponentId(componentId),
+    shape: "BOX",
+    width: 0.8,
+    height: 0.8,
+    radius: 0.4,
+    isTrigger: false,
+    layer: layer2,
+    enabled: true
+  };
+}
+function rigidbody(componentId, bodyType) {
+  return {
+    type: "RIGIDBODY",
+    componentId: asComponentId(componentId),
+    bodyType,
+    mass: 1,
+    gravityScale: 0,
+    fixedRotation: true,
+    enabled: true
+  };
+}
+function characterController(componentId) {
+  return {
+    type: "CHARACTER_CONTROLLER",
+    componentId: asComponentId(componentId),
+    moveSpeed: 4,
+    stepHeight: 0.25,
+    fixedStep: GAME351_FIXED_STEP_TICKS,
+    enabled: true
+  };
+}
+function tilemap(componentId) {
+  return {
+    type: "TILEMAP",
+    componentId: asComponentId(componentId),
+    mapId: "game351-rpg-map",
+    tileSize: 1,
+    collisionEnabled: true
+  };
+}
+function entity(entityId2, name, components) {
+  return {
+    entityId: asEntityId(entityId2),
+    name,
+    components
+  };
+}
+async function createGame351RpgTemplate(options = {}) {
+  const projectId = asProjectId(options.projectId ?? "game351-rpg-template");
+  const ownerId = asOwnerId(options.ownerId ?? "game351-template-owner");
+  const revisionId = asRevisionId(options.revisionId ?? "game351-rpg-revision-1");
+  const sceneId = asSceneId("game351-rpg-scene");
+  const playerEntityId = asEntityId("game351-rpg-player");
+  const npcEntityId = asEntityId("game351-rpg-npc");
+  const mapEntityId = asEntityId("game351-rpg-map");
+  const cameraEntityId = asEntityId("game351-rpg-camera");
+  const caller = {
+    projectId,
+    ownerId,
+    revisionId
+  };
+  const scene = {
+    sceneId,
+    name: "RPG Main Scene",
+    rootEntityIds: [
+      mapEntityId,
+      playerEntityId,
+      npcEntityId,
+      cameraEntityId
+    ],
+    entities: [
+      entity(String(mapEntityId), "Map", [
+        transform("game351-rpg-map-transform", 0, 0),
+        tilemap("game351-rpg-map-tilemap"),
+        collider("game351-rpg-map-collider", "WORLD")
+      ]),
+      entity(String(playerEntityId), "Player", [
+        transform("game351-rpg-player-transform", 1, 1),
+        collider("game351-rpg-player-collider", "PLAYER"),
+        rigidbody("game351-rpg-player-rigidbody", "DYNAMIC"),
+        characterController("game351-rpg-player-controller")
+      ]),
+      entity(String(npcEntityId), "Guide NPC", [
+        transform("game351-rpg-npc-transform", 5, 3),
+        collider("game351-rpg-npc-collider", "NPC"),
+        rigidbody("game351-rpg-npc-rigidbody", "KINEMATIC")
+      ]),
+      entity(String(cameraEntityId), "Camera", [
+        camera("game351-rpg-camera-component")
+      ])
+    ]
+  };
+  const draft = {
+    schemaVersion: 1,
+    projectId,
+    ownerId,
+    name: options.name ?? "iGAME RPG Playable Slice",
+    revision: {
+      revisionId,
+      projectId,
+      ownerId,
+      sequence: 1
+    },
+    scenes: [
+      scene
+    ],
+    prefabs: [],
+    dependencies: [],
+    behaviors: [],
+    runtimeProfile: {
+      schemaVersion: 1,
+      profileId: DEFAULT_GAME_RUNTIME_PROFILE_ID
+    }
+  };
+  const project = await createGameProject(draft, caller);
+  return {
+    project,
+    caller,
+    sceneId,
+    playerEntityId,
+    npcEntityId,
+    map: defaultMap()
+  };
+}
+function createGame351RpgTemplateFromProject(project) {
+  const profileId = project.runtimeProfile?.profileId ?? DEFAULT_GAME_RUNTIME_PROFILE_ID;
+  if (profileId !== GAME_RUNTIME_PROFILE_IDS.TOP_DOWN_RPG) {
+    throw new Error(`GAME-351 RPG preview does not support runtime profile: ${profileId}`);
+  }
+  const scene = project.scenes.find((candidate) => String(candidate.sceneId).startsWith("scene:pixiedraw-game:")) ?? project.scenes[0];
+  const playerEntityId = asEntityId(`entity:pixieed-game:hero`);
+  const npcEntityId = asEntityId(`entity:pixieed-game:enemy`);
+  if (scene === void 0 || !scene.entities.some((entity2) => entity2.entityId === playerEntityId) || !scene.entities.some((entity2) => entity2.entityId === npcEntityId)) {
+    throw new Error("Studio Game Project does not contain the RPG Player/NPC pair.");
+  }
+  return {
+    project,
+    caller: {
+      projectId: project.projectId,
+      ownerId: project.ownerId,
+      revisionId: project.revision.revisionId
+    },
+    sceneId: scene.sceneId,
+    playerEntityId,
+    npcEntityId,
+    map: defaultMap()
+  };
+}
+function entityTransform(project, sceneId, entityId2) {
+  const scene = project.scenes.find((item) => item.sceneId === sceneId);
+  const target = scene?.entities.find((item) => item.entityId === entityId2);
+  const component = target?.components.find((item) => item.type === "TRANSFORM");
+  if (component === void 0 || !Number.isSafeInteger(component.x) || !Number.isSafeInteger(component.y)) {
+    throw new Error(`Entity ${String(entityId2)} must have an integer Transform.`);
+  }
+  return position(component.x, component.y);
+}
+function inBounds(bounds, value) {
+  return value.x >= bounds.minX && value.x <= bounds.maxX && value.y >= bounds.minY && value.y <= bounds.maxY;
+}
+function validateMap(map) {
+  if (!Number.isSafeInteger(map.width) || !Number.isSafeInteger(map.height) || map.width < 1 || map.height < 1) throw new Error("RPG map dimensions must be positive integers.");
+  if (map.bounds.minX > map.bounds.maxX || map.bounds.minY > map.bounds.maxY) {
+    throw new Error("RPG collision bounds are invalid.");
+  }
+  const seen = /* @__PURE__ */ new Set();
+  for (const cell of map.solidCells) {
+    if (!Number.isSafeInteger(cell.x) || !Number.isSafeInteger(cell.y) || !inBounds(map.bounds, cell)) {
+      throw new Error("RPG solid cells must be integer cells inside collision bounds.");
+    }
+    if (seen.has(cellKey(cell))) {
+      throw new Error(`RPG solid cell is duplicated: ${cellKey(cell)}`);
+    }
+    seen.add(cellKey(cell));
+  }
+}
+function createGame351PlayableSnapshot(template) {
+  const validation = validateGameProject(template.project, template.caller);
+  if (!validation.valid) {
+    throw new Error(`Cannot compile invalid RPG Project: ${validation.diagnostics.map((item) => item.code).join(",")}`);
+  }
+  validateMap(template.map);
+  const scene = template.project.scenes.find((item) => item.sceneId === template.sceneId);
+  if (scene === void 0) {
+    throw new Error(`Scene ${String(template.sceneId)} is not part of the Project.`);
+  }
+  const player = scene.entities.find((item) => item.entityId === template.playerEntityId);
+  const npc = scene.entities.find((item) => item.entityId === template.npcEntityId);
+  if (player === void 0 || npc === void 0) {
+    throw new Error("RPG template must contain Player and NPC entities in its Scene.");
+  }
+  const playerPosition = entityTransform(template.project, template.sceneId, template.playerEntityId);
+  const npcPosition = entityTransform(template.project, template.sceneId, template.npcEntityId);
+  if (!inBounds(template.map.bounds, playerPosition) || !inBounds(template.map.bounds, npcPosition)) throw new Error("RPG actors must start inside collision bounds.");
+  const solid = new Set(template.map.solidCells.map(cellKey));
+  if (solid.has(cellKey(playerPosition)) || solid.has(cellKey(npcPosition))) {
+    throw new Error("RPG actors may not start on solid cells.");
+  }
+  return freezeDeep({
+    schemaVersion: GAME351_PLAYABLE_SCHEMA_VERSION,
+    projectId: template.project.projectId,
+    ownerId: template.project.ownerId,
+    projectRevisionId: template.project.revision.revisionId,
+    projectHash: template.project.revision.snapshotHash,
+    sceneId: template.sceneId,
+    playerEntityId: template.playerEntityId,
+    playerPosition: clonePosition(playerPosition),
+    npcEntityId: template.npcEntityId,
+    npcPosition: clonePosition(npcPosition),
+    collisionBounds: {
+      ...template.map.bounds
+    },
+    solidCells: template.map.solidCells.map((cell) => clonePosition(cell))
+  });
+}
+function createGame351PlayableState(template) {
+  const snapshot = createGame351PlayableSnapshot(template);
+  return createGameRuntimeState({
+    journal: createJournal(template.project, template.caller),
+    snapshot,
+    module: GAME351_RPG_RUNTIME_MODULE
+  });
+}
+function playGame351(state2) {
+  return playGameRuntimeState(state2);
+}
+function stopGame351(state2) {
+  return stopGameRuntimeState(state2, GAME351_RPG_RUNTIME_MODULE);
+}
+function clearGame351Dialogue(state2) {
+  return {
+    ...cloneUnchangedState(state2),
+    runtime: {
+      ...state2.runtime,
+      dialogue: null
+    }
+  };
+}
+function restartGame351(state2) {
+  return restartGameRuntimeState(state2, GAME351_RPG_RUNTIME_MODULE);
+}
+function validAction(value) {
+  return value === null || Object.values(GAME351_INPUT_ACTIONS).includes(value);
+}
+function movement(action) {
+  if (action === GAME351_INPUT_ACTIONS.MOVE_UP) return position(0, -1);
+  if (action === GAME351_INPUT_ACTIONS.MOVE_DOWN) return position(0, 1);
+  if (action === GAME351_INPUT_ACTIONS.MOVE_LEFT) return position(-1, 0);
+  if (action === GAME351_INPUT_ACTIONS.MOVE_RIGHT) return position(1, 0);
+  return position(0, 0);
+}
+var GAME351_RPG_RUNTIME_MODULE = {
+  profile: GAME_RUNTIME_PROFILES.resolve(GAME_RUNTIME_PROFILE_IDS.TOP_DOWN_RPG),
+  fixedStepTicks: GAME351_FIXED_STEP_TICKS,
+  createInitialRuntime(snapshot) {
+    return {
+      mode: "STOPPED",
+      tick: 0,
+      sceneId: snapshot.sceneId,
+      playerPosition: clonePosition(snapshot.playerPosition),
+      npcPosition: clonePosition(snapshot.npcPosition),
+      dialogue: null
+    };
+  },
+  isValidAction(action) {
+    return validAction(action);
+  },
+  step(snapshot, runtime, action) {
+    const delta = movement(action);
+    const candidate = position(runtime.playerPosition.x + delta.x, runtime.playerPosition.y + delta.y);
+    const nextPlayerPosition = canEnterGame351Cell(snapshot, candidate) ? candidate : clonePosition(runtime.playerPosition);
+    return {
+      ...runtime,
+      playerPosition: nextPlayerPosition,
+      npcPosition: clonePosition(runtime.npcPosition)
+    };
+  },
+  cloneRuntime(runtime) {
+    return {
+      ...runtime,
+      playerPosition: clonePosition(runtime.playerPosition),
+      npcPosition: clonePosition(runtime.npcPosition)
+    };
+  },
+  stopRuntime(runtime) {
+    return {
+      ...runtime,
+      dialogue: null
+    };
+  }
+};
+function cloneUnchangedState(state2) {
+  return cloneGameRuntimeState(state2, GAME351_RPG_RUNTIME_MODULE);
+}
+function isAdjacent(left, right) {
+  return Math.abs(left.x - right.x) + Math.abs(left.y - right.y) === 1;
+}
+function triggerGame351Action(state2, actionId, behaviors) {
+  if (state2.runtime.mode !== "PLAYING" || actionId !== String(GAME351_INTERACT_ACTION) && actionId !== String(GAME351_TAP_ACTION) || !isAdjacent(state2.runtime.playerPosition, state2.runtime.npcPosition)) return cloneUnchangedState(state2);
+  for (const behavior of behaviors) {
+    for (const rule of behavior.rules) {
+      if (!rule.enabled || rule.trigger.type !== "ACTION" || rule.trigger.actionId !== actionId) continue;
+      for (const action of rule.actions) {
+        if (action.kind === "SET_VARIABLE" && action.property === "dialogue" && typeof action.value === "string" && action.value.trim().length > 0) {
+          return {
+            ...cloneUnchangedState(state2),
+            runtime: {
+              ...state2.runtime,
+              dialogue: action.value.trim()
+            }
+          };
+        }
+      }
+    }
+  }
+  return cloneUnchangedState(state2);
+}
+function canEnterGame351Cell(snapshot, value) {
+  return inBounds(snapshot.collisionBounds, value) && !new Set(snapshot.solidCells.map(cellKey)).has(cellKey(value)) && cellKey(value) !== cellKey(snapshot.npcPosition);
+}
+function stepGame351(state2, input) {
+  return stepGameRuntimeState(state2, input, GAME351_RPG_RUNTIME_MODULE);
 }
 
 // src/workspace/project-manifest.ts
@@ -12224,8 +13242,8 @@ function loadAdvancedModule() {
 }
 function loadWorkspaceModule() {
   const workspaceMobileProjectionMarker = "20260819-compare-final-1";
-  const workspaceChunkUrl = new URL("wp180-workspace.js?v=20260825-igame-handoff-v77", import.meta.url);
-  workspaceChunkUrl.searchParams.set("v", "20260825-studio-mode-query-v72");
+  const workspaceChunkUrl = new URL("wp180-workspace.js?v=20260825-game-studio-systems-v82", import.meta.url);
+  workspaceChunkUrl.searchParams.set("v", "20260825-game-studio-systems-v82");
   workspaceChunkUrl.searchParams.set("mobile", workspaceMobileProjectionMarker);
   workspaceModulePromise ??= import(workspaceChunkUrl.href);
   return workspaceModulePromise;
@@ -12455,6 +13473,8 @@ var projectDialogNewButton = document.querySelector("#draw2ProjectNew");
 var projectDialogStatusElement = document.querySelector("#draw2ProjectDialogStatus");
 var importPxdInput = document.querySelector("#draw2ImportPxd");
 var gamePreviewStartButton = document.querySelector("#draw2GamePreviewStart");
+var gamePreviewStopButton = document.querySelector("#draw2GamePreviewStop");
+var gamePreviewRestartButton = document.querySelector("#draw2GamePreviewRestart");
 var gamePreviewPinButton = document.querySelector("#draw2GamePreviewPin");
 var gamePreviewReloadButton = document.querySelector("#draw2GamePreviewReload");
 var gamePreviewStatusElement = document.querySelector("#draw2GamePreviewStatus");
@@ -12497,7 +13517,7 @@ var languageElement = document.querySelector("#draw2Language");
 var shortcutsDialogElement = document.querySelector("#draw2ShortcutsDialog");
 var shortcutSearchElement = document.querySelector("#draw2ShortcutSearch");
 var shortcutListElement = document.querySelector("#draw2ShortcutList");
-if (canvasElement === null || overlayElement === null || erasePreviewElement === null || viewportCenterButtonElement === null || pixelGridElement === null || pixelGridMinorPathElement === null || pixelGridMajorPathElement === null || selectionOverlayElement === null || mirrorGuideOverlayElement === null || mirrorGuideVerticalElement === null || mirrorGuideHorizontalElement === null || mirrorGuideDiagonalDownElement === null || mirrorGuideDiagonalUpElement === null || mirrorToggleXElement === null || mirrorToggleYElement === null || mirrorToggleDiagonalDownElement === null || mirrorToggleDiagonalUpElement === null || selectionOverlayRegionsElement === null || statusElement === null || metricsElement === null || selectionStatusElement === null || projectIdInputElement === null || tileSizeSelectElement === null || toolSelectElement === null || brushSizeElement === null || brushPatternElement === null || brushShapeElement === null || brushSizeControlElement === null || quickControlsElement === null || brushOptionsButtonElement === null || brushOptionsSummaryElement === null || brushOptionsFlyoutElement === null || brushOptionsCloseButtonElement === null || brushPresetElement === null || brushPresetNameElement === null || brushPresetSaveButton === null || brushPresetDeleteButton === null || mirrorModeToggleElement === null || viewportContextRailElement === null || similarityControlElement === null || similarityElement === null || similarityValueElement === null || colorSelectionModeElement === null || miniPreviewCanvasElement === null || miniPreviewContainerElement === null || miniPreviewPlayButtonElement === null || miniPreviewReferenceButtonElement === null || miniPreviewReferenceClearButtonElement === null || miniPreviewReferenceInputElement === null || miniPreviewReferenceStatusElement === null || miniPreviewCollapseButtonElement === null || miniPreviewRestoreButtonElement === null || miniPreviewResizeLeftElement === null || miniPreviewResizeBottomElement === null || miniPreviewResizeCornerElement === null || selectionXElement === null || selectionYElement === null || selectionWidthElement === null || selectionHeightElement === null || selectionModeElement === null || selectionExpandButton === null || selectionShrinkButton === null || selectionInvertButton === null || selectionBorderButton === null || transformOperationElement === null || transformDxElement === null || transformDyElement === null || transformFactorElement === null || selectButton === null || commitSelectionButton === null || cancelSelectionButton === null || previewButton === null || commitButton === null || cancelButton === null || flipHorizontalButton === null || flipVerticalButton === null || rotateCCWButton === null || rotateCWButton === null || rotate180Button === null || copyButton === null || cutButton === null || pasteButton === null || undoButton === null || redoButton === null || timelineCardElement === null || timelineContextMenu === null || createButton === null || importPxdInput === null || timelineStatusElement === null || timelineViewportElement === null || timelineSpacerElement === null || timelineWindowElement === null || timelinePropertiesResizeElement === null || timelinePropertiesElement === null || timelinePropertiesBodyElement === null || timelinePropertiesCollapseElement === null || timelineSecondaryControlsElement === null || animationTagNameElement === null || animationTagFromElement === null || animationTagToElement === null || animationTagLoopElement === null || animationTagAddElement === null || animationTagListElement === null || timelineMarkerKindElement === null || timelineMarkerLabelElement === null || timelineMarkerAddElement === null || timelineMarkerListElement === null || linkedCelToggleElement === null || linkedCelStatusElement === null || addFrameButton === null || duplicateFrameButton === null || removeFrameButton === null || addLayerButton === null || reorderLayerButton === null || toggleLayerButton === null || toggleOnionButton === null || togglePlaybackButton === null || onionOptionsElement === null || onionPreviousElement === null || onionPreviousValueElement === null || onionNextElement === null || onionNextValueElement === null || onionOpacityElement === null || onionOpacityValueElement === null || onionColorModeElement === null || playbackFpsElement === null || playbackLoopElement === null || playbackFpsCustomElement === null || colorMapElement === null || paletteWheelElement === null || hueCursorElement === null || svCursorElement === null || colorRElement === null || colorGElement === null || colorBElement === null || colorAlphaElement === null || colorRValueElement === null || colorGValueElement === null || colorBValueElement === null || colorAlphaValueElement === null || colorHexElement === null || colorHexOutputElement === null || colorApplyButton === null || colorEditorStatusElement === null || gamePreviewStartButton === null || gamePreviewPinButton === null || gamePreviewReloadButton === null || gamePreviewStatusElement === null || gamePreviewCanvasElement === null || advancedLoadButton === null || advancedPatternButton === null || advancedStampButton === null || advancedMirrorButton === null || advancedGridButton === null || advancedGuideButton === null || advancedStatusElement === null || languageElement === null || exportPanelStatusElement === null || exportNameElement === null || exportScaleElement === null || exportFormatCardsElement === null || exportSelectionSummaryElement === null || exportFormatOptionsElement === null || exportPackageSectionElement === null || exportPackageSingleElement === null || exportPackageZipElement === null || exportPreviewCanvasElement === null || exportPreviewSummaryElement === null || exportOutputFilesElement === null || exportProgressElement === null || exportProgressBarElement === null || exportProgressPercentElement === null || exportProgressTitleElement === null || exportProgressDetailElement === null || exportProgressCurrentElement === null || exportProgressCountElement === null || exportProgressTrackElement === null || exportExecuteButton === null || exportToMarketButton === null) {
+if (canvasElement === null || overlayElement === null || erasePreviewElement === null || viewportCenterButtonElement === null || pixelGridElement === null || pixelGridMinorPathElement === null || pixelGridMajorPathElement === null || selectionOverlayElement === null || mirrorGuideOverlayElement === null || mirrorGuideVerticalElement === null || mirrorGuideHorizontalElement === null || mirrorGuideDiagonalDownElement === null || mirrorGuideDiagonalUpElement === null || mirrorToggleXElement === null || mirrorToggleYElement === null || mirrorToggleDiagonalDownElement === null || mirrorToggleDiagonalUpElement === null || selectionOverlayRegionsElement === null || statusElement === null || metricsElement === null || selectionStatusElement === null || projectIdInputElement === null || tileSizeSelectElement === null || toolSelectElement === null || brushSizeElement === null || brushPatternElement === null || brushShapeElement === null || brushSizeControlElement === null || quickControlsElement === null || brushOptionsButtonElement === null || brushOptionsSummaryElement === null || brushOptionsFlyoutElement === null || brushOptionsCloseButtonElement === null || brushPresetElement === null || brushPresetNameElement === null || brushPresetSaveButton === null || brushPresetDeleteButton === null || mirrorModeToggleElement === null || viewportContextRailElement === null || similarityControlElement === null || similarityElement === null || similarityValueElement === null || colorSelectionModeElement === null || miniPreviewCanvasElement === null || miniPreviewContainerElement === null || miniPreviewPlayButtonElement === null || miniPreviewReferenceButtonElement === null || miniPreviewReferenceClearButtonElement === null || miniPreviewReferenceInputElement === null || miniPreviewReferenceStatusElement === null || miniPreviewCollapseButtonElement === null || miniPreviewRestoreButtonElement === null || miniPreviewResizeLeftElement === null || miniPreviewResizeBottomElement === null || miniPreviewResizeCornerElement === null || selectionXElement === null || selectionYElement === null || selectionWidthElement === null || selectionHeightElement === null || selectionModeElement === null || selectionExpandButton === null || selectionShrinkButton === null || selectionInvertButton === null || selectionBorderButton === null || transformOperationElement === null || transformDxElement === null || transformDyElement === null || transformFactorElement === null || selectButton === null || commitSelectionButton === null || cancelSelectionButton === null || previewButton === null || commitButton === null || cancelButton === null || flipHorizontalButton === null || flipVerticalButton === null || rotateCCWButton === null || rotateCWButton === null || rotate180Button === null || copyButton === null || cutButton === null || pasteButton === null || undoButton === null || redoButton === null || timelineCardElement === null || timelineContextMenu === null || createButton === null || importPxdInput === null || timelineStatusElement === null || timelineViewportElement === null || timelineSpacerElement === null || timelineWindowElement === null || timelinePropertiesResizeElement === null || timelinePropertiesElement === null || timelinePropertiesBodyElement === null || timelinePropertiesCollapseElement === null || timelineSecondaryControlsElement === null || animationTagNameElement === null || animationTagFromElement === null || animationTagToElement === null || animationTagLoopElement === null || animationTagAddElement === null || animationTagListElement === null || timelineMarkerKindElement === null || timelineMarkerLabelElement === null || timelineMarkerAddElement === null || timelineMarkerListElement === null || linkedCelToggleElement === null || linkedCelStatusElement === null || addFrameButton === null || duplicateFrameButton === null || removeFrameButton === null || addLayerButton === null || reorderLayerButton === null || toggleLayerButton === null || toggleOnionButton === null || togglePlaybackButton === null || onionOptionsElement === null || onionPreviousElement === null || onionPreviousValueElement === null || onionNextElement === null || onionNextValueElement === null || onionOpacityElement === null || onionOpacityValueElement === null || onionColorModeElement === null || playbackFpsElement === null || playbackLoopElement === null || playbackFpsCustomElement === null || colorMapElement === null || paletteWheelElement === null || hueCursorElement === null || svCursorElement === null || colorRElement === null || colorGElement === null || colorBElement === null || colorAlphaElement === null || colorRValueElement === null || colorGValueElement === null || colorBValueElement === null || colorAlphaValueElement === null || colorHexElement === null || colorHexOutputElement === null || colorApplyButton === null || colorEditorStatusElement === null || gamePreviewStartButton === null || gamePreviewStopButton === null || gamePreviewRestartButton === null || gamePreviewPinButton === null || gamePreviewReloadButton === null || gamePreviewStatusElement === null || gamePreviewCanvasElement === null || advancedLoadButton === null || advancedPatternButton === null || advancedStampButton === null || advancedMirrorButton === null || advancedGridButton === null || advancedGuideButton === null || advancedStatusElement === null || languageElement === null || exportPanelStatusElement === null || exportNameElement === null || exportScaleElement === null || exportFormatCardsElement === null || exportSelectionSummaryElement === null || exportFormatOptionsElement === null || exportPackageSectionElement === null || exportPackageSingleElement === null || exportPackageZipElement === null || exportPreviewCanvasElement === null || exportPreviewSummaryElement === null || exportOutputFilesElement === null || exportProgressElement === null || exportProgressBarElement === null || exportProgressPercentElement === null || exportProgressTitleElement === null || exportProgressDetailElement === null || exportProgressCurrentElement === null || exportProgressCountElement === null || exportProgressTrackElement === null || exportExecuteButton === null || exportToMarketButton === null) {
   throw new Error("Draw2 isolated entry is missing a required element.");
 }
 if (canvasSettingsDialogElement === null || canvasSettingsProjectIdElement === null || canvasSettingsWidthElement === null || canvasSettingsHeightElement === null || canvasSettingsTileSizeElement === null || canvasSettingsApplyButton === null || openCanvasSettingsButton === null || openProjectDialogButton === null || projectDialogElement === null || projectDialogIdElement === null || projectDialogOpenButton === null || projectDialogNewButton === null || projectDialogStatusElement === null) {
@@ -12719,6 +13739,8 @@ var copyControl = copyButton;
 var cutControl = cutButton;
 var pasteControl = pasteButton;
 var gamePreviewStartControl = gamePreviewStartButton;
+var gamePreviewStopControl = gamePreviewStopButton;
+var gamePreviewRestartControl = gamePreviewRestartButton;
 var gamePreviewPinControl = gamePreviewPinButton;
 var gamePreviewReloadControl = gamePreviewReloadButton;
 var gamePreviewStatus = gamePreviewStatusElement;
@@ -13100,7 +14122,7 @@ function applyDraw2Locale(nextLocale = draw2Locale, persist = true) {
   if (persist) {
     try {
       window.localStorage.setItem("pixieed:draw2:locale:v1", draw2Locale);
-    } catch {
+    } catch (cause) {
     }
   }
 }
@@ -14979,6 +16001,10 @@ var onionSkinColorMode = "TINTED";
 var onionSkinCache;
 var runtimePreviewSession;
 var game350ProductSession;
+var game351PlayableState;
+var game351Behaviors = [];
+var game351InputSequence = 0;
+var game351PreviewMode = "LIVE";
 var toolOptions = {
   brushSize: 1,
   brushShape: "square",
@@ -15034,6 +16060,13 @@ function nextClientSequence(clientId) {
 function setGamePreviewStatus(message, kind = "ready") {
   gamePreviewStatus.textContent = translateDraw2Text(message, draw2Locale);
   gamePreviewStatus.dataset.state = kind;
+  const normalized = message.toLocaleUpperCase();
+  document.documentElement.dataset.gamePreviewState = kind === "error" ? "error" : normalized.includes("READY") ? "ready" : normalized.includes("STOPPED") ? "stopped" : "idle";
+  window.dispatchEvent(new CustomEvent("draw2:game-preview-state", {
+    detail: {
+      state: document.documentElement.dataset.gamePreviewState
+    }
+  }));
 }
 async function buildLocalDraw2GameProject(mode) {
   const asset = state.assets[state.activeAssetId];
@@ -15146,6 +16179,131 @@ function drawGamePreview(session, asset) {
   }
   gamePreviewContext.putImageData(image, 0, 0);
 }
+function drawGame351Preview(state2, mode) {
+  const { snapshot, runtime } = state2;
+  const cellWidth = gamePreviewCanvas.width / 8;
+  const cellHeight = gamePreviewCanvas.height / 6;
+  gamePreviewContext.clearRect(0, 0, gamePreviewCanvas.width, gamePreviewCanvas.height);
+  gamePreviewContext.fillStyle = "#10233b";
+  gamePreviewContext.fillRect(0, 0, gamePreviewCanvas.width, gamePreviewCanvas.height);
+  gamePreviewContext.fillStyle = "#2d6b52";
+  gamePreviewContext.fillRect(cellWidth, cellHeight, cellWidth * 6, cellHeight * 4);
+  for (const solid of snapshot.solidCells) {
+    gamePreviewContext.fillStyle = solid.x === 0 || solid.y === 0 || solid.x === 7 || solid.y === 5 ? "#25334a" : "#7f4a4a";
+    gamePreviewContext.fillRect(solid.x * cellWidth, solid.y * cellHeight, cellWidth, cellHeight);
+  }
+  gamePreviewContext.strokeStyle = "rgba(220, 237, 255, 0.22)";
+  gamePreviewContext.lineWidth = 1;
+  for (let x = 0; x <= 8; x += 1) {
+    gamePreviewContext.beginPath();
+    gamePreviewContext.moveTo(x * cellWidth + 0.5, 0);
+    gamePreviewContext.lineTo(x * cellWidth + 0.5, gamePreviewCanvas.height);
+    gamePreviewContext.stroke();
+  }
+  for (let y = 0; y <= 6; y += 1) {
+    gamePreviewContext.beginPath();
+    gamePreviewContext.moveTo(0, y * cellHeight + 0.5);
+    gamePreviewContext.lineTo(gamePreviewCanvas.width, y * cellHeight + 0.5);
+    gamePreviewContext.stroke();
+  }
+  const cameraX = Math.max(0, Math.min(6, runtime.playerPosition.x - 3));
+  const cameraY = Math.max(0, Math.min(4, runtime.playerPosition.y - 2));
+  gamePreviewContext.strokeStyle = "#b8e5ff";
+  gamePreviewContext.lineWidth = 1.5;
+  gamePreviewContext.strokeRect(cameraX * cellWidth + 2, cameraY * cellHeight + 2, cellWidth * 6 - 4, cellHeight * 4 - 4);
+  gamePreviewContext.fillStyle = "#f5a04f";
+  gamePreviewContext.fillRect(runtime.npcPosition.x * cellWidth + 4, runtime.npcPosition.y * cellHeight + 3, cellWidth - 8, cellHeight - 6);
+  gamePreviewContext.fillStyle = runtime.mode === "PLAYING" ? "#6bd4ff" : "#7b8fa5";
+  gamePreviewContext.fillRect(runtime.playerPosition.x * cellWidth + 3, runtime.playerPosition.y * cellHeight + 2, cellWidth - 6, cellHeight - 4);
+  if (runtime.dialogue !== null) {
+    gamePreviewContext.fillStyle = "rgba(8, 14, 25, 0.92)";
+    gamePreviewContext.fillRect(4, gamePreviewCanvas.height - 25, 152, 21);
+    gamePreviewContext.strokeStyle = "#f5d18b";
+    gamePreviewContext.strokeRect(4.5, gamePreviewCanvas.height - 24.5, 151, 20);
+    gamePreviewContext.fillStyle = "#fff2cc";
+    gamePreviewContext.font = "7px sans-serif";
+    gamePreviewContext.fillText(runtime.dialogue.slice(0, 38), 8, gamePreviewCanvas.height - 11);
+  }
+  delete gamePreviewCanvas.dataset.game351Error;
+  gamePreviewCanvas.dataset.game351Mode = runtime.mode;
+  gamePreviewCanvas.dataset.game351Player = `${runtime.playerPosition.x},${runtime.playerPosition.y}`;
+  gamePreviewCanvas.dataset.game351Tick = String(runtime.tick);
+  gamePreviewCanvas.dataset.game351Dialogue = runtime.dialogue ?? "";
+  setGamePreviewStatus(`Runtime ${runtime.mode === "PLAYING" ? "READY" : "STOPPED"} \xB7 GAME-351 RPG \xB7 ${mode} \xB7 tick=${runtime.tick} \xB7 Player ${runtime.playerPosition.x},${runtime.playerPosition.y} \xB7 Camera follow${runtime.dialogue === null ? "" : " \xB7 dialogue"}`);
+}
+async function startGame351Preview(mode) {
+  game351PreviewMode = mode;
+  const workspace = getWorkspacePxdBridge();
+  await workspace.preparePixyncGameState?.();
+  const project = workspace.gameCurrentProject?.();
+  let template;
+  let playable;
+  try {
+    template = project === void 0 ? await createGame351RpgTemplate({
+      projectId: state.projectId,
+      ownerId: "draw2-local-owner",
+      revisionId: "game351-preview-revision"
+    }) : createGame351RpgTemplateFromProject(project);
+    playable = createGame351PlayableState(template);
+  } catch {
+    template = await createGame351RpgTemplate({
+      projectId: project?.projectId ?? state.projectId,
+      ownerId: project?.ownerId ?? "draw2-local-owner",
+      revisionId: project?.revision.revisionId ?? "game351-preview-revision"
+    });
+    playable = createGame351PlayableState(template);
+  }
+  if (playable === void 0) {
+    throw new Error("GAME-351 preview state could not be created.");
+  }
+  game351PlayableState = playGame351(playable);
+  game351InputSequence = 0;
+  game351Behaviors = project?.behaviors ?? [];
+  drawGame351Preview(game351PlayableState, mode);
+  if (typeof workspace.refreshSite400IGameRoute === "function") {
+    await workspace.refreshSite400IGameRoute("open");
+  }
+}
+function game351ActionForKey(key) {
+  if (key === "ArrowUp" || key.toLowerCase() === "w") {
+    return GAME351_INPUT_ACTIONS.MOVE_UP;
+  }
+  if (key === "ArrowDown" || key.toLowerCase() === "s") {
+    return GAME351_INPUT_ACTIONS.MOVE_DOWN;
+  }
+  if (key === "ArrowLeft" || key.toLowerCase() === "a") {
+    return GAME351_INPUT_ACTIONS.MOVE_LEFT;
+  }
+  if (key === "ArrowRight" || key.toLowerCase() === "d") {
+    return GAME351_INPUT_ACTIONS.MOVE_RIGHT;
+  }
+  return void 0;
+}
+function handleGame351PreviewKey(event) {
+  const current = game351PlayableState;
+  if (current === void 0) return;
+  if (event.key === "Escape") {
+    event.preventDefault();
+    game351PlayableState = clearGame351Dialogue(current);
+    drawGame351Preview(game351PlayableState, game351PreviewMode);
+    return;
+  }
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    game351PlayableState = triggerGame351Action(current, String(GAME351_INTERACT_ACTION), game351Behaviors);
+    drawGame351Preview(game351PlayableState, game351PreviewMode);
+    return;
+  }
+  const action = game351ActionForKey(event.key);
+  if (action === void 0) return;
+  event.preventDefault();
+  game351InputSequence = Math.max(game351InputSequence + 1, current.input.lastSequence + 1);
+  game351PlayableState = stepGame351(current, {
+    sequence: game351InputSequence,
+    action
+  });
+  drawGame351Preview(game351PlayableState, game351PreviewMode);
+}
 async function startGamePreview(mode = "LIVE") {
   try {
     const boundary = await buildLocalDraw2GameProject(mode);
@@ -15199,6 +16357,13 @@ async function startGamePreview(mode = "LIVE") {
     gamePreviewPinControl.disabled = false;
     gamePreviewReloadControl.disabled = false;
     setGamePreviewStatus(`Runtime READY \xB7 ${mode} \xB7 tick=${runtimePreviewSession.world.tick}`);
+    try {
+      await startGame351Preview(mode);
+    } catch (cause) {
+      game351PlayableState = void 0;
+      game351Behaviors = [];
+      gamePreviewCanvas.dataset.game351Error = cause instanceof Error ? cause.message : "preview-unavailable";
+    }
   } catch (cause) {
     setGamePreviewStatus(cause instanceof Error ? cause.message : "Runtime preview failed.", "error");
   }
@@ -17804,16 +18969,16 @@ function compositeRegion(region, frameId = timelineSession.activeFrameId, previe
   const image = canonicalContext.createImageData(region.width, region.height);
   const orderedLayers = state.timeline.layerTrackOrder.map((layerTrackId) => state.layers.find((item) => item.layerTrackId === layerTrackId)).filter((item) => item !== void 0 && item.visible && item.opacity > 0);
   for (const layer2 of orderedLayers) {
-    const tilemap = layer2.kind === "TILEMAP" ? state.tilemaps?.[tilemapIdFor(layer2.layerTrackId, frameId)] : void 0;
-    const cel2 = state.cels.find((item) => item.layerTrackId === layer2.layerTrackId && item.frameId === frameId && item.lifecycle === "ACTIVE" && (item.assetId !== void 0 || tilemap !== void 0));
+    const tilemap2 = layer2.kind === "TILEMAP" ? state.tilemaps?.[tilemapIdFor(layer2.layerTrackId, frameId)] : void 0;
+    const cel2 = state.cels.find((item) => item.layerTrackId === layer2.layerTrackId && item.frameId === frameId && item.lifecycle === "ACTIVE" && (item.assetId !== void 0 || tilemap2 !== void 0));
     const source = cel2?.assetId === void 0 ? void 0 : state.assets[cel2.assetId];
-    if (source === void 0 && tilemap === void 0) continue;
+    if (source === void 0 && tilemap2 === void 0) continue;
     const pixels = source === void 0 ? void 0 : source.raster.readRegion(region.x, region.y, region.width, region.height).pixels;
     const pixelCount = region.width * region.height;
     for (let index = 0; index < pixelCount; index += 1) {
       const globalX = region.x + index % region.width;
       const globalY = region.y + Math.floor(index / region.width);
-      const tilePixel = tilemap === void 0 ? void 0 : tilemapSourcePixel(tilemap, globalX, globalY);
+      const tilePixel = tilemap2 === void 0 ? void 0 : tilemapSourcePixel(tilemap2, globalX, globalY);
       const sourceAsset = tilePixel?.asset ?? source;
       const sourceColorIndex = tilePixel?.colorIndex ?? pixels?.[index];
       if (sourceAsset === void 0 || sourceColorIndex === void 0) continue;
@@ -19792,8 +20957,8 @@ async function importPxdFile(file) {
         game: imported.game
       };
     } else {
-      const diagnostic8 = inspection.diagnostics[0];
-      throw new Error(diagnostic8?.message ?? "PXD format could not be identified.");
+      const diagnostic9 = inspection.diagnostics[0];
+      throw new Error(diagnostic9?.message ?? "PXD format could not be identified.");
     }
     flushDrawPersistence();
     await flushDrawPersistence();
@@ -20995,18 +22160,18 @@ function beginSelectionDrag(event, point) {
   transformOperation.value = "MOVE";
   transformDx.value = "0";
   transformDy.value = "0";
-  const transform = {
+  const transform2 = {
     ...currentTransform(),
     operation: "MOVE"
   };
   if (duplicate) {
     clipboard = createClipboardPayload(state, currentSelection, "draw2-selection-alt-drag");
     pasteMode = true;
-    transformSession = createClipboardPasteSession(state, clipboard, transform, `paste-drag-${state.projectId}-${currentSelection.mask.selectionVersion}-0-0`);
+    transformSession = createClipboardPasteSession(state, clipboard, transform2, `paste-drag-${state.projectId}-${currentSelection.mask.selectionVersion}-0-0`);
     transformPreview = previewClipboardPaste(state, clipboard, transformSession);
   } else {
     pasteMode = false;
-    transformSession = createTransformSession(currentSelection, transform, `transform-drag-${state.projectId}-${currentSelection.mask.selectionVersion}-0-0`);
+    transformSession = createTransformSession(currentSelection, transform2, `transform-drag-${state.projectId}-${currentSelection.mask.selectionVersion}-0-0`);
     transformPreview = previewTransform(currentSelection, transformSession);
   }
   syncWorkspaceEditCommandState();
@@ -21039,7 +22204,7 @@ function updateSelectionDragPreview(point) {
   transformOperation.value = "MOVE";
   transformDx.value = String(dx);
   transformDy.value = String(dy);
-  const transform = {
+  const transform2 = {
     ...currentTransform(),
     operation: "MOVE",
     dx,
@@ -21047,11 +22212,11 @@ function updateSelectionDragPreview(point) {
   };
   if (selectionDrag.duplicate && clipboard !== void 0) {
     pasteMode = true;
-    transformSession = createClipboardPasteSession(state, clipboard, transform, `paste-drag-${state.projectId}-${selection.mask.selectionVersion}-${dx}-${dy}`);
+    transformSession = createClipboardPasteSession(state, clipboard, transform2, `paste-drag-${state.projectId}-${selection.mask.selectionVersion}-${dx}-${dy}`);
     transformPreview = previewClipboardPaste(state, clipboard, transformSession);
   } else {
     pasteMode = false;
-    transformSession = createTransformSession(selection, transform, `transform-drag-${state.projectId}-${selection.mask.selectionVersion}-${dx}-${dy}`);
+    transformSession = createTransformSession(selection, transform2, `transform-drag-${state.projectId}-${selection.mask.selectionVersion}-${dx}-${dy}`);
   }
   if (!selectionDrag.duplicate || clipboard === void 0) {
     transformPreview = previewTransform(selection, transformSession);
@@ -22880,11 +24045,31 @@ colorMap.addEventListener("keyup", (event) => {
 gamePreviewStartControl.addEventListener("click", () => {
   void startGamePreview("LIVE");
 });
+gamePreviewStopControl.addEventListener("click", () => {
+  if (game351PlayableState === void 0) return;
+  game351PlayableState = stopGame351(game351PlayableState);
+  drawGame351Preview(game351PlayableState, game351PreviewMode);
+});
+gamePreviewRestartControl.addEventListener("click", () => {
+  if (game351PlayableState === void 0) {
+    void startGamePreview("LIVE");
+    return;
+  }
+  game351PlayableState = restartGame351(game351PlayableState);
+  drawGame351Preview(game351PlayableState, game351PreviewMode);
+});
 gamePreviewReloadControl.addEventListener("click", () => {
   void startGamePreview("LIVE");
 });
 gamePreviewPinControl.addEventListener("click", () => {
   void startGamePreview("PINNED");
+});
+gamePreviewCanvas.addEventListener("keydown", handleGame351PreviewKey);
+gamePreviewCanvas.addEventListener("click", () => {
+  gamePreviewCanvas.focus();
+  if (game351PlayableState === void 0) return;
+  game351PlayableState = triggerGame351Action(game351PlayableState, String(GAME351_TAP_ACTION), game351Behaviors);
+  drawGame351Preview(game351PlayableState, game351PreviewMode);
 });
 var advancedModule;
 var advancedOverlayState;

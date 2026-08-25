@@ -110,6 +110,7 @@ export interface AddComponentCommand extends Game350EditorCommandBase {
 
 export interface BindAssetCommand extends Game350EditorCommandBase {
   readonly type: "BIND_ASSET";
+  /** Binds a Draw/Audio reference; it never carries source bytes or edits. */
   readonly sceneId: Scene["sceneId"];
   readonly entityId: Entity["entityId"];
   readonly componentId: Component["componentId"];
