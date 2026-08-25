@@ -424,6 +424,11 @@ body.draw2-home-body > .draw2-home--legacy {
   background: #080e1b;
 }
 
+.home-shell-v2__workspace-preview--flow {
+  grid-template-rows: 30px minmax(0, 1fr);
+  background: #080e1b;
+}
+
 .home-shell-v2__preview-toolbar,
 .home-shell-v2__preview-timeline {
   display: flex;
@@ -468,6 +473,215 @@ body.draw2-home-body > .draw2-home--legacy {
   height: 5px;
   border-radius: 999px;
   background: rgba(148, 163, 184, .22);
+}
+
+.home-shell-v2__preview-flow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 22px minmax(0, 1fr) 22px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 0;
+  padding: clamp(14px, 2.5vw, 28px);
+  background: radial-gradient(circle at 50% 18%, rgba(114, 230, 213, .08), transparent 48%), #080e1b;
+}
+
+.home-shell-v2__flow-stage {
+  --flow-accent: #72e6d5;
+  --flow-soft: rgba(114, 230, 213, .12);
+  display: grid;
+  grid-template-rows: auto minmax(88px, 1fr) auto;
+  gap: 8px;
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid color-mix(in srgb, var(--flow-accent) 35%, rgba(148, 163, 184, .2));
+  border-radius: 10px;
+  background: linear-gradient(180deg, var(--flow-soft), rgba(8, 14, 27, .75));
+}
+
+.home-shell-v2__flow-stage--audio {
+  --flow-accent: #c28bff;
+  --flow-soft: rgba(194, 139, 255, .12);
+}
+
+.home-shell-v2__flow-stage--game {
+  --flow-accent: #f4cc76;
+  --flow-soft: rgba(244, 204, 118, .12);
+}
+
+.home-shell-v2__flow-stage header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px;
+  min-width: 0;
+  color: var(--flow-accent);
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: .08em;
+}
+
+.home-shell-v2__flow-stage header span {
+  color: #8c9bb0;
+  font-variant-numeric: tabular-nums;
+}
+
+.home-shell-v2__flow-stage small {
+  overflow: hidden;
+  color: #aab7c9;
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-shell-v2__flow-art {
+  position: relative;
+  min-width: 0;
+  min-height: 88px;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, .16);
+  border-radius: 7px;
+  background: #0b1423;
+}
+
+.home-shell-v2__screenshot .home-shell-v2__flow-art img {
+  display: block;
+  position: absolute;
+  z-index: 2;
+  width: clamp(45px, 7vw, 72px);
+  height: clamp(45px, 7vw, 72px);
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.home-shell-v2__flow-art--draw img {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(1.08);
+}
+
+.home-shell-v2__flow-grid {
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(rgba(114, 230, 213, .12) 1px, transparent 1px), linear-gradient(90deg, rgba(114, 230, 213, .12) 1px, transparent 1px);
+  background-size: 12px 12px;
+}
+
+.home-shell-v2__flow-cursor {
+  position: absolute;
+  right: 17%;
+  bottom: 20%;
+  z-index: 3;
+  width: 11px;
+  height: 15px;
+  border: 2px solid #f8fbff;
+  border-top: 0;
+  border-left: 0;
+  transform: rotate(-35deg);
+}
+
+.home-shell-v2__flow-art--audio {
+  display: grid;
+  place-items: center;
+  background: linear-gradient(160deg, rgba(194, 139, 255, .18), #0b1423 58%);
+}
+
+.home-shell-v2__flow-art--audio img {
+  bottom: 9%;
+  left: 10%;
+  width: clamp(29px, 4vw, 44px);
+  height: clamp(29px, 4vw, 44px);
+  opacity: .9;
+}
+
+.home-shell-v2__flow-wave {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  width: 62%;
+  height: 46%;
+}
+
+.home-shell-v2__flow-wave i {
+  flex: 1 1 0;
+  min-width: 2px;
+  height: 35%;
+  border-radius: 999px;
+  background: #c28bff;
+  opacity: .85;
+}
+
+.home-shell-v2__flow-wave i:nth-child(2),
+.home-shell-v2__flow-wave i:nth-child(6) { height: 72%; }
+.home-shell-v2__flow-wave i:nth-child(3),
+.home-shell-v2__flow-wave i:nth-child(5) { height: 100%; }
+.home-shell-v2__flow-wave i:nth-child(4) { height: 56%; }
+
+.home-shell-v2__flow-note {
+  position: absolute;
+  color: #f3ddff;
+  font-size: 17px;
+  font-weight: 850;
+}
+
+.home-shell-v2__flow-note--one { top: 12%; right: 18%; }
+.home-shell-v2__flow-note--two { top: 30%; right: 8%; font-size: 12px; }
+
+.home-shell-v2__flow-art--game {
+  background: linear-gradient(180deg, #152b47 0 68%, #1b2e32 68% 100%);
+}
+
+.home-shell-v2__flow-sky {
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(rgba(244, 204, 118, .08) 1px, transparent 1px), linear-gradient(90deg, rgba(244, 204, 118, .08) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+
+.home-shell-v2__flow-art--game img {
+  bottom: 11%;
+  left: 19%;
+}
+
+.home-shell-v2__flow-ground {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 17%;
+  border-top: 2px solid #f4cc76;
+  background: repeating-linear-gradient(90deg, #304b3a 0 13px, #24392f 13px 22px);
+}
+
+.home-shell-v2__flow-play {
+  position: absolute;
+  top: 10%;
+  right: 10%;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid rgba(244, 204, 118, .55);
+  border-radius: 50%;
+  color: #07101e;
+  background: #f4cc76;
+  font-size: 8px;
+  font-style: normal;
+}
+
+.home-shell-v2__flow-connector {
+  display: grid;
+  place-items: center;
+  color: #8e9bb0;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.home-shell-v2__flow-connector span {
+  display: block;
+  transform: translateY(-2px);
 }
 
 .home-shell-v2__preview-body {
@@ -1278,6 +1492,33 @@ body.draw2-home-body .bottom-nav {
 
   .home-shell-v2__hero-visual {
     padding-inline: 4px;
+  }
+
+  .home-shell-v2__preview-flow {
+    grid-template-columns: minmax(0, 1fr) 15px minmax(0, 1fr) 15px minmax(0, 1fr);
+    gap: 3px;
+    padding: 12px 9px;
+  }
+
+  .home-shell-v2__flow-stage {
+    grid-template-rows: auto minmax(72px, 1fr) auto;
+    gap: 5px;
+    padding: 7px;
+    border-radius: 8px;
+  }
+
+  .home-shell-v2__flow-art {
+    min-height: 72px;
+    border-radius: 6px;
+  }
+
+  .home-shell-v2__flow-stage header,
+  .home-shell-v2__flow-stage small {
+    font-size: 6px;
+  }
+
+  .home-shell-v2__flow-connector {
+    font-size: 13px;
   }
 
   .home-shell-v2__screenshot--hero {

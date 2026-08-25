@@ -24,7 +24,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="site/landing.css?v=2026.07.19-home-centered3">
-    <link rel="stylesheet" href="site/home-shell.css?v=20260824-home-shell4">
+    <link rel="stylesheet" href="site/home-shell.css?v=20260825-home-flow1">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -93,10 +93,27 @@
       <div class="home-shell-v2__hero-visual">
         <figure class="home-shell-v2__screenshot home-shell-v2__screenshot--hero">
           <div class="home-shell-v2__window-bar"><span></span><span></span><span></span><small>PiXiEEDstudio</small></div>
-          <div class="home-shell-v2__workspace-preview" role="img" aria-label="PiXiEEDstudioの制作ワークスペース。キャンバス、カラーパレット、タイムラインを表示">
+          <div class="home-shell-v2__workspace-preview home-shell-v2__workspace-preview--flow" role="img" aria-label="iDRAWでドット絵を描き、iAUDIOで音を重ね、iGAMEで遊べる作品にする流れ" data-i18n-aria-label="homePreviewAria">
             <div class="home-shell-v2__preview-toolbar"><span class="home-shell-v2__preview-brand">STUDIO</span><span class="home-shell-v2__preview-mode is-active">iDRAW</span><span class="home-shell-v2__preview-mode">iAUDIO</span><span class="home-shell-v2__preview-mode">iGAME</span><span class="home-shell-v2__preview-spacer"></span><i></i><i></i></div>
-            <div class="home-shell-v2__preview-body"><div class="home-shell-v2__preview-tools"><b></b><b></b><b></b><b class="is-active"></b><b></b><b></b></div><div class="home-shell-v2__preview-canvas"><span class="home-shell-v2__pixel-art" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></div><aside class="home-shell-v2__preview-panel"><span></span><span></span><span></span><div></div><div></div></aside></div>
-            <div class="home-shell-v2__preview-timeline"><span>ANIMATION</span><i></i><i></i><i></i><i></i><i></i><i></i><b></b></div>
+            <div class="home-shell-v2__preview-flow">
+              <article class="home-shell-v2__flow-stage home-shell-v2__flow-stage--draw">
+                <header><span>01</span><strong data-i18n-key="homePreviewDraw">iDRAW</strong></header>
+                <div class="home-shell-v2__flow-art home-shell-v2__flow-art--draw"><span class="home-shell-v2__flow-grid" aria-hidden="true"></span><img src="character-dots/mao1.png" width="16" height="16" alt=""><i class="home-shell-v2__flow-cursor" aria-hidden="true"></i></div>
+                <small data-i18n-key="homePreviewDrawCopy">PIXEL ART</small>
+              </article>
+              <div class="home-shell-v2__flow-connector" aria-hidden="true"><span>→</span></div>
+              <article class="home-shell-v2__flow-stage home-shell-v2__flow-stage--audio">
+                <header><span>02</span><strong data-i18n-key="homePreviewAudio">iAUDIO</strong></header>
+                <div class="home-shell-v2__flow-art home-shell-v2__flow-art--audio"><img src="character-dots/mao1.png" width="16" height="16" alt=""><span class="home-shell-v2__flow-note home-shell-v2__flow-note--one">♪</span><span class="home-shell-v2__flow-note home-shell-v2__flow-note--two">♫</span><span class="home-shell-v2__flow-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></div>
+                <small data-i18n-key="homePreviewAudioCopy">BGM + SE</small>
+              </article>
+              <div class="home-shell-v2__flow-connector" aria-hidden="true"><span>→</span></div>
+              <article class="home-shell-v2__flow-stage home-shell-v2__flow-stage--game">
+                <header><span>03</span><strong data-i18n-key="homePreviewGame">iGAME</strong></header>
+                <div class="home-shell-v2__flow-art home-shell-v2__flow-art--game"><span class="home-shell-v2__flow-sky" aria-hidden="true"></span><img src="character-dots/mao1.png" width="16" height="16" alt=""><span class="home-shell-v2__flow-ground" aria-hidden="true"></span><i class="home-shell-v2__flow-play" aria-hidden="true">▶</i></div>
+                <small data-i18n-key="homePreviewGameCopy">PLAYABLE WORLD</small>
+              </article>
+            </div>
           </div>
           <figcaption><span>PiXiEEDstudio</span><span>iDRAW / ANIMATION</span></figcaption>
         </figure>
