@@ -40,6 +40,11 @@
           <div class="market-card__badges" id="itemBadges"></div>
           <div class="market-item__social"><a id="itemAuthor" href="#">作者: モケモ</a><div class="market-item__social-actions"><button class="market-item__share-button" id="itemShare" type="button" aria-label="この商品のURLをコピー">URLをコピー</button><button class="market-favorite-button" id="itemFavorite" type="button" aria-pressed="false" aria-label="お気に入りに追加">♡</button></div></div>
           <h2 id="itemTitle">16x16OtegoroEffects1</h2>
+          <section class="market-price-equation market-item-price-equation" aria-label="販売価格">
+            <div class="market-price-part is-total"><span>販売価格</span><strong id="itemPrice">500円</strong></div>
+          </section>
+          <button class="market-purchase-button" id="itemPurchase" type="button" disabled>購入状態を確認しています</button>
+          <p class="helper" id="itemPurchaseStatus" aria-live="polite">購入状態を確認しています。</p>
           <p id="itemDescription" class="market-item__description">■商品説明
 16×16pxで描かれたエフェクトのアニメーションセットです。
 ゲーム開発向けに描いており、それぞれ特別でかわいいものをご用意しています！
@@ -74,9 +79,6 @@
 
 ■更新内容
 なし</p>
-          <section class="market-price-equation market-item-price-equation" aria-label="販売価格">
-            <div class="market-price-part is-total"><span>販売価格</span><strong id="itemPrice">500円</strong></div>
-          </section>
           <dl class="market-item__facts">
             <div><dt>商品種類</dt><dd id="itemProductType">一般素材（画像・アニメーション）</dd></div>
             <div><dt><span class="market-heading-with-help">収録形式<span class="market-help-tip" data-market-help><button class="market-help-tip__button" type="button" aria-label="収録形式について" aria-describedby="itemFormatHelp" aria-expanded="false">?</button><span class="market-help-tip__content" id="itemFormatHelp" role="tooltip">購入後に受け取れるファイル形式です。利用するソフトや制作環境で開ける形式か確認してください。</span></span></span></dt><dd id="itemFormats">PNG / GIF</dd></div>
@@ -95,8 +97,6 @@
             <ol class="market-payment-steps"><li>内容と金額を確認</li><li>Stripeで支払う</li><li>マイページで受取</li></ol>
             <small>表示された販売価格を、すべてStripeで決済します。</small>
           </section>
-          <button class="market-purchase-button" id="itemPurchase" type="button" disabled>購入状態を確認しています</button>
-          <p class="helper" id="itemPurchaseStatus" aria-live="polite">購入状態を確認しています。</p>
         </section>
       </article>
       <aside class="market-ad market-ad--detail" id="marketItemAd" data-market-ad-slot="9279466474" aria-label="広告" hidden>
