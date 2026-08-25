@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "workPackage": "WP-130",
+  "title": "PiXiEEDraw2 Layers, Frames, Cels, Timeline, Onion Skin, and Playback boundary",
+  "status": "COMPLETE_ISOLATED_REFERENCE",
+  "measuredAt": "2026-08-08",
+  "scope": {
+    "entry": "pixiedraw2/",
+    "featureFlagDefault": "off",
+    "publicNavigation": "unchanged",
+    "productionRoutes": "unchanged",
+    "productionData": "unchanged",
+    "persistenceAndTransport": "adapter_seam_only",
+    "formalPerformanceGate": "UNTESTED"
+  },
+  "canonicalModel": {
+    "identities": ["projectId", "timelineId", "frameId", "layerTrackId", "celId", "assetId"],
+    "indexIsIdentity": false,
+    "layerTrackMetadata": ["name", "visibility", "opacity", "blendMode", "locked", "lifecycle", "orderingKey"],
+    "frameMetadata": ["durationMs", "timingUnit", "orderKey", "metadataVersion", "celBindings"],
+    "celMetadata": ["frameId", "layerTrackId", "bindingMode", "assetId", "recordVersion", "lifecycle"],
+    "bindingModes": ["EMPTY", "RASTER", "DUPLICATE_INDEPENDENT", "SHARED_REFERENCE", "LINKED_HELD_CANDIDATE"],
+    "duplicateRasterPolicy": "shared_backing_then_affected_tile_cow",
+    "emptyCelRasterAllocation": false
+  },
+  "commands": {
+    "layer": ["add", "remove", "duplicate", "reorder", "rename", "visibility", "opacity", "lock"],
+    "frame": ["add", "remove", "duplicate", "reorder", "duration"],
+    "cel": ["create", "clear", "replace"],
+    "validation": ["stable_id", "unknown_id", "duplicate_id", "stale_epoch", "duplicate_command", "sequence_gap", "invalid_order", "invalid_duration", "remove_last", "wrong_asset", "empty_with_raster"],
+    "dirtyDomains": ["RASTER_DIRTY", "COMPOSITE_DIRTY", "TIMELINE_STRUCTURE_DIRTY", "TIMELINE_CELL_DIRTY", "LAYER_METADATA_DIRTY", "ONION_SKIN_DIRTY"],
+    "syncEnvelope": {"transport": "ACTIVE_SYNC", "snapshotIncluded": false, "uiSessionStateSync": false}
+  },
+  "fixtures": [
+    {"id": "A-256-12x60", "canvas": "256x256", "layers": 12, "frames": 60},
+    {"id": "B-512-20x120", "canvas": "512x512", "layers": 20, "frames": 120},
+    {"id": "C-1000-frame", "canvas": "256x256", "layers": 1, "frames": 1000},
+    {"id": "D-100-layer", "canvas": "256x256", "layers": 100, "frames": 60}
+  ],
+  "benchmarkObservations": {
+    "duplicateFrame": {"copiedBytes": 0, "cowSplitCount": 0, "fullRasterCloneCount": 0, "allocatedRasterTileBytesBefore": 1024, "allocatedRasterTileBytesAfterDuplicate": 1024},
+    "editedDuplicate": {"copiedBytes": 1024, "cowSplitCount": 1, "dirtyTileCount": 1, "independentRasterAsset": true},
+    "1000FrameWindow": {"framesAfterFixture": 1002, "visibleFrameCount": 15, "visibleLayerTrackCount": 2, "timelineProjectionWindowCount": 15, "allocatedRasterTileBytes": 1024},
+    "100LayerWindow": {"layersAfterFixture": 101, "visibleLayerTrackCount": 13, "timelineProjectionWindowCount": 15}
+  },
+  "strokeFinalization": {
+    "status": "MEASURED_LOCAL_SYNTHETIC_REFERENCE",
+    "algorithm": "BRESENHAM_DETERMINISTIC",
+    "fixtures": ["horizontalFast", "verticalFast", "diagonalFast", "steepDiagonal", "reverseDirection", "canvasEdge", "repeatedCoordinate", "eraserContinuous"],
+    "horizontalFast": {"inputPointCount": 2, "interpolatedPixelCount": 29, "touchedTileCount": 1, "dirtyTileCount": 1, "dirtyRegionCount": 1, "unrelatedFrameCount": 2, "unrelatedLayerCount": 1, "canonicalOperationCount": 1, "fullRasterCloneCount": 0},
+    "canvasEdge": {"inputPointCount": 2, "interpolatedPixelCount": 64, "touchedTileCount": 2, "dirtyTileCount": 2, "dirtyRegionCount": 1, "canonicalOperationCount": 1, "fullRasterCloneCount": 0},
+    "eraserContinuous": {"inputPointCount": 2, "interpolatedPixelCount": 29, "touchedTileCount": 1, "dirtyTileCount": 1, "dirtyRegionCount": 1, "cowSplitCount": 1, "canonicalOperationCount": 1},
+    "undoAtomicity": true,
+    "pointerCaptureOutsideCanvas": "implemented_and_browser_stroke_checked; leave_boundary_runtime_unverified",
+    "coalescedEvents": "optional",
+    "formalDeviceCoverage": "UNTESTED"
+  },
+  "bundle": {
+    "sourceBytes": {"draw2-core.ts": 42406, "draw2-selection.ts": 38734, "draw2-timeline.ts": 41028, "draw2-entry.ts": 34997, "total": 157165},
+    "rawBytes": 121056,
+    "minifiedBytes": 69636,
+    "rawGzipBytes": 23156,
+    "rawBrotliBytes": 19580,
+    "minifiedGzipBytes": 18262,
+    "minifiedBrotliBytes": 15844,
+    "cssBytes": 7576,
+    "lazyChunks": [],
+    "status": "MEASURED_LOCAL_BUILD_NOT_DEVICE_GATE",
+    "wp110ComparableBaseline": {"rawBytes": 33723, "minifiedBytes": 18891, "gzipBytes": 8306, "brotliBytes": 7305, "comparisonDefinition": "same local compression script and entry measurement policy"}
+  },
+  "browser": {
+    "viewports": ["390x844", "1280x900"],
+    "passed": ["flag_off", "noindex", "horizontal_overflow_absent", "frame_add_duplicate_remove", "frame_selection", "layer_add_select_reorder_visibility", "keyboard_enter", "timeline_internal_scroll", "virtual_window_rendered_subset", "onion_toggle_projection_only", "accessible_names", "aria_selected_and_pressed", "native_focusable_controls"],
+    "pageErrors": 0,
+    "formalDeviceCoverage": "UNTESTED"
+  },
+  "files": {
+    "implementation": ["pixiedraw2/src/draw2-core.ts", "pixiedraw2/src/draw2-timeline.ts", "pixiedraw2/src/draw2-entry.ts", "pixiedraw2/index.html", "pixiedraw2/assets/draw2-shell.css"],
+    "tests": ["pixiedraw2/tests/core.test.ts", "scripts/test-pixiedraw2-wp130.mjs", "scripts/test-pixiedraw2-wp130-finalization.mjs"],
+    "benchmark": ["pixiedraw2/benchmarks/run-timeline-structure-benchmark.ts", "pixiedraw2/benchmarks/run-stroke-continuity-benchmark.ts", "scripts/measure-pixiedraw2-wp130-bundle.mjs"],
+    "contract": ["docs/contracts/WP-130-TIMELINE-STRUCTURE.md", "docs/decisions/ADR-20260808-WP130-timeline-structure.md"]
+  },
+  "verification": {
+    "coreTests": "17 passed / 0 failed",
+    "baselineFailureIdentity": "14/14 existing identities match; new identities 0",
+    "nextWorkPackage": "WP-140",
+    "wp140Started": false
+  }
+}

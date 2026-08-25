@@ -21,6 +21,18 @@ const ALLOWED_FORMATS = new Set([
   "gif",
   "apng",
   "sprite-sheet-png",
+  "aac",
+  "aiff",
+  "flac",
+  "m4a",
+  "mid",
+  "midi",
+  "mp3",
+  "oga",
+  "ogg",
+  "opus",
+  "wav",
+  "weba",
 ]);
 const PIXIEEDRAW_OPEN_FORMAT_PRIORITY = [
   "pixiedraw-project",
@@ -66,8 +78,10 @@ function safeFormats(value: unknown): string[] {
   return Array.from(new Set(stringArray(value).filter((format) => ALLOWED_FORMATS.has(format))));
 }
 
-function packageFiles(asset: AssetRow): PackageFile[] {
-  const manifest = asRecord(asset.provenance_manifest);
+function packageFiles(asset: AssetRow, snapshot: JsonRecord | null = null): PackageFile[] {
+  const manifest = snapshot && Array.isArray(snapshot.files)
+    ? snapshot
+    : asRecord(asset.provenance_manifest);
   const storagePaths = stringArray(manifest.storage_file_paths);
   const allowedStoragePaths = new Set(storagePaths);
   const files = Array.isArray(manifest.files) ? manifest.files : [];
@@ -182,7 +196,7 @@ async function authorizeDelivery(request: Request, userId: string, body: JsonRec
 
   const { data: purchase, error: purchaseError } = await admin
     .from("market_purchases")
-    .select("id,asset_id,status,paid_at,created_at")
+    .select("id,asset_id,status,paid_at,created_at,package_rights_snapshot,package_snapshot_hash")
     .eq("buyer_user_id", userId)
     .eq("asset_id", assetId)
     .in("status", ["paid", "granted"])
@@ -209,9 +223,13 @@ async function authorizeDelivery(request: Request, userId: string, body: JsonRec
     .single();
   if (assetError) throw assetError;
   const asset = assetData as AssetRow;
-  const includedFormats = safeFormats(asset.included_formats);
+  const rightsSnapshot = asRecord(purchase.package_rights_snapshot);
+  const hasRightsSnapshot = stringValue(rightsSnapshot.schema) === "pixieed-market-purchase-rights/v1";
+  const includedFormats = hasRightsSnapshot
+    ? safeFormats(rightsSnapshot.included_formats)
+    : safeFormats(asset.included_formats);
   const effectiveFormats = includedFormats.length ? includedFormats : [asset.asset_format];
-  const availableFiles = packageFiles(asset);
+  const availableFiles = packageFiles(asset, hasRightsSnapshot ? rightsSnapshot : null);
   if (kind === "pixieedraw-open") {
     const openFormat = PIXIEEDRAW_OPEN_FORMAT_PRIORITY.find((format) => (
       effectiveFormats.includes(format) && availableFiles.some((file) => file.format === format)
@@ -233,6 +251,8 @@ async function authorizeDelivery(request: Request, userId: string, body: JsonRec
     .eq("id", asset.series_id)
     .single();
   if (seriesError) throw seriesError;
+  const snapshotLicense = asRecord(rightsSnapshot.license);
+  const license = Object.keys(snapshotLicense).length ? snapshotLicense : asRecord(series);
 
   const traceId = crypto.randomUUID();
   const { error: auditError } = await admin.from("market_download_events").insert({
@@ -263,10 +283,10 @@ async function authorizeDelivery(request: Request, userId: string, body: JsonRec
     formats: requestedFormats,
     files: signedFiles,
     license: {
-      derivative_sales_allowed: series.derivative_sales_allowed === true,
-      inherited_terms: asRecord(series.inherited_terms),
-      prohibited_uses: Array.isArray(series.prohibited_uses) ? series.prohibited_uses : [],
-      selected_option_ids: stringArray(series.selected_option_ids),
+      derivative_sales_allowed: license.derivative_sales_allowed === true,
+      inherited_terms: asRecord(license.inherited_terms),
+      prohibited_uses: Array.isArray(license.prohibited_uses) ? license.prohibited_uses : [],
+      selected_option_ids: stringArray(license.selected_option_ids),
       ai_training_allowed: false,
       redistribution_allowed: false,
     },

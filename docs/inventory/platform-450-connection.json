@@ -1,0 +1,33 @@
+{
+  "package": "PLATFORM-450",
+  "status": "COMPLETE_CANDIDATE",
+  "siteConnection": "SITE_CONNECTION_PENDING",
+  "routeMutation": false,
+  "routeTrace": {
+    "source": "docs/inventory/route-inventory.json",
+    "status": "STATIC_NON_INTRUSION_ONLY",
+    "routeMutation": false,
+    "activation": "NOT_ATTEMPTED"
+  },
+  "existingEvidenceReuse": true,
+  "predecessorEvidenceReuse": {
+    "packages": [
+      "SITE-400",
+      "MARKET-410",
+      "WORK-420",
+      "SOCIAL-430",
+      "OPS-440"
+    ],
+    "mode": "HASH_MATCH_NO_RERUN"
+  },
+  "benchmarkPath": "docs/inventory/platform-450-benchmark.json",
+  "evidencePath": "docs/inventory/platform-450-evidence.json",
+  "productionQualification": "UNTESTED",
+  "browserQualification": "UNTESTED",
+  "nativeStore": "DEFERRED",
+  "acceptance": {
+    "PLATFORM450-SCOPE-001": "PENDING_SOL_REVIEW",
+    "PLATFORM450-EVIDENCE-001": "PENDING_SOL_REVIEW",
+    "PLATFORM450-STOP-001": "PENDING_SOL_REVIEW"
+  }
+}

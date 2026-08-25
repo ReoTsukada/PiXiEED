@@ -15,20 +15,23 @@
     gate.id = 'marketAccessGate';
     gate.className = 'market-access-gate';
     const icon = new Image(); icon.src = new URL('../assets/icons/Market.png', window.location.href).href; icon.alt = '';
-    const label = document.createElement('span'); label.className = 'market-access-gate__label'; label.textContent = 'MARKET ACCOUNT';
+    const label = document.createElement('span'); label.className = 'market-access-gate__label'; label.dataset.i18nKey = 'marketAccessLabel'; label.textContent = 'MARKET ACCOUNT';
     const title = document.createElement('h1'); title.textContent = error
       ? 'ログイン状態を確認できません'
       : (authenticated ? 'メール確認が必要です' : 'ログインして利用してください');
+    title.dataset.i18nKey = error ? 'marketAccessErrorTitle' : (authenticated ? 'marketAccessEmailTitle' : 'marketAccessLoginTitle');
     const copy = document.createElement('p');
     copy.textContent = error
       ? '通信状態を確認してから、もう一度お試しください。'
       : (authenticated
         ? '出品・購入にはメール確認済みのアカウントが必要です。'
         : 'マーケットの出品・購入・販売者設定は、ログインすると利用できます。');
+    copy.dataset.i18nKey = error ? 'marketAccessErrorCopy' : (authenticated ? 'marketAccessEmailCopy' : 'marketAccessLoginCopy');
     const actions = document.createElement('div'); actions.className = 'market-access-gate__actions';
-    const primary = document.createElement('a'); primary.href = error ? window.location.href : accountUrl(); primary.textContent = error ? '再読み込み' : (authenticated ? '確認・アカウント設定へ' : 'ログインする');
-    const secondary = document.createElement('a'); secondary.href = new URL('./index.html', window.location.href).href; secondary.textContent = 'マーケットを見る'; secondary.className = 'is-subtle';
+    const primary = document.createElement('a'); primary.href = error ? window.location.href : accountUrl(); primary.textContent = error ? '再読み込み' : (authenticated ? '確認・アカウント設定へ' : 'ログインする'); primary.dataset.i18nKey = error ? 'marketAccessReload' : (authenticated ? 'marketAccessAccount' : 'marketAccessLogin');
+    const secondary = document.createElement('a'); secondary.href = new URL('./index.html', window.location.href).href; secondary.textContent = 'マーケットを見る'; secondary.dataset.i18nKey = 'marketTitle'; secondary.className = 'is-subtle';
     actions.append(primary, secondary); gate.append(icon, label, title, copy, actions); document.body.appendChild(gate);
+    if (window.PiXiEEDLocale) window.PiXiEEDLocale.apply(window.PiXiEEDLocale.get(), false);
     document.documentElement.dataset.pixieedMarketAccess = 'denied';
   }
 

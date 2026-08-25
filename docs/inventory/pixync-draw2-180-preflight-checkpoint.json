@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "AGENT_PACKAGE_PREFLIGHT_CHECKPOINT_V1",
+  "packageId": "PIXYNC-DRAW2-180",
+  "sourcePath": "pixiedraw2/tests/pixync/pixync-draw2-180-browser-fixture.test.ts",
+  "sourceHash": "78ba73baa7f95809087cf74b6205f6fffd96d39fdc4b9f76d0a5441eec96fa01",
+  "status": "READY_FOR_TERRA",
+  "executionPolicy": {
+    "mode": "BALANCED",
+    "contract": "required-before-implementation",
+    "changeBudget": { "maxChangedLines": 500, "maxFiles": 4, "maxRetries": 2, "maxFullAudits": 1, "maxFullEvidenceRuns": 1 },
+    "testTiers": { "specialistMax": 1, "integratorMax": 2, "finalMax": 4 },
+    "maxAffectedDiffReviews": 1,
+    "maxReleaseGateFullAudits": 1,
+    "maxFullEvidenceRuns": 1,
+    "evidenceRuns": 1,
+    "terraMode": "READ_ONLY_FINAL",
+    "specialistPolicy": "DISJOINT_ONLY",
+    "integratorTier": 2,
+    "sameCategoryEscalation": "SOL"
+  },
+  "currentRound": 1,
+  "max_fix_rounds": 2,
+  "timebox_minutes": 20,
+  "checkpoint_every_minutes": 10,
+  "sameClassFinding": { "class": "browser-cross-tab-cas-qualification", "occurrence": 1, "decision": "CONTINUE" }
+}

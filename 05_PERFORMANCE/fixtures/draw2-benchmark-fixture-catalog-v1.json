@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "status": "CONTRACT",
+  "projects": [
+    { "id": "PROJECT_A", "canvas": "256x256", "layers": 12, "frames": 60 },
+    { "id": "PROJECT_B", "canvas": "512x512", "layers": 20, "frames": 120 },
+    { "id": "PROJECT_C", "canvas": "1024x1024", "layers": 50, "frames": 500 },
+    { "id": "TIMELINE_1000", "canvas": "fixture-dependent", "layers": "fixture-dependent", "frames": 1000 },
+    { "id": "COMPOSITE_100", "canvas": "fixture-dependent", "layers": 100, "frames": "fixture-dependent" },
+    { "id": "SPARSE_LARGE", "canvas": "large", "layers": "sparse", "frames": "fixture-dependent" },
+    { "id": "DENSE_LARGE", "canvas": "large", "layers": "dense", "frames": "fixture-dependent" }
+  ],
+  "workloads": [
+    "single-pixel", "rapid-short-strokes", "long-continuous-stroke", "flood-fill", "selection-transform",
+    "frame-duplicate", "cel-duplicate", "layer-visibility", "timeline-scrub", "onion-skin", "palette-update",
+    "autosave-while-drawing", "pixisync-while-drawing", "asset-revision-commit", "draw-game-live-invalidation",
+    "import", "export", "checkpoint", "crash-recovery", "background-foreground", "continuous-30-minute"
+  ],
+  "deviceClasses": ["modern-desktop", "lower-power-desktop-laptop", "modern-phone", "lower-memory-phone", "touch-device", "high-dpi-display"],
+  "browserClasses": ["CHROMIUM", "SAFARI", "FIREFOX"],
+  "conditions": ["COLD", "WARM"],
+  "requiredResultFields": ["benchmarkId", "projectFixture", "deviceClass", "actualDevice", "browser", "browserVersion", "os", "buildVersion", "condition", "iterations", "p50", "p95", "max", "memory", "longTasks", "rawResultReference", "measuredAt", "status"],
+  "statusPolicy": { "missingActualDevice": "UNTESTED", "missingBrowserEvidence": "UNTESTED", "averageOnly": "INVALID" }
+}

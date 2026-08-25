@@ -70,7 +70,7 @@ export const FP007_CURRENT_SYSTEM_IMPACT_SCOPE = [
   "CURRENT_ROUTES",
   "CURRENT_PIXIEEDRAW",
   "PXD",
-  "PIXISYNC",
+  "PIXYNC",
   "MARKET",
 ] as const;
 
@@ -217,7 +217,7 @@ export interface Fp007IntegrationEvidence {
     readonly currentRoutes: Fp007CurrentSystemImpactStatus;
     readonly currentPixiEEDraw: Fp007CurrentSystemImpactStatus;
     readonly pxd: Fp007CurrentSystemImpactStatus;
-    readonly pixiSync: Fp007CurrentSystemImpactStatus;
+    readonly pixync: Fp007CurrentSystemImpactStatus;
     readonly market: Fp007CurrentSystemImpactStatus;
     readonly productionData: "NOT_ACCESSED";
     readonly productionAction: "NONE";
@@ -902,7 +902,7 @@ function untestedCurrentSystemImpact(): Fp007IntegrationEvidence[
     currentRoutes: "UNTESTED",
     currentPixiEEDraw: "UNTESTED",
     pxd: "UNTESTED",
-    pixiSync: "UNTESTED",
+    pixync: "UNTESTED",
     market: "UNTESTED",
     productionData: "NOT_ACCESSED",
     productionAction: "NONE",
@@ -956,7 +956,7 @@ async function deriveCurrentSystemImpact(
     currentRoutes: "UNCHANGED",
     currentPixiEEDraw: "UNCHANGED",
     pxd: "UNCHANGED",
-    pixiSync: "UNCHANGED",
+    pixync: "UNCHANGED",
     market: "UNCHANGED",
     productionData: "NOT_ACCESSED",
     productionAction: "NONE",

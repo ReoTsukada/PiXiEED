@@ -1,0 +1,59 @@
+{
+  "packageId": "DRAW-140",
+  "title": "Draw2 PNG / PXD Export",
+  "status": "IMPLEMENTED_ISOLATED_REFERENCE",
+  "context": {
+    "path": ".codex/context/DRAW-140.md",
+    "sha256": "cc913a51d39edee710b6911ac9edf311a26b8c8cdf0b8772dc4574ef934311e8"
+  },
+  "implementation": {
+    "adapter": "pixiedraw2/src/draw2/draw-140/export-contract.ts",
+    "authority": "pixiedraw2/src/draw2-export.ts",
+    "currentPxdReplaced": false,
+    "networkUpload": false,
+    "productionDataRead": false
+  },
+  "fixture": {
+    "projectId": "draw-140-fixture",
+    "dimensions": "4x4",
+    "indexedRasterSha256": "4fc0c457cba1ddbd1e47a5bcdbf723606d100f89478cae96fb681e383e0a0392",
+    "pngBytes": 136,
+    "pxdBytes": 1854,
+    "pxdPackageHash": "2dbf0c7a894059459913ddc4950af2c5ab6b28a801d6935c273250553a2ff106",
+    "pxdManifestHash": "5753d91cb563590f77d8ca07165b0bab7e164680c805445d54672c7219c541c4"
+  },
+  "acceptance": {
+    "DRAW140-SCOPE-001": "PASS",
+    "DRAW140-WORKSPACE-001": "PASS / isolated adapter; browser UI qualification UNTESTED",
+    "DRAW140-EVIDENCE-001": "PASS",
+    "DRAW140-STOP-001": "PASS"
+  },
+  "verification": [
+    { "command": "deno check --no-remote pixiedraw2/src/draw2/draw-140/export-contract.ts pixiedraw2/tests/draw-140/export-contract.test.ts pixiedraw2/benchmarks/draw-140/export-contract.bench.ts", "exitCode": 0 },
+    { "command": "deno test --no-remote --check pixiedraw2/tests/draw-140/export-contract.test.ts", "exitCode": 0, "result": "4 passed / 0 failed" },
+    { "command": "node scripts/test-pixiedraw2-wp140.mjs", "exitCode": 0, "result": "isolated legacy export contract suite passed" },
+    { "command": "deno task --config pixiedraw2/deno.json check", "exitCode": 0 },
+    { "command": "git diff --check", "exitCode": 0 }
+  ],
+  "negativeFixtures": {
+    "corruptedAsset": "PASS / PXD_ASSET_HASH_MISMATCH",
+    "trailingBytes": "PASS / PXD_TRAILING_BYTES",
+    "expectedPackageHashMismatch": "PASS / PXD_PACKAGE_HASH_MISMATCH",
+    "unknownSchema": "PASS / PXD_VERSION_UNSUPPORTED"
+  },
+  "baseline": {
+    "matchedIdentities": "14/14",
+    "newFailureIdentities": 0,
+    "suite": "63/77; 14 inherited failures preserved"
+  },
+  "untested": [
+    "browser file picker and dialog focus evidence",
+    "physical device performance",
+    "Safari/Firefox",
+    "real legacy/user PXD compatibility",
+    "native shell file association",
+    "production storage/provider"
+  ],
+  "nextPackage": "DRAW-150",
+  "autoStartNext": false
+}

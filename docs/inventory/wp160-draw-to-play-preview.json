@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 1,
+  "workPackage": "WP-160",
+  "status": "IMPLEMENTED_ISOLATED_LOCAL",
+  "implementation": {
+    "runtimeCore": "pixiedraw2/src/wp160-game-runtime-core.ts",
+    "buildPipeline": "pixiedraw2/src/wp160-build-pipeline.ts",
+    "sharedContracts": "pixiedraw2/src/wp160-contracts.ts",
+    "runtimeBundle": "pixiedraw2/dist/wp160-runtime-core.js",
+    "buildToolingBundle": "pixiedraw2/dist/wp160-build-tooling.js",
+    "editorEntry": "pixiedraw2/src/draw2-entry.ts",
+    "runtimeLoad": "ON_DEMAND_AFTER_LOCAL_PREVIEW_ACTION",
+    "productionChanges": false
+  },
+  "boundaries": {
+    "runtimeEditorDependency": "PASS",
+    "runtimeLegacyDependency": "PASS",
+    "runtimeDomCanvasNetworkStorageDependency": "PASS",
+    "buildEditorDependency": "PASS",
+    "buildSeparatedFromPublish": "PASS",
+    "currentRoutesDrawPxdPixiSyncMarket": "PRESERVED"
+  },
+  "assetRevision": {
+    "typedIds": "PASS",
+    "live": "PASS",
+    "pinned": "PASS",
+    "lazyResolution": "PASS",
+    "dependencySnapshotHash": "PASS",
+    "safeHotReload": "PASS"
+  },
+  "runtime": {
+    "animationPreview": "PASS",
+    "semanticInput": "PASS",
+    "stateSeparateFromProject": "PASS",
+    "runtimeDiagnostics": "PASS",
+    "capabilityProfile": "PASS",
+    "rendererExchangeBoundary": "CONTRACT_ONLY"
+  },
+  "build": {
+    "lifecycle": "PASS",
+    "readyEvidence": "PASS",
+    "artifactIdentity": "PASS",
+    "deterministicManifestAndCacheKey": "PASS",
+    "cancelAndIdempotentFingerprint": "PASS",
+    "publishSeparate": "PASS",
+    "cloudBuild": "UNTESTED"
+  },
+  "securityFixtures": {
+    "pathTraversal": "PASS",
+    "externalUrl": "PASS",
+    "activeContent": "PASS",
+    "oversizedScriptArtifact": "PASS",
+    "unauthorized": "PASS",
+    "quarantined": "PASS",
+    "hashMismatch": "PASS",
+    "wp150RealLegacyCompatibility": "UNTESTED"
+  },
+  "featureFlags": {
+    "game-core-read": false,
+    "game-core-write": false,
+    "runtime-preview": false,
+    "runtime-execution": false,
+    "game-build": false,
+    "game-build-cache": false,
+    "game-publish": false
+  },
+  "measurements": {
+    "editorInitialRawBytes": 148409,
+    "editorInitialMinifiedBytes": 85302,
+    "runtimeRawBytes": 12649,
+    "runtimeGzipBytes": 3645,
+    "runtimeBrotliBytes": 3167,
+    "buildToolingRawBytes": 9935,
+    "buildToolingGzipBytes": 2905,
+    "buildToolingBrotliBytes": 2456,
+    "runtimeSyntheticSteps": 10000,
+    "runtimeSyntheticStatus": "MEASURED_LOCAL_SYNTHETIC",
+    "deviceProductionPerformance": "UNTESTED"
+  },
+  "tests": {
+    "targetedDenoTests": "7 passed / 0 failed",
+    "browserEntry": "Runtime READY LIVE then Runtime READY PINNED",
+    "browserConsoleErrors": 0,
+    "bundleBoundary": "PASS",
+    "baselineFailureIdentity": {
+      "existingFailureCount": 14,
+      "matchedTestTargetSignatureCount": 14,
+      "newFailureIdentities": 0,
+      "source": "prior WP-000/WP-005 baseline evidence; not re-executed by WP-160"
+    }
+  },
+  "preservation": {
+    "currentProductionRoute": false,
+    "currentPiXiEEDraw": false,
+    "currentPxd": false,
+    "currentPixiSync": false,
+    "marketAndRightsData": false,
+    "databaseStorageMigrationDeployPublish": false,
+    "commitPush": false
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "benchmarkId": "WP230_SNS_REFERENCE_PROJECTION_SYNTHETIC",
+  "status": "MEASURED_LOCAL_SYNTHETIC",
+  "iterations": 10000,
+  "successful": 10000,
+  "elapsedMs": 156.464,
+  "operationsPerSecond": 63912.31,
+  "notes": [
+    "Pure Share/Post reference projection; no current route, social API, provider, Database, Storage, Search, Notification, Market, or production data was accessed.",
+    "This is not a real SNS, RLS, upload, browser, device, memory, moderation, or production performance PASS."
+  ]
+}

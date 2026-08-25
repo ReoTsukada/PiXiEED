@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "work_package": "WP-099",
+  "status": "EXTERNAL_AUDIT_REQUIRED",
+  "mandatory_artifacts": [
+    "05_PERFORMANCE/DRAW2_HIGH_PERFORMANCE_IMPLEMENTATION_CONTRACT.md",
+    "05_PERFORMANCE/DRAW2_TECHNOLOGY_SELECTION_GATE.md",
+    "05_PERFORMANCE/DRAW2_DEVICE_AND_WORKLOAD_MATRIX.md",
+    "05_PERFORMANCE/DRAW2_BUNDLE_MEMORY_AND_WORKER_BUDGETS.md",
+    "05_PERFORMANCE/fixtures/draw2-benchmark-result-v1.schema.json",
+    "05_PERFORMANCE/fixtures/draw2-benchmark-fixture-catalog-v1.json",
+    "05_PERFORMANCE/PERFORMANCE_BUDGETS.md",
+    "05_PERFORMANCE/RENDERING_PIPELINE.md",
+    "05_PERFORMANCE/MEMORY_AND_RASTER_MODEL.md",
+    "05_PERFORMANCE/BENCHMARK_AND_PROFILING_PLAN.md"
+  ],
+  "unexecuted_by_design": ["WP-100 implementation", "real-device benchmark", "production migration", "deploy", "publish", "commit", "push"],
+  "audit_questions": ["local-first", "dirty invalidation", "worker/gpu/wasm purpose", "mobile viability", "bundle growth", "1000-frame scalability", "data safety"],
+  "device_evidence_status": "UNTESTED",
+  "technology_selection_status": "UNTESTED",
+  "baseline_failure_identity": { "existing_match": "14/14", "new_failure_identities": 0 },
+  "wp098_routing_security_coverage": {
+    "matrix": "docs/inventory/wp098-routing-security-coverage.json",
+    "categories_passed": 10,
+    "named_fixture_cases": 14
+  },
+  "external_audit_required": true
+}

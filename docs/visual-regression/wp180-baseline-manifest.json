@@ -1,0 +1,30 @@
+{
+  "workPackage": "WP-180",
+  "status": "REFERENCE_SCREENSHOTS_CAPTURED",
+  "viewports": [
+    {"name": "mobile-portrait", "width": 390, "height": 844},
+    {"name": "tablet", "width": 834, "height": 1112},
+    {"name": "desktop", "width": 1280, "height": 900}
+  ],
+  "themes": ["light", "dark", "system"],
+  "states": ["blank", "drawing", "selection", "layers", "timeline", "palette", "advanced", "mobile-sheet", "loading", "error"],
+  "canonicalPixelColorRule": "Theme changes must not change Canvas/Preview/Thumbnail canonical pixel colors",
+  "evidence": "Chromium screenshots captured after isolated Draw2 entry loads; no production route is changed",
+  "files": [
+    "docs/visual-regression/wp180/desktop-blank.png",
+    "docs/visual-regression/wp180/tablet-blank.png",
+    "docs/visual-regression/wp180/mobile-blank.png"
+  ],
+  "coverage": {
+    "blank": "CAPTURED",
+    "drawing": "UNTESTED_POINTER_E2E",
+    "selection": "DOM_STATE_AVAILABLE",
+    "layers": "CAPTURED_IN_BLANK_SHELL",
+    "timeline": "CAPTURED_IN_BLANK_SHELL",
+    "palette": "DOM_STATE_AVAILABLE",
+    "advanced": "WP170_PRIOR_EVIDENCE_PRESERVED_NOT_RERUN",
+    "mobileSheet": "DOM_STATE_AVAILABLE",
+    "loading": "UNTESTED",
+    "error": "UNTESTED"
+  }
+}

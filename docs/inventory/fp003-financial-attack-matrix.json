@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "package": "FP-003",
+  "status": "COMPLETE_ISOLATED",
+  "derivation": [
+    "Verified Provider Event",
+    "AuthorizationProofV1",
+    "FinancialAuthorityResolutionV1",
+    "Canonical Purchase or Payment",
+    "Fee Schedule",
+    "Canonical Money",
+    "Royalty Allocation",
+    "Ledger Projection"
+  ],
+  "attackFixtures": [
+    { "id": "FP003-FI-001", "attack": "caller-amount-hint", "expected": "DENY", "signature": "CALLER_FINANCIAL_INPUT_REJECTED" },
+    { "id": "FP003-FI-002", "attack": "caller-currency-hint", "expected": "DENY", "signature": "CALLER_FINANCIAL_INPUT_REJECTED" },
+    { "id": "FP003-FI-003", "attack": "caller-recipient-hint", "expected": "DENY", "signature": "CALLER_FINANCIAL_INPUT_REJECTED" },
+    { "id": "FP003-FI-004", "attack": "caller-royalty-rate-hint", "expected": "DENY", "signature": "CALLER_FINANCIAL_INPUT_REJECTED" },
+    { "id": "FP003-FI-005", "attack": "caller-entry-type-or-direction", "expected": "DENY", "signature": "LEDGER_INVALID" },
+    { "id": "FP003-FI-006", "attack": "purchase-a-with-product-b", "expected": "DENY", "signature": "PURCHASE_BINDING_MISMATCH" },
+    { "id": "FP003-FI-007", "attack": "provider-event-identity-substitution", "expected": "DENY", "signature": "PROVIDER_EVENT_INVALID" },
+    { "id": "FP003-FI-008", "attack": "unsupported-currency", "expected": "DENY", "signature": "MONEY_INVALID" },
+    { "id": "FP003-FI-009", "attack": "negative-or-unsafe-money", "expected": "DENY", "signature": "MONEY_INVALID" },
+    { "id": "FP003-FI-010", "attack": "fee-schedule-over-allocation", "expected": "DENY", "signature": "FEE_SCHEDULE_INVALID" },
+    { "id": "FP003-FI-011", "attack": "payment-a-with-direct-work-b", "expected": "DENY", "signature": "PAYMENT_BINDING_MISMATCH" },
+    { "id": "FP003-FI-012", "attack": "duplicate-source-event", "expected": "NO_OP", "signature": "DUPLICATE_EVENT_CONFLICT" },
+    { "id": "FP003-CC-001", "attack": "product-lead-sets-self-to-100-percent", "expected": "DENY", "signature": "COLLABORATIVE_OVERRIDE_REJECTED" },
+    { "id": "FP003-CC-002", "attack": "product-lead-removes-contributor", "expected": "DENY", "signature": "COLLABORATIVE_OVERRIDE_REJECTED" },
+    { "id": "FP003-CC-003", "attack": "partial-product-removes-contributor", "expected": "DENY", "signature": "COLLABORATIVE_SNAPSHOT_INVALID" },
+    { "id": "FP003-CC-004", "attack": "late-contributor-added-to-historical-sale", "expected": "DENY", "signature": "COLLABORATIVE_SNAPSHOT_INVALID" },
+    { "id": "FP003-CC-005", "attack": "product-lead-change-alters-revenue-split", "expected": "DENY", "signature": "ALLOCATION_NEUTRALITY" },
+    { "id": "FP003-CC-006", "attack": "duplicate-product-fingerprint", "expected": "DENY", "signature": "DUPLICATE_PRODUCT" },
+    { "id": "FP003-CC-007", "attack": "different-product-shape-from-same-work", "expected": "ALLOW", "signature": "DISTINCT_PRODUCT_FINGERPRINT" },
+    { "id": "FP003-CC-008", "attack": "equal-split-after-parent-and-external-deductions", "expected": "ALLOW", "signature": "EQUAL_AFTER_DEDUCTIONS_V1" },
+    { "id": "FP003-CC-009", "attack": "deterministic-remainder-minor-unit", "expected": "ALLOW", "signature": "STABLE_ALLOCATION_ORDER" },
+    { "id": "FP003-CC-010", "attack": "mixed-currency-contributor-allocation", "expected": "DENY", "signature": "DEDUCTION_INVALID" }
+  ],
+  "outOfScope": [
+    "FP-004 Durable Event/Inbox/Outbox",
+    "provider signature transport",
+    "database/RLS/transaction execution",
+    "payout and settlement",
+    "production"
+  ],
+  "currentSystemMutation": false
+}

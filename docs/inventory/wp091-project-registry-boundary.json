@@ -1,0 +1,63 @@
+{
+  "workPackage": "WP-091",
+  "status": "complete",
+  "implementation": {
+    "module": "core-shell/assets/core-project-registry-contracts.js",
+    "schema": "core-shell/schemas/project-registry-v1.schema.json",
+    "validFixture": "core-shell/fixtures/project-registry-v1.valid.json",
+    "test": "scripts/test-core-project-registry-wp091.mjs",
+    "loadedBy": [],
+    "domCanvasEditorNetworkCoupling": false
+  },
+  "recordBoundary": {
+    "included": [
+      "Project ID and typed identity",
+      "Project kind, registered tool, format and format version",
+      "User/Team ownership and bounded membership",
+      "Name, visibility, lifecycle, head revision reference",
+      "Legacy binding and verification metadata",
+      "Schema, record, membership versions and timestamps"
+    ],
+    "excluded": [
+      "Pixel/Audio/Game Blob",
+      "Tile/Chunk",
+      "Journal",
+      "Checkpoint",
+      "Operation payload",
+      "PXD/package body",
+      "Base64/Data URL",
+      "Full Editor State",
+      "JWT/email/secret",
+      "Commission body",
+      "Market payment/entitlement/royalty data"
+    ]
+  },
+  "flags": {
+    "project-registry-read": "default-off",
+    "project-registry-write": "default-off",
+    "project-registry-legacy-adapter": "default-off",
+    "project-registry-migration": "default-off",
+    "project-registry-ownership-transfer": "default-off"
+  },
+  "preservation": {
+    "productionRoutesChanged": false,
+    "currentPiXiEEDrawChanged": false,
+    "currentPxdChanged": false,
+    "currentPiXiSYNCChanged": false,
+    "marketChanged": false,
+    "productionProjectsRegistered": false,
+    "databaseMigrationApplied": false,
+    "storageMutationApplied": false,
+    "deployPublishCommitPush": false
+  },
+  "verification": {
+    "testCommand": "node scripts/test-core-project-registry-wp091.mjs",
+    "exitCode": 0,
+    "commandsCovered": 14,
+    "eventsCovered": 11,
+    "failureFixtures": 22,
+    "baselineFailureIdentity": "14/14 inherited match; new 0",
+    "diffCheck": "pass"
+  },
+  "nextBoundary": "WP-092 Asset Registry owns Asset/Revision/Blob references; Project Registry retains only project identity and references."
+}

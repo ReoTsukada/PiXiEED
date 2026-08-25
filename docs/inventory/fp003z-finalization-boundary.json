@@ -1,0 +1,65 @@
+{
+  "schemaVersion": "FP003Z_FINALIZATION_BOUNDARY_V1",
+  "status": "ISOLATED_COMPLETE_PENDING_EXTERNAL_AUDIT",
+  "browser": {
+    "entriesChecked": 11,
+    "distArtifactsChecked": 29,
+    "callerInjectableAuthority": 0,
+    "serverAuthorityExports": 0,
+    "runtimeAttack": "PASS"
+  },
+  "buildGraph": {
+    "sourceToDistEnumerated": true,
+    "untrackedDistArtifacts": 0,
+    "staleDistArtifacts": 0,
+    "auditScript": "scripts/audit-fp003z-finalization.mjs",
+    "releaseTrace": {
+      "buildManifest": "pixiedraw2/deno.json",
+      "initialHtml": "pixiedraw2/index.html -> dist/draw2-entry.js",
+      "benchmarkHtml": "pixiedraw2/reference-benchmark.html -> dist/draw2-reference-benchmark-entry.js",
+      "lazyEditorArtifacts": [
+        "draw2-legacy-compat.js",
+        "wp160-runtime-core.js",
+        "wp170-advanced-tools.js",
+        "wp180-workspace.js"
+      ],
+      "isolatedWp230Wp240Wp250InitialHtmlReferences": 0
+    }
+  },
+  "tenant": {
+    "canonicalRecordRef": "CANONICAL_RECORD_REF_V2",
+    "serverTenantContext": "SERVER_TENANT_CONTEXT_V1",
+    "serverAuthorityRequestContext": "SERVER_AUTHORITY_REQUEST_CONTEXT_V1",
+    "sameIdDifferentTenant": "PASS",
+    "mixedRecord": "DENY",
+    "crossTenantLedger": "DENY",
+    "legacyCompatibilityTenant": "legacy-compatibility"
+  },
+  "regressions": {
+    "fp001ToFp003y": "PASS",
+    "wp210": "PASS",
+    "wp220": "PASS",
+    "wp230": "PASS",
+    "wp240": "PASS",
+    "wp250": "PASS",
+    "staleDirectWorkStages": 8,
+    "paymentLedgerBinding": "PASS",
+    "baselineFailureIdentity": {
+      "existingMatched": "14/14",
+      "newFailureIdentities": 0
+    }
+  },
+  "preservation": {
+    "currentRoutes": "UNCHANGED",
+    "currentPiXiEEDraw": "UNCHANGED",
+    "PXD": "UNCHANGED",
+    "PiXiSYNC": "UNCHANGED",
+    "Market": "UNCHANGED",
+    "productionData": "NOT_ACCESSED",
+    "migration": false,
+    "deploy": false,
+    "publish": false,
+    "commit": false,
+    "push": false
+  }
+}

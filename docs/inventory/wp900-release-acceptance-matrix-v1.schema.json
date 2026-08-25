@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pixieed.invalid/schema/wp900-release-acceptance-matrix-v1.json",
+  "title": "PiXiEED WP-900 Release Acceptance Matrix v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "workPackage", "definitionStatus", "releaseDecision", "gates", "acceptanceItems", "bundleBaselines", "sourceGapInventory", "prohibitedActions", "ownerApprovalBoundary"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "workPackage": {"const": "WP-900"},
+    "definitionStatus": {"enum": ["DEFINED_NOT_EXECUTED", "EVIDENCE_COLLECTION_ACTIVE", "FINALIZED"]},
+    "releaseDecision": {"enum": ["READY_FOR_LIMITED_ROLLOUT", "NOT_READY", "BLOCKED"]},
+    "gates": {"type": "array", "minItems": 10, "maxItems": 10, "items": {"$ref": "#/$defs/gate"}},
+    "acceptanceItems": {"type": "array", "minItems": 1, "maxItems": 256, "items": {"$ref": "#/$defs/item"}},
+    "bundleBaselines": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/bundle"}},
+    "sourceGapInventory": {"$ref": "#/$defs/sourceGapInventory"},
+    "prohibitedActions": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1, "maxLength": 160}},
+    "ownerApprovalBoundary": {"$ref": "#/$defs/ownerApproval"}
+  },
+  "$defs": {
+    "stableId": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "evidenceStatus": {"enum": ["COMPLETE", "PARTIAL", "UNTESTED", "DECISION_PENDING", "UNKNOWN", "BLOCKED"]},
+    "priority": {"enum": ["P0_BLOCKER", "P1_REQUIRED", "P2_POST_LAUNCH", "OPTIONAL_OPTIMIZATION"]},
+    "gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "currentStatus", "purpose", "requiredEvidence", "exitRule"],
+      "properties": {
+        "id": {"enum": ["G0", "G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8", "G9"]},
+        "title": {"type": "string", "minLength": 1, "maxLength": 128},
+        "currentStatus": {"$ref": "#/$defs/evidenceStatus"},
+        "purpose": {"type": "string", "minLength": 1, "maxLength": 1024},
+        "requiredEvidence": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1, "maxLength": 320}},
+        "exitRule": {"type": "string", "minLength": 1, "maxLength": 1024}
+      }
+    },
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "gate", "domain", "title", "currentStatus", "priority", "releaseScope", "sourceRefs", "requiredEvidence"],
+      "properties": {
+        "id": {"$ref": "#/$defs/stableId"},
+        "gate": {"enum": ["G0", "G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8", "G9"]},
+        "domain": {"type": "string", "minLength": 1, "maxLength": 96},
+        "title": {"type": "string", "minLength": 1, "maxLength": 256},
+        "currentStatus": {"$ref": "#/$defs/evidenceStatus"},
+        "priority": {"$ref": "#/$defs/priority"},
+        "releaseScope": {"type": "array", "minItems": 1, "items": {"enum": ["ALL", "DESKTOP", "MOBILE", "TABLET", "COMMERCE", "SOCIAL", "ADMIN", "RUNTIME", "AUDIO", "DRAW2"]}},
+        "sourceRefs": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1, "maxLength": 512}},
+        "requiredEvidence": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1, "maxLength": 512}}
+      }
+    },
+    "bundle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "file", "loading", "raw", "minified", "gzip", "brotli", "sourceRef"],
+      "properties": {
+        "id": {"$ref": "#/$defs/stableId"},
+        "file": {"type": "string", "minLength": 1, "maxLength": 512},
+        "loading": {"enum": ["INITIAL", "STARTUP_LAZY", "ON_DEMAND_LAZY", "RUNTIME_LAZY"]},
+        "raw": {"type": "integer", "minimum": 0},
+        "minified": {"type": "integer", "minimum": 0},
+        "gzip": {"type": "integer", "minimum": 0},
+        "brotli": {"type": "integer", "minimum": 0},
+        "sourceRef": {"type": "string", "minLength": 1, "maxLength": 512}
+      }
+    },
+    "sourceGapInventory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "derivation", "sourceInventoryCount", "sourceStatusReferenceCount", "statusPreservation"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1, "maxLength": 512},
+        "derivation": {"type": "string", "minLength": 1, "maxLength": 512},
+        "sourceInventoryCount": {"type": "integer", "minimum": 1},
+        "sourceStatusReferenceCount": {"type": "integer", "minimum": 1},
+        "statusPreservation": {"const": "SOURCE_STATUS_UNCHANGED"}
+      }
+    },
+    "ownerApproval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["wp900CanGrantApproval", "requiredDecisionValues", "requiredActors", "productionActionSeparate"],
+      "properties": {
+        "wp900CanGrantApproval": {"const": false},
+        "requiredDecisionValues": {"type": "array", "minItems": 3, "items": {"enum": ["READY_FOR_LIMITED_ROLLOUT", "NOT_READY", "BLOCKED"]}},
+        "requiredActors": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1, "maxLength": 128}},
+        "productionActionSeparate": {"const": true}
+      }
+    }
+  }
+}

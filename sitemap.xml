@@ -2,7 +2,15 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://pixieed.jp/</loc>
-    <lastmod>2026-07-30</lastmod>
+    <lastmod>2026-08-25</lastmod>
+  </url>
+  <url>
+    <loc>https://pixieed.jp/studio/</loc>
+    <lastmod>2026-08-25</lastmod>
+  </url>
+  <url>
+    <loc>https://pixieed.jp/community/</loc>
+    <lastmod>2026-08-25</lastmod>
   </url>
   <url>
     <loc>https://pixieed.jp/notes/</loc>
@@ -126,4 +134,6 @@
     <lastmod>2026-07-21</lastmod>
   </url>
   <!-- market-seo-items:end -->
+  <!-- social-seo-posts:start -->
+  <!-- social-seo-posts:end -->
 </urlset>

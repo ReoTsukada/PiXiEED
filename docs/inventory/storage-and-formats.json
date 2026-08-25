@@ -1,0 +1,2515 @@
+{
+  "schema_version": 1,
+  "work_package": "WP-000",
+  "captured_on": "2026-08-06",
+  "indexeddb": {
+    "pixiedraw-autosave": {
+      "source": "pixiedraw/assets/js/modules/project-storage-utils.js",
+      "version": 3,
+      "stores": [
+        "handles",
+        "recentProjects",
+        "sharedLocalOpJournal",
+        "localProjectManifests",
+        "localProjectSheetCheckpoints",
+        "localProjectJournals",
+        "localProjectThumbnails",
+        "localProjectCurrentManifests"
+      ]
+    },
+    "pixiedraw-autosave-v2-experimental": {
+      "source": "pixiedraw/assets/js/modules/project-storage-utils.js",
+      "version": 1,
+      "stores": [
+        "v2 project stores; exact store set is defined by autosave-schema-v2-indexeddb-utils.js"
+      ]
+    },
+    "pixiedraw-cold-history-v1": {
+      "source": "pixiedraw/assets/js/modules/cold-history-store-utils.js",
+      "stores": [
+        "projectMeta",
+        "historyChunks"
+      ]
+    },
+    "pixiedraw-timelapse-operations-v1": {
+      "source": "pixiedraw/assets/js/modules/timelapse-operation-store-utils.js",
+      "version": 3,
+      "stores": [
+        "timelapseEvents",
+        "timelapseOperationStates",
+        "timelapseProjectMeta",
+        "timelapseCheckpoints"
+      ]
+    },
+    "pixiedraw-ios-snapshots": {
+      "source": "pixiedraw/assets/js/modules/ui-static-config.js",
+      "version": 1,
+      "stores": [
+        "snapshots"
+      ],
+      "runtime_supported": false
+    },
+    "pixieed-pixisync-v1": {
+      "source": "pixiedraw/assets/js/modules/pixisync-journal-utils.js",
+      "version": 1,
+      "stores": [
+        "pendingOperations"
+      ]
+    },
+    "pixieed-pixfind-transfer": {
+      "source": "pixiedraw/assets/js/modules/pixfind-mode-utils.js",
+      "stores": [
+        "payloads"
+      ]
+    },
+    "pixieed-market-import-v1": {
+      "source": "scripts/market-purchase-delivery.js",
+      "stores": [
+        "imports"
+      ]
+    },
+    "pixieed-market-project-transfers": {
+      "source": "market/sell.js",
+      "stores": [
+        "transfers"
+      ]
+    },
+    "pixieed-market-listing-drafts": {
+      "source": "market/sell.js",
+      "version": 1,
+      "stores": [
+        "listing drafts; exact name is defined in market/sell.js"
+      ]
+    },
+    "pixieed-workspace-v1": {
+      "source": "scripts/pixieed-workspace.js",
+      "version": 1,
+      "stores": [
+        "handles"
+      ],
+      "keys": [
+        "workspaceDirectory"
+      ]
+    },
+    "pixiedraw-pre-update-checkpoints-dev": {
+      "source": "pixiedraw/assets/js/modules/pre-update-checkpoint-utils.js",
+      "version": 1,
+      "development_only": true
+    }
+  },
+  "file_system_access_api": {
+    "present": true,
+    "apis": [
+      "showDirectoryPicker",
+      "showOpenFilePicker",
+      "showSaveFilePicker"
+    ],
+    "references": [
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/jerin-maker/index.html",
+        "line": 3954,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/jerin-maker/index.html",
+        "line": 4107,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/jerin-maker/index.html",
+        "line": 4190,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/jerin-maker/index.html",
+        "line": 4203,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/jerin-maker/index.html",
+        "line": 4215,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/pixiedraw/assets/js/app.js",
+        "line": 2030,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/pixiedraw/assets/js/app.js",
+        "line": 2035,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/pixiedraw/assets/js/app.js",
+        "line": 9220,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/pixiedraw/assets/js/app.js",
+        "line": 9226,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/pixiedraw/assets/js/app.js",
+        "line": 9680,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/pixiedraw/assets/js/app.js",
+        "line": 9691,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/pixiedraw/assets/js/app.js",
+        "line": 10242,
+        "api": "showOpenFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/pixiedraw/assets/js/app.js",
+        "line": 10244,
+        "api": "showOpenFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/pixiedraw/assets/js/app.js",
+        "line": 12876,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/pixiedraw/assets/js/app.js",
+        "line": 16943,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/pixiedraw/assets/js/app.js",
+        "line": 16954,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/pixiedraw/assets/js/app.js",
+        "line": 16966,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/pixiedraw/assets/js/app.js",
+        "line": 17081,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/pixiedraw/assets/js/app.js",
+        "line": 17083,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/pixiee-lens/index.html",
+        "line": 9594,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/pixiee-lens/index.html",
+        "line": 9747,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/pixiee-lens/index.html",
+        "line": 9850,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/pixiee-lens/index.html",
+        "line": 9863,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/pixiee-lens/index.html",
+        "line": 9875,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/release/mergeReleaseAssets/public/pixiedraw/assets/js/local-extension-runtime.js",
+        "line": 313,
+        "api": "showOpenFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/release/mergeReleaseAssets/public/pixiedraw/assets/js/local-extension-runtime.js",
+        "line": 781,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/release/mergeReleaseAssets/public/pixiedraw/assets/js/local-extension-runtime.js",
+        "line": 823,
+        "api": "showOpenFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/release/mergeReleaseAssets/public/pixiedraw/assets/js/modules/open-import-workflow-utils.js",
+        "line": 665,
+        "api": "showOpenFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/release/mergeReleaseAssets/public/pixiedraw/assets/js/modules/open-import-workflow-utils.js",
+        "line": 667,
+        "api": "showOpenFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/release/mergeReleaseAssets/public/pixiee-lens/index.html",
+        "line": 9598,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/release/mergeReleaseAssets/public/pixiee-lens/index.html",
+        "line": 9751,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/release/mergeReleaseAssets/public/pixiee-lens/index.html",
+        "line": 9868,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/release/mergeReleaseAssets/public/pixiee-lens/index.html",
+        "line": 9881,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/release/mergeReleaseAssets/public/pixiee-lens/index.html",
+        "line": 9893,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/release/mergeReleaseAssets/public/qr-maker/index.html",
+        "line": 1044,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/release/mergeReleaseAssets/public/qr-maker/index.html",
+        "line": 1048,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/release/mergeReleaseAssets/public/qr-maker/index.html",
+        "line": 1063,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/release/mergeReleaseAssets/public/scripts/pixieed-workspace.js",
+        "line": 31,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/release/mergeReleaseAssets/public/scripts/pixieed-workspace.js",
+        "line": 175,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/release/mergeReleaseAssets/public/scripts/test-pixiedraw-timelapse-base-disk-browser.mjs",
+        "line": 66,
+        "api": "showOpenFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/src/main/assets/public/pixiedraw/assets/js/local-extension-runtime.js",
+        "line": 313,
+        "api": "showOpenFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/src/main/assets/public/pixiedraw/assets/js/local-extension-runtime.js",
+        "line": 781,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/src/main/assets/public/pixiedraw/assets/js/local-extension-runtime.js",
+        "line": 823,
+        "api": "showOpenFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/src/main/assets/public/pixiedraw/assets/js/modules/open-import-workflow-utils.js",
+        "line": 665,
+        "api": "showOpenFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/src/main/assets/public/pixiedraw/assets/js/modules/open-import-workflow-utils.js",
+        "line": 667,
+        "api": "showOpenFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/src/main/assets/public/pixiee-lens/index.html",
+        "line": 9598,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/src/main/assets/public/pixiee-lens/index.html",
+        "line": 9751,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/src/main/assets/public/pixiee-lens/index.html",
+        "line": 9868,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/src/main/assets/public/pixiee-lens/index.html",
+        "line": 9881,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/src/main/assets/public/pixiee-lens/index.html",
+        "line": 9893,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/src/main/assets/public/qr-maker/index.html",
+        "line": 1044,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/src/main/assets/public/qr-maker/index.html",
+        "line": 1048,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/src/main/assets/public/qr-maker/index.html",
+        "line": 1063,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/src/main/assets/public/scripts/pixieed-workspace.js",
+        "line": 31,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/src/main/assets/public/scripts/pixieed-workspace.js",
+        "line": 175,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/android/app/src/main/assets/public/scripts/test-pixiedraw-timelapse-base-disk-browser.mjs",
+        "line": 66,
+        "api": "showOpenFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/dist/web/pixiedraw/assets/js/local-extension-runtime.js",
+        "line": 313,
+        "api": "showOpenFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/dist/web/pixiedraw/assets/js/local-extension-runtime.js",
+        "line": 781,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/dist/web/pixiedraw/assets/js/local-extension-runtime.js",
+        "line": 823,
+        "api": "showOpenFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/dist/web/pixiedraw/assets/js/modules/open-import-workflow-utils.js",
+        "line": 665,
+        "api": "showOpenFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/dist/web/pixiedraw/assets/js/modules/open-import-workflow-utils.js",
+        "line": 667,
+        "api": "showOpenFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/dist/web/pixiee-lens/index.html",
+        "line": 9598,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/dist/web/pixiee-lens/index.html",
+        "line": 9751,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/dist/web/pixiee-lens/index.html",
+        "line": 9868,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/dist/web/pixiee-lens/index.html",
+        "line": 9881,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/dist/web/pixiee-lens/index.html",
+        "line": 9893,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/dist/web/qr-maker/index.html",
+        "line": 1044,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/dist/web/qr-maker/index.html",
+        "line": 1048,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/dist/web/qr-maker/index.html",
+        "line": 1063,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/dist/web/scripts/pixieed-workspace.js",
+        "line": 31,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/dist/web/scripts/pixieed-workspace.js",
+        "line": 175,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/dist/web/scripts/test-pixiedraw-timelapse-base-disk-browser.mjs",
+        "line": 66,
+        "api": "showOpenFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/App/App/public/pixiedraw/assets/js/local-extension-runtime.js",
+        "line": 313,
+        "api": "showOpenFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/App/App/public/pixiedraw/assets/js/local-extension-runtime.js",
+        "line": 781,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/App/App/public/pixiedraw/assets/js/local-extension-runtime.js",
+        "line": 823,
+        "api": "showOpenFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/App/App/public/pixiedraw/assets/js/modules/open-import-workflow-utils.js",
+        "line": 665,
+        "api": "showOpenFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/App/App/public/pixiedraw/assets/js/modules/open-import-workflow-utils.js",
+        "line": 667,
+        "api": "showOpenFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/App/App/public/pixiee-lens/index.html",
+        "line": 9598,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/App/App/public/pixiee-lens/index.html",
+        "line": 9751,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/App/App/public/pixiee-lens/index.html",
+        "line": 9868,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/App/App/public/pixiee-lens/index.html",
+        "line": 9881,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/App/App/public/pixiee-lens/index.html",
+        "line": 9893,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/App/App/public/qr-maker/index.html",
+        "line": 1044,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/App/App/public/qr-maker/index.html",
+        "line": 1048,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/App/App/public/qr-maker/index.html",
+        "line": 1063,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/App/App/public/scripts/pixieed-workspace.js",
+        "line": 31,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/App/App/public/scripts/pixieed-workspace.js",
+        "line": 175,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/App/App/public/scripts/test-pixiedraw-timelapse-base-disk-browser.mjs",
+        "line": 66,
+        "api": "showOpenFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/jerin-maker/index.html",
+        "line": 3954,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/jerin-maker/index.html",
+        "line": 4107,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/jerin-maker/index.html",
+        "line": 4190,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/jerin-maker/index.html",
+        "line": 4203,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/jerin-maker/index.html",
+        "line": 4215,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/pixiedraw/assets/js/app.js",
+        "line": 2030,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/pixiedraw/assets/js/app.js",
+        "line": 2035,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/pixiedraw/assets/js/app.js",
+        "line": 9220,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/pixiedraw/assets/js/app.js",
+        "line": 9226,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/pixiedraw/assets/js/app.js",
+        "line": 9680,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/pixiedraw/assets/js/app.js",
+        "line": 9691,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/pixiedraw/assets/js/app.js",
+        "line": 10242,
+        "api": "showOpenFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/pixiedraw/assets/js/app.js",
+        "line": 10244,
+        "api": "showOpenFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/pixiedraw/assets/js/app.js",
+        "line": 12876,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/pixiedraw/assets/js/app.js",
+        "line": 16943,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/pixiedraw/assets/js/app.js",
+        "line": 16954,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/pixiedraw/assets/js/app.js",
+        "line": 16966,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/pixiedraw/assets/js/app.js",
+        "line": 17081,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/pixiedraw/assets/js/app.js",
+        "line": 17083,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/pixiee-lens/index.html",
+        "line": 9594,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/pixiee-lens/index.html",
+        "line": 9747,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/pixiee-lens/index.html",
+        "line": 9850,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/pixiee-lens/index.html",
+        "line": 9863,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/pixiee-lens/index.html",
+        "line": 9875,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/pixiedraw/assets/js/app.js",
+        "line": 2548,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/pixiedraw/assets/js/app.js",
+        "line": 2553,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/pixiedraw/assets/js/app.js",
+        "line": 19311,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/pixiedraw/assets/js/app.js",
+        "line": 19317,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/pixiedraw/assets/js/app.js",
+        "line": 19861,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/pixiedraw/assets/js/app.js",
+        "line": 19872,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/pixiedraw/assets/js/app.js",
+        "line": 20880,
+        "api": "showOpenFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/pixiedraw/assets/js/app.js",
+        "line": 20882,
+        "api": "showOpenFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/pixiedraw/assets/js/app.js",
+        "line": 25139,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/pixiedraw/assets/js/app.js",
+        "line": 34928,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/pixiedraw/assets/js/app.js",
+        "line": 34939,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/pixiedraw/assets/js/app.js",
+        "line": 34951,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/pixiedraw/assets/js/app.js",
+        "line": 35093,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/pixiedraw/assets/js/app.js",
+        "line": 35095,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/pixiedraw/assets/js/local-extension-runtime.js",
+        "line": 313,
+        "api": "showOpenFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/pixiedraw/assets/js/local-extension-runtime.js",
+        "line": 781,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/pixiedraw/assets/js/local-extension-runtime.js",
+        "line": 823,
+        "api": "showOpenFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/pixiee-lens/index.html",
+        "line": 9704,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/pixiee-lens/index.html",
+        "line": 9857,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/pixiee-lens/index.html",
+        "line": 9960,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/pixiee-lens/index.html",
+        "line": 9973,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/pixiee-lens/index.html",
+        "line": 9985,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/qr-maker/index.html",
+        "line": 1191,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/qr-maker/index.html",
+        "line": 1195,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/qr-maker/index.html",
+        "line": 1210,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "pixiedraw/assets/js/local-extension-runtime.js",
+        "line": 313,
+        "api": "showOpenFilePicker"
+      },
+      {
+        "source": "pixiedraw/assets/js/local-extension-runtime.js",
+        "line": 781,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "pixiedraw/assets/js/local-extension-runtime.js",
+        "line": 823,
+        "api": "showOpenFilePicker"
+      },
+      {
+        "source": "pixiedraw/assets/js/modules/open-import-workflow-utils.js",
+        "line": 665,
+        "api": "showOpenFilePicker"
+      },
+      {
+        "source": "pixiedraw/assets/js/modules/open-import-workflow-utils.js",
+        "line": 667,
+        "api": "showOpenFilePicker"
+      },
+      {
+        "source": "pixiee-lens/index.html",
+        "line": 9598,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "pixiee-lens/index.html",
+        "line": 9751,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "pixiee-lens/index.html",
+        "line": 9868,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "pixiee-lens/index.html",
+        "line": 9881,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "pixiee-lens/index.html",
+        "line": 9893,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "qr-maker/index.html",
+        "line": 1044,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "qr-maker/index.html",
+        "line": 1048,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "qr-maker/index.html",
+        "line": 1063,
+        "api": "showSaveFilePicker"
+      },
+      {
+        "source": "scripts/pixieed-workspace.js",
+        "line": 31,
+        "api": "showDirectoryPicker"
+      },
+      {
+        "source": "scripts/pixieed-workspace.js",
+        "line": 175,
+        "api": "showDirectoryPicker"
+      }
+    ],
+    "workspace_contract": {
+      "name": "PiXiEED",
+      "directories": [
+        "Projects",
+        "Exports"
+      ],
+      "source": "scripts/pixieed-workspace.js"
+    }
+  },
+  "opfs": {
+    "direct_api_reference_found": false,
+    "status": "not found in scanned source"
+  },
+  "formats": [
+    {
+      "format": ".pxd",
+      "status": "current project/archive path",
+      "sources": [
+        "pixiedraw/index.html",
+        "pixiedraw/assets/js/modules/document-model.js",
+        "pixiedraw/assets/js/modules/project-storage-v2-archive-codec.js"
+      ]
+    },
+    {
+      "format": ".pixieedraw / .pxdraw",
+      "status": "legacy import/compatibility path",
+      "sources": [
+        "market/listing-package-utils.js",
+        "pixiedraw/assets/js/modules/document-model.js"
+      ]
+    },
+    {
+      "format": "PNG/JPEG/GIF/SVG/APNG",
+      "status": "image import/export references",
+      "sources": [
+        "pixiedraw/assets/js/modules/image-utils.js",
+        "pixiedraw/assets/js/modules/export-utils.js"
+      ]
+    },
+    {
+      "format": "Timelapse GIF",
+      "status": "export/replay path",
+      "sources": [
+        "pixiedraw/assets/js/modules/timelapse-dialog-utils.js",
+        "pixiedraw/assets/js/modules/timelapse-replay-utils.js"
+      ]
+    }
+  ],
+  "local_storage_references": [
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/contest/assets/js/contest.js",
+      "line": 74,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/contest/index.html",
+      "line": 1560,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/contest/index.html",
+      "line": 1568,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/contest/index.html",
+      "line": 1574,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/contest/index.html",
+      "line": 1612,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/contest/index.html",
+      "line": 1614,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/contest/index.html",
+      "line": 1693,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/contest/index.html",
+      "line": 1701,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/contest/index.html",
+      "line": 3886,
+      "storage": "localStorage",
+      "key": "pixieed_link_conflict"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/contest/index.html",
+      "line": 3888,
+      "storage": "localStorage",
+      "key": "pixieed_link_conflict"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/contest/index.html",
+      "line": 4288,
+      "storage": "localStorage",
+      "key": "pixieed_link_conflict"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/contest/view.html",
+      "line": 1398,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/contest/view.html",
+      "line": 1405,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/contest/view.html",
+      "line": 1411,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/contest/view.html",
+      "line": 1449,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/contest/view.html",
+      "line": 1451,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/contest/view.html",
+      "line": 1522,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/contest/view.html",
+      "line": 1529,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/contest/view.html",
+      "line": 1976,
+      "storage": "localStorage",
+      "key": "pixieed_link_conflict"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/contest/view.html",
+      "line": 1978,
+      "storage": "localStorage",
+      "key": "pixieed_link_conflict"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/contest/view.html",
+      "line": 2371,
+      "storage": "localStorage",
+      "key": "pixieed_link_conflict"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/en/index.html",
+      "line": 2711,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/en/index.html",
+      "line": 2712,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/en/index.html",
+      "line": 2713,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/en/index.html",
+      "line": 2714,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/en/index.html",
+      "line": 2715,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/en/index.html",
+      "line": 2745,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/en/index.html",
+      "line": 2747,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/maoitu/assets/js/ranking-submit.js",
+      "line": 232,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/maoitu/assets/js/ranking.js",
+      "line": 140,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/maoitu/assets/js/ranking.js",
+      "line": 154,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/maoitu/assets/js/ranking.js",
+      "line": 161,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/pixfind/app.js",
+      "line": 1594,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/pixfind/app.js",
+      "line": 1605,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/pixfind/app.js",
+      "line": 1615,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/pixiee-lens/index.html",
+      "line": 3190,
+      "storage": "localStorage",
+      "key": "pixiee-lens:update-toast-hidden"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/projects/maou-war/index.html",
+      "line": 5615,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/tools.html",
+      "line": 1057,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/tools.html",
+      "line": 1058,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/tools.html",
+      "line": 1059,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/tools.html",
+      "line": 1060,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/tools.html",
+      "line": 1061,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/tools.html",
+      "line": 1091,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/tools.html",
+      "line": 1093,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/release/mergeReleaseAssets/public/maoitu/assets/js/ranking-submit.js",
+      "line": 248,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/release/mergeReleaseAssets/public/maoitu/assets/js/ranking.js",
+      "line": 59,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/release/mergeReleaseAssets/public/maoitu/assets/js/ranking.js",
+      "line": 243,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/release/mergeReleaseAssets/public/maoitu/assets/js/ranking.js",
+      "line": 257,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/release/mergeReleaseAssets/public/maoitu/assets/js/ranking.js",
+      "line": 264,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/release/mergeReleaseAssets/public/maoitu/assets/js/supabase.js",
+      "line": 10,
+      "storage": "localStorage",
+      "key": "pixieed_client_id"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/release/mergeReleaseAssets/public/maoitu/assets/js/supabase.js",
+      "line": 13,
+      "storage": "localStorage",
+      "key": "pixieed_client_id"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/release/mergeReleaseAssets/public/pixfind/app.js",
+      "line": 1816,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/release/mergeReleaseAssets/public/pixfind/app.js",
+      "line": 1827,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/release/mergeReleaseAssets/public/pixfind/app.js",
+      "line": 1837,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/release/mergeReleaseAssets/public/pixfind/app.js",
+      "line": 1874,
+      "storage": "localStorage",
+      "key": "sb-kyyiuakrqomzlikfaire-auth-token"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/release/mergeReleaseAssets/public/portfolio/index.html",
+      "line": 1036,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/release/mergeReleaseAssets/public/portfolio/index.html",
+      "line": 1037,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/release/mergeReleaseAssets/public/portfolio/index.html",
+      "line": 1038,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/release/mergeReleaseAssets/public/portfolio/index.html",
+      "line": 1039,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/release/mergeReleaseAssets/public/portfolio/index.html",
+      "line": 1040,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/release/mergeReleaseAssets/public/portfolio/index.html",
+      "line": 1070,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/release/mergeReleaseAssets/public/portfolio/index.html",
+      "line": 1072,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/release/mergeReleaseAssets/public/scripts/shared-auth-panel.js",
+      "line": 86,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/release/mergeReleaseAssets/public/scripts/shared-auth-panel.js",
+      "line": 95,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/release/mergeReleaseAssets/public/scripts/shared-auth-panel.js",
+      "line": 102,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/release/mergeReleaseAssets/public/scripts/shared-auth-panel.js",
+      "line": 111,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/release/mergeReleaseAssets/public/scripts/shared-auth-panel.js",
+      "line": 143,
+      "storage": "localStorage",
+      "key": "pixieed_profile_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/release/mergeReleaseAssets/public/scripts/shared-auth-panel.js",
+      "line": 153,
+      "storage": "localStorage",
+      "key": "pixieed_profile_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/release/mergeReleaseAssets/public/scripts/shared-auth-panel.js",
+      "line": 155,
+      "storage": "localStorage",
+      "key": "pixieed_profile_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/release/mergeReleaseAssets/public/scripts/shared-auth-panel.js",
+      "line": 162,
+      "storage": "localStorage",
+      "key": "pixieed_client_id"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/release/mergeReleaseAssets/public/scripts/shared-auth-panel.js",
+      "line": 165,
+      "storage": "localStorage",
+      "key": "pixieed_client_id"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/src/main/assets/public/maoitu/assets/js/ranking-submit.js",
+      "line": 248,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/src/main/assets/public/maoitu/assets/js/ranking.js",
+      "line": 59,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/src/main/assets/public/maoitu/assets/js/ranking.js",
+      "line": 243,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/src/main/assets/public/maoitu/assets/js/ranking.js",
+      "line": 257,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/src/main/assets/public/maoitu/assets/js/ranking.js",
+      "line": 264,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/src/main/assets/public/maoitu/assets/js/supabase.js",
+      "line": 10,
+      "storage": "localStorage",
+      "key": "pixieed_client_id"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/src/main/assets/public/maoitu/assets/js/supabase.js",
+      "line": 13,
+      "storage": "localStorage",
+      "key": "pixieed_client_id"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/src/main/assets/public/pixfind/app.js",
+      "line": 1816,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/src/main/assets/public/pixfind/app.js",
+      "line": 1827,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/src/main/assets/public/pixfind/app.js",
+      "line": 1837,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/src/main/assets/public/pixfind/app.js",
+      "line": 1874,
+      "storage": "localStorage",
+      "key": "sb-kyyiuakrqomzlikfaire-auth-token"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/src/main/assets/public/portfolio/index.html",
+      "line": 1036,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/src/main/assets/public/portfolio/index.html",
+      "line": 1037,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/src/main/assets/public/portfolio/index.html",
+      "line": 1038,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/src/main/assets/public/portfolio/index.html",
+      "line": 1039,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/src/main/assets/public/portfolio/index.html",
+      "line": 1040,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/src/main/assets/public/portfolio/index.html",
+      "line": 1070,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/src/main/assets/public/portfolio/index.html",
+      "line": 1072,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/src/main/assets/public/scripts/shared-auth-panel.js",
+      "line": 86,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/src/main/assets/public/scripts/shared-auth-panel.js",
+      "line": 95,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/src/main/assets/public/scripts/shared-auth-panel.js",
+      "line": 102,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/src/main/assets/public/scripts/shared-auth-panel.js",
+      "line": 111,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/src/main/assets/public/scripts/shared-auth-panel.js",
+      "line": 143,
+      "storage": "localStorage",
+      "key": "pixieed_profile_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/src/main/assets/public/scripts/shared-auth-panel.js",
+      "line": 153,
+      "storage": "localStorage",
+      "key": "pixieed_profile_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/src/main/assets/public/scripts/shared-auth-panel.js",
+      "line": 155,
+      "storage": "localStorage",
+      "key": "pixieed_profile_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/src/main/assets/public/scripts/shared-auth-panel.js",
+      "line": 162,
+      "storage": "localStorage",
+      "key": "pixieed_client_id"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/android/app/src/main/assets/public/scripts/shared-auth-panel.js",
+      "line": 165,
+      "storage": "localStorage",
+      "key": "pixieed_client_id"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/dist/web/maoitu/assets/js/ranking-submit.js",
+      "line": 248,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/dist/web/maoitu/assets/js/ranking.js",
+      "line": 59,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/dist/web/maoitu/assets/js/ranking.js",
+      "line": 243,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/dist/web/maoitu/assets/js/ranking.js",
+      "line": 257,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/dist/web/maoitu/assets/js/ranking.js",
+      "line": 264,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/dist/web/maoitu/assets/js/supabase.js",
+      "line": 10,
+      "storage": "localStorage",
+      "key": "pixieed_client_id"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/dist/web/maoitu/assets/js/supabase.js",
+      "line": 13,
+      "storage": "localStorage",
+      "key": "pixieed_client_id"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/dist/web/pixfind/app.js",
+      "line": 1816,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/dist/web/pixfind/app.js",
+      "line": 1827,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/dist/web/pixfind/app.js",
+      "line": 1837,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/dist/web/pixfind/app.js",
+      "line": 1874,
+      "storage": "localStorage",
+      "key": "sb-kyyiuakrqomzlikfaire-auth-token"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/dist/web/portfolio/index.html",
+      "line": 1036,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/dist/web/portfolio/index.html",
+      "line": 1037,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/dist/web/portfolio/index.html",
+      "line": 1038,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/dist/web/portfolio/index.html",
+      "line": 1039,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/dist/web/portfolio/index.html",
+      "line": 1040,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/dist/web/portfolio/index.html",
+      "line": 1070,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/dist/web/portfolio/index.html",
+      "line": 1072,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/dist/web/scripts/shared-auth-panel.js",
+      "line": 86,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/dist/web/scripts/shared-auth-panel.js",
+      "line": 95,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/dist/web/scripts/shared-auth-panel.js",
+      "line": 102,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/dist/web/scripts/shared-auth-panel.js",
+      "line": 111,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/dist/web/scripts/shared-auth-panel.js",
+      "line": 143,
+      "storage": "localStorage",
+      "key": "pixieed_profile_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/dist/web/scripts/shared-auth-panel.js",
+      "line": 153,
+      "storage": "localStorage",
+      "key": "pixieed_profile_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/dist/web/scripts/shared-auth-panel.js",
+      "line": 155,
+      "storage": "localStorage",
+      "key": "pixieed_profile_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/dist/web/scripts/shared-auth-panel.js",
+      "line": 162,
+      "storage": "localStorage",
+      "key": "pixieed_client_id"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/dist/web/scripts/shared-auth-panel.js",
+      "line": 165,
+      "storage": "localStorage",
+      "key": "pixieed_client_id"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/App/App/public/maoitu/assets/js/ranking-submit.js",
+      "line": 248,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/App/App/public/maoitu/assets/js/ranking.js",
+      "line": 59,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/App/App/public/maoitu/assets/js/ranking.js",
+      "line": 243,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/App/App/public/maoitu/assets/js/ranking.js",
+      "line": 257,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/App/App/public/maoitu/assets/js/ranking.js",
+      "line": 264,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/App/App/public/maoitu/assets/js/supabase.js",
+      "line": 10,
+      "storage": "localStorage",
+      "key": "pixieed_client_id"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/App/App/public/maoitu/assets/js/supabase.js",
+      "line": 13,
+      "storage": "localStorage",
+      "key": "pixieed_client_id"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/App/App/public/pixfind/app.js",
+      "line": 1816,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/App/App/public/pixfind/app.js",
+      "line": 1827,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/App/App/public/pixfind/app.js",
+      "line": 1837,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/App/App/public/pixfind/app.js",
+      "line": 1874,
+      "storage": "localStorage",
+      "key": "sb-kyyiuakrqomzlikfaire-auth-token"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/App/App/public/portfolio/index.html",
+      "line": 1036,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/App/App/public/portfolio/index.html",
+      "line": 1037,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/App/App/public/portfolio/index.html",
+      "line": 1038,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/App/App/public/portfolio/index.html",
+      "line": 1039,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/App/App/public/portfolio/index.html",
+      "line": 1040,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/App/App/public/portfolio/index.html",
+      "line": 1070,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/App/App/public/portfolio/index.html",
+      "line": 1072,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/App/App/public/scripts/shared-auth-panel.js",
+      "line": 86,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/App/App/public/scripts/shared-auth-panel.js",
+      "line": 95,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/App/App/public/scripts/shared-auth-panel.js",
+      "line": 102,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/App/App/public/scripts/shared-auth-panel.js",
+      "line": 111,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/App/App/public/scripts/shared-auth-panel.js",
+      "line": 143,
+      "storage": "localStorage",
+      "key": "pixieed_profile_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/App/App/public/scripts/shared-auth-panel.js",
+      "line": 153,
+      "storage": "localStorage",
+      "key": "pixieed_profile_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/App/App/public/scripts/shared-auth-panel.js",
+      "line": 155,
+      "storage": "localStorage",
+      "key": "pixieed_profile_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/App/App/public/scripts/shared-auth-panel.js",
+      "line": 162,
+      "storage": "localStorage",
+      "key": "pixieed_client_id"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/App/App/public/scripts/shared-auth-panel.js",
+      "line": 165,
+      "storage": "localStorage",
+      "key": "pixieed_client_id"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/contest/assets/js/contest.js",
+      "line": 74,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/contest/index.html",
+      "line": 1560,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/contest/index.html",
+      "line": 1568,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/contest/index.html",
+      "line": 1574,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/contest/index.html",
+      "line": 1612,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/contest/index.html",
+      "line": 1614,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/contest/index.html",
+      "line": 1693,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/contest/index.html",
+      "line": 1701,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/contest/index.html",
+      "line": 3886,
+      "storage": "localStorage",
+      "key": "pixieed_link_conflict"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/contest/index.html",
+      "line": 3888,
+      "storage": "localStorage",
+      "key": "pixieed_link_conflict"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/contest/index.html",
+      "line": 4288,
+      "storage": "localStorage",
+      "key": "pixieed_link_conflict"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/contest/view.html",
+      "line": 1398,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/contest/view.html",
+      "line": 1405,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/contest/view.html",
+      "line": 1411,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/contest/view.html",
+      "line": 1449,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/contest/view.html",
+      "line": 1451,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/contest/view.html",
+      "line": 1522,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/contest/view.html",
+      "line": 1529,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/contest/view.html",
+      "line": 1976,
+      "storage": "localStorage",
+      "key": "pixieed_link_conflict"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/contest/view.html",
+      "line": 1978,
+      "storage": "localStorage",
+      "key": "pixieed_link_conflict"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/contest/view.html",
+      "line": 2371,
+      "storage": "localStorage",
+      "key": "pixieed_link_conflict"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/en/index.html",
+      "line": 2711,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/en/index.html",
+      "line": 2712,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/en/index.html",
+      "line": 2713,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/en/index.html",
+      "line": 2714,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/en/index.html",
+      "line": 2715,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/en/index.html",
+      "line": 2745,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/en/index.html",
+      "line": 2747,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/maoitu/assets/js/ranking-submit.js",
+      "line": 232,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/maoitu/assets/js/ranking.js",
+      "line": 140,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/maoitu/assets/js/ranking.js",
+      "line": 154,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/maoitu/assets/js/ranking.js",
+      "line": 161,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/pixfind/app.js",
+      "line": 1594,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/pixfind/app.js",
+      "line": 1605,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/pixfind/app.js",
+      "line": 1615,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/pixiee-lens/index.html",
+      "line": 3190,
+      "storage": "localStorage",
+      "key": "pixiee-lens:update-toast-hidden"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/projects/maou-war/index.html",
+      "line": 5615,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/tools.html",
+      "line": 1057,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/tools.html",
+      "line": 1058,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/tools.html",
+      "line": 1059,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/tools.html",
+      "line": 1060,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/tools.html",
+      "line": 1061,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/tools.html",
+      "line": 1091,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/tools.html",
+      "line": 1093,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/contest/assets/js/contest.js",
+      "line": 74,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/contest/view.html",
+      "line": 1527,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/contest/view.html",
+      "line": 1534,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/contest/view.html",
+      "line": 1540,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/contest/view.html",
+      "line": 1578,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/contest/view.html",
+      "line": 1580,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/contest/view.html",
+      "line": 1652,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/contest/view.html",
+      "line": 1659,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/contest/view.html",
+      "line": 2400,
+      "storage": "localStorage",
+      "key": "pixieed_link_conflict"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/contest/view.html",
+      "line": 2402,
+      "storage": "localStorage",
+      "key": "pixieed_link_conflict"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/contest/view.html",
+      "line": 2812,
+      "storage": "localStorage",
+      "key": "pixieed_link_conflict"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/maoitu/assets/js/ranking-submit.js",
+      "line": 232,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/maoitu/assets/js/ranking.js",
+      "line": 140,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/maoitu/assets/js/ranking.js",
+      "line": 154,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/maoitu/assets/js/ranking.js",
+      "line": 161,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/pixiee-lens/index.html",
+      "line": 3196,
+      "storage": "localStorage",
+      "key": "pixiee-lens:update-toast-hidden"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/portfolio/index.html",
+      "line": 1038,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/portfolio/index.html",
+      "line": 1039,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/portfolio/index.html",
+      "line": 1040,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/portfolio/index.html",
+      "line": 1041,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/portfolio/index.html",
+      "line": 1042,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/portfolio/index.html",
+      "line": 1072,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/portfolio/index.html",
+      "line": 1074,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/scripts/ads-lazy.js",
+      "line": 10,
+      "storage": "localStorage",
+      "key": "pixieed_browser_adfree_cache_v1"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/scripts/bottom-nav-footer-ad.js",
+      "line": 26,
+      "storage": "localStorage",
+      "key": "pixieed_browser_adfree_cache_v1"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/scripts/pixieed-dot-stats.js",
+      "line": 19,
+      "storage": "localStorage",
+      "key": "pixieed_browser_adfree_cache_v1"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/scripts/shared-auth-panel.js",
+      "line": 21,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/scripts/shared-auth-panel.js",
+      "line": 29,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/scripts/shared-auth-panel.js",
+      "line": 35,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/scripts/shared-auth-panel.js",
+      "line": 44,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/scripts/shared-auth-panel.js",
+      "line": 79,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/scripts/shared-auth-panel.js",
+      "line": 89,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/scripts/shared-auth-panel.js",
+      "line": 91,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/scripts/shared-profile-header.js",
+      "line": 226,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/scripts/shared-profile-header.js",
+      "line": 234,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/scripts/shared-profile-header.js",
+      "line": 240,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/scripts/shared-profile-header.js",
+      "line": 249,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/scripts/shared-profile-header.js",
+      "line": 255,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/scripts/shared-profile-header.js",
+      "line": 265,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/scripts/shared-profile-header.js",
+      "line": 267,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "app-shell/pixieed-capacitor/ios/build/PiXiEED-unsigned.xcarchive/Products/Applications/App.app/public/scripts.js",
+      "line": 21,
+      "storage": "localStorage",
+      "key": "pixieed_browser_adfree_cache_v1"
+    },
+    {
+      "source": "maoitu/assets/js/ranking-submit.js",
+      "line": 248,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "maoitu/assets/js/ranking.js",
+      "line": 59,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "maoitu/assets/js/ranking.js",
+      "line": 243,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "maoitu/assets/js/ranking.js",
+      "line": 257,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "maoitu/assets/js/ranking.js",
+      "line": 264,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "maoitu/assets/js/supabase.js",
+      "line": 10,
+      "storage": "localStorage",
+      "key": "pixieed_client_id"
+    },
+    {
+      "source": "maoitu/assets/js/supabase.js",
+      "line": 13,
+      "storage": "localStorage",
+      "key": "pixieed_client_id"
+    },
+    {
+      "source": "pixfind/app.js",
+      "line": 2469,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "pixfind/app.js",
+      "line": 2480,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "pixfind/app.js",
+      "line": 2490,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "pixfind/app.js",
+      "line": 2543,
+      "storage": "localStorage",
+      "key": "sb-kyyiuakrqomzlikfaire-auth-token"
+    },
+    {
+      "source": "portfolio/index.html",
+      "line": 1036,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "portfolio/index.html",
+      "line": 1037,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "portfolio/index.html",
+      "line": 1038,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "portfolio/index.html",
+      "line": 1039,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "portfolio/index.html",
+      "line": 1040,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "portfolio/index.html",
+      "line": 1070,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "portfolio/index.html",
+      "line": 1072,
+      "storage": "localStorage",
+      "key": "pixieed_x_url"
+    },
+    {
+      "source": "q/1/index.html",
+      "line": 10,
+      "storage": "localStorage",
+      "key": "pixieed-qr-target-1"
+    },
+    {
+      "source": "scripts/shared-auth-panel.js",
+      "line": 86,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "scripts/shared-auth-panel.js",
+      "line": 95,
+      "storage": "localStorage",
+      "key": "pixieed_nickname"
+    },
+    {
+      "source": "scripts/shared-auth-panel.js",
+      "line": 102,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "scripts/shared-auth-panel.js",
+      "line": 111,
+      "storage": "localStorage",
+      "key": "pixieed_avatar"
+    },
+    {
+      "source": "scripts/shared-auth-panel.js",
+      "line": 143,
+      "storage": "localStorage",
+      "key": "pixieed_profile_url"
+    },
+    {
+      "source": "scripts/shared-auth-panel.js",
+      "line": 153,
+      "storage": "localStorage",
+      "key": "pixieed_profile_url"
+    },
+    {
+      "source": "scripts/shared-auth-panel.js",
+      "line": 155,
+      "storage": "localStorage",
+      "key": "pixieed_profile_url"
+    },
+    {
+      "source": "scripts/shared-auth-panel.js",
+      "line": 162,
+      "storage": "localStorage",
+      "key": "pixieed_client_id"
+    },
+    {
+      "source": "scripts/shared-auth-panel.js",
+      "line": 165,
+      "storage": "localStorage",
+      "key": "pixieed_client_id"
+    }
+  ],
+  "synthetic_fixtures": [
+    "docs/inventory/fixtures/legacy-pixiedraw-v1.synthetic.json",
+    "docs/inventory/fixtures/market-purchase.synthetic.json",
+    "docs/inventory/fixtures/pixisync-convergence.synthetic.json"
+  ],
+  "privacy_boundary": "No user creative content, real account identifiers, access tokens, or production object names are stored in fixtures."
+}

@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pixieed.jp/schemas/project-state-v1.json",
+  "title": "PiXiEED Minimal Project State v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "projectId",
+    "structureEpoch",
+    "assets",
+    "appliedCommandIds",
+    "lastClientSequenceByClient"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "projectId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "structureEpoch": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "assets": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/rasterAsset"
+      }
+    },
+    "appliedCommandIds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "lastClientSequenceByClient": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    }
+  },
+  "$defs": {
+    "rasterAsset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "revision",
+        "width",
+        "height",
+        "palette",
+        "pixels"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "palette": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          }
+        },
+        "pixels": {
+          "description": "Canonical serialized Uint8Array representation.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "$type",
+            "data"
+          ],
+          "properties": {
+            "$type": {
+              "const": "Uint8Array"
+            },
+            "data": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

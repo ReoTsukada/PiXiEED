@@ -535,7 +535,7 @@
   }
 
   async function stagePiXiEEDrawFile(blob, metadata = {}) {
-    if (!(blob instanceof Blob)) throw new Error('PiXiEEDrawで開く素材を準備できませんでした。');
+    if (!(blob instanceof Blob)) throw new Error('iDRAWで開く素材を準備できませんでした。');
     const token = crypto.randomUUID ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
     const db = await openTransferDb();
     try {
@@ -551,8 +551,8 @@
           expiresAt: Date.now() + 5 * 60 * 1000
         });
         transaction.oncomplete = resolve;
-        transaction.onerror = () => reject(transaction.error || new Error('PiXiEEDrawへの受け渡しを保存できませんでした。'));
-        transaction.onabort = () => reject(transaction.error || new Error('PiXiEEDrawへの受け渡しが中断されました。'));
+        transaction.onerror = () => reject(transaction.error || new Error('iDRAWへの受け渡しを保存できませんでした。'));
+        transaction.onabort = () => reject(transaction.error || new Error('iDRAWへの受け渡しが中断されました。'));
       });
     } finally {
       db.close();

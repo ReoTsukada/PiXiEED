@@ -1,0 +1,31 @@
+schema_version: 1
+program_id: PIXIEED-IMPLEMENTATION-PROGRAM-001
+current_work_package: WP-000
+status: not_started
+repository_commit: null
+started_at: null
+updated_at: null
+
+completed_work_packages: []
+
+current:
+  completed: []
+  remaining: []
+  files_changed: []
+  migrations: []
+  tests_passed: []
+  tests_failed: []
+  risks: []
+  decisions: []
+  blockers: []
+
+next_work_package: WP-000
+resume_command: "Read AGENTS.md, PLANS.md, MODEL_ROUTING.md, and this state file; continue the current unblocked Work Package without repeating completed work."
+
+
+model_routing:
+  implementation_default: luna_max
+  escalation_model: terra
+  high_risk_model: sol
+  independent_review_required_for_high_risk: true
+  repeated_failure_escalation_threshold: 2

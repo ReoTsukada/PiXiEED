@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "workPackage": "WP-250",
+  "status": "MEASURED_LOCAL_SYNTHETIC",
+  "benchmarkId": "WP250_POLICY_ECONOMICS_SYNTHETIC",
+  "iterations": 10000,
+  "successful": 10000,
+  "elapsedMs": 20.273,
+  "operationsPerSecond": 493271.97,
+  "scope": [
+    "consent and region policy",
+    "public Ad eligibility and reserved slot",
+    "Revenue/Cost shadow projection",
+    "Organic/Sponsored Search",
+    "Admin Audit reference",
+    "Moderation Case/Decision"
+  ],
+  "notAProductionPass": true,
+  "notes": [
+    "No provider, database, storage, financial, production, or user data was accessed.",
+    "Synthetic result is not a production policy, provider, moderation, revenue, browser, device, or performance PASS."
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "format": "pxd",
+  "schemaVersion": 1,
+  "packageId": "package-1",
+  "projectId": "project-1",
+  "createdBy": {
+    "application": "PiXiEED",
+    "version": "0.1.0"
+  },
+  "assets": [
+    {
+      "assetId": "asset-1",
+      "revisionId": "revision-1",
+      "mediaType": "application/octet-stream",
+      "path": "assets/asset-1.bin",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 4
+    }
+  ],
+  "dependencies": []
+}

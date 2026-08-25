@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "workPackage": "WP-240",
+  "status": "IMPLEMENTED_ISOLATED",
+  "sourceStatus": "RECONSTRUCTED_FROM_APPROVED_SOURCES",
+  "scope": ["permission-gated-admin-projection", "privacy-safe-analytics", "public-only-ad-placement", "moderation-reference", "shadow-only-revenue-comparison", "default-off-rollback"],
+  "admin": {"serverPermissionRequired": true, "clientOverrideAuthority": false, "readOnly": true, "canonicalMutation": false},
+  "analytics": {"boundedMetadataOnly": true, "rejects": ["JWT", "Email", "Secret", "Project content", "Commission body", "Payment", "Purchase", "Entitlement", "License", "Royalty", "Ledger"]},
+  "ads": {"allowed": ["PUBLIC_DISCOVERY", "PUBLIC_FEED", "MARKET_LISTING", "PUBLIC_RESOURCE"], "excluded": ["ACTIVE_STUDIO", "CHECKOUT", "ENTITLEMENT", "COMMISSION", "ACCOUNT_PRIVATE", "PROJECT_PRIVATE"], "commerceMutation": false},
+  "moderation": {"actions": ["REPORT", "HIDE", "REMOVE", "RESTRICT", "SUSPEND", "APPEAL"], "bodyCopied": false, "targetMutation": false},
+  "revenue": {"mode": "READ_ONLY_COMPARISON", "ledgerMutation": false, "payoutMutation": false},
+  "featureFlags": {"admin-projection-read": false, "analytics-write": false, "ads-public-read": false, "moderation-reference-read": false, "revenue-shadow-read": false, "killSwitch": "SUPPORTED_SHADOW_ROLLBACK_ONLY"},
+  "nonIntrusion": {"currentRoutes": "PRESERVED", "currentAdmin": "PRESERVED", "market": "PRESERVED", "ads": "PRESERVED", "productionDatabase": "NOT_ACCESSED", "productionStorage": "NOT_ACCESSED", "productionFinance": "NOT_ACCESSED"},
+  "baselineFailureIdentity": {"existing": 14, "new": 0, "status": "INHERITED_APPROVED_IDENTITY_NOT_REEXECUTED"},
+  "untested": ["real Admin RPC/RLS", "Analytics pipeline", "ad provider delivery", "moderation console", "financial reconciliation", "production performance"]
+}

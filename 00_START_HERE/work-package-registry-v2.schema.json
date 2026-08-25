@@ -1,0 +1,196 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pixieed.invalid/schema/work-package-registry-v2.json",
+  "title": "PiXiEED Work Package Registry v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "programId",
+    "updatedAt",
+    "authority",
+    "globalContext",
+    "historicalCompleted",
+    "phases",
+    "packages"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 2 },
+    "programId": { "$ref": "#/$defs/nonEmptyString" },
+    "updatedAt": { "$ref": "#/$defs/nonEmptyString" },
+    "authority": {
+      "oneOf": [
+        { "$ref": "#/$defs/nonEmptyString" },
+        { "type": "object", "additionalProperties": true }
+      ]
+    },
+    "globalContext": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/nonEmptyString" }
+    },
+    "historicalCompleted": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          { "$ref": "#/$defs/nonEmptyString" },
+          { "$ref": "#/$defs/historicalPackage" }
+        ]
+      }
+    },
+    "phases": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          { "$ref": "#/$defs/nonEmptyString" },
+          { "$ref": "#/$defs/phase" }
+        ]
+      }
+    },
+    "packages": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/package" }
+    }
+  },
+  "$defs": {
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?![A-Za-z]:[\\\\/])[^\\\\u0000]+$"
+    },
+    "phase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title"],
+      "properties": {
+        "id": { "$ref": "#/$defs/nonEmptyString" },
+        "title": { "$ref": "#/$defs/nonEmptyString" },
+        "order": { "type": "integer", "minimum": 0 },
+        "description": { "type": "string" }
+      }
+    },
+    "historicalPackage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": { "$ref": "#/$defs/nonEmptyString" },
+        "title": { "type": "string" },
+        "status": { "type": "string" }
+      }
+    },
+    "routeModel": {
+      "enum": [
+        "luna_high",
+        "luna_max",
+        "terra",
+        "terra_high",
+        "terra_max",
+        "sol",
+        "sol_high",
+        "sol_max",
+        "owner",
+        "external_audit"
+      ]
+    },
+    "implementationRoute": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["model", "reasoning", "parallelism"],
+      "properties": {
+        "model": { "$ref": "#/$defs/routeModel" },
+        "reasoning": { "$ref": "#/$defs/nonEmptyString" },
+        "parallelism": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "reviewRoute": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["model", "reasoning", "independent"],
+      "properties": {
+        "model": { "$ref": "#/$defs/routeModel" },
+        "reasoning": { "$ref": "#/$defs/nonEmptyString" },
+        "independent": { "const": true }
+      }
+    },
+    "package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "phase",
+        "status",
+        "kind",
+        "dependsOn",
+        "definition",
+        "contextFiles",
+        "allowedWriteGlobs",
+        "forbiddenActions",
+        "acceptanceIds",
+        "verificationLevel",
+        "implementationRoute",
+        "reviewRoute",
+        "nextPackage",
+        "autoStartNext"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/nonEmptyString" },
+        "title": { "$ref": "#/$defs/nonEmptyString" },
+        "phase": { "$ref": "#/$defs/nonEmptyString" },
+        "status": { "$ref": "#/$defs/nonEmptyString" },
+        "kind": { "$ref": "#/$defs/nonEmptyString" },
+        "dependsOn": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/nonEmptyString" }
+        },
+        "definition": {
+          "oneOf": [
+            { "$ref": "#/$defs/path" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["path"],
+              "properties": {
+                "path": { "$ref": "#/$defs/path" },
+                "summary": { "type": "string" }
+              }
+            }
+          ]
+        },
+        "contextFiles": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/path" }
+        },
+        "allowedWriteGlobs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/nonEmptyString" }
+        },
+        "forbiddenActions": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/nonEmptyString" }
+        },
+        "acceptanceIds": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/nonEmptyString" }
+        },
+        "verificationLevel": { "$ref": "#/$defs/nonEmptyString" },
+        "implementationRoute": { "$ref": "#/$defs/implementationRoute" },
+        "reviewRoute": { "$ref": "#/$defs/reviewRoute" },
+        "nextPackage": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/nonEmptyString" }
+          ]
+        },
+        "autoStartNext": { "const": false }
+      }
+    }
+  }
+}

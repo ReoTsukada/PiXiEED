@@ -1,0 +1,20 @@
+skill_id: BLUEPRINT-BUILDER-002
+input:
+  - .luna/state/DISCOVERY.yaml
+  - GOAL.md
+  - repository_state_if_existing
+precondition: discovery_lock=true
+steps:
+  - derive_product_outcome_target_users_success_metrics_constraints_from_discovery
+  - copy_confirmed_facts_into_blueprint_constraints
+  - copy_safe_assumptions_with_reversibility_metadata
+  - inspect_existing_system_if_any
+  - define_acceptance_outcomes_not_pixel_level_solution
+  - define_experience_architecture_data_security_performance_invariants
+  - create_mutable_solution_hypotheses
+  - build_initial_work_queue_mapped_to_acceptance_outcomes
+  - record_revision_1
+output: .luna/state/PRODUCT_BLUEPRINT.yaml
+anti_patterns:
+  - ask_user_for_reversible_implementation_details_after_discovery_lock
+  - over_specify_implementation_before_evidence

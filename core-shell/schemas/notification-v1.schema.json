@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pixieed.invalid/schema/notification-v1.json",
+  "title": "PiXiEED Notification Core v1",
+  "oneOf": [
+    { "$ref": "#/$defs/notification" },
+    { "$ref": "#/$defs/preferences" },
+    { "$ref": "#/$defs/deliveryAttempt" }
+  ],
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["referenceType", "referenceId"],
+      "properties": {
+        "referenceType": { "type": "string", "minLength": 1, "maxLength": 48 },
+        "referenceId": { "$ref": "#/$defs/id" }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "maxProperties": 32,
+      "additionalProperties": true
+    },
+    "deliveryPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["inApp", "webPush", "mobilePush", "email", "digest", "quietHours", "rateLimited", "mandatory", "suppressedReason"],
+      "properties": {
+        "inApp": { "type": "boolean" },
+        "webPush": { "type": "boolean" },
+        "mobilePush": { "type": "boolean" },
+        "email": { "type": "boolean" },
+        "digest": { "type": "boolean" },
+        "quietHours": { "type": "boolean" },
+        "rateLimited": { "type": "boolean" },
+        "mandatory": { "type": "boolean" },
+        "suppressedReason": { "type": ["string", "null"], "maxLength": 96 }
+      }
+    },
+    "notification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "notificationId", "notificationVersion", "recipientType", "recipientId", "notificationType",
+        "sourceEventId", "sourceEventVersion", "actorReference", "objectReference", "projectReference",
+        "resourceReference", "visibilityClass", "priority", "presentationKey", "presentationMetadata",
+        "groupingKey", "deduplicationKey", "deliveryPolicy", "createdAt", "readAt", "archivedAt", "schemaVersion"
+      ],
+      "properties": {
+        "notificationId": { "$ref": "#/$defs/id" },
+        "notificationVersion": { "const": 1 },
+        "recipientType": { "enum": ["USER", "TEAM", "ACCOUNT"] },
+        "recipientId": { "$ref": "#/$defs/id" },
+        "notificationType": { "enum": [
+          "ACCOUNT_STATE_CHANGED", "SECURITY_ACTION_REQUIRED", "PROJECT_INVITED", "PROJECT_MEMBER_CHANGED",
+          "PROJECT_ACCESS_CHANGED", "PROJECT_MIGRATION_REQUIRES_REVIEW", "ASSET_REVIEW_AVAILABLE",
+          "ASSET_REFERENCE_BROKEN", "ASSET_QUARANTINED", "PACKAGE_READY", "PACKAGE_FAILED",
+          "PACKAGE_QUARANTINED", "TOOL_OPERATION_REQUIRES_REVIEW", "TOOL_COMPATIBILITY_WARNING"
+        ] },
+        "sourceEventId": { "$ref": "#/$defs/id" },
+        "sourceEventVersion": { "type": "integer", "minimum": 1 },
+        "actorReference": { "anyOf": [{ "$ref": "#/$defs/reference" }, { "type": "null" }] },
+        "objectReference": { "$ref": "#/$defs/reference" },
+        "projectReference": { "anyOf": [{ "$ref": "#/$defs/reference" }, { "type": "null" }] },
+        "resourceReference": { "anyOf": [{ "$ref": "#/$defs/reference" }, { "type": "null" }] },
+        "visibilityClass": { "enum": ["PRIVATE", "RECIPIENT_ONLY", "PROJECT_MEMBERS", "CREATOR_PRIVATE", "PUBLIC_SAFE"] },
+        "priority": { "enum": ["LOW", "NORMAL", "HIGH", "CRITICAL"] },
+        "presentationKey": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "presentationMetadata": { "$ref": "#/$defs/metadata" },
+        "groupingKey": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "deduplicationKey": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "deliveryPolicy": { "$ref": "#/$defs/deliveryPolicy" },
+        "createdAt": { "$ref": "#/$defs/timestamp" },
+        "readAt": { "anyOf": [{ "$ref": "#/$defs/timestamp" }, { "type": "null" }] },
+        "archivedAt": { "anyOf": [{ "$ref": "#/$defs/timestamp" }, { "type": "null" }] },
+        "schemaVersion": { "const": 1 }
+      }
+    },
+    "quietHours": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["enabled", "startMinute", "endMinute", "timezone"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "startMinute": { "type": "integer", "minimum": 0, "maximum": 1439 },
+        "endMinute": { "type": "integer", "minimum": 0, "maximum": 1439 },
+        "timezone": { "type": "string", "minLength": 1, "maxLength": 64 }
+      }
+    },
+    "preferences": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["category", "inAppEnabled", "pushEnabled", "emailEnabled", "digestEnabled", "mutedProjectIds", "mutedResourceIds", "mutedActorIds", "quietHours", "locale", "timezone"],
+      "properties": {
+        "category": { "enum": ["ACCOUNT_SECURITY", "PROJECT", "ASSET", "PACKAGE", "TOOL", "MARKETING_FUTURE"] },
+        "inAppEnabled": { "type": "boolean" },
+        "pushEnabled": { "type": "boolean" },
+        "emailEnabled": { "type": "boolean" },
+        "digestEnabled": { "type": "boolean" },
+        "mutedProjectIds": { "type": "array", "maxItems": 64, "items": { "$ref": "#/$defs/id" } },
+        "mutedResourceIds": { "type": "array", "maxItems": 64, "items": { "$ref": "#/$defs/id" } },
+        "mutedActorIds": { "type": "array", "maxItems": 64, "items": { "$ref": "#/$defs/id" } },
+        "quietHours": { "$ref": "#/$defs/quietHours" },
+        "locale": { "type": "string", "pattern": "^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$" },
+        "timezone": { "type": "string", "minLength": 1, "maxLength": 64 }
+      }
+    },
+    "deliveryAttempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["deliveryAttemptId", "notificationId", "channel", "providerReference", "state", "attemptNumber", "retryable", "diagnosticCode", "createdAt", "completedAt"],
+      "properties": {
+        "deliveryAttemptId": { "$ref": "#/$defs/id" },
+        "notificationId": { "$ref": "#/$defs/id" },
+        "channel": { "enum": ["IN_APP", "WEB_PUSH", "MOBILE_PUSH", "EMAIL", "DIGEST"] },
+        "providerReference": { "anyOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] },
+        "state": { "enum": ["PENDING", "SENT", "DELIVERED", "FAILED", "SUPPRESSED", "CANCELLED"] },
+        "attemptNumber": { "type": "integer", "minimum": 1 },
+        "retryable": { "type": "boolean" },
+        "diagnosticCode": { "anyOf": [{ "type": "string", "maxLength": 96 }, { "type": "null" }] },
+        "createdAt": { "$ref": "#/$defs/timestamp" },
+        "completedAt": { "anyOf": [{ "$ref": "#/$defs/timestamp" }, { "type": "null" }] }
+      }
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "benchmarkId": "WP210_MARKET_RIGHTS_SYNTHETIC",
+  "status": "MEASURED_LOCAL_SYNTHETIC",
+  "iterations": 10000,
+  "successful": 10000,
+  "elapsedMs": 20.132,
+  "operationsPerSecond": 496730.89,
+  "notes": [
+    "Pure projection/reconciliation only; no provider, database, Storage, route, or production data was accessed.",
+    "This is not a checkout, browser compositor, device, memory, or production performance PASS."
+  ]
+}

@@ -1,0 +1,12 @@
+policy_id: HARNESS-MEMORY-001
+promotion_triggers:
+  repeated_same_class_finding: 2
+  repeated_manual_verification: 2
+  data_loss_or_corruption_risk: 1
+  auth_finance_boundary: 1
+  performance_regression: 2
+  lifecycle_resource_leak: 2
+  repeated_research_question: 2
+order: [reuse, extend, compose, create]
+required_metadata: [owner, purpose, scope, trigger, evidence, cost, expected_benefit, retirement_rule]
+repository_memory_priority: [state, blueprint, decisions, caches, tests, harnesses, conversation]

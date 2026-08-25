@@ -1,0 +1,56 @@
+{
+  "id": "WP-090-CORE-SHELL-VISUAL-001",
+  "status": "BASELINE_REGISTERED_ISOLATED",
+  "source": "/core-shell/",
+  "deterministic": {
+    "themes": [
+      "light",
+      "dark"
+    ],
+    "reducedMotion": true,
+    "dynamicClock": false,
+    "randomIds": false,
+    "animations": "disabled"
+  },
+  "viewports": [
+    {
+      "id": "390x844",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "id": "540x900",
+      "width": 540,
+      "height": 900
+    },
+    {
+      "id": "900x900",
+      "width": 900,
+      "height": 900
+    },
+    {
+      "id": "1440x900",
+      "width": 1440,
+      "height": 900
+    }
+  ],
+  "themes": [
+    "light",
+    "dark"
+  ],
+  "states": [
+    "default",
+    "loading",
+    "empty",
+    "error",
+    "permission-denied",
+    "offline",
+    "dialog",
+    "mobile-sheet"
+  ],
+  "imagePattern": "core-shell/{viewport}/{theme}/{state}.png",
+  "semanticInteractionTestsRemainRequired": true,
+  "reference": {
+    "wp080InitialSourceBytes": 62052
+  }
+}

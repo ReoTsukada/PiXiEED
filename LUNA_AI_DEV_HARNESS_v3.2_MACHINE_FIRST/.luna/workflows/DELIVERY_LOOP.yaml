@@ -1,0 +1,38 @@
+workflow_id: DELIVERY-LOOP-002
+precondition: discovery_lock=true
+loop_until: work_package_completion_or_stop_condition
+steps:
+  - build_minimal_context_pack
+  - verify_blueprint_links
+  - run_global_coherence_gate_if_material_change
+  - run_evidence_value_gate
+  - resolve_ambiguity_without_user_question
+  - acquire_only_required_research_or_comparison
+  - design_smallest_safe_complete_solution
+  - create_or_identify_repro_test_or_benchmark_when_useful
+  - implement
+  - run_targeted_tests
+  - fix_by_evidence
+  - run_risk_weighted_regression_checks
+  - run_required_review_only
+  - update_state_decisions_caches_failure_memory
+  - promote_repeated_findings_to_harness
+  - verify_completion_criteria
+resolve_ambiguity_without_user_question:
+  order:
+    - canonical_state_or_decision
+    - cached_evidence
+    - targeted_research_if_positive_value
+    - reversible_default
+    - option_preserving_architecture
+    - cheap_comparison_or_prototype
+    - safe_assumption
+on_complete:
+  - mark_work_package_complete
+  - select_next_highest_value_unblocked_work_package
+  - continue_without_ordinary_user_question
+stop_conditions:
+  - hard_human_approval_for_external_or_irreversible_action
+  - missing_external_credential_or_resource_that_cannot_be_bypassed
+  - unsafe_or_legally_unclear_action_that_cannot_be_avoided
+  - budget_hard_limit

@@ -21,6 +21,27 @@
   margin: 0 auto;
 }
 
+.pixieed-site-header__brand-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pixieed-site-header__collapse {
+  display: none;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(148, 163, 184, .2);
+  border-radius: 8px;
+  color: #aebbd0;
+  background: transparent;
+  cursor: pointer;
+  font: 700 18px/1 system-ui, sans-serif;
+}
+
 .pixieed-site-header__brand,
 .pixieed-site-header__nav a,
 .pixieed-site-header__actions a {
@@ -109,6 +130,25 @@
   padding: 0 11px;
 }
 
+.pixieed-site-header__nav-icon {
+  display: none;
+  width: 18px;
+  margin-right: 8px;
+  color: #72e6d5;
+  font-size: 15px;
+  line-height: 1;
+  text-align: center;
+}
+
+.pixieed-site-header__nav-icon svg {
+  display: block;
+  width: 17px;
+  height: 17px;
+  fill: currentColor;
+  stroke: currentColor;
+  stroke-width: 0;
+}
+
 .pixieed-site-header__nav a:hover,
 .pixieed-site-header__nav a:focus-visible,
 .pixieed-site-header__nav a[aria-current="page"],
@@ -161,23 +201,25 @@
 }
 
 @media (max-width: 860px) {
-  .pixieed-site-header__inner {
-    grid-template-columns: minmax(150px, 1fr) auto;
-    gap: 8px;
-  }
-
-  .pixieed-site-header__nav {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    justify-content: flex-start;
-    width: calc(100vw - 32px);
-    margin-inline: auto;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-
-  .pixieed-site-header__nav::-webkit-scrollbar {
+  /* Global navigation is already represented by the fixed bottom rail on
+     touch layouts. Keep this header as a compact brand/context bar; page
+     specific tabs remain in the page content instead of duplicating the
+     global destinations here. */
+  body.pixieed-public-shell .pixieed-site-header__nav {
     display: none;
+  }
+
+  body.pixieed-public-shell .pixieed-site-header__actions {
+    justify-content: flex-end;
+  }
+
+  body.pixieed-public-shell .pixieed-site-header__actions a {
+    display: none;
+  }
+
+  .pixieed-site-header__inner {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
   }
 
   .pixieed-site-header__inner {
@@ -197,5 +239,182 @@
 
   .pixieed-site-header__nav {
     width: calc(100vw - 20px);
+  }
+}
+
+@media (min-width: 861px) {
+  body.pixieed-public-shell {
+    padding-left: 220px;
+    transition: padding-left 180ms ease;
+  }
+
+  body.pixieed-public-shell .pixieed-site-header {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: 220px;
+    height: 100vh;
+    border-right: 1px solid rgba(148, 163, 184, .16);
+    border-bottom: 0;
+    box-shadow: 10px 0 34px rgba(2, 6, 23, .14);
+    transition: width 180ms ease;
+  }
+
+  body.pixieed-public-shell .pixieed-site-header__inner {
+    display: flex;
+    width: auto;
+    height: 100%;
+    min-height: 0;
+    box-sizing: border-box;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    padding: 18px 14px;
+  }
+
+  body.pixieed-public-shell .pixieed-site-header__brand-row {
+    min-height: 42px;
+  }
+
+  body.pixieed-public-shell .pixieed-site-header__collapse {
+    display: block;
+  }
+
+  body.pixieed-public-shell .pixieed-site-header__collapse:hover,
+  body.pixieed-public-shell .pixieed-site-header__collapse:focus-visible {
+    border-color: rgba(114, 230, 213, .5);
+    color: #f8fafc;
+    background: rgba(114, 230, 213, .08);
+    outline: none;
+  }
+
+  body.pixieed-public-shell .pixieed-site-header__nav {
+    width: 100%;
+    margin-top: 30px;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 6px;
+  }
+
+  body.pixieed-public-shell .pixieed-site-header__nav a {
+    min-height: 42px;
+    justify-content: flex-start;
+    gap: 0;
+    padding: 0 12px;
+  }
+
+  body.pixieed-public-shell .pixieed-site-header__nav-icon {
+    display: inline-block;
+  }
+
+  body.pixieed-public-shell .pixieed-site-header__actions {
+    width: 100%;
+    margin-top: auto;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+
+  body.pixieed-public-shell .pixieed-site-header__actions a,
+  body.pixieed-public-shell .pixieed-site-header__language {
+    width: 100%;
+  }
+
+  body.pixieed-public-shell.is-public-nav-collapsed {
+    padding-left: 72px;
+  }
+
+  /* Keep the temporary Figma-style peek from covering page headings or
+     controls. The content follows the rail only while the rail is open by
+     pointer or keyboard focus; the collapsed preference remains unchanged. */
+  body.pixieed-public-shell.is-public-nav-collapsed:has(.pixieed-site-header:hover),
+  body.pixieed-public-shell.is-public-nav-collapsed:has(.pixieed-site-header:focus-within) {
+    padding-left: 220px;
+  }
+
+  body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header {
+    width: 72px;
+  }
+
+  body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header__inner {
+    padding-inline: 10px;
+  }
+
+  body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header__brand-row {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header__brand-copy,
+  body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header__nav a > span:not(.pixieed-site-header__nav-icon),
+  body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header__tool-group > summary > span:not(.pixieed-site-header__nav-icon),
+  body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header__actions a,
+  body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header__language {
+    display: none !important;
+  }
+
+  body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header__nav a {
+    justify-content: center;
+    padding-inline: 0;
+  }
+
+  body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header__nav-icon {
+    width: auto;
+    margin-right: 0;
+    font-size: 17px;
+  }
+
+  /* Figma-style peek: a collapsed rail stays out of the way, but the full
+     navigation temporarily returns when the pointer reaches the left rail or
+     keyboard focus enters it. The stored collapsed preference is untouched. */
+  body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header:hover,
+  body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header:focus-within {
+    width: 220px !important;
+    box-shadow: 10px 0 34px rgba(2, 6, 23, .22);
+  }
+
+  body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header:hover .pixieed-site-header__inner,
+  body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header:focus-within .pixieed-site-header__inner {
+    padding-inline: 14px !important;
+  }
+
+  body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header:hover .pixieed-site-header__brand-row,
+  body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header:focus-within .pixieed-site-header__brand-row {
+    flex-direction: row;
+    gap: 8px;
+  }
+
+  body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header:hover .pixieed-site-header__brand-copy,
+  body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header:focus-within .pixieed-site-header__brand-copy,
+  body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header:hover .pixieed-site-header__nav a > span:not(.pixieed-site-header__nav-icon),
+  body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header:focus-within .pixieed-site-header__nav a > span:not(.pixieed-site-header__nav-icon),
+  body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header:hover .pixieed-site-header__tool-group > summary > span:not(.pixieed-site-header__nav-icon),
+  body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header:focus-within .pixieed-site-header__tool-group > summary > span:not(.pixieed-site-header__nav-icon),
+  body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header:hover .pixieed-site-header__actions a,
+  body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header:focus-within .pixieed-site-header__actions a,
+  body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header:hover .pixieed-site-header__language,
+  body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header:focus-within .pixieed-site-header__language {
+    display: inline-flex !important;
+  }
+
+  body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header:hover .pixieed-site-header__nav a,
+  body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header:focus-within .pixieed-site-header__nav a {
+    justify-content: flex-start;
+    padding-inline: 12px;
+  }
+
+  body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header:hover .pixieed-site-header__nav-icon,
+  body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header:focus-within .pixieed-site-header__nav-icon {
+    width: 18px;
+    margin-right: 8px;
+    font-size: 15px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.pixieed-public-shell,
+  body.pixieed-public-shell .pixieed-site-header {
+    transition: none;
   }
 }

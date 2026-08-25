@@ -1,0 +1,86 @@
+{
+  "schemaVersion": "AGENT_PACKAGE_PREFLIGHT_MANIFEST_V1",
+  "packageId": "PIXYNC-DRAW2-160",
+  "classification": "FIXED_SYNTHETIC",
+  "network": false,
+  "productionAccess": false,
+  "realData": false,
+  "staticOnly": true,
+  "executionPolicy": {
+    "mode": "BALANCED",
+    "contract": "required-before-implementation",
+    "changeBudget": { "maxChangedLines": 500, "maxFiles": 4, "maxRetries": 2, "maxFullAudits": 1, "maxFullEvidenceRuns": 1 },
+    "testTiers": { "specialistMax": 1, "integratorMax": 2, "finalMax": 4 },
+    "maxAffectedDiffReviews": 1,
+    "maxReleaseGateFullAudits": 1,
+    "maxFullEvidenceRuns": 1,
+    "evidenceRuns": 1,
+    "terraMode": "READ_ONLY_FINAL",
+    "specialistPolicy": "DISJOINT_ONLY",
+    "integratorTier": 2,
+    "sameCategoryEscalation": "SOL"
+  },
+  "requiredRiskClasses": ["authority", "security", "privacy", "lifecycle"],
+  "publicEntrypoints": ["pixiedraw2/src/pixync/project-lifecycle.ts"],
+  "serverOnlyCompositionRoots": ["pixiedraw2/src/pixync/composition-root.ts"],
+  "forbiddenPublicExports": ["PixyncProductionDurability", "createSupabasePixyncDurability", "resolveProductionEnvelope"],
+  "forbiddenPublicConstructors": ["PixyncProductionDurability", "SupabasePixyncDurability"],
+  "forbiddenPublicFactories": ["createSupabasePixyncDurability", "createProductionPixyncDurability"],
+  "resolverBindings": [{
+    "name": "draw2-160-product-wiring-project-binding",
+    "requested": { "id": "project-a", "type": "PIXYNC_PROJECT", "tenant": "local", "version": "1", "surface": "DRAW2", "cardType": "DRAW2" },
+    "returned": { "id": "project-b", "type": "PIXYNC_PROJECT", "tenant": "other", "version": "2", "surface": "GAME", "cardType": "GAME" },
+    "expectedOutcome": "REJECT",
+    "reasonCode": "CANONICAL_IDENTITY_MISMATCH"
+  }],
+  "eventBindings": [{
+    "name": "draw2-160-common-workspace-event",
+    "lookup": { "eventId": "pixiedraw2:project-changed", "projectId": "project-a", "source": "workspace", "payloadHash": "hash-a", "aggregate": "draw", "version": 1 },
+    "resolved": { "eventId": "substituted:event", "projectId": "project-b", "source": "caller", "payloadHash": "hash-b", "aggregate": "game", "version": 2 },
+    "expectedOutcome": "REJECT",
+    "reasonCode": "CANONICAL_EVENT_ID_REQUIRED"
+  }],
+  "boundaryMatrix": [
+    { "id": "AUTHORITY-ROOT-001", "riskClass": "authority", "boundary": "product wiring caller injection", "expectedOutcome": "REJECT", "reasonCode": "CALLER_INJECTION_REJECTED" },
+    { "id": "RESOLVER-IDENTITY-001", "riskClass": "security", "boundary": "project-bound persistence identity substitution", "expectedOutcome": "REJECT", "reasonCode": "CANONICAL_IDENTITY_MISMATCH" },
+    { "id": "CALLER-STATE-001", "riskClass": "privacy", "boundary": "Draw/Audio/Game or UI state supplied as sync metadata", "expectedOutcome": "REJECT", "reasonCode": "CALLER_STATE_NOT_AUTHORITY" },
+    { "id": "EVENT-ID-001", "riskClass": "lifecycle", "boundary": "non-common project event substitution", "expectedOutcome": "REJECT", "reasonCode": "CANONICAL_EVENT_ID_REQUIRED" },
+    { "id": "REPLAY-REVOKE-001", "riskClass": "lifecycle", "boundary": "page lifecycle disposal replay", "expectedOutcome": "REJECT", "reasonCode": "LIFECYCLE_TRANSITION_NOT_AUTHORIZED" }
+  ],
+  "boundaryProbes": [
+    { "id": "AUTHORITY-ROOT-001", "expectedOutcome": "REJECT", "expectedReasonCode": "CALLER_INJECTION_REJECTED", "input": { "compositionRoot": "caller", "transport": "caller", "persistence": "caller" } },
+    { "id": "RESOLVER-IDENTITY-001", "expectedOutcome": "REJECT", "expectedReasonCode": "CANONICAL_IDENTITY_MISMATCH", "input": { "requestedProjectId": "project-a", "returnedProjectId": "project-b", "requestedSurface": "DRAW2", "returnedSurface": "GAME" } },
+    { "id": "CALLER-STATE-001", "expectedOutcome": "REJECT", "expectedReasonCode": "CALLER_STATE_NOT_AUTHORITY", "input": { "stateSource": "caller", "drawPayload": true, "audioPayload": true, "gamePayload": true, "uiPreferences": true } },
+    { "id": "EVENT-ID-001", "expectedOutcome": "REJECT", "expectedReasonCode": "CANONICAL_EVENT_ID_REQUIRED", "input": { "eventSource": "caller", "expectedEvent": "pixiedraw2:project-changed", "receivedEvent": "substituted:event" } },
+    { "id": "REPLAY-REVOKE-001", "expectedOutcome": "REJECT", "expectedReasonCode": "LIFECYCLE_TRANSITION_NOT_AUTHORIZED", "input": { "event": "pagehide", "persisted": true, "replayedDispose": true } }
+  ],
+  "terraReviewChecklist": [
+    "draw2-entry uses the shared WORKSPACE_PROJECT_CHANGED_EVENT",
+    "startup project identity is read from active workspace state",
+    "IndexedDB persistence and durable journal are project-bound",
+    "pagehide disposal preserves bfcache and visibility remains a local boundary",
+    "only bounded body dataset lifecycle metadata is published",
+    "Realtime/Supabase/operation dispatch remains disconnected",
+    "Draw/Audio/Game payloads and UI preferences are not synchronized",
+    "cache-buster is detected only and never rewritten"
+  ],
+  "terminology": { "preferred": ["boundary validation", "invalid-input rejection", "substituted input"], "forbidden": ["attack", "attacker", "forged"] },
+  "designGate": { "status": "STRUCTURAL_REMEDIATION_COMPLETE", "rootCause": "product wiring must remain separate from transport and editor payload authorities", "structuralCorrection": "static gate inspects the existing composition boundary without editing product source", "releaseCondition": "Terra read-only semantic review plus later browser qualification", "currentDecision": "STATIC_PRODUCT_WIRING_GATE" },
+  "invalidInputCases": [
+    { "id": "AUTHORITY-ROOT-001", "riskClass": "authority", "expectedOutcome": "REJECT", "reasonCode": "CALLER_INJECTION_REJECTED" },
+    { "id": "RESOLVER-IDENTITY-001", "riskClass": "security", "expectedOutcome": "REJECT", "reasonCode": "CANONICAL_IDENTITY_MISMATCH" },
+    { "id": "CALLER-STATE-001", "riskClass": "privacy", "expectedOutcome": "REJECT", "reasonCode": "CALLER_STATE_NOT_AUTHORITY" },
+    { "id": "EVENT-ID-001", "riskClass": "lifecycle", "expectedOutcome": "REJECT", "reasonCode": "CANONICAL_EVENT_ID_REQUIRED" },
+    { "id": "REPLAY-REVOKE-001", "riskClass": "lifecycle", "expectedOutcome": "REJECT", "reasonCode": "LIFECYCLE_TRANSITION_NOT_AUTHORIZED" }
+  ],
+  "expectedReasonCodes": ["CALLER_INJECTION_REJECTED", "CANONICAL_IDENTITY_MISMATCH", "CALLER_STATE_NOT_AUTHORITY", "CANONICAL_EVENT_ID_REQUIRED", "LIFECYCLE_TRANSITION_NOT_AUTHORIZED"],
+  "invalidInputTest": { "mode": "STATIC_MANIFEST_AND_RESULT_ARTIFACT", "testSource": "pixiedraw2/tests/pixync/pixync-draw2-160-product-wiring.test.ts", "resultArtifact": "docs/inventory/pixync-draw2-160-preflight-result.json" },
+  "evidencePath": "docs/inventory/pixync-draw2-160-preflight-evidence.json",
+  "checkpointPath": "docs/inventory/pixync-draw2-160-preflight-checkpoint.json",
+  "evidenceSeparation": { "schemaStatus": "PASS", "semanticAcceptanceStatus": "PENDING", "independentReviewer": "Terra High", "lunaSelfApproval": false },
+  "harnessRegistryPath": "docs/inventory/harness-registry.json",
+  "harnessId": "core-security-boundary-validation",
+  "legacyHarnessAlias": "core-security-attack",
+  "fixRound": { "currentRound": 1, "max_fix_rounds": 2, "timebox_minutes": 20, "checkpoint_every_minutes": 10, "sameClassFinding": { "class": "product-wiring-boundary", "occurrence": 1, "decision": "CONTINUE" } },
+  "forbiddenOperations": ["network", "production", "real-data", "real-account", "real-user-data", "production-db", "production-storage", "provider-write", "secrets", "ad-hoc-eval", "deploy", "publish", "commit", "push", "migrate", "route-cutover", "cutover", "real-payment", "real-payout", "store-submit", "production-signing", "auto-start-next-package"]
+}

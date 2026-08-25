@@ -1,0 +1,29 @@
+{
+  "evidenceVersion": "QUALIFICATION_COMMAND_MANIFEST_V1",
+  "scope": "CORE-120-PREDECESSOR-NORMALIZATION",
+  "commands": [
+    {"id":"CORE100-TEST","acceptanceIds":["CORE100-SCOPE-001","CORE100-EVIDENCE-001"],"argv":["deno","test","--no-remote","--allow-read","--allow-write","--check","pixiedraw2/tests/core-100"]},
+    {"id":"CORE100-TYPE","acceptanceIds":["CORE100-SCOPE-001","CORE100-EVIDENCE-001"],"argv":["deno","check","--no-remote","pixiedraw2/src/core/core-100/composition-root.ts","pixiedraw2/src/core/core-100/authority-boundary.ts","pixiedraw2/src/core/core-100/contracts.ts","pixiedraw2/tests/core-100/core-100.test.ts"]},
+    {"id":"CORE100-BENCH","acceptanceIds":["CORE100-EVIDENCE-001"],"argv":["deno","run","--no-remote","pixiedraw2/benchmarks/core-100/composition.bench.ts"]},
+    {"id":"CORE100-DIFF","acceptanceIds":["CORE100-STOP-001"],"argv":["git","diff","--check"]},
+    {"id":"CORE110-TEST","acceptanceIds":["CORE110-SCOPE-001","CORE110-EVIDENCE-001"],"argv":["deno","test","--no-remote","--allow-read","--allow-write","--check","pixiedraw2/tests/core-110"]},
+    {"id":"CORE110-TYPE","acceptanceIds":["CORE110-SCOPE-001","CORE110-EVIDENCE-001"],"argv":["deno","check","--no-remote","pixiedraw2/src/core/core-110/contracts.ts","pixiedraw2/src/core/core-110/conformance-runner.ts","pixiedraw2/src/core/core-110/evidence-serializer.ts","pixiedraw2/tests/core-110/core-110-conformance.test.ts"]},
+    {"id":"CORE110-BENCH","acceptanceIds":["CORE110-EVIDENCE-001"],"argv":["deno","run","--no-remote","pixiedraw2/benchmarks/core-110/run-conformance-benchmark.ts"]},
+    {"id":"CORE110-DIFF","acceptanceIds":["CORE110-STOP-001"],"argv":["git","diff","--check"]},
+    {"id":"BOUNDARY-IMPORT-SCAN","acceptanceIds":["CORE100-STOP-001","CORE110-STOP-001","FP007-PROVENANCE-001"],"argv":["node","scripts/audit-core120-predecessor-boundaries.mjs"]},
+    {"id":"FP004-TEST","acceptanceIds":["FP004-EVT-001","FP004-EVT-002","FP004-INBOX-001","FP004-ORDER-001","FP004-RECOVERY-001","FP004-REPLAY-001","FP004-SEC-001"],"argv":["deno","test","--no-remote","--allow-read","--allow-write","--check","pixiedraw2/tests/fp-004"]},
+    {"id":"FP004-FILE","acceptanceIds":["FP004-EVT-001","FP004-RECOVERY-001"],"argv":["deno","test","--no-remote","--allow-read","--allow-write","pixiedraw2/tests/fp-004/file-durable-adapter.test.ts"]},
+    {"id":"FP004-TYPE","acceptanceIds":["FP004-EVT-001","FP004-EVT-002","FP004-INBOX-001","FP004-ORDER-001","FP004-RECOVERY-001","FP004-REPLAY-001","FP004-SEC-001"],"argv":["deno","check","--no-remote","pixiedraw2/src/fp-004/contracts.ts","pixiedraw2/src/fp-004/durable-transaction.ts","pixiedraw2/src/fp-004/inbox-outbox-lease.ts","pixiedraw2/src/fp-004/replay-consumer.ts"]},
+    {"id":"FP004-BENCH","acceptanceIds":["FP004-EVT-001","FP004-EVT-002","FP004-INBOX-001","FP004-ORDER-001","FP004-RECOVERY-001","FP004-REPLAY-001","FP004-SEC-001"],"argv":["deno","run","--no-remote","pixiedraw2/benchmarks/fp004-durable-event-benchmark.ts"]},
+    {"id":"FP005-TEST","acceptanceIds":["FP005-PII-001","FP005-STORAGE-001","FP005-INPUT-001","FP005-PATH-001","FP005-TELEMETRY-001"],"argv":["deno","test","--no-remote","pixiedraw2/tests/fp-005"]},
+    {"id":"FP005-BENCH","acceptanceIds":["FP005-PII-001","FP005-STORAGE-001","FP005-INPUT-001","FP005-PATH-001","FP005-TELEMETRY-001"],"argv":["deno","run","--no-remote","pixiedraw2/benchmarks/fp-005/validation.bench.ts"]},
+    {"id":"FP005-BASELINE","acceptanceIds":["FP005-PII-001","FP005-STORAGE-001","FP005-INPUT-001","FP005-PATH-001","FP005-TELEMETRY-001"],"argv":["node","scripts/test-baseline-failure-identity-wp080.mjs"]},
+    {"id":"FP005-DIFF","acceptanceIds":["FP005-TELEMETRY-001"],"argv":["git","diff","--check"]},
+    {"id":"FP007-TEST","acceptanceIds":["FP007-SCHEMA-001","FP007-DEP-001","FP007-BUILD-001","FP007-DIST-001","FP007-PROVENANCE-001"],"argv":["deno","test","--no-remote","--allow-read","--allow-write","pixiedraw2/tests/fp-007"]},
+    {"id":"FP007-BUILD","acceptanceIds":["FP007-DEP-001","FP007-BUILD-001"],"argv":["deno","run","--no-remote","--allow-read","pixiedraw2/benchmarks/fp-007/repeat-build.ts"]},
+    {"id":"FP007-NONINTRUSION","acceptanceIds":["FP007-SCHEMA-001","FP007-PROVENANCE-001"],"argv":["deno","test","--no-remote","--allow-read","pixiedraw2/tests/fp-007/non-intrusion-authority.test.ts"]},
+    {"id":"FP007-DIFF","acceptanceIds":["FP007-PROVENANCE-001"],"argv":["git","diff","--check"]},
+    {"id":"BASELINE-IDENTITY","acceptanceIds":["FP007-DEP-001","FP007-BUILD-001","FP007-PROVENANCE-001"],"argv":["node","scripts/test-baseline-failure-identity-wp080.mjs"]},
+    {"id":"BASELINE-SUITE","acceptanceIds":["FP007-DEP-001","FP007-BUILD-001","FP007-PROVENANCE-001"],"argv":["node","scripts/test-baseline-suite-wp000.mjs"]}
+  ]
+}

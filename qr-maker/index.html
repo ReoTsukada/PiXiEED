@@ -833,7 +833,7 @@
 <div class="qr-actions" id="qrActions">
 <button class="btn" id="downloadBtn" type="button">PNGを保存</button>
 <button class="btn secondary" id="copyDataBtn" type="button">テキストをコピー</button>
-<button class="btn secondary" id="openInDrawBtn" type="button">PiXiEEDrawで編集</button>
+<button class="btn secondary" id="openInDrawBtn" type="button">iDRAWで編集</button>
 </div>
 </section>
 <section class="card">
@@ -1271,7 +1271,7 @@
     sourceCanvas.height = drawEditSize;
     const sourceCtx = sourceCanvas.getContext('2d', { alpha: false });
     if (!sourceCtx) {
-      qrStatus.textContent = 'PiXiEEDrawへ送信できませんでした';
+      qrStatus.textContent = 'iDRAWへ送信できませんでした';
       qrStatus.style.color = '#ffa95c';
       return;
     }
@@ -1281,7 +1281,7 @@
         width: drawEditSize,
       });
     } catch (error) {
-      qrStatus.textContent = 'PiXiEEDrawへ送信できませんでした';
+      qrStatus.textContent = 'iDRAWへ送信できませんでした';
       qrStatus.style.color = '#ffa95c';
       return;
     }
@@ -1292,7 +1292,7 @@
       dataUrl = '';
     }
     if (!dataUrl || !dataUrl.startsWith('data:image')) {
-      qrStatus.textContent = 'PiXiEEDrawへ送信できませんでした';
+      qrStatus.textContent = 'iDRAWへ送信できませんでした';
       qrStatus.style.color = '#ffa95c';
       return;
     }
@@ -1312,12 +1312,12 @@
       return;
     }
     const targetUrl = buildDrawReturnTargetUrl();
-    qrStatus.textContent = 'PiXiEEDrawへ移動中…';
+    qrStatus.textContent = 'iDRAWへ移動中…';
     qrStatus.style.color = '#7bcfff';
     try {
       window.location.assign(targetUrl);
     } catch (error) {
-      qrStatus.textContent = 'PiXiEEDrawを開けませんでした';
+      qrStatus.textContent = 'iDRAWを開けませんでした';
       qrStatus.style.color = '#ffa95c';
       console.warn('Failed to open PiXiEEDraw', error);
     }
@@ -1341,8 +1341,8 @@
   syncLabels();
   renderQRCode();
 </script>
-<script src="../scripts/shared-profile-header.js"></script>
-<script src="../scripts/shared-bottom-nav.js?v=20260724-fullscreen-icons2"></script>
+<script src="../scripts/shared-profile-header.js?v=20260825-common-shell15"></script>
+<script src="../scripts/shared-bottom-nav.js?v=20260825-studio-brand1"></script>
 <script src="../scripts/bottom-nav-footer-ad.js?v=20260719-shared-top-resume1"></script>
 <script src="../scripts/tool-fullscreen.js"></script>
 <script src="../scripts/pixieed-dot-stats.js"></script>

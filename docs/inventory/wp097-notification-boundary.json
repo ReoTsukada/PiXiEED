@@ -1,0 +1,86 @@
+{
+  "workPackage": "WP-097",
+  "status": "complete",
+  "implementation": {
+    "contract": "core-shell/assets/core-notification-contracts.js",
+    "schema": "core-shell/schemas/notification-v1.schema.json",
+    "fixture": "core-shell/fixtures/notification-v1.valid.json",
+    "test": "scripts/test-core-notification-wp097.mjs",
+    "backend": "in-memory-reference-adapter",
+    "deliveryAdapters": ["IN_APP synthetic/reference", "WEB_PUSH exchangeable", "MOBILE_PUSH exchangeable", "EMAIL exchangeable", "DIGEST exchangeable"],
+    "loadedBy": [],
+    "domCanvasStorageNetworkCoupling": false,
+    "providerSdkOrEmailLibrary": false,
+    "searchIndexConnection": false,
+    "currentRoutesChanged": false
+  },
+  "catalog": {
+    "coreNotificationTypes": 14,
+    "reservedNotificationTypes": 11,
+    "recordVersion": 1,
+    "deliveryAttemptVersion": 1,
+    "recipientTypes": ["USER", "TEAM", "ACCOUNT"],
+    "visibilityClasses": ["PRIVATE", "RECIPIENT_ONLY", "PROJECT_MEMBERS", "CREATOR_PRIVATE", "PUBLIC_SAFE"],
+    "priorities": ["LOW", "NORMAL", "HIGH", "CRITICAL"],
+    "inboxStates": ["UNREAD", "READ", "ARCHIVED"],
+    "channels": ["IN_APP", "WEB_PUSH", "MOBILE_PUSH", "EMAIL", "DIGEST"],
+    "deliveryStates": ["PENDING", "SENT", "DELIVERED", "FAILED", "SUPPRESSED", "CANCELLED"],
+    "flags": [
+      "notification-core-read", "notification-core-write", "notification-event-projection",
+      "notification-external-delivery", "notification-digest", "notification-legacy-adapter"
+    ],
+    "eventAuthority": "WP-095 trusted Event Envelope",
+    "permissionAuthority": "WP-060 server Permission/Core adapter"
+  },
+  "included": [
+    "durable bounded Notification Record",
+    "catalog-driven Event eligibility",
+    "server-only recipient resolution and scope recheck",
+    "visibility and external-presentation sanitization",
+    "preference, mute, mandatory security, locale/timezone, and quiet-hours contract",
+    "inbox stable cursor and read/archive commands",
+    "Event/Notification and Notification/Delivery deduplication",
+    "non-critical semantic grouping with injected clock",
+    "server-owned priority and typed rate-limit result",
+    "IN_APP reference delivery plus external adapter boundary",
+    "bounded retry, non-retryable failure, DLQ, cancellation, and replay no resend",
+    "replaceable backend adapter and default-off flags"
+  ],
+  "excluded": [
+    "production Push/Email/Mobile provider or SDK",
+    "Market Sale/Purchase/Refund, Commission, Royalty, Payout, Finance, Entitlement, SNS, Community, Moderation, Subscription implementation",
+    "Search Notification indexing",
+    "raw Event payload, Activity, Audit, Telemetry, Project body, private request body",
+    "raw Pixel/Audio/PXD/PiXiPackage/Game Build/Blob/Base64/Data URL",
+    "JWT, Session Token, Secret, Password, Email, Address, Phone, Payment Card, PII",
+    "production database/storage migration, upload, deploy, publish, current-route switch"
+  ],
+  "verification": {
+    "failureFixtures": 40,
+    "duplicateEventIdempotency": true,
+    "semanticGrouping": true,
+    "privateDeliverySanitized": true,
+    "mandatorySecurity": true,
+    "stableCursor": true,
+    "quietHoursDelay": true,
+    "retryAndDeadLetter": true,
+    "replayExternalResends": 0,
+    "highFrequencyEditorEventsAccepted": false,
+    "baselineFailureIdentity": "14/14 inherited match; new 0",
+    "diffCheck": "pass"
+  },
+  "preservation": {
+    "productionRoutesChanged": false,
+    "currentPiXiEEDrawChanged": false,
+    "currentPxdChanged": false,
+    "currentPiXiSYNCChanged": false,
+    "marketChanged": false,
+    "snsDeleted": false,
+    "projectAssetPackageDataChanged": false,
+    "databaseMigrationApplied": false,
+    "storageUploadApplied": false,
+    "externalNotificationSent": false,
+    "deployPublishCommitPush": false
+  },
+  "nextBoundary": "WP-098 Public URL and Routing Core consumes Notification references only through isolated contracts."
+}

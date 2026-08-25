@@ -1,0 +1,17 @@
+{
+  "package": "AUDIO-210",
+  "status": "PASS_STATIC",
+  "scope": ["pixiedraw2/src/audio/audio-210", "pixiedraw2/tests/audio-210", "pixiedraw2/benchmarks/audio-210"],
+  "coverage": ["event identity/project/asset/revision binding", "LIVE", "PINNED", "preview commit/cancel", "stale and wrong project", "duplicate and caller claims", "unsupported and forged decode"],
+  "environment": "Deno isolated pure TypeScript fixture",
+  "browser": "UNTESTED",
+  "device": "UNTESTED",
+  "production": "UNTESTED",
+  "commands": [
+    {"command": "deno check pixiedraw2/src/audio/audio-210/contracts.ts pixiedraw2/src/audio/audio-210/core.ts pixiedraw2/tests/audio-210/core_test.ts pixiedraw2/benchmarks/audio-210/core_bench.ts", "exitCode": 0},
+    {"command": "deno test pixiedraw2/tests/audio-210/core_test.ts", "exitCode": 0, "result": "5 passed, 0 failed"},
+    {"command": "deno bench --no-remote pixiedraw2/benchmarks/audio-210/core_bench.ts", "exitCode": 0, "result": "24-event graph: 363.2 us/iter average, 2,754 iter/s"},
+    {"command": "python3 -m json.tool docs/inventory/audio-210-evidence.json", "exitCode": 0},
+    {"command": "git diff --check", "exitCode": 0}
+  ]
+}

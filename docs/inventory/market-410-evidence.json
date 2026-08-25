@@ -1,0 +1,252 @@
+{
+  "evidenceVersion": "QUALIFICATION_EVIDENCE_V1",
+  "packageId": "MARKET-410",
+  "contextSha256": "06b37447ffe49d46704d7040291c1a67545acdfbd1a093f48c5dec9f69c87212",
+  "status": "PASS",
+  "acceptance": [
+    {
+      "id": "MARKET410-SCOPE-001",
+      "status": "PASS",
+      "source": [
+        "pixiedraw2/src/platform/market-410/composition.ts",
+        "pixiedraw2/tests/market-410/composition.test.ts"
+      ],
+      "contract": [
+        "docs/contracts/MARKET-410-COMPOSITION.md",
+        "docs/contracts/WP-210-MARKET-RIGHTS-COMMERCE.md",
+        "docs/contracts/FP-003-FINANCIAL-INTEGRITY.md"
+      ],
+      "schema": [
+        "pixiedraw2/src/wp210-market-rights-core.ts",
+        "pixiedraw2/src/fp003-financial-integrity-core.ts"
+      ],
+      "build": [
+        "pixiedraw2/benchmarks/market-410/generate-evidence.ts"
+      ],
+      "commands": [
+        {
+          "command": "deno fmt --check pixiedraw2/src/platform/market-410 pixiedraw2/tests/market-410 pixiedraw2/benchmarks/market-410",
+          "exitCode": 0
+        },
+        {
+          "command": "deno check --no-remote pixiedraw2/src/platform/market-410/composition.ts pixiedraw2/tests/market-410/composition.test.ts pixiedraw2/benchmarks/market-410/generate-evidence.ts",
+          "exitCode": 0
+        },
+        {
+          "command": "deno test --no-remote pixiedraw2/tests/market-410/composition.test.ts",
+          "exitCode": 0
+        },
+        {
+          "command": "deno test --no-remote pixiedraw2/tests/wp210-market-rights.test.ts",
+          "exitCode": 0
+        },
+        {
+          "command": "deno test --no-remote pixiedraw2/tests/fp003-financial-integrity.test.ts",
+          "exitCode": 0
+        },
+        {
+          "command": "deno run --no-remote --allow-read --allow-write=docs/inventory pixiedraw2/benchmarks/market-410/generate-evidence.ts",
+          "exitCode": 0
+        },
+        {
+          "command": "node scripts/validate-qualification-evidence.mjs docs/inventory/market-410-evidence.json",
+          "exitCode": 0
+        },
+        {
+          "command": "shasum -a 256 .codex/context/MARKET-410.md",
+          "exitCode": 0
+        },
+        {
+          "command": "git diff --check -- pixiedraw2/src/platform/market-410 pixiedraw2/tests/market-410 pixiedraw2/benchmarks/market-410 docs/contracts/MARKET-410-COMPOSITION.md docs/inventory/market-410-benchmark.json docs/inventory/market-410-command-transcript.json docs/inventory/market-410-evidence.json docs/decisions/ADR-20260816-MARKET-410-composition-boundary.md",
+          "exitCode": 0
+        },
+        {
+          "command": "for f in pixiedraw2/src/platform/market-410/composition.ts pixiedraw2/tests/market-410/composition.test.ts pixiedraw2/benchmarks/market-410/generate-evidence.ts docs/contracts/MARKET-410-COMPOSITION.md docs/inventory/market-410-benchmark.json docs/inventory/market-410-command-transcript.json docs/inventory/market-410-evidence.json docs/decisions/ADR-20260816-MARKET-410-composition-boundary.md; do output=\"$(git diff --no-index --check -- /dev/null \"$f\" 2>&1)\"; rc=$?; test \"$rc\" -eq 1; test -z \"$output\"; done",
+          "exitCode": 0
+        }
+      ],
+      "artifactHashes": [
+        "958619e452ae7471e559225ece80697a7e4cfe9a10ebe3288804d5657f97014c",
+        "b7f5f0a68749eadb2e0e96018737995c20d38d6e93444671b547ab51d217a409",
+        "bd476b18081041ff637fac570567c0d73256201dd6fafa7c766627bb702394fe",
+        "a2ad5e592d6db946175abda06fa9e00cd063210f4670977cd99dc66bbcbbcda8",
+        "e7f2ba25707681318985e1cc06b0ac8e245a6b98ec5d97bdd4f98e1750b350c9",
+        "b1d875ddca3e9eff14421abd696ae48a63fd79f6f2d40087f6011888a1cd691b",
+        "26f17f6e132a83a53f3086a17bab24c9fb35b5ba7d99c4e3ed1054e589bed321"
+      ],
+      "adapterClass": "IN_MEMORY",
+      "classification": "IMPLEMENTED_ISOLATED",
+      "reviewer": "TERRA_HIGH_INDEPENDENT_REVIEW",
+      "findingIdentity": null
+    },
+    {
+      "id": "MARKET410-EVIDENCE-001",
+      "status": "PASS",
+      "source": [
+        "pixiedraw2/tests/market-410/composition.test.ts",
+        "pixiedraw2/benchmarks/market-410/generate-evidence.ts"
+      ],
+      "contract": [
+        "docs/contracts/MARKET-410-COMPOSITION.md",
+        "docs/contracts/QUALIFICATION-EVIDENCE-V1.md"
+      ],
+      "schema": [
+        "docs/inventory/market-410-evidence.json"
+      ],
+      "build": [
+        "pixiedraw2/benchmarks/market-410/generate-evidence.ts"
+      ],
+      "commands": [
+        {
+          "command": "deno fmt --check pixiedraw2/src/platform/market-410 pixiedraw2/tests/market-410 pixiedraw2/benchmarks/market-410",
+          "exitCode": 0
+        },
+        {
+          "command": "deno check --no-remote pixiedraw2/src/platform/market-410/composition.ts pixiedraw2/tests/market-410/composition.test.ts pixiedraw2/benchmarks/market-410/generate-evidence.ts",
+          "exitCode": 0
+        },
+        {
+          "command": "deno test --no-remote pixiedraw2/tests/market-410/composition.test.ts",
+          "exitCode": 0
+        },
+        {
+          "command": "deno test --no-remote pixiedraw2/tests/wp210-market-rights.test.ts",
+          "exitCode": 0
+        },
+        {
+          "command": "deno test --no-remote pixiedraw2/tests/fp003-financial-integrity.test.ts",
+          "exitCode": 0
+        },
+        {
+          "command": "deno run --no-remote --allow-read --allow-write=docs/inventory pixiedraw2/benchmarks/market-410/generate-evidence.ts",
+          "exitCode": 0
+        },
+        {
+          "command": "node scripts/validate-qualification-evidence.mjs docs/inventory/market-410-evidence.json",
+          "exitCode": 0
+        },
+        {
+          "command": "shasum -a 256 .codex/context/MARKET-410.md",
+          "exitCode": 0
+        },
+        {
+          "command": "git diff --check -- pixiedraw2/src/platform/market-410 pixiedraw2/tests/market-410 pixiedraw2/benchmarks/market-410 docs/contracts/MARKET-410-COMPOSITION.md docs/inventory/market-410-benchmark.json docs/inventory/market-410-command-transcript.json docs/inventory/market-410-evidence.json docs/decisions/ADR-20260816-MARKET-410-composition-boundary.md",
+          "exitCode": 0
+        },
+        {
+          "command": "for f in pixiedraw2/src/platform/market-410/composition.ts pixiedraw2/tests/market-410/composition.test.ts pixiedraw2/benchmarks/market-410/generate-evidence.ts docs/contracts/MARKET-410-COMPOSITION.md docs/inventory/market-410-benchmark.json docs/inventory/market-410-command-transcript.json docs/inventory/market-410-evidence.json docs/decisions/ADR-20260816-MARKET-410-composition-boundary.md; do output=\"$(git diff --no-index --check -- /dev/null \"$f\" 2>&1)\"; rc=$?; test \"$rc\" -eq 1; test -z \"$output\"; done",
+          "exitCode": 0
+        }
+      ],
+      "artifactHashes": [
+        "958619e452ae7471e559225ece80697a7e4cfe9a10ebe3288804d5657f97014c",
+        "b7f5f0a68749eadb2e0e96018737995c20d38d6e93444671b547ab51d217a409",
+        "bd476b18081041ff637fac570567c0d73256201dd6fafa7c766627bb702394fe",
+        "a2ad5e592d6db946175abda06fa9e00cd063210f4670977cd99dc66bbcbbcda8",
+        "e7f2ba25707681318985e1cc06b0ac8e245a6b98ec5d97bdd4f98e1750b350c9",
+        "b1d875ddca3e9eff14421abd696ae48a63fd79f6f2d40087f6011888a1cd691b",
+        "26f17f6e132a83a53f3086a17bab24c9fb35b5ba7d99c4e3ed1054e589bed321"
+      ],
+      "adapterClass": "IN_MEMORY",
+      "classification": "IMPLEMENTED_ISOLATED",
+      "reviewer": "TERRA_HIGH_INDEPENDENT_REVIEW",
+      "findingIdentity": null
+    },
+    {
+      "id": "MARKET410-STOP-001",
+      "status": "PASS",
+      "source": [
+        "pixiedraw2/src/platform/market-410/composition.ts",
+        "pixiedraw2/tests/market-410/composition.test.ts",
+        "docs/decisions/ADR-20260816-MARKET-410-composition-boundary.md"
+      ],
+      "contract": [
+        "docs/contracts/MARKET-410-COMPOSITION.md"
+      ],
+      "schema": [
+        "pixiedraw2/src/platform/market-410/composition.ts"
+      ],
+      "build": [
+        "pixiedraw2/benchmarks/market-410/generate-evidence.ts"
+      ],
+      "commands": [
+        {
+          "command": "deno fmt --check pixiedraw2/src/platform/market-410 pixiedraw2/tests/market-410 pixiedraw2/benchmarks/market-410",
+          "exitCode": 0
+        },
+        {
+          "command": "deno check --no-remote pixiedraw2/src/platform/market-410/composition.ts pixiedraw2/tests/market-410/composition.test.ts pixiedraw2/benchmarks/market-410/generate-evidence.ts",
+          "exitCode": 0
+        },
+        {
+          "command": "deno test --no-remote pixiedraw2/tests/market-410/composition.test.ts",
+          "exitCode": 0
+        },
+        {
+          "command": "deno test --no-remote pixiedraw2/tests/wp210-market-rights.test.ts",
+          "exitCode": 0
+        },
+        {
+          "command": "deno test --no-remote pixiedraw2/tests/fp003-financial-integrity.test.ts",
+          "exitCode": 0
+        },
+        {
+          "command": "deno run --no-remote --allow-read --allow-write=docs/inventory pixiedraw2/benchmarks/market-410/generate-evidence.ts",
+          "exitCode": 0
+        },
+        {
+          "command": "node scripts/validate-qualification-evidence.mjs docs/inventory/market-410-evidence.json",
+          "exitCode": 0
+        },
+        {
+          "command": "shasum -a 256 .codex/context/MARKET-410.md",
+          "exitCode": 0
+        },
+        {
+          "command": "git diff --check -- pixiedraw2/src/platform/market-410 pixiedraw2/tests/market-410 pixiedraw2/benchmarks/market-410 docs/contracts/MARKET-410-COMPOSITION.md docs/inventory/market-410-benchmark.json docs/inventory/market-410-command-transcript.json docs/inventory/market-410-evidence.json docs/decisions/ADR-20260816-MARKET-410-composition-boundary.md",
+          "exitCode": 0
+        },
+        {
+          "command": "for f in pixiedraw2/src/platform/market-410/composition.ts pixiedraw2/tests/market-410/composition.test.ts pixiedraw2/benchmarks/market-410/generate-evidence.ts docs/contracts/MARKET-410-COMPOSITION.md docs/inventory/market-410-benchmark.json docs/inventory/market-410-command-transcript.json docs/inventory/market-410-evidence.json docs/decisions/ADR-20260816-MARKET-410-composition-boundary.md; do output=\"$(git diff --no-index --check -- /dev/null \"$f\" 2>&1)\"; rc=$?; test \"$rc\" -eq 1; test -z \"$output\"; done",
+          "exitCode": 0
+        }
+      ],
+      "artifactHashes": [
+        "958619e452ae7471e559225ece80697a7e4cfe9a10ebe3288804d5657f97014c",
+        "b7f5f0a68749eadb2e0e96018737995c20d38d6e93444671b547ab51d217a409",
+        "bd476b18081041ff637fac570567c0d73256201dd6fafa7c766627bb702394fe",
+        "a2ad5e592d6db946175abda06fa9e00cd063210f4670977cd99dc66bbcbbcda8",
+        "e7f2ba25707681318985e1cc06b0ac8e245a6b98ec5d97bdd4f98e1750b350c9",
+        "b1d875ddca3e9eff14421abd696ae48a63fd79f6f2d40087f6011888a1cd691b",
+        "26f17f6e132a83a53f3086a17bab24c9fb35b5ba7d99c4e3ed1054e589bed321"
+      ],
+      "adapterClass": "IN_MEMORY",
+      "classification": "IMPLEMENTED_ISOLATED",
+      "reviewer": "TERRA_HIGH_INDEPENDENT_REVIEW",
+      "findingIdentity": null
+    }
+  ],
+  "untested": [
+    "real provider verification and payment execution",
+    "Supabase/database/RLS/Storage persistence",
+    "durable cross-process idempotency and crash recovery",
+    "current Market route/UI integration and browser/device behavior",
+    "production deployment/cutover"
+  ],
+  "baseline": {
+    "inventory": "docs/inventory/market-current-baseline.md",
+    "currentMarketRoutesUntouched": true,
+    "productionQualification": "UNTESTED"
+  },
+  "independentReview": {
+    "reviewer": "TERRA_HIGH_INDEPENDENT_REVIEW",
+    "status": "APPROVED_BOUNDED_LOCAL_SLICE",
+    "externalIndependentReview": "PASS_BOUNDED_INDEPENDENT_REVIEW"
+  },
+  "checkpoint": {
+    "handoff": "MARKET-410",
+    "nextPackage": "WORK-420",
+    "autoStartNext": false
+  },
+  "noProductionClaims": true
+}

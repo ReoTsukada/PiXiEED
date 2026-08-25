@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "work_package": "WP-098",
+  "status": "PASS",
+  "audit_status": "PASS_WITHOUT_REIMPLEMENTATION",
+  "source_test": "scripts/test-core-public-url-routing-wp098.mjs",
+  "baselineFailureIdentityMatch": "14/14",
+  "newFailureIdentities": 0,
+  "coverage": [
+    { "id": "open-redirect", "status": "PASS", "fixtures": ["cross-origin", "protocol-relative-open-redirect", "redirect-proof-failed"] },
+    { "id": "protocol-relative-url", "status": "PASS", "fixtures": ["protocol-relative-open-redirect"] },
+    { "id": "encoded-double-encoded-traversal", "status": "PASS", "fixtures": ["malformed-encoded-path", "double-encoded-path-traversal"] },
+    { "id": "redirect-loop", "status": "PASS", "fixtures": ["redirect-loop-canonical-path"] },
+    { "id": "query-token-secret-propagation", "status": "PASS", "fixtures": ["secret-query-not-propagated"] },
+    { "id": "private-canonical-metadata-leakage", "status": "PASS", "fixtures": ["private-metadata-noindex"] },
+    { "id": "private-public-cache-contamination", "status": "PASS", "fixtures": ["private-metadata-private-no-store"] },
+    { "id": "flag-off-permanent-redirect", "status": "PASS", "fixtures": ["default-off-read", "redirect-flag-off"] },
+    { "id": "case-trailing-slash-unicode", "status": "PASS", "fixtures": ["trailing-slash-candidate", "unicode-nfc-nfd-equivalence"] },
+    { "id": "cross-user-resource-id-substitution", "status": "PASS", "fixtures": ["private-resource-denied", "private-resource-not-found-without-principal"] }
+  ],
+  "production_redirect_changed": false,
+  "production_data_changed": false,
+  "realtime_subscription_opened": false
+}

@@ -5,28 +5,26 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#070d1b">
+  <link rel="manifest" href="manifest.webmanifest?v=20260825-studio-brand1">
   <meta name="robots" content="index,follow">
-  <title>PiXiEEDraw2｜無料で使えるドット絵・アニメーション制作ツール | PiXiEED</title>
-  <meta name="description" content="PiXiEEDraw2は、ブラウザでドット絵を描き、色・ミラー・レイヤー・アニメーションを扱える無料のピクセルアート制作ツールです。PiXiEEDで作品を作り、共有・公開・マーケット連携まで進められます。">
+  <title>PiXiEEDstudio｜打って、奏でて、作品にする制作プラットフォーム | PiXiEED</title>
+  <meta name="description" content="PiXiEEDstudioは、ブラウザでドット絵、音楽、ゲームを制作し、リアルタイム同期、共有、公開、マーケット連携まで進められる制作プラットフォームです。">
   <link rel="canonical" href="https://pixieed.jp/">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="PiXiEED">
   <meta property="og:locale" content="ja_JP">
-  <meta property="og:title" content="PiXiEEDraw2｜ドット絵を、描く。動かす。届ける。">
+  <meta property="og:title" content="PiXiEEDstudio｜打って、奏でて、作品にする。">
   <meta property="og:description" content="ブラウザで始められるPiXiEEDの新しいドット絵制作ワークスペース。描画、アニメーション、共有を一つの流れに。">
   <meta property="og:url" content="https://pixieed.jp/">
-  <meta property="og:image" content="https://pixieed.jp/assets/screenshots/generated/pixiedraw2-workspace.png">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="PiXiEEDraw2｜ドット絵を、描く。動かす。届ける。">
+  <meta name="twitter:title" content="PiXiEEDstudio｜打って、奏でて、作品にする。">
   <meta name="twitter:description" content="ブラウザで始められるPiXiEEDのドット絵・アニメーション制作ワークスペース。">
-  <meta name="twitter:image" content="https://pixieed.jp/assets/screenshots/generated/pixiedraw2-workspace.png">
   <link rel="icon" type="image/png" href="icon/icon-512-4.png">
-  <link rel="preload" as="image" href="assets/screenshots/generated/pixiedraw2-workspace.png" fetchpriority="high">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="site/landing.css?v=2026.07.19-home-centered3">
-  <link rel="stylesheet" href="site/home-shell.css?v=20260824-home-shell1">
+    <link rel="stylesheet" href="site/home-shell.css?v=20260824-home-shell4">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -47,12 +45,12 @@
       },
       {
         "@type": ["SoftwareApplication", "WebApplication"],
-        "@id": "https://pixieed.jp/#pixiedraw2",
-        "name": "PiXiEEDraw2",
-        "alternateName": "PiXiEEDraw 2",
+        "@id": "https://pixieed.jp/#studio",
+        "name": "PiXiEEDstudio",
+        "alternateName": "PiXiEEDstudio",
         "applicationCategory": "DesignApplication",
         "operatingSystem": "Web",
-        "url": "https://pixieed.jp/pixiedraw2/",
+        "url": "https://pixieed.jp/studio/",
         "description": "ブラウザでドット絵を描き、色、ミラー、レイヤー、アニメーションを扱えるピクセルアート制作ツールです。",
         "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
         "featureList": ["ドット絵描画", "インデックスカラーとパレット", "ミラー描画", "レイヤーとアニメーションタイムライン", "PNG・アニメーション出力"],
@@ -63,7 +61,7 @@
         "@type": "ItemList",
         "name": "PiXiEEDの制作・共有サービス",
         "itemListElement": [
-          { "@type": "ListItem", "position": 1, "name": "PiXiEEDraw2", "url": "https://pixieed.jp/pixiedraw2/" },
+          { "@type": "ListItem", "position": 1, "name": "PiXiEEDstudio", "url": "https://pixieed.jp/studio/" },
           { "@type": "ListItem", "position": 2, "name": "コミュニティ", "url": "https://pixieed.jp/community/" },
           { "@type": "ListItem", "position": 3, "name": "マーケット", "url": "https://pixieed.jp/market/" },
           { "@type": "ListItem", "position": 4, "name": "PiXiEELENS", "url": "https://pixieed.jp/pixiee-lens/" },
@@ -76,89 +74,79 @@
   </script>
 </head>
 <body class="draw2-home-body">
-  <header class="site-header draw2-home-header" aria-label="PiXiEEDメインナビゲーション">
-    <div class="header-inner header-inner--app">
-      <a class="brand draw2-home-brand" id="openProfilePanel" href="index.html" aria-label="PiXiEED ホーム">
-        <span class="brand-icon" id="brandAvatar">
-          <img src="pixiedraw2/assets/brand/pixieed-logo-48.png" alt="PiXiEED">
-        </span>
-        <div class="brand-text">
-          <p class="brand-title">PiXiEED</p>
-          <p class="brand-sub" id="brandUser">CREATIVE WORKSPACE</p>
-        </div>
-      </a>
-      <nav class="draw2-home-header__nav" aria-label="主要ページ">
-        <a class="is-active" href="pixiedraw2/index.html">Draw2</a>
-        <a href="market/">マーケット</a>
-        <a href="account/index.html">ライブラリ</a>
-        <a href="community/">コミュニティ</a>
-      </nav>
-      <div class="draw2-home-header__actions">
-        <a class="draw2-home-header__account" href="account/index.html">ログイン</a>
-        <a class="draw2-home-header__start" href="pixiedraw2/index.html">今すぐ作る <span aria-hidden="true">↗</span></a>
-      </div>
-    </div>
-  </header>
-
   <main class="home-shell-v2" id="main-content-v2">
     <section class="home-shell-v2__hero" aria-labelledby="homeHeroTitleV2">
       <div class="home-shell-v2__hero-copy">
-        <div class="home-shell-v2__kicker"><span aria-hidden="true"></span><span>PIXEL CREATION WORKSPACE</span></div>
-        <h1 id="homeHeroTitleV2">描く、動かす、<br><em>作品にする。</em></h1>
-        <p class="home-shell-v2__lead">PiXiEEDraw2は、ドット絵とアニメーションをブラウザで始められる制作ワークスペースです。描画、タイムライン、音、共有を一つの作品の流れで扱えます。</p>
+        <div class="home-shell-v2__kicker"><span aria-hidden="true"></span><span data-i18n-key="homeHeroKicker">PIXEL CREATION WORKSPACE</span></div>
+        <h1 id="homeHeroTitleV2"><span data-i18n-key="homeHeroTitleA">打って、奏でて、</span><br><em data-i18n-key="homeHeroTitleB">作品にする。</em></h1>
+        <p class="home-shell-v2__lead" data-i18n-key="homeHeroLead">PiXiEEDstudioは、ドット絵、音楽、ゲームをブラウザで始められる制作ワークスペースです。打って、奏でて、作品にする流れを一つにまとめます。</p>
         <div class="home-shell-v2__actions">
-          <a class="home-shell-v2__button home-shell-v2__button--primary" href="pixiedraw2/index.html">Draw2を開く <span aria-hidden="true">↗</span></a>
-          <a class="home-shell-v2__button home-shell-v2__button--quiet" href="market/">マーケットを見る</a>
+          <a class="home-shell-v2__button home-shell-v2__button--primary" href="studio/"><span data-i18n-key="homeDrawButton">PiXiEEDstudioを開く</span> <span aria-hidden="true">↗</span></a>
+          <a class="home-shell-v2__button home-shell-v2__button--quiet" href="market/" data-i18n-key="homeMarketButton">マーケットを見る</a>
         </div>
-        <div class="home-shell-v2__meta" aria-label="PiXiEEDraw2の特徴">
-          <span><strong>Web</strong> インストール不要</span>
-          <span><strong>Free</strong> すぐ試せる</span>
-          <span><strong>Sync</strong> 作品をつなぐ</span>
+        <div class="home-shell-v2__meta" aria-label="PiXiEEDstudioの特徴" data-i18n-aria-label="homeMetaAria">
+          <span><strong>Web</strong> <span data-i18n-key="homeNoInstall">インストール不要</span></span>
+          <span><strong>Free</strong> <span data-i18n-key="homeTryFree">すぐ試せる</span></span>
+          <span><strong>Sync</strong> <span data-i18n-key="homeConnectWork">作品をつなぐ</span></span>
         </div>
       </div>
       <div class="home-shell-v2__hero-visual">
         <figure class="home-shell-v2__screenshot home-shell-v2__screenshot--hero">
-          <div class="home-shell-v2__window-bar"><span></span><span></span><span></span><small>PiXiEEDraw2</small></div>
-          <img src="assets/screenshots/generated/pixiedraw2-workspace.png" alt="PiXiEEDraw2の制作ワークスペース。キャンバス、カラーパレット、タイムラインを表示" width="1280" height="720" fetchpriority="high">
-          <figcaption><span>PiXiEEDraw2</span><span>DRAW / ANIMATION</span></figcaption>
+          <div class="home-shell-v2__window-bar"><span></span><span></span><span></span><small>PiXiEEDstudio</small></div>
+          <div class="home-shell-v2__workspace-preview" role="img" aria-label="PiXiEEDstudioの制作ワークスペース。キャンバス、カラーパレット、タイムラインを表示">
+            <div class="home-shell-v2__preview-toolbar"><span class="home-shell-v2__preview-brand">STUDIO</span><span class="home-shell-v2__preview-mode is-active">iDRAW</span><span class="home-shell-v2__preview-mode">iAUDIO</span><span class="home-shell-v2__preview-mode">iGAME</span><span class="home-shell-v2__preview-spacer"></span><i></i><i></i></div>
+            <div class="home-shell-v2__preview-body"><div class="home-shell-v2__preview-tools"><b></b><b></b><b></b><b class="is-active"></b><b></b><b></b></div><div class="home-shell-v2__preview-canvas"><span class="home-shell-v2__pixel-art" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></div><aside class="home-shell-v2__preview-panel"><span></span><span></span><span></span><div></div><div></div></aside></div>
+            <div class="home-shell-v2__preview-timeline"><span>ANIMATION</span><i></i><i></i><i></i><i></i><i></i><i></i><b></b></div>
+          </div>
+          <figcaption><span>PiXiEEDstudio</span><span>iDRAW / ANIMATION</span></figcaption>
         </figure>
-        <div class="home-shell-v2__badge home-shell-v2__badge--top"><strong>01</strong><span>描画から始める</span></div>
-        <div class="home-shell-v2__badge home-shell-v2__badge--bottom"><strong>PiXYNC</strong><span>制作の流れを同期</span></div>
+        <div class="home-shell-v2__badge home-shell-v2__badge--top"><strong>01</strong><span data-i18n-key="homeBadgeStart">描画から始める</span></div>
+        <div class="home-shell-v2__badge home-shell-v2__badge--bottom"><strong>PiXYNC</strong><span data-i18n-key="homeBadgeSync">制作の流れを同期</span></div>
       </div>
     </section>
 
     <section class="home-shell-v2__section home-shell-v2__section--workspace" aria-labelledby="workspaceTitleV2">
-      <div class="home-shell-v2__section-heading"><div><p class="home-shell-v2__eyebrow">ONE WORKSPACE</p><h2 id="workspaceTitleV2">作業に合わせて、必要な場所だけ。</h2></div><p>Draw2を中心にモードを切り替えて制作します。別ページを増やさず、同じ作品の時間軸を保ちます。</p></div>
+      <div class="home-shell-v2__section-heading"><div><p class="home-shell-v2__eyebrow" data-i18n-key="homeWorkspaceEyebrow">ONE WORKSPACE</p><h2 id="workspaceTitleV2" data-i18n-key="homeWorkspaceTitle">作業に合わせて、必要な場所だけ。</h2></div><p data-i18n-key="homeWorkspaceCopy">PiXiEEDstudioの中でiDRAW・iAUDIO・iGAMEを切り替えて制作します。別ページを増やさず、同じ作品の時間軸を保ちます。</p></div>
       <div class="home-shell-v2__workspace-grid">
-        <a class="home-shell-v2__workspace-card is-primary" href="pixiedraw2/index.html"><span class="home-shell-v2__workspace-icon"><img src="pixiedraw2/assets/icons/export-v040/icon-pen.svg" alt=""></span><span><strong>Draw</strong><small>ドット絵とアニメーションを制作</small></span><b aria-hidden="true">↗</b></a>
-        <a class="home-shell-v2__workspace-card" href="pixiedraw2/index.html"><span class="home-shell-v2__workspace-icon"><img src="pixiedraw2/assets/icons/export-v040/icon-note.svg" alt=""></span><span><strong>Audio</strong><small>Draw2内でBGM・SEを確認</small></span><b aria-hidden="true">↗</b></a>
-        <a class="home-shell-v2__workspace-card" href="pixiedraw2/index.html"><span class="home-shell-v2__workspace-icon"><img src="pixiedraw2/assets/icons/export-v040/icon-play.svg" alt=""></span><span><strong>Game</strong><small>作品の動きと体験を確認</small></span><b aria-hidden="true">↗</b></a>
+          <a class="home-shell-v2__workspace-card is-primary" href="studio/"><span class="home-shell-v2__workspace-icon"><img src="pixiedraw2/assets/icons/export-v040/icon-pen.svg" alt=""></span><span><strong>iDRAW</strong><small data-i18n-key="homeDrawCopy">ドット絵とアニメーションを制作</small></span><b aria-hidden="true">↗</b></a>
+        <a class="home-shell-v2__workspace-card" href="studio/"><span class="home-shell-v2__workspace-icon"><img src="pixiedraw2/assets/icons/export-v040/icon-note.svg" alt=""></span><span><strong>iAUDIO</strong><small data-i18n-key="homeAudioCopy">PiXiEEDstudio内でBGM・SEを確認</small></span><b aria-hidden="true">↗</b></a>
+        <a class="home-shell-v2__workspace-card" href="studio/"><span class="home-shell-v2__workspace-icon"><img src="pixiedraw2/assets/icons/export-v040/icon-play.svg" alt=""></span><span><strong>iGAME</strong><small data-i18n-key="homeGameCopy">作品の動きと体験を確認</small></span><b aria-hidden="true">↗</b></a>
+      </div>
+    </section>
+
+    <section class="home-shell-v2__section home-shell-v2__section--toolkit" aria-labelledby="toolkitTitleV2">
+      <div class="home-shell-v2__section-heading"><div><p class="home-shell-v2__eyebrow" data-i18n-key="homeToolkitEyebrow">PIXiEED TOOLKIT</p><h2 id="toolkitTitleV2" data-i18n-key="homeToolkitTitle">作る、変換する、遊ぶ。</h2></div><p data-i18n-key="homeToolkitCopy">PiXiEEDstudioを中心に、既存のPiXiEEDツールも同じ入口からすぐ開けます。</p></div>
+      <div class="home-shell-v2__tool-grid">
+        <a class="home-shell-v2__tool-card" href="pixiee-lens/"><span class="home-shell-v2__tool-icon"><img src="assets/icons/Camera.png" alt=""></span><strong>PiXiEELENS</strong><small data-i18n-key="toolLens">写真をドット化</small><b aria-hidden="true">↗</b></a>
+        <a class="home-shell-v2__tool-card" href="qr/"><span class="home-shell-v2__tool-icon"><img src="assets/icons/QR.png" alt=""></span><strong>QR</strong><small data-i18n-key="toolQr">QRを作成</small><b aria-hidden="true">↗</b></a>
+        <a class="home-shell-v2__tool-card" href="pixfind/"><span class="home-shell-v2__tool-icon"><img src="assets/icons/Preview.png" alt=""></span><strong>PiXFiND</strong><small data-i18n-key="toolPixfind">遊ぶ・共有する</small><b aria-hidden="true">↗</b></a>
+        <a class="home-shell-v2__tool-card" href="maoitu/"><span class="home-shell-v2__tool-icon"><img src="assets/icons/Draw.png" alt=""></span><strong>まおいつ</strong><small data-i18n-key="toolMaoitu">ゲームで遊ぶ</small><b aria-hidden="true">↗</b></a>
       </div>
     </section>
 
     <section class="home-shell-v2__section home-shell-v2__section--split" aria-labelledby="flowTitleV2">
       <div class="home-shell-v2__split-card">
-        <div class="home-shell-v2__split-copy"><p class="home-shell-v2__eyebrow">FROM PIXEL TO MOTION</p><h2 id="flowTitleV2">ひとつの作品を、<br>最後まで見失わない。</h2><p>キャンバス、パレット、レイヤー、フレーム、タイムラインを近くに置き、制作の途中で画面を探し回らない構成にしています。</p><a class="home-shell-v2__text-link" href="pixiedraw2/index.html">制作画面を開く <span aria-hidden="true">→</span></a></div>
-        <figure class="home-shell-v2__screenshot home-shell-v2__screenshot--detail"><img src="assets/screenshots/generated/pixiedraw-maousama-canvas.png" alt="PiXiEEDrawのキャンバスとピクセルアート" width="1440" height="960" loading="lazy" decoding="async"><figcaption><span>CANVAS</span><span>PALETTE / GRID</span></figcaption></figure>
+        <div class="home-shell-v2__split-copy"><p class="home-shell-v2__eyebrow" data-i18n-key="homeFlowEyebrow">FROM PIXEL TO MOTION</p><h2 id="flowTitleV2"><span data-i18n-key="homeFlowTitleA">ひとつの作品を、</span><br><span data-i18n-key="homeFlowTitleB">最後まで見失わない。</span></h2><p data-i18n-key="homeFlowCopy">キャンバス、パレット、レイヤー、フレーム、タイムラインを近くに置き、制作の途中で画面を探し回らない構成にしています。</p><a class="home-shell-v2__text-link" href="studio/"><span data-i18n-key="homeFlowLink">PiXiEEDstudioを開く</span> <span aria-hidden="true">→</span></a></div>
+        <figure class="home-shell-v2__screenshot home-shell-v2__screenshot--detail"><div class="home-shell-v2__detail-preview" role="img" aria-label="PiXiEEDstudioのキャンバス、パレット、グリッドを表すプレビュー"><div class="home-shell-v2__detail-grid"></div><div class="home-shell-v2__detail-palette"><i></i><i></i><i></i><i></i><i></i></div></div><figcaption><span>CANVAS</span><span>PALETTE / GRID</span></figcaption></figure>
       </div>
     </section>
 
     <section class="home-shell-v2__section home-shell-v2__section--market" aria-labelledby="marketPreviewTitleV2">
-      <div class="home-shell-v2__section-heading"><div><p class="home-shell-v2__eyebrow">MARKETPLACE</p><h2 id="marketPreviewTitleV2">作ったものも、見つけたものも。</h2></div><a class="home-shell-v2__text-link" href="market/">マーケットを開く <span aria-hidden="true">→</span></a></div>
+      <div class="home-shell-v2__section-heading"><div><p class="home-shell-v2__eyebrow" data-i18n-key="homeMarketEyebrow">MARKETPLACE</p><h2 id="marketPreviewTitleV2" data-i18n-key="homeMarketTitle">作ったものも、見つけたものも。</h2></div><a class="home-shell-v2__text-link" href="market/"><span data-i18n-key="homeMarketLink">マーケットを開く</span> <span aria-hidden="true">→</span></a></div>
       <div class="home-shell-v2__market-grid">
-        <a class="home-shell-v2__market-card" href="market/items/ef0597f1-2b4e-4c96-9556-d55fd286393a/index.html"><img src="market/items/ef0597f1-2b4e-4c96-9556-d55fd286393a/share.png" alt="16×16px OtegoroIcons1のプレビュー" loading="lazy"><span><strong>16×16px OtegoroIcons1</strong><small>アイコン素材</small></span></a>
-        <a class="home-shell-v2__market-card" href="market/items/e232a878-dc00-4dd7-b648-bb6a5b37eb5c/index.html"><img src="market/items/e232a878-dc00-4dd7-b648-bb6a5b37eb5c/share.png" alt="16x16 OtegoroEffects1のプレビュー" loading="lazy"><span><strong>16x16 OtegoroEffects1</strong><small>エフェクト素材</small></span></a>
-        <a class="home-shell-v2__market-card" href="market/items/919d97bc-cbd5-4a4d-aeee-c658759a97f3/index.html"><img src="market/items/919d97bc-cbd5-4a4d-aeee-c658759a97f3/share.png" alt="16x16 OtegoroMonsters1のプレビュー" loading="lazy"><span><strong>16x16 OtegoroMonsters1</strong><small>キャラクター素材</small></span></a>
-        <a class="home-shell-v2__market-card" href="market/items/c4a1dc20-fcef-4acb-bd30-cd5e6a69920f/index.html"><img src="market/items/c4a1dc20-fcef-4acb-bd30-cd5e6a69920f/share.png" alt="ジェリンオールスターズのプレビュー" loading="lazy"><span><strong>ジェリンオールスターズ</strong><small>キャラクター素材</small></span></a>
+        <a class="home-shell-v2__market-card" href="market/items/ef0597f1-2b4e-4c96-9556-d55fd286393a/index.html"><img src="market/items/ef0597f1-2b4e-4c96-9556-d55fd286393a/share.png" alt="16×16px OtegoroIcons1のプレビュー" loading="lazy"><span><strong>16×16px OtegoroIcons1</strong><small data-i18n-key="homeAssetIcons">アイコン素材</small></span></a>
+        <a class="home-shell-v2__market-card" href="market/items/e232a878-dc00-4dd7-b648-bb6a5b37eb5c/index.html"><img src="market/items/e232a878-dc00-4dd7-b648-bb6a5b37eb5c/share.png" alt="16x16 OtegoroEffects1のプレビュー" loading="lazy"><span><strong>16x16 OtegoroEffects1</strong><small data-i18n-key="homeAssetEffects">エフェクト素材</small></span></a>
+        <a class="home-shell-v2__market-card" href="market/items/919d97bc-cbd5-4a4d-aeee-c658759a97f3/index.html"><img src="market/items/919d97bc-cbd5-4a4d-aeee-c658759a97f3/share.png" alt="16x16 OtegoroMonsters1のプレビュー" loading="lazy"><span><strong>16x16 OtegoroMonsters1</strong><small data-i18n-key="homeAssetCharacters">キャラクター素材</small></span></a>
+        <a class="home-shell-v2__market-card" href="market/items/c4a1dc20-fcef-4acb-bd30-cd5e6a69920f/index.html"><img src="market/items/c4a1dc20-fcef-4acb-bd30-cd5e6a69920f/share.png" alt="ジェリンオールスターズのプレビュー" loading="lazy"><span><strong>ジェリンオールスターズ</strong><small data-i18n-key="homeAssetCharacters">キャラクター素材</small></span></a>
       </div>
     </section>
 
     <section class="home-shell-v2__section home-shell-v2__section--answers" aria-labelledby="faqTitleV2">
-      <div class="home-shell-v2__section-heading"><div><p class="home-shell-v2__eyebrow">QUICK ANSWERS</p><h2 id="faqTitleV2">はじめる前に。</h2></div><p>迷いやすい部分は短くまとめています。</p></div>
+      <div class="home-shell-v2__section-heading"><div><p class="home-shell-v2__eyebrow" data-i18n-key="homeAnswersEyebrow">QUICK ANSWERS</p><h2 id="faqTitleV2" data-i18n-key="homeAnswersTitle">はじめる前に。</h2></div><p data-i18n-key="homeAnswersCopy">迷いやすい部分は短くまとめています。</p></div>
       <div class="home-shell-v2__faq-grid">
-        <details><summary>PiXiEEDraw2は何ができますか？</summary><p>ブラウザ上でドット絵を描き、パレット、ミラー、レイヤー、フレーム、アニメーションタイムラインを使って作品を制作できます。</p></details>
-        <details><summary>AudioとGameは別ページですか？</summary><p>現状は別ページを作らず、Draw2内のモードとして扱います。作品データと再生速度を勝手に分離しないためです。</p></details>
-        <details><summary>マーケットは使えますか？</summary><p>はい。マーケットの閲覧、商品詳細、購入済み素材のマイページ利用に対応しています。販売やアプリ内決済は段階的に拡張します。</p></details>
+        <details><summary data-i18n-key="homeFaqDrawQ">PiXiEEDstudioでは何ができますか？</summary><p data-i18n-key="homeFaqDrawA">iDRAW・iAUDIO・iGAMEを切り替えながら、ドット絵、音楽、ゲームを一つの作品として制作できます。</p></details>
+        <details><summary data-i18n-key="homeFaqAudioQ">iAUDIOとiGAMEは別ページですか？</summary><p data-i18n-key="homeFaqAudioA">別ページを増やさず、PiXiEEDstudio内のモードとして扱います。作品データと再生速度を分離せず、同じ作品の時間軸で確認できます。</p></details>
+        <details><summary data-i18n-key="homeFaqMarketQ">マーケットは使えますか？</summary><p data-i18n-key="homeFaqMarketA">はい。マーケットの閲覧、商品詳細、購入済み素材のマイページ利用に対応しています。販売やアプリ内決済は段階的に拡張します。</p></details>
       </div>
     </section>
   </main>
@@ -166,7 +154,7 @@
   <footer>
     <p>© <span id="year">2026</span> PiXiEED. All rights reserved.</p>
     <div class="footer-links">
-      <a href="pixiedraw2/index.html">PiXiEEDraw2</a>
+        <a href="studio/">PiXiEEDstudio</a>
       <a href="community/">コミュニティ</a>
       <a href="market/">マーケット</a>
       <a href="account/index.html">マイページ</a>
@@ -185,8 +173,8 @@
       <a class="bottom-nav__item" data-tab="market" href="market/">
         <span class="icon"><img src="assets/icons/Market.png" alt=""></span><span>マーケット</span>
       </a>
-      <a class="bottom-nav__item bottom-nav__item--primary" data-tab="draw" href="pixiedraw2/index.html">
-        <span class="icon"><img src="assets/icons/Draw.png?v=2026.07.19-ui-icons1" alt=""></span><span>PiXiEEDraw2</span>
+      <a class="bottom-nav__item bottom-nav__item--primary" data-tab="draw" href="studio/">
+        <span class="icon"><img src="assets/icons/Draw.png?v=2026.07.19-ui-icons1" alt=""></span><span>PiXiEEDstudio</span>
       </a>
       <a class="bottom-nav__item" data-tab="camera" href="pixiee-lens/index.html">
         <span class="icon"><img src="assets/icons/Camera.png" alt=""></span><span>カメラ</span>
@@ -196,7 +184,7 @@
       </a>
   </nav>
 
-  <script src="scripts/shared-profile-header.js"></script>
+  <script src="scripts/shared-profile-header.js?v=20260825-common-shell15"></script>
   <script src="scripts/shared-auth-panel.js?v=20260824-login-home-label1"></script>
   <script src="scripts/ads-lazy.js?v=20260719-no-ad-fallback1"></script>
   <script src="scripts/bottom-nav-footer-ad.js?v=20260719-shared-top-resume1"></script>
@@ -239,7 +227,7 @@
       </div>
     </div>
   </div>
-  <script src="scripts/shared-bottom-nav.js?v=20260803-tools-panel1"></script>
+  <script src="scripts/shared-bottom-nav.js?v=20260825-studio-brand1"></script>
   <script src="scripts/pixel-art-fit.js"></script>
 </body>
 </html>

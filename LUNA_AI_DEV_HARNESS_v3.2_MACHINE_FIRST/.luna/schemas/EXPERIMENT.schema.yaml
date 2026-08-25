@@ -1,0 +1,12 @@
+required: [id, decision, mode, variants, metric, stop_rule, cost_estimate]
+example:
+  id: EXP-001
+  decision: string
+  mode: cheap_compare|prototype|live_ab
+  variants: []
+  metric: null
+  guardrails: []
+  minimum_meaningful_effect: null
+  stop_rule: string
+  cost_estimate: 0
+  result: null

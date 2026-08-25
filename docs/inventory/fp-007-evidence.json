@@ -5,7 +5,7 @@
   "evidenceScope": "CROSS_TRACK_COORDINATOR_INTEGRATION",
   "contextSha256": "1456bdd0593538d1f454f3f20c494ba9151914ced8bee1619f16ca7b5b1da200",
   "status": "BLOCKED",
-  "statusReason": "The bounded exact JSR vulnerability receipt chain is independently approved with external blockers: it clears the two VULNERABILITY_REVIEW_UNKNOWN findings and binds the locked artifact to an immutable source revision with a revision-scoped zero-vulnerability OSV receipt. The fixed WP-000 baseline runner executed successfully with 63/77 successful, the 14 inherited failures matching, and zero new failures. Dirty-tree, clean-checkout, real distribution, current-system, and production qualification blockers remain.",
+  "statusReason": "The bounded exact JSR vulnerability receipt chain is independently approved with external blockers: it clears the two VULNERABILITY_REVIEW_UNKNOWN findings and binds the locked artifact to an immutable source revision with a revision-scoped zero-vulnerability OSV receipt. The fixed WP-000 baseline runner executed successfully with 63/77 successful, the 14 inherited failures matching, and zero new failures. A scoped real clean-checkout repeat-build passed at HEAD ff0a172a2db55e68a339959c2cde8f9ae5346295 with 34 staging entries, 744 artifacts, and identical hashes across both runs. Dirty-tree, real distribution provenance, current-system, and production qualification blockers remain.",
   "acceptances": [
     {
       "id": "FP007-SCHEMA-001",
@@ -55,11 +55,11 @@
         "evidenceLevel": "ISOLATED_REFERENCE"
       },
       "realRepoQualification": {
-        "status": "BLOCKED",
+        "status": "PASS",
         "evidenceLevel": "REAL_REPOSITORY",
-        "reason": "Dirty worktree prevents real clean-checkout repeat-build qualification."
+        "reason": "Scoped clean-checkout repeat-build passed at HEAD ff0a172a2db55e68a339959c2cde8f9ae5346295: 34 staging entries, 744 artifacts, and identical input, artifact-tree, build-manifest, and source-to-distribution provenance hashes across two runs."
       },
-      "status": "BLOCKED"
+      "status": "PASS"
     },
     {
       "id": "FP007-DIST-001",
@@ -223,6 +223,31 @@
     "provenanceHash": "8f146028f63601c03f936ea9ef571541e70acd618dfa18b99dc3b97539d48ade",
     "brotli": "UNTESTED"
   },
+  "realCleanCheckoutQualification": {
+    "status": "PASS",
+    "evidenceLevel": "REAL_REPOSITORY",
+    "scope": "SCOPED_REAL_CLEAN_CHECKOUT",
+    "headCommit": "ff0a172a2db55e68a339959c2cde8f9ae5346295",
+    "nodeVersion": "22.19.0",
+    "npmVersion": "10.9.3",
+    "staging": {
+      "entryCount": 34,
+      "runCount": 2,
+      "artifactFileCount": 744,
+      "identicalSecondRun": true
+    },
+    "identity": {
+      "inputHash": "c88ee5dd36880a3eeee42f5815390b1c5bc98f04dfbfd5c42a38865a2164bada",
+      "buildInputManifestHash": "b94093b49d5ee36b28e1f15f56d81045919a36c89a7ded83ed3bfdbaea4255e3",
+      "artifactTreeHash": "7127f5ac8b50cab59a829f022a07b8b880b8788a3d15506a8932b102815f076a",
+      "buildManifestHash": "261ef5b768f357db32b1cde7a4d649a89042e96b052ec2609a913265663027e2",
+      "sourceToDistProvenanceHash": "f6fba87461b5a72248e16ea9fbb95e1301d4f56d78e198b72740a4d97359f83d"
+    },
+    "source": [
+      "/private/tmp/pixieed-fp007-ff0a-run-a.json",
+      "/private/tmp/pixieed-fp007-ff0a-run-b.json"
+    ]
+  },
   "currentRepositoryFindings": [
     {
       "code": "NPM_DEPENDENCY_EXACT_PIN",
@@ -248,9 +273,10 @@
       "count": 1
     },
     {
-      "code": "REAL_CLEAN_CHECKOUT_NOT_RUN",
-      "status": "BLOCKED",
-      "count": 1
+      "code": "REAL_CLEAN_CHECKOUT_REPEAT_BUILD",
+      "status": "PASS",
+      "count": 1,
+      "detail": "Scoped clean checkout at HEAD ff0a172a2db55e68a339959c2cde8f9ae5346295 produced 34 staging entries and 744 artifacts with identical hashes across two runs."
     },
     {
       "code": "REAL_DIST_PROVENANCE_NOT_QUALIFIED",
@@ -315,7 +341,6 @@
     "rawNetworkDetailsExcluded": true,
     "requiredExternalEvidence": [
       "DIRTY_WORKTREE",
-      "REAL_CLEAN_CHECKOUT_NOT_RUN",
       "REAL_DIST_PROVENANCE_NOT_QUALIFIED",
       "CURRENT_SYSTEM_QUALIFICATION_UNTESTED",
       "PRODUCTION_QUALIFICATION_UNTESTED"
@@ -370,7 +395,6 @@
     "qualification": "BLOCKED",
     "qualificationBlockers": [
       "DIRTY_WORKTREE",
-      "REAL_CLEAN_CHECKOUT_NOT_RUN",
       "REAL_DIST_PROVENANCE_NOT_QUALIFIED"
     ],
     "securityReview": {

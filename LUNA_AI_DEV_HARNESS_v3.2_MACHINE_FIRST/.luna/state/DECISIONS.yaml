@@ -1,0 +1,55 @@
+schema_version: 3.1
+items:
+  - id: DEC-001
+    decision: "Web版を先行し、同じApp ShellをCapacitorのiOS/Android版へ段階展開する"
+    context: "Web検索・共有・更新速度を優先しながら、将来のアプリ内制作体験を分断しないため"
+    evidence_refs:
+      - "unified-creative-app-ux-20260824"
+      - "https://developer.android.com/design/ui/mobile/guides/layout-and-content/layout-and-nav-patterns"
+    alternatives:
+      - "旧ページをアプリへそのままバンドルする"
+      - "アプリを別実装にする"
+    rationale: "同一ルート・同一データ・同一UI部品を維持でき、既存Capacitor資産を活かせる"
+    blueprint_revision: 1
+    reversible: true
+    revisit_triggers:
+      - "ネイティブ固有操作がWeb Shellと両立しないことが実測された場合"
+  - id: DEC-002
+    decision: "デジタル商品の最終販売はWeb決済、StoreKit、Google Play BillingをCommerce Adapterで分離する"
+    context: "Webとアプリで同じ商品を扱い、ストア規約に適合させるため"
+    evidence_refs:
+      - "https://developer.apple.com/app-store/review/guidelines/"
+      - "https://support.google.com/googleplay/android-developer/answer/9858738?hl=en"
+    alternatives:
+      - "アプリからWeb決済だけへ誘導する"
+      - "プラットフォームごとに商品データを複製する"
+    rationale: "商品・権限は共通化し、購入処理だけプラットフォームへ適応できる"
+    blueprint_revision: 1
+    reversible: true
+    revisit_triggers:
+      - "対象商品がデジタル商品ではなくなる場合"
+  - id: DEC-003
+    decision: "PiXiEED.jpトップはPiXiEEDraw2の検索・理解・開始に特化し、既存ページへの導線を共通App Shellへ接続する"
+    context: "PiXiEEDの主役をDraw2へ移し、SEO/AIEOと制作開始を同時に強化するため"
+    evidence_refs:
+      - "unified-creative-app-ux-20260824"
+      - "https://www.figma.com/blog/our-approach-to-designing-ui3/"
+      - "https://www.canva.com/newsroom/news/all-new-affinity/"
+    alternatives:
+      - "現在のサービス一覧型ホームを維持する"
+      - "Draw2だけの単独ランチャーにする"
+    rationale: "入口はDraw2中心にしつつ、Market/Library/Social/Accountのサービス価値を失わない"
+    blueprint_revision: 1
+    reversible: true
+    revisit_triggers:
+      - "検索流入の大半が別サービスへ移ることが実測された場合"
+item_schema:
+  id: string
+  decision: string
+  context: string
+  evidence_refs: []
+  alternatives: []
+  rationale: string
+  blueprint_revision: integer
+  reversible: boolean
+  revisit_triggers: []

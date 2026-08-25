@@ -1,0 +1,27 @@
+{
+  "registry": {
+    "schemaVersion": 1,
+    "registryVersion": 1,
+    "routeCount": 59,
+    "currentSnapshotCount": 51,
+    "representativeCurrentRoutes": ["/", "/pixiedraw/", "/market/", "/market/item.html", "/account/", "/pixfind/"],
+    "representativeCompatibilityRoutes": ["/market/items/:itemId/", "/market/item.html?id=:itemId", "/pixfind/puzzles/:puzzleId/"],
+    "flags": ["public-url-read", "public-url-resolve", "public-url-redirect", "public-url-metadata", "public-url-legacy-adapter"],
+    "redirectDefault": "shadow",
+    "currentPathFallback": true
+  },
+  "resources": {
+    "publicMarketItemId": "919d97bc-cbd5-4a4d-aeee-c658759a97f3",
+    "publicPuzzleId": "pixfind-45be2f57-5271-4389-8cdf-85d56714a52b",
+    "privateProjectId": "project-private-001",
+    "deletedMarketItemId": "00000000-0000-4000-8000-000000000000"
+  },
+  "expectedSafety": {
+    "crossOrigin": "deny",
+    "unknownFlag": "deny",
+    "missingOrDeletedResource": "deny-without-redirect",
+    "unprovenRedirect": "shadow-only",
+    "privateMetadata": "noindex,nofollow",
+    "rollback": "keep-current-route"
+  }
+}

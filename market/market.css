@@ -869,6 +869,16 @@ html[data-pixieed-ad-free-account="true"] .market-ad {
 .market-product-type-preview { margin: 0; padding: 8px 9px; border: 1px solid rgba(255,255,255,.1); border-radius: 6px; color: #aebbd0; font-size: 10px; line-height: 1.5; }
 .market-product-type-preview.is-pixiedraw-product { border-color: rgba(126,240,199,.3); background: rgba(23,107,85,.12); color: #bff8e5; }
 .market-product-type-preview.is-general-product { border-color: rgba(167,139,250,.28); background: rgba(88,60,140,.12); color: #ddd2ff; }
+.market-composition-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 7px; }
+.market-composition-option { display: grid; min-width: 0; min-height: 86px; grid-template-columns: auto minmax(0, 1fr); align-content: start; gap: 7px; padding: 9px; border: 1px solid rgba(255,255,255,.1); border-radius: 7px; background: #0b1224; color: #cbd5e1; cursor: pointer; }
+.market-composition-option:has(input:checked) { border-color: rgba(94,226,181,.72); background: rgba(23,107,85,.18); box-shadow: 0 0 0 1px rgba(94,226,181,.16) inset; }
+.market-composition-option:has(input:disabled) { cursor: not-allowed; opacity: .5; }
+.market-composition-option input { margin: 3px 0 0; accent-color: #5ee2b5; }
+.market-composition-option > span { display: grid; min-width: 0; gap: 4px; }
+.market-composition-option strong { color: #f8fafc; font-size: 11px; line-height: 1.35; }
+.market-composition-option span span, .market-composition-option small { color: #94a3b8; font-size: 9px; line-height: 1.45; }
+.market-composition-option > small { grid-column: 1 / -1; color: #f8c66d; font-size: 9px; line-height: 1.4; }
+.market-composition-status { margin: 8px 0 0; color: #94a3b8; font-size: 10px; line-height: 1.55; }
 .market-option-details { margin-top: 9px; border-top: 1px solid rgba(255,255,255,.08); padding-top: 9px; }
 .market-option-details summary { width: fit-content; color: #b9dfff; font-size: 10px; font-weight: 800; cursor: pointer; }
 .market-option-details > p { margin: 8px 0; color: #94a3b8; font-size: 9px; line-height: 1.5; }
@@ -926,6 +936,8 @@ html[data-pixieed-ad-free-account="true"] .market-ad {
 @media (max-width: 640px) { .market-form-grid { grid-template-columns: 1fr; } }
 @media (max-width: 720px) { .market-custom-option-editor { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 560px) { .market-switch-list, .market-option-price-fields, .market-custom-option-editor { grid-template-columns: 1fr; } .market-source-buttons > button { flex: 1 1 42%; } .market-custom-option-card { grid-template-columns: minmax(0, 1fr) auto; } .market-custom-option-card > .market-file-button { grid-column: 1 / -1; } }
+@media (max-width: 900px) { .market-composition-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .market-composition-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 .market-review-shell { max-width: 1040px; grid-template-rows: auto auto; }
 .market-review-section { display: grid; gap: 12px; padding: 16px; background: #10182c; border-top: 1px solid rgba(255,255,255,.1); }
@@ -968,6 +980,20 @@ html[data-pixieed-ad-free-account="true"] .market-ad {
 .market-item__body h2, .market-item__body h3, .market-item__body p { margin: 0; }
 .market-item__body h2 { font-size: clamp(18px, 3vw, 25px); }
 .market-item__description { color: #cbd5e1; font-size: 12px; line-height: 1.75; white-space: pre-wrap; }
+
+/* Keep the decision path visible in the first screen of the Figma product detail.
+   Generated item pages share this body structure, while the fallback page may
+   already use the same order in its markup. */
+.market-item__body > .market-card__badges { order: 0; }
+.market-item__body > .market-item__social { order: 1; }
+.market-item__body > h2 { order: 2; }
+.market-item__body > .market-item-price-equation { order: 3; }
+.market-item__body > .market-item__facts { order: 4; }
+.market-item__body > .market-purchase-button { order: 5; }
+.market-item__body > #itemPurchaseStatus { order: 6; }
+.market-item__body > .market-item__description { order: 7; }
+.market-item__body > .market-item__terms { order: 8; }
+.market-item__body > .market-payment-guide { order: 9; }
 .market-item__social { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: #aebbd0; font-size: 11px; }
 .market-item__social a { color: inherit; text-decoration: none; }
 .market-item__social a[href]:not([href="#"]) { color: #9ae6c8; text-decoration: underline; text-underline-offset: 3px; }

@@ -1,0 +1,329 @@
+{
+  "evidenceVersion": "QUALIFICATION_EVIDENCE_V1",
+  "packageId": "GAME-350",
+  "contextSha256": "7dea7eb00216f6a77a3ffb2770ef65d630ad00919a3e50b26761b1ee9fed412a",
+  "status": "PARTIAL",
+  "acceptance": [
+    {
+      "id": "GAME350-SCOPE-001",
+      "status": "PASS",
+      "source": [
+        "pixiedraw2/src/game/game-350/core.ts",
+        "pixiedraw2/src/game/game-350/studio.ts",
+        "pixiedraw2/src/game/game-350/runtime-qualification.ts"
+      ],
+      "contract": [
+        "09_ROADMAP/WORK_PACKAGES/GAME-350.md",
+        "docs/contracts/GAME-340-cross-tool-integration.md"
+      ],
+      "schema": [
+        "pixiedraw2/src/game/game-350/core.ts",
+        "pixiedraw2/src/game/game-350/studio.ts",
+        "pixiedraw2/src/game/game-350/runtime-qualification.ts"
+      ],
+      "build": [
+        "pixiedraw2/benchmarks/game-350/core.bench.ts"
+      ],
+      "commands": [
+        {
+          "command": "cd pixiedraw2 && deno test --no-remote --allow-read=src tests/game-350/core.test.ts",
+          "exitCode": 0
+        },
+        {
+          "command": "cd pixiedraw2 && deno bench --no-remote benchmarks/game-350/core.bench.ts",
+          "exitCode": 0
+        }
+      ],
+      "artifactHashes": [
+        "c1a91334a25f52fa5c80f0fe9b218dfe69e7822fffa08495b7dea97174bfcdde",
+        "f2e05f6a3dfd11cccf56dffb11333fcdb78381c1f29798d00d14f70011ab2a93",
+        "947cc40ae4cf7439c4a40ba4f2a328f333a7401f1beb970b1b7ae5f3a717ee2b",
+        "df8af813ea1e29570183dc9112eacd14cd233262e2de6e05cc18ede2dbdcf2fe",
+        "44f11aae34586798e8c322f2000802e055686727a157d5288b2feec5e64378f6",
+        "5a2947fbb75520c801a6ad1c1366254f12f9b7451cc757ff7fa07204e8d42d11"
+      ],
+      "adapterClass": "IN_MEMORY",
+      "classification": "IMPLEMENTED_ISOLATED",
+      "reviewer": "COORDINATOR_REEXECUTION_REVIEW",
+      "findingIdentity": null
+    },
+    {
+      "id": "GAME350-EVIDENCE-001",
+      "status": "PARTIAL",
+      "source": [
+        "pixiedraw2/src/game/game-350/core.ts",
+        "pixiedraw2/src/game/game-350/studio.ts",
+        "docs/inventory/game-350-evidence.json"
+      ],
+      "contract": [
+        "docs/contracts/QUALIFICATION-EVIDENCE-V1.md",
+        "09_ROADMAP/WORK_PACKAGES/GAME-350.md"
+      ],
+      "schema": [
+        "pixiedraw2/src/game/game-350/core.ts",
+        "pixiedraw2/src/game/game-350/studio.ts"
+      ],
+      "build": [
+        "pixiedraw2/benchmarks/game-350/core.bench.ts"
+      ],
+      "commands": [
+        {
+          "command": "python3 scripts/verify_work_package_context.py --context .codex/context/GAME-350.md",
+          "exitCode": 0
+        },
+        {
+          "command": "node scripts/validate-qualification-evidence.mjs docs/inventory/game-350-evidence.json",
+          "exitCode": 0
+        },
+        {
+          "command": "node scripts/test-baseline-suite-wp000.mjs",
+          "exitCode": 0
+        }
+      ],
+      "artifactHashes": [],
+      "adapterClass": "IN_MEMORY",
+      "classification": "IMPLEMENTED_ISOLATED",
+      "reviewer": "COORDINATOR_EVIDENCE_REVIEW",
+      "findingIdentity": "GAME350-QUALIFICATION-UNTESTED"
+    },
+    {
+      "id": "GAME350-STOP-001",
+      "status": "PASS",
+      "source": [
+        "pixiedraw2/src/game/game-350/core.ts",
+        "pixiedraw2/src/game/game-350/studio.ts",
+        "pixiedraw2/src/game/game-350/runtime-qualification.ts"
+      ],
+      "contract": [
+        "09_ROADMAP/WORK_PACKAGES/GAME-350.md"
+      ],
+      "schema": [
+        "pixiedraw2/src/game/game-350/core.ts",
+        "pixiedraw2/src/game/game-350/studio.ts",
+        "pixiedraw2/src/game/game-350/runtime-qualification.ts"
+      ],
+      "build": [
+        "pixiedraw2/benchmarks/game-350/core.bench.ts"
+      ],
+      "commands": [
+        {
+          "command": "cd pixiedraw2 && deno test --no-remote --allow-read=src tests/game-350/core.test.ts",
+          "exitCode": 0
+        }
+      ],
+      "artifactHashes": [
+        "c1a91334a25f52fa5c80f0fe9b218dfe69e7822fffa08495b7dea97174bfcdde",
+        "d43468334c8080e97e22fa67992ae89a5053672db27c5b8ab452d9bf791bffe1"
+      ],
+      "adapterClass": "IN_MEMORY",
+      "classification": "IMPLEMENTED_ISOLATED",
+      "reviewer": "COORDINATOR_REEXECUTION_REVIEW",
+      "findingIdentity": null
+    },
+    {
+      "id": "GAME350-IDENTITY-001",
+      "status": "PASS",
+      "source": [
+        "pixiedraw2/src/game/game-350/studio.ts",
+        "pixiedraw2/src/game/game-350/runtime-qualification.ts"
+      ],
+      "contract": [
+        "09_ROADMAP/WORK_PACKAGES/GAME-350.md",
+        "docs/contracts/GAME-350-completion-gate.md"
+      ],
+      "schema": [
+        "pixiedraw2/src/game/game-350/studio.ts",
+        "pixiedraw2/src/game/game-350/runtime-qualification.ts"
+      ],
+      "build": [
+        "pixiedraw2/tests/game-350/studio.test.ts",
+        "pixiedraw2/tests/game-350/runtime-qualification.test.ts"
+      ],
+      "commands": [
+        {
+          "command": "cd pixiedraw2 && deno test --allow-read=src --no-remote --check tests/game-350",
+          "exitCode": 0
+        },
+        {
+          "command": "cd pixiedraw2 && deno check --no-remote src/game/game-350/studio.ts src/game/game-350/runtime-qualification.ts tests/game-350/studio.test.ts tests/game-350/runtime-qualification.test.ts",
+          "exitCode": 0
+        }
+      ],
+      "artifactHashes": [
+        "7e80e7760a583c1e4579f5048b9ec3f7d75af8e2dfe3c28829f5d2492a1cfd0b",
+        "d43468334c8080e97e22fa67992ae89a5053672db27c5b8ab452d9bf791bffe1",
+        "9cfe8bf93060e0ad9363d29d70c7361921a87688939214bf1c030e339c952bdf",
+        "a8ac3de2097440c27cd2527c42a5af9bac0c972f6643c583a7056fc9f6ac1e9c"
+      ],
+      "adapterClass": "IN_MEMORY",
+      "classification": "IMPLEMENTED_ISOLATED",
+      "reviewer": "COORDINATOR_FRESH_ATTACK_FIXTURE_REVIEW",
+      "findingIdentity": null
+    },
+    {
+      "id": "GAME350-RUNTIME-FAILURE-001",
+      "status": "PASS",
+      "source": [
+        "pixiedraw2/src/game/game-350/runtime-qualification.ts",
+        "pixiedraw2/src/wp200-game-runtime-core.ts"
+      ],
+      "contract": [
+        "09_ROADMAP/WORK_PACKAGES/GAME-350.md",
+        "docs/contracts/GAME-350-completion-gate.md"
+      ],
+      "schema": [
+        "pixiedraw2/src/game/game-350/runtime-qualification.ts",
+        "pixiedraw2/src/wp160-contracts.ts"
+      ],
+      "build": [
+        "pixiedraw2/tests/game-350/runtime-qualification.test.ts"
+      ],
+      "commands": [
+        {
+          "command": "cd pixiedraw2 && deno test --allow-read=src --no-remote --check tests/game-350/runtime-qualification.test.ts",
+          "exitCode": 0
+        }
+      ],
+      "artifactHashes": [
+        "d43468334c8080e97e22fa67992ae89a5053672db27c5b8ab452d9bf791bffe1",
+        "a8ac3de2097440c27cd2527c42a5af9bac0c972f6643c583a7056fc9f6ac1e9c"
+      ],
+      "adapterClass": "IN_MEMORY",
+      "classification": "IMPLEMENTED_ISOLATED",
+      "reviewer": "COORDINATOR_FRESH_ATTACK_FIXTURE_REVIEW",
+      "findingIdentity": null
+    },
+    {
+      "id": "GAME350-CROSS-TOOL-001",
+      "status": "PARTIAL",
+      "source": [
+        "pixiedraw2/src/game/game-350/runtime-qualification.ts",
+        "pixiedraw2/src/game/game-340/core.ts"
+      ],
+      "contract": [
+        "docs/contracts/GAME-340-cross-tool-integration.md",
+        "09_ROADMAP/WORK_PACKAGES/GAME-350.md"
+      ],
+      "schema": [
+        "pixiedraw2/src/game/game-350/runtime-qualification.ts",
+        "pixiedraw2/src/game/game-340/core.ts"
+      ],
+      "build": [
+        "pixiedraw2/tests/game-350/runtime-qualification.test.ts"
+      ],
+      "commands": [
+        {
+          "command": "cd pixiedraw2 && deno test --allow-read=src --no-remote --check tests/game-350/runtime-qualification.test.ts",
+          "exitCode": 0
+        }
+      ],
+      "artifactHashes": [
+        "d43468334c8080e97e22fa67992ae89a5053672db27c5b8ab452d9bf791bffe1",
+        "a8ac3de2097440c27cd2527c42a5af9bac0c972f6643c583a7056fc9f6ac1e9c"
+      ],
+      "adapterClass": "IN_MEMORY",
+      "classification": "IMPLEMENTED_ISOLATED",
+      "reviewer": "LUNA_INDEPENDENT_REVIEW_20260815",
+      "findingIdentity": "GAME350-REAL-REGISTRY-UNTESTED"
+    },
+    {
+      "id": "GAME350-LIFECYCLE-001",
+      "status": "PASS",
+      "source": [
+        "pixiedraw2/src/game/game-350/runtime-qualification.ts",
+        "pixiedraw2/src/wp200-game-runtime-core.ts"
+      ],
+      "contract": [
+        "09_ROADMAP/WORK_PACKAGES/GAME-350.md",
+        "docs/contracts/GAME-350-completion-gate.md"
+      ],
+      "schema": [
+        "pixiedraw2/src/game/game-350/runtime-qualification.ts"
+      ],
+      "build": [
+        "pixiedraw2/tests/game-350/runtime-qualification.test.ts"
+      ],
+      "commands": [
+        {
+          "command": "cd pixiedraw2 && deno test --allow-read=src --no-remote --check tests/game-350/runtime-qualification.test.ts",
+          "exitCode": 0
+        }
+      ],
+      "artifactHashes": [
+        "d43468334c8080e97e22fa67992ae89a5053672db27c5b8ab452d9bf791bffe1",
+        "a8ac3de2097440c27cd2527c42a5af9bac0c972f6643c583a7056fc9f6ac1e9c"
+      ],
+      "adapterClass": "IN_MEMORY",
+      "classification": "IMPLEMENTED_ISOLATED",
+      "reviewer": "COORDINATOR_FRESH_ATTACK_FIXTURE_REVIEW",
+      "findingIdentity": null
+    }
+  ],
+  "untested": [
+    "browser smoke and visual regression for Game authoring/runtime flow",
+    "physical mobile/tablet/stylus/gamepad and accessibility technology",
+    "Safari/Firefox cross-browser behavior",
+    "native Android/iOS/desktop toolchain and signing",
+    "production-equivalent staging, provider, RLS, migration, rollback, deploy, publish",
+    "30-minute session, device memory, long-task and bundle qualification",
+    "real canonical Registry/Queue/State/Context, Market, PiXiSYNC, Draw/Audio integration"
+  ],
+  "studioProjection": {
+    "status": "IMPLEMENTED_ISOLATED",
+    "source": "pixiedraw2/src/game/game-350/studio.ts",
+    "features": [
+      "SIMPLE/DETAIL/CODE projection modes",
+      "Scene/Entity selection without Project mutation",
+      "canonical Behavior IR intent for No-code/Graph/TypeScript",
+      "stale caller rejection",
+      "deterministic Project-to-Build creation guide"
+    ],
+    "testCommand": "cd pixiedraw2 && deno test --no-remote --allow-read=src tests/game-350",
+    "testResult": "20/20 PASS (4 Core + 9 Studio + 7 Runtime qualification)",
+    "benchmarkCommand": "cd pixiedraw2 && deno bench --no-remote benchmarks/game-350/studio.bench.ts",
+    "benchmarkResult": "1000/1000 deterministic; 0.003281ms average local synthetic",
+      "qualification": "does not promote browser/device/native/staging/production evidence"
+  },
+  "browserQualification": {
+    "status": "PARTIAL",
+    "url": "http://localhost:8000/pixiedraw2/",
+    "viewports": {
+      "desktop": "1280x720",
+      "tablet": "1024x768",
+      "mobile": "390x844"
+    },
+    "checks": [
+      "document scroll equals viewport at all three sizes",
+      "desktop Canvas/Color Dock/Tool Rail/Timeline are bounded",
+      "desktop Runtime Preview reports Runtime READY · LIVE · tick=1",
+      "mobile Color sheet and Timeline sheet are bounded",
+      "mobile compact controls measure 44x44",
+      "tested controls expose accessible names and keyboard menu focus"
+    ],
+    "qualification": "isolated Draw2 shell and Runtime Preview only; does not qualify complete GAME-350 Studio, physical devices, browser matrix, native, staging, or production"
+  },
+  "baselineQualification": {
+    "command": "node scripts/test-baseline-suite-wp000.mjs",
+    "exitCode": 0,
+    "result": "63/77 successful; 14 inherited failures match Test/target/major Error Signature; new failure identities: 0",
+    "qualification": "identity-preserving baseline evidence only; not a production or device qualification"
+  },
+  "currentCoordinatorRecheck": {
+    "date": "2026-08-25",
+    "status": "LOCAL_BROWSER_PASS_EXTERNAL_GATES_PENDING",
+    "evidence": [
+      "docs/contracts/GAME-350-local-browser-evidence-20260825.md",
+      "docs/contracts/MARKET-PXD-composition-browser-evidence-20260825.md",
+      "docs/contracts/GAME-350-production-gate-audit-20260825.md"
+    ],
+    "commands": [
+      "node scripts/test-game350-browser.mjs",
+      "node scripts/test-pixiedraw2-market-handoff-browser.mjs",
+      "node scripts/test-market-composition-browser.mjs",
+      "node scripts/verify-pixiedraw2-release-integrity.mjs"
+    ],
+    "result": "iGAME five-rail browser flow, PXD composition selection, iGAME-to-Market handoff, and Draw2 release provenance passed locally; Supabase provider/migration, native engine import/compile, and production commerce remain untested",
+    "qualification": "does not promote local browser evidence to production release readiness"
+  },
+  "noProductionClaims": true
+}

@@ -1,0 +1,27 @@
+policy_id: EXPERIMENT-001
+objective: use_comparison_only_when_it_can_change_a_material_decision
+modes_by_cost: [cheap_compare, prototype, live_ab]
+prefer_lowest_valid_mode: true
+eligible:
+  - multiple_plausible_ui_or_copy_options
+  - onboarding_navigation_pricing_presentation
+  - ranking_recommendation_or_algorithm_tuning
+  - game_difficulty_tutorial_notifications
+ineligible:
+  - security_fix
+  - legal_requirement
+  - clear_bug_fix
+  - data_corruption_fix
+  - dominated_variant
+  - insufficient_traffic_for_live_ab
+  - experiment_cost_exceeds_expected_improvement
+live_ab_requires:
+  - primary_metric
+  - guardrail_metrics
+  - minimum_meaningful_effect
+  - sample_or_duration_plan
+  - stop_rule
+  - rollback
+  - privacy_and_consent_check_if_applicable
+result_rule: inconclusive_is_valid_result_do_not_force_winner
+cache: required

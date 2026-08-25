@@ -14,74 +14,68 @@
   <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../site/landing.css?v=2026.07.19-home-centered3">
   <link rel="stylesheet" href="../market/market.css?v=20260730-row-ad-reserve1">
-  <link rel="stylesheet" href="../site/home-social.css?v=20260803-social-seo-comments1">
-  <link rel="stylesheet" href="../site/home-shell.css?v=20260824-home-shell1">
+  <link rel="stylesheet" href="../site/home-social.css?v=20260825-social-empty-state1">
+  <link rel="stylesheet" href="../site/home-shell.css?v=20260824-home-shell2">
 </head>
 <body class="draw2-home-body draw2-community-body">
-  <header class="site-header draw2-home-header" aria-label="PiXiEEDメインナビゲーション">
-    <div class="header-inner header-inner--app">
-      <a class="brand draw2-home-brand" href="../index.html" aria-label="PiXiEED ホーム">
-        <span class="brand-icon"><img src="../pixiedraw2/assets/brand/pixieed-logo-48.png" alt="PiXiEED"></span>
-        <div class="brand-text">
-          <p class="brand-title">PiXiEED</p>
-          <p class="brand-sub">CREATIVE WORKSPACE</p>
-        </div>
-      </a>
-      <nav class="draw2-home-header__nav" aria-label="主要ページ">
-        <a href="../pixiedraw2/index.html">Draw2</a>
-        <a href="../market/">マーケット</a>
-        <a href="../account/index.html">ライブラリ</a>
-        <a class="is-active" href="./">コミュニティ</a>
-      </nav>
-      <div class="draw2-home-header__actions">
-        <a class="draw2-home-header__account" href="../account/index.html">ログイン</a>
-        <a class="draw2-home-header__start" href="../pixiedraw2/index.html">今すぐ作る <span aria-hidden="true">↗</span></a>
-      </div>
-    </div>
-  </header>
-
   <div class="page market-page social-home-page draw2-home__community">
     <main class="market-shell social-home" aria-labelledby="socialHomeTitle">
       <header class="market-titlebar social-home__header">
-        <div class="market-titlebar__title"><img src="../assets/icons/HOME.png?v=2026.07.19-ui-icons1" alt=""><h1 id="socialHomeTitle">コミュニティ</h1></div>
+        <div class="market-titlebar__title"><img src="../assets/icons/HOME.png?v=2026.07.19-ui-icons1" alt=""><h1 id="socialHomeTitle" data-i18n-key="communityTitle">コミュニティ</h1></div>
       </header>
-      <p class="draw2-home__community-intro">PiXiEEDで作られた作品を見つけたり、制作途中の作品を共有できます。</p>
-      <p class="social-home__status" id="socialFeedStatus" role="status">作品を読み込んでいます。</p>
-      <section class="market-section market-grid social-feed" id="socialFeed" aria-label="作品投稿" aria-live="polite"></section>
+      <nav class="social-feed-tabs" aria-label="作品の表示切替" data-i18n-aria-label="communityTabsAria">
+        <button class="is-active" type="button" data-social-feed-filter="recommended" aria-pressed="true" data-i18n-key="communityTabRecommended">おすすめ</button>
+        <button type="button" data-social-feed-filter="popular" aria-pressed="false" data-i18n-key="communityTabPopular">人気</button>
+        <button type="button" data-social-feed-filter="new" aria-pressed="false" data-i18n-key="communityTabNew">新着</button>
+        <button type="button" data-social-feed-filter="following" aria-pressed="false" data-i18n-key="communityTabFollowing">フォロー中</button>
+      </nav>
+      <p class="draw2-home__community-intro" data-i18n-key="communityIntro">PiXiEEDで作られた作品を見つけたり、制作途中の作品を共有できます。</p>
+      <p class="social-home__status" id="socialFeedStatus" role="status" data-i18n-key="communityFeedLoading">作品を読み込んでいます。</p>
+      <section class="market-section market-grid social-feed" id="socialFeed" data-i18n-aria-label="communityFeedAria" aria-label="作品投稿" aria-live="polite"></section>
+      <section class="social-home__empty" id="socialFeedEmpty" hidden aria-labelledby="socialFeedEmptyTitle">
+        <div class="social-home__empty-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+        <p class="social-home__empty-eyebrow">EXPLORE / COMMUNITY</p>
+        <h2 id="socialFeedEmptyTitle" data-i18n-key="communityEmptyTitle">作品を見つける場所を、ここから。</h2>
+        <p class="social-home__empty-copy" data-i18n-key="communityEmptyCopy">PiXiEEDで生まれたドット絵、音、ゲームがここに集まります。まずはStudioで作品を作るか、マーケットから素材を探せます。</p>
+        <div class="social-home__empty-actions">
+          <a class="social-home__empty-action social-home__empty-action--primary" href="../studio/" data-i18n-key="communityEmptyStudio">PiXiEEDstudioで作る</a>
+          <a class="social-home__empty-action" href="../market/" data-i18n-key="communityEmptyMarket">マーケットを見る</a>
+        </div>
+      </section>
     </main>
 
     <div class="market-quick-actions social-home__quick-actions">
-      <button class="market-quick-actions__toggle social-home__compose" id="socialComposeOpen" type="button" aria-haspopup="dialog" aria-label="作品を投稿する">+</button>
+      <button class="market-quick-actions__toggle social-home__compose" id="socialComposeOpen" type="button" aria-haspopup="dialog" data-i18n-aria-label="communityComposeAria" aria-label="作品を投稿する">+</button>
     </div>
 
     <dialog class="social-compose" id="socialComposeDialog" aria-labelledby="socialComposeTitle">
       <form class="social-compose__form" id="socialComposeForm" method="dialog">
-        <header><div><small>NEW POST</small><h2 id="socialComposeTitle">画像を投稿</h2></div><button id="socialComposeClose" type="button" aria-label="閉じる">×</button></header>
+        <header><div><small>NEW POST</small><h2 id="socialComposeTitle" data-i18n-key="communityNewPost">画像を投稿</h2></div><button id="socialComposeClose" type="button" data-i18n-aria-label="communityClose" aria-label="閉じる">×</button></header>
         <label class="social-compose__picker" for="socialComposeFile">
           <input id="socialComposeFile" type="file" accept="image/png,image/webp,image/gif,image/jpeg" required>
           <img id="socialComposePreview" alt="選択した画像のプレビュー" hidden>
-          <span id="socialComposePickerLabel">PNG・WebP・GIF・JPEGを選択</span>
+          <span id="socialComposePickerLabel" data-i18n-key="communityPickerLabel">PNG・WebP・GIF・JPEGを選択</span>
         </label>
-        <label class="social-compose__caption">作品の種類
+        <label class="social-compose__caption"><span data-i18n-key="communityKindLabel">作品の種類</span>
           <select id="socialComposeContentKind" aria-describedby="socialComposeContentKindHint">
-            <option value="finished">完成作品</option>
-            <option value="wip">制作途中</option>
-            <option value="material">素材</option>
-            <option value="game">ゲーム作品</option>
+            <option value="finished" data-i18n-key="communityKindFinished">完成作品</option>
+            <option value="wip" data-i18n-key="communityKindWip">制作途中</option>
+            <option value="material" data-i18n-key="communityKindMaterial">素材</option>
+            <option value="game" data-i18n-key="communityKindGame">ゲーム作品</option>
           </select>
-          <small id="socialComposeContentKindHint" class="social-compose__hint">あとから詳細設定で公開方法を変更できます。</small>
+          <small id="socialComposeContentKindHint" class="social-compose__hint" data-i18n-key="communityKindHint">あとから詳細設定で公開方法を変更できます。</small>
         </label>
-        <label class="social-compose__caption social-compose__caption--short">ひとこと（任意）<textarea id="socialComposeCaption" maxlength="300" placeholder="作品について一言（300文字まで）"></textarea></label>
+        <label class="social-compose__caption social-compose__caption--short"><span data-i18n-key="communityCaptionLabel">ひとこと（任意）</span><textarea id="socialComposeCaption" maxlength="300" data-i18n-placeholder="communityCaptionPlaceholder" placeholder="作品について一言（300文字まで）"></textarea></label>
         <details class="social-compose__details">
-          <summary>詳細設定（任意）</summary>
+          <summary data-i18n-key="communityDetails">詳細設定（任意）</summary>
           <div class="social-compose__details-body">
-            <label class="social-compose__caption">作品タイトル（任意）<input id="socialComposeTitleInput" maxlength="50" placeholder="未入力なら作品の種類から自動設定"></label>
-            <label class="social-compose__caption">タグ<input id="socialComposeTags" maxlength="124" placeholder="例：街, 夜, 16x16（5個まで）"></label>
-            <label class="social-compose__option"><input id="socialComposeComments" type="checkbox" checked><span><strong>コメントを許可</strong><small>詳細画面で200文字までのコメントを受け付けます</small></span></label>
+            <label class="social-compose__caption"><span data-i18n-key="communityTitleLabel">作品タイトル（任意）</span><input id="socialComposeTitleInput" maxlength="50" data-i18n-placeholder="communityTitlePlaceholder" placeholder="未入力なら作品の種類から自動設定"></label>
+            <label class="social-compose__caption"><span data-i18n-key="communityTagsLabel">タグ</span><input id="socialComposeTags" maxlength="124" data-i18n-placeholder="communityTagsPlaceholder" placeholder="例：街, 夜, 16x16（5個まで）"></label>
+            <label class="social-compose__option"><input id="socialComposeComments" type="checkbox" checked><span><strong data-i18n-key="communityComments">コメントを許可</strong><small data-i18n-key="communityCommentsCopy">詳細画面で200文字までのコメントを受け付けます</small></span></label>
           </div>
         </details>
         <p class="social-compose__status" id="socialComposeStatus" role="status"></p>
-        <button class="social-compose__submit" id="socialComposeSubmit" type="submit">投稿する</button>
+        <button class="social-compose__submit" id="socialComposeSubmit" type="submit" data-i18n-key="communitySubmit">投稿する</button>
       </form>
     </dialog>
   </div>
@@ -89,7 +83,7 @@
   <footer>
     <p>© <span id="year">2026</span> PiXiEED. All rights reserved.</p>
     <div class="footer-links">
-      <a href="../pixiedraw2/index.html">PiXiEEDraw2</a>
+      <a href="../studio/">PiXiEEDstudio</a>
       <a href="./">コミュニティ</a>
       <a href="../market/">マーケット</a>
       <a href="../account/index.html">マイページ</a>
@@ -105,7 +99,7 @@
   <nav class="bottom-nav" aria-label="下部ナビ">
     <a class="bottom-nav__item" data-tab="home" href="../index.html"><span class="icon"><img src="../assets/icons/HOME.png?v=2026.07.19-ui-icons1" alt=""></span><span>ホーム</span></a>
     <a class="bottom-nav__item" data-tab="market" href="../market/"><span class="icon"><img src="../assets/icons/Market.png" alt=""></span><span>マーケット</span></a>
-    <a class="bottom-nav__item bottom-nav__item--primary" data-tab="draw" href="../pixiedraw2/index.html"><span class="icon"><img src="../assets/icons/Draw.png?v=2026.07.19-ui-icons1" alt=""></span><span>PiXiEEDraw2</span></a>
+    <a class="bottom-nav__item bottom-nav__item--primary" data-tab="draw" href="../studio/"><span class="icon"><img src="../assets/icons/Draw.png?v=2026.07.19-ui-icons1" alt=""></span><span>PiXiEEDstudio</span></a>
     <a class="bottom-nav__item" data-tab="camera" href="../pixiee-lens/index.html"><span class="icon"><img src="../assets/icons/Camera.png" alt=""></span><span>カメラ</span></a>
     <a class="bottom-nav__item" data-tab="account" href="../account/index.html"><span class="icon"><img src="../pixiedraw/assets/icons/ecticon_frame_01.png" alt=""></span><span>マイページ</span></a>
   </nav>
@@ -113,10 +107,10 @@
   <script src="../scripts/ad-account-control.js?v=20260719-no-ad-fallback1"></script>
   <script src="../scripts/card-feed-ads.js?v=20260730-progressive-feed1"></script>
   <script src="../scripts/social-posts.js?v=20260803-social-seo-comments1"></script>
-  <script src="../scripts/home-social-feed.js?v=20260803-social-seo-comments1"></script>
+  <script src="../scripts/home-social-feed.js?v=20260825-social-empty-state1"></script>
   <script src="../scripts/ads-lazy.js?v=20260719-no-ad-fallback1"></script>
-  <script src="../scripts/shared-profile-header.js"></script>
-  <script src="../scripts/shared-bottom-nav.js?v=20260803-tools-panel1"></script>
+  <script src="../scripts/shared-profile-header.js?v=20260825-common-shell15"></script>
+  <script src="../scripts/shared-bottom-nav.js?v=20260825-studio-brand1"></script>
   <script src="../scripts/pixel-art-fit.js"></script>
   <script>const year = document.getElementById('year'); if (year) year.textContent = new Date().getFullYear();</script>
 </body>

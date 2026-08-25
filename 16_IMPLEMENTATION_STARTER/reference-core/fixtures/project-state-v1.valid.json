@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "projectId": "project-1",
+  "structureEpoch": 1,
+  "assets": {
+    "asset-1": {
+      "id": "asset-1",
+      "revision": 0,
+      "width": 2,
+      "height": 2,
+      "palette": [0, 4294967295],
+      "pixels": {
+        "$type": "Uint8Array",
+        "data": [0, 0, 0, 0]
+      }
+    }
+  },
+  "appliedCommandIds": [],
+  "lastClientSequenceByClient": {}
+}

@@ -1,0 +1,21 @@
+{
+  "workPackage": "WP-190",
+  "status": "CHROMIUM_REFERENCE_SMOKE",
+  "measurements": {
+    "narrow320x844": {"profile":"mobile","pageHorizontalOverflow":0,"canvasWidth":302},
+    "mobile390x844": {"profile":"mobile","pageHorizontalOverflow":0,"canvasWidth":372},
+    "tablet834x1112": {"profile":"tablet","pageHorizontalOverflow":0,"canvasWidth":484},
+    "split834x600": {"profile":"split","pageHorizontalOverflow":0},
+    "desktop1280x900": {"profile":"desktop","pageHorizontalOverflow":0},
+    "wide1440x900": {"profile":"desktop","pageHorizontalOverflow":0,"canvasWidth":1044}
+  },
+  "contracts": {
+    "textScaling200Percent": "CONTRACT_PRESENT_NOT_MANUALLY_MEASURED",
+    "safeArea": "CSS_ENV_INSETS_PRESENT",
+    "softwareKeyboard": "CONTRACT_PRESENT_NOT_MANUALLY_MEASURED",
+    "canvasInternalScrollSeparated": "PASS_STATIC",
+    "timelineInternalScrollSeparated": "PASS_STATIC",
+    "productionCurrentMobile": "READ_ONLY_UNTOUCHED"
+  },
+  "physicalDevice": "UNTESTED"
+}

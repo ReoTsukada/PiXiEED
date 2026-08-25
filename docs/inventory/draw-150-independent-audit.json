@@ -1,0 +1,21 @@
+{
+  "packageId": "DRAW-150",
+  "status": "INDEPENDENT_REVIEW_PASS",
+  "reviewMode": "source-read-and-rerun-scoped-checks",
+  "findings": [],
+  "confirmed": [
+    "Legacy v2 byte identity is separate from Draw2 PXD v1",
+    "source bytes/hash are retained and import is copy-only",
+    "unsafe/trailing/active-content inputs fail closed",
+    "unknown fields are review-visible",
+    "adapter remains DOM/network/storage-provider free",
+    "current routes/PXD/PiXiSYNC/Market are not changed"
+  ],
+  "notPromoted": [
+    "real user or production compatibility",
+    "native/browser/device qualification",
+    "production release readiness"
+  ],
+  "baseline": { "matched": "14/14", "newFailures": 0 },
+  "nextPackage": "DRAW-160"
+}

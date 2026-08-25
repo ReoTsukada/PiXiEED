@@ -9,14 +9,16 @@
   const scriptUrl = document.currentScript?.src || window.location.href;
   const assetUrl = (path) => new URL(path, scriptUrl).href;
   const FORMAT_LABELS = {
-    'pixiedraw-project': 'PiXiEEDraw',
+    'pixiedraw-project': 'iDRAW',
     png: 'PNG',
     webp: 'WebP',
     gif: 'GIF',
     apng: 'APNG',
     'sprite-sheet-png': 'PNGスプライトシート',
     'gif-frames-png': 'GIF → 各フレームPNG',
-    'gif-spritemap-png': 'GIF → SpriteMAP＋カラーマップ'
+    'gif-spritemap-png': 'GIF → SpriteMAP＋カラーマップ',
+    aac: 'AAC', aiff: 'AIFF', flac: 'FLAC', m4a: 'M4A', mid: 'MIDI', midi: 'MIDI',
+    mp3: 'MP3', oga: 'OGA', ogg: 'OGG', opus: 'Opus', wav: 'WAV', weba: 'WebM音声'
   };
   const GIF_DERIVED_FORMATS = new Set(['gif-frames-png', 'gif-spritemap-png']);
   let renderToken = 0;
@@ -134,6 +136,9 @@
   function createCard(client, purchase) {
     const product = purchase.asset || {};
     const formats = Array.from(new Set(Array.isArray(product.included_formats) ? product.included_formats : [product.asset_format])).filter(Boolean);
+    const audioFormats = new Set(['aac', 'aiff', 'flac', 'm4a', 'mid', 'midi', 'mp3', 'oga', 'ogg', 'opus', 'wav', 'weba']);
+    const hasAudio = formats.some((format) => audioFormats.has(format));
+    const hasDraw = formats.some((format) => ['pixiedraw-project', 'png', 'webp', 'gif', 'apng', 'sprite-sheet-png'].includes(format));
     const card = document.createElement('article'); card.className = 'market-card account-market-card';
     const previewLink = document.createElement('a'); previewLink.className = 'market-card__preview';
     previewLink.href = assetUrl(`../market/items/${encodeURIComponent(product.id || '')}/`);
@@ -144,7 +149,13 @@
     const badges = document.createElement('div'); badges.className = 'market-card__badges';
     const productType = document.createElement('span');
     productType.className = formats.includes('pixiedraw-project') ? 'is-pixiedraw-product' : 'is-general-product';
-    productType.textContent = formats.includes('pixiedraw-project') ? 'PiXiEEDraw作品' : '一般素材';
+    productType.textContent = formats.includes('pixiedraw-project')
+      ? 'iDRAW作品'
+      : hasAudio && hasDraw
+        ? 'iDRAW + iAUDIO素材'
+        : hasAudio
+          ? 'iAUDIO素材'
+          : '一般素材';
     badges.appendChild(productType);
     const paid = document.createElement('span');
     paid.textContent = purchase.status === 'granted' ? '管理者取得' : '購入済み';
@@ -168,7 +179,10 @@
     }
     fieldset.append(legend, ...switches);
     const actions = document.createElement('div'); actions.className = 'account-market-actions';
-    const drawButton = createButton('PiXiEEDrawで開く', 'account-market-button--primary'); actions.appendChild(drawButton);
+    const drawButton = createButton('iDRAWで開く', 'account-market-button--primary');
+    if (formats.includes('pixiedraw-project') || formats.some((format) => ['png', 'webp', 'gif', 'apng', 'sprite-sheet-png'].includes(format))) {
+      actions.appendChild(drawButton);
+    }
     if (right?.status === 'active' && right?.id && right?.source_asset_id) {
       const derivative = document.createElement('a');
       derivative.className = 'account-market-button account-market-button--derivative';
@@ -254,20 +268,20 @@
     });
 
     drawButton.addEventListener('click', async () => {
-      setBusy(true); status.textContent = 'PiXiEEDrawで開く素材を確認しています…';
+      setBusy(true); status.textContent = 'iDRAWで開く素材を確認しています…';
       try {
         const payload = await invoke(client, { action: 'authorize', kind: 'pixieedraw-open', asset_id: product.id });
         const [file] = await fetchDeliveredFiles(payload.files || []);
-        if (!file) throw new Error('PiXiEEDrawで開ける素材ファイルがありません。');
+        if (!file) throw new Error('iDRAWで開ける素材ファイルがありません。');
         const token = await delivery.stagePiXiEEDrawFile(file.blob, {
           filename: file.name || file.original_path,
           assetId: product.id,
           traceId: payload.trace_id
         });
-        status.textContent = 'PiXiEEDrawを開きます…';
+        status.textContent = 'iDRAWを開きます…';
         window.location.assign(assetUrl(`../pixiedraw/?market_import=${encodeURIComponent(token)}`));
       } catch (error) {
-        status.textContent = error.message || 'PiXiEEDrawで開けませんでした。'; setBusy(false);
+        status.textContent = error.message || 'iDRAWで開けませんでした。'; setBusy(false);
       }
     });
 

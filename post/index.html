@@ -10,12 +10,22 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/site/landing.css?v=2026.07.19-home-centered3">
-  <link rel="stylesheet" href="/post/post.css?v=20260803-social-seo-comments1">
+  <link rel="stylesheet" href="/post/post.css?v=20260825-figma-empty2">
 </head>
 <body>
   <div class="page post-page">
     <main class="post-detail" id="postDetail" aria-live="polite">
-      <p class="post-detail__status" id="postStatus">作品を読み込んでいます。</p>
+      <p class="post-detail__status" id="postStatus" data-i18n-key="postLoading">作品を読み込んでいます。</p>
+      <section class="post-empty" id="postEmpty" hidden aria-labelledby="postEmptyTitle">
+        <span class="post-empty__mark" aria-hidden="true">✦</span>
+        <p class="post-empty__eyebrow">COMMUNITY</p>
+        <h1 id="postEmptyTitle" data-i18n-key="postEmptyTitle">作品を見つける</h1>
+        <p data-i18n-key="postEmptyCopy">コミュニティから作品を選ぶか、PiXiEEDstudioで新しい作品を作れます。</p>
+        <div class="post-empty__actions">
+          <a class="post-empty__primary" href="/community/" data-i18n-key="postEmptyCommunity">コミュニティを見る</a>
+          <a class="post-empty__secondary" href="/studio/" data-i18n-key="postEmptyStudio">PiXiEEDstudioで作る</a>
+        </div>
+      </section>
       <article id="postContent" hidden>
         <header class="post-detail__author">
           <img id="postAuthorAvatar" src="/character-dots/maousama.png" alt="">
@@ -57,9 +67,9 @@
     </main>
   </div>
   <script src="/scripts/social-posts.js?v=20260803-social-seo-comments1"></script>
-  <script src="/post/post.js?v=20260803-social-seo-comments1"></script>
-  <script src="/scripts/shared-profile-header.js"></script>
-  <script src="/scripts/shared-bottom-nav.js?v=20260803-tools-panel1"></script>
+  <script src="/post/post.js?v=20260825-figma-empty2"></script>
+<script src="/scripts/shared-profile-header.js?v=20260825-common-shell15"></script>
+  <script src="/scripts/shared-bottom-nav.js?v=20260825-studio-brand1"></script>
   <script src="/scripts/pixel-art-fit.js"></script>
 </body>
 </html>

@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "benchmarkId": "OPS440_SERVER_COMPOSITION_SYNTHETIC",
+  "status": "MEASURED_LOCAL_SYNTHETIC",
+  "iterations": 1000,
+  "successful": 1000,
+  "elapsedMs": 17.567,
+  "operationsPerSecond": 56924.11,
+  "sourceSha256": "3ab6d123d76fd60ee8b6fe8333faaf0605ce2a3b903095c9350246325ef15e77",
+  "notes": [
+    "Server-composed analytics projection with synthetic FP-003AA Auth/Tenant and WP240/WP250 contracts.",
+    "No network, provider, route, database, storage, payment, production, browser, device, or real-user data was accessed.",
+    "This is not a production semantic or performance PASS."
+  ]
+}

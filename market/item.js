@@ -5,8 +5,10 @@
   const SUPABASE_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
   const $ = (id) => document.getElementById(id);
   const labels = {
-    'pixiedraw-project': 'PiXiEEDraw', png: 'PNG', webp: 'WebP', gif: 'GIF', apng: 'APNG',
-    'sprite-sheet-png': 'PNGスプライトシート'
+    'pixiedraw-project': 'iDRAW', png: 'PNG', webp: 'WebP', gif: 'GIF', apng: 'APNG',
+    'sprite-sheet-png': 'PNGスプライトシート',
+    aac: 'AAC', aiff: 'AIFF', flac: 'FLAC', m4a: 'M4A', mid: 'MIDI', midi: 'MIDI',
+    mp3: 'MP3', oga: 'OGA', ogg: 'OGG', opus: 'Opus', wav: 'WAV', weba: 'WebM音声'
   };
   const yen = (value) => `${Number(value || 0).toLocaleString('ja-JP')}円`;
   let currentAsset = null;
@@ -164,6 +166,8 @@
     currentAsset = asset;
     const series = asset.series || {};
     const formats = assetFormats(asset);
+    const hasAudio = formats.some((format) => ['aac', 'aiff', 'flac', 'm4a', 'mid', 'midi', 'mp3', 'oga', 'ogg', 'opus', 'wav', 'weba'].includes(format));
+    const hasDraw = formats.some((format) => ['pixiedraw-project', 'png', 'webp', 'gif', 'apng', 'sprite-sheet-png'].includes(format));
     const options = series.inherited_terms?.license_options || [];
     document.title = `${asset.title} | PiXiEEDマーケット`;
     const canonical = document.querySelector('link[rel="canonical"]');
@@ -173,8 +177,12 @@
     $('itemPrice').textContent = yen(asset.sale_price_yen);
     $('itemFormats').textContent = formats.map((format) => labels[format] || format).join(' / ');
     $('itemProductType').textContent = isPixieeDrawProduct(asset)
-      ? 'PiXiEEDraw作品（編集用プロジェクト入り）'
-      : '一般素材（画像・アニメーション）';
+      ? 'iDRAW作品（編集用プロジェクト入り）'
+      : hasAudio && hasDraw
+        ? 'iDRAW + iAUDIO素材（絵と音楽）'
+        : hasAudio
+          ? 'iAUDIO素材（音楽・SE）'
+          : '一般素材（画像・アニメーション）';
     const limitedQuantity = Number(asset.limited_quantity);
     const limitedSold = Math.max(0, Number(asset.limited_sold_count || 0));
     $('itemAvailability').textContent = asset.withdrawn_at
@@ -204,7 +212,7 @@
       author.removeAttribute('aria-label');
     }
     favorites?.bind?.($('itemFavorite'), asset);
-    const productBadge = badge(isPixieeDrawProduct(asset) ? 'PiXiEEDraw作品' : '一般素材');
+    const productBadge = badge(isPixieeDrawProduct(asset) ? 'iDRAW作品' : '一般素材');
     productBadge.className = isPixieeDrawProduct(asset) ? 'is-pixiedraw-product' : 'is-general-product';
     const badges = [productBadge];
     if (asset.verification_status === 'verified') {

@@ -1,0 +1,202 @@
+{
+  "schemaVersion": 1,
+  "packageId": "FP-004",
+  "recordedAt": "2026-08-11",
+  "status": "ISOLATED_REFERENCE_COMPLETE",
+  "evidenceMode": "ISOLATED_REFERENCE_IMPLEMENTATION",
+  "implementationStatus": "VERIFIED_ISOLATED_REFERENCE_29_OF_29",
+  "contractSource": "docs/contracts/FP-004-DURABLE-EVENT.md",
+  "conformanceMatrix": "docs/contracts/FP-004-CONFORMANCE-MATRIX.md",
+  "verification": [
+    {
+      "command": "deno check --no-remote pixiedraw2/src/fp-004/contracts.ts pixiedraw2/src/fp-004/durable-transaction.ts pixiedraw2/src/fp-004/inbox-outbox-lease.ts pixiedraw2/src/fp-004/replay-consumer.ts",
+      "exitCode": 0,
+      "status": "PASS_STATIC"
+    },
+    {
+      "command": "deno test --no-remote --check pixiedraw2/tests/fp004-contracts.test.ts pixiedraw2/tests/fp004-durable-transaction.test.ts pixiedraw2/tests/fp004-inbox-outbox-lease.test.ts pixiedraw2/tests/fp004-replay-consumer.test.ts pixiedraw2/tests/fp004-integration.test.ts",
+      "exitCode": 0,
+      "status": "PASS_ISOLATED_REFERENCE_29_OF_29"
+    },
+    {
+      "command": "deno test --no-remote --allow-read --allow-write pixiedraw2/tests/fp-004/file-durable-adapter.test.ts",
+      "exitCode": 0,
+      "status": "PASS_ISOLATED_FILE_REFERENCE_5_OF_5"
+    },
+    {
+      "command": "Terra formal audit: 29/29 (baseline 14/14, new 0; Acceptance 7/7; P0/P1 0)",
+      "exitCode": 0,
+      "status": "INDEPENDENT_REVIEW_PASS"
+    },
+    {
+      "command": "deno check --no-remote pixiedraw2/benchmarks/fp004-durable-event-benchmark.ts",
+      "exitCode": 0,
+      "status": "PASS_STATIC"
+    },
+    {
+      "command": "deno run --no-remote pixiedraw2/benchmarks/fp004-durable-event-benchmark.ts",
+      "exitCode": 0,
+      "status": "MEASURED_LOCAL_SYNTHETIC"
+    },
+    {
+      "command": "python3 -m json.tool docs/inventory/fp-004-evidence.json",
+      "exitCode": 0,
+      "status": "PASS_STATIC"
+    },
+    {
+      "command": "git diff --check -- pixiedraw2/src/fp-004 pixiedraw2/tests/fp004-*.test.ts pixiedraw2/benchmarks/fp004-durable-event-benchmark.ts docs/contracts/FP-004-CONFORMANCE-MATRIX.md docs/inventory/fp-004-evidence.json docs/decisions/ADR-20260810-FP-004-ISOLATED-DURABILITY-ADAPTER.md",
+      "exitCode": 0,
+      "status": "PASS_STATIC"
+    }
+  ],
+  "benchmark": {
+    "source": "pixiedraw2/benchmarks/fp004-durable-event-benchmark.ts",
+    "adapter": "IsolatedFp004DurabilityFixture",
+    "command": "deno run --no-remote pixiedraw2/benchmarks/fp004-durable-event-benchmark.ts",
+    "exitCode": 0,
+    "status": "MEASURED_LOCAL_SYNTHETIC",
+    "fixtureSizes": [1, 10, 100, 1000],
+    "metrics": ["transaction_ms", "lease_ms", "retry_ms", "replay_ms", "p50", "p95", "max", "logical_counters"],
+    "productionSloClaim": false,
+    "productionEquivalentClaim": false,
+    "sourceArtifactHash": "ab61b0a26d6ed59915c4247c10e2854e2f3114dad732708988a7664efb3f6d37",
+    "outputHash": null,
+    "lastRun": {
+      "environment": "local Deno synthetic fixture",
+      "recordedAt": "2026-08-10",
+      "reports": [
+        { "eventCount": 1, "transactionP50Ms": 0.002041, "leaseP50Ms": 0.00275, "retryP50Ms": 0.002125, "replayP50Ms": 0.001041, "replaySideEffects": 0 },
+        { "eventCount": 10, "transactionP50Ms": 0.005, "leaseP50Ms": 0.003792, "retryP50Ms": 0.007667, "replayP50Ms": 0.001375, "replaySideEffects": 0 },
+        { "eventCount": 100, "transactionP50Ms": 0.021959, "leaseP50Ms": 0.021209, "retryP50Ms": 0.025583, "replayP50Ms": 0.002167, "replaySideEffects": 0 },
+        { "eventCount": 1000, "transactionP50Ms": 0.394167, "leaseP50Ms": 0.103209, "retryP50Ms": 0.164417, "replayP50Ms": 0.01075, "replaySideEffects": 0 }
+      ],
+      "interpretation": "Synthetic fixture health only; wall-clock output is intentionally not hash-pinned because it varies by host. Timings are not production SLO evidence."
+    }
+  },
+  "acceptance": [
+    {
+      "id": "FP004-EVT-001",
+      "status": "PASS_ISOLATED_REFERENCE",
+      "requiredImplementation": "Atomic state + canonical Event + Outbox + idempotency transaction with crash recovery.",
+      "testCommand": "deno test --no-remote --check <FP-004 transaction/crash tests>",
+      "exitCode": null,
+      "fixtureIds": ["TX-BEFORE-BEGIN", "TX-AFTER-STATE-BEFORE-EVENT", "TX-AFTER-EVENT-BEFORE-COMMIT", "TX-AFTER-COMMIT-BEFORE-RESPONSE"],
+      "expected": "No partial durable records; retry-after-commit returns the original canonical result.",
+      "actual": "Atomic commit, concurrent idempotency, crash points, retry-after-commit, and file-backed restart recovery passed in isolated reference adapters.",
+      "artifactHash": null,
+      "reviewer": null
+    },
+    {
+      "id": "FP004-EVT-002",
+      "status": "PASS_ISOLATED_REFERENCE",
+      "requiredImplementation": "Core-owned provider identity, payload hash, schema validation, idempotency conflict, malformed-success rejection.",
+      "testCommand": "deno test --no-remote --check <FP-004 provider identity tests>",
+      "exitCode": null,
+      "fixtureIds": ["PROVIDER-ID-SAME-HASH", "PROVIDER-ID-DIFFERENT-HASH", "PROVIDER-ID-MISSING", "MALFORMED-SUCCESS", "SCHEMA-UNKNOWN"],
+      "expected": "Duplicate is acknowledged once; conflicts and malformed/unknown success fail closed without mutation.",
+      "actual": "Duplicate/conflict provider identities, malformed success, and opaque ingress forgery tests passed in isolated scope.",
+      "artifactHash": null,
+      "reviewer": null
+    },
+    {
+      "id": "FP004-INBOX-001",
+      "status": "PASS_ISOLATED_REFERENCE",
+      "requiredImplementation": "Restartable Inbox acceptance with lease/fencing and consumer idempotency.",
+      "testCommand": "deno test --no-remote --check <FP-004 Inbox/lease tests>",
+      "exitCode": null,
+      "fixtureIds": ["INBOX-RESTART", "INBOX-DUPLICATE", "INBOX-CONCURRENT-WORKERS", "LEASE-EXPIRED", "LEASE-STALE-FENCE"],
+      "expected": "One current lease owner can complete; duplicate/restarted/stale workers cannot create a second side effect.",
+      "actual": "Duplicate delivery, restart, lease fencing, retry, and DLQ transitions passed in isolated scope.",
+      "artifactHash": null,
+      "reviewer": null
+    },
+    {
+      "id": "FP004-ORDER-001",
+      "status": "PASS_ISOLATED_REFERENCE",
+      "requiredImplementation": "Tenant-scoped aggregate head, gap record, stale handling, same-version conflict quarantine.",
+      "testCommand": "deno test --no-remote --check <FP-004 ordering/gap tests>",
+      "exitCode": null,
+      "fixtureIds": ["ORDER-LOWER-VERSION", "ORDER-HIGHER-GAP", "ORDER-SAME-VERSION-CONFLICT", "ORDER-CROSS-TENANT"],
+      "expected": "Stale is ignored, higher versions are durably held, conflicts are quarantined, and projections never skip gaps.",
+      "actual": "Expected-next, stale, gap, and same-version conflict paths passed in isolated scope.",
+      "artifactHash": null,
+      "reviewer": null
+    },
+    {
+      "id": "FP004-RECOVERY-001",
+      "status": "PASS_ISOLATED_REFERENCE",
+      "requiredImplementation": "Bounded retry/backoff, poison/non-retryable DLQ, crash recovery, independent consumer retry state.",
+      "testCommand": "deno test --no-remote --check <FP-004 recovery/DLQ tests>",
+      "exitCode": null,
+      "fixtureIds": ["RETRY-BOUNDED", "RETRY-POISON", "RETRY-NON-RETRYABLE", "DLQ-RECOVERABLE", "CRASH-ACK-WINDOW"],
+      "expected": "Retry is bounded, DLQ is recoverable, no silent drop/infinite retry occurs, and consumer failures remain isolated.",
+      "actual": "Bounded retry, poison/non-retryable DLQ, restart, file-backed recovery, and consumer isolation passed in isolated scope.",
+      "artifactHash": null,
+      "reviewer": null
+    },
+    {
+      "id": "FP004-REPLAY-001",
+      "status": "PASS_ISOLATED_REFERENCE",
+      "requiredImplementation": "Projection-only replay requiring replayRunId, consumer scope, and sideEffectMode=NONE.",
+      "testCommand": "deno test --no-remote --check <FP-004 replay tests>",
+      "exitCode": null,
+      "fixtureIds": ["REPLAY-FINANCE", "REPLAY-NOTIFICATION", "REPLAY-SEARCH", "REPLAY-MISSING-MODE"],
+      "expected": "Projection can rebuild while external, financial, notification, listing, purchase, entitlement, and canonical mutations remain zero.",
+      "actual": "Finance, Notification, and Search projection replay stayed side-effect-free in isolated scope.",
+      "artifactHash": null,
+      "reviewer": null
+    },
+    {
+      "id": "FP004-SEC-001",
+      "status": "PASS_ISOLATED_REFERENCE",
+      "requiredImplementation": "Authorization revalidation, tenant/resource binding, bounded privacy-safe records, fail-closed validation.",
+      "testCommand": "deno test --no-remote --check <FP-004 security/privacy tests>",
+      "exitCode": null,
+      "fixtureIds": ["AUTH-REVOKED-BEFORE-MUTATION", "AUTH-STALE-PROOF", "SEC-CROSS-TENANT", "SEC-CYCLIC", "SEC-OVERSIZED", "SEC-PRIVATE-FIELD"],
+      "expected": "Unauthorized, stale, cross-tenant, cyclic, oversized, private, or credential-bearing envelopes create no state/event/projection and do not leak payloads.",
+      "actual": "Authorization revalidation, tenant/resource mismatch, forged ingress, and malformed success were rejected in isolated scope. File Adapter accepts only an explicit non-symlink root plus a safe relative snapshot name; root/snapshot/tmp symlinks and deterministic rename failure were rejected without replacing the prior snapshot.",
+      "artifactHash": null,
+      "reviewer": null
+    }
+  ],
+  "noProductionClaims": {
+    "currentRoutesChanged": false,
+    "currentPiXiEEDrawChanged": false,
+    "marketChanged": false,
+    "piXiSYNCChanged": false,
+    "productionDatabaseAccessed": false,
+    "productionStorageAccessed": false,
+    "productionCredentialsUsed": false,
+    "migrationRun": false,
+    "deployRun": false,
+    "publishRun": false,
+    "commitRun": false,
+    "pushRun": false,
+    "wp095InMemoryCountedAsDurable": false
+  },
+  "untested": [
+    "file adapter rename metadata durability across power loss",
+    "production-equivalent Auth/DB/RLS/Storage/queue/provider",
+    "real cross-process concurrency and crash recovery",
+    "Finance/Notification/Search consumer integration",
+    "browser/device/network timing",
+    "migration/deploy/rollback rehearsal",
+    "production SLO and cutover"
+  ],
+  "reviewer": {
+    "agentFamily": "TERRA_HIGH",
+    "result": "INDEPENDENT_REVIEW_PASS",
+    "classification": "ISOLATED_REFERENCE_COMPLETE",
+    "auditScope": {
+      "total": 29,
+      "passed": 29,
+      "baseline": 14,
+      "new": 0,
+      "acceptancePassed": 7,
+      "p0": 0,
+      "p1": 0
+    },
+    "finding": "Terra formal audit passed 29/29 checks, including baseline 14/14 and new 0; all 7 Acceptance IDs are PASS_ISOLATED_REFERENCE and P0/P1 are 0. Power-loss metadata durability, cross-process concurrency, real provider/DB/queue/RLS boundaries, and production-equivalent behavior remain UNTESTED."
+  },
+  "artifactHash": null
+}

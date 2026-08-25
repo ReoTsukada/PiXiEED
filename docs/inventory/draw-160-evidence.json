@@ -1,0 +1,126 @@
+{
+  "schemaVersion": 1,
+  "packageId": "DRAW-160",
+  "status": "IMPLEMENTED_ISOLATED_REFERENCE",
+  "context": {
+    "path": ".codex/context/DRAW-160.md",
+    "sha256": "5b4a2f0a92efcc0b06a4b56fcd2d226b31b1f7ca5478efdc16139752b3cc7e78"
+  },
+  "implementation": {
+    "adapter": "pixiedraw2/src/draw2/draw-160/preview-boundary.ts",
+    "contract": "docs/contracts/DRAW-160-DRAW-TO-PLAY.md",
+    "authority": "CanonicalPreviewResolver / Canonical Registry",
+    "runtimeCoreReused": "pixiedraw2/src/wp160-game-runtime-core.ts",
+    "runtimeEditorDependency": "PASS",
+    "runtimeStateSeparateFromEditor": "PASS",
+    "publishImplicit": false,
+    "currentRoutesDrawPxdPixiSyncMarketChanged": false,
+    "productionDataChanged": false
+  },
+  "referenceModes": {
+    "LIVE": "PASS / canonical revision only; caller override rejected",
+    "PINNED": "PASS / explicit revision and hash lock",
+    "REVIEW": "PASS / APPROVED required",
+    "FORKED": "PASS / fork binding required"
+  },
+  "failureFixtures": {
+    "callerRevisionOverride": "PASS",
+    "missingRevision": "PASS",
+    "missingFork": "PASS",
+    "invalidCanonicalIdentityOrHash": "PASS",
+    "invalidLicense": "PASS",
+    "permissionDenied": "PASS",
+    "unapprovedReview": "PASS",
+    "forkMismatch": "PASS",
+    "pinnedMutationDuringReload": "PASS",
+    "rollbackReferenceAndRuntimeSessionTogether": "PASS"
+  },
+  "verification": [
+    {
+      "command": "deno check --no-remote pixiedraw2/src/draw2/draw-160/preview-boundary.ts pixiedraw2/tests/draw-160/preview-boundary.test.ts pixiedraw2/benchmarks/draw-160/preview-boundary.bench.ts",
+      "exitCode": 0
+    },
+    {
+      "command": "deno test --no-remote --allow-read=pixiedraw2/src --check pixiedraw2/tests/draw-160/preview-boundary.test.ts",
+      "exitCode": 0,
+      "result": "6 passed / 0 failed"
+    },
+    {
+      "command": "deno test --no-remote --check pixiedraw2/tests/wp160-runtime-build.test.ts",
+      "exitCode": 0,
+      "result": "7 passed / 0 failed"
+    },
+    {
+      "command": "deno test --no-remote --check pixiedraw2/tests/core.test.ts",
+      "exitCode": 0,
+      "result": "18 passed / 0 failed"
+    },
+    {
+      "command": "deno test --no-remote --allow-read --check pixiedraw2/tests/legacy-compat.test.ts",
+      "exitCode": 0,
+      "result": "7 passed / 0 failed"
+    },
+    {
+      "command": "deno task --config pixiedraw2/deno.json check",
+      "exitCode": 0
+    },
+    {
+      "command": "node scripts/test-pixiedraw2-wp140.mjs",
+      "exitCode": 0,
+      "result": "D140 deterministic PNG/PXD export, import, corruption, schema, Aseprite baseline, and isolation checks passed"
+    },
+    {
+      "command": "git diff --check",
+      "exitCode": 0
+    }
+  ],
+  "benchmarks": {
+    "previewBoundary": {
+      "iterations": 1000,
+      "elapsedMs": 25.072,
+      "status": "MEASURED_LOCAL_SYNTHETIC"
+    },
+    "runtimeStep": {
+      "iterations": 10000,
+      "elapsedMs": 3.78,
+      "stepsPerSecond": 2645386.47,
+      "status": "MEASURED_LOCAL_SYNTHETIC"
+    },
+    "runtimeBundle": {
+      "rawBytes": 12795,
+      "minifiedBytes": 7589,
+      "gzipRawBytes": 3736,
+      "gzipMinifiedBytes": 2878,
+      "brotli": "UNAVAILABLE_IN_ENVIRONMENT",
+      "buildCommandExitCode": 0,
+      "output": "/private/tmp/pixiedraw2-draw160-runtime.js (not repository output)"
+    }
+  },
+  "baseline": {
+    "matchedFailureIdentities": "14/14 inherited baseline record",
+    "newFailureIdentities": 0,
+    "source": "existing WP-000/WP-005 baseline evidence; D160 did not rewrite the baseline"
+  },
+  "untested": [
+    "browser preview UI and page-scroll qualification",
+    "physical mobile/tablet/desktop device interaction",
+    "stylus and palm rejection",
+    "full compositor E2E and long-session memory",
+    "Safari/Firefox qualification",
+    "native shell and app-store packaging",
+    "cloud build and production Runtime",
+    "real user PXD compatibility"
+  ],
+  "preservation": {
+    "currentPiXiEEDraw": false,
+    "currentRoutes": false,
+    "existingPxd": false,
+    "pixiSync": false,
+    "marketRightsCommerce": false,
+    "databaseStorage": false,
+    "migrationDeployPublish": false,
+    "commitPush": false
+  },
+  "nextPackage": "DRAW-170",
+  "autoStartNext": false
+}

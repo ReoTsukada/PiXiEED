@@ -1,0 +1,292 @@
+{
+  "evidenceVersion": "QUALIFICATION_EVIDENCE_V1",
+  "packageId": "DRAW-110",
+  "contextSha256": "1944b8c278e6d8af1ddd80ee92abc8b2af09c7adb0e849a5163c1acd1690cd48",
+  "status": "PARTIAL",
+  "acceptance": [
+    {
+      "id": "DRAW110-SCOPE-001",
+      "status": "PASS",
+      "source": [
+        "pixiedraw2/src/draw2/draw-110/raster-editor.ts"
+      ],
+      "contract": [
+        "docs/contracts/DRAW-110-RASTER-EDITOR.md"
+      ],
+      "schema": [
+        "pixiedraw2/src/draw2-core.ts"
+      ],
+      "build": [
+        "pixiedraw2/benchmarks/draw-110/generate-evidence.ts"
+      ],
+      "commands": [
+        {
+          "command": "\"deno\" \"fmt\" \"--check\" \"pixiedraw2/src/draw2/draw-110\" \"pixiedraw2/tests/draw-110\" \"pixiedraw2/benchmarks/draw-110\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"deno\" \"check\" \"pixiedraw2/src/draw2/draw-110/raster-editor.ts\" \"pixiedraw2/tests/draw-110/raster-editor.test.ts\" \"pixiedraw2/benchmarks/draw-110/generate-evidence.ts\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"deno\" \"test\" \"--no-remote\" \"--allow-read\" \"--allow-write\" \"--check\" \"pixiedraw2/tests/draw-110\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"python3\" \"scripts/verify_work_package_context.py\" \"--context\" \".codex/context/DRAW-110.md\" \"--root\" \".\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"node\" \"scripts/test-baseline-failure-identity-wp080.mjs\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"node\" \"scripts/test-baseline-suite-wp000.mjs\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"deno\" \"run\" \"--no-remote\" \"--allow-read\" \"--allow-write\" \"pixiedraw2/benchmarks/draw-110/generate-evidence.ts\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"git\" \"diff\" \"--check\"",
+          "exitCode": 0
+        }
+      ],
+      "artifactHashes": [
+        "de153b6e0ffdf34e84c4fa5ea34fc65925f0224a9d3b7060d5bb6dd40eecbbca",
+        "8ecd06173e20ad038569b84b04cf217384c868c1c6b83095f1c3b45690808333",
+        "2aa566c75bf8ae6349e09df5c4f18260d661d2170ffabf3b39694c3121c4ffd8",
+        "bb36f2d859482d8eb277eccded57aaaa5234727635e56c96224a428762678f0e",
+        "dddcfb5bd131327b0fe82c3d09bdc5260501f56b9af3c4ee7c8305e4fe2d22a0",
+        "17f7fe4c6f34340994cff7475117dcd9da94eea32e4bbb59f28c7818e6460b17",
+        "f8447c80e89b8b19e4a01e030e4da20f8832f56d97dbc807bd284b9359e75710"
+      ],
+      "adapterClass": "IN_MEMORY",
+      "classification": "IMPLEMENTED_ISOLATED",
+      "reviewer": "SOL_SCOPE_AUDIT",
+      "findingIdentity": null
+    },
+    {
+      "id": "DRAW110-WORKSPACE-001",
+      "status": "PARTIAL",
+      "source": [
+        "pixiedraw2/src/draw2/draw-110/raster-editor.ts"
+      ],
+      "contract": [
+        "docs/contracts/DRAW-110-RASTER-EDITOR.md"
+      ],
+      "schema": [
+        "pixiedraw2/src/draw2-core.ts"
+      ],
+      "build": [
+        "pixiedraw2/benchmarks/draw-110/generate-evidence.ts"
+      ],
+      "commands": [
+        {
+          "command": "\"deno\" \"fmt\" \"--check\" \"pixiedraw2/src/draw2/draw-110\" \"pixiedraw2/tests/draw-110\" \"pixiedraw2/benchmarks/draw-110\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"deno\" \"check\" \"pixiedraw2/src/draw2/draw-110/raster-editor.ts\" \"pixiedraw2/tests/draw-110/raster-editor.test.ts\" \"pixiedraw2/benchmarks/draw-110/generate-evidence.ts\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"deno\" \"test\" \"--no-remote\" \"--allow-read\" \"--allow-write\" \"--check\" \"pixiedraw2/tests/draw-110\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"python3\" \"scripts/verify_work_package_context.py\" \"--context\" \".codex/context/DRAW-110.md\" \"--root\" \".\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"node\" \"scripts/test-baseline-failure-identity-wp080.mjs\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"node\" \"scripts/test-baseline-suite-wp000.mjs\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"deno\" \"run\" \"--no-remote\" \"--allow-read\" \"--allow-write\" \"pixiedraw2/benchmarks/draw-110/generate-evidence.ts\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"git\" \"diff\" \"--check\"",
+          "exitCode": 0
+        }
+      ],
+      "artifactHashes": [
+        "de153b6e0ffdf34e84c4fa5ea34fc65925f0224a9d3b7060d5bb6dd40eecbbca",
+        "8ecd06173e20ad038569b84b04cf217384c868c1c6b83095f1c3b45690808333",
+        "2aa566c75bf8ae6349e09df5c4f18260d661d2170ffabf3b39694c3121c4ffd8",
+        "bb36f2d859482d8eb277eccded57aaaa5234727635e56c96224a428762678f0e",
+        "dddcfb5bd131327b0fe82c3d09bdc5260501f56b9af3c4ee7c8305e4fe2d22a0",
+        "17f7fe4c6f34340994cff7475117dcd9da94eea32e4bbb59f28c7818e6460b17",
+        "f8447c80e89b8b19e4a01e030e4da20f8832f56d97dbc807bd284b9359e75710"
+      ],
+      "adapterClass": "UNTESTED",
+      "classification": "UNTESTED",
+      "reviewer": "SOL_SCOPE_AUDIT",
+      "findingIdentity": null
+    },
+    {
+      "id": "DRAW110-EVIDENCE-001",
+      "status": "PARTIAL",
+      "source": [
+        "pixiedraw2/src/draw2/draw-110/raster-editor.ts",
+        "pixiedraw2/tests/draw-110/raster-editor.test.ts",
+        "pixiedraw2/benchmarks/draw-110/generate-evidence.ts"
+      ],
+      "contract": [
+        "docs/contracts/DRAW-110-PERFORMANCE.md"
+      ],
+      "schema": [
+        "pixiedraw2/src/draw2-core.ts"
+      ],
+      "build": [
+        "pixiedraw2/benchmarks/draw-110/generate-evidence.ts"
+      ],
+      "commands": [
+        {
+          "command": "\"deno\" \"fmt\" \"--check\" \"pixiedraw2/src/draw2/draw-110\" \"pixiedraw2/tests/draw-110\" \"pixiedraw2/benchmarks/draw-110\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"deno\" \"check\" \"pixiedraw2/src/draw2/draw-110/raster-editor.ts\" \"pixiedraw2/tests/draw-110/raster-editor.test.ts\" \"pixiedraw2/benchmarks/draw-110/generate-evidence.ts\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"deno\" \"test\" \"--no-remote\" \"--allow-read\" \"--allow-write\" \"--check\" \"pixiedraw2/tests/draw-110\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"python3\" \"scripts/verify_work_package_context.py\" \"--context\" \".codex/context/DRAW-110.md\" \"--root\" \".\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"node\" \"scripts/test-baseline-failure-identity-wp080.mjs\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"node\" \"scripts/test-baseline-suite-wp000.mjs\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"deno\" \"run\" \"--no-remote\" \"--allow-read\" \"--allow-write\" \"pixiedraw2/benchmarks/draw-110/generate-evidence.ts\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"git\" \"diff\" \"--check\"",
+          "exitCode": 0
+        }
+      ],
+      "artifactHashes": [
+        "de153b6e0ffdf34e84c4fa5ea34fc65925f0224a9d3b7060d5bb6dd40eecbbca",
+        "8ecd06173e20ad038569b84b04cf217384c868c1c6b83095f1c3b45690808333",
+        "2aa566c75bf8ae6349e09df5c4f18260d661d2170ffabf3b39694c3121c4ffd8",
+        "bb36f2d859482d8eb277eccded57aaaa5234727635e56c96224a428762678f0e",
+        "dddcfb5bd131327b0fe82c3d09bdc5260501f56b9af3c4ee7c8305e4fe2d22a0",
+        "17f7fe4c6f34340994cff7475117dcd9da94eea32e4bbb59f28c7818e6460b17",
+        "f8447c80e89b8b19e4a01e030e4da20f8832f56d97dbc807bd284b9359e75710"
+      ],
+      "adapterClass": "IN_MEMORY",
+      "classification": "IMPLEMENTED_ISOLATED",
+      "reviewer": "SOL_SCOPE_AUDIT",
+      "findingIdentity": null
+    },
+    {
+      "id": "DRAW110-STOP-001",
+      "status": "PASS",
+      "source": [
+        "09_ROADMAP/WORK_PACKAGES/DRAW-110.md"
+      ],
+      "contract": [
+        "docs/contracts/DRAW-110-RASTER-EDITOR.md"
+      ],
+      "schema": [
+        "pixiedraw2/src/draw2-core.ts"
+      ],
+      "build": [
+        "pixiedraw2/benchmarks/draw-110/generate-evidence.ts"
+      ],
+      "commands": [
+        {
+          "command": "\"deno\" \"fmt\" \"--check\" \"pixiedraw2/src/draw2/draw-110\" \"pixiedraw2/tests/draw-110\" \"pixiedraw2/benchmarks/draw-110\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"deno\" \"check\" \"pixiedraw2/src/draw2/draw-110/raster-editor.ts\" \"pixiedraw2/tests/draw-110/raster-editor.test.ts\" \"pixiedraw2/benchmarks/draw-110/generate-evidence.ts\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"deno\" \"test\" \"--no-remote\" \"--allow-read\" \"--allow-write\" \"--check\" \"pixiedraw2/tests/draw-110\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"python3\" \"scripts/verify_work_package_context.py\" \"--context\" \".codex/context/DRAW-110.md\" \"--root\" \".\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"node\" \"scripts/test-baseline-failure-identity-wp080.mjs\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"node\" \"scripts/test-baseline-suite-wp000.mjs\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"deno\" \"run\" \"--no-remote\" \"--allow-read\" \"--allow-write\" \"pixiedraw2/benchmarks/draw-110/generate-evidence.ts\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"git\" \"diff\" \"--check\"",
+          "exitCode": 0
+        }
+      ],
+      "artifactHashes": [
+        "de153b6e0ffdf34e84c4fa5ea34fc65925f0224a9d3b7060d5bb6dd40eecbbca",
+        "8ecd06173e20ad038569b84b04cf217384c868c1c6b83095f1c3b45690808333",
+        "2aa566c75bf8ae6349e09df5c4f18260d661d2170ffabf3b39694c3121c4ffd8",
+        "bb36f2d859482d8eb277eccded57aaaa5234727635e56c96224a428762678f0e",
+        "dddcfb5bd131327b0fe82c3d09bdc5260501f56b9af3c4ee7c8305e4fe2d22a0",
+        "17f7fe4c6f34340994cff7475117dcd9da94eea32e4bbb59f28c7818e6460b17",
+        "f8447c80e89b8b19e4a01e030e4da20f8832f56d97dbc807bd284b9359e75710"
+      ],
+      "adapterClass": "IN_MEMORY",
+      "classification": "IMPLEMENTED_ISOLATED",
+      "reviewer": "SOL_SCOPE_AUDIT",
+      "findingIdentity": null
+    }
+  ],
+  "benchmarkPath": "docs/inventory/draw-110-benchmark.json",
+  "untested": [
+    "browser screenshot",
+    "physical mobile",
+    "stylus",
+    "Safari",
+    "Firefox",
+    "full input-to-visible compositor",
+    "30-minute memory"
+  ],
+  "baseline": {
+    "expectedFailureCount": 14,
+    "identityMatches": 14,
+    "newFailures": 0,
+    "suitePasses": 63,
+    "suiteTotal": 77
+  },
+  "independentReview": {
+    "reviewer": "SOL_SCOPE_AUDIT",
+    "status": "INDEPENDENT_REVIEW_PASS",
+    "path": "docs/inventory/draw-110-independent-audit.json"
+  },
+  "checkpoint": {
+    "manifest": "docs/inventory/draw-110-command-manifest.json",
+    "transcript": "docs/inventory/draw-110-command-transcript.json",
+    "handoff": "DRAW-110",
+    "nextPackage": "DRAW-120",
+    "autoStartNext": false
+  },
+  "noProductionClaims": true
+}

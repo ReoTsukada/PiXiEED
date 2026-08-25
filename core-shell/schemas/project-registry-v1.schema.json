@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pixieed.invalid/schema/project-registry-v1.json",
+  "title": "PiXiEED Project Registry Record v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "projectId",
+    "projectKind",
+    "toolId",
+    "formatId",
+    "formatVersion",
+    "ownerType",
+    "ownerId",
+    "createdBy",
+    "name",
+    "visibility",
+    "lifecycleState",
+    "headRevisionId",
+    "legacyBindings",
+    "members",
+    "schemaVersion",
+    "recordVersion",
+    "createdAt",
+    "updatedAt"
+  ],
+  "properties": {
+    "projectId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "projectKind": { "enum": ["DRAW", "DRAW2", "AUDIO", "GAME", "PIXFIND", "CAMERA_IMAGE", "OTHER_REGISTERED"] },
+    "toolId": { "enum": ["pixiedraw", "pixiedraw2", "pixieaudio", "pixigame", "pixfind", "camera-image", "registered-tool"] },
+    "formatId": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "formatVersion": { "type": "string", "minLength": 1, "maxLength": 32 },
+    "ownerType": { "enum": ["USER", "TEAM"] },
+    "ownerId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "createdBy": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "visibility": { "enum": ["PRIVATE", "UNLISTED", "PUBLIC"] },
+    "lifecycleState": { "enum": ["ACTIVE", "ARCHIVED", "TRASHED", "MIGRATING", "QUARANTINED"] },
+    "headRevisionId": { "type": ["string", "null"] },
+    "rootAssetId": { "type": ["string", "null"] },
+    "rootReference": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "id": { "type": ["string", "null"] }
+      }
+    },
+    "legacyBindings": { "type": "array", "maxItems": 16, "items": { "$ref": "#/$defs/legacyBinding" } },
+    "members": { "type": "array", "maxItems": 100, "items": { "$ref": "#/$defs/member" } },
+    "metadata": { "type": "object", "additionalProperties": false },
+    "schemaVersion": { "const": 1 },
+    "recordVersion": { "type": "integer", "minimum": 1 },
+    "membershipVersion": { "type": "integer", "minimum": 1 },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "updatedAt": { "type": "string", "format": "date-time" }
+  },
+  "$defs": {
+    "legacyBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["legacySystemId", "legacyProjectId", "legacyFormatVersion", "mappingState", "adapterVersion", "migrationStatus", "verificationHash"],
+      "properties": {
+        "legacySystemId": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "legacyProjectId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+        "legacyFormatVersion": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "mappingState": { "enum": ["MAPPED", "QUARANTINED"] },
+        "adapterVersion": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "migrationStatus": { "enum": ["NOT_STARTED", "IN_PROGRESS", "VERIFIED", "COMPLETED", "FAILED", "QUARANTINED"] },
+        "verificationHash": { "type": "string", "minLength": 1, "maxLength": 256 }
+      }
+    },
+    "member": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["principalId", "role", "status", "membershipVersion", "addedAt", "removedAt"],
+      "properties": {
+        "principalId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+        "role": { "enum": ["CREATOR", "EDITOR", "VIEWER"] },
+        "status": { "enum": ["ACTIVE", "REMOVED"] },
+        "membershipVersion": { "type": "integer", "minimum": 1 },
+        "addedAt": { "type": "string", "format": "date-time" },
+        "removedAt": { "type": ["string", "null"], "format": "date-time" }
+      }
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "documentId": "PIXIEED-CORE-100-EVIDENCE-001",
+  "status": "ACCEPTED_ISOLATED",
+  "productionStatus": "UNTESTED",
+  "compositionRoot": "pixiedraw2/src/core/core-100/composition-root.ts",
+  "sourcePaths": ["pixiedraw2/src/core/core-100/authority-boundary.ts", "pixiedraw2/src/core/core-100/composition-root.ts", "pixiedraw2/src/core/core-100/contracts.ts", "pixiedraw2/src/core/core-100/index.ts"],
+  "adapterCapabilities": ["durable-transaction", "inbox-accept", "outbox-lease-transport-complete", "privacy-storage-policy", "schema-build-policy", "provider-shaped-transport"],
+  "consumers": ["FINANCE", "NOTIFICATION", "SEARCH"],
+  "fixtures": ["default-off", "unknown-flag", "extra-flag", "invalid-command", "copied-authority", "json-authority", "proxy-authority", "caller-proof-rebind", "expired-authority", "mis-bound-authority", "revoked-membership-before-adapter", "malformed-commit-success", "consumer-cross-wire", "valid-inbox", "malformed-inbox-before-adapter", "valid-outbox", "malformed-outbox-before-adapter", "valid-consumer-ownership", "missing-adapter"],
+  "commands": [
+    {"command": "deno test --no-remote --allow-read --allow-write --check pixiedraw2/tests/core-100", "exitCode": 0, "status": "PASS_13_OF_13"},
+    {"command": "deno check --no-remote pixiedraw2/src/core/core-100/*.ts pixiedraw2/tests/core-100/*.ts pixiedraw2/benchmarks/core-100/*.ts", "exitCode": 0, "status": "PASS_STATIC"},
+    {"command": "deno fmt --check pixiedraw2/src/core/core-100 pixiedraw2/tests/core-100 pixiedraw2/benchmarks/core-100", "exitCode": 0, "status": "PASS_FORMAT"},
+    {"command": "deno run --no-remote pixiedraw2/benchmarks/core-100/composition.bench.ts", "exitCode": 0, "status": "PASS_ISOLATED_REFERENCE_1000_ITERATIONS_2_11MS_2026-08-13"},
+    {"command": "git diff --check", "exitCode": 0, "status": "PASS"}
+  ],
+  "independentReview": {"status": "APPROVED", "reviewer": "McClintock", "reviewerId": "019ff922-c164-7732-a369-2e1417e1429d", "summary": "Independent re-audit found P0=0; caller-proof rebind and revoked/revision-mismatch membership are denied before adapters."},
+  "untested": ["durable provider failure qualification", "replay/out-of-order/crash", "browser/device", "production/staging/RLS", "real legacy data", "CORE-110 qualification"],
+  "forbiddenActions": ["migration", "deploy", "publish", "commit", "push", "CORE-110"]
+}

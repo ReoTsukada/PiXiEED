@@ -1,0 +1,58 @@
+policy_id: DISCOVERY-QUESTION-001
+purpose: finish_material_user_questions_before_autonomous_delivery
+default_behavior:
+  before_lock: ask_only_material_unknowns
+  after_lock: do_not_ask_ordinary_questions
+question_value_formula:
+  prioritize:
+    - product_identity_impact
+    - irreversibility
+    - acceptance_outcome_impact
+    - architecture_lock_in
+    - budget_boundary_impact
+    - platform_or_distribution_impact
+    - safety_legal_license_impact
+    - expected_rework_if_wrong
+  penalize:
+    - answer_can_be_researched
+    - answer_can_be_inferred_safely
+    - decision_is_reversible
+    - low_user_value
+    - question_fatigue
+startup_question_domains:
+  - product_identity
+  - target_user
+  - primary_experience_or_gameplay
+  - platform_and_distribution
+  - must_have_and_forbidden_outcomes
+  - realism_or_style_when_identity_defining
+  - online_offline_multiplayer_if_architecture_defining
+  - monetization_if_architecture_defining
+  - budget_or_external_service_limits
+  - hard_deadline_if_any
+  - legal_safety_privacy_constraints
+  - existing_assets_or_tech_constraints
+batching:
+  preferred_max_questions_per_batch: 8
+  hard_max_questions_per_batch: 12
+  second_batch_allowed_only_if:
+    - first_answer_created_new_material_branch
+    - material_blocker_was_impossible_to_identify_before_answer
+  target_batches: 1
+closure_rule:
+  lock_when:
+    - no_remaining_material_blocker_questions
+    - unanswered_items_are_safe_assumptions_or_deferred_choices
+post_lock:
+  ordinary_question: forbidden
+  new_unknown:
+    resolve_order:
+      - reuse_existing_decision_or_cache
+      - research_if_expected_value_positive
+      - choose_reversible_default
+      - preserve_multiple_options_in_architecture
+      - cheap_compare_or_prototype_if_useful
+      - record_safe_assumption
+  hard_approval:
+    allowed_only_under: HUMAN_APPROVAL.yaml
+    batching: latest_safe_milestone

@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "package": "AUDIO-230",
+  "acceptance": ["AUDIO230-SCOPE-001", "AUDIO230-EVIDENCE-001", "AUDIO230-STOP-001"],
+  "implementation": {
+    "source": [
+      "pixiedraw2/src/audio/audio-230/contracts.ts",
+      "pixiedraw2/src/audio/audio-230/geometry.ts",
+      "pixiedraw2/src/audio/audio-230/device.ts",
+      "pixiedraw2/src/audio/audio-230/projection.ts",
+      "pixiedraw2/src/audio/audio-230/workspace.ts",
+      "pixiedraw2/src/audio/audio-230/index.ts"
+    ],
+    "hostNeutral": true,
+    "domNetworkFilesystemProduction": false,
+    "pageScroll": { "horizontal": false, "vertical": false },
+    "profiles": ["DESKTOP", "TABLET", "MOBILE"],
+    "panelBoundary": { "hiddenState": "LAZY", "hiddenWorkAllowed": false, "hiddenDecodeAllowed": false, "networkAllowed": false },
+    "projectionLimits": { "timelineItems": 512, "waveformBins": 4096, "waveformSourceBinsDefault": 1000000 }
+  },
+  "checks": {
+    "denoCheck": { "status": "PASS", "command": "deno check --no-remote pixiedraw2/src/audio/audio-230/index.ts pixiedraw2/tests/audio-230/workspace_test.ts pixiedraw2/benchmarks/audio-230/workspace_bench.ts", "exitCode": 0 },
+    "unitFailureFixtures": { "status": "PASS", "command": "deno test --no-remote --check pixiedraw2/tests/audio-230/workspace_test.ts", "passed": 6, "failed": 0, "exitCode": 0 },
+    "benchmark": { "status": "PASS", "command": "deno bench --no-remote pixiedraw2/benchmarks/audio-230/workspace_bench.ts", "exitCode": 0, "avg": { "workspaceNs": 101.3, "timelineUs": 13.9, "waveformUs": 59.9 } },
+    "jsonParse": { "status": "PASS", "command": "deno eval JSON.parse(docs/inventory/audio-230-evidence.json)", "exitCode": 0 },
+    "gitDiffCheck": { "status": "PASS", "command": "git diff --check", "exitCode": 0 },
+    "browserVisual": "UNTESTED",
+    "physicalMobileAudioHardware": "UNTESTED",
+    "screenReaderSafariFirefox": "UNTESTED",
+    "productionCutover": "NOT_IN_SCOPE"
+  },
+  "nonIntrusion": { "currentRoutesDataMarketPiXiSYNC": "NOT_EDITED_BY_SCOPE" }
+}

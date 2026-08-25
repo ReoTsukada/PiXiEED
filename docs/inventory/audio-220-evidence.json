@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "AUDIO-220_EVIDENCE_V1",
+  "workPackage": "AUDIO-220",
+  "status": "ISOLATED_REFERENCE_PASS",
+  "acceptanceIds": ["AUDIO220-SCOPE-001", "AUDIO220-EVIDENCE-001", "AUDIO220-STOP-001"],
+  "implementation": {
+    "deterministicManifest": true,
+    "dependencyLock": "PINNED revision/hash/size/mime/locator",
+    "licenseAndProvenanceSnapshot": true,
+    "exportImportHashBinding": true,
+    "rawAudioAuthority": false,
+    "failClosedCases": ["unsupported-schema", "unsupported-license", "missing-license", "unlocked-revision", "duplicate-dependency", "dependency-cycle", "path-traversal", "hash-mismatch", "tampered-manifest", "raw-payload", "portable-ephemeral-locator"]
+  },
+  "commands": [
+    {"command": "deno check --no-remote pixiedraw2/src/audio/audio-220/index.ts pixiedraw2/src/audio/audio-220/contracts.ts pixiedraw2/src/audio/audio-220/core.ts pixiedraw2/tests/audio-220/core_test.ts pixiedraw2/benchmarks/audio-220/package_bench.ts", "exitCode": 0},
+    {"command": "deno test --no-remote --check pixiedraw2/tests/audio-220/core_test.ts", "exitCode": 0, "result": "3 passed, 0 failed"},
+    {"command": "deno bench --no-remote pixiedraw2/benchmarks/audio-220/package_bench.ts", "exitCode": 0, "result": "deterministic package creation: 49.3 us/iter average, 20,300 iter/s", "classification": "MEASURED_LOCAL_SYNTHETIC"},
+    {"command": "python3 -m json.tool docs/inventory/audio-220-evidence.json", "exitCode": 0},
+    {"command": "git diff --check -- pixiedraw2/src/audio/audio-220 pixiedraw2/tests/audio-220 pixiedraw2/benchmarks/audio-220 docs/contracts/AUDIO-220-PACKAGE-LICENSE-COMPATIBILITY.md docs/inventory/audio-220-evidence.json docs/decisions/ADR-20260813-AUDIO-220-package-license.md", "exitCode": 0}
+  ],
+  "evidence": {
+    "manifest": "synthetic canonical AUDIO-200/AUDIO-210 fixture; deterministic packageHash equality verified",
+    "negativeFixtures": ["tampered manifest", "unsafe path", "duplicate dependency", "cycle", "missing license", "unsupported license", "unlocked revision", "raw payload"],
+    "marketNonIntrusion": "static scope review: no Market, PiXiSYNC, route, Registry, Queue, State, Context, Storage, or production file edited"
+  },
+  "untested": ["browser", "real device", "native audio output", "real Storage/network", "production", "Market/publish/sale", "independent external review"]
+}

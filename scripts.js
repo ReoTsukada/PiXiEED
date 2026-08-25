@@ -1201,28 +1201,28 @@
   function setupRecentUpdates() {
     const updates = [
       {
-        title: 'PiXiEEDraw カメラ連携・ミラー・パレット同期を改善',
+        title: 'iDRAW カメラ連携・ミラー・パレット同期を改善',
         summary: 'PNG/GIF読込時の使用色だけのパレット生成、貼り付け時のインデックス/RGB別色処理、PiXiEELENSカメラ連携、ミラーモードの＋操作整理を反映しました。',
         date: '2026-03-09',
         tag: 'Tool',
         href: 'pixiedraw/index.html'
       },
       {
-        title: 'PiXiEEDraw 設定UIとパレット表示を調整',
+        title: 'iDRAW 設定UIとパレット表示を調整',
         summary: 'プリセット色プレビュー最大32色、新規作成パネルの構成整理、設定下5ボタンのサブスタイル統一（あ/A）、ローカル拡張（外付け）追加、キャンバスサイズ枠強調、更新トーストのスクロール表示に対応しました。',
         date: '2026-03-07',
         tag: 'Tool',
         href: 'pixiedraw/index.html'
       },
       {
-        title: 'PiXiEEDraw 共有モード導線を簡略化',
+        title: 'iDRAW 共有モード導線を簡略化',
         summary: '部屋を開くでキー自動生成、参加はキー入力後に参加者/視聴を選択、新規ルームは非公開開始に統一しました。',
         date: '2026-03-07',
         tag: 'Tool',
         href: 'pixiedraw/index.html'
       },
       {
-        title: 'PiXiEEDraw 出力・カラー・選択移動を改善',
+        title: 'iDRAW 出力・カラー・選択移動を改善',
         summary: 'JPEG/SVG出力追加、インデックス/RGB切替、RGB→インデックス時の自動パレット追加、方向キー移動の欠け軽減を反映しました。',
         date: '2026-03-07',
         tag: 'Tool',
@@ -1230,7 +1230,7 @@
       },
       {
         title: 'PiXiEED ホームの案内と比較導線を調整',
-        summary: 'ホーム文言をユーザー向けに整理し、Lite / PiXiEEDraw 比較カードに実機スクリーンショット切替を追加しました。',
+        summary: 'ホーム文言をユーザー向けに整理し、Lite / iDRAW 比較カードに実機スクリーンショット切替を追加しました。',
         date: '2026-03-07',
         tag: 'Home',
         href: 'index.html'

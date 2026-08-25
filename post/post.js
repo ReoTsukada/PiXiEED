@@ -2,6 +2,7 @@
   'use strict';
 
   const status = document.getElementById('postStatus');
+  const empty = document.getElementById('postEmpty');
   const content = document.getElementById('postContent');
   const title = document.getElementById('postTitle');
   const kindBadge = document.getElementById('postKindBadge');
@@ -142,7 +143,14 @@
     updateLike();
     configureDistribution();
     status.hidden = true;
+    if (empty) empty.hidden = true;
     content.hidden = false;
+  }
+
+  function showEmpty(messageKey) {
+    status.hidden = true;
+    if (empty) empty.hidden = false;
+    if (messageKey) status.dataset.i18nKey = messageKey;
   }
 
   function formatDate(value) {
@@ -235,7 +243,7 @@
   async function init() {
     const id = postId();
     if (!id) {
-      status.textContent = '作品が指定されていません。';
+      showEmpty('postMissing');
       return;
     }
     try {
@@ -253,7 +261,7 @@
       await loadComments();
     } catch (error) {
       console.warn('social post detail load failed', error);
-      status.textContent = '作品を読み込めませんでした。';
+      showEmpty('postLoadError');
     }
   }
 

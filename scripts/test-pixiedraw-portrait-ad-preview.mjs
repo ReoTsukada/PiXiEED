@@ -13,6 +13,6 @@ assert.match(controller, /host === 'localhost' \|\| host === '127\.0\.0\.1'/);
 assert.match(controller, /const localFilePreview = isLocalPiXiEEDrawPreview\(\)/);
 assert.match(controller, /is-local-preview \.ad-block::after/);
 assert.match(navigation, /bottom-nav-footer-ad\.js\?v=20260730-pixiedraw-local-preview1/);
-assert.match(index, /shared-bottom-nav\.js\?v=20260730-pixiedraw-local-preview1/);
+assert.match(index, /shared-bottom-nav\.js\?v=20260824-bottom-nav-locale1/);
 
 console.log('PiXiEEDraw portrait local ad preview checks passed.');

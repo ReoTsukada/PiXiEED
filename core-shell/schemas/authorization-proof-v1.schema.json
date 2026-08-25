@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pixieed.local/schema/authorization-proof-v1.schema.json",
+  "title": "PiXiEED Authorization Proof v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "proofType", "source", "decision", "authorityId", "proofId",
+    "principalId", "resourceType", "resourceId", "action", "capability", "tenantId",
+    "correlationId", "policyVersion", "grantId", "issuedAt", "expiresAt"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "proofType": { "const": "AUTHORIZATION_PROOF" },
+    "source": { "const": "server" },
+    "decision": { "enum": ["allow", "deny", "unknown"] },
+    "authorityId": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "proofId": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "principalId": { "type": ["string", "null"], "maxLength": 128 },
+    "resourceType": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "resourceId": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "action": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "capability": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "tenantId": { "type": ["string", "null"], "maxLength": 128 },
+    "correlationId": { "type": ["string", "null"], "maxLength": 128 },
+    "policyVersion": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "grantId": { "type": ["string", "null"], "maxLength": 128 },
+    "issuedAt": { "type": "string", "format": "date-time" },
+    "expiresAt": { "type": "string", "format": "date-time" }
+  }
+}

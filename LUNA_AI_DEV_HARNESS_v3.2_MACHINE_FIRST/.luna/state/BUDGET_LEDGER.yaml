@@ -1,0 +1,10 @@
+schema_version: 3.1
+entries: []
+entry_schema:
+  work_package_id: string
+  action: research|review|experiment|model_escalation|human_wait|implementation
+  expected_value: 0
+  expected_cost: 0
+  actual_cost: null
+  decision: execute|skip|defer
+  reason: string

@@ -50,6 +50,7 @@ const includeEntries = Object.freeze([
   "notes",
   "notice",
   "pixiedraw",
+  "pixiedraw2",
   "pixfind",
   "pixiee-lens",
   "PiXiEEDogp.png",
@@ -65,6 +66,7 @@ const includeEntries = Object.freeze([
   "site",
   "sitemap.xml",
   "styles.css",
+  "studio",
   "terms",
 ]);
 
@@ -116,7 +118,7 @@ function buildLauncherHtml() {
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-  <title>PiXiEED App</title>
+  <title>PiXiEEDstudio</title>
   <meta name="theme-color" content="#020816"/>
   <style>
     :root {
@@ -216,15 +218,15 @@ function buildLauncherHtml() {
     <section class="brand">
       <img src="./icon/icon-512-4.png" alt="PiXiEED icon"/>
       <div>
-        <p class="meta">PiXiEED App</p>
+        <p class="meta">PiXiEEDstudio</p>
         <h1>PiXiEED</h1>
       </div>
     </section>
-    <p class="lead">描く、撮る、みんなで遊ぶ。PiXiEED の主要機能へこのホームから移動できます。</p>
+    <p class="lead">打って、奏でて、作品にする。PiXiEED の主要機能へこのホームから移動できます。</p>
     <section class="actions">
-      <a class="action action--primary" href="./pixiedraw/index.html">
-        <strong>PiXiEEDraw を開く</strong>
-        <span>本格ドット絵制作と共同編集を始めます。</span>
+      <a class="action action--primary" href="./studio/index.html">
+        <strong>PiXiEEDstudio を開く</strong>
+        <span>iDRAW・iAUDIO・iGAMEから制作を始めます。</span>
       </a>
       <a class="action" href="./pixiee-lens/index.html">
         <strong>PiXiEELENS</strong>

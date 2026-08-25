@@ -1,0 +1,51 @@
+{
+  "benchmarkVersion": "DRAW120_REFERENCE_SYNTHETIC_V1",
+  "classification": "REFERENCE_SYNTHETIC",
+  "desktop": {
+    "raster": "512x512",
+    "layers": 20,
+    "frames": 120,
+    "workload": {
+      "width": 512,
+      "height": 512,
+      "selectedPixels": 256,
+      "previewWriteCount": 64,
+      "commitCount": 1,
+      "undoDepth": 2,
+      "elapsedMs": 5.552,
+      "rasterHash": "fffaf9fce650b7255b2674839b978021b814651644ff7694890904579865b493",
+      "classification": "REFERENCE_SYNTHETIC"
+    }
+  },
+  "mobile": {
+    "raster": "256x256",
+    "layers": 12,
+    "frames": 60,
+    "workload": {
+      "width": 256,
+      "height": 256,
+      "selectedPixels": 64,
+      "previewWriteCount": 16,
+      "commitCount": 1,
+      "undoDepth": 2,
+      "elapsedMs": 1.367,
+      "rasterHash": "ebee1b3fbf59f53c57dc85d4fb73c991400889aa9247a4ae4c44c9b7ac783ba0",
+      "classification": "REFERENCE_SYNTHETIC"
+    }
+  },
+  "preview": {
+    "canonicalRasterMutationDuringPreview": false,
+    "fullRasterCloneCount": 0,
+    "workerUsed": false
+  },
+  "untested": [
+    "browser screenshot",
+    "physical mobile",
+    "stylus",
+    "Safari",
+    "Firefox",
+    "full input-to-visible compositor",
+    "30-minute memory"
+  ],
+  "noProductionClaims": true
+}

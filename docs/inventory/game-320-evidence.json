@@ -1,0 +1,23 @@
+{
+  "package": "GAME-320",
+  "status": "PASS_STATIC_AND_TARGETED",
+  "implementation": ["pixiedraw2/src/game/game-320/core.ts"],
+  "contract": "docs/contracts/GAME-320-RUNTIME-PREVIEW-SAVE-STATE.md",
+  "adr": "docs/decisions/ADR-001-GAME-320-runtime-state-isolation.md",
+  "schemas": { "runtimeSnapshot": 1, "saveState": 1 },
+  "gates": {
+    "GAME320-SCOPE-001": "PASS",
+    "GAME320-EVIDENCE-001": "PASS_STATIC_AND_TARGETED",
+    "GAME320-STOP-001": "PASS"
+  },
+  "covered": ["deterministic snapshot hash", "preview/play/pause/stop/reset", "fixed-step semantic input", "checkpoint/restore", "project and asset revision locks", "wrong caller/project/stale/tampered save rejection", "unsupported migration rejection", "authoring non-mutation", "host-boundary source guard"],
+  "commands": [
+    { "command": "deno check --no-remote pixiedraw2/src/game/game-320/core.ts pixiedraw2/tests/game-320/core.test.ts pixiedraw2/benchmarks/game-320/runtime-benchmark.ts", "result": "PASS", "exitCode": 0 },
+    { "command": "cd pixiedraw2 && deno test --no-remote --allow-read=src --check tests/game-320/core.test.ts", "result": "PASS 4/4", "exitCode": 0 },
+    { "command": "cd pixiedraw2 && deno run --no-remote --check benchmarks/game-320/runtime-benchmark.ts", "result": "PASS", "exitCode": 0, "measurement": { "steps": 1000, "stepMs": 0.355708, "saveMs": 0.18075, "deterministic": true } },
+    { "command": "node -e JSON.parse(game-320-evidence.json)", "result": "PASS", "exitCode": 0 },
+    { "command": "git diff --check -- GAME-320 write scope", "result": "PASS", "exitCode": 0 }
+  ],
+  "untested": ["browser smoke", "visual/a11y", "physical device", "production Runtime", "storage/migration adapter", "package/build provenance", "memory/long-task/device perf", "Market/PiXiSYNC/Registry/Queue/State/Context integration"],
+  "scopeDecision": "Only GAME-320 write scope was changed; no commit, push, deploy, migration, route, or data change was performed."
+}

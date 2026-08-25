@@ -1,0 +1,108 @@
+{
+  "schemaVersion": 1,
+  "document": "03_PRODUCTS/PIXIEEDRAW2_SPEC.md",
+  "status": "RECONSTRUCTED",
+  "originalFound": false,
+  "searched": [
+    "working tree: 03_PRODUCTS/PIXIEEDRAW2_SPEC.md",
+    "git log --all --full-history -- 03_PRODUCTS/PIXIEEDRAW2_SPEC.md"
+  ],
+  "rule": "Only approved repository materials were used; no absent implementation was promoted to CURRENT SLICE.",
+  "sources": [
+    {
+      "source": "02_ARCHITECTURE/PIXIEED_PRODUCT_STRATEGY.md",
+      "kind": "canonical product strategy",
+      "requirements": ["high-performance pixel art editor", "Draw2 replacement boundary", "Core Asset Graph", "Market/PiXiSYNC/legacy preservation"],
+      "recovery": "reconstructed",
+      "targetWp": ["WP-110", "WP-120", "WP-160", "WP-170", "WP-190"],
+      "implementationStatus": "strategy and boundaries recorded; not a feature implementation"
+    },
+    {
+      "source": "00_START_HERE/LATEST_CANONICAL_DECISIONS.md",
+      "kind": "canonical product decisions",
+      "requirements": ["indexed palette", "Pen/Eraser/Fill", "PXD naming and compatibility", "Collider/Hitbox/Hurtbox guide boundary", "Unity/Blender/external extension direction", "touch and mobile direction"],
+      "recovery": "reconstructed",
+      "targetWp": ["WP-110", "WP-120", "WP-140", "WP-160", "WP-180"],
+      "implementationStatus": "WP-110 subset verified; later decisions remain planned or extension boundaries"
+    },
+    {
+      "source": "docs/contracts/WP-100-PIXEEDRAW2-VERTICAL-SLICE.md",
+      "kind": "approved implementation contract",
+      "requirements": ["Project open/create", "indexed sparse raster", "dirty Tile/Region", "local autosave seam", "isolated Entry"],
+      "recovery": "reconstructed",
+      "targetWp": ["WP-100", "WP-110"],
+      "implementationStatus": "implemented isolated vertical slice"
+    },
+    {
+      "source": "docs/contracts/WP-110-PALETTE-RASTER-PEN-ERASER.md",
+      "kind": "approved implementation contract",
+      "requirements": ["indexed palette", "Pen", "Eraser", "bounded Fill", "dirty presentation", "local Journal/Checkpoint", "renderer fallback"],
+      "recovery": "reconstructed",
+      "targetWp": ["WP-110"],
+      "implementationStatus": "implemented and locally tested; formal device performance remains untested"
+    },
+    {
+      "source": "05_PERFORMANCE/DRAW2_HIGH_PERFORMANCE_IMPLEMENTATION_CONTRACT.md",
+      "kind": "mandatory performance contract",
+      "requirements": ["512x512 20-layer 120-frame desktop fixture", "256x256 12-layer 60-frame mobile fixture", "p95 input-to-visible", "Long Tasks", "virtualization", "Canvas/backend Golden equivalence", "worker and storage boundaries"],
+      "recovery": "reconstructed",
+      "targetWp": ["WP-110", "WP-120", "WP-130", "WP-140", "WP-150", "WP-160", "WP-170", "WP-180", "WP-190"],
+      "implementationStatus": "contract recorded; current finalization smoke is partial Core-slice evidence"
+    },
+    {
+      "source": "05_PERFORMANCE/DRAW2_DEVICE_AND_WORKLOAD_MATRIX.md",
+      "kind": "mandatory benchmark matrix",
+      "requirements": ["desktop/mobile fixtures", "sprite/raster/timeline workloads", "touch/stylus/device/browser evidence", "memory and Long Task evidence"],
+      "recovery": "reconstructed",
+      "targetWp": ["WP-110", "WP-120", "WP-180"],
+      "implementationStatus": "matrix recorded; real device, Safari/Firefox, stylus, and 30-minute rows remain untested"
+    },
+    {
+      "source": "02_ARCHITECTURE/INTEGRATED_PACKAGE_FORMAT.md",
+      "kind": "normative compatibility contract",
+      "requirements": ["PXD/legacy compatibility", "Draw/Audio/Game/Video/Input package", "LIVE/PINNED/REVIEW/FORKED", "PNG/GIF/project/package export", "license/dependency snapshot"],
+      "recovery": "reconstructed",
+      "targetWp": ["WP-140", "WP-150", "WP-160", "WP-190"],
+      "implementationStatus": "package boundary exists; Draw2 adapter and full export are planned"
+    },
+    {
+      "source": "02_ARCHITECTURE/STORAGE_PLACEMENT_AND_SYNC.md",
+      "kind": "normative storage and event contract",
+      "requirements": ["Memory/IndexedDB/OPFS/server/Object Storage separation", "PiXiSYNC structured change boundary", "Draw2-to-Game and visual/runtime event boundary"],
+      "recovery": "reconstructed",
+      "targetWp": ["WP-110", "WP-130", "WP-160", "WP-170", "WP-190"],
+      "implementationStatus": "Core boundary recorded; production integration is not connected"
+    },
+    {
+      "source": "02_ARCHITECTURE/PROJECT_REGISTRY_CORE.md",
+      "kind": "normative registry contract",
+      "requirements": ["Project Registry integration", "pixiedraw2 registration", "legacy bindings", "permission and rollback"],
+      "recovery": "reconstructed",
+      "targetWp": ["WP-091", "WP-150", "WP-170"],
+      "implementationStatus": "isolated registry contract exists; Draw2 production adapter is planned"
+    },
+    {
+      "source": "02_ARCHITECTURE/ASSET_REGISTRY_CORE.md",
+      "kind": "normative registry contract",
+      "requirements": ["Asset Registry integration", "immutable Asset Revision", "sprite/tile/audio/game asset kinds", "live update policy"],
+      "recovery": "reconstructed",
+      "targetWp": ["WP-092", "WP-160", "WP-170"],
+      "implementationStatus": "isolated registry contract exists; Draw2 production adapter is planned"
+    },
+    {
+      "source": "02_ARCHITECTURE/TOOL_BRIDGE_CORE.md",
+      "kind": "normative integration contract",
+      "requirements": ["extension/plugin architecture", "Draw2-to-Game bridge", "Draw2-to-runtime bridge", "external tool boundary"],
+      "recovery": "reconstructed",
+      "targetWp": ["WP-093", "WP-160", "WP-170", "WP-180", "WP-190"],
+      "implementationStatus": "versioned bridge contract exists; tool integrations are planned"
+    }
+  ],
+  "requirementCoverage": {
+    "requiredProductDirections": 27,
+    "mappedToApprovedSource": 27,
+    "missing": [],
+    "inventedAsImplemented": [],
+    "futureStatusValues": ["CURRENT SLICE", "PLANNED", "ADVANCED", "FUTURE EXTENSION"]
+  }
+}

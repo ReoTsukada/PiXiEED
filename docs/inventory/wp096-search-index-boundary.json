@@ -1,0 +1,69 @@
+{
+  "workPackage": "WP-096",
+  "status": "complete",
+  "implementation": {
+    "contract": "core-shell/assets/core-search-index-contracts.js",
+    "schema": "core-shell/schemas/search-index-v1.schema.json",
+    "fixture": "core-shell/fixtures/search-index-v1.valid.json",
+    "test": "scripts/test-core-search-index-wp096.mjs",
+    "backend": "in-memory-reference-adapter",
+    "loadedBy": [],
+    "domCanvasStorageNetworkCoupling": false,
+    "editorMainThreadIndexing": false,
+    "currentRoutesChanged": false
+  },
+  "catalog": {
+    "coreResourceTypes": ["PROJECT", "ASSET", "PACKAGE", "CREATOR"],
+    "reservedResourceTypes": ["MARKET_PRODUCT", "GAME", "AUDIO", "DRAW_WORK", "COLLECTION", "SOCIAL_POST", "COMMUNITY", "BOARD_THREAD", "COMMISSION_REQUEST"],
+    "documentVersion": 1,
+    "queryVersion": 1,
+    "visibilityClasses": ["PRIVATE", "PROJECT_MEMBERS", "CREATOR_PRIVATE", "UNLISTED", "PUBLIC"],
+    "visibilityScopes": ["PUBLIC_DISCOVERY", "MEMBER_SCOPED", "CREATOR_SCOPED", "OWNER_SCOPED"],
+    "projectionEventCount": 21,
+    "eventCatalogAuthority": "WP-095"
+  },
+  "included": [
+    "bounded Search Document with separate Search Document ID and Resource ID",
+    "Public Discovery and server-filtered Scoped Index separation",
+    "WP-095 trusted Event projection and Event ID idempotency",
+    "Aggregate stale/gap handling and Tombstone anti-resurrection",
+    "typed Query, hard limits, literal token plan, Stable Cursor",
+    "BCP-47-compatible locale and Unicode normalization without display mutation",
+    "Full/Resource-type/Single Resource/Rebuild Resume boundaries",
+    "bounded queue, batch, retry, dead letter, and replaceable Backend Adapter",
+    "six default-off flags and canonical fallback Exact ID Lookup"
+  ],
+  "excluded": [
+    "Production search service and database migration",
+    "Market/SNS/Community domain implementations",
+    "recommendation, sponsored ranking, advertisement, revenue, and personalized purchase state",
+    "Pixel/Audio/PXD/PiXiPackage/Game Build/Blob/Journal/PiXiSYNC Operation payloads",
+    "JWT, Email, Secret, Password, Address, Phone, Payment, Commission, License, Royalty, Entitlement, and Private Chat content"
+  ],
+  "verification": {
+    "failureFixtures": 37,
+    "publicLeakPrevented": true,
+    "unlistedExcluded": true,
+    "tombstoneProtected": true,
+    "rebuildExternalSideEffects": 0,
+    "stableCursor": true,
+    "retryAndDeadLetter": true,
+    "multilingual": ["ja-JP", "en-US", "mixed", "CJK", "accent-folding"],
+    "highFrequencyEditorEventsAccepted": false,
+    "baselineFailureIdentity": "14/14 inherited match; new 0",
+    "diffCheck": "pass"
+  },
+  "preservation": {
+    "productionRoutesChanged": false,
+    "currentPiXiEEDrawChanged": false,
+    "currentPxdChanged": false,
+    "currentPiXiSYNCChanged": false,
+    "marketChanged": false,
+    "snsDeleted": false,
+    "projectAssetPackageDataChanged": false,
+    "databaseMigrationApplied": false,
+    "storageUploadApplied": false,
+    "deployPublishCommitPush": false
+  },
+  "nextBoundary": "WP-097 Notification Core consumes permission-filtered Event/Activity/Search references without becoming Search or financial authority."
+}

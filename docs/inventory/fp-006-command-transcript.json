@@ -1,0 +1,182 @@
+{
+  "evidenceVersion": "QUALIFICATION_COMMAND_TRANSCRIPT_V1",
+  "manifestPath": "docs/inventory/fp-006-command-manifest.json",
+  "commands": [
+    {
+      "id": "FP006-FORMAT",
+      "acceptanceIds": [
+        "FP006-HOTPATH-001",
+        "FP006-RECOVERY-001",
+        "FP006-DEVICE-001",
+        "FP006-UX-001",
+        "FP006-OVERCLAIM-001"
+      ],
+      "argv": [
+        "deno",
+        "fmt",
+        "--check",
+        "pixiedraw2/src/fp-006",
+        "pixiedraw2/tests/fp-006",
+        "pixiedraw2/benchmarks/fp-006"
+      ],
+      "display": "\"deno\" \"fmt\" \"--check\" \"pixiedraw2/src/fp-006\" \"pixiedraw2/tests/fp-006\" \"pixiedraw2/benchmarks/fp-006\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 16,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "053e9f5e0bd72764600aefaee279cd35aee25981ff6e5580685425029a372e2a"
+    },
+    {
+      "id": "FP006-TYPECHECK",
+      "acceptanceIds": [
+        "FP006-HOTPATH-001",
+        "FP006-RECOVERY-001",
+        "FP006-DEVICE-001",
+        "FP006-UX-001"
+      ],
+      "argv": [
+        "deno",
+        "check",
+        "pixiedraw2/src/fp-006/contracts.ts",
+        "pixiedraw2/src/fp-006/input-state.ts",
+        "pixiedraw2/src/fp-006/device-profile.ts",
+        "pixiedraw2/src/fp-006/hot-path.ts",
+        "pixiedraw2/src/fp-006/ux-contract.ts",
+        "pixiedraw2/tests/fp-006/input-state.test.ts",
+        "pixiedraw2/tests/fp-006/device-profile.test.ts",
+        "pixiedraw2/tests/fp-006/hot-path.test.ts",
+        "pixiedraw2/tests/fp-006/ux-contract.test.ts",
+        "pixiedraw2/benchmarks/fp-006/generate-evidence.ts"
+      ],
+      "display": "\"deno\" \"check\" \"pixiedraw2/src/fp-006/contracts.ts\" \"pixiedraw2/src/fp-006/input-state.ts\" \"pixiedraw2/src/fp-006/device-profile.ts\" \"pixiedraw2/src/fp-006/hot-path.ts\" \"pixiedraw2/src/fp-006/ux-contract.ts\" \"pixiedraw2/tests/fp-006/input-state.test.ts\" \"pixiedraw2/tests/fp-006/device-profile.test.ts\" \"pixiedraw2/tests/fp-006/hot-path.test.ts\" \"pixiedraw2/tests/fp-006/ux-contract.test.ts\" \"pixiedraw2/benchmarks/fp-006/generate-evidence.ts\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 283,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "c6f8836492c3303c50f77e526471097688dc48b6ca99d89d4de9b3ecff726e4f"
+    },
+    {
+      "id": "FP006-TEST",
+      "acceptanceIds": [
+        "FP006-HOTPATH-001",
+        "FP006-RECOVERY-001",
+        "FP006-DEVICE-001",
+        "FP006-UX-001",
+        "FP006-OVERCLAIM-001"
+      ],
+      "argv": [
+        "deno",
+        "test",
+        "--no-remote",
+        "--allow-read",
+        "--allow-write",
+        "--check",
+        "pixiedraw2/tests/fp-006"
+      ],
+      "display": "\"deno\" \"test\" \"--no-remote\" \"--allow-read\" \"--allow-write\" \"--check\" \"pixiedraw2/tests/fp-006\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 580,
+      "stdoutSha256": "056703abb7172d7ba73db0134c332f06fe63514304021c264f4646e26247bc93",
+      "stderrSha256": "2ae55321418c983f368d047346e4547e11aa732e7b54054238314e88531994f8"
+    },
+    {
+      "id": "FP006-CONTEXT",
+      "acceptanceIds": [
+        "FP006-HOTPATH-001",
+        "FP006-DEVICE-001",
+        "FP006-OVERCLAIM-001"
+      ],
+      "argv": [
+        "python3",
+        "scripts/verify_work_package_context.py",
+        "--context",
+        ".codex/context/FP-006.md",
+        "--root",
+        "."
+      ],
+      "display": "\"python3\" \"scripts/verify_work_package_context.py\" \"--context\" \".codex/context/FP-006.md\" \"--root\" \".\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 33,
+      "stdoutSha256": "2dddf3c0888792486fce434df4c9246f8a066c6c4fe9bee5696a723a44edcc67",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "BASELINE-IDENTITY",
+      "acceptanceIds": [
+        "FP006-OVERCLAIM-001"
+      ],
+      "argv": [
+        "node",
+        "scripts/test-baseline-failure-identity-wp080.mjs"
+      ],
+      "display": "\"node\" \"scripts/test-baseline-failure-identity-wp080.mjs\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 357,
+      "stdoutSha256": "3839ae5f3ddbd8ba0b5810b84f15724743bd2ccdbb8f7d34e324917ef852a0d8",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "BASELINE-SUITE",
+      "acceptanceIds": [
+        "FP006-OVERCLAIM-001"
+      ],
+      "argv": [
+        "node",
+        "scripts/test-baseline-suite-wp000.mjs"
+      ],
+      "display": "\"node\" \"scripts/test-baseline-suite-wp000.mjs\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 8392,
+      "stdoutSha256": "292468716edc77223d809bdd49dfff858c85fff2716dd819e253c2c42ef6c68d",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "FP006-BENCHMARK-EVIDENCE",
+      "acceptanceIds": [
+        "FP006-HOTPATH-001",
+        "FP006-DEVICE-001",
+        "FP006-OVERCLAIM-001"
+      ],
+      "argv": [
+        "deno",
+        "run",
+        "--no-remote",
+        "--allow-read",
+        "--allow-write",
+        "pixiedraw2/benchmarks/fp-006/generate-evidence.ts"
+      ],
+      "display": "\"deno\" \"run\" \"--no-remote\" \"--allow-read\" \"--allow-write\" \"pixiedraw2/benchmarks/fp-006/generate-evidence.ts\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 198,
+      "stdoutSha256": "7faa3554cc79f3cc2e67e83b32219e29bad517659c7f0805ac685982a7f9984e",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "FP006-DIFF-CHECK",
+      "acceptanceIds": [
+        "FP006-HOTPATH-001",
+        "FP006-RECOVERY-001",
+        "FP006-DEVICE-001",
+        "FP006-UX-001",
+        "FP006-OVERCLAIM-001"
+      ],
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "display": "\"git\" \"diff\" \"--check\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 26,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "transcriptSha256": "ed76a68588a701edeca916a6bc3929fca3674722f9c9fe75b2092a239be891eb"
+}

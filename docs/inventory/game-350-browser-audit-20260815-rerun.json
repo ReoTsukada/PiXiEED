@@ -1,0 +1,47 @@
+{
+  "evidenceVersion": "GAME350_BROWSER_AUDIT_RERUN_V1",
+  "auditId": "GAME350-BROWSER-AUDIT-RERUN-20260815",
+  "packageId": "GAME-350",
+  "capturedAt": "2026-08-15",
+  "browserSurface": "Codex In-app Browser",
+  "browserVersion": "UNRECORDED",
+  "url": "http://localhost:8000/pixiedraw2/",
+  "qualification": "ISOLATED_BROWSER_REFERENCE_ONLY",
+  "sourceHashes": {
+    "pixiedraw2/src/game/game-350/core.ts": "c1a91334a25f52fa5c80f0fe9b218dfe69e7822fffa08495b7dea97174bfcdde",
+    "pixiedraw2/src/game/game-350/studio.ts": "df8af813ea1e29570183dc9112eacd14cd233262e2de6e05cc18ede2dbdcf2fe",
+    "pixiedraw2/dist/draw2-entry.js": "faaaf62785fb81ac84b40be3be9f2e2cf132ae03ae66ca2cfd3981bb97648bb0"
+  },
+  "runtimeFlow": {
+    "liveStart": { "status": "PASS_ISOLATED", "observed": "Runtime READY · LIVE · tick=1" },
+    "pinnedSwitch": { "status": "PASS_ISOLATED", "observed": "Runtime READY · PINNED · tick=1" },
+    "reloadThenLive": { "status": "PASS_ISOLATED", "observed": "After reload and explicit start: Runtime READY · LIVE · tick=1" },
+    "browserErrors": [],
+    "scope": "Preview-only; no Registry, Market, PiXiSYNC, current Draw, PXD or production path"
+  },
+  "responsiveMeasurements": [
+    { "viewport": [1280, 720], "document": [1280, 720], "body": [1280, 720], "overflowX": false, "overflowY": false, "canvasRect": [48, 79, 912, 415] },
+    { "viewport": [1024, 768], "document": [1024, 768], "body": [1024, 768], "overflowX": false, "overflowY": false, "canvasRect": [52, 72, 728, 498.40625] },
+    { "viewport": [390, 844], "document": [390, 844], "body": [390, 844], "overflowX": false, "overflowY": false, "canvasRect": [0, 88, 390, 544] }
+  ],
+  "currentReadOnlySnapshot": {
+    "viewport": [1280, 720],
+    "document": [1280, 720],
+    "body": [1280, 720],
+    "overflowX": false,
+    "overflowY": false,
+    "runtimeStatusTexts": ["準備完了 · ローカル書き出しのみ", "F1/1 · Layer 1 · 24 FPS · ループ"],
+    "timelineCellCount": 1,
+    "buttonCount": 255
+  },
+  "untested": [
+    "complete Game Studio authoring flow from UI",
+    "Safari and Firefox runtime flow",
+    "physical smartphone/tablet/stylus/gamepad",
+    "screen reader and full visual regression",
+    "30-minute memory/Page Memory/Long Task/GC qualification",
+    "real Core Registry/Queue/State/Context and Draw/Audio adapters",
+    "native, staging, RLS, rollback, production"
+  ],
+  "noProductionClaims": true
+}

@@ -1,0 +1,60 @@
+{
+  "auditVersion": "DRAW120_INDEPENDENT_AUDIT_V1",
+  "packageId": "DRAW-120",
+  "status": "INDEPENDENT_REVIEW_PASS",
+  "reviewer": "SOL_SCOPE_AUDIT",
+  "contextSha256": "b62057cc30c70c881a04c4465acefe869b6259a243021e41869d3e9a997aaee7",
+  "transcriptSha256": "7984abb8b5e37339349b8dc7e1e5ebbaf3c6d61d8a266b778dca10e11f4f4d67",
+  "checks": {
+    "format": { "status": "PASS", "exitCode": 0 },
+    "typecheck": { "status": "PASS", "exitCode": 0 },
+    "draw120Tests": { "status": "PASS", "passed": 5, "total": 5, "exitCode": 0 },
+    "contextVerification": { "status": "PASS", "exitCode": 0 },
+    "baselineIdentity": { "status": "PASS", "matched": 14, "expected": 14, "newFailures": 0, "exitCode": 0 },
+    "baselineSuite": { "status": "PASS", "passed": 63, "total": 77, "existingFailures": 14, "exitCode": 0 },
+    "benchmarkEvidence": { "status": "PASS", "exitCode": 0 },
+    "diffCheck": { "status": "PASS", "exitCode": 0 }
+  },
+  "sourceBoundary": {
+    "status": "PASS",
+    "findings": 0,
+    "prohibitedDependenciesObserved": [],
+    "note": "The adapter is DOM-, Canvas-, storage-, network-, provider-, and current-route-free and does not import production PiXiEEDraw, PXD, PiXiSYNC, or Market code."
+  },
+  "selectionTransformReview": {
+    "status": "PASS",
+    "selectionModes": ["REPLACE", "ADD", "SUBTRACT", "INTERSECT"],
+    "previewDoesNotMutateCanonicalRaster": true,
+    "commitUsesBoundedWriteSet": true,
+    "oneCommitOneUndo": true,
+    "clipboardPaletteIndicesPreserved": true,
+    "invalidAndOutOfBoundsInputsFailClosed": true
+  },
+  "qualificationDecision": {
+    "status": "PARTIAL_BROWSER_UNTESTED",
+    "qualificationReady": false,
+    "untested": [
+      "browser screenshot",
+      "physical mobile",
+      "stylus",
+      "Safari",
+      "Firefox",
+      "full input-to-visible compositor",
+      "30-minute memory"
+    ]
+  },
+  "currentSystemProtection": {
+    "status": "PASS",
+    "currentRoutesChanged": false,
+    "productionPiXiEEDrawChanged": false,
+    "pxdChanged": false,
+    "pixiSyncChanged": false,
+    "marketChanged": false,
+    "productionClaims": false,
+    "cleanCheckoutClaim": false,
+    "note": "The repository was already dirty with unrelated tracked and untracked work; this audit does not claim a clean checkout."
+  },
+  "findings": [],
+  "nextPackage": "DRAW-130",
+  "autoStartNext": false
+}

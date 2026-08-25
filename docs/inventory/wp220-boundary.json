@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "workPackage": "WP-220",
+  "status": "IMPLEMENTED_ISOLATED",
+  "sourceStatus": "RECONSTRUCTED_FROM_APPROVED_SOURCES",
+  "scope": [
+    "direct-work-request-quote-agreement-milestone-delivery-acceptance",
+    "explicit-rights-license-decision",
+    "opaque-payment-event-and-reconciliation-adapter",
+    "append-only-ledger-adjustment-reversal",
+    "default-off-shadow-rollback"
+  ],
+  "separation": {
+    "generalDm": "SEPARATE_AUTHORITY",
+    "marketProduct": "SEPARATE_AUTHORITY",
+    "marketPurchase": "NO_MUTATION",
+    "subscription": "OUT_OF_SCOPE",
+    "notification": "OUT_OF_SCOPE",
+    "directWorkAuthority": "REQUESTER_CREATOR_MILESTONE_SCOPED"
+  },
+  "stateFlow": [
+    "REQUEST",
+    "QUOTE",
+    "AGREEMENT",
+    "MILESTONE",
+    "DELIVERY",
+    "ACCEPTANCE",
+    "RIGHTS_DECISION",
+    "PAYMENT",
+    "LEDGER_RECONCILIATION"
+  ],
+  "money": {
+    "representation": "INTEGER_MINOR_UNITS",
+    "currencies": ["JPY", "USD", "EUR"],
+    "roundingPolicyVersionRequired": true,
+    "floatingPointAuthoritative": false
+  },
+  "providerBoundary": {
+    "provider": "OPAQUE_PROVIDER_OR_CURRENT_SERVER",
+    "execution": "NOT_CALLED",
+    "signatureVerification": "SERVER_ADAPTER_REQUIRED_UNTESTED",
+    "eventIdempotency": "SYNTHETIC_CONTRACT_TESTED",
+    "unknownEvent": "FAIL_CLOSED"
+  },
+  "nonIntrusion": {
+    "currentDraw": "PRESERVED",
+    "currentPxd": "PRESERVED",
+    "pixiSync": "PRESERVED",
+    "marketRoutes": "PRESERVED",
+    "marketData": "NOT_ACCESSED",
+    "productionDatabase": "NOT_ACCESSED",
+    "productionStorage": "NOT_ACCESSED",
+    "provider": "NOT_CALLED",
+    "initialEditor": "NOT_CHANGED",
+    "runtime": "NOT_CHANGED"
+  },
+  "featureFlags": {
+    "work-request-read": false,
+    "work-request-write": false,
+    "quote-create": false,
+    "agreement-sign": false,
+    "milestone-write": false,
+    "delivery-submit": false,
+    "payment-intent": false,
+    "rights-acceptance": false,
+    "killSwitch": "SUPPORTED_SHADOW_ROLLBACK_ONLY"
+  },
+  "baselineFailureIdentity": {
+    "existing": 14,
+    "new": 0,
+    "status": "INHERITED_APPROVED_IDENTITY_NOT_REEXECUTED"
+  },
+  "untested": [
+    "real checkout",
+    "provider webhook signature and replay",
+    "production rights reconciliation",
+    "real legacy commerce data",
+    "payout execution",
+    "production entitlement mutation",
+    "production performance"
+  ]
+}

@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "descriptors": [
+    {
+      "toolId": "pixiedraw2",
+      "displayKind": "DRAW2",
+      "bridgeApiVersion": "1",
+      "toolVersion": "2.0.0",
+      "supportedProjectKinds": ["DRAW2"],
+      "supportedAssetKinds": ["RASTER_IMAGE", "ANIMATION", "PALETTE"],
+      "supportedImportFormats": [
+        {"formatId": "pxd", "versions": ["archive-v2"], "requiredAdapter": "legacy-pxd-adapter", "copyRequired": true}
+      ],
+      "supportedExportFormats": [{"formatId": "pxd", "versions": ["archive-v2"]}],
+      "capabilities": [
+        {"capabilityId": "project.open", "version": "1", "limits": {}},
+        {"capabilityId": "asset.read", "version": "2", "limits": {"maxReferences": 32}},
+        {"capabilityId": "asset.live-reference", "version": "1", "limits": {}}
+      ],
+      "featureRequirements": ["tool-bridge-read", "tool-bridge-live-events"],
+      "minimumCoreVersion": "1.0.0",
+      "maximumTestedCoreVersion": "1.9.0",
+      "availabilityState": "AVAILABLE",
+      "legacyAdapterIds": ["legacy-pxd-adapter"]
+    },
+    {
+      "toolId": "pixigame",
+      "displayKind": "GAME",
+      "bridgeApiVersion": "1",
+      "toolVersion": "1.0.0",
+      "supportedProjectKinds": ["GAME"],
+      "supportedAssetKinds": ["GAME_SCENE", "RASTER_IMAGE", "AUDIO"],
+      "supportedImportFormats": [{"formatId": "pixigame-project", "versions": ["1"]}, {"formatId": "wav", "versions": ["1"]}],
+      "supportedExportFormats": [{"formatId": "pixigame-project", "versions": ["1"]}],
+      "capabilities": [
+        {"capabilityId": "project.open", "version": "1", "limits": {}},
+        {"capabilityId": "game.consume-raster", "version": "1", "limits": {}},
+        {"capabilityId": "game.consume-audio", "version": "1", "limits": {"formats": ["wav"]}}
+      ],
+      "featureRequirements": ["tool-bridge-read", "tool-bridge-live-events"],
+      "minimumCoreVersion": "1.0.0",
+      "maximumTestedCoreVersion": "1.9.0",
+      "availabilityState": "AVAILABLE",
+      "legacyAdapterIds": []
+    }
+  ],
+  "request": {
+    "requestId": "request-open-1",
+    "bridgeApiVersion": "1",
+    "toolId": "pixiedraw2",
+    "actorContextRef": "session:synthetic",
+    "projectId": "project-draw2",
+    "assetRefs": [{"assetId": "asset-raster", "revisionId": "revision-raster", "contentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}],
+    "operation": "project.open",
+    "capabilityVersion": "1",
+    "correlationId": "correlation-open-1",
+    "causationId": null,
+    "idempotencyKey": "idem-open-1",
+    "expectedVersion": 1,
+    "payloadMetadata": {"surface": "studio"},
+    "authorization": {"schemaVersion": 1, "proofType": "AUTHORIZATION_PROOF", "source": "server", "decision": "allow", "authorityId": "tool-fixture-authority", "proofId": "tool-fixture-proof", "principalId": "user-owner", "resourceType": "TOOL", "resourceId": "pixiedraw2", "action": "project.open", "capability": "project.open", "tenantId": "tenant-1", "correlationId": "correlation-open-1", "policyVersion": "authorization-policy-v1", "grantId": "tool-fixture-grant", "issuedAt": "2099-08-09T00:00:00.000Z", "expiresAt": "2099-08-09T00:05:00.000Z"},
+    "createdAt": "synthetic:1"
+  },
+  "event": {
+    "eventId": "event-revision-1",
+    "bridgeApiVersion": "1",
+    "originToolId": "pixiedraw2",
+    "targetToolId": "pixigame",
+    "eventType": "REVISION_CHANGED",
+    "projectId": "project-draw2",
+    "assetId": "asset-raster",
+    "revisionId": "revision-raster",
+    "correlationId": "correlation-open-1",
+    "causationId": null,
+    "eventChainDepth": 0,
+    "causationChain": [],
+    "visitedToolIds": [],
+    "payloadMetadata": {"referencePolicy": "LIVE"}
+  },
+  "compatibility": {
+    "state": "SUPPORTED_WITH_ADAPTER",
+    "toolId": "pixiedraw2",
+    "toolVersion": "2.0.0",
+    "formatId": "pxd",
+    "formatVersion": "archive-v2",
+    "requiredAdapter": "legacy-pxd-adapter",
+    "unsupportedFeatures": [],
+    "warnings": [],
+    "dataLossRisk": "medium",
+    "copyRequired": true
+  }
+}

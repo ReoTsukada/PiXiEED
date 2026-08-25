@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "workPackage": "WP-250",
+  "status": "IMPLEMENTED_ISOLATED_GAP_INVENTORY",
+  "sourceStatus": "RECONSTRUCTED_FROM_APPROVED_SOURCES",
+  "notImplemented": [
+    "provider consent and region service",
+    "ad provider delivery and invalid-traffic reconciliation",
+    "Analytics transport, retention, and consent enforcement",
+    "server Admin projection RPC/RLS",
+    "Moderation console, appeals, and authorized execution adapter",
+    "Ledger/Payout integration",
+    "real Search sponsored serving",
+    "browser/device/mobile/Safari/Firefox/screen-reader performance",
+    "production rollout"
+  ],
+  "productionMutation": false,
+  "baselineFailureIdentity": "14/14 inherited match; new 0"
+}

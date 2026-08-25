@@ -941,15 +941,32 @@
           reserveTopSpace('shared-top-ad-geometry-sync');
         });
       };
+      const syncAdStatus = () => {
+        const slot = banner.querySelector('ins.adsbygoogle');
+        if (slot instanceof HTMLElement && slot.getAttribute('data-ad-status') === 'unfilled') {
+          // An empty AdSense slot must not leave a white or inert 50px block
+          // in front of the public Figma shell.
+          removeTopAd();
+          return;
+        }
+        scheduleGeometrySync();
+      };
       const geometryObserver = new MutationObserver(scheduleGeometrySync);
       geometryObserver.observe(banner, {
         attributes: true,
-        attributeFilter: ['style'],
+        attributeFilter: ['style', 'data-ad-status', 'data-adsbygoogle-status', 'data-ads-request-state'],
         childList: true,
+        subtree: true,
+      });
+      const statusObserver = new MutationObserver(syncAdStatus);
+      statusObserver.observe(banner, {
+        attributes: true,
+        attributeFilter: ['data-ad-status', 'data-adsbygoogle-status', 'data-ads-request-state'],
         subtree: true,
       });
       window.addEventListener('orientationchange', scheduleGeometrySync, { passive: true });
       window.addEventListener('resize', scheduleGeometrySync, { passive: true });
+      syncAdStatus();
       scheduleGeometrySync();
     } else {
       syncBannerGeometry();

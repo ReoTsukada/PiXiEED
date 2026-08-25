@@ -1,0 +1,1610 @@
+{
+  "runId": "pixiedraw2-icons-20260821",
+  "fileKey": "gakLbGdx2Gl7UYIntUFOhN",
+  "phase": "phase4",
+  "step": "outline-tool-system-v0.4.0",
+  "entities": {
+    "collections": {
+      "primitives": "VariableCollectionId:3:2",
+      "color": "VariableCollectionId:3:3",
+      "geometry": "VariableCollectionId:3:4"
+    },
+    "modes": {
+      "primitives/value": "3:0",
+      "color/light": "3:1",
+      "color/dark": "3:2",
+      "geometry/value": "3:3"
+    },
+    "variables": {
+      "gray/900": "VariableID:4:2",
+      "gray/100": "VariableID:4:3",
+      "accent/500": "VariableID:4:4",
+      "focus/500": "VariableID:4:5",
+      "warning/500": "VariableID:4:6",
+      "danger/500": "VariableID:4:7",
+      "border/dark": "VariableID:4:8",
+      "border/light": "VariableID:4:9",
+      "surface/dark": "VariableID:4:10",
+      "surface/light": "VariableID:4:11",
+      "surface/canvas-dark": "VariableID:5:2",
+      "surface/canvas-light": "VariableID:5:3",
+      "icon/size": "VariableID:5:4",
+      "icon/size/tool": "VariableID:5:5",
+      "icon/size/menu": "VariableID:5:6",
+      "icon/stroke": "VariableID:5:7",
+      "icon/gap": "VariableID:5:8",
+      "color/icon/default": "VariableID:6:2",
+      "color/icon/accent": "VariableID:6:3",
+      "color/icon/focus": "VariableID:6:4",
+      "color/icon/warning": "VariableID:6:5",
+      "color/icon/danger": "VariableID:6:6",
+      "color/surface/default": "VariableID:6:7",
+      "color/surface/canvas": "VariableID:6:8",
+      "color/border/default": "VariableID:6:9",
+      "icon/grid": "VariableID:117:2",
+      "icon/safe-area": "VariableID:117:3",
+      "icon/size/16": "VariableID:117:4",
+      "icon/size/20": "VariableID:117:5",
+      "icon/size/24": "VariableID:117:6",
+      "icon/size/32": "VariableID:117:7",
+      "icon/corner/small": "VariableID:117:8",
+      "icon/corner/medium": "VariableID:117:9",
+      "icon/state/disabled-opacity": "VariableID:117:10",
+      "icon/state/default": "VariableID:117:11",
+      "icon/state/active": "VariableID:117:12",
+      "icon/state/hover": "VariableID:117:13",
+      "icon/state/disabled": "VariableID:117:14"
+    },
+    "pages": {
+      "Cover": "0:1",
+      "Getting Started": "8:2",
+      "Foundations": "8:3",
+      "---": "8:4",
+      "Components": "8:5",
+      "Common": "8:6",
+      "Viewport": "8:7",
+      "Drawing": "8:8",
+      "Layers / Timeline": "9:2",
+      "Audio": "9:3",
+      "Mirror": "9:4",
+      "Zoom": "9:5",
+      "PiXYNC": "9:6",
+      "Optional": "9:7",
+      "Utilities": "9:8"
+    },
+    "docs": {
+      "Cover": "13:2",
+      "Getting Started": "13:20",
+      "Foundations": "14:2",
+      "Components": "14:52",
+      "Utilities": "15:2",
+      "Common": "8:6"
+    },
+    "categoryDocs": {
+      "Common": "16:2",
+      "Viewport": "20:2",
+      "Drawing": "21:2",
+      "Layers / Timeline": "22:2",
+      "Audio": "23:2",
+      "Mirror": "24:2",
+      "Zoom": "24:12",
+      "PiXYNC": "24:25",
+      "Optional": "24:44"
+    },
+    "grids": {
+      "Common": "16:5",
+      "Viewport": "20:5",
+      "Drawing": "21:5",
+      "Layers / Timeline": "22:5",
+      "Audio": "23:5",
+      "Mirror": "24:5",
+      "Zoom": "24:15",
+      "PiXYNC": "24:28",
+      "Optional": "24:47"
+    },
+    "components": {
+      "icon-commands": "16:8",
+      "icon-undo": "16:11",
+      "icon-redo": "18:4",
+      "icon-rollback": "18:7",
+      "icon-export": "18:10",
+      "icon-import": "18:13",
+      "icon-file": "18:16",
+      "icon-folder": "18:19",
+      "icon-image": "18:22",
+      "icon-check": "18:25",
+      "icon-close": "19:4",
+      "icon-add": "19:7",
+      "icon-remove": "19:10",
+      "icon-delete": "19:13",
+      "icon-duplicate": "19:16",
+      "icon-edit": "19:19",
+      "icon-more": "19:22",
+      "icon-help": "19:25",
+      "icon-warning": "19:28",
+      "icon-pin": "19:31",
+      "icon-link": "19:34",
+      "icon-star": "19:37",
+      "icon-inspector": "19:40",
+      "icon-chevron-left": "20:8",
+      "icon-chevron-right": "20:11",
+      "icon-chevron-up": "20:14",
+      "icon-chevron-down": "20:17",
+      "icon-collapse": "20:20",
+      "icon-expand": "20:23",
+      "icon-shrink": "20:26",
+      "icon-focus": "20:29",
+      "icon-view": "20:32",
+      "icon-center": "20:35",
+      "icon-pan": "20:38",
+      "icon-manual": "20:41",
+      "icon-border": "20:45",
+      "icon-anchor": "20:48",
+      "icon-anchor-nw": "20:51",
+      "icon-anchor-n": "20:54",
+      "icon-anchor-ne": "20:57",
+      "icon-anchor-w": "20:60",
+      "icon-anchor-e": "20:63",
+      "icon-anchor-sw": "20:66",
+      "icon-anchor-s": "20:69",
+      "icon-anchor-se": "20:72",
+      "icon-pen": "21:8",
+      "icon-brush": "21:11",
+      "icon-eraser": "21:14",
+      "icon-fill": "21:17",
+      "icon-eyedropper": "21:20",
+      "icon-line": "21:23",
+      "icon-rect": "21:26",
+      "icon-rect-fill": "21:29",
+      "icon-ellipse": "21:32",
+      "icon-ellipse-fill": "21:35",
+      "icon-circle": "21:38",
+      "icon-circle-fill": "21:41",
+      "icon-select": "21:45",
+      "icon-select-color": "21:48",
+      "icon-color": "21:51",
+      "icon-color-mode": "21:55",
+      "icon-tools": "21:58",
+      "icon-fx": "21:61",
+      "icon-opacity": "21:65",
+      "icon-invert": "21:68",
+      "icon-flip-horizontal": "21:71",
+      "icon-flip-vertical": "21:74",
+      "icon-rotate-ccw": "21:77",
+      "icon-rotate-cw": "21:80",
+      "icon-rotate-180": "21:83",
+      "icon-layers": "22:8",
+      "icon-eye": "22:11",
+      "icon-eye-off": "22:14",
+      "icon-lock": "22:17",
+      "icon-unlock": "22:20",
+      "icon-timeline": "22:23",
+      "icon-play": "22:26",
+      "icon-pause": "22:29",
+      "icon-stop": "22:32",
+      "icon-loop": "22:35",
+      "icon-bounce": "22:38",
+      "icon-sequence": "22:41",
+      "icon-onion": "22:44",
+      "icon-sheet": "22:47",
+      "icon-power-on": "22:50",
+      "icon-power-off": "22:53",
+      "icon-note": "23:8",
+      "icon-wave": "23:11",
+      "icon-instrument": "23:14",
+      "icon-microphone": "23:17",
+      "icon-record": "23:20",
+      "icon-mirror-diagonal-down": "24:8",
+      "icon-mirror-diagonal-up": "24:11",
+      "icon-zoom-out": "24:18",
+      "icon-zoom-in": "24:21",
+      "icon-fit-canvas": "24:24",
+      "icon-sync-local": "24:31",
+      "icon-sync-connecting": "24:35",
+      "icon-sync-online": "24:39",
+      "icon-sync-error": "24:43",
+      "icon-save": "24:50",
+      "icon-search": "24:53",
+      "icon-skip-previous": "24:56",
+      "icon-skip-next": "24:59"
+    },
+    "styles": {
+      "Icon/Heading": "S:207bc0971475f7fb359008a83abe03f01bd33c26,",
+      "Icon/Label": "S:69e3c40ec3d2951a021ef169dcee53d6d4539a6a,",
+      "Icon/Code": "S:1659576b42519740e1c86a86c808c0e82f45858c,",
+      "Shadow/Panel": "S:8969c37c2355411fac751bb9f11e2110699f68ec,"
+    },
+    "glyphs": {
+      "icon-commands": {
+        "componentId": "16:8",
+        "glyphId": "119:2",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:3"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-undo": {
+        "componentId": "16:11",
+        "glyphId": "119:4",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:5"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-redo": {
+        "componentId": "18:4",
+        "glyphId": "119:6",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:7"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-rollback": {
+        "componentId": "18:7",
+        "glyphId": "119:8",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:9"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-export": {
+        "componentId": "18:10",
+        "glyphId": "119:10",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:11"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-import": {
+        "componentId": "18:13",
+        "glyphId": "119:12",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:13"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-file": {
+        "componentId": "18:16",
+        "glyphId": "119:14",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:16"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-folder": {
+        "componentId": "18:19",
+        "glyphId": "119:17",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:19"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-image": {
+        "componentId": "18:22",
+        "glyphId": "119:20",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:22"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-check": {
+        "componentId": "18:25",
+        "glyphId": "119:23",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:25"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-close": {
+        "componentId": "19:4",
+        "glyphId": "119:26",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:28"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-add": {
+        "componentId": "19:7",
+        "glyphId": "119:29",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:31",
+          "119:32"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-remove": {
+        "componentId": "19:10",
+        "glyphId": "119:33",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:35"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-delete": {
+        "componentId": "19:13",
+        "glyphId": "119:36",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:38"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-duplicate": {
+        "componentId": "19:16",
+        "glyphId": "119:39",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:41"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-edit": {
+        "componentId": "19:19",
+        "glyphId": "119:42",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:43"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-more": {
+        "componentId": "19:22",
+        "glyphId": "119:44",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:46",
+          "119:47",
+          "119:48"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-help": {
+        "componentId": "19:25",
+        "glyphId": "119:49",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:51"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-warning": {
+        "componentId": "19:28",
+        "glyphId": "119:52",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:53",
+          "119:54"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-pin": {
+        "componentId": "19:31",
+        "glyphId": "119:55",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:57"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-link": {
+        "componentId": "19:34",
+        "glyphId": "119:58",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:59"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-star": {
+        "componentId": "19:37",
+        "glyphId": "119:60",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:62"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-inspector": {
+        "componentId": "19:40",
+        "glyphId": "119:63",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:65",
+          "119:66",
+          "119:67",
+          "119:68",
+          "119:69",
+          "119:70"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-chevron-left": {
+        "componentId": "20:8",
+        "glyphId": "119:71",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:73"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-chevron-right": {
+        "componentId": "20:11",
+        "glyphId": "119:74",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:76"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-chevron-up": {
+        "componentId": "20:14",
+        "glyphId": "119:77",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:79"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-chevron-down": {
+        "componentId": "20:17",
+        "glyphId": "119:80",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:82"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-collapse": {
+        "componentId": "20:20",
+        "glyphId": "119:83",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:85"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-expand": {
+        "componentId": "20:23",
+        "glyphId": "119:86",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:88"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-shrink": {
+        "componentId": "20:26",
+        "glyphId": "119:89",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:91"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-focus": {
+        "componentId": "20:29",
+        "glyphId": "119:92",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:94",
+          "119:95"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-view": {
+        "componentId": "20:32",
+        "glyphId": "119:96",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:98"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-center": {
+        "componentId": "20:35",
+        "glyphId": "119:99",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:101"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-pan": {
+        "componentId": "20:38",
+        "glyphId": "119:102",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:103"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-manual": {
+        "componentId": "20:41",
+        "glyphId": "119:104",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:106"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-border": {
+        "componentId": "20:45",
+        "glyphId": "119:107",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:108"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-anchor": {
+        "componentId": "20:48",
+        "glyphId": "119:109",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:111"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-anchor-nw": {
+        "componentId": "20:51",
+        "glyphId": "119:112",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:114"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-anchor-n": {
+        "componentId": "20:54",
+        "glyphId": "119:115",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:117"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-anchor-ne": {
+        "componentId": "20:57",
+        "glyphId": "119:118",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:120"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-anchor-w": {
+        "componentId": "20:60",
+        "glyphId": "119:121",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:123"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-anchor-e": {
+        "componentId": "20:63",
+        "glyphId": "119:124",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:126"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-anchor-sw": {
+        "componentId": "20:66",
+        "glyphId": "119:127",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:129"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-anchor-s": {
+        "componentId": "20:69",
+        "glyphId": "119:130",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:132"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-anchor-se": {
+        "componentId": "20:72",
+        "glyphId": "119:133",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:135"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-pen": {
+        "componentId": "21:8",
+        "glyphId": "118:2",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "118:3"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-brush": {
+        "componentId": "21:11",
+        "glyphId": "119:136",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:138"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-eraser": {
+        "componentId": "21:14",
+        "glyphId": "119:139",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:140"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-fill": {
+        "componentId": "21:17",
+        "glyphId": "119:141",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:142"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-eyedropper": {
+        "componentId": "21:20",
+        "glyphId": "119:143",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:145"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-line": {
+        "componentId": "21:23",
+        "glyphId": "119:146",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:148"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-rect": {
+        "componentId": "21:26",
+        "glyphId": "119:149",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:150"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-rect-fill": {
+        "componentId": "21:29",
+        "glyphId": "119:151",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:153"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-ellipse": {
+        "componentId": "21:32",
+        "glyphId": "119:154",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:155"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-ellipse-fill": {
+        "componentId": "21:35",
+        "glyphId": "119:156",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:158"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-circle": {
+        "componentId": "21:38",
+        "glyphId": "119:159",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:160"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-circle-fill": {
+        "componentId": "21:41",
+        "glyphId": "119:161",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:163"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-select": {
+        "componentId": "21:45",
+        "glyphId": "119:164",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:165"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-select-color": {
+        "componentId": "21:48",
+        "glyphId": "119:166",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:168"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-color": {
+        "componentId": "21:51",
+        "glyphId": "119:169",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:171"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-color-mode": {
+        "componentId": "21:55",
+        "glyphId": "119:172",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:174",
+          "119:175"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-tools": {
+        "componentId": "21:58",
+        "glyphId": "119:176",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:177"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-fx": {
+        "componentId": "21:61",
+        "glyphId": "119:178",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:180"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-opacity": {
+        "componentId": "21:65",
+        "glyphId": "119:181",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:183",
+          "119:184"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-invert": {
+        "componentId": "21:68",
+        "glyphId": "119:185",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:187"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-flip-horizontal": {
+        "componentId": "21:71",
+        "glyphId": "119:188",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:190",
+          "119:191"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-flip-vertical": {
+        "componentId": "21:74",
+        "glyphId": "119:192",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:194",
+          "119:195"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-rotate-ccw": {
+        "componentId": "21:77",
+        "glyphId": "119:196",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:197"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-rotate-cw": {
+        "componentId": "21:80",
+        "glyphId": "119:198",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:199"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-rotate-180": {
+        "componentId": "21:83",
+        "glyphId": "119:200",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:201"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-layers": {
+        "componentId": "22:8",
+        "glyphId": "119:202",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:203"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-eye": {
+        "componentId": "22:11",
+        "glyphId": "119:204",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:205",
+          "119:206"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-eye-off": {
+        "componentId": "22:14",
+        "glyphId": "119:207",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:208"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-lock": {
+        "componentId": "22:17",
+        "glyphId": "119:209",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:211",
+          "119:212"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-unlock": {
+        "componentId": "22:20",
+        "glyphId": "119:213",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:215",
+          "119:216"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-timeline": {
+        "componentId": "22:23",
+        "glyphId": "119:217",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:218",
+          "119:219"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-play": {
+        "componentId": "22:26",
+        "glyphId": "119:220",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:222"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-pause": {
+        "componentId": "22:29",
+        "glyphId": "119:223",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:225",
+          "119:226"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-stop": {
+        "componentId": "22:32",
+        "glyphId": "119:227",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:229"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-loop": {
+        "componentId": "22:35",
+        "glyphId": "119:230",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:232"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-bounce": {
+        "componentId": "22:38",
+        "glyphId": "119:233",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:235"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-sequence": {
+        "componentId": "22:41",
+        "glyphId": "119:236",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:238"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-onion": {
+        "componentId": "22:44",
+        "glyphId": "119:239",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:241"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-sheet": {
+        "componentId": "22:47",
+        "glyphId": "119:242",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:244"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-power-on": {
+        "componentId": "22:50",
+        "glyphId": "119:245",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:247",
+          "119:248"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-power-off": {
+        "componentId": "22:53",
+        "glyphId": "119:249",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:251",
+          "119:252",
+          "119:253"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-note": {
+        "componentId": "23:8",
+        "glyphId": "119:254",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:255"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-wave": {
+        "componentId": "23:11",
+        "glyphId": "119:256",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:258"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-instrument": {
+        "componentId": "23:14",
+        "glyphId": "119:259",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:261"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-microphone": {
+        "componentId": "23:17",
+        "glyphId": "119:262",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:264"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-record": {
+        "componentId": "23:20",
+        "glyphId": "119:265",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:267"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-mirror-diagonal-down": {
+        "componentId": "24:8",
+        "glyphId": "119:268",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:269"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-mirror-diagonal-up": {
+        "componentId": "24:11",
+        "glyphId": "119:270",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:271"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-zoom-out": {
+        "componentId": "24:18",
+        "glyphId": "119:272",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:273",
+          "119:274"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-zoom-in": {
+        "componentId": "24:21",
+        "glyphId": "119:275",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:276",
+          "119:277"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-fit-canvas": {
+        "componentId": "24:24",
+        "glyphId": "119:278",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:279",
+          "119:280"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-sync-local": {
+        "componentId": "24:31",
+        "glyphId": "119:281",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:282",
+          "119:283"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-sync-connecting": {
+        "componentId": "24:35",
+        "glyphId": "119:284",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:285",
+          "119:286"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-sync-online": {
+        "componentId": "24:39",
+        "glyphId": "119:287",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:288",
+          "119:289"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-sync-error": {
+        "componentId": "24:43",
+        "glyphId": "119:290",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:291",
+          "119:292",
+          "119:293"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-save": {
+        "componentId": "24:50",
+        "glyphId": "119:294",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:296"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-search": {
+        "componentId": "24:53",
+        "glyphId": "119:297",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:298",
+          "119:299"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-skip-previous": {
+        "componentId": "24:56",
+        "glyphId": "119:300",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:302",
+          "119:303"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      },
+      "icon-skip-next": {
+        "componentId": "24:59",
+        "glyphId": "119:304",
+        "glyphType": "FRAME",
+        "vectorIds": [
+          "119:306",
+          "119:307"
+        ],
+        "size": [
+          24,
+          24
+        ]
+      }
+    },
+    "control": {
+      "componentSetId": "123:66",
+      "propertyKey": "Glyph#123:0",
+      "propertyType": "INSTANCE_SWAP",
+      "defaultGlyphComponentId": "21:8",
+      "variantIds": [
+        "123:2",
+        "123:6",
+        "123:10",
+        "123:14",
+        "123:18",
+        "123:22",
+        "123:26",
+        "123:30",
+        "123:34",
+        "123:38",
+        "123:42",
+        "123:46",
+        "123:50",
+        "123:54",
+        "123:58",
+        "123:62"
+      ],
+      "states": [
+        "Default",
+        "Active",
+        "Hover",
+        "Disabled"
+      ],
+      "sizes": [
+        16,
+        20,
+        24,
+        32
+      ],
+      "disabledOpacity": 0.42
+    },
+    "artifacts": {
+      "sourceSvg": "pixiedraw2/assets/icons/draw2-icons-source.svg",
+      "outputSvg": "pixiedraw2/assets/icons/draw2-icons.svg",
+      "preview": "pixiedraw2/assets/icons/draw2-icons-preview.html",
+      "exportDirectory": "pixiedraw2/assets/icons/export-v040/"
+    }
+  },
+  "pendingValidations": [],
+  "completedSteps": [
+    "phase0:code-audit",
+    "phase0:figma-file-created",
+    "phase0:scope-locked",
+    "phase1:collections",
+    "phase1:primitives",
+    "phase1:semantic-aliases",
+    "phase1:styles",
+    "phase1:validation",
+    "phase2:pages",
+    "phase2:cover-getting-started",
+    "phase2:foundations-components",
+    "phase2:utilities",
+    "phase2:documentation-validation",
+    "phase3:common-import-test",
+    "phase3:common-batch-1",
+    "phase3:common-batch-1-validation",
+    "phase3:common-batch-2",
+    "phase3:common-batch-2-validation",
+    "phase3:common-batch-3",
+    "phase3:common-batch-3-validation",
+    "phase3:viewport-batch-1",
+    "phase3:viewport-batch-1-validation",
+    "phase3:viewport-batch-2",
+    "phase3:viewport-batch-2-validation",
+    "phase3:viewport-batch-3",
+    "phase3:viewport-batch-3-validation",
+    "phase3:drawing-batch-1",
+    "phase3:drawing-batch-1-validation",
+    "phase3:drawing-batch-2",
+    "phase3:drawing-batch-2-validation",
+    "phase3:drawing-batch-3",
+    "phase3:drawing-batch-3-validation",
+    "phase3:drawing-batch-4",
+    "phase3:drawing-batch-4-validation",
+    "phase3:layers-timeline-batch-1",
+    "phase3:layers-timeline-batch-1-validation",
+    "phase3:layers-timeline-batch-2",
+    "phase3:layers-timeline-batch-2-validation",
+    "phase3:audio",
+    "phase3:audio-validation",
+    "phase3:mirror",
+    "phase3:mirror-validation",
+    "phase3:zoom",
+    "phase3:zoom-validation",
+    "phase3:pixync",
+    "phase3:pixync-validation",
+    "phase3:optional",
+    "phase3:optional-validation",
+    "phase3:all-icons-audit",
+    "phase4:svg-manifest-audit",
+    "phase4:handoff-validated",
+    "phase4:primitive-silhouette-reset",
+    "phase4:primitive-silhouette-sync",
+    "phase4:recognizable-tool-silhouettes",
+    "phase1:v0.4.0-geometry-tokens",
+    "phase3:v0.4.0-glyph-sync",
+    "phase3:v0.4.0-glyph-readback",
+    "phase4:v0.4.0-control-component",
+    "phase4:v0.4.0-control-readback",
+    "phase4:v0.4.0-control-screenshot",
+    "phase4:v0.4.0-reproducible-build",
+    "phase5:v0.4.0-browser-qa",
+    "phase5:v0.4.0-preview-layout-qa"
+  ]
+}

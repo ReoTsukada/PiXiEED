@@ -1,0 +1,24 @@
+schema_version: 3.2
+product: LUNA_AI_DEV_HARNESS
+mode: machine_first
+canonical_language: yaml
+human_adapters: [GOAL.md, CHANGE.md, START.md, README_JA.md, NOTICE.md]
+source_of_truth_order:
+  - .luna/state/DISCOVERY.yaml
+  - .luna/state/PRODUCT_BLUEPRINT.yaml
+  - .luna/state/STATE.yaml
+  - .luna/state/WORK_QUEUE.yaml
+  - .luna/state/DECISIONS.yaml
+  - .luna/policies
+  - .luna/agents/REGISTRY.yaml
+  - .luna/workflows
+  - conversation_context
+principles:
+  startup_questions_first: true
+  discovery_then_autonomy: true
+  no_midstream_ordinary_questions: true
+  north_star_fixed_solution_adaptive: true
+  evidence_over_memory: true
+  quality_per_total_cost: true
+  repository_as_durable_memory: true
+  global_coherence_over_local_optimum: true

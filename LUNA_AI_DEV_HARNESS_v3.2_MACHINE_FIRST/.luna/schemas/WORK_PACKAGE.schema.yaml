@@ -1,0 +1,14 @@
+required: [id, goal, user_visible_result, blueprint_links, dependencies, completion_criteria, risk, evidence_gate, test_plan, rollback]
+example:
+  id: WP-001
+  goal: string
+  user_visible_result: string
+  blueprint_links: [acceptance:AO-001]
+  dependencies: []
+  risk: {impact: 0, uncertainty: 0, irreversibility: 0, surface_area: 0, freshness_need: 0, decision_sensitivity: 0}
+  evidence_gate: {research: none, review: self, experiment: none, model_tier: default, human_approval: false}
+  affected_areas: []
+  test_plan: []
+  rollback: null
+  completion_criteria: []
+  status: queued

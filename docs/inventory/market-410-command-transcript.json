@@ -1,0 +1,46 @@
+{
+  "transcriptVersion": "MARKET410_COMMAND_TRANSCRIPT_V1",
+  "packageId": "MARKET-410",
+  "commands": [
+    {
+      "command": "deno fmt --check pixiedraw2/src/platform/market-410 pixiedraw2/tests/market-410 pixiedraw2/benchmarks/market-410",
+      "exitCode": 0
+    },
+    {
+      "command": "deno check --no-remote pixiedraw2/src/platform/market-410/composition.ts pixiedraw2/tests/market-410/composition.test.ts pixiedraw2/benchmarks/market-410/generate-evidence.ts",
+      "exitCode": 0
+    },
+    {
+      "command": "deno test --no-remote pixiedraw2/tests/market-410/composition.test.ts",
+      "exitCode": 0
+    },
+    {
+      "command": "deno test --no-remote pixiedraw2/tests/wp210-market-rights.test.ts",
+      "exitCode": 0
+    },
+    {
+      "command": "deno test --no-remote pixiedraw2/tests/fp003-financial-integrity.test.ts",
+      "exitCode": 0
+    },
+    {
+      "command": "deno run --no-remote --allow-read --allow-write=docs/inventory pixiedraw2/benchmarks/market-410/generate-evidence.ts",
+      "exitCode": 0
+    },
+    {
+      "command": "node scripts/validate-qualification-evidence.mjs docs/inventory/market-410-evidence.json",
+      "exitCode": 0
+    },
+    {
+      "command": "shasum -a 256 .codex/context/MARKET-410.md",
+      "exitCode": 0
+    },
+    {
+      "command": "git diff --check -- pixiedraw2/src/platform/market-410 pixiedraw2/tests/market-410 pixiedraw2/benchmarks/market-410 docs/contracts/MARKET-410-COMPOSITION.md docs/inventory/market-410-benchmark.json docs/inventory/market-410-command-transcript.json docs/inventory/market-410-evidence.json docs/decisions/ADR-20260816-MARKET-410-composition-boundary.md",
+      "exitCode": 0
+    },
+    {
+      "command": "for f in pixiedraw2/src/platform/market-410/composition.ts pixiedraw2/tests/market-410/composition.test.ts pixiedraw2/benchmarks/market-410/generate-evidence.ts docs/contracts/MARKET-410-COMPOSITION.md docs/inventory/market-410-benchmark.json docs/inventory/market-410-command-transcript.json docs/inventory/market-410-evidence.json docs/decisions/ADR-20260816-MARKET-410-composition-boundary.md; do output=\"$(git diff --no-index --check -- /dev/null \"$f\" 2>&1)\"; rc=$?; test \"$rc\" -eq 1; test -z \"$output\"; done",
+      "exitCode": 0
+    }
+  ]
+}

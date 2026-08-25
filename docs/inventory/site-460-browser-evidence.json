@@ -1,0 +1,42 @@
+{
+  "packageId": "SITE-460",
+  "acceptance": {
+    "SITE460-CONNECTION-001": "PASS_LOCAL_BROWSER",
+    "SITE460-BROWSER-001": "PASS_LOCAL_BROWSER",
+    "SITE460-PRESERVE-001": "PASS_LOCAL_BROWSER"
+  },
+  "source": "pixiedraw2/src/platform/site-460/browser-entry.ts",
+  "build": "pixiedraw2/dist/site460-browser-entry.js",
+  "featureFlag": "?site460=on",
+  "hostPolicy": ["localhost", "127.0.0.1", "[::1]"],
+  "browserMatrix": {
+    "viewports": [[390, 844], [768, 1024], [1280, 900]],
+    "status": "PASS_LOCAL_BROWSER",
+    "queryOn": {
+      "statusHidden": false,
+      "statusState": "completed",
+      "statusText": "PUBLIC_WORK_SOCIAL · COMPLETED",
+      "horizontalOverflow": false,
+      "canvasOverlap": false,
+      "consoleWarnError": []
+    },
+    "queryOff": {
+      "viewport": [390, 844],
+      "statusHidden": true,
+      "outputCount": 0,
+      "canvasVisible": true,
+      "horizontalOverflow": false,
+      "consoleWarnError": []
+    }
+  },
+  "production": "UNTESTED",
+  "providerDatabaseNative": "UNTESTED",
+  "finalAcceptance": "PASS_LOCAL_BROWSER",
+  "solCloseout": {
+    "status": "COMPLETE_CANDIDATE",
+    "scope": "LOCAL_BROWSER",
+    "review": "SOL_READ_ONLY_CLOSEOUT",
+    "productionProviderDatabaseNative": "PENDING_UNTESTED",
+    "nativeNext": "NOT_AUTO_STARTED"
+  }
+}

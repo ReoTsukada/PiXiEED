@@ -1,0 +1,30 @@
+{
+  "inventoryId": "FP-003Z-ATTACK-MATRIX-V1",
+  "status": "COMPLETE_ISOLATED_PENDING_EXTERNAL_AUDIT",
+  "productionConnected": false,
+  "attacks": [
+    { "id": "ATTACK-01", "name": "malicious Provider injection", "result": "PASS_STATIC", "evidence": ["scripts/audit-fp003y-boundary.mjs", "pixiedraw2/src/server/authority-composition-root.ts"] },
+    { "id": "ATTACK-02", "name": "fake SERVER_REGISTRY reference", "result": "PASS", "evidence": ["pixiedraw2/tests/fp003z-attack-matrix.test.ts"] },
+    { "id": "ATTACK-03", "name": "forged currentRevision", "result": "PASS", "evidence": ["pixiedraw2/tests/fp003z-attack-matrix.test.ts"] },
+    { "id": "ATTACK-04", "name": "forged canonicalHash", "result": "PASS", "evidence": ["pixiedraw2/tests/fp003z-attack-matrix.test.ts"] },
+    { "id": "ATTACK-05", "name": "old persisted Payment to Ledger", "result": "PASS", "evidence": ["pixiedraw2/tests/fp003z-attack-matrix.test.ts"] },
+    { "id": "ATTACK-06", "name": "stale Request", "result": "PASS", "evidence": ["pixiedraw2/tests/fp003z-attack-matrix.test.ts"] },
+    { "id": "ATTACK-07", "name": "stale Quote", "result": "PASS", "evidence": ["pixiedraw2/tests/fp003z-attack-matrix.test.ts"] },
+    { "id": "ATTACK-08", "name": "stale Agreement", "result": "PASS", "evidence": ["pixiedraw2/tests/fp003z-attack-matrix.test.ts"] },
+    { "id": "ATTACK-09", "name": "stale Milestone", "result": "PASS", "evidence": ["pixiedraw2/tests/fp003z-attack-matrix.test.ts"] },
+    { "id": "ATTACK-10", "name": "stale Delivery", "result": "PASS", "evidence": ["pixiedraw2/tests/fp003z-attack-matrix.test.ts"] },
+    { "id": "ATTACK-11", "name": "stale Acceptance", "result": "PASS", "evidence": ["pixiedraw2/tests/fp003z-attack-matrix.test.ts"] },
+    { "id": "ATTACK-12", "name": "stale Rights", "result": "PASS", "evidence": ["pixiedraw2/tests/fp003z-attack-matrix.test.ts"] },
+    { "id": "ATTACK-13", "name": "stale Payment", "result": "PASS", "evidence": ["pixiedraw2/tests/fp003z-attack-matrix.test.ts"] },
+    { "id": "ATTACK-14", "name": "attacker Principal with victim resource", "result": "PASS", "evidence": ["pixiedraw2/tests/fp003x-cross-layer-authority.test.ts", "pixiedraw2/tests/fp003z-attack-matrix.test.ts"] },
+    { "id": "ATTACK-15", "name": "fake Contributor Snapshot", "result": "PASS", "evidence": ["pixiedraw2/tests/fp003x-cross-layer-authority.test.ts", "pixiedraw2/tests/fp003z-attack-matrix.test.ts"] },
+    { "id": "ATTACK-16", "name": "fake License Semantic Hash", "result": "PASS", "evidence": ["pixiedraw2/tests/fp003z-attack-matrix.test.ts"] },
+    { "id": "ATTACK-17", "name": "Browser import of Server Authority", "result": "PASS_STATIC", "evidence": ["scripts/audit-fp003y-boundary.mjs"] },
+    { "id": "ATTACK-18", "name": "stale dist artifact inclusion", "result": "PASS_STATIC", "evidence": ["scripts/audit-fp003y-boundary.mjs", "pixiedraw2/deno.json"] }
+  ],
+  "notes": [
+    "ATTACK-01, ATTACK-17, and ATTACK-18 are source/build-boundary checks, not production-runtime evidence.",
+    "The in-memory Registry is test-only and does not prove the production adapter, DB transaction, or Provider boundary.",
+    "FP-004 and WP-900 remain stopped pending independent external audit."
+  ]
+}

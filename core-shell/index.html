@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="ja" data-theme="system">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="PiXiEEDstudio App Shell isolated design-system preview">
+  <meta name="robots" content="noindex,nofollow">
+  <title>PiXiEEDstudio App Shell — Isolated Preview</title>
+  <link rel="stylesheet" href="assets/core-shell.css">
+</head>
+<body>
+  <div id="coreShellRoot" data-layout="auto" data-shell-state="isolated-preview">
+    <div id="coreShellAnnouncer" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+    <div id="coreShellApp"></div>
+  </div>
+  <!-- The Core flag adapter is a small, unloaded compatibility adapter. It does not load Draw. -->
+  <script src="../pixiedraw/assets/js/modules/core-feature-flag-rollback-utils.js"></script>
+  <script type="module" src="assets/core-shell.js"></script>
+</body>
+</html>

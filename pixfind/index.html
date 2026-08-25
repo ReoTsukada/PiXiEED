@@ -67,7 +67,7 @@
 <link href="https://fonts.googleapis.com" rel="preconnect"/>
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
 <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;700&amp;display=swap" rel="stylesheet"/>
-<link href="styles.css?v=20260730-result-panel-scroll1" rel="stylesheet"/>
+<link href="styles.css?v=20260803-social-likes1" rel="stylesheet"/>
 <script src="../scripts/ad-account-control.js?v=20260719-no-ad-fallback1"></script>
 <link rel="icon" type="image/png" sizes="192x192" href="../icon/icon-192-2.png"/>
 <link rel="icon" type="image/png" sizes="512x512" href="../icon/icon-512-2.png"/>
@@ -228,6 +228,7 @@
 </div>
 <div class="game-header-slot game-header-slot--right">
 <div class="game-controls">
+<button class="button button--ghost button--compact pixfind-like-button" id="gameLikeButton" type="button" aria-pressed="false" hidden><span aria-hidden="true">♡</span> <span id="gameLikeCount">0</span></button>
 <button class="button button--ghost button--compact" id="gameBackButton" type="button">問題選択</button>
 <button class="button button--primary button--compact" id="resetButton" type="button">もう一度</button>
 <button hidden="" id="zoomResetButton" type="button">表示リセット</button>
@@ -286,7 +287,7 @@
 <div class="creator-draw-links">
 <p class="creator-draw-links__label">画像をこれから作る場合</p>
 <div class="creator-draw-links__actions">
-<a class="button button--ghost button--compact" href="../pixiedraw/index.html" rel="noopener"><span class="creator-draw-links__main">PiXiEEDrawで作る</span><span class="creator-draw-links__sub">画像を保存してPiXFiNDへ追加</span></a>
+<a class="button button--ghost button--compact" href="../studio/" rel="noopener"><span class="creator-draw-links__main">iDRAWで作る</span><span class="creator-draw-links__sub">画像を保存してPiXFiNDへ追加</span></a>
 </div>
 </div>
 </header>
@@ -489,9 +490,10 @@
 </div>
 <script defer="" src="assets/puzzles/manifest.js"></script>
 <script src="../scripts/creator-play-rewards.js?v=2026.07.19-play-rewards1"></script>
-<script defer="" src="app.js?v=20260730-progressive-feed1"></script>
-<script src="../scripts/shared-profile-header.js"></script>
-<script src="../scripts/shared-bottom-nav.js?v=20260724-fullscreen-icons2"></script>
+<script defer="" src="../scripts/social-posts.js?v=20260803-social-seo-comments1"></script>
+<script defer="" src="app.js?v=20260825-studio-labels1"></script>
+<script src="../scripts/shared-profile-header.js?v=20260825-common-shell15"></script>
+<script src="../scripts/shared-bottom-nav.js?v=20260825-studio-brand1"></script>
 <script src="../scripts/pixel-art-fit.js"></script>
 </body>
 </html>

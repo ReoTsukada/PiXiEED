@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "work_package": "WP-110",
+  "phase": "REFERENCE_PERFORMANCE_CHECKPOINT",
+  "status": "MEASURED_REFERENCE_UNTESTED",
+  "contract": "docs/contracts/WP-110-REFERENCE-PERFORMANCE-CHECKPOINT.md",
+  "raw_results": {
+    "node": "docs/inventory/wp110-reference-performance-checkpoint-node.json",
+    "browser": "docs/inventory/wp110-reference-performance-checkpoint-browser.json",
+    "bundle": "docs/inventory/wp110-reference-bundle-baseline.json"
+  },
+  "executed": {
+    "node_reference": true,
+    "in_app_browser_reference": true,
+    "actual_mobile_device": false,
+    "safari_or_firefox": false,
+    "thirty_minute_session": false,
+    "full_layer_frame_compositor": false,
+    "fill": false,
+    "composite": false,
+    "production_integration": false
+  },
+  "coverage": {
+    "single_pixel": ["512x512", "256x256 desktop-simulated-mobile-fixture"],
+    "cow_tile_sizes": [32, 64],
+    "sparse_canvas": "1024x1024",
+    "tile_workloads": ["single-pixel", "short-stroke", "long-stroke", "duplicate-cow", "fill-unimplemented", "composite-unimplemented"],
+    "sample_count": 40,
+    "minimum_formal_p95_sample_count": 30
+  },
+  "architecture_findings": {
+    "active_dirty_region_is_bounded": true,
+    "full_raster_read_reserved_for_golden": true,
+    "unrelated_frame_scan": false,
+    "unrelated_layer_scan": false,
+    "full_project_serialization": false,
+    "full_timeline_rebuild": false,
+    "full_raster_clone": false,
+    "unchanged_tile_copy": false,
+    "core_slice_layer_count": 1,
+    "core_slice_frame_count": 1
+  },
+  "technology": {
+    "tile_size": "DECISION_PENDING",
+    "renderer": "DECISION_PENDING",
+    "worker_topology": "DECISION_PENDING",
+    "offscreen_canvas": "UNTESTED_CANDIDATE",
+    "webgpu": "UNTESTED_OPTIONAL_CANDIDATE",
+    "wasm": "UNTESTED_CANDIDATE",
+    "shared_array_buffer": "UNTESTED_OPTIONAL_CANDIDATE"
+  },
+  "baseline_failure_identity": {
+    "existing_match": "14/14",
+    "new_failure_identities": 0,
+    "note": "Preserved WP-099 evidence; WP-000 through WP-100 were not rerun."
+  },
+  "production_changes": {
+    "current_routes": false,
+    "current_pixiedraw": false,
+    "pxd": false,
+    "pixisync": false,
+    "market": false,
+    "production_database": false,
+    "production_storage": false,
+    "migration": false,
+    "deploy": false,
+    "publish": false,
+    "commit": false,
+    "push": false
+  }
+}

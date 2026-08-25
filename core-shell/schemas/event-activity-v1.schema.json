@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pixieed.invalid/schema/event-activity-v1.json",
+  "title": "PiXiEED Event and Activity Core v1",
+  "oneOf": [
+    { "$ref": "#/$defs/event" },
+    { "$ref": "#/$defs/activity" },
+    { "$ref": "#/$defs/producer" }
+  ],
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "version": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:+-]{0,63}$" },
+    "eventVersion": { "type": "integer", "minimum": 1 },
+    "visibility": { "enum": ["PRIVATE", "PROJECT_MEMBERS", "CREATOR_PRIVATE", "UNLISTED", "PUBLIC"] },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["actorId", "actorType"],
+      "properties": {
+        "actorId": { "$ref": "#/$defs/id" },
+        "actorType": { "type": "string", "minLength": 1, "maxLength": 32 }
+      }
+    },
+    "producer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["producerId", "producerVersion", "producerType"],
+      "properties": {
+        "producerId": { "$ref": "#/$defs/id" },
+        "producerVersion": { "$ref": "#/$defs/version" },
+        "producerType": { "enum": ["ACCOUNT_PERMISSION_CORE", "PROJECT_REGISTRY", "ASSET_REGISTRY", "PACKAGE_REGISTRY", "TOOL_BRIDGE", "CORE_SYSTEM", "LEGACY_ADAPTER"] }
+      }
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "eventId", "eventType", "eventVersion", "occurredAt", "producer", "aggregateType", "aggregateId",
+        "aggregateVersion", "actorRef", "correlationId", "causationId", "projectId", "assetId", "packageId",
+        "visibilityClass", "payload", "schemaVersion", "causationDepth", "causationChain"
+      ],
+      "properties": {
+        "eventId": { "$ref": "#/$defs/id" },
+        "eventType": { "type": "string", "minLength": 1, "maxLength": 96 },
+        "eventVersion": { "$ref": "#/$defs/eventVersion" },
+        "occurredAt": { "type": "string", "format": "date-time" },
+        "producer": { "$ref": "#/$defs/producer" },
+        "aggregateType": { "enum": ["ACCOUNT", "PROJECT", "ASSET", "PACKAGE", "TOOL", "PRODUCT", "PURCHASE", "ENTITLEMENT", "LICENSE", "COMMUNITY"] },
+        "aggregateId": { "$ref": "#/$defs/id" },
+        "aggregateVersion": { "type": "integer", "minimum": 1 },
+        "actorRef": { "anyOf": [{ "$ref": "#/$defs/actor" }, { "type": "null" }] },
+        "correlationId": { "anyOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] },
+        "causationId": { "anyOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] },
+        "projectId": { "anyOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] },
+        "assetId": { "anyOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] },
+        "packageId": { "anyOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] },
+        "visibilityClass": { "$ref": "#/$defs/visibility" },
+        "payload": { "type": "object", "maxProperties": 64 },
+        "schemaVersion": { "const": 1 },
+        "causationDepth": { "type": "integer", "minimum": 0, "maximum": 16 },
+        "causationChain": { "type": "array", "maxItems": 16, "items": { "$ref": "#/$defs/id" } }
+      }
+    },
+    "activity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["activityId", "sourceEventId", "activityType", "actorReference", "objectReference", "projectReference", "occurredAt", "visibility", "presentationKey", "metadata"],
+      "properties": {
+        "activityId": { "$ref": "#/$defs/id" },
+        "sourceEventId": { "$ref": "#/$defs/id" },
+        "activityType": { "type": "string", "minLength": 1, "maxLength": 96 },
+        "actorReference": { "anyOf": [{ "$ref": "#/$defs/actor" }, { "type": "null" }] },
+        "objectReference": { "type": "object", "maxProperties": 16 },
+        "projectReference": { "anyOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] },
+        "occurredAt": { "type": "string", "format": "date-time" },
+        "visibility": { "$ref": "#/$defs/visibility" },
+        "presentationKey": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "metadata": { "type": "object", "maxProperties": 64 }
+      }
+    }
+  }
+}

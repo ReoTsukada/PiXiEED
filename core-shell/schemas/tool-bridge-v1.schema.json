@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pixieed.invalid/schemas/tool-bridge-v1.schema.json",
+  "title": "PiXiEEDstudio Versioned Tool Bridge v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "descriptors": { "type": "array", "items": { "$ref": "#/$defs/toolDescriptor" } },
+    "request": { "$ref": "#/$defs/request" },
+    "event": { "$ref": "#/$defs/event" },
+    "compatibility": { "$ref": "#/$defs/compatibility" }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "version": { "type": "string", "pattern": "^[0-9]+(?:\\.[0-9]+){0,3}(?:[-+][A-Za-z0-9.-]+)?$" },
+    "metadata": { "type": "object", "additionalProperties": true, "maxProperties": 32 },
+    "capability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["capabilityId", "version", "limits"],
+      "properties": {
+        "capabilityId": { "type": "string", "minLength": 1, "maxLength": 96 },
+        "version": { "$ref": "#/$defs/version" },
+        "limits": { "$ref": "#/$defs/metadata" }
+      }
+    },
+    "format": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["formatId", "versions"],
+      "properties": {
+        "formatId": { "type": "string", "minLength": 1, "maxLength": 96 },
+        "versions": { "type": "array", "minItems": 1, "items": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:+-]{0,63}$" } },
+        "requiredAdapter": { "type": ["string", "null"], "maxLength": 96 },
+        "readOnly": { "type": "boolean" },
+        "copyRequired": { "type": "boolean" },
+        "reviewRequired": { "type": "boolean" }
+      }
+    },
+    "toolDescriptor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["toolId", "displayKind", "bridgeApiVersion", "toolVersion", "supportedProjectKinds", "supportedAssetKinds", "supportedImportFormats", "supportedExportFormats", "capabilities", "featureRequirements", "minimumCoreVersion", "maximumTestedCoreVersion", "availabilityState", "legacyAdapterIds"],
+      "properties": {
+        "toolId": { "$ref": "#/$defs/id" },
+        "displayKind": { "type": "string" },
+        "bridgeApiVersion": { "$ref": "#/$defs/version" },
+        "toolVersion": { "$ref": "#/$defs/version" },
+        "supportedProjectKinds": { "type": "array", "items": { "type": "string" } },
+        "supportedAssetKinds": { "type": "array", "items": { "type": "string" } },
+        "supportedImportFormats": { "type": "array", "items": { "$ref": "#/$defs/format" } },
+        "supportedExportFormats": { "type": "array", "items": { "$ref": "#/$defs/format" } },
+        "capabilities": { "type": "array", "items": { "$ref": "#/$defs/capability" } },
+        "featureRequirements": { "type": "array", "items": { "type": "string" } },
+        "minimumCoreVersion": { "$ref": "#/$defs/version" },
+        "maximumTestedCoreVersion": { "$ref": "#/$defs/version" },
+        "availabilityState": { "type": "string" },
+        "legacyAdapterIds": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "projectId": { "$ref": "#/$defs/id" },
+        "assetId": { "$ref": "#/$defs/id" },
+        "revisionId": { "$ref": "#/$defs/id" },
+        "contentHash": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+        "packageId": { "$ref": "#/$defs/id" },
+        "storageHandleRef": { "type": "string", "pattern": "^handle:[A-Za-z0-9._:-]{1,240}$" }
+      }
+    },
+    "authorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion", "proofType", "source", "decision", "authorityId", "proofId", "principalId",
+        "resourceType", "resourceId", "action", "capability", "tenantId", "correlationId", "policyVersion",
+        "grantId", "issuedAt", "expiresAt"
+      ],
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "proofType": { "const": "AUTHORIZATION_PROOF" },
+        "source": { "const": "server" },
+        "decision": { "enum": ["allow", "deny", "unknown"] },
+        "authorityId": { "$ref": "#/$defs/id" },
+        "proofId": { "$ref": "#/$defs/id" },
+        "principalId": { "anyOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] },
+        "resourceType": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "resourceId": { "$ref": "#/$defs/id" },
+        "action": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "capability": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "tenantId": { "anyOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] },
+        "correlationId": { "anyOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] },
+        "policyVersion": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "grantId": { "anyOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] },
+        "issuedAt": { "type": "string", "format": "date-time" },
+        "expiresAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requestId", "bridgeApiVersion", "toolId", "operation", "capabilityVersion", "correlationId", "idempotencyKey", "payloadMetadata", "authorization", "createdAt"],
+      "properties": {
+        "requestId": { "$ref": "#/$defs/id" },
+        "bridgeApiVersion": { "$ref": "#/$defs/version" },
+        "toolId": { "$ref": "#/$defs/id" },
+        "actorContextRef": { "type": ["string", "null"] },
+        "projectId": { "type": ["string", "null"] },
+        "assetRefs": { "type": "array", "items": { "$ref": "#/$defs/reference" } },
+        "operation": { "type": "string" },
+        "capabilityVersion": { "$ref": "#/$defs/version" },
+        "correlationId": { "$ref": "#/$defs/id" },
+        "causationId": { "type": ["string", "null"] },
+        "idempotencyKey": { "$ref": "#/$defs/id" },
+        "expectedVersion": { "type": ["integer", "null"], "minimum": 1 },
+        "payloadMetadata": { "$ref": "#/$defs/metadata" },
+        "authorization": { "$ref": "#/$defs/authorization" },
+        "createdAt": { "type": "string", "minLength": 1 }
+      }
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["eventId", "bridgeApiVersion", "originToolId", "eventType", "correlationId", "eventChainDepth", "causationChain", "visitedToolIds", "payloadMetadata"],
+      "properties": {
+        "eventId": { "$ref": "#/$defs/id" },
+        "bridgeApiVersion": { "$ref": "#/$defs/version" },
+        "originToolId": { "$ref": "#/$defs/id" },
+        "targetToolId": { "type": ["string", "null"] },
+        "eventType": { "type": "string" },
+        "projectId": { "type": ["string", "null"] },
+        "assetId": { "type": ["string", "null"] },
+        "revisionId": { "type": ["string", "null"] },
+        "correlationId": { "$ref": "#/$defs/id" },
+        "causationId": { "type": ["string", "null"] },
+        "eventChainDepth": { "type": "integer", "minimum": 0, "maximum": 16 },
+        "causationChain": { "type": "array", "items": { "$ref": "#/$defs/id" } },
+        "visitedToolIds": { "type": "array", "items": { "$ref": "#/$defs/id" } },
+        "payloadMetadata": { "$ref": "#/$defs/metadata" }
+      }
+    },
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "toolId", "toolVersion", "formatId", "formatVersion", "requiredAdapter", "unsupportedFeatures", "warnings", "dataLossRisk", "copyRequired"],
+      "properties": {
+        "state": { "type": "string" },
+        "toolId": { "$ref": "#/$defs/id" },
+        "toolVersion": { "$ref": "#/$defs/version" },
+        "formatId": { "type": "string" },
+        "formatVersion": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:+-]{0,63}$" },
+        "requiredAdapter": { "type": ["string", "null"] },
+        "unsupportedFeatures": { "type": "array", "items": { "type": "string" } },
+        "warnings": { "type": "array", "items": { "type": "string" } },
+        "dataLossRisk": { "type": "string" },
+        "copyRequired": { "type": "boolean" }
+      }
+    }
+  }
+}

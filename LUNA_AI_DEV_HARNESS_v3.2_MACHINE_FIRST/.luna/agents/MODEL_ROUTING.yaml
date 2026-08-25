@@ -1,0 +1,17 @@
+schema_version: 3.1
+principle: route_by_failure_cost_uncertainty_and_independence_not_task_size
+default_tier: economical_implementation
+escalate_any:
+  - high_impact_high_uncertainty
+  - repeated_substantive_failure_twice
+  - unclear_cross_system_boundary
+  - auth_or_payment_or_sensitive_data
+  - destructive_migration
+  - corruption_or_sync_divergence
+  - major_architecture_decision
+  - release_critical_independent_review
+rules:
+  - expensive_model_not_default
+  - different_model_or_agent_for_high_risk_independent_review
+  - deescalate_after_uncertainty_resolved
+  - batch_related_high_cost_reasoning_when_possible

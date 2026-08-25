@@ -1,0 +1,20 @@
+schema_version: 3.1
+roles:
+  orchestrator: {mode: plan_route_integrate, write: controlled}
+  blueprint_builder: {mode: product_system_design, write: state}
+  efficiency_governor: {mode: evidence_cost_routing, write: state}
+  context_builder: {mode: minimal_context_pack, write: state}
+  reference_scout: {mode: research, write: cache_only}
+  product_ux: {focus: [workflow, information_architecture, accessibility, conversion, consistency]}
+  runtime_architecture: {focus: [state, lifecycle, sync, concurrency, performance, boundaries]}
+  data: {focus: [schema, migration, consistency, recovery, rollback]}
+  security: {focus: [identity, authn, authz, secrets, trust_boundaries, privacy]}
+  commerce: {focus: [billing, ledger, entitlement, licensing, refund]}
+  harness_qa: {focus: [repro, regression, benchmark, invariant, evidence]}
+  experiment_evaluator: {focus: [compare, prototype, live_ab, metrics, guardrails]}
+  independent_reviewer: {mode: review_only, write: false}
+  release_guard: {mode: release_gate, write: state}
+  memory_gardener: {mode: dedupe_compact_state, write: state}
+parallelism:
+  allowed_when: independent_work_packages_and_nonoverlapping_write_sets
+  forbidden_when: same_files_or_shared_unstable_contract

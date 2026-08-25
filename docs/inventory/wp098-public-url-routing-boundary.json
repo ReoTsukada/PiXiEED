@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "work_package": "WP-098",
+  "status": "isolated",
+  "canonical_files": [
+    "02_ARCHITECTURE/COST_AWARE_REALTIME_POLICY.md",
+    "02_ARCHITECTURE/PUBLIC_URL_ROUTING_CORE.md",
+    "core-shell/assets/core-public-url-routing-contracts.js",
+    "core-shell/schemas/public-url-routing-v1.schema.json",
+    "core-shell/fixtures/public-url-routing-v1.valid.json"
+  ],
+  "current_route_snapshot": {
+    "source_inventory": "docs/inventory/route-inventory.json",
+    "route_count": 50,
+    "catalog_count": 58,
+    "sitemap_entries_are_not_route_authority": true,
+    "production_route_files_modified": false
+  },
+  "compatibility": {
+    "market_item_legacy_query": "/market/item.html?id=<uuid>",
+    "market_item_canonical": "/market/items/<uuid>/",
+    "pixfind_puzzle_legacy": "/pixfind/puzzles/<puzzle-id>/",
+    "pixfind_puzzle_canonical": "/pixfind/?puzzle=<puzzle-id>",
+    "redirect_default": "shadow",
+    "server_canonical_privacy_proof_required": true
+  },
+  "transport": {
+    "route_registry": "LOCAL_ONLY",
+    "metadata_and_resource_read": "ASYNC_ON_DEMAND",
+    "permanent_realtime_subscription": false,
+    "policy": "02_ARCHITECTURE/COST_AWARE_REALTIME_POLICY.md"
+  },
+  "preserved": ["current routes", "PiXiEEDraw", "PXD", "PiXiSYNC", "Market", "Projects", "Purchases", "Entitlements", "production Database/Storage"],
+  "excluded": ["production migration", "redirect cutover", "deploy", "publish", "commit", "push", "raw media", "JWT", "secret", "payment data"]
+}

@@ -1,0 +1,41 @@
+{
+  "fixture_id": "wp000-market-purchase",
+  "synthetic": true,
+  "private_data": false,
+  "purpose": "Source-only contract fixture for product, purchase, entitlement, and royalty assertions",
+  "ids": {
+    "asset_id": "00000000-0000-4000-8000-000000000001",
+    "purchase_id": "00000000-0000-4000-8000-000000000002",
+    "buyer_id": "00000000-0000-4000-8000-000000000003",
+    "creator_id": "00000000-0000-4000-8000-000000000004"
+  },
+  "asset": {
+    "table": "market_assets",
+    "status": "published",
+    "asset_type": "root",
+    "price_yen": 100,
+    "source_object_path": "synthetic/asset-0001/source.pxd",
+    "preview_object_path": "synthetic/asset-0001/preview.png",
+    "bucket": "market-private"
+  },
+  "purchase": {
+    "table": "market_purchases",
+    "status_sequence": ["pending", "paid", "delivered"],
+    "payment_provider": "synthetic",
+    "external_reference": "fixture-payment-0001"
+  },
+  "entitlement": {
+    "table": "user_entitlements",
+    "subject": "synthetic buyer receives the purchased asset license"
+  },
+  "royalty": {
+    "table": "market_royalty_ledger",
+    "amount_yen": 80,
+    "currency": "JPY"
+  },
+  "assertions": [
+    "A pending purchase is not an entitlement.",
+    "A paid purchase is reconciled by the current webhook/RPC contract before delivery.",
+    "Download access is represented by a signed URL boundary, not a public bucket object."
+  ]
+}

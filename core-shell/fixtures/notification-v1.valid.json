@@ -1,0 +1,61 @@
+{
+  "notification": {
+    "notificationId": "notification-project-invite-001",
+    "notificationVersion": 1,
+    "recipientType": "USER",
+    "recipientId": "user-invitee-001",
+    "notificationType": "PROJECT_INVITED",
+    "sourceEventId": "event-project-invite-001",
+    "sourceEventVersion": 1,
+    "actorReference": { "referenceType": "USER", "referenceId": "user-owner-001" },
+    "objectReference": { "referenceType": "PROJECT", "referenceId": "project-draw2-001" },
+    "projectReference": { "referenceType": "PROJECT", "referenceId": "project-draw2-001" },
+    "resourceReference": { "referenceType": "PROJECT", "referenceId": "project-draw2-001" },
+    "visibilityClass": "RECIPIENT_ONLY",
+    "priority": "HIGH",
+    "presentationKey": "notification.project.invited",
+    "presentationMetadata": { "locale": "ja-JP", "reasonCode": "PROJECT_INVITATION" },
+    "groupingKey": "group:project-invite-001",
+    "deduplicationKey": "notification:project-invite-001",
+    "deliveryPolicy": {
+      "inApp": true,
+      "webPush": false,
+      "mobilePush": false,
+      "email": false,
+      "digest": false,
+      "quietHours": false,
+      "rateLimited": false,
+      "mandatory": false,
+      "suppressedReason": null
+    },
+    "createdAt": "2026-08-07T00:00:00.000Z",
+    "readAt": null,
+    "archivedAt": null,
+    "schemaVersion": 1
+  },
+  "preferences": {
+    "category": "PROJECT",
+    "inAppEnabled": true,
+    "pushEnabled": false,
+    "emailEnabled": false,
+    "digestEnabled": false,
+    "mutedProjectIds": [],
+    "mutedResourceIds": [],
+    "mutedActorIds": [],
+    "quietHours": null,
+    "locale": "ja-JP",
+    "timezone": "Asia/Tokyo"
+  },
+  "deliveryAttempt": {
+    "deliveryAttemptId": "delivery-attempt-in-app-001",
+    "notificationId": "notification-project-invite-001",
+    "channel": "IN_APP",
+    "providerReference": null,
+    "state": "DELIVERED",
+    "attemptNumber": 1,
+    "retryable": false,
+    "diagnosticCode": null,
+    "createdAt": "2026-08-07T00:00:01.000Z",
+    "completedAt": "2026-08-07T00:00:01.000Z"
+  }
+}

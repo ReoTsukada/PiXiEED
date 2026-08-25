@@ -3570,7 +3570,8 @@ body[data-pixieed-page="pixfind"] .pixieed-common-tabbar {
 
 .puzzle-card__actions .button,
 .puzzle-card__play,
-.puzzle-card__share {
+.puzzle-card__share,
+.puzzle-card__like {
   width: 100%;
   min-width: 0;
   max-width: 100%;
@@ -3582,6 +3583,15 @@ body[data-pixieed-page="pixfind"] .pixieed-common-tabbar {
   line-height: 1;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.puzzle-card__actions.has-like {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.puzzle-card__like[aria-pressed="true"],
+.pixfind-like-button[aria-pressed="true"] {
+  color: #ff4f7b;
 }
 
 .puzzle-list-ad {

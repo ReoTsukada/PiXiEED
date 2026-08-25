@@ -1,0 +1,169 @@
+{
+  "evidenceVersion": "QUALIFICATION_COMMAND_TRANSCRIPT_V1",
+  "manifestPath": "docs/inventory/draw-120-command-manifest.json",
+  "commands": [
+    {
+      "id": "DRAW120-FORMAT",
+      "acceptanceIds": [
+        "DRAW120-SCOPE-001",
+        "DRAW120-WORKSPACE-001",
+        "DRAW120-EVIDENCE-001",
+        "DRAW120-STOP-001"
+      ],
+      "argv": [
+        "deno",
+        "fmt",
+        "--check",
+        "pixiedraw2/src/draw2/draw-120",
+        "pixiedraw2/tests/draw-120",
+        "pixiedraw2/benchmarks/draw-120"
+      ],
+      "display": "\"deno\" \"fmt\" \"--check\" \"pixiedraw2/src/draw2/draw-120\" \"pixiedraw2/tests/draw-120\" \"pixiedraw2/benchmarks/draw-120\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 18,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "f1ceb13c7c95afab86ef305e6680ede5175e5cebb631874e9595f77b66cca5ca"
+    },
+    {
+      "id": "DRAW120-TYPECHECK",
+      "acceptanceIds": [
+        "DRAW120-SCOPE-001",
+        "DRAW120-WORKSPACE-001"
+      ],
+      "argv": [
+        "deno",
+        "check",
+        "pixiedraw2/src/draw2/draw-120/selection-transform.ts",
+        "pixiedraw2/tests/draw-120/selection-transform.test.ts",
+        "pixiedraw2/benchmarks/draw-120/generate-evidence.ts"
+      ],
+      "display": "\"deno\" \"check\" \"pixiedraw2/src/draw2/draw-120/selection-transform.ts\" \"pixiedraw2/tests/draw-120/selection-transform.test.ts\" \"pixiedraw2/benchmarks/draw-120/generate-evidence.ts\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 323,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "88bcb2b8bb6c0150dcc5f1683371c6be9884c053cdff137bc26163964c49ba27"
+    },
+    {
+      "id": "DRAW120-TEST",
+      "acceptanceIds": [
+        "DRAW120-SCOPE-001",
+        "DRAW120-WORKSPACE-001",
+        "DRAW120-STOP-001"
+      ],
+      "argv": [
+        "deno",
+        "test",
+        "--no-remote",
+        "--allow-read",
+        "--allow-write",
+        "--check",
+        "pixiedraw2/tests/draw-120"
+      ],
+      "display": "\"deno\" \"test\" \"--no-remote\" \"--allow-read\" \"--allow-write\" \"--check\" \"pixiedraw2/tests/draw-120\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 585,
+      "stdoutSha256": "f19c2306f30c3f54e4f9e740c8e440f624f85ea04a1a2515a3cb8885f468d7e7",
+      "stderrSha256": "f257bdfa12932a9eefe437cca54e1d118f87eaf9f2129d9e5af031d30459d39f"
+    },
+    {
+      "id": "DRAW120-CONTEXT",
+      "acceptanceIds": [
+        "DRAW120-SCOPE-001",
+        "DRAW120-EVIDENCE-001",
+        "DRAW120-STOP-001"
+      ],
+      "argv": [
+        "python3",
+        "scripts/verify_work_package_context.py",
+        "--context",
+        ".codex/context/DRAW-120.md",
+        "--root",
+        "."
+      ],
+      "display": "\"python3\" \"scripts/verify_work_package_context.py\" \"--context\" \".codex/context/DRAW-120.md\" \"--root\" \".\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 74,
+      "stdoutSha256": "f6760a3edab4cb560082077bbdfda4803be8e74a1a45e7d835d50a6ff40085e2",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "BASELINE-IDENTITY",
+      "acceptanceIds": [
+        "DRAW120-STOP-001"
+      ],
+      "argv": [
+        "node",
+        "scripts/test-baseline-failure-identity-wp080.mjs"
+      ],
+      "display": "\"node\" \"scripts/test-baseline-failure-identity-wp080.mjs\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 379,
+      "stdoutSha256": "3839ae5f3ddbd8ba0b5810b84f15724743bd2ccdbb8f7d34e324917ef852a0d8",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "BASELINE-SUITE",
+      "acceptanceIds": [
+        "DRAW120-STOP-001"
+      ],
+      "argv": [
+        "node",
+        "scripts/test-baseline-suite-wp000.mjs"
+      ],
+      "display": "\"node\" \"scripts/test-baseline-suite-wp000.mjs\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 8443,
+      "stdoutSha256": "292468716edc77223d809bdd49dfff858c85fff2716dd819e253c2c42ef6c68d",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "DRAW120-BENCHMARK-EVIDENCE",
+      "acceptanceIds": [
+        "DRAW120-SCOPE-001",
+        "DRAW120-WORKSPACE-001",
+        "DRAW120-EVIDENCE-001"
+      ],
+      "argv": [
+        "deno",
+        "run",
+        "--no-remote",
+        "--allow-read",
+        "--allow-write",
+        "pixiedraw2/benchmarks/draw-120/generate-evidence.ts"
+      ],
+      "display": "\"deno\" \"run\" \"--no-remote\" \"--allow-read\" \"--allow-write\" \"pixiedraw2/benchmarks/draw-120/generate-evidence.ts\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 249,
+      "stdoutSha256": "a87fe6db459829bab73af27b76d127559333230ebd0a41e4ea9cdac446bec3bf",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "DRAW120-DIFF-CHECK",
+      "acceptanceIds": [
+        "DRAW120-SCOPE-001",
+        "DRAW120-WORKSPACE-001",
+        "DRAW120-EVIDENCE-001",
+        "DRAW120-STOP-001"
+      ],
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "display": "\"git\" \"diff\" \"--check\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 28,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "transcriptSha256": "7984abb8b5e37339349b8dc7e1e5ebbaf3c6d61d8a266b778dca10e11f4f4d67"
+}

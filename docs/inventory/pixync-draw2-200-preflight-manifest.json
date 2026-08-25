@@ -1,0 +1,332 @@
+{
+  "schemaVersion": "AGENT_PACKAGE_PREFLIGHT_MANIFEST_V1",
+  "packageId": "PIXYNC-DRAW2-200",
+  "classification": "FIXED_SYNTHETIC",
+  "network": false,
+  "productionAccess": false,
+  "realData": false,
+  "staticOnly": true,
+  "executionPolicy": {
+    "mode": "BALANCED",
+    "contract": "required-before-implementation",
+    "changeBudget": {
+      "maxChangedLines": 500,
+      "maxFiles": 4,
+      "maxRetries": 2,
+      "maxFullAudits": 1,
+      "maxFullEvidenceRuns": 1
+    },
+    "testTiers": { "specialistMax": 1, "integratorMax": 2, "finalMax": 4 },
+    "maxAffectedDiffReviews": 1,
+    "maxReleaseGateFullAudits": 1,
+    "maxFullEvidenceRuns": 1,
+    "evidenceRuns": 1,
+    "terraMode": "READ_ONLY_FINAL",
+    "specialistPolicy": "DISJOINT_ONLY",
+    "integratorTier": 2,
+    "sameCategoryEscalation": "SOL"
+  },
+  "requiredRiskClasses": ["authority", "security", "privacy", "lifecycle"],
+  "publicEntrypoints": ["pixiedraw2/src/pixync/index.ts"],
+  "internalEntrypoints": [
+    "pixiedraw2/src/pixync/transport.ts",
+    "pixiedraw2/src/pixync/durable-transport.ts"
+  ],
+  "serverOnlyCompositionRoots": ["pixiedraw2/src/pixync/composition-root.ts"],
+  "forbiddenPublicExports": [
+    "PixyncTransportAdapter",
+    "PixyncTransportProvider",
+    "PixyncTransportProviderConnection",
+    "PixyncTransportProviderOpenInput",
+    "PixyncTransportProviderOpenResult",
+    "PixyncProductionTransport",
+    "createSupabasePixyncTransport",
+    "resolveProductionTransport",
+    "PixyncDurableTransportCoordinator",
+    "createPixyncDurableTransport"
+  ],
+  "forbiddenPublicConstructors": [
+    "PixyncTransportAdapter",
+    "PixyncTransportProvider",
+    "PixyncTransportProviderConnection",
+    "PixyncTransportProviderOpenInput",
+    "PixyncTransportProviderOpenResult",
+    "PixyncProductionTransport",
+    "SupabasePixyncTransport",
+    "PixyncDurableTransportCoordinator"
+  ],
+  "forbiddenPublicFactories": [
+    "createSupabasePixyncTransport",
+    "createProductionPixyncTransport",
+    "createPixyncDurableTransport"
+  ],
+  "resolverBindings": [{
+    "name": "draw2-200-durable-project-identity",
+    "requested": {
+      "id": "project-a",
+      "type": "PIXYNC_PROJECT",
+      "tenant": "local",
+      "version": "1",
+      "cardType": "DRAW2"
+    },
+    "returned": {
+      "id": "project-b",
+      "type": "PIXYNC_PROJECT",
+      "tenant": "other",
+      "version": "2",
+      "cardType": "GAME"
+    },
+    "expectedOutcome": "REJECT",
+    "reasonCode": "CANONICAL_IDENTITY_MISMATCH"
+  }],
+  "eventBindings": [{
+    "name": "draw2-200-durable-operation-identity",
+    "lookup": {
+      "eventId": "operation-a",
+      "payloadHash": "hash-a",
+      "aggregate": "draw",
+      "version": 1
+    },
+    "resolved": {
+      "eventId": "operation-b",
+      "payloadHash": "hash-b",
+      "aggregate": "game",
+      "version": 2
+    },
+    "expectedOutcome": "REJECT",
+    "reasonCode": "CANONICAL_EVENT_ID_REQUIRED"
+  }],
+  "boundaryMatrix": [
+    {
+      "id": "AUTHORITY-ROOT-001",
+      "riskClass": "authority",
+      "boundary": "durable coordinator provider and public export ownership",
+      "expectedOutcome": "REJECT",
+      "reasonCode": "CALLER_INJECTION_REJECTED"
+    },
+    {
+      "id": "RESOLVER-IDENTITY-001",
+      "riskClass": "security",
+      "boundary": "project, client, actor, and committed identity substitution",
+      "expectedOutcome": "REJECT",
+      "reasonCode": "CANONICAL_IDENTITY_MISMATCH"
+    },
+    {
+      "id": "CALLER-STATE-001",
+      "riskClass": "privacy",
+      "boundary": "local draft, aggregate, or snapshot state replacing authoritative ACK",
+      "expectedOutcome": "REJECT",
+      "reasonCode": "CALLER_STATE_NOT_AUTHORITY"
+    },
+    {
+      "id": "EVENT-ID-001",
+      "riskClass": "lifecycle",
+      "boundary": "direct Event object or non-canonical ACK operation substitution",
+      "expectedOutcome": "REJECT",
+      "reasonCode": "CANONICAL_EVENT_ID_REQUIRED"
+    },
+    {
+      "id": "REPLAY-REVOKE-001",
+      "riskClass": "lifecycle",
+      "boundary": "stale lease, retry, restart, and session callback reuse",
+      "expectedOutcome": "REJECT",
+      "reasonCode": "LIFECYCLE_TRANSITION_NOT_AUTHORIZED"
+    }
+  ],
+  "boundaryProbes": [
+    {
+      "id": "AUTHORITY-ROOT-001",
+      "expectedOutcome": "REJECT",
+      "expectedReasonCode": "CALLER_INJECTION_REJECTED",
+      "input": {
+        "publicExportSource": "server",
+        "authoritySource": "server",
+        "resolverSource": "server",
+        "factorySource": "caller"
+      }
+    },
+    {
+      "id": "RESOLVER-IDENTITY-001",
+      "expectedOutcome": "REJECT",
+      "expectedReasonCode": "CANONICAL_IDENTITY_MISMATCH",
+      "input": {
+        "lookupId": "project-a",
+        "returnedId": "project-b",
+        "lookupType": "project",
+        "returnedType": "project",
+        "lookupTenant": "local",
+        "returnedTenant": "other",
+        "lookupVersion": "1",
+        "returnedVersion": "2",
+        "lookupRevision": 1,
+        "returnedRevision": 1,
+        "lookupContent": "hash-a",
+        "returnedContent": "hash-a"
+      }
+    },
+    {
+      "id": "CALLER-STATE-001",
+      "expectedOutcome": "REJECT",
+      "expectedReasonCode": "CALLER_STATE_NOT_AUTHORITY",
+      "input": {
+        "stateSource": "caller",
+        "canonicalVisibility": "local",
+        "callerVisibility": "remote",
+        "canonicalLifecycle": "active",
+        "callerLifecycle": "active",
+        "canonicalModeration": "clear",
+        "callerModeration": "clear",
+        "canonicalMembership": "owner",
+        "callerMembership": "owner",
+        "canonicalLocked": false,
+        "callerLocked": false
+      }
+    },
+    {
+      "id": "EVENT-ID-001",
+      "expectedOutcome": "REJECT",
+      "expectedReasonCode": "CANONICAL_EVENT_ID_REQUIRED",
+      "input": {
+        "eventSource": "direct Event object",
+        "lookupEventId": "operation-a",
+        "returnedEventId": "operation-b"
+      }
+    },
+    {
+      "id": "REPLAY-REVOKE-001",
+      "expectedOutcome": "REJECT",
+      "expectedReasonCode": "LIFECYCLE_TRANSITION_NOT_AUTHORIZED",
+      "input": {
+        "transitionSource": "caller",
+        "operation": "close",
+        "replayed": true,
+        "stale": true,
+        "serverEventId": 200,
+        "authorizationSource": "caller"
+      }
+    }
+  ],
+  "terraReviewChecklist": [
+    "public index exposes no transport or durable coordinator constructor",
+    "durable coordinator has no caller-replaceable provider authority",
+    "authoritative ACK envelope is persisted byte-for-byte as the committed vault entry",
+    "draft fingerprint, operation, project, client, actor, payload, and revision identities are rechecked",
+    "remote tail is persisted before OrderKeeper apply",
+    "lease fencing, duplicate, gap, retry, and restart recovery remain idempotent",
+    "direct Event object substitution is rejected",
+    "restored OrderKeeper starts from canonical committed receipts and does not reapply completed operations",
+    "Supabase, Realtime, network, product entry, and migration files remain untouched"
+  ],
+  "terminology": {
+    "preferred": [
+      "boundary validation",
+      "invalid-input rejection",
+      "substituted input"
+    ],
+    "forbidden": ["attack", "attacker", "forged"]
+  },
+  "designGate": {
+    "status": "DURABLE_TRANSPORT_DESIGN_GATE_READY_FOR_TERRA",
+    "rootCause": "190 validates a provider ACK but 120 still reconstructs a committed envelope from local state and a revision, so the durable transport coordinator must bind and persist the authoritative ACK before ordered application",
+    "structuralCorrection": "keep durable transport internal, add an authoritative ACK journal API, restore OrderKeeper from canonical committed receipts, and sequence enqueue before submit and inbox persistence before apply",
+    "releaseCondition": "Terra read-only semantic review followed by provider qualification",
+    "currentDecision": "SYNTHETIC_DURABLE_TRANSPORT_ONLY",
+    "history": [
+      {
+        "status": "READY",
+        "reason": "190 provider-neutral transport boundary is internal and 120 durable journal is transport-free",
+        "resolvedBy": "PIXYNC-DRAW2-200 scoped coordinator"
+      }
+    ]
+  },
+  "invalidInputCases": [
+    {
+      "id": "AUTHORITY-ROOT-001",
+      "riskClass": "authority",
+      "expectedOutcome": "REJECT",
+      "reasonCode": "CALLER_INJECTION_REJECTED"
+    },
+    {
+      "id": "RESOLVER-IDENTITY-001",
+      "riskClass": "security",
+      "expectedOutcome": "REJECT",
+      "reasonCode": "CANONICAL_IDENTITY_MISMATCH"
+    },
+    {
+      "id": "CALLER-STATE-001",
+      "riskClass": "privacy",
+      "expectedOutcome": "REJECT",
+      "reasonCode": "CALLER_STATE_NOT_AUTHORITY"
+    },
+    {
+      "id": "EVENT-ID-001",
+      "riskClass": "lifecycle",
+      "expectedOutcome": "REJECT",
+      "reasonCode": "CANONICAL_EVENT_ID_REQUIRED"
+    },
+    {
+      "id": "REPLAY-REVOKE-001",
+      "riskClass": "lifecycle",
+      "expectedOutcome": "REJECT",
+      "reasonCode": "LIFECYCLE_TRANSITION_NOT_AUTHORIZED"
+    }
+  ],
+  "expectedReasonCodes": [
+    "CALLER_INJECTION_REJECTED",
+    "CANONICAL_IDENTITY_MISMATCH",
+    "CALLER_STATE_NOT_AUTHORITY",
+    "CANONICAL_EVENT_ID_REQUIRED",
+    "LIFECYCLE_TRANSITION_NOT_AUTHORIZED"
+  ],
+  "invalidInputTest": {
+    "mode": "STATIC_MANIFEST_AND_RESULT_ARTIFACT",
+    "testSource": "pixiedraw2/tests/pixync/pixync-draw2-200-durable-transport.test.ts",
+    "resultArtifact": "docs/inventory/pixync-draw2-200-preflight-result.json"
+  },
+  "evidencePath": "docs/inventory/pixync-draw2-200-preflight-evidence.json",
+  "checkpointPath": "docs/inventory/pixync-draw2-200-preflight-checkpoint.json",
+  "evidenceSeparation": {
+    "schemaStatus": "PASS",
+    "semanticAcceptanceStatus": "PENDING",
+    "independentReviewer": "Terra High",
+    "lunaSelfApproval": false
+  },
+  "harnessRegistryPath": "docs/inventory/harness-registry.json",
+  "harnessId": "core-security-boundary-validation",
+  "legacyHarnessAlias": "core-security-attack",
+  "fixRound": {
+    "currentRound": 1,
+    "max_fix_rounds": 2,
+    "timebox_minutes": 20,
+    "checkpoint_every_minutes": 10,
+    "sameClassFinding": {
+      "class": "authoritative-ack-durable-binding",
+      "occurrence": 1,
+      "decision": "CONTINUE"
+    }
+  },
+  "forbiddenOperations": [
+    "network",
+    "production",
+    "real-data",
+    "real-account",
+    "real-user-data",
+    "production-db",
+    "production-storage",
+    "provider-write",
+    "secrets",
+    "ad-hoc-eval",
+    "deploy",
+    "publish",
+    "commit",
+    "push",
+    "migrate",
+    "route-cutover",
+    "cutover",
+    "real-payment",
+    "real-payout",
+    "store-submit",
+    "production-signing",
+    "auto-start-next-package"
+  ]
+}

@@ -1,0 +1,69 @@
+{
+  "asset": {
+    "assetId": "asset-character-1",
+    "assetKind": "RASTER_IMAGE",
+    "ownerType": "USER",
+    "ownerId": "user-owner-1",
+    "sourceProjectId": "project-demo-1",
+    "createdBy": "user-owner-1",
+    "visibility": "PRIVATE",
+    "lifecycleState": "ACTIVE",
+    "headRevisionId": "revision-character-1",
+    "provenance": {
+      "kind": "ORIGINAL",
+      "sourceAssetId": null,
+      "sourceRevisionId": null,
+      "sourceProjectId": null,
+      "sourceSystemId": null
+    },
+    "legacyBindings": [],
+    "metadata": {
+      "description": "Synthetic Asset Registry fixture",
+      "tags": ["fixture", "draw2"],
+      "custom": { "palette": "demo" },
+      "locale": "ja-JP"
+    },
+    "schemaVersion": 1,
+    "recordVersion": 2,
+    "createdAt": "2026-08-07T00:00:00.000Z",
+    "updatedAt": "2026-08-07T00:00:01.000Z"
+  },
+  "revision": {
+    "revisionId": "revision-character-1",
+    "assetId": "asset-character-1",
+    "parentRevisionId": null,
+    "contentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "contentType": "image/png",
+    "byteLength": 128,
+    "storageLocator": {
+      "provider": "object-storage",
+      "bucket": "synthetic-assets",
+      "objectKey": "sha256/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "toolId": "pixiedraw2",
+    "formatId": "png",
+    "formatVersion": "1",
+    "dependencySnapshotId": null,
+    "createdBy": "user-owner-1",
+    "createdAt": "2026-08-07T00:00:01.000Z",
+    "verificationState": "VERIFIED",
+    "recordVersion": 1,
+    "immutable": true
+  },
+  "dependency": {
+    "edgeId": "edge-game-character-1",
+    "consumerAssetId": "asset-game-scene-1",
+    "providerAssetId": "asset-character-1",
+    "providerRevisionId": null,
+    "resolvedRevisionId": "revision-character-1",
+    "candidateRevisionId": null,
+    "derivedAssetId": null,
+    "relationType": "DEPENDS_ON",
+    "referencePolicy": "LIVE",
+    "required": true,
+    "compatibilityConstraint": { "toolIds": ["pixigame"], "assetKinds": ["RASTER_IMAGE"] },
+    "recordVersion": 1,
+    "createdAt": "2026-08-07T00:00:02.000Z",
+    "updatedAt": "2026-08-07T00:00:02.000Z"
+  }
+}

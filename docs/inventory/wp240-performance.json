@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "workPackage": "WP-240",
+  "status": "MEASURED_LOCAL_ISOLATED_BUNDLE",
+  "measurementDefinition": {"sourceMaps": "excluded", "initialRequests": ["pixiedraw2/assets/draw2-shell.css", "pixiedraw2/dist/draw2-entry.js"], "wp240OnDemandLazyRequests": ["pixiedraw2/dist/wp240-admin-analytics-ads-core.js"]},
+  "bundles": {"initialEditor": {"raw": 158807, "minified": 90968, "gzip": 31916, "brotli": 26521}, "wp240Lazy": {"raw": 10369, "minified": 6645, "gzip": 3113, "brotli": 2594, "minifiedGzip": 2671, "minifiedBrotli": 2230, "sha256": "83987ba1da7df07730e43a56e9cef38b0bb01c673ae28d74275d8bca70a28d0d"}},
+  "boundaries": {"outsideInitial": "PASS_STATIC_BOUNDARY", "outsideRuntime": "PASS_STATIC_BOUNDARY", "currentRoutesAndData": "OUT_OF_SCOPE_AND_UNTOUCHED"},
+  "baselineFailureIdentity": {"existing": 14, "new": 0},
+  "untested": ["real Admin RLS/RPC", "real Analytics pipeline", "ad provider delivery", "moderation console", "financial reconciliation", "browser/device performance", "production performance"]
+}

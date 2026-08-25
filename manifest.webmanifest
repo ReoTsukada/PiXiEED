@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "PiXiEED",
-  "short_name": "PiXiEED",
-  "description": "PiXiEED official tools and games for pixel art.",
+  "name": "PiXiEEDstudio",
+  "short_name": "PiXiEEDstudio",
+  "description": "iDRAW、iAUDIO、iGAMEをひとつの作品で使えるPiXiEEDの制作ワークスペース。",
   "lang": "ja",
   "start_url": "/",
   "scope": "/",

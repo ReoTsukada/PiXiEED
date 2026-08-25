@@ -1,0 +1,291 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pixieed.invalid/schema/package-registry-v1.json",
+  "title": "PiXiEED Package Registry v1",
+  "oneOf": [
+    { "$ref": "#/$defs/command" },
+    { "$ref": "#/$defs/packageRecord" },
+    { "$ref": "#/$defs/manifest" }
+  ],
+  "$defs": {
+    "typedId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "packageVersion": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:+-]{0,63}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "packageKind": {
+      "enum": [
+        "PROJECT_PACKAGE",
+        "MATERIAL_PACKAGE",
+        "FINISHED_PRODUCT_PACKAGE",
+        "GAME_PACKAGE",
+        "AUDIO_PACKAGE",
+        "DRAW_PACKAGE",
+        "BACKUP_PACKAGE",
+        "EXPORT_PACKAGE",
+        "TEMPLATE_PACKAGE"
+      ]
+    },
+    "materializationMode": {
+      "enum": ["THIN", "PORTABLE"]
+    },
+    "lifecycleState": {
+      "enum": ["BUILDING", "VERIFYING", "READY", "FAILED", "QUARANTINED", "ARCHIVED"]
+    },
+    "ownerType": {
+      "enum": ["USER", "TEAM"]
+    },
+    "referencePolicy": {
+      "enum": ["LIVE", "PINNED", "REVIEW", "FORKED"]
+    },
+    "storageLocator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "bucket", "objectKey"],
+      "properties": {
+        "provider": { "enum": ["object-storage", "opfs"] },
+        "bucket": { "type": ["string", "null"], "maxLength": 128 },
+        "objectKey": { "type": "string", "minLength": 1, "maxLength": 512, "pattern": "^(?!/)(?!.*\\.\\.)[^\\u0000-\\u001f\\u007f]+$" }
+      }
+    },
+    "reference": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "licenseId": { "$ref": "#/$defs/typedId" },
+        "provenanceId": { "$ref": "#/$defs/typedId" },
+        "projectId": { "$ref": "#/$defs/typedId" },
+        "assetId": { "$ref": "#/$defs/typedId" },
+        "revisionId": { "$ref": "#/$defs/typedId" },
+        "packageId": { "$ref": "#/$defs/typedId" },
+        "packageVersion": { "$ref": "#/$defs/packageVersion" },
+        "contentHash": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "assetEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assetId", "revisionId", "assetKind", "contentHash", "contentType", "byteLength",
+        "toolId", "formatId", "formatVersion", "storageHandleRef", "required", "sourcePolicy",
+        "lockPolicy", "portableAllowed", "sandboxRequired", "deduplicated"
+      ],
+      "properties": {
+        "assetId": { "$ref": "#/$defs/typedId" },
+        "revisionId": { "$ref": "#/$defs/typedId" },
+        "assetKind": { "type": "string", "minLength": 1, "maxLength": 96 },
+        "contentHash": { "$ref": "#/$defs/sha256" },
+        "contentType": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "byteLength": { "type": "integer", "minimum": 0 },
+        "toolId": { "type": "string", "minLength": 1, "maxLength": 96 },
+        "formatId": { "type": "string", "minLength": 1, "maxLength": 96 },
+        "formatVersion": { "$ref": "#/$defs/packageVersion" },
+        "storageHandleRef": { "type": "string", "pattern": "^handle:[A-Za-z0-9._:-]{1,240}$" },
+        "required": { "type": "boolean" },
+        "sourcePolicy": { "$ref": "#/$defs/referencePolicy" },
+        "lockPolicy": { "const": "PINNED" },
+        "portableAllowed": { "type": "boolean" },
+        "sandboxRequired": { "type": "boolean" },
+        "deduplicated": { "type": "boolean" },
+        "assetState": { "enum": ["ACTIVE", "ARCHIVED", "TRASHED", "QUARANTINED"] },
+        "assetAccess": { "type": "boolean" }
+      }
+    },
+    "graphEdge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["edgeId", "consumerAssetId", "providerAssetId", "providerRevisionId", "relationType", "referencePolicy", "required", "compatibilityConstraint", "lockPolicy"],
+      "properties": {
+        "edgeId": { "$ref": "#/$defs/typedId" },
+        "consumerAssetId": { "$ref": "#/$defs/typedId" },
+        "providerAssetId": { "$ref": "#/$defs/typedId" },
+        "providerRevisionId": { "$ref": "#/$defs/typedId" },
+        "relationType": { "type": "string", "minLength": 1, "maxLength": 96 },
+        "referencePolicy": { "$ref": "#/$defs/referencePolicy" },
+        "required": { "type": "boolean" },
+        "compatibilityConstraint": { "type": "object" },
+        "lockPolicy": { "type": ["string", "null"], "enum": ["PINNED", null] }
+      }
+    },
+    "packageDependency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["packageId", "packageVersion", "contentHash", "required", "accessGranted", "dependencies"],
+      "properties": {
+        "packageId": { "$ref": "#/$defs/typedId" },
+        "packageVersion": { "$ref": "#/$defs/packageVersion" },
+        "contentHash": { "type": ["string", "null"], "pattern": "^[a-fA-F0-9]{64}$" },
+        "required": { "type": "boolean" },
+        "accessGranted": { "type": "boolean" },
+        "dependencies": { "type": "array", "maxItems": 64, "items": { "$ref": "#/$defs/packageDependency" } }
+      }
+    },
+    "dependencyLockEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assetId", "revisionId", "contentHash", "byteLength", "required", "sourcePolicy", "lockPolicy", "compatibility"],
+      "properties": {
+        "assetId": { "$ref": "#/$defs/typedId" },
+        "revisionId": { "$ref": "#/$defs/typedId" },
+        "contentHash": { "$ref": "#/$defs/sha256" },
+        "byteLength": { "type": "integer", "minimum": 0 },
+        "required": { "const": true },
+        "sourcePolicy": { "$ref": "#/$defs/referencePolicy" },
+        "lockPolicy": { "const": "PINNED" },
+        "compatibility": { "type": "object" }
+      }
+    },
+    "dependencyGraphSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["projectId", "rootAssetId", "edges"],
+      "properties": {
+        "projectId": { "$ref": "#/$defs/typedId" },
+        "rootAssetId": { "$ref": "#/$defs/typedId" },
+        "edges": { "type": "array", "maxItems": 2048, "items": { "$ref": "#/$defs/graphEdge" } }
+      }
+    },
+    "manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "packageId", "packageVersion", "schemaVersion", "manifestVersion", "packageKind", "materializationMode",
+        "sourceProjectId", "rootAssetId", "toolReferences", "includedAssetRevisions", "dependencyGraphSnapshot",
+        "dependencyLock", "requiredPackageDependencies", "optionalDependencies", "compatibility", "hash", "size",
+        "licenseReference", "provenanceReference", "createdAt", "security", "streaming"
+      ],
+      "properties": {
+        "packageId": { "$ref": "#/$defs/typedId" },
+        "packageVersion": { "$ref": "#/$defs/packageVersion" },
+        "schemaVersion": { "const": 1 },
+        "manifestVersion": { "$ref": "#/$defs/packageVersion" },
+        "packageKind": { "$ref": "#/$defs/packageKind" },
+        "materializationMode": { "$ref": "#/$defs/materializationMode" },
+        "sourceProjectId": { "$ref": "#/$defs/typedId" },
+        "rootAssetId": { "$ref": "#/$defs/typedId" },
+        "toolReferences": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 160 } },
+        "includedAssetRevisions": { "type": "array", "maxItems": 1024, "items": { "$ref": "#/$defs/assetEntry" } },
+        "dependencyGraphSnapshot": { "$ref": "#/$defs/dependencyGraphSnapshot" },
+        "dependencyLock": { "type": "array", "maxItems": 1024, "items": { "$ref": "#/$defs/dependencyLockEntry" } },
+        "requiredPackageDependencies": { "type": "array", "items": { "$ref": "#/$defs/packageDependency" } },
+        "optionalDependencies": { "type": "array", "items": { "type": "object" } },
+        "compatibility": { "type": "object" },
+        "hash": { "$ref": "#/$defs/sha256" },
+        "size": { "type": "integer", "minimum": 0 },
+        "licenseReference": { "anyOf": [{ "$ref": "#/$defs/reference" }, { "type": "null" }] },
+        "provenanceReference": { "anyOf": [{ "$ref": "#/$defs/reference" }, { "type": "null" }] },
+        "createdAt": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "security": { "type": "object" },
+        "streaming": { "type": "object" }
+      }
+    },
+    "authorizationProof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion", "proofType", "source", "decision", "authorityId", "proofId", "principalId",
+        "resourceType", "resourceId", "action", "capability", "tenantId", "correlationId", "policyVersion",
+        "grantId", "issuedAt", "expiresAt"
+      ],
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "proofType": { "const": "AUTHORIZATION_PROOF" },
+        "source": { "const": "server" },
+        "decision": { "enum": ["allow", "deny", "unknown"] },
+        "authorityId": { "$ref": "#/$defs/typedId" },
+        "proofId": { "$ref": "#/$defs/typedId" },
+        "principalId": { "anyOf": [{ "$ref": "#/$defs/typedId" }, { "type": "null" }] },
+        "resourceType": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "resourceId": { "$ref": "#/$defs/typedId" },
+        "action": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "capability": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "tenantId": { "anyOf": [{ "$ref": "#/$defs/typedId" }, { "type": "null" }] },
+        "correlationId": { "anyOf": [{ "$ref": "#/$defs/typedId" }, { "type": "null" }] },
+        "policyVersion": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "grantId": { "anyOf": [{ "$ref": "#/$defs/typedId" }, { "type": "null" }] },
+        "issuedAt": { "type": "string", "format": "date-time" },
+        "expiresAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "permissionDecision": { "$ref": "#/$defs/authorizationProof" },
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "packageId", "packageKind", "packageVersion", "schemaVersion", "ownerType", "ownerId", "sourceProjectId",
+        "rootAssetId", "manifestVersion", "materializationMode", "actorId", "correlationId", "idempotencyKey",
+        "createdAt", "compatibility", "metadata", "dependencySnapshot", "packageDependencies", "legacyPxd", "permissionDecision"
+      ],
+      "properties": {
+        "packageId": { "$ref": "#/$defs/typedId" },
+        "packageKind": { "$ref": "#/$defs/packageKind" },
+        "packageVersion": { "$ref": "#/$defs/packageVersion" },
+        "schemaVersion": { "const": 1 },
+        "ownerType": { "$ref": "#/$defs/ownerType" },
+        "ownerId": { "$ref": "#/$defs/typedId" },
+        "sourceProjectId": { "$ref": "#/$defs/typedId" },
+        "rootAssetId": { "$ref": "#/$defs/typedId" },
+        "manifestVersion": { "$ref": "#/$defs/packageVersion" },
+        "materializationMode": { "$ref": "#/$defs/materializationMode" },
+        "actorId": { "$ref": "#/$defs/typedId" },
+        "correlationId": { "$ref": "#/$defs/typedId" },
+        "idempotencyKey": { "$ref": "#/$defs/typedId" },
+        "expectedRecordVersion": { "type": ["integer", "null"], "minimum": 1 },
+        "createdAt": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "expectedContentHash": { "anyOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
+        "expectedManifestHash": { "anyOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
+        "compatibility": { "type": "object" },
+        "licenseReference": { "anyOf": [{ "$ref": "#/$defs/reference" }, { "type": "null" }] },
+        "provenanceReference": { "anyOf": [{ "$ref": "#/$defs/reference" }, { "type": "null" }] },
+        "metadata": { "type": "object" },
+        "dependencySnapshot": { "type": "object" },
+        "packageDependencies": { "type": "array", "items": { "$ref": "#/$defs/packageDependency" } },
+        "legacyPxd": { "type": "boolean" },
+        "permissionDecision": { "$ref": "#/$defs/permissionDecision" }
+      }
+    },
+    "packageRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "packageId", "packageKind", "packageVersion", "schemaVersion", "ownerType", "ownerId", "sourceProjectId",
+        "rootAssetId", "manifestVersion", "lifecycleState", "createdBy", "createdAt", "contentHash", "byteLength",
+        "storageLocator", "dependencySnapshotHash", "recordVersion", "materializationMode", "manifestHash", "manifest",
+        "compatibility", "licenseReference", "provenanceReference"
+      ],
+      "properties": {
+        "packageId": { "$ref": "#/$defs/typedId" },
+        "packageKind": { "$ref": "#/$defs/packageKind" },
+        "packageVersion": { "$ref": "#/$defs/packageVersion" },
+        "schemaVersion": { "const": 1 },
+        "ownerType": { "$ref": "#/$defs/ownerType" },
+        "ownerId": { "$ref": "#/$defs/typedId" },
+        "sourceProjectId": { "$ref": "#/$defs/typedId" },
+        "rootAssetId": { "$ref": "#/$defs/typedId" },
+        "manifestVersion": { "$ref": "#/$defs/packageVersion" },
+        "lifecycleState": { "$ref": "#/$defs/lifecycleState" },
+        "createdBy": { "$ref": "#/$defs/typedId" },
+        "createdAt": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "contentHash": { "$ref": "#/$defs/sha256" },
+        "byteLength": { "type": "integer", "minimum": 0 },
+        "storageLocator": { "$ref": "#/$defs/storageLocator" },
+        "dependencySnapshotHash": { "$ref": "#/$defs/sha256" },
+        "recordVersion": { "type": "integer", "minimum": 1 },
+        "materializationMode": { "$ref": "#/$defs/materializationMode" },
+        "manifestHash": { "$ref": "#/$defs/sha256" },
+        "manifest": { "$ref": "#/$defs/manifest" },
+        "compatibility": { "type": "object" },
+        "licenseReference": { "anyOf": [{ "$ref": "#/$defs/reference" }, { "type": "null" }] },
+        "provenanceReference": { "anyOf": [{ "$ref": "#/$defs/reference" }, { "type": "null" }] }
+      }
+    }
+  }
+}

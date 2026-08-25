@@ -1,0 +1,48 @@
+{
+  "document": {
+    "searchDocumentId": "search-doc:project:world-001",
+    "documentVersion": 1,
+    "resourceType": "PROJECT",
+    "resourceId": "world-001",
+    "sourceAggregateVersion": 1,
+    "sourceEventId": "event-project-created-001",
+    "ownerReference": { "referenceType": "USER", "referenceId": "user-demo-001" },
+    "creatorReference": { "referenceType": "CREATOR", "referenceId": "creator-demo-001" },
+    "projectReference": { "referenceType": "PROJECT", "referenceId": "world-001" },
+    "visibilityClass": "PUBLIC",
+    "lifecycleState": "ACTIVE",
+    "title": { "displayValue": "星の庭 / Star Garden", "normalizedSearchValue": "星の庭 / star garden" },
+    "summary": { "displayValue": "Japanese and English synthetic project fixture.", "normalizedSearchValue": "japanese and english synthetic project fixture." },
+    "tags": [
+      { "displayValue": "pixel-art", "normalizedSearchValue": "pixel-art" },
+      { "displayValue": "ゲーム", "normalizedSearchValue": "ゲーム" }
+    ],
+    "locale": "ja-JP",
+    "facets": { "tool": ["pixiedraw2"], "audience": ["public"] },
+    "sortKeys": { "textRelevance": 0, "freshness": 1, "creatorRelevance": 1, "qualityReference": 0.8 },
+    "previewReference": { "kind": "THUMBNAIL", "referenceId": "preview-world-001" },
+    "createdAt": "2026-08-07T00:00:00.000Z",
+    "updatedAt": "2026-08-07T00:00:01.000Z",
+    "indexedAt": "2026-08-07T00:00:02.000Z",
+    "schemaVersion": 1
+  },
+  "query": {
+    "queryVersion": 1,
+    "text": "星 Star",
+    "resourceTypes": ["PROJECT", "ASSET", "PACKAGE", "CREATOR"],
+    "locale": "ja-JP",
+    "visibilityScope": "PUBLIC_DISCOVERY",
+    "ownerReference": null,
+    "creatorReference": null,
+    "projectReference": null,
+    "tags": ["pixel-art"],
+    "facets": { "tool": ["pixiedraw2"] },
+    "lifecycleStates": ["ACTIVE"],
+    "sort": [
+      { "field": "textRelevance", "direction": "desc" },
+      { "field": "updatedAt", "direction": "desc" }
+    ],
+    "cursor": null,
+    "pageSize": 20
+  }
+}

@@ -1,0 +1,3186 @@
+{
+  "schemaVersion": 2,
+  "programId": "PIXIEED-COMPLETION-PROGRAM-002",
+    "updatedAt": "2026-08-16",
+  "authority": {
+    "registry": "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+    "queue": "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+    "state": ".codex/PIXIEED_IMPLEMENTATION_STATE.yaml",
+    "precedence": [
+      "WORK_PACKAGE_REGISTRY.json",
+      "package definition",
+      "AGENT_EXECUTION_FRAMEWORK.md",
+      "IMPLEMENTATION_QUEUE.yaml",
+      "active handoff Prompt",
+      "historical artifacts"
+    ],
+    "currentReadyPackage": "SITE-460",
+    "parentIntegrationReady": true,
+    "completionCore": "CORE-120",
+    "browserFirst": true,
+    "nativeHostBoundary": "NATIVE-500",
+    "desktopDistributionCandidate": "NATIVE-510",
+    "mobileDistributionCandidate": "NATIVE-520",
+    "mobileShell": "app-shell/pixieed-capacitor",
+    "postCoreParallelRoots": [
+      "FP-006",
+      "AUDIO-200",
+      "GAME-300"
+    ],
+    "postCoreJoin": "SITE-400",
+    "qualificationEntry": "WP-900",
+    "ownerDecisionPreparation": "WP-990",
+    "cutoverBoundary": "CUT-001 requires explicit Owner authorization",
+    "agentOrchestration": {
+      "coordinator": "sol_max",
+      "coordinatorReadOnly": true,
+      "implementationDefault": "luna_fast",
+      "independentReviewDefault": "terra_high",
+      "parallelism": "bounded_disjoint_scopes_only",
+      "defaultMode": "FAST",
+      "optimizationPrompt": ".codex/prompts/AI_DEVELOPMENT_HARNESS_OPTIMIZATION.md",
+      "finalReview": "terra_high_read_only",
+      "maxAffectedDiffReviews": 1,
+      "maxReleaseGateFullAudits": 1,
+      "maxFullEvidenceRuns": 1,
+      "sameCategoryEscalation": "SOL",
+      "specialistPolicy": "disjoint_only",
+      "integratorTier": 2,
+      "activationRule": "Any new or in-progress package must not use sol_max as its implementation model; normalize that route to Luna or Terra before activation. Historical completed routes remain historical evidence."
+    }
+  },
+  "globalContext": [
+    "AGENTS.md",
+    "CURRENT_SYSTEM_PRESERVATION_GATE.md",
+    "PLANS.md",
+    "MODEL_ROUTING.md",
+    ".codex/prompts/AI_DEVELOPMENT_HARNESS_OPTIMIZATION.md",
+    "00_START_HERE/PRESERVATION_FIRST.md",
+    "00_START_HERE/LATEST_CANONICAL_DECISIONS.md",
+    "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+    "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+    "09_ROADMAP/PIXIEED_COMPLETION_ROADMAP.md",
+    "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md",
+    "08_IMPLEMENTATION/TECH_STACK.md",
+    "app-shell/pixieed-capacitor/package.json",
+    "docs/contracts/QUALIFICATION-EVIDENCE-V1.md"
+  ],
+  "historicalCompleted": [
+    "WP-000",
+    "WP-005",
+    "WP-010",
+    "WP-020",
+    "WP-030",
+    "WP-040",
+    "WP-050",
+    "WP-060",
+    "WP-070",
+    "WP-080",
+    "WP-090",
+    "WP-091",
+    "WP-092",
+    "WP-093",
+    "WP-094",
+    "WP-095",
+    "WP-096",
+    "WP-097",
+    "WP-098",
+    "WP-099",
+    "WP-100",
+    "WP-110",
+    "WP-120",
+    "WP-130",
+    "WP-140",
+    "WP-150",
+    "WP-160",
+    "WP-170",
+    "WP-180",
+    "WP-190",
+    "WP-200",
+    "WP-210",
+    "WP-220",
+    "WP-230",
+    "WP-240",
+    "WP-250",
+    "FP-001",
+    "FP-002",
+    "FP-003",
+    "FP-003X",
+    "FP-003Y",
+    "FP-003Z",
+    "FP-003Z-FINALIZATION",
+    "FP-003AA",
+    "FP-004",
+    "FP-005",
+    "FP-007",
+    "CORE-100",
+    "CORE-110"
+  ],
+  "phases": [
+    {
+      "id": "foundation",
+      "title": "Authority, durability, privacy, and reproducibility remediation",
+      "order": 10,
+      "completionPackage": "FP-007"
+    },
+    {
+      "id": "core",
+      "title": "Canonical Core completion",
+      "order": 20,
+      "completionPackage": "CORE-120"
+    },
+    {
+      "id": "draw2",
+      "title": "Draw2 editor, workspace, recovery, and device UX",
+      "order": 30,
+      "completionPackage": "DRAW-170"
+    },
+    {
+      "id": "audio",
+      "title": "Audio creation and bridge",
+      "order": 40,
+      "completionPackage": "AUDIO-240"
+    },
+    {
+      "id": "game",
+      "title": "Game and Runtime creation",
+      "order": 50,
+      "completionPackage": "GAME-350"
+    },
+    {
+      "id": "platform-site",
+      "title": "Site, Market, Work, Social, Operations, and Platform",
+      "order": 60,
+      "completionPackage": "PLATFORM-450"
+    },
+    {
+      "id": "native",
+      "title": "Browser/PWA-first desktop and mobile host/distribution boundaries",
+      "order": 65,
+      "completionPackage": "NATIVE-520"
+    },
+    {
+      "id": "qualification",
+      "title": "G0-G9 evidence and Owner decision preparation",
+      "order": 70,
+      "completionPackage": "WP-990"
+    },
+    {
+      "id": "cutover",
+      "title": "Separately authorized production cutover",
+      "order": 80,
+      "completionPackage": "CUT-001"
+    }
+  ],
+  "packages": [
+    {
+      "id": "CORE-120",
+      "title": "Core Completion and Cross-Core Convergence Gate",
+      "phase": "core",
+      "status": "COMPLETE",
+      "kind": "gate",
+      "dependsOn": [
+        "CORE-110"
+      ],
+      "definition": "09_ROADMAP/WORK_PACKAGES/CORE-120.md",
+      "contextFiles": [
+        "AGENTS.md",
+        "CURRENT_SYSTEM_PRESERVATION_GATE.md",
+        "PLANS.md",
+        "MODEL_ROUTING.md",
+        "00_START_HERE/PRESERVATION_FIRST.md",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md",
+        "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+        "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+        "09_ROADMAP/PIXIEED_COMPLETION_ROADMAP.md",
+        "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md",
+        "02_ARCHITECTURE/CORE_COMPLETION_BLUEPRINT.md",
+        "02_ARCHITECTURE/PIXIEED_CORE_SYSTEM.md",
+        "02_ARCHITECTURE/ASSET_GRAPH.md",
+        "02_ARCHITECTURE/EVENT_ACTIVITY_CORE.md",
+        "02_ARCHITECTURE/STORAGE_PLACEMENT_AND_SYNC.md",
+        "09_ROADMAP/WORK_PACKAGES/CORE-120.md",
+        "docs/contracts/QUALIFICATION-EVIDENCE-V1.md",
+        "docs/contracts/CORE-120-EVIDENCE-NORMALIZATION.md",
+        "pixiedraw2/src/core/core-120/contracts.ts",
+        "pixiedraw2/src/core/core-120/gate.ts",
+        "pixiedraw2/src/core/core-120/index.ts",
+        "pixiedraw2/tests/core-120/core-120-gate.test.ts",
+        "pixiedraw2/benchmarks/core-120/generate-evidence.ts",
+        "docs/inventory/baseline-failure-identity-wp080.json",
+    "docs/inventory/baseline-suite-wp000.json",
+    "docs/inventory/baseline-results.json",
+    "scripts/verify_work_package_context.py",
+    "scripts/validate-qualification-evidence.mjs",
+    "scripts/run-qualification-commands.mjs",
+    "scripts/test-qualification-evidence-v1.mjs",
+    "docs/inventory/core-120-command-manifest.json",
+    "docs/inventory/core-120-predecessor-command-manifest.json",
+    "scripts/normalize-core120-predecessor-evidence.mjs",
+    "scripts/audit-core120-predecessor-boundaries.mjs",
+    "docs/inventory/core-120-predecessors.json"
+      ],
+      "allowedWriteGlobs": [
+        "pixiedraw2/src/core/core-120/**",
+        "pixiedraw2/tests/core-120/**",
+        "pixiedraw2/benchmarks/core-120/**",
+        "docs/contracts/CORE-120-*.md",
+        "docs/inventory/core-120-*.json",
+        "docs/decisions/ADR-*-CORE-120-*.md"
+      ],
+      "forbiddenActions": [
+        "modify_current_production_routes_or_data",
+        "apply_production_migration",
+        "deploy_publish_commit_or_push",
+        "do_not_deploy",
+        "do_not_publish",
+        "do_not_commit",
+        "do_not_push",
+        "do_not_migrate",
+        "do_not_cutover",
+        "start_next_package_automatically",
+        "claim_unmeasured_or_synthetic_evidence_as_production_pass",
+        "edit_files_outside_CORE-120_write_scope",
+        "consume_or_publish_real_private_user_content"
+      ],
+      "acceptanceIds": [
+        "CORE120-GATE-001",
+        "CORE120-CONVERGENCE-001",
+        "CORE120-NONINTRUSION-001",
+        "CORE120-HANDOFF-001"
+      ],
+      "verificationLevel": "isolated-reference+targeted-tests+independent-review",
+      "implementationRoute": {
+        "model": "terra_high",
+        "reasoning": "Declare Core complete only after all Core contracts and evidence converge.",
+        "parallelism": 2
+      },
+      "reviewRoute": {
+        "model": "sol_max",
+        "reasoning": "Independent review of actual diff, evidence, negative cases, and residual risks.",
+        "independent": true
+      },
+      "nextPackage": "FP-006",
+      "autoStartNext": false
+    },
+    {
+      "id": "FP-006",
+      "title": "Draw2 Hot Path / Recovery / Device UX",
+      "phase": "draw2",
+      "status": "COMPLETE",
+      "kind": "remediation",
+      "dependsOn": [
+        "CORE-120"
+      ],
+      "definition": "09_ROADMAP/WORK_PACKAGES/FP-006.md",
+      "contextFiles": [
+        "AGENTS.md",
+        "CURRENT_SYSTEM_PRESERVATION_GATE.md",
+        "PLANS.md",
+        "MODEL_ROUTING.md",
+        "00_START_HERE/PRESERVATION_FIRST.md",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md",
+        "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+        "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+        "09_ROADMAP/PIXIEED_COMPLETION_ROADMAP.md",
+        "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md",
+        "CODEX_TASK_PROMPTS/README.md",
+        "03_PRODUCTS/PIXIEEDRAW2_SPEC.md",
+        "03_PRODUCTS/PIXIEEDRAW2_UX_SPEC.md",
+        "docs/inventory/pixiedraw-layout-audit-20260810.md",
+        "docs/decisions/ADR-20260810-DRAW2-UX-DIRECTION.md",
+        "05_PERFORMANCE/DRAW2_HIGH_PERFORMANCE_IMPLEMENTATION_CONTRACT.md",
+        "05_PERFORMANCE/DRAW2_DEVICE_AND_WORKLOAD_MATRIX.md",
+        "09_ROADMAP/WORK_PACKAGES/FP-006.md",
+        "pixiedraw2/src/fp-006/contracts.ts",
+        "pixiedraw2/src/fp-006/input-state.ts",
+        "pixiedraw2/src/fp-006/device-profile.ts",
+        "pixiedraw2/src/fp-006/hot-path.ts",
+        "pixiedraw2/src/fp-006/ux-contract.ts",
+        "pixiedraw2/tests/fp-006/input-state.test.ts",
+        "pixiedraw2/tests/fp-006/device-profile.test.ts",
+        "pixiedraw2/tests/fp-006/hot-path.test.ts",
+        "pixiedraw2/tests/fp-006/ux-contract.test.ts",
+        "pixiedraw2/benchmarks/fp-006/generate-evidence.ts",
+        "docs/contracts/FP-006-HOTPATH.md",
+        "docs/contracts/FP-006-RECOVERY.md",
+        "docs/contracts/FP-006-DEVICE-UX.md",
+        "docs/decisions/ADR-20260813-FP-006-adapter-boundary.md"
+      ],
+      "allowedWriteGlobs": [
+        "pixiedraw2/src/fp-006/**",
+        "pixiedraw2/tests/fp-006/**",
+        "pixiedraw2/benchmarks/fp-006/**",
+        "docs/contracts/FP-006-*.md",
+        "docs/inventory/fp-006-*.json",
+        "docs/decisions/ADR-*-FP-006-*.md"
+      ],
+      "forbiddenActions": [
+        "modify_current_production_routes_or_data",
+        "apply_production_migration",
+        "deploy_publish_commit_or_push",
+        "do_not_deploy",
+        "do_not_publish",
+        "do_not_commit",
+        "do_not_push",
+        "do_not_migrate",
+        "do_not_cutover",
+        "start_next_package_automatically",
+        "claim_unmeasured_or_synthetic_evidence_as_production_pass",
+        "edit_files_outside_FP-006_write_scope",
+        "consume_or_publish_real_private_user_content"
+      ],
+      "acceptanceIds": [
+        "FP006-HOTPATH-001",
+        "FP006-RECOVERY-001",
+        "FP006-DEVICE-001",
+        "FP006-UX-001",
+        "FP006-OVERCLAIM-001"
+      ],
+      "verificationLevel": "isolated-reference+targeted-tests+independent-review",
+      "implementationRoute": {
+        "model": "luna_max",
+        "reasoning": "Reclassify the former FP-006 concern into the post-Core Draw2 phase.",
+        "parallelism": 5
+      },
+      "reviewRoute": {
+        "model": "sol_high",
+        "reasoning": "Independent review of actual diff, evidence, negative cases, and residual risks.",
+        "independent": true
+      },
+      "nextPackage": "DRAW-110",
+      "autoStartNext": false
+    },
+    {
+      "id": "DRAW-110",
+      "title": "Draw2 Raster and Editor Hot Path",
+      "phase": "draw2",
+      "status": "COMPLETE",
+      "kind": "draw2",
+      "dependsOn": [
+        "FP-006"
+      ],
+      "definition": "09_ROADMAP/WORK_PACKAGES/DRAW-110.md",
+      "contextFiles": [
+        "AGENTS.md",
+        "CURRENT_SYSTEM_PRESERVATION_GATE.md",
+        "PLANS.md",
+        "MODEL_ROUTING.md",
+        "00_START_HERE/PRESERVATION_FIRST.md",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md",
+        "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+        "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+        "09_ROADMAP/PIXIEED_COMPLETION_ROADMAP.md",
+        "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md",
+        "CODEX_TASK_PROMPTS/README.md",
+        "03_PRODUCTS/PIXIEEDRAW2_SPEC.md",
+        "03_PRODUCTS/PIXIEEDRAW2_UX_SPEC.md",
+        "docs/inventory/pixiedraw-layout-audit-20260810.md",
+        "docs/decisions/ADR-20260810-DRAW2-UX-DIRECTION.md",
+        "05_PERFORMANCE/DRAW2_HIGH_PERFORMANCE_IMPLEMENTATION_CONTRACT.md",
+        "05_PERFORMANCE/DRAW2_DEVICE_AND_WORKLOAD_MATRIX.md",
+        "09_ROADMAP/WORK_PACKAGES/DRAW-110.md",
+        "pixiedraw2/src/draw2/draw-110/raster-editor.ts",
+        "pixiedraw2/tests/draw-110/raster-editor.test.ts",
+        "pixiedraw2/benchmarks/draw-110/generate-evidence.ts",
+        "docs/contracts/DRAW-110-RASTER-EDITOR.md",
+        "docs/contracts/DRAW-110-PERFORMANCE.md",
+        "docs/decisions/ADR-20260813-DRAW-110-core-reuse.md"
+      ],
+      "allowedWriteGlobs": [
+        "pixiedraw2/src/draw2/draw-110/**",
+        "pixiedraw2/tests/draw-110/**",
+        "pixiedraw2/benchmarks/draw-110/**",
+        "docs/contracts/DRAW-110-*.md",
+        "docs/inventory/draw-110-*.json",
+        "docs/decisions/ADR-*-DRAW-110-*.md"
+      ],
+      "forbiddenActions": [
+        "modify_current_production_routes_or_data",
+        "apply_production_migration",
+        "deploy_publish_commit_or_push",
+        "do_not_deploy",
+        "do_not_publish",
+        "do_not_commit",
+        "do_not_push",
+        "do_not_migrate",
+        "do_not_cutover",
+        "start_next_package_automatically",
+        "claim_unmeasured_or_synthetic_evidence_as_production_pass",
+        "edit_files_outside_DRAW-110_write_scope",
+        "consume_or_publish_real_private_user_content"
+      ],
+      "acceptanceIds": [
+        "DRAW110-SCOPE-001",
+        "DRAW110-WORKSPACE-001",
+        "DRAW110-EVIDENCE-001",
+        "DRAW110-STOP-001"
+      ],
+      "verificationLevel": "isolated-reference+targeted-tests+independent-review",
+      "implementationRoute": {
+        "model": "luna_max",
+        "reasoning": "Deliver indexed raster, pen, eraser, fill, dirty presentation, and bounded input.",
+        "parallelism": 4
+      },
+      "reviewRoute": {
+        "model": "terra_high",
+        "reasoning": "Independent review of actual diff, evidence, negative cases, and residual risks.",
+        "independent": true
+      },
+      "nextPackage": "DRAW-120",
+      "autoStartNext": false
+    },
+    {
+      "id": "DRAW-120",
+      "title": "Draw2 Selection / Transform / Clipboard",
+      "phase": "draw2",
+      "status": "COMPLETE",
+      "kind": "draw2",
+      "dependsOn": [
+        "DRAW-110"
+      ],
+      "definition": "09_ROADMAP/WORK_PACKAGES/DRAW-120.md",
+      "contextFiles": [
+        "AGENTS.md",
+        "CURRENT_SYSTEM_PRESERVATION_GATE.md",
+        "PLANS.md",
+        "MODEL_ROUTING.md",
+        "00_START_HERE/PRESERVATION_FIRST.md",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md",
+        "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+        "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+        "09_ROADMAP/PIXIEED_COMPLETION_ROADMAP.md",
+        "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md",
+        "CODEX_TASK_PROMPTS/README.md",
+        "03_PRODUCTS/PIXIEEDRAW2_SPEC.md",
+        "03_PRODUCTS/PIXIEEDRAW2_UX_SPEC.md",
+        "docs/inventory/pixiedraw-layout-audit-20260810.md",
+        "docs/decisions/ADR-20260810-DRAW2-UX-DIRECTION.md",
+        "05_PERFORMANCE/DRAW2_HIGH_PERFORMANCE_IMPLEMENTATION_CONTRACT.md",
+        "05_PERFORMANCE/DRAW2_DEVICE_AND_WORKLOAD_MATRIX.md",
+        "09_ROADMAP/WORK_PACKAGES/DRAW-120.md",
+        "pixiedraw2/src/draw2/draw-120/selection-transform.ts",
+        "pixiedraw2/tests/draw-120/selection-transform.test.ts",
+        "pixiedraw2/benchmarks/draw-120/generate-evidence.ts",
+        "docs/contracts/DRAW-120-SELECTION-TRANSFORM.md",
+        "docs/contracts/DRAW-120-PERFORMANCE.md",
+        "docs/decisions/ADR-20260813-DRAW-120-core-reuse.md"
+      ],
+      "allowedWriteGlobs": [
+        "pixiedraw2/src/draw2/draw-120/**",
+        "pixiedraw2/tests/draw-120/**",
+        "pixiedraw2/benchmarks/draw-120/**",
+        "docs/contracts/DRAW-120-*.md",
+        "docs/inventory/draw-120-*.json",
+        "docs/decisions/ADR-*-DRAW-120-*.md"
+      ],
+      "forbiddenActions": [
+        "modify_current_production_routes_or_data",
+        "apply_production_migration",
+        "deploy_publish_commit_or_push",
+        "do_not_deploy",
+        "do_not_publish",
+        "do_not_commit",
+        "do_not_push",
+        "do_not_migrate",
+        "do_not_cutover",
+        "start_next_package_automatically",
+        "claim_unmeasured_or_synthetic_evidence_as_production_pass",
+        "edit_files_outside_DRAW-120_write_scope",
+        "consume_or_publish_real_private_user_content"
+      ],
+      "acceptanceIds": [
+        "DRAW120-SCOPE-001",
+        "DRAW120-WORKSPACE-001",
+        "DRAW120-EVIDENCE-001",
+        "DRAW120-STOP-001"
+      ],
+      "verificationLevel": "isolated-reference+targeted-tests+independent-review",
+      "implementationRoute": {
+        "model": "luna_max",
+        "reasoning": "Provide deterministic selection, transform preview, clipboard, and atomic history.",
+        "parallelism": 4
+      },
+      "reviewRoute": {
+        "model": "terra_high",
+        "reasoning": "Independent review of actual diff, evidence, negative cases, and residual risks.",
+        "independent": true
+      },
+      "nextPackage": "DRAW-130",
+      "autoStartNext": false
+    },
+    {
+      "id": "DRAW-130",
+      "title": "Draw2 Layers / Frames / Cels / Timeline",
+      "phase": "draw2",
+      "status": "COMPLETE",
+      "kind": "draw2",
+      "dependsOn": [
+        "DRAW-120"
+      ],
+      "definition": "09_ROADMAP/WORK_PACKAGES/DRAW-130.md",
+      "contextFiles": [
+        "AGENTS.md",
+        "CURRENT_SYSTEM_PRESERVATION_GATE.md",
+        "PLANS.md",
+        "MODEL_ROUTING.md",
+        "00_START_HERE/PRESERVATION_FIRST.md",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md",
+        "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+        "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+        "09_ROADMAP/PIXIEED_COMPLETION_ROADMAP.md",
+        "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md",
+        "CODEX_TASK_PROMPTS/README.md",
+        "03_PRODUCTS/PIXIEEDRAW2_SPEC.md",
+        "03_PRODUCTS/PIXIEEDRAW2_UX_SPEC.md",
+        "docs/inventory/pixiedraw-layout-audit-20260810.md",
+        "docs/decisions/ADR-20260810-DRAW2-UX-DIRECTION.md",
+        "05_PERFORMANCE/DRAW2_HIGH_PERFORMANCE_IMPLEMENTATION_CONTRACT.md",
+        "05_PERFORMANCE/DRAW2_DEVICE_AND_WORKLOAD_MATRIX.md",
+        "09_ROADMAP/WORK_PACKAGES/DRAW-130.md",
+        "pixiedraw2/src/draw2/draw-130/timeline-editor.ts",
+        "pixiedraw2/tests/draw-130/timeline-editor.test.ts",
+        "pixiedraw2/benchmarks/draw-130/generate-evidence.ts",
+        "docs/contracts/DRAW-130-TIMELINE.md",
+        "docs/contracts/DRAW-130-PERFORMANCE.md",
+        "docs/decisions/ADR-20260813-DRAW-130-structural-adapter.md"
+      ],
+      "allowedWriteGlobs": [
+        "pixiedraw2/src/draw2/draw-130/**",
+        "pixiedraw2/tests/draw-130/**",
+        "pixiedraw2/benchmarks/draw-130/**",
+        "docs/contracts/DRAW-130-*.md",
+        "docs/inventory/draw-130-*.json",
+        "docs/decisions/ADR-*-DRAW-130-*.md"
+      ],
+      "forbiddenActions": [
+        "modify_current_production_routes_or_data",
+        "apply_production_migration",
+        "deploy_publish_commit_or_push",
+        "do_not_deploy",
+        "do_not_publish",
+        "do_not_commit",
+        "do_not_push",
+        "do_not_migrate",
+        "do_not_cutover",
+        "start_next_package_automatically",
+        "claim_unmeasured_or_synthetic_evidence_as_production_pass",
+        "edit_files_outside_DRAW-130_write_scope",
+        "consume_or_publish_real_private_user_content"
+      ],
+      "acceptanceIds": [
+        "DRAW130-SCOPE-001",
+        "DRAW130-WORKSPACE-001",
+        "DRAW130-EVIDENCE-001",
+        "DRAW130-STOP-001"
+      ],
+      "verificationLevel": "isolated-reference+targeted-tests+independent-review",
+      "implementationRoute": {
+        "model": "luna_max",
+        "reasoning": "Provide canonical structure, virtualization, playback, and structural recovery.",
+        "parallelism": 4
+      },
+      "reviewRoute": {
+        "model": "terra_high",
+        "reasoning": "Independent review of actual diff, evidence, negative cases, and residual risks.",
+        "independent": true
+      },
+      "nextPackage": "DRAW-140",
+      "autoStartNext": false
+    },
+    {
+      "id": "DRAW-140",
+      "title": "Draw2 PNG / PXD Export",
+      "phase": "draw2",
+      "status": "COMPLETE",
+      "kind": "draw2",
+      "dependsOn": [
+        "DRAW-130"
+      ],
+      "definition": "09_ROADMAP/WORK_PACKAGES/DRAW-140.md",
+      "contextFiles": [
+        "AGENTS.md",
+        "CURRENT_SYSTEM_PRESERVATION_GATE.md",
+        "PLANS.md",
+        "MODEL_ROUTING.md",
+        "00_START_HERE/PRESERVATION_FIRST.md",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md",
+        "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+        "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+        "09_ROADMAP/PIXIEED_COMPLETION_ROADMAP.md",
+        "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md",
+        "CODEX_TASK_PROMPTS/README.md",
+        "03_PRODUCTS/PIXIEEDRAW2_SPEC.md",
+        "03_PRODUCTS/PIXIEEDRAW2_UX_SPEC.md",
+        "docs/inventory/pixiedraw-layout-audit-20260810.md",
+        "docs/decisions/ADR-20260810-DRAW2-UX-DIRECTION.md",
+        "05_PERFORMANCE/DRAW2_HIGH_PERFORMANCE_IMPLEMENTATION_CONTRACT.md",
+        "05_PERFORMANCE/DRAW2_DEVICE_AND_WORKLOAD_MATRIX.md",
+        "09_ROADMAP/WORK_PACKAGES/DRAW-140.md"
+      ],
+      "allowedWriteGlobs": [
+        "pixiedraw2/src/draw2/draw-140/**",
+        "pixiedraw2/tests/draw-140/**",
+        "pixiedraw2/benchmarks/draw-140/**",
+        "docs/contracts/DRAW-140-*.md",
+        "docs/inventory/draw-140-*.json",
+        "docs/decisions/ADR-*-DRAW-140-*.md"
+      ],
+      "forbiddenActions": [
+        "modify_current_production_routes_or_data",
+        "apply_production_migration",
+        "deploy_publish_commit_or_push",
+        "do_not_deploy",
+        "do_not_publish",
+        "do_not_commit",
+        "do_not_push",
+        "do_not_migrate",
+        "do_not_cutover",
+        "start_next_package_automatically",
+        "claim_unmeasured_or_synthetic_evidence_as_production_pass",
+        "edit_files_outside_DRAW-140_write_scope",
+        "consume_or_publish_real_private_user_content"
+      ],
+      "acceptanceIds": [
+        "DRAW140-SCOPE-001",
+        "DRAW140-WORKSPACE-001",
+        "DRAW140-EVIDENCE-001",
+        "DRAW140-STOP-001"
+      ],
+      "verificationLevel": "isolated-reference+targeted-tests+independent-review",
+      "implementationRoute": {
+        "model": "luna_max",
+        "reasoning": "Provide deterministic PNG and versioned PXD export/import.",
+        "parallelism": 4
+      },
+      "reviewRoute": {
+        "model": "terra_high",
+        "reasoning": "Independent review of actual diff, evidence, negative cases, and residual risks.",
+        "independent": true
+      },
+      "nextPackage": "DRAW-150",
+      "autoStartNext": false
+    },
+    {
+      "id": "DRAW-150",
+      "title": "Draw2 Legacy Compatibility",
+      "phase": "draw2",
+      "status": "COMPLETE",
+      "kind": "draw2",
+      "dependsOn": [
+        "DRAW-140"
+      ],
+      "definition": "09_ROADMAP/WORK_PACKAGES/DRAW-150.md",
+      "contextFiles": [
+        "AGENTS.md",
+        "CURRENT_SYSTEM_PRESERVATION_GATE.md",
+        "PLANS.md",
+        "MODEL_ROUTING.md",
+        "00_START_HERE/PRESERVATION_FIRST.md",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md",
+        "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+        "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+        "09_ROADMAP/PIXIEED_COMPLETION_ROADMAP.md",
+        "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md",
+        "CODEX_TASK_PROMPTS/README.md",
+        "03_PRODUCTS/PIXIEEDRAW2_SPEC.md",
+        "03_PRODUCTS/PIXIEEDRAW2_UX_SPEC.md",
+        "docs/inventory/pixiedraw-layout-audit-20260810.md",
+        "docs/decisions/ADR-20260810-DRAW2-UX-DIRECTION.md",
+        "05_PERFORMANCE/DRAW2_HIGH_PERFORMANCE_IMPLEMENTATION_CONTRACT.md",
+        "05_PERFORMANCE/DRAW2_DEVICE_AND_WORKLOAD_MATRIX.md",
+        "09_ROADMAP/WORK_PACKAGES/DRAW-150.md"
+      ],
+      "allowedWriteGlobs": [
+        "pixiedraw2/src/draw2/draw-150/**",
+        "pixiedraw2/tests/draw-150/**",
+        "pixiedraw2/benchmarks/draw-150/**",
+        "docs/contracts/DRAW-150-*.md",
+        "docs/inventory/draw-150-*.json",
+        "docs/decisions/ADR-*-DRAW-150-*.md"
+      ],
+      "forbiddenActions": [
+        "modify_current_production_routes_or_data",
+        "apply_production_migration",
+        "deploy_publish_commit_or_push",
+        "do_not_deploy",
+        "do_not_publish",
+        "do_not_commit",
+        "do_not_push",
+        "do_not_migrate",
+        "do_not_cutover",
+        "start_next_package_automatically",
+        "claim_unmeasured_or_synthetic_evidence_as_production_pass",
+        "edit_files_outside_DRAW-150_write_scope",
+        "consume_or_publish_real_private_user_content"
+      ],
+      "acceptanceIds": [
+        "DRAW150-SCOPE-001",
+        "DRAW150-WORKSPACE-001",
+        "DRAW150-EVIDENCE-001",
+        "DRAW150-STOP-001"
+      ],
+      "verificationLevel": "isolated-reference+targeted-tests+independent-review",
+      "implementationRoute": {
+        "model": "luna_max",
+        "reasoning": "Read legacy PXD safely and preserve source bytes, hashes, and rollback.",
+        "parallelism": 4
+      },
+      "reviewRoute": {
+        "model": "terra_high",
+        "reasoning": "Independent review of actual diff, evidence, negative cases, and residual risks.",
+        "independent": true
+      },
+      "nextPackage": "DRAW-160",
+      "autoStartNext": false
+    },
+    {
+      "id": "DRAW-160",
+      "title": "Draw-to-Play Preview and Runtime Boundary",
+      "phase": "draw2",
+      "status": "COMPLETE",
+      "kind": "draw2",
+      "dependsOn": [
+        "DRAW-150"
+      ],
+      "definition": "09_ROADMAP/WORK_PACKAGES/DRAW-160.md",
+      "contextFiles": [
+        "AGENTS.md",
+        "CURRENT_SYSTEM_PRESERVATION_GATE.md",
+        "PLANS.md",
+        "MODEL_ROUTING.md",
+        "00_START_HERE/PRESERVATION_FIRST.md",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md",
+        "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+        "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+        "09_ROADMAP/PIXIEED_COMPLETION_ROADMAP.md",
+        "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md",
+        "CODEX_TASK_PROMPTS/README.md",
+        "03_PRODUCTS/PIXIEEDRAW2_SPEC.md",
+        "03_PRODUCTS/PIXIEEDRAW2_UX_SPEC.md",
+        "docs/inventory/pixiedraw-layout-audit-20260810.md",
+        "docs/decisions/ADR-20260810-DRAW2-UX-DIRECTION.md",
+        "05_PERFORMANCE/DRAW2_HIGH_PERFORMANCE_IMPLEMENTATION_CONTRACT.md",
+        "05_PERFORMANCE/DRAW2_DEVICE_AND_WORKLOAD_MATRIX.md",
+        "09_ROADMAP/WORK_PACKAGES/DRAW-160.md"
+      ],
+      "allowedWriteGlobs": [
+        "pixiedraw2/src/draw2/draw-160/**",
+        "pixiedraw2/tests/draw-160/**",
+        "pixiedraw2/benchmarks/draw-160/**",
+        "docs/contracts/DRAW-160-*.md",
+        "docs/inventory/draw-160-*.json",
+        "docs/decisions/ADR-*-DRAW-160-*.md"
+      ],
+      "forbiddenActions": [
+        "modify_current_production_routes_or_data",
+        "apply_production_migration",
+        "deploy_publish_commit_or_push",
+        "do_not_deploy",
+        "do_not_publish",
+        "do_not_commit",
+        "do_not_push",
+        "do_not_migrate",
+        "do_not_cutover",
+        "start_next_package_automatically",
+        "claim_unmeasured_or_synthetic_evidence_as_production_pass",
+        "edit_files_outside_DRAW-160_write_scope",
+        "consume_or_publish_real_private_user_content"
+      ],
+      "acceptanceIds": [
+        "DRAW160-SCOPE-001",
+        "DRAW160-WORKSPACE-001",
+        "DRAW160-EVIDENCE-001",
+        "DRAW160-STOP-001"
+      ],
+      "verificationLevel": "isolated-reference+targeted-tests+independent-review",
+      "implementationRoute": {
+        "model": "luna_max",
+        "reasoning": "Bind Draw2 revisions to preview without mixing editor and runtime state.",
+        "parallelism": 4
+      },
+      "reviewRoute": {
+        "model": "terra_high",
+        "reasoning": "Independent review of actual diff, evidence, negative cases, and residual risks.",
+        "independent": true
+      },
+      "nextPackage": "DRAW-170",
+      "autoStartNext": false
+    },
+    {
+      "id": "DRAW-170",
+      "title": "Draw2 Advanced Production Workspace",
+      "phase": "draw2",
+      "status": "COMPLETE",
+      "kind": "draw2",
+      "dependsOn": [
+        "DRAW-160"
+      ],
+      "definition": "09_ROADMAP/WORK_PACKAGES/DRAW-170.md",
+      "contextFiles": [
+        "AGENTS.md",
+        "CURRENT_SYSTEM_PRESERVATION_GATE.md",
+        "PLANS.md",
+        "MODEL_ROUTING.md",
+        "00_START_HERE/PRESERVATION_FIRST.md",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md",
+        "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+        "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+        "09_ROADMAP/PIXIEED_COMPLETION_ROADMAP.md",
+        "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md",
+        "CODEX_TASK_PROMPTS/README.md",
+        "03_PRODUCTS/PIXIEEDRAW2_SPEC.md",
+        "03_PRODUCTS/PIXIEEDRAW2_UX_SPEC.md",
+        "docs/inventory/pixiedraw-layout-audit-20260810.md",
+        "docs/decisions/ADR-20260810-DRAW2-UX-DIRECTION.md",
+        "05_PERFORMANCE/DRAW2_HIGH_PERFORMANCE_IMPLEMENTATION_CONTRACT.md",
+        "05_PERFORMANCE/DRAW2_DEVICE_AND_WORKLOAD_MATRIX.md",
+        "09_ROADMAP/WORK_PACKAGES/DRAW-170.md"
+      ],
+      "allowedWriteGlobs": [
+        "pixiedraw2/src/draw2-entry.ts",
+        "pixiedraw2/deno.json",
+        "pixiedraw2/dist/draw2-entry.js",
+        "pixiedraw2/dist/draw2-entry.min.js",
+        "pixiedraw2/dist/draw2-export.js",
+        "pixiedraw2/src/draw2/draw-170/**",
+        "pixiedraw2/tests/draw-170/**",
+        "pixiedraw2/benchmarks/draw-170/**",
+        "docs/contracts/DRAW-170-*.md",
+        "docs/inventory/draw-170-*.json",
+        "docs/decisions/ADR-*-DRAW-170-*.md"
+      ],
+      "forbiddenActions": [
+        "modify_current_production_routes_or_data",
+        "apply_production_migration",
+        "deploy_publish_commit_or_push",
+        "do_not_deploy",
+        "do_not_publish",
+        "do_not_commit",
+        "do_not_push",
+        "do_not_migrate",
+        "do_not_cutover",
+        "start_next_package_automatically",
+        "claim_unmeasured_or_synthetic_evidence_as_production_pass",
+        "edit_files_outside_DRAW-170_write_scope",
+        "consume_or_publish_real_private_user_content"
+      ],
+      "acceptanceIds": [
+        "DRAW170-SCOPE-001",
+        "DRAW170-WORKSPACE-001",
+        "DRAW170-EVIDENCE-001",
+        "DRAW170-STOP-001"
+      ],
+      "verificationLevel": "isolated-reference+targeted-tests+independent-review",
+      "implementationRoute": {
+        "model": "luna_max",
+        "reasoning": "Provide Aseprite-level production efficiency and Unity-style organization without copying.",
+        "parallelism": 4
+      },
+      "reviewRoute": {
+        "model": "terra_high",
+        "reasoning": "Independent review of actual diff, evidence, negative cases, and residual risks.",
+        "independent": true
+      },
+      "nextPackage": "SITE-400",
+      "autoStartNext": false
+    },
+    {
+      "id": "AUDIO-200",
+      "title": "Audio Project / Revision Core",
+      "phase": "audio",
+      "status": "COMPLETE",
+      "kind": "audio",
+      "dependsOn": [
+        "CORE-120"
+      ],
+      "definition": "09_ROADMAP/WORK_PACKAGES/AUDIO-200.md",
+      "contextFiles": [
+        "AGENTS.md",
+        "CURRENT_SYSTEM_PRESERVATION_GATE.md",
+        "PLANS.md",
+        "MODEL_ROUTING.md",
+        "00_START_HERE/PRESERVATION_FIRST.md",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md",
+        "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+        "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+        "09_ROADMAP/PIXIEED_COMPLETION_ROADMAP.md",
+        "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md",
+        "CODEX_TASK_PROMPTS/README.md",
+        "02_ARCHITECTURE/CROSS_TOOL_LIVE_EDIT.md",
+        "02_ARCHITECTURE/ASSET_GRAPH.md",
+        "02_ARCHITECTURE/INTEGRATED_PACKAGE_FORMAT.md",
+        "docs/contracts/WP-190-AUDIO-CORE-BRIDGE.md",
+        "09_ROADMAP/WORK_PACKAGES/AUDIO-200.md"
+      ],
+      "allowedWriteGlobs": [
+        "pixiedraw2/src/audio/audio-200/**",
+        "pixiedraw2/tests/audio-200/**",
+        "pixiedraw2/benchmarks/audio-200/**",
+        "docs/contracts/AUDIO-200-*.md",
+        "docs/inventory/audio-200-*.json",
+        "docs/decisions/ADR-*-AUDIO-200-*.md"
+      ],
+      "forbiddenActions": [
+        "modify_current_production_routes_or_data",
+        "apply_production_migration",
+        "deploy_publish_commit_or_push",
+        "do_not_deploy",
+        "do_not_publish",
+        "do_not_commit",
+        "do_not_push",
+        "do_not_migrate",
+        "do_not_cutover",
+        "start_next_package_automatically",
+        "claim_unmeasured_or_synthetic_evidence_as_production_pass",
+        "edit_files_outside_AUDIO-200_write_scope",
+        "consume_or_publish_real_private_user_content"
+      ],
+      "acceptanceIds": [
+        "AUDIO200-SCOPE-001",
+        "AUDIO200-EVIDENCE-001",
+        "AUDIO200-STOP-001"
+      ],
+      "verificationLevel": "isolated-reference+targeted-tests+independent-review",
+      "implementationRoute": {
+        "model": "luna_max",
+        "reasoning": "Create canonical Audio Project and Revision references over Core Asset boundaries.",
+        "parallelism": 4
+      },
+      "reviewRoute": {
+        "model": "terra_high",
+        "reasoning": "Independent review of actual diff, evidence, negative cases, and residual risks.",
+        "independent": true
+      },
+      "nextPackage": "AUDIO-210",
+      "autoStartNext": false
+    },
+    {
+      "id": "AUDIO-210",
+      "title": "Audio Event Binding and Preview",
+      "phase": "audio",
+      "status": "COMPLETE",
+      "kind": "audio",
+      "dependsOn": [
+        "AUDIO-200"
+      ],
+      "definition": "09_ROADMAP/WORK_PACKAGES/AUDIO-210.md",
+      "contextFiles": [
+        "AGENTS.md",
+        "CURRENT_SYSTEM_PRESERVATION_GATE.md",
+        "PLANS.md",
+        "MODEL_ROUTING.md",
+        "00_START_HERE/PRESERVATION_FIRST.md",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md",
+        "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+        "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+        "09_ROADMAP/PIXIEED_COMPLETION_ROADMAP.md",
+        "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md",
+        "CODEX_TASK_PROMPTS/README.md",
+        "02_ARCHITECTURE/CROSS_TOOL_LIVE_EDIT.md",
+        "02_ARCHITECTURE/ASSET_GRAPH.md",
+        "02_ARCHITECTURE/INTEGRATED_PACKAGE_FORMAT.md",
+        "docs/contracts/WP-190-AUDIO-CORE-BRIDGE.md",
+        "09_ROADMAP/WORK_PACKAGES/AUDIO-210.md"
+      ],
+      "allowedWriteGlobs": [
+        "pixiedraw2/src/audio/audio-210/**",
+        "pixiedraw2/tests/audio-210/**",
+        "pixiedraw2/benchmarks/audio-210/**",
+        "docs/contracts/AUDIO-210-*.md",
+        "docs/inventory/audio-210-*.json",
+        "docs/decisions/ADR-*-AUDIO-210-*.md"
+      ],
+      "forbiddenActions": [
+        "modify_current_production_routes_or_data",
+        "apply_production_migration",
+        "deploy_publish_commit_or_push",
+        "do_not_deploy",
+        "do_not_publish",
+        "do_not_commit",
+        "do_not_push",
+        "do_not_migrate",
+        "do_not_cutover",
+        "start_next_package_automatically",
+        "claim_unmeasured_or_synthetic_evidence_as_production_pass",
+        "edit_files_outside_AUDIO-210_write_scope",
+        "consume_or_publish_real_private_user_content"
+      ],
+      "acceptanceIds": [
+        "AUDIO210-SCOPE-001",
+        "AUDIO210-EVIDENCE-001",
+        "AUDIO210-STOP-001"
+      ],
+      "verificationLevel": "isolated-reference+targeted-tests+independent-review",
+      "implementationRoute": {
+        "model": "luna_max",
+        "reasoning": "Bind BGM/SFX events and provide safe local preview/export adapters.",
+        "parallelism": 4
+      },
+      "reviewRoute": {
+        "model": "terra_high",
+        "reasoning": "Independent review of actual diff, evidence, negative cases, and residual risks.",
+        "independent": true
+      },
+      "nextPackage": "AUDIO-220",
+      "autoStartNext": false
+    },
+    {
+      "id": "AUDIO-220",
+      "title": "Audio Package / License Compatibility",
+      "phase": "audio",
+      "status": "COMPLETE",
+      "kind": "audio",
+      "dependsOn": [
+        "AUDIO-210"
+      ],
+      "definition": "09_ROADMAP/WORK_PACKAGES/AUDIO-220.md",
+      "contextFiles": [
+        "AGENTS.md",
+        "CURRENT_SYSTEM_PRESERVATION_GATE.md",
+        "PLANS.md",
+        "MODEL_ROUTING.md",
+        "00_START_HERE/PRESERVATION_FIRST.md",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md",
+        "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+        "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+        "09_ROADMAP/PIXIEED_COMPLETION_ROADMAP.md",
+        "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md",
+        "CODEX_TASK_PROMPTS/README.md",
+        "02_ARCHITECTURE/CROSS_TOOL_LIVE_EDIT.md",
+        "02_ARCHITECTURE/ASSET_GRAPH.md",
+        "02_ARCHITECTURE/INTEGRATED_PACKAGE_FORMAT.md",
+        "docs/contracts/WP-190-AUDIO-CORE-BRIDGE.md",
+        "09_ROADMAP/WORK_PACKAGES/AUDIO-220.md"
+      ],
+      "allowedWriteGlobs": [
+        "pixiedraw2/src/audio/audio-220/**",
+        "pixiedraw2/tests/audio-220/**",
+        "pixiedraw2/benchmarks/audio-220/**",
+        "docs/contracts/AUDIO-220-*.md",
+        "docs/inventory/audio-220-*.json",
+        "docs/decisions/ADR-*-AUDIO-220-*.md"
+      ],
+      "forbiddenActions": [
+        "modify_current_production_routes_or_data",
+        "apply_production_migration",
+        "deploy_publish_commit_or_push",
+        "do_not_deploy",
+        "do_not_publish",
+        "do_not_commit",
+        "do_not_push",
+        "do_not_migrate",
+        "do_not_cutover",
+        "start_next_package_automatically",
+        "claim_unmeasured_or_synthetic_evidence_as_production_pass",
+        "edit_files_outside_AUDIO-220_write_scope",
+        "consume_or_publish_real_private_user_content"
+      ],
+      "acceptanceIds": [
+        "AUDIO220-SCOPE-001",
+        "AUDIO220-EVIDENCE-001",
+        "AUDIO220-STOP-001"
+      ],
+      "verificationLevel": "isolated-reference+targeted-tests+independent-review",
+      "implementationRoute": {
+        "model": "luna_max",
+        "reasoning": "Connect audio revisions to Package and License snapshots without raw-byte authority.",
+        "parallelism": 4
+      },
+      "reviewRoute": {
+        "model": "terra_high",
+        "reasoning": "Independent review of actual diff, evidence, negative cases, and residual risks.",
+        "independent": true
+      },
+      "nextPackage": "AUDIO-230",
+      "autoStartNext": false
+    },
+    {
+      "id": "AUDIO-230",
+      "title": "Audio Workspace and Device UX",
+      "phase": "audio",
+      "status": "COMPLETE",
+      "kind": "audio",
+      "dependsOn": [
+        "AUDIO-220"
+      ],
+      "definition": "09_ROADMAP/WORK_PACKAGES/AUDIO-230.md",
+      "contextFiles": [
+        "AGENTS.md",
+        "CURRENT_SYSTEM_PRESERVATION_GATE.md",
+        "PLANS.md",
+        "MODEL_ROUTING.md",
+        "00_START_HERE/PRESERVATION_FIRST.md",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md",
+        "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+        "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+        "09_ROADMAP/PIXIEED_COMPLETION_ROADMAP.md",
+        "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md",
+        "CODEX_TASK_PROMPTS/README.md",
+        "02_ARCHITECTURE/CROSS_TOOL_LIVE_EDIT.md",
+        "02_ARCHITECTURE/ASSET_GRAPH.md",
+        "02_ARCHITECTURE/INTEGRATED_PACKAGE_FORMAT.md",
+        "docs/contracts/WP-190-AUDIO-CORE-BRIDGE.md",
+        "09_ROADMAP/WORK_PACKAGES/AUDIO-230.md"
+      ],
+      "allowedWriteGlobs": [
+        "pixiedraw2/src/audio/audio-230/**",
+        "pixiedraw2/tests/audio-230/**",
+        "pixiedraw2/benchmarks/audio-230/**",
+        "docs/contracts/AUDIO-230-*.md",
+        "docs/inventory/audio-230-*.json",
+        "docs/decisions/ADR-*-AUDIO-230-*.md"
+      ],
+      "forbiddenActions": [
+        "modify_current_production_routes_or_data",
+        "apply_production_migration",
+        "deploy_publish_commit_or_push",
+        "do_not_deploy",
+        "do_not_publish",
+        "do_not_commit",
+        "do_not_push",
+        "do_not_migrate",
+        "do_not_cutover",
+        "start_next_package_automatically",
+        "claim_unmeasured_or_synthetic_evidence_as_production_pass",
+        "edit_files_outside_AUDIO-230_write_scope",
+        "consume_or_publish_real_private_user_content"
+      ],
+      "acceptanceIds": [
+        "AUDIO230-SCOPE-001",
+        "AUDIO230-EVIDENCE-001",
+        "AUDIO230-STOP-001"
+      ],
+      "verificationLevel": "isolated-reference+targeted-tests+independent-review",
+      "implementationRoute": {
+        "model": "luna_max",
+        "reasoning": "Provide adaptive audio workspace and device-safe controls.",
+        "parallelism": 4
+      },
+      "reviewRoute": {
+        "model": "terra_high",
+        "reasoning": "Independent review of actual diff, evidence, negative cases, and residual risks.",
+        "independent": true
+      },
+      "nextPackage": "AUDIO-240",
+      "autoStartNext": false
+    },
+    {
+      "id": "AUDIO-240",
+      "title": "Audio Completion Gate",
+      "phase": "audio",
+      "status": "COMPLETE",
+      "kind": "gate",
+      "dependsOn": [
+        "AUDIO-230"
+      ],
+      "definition": "09_ROADMAP/WORK_PACKAGES/AUDIO-240.md",
+      "contextFiles": [
+        "AGENTS.md",
+        "CURRENT_SYSTEM_PRESERVATION_GATE.md",
+        "PLANS.md",
+        "MODEL_ROUTING.md",
+        "00_START_HERE/PRESERVATION_FIRST.md",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md",
+        "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+        "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+        "09_ROADMAP/PIXIEED_COMPLETION_ROADMAP.md",
+        "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md",
+        "CODEX_TASK_PROMPTS/README.md",
+        "02_ARCHITECTURE/CROSS_TOOL_LIVE_EDIT.md",
+        "02_ARCHITECTURE/ASSET_GRAPH.md",
+        "02_ARCHITECTURE/INTEGRATED_PACKAGE_FORMAT.md",
+        "docs/contracts/WP-190-AUDIO-CORE-BRIDGE.md",
+        "09_ROADMAP/WORK_PACKAGES/AUDIO-240.md"
+      ],
+      "allowedWriteGlobs": [
+        "pixiedraw2/src/audio/audio-240/**",
+        "pixiedraw2/tests/audio-240/**",
+        "pixiedraw2/benchmarks/audio-240/**",
+        "docs/contracts/AUDIO-240-*.md",
+        "docs/inventory/audio-240-*.json",
+        "docs/decisions/ADR-*-AUDIO-240-*.md"
+      ],
+      "forbiddenActions": [
+        "modify_current_production_routes_or_data",
+        "apply_production_migration",
+        "deploy_publish_commit_or_push",
+        "do_not_deploy",
+        "do_not_publish",
+        "do_not_commit",
+        "do_not_push",
+        "do_not_migrate",
+        "do_not_cutover",
+        "start_next_package_automatically",
+        "claim_unmeasured_or_synthetic_evidence_as_production_pass",
+        "edit_files_outside_AUDIO-240_write_scope",
+        "consume_or_publish_real_private_user_content"
+      ],
+      "acceptanceIds": [
+        "AUDIO240-SCOPE-001",
+        "AUDIO240-EVIDENCE-001",
+        "AUDIO240-STOP-001"
+      ],
+      "verificationLevel": "isolated-reference+targeted-tests+independent-review",
+      "implementationRoute": {
+        "model": "terra_high",
+        "reasoning": "Close Audio correctness, lazy loading, accessibility, and performance evidence.",
+        "parallelism": 4
+      },
+      "reviewRoute": {
+        "model": "sol_max",
+        "reasoning": "Independent review of actual diff, evidence, negative cases, and residual risks.",
+        "independent": true
+      },
+      "nextPackage": "SITE-400",
+      "autoStartNext": false
+    },
+    {
+      "id": "GAME-300",
+      "title": "Game Project Core",
+      "phase": "game",
+      "status": "COMPLETE",
+      "kind": "game",
+      "dependsOn": [
+        "CORE-120"
+      ],
+      "definition": "09_ROADMAP/WORK_PACKAGES/GAME-300.md",
+      "contextFiles": [
+        "AGENTS.md",
+        "CURRENT_SYSTEM_PRESERVATION_GATE.md",
+        "PLANS.md",
+        "MODEL_ROUTING.md",
+        "00_START_HERE/PRESERVATION_FIRST.md",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md",
+        "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+        "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+        "09_ROADMAP/PIXIEED_COMPLETION_ROADMAP.md",
+        "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md",
+        "CODEX_TASK_PROMPTS/README.md",
+        "03_PRODUCTS/PIXIGAME_SPEC.md",
+        "03_PRODUCTS/PIXIGAME_AUTHORING_SPEC.md",
+        "03_PRODUCTS/PIXIGAME_SCRIPTING_SPEC.md",
+        "03_PRODUCTS/PIXIGAME_CUSTOM_CONTROL_UI_SPEC.md",
+        "03_PRODUCTS/PIXIRUNTIME_SPEC.md",
+        "02_ARCHITECTURE/CROSS_TOOL_LIVE_EDIT.md",
+        "02_ARCHITECTURE/BUILD_EXPORT_PIPELINE.md",
+        "02_ARCHITECTURE/INTEGRATED_PACKAGE_FORMAT.md",
+        "09_ROADMAP/WORK_PACKAGES/GAME-300.md"
+      ],
+      "allowedWriteGlobs": [
+        "pixiedraw2/src/game/game-300/**",
+        "pixiedraw2/tests/game-300/**",
+        "pixiedraw2/benchmarks/game-300/**",
+        "docs/contracts/GAME-300-*.md",
+        "docs/inventory/game-300-*.json",
+        "docs/decisions/ADR-*-GAME-300-*.md"
+      ],
+      "forbiddenActions": [
+        "modify_current_production_routes_or_data",
+        "apply_production_migration",
+        "deploy_publish_commit_or_push",
+        "do_not_deploy",
+        "do_not_publish",
+        "do_not_commit",
+        "do_not_push",
+        "do_not_migrate",
+        "do_not_cutover",
+        "start_next_package_automatically",
+        "claim_unmeasured_or_synthetic_evidence_as_production_pass",
+        "edit_files_outside_GAME-300_write_scope",
+        "consume_or_publish_real_private_user_content"
+      ],
+      "acceptanceIds": [
+        "GAME300-SCOPE-001",
+        "GAME300-EVIDENCE-001",
+        "GAME300-STOP-001"
+      ],
+      "verificationLevel": "isolated-reference+targeted-tests+independent-review",
+      "implementationRoute": {
+        "model": "luna_max",
+        "reasoning": "Create canonical Game Project, Scene, Entity, Component, and Revision boundaries.",
+        "parallelism": 4
+      },
+      "reviewRoute": {
+        "model": "terra_high",
+        "reasoning": "Independent review of actual diff, evidence, negative cases, and residual risks.",
+        "independent": true
+      },
+      "nextPackage": "GAME-310",
+      "autoStartNext": false
+    },
+    {
+      "id": "GAME-310",
+      "title": "Game Controls and Input Actions",
+      "phase": "game",
+      "status": "COMPLETE",
+      "kind": "game",
+      "dependsOn": [
+        "GAME-300"
+      ],
+      "definition": "09_ROADMAP/WORK_PACKAGES/GAME-310.md",
+      "contextFiles": [
+        "AGENTS.md",
+        "CURRENT_SYSTEM_PRESERVATION_GATE.md",
+        "PLANS.md",
+        "MODEL_ROUTING.md",
+        "00_START_HERE/PRESERVATION_FIRST.md",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md",
+        "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+        "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+        "09_ROADMAP/PIXIEED_COMPLETION_ROADMAP.md",
+        "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md",
+        "CODEX_TASK_PROMPTS/README.md",
+        "03_PRODUCTS/PIXIGAME_SPEC.md",
+        "03_PRODUCTS/PIXIGAME_AUTHORING_SPEC.md",
+        "03_PRODUCTS/PIXIGAME_SCRIPTING_SPEC.md",
+        "03_PRODUCTS/PIXIGAME_CUSTOM_CONTROL_UI_SPEC.md",
+        "03_PRODUCTS/PIXIRUNTIME_SPEC.md",
+        "02_ARCHITECTURE/CROSS_TOOL_LIVE_EDIT.md",
+        "02_ARCHITECTURE/BUILD_EXPORT_PIPELINE.md",
+        "02_ARCHITECTURE/INTEGRATED_PACKAGE_FORMAT.md",
+        "09_ROADMAP/WORK_PACKAGES/GAME-310.md"
+      ],
+      "allowedWriteGlobs": [
+        "pixiedraw2/src/game/game-310/**",
+        "pixiedraw2/tests/game-310/**",
+        "pixiedraw2/benchmarks/game-310/**",
+        "docs/contracts/GAME-310-*.md",
+        "docs/inventory/game-310-*.json",
+        "docs/decisions/ADR-*-GAME-310-*.md"
+      ],
+      "forbiddenActions": [
+        "modify_current_production_routes_or_data",
+        "apply_production_migration",
+        "deploy_publish_commit_or_push",
+        "do_not_deploy",
+        "do_not_publish",
+        "do_not_commit",
+        "do_not_push",
+        "do_not_migrate",
+        "do_not_cutover",
+        "start_next_package_automatically",
+        "claim_unmeasured_or_synthetic_evidence_as_production_pass",
+        "edit_files_outside_GAME-310_write_scope",
+        "consume_or_publish_real_private_user_content"
+      ],
+      "acceptanceIds": [
+        "GAME310-SCOPE-001",
+        "GAME310-EVIDENCE-001",
+        "GAME310-STOP-001"
+      ],
+      "verificationLevel": "isolated-reference+targeted-tests+independent-review",
+      "implementationRoute": {
+        "model": "luna_max",
+        "reasoning": "Provide semantic controls and input actions across desktop, tablet, and mobile.",
+        "parallelism": 4
+      },
+      "reviewRoute": {
+        "model": "terra_high",
+        "reasoning": "Independent review of actual diff, evidence, negative cases, and residual risks.",
+        "independent": true
+      },
+      "nextPackage": "GAME-320",
+      "autoStartNext": false
+    },
+    {
+      "id": "GAME-320",
+      "title": "Runtime Preview and Save State",
+      "phase": "game",
+      "status": "COMPLETE",
+      "kind": "game",
+      "dependsOn": [
+        "GAME-310"
+      ],
+      "definition": "09_ROADMAP/WORK_PACKAGES/GAME-320.md",
+      "contextFiles": [
+        "AGENTS.md",
+        "CURRENT_SYSTEM_PRESERVATION_GATE.md",
+        "PLANS.md",
+        "MODEL_ROUTING.md",
+        "00_START_HERE/PRESERVATION_FIRST.md",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md",
+        "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+        "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+        "09_ROADMAP/PIXIEED_COMPLETION_ROADMAP.md",
+        "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md",
+        "CODEX_TASK_PROMPTS/README.md",
+        "03_PRODUCTS/PIXIGAME_SPEC.md",
+        "03_PRODUCTS/PIXIGAME_AUTHORING_SPEC.md",
+        "03_PRODUCTS/PIXIGAME_SCRIPTING_SPEC.md",
+        "03_PRODUCTS/PIXIGAME_CUSTOM_CONTROL_UI_SPEC.md",
+        "03_PRODUCTS/PIXIRUNTIME_SPEC.md",
+        "02_ARCHITECTURE/CROSS_TOOL_LIVE_EDIT.md",
+        "02_ARCHITECTURE/BUILD_EXPORT_PIPELINE.md",
+        "02_ARCHITECTURE/INTEGRATED_PACKAGE_FORMAT.md",
+        "09_ROADMAP/WORK_PACKAGES/GAME-320.md"
+      ],
+      "allowedWriteGlobs": [
+        "pixiedraw2/src/game/game-320/**",
+        "pixiedraw2/tests/game-320/**",
+        "pixiedraw2/benchmarks/game-320/**",
+        "docs/contracts/GAME-320-*.md",
+        "docs/inventory/game-320-*.json",
+        "docs/decisions/ADR-*-GAME-320-*.md"
+      ],
+      "forbiddenActions": [
+        "modify_current_production_routes_or_data",
+        "apply_production_migration",
+        "deploy_publish_commit_or_push",
+        "do_not_deploy",
+        "do_not_publish",
+        "do_not_commit",
+        "do_not_push",
+        "do_not_migrate",
+        "do_not_cutover",
+        "start_next_package_automatically",
+        "claim_unmeasured_or_synthetic_evidence_as_production_pass",
+        "edit_files_outside_GAME-320_write_scope",
+        "consume_or_publish_real_private_user_content"
+      ],
+      "acceptanceIds": [
+        "GAME320-SCOPE-001",
+        "GAME320-EVIDENCE-001",
+        "GAME320-STOP-001"
+      ],
+      "verificationLevel": "isolated-reference+targeted-tests+independent-review",
+      "implementationRoute": {
+        "model": "luna_max",
+        "reasoning": "Separate editable Game Project State from versioned Runtime Save State.",
+        "parallelism": 4
+      },
+      "reviewRoute": {
+        "model": "terra_high",
+        "reasoning": "Independent review of actual diff, evidence, negative cases, and residual risks.",
+        "independent": true
+      },
+      "nextPackage": "GAME-330",
+      "autoStartNext": false
+    },
+    {
+      "id": "GAME-330",
+      "title": "Game Build and Artifact Provenance",
+      "phase": "game",
+      "status": "COMPLETE",
+      "kind": "game",
+      "dependsOn": [
+        "GAME-320"
+      ],
+      "definition": "09_ROADMAP/WORK_PACKAGES/GAME-330.md",
+      "contextFiles": [
+        "AGENTS.md",
+        "CURRENT_SYSTEM_PRESERVATION_GATE.md",
+        "PLANS.md",
+        "MODEL_ROUTING.md",
+        "00_START_HERE/PRESERVATION_FIRST.md",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md",
+        "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+        "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+        "09_ROADMAP/PIXIEED_COMPLETION_ROADMAP.md",
+        "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md",
+        "CODEX_TASK_PROMPTS/README.md",
+        "03_PRODUCTS/PIXIGAME_SPEC.md",
+        "03_PRODUCTS/PIXIGAME_AUTHORING_SPEC.md",
+        "03_PRODUCTS/PIXIGAME_SCRIPTING_SPEC.md",
+        "03_PRODUCTS/PIXIGAME_CUSTOM_CONTROL_UI_SPEC.md",
+        "03_PRODUCTS/PIXIRUNTIME_SPEC.md",
+        "02_ARCHITECTURE/CROSS_TOOL_LIVE_EDIT.md",
+        "02_ARCHITECTURE/BUILD_EXPORT_PIPELINE.md",
+        "02_ARCHITECTURE/INTEGRATED_PACKAGE_FORMAT.md",
+        "09_ROADMAP/WORK_PACKAGES/GAME-330.md"
+      ],
+      "allowedWriteGlobs": [
+        "pixiedraw2/src/game/game-330/**",
+        "pixiedraw2/tests/game-330/**",
+        "pixiedraw2/benchmarks/game-330/**",
+        "docs/contracts/GAME-330-*.md",
+        "docs/inventory/game-330-*.json",
+        "docs/decisions/ADR-*-GAME-330-*.md"
+      ],
+      "forbiddenActions": [
+        "modify_current_production_routes_or_data",
+        "apply_production_migration",
+        "deploy_publish_commit_or_push",
+        "do_not_deploy",
+        "do_not_publish",
+        "do_not_commit",
+        "do_not_push",
+        "do_not_migrate",
+        "do_not_cutover",
+        "start_next_package_automatically",
+        "claim_unmeasured_or_synthetic_evidence_as_production_pass",
+        "edit_files_outside_GAME-330_write_scope",
+        "consume_or_publish_real_private_user_content"
+      ],
+      "acceptanceIds": [
+        "GAME330-SCOPE-001",
+        "GAME330-EVIDENCE-001",
+        "GAME330-STOP-001"
+      ],
+      "verificationLevel": "isolated-reference+targeted-tests+independent-review",
+      "implementationRoute": {
+        "model": "luna_max",
+        "reasoning": "Produce deterministic build plans, artifacts, dependency locks, and provenance.",
+        "parallelism": 4
+      },
+      "reviewRoute": {
+        "model": "terra_high",
+        "reasoning": "Independent review of actual diff, evidence, negative cases, and residual risks.",
+        "independent": true
+      },
+      "nextPackage": "GAME-340",
+      "autoStartNext": false
+    },
+    {
+      "id": "GAME-340",
+      "title": "Game Package / Draw / Audio Integration",
+      "phase": "game",
+      "status": "COMPLETE",
+      "kind": "game",
+      "dependsOn": [
+        "GAME-330",
+        "DRAW-160",
+        "AUDIO-230"
+      ],
+      "definition": "09_ROADMAP/WORK_PACKAGES/GAME-340.md",
+      "contextFiles": [
+        "AGENTS.md",
+        "CURRENT_SYSTEM_PRESERVATION_GATE.md",
+        "PLANS.md",
+        "MODEL_ROUTING.md",
+        "00_START_HERE/PRESERVATION_FIRST.md",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md",
+        "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+        "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+        "09_ROADMAP/PIXIEED_COMPLETION_ROADMAP.md",
+        "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md",
+        "CODEX_TASK_PROMPTS/README.md",
+        "03_PRODUCTS/PIXIGAME_SPEC.md",
+        "03_PRODUCTS/PIXIGAME_AUTHORING_SPEC.md",
+        "03_PRODUCTS/PIXIGAME_SCRIPTING_SPEC.md",
+        "03_PRODUCTS/PIXIGAME_CUSTOM_CONTROL_UI_SPEC.md",
+        "03_PRODUCTS/PIXIRUNTIME_SPEC.md",
+        "02_ARCHITECTURE/CROSS_TOOL_LIVE_EDIT.md",
+        "02_ARCHITECTURE/BUILD_EXPORT_PIPELINE.md",
+        "02_ARCHITECTURE/INTEGRATED_PACKAGE_FORMAT.md",
+        "09_ROADMAP/WORK_PACKAGES/GAME-340.md"
+      ],
+      "allowedWriteGlobs": [
+        "pixiedraw2/src/game/game-340/**",
+        "pixiedraw2/tests/game-340/**",
+        "pixiedraw2/benchmarks/game-340/**",
+        "docs/contracts/GAME-340-*.md",
+        "docs/inventory/game-340-*.json",
+        "docs/decisions/ADR-*-GAME-340-*.md"
+      ],
+      "forbiddenActions": [
+        "modify_current_production_routes_or_data",
+        "apply_production_migration",
+        "deploy_publish_commit_or_push",
+        "do_not_deploy",
+        "do_not_publish",
+        "do_not_commit",
+        "do_not_push",
+        "do_not_migrate",
+        "do_not_cutover",
+        "start_next_package_automatically",
+        "claim_unmeasured_or_synthetic_evidence_as_production_pass",
+        "edit_files_outside_GAME-340_write_scope",
+        "consume_or_publish_real_private_user_content"
+      ],
+      "acceptanceIds": [
+        "GAME340-SCOPE-001",
+        "GAME340-EVIDENCE-001",
+        "GAME340-STOP-001"
+      ],
+      "verificationLevel": "isolated-reference+targeted-tests+independent-review",
+      "implementationRoute": {
+        "model": "luna_max",
+        "reasoning": "Integrate Draw2 and Audio assets through package references with fail-closed checks.",
+        "parallelism": 4
+      },
+      "reviewRoute": {
+        "model": "terra_high",
+        "reasoning": "Independent review of actual diff, evidence, negative cases, and residual risks.",
+        "independent": true
+      },
+      "nextPackage": "GAME-350",
+      "autoStartNext": false
+    },
+    {
+      "id": "GAME-350",
+      "title": "Game Completion Gate",
+      "phase": "game",
+      "status": "COMPLETE_CANDIDATE",
+      "kind": "gate",
+      "dependsOn": [
+        "GAME-340"
+      ],
+      "definition": "09_ROADMAP/WORK_PACKAGES/GAME-350.md",
+      "contextFiles": [
+        "AGENTS.md",
+        "CURRENT_SYSTEM_PRESERVATION_GATE.md",
+        "PLANS.md",
+        "MODEL_ROUTING.md",
+        "00_START_HERE/PRESERVATION_FIRST.md",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md",
+        "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+        "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+        "09_ROADMAP/PIXIEED_COMPLETION_ROADMAP.md",
+        "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md",
+        "CODEX_TASK_PROMPTS/README.md",
+        "03_PRODUCTS/PIXIGAME_SPEC.md",
+        "03_PRODUCTS/PIXIGAME_AUTHORING_SPEC.md",
+        "03_PRODUCTS/PIXIGAME_SCRIPTING_SPEC.md",
+        "03_PRODUCTS/PIXIGAME_CUSTOM_CONTROL_UI_SPEC.md",
+        "03_PRODUCTS/PIXIRUNTIME_SPEC.md",
+        "02_ARCHITECTURE/CROSS_TOOL_LIVE_EDIT.md",
+        "02_ARCHITECTURE/BUILD_EXPORT_PIPELINE.md",
+        "02_ARCHITECTURE/INTEGRATED_PACKAGE_FORMAT.md",
+        "09_ROADMAP/WORK_PACKAGES/GAME-350.md"
+      ],
+      "allowedWriteGlobs": [
+        "pixiedraw2/src/game/game-350/**",
+        "pixiedraw2/tests/game-350/**",
+        "pixiedraw2/benchmarks/game-350/**",
+        "docs/contracts/GAME-350-*.md",
+        "docs/inventory/game-350-*.json",
+        "docs/decisions/ADR-*-GAME-350-*.md"
+      ],
+      "forbiddenActions": [
+        "modify_current_production_routes_or_data",
+        "apply_production_migration",
+        "deploy_publish_commit_or_push",
+        "do_not_deploy",
+        "do_not_publish",
+        "do_not_commit",
+        "do_not_push",
+        "do_not_migrate",
+        "do_not_cutover",
+        "start_next_package_automatically",
+        "claim_unmeasured_or_synthetic_evidence_as_production_pass",
+        "edit_files_outside_GAME-350_write_scope",
+        "consume_or_publish_real_private_user_content"
+      ],
+      "acceptanceIds": [
+        "GAME350-SCOPE-001",
+        "GAME350-EVIDENCE-001",
+        "GAME350-STOP-001"
+      ],
+      "verificationLevel": "isolated-reference+targeted-tests+independent-review",
+      "implementationRoute": {
+        "model": "terra_high",
+        "reasoning": "Close Game preview, build, recovery, capability, and lazy-boundary evidence.",
+        "parallelism": 4
+      },
+      "reviewRoute": {
+        "model": "sol_max",
+        "reasoning": "Independent review of actual diff, evidence, negative cases, and residual risks.",
+        "independent": true
+      },
+      "nextPackage": "SITE-400",
+      "autoStartNext": false
+    },
+    {
+      "id": "SITE-400",
+      "title": "Site Shell and Cross-Tool Integration",
+      "phase": "platform-site",
+      "status": "COMPLETE_CANDIDATE",
+      "kind": "site",
+      "dependsOn": [
+        "DRAW-170",
+        "AUDIO-240",
+        "GAME-350"
+      ],
+      "definition": "09_ROADMAP/WORK_PACKAGES/SITE-400.md",
+      "contextFiles": [
+        "AGENTS.md",
+        "CURRENT_SYSTEM_PRESERVATION_GATE.md",
+        "PLANS.md",
+        "MODEL_ROUTING.md",
+        "00_START_HERE/PRESERVATION_FIRST.md",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md",
+        "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+        "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+        "09_ROADMAP/PIXIEED_COMPLETION_ROADMAP.md",
+        "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md",
+        "CODEX_TASK_PROMPTS/README.md",
+        "02_ARCHITECTURE/PIXIEED_PRODUCT_STRATEGY.md",
+        "02_ARCHITECTURE/APP_SHELL_NAVIGATION_DESIGN_SYSTEM_CORE.md",
+        "02_ARCHITECTURE/TOOL_BRIDGE_CORE.md",
+        "02_ARCHITECTURE/PUBLIC_URL_ROUTING_CORE.md",
+        "09_ROADMAP/WORK_PACKAGES/SITE-400.md"
+      ],
+      "allowedWriteGlobs": [
+        "pixiedraw2/src/platform/site-400/**",
+        "pixiedraw2/tests/site-400/**",
+        "pixiedraw2/benchmarks/site-400/**",
+        "docs/contracts/SITE-400-*.md",
+        "docs/inventory/site-400-*.json",
+        "docs/decisions/ADR-*-SITE-400-*.md"
+      ],
+      "forbiddenActions": [
+        "modify_current_production_routes_or_data",
+        "apply_production_migration",
+        "deploy_publish_commit_or_push",
+        "do_not_deploy",
+        "do_not_publish",
+        "do_not_commit",
+        "do_not_push",
+        "do_not_migrate",
+        "do_not_cutover",
+        "start_next_package_automatically",
+        "claim_unmeasured_or_synthetic_evidence_as_production_pass",
+        "edit_files_outside_SITE-400_write_scope",
+        "consume_or_publish_real_private_user_content"
+      ],
+      "acceptanceIds": [
+        "SITE400-SCOPE-001",
+        "SITE400-EVIDENCE-001",
+        "SITE400-STOP-001"
+      ],
+      "verificationLevel": "isolated-reference+targeted-tests+independent-review",
+      "implementationRoute": {
+        "model": "luna_max",
+        "reasoning": "Connect Core, Draw2, Audio, and Game surfaces behind safe shell boundaries.",
+        "parallelism": 4
+      },
+      "reviewRoute": {
+        "model": "terra_high",
+        "reasoning": "Independent review of actual diff, evidence, negative cases, and residual risks.",
+        "independent": true
+      },
+      "nextPackage": "MARKET-410",
+      "autoStartNext": false
+    },
+    {
+      "id": "MARKET-410",
+      "title": "Market / Rights / Commerce Compatibility",
+      "phase": "platform-site",
+      "status": "COMPLETE_CANDIDATE",
+      "kind": "market",
+      "dependsOn": [
+        "SITE-400"
+      ],
+      "definition": "09_ROADMAP/WORK_PACKAGES/MARKET-410.md",
+      "contextFiles": [
+        "AGENTS.md",
+        "CURRENT_SYSTEM_PRESERVATION_GATE.md",
+        "PLANS.md",
+        "MODEL_ROUTING.md",
+        "00_START_HERE/PRESERVATION_FIRST.md",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md",
+        "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+        "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+        "09_ROADMAP/PIXIEED_COMPLETION_ROADMAP.md",
+        "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md",
+        "CODEX_TASK_PROMPTS/README.md",
+        "02_ARCHITECTURE/FINANCIAL_INTEGRITY_CORE.md",
+        "docs/contracts/FP-003-FINANCIAL-INTEGRITY.md",
+        "docs/contracts/WP-210-MARKET-RIGHTS-COMMERCE.md",
+        "09_ROADMAP/WORK_PACKAGES/MARKET-410.md"
+      ],
+      "allowedWriteGlobs": [
+        "pixiedraw2/src/platform/market-410/**",
+        "pixiedraw2/tests/market-410/**",
+        "pixiedraw2/benchmarks/market-410/**",
+        "docs/contracts/MARKET-410-*.md",
+        "docs/inventory/market-410-*.json",
+        "docs/decisions/ADR-*-MARKET-410-*.md"
+      ],
+      "forbiddenActions": [
+        "modify_current_production_routes_or_data",
+        "apply_production_migration",
+        "deploy_publish_commit_or_push",
+        "do_not_deploy",
+        "do_not_publish",
+        "do_not_commit",
+        "do_not_push",
+        "do_not_migrate",
+        "do_not_cutover",
+        "start_next_package_automatically",
+        "claim_unmeasured_or_synthetic_evidence_as_production_pass",
+        "edit_files_outside_MARKET-410_write_scope",
+        "consume_or_publish_real_private_user_content"
+      ],
+      "acceptanceIds": [
+        "MARKET410-SCOPE-001",
+        "MARKET410-EVIDENCE-001",
+        "MARKET410-STOP-001"
+      ],
+      "verificationLevel": "isolated-reference+targeted-tests+independent-review",
+      "implementationRoute": {
+        "model": "luna_max",
+        "reasoning": "Compose the existing WP-210 projection and FP-003 financial contracts through an isolated Market-410 authority boundary.",
+        "parallelism": 4
+      },
+      "reviewRoute": {
+        "model": "terra_high",
+        "reasoning": "Independent review of the actual Market-410 diff, evidence, negative cases, and residual risks under the current agent protocol.",
+        "independent": true
+      },
+      "nextPackage": "WORK-420",
+      "autoStartNext": false
+    },
+    {
+      "id": "WORK-420",
+      "title": "Direct Work and Billing Compatibility",
+      "phase": "platform-site",
+      "status": "COMPLETE_CANDIDATE",
+      "kind": "direct-work",
+      "dependsOn": [
+        "MARKET-410"
+      ],
+      "definition": "09_ROADMAP/WORK_PACKAGES/WORK-420.md",
+      "contextFiles": [
+        "AGENTS.md",
+        "CURRENT_SYSTEM_PRESERVATION_GATE.md",
+        "PLANS.md",
+        "MODEL_ROUTING.md",
+        "00_START_HERE/PRESERVATION_FIRST.md",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md",
+        "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+        "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+        "09_ROADMAP/PIXIEED_COMPLETION_ROADMAP.md",
+        "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md",
+        "CODEX_TASK_PROMPTS/README.md",
+        "02_ARCHITECTURE/DIRECT_WORK_AGGREGATE_INTEGRITY.md",
+        "docs/contracts/FP-002-DIRECT-WORK-AGGREGATE-INTEGRITY.md",
+        "docs/contracts/WP-220-DIRECT-WORK-BILLING.md",
+        "09_ROADMAP/WORK_PACKAGES/WORK-420.md"
+      ],
+      "allowedWriteGlobs": [
+        "pixiedraw2/src/platform/work-420/**",
+        "pixiedraw2/tests/work-420/**",
+        "pixiedraw2/benchmarks/work-420/**",
+        "docs/contracts/WORK-420-*.md",
+        "docs/inventory/work-420-*.json",
+        "docs/decisions/ADR-*-WORK-420-*.md"
+      ],
+      "forbiddenActions": [
+        "modify_current_production_routes_or_data",
+        "apply_production_migration",
+        "deploy_publish_commit_or_push",
+        "do_not_deploy",
+        "do_not_publish",
+        "do_not_commit",
+        "do_not_push",
+        "do_not_migrate",
+        "do_not_cutover",
+        "start_next_package_automatically",
+        "claim_unmeasured_or_synthetic_evidence_as_production_pass",
+        "edit_files_outside_WORK-420_write_scope",
+        "consume_or_publish_real_private_user_content"
+      ],
+      "acceptanceIds": [
+        "WORK420-SCOPE-001",
+        "WORK420-EVIDENCE-001",
+        "WORK420-STOP-001"
+      ],
+      "verificationLevel": "isolated-reference+targeted-tests+independent-review",
+      "implementationRoute": {
+        "model": "luna_max",
+        "reasoning": "Compose a bounded, server-authoritative Direct Work aggregate over the existing FP-002/FP-003 contracts without touching current routes or production data.",
+        "parallelism": 4
+      },
+      "reviewRoute": {
+        "model": "terra_high",
+        "reasoning": "Independent review of the actual WORK-420 diff, full-chain stale-record attacks, evidence truthfulness, and residual boundaries.",
+        "independent": true
+      },
+      "nextPackage": "SOCIAL-430",
+      "autoStartNext": false
+    },
+    {
+      "id": "SOCIAL-430",
+      "title": "Social / Community / Creator Integration",
+      "phase": "platform-site",
+      "status": "COMPLETE_CANDIDATE",
+      "kind": "social",
+      "dependsOn": [
+        "WORK-420"
+      ],
+      "definition": "09_ROADMAP/WORK_PACKAGES/SOCIAL-430.md",
+      "contextFiles": [
+        "AGENTS.md",
+        "CURRENT_SYSTEM_PRESERVATION_GATE.md",
+        "PLANS.md",
+        "MODEL_ROUTING.md",
+        "00_START_HERE/PRESERVATION_FIRST.md",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md",
+        "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+        "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+        "09_ROADMAP/PIXIEED_COMPLETION_ROADMAP.md",
+        "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md",
+        "CODEX_TASK_PROMPTS/README.md",
+        "02_ARCHITECTURE/EVENT_ACTIVITY_CORE.md",
+        "02_ARCHITECTURE/SEARCH_INDEX_CORE.md",
+        "02_ARCHITECTURE/NOTIFICATION_CORE.md",
+        "docs/contracts/WP-230-SNS-COMMUNITY-CREATOR.md",
+        "09_ROADMAP/WORK_PACKAGES/SOCIAL-430.md"
+      ],
+      "allowedWriteGlobs": [
+        "pixiedraw2/src/platform/social-430/**",
+        "pixiedraw2/tests/social-430/**",
+        "pixiedraw2/benchmarks/social-430/**",
+        "docs/contracts/SOCIAL-430-*.md",
+        "docs/inventory/social-430-*.json",
+        "docs/decisions/ADR-*-SOCIAL-430-*.md"
+      ],
+      "forbiddenActions": [
+        "modify_current_production_routes_or_data",
+        "apply_production_migration",
+        "deploy_publish_commit_or_push",
+        "do_not_deploy",
+        "do_not_publish",
+        "do_not_commit",
+        "do_not_push",
+        "do_not_migrate",
+        "do_not_cutover",
+        "start_next_package_automatically",
+        "claim_unmeasured_or_synthetic_evidence_as_production_pass",
+        "edit_files_outside_SOCIAL-430_write_scope",
+        "consume_or_publish_real_private_user_content"
+      ],
+      "acceptanceIds": [
+        "SOCIAL430-SCOPE-001",
+        "SOCIAL430-EVIDENCE-001",
+        "SOCIAL430-STOP-001"
+      ],
+      "verificationLevel": "isolated-reference+targeted-tests+independent-review",
+      "implementationRoute": {
+        "model": "luna_max",
+        "reasoning": "Connect Posts, Comments, Creator, Project, My Page, and Market Card references safely.",
+        "parallelism": 4
+      },
+      "reviewRoute": {
+        "model": "terra_high",
+        "reasoning": "Independent review of actual diff, evidence, negative cases, and residual risks.",
+        "independent": true
+      },
+      "nextPackage": "OPS-440",
+      "autoStartNext": false
+    },
+    {
+      "id": "OPS-440",
+      "title": "Operations / Admin / Analytics / Ads",
+      "phase": "platform-site",
+      "status": "COMPLETE_CANDIDATE",
+      "kind": "operations",
+      "dependsOn": [
+        "SOCIAL-430"
+      ],
+      "definition": "09_ROADMAP/WORK_PACKAGES/OPS-440.md",
+      "contextFiles": [
+        "AGENTS.md",
+        "CURRENT_SYSTEM_PRESERVATION_GATE.md",
+        "PLANS.md",
+        "MODEL_ROUTING.md",
+        "00_START_HERE/PRESERVATION_FIRST.md",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md",
+        "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+        "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+        "09_ROADMAP/PIXIEED_COMPLETION_ROADMAP.md",
+        "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md",
+        "CODEX_TASK_PROMPTS/README.md",
+        "docs/contracts/WP-240-ADMIN-ANALYTICS-ADS-REVENUE.md",
+        "docs/contracts/WP-250-POLICY-ECONOMICS.md",
+        "02_ARCHITECTURE/ACCOUNT_PERMISSION_CORE.md",
+        "09_ROADMAP/WORK_PACKAGES/OPS-440.md"
+      ],
+      "allowedWriteGlobs": [
+        "pixiedraw2/src/platform/ops-440/**",
+        "pixiedraw2/tests/ops-440/**",
+        "pixiedraw2/benchmarks/ops-440/**",
+        "docs/contracts/OPS-440-*.md",
+        "docs/inventory/ops-440-*.json",
+        "docs/decisions/ADR-*-OPS-440-*.md"
+      ],
+      "forbiddenActions": [
+        "modify_current_production_routes_or_data",
+        "apply_production_migration",
+        "deploy_publish_commit_or_push",
+        "do_not_deploy",
+        "do_not_publish",
+        "do_not_commit",
+        "do_not_push",
+        "do_not_migrate",
+        "do_not_cutover",
+        "start_next_package_automatically",
+        "claim_unmeasured_or_synthetic_evidence_as_production_pass",
+        "edit_files_outside_OPS-440_write_scope",
+        "consume_or_publish_real_private_user_content"
+      ],
+      "acceptanceIds": [
+        "OPS440-SCOPE-001",
+        "OPS440-EVIDENCE-001",
+        "OPS440-STOP-001"
+      ],
+      "verificationLevel": "isolated-reference+targeted-tests+independent-review",
+      "implementationRoute": {
+        "model": "luna_max",
+        "reasoning": "Provide permission-gated operations, privacy-safe analytics, ads, and moderation references.",
+        "parallelism": 4
+      },
+      "reviewRoute": {
+        "model": "terra_high",
+        "reasoning": "Independent review of actual diff, evidence, negative cases, and residual risks.",
+        "independent": true
+      },
+      "nextPackage": "SITE-460",
+      "autoStartNext": false
+    },
+    {
+      "id": "PLATFORM-450",
+      "title": "Platform Completion and Rollback Integration",
+      "phase": "platform-site",
+      "status": "COMPLETE_CANDIDATE",
+      "kind": "gate",
+      "dependsOn": [
+        "OPS-440"
+      ],
+      "definition": "09_ROADMAP/WORK_PACKAGES/PLATFORM-450.md",
+      "contextFiles": [
+        "AGENTS.md",
+        "CURRENT_SYSTEM_PRESERVATION_GATE.md",
+        "PLANS.md",
+        "MODEL_ROUTING.md",
+        "00_START_HERE/PRESERVATION_FIRST.md",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md",
+        "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+        "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+        "09_ROADMAP/PIXIEED_COMPLETION_ROADMAP.md",
+        "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md",
+        "CODEX_TASK_PROMPTS/README.md",
+        "02_ARCHITECTURE/PIXIEED_PRODUCT_STRATEGY.md",
+        "02_ARCHITECTURE/CROSS_TOOL_LIVE_EDIT.md",
+        "02_ARCHITECTURE/APP_SHELL_NAVIGATION_DESIGN_SYSTEM_CORE.md",
+        "02_ARCHITECTURE/EVENT_ACTIVITY_CORE.md",
+        "09_ROADMAP/WORK_PACKAGES/PLATFORM-450.md"
+      ],
+      "allowedWriteGlobs": [
+        "pixiedraw2/src/platform/platform-450/**",
+        "pixiedraw2/tests/platform-450/**",
+        "pixiedraw2/benchmarks/platform-450/**",
+        "docs/contracts/PLATFORM-450-*.md",
+        "docs/inventory/platform-450-*.json",
+        "docs/decisions/ADR-*-PLATFORM-450-*.md"
+      ],
+      "forbiddenActions": [
+        "modify_current_production_routes_or_data",
+        "apply_production_migration",
+        "deploy_publish_commit_or_push",
+        "do_not_deploy",
+        "do_not_publish",
+        "do_not_commit",
+        "do_not_push",
+        "do_not_migrate",
+        "do_not_cutover",
+        "start_next_package_automatically",
+        "claim_unmeasured_or_synthetic_evidence_as_production_pass",
+        "edit_files_outside_PLATFORM-450_write_scope",
+        "consume_or_publish_real_private_user_content"
+      ],
+      "acceptanceIds": [
+        "PLATFORM450-SCOPE-001",
+        "PLATFORM450-EVIDENCE-001",
+        "PLATFORM450-STOP-001"
+      ],
+      "verificationLevel": "isolated-reference+targeted-tests+independent-review",
+      "implementationRoute": {
+        "model": "luna_max",
+        "reasoning": "Prove site-wide flags, rollback, compatibility, observability, and non-intrusion.",
+        "parallelism": 4
+      },
+      "reviewRoute": {
+        "model": "sol_max",
+        "reasoning": "Independent review of actual diff, evidence, negative cases, and residual risks.",
+        "independent": true
+      },
+      "nextPackage": "SITE-460",
+      "autoStartNext": false
+    },
+    {
+      "id": "SITE-460",
+      "title": "Browser Site Connection and Usability",
+      "phase": "platform-site",
+      "status": "COMPLETE_CANDIDATE",
+      "kind": "site-connection",
+      "dependsOn": ["PLATFORM-450"],
+      "definition": "09_ROADMAP/WORK_PACKAGES/SITE-460.md",
+      "contextFiles": [
+        "AGENTS.md",
+        "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+        "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+        "09_ROADMAP/PIXIEED_COMPLETION_ROADMAP.md",
+        "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md",
+        "09_ROADMAP/WORK_PACKAGES/SITE-460.md",
+        "pixiedraw2/index.html",
+        "pixiedraw2/deno.json",
+        "pixiedraw2/src/platform/site-400/local-browser-entry.ts",
+        "pixiedraw2/src/platform/site-400/local-route.ts",
+        "pixiedraw2/src/platform/platform-450/contracts.ts",
+        "docs/inventory/platform-450-evidence.json",
+        "docs/inventory/platform-450-connection.json"
+      ],
+      "allowedWriteGlobs": [
+        "pixiedraw2/src/platform/site-460/**",
+        "pixiedraw2/tests/platform-site-460/**",
+        "pixiedraw2/benchmarks/platform-site-460/**",
+        "pixiedraw2/index.html",
+        "pixiedraw2/deno.json",
+        "pixiedraw2/dist/site460-browser-entry.js",
+        "docs/contracts/SITE-460-*.md",
+        "docs/inventory/site-460-*.json",
+        "docs/decisions/ADR-*-SITE-460-*.md"
+      ],
+      "forbiddenActions": [
+        "replace_or_cut_over_existing_routes",
+        "cutover",
+        "modify_production_data_or_database",
+        "migration",
+        "deploy_publish_commit_or_push",
+        "native_or_store_work",
+        "claim_local_browser_evidence_as_production_qualification",
+        "start_next_package_automatically"
+      ],
+      "acceptanceIds": ["SITE460-CONNECTION-001", "SITE460-BROWSER-001", "SITE460-PRESERVE-001"],
+      "verificationLevel": "local-browser+feature-flag+existing-route-preservation",
+      "implementationRoute": {
+        "model": "luna_high",
+        "reasoning": "Implement one bounded, feature-flagged browser connection seam with a user-visible smoke path.",
+        "parallelism": 1
+      },
+      "reviewRoute": {
+        "model": "sol_max",
+        "reasoning": "Read-only integration check; no Terra audit for this handoff.",
+        "independent": true
+      },
+      "nextPackage": "NATIVE-500",
+      "autoStartNext": false
+    },
+    {
+      "id": "NATIVE-500",
+      "title": "Cross-platform Host Boundary",
+      "phase": "native",
+      "status": "PLANNED",
+      "kind": "native",
+      "dependsOn": [
+        "PLATFORM-450"
+      ],
+      "definition": "09_ROADMAP/WORK_PACKAGES/NATIVE-500.md",
+      "contextFiles": [
+        "AGENTS.md",
+        "CURRENT_SYSTEM_PRESERVATION_GATE.md",
+        "PLANS.md",
+        "MODEL_ROUTING.md",
+        "00_START_HERE/PRESERVATION_FIRST.md",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md",
+        "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+        "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+        "09_ROADMAP/PIXIEED_COMPLETION_ROADMAP.md",
+        "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md",
+        "CODEX_TASK_PROMPTS/README.md",
+        "08_IMPLEMENTATION/TECH_STACK.md",
+        "app-shell/pixieed-capacitor/package.json",
+        "03_PRODUCTS/PIXIEED_APP_DISTRIBUTION_SPEC.md",
+        "08_IMPLEMENTATION/NATIVE_APP_SHELL_STRATEGY.md",
+        "docs/decisions/ADR-20260810-WEB-NATIVE-DISTRIBUTION.md",
+        "docs/inventory/current-native-shell-readiness-20260810.md",
+        "03_PRODUCTS/PIXIEEDRAW2_UX_SPEC.md",
+        "09_ROADMAP/WORK_PACKAGES/NATIVE-500.md"
+      ],
+      "allowedWriteGlobs": [
+        "native/native-500/**",
+        "docs/contracts/NATIVE-500-*.md",
+        "docs/inventory/native-500-*.json",
+        "docs/decisions/ADR-*-NATIVE-500-*.md"
+      ],
+      "forbiddenActions": [
+        "modify_current_production_routes_or_data",
+        "apply_production_migration",
+        "deploy_publish_commit_or_push",
+        "do_not_deploy",
+        "do_not_publish",
+        "do_not_commit",
+        "do_not_push",
+        "do_not_migrate",
+        "do_not_cutover",
+        "start_next_package_automatically",
+        "claim_unmeasured_or_synthetic_evidence_as_production_pass",
+        "store_submission_or_deploy",
+        "access_signing_keys_or_store_accounts",
+        "fork_canonical_project_or_Core_by_shell"
+      ],
+      "acceptanceIds": [
+        "NATIVE500-HOST-001",
+        "NATIVE500-WORKSPACE-001",
+        "NATIVE500-BROWSERFIRST-001",
+        "NATIVE500-SECURITY-001",
+        "NATIVE500-FORK-001",
+        "NATIVE500-ADR-001"
+      ],
+      "verificationLevel": "browser-pwa-first+host-boundary+independent-review",
+      "implementationRoute": {
+        "model": "luna_max",
+        "reasoning": "Define one canonical Core/project contract behind Browser/PWA, desktop, and mobile host adapters.",
+        "parallelism": 4
+      },
+      "reviewRoute": {
+        "model": "sol_high",
+        "reasoning": "Independent review of actual diff, evidence, negative cases, and residual risks.",
+        "independent": true
+      },
+      "nextPackage": "NATIVE-510",
+      "autoStartNext": false
+    },
+    {
+      "id": "NATIVE-510",
+      "title": "Desktop Native Distribution",
+      "phase": "native",
+      "status": "PLANNED",
+      "kind": "native",
+      "dependsOn": [
+        "NATIVE-500"
+      ],
+      "definition": "09_ROADMAP/WORK_PACKAGES/NATIVE-510.md",
+      "contextFiles": [
+        "AGENTS.md",
+        "CURRENT_SYSTEM_PRESERVATION_GATE.md",
+        "PLANS.md",
+        "MODEL_ROUTING.md",
+        "00_START_HERE/PRESERVATION_FIRST.md",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md",
+        "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+        "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+        "09_ROADMAP/PIXIEED_COMPLETION_ROADMAP.md",
+        "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md",
+        "CODEX_TASK_PROMPTS/README.md",
+        "08_IMPLEMENTATION/TECH_STACK.md",
+        "app-shell/pixieed-capacitor/package.json",
+        "03_PRODUCTS/PIXIEED_APP_DISTRIBUTION_SPEC.md",
+        "08_IMPLEMENTATION/NATIVE_APP_SHELL_STRATEGY.md",
+        "docs/decisions/ADR-20260810-WEB-NATIVE-DISTRIBUTION.md",
+        "docs/inventory/current-native-shell-readiness-20260810.md",
+        "03_PRODUCTS/PIXIEEDRAW2_UX_SPEC.md",
+        "09_ROADMAP/WORK_PACKAGES/NATIVE-510.md"
+      ],
+      "allowedWriteGlobs": [
+        "native/native-510/**",
+        "docs/contracts/NATIVE-510-*.md",
+        "docs/inventory/native-510-*.json",
+        "docs/decisions/ADR-*-NATIVE-510-*.md"
+      ],
+      "forbiddenActions": [
+        "modify_current_production_routes_or_data",
+        "apply_production_migration",
+        "deploy_publish_commit_or_push",
+        "do_not_deploy",
+        "do_not_publish",
+        "do_not_commit",
+        "do_not_push",
+        "do_not_migrate",
+        "do_not_cutover",
+        "start_next_package_automatically",
+        "claim_unmeasured_or_synthetic_evidence_as_production_pass",
+        "store_submission_or_deploy",
+        "access_signing_keys_or_store_accounts",
+        "fork_canonical_project_or_Core_by_shell"
+      ],
+      "acceptanceIds": [
+        "NATIVE510-SIGNING-001",
+        "NATIVE510-WORKSPACE-001",
+        "NATIVE510-NOTARIZE-001",
+        "NATIVE510-UPDATE-001",
+        "NATIVE510-ROLLBACK-001",
+        "NATIVE510-ASSOC-001",
+        "NATIVE510-OFFLINE-001",
+        "NATIVE510-ADR-001"
+      ],
+      "verificationLevel": "browser-pwa-first+host-boundary+independent-review",
+      "implementationRoute": {
+        "model": "luna_max",
+        "reasoning": "Evaluate direct site distribution as a desktop candidate with signing and recovery evidence.",
+        "parallelism": 4
+      },
+      "reviewRoute": {
+        "model": "sol_high",
+        "reasoning": "Independent review of actual diff, evidence, negative cases, and residual risks.",
+        "independent": true
+      },
+      "nextPackage": "NATIVE-520",
+      "autoStartNext": false
+    },
+    {
+      "id": "NATIVE-520",
+      "title": "Mobile Store Distribution",
+      "phase": "native",
+      "status": "PLANNED",
+      "kind": "native",
+      "dependsOn": [
+        "NATIVE-510"
+      ],
+      "definition": "09_ROADMAP/WORK_PACKAGES/NATIVE-520.md",
+      "contextFiles": [
+        "AGENTS.md",
+        "CURRENT_SYSTEM_PRESERVATION_GATE.md",
+        "PLANS.md",
+        "MODEL_ROUTING.md",
+        "00_START_HERE/PRESERVATION_FIRST.md",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md",
+        "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+        "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+        "09_ROADMAP/PIXIEED_COMPLETION_ROADMAP.md",
+        "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md",
+        "CODEX_TASK_PROMPTS/README.md",
+        "08_IMPLEMENTATION/TECH_STACK.md",
+        "app-shell/pixieed-capacitor/package.json",
+        "03_PRODUCTS/PIXIEED_APP_DISTRIBUTION_SPEC.md",
+        "08_IMPLEMENTATION/NATIVE_APP_SHELL_STRATEGY.md",
+        "docs/decisions/ADR-20260810-WEB-NATIVE-DISTRIBUTION.md",
+        "docs/inventory/current-native-shell-readiness-20260810.md",
+        "03_PRODUCTS/PIXIEEDRAW2_UX_SPEC.md",
+        "09_ROADMAP/WORK_PACKAGES/NATIVE-520.md"
+      ],
+      "allowedWriteGlobs": [
+        "native/native-520/**",
+        "app-shell/pixieed-capacitor/src/pixieed-host/**",
+        "app-shell/pixieed-capacitor/tests/pixieed-host/**",
+        "app-shell/pixieed-capacitor/scripts/pixieed-host/**",
+        "docs/contracts/NATIVE-520-*.md",
+        "docs/inventory/native-520-*.json",
+        "docs/decisions/ADR-*-NATIVE-520-*.md"
+      ],
+      "forbiddenActions": [
+        "modify_current_production_routes_or_data",
+        "apply_production_migration",
+        "deploy_publish_commit_or_push",
+        "do_not_deploy",
+        "do_not_publish",
+        "do_not_commit",
+        "do_not_push",
+        "do_not_migrate",
+        "do_not_cutover",
+        "start_next_package_automatically",
+        "claim_unmeasured_or_synthetic_evidence_as_production_pass",
+        "store_submission_or_deploy",
+        "access_signing_keys_or_store_accounts",
+        "fork_canonical_project_or_Core_by_shell"
+      ],
+      "acceptanceIds": [
+        "NATIVE520-CAPACITOR-001",
+        "NATIVE520-WORKSPACE-001",
+        "NATIVE520-PLAY-001",
+        "NATIVE520-APPSTORE-001",
+        "NATIVE520-STAGED-001",
+        "NATIVE520-PWA-001",
+        "NATIVE520-NODEPLOY-001"
+      ],
+      "verificationLevel": "browser-pwa-first+host-boundary+independent-review",
+      "implementationRoute": {
+        "model": "luna_max",
+        "reasoning": "Evaluate existing Capacitor shell for staged Google Play/App Store distribution with PWA fallback.",
+        "parallelism": 4
+      },
+      "reviewRoute": {
+        "model": "sol_high",
+        "reasoning": "Independent review of actual diff, evidence, negative cases, and residual risks.",
+        "independent": true
+      },
+      "nextPackage": "WP-900",
+      "autoStartNext": false
+    },
+    {
+      "id": "WP-900",
+      "title": "Qualification Entry and Acceptance Gap Authority",
+      "phase": "qualification",
+      "status": "PLANNED",
+      "kind": "qualification",
+      "dependsOn": [
+        "NATIVE-520"
+      ],
+      "definition": "09_ROADMAP/WORK_PACKAGES/WP-900.md",
+      "contextFiles": [
+        "AGENTS.md",
+        "CURRENT_SYSTEM_PRESERVATION_GATE.md",
+        "PLANS.md",
+        "MODEL_ROUTING.md",
+        "00_START_HERE/PRESERVATION_FIRST.md",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md",
+        "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+        "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+        "09_ROADMAP/PIXIEED_COMPLETION_ROADMAP.md",
+        "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md",
+        "CODEX_TASK_PROMPTS/README.md",
+        "09_ROADMAP/MIGRATION_ACCEPTANCE_GATES.md",
+        "09_ROADMAP/TEST_MATRIX.md",
+        "docs/inventory/wp900-release-acceptance-matrix.json",
+        "docs/inventory/wp900-aggregated-release-gaps.json",
+        "08_IMPLEMENTATION/NATIVE_APP_SHELL_STRATEGY.md",
+        "09_ROADMAP/WORK_PACKAGES/WP-900.md"
+      ],
+      "allowedWriteGlobs": [
+        "docs/qualification/WP-900/**",
+        "scripts/qualification/wp-900/**",
+        "docs/contracts/WP-900-*.md",
+        "docs/inventory/wp-900-*.json",
+        "docs/decisions/ADR-*-WP-900-*.md"
+      ],
+      "forbiddenActions": [
+        "modify_current_production_routes_or_data",
+        "apply_production_migration",
+        "deploy_publish_commit_or_push",
+        "do_not_deploy",
+        "do_not_publish",
+        "do_not_commit",
+        "do_not_push",
+        "do_not_migrate",
+        "do_not_cutover",
+        "start_next_package_automatically",
+        "claim_unmeasured_or_synthetic_evidence_as_production_pass",
+        "edit_files_outside_WP-900_write_scope",
+        "consume_or_publish_real_private_user_content"
+      ],
+      "acceptanceIds": [
+        "WP900-MATRIX-001",
+        "WP900-GAP-001",
+        "WP900-SOURCE-001",
+        "WP900-BOUNDARY-001",
+        "WP900-NONINTRUSION-001"
+      ],
+      "verificationLevel": "production-equivalent-evidence-required",
+      "implementationRoute": {
+        "model": "terra_high",
+        "reasoning": "Own the qualification matrix and acceptance-gap authority; never perform cutover.",
+        "parallelism": 2
+      },
+      "reviewRoute": {
+        "model": "terra_high",
+        "reasoning": "Independent review of actual diff, evidence, negative cases, and residual risks.",
+        "independent": true
+      },
+      "nextPackage": "WP-910",
+      "autoStartNext": false
+    },
+    {
+      "id": "WP-910",
+      "title": "G0 Canonical Completeness Qualification",
+      "phase": "qualification",
+      "status": "PLANNED",
+      "kind": "qualification",
+      "dependsOn": [
+        "WP-900"
+      ],
+      "definition": "09_ROADMAP/WORK_PACKAGES/WP-910.md",
+      "contextFiles": [
+        "AGENTS.md",
+        "CURRENT_SYSTEM_PRESERVATION_GATE.md",
+        "PLANS.md",
+        "MODEL_ROUTING.md",
+        "00_START_HERE/PRESERVATION_FIRST.md",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md",
+        "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+        "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+        "09_ROADMAP/PIXIEED_COMPLETION_ROADMAP.md",
+        "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md",
+        "CODEX_TASK_PROMPTS/README.md",
+        "09_ROADMAP/MIGRATION_ACCEPTANCE_GATES.md",
+        "09_ROADMAP/TEST_MATRIX.md",
+        "docs/inventory/wp900-release-acceptance-matrix.json",
+        "docs/inventory/wp900-aggregated-release-gaps.json",
+        "08_IMPLEMENTATION/NATIVE_APP_SHELL_STRATEGY.md",
+        "09_ROADMAP/WORK_PACKAGES/WP-910.md"
+      ],
+      "allowedWriteGlobs": [
+        "docs/qualification/WP-910/**",
+        "scripts/qualification/wp-910/**",
+        "docs/contracts/WP-910-*.md",
+        "docs/inventory/wp-910-*.json",
+        "docs/decisions/ADR-*-WP-910-*.md"
+      ],
+      "forbiddenActions": [
+        "modify_current_production_routes_or_data",
+        "apply_production_migration",
+        "deploy_publish_commit_or_push",
+        "do_not_deploy",
+        "do_not_publish",
+        "do_not_commit",
+        "do_not_push",
+        "do_not_migrate",
+        "do_not_cutover",
+        "start_next_package_automatically",
+        "claim_unmeasured_or_synthetic_evidence_as_production_pass",
+        "edit_files_outside_WP-910_write_scope",
+        "consume_or_publish_real_private_user_content"
+      ],
+      "acceptanceIds": [
+        "WP910-CANONICAL-001",
+        "WP910-PROVENANCE-001",
+        "WP910-MISSING-001"
+      ],
+      "verificationLevel": "production-equivalent-evidence-required",
+      "implementationRoute": {
+        "model": "terra_high",
+        "reasoning": "Verify every required contract, definition, source, and provenance record.",
+        "parallelism": 5
+      },
+      "reviewRoute": {
+        "model": "terra_high",
+        "reasoning": "Independent review of actual diff, evidence, negative cases, and residual risks.",
+        "independent": true
+      },
+      "nextPackage": "WP-920",
+      "autoStartNext": false
+    },
+    {
+      "id": "WP-920",
+      "title": "G1 Functional Completeness Qualification",
+      "phase": "qualification",
+      "status": "PLANNED",
+      "kind": "qualification",
+      "dependsOn": [
+        "WP-910"
+      ],
+      "definition": "09_ROADMAP/WORK_PACKAGES/WP-920.md",
+      "contextFiles": [
+        "AGENTS.md",
+        "CURRENT_SYSTEM_PRESERVATION_GATE.md",
+        "PLANS.md",
+        "MODEL_ROUTING.md",
+        "00_START_HERE/PRESERVATION_FIRST.md",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md",
+        "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+        "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+        "09_ROADMAP/PIXIEED_COMPLETION_ROADMAP.md",
+        "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md",
+        "CODEX_TASK_PROMPTS/README.md",
+        "09_ROADMAP/MIGRATION_ACCEPTANCE_GATES.md",
+        "09_ROADMAP/TEST_MATRIX.md",
+        "docs/inventory/wp900-release-acceptance-matrix.json",
+        "docs/inventory/wp900-aggregated-release-gaps.json",
+        "08_IMPLEMENTATION/NATIVE_APP_SHELL_STRATEGY.md",
+        "09_ROADMAP/WORK_PACKAGES/WP-920.md"
+      ],
+      "allowedWriteGlobs": [
+        "docs/qualification/WP-920/**",
+        "scripts/qualification/wp-920/**",
+        "docs/contracts/WP-920-*.md",
+        "docs/inventory/wp-920-*.json",
+        "docs/decisions/ADR-*-WP-920-*.md"
+      ],
+      "forbiddenActions": [
+        "modify_current_production_routes_or_data",
+        "apply_production_migration",
+        "deploy_publish_commit_or_push",
+        "do_not_deploy",
+        "do_not_publish",
+        "do_not_commit",
+        "do_not_push",
+        "do_not_migrate",
+        "do_not_cutover",
+        "start_next_package_automatically",
+        "claim_unmeasured_or_synthetic_evidence_as_production_pass",
+        "edit_files_outside_WP-920_write_scope",
+        "consume_or_publish_real_private_user_content"
+      ],
+      "acceptanceIds": [
+        "WP920-FUNCTIONAL-001",
+        "WP920-CROSSFLOW-001",
+        "WP920-FAILURE-001"
+      ],
+      "verificationLevel": "production-equivalent-evidence-required",
+      "implementationRoute": {
+        "model": "terra_high",
+        "reasoning": "Verify cross-surface functional acceptance without isolated-to-production overclaim.",
+        "parallelism": 5
+      },
+      "reviewRoute": {
+        "model": "terra_high",
+        "reasoning": "Independent review of actual diff, evidence, negative cases, and residual risks.",
+        "independent": true
+      },
+      "nextPackage": "WP-930",
+      "autoStartNext": false
+    },
+    {
+      "id": "WP-930",
+      "title": "G2 UX and Device Readiness Qualification",
+      "phase": "qualification",
+      "status": "PLANNED",
+      "kind": "qualification",
+      "dependsOn": [
+        "WP-920"
+      ],
+      "definition": "09_ROADMAP/WORK_PACKAGES/WP-930.md",
+      "contextFiles": [
+        "AGENTS.md",
+        "CURRENT_SYSTEM_PRESERVATION_GATE.md",
+        "PLANS.md",
+        "MODEL_ROUTING.md",
+        "00_START_HERE/PRESERVATION_FIRST.md",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md",
+        "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+        "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+        "09_ROADMAP/PIXIEED_COMPLETION_ROADMAP.md",
+        "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md",
+        "CODEX_TASK_PROMPTS/README.md",
+        "09_ROADMAP/MIGRATION_ACCEPTANCE_GATES.md",
+        "09_ROADMAP/TEST_MATRIX.md",
+        "docs/inventory/wp900-release-acceptance-matrix.json",
+        "docs/inventory/wp900-aggregated-release-gaps.json",
+        "08_IMPLEMENTATION/NATIVE_APP_SHELL_STRATEGY.md",
+        "09_ROADMAP/WORK_PACKAGES/WP-930.md"
+      ],
+      "allowedWriteGlobs": [
+        "docs/qualification/WP-930/**",
+        "scripts/qualification/wp-930/**",
+        "docs/contracts/WP-930-*.md",
+        "docs/inventory/wp-930-*.json",
+        "docs/decisions/ADR-*-WP-930-*.md"
+      ],
+      "forbiddenActions": [
+        "modify_current_production_routes_or_data",
+        "apply_production_migration",
+        "deploy_publish_commit_or_push",
+        "do_not_deploy",
+        "do_not_publish",
+        "do_not_commit",
+        "do_not_push",
+        "do_not_migrate",
+        "do_not_cutover",
+        "start_next_package_automatically",
+        "claim_unmeasured_or_synthetic_evidence_as_production_pass",
+        "edit_files_outside_WP-930_write_scope",
+        "consume_or_publish_real_private_user_content"
+      ],
+      "acceptanceIds": [
+        "WP930-DESKTOP-001",
+        "WP930-MOBILE-001",
+        "WP930-TABLET-001",
+        "WP930-A11Y-001"
+      ],
+      "verificationLevel": "production-equivalent-evidence-required",
+      "implementationRoute": {
+        "model": "terra_high",
+        "reasoning": "Qualify desktop, portrait mobile, tablet, accessibility, browser, and device evidence.",
+        "parallelism": 5
+      },
+      "reviewRoute": {
+        "model": "terra_high",
+        "reasoning": "Independent review of actual diff, evidence, negative cases, and residual risks.",
+        "independent": true
+      },
+      "nextPackage": "WP-940",
+      "autoStartNext": false
+    },
+    {
+      "id": "WP-940",
+      "title": "G3 Performance and Memory Qualification",
+      "phase": "qualification",
+      "status": "PLANNED",
+      "kind": "qualification",
+      "dependsOn": [
+        "WP-930"
+      ],
+      "definition": "09_ROADMAP/WORK_PACKAGES/WP-940.md",
+      "contextFiles": [
+        "AGENTS.md",
+        "CURRENT_SYSTEM_PRESERVATION_GATE.md",
+        "PLANS.md",
+        "MODEL_ROUTING.md",
+        "00_START_HERE/PRESERVATION_FIRST.md",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md",
+        "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+        "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+        "09_ROADMAP/PIXIEED_COMPLETION_ROADMAP.md",
+        "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md",
+        "CODEX_TASK_PROMPTS/README.md",
+        "09_ROADMAP/MIGRATION_ACCEPTANCE_GATES.md",
+        "09_ROADMAP/TEST_MATRIX.md",
+        "docs/inventory/wp900-release-acceptance-matrix.json",
+        "docs/inventory/wp900-aggregated-release-gaps.json",
+        "08_IMPLEMENTATION/NATIVE_APP_SHELL_STRATEGY.md",
+        "09_ROADMAP/WORK_PACKAGES/WP-940.md"
+      ],
+      "allowedWriteGlobs": [
+        "docs/qualification/WP-940/**",
+        "scripts/qualification/wp-940/**",
+        "docs/contracts/WP-940-*.md",
+        "docs/inventory/wp-940-*.json",
+        "docs/decisions/ADR-*-WP-940-*.md"
+      ],
+      "forbiddenActions": [
+        "modify_current_production_routes_or_data",
+        "apply_production_migration",
+        "deploy_publish_commit_or_push",
+        "do_not_deploy",
+        "do_not_publish",
+        "do_not_commit",
+        "do_not_push",
+        "do_not_migrate",
+        "do_not_cutover",
+        "start_next_package_automatically",
+        "claim_unmeasured_or_synthetic_evidence_as_production_pass",
+        "edit_files_outside_WP-940_write_scope",
+        "consume_or_publish_real_private_user_content"
+      ],
+      "acceptanceIds": [
+        "WP940-BUNDLE-001",
+        "WP940-LATENCY-001",
+        "WP940-MEMORY-001",
+        "WP940-DEVICE-001"
+      ],
+      "verificationLevel": "production-equivalent-evidence-required",
+      "implementationRoute": {
+        "model": "terra_high",
+        "reasoning": "Qualify bundle, input-to-visible, long task, memory, worker, and workload evidence.",
+        "parallelism": 5
+      },
+      "reviewRoute": {
+        "model": "terra_high",
+        "reasoning": "Independent review of actual diff, evidence, negative cases, and residual risks.",
+        "independent": true
+      },
+      "nextPackage": "WP-950",
+      "autoStartNext": false
+    },
+    {
+      "id": "WP-950",
+      "title": "G4 Legacy Compatibility Qualification",
+      "phase": "qualification",
+      "status": "PLANNED",
+      "kind": "qualification",
+      "dependsOn": [
+        "WP-940"
+      ],
+      "definition": "09_ROADMAP/WORK_PACKAGES/WP-950.md",
+      "contextFiles": [
+        "AGENTS.md",
+        "CURRENT_SYSTEM_PRESERVATION_GATE.md",
+        "PLANS.md",
+        "MODEL_ROUTING.md",
+        "00_START_HERE/PRESERVATION_FIRST.md",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md",
+        "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+        "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+        "09_ROADMAP/PIXIEED_COMPLETION_ROADMAP.md",
+        "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md",
+        "CODEX_TASK_PROMPTS/README.md",
+        "09_ROADMAP/MIGRATION_ACCEPTANCE_GATES.md",
+        "09_ROADMAP/TEST_MATRIX.md",
+        "docs/inventory/wp900-release-acceptance-matrix.json",
+        "docs/inventory/wp900-aggregated-release-gaps.json",
+        "08_IMPLEMENTATION/NATIVE_APP_SHELL_STRATEGY.md",
+        "09_ROADMAP/WORK_PACKAGES/WP-950.md"
+      ],
+      "allowedWriteGlobs": [
+        "docs/qualification/WP-950/**",
+        "scripts/qualification/wp-950/**",
+        "docs/contracts/WP-950-*.md",
+        "docs/inventory/wp-950-*.json",
+        "docs/decisions/ADR-*-WP-950-*.md"
+      ],
+      "forbiddenActions": [
+        "modify_current_production_routes_or_data",
+        "apply_production_migration",
+        "deploy_publish_commit_or_push",
+        "do_not_deploy",
+        "do_not_publish",
+        "do_not_commit",
+        "do_not_push",
+        "do_not_migrate",
+        "do_not_cutover",
+        "start_next_package_automatically",
+        "claim_unmeasured_or_synthetic_evidence_as_production_pass",
+        "edit_files_outside_WP-950_write_scope",
+        "consume_or_publish_real_private_user_content"
+      ],
+      "acceptanceIds": [
+        "WP950-PXD-001",
+        "WP950-PROJECT-001",
+        "WP950-PIXISYNC-001",
+        "WP950-MARKET-001",
+        "WP950-NODATALOSS-001"
+      ],
+      "verificationLevel": "production-equivalent-evidence-required",
+      "implementationRoute": {
+        "model": "terra_high",
+        "reasoning": "Qualify legacy PXD, projects, PiXiSYNC, Market, URLs, and no-data-loss evidence.",
+        "parallelism": 5
+      },
+      "reviewRoute": {
+        "model": "terra_high",
+        "reasoning": "Independent review of actual diff, evidence, negative cases, and residual risks.",
+        "independent": true
+      },
+      "nextPackage": "WP-960",
+      "autoStartNext": false
+    },
+    {
+      "id": "WP-960",
+      "title": "G5 Security / Permission / RLS Qualification",
+      "phase": "qualification",
+      "status": "PLANNED",
+      "kind": "qualification",
+      "dependsOn": [
+        "WP-950"
+      ],
+      "definition": "09_ROADMAP/WORK_PACKAGES/WP-960.md",
+      "contextFiles": [
+        "AGENTS.md",
+        "CURRENT_SYSTEM_PRESERVATION_GATE.md",
+        "PLANS.md",
+        "MODEL_ROUTING.md",
+        "00_START_HERE/PRESERVATION_FIRST.md",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md",
+        "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+        "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+        "09_ROADMAP/PIXIEED_COMPLETION_ROADMAP.md",
+        "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md",
+        "CODEX_TASK_PROMPTS/README.md",
+        "09_ROADMAP/MIGRATION_ACCEPTANCE_GATES.md",
+        "09_ROADMAP/TEST_MATRIX.md",
+        "docs/inventory/wp900-release-acceptance-matrix.json",
+        "docs/inventory/wp900-aggregated-release-gaps.json",
+        "08_IMPLEMENTATION/NATIVE_APP_SHELL_STRATEGY.md",
+        "09_ROADMAP/WORK_PACKAGES/WP-960.md"
+      ],
+      "allowedWriteGlobs": [
+        "docs/qualification/WP-960/**",
+        "scripts/qualification/wp-960/**",
+        "docs/contracts/WP-960-*.md",
+        "docs/inventory/wp-960-*.json",
+        "docs/decisions/ADR-*-WP-960-*.md"
+      ],
+      "forbiddenActions": [
+        "modify_current_production_routes_or_data",
+        "apply_production_migration",
+        "deploy_publish_commit_or_push",
+        "do_not_deploy",
+        "do_not_publish",
+        "do_not_commit",
+        "do_not_push",
+        "do_not_migrate",
+        "do_not_cutover",
+        "start_next_package_automatically",
+        "claim_unmeasured_or_synthetic_evidence_as_production_pass",
+        "edit_files_outside_WP-960_write_scope",
+        "consume_or_publish_real_private_user_content"
+      ],
+      "acceptanceIds": [
+        "WP960-AUTH-001",
+        "WP960-RLS-001",
+        "WP960-VISIBILITY-001",
+        "WP960-WEBHOOK-001",
+        "WP960-REDACTION-001"
+      ],
+      "verificationLevel": "production-equivalent-evidence-required",
+      "implementationRoute": {
+        "model": "sol_max",
+        "reasoning": "Qualify Auth, RLS, RPC, provider, visibility, path, webhook, and redaction boundaries.",
+        "parallelism": 5
+      },
+      "reviewRoute": {
+        "model": "sol_high",
+        "reasoning": "Independent review of actual diff, evidence, negative cases, and residual risks.",
+        "independent": true
+      },
+      "nextPackage": "WP-970",
+      "autoStartNext": false
+    },
+    {
+      "id": "WP-970",
+      "title": "G6 Production Integration Rehearsal Qualification",
+      "phase": "qualification",
+      "status": "PLANNED",
+      "kind": "qualification",
+      "dependsOn": [
+        "WP-960"
+      ],
+      "definition": "09_ROADMAP/WORK_PACKAGES/WP-970.md",
+      "contextFiles": [
+        "AGENTS.md",
+        "CURRENT_SYSTEM_PRESERVATION_GATE.md",
+        "PLANS.md",
+        "MODEL_ROUTING.md",
+        "00_START_HERE/PRESERVATION_FIRST.md",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md",
+        "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+        "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+        "09_ROADMAP/PIXIEED_COMPLETION_ROADMAP.md",
+        "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md",
+        "CODEX_TASK_PROMPTS/README.md",
+        "09_ROADMAP/MIGRATION_ACCEPTANCE_GATES.md",
+        "09_ROADMAP/TEST_MATRIX.md",
+        "docs/inventory/wp900-release-acceptance-matrix.json",
+        "docs/inventory/wp900-aggregated-release-gaps.json",
+        "08_IMPLEMENTATION/NATIVE_APP_SHELL_STRATEGY.md",
+        "09_ROADMAP/WORK_PACKAGES/WP-970.md"
+      ],
+      "allowedWriteGlobs": [
+        "docs/qualification/WP-970/**",
+        "scripts/qualification/wp-970/**",
+        "docs/contracts/WP-970-*.md",
+        "docs/inventory/wp-970-*.json",
+        "docs/decisions/ADR-*-WP-970-*.md"
+      ],
+      "forbiddenActions": [
+        "modify_current_production_routes_or_data",
+        "apply_production_migration",
+        "deploy_publish_commit_or_push",
+        "do_not_deploy",
+        "do_not_publish",
+        "do_not_commit",
+        "do_not_push",
+        "do_not_migrate",
+        "do_not_cutover",
+        "start_next_package_automatically",
+        "claim_unmeasured_or_synthetic_evidence_as_production_pass",
+        "edit_files_outside_WP-970_write_scope",
+        "consume_or_publish_real_private_user_content"
+      ],
+      "acceptanceIds": [
+        "WP970-DB-001",
+        "WP970-STORAGE-001",
+        "WP970-ADAPTER-001",
+        "WP970-MONITOR-001",
+        "WP970-ROLLBACK-001",
+        "WP970-L8-001"
+      ],
+      "verificationLevel": "production-equivalent-evidence-required",
+      "implementationRoute": {
+        "model": "terra_high",
+        "reasoning": "Qualify isolated production-equivalent integration, monitoring, adapters, and rollback.",
+        "parallelism": 5
+      },
+      "reviewRoute": {
+        "model": "terra_high",
+        "reasoning": "Independent review of actual diff, evidence, negative cases, and residual risks.",
+        "independent": true
+      },
+      "nextPackage": "WP-980",
+      "autoStartNext": false
+    },
+    {
+      "id": "WP-980",
+      "title": "G7 Migration and Rollback Rehearsal Qualification",
+      "phase": "qualification",
+      "status": "PLANNED",
+      "kind": "qualification",
+      "dependsOn": [
+        "WP-970"
+      ],
+      "definition": "09_ROADMAP/WORK_PACKAGES/WP-980.md",
+      "contextFiles": [
+        "AGENTS.md",
+        "CURRENT_SYSTEM_PRESERVATION_GATE.md",
+        "PLANS.md",
+        "MODEL_ROUTING.md",
+        "00_START_HERE/PRESERVATION_FIRST.md",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md",
+        "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+        "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+        "09_ROADMAP/PIXIEED_COMPLETION_ROADMAP.md",
+        "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md",
+        "CODEX_TASK_PROMPTS/README.md",
+        "09_ROADMAP/MIGRATION_ACCEPTANCE_GATES.md",
+        "09_ROADMAP/TEST_MATRIX.md",
+        "docs/inventory/wp900-release-acceptance-matrix.json",
+        "docs/inventory/wp900-aggregated-release-gaps.json",
+        "08_IMPLEMENTATION/NATIVE_APP_SHELL_STRATEGY.md",
+        "09_ROADMAP/WORK_PACKAGES/WP-980.md"
+      ],
+      "allowedWriteGlobs": [
+        "docs/qualification/WP-980/**",
+        "scripts/qualification/wp-980/**",
+        "docs/contracts/WP-980-*.md",
+        "docs/inventory/wp-980-*.json",
+        "docs/decisions/ADR-*-WP-980-*.md"
+      ],
+      "forbiddenActions": [
+        "modify_current_production_routes_or_data",
+        "apply_production_migration",
+        "deploy_publish_commit_or_push",
+        "do_not_deploy",
+        "do_not_publish",
+        "do_not_commit",
+        "do_not_push",
+        "do_not_migrate",
+        "do_not_cutover",
+        "start_next_package_automatically",
+        "claim_unmeasured_or_synthetic_evidence_as_production_pass",
+        "edit_files_outside_WP-980_write_scope",
+        "consume_or_publish_real_private_user_content"
+      ],
+      "acceptanceIds": [
+        "WP980-BACKUP-001",
+        "WP980-IDENTITY-001",
+        "WP980-MONEY-001",
+        "WP980-SHADOW-001",
+        "WP980-RETIREMENT-001",
+        "WP980-OBSERVE-001"
+      ],
+      "verificationLevel": "production-equivalent-evidence-required",
+      "implementationRoute": {
+        "model": "sol_max",
+        "reasoning": "Qualify L0-L8 gates, backup/restore, reconciliation, shadow operation, and fallback.",
+        "parallelism": 3
+      },
+      "reviewRoute": {
+        "model": "sol_high",
+        "reasoning": "Independent review of actual diff, evidence, negative cases, and residual risks.",
+        "independent": true
+      },
+      "nextPackage": "WP-990",
+      "autoStartNext": false
+    },
+    {
+      "id": "WP-990",
+      "title": "G8/G9 Limited Rollout Readiness and Owner Decision Packet",
+      "phase": "qualification",
+      "status": "PLANNED",
+      "kind": "gate",
+      "dependsOn": [
+        "WP-980"
+      ],
+      "definition": "09_ROADMAP/WORK_PACKAGES/WP-990.md",
+      "contextFiles": [
+        "AGENTS.md",
+        "CURRENT_SYSTEM_PRESERVATION_GATE.md",
+        "PLANS.md",
+        "MODEL_ROUTING.md",
+        "00_START_HERE/PRESERVATION_FIRST.md",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md",
+        "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+        "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+        "09_ROADMAP/PIXIEED_COMPLETION_ROADMAP.md",
+        "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md",
+        "CODEX_TASK_PROMPTS/README.md",
+        "09_ROADMAP/MIGRATION_ACCEPTANCE_GATES.md",
+        "09_ROADMAP/TEST_MATRIX.md",
+        "docs/inventory/wp900-release-acceptance-matrix.json",
+        "docs/inventory/wp900-aggregated-release-gaps.json",
+        "08_IMPLEMENTATION/NATIVE_APP_SHELL_STRATEGY.md",
+        "09_ROADMAP/WORK_PACKAGES/WP-990.md"
+      ],
+      "allowedWriteGlobs": [
+        "docs/qualification/WP-990/**",
+        "scripts/qualification/wp-990/**",
+        "docs/contracts/WP-990-*.md",
+        "docs/inventory/wp-990-*.json",
+        "docs/decisions/ADR-*-WP-990-*.md"
+      ],
+      "forbiddenActions": [
+        "modify_current_production_routes_or_data",
+        "apply_production_migration",
+        "deploy_publish_commit_or_push",
+        "do_not_deploy",
+        "do_not_publish",
+        "do_not_commit",
+        "do_not_push",
+        "do_not_migrate",
+        "do_not_cutover",
+        "start_next_package_automatically",
+        "claim_unmeasured_or_synthetic_evidence_as_production_pass",
+        "edit_files_outside_WP-990_write_scope",
+        "consume_or_publish_real_private_user_content",
+        "require_explicit_owner_authorization",
+        "do_not_grant_owner_approval",
+        "do_not_unblock_CUT-001"
+      ],
+      "acceptanceIds": [
+        "WP990-COHORT-001",
+        "WP990-THRESHOLD-001",
+        "WP990-ROLLBACK-001",
+        "WP990-OWNER-001",
+        "WP990-INDEPENDENT-001"
+      ],
+      "verificationLevel": "production-equivalent-evidence-required",
+      "implementationRoute": {
+        "model": "sol_max",
+        "reasoning": "Prepare and record an explicit Owner decision request; never grant approval or rollout.",
+        "parallelism": 1
+      },
+      "reviewRoute": {
+        "model": "sol_max",
+        "reasoning": "Independent review of actual diff, evidence, negative cases, and residual risks.",
+        "independent": true
+      },
+      "nextPackage": "CUT-001",
+      "autoStartNext": false
+    },
+    {
+      "id": "CUT-001",
+      "title": "Explicit Production Cutover",
+      "phase": "cutover",
+      "status": "BLOCKED",
+      "kind": "cutover",
+      "dependsOn": [
+        "WP-990"
+      ],
+      "definition": "09_ROADMAP/WORK_PACKAGES/CUT-001.md",
+      "contextFiles": [
+        "AGENTS.md",
+        "CURRENT_SYSTEM_PRESERVATION_GATE.md",
+        "PLANS.md",
+        "MODEL_ROUTING.md",
+        "00_START_HERE/PRESERVATION_FIRST.md",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md",
+        "00_START_HERE/IMPLEMENTATION_QUEUE.yaml",
+        "00_START_HERE/WORK_PACKAGE_REGISTRY.json",
+        "09_ROADMAP/PIXIEED_COMPLETION_ROADMAP.md",
+        "09_ROADMAP/AGENT_EXECUTION_FRAMEWORK.md",
+        "CODEX_TASK_PROMPTS/README.md",
+        "09_ROADMAP/MIGRATION_ACCEPTANCE_GATES.md",
+        "09_ROADMAP/TEST_MATRIX.md",
+        "docs/inventory/wp900-release-acceptance-matrix.json",
+        "docs/inventory/wp900-aggregated-release-gaps.json",
+        "08_IMPLEMENTATION/NATIVE_APP_SHELL_STRATEGY.md",
+        "09_ROADMAP/WORK_PACKAGES/CUT-001.md"
+      ],
+      "allowedWriteGlobs": [
+        "docs/cutover/CUT-001/**",
+        "scripts/cutover/CUT-001/**",
+        "docs/inventory/cut001-*.json",
+        "docs/decisions/ADR-*-CUT001-*.md"
+      ],
+      "forbiddenActions": [
+        "modify_current_production_routes_or_data",
+        "apply_production_migration",
+        "deploy_publish_commit_or_push",
+        "do_not_deploy",
+        "do_not_publish",
+        "do_not_commit",
+        "do_not_push",
+        "do_not_migrate",
+        "do_not_cutover",
+        "start_next_package_automatically",
+        "claim_unmeasured_or_synthetic_evidence_as_production_pass",
+        "execute_cutover_without_explicit_owner_authorization",
+        "enable_production_flag_without_rollback_and_observation_window",
+        "owner_authorization_required",
+        "do_not_execute_cutover"
+      ],
+      "acceptanceIds": [
+        "CUT001-AUTH-001",
+        "CUT001-DRYRUN-001",
+        "CUT001-ROLLBACK-001",
+        "CUT001-RECON-001",
+        "CUT001-OBSERVE-001"
+      ],
+      "verificationLevel": "owner-authorized-production-cutover",
+      "implementationRoute": {
+        "model": "sol_max",
+        "reasoning": "Execute a separately authorized production cutover only after qualification and Owner authorization.",
+        "parallelism": 1
+      },
+      "reviewRoute": {
+        "model": "sol_max",
+        "reasoning": "Independent review of actual diff, evidence, negative cases, and residual risks.",
+        "independent": true
+      },
+      "nextPackage": null,
+      "autoStartNext": false
+    }
+  ]
+}

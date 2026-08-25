@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "workPackage": "WP-230",
+  "status": "IMPLEMENTED_ISOLATED_GAP_INVENTORY",
+  "implemented": [
+    "explicit Share Command and Post reference",
+    "Comment lifecycle",
+    "Follow and Reaction idempotency",
+    "Mention target resolution",
+    "Community and Membership scope",
+    "Creator Page, Project Page, and owner-scoped My Page projection",
+    "Market Card reference-only boundary",
+    "Core Card content policy and explicit snapshot modes",
+    "stale/private/deleted/quarantined Core Card redaction",
+    "idempotent explicit Share and public Search eligibility",
+    "plain-text comment and commerce mutation rejection",
+    "trusted Event and sanitized Notification reference",
+    "visibility/permission/public URL fail-closed contracts",
+    "default-off flags and shadow rollback"
+  ],
+  "legacyClassification": {
+    "index.html social feed": "ADAPT",
+    "post route": "ADAPT",
+    "pixfind social references": "ADAPT",
+    "social migration/RLS evidence": "UNKNOWN",
+    "Market social/share adjacency": "UNKNOWN"
+  },
+  "notImplemented": [
+    "current UI adapter or route replacement",
+    "real social API/RLS compatibility",
+    "public media upload",
+    "moderation and abuse operations",
+    "Search backend connection",
+    "Notification provider delivery",
+    "real legacy post/comment migration",
+    "creator follow production reconciliation",
+    "real Core Card/legacy Social data compatibility"
+  ],
+  "baselineFailureIdentity": "14/14 inherited match; new 0",
+  "productionMutation": false
+}

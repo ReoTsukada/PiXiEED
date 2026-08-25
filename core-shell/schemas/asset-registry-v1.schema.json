@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pixieed.invalid/schema/asset-registry-v1.json",
+  "title": "PiXiEED Asset Registry v1",
+  "oneOf": [
+    { "$ref": "#/$defs/asset" },
+    { "$ref": "#/$defs/revision" },
+    { "$ref": "#/$defs/dependency" }
+  ],
+  "$defs": {
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assetId", "assetKind", "ownerType", "ownerId", "sourceProjectId", "createdBy", "visibility", "lifecycleState", "headRevisionId", "provenance", "legacyBindings", "metadata", "schemaVersion", "recordVersion", "createdAt", "updatedAt"],
+      "properties": {
+        "assetId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+        "assetKind": { "enum": ["RASTER_IMAGE", "ANIMATION", "PALETTE", "TILE_SET", "SPRITE_SHEET", "AUDIO", "MUSIC_PROJECT", "SOUND_EFFECT", "GAME_SCENE", "GAME_COMPONENT", "GAME_UI", "SCRIPT", "VISUAL_GRAPH", "EVENT_SHEET", "VIDEO_TIMELINE", "PACKAGE", "THUMBNAIL_PREVIEW"] },
+        "ownerType": { "enum": ["USER", "TEAM"] },
+        "ownerId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+        "sourceProjectId": { "type": ["string", "null"] },
+        "createdBy": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+        "visibility": { "enum": ["PRIVATE", "UNLISTED", "PUBLIC_PREVIEW"] },
+        "lifecycleState": { "enum": ["ACTIVE", "ARCHIVED", "TRASHED", "QUARANTINED"] },
+        "headRevisionId": { "type": ["string", "null"] },
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "legacyBindings": { "type": "array", "maxItems": 16, "items": { "$ref": "#/$defs/legacyBinding" } },
+        "metadata": { "$ref": "#/$defs/metadata" },
+        "schemaVersion": { "const": 1 },
+        "recordVersion": { "type": "integer", "minimum": 1 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "revision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["revisionId", "assetId", "parentRevisionId", "contentHash", "contentType", "byteLength", "storageLocator", "toolId", "formatId", "formatVersion", "dependencySnapshotId", "createdBy", "createdAt", "verificationState", "recordVersion", "immutable"],
+      "properties": {
+        "revisionId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+        "assetId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+        "parentRevisionId": { "type": ["string", "null"] },
+        "contentHash": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+        "contentType": { "type": "string", "minLength": 3, "maxLength": 128 },
+        "byteLength": { "type": "integer", "minimum": 0 },
+        "storageLocator": { "$ref": "#/$defs/storageLocator" },
+        "toolId": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "formatId": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "formatVersion": { "type": "string", "minLength": 1, "maxLength": 32 },
+        "dependencySnapshotId": { "type": ["string", "null"] },
+        "createdBy": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "verificationState": { "enum": ["VERIFIED", "MISSING", "QUARANTINED"] },
+        "recordVersion": { "type": "integer", "minimum": 1 },
+        "immutable": { "const": true }
+      }
+    },
+    "dependency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["edgeId", "consumerAssetId", "providerAssetId", "providerRevisionId", "resolvedRevisionId", "candidateRevisionId", "derivedAssetId", "relationType", "referencePolicy", "required", "compatibilityConstraint", "recordVersion", "createdAt", "updatedAt"],
+      "properties": {
+        "edgeId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+        "consumerAssetId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+        "providerAssetId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+        "providerRevisionId": { "type": ["string", "null"] },
+        "resolvedRevisionId": { "type": ["string", "null"] },
+        "candidateRevisionId": { "type": ["string", "null"] },
+        "derivedAssetId": { "type": ["string", "null"] },
+        "relationType": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "referencePolicy": { "enum": ["LIVE", "PINNED", "REVIEW", "FORKED"] },
+        "required": { "type": "boolean" },
+        "compatibilityConstraint": { "type": "object" },
+        "recordVersion": { "type": "integer", "minimum": 1 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "storageLocator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "bucket", "objectKey"],
+      "properties": {
+        "provider": { "enum": ["object-storage", "opfs"] },
+        "bucket": { "type": ["string", "null"] },
+        "objectKey": { "type": "string", "minLength": 1, "maxLength": 512 }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "sourceAssetId", "sourceRevisionId", "sourceProjectId", "sourceSystemId"],
+      "properties": {
+        "kind": { "enum": ["ORIGINAL", "DERIVED_FROM", "FORKED_FROM", "IMPORTED_FROM", "GENERATED_FROM"] },
+        "sourceAssetId": { "type": ["string", "null"] },
+        "sourceRevisionId": { "type": ["string", "null"] },
+        "sourceProjectId": { "type": ["string", "null"] },
+        "sourceSystemId": { "type": ["string", "null"] }
+      }
+    },
+    "legacyBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["legacySystemId", "legacyAssetId", "legacyFormatVersion", "adapterVersion", "verificationHash", "mappingState"],
+      "properties": {
+        "legacySystemId": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "legacyAssetId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+        "legacyFormatVersion": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "adapterVersion": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "verificationHash": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "mappingState": { "enum": ["MAPPED", "QUARANTINED"] }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "description": { "type": "string", "maxLength": 1024 },
+        "tags": { "type": "array", "maxItems": 24, "items": { "type": "string", "maxLength": 64 } },
+        "custom": { "type": "object", "maxProperties": 24 },
+        "locale": { "type": "string", "maxLength": 32 }
+      }
+    }
+  }
+}

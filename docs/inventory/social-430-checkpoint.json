@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "AGENT_PACKAGE_PREFLIGHT_CHECKPOINT_V1",
+  "packageId": "SOCIAL-430",
+  "sourcePath": "pixiedraw2/tests/social-430/social-430.test.ts",
+  "sourceHash": "9a1d966f396a31ca36f99274ff5e4f353d9dc2c5aafb10171c9e35c916903c69",
+  "status": "STOP_DESIGN_GATE",
+  "statusRole": "historicalDesignGate",
+  "currentRound": 2,
+  "max_fix_rounds": 2,
+  "timebox_minutes": 20,
+  "checkpoint_every_minutes": 10,
+  "sameClassFinding": {
+    "class": "composition-root-boundary",
+    "occurrence": 2,
+    "decision": "STOP_DESIGN_GATE"
+  },
+  "fixRoundRole": "historicalDesignGate",
+  "currentDecision": {
+    "status": "STRUCTURAL_PASS_TERRA",
+    "boundaryModel": "EXTERNAL_CALLER_VS_SERVER_TCB",
+    "deepImportP0": "WITHDRAWN",
+    "semanticAcceptance": "STRUCTURAL_PASS_TERRA",
+    "productionSemanticQualification": "PENDING",
+    "reason": "Terra High independently passed the structural boundary review; production semantic qualification remains pending for untested external and production-integrated items."
+  },
+  "review": {
+    "reviewer": "Terra High",
+    "source": "TERRA_FINAL_INDEPENDENT_STRUCTURAL_REVIEW",
+    "decision": "PASS",
+    "reviewedAt": "2026-08-16T14:50:32+09:00"
+  },
+  "historicalDesignGate": {
+    "status": "CLOSED_HISTORICAL",
+    "previousDecision": "STOP_DESIGN_GATE",
+    "closedAt": "2026-08-16T14:41:15+09:00",
+    "reason": "Fix round 2 recorded the second composition-root-boundary finding before the design decision was superseded by the adopted boundary model.",
+    "fixRound": {
+      "currentRound": 2,
+      "max_fix_rounds": 2,
+      "timebox_minutes": 20,
+      "checkpoint_every_minutes": 10,
+      "sameClassFinding": {
+        "class": "composition-root-boundary",
+        "occurrence": 2,
+        "decision": "STOP_DESIGN_GATE"
+      }
+    }
+  },
+  "designGate": {
+    "rootCause": "public composition surface allowed caller-controlled authority construction/injection",
+    "structuralCorrection": "public contracts and server-only composition root are physically separated",
+    "status": "STRUCTURAL_REMEDIATION_COMPLETE",
+    "currentDecision": "EXTERNAL_CALLER_VS_SERVER_TCB"
+  }
+}

@@ -1,0 +1,925 @@
+{
+  "evidenceVersion": "CORE120_PREDECESSOR_NORMALIZATION_V1",
+  "reviewer": "SOL_INDEPENDENT_AUDIT",
+  "transcript": {
+    "path": "docs/inventory/core-120-predecessor-command-transcript.json",
+    "sha256": "4ef57b8e3fecc25d6d6f57c353d7e152ba616db6281ee67158e4a2a8c03c5358"
+  },
+  "packages": {
+    "CORE-100": {
+      "packageId": "CORE-100",
+      "sourceEvidencePath": "docs/inventory/core-100-evidence.json",
+      "status": "ACCEPTED_ISOLATED",
+      "independentReview": {
+        "reviewer": "SOL_INDEPENDENT_AUDIT",
+        "status": "INDEPENDENT_REVIEW_PASS",
+        "reviewScope": {
+          "acceptanceIds": [
+            "CORE100-SCOPE-001",
+            "CORE100-EVIDENCE-001",
+            "CORE100-STOP-001"
+          ]
+        },
+        "basis": "CORE-120 predecessor command transcript plus source/contract/schema/build hash review"
+      },
+      "acceptance": [
+        {
+          "id": "CORE100-SCOPE-001",
+          "status": "PASS_ISOLATED_REFERENCE",
+          "source": [
+            "pixiedraw2/src/core/core-100"
+          ],
+          "contract": [
+            "docs/contracts/CORE-100-composition.md"
+          ],
+          "schema": [
+            "pixiedraw2/src/core/core-100/contracts.ts"
+          ],
+          "build": [
+            "pixiedraw2/benchmarks/core-100/composition.bench.ts"
+          ],
+          "exitCode": 0,
+          "reviewer": "SOL_INDEPENDENT_AUDIT",
+          "artifactHash": "0f0309c9c351bf851a261825d79545064b2e3a68c7161319bb5bee77a2f88d39",
+          "hashes": {
+            "sourceHash": "dda98132be3423b1d5f9ce05af112282326d5cb97bda85c234c8dc55067b4656",
+            "contractHash": "2ac8c06c38307c098d96b975d082e3ac86dc72fd0eb1d79644aba11df6a2427f",
+            "schemaHash": "d639a297dfb642d9488ce91d5d72f291c7efb45c6c8355d54a2c898cdff47d40",
+            "buildHash": "f838890182bbb8015e676ddc605f7fea8587538fd7c3f0a32870012f1cad992a"
+          },
+          "classification": "IMPLEMENTED_ISOLATED",
+          "adapterClass": "IN_MEMORY",
+          "findingIdentity": null,
+          "commandIds": [
+            "CORE100-TEST",
+            "CORE100-TYPE"
+          ]
+        },
+        {
+          "id": "CORE100-EVIDENCE-001",
+          "status": "PASS_ISOLATED_REFERENCE",
+          "source": [
+            "pixiedraw2/src/core/core-100"
+          ],
+          "contract": [
+            "docs/contracts/CORE-100-composition.md"
+          ],
+          "schema": [
+            "pixiedraw2/src/core/core-100/contracts.ts"
+          ],
+          "build": [
+            "pixiedraw2/benchmarks/core-100/composition.bench.ts"
+          ],
+          "exitCode": 0,
+          "reviewer": "SOL_INDEPENDENT_AUDIT",
+          "artifactHash": "0b5642fc3fac129e44f8b7bca96ae3a50561059d56ffa088b4dd9f163961e1bf",
+          "hashes": {
+            "sourceHash": "dda98132be3423b1d5f9ce05af112282326d5cb97bda85c234c8dc55067b4656",
+            "contractHash": "2ac8c06c38307c098d96b975d082e3ac86dc72fd0eb1d79644aba11df6a2427f",
+            "schemaHash": "d639a297dfb642d9488ce91d5d72f291c7efb45c6c8355d54a2c898cdff47d40",
+            "buildHash": "f838890182bbb8015e676ddc605f7fea8587538fd7c3f0a32870012f1cad992a"
+          },
+          "classification": "IMPLEMENTED_ISOLATED",
+          "adapterClass": "IN_MEMORY",
+          "findingIdentity": null,
+          "commandIds": [
+            "CORE100-TEST",
+            "CORE100-TYPE",
+            "CORE100-BENCH"
+          ]
+        },
+        {
+          "id": "CORE100-STOP-001",
+          "status": "PASS_ISOLATED_REFERENCE",
+          "source": [
+            "pixiedraw2/src/core/core-100"
+          ],
+          "contract": [
+            "docs/contracts/CORE-100-composition.md"
+          ],
+          "schema": [
+            "pixiedraw2/src/core/core-100/contracts.ts"
+          ],
+          "build": [
+            "pixiedraw2/benchmarks/core-100/composition.bench.ts"
+          ],
+          "exitCode": 0,
+          "reviewer": "SOL_INDEPENDENT_AUDIT",
+          "artifactHash": "eff69f94601daf3fe66afa55bda7137b931b88de4b88e40db1cc038833e5cd5e",
+          "hashes": {
+            "sourceHash": "dda98132be3423b1d5f9ce05af112282326d5cb97bda85c234c8dc55067b4656",
+            "contractHash": "2ac8c06c38307c098d96b975d082e3ac86dc72fd0eb1d79644aba11df6a2427f",
+            "schemaHash": "d639a297dfb642d9488ce91d5d72f291c7efb45c6c8355d54a2c898cdff47d40",
+            "buildHash": "f838890182bbb8015e676ddc605f7fea8587538fd7c3f0a32870012f1cad992a"
+          },
+          "classification": "IMPLEMENTED_ISOLATED",
+          "adapterClass": "IN_MEMORY",
+          "findingIdentity": null,
+          "commandIds": [
+            "CORE100-DIFF",
+            "BOUNDARY-IMPORT-SCAN"
+          ]
+        }
+      ],
+      "untested": [],
+      "externalBlockers": [],
+      "transcript": {
+        "path": "docs/inventory/core-120-predecessor-command-transcript.json",
+        "sha256": "4ef57b8e3fecc25d6d6f57c353d7e152ba616db6281ee67158e4a2a8c03c5358"
+      }
+    },
+    "CORE-110": {
+      "packageId": "CORE-110",
+      "sourceEvidencePath": "docs/inventory/core-110-evidence.json",
+      "status": "ACCEPTED_ISOLATED",
+      "independentReview": {
+        "reviewer": "SOL_INDEPENDENT_AUDIT",
+        "status": "INDEPENDENT_REVIEW_PASS",
+        "reviewScope": {
+          "acceptanceIds": [
+            "CORE110-SCOPE-001",
+            "CORE110-EVIDENCE-001",
+            "CORE110-STOP-001"
+          ]
+        },
+        "basis": "CORE-120 predecessor command transcript plus source/contract/schema/build hash review"
+      },
+      "acceptance": [
+        {
+          "id": "CORE110-SCOPE-001",
+          "status": "PASS_ISOLATED_REFERENCE",
+          "source": [
+            "pixiedraw2/src/core/core-110"
+          ],
+          "contract": [
+            "docs/contracts/CORE-110-CONFORMANCE.md"
+          ],
+          "schema": [
+            "pixiedraw2/src/core/core-110/contracts.ts"
+          ],
+          "build": [
+            "pixiedraw2/benchmarks/core-110/generate-evidence.ts",
+            "pixiedraw2/benchmarks/core-110/run-conformance-benchmark.ts"
+          ],
+          "exitCode": 0,
+          "reviewer": "SOL_INDEPENDENT_AUDIT",
+          "artifactHash": "f5f9f94a19e85ef1ad4853580dcafdd86919204bcccba8c31e972ce58e90e028",
+          "hashes": {
+            "sourceHash": "2e040123ccd44d0dbfc65b544db7ba2db8c9e9d0b6f2dafaa8435d55292e2472",
+            "contractHash": "1bf2d126c254bef585ccf0f49b45a1dab4add52cd46721544ad0cad12d89c6f5",
+            "schemaHash": "00b901da8ca92f3eabb49d95eae9a87a9a47bc00faeb3ba060979d721d30c10a",
+            "buildHash": "e19115e22dfee435f9f28434d7aa70903ddc979ba99cfd3c5fd668063d210a2f"
+          },
+          "classification": "IMPLEMENTED_ISOLATED",
+          "adapterClass": "IN_MEMORY",
+          "findingIdentity": null,
+          "commandIds": [
+            "CORE110-TEST",
+            "CORE110-TYPE"
+          ]
+        },
+        {
+          "id": "CORE110-EVIDENCE-001",
+          "status": "PASS_ISOLATED_REFERENCE",
+          "source": [
+            "pixiedraw2/src/core/core-110"
+          ],
+          "contract": [
+            "docs/contracts/CORE-110-CONFORMANCE.md"
+          ],
+          "schema": [
+            "pixiedraw2/src/core/core-110/contracts.ts"
+          ],
+          "build": [
+            "pixiedraw2/benchmarks/core-110/generate-evidence.ts",
+            "pixiedraw2/benchmarks/core-110/run-conformance-benchmark.ts"
+          ],
+          "exitCode": 0,
+          "reviewer": "SOL_INDEPENDENT_AUDIT",
+          "artifactHash": "b666ae0af73ada6e21d4373b01d45be7d3c8ab3d133509c9648a346d79c67f1a",
+          "hashes": {
+            "sourceHash": "2e040123ccd44d0dbfc65b544db7ba2db8c9e9d0b6f2dafaa8435d55292e2472",
+            "contractHash": "1bf2d126c254bef585ccf0f49b45a1dab4add52cd46721544ad0cad12d89c6f5",
+            "schemaHash": "00b901da8ca92f3eabb49d95eae9a87a9a47bc00faeb3ba060979d721d30c10a",
+            "buildHash": "e19115e22dfee435f9f28434d7aa70903ddc979ba99cfd3c5fd668063d210a2f"
+          },
+          "classification": "IMPLEMENTED_ISOLATED",
+          "adapterClass": "IN_MEMORY",
+          "findingIdentity": null,
+          "commandIds": [
+            "CORE110-TEST",
+            "CORE110-TYPE",
+            "CORE110-BENCH"
+          ]
+        },
+        {
+          "id": "CORE110-STOP-001",
+          "status": "PASS_ISOLATED_REFERENCE",
+          "source": [
+            "pixiedraw2/src/core/core-110"
+          ],
+          "contract": [
+            "docs/contracts/CORE-110-CONFORMANCE.md"
+          ],
+          "schema": [
+            "pixiedraw2/src/core/core-110/contracts.ts"
+          ],
+          "build": [
+            "pixiedraw2/benchmarks/core-110/generate-evidence.ts",
+            "pixiedraw2/benchmarks/core-110/run-conformance-benchmark.ts"
+          ],
+          "exitCode": 0,
+          "reviewer": "SOL_INDEPENDENT_AUDIT",
+          "artifactHash": "79490f1689021c3c2f7aa775b474cc1da961bf4ad688b9b8c7c94ae6ff99a22f",
+          "hashes": {
+            "sourceHash": "2e040123ccd44d0dbfc65b544db7ba2db8c9e9d0b6f2dafaa8435d55292e2472",
+            "contractHash": "1bf2d126c254bef585ccf0f49b45a1dab4add52cd46721544ad0cad12d89c6f5",
+            "schemaHash": "00b901da8ca92f3eabb49d95eae9a87a9a47bc00faeb3ba060979d721d30c10a",
+            "buildHash": "e19115e22dfee435f9f28434d7aa70903ddc979ba99cfd3c5fd668063d210a2f"
+          },
+          "classification": "IMPLEMENTED_ISOLATED",
+          "adapterClass": "IN_MEMORY",
+          "findingIdentity": null,
+          "commandIds": [
+            "CORE110-DIFF",
+            "BOUNDARY-IMPORT-SCAN"
+          ]
+        }
+      ],
+      "untested": [],
+      "externalBlockers": [],
+      "transcript": {
+        "path": "docs/inventory/core-120-predecessor-command-transcript.json",
+        "sha256": "4ef57b8e3fecc25d6d6f57c353d7e152ba616db6281ee67158e4a2a8c03c5358"
+      }
+    },
+    "FP-004": {
+      "packageId": "FP-004",
+      "sourceEvidencePath": "docs/inventory/fp-004-evidence.json",
+      "status": "ISOLATED_REFERENCE_COMPLETE",
+      "independentReview": {
+        "reviewer": "SOL_INDEPENDENT_AUDIT",
+        "status": "INDEPENDENT_REVIEW_PASS",
+        "reviewScope": {
+          "acceptanceIds": [
+            "FP004-EVT-001",
+            "FP004-EVT-002",
+            "FP004-INBOX-001",
+            "FP004-ORDER-001",
+            "FP004-RECOVERY-001",
+            "FP004-REPLAY-001",
+            "FP004-SEC-001"
+          ]
+        },
+        "basis": "CORE-120 predecessor command transcript plus source/contract/schema/build hash review"
+      },
+      "acceptance": [
+        {
+          "id": "FP004-EVT-001",
+          "status": "PASS_ISOLATED_REFERENCE",
+          "source": [
+            "pixiedraw2/src/fp-004"
+          ],
+          "contract": [
+            "docs/contracts/FP-004-DURABLE-EVENT.md",
+            "docs/contracts/FP-004-CONFORMANCE-MATRIX.md"
+          ],
+          "schema": [
+            "pixiedraw2/src/fp-004/contracts.ts"
+          ],
+          "build": [
+            "pixiedraw2/benchmarks/fp004-durable-event-benchmark.ts"
+          ],
+          "exitCode": 0,
+          "reviewer": "SOL_INDEPENDENT_AUDIT",
+          "artifactHash": "b5194eef2ebee8b44cd7db943c99ba6181aa60f46aa7e63609a6a19305b29505",
+          "hashes": {
+            "sourceHash": "4ff79b3d893363e8f52437a2198179c44b5e56ca34e134e161b9ae9685d674d9",
+            "contractHash": "73f0a3d8219c33a8f94c5982170f86e6fcae206b3b951e4f287af25c064c51a2",
+            "schemaHash": "5b0c57fd0f5938f794498ebb27dd12c9ace464865dab07904b53cb25a777c9aa",
+            "buildHash": "4f710aa5ed2be5e6b6d49e3c6aaa8149ea11b5bedfafb5e4c6f5eaac8b9b7194"
+          },
+          "classification": "IMPLEMENTED_ISOLATED",
+          "adapterClass": "IN_MEMORY",
+          "findingIdentity": null,
+          "commandIds": [
+            "FP004-TEST",
+            "FP004-FILE",
+            "FP004-TYPE",
+            "FP004-BENCH"
+          ]
+        },
+        {
+          "id": "FP004-EVT-002",
+          "status": "PASS_ISOLATED_REFERENCE",
+          "source": [
+            "pixiedraw2/src/fp-004"
+          ],
+          "contract": [
+            "docs/contracts/FP-004-DURABLE-EVENT.md",
+            "docs/contracts/FP-004-CONFORMANCE-MATRIX.md"
+          ],
+          "schema": [
+            "pixiedraw2/src/fp-004/contracts.ts"
+          ],
+          "build": [
+            "pixiedraw2/benchmarks/fp004-durable-event-benchmark.ts"
+          ],
+          "exitCode": 0,
+          "reviewer": "SOL_INDEPENDENT_AUDIT",
+          "artifactHash": "5b3bb4bcd66e1263cb472c19b107321d3e25bde89dc24c51cdc694e6b04f203a",
+          "hashes": {
+            "sourceHash": "4ff79b3d893363e8f52437a2198179c44b5e56ca34e134e161b9ae9685d674d9",
+            "contractHash": "73f0a3d8219c33a8f94c5982170f86e6fcae206b3b951e4f287af25c064c51a2",
+            "schemaHash": "5b0c57fd0f5938f794498ebb27dd12c9ace464865dab07904b53cb25a777c9aa",
+            "buildHash": "4f710aa5ed2be5e6b6d49e3c6aaa8149ea11b5bedfafb5e4c6f5eaac8b9b7194"
+          },
+          "classification": "IMPLEMENTED_ISOLATED",
+          "adapterClass": "IN_MEMORY",
+          "findingIdentity": null,
+          "commandIds": [
+            "FP004-TEST",
+            "FP004-TYPE",
+            "FP004-BENCH"
+          ]
+        },
+        {
+          "id": "FP004-INBOX-001",
+          "status": "PASS_ISOLATED_REFERENCE",
+          "source": [
+            "pixiedraw2/src/fp-004"
+          ],
+          "contract": [
+            "docs/contracts/FP-004-DURABLE-EVENT.md",
+            "docs/contracts/FP-004-CONFORMANCE-MATRIX.md"
+          ],
+          "schema": [
+            "pixiedraw2/src/fp-004/contracts.ts"
+          ],
+          "build": [
+            "pixiedraw2/benchmarks/fp004-durable-event-benchmark.ts"
+          ],
+          "exitCode": 0,
+          "reviewer": "SOL_INDEPENDENT_AUDIT",
+          "artifactHash": "2483ece20b1da1d44e6f6f49b69de6df577a986b853f27c37f2b723b2458e339",
+          "hashes": {
+            "sourceHash": "4ff79b3d893363e8f52437a2198179c44b5e56ca34e134e161b9ae9685d674d9",
+            "contractHash": "73f0a3d8219c33a8f94c5982170f86e6fcae206b3b951e4f287af25c064c51a2",
+            "schemaHash": "5b0c57fd0f5938f794498ebb27dd12c9ace464865dab07904b53cb25a777c9aa",
+            "buildHash": "4f710aa5ed2be5e6b6d49e3c6aaa8149ea11b5bedfafb5e4c6f5eaac8b9b7194"
+          },
+          "classification": "IMPLEMENTED_ISOLATED",
+          "adapterClass": "IN_MEMORY",
+          "findingIdentity": null,
+          "commandIds": [
+            "FP004-TEST",
+            "FP004-TYPE"
+          ]
+        },
+        {
+          "id": "FP004-ORDER-001",
+          "status": "PASS_ISOLATED_REFERENCE",
+          "source": [
+            "pixiedraw2/src/fp-004"
+          ],
+          "contract": [
+            "docs/contracts/FP-004-DURABLE-EVENT.md",
+            "docs/contracts/FP-004-CONFORMANCE-MATRIX.md"
+          ],
+          "schema": [
+            "pixiedraw2/src/fp-004/contracts.ts"
+          ],
+          "build": [
+            "pixiedraw2/benchmarks/fp004-durable-event-benchmark.ts"
+          ],
+          "exitCode": 0,
+          "reviewer": "SOL_INDEPENDENT_AUDIT",
+          "artifactHash": "b2f7a3d59c2733b7c47f343aae11a58921b0346c02d9306892518b2ad671c259",
+          "hashes": {
+            "sourceHash": "4ff79b3d893363e8f52437a2198179c44b5e56ca34e134e161b9ae9685d674d9",
+            "contractHash": "73f0a3d8219c33a8f94c5982170f86e6fcae206b3b951e4f287af25c064c51a2",
+            "schemaHash": "5b0c57fd0f5938f794498ebb27dd12c9ace464865dab07904b53cb25a777c9aa",
+            "buildHash": "4f710aa5ed2be5e6b6d49e3c6aaa8149ea11b5bedfafb5e4c6f5eaac8b9b7194"
+          },
+          "classification": "IMPLEMENTED_ISOLATED",
+          "adapterClass": "IN_MEMORY",
+          "findingIdentity": null,
+          "commandIds": [
+            "FP004-TEST",
+            "FP004-TYPE"
+          ]
+        },
+        {
+          "id": "FP004-RECOVERY-001",
+          "status": "PASS_ISOLATED_REFERENCE",
+          "source": [
+            "pixiedraw2/src/fp-004"
+          ],
+          "contract": [
+            "docs/contracts/FP-004-DURABLE-EVENT.md",
+            "docs/contracts/FP-004-CONFORMANCE-MATRIX.md"
+          ],
+          "schema": [
+            "pixiedraw2/src/fp-004/contracts.ts"
+          ],
+          "build": [
+            "pixiedraw2/benchmarks/fp004-durable-event-benchmark.ts"
+          ],
+          "exitCode": 0,
+          "reviewer": "SOL_INDEPENDENT_AUDIT",
+          "artifactHash": "5c944c1ce7124bc37886824d702bbfe713126b63d212b58642a56cdfc67e2647",
+          "hashes": {
+            "sourceHash": "4ff79b3d893363e8f52437a2198179c44b5e56ca34e134e161b9ae9685d674d9",
+            "contractHash": "73f0a3d8219c33a8f94c5982170f86e6fcae206b3b951e4f287af25c064c51a2",
+            "schemaHash": "5b0c57fd0f5938f794498ebb27dd12c9ace464865dab07904b53cb25a777c9aa",
+            "buildHash": "4f710aa5ed2be5e6b6d49e3c6aaa8149ea11b5bedfafb5e4c6f5eaac8b9b7194"
+          },
+          "classification": "IMPLEMENTED_ISOLATED",
+          "adapterClass": "IN_MEMORY",
+          "findingIdentity": null,
+          "commandIds": [
+            "FP004-TEST",
+            "FP004-FILE",
+            "FP004-TYPE",
+            "FP004-BENCH"
+          ]
+        },
+        {
+          "id": "FP004-REPLAY-001",
+          "status": "PASS_ISOLATED_REFERENCE",
+          "source": [
+            "pixiedraw2/src/fp-004"
+          ],
+          "contract": [
+            "docs/contracts/FP-004-DURABLE-EVENT.md",
+            "docs/contracts/FP-004-CONFORMANCE-MATRIX.md"
+          ],
+          "schema": [
+            "pixiedraw2/src/fp-004/contracts.ts"
+          ],
+          "build": [
+            "pixiedraw2/benchmarks/fp004-durable-event-benchmark.ts"
+          ],
+          "exitCode": 0,
+          "reviewer": "SOL_INDEPENDENT_AUDIT",
+          "artifactHash": "9f42cbda5504ea2a3f6e4ae6ebd12541b8a76cfcc3f29030e8ac54327b2b768e",
+          "hashes": {
+            "sourceHash": "4ff79b3d893363e8f52437a2198179c44b5e56ca34e134e161b9ae9685d674d9",
+            "contractHash": "73f0a3d8219c33a8f94c5982170f86e6fcae206b3b951e4f287af25c064c51a2",
+            "schemaHash": "5b0c57fd0f5938f794498ebb27dd12c9ace464865dab07904b53cb25a777c9aa",
+            "buildHash": "4f710aa5ed2be5e6b6d49e3c6aaa8149ea11b5bedfafb5e4c6f5eaac8b9b7194"
+          },
+          "classification": "IMPLEMENTED_ISOLATED",
+          "adapterClass": "IN_MEMORY",
+          "findingIdentity": null,
+          "commandIds": [
+            "FP004-TEST",
+            "FP004-TYPE"
+          ]
+        },
+        {
+          "id": "FP004-SEC-001",
+          "status": "PASS_ISOLATED_REFERENCE",
+          "source": [
+            "pixiedraw2/src/fp-004"
+          ],
+          "contract": [
+            "docs/contracts/FP-004-DURABLE-EVENT.md",
+            "docs/contracts/FP-004-CONFORMANCE-MATRIX.md"
+          ],
+          "schema": [
+            "pixiedraw2/src/fp-004/contracts.ts"
+          ],
+          "build": [
+            "pixiedraw2/benchmarks/fp004-durable-event-benchmark.ts"
+          ],
+          "exitCode": 0,
+          "reviewer": "SOL_INDEPENDENT_AUDIT",
+          "artifactHash": "311d7fe356c7f6c14245cba1d7b56774a08d08ac88ec0a04a16f0e2de1c208fb",
+          "hashes": {
+            "sourceHash": "4ff79b3d893363e8f52437a2198179c44b5e56ca34e134e161b9ae9685d674d9",
+            "contractHash": "73f0a3d8219c33a8f94c5982170f86e6fcae206b3b951e4f287af25c064c51a2",
+            "schemaHash": "5b0c57fd0f5938f794498ebb27dd12c9ace464865dab07904b53cb25a777c9aa",
+            "buildHash": "4f710aa5ed2be5e6b6d49e3c6aaa8149ea11b5bedfafb5e4c6f5eaac8b9b7194"
+          },
+          "classification": "IMPLEMENTED_ISOLATED",
+          "adapterClass": "IN_MEMORY",
+          "findingIdentity": null,
+          "commandIds": [
+            "FP004-TEST",
+            "FP004-TYPE"
+          ]
+        }
+      ],
+      "untested": [],
+      "externalBlockers": [],
+      "transcript": {
+        "path": "docs/inventory/core-120-predecessor-command-transcript.json",
+        "sha256": "4ef57b8e3fecc25d6d6f57c353d7e152ba616db6281ee67158e4a2a8c03c5358"
+      }
+    },
+    "FP-005": {
+      "packageId": "FP-005",
+      "sourceEvidencePath": "docs/inventory/fp-005-evidence.json",
+      "status": "ISOLATED_REFERENCE_COMPLETE",
+      "independentReview": {
+        "reviewer": "SOL_INDEPENDENT_AUDIT",
+        "status": "INDEPENDENT_REVIEW_PASS",
+        "reviewScope": {
+          "acceptanceIds": [
+            "FP005-PII-001",
+            "FP005-STORAGE-001",
+            "FP005-INPUT-001",
+            "FP005-PATH-001",
+            "FP005-TELEMETRY-001"
+          ]
+        },
+        "basis": "CORE-120 predecessor command transcript plus source/contract/schema/build hash review"
+      },
+      "acceptance": [
+        {
+          "id": "FP005-PII-001",
+          "status": "PASS_ISOLATED_REFERENCE",
+          "source": [
+            "pixiedraw2/src/fp-005"
+          ],
+          "contract": [
+            "docs/contracts/FP-005-CONTRACTS.md",
+            "docs/contracts/FP-005-INTEGRATION.md"
+          ],
+          "schema": [
+            "pixiedraw2/src/fp-005/contracts.ts"
+          ],
+          "build": [
+            "pixiedraw2/benchmarks/fp-005/validation.bench.ts"
+          ],
+          "exitCode": 0,
+          "reviewer": "SOL_INDEPENDENT_AUDIT",
+          "artifactHash": "38a794e01b497631475fcb4403df68e67af1ca00c00548d045e8b7c06f9a16b2",
+          "hashes": {
+            "sourceHash": "afd79728cc8b1e86ab3df049d2a91b5f6827d8363e35551af8808082ae2784d3",
+            "contractHash": "7f18bca70dd1068eb71cbb2208da14dd778fd383ae175af4323c7906c89c923d",
+            "schemaHash": "79c16dfb024b49c6d689124b4267867c5326b1c64e558810479453e3de9895a5",
+            "buildHash": "e9749d6e9d201be3dd3fa10b6bed17dd3fc4a48d415f0958a2fe3a470fbb9d89"
+          },
+          "classification": "IMPLEMENTED_ISOLATED",
+          "adapterClass": "IN_MEMORY",
+          "findingIdentity": null,
+          "commandIds": [
+            "FP005-TEST",
+            "FP005-BENCH",
+            "FP005-BASELINE"
+          ]
+        },
+        {
+          "id": "FP005-STORAGE-001",
+          "status": "PASS_ISOLATED_REFERENCE",
+          "source": [
+            "pixiedraw2/src/fp-005"
+          ],
+          "contract": [
+            "docs/contracts/FP-005-CONTRACTS.md",
+            "docs/contracts/FP-005-INTEGRATION.md"
+          ],
+          "schema": [
+            "pixiedraw2/src/fp-005/contracts.ts"
+          ],
+          "build": [
+            "pixiedraw2/benchmarks/fp-005/validation.bench.ts"
+          ],
+          "exitCode": 0,
+          "reviewer": "SOL_INDEPENDENT_AUDIT",
+          "artifactHash": "d67eab94eb8ceaad26dc7cd1fbe45d129b608b9db8a2cd79767d1d92e47dae63",
+          "hashes": {
+            "sourceHash": "afd79728cc8b1e86ab3df049d2a91b5f6827d8363e35551af8808082ae2784d3",
+            "contractHash": "7f18bca70dd1068eb71cbb2208da14dd778fd383ae175af4323c7906c89c923d",
+            "schemaHash": "79c16dfb024b49c6d689124b4267867c5326b1c64e558810479453e3de9895a5",
+            "buildHash": "e9749d6e9d201be3dd3fa10b6bed17dd3fc4a48d415f0958a2fe3a470fbb9d89"
+          },
+          "classification": "IMPLEMENTED_ISOLATED",
+          "adapterClass": "IN_MEMORY",
+          "findingIdentity": null,
+          "commandIds": [
+            "FP005-TEST",
+            "FP005-BENCH"
+          ]
+        },
+        {
+          "id": "FP005-INPUT-001",
+          "status": "PASS_ISOLATED_REFERENCE",
+          "source": [
+            "pixiedraw2/src/fp-005"
+          ],
+          "contract": [
+            "docs/contracts/FP-005-CONTRACTS.md",
+            "docs/contracts/FP-005-INTEGRATION.md"
+          ],
+          "schema": [
+            "pixiedraw2/src/fp-005/contracts.ts"
+          ],
+          "build": [
+            "pixiedraw2/benchmarks/fp-005/validation.bench.ts"
+          ],
+          "exitCode": 0,
+          "reviewer": "SOL_INDEPENDENT_AUDIT",
+          "artifactHash": "a0a0b95997c42bda3470c5f9e4d9a3ed8f9109e25ba2cc0c534c3c42c6aa7ab2",
+          "hashes": {
+            "sourceHash": "afd79728cc8b1e86ab3df049d2a91b5f6827d8363e35551af8808082ae2784d3",
+            "contractHash": "7f18bca70dd1068eb71cbb2208da14dd778fd383ae175af4323c7906c89c923d",
+            "schemaHash": "79c16dfb024b49c6d689124b4267867c5326b1c64e558810479453e3de9895a5",
+            "buildHash": "e9749d6e9d201be3dd3fa10b6bed17dd3fc4a48d415f0958a2fe3a470fbb9d89"
+          },
+          "classification": "IMPLEMENTED_ISOLATED",
+          "adapterClass": "IN_MEMORY",
+          "findingIdentity": null,
+          "commandIds": [
+            "FP005-TEST",
+            "FP005-BENCH"
+          ]
+        },
+        {
+          "id": "FP005-PATH-001",
+          "status": "PASS_ISOLATED_REFERENCE",
+          "source": [
+            "pixiedraw2/src/fp-005"
+          ],
+          "contract": [
+            "docs/contracts/FP-005-CONTRACTS.md",
+            "docs/contracts/FP-005-INTEGRATION.md"
+          ],
+          "schema": [
+            "pixiedraw2/src/fp-005/contracts.ts"
+          ],
+          "build": [
+            "pixiedraw2/benchmarks/fp-005/validation.bench.ts"
+          ],
+          "exitCode": 0,
+          "reviewer": "SOL_INDEPENDENT_AUDIT",
+          "artifactHash": "226dc504e9ab3b881ea8310e00cb6a66890a84fa93bd24934a9b4ec3a1916099",
+          "hashes": {
+            "sourceHash": "afd79728cc8b1e86ab3df049d2a91b5f6827d8363e35551af8808082ae2784d3",
+            "contractHash": "7f18bca70dd1068eb71cbb2208da14dd778fd383ae175af4323c7906c89c923d",
+            "schemaHash": "79c16dfb024b49c6d689124b4267867c5326b1c64e558810479453e3de9895a5",
+            "buildHash": "e9749d6e9d201be3dd3fa10b6bed17dd3fc4a48d415f0958a2fe3a470fbb9d89"
+          },
+          "classification": "IMPLEMENTED_ISOLATED",
+          "adapterClass": "IN_MEMORY",
+          "findingIdentity": null,
+          "commandIds": [
+            "FP005-TEST",
+            "FP005-BENCH"
+          ]
+        },
+        {
+          "id": "FP005-TELEMETRY-001",
+          "status": "PASS_ISOLATED_REFERENCE",
+          "source": [
+            "pixiedraw2/src/fp-005"
+          ],
+          "contract": [
+            "docs/contracts/FP-005-CONTRACTS.md",
+            "docs/contracts/FP-005-INTEGRATION.md"
+          ],
+          "schema": [
+            "pixiedraw2/src/fp-005/contracts.ts"
+          ],
+          "build": [
+            "pixiedraw2/benchmarks/fp-005/validation.bench.ts"
+          ],
+          "exitCode": 0,
+          "reviewer": "SOL_INDEPENDENT_AUDIT",
+          "artifactHash": "e121e63286bf3180c62b01500d89a33605a43022278eb60efb9bfb63db475e6e",
+          "hashes": {
+            "sourceHash": "afd79728cc8b1e86ab3df049d2a91b5f6827d8363e35551af8808082ae2784d3",
+            "contractHash": "7f18bca70dd1068eb71cbb2208da14dd778fd383ae175af4323c7906c89c923d",
+            "schemaHash": "79c16dfb024b49c6d689124b4267867c5326b1c64e558810479453e3de9895a5",
+            "buildHash": "e9749d6e9d201be3dd3fa10b6bed17dd3fc4a48d415f0958a2fe3a470fbb9d89"
+          },
+          "classification": "IMPLEMENTED_ISOLATED",
+          "adapterClass": "IN_MEMORY",
+          "findingIdentity": null,
+          "commandIds": [
+            "FP005-TEST",
+            "FP005-BENCH",
+            "FP005-DIFF"
+          ]
+        }
+      ],
+      "untested": [],
+      "externalBlockers": [],
+      "transcript": {
+        "path": "docs/inventory/core-120-predecessor-command-transcript.json",
+        "sha256": "4ef57b8e3fecc25d6d6f57c353d7e152ba616db6281ee67158e4a2a8c03c5358"
+      }
+    },
+    "FP-007": {
+      "packageId": "FP-007",
+      "sourceEvidencePath": "docs/inventory/fp-007-evidence.json",
+      "status": "ACCEPTED_ISOLATED_WITH_EXTERNAL_BLOCKERS",
+      "independentReview": {
+        "reviewer": "SOL_INDEPENDENT_AUDIT",
+        "status": "APPROVED_WITH_EXTERNAL_BLOCKERS",
+        "reviewScope": {
+          "acceptanceIds": [
+            "FP007-DEP-001",
+            "FP007-BUILD-001"
+          ]
+        },
+        "basis": "CORE-120 predecessor command transcript plus source/contract/schema/build hash review"
+      },
+      "acceptance": [
+        {
+          "id": "FP007-SCHEMA-001",
+          "status": "UNTESTED",
+          "source": [
+            "pixiedraw2/src/fp-007"
+          ],
+          "contract": [
+            "docs/contracts/FP-007-INTEGRATION.md",
+            "docs/contracts/FP-007-schema-registry.md"
+          ],
+          "schema": [
+            "pixiedraw2/src/fp-007/schema-registry.ts",
+            "pixiedraw2/src/fp-007/schema-compatibility.ts"
+          ],
+          "build": [
+            "pixiedraw2/benchmarks/fp-007/repeat-build.ts"
+          ],
+          "exitCode": null,
+          "reviewer": null,
+          "artifactHash": null,
+          "hashes": {
+            "sourceHash": "7988046eeccbd635dcf3167ad295dd44c4624a785e5994f049612e573a985055",
+            "contractHash": "03dfd50b71c713b5fb06fd2244275bf14c8b27e438282e7f01a0cd713606fc6c",
+            "schemaHash": "a3706a23b5e5d43378fc3c921363f733c5f6a03dbed1a64199ac8265b76ee0a5",
+            "buildHash": "b47e86d5e8fdfa002e9ca780ef489cefc4d1a0ebd30be11a257bece915eb4f03"
+          },
+          "classification": "UNTESTED",
+          "adapterClass": "UNTESTED",
+          "findingIdentity": "FP-007:FP007-SCHEMA-001:UNTESTED",
+          "commandIds": [
+            "FP007-TEST",
+            "FP007-NONINTRUSION"
+          ]
+        },
+        {
+          "id": "FP007-DEP-001",
+          "status": "PASS_ISOLATED_REFERENCE",
+          "source": [
+            "pixiedraw2/src/fp-007"
+          ],
+          "contract": [
+            "docs/contracts/FP-007-INTEGRATION.md",
+            "docs/contracts/FP-007-schema-registry.md"
+          ],
+          "schema": [
+            "pixiedraw2/src/fp-007/schema-registry.ts",
+            "pixiedraw2/src/fp-007/schema-compatibility.ts"
+          ],
+          "build": [
+            "pixiedraw2/benchmarks/fp-007/repeat-build.ts"
+          ],
+          "exitCode": 0,
+          "reviewer": "SOL_INDEPENDENT_AUDIT",
+          "artifactHash": "04dde0316015cea55eed8491d4eaffe1a6712fdefd2cd4c4cf46c28445a3b70b",
+          "hashes": {
+            "sourceHash": "7988046eeccbd635dcf3167ad295dd44c4624a785e5994f049612e573a985055",
+            "contractHash": "03dfd50b71c713b5fb06fd2244275bf14c8b27e438282e7f01a0cd713606fc6c",
+            "schemaHash": "a3706a23b5e5d43378fc3c921363f733c5f6a03dbed1a64199ac8265b76ee0a5",
+            "buildHash": "b47e86d5e8fdfa002e9ca780ef489cefc4d1a0ebd30be11a257bece915eb4f03"
+          },
+          "classification": "IMPLEMENTED_ISOLATED",
+          "adapterClass": "IN_MEMORY",
+          "findingIdentity": null,
+          "commandIds": [
+            "FP007-TEST",
+            "FP007-BUILD",
+            "BASELINE-IDENTITY",
+            "BASELINE-SUITE"
+          ]
+        },
+        {
+          "id": "FP007-BUILD-001",
+          "status": "PASS_ISOLATED_REFERENCE",
+          "source": [
+            "pixiedraw2/src/fp-007"
+          ],
+          "contract": [
+            "docs/contracts/FP-007-INTEGRATION.md",
+            "docs/contracts/FP-007-schema-registry.md"
+          ],
+          "schema": [
+            "pixiedraw2/src/fp-007/schema-registry.ts",
+            "pixiedraw2/src/fp-007/schema-compatibility.ts"
+          ],
+          "build": [
+            "pixiedraw2/benchmarks/fp-007/repeat-build.ts"
+          ],
+          "exitCode": 0,
+          "reviewer": "SOL_INDEPENDENT_AUDIT",
+          "artifactHash": "cd5a001155f8a00731ccf43496558a84940a24c3cd7fa5ca8a326bd5dbaf50d7",
+          "hashes": {
+            "sourceHash": "7988046eeccbd635dcf3167ad295dd44c4624a785e5994f049612e573a985055",
+            "contractHash": "03dfd50b71c713b5fb06fd2244275bf14c8b27e438282e7f01a0cd713606fc6c",
+            "schemaHash": "a3706a23b5e5d43378fc3c921363f733c5f6a03dbed1a64199ac8265b76ee0a5",
+            "buildHash": "b47e86d5e8fdfa002e9ca780ef489cefc4d1a0ebd30be11a257bece915eb4f03"
+          },
+          "classification": "IMPLEMENTED_ISOLATED",
+          "adapterClass": "IN_MEMORY",
+          "findingIdentity": null,
+          "commandIds": [
+            "FP007-TEST",
+            "FP007-BUILD",
+            "BASELINE-IDENTITY",
+            "BASELINE-SUITE"
+          ]
+        },
+        {
+          "id": "FP007-DIST-001",
+          "status": "UNTESTED",
+          "source": [
+            "pixiedraw2/src/fp-007"
+          ],
+          "contract": [
+            "docs/contracts/FP-007-INTEGRATION.md",
+            "docs/contracts/FP-007-schema-registry.md"
+          ],
+          "schema": [
+            "pixiedraw2/src/fp-007/schema-registry.ts",
+            "pixiedraw2/src/fp-007/schema-compatibility.ts"
+          ],
+          "build": [
+            "pixiedraw2/benchmarks/fp-007/repeat-build.ts"
+          ],
+          "exitCode": null,
+          "reviewer": null,
+          "artifactHash": null,
+          "hashes": {
+            "sourceHash": "7988046eeccbd635dcf3167ad295dd44c4624a785e5994f049612e573a985055",
+            "contractHash": "03dfd50b71c713b5fb06fd2244275bf14c8b27e438282e7f01a0cd713606fc6c",
+            "schemaHash": "a3706a23b5e5d43378fc3c921363f733c5f6a03dbed1a64199ac8265b76ee0a5",
+            "buildHash": "b47e86d5e8fdfa002e9ca780ef489cefc4d1a0ebd30be11a257bece915eb4f03"
+          },
+          "classification": "UNTESTED",
+          "adapterClass": "UNTESTED",
+          "findingIdentity": "FP-007:FP007-DIST-001:UNTESTED",
+          "commandIds": [
+            "FP007-TEST"
+          ]
+        },
+        {
+          "id": "FP007-PROVENANCE-001",
+          "status": "UNTESTED",
+          "source": [
+            "pixiedraw2/src/fp-007"
+          ],
+          "contract": [
+            "docs/contracts/FP-007-INTEGRATION.md",
+            "docs/contracts/FP-007-schema-registry.md"
+          ],
+          "schema": [
+            "pixiedraw2/src/fp-007/schema-registry.ts",
+            "pixiedraw2/src/fp-007/schema-compatibility.ts"
+          ],
+          "build": [
+            "pixiedraw2/benchmarks/fp-007/repeat-build.ts"
+          ],
+          "exitCode": null,
+          "reviewer": null,
+          "artifactHash": null,
+          "hashes": {
+            "sourceHash": "7988046eeccbd635dcf3167ad295dd44c4624a785e5994f049612e573a985055",
+            "contractHash": "03dfd50b71c713b5fb06fd2244275bf14c8b27e438282e7f01a0cd713606fc6c",
+            "schemaHash": "a3706a23b5e5d43378fc3c921363f733c5f6a03dbed1a64199ac8265b76ee0a5",
+            "buildHash": "b47e86d5e8fdfa002e9ca780ef489cefc4d1a0ebd30be11a257bece915eb4f03"
+          },
+          "classification": "UNTESTED",
+          "adapterClass": "UNTESTED",
+          "findingIdentity": "FP-007:FP007-PROVENANCE-001:UNTESTED",
+          "commandIds": [
+            "FP007-TEST",
+            "FP007-NONINTRUSION",
+            "FP007-DIFF",
+            "BOUNDARY-IMPORT-SCAN",
+            "BASELINE-IDENTITY",
+            "BASELINE-SUITE"
+          ]
+        }
+      ],
+      "untested": [
+        "FP007-SCHEMA-001",
+        "FP007-DIST-001",
+        "FP007-PROVENANCE-001"
+      ],
+      "externalBlockers": [
+        "REAL_DIST_PROVENANCE_NOT_QUALIFIED",
+        "CURRENT_SYSTEM_QUALIFICATION_UNTESTED",
+        "PRODUCTION_QUALIFICATION_UNTESTED"
+      ],
+      "transcript": {
+        "path": "docs/inventory/core-120-predecessor-command-transcript.json",
+        "sha256": "4ef57b8e3fecc25d6d6f57c353d7e152ba616db6281ee67158e4a2a8c03c5358"
+      }
+    }
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "workPackage": "WP-230",
+  "status": "FINALIZATION_GATE_PASS_ISOLATED",
+  "notReexecuted": ["WP-000", "WP-005", "WP-010", "WP-020", "WP-030", "WP-040", "WP-050", "WP-060", "WP-070", "WP-080", "WP-090", "WP-091", "WP-092", "WP-093", "WP-094", "WP-095", "WP-096", "WP-097", "WP-098", "WP-099", "WP-100", "WP-110", "WP-120", "WP-130", "WP-140", "WP-150", "WP-160", "WP-170", "WP-180", "WP-190", "WP-200", "WP-210", "WP-220", "WP-230"],
+  "checks": {
+    "rawImageRejected": "PASS",
+    "base64AndDataUrlRejected": "PASS",
+    "coreCardRequiredForResourceShare": "PASS",
+    "marketCardAcceptedReferenceOnly": "PASS",
+    "snapshotPolicyExplicit": "PASS",
+    "privateDeletedTrashedQuarantinedUnpublishedUnavailable": "PASS",
+    "explicitShareRequired": "PASS",
+    "duplicateShareIdempotent": "PASS",
+    "unauthorizedShareRejected": "PASS",
+    "directWorkMutationRejected": "PASS",
+    "purchaseEntitlementMutationRejected": "PASS",
+    "notificationFailureDoesNotRollback": "PASS_EXISTING_WP230_FIXTURE",
+    "searchVisibilityBoundary": "PASS",
+    "plainCommentAndMarkupBoundary": "PASS"
+  },
+  "contentTypes": ["MARKET_PRODUCT", "MATERIAL", "COMPLETED_WORK", "PUBLIC_GAME", "PUBLIC_PROJECT", "CREATOR", "COLLECTION", "PUBLIC_RESOURCE"],
+  "readFailure": "CONTENT_UNAVAILABLE_WITHOUT_STALE_PRESENTATION_DATA",
+  "baselineFailureIdentity": {"existing": 14, "new": 0, "status": "INHERITED_MATCH_NOT_REEXECUTED"},
+  "productionMutation": false,
+  "untested": ["real SNS/RLS", "real moderation", "real Search backend", "real notification delivery", "real legacy social data"]
+}

@@ -1,0 +1,292 @@
+{
+  "evidenceVersion": "QUALIFICATION_EVIDENCE_V1",
+  "packageId": "DRAW-120",
+  "contextSha256": "b62057cc30c70c881a04c4465acefe869b6259a243021e41869d3e9a997aaee7",
+  "status": "PARTIAL",
+  "acceptance": [
+    {
+      "id": "DRAW120-SCOPE-001",
+      "status": "PASS",
+      "source": [
+        "pixiedraw2/src/draw2/draw-120/selection-transform.ts"
+      ],
+      "contract": [
+        "docs/contracts/DRAW-120-SELECTION-TRANSFORM.md"
+      ],
+      "schema": [
+        "pixiedraw2/src/draw2-core.ts"
+      ],
+      "build": [
+        "pixiedraw2/benchmarks/draw-120/generate-evidence.ts"
+      ],
+      "commands": [
+        {
+          "command": "\"deno\" \"fmt\" \"--check\" \"pixiedraw2/src/draw2/draw-120\" \"pixiedraw2/tests/draw-120\" \"pixiedraw2/benchmarks/draw-120\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"deno\" \"check\" \"pixiedraw2/src/draw2/draw-120/selection-transform.ts\" \"pixiedraw2/tests/draw-120/selection-transform.test.ts\" \"pixiedraw2/benchmarks/draw-120/generate-evidence.ts\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"deno\" \"test\" \"--no-remote\" \"--allow-read\" \"--allow-write\" \"--check\" \"pixiedraw2/tests/draw-120\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"python3\" \"scripts/verify_work_package_context.py\" \"--context\" \".codex/context/DRAW-120.md\" \"--root\" \".\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"node\" \"scripts/test-baseline-failure-identity-wp080.mjs\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"node\" \"scripts/test-baseline-suite-wp000.mjs\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"deno\" \"run\" \"--no-remote\" \"--allow-read\" \"--allow-write\" \"pixiedraw2/benchmarks/draw-120/generate-evidence.ts\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"git\" \"diff\" \"--check\"",
+          "exitCode": 0
+        }
+      ],
+      "artifactHashes": [
+        "64fa0f6248a03ff720e815a1bf0086fe826ba5453e68d444963470244df5248c",
+        "5cd4eceb446d9480f4f52d8a9d2c27d510be66ea3395a9590d26436017cfe474",
+        "da9e3313be2e04d4fe3d7b6aa329c2db3e4f03b939a60408dce63ca02ad25f94",
+        "153f0ff2487358aa115b9b3f7fc4cb72cc780695cd2bbca9d1e35876c3cfc9c4",
+        "c036b3abe5d9be5b06930309ea23cb821ba52bba7fe19b6e302f4de226431390",
+        "dc05e38a49272e4b4fcaa578fb347967d0457fae71acde19ddd670eaf60a019a",
+        "725a227a2d688eed5d70232a7af158f4cbbfa7aa408f5d45a52f395a086a2fbd"
+      ],
+      "adapterClass": "IN_MEMORY",
+      "classification": "IMPLEMENTED_ISOLATED",
+      "reviewer": "SOL_SCOPE_AUDIT",
+      "findingIdentity": null
+    },
+    {
+      "id": "DRAW120-WORKSPACE-001",
+      "status": "PARTIAL",
+      "source": [
+        "pixiedraw2/src/draw2/draw-120/selection-transform.ts"
+      ],
+      "contract": [
+        "docs/contracts/DRAW-120-SELECTION-TRANSFORM.md"
+      ],
+      "schema": [
+        "pixiedraw2/src/draw2-core.ts"
+      ],
+      "build": [
+        "pixiedraw2/benchmarks/draw-120/generate-evidence.ts"
+      ],
+      "commands": [
+        {
+          "command": "\"deno\" \"fmt\" \"--check\" \"pixiedraw2/src/draw2/draw-120\" \"pixiedraw2/tests/draw-120\" \"pixiedraw2/benchmarks/draw-120\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"deno\" \"check\" \"pixiedraw2/src/draw2/draw-120/selection-transform.ts\" \"pixiedraw2/tests/draw-120/selection-transform.test.ts\" \"pixiedraw2/benchmarks/draw-120/generate-evidence.ts\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"deno\" \"test\" \"--no-remote\" \"--allow-read\" \"--allow-write\" \"--check\" \"pixiedraw2/tests/draw-120\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"python3\" \"scripts/verify_work_package_context.py\" \"--context\" \".codex/context/DRAW-120.md\" \"--root\" \".\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"node\" \"scripts/test-baseline-failure-identity-wp080.mjs\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"node\" \"scripts/test-baseline-suite-wp000.mjs\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"deno\" \"run\" \"--no-remote\" \"--allow-read\" \"--allow-write\" \"pixiedraw2/benchmarks/draw-120/generate-evidence.ts\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"git\" \"diff\" \"--check\"",
+          "exitCode": 0
+        }
+      ],
+      "artifactHashes": [
+        "64fa0f6248a03ff720e815a1bf0086fe826ba5453e68d444963470244df5248c",
+        "5cd4eceb446d9480f4f52d8a9d2c27d510be66ea3395a9590d26436017cfe474",
+        "da9e3313be2e04d4fe3d7b6aa329c2db3e4f03b939a60408dce63ca02ad25f94",
+        "153f0ff2487358aa115b9b3f7fc4cb72cc780695cd2bbca9d1e35876c3cfc9c4",
+        "c036b3abe5d9be5b06930309ea23cb821ba52bba7fe19b6e302f4de226431390",
+        "dc05e38a49272e4b4fcaa578fb347967d0457fae71acde19ddd670eaf60a019a",
+        "725a227a2d688eed5d70232a7af158f4cbbfa7aa408f5d45a52f395a086a2fbd"
+      ],
+      "adapterClass": "UNTESTED",
+      "classification": "UNTESTED",
+      "reviewer": "SOL_SCOPE_AUDIT",
+      "findingIdentity": null
+    },
+    {
+      "id": "DRAW120-EVIDENCE-001",
+      "status": "PARTIAL",
+      "source": [
+        "pixiedraw2/src/draw2/draw-120/selection-transform.ts",
+        "pixiedraw2/tests/draw-120/selection-transform.test.ts",
+        "pixiedraw2/benchmarks/draw-120/generate-evidence.ts"
+      ],
+      "contract": [
+        "docs/contracts/DRAW-120-PERFORMANCE.md"
+      ],
+      "schema": [
+        "pixiedraw2/src/draw2-core.ts"
+      ],
+      "build": [
+        "pixiedraw2/benchmarks/draw-120/generate-evidence.ts"
+      ],
+      "commands": [
+        {
+          "command": "\"deno\" \"fmt\" \"--check\" \"pixiedraw2/src/draw2/draw-120\" \"pixiedraw2/tests/draw-120\" \"pixiedraw2/benchmarks/draw-120\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"deno\" \"check\" \"pixiedraw2/src/draw2/draw-120/selection-transform.ts\" \"pixiedraw2/tests/draw-120/selection-transform.test.ts\" \"pixiedraw2/benchmarks/draw-120/generate-evidence.ts\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"deno\" \"test\" \"--no-remote\" \"--allow-read\" \"--allow-write\" \"--check\" \"pixiedraw2/tests/draw-120\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"python3\" \"scripts/verify_work_package_context.py\" \"--context\" \".codex/context/DRAW-120.md\" \"--root\" \".\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"node\" \"scripts/test-baseline-failure-identity-wp080.mjs\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"node\" \"scripts/test-baseline-suite-wp000.mjs\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"deno\" \"run\" \"--no-remote\" \"--allow-read\" \"--allow-write\" \"pixiedraw2/benchmarks/draw-120/generate-evidence.ts\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"git\" \"diff\" \"--check\"",
+          "exitCode": 0
+        }
+      ],
+      "artifactHashes": [
+        "64fa0f6248a03ff720e815a1bf0086fe826ba5453e68d444963470244df5248c",
+        "5cd4eceb446d9480f4f52d8a9d2c27d510be66ea3395a9590d26436017cfe474",
+        "da9e3313be2e04d4fe3d7b6aa329c2db3e4f03b939a60408dce63ca02ad25f94",
+        "153f0ff2487358aa115b9b3f7fc4cb72cc780695cd2bbca9d1e35876c3cfc9c4",
+        "c036b3abe5d9be5b06930309ea23cb821ba52bba7fe19b6e302f4de226431390",
+        "dc05e38a49272e4b4fcaa578fb347967d0457fae71acde19ddd670eaf60a019a",
+        "725a227a2d688eed5d70232a7af158f4cbbfa7aa408f5d45a52f395a086a2fbd"
+      ],
+      "adapterClass": "IN_MEMORY",
+      "classification": "IMPLEMENTED_ISOLATED",
+      "reviewer": "SOL_SCOPE_AUDIT",
+      "findingIdentity": null
+    },
+    {
+      "id": "DRAW120-STOP-001",
+      "status": "PASS",
+      "source": [
+        "09_ROADMAP/WORK_PACKAGES/DRAW-120.md"
+      ],
+      "contract": [
+        "docs/contracts/DRAW-120-SELECTION-TRANSFORM.md"
+      ],
+      "schema": [
+        "pixiedraw2/src/draw2-core.ts"
+      ],
+      "build": [
+        "pixiedraw2/benchmarks/draw-120/generate-evidence.ts"
+      ],
+      "commands": [
+        {
+          "command": "\"deno\" \"fmt\" \"--check\" \"pixiedraw2/src/draw2/draw-120\" \"pixiedraw2/tests/draw-120\" \"pixiedraw2/benchmarks/draw-120\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"deno\" \"check\" \"pixiedraw2/src/draw2/draw-120/selection-transform.ts\" \"pixiedraw2/tests/draw-120/selection-transform.test.ts\" \"pixiedraw2/benchmarks/draw-120/generate-evidence.ts\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"deno\" \"test\" \"--no-remote\" \"--allow-read\" \"--allow-write\" \"--check\" \"pixiedraw2/tests/draw-120\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"python3\" \"scripts/verify_work_package_context.py\" \"--context\" \".codex/context/DRAW-120.md\" \"--root\" \".\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"node\" \"scripts/test-baseline-failure-identity-wp080.mjs\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"node\" \"scripts/test-baseline-suite-wp000.mjs\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"deno\" \"run\" \"--no-remote\" \"--allow-read\" \"--allow-write\" \"pixiedraw2/benchmarks/draw-120/generate-evidence.ts\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"git\" \"diff\" \"--check\"",
+          "exitCode": 0
+        }
+      ],
+      "artifactHashes": [
+        "64fa0f6248a03ff720e815a1bf0086fe826ba5453e68d444963470244df5248c",
+        "5cd4eceb446d9480f4f52d8a9d2c27d510be66ea3395a9590d26436017cfe474",
+        "da9e3313be2e04d4fe3d7b6aa329c2db3e4f03b939a60408dce63ca02ad25f94",
+        "153f0ff2487358aa115b9b3f7fc4cb72cc780695cd2bbca9d1e35876c3cfc9c4",
+        "c036b3abe5d9be5b06930309ea23cb821ba52bba7fe19b6e302f4de226431390",
+        "dc05e38a49272e4b4fcaa578fb347967d0457fae71acde19ddd670eaf60a019a",
+        "725a227a2d688eed5d70232a7af158f4cbbfa7aa408f5d45a52f395a086a2fbd"
+      ],
+      "adapterClass": "IN_MEMORY",
+      "classification": "IMPLEMENTED_ISOLATED",
+      "reviewer": "SOL_SCOPE_AUDIT",
+      "findingIdentity": null
+    }
+  ],
+  "benchmarkPath": "docs/inventory/draw-120-benchmark.json",
+  "untested": [
+    "browser screenshot",
+    "physical mobile",
+    "stylus",
+    "Safari",
+    "Firefox",
+    "full input-to-visible compositor",
+    "30-minute memory"
+  ],
+  "baseline": {
+    "expectedFailureCount": 14,
+    "identityMatches": 14,
+    "newFailures": 0,
+    "suitePasses": 63,
+    "suiteTotal": 77
+  },
+  "independentReview": {
+    "reviewer": "SOL_SCOPE_AUDIT",
+    "status": "INDEPENDENT_REVIEW_PASS",
+    "path": "docs/inventory/draw-120-independent-audit.json"
+  },
+  "checkpoint": {
+    "manifest": "docs/inventory/draw-120-command-manifest.json",
+    "transcript": "docs/inventory/draw-120-command-transcript.json",
+    "handoff": "DRAW-120",
+    "nextPackage": "DRAW-130",
+    "autoStartNext": false
+  },
+  "noProductionClaims": true
+}

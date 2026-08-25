@@ -1,0 +1,15 @@
+schema_version: 3.2
+precedence:
+  - DISCOVERY_QUESTION_POLICY.yaml
+  - HUMAN_APPROVAL.yaml
+  - SECURITY_LICENSE.yaml
+  - BLUEPRINT_GLOBAL_COHERENCE.yaml
+  - EVIDENCE_VALUE_COST.yaml
+  - RESEARCH.yaml
+  - EXPERIMENT.yaml
+  - QUALITY_RELEASE.yaml
+  - HARNESS_MEMORY.yaml
+conflict_resolution:
+  choose: higher_precedence_then_lower_irreversibility_then_lower_total_cost
+  unresolved_high_impact_before_discovery_lock: ask_in_discovery_batch
+  unresolved_high_impact_after_discovery_lock: preserve_options_or_queue_hard_approval

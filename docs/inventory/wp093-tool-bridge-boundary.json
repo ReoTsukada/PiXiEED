@@ -1,0 +1,71 @@
+{
+  "workPackage": "WP-093",
+  "status": "complete",
+  "implementation": {
+    "bridge": "core-shell/assets/core-tool-bridge-contracts.js",
+    "legacyDrawBridge": "core-shell/assets/core-legacy-draw-bridge-contract.js",
+    "schema": "core-shell/schemas/tool-bridge-v1.schema.json",
+    "fixture": "core-shell/fixtures/tool-bridge-v1.valid.json",
+    "test": "scripts/test-core-tool-bridge-wp093.mjs",
+    "loadedBy": [],
+    "domCanvasAudioStorageNetworkCoupling": false,
+    "currentDrawChanged": false
+  },
+  "registeredToolFamilies": [
+    "pixiedraw",
+    "pixiedraw2",
+    "pixieaudio",
+    "pixigame",
+    "pixiruntime",
+    "pixfind",
+    "camera-image",
+    "market-package",
+    "social-card"
+  ],
+  "included": [
+    "Tool Descriptor and trusted registration",
+    "Bridge API Version separate from Tool Version",
+    "Capability negotiation with versions and limits",
+    "Request/Result/Diagnostic/Retryability envelope",
+    "Project and Asset reference operations",
+    "Compatibility states and Adapter requirement",
+    "Cancellation and idempotent retry",
+    "Causation-aware invalidation/update/revision events",
+    "In-memory subscription and injected transport boundary",
+    "Thin current Draw/PXD/PiXiSYNC reference adapter",
+    "Independent default-off Bridge flags"
+  ],
+  "excluded": [
+    "Raw Pixel/Audio/Game/PXD/PiXiPackage bytes",
+    "Base64/Data URL/full Editor State",
+    "Tool renderer/player/editor implementation",
+    "Project/Asset Registry mutation",
+    "Supabase/Auth/RLS/Storage/Realtime implementation",
+    "Market Product/Purchase/License/Royalty/Commission data",
+    "SNS deletion or content mutation"
+  ],
+  "verification": {
+    "bridgeApiVersion": "1",
+    "operationsCovered": 24,
+    "capabilitiesCovered": 29,
+    "eventTypes": ["INVALIDATE", "UPDATE_AVAILABLE", "REVISION_CHANGED"],
+    "compatibilityStates": ["SUPPORTED", "SUPPORTED_WITH_ADAPTER", "READ_ONLY", "COPY_REQUIRED", "REVIEW_REQUIRED", "UNSUPPORTED", "QUARANTINED"],
+    "failureFixtures": 31,
+    "blobPayloadsTransferred": 0,
+    "baselineFailureIdentity": "14/14 inherited match; new 0",
+    "diffCheck": "pass"
+  },
+  "preservation": {
+    "productionRoutesChanged": false,
+    "currentPiXiEEDrawChanged": false,
+    "currentPxdChanged": false,
+    "currentPiXiSYNCChanged": false,
+    "marketChanged": false,
+    "snsDeleted": false,
+    "projectOrAssetDataChanged": false,
+    "databaseMigrationApplied": false,
+    "storageUploadApplied": false,
+    "deployPublishCommitPush": false
+  },
+  "nextBoundary": "WP-094 Package Registry Core consumes Project/Asset references and materializes PXD/PiXiPackage without moving Blob authority into Bridge."
+}

@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "AUDIO-240_EVIDENCE_V1",
+  "workPackage": "AUDIO-240",
+  "status": "ISOLATED_REFERENCE_PASS_WITH_UNTESTED_QUALIFICATION",
+  "decision": "ISOLATED_REFERENCE_PASS",
+  "acceptanceIds": ["AUDIO240-SCOPE-001", "AUDIO240-EVIDENCE-001", "AUDIO240-STOP-001"],
+  "implementation": {
+    "source": [
+      "pixiedraw2/src/audio/audio-240/contracts.ts",
+      "pixiedraw2/src/audio/audio-240/gate.ts",
+      "pixiedraw2/src/audio/audio-240/index.ts"
+    ],
+    "aggregates": ["AUDIO-200 project/state", "AUDIO-210 event graph/binding", "AUDIO-220 package/lock", "AUDIO-230 workspace/a11y/projection"],
+    "pureTypeScript": true,
+    "domNetworkFilesystemAudioContext": false,
+    "publishAllowed": false,
+    "referenceModes": "LIVE preserved for bridge/preview; PINNED required for package lock"
+  },
+  "coverage": {
+    "positive": ["coherent complete evidence produces deterministic PASS"],
+    "negative": ["missing package", "browser/device/production UNTESTED", "stale evidence", "project hash mismatch", "LIVE package lock", "page scroll", "incomplete cross-tool rollback evidence"],
+    "failClosed": ["missing", "contradictory", "stale", "hash mismatch", "unsafe page scroll", "LIVE package publish lock"]
+  },
+  "checks": {
+    "denoCheck": {"status": "PASS", "command": "deno check --no-remote pixiedraw2/src/audio/audio-240/index.ts pixiedraw2/src/audio/audio-240/contracts.ts pixiedraw2/src/audio/audio-240/gate.ts pixiedraw2/tests/audio-240/gate_test.ts pixiedraw2/benchmarks/audio-240/gate_bench.ts", "exitCode": 0},
+    "denoTest": {"status": "PASS", "command": "deno test --no-remote --check pixiedraw2/tests/audio-240/gate_test.ts", "passed": 4, "failed": 0, "exitCode": 0},
+    "denoBench": {"status": "PASS", "command": "deno bench --no-remote pixiedraw2/benchmarks/audio-240/gate_bench.ts", "classification": "MEASURED_LOCAL_SYNTHETIC", "result": "35.1 us/iter average; 28,470 iter/s", "exitCode": 0},
+    "jsonParse": {"status": "PASS", "command": "deno eval JSON.parse(await Deno.readTextFile('docs/inventory/audio-240-evidence.json'))", "exitCode": 0},
+    "gitDiffCheck": {"status": "PASS", "command": "git diff --check", "exitCode": 0},
+    "independentReview": "COORDINATOR_SOURCE_AND_REEXECUTION_REVIEW_PASS"
+  },
+  "environment": {
+    "browser": "UNTESTED",
+    "physicalDevice": "UNTESTED",
+    "nativeAudioOutput": "UNTESTED",
+    "accessibilityScreenReaderSafariFirefox": "UNTESTED",
+    "longSessionLargeTimeline": "UNTESTED",
+    "productionEquivalentStagingMigrationRlsProviderRollback": "UNTESTED",
+    "marketPiXiSYNCCurrentRoutesData": "NOT_IN_SCOPE"
+  },
+  "nonIntrusion": {
+    "allowedWriteScopeOnly": true,
+    "RegistryQueueStateContextCurrentRoutesDataMarketPiXiSYNCEdited": false,
+    "deployPublishCommitPush": false,
+    "nextPackageStarted": false
+  }
+}

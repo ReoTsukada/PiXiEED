@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "workPackage": "WP-170",
+  "status": "MEASURED_LOCAL_SYNTHETIC_WITH_LONG_TASK_CANDIDATES",
+  "command": "deno run --no-remote --check pixiedraw2/benchmarks/run-wp170-advanced-benchmark.ts",
+  "fixtures": {
+    "A": { "dimensions": "256x256", "layers": 12, "frames": 60, "iterations": 5, "latencyMs": { "p50": 0.71, "p95": 0.83, "max": 2.29 }, "dirtyTiles": 7, "writes": 616, "longTaskCount": 0 },
+    "B": { "dimensions": "512x512", "layers": 20, "frames": 120, "iterations": 5, "latencyMs": { "p50": 46.94, "p95": 51.60, "max": 63.29 }, "dirtyTiles": 256, "writes": 131072, "longTaskCount": 2 },
+    "advancedStress": { "dimensions": "512x512", "layers": 100, "frames": 1000, "iterations": 5, "latencyMs": { "p50": 48.48, "p95": 54.33, "max": 62.98 }, "dirtyTiles": 252, "writes": 47982, "longTaskCount": 2 }
+  },
+  "sparseCow": { "copiedBytes": 0, "cowSplits": 0, "note": "Planner-only; Editor Adapter mutation metrics are separate." },
+  "deviceGate": "UNTESTED_DEVICE_GATE",
+  "workerCandidate": "Dither writes over 4096 expose MEASURE_AFTER_BOUNDARY; Worker implementation is not claimed complete.",
+  "untested": ["real devices", "GPU/compositor", "memory pressure", "long session", "network/storage" ]
+}

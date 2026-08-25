@@ -1,0 +1,11 @@
+required: [id, claim, source_type, confidence, freshness, affects_decision]
+example:
+  id: EV-001
+  claim: string
+  source_type: official|standard|upstream|licensed_oss|primary|secondary|community|test|benchmark
+  source_ref: null
+  confidence: low|medium|high
+  freshness: stable|medium|volatile
+  verified_at: null
+  license_note: null
+  affects_decision: []

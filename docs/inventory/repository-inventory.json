@@ -1,0 +1,174 @@
+{
+  "schema_version": 1,
+  "work_package": "WP-000",
+  "captured_on": "2026-08-06",
+  "repository": {
+    "commit": "76e01b24c7f4f4ae3b75c0727f1e3612a133d970",
+    "branch": "main",
+    "remote_tracking": "origin/main",
+    "workspace_status_capture": "after WP-000 context bootstrap; the worktree was already dirty",
+    "status_entries": 72,
+    "modified_entries": 45,
+    "untracked_entries": 27,
+    "preservation_note": "Pre-existing user changes are intentionally preserved and are not classified as WP-000 edits."
+  },
+  "packages": [
+    {
+      "path": "app-shell/pixieed-capacitor/android/app/build/intermediates/assets/debug/mergeDebugAssets/public/pixfind/package.json",
+      "name": "pixfind",
+      "private": true,
+      "scripts": [
+        "dev",
+        "puzzles"
+      ],
+      "dependencies": [],
+      "devDependencies": []
+    },
+    {
+      "path": "app-shell/pixieed-capacitor/ios/build/PiXiEED-pre-signing.xcarchive/Products/Applications/App.app/public/pixfind/package.json",
+      "name": "pixfind",
+      "private": true,
+      "scripts": [
+        "dev",
+        "puzzles"
+      ],
+      "dependencies": [],
+      "devDependencies": []
+    },
+    {
+      "path": "app-shell/pixieed-capacitor/package.json",
+      "name": "pixieed-capacitor-app",
+      "private": true,
+      "scripts": [
+        "android:build:aab",
+        "android:build:debug",
+        "android:build:release-apk",
+        "android:keystore:generate",
+        "android:sdk:install",
+        "build:web",
+        "cap:add:android",
+        "cap:add:ios",
+        "cap:copy",
+        "cap:open:android",
+        "cap:open:ios",
+        "cap:sync",
+        "doctor",
+        "doctor:android",
+        "doctor:ios",
+        "icons:generate",
+        "ios:archive",
+        "ios:archive:unsigned",
+        "ios:build:sim",
+        "ios:export:appstore"
+      ],
+      "dependencies": [
+        "@capacitor/core",
+        "@capacitor/filesystem"
+      ],
+      "devDependencies": [
+        "@capacitor/android",
+        "@capacitor/cli",
+        "@capacitor/ios"
+      ]
+    },
+    {
+      "path": "package.json",
+      "name": "pixieed-site-tools",
+      "private": true,
+      "scripts": [],
+      "dependencies": [],
+      "devDependencies": [
+        "sharp"
+      ]
+    },
+    {
+      "path": "tools/screenshots/package.json",
+      "name": "pixieed-screenshot-tools",
+      "private": true,
+      "scripts": [
+        "capture"
+      ],
+      "dependencies": [
+        "playwright"
+      ],
+      "devDependencies": []
+    }
+  ],
+  "applications": [
+    {
+      "name": "PiXiEED web",
+      "path": "index.html",
+      "boundary": "public web"
+    },
+    {
+      "name": "PiXiEEDraw",
+      "path": "pixiedraw/",
+      "boundary": "public web app"
+    },
+    {
+      "name": "PiXFiND",
+      "path": "pixfind/",
+      "boundary": "public web app"
+    },
+    {
+      "name": "PiXiEELENS",
+      "path": "pixiee-lens/",
+      "boundary": "public web app"
+    },
+    {
+      "name": "Market",
+      "path": "market/",
+      "boundary": "public web app with Supabase/Stripe boundaries"
+    },
+    {
+      "name": "Maoitu",
+      "path": "maoitu/",
+      "boundary": "public web app"
+    },
+    {
+      "name": "QR Maker",
+      "path": "qr-maker/",
+      "boundary": "public web app"
+    },
+    {
+      "name": "Capacitor shell",
+      "path": "app-shell/pixieed-capacitor/",
+      "boundary": "native build boundary"
+    },
+    {
+      "name": "Supabase",
+      "path": "supabase/",
+      "boundary": "database/functions boundary"
+    }
+  ],
+  "build_boundaries": [
+    {
+      "command": "npm run build:web",
+      "cwd": "app-shell/pixieed-capacitor",
+      "effect": "stage web assets for native shell"
+    },
+    {
+      "command": "npm run cap:sync",
+      "cwd": "app-shell/pixieed-capacitor",
+      "effect": "stage and sync native projects"
+    },
+    {
+      "command": "node scripts/static-server.mjs",
+      "cwd": ".",
+      "effect": "local static server"
+    },
+    {
+      "command": "supabase migration list",
+      "cwd": ".",
+      "effect": "read-only local/remote migration metadata"
+    }
+  ],
+  "production_actions_not_run": [
+    "supabase db push",
+    "supabase functions deploy",
+    "npm run cap:sync",
+    "native release/archive commands",
+    "git commit",
+    "git push"
+  ]
+}

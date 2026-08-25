@@ -1,0 +1,50 @@
+{
+  "benchmarkVersion": "DRAW130_REFERENCE_SYNTHETIC_V1",
+  "classification": "REFERENCE_SYNTHETIC",
+  "fixture": {
+    "frames": 1000,
+    "layers": 100,
+    "totalCells": 100000
+  },
+  "projection": {
+    "totalItems": 100000,
+    "visibleItems": 20,
+    "overscanItems": 192,
+    "mountedItems": 20,
+    "renderedItems": 20
+  },
+  "visibleWindow": {
+    "frames": 12,
+    "layers": 8,
+    "cells": 0
+  },
+  "structuralCommitCount": 2,
+  "undoDepth": 2,
+  "elapsedMs": 2.845,
+  "structureHash": "7cd65ddd904823a70e4c4590930328089aefe0865e040a2b86d973a3d5368c0c",
+  "onionSkin": {
+    "enabled": true,
+    "currentFrameId": "draw130-benchmark:frame:1",
+    "before": [
+      {
+        "frameId": "draw130-benchmark:frame:0",
+        "offset": 1,
+        "celIds": [
+          "draw130-benchmark:cel:0:0",
+          "draw130-benchmark:cel:draw130-benchmark:layer:1:draw130-benchmark:frame:0"
+        ]
+      }
+    ],
+    "after": []
+  },
+  "untested": [
+    "browser screenshot",
+    "physical mobile",
+    "stylus",
+    "Safari",
+    "Firefox",
+    "full compositor",
+    "30-minute memory"
+  ],
+  "noProductionClaims": true
+}

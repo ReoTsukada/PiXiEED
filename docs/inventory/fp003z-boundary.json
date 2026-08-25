@@ -1,0 +1,34 @@
+{
+  "inventoryId": "FP-003Z-BOUNDARY-V1",
+  "status": "COMPLETE_ISOLATED_PENDING_EXTERNAL_AUDIT",
+  "serverCompositionRoot": {
+    "module": "pixiedraw2/src/server/authority-composition-root.ts",
+    "mode": "fixed-instance-only",
+    "providerInjection": false,
+    "registryInjectionAtRelease": false,
+    "defaultAdapter": "fail-closed"
+  },
+  "browserEntries": {
+    "checked": 11,
+    "serverAuthorityImplementationIncluded": false,
+    "serverImportResidual": 0
+  },
+  "buildGraph": [
+    { "task": "build:market", "entry": "src/wp210-market-bundle-entry.ts", "output": "dist/wp210-market-core.js" },
+    { "task": "build:market:min", "entry": "src/wp210-market-bundle-entry.ts", "output": "dist/wp210-market-core.min.js" },
+    { "task": "build:direct-work", "entry": "src/wp220-direct-work-bundle-entry.ts", "output": "dist/wp220-direct-work-core.js" },
+    { "task": "build:direct-work:min", "entry": "src/wp220-direct-work-bundle-entry.ts", "output": "dist/wp220-direct-work-core.min.js" },
+    { "task": "build:fp003", "entry": "src/fp003-financial-bundle-entry.ts", "output": "dist/fp003-financial-integrity-core.js" },
+    { "task": "build:fp003:min", "entry": "src/fp003-financial-bundle-entry.ts", "output": "dist/fp003-financial-integrity-core.min.js" }
+  ],
+  "distArtifacts": [
+    { "file": "pixiedraw2/dist/fp003-financial-integrity-core.js", "rawBytes": 318, "gzipBytes": 224, "brotli": "UNTESTED" },
+    { "file": "pixiedraw2/dist/fp003-financial-integrity-core.min.js", "rawBytes": 211, "gzipBytes": 194, "brotli": "UNTESTED" },
+    { "file": "pixiedraw2/dist/wp210-market-core.js", "rawBytes": 318, "gzipBytes": 211, "brotli": "UNTESTED" },
+    { "file": "pixiedraw2/dist/wp210-market-core.min.js", "rawBytes": 211, "gzipBytes": 181, "brotli": "UNTESTED" },
+    { "file": "pixiedraw2/dist/wp220-direct-work-core.js", "rawBytes": 318, "gzipBytes": 216, "brotli": "UNTESTED" },
+    { "file": "pixiedraw2/dist/wp220-direct-work-core.min.js", "rawBytes": 211, "gzipBytes": 186, "brotli": "UNTESTED" }
+  ],
+  "staleTokens": 0,
+  "productionAdapter": "CONTRACT_ONLY_UNTESTED"
+}

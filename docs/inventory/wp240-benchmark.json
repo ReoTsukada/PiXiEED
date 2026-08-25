@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "benchmarkId": "WP240_ADMIN_ANALYTICS_ADS_SYNTHETIC",
+  "status": "MEASURED_LOCAL_SYNTHETIC",
+  "iterations": 10000,
+  "successful": 10000,
+  "elapsedMs": 10.62,
+  "operationsPerSecond": 941638.03,
+  "notes": ["Pure local Admin/Analytics/Ads/Moderation/Revenue projection only.", "Not a production, provider, browser, device, or financial performance PASS."]
+}

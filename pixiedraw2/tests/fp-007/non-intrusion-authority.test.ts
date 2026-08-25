@@ -17,7 +17,7 @@ const INSPECTED_PATHS = [
   "current-routes",
   "pixiedraw",
   "pxd",
-  "pixisync",
+  "pixync",
   "market",
 ] as const;
 

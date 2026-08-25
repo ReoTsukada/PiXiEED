@@ -1,0 +1,146 @@
+schema_version: 2
+program_id: PIXIEED-COMPLETION-PROGRAM-002
+registry: 00_START_HERE/WORK_PACKAGE_REGISTRY.json
+queue_role: human-readable mirror; the registry is the machine authority
+current_ready_package: SITE-460
+active_parallel_packages:
+  []
+core_completion: CORE-120
+qualification_entry: WP-900
+cutover_package: CUT-001
+production_apply_allowed: false
+auto_start_next: false
+current_status: COMPLETE_CANDIDATE
+goal: browser_site_usable_first_native_and_store_deferred
+
+historical_completed:
+  - WP-000
+  - WP-005
+  - WP-010
+  - WP-020
+  - WP-030
+  - WP-040
+  - WP-050
+  - WP-060
+  - WP-070
+  - WP-080
+  - WP-090
+  - WP-091
+  - WP-092
+  - WP-093
+  - WP-094
+  - WP-095
+  - WP-096
+  - WP-097
+  - WP-098
+  - WP-099
+  - WP-100
+  - WP-110
+  - WP-120
+  - WP-130
+  - WP-140
+  - WP-150
+  - WP-160
+  - WP-170
+  - WP-180
+  - WP-190
+  - WP-200
+  - WP-210
+  - WP-220
+  - WP-230
+  - WP-240
+  - WP-250
+  - FP-001
+  - FP-002
+  - FP-003
+  - FP-003X
+  - FP-003Y
+  - FP-003Z
+  - FP-003Z-FINALIZATION
+  - FP-003AA
+  - FP-004
+  - FP-005
+  - FP-007
+
+catalog_order:
+  - FP-004
+  - FP-005
+  - FP-007
+  - CORE-100
+  - CORE-110
+  - CORE-120
+  - FP-006
+  - DRAW-110
+  - DRAW-120
+  - DRAW-130
+  - DRAW-140
+  - DRAW-150
+  - DRAW-160
+  - DRAW-170
+  - AUDIO-200
+  - AUDIO-210
+  - AUDIO-220
+  - AUDIO-230
+  - AUDIO-240
+  - GAME-300
+  - GAME-310
+  - GAME-320
+  - GAME-330
+  - GAME-340
+  - GAME-350
+  - SITE-400
+  - MARKET-410
+  - WORK-420
+  - SOCIAL-430
+  - OPS-440
+  - PLATFORM-450
+  - SITE-460
+  - NATIVE-500
+  - NATIVE-510
+  - NATIVE-520
+  - WP-900
+  - WP-910
+  - WP-920
+  - WP-930
+  - WP-940
+  - WP-950
+  - WP-960
+  - WP-970
+  - WP-980
+  - WP-990
+  - CUT-001
+
+phase_order:
+  - foundation: FP-004 -> FP-005 -> FP-007
+  - core: CORE-100 -> CORE-110 -> CORE-120
+  - draw2: FP-006 -> DRAW-110 -> DRAW-120 -> DRAW-130 -> DRAW-140 -> DRAW-150 -> DRAW-160 -> DRAW-170
+  - audio: AUDIO-200 -> AUDIO-210 -> AUDIO-220 -> AUDIO-230 -> AUDIO-240
+  - game: GAME-300 -> GAME-310 -> GAME-320 -> GAME-330 -> GAME-340 -> GAME-350
+  - platform-site: SITE-400 -> MARKET-410 -> WORK-420 -> SOCIAL-430 -> OPS-440 -> PLATFORM-450 -> SITE-460
+  - native: NATIVE-500 -> NATIVE-510 -> NATIVE-520
+  - qualification: WP-900 -> WP-910 -> WP-920 -> WP-930 -> WP-940 -> WP-950 -> WP-960 -> WP-970 -> WP-980 -> WP-990
+  - cutover: CUT-001
+
+post_core_parallel:
+  roots: [FP-006, AUDIO-200, GAME-300]
+  draw_branch: FP-006 -> DRAW-110 -> DRAW-120 -> DRAW-130 -> DRAW-140 -> DRAW-150 -> DRAW-160 -> DRAW-170
+  audio_branch: AUDIO-200 -> AUDIO-210 -> AUDIO-220 -> AUDIO-230 -> AUDIO-240
+  game_branch: GAME-300 -> GAME-310 -> GAME-320 -> GAME-330
+  game_cross_tool_join: "[GAME-330, DRAW-160, AUDIO-230] -> GAME-340 -> GAME-350"
+  platform_join: "[DRAW-170, AUDIO-240, GAME-350] -> SITE-400"
+  rule: Dispatch independent branch workers together after CORE-120; join only when declared dependencies pass.
+
+native_policy:
+  - Browser/PWA is the first delivery and remains the fallback.
+  - NATIVE-500 defines one host boundary; canonical Core/project state never forks by shell.
+  - Desktop distribution is a candidate only; signing, macOS notarization, auto-update, rollback, file association, offline, and security evidence are mandatory.
+  - Tauri/Electron are not selected before an ADR comparison.
+  - Mobile uses app-shell/pixieed-capacitor for Google Play/App Store evaluation; Play internal/closed and TestFlight are staged evidence only.
+  - Store submission and deploy are prohibited.
+
+non_negotiable:
+  - current Market, PiXiSYNC, URLs, data, and production fallback remain usable
+  - isolated or copied fixtures are never reported as production proof
+  - every package has bounded writes, acceptance evidence, and independent review
+  - completion never starts the next package automatically
+  - WP-990 records a decision request only; CUT-001 remains blocked until explicit Owner authorization

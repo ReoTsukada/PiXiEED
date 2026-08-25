@@ -1,0 +1,32 @@
+schema_version: 3.2
+status: ready
+discovery_lock: true
+blueprint_revision_seen: 1
+current_work_package: WP-080-APP-SHELL-DESIGN-SYSTEM
+current_phase: delivery
+completed_work_packages: []
+blocked_work_packages: []
+open_blockers: []
+safe_assumptions:
+  - "トップページの第一目的はPiXiEEDraw2の発見・理解・開始"
+  - "既存ページは段階移行し、既存URL・商品・権限を維持する"
+active_risks:
+  - "現行の大量の未コミット変更と新しいApp Shell変更の境界を厳守する必要がある"
+  - "既存トップのSEO・共有導線を壊さずに新構成へ移行する必要がある"
+last_gate_decision: "DISCOVERY_LOCKED_BLUEPRINT_ACTIVE"
+last_research_ref: login-ux-and-auth-methods-20260824
+last_experiment_ref: null
+last_review_ref: null
+last_release_check: null
+last_experiment_ref: null
+last_review_ref: null
+last_release_check: null
+budget:
+  mode: quality_per_total_cost
+  spend_class: normal
+  hard_limit: null
+  soft_limit: null
+  cumulative_estimate: 0
+resume:
+  command: read_bootstrap_then_resume
+  evidence_snapshot: "2026-08-24: Draw2-first homepage and account login surface implemented; actual Draw2 workspace screenshot loads in both surfaces, desktop overflow is absent, supported auth method labels remain wired to existing handlers, and App Shell staging checks pass"

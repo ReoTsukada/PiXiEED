@@ -1,0 +1,265 @@
+{
+  "schemaVersion": "AGENT_PACKAGE_PREFLIGHT_MANIFEST_V1",
+  "packageId": "SOCIAL-430",
+  "classification": "FIXED_SYNTHETIC",
+  "contextSha256": "99ef42018fd768c69a36c16277970205a7696936afe89781b0a8ab5375611df0",
+  "currentDecision": {
+    "status": "STRUCTURAL_PASS_TERRA",
+    "boundaryModel": "EXTERNAL_CALLER_VS_SERVER_TCB",
+    "deepImportP0": "WITHDRAWN",
+    "semanticAcceptance": "STRUCTURAL_PASS_TERRA",
+    "productionSemanticQualification": "PENDING",
+    "reason": "Terra High independently passed the structural boundary review; production semantic qualification remains pending for untested external and production-integrated items."
+  },
+  "review": {
+    "reviewer": "Terra High",
+    "source": "TERRA_FINAL_INDEPENDENT_STRUCTURAL_REVIEW",
+    "decision": "PASS",
+    "reviewedAt": "2026-08-16T14:50:32+09:00"
+  },
+  "historicalDesignGate": {
+    "status": "CLOSED_HISTORICAL",
+    "previousDecision": "STOP_DESIGN_GATE",
+    "closedAt": "2026-08-16T14:41:15+09:00",
+    "reason": "Fix round 2 recorded the second composition-root-boundary finding before the design decision was superseded by the adopted boundary model.",
+    "fixRound": {
+      "currentRound": 2,
+      "max_fix_rounds": 2,
+      "timebox_minutes": 20,
+      "checkpoint_every_minutes": 10,
+      "sameClassFinding": {
+        "class": "composition-root-boundary",
+        "occurrence": 2,
+        "decision": "STOP_DESIGN_GATE"
+      }
+    }
+  },
+  "network": false,
+  "productionAccess": false,
+  "realData": false,
+  "staticOnly": true,
+  "publicEntrypoints": [
+    "pixiedraw2/src/platform/social-430/contracts.ts"
+  ],
+  "serverOnlyCompositionRoots": [
+    "pixiedraw2/src/platform/social-430/server-composition-root.ts"
+  ],
+  "forbiddenPublicExports": [
+    "createSocial430ServerComposition",
+    "createSocial430ServerCapability",
+    "Social430ServerCapability",
+    "Social430EventProjectionLedger"
+  ],
+  "forbiddenPublicConstructors": [
+    "Social430ServerCapability",
+    "Social430AuthorityAdapter"
+  ],
+  "forbiddenPublicFactories": [
+    "createSocial430ServerComposition",
+    "createSocial430ServerCapability",
+    "createSocial430Authority"
+  ],
+  "requiredRiskClasses": [
+    "authority",
+    "security",
+    "privacy",
+    "lifecycle"
+  ],
+  "invalidInputCases": [
+    {
+      "id": "AUTHORITY-ROOT-001",
+      "riskClass": "authority",
+      "expectedOutcome": "REJECT",
+      "reasonCode": "CALLER_INJECTION_REJECTED"
+    },
+    {
+      "id": "RESOLVER-IDENTITY-001",
+      "riskClass": "security",
+      "expectedOutcome": "REJECT",
+      "reasonCode": "CANONICAL_IDENTITY_MISMATCH"
+    },
+    {
+      "id": "CALLER-STATE-001",
+      "riskClass": "privacy",
+      "expectedOutcome": "REJECT",
+      "reasonCode": "CALLER_STATE_NOT_AUTHORITY"
+    },
+    {
+      "id": "EVENT-ID-001",
+      "riskClass": "security",
+      "expectedOutcome": "REJECT",
+      "reasonCode": "CANONICAL_EVENT_ID_REQUIRED"
+    },
+    {
+      "id": "REPLAY-REVOKE-001",
+      "riskClass": "lifecycle",
+      "expectedOutcome": "REJECT",
+      "reasonCode": "LIFECYCLE_TRANSITION_NOT_AUTHORIZED"
+    }
+  ],
+  "expectedReasonCodes": [
+    "CALLER_INJECTION_REJECTED",
+    "CANONICAL_IDENTITY_MISMATCH",
+    "CALLER_STATE_NOT_AUTHORITY",
+    "CANONICAL_EVENT_ID_REQUIRED",
+    "LIFECYCLE_TRANSITION_NOT_AUTHORIZED"
+  ],
+  "resolverBindings": [
+    {
+      "name": "resource-canonical-identity",
+      "requested": {
+        "id": "asset:social430",
+        "type": "ASSET",
+        "tenant": "tenant:social430",
+        "version": "7",
+        "cardType": "COMPLETED_WORK"
+      },
+      "returned": {
+        "id": "asset:substituted",
+        "type": "PROJECT",
+        "tenant": "tenant:other",
+        "version": "8",
+        "cardType": "PUBLIC_PROJECT"
+      },
+      "expectedOutcome": "REJECT",
+      "reasonCode": "CANONICAL_IDENTITY_MISMATCH"
+    }
+  ],
+  "eventBindings": [
+    {
+      "name": "event-canonical-integrity",
+      "lookup": {
+        "eventId": "event:social430",
+        "payloadHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "aggregate": "post:social430",
+        "version": 7
+      },
+      "resolved": {
+        "eventId": "event:substituted",
+        "payloadHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "aggregate": "post:other",
+        "version": 8
+      },
+      "expectedOutcome": "REJECT",
+      "reasonCode": "CANONICAL_EVENT_ID_REQUIRED"
+    }
+  ],
+  "invalidInputTest": {
+    "mode": "STATIC_MANIFEST_AND_RESULT_ARTIFACT",
+    "testSource": "pixiedraw2/tests/social-430/social-430.test.ts",
+    "resultArtifact": "docs/inventory/social-430-preflight-result.json"
+  },
+  "evidencePath": "docs/inventory/social-430-preflight-evidence.json",
+  "checkpointPath": "docs/inventory/social-430-checkpoint.json",
+  "evidenceSeparation": {
+    "schemaStatus": "PASS",
+    "semanticAcceptanceStatus": "PENDING",
+    "independentReviewer": "Terra High",
+    "lunaSelfApproval": false
+  },
+  "harnessRegistryPath": "docs/inventory/harness-registry.json",
+  "harnessId": "core-security-boundary-validation",
+  "legacyHarnessAlias": "core-security-attack",
+  "forbiddenOperations": [
+    "network",
+    "production",
+    "real-data",
+    "real-account",
+    "real-user-data",
+    "production-db",
+    "production-storage",
+    "provider-write",
+    "secrets",
+    "ad-hoc-eval",
+    "deploy",
+    "publish",
+    "commit",
+    "push",
+    "migrate",
+    "route-cutover",
+    "cutover",
+    "real-payment",
+    "real-payout",
+    "store-submit",
+    "production-signing",
+    "auto-start-next-package"
+  ],
+  "fixRound": {
+    "currentRound": 2,
+    "max_fix_rounds": 2,
+    "timebox_minutes": 20,
+    "checkpoint_every_minutes": 10,
+    "sameClassFinding": {
+      "class": "composition-root-boundary",
+      "occurrence": 2,
+      "decision": "STOP_DESIGN_GATE"
+    }
+  },
+  "fixRoundRole": "historicalDesignGate",
+  "boundaryMatrix": [
+    {
+      "id": "AUTHORITY-ROOT-001",
+      "riskClass": "authority",
+      "boundary": "public export / constructor / factory / caller injection",
+      "expectedOutcome": "REJECT",
+      "reasonCode": "CALLER_INJECTION_REJECTED"
+    },
+    {
+      "id": "RESOLVER-IDENTITY-001",
+      "riskClass": "security",
+      "boundary": "resolver returned ID/type/tenant/version/revision/content identity",
+      "expectedOutcome": "REJECT",
+      "reasonCode": "CANONICAL_IDENTITY_MISMATCH"
+    },
+    {
+      "id": "CALLER-STATE-001",
+      "riskClass": "privacy",
+      "boundary": "caller current visibility/lifecycle/moderation/membership/locked state",
+      "expectedOutcome": "REJECT",
+      "reasonCode": "CALLER_STATE_NOT_AUTHORITY"
+    },
+    {
+      "id": "EVENT-ID-001",
+      "riskClass": "security",
+      "boundary": "direct Event object / substituted Event ID / payload integrity",
+      "expectedOutcome": "REJECT",
+      "reasonCode": "CANONICAL_EVENT_ID_REQUIRED"
+    },
+    {
+      "id": "REPLAY-REVOKE-001",
+      "riskClass": "lifecycle",
+      "boundary": "server-resolved lifecycle transition, replay, and revoke",
+      "expectedOutcome": "REJECT",
+      "reasonCode": "LIFECYCLE_TRANSITION_NOT_AUTHORIZED"
+    }
+  ],
+  "terraReviewChecklist": [
+    "public export graph excludes authority construction and injection",
+    "server-only composition root is physically separate",
+    "caller-facing handlers accept no authority parameter",
+    "resolver returned ID/type/tenant/version/cardType is checked",
+    "resolved revision/content identity is bound to references and Cards",
+    "resolved Event ID/payload hash/aggregate/version is checked",
+    "direct Event objects and substituted IDs are rejected",
+    "replay and revoke require server-resolved lifecycle authority"
+  ],
+  "designGate": {
+    "status": "STRUCTURAL_REMEDIATION_COMPLETE",
+    "rootCause": "public composition surface allowed caller-controlled authority construction/injection",
+    "structuralCorrection": "contracts/public commands and server-only composition root are physically separated",
+    "releaseCondition": "Terra independently confirms the fixed boundary matrix and all five invalid-input cases",
+    "currentDecision": "EXTERNAL_CALLER_VS_SERVER_TCB"
+  },
+  "terminology": {
+    "preferred": [
+      "boundary validation",
+      "invalid-input rejection",
+      "substituted input"
+    ],
+    "forbidden": [
+      "attack",
+      "attacker",
+      "forged"
+    ]
+  }
+}

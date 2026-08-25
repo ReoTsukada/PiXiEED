@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "workPackage": "WP-210",
+  "status": "MEASURED_LOCAL_ISOLATED_BUNDLE",
+  "measurementDefinition": {
+    "baseline": "WP-200 same raw/minified/gzip/Brotli definition",
+    "sourceMaps": "excluded",
+    "initialRequests": ["pixiedraw2/assets/draw2-shell.css", "pixiedraw2/dist/draw2-entry.js"],
+    "marketOnDemandLazyRequests": ["pixiedraw2/dist/wp210-market-core.js"]
+  },
+  "baselines": {
+    "initialEditorRaw": 158807,
+    "workspaceLazyRaw": 20295,
+    "audioLazyRaw": 15725,
+    "wp160RuntimeRaw": 12649,
+    "wp200GameLazyRaw": 45919,
+    "wp200RuntimeLazyRaw": 28657
+  },
+  "bundles": {
+    "initialEditor": {"file": "pixiedraw2/dist/draw2-entry.js", "raw": 158807, "minified": 90968, "gzip": 31916, "brotli": 26521, "minifiedGzip": 24854, "minifiedBrotli": 21370, "sha256": "0f029dabb6770fc574e7f3930714bef46bde3187f12067c13849955647e32cd1"},
+    "wp210MarketLazy": {"file": "pixiedraw2/dist/wp210-market-core.js", "raw": 21271, "minified": 13726, "gzip": 5579, "brotli": 4721, "minifiedGzip": 4781, "minifiedBrotli": 4074, "sha256": "f23b50d60017b2451f59e685dcd04438a8132010031e3991889f4b263c1a6253"},
+    "wp160RuntimeBaseline": {"file": "pixiedraw2/dist/wp160-runtime-core.js", "raw": 12649, "minified": 12649, "gzip": 3645, "brotli": 3167, "minifiedGzip": 3645, "minifiedBrotli": 3167, "sha256": "eab694dc5721e332271b6ea5102f904873c390a8e74f4f2f1c3cdbf1ae6c57a8"},
+    "wp200GameLazyBaseline": {"file": "pixiedraw2/dist/wp200-game-core.js", "raw": 45919, "minified": 45919, "gzip": 9760, "brotli": 8395, "minifiedGzip": 9760, "minifiedBrotli": 8395, "sha256": "24f245b9c3043926f01a570d5ea0724527b51eef3dcde225ff42a41474bbe8a3"},
+    "wp200RuntimeLazyBaseline": {"file": "pixiedraw2/dist/wp200-runtime-core.js", "raw": 28657, "minified": 28657, "gzip": 6604, "brotli": 5735, "minifiedGzip": 6604, "minifiedBrotli": 5735, "sha256": "28e29b1080f2485b6c217f5004dfae509c6458db751f2817f037078c2e315b5f"}
+  },
+  "deltas": {"initialEditorRaw": 0, "wp160RuntimeRaw": 0, "wp200GameLazyRaw": 0, "wp200RuntimeLazyRaw": 0},
+  "boundaries": {"marketOutsideInitial": "PASS_STATIC_BOUNDARY", "marketOutsideRuntime": "PASS_STATIC_BOUNDARY", "currentRoutesAndData": "OUT_OF_SCOPE_AND_UNTOUCHED"},
+  "metricScopes": {"bundle": "LOCAL_BYTE_AND_COMPRESSION_MEASUREMENT", "commerce": "PURE_SYNTHETIC_RECONCILIATION", "realCheckout": "UNTESTED"},
+  "untested": ["real checkout", "provider webhook replay", "live entitlement reconciliation", "real legacy/user data", "physical devices", "full compositor", "production performance", "Safari", "Firefox", "30-minute memory"]
+}

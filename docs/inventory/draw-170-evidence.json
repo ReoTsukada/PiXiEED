@@ -1,0 +1,191 @@
+{
+  "schemaVersion": 1,
+  "packageId": "DRAW-170",
+  "status": "IMPLEMENTED_ISOLATED_REFERENCE_WITH_UNTESTED_QUALIFICATION",
+  "context": {
+    "path": ".codex/context/DRAW-170.md",
+    "sha256": "0a54b77273e38f1ced9aafe972e01b1acce8cef237339ca66747e93a3d611782"
+  },
+  "implementation": {
+    "advancedCore": "pixiedraw2/src/wp170-advanced-tools-core.ts",
+    "editorAdapter": "pixiedraw2/src/wp170-advanced-editor-adapter.ts",
+    "lazyEntry": "pixiedraw2/src/wp170-advanced-bundle-entry.ts",
+    "canonicalMutation": "raster.writeSet",
+    "previewMutation": "FORBIDDEN",
+    "featureFlagDefault": "OFF",
+    "marketBoundary": "PREPARATION_ONLY",
+    "runtimeWorkspaceIntrusion": "PASS_STATIC_REVIEW"
+  },
+  "featureCoverage": {
+    "patternBrush": "PASS_CORE",
+    "stamp": "PASS_CORE",
+    "mirrorSymmetry": "PASS_CORE",
+    "dither": "PASS_CORE_WITH_MEASURED_LARGE_WRITE_CANDIDATE",
+    "indexedPalette": "PASS_CORE",
+    "gridRulerGuide": "PASS_CORE_OVERLAY",
+    "referenceImage": "PASS_CORE_OWNED_REVISION_ONLY",
+    "slice": "PASS_CORE",
+    "animationTags": "PASS_CORE",
+    "tileMap": "PASS_CORE",
+    "gameAssetMetadata": "PASS_CORE",
+    "marketPackagePreparation": "PASS_PREPARATION_ONLY"
+  },
+  "verification": [
+    {
+      "command": "deno test --no-remote --check pixiedraw2/tests/wp170-advanced-tools.test.ts",
+      "exitCode": 0,
+      "result": "4 passed / 0 failed"
+    },
+    {
+      "command": "deno task --config pixiedraw2/deno.json test:draw170",
+      "exitCode": 0,
+      "result": "1 passed / 0 failed; initial Entry excludes Export implementation"
+    },
+    {
+      "command": "deno check --no-remote pixiedraw2/src/wp170-advanced-tools-core.ts pixiedraw2/src/wp170-advanced-editor-adapter.ts pixiedraw2/src/wp170-advanced-bundle-entry.ts pixiedraw2/tests/wp170-advanced-tools.test.ts pixiedraw2/benchmarks/run-wp170-advanced-benchmark.ts",
+      "exitCode": 0
+    },
+    {
+      "command": "deno task --config pixiedraw2/deno.json check",
+      "exitCode": 0
+    },
+    {
+      "command": "deno task --config pixiedraw2/deno.json build:export",
+      "exitCode": 0,
+      "result": "Export lazy chunk generated"
+    },
+    {
+      "command": "git diff --check",
+      "exitCode": 0
+    }
+  ],
+  "browserReference": {
+    "browser": "Codex In-app Browser",
+    "featureFlag": "off",
+    "desktop": {
+      "viewport": "1280x720",
+      "documentScroll": "0x0",
+      "canvasRegion": { "x": 329, "y": 84, "width": 866, "height": 429.6875 },
+      "colorDock": { "x": 9, "y": 84, "width": 320, "height": 429.6875 },
+      "toolDock": { "x": 1195, "y": 84, "width": 76, "height": 429.6875 },
+      "timelineRegion": { "x": 9, "y": 513.6875, "width": 1262, "height": 177.3125 }
+    },
+    "mobile": {
+      "viewport": "390x844",
+      "documentScroll": "0x0",
+      "canvas": { "x": 16, "y": 191, "width": 358, "height": 358 },
+      "toolButtons": "5 x 44x44",
+      "quickPaletteButtons": "5 x 44x44, two-row positions observed",
+      "timelineBeforeToggle": "not mounted/visible",
+      "timelineAfterToggle": { "x": 0, "y": 364, "width": 390, "height": 260 },
+      "timelineCells": "40x40 with border-radius 2px",
+      "pageOverflow": "0x0"
+    },
+    "visualBaselineArtifact": "WP-180 shell baselines reused; D170 advanced-state screenshot baseline remains UNTESTED",
+    "screenReaderAndPhysicalTouch": "UNTESTED"
+  },
+  "benchmarks": {
+    "command": "deno run --no-remote --check pixiedraw2/benchmarks/run-wp170-advanced-benchmark.ts",
+    "status": "MEASURED_LOCAL_SYNTHETIC",
+    "fixtures": {
+      "A": { "dimensions": "256x256", "layers": 12, "frames": 60, "p50Ms": 0.728, "p95Ms": 0.849, "maxMs": 1.300, "writes": 616, "longTaskCount": 0 },
+      "B": { "dimensions": "512x512", "layers": 20, "frames": 120, "p50Ms": 12.971, "p95Ms": 24.930, "maxMs": 27.011, "writes": 131072, "longTaskCount": 0 },
+      "advancedStress": { "dimensions": "512x512", "layers": 100, "frames": 1000, "p50Ms": 17.050, "p95Ms": 19.115, "maxMs": 25.474, "writes": 47982, "longTaskCount": 0 }
+    },
+    "optimizationApplied": [
+      "Dither row-major unique writes skip redundant Map/Sort canonicalization",
+      "operation identity uses ordered deterministic WriteSet fingerprint",
+      "bounded Canvas coordinates use numeric deterministic deduplication keys; generic coordinates fall back to string keys",
+      "Pattern repeat origins are generated once before canonicalization while preserving deterministic output",
+      "PNG/PXD export and import are loaded only through draw2-export.js on demand"
+    ],
+    "workerDecision": "NOT_SELECTED; Pattern Stress requires a measured net-benefit candidate"
+  },
+  "bundles": {
+    "initialSourceRebundle": {
+      "rawBytes": 166730,
+      "minifiedBytes": 93673,
+      "gzipBytes": 32550,
+      "minifiedGzipBytes": 24933,
+      "sourceMaps": "NONE",
+      "baselineRawBytes": 158807,
+      "rawDeltaBytes": 7923,
+      "deltaAttribution": "remaining delta is in the current isolated Workspace/entry source; Export implementation is excluded from initial Entry"
+    },
+    "advancedLazy": {
+      "rawBytes": 32898,
+      "minifiedBytes": 19143,
+      "gzipBytes": 8874,
+      "minifiedGzipBytes": 7030,
+      "brotli": "UNAVAILABLE_IN_ENVIRONMENT",
+      "adapterRawBytes": 1501,
+      "adapterMinifiedBytes": 885,
+      "adapterGzipBytes": 651,
+      "adapterMinifiedGzipBytes": 520,
+      "buildExitCode": 0,
+      "output": "/private/tmp (not repository output)"
+    },
+    "exportLazy": {
+      "rawBytes": 25657,
+      "minifiedBytes": 14932,
+      "gzipBytes": 6954,
+      "minifiedGzipBytes": 5394,
+      "sourceMaps": "NONE",
+      "buildExitCode": 0,
+      "output": "pixiedraw2/dist/draw2-export.js"
+    }
+  },
+  "baseline": {
+    "matchedFailureIdentities": "14/14 inherited baseline record",
+    "newFailureIdentities": 0,
+    "source": "approved WP-000/WP-005 baseline evidence; not rewritten by DRAW-170"
+  },
+  "openFindings": [
+    "A11Y/DEVICE-UNTESTED: physical touch/stylus/screen-reader and long-session memory were not executed",
+    "VISUAL-UNTESTED: screenshot baselines were observed but not persisted as repository artifacts"
+  ],
+  "preservation": {
+    "currentSite": false,
+    "currentDraw": false,
+    "existingPxd": false,
+    "pixiSync": false,
+    "marketRightsCommerce": false,
+    "runtimeProduction": false,
+    "databaseStorage": false,
+    "migrationDeployPublish": false,
+    "commitPush": false
+  },
+  "latestBrowserQualification": {
+    "recordedAt": "2026-08-13",
+    "entry": "http://localhost:8000/pixiedraw2/",
+    "featureFlag": "off",
+    "desktop": {
+      "viewport": "1280x720",
+      "bodyScroll": "0x0",
+      "canvas": { "x": 329, "y": 84, "width": 866, "height": 429.6875 },
+      "colorDock": { "x": 9, "y": 84, "width": 320, "height": 429.6875 },
+      "toolDock": { "x": 1195, "y": 84, "width": 76, "height": 429.6875 },
+      "timeline": { "x": 9, "y": 513.6875, "width": 1262, "height": 177.3125 }
+    },
+    "mobile": {
+      "viewport": "390x844",
+      "bodyScroll": "0x0",
+      "closedSheet": "intentionally translated below viewport with pointer-events disabled",
+      "colorSheetOpen": { "x": 8, "y": 276, "width": 374, "height": 560, "contentOutOfViewport": 0 },
+      "timelineSheetOpen": { "x": 0, "y": 364, "width": 390, "height": 260, "contentOutOfViewport": 0 },
+      "runtimePreview": {
+        "profile": "mobile",
+        "trigger": "Preview / Play",
+        "status": "Runtime READY · LIVE · tick=1",
+        "canvas": { "x": 54, "y": 547, "width": 282, "height": 169.1953125 },
+        "pageScroll": "0x0",
+        "panelOverflow": "bounded right-panel internal scroll only"
+      },
+      "timelineCells": "40x40 with border-radius 2px",
+      "physicalTouchStylusScreenReader": "UNTESTED"
+    },
+    "scope": "browser-emulated-local-only; does not promote physical-device, browser-matrix, or release readiness"
+  },
+  "nextPackage": "SITE-400",
+  "autoStartNext": false
+}

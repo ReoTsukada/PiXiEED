@@ -1,0 +1,135 @@
+{
+  "auditVersion": "WORK420_INDEPENDENT_AUDIT_V1",
+  "packageId": "WORK-420",
+  "auditor": "Terra High",
+  "auditMode": "READ_ONLY_IMPLEMENTATION_AND_EVIDENCE_REVIEW",
+  "contextSha256": "450a93e659ff166ae13477f4393f4610b3de1444ef1e4a978cb6c88c603a0115",
+  "contextVerification": "PASS",
+  "decision": "NO_GO",
+  "decisionBasis": "P1 stop conditions are reproduced in the isolated WORK-420 composition root. Passing local tests and PARTIAL/SELF_CHECK evidence do not mitigate server-side participant authorization, commit-time membership revalidation, or current-head validation failures.",
+  "findings": [
+    {
+      "severity": "P1",
+      "code": "WORK420-AUTH-001",
+      "file": "pixiedraw2/src/platform/work-420/composition.ts",
+      "lines": "1064-1121",
+      "claim": "Every aggregate transition is bound to the current server-resolved participant and membership.",
+      "evidence": "actorForOperation returns undefined for SUBMIT_REQUEST, CREATE_MILESTONE, START_MILESTONE, and MARK_DELIVERY_PENDING; validateAuthority accepts undefined actors. Independent fixture execution with account:work420:unrelated returned ok:true for SUBMIT_REQUEST, and after a valid Agreement returned ok:true for CREATE_MILESTONE, START_MILESTONE, and MARK_DELIVERY_PENDING. No target test rejects an unrelated active member for these operations."
+    },
+    {
+      "severity": "P1",
+      "code": "WORK420-AUTH-002",
+      "file": "pixiedraw2/src/platform/work-420/composition.ts",
+      "lines": "1313-1440",
+      "claim": "The branded one-shot Server Context is revalidated immediately before the durable mutation, including current membership.",
+      "evidence": "Membership is consumed at lines 1313-1328, but no membership revalidation occurs between authority resolution/apply and commit. Work420CommitInput carries no membership identity or revision. Independent fixture execution revoked the requester inside resolveAuthority, after context consumption and before commit; SUBMIT_REQUEST still returned ok:true with status SUBMITTED."
+    },
+    {
+      "severity": "P1",
+      "code": "WORK420-CURRENT-001",
+      "file": "pixiedraw2/src/platform/work-420/composition.ts",
+      "lines": "419-764",
+      "claim": "Every current record/head is verified before each transition, so a saved stale downstream record cannot be used.",
+      "evidence": "verifyCurrentAggregate checks currentHeads.requestRevision and currentHeads.quoteRevision only; agreement, milestone, delivery, acceptance, rights, payment, and ledger heads are not compared. After a valid Agreement, an independent fixture changed only currentHeads.agreementRevision to agreement:v999; CREATE_MILESTONE returned ok:true. The checked test covers a tampered hash and cross-root Quote, not downstream current-head mismatch."
+    },
+    {
+      "severity": "P2",
+      "code": "WORK420-SCOPE-001-LIMITATION",
+      "file": "docs/inventory/work-420-evidence.json",
+      "claim": "Existing Market/Direct Work routes and FP-002/FP-003/FP-004 files are untouched.",
+      "evidence": "The isolated source has no static browser, network, Supabase, Market, Commission, PiXiSYNC, PXD, DB, or Storage access, and all observed WORK-420 artifacts are inside the declared globs. The shared worktree already contains 1131 out-of-scope dirty entries, so this audit does not attribute them to WORK-420 and cannot elevate the self-asserted baseline to an independent clean-tree proof."
+    }
+  ],
+  "commands": [
+    {
+      "command": "shasum -a 256 .codex/context/WORK-420.md",
+      "exitCode": 0,
+      "result": "450a93e659ff166ae13477f4393f4610b3de1444ef1e4a978cb6c88c603a0115"
+    },
+    {
+      "command": "deno test --no-remote --allow-read --allow-write --check pixiedraw2/tests/work-420",
+      "exitCode": 0,
+      "result": "12 passed, 0 failed; insufficient negative coverage for the P1 findings"
+    },
+    {
+      "command": "deno check --no-remote pixiedraw2/src/platform/work-420/contracts.ts pixiedraw2/src/platform/work-420/composition.ts pixiedraw2/src/platform/work-420/event-adapter.ts pixiedraw2/tests/work-420/fixture.ts pixiedraw2/tests/work-420/composition.test.ts pixiedraw2/tests/work-420/event-adapter.test.ts pixiedraw2/benchmarks/work-420/generate-evidence.ts",
+      "exitCode": 0
+    },
+    {
+      "command": "node scripts/validate-qualification-evidence.mjs docs/inventory/work-420-evidence.json",
+      "exitCode": 0,
+      "result": "valid:true, qualificationReady:false"
+    },
+    {
+      "command": "python3 scripts/verify_work_package_context.py --context .codex/context/WORK-420.md --manifest .codex/context/WORK-420.manifest.json",
+      "exitCode": 0,
+      "result": "status:PASS"
+    },
+    {
+      "command": "git diff --check -- pixiedraw2/src/platform/work-420 pixiedraw2/tests/work-420 pixiedraw2/benchmarks/work-420 docs/contracts/WORK-420-COMPOSITION.md docs/inventory/work-420-benchmark.json docs/inventory/work-420-command-transcript.json docs/inventory/work-420-evidence.json docs/decisions/ADR-20260816-WORK-420-composition-boundary.md",
+      "exitCode": 0
+    },
+    {
+      "command": "deno eval --no-remote [unrelated active-member transition reproduction]",
+      "exitCode": 0,
+      "result": "SECURITY_FAIL: unrelated member accepted for SUBMIT_REQUEST, CREATE_MILESTONE, START_MILESTONE, and MARK_DELIVERY_PENDING"
+    },
+    {
+      "command": "deno eval --no-remote [revoke-after-context-consume reproduction]",
+      "exitCode": 0,
+      "result": "SECURITY_FAIL: revocation before commit still accepted SUBMIT_REQUEST"
+    },
+    {
+      "command": "deno eval --no-remote [downstream current-head mismatch reproduction]",
+      "exitCode": 0,
+      "result": "SECURITY_FAIL: mismatched agreement current head still accepted CREATE_MILESTONE"
+    }
+  ],
+  "scope": {
+    "allowedWriteGlobsVerified": true,
+    "auditWrite": "docs/inventory/work-420-independent-audit.json only",
+    "auditScopeOutsideWrites": 0,
+    "work420ArtifactsObservedOutsideDeclaredGlobs": 0,
+    "preexistingOutOfScopeDirtyEntriesObserved": 1131,
+    "attribution": "Existing dirty entries were preserved and are not attributed to WORK-420. This is not a clean-tree qualification."
+  },
+  "nonIntrusion": {
+    "staticIsolatedSourceReview": "PASS",
+    "featureFlagDefaultOffAndKillSwitch": "PASS_STATIC_AND_TESTED",
+    "currentRouteMarketCommissionPxdPixiSyncDbStorageAccess": "NOT_FOUND_IN_WORK420_STATIC_REVIEW",
+    "networkOrPerFrameOrFullSerialization": "NOT_FOUND_IN_WORK420_STATIC_REVIEW",
+    "productionProviderOrPaymentConnection": "NOT_FOUND_IN_WORK420_STATIC_REVIEW"
+  },
+  "evidenceReview": {
+    "acceptanceIds": {
+      "WORK420-SCOPE-001": "PARTIAL / SELF_CHECK / exitCode+contextSha256+artifactHashes present",
+      "WORK420-EVIDENCE-001": "PARTIAL / SELF_CHECK / exitCode+contextSha256+artifactHashes present",
+      "WORK420-STOP-001": "PARTIAL / SELF_CHECK / exitCode+contextSha256+artifactHashes present"
+    },
+    "independentPassPromotion": "NOT_FOUND; evidence correctly states SELF_CHECK_ONLY and externalIndependentReview UNTESTED",
+    "baselinePromotion": "NOT_FOUND; no 63/77, existing-14, or new-0 result is promoted by WORK-420 evidence",
+    "qualification": "The evidence schema validates but cannot make a P1-vulnerable implementation acceptable."
+  },
+  "untested": [
+    "real Provider/Auth/RLS/DB/Storage verification",
+    "real payment execution and provider delivery",
+    "browser/device and current production route behavior",
+    "cross-process durable eventing and crash recovery",
+    "production deployment, migration, cutover, or publish",
+    "clean-worktree attribution for the pre-existing 1131 out-of-scope dirty entries"
+  ],
+  "artifactHashes": {
+    "pixiedraw2/src/platform/work-420/contracts.ts": "63a66ad69d0819a081c6c9575708437adfcb115fac81f29b2282c055a356f6c3",
+    "pixiedraw2/src/platform/work-420/composition.ts": "125cad2dc49f3eeece880f9d4407764cb0fb05567c08161a7ad435722ea29c74",
+    "pixiedraw2/src/platform/work-420/event-adapter.ts": "a1f523cf2c77c16e300f678ece97539a4c8980ba76cfe0a2db6ff5fd93cda543",
+    "pixiedraw2/tests/work-420/fixture.ts": "b10f647f16b935ee82f1270abc732983fd6983ef69f6c25ffee7a8a30fd4b388",
+    "pixiedraw2/tests/work-420/composition.test.ts": "45800762ea98c8a9cc74c2b129f4af41e5d9085407e3420442cbe187bb1fc6cc",
+    "pixiedraw2/tests/work-420/event-adapter.test.ts": "01e014636d42ef8ab80661b48796a4e92838c650b16cc89beb31f5db01f9f44e",
+    "pixiedraw2/benchmarks/work-420/generate-evidence.ts": "01ab3bb5f57aa5e87974a3b4b141c941d8d98f6e67b1fc828bd7f44be4e76a93",
+    "docs/contracts/WORK-420-COMPOSITION.md": "c08b0436cf10cacbbca711f546195263fed0892eaf49a42e49b6330a7d3777a6",
+    "docs/decisions/ADR-20260816-WORK-420-composition-boundary.md": "807cf87e579a0787008ab0669d32b819c460f9ed19a8176f7608286d5b3bfd93",
+    "docs/inventory/work-420-command-transcript.json": "78a896d59df964dcabd4748c460817526b6b3ac1cc122960b23e4718aef2d052",
+    "docs/inventory/work-420-benchmark.json": "b8f9cb8ab9083b80a65044e8841c97c2d52cc9c14de3f5271add6ad02f9f44e",
+    "docs/inventory/work-420-evidence.json": "7c39681d2ba71d094b12bbe3010476d05b5f1f3bc7fd649417e9208285e29005"
+  }
+}

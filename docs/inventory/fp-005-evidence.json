@@ -1,0 +1,249 @@
+{
+  "schemaVersion": 1,
+  "packageId": "FP-005",
+  "recordedAt": "2026-08-11",
+  "status": "ISOLATED_REFERENCE_COMPLETE",
+  "independentReview": "INDEPENDENT_TERRA_REVIEW_PASS",
+  "statusSummary": "ISOLATED_REFERENCE_COMPLETE / INDEPENDENT_TERRA_REVIEW_PASS",
+  "evidenceMode": "ISOLATED_REFERENCE_IMPLEMENTATION",
+  "implementationStatus": "ISOLATED_REFERENCE_COMPLETE_43_OF_43",
+  "contractSource": "docs/contracts/FP-005-CONTRACTS.md",
+  "integrationContract": "docs/contracts/FP-005-INTEGRATION.md",
+  "definitionSource": "09_ROADMAP/WORK_PACKAGES/FP-005.md",
+  "contextSource": "02_ARCHITECTURE/CORE_COMPLETION_BLUEPRINT.md",
+  "changedScope": {
+    "documentationWritten": [
+      "docs/contracts/FP-005-INTEGRATION.md",
+      "docs/inventory/fp-005-evidence.json",
+      "docs/decisions/ADR-20260811-FP-005-STORAGE-INPUT-PRIVACY-BOUNDARY.md"
+    ],
+    "implementationReviewed": [
+      "pixiedraw2/src/fp-005/**",
+      "pixiedraw2/tests/fp-005/**",
+      "pixiedraw2/benchmarks/fp-005/validation.bench.ts"
+    ],
+    "stateRegistrySourceTestContextChanged": false
+  },
+  "verification": [
+    {
+      "command": "deno test --no-remote pixiedraw2/tests/fp-005/*.test.ts",
+      "exitCode": 0,
+      "testCount": 43,
+      "passed": 43,
+      "failed": 0,
+      "status": "PASS_FP005_43_OF_43"
+    },
+    {
+      "command": "deno test --no-remote pixiedraw2/tests/fp-005/public-boundary-finalization.test.ts",
+      "exitCode": 0,
+      "testCount": 2,
+      "passed": 2,
+      "failed": 0,
+      "status": "PASS_PUBLIC_BOUNDARY_2_OF_2"
+    },
+    {
+      "command": "deno check --no-remote pixiedraw2/src/fp-005/*.ts pixiedraw2/tests/fp-005/*.test.ts pixiedraw2/benchmarks/fp-005/validation.bench.ts",
+      "exitCode": 0,
+      "fileCount": 28,
+      "status": "PASS_CHECK_28_FILES"
+    },
+    {
+      "command": "deno run --no-remote pixiedraw2/benchmarks/fp-005/validation.bench.ts",
+      "exitCode": 0,
+      "status": "MEASURED_LOCAL_SYNTHETIC"
+    },
+    {
+      "command": "node scripts/test-baseline-failure-identity-wp080.mjs",
+      "exitCode": 0,
+      "existingMatch": "14/14",
+      "newFailureIdentities": 0,
+      "status": "PASS_BASELINE_IDENTITY"
+    },
+    {
+      "command": "node scripts/test-pixieed-program-framework.mjs",
+      "exitCode": 0,
+      "status": "PASS_PROGRAM_VALIDATOR_AND_FRAMEWORK"
+    },
+    {
+      "command": "Terra independent review",
+      "exitCode": 0,
+      "acceptancePassed": "5/5",
+      "p0": 0,
+      "p1": 0,
+      "p2": 0,
+      "status": "INDEPENDENT_TERRA_REVIEW_PASS",
+      "note": "All five Acceptance IDs passed in isolated scope."
+    },
+    {
+      "command": "python3 -m json.tool docs/inventory/fp-005-evidence.json",
+      "exitCode": 0,
+      "status": "PASS_JSON_VALIDATE"
+    },
+    {
+      "command": "git diff --check -- docs/contracts/FP-005-INTEGRATION.md docs/inventory/fp-005-evidence.json docs/decisions/ADR-20260811-FP-005-STORAGE-INPUT-PRIVACY-BOUNDARY.md",
+      "exitCode": 0,
+      "whitespaceIssues": 0,
+      "status": "PASS_TARGET_DIFF_CHECK",
+      "note": "Only the three requested evidence paths are in scope; no source, test, manifest, state, registry, or context files were changed."
+    },
+    {
+      "command": "all-repository permission-limited execution",
+      "failureCount": 8,
+      "status": "EXCLUDED_FROM_FP005_PACKAGE_PASS",
+      "note": "The eight permission failures were not counted as package failures; baseline identity is authoritative."
+    }
+  ],
+  "benchmark": {
+    "source": "pixiedraw2/benchmarks/fp-005/validation.bench.ts",
+    "benchmarkId": "FP-005_METADATA_ONLY_VALIDATION",
+    "command": "deno run --no-remote pixiedraw2/benchmarks/fp-005/validation.bench.ts",
+    "exitCode": 0,
+    "status": "MEASURED_LOCAL_SYNTHETIC",
+    "fixtureSizes": [1, 10, 100, 1000],
+    "rejected": [1, 10, 100, 1000],
+    "boundaries": ["STORAGE", "INPUT", "PATH", "TELEMETRY"],
+    "dataClass": "synthetic-metadata-only",
+    "productionSloClaim": false,
+    "productionEquivalentClaim": false,
+    "results": [
+      { "count": 1, "rejected": 1, "p50Ms": 1.578833, "p95Ms": 1.578833, "maxMs": 1.578833 },
+      { "count": 10, "rejected": 10, "p50Ms": 0.205166, "p95Ms": 0.30325, "maxMs": 0.30325 },
+      { "count": 100, "rejected": 100, "p50Ms": 0.167833, "p95Ms": 0.277875, "maxMs": 0.756458 },
+      { "count": 1000, "rejected": 1000, "p50Ms": 0.144334, "p95Ms": 0.398375, "maxMs": 3.728875 }
+    ],
+    "lastRun": {
+      "environment": "local Deno synthetic fixture",
+      "recordedAt": "2026-08-11",
+      "outputHash": null,
+      "interpretation": "Local validator timing only; not production SLO or production-equivalent evidence."
+    }
+  },
+  "securityProbes": {
+    "status": "PASS_FAIL_CLOSED",
+    "probes": ["original forged proof", "redactor", "truncation", "Deflate", "quota-retention", "unknown", "locator"],
+    "passed": true
+  },
+  "acceptance": [
+    {
+      "id": "FP005-PII-001",
+      "status": "PASS_ISOLATED_REFERENCE",
+      "source": ["pixiedraw2/src/fp-005/redaction.ts", "pixiedraw2/src/fp-005/policies.ts", "pixiedraw2/src/fp-005/telemetry.ts"],
+      "tests": ["pixiedraw2/tests/fp-005/privacy-telemetry.test.ts", "pixiedraw2/tests/fp-005/integration.test.ts"],
+      "fixtureIds": ["PII-FORBIDDEN-FIELDS", "PII-SENSITIVE-STRING", "PII-SERIALIZED-DROP"],
+      "expected": "Forbidden credential, direct-identifier, and raw-content fields are redacted or excluded before serialization.",
+      "actual": "Synthetic serialization and integration assertions passed; no raw sensitive value is retained in this evidence.",
+      "exitCode": 0,
+      "reviewer": "TERRA_HIGH"
+    },
+    {
+      "id": "FP005-STORAGE-001",
+      "status": "PASS_ISOLATED_REFERENCE",
+      "source": ["pixiedraw2/src/fp-005/storage-placement.ts", "pixiedraw2/src/fp-005/storage-scope.ts", "pixiedraw2/src/fp-005/storage-integrity.ts", "pixiedraw2/src/fp-005/retention-decision.ts", "pixiedraw2/src/fp-005/locator-validation.ts"],
+      "tests": ["pixiedraw2/tests/fp-005/storage.test.ts", "pixiedraw2/tests/fp-005/integration.test.ts"],
+      "fixtureIds": ["STORAGE-DURABLE-MEMORY", "STORAGE-HASH-SIZE-MISMATCH", "STORAGE-QUOTA-FULL", "STORAGE-PURCHASED-RETAIN", "STORAGE-MISSING-AUTH", "STORAGE-CROSS-TENANT"],
+      "expected": "Canonical placement, typed locator metadata, quota, retention, and tenant/resource authorization fail closed.",
+      "actual": "Synthetic placement, integrity, quota, retention, missing-proof, cross-tenant, and facade integration assertions passed.",
+      "exitCode": 0,
+      "reviewer": "TERRA_HIGH"
+    },
+    {
+      "id": "FP005-INPUT-001",
+      "status": "PASS_ISOLATED_REFERENCE",
+      "source": ["pixiedraw2/src/fp-005/input-limits.ts", "pixiedraw2/src/fp-005/content-validation.ts", "pixiedraw2/src/fp-005/archive-validation.ts", "pixiedraw2/src/fp-005/index.ts"],
+      "tests": ["pixiedraw2/tests/fp-005/input.test.ts", "pixiedraw2/tests/fp-005/integration.test.ts"],
+      "fixtureIds": ["INPUT-CYCLE", "INPUT-DEPTH-LIMIT", "INPUT-ENVELOPE-OVERSIZE", "INPUT-ACTIVE-MIME", "INPUT-MIME-MISMATCH", "INPUT-TRUNCATED", "INPUT-ZIP-BOMB", "INPUT-NESTED-ARCHIVE"],
+      "expected": "Bounded JSON, binary, archive, and active-content checks reject malformed or unsafe input without unbounded acceptance.",
+      "actual": "Synthetic bounded, cyclic, deep, oversized, MIME, truncation, archive-ratio, count, expansion, active, and nested-archive assertions passed.",
+      "exitCode": 0,
+      "reviewer": "TERRA_HIGH"
+    },
+    {
+      "id": "FP005-PATH-001",
+      "status": "PASS_ISOLATED_REFERENCE",
+      "source": ["pixiedraw2/src/fp-005/path-validation.ts", "pixiedraw2/src/fp-005/locator-validation.ts"],
+      "tests": ["pixiedraw2/tests/fp-005/path.test.ts", "pixiedraw2/tests/fp-005/contracts.test.ts", "pixiedraw2/tests/fp-005/integration.test.ts"],
+      "fixtureIds": ["PATH-ABSOLUTE", "PATH-TRAVERSAL", "PATH-ENCODED-TRAVERSAL", "PATH-NUL-BACKSLASH", "PATH-NONCANONICAL-UNICODE", "PATH-DUPLICATE", "PATH-SYMLINK", "PATH-AUTHORITY-MISMATCH", "PATH-CROSS-TENANT"],
+      "expected": "Relative normalized paths and locator authority/scope are validated before access; unsafe or duplicate paths fail closed.",
+      "actual": "Synthetic path, archive-entry, provider/bucket/object-key, authority, and tenant-scope assertions passed.",
+      "exitCode": 0,
+      "reviewer": "TERRA_HIGH"
+    },
+    {
+      "id": "FP005-TELEMETRY-001",
+      "status": "PASS_ISOLATED_REFERENCE",
+      "source": ["pixiedraw2/src/fp-005/telemetry.ts", "pixiedraw2/src/fp-005/redaction.ts", "pixiedraw2/src/fp-005/policies.ts"],
+      "tests": ["pixiedraw2/tests/fp-005/privacy-telemetry.test.ts", "pixiedraw2/tests/fp-005/integration.test.ts", "pixiedraw2/tests/fp-005/contracts.test.ts"],
+      "fixtureIds": ["TELEMETRY-ALLOWLIST", "TELEMETRY-FORBIDDEN-FIELD", "TELEMETRY-PII-SHAPED-ID", "TELEMETRY-SERIALIZED-REDACTION"],
+      "expected": "Only the allowlisted telemetry shape is serialized and forbidden private fields are absent.",
+      "actual": "Synthetic allowlist, forbidden-field, PII-shaped identifier, and serialized redaction assertions passed.",
+      "exitCode": 0,
+      "reviewer": "TERRA_HIGH"
+    }
+  ],
+  "baseline": {
+    "status": "PASS",
+    "identity": {
+      "existingMatch": "14/14",
+      "newFailureIdentities": 0,
+      "exitCode": 0
+    },
+    "note": "Baseline identity is authoritative for the package result; no new failure identity was introduced."
+  },
+  "untested": [
+    "production Auth/DB/RLS/Storage/provider",
+    "real large streaming",
+    "power-loss",
+    "browser/device/network",
+    "long session",
+    "migration/deploy/rollback/cutover"
+  ],
+  "noProductionClaims": {
+    "productionAuthAccessed": false,
+    "productionDatabaseAccessed": false,
+    "productionRlsAccessed": false,
+    "productionStorageAccessed": false,
+    "productionProviderAccessed": false,
+    "productionCredentialsUsed": false,
+    "realFilesUsed": false,
+    "realMediaUsed": false,
+    "archiveStreamingUsed": false,
+    "realLargeStreamingTested": false,
+    "powerLossTested": false,
+    "browserTested": false,
+    "deviceTested": false,
+    "networkTested": false,
+    "longSessionTested": false,
+    "migrationRun": false,
+    "deployRun": false,
+    "rollbackRun": false,
+    "cutoverRun": false,
+    "currentRoutesChanged": false,
+    "marketChanged": false,
+    "piXiSYNCChanged": false,
+    "productionSloClaim": false,
+    "productionEquivalentClaim": false,
+    "commitRun": false,
+    "pushRun": false
+  },
+  "reviewer": {
+    "result": "INDEPENDENT_TERRA_REVIEW_PASS",
+    "agentFamily": "TERRA_HIGH",
+    "classification": "ISOLATED_REFERENCE_COMPLETE",
+    "auditScope": {
+      "acceptancePassed": "5/5",
+      "p0": 0,
+      "p1": 0,
+      "p2": 0
+    },
+    "finding": "Independent Terra review passed all five Acceptance IDs in isolated scope; P0/P1/P2 are 0."
+  },
+  "artifactHash": {
+    "algorithm": "SHA-256",
+    "manifestFormat": "sorted UTF-8 lines of <file SHA-256><two spaces><relative path>\\n",
+    "sourceManifestSha256": "0305ac814f69698784ddd76b7a8ac4ddc407f722b665b61bb43c2be258694b38",
+    "sourceFileCount": 16,
+    "testManifestSha256": "de644a76b5394c0ccdaf666f59ab4f14e01ca15e6ed719c62d6c7998b90d0844",
+    "testFileCount": 11,
+    "benchmarkSourceSha256": "6abde78f7deac1bd91c91718a318753b92004d4f2f1f6b91d9bc0c21549cacf4"
+  }
+}

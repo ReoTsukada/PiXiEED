@@ -1,0 +1,480 @@
+{
+  "evidenceVersion": "QUALIFICATION_COMMAND_TRANSCRIPT_V1",
+  "manifestPath": "docs/inventory/core-120-predecessor-command-manifest.json",
+  "commands": [
+    {
+      "id": "CORE100-TEST",
+      "acceptanceIds": [
+        "CORE100-SCOPE-001",
+        "CORE100-EVIDENCE-001"
+      ],
+      "argv": [
+        "deno",
+        "test",
+        "--no-remote",
+        "--allow-read",
+        "--allow-write",
+        "--check",
+        "pixiedraw2/tests/core-100"
+      ],
+      "display": "\"deno\" \"test\" \"--no-remote\" \"--allow-read\" \"--allow-write\" \"--check\" \"pixiedraw2/tests/core-100\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 1828,
+      "stdoutSha256": "a126504c0d9e8e5f030617e57df162e4a1ed5865ec2fa4e032a1bbfb25248ede",
+      "stderrSha256": "e3f022e8162142a5ac872fb728c6ab9ef3955b81cab7e58a3aad95e1f72df37c"
+    },
+    {
+      "id": "CORE100-TYPE",
+      "acceptanceIds": [
+        "CORE100-SCOPE-001",
+        "CORE100-EVIDENCE-001"
+      ],
+      "argv": [
+        "deno",
+        "check",
+        "--no-remote",
+        "pixiedraw2/src/core/core-100/composition-root.ts",
+        "pixiedraw2/src/core/core-100/authority-boundary.ts",
+        "pixiedraw2/src/core/core-100/contracts.ts",
+        "pixiedraw2/tests/core-100/core-100.test.ts"
+      ],
+      "display": "\"deno\" \"check\" \"--no-remote\" \"pixiedraw2/src/core/core-100/composition-root.ts\" \"pixiedraw2/src/core/core-100/authority-boundary.ts\" \"pixiedraw2/src/core/core-100/contracts.ts\" \"pixiedraw2/tests/core-100/core-100.test.ts\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 430,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "d37e8e1eba5c6db82ec164a575abed803a429d923145008c1520447459a56b81"
+    },
+    {
+      "id": "CORE100-BENCH",
+      "acceptanceIds": [
+        "CORE100-EVIDENCE-001"
+      ],
+      "argv": [
+        "deno",
+        "run",
+        "--no-remote",
+        "pixiedraw2/benchmarks/core-100/composition.bench.ts"
+      ],
+      "display": "\"deno\" \"run\" \"--no-remote\" \"pixiedraw2/benchmarks/core-100/composition.bench.ts\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 207,
+      "stdoutSha256": "27a12ac96fcc9166fd3e7885bfdb83000476564a1fb1b598af24655a370e8564",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "CORE100-DIFF",
+      "acceptanceIds": [
+        "CORE100-STOP-001"
+      ],
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "display": "\"git\" \"diff\" \"--check\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 28,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "CORE110-TEST",
+      "acceptanceIds": [
+        "CORE110-SCOPE-001",
+        "CORE110-EVIDENCE-001"
+      ],
+      "argv": [
+        "deno",
+        "test",
+        "--no-remote",
+        "--allow-read",
+        "--allow-write",
+        "--check",
+        "pixiedraw2/tests/core-110"
+      ],
+      "display": "\"deno\" \"test\" \"--no-remote\" \"--allow-read\" \"--allow-write\" \"--check\" \"pixiedraw2/tests/core-110\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 760,
+      "stdoutSha256": "5c3dcc5016223f938dc30f709653db45fe72641df13192dec61e289d28b5d059",
+      "stderrSha256": "a478d43d7266ed2365f390c078e157fa3ab1817d0ba3a050bc391baa931fdbe7"
+    },
+    {
+      "id": "CORE110-TYPE",
+      "acceptanceIds": [
+        "CORE110-SCOPE-001",
+        "CORE110-EVIDENCE-001"
+      ],
+      "argv": [
+        "deno",
+        "check",
+        "--no-remote",
+        "pixiedraw2/src/core/core-110/contracts.ts",
+        "pixiedraw2/src/core/core-110/conformance-runner.ts",
+        "pixiedraw2/src/core/core-110/evidence-serializer.ts",
+        "pixiedraw2/tests/core-110/core-110-conformance.test.ts"
+      ],
+      "display": "\"deno\" \"check\" \"--no-remote\" \"pixiedraw2/src/core/core-110/contracts.ts\" \"pixiedraw2/src/core/core-110/conformance-runner.ts\" \"pixiedraw2/src/core/core-110/evidence-serializer.ts\" \"pixiedraw2/tests/core-110/core-110-conformance.test.ts\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 475,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "622442e76f59a5908e9722faddb85c340bce50fd2861f213dc5b7842c08aadc9"
+    },
+    {
+      "id": "CORE110-BENCH",
+      "acceptanceIds": [
+        "CORE110-EVIDENCE-001"
+      ],
+      "argv": [
+        "deno",
+        "run",
+        "--no-remote",
+        "pixiedraw2/benchmarks/core-110/run-conformance-benchmark.ts"
+      ],
+      "display": "\"deno\" \"run\" \"--no-remote\" \"pixiedraw2/benchmarks/core-110/run-conformance-benchmark.ts\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 276,
+      "stdoutSha256": "e822c05859f8976552b760e9af51ced3b312383c887baa2ab501d9c24eb81db7",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "CORE110-DIFF",
+      "acceptanceIds": [
+        "CORE110-STOP-001"
+      ],
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "display": "\"git\" \"diff\" \"--check\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 25,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "BOUNDARY-IMPORT-SCAN",
+      "acceptanceIds": [
+        "CORE100-STOP-001",
+        "CORE110-STOP-001",
+        "FP007-PROVENANCE-001"
+      ],
+      "argv": [
+        "node",
+        "scripts/audit-core120-predecessor-boundaries.mjs"
+      ],
+      "display": "\"node\" \"scripts/audit-core120-predecessor-boundaries.mjs\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 22,
+      "stdoutSha256": "1864b263f3b9471b02d0ee186de8a6b1cf89795bc79f72671104666b13378ab4",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "FP004-TEST",
+      "acceptanceIds": [
+        "FP004-EVT-001",
+        "FP004-EVT-002",
+        "FP004-INBOX-001",
+        "FP004-ORDER-001",
+        "FP004-RECOVERY-001",
+        "FP004-REPLAY-001",
+        "FP004-SEC-001"
+      ],
+      "argv": [
+        "deno",
+        "test",
+        "--no-remote",
+        "--allow-read",
+        "--allow-write",
+        "--check",
+        "pixiedraw2/tests/fp-004"
+      ],
+      "display": "\"deno\" \"test\" \"--no-remote\" \"--allow-read\" \"--allow-write\" \"--check\" \"pixiedraw2/tests/fp-004\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 327,
+      "stdoutSha256": "b4ae448eb51f800a793f457155c83ec4ff4cb36ff72753eac17e72ce4c927348",
+      "stderrSha256": "ea27ac76c453ee1dabb115f80438000906cbadbaa632e2fd1691c60a1fdc0a10"
+    },
+    {
+      "id": "FP004-FILE",
+      "acceptanceIds": [
+        "FP004-EVT-001",
+        "FP004-RECOVERY-001"
+      ],
+      "argv": [
+        "deno",
+        "test",
+        "--no-remote",
+        "--allow-read",
+        "--allow-write",
+        "pixiedraw2/tests/fp-004/file-durable-adapter.test.ts"
+      ],
+      "display": "\"deno\" \"test\" \"--no-remote\" \"--allow-read\" \"--allow-write\" \"pixiedraw2/tests/fp-004/file-durable-adapter.test.ts\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 333,
+      "stdoutSha256": "be2fd1f555036c186a7bc81015d5a1b9056a27f64c842e4b471f93fbee70e54a",
+      "stderrSha256": "ea27ac76c453ee1dabb115f80438000906cbadbaa632e2fd1691c60a1fdc0a10"
+    },
+    {
+      "id": "FP004-TYPE",
+      "acceptanceIds": [
+        "FP004-EVT-001",
+        "FP004-EVT-002",
+        "FP004-INBOX-001",
+        "FP004-ORDER-001",
+        "FP004-RECOVERY-001",
+        "FP004-REPLAY-001",
+        "FP004-SEC-001"
+      ],
+      "argv": [
+        "deno",
+        "check",
+        "--no-remote",
+        "pixiedraw2/src/fp-004/contracts.ts",
+        "pixiedraw2/src/fp-004/durable-transaction.ts",
+        "pixiedraw2/src/fp-004/inbox-outbox-lease.ts",
+        "pixiedraw2/src/fp-004/replay-consumer.ts"
+      ],
+      "display": "\"deno\" \"check\" \"--no-remote\" \"pixiedraw2/src/fp-004/contracts.ts\" \"pixiedraw2/src/fp-004/durable-transaction.ts\" \"pixiedraw2/src/fp-004/inbox-outbox-lease.ts\" \"pixiedraw2/src/fp-004/replay-consumer.ts\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 338,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "1e8cd0b66a1a38bc720065055215dd78aa779fe7e6c54b9ac32ae1a0115e10bc"
+    },
+    {
+      "id": "FP004-BENCH",
+      "acceptanceIds": [
+        "FP004-EVT-001",
+        "FP004-EVT-002",
+        "FP004-INBOX-001",
+        "FP004-ORDER-001",
+        "FP004-RECOVERY-001",
+        "FP004-REPLAY-001",
+        "FP004-SEC-001"
+      ],
+      "argv": [
+        "deno",
+        "run",
+        "--no-remote",
+        "pixiedraw2/benchmarks/fp004-durable-event-benchmark.ts"
+      ],
+      "display": "\"deno\" \"run\" \"--no-remote\" \"pixiedraw2/benchmarks/fp004-durable-event-benchmark.ts\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 26,
+      "stdoutSha256": "6aec774f1bd7f96242fd25a6c70589d2d2e10a92351c95db52d9701ed045d506",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "FP005-TEST",
+      "acceptanceIds": [
+        "FP005-PII-001",
+        "FP005-STORAGE-001",
+        "FP005-INPUT-001",
+        "FP005-PATH-001",
+        "FP005-TELEMETRY-001"
+      ],
+      "argv": [
+        "deno",
+        "test",
+        "--no-remote",
+        "pixiedraw2/tests/fp-005"
+      ],
+      "display": "\"deno\" \"test\" \"--no-remote\" \"pixiedraw2/tests/fp-005\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 885,
+      "stdoutSha256": "0dea7f5fd4e2156e02813ab0e5565cac0015998cd6c85d9de5bbcf3776d32d4f",
+      "stderrSha256": "e1816ab274a0577e4039621a0d6fa55ea69d0e7061cf5bfa5e74f3c2a56c7db3"
+    },
+    {
+      "id": "FP005-BENCH",
+      "acceptanceIds": [
+        "FP005-PII-001",
+        "FP005-STORAGE-001",
+        "FP005-INPUT-001",
+        "FP005-PATH-001",
+        "FP005-TELEMETRY-001"
+      ],
+      "argv": [
+        "deno",
+        "run",
+        "--no-remote",
+        "pixiedraw2/benchmarks/fp-005/validation.bench.ts"
+      ],
+      "display": "\"deno\" \"run\" \"--no-remote\" \"pixiedraw2/benchmarks/fp-005/validation.bench.ts\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 499,
+      "stdoutSha256": "aaaa4448edfd51bf1c2f29e130fdae461fda04334f8d502e2a666969c1d4cb94",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "FP005-BASELINE",
+      "acceptanceIds": [
+        "FP005-PII-001",
+        "FP005-STORAGE-001",
+        "FP005-INPUT-001",
+        "FP005-PATH-001",
+        "FP005-TELEMETRY-001"
+      ],
+      "argv": [
+        "node",
+        "scripts/test-baseline-failure-identity-wp080.mjs"
+      ],
+      "display": "\"node\" \"scripts/test-baseline-failure-identity-wp080.mjs\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 346,
+      "stdoutSha256": "3839ae5f3ddbd8ba0b5810b84f15724743bd2ccdbb8f7d34e324917ef852a0d8",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "FP005-DIFF",
+      "acceptanceIds": [
+        "FP005-TELEMETRY-001"
+      ],
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "display": "\"git\" \"diff\" \"--check\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 24,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "FP007-TEST",
+      "acceptanceIds": [
+        "FP007-SCHEMA-001",
+        "FP007-DEP-001",
+        "FP007-BUILD-001",
+        "FP007-DIST-001",
+        "FP007-PROVENANCE-001"
+      ],
+      "argv": [
+        "deno",
+        "test",
+        "--no-remote",
+        "--allow-read",
+        "--allow-write",
+        "pixiedraw2/tests/fp-007"
+      ],
+      "display": "\"deno\" \"test\" \"--no-remote\" \"--allow-read\" \"--allow-write\" \"pixiedraw2/tests/fp-007\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 1128,
+      "stdoutSha256": "1d87f208b63b73e9fbb63e62a7a759a9044736a2385ae2e19265c2dc31050b4b",
+      "stderrSha256": "a29b59e8343665c7a2c8827f329ca16f08a12117fee4a0692467e8f2e55864b1"
+    },
+    {
+      "id": "FP007-BUILD",
+      "acceptanceIds": [
+        "FP007-DEP-001",
+        "FP007-BUILD-001"
+      ],
+      "argv": [
+        "deno",
+        "run",
+        "--no-remote",
+        "--allow-read",
+        "pixiedraw2/benchmarks/fp-007/repeat-build.ts"
+      ],
+      "display": "\"deno\" \"run\" \"--no-remote\" \"--allow-read\" \"pixiedraw2/benchmarks/fp-007/repeat-build.ts\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 236,
+      "stdoutSha256": "ce4b7796412e7db2271749b20c3309375793b6189980a18bbe1f76477635a24a",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "FP007-NONINTRUSION",
+      "acceptanceIds": [
+        "FP007-SCHEMA-001",
+        "FP007-PROVENANCE-001"
+      ],
+      "argv": [
+        "deno",
+        "test",
+        "--no-remote",
+        "--allow-read",
+        "pixiedraw2/tests/fp-007/non-intrusion-authority.test.ts"
+      ],
+      "display": "\"deno\" \"test\" \"--no-remote\" \"--allow-read\" \"pixiedraw2/tests/fp-007/non-intrusion-authority.test.ts\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 693,
+      "stdoutSha256": "e985c6fd54276d2313514c473cc55a3aa4e4b7c80accd415cf310a7bf8587798",
+      "stderrSha256": "3e4dd98e00ddfb00e42447b18e133516e52af32b30cc7bb7448220b590726fd3"
+    },
+    {
+      "id": "FP007-DIFF",
+      "acceptanceIds": [
+        "FP007-PROVENANCE-001"
+      ],
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "display": "\"git\" \"diff\" \"--check\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 32,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "BASELINE-IDENTITY",
+      "acceptanceIds": [
+        "FP007-DEP-001",
+        "FP007-BUILD-001",
+        "FP007-PROVENANCE-001"
+      ],
+      "argv": [
+        "node",
+        "scripts/test-baseline-failure-identity-wp080.mjs"
+      ],
+      "display": "\"node\" \"scripts/test-baseline-failure-identity-wp080.mjs\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 347,
+      "stdoutSha256": "3839ae5f3ddbd8ba0b5810b84f15724743bd2ccdbb8f7d34e324917ef852a0d8",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "BASELINE-SUITE",
+      "acceptanceIds": [
+        "FP007-DEP-001",
+        "FP007-BUILD-001",
+        "FP007-PROVENANCE-001"
+      ],
+      "argv": [
+        "node",
+        "scripts/test-baseline-suite-wp000.mjs"
+      ],
+      "display": "\"node\" \"scripts/test-baseline-suite-wp000.mjs\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 8319,
+      "stdoutSha256": "292468716edc77223d809bdd49dfff858c85fff2716dd819e253c2c42ef6c68d",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "transcriptSha256": "4ef57b8e3fecc25d6d6f57c353d7e152ba616db6281ee67158e4a2a8c03c5358"
+}

@@ -1,0 +1,680 @@
+{
+  "schemaVersion": 1,
+  "benchmarkId": "WP110_REFERENCE_PERFORMANCE_CHECKPOINT",
+  "measuredAt": "2026-08-07T13:43:24.772Z",
+  "environment": {
+    "deviceClass": "browser-host-unknown",
+    "actualDevice": "Codex In-app Browser host; device model unavailable",
+    "browser": "CHROMIUM",
+    "browserVersion": "151.0.0.0",
+    "os": "MacIntel",
+    "buildVersion": "pixiedraw2-reference-checkpoint-local",
+    "condition": "WARM",
+    "surface": "ACTUAL_BROWSER"
+  },
+  "samplePolicy": {
+    "minimumFormalP95Samples": 30,
+    "usedSamples": 40,
+    "p95GateEvaluated": false
+  },
+  "scope": {
+    "canonicalCore": "pixiedraw2/src/draw2-core.ts",
+    "activeEditingPath": "command → dirty Tile/Region → Reference dirty-region preparation → optional Canvas present",
+    "heavyTasks": "SEPARATE_BUDGET",
+    "layerFrameCoverage": "CORE_SLICE_ONLY"
+  },
+  "singlePixel": [
+    {
+      "benchmarkId": "WP110_REFERENCE_SINGLE_PIXEL_512X512",
+      "projectFixture": "PROJECT_B_DESKTOP_REFERENCE_CORE_SLICE",
+      "environment": {
+        "deviceClass": "browser-host-unknown",
+        "actualDevice": "Codex In-app Browser host; device model unavailable",
+        "browser": "CHROMIUM",
+        "browserVersion": "151.0.0.0",
+        "os": "MacIntel",
+        "buildVersion": "pixiedraw2-reference-checkpoint-local",
+        "condition": "WARM",
+        "surface": "ACTUAL_BROWSER"
+      },
+      "iterations": 40,
+      "inputToVisibleMs": {
+        "p50": 0,
+        "p95": 0.10000000894069672,
+        "max": 0.699999988079071,
+        "sampleCount": 40
+      },
+      "commandValidationMs": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0.09999999403953552,
+        "sampleCount": 40
+      },
+      "commandCommitMs": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0.10000000894069672,
+        "sampleCount": 40
+      },
+      "trace": {
+        "commandValidationCount": 1,
+        "commandCommitCount": 1,
+        "touchedTileCount": 1,
+        "cowSplitCount": 0,
+        "copiedBytes": 0,
+        "dirtyTileCount": 1,
+        "dirtyRegionArea": 1,
+        "affectedLayerCount": 1,
+        "affectedFrameCount": 1,
+        "rendererPreparationArea": 1,
+        "presentArea": 1,
+        "canonicalRasterAllocationDelta": 1024,
+        "fullRasterCloneCount": 0,
+        "fullTimelineRebuildCount": 0,
+        "wholeProjectSerializationCount": 0
+      },
+      "memory": {
+        "before": {
+          "logicalRasterBytes": 262144,
+          "allocatedTileBytes": 0,
+          "sharedTileBytes": 0,
+          "tileCount": 0,
+          "implicitTransparentTileCount": 256,
+          "cowSplitCount": 0,
+          "copiedBytes": 0
+        },
+        "after": {
+          "logicalRasterBytes": 262144,
+          "allocatedTileBytes": 1024,
+          "sharedTileBytes": 0,
+          "tileCount": 1,
+          "implicitTransparentTileCount": 255,
+          "cowSplitCount": 0,
+          "copiedBytes": 0
+        },
+        "deltaAllocatedTileBytes": 1024,
+        "componentCategories": {
+          "logicalRasterBytes": 262144,
+          "canonicalRasterBytes": 1024,
+          "tileMetadataBytes": null,
+          "sharedCOWBytes": 0,
+          "cowSplitBytes": 0,
+          "rendererCacheBytes": 0,
+          "journalBytes": 0,
+          "workerTransferBytes": 0,
+          "temporaryOperationBytes": 514,
+          "opfsCacheBytes": 0
+        }
+      },
+      "longTasks": {
+        "available": true,
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0
+      },
+      "status": "UNTESTED",
+      "statusReason": "Reference measurements are recorded, but formal p95/device gates are not evaluated by this checkpoint."
+    },
+    {
+      "benchmarkId": "WP110_REFERENCE_SINGLE_PIXEL_256X256",
+      "projectFixture": "PROJECT_A_MOBILE_REFERENCE_CORE_SLICE",
+      "environment": {
+        "deviceClass": "desktop-simulated-mobile-fixture",
+        "actualDevice": "Codex In-app Browser host; device model unavailable",
+        "browser": "CHROMIUM",
+        "browserVersion": "151.0.0.0",
+        "os": "MacIntel",
+        "buildVersion": "pixiedraw2-reference-checkpoint-local",
+        "condition": "WARM",
+        "surface": "DESKTOP_SIMULATED_MOBILE_FIXTURE"
+      },
+      "iterations": 40,
+      "inputToVisibleMs": {
+        "p50": 0,
+        "p95": 0.10000000894069672,
+        "max": 0.5,
+        "sampleCount": 40
+      },
+      "commandValidationMs": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0.09999999403953552,
+        "sampleCount": 40
+      },
+      "commandCommitMs": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0.09999999403953552,
+        "sampleCount": 40
+      },
+      "trace": {
+        "commandValidationCount": 1,
+        "commandCommitCount": 1,
+        "touchedTileCount": 1,
+        "cowSplitCount": 0,
+        "copiedBytes": 0,
+        "dirtyTileCount": 1,
+        "dirtyRegionArea": 1,
+        "affectedLayerCount": 1,
+        "affectedFrameCount": 1,
+        "rendererPreparationArea": 1,
+        "presentArea": 1,
+        "canonicalRasterAllocationDelta": 1024,
+        "fullRasterCloneCount": 0,
+        "fullTimelineRebuildCount": 0,
+        "wholeProjectSerializationCount": 0
+      },
+      "memory": {
+        "before": {
+          "logicalRasterBytes": 65536,
+          "allocatedTileBytes": 0,
+          "sharedTileBytes": 0,
+          "tileCount": 0,
+          "implicitTransparentTileCount": 64,
+          "cowSplitCount": 0,
+          "copiedBytes": 0
+        },
+        "after": {
+          "logicalRasterBytes": 65536,
+          "allocatedTileBytes": 1024,
+          "sharedTileBytes": 0,
+          "tileCount": 1,
+          "implicitTransparentTileCount": 63,
+          "cowSplitCount": 0,
+          "copiedBytes": 0
+        },
+        "deltaAllocatedTileBytes": 1024,
+        "componentCategories": {
+          "logicalRasterBytes": 65536,
+          "canonicalRasterBytes": 1024,
+          "tileMetadataBytes": null,
+          "sharedCOWBytes": 0,
+          "cowSplitBytes": 0,
+          "rendererCacheBytes": 0,
+          "journalBytes": 0,
+          "workerTransferBytes": 0,
+          "temporaryOperationBytes": 511,
+          "opfsCacheBytes": 0
+        }
+      },
+      "longTasks": {
+        "available": true,
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0
+      },
+      "status": "UNTESTED",
+      "statusReason": "Reference measurements are recorded, but formal p95/device gates are not evaluated by this checkpoint."
+    }
+  ],
+  "cow": [
+    {
+      "benchmarkId": "WP110_REFERENCE_COW_32",
+      "projectFixture": "FRAME_DUPLICATE_SYNTHETIC",
+      "tileSize": 32,
+      "sourceGoldenHash": "6ab81abd66ecaab3e8dffb6fad705099480c4b722df67985f4ae09e2f2d6e04d",
+      "duplicateGoldenHash": "03968ceb2936b1f9ca253540dd6263b0b54e34281d86d0abfe2352a871c74473",
+      "sourceUnchanged": true,
+      "duplicateChanged": true,
+      "sharedBytesBeforeEdit": 1024,
+      "sharedBytesAfterEdit": 0,
+      "cowSplitCount": 1,
+      "copiedBytes": 1024,
+      "expectedCopiedBytes": 1024,
+      "status": "UNTESTED",
+      "statusReason": "COW correctness is measured; formal duplicate latency gate is not evaluated here."
+    },
+    {
+      "benchmarkId": "WP110_REFERENCE_COW_64",
+      "projectFixture": "FRAME_DUPLICATE_SYNTHETIC",
+      "tileSize": 64,
+      "sourceGoldenHash": "6ab81abd66ecaab3e8dffb6fad705099480c4b722df67985f4ae09e2f2d6e04d",
+      "duplicateGoldenHash": "03968ceb2936b1f9ca253540dd6263b0b54e34281d86d0abfe2352a871c74473",
+      "sourceUnchanged": true,
+      "duplicateChanged": true,
+      "sharedBytesBeforeEdit": 4096,
+      "sharedBytesAfterEdit": 0,
+      "cowSplitCount": 1,
+      "copiedBytes": 4096,
+      "expectedCopiedBytes": 4096,
+      "status": "UNTESTED",
+      "statusReason": "COW correctness is measured; formal duplicate latency gate is not evaluated here."
+    }
+  ],
+  "sparse": [
+    {
+      "benchmarkId": "WP110_REFERENCE_SPARSE_32",
+      "canvas": "1024x1024",
+      "tileSize": 32,
+      "sparse": {
+        "logicalRasterBytes": 1048576,
+        "allocatedTileBytes": 1024,
+        "sharedTileBytes": 0,
+        "tileCount": 1,
+        "implicitTransparentTileCount": 1023,
+        "cowSplitCount": 0,
+        "copiedBytes": 0
+      },
+      "tileDense": {
+        "logicalRasterBytes": 1048576,
+        "allocatedTileBytes": 1048576,
+        "sharedTileBytes": 1047552,
+        "tileCount": 1024,
+        "implicitTransparentTileCount": 0,
+        "cowSplitCount": 0,
+        "copiedBytes": 0
+      },
+      "logicalCanvasBytes": 1048576,
+      "status": "UNTESTED",
+      "statusReason": "Sparse allocation is measured; dense fixture is tile-dense (one pixel per tile), not a full pixel fill."
+    },
+    {
+      "benchmarkId": "WP110_REFERENCE_SPARSE_64",
+      "canvas": "1024x1024",
+      "tileSize": 64,
+      "sparse": {
+        "logicalRasterBytes": 1048576,
+        "allocatedTileBytes": 4096,
+        "sharedTileBytes": 0,
+        "tileCount": 1,
+        "implicitTransparentTileCount": 255,
+        "cowSplitCount": 0,
+        "copiedBytes": 0
+      },
+      "tileDense": {
+        "logicalRasterBytes": 1048576,
+        "allocatedTileBytes": 1048576,
+        "sharedTileBytes": 1044480,
+        "tileCount": 256,
+        "implicitTransparentTileCount": 0,
+        "cowSplitCount": 0,
+        "copiedBytes": 0
+      },
+      "logicalCanvasBytes": 1048576,
+      "status": "UNTESTED",
+      "statusReason": "Sparse allocation is measured; dense fixture is tile-dense (one pixel per tile), not a full pixel fill."
+    }
+  ],
+  "determinism": {
+    "benchmarkId": "WP110_REFERENCE_DETERMINISM",
+    "commandCount": 3,
+    "canonicalPixelHashA": "e67721c5f9803e56f0ead206d50350a5cca15ec12a3ad23cc66e2fb8ea7b21c4",
+    "canonicalPixelHashB": "e67721c5f9803e56f0ead206d50350a5cca15ec12a3ad23cc66e2fb8ea7b21c4",
+    "structureHashA": "50e7944ebe6f2b4998265682bcf97e0ff8acfda3b877cb0c6edfaa26070055ea",
+    "structureHashB": "50e7944ebe6f2b4998265682bcf97e0ff8acfda3b877cb0c6edfaa26070055ea",
+    "commandResultHashA": "3c09febef2b15134382897ff120ef91d0af26dfea1f0fda2c63756de863ed25d",
+    "commandResultHashB": "3c09febef2b15134382897ff120ef91d0af26dfea1f0fda2c63756de863ed25d",
+    "dirtyResultHashA": "2f6a960decba10757cb26b55e960268a445796a11527bc59a97eae618c84f74b",
+    "dirtyResultHashB": "2f6a960decba10757cb26b55e960268a445796a11527bc59a97eae618c84f74b",
+    "matched": true,
+    "status": "MEASURED_REFERENCE"
+  },
+  "tileComparison": [
+    {
+      "workload": "single-pixel",
+      "tileSize": 32,
+      "status": "MEASURED_REFERENCE",
+      "iterations": 40,
+      "latencyMs": {
+        "p50": 0,
+        "p95": 0.10000000894069672,
+        "max": 0.20000000298023224,
+        "sampleCount": 40
+      },
+      "touchedTileCount": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1,
+        "sampleCount": 40
+      },
+      "copiedBytes": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0,
+        "sampleCount": 40
+      },
+      "allocatedTileBytes": {
+        "p50": 1024,
+        "p95": 1024,
+        "max": 1024,
+        "sampleCount": 40
+      },
+      "allocationCount": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1,
+        "sampleCount": 40
+      },
+      "metadataOverheadBytes": null
+    },
+    {
+      "workload": "short-stroke",
+      "tileSize": 32,
+      "status": "MEASURED_REFERENCE",
+      "iterations": 40,
+      "latencyMs": {
+        "p50": 0,
+        "p95": 0.10000000894069672,
+        "max": 0.10000000894069672,
+        "sampleCount": 40
+      },
+      "touchedTileCount": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1,
+        "sampleCount": 40
+      },
+      "copiedBytes": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0,
+        "sampleCount": 40
+      },
+      "allocatedTileBytes": {
+        "p50": 1024,
+        "p95": 1024,
+        "max": 1024,
+        "sampleCount": 40
+      },
+      "allocationCount": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1,
+        "sampleCount": 40
+      },
+      "metadataOverheadBytes": null
+    },
+    {
+      "workload": "long-stroke",
+      "tileSize": 32,
+      "status": "MEASURED_REFERENCE",
+      "iterations": 40,
+      "latencyMs": {
+        "p50": 0.20000000298023224,
+        "p95": 0.29999999701976776,
+        "max": 0.30000001192092896,
+        "sampleCount": 40
+      },
+      "touchedTileCount": {
+        "p50": 8,
+        "p95": 8,
+        "max": 8,
+        "sampleCount": 40
+      },
+      "copiedBytes": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0,
+        "sampleCount": 40
+      },
+      "allocatedTileBytes": {
+        "p50": 8192,
+        "p95": 8192,
+        "max": 8192,
+        "sampleCount": 40
+      },
+      "allocationCount": {
+        "p50": 8,
+        "p95": 8,
+        "max": 8,
+        "sampleCount": 40
+      },
+      "metadataOverheadBytes": null
+    },
+    {
+      "workload": "duplicate-cow",
+      "tileSize": 32,
+      "status": "MEASURED_REFERENCE",
+      "iterations": 40,
+      "latencyMs": {
+        "p50": 0,
+        "p95": 0.09999999403953552,
+        "max": 0.10000000894069672,
+        "sampleCount": 40
+      },
+      "touchedTileCount": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1,
+        "sampleCount": 40
+      },
+      "copiedBytes": {
+        "p50": 1024,
+        "p95": 1024,
+        "max": 1024,
+        "sampleCount": 40
+      },
+      "allocatedTileBytes": {
+        "p50": 1024,
+        "p95": 1024,
+        "max": 1024,
+        "sampleCount": 40
+      },
+      "allocationCount": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1,
+        "sampleCount": 40
+      },
+      "metadataOverheadBytes": null
+    },
+    {
+      "workload": "fill",
+      "tileSize": 32,
+      "status": "UNTESTED",
+      "reason": "WP-110 feature is not implemented; fixture is reserved without a fabricated measurement.",
+      "iterations": 40
+    },
+    {
+      "workload": "composite",
+      "tileSize": 32,
+      "status": "UNTESTED",
+      "reason": "WP-110 feature is not implemented; fixture is reserved without a fabricated measurement.",
+      "iterations": 40
+    },
+    {
+      "workload": "single-pixel",
+      "tileSize": 64,
+      "status": "MEASURED_REFERENCE",
+      "iterations": 40,
+      "latencyMs": {
+        "p50": 0,
+        "p95": 0.09999999403953552,
+        "max": 0.10000000894069672,
+        "sampleCount": 40
+      },
+      "touchedTileCount": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1,
+        "sampleCount": 40
+      },
+      "copiedBytes": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0,
+        "sampleCount": 40
+      },
+      "allocatedTileBytes": {
+        "p50": 4096,
+        "p95": 4096,
+        "max": 4096,
+        "sampleCount": 40
+      },
+      "allocationCount": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1,
+        "sampleCount": 40
+      },
+      "metadataOverheadBytes": null
+    },
+    {
+      "workload": "short-stroke",
+      "tileSize": 64,
+      "status": "MEASURED_REFERENCE",
+      "iterations": 40,
+      "latencyMs": {
+        "p50": 0,
+        "p95": 0.09999999403953552,
+        "max": 0.10000000894069672,
+        "sampleCount": 40
+      },
+      "touchedTileCount": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1,
+        "sampleCount": 40
+      },
+      "copiedBytes": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0,
+        "sampleCount": 40
+      },
+      "allocatedTileBytes": {
+        "p50": 4096,
+        "p95": 4096,
+        "max": 4096,
+        "sampleCount": 40
+      },
+      "allocationCount": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1,
+        "sampleCount": 40
+      },
+      "metadataOverheadBytes": null
+    },
+    {
+      "workload": "long-stroke",
+      "tileSize": 64,
+      "status": "MEASURED_REFERENCE",
+      "iterations": 40,
+      "latencyMs": {
+        "p50": 0.19999998807907104,
+        "p95": 0.29999999701976776,
+        "max": 0.29999999701976776,
+        "sampleCount": 40
+      },
+      "touchedTileCount": {
+        "p50": 4,
+        "p95": 4,
+        "max": 4,
+        "sampleCount": 40
+      },
+      "copiedBytes": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0,
+        "sampleCount": 40
+      },
+      "allocatedTileBytes": {
+        "p50": 16384,
+        "p95": 16384,
+        "max": 16384,
+        "sampleCount": 40
+      },
+      "allocationCount": {
+        "p50": 4,
+        "p95": 4,
+        "max": 4,
+        "sampleCount": 40
+      },
+      "metadataOverheadBytes": null
+    },
+    {
+      "workload": "duplicate-cow",
+      "tileSize": 64,
+      "status": "MEASURED_REFERENCE",
+      "iterations": 40,
+      "latencyMs": {
+        "p50": 0,
+        "p95": 0.10000000894069672,
+        "max": 0.10000000894069672,
+        "sampleCount": 40
+      },
+      "touchedTileCount": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1,
+        "sampleCount": 40
+      },
+      "copiedBytes": {
+        "p50": 4096,
+        "p95": 4096,
+        "max": 4096,
+        "sampleCount": 40
+      },
+      "allocatedTileBytes": {
+        "p50": 4096,
+        "p95": 4096,
+        "max": 4096,
+        "sampleCount": 40
+      },
+      "allocationCount": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1,
+        "sampleCount": 40
+      },
+      "metadataOverheadBytes": null
+    },
+    {
+      "workload": "fill",
+      "tileSize": 64,
+      "status": "UNTESTED",
+      "reason": "WP-110 feature is not implemented; fixture is reserved without a fabricated measurement.",
+      "iterations": 40
+    },
+    {
+      "workload": "composite",
+      "tileSize": 64,
+      "status": "UNTESTED",
+      "reason": "WP-110 feature is not implemented; fixture is reserved without a fabricated measurement.",
+      "iterations": 40
+    }
+  ],
+  "technology": {
+    "tileSize": "DECISION_PENDING",
+    "renderer": "DECISION_PENDING",
+    "workerTopology": "DECISION_PENDING",
+    "offscreenCanvas": "UNTESTED_CANDIDATE",
+    "webgpu": "UNTESTED_OPTIONAL_CANDIDATE",
+    "wasm": "UNTESTED_CANDIDATE",
+    "sharedArrayBuffer": "UNTESTED_OPTIONAL_CANDIDATE"
+  },
+  "notes": [
+    "Measurements are evidence for the isolated Reference Path, not a production performance PASS.",
+    "The current Core slice has one raster asset and no 20-layer/120-frame compositor; layer/frame counts are reported as affected Core slice counts, not full-project coverage.",
+    "Desktop-sized and mobile-sized browser fixtures must remain separate from actual device evidence.",
+    "Full raster reads and Golden hashes are explicit verification paths; active dirty rendering uses readRegion only.",
+    "No current Route, PiXiEEDraw, PXD, PiXiSYNC, Market, Project, Asset, Package, database, Storage, or production path is loaded."
+  ],
+  "browserEvidence": {
+    "viewport": {
+      "width": 1280,
+      "height": 720,
+      "devicePixelRatio": 2
+    },
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+    "resourceRequests": [
+      {
+        "name": "http://127.0.0.1:8000/pixiedraw2/assets/draw2-shell.css",
+        "duration": 2.6000000089406967,
+        "transferSize": 5006
+      },
+      {
+        "name": "http://127.0.0.1:8000/pixiedraw2/dist/draw2-reference-benchmark-entry.js",
+        "duration": 2.7999999970197678,
+        "transferSize": 42507
+      }
+    ],
+    "longTasks": {
+      "available": true,
+      "count": 0,
+      "totalMs": 0,
+      "maxMs": 0
+    }
+  }
+}

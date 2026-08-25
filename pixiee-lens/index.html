@@ -5,21 +5,21 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <title>登録不要・無料でドット絵にするサイト PiXiEELENS | 写真をオンライン変換</title>
-<meta content="PiXiEELENSは登録不要・無料で写真やカメラ映像をドット絵にするブラウザツール。オンラインですぐにドット化・ピクセル化し、PiXiEEDrawで編集にも進めます。" name="description"/>
+<meta content="PiXiEELENSは登録不要・無料で写真やカメラ映像をドット絵にするブラウザツール。オンラインですぐにドット化・ピクセル化し、iDRAWで編集にも進めます。" name="description"/>
 <link rel="canonical" href="https://pixieed.jp/pixiee-lens/"/>
 <meta content="#0b1224" name="theme-color"/>
 <meta content="website" property="og:type"/>
 <meta content="PiXiEED" property="og:site_name"/>
 <meta content="ja_JP" property="og:locale"/>
 <meta content="登録不要・無料でドット絵にするサイト PiXiEELENS | 写真をオンライン変換" property="og:title"/>
-<meta content="登録不要・無料で写真やカメラ映像をブラウザでドット化・ピクセル化。PiXiEEDrawで編集にも進めるオンライン変換ツールです。" property="og:description"/>
+<meta content="登録不要・無料で写真やカメラ映像をブラウザでドット化・ピクセル化。iDRAWで編集にも進めるオンライン変換ツールです。" property="og:description"/>
 <meta content="https://pixieed.jp/pixiee-lens/ogp.png" property="og:image"/>
 <meta content="https://pixieed.jp/pixiee-lens/" property="og:url"/>
 <meta content="summary_large_image" name="twitter:card"/>
 <meta content="@PiXiEED_arta" name="twitter:site"/>
 <meta content="https://pixieed.jp/pixiee-lens/" name="twitter:url"/>
 <meta content="登録不要・無料でドット絵にするサイト PiXiEELENS | 写真をオンライン変換" name="twitter:title"/>
-<meta content="登録不要・無料で写真やカメラ映像をブラウザでドット化・ピクセル化。PiXiEEDrawで編集にも進めるオンライン変換ツールです。" name="twitter:description"/>
+<meta content="登録不要・無料で写真やカメラ映像をブラウザでドット化・ピクセル化。iDRAWで編集にも進めるオンライン変換ツールです。" name="twitter:description"/>
 <meta content="https://pixieed.jp/pixiee-lens/ogp.png" name="twitter:image"/>
 <script type="application/ld+json">
 {
@@ -30,7 +30,7 @@
   "operatingSystem": "Web",
   "url": "https://pixieed.jp/pixiee-lens/",
   "image": "https://pixieed.jp/pixiee-lens/ogp.png",
-  "description": "登録不要・無料で写真やカメラ映像をブラウザでドット化・ピクセル化し、PiXiEEDrawで編集にも進めるオンライン変換ツールです。",
+  "description": "登録不要・無料で写真やカメラ映像をブラウザでドット化・ピクセル化し、iDRAWで編集にも進めるオンライン変換ツールです。",
   "offers": {
     "@type": "Offer",
     "price": "0",
@@ -2596,7 +2596,7 @@
              data-ad-slot="2141591954"></ins>
       </div>
       <div class="capture-preview__actions">
-        <button class="capture-preview__button" hidden="" id="capturePreviewEditBtn" type="button">PiXiEEDrawで編集</button>
+        <button class="capture-preview__button" hidden="" id="capturePreviewEditBtn" type="button">iDRAWで編集</button>
         <button class="capture-preview__button capture-preview__button--primary" hidden="" id="capturePreviewShareBtn" type="button">共有する</button>
         <button class="capture-preview__button" id="capturePreviewCloseActionBtn" type="button">閉じる</button>
       </div>
@@ -5497,7 +5497,7 @@
       capturePreviewImage.src = url;
       capturePreviewImage.alt = `撮影した画像 ${width}×${height}`;
       if (!infoMessage && drawPayload) {
-        infoMessage = '画像を長押しして保存するか、「PiXiEEDrawで編集」で編集できます。';
+        infoMessage = '画像を長押しして保存するか、「iDRAWで編集」で編集できます。';
       }
       if (capturePreviewInfo) {
         capturePreviewInfo.textContent = infoMessage || '画像を長押しするか共有メニューから保存してください。';
@@ -10053,7 +10053,7 @@
 
     function openCaptureInDraw() {
       if (!capturePreviewEditPayload || typeof capturePreviewEditPayload.dataUrl !== 'string') {
-        setStatus('PiXiEEDraw に送信できるデータがありません');
+        setStatus('iDRAW に送信できるデータがありません');
         return;
       }
       const transferPayload = {
@@ -10075,11 +10075,11 @@
       }
       const opened = window.open(drawUrl.toString(), '_blank');
       if (!opened) {
-        setStatus('PiXiEEDraw を開けませんでした。ポップアップがブロックされていないか確認してください。');
+      setStatus('iDRAW を開けませんでした。ポップアップがブロックされていないか確認してください。');
         return;
       }
       postDrawImportPayloadToWindow(opened, drawUrl, transferPayload);
-      setStatus('PiXiEEDraw を新しいタブで開きました');
+      setStatus('iDRAW を新しいタブで開きました');
       closeCapturePreview();
     }
 
@@ -10362,7 +10362,7 @@
       }
       let sharePayload = null;
       let infoMessage = drawPayload
-        ? 'PiXiEEDrawで編集するか、画像を保存してご利用ください。'
+        ? 'iDRAWで編集するか、画像を保存してご利用ください。'
         : `${formatLabel}を保存してご利用ください。`;
       if (blob instanceof Blob) {
         if (blob.size <= 0) {
@@ -10407,21 +10407,21 @@
         }
         if (downloaded) {
           infoMessage = drawPayload
-            ? `${formatLabel}をダウンロードしました。「PiXiEEDrawで編集」で続けて編集できます。`
+            ? `${formatLabel}をダウンロードしました。「iDRAWで編集」で続けて編集できます。`
             : `${formatLabel}をダウンロードしました。`;
         } else if (canShareFiles) {
           if (autoShareSucceeded) {
             infoMessage = drawPayload
-              ? '共有を実行しました。必要に応じて「共有する」から端末に保存するか、「PiXiEEDrawで編集」で続けて編集できます。'
+            ? '共有を実行しました。必要に応じて「共有する」から端末に保存するか、「iDRAWで編集」で続けて編集できます。'
               : `共有を実行しました。必要に応じて「共有する」から${formatLabel}を端末に保存してください。`;
           } else {
             infoMessage = drawPayload
-              ? '「共有する」ボタンで保存するか、「PiXiEEDrawで編集」で編集できます。'
+            ? '「共有する」ボタンで保存するか、「iDRAWで編集」で編集できます。'
               : `「共有する」ボタンから${formatLabel}を保存してください。`;
           }
         } else {
           infoMessage = drawPayload
-            ? '画像を長押しして保存するか、「PiXiEEDrawで編集」で編集できます。'
+            ? '画像を長押しして保存するか、「iDRAWで編集」で編集できます。'
             : `${formatLabel}を長押しして保存してください。`;
         }
         if (canShareFiles) {
@@ -12046,7 +12046,7 @@
     })();
   </script>
   <button aria-pressed="false" hidden id="fullscreenButton" type="button">拡大</button>
-  <script src="../scripts/shared-bottom-nav.js?v=20260724-fullscreen-icons2"></script>
+  <script src="../scripts/shared-bottom-nav.js?v=20260825-studio-brand1"></script>
   <script src="../scripts/tool-fullscreen.js"></script>
   <script src="../scripts/pixel-art-fit.js"></script>
 </body>

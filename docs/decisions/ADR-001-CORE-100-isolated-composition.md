@@ -1,0 +1,5 @@
+# ADR-001 CORE-100 isolated composition
+
+Decision: compose FP-004/005/007 behind one typed server-only root and a package-local runtime-branded context boundary. The server context factory privately binds the action AuthorizationProof; copied, serialized, proxied, caller-proof, or caller-shaped authority wrappers are rejected. The root revalidates the canonical membership status and revision before any adapter side effect. Keep all provider and production integration outside this package. The root validates canonical authority, capability, schema, input, policy, idempotency, event identity, and adapter result identity before side effects. The feature is default OFF and has no route or production import.
+
+Rationale: preserve the current system while establishing one authority and result path. COMMIT, Inbox/Outbox, and Finance/Notification/Search boundaries are explicit without moving durable failure/replay/provider qualification into this package. Failure qualification and provider-backed durability remain explicitly `UNTESTED` for CORE-110 or a separately authorized package.

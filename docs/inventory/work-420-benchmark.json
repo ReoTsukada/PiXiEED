@@ -1,0 +1,111 @@
+{
+  "benchmarkVersion": "WORK420_BOUNDED_EVIDENCE_V1",
+  "packageId": "WORK-420",
+  "classification": "IMPLEMENTED_ISOLATED",
+  "adapterClass": "IN_MEMORY",
+  "adapterId": "WORK420_FP004_REFERENCE_ADAPTER",
+  "contextSha256": "ceacf9223d19ef74b0a00998cb9e2796fc7ab1bf31d14f9b26e3666d483930a2",
+  "bounded": true,
+  "network": false,
+  "productionMutation": false,
+  "scenarioCount": 15,
+  "testCounts": {
+    "composition": 11,
+    "eventAdapter": 4,
+    "total": 15
+  },
+  "remediatedFindings": [
+    "WORK420-AUTH-001",
+    "WORK420-AUTH-002",
+    "WORK420-CURRENT-001"
+  ],
+  "maxReplayAttempts": 32,
+  "artifactPaths": [
+    "pixiedraw2/src/platform/work-420/contracts.ts",
+    "pixiedraw2/src/platform/work-420/composition.ts",
+    "pixiedraw2/src/platform/work-420/event-adapter.ts",
+    "pixiedraw2/tests/work-420/fixture.ts",
+    "pixiedraw2/tests/work-420/composition.test.ts",
+    "pixiedraw2/tests/work-420/event-adapter.test.ts",
+    "pixiedraw2/benchmarks/work-420/generate-evidence.ts",
+    "docs/contracts/WORK-420-COMPOSITION.md",
+    "docs/contracts/QUALIFICATION-EVIDENCE-V1.md",
+    "docs/decisions/ADR-20260816-WORK-420-composition-boundary.md",
+    "docs/inventory/work-420-command-transcript.json"
+  ],
+  "artifactHashes": [
+    "e99ddee8af5aae67638df04296e03fd74c7c7c8018c67a2e73085b4aba3ab712",
+    "5d9b6bcc52edbfbd510541508777e595bbb5daed0fd057dc108045f2f3a0be75",
+    "a1f523cf2c77c16e300f678ece97539a4c8980ba76cfe0a2db6ff5fd93cda543",
+    "b88103b7bbe2db0526f9d77d8902a5f3a92a1f37de8c0b1081e3171ccbe08b90",
+    "9dcaafda007d20b471065aab18062b6953f8072dd2c459148278533afafc3113",
+    "01e014636d42ef8ab80661b48796a4e92838c650b16cc89beb31f5db01f9f44e",
+    "808c82a94363709576f49846a4fded796f4275754597f36b1977f10830a9a9a7",
+    "cc80723204f2f2d468749522384fcf16849bc96c8af1e4fea306313b2c85fb5f",
+    "e7f2ba25707681318985e1cc06b0ac8e245a6b98ec5d97bdd4f98e1750b350c9",
+    "e3fb72698fd1da2543a33ff2f7f0e38947c38823a472809cc8d5042436029db5",
+    "313c8d2c5b17175af21dc8c8f394b91663e0cc3dc32012b63f3ac785dbb73bf8"
+  ],
+  "commands": [
+    {
+      "command": "shasum -a 256 .codex/context/WORK-420.md",
+      "exitCode": 0
+    },
+    {
+      "command": "deno fmt --check pixiedraw2/src/platform/work-420 pixiedraw2/tests/work-420 pixiedraw2/benchmarks/work-420",
+      "exitCode": 0
+    },
+    {
+      "command": "deno check --no-remote pixiedraw2/src/platform/work-420/contracts.ts pixiedraw2/src/platform/work-420/composition.ts pixiedraw2/src/platform/work-420/event-adapter.ts pixiedraw2/tests/work-420/fixture.ts pixiedraw2/tests/work-420/composition.test.ts pixiedraw2/tests/work-420/event-adapter.test.ts pixiedraw2/benchmarks/work-420/generate-evidence.ts",
+      "exitCode": 0
+    },
+    {
+      "command": "deno test --no-remote --allow-read --allow-write --check pixiedraw2/tests/work-420/event-adapter.test.ts",
+      "exitCode": 0
+    },
+    {
+      "command": "deno test --no-remote --allow-read --allow-write --check pixiedraw2/tests/work-420/composition.test.ts",
+      "exitCode": 0
+    },
+    {
+      "command": "deno test --no-remote --allow-read --allow-write --check pixiedraw2/tests/work-420",
+      "exitCode": 0
+    },
+    {
+      "command": "deno run --no-remote --allow-read --allow-write=docs/inventory pixiedraw2/benchmarks/work-420/generate-evidence.ts",
+      "exitCode": 0
+    },
+    {
+      "command": "node scripts/validate-qualification-evidence.mjs docs/inventory/work-420-evidence.json",
+      "exitCode": 0
+    },
+    {
+      "command": "python3 scripts/verify_work_package_context.py --context .codex/context/WORK-420.md --manifest .codex/context/WORK-420.manifest.json",
+      "exitCode": 0
+    },
+    {
+      "command": "node scripts/test-baseline-failure-identity-wp080.mjs",
+      "exitCode": 0
+    },
+    {
+      "command": "git diff --check -- pixiedraw2/src/platform/work-420 pixiedraw2/tests/work-420 pixiedraw2/benchmarks/work-420 docs/contracts/WORK-420-COMPOSITION.md docs/inventory/work-420-benchmark.json docs/inventory/work-420-command-transcript.json docs/inventory/work-420-evidence.json docs/decisions/ADR-20260816-WORK-420-composition-boundary.md",
+      "exitCode": 0
+    }
+  ],
+  "reviewer": "TERRA_HIGH_INDEPENDENT_REVIEW",
+  "status": "PASS",
+  "failedAttempts": [
+    {
+      "command": "deno fmt --check pixiedraw2/src/platform/work-420 pixiedraw2/tests/work-420 pixiedraw2/benchmarks/work-420",
+      "exitCode": 1,
+      "reason": "Deno reported six existing WORK-420 files not formatted; the permitted WORK-420 paths were then formatted and the check passed."
+    }
+  ],
+  "untested": [
+    "real Provider/Auth/RLS/DB/Storage verification",
+    "real payment execution and provider delivery",
+    "browser/device and current production route behavior",
+    "cross-process durable eventing and crash recovery",
+    "production deployment, migration, cutover, or publish"
+  ]
+}

@@ -1,0 +1,401 @@
+{
+  "evidenceVersion": "QUALIFICATION_EVIDENCE_V1",
+  "packageId": "FP-006",
+  "contextSha256": "f9b4a98078976634af75e70733a46a4bef48a2bc36466948ed521798d6e01c8e",
+  "status": "PARTIAL",
+  "acceptance": [
+    {
+      "id": "FP006-HOTPATH-001",
+      "status": "PASS",
+      "source": [
+        "pixiedraw2/src/fp-006/contracts.ts",
+        "pixiedraw2/src/fp-006/input-state.ts",
+        "pixiedraw2/src/fp-006/device-profile.ts",
+        "pixiedraw2/src/fp-006/hot-path.ts",
+        "pixiedraw2/src/fp-006/ux-contract.ts"
+      ],
+      "contract": [
+        "docs/contracts/FP-006-HOTPATH.md"
+      ],
+      "schema": [
+        "pixiedraw2/src/fp-006/contracts.ts"
+      ],
+      "build": [
+        "pixiedraw2/benchmarks/fp-006/generate-evidence.ts"
+      ],
+      "commands": [
+        {
+          "command": "\"deno\" \"fmt\" \"--check\" \"pixiedraw2/src/fp-006\" \"pixiedraw2/tests/fp-006\" \"pixiedraw2/benchmarks/fp-006\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"deno\" \"check\" \"pixiedraw2/src/fp-006/contracts.ts\" \"pixiedraw2/src/fp-006/input-state.ts\" \"pixiedraw2/src/fp-006/device-profile.ts\" \"pixiedraw2/src/fp-006/hot-path.ts\" \"pixiedraw2/src/fp-006/ux-contract.ts\" \"pixiedraw2/tests/fp-006/input-state.test.ts\" \"pixiedraw2/tests/fp-006/device-profile.test.ts\" \"pixiedraw2/tests/fp-006/hot-path.test.ts\" \"pixiedraw2/tests/fp-006/ux-contract.test.ts\" \"pixiedraw2/benchmarks/fp-006/generate-evidence.ts\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"deno\" \"test\" \"--no-remote\" \"--allow-read\" \"--allow-write\" \"--check\" \"pixiedraw2/tests/fp-006\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"python3\" \"scripts/verify_work_package_context.py\" \"--context\" \".codex/context/FP-006.md\" \"--root\" \".\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"node\" \"scripts/test-baseline-failure-identity-wp080.mjs\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"node\" \"scripts/test-baseline-suite-wp000.mjs\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"deno\" \"run\" \"--no-remote\" \"--allow-read\" \"--allow-write\" \"pixiedraw2/benchmarks/fp-006/generate-evidence.ts\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"git\" \"diff\" \"--check\"",
+          "exitCode": 0
+        }
+      ],
+      "artifactHashes": [
+        "818dc902d23ef698132c319dfa11afcc0a81f87341354dcf4590ca5e96df5123",
+        "2196694db4f28581090411af8d81f8ac3b67211109fb22044db6df8d585baed7",
+        "bbe70bdc808f88554e84f248731df57f968f44f438b7a33e45dc436b9a40466f",
+        "a1ae2e16f6a9d4f53d29d6cbd4bbd733138a803ae9100cebbe78f9b2d7d4618d",
+        "809928600f6a5caeed8811c338326fe1044b4bdd1243c37f8ed2041149c8fc9b",
+        "e7e3e963b84fceee30f11c6a2829a2bfe47f18c1bb95e7ee4c29bb5ef76a101e",
+        "1bdb2712072f64035aff8eccc76307c836592bae7b676c9e2deacc71edaea8ae",
+        "34f714816cd6a99c9533290d5743134ffcfebaee821a40dab74379e8348e105e",
+        "487a6045e615b9114259648b0471e3389811d8c73cb43903ada07fee267df753",
+        "f84077a23dbe12b4fcb063711928172480539abbda09e34ac58159d7e6725d47",
+        "97e28b4b1a2ab3b9145465eabab85d9fb93763ce0f48fdca771b1120ad546baf",
+        "97e28b4b1a2ab3b9145465eabab85d9fb93763ce0f48fdca771b1120ad546baf"
+      ],
+      "adapterClass": "IN_MEMORY",
+      "classification": "IMPLEMENTED_ISOLATED",
+      "reviewer": "SOL_SCOPE_AUDIT",
+      "findingIdentity": null
+    },
+    {
+      "id": "FP006-RECOVERY-001",
+      "status": "PASS",
+      "source": [
+        "pixiedraw2/src/fp-006/input-state.ts"
+      ],
+      "contract": [
+        "docs/contracts/FP-006-RECOVERY.md"
+      ],
+      "schema": [
+        "pixiedraw2/src/fp-006/contracts.ts"
+      ],
+      "build": [
+        "pixiedraw2/benchmarks/fp-006/generate-evidence.ts"
+      ],
+      "commands": [
+        {
+          "command": "\"deno\" \"fmt\" \"--check\" \"pixiedraw2/src/fp-006\" \"pixiedraw2/tests/fp-006\" \"pixiedraw2/benchmarks/fp-006\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"deno\" \"check\" \"pixiedraw2/src/fp-006/contracts.ts\" \"pixiedraw2/src/fp-006/input-state.ts\" \"pixiedraw2/src/fp-006/device-profile.ts\" \"pixiedraw2/src/fp-006/hot-path.ts\" \"pixiedraw2/src/fp-006/ux-contract.ts\" \"pixiedraw2/tests/fp-006/input-state.test.ts\" \"pixiedraw2/tests/fp-006/device-profile.test.ts\" \"pixiedraw2/tests/fp-006/hot-path.test.ts\" \"pixiedraw2/tests/fp-006/ux-contract.test.ts\" \"pixiedraw2/benchmarks/fp-006/generate-evidence.ts\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"deno\" \"test\" \"--no-remote\" \"--allow-read\" \"--allow-write\" \"--check\" \"pixiedraw2/tests/fp-006\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"python3\" \"scripts/verify_work_package_context.py\" \"--context\" \".codex/context/FP-006.md\" \"--root\" \".\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"node\" \"scripts/test-baseline-failure-identity-wp080.mjs\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"node\" \"scripts/test-baseline-suite-wp000.mjs\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"deno\" \"run\" \"--no-remote\" \"--allow-read\" \"--allow-write\" \"pixiedraw2/benchmarks/fp-006/generate-evidence.ts\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"git\" \"diff\" \"--check\"",
+          "exitCode": 0
+        }
+      ],
+      "artifactHashes": [
+        "818dc902d23ef698132c319dfa11afcc0a81f87341354dcf4590ca5e96df5123",
+        "2196694db4f28581090411af8d81f8ac3b67211109fb22044db6df8d585baed7",
+        "bbe70bdc808f88554e84f248731df57f968f44f438b7a33e45dc436b9a40466f",
+        "a1ae2e16f6a9d4f53d29d6cbd4bbd733138a803ae9100cebbe78f9b2d7d4618d",
+        "809928600f6a5caeed8811c338326fe1044b4bdd1243c37f8ed2041149c8fc9b",
+        "e7e3e963b84fceee30f11c6a2829a2bfe47f18c1bb95e7ee4c29bb5ef76a101e",
+        "1bdb2712072f64035aff8eccc76307c836592bae7b676c9e2deacc71edaea8ae",
+        "34f714816cd6a99c9533290d5743134ffcfebaee821a40dab74379e8348e105e",
+        "487a6045e615b9114259648b0471e3389811d8c73cb43903ada07fee267df753",
+        "f84077a23dbe12b4fcb063711928172480539abbda09e34ac58159d7e6725d47",
+        "97e28b4b1a2ab3b9145465eabab85d9fb93763ce0f48fdca771b1120ad546baf",
+        "97e28b4b1a2ab3b9145465eabab85d9fb93763ce0f48fdca771b1120ad546baf"
+      ],
+      "adapterClass": "IN_MEMORY",
+      "classification": "IMPLEMENTED_ISOLATED",
+      "reviewer": "SOL_SCOPE_AUDIT",
+      "findingIdentity": null
+    },
+    {
+      "id": "FP006-DEVICE-001",
+      "status": "PARTIAL",
+      "source": [
+        "pixiedraw2/src/fp-006/device-profile.ts"
+      ],
+      "contract": [
+        "docs/contracts/FP-006-DEVICE-UX.md"
+      ],
+      "schema": [
+        "pixiedraw2/src/fp-006/contracts.ts"
+      ],
+      "build": [
+        "pixiedraw2/benchmarks/fp-006/generate-evidence.ts"
+      ],
+      "commands": [
+        {
+          "command": "\"deno\" \"fmt\" \"--check\" \"pixiedraw2/src/fp-006\" \"pixiedraw2/tests/fp-006\" \"pixiedraw2/benchmarks/fp-006\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"deno\" \"check\" \"pixiedraw2/src/fp-006/contracts.ts\" \"pixiedraw2/src/fp-006/input-state.ts\" \"pixiedraw2/src/fp-006/device-profile.ts\" \"pixiedraw2/src/fp-006/hot-path.ts\" \"pixiedraw2/src/fp-006/ux-contract.ts\" \"pixiedraw2/tests/fp-006/input-state.test.ts\" \"pixiedraw2/tests/fp-006/device-profile.test.ts\" \"pixiedraw2/tests/fp-006/hot-path.test.ts\" \"pixiedraw2/tests/fp-006/ux-contract.test.ts\" \"pixiedraw2/benchmarks/fp-006/generate-evidence.ts\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"deno\" \"test\" \"--no-remote\" \"--allow-read\" \"--allow-write\" \"--check\" \"pixiedraw2/tests/fp-006\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"python3\" \"scripts/verify_work_package_context.py\" \"--context\" \".codex/context/FP-006.md\" \"--root\" \".\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"node\" \"scripts/test-baseline-failure-identity-wp080.mjs\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"node\" \"scripts/test-baseline-suite-wp000.mjs\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"deno\" \"run\" \"--no-remote\" \"--allow-read\" \"--allow-write\" \"pixiedraw2/benchmarks/fp-006/generate-evidence.ts\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"git\" \"diff\" \"--check\"",
+          "exitCode": 0
+        }
+      ],
+      "artifactHashes": [
+        "818dc902d23ef698132c319dfa11afcc0a81f87341354dcf4590ca5e96df5123",
+        "2196694db4f28581090411af8d81f8ac3b67211109fb22044db6df8d585baed7",
+        "bbe70bdc808f88554e84f248731df57f968f44f438b7a33e45dc436b9a40466f",
+        "a1ae2e16f6a9d4f53d29d6cbd4bbd733138a803ae9100cebbe78f9b2d7d4618d",
+        "809928600f6a5caeed8811c338326fe1044b4bdd1243c37f8ed2041149c8fc9b",
+        "e7e3e963b84fceee30f11c6a2829a2bfe47f18c1bb95e7ee4c29bb5ef76a101e",
+        "1bdb2712072f64035aff8eccc76307c836592bae7b676c9e2deacc71edaea8ae",
+        "34f714816cd6a99c9533290d5743134ffcfebaee821a40dab74379e8348e105e",
+        "487a6045e615b9114259648b0471e3389811d8c73cb43903ada07fee267df753",
+        "f84077a23dbe12b4fcb063711928172480539abbda09e34ac58159d7e6725d47",
+        "97e28b4b1a2ab3b9145465eabab85d9fb93763ce0f48fdca771b1120ad546baf",
+        "97e28b4b1a2ab3b9145465eabab85d9fb93763ce0f48fdca771b1120ad546baf"
+      ],
+      "adapterClass": "UNTESTED",
+      "classification": "UNTESTED",
+      "reviewer": "SOL_SCOPE_AUDIT",
+      "findingIdentity": null
+    },
+    {
+      "id": "FP006-UX-001",
+      "status": "PASS",
+      "source": [
+        "pixiedraw2/src/fp-006/ux-contract.ts"
+      ],
+      "contract": [
+        "docs/contracts/FP-006-DEVICE-UX.md"
+      ],
+      "schema": [
+        "pixiedraw2/src/fp-006/contracts.ts"
+      ],
+      "build": [
+        "pixiedraw2/benchmarks/fp-006/generate-evidence.ts"
+      ],
+      "commands": [
+        {
+          "command": "\"deno\" \"fmt\" \"--check\" \"pixiedraw2/src/fp-006\" \"pixiedraw2/tests/fp-006\" \"pixiedraw2/benchmarks/fp-006\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"deno\" \"check\" \"pixiedraw2/src/fp-006/contracts.ts\" \"pixiedraw2/src/fp-006/input-state.ts\" \"pixiedraw2/src/fp-006/device-profile.ts\" \"pixiedraw2/src/fp-006/hot-path.ts\" \"pixiedraw2/src/fp-006/ux-contract.ts\" \"pixiedraw2/tests/fp-006/input-state.test.ts\" \"pixiedraw2/tests/fp-006/device-profile.test.ts\" \"pixiedraw2/tests/fp-006/hot-path.test.ts\" \"pixiedraw2/tests/fp-006/ux-contract.test.ts\" \"pixiedraw2/benchmarks/fp-006/generate-evidence.ts\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"deno\" \"test\" \"--no-remote\" \"--allow-read\" \"--allow-write\" \"--check\" \"pixiedraw2/tests/fp-006\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"python3\" \"scripts/verify_work_package_context.py\" \"--context\" \".codex/context/FP-006.md\" \"--root\" \".\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"node\" \"scripts/test-baseline-failure-identity-wp080.mjs\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"node\" \"scripts/test-baseline-suite-wp000.mjs\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"deno\" \"run\" \"--no-remote\" \"--allow-read\" \"--allow-write\" \"pixiedraw2/benchmarks/fp-006/generate-evidence.ts\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"git\" \"diff\" \"--check\"",
+          "exitCode": 0
+        }
+      ],
+      "artifactHashes": [
+        "818dc902d23ef698132c319dfa11afcc0a81f87341354dcf4590ca5e96df5123",
+        "2196694db4f28581090411af8d81f8ac3b67211109fb22044db6df8d585baed7",
+        "bbe70bdc808f88554e84f248731df57f968f44f438b7a33e45dc436b9a40466f",
+        "a1ae2e16f6a9d4f53d29d6cbd4bbd733138a803ae9100cebbe78f9b2d7d4618d",
+        "809928600f6a5caeed8811c338326fe1044b4bdd1243c37f8ed2041149c8fc9b",
+        "e7e3e963b84fceee30f11c6a2829a2bfe47f18c1bb95e7ee4c29bb5ef76a101e",
+        "1bdb2712072f64035aff8eccc76307c836592bae7b676c9e2deacc71edaea8ae",
+        "34f714816cd6a99c9533290d5743134ffcfebaee821a40dab74379e8348e105e",
+        "487a6045e615b9114259648b0471e3389811d8c73cb43903ada07fee267df753",
+        "f84077a23dbe12b4fcb063711928172480539abbda09e34ac58159d7e6725d47",
+        "97e28b4b1a2ab3b9145465eabab85d9fb93763ce0f48fdca771b1120ad546baf",
+        "97e28b4b1a2ab3b9145465eabab85d9fb93763ce0f48fdca771b1120ad546baf"
+      ],
+      "adapterClass": "IN_MEMORY",
+      "classification": "IMPLEMENTED_ISOLATED",
+      "reviewer": "SOL_SCOPE_AUDIT",
+      "findingIdentity": null
+    },
+    {
+      "id": "FP006-OVERCLAIM-001",
+      "status": "PASS",
+      "source": [
+        "docs/inventory/fp-006-benchmark.json"
+      ],
+      "contract": [
+        "docs/contracts/FP-006-DEVICE-UX.md"
+      ],
+      "schema": [
+        "pixiedraw2/src/fp-006/contracts.ts"
+      ],
+      "build": [
+        "pixiedraw2/benchmarks/fp-006/generate-evidence.ts"
+      ],
+      "commands": [
+        {
+          "command": "\"deno\" \"fmt\" \"--check\" \"pixiedraw2/src/fp-006\" \"pixiedraw2/tests/fp-006\" \"pixiedraw2/benchmarks/fp-006\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"deno\" \"check\" \"pixiedraw2/src/fp-006/contracts.ts\" \"pixiedraw2/src/fp-006/input-state.ts\" \"pixiedraw2/src/fp-006/device-profile.ts\" \"pixiedraw2/src/fp-006/hot-path.ts\" \"pixiedraw2/src/fp-006/ux-contract.ts\" \"pixiedraw2/tests/fp-006/input-state.test.ts\" \"pixiedraw2/tests/fp-006/device-profile.test.ts\" \"pixiedraw2/tests/fp-006/hot-path.test.ts\" \"pixiedraw2/tests/fp-006/ux-contract.test.ts\" \"pixiedraw2/benchmarks/fp-006/generate-evidence.ts\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"deno\" \"test\" \"--no-remote\" \"--allow-read\" \"--allow-write\" \"--check\" \"pixiedraw2/tests/fp-006\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"python3\" \"scripts/verify_work_package_context.py\" \"--context\" \".codex/context/FP-006.md\" \"--root\" \".\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"node\" \"scripts/test-baseline-failure-identity-wp080.mjs\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"node\" \"scripts/test-baseline-suite-wp000.mjs\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"deno\" \"run\" \"--no-remote\" \"--allow-read\" \"--allow-write\" \"pixiedraw2/benchmarks/fp-006/generate-evidence.ts\"",
+          "exitCode": 0
+        },
+        {
+          "command": "\"git\" \"diff\" \"--check\"",
+          "exitCode": 0
+        }
+      ],
+      "artifactHashes": [
+        "818dc902d23ef698132c319dfa11afcc0a81f87341354dcf4590ca5e96df5123",
+        "2196694db4f28581090411af8d81f8ac3b67211109fb22044db6df8d585baed7",
+        "bbe70bdc808f88554e84f248731df57f968f44f438b7a33e45dc436b9a40466f",
+        "a1ae2e16f6a9d4f53d29d6cbd4bbd733138a803ae9100cebbe78f9b2d7d4618d",
+        "809928600f6a5caeed8811c338326fe1044b4bdd1243c37f8ed2041149c8fc9b",
+        "e7e3e963b84fceee30f11c6a2829a2bfe47f18c1bb95e7ee4c29bb5ef76a101e",
+        "1bdb2712072f64035aff8eccc76307c836592bae7b676c9e2deacc71edaea8ae",
+        "34f714816cd6a99c9533290d5743134ffcfebaee821a40dab74379e8348e105e",
+        "487a6045e615b9114259648b0471e3389811d8c73cb43903ada07fee267df753",
+        "f84077a23dbe12b4fcb063711928172480539abbda09e34ac58159d7e6725d47",
+        "97e28b4b1a2ab3b9145465eabab85d9fb93763ce0f48fdca771b1120ad546baf",
+        "97e28b4b1a2ab3b9145465eabab85d9fb93763ce0f48fdca771b1120ad546baf"
+      ],
+      "adapterClass": "UNTESTED",
+      "classification": "IMPLEMENTED_ISOLATED",
+      "reviewer": "SOL_SCOPE_AUDIT",
+      "findingIdentity": null
+    }
+  ],
+  "untested": [
+    "physical mobile",
+    "physical stylus",
+    "Safari",
+    "Firefox",
+    "local browser DOM interaction (file URL blocked by browser policy)",
+    "30-minute memory",
+    "full input-to-visible compositor",
+    "native host"
+  ],
+  "baseline": {
+    "expectedFailureCount": 14,
+    "identityMatches": 14,
+    "newFailures": 0,
+    "suitePasses": 63,
+    "suiteTotal": 77
+  },
+  "benchmarkPath": "docs/inventory/fp-006-benchmark.json",
+  "independentReview": {
+    "reviewer": "SOL_SCOPE_AUDIT",
+    "status": "INDEPENDENT_REVIEW_PASS",
+    "path": "docs/inventory/fp-006-independent-audit.json"
+  },
+  "checkpoint": {
+    "changedFiles": [
+      "pixiedraw2/src/fp-006/contracts.ts",
+      "pixiedraw2/src/fp-006/input-state.ts",
+      "pixiedraw2/src/fp-006/device-profile.ts",
+      "pixiedraw2/src/fp-006/hot-path.ts",
+      "pixiedraw2/src/fp-006/ux-contract.ts",
+      "pixiedraw2/tests/fp-006/input-state.test.ts",
+      "pixiedraw2/tests/fp-006/device-profile.test.ts",
+      "pixiedraw2/tests/fp-006/hot-path.test.ts",
+      "pixiedraw2/tests/fp-006/ux-contract.test.ts",
+      "pixiedraw2/benchmarks/fp-006/generate-evidence.ts",
+      "docs/contracts/FP-006-HOTPATH.md",
+      "docs/contracts/FP-006-RECOVERY.md",
+      "docs/contracts/FP-006-DEVICE-UX.md",
+      "docs/decisions/ADR-20260813-FP-006-adapter-boundary.md"
+    ],
+    "manifest": "docs/inventory/fp-006-command-manifest.json",
+    "transcript": "docs/inventory/fp-006-command-transcript.json",
+    "evidence": "docs/inventory/fp-006-evidence.json",
+    "independentReview": "docs/inventory/fp-006-independent-audit.json",
+    "handoff": "FP-006",
+    "nextPackage": "DRAW-110",
+    "autoStartNext": false
+  },
+  "noProductionClaims": true
+}

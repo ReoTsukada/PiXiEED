@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "proofType": "AUTHORIZATION_PROOF",
+  "source": "server",
+  "decision": "allow",
+  "authorityId": "account-permission-server",
+  "proofId": "authz-proof-1",
+  "principalId": "principal-1",
+  "resourceType": "PROJECT",
+  "resourceId": "project-1",
+  "action": "read",
+  "capability": "project.read",
+  "tenantId": "tenant-1",
+  "correlationId": "correlation-1",
+  "policyVersion": "account-policy-v1",
+  "grantId": "grant-1",
+  "issuedAt": "2099-08-09T00:00:00.000Z",
+  "expiresAt": "2099-08-09T00:05:00.000Z"
+}

@@ -1,0 +1,32 @@
+{
+  "workPackage": "WP-190",
+  "status": "INTEGRATION_AUDIT_PENDING",
+  "source": "pixiedraw2/src/wp190-final-gate.ts",
+  "entries": [
+    {"area":"Pixel tools","status":"PARTIAL","nextGate":"Physical/browser interaction audit"},
+    {"area":"Palette","status":"COMPLETE"},
+    {"area":"Selection/Transform","status":"COMPLETE"},
+    {"area":"Layers","status":"COMPLETE"},
+    {"area":"Frames/Cels","status":"COMPLETE"},
+    {"area":"Timeline","status":"COMPLETE"},
+    {"area":"Animation","status":"PARTIAL","nextGate":"Full playback UX"},
+    {"area":"History","status":"COMPLETE"},
+    {"area":"Autosave","status":"PARTIAL","nextGate":"Workspace persistence E2E"},
+    {"area":"PXD","status":"COMPLETE"},
+    {"area":"Legacy compatibility","status":"UNTESTED","nextGate":"Real Legacy/user/device fixtures"},
+    {"area":"PiXiSYNC","status":"PARTIAL","nextGate":"Existing transport compatibility gate"},
+    {"area":"Asset integration","status":"PARTIAL","nextGate":"Production adapter gate"},
+    {"area":"Game integration","status":"PARTIAL","nextGate":"WP-200"},
+    {"area":"Runtime","status":"COMPLETE"},
+    {"area":"Advanced tools","status":"PARTIAL","nextGate":"Operational UX audit"},
+    {"area":"Desktop workspace","status":"COMPLETE"},
+    {"area":"Tablet","status":"COMPLETE"},
+    {"area":"Mobile","status":"PARTIAL","nextGate":"Physical Mobile flow"},
+    {"area":"Accessibility","status":"PARTIAL","nextGate":"Real Screen Reader"},
+    {"area":"Performance","status":"PARTIAL","nextGate":"Full Compositor"},
+    {"area":"Memory","status":"UNTESTED","nextGate":"30-minute session"},
+    {"area":"Cross-browser","status":"UNTESTED","nextGate":"Safari/Firefox"},
+    {"area":"Stylus","status":"UNTESTED","nextGate":"Physical Stylus"},
+    {"area":"Market preparation","status":"COMPLETE"}
+  ]
+}

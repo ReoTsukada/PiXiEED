@@ -1,0 +1,94 @@
+{
+  "document_id": "PIXIEED-WP010-CONTRACT-INVENTORY-001",
+  "work_package": "WP-010",
+  "repository_commit": "76e01b24c7f4f4ae3b75c0727f1e3612a133d970",
+  "master_context": "PIXIEED-CODEX-MASTER-CONTEXT v4.2.0",
+  "status": "reference_contracts_validated_production_adapter_deferred",
+  "reference_core": {
+    "root": "16_IMPLEMENTATION_STARTER/reference-core",
+    "schemas": [
+      "schemas/command-envelope-v1.schema.json",
+      "schemas/canonical-operation-v1.schema.json",
+      "schemas/project-state-v1.schema.json",
+      "schemas/pxd-manifest-v1.schema.json"
+    ],
+    "fixtures": [
+      "fixtures/command-envelope-v1.valid.json",
+      "fixtures/canonical-operation-v1.valid.json",
+      "fixtures/project-state-v1.valid.json",
+      "fixtures/pxd-manifest-v1.valid.json"
+    ],
+    "tests": [
+      "16_IMPLEMENTATION_STARTER/reference-core/tests/reference-core.test.mjs",
+      "scripts/test-wp010-schemas.mjs"
+    ]
+  },
+  "current_repository_contracts": [
+    {
+      "name": "project_id",
+      "current_source": [
+        "pixiedraw/assets/js/app.js",
+        "pixiedraw/assets/js/modules/autosave-schema-v2-utils.js"
+      ],
+      "observed_forms": ["local-*", "existing project IDs", "shared project IDs"],
+      "adapter_rule": "Preserve current value; do not rewrite URL, IndexedDB, or shared-project identity."
+    },
+    {
+      "name": "pixisync_operation",
+      "current_source": [
+        "pixiedraw/assets/js/modules/pixisync-realtime-client-utils.js",
+        "pixiedraw/assets/js/modules/pixisync-order-keeper-utils.js",
+        "pixiedraw/assets/js/modules/pixisync-document-operation-utils.js"
+      ],
+      "observed_fields": [
+        "operationId",
+        "revision",
+        "structureEpoch",
+        "payloadSha256",
+        "kind",
+        "canvasId",
+        "frameId",
+        "layerId",
+        "undoOfOperationId"
+      ],
+      "adapter_rule": "Keep current RPC, codec, ordering, and UUID operation IDs; map only at an isolated boundary."
+    },
+    {
+      "name": "pxd_archive",
+      "current_source": ["pixiedraw/assets/js/modules/project-storage-v2-archive-codec.js"],
+      "observed_fields": [
+        "format",
+        "version",
+        "storageAdapterId",
+        "packageType",
+        "packageVersion",
+        "documentVersion",
+        "width",
+        "height",
+        "canvasCount",
+        "activeCanvasId",
+        "sheetCount",
+        "documentName",
+        "updatedAt",
+        "certification"
+      ],
+      "adapter_rule": "Retain current archive version 2 and reader compatibility; do not substitute the reference manifest in production."
+    }
+  ],
+  "preservation": {
+    "market": "unchanged",
+    "pixisync": "current RPC/Realtime/ordering path unchanged",
+    "public_urls": "unchanged",
+    "existing_projects": "unchanged",
+    "financial_entitlement_rights_data": "unchanged",
+    "production_migration": false,
+    "deploy_publish_cutover": false
+  },
+  "validation": {
+    "schema_valid_fixtures": 4,
+    "schema_invalid_cases": 8,
+    "reference_core_tests": 6,
+    "type_check": "deno check --unstable-sloppy-imports src/index.ts passed; npm tsc unavailable",
+    "baseline": "WP-000/WP-005 63/77 pass and same 14 inherited failures remain the comparison point"
+  }
+}

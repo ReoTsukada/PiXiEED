@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "work_package": "WP-000",
+  "captured_on": "2026-08-06",
+  "repository_commit": "76e01b24c7f4f4ae3b75c0727f1e3612a133d970",
+  "commands": [
+    {
+      "command": "node --check pixiedraw/assets/js/app.js",
+      "result": "pass"
+    },
+    {
+      "command": "node --check market/market.js && node --check market/item.js && node --check market/sell.js",
+      "result": "pass"
+    },
+    {
+      "command": "node --check pixfind/app.js",
+      "result": "pass"
+    },
+    {
+      "command": "node --check scripts/shared-bottom-nav.js && node --check scripts/shared-auth-panel.js",
+      "result": "pass"
+    },
+    {
+      "command": "(cd app-shell/pixieed-capacitor && npm run doctor)",
+      "result": "pass",
+      "detail": "OK: 34 entries are available for staging."
+    },
+    {
+      "command": "node scripts/test-pixiedraw-pxd-index8-roundtrip.mjs",
+      "result": "pass",
+      "detail": "PXD index8 roundtrip checks passed; sandbox socket restriction required one approved rerun."
+    },
+    {
+      "command": "pure baseline scripts (77 candidates)",
+      "result": "partial",
+      "detail": "63 passed; 14 pre-existing failures recorded in .codex/PIXIEED_TEST_RESULTS.md."
+    },
+    {
+      "command": "npm test",
+      "result": "fail",
+      "detail": "Root package.json has no test script."
+    },
+    {
+      "command": "git diff --check",
+      "result": "pass"
+    },
+    {
+      "command": "supabase migration list",
+      "result": "read-only observation",
+      "detail": "Displayed Local/Remote migration columns matched through 20260805020000; no migration applied."
+    }
+  ],
+  "known_unresolved_failures": [
+    "scripts/test-account-auth-state-stability.mjs: missing scripts/account-dev-tools.js",
+    "scripts/test-account-reward-dashboard.mjs: assertion drift in account UI text",
+    "scripts/test-ad-lifecycle.mjs: assertion drift around retry symbols",
+    "scripts/test-ad-permission-management.mjs: missing adFreeGrantForm",
+    "scripts/test-market-fee-schedule.mjs: 5-second UI differs from test's 10-second expectation",
+    "scripts/test-market-lineage-pageview-rewards.mjs: missing pageviewRewardSettlementMonth",
+    "scripts/test-market-listing-package.mjs: detectFormat export shape mismatch",
+    "scripts/test-market-pageview-reward-budget.mjs: documentation phrase drift",
+    "scripts/test-market-verification.mjs: expected legacy market_public_asset_v1 RPC shape",
+    "scripts/test-pixiedraw-existing-project-native-scale.mjs: expected legacy normalizer line shape",
+    "scripts/test-pixiedraw-export-runtime-wiring.mjs: cache-buster drift",
+    "scripts/test-pixiedraw-new-project-session-handoff.mjs: new-project id assertion",
+    "scripts/test-pixiedraw-release-cache.mjs: cache-buster drift",
+    "scripts/test-pixisync-paid-slots.mjs: cache-buster drift"
+  ],
+  "production_data_changes": false,
+  "production_deployments": false
+}

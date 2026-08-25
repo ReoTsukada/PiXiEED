@@ -1,0 +1,130 @@
+{
+  "schemaVersion": "WORK420_INDEPENDENT_AUDIT_R2_V1",
+  "packageId": "WORK-420",
+  "auditor": "Terra",
+  "auditMode": "READ_ONLY_INDEPENDENT_REAUDIT",
+  "contextSha256": "450a93e659ff166ae13477f4393f4610b3de1444ef1e4a978cb6c88c603a0115",
+  "contextVerification": "PASS",
+  "decision": "PASS_APPROVED",
+  "decisionScope": "BOUNDED_LOCAL_WORK_420_ONLY",
+  "decisionBasis": "No open P0/P1 findings. The three prior P1 findings are closed by the current composition implementation and by independent in-memory attack-fixture execution. This decision does not promote PARTIAL/SELF_CHECK evidence or qualify any external system.",
+  "openFindingCounts": {
+    "P0": 0,
+    "P1": 0,
+    "P2": 0
+  },
+  "findings": [
+    {
+      "code": "WORK420-AUTH-001",
+      "severity": "CLOSED",
+      "previousSeverity": "P1",
+      "file": "pixiedraw2/src/platform/work-420/composition.ts",
+      "lines": "1070-1188, 1471-1496",
+      "evidence": "canonicalParticipantForOperation derives requester/creator from the Current Request for every operation, including SUBMIT_REQUEST, CREATE_MILESTONE, START_MILESTONE, and MARK_DELIVERY_PENDING. validateAuthority rejects a context principal that differs from that role and rejects any authority actor that differs from the same canonical role. Independent fixture: an unrelated active tenant member was rejected for all four target operations (4/4)."
+    },
+    {
+      "code": "WORK420-AUTH-002",
+      "severity": "CLOSED",
+      "previousSeverity": "P1",
+      "file": "pixiedraw2/src/platform/work-420/composition.ts",
+      "lines": "1119-1150, 1497-1522",
+      "evidence": "After apply and immediately before commit, resolveCommitMembership re-resolves Current Membership and compares active status, membershipId, principalId, tenantId, and membershipRevision. Work420CommitInput carries this identity; the fixture commit repeats the comparison before mutation (fixture.ts:564-610). Independent fixture revoked membership during resolveAuthority: execute returned SERVER_CONTEXT_INVALID, aggregate identity/state were unchanged, and commitCount remained 0."
+    },
+    {
+      "code": "WORK420-CURRENT-001",
+      "severity": "CLOSED",
+      "previousSeverity": "P1",
+      "file": "pixiedraw2/src/platform/work-420/composition.ts",
+      "lines": "416-486, 1471-1472",
+      "evidence": "verifyCurrentAggregate validates the canonical envelope then compares request, quote, agreement, milestone, delivery, acceptance, rights, payment, and ledger current heads against envelope ref.revision before authority resolution. Existing test covers downstream stale-head operations (composition.test.ts:909-1047); independent fixture completed the full chain and substituted each of the nine heads. All 9/9 were rejected with STALE_CURRENT_RECORD without aggregate-version mutation."
+    }
+  ],
+  "commands": [
+    {
+      "command": "shasum -a 256 .codex/context/WORK-420.md",
+      "exitCode": 0,
+      "result": "450a93e659ff166ae13477f4393f4610b3de1444ef1e4a978cb6c88c603a0115"
+    },
+    {
+      "command": "deno fmt --check pixiedraw2/src/platform/work-420 pixiedraw2/tests/work-420 pixiedraw2/benchmarks/work-420",
+      "exitCode": 0,
+      "result": "Checked 7 files"
+    },
+    {
+      "command": "deno check --no-remote pixiedraw2/src/platform/work-420/contracts.ts pixiedraw2/src/platform/work-420/composition.ts pixiedraw2/src/platform/work-420/event-adapter.ts pixiedraw2/tests/work-420/fixture.ts pixiedraw2/tests/work-420/composition.test.ts pixiedraw2/tests/work-420/event-adapter.test.ts pixiedraw2/benchmarks/work-420/generate-evidence.ts",
+      "exitCode": 0,
+      "result": "7 files checked"
+    },
+    {
+      "command": "deno test --no-remote --allow-read --allow-write --check pixiedraw2/tests/work-420",
+      "exitCode": 0,
+      "result": "15 passed, 0 failed; includes canonical participant, post-authority revoke, and downstream stale-head coverage"
+    },
+    {
+      "command": "node scripts/validate-qualification-evidence.mjs docs/inventory/work-420-evidence.json",
+      "exitCode": 0,
+      "result": "valid:true, qualificationReady:false"
+    },
+    {
+      "command": "python3 scripts/verify_work_package_context.py --context .codex/context/WORK-420.md --manifest .codex/context/WORK-420.manifest.json",
+      "exitCode": 0,
+      "result": "status:PASS"
+    },
+    {
+      "command": "node scripts/test-baseline-failure-identity-wp080.mjs",
+      "exitCode": 0,
+      "result": "14/14 inherited failure identities matched; 0 new identities"
+    },
+    {
+      "command": "node scripts/test-baseline-suite-wp000.mjs",
+      "exitCode": 0,
+      "result": "63/77 successful; 14 inherited failures matched; 0 new failures"
+    },
+    {
+      "command": "deno eval --no-remote [independent WORK-420 attack fixture]",
+      "exitCode": 0,
+      "result": "participantRejected:true (4/4); toctouRejected:true with commitCount:0; currentHeadsRejected:true (9/9)"
+    }
+  ],
+  "tested": [
+    "Static composition inspection for role binding, current-head verification, and commit-time membership revalidation",
+    "Isolated Deno type, formatting, and WORK-420 composition/event-adapter tests",
+    "Independent in-memory unrelated-member attacks for SUBMIT_REQUEST, CREATE_MILESTONE, START_MILESTONE, and MARK_DELIVERY_PENDING",
+    "Independent in-memory membership-revocation TOCTOU attack between authority resolution and commit",
+    "Independent in-memory stale-head substitutions for all nine Request-to-Ledger current heads",
+    "Context manifest integrity, qualification-evidence schema validity, and baseline identity/suite checks"
+  ],
+  "untested": [
+    "real Provider/Auth/RLS/DB/Storage verification",
+    "real payment execution and provider delivery",
+    "browser/device and current production route behavior",
+    "cross-process durable eventing and crash recovery",
+    "production deployment, migration, cutover, or publish",
+    "clean-worktree attribution for pre-existing out-of-scope dirty entries"
+  ],
+  "evidenceState": {
+    "work420EvidenceStatus": "PARTIAL",
+    "reviewer": "SELF_CHECK",
+    "qualificationReady": false,
+    "preserved": true,
+    "note": "This independent audit neither edits nor promotes docs/inventory/work-420-evidence.json."
+  },
+  "scopeOutside": {
+    "codeOrConfigurationWrites": 0,
+    "auditReportWrite": "docs/inventory/work-420-independent-audit-r2.json only",
+    "commitPushDeployMigrationPublish": "NOT_PERFORMED",
+    "existingRouteMarketSiteProductionDbRlsStorageChanges": "NOT_PERFORMED",
+    "preexistingDirtyWorktree": "Observed and preserved; not attributed to WORK-420 or treated as a P0/P1 finding."
+  },
+  "artifactHashes": {
+    "pixiedraw2/src/platform/work-420/contracts.ts": "e99ddee8af5aae67638df04296e03fd74c7c7c8018c67a2e73085b4aba3ab712",
+    "pixiedraw2/src/platform/work-420/composition.ts": "5d9b6bcc52edbfbd510541508777e595bbb5daed0fd057dc108045f2f3a0be75",
+    "pixiedraw2/src/platform/work-420/event-adapter.ts": "a1f523cf2c77c16e300f678ece97539a4c8980ba76cfe0a2db6ff5fd93cda543",
+    "pixiedraw2/tests/work-420/fixture.ts": "b88103b7bbe2db0526f9d77d8902a5f3a92a1f37de8c0b1081e3171ccbe08b90",
+    "pixiedraw2/tests/work-420/composition.test.ts": "9dcaafda007d20b471065aab18062b6953f8072dd2c459148278533afafc3113",
+    "pixiedraw2/tests/work-420/event-adapter.test.ts": "01e014636d42ef8ab80661b48796a4e92838c650b16cc89beb31f5db01f9f44e",
+    "docs/inventory/work-420-evidence.json": "6f5f6ba98475e6487d190da021ba6d23ddd9daa1c518f2ea5005c59e4e59c149",
+    "docs/contracts/WORK-420-COMPOSITION.md": "32e9fed8170bc4fc95d9db9c55ac6204819e2ab1c2fe89de4e14e4c1d46a8371",
+    "docs/decisions/ADR-20260816-WORK-420-composition-boundary.md": "304265f2dcca9b85cda53d9ed2f55efe2b94c1517925862ff966042579399ae6"
+  }
+}

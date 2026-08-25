@@ -1,0 +1,10 @@
+schema_version: 3.1
+items: []
+item_schema:
+  id: string
+  statement: string
+  class: safe_assumption|blocker_question|deferred_choice
+  confidence: low|medium|high
+  affected_blueprint_fields: []
+  invalidate_when: []
+  created_at: null

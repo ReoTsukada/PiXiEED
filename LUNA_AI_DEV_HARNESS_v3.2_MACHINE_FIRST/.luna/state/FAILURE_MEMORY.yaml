@@ -1,0 +1,12 @@
+schema_version: 3.1
+findings: []
+promotion_rule:
+  same_class_count: 2
+  promote_to: harness_or_invariant_or_regression_test
+finding_schema:
+  signature: string
+  class: string
+  count: 0
+  work_packages: []
+  root_causes: []
+  prevention_refs: []

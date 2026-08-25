@@ -48,11 +48,11 @@
       <section class="market-titlebar">
         <div class="market-titlebar__title">
           <img src="../assets/icons/Market.png" alt="">
-          <h1>マーケット</h1>
-          <span class="market-count" id="marketCount">読み込み中</span>
+          <h1 data-i18n-key="marketTitle">マーケット</h1>
+          <span class="market-count" id="marketCount" data-i18n-key="marketLoading">読み込み中</span>
           <span class="market-help-tip" data-market-help>
-            <button class="market-help-tip__button" type="button" aria-label="マーケット一覧の見方" aria-describedby="marketListHelp" aria-expanded="false">?</button>
-            <span class="market-help-tip__content" id="marketListHelp" role="tooltip">カードを開くと、価格、収録形式、利用範囲、派生販売の可否を確認できます。認証バッジは確認対象が異なるため、商品詳細と利用条件も必ず確認してください。</span>
+            <button class="market-help-tip__button" type="button" data-i18n-aria-label="marketListAria" aria-label="マーケット一覧の見方" aria-describedby="marketListHelp" aria-expanded="false">?</button>
+            <span class="market-help-tip__content" id="marketListHelp" role="tooltip" data-i18n-key="marketHelpTip">カードを開くと、価格、収録形式、利用範囲、派生販売の可否を確認できます。認証バッジは確認対象が異なるため、商品詳細と利用条件も必ず確認してください。</span>
           </span>
         </div>
       </section>
@@ -60,86 +60,86 @@
       <section class="market-want-posts" id="marketWantPosts" data-mode="featured" aria-labelledby="marketWantPostsTitle">
         <div class="market-want-posts__head">
           <div>
-            <h2 id="marketWantPostsTitle">欲しい素材</h2>
-            <p id="marketWantPostsDescription">みんなが欲しい素材を毎日1件表示します。</p>
+            <h2 id="marketWantPostsTitle" data-i18n-key="marketWantTitle">欲しい素材</h2>
+            <p id="marketWantPostsDescription" data-i18n-key="marketWantDescription">みんなが欲しい素材を毎日1件表示します。</p>
           </div>
         </div>
         <div id="marketWantPostFields" hidden>
           <form class="market-want-posts__form" id="marketWantPostForm">
-            <label class="sr-only" for="marketWantPostInput">今欲しいものを入力</label>
-            <input id="marketWantPostInput" name="want-post" type="text" maxlength="25" autocomplete="off" placeholder="例：森のタイルセット" required>
+            <label class="sr-only" for="marketWantPostInput" data-i18n-key="marketWantInputLabel">今欲しいものを入力</label>
+            <input id="marketWantPostInput" name="want-post" type="text" maxlength="25" autocomplete="off" data-i18n-placeholder="marketWantPlaceholder" placeholder="例：森のタイルセット" required>
             <span class="market-want-posts__count" id="marketWantPostCount" aria-live="polite">0 / 25</span>
-            <button type="submit" id="marketWantPostSubmit">送信する</button>
-            <button class="market-want-posts__cancel" type="button" id="marketWantPostCancel">閉じる</button>
+            <button type="submit" id="marketWantPostSubmit" data-i18n-key="marketSend">送信する</button>
+            <button class="market-want-posts__cancel" type="button" id="marketWantPostCancel" data-i18n-key="marketClose">閉じる</button>
           </form>
           <p class="market-want-posts__status" id="marketWantPostStatus" aria-live="polite"></p>
         </div>
         <div class="market-want-posts__featured" id="marketWantPostList" aria-live="polite"></div>
       </section>
 
-      <section class="market-toolbar" aria-label="素材を絞り込む">
+      <section class="market-toolbar" data-i18n-aria-label="marketSearchAria" aria-label="素材を絞り込む">
         <label class="market-search">
-          <span class="sr-only">素材を検索</span>
-          <input id="marketSearch" type="search" placeholder="素材名・作者・キーワードで検索" autocomplete="off">
+          <span class="sr-only" data-i18n-key="marketSearchAria">素材を検索</span>
+          <input id="marketSearch" type="search" data-i18n-placeholder="marketSearchPlaceholder" placeholder="素材名・作者・キーワードで検索" autocomplete="off">
         </label>
         <div class="market-filters" id="marketFilters">
-          <button type="button" class="is-active" data-filter="all">すべて</button>
-          <button type="button" data-filter="pixiedraw-project">PiXiEEDraw</button>
-          <button type="button" data-filter="image">画像素材</button>
-          <button type="button" data-filter="animation">アニメーション</button>
+          <button type="button" class="is-active" data-filter="all" data-i18n-key="marketFilterAll">すべて</button>
+          <button type="button" data-filter="pixiedraw-project" data-i18n-key="marketFilterDraw">iDRAW</button>
+          <button type="button" data-filter="image" data-i18n-key="marketFilterImage">画像素材</button>
+          <button type="button" data-filter="animation" data-i18n-key="marketFilterAnimation">アニメーション</button>
         </div>
         <label class="market-sort">
-          <span class="sr-only">並び順</span>
+          <span class="sr-only" data-i18n-key="marketSortLabel">並び順</span>
           <select id="marketSort">
-            <option value="new">新着順</option>
-            <option value="popular">人気順</option>
-            <option value="popular-derivatives">人気派生</option>
-            <option value="derivative-count">派生が多い順</option>
-            <option value="price-low">価格が低い順</option>
-            <option value="price-high">価格が高い順</option>
+            <option value="new" data-i18n-key="marketSortNew">新着順</option>
+            <option value="popular" data-i18n-key="marketSortPopular">人気順</option>
+            <option value="popular-derivatives" data-i18n-key="marketSortDerivatives">人気派生</option>
+            <option value="derivative-count" data-i18n-key="marketSortDerivativeCount">派生が多い順</option>
+            <option value="price-low" data-i18n-key="marketSortPriceLow">価格が低い順</option>
+            <option value="price-high" data-i18n-key="marketSortPriceHigh">価格が高い順</option>
           </select>
         </label>
         <details class="market-advanced-search" id="marketAdvancedSearch">
-          <summary>詳細検索</summary>
+          <summary data-i18n-key="marketAdvancedSearch">詳細検索</summary>
           <div class="market-advanced-search__body">
-            <label>派生条件
+            <label><span data-i18n-key="marketDerivativeLabel">派生条件</span>
               <select id="marketDerivativeFilter">
-                <option value="all">すべて</option>
-                <option value="allowed">改変・素材再販売OK</option>
-                <option value="derivatives">派生作品のみ</option>
-                <option value="roots">大元作品のみ</option>
+                <option value="all" data-i18n-key="marketDerivativeAll">すべて</option>
+                <option value="allowed" data-i18n-key="marketDerivativeAllowed">改変・素材再販売OK</option>
+                <option value="derivatives" data-i18n-key="marketDerivativeOnly">派生作品のみ</option>
+                <option value="roots" data-i18n-key="marketRootOnly">大元作品のみ</option>
               </select>
             </label>
-            <label>最低価格
+            <label><span data-i18n-key="marketMinPrice">最低価格</span>
               <input id="marketPriceMin" type="text" inputmode="numeric" pattern="[0-9]*" list="marketPricePresets" placeholder="0">
             </label>
-            <label>最高価格
-              <input id="marketPriceMax" type="text" inputmode="numeric" pattern="[0-9]*" list="marketPricePresets" placeholder="上限なし">
+            <label><span data-i18n-key="marketMaxPrice">最高価格</span>
+              <input id="marketPriceMax" type="text" inputmode="numeric" pattern="[0-9]*" list="marketPricePresets" data-i18n-placeholder="marketNoLimit" placeholder="上限なし">
             </label>
-            <button id="marketFilterReset" type="button">条件をリセット</button>
+            <button id="marketFilterReset" type="button" data-i18n-key="marketReset">条件をリセット</button>
           </div>
         </details>
       </section>
 
       <section class="market-section" id="marketItems">
         <div class="market-grid" id="marketGrid" aria-live="polite">
-          <article class="market-empty"><img src="../assets/icons/Market.png" alt=""><strong>読み込み中</strong></article>
+          <article class="market-empty"><img src="../assets/icons/Market.png" alt=""><strong data-i18n-key="marketItemsLoading">読み込み中</strong></article>
         </div>
       </section>
 
-      <nav class="market-info-links" aria-label="マーケット情報">
-        <a href="about.html">マーケットとは</a>
-        <a href="help.html">ヘルプ</a>
-        <a href="../terms/index.html">利用規約</a>
-        <a href="../privacy/index.html">プライバシーポリシー</a>
+      <nav class="market-info-links" data-i18n-aria-label="marketInfoAria" aria-label="マーケット情報">
+        <a href="about.html" data-i18n-key="marketAbout">マーケットとは</a>
+        <a href="help.html" data-i18n-key="marketHelp">ヘルプ</a>
+        <a href="../terms/index.html" data-i18n-key="marketTerms">利用規約</a>
+        <a href="../privacy/index.html" data-i18n-key="marketPrivacy">プライバシーポリシー</a>
       </nav>
     </main>
     <div class="market-quick-actions" id="marketQuickActions">
       <div class="market-quick-actions__menu" id="marketQuickActionsMenu" hidden>
-        <a class="market-quick-actions__choice is-sell" id="marketSellButton" href="sell.html">出品</a>
-        <button class="market-quick-actions__choice is-post" id="marketWantPostToggle" type="button" aria-expanded="false" aria-controls="marketWantPostFields">投稿</button>
+        <a class="market-quick-actions__choice is-sell" id="marketSellButton" href="sell.html" data-i18n-key="marketSell">出品</a>
+        <button class="market-quick-actions__choice is-post" id="marketWantPostToggle" type="button" aria-expanded="false" aria-controls="marketWantPostFields" data-i18n-key="marketPost">投稿</button>
       </div>
-      <button class="market-quick-actions__toggle" id="marketQuickActionsToggle" type="button" aria-expanded="false" aria-controls="marketQuickActionsMenu" aria-label="マーケットの操作を開く">+</button>
+      <button class="market-quick-actions__toggle" id="marketQuickActionsToggle" type="button" aria-expanded="false" aria-controls="marketQuickActionsMenu" data-i18n-aria-label="marketQuickActionsAria" aria-label="マーケットの操作を開く">+</button>
     </div>
   </div>
 
@@ -151,12 +151,12 @@
   <script defer src="favorites.js?v=20260721-auth-network-fallback1"></script>
   <script defer src="discovery-utils.js?v=2026.07.17-social1"></script>
   <script defer src="market-ads.js?v=20260730-progressive-feed1"></script>
-  <script defer src="market.js?v=20260730-progressive-feed1"></script>
+  <script defer src="market.js?v=20260825-audio-composition1"></script>
   <script defer src="market-want-posts.js?v=20260724-quick-actions1"></script>
   <script defer src="media-protection.js?v=2026.07.17-preview-protection1"></script>
   <script defer src="help-tips.js?v=2026.07.17-context-help1"></script>
-  <script defer src="../scripts/shared-profile-header.js"></script>
-  <script defer src="../scripts/shared-bottom-nav.js?v=20260724-fullscreen-icons2"></script>
+  <script defer src="../scripts/shared-profile-header.js?v=20260825-common-shell15"></script>
+  <script defer src="../scripts/shared-bottom-nav.js?v=20260825-studio-brand1"></script>
   <script defer src="../scripts/pixel-art-fit.js"></script>
 </body>
 </html>

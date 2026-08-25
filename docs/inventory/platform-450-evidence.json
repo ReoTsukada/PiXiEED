@@ -1,0 +1,362 @@
+{
+  "evidenceVersion": "QUALIFICATION_EVIDENCE_V1",
+  "packageId": "PLATFORM-450",
+  "contextSha256": "4bbb612b9b3732a6c7005ab70e9e0f4408c60363ea104e270100ca0918a47b3a",
+  "status": "PARTIAL",
+  "acceptance": [
+    {
+      "id": "PLATFORM450-SCOPE-001",
+      "status": "PARTIAL",
+      "source": [
+        "pixiedraw2/src/platform/platform-450/contracts.ts",
+        "pixiedraw2/src/platform/platform-450/server-contracts.ts",
+        "pixiedraw2/src/platform/platform-450/composition.ts",
+        "pixiedraw2/tests/platform-450/composition.test.ts",
+        "pixiedraw2/benchmarks/platform-450/generate-evidence.ts",
+        "docs/contracts/PLATFORM-450-COMPOSITION.md",
+        "docs/contracts/QUALIFICATION-EVIDENCE-V1.md",
+        "docs/inventory/route-inventory.json",
+        ".codex/context/PLATFORM-450.md"
+      ],
+      "contract": [
+        "docs/contracts/PLATFORM-450-COMPOSITION.md",
+        "docs/contracts/QUALIFICATION-EVIDENCE-V1.md"
+      ],
+      "schema": [
+        "pixiedraw2/src/platform/platform-450/contracts.ts",
+        "docs/inventory/platform-450-connection.json"
+      ],
+      "build": [
+        "pixiedraw2/benchmarks/platform-450/generate-evidence.ts"
+      ],
+      "commands": [
+        {
+          "command": "deno fmt --check pixiedraw2/src/platform/platform-450 pixiedraw2/tests/platform-450 pixiedraw2/benchmarks/platform-450",
+          "exitCode": 0
+        },
+        {
+          "command": "deno check --no-remote pixiedraw2/src/platform/platform-450/contracts.ts pixiedraw2/src/platform/platform-450/server-contracts.ts pixiedraw2/src/platform/platform-450/composition.ts pixiedraw2/tests/platform-450/composition.test.ts pixiedraw2/benchmarks/platform-450/generate-evidence.ts",
+          "exitCode": 0
+        },
+        {
+          "command": "deno test --no-remote --allow-read=pixiedraw2/src/platform/platform-450 --check pixiedraw2/tests/platform-450/composition.test.ts",
+          "exitCode": 0
+        },
+        {
+          "command": "deno run --no-remote --allow-read --allow-write=docs/inventory pixiedraw2/benchmarks/platform-450/generate-evidence.ts",
+          "exitCode": 0
+        },
+        {
+          "command": "git diff --check -- pixiedraw2/src/platform/platform-450 pixiedraw2/tests/platform-450 pixiedraw2/benchmarks/platform-450",
+          "exitCode": 0
+        }
+      ],
+      "artifactHashes": [
+        "250c7de1835cd3f0adb72b5672aba170602eb667c86fb17bfba77b5e23d5660d",
+        "14d9d7957a7ba00eca1303a6af7a7d85174d2c17e2ccd551a97a4c41fbd84cd2",
+        "7c08ffa6ce65d14817cd1f1bc2039cb7e1332a68ec82d83fb8ada9dcda60a7d4",
+        "61b5b9172b59410c0a2b73d10d4a7694e8511a27e6684413a89218903de03992",
+        "3434c13261f39d97d21dd5d1086673022d178ecd7185545d3af0b16d81c55df5",
+        "7c61aefbdf9e6077f39a2016297dee6353dfc0bbae1281b1f0fb97bd8f0dad43",
+        "e7f2ba25707681318985e1cc06b0ac8e245a6b98ec5d97bdd4f98e1750b350c9",
+        "ea68074ed31f91a9002e80ddf3b75f69348be1988ee5b92ad1a1d4a63e7b3b77",
+        "4bbb612b9b3732a6c7005ab70e9e0f4408c60363ea104e270100ca0918a47b3a"
+      ],
+      "adapterClass": "IN_MEMORY",
+      "classification": "IMPLEMENTED_ISOLATED",
+      "reviewer": "PENDING_SOL_REVIEW",
+      "findingIdentity": null
+    },
+    {
+      "id": "PLATFORM450-EVIDENCE-001",
+      "status": "PARTIAL",
+      "source": [
+        "pixiedraw2/src/platform/platform-450/contracts.ts",
+        "pixiedraw2/src/platform/platform-450/server-contracts.ts",
+        "pixiedraw2/src/platform/platform-450/composition.ts",
+        "pixiedraw2/tests/platform-450/composition.test.ts",
+        "pixiedraw2/benchmarks/platform-450/generate-evidence.ts",
+        "docs/contracts/PLATFORM-450-COMPOSITION.md",
+        "docs/contracts/QUALIFICATION-EVIDENCE-V1.md",
+        "docs/inventory/route-inventory.json",
+        ".codex/context/PLATFORM-450.md"
+      ],
+      "contract": [
+        "docs/contracts/PLATFORM-450-COMPOSITION.md",
+        "docs/contracts/QUALIFICATION-EVIDENCE-V1.md"
+      ],
+      "schema": [
+        "pixiedraw2/src/platform/platform-450/contracts.ts",
+        "docs/inventory/platform-450-connection.json"
+      ],
+      "build": [
+        "pixiedraw2/benchmarks/platform-450/generate-evidence.ts"
+      ],
+      "commands": [
+        {
+          "command": "deno fmt --check pixiedraw2/src/platform/platform-450 pixiedraw2/tests/platform-450 pixiedraw2/benchmarks/platform-450",
+          "exitCode": 0
+        },
+        {
+          "command": "deno check --no-remote pixiedraw2/src/platform/platform-450/contracts.ts pixiedraw2/src/platform/platform-450/server-contracts.ts pixiedraw2/src/platform/platform-450/composition.ts pixiedraw2/tests/platform-450/composition.test.ts pixiedraw2/benchmarks/platform-450/generate-evidence.ts",
+          "exitCode": 0
+        },
+        {
+          "command": "deno test --no-remote --allow-read=pixiedraw2/src/platform/platform-450 --check pixiedraw2/tests/platform-450/composition.test.ts",
+          "exitCode": 0
+        },
+        {
+          "command": "deno run --no-remote --allow-read --allow-write=docs/inventory pixiedraw2/benchmarks/platform-450/generate-evidence.ts",
+          "exitCode": 0
+        },
+        {
+          "command": "git diff --check -- pixiedraw2/src/platform/platform-450 pixiedraw2/tests/platform-450 pixiedraw2/benchmarks/platform-450",
+          "exitCode": 0
+        }
+      ],
+      "artifactHashes": [
+        "250c7de1835cd3f0adb72b5672aba170602eb667c86fb17bfba77b5e23d5660d",
+        "14d9d7957a7ba00eca1303a6af7a7d85174d2c17e2ccd551a97a4c41fbd84cd2",
+        "7c08ffa6ce65d14817cd1f1bc2039cb7e1332a68ec82d83fb8ada9dcda60a7d4",
+        "61b5b9172b59410c0a2b73d10d4a7694e8511a27e6684413a89218903de03992",
+        "3434c13261f39d97d21dd5d1086673022d178ecd7185545d3af0b16d81c55df5",
+        "7c61aefbdf9e6077f39a2016297dee6353dfc0bbae1281b1f0fb97bd8f0dad43",
+        "e7f2ba25707681318985e1cc06b0ac8e245a6b98ec5d97bdd4f98e1750b350c9",
+        "ea68074ed31f91a9002e80ddf3b75f69348be1988ee5b92ad1a1d4a63e7b3b77",
+        "4bbb612b9b3732a6c7005ab70e9e0f4408c60363ea104e270100ca0918a47b3a"
+      ],
+      "adapterClass": "IN_MEMORY",
+      "classification": "IMPLEMENTED_ISOLATED",
+      "reviewer": "PENDING_SOL_REVIEW",
+      "findingIdentity": null
+    },
+    {
+      "id": "PLATFORM450-STOP-001",
+      "status": "PARTIAL",
+      "source": [
+        "pixiedraw2/src/platform/platform-450/contracts.ts",
+        "pixiedraw2/src/platform/platform-450/server-contracts.ts",
+        "pixiedraw2/src/platform/platform-450/composition.ts",
+        "pixiedraw2/tests/platform-450/composition.test.ts",
+        "pixiedraw2/benchmarks/platform-450/generate-evidence.ts",
+        "docs/contracts/PLATFORM-450-COMPOSITION.md",
+        "docs/contracts/QUALIFICATION-EVIDENCE-V1.md",
+        "docs/inventory/route-inventory.json",
+        ".codex/context/PLATFORM-450.md"
+      ],
+      "contract": [
+        "docs/contracts/PLATFORM-450-COMPOSITION.md",
+        "docs/contracts/QUALIFICATION-EVIDENCE-V1.md"
+      ],
+      "schema": [
+        "pixiedraw2/src/platform/platform-450/contracts.ts",
+        "docs/inventory/platform-450-connection.json"
+      ],
+      "build": [
+        "pixiedraw2/benchmarks/platform-450/generate-evidence.ts"
+      ],
+      "commands": [
+        {
+          "command": "deno fmt --check pixiedraw2/src/platform/platform-450 pixiedraw2/tests/platform-450 pixiedraw2/benchmarks/platform-450",
+          "exitCode": 0
+        },
+        {
+          "command": "deno check --no-remote pixiedraw2/src/platform/platform-450/contracts.ts pixiedraw2/src/platform/platform-450/server-contracts.ts pixiedraw2/src/platform/platform-450/composition.ts pixiedraw2/tests/platform-450/composition.test.ts pixiedraw2/benchmarks/platform-450/generate-evidence.ts",
+          "exitCode": 0
+        },
+        {
+          "command": "deno test --no-remote --allow-read=pixiedraw2/src/platform/platform-450 --check pixiedraw2/tests/platform-450/composition.test.ts",
+          "exitCode": 0
+        },
+        {
+          "command": "deno run --no-remote --allow-read --allow-write=docs/inventory pixiedraw2/benchmarks/platform-450/generate-evidence.ts",
+          "exitCode": 0
+        },
+        {
+          "command": "git diff --check -- pixiedraw2/src/platform/platform-450 pixiedraw2/tests/platform-450 pixiedraw2/benchmarks/platform-450",
+          "exitCode": 0
+        }
+      ],
+      "artifactHashes": [
+        "250c7de1835cd3f0adb72b5672aba170602eb667c86fb17bfba77b5e23d5660d",
+        "14d9d7957a7ba00eca1303a6af7a7d85174d2c17e2ccd551a97a4c41fbd84cd2",
+        "7c08ffa6ce65d14817cd1f1bc2039cb7e1332a68ec82d83fb8ada9dcda60a7d4",
+        "61b5b9172b59410c0a2b73d10d4a7694e8511a27e6684413a89218903de03992",
+        "3434c13261f39d97d21dd5d1086673022d178ecd7185545d3af0b16d81c55df5",
+        "7c61aefbdf9e6077f39a2016297dee6353dfc0bbae1281b1f0fb97bd8f0dad43",
+        "e7f2ba25707681318985e1cc06b0ac8e245a6b98ec5d97bdd4f98e1750b350c9",
+        "ea68074ed31f91a9002e80ddf3b75f69348be1988ee5b92ad1a1d4a63e7b3b77",
+        "4bbb612b9b3732a6c7005ab70e9e0f4408c60363ea104e270100ca0918a47b3a"
+      ],
+      "adapterClass": "IN_MEMORY",
+      "classification": "IMPLEMENTED_ISOLATED",
+      "reviewer": "PENDING_SOL_REVIEW",
+      "findingIdentity": null
+    }
+  ],
+  "acceptanceDecision": "PENDING_SOL_REVIEW",
+  "siteConnection": "SITE_CONNECTION_PENDING",
+  "production": "UNTESTED",
+  "browser": "UNTESTED",
+  "benchmark": {
+    "benchmarkVersion": "PLATFORM450_SYNTHETIC_COMPOSITION_V1",
+    "packageId": "PLATFORM-450",
+    "contextSha256": "4bbb612b9b3732a6c7005ab70e9e0f4408c60363ea104e270100ca0918a47b3a",
+    "classification": "IMPLEMENTED_ISOLATED",
+    "adapterClass": "IN_MEMORY",
+    "network": false,
+    "productionMutation": false,
+    "iterations": 1000,
+    "successful": 1000,
+    "elapsedMs": 51.962,
+    "operationsPerSecond": 19244.77,
+    "dependencyManifest": [
+      {
+        "packageId": "SITE-400",
+        "contractPaths": [
+          "docs/contracts/SITE-400-SERVER-AUTHORIZED-REGISTRY-PROVIDER.md"
+        ],
+        "evidencePaths": [
+          "docs/inventory/site-400-evidence.json"
+        ],
+        "contractSha256": [
+          "6f1ddde05fb1aae7aaf1ad0052b5edd8939d6fde9436689c2d638084243040ed"
+        ],
+        "evidenceSha256": [
+          "9c1b063c982d00f25406253d9389828992d5ce448a3519872ae19df450b857c5"
+        ]
+      },
+      {
+        "packageId": "MARKET-410",
+        "contractPaths": [
+          "docs/contracts/MARKET-410-COMPOSITION.md"
+        ],
+        "evidencePaths": [
+          "docs/inventory/market-410-evidence.json"
+        ],
+        "contractSha256": [
+          "a2ad5e592d6db946175abda06fa9e00cd063210f4670977cd99dc66bbcbbcda8"
+        ],
+        "evidenceSha256": [
+          "ab41130b1033c82420eeb14ee9a56e505f4bca4908543d6a2b19fa73f3019fc1"
+        ]
+      },
+      {
+        "packageId": "WORK-420",
+        "contractPaths": [
+          "docs/contracts/WORK-420-COMPOSITION.md"
+        ],
+        "evidencePaths": [
+          "docs/inventory/work-420-evidence.json"
+        ],
+        "contractSha256": [
+          "cc80723204f2f2d468749522384fcf16849bc96c8af1e4fea306313b2c85fb5f"
+        ],
+        "evidenceSha256": [
+          "cf7f20a6e29fa638187f0bd5bbecc64ae107200e835af2a83a0113d0e3c1e563"
+        ]
+      },
+      {
+        "packageId": "SOCIAL-430",
+        "contractPaths": [
+          "docs/contracts/SOCIAL-430-CONTENT-BOUNDARY.md",
+          "docs/contracts/SOCIAL-430-EVIDENCE.md",
+          "docs/contracts/SOCIAL-430-STOP.md"
+        ],
+        "evidencePaths": [
+          "docs/inventory/social-430-evidence.json"
+        ],
+        "contractSha256": [
+          "0e57a90e760239656f753a8905e4f0213c8b422e1306fe0f4ba0875c188d88cc",
+          "15c589481fcf6f2fb6623aebfbab60c059a401d591aba17cc5a33d04ad6874d5",
+          "84046e9ebced91581e3aa5e374bfa1936ec6cea6b9b24dc004659e339db21e5d"
+        ],
+        "evidenceSha256": [
+          "0340e96ea93ca63efd0ff02271262da0c1d95fb279e7c14369a8ce7f9aa13a9d"
+        ]
+      },
+      {
+        "packageId": "OPS-440",
+        "contractPaths": [
+          "docs/contracts/OPS-440-COMPOSITION.md"
+        ],
+        "evidencePaths": [
+          "docs/inventory/ops-440-evidence.json"
+        ],
+        "contractSha256": [
+          "acb70e06e92eddaedc75c5d04de824b3bdf86de8cbdbf2bc3d36588530bdc076"
+        ],
+        "evidenceSha256": [
+          "60721731dcc25dd1525c61430c06abe7ea236743fa11dae6be1627db3c844e52"
+        ]
+      }
+    ],
+    "artifactPaths": [
+      "pixiedraw2/src/platform/platform-450/contracts.ts",
+      "pixiedraw2/src/platform/platform-450/server-contracts.ts",
+      "pixiedraw2/src/platform/platform-450/composition.ts",
+      "pixiedraw2/tests/platform-450/composition.test.ts",
+      "pixiedraw2/benchmarks/platform-450/generate-evidence.ts",
+      "docs/contracts/PLATFORM-450-COMPOSITION.md",
+      "docs/contracts/QUALIFICATION-EVIDENCE-V1.md",
+      "docs/inventory/route-inventory.json",
+      ".codex/context/PLATFORM-450.md"
+    ],
+    "artifactHashes": [
+      "250c7de1835cd3f0adb72b5672aba170602eb667c86fb17bfba77b5e23d5660d",
+      "14d9d7957a7ba00eca1303a6af7a7d85174d2c17e2ccd551a97a4c41fbd84cd2",
+      "7c08ffa6ce65d14817cd1f1bc2039cb7e1332a68ec82d83fb8ada9dcda60a7d4",
+      "61b5b9172b59410c0a2b73d10d4a7694e8511a27e6684413a89218903de03992",
+      "3434c13261f39d97d21dd5d1086673022d178ecd7185545d3af0b16d81c55df5",
+      "7c61aefbdf9e6077f39a2016297dee6353dfc0bbae1281b1f0fb97bd8f0dad43",
+      "e7f2ba25707681318985e1cc06b0ac8e245a6b98ec5d97bdd4f98e1750b350c9",
+      "ea68074ed31f91a9002e80ddf3b75f69348be1988ee5b92ad1a1d4a63e7b3b77",
+      "4bbb612b9b3732a6c7005ab70e9e0f4408c60363ea104e270100ca0918a47b3a"
+    ],
+    "baseline": "REUSED_HASH_MATCH",
+    "predecessorEvidenceReuse": {
+      "packages": [
+        "SITE-400",
+        "MARKET-410",
+        "WORK-420",
+        "SOCIAL-430",
+        "OPS-440"
+      ],
+      "mode": "HASH_MATCH_NO_RERUN"
+    },
+    "routeTrace": {
+      "source": "docs/inventory/route-inventory.json",
+      "status": "STATIC_NON_INTRUSION_ONLY",
+      "routeMutation": false,
+      "activation": "NOT_ATTEMPTED"
+    },
+    "acceptance": "PENDING_SOL_REVIEW",
+    "siteConnection": "SITE_CONNECTION_PENDING",
+    "production": "UNTESTED",
+    "browser": "UNTESTED"
+  },
+  "predecessorEvidenceReuse": {
+    "packages": [
+      "SITE-400",
+      "MARKET-410",
+      "WORK-420",
+      "SOCIAL-430",
+      "OPS-440"
+    ],
+    "mode": "HASH_MATCH_NO_RERUN"
+  },
+  "routeTrace": {
+    "source": "docs/inventory/route-inventory.json",
+    "status": "STATIC_NON_INTRUSION_ONLY",
+    "routeMutation": false,
+    "activation": "NOT_ATTEMPTED"
+  },
+  "untested": [
+    "Production Auth/RLS/DB/Storage",
+    "current public route and chunk activation",
+    "Provider and payment semantics",
+    "browser/device/accessibility behavior",
+    "deploy, publish, native, store, and cutover"
+  ],
+  "noProductionClaims": true
+}

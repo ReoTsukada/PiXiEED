@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "work_package": "WP-000",
+  "synthetic_only": true,
+  "fixtures": [
+    "legacy-pixiedraw-v1.synthetic.json",
+    "market-purchase.synthetic.json",
+    "pixisync-convergence.synthetic.json"
+  ],
+  "prohibited_content": [
+    "real user creative files",
+    "real account identifiers",
+    "access tokens",
+    "production storage object contents"
+  ]
+}

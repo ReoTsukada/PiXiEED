@@ -1,0 +1,844 @@
+/* Public Figma shell layer.
+   It only targets pages that opt into the shared header. Editor pages keep
+   their dense workspace chrome and page-specific layout. */
+:root {
+  --public-shell-content: min(1200px, calc(100% - 40px));
+  --public-shell-gap: 16px;
+  --public-shell-radius: 14px;
+  --public-shell-border: rgba(148, 163, 184, .18);
+  --public-shell-surface: #101827;
+  --public-shell-surface-raised: #151f30;
+  --public-shell-muted: #9eacc0;
+  --public-shell-accent: #72e6d5;
+  /* Figma mode tokens: the three focused workspaces share one shell while
+     retaining a clear, non-semantic accent for quick recognition. */
+  --pixieed-mode-draw: #72e6d5;
+  --pixieed-mode-audio: #b8a9ff;
+  --pixieed-mode-game: #ffd070;
+  --pixieed-space-1: 8px;
+  --pixieed-space-2: 16px;
+  --pixieed-space-3: 24px;
+  --pixieed-radius-card: 16px;
+}
+
+body.pixieed-public-shell {
+  --header-offset: 0px;
+  --pixieed-common-content-top: var(--pixieed-top-ad-offset, 0px);
+  min-width: 0;
+  padding-bottom: 96px;
+}
+
+/* Public pages use the Figma discovery header as their single navigation
+   surface. The legacy common action bar remains available inside editor and
+   standalone tool pages, but must not create a second header here. */
+body.pixieed-public-shell.has-pixieed-common-tabbar:not([data-pixieed-page="pixiedraw"]):not([data-pixieed-page="pixiee-lens"]):not([data-pixieed-page="maoitu"]):not([data-pixieed-page="pixfind"]) {
+  padding-top: var(--pixieed-top-ad-offset, 0px) !important;
+}
+
+body.pixieed-public-shell .pixieed-common-tabbar {
+  display: none !important;
+}
+
+/* The discovery header is the desktop navigation surface. Keep the compact
+   bottom rail for touch layouts, but do not let the legacy rail become a
+   second vertical navigation column on wide public pages. */
+@media (min-width: 721px) {
+  body.pixieed-public-shell > .bottom-nav {
+    display: none !important;
+  }
+
+  body.pixieed-public-shell {
+    padding-bottom: 24px;
+  }
+}
+
+body.pixieed-public-shell > .page,
+body.pixieed-public-shell > .page-shell {
+  width: var(--public-shell-content);
+  max-width: 1200px;
+  margin-inline: auto;
+}
+
+body.pixieed-public-shell .pixieed-site-header {
+  min-height: 60px;
+  width: 100%;
+  margin: 0 !important;
+  padding: 0 !important;
+  box-sizing: border-box;
+}
+
+body.pixieed-public-shell .pixieed-site-header__inner {
+  width: var(--public-shell-content);
+  min-height: 60px;
+}
+
+body.pixieed-public-shell[data-pixieed-public-section="market"] .page,
+body.pixieed-public-shell[data-pixieed-public-section="account"] .page {
+  margin-top: var(--public-shell-gap);
+}
+
+/* Legacy content pages keep their existing information architecture, but
+   inherit the same Figma shell rhythm as Home, Studio, Market, and Account. */
+body.pixieed-public-shell {
+  color: #edf4ff;
+  background:
+    radial-gradient(circle at 82% -8%, rgba(114, 230, 213, .08), transparent 34rem),
+    #080c14;
+}
+
+body.pixieed-public-shell .page,
+body.pixieed-public-shell .page-shell {
+  width: var(--public-shell-content);
+  max-width: 1200px;
+  margin-inline: auto;
+  box-sizing: border-box;
+}
+
+body.pixieed-public-shell .page-shell {
+  padding: 18px 0 30px;
+}
+
+body.pixieed-public-shell .section {
+  padding: 8px 0;
+}
+
+body.pixieed-public-shell .section__inner,
+body.pixieed-public-shell .home-live-tool,
+body.pixieed-public-shell .project-live-tool,
+body.pixieed-public-shell .card,
+body.pixieed-public-shell .faq-card,
+body.pixieed-public-shell .link-card {
+  border: 1px solid var(--public-shell-border);
+  border-radius: var(--public-shell-radius);
+  background: rgba(16, 24, 39, .82);
+  box-shadow: 0 14px 36px rgba(2, 6, 23, .14);
+}
+
+body.pixieed-public-shell .section__inner {
+  padding: 24px;
+}
+
+body.pixieed-public-shell .section-title,
+body.pixieed-public-shell .section__inner h1,
+body.pixieed-public-shell .section__inner h2,
+body.pixieed-public-shell .section__inner h3 {
+  color: #f8fafc;
+  letter-spacing: -.025em;
+}
+
+body.pixieed-public-shell .section-title {
+  margin: 0 0 10px;
+  font-size: clamp(24px, 3vw, 38px);
+  line-height: 1.12;
+}
+
+body.pixieed-public-shell .section-copy,
+body.pixieed-public-shell .card-copy,
+body.pixieed-public-shell .meta-copy {
+  color: var(--public-shell-muted);
+  line-height: 1.7;
+}
+
+body.pixieed-public-shell .eyebrow,
+body.pixieed-public-shell .meta-label {
+  color: var(--public-shell-accent);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .14em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+body.pixieed-public-shell .link-grid {
+  gap: 14px;
+}
+
+body.pixieed-public-shell .link-card {
+  min-width: 0;
+  padding: 18px;
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 140ms ease, background-color 140ms ease, transform 140ms ease;
+}
+
+body.pixieed-public-shell .link-card:hover,
+body.pixieed-public-shell .link-card:focus-within {
+  border-color: rgba(114, 230, 213, .56);
+  background: #152237;
+  transform: translateY(-2px);
+}
+
+body.pixieed-public-shell .button,
+body.pixieed-public-shell .button-secondary,
+body.pixieed-public-shell button,
+body.pixieed-public-shell input,
+body.pixieed-public-shell select,
+body.pixieed-public-shell textarea {
+  font: inherit;
+}
+
+body.pixieed-public-shell .button,
+body.pixieed-public-shell .button-secondary {
+  min-height: 40px;
+  box-sizing: border-box;
+  border-radius: 10px;
+  padding: 10px 15px;
+  border: 1px solid rgba(114, 230, 213, .34);
+  color: #eafffb;
+  background: rgba(114, 230, 213, .09);
+  text-decoration: none;
+  transition: border-color 140ms ease, background-color 140ms ease, transform 140ms ease;
+}
+
+body.pixieed-public-shell .button:hover,
+body.pixieed-public-shell .button:focus-visible,
+body.pixieed-public-shell .button-secondary:hover,
+body.pixieed-public-shell .button-secondary:focus-visible {
+  border-color: rgba(114, 230, 213, .78);
+  background: rgba(114, 230, 213, .16);
+  transform: translateY(-1px);
+}
+
+body.pixieed-public-shell .faq-card {
+  display: grid;
+  gap: 0;
+  overflow: hidden;
+  padding: 0;
+}
+
+body.pixieed-public-shell .faq-card details {
+  padding: 0 18px;
+  border-bottom: 1px solid rgba(148, 163, 184, .14);
+}
+
+body.pixieed-public-shell .faq-card details:last-child {
+  border-bottom: 0;
+}
+
+body.pixieed-public-shell .faq-card summary {
+  padding: 16px 0;
+  color: #f8fafc;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+body.pixieed-public-shell .faq-card details p {
+  margin: 0 0 16px;
+  color: var(--public-shell-muted);
+  line-height: 1.65;
+}
+
+body.pixieed-public-shell footer {
+  width: var(--public-shell-content);
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 0 36px;
+  color: var(--public-shell-muted);
+  border-top: 1px solid rgba(148, 163, 184, .12);
+}
+
+body.pixieed-public-shell footer a {
+  color: #b7c5d9;
+}
+
+body.pixieed-public-shell .home-live-tool,
+body.pixieed-public-shell .project-live-tool {
+  overflow: hidden;
+  padding: 18px;
+  border-radius: var(--public-shell-radius) !important;
+}
+
+body.pixieed-public-shell .home-live-tool__stage,
+body.pixieed-public-shell .project-live-tool__frame {
+  border-color: rgba(148, 163, 184, .18);
+  border-radius: 12px;
+}
+
+body.pixieed-public-shell .help-main {
+  display: grid;
+  gap: var(--public-shell-gap);
+  width: var(--public-shell-content);
+  max-width: 900px;
+  margin-inline: auto;
+  padding: 18px 0 30px;
+}
+
+body.pixieed-public-shell .help-head,
+body.pixieed-public-shell .help-section {
+  min-width: 0;
+  padding: 22px 24px;
+  border: 1px solid var(--public-shell-border);
+  border-radius: var(--public-shell-radius) !important;
+  background: rgba(16, 24, 39, .82);
+  box-shadow: 0 14px 36px rgba(2, 6, 23, .14);
+}
+
+body.pixieed-public-shell .help-head h1,
+body.pixieed-public-shell .help-section h2 {
+  margin: 0 0 8px;
+  color: #f8fafc;
+  letter-spacing: -.025em;
+}
+
+body.pixieed-public-shell .help-head p,
+body.pixieed-public-shell .help-section > p {
+  color: var(--public-shell-muted);
+  line-height: 1.7;
+}
+
+body.pixieed-public-shell .help-grid {
+  gap: 10px;
+}
+
+body.pixieed-public-shell .help-card {
+  min-width: 0;
+  border: 1px solid rgba(148, 163, 184, .18);
+  border-radius: 12px;
+  background: var(--public-shell-surface-raised);
+  transition: border-color 140ms ease, background-color 140ms ease, transform 140ms ease;
+}
+
+body.pixieed-public-shell .help-card:hover,
+body.pixieed-public-shell .help-card:focus-visible {
+  border-color: rgba(114, 230, 213, .56);
+  background: #1a2940;
+  transform: translateY(-2px);
+}
+
+/* Policy and account-deletion pages use a deliberately simple document
+   structure. Give them the same readable content column and raised sections
+   without touching the Home, Market, Account, or editor-specific layouts. */
+body.pixieed-public-shell[data-pixieed-public-section="home"]:not(.draw2-home-body):not(.project-tool-window) > header,
+body.pixieed-public-shell[data-pixieed-public-section="home"]:not(.draw2-home-body):not(.project-tool-window) > main {
+  width: var(--public-shell-content);
+  max-width: 900px;
+  margin-inline: auto;
+  box-sizing: border-box;
+}
+
+body.pixieed-public-shell[data-pixieed-public-section="home"]:not(.draw2-home-body):not(.project-tool-window) > header {
+  margin-top: 18px;
+  padding: 24px;
+  border: 1px solid var(--public-shell-border);
+  border-radius: var(--public-shell-radius);
+  background: rgba(16, 24, 39, .82);
+}
+
+body.pixieed-public-shell[data-pixieed-public-section="home"]:not(.draw2-home-body):not(.project-tool-window) > header h1 {
+  margin: 0 0 8px;
+  color: #f8fafc;
+  font-size: clamp(24px, 4vw, 38px);
+  line-height: 1.15;
+}
+
+body.pixieed-public-shell[data-pixieed-public-section="home"]:not(.draw2-home-body):not(.project-tool-window) > header p,
+body.pixieed-public-shell[data-pixieed-public-section="home"]:not(.draw2-home-body):not(.project-tool-window) > main p,
+body.pixieed-public-shell[data-pixieed-public-section="home"]:not(.draw2-home-body):not(.project-tool-window) > main li {
+  color: var(--public-shell-muted);
+  line-height: 1.75;
+}
+
+body.pixieed-public-shell[data-pixieed-public-section="home"]:not(.draw2-home-body):not(.project-tool-window) > main {
+  padding: 10px 0 36px;
+}
+
+body.pixieed-public-shell[data-pixieed-public-section="home"]:not(.draw2-home-body):not(.project-tool-window) > main > section {
+  margin: 10px 0;
+  padding: 22px 24px;
+  border: 1px solid var(--public-shell-border);
+  border-radius: var(--public-shell-radius) !important;
+  background: rgba(16, 24, 39, .72);
+}
+
+body.pixieed-public-shell[data-pixieed-public-section="home"]:not(.draw2-home-body):not(.project-tool-window) > main > section h2 {
+  margin-top: 0;
+  color: #f8fafc;
+  font-size: 20px;
+  line-height: 1.25;
+}
+
+@media (max-width: 720px) {
+  body.pixieed-public-shell .page-shell {
+    padding: 10px 0 24px;
+  }
+
+  body.pixieed-public-shell .section__inner {
+    padding: 18px;
+  }
+
+  body.pixieed-public-shell footer {
+    padding-bottom: 112px;
+  }
+}
+
+/* Figma's compact tool rail is kept as one intentional group so legacy
+   products remain discoverable without competing with Studio, Community,
+   Market, and Account. */
+body.pixieed-public-shell .pixieed-site-header__tool-group {
+  min-width: 0;
+  color: inherit;
+}
+
+body.pixieed-public-shell .pixieed-site-header__tool-group > summary {
+  display: flex;
+  min-height: 42px;
+  box-sizing: border-box;
+  align-items: center;
+  gap: 0;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: #aebbd0;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.1;
+  list-style: none;
+  white-space: nowrap;
+}
+
+body.pixieed-public-shell .pixieed-site-header__tool-group > summary::-webkit-details-marker {
+  display: none;
+}
+
+body.pixieed-public-shell .pixieed-site-header__tool-group > summary::after {
+  margin-left: auto;
+  color: #8795aa;
+  content: '›';
+  font-size: 16px;
+  transition: transform 140ms ease;
+}
+
+body.pixieed-public-shell .pixieed-site-header__tool-group[open] > summary::after {
+  transform: rotate(90deg);
+}
+
+body.pixieed-public-shell .pixieed-site-header__tool-group > summary:hover,
+body.pixieed-public-shell .pixieed-site-header__tool-group > summary:focus-visible,
+body.pixieed-public-shell .pixieed-site-header__tool-group[open] > summary {
+  border-color: rgba(114, 230, 213, .22);
+  background: rgba(114, 230, 213, .08);
+  color: #f8fafc;
+  outline: none;
+}
+
+body.pixieed-public-shell .pixieed-site-header__tool-links {
+  display: grid;
+  gap: 3px;
+  margin: 4px 0 0 18px;
+  padding-left: 12px;
+  border-left: 1px solid rgba(148, 163, 184, .18);
+}
+
+body.pixieed-public-shell .pixieed-site-header__tool-links a {
+  display: flex;
+  min-height: 34px;
+  box-sizing: border-box;
+  align-items: center;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: #9eacc0;
+  font-size: 11px;
+  font-weight: 750;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+body.pixieed-public-shell .pixieed-site-header__tool-links a:hover,
+body.pixieed-public-shell .pixieed-site-header__tool-links a:focus-visible,
+body.pixieed-public-shell .pixieed-site-header__tool-links a[aria-current="page"] {
+  border-color: rgba(114, 230, 213, .22);
+  background: rgba(114, 230, 213, .08);
+  color: #f8fafc;
+  outline: none;
+}
+
+@media (min-width: 861px) {
+  body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header__tool-group {
+    position: relative;
+  }
+
+  body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header__tool-group > summary {
+    justify-content: center;
+    padding-inline: 0;
+  }
+
+  body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header__tool-group > summary::after {
+    display: none;
+  }
+
+  body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header__tool-group[open] > .pixieed-site-header__tool-links {
+    position: absolute;
+    z-index: 1400;
+    top: 0;
+    left: calc(100% + 8px);
+    display: grid !important;
+    width: 178px;
+    margin: 0;
+    padding: 8px;
+    border: 1px solid rgba(148, 163, 184, .24);
+    border-radius: 12px;
+    background: #101827;
+    box-shadow: 12px 16px 32px rgba(2, 6, 23, .36);
+  }
+}
+
+@media (max-width: 860px) {
+  body.pixieed-public-shell .pixieed-site-header__tool-group {
+    flex: 0 0 auto;
+  }
+
+  body.pixieed-public-shell .pixieed-site-header__tool-group > summary {
+    min-height: 34px;
+    padding-inline: 10px;
+  }
+
+  body.pixieed-public-shell .pixieed-site-header__tool-links {
+    position: absolute;
+    z-index: 3;
+    top: calc(100% + 4px);
+    right: 0;
+    min-width: 150px;
+    margin: 0;
+    padding: 6px;
+    border: 1px solid var(--public-shell-border);
+    border-radius: 10px;
+    background: #101827;
+    box-shadow: 0 14px 28px rgba(2, 6, 23, .28);
+  }
+}
+
+/* Market: unify title, search, result grid and auxiliary links as one shell. */
+body.pixieed-public-shell[data-pixieed-public-section="market"] .market-page {
+  max-width: 1200px;
+}
+
+body.pixieed-public-shell[data-pixieed-public-section="market"] .market-shell {
+  grid-template-rows: auto auto auto minmax(340px, 1fr) auto;
+  gap: var(--public-shell-gap) !important;
+  min-height: calc(100vh - 170px);
+  padding: 0;
+  background: transparent;
+}
+
+body.pixieed-public-shell[data-pixieed-public-section="market"] .market-titlebar,
+body.pixieed-public-shell[data-pixieed-public-section="market"] .market-want-posts,
+body.pixieed-public-shell[data-pixieed-public-section="market"] .market-toolbar,
+body.pixieed-public-shell[data-pixieed-public-section="market"] .market-section,
+body.pixieed-public-shell[data-pixieed-public-section="market"] .market-info-links {
+  border: 1px solid var(--public-shell-border);
+  border-radius: var(--public-shell-radius) !important;
+  background: var(--public-shell-surface);
+  box-shadow: 0 14px 36px rgba(2, 6, 23, .14);
+}
+
+body.pixieed-public-shell[data-pixieed-public-section="market"] .market-titlebar {
+  min-height: 60px;
+  padding: 10px 16px;
+}
+
+body.pixieed-public-shell[data-pixieed-public-section="market"] .market-toolbar {
+  gap: 10px;
+  padding: 12px;
+}
+
+body.pixieed-public-shell[data-pixieed-public-section="market"] .market-section {
+  padding: 14px;
+}
+
+body.pixieed-public-shell[data-pixieed-public-section="market"] .market-grid {
+  gap: 14px;
+}
+
+body.pixieed-public-shell[data-pixieed-public-section="market"] .market-card {
+  border-color: var(--public-shell-border);
+  border-radius: 12px;
+  background: var(--public-shell-surface-raised);
+}
+
+body.pixieed-public-shell[data-pixieed-public-section="market"] .market-card:hover,
+body.pixieed-public-shell[data-pixieed-public-section="market"] .market-card:focus-visible {
+  border-color: rgba(114, 230, 213, .52);
+  transform: translateY(-2px);
+}
+
+body.pixieed-public-shell[data-pixieed-public-section="market"] .market-info-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  padding: 12px 16px;
+}
+
+body.pixieed-public-shell[data-pixieed-public-section="market"] .market-item-shell,
+body.pixieed-public-shell[data-pixieed-public-section="market"] .market-sell-shell {
+  gap: var(--public-shell-gap) !important;
+  min-height: calc(100vh - 170px);
+  padding: 0;
+  background: transparent;
+}
+
+body.pixieed-public-shell[data-pixieed-public-section="market"] .market-item,
+body.pixieed-public-shell[data-pixieed-public-section="market"] .market-sell-status,
+body.pixieed-public-shell[data-pixieed-public-section="market"] .market-listing-form,
+body.pixieed-public-shell[data-pixieed-public-section="market"] .market-related {
+  border: 1px solid var(--public-shell-border);
+  border-radius: var(--public-shell-radius) !important;
+  background: var(--public-shell-surface);
+  box-shadow: 0 14px 36px rgba(2, 6, 23, .12);
+}
+
+body.pixieed-public-shell[data-pixieed-public-section="market"] .market-info-page {
+  max-width: 1200px;
+  padding: 0 0 24px;
+  margin-top: var(--public-shell-gap);
+}
+
+body.pixieed-public-shell[data-pixieed-public-section="market"] .market-info-main {
+  gap: var(--public-shell-gap) !important;
+  overflow: visible;
+  border: 0;
+  background: transparent;
+}
+
+body.pixieed-public-shell[data-pixieed-public-section="market"] .market-info-head,
+body.pixieed-public-shell[data-pixieed-public-section="market"] .market-info-section,
+body.pixieed-public-shell[data-pixieed-public-section="market"] .market-info-nav,
+body.pixieed-public-shell[data-pixieed-public-section="market"] .market-help-jump {
+  border: 1px solid var(--public-shell-border);
+  border-radius: var(--public-shell-radius) !important;
+  box-shadow: 0 14px 36px rgba(2, 6, 23, .12);
+}
+
+/* Account: the titlebar, tabs and content cards share the same rhythm. */
+body.pixieed-public-shell[data-pixieed-public-section="account"] .account-page {
+  gap: var(--public-shell-gap) !important;
+  padding: 0 0 24px;
+}
+
+body.pixieed-public-shell[data-pixieed-public-section="account"] .account-titlebar,
+body.pixieed-public-shell[data-pixieed-public-section="account"] .account-command-bar,
+body.pixieed-public-shell[data-pixieed-public-section="account"] .account-panel {
+  border-color: var(--public-shell-border);
+  border-radius: var(--public-shell-radius) !important;
+}
+
+body.pixieed-public-shell[data-pixieed-public-section="account"] .account-titlebar,
+body.pixieed-public-shell[data-pixieed-public-section="account"] .account-command-bar,
+body.pixieed-public-shell[data-pixieed-public-section="account"] .account-panel {
+  background: var(--public-shell-surface);
+  box-shadow: 0 14px 36px rgba(2, 6, 23, .12);
+}
+
+body.pixieed-public-shell[data-pixieed-public-section="account"] .account-titlebar {
+  padding: 10px 14px;
+}
+
+body.pixieed-public-shell[data-pixieed-public-section="account"][data-pixieed-account-auth="signed-out"] .account-titlebar {
+  width: 100% !important;
+  margin-inline: 0 !important;
+  justify-content: flex-start;
+  border: 0 !important;
+  background: transparent;
+  box-shadow: none;
+}
+
+body.pixieed-public-shell[data-pixieed-public-section="account"][data-pixieed-account-auth="signed-out"] .account-title {
+  width: auto !important;
+  margin-inline: 0 !important;
+  padding-inline: 0 !important;
+  text-align: left;
+}
+
+body.pixieed-public-shell[data-pixieed-public-section="account"] .account-command-bar {
+  position: static;
+  padding: 5px;
+}
+
+body.pixieed-public-shell[data-pixieed-public-section="account"] .account-panel {
+  padding: 16px !important;
+}
+
+body.pixieed-public-shell :where(a, button, input, select, summary) {
+  transition: border-color 140ms ease, background-color 140ms ease,
+    color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+
+@media (max-width: 520px) {
+  body.pixieed-public-shell .pixieed-site-header__nav {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.pixieed-public-shell :where(a, button, input, select, summary) {
+    transition: none;
+  }
+}
+
+/* Figma document frame: legal, help, glossary, notes, and contact pages use
+   different legacy markup, but their reading surfaces share one shell rhythm. */
+body.pixieed-public-shell[data-pixieed-public-section="info"] > .page,
+body.pixieed-public-shell[data-pixieed-public-section="info"] > main:not(.portfolio-main) {
+  width: min(1200px, calc(100% - 40px));
+  max-width: 1200px;
+  margin-inline: auto;
+  box-sizing: border-box;
+  padding: 24px 0 40px;
+}
+
+body.pixieed-public-shell[data-pixieed-public-section="info"] > main:not(.portfolio-main) {
+  width: min(900px, calc(100% - 40px));
+  max-width: 900px;
+}
+
+body.pixieed-public-shell[data-pixieed-public-section="info"] > main:not(.portfolio-main) > section,
+body.pixieed-public-shell[data-pixieed-public-section="info"] .section__inner,
+body.pixieed-public-shell[data-pixieed-public-section="info"] .page > .card {
+  border: 1px solid var(--public-shell-border) !important;
+  border-radius: var(--public-shell-radius) !important;
+  background: var(--public-shell-surface) !important;
+  box-shadow: 0 14px 36px rgba(2, 6, 23, .12);
+}
+
+body.pixieed-public-shell[data-pixieed-public-section="info"] > main:not(.portfolio-main) > section {
+  margin-bottom: var(--public-shell-gap);
+  padding: 22px 24px;
+}
+
+body.pixieed-public-shell[data-pixieed-public-section="info"] .page > .card {
+  margin-bottom: var(--public-shell-gap);
+}
+
+body.pixieed-public-shell[data-pixieed-public-section="info"] .portfolio-main > .section,
+body.pixieed-public-shell[data-pixieed-public-section="info"] .portfolio-main > .card {
+  border: 1px solid var(--public-shell-border) !important;
+  border-radius: var(--public-shell-radius) !important;
+  background: var(--public-shell-surface) !important;
+  box-shadow: 0 14px 36px rgba(2, 6, 23, .12);
+}
+
+body.pixieed-public-shell[data-pixieed-public-section="info"] .portfolio-main > .section > .section-inner,
+body.pixieed-public-shell[data-pixieed-public-section="info"] .portfolio-main > .card > .section-inner {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none;
+}
+
+body.pixieed-public-shell[data-pixieed-public-section="info"] :where(h1, h2, h3) {
+  color: #f8fafc;
+  letter-spacing: -.025em;
+}
+
+body.pixieed-public-shell[data-pixieed-public-section="info"] :where(p, li, dd) {
+  color: var(--public-shell-muted);
+  line-height: 1.75;
+}
+
+@media (max-width: 720px) {
+  :root { --public-shell-content: calc(100% - 24px); }
+
+  body.pixieed-public-shell {
+    --pixieed-common-content-top: var(--pixieed-top-ad-offset, 0px);
+  }
+
+  body.pixieed-public-shell[data-pixieed-public-section="market"] .market-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  body.pixieed-public-shell[data-pixieed-public-section="market"] .market-filters {
+    order: 2;
+  }
+
+  body.pixieed-public-shell[data-pixieed-public-section="market"] .market-sort {
+    width: 100%;
+  }
+}
+
+/* The shared-bottom-nav legacy compatibility layer is injected after this
+   stylesheet and intentionally resets seamless pages to edge-to-edge. The
+   Figma desktop shell needs a stronger, explicit rail contract so that the
+   public layout keeps its left navigation at every load order. */
+@media (min-width: 861px) {
+  body.pixieed-public-shell,
+  body.pixieed-public-shell.pixieed-seamless-page,
+  body.draw2-home-body.pixieed-public-shell.pixieed-seamless-page {
+    padding-left: 220px !important;
+  }
+
+  body.pixieed-public-shell .pixieed-site-header {
+    position: fixed !important;
+    inset: 0 auto 0 0 !important;
+    width: 220px !important;
+    height: 100vh !important;
+    border-right: 1px solid rgba(148, 163, 184, .16) !important;
+    border-bottom: 0 !important;
+  }
+
+  body.pixieed-public-shell .pixieed-site-header__inner {
+    display: flex !important;
+    width: auto !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    box-sizing: border-box;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    padding: 18px 14px !important;
+  }
+
+  body.pixieed-public-shell .pixieed-site-header__nav {
+    width: 100% !important;
+    margin-top: 30px;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 6px;
+  }
+
+  body.pixieed-public-shell .pixieed-site-header__actions {
+    width: 100%;
+    margin-top: auto;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  body.pixieed-public-shell .pixieed-site-header__actions a,
+  body.pixieed-public-shell .pixieed-site-header__language {
+    width: 100%;
+  }
+
+  body.pixieed-public-shell > .bottom-nav {
+    display: none !important;
+  }
+
+  body.pixieed-public-shell.is-public-nav-collapsed {
+    padding-left: 72px !important;
+  }
+
+  /* The rail can temporarily expand on pointer hover or keyboard focus.
+     Follow that visual state so headings and controls never sit underneath
+     the expanded rail. */
+  body.pixieed-public-shell.is-public-nav-collapsed:has(.pixieed-site-header:hover),
+  body.pixieed-public-shell.is-public-nav-collapsed:has(.pixieed-site-header:focus-within),
+  body.draw2-home-body.pixieed-public-shell.is-public-nav-collapsed:has(.pixieed-site-header:hover),
+  body.draw2-home-body.pixieed-public-shell.is-public-nav-collapsed:has(.pixieed-site-header:focus-within) {
+    padding-left: 220px !important;
+  }
+
+  body.draw2-home-body.pixieed-public-shell.is-public-nav-collapsed {
+    padding-left: 72px !important;
+  }
+
+  body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header {
+    width: 72px !important;
+  }
+
+  body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header__inner {
+    padding-inline: 10px !important;
+  }
+}

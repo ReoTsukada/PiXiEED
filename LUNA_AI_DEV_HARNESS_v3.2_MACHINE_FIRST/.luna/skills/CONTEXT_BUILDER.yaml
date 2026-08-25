@@ -1,0 +1,15 @@
+skill_id: CONTEXT-BUILDER-001
+objective: minimize_context_without_losing_decision_critical_information
+include_order:
+  - current_work_package
+  - linked_blueprint_fields
+  - directly_affected_contracts_and_files
+  - active_decisions_and_assumptions
+  - relevant_cached_evidence
+  - relevant_tests_and_failures
+exclude_default:
+  - unrelated_repository_history
+  - stale_conversation
+  - completed_unrelated_work_packages
+  - duplicate_docs
+output: minimal_context_pack

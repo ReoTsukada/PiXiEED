@@ -1,0 +1,2 @@
+required: [north_star, acceptance_outcomes, solution_hypotheses, coherence_checks]
+semantic_rule: north_star_defines_what_good_looks_like_solution_hypotheses_define_how_and_are_revisable

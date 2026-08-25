@@ -1,0 +1,39 @@
+{
+  "workPackage": "WP-200",
+  "status": "IMPLEMENTED_ISOLATED",
+  "sourceStatus": "RECONSTRUCTED_CANONICAL_FROM_APPROVED_SOURCES",
+  "scope": [
+    "game-project-revision",
+    "draw-audio-asset-references",
+    "semantic-controls",
+    "runtime-preview-and-recovery",
+    "runtime-save-state-separation",
+    "build-plan-and-provenance",
+    "fail-closed-security"
+  ],
+  "nonIntrusion": {
+    "currentDraw": "PRESERVED",
+    "currentPxd": "PRESERVED",
+    "pixiSync": "PRESERVED",
+    "market": "PRESERVED",
+    "productionData": "PRESERVED",
+    "publicRoutes": "PRESERVED"
+  },
+  "releaseGates": {
+    "fullCompositor": "UNTESTED",
+    "physicalMobile": "UNTESTED",
+    "physicalStylus": "UNTESTED",
+    "realScreenReader": "UNTESTED",
+    "safari": "UNTESTED",
+    "firefox": "UNTESTED",
+    "thirtyMinuteMemory": "UNTESTED",
+    "productionPerformance": "UNTESTED",
+    "realLegacyPxd": "UNTESTED",
+    "existingUserCompatibility": "UNTESTED"
+  },
+  "baselineFailureIdentity": {
+    "existing": 14,
+    "new": 0,
+    "status": "INHERITED_APPROVED_IDENTITY_NOT_REEXECUTED"
+  }
+}

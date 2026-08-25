@@ -1,0 +1,29 @@
+policy_id: HUMAN-APPROVAL-002
+default: no
+startup_discovery:
+  ordinary_product_questions: handled_by_DISCOVERY_QUESTION_POLICY
+post_discovery:
+  ordinary_product_design_implementation_questions: forbidden
+ask_only_if_any:
+  - production_deploy_or_public_release
+  - pricing_or_paid_plan_activation
+  - payments_ledger_payout_or_real_money_commitment
+  - auth_authorization_material_change_with_external_consequence
+  - sensitive_or_personal_data_boundary_change_with_external_consequence
+  - destructive_production_migration_or_delete
+  - irreversible_compatibility_break
+  - high_cost_external_commitment
+  - legal_license_compliance_material_uncertainty_that_cannot_be_safely_avoided
+  - budget_hard_limit_exceeded
+question_classes:
+  startup_material_question: ask_before_discovery_lock
+  safe_assumption: record_and_continue
+  deferred_choice: defer
+  hard_approval: ask_at_latest_safe_milestone
+batching:
+  enabled: true
+  rule: group_nonurgent_hard_approvals_to_minimize_human_wait
+autonomy_rule:
+  if_action_can_be_safely_prepared_without_external_commitment:
+    prepare_everything_first: true
+    request_approval_only_for_final_irreversible_step: true

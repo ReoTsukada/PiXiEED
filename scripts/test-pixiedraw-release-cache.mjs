@@ -19,7 +19,7 @@ assert.match(serviceWorker, new RegExp(`build-info\\.js\\?v=${buildId}`));
 assert.match(indexHtml, /assets\/css\/style\.css\?v=20260803-ad-responsive2-file-icons2-timelapse-panel1/);
 assert.match(indexHtml, /scripts\/card-feed-ads\.js\?v=20260803-leading-project-ad1/);
 assert.match(indexHtml, /startup-workflow-utils\.js\?v=20260803-leading-project-ad1/);
-assert.match(indexHtml, /shared-bottom-nav\.js\?v=20260803-tools-panel1/);
+assert.match(indexHtml, /shared-bottom-nav\.js\?v=20260824-bottom-nav-locale1/);
 assert.match(indexHtml, /controls-mirror\.js\?v=20260803-mobile-window-reset1/);
 assert.match(indexHtml, /rail-tool-ui-utils\.js\?v=20260803-mobile-window-reset1/);
 for (const moduleName of [

@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "workPackage": "WP-240",
+  "status": "IMPLEMENTED_ISOLATED_GAP_INVENTORY",
+  "implemented": ["server-permissioned Admin projection", "privacy-safe Analytics event", "public-only Ads policy", "typed Moderation reference", "read-only Revenue shadow comparison", "default-off flags and local rollback", "lazy/static boundary test"],
+  "notImplemented": ["Admin route/provider/RPC wiring", "Analytics transport and retention", "Ad provider delivery", "Moderation console/workflow", "Ledger/Payout reconciliation", "production finance action", "route replacement", "migration/deploy/publish"],
+  "productionMutation": false,
+  "baselineFailureIdentity": "14/14 inherited match; new 0"
+}

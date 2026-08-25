@@ -1,0 +1,38 @@
+workflow_id: DISCOVERY-INTERVIEW-001
+goal: convert_minimal_user_intent_into_sufficient_decision_context_then_lock_questions
+inputs:
+  - GOAL.md
+  - existing_repository_if_any
+  - .luna/state/DISCOVERY.yaml
+steps:
+  - parse_user_intent_even_if_one_sentence
+  - inspect_existing_repository_if_any
+  - identify_material_unknowns
+  - eliminate_questions_answerable_by_low_cost_research_or_safe_inference
+  - score_remaining_questions_by_information_gain_and_rework_avoidance
+  - generate_compact_question_batch
+  - if_questions_exist: set_status_waiting_for_answers_and_ask_batch
+  - on_answers: normalize_into_structured_facts
+  - detect_only_new_material_branches_created_by_answers
+  - if_second_batch_justified: ask_one_final_compact_batch
+  - classify_all_remaining_unknowns_as_safe_assumption_or_deferred_choice
+  - write_DISCOVERY_state
+  - set_discovery_lock_true
+  - run_BLUEPRINT_BUILDER
+  - continue_START_without_additional_ordinary_questions
+question_output_format:
+  style: short_numbered_questions
+  each_question:
+    - question
+    - why_it_matters_optional_short
+    - suggested_default_optional
+  prohibit:
+    - implementation_micro_preferences
+    - questions_answerable_by_reference_scout
+    - questions_about_reversible_details
+completion_output:
+  - discovery_lock
+  - confirmed_facts
+  - safe_assumptions
+  - deferred_choices
+  - blueprint_revision

@@ -1,0 +1,109 @@
+{
+  "schemaVersion": 1,
+  "workPackage": "WP-160",
+  "status": "RECONSTRUCTED_FROM_APPROVED_SOURCES",
+  "originalFilesFound": {
+    "03_PRODUCTS/PIXIRUNTIME_SPEC.md": false,
+    "03_PRODUCTS/PIXIGAME_SPEC.md": false,
+    "02_ARCHITECTURE/BUILD_EXPORT_PIPELINE.md": false
+  },
+  "searchEvidence": {
+    "workingTreeSearch": "rg --files plus content search across .codex/context, 00_START_HERE, 02_ARCHITECTURE, 03_PRODUCTS, 05_PERFORMANCE, 08_IMPLEMENTATION, 09_ROADMAP, docs, CODEX_TASK_PROMPTS, and 16_IMPLEMENTATION_STARTER",
+    "historySearch": "git log --all --full-history -- <each missing path> returned no commits"
+  },
+  "reconstructionRule": "Use approved source requirements only; do not promote planned or absent implementation to CURRENT.",
+  "documents": [
+    {
+      "file": "03_PRODUCTS/PIXIGAME_SPEC.md",
+      "requirement": [
+        "PiXiGame is a Core-integrated Game Creation Environment",
+        "shared Project/Asset/Revision and Tool Bridge boundaries",
+        "easy/detailed/code authoring over one Entity/Component/Action model",
+        "Scene, Entity, Component, Transform, Animation, Sprite, Audio, UI, Input, Event/Logic, Script, preview, build, package, publish, Runtime snapshot, extension direction",
+        "Unity-like Creator Workspace as a UX reference without copying it"
+      ],
+      "canonicalSources": [
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md#PIXIGAME-UNIFIED-AUTHORING-001",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md#PIXIEED-CROSS-TOOL-LIVE-EDIT-001",
+        "02_ARCHITECTURE/PIXIEED_CORE_SYSTEM.md",
+        "02_ARCHITECTURE/PROJECT_REGISTRY_CORE.md",
+        "02_ARCHITECTURE/ASSET_REGISTRY_CORE.md",
+        "02_ARCHITECTURE/TOOL_BRIDGE_CORE.md",
+        "02_ARCHITECTURE/EVENT_ACTIVITY_CORE.md",
+        "02_ARCHITECTURE/PACKAGE_REGISTRY_CORE.md",
+        "02_ARCHITECTURE/INTEGRATED_PACKAGE_FORMAT.md",
+        "09_ROADMAP/CORE_SITE_INTEGRATION_PROGRAM.md",
+        "03_PRODUCTS/PIXIEEDRAW2_SPEC.md"
+      ],
+      "recovery": "RECONSTRUCTED_FROM_APPROVED_SOURCES",
+      "implementationStatus": "Product architecture and status taxonomy recorded; Game editor and production bridge are not implemented.",
+      "targetWp": ["WP-160", "WP-170", "WP-190", "WP-200", "WP-210"]
+    },
+    {
+      "file": "03_PRODUCTS/PIXIRUNTIME_SPEC.md",
+      "requirement": [
+        "PiXiRuntime is a lightweight execution Runtime separate from the Game Editor",
+        "versioned package/manifest compatibility and Dependency Lock",
+        "Scene loading, Asset resolution, raster/animation/audio, input, timing, game loop, save/state, security, capability detection, device adaptation, fallback, diagnostics, performance",
+        "no Editor UI, Draw2, PiXiAudio Editor, or unrestricted full Registry client in Runtime"
+      ],
+      "canonicalSources": [
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md#PIXIGAME-UNIFIED-AUTHORING-001",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md#PIXIEED-CROSS-TOOL-LIVE-EDIT-001",
+        "02_ARCHITECTURE/PIXIEED_CORE_SYSTEM.md",
+        "02_ARCHITECTURE/PACKAGE_REGISTRY_CORE.md",
+        "02_ARCHITECTURE/INTEGRATED_PACKAGE_FORMAT.md",
+        "02_ARCHITECTURE/STORAGE_PLACEMENT_AND_SYNC.md",
+        "02_ARCHITECTURE/COST_AWARE_REALTIME_POLICY.md",
+        "05_PERFORMANCE/PERFORMANCE_BUDGETS.md",
+        "05_PERFORMANCE/DRAW2_BUNDLE_MEMORY_AND_WORKER_BUDGETS.md",
+        "09_ROADMAP/CORE_SITE_INTEGRATION_PROGRAM.md"
+      ],
+      "recovery": "RECONSTRUCTED_FROM_APPROVED_SOURCES",
+      "implementationStatus": "Runtime boundary and target taxonomy recorded; no shipped Runtime or native execution is claimed.",
+      "targetWp": ["WP-160", "WP-200", "WP-900"]
+    },
+    {
+      "file": "02_ARCHITECTURE/BUILD_EXPORT_PIPELINE.md",
+      "requirement": [
+        "Editor to Package to Build to Runtime Artifact to Distribution pipeline",
+        "Validation, dependency resolution, Revision Lock, compatibility, license/permission boundary, Build Plan, processing, packaging, hash/integrity, verification",
+        "Package and Build separation",
+        "target adapters, cache/cost measurements, security, fail-closed incomplete artifacts"
+      ],
+      "canonicalSources": [
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md#PIXIEED-CODEX-MASTER-CONTEXT",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md#PIXIGAME-UNIFIED-AUTHORING-001",
+        "00_START_HERE/LATEST_CANONICAL_DECISIONS.md#PIXIEED-CROSS-TOOL-LIVE-EDIT-001",
+        "02_ARCHITECTURE/PIXIEED_CORE_SYSTEM.md",
+        "02_ARCHITECTURE/ASSET_GRAPH.md",
+        "02_ARCHITECTURE/ASSET_REGISTRY_CORE.md",
+        "02_ARCHITECTURE/PACKAGE_REGISTRY_CORE.md",
+        "02_ARCHITECTURE/INTEGRATED_PACKAGE_FORMAT.md",
+        "02_ARCHITECTURE/STORAGE_PLACEMENT_AND_SYNC.md",
+        "02_ARCHITECTURE/COST_AWARE_REALTIME_POLICY.md",
+        "05_PERFORMANCE/PERFORMANCE_BUDGETS.md",
+        "09_ROADMAP/CORE_SITE_INTEGRATION_PROGRAM.md"
+      ],
+      "recovery": "RECONSTRUCTED_FROM_APPROVED_SOURCES",
+      "implementationStatus": "Architecture contract recorded; production Build service, cloud billing, Store, and external exporters are not implemented.",
+      "targetWp": ["WP-160", "WP-190", "WP-200", "WP-210", "WP-900"]
+    }
+  ],
+  "canonicalUiDirection": {
+    "draw2Desktop": "Aseprite pixel-art efficiency plus Unity-like Creator Workspace concepts, adapted to PiXiEEDstudio",
+    "draw2MobilePortrait": "Current PiXiEEDraw Canvas-first portrait strength with contextual sheets/panels, not a scaled desktop UI",
+    "tablet": "Adaptive intermediate workspace",
+    "sharedCore": "Desktop, tablet, and mobile share Canonical Editor Core and Project Format; only Presentation/Workspace adapts",
+    "reference": "docs/contracts/DRAW2-ASEPRITE-UX-REFERENCE.md"
+  },
+  "preservation": {
+    "currentRoutesChanged": false,
+    "currentPiXiEEDrawChanged": false,
+    "currentPxdChanged": false,
+    "pixiSyncChanged": false,
+    "marketChanged": false,
+    "productionDataChanged": false,
+    "migrationDeployPublishCommitPush": false
+  }
+}

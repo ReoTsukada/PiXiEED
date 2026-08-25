@@ -1,0 +1,6 @@
+workflow_id: RELEASE-LOOP-001
+steps:
+  - run_RELEASE_GUARD
+  - if_blocked: create_minimum_fix_work_packages
+  - if_approval_required: batch_and_request_human_approval
+  - if_ready: produce_release_evidence_summary

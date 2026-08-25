@@ -1,0 +1,57 @@
+{
+  "transcriptVersion": "WORK420_COMMAND_TRANSCRIPT_V1",
+  "packageId": "WORK-420",
+  "commands": [
+    {
+      "command": "shasum -a 256 .codex/context/WORK-420.md",
+      "exitCode": 0
+    },
+    {
+      "command": "deno fmt --check pixiedraw2/src/platform/work-420 pixiedraw2/tests/work-420 pixiedraw2/benchmarks/work-420",
+      "exitCode": 0
+    },
+    {
+      "command": "deno check --no-remote pixiedraw2/src/platform/work-420/contracts.ts pixiedraw2/src/platform/work-420/composition.ts pixiedraw2/src/platform/work-420/event-adapter.ts pixiedraw2/tests/work-420/fixture.ts pixiedraw2/tests/work-420/composition.test.ts pixiedraw2/tests/work-420/event-adapter.test.ts pixiedraw2/benchmarks/work-420/generate-evidence.ts",
+      "exitCode": 0
+    },
+    {
+      "command": "deno test --no-remote --allow-read --allow-write --check pixiedraw2/tests/work-420/event-adapter.test.ts",
+      "exitCode": 0
+    },
+    {
+      "command": "deno test --no-remote --allow-read --allow-write --check pixiedraw2/tests/work-420/composition.test.ts",
+      "exitCode": 0
+    },
+    {
+      "command": "deno test --no-remote --allow-read --allow-write --check pixiedraw2/tests/work-420",
+      "exitCode": 0
+    },
+    {
+      "command": "deno run --no-remote --allow-read --allow-write=docs/inventory pixiedraw2/benchmarks/work-420/generate-evidence.ts",
+      "exitCode": 0
+    },
+    {
+      "command": "node scripts/validate-qualification-evidence.mjs docs/inventory/work-420-evidence.json",
+      "exitCode": 0
+    },
+    {
+      "command": "python3 scripts/verify_work_package_context.py --context .codex/context/WORK-420.md --manifest .codex/context/WORK-420.manifest.json",
+      "exitCode": 0
+    },
+    {
+      "command": "node scripts/test-baseline-failure-identity-wp080.mjs",
+      "exitCode": 0
+    },
+    {
+      "command": "git diff --check -- pixiedraw2/src/platform/work-420 pixiedraw2/tests/work-420 pixiedraw2/benchmarks/work-420 docs/contracts/WORK-420-COMPOSITION.md docs/inventory/work-420-benchmark.json docs/inventory/work-420-command-transcript.json docs/inventory/work-420-evidence.json docs/decisions/ADR-20260816-WORK-420-composition-boundary.md",
+      "exitCode": 0
+    }
+  ],
+  "failedAttempts": [
+    {
+      "command": "deno fmt --check pixiedraw2/src/platform/work-420 pixiedraw2/tests/work-420 pixiedraw2/benchmarks/work-420",
+      "exitCode": 1,
+      "reason": "Deno reported six existing WORK-420 files not formatted; the permitted WORK-420 paths were then formatted and the check passed."
+    }
+  ]
+}

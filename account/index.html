@@ -283,6 +283,7 @@
     }
   </style>
   <link rel="stylesheet" href="account.css?v=20260726-admin-visibility1">
+    <link rel="stylesheet" href="../site/account-login.css?v=20260824-login-redesign2">
 </head>
 <body data-pixieed-account-auth="checking">
   <header class="site-header" aria-label="トップナビ">
@@ -298,17 +299,17 @@
     <main class="page-shell account-page">
       <section class="account-titlebar" aria-labelledby="accountTitle">
         <div class="account-titlebar__title">
-          <h1 class="section-title account-title" id="accountTitle">マイページ</h1>
+          <h1 class="section-title account-title" id="accountTitle" data-i18n-key="accountTitle">マイページ</h1>
         </div>
         <div class="account-titlebar__actions">
-          <a href="../pixiedraw/?new_project=1">新規作成</a>
+          <a href="../studio/" data-i18n-key="accountNewProject">新規作成</a>
           <a href="../market/">マーケット</a>
         </div>
       </section>
-      <nav class="account-command-bar" aria-label="マイページの表示切替">
-        <button type="button" data-account-tab-target="library" aria-pressed="false">作品</button>
-        <button type="button" data-account-tab-target="rewards" aria-pressed="false">売上</button>
-        <button class="is-active" type="button" data-account-tab-target="settings" aria-pressed="true">プロフィール</button>
+      <nav class="account-command-bar" aria-label="マイページの表示切替" data-i18n-aria-label="accountTabsAria">
+        <button type="button" data-account-tab-target="library" aria-pressed="false" data-i18n-key="accountWorks">作品</button>
+        <button type="button" data-account-tab-target="rewards" aria-pressed="false" data-i18n-key="accountRevenue">売上</button>
+        <button class="is-active" type="button" data-account-tab-target="settings" aria-pressed="true" data-i18n-key="accountProfile">プロフィール</button>
       </nav>
 
       <div class="account-grid">
@@ -316,10 +317,10 @@
           <div class="account-reward-dashboard__head">
             <div>
               <p class="account-eyebrow">REVENUE ANALYTICS</p>
-              <h2 class="section-title" id="accountRewardDashboardTitle">売上・報酬の推移</h2>
-              <p class="helper">表示は2点を作品系列で、PiXFiNDの有効プレイは3点を作者へ加算し、月次報酬予算をポイント比で配分します。</p>
+              <h2 class="section-title" id="accountRewardDashboardTitle" data-i18n-key="accountRevenueTitle">売上・報酬の推移</h2>
+              <p class="helper" data-i18n-key="accountRevenueHelper">表示は2点を作品系列で、PiXFiNDの有効プレイは3点を作者へ加算し、月次報酬予算をポイント比で配分します。</p>
             </div>
-            <label class="account-chart-period">表示期間
+            <label class="account-chart-period"><span data-i18n-key="accountPeriodLabel">表示期間</span>
               <select id="accountRewardPeriod">
                 <option value="6">6か月</option>
                 <option value="12" selected>12か月</option>
@@ -329,40 +330,40 @@
           </div>
           <div class="account-summary-grid" aria-live="polite">
             <article class="account-summary-card account-summary-card--sales">
-              <span>販売による受取</span>
+              <span data-i18n-key="accountSalesReceived">販売による受取</span>
               <strong id="accountSummarySales">0円</strong>
-              <small id="accountSummarySalesMeta">直近12か月</small>
+              <small id="accountSummarySalesMeta" data-i18n-key="accountRecent12Months">直近12か月</small>
             </article>
             <article class="account-summary-card account-summary-card--lineage">
-              <span>継承ロイヤリティー</span>
+              <span data-i18n-key="accountLineageRoyalty">継承ロイヤリティー</span>
               <strong id="accountSummaryLineage">0円</strong>
-              <small id="accountSummaryLineageMeta">直近12か月</small>
+              <small id="accountSummaryLineageMeta" data-i18n-key="accountRecent12Months">直近12か月</small>
             </article>
             <article class="account-summary-card account-summary-card--views">
-              <span>ポイント報酬</span>
+              <span data-i18n-key="accountPageviewReward">ポイント報酬</span>
               <strong id="accountSummaryPageview">0円</strong>
-              <small id="accountSummaryViews">確定 0円・暫定 0円</small>
+              <small id="accountSummaryViews" data-i18n-key="accountConfirmedPending">確定 0円・暫定 0円</small>
             </article>
             <article class="account-summary-card account-summary-card--balance">
-              <span>出金可能な残高</span>
+              <span data-i18n-key="accountWithdrawable">出金可能な残高</span>
               <strong id="accountSummaryBalance">0円</strong>
-              <small id="accountSummaryPending">保留中 0円</small>
+              <small id="accountSummaryPending" data-i18n-key="accountPending">保留中 0円</small>
             </article>
           </div>
           <p class="account-dashboard-status" id="accountOverviewStatus" role="status" aria-live="polite">報酬データを確認しています。</p>
-          <div class="account-chart-legend" aria-label="表示する系列">
-            <button class="is-active" type="button" data-account-chart-series="sales" aria-pressed="true"><i aria-hidden="true"></i>販売収益</button>
-            <button class="is-active" type="button" data-account-chart-series="lineage" aria-pressed="true"><i aria-hidden="true"></i>継承ロイヤリティー</button>
-            <button class="is-active" type="button" data-account-chart-series="pageview" aria-pressed="true"><i aria-hidden="true"></i>表示報酬</button>
-            <button class="is-active" type="button" data-account-chart-series="views" aria-pressed="true"><i aria-hidden="true"></i>有効表示数</button>
+          <div class="account-chart-legend" aria-label="表示する系列" data-i18n-aria-label="accountSeriesAria">
+            <button class="is-active" type="button" data-account-chart-series="sales" aria-pressed="true"><i aria-hidden="true"></i><span data-i18n-key="accountSalesRevenue">販売収益</span></button>
+            <button class="is-active" type="button" data-account-chart-series="lineage" aria-pressed="true"><i aria-hidden="true"></i><span data-i18n-key="accountLineage">継承ロイヤリティー</span></button>
+            <button class="is-active" type="button" data-account-chart-series="pageview" aria-pressed="true"><i aria-hidden="true"></i><span data-i18n-key="accountViewsReward">表示報酬</span></button>
+            <button class="is-active" type="button" data-account-chart-series="views" aria-pressed="true"><i aria-hidden="true"></i><span data-i18n-key="accountValidViews">有効表示数</span></button>
           </div>
           <div class="account-chart-shell" id="accountRewardChartShell">
-            <canvas id="accountRewardChart" role="img" aria-label="月別の販売収益、継承ロイヤリティー、表示報酬、有効表示数のグラフ"></canvas>
+            <canvas id="accountRewardChart" role="img" aria-label="月別の販売収益、継承ロイヤリティー、表示報酬、有効表示数のグラフ" data-i18n-aria-label="accountChartAria"></canvas>
             <div class="account-chart-tooltip" id="accountRewardChartTooltip" hidden></div>
             <div class="account-chart-empty" id="accountRewardChartEmpty">報酬データを確認しています。</div>
           </div>
           <details class="account-chart-table-details">
-            <summary>月別の数値を表で確認</summary>
+            <summary data-i18n-key="accountChartTable">月別の数値を表で確認</summary>
             <div class="account-chart-table-scroll">
               <table class="account-chart-table">
                 <thead><tr><th scope="col">月</th><th scope="col">販売収益</th><th scope="col">継承ロイヤリティー</th><th scope="col">確定報酬</th><th scope="col">暫定額</th><th scope="col">暫定ポイント</th></tr></thead>
@@ -375,12 +376,12 @@
 
         <section class="account-stack" aria-label="作品">
           <section class="account-panel account-panel--profile" id="authPanel" data-account-tab="settings" aria-hidden="false" aria-label="アカウント">
-            <h2 class="section-title">プロフィール</h2>
+            <h2 class="section-title" data-i18n-key="accountProfileTitle">プロフィール</h2>
             <div class="account-profile-grid">
               <section class="profile-block profile-block--profile" aria-labelledby="profileSettingsTitle">
                 <div class="account-settings-heading">
-                  <strong id="profileSettingsTitle">自分の表示</strong>
-                  <small>アイコン・名前・公開リンク</small>
+                    <strong id="profileSettingsTitle" data-i18n-key="accountMyDisplay">自分の表示</strong>
+                    <small data-i18n-key="accountDisplayHint">アイコン・名前・公開リンク</small>
                 </div>
                 <p class="auth-signed-in-notice" id="authSignedInNotice" role="status" aria-live="polite" hidden></p>
                 <div class="account-profile-settings">
@@ -389,36 +390,49 @@
                     <span class="avatar-toggle__img" id="avatarPreview"></span>
                   </button>
                   <label class="profile-name">
-                    <span style="font-weight:700; color:#e5e7eb;">ニックネーム</span>
+                    <span style="font-weight:700; color:#e5e7eb;" data-i18n-key="accountNickname">ニックネーム</span>
                     <input class="auth-input" id="profileNickname" type="text" placeholder="なまえ" maxlength="32">
                   </label>
                 </div>
                 <label class="profile-name profile-email">
-                  <span style="font-weight:700; color:#e5e7eb;">メールアドレス</span>
+                  <span style="font-weight:700; color:#e5e7eb;" data-i18n-key="accountEmail">メールアドレス</span>
                   <input class="auth-input" id="profileEmail" type="email" readonly aria-describedby="profileEmailHelp">
-                  <small id="profileEmailHelp">ログイン用メールアドレス</small>
+                  <small id="profileEmailHelp" data-i18n-key="accountLoginEmail">ログイン用メールアドレス</small>
                 </label>
                 <div class="avatar-panel" id="avatarPanel" hidden>
                   <div class="avatar-grid" id="avatarGrid"></div>
                 </div>
                 <label class="profile-name">
-                  <span style="font-weight:700; color:#e5e7eb;">公開プロフィールリンク（任意）</span>
+                  <span style="font-weight:700; color:#e5e7eb;" data-i18n-key="accountPublicLink">公開プロフィールリンク（任意）</span>
                   <input class="auth-input" id="profileX" type="url" placeholder="https://example.com/your-profile" maxlength="200" inputmode="url">
                 </label>
-                <a class="profile-x-preview" id="profileXPreview" href="#" target="_blank" rel="noopener noreferrer" hidden>公開プロフィールを開く</a>
-                <button class="auth-btn" id="saveProfile" type="button">プロフィールを保存</button>
+                <a class="profile-x-preview" id="profileXPreview" href="#" target="_blank" rel="noopener noreferrer" hidden data-i18n-key="accountOpenProfile">公開プロフィールを開く</a>
+                <button class="auth-btn" id="saveProfile" type="button" data-i18n-key="accountSaveProfile">プロフィールを保存</button>
                 <p class="auth-status" id="authStatus"></p>
                 <span class="helper" id="linkedEmail" style="display:none;"></span>
-                <button class="auth-btn logout" id="logoutBtn" type="button" style="display:none;">ログアウト</button>
+                <button class="auth-btn logout" id="logoutBtn" type="button" style="display:none;" data-i18n-key="accountLogout">ログアウト</button>
                 </div>
               </section>
               <div class="profile-block profile-block--login" id="pixieedSharedAuthLoginBlock">
-                <p class="auth-session-check" id="authSessionCheck" role="status" aria-live="polite">ログイン状態を確認しています…</p>
+                <div class="account-login-visual" aria-labelledby="accountLoginVisualTitle">
+                  <div class="account-login-visual__copy">
+                    <p class="account-eyebrow">PiXiEEDstudio</p>
+                    <h2 id="accountLoginVisualTitle" data-i18n-key="accountLoginContinue">描く時間を、そのまま続ける。</h2>
+                    <p data-i18n-key="accountLoginLead">ログインすると、作品・購入した素材・共有プロジェクトへすぐ戻れます。</p>
+                  </div>
+                  <figure class="account-login-visual__workspace">
+                    <div class="account-login-visual__workspace-preview" role="img" aria-label="PiXiEEDstudioのキャンバス、パレット、タイムライン"><div class="account-login-visual__toolbar"><span>STUDIO</span><b>iDRAW</b><b>iAUDIO</b><b>iGAME</b></div><div class="account-login-visual__canvas"><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="account-login-visual__timeline"><b></b><b></b><b></b><b></b><b></b></div></div>
+                    <figcaption><span>iDRAW</span><span>ANIMATION</span><span>PALETTE</span></figcaption>
+                  </figure>
+                  <div class="account-login-visual__footer"><span>Web workspace</span><span>PiXYNC ready</span></div>
+                </div>
+                <div class="account-login-content">
+                <p class="auth-session-check" id="authSessionCheck" role="status" aria-live="polite" data-i18n-key="accountChecking">ログイン状態を確認しています…</p>
                 <div class="auth-section-head">
-                  <strong id="authModeTitle">ログイン</strong>
+                  <strong id="authModeTitle" data-i18n-key="accountLogin">ログイン</strong>
                   <span id="authModeDescription">PiXiEED IDを使う</span>
                 </div>
-                <p class="auth-login-copy" id="authModeCopy">すでにアカウントをお持ちの方は、ログイン方法を選んでください。</p>
+                <p class="auth-login-copy" id="authModeCopy" data-i18n-key="accountLoginMethods">すでにアカウントをお持ちの方は、ログイン方法を選んでください。</p>
                 <div class="auth-signup-pending" id="authSignupPending" hidden aria-live="polite">
                   <strong>確認メールを送信しました</strong>
                   <p id="authSignupPendingMessage">メール内の「アカウントを確認」リンクを開くと、新規作成が完了します。</p>
@@ -438,32 +452,33 @@
                 </div>
                 <p class="auth-provider-note" id="authProviderNote">Googleアカウントをお持ちなら、パスワードを入力せずログインできます。</p>
                 <div class="auth-mode-switch" role="tablist" aria-label="メールアカウント">
-                  <button class="auth-mode-switch__button is-active" type="button" data-auth-mode="login" role="tab" aria-selected="true">ログイン</button>
-                  <button class="auth-mode-switch__button" type="button" data-auth-mode="signup" role="tab" aria-selected="false">新規作成</button>
+                  <button class="auth-mode-switch__button is-active" type="button" data-auth-mode="login" role="tab" aria-selected="true" data-i18n-key="accountLogin">ログイン</button>
+                  <button class="auth-mode-switch__button" type="button" data-auth-mode="signup" role="tab" aria-selected="false" data-i18n-key="accountCreateAccount">新規作成</button>
                 </div>
-                <button class="auth-btn auth-btn--email" id="authEmailToggle" type="button">メールアドレスでログイン</button>
+                <button class="auth-btn auth-btn--email" id="authEmailToggle" type="button" data-i18n-key="accountEmailLogin">メールアドレスでログイン</button>
                 <form class="auth-form" id="authForm" novalidate>
                   <div id="authInputs" style="display:grid; gap:8px;" data-expanded="true">
                     <label class="auth-field">
-                      <span>メールアドレス</span>
+                      <span data-i18n-key="accountEmail">メールアドレス</span>
                       <input class="auth-input" id="authEmail" type="email" placeholder="name@example.com" autocomplete="email">
                     </label>
                     <label class="auth-field" id="authPasscodeField">
-                      <span id="authPasscodeLabel">パスワード</span>
-                      <input class="auth-input" id="authPasscode" type="password" placeholder="パスワードを入力" minlength="6" autocomplete="current-password">
+                      <span id="authPasscodeLabel" data-i18n-key="accountPassword">パスワード</span>
+                      <input class="auth-input" id="authPasscode" type="password" placeholder="パスワードを入力" data-i18n-placeholder="accountPasswordPlaceholder" minlength="6" autocomplete="current-password">
                     </label>
                   </div>
                   <div class="auth-actions" style="display:grid; gap:8px;">
-                    <button class="auth-btn" id="authLoginBtn" type="submit">メールアドレスとパスワードでログイン</button>
+                    <button class="auth-btn" id="authLoginBtn" type="submit" data-i18n-key="accountLoginButton">メールアドレスとパスワードでログイン</button>
                   </div>
                   <div class="auth-secondary-actions">
-                    <button class="auth-text-btn" id="authMagicLinkBtn" type="button">メールにログインリンクを送る（パスワード不要）</button>
-                    <button class="auth-text-btn" id="authResetBtn" type="button">パスワードを忘れた場合</button>
+                    <button class="auth-text-btn" id="authMagicLinkBtn" type="button" data-i18n-key="accountMagicLink">メールにログインリンクを送る（パスワード不要）</button>
+                    <button class="auth-text-btn" id="authResetBtn" type="button" data-i18n-key="accountForgotPassword">パスワードを忘れた場合</button>
                   </div>
-                  <p class="helper auth-link-guide" id="authMagicLinkGuide">メールアドレスを入力して送信後、届いたメールのリンクを開くだけでログインできます。</p>
-                  <p class="auth-security-note" id="authSecurityNote">ログイン後は、この端末で次回もログイン状態を保持します。共有端末では必ずログアウトしてください。</p>
+                  <p class="helper auth-link-guide" id="authMagicLinkGuide" data-i18n-key="accountMagicLinkGuide">メールアドレスを入力して送信後、届いたメールのリンクを開くだけでログインできます。</p>
+                  <p class="auth-security-note" id="authSecurityNote" data-i18n-key="accountSecurityNote">ログイン後は、この端末で次回もログイン状態を保持します。共有端末では必ずログアウトしてください。</p>
                   <p class="helper" id="authAccountStatus"></p>
                 </form>
+                </div>
               </div>
             </div>
           </section>
@@ -471,13 +486,13 @@
           <section class="account-panel account-collection" id="accountProjects" data-account-tab="library" data-account-collection>
             <div class="account-panel__head">
               <div>
-                <p class="account-eyebrow">PIXIEEDRAW</p>
-                <h2 class="section-title">作品</h2>
+                <p class="account-eyebrow">iDRAW</p>
+                <h2 class="section-title" data-i18n-key="accountWorks">作品</h2>
               </div>
               <div class="account-panel__actions">
-                <a class="account-text-action" href="../pixiedraw/?new_project=1">新規作成</a>
+                <a class="account-text-action" href="../studio/" data-i18n-key="accountNewProject">新規作成</a>
                 <span class="account-chip" id="localProjectCount">確認中</span>
-                <button class="account-text-action account-collection-toggle" type="button" data-account-collection-toggle aria-controls="localProjectList" aria-expanded="false" hidden>全て見る</button>
+                <button class="account-text-action account-collection-toggle" type="button" data-account-collection-toggle aria-controls="localProjectList" aria-expanded="false" hidden data-i18n-key="accountSeeAll">全て見る</button>
               </div>
             </div>
             <div class="account-list account-collection-grid" id="localProjectList" data-account-collection-list>
@@ -486,8 +501,8 @@
                   <img src="../icon/icon-192-4.png" alt="">
                 </div>
                 <div class="account-item__body">
-                  <strong>作品がありません</strong>
-                  <span>PiXiEEDrawの端末内保存がここに出ます。</span>
+                  <strong data-i18n-key="accountEmptyWorks">作品がありません</strong>
+                  <span data-i18n-key="accountLocalWorks">iDRAWの端末内保存がここに出ます。</span>
                 </div>
                 <span class="account-chip">0件</span>
               </div>
@@ -508,12 +523,12 @@
             <div class="account-panel__head">
               <div>
                 <p class="account-eyebrow">PURCHASES</p>
-                <h2 class="section-title">購入したもの</h2>
+                <h2 class="section-title" data-i18n-key="accountPurchases">購入したもの</h2>
               </div>
               <div class="account-panel__actions">
-                <a class="account-text-action" href="../market/">素材を探す</a>
+                <a class="account-text-action" href="../market/" data-i18n-key="accountFindAssets">素材を探す</a>
                 <span class="account-chip" id="marketPurchaseCount">確認中</span>
-                <button class="account-text-action account-collection-toggle" type="button" data-account-collection-toggle aria-controls="marketPurchaseList" aria-expanded="false" hidden>全て見る</button>
+                <button class="account-text-action account-collection-toggle" type="button" data-account-collection-toggle aria-controls="marketPurchaseList" aria-expanded="false" hidden data-i18n-key="accountSeeAll">全て見る</button>
               </div>
             </div>
             <div class="account-list account-market-grid account-collection-grid" id="marketPurchaseList" data-account-collection-list aria-label="購入済み商品一覧" aria-live="polite">
@@ -533,13 +548,13 @@
             <div class="account-panel__head">
               <div>
                 <p class="account-eyebrow">LISTINGS</p>
-                <h2 class="section-title">出品物</h2>
+                <h2 class="section-title" data-i18n-key="accountListings">出品物</h2>
               </div>
               <div class="account-panel__actions">
-                <a class="account-text-action" href="../market/sell.html">新しく出品</a>
+                <a class="account-text-action" href="../market/sell.html" data-i18n-key="accountNewListing">新しく出品</a>
                 <button class="account-text-action" id="marketRebuildPreviews" type="button" hidden>透かしを統一</button>
                 <span class="account-chip" id="marketListingCount">確認中</span>
-                <button class="account-text-action account-collection-toggle" type="button" data-account-collection-toggle aria-controls="marketListingList" aria-expanded="false" hidden>全て見る</button>
+                <button class="account-text-action account-collection-toggle" type="button" data-account-collection-toggle aria-controls="marketListingList" aria-expanded="false" hidden data-i18n-key="accountSeeAll">全て見る</button>
               </div>
             </div>
             <div class="account-list account-market-grid account-collection-grid" id="marketListingList" data-account-collection-list aria-label="自分の出品物一覧" aria-live="polite">
@@ -554,12 +569,12 @@
             <div class="account-panel__head">
               <div>
                 <p class="account-eyebrow">PIXfind</p>
-                <h2 class="section-title">投稿したもの</h2>
+                <h2 class="section-title" data-i18n-key="accountPosts">投稿したもの</h2>
               </div>
               <div class="account-panel__actions">
-                <a class="account-text-action" href="../pixfind/index.html#creator">作る</a>
+                <a class="account-text-action" href="../pixfind/index.html#creator" data-i18n-key="accountMake">作る</a>
                 <span class="account-chip" id="pixfindPostCount">確認中</span>
-                <button class="account-text-action account-collection-toggle" type="button" data-account-collection-toggle aria-controls="pixfindPostList" aria-expanded="false" hidden>全て見る</button>
+                <button class="account-text-action account-collection-toggle" type="button" data-account-collection-toggle aria-controls="pixfindPostList" aria-expanded="false" hidden data-i18n-key="accountSeeAll">全て見る</button>
               </div>
             </div>
             <p class="helper">有効プレイ数を記録しています。将来のプレイ報酬はPiXiEEDの売上の一部を原資とし、月次配分の実装後に金額を表示します。</p>
@@ -576,12 +591,12 @@
           </section>
           <section class="account-panel account-seller-panel" id="accountSeller" data-account-tab="rewards" hidden>
             <div class="account-panel__head">
-              <h2 class="section-title">販売</h2>
+              <h2 class="section-title" data-i18n-key="accountSeller">販売</h2>
               <span class="account-chip" id="marketSellerVerificationStatus">確認中</span>
             </div>
             <div class="account-service-grid">
-              <a class="account-service" id="marketSellerRequest" href="../market/seller.html"><strong>販売者設定</strong><span>本人情報・二段階認証・売上受取</span></a>
-              <a class="account-service" href="../market/sell.html"><strong>大元作品を出品</strong><span>購入済み素材を元にしていない作品を登録</span></a>
+              <a class="account-service" id="marketSellerRequest" href="../market/seller.html"><strong data-i18n-key="accountSellerSettings">販売者設定</strong><span data-i18n-key="accountSellerSettingsCopy">本人情報・二段階認証・売上受取</span></a>
+              <a class="account-service" href="../market/sell.html"><strong data-i18n-key="accountListOriginal">大元作品を出品</strong><span data-i18n-key="accountListOriginalCopy">購入済み素材を元にしていない作品を登録</span></a>
             </div>
           </section>
         </section>
@@ -589,7 +604,7 @@
     </main>
   </div>
 
-  <script src="../scripts/shared-auth-panel.js?v=20260722-fast-account-session1"></script>
+  <script src="../scripts/shared-auth-panel.js?v=20260824-login-home-label2"></script>
   <script src="../scripts/account-dashboard.js?v=20260722-provisional-views1"></script>
   <script src="../scripts/account-collections.js?v=2026.07.19-account-library2"></script>
   <script src="../scripts/pixieed-market-access.js?v=20260721-shared-client1"></script>
@@ -597,13 +612,13 @@
   <script src="../scripts/account-pageview-reward-budget.js?v=2026.07.19-reward-terms1"></script>
   <script src="../scripts/account-pageview-rewards.js?v=2026.07.19-lineage-rewards1"></script>
   <script src="../scripts/account-ad-permissions.js?v=2026.07.18-auth-stability1"></script>
-  <script src="../scripts/shared-profile-header.js"></script>
-  <script src="../scripts/shared-bottom-nav.js?v=20260724-fullscreen-icons2"></script>
-  <script src="../scripts/account-local-projects.js?v=20260726-v2-thumb1"></script>
+  <script src="../scripts/shared-profile-header.js?v=20260825-common-shell15"></script>
+  <script src="../scripts/shared-bottom-nav.js?v=20260825-studio-brand1"></script>
+  <script src="../scripts/account-local-projects.js?v=20260825-studio-labels1"></script>
   <script src="../scripts/account-pixfind-posts.js?v=20260728-individual-ogp-share1"></script>
   <script src="../pixiedraw/assets/js/modules/color-codec-utils.js?v=2026.06.30-color-codec-v1"></script>
   <script src="../scripts/market-purchase-delivery.js?v=20260720-pxd2"></script>
-  <script src="../scripts/account-market-purchases.js?v=20260722-item-url-fallback1"></script>
+  <script src="../scripts/account-market-purchases.js?v=20260825-audio-composition1"></script>
   <script src="../scripts/account-market-listings.js?v=20260726-signed-thumb1"></script>
   <script src="../market/media-protection.js?v=2026.07.17-preview-protection1"></script>
   <script src="../scripts/account-market-seller.js?v=20260724-seller-status1"></script>

@@ -1,0 +1,14 @@
+{
+  "evidenceVersion": "QUALIFICATION_COMMAND_MANIFEST_V1",
+  "packageId": "DRAW-130",
+  "commands": [
+    { "id": "DRAW130-FORMAT", "acceptanceIds": ["DRAW130-SCOPE-001", "DRAW130-WORKSPACE-001", "DRAW130-EVIDENCE-001", "DRAW130-STOP-001"], "argv": ["deno", "fmt", "--check", "pixiedraw2/src/draw2/draw-130", "pixiedraw2/tests/draw-130", "pixiedraw2/benchmarks/draw-130"] },
+    { "id": "DRAW130-TYPECHECK", "acceptanceIds": ["DRAW130-SCOPE-001", "DRAW130-WORKSPACE-001"], "argv": ["deno", "check", "pixiedraw2/src/draw2/draw-130/timeline-editor.ts", "pixiedraw2/tests/draw-130/timeline-editor.test.ts", "pixiedraw2/benchmarks/draw-130/generate-evidence.ts"] },
+    { "id": "DRAW130-TEST", "acceptanceIds": ["DRAW130-SCOPE-001", "DRAW130-WORKSPACE-001", "DRAW130-STOP-001"], "argv": ["deno", "test", "--no-remote", "--allow-read", "--allow-write", "--check", "pixiedraw2/tests/draw-130"] },
+    { "id": "DRAW130-CONTEXT", "acceptanceIds": ["DRAW130-SCOPE-001", "DRAW130-EVIDENCE-001", "DRAW130-STOP-001"], "argv": ["python3", "scripts/verify_work_package_context.py", "--context", ".codex/context/DRAW-130.md", "--root", "."] },
+    { "id": "BASELINE-IDENTITY", "acceptanceIds": ["DRAW130-STOP-001"], "argv": ["node", "scripts/test-baseline-failure-identity-wp080.mjs"] },
+    { "id": "BASELINE-SUITE", "acceptanceIds": ["DRAW130-STOP-001"], "argv": ["node", "scripts/test-baseline-suite-wp000.mjs"] },
+    { "id": "DRAW130-BENCHMARK-EVIDENCE", "acceptanceIds": ["DRAW130-SCOPE-001", "DRAW130-WORKSPACE-001", "DRAW130-EVIDENCE-001"], "argv": ["deno", "run", "--no-remote", "--allow-read", "--allow-write", "pixiedraw2/benchmarks/draw-130/generate-evidence.ts"] },
+    { "id": "DRAW130-DIFF-CHECK", "acceptanceIds": ["DRAW130-SCOPE-001", "DRAW130-WORKSPACE-001", "DRAW130-EVIDENCE-001", "DRAW130-STOP-001"], "argv": ["git", "diff", "--check"] }
+  ]
+}

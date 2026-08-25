@@ -7,6 +7,8 @@ const dom = {
   difficultyBackButton: document.getElementById('difficultyBackButton'),
   gameBackButton: document.getElementById('gameBackButton'),
   resetButton: document.getElementById('resetButton'),
+  gameLikeButton: document.getElementById('gameLikeButton'),
+  gameLikeCount: document.getElementById('gameLikeCount'),
   zoomResetButton: document.getElementById('zoomResetButton'),
   fullscreenButton: document.getElementById('fullscreenButton'),
   difficultyChips: Array.from(document.querySelectorAll('[data-difficulty]')),
@@ -653,6 +655,10 @@ async function init() {
     resetRound();
   });
 
+  dom.gameLikeButton?.addEventListener('click', () => {
+    if (state.currentPuzzle) void togglePuzzleLike(state.currentPuzzle, dom.gameLikeButton);
+  });
+
   dom.zoomResetButton?.addEventListener('click', () => {
     resetAllZoomTransforms();
   });
@@ -1127,8 +1133,8 @@ async function restorePendingCreatorUpload() {
   } else if (transferredImages) {
     setCreatorStatus(
       isHiddenObjectUpload
-        ? 'PiXiEEDrawの1枚を読み込みました。もの探しを作れます。'
-        : 'PiXiEEDrawの2枚を読み込みました。間違い探しを作れます。'
+        ? 'iDRAWの1枚を読み込みました。もの探しを作れます。'
+        : 'iDRAWの2枚を読み込みました。間違い探しを作れます。'
     );
   }
 }
@@ -3028,6 +3034,9 @@ function normalizePublishedPuzzleEntry(entry, fallback = null) {
     authorAvatar: resolveAuthorAvatar(source),
     clientId: source.client_id ?? source.clientId ?? null,
     validPlayCount: Math.max(0, Number(source.valid_play_count ?? source.validPlayCount) || 0),
+    socialPostId: source.socialPostId ?? source.social_post_id ?? null,
+    socialLikeCount: Math.max(0, Number(source.socialLikeCount ?? source.social_like_count) || 0),
+    socialLiked: Boolean(source.socialLiked ?? source.social_liked),
     original,
     diff,
     mode,
@@ -3040,6 +3049,24 @@ function normalizePublishedPuzzleEntry(entry, fallback = null) {
     source: 'published',
     badge: '公開',
   };
+}
+
+async function hydratePublishedPuzzleSocialStates(puzzles) {
+  const published = (puzzles || []).filter((puzzle) => puzzle?.source === 'published' && puzzle?.id);
+  if (!published.length || !window.PiXiEEDSocialPosts?.sourceStates) return puzzles;
+  try {
+    const states = await window.PiXiEEDSocialPosts.sourceStates('pixfind', published.map((puzzle) => puzzle.id));
+    published.forEach((puzzle) => {
+      const social = states.get(String(puzzle.id));
+      if (!social) return;
+      puzzle.socialPostId = social.id;
+      puzzle.socialLikeCount = Math.max(0, Number(social.like_count) || 0);
+      puzzle.socialLiked = Boolean(social.liked_by_me);
+    });
+  } catch (error) {
+    console.warn('PiXFiND likes are not available yet', error);
+  }
+  return puzzles;
 }
 
 async function loadPublishedPuzzles() {
@@ -3064,10 +3091,10 @@ async function loadPublishedPuzzles() {
     if (!response.ok) {
       console.warn('Failed to load published puzzles', response.status);
       markSupabaseMaintenanceFromError(null, response.status);
-      return cached.length ? cached : [];
+      return hydratePublishedPuzzleSocialStates(cached.length ? cached : []);
     }
     const data = await response.json();
-    if (!Array.isArray(data)) return cached.length ? cached : [];
+    if (!Array.isArray(data)) return hydratePublishedPuzzleSocialStates(cached.length ? cached : []);
     const repaired = [];
     for (const entry of data) {
       const key = entry?.id ?? entry?.slug;
@@ -3086,11 +3113,11 @@ async function loadPublishedPuzzles() {
     }).filter(Boolean);
     savePublishedCache(normalized);
     noteSupabaseSuccess();
-    return normalized;
+    return hydratePublishedPuzzleSocialStates(normalized);
   } catch (error) {
     console.warn('Failed to load published puzzles', error);
     markSupabaseMaintenanceFromError(error);
-    return cached.length ? cached : [];
+    return hydratePublishedPuzzleSocialStates(cached.length ? cached : []);
   }
 }
 
@@ -3526,13 +3553,14 @@ function createOfficialCard(puzzle) {
           : `<span>${authorName}</span>`}
       </span>
     </div>
-    <div class="puzzle-card__actions">
+    <div class="puzzle-card__actions${puzzle.source === 'published' ? ' has-like' : ''}">
       <button type="button" class="button button--primary button--compact puzzle-card__play" aria-label="${puzzle.label} をプレイする">
         プレイ
       </button>
       <button type="button" class="button button--ghost button--compact puzzle-card__share" aria-label="${puzzle.label} をシェアする">
         シェア
       </button>
+      ${puzzle.source === 'published' ? `<button type="button" class="button button--ghost button--compact puzzle-card__like" aria-label="${puzzle.label} にいいね" aria-pressed="${puzzle.socialLiked ? 'true' : 'false'}"><span aria-hidden="true">${puzzle.socialLiked ? '♥' : '♡'}</span> <span>${Number(puzzle.socialLikeCount || 0).toLocaleString('ja-JP')}</span></button>` : ''}
     </div>
   `;
 
@@ -3585,6 +3613,15 @@ function createOfficialCard(puzzle) {
   shareButton?.addEventListener('keydown', event => {
     event.stopPropagation();
   });
+  const likeButton = card.querySelector('.puzzle-card__like');
+  likeButton?.addEventListener('click', async event => {
+    event.stopPropagation();
+    event.preventDefault();
+    await togglePuzzleLike(puzzle, likeButton);
+  });
+  likeButton?.addEventListener('keydown', event => {
+    event.stopPropagation();
+  });
   card.querySelectorAll('.puzzle-card__author a').forEach(link => {
     link.addEventListener('click', event => {
       event.stopPropagation();
@@ -3595,6 +3632,49 @@ function createOfficialCard(puzzle) {
   });
 
   return card;
+}
+
+function updatePuzzleLikeButton(button, puzzle) {
+  if (!(button instanceof HTMLButtonElement)) return;
+  button.setAttribute('aria-pressed', String(Boolean(puzzle?.socialLiked)));
+  const values = button.querySelectorAll('span');
+  if (values[0]) values[0].textContent = puzzle?.socialLiked ? '♥' : '♡';
+  if (values[1]) values[1].textContent = Math.max(0, Number(puzzle?.socialLikeCount) || 0).toLocaleString('ja-JP');
+}
+
+async function togglePuzzleLike(puzzle, button) {
+  if (!puzzle?.socialPostId || !window.PiXiEEDSocialPosts?.toggleLike || button?.disabled) {
+    setHint('いいねを準備しています。時間をおいてもう一度お試しください。');
+    return;
+  }
+  button.disabled = true;
+  try {
+    const result = await window.PiXiEEDSocialPosts.toggleLike(puzzle.socialPostId);
+    puzzle.socialLiked = Boolean(result?.liked);
+    puzzle.socialLikeCount = Math.max(0, Number(result?.like_count) || 0);
+    state.officialPuzzles.filter((entry) => entry?.id === puzzle.id).forEach((entry) => {
+      entry.socialLiked = puzzle.socialLiked;
+      entry.socialLikeCount = puzzle.socialLikeCount;
+    });
+    updatePuzzleLikeButton(button, puzzle);
+    updateGameLikeButton();
+  } catch (error) {
+    if (error?.code === 'LOGIN_REQUIRED' || /login required/i.test(error?.message || '')) {
+      window.location.href = window.PiXiEEDSocialPosts.loginUrl();
+      return;
+    }
+    setHint('いいねを更新できませんでした。時間をおいてお試しください。');
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function updateGameLikeButton() {
+  if (!dom.gameLikeButton) return;
+  const puzzle = state.currentPuzzle;
+  dom.gameLikeButton.hidden = !puzzle?.socialPostId;
+  if (!puzzle?.socialPostId) return;
+  updatePuzzleLikeButton(dom.gameLikeButton, puzzle);
 }
 
 async function startOfficialPuzzle(puzzle) {
@@ -3700,6 +3780,9 @@ async function startOfficialPuzzle(puzzle) {
       authorUrl: puzzle.authorUrl || '',
       authorAvatar: puzzle.authorAvatar || resolveAvatarSrcFromId('mao'),
       clientId: puzzle.clientId || null,
+      socialPostId: puzzle.socialPostId || null,
+      socialLikeCount: Math.max(0, Number(puzzle.socialLikeCount) || 0),
+      socialLiked: Boolean(puzzle.socialLiked),
     };
     prepareGameBoard(
       originalImage,
@@ -3710,6 +3793,7 @@ async function startOfficialPuzzle(puzzle) {
     dom.gameTitle.textContent = metadata.name;
     renderGameAuthor(metadata);
     setActiveScreen('game');
+    updateGameLikeButton();
     resetRound();
     window.PiXiEEDCreatorPlayRewards?.track('pixfind', metadata.id);
   } catch (error) {

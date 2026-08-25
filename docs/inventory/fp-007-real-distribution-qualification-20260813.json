@@ -5,14 +5,14 @@
   "status": "PASS_WITH_EXTERNAL_BLOCKERS",
   "qualificationStatus": "PASS",
   "scope": "REAL_CLEAN_CHECKOUT",
-  "snapshotCommit": "aee6eb58a72ce47a0befc33293f5589c73a4b858",
+  "snapshotCommit": "ff0a172a2db55e68a339959c2cde8f9ae5346295",
   "staging": {
     "entryCount": 34,
     "runCount": 2,
     "cleanOutput": false,
     "identicalSecondRun": true,
-    "artifactFileCount": 743,
-    "artifactTotalBytes": 74428670
+    "artifactFileCount": 744,
+    "artifactTotalBytes": 74453530
   },
   "buildInputs": {
     "manifestPath": "scripts/fp007-build-input-manifest.json",
@@ -22,10 +22,10 @@
     "allFilesHaveGitBlobOid": true
   },
   "identity": {
-    "inputHash": "4bcd63ad97eb5c5bcc5bd63b0652c6a288a67b58fd092939fe506d7ce3f2feff",
-    "artifactTreeHash": "17984fe32022cf1f8bdba51e50aa8a95ff920f86f11a45f323ccffe45d592f40",
+    "inputHash": "c88ee5dd36880a3eeee42f5815390b1c5bc98f04dfbfd5c42a38865a2164bada",
+    "artifactTreeHash": "7127f5ac8b50cab59a829f022a07b8b880b8788a3d15506a8932b102815f076a",
     "buildManifestHash": "261ef5b768f357db32b1cde7a4d649a89042e96b052ec2609a913265663027e2",
-    "sourceToDistProvenanceHash": "975a7d4e12c201697b45a8d34b3f08d4879cd4a0baf9617b5d4ed06a04b4e356"
+    "sourceToDistProvenanceHash": "f6fba87461b5a72248e16ea9fbb95e1301d4f56d78e198b72740a4d97359f83d"
   },
   "toolchain": {
     "nodeVersion": "22.19.0",
@@ -36,7 +36,8 @@
   "currentSystemImpact": "NOT_ACCESSED",
   "releaseClaim": false,
   "notes": [
-    "The snapshot retained the existing post route instead of excluding it from staging.",
+    "The snapshot retained the existing post route because it is a required entry in the canonical staging manifest; its content was not changed by this qualification.",
+    "The qualification was performed from the scoped FP-007 commit; it is not a whole-dirty-worktree release qualification.",
     "This evidence does not clean, commit, push, deploy, or publish the main worktree.",
     "FP-007 overall status remains blocked until the main qualification boundary and later production-equivalent gates are separately resolved."
   ]

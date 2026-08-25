@@ -1,0 +1,65 @@
+{
+  "workPackage": "WP-092",
+  "status": "complete",
+  "implementation": {
+    "module": "core-shell/assets/core-asset-registry-contracts.js",
+    "schema": "core-shell/schemas/asset-registry-v1.schema.json",
+    "validFixture": "core-shell/fixtures/asset-registry-v1.valid.json",
+    "test": "scripts/test-core-asset-registry-wp092.mjs",
+    "loadedBy": [],
+    "domCanvasEditorNetworkCoupling": false,
+    "existingWp040AdapterChanged": false
+  },
+  "recordBoundary": {
+    "included": [
+      "Asset identity, registered kind, owner, Project reference",
+      "Visibility, lifecycle, HEAD, record version",
+      "Immutable Revision, parent, verified Hash, MIME, size",
+      "Relative OPFS/Object Storage locator metadata",
+      "Dependency edge, relation, compatibility, required/optional status",
+      "LIVE/PINNED/REVIEW/FORKED policy",
+      "Provenance and synthetic legacy binding evidence"
+    ],
+    "excluded": [
+      "Blob bytes",
+      "Base64/Data URL",
+      "Full Editor State",
+      "Journal/Checkpoint/Operation payload",
+      "Post/Comment/Follow content",
+      "Purchase/Entitlement/License body",
+      "Royalty/Payment/Payout data",
+      "Commission body"
+    ]
+  },
+  "flags": {
+    "asset-registry-read": "default-off",
+    "asset-registry-write": "default-off",
+    "asset-revision-write": "default-off",
+    "asset-dependency-live": "default-off",
+    "asset-legacy-adapter": "default-off",
+    "asset-storage-upload": "default-off"
+  },
+  "preservation": {
+    "productionRoutesChanged": false,
+    "currentPiXiEEDrawChanged": false,
+    "currentPxdChanged": false,
+    "currentPiXiSYNCChanged": false,
+    "marketChanged": false,
+    "snsDeleted": false,
+    "productionAssetsMigrated": false,
+    "databaseMigrationApplied": false,
+    "storageUploadApplied": false,
+    "deployPublishCommitPush": false
+  },
+  "verification": {
+    "testCommand": "node scripts/test-core-asset-registry-wp092.mjs",
+    "exitCode": 0,
+    "commandsCovered": 11,
+    "eventsCovered": 12,
+    "referencePolicies": ["LIVE", "PINNED", "REVIEW", "FORKED"],
+    "failureFixtures": 36,
+    "baselineFailureIdentity": "14/14 inherited match; new 0",
+    "diffCheck": "pass"
+  },
+  "nextBoundary": "WP-093 Tool Bridge API consumes Asset/Revision/Dependency events without owning Asset storage or Editor data."
+}

@@ -1,0 +1,22 @@
+workflow_id: START-001
+steps:
+  - read_bootstrap_and_canonical_state
+  - parse_GOAL_adapter
+  - if_discovery_lock_false: run_DISCOVERY_INTERVIEW
+  - if_discovery_waiting_for_answers: ask_batch_and_stop
+  - if_discovery_lock_true_and_blueprint_uninitialized: run_BLUEPRINT_BUILDER
+  - parse_new_CHANGE_adapter_and_run_CHANGE_IMPACT_if_needed
+  - inspect_repository_current_state_if_existing
+  - select_highest_value_unblocked_work_package
+  - run_EVIDENCE_VALUE_GATE
+  - execute_DELIVERY_LOOP
+startup_user_output:
+  before_lock:
+    - one_compact_question_batch
+  after_lock:
+    - understood_goal_short
+    - autonomy_started
+    - first_user_visible_result_target
+delivery_user_output:
+  - completed_result
+  - material_risk_or_hard_approval_only

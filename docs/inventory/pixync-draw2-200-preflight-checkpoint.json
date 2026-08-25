@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "AGENT_PACKAGE_PREFLIGHT_CHECKPOINT_V1",
+  "packageId": "PIXYNC-DRAW2-200",
+  "sourcePath": "pixiedraw2/tests/pixync/pixync-draw2-200-durable-transport.test.ts",
+  "sourceHash": "d81b4e4467a60cb1456042c57cd4ed5ce58f73f2140d6065b3e561fe5ba2d1c6",
+  "status": "READY_FOR_TERRA",
+  "executionPolicy": {
+    "mode": "BALANCED",
+    "contract": "required-before-implementation",
+    "changeBudget": {
+      "maxChangedLines": 500,
+      "maxFiles": 4,
+      "maxRetries": 2,
+      "maxFullAudits": 1,
+      "maxFullEvidenceRuns": 1
+    },
+    "testTiers": { "specialistMax": 1, "integratorMax": 2, "finalMax": 4 },
+    "maxAffectedDiffReviews": 1,
+    "maxReleaseGateFullAudits": 1,
+    "maxFullEvidenceRuns": 1,
+    "evidenceRuns": 1,
+    "terraMode": "READ_ONLY_FINAL",
+    "specialistPolicy": "DISJOINT_ONLY",
+    "integratorTier": 2,
+    "sameCategoryEscalation": "SOL"
+  },
+  "currentRound": 1,
+  "max_fix_rounds": 2,
+  "timebox_minutes": 20,
+  "checkpoint_every_minutes": 10,
+  "sameClassFinding": {
+    "class": "authoritative-ack-durable-binding",
+    "occurrence": 1,
+    "decision": "CONTINUE"
+  },
+  "history": [
+    {
+      "status": "READY",
+      "reason": "200 preflight fixed the authority, identity, privacy, and lifecycle boundary before implementation",
+      "resolvedBy": "LUNA"
+    }
+  ]
+}

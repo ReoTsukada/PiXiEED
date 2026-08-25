@@ -267,6 +267,9 @@
   function updateHeaderLabel() {
     const brandUser = document.getElementById('brandUser');
     if (!brandUser) return;
+    // Draw2-firstホームのブランドサブタイトルは、認証状態ではなく
+    // サービスの位置付けを示す固定ラベルとして扱う。
+    if (brandUser.closest('.draw2-home-header')) return;
     if (supabaseUser?.email) {
       brandUser.textContent = loadNickname() || supabaseUser.email;
       return;
@@ -769,7 +772,16 @@
     const signedIn = Boolean(supabaseUser) && authMode !== 'update-password';
     document.body.dataset.pixieedAccountAuth = signedIn ? 'signed-in' : 'signed-out';
     const title = document.getElementById('accountTitle');
-    if (title) title.textContent = signedIn ? 'マイページ' : authMode === 'signup' ? 'アカウントを作成' : authMode === 'reset' ? 'パスワードを再設定' : 'ログイン';
+    if (title) {
+      const english = document.documentElement.lang === 'en';
+      title.textContent = signedIn
+        ? english ? 'Profile' : 'マイページ'
+        : authMode === 'signup'
+          ? english ? 'Create account' : 'アカウントを作成'
+          : authMode === 'reset'
+            ? english ? 'Reset password' : 'パスワードを再設定'
+            : english ? 'Log in' : 'ログイン';
+    }
   }
 
   async function signInWithProvider(provider, label) {
@@ -1375,6 +1387,8 @@
   window.pixieedSharedAuthPanel = {
     init,
   };
+
+  window.addEventListener('pixieed:locale-changed', () => updateAccountPageAuthState());
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {

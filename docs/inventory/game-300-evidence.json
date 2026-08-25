@@ -1,0 +1,47 @@
+{
+  "workPackage": "GAME-300",
+  "status": "ISOLATED_REFERENCE_PASS",
+  "acceptanceIds": ["GAME300-SCOPE-001", "GAME300-EVIDENCE-001", "GAME300-STOP-001"],
+  "implementation": [
+    "pixiedraw2/src/game/game-300/core.ts",
+    "pixiedraw2/tests/game-300/core.test.ts",
+    "pixiedraw2/benchmarks/game-300/core.bench.ts"
+  ],
+  "contract": "docs/contracts/GAME-300-game-project-core.md",
+  "adr": "docs/decisions/ADR-001-GAME-300-canonical-project-ir.md",
+  "checks": {
+    "typecheck": {
+      "command": "deno check --no-remote src/game/game-300/core.ts tests/game-300/core.test.ts benchmarks/game-300/core.bench.ts",
+      "exitCode": 0
+    },
+    "tests": {
+      "command": "deno test --no-remote --check tests/game-300/core.test.ts",
+      "exitCode": 0,
+      "passed": 4,
+      "failed": 0,
+      "coverage": ["deterministic project hash", "Draw/Audio Asset Revision reference", "No-code/Graph/Script same IR", "journal undo/redo/checkpoint/restore", "duplicate", "dependency cycle", "unknown schema", "invalid component", "caller owner/revision mismatch"]
+    },
+    "benchmark": {
+      "command": "deno run --no-remote --check benchmarks/game-300/core.bench.ts",
+      "exitCode": 0,
+      "status": "MEASURED_LOCAL_SYNTHETIC",
+      "iterations": 100,
+      "totalMs": 10.567,
+      "averageMs": 0.1057,
+      "deterministicHash": "2f378321a14e10c7d8e72d281ebe16a15ca28f4405618cb25f00e705f0e76b68"
+    },
+    "diffCheck": {
+      "command": "git diff --check -- pixiedraw2/src/game/game-300 pixiedraw2/tests/game-300 pixiedraw2/benchmarks/game-300 docs/contracts/GAME-300-game-project-core.md docs/inventory/game-300-evidence.json docs/decisions/ADR-001-GAME-300-canonical-project-ir.md",
+      "exitCode": 0
+    }
+  },
+  "boundaries": {
+    "registryQueueStateContext": "UNTOUCHED",
+    "game310": "UNTOUCHED",
+    "currentSystemProduction": "UNTOUCHED",
+    "browser": "UNTESTED",
+    "physicalDevice": "UNTESTED",
+    "production": "UNTESTED",
+    "deploymentMigrationCommitPush": "NOT_PERFORMED"
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "benchmarkId": "WP110_REFERENCE_BUNDLE_BASELINE",
+  "measuredAt": "2026-08-07T14:09:09.697Z",
+  "status": "MEASURED_LOCAL_BUILD",
+  "build": {
+    "command": "deno bundle --platform browser src/draw2-entry.ts",
+    "minifiedCommand": "deno bundle --platform browser --minify src/draw2-entry.ts",
+    "sourceMapExcluded": true,
+    "sourceMapIncluded": false
+  },
+  "source": {
+    "files": [
+      {
+        "file": "pixiedraw2/src/draw2-core.ts",
+        "bytes": 35233
+      },
+      {
+        "file": "pixiedraw2/src/draw2-entry.ts",
+        "bytes": 9398
+      }
+    ],
+    "totalBytes": 44631
+  },
+  "initialEditorEntry": {
+    "file": "pixiedraw2/dist/draw2-entry.js",
+    "rawBytes": 33723,
+    "minifiedBytes": 18891,
+    "rawCompressed": {
+      "gzipBytes": 8306,
+      "brotliBytes": 7305
+    },
+    "minifiedCompressed": {
+      "gzipBytes": 6431,
+      "brotliBytes": 5716
+    }
+  },
+  "css": {
+    "file": "pixiedraw2/assets/draw2-shell.css",
+    "rawBytes": 4706,
+    "compressed": {
+      "gzipBytes": 1560,
+      "brotliBytes": 1321
+    }
+  },
+  "initialRequests": [
+    "pixiedraw2/assets/draw2-shell.css",
+    "pixiedraw2/dist/draw2-entry.js"
+  ],
+  "lazyChunks": [],
+  "notes": [
+    "22.31KB was the previous WP-100 bundle definition; this record measures the current isolated WP-110 feature entry after dirty-region instrumentation.",
+    "The benchmark entry is an isolated measurement page and is not part of the editor initial bundle.",
+    "No arbitrary byte budget or performance PASS is inferred from these byte counts."
+  ]
+}

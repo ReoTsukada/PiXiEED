@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "workPackage": "WP-170",
+  "scope": "isolated pixiedraw2 advanced production feature layer",
+  "status": "PASS_WITH_UNTESTED_GATES",
+  "features": {
+    "tileAssetAndMap": "PASS_CORE",
+    "patternBrush": "PASS_CORE",
+    "stamp": "PASS_CORE",
+    "referenceImage": "PASS_CORE",
+    "gridRulerGuide": "PASS_CORE_OVERLAY",
+    "mirrorSymmetry": "PASS_CORE",
+    "dither": "PASS_CORE",
+    "indexedPalette": "PASS_CORE",
+    "animationTag": "PASS_CORE",
+    "slice": "PASS_CORE",
+    "gameAssetMetadata": "PASS_CORE",
+    "marketPackagePreparation": "PASS_PREPARATION_ONLY"
+  },
+  "architecture": {
+    "pureCore": "pixiedraw2/src/wp170-advanced-tools-core.ts",
+    "lazyBundle": "pixiedraw2/dist/wp170-advanced-tools.js",
+    "editorAdapter": "pixiedraw2/src/wp170-advanced-editor-adapter.ts",
+    "canonicalMutation": "raster.writeSet",
+    "previewMutation": "FORBIDDEN",
+    "syncBoundary": "typed committed operation only",
+    "featureFlagDefault": "OFF"
+  },
+  "failureFixtures": 24,
+  "asepriteReference": "docs/contracts/DRAW2-ASEPRITE-UX-REFERENCE.md",
+  "preservation": {
+    "currentSite": "UNCHANGED_BY_WP170_SCOPE",
+    "currentDraw": "UNCHANGED_BY_WP170_SCOPE",
+    "legacyPxd": "lazy_compatibility_boundary",
+    "pixiSync": "no_transport_connection",
+    "market": "package_preparation_only",
+    "productionData": "UNCHANGED"
+  },
+  "baselineFailureIdentity": {
+    "existing": "14/14 preserved from approved evidence; not re-executed",
+    "new": 0
+  },
+  "untested": [
+    "real desktop/tablet/phone device",
+    "full compositor and GPU path",
+    "physical touch/stylus and screen reader device lifecycle",
+    "long-session memory pressure",
+    "WP-150 real legacy/user/device/production compatibility",
+    "production migration/deploy/publish"
+  ]
+}

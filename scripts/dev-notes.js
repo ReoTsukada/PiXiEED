@@ -7,21 +7,22 @@
     {
       id: 'site',
       name: 'PiXiEED 全体',
+      nameKey: 'notesSite',
       url: '../index.html',
       entries: [
         {
           date: '2026-03-20',
           items: [
-            'ホームの最近の更新に、PiXiEEDrawの最新変更と紹介ページの広告調整を反映',
+            'ホームの最近の更新に、iDRAWの最新変更と紹介ページの広告調整を反映',
             '各ツール紹介ページの広告配置を最適化し、下部広告を追加',
-            'PiXiEEDrawのファイル/カラーUI間隔調整を更新状況に反映'
+            'iDRAWのファイル/カラーUI間隔調整を更新状況に反映'
           ]
         },
         {
           date: '2026-03-15',
           items: [
-            'ホームの更新状況カードに、最新の PiXiEEDraw / 各ツール / 関連ページ更新を反映',
-            '開発ノートに最新の PiXiEEDraw とサイト更新メモを追加'
+            'ホームの更新状況カードに、最新の iDRAW / 各ツール / 関連ページ更新を反映',
+            '開発ノートに最新の iDRAW とサイト更新メモを追加'
           ]
         },
         {
@@ -35,9 +36,9 @@
         }
       ]
     },
-    { id: 'pixiedraw', name: 'PiXiEEDraw', url: '../pixiedraw/index.html', entries: [] },
-    { id: 'pixiee-lens', name: 'PiXiEELENS', url: '../pixiee-lens/index.html', entries: [] },
-    { id: 'qr-maker', name: 'QRコードメーカー', url: '../qr-maker/index.html', entries: [] }
+    { id: 'pixiedraw', name: 'iDRAW', nameKey: 'notesDraw', url: '../pixiedraw/index.html', entries: [] },
+    { id: 'pixiee-lens', name: 'PiXiEELENS', nameKey: 'notesLens', url: '../pixiee-lens/index.html', entries: [] },
+    { id: 'qr-maker', name: 'QRコードメーカー', nameKey: 'notesQr', url: '../qr-maker/index.html', entries: [] }
   ];
 
   // file:// 直開きなど fetch が失敗する環境でも主要ツールだけは空欄にしない
@@ -109,6 +110,8 @@
   }).catch(() => {
     // keep rendered fallback
   });
+
+  window.addEventListener('pixieed:locale-changed', () => render(notes));
 
   function cloneNotes(source) {
     return source.map(note => ({
@@ -339,14 +342,15 @@
       head.className = 'note-section__head';
 
       const title = document.createElement('h2');
-      title.textContent = note.name;
+      const displayName = localizedNoteName(note);
+      title.textContent = displayName;
 
       if (note.url) {
         const link = document.createElement('a');
         link.className = 'note-section__link';
         link.href = note.url;
-        link.textContent = '開く';
-        link.setAttribute('aria-label', `${note.name} を開く`);
+        link.textContent = localizedMessage('notesOpen', '開く');
+        link.setAttribute('aria-label', localizedMessage('notesOpenAria', `${displayName} を開く`).replace('{name}', displayName));
         head.append(title, link);
       } else {
         head.appendChild(title);
@@ -357,7 +361,7 @@
       if (!note.entries.length) {
         const empty = document.createElement('p');
         empty.className = 'note-empty';
-        empty.textContent = '準備中';
+        empty.textContent = localizedMessage('notesPreparing', '準備中');
         section.appendChild(empty);
       } else {
         const list = document.createElement('div');
@@ -397,11 +401,30 @@
         const chip = document.createElement('a');
         chip.className = 'note-chip';
         chip.href = `#note-${note.id}`;
-        chip.textContent = note.name;
+        chip.textContent = localizedNoteName(note);
         navFragment.appendChild(chip);
       });
       nav.appendChild(navFragment);
     }
+  }
+
+  function localizedNoteName(note) {
+    return localizedMessage(note.nameKey, note.name);
+  }
+
+  function localizedMessage(key, fallback) {
+    const locale = document.documentElement.dataset.pixieedLocale;
+    const english = locale === 'en';
+    const messages = {
+      notesOpen: english ? 'Open' : '開く',
+      notesOpenAria: english ? 'Open {name}' : '{name} を開く',
+      notesPreparing: english ? 'Coming soon' : '準備中',
+      notesSite: english ? 'PiXiEED overall' : 'PiXiEED 全体',
+      notesDraw: 'iDRAW',
+      notesLens: 'PiXiEELENS',
+      notesQr: english ? 'QR Maker' : 'QRコードメーカー'
+    };
+    return messages[key] || fallback || '';
   }
 
   function formatDate(value) {

@@ -1,0 +1,128 @@
+schema_version: 3.2
+blueprint_id: PRODUCT-BLUEPRINT-001
+status: active
+revision: 1
+discovery_provenance:
+  discovery_lock_required: true
+  confirmed_facts:
+    - "Web先行、同一App ShellでiOS/Androidへ段階展開"
+    - "最終的にiOS/Androidのネイティブ決済でデジタル商品を販売"
+    - "PiXiEED.jpトップをDraw2発見・導入の入口へ更新"
+    - "既存ページ、既存マーケット商品、購入権限を保持して段階移行"
+  safe_assumptions: []
+north_star:
+  product_outcome: "PiXiEEDraw2を中心に、描画・音声・ゲーム制作・同期・公開・マーケット・コミュニティを一つの高性能クリエイティブ製品として利用できるWeb/アプリ基盤を提供する。"
+  target_users:
+    - "ピクセルアート、アニメーション、ゲーム素材、音声素材を制作するクリエイター"
+    - "専門ツールの性能を求めるが、複雑な画面に迷いたくないユーザー"
+    - "Webとアプリを行き来しながら作品を作り、共有・販売したいユーザー"
+  primary_jobs_to_be_done:
+    - "PiXiEEDraw2で迷わず制作を開始する"
+    - "AudioとGameを必要な時だけ読み込み、Draw2と連携する"
+    - "作品を保存、同期、公開、販売、購入する"
+    - "Webとアプリで同じアカウント・作品・権限を使う"
+  success_metrics:
+    - "トップページを見て短時間でPiXiEEDraw2の用途と開始導線を理解できる"
+    - "制作画面の初回操作でキャンバス・ツール・保存状態が理解できる"
+    - "不要なモードやパネルを初期ロードせず、制作開始までの待機を抑える"
+    - "既存マーケット商品と購入権限が新UIでも欠落しない"
+    - "Webからアプリ、アプリから作品公開ページへ一貫して遷移できる"
+  non_negotiable_constraints:
+    - "既存マーケットの商品ID、購入権限、出品者、作品データを破壊しない"
+    - "Draw、Audio、Gameの編集責務を混在させない"
+    - "PiXYNCと履歴・保存・権限の整合性を崩さない"
+    - "Web版とネイティブ版で共通のApp Shell・URL・データ契約を使う"
+    - "ストア決済は各プラットフォームの規約に適合させる"
+  forbidden_outcomes:
+    - "旧ページと新ページでアカウント、購入、作品が分断される"
+    - "マーケットやSNSの機能がDraw2の制作領域を圧迫する"
+    - "見た目だけを先行し、ロード・保存・同期・復旧が不安定になる"
+    - "競合製品のコード、固有アイコン、固有表現をコピーする"
+  budget_policy: quality_per_total_cost
+acceptance_outcomes:
+  - "PiXiEED.jpがDraw2の用途、特徴、開始導線、既存マーケットへの導線を明確に提示する"
+  - "共通App ShellからDraw2、Audio、Game、Market、Library、Social、Accountへ一貫して遷移できる"
+  - "Draw2の制作中に不要なモードのUI・データを初期ロードしない"
+  - "既存商品を新しいマーケットUIで同じ商品として表示し、購入済み状態を復元できる"
+  - "Web・iOS・Androidで同じ作品ID、ユーザーID、権限ID、PiXYNCプロジェクトIDを利用できる"
+experience_principles:
+  - "作品・キャンバスを主役にする"
+  - "主要ナビゲーションを少数に絞る"
+  - "現在の作業に必要な操作だけをコンテキスト表示する"
+  - "固定・リサイズ可能な領域を基本とし、キャンバス上への不用意な重なりを避ける"
+  - "高速な反応、明確な状態表示、復旧可能な操作を優先する"
+  - "Webとアプリで同じ意味・同じ導線を維持する"
+architecture_principles:
+  - "Shared Domain + Shared UI + Web/Native Shell Adapter"
+  - "Route単位の遅延ロードと制作機能のローカル優先"
+  - "マーケット・SNS・マイページのサーバー認証とキャッシュ分離"
+  - "Web決済、StoreKit、Google Play BillingをCommerce Adapterで分離"
+  - "既存データをCanonical IDで保持し、旧形式はAdapterで扱う"
+data_invariants:
+  - "product_id/listing_id/purchase_id/asset_id/project_idは移行で変えない"
+  - "購入権限は決済プロバイダーではなくサーバーの検証済み権限を正とする"
+  - "PiXYNCの履歴・差分・チェックポイントはモード別編集責務を越えて書き換えない"
+security_privacy_invariants:
+  - "購入・公開・削除・共有権限はサーバー側で検証する"
+  - "アプリ内から外部決済へ不用意に誘導しない"
+performance_budgets:
+  - "トップページは主要コンテンツを初期表示し、制作機能本体は開始操作後にロードする"
+  - "Draw2起動時にAudio、Game、Market、Socialの重いモジュールを同期ロードしない"
+compatibility_invariants:
+  - "既存PiXiEEDの公開URLとマーケット商品URLを段階移行中も維持する"
+  - "旧商品のプレビュー・購入済み利用・ダウンロード導線を失わない"
+monetization_constraints:
+  - "Webは既存決済を維持し、iOS/Androidはネイティブ決済アダプターを使用する"
+  - "同一商品にWeb/iOS/Androidの決済商品マッピングを持たせる"
+solution_hypotheses:
+  mutable: true
+  ui_information_architecture:
+    - "Global: 制作 / マーケット / ライブラリ / コミュニティ / マイページ"
+    - "制作: Draw / Audio / Gameをモード切替し、各モード内部の編集責務を分離"
+    - "PiXiEED.jp: Draw2中心の検索・理解・開始・作品発見ランディング"
+  technical_architecture:
+    - "既存core-shellを共通App Shellの基盤として段階拡張"
+    - "pixiedraw2のplatform compositionをApp Shellのroute/authorityへ接続"
+    - "Capacitorは同一Web資産を段階的にネイティブへ包む"
+  technology_choices:
+    - "現行の静的Web資産、Capacitor、Supabase、既存Draw2モジュールを優先利用"
+    - "ストア固有機能はNative Adapterに閉じ込める"
+  algorithms:
+    - "必要なルート・モードだけ遅延ロード"
+    - "既存商品をCanonical IDで変換表示"
+  workflows:
+    - "Discovery → Blueprint → Evidence Gate → Work Package → Browser/Node Verification"
+  design_patterns:
+    - "Fixed/resizable work regions"
+    - "Contextual controls"
+    - "Progressive disclosure"
+    - "Recent/Quick start"
+    - "Shared status and recovery feedback"
+open_questions:
+  - "iOS/Androidの公開時期と対象地域"
+  - "ストア別価格・税・返金・サブスクリプションの最終運用"
+safe_assumptions:
+  - "まずWebトップと共通Shellの視覚・導線を実装し、ネイティブ公開は後段で行う"
+evidence_dependencies: []
+coherence_checks:
+  - every_work_package_maps_to_acceptance_outcome
+  - no_local_change_violates_non_negotiable_constraint
+  - architecture_changes_update_dependency_and_test_impact
+  - user_experience_remains_cross_feature_consistent
+  - duplicate_capabilities_are_reused_or_merged
+revision_policy:
+  immutable_without_human_approval:
+    - product_outcome_when_change_creates_different_product
+    - non_negotiable_constraints
+    - forbidden_outcomes
+  adaptive_with_evidence:
+    - solution_hypotheses
+    - technology_choices
+    - ui_information_architecture
+    - algorithms
+    - implementation_sequence
+  revision_requires:
+    - reason
+    - evidence
+    - affected_work_packages
+    - migration_or_rollback_if_needed

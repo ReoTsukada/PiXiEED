@@ -1,0 +1,92 @@
+schema_version: 3.1
+entries:
+  - cache_key: unified-creative-app-ux-20260824
+    research_question: "現行の主要クリエイティブアプリからPiXiEED共通App Shellへ転用できるUI/UX原則は何か"
+    findings:
+      - "Figma UI3は作品領域を中心に据え、UIを縮小できる一方、長時間作業で浮遊パネルが作業領域を圧迫したため固定・リサイズ可能なパネルへ調整している。"
+      - "Affinityはベクター、ピクセル、レイアウトを一つの高速な制作環境にまとめ、ワークスペースを調整・保存できる。"
+      - "Adobe Frescoはクイックスタート、コンテキストツール、ジェスチャー、ショートカット、同期を制作フローに統合している。"
+      - "Asepriteはレイヤー・フレーム・セルをタイムライン中心に扱い、タイムラインを表示・非表示できる。"
+      - "Apple HIGとMaterialの現行指針では、主要ナビゲーションを少数項目に絞り、画面サイズに応じてボトムバー・ナビゲーションレール・ドロワーを切り替える。"
+      - "PiXiEEDでは制作中のDraw2領域を最優先にし、マーケット・ライブラリ・SNS・マイページはApp Shellの共通ナビゲーションへ分離するのが整合的。"
+    source_refs:
+      - "https://www.figma.com/blog/our-approach-to-designing-ui3/"
+      - "https://www.canva.com/newsroom/news/all-new-affinity/"
+      - "https://helpx.adobe.com/fresco/desktop/introduction/getting-started-with-user-interface.html"
+      - "https://www.aseprite.org/docs/timeline/"
+      - "https://developer.apple.com/design/human-interface-guidelines/"
+      - "https://developer.android.com/design/ui/mobile/guides/layout-and-content/layout-and-nav-patterns"
+    license_notes:
+      - "競合製品のコード・固有表現・アイコンを複製せず、公開ガイドラインと観察可能な設計原則のみを参照する。"
+    verified_at: 2026-08-24
+    freshness_class: medium
+    invalidate_when:
+      - "主要OSのナビゲーション指針が大きく更新された場合"
+      - "PiXiEEDの対象プラットフォームまたは主要ユーザーが変わった場合"
+    reusable_for:
+      - "PRODUCT-BLUEPRINT-001"
+      - "WP-080-APP-SHELL-DESIGN-SYSTEM"
+      - "WP-210-MARKET-RIGHTS-COMMERCE"
+      - "WP-230-SNS-COMMUNITY-CREATOR"
+  - cache_key: homepage-seo-aieo-20260824
+    research_question: "PiXiEED.jpをPiXiEEDraw2の発見・理解・開始ページへ移行するためのSEO/AIEOとホームページ構成の要件は何か"
+    findings:
+      - "Google Search CentralはAI検索向けの特別なマークアップを要求しておらず、従来のSEO、可視コンテンツ、信頼できる内部外部リンク、構造化データの整合性を基本とする。"
+      - "SoftwareApplicationの構造化データではアプリ名と価格情報を含め、DesignApplication、Web、機能一覧を可視の説明と一致させる。リッチリザルトは保証されない。"
+      - "Procreate、Canva、Figmaの公式トップは、最初の画面で短い価値提案と開始導線を示し、その後に機能を用途別に分けて説明している。"
+      - "Linearの公式デザイン更新は、積み重なったUIを整理し、作業領域を主役にしながらナビゲーションを静かで予測可能にする考え方を示している。"
+      - "PiXiEEDではDraw2を最初の価値提案とCTAにし、コミュニティ、マーケット、ライブラリは既存機能を失わない下流導線として残すのが安全。"
+    source_refs:
+      - "https://developers.google.com/search/docs/appearance/ai-features"
+      - "https://developers.google.com/search/docs/appearance/structured-data/software-app"
+      - "https://developers.google.com/search/docs/appearance/structured-data/sd-policies"
+      - "https://procreate.com/"
+      - "https://www.canva.com/"
+      - "https://www.figma.com/"
+      - "https://linear.app/now/behind-the-latest-design-refresh"
+    license_notes:
+      - "競合サイトの文章・コード・固有アイコンを複製せず、公開されている情報設計と設計原則だけを参照する。"
+    verified_at: 2026-08-24
+    freshness_class: medium
+    invalidate_when:
+      - "GoogleのAI検索・構造化データ仕様が更新された場合"
+      - "PiXiEEDraw2の公開機能、価格、主要導線が変わった場合"
+    reusable_for:
+      - "PRODUCT-BLUEPRINT-001"
+      - "WP-080-APP-SHELL-DESIGN-SYSTEM"
+      - "WP-210-MARKET-RIGHTS-COMMERCE"
+  - cache_key: login-ux-and-auth-methods-20260824
+    research_question: "PiXiEEDのログイン画面を、対応済みの認証方式を保ったまま信頼性・理解しやすさ・開始率の高い導線へ整理するには何が必要か"
+    findings:
+      - "Apple HIGは、ログインを求める理由を短く示し、価値を先に伝え、不要な入力を増やさず、ログイン後すぐに利用できる状態へ戻すことを重視している。"
+      - "Googleの公式ガイドは、Googleボタンを他の外部ログインと同等以上に目立たせ、Googleの標準ロゴ・文言・境界・余白を守ることを求めている。"
+      - "Auth0 Universal Loginは、ログイン、登録、パスワード再設定、パスワードレスを一貫した一つの認証面にまとめる考え方を示している。"
+      - "PiXiEEDの現在の実装はGoogle OAuth、メール/パスワード、メールのログインリンク、パスワード再設定を既に持つため、未接続のAppleや別プロバイダーのボタンは追加しない。"
+      - "ログイン画面にはPiXiEEDraw2の実画面を使い、ログイン後に戻れる作品・購入素材・共有プロジェクトを明示する。認証処理、リダイレクト、セッション保持、管理者表示制御は既存契約を維持する。"
+    source_refs:
+      - "https://developer.apple.com/design/human-interface-guidelines/sign-in-with-apple"
+      - "https://developers.google.com/identity/branding-guidelines"
+      - "https://developers.google.com/identity/gsi/web/guides/offerings"
+      - "https://auth0.com/docs/authenticate/login/auth0-universal-login"
+    license_notes:
+      - "Google・Appleのロゴやボタン表現は公式ガイドラインに従い、競合サービスの画面を複製しない。"
+      - "実装対象は既存のSupabase認証方式に限定し、未設定のOAuthプロバイダーを表示だけ追加しない。"
+    verified_at: 2026-08-24
+    freshness_class: medium
+    invalidate_when:
+      - "PiXiEEDで利用可能な認証プロバイダーまたは認証方式が変わった場合"
+      - "Google・Appleの認証ボタン表示ガイドラインが更新された場合"
+    reusable_for:
+      - "PRODUCT-BLUEPRINT-001"
+      - "WP-080-APP-SHELL-DESIGN-SYSTEM"
+      - "WP-250-POLICY-ECONOMICS"
+entry_schema:
+  cache_key: string
+  research_question: string
+  findings: []
+  source_refs: []
+  license_notes: []
+  verified_at: null
+  freshness_class: stable|medium|volatile
+  invalidate_when: []
+  reusable_for: []

@@ -1,0 +1,10 @@
+skill_id: AB-EVALUATOR-001
+steps:
+  - define_material_decision
+  - ask_if_comparison_can_change_decision
+  - remove_dominated_variants
+  - choose_cheapest_valid_mode
+  - define_metric_guardrail_stop_rule
+  - execute_or_defer
+  - accept_inconclusive
+  - cache_result

@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "benchmarkId": "WP200_GAME_RUNTIME_SYNTHETIC",
+  "status": "MEASURED_LOCAL_SYNTHETIC",
+  "iterations": 10000,
+  "runtimeElapsedMs": 2.654,
+  "runtimeStepsPerSecond": 3768252.47,
+  "runtimeTick": 10000,
+  "buildElapsedMs": 0.499,
+  "buildLifecycle": "PLANNED",
+  "planCacheKey": "54975ddccdc08681a4c8c86998da89bc91ed0c880f29b2efa01c97c00f32993c",
+  "projectSnapshotHash": "78049f4039e1d6dcdb47c6e06be2118ee2d6de38d67cde7311eb3892c618473d",
+  "notes": [
+    "Synthetic local Deno measurement only; not a device, browser compositor, memory, or production performance PASS.",
+    "Build is isolated and no artifact is published."
+  ]
+}

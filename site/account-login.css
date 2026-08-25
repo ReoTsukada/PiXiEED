@@ -1,0 +1,471 @@
+/* Draw2-first authentication surface. The auth handlers and their IDs remain shared. */
+
+body[data-pixieed-account-auth="signed-out"] {
+  min-width: 0;
+  background:
+    radial-gradient(48rem 32rem at 84% 8%, rgba(37, 99, 235, .2), transparent 68%),
+    radial-gradient(42rem 28rem at 8% 76%, rgba(126, 240, 199, .08), transparent 70%),
+    #070d1b;
+}
+
+body[data-pixieed-account-auth="signed-out"] .page {
+  max-width: 100%;
+}
+
+body[data-pixieed-account-auth="signed-out"] .account-page {
+  width: min(1180px, calc(100% - 40px));
+  padding: 24px 0 116px;
+  gap: 18px;
+}
+
+body[data-pixieed-account-auth="signed-out"] .account-titlebar {
+  width: auto;
+  min-height: 0;
+  justify-content: flex-start;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+}
+
+body[data-pixieed-account-auth="signed-out"] .account-title {
+  color: #f8fbff;
+  font-size: clamp(22px, 3vw, 34px);
+  letter-spacing: -.045em;
+}
+
+body[data-pixieed-account-auth="signed-out"] .account-grid {
+  display: block;
+  width: min(1180px, 100%) !important;
+  margin-inline: auto;
+}
+
+body[data-pixieed-account-auth="signed-out"] #authPanel {
+  display: block !important;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+body[data-pixieed-account-auth="signed-out"] #authPanel > .section-title,
+body[data-pixieed-account-auth="signed-out"] #authPanel .profile-block--profile {
+  display: none !important;
+}
+
+body[data-pixieed-account-auth="signed-out"] #authPanel .account-profile-grid {
+  display: block;
+}
+
+body[data-pixieed-account-auth="signed-out"] #pixieedSharedAuthLoginBlock {
+  display: grid;
+  grid-template-columns: minmax(0, 1.16fr) minmax(360px, .84fr);
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid rgba(126, 240, 199, .22);
+  border-radius: 24px;
+  background: rgba(12, 22, 40, .86);
+  box-shadow: 0 28px 80px rgba(2, 6, 23, .46), 0 0 0 8px rgba(121, 192, 255, .025);
+}
+
+body[data-pixieed-account-auth="signed-out"] .account-login-visual {
+  display: grid;
+  min-width: 0;
+  align-content: space-between;
+  gap: 26px;
+  padding: clamp(26px, 4vw, 54px);
+  background:
+    linear-gradient(145deg, rgba(25, 53, 92, .9), rgba(8, 20, 39, .92) 58%),
+    radial-gradient(24rem 18rem at 10% 10%, rgba(126, 240, 199, .18), transparent 70%);
+}
+
+.account-login-visual__copy {
+  max-width: 520px;
+}
+
+.account-login-visual__copy .account-eyebrow {
+  margin-bottom: 14px;
+  color: #7ef0c7;
+  font-size: 10px;
+  letter-spacing: .2em;
+}
+
+.account-login-visual__copy h2 {
+  margin: 0;
+  color: #f8fbff;
+  font-size: clamp(30px, 4vw, 56px);
+  font-weight: 900;
+  letter-spacing: -.065em;
+  line-height: 1.04;
+}
+
+.account-login-visual__copy h2 em {
+  color: #7ef0c7;
+  font-style: normal;
+}
+
+.account-login-visual__copy > p:last-child {
+  max-width: 420px;
+  margin: 18px 0 0;
+  color: #b4c4d8;
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.account-login-visual__workspace {
+  position: relative;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid rgba(126, 240, 199, .42);
+  border-radius: 16px;
+  background: #070d1b;
+  box-shadow: 0 22px 46px rgba(2, 6, 23, .34), 0 0 0 5px rgba(126, 240, 199, .05);
+  transform: rotate(-1deg);
+}
+
+.account-login-visual__workspace::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(126, 240, 199, .12), transparent 38%, rgba(37, 99, 235, .14));
+  content: "";
+  pointer-events: none;
+}
+
+.account-login-visual__workspace-preview {
+  display: grid;
+  grid-template-rows: 22px minmax(0, 1fr) 22px;
+  aspect-ratio: 16 / 9;
+  min-height: 0;
+  background: #080e1b;
+}
+
+.account-login-visual__toolbar,
+.account-login-visual__timeline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 9px;
+  border-bottom: 1px solid rgba(126, 240, 199, .14);
+  color: #8fa4bc;
+  font-size: 7px;
+  font-weight: 850;
+  letter-spacing: .08em;
+}
+
+.account-login-visual__toolbar span { color: #7ef0c7; letter-spacing: .16em; }
+.account-login-visual__toolbar b { padding: 3px 4px; border-radius: 3px; background: rgba(255,255,255,.07); }
+.account-login-visual__toolbar b:first-of-type { color: #07101e; background: #7ef0c7; }
+
+.account-login-visual__canvas {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  background-color: #0b1423;
+  background-image: linear-gradient(rgba(126, 240, 199, .07) 1px, transparent 1px), linear-gradient(90deg, rgba(126, 240, 199, .07) 1px, transparent 1px);
+  background-size: 12px 12px;
+}
+
+.account-login-visual__canvas::before {
+  position: absolute;
+  inset: 23% 31%;
+  background: #304862;
+  box-shadow: 0 0 0 1px rgba(126,240,199,.26);
+  content: "";
+}
+
+.account-login-visual__canvas i { position: absolute; z-index: 1; width: 10%; height: 14%; background: #7ef0c7; }
+.account-login-visual__canvas i:nth-child(1) { top: 37%; left: 39%; }
+.account-login-visual__canvas i:nth-child(2) { top: 37%; left: 49%; background: #f4cc76; }
+.account-login-visual__canvas i:nth-child(3) { top: 51%; left: 44%; background: #f4cc76; }
+.account-login-visual__canvas i:nth-child(4) { top: 65%; left: 39%; }
+.account-login-visual__canvas i:nth-child(5) { top: 65%; left: 49%; }
+.account-login-visual__canvas i:nth-child(6) { top: 51%; left: 34%; background: #7ef0c7; }
+
+.account-login-visual__timeline {
+  border-top: 1px solid rgba(126, 240, 199, .14);
+  border-bottom: 0;
+}
+
+.account-login-visual__timeline b { width: 22px; height: 9px; border-radius: 2px; background: rgba(126,240,199,.48); }
+.account-login-visual__timeline b:nth-child(2n) { background: rgba(244,204,118,.56); }
+
+.account-login-visual__workspace img {
+  display: none;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  image-rendering: auto;
+}
+
+.account-login-visual__workspace figcaption {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  max-width: calc(100% - 20px);
+}
+
+.account-login-visual__workspace figcaption span,
+.account-login-visual__footer span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 7px;
+  border: 1px solid rgba(255, 255, 255, .16);
+  border-radius: 999px;
+  color: #d8e8f7;
+  background: rgba(7, 13, 27, .78);
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: .08em;
+  backdrop-filter: blur(10px);
+}
+
+.account-login-visual__footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: #8fa4bc;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.account-login-visual__footer span {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  color: #8fa4bc;
+  background: transparent;
+  font-size: 9px;
+  backdrop-filter: none;
+}
+
+body[data-pixieed-account-auth="signed-out"] .account-login-content {
+  display: grid;
+  align-content: center;
+  gap: 12px;
+  min-width: 0;
+  padding: clamp(24px, 4vw, 44px);
+  background: rgba(7, 13, 27, .54);
+}
+
+body[data-pixieed-account-auth="signed-out"] .account-login-content [hidden] {
+  display: none !important;
+}
+
+body[data-pixieed-account-auth="signed-out"] .account-login-content .auth-session-check {
+  color: #9fb4c8;
+  font-size: 11px;
+}
+
+body[data-pixieed-account-auth="signed-out"] .account-login-content .auth-section-head {
+  align-items: baseline;
+  margin-top: 2px;
+}
+
+body[data-pixieed-account-auth="signed-out"] .account-login-content .auth-section-head strong {
+  color: #f8fbff;
+  font-size: 25px;
+  letter-spacing: -.04em;
+}
+
+body[data-pixieed-account-auth="signed-out"] .account-login-content .auth-section-head span {
+  color: #7ef0c7;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+body[data-pixieed-account-auth="signed-out"] .account-login-content .auth-login-copy {
+  color: #a9b8cc;
+  font-size: 12px;
+}
+
+body[data-pixieed-account-auth="signed-out"] .account-login-content .auth-signup-pending {
+  gap: 9px;
+  padding: 12px;
+  border-color: rgba(255, 209, 102, .34);
+  border-radius: 12px;
+  background: rgba(255, 209, 102, .08);
+}
+
+body[data-pixieed-account-auth="signed-out"] .account-login-content .auth-signup-pending strong {
+  color: #ffe6a3;
+  font-size: 13px;
+}
+
+body[data-pixieed-account-auth="signed-out"] .account-login-content .auth-signup-pending p {
+  color: #c8d3e2;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+body[data-pixieed-account-auth="signed-out"] .account-login-content .auth-social-grid {
+  margin-top: 3px;
+}
+
+body[data-pixieed-account-auth="signed-out"] .account-login-content .auth-btn--google {
+  min-height: 48px;
+  border-radius: 12px;
+  border-color: #dadce0;
+  background: #fff;
+  box-shadow: 0 8px 20px rgba(2, 6, 23, .18);
+  color: #3c4043;
+  font-size: 13px;
+}
+
+body[data-pixieed-account-auth="signed-out"] .account-login-content .auth-provider-note {
+  margin-top: -4px;
+  color: #8fa4bc;
+  font-size: 10px;
+}
+
+body[data-pixieed-account-auth="signed-out"] .account-login-content .auth-mode-switch {
+  border-color: rgba(126, 240, 199, .16);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, .035);
+}
+
+body[data-pixieed-account-auth="signed-out"] .account-login-content .auth-mode-switch__button {
+  min-height: 34px;
+  border-radius: 8px;
+  color: #9fb4c8;
+  font-size: 11px;
+}
+
+body[data-pixieed-account-auth="signed-out"] .account-login-content .auth-mode-switch__button.is-active {
+  color: #07111f;
+  background: #7ef0c7;
+  box-shadow: none;
+}
+
+body[data-pixieed-account-auth="signed-out"] .account-login-content .auth-btn--email {
+  min-height: 42px;
+  border-color: rgba(121, 192, 255, .35);
+  border-radius: 11px;
+  background: rgba(121, 192, 255, .09);
+  color: #dceeff;
+}
+
+body[data-pixieed-account-auth="signed-out"] .account-login-content .auth-form {
+  gap: 10px;
+}
+
+body[data-pixieed-account-auth="signed-out"] .account-login-content .auth-field {
+  gap: 5px;
+  color: #cbd9e9;
+  font-size: 11px;
+}
+
+body[data-pixieed-account-auth="signed-out"] .account-login-content .auth-input {
+  min-height: 44px;
+  box-sizing: border-box;
+  border-color: rgba(148, 163, 184, .24);
+  border-radius: 10px;
+  background: rgba(7, 13, 27, .62);
+  font-size: 13px;
+}
+
+body[data-pixieed-account-auth="signed-out"] .account-login-content .auth-input:focus {
+  border-color: rgba(126, 240, 199, .78);
+  outline: 2px solid rgba(126, 240, 199, .18);
+  outline-offset: 1px;
+}
+
+body[data-pixieed-account-auth="signed-out"] .account-login-content #authLoginBtn {
+  min-height: 46px;
+  border: 1px solid rgba(126, 240, 199, .56);
+  border-radius: 11px;
+  background: linear-gradient(135deg, #7ef0c7, #63d4ff);
+  color: #07111f;
+  font-size: 12px;
+  box-shadow: 0 10px 22px rgba(78, 220, 190, .14);
+}
+
+body[data-pixieed-account-auth="signed-out"] .account-login-content .auth-secondary-actions {
+  gap: 4px 10px;
+}
+
+body[data-pixieed-account-auth="signed-out"] .account-login-content .auth-text-btn {
+  min-height: 28px;
+  color: #a9d9ff;
+  font-size: 10px;
+}
+
+body[data-pixieed-account-auth="signed-out"] .account-login-content .auth-link-guide,
+body[data-pixieed-account-auth="signed-out"] .account-login-content .auth-security-note {
+  color: #8296ad;
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+body[data-pixieed-account-auth="signed-out"] .account-login-content .auth-status {
+  min-height: 18px;
+  margin: 0;
+  color: #ffd166;
+  font-size: 11px;
+}
+
+body[data-pixieed-account-auth="signed-out"] .account-login-content button:focus-visible,
+body[data-pixieed-account-auth="signed-out"] .account-login-content input:focus-visible {
+  outline: 2px solid #7ef0c7;
+  outline-offset: 2px;
+}
+
+@media (max-width: 900px) {
+  body[data-pixieed-account-auth="signed-out"] .account-page {
+    width: min(720px, calc(100% - 28px));
+  }
+
+  body[data-pixieed-account-auth="signed-out"] #pixieedSharedAuthLoginBlock {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  body[data-pixieed-account-auth="signed-out"] .account-login-visual {
+    gap: 20px;
+    padding: 28px;
+  }
+
+  body[data-pixieed-account-auth="signed-out"] .account-login-visual__copy h2 {
+    font-size: clamp(30px, 7vw, 46px);
+  }
+}
+
+@media (max-width: 520px) {
+  body[data-pixieed-account-auth="signed-out"] .account-page {
+    width: calc(100% - 20px);
+    padding-top: 16px;
+  }
+
+  body[data-pixieed-account-auth="signed-out"] #pixieedSharedAuthLoginBlock {
+    border-radius: 18px;
+  }
+
+  body[data-pixieed-account-auth="signed-out"] .account-login-visual,
+  body[data-pixieed-account-auth="signed-out"] .account-login-content {
+    padding: 20px;
+  }
+
+  body[data-pixieed-account-auth="signed-out"] .account-login-visual__workspace {
+    border-radius: 12px;
+  }
+
+  body[data-pixieed-account-auth="signed-out"] .account-login-visual__footer {
+    font-size: 8px;
+  }
+
+  body[data-pixieed-account-auth="signed-out"] .account-login-content .auth-secondary-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    justify-content: stretch;
+  }
+}

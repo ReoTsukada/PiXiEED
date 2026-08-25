@@ -26,7 +26,10 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: 22
+          node-version: 22.19.0
+
+      - name: Verify npm version
+        run: test "$(npm --version)" = "10.9.3"
 
       - name: Generate published PiXFiND OGP pages
         run: node scripts/generate-pixfind-ogp-pages.mjs

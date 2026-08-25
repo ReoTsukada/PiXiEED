@@ -1,0 +1,11 @@
+skill_id: REFERENCE-SCOUT-001
+steps:
+  - formulate_1_to_3_decision_relevant_questions
+  - check_research_cache_first
+  - search_by_source_priority_if_needed
+  - capture_source_freshness_license_confidence
+  - extract_patterns_not_surface_copy
+  - map_patterns_to_blueprint
+  - adopt_adapt_reject
+  - cache_result
+  - stop_on_information_saturation

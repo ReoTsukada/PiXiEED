@@ -1,0 +1,68 @@
+{
+  "schemaVersion": "AGENT_PACKAGE_PREFLIGHT_RESULT_V1",
+  "packageId": "SOCIAL-430",
+  "sourcePath": "pixiedraw2/tests/social-430/social-430.test.ts",
+  "sourceHash": "9a1d966f396a31ca36f99274ff5e4f353d9dc2c5aafb10171c9e35c916903c69",
+  "exitCode": 0,
+  "status": "PASS",
+  "currentDecision": {
+    "status": "STRUCTURAL_PASS_TERRA",
+    "boundaryModel": "EXTERNAL_CALLER_VS_SERVER_TCB",
+    "deepImportP0": "WITHDRAWN",
+    "semanticAcceptance": "STRUCTURAL_PASS_TERRA",
+    "productionSemanticQualification": "PENDING",
+    "reason": "Terra High independently passed the structural boundary review; production semantic qualification remains pending for untested external and production-integrated items."
+  },
+  "review": {
+    "reviewer": "Terra High",
+    "source": "TERRA_FINAL_INDEPENDENT_STRUCTURAL_REVIEW",
+    "decision": "PASS",
+    "reviewedAt": "2026-08-16T14:50:32+09:00"
+  },
+  "historicalDesignGate": {
+    "status": "CLOSED_HISTORICAL",
+    "previousDecision": "STOP_DESIGN_GATE",
+    "closedAt": "2026-08-16T14:41:15+09:00",
+    "reason": "Fix round 2 recorded the second composition-root-boundary finding before the design decision was superseded by the adopted boundary model.",
+    "fixRound": {
+      "currentRound": 2,
+      "max_fix_rounds": 2,
+      "timebox_minutes": 20,
+      "checkpoint_every_minutes": 10,
+      "sameClassFinding": {
+        "class": "composition-root-boundary",
+        "occurrence": 2,
+        "decision": "STOP_DESIGN_GATE"
+      }
+    }
+  },
+  "caseResults": [
+    {
+      "caseId": "AUTHORITY-ROOT-001",
+      "status": "PASS",
+      "reasonCode": "CALLER_INJECTION_REJECTED"
+    },
+    {
+      "caseId": "RESOLVER-IDENTITY-001",
+      "status": "PASS",
+      "reasonCode": "CANONICAL_IDENTITY_MISMATCH"
+    },
+    {
+      "caseId": "CALLER-STATE-001",
+      "status": "PASS",
+      "reasonCode": "CALLER_STATE_NOT_AUTHORITY"
+    },
+    {
+      "caseId": "EVENT-ID-001",
+      "status": "PASS",
+      "reasonCode": "CANONICAL_EVENT_ID_REQUIRED"
+    },
+    {
+      "caseId": "REPLAY-REVOKE-001",
+      "status": "PASS",
+      "reasonCode": "LIFECYCLE_TRANSITION_NOT_AUTHORIZED"
+    }
+  ],
+  "evidencePath": "docs/inventory/social-430-preflight-evidence.json",
+  "checkpointPath": "docs/inventory/social-430-checkpoint.json"
+}

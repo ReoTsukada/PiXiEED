@@ -1,0 +1,29 @@
+schema_version: 3.2
+bootstrap_id: LUNA-BOOT-001
+read_order:
+  - .luna/MANIFEST.yaml
+  - GOAL.md
+  - CHANGE.md
+  - .luna/state/DISCOVERY.yaml
+  - .luna/state/PRODUCT_BLUEPRINT.yaml
+  - .luna/state/STATE.yaml
+  - .luna/state/WORK_QUEUE.yaml
+  - .luna/policies/POLICY_INDEX.yaml
+  - .luna/agents/REGISTRY.yaml
+  - .luna/agents/MODEL_ROUTING.yaml
+  - .luna/workflows/DISCOVERY_INTERVIEW.yaml
+  - .luna/workflows/DELIVERY_LOOP.yaml
+rules:
+  on_discovery_uninitialized_or_unlocked: run_DISCOVERY_INTERVIEW
+  on_discovery_waiting_for_answers: ask_question_batch_and_stop
+  on_discovery_answers_received: normalize_answers_then_lock_discovery
+  on_empty_blueprint_after_discovery_lock: run_blueprint_builder
+  on_new_change_text: run_change_impact
+  on_active_work_package: resume_active_work_package
+  on_no_active_work_package: select_highest_value_unblocked_work_package
+  on_missing_evidence: run_evidence_value_gate_before_acquisition
+  on_context_pressure: persist_state_then_compact
+output_contract:
+  internal: machine_state_first
+  startup_user: question_batch_or_discovery_complete_summary
+  delivery_user: concise_result_plus_only_hard_approval_if_unavoidable

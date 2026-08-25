@@ -1,0 +1,9 @@
+workflow_id: CHANGE-LOOP-001
+trigger: new_user_change
+steps:
+  - run_CHANGE_IMPACT
+  - preserve_unaffected_completed_work
+  - invalidate_only_affected_work_and_evidence
+  - update_blueprint_revision_if_needed
+  - reorder_work_queue_by_expected_value_per_total_cost
+  - resume_delivery

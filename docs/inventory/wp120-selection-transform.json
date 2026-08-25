@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "workPackage": "WP-120",
+  "status": "IMPLEMENTED_ISOLATED",
+  "measuredAt": "2026-08-07",
+  "scope": {
+    "root": "pixiedraw2/",
+    "productionChanges": false,
+    "currentRouteChanges": false,
+    "pxdPiXiSYNCMarketChanges": false,
+    "realtimePointerOrHandleTransport": false
+  },
+  "selection": {
+    "representation": "bounded sparse regions plus indexed selected pixels; no full-canvas mask",
+    "shapeKinds": ["rectangle", "freehand", "magic", "alpha", "multi-region"],
+    "activeScope": ["assetId", "layerId", "frameId", "celId"],
+    "versionGuards": ["selectionVersion", "sourceRasterRevision", "sourceStructureEpoch"]
+  },
+  "transforms": {
+    "supported": ["MOVE", "FLIP_HORIZONTAL", "FLIP_VERTICAL", "ROTATE_90_CW", "SCALE_INTEGER"],
+    "interpolation": "NEAREST_NEIGHBOR",
+    "integerScaleRange": [1, 8],
+    "outOfBounds": "CLIP",
+    "canvasExpansion": "REJECTED",
+    "preview": {"canonicalMutation": false, "journal": false, "canonicalDirtyTiles": 0, "metricScope": "PREVIEW_ONLY"},
+    "commit": {"operation": "selection.transformCommit", "metricScope": "COMMAND_TO_DIRTY", "oneUserOperation": true, "staleCommit": "FAIL_CLOSED"}
+  },
+  "clipboard": {
+    "format": "PIXIEEDRAW2_CLIPBOARD",
+    "version": 1,
+    "bounded": {"maxPixels": 1048576, "maxDimension": 4096},
+    "payloadFields": ["width", "height", "origin", "indexedPixels", "palette", "sourceAssetId", "sourceSelectionVersion", "provenance"],
+    "systemClipboardCoreDependency": false,
+    "palettePolicy": "EXACT_MATCH_REQUIRED; mismatch/remap/extension/overflow are explicit fail-closed results",
+    "unsafeInput": "malformed dimensions, duplicate/out-of-bounds pixels, invalid palette, unsafe provenance rejected"
+  },
+  "locality": {
+    "fixtures": [256, 512, 1024],
+    "selection": "16x16 sparse selection moved by 32px",
+    "records": [
+      {"size": 256, "previewMs": 0.027, "commitMs": 5.391, "affectedTiles": 2, "dirtyRegions": 2, "copiedBytes": 2048, "cowSplitCount": 2, "fullRasterCloneCount": 0, "previewCanonicalDirtyTiles": 0},
+      {"size": 512, "previewMs": 0.018, "commitMs": 0.384, "affectedTiles": 2, "dirtyRegions": 2, "copiedBytes": 2048, "cowSplitCount": 2, "fullRasterCloneCount": 0, "previewCanonicalDirtyTiles": 0},
+      {"size": 1024, "previewMs": 0.004, "commitMs": 0.284, "affectedTiles": 2, "dirtyRegions": 2, "copiedBytes": 2048, "cowSplitCount": 2, "fullRasterCloneCount": 0, "previewCanonicalDirtyTiles": 0}
+    ],
+    "sourceHashUnchanged": true,
+    "previewLongTaskBudget": "PASS for synthetic local run; browser Long Task observer emitted no entry over 50ms"
+  },
+  "history": {"undoRedo": "local-only atomic one user action", "cancel": "not recorded"},
+  "browser": {
+    "viewports": ["390x844", "1280x900"],
+    "checks": ["Feature Flag OFF", "no horizontal overflow", "keyboard Select activation", "focus", "Preview", "Cancel", "Commit", "Copy", "Cut", "Paste placement", "Undo", "Redo", "page errors"],
+    "result": "PASS"
+  },
+  "bundle": {
+    "rawBytes": 78643,
+    "minifiedBytes": 44822,
+    "rawGzipBytes": 15954,
+    "rawBrotliBytes": 13842,
+    "minifiedGzipBytes": 12645,
+    "minifiedBrotliBytes": 11124,
+    "cssRawBytes": 5881,
+    "cssGzipBytes": 1814,
+    "cssBrotliBytes": 1522,
+    "initialRequests": ["pixiedraw2/assets/draw2-shell.css", "pixiedraw2/dist/draw2-entry.js"],
+    "lazyChunks": [],
+    "interpretation": "local isolated Draw2 bundle measurement; no arbitrary byte budget or performance PASS"
+  },
+  "verification": {
+    "core": "13 passed / 0 failed",
+    "browserWp120": "2 viewports passed",
+    "browserWp110Regression": "2 viewports passed",
+    "remainingUntested": ["real device input-to-visible", "full layer/frame compositor", "30-minute memory", "Canvas/WebGL2/Worker backend equivalence", "OS system Clipboard adapter", "visual regression image baseline for transform overlay"]
+  },
+  "nonIntrusion": ["current PiXiEEDraw", "PXD", "PiXiSYNC", "Market", "existing URL", "production database/storage", "commit/push/deploy/publish"]
+}

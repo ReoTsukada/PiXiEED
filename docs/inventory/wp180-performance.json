@@ -1,0 +1,35 @@
+{
+  "workPackage": "WP-180",
+  "status": "MEASURED_LOCAL_BUILD_WITH_UNTESTED_DEVICE_GATES",
+  "measurementDefinition": {
+    "bytes": ["raw", "minified", "gzip", "brotli"],
+    "sourceMaps": "excluded",
+    "requests": "initial HTML/CSS/entry and requested lazy chunks counted separately",
+    "runtime": "WP-160 runtime bundle measured independently from Editor Workspace",
+    "initialRequests": ["pixiedraw2/assets/draw2-shell.css", "pixiedraw2/dist/draw2-entry.js"],
+    "startupLazyRequests": ["pixiedraw2/dist/wp180-workspace.js"],
+    "onDemandLazyRequests": ["pixiedraw2/dist/wp160-runtime-core.js", "pixiedraw2/dist/wp170-advanced-tools.js", "pixiedraw2/dist/draw2-legacy-compat.js"]
+  },
+  "wp170Baseline": {
+    "initialEditorRaw": 158269,
+    "initialEditorMinified": 90678,
+    "initialEditorGzip": 31781,
+    "initialEditorBrotli": 26410,
+    "advancedCoreRaw": 31086,
+    "advancedAdapterRaw": 1490,
+    "initialEditorMeasured": {"raw": 158807, "minified": 90968, "gzip": 31916, "brotli": 26521, "minifiedGzip": 24854, "minifiedBrotli": 21370},
+    "workspaceStartupLazyMeasured": {"raw": 18816, "minified": 10168, "gzip": 4902, "brotli": 4295, "minifiedGzip": 3714, "minifiedBrotli": 3331},
+    "cssMeasured": {"raw": 24768, "minified": 22250, "gzip": 4866, "brotli": 4220, "minifiedGzip": 4497, "minifiedBrotli": 3928},
+    "runtimeMeasured": {"raw": 12649, "gzip": 3645, "brotli": 3167},
+    "initialRawDeltaFromWp170": 538,
+    "sourceMaps": "excluded"
+  },
+  "workloads": {
+    "desktop": "512x512 / 20 layers / 120 frames",
+    "mobile": "256x256 / 12 layers / 60 frames",
+    "virtualization": "1000 frames / 100 layers"
+  },
+  "statusLabels": ["MEASURED_LOCAL_BUILD", "MEASURED_LOCAL_SYNTHETIC", "REFERENCE_SMOKE", "UNTESTED", "FORMAL_GATE"],
+  "longTaskClassification": {"contractAndVirtualization": "no long task in local synthetic run", "raster": "UNTESTED", "tile": "UNTESTED", "pattern": "UNTESTED", "uiRendering": "UNTESTED", "serialization": "UNTESTED", "hashing": "UNTESTED", "layout": "UNTESTED", "gc": "UNTESTED"},
+  "memoryCategories": {"rasterTile": "instrumentation boundary only", "layerFrameCelMetadata": "instrumentation boundary only", "undoHistory": "instrumentation boundary only", "timelineProjection": "instrumentation boundary only", "panelState": "instrumentation boundary only", "thumbnails": "UNTESTED", "assetCache": "UNTESTED", "advancedTools": "UNTESTED", "rendererResources": "UNTESTED", "thirtyMinuteSession": "UNTESTED"}
+}

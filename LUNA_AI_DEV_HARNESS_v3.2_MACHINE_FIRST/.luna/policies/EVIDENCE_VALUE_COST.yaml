@@ -1,0 +1,21 @@
+policy_id: EVIDENCE-VALUE-COST-001
+objective: maximize_quality_per_total_cost
+score_range: [0,3]
+risk_dimensions: [impact, uncertainty, irreversibility, surface_area, freshness_need, decision_sensitivity]
+cost_dimensions: [model_cost, research_time, experiment_time, human_wait, implementation_delay]
+heuristic:
+  evidence_value: impact * max(1, uncertainty) * max(1, decision_sensitivity)
+  cost_pressure: sum(cost_dimensions)
+  execute_extra_evidence_when: evidence_value > cost_pressure
+escalation:
+  low: {risk_sum_max: 5, research: none_or_cached, review: self, experiment: none, model: default, human: no}
+  medium: {risk_sum_max: 10, research: targeted, review: specialist_if_needed, experiment: cheap_compare_if_decision_sensitive, model: default, human: no}
+  high: {risk_sum_min: 11, research: targeted_or_deep, review: independent, experiment: as_valuable, model: escalated, human: if_gate_matches}
+anti_ritual:
+  never_default_all: [web_research, full_repo_reread, full_test_suite, multi_model_review, live_ab, human_confirmation, expensive_model]
+reuse_first:
+  - valid_research_cache
+  - existing_tests
+  - prior_experiment
+  - existing_harness
+  - repository_decision

@@ -12,6 +12,172 @@
   const state = { actions: [], details: [], reloadAction: null };
   let ui = null;
 
+  const chromeLabels = Object.freeze({
+    ja: Object.freeze({
+      action: '操作',
+      details: '詳細',
+      closeDetails: '詳細を閉じる',
+      close: '閉じる',
+      pageActions: 'ページ操作',
+      commonMenu: '共通メニュー',
+      advertisement: '広告',
+      home: 'ホーム',
+      openDraw: 'iDRAWを開く',
+      openCamera: 'カメラを開く',
+      reload: '再読み込み',
+      search: '検索',
+      purchases: '購入済み',
+      draw: 'iDRAW',
+      file: 'ファイル',
+      settings: '設定',
+      pixisync: 'PiXYNC',
+      camera: 'カメラ',
+      qrEdit: 'QR編集',
+      copy: 'コピー',
+      cut: 'カット',
+      paste: 'ペースト',
+      undo: '元に戻す',
+      redo: 'やり直す',
+      fullscreen: '拡大',
+      shortcut: 'ショートカット一覧',
+      operationHelp: '使い方ヘルプ',
+      updates: '更新情報',
+      app: 'アプリとして使う',
+      language: '言語',
+      support: 'ヘルプ',
+      marketAbout: 'マーケットとは',
+      localProjects: '端末内',
+      accountDelete: 'アカウント削除',
+      marketHelp: 'マーケットヘルプ',
+      contact: 'お問い合わせ',
+      terms: '利用規約',
+      privacy: 'プライバシー',
+      glossary: '用語集',
+      notes: '開発ノート',
+      account: 'マイページ',
+      notifications: '通知',
+      play: '遊ぶ',
+      create: '作る',
+      image: '画像を読み込む',
+      clearImage: '読み込みを取り消す',
+      cameraSwitch: 'カメラ切り替え',
+      cameraSettings: 'カメラ設定',
+      guide: 'はじめての使い方',
+      lensGuide: 'PiXiEELENSの使い方',
+      qrGuide: 'QRの使い方',
+      maoitu: 'まおいつ',
+      pixfind: 'PiXFiND',
+      expand: '拡大',
+      shrink: '縮小',
+      email: 'メール',
+      commercial: '特定商取引法に基づく表記',
+    }),
+    en: Object.freeze({
+      action: 'Action',
+      details: 'Details',
+      closeDetails: 'Close details',
+      close: 'Close',
+      pageActions: 'Page actions',
+      commonMenu: 'Common menu',
+      advertisement: 'Advertisement',
+      home: 'Home',
+      openDraw: 'Open iDRAW',
+      openCamera: 'Open camera',
+      reload: 'Reload',
+      search: 'Search',
+      purchases: 'Purchased',
+      draw: 'iDRAW',
+      file: 'File',
+      settings: 'Settings',
+      pixisync: 'PiXYNC',
+      camera: 'Camera',
+      qrEdit: 'Edit QR',
+      copy: 'Copy',
+      cut: 'Cut',
+      paste: 'Paste',
+      undo: 'Undo',
+      redo: 'Redo',
+      fullscreen: 'Fullscreen',
+      shortcut: 'Shortcuts',
+      operationHelp: 'How to use',
+      updates: 'Updates',
+      app: 'Use as an app',
+      language: 'Language',
+      support: 'Help',
+      marketAbout: 'About the Market',
+      localProjects: 'On this device',
+      accountDelete: 'Delete account',
+      marketHelp: 'Market help',
+      contact: 'Contact',
+      terms: 'Terms of service',
+      privacy: 'Privacy policy',
+      glossary: 'Glossary',
+      notes: 'Development notes',
+      account: 'Profile',
+      notifications: 'Notifications',
+      play: 'Play',
+      create: 'Create',
+      image: 'Load image',
+      clearImage: 'Clear image',
+      cameraSwitch: 'Switch camera',
+      cameraSettings: 'Camera settings',
+      guide: 'Getting started',
+      lensGuide: 'PiXiEELENS guide',
+      qrGuide: 'QR guide',
+      maoitu: 'Maoitu',
+      pixfind: 'PiXFiND',
+      expand: 'Fullscreen',
+      shrink: 'Exit fullscreen',
+      email: 'Email',
+      commercial: 'Commercial transaction notice',
+    }),
+  });
+
+  const labelKeys = Object.freeze({
+    '操作': 'action', '詳細': 'details', '詳細を閉じる': 'closeDetails', '閉じる': 'close',
+    'ページ操作': 'pageActions', '共通メニュー': 'commonMenu', '広告': 'advertisement',
+    'ホーム': 'home', 'Drawを開く': 'openDraw', 'iDRAWを開く': 'openDraw', 'カメラを開く': 'openCamera',
+    '再読み込み': 'reload', '検索': 'search', '購入済み': 'purchases', 'Draw': 'draw', 'ファイル': 'file',
+    '設定': 'settings', 'PiXiSYNC': 'pixisync', 'PiXYNC': 'pixisync', 'カメラ': 'camera', 'QR編集': 'qrEdit',
+    'コピー': 'copy', 'カット': 'cut', 'ペースト': 'paste', '元に戻す': 'undo', 'やり直す': 'redo',
+    '拡大': 'expand', '縮小': 'shrink', 'ショートカット一覧': 'shortcut', '使い方ヘルプ': 'operationHelp',
+    '更新情報': 'updates', 'アプリとして使う': 'app', '言語': 'language', 'ヘルプ': 'support',
+    'マーケットとは': 'marketAbout', 'マーケットヘルプ': 'marketHelp', '端末内': 'localProjects', 'アカウント削除': 'accountDelete',
+    'お問い合わせ': 'contact', '利用規約': 'terms', 'プライバシー': 'privacy',
+    'プライバシーポリシー': 'privacy', '用語集': 'glossary', '開発ノート': 'notes', 'マイページ': 'account',
+    '通知': 'notifications', '遊ぶ': 'play', '作る': 'create', '画像を読み込む': 'image',
+    '読み込みを取り消す': 'clearImage', 'カメラ切り替え': 'cameraSwitch', 'カメラ設定': 'cameraSettings',
+    'はじめての使い方': 'guide', 'PiXiEELENSの使い方': 'lensGuide', 'QRの使い方': 'qrGuide',
+    'まおいつ': 'maoitu', 'PiXFiND': 'pixfind', 'メール': 'email', '特定商取引法に基づく表記': 'commercial',
+  });
+
+  function currentLocale() {
+    return document.documentElement.dataset.pixieedLocale === 'en' ? 'en' : 'ja';
+  }
+
+  function localizeLabel(label) {
+    const raw = String(label || '');
+    const key = labelKeys[raw];
+    return key ? chromeLabels[currentLocale()][key] : raw;
+  }
+
+  function localizeChromeUi() {
+    const copy = chromeLabels[currentLocale()];
+    if (!ui) return;
+    ui.bar.setAttribute('aria-label', copy.pageActions);
+    ui.detailButton.title = copy.details;
+    ui.detailButton.setAttribute('aria-label', copy.details);
+    ui.detailButton.querySelector('.pixieed-common-tabbar__sr-only')?.replaceChildren(document.createTextNode(copy.details));
+    ui.backdrop.setAttribute('aria-label', copy.closeDetails);
+    ui.panel.setAttribute('aria-label', copy.details);
+    ui.panel.querySelector('h2').textContent = copy.details;
+    ui.closeButton.textContent = copy.close;
+    ui.links.setAttribute('aria-label', copy.commonMenu);
+    ui.ad.setAttribute('aria-label', copy.advertisement);
+    renderActions(ui);
+    renderDetails(ui.links);
+  }
+
   function href(path) {
     return new URL(path, rootUrl).href;
   }
@@ -77,7 +243,7 @@
     if (kind === 'project-draw') {
       return {
         actions: [
-          { id: 'open-draw', label: 'Drawを開く', path: 'pixiedraw/index.html', icon: 'assets/icons/Draw.png?v=2026.07.19-ui-icons1' },
+          { id: 'open-draw', label: 'Drawを開く', path: 'studio/index.html', icon: 'assets/icons/Draw.png?v=2026.07.19-ui-icons1' },
         ],
         details: buildSupportDetails(),
       };
@@ -212,6 +378,8 @@
   renderActions(ui);
   renderDetails(ui.links);
   bindDetailsPanel(ui);
+  localizeChromeUi();
+  window.addEventListener('pixieed:locale-changed', localizeChromeUi);
 
   window.__PIXIEED_COMMON_TAB_BAR__ = true;
   window.PiXiEEDCommonTabBar = Object.freeze({
@@ -236,7 +404,7 @@
     bar.className = 'pixieed-common-tabbar';
     bar.dataset.pageKind = pageKind;
     bar.setAttribute('role', 'toolbar');
-    bar.setAttribute('aria-label', 'ページ操作');
+    bar.setAttribute('aria-label', chromeLabels[currentLocale()].pageActions);
 
     const leadingActions = document.createElement('div');
     leadingActions.className = 'pixieed-common-tabbar__leading-actions';
@@ -250,11 +418,12 @@
     const detailButton = document.createElement('button');
     detailButton.className = 'pixieed-common-tabbar__button pixieed-common-tabbar__button--icon pixieed-common-tabbar__details-button';
     detailButton.type = 'button';
-    detailButton.title = '詳細';
-    detailButton.setAttribute('aria-label', '詳細');
+    const copy = chromeLabels[currentLocale()];
+    detailButton.title = copy.details;
+    detailButton.setAttribute('aria-label', copy.details);
     detailButton.setAttribute('aria-expanded', 'false');
     detailButton.setAttribute('aria-controls', 'pixieedCommonDetailsPanel');
-    detailButton.append(createIcon('pixiedraw/assets/icons/action-more-menu.svg'), createSrOnlyLabel('詳細'));
+    detailButton.append(createIcon('pixiedraw/assets/icons/action-more-menu.svg'), createSrOnlyLabel(copy.details));
 
     const layer = document.createElement('div');
     layer.className = 'pixieed-common-details-layer';
@@ -264,7 +433,7 @@
     backdrop.className = 'pixieed-common-details__backdrop';
     backdrop.type = 'button';
     backdrop.tabIndex = -1;
-    backdrop.setAttribute('aria-label', '詳細を閉じる');
+    backdrop.setAttribute('aria-label', copy.closeDetails);
 
     const panel = document.createElement('aside');
     panel.className = 'pixieed-common-details';
@@ -277,21 +446,21 @@
     header.className = 'pixieed-common-details__header';
     const title = document.createElement('h2');
     title.id = 'pixieedCommonDetailsTitle';
-    title.textContent = '詳細';
+    title.textContent = copy.details;
     const closeButton = document.createElement('button');
     closeButton.className = 'pixieed-common-details__close';
     closeButton.type = 'button';
-    closeButton.textContent = '閉じる';
+    closeButton.textContent = copy.close;
     header.append(title, closeButton);
 
     const content = document.createElement('div');
     content.className = 'pixieed-common-details__content';
     const links = document.createElement('nav');
     links.className = 'pixieed-common-details__links';
-    links.setAttribute('aria-label', '共通メニュー');
+    links.setAttribute('aria-label', copy.commonMenu);
     const ad = document.createElement('div');
     ad.className = 'pixieed-common-details__ad';
-    ad.setAttribute('aria-label', '広告');
+    ad.setAttribute('aria-label', copy.advertisement);
     ad.innerHTML = `
       <ins class="ad-seed"
            style="display:block"
@@ -317,7 +486,7 @@
   function createActionControl(item, className) {
     const isLink = typeof item.path === 'string' && item.path;
     const control = document.createElement(isLink ? 'a' : 'button');
-    const label = String(item.label || '操作');
+    const label = localizeLabel(item.label || chromeLabels[currentLocale()].action);
     const clonedIcon = item.cloneIcon ? cloneTargetIcon(item.iconSourceSelector || item.selector) : null;
     const hasIcon = Boolean(item.icon || clonedIcon);
     const isDetailsItem = className.includes('pixieed-common-details__item');

@@ -1,0 +1,27 @@
+{
+  "package": "GAME-340",
+  "status": "PASS_STATIC_TARGETED",
+  "acceptance": ["GAME340-SCOPE-001", "GAME340-EVIDENCE-001", "GAME340-STOP-001"],
+  "implementation": {
+    "source": "pixiedraw2/src/game/game-340/core.ts",
+    "tests": "pixiedraw2/tests/game-340/core.test.ts",
+    "benchmark": "pixiedraw2/benchmarks/game-340/core.bench.ts",
+    "boundary": "pure TypeScript; no DOM/network/filesystem/production seam"
+  },
+  "coverage": [
+    "LIVE/PINNED resolution",
+    "deterministic asset/dependency/license package hash",
+    "Draw/Audio preview update and rollback",
+    "wrong project/owner/stale revision/caller hash/cycle/duplicate/partial/locked event fail-closed",
+    "source project remains unchanged"
+  ],
+  "commands": {
+    "deno_check": {"command": "deno check --no-remote pixiedraw2/src/game/game-340/core.ts pixiedraw2/tests/game-340/core.test.ts pixiedraw2/benchmarks/game-340/core.bench.ts", "status": "PASS", "exitCode": 0},
+    "deno_test": {"command": "deno test --no-remote --allow-read=src --check tests/game-340/core.test.ts", "status": "PASS", "passed": 4, "failed": 0, "exitCode": 0},
+    "deno_bench": {"command": "cd pixiedraw2 && deno bench --no-remote benchmarks/game-340/core.bench.ts", "status": "PASS", "iterations": 10, "observedRunMs": {"min": 0.068, "max": 0.388}, "exitCode": 0},
+    "json_parse": {"command": "deno eval --no-remote JSON.parse(game-340-evidence.json)", "status": "PASS", "exitCode": 0},
+    "git_diff_check": {"command": "git diff --check -- GAME-340 write scope", "status": "PASS", "exitCode": 0}
+  },
+  "browser_device_native_production_publish": "UNTESTED",
+  "scope": {"production_routes_data_registry_queue_state_context_market_pixisync_edited": false}
+}

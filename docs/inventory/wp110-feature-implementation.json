@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "workPackage": "WP-110",
+  "phase": "ISOLATED_FEATURE_IMPLEMENTATION",
+  "status": "IMPLEMENTED_ISOLATED_UNTESTED_DEVICE_PERFORMANCE",
+  "contracts": [
+    "docs/contracts/WP-110-PALETTE-RASTER-PEN-ERASER.md",
+    "docs/contracts/WP-110-REFERENCE-PERFORMANCE-CHECKPOINT.md",
+    "docs/contracts/WP-110-FINALIZATION-GATE.md",
+    "03_PRODUCTS/PIXIEEDRAW2_SPEC.md",
+    "docs/inventory/pixiedraw2-product-spec-provenance.json",
+    "docs/inventory/wp110-finalization-browser-smoke.json"
+  ],
+  "features": {
+    "pen": true,
+    "eraser": true,
+    "paletteSelection": true,
+    "paletteDefinitionWithoutPixelRemap": true,
+    "boundedFill": true,
+    "cancellableFill": true,
+    "workerReadyCoreBoundary": true,
+    "dirtyRegionPresentation": true,
+    "localFirstAutosave": true,
+    "rendererFallback": true
+  },
+  "tests": {
+    "coreDeno": { "passed": 10, "failed": 0 },
+    "browserViewports": ["390x844", "1280x900"],
+    "baselineExistingFailures": "14/14",
+    "newFailureIdentities": 0,
+    "gitDiffCheck": 0
+  },
+  "performance": {
+    "referenceCheckpoint": "MEASURED_REFERENCE_UNTESTED",
+    "actualMobileDevice": false,
+    "formalP95Gate": "PARTIAL_UNTESTED",
+    "finalizationBrowserSmoke": "PARTIAL_UNTESTED",
+    "desktopReferenceP95Ms": { "p50": 0, "p95": 0.10000000894069672, "max": 1.1000000089406967, "samples": 40 },
+    "desktopBrowserMobileViewportP95Ms": { "p50": 0, "p95": 0.10000000894069672, "max": 0.5999999940395355, "samples": 40 },
+    "longTasks": { "available": true, "count": 0, "totalMs": 0, "maxMs": 0 },
+    "fixtureCoverage": "CORE_SLICE_ONLY; requested PROJECT_B is 512x512/20 layers/120 frames, measured affected layer/frame is 1/1",
+    "transparencyRegression": "PASS",
+    "thirtyMinuteMemory": "UNTESTED",
+    "workerBackendEquivalence": "UNTESTED",
+    "technologySelection": "DECISION_PENDING"
+  },
+  "productionChanges": {
+    "currentRoutes": false,
+    "currentPixieedraw": false,
+    "pxd": false,
+    "pixisync": false,
+    "market": false,
+    "database": false,
+    "storage": false,
+    "migration": false,
+    "deploy": false,
+    "publish": false,
+    "commit": false,
+    "push": false
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "workPackage": "WP-094",
+  "audit": "supplemental-failure-coverage",
+  "status": "complete",
+  "testCommand": "node scripts/test-core-package-registry-wp094.mjs",
+  "result": {
+    "exitCode": 0,
+    "failureFixtureCount": 29,
+    "baselineFailureIdentity": "14/14 inherited match; new 0"
+  },
+  "coverage": [
+    { "requirement": "Missing Required Asset", "covered": true, "fixture": "missing-required-asset", "expectedCode": "PACKAGE_DEPENDENCY_ASSET_UNKNOWN", "source": "scripts/test-core-package-registry-wp094.mjs:239-240" },
+    { "requirement": "Missing Revision", "covered": true, "fixture": "missing-required-revision", "expectedCode": "PACKAGE_VALUE_INVALID", "source": "scripts/test-core-package-registry-wp094.mjs:241-243" },
+    { "requirement": "Unauthorized Asset", "covered": true, "fixture": "unauthorized-asset", "expectedCode": "PACKAGE_ASSET_PERMISSION_DENIED", "source": "scripts/test-core-package-registry-wp094.mjs:244-246" },
+    { "requirement": "Quarantined Asset", "covered": true, "fixture": "quarantined-dependency", "expectedCode": "PACKAGE_DEPENDENCY_QUARANTINED", "source": "scripts/test-core-package-registry-wp094.mjs:282-284" },
+    { "requirement": "Hash mismatch", "covered": true, "fixture": "blob-hash-mismatch", "expectedCode": "PACKAGE_HASH_MISMATCH", "source": "scripts/test-core-package-registry-wp094.mjs:249" },
+    { "requirement": "Manifest tampering", "covered": true, "fixture": "manifest-tamper", "expectedCode": "PACKAGE_MANIFEST_TAMPERED", "source": "scripts/test-core-package-registry-wp094.mjs:254" },
+    { "requirement": "Circular Dependency", "covered": true, "fixture": "dependency-cycle", "expectedCode": "PACKAGE_DEPENDENCY_CYCLE", "source": "scripts/test-core-package-registry-wp094.mjs:237-238" },
+    { "requirement": "Nested Package recursion", "covered": true, "fixture": "nested-recursion", "expectedCode": "PACKAGE_NESTED_RECURSION", "source": "scripts/test-core-package-registry-wp094.mjs:276-277" },
+    { "requirement": "Path Traversal / ZIP Slip", "covered": true, "fixture": "unsafe-locator", "expectedCode": "PACKAGE_PATH_UNSAFE", "source": "scripts/test-core-package-registry-wp094.mjs:255" },
+    { "requirement": "Excessive file count", "covered": true, "fixture": "excessive-file-count", "expectedCode": "PACKAGE_FILE_COUNT_EXCEEDED", "source": "scripts/test-core-package-registry-wp094.mjs:257" },
+    { "requirement": "Excessive uncompressed size / decompression bomb", "covered": true, "fixture": "decompression-bomb", "expectedCode": "PACKAGE_UNCOMPRESSED_SIZE_EXCEEDED", "source": "scripts/test-core-package-registry-wp094.mjs:258" },
+    { "requirement": "Base64 / Data URL", "covered": true, "fixture": "metadata-data-url", "expectedCode": "PACKAGE_BLOB_PAYLOAD_FORBIDDEN", "source": "scripts/test-core-package-registry-wp094.mjs:72" },
+    { "requirement": "External URL", "covered": true, "fixture": "external-url-locator", "expectedCode": "PACKAGE_PATH_UNSAFE", "source": "scripts/test-core-package-registry-wp094.mjs:256" },
+    { "requirement": "Blob in Registry", "covered": true, "fixture": "record-blob-field", "expectedCode": "PACKAGE_UNKNOWN_FIELD", "source": "scripts/test-core-package-registry-wp094.mjs:156" },
+    { "requirement": "Cancellation before commit", "covered": true, "fixture": "cancelled", "expectedCode": "PACKAGE_CANCELLED", "source": "scripts/test-core-package-registry-wp094.mjs:260" },
+    { "requirement": "Crash before commit", "covered": true, "fixture": "crash-before-commit", "expectedCode": "PACKAGE_ASSEMBLY_CRASH", "source": "scripts/test-core-package-registry-wp094.mjs:261" },
+    { "requirement": "Storage upload failure", "covered": true, "fixture": "storage-upload-failure", "expectedCode": "PACKAGE_STORAGE_UPLOAD_FAILED", "source": "scripts/test-core-package-registry-wp094.mjs:262" },
+    { "requirement": "THIN dependency missing", "covered": true, "fixture": "thin-dependency-missing", "expectedCode": "PACKAGE_DEPENDENCY_MISSING", "source": "scripts/test-core-package-registry-wp094.mjs:278" },
+    { "requirement": "PORTABLE permission failure", "covered": true, "fixture": "portable-unauthorized", "expectedCode": "PACKAGE_PORTABLE_PERMISSION_REQUIRED", "source": "scripts/test-core-package-registry-wp094.mjs:247" },
+    { "requirement": "Duplicate Materialize", "covered": true, "fixture": "duplicate-materialize", "expectedCode": "PACKAGE_DUPLICATE", "source": "scripts/test-core-package-registry-wp094.mjs:171-173" },
+    { "requirement": "Idempotent Retry", "covered": true, "fixture": "idempotent-retry", "expectedCode": "idempotentReplay=true", "source": "scripts/test-core-package-registry-wp094.mjs:166-169" },
+    { "requirement": "Feature Flag OFF", "covered": true, "fixture": "default-flag-off", "expectedCode": "PACKAGE_FLAG_OFF", "source": "scripts/test-core-package-registry-wp094.mjs:132-137" },
+    { "requirement": "Upload OFF / Read ON", "covered": true, "fixture": "upload-off plus readOn", "expectedCode": "PACKAGE_FLAG_OFF and read ok", "source": "scripts/test-core-package-registry-wp094.mjs:285,291-292" },
+    { "requirement": "Kill Switch", "covered": true, "fixture": "kill-switch", "expectedCode": "PACKAGE_KILL_SWITCH", "source": "scripts/test-core-package-registry-wp094.mjs:286" },
+    { "requirement": "Market / Purchase / Entitlement / Royalty / Payout data混入拒否", "covered": true, "fixture": "forbidden-market-metadata and market-reference", "expectedCode": "PACKAGE_FORBIDDEN_DATA plus absent financial keys", "source": "scripts/test-core-package-registry-wp094.mjs:73-76,207-208" }
+  ],
+  "preservation": {
+    "wp000ThroughWp093Reexecuted": false,
+    "currentRoutesChanged": false,
+    "currentDrawChanged": false,
+    "currentPxdChanged": false,
+    "currentPiXiSYNCChanged": false,
+    "marketDataChanged": false,
+    "productionMigrationUploadDeployPublishCommitPush": false
+  }
+}

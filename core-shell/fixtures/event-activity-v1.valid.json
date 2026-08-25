@@ -1,0 +1,32 @@
+{
+  "eventId": "event-asset-head-2",
+  "eventType": "ASSET_HEAD_CHANGED",
+  "eventVersion": 1,
+  "occurredAt": "2026-08-07T00:00:00.000Z",
+  "producer": {
+    "producerId": "asset-registry-v1",
+    "producerVersion": "1.0.0",
+    "producerType": "ASSET_REGISTRY"
+  },
+  "aggregateType": "ASSET",
+  "aggregateId": "asset-character",
+  "aggregateVersion": 2,
+  "actorRef": {
+    "actorId": "user-synthetic",
+    "actorType": "USER"
+  },
+  "correlationId": "correlation-draw-asset-1",
+  "causationId": null,
+  "projectId": "project-draw2",
+  "assetId": "asset-character",
+  "packageId": null,
+  "visibilityClass": "PROJECT_MEMBERS",
+  "payload": {
+    "previousRevisionId": "revision-character-1",
+    "newRevisionId": "revision-character-2",
+    "reasonCode": "DRAW_REVISION_COMMITTED"
+  },
+  "schemaVersion": 1,
+  "causationDepth": 0,
+  "causationChain": []
+}

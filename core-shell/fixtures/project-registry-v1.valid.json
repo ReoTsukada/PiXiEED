@@ -1,0 +1,37 @@
+{
+  "projectId": "project-demo-1",
+  "projectKind": "DRAW2",
+  "toolId": "pixiedraw2",
+  "formatId": "pixipackage",
+  "formatVersion": "1",
+  "ownerType": "USER",
+  "ownerId": "user-owner-1",
+  "createdBy": "user-owner-1",
+  "name": "Demo Project",
+  "visibility": "PRIVATE",
+  "lifecycleState": "ACTIVE",
+  "headRevisionId": "revision-1",
+  "rootAssetId": "asset-root-1",
+  "rootReference": null,
+  "legacyBindings": [],
+  "members": [
+    {
+      "principalId": "user-editor-1",
+      "role": "EDITOR",
+      "status": "ACTIVE",
+      "membershipVersion": 1,
+      "addedAt": "2026-08-07T00:00:00.000Z",
+      "removedAt": null
+    }
+  ],
+  "metadata": {
+    "summary": "Metadata only",
+    "labels": ["fixture"],
+    "locale": "ja-JP"
+  },
+  "schemaVersion": 1,
+  "recordVersion": 1,
+  "membershipVersion": 1,
+  "createdAt": "2026-08-07T00:00:00.000Z",
+  "updatedAt": "2026-08-07T00:00:00.000Z"
+}

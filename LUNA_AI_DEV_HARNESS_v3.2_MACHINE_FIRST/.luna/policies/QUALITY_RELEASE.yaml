@@ -1,0 +1,18 @@
+policy_id: QUALITY-RELEASE-001
+quality_strategy: risk_weighted
+work_package_completion_requires:
+  - requested_behavior_exists
+  - blueprint_links_still_valid
+  - completion_criteria_met
+  - targeted_tests_pass
+  - known_gaps_explicit
+  - state_updated
+additional_by_risk:
+  medium: [broader_regression_check]
+  high: [independent_review, rollback_or_recovery_proven, relevant_security_performance_compatibility_checks]
+release_requires:
+  - all_release_blocking_acceptance_outcomes_pass
+  - unresolved_high_risks_zero_or_human_accepted
+  - migration_and_rollback_ready_if_applicable
+  - observability_or_failure_detection_defined_for_material_runtime_change
+  - human_approval_if_release_gate_matches

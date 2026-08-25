@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "work_package": "WP-000",
+  "captured_on": "2026-08-06",
+  "source_entry": "pixiedraw/index.html -> assets/js/app.js and split module scripts",
+  "documentation_mismatch": {
+    "path": "docs/project-file-map.md",
+    "claim": "production uses true pre-split single app.js and index does not load modules",
+    "observed": "pixiedraw/index.html currently loads assets/js/modules/*.js and app.js",
+    "classification": "documentation drift; no production change made in WP-000"
+  },
+  "features": [
+    {
+      "id": "raster-drawing",
+      "classification": "keep",
+      "evidence": [
+        "pixiedraw/assets/js/app.js",
+        "pixiedraw/assets/js/modules/document-model.js",
+        "pixiedraw/assets/js/modules/pixel-patch-history-utils.js"
+      ]
+    },
+    {
+      "id": "palette-and-color-codecs",
+      "classification": "keep",
+      "evidence": [
+        "pixiedraw/assets/js/modules/palette-utils.js",
+        "pixiedraw/assets/js/modules/color-codec-utils.js"
+      ]
+    },
+    {
+      "id": "layers-frames-and-animation",
+      "classification": "keep",
+      "evidence": [
+        "pixiedraw/assets/js/modules/document-model.js",
+        "pixiedraw/assets/js/modules/timelapse-operation-store-utils.js"
+      ]
+    },
+    {
+      "id": "local-project-autosave",
+      "classification": "keep",
+      "evidence": [
+        "pixiedraw/assets/js/modules/project-storage-utils.js",
+        "pixiedraw/assets/js/modules/local-project-journal-utils.js"
+      ]
+    },
+    {
+      "id": "v2-project-archive",
+      "classification": "migrate",
+      "evidence": [
+        "pixiedraw/assets/js/modules/project-storage-v2-archive-codec.js",
+        "scripts/test-pixiedraw-pxd-index8-roundtrip.mjs"
+      ]
+    },
+    {
+      "id": "pixisync-v1",
+      "classification": "keep",
+      "evidence": [
+        "pixiedraw/assets/js/modules/pixisync-operation-codec.js",
+        "pixiedraw/assets/js/modules/pixisync-realtime-client.js",
+        "supabase/migrations/20260730001657_pixisync_collab_v1_access_rpc.sql"
+      ]
+    },
+    {
+      "id": "legacy-shared-project-flow",
+      "classification": "retire",
+      "evidence": [
+        "pixiedraw/assets/js/app.js:14",
+        "SHARED_PROJECTS_ENABLED=false"
+      ]
+    },
+    {
+      "id": "multi-canvas",
+      "classification": "replace-or-defer",
+      "evidence": [
+        "pixiedraw/assets/js/modules/state-normalizers.js:49",
+        "MULTI_CANVAS_FEATURE_ENABLED=false"
+      ]
+    },
+    {
+      "id": "reload-snapshot",
+      "classification": "keep",
+      "evidence": [
+        "pixiedraw/assets/js/modules/ui-static-config.js:330",
+        "RELOAD_SNAPSHOT_ENABLED=true"
+      ]
+    }
+  ],
+  "feature_flags": [
+    {
+      "name": "SHARED_PROJECTS_ENABLED",
+      "value": false,
+      "source": "pixiedraw/assets/js/app.js:14"
+    },
+    {
+      "name": "PIXISYNC_V1_ENABLED",
+      "value": true,
+      "source": "pixiedraw/assets/js/app.js:15"
+    },
+    {
+      "name": "MULTI_CANVAS_FEATURE_ENABLED",
+      "value": false,
+      "source": "pixiedraw/assets/js/modules/state-normalizers.js:49"
+    },
+    {
+      "name": "RELOAD_SNAPSHOT_ENABLED",
+      "value": true,
+      "source": "pixiedraw/assets/js/modules/ui-static-config.js:330"
+    },
+    {
+      "name": "IOS_SNAPSHOT_SUPPORTED",
+      "value": false,
+      "source": "pixiedraw/assets/js/modules/ui-static-config.js:414"
+    }
+  ]
+}

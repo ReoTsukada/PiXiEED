@@ -266,13 +266,13 @@
     <section class="card">
       <div class="glossary-title">
         <img src="../assets/icons/Word.png?v=2026.07.19-icons2" alt="" aria-hidden="true">
-        <h1>ドット絵・ピクセルアート用語集</h1>
+        <h1 data-i18n-key="glossaryTitle">ドット絵・ピクセルアート用語集</h1>
       </div>
-      <p class="lead">ドット絵とは何か、ピクセルアートとの違い、英語表現、制作でよく使う基本用語をまとめています。PiXiEEDで制作する時によく使う言葉を、基本用語・解像度・表現・アニメ・制作工程までカテゴリ別に整理しました。</p>
+      <p class="lead" data-i18n-key="glossaryLead">ドット絵とは何か、ピクセルアートとの違い、英語表現、制作でよく使う基本用語をまとめています。PiXiEEDで制作する時によく使う言葉を、基本用語・解像度・表現・アニメ・制作工程までカテゴリ別に整理しました。</p>
       <div class="top-links">
-        <a class="chip" href="../pixiedraw/index.html">PiXiEEDrawを開く</a>
-        <a class="chip" href="../pixiee-lens/index.html">カメラで変換</a>
-        <a class="chip" href="../qr/index.html">QRを作る</a>
+        <a class="chip" href="../studio/" data-i18n-key="glossaryOpenDraw">iDRAWを開く</a>
+        <a class="chip" href="../pixiee-lens/index.html" data-i18n-key="glossaryOpenLens">カメラで変換</a>
+        <a class="chip" href="../qr/index.html" data-i18n-key="glossaryOpenQr">QRを作る</a>
         <a class="chip" href="#intro-faq">最初に見る3項目</a>
         <a class="chip" href="#basic">基本用語</a>
         <a class="chip" href="#size">解像度・サイズ</a>
@@ -290,18 +290,18 @@
       </div>
     </section>
 
-    <section class="card search-wrap" aria-label="用語検索">
+    <section class="card search-wrap" aria-label="用語検索" data-i18n-aria-label="glossarySearchAria">
       <div class="search-row">
-        <label for="termSearch">用語を検索</label>
-        <input id="termSearch" type="search" placeholder="例: スプライト / インデックス / 64×64"/>
+        <label for="termSearch" data-i18n-key="glossarySearchLabel">用語を検索</label>
+        <input id="termSearch" type="search" placeholder="例: スプライト / インデックス / 64×64" data-i18n-placeholder="glossarySearchPlaceholder"/>
       </div>
-      <p class="search-note" id="termCount">表示件数: -</p>
+      <p class="search-note" id="termCount" data-i18n-key="glossaryCount" data-i18n-template="true">表示件数: -</p>
     </section>
 
     <section class="card" id="intro-faq">
       <div class="section-head">
-        <h2>最初に見る3項目</h2>
-        <p class="section-sub">検索されやすい入口から短く整理</p>
+        <h2 data-i18n-key="glossaryIntroTitle">最初に見る3項目</h2>
+        <p class="section-sub" data-i18n-key="glossaryIntroSub">検索されやすい入口から短く整理</p>
       </div>
       <dl class="glossary-list">
         <div class="term-item"><dt>ドット絵とは</dt><dd>ドット絵は、低解像度のグリッドを前提に、限られた色と形で描く画像表現です。1マスずつ設計する感覚が強く、小さなサイズでも形を伝えやすいのが特徴です。</dd></div>
@@ -312,8 +312,8 @@
 
     <section class="card" id="basic">
       <div class="section-head">
-        <h2>基本用語</h2>
-        <p class="section-sub">Pixel art の土台になる言葉</p>
+        <h2 data-i18n-key="glossaryBasicTitle">基本用語</h2>
+        <p class="section-sub" data-i18n-key="glossaryBasicSub">Pixel art の土台になる言葉</p>
       </div>
       <dl class="glossary-list">
         <div class="term-item"><dt>ドット絵とは <span>What is Dot Art?</span></dt><dd>低解像度のマス目を前提に、少ない色と単純化した形で情報を伝える画像表現です。小さいサイズでも読みやすさを保つ設計が重要です。</dd></div>
@@ -340,8 +340,8 @@
 
     <section class="card" id="size">
       <div class="section-head">
-        <h2>解像度・サイズ</h2>
-        <p class="section-sub">画面サイズと表示品質に関する言葉</p>
+        <h2 data-i18n-key="glossarySizeTitle">解像度・サイズ</h2>
+        <p class="section-sub" data-i18n-key="glossarySizeSub">画面サイズと表示品質に関する言葉</p>
       </div>
       <dl class="glossary-list">
         <div class="term-item"><dt>16×16</dt><dd>超小型スプライトの代表サイズ。アイコンや顔グラの最小構成で使われます。</dd></div>
@@ -361,8 +361,8 @@
 
     <section class="card" id="workflow">
       <div class="section-head">
-        <h2>制作・共同制作</h2>
-        <p class="section-sub">PiXiEEDraw運用でも使う機能用語</p>
+        <h2 data-i18n-key="glossaryWorkflowTitle">制作・共同制作</h2>
+        <p class="section-sub" data-i18n-key="glossaryWorkflowSub">iDRAW運用でも使う機能用語</p>
       </div>
       <dl class="glossary-list">
         <div class="term-item"><dt>マルチレイヤー <span>Multi Layer</span></dt><dd>線・色・影などを層で分離して編集する方式。修正時の破壊的変更を減らせます。</dd></div>
@@ -377,8 +377,8 @@
 
     <section class="card" id="rendering">
       <div class="section-head">
-        <h2>描画表現・陰影</h2>
-        <p class="section-sub">見た目の質感を作るテクニック用語</p>
+        <h2 data-i18n-key="glossaryRenderingTitle">描画表現・陰影</h2>
+        <p class="section-sub" data-i18n-key="glossaryRenderingSub">見た目の質感を作るテクニック用語</p>
       </div>
       <dl class="glossary-list">
         <div class="term-item"><dt>アウトライン <span>Outline</span></dt><dd>対象の外側を縁取る線。シルエットを明確にする基本手法です。</dd></div>
@@ -410,8 +410,8 @@
 
     <section class="card" id="animation">
       <div class="section-head">
-        <h2>アニメーション</h2>
-        <p class="section-sub">フレーム設計と再生制御の用語</p>
+        <h2 data-i18n-key="glossaryAnimationTitle">アニメーション</h2>
+        <p class="section-sub" data-i18n-key="glossaryAnimationSub">フレーム設計と再生制御の用語</p>
       </div>
       <dl class="glossary-list">
         <div class="term-item"><dt>フレーム <span>Frame</span></dt><dd>アニメーションを構成する1コマです。</dd></div>
@@ -429,8 +429,8 @@
 
     <section class="card" id="game-assets">
       <div class="section-head">
-        <h2>ゲーム素材</h2>
-        <p class="section-sub">ゲーム制作で使うスプライト関連用語</p>
+        <h2 data-i18n-key="glossaryGameTitle">ゲーム素材</h2>
+        <p class="section-sub" data-i18n-key="glossaryGameSub">ゲーム制作で使うスプライト関連用語</p>
       </div>
       <dl class="glossary-list">
         <div class="term-item"><dt>キャラクタースプライト <span>Character Sprite</span></dt><dd>プレイヤーや主要人物を表示するスプライトです。</dd></div>
@@ -448,8 +448,8 @@
 
     <section class="card" id="palette-style">
       <div class="section-head">
-        <h2>限定パレット・色制限</h2>
-        <p class="section-sub">色数やレトロ配色に関する用語</p>
+        <h2 data-i18n-key="glossaryPaletteTitle">限定パレット・色制限</h2>
+        <p class="section-sub" data-i18n-key="glossaryPaletteSub">色数やレトロ配色に関する用語</p>
       </div>
       <dl class="glossary-list">
         <div class="term-item"><dt>限定パレット <span>Limited Palette</span></dt><dd>使う色をあらかじめ限定したパレット設計です。</dd></div>
@@ -468,8 +468,8 @@
 
     <section class="card" id="hardware">
       <div class="section-head">
-        <h2>ハード世代・規格</h2>
-        <p class="section-sub">レトロ文脈でよく参照される用語</p>
+        <h2 data-i18n-key="glossaryHardwareTitle">ハード世代・規格</h2>
+        <p class="section-sub" data-i18n-key="glossaryHardwareSub">レトロ文脈でよく参照される用語</p>
       </div>
       <dl class="glossary-list">
         <div class="term-item"><dt>NES</dt><dd>任天堂の8bit世代機。色制限やタイル制約の文脈で参照されます。</dd></div>
@@ -486,8 +486,8 @@
 
     <section class="card" id="map-bg">
       <div class="section-head">
-        <h2>背景・タイルマップ</h2>
-        <p class="section-sub">背景制作とステージ構成の用語</p>
+        <h2 data-i18n-key="glossaryMapTitle">背景・タイルマップ</h2>
+        <p class="section-sub" data-i18n-key="glossaryMapSub">背景制作とステージ構成の用語</p>
       </div>
       <dl class="glossary-list">
         <div class="term-item"><dt>背景タイル <span>Background Tile</span></dt><dd>背景面を構築する反復用タイル素材です。</dd></div>
@@ -505,8 +505,8 @@
 
     <section class="card" id="production">
       <div class="section-head">
-        <h2>制作工程</h2>
-        <p class="section-sub">1枚を仕上げる時の代表的なフロー</p>
+        <h2 data-i18n-key="glossaryProductionTitle">制作工程</h2>
+        <p class="section-sub" data-i18n-key="glossaryProductionSub">1枚を仕上げる時の代表的なフロー</p>
       </div>
       <dl class="glossary-list">
         <div class="term-item"><dt>ラフ <span>Rough</span></dt><dd>初期の当たり取り段階。構図と比率の確認を目的にします。</dd></div>
@@ -523,8 +523,8 @@
 
     <section class="card" id="ui-tools">
       <div class="section-head">
-        <h2>UI・制作ツール関連</h2>
-        <p class="section-sub">エディタ操作で頻出する用語</p>
+        <h2 data-i18n-key="glossaryUiTitle">UI・制作ツール関連</h2>
+        <p class="section-sub" data-i18n-key="glossaryUiSub">エディタ操作で頻出する用語</p>
       </div>
       <dl class="glossary-list">
         <div class="term-item"><dt>ピクセルブラシ <span>Pixel Brush</span></dt><dd>ピクセル単位で塗るためのブラシです。</dd></div>
@@ -545,8 +545,8 @@
 
     <section class="card" id="community">
       <div class="section-head">
-        <h2>コミュニティ用語</h2>
-        <p class="section-sub">投稿・交流シーンでよく使われる語</p>
+        <h2 data-i18n-key="glossaryCommunityTitle">コミュニティ用語</h2>
+        <p class="section-sub" data-i18n-key="glossaryCommunitySub">投稿・交流シーンでよく使われる語</p>
       </div>
       <dl class="glossary-list">
         <div class="term-item"><dt>ドッター <span>Dotter</span></dt><dd>ドット絵を制作する人への呼称です。</dd></div>
@@ -561,8 +561,8 @@
 
     <section class="card" id="trends">
       <div class="section-head">
-        <h2>最近増えている用語</h2>
-        <p class="section-sub">現代の表現トレンドに関する言葉</p>
+        <h2 data-i18n-key="glossaryTrendsTitle">最近増えている用語</h2>
+        <p class="section-sub" data-i18n-key="glossaryTrendsSub">現代の表現トレンドに関する言葉</p>
       </div>
       <dl class="glossary-list">
         <div class="term-item"><dt>HDピクセル <span>HD Pixel</span></dt><dd>高解像度でドット感を残す表現を指す通称です。</dd></div>
@@ -575,7 +575,7 @@
     </section>
 
     <footer>
-      <p><a href="../index.html">PiXiEEDホームへ戻る</a> / <a href="../pixiedraw/index.html">PiXiEEDrawを開く</a> / <a href="../pixiee-lens/index.html">カメラで変換</a> / <a href="../qr/index.html">QRを作る</a></p>
+      <p><a href="../index.html" data-i18n-key="glossaryHome">PiXiEEDホームへ戻る</a> / <a href="../studio/" data-i18n-key="glossaryOpenDraw">iDRAWを開く</a> / <a href="../pixiee-lens/index.html" data-i18n-key="glossaryOpenLens">カメラで変換</a> / <a href="../qr/index.html" data-i18n-key="glossaryOpenQr">QRを作る</a></p>
     </footer>
   </div>
   <script>
@@ -587,19 +587,22 @@
       const update = () => {
         const q = String(input.value || '').trim().toLowerCase();
         let visible = 0;
-        items.forEach((item) => {
+      items.forEach((item) => {
           const hit = !q || item.textContent.toLowerCase().includes(q);
           item.hidden = !hit;
           if (hit) visible += 1;
         });
-        counter.textContent = `表示件数: ${visible}`;
+        counter.textContent = document.documentElement.dataset.pixieedLocale === 'en'
+          ? `Showing ${visible} terms`
+          : `表示件数: ${visible}`;
       };
       input.addEventListener('input', update);
+      window.addEventListener('pixieed:locale-changed', update);
       update();
     })();
   </script>
-  <script src="../scripts/shared-profile-header.js"></script>
-  <script src="../scripts/shared-bottom-nav.js?v=20260724-fullscreen-icons2"></script>
+  <script src="../scripts/shared-profile-header.js?v=20260825-common-shell15"></script>
+  <script src="../scripts/shared-bottom-nav.js?v=20260825-studio-brand1"></script>
   <script src="../scripts/pixel-art-fit.js"></script>
 </body>
 </html>

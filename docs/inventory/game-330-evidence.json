@@ -1,0 +1,32 @@
+{
+  "package": "GAME-330",
+  "acceptance": ["GAME330-SCOPE-001", "GAME330-EVIDENCE-001", "GAME330-STOP-001"],
+  "implementation": [
+    "pixiedraw2/src/game/game-330/core.ts",
+    "pixiedraw2/tests/game-330/core.test.ts",
+    "pixiedraw2/benchmarks/game-330/core.bench.ts"
+  ],
+  "contract": "docs/contracts/GAME-330-build-provenance.md",
+  "adr": "docs/decisions/ADR-001-GAME-330-deterministic-provenance.md",
+  "evidence": {
+    "deterministic_plan_and_artifact": "PASS_STATIC_AND_UNIT",
+    "lock_provenance_and_manifest_validation": "PASS_STATIC_AND_UNIT",
+    "negative_fixtures": ["wrong caller", "wrong project", "missing lock", "tampered hash", "duplicate path", "path traversal", "dependency cycle", "cancel", "quarantine", "partial artifact"],
+    "authoring_runtime_state_separation": "PASS_STATIC_AND_UNIT",
+    "pure_host_boundary": "PASS_STATIC_REVIEW",
+    "deno_check": {"status": "PASS", "exit_code": 0, "command": "deno check --no-remote pixiedraw2/src/game/game-330/core.ts pixiedraw2/tests/game-330/core.test.ts pixiedraw2/benchmarks/game-330/core.bench.ts"},
+    "deno_test": {"status": "PASS", "exit_code": 0, "passed": 4, "failed": 0, "command": "deno test --no-remote --check pixiedraw2/tests/game-330/core.test.ts"},
+    "deno_bench": {"status": "PASS", "exit_code": 0, "benchmark": "GAME330 deterministic artifact materialization (32 entries)", "average": "298.4 us", "command": "deno bench --no-remote pixiedraw2/benchmarks/game-330/core.bench.ts"},
+    "json_parse": {"status": "PASS", "exit_code": 0, "command": "node -e JSON.parse(require('fs').readFileSync('docs/inventory/game-330-evidence.json','utf8'))"},
+    "git_diff_check": {"status": "PASS", "exit_code": 0, "command": "git diff --check"},
+    "browser": "UNTESTED: pure TypeScript package has no DOM/UI",
+    "device": "UNTESTED",
+    "native_toolchain_and_signing": "UNTESTED",
+    "production_deploy_publish": "NOT_RUN_BY_BOUNDARY"
+  },
+  "scope": {
+    "allowed_write_globs": ["pixiedraw2/src/game/game-330/**", "pixiedraw2/tests/game-330/**", "pixiedraw2/benchmarks/game-330/**", "docs/contracts/GAME-330-*.md", "docs/inventory/game-330-*.json", "docs/decisions/ADR-*-GAME-330-*.md"],
+    "production_routes_data_market_pixisync_changed": false,
+    "commit_push_deploy_publish": false
+  }
+}

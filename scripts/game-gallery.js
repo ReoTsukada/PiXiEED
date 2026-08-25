@@ -190,8 +190,8 @@
     const blueprints = IS_EN
       ? [
           {
-            title: 'PiXiEEDraw',
-            link: 'pixiedraw/index.html',
+            title: 'iDRAW',
+            link: 'studio/index.html',
             desc: 'Full pixel editor for production workflows, from draft to finish with multiplayer collaboration.'
           },
           {
@@ -207,8 +207,8 @@
         ]
       : [
           {
-            title: 'PiXiEEDraw',
-            link: 'pixiedraw/index.html',
+            title: 'iDRAW',
+            link: 'studio/index.html',
             desc: '本格ドット制作から共同編集まで、1つの画面で完結。下書きから仕上げまでスムーズです。'
           },
           {

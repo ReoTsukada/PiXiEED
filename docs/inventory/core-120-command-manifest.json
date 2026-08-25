@@ -1,0 +1,56 @@
+{
+  "evidenceVersion": "QUALIFICATION_COMMAND_MANIFEST_V1",
+  "packageId": "CORE-120",
+  "commands": [
+    {
+      "id": "CORE120-FORMAT",
+      "acceptanceIds": ["CORE120-GATE-001", "CORE120-CONVERGENCE-001", "CORE120-NONINTRUSION-001", "CORE120-HANDOFF-001"],
+      "argv": ["deno", "fmt", "--check", "pixiedraw2/src/core/core-120", "pixiedraw2/tests/core-120", "pixiedraw2/benchmarks/core-120"]
+    },
+    {
+      "id": "CORE120-TYPECHECK",
+      "acceptanceIds": ["CORE120-GATE-001", "CORE120-CONVERGENCE-001"],
+      "argv": ["deno", "check", "--no-remote", "pixiedraw2/src/core/core-120/contracts.ts", "pixiedraw2/src/core/core-120/gate.ts", "pixiedraw2/src/core/core-120/index.ts", "pixiedraw2/tests/core-120/core-120-gate.test.ts", "pixiedraw2/benchmarks/core-120/generate-evidence.ts"]
+    },
+    {
+      "id": "CORE120-TEST",
+      "acceptanceIds": ["CORE120-GATE-001", "CORE120-CONVERGENCE-001", "CORE120-NONINTRUSION-001", "CORE120-HANDOFF-001"],
+      "argv": ["deno", "test", "--no-remote", "--allow-read", "--allow-write", "--check", "pixiedraw2/tests/core-120"]
+    },
+    {
+      "id": "CORE120-CONTEXT",
+      "acceptanceIds": ["CORE120-GATE-001", "CORE120-NONINTRUSION-001", "CORE120-HANDOFF-001"],
+      "argv": ["python3", "scripts/verify_work_package_context.py", "--context", ".codex/context/CORE-120.md", "--root", "."]
+    },
+    {
+      "id": "BASELINE-IDENTITY",
+      "acceptanceIds": ["CORE120-GATE-001", "CORE120-NONINTRUSION-001"],
+      "argv": ["node", "scripts/test-baseline-failure-identity-wp080.mjs"]
+    },
+    {
+      "id": "BASELINE-SUITE",
+      "acceptanceIds": ["CORE120-GATE-001", "CORE120-NONINTRUSION-001"],
+      "argv": ["node", "scripts/test-baseline-suite-wp000.mjs"]
+    },
+    {
+      "id": "CANONICAL-ALIGNMENT",
+      "acceptanceIds": ["CORE120-GATE-001", "CORE120-HANDOFF-001"],
+      "argv": ["node", "scripts/verify-canonical-package-alignment.mjs"]
+    },
+    {
+      "id": "PROGRAM-VALIDATOR",
+      "acceptanceIds": ["CORE120-GATE-001", "CORE120-HANDOFF-001"],
+      "argv": ["python3", "scripts/validate_pixieed_program.py", "--root", "."]
+    },
+    {
+      "id": "DIFF-CHECK",
+      "acceptanceIds": ["CORE120-NONINTRUSION-001", "CORE120-HANDOFF-001"],
+      "argv": ["git", "diff", "--check"]
+    },
+    {
+      "id": "EVIDENCE-CONTRACT-SELFTEST",
+      "acceptanceIds": ["CORE120-GATE-001", "CORE120-HANDOFF-001"],
+      "argv": ["node", "scripts/test-qualification-evidence-v1.mjs"]
+    }
+  ]
+}

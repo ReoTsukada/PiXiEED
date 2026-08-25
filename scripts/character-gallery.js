@@ -43,33 +43,32 @@
   const SECRET_UNLOCK_EVENT_NAME = 'pixiePet:secretUnlocked';
   const PLACEHOLDER_IMG = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
   const LANG = (document.documentElement.getAttribute('lang') || 'ja').toLowerCase();
-  const IS_EN = LANG.startsWith('en');
-  const I18N = IS_EN
-    ? {
-        viewerAltSuffix: ' pixel preview',
-        pngMissing: 'PNG missing',
-        draftName: 'Character (Draft)',
-        weightLabel: 'Weight',
-        weightPending: 'TBD',
-        detailPending: 'Details are being prepared.',
-        traitsPending: 'Trait details are being prepared.',
-        ariaView: 'View',
-        ariaNew: '(New)',
-        spriteAltSuffix: ' pixel sprite',
-        locked: 'Locked',
-        unlockOn: 'Unlock on',
-        roleUnknown: 'Unknown',
-        unseenOne: '1 new character has been added',
-        unseenManyPrefix: '',
-        unseenManySuffix: ' new characters have been added',
-        fallbackDetailPrefix: 'Details for',
-        fallbackDetailSuffix: 'are currently available in Japanese. English copy is coming soon.',
-        placeholderTagline: 'Temporary placeholder for character gallery.',
-        placeholderDesc: 'Add entries in manifest.js to switch images and notes.',
-        placeholderBackground: 'Background is not set',
-        placeholderTrait: 'Add trait points'
-      }
-    : {
+  let IS_EN = LANG.startsWith('en');
+  const LOCALE_COPY_EN = {
+    viewerAltSuffix: ' pixel preview',
+    pngMissing: 'PNG missing',
+    draftName: 'Character (Draft)',
+    weightLabel: 'Weight',
+    weightPending: 'TBD',
+    detailPending: 'Details are being prepared.',
+    traitsPending: 'Trait details are being prepared.',
+    ariaView: 'View',
+    ariaNew: '(New)',
+    spriteAltSuffix: ' pixel sprite',
+    locked: 'Locked',
+    unlockOn: 'Unlock on',
+    roleUnknown: 'Unknown',
+    unseenOne: '1 new character has been added',
+    unseenManyPrefix: '',
+    unseenManySuffix: ' new characters have been added',
+    fallbackDetailPrefix: 'Details for',
+    fallbackDetailSuffix: 'are being prepared.',
+    placeholderTagline: 'Temporary placeholder for character gallery.',
+    placeholderDesc: 'Add entries in manifest.js to switch images and notes.',
+    placeholderBackground: 'Background is not set',
+    placeholderTrait: 'Add trait points'
+  };
+  const LOCALE_COPY_JA = {
         viewerAltSuffix: 'のドットプレビュー',
         pngMissing: 'PNG未配置',
         draftName: 'キャラクター（仮）',
@@ -93,6 +92,7 @@
         placeholderBackground: '未設定の背景情報',
         placeholderTrait: 'ポイントを追加'
       };
+  let I18N = IS_EN ? LOCALE_COPY_EN : LOCALE_COPY_JA;
   const EN_NAME_OVERRIDES_BY_ID = Object.freeze({
     'mao-chill': 'Maosama',
     'baburin': 'Baburin',
@@ -157,6 +157,27 @@
   const displayEntries = manifestEntries.map(entry => getDisplayEntry(entry));
   const buttons = displayEntries.map((entry, index) => createButton(entry, index));
   let currentCharacterId = null;
+
+  window.addEventListener('pixieed:locale-changed', event => {
+    const nextIsEn = String(event?.detail?.locale || document.documentElement.lang || 'ja').toLowerCase().startsWith('en');
+    if (nextIsEn === IS_EN) return;
+    IS_EN = nextIsEn;
+    I18N = IS_EN ? LOCALE_COPY_EN : LOCALE_COPY_JA;
+    stopAllTyping();
+    manifestEntries.forEach((entry, index) => {
+      displayEntries[index] = getDisplayEntry(entry);
+      applyEntryToButton(buttons[index], displayEntries[index], index);
+    });
+    const currentIndex = displayEntries.findIndex(entry => entry?.id === currentCharacterId);
+    if (currentIndex >= 0) {
+      selectCharacter(displayEntries[currentIndex], buttons[currentIndex], {
+        updateUrl: false,
+        animateText: false
+      });
+    }
+    updateHeaderIndicator();
+    announceUnseenCharacters({ autoHide: true, duration: 4200 });
+  });
 
   const initialIndex = manifestEntries.findIndex(entry => entry.id === initialCharacterId);
   if (initialIndex >= 0) {
@@ -292,7 +313,7 @@
   }
 
   function selectCharacter(entry, activeButton, options = {}) {
-    const { updateUrl = false, markViewed = false } = options;
+    const { updateUrl = false, markViewed = false, animateText = true } = options;
     if (!entry) return;
     const entryIndex = getEntryIndex(entry);
     const resolvedName = getEntryName(entry, entryIndex);
@@ -333,9 +354,9 @@
       }
     }
 
-    typeText(nameEl, resolvedName);
-    typeText(weightEl, `${I18N.weightLabel}: ${getEntryWeight(entry)}`);
-    typeText(detailEl, getEntryDetail(entry, entryIndex));
+    writeText(nameEl, resolvedName, animateText);
+    writeText(weightEl, `${I18N.weightLabel}: ${getEntryWeight(entry)}`, animateText);
+    writeText(detailEl, getEntryDetail(entry, entryIndex), animateText);
     applyScale(DEFAULT_IMAGE_SCALE);
     if (traitsEl) {
       traitsEl.innerHTML = '';
@@ -343,7 +364,7 @@
       traits.forEach(trait => {
         const li = document.createElement('li');
         traitsEl.appendChild(li);
-        typeText(li, trait);
+        writeText(li, trait, animateText);
       });
     }
 
@@ -533,6 +554,23 @@
     };
 
     step();
+  }
+
+  function writeText(element, text, animate = true) {
+    if (!animate) {
+      stopTyping(element);
+      element.textContent = typeof text === 'string' ? text : '';
+      return;
+    }
+    typeText(element, text);
+  }
+
+  function stopAllTyping() {
+    typingControllers.forEach((controller, element) => {
+      clearTimeout(controller);
+      element.textContent = '';
+    });
+    typingControllers.clear();
   }
 
   function stopTyping(element) {

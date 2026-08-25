@@ -30,9 +30,9 @@
       entries = [
         {
           file: 'icon/icon-192-4.png',
-          label: 'PiXiEEDraw',
+          label: 'iDRAW',
           date: new Date().toISOString().slice(0, 10),
-          alt: 'PiXiEEDraw'
+          alt: 'iDRAW'
         }
       ];
     }

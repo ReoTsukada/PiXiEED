@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pixieed.jp/schemas/pxd-manifest-v1.json",
+  "title": "PiXiEED PXD Manifest v1 Starter",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schemaVersion",
+    "packageId",
+    "projectId",
+    "createdBy",
+    "assets",
+    "dependencies"
+  ],
+  "properties": {
+    "format": {
+      "const": "pxd"
+    },
+    "archiveVersion": {
+      "const": 1
+    },
+    "packageKind": {
+      "const": "PROJECT_PACKAGE"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "packageId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "projectId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "createdBy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "application",
+        "version"
+      ],
+      "properties": {
+        "application": {
+          "const": "PiXiEED"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "project": {
+      "type": "object"
+    },
+    "canonicalManifestHash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "assets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "assetId",
+          "revisionId",
+          "mediaType",
+          "path",
+          "sha256",
+          "bytes"
+        ],
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "revisionId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "mediaType": {
+            "type": "string",
+            "minLength": 1
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "tileSize": {
+            "enum": [32, 64]
+          },
+          "palette": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 256,
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            }
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          }
+          }
+        }
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "fromAssetId",
+          "toAssetId",
+          "kind"
+        ],
+        "properties": {
+          "fromAssetId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "toAssetId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}

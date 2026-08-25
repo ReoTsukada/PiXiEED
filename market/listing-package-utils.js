@@ -17,6 +17,15 @@
   const PNG_SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10];
   const GIF_MAX_OPTIMIZE_FRAMES = 1000;
   const DEFAULT_GIF_FRAME_DURATION = 100;
+  const AUDIO_EXTENSIONS = new Set([
+    'aac', 'aiff', 'flac', 'm4a', 'mid', 'midi', 'mp3', 'oga', 'ogg', 'opus', 'wav', 'weba'
+  ]);
+  const AUDIO_MIME_FORMATS = new Map([
+    ['audio/aac', 'aac'], ['audio/aiff', 'aiff'], ['audio/flac', 'flac'],
+    ['audio/mp4', 'm4a'], ['audio/midi', 'midi'], ['audio/x-midi', 'midi'],
+    ['audio/mpeg', 'mp3'], ['audio/ogg', 'ogg'], ['audio/opus', 'opus'],
+    ['audio/wav', 'wav'], ['audio/x-wav', 'wav'], ['audio/webm', 'weba']
+  ]);
   let gifCodec = null;
 
   function readUint24LittleEndian(bytes, offset) {
@@ -65,6 +74,7 @@
     const isGif = hasSignature(bytes, [71, 73, 70, 56]);
     const isWebp = hasSignature(bytes, [82, 73, 70, 70])
       && bytes[8] === 87 && bytes[9] === 69 && bytes[10] === 66 && bytes[11] === 80;
+    const mimeType = String(file?.type || '').toLowerCase();
 
     // .pxd is the current PiXiEEDraw extension. Keep the prior extension as
     // a read-only compatibility alias for existing creators and purchasers.
@@ -76,7 +86,18 @@
       if (/(?:sprite[-_ ]?(?:sheet|map)|sprites?)(?:[._ -]|$)/i.test(file.name)) return 'sprite-sheet-png';
       return 'png';
     }
+    if (AUDIO_EXTENSIONS.has(extension)) return extension;
+    if (mimeType.startsWith('audio/')) return AUDIO_MIME_FORMATS.get(mimeType) || 'm4a';
     return null;
+  }
+
+  function detectMediaKind(file, detectedFormat = '') {
+    if (detectedFormat === 'pixiedraw-project') return 'project';
+    const extension = extensionOf(file);
+    const mimeType = String(file?.type || '').toLowerCase();
+    if (AUDIO_EXTENSIONS.has(detectedFormat) || mimeType.startsWith('audio/') || AUDIO_EXTENSIONS.has(extension)) return 'audio';
+    if (detectedFormat) return 'image';
+    return 'other';
   }
 
   async function collectFilesFromHandle(handle, prefix = '') {
@@ -461,5 +482,12 @@
     };
   }
 
-  return { detectFormat, collectFilesFromHandle, extractPixieeDrawPreviewPng, optimizeGifIntegerScale, readRasterDimensions };
+  return {
+    detectFormat,
+    detectMediaKind,
+    collectFilesFromHandle,
+    extractPixieeDrawPreviewPng,
+    optimizeGifIntegerScale,
+    readRasterDimensions
+  };
 });

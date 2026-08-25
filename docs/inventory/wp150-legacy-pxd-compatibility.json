@@ -1,0 +1,63 @@
+{
+  "workPackage": "WP-150",
+  "title": "Legacy PiXiEEDraw import and compatibility gate",
+  "status": "COMPLETE_ISOLATED_REFERENCE",
+  "entryGate": {
+    "canonicalScope": "PASS",
+    "newAndLegacyIdentitySeparation": "PASS",
+    "legacySourceReadOnly": "PASS",
+    "originalHashPreservation": "PASS",
+    "compatibilityResultModel": "PASS",
+    "unknownFieldPolicy": "PASS",
+    "securityLimits": "PASS",
+    "exporterReaderSeparation": "PASS",
+    "lazyLoadBoundary": "PASS"
+  },
+  "formats": {
+    "newDraw2PxdV1": "PXD\\0 + archiveVersion=1 + manifest format=pxd/schemaVersion=1",
+    "legacyPxdArchiveV2": "stored ZIP + manifest.json format=pxd|pixieedraw/version=2 + storageAdapterId=pxd-v2-zip"
+  },
+  "compatibility": {
+    "supportedStatus": "SUPPORTED_WITH_ADAPTER",
+    "copyRequired": true,
+    "sourceReadOnly": true,
+    "unknownStatus": "REVIEW_REQUIRED",
+    "unsupportedStatus": "UNSUPPORTED",
+    "unknownFieldPolicy": "PRESERVE_IN_ORIGINAL_AND_REVIEW"
+  },
+  "security": {
+    "boundedZip": true,
+    "pathTraversalRejected": true,
+    "activeContentRejected": true,
+    "unsupportedCompressionRejected": true,
+    "decompressionBudget": true,
+    "noScriptExecution": true,
+    "noNetworkOrStorage": true
+  },
+  "verification": {
+    "syntheticLegacyTests": "7 passed / 0 failed",
+    "realLegacyFixture": "UNTESTED",
+    "productionCompatibility": "UNTESTED",
+    "currentRouteMutation": false,
+    "currentPxdMutation": false,
+    "pixiSyncMutation": false,
+    "marketOrProductionDataMutation": false
+  },
+  "bundle": {
+    "legacyChunk": "separate on-demand chunk",
+    "initialLegacySourceIncluded": false,
+    "initialBundlePerformanceGate": "MEASURED_NOT_A_PRODUCTION_GATE",
+    "initialRequests": 2,
+    "mainRawBytes": 142343,
+    "mainMinifiedBytes": 82212,
+    "mainGzipBytes": 28456,
+    "mainBrotliBytes": 23789,
+    "mainMinifiedGzipBytes": 22310,
+    "mainMinifiedBrotliBytes": 19251,
+    "legacyChunkRawBytes": 51823,
+    "legacyChunkGzipBytes": 12411,
+    "legacyChunkBrotliBytes": 10714,
+    "cssBytes": 7941
+  },
+  "nextWorkPackage": "WP-160"
+}

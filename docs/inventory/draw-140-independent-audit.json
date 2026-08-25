@@ -1,0 +1,20 @@
+{
+  "packageId": "DRAW-140",
+  "status": "INDEPENDENT_REVIEW_PASS",
+  "reviewMode": "source-read-and-rerun-scoped-checks",
+  "findings": [],
+  "confirmed": [
+    "deterministic PNG/PXD bytes and hashes",
+    "indexed raster round-trip",
+    "corruption and trailing-byte fail-closed behavior",
+    "DOM/network/provider-free adapter",
+    "current PXD/PiXiSYNC/Market non-intrusion"
+  ],
+  "notPromoted": [
+    "real user data compatibility",
+    "browser/device/native qualification",
+    "production release readiness"
+  ],
+  "baseline": { "matched": "14/14", "newFailures": 0 },
+  "nextPackage": "DRAW-150"
+}

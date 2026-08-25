@@ -1,0 +1,43 @@
+{
+  "auditVersion": "FP006_INDEPENDENT_AUDIT_V1",
+  "packageId": "FP-006",
+  "status": "INDEPENDENT_REVIEW_PASS",
+  "reviewer": "SOL_SCOPE_AUDIT",
+  "contextSha256": "f9b4a98078976634af75e70733a46a4bef48a2bc36466948ed521798d6e01c8e",
+  "evidencePath": "docs/inventory/fp-006-evidence.json",
+  "transcriptPath": "docs/inventory/fp-006-command-transcript.json",
+  "transcriptSha256": "ed76a68588a701edeca916a6bc3929fca3674722f9c9fe75b2092a239be891eb",
+  "checks": {
+    "sourceBoundary": {
+      "status": "PASS",
+      "browserOrProductionImports": 0,
+      "externalRuntimeImports": 0,
+      "domCanvasNetworkStorageImports": 0,
+      "note": "FP-006 source imports only its local contracts module; host integration remains an adapter task."
+    },
+    "testResult": { "status": "PASS", "passed": 13, "failed": 0 },
+    "format": { "status": "PASS", "exitCode": 0 },
+    "typecheck": { "status": "PASS", "exitCode": 0 },
+    "context": { "status": "PASS", "exitCode": 0 },
+    "baseline": { "status": "PASS", "identityMatches": 14, "newFailures": 0, "suitePasses": 63, "suiteTotal": 77 },
+    "nonIntrusion": {
+      "status": "PASS",
+      "fp006WriteScopeContainsCurrentPiXiEEDraw": false,
+      "fp006WriteScopeContainsCurrentRoutes": false,
+      "fp006WriteScopeContainsPxdPiXiSYNCMarketProduction": false,
+      "workingTreeCaveat": "The repository was already dirty/untracked before FP-006; this audit records package scope, not a clean-tree claim."
+    }
+  },
+  "findings": [],
+  "qualificationDecision": "PARTIAL_DEVICE_UNTESTED",
+  "untested": [
+    "physical mobile",
+    "physical stylus pressure/tilt/palm rejection",
+    "Safari",
+    "Firefox",
+    "30-minute memory",
+    "full input-to-visible compositor",
+    "native host"
+  ],
+  "noProductionClaims": true
+}

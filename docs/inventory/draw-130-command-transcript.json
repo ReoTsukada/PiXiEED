@@ -1,0 +1,169 @@
+{
+  "evidenceVersion": "QUALIFICATION_COMMAND_TRANSCRIPT_V1",
+  "manifestPath": "docs/inventory/draw-130-command-manifest.json",
+  "commands": [
+    {
+      "id": "DRAW130-FORMAT",
+      "acceptanceIds": [
+        "DRAW130-SCOPE-001",
+        "DRAW130-WORKSPACE-001",
+        "DRAW130-EVIDENCE-001",
+        "DRAW130-STOP-001"
+      ],
+      "argv": [
+        "deno",
+        "fmt",
+        "--check",
+        "pixiedraw2/src/draw2/draw-130",
+        "pixiedraw2/tests/draw-130",
+        "pixiedraw2/benchmarks/draw-130"
+      ],
+      "display": "\"deno\" \"fmt\" \"--check\" \"pixiedraw2/src/draw2/draw-130\" \"pixiedraw2/tests/draw-130\" \"pixiedraw2/benchmarks/draw-130\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 19,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "f1ceb13c7c95afab86ef305e6680ede5175e5cebb631874e9595f77b66cca5ca"
+    },
+    {
+      "id": "DRAW130-TYPECHECK",
+      "acceptanceIds": [
+        "DRAW130-SCOPE-001",
+        "DRAW130-WORKSPACE-001"
+      ],
+      "argv": [
+        "deno",
+        "check",
+        "pixiedraw2/src/draw2/draw-130/timeline-editor.ts",
+        "pixiedraw2/tests/draw-130/timeline-editor.test.ts",
+        "pixiedraw2/benchmarks/draw-130/generate-evidence.ts"
+      ],
+      "display": "\"deno\" \"check\" \"pixiedraw2/src/draw2/draw-130/timeline-editor.ts\" \"pixiedraw2/tests/draw-130/timeline-editor.test.ts\" \"pixiedraw2/benchmarks/draw-130/generate-evidence.ts\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 315,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "ab37873086ad9efd563e159de92b3f5f3a42adeaeea0a9d26043f1310dc86d0c"
+    },
+    {
+      "id": "DRAW130-TEST",
+      "acceptanceIds": [
+        "DRAW130-SCOPE-001",
+        "DRAW130-WORKSPACE-001",
+        "DRAW130-STOP-001"
+      ],
+      "argv": [
+        "deno",
+        "test",
+        "--no-remote",
+        "--allow-read",
+        "--allow-write",
+        "--check",
+        "pixiedraw2/tests/draw-130"
+      ],
+      "display": "\"deno\" \"test\" \"--no-remote\" \"--allow-read\" \"--allow-write\" \"--check\" \"pixiedraw2/tests/draw-130\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 579,
+      "stdoutSha256": "6c692c27834ba199ac38f9c60157e7b12b251dd2ba0355e8dc7e0ec13d4344d9",
+      "stderrSha256": "50273b433324025288c392dfeb83321a7e1ab91c0914506bcae306781ab66824"
+    },
+    {
+      "id": "DRAW130-CONTEXT",
+      "acceptanceIds": [
+        "DRAW130-SCOPE-001",
+        "DRAW130-EVIDENCE-001",
+        "DRAW130-STOP-001"
+      ],
+      "argv": [
+        "python3",
+        "scripts/verify_work_package_context.py",
+        "--context",
+        ".codex/context/DRAW-130.md",
+        "--root",
+        "."
+      ],
+      "display": "\"python3\" \"scripts/verify_work_package_context.py\" \"--context\" \".codex/context/DRAW-130.md\" \"--root\" \".\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 35,
+      "stdoutSha256": "fc27deb156a4c346d21c058c96764192a657ad62dd0cddea43f9da12d119a4d6",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "BASELINE-IDENTITY",
+      "acceptanceIds": [
+        "DRAW130-STOP-001"
+      ],
+      "argv": [
+        "node",
+        "scripts/test-baseline-failure-identity-wp080.mjs"
+      ],
+      "display": "\"node\" \"scripts/test-baseline-failure-identity-wp080.mjs\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 345,
+      "stdoutSha256": "3839ae5f3ddbd8ba0b5810b84f15724743bd2ccdbb8f7d34e324917ef852a0d8",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "BASELINE-SUITE",
+      "acceptanceIds": [
+        "DRAW130-STOP-001"
+      ],
+      "argv": [
+        "node",
+        "scripts/test-baseline-suite-wp000.mjs"
+      ],
+      "display": "\"node\" \"scripts/test-baseline-suite-wp000.mjs\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 8562,
+      "stdoutSha256": "292468716edc77223d809bdd49dfff858c85fff2716dd819e253c2c42ef6c68d",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "DRAW130-BENCHMARK-EVIDENCE",
+      "acceptanceIds": [
+        "DRAW130-SCOPE-001",
+        "DRAW130-WORKSPACE-001",
+        "DRAW130-EVIDENCE-001"
+      ],
+      "argv": [
+        "deno",
+        "run",
+        "--no-remote",
+        "--allow-read",
+        "--allow-write",
+        "pixiedraw2/benchmarks/draw-130/generate-evidence.ts"
+      ],
+      "display": "\"deno\" \"run\" \"--no-remote\" \"--allow-read\" \"--allow-write\" \"pixiedraw2/benchmarks/draw-130/generate-evidence.ts\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 223,
+      "stdoutSha256": "c6a0a48594b333a746cb8f62d78ba5c4df5b34ff9f62378c316c3e42783f114a",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "DRAW130-DIFF-CHECK",
+      "acceptanceIds": [
+        "DRAW130-SCOPE-001",
+        "DRAW130-WORKSPACE-001",
+        "DRAW130-EVIDENCE-001",
+        "DRAW130-STOP-001"
+      ],
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "display": "\"git\" \"diff\" \"--check\"",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 31,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "transcriptSha256": "7abc3884bfbdbdddba32602536541253c0e9dfaa17e0258b993d5bcfde61ec5e"
+}

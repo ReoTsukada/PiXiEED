@@ -1,0 +1,100 @@
+{
+  "documentId": "PIXIEED-DRAW2-RELEASE-READINESS-001",
+  "schemaVersion": 1,
+  "recordedAt": "2026-08-13",
+  "status": "GAME_350_QUALIFICATION_BLOCKED",
+  "canonical": {
+    "currentReadyPackage": "GAME-350",
+    "currentStatus": "IN_PROGRESS",
+    "completionCore": "CORE-120",
+    "qualificationEntry": "WP-900",
+    "cutoverPackage": "CUT-001",
+    "productionApplyAllowed": false,
+    "autoStartNext": false
+  },
+  "verified": {
+    "canonicalAlignment": {
+      "status": "PASS",
+      "command": "node scripts/verify-canonical-package-alignment.mjs"
+    },
+    "draw2ReleaseIntegrity": {
+      "status": "PASS_FILE_LEVEL_ONLY",
+      "command": "node scripts/verify-pixiedraw2-release-integrity.mjs",
+      "artifact": "pixiedraw2/dist/draw2-entry.js",
+      "source": "pixiedraw2/src/draw2-entry.ts",
+      "legacyWp210To250": "LEGACY_NOT_CANONICAL"
+    },
+    "coreAndFoundationTests": {
+      "status": "PASS",
+      "passed": 315,
+      "failed": 0,
+      "command": "deno test --no-remote --allow-read --allow-write --check pixiedraw2/tests"
+    },
+    "baseline": {
+      "status": "PASS_WITH_INHERITED_FAILURES",
+      "successful": 63,
+      "total": 77,
+      "inheritedFailures": 14,
+      "newFailureIdentities": 0
+    },
+    "isolatedBrowser": {
+      "status": "PASS_WITH_UNTESTED_DEVICE_GATES",
+      "entry": "draw2-isolated",
+      "defaultFeatureFlag": "off",
+      "workspaceOnQuery": "isolated-only",
+      "unknownFlag": "fail-closed-off",
+      "killSwitch": "observed",
+      "defaultViewport": "1280x720",
+    "deviceViewport": "UNTESTED",
+    "latestLocalBrowserQualification": "docs/inventory/draw-170-evidence.json#latestBrowserQualification"
+    },
+    "capacitorStaging": {
+      "status": "PASS_STAGING_ONLY",
+      "entryCount": 34,
+      "draw2NativeBundle": "NOT_CONNECTED",
+      "command": "node scripts/test-capacitor-stage-manifest.mjs && node app-shell/pixieed-capacitor/scripts/stage-web-assets.mjs --check"
+    }
+  },
+  "blockers": [
+    {
+      "id": "FP007-CLEAN-CHECKOUT",
+      "status": "BLOCKED",
+      "reason": "Main worktree contains unrelated tracked and untracked changes; real repository clean qualification cannot be promoted from the isolated temporary snapshot."
+    },
+    {
+      "id": "FP007-DISTRIBUTION-PROVENANCE",
+      "status": "UNTESTED",
+      "reason": "A reproducible isolated qualification exists, but a release-scoped repository snapshot and source-to-distribution provenance are not yet independently approved."
+    },
+    {
+      "id": "DRAW2-LEGACY-PXD",
+      "status": "UNTESTED",
+      "reason": "Only synthetic fixtures are covered; real legacy PXD and real user data must remain outside the current production boundary until a fixture is explicitly supplied and isolated."
+    },
+    {
+      "id": "DRAW2-PIXISYNC",
+      "status": "UNTESTED",
+      "reason": "The isolated Entry intentionally does not connect to PiXiSYNC; compatibility requires a later dedicated gate."
+    },
+    {
+      "id": "NATIVE-RELEASE",
+      "status": "UNTESTED",
+      "reason": "Android/iOS builds, signing, physical devices, Play/TestFlight, rollback rehearsal, and store policy evidence were not performed."
+    }
+  ],
+  "nextOrder": [
+    "GAME-350 qualification remains the current gate; do not start SITE-400 until its NOT_READY inputs are resolved or explicitly dispositioned.",
+    "Browser-emulated local checks are evidence only; physical device, browser matrix, native, staging/provider/RLS/rollback, long-session, and real cross-system qualification remain UNTESTED.",
+    "After the post-Core tracks are qualified, complete SITE/MARKET/WORK/SOCIAL/OPS/PLATFORM and NATIVE-500/510/520.",
+    "Complete SITE/MARKET/WORK/SOCIAL/OPS/PLATFORM and NATIVE-500/510/520.",
+    "Run WP-900 through WP-990; only then prepare CUT-001 for explicit Owner authorization."
+  ],
+  "nonIntrusion": {
+    "currentPiXiEEDraw": "UNCHANGED_BY_THIS_CHECK",
+    "existingRoutes": "NOT_REPLACED",
+    "market": "NOT_MODIFIED",
+    "pixisync": "NOT_MODIFIED",
+    "production": "NOT_ACCESSED_OR_CHANGED",
+    "deployPublishCommitPush": "NOT_PERFORMED"
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "package": "FP-002",
+  "status": "COMPLETE_ISOLATED",
+  "root": "DirectWorkRequest",
+  "graphVersion": "DIRECT_WORK_GRAPH_V1",
+  "identityPath": [
+    "Request",
+    "Quote",
+    "Agreement",
+    "Milestone",
+    "Delivery",
+    "Acceptance",
+    "Rights",
+    "Payment"
+  ],
+  "attackFixtures": [
+    { "id": "FP002-XR-001", "attack": "quote-from-request-b-into-request-a", "expected": "DENY", "signature": "AGGREGATE_IDENTITY_MISMATCH" },
+    { "id": "FP002-XR-002", "attack": "delivery-from-request-b-into-request-a-acceptance", "expected": "DENY", "signature": "AGGREGATE_IDENTITY_MISMATCH" },
+    { "id": "FP002-XR-003", "attack": "caller-created-modified-milestone", "expected": "DENY", "signature": "RECORD_INTEGRITY_VIOLATION" },
+    { "id": "FP002-XR-004", "attack": "replace-terms-after-quote-acceptance", "expected": "DENY", "signature": "QUOTE_TERMS_MISMATCH" },
+    { "id": "FP002-XR-005", "attack": "copied-quote-with-changed-terms", "expected": "DENY", "signature": "RECORD_INTEGRITY_VIOLATION" },
+    { "id": "FP002-XR-006", "attack": "rights-from-request-b-acceptance", "expected": "DENY", "signature": "AGGREGATE_IDENTITY_MISMATCH" },
+    { "id": "FP002-XR-007", "attack": "payment-with-request-b-quote", "expected": "DENY", "signature": "PAYMENT_QUOTE_MISMATCH" },
+    { "id": "FP002-XR-008", "attack": "payment-with-request-b-agreement", "expected": "DENY", "signature": "PAYMENT_QUOTE_MISMATCH" }
+  ],
+  "outOfScope": ["FP-003 Commerce/Royalty/Ledger", "FP-004 Durable Event/Inbox/Outbox", "production"],
+  "currentSystemMutation": false
+}

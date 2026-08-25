@@ -1,0 +1,55 @@
+{
+  "packageId": "DRAW-150",
+  "title": "Draw2 Legacy PXD Compatibility",
+  "status": "IMPLEMENTED_ISOLATED_REFERENCE",
+  "context": {
+    "path": ".codex/context/DRAW-150.md",
+    "sha256": "5ca7b34a5499873f5f5b07b0da9c422275eb187e9002bef8a07600107104136a"
+  },
+  "implementation": {
+    "adapter": "pixiedraw2/src/draw2/draw-150/legacy-compat-contract.ts",
+    "authority": "pixiedraw2/src/draw2-legacy-compat.ts",
+    "sourceReadOnly": true,
+    "copyRequired": true,
+    "originalBytesRetained": true,
+    "currentPxdReplaced": false,
+    "pixiSyncMutation": false,
+    "marketOrProductionDataMutation": false
+  },
+  "acceptance": {
+    "DRAW150-SCOPE-001": "PASS",
+    "DRAW150-WORKSPACE-001": "PASS / isolated adapter; browser/mobile UI qualification UNTESTED",
+    "DRAW150-EVIDENCE-001": "PASS",
+    "DRAW150-STOP-001": "PASS"
+  },
+  "verification": [
+    { "command": "deno check --no-remote pixiedraw2/src/draw2/draw-150/legacy-compat-contract.ts pixiedraw2/tests/draw-150/legacy-compat-contract.test.ts pixiedraw2/benchmarks/draw-150/legacy-compat.bench.ts", "exitCode": 0 },
+    { "command": "deno test --no-remote --check pixiedraw2/tests/legacy-compat.test.ts", "exitCode": 0, "result": "7 passed / 0 failed" },
+    { "command": "deno test --no-remote --check pixiedraw2/tests/draw-150/legacy-compat-contract.test.ts", "exitCode": 0, "result": "3 passed / 0 failed" },
+    { "command": "deno task --config pixiedraw2/deno.json check", "exitCode": 0 },
+    { "command": "git diff --check", "exitCode": 0 }
+  ],
+  "securityFixtures": {
+    "legacyV2Identity": "PASS",
+    "newPxdV1Separation": "PASS / NEW_PXD_NOT_LEGACY",
+    "pathTraversal": "PASS / LEGACY_PATH_UNSAFE",
+    "trailingBytes": "PASS / LEGACY_ZIP_TRAILING_BYTES",
+    "activeContent": "PASS / LEGACY_ACTIVE_CONTENT_REJECTED",
+    "unknownField": "PASS / REVIEW_REQUIRED",
+    "sourceMutation": "PASS / source bytes unchanged"
+  },
+  "baseline": {
+    "matchedIdentities": "14/14",
+    "newFailureIdentities": 0,
+    "suite": "63/77; 14 inherited failures preserved"
+  },
+  "untested": [
+    "real non-private binary Legacy PXD fixtures",
+    "real user compatibility",
+    "physical device and native file picker",
+    "Safari/Firefox",
+    "production storage/provider compatibility"
+  ],
+  "nextPackage": "DRAW-160",
+  "autoStartNext": false
+}

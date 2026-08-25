@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pixieed.invalid/schema/public-url-routing-v1.json",
+  "title": "PiXiEED Public URL and Routing Core v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "registryVersion", "routeCount", "currentSnapshotCount", "currentRoutes", "catalog", "flags", "storageBoundary"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "registryVersion": { "const": 1 },
+    "routeCount": { "type": "integer", "minimum": 1, "maximum": 256 },
+    "currentSnapshotCount": { "const": 51 },
+    "currentRoutes": { "type": "array", "minItems": 50, "maxItems": 50, "items": { "$ref": "#/$defs/route" } },
+    "catalog": { "type": "array", "minItems": 50, "maxItems": 256, "items": { "$ref": "#/$defs/route" } },
+    "flags": { "type": "object", "minProperties": 5, "additionalProperties": { "type": "string", "minLength": 1, "maxLength": 64 } },
+    "storageBoundary": { "type": "object", "required": ["registry", "resolver", "metadata", "excluded"], "additionalProperties": false, "properties": {
+      "registry": { "type": "string", "maxLength": 160 },
+      "resolver": { "type": "string", "maxLength": 160 },
+      "metadata": { "type": "string", "maxLength": 160 },
+      "excluded": { "type": "array", "maxItems": 64, "items": { "type": "string", "maxLength": 96 } }
+    } }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["routeId", "path", "source", "kind", "visibility", "requiresAuth", "redirectAllowed", "canonicalPath", "metadataKey", "resourceType", "legacy"],
+      "properties": {
+        "routeId": { "$ref": "#/$defs/id" },
+        "path": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "source": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "kind": { "enum": ["STATIC", "DYNAMIC_PUBLIC", "LEGACY_COMPAT", "VERIFICATION_FILE", "PRIVATE_STATIC", "FUTURE"] },
+        "visibility": { "enum": ["PUBLIC", "UNLISTED", "PRIVATE", "MISSING", "TRASHED", "QUARANTINED"] },
+        "requiresAuth": { "type": "boolean" },
+        "redirectAllowed": { "type": "boolean" },
+        "canonicalPath": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "metadataKey": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "resourceType": { "type": ["string", "null"], "maxLength": 64 },
+        "legacy": { "type": "boolean" }
+      }
+    }
+  }
+}

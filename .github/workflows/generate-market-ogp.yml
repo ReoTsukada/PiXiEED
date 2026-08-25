@@ -10,7 +10,8 @@ permissions:
   contents: write
 
 concurrency:
-  group: generate-market-ogp
+  # sitemap.xml を更新するSNS生成と同時実行しない。
+  group: generate-seo-pages
   cancel-in-progress: false
 
 jobs:
@@ -25,8 +26,10 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: 22
+          node-version: 22.19.0
           cache: npm
+      - name: Verify npm version
+        run: test "$(npm --version)" = "10.9.3"
 
       - name: Install OGP generator dependencies
         run: npm ci

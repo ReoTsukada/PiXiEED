@@ -1,0 +1,10 @@
+skill_id: RELEASE-GUARD-001
+steps:
+  - verify_blueprint_acceptance_outcomes
+  - verify_release_blockers
+  - verify_risk_specific_tests_reviews
+  - verify_migration_rollback_if_needed
+  - verify_observability_for_material_runtime_change
+  - verify_license_security_privacy
+  - trigger_human_approval_if_required
+output: release_ready|blocked|approval_required

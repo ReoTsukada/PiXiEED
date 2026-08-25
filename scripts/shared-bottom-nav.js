@@ -13,8 +13,102 @@
   const currentPath = String(pageUrl.pathname || '').toLowerCase();
   const currentTab = resolveCurrentTab(currentPath);
   let lastPixiedrawMobileChromeActive = null;
+  let toolsToggle = null;
+  let toolsLayer = null;
+  let toolsCloseButton = null;
+  let toolsReturnFocus = null;
 
-  if (!currentPath.includes('/projects/') && /(?:^|\/)(?:pixiedraw|pixieedrawdev)(?:\/|\/index\.html)?$/.test(currentPath)) {
+  const chromeMessages = Object.freeze({
+    ja: Object.freeze({
+      bottomNavAria: '下部ナビ',
+      navHome: 'ホーム',
+      navMarket: 'マーケット',
+      navDraw: 'PiXiEEDstudio',
+      navTools: 'ツール',
+      navAccount: 'マイページ',
+      toolsEyebrow: 'PIXIEED TOOLS',
+      toolsTitle: 'ツール',
+      toolsClose: 'ツールを閉じる',
+      toolDrawDescription: '制作をはじめる',
+      toolLensDescription: '写真をドット絵にする',
+      toolQrDescription: 'QRコードを作る',
+      toolPixfindDescription: '作る・遊ぶ',
+      toolMaoituDescription: 'ドット絵ゲーム',
+      footerDraw: 'PiXiEEDstudio',
+      footerCommunity: 'コミュニティ',
+      footerMarket: 'マーケット',
+      footerAccount: 'マイページ',
+      footerLens: 'PiXiEELENS',
+      footerPixfind: 'PiXFiND',
+      footerQr: 'QR',
+      footerMaoitu: 'まおいつ',
+      footerHelp: 'ヘルプ',
+      footerContact: 'お問い合わせ',
+      footerEvents: 'イベント',
+      footerNotice: 'お知らせ',
+      footerNotes: '開発ノート',
+      footerPortfolio: '企業向け',
+      footerProjects: 'プロジェクト一覧',
+      footerGlossary: '用語集',
+      footerTerms: '利用規約',
+      footerPrivacy: 'プライバシーポリシー',
+      footerLegal: '特定商取引法に基づく表記'
+    }),
+    en: Object.freeze({
+      bottomNavAria: 'Bottom navigation',
+      navHome: 'Home',
+      navMarket: 'Market',
+      navDraw: 'PiXiEEDstudio',
+      navTools: 'Tools',
+      navAccount: 'Profile',
+      toolsEyebrow: 'PIXIEED TOOLS',
+      toolsTitle: 'Tools',
+      toolsClose: 'Close tools',
+      toolDrawDescription: 'Start creating',
+      toolLensDescription: 'Turn photos into pixel art',
+      toolQrDescription: 'Create a QR code',
+      toolPixfindDescription: 'Create and play',
+      toolMaoituDescription: 'Pixel art game',
+      footerDraw: 'PiXiEEDstudio',
+      footerCommunity: 'Community',
+      footerMarket: 'Market',
+      footerAccount: 'Profile',
+      footerLens: 'PiXiEELENS',
+      footerPixfind: 'PiXFiND',
+      footerQr: 'QR',
+      footerMaoitu: 'Maoitu',
+      footerHelp: 'Help',
+      footerContact: 'Contact',
+      footerEvents: 'Events',
+      footerNotice: 'News',
+      footerNotes: 'Development notes',
+      footerPortfolio: 'For business',
+      footerProjects: 'Projects',
+      footerGlossary: 'Glossary',
+      footerTerms: 'Terms of service',
+      footerPrivacy: 'Privacy policy',
+      footerLegal: 'Commercial transaction notice'
+    })
+  });
+
+  function getChromeCopy() {
+    const locale = document.documentElement.dataset.pixieedLocale === 'en' ? 'en' : 'ja';
+    return chromeMessages[locale];
+  }
+
+  function refreshLocalizedChrome() {
+    const copy = getChromeCopy();
+    doc.querySelectorAll('[data-pixieed-chrome-key]').forEach((node) => {
+      const key = node.dataset.pixieedChromeKey;
+      if (copy[key] !== undefined) node.textContent = copy[key];
+    });
+    const nav = doc.querySelector('.bottom-nav');
+    if (nav) nav.setAttribute('aria-label', copy.bottomNavAria);
+    const closeButton = doc.querySelector('.pixieed-tools-panel__close');
+    if (closeButton) closeButton.setAttribute('aria-label', copy.toolsClose);
+  }
+
+  if (!currentPath.includes('/projects/') && /(?:^|\/)(?:pixiedraw|pixiedraw2|pixieedrawdev)(?:\/|\/index\.html)?$/.test(currentPath)) {
     body.dataset.pixieedPage = 'pixiedraw';
     doc.documentElement.dataset.pixieedPage = 'pixiedraw';
   } else if (!currentPath.includes('/projects/') && /(?:^|\/)pixiee-lens(?:\/|\/index\.html)?$/.test(currentPath)) {
@@ -35,6 +129,8 @@
   injectStyles();
   replaceFooter();
   replaceBottomNav();
+  refreshLocalizedChrome();
+  window.addEventListener('pixieed:locale-changed', refreshLocalizedChrome);
   ensureAdAccountControl(() => {
     ensureCommonTabBarController();
     if (script.dataset.pixieedFooterAd !== 'false') ensureFooterAdController();
@@ -42,10 +138,11 @@
 
   function resolveCurrentTab(pathname) {
     const path = String(pathname || '').toLowerCase();
-    if (path.includes('/pixiedraw/') || path.includes('/pixieedrawdev/')) return 'draw';
+    if (path.includes('/studio/')) return 'draw';
+    if (path.includes('/pixiedraw/') || path.includes('/pixiedraw2/') || path.includes('/pixieedrawdev/')) return 'draw';
     if (path.includes('/market/')) return 'market';
-    if (path.includes('/qr/') || path.includes('/qr-maker/')) return '';
-    if (path.includes('/pixiee-lens/')) return 'camera';
+    if (path.includes('/qr/') || path.includes('/qr-maker/')) return 'tools';
+    if (path.includes('/pixiee-lens/') || path.includes('/pixfind/') || path.includes('/maoitu/')) return 'tools';
     if (/(?:^|\/)account(?:\/|\/index\.html)?$/.test(path)) return 'account';
     return 'home';
   }
@@ -103,7 +200,7 @@
     const controller = doc.createElement('script');
     controller.async = false;
     controller.dataset.pixieedCommonTabBar = 'true';
-    controller.src = relHref('scripts/shared-tab-bar.js?v=20260803-details-ad-responsive2');
+    controller.src = relHref('scripts/shared-tab-bar.js?v=20260825-locale2');
     controller.addEventListener('load', ensureNotificationController, { once: true });
     doc.body.appendChild(controller);
   }
@@ -118,14 +215,14 @@
   }
 
   function isPixiedrawPage() {
-    return !currentPath.includes('/projects/') && /(?:^|\/)(?:pixiedraw|pixieedrawdev)(?:\/|\/index\.html)?$/.test(currentPath);
+    return !currentPath.includes('/projects/') && /(?:^|\/)(?:pixiedraw|pixiedraw2|pixieedrawdev)(?:\/|\/index\.html)?$/.test(currentPath);
   }
 
   function isStandaloneToolOrGamePage() {
     if (currentPath.includes('/projects/')) {
       return false;
     }
-    return /(?:^|\/)(?:pixiedraw|pixieedrawdev|pixiee-lens|qr|qr-maker|maoitu|pixfind)(?:\/|\/index\.html)?$/.test(currentPath);
+    return /(?:^|\/)(?:pixiedraw|pixiedraw2|pixieedrawdev|pixiee-lens|qr|qr-maker|maoitu|pixfind)(?:\/|\/index\.html)?$/.test(currentPath);
   }
 
   function applyResponsivePageState() {
@@ -188,6 +285,7 @@
       if (entry.disabled) {
         const span = doc.createElement('span');
         span.className = 'pixieed-footer-link is-disabled';
+        span.dataset.pixieedChromeKey = entry.labelKey || '';
         span.textContent = entry.label;
         links.appendChild(span);
         return;
@@ -195,6 +293,7 @@
       const link = doc.createElement('a');
       link.className = 'pixieed-footer-link';
       link.href = relHref(entry.path);
+      link.dataset.pixieedChromeKey = entry.labelKey || '';
       link.textContent = entry.label;
       links.appendChild(link);
     });
@@ -214,14 +313,21 @@
 
     const nav = doc.createElement('nav');
     nav.className = 'bottom-nav';
-    nav.setAttribute('aria-label', '下部ナビ');
+    nav.setAttribute('aria-label', getChromeCopy().bottomNavAria);
 
     getNavItems().forEach((entry) => {
-      const item = doc.createElement(entry.disabled ? 'span' : 'a');
+      const item = doc.createElement(entry.disabled ? 'span' : entry.action ? 'button' : 'a');
       item.className = `bottom-nav__item${entry.primary ? ' bottom-nav__item--primary' : ''}${entry.key === currentTab ? ' is-active' : ''}`;
       item.dataset.tab = entry.key;
       if (entry.disabled) {
         item.setAttribute('aria-disabled', 'true');
+      } else if (entry.action === 'tools') {
+        item.type = 'button';
+        item.setAttribute('aria-haspopup', 'dialog');
+        item.setAttribute('aria-expanded', 'false');
+        item.setAttribute('aria-controls', 'pixieedToolsPanel');
+        item.addEventListener('click', () => setToolsPanelOpen(toolsLayer?.hidden !== false));
+        toolsToggle = item;
       } else {
         item.href = relHref(entry.path);
       }
@@ -234,6 +340,7 @@
       icon.appendChild(img);
 
       const label = doc.createElement('span');
+      label.dataset.pixieedChromeKey = entry.labelKey || '';
       label.textContent = entry.label;
 
       item.append(icon, label);
@@ -241,31 +348,137 @@
     });
 
     body.appendChild(nav);
+    ensureToolsPanel();
+  }
+
+  function ensureToolsPanel() {
+    doc.querySelectorAll('.pixieed-tools-layer').forEach((node) => node.remove());
+
+    const layer = doc.createElement('div');
+    layer.className = 'pixieed-tools-layer';
+    layer.hidden = true;
+
+    const panel = doc.createElement('section');
+    panel.className = 'pixieed-tools-panel';
+    panel.id = 'pixieedToolsPanel';
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-modal', 'true');
+    panel.setAttribute('aria-labelledby', 'pixieedToolsTitle');
+
+    const header = doc.createElement('header');
+    header.className = 'pixieed-tools-panel__header';
+    const heading = doc.createElement('div');
+    const eyebrow = doc.createElement('small');
+    eyebrow.dataset.pixieedChromeKey = 'toolsEyebrow';
+    eyebrow.textContent = 'PIXIEED TOOLS';
+    const title = doc.createElement('h2');
+    title.id = 'pixieedToolsTitle';
+    title.dataset.pixieedChromeKey = 'toolsTitle';
+    title.textContent = 'ツール';
+    heading.append(eyebrow, title);
+
+    const close = doc.createElement('button');
+    close.className = 'pixieed-tools-panel__close';
+    close.type = 'button';
+    close.setAttribute('aria-label', getChromeCopy().toolsClose);
+    close.textContent = '×';
+    close.addEventListener('click', () => setToolsPanelOpen(false));
+    toolsCloseButton = close;
+    header.append(heading, close);
+
+    const grid = doc.createElement('div');
+    grid.className = 'pixieed-tools-grid';
+    getToolItems().forEach((entry) => {
+      const link = doc.createElement('a');
+      link.className = 'pixieed-tools-card';
+      link.href = relHref(entry.path);
+
+      const icon = doc.createElement('span');
+      icon.className = 'pixieed-tools-card__icon';
+      const image = doc.createElement('img');
+      image.src = relHref(entry.icon);
+      image.alt = '';
+      icon.appendChild(image);
+
+      const copy = doc.createElement('span');
+      copy.className = 'pixieed-tools-card__copy';
+      const name = doc.createElement('strong');
+      name.dataset.pixieedChromeKey = entry.labelKey || '';
+      name.textContent = entry.label;
+      const description = doc.createElement('small');
+      description.dataset.pixieedChromeKey = entry.descriptionKey || '';
+      description.textContent = entry.description;
+      copy.append(name, description);
+
+      link.append(icon, copy);
+      grid.appendChild(link);
+    });
+
+    panel.append(header, grid);
+    layer.appendChild(panel);
+    layer.addEventListener('click', (event) => {
+      if (event.target === layer) setToolsPanelOpen(false);
+    });
+    body.appendChild(layer);
+    toolsLayer = layer;
+  }
+
+  function setToolsPanelOpen(open) {
+    if (!toolsLayer || !toolsToggle) return;
+    const shouldOpen = Boolean(open);
+    if (shouldOpen) toolsReturnFocus = doc.activeElement;
+    toolsLayer.hidden = !shouldOpen;
+    toolsToggle.setAttribute('aria-expanded', String(shouldOpen));
+    body.classList.toggle('is-pixieed-tools-open', shouldOpen);
+    if (shouldOpen) {
+      requestAnimationFrame(() => toolsCloseButton?.focus());
+    } else if (toolsReturnFocus instanceof HTMLElement) {
+      toolsReturnFocus.focus();
+      toolsReturnFocus = null;
+    }
+  }
+
+  function getToolItems() {
+    return [
+      { label: 'PiXiEEDstudio', labelKey: 'navDraw', description: '制作をはじめる', descriptionKey: 'toolDrawDescription', path: 'studio/index.html', icon: 'assets/icons/Draw.png?v=2026.07.19-ui-icons1' },
+      { label: 'PiXiEELENS', labelKey: 'footerLens', description: '写真をドット絵にする', descriptionKey: 'toolLensDescription', path: 'pixiee-lens/index.html', icon: 'assets/icons/Camera.png' },
+      { label: 'QR', labelKey: 'footerQr', description: 'QRコードを作る', descriptionKey: 'toolQrDescription', path: 'qr/index.html', icon: 'assets/icons/QR.png' },
+      { label: 'PiXFiND', labelKey: 'footerPixfind', description: '作る・遊ぶ', descriptionKey: 'toolPixfindDescription', path: 'pixfind/index.html', icon: 'icon/icon-192-2.png' },
+      { label: 'まおいつ', labelKey: 'footerMaoitu', description: 'ドット絵ゲーム', descriptionKey: 'toolMaoituDescription', path: 'maoitu/index.html', icon: 'icon/icon-192-3.png' }
+    ];
   }
 
   function getFooterLinks() {
     return [
-      { label: 'PiXiEEDraw', path: 'pixiedraw/index.html' },
-      { label: 'PiXiEELENS', path: 'pixiee-lens/index.html' },
-      { label: 'マーケット', path: 'market/' },
-      { label: 'QR', path: 'qr/index.html' },
-      { label: 'PiXFiND', path: 'pixfind/index.html' },
-      { label: 'まおいつ', path: 'maoitu/index.html' },
-      { label: '用語集', path: 'glossary/index.html' },
-      { label: '企業', path: 'portfolio/index.html' },
-      { label: '利用規約', path: 'terms/index.html' },
-      { label: 'プライバシーポリシー', path: 'privacy/index.html' },
-      { label: '特定商取引法に基づく表記', path: 'legal/index.html' }
+      { label: 'PiXiEEDstudio', labelKey: 'footerDraw', path: 'studio/index.html' },
+      { label: 'コミュニティ', labelKey: 'footerCommunity', path: 'community/' },
+      { label: 'マーケット', labelKey: 'footerMarket', path: 'market/' },
+      { label: 'マイページ', labelKey: 'footerAccount', path: 'account/index.html' },
+      { label: 'PiXiEELENS', labelKey: 'footerLens', path: 'pixiee-lens/index.html' },
+      { label: 'PiXFiND', labelKey: 'footerPixfind', path: 'pixfind/index.html' },
+      { label: 'QR', labelKey: 'footerQr', path: 'qr/index.html' },
+      { label: 'まおいつ', labelKey: 'footerMaoitu', path: 'maoitu/index.html' },
+      { label: 'ヘルプ', labelKey: 'footerHelp', path: 'help/index.html' },
+      { label: 'お問い合わせ', labelKey: 'footerContact', path: 'contact/index.html' },
+      { label: 'イベント', labelKey: 'footerEvents', path: 'events/index.html' },
+      { label: 'お知らせ', labelKey: 'footerNotice', path: 'notice/index.html' },
+      { label: '開発ノート', labelKey: 'footerNotes', path: 'notes/index.html' },
+      { label: '企業向け', labelKey: 'footerPortfolio', path: 'portfolio/index.html' },
+      { label: 'プロジェクト一覧', labelKey: 'footerProjects', path: 'projects/index.html' },
+      { label: '用語集', labelKey: 'footerGlossary', path: 'glossary/index.html' },
+      { label: '利用規約', labelKey: 'footerTerms', path: 'terms/index.html' },
+      { label: 'プライバシーポリシー', labelKey: 'footerPrivacy', path: 'privacy/index.html' },
+      { label: '特定商取引法に基づく表記', labelKey: 'footerLegal', path: 'legal/index.html' }
     ];
   }
 
   function getNavItems() {
     return [
-      { key: 'home', label: 'ホーム', path: 'index.html', icon: 'assets/icons/HOME.png?v=2026.07.19-ui-icons1' },
-      { key: 'market', label: 'マーケット', path: 'market/', icon: 'assets/icons/Market.png' },
-      { key: 'draw', label: 'PiXiEEDraw', path: 'pixiedraw/index.html', icon: 'assets/icons/Draw.png?v=2026.07.19-ui-icons1', primary: true },
-      { key: 'camera', label: 'カメラ', path: 'pixiee-lens/index.html', icon: 'assets/icons/Camera.png' },
-      { key: 'account', label: 'マイページ', path: 'account/index.html', icon: 'pixiedraw/assets/icons/ecticon_frame_01.png' }
+      { key: 'home', label: 'ホーム', labelKey: 'navHome', path: 'index.html', icon: 'assets/icons/HOME.png?v=2026.07.19-ui-icons1' },
+      { key: 'market', label: 'マーケット', labelKey: 'navMarket', path: 'market/', icon: 'assets/icons/Market.png' },
+      { key: 'draw', label: 'PiXiEEDstudio', labelKey: 'navDraw', path: 'studio/index.html', icon: 'assets/icons/Draw.png?v=2026.07.19-ui-icons1', primary: true },
+      { key: 'tools', label: 'ツール', labelKey: 'navTools', action: 'tools', icon: 'pixiedraw/assets/icons/menu-tools.png' },
+      { key: 'account', label: 'マイページ', labelKey: 'navAccount', path: 'account/index.html', icon: 'pixiedraw/assets/icons/ecticon_frame_01.png' }
     ];
   }
 
@@ -461,11 +674,11 @@
         text-align:center;
         font-size:12px;
         display:grid;
-        gap:10px;
+        gap:8px;
         width:100%;
         max-width:min(1200px, 100%);
-        margin:0 auto 14px;
-        padding:0 0 4px;
+        margin:0 auto 10px;
+        padding:0 0 2px;
       }
       .pixieed-shared-footer__copy{
         margin:0;
@@ -474,7 +687,7 @@
         display:flex;
         flex-wrap:wrap;
         justify-content:center;
-        gap:12px;
+        gap:8px 10px;
         padding:0;
         margin:0;
         list-style:none;
@@ -484,10 +697,10 @@
       .footer-links span{
         color:#cbd5e1;
         text-decoration:none;
-        border:1px solid rgba(255,255,255,0.16);
-        border-radius:10px;
-        padding:6px 10px;
-        background:rgba(255,255,255,0.04);
+        border:1px solid rgba(148,163,184,0.18);
+        border-radius:8px;
+        padding:4px 7px;
+        background:transparent;
         font-weight:700;
         font-size:12px;
         transition:transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
@@ -502,7 +715,7 @@
       .footer-links a:focus-visible{
         transform:translateY(-1px);
         border-color:rgba(255,255,255,0.26);
-        background:rgba(255,255,255,0.08);
+        background:rgba(114,230,213,0.08);
       }
       body .bottom-nav{
         position:fixed!important;
@@ -581,6 +794,131 @@
         outline:2px solid #79c0ff;
         outline-offset:-2px;
       }
+      .pixieed-tools-layer[hidden]{
+        display:none!important;
+      }
+      .pixieed-tools-layer{
+        position:fixed;
+        z-index:14050;
+        inset:0 0 var(--pixieed-shared-bottom-nav-offset) 0;
+        display:flex;
+        box-sizing:border-box;
+        align-items:flex-end;
+        justify-content:center;
+        padding:12px;
+        background:rgba(2,6,23,.72);
+        backdrop-filter:blur(4px);
+      }
+      .pixieed-tools-panel{
+        width:min(560px, 100%);
+        max-height:calc(100dvh - var(--pixieed-shared-bottom-nav-offset) - 24px);
+        box-sizing:border-box;
+        overflow:auto;
+        padding:14px;
+        border:1px solid rgba(121,192,255,.3);
+        border-radius:14px;
+        background:#10182c;
+        box-shadow:0 24px 70px rgba(0,0,0,.58);
+        color:#f8fafc;
+      }
+      .pixieed-tools-panel__header{
+        display:flex;
+        align-items:flex-start;
+        justify-content:space-between;
+        gap:12px;
+        margin-bottom:12px;
+      }
+      .pixieed-tools-panel__header small,
+      .pixieed-tools-panel__header h2{
+        margin:0;
+      }
+      .pixieed-tools-panel__header small{
+        color:#7ef0c7;
+        font-size:9px;
+        font-weight:900;
+        letter-spacing:.13em;
+      }
+      .pixieed-tools-panel__header h2{
+        margin-top:2px;
+        font-size:18px;
+      }
+      .pixieed-tools-panel__close{
+        width:40px;
+        height:40px;
+        flex:0 0 auto;
+        padding:0;
+        border:1px solid rgba(255,255,255,.14);
+        border-radius:8px;
+        background:#1b2741;
+        color:#f8fafc;
+        font:inherit;
+        font-size:22px;
+        font-weight:700;
+        line-height:1;
+        cursor:pointer;
+      }
+      .pixieed-tools-grid{
+        display:grid;
+        grid-template-columns:repeat(2, minmax(0, 1fr));
+        gap:8px;
+      }
+      .pixieed-tools-card{
+        display:flex;
+        min-width:0;
+        min-height:72px;
+        box-sizing:border-box;
+        align-items:center;
+        gap:10px;
+        padding:10px;
+        border:1px solid rgba(255,255,255,.11);
+        border-radius:9px;
+        background:#0b1224;
+        color:#f8fafc;
+        text-align:left;
+        text-decoration:none;
+      }
+      .pixieed-tools-card:hover,
+      .pixieed-tools-card:focus-visible{
+        border-color:rgba(121,192,255,.52);
+        outline:0;
+        background:#14203a;
+      }
+      .pixieed-tools-card__icon{
+        display:grid;
+        width:38px;
+        height:38px;
+        flex:0 0 auto;
+        place-items:center;
+        border-radius:8px;
+        background:rgba(121,192,255,.09);
+      }
+      .pixieed-tools-card__icon img{
+        width:28px;
+        height:28px;
+        object-fit:contain;
+        image-rendering:pixelated;
+      }
+      .pixieed-tools-card__copy{
+        display:grid;
+        min-width:0;
+        gap:3px;
+      }
+      .pixieed-tools-card__copy strong{
+        overflow:hidden;
+        font-size:12px;
+        text-overflow:ellipsis;
+        white-space:nowrap;
+      }
+      .pixieed-tools-card__copy small{
+        color:#94a3b8;
+        font-size:9px;
+        line-height:1.35;
+      }
+      @media (min-width:700px) and (orientation:portrait){
+        .pixieed-tools-grid{
+          grid-template-columns:repeat(3, minmax(0, 1fr));
+        }
+      }
       @media (orientation:landscape){
         body .bottom-nav{
           top:0!important;
@@ -592,6 +930,16 @@
           min-height:var(--viewport-height, var(--app-height, 100dvh))!important;
           max-height:var(--viewport-height, var(--app-height, 100dvh))!important;
         }
+        .pixieed-tools-layer{
+          right:var(--pixieed-shared-side-nav-width);
+          bottom:0;
+          align-items:center;
+          justify-content:flex-end;
+        }
+        .pixieed-tools-panel{
+          width:min(430px, calc(100vw - var(--pixieed-shared-side-nav-width) - 24px));
+          max-height:calc(100dvh - 24px);
+        }
       }
     `;
     doc.head.appendChild(style);
@@ -602,6 +950,12 @@
   if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', applyResponsivePageState, { passive: true });
   }
+  doc.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && toolsLayer?.hidden === false) {
+      event.preventDefault();
+      setToolsPanelOpen(false);
+    }
+  });
 
   function toRelativeHref(fromDirUrl, targetUrl) {
     if (fromDirUrl.origin !== targetUrl.origin) return targetUrl.href;

@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pixieed.invalid/schema/draw2-benchmark-result-v1.json",
+  "title": "PiXiEED Draw2 Benchmark Result v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "benchmarkId", "projectFixture", "deviceClass", "actualDevice", "browser", "browserVersion", "os", "buildVersion", "condition", "iterations", "metrics", "memory", "longTasks", "rawResultReference", "measuredAt", "status"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "benchmarkId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "projectFixture": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "deviceClass": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "actualDevice": { "type": "string", "minLength": 1, "maxLength": 160 },
+    "browser": { "enum": ["CHROMIUM", "SAFARI", "FIREFOX", "OTHER"] },
+    "browserVersion": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "os": { "type": "string", "minLength": 1, "maxLength": 96 },
+    "buildVersion": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "condition": { "enum": ["COLD", "WARM"] },
+    "iterations": { "type": "integer", "minimum": 1, "maximum": 100000 },
+    "metrics": { "$ref": "#/$defs/metrics" },
+    "memory": { "$ref": "#/$defs/memory" },
+    "longTasks": { "$ref": "#/$defs/longTasks" },
+    "rawResultReference": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "measuredAt": { "type": "string", "format": "date-time" },
+    "status": { "enum": ["PASS", "FAIL", "UNTESTED"] }
+  },
+  "$defs": {
+    "number": { "type": "number", "minimum": 0 },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["metricId", "unit", "p50", "p95", "max"],
+      "properties": {
+        "metricId": { "type": "string", "minLength": 1, "maxLength": 96 },
+        "unit": { "enum": ["ms", "bytes", "count", "ratio"] },
+        "p50": { "$ref": "#/$defs/number" },
+        "p95": { "$ref": "#/$defs/number" },
+        "max": { "$ref": "#/$defs/number" }
+      }
+    },
+    "memory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["canonicalRasterBytes", "decodedTileBytes", "compositeCacheBytes", "previewCacheBytes", "undoBytes", "workerTransferBytes", "cowSharedBytes", "cowSplitCount", "activeFrameBytes", "inactiveColdTileBytes", "opfsCacheBytes"],
+      "properties": {
+        "canonicalRasterBytes": { "$ref": "#/$defs/number" },
+        "decodedTileBytes": { "$ref": "#/$defs/number" },
+        "compositeCacheBytes": { "$ref": "#/$defs/number" },
+        "previewCacheBytes": { "$ref": "#/$defs/number" },
+        "undoBytes": { "$ref": "#/$defs/number" },
+        "workerTransferBytes": { "$ref": "#/$defs/number" },
+        "cowSharedBytes": { "$ref": "#/$defs/number" },
+        "cowSplitCount": { "$ref": "#/$defs/number" },
+        "activeFrameBytes": { "$ref": "#/$defs/number" },
+        "inactiveColdTileBytes": { "$ref": "#/$defs/number" },
+        "opfsCacheBytes": { "$ref": "#/$defs/number" }
+      }
+    },
+    "longTasks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["count", "totalMs", "maxMs"],
+      "properties": {
+        "count": { "type": "integer", "minimum": 0 },
+        "totalMs": { "$ref": "#/$defs/number" },
+        "maxMs": { "$ref": "#/$defs/number" }
+      }
+    }
+  }
+}

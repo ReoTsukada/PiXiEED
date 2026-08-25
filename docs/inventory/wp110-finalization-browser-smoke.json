@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 1,
+  "workPackage": "WP-110",
+  "gate": "FINALIZATION_REFERENCE_BROWSER_SMOKE",
+  "status": "PARTIAL_UNTESTED",
+  "measuredAt": "2026-08-07T14:26:39.229Z",
+  "environment": {
+    "deviceClass": "browser-host-unknown",
+    "actualDevice": "Codex In-app Browser host; device model unavailable",
+    "browser": "CHROMIUM",
+    "browserVersion": "151.0.0.0",
+    "os": "MacIntel",
+    "buildVersion": "pixiedraw2-reference-checkpoint-local",
+    "condition": "WARM",
+    "surface": "ACTUAL_BROWSER",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+    "viewport": { "width": 1280, "height": 720, "devicePixelRatio": 2 }
+  },
+  "samplePolicy": {
+    "usedSamples": 40,
+    "minimumFormalP95Samples": 30,
+    "p95GateEvaluated": false
+  },
+  "measuredInterval": "command -> dirty Tile/Region -> Reference dirty-region preparation -> optional Canvas present",
+  "fixtures": [
+    {
+      "requestedFixture": "PROJECT_B",
+      "requestedCanvas": "512x512",
+      "requestedLayers": 20,
+      "requestedFrames": 120,
+      "executedFixture": "PROJECT_B_DESKTOP_REFERENCE_CORE_SLICE",
+      "executedCanvas": "512x512",
+      "measuredAffectedLayerCount": 1,
+      "measuredAffectedFrameCount": 1,
+      "surfaceClassification": "DESKTOP_BROWSER_REFERENCE",
+      "inputToVisibleMs": { "p50": 0, "p95": 0.10000000894069672, "max": 1.1000000089406967, "sampleCount": 40 },
+      "commandValidationMs": { "p50": 0, "p95": 0, "max": 0.09999999403953552, "sampleCount": 40 },
+      "commandCommitMs": { "p50": 0, "p95": 0.10000000894069672, "max": 0.20000000298023224, "sampleCount": 40 },
+      "trace": { "commandValidationCount": 1, "commandCommitCount": 1, "touchedTileCount": 1, "cowSplitCount": 0, "copiedBytes": 0, "dirtyTileCount": 1, "dirtyRegionArea": 1, "affectedLayerCount": 1, "affectedFrameCount": 1, "rendererPreparationArea": 1, "presentArea": 1, "canonicalRasterAllocationDelta": 1024, "fullRasterCloneCount": 0, "fullTimelineRebuildCount": 0, "wholeProjectSerializationCount": 0 },
+      "memory": { "logicalRasterBytes": 262144, "canonicalRasterBytes": 1024, "sharedCOWBytes": 0, "cowSplitBytes": 0, "rendererCacheBytes": 0, "journalBytes": 0, "workerTransferBytes": 0, "temporaryOperationBytes": 514, "opfsCacheBytes": 0 },
+      "longTasks": { "available": true, "count": 0, "totalMs": 0, "maxMs": 0 },
+      "targetP95Ms": 24,
+      "status": "PARTIAL_UNTESTED",
+      "statusReason": "Measured Core slice does not cover the requested 20-layer/120-frame compositor and host device model is unavailable."
+    },
+    {
+      "requestedFixture": "PROJECT_A",
+      "requestedCanvas": "256x256",
+      "requestedLayers": 12,
+      "requestedFrames": 60,
+      "executedFixture": "PROJECT_A_MOBILE_REFERENCE_CORE_SLICE",
+      "executedCanvas": "256x256",
+      "measuredAffectedLayerCount": 1,
+      "measuredAffectedFrameCount": 1,
+      "surfaceClassification": "DESKTOP_BROWSER_MOBILE_VIEWPORT",
+      "inputToVisibleMs": { "p50": 0, "p95": 0.10000000894069672, "max": 0.5999999940395355, "sampleCount": 40 },
+      "commandValidationMs": { "p50": 0, "p95": 0, "max": 0, "sampleCount": 40 },
+      "commandCommitMs": { "p50": 0, "p95": 0, "max": 0.09999999403953552, "sampleCount": 40 },
+      "trace": { "commandValidationCount": 1, "commandCommitCount": 1, "touchedTileCount": 1, "cowSplitCount": 0, "copiedBytes": 0, "dirtyTileCount": 1, "dirtyRegionArea": 1, "affectedLayerCount": 1, "affectedFrameCount": 1, "rendererPreparationArea": 1, "presentArea": 1, "canonicalRasterAllocationDelta": 1024, "fullRasterCloneCount": 0, "fullTimelineRebuildCount": 0, "wholeProjectSerializationCount": 0 },
+      "memory": { "logicalRasterBytes": 65536, "canonicalRasterBytes": 1024, "sharedCOWBytes": 0, "cowSplitBytes": 0, "rendererCacheBytes": 0, "journalBytes": 0, "workerTransferBytes": 0, "temporaryOperationBytes": 511, "opfsCacheBytes": 0 },
+      "longTasks": { "available": true, "count": 0, "totalMs": 0, "maxMs": 0 },
+      "targetP95Ms": 32,
+      "status": "UNTESTED",
+      "statusReason": "This is a desktop browser viewport classification, not real mobile device evidence."
+    }
+  ],
+  "browserEvidence": {
+    "longTasks": { "available": true, "count": 0, "totalMs": 0, "maxMs": 0 },
+    "resourceRequests": [
+      { "name": "http://127.0.0.1:8000/pixiedraw2/assets/draw2-shell.css", "duration": 3, "transferSize": 5006 },
+      { "name": "http://127.0.0.1:8000/pixiedraw2/dist/draw2-reference-benchmark-entry.js", "duration": 3.2000000029802322, "transferSize": 47661 }
+    ]
+  },
+  "baselineFailureIdentity": {
+    "existingFailureCount": 14,
+    "matchedTestTargetSignatureCount": 14,
+    "newFailureIdentities": 0,
+    "status": "PASS"
+  },
+  "bundleBaseline": {
+    "source": "docs/inventory/wp110-reference-bundle-baseline.json",
+    "entryRawBytes": 33723,
+    "entryMinifiedBytes": 18891,
+    "entryRawGzipBytes": 8306,
+    "entryRawBrotliBytes": 7305,
+    "cssBytes": 4706,
+    "cssGzipBytes": 1560,
+    "cssBrotliBytes": 1321,
+    "lazyChunks": [],
+    "initialRequests": 2,
+    "historical22_31KbNotComparable": true
+  },
+  "productionChanges": false,
+  "rawReference": null,
+  "captureSource": "in-app Browser #referenceOutput JSON captured at measuredAt; normalized finalization metrics are retained in this artifact",
+  "notes": [
+    "No actual mobile device, Safari, Firefox, stylus, 30-minute memory, WebGPU, Wasm, SharedArrayBuffer, or final Worker/Renderer equivalence was measured.",
+    "The raw checkpoint remains unchanged; this is a separate finalization smoke artifact.",
+    "No current Route, PiXiEEDraw, PXD, PiXiSYNC, Market, Project, Asset, Package, database, Storage, migration, deploy, publish, upload, commit, or push was changed."
+  ]
+}

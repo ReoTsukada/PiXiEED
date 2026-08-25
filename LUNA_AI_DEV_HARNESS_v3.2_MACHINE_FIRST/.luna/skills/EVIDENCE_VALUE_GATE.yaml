@@ -1,0 +1,13 @@
+skill_id: EVIDENCE-VALUE-GATE-001
+input: [decision, risk, available_evidence, cache, estimated_cost]
+output_schema:
+  research: none|cached|targeted|deep
+  review: self|specialist|independent
+  experiment: none|cheap_compare|prototype|live_ab
+  model_tier: default|escalated
+  human_approval: false|true
+  rationale: string
+rules:
+  - choose_minimum_sufficient_evidence
+  - prefer_cache_and_existing_tests
+  - escalate_only_if_expected_value_exceeds_cost

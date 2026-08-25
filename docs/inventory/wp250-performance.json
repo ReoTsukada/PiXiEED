@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "workPackage": "WP-250",
+  "status": "MEASURED_LOCAL_ISOLATED_BUNDLE",
+  "measurementDefinition": {
+    "sourceMaps": "excluded",
+    "initialRequests": [
+      "pixiedraw2/assets/draw2-shell.css",
+      "pixiedraw2/dist/draw2-entry.js"
+    ],
+    "wp240Baseline": "preserved and measured beside WP-250",
+    "wp250LazyRequest": "pixiedraw2/dist/wp250-policy-economics-core.js"
+  },
+  "metricScopes": {
+    "bundle": "local raw/minified/gzip/Brotli byte measurement",
+    "core": "pure synthetic reference projection",
+    "initialEditor": "158807 raw; unchanged from WP-240",
+    "wp240Lazy": "10369/6645/3113/2594 raw/minified/gzip/Brotli; preserved",
+    "wp250Lazy": "14662/9494/3704/3122 raw/minified/gzip/Brotli",
+    "wp250LazyMinifiedCompression": "3300 gzip / 2797 Brotli",
+    "wp250LazySha256": "4b166cc045a64bf96e013b1a9f9421b977862897ef331e319191b2daa913cf40",
+    "productionPerformance": "UNTESTED"
+  },
+  "untested": [
+    "real policy authority",
+    "real provider delivery",
+    "real Analytics transport",
+    "real Admin RLS/RPC",
+    "moderation console",
+    "financial reconciliation",
+    "browser/device/compositor performance",
+    "production performance"
+  ]
+}

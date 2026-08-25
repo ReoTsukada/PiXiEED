@@ -3067,3 +3067,66 @@ body:has(.home-app) .home-hero-tags{
     max-width:30ch;
   }
 }
+
+/* Projects keeps the legacy editor available for compatibility, but makes
+   PiXiEEDstudio the only primary action in the Figma-style tool surface. */
+.home-live-tool__legacy {
+  display: grid;
+  min-height: 44px;
+  align-content: center;
+  gap: 5px;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--muted);
+  font: 800 12px/1.2 'Fredoka', 'DotGothic16', system-ui, sans-serif;
+}
+
+.home-live-tool__legacy summary {
+  min-height: 28px;
+  padding: 7px 9px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 9px;
+  background: rgba(255,255,255,.035);
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+  white-space: nowrap;
+}
+
+.home-live-tool__legacy summary::-webkit-details-marker { display: none; }
+.home-live-tool__legacy summary::after { content: '＋'; margin-left: 6px; color: #72e6d5; }
+.home-live-tool__legacy[open] summary::after { content: '－'; }
+
+.home-live-tool__legacy summary:hover,
+.home-live-tool__legacy summary:focus-visible {
+  border-color: rgba(114,230,213,.42);
+  background: rgba(114,230,213,.08);
+  color: #f8fafc;
+  outline: none;
+}
+
+.home-live-tool__legacy a {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  padding: 6px 9px;
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 8px;
+  background: rgba(255,255,255,.025);
+  color: #aebbd0;
+  font-size: 11px;
+  text-decoration: none;
+}
+
+.home-live-tool__legacy a:hover,
+.home-live-tool__legacy a:focus-visible {
+  border-color: rgba(114,230,213,.42);
+  color: #f8fafc;
+  outline: none;
+}
+
+@media (max-width: 560px) {
+  .home-live-tool__legacy { width: 100%; }
+  .home-live-tool__legacy summary { white-space: normal; }
+}

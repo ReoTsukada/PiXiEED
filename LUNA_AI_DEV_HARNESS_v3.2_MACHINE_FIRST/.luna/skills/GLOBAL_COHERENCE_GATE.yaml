@@ -1,0 +1,15 @@
+skill_id: GLOBAL-COHERENCE-GATE-001
+input: [blueprint, proposed_change, work_queue, current_state]
+checks:
+  - north_star_alignment
+  - acceptance_outcome_coverage
+  - cross_feature_ux_consistency
+  - architecture_and_data_contract_consistency
+  - security_privacy_invariants
+  - performance_budget_conflicts
+  - duplicate_or_competing_subsystems
+  - invalidated_future_work_packages
+output:
+  decision: pass|revise_local|revise_blueprint|human_approval
+  affected_refs: []
+  required_updates: []

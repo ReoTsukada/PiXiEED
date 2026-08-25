@@ -6,6 +6,6 @@
     "capture": "node ./capture.mjs ./pages.json"
   },
   "dependencies": {
-    "playwright": "^1.54.2"
+    "playwright": "1.59.1"
   }
 }

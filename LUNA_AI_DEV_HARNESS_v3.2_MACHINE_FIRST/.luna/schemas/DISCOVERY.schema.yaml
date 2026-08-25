@@ -1,0 +1,22 @@
+schema_id: DISCOVERY-SCHEMA-001
+required:
+  - status
+  - discovery_lock
+  - raw_goal
+  - confirmed_facts
+  - safe_assumptions
+  - deferred_choices
+  - question_history
+  - unresolved_material_blockers
+fields:
+  status: uninitialized|analyzing|waiting_for_answers|locked
+  discovery_lock: boolean
+  raw_goal: string
+  confirmed_facts: list
+  safe_assumptions: list
+  deferred_choices: list
+  question_history: list
+  unresolved_material_blockers: list
+  batches_used: integer
+  max_batches: integer
+  locked_at: nullable

@@ -1,0 +1,355 @@
+{
+  "schema_version": 1,
+  "work_package": "WP-000",
+  "captured_on": "2026-08-06",
+  "source_scope": "HTML source files excluding app-shell generated output, node_modules, backup, and development-only split work area",
+  "routes": [
+    {
+      "route": "/account/admin.html",
+      "source": "account/admin.html",
+      "kind": "source-html",
+      "title": "運営管理 | PiXiEED"
+    },
+    {
+      "route": "/account/",
+      "source": "account/index.html",
+      "kind": "source-html",
+      "title": "マイページ | PiXiEED"
+    },
+    {
+      "route": "/account-deletion/",
+      "source": "account-deletion/index.html",
+      "kind": "source-html",
+      "title": "アカウント削除・データ削除について | PiXiEED"
+    },
+    {
+      "route": "/community/",
+      "source": "community/index.html",
+      "kind": "source-html",
+      "title": "PiXiEEDコミュニティ｜作品を見つけて共有する"
+    },
+    {
+      "route": "/contact/",
+      "source": "contact/index.html",
+      "kind": "source-html",
+      "title": "PiXiEED | コンタクト"
+    },
+    {
+      "route": "/events/",
+      "source": "events/index.html",
+      "kind": "source-html",
+      "title": "PiXiEED | イベント・特集"
+    },
+    {
+      "route": "/glossary/",
+      "source": "glossary/index.html",
+      "kind": "source-html",
+      "title": "ドット絵とは？ピクセルアートとの違い・英語・基本用語集 | PiXiEED"
+    },
+    {
+      "route": "/google10107469bdcc60fa.html",
+      "source": "google10107469bdcc60fa.html",
+      "kind": "public-verification-file",
+      "title": null
+    },
+    {
+      "route": "/google92ae386aca6917c9.html",
+      "source": "google92ae386aca6917c9.html",
+      "kind": "public-verification-file",
+      "title": null
+    },
+    {
+      "route": "/googlee776c49d223e1a38.html",
+      "source": "googlee776c49d223e1a38.html",
+      "kind": "public-verification-file",
+      "title": null
+    },
+    {
+      "route": "/help/",
+      "source": "help/index.html",
+      "kind": "source-html",
+      "title": "ヘルプ | PiXiEED"
+    },
+    {
+      "route": "/",
+      "source": "index.html",
+      "kind": "source-html",
+      "title": "ドット絵SNS | PiXiEED"
+    },
+    {
+      "route": "/legal/",
+      "source": "legal/index.html",
+      "kind": "source-html",
+      "title": "特定商取引法に基づく表記 | PiXiEED"
+    },
+    {
+      "route": "/maoitu/game.html",
+      "source": "maoitu/game.html",
+      "kind": "source-html",
+      "title": "魔王様！！いつまでよければいいですか！？"
+    },
+    {
+      "route": "/maoitu/",
+      "source": "maoitu/index.html",
+      "kind": "source-html",
+      "title": "登録不要・無料で遊べる 魔王様！！いつまでよければいいですか！？ | ブラウザゲーム"
+    },
+    {
+      "route": "/market/about.html",
+      "source": "market/about.html",
+      "kind": "source-html",
+      "title": "マーケットとは | PiXiEED"
+    },
+    {
+      "route": "/market/help.html",
+      "source": "market/help.html",
+      "kind": "source-html",
+      "title": "マーケットヘルプ | PiXiEED"
+    },
+    {
+      "route": "/market/",
+      "source": "market/index.html",
+      "kind": "source-html",
+      "title": "マーケット | PiXiEED"
+    },
+    {
+      "route": "/market/item.html",
+      "source": "market/item.html",
+      "kind": "source-html",
+      "title": "商品詳細 | PiXiEEDマーケット"
+    },
+    {
+      "route": "/market/items/919d97bc-cbd5-4a4d-aeee-c658759a97f3/",
+      "source": "market/items/919d97bc-cbd5-4a4d-aeee-c658759a97f3/index.html",
+      "kind": "source-html",
+      "title": "16x16OtegoroMonsters1 | PiXiEEDマーケット"
+    },
+    {
+      "route": "/market/items/c4a1dc20-fcef-4acb-bd30-cd5e6a69920f/",
+      "source": "market/items/c4a1dc20-fcef-4acb-bd30-cd5e6a69920f/index.html",
+      "kind": "source-html",
+      "title": "ジェリンオールスターズ | PiXiEEDマーケット"
+    },
+    {
+      "route": "/market/items/e232a878-dc00-4dd7-b648-bb6a5b37eb5c/",
+      "source": "market/items/e232a878-dc00-4dd7-b648-bb6a5b37eb5c/index.html",
+      "kind": "source-html",
+      "title": "16x16OtegoroEffects1 | PiXiEEDマーケット"
+    },
+    {
+      "route": "/market/items/ef0597f1-2b4e-4c96-9556-d55fd286393a/",
+      "source": "market/items/ef0597f1-2b4e-4c96-9556-d55fd286393a/index.html",
+      "kind": "source-html",
+      "title": "16×16px OtegoroIcons1 | PiXiEEDマーケット"
+    },
+    {
+      "route": "/market/review.html",
+      "source": "market/review.html",
+      "kind": "source-html",
+      "title": "マーケット管理 | PiXiEED"
+    },
+    {
+      "route": "/market/sell.html",
+      "source": "market/sell.html",
+      "kind": "source-html",
+      "title": "出品 | PiXiEEDマーケット"
+    },
+    {
+      "route": "/market/seller.html",
+      "source": "market/seller.html",
+      "kind": "source-html",
+      "title": "売上受取設定 | PiXiEED"
+    },
+    {
+      "route": "/notes/",
+      "source": "notes/index.html",
+      "kind": "source-html",
+      "title": "PiXiEED | 開発ノート"
+    },
+    {
+      "route": "/notice/",
+      "source": "notice/index.html",
+      "kind": "source-html",
+      "title": "PiXiEED | お知らせ"
+    },
+    {
+      "route": "/pixfind/",
+      "source": "pixfind/index.html",
+      "kind": "source-html",
+      "title": "PiXFiND（ピクスファインド） | ドット絵間違い探しゲーム"
+    },
+    {
+      "route": "/pixfind/marker-editor.html",
+      "source": "pixfind/marker-editor.html",
+      "kind": "source-html",
+      "title": "PiXFiND マーカー編集"
+    },
+    {
+      "route": "/pixfind/puzzles/pixfind-45be2f57-5271-4389-8cdf-85d56714a52b/",
+      "source": "pixfind/puzzles/pixfind-45be2f57-5271-4389-8cdf-85d56714a52b/index.html",
+      "kind": "source-html",
+      "title": "PiXFiND | 紫の街"
+    },
+    {
+      "route": "/pixfind/puzzles/pixfind-9e791ac4-820b-434f-9b58-3075d4990fe3/",
+      "source": "pixfind/puzzles/pixfind-9e791ac4-820b-434f-9b58-3075d4990fe3/index.html",
+      "kind": "source-html",
+      "title": "PiXFiND | トトリカゴ(ひなまつり)"
+    },
+    {
+      "route": "/pixfind/puzzles/pixfind-ho-a90bc7c5-e055-447c-b67f-d0b9fa61e3fa/",
+      "source": "pixfind/puzzles/pixfind-ho-a90bc7c5-e055-447c-b67f-d0b9fa61e3fa/index.html",
+      "kind": "source-html",
+      "title": "PiXFiND | カスタムパズル"
+    },
+    {
+      "route": "/pixfind/puzzles/pixfind-ho-e52df997-0fc7-4de9-a0d6-2f9b57454bdb/",
+      "source": "pixfind/puzzles/pixfind-ho-e52df997-0fc7-4de9-a0d6-2f9b57454bdb/index.html",
+      "kind": "source-html",
+      "title": "PiXFiND | 魔王様!!逃げて～!!"
+    },
+    {
+      "route": "/pixfind/puzzles/pixfind-sd-0fb05bfd-47e6-47eb-95b7-a3021aa12d70/",
+      "source": "pixfind/puzzles/pixfind-sd-0fb05bfd-47e6-47eb-95b7-a3021aa12d70/index.html",
+      "kind": "source-html",
+      "title": "PiXFiND | 1920sアメ車"
+    },
+    {
+      "route": "/pixiedraw/",
+      "source": "pixiedraw/index.html",
+      "kind": "source-html",
+      "title": "登録不要・無料のドット絵作成ツール PiXiEEDraw | ブラウザでオンライン制作"
+    },
+    {
+      "route": "/pixiee-lens/",
+      "source": "pixiee-lens/index.html",
+      "kind": "source-html",
+      "title": "登録不要・無料でドット絵にするサイト PiXiEELENS | 写真をオンライン変換"
+    },
+    {
+      "route": "/portfolio/",
+      "source": "portfolio/index.html",
+      "kind": "source-html",
+      "title": "PiXiEED | 企業向けポートフォリオ・ドット絵とキャラクター"
+    },
+    {
+      "route": "/post/",
+      "source": "post/index.html",
+      "kind": "source-html",
+      "title": "作品 | PiXiEED"
+    },
+    {
+      "route": "/privacy/",
+      "source": "privacy/index.html",
+      "kind": "source-html",
+      "title": "プライバシーポリシー | PiXiEED"
+    },
+    {
+      "route": "/projects/",
+      "source": "projects/index.html",
+      "kind": "source-html",
+      "title": "PiXiEED プロジェクト | ドット絵制作・変換・QR・ゲーム"
+    },
+    {
+      "route": "/projects/maoitu/",
+      "source": "projects/maoitu/index.html",
+      "kind": "source-html",
+      "title": "登録不要・無料で遊べる 魔王様!!いつまでよければいいですか!? | ブラウザゲーム"
+    },
+    {
+      "route": "/projects/pixfind/",
+      "source": "projects/pixfind/index.html",
+      "kind": "source-html",
+      "title": "無料ドット絵間違い探し・もの探しゲーム PiXFiND | ブラウザで遊ぶ"
+    },
+    {
+      "route": "/projects/pixiedraw/",
+      "source": "projects/pixiedraw/index.html",
+      "kind": "source-html",
+      "title": "ドット絵を描くサイト・無料ドット絵メーカー PiXiEEDraw | ブラウザで作成"
+    },
+    {
+      "route": "/projects/pixiee-lens/",
+      "source": "projects/pixiee-lens/index.html",
+      "kind": "source-html",
+      "title": "登録不要・無料で写真をドット絵に変換 PiXiEELENS | ブラウザでオンライン変換"
+    },
+    {
+      "route": "/projects/qr-maker/",
+      "source": "projects/qr-maker/index.html",
+      "kind": "source-html",
+      "title": "QRコードメーカー | 登録不要・無料・オンラインでQRコード作成"
+    },
+    {
+      "route": "/q/1/",
+      "source": "q/1/index.html",
+      "kind": "source-html",
+      "title": "PiXiEED"
+    },
+    {
+      "route": "/q/",
+      "source": "q/index.html",
+      "kind": "source-html",
+      "title": "PiXiEED"
+    },
+    {
+      "route": "/qr/",
+      "source": "qr/index.html",
+      "kind": "source-html",
+      "title": "登録不要・無料のQRコードメーカー | オンライン作成 PiXiEED QR"
+    },
+    {
+      "route": "/qr-maker/",
+      "source": "qr-maker/index.html",
+      "kind": "source-html",
+      "title": "QRコードメーカー | 登録不要・無料・オンラインでQRコード作成"
+    },
+    {
+      "route": "/terms/",
+      "source": "terms/index.html",
+      "kind": "source-html",
+      "title": "利用規約 | PiXiEED"
+    }
+  ],
+  "sitemap": {
+    "source": "sitemap.xml",
+    "urls": [
+      "https://pixieed.jp/",
+      "https://pixieed.jp/notes/",
+      "https://pixieed.jp/market/",
+      "https://pixieed.jp/market/about.html",
+      "https://pixieed.jp/market/help.html",
+      "https://pixieed.jp/portfolio/",
+      "https://pixieed.jp/contact/",
+      "https://pixieed.jp/help/",
+      "https://pixieed.jp/privacy/",
+      "https://pixieed.jp/account-deletion/",
+      "https://pixieed.jp/terms/",
+      "https://pixieed.jp/legal/",
+      "https://pixieed.jp/glossary/",
+      "https://pixieed.jp/events/",
+      "https://pixieed.jp/notice/",
+      "https://pixieed.jp/pixiedraw/",
+      "https://pixieed.jp/pixiee-lens/",
+      "https://pixieed.jp/qr-maker/",
+      "https://pixieed.jp/qr/",
+      "https://pixieed.jp/maoitu/",
+      "https://pixieed.jp/pixfind/",
+      "https://pixieed.jp/projects/pixfind/",
+      "https://pixieed.jp/projects/",
+      "https://pixieed.jp/projects/pixiedraw/",
+      "https://pixieed.jp/projects/pixiee-lens/",
+      "https://pixieed.jp/projects/qr-maker/",
+      "https://pixieed.jp/projects/maoitu/",
+      "https://pixieed.jp/market/items/ef0597f1-2b4e-4c96-9556-d55fd286393a/",
+      "https://pixieed.jp/market/items/e232a878-dc00-4dd7-b648-bb6a5b37eb5c/",
+      "https://pixieed.jp/market/items/919d97bc-cbd5-4a4d-aeee-c658759a97f3/",
+      "https://pixieed.jp/market/items/c4a1dc20-fcef-4acb-bd30-cd5e6a69920f/"
+    ]
+  },
+  "route_policy_notes": [
+    "An index.html file maps to the directory route; non-index HTML keeps its .html path.",
+    "Google verification HTML files are public files but are not product routes.",
+    "Generated Capacitor output is excluded from the public source route inventory."
+  ]
+}

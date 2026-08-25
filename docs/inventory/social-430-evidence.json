@@ -1,0 +1,360 @@
+{
+  "evidenceVersion": "QUALIFICATION_EVIDENCE_V1",
+  "packageId": "SOCIAL-430",
+  "contextSha256": "99ef42018fd768c69a36c16277970205a7696936afe89781b0a8ab5375611df0",
+  "status": "PARTIAL",
+  "noProductionClaims": true,
+  "qualificationReady": false,
+  "qualificationReadyReason": "External provider, production Auth/RLS, routes/data, device behavior, and production performance remain UNTESTED.",
+  "currentDecision": {
+    "status": "STRUCTURAL_PASS_TERRA",
+    "boundaryModel": "EXTERNAL_CALLER_VS_SERVER_TCB",
+    "deepImportP0": "WITHDRAWN",
+    "semanticAcceptance": "STRUCTURAL_PASS_TERRA",
+    "productionSemanticQualification": "PENDING",
+    "reason": "Terra High independently passed the structural boundary review; production semantic qualification remains pending for untested external and production-integrated items."
+  },
+  "historicalDesignGate": {
+    "status": "CLOSED_HISTORICAL",
+    "previousDecision": "STOP_DESIGN_GATE",
+    "closedAt": "2026-08-16T14:41:15+09:00",
+    "reason": "Fix round 2 recorded the second composition-root-boundary finding before the design decision was superseded by the adopted boundary model.",
+    "fixRound": {
+      "currentRound": 2,
+      "max_fix_rounds": 2,
+      "timebox_minutes": 20,
+      "checkpoint_every_minutes": 10,
+      "sameClassFinding": {
+        "class": "composition-root-boundary",
+        "occurrence": 2,
+        "decision": "STOP_DESIGN_GATE"
+      }
+    }
+  },
+  "review": {
+    "reviewer": "Terra High",
+    "source": "TERRA_FINAL_INDEPENDENT_STRUCTURAL_REVIEW",
+    "decision": "PASS",
+    "reviewedAt": "2026-08-16T14:50:32+09:00",
+    "scope": "public export boundary, server TCB composition, resolver/event/lifecycle invalid-input rejection",
+    "reviewedArtifactHashes": [
+      "60335c1187c4d17e08bcfaf37bb42fc048ec15ac00768da2db102f1663701e76",
+      "7dfdae60020810e8d374952207d6e62e613e4157d5be11dea8764a0cc4e29446",
+      "baf58d67435ec7d0cd9c906d62336135ec69f8c78964759c9334fc98b48a74c4",
+      "9a1d966f396a31ca36f99274ff5e4f353d9dc2c5aafb10171c9e35c916903c69",
+      "ae4a6148d849061786e29fbfee004349c4c8b6c80b21cdede762e5b9448e76a7",
+      "0e57a90e760239656f753a8905e4f0213c8b422e1306fe0f4ba0875c188d88cc",
+      "15c589481fcf6f2fb6623aebfbab60c059a401d591aba17cc5a33d04ad6874d5",
+      "84046e9ebced91581e3aa5e374bfa1936ec6cea6b9b24dc004659e339db21e5d",
+      "e7f2ba25707681318985e1cc06b0ac8e245a6b98ec5d97bdd4f98e1750b350c9",
+      "7e8367765dedb413ce907d971d8583e6937cadd73678548b652200665477645b",
+      "2ba33cdcfa77873a088141ca81658f5de7299469202a5a53544ebc91a08092d2",
+      "0f32a55c9c524bd94e66680d6999c5a60bbf1852d1e1ca1725b6a6e986e901b1"
+    ]
+  },
+  "acceptance": [
+    {
+      "id": "SOCIAL430-SCOPE-001",
+      "status": "PASS",
+      "source": [
+        "pixiedraw2/src/platform/social-430/contracts.ts",
+        "pixiedraw2/src/platform/social-430/composition.ts",
+        "pixiedraw2/src/platform/social-430/event-adapter.ts",
+        "pixiedraw2/tests/social-430/social-430.test.ts"
+      ],
+      "contract": [
+        "docs/contracts/SOCIAL-430-CONTENT-BOUNDARY.md",
+        "docs/contracts/QUALIFICATION-EVIDENCE-V1.md"
+      ],
+      "schema": [
+        "pixiedraw2/src/platform/social-430/contracts.ts"
+      ],
+      "build": [
+        "pixiedraw2/benchmarks/social-430/generate-evidence.ts"
+      ],
+      "commands": [
+        {
+          "command": "deno fmt --check pixiedraw2/src/platform/social-430 pixiedraw2/tests/social-430 pixiedraw2/benchmarks/social-430",
+          "exitCode": 0
+        },
+        {
+          "command": "deno check --no-remote pixiedraw2/src/platform/social-430/contracts.ts pixiedraw2/src/platform/social-430/composition.ts pixiedraw2/src/platform/social-430/event-adapter.ts pixiedraw2/tests/social-430/social-430.test.ts pixiedraw2/benchmarks/social-430/generate-evidence.ts",
+          "exitCode": 0
+        },
+        {
+          "command": "deno test --no-remote --allow-read --check pixiedraw2/tests/social-430",
+          "exitCode": 0
+        },
+        {
+          "command": "deno run --no-remote --allow-read --allow-write=docs/inventory pixiedraw2/benchmarks/social-430/generate-evidence.ts",
+          "exitCode": 0
+        },
+        {
+          "command": "python3 scripts/verify_work_package_context.py --context .codex/context/SOCIAL-430.md --manifest .codex/context/SOCIAL-430.manifest.json",
+          "exitCode": 0
+        },
+        {
+          "command": "node scripts/validate-qualification-evidence.mjs docs/inventory/social-430-evidence.json",
+          "exitCode": 0
+        },
+        {
+          "command": "node scripts/test-baseline-failure-identity-wp080.mjs",
+          "exitCode": 0
+        },
+        {
+          "command": "git diff --check -- pixiedraw2/src/platform/social-430 pixiedraw2/tests/social-430 pixiedraw2/benchmarks/social-430 docs/contracts/SOCIAL-430-*.md docs/inventory/social-430-*.json docs/decisions/ADR-*-SOCIAL-430-*.md",
+          "exitCode": 0
+        }
+      ],
+      "exitCode": 0,
+      "contextSha256": "99ef42018fd768c69a36c16277970205a7696936afe89781b0a8ab5375611df0",
+      "artifactHashes": [
+        "60335c1187c4d17e08bcfaf37bb42fc048ec15ac00768da2db102f1663701e76",
+        "7dfdae60020810e8d374952207d6e62e613e4157d5be11dea8764a0cc4e29446",
+        "baf58d67435ec7d0cd9c906d62336135ec69f8c78964759c9334fc98b48a74c4",
+        "9a1d966f396a31ca36f99274ff5e4f353d9dc2c5aafb10171c9e35c916903c69",
+        "ae4a6148d849061786e29fbfee004349c4c8b6c80b21cdede762e5b9448e76a7",
+        "0e57a90e760239656f753a8905e4f0213c8b422e1306fe0f4ba0875c188d88cc",
+        "15c589481fcf6f2fb6623aebfbab60c059a401d591aba17cc5a33d04ad6874d5",
+        "84046e9ebced91581e3aa5e374bfa1936ec6cea6b9b24dc004659e339db21e5d",
+        "e7f2ba25707681318985e1cc06b0ac8e245a6b98ec5d97bdd4f98e1750b350c9",
+        "7e8367765dedb413ce907d971d8583e6937cadd73678548b652200665477645b",
+        "2ba33cdcfa77873a088141ca81658f5de7299469202a5a53544ebc91a08092d2",
+        "0f32a55c9c524bd94e66680d6999c5a60bbf1852d1e1ca1725b6a6e986e901b1"
+      ],
+      "targetTests": [
+        "pixiedraw2/tests/social-430/social-430.test.ts (11/11)"
+      ],
+      "adapterClass": "IN_MEMORY",
+      "classification": "IMPLEMENTED_ISOLATED",
+      "reviewer": "Terra High",
+      "findingIdentity": null
+    },
+    {
+      "id": "SOCIAL430-EVIDENCE-001",
+      "status": "PASS",
+      "source": [
+        "pixiedraw2/tests/social-430/social-430.test.ts",
+        "pixiedraw2/benchmarks/social-430/generate-evidence.ts"
+      ],
+      "contract": [
+        "docs/contracts/SOCIAL-430-EVIDENCE.md",
+        "docs/contracts/QUALIFICATION-EVIDENCE-V1.md"
+      ],
+      "schema": [
+        "docs/inventory/social-430-command-transcript.json",
+        "docs/inventory/social-430-benchmark.json",
+        "docs/inventory/social-430-evidence.json"
+      ],
+      "build": [
+        "pixiedraw2/benchmarks/social-430/generate-evidence.ts"
+      ],
+      "commands": [
+        {
+          "command": "deno fmt --check pixiedraw2/src/platform/social-430 pixiedraw2/tests/social-430 pixiedraw2/benchmarks/social-430",
+          "exitCode": 0
+        },
+        {
+          "command": "deno check --no-remote pixiedraw2/src/platform/social-430/contracts.ts pixiedraw2/src/platform/social-430/composition.ts pixiedraw2/src/platform/social-430/event-adapter.ts pixiedraw2/tests/social-430/social-430.test.ts pixiedraw2/benchmarks/social-430/generate-evidence.ts",
+          "exitCode": 0
+        },
+        {
+          "command": "deno test --no-remote --allow-read --check pixiedraw2/tests/social-430",
+          "exitCode": 0
+        },
+        {
+          "command": "deno run --no-remote --allow-read --allow-write=docs/inventory pixiedraw2/benchmarks/social-430/generate-evidence.ts",
+          "exitCode": 0
+        },
+        {
+          "command": "python3 scripts/verify_work_package_context.py --context .codex/context/SOCIAL-430.md --manifest .codex/context/SOCIAL-430.manifest.json",
+          "exitCode": 0
+        },
+        {
+          "command": "node scripts/validate-qualification-evidence.mjs docs/inventory/social-430-evidence.json",
+          "exitCode": 0
+        },
+        {
+          "command": "node scripts/test-baseline-failure-identity-wp080.mjs",
+          "exitCode": 0
+        },
+        {
+          "command": "git diff --check -- pixiedraw2/src/platform/social-430 pixiedraw2/tests/social-430 pixiedraw2/benchmarks/social-430 docs/contracts/SOCIAL-430-*.md docs/inventory/social-430-*.json docs/decisions/ADR-*-SOCIAL-430-*.md",
+          "exitCode": 0
+        }
+      ],
+      "exitCode": 0,
+      "contextSha256": "99ef42018fd768c69a36c16277970205a7696936afe89781b0a8ab5375611df0",
+      "artifactHashes": [
+        "60335c1187c4d17e08bcfaf37bb42fc048ec15ac00768da2db102f1663701e76",
+        "7dfdae60020810e8d374952207d6e62e613e4157d5be11dea8764a0cc4e29446",
+        "baf58d67435ec7d0cd9c906d62336135ec69f8c78964759c9334fc98b48a74c4",
+        "9a1d966f396a31ca36f99274ff5e4f353d9dc2c5aafb10171c9e35c916903c69",
+        "ae4a6148d849061786e29fbfee004349c4c8b6c80b21cdede762e5b9448e76a7",
+        "0e57a90e760239656f753a8905e4f0213c8b422e1306fe0f4ba0875c188d88cc",
+        "15c589481fcf6f2fb6623aebfbab60c059a401d591aba17cc5a33d04ad6874d5",
+        "84046e9ebced91581e3aa5e374bfa1936ec6cea6b9b24dc004659e339db21e5d",
+        "e7f2ba25707681318985e1cc06b0ac8e245a6b98ec5d97bdd4f98e1750b350c9",
+        "7e8367765dedb413ce907d971d8583e6937cadd73678548b652200665477645b",
+        "2ba33cdcfa77873a088141ca81658f5de7299469202a5a53544ebc91a08092d2",
+        "0f32a55c9c524bd94e66680d6999c5a60bbf1852d1e1ca1725b6a6e986e901b1"
+      ],
+      "targetTests": [
+        "synthetic benchmark 10000/10000",
+        "11 targeted tests"
+      ],
+      "adapterClass": "IN_MEMORY",
+      "classification": "IMPLEMENTED_ISOLATED",
+      "reviewer": "Terra High",
+      "findingIdentity": null
+    },
+    {
+      "id": "SOCIAL430-STOP-001",
+      "status": "PASS",
+      "source": [
+        "docs/contracts/SOCIAL-430-STOP.md",
+        "pixiedraw2/src/platform/social-430/composition.ts",
+        "pixiedraw2/src/platform/social-430/event-adapter.ts"
+      ],
+      "contract": [
+        "docs/contracts/SOCIAL-430-STOP.md",
+        "docs/contracts/QUALIFICATION-EVIDENCE-V1.md"
+      ],
+      "schema": [
+        "pixiedraw2/src/platform/social-430/contracts.ts"
+      ],
+      "build": [
+        "pixiedraw2/benchmarks/social-430/generate-evidence.ts"
+      ],
+      "commands": [
+        {
+          "command": "deno fmt --check pixiedraw2/src/platform/social-430 pixiedraw2/tests/social-430 pixiedraw2/benchmarks/social-430",
+          "exitCode": 0
+        },
+        {
+          "command": "deno check --no-remote pixiedraw2/src/platform/social-430/contracts.ts pixiedraw2/src/platform/social-430/composition.ts pixiedraw2/src/platform/social-430/event-adapter.ts pixiedraw2/tests/social-430/social-430.test.ts pixiedraw2/benchmarks/social-430/generate-evidence.ts",
+          "exitCode": 0
+        },
+        {
+          "command": "deno test --no-remote --allow-read --check pixiedraw2/tests/social-430",
+          "exitCode": 0
+        },
+        {
+          "command": "deno run --no-remote --allow-read --allow-write=docs/inventory pixiedraw2/benchmarks/social-430/generate-evidence.ts",
+          "exitCode": 0
+        },
+        {
+          "command": "python3 scripts/verify_work_package_context.py --context .codex/context/SOCIAL-430.md --manifest .codex/context/SOCIAL-430.manifest.json",
+          "exitCode": 0
+        },
+        {
+          "command": "node scripts/validate-qualification-evidence.mjs docs/inventory/social-430-evidence.json",
+          "exitCode": 0
+        },
+        {
+          "command": "node scripts/test-baseline-failure-identity-wp080.mjs",
+          "exitCode": 0
+        },
+        {
+          "command": "git diff --check -- pixiedraw2/src/platform/social-430 pixiedraw2/tests/social-430 pixiedraw2/benchmarks/social-430 docs/contracts/SOCIAL-430-*.md docs/inventory/social-430-*.json docs/decisions/ADR-*-SOCIAL-430-*.md",
+          "exitCode": 0
+        }
+      ],
+      "exitCode": 0,
+      "contextSha256": "99ef42018fd768c69a36c16277970205a7696936afe89781b0a8ab5375611df0",
+      "artifactHashes": [
+        "60335c1187c4d17e08bcfaf37bb42fc048ec15ac00768da2db102f1663701e76",
+        "7dfdae60020810e8d374952207d6e62e613e4157d5be11dea8764a0cc4e29446",
+        "baf58d67435ec7d0cd9c906d62336135ec69f8c78964759c9334fc98b48a74c4",
+        "9a1d966f396a31ca36f99274ff5e4f353d9dc2c5aafb10171c9e35c916903c69",
+        "ae4a6148d849061786e29fbfee004349c4c8b6c80b21cdede762e5b9448e76a7",
+        "0e57a90e760239656f753a8905e4f0213c8b422e1306fe0f4ba0875c188d88cc",
+        "15c589481fcf6f2fb6623aebfbab60c059a401d591aba17cc5a33d04ad6874d5",
+        "84046e9ebced91581e3aa5e374bfa1936ec6cea6b9b24dc004659e339db21e5d",
+        "e7f2ba25707681318985e1cc06b0ac8e245a6b98ec5d97bdd4f98e1750b350c9",
+        "7e8367765dedb413ce907d971d8583e6937cadd73678548b652200665477645b",
+        "2ba33cdcfa77873a088141ca81658f5de7299469202a5a53544ebc91a08092d2",
+        "0f32a55c9c524bd94e66680d6999c5a60bbf1852d1e1ca1725b6a6e986e901b1"
+      ],
+      "targetTests": [
+        "tenant/privacy/stale/replay/commerce boundary validation (11/11)"
+      ],
+      "adapterClass": "IN_MEMORY",
+      "classification": "IMPLEMENTED_ISOLATED",
+      "reviewer": "Terra High",
+      "findingIdentity": null
+    }
+  ],
+  "artifactPaths": [
+    "pixiedraw2/src/platform/social-430/contracts.ts",
+    "pixiedraw2/src/platform/social-430/composition.ts",
+    "pixiedraw2/src/platform/social-430/event-adapter.ts",
+    "pixiedraw2/tests/social-430/social-430.test.ts",
+    "pixiedraw2/benchmarks/social-430/generate-evidence.ts",
+    "docs/contracts/SOCIAL-430-CONTENT-BOUNDARY.md",
+    "docs/contracts/SOCIAL-430-EVIDENCE.md",
+    "docs/contracts/SOCIAL-430-STOP.md",
+    "docs/contracts/QUALIFICATION-EVIDENCE-V1.md",
+    "docs/decisions/ADR-20260816-SOCIAL-430-boundary.md",
+    "docs/inventory/social-430-command-transcript.json",
+    "docs/inventory/social-430-benchmark.json"
+  ],
+  "artifactHashes": [
+    "60335c1187c4d17e08bcfaf37bb42fc048ec15ac00768da2db102f1663701e76",
+    "7dfdae60020810e8d374952207d6e62e613e4157d5be11dea8764a0cc4e29446",
+    "baf58d67435ec7d0cd9c906d62336135ec69f8c78964759c9334fc98b48a74c4",
+    "9a1d966f396a31ca36f99274ff5e4f353d9dc2c5aafb10171c9e35c916903c69",
+    "ae4a6148d849061786e29fbfee004349c4c8b6c80b21cdede762e5b9448e76a7",
+    "0e57a90e760239656f753a8905e4f0213c8b422e1306fe0f4ba0875c188d88cc",
+    "15c589481fcf6f2fb6623aebfbab60c059a401d591aba17cc5a33d04ad6874d5",
+    "84046e9ebced91581e3aa5e374bfa1936ec6cea6b9b24dc004659e339db21e5d",
+    "e7f2ba25707681318985e1cc06b0ac8e245a6b98ec5d97bdd4f98e1750b350c9",
+    "7e8367765dedb413ce907d971d8583e6937cadd73678548b652200665477645b",
+    "2ba33cdcfa77873a088141ca81658f5de7299469202a5a53544ebc91a08092d2",
+    "0f32a55c9c524bd94e66680d6999c5a60bbf1852d1e1ca1725b6a6e986e901b1"
+  ],
+  "baseline": {
+    "existingFailureIdentityCount": 14,
+    "newFailureIdentityCount": 0,
+    "status": "REUSED_HASH_MATCH",
+    "harness": "baseline-wp000"
+  },
+  "currentSystem": {
+    "currentRoutes": "PRESERVED",
+    "market": "PRESERVED",
+    "pixisync": "PRESERVED",
+    "productionData": "NOT_ACCESSED"
+  },
+  "untested": [
+    "real SNS/Community provider",
+    "real moderation",
+    "real Search backend",
+    "real Notification provider delivery",
+    "Production Auth/RLS",
+    "legacy route/data compatibility",
+    "device/cross-browser/accessibility",
+    "production performance",
+    "OPS-440"
+  ],
+  "noProductionMutation": true,
+  "reviewer": "Terra High",
+  "reviewerSource": "TERRA_FINAL_INDEPENDENT_STRUCTURAL_REVIEW",
+  "reviewDecision": "PASS",
+  "reviewedAt": "2026-08-16T14:50:32+09:00",
+  "reviewedArtifactHashes": [
+    "60335c1187c4d17e08bcfaf37bb42fc048ec15ac00768da2db102f1663701e76",
+    "7dfdae60020810e8d374952207d6e62e613e4157d5be11dea8764a0cc4e29446",
+    "baf58d67435ec7d0cd9c906d62336135ec69f8c78964759c9334fc98b48a74c4",
+    "9a1d966f396a31ca36f99274ff5e4f353d9dc2c5aafb10171c9e35c916903c69",
+    "ae4a6148d849061786e29fbfee004349c4c8b6c80b21cdede762e5b9448e76a7",
+    "0e57a90e760239656f753a8905e4f0213c8b422e1306fe0f4ba0875c188d88cc",
+    "15c589481fcf6f2fb6623aebfbab60c059a401d591aba17cc5a33d04ad6874d5",
+    "84046e9ebced91581e3aa5e374bfa1936ec6cea6b9b24dc004659e339db21e5d",
+    "e7f2ba25707681318985e1cc06b0ac8e245a6b98ec5d97bdd4f98e1750b350c9",
+    "7e8367765dedb413ce907d971d8583e6937cadd73678548b652200665477645b",
+    "2ba33cdcfa77873a088141ca81658f5de7299469202a5a53544ebc91a08092d2",
+    "0f32a55c9c524bd94e66680d6999c5a60bbf1852d1e1ca1725b6a6e986e901b1"
+  ],
+  "nextPackage": "OPS-440",
+  "autoStartNext": false
+}

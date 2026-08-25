@@ -15,7 +15,7 @@ export const FP007_SERVER_NON_INTRUSION_SCOPE = [
   "CURRENT_ROUTES",
   "CURRENT_PIXIEEDRAW",
   "PXD",
-  "PIXISYNC",
+  "PIXYNC",
   "MARKET",
 ] as const;
 
@@ -23,7 +23,7 @@ const FP007_SERVER_NON_INTRUSION_PATHS = [
   "current-routes",
   "pixiedraw",
   "pxd",
-  "pixisync",
+  "pixync",
   "market",
 ] as const;
 

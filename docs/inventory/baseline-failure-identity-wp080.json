@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "baseline": "WP-000/WP-005",
+  "captured_on": "2026-08-06",
+  "baseline_commit": "76e01b24c7f4f4ae3b75c0727f1e3612a133d970",
+  "expected_failure_count": 14,
+  "comparison_rule": "Each recorded test must exit 1 and contain every major signature token. Any other exit code or missing token is a new identity and fails the check.",
+  "failures": [
+    { "test": "scripts/test-account-auth-state-stability.mjs", "target": "scripts/account-dev-tools.js", "signature": ["ENOENT", "scripts/account-dev-tools.js"] },
+    { "test": "scripts/test-account-reward-dashboard.mjs", "target": "scripts/account-market-listings.js", "signature": ["AssertionError", "published", "リンクをコピー", "公開後に共有"] },
+    { "test": "scripts/test-ad-lifecycle.mjs", "target": "scripts/ads-lazy.js", "signature": ["AssertionError", "MAX_RETRIES", "RETRY_DELAY_MS", "queueRetry"] },
+    { "test": "scripts/test-ad-permission-management.mjs", "target": "account/index.html", "signature": ["AssertionError", "id=\"adFreeGrantForm\""] },
+    { "test": "scripts/test-market-fee-schedule.mjs", "target": "market/about.html", "signature": ["AssertionError", "前面で10秒以上表示"] },
+    { "test": "scripts/test-market-lineage-pageview-rewards.mjs", "target": "account/index.html", "signature": ["AssertionError", "pageviewRewardSettlementMonth"] },
+    { "test": "scripts/test-market-listing-package.mjs", "target": "market/listing-package-utils.js", "signature": ["TypeError", "detectFormat is not a function"] },
+    { "test": "scripts/test-market-pageview-reward-budget.mjs", "target": "docs/inheritance-material-market-system.md", "signature": ["AssertionError", "表示報酬はPiXiEEDの売上の一部を原資"] },
+    { "test": "scripts/test-market-verification.mjs", "target": "market/item.js", "signature": ["AssertionError", "market_public_asset_v1"] },
+    { "test": "scripts/test-pixiedraw-existing-project-native-scale.mjs", "target": "pixiedraw/assets/js/app.js", "signature": ["AssertionError", "The input did not match the regular expression"] },
+    { "test": "scripts/test-pixiedraw-export-runtime-wiring.mjs", "target": "pixiedraw/index.html", "signature": ["AssertionError", "The input did not match the regular expression"] },
+    { "test": "scripts/test-pixiedraw-new-project-session-handoff.mjs", "target": "pixiedraw/assets/js/modules/startup-workflow-utils.js", "signature": ["AssertionError", "new project id must be allocated after the clean reset"] },
+    { "test": "scripts/test-pixiedraw-release-cache.mjs", "target": "pixiedraw/index.html", "signature": ["AssertionError", "The input did not match the regular expression"] },
+    { "test": "scripts/test-pixisync-paid-slots.mjs", "target": "pixiedraw/index.html", "signature": ["AssertionError", "The input did not match the regular expression"] }
+  ]
+}

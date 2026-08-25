@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "workPackage": "WP-190",
+  "status": "MEASURED_LOCAL_BUILD_WITH_UNTESTED_RELEASE_GATES",
+  "measurementDefinition": {
+    "baseline": "WP-180 same command and compression definition",
+    "sourceMaps": "excluded",
+    "initialRequests": ["pixiedraw2/assets/draw2-shell.css", "pixiedraw2/dist/draw2-entry.js"],
+    "startupLazyRequests": ["pixiedraw2/dist/wp180-workspace.js"],
+    "onDemandLazyRequests": ["pixiedraw2/dist/wp190-audio-core.js", "pixiedraw2/dist/wp190-integration-ui.js", "pixiedraw2/dist/wp160-runtime-core.js", "pixiedraw2/dist/wp170-advanced-tools.js", "pixiedraw2/dist/draw2-legacy-compat.js"]
+  },
+  "wp180Baseline": {"initialEditorRaw":158807,"workspaceLazyRaw":18816,"cssRaw":24768,"runtimeRaw":12649},
+  "bundles": {
+    "initialEditor": {"raw":158807,"minified":90968,"gzip":31916,"brotli":26521,"minifiedGzip":24854,"minifiedBrotli":21370,"sha256":"0f029dabb6770fc574e7f3930714bef46bde3187f12067c13849955647e32cd1"},
+    "workspaceStartupLazy": {"raw":20295,"minified":10987,"gzip":5199,"brotli":4568,"minifiedGzip":3936,"minifiedBrotli":3522,"sha256":"9587a26db554f1916cf72a8972188db848bc11a3d2f04b228018cf6650db2c5f"},
+    "audioOnDemandLazy": {"raw":15725,"minified":10298,"gzip":4296,"brotli":3701,"minifiedGzip":3671,"minifiedBrotli":3193,"sha256":"758ac42cdddcb2056c830e86a741621e66f2fbd0dbf541b043fa821e73af0043"},
+    "integrationOnDemandLazy": {"raw":5881,"minified":5881,"gzip":1867,"brotli":1610,"minifiedGzip":1867,"minifiedBrotli":1610,"sha256":"c36918ea1beaf8f36e8740eac5b2517adb2f932d62e55c3902244f2945cc55c7"},
+    "css": {"raw":26668,"minified":23938,"gzip":5162,"brotli":4466,"minifiedGzip":4743,"minifiedBrotli":4142},
+    "advancedCore": {"raw":31086,"minified":31086,"gzip":8518,"brotli":7360,"minifiedGzip":8518,"minifiedBrotli":7360,"sha256":"e3e0cc4b56cf9031b7217240408ceb0b7a6daa05c347b26e0aa01aaaa6d393ea"},
+    "advancedAdapter": {"raw":1490,"minified":1490,"gzip":638,"brotli":541,"minifiedGzip":638,"minifiedBrotli":541,"sha256":"9318fc95c5edd315540da5e1ad20ecc30e0b42ea34992c56d9eea7eabd6ba8e8"},
+    "runtime": {"raw":12649,"minified":12649,"gzip":3645,"brotli":3167,"minifiedGzip":3645,"minifiedBrotli":3167,"sha256":"eab694dc5721e332271b6ea5102f904873c390a8e74f4f2f1c3cdbf1ae6c57a8"}
+  },
+  "deltas": {"initialEditorRaw":0,"workspaceLazyRaw":1479},
+  "boundaries": {"audioOutsideInitial":"PASS_STATIC_BOUNDARY","audioOutsideRuntime":"PASS_STATIC_BOUNDARY","workspaceAdvancedRuntimeBoundaries":"PRESERVED_STATIC","currentRoutesAndData":"OUT_OF_SCOPE_AND_UNTOUCHED"},
+  "metricScopes": {"audioPlanning":"COMMAND_ONLY","hotPath":"WORKSPACE_UI_UPDATE","populatedFixture":"INPUT_TO_VISIBLE_REFERENCE","fullCompositor":"INPUT_TO_VISIBLE_FULL_COMPOSITOR / PARTIAL"},
+  "untested": ["physical mobile","physical stylus","real screen reader","Safari","Firefox","30-minute memory","full compositor input-to-visible","production performance","real Legacy/user data"]
+}

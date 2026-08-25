@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "work_package": "WP-100",
+  "status": "COMPLETE_ISOLATED_VERTICAL_SLICE",
+  "entry": "pixiedraw2/index.html",
+  "core": "pixiedraw2/src/draw2-core.ts",
+  "browser_projection": "pixiedraw2/src/draw2-entry.ts",
+  "canonical_state": {
+    "dom_independent": true,
+    "canvas_independent": true,
+    "ui_framework_independent": true,
+    "network_independent": true,
+    "storage_implementation_independent": true,
+    "deterministic_commands": true,
+    "indexed_pixel_storage": "Uint8Array",
+    "transparent_index": 0,
+    "palette_indices": "1..255"
+  },
+  "boundaries": {
+    "tile_api": "exchangeable; 32/64 decision pending benchmark",
+    "renderer": "ReferenceRenderer adapter; backend decision pending benchmark",
+    "worker": "not required by reference path; topology decision pending benchmark",
+    "storage": "local Journal + dirty Tile + periodic Checkpoint seam",
+    "transport": "LOCAL_ONLY",
+    "production_connections": false
+  },
+  "benchmark_status": "UNTESTED",
+  "technology_decision": "DECISION_PENDING",
+  "active_editing_long_task_scope": ["pointer-input", "drawing", "selection", "transform", "timeline-scrub", "layer-interaction", "routine-autosave", "routine-collaboration"],
+  "heavy_task_separate_budget": ["import", "export", "package-build"],
+  "baseline_failure_identity": { "existing_match": "14/14", "new_failure_identities": 0 },
+  "production_changes": { "routes": false, "draw": false, "pxd": false, "pixisync": false, "market": false, "database": false, "storage": false, "migration": false, "deploy": false, "publish": false }
+}

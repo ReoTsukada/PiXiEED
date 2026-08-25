@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "PIXYNC_DRAW2_BROWSER_EVIDENCE_V1",
+  "packageId": "PIXYNC-DRAW2-180",
+  "environment": "localhost in-app Chromium browser",
+  "databaseName": "pixync-draw2-180-qualification-v1",
+  "projectId": "pixync-draw2-180-browser-final",
+  "checks": [
+    { "id": "two-tab-initial-open", "status": "PASS", "detail": "both tabs opened revision 0 with the same snapshot hash" },
+    { "id": "concurrent-cas-single-winner", "status": "PASS", "detail": "final-tab-a ENQUEUED; final-tab-b SNAPSHOT_CONFLICT" },
+    { "id": "persistent-winner-only", "status": "PASS", "detail": "persisted outbox contains only final-tab-a" },
+    { "id": "stale-memory-unchanged", "status": "PASS", "detail": "losing journal retained initial hash and empty outbox" },
+    { "id": "reopen-converges", "status": "PASS", "detail": "losing tab reopened to the persisted winner hash" }
+  ],
+  "untested": ["Safari", "physical device", "quota exhaustion", "cross-process", "staging", "production", "Supabase Realtime"],
+  "productDataTouched": false
+}

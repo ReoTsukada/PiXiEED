@@ -1,0 +1,12 @@
+schema_version: 3.1
+entries: []
+entry_schema:
+  experiment_id: string
+  decision: string
+  mode: cheap_compare|prototype|live_ab
+  variants: []
+  metrics: []
+  result: null
+  confidence: null
+  reuse_scope: []
+  invalidate_when: []

@@ -1,0 +1,32 @@
+schema_version: 3.2
+status: complete
+discovery_lock: true
+raw_goal: "PiXiEEDを、Draw2・Audio・Game・PiXYNC・マーケット・マイページ・SNSを共通の高性能UI/UXとデータ基盤で統合し、WebとiOS/Androidアプリの両方で使えるクリエイティブプラットフォームとして再構築する。既存マーケット商品と購入権限は維持し、人気・高評価の現行クリエイティブアプリから検証可能な設計原則を取り入れる。"
+confirmed_facts:
+  - "公開順はWeb版を先行し、同じApp Shellを使ってiOS/Android版を段階公開する。"
+  - "アプリ内マーケットは最終的にデジタル商品の購入まで対応する。"
+  - "iOSはStoreKit、AndroidはGoogle Play Billingを使用し、Web決済とはアダプターを分離する。"
+  - "PiXiEED.jpのトップページはPiXiEEDraw2を検索・理解・利用開始するための入口にする。"
+  - "既存のPiXiEEDページ、マーケット商品、購入権限、共通要素は破棄せず、段階的に新App Shellへ切り替える。"
+  - "デザインは現行の主要クリエイティブ製品とOSガイドラインを調査し、コードや固有表現は複製せず設計原則のみ採用する。"
+safe_assumptions:
+  - "現行のCapacitor、Supabase、既存URL、既存マーケットデータを基盤として継続利用する。"
+  - "Draw2を制作体験の主役とし、AudioとGameは同じApp Shell内で必要時に遅延ロードする。"
+  - "グローバルナビゲーションは制作、マーケット、ライブラリ、コミュニティ、マイページを基本候補とする。"
+  - "アプリ内デジタル販売は、初期の閲覧・購入済み利用と分離して段階実装する。"
+deferred_choices:
+  - "iOS/Androidのストア公開時期と対象地域"
+  - "デジタル商品のストア別価格・税・返金運用の詳細"
+  - "SNSの公開範囲と通知頻度の最終値"
+question_history:
+  - batch: 1
+    questions:
+      - "Web先行で同一App ShellをiOS/Androidへ段階展開するか"
+      - "アプリ内マーケットでデジタル商品を最終的に販売するか"
+    answers:
+      - "はい"
+      - "はい"
+unresolved_material_blockers: []
+batches_used: 1
+max_batches: 2
+locked_at: 2026-08-24

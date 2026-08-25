@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="ja" data-theme="system">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow">
+  <title>PiXiEEDstudio App Shell — SITE-400 Local Qualification</title>
+  <link rel="stylesheet" href="assets/core-shell.css">
+</head>
+<body>
+  <div id="coreShellRoot" data-layout="auto" data-shell-state="isolated-preview" data-site400-local-test="true">
+    <div id="coreShellAnnouncer" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+    <div id="coreShellApp"></div>
+  </div>
+  <!-- Local-only qualification fixture. It is not an authority proof and is never linked from public navigation. -->
+  <script src="../pixiedraw/assets/js/modules/core-feature-flag-rollback-utils.js"></script>
+  <script>window.__PIXIEED_CORE_SHELL_LOCAL_TEST__ = true;</script>
+  <script type="module" src="assets/site400-local-test-entry.js?v=site400-local-20260816-5"></script>
+</body>
+</html>

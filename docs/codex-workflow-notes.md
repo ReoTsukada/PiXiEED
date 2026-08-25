@@ -12,6 +12,7 @@ Codex が PiXiEED の精査・修正・検証を進めるための作業メモ�
 - まず `rg` / `rg --files` で対象を探す。
 - 手編集は `apply_patch` を使う。
 - 既存の未コミット変更はユーザー作業の可能性があるため、勝手に戻さない。
+- エージェントを起用する場合は `.codex/prompts/AGENT_OPERATING_PROTOCOL.md` を共通指示として先に渡し、対象WP/FP Contextを追加する。完了済みエージェントは閉じ、同じファイルへ複数エージェントを並列投入しない。
 
 ## Playwright 検証
 

@@ -1,0 +1,35 @@
+{
+  "id": "WP-090-UI-PERFORMANCE-BASELINE-001",
+  "status": "ISOLATED_PREVIEW",
+  "entry": "/core-shell/",
+  "reference": {
+    "wp080InitialSourceBytes": 62052,
+    "wp090SourceDeltaBytes": 20934
+  },
+  "rawBytes": {
+    "html": 952,
+    "css": 19922,
+    "javascript": 62112,
+    "total": 82986
+  },
+  "compressedBytes": {
+    "gzip": 21244,
+    "brotli": 18150,
+    "method": "concatenated-isolated-entry-sources"
+  },
+  "initialRoute": {
+    "routeChunkRequests": 0,
+    "draw2AudioGameMarketIncluded": false,
+    "unauthorizedRouteAdditionalChunkRequests": 0
+  },
+  "browserMeasurements": {
+    "viewports": ["390x844", "540x900", "900x900", "1440x900"],
+    "textScaling": ["100%", "200%"],
+    "reducedMotion": "pass",
+    "parseMs": null,
+    "executeMs": null,
+    "longTaskLowEndMobile": "NOT_RUN",
+    "note": "Parse/execute and low-end mobile Long Task require a dedicated performance session; null/NOT_RUN is not reported as measured."
+  },
+  "globalStateCanvasBoundary": "route view/store slice contract; Editor Canvas is not a Shell subscriber"
+}

@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "benchmarkId": "WP220_DIRECT_WORK_PAYMENT_SYNTHETIC",
+  "status": "MEASURED_LOCAL_SYNTHETIC",
+  "iterations": 10000,
+  "successful": 10000,
+  "elapsedMs": 8.795,
+  "operationsPerSecond": 1137047.42,
+  "notes": [
+    "Pure Request/Quote/Agreement/Payment state projection; no provider, database, Storage, Notification, Market, or production data was accessed.",
+    "This is not a real checkout, webhook, device, memory, or production performance PASS."
+  ]
+}

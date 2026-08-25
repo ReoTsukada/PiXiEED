@@ -1,0 +1,46 @@
+{
+  "evidenceVersion": "QUALIFICATION_COMMAND_MANIFEST_V1",
+  "packageId": "FP-006",
+  "commands": [
+    {
+      "id": "FP006-FORMAT",
+      "acceptanceIds": ["FP006-HOTPATH-001", "FP006-RECOVERY-001", "FP006-DEVICE-001", "FP006-UX-001", "FP006-OVERCLAIM-001"],
+      "argv": ["deno", "fmt", "--check", "pixiedraw2/src/fp-006", "pixiedraw2/tests/fp-006", "pixiedraw2/benchmarks/fp-006"]
+    },
+    {
+      "id": "FP006-TYPECHECK",
+      "acceptanceIds": ["FP006-HOTPATH-001", "FP006-RECOVERY-001", "FP006-DEVICE-001", "FP006-UX-001"],
+      "argv": ["deno", "check", "pixiedraw2/src/fp-006/contracts.ts", "pixiedraw2/src/fp-006/input-state.ts", "pixiedraw2/src/fp-006/device-profile.ts", "pixiedraw2/src/fp-006/hot-path.ts", "pixiedraw2/src/fp-006/ux-contract.ts", "pixiedraw2/tests/fp-006/input-state.test.ts", "pixiedraw2/tests/fp-006/device-profile.test.ts", "pixiedraw2/tests/fp-006/hot-path.test.ts", "pixiedraw2/tests/fp-006/ux-contract.test.ts", "pixiedraw2/benchmarks/fp-006/generate-evidence.ts"]
+    },
+    {
+      "id": "FP006-TEST",
+      "acceptanceIds": ["FP006-HOTPATH-001", "FP006-RECOVERY-001", "FP006-DEVICE-001", "FP006-UX-001", "FP006-OVERCLAIM-001"],
+      "argv": ["deno", "test", "--no-remote", "--allow-read", "--allow-write", "--check", "pixiedraw2/tests/fp-006"]
+    },
+    {
+      "id": "FP006-CONTEXT",
+      "acceptanceIds": ["FP006-HOTPATH-001", "FP006-DEVICE-001", "FP006-OVERCLAIM-001"],
+      "argv": ["python3", "scripts/verify_work_package_context.py", "--context", ".codex/context/FP-006.md", "--root", "."]
+    },
+    {
+      "id": "BASELINE-IDENTITY",
+      "acceptanceIds": ["FP006-OVERCLAIM-001"],
+      "argv": ["node", "scripts/test-baseline-failure-identity-wp080.mjs"]
+    },
+    {
+      "id": "BASELINE-SUITE",
+      "acceptanceIds": ["FP006-OVERCLAIM-001"],
+      "argv": ["node", "scripts/test-baseline-suite-wp000.mjs"]
+    },
+    {
+      "id": "FP006-BENCHMARK-EVIDENCE",
+      "acceptanceIds": ["FP006-HOTPATH-001", "FP006-DEVICE-001", "FP006-OVERCLAIM-001"],
+      "argv": ["deno", "run", "--no-remote", "--allow-read", "--allow-write", "pixiedraw2/benchmarks/fp-006/generate-evidence.ts"]
+    },
+    {
+      "id": "FP006-DIFF-CHECK",
+      "acceptanceIds": ["FP006-HOTPATH-001", "FP006-RECOVERY-001", "FP006-DEVICE-001", "FP006-UX-001", "FP006-OVERCLAIM-001"],
+      "argv": ["git", "diff", "--check"]
+    }
+  ]
+}

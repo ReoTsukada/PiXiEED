@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <title>マーケットとは | PiXiEED</title>
+  <title data-i18n-title="marketAboutPageTitle">マーケットとは | PiXiEED</title>
   <meta name="description" content="PiXiEEDマーケットの素材利用と派生制作の仕組みについて説明します。">
   <meta name="robots" content="index,follow">
   <link rel="canonical" href="https://pixieed.jp/market/about.html">
@@ -30,77 +30,77 @@
     <main class="market-info-main">
       <header class="market-info-head">
         <img src="../assets/icons/Market.png" alt="">
-        <h1>マーケットとは</h1>
-        <p>PiXiEEDで制作に使える素材を探し、購入した素材から新しい作品を作れる場所です。</p>
+        <h1 data-i18n-key="marketAboutTitle">マーケットとは</h1>
+        <p data-i18n-key="marketAboutIntro">PiXiEEDで制作に使える素材を探し、購入した素材から新しい作品を作れる場所です。</p>
       </header>
       <section class="market-info-section">
-        <h2>現在の公開範囲</h2>
-        <p>メール確認済みのアカウントは、作品を出品して審査へ送れます。売上受取のStripe設定は、出金前に段階的に完了できます。</p>
+        <h2 data-i18n-key="marketAboutPublic">現在の公開範囲</h2>
+        <p data-i18n-key="marketAboutPublicCopy">メール確認済みのアカウントは、作品を出品して審査へ送れます。売上受取のStripe設定は、出金前に段階的に完了できます。</p>
       </section>
       <section class="market-info-section">
-        <h2>素材の利用</h2>
-        <p>購入した素材は、商品ごとに表示される利用条件の範囲で制作に利用できます。利用可能な媒体、禁止事項、改変の可否は商品詳細で確認します。</p>
+        <h2 data-i18n-key="marketAboutUsage">素材の利用</h2>
+        <p data-i18n-key="marketAboutUsageCopy">購入した素材は、商品ごとに表示される利用条件の範囲で制作に利用できます。利用可能な媒体、禁止事項、改変の可否は商品詳細で確認します。</p>
       </section>
       <section class="market-info-section">
-        <h2>派生素材</h2>
-        <p>派生販売が許可された素材は、必要なライセンスを取得することで改変作品として出品できます。元素材との関係と引き継ぐ条件は記録されます。</p>
+        <h2 data-i18n-key="marketAboutDerivative">派生素材</h2>
+        <p data-i18n-key="marketAboutDerivativeCopy">派生販売が許可された素材は、必要なライセンスを取得することで改変作品として出品できます。元素材との関係と引き継ぐ条件は記録されます。</p>
       </section>
       <section class="market-info-section" id="fees" aria-labelledby="fees-title">
         <div class="market-section-heading">
-          <span>料金</span>
-          <div><h2 id="fees-title">販売手数料とお金の流れ</h2><p>購入者が支払うのは商品ページに表示された価格だけです。PiXiEEDの手数料は、販売額が高くなるほど段階的に下がります。</p></div>
+          <span data-i18n-key="marketAboutFeeEyebrow">料金</span>
+          <div><h2 id="fees-title" data-i18n-key="marketAboutFees">販売手数料とお金の流れ</h2><p data-i18n-key="marketAboutFeesIntro">購入者が支払うのは商品ページに表示された価格だけです。PiXiEEDの手数料は、販売額が高くなるほど段階的に下がります。</p></div>
         </div>
 
-        <div class="market-fee-flow" aria-label="販売額からStripe決済実費とPiXiEED手数料を控除し、残額を作者とロイヤリティへ分配する流れ">
-          <div class="market-fee-flow__source"><span>購入者</span><strong>表示価格を支払う</strong><small>追加の購入者手数料なし</small></div>
+        <div class="market-fee-flow" aria-label="販売額からStripe決済実費とPiXiEED手数料を控除し、残額を作者とロイヤリティへ分配する流れ" data-i18n-aria-label="marketAboutFeeFlowAria">
+          <div class="market-fee-flow__source"><span data-i18n-key="marketAboutFeeBuyer">購入者</span><strong data-i18n-key="marketAboutFeeBuyerStrong">表示価格を支払う</strong><small data-i18n-key="marketAboutFeeBuyerSmall">追加の購入者手数料なし</small></div>
           <span class="market-fee-flow__arrow" aria-hidden="true">↓</span>
           <div class="market-fee-flow__split">
-            <div><span>決済実費</span><strong>Stripe</strong><small>決済手段ごとの実費</small></div>
-            <div class="market-fee-flow__platform"><span>PiXiEED手数料</span><strong>累進 10% → 1%</strong><small>価格帯の超過分だけに適用</small></div>
-            <div><span>作者分配原資</span><strong>作者・ロイヤリティ</strong><small>残額を系譜に沿って配分</small></div>
+            <div><span data-i18n-key="marketAboutFeeCost">決済実費</span><strong data-i18n-key="marketAboutFeeCostStrong">Stripe</strong><small data-i18n-key="marketAboutFeeCostSmall">決済手段ごとの実費</small></div>
+            <div class="market-fee-flow__platform"><span data-i18n-key="marketAboutFeePlatform">PiXiEED手数料</span><strong data-i18n-key="marketAboutFeePlatformStrong">累進 10% → 1%</strong><small data-i18n-key="marketAboutFeePlatformSmall">価格帯の超過分だけに適用</small></div>
+            <div><span data-i18n-key="marketAboutFeeAuthor">作者分配原資</span><strong data-i18n-key="marketAboutFeeAuthorStrong">作者・ロイヤリティ</strong><small data-i18n-key="marketAboutFeeAuthorSmall">残額を系譜に沿って配分</small></div>
           </div>
         </div>
 
         <div class="market-fee-use">
           <div class="market-fee-use__donation">
-            <span>販売額の 0.5%</span>
-            <strong>環境・資源保全へ</strong>
-            <p>PiXiEED手数料の中から拠出します。作者・ロイヤリティの取り分を追加で減らしません。</p>
+            <span data-i18n-key="marketAboutDonationLabel">販売額の 0.5%</span>
+            <strong data-i18n-key="marketAboutDonationTitle">環境・資源保全へ</strong>
+            <p data-i18n-key="marketAboutDonationCopy">PiXiEED手数料の中から拠出します。作者・ロイヤリティの取り分を追加で減らしません。</p>
           </div>
           <div class="market-fee-use__operations">
-            <strong>残りのPiXiEED手数料の使い道</strong>
+            <strong data-i18n-key="marketAboutOperationsTitle">残りのPiXiEED手数料の使い道</strong>
             <ul>
-              <li>出品審査・不正利用対策・返金や問題発生時の対応</li>
-              <li>素材の安全な配信・保管、マーケットとPiXiEEDrawの開発</li>
-              <li>販売者サポート、Stripe Connectによる売上受取と運営コスト</li>
-              <li>月次の表示報酬予算（有効表示に応じた作者への還元）</li>
+              <li data-i18n-key="marketAboutOperations1">出品審査・不正利用対策・返金や問題発生時の対応</li>
+              <li data-i18n-key="marketAboutOperations2">素材の安全な配信・保管、マーケットとiDRAWの開発</li>
+              <li data-i18n-key="marketAboutOperations3">販売者サポート、Stripe Connectによる売上受取と運営コスト</li>
+              <li data-i18n-key="marketAboutOperations4">月次の表示報酬予算（有効表示に応じた作者への還元）</li>
             </ul>
           </div>
         </div>
 
         <div class="market-fee-formula">
-          <strong>作者・ロイヤリティ原資 ＝ 販売額 − Stripe決済実費 − PiXiEED手数料</strong>
-          <span>派生作品では、この原資を派生作者と親作品の作者へ配分します。ロイヤリティを別の手数料として上乗せしません。</span>
+          <strong data-i18n-key="marketAboutFormula">作者・ロイヤリティ原資 ＝ 販売額 − Stripe決済実費 − PiXiEED手数料</strong>
+          <span data-i18n-key="marketAboutFormulaCopy">派生作品では、この原資を派生作者と親作品の作者へ配分します。ロイヤリティを別の手数料として上乗せしません。</span>
         </div>
 
         <div class="market-reward-compare" aria-label="継承ロイヤリティと表示報酬の違い">
           <article>
-            <span>売れたとき</span>
-            <h3>継承ロイヤリティ</h3>
-            <p>派生商品が購入されたとき、作者・ロイヤリティ原資の中から、派生作者と親作品の作者へ系譜に沿って配分します。</p>
-            <small>購入のたびに発生。商品価格へ追加請求せず、表示報酬とも別です。</small>
+            <span data-i18n-key="marketAboutRewardSold">売れたとき</span>
+            <h3 data-i18n-key="marketAboutRewardSoldTitle">継承ロイヤリティ</h3>
+            <p data-i18n-key="marketAboutRewardSoldCopy">派生商品が購入されたとき、作者・ロイヤリティ原資の中から、派生作者と親作品の作者へ系譜に沿って配分します。</p>
+            <small data-i18n-key="marketAboutRewardSoldSmall">購入のたびに発生。商品価格へ追加請求せず、表示報酬とも別です。</small>
           </article>
           <article>
-            <span>見られたとき</span>
-            <h3>表示報酬<br><em>（表示ロイヤリティ）</em></h3>
-            <p>商品詳細が前面で5秒以上表示された有効表示を、月ごとの表示報酬予算の中で、表示作品と直系系列へ配分します。</p>
-            <small>予算が未設定・0円の月は発生しません。月次確定後、販売収益・継承ロイヤリティと合算して同じStripe出金残高へ加わります。</small>
+            <span data-i18n-key="marketAboutRewardViewed">見られたとき</span>
+            <h3 data-i18n-key="marketAboutRewardViewedTitle">表示報酬（表示ロイヤリティ）</h3>
+            <p data-i18n-key="marketAboutRewardViewedCopy">商品詳細が前面で5秒以上表示された有効表示を、月ごとの表示報酬予算の中で、表示作品と直系系列へ配分します。</p>
+            <small data-i18n-key="marketAboutRewardViewedSmall">予算が未設定・0円の月は発生しません。月次確定後、販売収益・継承ロイヤリティと合算して同じStripe出金残高へ加わります。</small>
           </article>
         </div>
 
-        <div class="market-fee-table-wrap" role="region" aria-label="PiXiEEDの累進販売手数料表" tabindex="0">
+        <div class="market-fee-table-wrap" role="region" aria-label="PiXiEEDの累進販売手数料表" data-i18n-aria-label="marketAboutFeeTableAria" tabindex="0">
           <table class="market-fee-table">
-            <thead><tr><th scope="col">販売額の範囲</th><th scope="col">その範囲のPiXiEED手数料</th></tr></thead>
+            <thead><tr><th scope="col" data-i18n-key="marketAboutFeeTableRange">販売額の範囲</th><th scope="col" data-i18n-key="marketAboutFeeTableFee">その範囲のPiXiEED手数料</th></tr></thead>
             <tbody>
               <tr><td>500〜1,000円</td><td>10%</td></tr>
               <tr><td>1,001〜2,000円</td><td>9%</td></tr>
@@ -116,32 +116,32 @@
           </table>
         </div>
         <div class="market-fee-example">
-          <strong>例：8,000円の商品</strong>
-          <p>最初の1,000円の10%、次の1,000円の9%…と各段階を合計します。PiXiEED手数料は590円（実効約7.38%）です。価格が境界を1円超えても、手数料総額が下がることはありません。</p>
+          <strong data-i18n-key="marketAboutFeeExampleTitle">例：8,000円の商品</strong>
+          <p data-i18n-key="marketAboutFeeExampleCopy">最初の1,000円の10%、次の1,000円の9%…と各段階を合計します。PiXiEED手数料は590円（実効約7.38%）です。価格が境界を1円超えても、手数料総額が下がることはありません。</p>
         </div>
       </section>
       <section class="market-info-section">
-        <h2>購入済み商品</h2>
-        <p>購入した素材とライセンスはマイページにまとめて表示されます。端末内のPiXiEEDrawプロジェクトとは別に管理されます。</p>
+        <h2 data-i18n-key="marketAboutPurchased">購入済み商品</h2>
+        <p data-i18n-key="marketAboutPurchasedCopy">購入した素材とライセンスはマイページにまとめて表示されます。端末内のiDRAWプロジェクトとは別に管理されます。</p>
       </section>
       <section class="market-info-section">
-        <h2>認証表示</h2>
+        <h2 data-i18n-key="marketAboutBadges">認証表示</h2>
         <ul>
-          <li>PiXiEED形式・外部形式：ファイルの作成・登録経路</li>
-          <li>出品審査済み：商品と派生内容の審査状態</li>
-          <li>販売者確認済み：二段階認証、販売者情報、Stripeの売上受取設定が完了した状態</li>
+          <li data-i18n-key="marketAboutBadge1">PiXiEED形式・外部形式：ファイルの作成・登録経路</li>
+          <li data-i18n-key="marketAboutBadge2">出品審査済み：商品と派生内容の審査状態</li>
+          <li data-i18n-key="marketAboutBadge3">販売者確認済み：二段階認証、販売者情報、Stripeの売上受取設定が完了した状態</li>
         </ul>
-        <p>それぞれ確認する対象が異なり、単独で著作権を保証する表示ではありません。</p>
+        <p data-i18n-key="marketAboutBadgesCopy">それぞれ確認する対象が異なり、単独で著作権を保証する表示ではありません。</p>
       </section>
-      <nav class="market-info-nav" aria-label="関連ページ">
-        <a href="./">マーケットへ戻る</a>
-        <a href="help.html">ヘルプ</a>
-        <a href="../terms/index.html">利用規約</a>
-        <a href="../privacy/index.html">プライバシーポリシー</a>
+      <nav class="market-info-nav" aria-label="関連ページ" data-i18n-aria-label="marketRelatedNav">
+        <a href="./" data-i18n-key="marketBack">マーケットへ戻る</a>
+        <a href="help.html" data-i18n-key="marketHelpRelated">ヘルプ</a>
+        <a href="../terms/index.html" data-i18n-key="marketTermsRelated">利用規約</a>
+        <a href="../privacy/index.html" data-i18n-key="marketPrivacyRelated">プライバシーポリシー</a>
       </nav>
     </main>
   </div>
-  <script src="../scripts/shared-profile-header.js?v=20260824-common-shell2"></script>
-  <script src="../scripts/shared-bottom-nav.js?v=20260803-tools-panel1"></script>
+  <script src="../scripts/shared-profile-header.js?v=20260825-common-shell15"></script>
+  <script src="../scripts/shared-bottom-nav.js?v=20260825-studio-brand1"></script>
 </body>
 </html>

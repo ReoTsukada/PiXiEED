@@ -1,0 +1,29 @@
+{
+  "fixture_id": "wp000-legacy-pixiedraw-v1",
+  "synthetic": true,
+  "private_data": false,
+  "purpose": "Minimal legacy-shaped document for adapter and preservation tests",
+  "project": {
+    "id": "fixture-project-0001",
+    "name": "WP-000 synthetic project",
+    "version": 1,
+    "width": 2,
+    "height": 2,
+    "palette": ["#000000", "#ffffff"],
+    "layers": [
+      {
+        "id": "fixture-layer-0001",
+        "name": "Synthetic layer",
+        "visible": true,
+        "opacity": 1,
+        "pixels": [0, 1, 1, 0]
+      }
+    ],
+    "frames": [{"id": "fixture-frame-0001", "durationMs": 100, "layerIds": ["fixture-layer-0001"]}]
+  },
+  "expected": {
+    "dimensions": [2, 2],
+    "pixel_count": 4,
+    "round_trip_must_preserve": ["project.id", "project.palette", "project.layers[0].pixels", "project.frames[0].durationMs"]
+  }
+}

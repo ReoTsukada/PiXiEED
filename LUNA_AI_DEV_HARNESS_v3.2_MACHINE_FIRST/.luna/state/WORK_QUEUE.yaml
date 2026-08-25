@@ -1,0 +1,40 @@
+schema_version: 3.1
+queue_policy: highest_expected_user_value_per_total_cost_subject_to_dependencies_and_risk
+items:
+  - id: WP-080-APP-SHELL-DESIGN-SYSTEM
+    goal: "PiXiEED.jpと共通App ShellをDraw2中心の高性能なWeb/アプリ入口へ更新する"
+    user_visible_result: "PiXiEED.jpでPiXiEEDraw2の用途・主要機能・開始方法・マーケット/ライブラリへの導線が一目で分かり、既存ページへ安全に遷移できる"
+    blueprint_links:
+      - "PRODUCT-BLUEPRINT-001"
+      - "DEC-003"
+    dependencies:
+      - "既存トップページ構造の監査"
+      - "SEO/AIEOの技術要件調査"
+      - "共通App Shellの現行資産確認"
+    completion_criteria:
+      - "既存トップページの主要導線とメタ情報を棚卸しできている"
+      - "PiXiEEDraw2中心の見出し、説明、機能、開始CTA、既存サービス導線が実装されている"
+      - "canonical、OG、JSON-LD、見出し階層、内部リンクが検証できる"
+      - "主要デスクトップ幅と狭いWeb幅でレイアウト崩れがない"
+      - "既存マーケット、アカウント、Draw2への導線が404にならない"
+      - "ホームとアカウント入口にPiXiEEDraw2の実画面を使った視覚的な価値説明がある"
+      - "アカウント入口のログイン画面が既存のGoogle OAuth、メール/パスワード、ログインリンク、再設定導線を壊さず、未対応方式を表示しない"
+      - "ログイン画面がデスクトップと狭いWeb幅でフォーム、状態表示、画像の順序を保つ"
+    risk: "既存の未コミット変更と既存SEO導線を上書きする危険"
+    evidence_gate: "read-only inventory → authoritative SEO research → browser layout/link validation"
+    test_plan:
+      - "静的HTML・JSON-LD・リンク監査"
+      - "Playwrightまたはブラウザで主要幅を確認"
+      - "git diff --check"
+    rollback: "トップページ対象ファイルだけを変更し、旧HTMLのコピーまたは差分で復元可能にする"
+work_package_required_fields:
+  - id
+  - goal
+  - user_visible_result
+  - blueprint_links
+  - dependencies
+  - completion_criteria
+  - risk
+  - evidence_gate
+  - test_plan
+  - rollback

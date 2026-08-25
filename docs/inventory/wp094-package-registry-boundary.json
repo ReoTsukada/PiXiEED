@@ -1,0 +1,61 @@
+{
+  "workPackage": "WP-094",
+  "status": "complete",
+  "implementation": {
+    "contract": "core-shell/assets/core-package-registry-contracts.js",
+    "schema": "core-shell/schemas/package-registry-v1.schema.json",
+    "fixture": "core-shell/fixtures/package-registry-v1.valid.json",
+    "test": "scripts/test-core-package-registry-wp094.mjs",
+    "loadedBy": [],
+    "domCanvasStorageNetworkCoupling": false,
+    "currentRoutesChanged": false
+  },
+  "productStrategy": {
+    "canonicalDocument": "02_ARCHITECTURE/PIXIEED_PRODUCT_STRATEGY.md",
+    "globalCreatorPlatformRebuild": true,
+    "mainSurfaces": ["core", "draw2", "audio", "game", "runtime", "market", "community", "commission", "subscription", "creator-economy"],
+    "currentDrawAndMarketRemainUntilReplacementGates": true,
+    "wp080ShellIsolatedFoundationNotFinalUi": true
+  },
+  "included": [
+    "typed Package identity and Package Kind validation",
+    "THIN and PORTABLE materialization",
+    "Manifest and exact Revision/Hash/Size Dependency Lock",
+    "Project/Asset dependency graph and package dependency recursion guards",
+    "Permission, license, provenance, compatibility, lifecycle, idempotency",
+    "streaming/worker and injected Blob verification/assembly boundary",
+    "content-hash dedup metadata without permission leakage",
+    "legacy PXD and Market projection boundaries",
+    "default-off Package flags and metadata-only events"
+  ],
+  "excluded": [
+    "raw Pixel/Audio/Game/PXD/PiXiPackage bytes",
+    "Base64/Data URL/JWT/Secret/Payment/Royalty/Commission body",
+    "current route or PiXiEEDraw/PXD/PiXiSYNC/Market wiring",
+    "Supabase migration, Storage upload, deployment, publish, commit, push"
+  ],
+  "verification": {
+    "packageKinds": 9,
+    "materializationModes": ["THIN", "PORTABLE"],
+    "lifecycleStates": ["BUILDING", "VERIFYING", "READY", "FAILED", "QUARANTINED", "ARCHIVED"],
+    "referencePolicies": ["LIVE", "PINNED", "REVIEW", "FORKED"],
+    "eventTypes": ["PACKAGE_BUILD_STARTED", "PACKAGE_MATERIALIZED", "PACKAGE_VERIFIED", "PACKAGE_FAILED", "PACKAGE_QUARANTINED", "PACKAGE_ARCHIVED"],
+    "syntheticGameIncludes": ["Draw raster", "Animation", "BGM", "SFX", "Game Scene", "Game UI", "Sandboxed Script", "Dependency Snapshot"],
+    "failureFixtures": 29,
+    "rawBlobPayloadsTransferred": 0,
+    "baselineFailureIdentity": "14/14 inherited match; new 0",
+    "diffCheck": "pass"
+  },
+  "preservation": {
+    "productionRoutesChanged": false,
+    "currentPiXiEEDrawChanged": false,
+    "currentPxdChanged": false,
+    "currentPiXiSYNCChanged": false,
+    "marketChanged": false,
+    "projectAssetDataChanged": false,
+    "databaseMigrationApplied": false,
+    "storageUploadApplied": false,
+    "deployPublishCommitPush": false
+  },
+  "nextBoundary": "WP-095 Event and Activity Core consumes Package/Project/Asset references without moving Package body or financial/rights data into events."
+}

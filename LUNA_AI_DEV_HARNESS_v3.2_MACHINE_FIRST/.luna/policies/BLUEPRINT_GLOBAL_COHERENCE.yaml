@@ -1,0 +1,23 @@
+policy_id: BLUEPRINT-GLOBAL-COHERENCE-001
+objective: prevent_local_optimum_and_goal_drift
+rules:
+  - before_first_work_package: build_product_blueprint
+  - before_each_work_package: verify_blueprint_links
+  - after_material_design_change: run_global_coherence_gate
+  - before_completion: verify_all_acceptance_outcomes
+north_star_vs_solution:
+  north_star: stable
+  solution: adaptive
+  rule: prefer_evidence_based_solution_revision_over_preserving_early_detail
+coherence_gate:
+  checks:
+    - goal_alignment
+    - cross_feature_consistency
+    - architecture_consistency
+    - data_contract_consistency
+    - visual_interaction_consistency
+    - duplication_or_fragmentation
+    - future_work_invalidation
+  on_conflict:
+    reversible_low_impact: revise_solution_and_record
+    high_impact_or_product_identity_change: human_approval

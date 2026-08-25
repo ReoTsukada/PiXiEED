@@ -1,0 +1,51 @@
+{
+  "workPackage": "WP-190",
+  "status": "REFERENCE_AND_POPULATED_FIXTURES_CAPTURED",
+  "fixture": "wp190-populated-workspace-v1",
+  "deterministicRules": {
+    "seed": 190,
+    "timestamps": "FIXED",
+    "random": "DISABLED",
+    "canonicalPixelColor": "fixed palette; theme must not alter artwork/preview/thumbnail colors",
+    "sourceMaps": "excluded"
+  },
+  "viewports": [
+    {"name":"mobile-portrait","width":390,"height":844},
+    {"name":"tablet","width":834,"height":1112},
+    {"name":"desktop","width":1280,"height":900}
+  ],
+  "states": [
+    "blank",
+    "populated-artwork",
+    "populated-layers",
+    "populated-palette",
+    "populated-selection-transform",
+    "populated-timeline-onion",
+    "mobile-layers-sheet",
+    "mobile-palette-sheet",
+    "loading",
+    "error"
+  ],
+  "files": [
+    "docs/visual-regression/wp180/desktop-blank.png",
+    "docs/visual-regression/wp180/tablet-blank.png",
+    "docs/visual-regression/wp180/mobile-blank.png",
+    "docs/visual-regression/wp190/desktop-populated.png",
+    "docs/visual-regression/wp190/tablet-populated.png",
+    "docs/visual-regression/wp190/mobile-populated.png",
+    "docs/visual-regression/wp190/mobile-layers-sheet.png",
+    "docs/visual-regression/wp190/mobile-palette-sheet.png"
+  ],
+  "coverage": {
+    "blank": "WP180_REFERENCE_PRESERVED",
+    "populatedDesktop": "REFERENCE_CAPTURED",
+    "populatedTablet": "REFERENCE_CAPTURED",
+    "populatedMobile": "REFERENCE_CAPTURED",
+    "mobileLayersSheet": "REFERENCE_CAPTURED",
+    "mobilePaletteSheet": "REFERENCE_CAPTURED",
+    "loading": "UNTESTED",
+    "error": "UNTESTED",
+    "drawingPointerE2E": "UNTESTED"
+  },
+  "evidence": "Isolated Chromium local Entry only; current production route and data are untouched."
+}

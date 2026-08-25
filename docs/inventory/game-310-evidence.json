@@ -1,0 +1,18 @@
+{
+  "workPackage": "GAME-310",
+  "status": "ISOLATED_REFERENCE_PASS",
+  "acceptanceIds": ["GAME310-SCOPE-001", "GAME310-EVIDENCE-001", "GAME310-STOP-001"],
+  "implementation": ["pixiedraw2/src/game/game-310/core.ts", "pixiedraw2/tests/game-310/core.test.ts", "pixiedraw2/benchmarks/game-310/core.bench.ts"],
+  "contract": "docs/contracts/GAME-310-input-actions.md",
+  "adr": "docs/decisions/ADR-002-GAME-310-semantic-input-actions.md",
+  "fixtures": ["keyboard", "touch", "gamepad", "custom", "context-priority-consume", "duplicate-binding", "ambiguous-priority", "unsafe-bounds", "caller-mismatch"],
+  "checks": {
+    "typecheck": {"command": "deno check --no-remote pixiedraw2/src/game/game-310/core.ts pixiedraw2/tests/game-310/core.test.ts pixiedraw2/benchmarks/game-310/core.bench.ts", "exitCode": 0},
+    "tests": {"command": "deno test --no-remote --check pixiedraw2/tests/game-310/core.test.ts", "exitCode": 0, "passed": 4, "failed": 0, "coverage": ["semantic keyboard/touch/gamepad/custom mapping", "context priority and consume", "duplicate binding", "ambiguous priority", "unsafe bounds", "caller mismatch", "safe-area accessibility metadata"]},
+    "benchmark": {"command": "deno run --no-remote --check pixiedraw2/benchmarks/game-310/core.bench.ts", "exitCode": 0, "status": "MEASURED_LOCAL_SYNTHETIC", "iterations": 1000, "resolved": 1000, "totalMs": 1.911, "averageMs": 0.0019},
+    "jsonParse": {"command": "deno eval 'JSON.parse(await Deno.readTextFile(\"docs/inventory/game-310-evidence.json\"))'", "exitCode": 0},
+    "diffCheck": {"command": "git diff --check -- pixiedraw2/src/game/game-310 pixiedraw2/tests/game-310 pixiedraw2/benchmarks/game-310 docs/contracts/GAME-310-input-actions.md docs/inventory/game-310-evidence.json docs/decisions/ADR-002-GAME-310-semantic-input-actions.md", "exitCode": 0}
+  },
+  "boundaries": {"registryQueueStateContext": "UNTOUCHED", "game300": "READ_ONLY", "production": "UNTESTED", "browser": "UNTESTED", "physicalDevice": "UNTESTED", "deploymentMigrationCommitPush": "NOT_PERFORMED"},
+  "independentReview": "COORDINATOR_SOURCE_AND_REEXECUTION_REVIEW_PASS"
+}

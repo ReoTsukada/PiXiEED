@@ -266,7 +266,7 @@
     countLabel.textContent = `${Math.max(0, count)}件`;
   }
 
-  function createEmptyItem(message, detail, actionLabel = 'PiXiEEDrawを開く') {
+  function createEmptyItem(message, detail, actionLabel = 'iDRAWを開く') {
     const item = document.createElement('article');
     item.className = 'account-item';
     item.setAttribute('role', 'listitem');
@@ -290,7 +290,7 @@
     if (actionLabel) {
       const action = document.createElement('a');
       action.className = 'account-action';
-      action.href = asset('../pixiedraw/index.html');
+      action.href = asset('../pixiedraw2/index.html?new_project=1&mode=DRAW');
       action.textContent = actionLabel;
       item.appendChild(action);
     }
@@ -330,7 +330,7 @@
     action.type = 'button';
     action.textContent = '開く';
     action.dataset.localProjectOpenId = projectId;
-    action.setAttribute('aria-label', `${displayName} をPiXiEEDrawで開く`);
+    action.setAttribute('aria-label', `${displayName} をiDRAWで開く`);
     actions.appendChild(action);
     body.append(title, meta, actions);
 
@@ -361,7 +361,7 @@
     // Keep the storage keys as a fallback for older PiXiEEDraw builds, but
     // use an explicit URL request so a normal navigation opens this exact
     // project instead of showing the default project chooser.
-    window.location.href = asset(`../pixiedraw/?project=${encodeURIComponent(normalizedId)}`);
+    window.location.href = asset(`../pixiedraw2/index.html?project=${encodeURIComponent(normalizedId)}&mode=DRAW`);
   }
 
   async function renderLocalProjects() {
@@ -375,7 +375,7 @@
     setProjectCount(countLabel, 0, '確認中');
     list.replaceChildren(createEmptyItem(
       '読み込み中',
-      'PiXiEEDrawの端末内プロジェクトを確認しています。',
+      'iDRAWの端末内プロジェクトを確認しています。',
       ''
     ));
     try {
@@ -388,7 +388,7 @@
       if (!entries.length) {
         list.appendChild(createEmptyItem(
           '作品がありません',
-          'PiXiEEDrawで新規作成すると、端末内保存がここに出ます。'
+          'iDRAWで新規作成すると、端末内保存がここに出ます。'
         ));
         return;
       }
@@ -403,7 +403,7 @@
       setProjectCount(countLabel, 0, '未取得');
       list.replaceChildren(createEmptyItem(
         '読み取れませんでした',
-        'ブラウザの端末内保存を確認できませんでした。PiXiEEDraw側の一覧はそのまま使えます。'
+        'ブラウザの端末内保存を確認できませんでした。iDRAW側の一覧はそのまま使えます。'
       ));
     }
   }

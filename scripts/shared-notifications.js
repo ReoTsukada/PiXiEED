@@ -157,7 +157,7 @@
         close();
         return;
       }
-      window.location.href = href('pixiedraw/');
+      window.location.href = href('studio/');
     });
     return button;
   }

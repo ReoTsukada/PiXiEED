@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pixieed.jp/schemas/canonical-operation-v1.json",
+  "title": "PiXiEED Canonical Operation v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "operationId",
+    "operationType",
+    "schemaVersion",
+    "commandId",
+    "projectId",
+    "assetId",
+    "actorId",
+    "clientId",
+    "clientSequence",
+    "structureEpoch",
+    "payload"
+  ],
+  "properties": {
+    "operationId": {
+      "type": "string",
+      "pattern": "^op_[0-9a-f]{64}$"
+    },
+    "operationType": {
+      "type": "string",
+      "minLength": 1
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "commandId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "projectId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "assetId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "actorId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "clientId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "clientSequence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "structureEpoch": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "payload": {},
+    "inverseOf": {
+      "type": "string",
+      "pattern": "^op_[0-9a-f]{64}$"
+    }
+  }
+}

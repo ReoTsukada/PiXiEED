@@ -50,3 +50,14 @@
 
 - The repo uses `.githooks/pre-commit` to regenerate `data/project-updates.json`.
 - If hook setup is needed, use `git config core.hooksPath .githooks`.
+
+## Repository cleanup
+
+- Repository cleanup applies only to files in the PiXiEED Git repository.
+- Read `11_CLEANUP/REPOSITORY_CLEANUP_POLICY.md`.
+- Audit and classify before deletion.
+- Never infer safe deletion from a single text search.
+- Do not delete `UNKNOWN` candidates.
+- Use a dedicated branch/worktree and small deletion batches.
+- Run build, tests, route smoke checks, Market baseline checks, and PiXiSYNC baseline checks.
+- Production Storage, database rows, purchased files, and PiXiSYNC data are outside this cleanup scope.

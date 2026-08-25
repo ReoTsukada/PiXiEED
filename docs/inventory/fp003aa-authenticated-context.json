@@ -1,0 +1,42 @@
+{
+  "inventoryId": "FP-003AA-AUTHENTICATED-CONTEXT-V1",
+  "status": "APPROVED_ISOLATED_FP004_GO_NOT_STARTED",
+  "scope": "server-only authenticated principal to tenant-bound authority context",
+  "authorityBoundary": {
+    "principalProvider": "pixiedraw2/src/server/internal/authenticated-context.ts",
+    "handler": "pixiedraw2/src/server/server-authority-handler.ts",
+    "compositionRoot": "pixiedraw2/src/server/authority-composition-internal.ts",
+    "browserEntries": "must not import authenticated context or server handler"
+  },
+  "runtimeControls": [
+    "private runtime brand",
+    "canonical current membership registry re-read",
+    "SERVER_AUTH_ADAPTER source required at handler boundary",
+    "AuthorizationProofV1 validation",
+    "canonical active tenant membership",
+    "principal and context lifetime",
+    "request/resource binding",
+    "one-time context consumption",
+    "in-flight reservation rejects concurrent double-consume",
+    "membershipId and membershipRevision conditional checks at Chain and Ledger",
+    "Ledger success response validation and fail-closed malformed response handling",
+    "clone/spread rejection"
+  ],
+  "testFile": "pixiedraw2/tests/fp003aa-authenticated-context.test.ts",
+  "independentAttackScript": "scripts/audit-fp003aa-three-blockers.ts",
+  "testCases": 17,
+  "independentAttackCases": 3,
+  "outOfScope": [
+    "FP-004 Durable Event/Inbox/Outbox",
+    "FP-005+",
+    "WP-900",
+    "Production Auth",
+    "Production DB/RLS",
+    "migration",
+    "deploy",
+    "publish",
+    "commit",
+    "push",
+    "FP-004 implementation"
+  ]
+}

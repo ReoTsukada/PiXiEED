@@ -1,0 +1,18 @@
+policy_id: SECURITY-LICENSE-001
+security_escalate_any:
+  - auth
+  - authorization
+  - secrets
+  - personal_or_sensitive_data
+  - payment_or_financial_state
+  - destructive_migration
+  - untrusted_code_execution
+license_rules:
+  competitor_nonpublic_code: forbidden
+  unknown_license_copy: forbidden
+  official_sample: allowed_subject_to_terms
+  oss: require_compatible_license_and_attribution_when_needed
+  ui_reference: extract_pattern_not_protected_expression
+privacy_rules:
+  minimize_data_collection: true
+  do_not_send_secrets_to_external_research: true

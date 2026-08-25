@@ -1,0 +1,100 @@
+{
+  "schemaVersion": 1,
+  "workPackage": "WP-220",
+  "status": "MEASURED_LOCAL_ISOLATED_BUNDLE",
+  "measurementDefinition": {
+    "baseline": "WP-210 same raw/minified/gzip/Brotli definition",
+    "sourceMaps": "excluded",
+    "initialRequests": [
+      "pixiedraw2/assets/draw2-shell.css",
+      "pixiedraw2/dist/draw2-entry.js"
+    ],
+    "directWorkOnDemandLazyRequests": [
+      "pixiedraw2/dist/wp220-direct-work-core.js"
+    ]
+  },
+  "baselines": {
+    "initialEditorRaw": 158807,
+    "wp160RuntimeRaw": 12649,
+    "wp200RuntimeLazyRaw": 28657,
+    "wp210MarketLazyRaw": 21271
+  },
+  "bundles": {
+    "initialEditor": {
+      "file": "pixiedraw2/dist/draw2-entry.js",
+      "raw": 158807,
+      "minified": 90968,
+      "gzip": 31916,
+      "brotli": 26521,
+      "minifiedGzip": 24854,
+      "minifiedBrotli": 21370,
+      "sha256": "0f029dabb6770fc574e7f3930714bef46bde3187f12067c13849955647e32cd1"
+    },
+    "wp210MarketLazy": {
+      "file": "pixiedraw2/dist/wp210-market-core.js",
+      "raw": 21271,
+      "minified": 13726,
+      "gzip": 5579,
+      "brotli": 4721,
+      "minifiedGzip": 4781,
+      "minifiedBrotli": 4074,
+      "sha256": "f23b50d60017b2451f59e685dcd04438a8132010031e3991889f4b263c1a6253"
+    },
+    "wp220DirectWorkLazy": {
+      "file": "pixiedraw2/dist/wp220-direct-work-core.js",
+      "raw": 30618,
+      "minified": 20566,
+      "gzip": 7174,
+      "brotli": 6116,
+      "minifiedGzip": 6229,
+      "minifiedBrotli": 5388,
+      "sha256": "13c5530dd99a659939bd1c04ce8121dde6669629dcea4e03ed608802516ab58f"
+    },
+    "wp160RuntimeBaseline": {
+      "file": "pixiedraw2/dist/wp160-runtime-core.js",
+      "raw": 12649,
+      "minified": 12649,
+      "gzip": 3645,
+      "brotli": 3167,
+      "minifiedGzip": 3645,
+      "minifiedBrotli": 3167,
+      "sha256": "eab694dc5721e332271b6ea5102f904873c390a8e74f4f2f1c3cdbf1ae6c57a8"
+    },
+    "wp200RuntimeBaseline": {
+      "file": "pixiedraw2/dist/wp200-runtime-core.js",
+      "raw": 28657,
+      "minified": 28657,
+      "gzip": 6604,
+      "brotli": 5735,
+      "minifiedGzip": 6604,
+      "minifiedBrotli": 5735,
+      "sha256": "28e29b1080f2485b6c217f5004dfae509c6458db751f2817f037078c2e315b5f"
+    }
+  },
+  "deltas": {
+    "initialEditorRaw": 0,
+    "wp160RuntimeRaw": 0,
+    "wp200RuntimeLazyRaw": 0,
+    "wp210MarketLazyRaw": 0
+  },
+  "boundaries": {
+    "directWorkOutsideInitial": "PASS_STATIC_BOUNDARY",
+    "directWorkOutsideRuntime": "PASS_STATIC_BOUNDARY",
+    "currentRoutesAndData": "OUT_OF_SCOPE_AND_UNTOUCHED"
+  },
+  "metricScopes": {
+    "bundle": "LOCAL_BYTE_AND_COMPRESSION_MEASUREMENT",
+    "directWork": "PURE_SYNTHETIC_STATE_AND_PAYMENT_RECONCILIATION",
+    "realCheckout": "UNTESTED"
+  },
+  "untested": [
+    "real checkout",
+    "provider webhook signature/replay",
+    "physical mobile",
+    "Safari",
+    "Firefox",
+    "screen reader",
+    "30-minute memory",
+    "production performance"
+  ]
+}

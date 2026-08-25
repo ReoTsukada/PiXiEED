@@ -1,0 +1,12 @@
+# v3.1 MACHINE-FIRST
+- Added Product Blueprint before Work Packages.
+- Added stable north-star / adaptive solution split.
+- Added Global Coherence Gate to prevent local optimum and goal drift.
+- Added Change Impact Analyzer and selective invalidation.
+- Added Context Builder to feed only decision-relevant repository context.
+- Added Research / Experiment caches and reuse-first policy.
+- Added Budget Ledger and explicit expected-value-vs-cost routing.
+- Added Release Guard, observability requirement for material runtime changes, and batched human approvals.
+- Added assumption classes and blueprint revision rules.
+- Converted internal harness to YAML-first machine-readable contracts.
+- Kept GOAL.md / CHANGE.md only as simple human input adapters.

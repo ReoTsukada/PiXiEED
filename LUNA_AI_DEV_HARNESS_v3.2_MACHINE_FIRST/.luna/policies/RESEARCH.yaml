@@ -1,0 +1,25 @@
+policy_id: RESEARCH-001
+trigger_any:
+  - freshness_can_change_decision
+  - ui_or_product_pattern_uncertain
+  - competitor_or_market_context_has_high_value
+  - technology_choice_high_failure_cost
+  - official_spec_needed
+  - repeated_failure_without_root_cause
+skip_if_any:
+  - valid_cached_evidence_exists
+  - low_impact_reversible_change_and_low_decision_sensitivity
+  - expected_decision_change_probability_low
+source_priority:
+  - official_docs_specs_release_notes
+  - standards_upstream
+  - licensed_oss_or_official_samples
+  - primary_or_near_primary_technical_material
+  - reputable_secondary
+  - reviews_community_for_sentiment_only
+pattern_transform: [observation, mechanism_hypothesis, generalized_pattern, fit_to_blueprint, adopt_adapt_reject]
+code_rule:
+  require_license_check: true
+  unknown_license_copy: forbidden
+stop_rule: stop_when_marginal_information_no_longer_changes_decision
+cache: required

@@ -1,0 +1,142 @@
+{
+  "benchmarkVersion": "FP006_REFERENCE_SYNTHETIC_V1",
+  "classification": "REFERENCE_SYNTHETIC",
+  "workloads": {
+    "desktop": {
+      "raster": "512x512",
+      "layers": 20,
+      "frames": 120,
+      "hotPath": {
+        "strokeId": "synthetic-desktop-stroke",
+        "pointerSamples": 240,
+        "canvasProjectionUpdates": 240,
+        "workspaceUpdates": 0,
+        "timelineUpdates": 0,
+        "layerUpdates": 0,
+        "paletteUpdates": 0,
+        "inspectorUpdates": 0,
+        "fullWorkspaceRerenders": 0,
+        "globalStateWrites": 0,
+        "violations": []
+      },
+      "virtualization": {
+        "timeline": {
+          "totalItems": 120,
+          "visibleItems": 20,
+          "overscan": 4,
+          "mountedItems": 28
+        },
+        "layers": {
+          "totalItems": 20,
+          "visibleItems": 13,
+          "overscan": 3,
+          "mountedItems": 19
+        }
+      }
+    },
+    "mobile": {
+      "raster": "256x256",
+      "layers": 12,
+      "frames": 60,
+      "hotPath": {
+        "strokeId": "synthetic-mobile-stroke",
+        "pointerSamples": 120,
+        "canvasProjectionUpdates": 120,
+        "workspaceUpdates": 0,
+        "timelineUpdates": 0,
+        "layerUpdates": 0,
+        "paletteUpdates": 0,
+        "inspectorUpdates": 0,
+        "fullWorkspaceRerenders": 0,
+        "globalStateWrites": 0,
+        "violations": []
+      },
+      "virtualization": {
+        "timeline": {
+          "totalItems": 60,
+          "visibleItems": 8,
+          "overscan": 3,
+          "mountedItems": 14
+        },
+        "layers": {
+          "totalItems": 12,
+          "visibleItems": 6,
+          "overscan": 2,
+          "mountedItems": 10
+        }
+      }
+    }
+  },
+  "viewports": [
+    {
+      "name": "mobile-390x844",
+      "profile": "mobile",
+      "pageOverflow": {
+        "horizontal": 0,
+        "vertical": 0
+      },
+      "layoutIssues": [],
+      "criticalControlsFit": true,
+      "classification": "REFERENCE_SYNTHETIC",
+      "physicalDeviceStatus": "UNTESTED"
+    },
+    {
+      "name": "mobile-430x932",
+      "profile": "mobile",
+      "pageOverflow": {
+        "horizontal": 0,
+        "vertical": 0
+      },
+      "layoutIssues": [],
+      "criticalControlsFit": true,
+      "classification": "REFERENCE_SYNTHETIC",
+      "physicalDeviceStatus": "UNTESTED"
+    },
+    {
+      "name": "desktop-1280x900",
+      "profile": "desktop",
+      "pageOverflow": {
+        "horizontal": 0,
+        "vertical": 0
+      },
+      "layoutIssues": [],
+      "criticalControlsFit": true,
+      "classification": "REFERENCE_SYNTHETIC",
+      "physicalDeviceStatus": "UNTESTED"
+    },
+    {
+      "name": "desktop-1366x768",
+      "profile": "desktop",
+      "pageOverflow": {
+        "horizontal": 0,
+        "vertical": 0
+      },
+      "layoutIssues": [],
+      "criticalControlsFit": true,
+      "classification": "REFERENCE_SYNTHETIC",
+      "physicalDeviceStatus": "UNTESTED"
+    },
+    {
+      "name": "desktop-1920x1080",
+      "profile": "desktop",
+      "pageOverflow": {
+        "horizontal": 0,
+        "vertical": 0
+      },
+      "layoutIssues": [],
+      "criticalControlsFit": true,
+      "classification": "REFERENCE_SYNTHETIC",
+      "physicalDeviceStatus": "UNTESTED"
+    }
+  ],
+  "untested": [
+    "physical mobile",
+    "physical stylus",
+    "Safari",
+    "Firefox",
+    "30-minute memory",
+    "full input-to-visible compositor",
+    "native host"
+  ],
+  "noProductionClaims": true
+}

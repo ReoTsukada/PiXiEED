@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "workPackage": "WP-250",
+  "sourceStatus": "RECONSTRUCTED_FROM_APPROVED_SOURCES",
+  "status": "IMPLEMENTED_ISOLATED_POLICY_ECONOMICS_BOUNDARY",
+  "implemented": [
+    "server-input consent/region/age/provider Ad policy",
+    "public-only lazy Ad eligibility",
+    "reserved safe-area-aware Ad slot plan",
+    "shadow-only Revenue/Cost unit economics",
+    "staged Ad revenue uncertainty",
+    "Organic/Sponsored Search separation",
+    "versioned Moderation Case/Decision references",
+    "non-replayable Admin Audit reference",
+    "default-off flags and local shadow rollback"
+  ],
+  "notImplemented": [
+    "consent/legal UI and policy authority",
+    "Analytics transport and retention",
+    "Ad provider SDK/delivery",
+    "Admin RPC/RLS and console",
+    "moderation workflow and canonical mutation",
+    "Ledger/Payout reconciliation",
+    "checkout or Market write",
+    "route replacement/migration/deploy/publish"
+  ],
+  "productionMutation": false,
+  "initialBundleImport": false,
+  "runtimeImport": false,
+  "adsOnPrivateSurfaces": false,
+  "ledgerMutation": false,
+  "payoutMutation": false,
+  "baselineFailureIdentity": "14/14 inherited match; new 0"
+}

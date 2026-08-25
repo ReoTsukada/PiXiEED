@@ -1,0 +1,71 @@
+{
+  "evidenceVersion": "QUALIFICATION_EVIDENCE_V1",
+  "packageId": "GAME-350",
+  "auditId": "GAME350-BROWSER-AUDIT-20260815",
+  "capturedAt": "2026-08-15",
+  "status": "PARTIAL",
+  "qualification": "ISOLATED_BROWSER_ONLY",
+  "browser": {
+    "surface": "Codex in-app browser",
+    "version": "UNRECORDED",
+    "url": "http://localhost:8000/pixiedraw2/",
+    "viewport": "1280x720"
+  },
+  "buildInputs": [
+    {
+      "path": "pixiedraw2/src/game/game-350/core.ts",
+      "sha256": "c1a91334a25f52fa5c80f0fe9b218dfe69e7822fffa08495b7dea97174bfcdde"
+    },
+    {
+      "path": "pixiedraw2/src/game/game-350/studio.ts",
+      "sha256": "df8af813ea1e29570183dc9112eacd14cd233262e2de6e05cc18ede2dbdcf2fe"
+    },
+    {
+      "path": "pixiedraw2/dist/draw2-entry.js",
+      "sha256": "faaaf62785fb81ac84b40be3be9f2e2cf132ae03ae66ca2cfd3981bb97648bb0"
+    }
+  ],
+  "protocol": [
+    "Open the isolated Preview panel from the workspace panel picker.",
+    "Start the local Runtime Preview in LIVE mode.",
+    "Pin the current revision.",
+    "Reload the preview and verify it returns to LIVE mode."
+  ],
+  "results": {
+    "liveStart": {
+      "statusText": "Runtime READY · LIVE · tick=1",
+      "pinEnabled": true,
+      "reloadEnabled": true,
+      "pageOverflow": [1280, 720],
+      "errors": []
+    },
+    "pinned": {
+      "statusText": "Runtime READY · PINNED · tick=1",
+      "pageOverflow": [1280, 720],
+      "errors": []
+    },
+    "reloaded": {
+      "statusText": "Runtime READY · LIVE · tick=1",
+      "pageOverflow": [1280, 720],
+      "errors": []
+    }
+  },
+  "boundary": {
+    "currentRoutesChanged": false,
+    "productionDataChanged": false,
+    "marketChanged": false,
+    "pixisyncChanged": false,
+    "productionClaims": false
+  },
+  "untested": [
+    "complete GAME-350 Studio authoring flow in browser",
+    "390x844 and tablet Game Studio visual regression",
+    "physical mobile/tablet/stylus/gamepad and accessibility technology",
+    "Safari/Firefox cross-browser behavior",
+    "native Android/iOS/desktop toolchain and signing",
+    "production-equivalent staging, provider, RLS, migration, rollback, deploy, publish",
+    "30-minute session, device memory, long-task and bundle qualification",
+    "real canonical Registry/Queue/State/Context, Market, PiXiSYNC, Draw/Audio integration"
+  ],
+  "noProductionClaims": true
+}

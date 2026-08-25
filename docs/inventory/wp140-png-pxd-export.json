@@ -1,0 +1,61 @@
+{
+  "workPackage": "WP-140",
+  "title": "PNG and PXD export",
+  "status": "IMPLEMENTED_ISOLATED_REFERENCE",
+  "scope": {
+    "entry": "pixiedraw2/index.html",
+    "productionRoutesChanged": false,
+    "currentPxdChanged": false,
+    "pixiSyncChanged": false,
+    "marketOrProductionDataChanged": false
+  },
+  "formats": {
+    "png": {
+      "encoding": "deterministic RGBA8, filter 0, stored DEFLATE",
+      "transparentPaletteIndex": 0,
+      "sourceHash": "SHA-256 indexed raster"
+    },
+    "pxd": {
+      "format": "pxd",
+      "schemaVersion": 1,
+      "archiveVersion": 1,
+      "packageKind": "PROJECT_PACKAGE",
+      "container": "magic + archiveVersion + manifestLength + canonicalManifest + rasterPayloads",
+      "hashes": ["asset sha256", "canonicalManifestHash", "packageHash"]
+    }
+  },
+  "verification": {
+    "typeCheck": "PASS",
+    "coreTests": "18 passed / 0 failed",
+    "determinism": "PASS",
+    "importRoundTrip": "PASS",
+    "corruptedPayloadRejected": "PASS / PXD_ASSET_HASH_MISMATCH",
+    "pngPxdIndexedHashAgreement": "PASS",
+    "canonicalIndexedRoundTripHash": "PASS",
+    "benchmark": "MEASURED_LOCAL_SYNTHETIC_REFERENCE",
+    "devicePerformanceGate": "UNTESTED",
+    "realLegacyPxdCompatibility": "UNTESTED / WP-150",
+    "diffCheck": "PASS"
+  },
+  "bundle": {
+    "status": "MEASURED_LOCAL_BUILD",
+    "rawBytes": 140941,
+    "minifiedBytes": 81545,
+    "rawGzipBytes": 28006,
+    "rawBrotliBytes": 23433,
+    "minifiedGzipBytes": 21996,
+    "minifiedBrotliBytes": 18963,
+    "cssBytes": 7941,
+    "initialRequests": 2,
+    "lazyChunks": 0,
+    "audioGameMarketInitialImport": false,
+    "devicePerformanceGate": "UNTESTED"
+  },
+  "security": {
+    "localDownloadOnly": true,
+    "networkUpload": false,
+    "productionMigration": false,
+    "secretsOrProjectContentTelemetry": false
+  },
+  "nextWorkPackage": "WP-150"
+}

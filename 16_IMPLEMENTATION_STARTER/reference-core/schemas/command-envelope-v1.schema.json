@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pixieed.jp/schemas/command-envelope-v1.json",
+  "title": "PiXiEED Command Envelope v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "commandId",
+    "commandType",
+    "schemaVersion",
+    "projectId",
+    "assetId",
+    "actorId",
+    "clientId",
+    "clientSequence",
+    "baseStructureEpoch",
+    "createdAtMonotonicMs",
+    "payload"
+  ],
+  "properties": {
+    "commandId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "commandType": {
+      "type": "string",
+      "minLength": 1
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "projectId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "assetId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "actorId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "clientId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "clientSequence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "baseStructureEpoch": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "createdAtMonotonicMs": {
+      "type": "number",
+      "minimum": 0
+    },
+    "payload": {}
+  }
+}

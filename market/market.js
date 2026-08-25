@@ -54,8 +54,10 @@
 
   function formatLabel(value) {
     const labels = {
-      'pixiedraw-project': 'PiXiEEDraw', png: 'PNG', webp: 'WebP', gif: 'GIF', apng: 'APNG',
-      'sprite-sheet-png': 'スプライトシート'
+      'pixiedraw-project': 'iDRAW', png: 'PNG', webp: 'WebP', gif: 'GIF', apng: 'APNG',
+      'sprite-sheet-png': 'スプライトシート',
+      aac: 'AAC', aiff: 'AIFF', flac: 'FLAC', m4a: 'M4A', mid: 'MIDI', midi: 'MIDI',
+      mp3: 'MP3', oga: 'OGA', ogg: 'OGG', opus: 'Opus', wav: 'WAV', weba: 'WebM音声'
     };
     return labels[String(value || '')] || '画像素材';
   }
@@ -64,7 +66,7 @@
     const badges = document.createElement('div'); badges.className = 'market-card__badges';
     const productType = document.createElement('span');
     productType.className = isPixieeDrawProduct(asset) ? 'is-pixiedraw-product' : 'is-general-product';
-    productType.textContent = isPixieeDrawProduct(asset) ? 'PiXiEEDraw作品' : '一般素材';
+    productType.textContent = isPixieeDrawProduct(asset) ? 'iDRAW作品' : '一般素材';
     badges.appendChild(productType);
     if (asset.ai_usage_status === 'used' || asset.ai_usage_status === 'not-used') {
       const ai = document.createElement('span');

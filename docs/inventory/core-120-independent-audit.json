@@ -1,0 +1,34 @@
+{
+  "auditVersion": "CORE120_INDEPENDENT_AUDIT_V1",
+  "packageId": "CORE-120",
+  "status": "INDEPENDENT_REVIEW_PASS",
+  "reviewer": "SOL_INDEPENDENT_AUDIT",
+  "contextSha256": "bfe6fc1971c4a3e678e0d53d7a025ed3504efc23ca41a329b06a815bdff773dc",
+  "predecessorTranscriptSha256": "4ef57b8e3fecc25d6d6f57c353d7e152ba616db6281ee67158e4a2a8c03c5358",
+  "core120TranscriptSha256": "ad0cb80d599a018d535deaca23c615dc86ed6302071013bc73be4e5276dce47f",
+  "normalizedPredecessorSha256": "23abe4e2cd2e4b29a9f4679f9747eec195acdc9f2774945de1fdcff0503ca042",
+  "acceptanceIds": [
+    "CORE120-GATE-001",
+    "CORE120-CONVERGENCE-001",
+    "CORE120-NONINTRUSION-001",
+    "CORE120-HANDOFF-001"
+  ],
+  "findingCount": 0,
+  "findings": [],
+  "baseline": {
+    "priorFailures": 14,
+    "identityMatches": 14,
+    "newFailures": 0,
+    "suitePasses": 63,
+    "suiteTotal": 77
+  },
+  "productionStatus": "UNTESTED",
+  "noProductionClaims": true,
+  "untested": [
+    "production DB/Auth/RLS/provider",
+    "physical device/stylus/Safari/Firefox",
+    "real legacy PXD/PiXiSYNC/Commerce",
+    "staging/store/cutover",
+    "production performance"
+  ]
+}

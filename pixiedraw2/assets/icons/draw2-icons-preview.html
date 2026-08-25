@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PiXiEEDstudio iDRAW Original Icons</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+        background: #0e151c;
+        color: #e8f0f7;
+      }
+      body {
+        margin: 0;
+        padding: 32px;
+      }
+      header {
+        max-width: 920px;
+        margin: 0 auto 28px;
+      }
+      h1, h2, p { margin: 0; }
+      h1 { font-size: 24px; letter-spacing: 0.02em; }
+      header p { margin-top: 8px; color: #9eb0bf; }
+      .draw2-quality-gates {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 14px;
+      }
+      .draw2-quality-gates span {
+        padding: 5px 8px;
+        border: 1px solid #355064;
+        border-radius: 999px;
+        color: #b9d4e5;
+        font-size: 11px;
+      }
+      section {
+        max-width: 920px;
+        margin: 0 auto 28px;
+      }
+      h2 {
+        margin-bottom: 10px;
+        color: #8bd7ff;
+        font-size: 14px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .draw2-icon-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 8px;
+      }
+      .draw2-icon-card {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+        padding: 10px;
+        border: 1px solid #2d4050;
+        border-radius: 8px;
+        background: #17232e;
+      }
+      .draw2-icon-samples {
+        display: grid;
+        gap: 5px;
+      }
+      .draw2-icon-theme {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        min-height: 25px;
+        padding: 3px 5px;
+        border-radius: 5px;
+      }
+      .draw2-icon-theme--light {
+        background: #f4f7fb;
+        color: #1b2430;
+      }
+      .draw2-icon-theme--dark {
+        background: #101923;
+        color: #f4f7fb;
+      }
+      .draw2-icon-theme-label {
+        width: 13px;
+        color: currentColor;
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+      }
+      .draw2-icon-sample {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        color: inherit;
+        font-size: 9px;
+      }
+      .draw2-icon-sample svg {
+        display: block;
+        color: var(--icon-color, #f4f8fb);
+        shape-rendering: geometricPrecision;
+      }
+      .draw2-icon-sample--16 svg {
+        width: 16px;
+        height: 16px;
+      }
+      .draw2-icon-sample--20 svg {
+        width: 20px;
+        height: 20px;
+      }
+      .draw2-icon-sample--24 svg {
+        width: 24px;
+        height: 24px;
+      }
+      .draw2-icon-sample--32 svg {
+        width: 32px;
+        height: 32px;
+      }
+      .draw2-icon-card--new {
+        border-color: #5d87a5;
+        background: #1a3040;
+      }
+      .draw2-icon-card--sync-local { --icon-color: #9ecbff; }
+      .draw2-icon-card--sync-connecting { --icon-color: #f3cc75; }
+      .draw2-icon-card--sync-online { --icon-color: #74e3b5; }
+      .draw2-icon-card--sync-error { --icon-color: #ff8e8e; }
+      code {
+        display: block;
+        line-height: 1.3;
+        overflow-wrap: anywhere;
+        color: #c9d7e2;
+        font-size: 11px;
+      }
+      .draw2-icon-card small {
+        display: block;
+        margin-top: 3px;
+        color: #82a0b4;
+        font-size: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>PiXiEEDstudio iDRAW Original Icons</h1>
+      <p id="draw2IconSummary">読み込み中…</p>
+      <div class="draw2-quality-gates" aria-label="品質ゲート">
+        <span>16px判別</span>
+        <span>24px基準</span>
+        <span>16 / 20 / 24 / 32px</span>
+        <span>白黒で意味が残る</span>
+        <span>ライト / ダーク</span>
+        <span>Figma / SVG一致</span>
+      </div>
+    </header>
+    <main id="draw2IconCatalog"></main>
+    <script type="module">
+      const manifest = await fetch("./draw2-icons-manifest.json").then((response) => response.json());
+      const categoryLabels = {
+        common: "Common",
+        viewport: "Viewport",
+        drawing: "Drawing",
+        layersTimelineAnimation: "Layers / Timeline / Animation",
+        audio: "Audio",
+        mirror: "Mirror",
+        zoom: "Zoom",
+        pixync: "PiXYNC",
+      };
+      const catalog = document.querySelector("#draw2IconCatalog");
+      document.querySelector("#draw2IconSummary").textContent =
+        `${manifest.functionalCount}機能アイコン + ${manifest.reserveCount}予備 · ${manifest.style} v${manifest.version} · 24px grid · 16 / 20 / 24 / 32px · Light / Dark QA`;
+      const renderSection = (category, ids, label) => {
+        const section = document.createElement("section");
+        const heading = document.createElement("h2");
+        heading.textContent = label ?? categoryLabels[category] ?? category;
+        section.append(heading);
+        const grid = document.createElement("div");
+        grid.className = "draw2-icon-grid";
+        for (const id of ids) {
+          const card = document.createElement("div");
+          card.className = "draw2-icon-card";
+          if (id.startsWith("icon-sync-")) card.classList.add(`draw2-icon-card--${id.slice("icon-".length)}`);
+          const samples = document.createElement("div");
+          samples.className = "draw2-icon-samples";
+          for (const theme of ["light", "dark"]) {
+            const themeRow = document.createElement("div");
+            themeRow.className = `draw2-icon-theme draw2-icon-theme--${theme}`;
+            const themeLabel = document.createElement("span");
+            themeLabel.className = "draw2-icon-theme-label";
+            themeLabel.textContent = theme === "light" ? "L" : "D";
+            themeRow.append(themeLabel);
+            for (const size of [16, 20, 24, 32]) {
+              const sample = document.createElement("div");
+              sample.className = `draw2-icon-sample draw2-icon-sample--${size}`;
+              const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+              icon.setAttribute("viewBox", "0 0 24 24");
+              icon.setAttribute("aria-hidden", "true");
+              const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
+              use.setAttribute("href", `./draw2-icons.svg#${id}`);
+              icon.append(use);
+              const sizeLabel = document.createElement("span");
+              sizeLabel.textContent = size;
+              sample.append(icon, sizeLabel);
+              themeRow.append(sample);
+            }
+            samples.append(themeRow);
+          }
+          const label = document.createElement("div");
+          const name = document.createElement("code");
+          name.textContent = id;
+          label.append(name);
+          card.append(samples, label);
+          grid.append(card);
+        }
+        section.append(grid);
+        catalog.append(section);
+      };
+      for (const [category, ids] of Object.entries(manifest.categories)) renderSection(category, ids);
+      renderSection("optional", manifest.reserve, "Optional / Reserve");
+    </script>
+  </body>
+</html>

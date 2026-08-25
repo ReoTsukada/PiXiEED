@@ -44,33 +44,33 @@
       <div class="info-page">
         <section class="card info-hero">
           <p class="info-hero__eyebrow">Notices</p>
-          <h1 class="info-hero__title">お知らせをまとめて確認できます</h1>
-          <p class="info-hero__copy">運営からの案内、キャンペーン、サポートに関する情報をまとめています。必要に応じて、そのまま企業ページやホームへ進めます。</p>
+          <h1 class="info-hero__title" data-i18n-key="noticeTitle">お知らせをまとめて確認できます</h1>
+          <p class="info-hero__copy" data-i18n-key="noticeIntro">運営からの案内、キャンペーン、サポートに関する情報をまとめています。必要に応じて、そのまま企業ページやホームへ進めます。</p>
           <div class="inline-actions">
-            <a class="button" href="../portfolio/index.html">企業ページを見る</a>
-            <a class="button-secondary" href="../index.html">ホームに戻る</a>
+            <a class="button" href="../portfolio/index.html" data-i18n-key="noticePortfolioButton">企業ページを見る</a>
+            <a class="button-secondary" href="../index.html" data-i18n-key="noticeHomeButton">ホームに戻る</a>
           </div>
         </section>
 
-        <section class="card info-list" aria-label="お知らせ一覧">
+        <section class="card info-list" aria-label="お知らせ一覧" data-i18n-aria-label="noticeListAria">
           <article class="info-card">
             <div class="info-card__head">
               <p class="info-card__eyebrow">Support</p>
-              <h2 class="info-card__title">サポートからサポートできます</h2>
+              <h2 class="info-card__title" data-i18n-key="noticeSupportTitle">サポートからサポートできます</h2>
             </div>
-            <p class="info-card__copy">PiXiEEDの活動を応援したい場合は、ヘッダーのサポートからサポートできます。今後の改善や継続運営につながります。</p>
+            <p class="info-card__copy" data-i18n-key="noticeSupportCopy">PiXiEEDの活動を応援したい場合は、ヘッダーのサポートからサポートできます。今後の改善や継続運営につながります。</p>
             <div class="info-card__actions">
-              <a class="button-secondary" href="../index.html">ホームへ戻る</a>
+              <a class="button-secondary" href="../index.html" data-i18n-key="noticeHomeButton2">ホームへ戻る</a>
             </div>
           </article>
           <article class="info-card">
             <div class="info-card__head">
               <p class="info-card__eyebrow">Business</p>
-              <h2 class="info-card__title">企業向けの相談はこちら</h2>
+              <h2 class="info-card__title" data-i18n-key="noticeBusinessTitle">企業向けの相談はこちら</h2>
             </div>
-            <p class="info-card__copy">制作依頼、導入相談、共同企画などの法人向け問い合わせは既存の企業ページから確認できます。</p>
+            <p class="info-card__copy" data-i18n-key="noticeBusinessCopy">制作依頼、導入相談、共同企画などの法人向け問い合わせは既存の企業ページから確認できます。</p>
             <div class="info-card__actions">
-              <a class="button" href="../portfolio/index.html">企業ページを開く</a>
+              <a class="button" href="../portfolio/index.html" data-i18n-key="noticeBusinessButton">企業ページを開く</a>
             </div>
           </article>
         </section>
@@ -94,7 +94,7 @@
     <a class="bottom-nav__item" data-tab="portfolio" href="../portfolio/index.html"><span class="icon"><img src="../assets/icons/FooterIcon4.png" alt=""></span><span>企業</span></a>
   </nav>
 
-  <script src="../scripts/shared-profile-header.js"></script>
+  <script src="../scripts/shared-profile-header.js?v=20260825-common-shell15"></script>
   <script src="../scripts/pixieed-dot-stats.js"></script>
   <script src="../scripts/bottom-nav-footer-ad.js?v=20260719-shared-top-resume1"></script>
   <script>const year=document.getElementById('year'); if(year) year.textContent=new Date().getFullYear();</script>
@@ -110,7 +110,7 @@
       </div>
     </div>
   </div>
-  <script src="../scripts/shared-bottom-nav.js?v=20260724-fullscreen-icons2"></script>
+  <script src="../scripts/shared-bottom-nav.js?v=20260825-studio-brand1"></script>
   <script src="../scripts/pixel-art-fit.js"></script>
 </body>
 </html>

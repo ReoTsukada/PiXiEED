@@ -22,16 +22,26 @@
   const MARKET_TERMS_VERSION = '2026-07-19';
   const MARKET_PRIVACY_VERSION = '2026-07-19';
   const packageUtils = window.PiXiEEDMarketPackage;
-  const FORMAT_ORDER = ['pixiedraw-project', 'png', 'sprite-sheet-png', 'webp', 'gif', 'apng'];
+  const FORMAT_ORDER = ['pixiedraw-project', 'png', 'sprite-sheet-png', 'webp', 'gif', 'apng', 'aac', 'aiff', 'flac', 'm4a', 'mid', 'midi', 'mp3', 'oga', 'ogg', 'opus', 'wav', 'weba'];
   const FORMAT_LABELS = {
-    'pixiedraw-project': 'PiXiEEDraw（PXD）',
+    'pixiedraw-project': 'iDRAW（PXD）',
     png: 'PNG',
     'sprite-sheet-png': 'PNGスプライトシート',
     webp: 'WebP',
     gif: 'GIF',
-    apng: 'APNG'
+    apng: 'APNG',
+    aac: 'AAC', aiff: 'AIFF', flac: 'FLAC', m4a: 'M4A', mid: 'MIDI', midi: 'MIDI',
+    mp3: 'MP3', oga: 'OGA', ogg: 'OGG', opus: 'Opus', wav: 'WAV', weba: 'WebM Audio'
   };
   const RASTER_FORMATS = new Set(['png', 'sprite-sheet-png', 'webp', 'gif', 'apng']);
+  const AUDIO_FORMATS = new Set(['aac', 'aiff', 'flac', 'm4a', 'mid', 'midi', 'mp3', 'oga', 'ogg', 'opus', 'wav', 'weba']);
+  const PACKAGE_COMPOSITIONS = [
+    { id: 'image-only', label: '絵のみ', description: '画像・アニメーション形式だけを収録します。' },
+    { id: 'audio-only', label: '音楽のみ', description: '音声ファイルだけを収録します。' },
+    { id: 'image-audio', label: '絵＋音楽', description: '画像・アニメーションと音声をまとめます。' },
+    { id: 'pixiedraw-project', label: 'PXDプロジェクト', description: 'iDRAWで編集できるPXDを収録します。' },
+    { id: 'all-files', label: '全ファイル', description: '検出できた対応形式をすべて収録します。' }
+  ];
   const FALLBACK_OPTIONS = [
     { id: 'commercial-use', label: '商用・収益化利用', description: 'ゲーム、アプリ、動画、配信、広告などに利用できます。', minimum_price_yen: 0, sort_order: 10 },
     { id: 'merchandise-use', label: 'グッズ・印刷販売', description: 'グッズや印刷物を制作して販売できます。', minimum_price_yen: 0, sort_order: 20 },
@@ -75,6 +85,7 @@
   let listingDraftKey = '';
   let listingDraftLoaded = false;
   let listingDraftSaveTimer = 0;
+  let productComposition = 'auto';
 
   const setStatus = (value) => { status.textContent = value || ''; };
   const yen = (value) => `${Number(value || 0).toLocaleString('ja-JP')}円`;
@@ -102,7 +113,7 @@
     return Math.min(ceiling, Math.ceil(parsed / PRICE_STEP_YEN) * PRICE_STEP_YEN);
   };
   const isPreviewable = (entry) => entry && Boolean(entry.format) && (
-    entry.format !== 'pixiedraw-project' || entry.previewBlob instanceof Blob
+    entry.mediaKind === 'image' || (entry.mediaKind === 'project' && entry.previewBlob instanceof Blob)
   );
   const isRasterEntry = (entry) => RASTER_FORMATS.has(entry?.format);
   const rasterDimensionError = (entry) => {
@@ -152,6 +163,7 @@
       fileOptimizations: Array.from(sourceOptimizations.entries()),
       selectedFormats: Array.from(selectedFormats),
       dismissedFormats: Array.from(dismissedFormats),
+      productComposition,
       selectedOptionIds: Array.from(selectedOptionIds),
       optionPrices: Array.from(optionPrices.entries()),
       limitedOptionPrice,
@@ -215,6 +227,9 @@
     });
     selectedFormats.clear(); (draft.selectedFormats || []).forEach((value) => selectedFormats.add(value));
     dismissedFormats.clear(); (draft.dismissedFormats || []).forEach((value) => dismissedFormats.add(value));
+    productComposition = PACKAGE_COMPOSITIONS.some((option) => option.id === draft.productComposition)
+      ? draft.productComposition
+      : 'auto';
     selectedOptionIds.clear(); (draft.selectedOptionIds || []).forEach((value) => selectedOptionIds.add(value));
     optionPrices.clear(); (draft.optionPrices || []).forEach(([id, value]) => optionPrices.set(id, Number(value)));
     limitedOptionPrice = 0;
@@ -429,6 +444,83 @@
     return detectedEntries.filter((entry) => selectedFormats.has(entry.format));
   }
 
+  function inferredComposition() {
+    const entries = activeEntries();
+    if (!entries.length) return 'image-only';
+    if (entries.every((entry) => entry.format === 'pixiedraw-project')) return 'pixiedraw-project';
+    const hasImage = entries.some((entry) => entry.mediaKind === 'image');
+    const hasAudio = entries.some((entry) => entry.mediaKind === 'audio');
+    if (hasAudio && hasImage && entries.every((entry) => entry.mediaKind === 'image' || entry.mediaKind === 'audio')) return 'image-audio';
+    if (hasAudio && entries.every((entry) => entry.mediaKind === 'audio')) return 'audio-only';
+    if (hasImage && entries.every((entry) => entry.mediaKind === 'image')) return 'image-only';
+    return 'all-files';
+  }
+
+  function effectiveComposition() {
+    return productComposition === 'auto' ? inferredComposition() : productComposition;
+  }
+
+  function compositionOption(id) {
+    return PACKAGE_COMPOSITIONS.find((option) => option.id === id) || PACKAGE_COMPOSITIONS[0];
+  }
+
+  function renderPackageComposition() {
+    const container = $('listingPackageComposition');
+    if (!container) return;
+    const hasImage = detectedEntries.some((entry) => entry.mediaKind === 'image' && entry.format);
+    const hasProject = detectedEntries.some((entry) => entry.mediaKind === 'project' && entry.format);
+    const hasAudio = detectedEntries.some((entry) => entry.mediaKind === 'audio');
+    const allFilesSupported = detectedEntries.length > 0 && detectedEntries.every((entry) => Boolean(entry.format));
+    const current = effectiveComposition();
+    container.replaceChildren(...PACKAGE_COMPOSITIONS.map((option) => {
+      const wrapper = document.createElement('label');
+      wrapper.className = 'market-composition-option';
+      const input = document.createElement('input');
+      input.type = 'radio'; input.name = 'listingProductComposition'; input.value = option.id;
+      const available = option.id === 'image-only' ? hasImage
+        : option.id === 'audio-only' ? hasAudio
+          : option.id === 'image-audio' ? hasImage && hasAudio
+            : option.id === 'pixiedraw-project' ? hasProject
+              : option.id === 'all-files' ? allFilesSupported
+          : false;
+      input.disabled = !available;
+      input.checked = current === option.id && available;
+      const text = document.createElement('span');
+      const title = document.createElement('strong'); title.textContent = option.label;
+      const description = document.createElement('span'); description.textContent = option.description;
+      text.append(title, description); wrapper.append(input, text);
+      const note = document.createElement('small');
+      if (!available) {
+        note.textContent = '対応ファイルがありません';
+      }
+      if (note.textContent) wrapper.append(note);
+      input.addEventListener('change', () => {
+        if (!input.checked) return;
+        productComposition = option.id;
+        if (option.id === 'image-only') {
+          selectedFormats.clear();
+          detectedEntries.filter((entry) => entry.format && entry.mediaKind === 'image').forEach((entry) => selectedFormats.add(entry.format));
+        } else if (option.id === 'audio-only') {
+          selectedFormats.clear();
+          detectedEntries.filter((entry) => entry.format && entry.mediaKind === 'audio').forEach((entry) => selectedFormats.add(entry.format));
+        } else if (option.id === 'image-audio') {
+          selectedFormats.clear();
+          detectedEntries.filter((entry) => entry.format && (entry.mediaKind === 'image' || entry.mediaKind === 'audio')).forEach((entry) => selectedFormats.add(entry.format));
+        } else if (option.id === 'pixiedraw-project') {
+          selectedFormats.clear(); selectedFormats.add('pixiedraw-project');
+        } else if (option.id === 'all-files') {
+          selectedFormats.clear(); detectedEntries.filter((entry) => entry.format).forEach((entry) => selectedFormats.add(entry.format));
+        }
+        renderFormats(); scheduleListingDraftSave();
+      });
+      return wrapper;
+    }));
+    const statusNode = $('listingCompositionStatus');
+    if (statusNode) statusNode.textContent = hasAudio
+      ? '音声形式も購入後にZIPで受け取れます。音声はiAUDIOの素材として利用できます。'
+      : '構成は1つ、形式スイッチは複数選択できます。';
+  }
+
   function activePreviewEntries() {
     return activeEntries().filter(isPreviewable);
   }
@@ -450,7 +542,9 @@
       const row = document.createElement('div');
       row.className = `market-file-row${entry.format ? (selectedFormats.has(entry.format) ? '' : ' is-excluded') : ' is-unsupported'}`;
       const name = document.createElement('span'); name.textContent = entry.path;
-      const format = document.createElement('b'); format.textContent = entry.format ? FORMAT_LABELS[entry.format] : (entry.rejectionReason || '未対応');
+      const format = document.createElement('b'); format.textContent = entry.format
+        ? FORMAT_LABELS[entry.format]
+        : entry.mediaKind === 'audio' ? '音声（受け取り未対応）' : (entry.rejectionReason || '未対応');
       const size = document.createElement('small');
       size.textContent = entry.optimization
         ? `${fileSize(entry.file.size)}・${entry.optimization.integer_scale_factor}倍縮小済み`
@@ -549,6 +643,7 @@
       onChange: (checked) => {
         if (checked) { selectedFormats.add(format); dismissedFormats.delete(format); }
         else { selectedFormats.delete(format); dismissedFormats.add(format); }
+        productComposition = 'auto';
         updateProductType(); renderFiles(); renderPreviews(); scheduleListingDraftSave();
       }
     })));
@@ -556,7 +651,7 @@
       const empty = document.createElement('p'); empty.className = 'helper'; empty.textContent = '対応形式はまだ検出されていません。';
       $('listingFormatSwitches').append(empty);
     }
-    updateProductType(); renderFiles(); renderPreviews();
+    updateProductType(); renderFiles(); renderPreviews(); renderPackageComposition();
   }
 
   function updateProductType() {
@@ -566,9 +661,10 @@
       return;
     }
     const pixieeDraw = selectedFormats.has('pixiedraw-project');
+    const composition = compositionOption(effectiveComposition());
     $('listingProductType').textContent = pixieeDraw
-      ? 'PiXiEEDraw作品：編集用プロジェクトを含み、購入後にPiXiEEDrawで開けます。'
-      : '一般素材：画像・アニメーション形式をZIPで受け取る商品です。';
+      ? `${composition.label}：編集用プロジェクトを含み、購入後にiDRAWで開けます。`
+      : `${composition.label}：画像・アニメーション形式をZIPで受け取る商品です。`;
     $('listingProductType').className = `market-product-type-preview ${pixieeDraw ? 'is-pixiedraw-product' : 'is-general-product'}`;
   }
 
@@ -637,7 +733,7 @@
       const previewBlob = acceptedFormat === 'pixiedraw-project'
         ? await packageUtils.extractPixieeDrawPreviewPng(file)
         : null;
-      detected.push({ path, file, format: acceptedFormat, previewBlob, optimization, dimensions, rejectionReason });
+      detected.push({ path, file, format: acceptedFormat, mediaKind: packageUtils.detectMediaKind(file, acceptedFormat), previewBlob, optimization, dimensions, rejectionReason });
       if (index > 0 && index % 20 === 0) setStatus(`ファイル形式を判定しています（${index + 1}/${files.length}）...`);
     }
     if (run !== detectionRun) return;
@@ -658,7 +754,7 @@
       ...optimizationWarnings,
       ignoredFileCount ? `未対応形式 ${ignoredFileCount}件は一覧に残していますが、現在の出品には含まれません。` : '',
       oversizedRasterEntries ? `512×512pxを超える画像素材 ${oversizedRasterEntries}件は出品に含められません。` : '',
-      previewlessProjectCount ? `旧形式などPNGサムネイルを含まないPiXiEEDraw ${previewlessProjectCount}件はプレビューを生成できませんでした。` : ''
+      previewlessProjectCount ? `旧形式などPNGサムネイルを含まないiDRAW ${previewlessProjectCount}件はプレビューを生成できませんでした。` : ''
     ].filter(Boolean).join(' '));
   }
 
@@ -725,6 +821,7 @@
     sourceFiles.clear(); detectedEntries = []; ignoredFileCount = 0; thumbnailPath = '';
     sourceOptimizations.clear();
     selectedFormats.clear(); dismissedFormats.clear(); samplePreviewPaths.clear(); previewSelectionTouched = false;
+    productComposition = 'auto';
     detectionRun += 1;
     previewUrls.forEach((url) => URL.revokeObjectURL(url)); previewUrls.clear();
     renderFormats(); setStatus(''); scheduleListingDraftSave();
@@ -912,12 +1009,12 @@
       };
     });
     if (!(transfer?.file instanceof File) || Number(transfer.expiresAt) < Date.now()) {
-      setStatus('販売用PXDの引き継ぎ期限が切れました。PiXiEEDrawからもう一度「販売する」を押してください。');
+      setStatus('販売用PXDの引き継ぎ期限が切れました。iDRAWからもう一度「販売する」を押してください。');
       return false;
     }
     await addFiles([{ file: transfer.file, path: transfer.file.name }]);
     if (!$('listingTitle').value.trim()) $('listingTitle').value = transfer.file.name.replace(/\.(?:pxd|pixieedraw|pxdraw)$/i, '');
-    setStatus('PiXiEEDrawからPXDを受け取りました。埋め込みPNGからサムネイルと購入前プレビューを選べます。');
+    setStatus('iDRAWからPXDを受け取りました。埋め込みPNGからサムネイルと購入前プレビューを選べます。');
     window.history.replaceState({}, '', `${location.pathname}${location.hash}`);
     return true;
   }
@@ -945,6 +1042,23 @@
     const totalBytes = entries.reduce((total, entry) => total + entry.file.size, 0);
     if (totalBytes > MAX_TOTAL_BYTES) { setStatus('1商品の合計ファイルサイズは50MBまでです。'); return; }
     const formats = FORMAT_ORDER.filter((format) => selectedFormats.has(format) && entries.some((entry) => entry.format === format));
+    const composition = effectiveComposition();
+    if (!['image-only', 'audio-only', 'image-audio', 'pixiedraw-project', 'all-files'].includes(composition)) {
+      setStatus('販売パッケージ構成を選び直してください。'); return;
+    }
+    const detectedSupportedFormats = new Set(detectedEntries.map((entry) => entry.format).filter(Boolean));
+    const compositionMismatch = composition === 'image-only'
+      ? formats.includes('pixiedraw-project') || formats.some((format) => AUDIO_FORMATS.has(format)) || !formats.some((format) => !AUDIO_FORMATS.has(format) && format !== 'pixiedraw-project')
+      : composition === 'audio-only'
+        ? formats.some((format) => !AUDIO_FORMATS.has(format)) || !formats.some((format) => AUDIO_FORMATS.has(format))
+        : composition === 'image-audio'
+          ? formats.includes('pixiedraw-project') || !formats.some((format) => AUDIO_FORMATS.has(format)) || !formats.some((format) => !AUDIO_FORMATS.has(format) && format !== 'pixiedraw-project')
+          : composition === 'pixiedraw-project'
+            ? formats.length !== 1 || formats[0] !== 'pixiedraw-project'
+            : detectedEntries.some((entry) => !entry.format) || formats.length !== detectedSupportedFormats.size;
+    if (compositionMismatch) {
+      setStatus('販売パッケージ構成と含める形式が一致していません。構成を選び直してください。'); return;
+    }
     const optionIds = optionCatalog.filter((option) => selectedOptionIds.has(option.id)).map((option) => option.id);
     const tags = listingTags();
     if (tags.length > MAX_TAGS || tags.some((tag) => Array.from(tag).length > 24)) {
@@ -992,6 +1106,9 @@
         file_count: entries.length,
         total_bytes: packageData.totalBytes,
         detected_formats: formats,
+        product_composition: composition,
+        composition_label: compositionOption(composition).label,
+        excluded_media: detectedEntries.filter((entry) => !entry.format).map((entry) => ({ path: entry.path, media_kind: entry.mediaKind })),
         ai_usage_status: aiUsageStatus,
         legal_confirmation: { terms_version: MARKET_TERMS_VERSION, privacy_version: MARKET_PRIVACY_VERSION },
         listing_tags: tags,
@@ -1097,13 +1214,27 @@
       const manifestFile = new Blob([JSON.stringify({ ...provenance, asset_id: assetId, files: packageData.files, preview_storage: { thumbnail: thumbnailStoragePath, samples: sampleStoragePaths } }, null, 2)], { type: 'application/json' });
       const { error: manifestError } = await client.storage.from('market-private').upload(manifestPath, manifestFile, { upsert: false, contentType: 'application/json' });
       if (manifestError) throw manifestError; uploadedPaths.push(manifestPath);
+      submissionStep = 'サーバー検証';
+      setStatus('Storage実体・形式・ハッシュをサーバーで検証しています...');
+      const { data: verification, error: verificationError } = await client.functions.invoke('market-verify-listing-package', {
+        body: {
+          asset_id: assetId,
+          manifest_object_path: manifestPath,
+          file_object_paths: storedFiles.map((stored) => stored.path),
+          preview_object_path: thumbnailStoragePath,
+          sample_preview_paths: sampleStoragePaths
+        }
+      });
+      if (verificationError || verification?.ok !== true) {
+        throw verificationError || new Error(verification?.error || '販売パッケージのサーバー検証に失敗しました');
+      }
       submissionStep = '送信確定';
       const attachInput = {
         input_asset_id: assetId,
-        input_manifest_object_path: manifestPath,
-        input_file_object_paths: storedFiles.map((stored) => stored.path),
-        input_preview_object_path: thumbnailStoragePath,
-        input_sample_preview_paths: sampleStoragePaths
+        input_manifest_object_path: verification.manifest_object_path,
+        input_file_object_paths: verification.file_object_paths,
+        input_preview_object_path: verification.preview_object_path,
+        input_sample_preview_paths: verification.sample_preview_paths || []
       };
       let attachError = null;
       for (let attempt = 0; attempt < 3; attempt += 1) {

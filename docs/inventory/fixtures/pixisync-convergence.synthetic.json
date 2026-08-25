@@ -1,0 +1,32 @@
+{
+  "fixture_id": "wp000-pixisync-convergence",
+  "synthetic": true,
+  "private_data": false,
+  "purpose": "Deterministic revision/order fixture for duplicate, reorder, delay, and convergence checks",
+  "room": {
+    "room_id": "00000000-0000-4000-8000-000000000010",
+    "project_id": "fixture-project-0001",
+    "confirmed_revision": 3,
+    "checkpoint_revision": 1
+  },
+  "clients": [
+    {"client_id": "fixture-client-a", "last_confirmed_revision": 1},
+    {"client_id": "fixture-client-b", "last_confirmed_revision": 1}
+  ],
+  "operations": [
+    {"op_id": "fixture-op-0002", "client_id": "fixture-client-b", "revision": 2, "kind": "pixel_patch", "payload": {"index": 1, "color": 1}},
+    {"op_id": "fixture-op-0001", "client_id": "fixture-client-a", "revision": 1, "kind": "pixel_patch", "payload": {"index": 0, "color": 1}},
+    {"op_id": "fixture-op-0003", "client_id": "fixture-client-a", "revision": 3, "kind": "pixel_patch", "payload": {"index": 2, "color": 1}}
+  ],
+  "delivery_variants": [
+    "in-order",
+    "reordered [2,1,3]",
+    "duplicate op-0002",
+    "delayed op-0003"
+  ],
+  "expected": {
+    "final_revision": 3,
+    "both_clients_converge_to_same_document_hash": true,
+    "duplicate_operation_is_not_applied_twice": true
+  }
+}

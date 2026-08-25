@@ -1,0 +1,12 @@
+skill_id: CHANGE-IMPACT-001
+input: [CHANGE.md, blueprint, state, work_queue]
+steps:
+  - extract_new_change_delta
+  - detect_conflict_with_north_star_or_constraints
+  - calculate_affected_specs_data_api_ui_tests_migrations_work_packages
+  - classify_reversibility_risk_and_cost
+  - invalidate_stale_research_or_experiment_cache_only_when_needed
+  - run_global_coherence_gate
+  - update_blueprint_if_solution_detail_changes
+  - request_human_only_if_approval_gate
+  - replan_minimum_affected_work

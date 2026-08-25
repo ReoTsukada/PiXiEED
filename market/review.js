@@ -28,7 +28,7 @@
     const title = document.createElement('h3'); title.textContent = asset.title || '名称未設定';
     const details = document.createElement('div'); details.className = 'market-review-fields';
     const formats = asset.included_formats?.length ? asset.included_formats.join(' / ') : asset.asset_format;
-    const productType = asset.included_formats?.includes('pixiedraw-project') ? 'PiXiEEDraw作品' : '一般素材';
+    const productType = asset.included_formats?.includes('pixiedraw-project') ? 'iDRAW作品' : '一般素材';
     const limitedSale = Number.isInteger(asset.limited_quantity) ? `先着${asset.limited_quantity}名` : '制限なし';
     const optionLabels = asset.series?.inherited_terms?.license_options?.map((option) => `${option.label} ${option.price_yen ?? option.minimum_price_yen ?? 0}円`).join(' / ') || '基本利用のみ';
     const filePaths = asset.provenance_manifest?.storage_file_paths || [];
