@@ -673,7 +673,7 @@ function validatePayload(state2, command) {
     }
   }
   if (command.commandType === "raster.writeSet") {
-    if (command.payload.writes.length < 1 || command.payload.writes.length > 1048576) {
+    if (command.payload.writes.length > 1048576) {
       diagnostics.push(diagnostic("WRITE_SET_COUNT_INVALID", "Write set must contain between 1 and 1048576 writes.", "payload.writes"));
     }
     for (const write of command.payload.writes) {
@@ -883,10 +883,14 @@ var EditorCore = class {
         }
       }
     }
+    const rasterChanged = command.commandType === "palette.setColor" || command.commandType === "palette.appendColor" ? false : points.some((point) => this.#state.assets[asset.id]?.raster.getPixel(point.x, point.y) !== asset.raster.getPixel(point.x, point.y));
+    const paletteChanged = command.commandType === "palette.setColor" ? asset.palette[command.payload.paletteIndex] !== command.payload.color : command.commandType === "palette.appendColor" ? true : rasterChanged;
+    const canonicalChanged = paletteChanged || rasterChanged;
+    const effectiveDirtyTileCount = canonicalChanged ? dirtyTiles.size : 0;
     const nextAsset = command.commandType === "palette.setColor" ? {
       ...asset,
       palette: asset.palette.map((color, index) => index === command.payload.paletteIndex ? command.payload.color : color),
-      revision: asset.revision + 1
+      revision: asset.revision + (paletteChanged ? 1 : 0)
     } : command.commandType === "palette.appendColor" ? {
       ...asset,
       palette: [
@@ -896,20 +900,22 @@ var EditorCore = class {
       revision: asset.revision + 1
     } : {
       ...asset,
-      revision: asset.revision + (dirtyTiles.size > 0 ? 1 : 0)
+      revision: asset.revision + (paletteChanged ? 1 : 0)
     };
     nextState.assets = {
       ...nextState.assets,
       [asset.id]: nextAsset
     };
-    nextState.appliedCommandIds = [
-      ...nextState.appliedCommandIds,
-      command.commandId
-    ];
-    nextState.lastClientSequenceByClient = {
-      ...nextState.lastClientSequenceByClient,
-      [command.clientId]: command.clientSequence
-    };
+    if (paletteChanged) {
+      nextState.appliedCommandIds = [
+        ...nextState.appliedCommandIds,
+        command.commandId
+      ];
+      nextState.lastClientSequenceByClient = {
+        ...nextState.lastClientSequenceByClient,
+        [command.clientId]: command.clientSequence
+      };
+    }
     this.#instrumentation.record({
       name: "command.commit",
       durationMs: this.#clock.now() - commitStarted
@@ -946,7 +952,7 @@ var EditorCore = class {
       paletteIndex: nextAsset.palette.length - 1
     } : {
       ...command.payload,
-      dirtyTileCount: dirtyTiles.size
+      dirtyTileCount: effectiveDirtyTileCount
     };
     const operationBody = {
       operationType: command.commandType,
@@ -964,33 +970,35 @@ var EditorCore = class {
       operationId: `op_${await sha256Hex(operationBody)}`,
       ...operationBody
     };
-    this.#state = nextState;
-    const dirtyRegions = command.commandType === "palette.setColor" || command.commandType === "palette.appendColor" ? [
+    const effectiveState = paletteChanged ? nextState : this.#state;
+    this.#state = effectiveState;
+    const dirtyRegions = paletteChanged && (command.commandType === "palette.setColor" || command.commandType === "palette.appendColor") ? [
       fullRegion(asset)
-    ] : dirtyTiles.size === 0 ? [] : [
+    ] : !paletteChanged ? [] : [
       regionFromPoints(asset.id, points)
     ];
     const strokeMetrics = command.commandType === "raster.strokeCommit" ? {
       inputPointCount: command.payload.points.length,
       interpolatedPixelCount: points.length,
       touchedTileCount: touchedTileKeys.size,
-      dirtyTileCount: dirtyTiles.size,
+      dirtyTileCount: effectiveDirtyTileCount,
       dirtyRegionCount: dirtyRegions.length,
       unrelatedFrameCount: Math.max(0, this.#state.frames.length - 1),
       unrelatedLayerCount: Math.max(0, this.#state.layers.length - 1)
     } : void 0;
     return {
       ok: true,
-      state: nextState,
+      state: effectiveState,
       result: {
         operation,
-        dirtyTiles: [
+        noOp: !canonicalChanged,
+        dirtyTiles: canonicalChanged ? [
           ...dirtyTiles.values()
-        ].sort((left, right) => left.tileKey.localeCompare(right.tileKey)),
+        ].sort((left, right) => left.tileKey.localeCompare(right.tileKey)) : [],
         dirtyRegions,
-        memory: nextAsset.raster.memoryMetrics(),
-        copiedBytes,
-        cowSplitCount,
+        memory: effectiveState.assets[asset.id]?.raster.memoryMetrics() ?? nextAsset.raster.memoryMetrics(),
+        copiedBytes: canonicalChanged ? copiedBytes : 0,
+        cowSplitCount: canonicalChanged ? cowSplitCount : 0,
         ...strokeMetrics === void 0 ? {} : {
           strokeMetrics
         },
@@ -1081,6 +1089,7 @@ var LocalAutosaveCoordinator = class {
     this.#instrumentation = instrumentation2;
   }
   async record(state2, result) {
+    if (result.noOp) return;
     const started = performance.now();
     await this.#journal.append(result.operation);
     const asset = state2.assets[result.operation.assetId];
@@ -4613,6 +4622,25 @@ var PixyncProductionCompositionRoot = class _PixyncProductionCompositionRoot {
 var GAME_PROJECT_SCHEMA_VERSION = 1;
 var BEHAVIOR_IR_VERSION = 1;
 var GAME_RUNTIME_PROFILE_SCHEMA_VERSION = 1;
+var GAME_TILEMAP_DOCUMENT_SCHEMA_VERSION = 1;
+var GAME_TEMPLATE_CATEGORIES = [
+  "CORE",
+  "RPG",
+  "ACTION",
+  "SHOOTING",
+  "RACING",
+  "RHYTHM"
+];
+var GAME_TEMPLATE_KINDS = [
+  "CHARACTER",
+  "WEAPON",
+  "ARMOR",
+  "SKILL",
+  "STATUS",
+  "TILE",
+  "DAMAGE",
+  "UI"
+];
 function asId(value, label) {
   if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(value)) {
     throw new Error(`${label} must be a stable identifier.`);
@@ -4633,6 +4661,97 @@ var asSha2562 = (value) => {
 };
 function isRecord5(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+var GAME_TILEMAP_DOCUMENT_KEYS = /* @__PURE__ */ new Set([
+  "schemaVersion",
+  "mapId",
+  "width",
+  "height",
+  "tileSize",
+  "cells"
+]);
+var GAME_TILEMAP_CELL_KEYS = /* @__PURE__ */ new Set([
+  "x",
+  "y",
+  "collision",
+  "triggerId"
+]);
+function isValidGameTilemapDocument(value) {
+  if (!isRecord5(value)) return false;
+  const width = value.width;
+  const height = value.height;
+  const tileSize = value.tileSize;
+  const cells = value.cells;
+  if (Object.keys(value).some((key) => !GAME_TILEMAP_DOCUMENT_KEYS.has(key)) || value.schemaVersion !== GAME_TILEMAP_DOCUMENT_SCHEMA_VERSION || typeof value.mapId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(value.mapId) || !Number.isSafeInteger(width) || typeof width !== "number" || width < 1 || width > 256 || !Number.isSafeInteger(height) || typeof height !== "number" || height < 1 || height > 256 || !Number.isSafeInteger(tileSize) || typeof tileSize !== "number" || tileSize < 1 || tileSize > 4096 || !Array.isArray(cells) || cells.length > width * height) {
+    return false;
+  }
+  const seen = /* @__PURE__ */ new Set();
+  for (const rawCell of cells) {
+    if (!isRecord5(rawCell)) return false;
+    const x = rawCell.x;
+    const y = rawCell.y;
+    const collision = rawCell.collision;
+    const triggerId = rawCell.triggerId;
+    if (Object.keys(rawCell).some((key2) => !GAME_TILEMAP_CELL_KEYS.has(key2)) || !Number.isSafeInteger(x) || typeof x !== "number" || x < 0 || x >= width || !Number.isSafeInteger(y) || typeof y !== "number" || y < 0 || y >= height || collision !== "NONE" && collision !== "SOLID" || triggerId !== void 0 && (typeof triggerId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(triggerId)) || collision === "NONE" && triggerId === void 0) {
+      return false;
+    }
+    const key = `${x},${y}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+  }
+  return true;
+}
+var GAME_TEMPLATE_INSTANCE_KEYS = /* @__PURE__ */ new Set([
+  "instanceId",
+  "templateId",
+  "category",
+  "kind",
+  "target",
+  "label",
+  "values",
+  "targetTrackId"
+]);
+var GAME_TEMPLATE_VALUE_KEY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u;
+function isValidGameTemplateInstance(value) {
+  if (!isRecord5(value)) return false;
+  if (Object.keys(value).some((key) => !GAME_TEMPLATE_INSTANCE_KEYS.has(key)) || typeof value.instanceId !== "string" || !GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.instanceId) || typeof value.templateId !== "string" || !GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.templateId) || !GAME_TEMPLATE_CATEGORIES.includes(value.category) || !GAME_TEMPLATE_KINDS.includes(value.kind) || value.target !== "SCENE_OBJECT" && value.target !== "GAME_DATA" || typeof value.label !== "string" || value.label.trim().length === 0 || !isRecord5(value.values) || value.targetTrackId !== void 0 && (typeof value.targetTrackId !== "string" || !GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.targetTrackId))) return false;
+  if (value.target === "SCENE_OBJECT" && value.targetTrackId === void 0) {
+    return false;
+  }
+  const templateValues = value.values;
+  if (!isRecord5(templateValues)) return false;
+  return Object.keys(templateValues).every((key) => {
+    if (!GAME_TEMPLATE_VALUE_KEY_PATTERN.test(key)) return false;
+    const templateValue = templateValues[key];
+    return typeof templateValue === "string" || typeof templateValue === "boolean" || typeof templateValue === "number" && Number.isFinite(templateValue);
+  });
+}
+var GAME_ANIMATION_BINDING_KEYS = /* @__PURE__ */ new Set([
+  "bindingId",
+  "trackId",
+  "assetDefinitionId",
+  "clipKey",
+  "motionName",
+  "direction",
+  "frameIds",
+  "fps",
+  "loopMode",
+  "flipX",
+  "flipY",
+  "mode",
+  "sourceAssetId",
+  "sourceRevisionId",
+  "sourceContentHash"
+]);
+function isValidGameAnimationBinding(value) {
+  if (!isRecord5(value)) return false;
+  const id = (candidate) => typeof candidate === "string" && GAME_TEMPLATE_VALUE_KEY_PATTERN.test(candidate);
+  const label = (candidate) => typeof candidate === "string" && candidate.trim().length > 0 && candidate.length <= 128;
+  return Object.keys(value).every((key) => GAME_ANIMATION_BINDING_KEYS.has(key)) && id(value.bindingId) && id(value.trackId) && id(value.assetDefinitionId) && label(value.clipKey) && label(value.motionName) && (value.direction === void 0 || label(value.direction)) && Array.isArray(value.frameIds) && value.frameIds.length > 0 && value.frameIds.length <= 512 && value.frameIds.every((frameId) => id(frameId)) && typeof value.fps === "number" && Number.isFinite(value.fps) && value.fps > 0 && value.fps <= 240 && [
+    "LOOP",
+    "ONCE",
+    "PING_PONG"
+  ].includes(String(value.loopMode)) && typeof value.flipX === "boolean" && typeof value.flipY === "boolean" && (value.mode === "LIVE" || value.mode === "PINNED") && (value.sourceAssetId === void 0 || id(value.sourceAssetId)) && (value.sourceRevisionId === void 0 || id(value.sourceRevisionId)) && (value.sourceContentHash === void 0 || typeof value.sourceContentHash === "string" && /^[a-f0-9]{64}$/u.test(value.sourceContentHash));
 }
 function diagnostic2(code, path, message) {
   return {
@@ -4751,6 +4870,9 @@ function validateComponent(component, path, ownerId, knownBehaviorIds, diagnosti
     if (typeof component.collisionEnabled !== "boolean") {
       diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.collisionEnabled`, "Tilemap collisionEnabled must be boolean."));
     }
+    if (component.document !== void 0 && !isValidGameTilemapDocument(component.document)) {
+      diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.document`, "Tilemap document is invalid."));
+    }
   }
   if (component.type === "COLLIDER") {
     if (![
@@ -4862,7 +4984,7 @@ function validateGameComponentState(component, path, diagnostics) {
   if (component.type === "CAMERA" && (typeof component.active !== "boolean" || typeof component.zoom !== "number" || !Number.isFinite(component.zoom) || component.zoom <= 0)) {
     diagnostics.push(diagnostic2("INVALID_PROJECT", path, "Game editor Camera state is invalid."));
   }
-  if (component.type === "TILEMAP" && (typeof component.mapId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(component.mapId) || typeof component.tileSize !== "number" || !Number.isSafeInteger(component.tileSize) || component.tileSize < 1 || typeof component.collisionEnabled !== "boolean")) {
+  if (component.type === "TILEMAP" && (typeof component.mapId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(component.mapId) || typeof component.tileSize !== "number" || !Number.isSafeInteger(component.tileSize) || component.tileSize < 1 || typeof component.collisionEnabled !== "boolean" || component.document !== void 0 && !isValidGameTilemapDocument(component.document))) {
     diagnostics.push(diagnostic2("INVALID_PROJECT", path, "Game editor Tilemap state is invalid."));
   }
   if (component.type === "COLLIDER") {
@@ -5076,6 +5198,41 @@ function validateGameProject(value, caller) {
             }
           }
         }
+        if (track.tilemap !== void 0 && !isValidGameTilemapDocument(track.tilemap)) {
+          diagnostics.push(diagnostic2("INVALID_PROJECT", `editorTimeline.tracks[${index}].tilemap`, "Editor tilemap document is invalid."));
+        }
+      }
+    }
+    if (timeline.templateInstances !== void 0) {
+      if (!Array.isArray(timeline.templateInstances) || timeline.templateInstances.some((instance) => !isValidGameTemplateInstance(instance))) {
+        diagnostics.push(diagnostic2("INVALID_PROJECT", "editorTimeline.templateInstances", "Game template instances are invalid."));
+      } else {
+        diagnostics.push(...duplicateDiagnostics(timeline.templateInstances.map((instance) => instance.instanceId), "editorTimeline.templateInstances.instanceId"));
+        const trackIds = new Set(Array.isArray(timeline.tracks) ? timeline.tracks.map((track) => track.trackId) : []);
+        for (const [index, instance] of timeline.templateInstances.entries()) {
+          if (instance.targetTrackId !== void 0 && !trackIds.has(instance.targetTrackId)) {
+            diagnostics.push(diagnostic2("MISSING_REFERENCE", `editorTimeline.templateInstances[${index}].targetTrackId`, "Game template target track is missing."));
+          }
+        }
+      }
+    }
+    if (timeline.animationBindings !== void 0) {
+      if (!Array.isArray(timeline.animationBindings) || timeline.animationBindings.some((binding) => !isValidGameAnimationBinding(binding))) {
+        diagnostics.push(diagnostic2("INVALID_PROJECT", "editorTimeline.animationBindings", "Game animation bindings are invalid."));
+      } else {
+        diagnostics.push(...duplicateDiagnostics(timeline.animationBindings.map((binding) => binding.bindingId), "editorTimeline.animationBindings.bindingId"));
+        const trackIds = new Set(Array.isArray(timeline.tracks) ? timeline.tracks.map((track) => track.trackId) : []);
+        const keys = /* @__PURE__ */ new Set();
+        for (const [index, binding] of timeline.animationBindings.entries()) {
+          if (!trackIds.has(binding.trackId)) {
+            diagnostics.push(diagnostic2("MISSING_REFERENCE", `editorTimeline.animationBindings[${index}].trackId`, "Game animation target track is missing."));
+          }
+          const key = `${binding.trackId}\0${binding.assetDefinitionId}\0${binding.clipKey}`;
+          if (keys.has(key)) {
+            diagnostics.push(diagnostic2("DUPLICATE_ID", `editorTimeline.animationBindings[${index}]`, "A Game animation clip can only be assigned once per object."));
+          }
+          keys.add(key);
+        }
       }
     }
   }
@@ -5131,7 +5288,18 @@ function canonicalProjectPayload(project) {
           activeFrames: [
             ...track.activeFrames
           ].sort((left, right) => left - right)
-        }))
+        })),
+        ...project.editorTimeline.templateInstances === void 0 ? {} : {
+          templateInstances: sortById(project.editorTimeline.templateInstances, "instanceId")
+        },
+        ...project.editorTimeline.animationBindings === void 0 ? {} : {
+          animationBindings: sortById(project.editorTimeline.animationBindings, "bindingId").map((binding) => ({
+            ...binding,
+            frameIds: [
+              ...binding.frameIds
+            ]
+          }))
+        }
       }
     }
   };
@@ -5618,7 +5786,7 @@ function changedRegions(assetId, points) {
     }
   ];
 }
-async function buildResult(state2, commandId, operationType, operationPayload2, asset, dirtyTiles, dirtyRegions, copiedBytes, cowSplitCount) {
+async function buildResult(state2, commandId, operationType, operationPayload2, asset, dirtyTiles, dirtyRegions, copiedBytes, cowSplitCount, noOp = false) {
   const operationBody = {
     operationType,
     schemaVersion: 1,
@@ -5647,6 +5815,7 @@ async function buildResult(state2, commandId, operationType, operationPayload2, 
   ]);
   return {
     operation,
+    noOp,
     metricScope: "COMMAND_TO_DIRTY",
     dirtyTiles: [
       ...dirtyTiles.values()
@@ -5704,9 +5873,33 @@ function applyPixelMutations(state2, assetId, sourcePixels, destinationPixels, c
   };
   if (clearSource) for (const pixel of sourcePixels) mutate(pixel, 0);
   for (const pixel of destinationPixels) mutate(pixel, pixel.colorIndex);
+  const uniqueDirtyPoints = new Map(dirtyPoints.map((point) => [
+    `${point.x}:${point.y}`,
+    point
+  ]));
+  const effectiveDirtyPoints = [
+    ...uniqueDirtyPoints.values()
+  ].filter((point) => state2.assets[assetId]?.raster.getPixel(point.x, point.y) !== asset.raster.getPixel(point.x, point.y));
+  if (effectiveDirtyPoints.length === 0) {
+    const originalAsset = state2.assets[assetId];
+    if (originalAsset === void 0) throw new Error("Selection target asset is missing.");
+    return {
+      state: state2,
+      asset: originalAsset,
+      dirtyTiles: /* @__PURE__ */ new Map(),
+      dirtyPoints: [],
+      copiedBytes: 0,
+      cowSplitCount: 0,
+      changed: false
+    };
+  }
+  const effectiveTileKeys = new Set(effectiveDirtyPoints.map((point) => `${Math.floor(point.x / asset.raster.tileSize)}:${Math.floor(point.y / asset.raster.tileSize)}`));
+  const effectiveDirtyTiles = new Map([
+    ...dirtyTiles
+  ].filter(([tileKey]) => effectiveTileKeys.has(tileKey)));
   const nextAsset = {
     ...asset,
-    revision: asset.revision + (dirtyTiles.size > 0 ? 1 : 0)
+    revision: asset.revision + 1
   };
   nextState.assets = {
     ...nextState.assets,
@@ -5715,10 +5908,11 @@ function applyPixelMutations(state2, assetId, sourcePixels, destinationPixels, c
   return {
     state: nextState,
     asset: nextAsset,
-    dirtyTiles,
-    dirtyPoints,
+    dirtyTiles: effectiveDirtyTiles,
+    dirtyPoints: effectiveDirtyPoints,
     copiedBytes,
-    cowSplitCount
+    cowSplitCount,
+    changed: true
   };
 }
 function commitState(state2, commandId) {
@@ -5763,13 +5957,27 @@ async function commitTransform(state2, command) {
     ]
   };
   const clipped = transformed.filter((pixel) => pixel.x >= 0 && pixel.y >= 0 && pixel.x < asset.width && pixel.y < asset.height);
+  const transform2 = command.payload.session.transform;
+  const identityTransform = transform2.operation === "MOVE" && transform2.dx === 0 && transform2.dy === 0;
+  if (identityTransform) {
+    const result = await buildResult(state2, command.commandId, "selection.transformCommit", {
+      selectionId: command.payload.selection.selectionId,
+      selectionVersion: command.payload.selection.mask.selectionVersion,
+      transform: transform2,
+      sourcePixelCount: command.payload.selection.pixels.length,
+      destinationPixelCount: clipped.length,
+      outOfBoundsClipped: false
+    }, asset, /* @__PURE__ */ new Map(), [], 0, 0, true);
+    return {
+      ok: true,
+      state: state2,
+      result
+    };
+  }
   const mutation = applyPixelMutations(state2, command.assetId, command.payload.selection.pixels, clipped, true);
   const sourcePoints = command.payload.selection.pixels;
   const destinationPoints = clipped;
-  const dirtyRegions = [
-    ...changedRegions(asset.id, sourcePoints),
-    ...changedRegions(asset.id, destinationPoints)
-  ];
+  const dirtyRegions = changedRegions(asset.id, mutation.dirtyPoints);
   const operationPayload2 = {
     selectionId: command.payload.selection.selectionId,
     selectionVersion: command.payload.selection.mask.selectionVersion,
@@ -5778,7 +5986,12 @@ async function commitTransform(state2, command) {
     destinationPixelCount: destinationPoints.length,
     outOfBoundsClipped: outOfBounds && command.payload.session.transform.outOfBoundsPolicy === "CLIP"
   };
-  const temporaryResult = await buildResult(mutation.state, command.commandId, "selection.transformCommit", operationPayload2, mutation.asset, mutation.dirtyTiles, dirtyRegions, mutation.copiedBytes, mutation.cowSplitCount);
+  const temporaryResult = await buildResult(mutation.state, command.commandId, "selection.transformCommit", operationPayload2, mutation.asset, mutation.dirtyTiles, dirtyRegions, mutation.copiedBytes, mutation.cowSplitCount, !mutation.changed);
+  if (!mutation.changed) return {
+    ok: true,
+    state: state2,
+    result: temporaryResult
+  };
   const nextState = commitState(mutation.state, command.commandId);
   return {
     ok: true,
@@ -5825,12 +6038,18 @@ async function cutClipboard(state2, command) {
     diagnostics
   };
   const mutation = applyPixelMutations(state2, command.assetId, command.payload.selection.pixels, [], true);
-  const dirtyRegions = changedRegions(asset.id, command.payload.selection.pixels);
+  const dirtyRegions = changedRegions(asset.id, mutation.dirtyPoints);
   const result = await buildResult(mutation.state, command.commandId, "clipboard.cut", {
     format: command.payload.clipboard.format,
     version: 1,
     pixelCount: command.payload.clipboard.pixels.length
-  }, mutation.asset, mutation.dirtyTiles, dirtyRegions, mutation.copiedBytes, mutation.cowSplitCount);
+  }, mutation.asset, mutation.dirtyTiles, dirtyRegions, mutation.copiedBytes, mutation.cowSplitCount, !mutation.changed);
+  if (!mutation.changed) return {
+    ok: true,
+    state: state2,
+    result,
+    clipboard: command.payload.clipboard
+  };
   const nextState = commitState(mutation.state, command.commandId);
   return {
     ok: true,
@@ -5926,7 +6145,13 @@ async function pasteClipboard(state2, command) {
     version: 1,
     pixelCount: clipped.length,
     paletteCompatibility: compatibility.result
-  }, mutation.asset, mutation.dirtyTiles, changedRegions(asset.id, clipped), mutation.copiedBytes, mutation.cowSplitCount);
+  }, mutation.asset, mutation.dirtyTiles, changedRegions(asset.id, mutation.dirtyPoints), mutation.copiedBytes, mutation.cowSplitCount, !mutation.changed);
+  if (!mutation.changed) return {
+    ok: true,
+    state: state2,
+    result,
+    clipboard: command.payload.clipboard
+  };
   const nextState = commitState(mutation.state, command.commandId);
   return {
     ok: true,
@@ -6004,6 +6229,52 @@ var LocalUndoRedoHistory = class {
     });
     this.#redo.length = 0;
     this.#state = cloneProjectStateShared(after);
+  }
+  /**
+   * Rebase local full-state history over a remote raster operation. Aseprite's
+   * local undo restores the user's previous edit without removing a later
+   * change; applying the remote command to both sides of every local entry
+   * gives the same invariant for Draw2's snapshot history.
+   */
+  async rebaseRemoteRasterOperation(command, currentState) {
+    if (!command.commandType.startsWith("raster.")) {
+      throw new Error("Only raster operations can rebase Draw2 history.");
+    }
+    const rebase = async (snapshot) => {
+      if (snapshot.appliedCommandIds.includes(command.commandId)) {
+        return snapshot;
+      }
+      const nextClientSequence2 = (snapshot.lastClientSequenceByClient[command.clientId] ?? 0) + 1;
+      const rebasedCommand = {
+        ...command,
+        projectId: snapshot.projectId,
+        baseStructureEpoch: snapshot.structureEpoch,
+        clientSequence: nextClientSequence2
+      };
+      const result = await new EditorCore(snapshot).execute(rebasedCommand);
+      if (!result.ok) {
+        throw new Error(`Remote history rebase failed: ${result.diagnostics[0]?.code ?? "unknown"}`);
+      }
+      return {
+        ...result.state,
+        lastClientSequenceByClient: {
+          ...result.state.lastClientSequenceByClient,
+          [command.clientId]: command.clientSequence
+        }
+      };
+    };
+    const rebaseEntry = async (entry) => ({
+      ...entry,
+      before: await rebase(entry.before),
+      after: await rebase(entry.after)
+    });
+    const [undo, redo] = await Promise.all([
+      Promise.all(this.#undo.map(rebaseEntry)),
+      Promise.all(this.#redo.map(rebaseEntry))
+    ]);
+    this.#undo.splice(0, this.#undo.length, ...undo);
+    this.#redo.splice(0, this.#redo.length, ...redo);
+    this.#state = cloneProjectStateShared(currentState);
   }
   undo() {
     const entry = this.#undo.pop();
@@ -6266,6 +6537,7 @@ async function resultFor(state2, command, operationType, domains) {
   const metricScope = "COMMAND_TO_DIRTY";
   return {
     operation,
+    noOp: false,
     metricScope,
     structuralDirtyDomains: domains,
     dirtyTiles: [],
@@ -6847,8 +7119,7 @@ function patternVisible(x, y, pattern) {
 }
 function stamp(center, options, bounds) {
   const size = options.brushSize;
-  const start = -Math.floor((size - 1) / 2);
-  const end = start + size - 1;
+  const start = -Math.floor(size / 2);
   const centerOffset = (size - 1) / 2;
   const radius = Math.max(0.5, size / 2);
   const points = [];
@@ -6884,6 +7155,64 @@ function rectanglePixels(rect, filled) {
     }
   }
   return points;
+}
+function isFilledShapeTool(tool) {
+  return tool === "rect-fill" || tool === "ellipse-fill" || tool === "circle-fill";
+}
+function isOutlineShapeTool(tool) {
+  return tool === "rect" || tool === "ellipse" || tool === "circle";
+}
+function patternedShapePixels(points, pattern, bounds) {
+  return sortedUnique(points.filter((point) => patternVisible(point.x, point.y, pattern)), bounds);
+}
+function insetBounds(rect, inset) {
+  const width = rect.width - inset * 2;
+  const height = rect.height - inset * 2;
+  if (width < 1 || height < 1) return void 0;
+  return {
+    x: rect.x + inset,
+    y: rect.y + inset,
+    width,
+    height
+  };
+}
+function circleRectForBounds(rect) {
+  const side = Math.min(rect.width, rect.height);
+  return {
+    x: rect.x + Math.floor((rect.width - side) / 2),
+    y: rect.y + Math.floor((rect.height - side) / 2),
+    width: side,
+    height: side
+  };
+}
+function shapeGeometryBounds(tool, rect) {
+  return tool === "circle" || tool === "circle-fill" ? circleRectForBounds(rect) : rect;
+}
+function subtractPixels(outer, inner, bounds) {
+  const innerKeys = new Set(inner.map(pointKey));
+  return sortedUnique(outer.filter((point) => !innerKeys.has(pointKey(point))), bounds);
+}
+function shapeStrokePixels(tool, from, to, brushSize2, bounds) {
+  const dragRect = normalizeBounds(from, to, bounds);
+  const geometryRect = shapeGeometryBounds(tool, dragRect);
+  if (brushSize2 <= 1) return shapePixels(tool, from, to, bounds);
+  const outer = tool === "rect" ? rectanglePixels(geometryRect, true) : ellipsePixels(geometryRect, true);
+  const innerRect = insetBounds(geometryRect, brushSize2);
+  if (innerRect === void 0) return sortedUnique(outer, bounds);
+  const inner = tool === "rect" ? rectanglePixels(innerRect, true) : ellipsePixels(innerRect, true);
+  return subtractPixels(outer, inner, bounds);
+}
+function shapeWritePixels(tool, from, to, options, bounds) {
+  const rect = normalizeBounds(from, to, bounds);
+  if (rect.width === 1 && rect.height === 1) {
+    return stampBrush([
+      clampPoint(from, bounds)
+    ], options, bounds);
+  }
+  if (isFilledShapeTool(tool)) {
+    return patternedShapePixels(shapePixels(tool, from, to, bounds), options.pattern, bounds);
+  }
+  return patternedShapePixels(shapeStrokePixels(tool, from, to, options.brushSize, bounds), options.pattern, bounds);
 }
 function ellipsePixels(rect, filled) {
   const points = [];
@@ -7004,21 +7333,15 @@ function shapePixels(tool, from, to, bounds) {
     return sortedUnique(ellipsePixels(rect, true), bounds);
   }
   if (tool === "circle" || tool === "circle-fill") {
-    const side = Math.min(rect.width, rect.height);
-    const circleRect = {
-      x: rect.x + Math.floor((rect.width - side) / 2),
-      y: rect.y + Math.floor((rect.height - side) / 2),
-      width: side,
-      height: side
-    };
+    const circleRect = circleRectForBounds(rect);
     return sortedUnique(ellipsePixels(circleRect, tool === "circle-fill"), bounds);
   }
   return [];
 }
 function createWriteSet(tool, from, to, colorIndex, options, bounds) {
   const safe = normalizeToolOptions(options);
-  const base = tool === "pen" || tool === "eraser" ? interpolatePixelLine(clampPoint(from, bounds), clampPoint(to, bounds)) : shapePixels(tool, from, to, bounds);
-  return stampBrush(base, safe, bounds).map((point) => ({
+  const base = tool === "pen" || tool === "eraser" ? stampBrush(interpolatePixelLine(clampPoint(from, bounds), clampPoint(to, bounds)), safe, bounds) : isFilledShapeTool(tool) || isOutlineShapeTool(tool) ? shapeWritePixels(tool, from, to, safe, bounds) : stampBrush(shapePixels(tool, from, to, bounds), safe, bounds);
+  return base.map((point) => ({
     ...point,
     colorIndex: tool === "eraser" ? 0 : colorIndex
   }));
@@ -8527,6 +8850,67 @@ var DrawAudioReferenceStore = class {
     ].sort((left, right) => left.startFrame - right.startFrame || left.id.localeCompare(right.id));
   }
 };
+var MAX_SELECTION_STAMP_DIMENSION = 4096;
+var MAX_SELECTION_STAMP_AREA = 1048576;
+function normalizeDraw2SelectionStamp(input) {
+  if (typeof input.id !== "string" || typeof input.name !== "string" || !Array.isArray(input.pixels) || !Array.isArray(input.palette)) {
+    throw new Error("Draw2 selection stamp shape is invalid.");
+  }
+  if (!Number.isSafeInteger(input.width) || !Number.isSafeInteger(input.height) || input.width < 1 || input.height < 1 || input.width > MAX_SELECTION_STAMP_DIMENSION || input.height > MAX_SELECTION_STAMP_DIMENSION || input.width * input.height > MAX_SELECTION_STAMP_AREA) {
+    throw new Error("Draw2 selection stamp dimensions are invalid.");
+  }
+  if (input.palette.length < 1 || input.palette.length > 256) {
+    throw new Error("Draw2 selection stamp palette is invalid.");
+  }
+  const palette = input.palette.map((color) => {
+    if (!Number.isSafeInteger(color) || color < 0 || color > 4294967295) throw new Error("Draw2 selection stamp palette color is invalid.");
+    return color >>> 0;
+  });
+  const pixels = /* @__PURE__ */ new Map();
+  for (const candidate of input.pixels) {
+    if (candidate === null || typeof candidate !== "object" || !Number.isSafeInteger(candidate.x) || !Number.isSafeInteger(candidate.y) || !Number.isSafeInteger(candidate.colorIndex) || candidate.x < 0 || candidate.y < 0 || candidate.x >= input.width || candidate.y >= input.height || candidate.colorIndex < 0 || candidate.colorIndex >= palette.length) {
+      throw new Error("Draw2 selection stamp pixel is invalid.");
+    }
+    pixels.set(`${candidate.x}:${candidate.y}`, {
+      x: candidate.x,
+      y: candidate.y,
+      colorIndex: candidate.colorIndex
+    });
+  }
+  return {
+    id: stableId(input.id, "Draw2 selection stamp ID"),
+    name: input.name.trim().slice(0, 64) || "Selection stamp",
+    width: input.width,
+    height: input.height,
+    pixels: [
+      ...pixels.values()
+    ].sort((left, right) => left.y - right.y || left.x - right.x),
+    palette,
+    schemaVersion: CREATOR_FEATURE_SCHEMA_VERSION
+  };
+}
+var Draw2SelectionStampStore = class {
+  #stamps = /* @__PURE__ */ new Map();
+  constructor(initial = []) {
+    for (const stamp2 of initial) this.save(stamp2);
+  }
+  save(input) {
+    const stamp2 = normalizeDraw2SelectionStamp(input);
+    this.#stamps.set(stamp2.id, stamp2);
+    return stamp2;
+  }
+  load(id) {
+    return this.#stamps.get(id);
+  }
+  remove(id) {
+    return this.#stamps.delete(id);
+  }
+  list() {
+    return [
+      ...this.#stamps.values()
+    ].sort((left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id));
+  }
+};
 var DRAW2_TIMELINE_METADATA_SCHEMA_VERSION = 2;
 function isMetadataRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -8558,6 +8942,10 @@ function normalizeDraw2TimelineMetadata(value, frameCount) {
   }
   if (!Array.isArray(value.animationTags) || !Array.isArray(value.markers) || !Array.isArray(value.audioReferences)) {
     throw new Error("Draw2 timeline metadata collections are invalid.");
+  }
+  const selectionStampCandidates = value.selectionStamps;
+  if (selectionStampCandidates !== void 0 && !Array.isArray(selectionStampCandidates)) {
+    throw new Error("Draw2 selection stamp collection is invalid.");
   }
   const tags = new AnimationTagStore();
   const tagIds = /* @__PURE__ */ new Set();
@@ -8598,6 +8986,19 @@ function normalizeDraw2TimelineMetadata(value, frameCount) {
     audioReferenceIds.add(candidate.id);
     audioReferences.upsert(candidate, frameCount);
   }
+  const selectionStamps = new Draw2SelectionStampStore();
+  const selectionStampIds = /* @__PURE__ */ new Set();
+  for (const candidate of selectionStampCandidates ?? []) {
+    if (candidate === null || typeof candidate !== "object" || typeof candidate.id !== "string") {
+      throw new Error("Draw2 selection stamp is invalid.");
+    }
+    const normalized = normalizeDraw2SelectionStamp(candidate);
+    if (selectionStampIds.has(normalized.id)) {
+      throw new Error("Draw2 selection stamp identity is duplicated.");
+    }
+    selectionStampIds.add(normalized.id);
+    selectionStamps.save(normalized);
+  }
   return {
     schemaVersion: DRAW2_TIMELINE_METADATA_SCHEMA_VERSION,
     animationTags: tags.list().map((tag) => ({
@@ -8606,7 +9007,18 @@ function normalizeDraw2TimelineMetadata(value, frameCount) {
     markers: markers.list().map(cloneTimelineMarker),
     audioReferences: audioReferences.list().map((reference) => ({
       ...reference
-    }))
+    })),
+    ...selectionStampCandidates === void 0 ? {} : {
+      selectionStamps: selectionStamps.list().map((stamp2) => ({
+        ...stamp2,
+        pixels: stamp2.pixels.map((pixel) => ({
+          ...pixel
+        })),
+        palette: [
+          ...stamp2.palette
+        ]
+      }))
+    }
   };
 }
 
@@ -9187,7 +9599,7 @@ var DRAW2_SHORTCUTS = [
     id: "tool-tile-stamp",
     version: 1,
     category: "Tools",
-    label: "Tile stamp",
+    label: "Tile placement",
     keys: "T",
     command: "tool-tile-stamp"
   },
@@ -10873,12 +11285,23 @@ async function loadRuntimeAssets(session, requests, resolver) {
   const diagnostics = [
     ...session.diagnostics
   ];
+  const uniqueRequests = /* @__PURE__ */ new Map();
   for (const request of requests) {
+    const key = String(request.assetId);
+    const existing = uniqueRequests.get(key);
+    uniqueRequests.set(key, existing === void 0 ? request : {
+      ...existing,
+      required: existing.required || request.required
+    });
+  }
+  for (const request of uniqueRequests.values()) {
     const entry = dependencyEntry(session, request.assetId);
     if (entry === void 0) {
       diagnostics.push(diagnostic4(request.required ? "MISSING_REQUIRED_ASSET" : "OPTIONAL_ASSET_MISSING", `Asset ${request.assetId} is not declared by the locked dependency snapshot.`, !request.required));
       continue;
     }
+    const existing = loaded[request.assetId];
+    if (existing !== void 0 && existing.revisionId === entry.revisionId && existing.contentHash === entry.contentHash) continue;
     const payload = await resolver.resolve(request);
     if (payload === void 0) {
       diagnostics.push(diagnostic4(request.required ? "MISSING_REQUIRED_ASSET" : "OPTIONAL_ASSET_MISSING", `Asset ${request.assetId} could not be resolved.`, !request.required));
@@ -10936,6 +11359,45 @@ function stepRuntime(session, deltaMs, input, animation) {
   };
 }
 
+// src/game/game-350/runtime-performance.ts
+var GAME_RUNTIME_PERFORMANCE_SCHEMA_VERSION = 1;
+var GAME_RUNTIME_PERFORMANCE_PROFILES = Object.freeze({
+  "2D_BROWSER": Object.freeze({
+    schemaVersion: GAME_RUNTIME_PERFORMANCE_SCHEMA_VERSION,
+    profileId: "2D_BROWSER",
+    label: "2D Browser",
+    budget: Object.freeze({
+      startupMs: 1200,
+      sceneLoadMs: 800,
+      firstFrameMs: 500,
+      steadyFrameMs: 16.67,
+      memoryBytes: 256 * 1024 * 1024,
+      assetBytes: 32 * 1024 * 1024,
+      decodedBytes: 96 * 1024 * 1024,
+      maxLongTasks: 2
+    })
+  }),
+  "2D_MOBILE": Object.freeze({
+    schemaVersion: GAME_RUNTIME_PERFORMANCE_SCHEMA_VERSION,
+    profileId: "2D_MOBILE",
+    label: "2D Mobile",
+    budget: Object.freeze({
+      startupMs: 1800,
+      sceneLoadMs: 1200,
+      firstFrameMs: 800,
+      steadyFrameMs: 20,
+      memoryBytes: 128 * 1024 * 1024,
+      assetBytes: 12 * 1024 * 1024,
+      decodedBytes: 48 * 1024 * 1024,
+      maxLongTasks: 1
+    })
+  })
+});
+function resolveGameRuntimePerformanceProfile(options) {
+  if (options.requestedProfileId !== void 0) return GAME_RUNTIME_PERFORMANCE_PROFILES[options.requestedProfileId];
+  return options.screenWidth < 768 || options.touch && options.screenWidth < 900 ? GAME_RUNTIME_PERFORMANCE_PROFILES["2D_MOBILE"] : GAME_RUNTIME_PERFORMANCE_PROFILES["2D_BROWSER"];
+}
+
 // src/wp200-game-runtime-core.ts
 function diagnostic5(code, message, recoverable, severity = "ERROR") {
   return {
@@ -10951,9 +11413,9 @@ function safeText(value, label) {
 function referenceKey(reference) {
   return `${reference.kind}:${reference.assetId}:${reference.revisionId}:${reference.contentHash}`;
 }
-function collectReferences(project) {
+function collectReferencesFromScenes(scenes) {
   const references = [];
-  for (const scene of project.scenes) {
+  for (const scene of scenes) {
     for (const entity2 of scene.entities) {
       for (const component of entity2.components) {
         if (component.type === "SPRITE" || component.type === "ANIMATION" || component.type === "AUDIO_SOURCE") references.push(component.asset);
@@ -10961,6 +11423,9 @@ function collectReferences(project) {
     }
   }
   return references.sort((left, right) => referenceKey(left).localeCompare(referenceKey(right)));
+}
+function collectReferences(project) {
+  return collectReferencesFromScenes(project.scenes);
 }
 function dependencyMatchesReference(reference, dependencies) {
   return dependencies.entries.some((entry) => entry.assetId === reference.assetId && entry.revisionId === reference.revisionId && entry.contentHash === reference.contentHash && entry.byteLength === reference.byteLength && entry.mimeType === reference.mimeType && entry.mode === reference.mode);
@@ -11087,9 +11552,9 @@ function gameInputActionMapToRuntime(inputMap) {
     bindings: inputMap.actions.flatMap((action) => action.bindings).sort((left, right) => `${left.action}:${left.source}:${left.code}`.localeCompare(`${right.action}:${right.source}:${right.code}`))
   };
 }
-function gameAssetRequests(project) {
+function assetRequestsFromScenes(scenes) {
   const unique = /* @__PURE__ */ new Map();
-  for (const reference of collectReferences(project)) unique.set(String(reference.assetId), {
+  for (const reference of collectReferencesFromScenes(scenes)) unique.set(String(reference.assetId), {
     assetId: reference.assetId,
     required: true,
     mode: reference.mode
@@ -11097,6 +11562,15 @@ function gameAssetRequests(project) {
   return [
     ...unique.values()
   ].sort((left, right) => left.assetId.localeCompare(right.assetId));
+}
+function gameAssetRequests(project) {
+  return assetRequestsFromScenes(project.scenes);
+}
+function gameAssetRequestsForScene(project, sceneId) {
+  const scene = project.scenes.find((candidate) => candidate.sceneId === sceneId);
+  return scene === void 0 ? [] : assetRequestsFromScenes([
+    scene
+  ]);
 }
 function featureEnabled(flags, feature, killSwitch) {
   return killSwitch !== true && flags[feature] === true;
@@ -11132,6 +11606,14 @@ async function createGameRuntimePreview(options) {
     ...runtime.diagnostics
   ];
   const running = runtime.running && validation.valid && featureEnabled(options.flags, "game-core-read", options.killSwitch) && featureEnabled(options.flags, "runtime-preview", options.killSwitch);
+  const performanceProfile = resolveGameRuntimePerformanceProfile(options.performanceProfileId === void 0 ? {
+    screenWidth: options.capabilities.screenWidth,
+    touch: options.capabilities.touch
+  } : {
+    screenWidth: options.capabilities.screenWidth,
+    touch: options.capabilities.touch,
+    requestedProfileId: options.performanceProfileId
+  });
   return {
     project: options.project,
     runtime: {
@@ -11139,6 +11621,7 @@ async function createGameRuntimePreview(options) {
       running,
       diagnostics: allDiagnostics
     },
+    performanceProfile,
     sceneId: options.project.scenes[0]?.sceneId ?? "",
     runtimeValues: {},
     recovery: validation.valid && running ? "VALID" : "BLOCKED",
@@ -11185,8 +11668,9 @@ function stepGameRuntime(session, deltaMs, input) {
     presentationChanged: stepped.presentationChanged
   };
 }
-async function loadGameRuntimeAssets(session, resolver) {
-  const runtime = await loadRuntimeAssets(session.runtime, gameAssetRequests(session.project), resolver);
+async function loadGameRuntimeAssets(session, resolver, options = {}) {
+  const requests = options.sceneId === void 0 ? gameAssetRequests(session.project) : gameAssetRequestsForScene(session.project, options.sceneId);
+  const runtime = await loadRuntimeAssets(session.runtime, requests, resolver);
   const blocked = runtime.diagnostics.some((item) => !item.recoverable && [
     "MISSING_REQUIRED_ASSET",
     "HASH_MISMATCH",
@@ -12049,6 +12533,121 @@ function stepGameRuntimeState(state2, input, module) {
   };
 }
 
+// src/game/game-350/physics-2d.ts
+var GAME350_PHYSICS_LAYER_BITS = Object.freeze({
+  DEFAULT: 1 << 0,
+  WORLD: 1 << 1,
+  PLAYER: 1 << 2,
+  NPC: 1 << 3,
+  SENSOR: 1 << 4,
+  PROJECTILE: 1 << 5
+});
+var DEFAULT_PHYSICS_2D_SETTINGS = Object.freeze({
+  gravity: Object.freeze({
+    x: 0,
+    y: 9.8
+  }),
+  fixedDeltaTime: 1 / 60,
+  maxSubSteps: 4,
+  defaultMaterial: Object.freeze({
+    friction: 0.4,
+    bounciness: 0
+  })
+});
+
+// src/game/game-350/tilemap-authoring.ts
+var GAME350_TILEMAP_MAX_WIDTH = 256;
+var GAME350_TILEMAP_MAX_HEIGHT = 256;
+var GAME350_TILEMAP_MAX_CELLS = 65536;
+function freezeDeep(value) {
+  if (value !== null && typeof value === "object" && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    for (const child of Object.values(value)) {
+      freezeDeep(child);
+    }
+  }
+  return value;
+}
+function cellKey(x, y) {
+  return `${x},${y}`;
+}
+function cellSort(left, right) {
+  return left.y - right.y || left.x - right.x;
+}
+function idIsValid(value) {
+  return /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(value);
+}
+function assertDimensions(mapId, width, height, tileSize) {
+  if (!idIsValid(mapId)) throw new Error("Tilemap mapId is invalid.");
+  if (!Number.isSafeInteger(width) || width < 1 || width > GAME350_TILEMAP_MAX_WIDTH) {
+    throw new Error("Tilemap width must be an integer between 1 and 256.");
+  }
+  if (!Number.isSafeInteger(height) || height < 1 || height > GAME350_TILEMAP_MAX_HEIGHT) {
+    throw new Error("Tilemap height must be an integer between 1 and 256.");
+  }
+  if (width * height > GAME350_TILEMAP_MAX_CELLS) {
+    throw new Error("Tilemap cell capacity is limited to 65536 cells.");
+  }
+  if (!Number.isSafeInteger(tileSize) || tileSize < 1 || tileSize > 4096) {
+    throw new Error("Tilemap tileSize must be an integer between 1 and 4096.");
+  }
+}
+function normalizeCells(cells = [], width, height) {
+  const byKey = /* @__PURE__ */ new Map();
+  for (const cell of cells) {
+    if (!Number.isSafeInteger(cell.x) || !Number.isSafeInteger(cell.y) || cell.x < 0 || cell.x >= width || cell.y < 0 || cell.y >= height) {
+      throw new Error("Tilemap cell must be inside the document bounds.");
+    }
+    if (cell.collision !== "NONE" && cell.collision !== "SOLID") {
+      throw new Error("Tilemap cell collision must be NONE or SOLID.");
+    }
+    if (cell.triggerId !== void 0 && !idIsValid(cell.triggerId)) {
+      throw new Error("Tilemap triggerId is invalid.");
+    }
+    if (cell.collision === "NONE" && cell.triggerId === void 0) {
+      throw new Error("An empty tilemap cell must not be persisted.");
+    }
+    const key = cellKey(cell.x, cell.y);
+    if (byKey.has(key)) throw new Error(`Duplicate tilemap cell: ${key}`);
+    byKey.set(key, {
+      x: cell.x,
+      y: cell.y,
+      collision: cell.collision,
+      ...cell.triggerId === void 0 ? {} : {
+        triggerId: cell.triggerId
+      }
+    });
+  }
+  return [
+    ...byKey.values()
+  ].sort(cellSort);
+}
+function documentFrom(options) {
+  const tileSize = options.tileSize ?? 1;
+  assertDimensions(options.mapId, options.width, options.height, tileSize);
+  const cells = normalizeCells(options.cells, options.width, options.height);
+  if (cells.length > GAME350_TILEMAP_MAX_CELLS) {
+    throw new Error("Tilemap cell capacity is limited to 65536 cells.");
+  }
+  return freezeDeep({
+    schemaVersion: GAME_TILEMAP_DOCUMENT_SCHEMA_VERSION,
+    mapId: options.mapId,
+    width: options.width,
+    height: options.height,
+    tileSize,
+    cells
+  });
+}
+function createGameTilemapDocument(options) {
+  return documentFrom(options);
+}
+function solidGameTilemapCells(document2) {
+  return document2.cells.filter((cell) => cell.collision === "SOLID");
+}
+function triggerGameTilemapCells(document2) {
+  return document2.cells.filter((cell) => cell.triggerId !== void 0);
+}
+
 // src/game/game-350/playable-slice.ts
 var GAME351_PLAYABLE_SCHEMA_VERSION = 1;
 var GAME351_FIXED_STEP_TICKS = 1;
@@ -12060,11 +12659,11 @@ var GAME351_INPUT_ACTIONS = Object.freeze({
 });
 var GAME351_INTERACT_ACTION = asActionId("rpg.interact");
 var GAME351_TAP_ACTION = asActionId("rpg.tap");
-function freezeDeep(value) {
+function freezeDeep2(value) {
   if (value !== null && typeof value === "object" && !Object.isFrozen(value)) {
     Object.freeze(value);
     for (const child of Object.values(value)) {
-      freezeDeep(child);
+      freezeDeep2(child);
     }
   }
   return value;
@@ -12078,29 +12677,53 @@ function position(x, y) {
 function clonePosition(value) {
   return position(value.x, value.y);
 }
-function cellKey(value) {
+function cellKey2(value) {
   return `${value.x},${value.y}`;
 }
 function defaultMap() {
+  return mapFromTilemapDocument(defaultMapDocument());
+}
+function mapFromTilemapDocument(document2) {
+  const bounds = {
+    minX: 0,
+    minY: 0,
+    maxX: document2.width - 1,
+    maxY: document2.height - 1
+  };
+  return freezeDeep2({
+    width: document2.width,
+    height: document2.height,
+    bounds,
+    solidCells: solidGameTilemapCells(document2).map((cell) => position(cell.x, cell.y)),
+    triggerCells: triggerGameTilemapCells(document2).map((cell) => ({
+      x: cell.x,
+      y: cell.y,
+      triggerId: cell.triggerId
+    }))
+  });
+}
+function defaultMapDocument() {
   const bounds = {
     minX: 0,
     minY: 0,
     maxX: 7,
     maxY: 5
   };
-  const solidCells = [];
+  const cells = [];
   for (let y = bounds.minY; y <= bounds.maxY; y += 1) {
     for (let x = bounds.minX; x <= bounds.maxX; x += 1) {
-      if (x === bounds.minX || x === bounds.maxX || y === bounds.minY || y === bounds.maxY || x === 3 && y === 2 || x === 4 && y === 2) {
-        solidCells.push(position(x, y));
-      }
+      if (x === bounds.minX || x === bounds.maxX || y === bounds.minY || y === bounds.maxY || x === 3 && y === 2 || x === 4 && y === 2) cells.push({
+        x,
+        y,
+        collision: "SOLID"
+      });
     }
   }
-  return freezeDeep({
-    width: bounds.maxX - bounds.minX + 1,
-    height: bounds.maxY - bounds.minY + 1,
-    bounds,
-    solidCells
+  return createGameTilemapDocument({
+    mapId: "game351-rpg-map",
+    width: 8,
+    height: 6,
+    cells
   });
 }
 function transform(componentId, x, y) {
@@ -12156,13 +12779,14 @@ function characterController(componentId) {
     enabled: true
   };
 }
-function tilemap(componentId) {
+function tilemap(componentId, document2 = defaultMapDocument()) {
   return {
     type: "TILEMAP",
     componentId: asComponentId(componentId),
     mapId: "game351-rpg-map",
     tileSize: 1,
-    collisionEnabled: true
+    collisionEnabled: true,
+    document: document2
   };
 }
 function entity(entityId2, name, components) {
@@ -12270,7 +12894,7 @@ function createGame351RpgTemplateFromProject(project) {
     sceneId: scene.sceneId,
     playerEntityId,
     npcEntityId,
-    map: defaultMap()
+    map: mapFromTilemapDocument(scene.entities.flatMap((entity2) => entity2.components).find((component) => component.type === "TILEMAP")?.document ?? defaultMapDocument())
   };
 }
 function entityTransform(project, sceneId, entityId2) {
@@ -12295,10 +12919,25 @@ function validateMap(map) {
     if (!Number.isSafeInteger(cell.x) || !Number.isSafeInteger(cell.y) || !inBounds(map.bounds, cell)) {
       throw new Error("RPG solid cells must be integer cells inside collision bounds.");
     }
-    if (seen.has(cellKey(cell))) {
-      throw new Error(`RPG solid cell is duplicated: ${cellKey(cell)}`);
+    if (seen.has(cellKey2(cell))) {
+      throw new Error(`RPG solid cell is duplicated: ${cellKey2(cell)}`);
     }
-    seen.add(cellKey(cell));
+    seen.add(cellKey2(cell));
+  }
+  const triggerIds = /* @__PURE__ */ new Set();
+  for (const cell of map.triggerCells) {
+    if (!Number.isSafeInteger(cell.x) || !Number.isSafeInteger(cell.y) || !inBounds(map.bounds, cell) || typeof cell.triggerId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(cell.triggerId)) {
+      throw new Error("RPG trigger cells must be valid integer cells with stable IDs.");
+    }
+    const key = cellKey2(cell);
+    if (seen.has(key)) {
+      throw new Error(`RPG map cell cannot be both solid and trigger: ${key}`);
+    }
+    if (triggerIds.has(cell.triggerId)) {
+      throw new Error(`RPG trigger id is duplicated: ${cell.triggerId}`);
+    }
+    triggerIds.add(cell.triggerId);
+    seen.add(key);
   }
 }
 function createGame351PlayableSnapshot(template) {
@@ -12319,11 +12958,11 @@ function createGame351PlayableSnapshot(template) {
   const playerPosition = entityTransform(template.project, template.sceneId, template.playerEntityId);
   const npcPosition = entityTransform(template.project, template.sceneId, template.npcEntityId);
   if (!inBounds(template.map.bounds, playerPosition) || !inBounds(template.map.bounds, npcPosition)) throw new Error("RPG actors must start inside collision bounds.");
-  const solid = new Set(template.map.solidCells.map(cellKey));
-  if (solid.has(cellKey(playerPosition)) || solid.has(cellKey(npcPosition))) {
+  const solid = new Set(template.map.solidCells.map(cellKey2));
+  if (solid.has(cellKey2(playerPosition)) || solid.has(cellKey2(npcPosition))) {
     throw new Error("RPG actors may not start on solid cells.");
   }
-  return freezeDeep({
+  return freezeDeep2({
     schemaVersion: GAME351_PLAYABLE_SCHEMA_VERSION,
     projectId: template.project.projectId,
     ownerId: template.project.ownerId,
@@ -12337,7 +12976,10 @@ function createGame351PlayableSnapshot(template) {
     collisionBounds: {
       ...template.map.bounds
     },
-    solidCells: template.map.solidCells.map((cell) => clonePosition(cell))
+    solidCells: template.map.solidCells.map((cell) => clonePosition(cell)),
+    triggerCells: template.map.triggerCells.map((cell) => ({
+      ...cell
+    }))
   });
 }
 function createGame351PlayableState(template) {
@@ -12443,7 +13085,7 @@ function triggerGame351Action(state2, actionId, behaviors) {
   return cloneUnchangedState(state2);
 }
 function canEnterGame351Cell(snapshot, value) {
-  return inBounds(snapshot.collisionBounds, value) && !new Set(snapshot.solidCells.map(cellKey)).has(cellKey(value)) && cellKey(value) !== cellKey(snapshot.npcPosition);
+  return inBounds(snapshot.collisionBounds, value) && !new Set(snapshot.solidCells.map(cellKey2)).has(cellKey2(value)) && cellKey2(value) !== cellKey2(snapshot.npcPosition);
 }
 function stepGame351(state2, input) {
   return stepGameRuntimeState(state2, input, GAME351_RPG_RUNTIME_MODULE);
@@ -13242,8 +13884,8 @@ function loadAdvancedModule() {
 }
 function loadWorkspaceModule() {
   const workspaceMobileProjectionMarker = "20260819-compare-final-1";
-  const workspaceChunkUrl = new URL("wp180-workspace.js?v=20260825-game-studio-systems-v82", import.meta.url);
-  workspaceChunkUrl.searchParams.set("v", "20260825-game-studio-systems-v82");
+  const workspaceChunkUrl = new URL("wp180-workspace.js?v=20260827-igame-template-v1", import.meta.url);
+  workspaceChunkUrl.searchParams.set("v", "20260827-igame-template-v1");
   workspaceChunkUrl.searchParams.set("mobile", workspaceMobileProjectionMarker);
   workspaceModulePromise ??= import(workspaceChunkUrl.href);
   return workspaceModulePromise;
@@ -13354,6 +13996,10 @@ var transformFactorElement = document.querySelector("#draw2TransformFactor");
 var selectButton = document.querySelector("#draw2Select");
 var commitSelectionButton = document.querySelector("#draw2CommitSelection");
 var cancelSelectionButton = document.querySelector("#draw2CancelSelection");
+var selectionStampNameInputElement = document.querySelector("#draw2SelectionStampName");
+var selectionStampSaveButton = document.querySelector("#draw2SelectionStampSave");
+var selectionStampListElement = document.querySelector("#draw2SelectionStampList");
+var selectionStampStatusElement = document.querySelector("#draw2SelectionStampStatus");
 var previewButton = document.querySelector("#draw2PreviewTransform");
 var commitButton = document.querySelector("#draw2CommitTransform");
 var cancelButton = document.querySelector("#draw2CancelTransform");
@@ -13481,7 +14127,6 @@ var gamePreviewStatusElement = document.querySelector("#draw2GamePreviewStatus")
 var gamePreviewCanvasElement = document.querySelector("#draw2GamePreviewCanvas");
 var advancedLoadButton = document.querySelector("#draw2AdvancedLoad");
 var advancedPatternButton = document.querySelector("#draw2AdvancedPattern");
-var advancedStampButton = document.querySelector("#draw2AdvancedStamp");
 var advancedMirrorButton = document.querySelector("#draw2AdvancedMirror");
 var advancedGridButton = document.querySelector("#draw2AdvancedGrid");
 var advancedGuideButton = document.querySelector("#draw2AdvancedGuide");
@@ -13517,7 +14162,7 @@ var languageElement = document.querySelector("#draw2Language");
 var shortcutsDialogElement = document.querySelector("#draw2ShortcutsDialog");
 var shortcutSearchElement = document.querySelector("#draw2ShortcutSearch");
 var shortcutListElement = document.querySelector("#draw2ShortcutList");
-if (canvasElement === null || overlayElement === null || erasePreviewElement === null || viewportCenterButtonElement === null || pixelGridElement === null || pixelGridMinorPathElement === null || pixelGridMajorPathElement === null || selectionOverlayElement === null || mirrorGuideOverlayElement === null || mirrorGuideVerticalElement === null || mirrorGuideHorizontalElement === null || mirrorGuideDiagonalDownElement === null || mirrorGuideDiagonalUpElement === null || mirrorToggleXElement === null || mirrorToggleYElement === null || mirrorToggleDiagonalDownElement === null || mirrorToggleDiagonalUpElement === null || selectionOverlayRegionsElement === null || statusElement === null || metricsElement === null || selectionStatusElement === null || projectIdInputElement === null || tileSizeSelectElement === null || toolSelectElement === null || brushSizeElement === null || brushPatternElement === null || brushShapeElement === null || brushSizeControlElement === null || quickControlsElement === null || brushOptionsButtonElement === null || brushOptionsSummaryElement === null || brushOptionsFlyoutElement === null || brushOptionsCloseButtonElement === null || brushPresetElement === null || brushPresetNameElement === null || brushPresetSaveButton === null || brushPresetDeleteButton === null || mirrorModeToggleElement === null || viewportContextRailElement === null || similarityControlElement === null || similarityElement === null || similarityValueElement === null || colorSelectionModeElement === null || miniPreviewCanvasElement === null || miniPreviewContainerElement === null || miniPreviewPlayButtonElement === null || miniPreviewReferenceButtonElement === null || miniPreviewReferenceClearButtonElement === null || miniPreviewReferenceInputElement === null || miniPreviewReferenceStatusElement === null || miniPreviewCollapseButtonElement === null || miniPreviewRestoreButtonElement === null || miniPreviewResizeLeftElement === null || miniPreviewResizeBottomElement === null || miniPreviewResizeCornerElement === null || selectionXElement === null || selectionYElement === null || selectionWidthElement === null || selectionHeightElement === null || selectionModeElement === null || selectionExpandButton === null || selectionShrinkButton === null || selectionInvertButton === null || selectionBorderButton === null || transformOperationElement === null || transformDxElement === null || transformDyElement === null || transformFactorElement === null || selectButton === null || commitSelectionButton === null || cancelSelectionButton === null || previewButton === null || commitButton === null || cancelButton === null || flipHorizontalButton === null || flipVerticalButton === null || rotateCCWButton === null || rotateCWButton === null || rotate180Button === null || copyButton === null || cutButton === null || pasteButton === null || undoButton === null || redoButton === null || timelineCardElement === null || timelineContextMenu === null || createButton === null || importPxdInput === null || timelineStatusElement === null || timelineViewportElement === null || timelineSpacerElement === null || timelineWindowElement === null || timelinePropertiesResizeElement === null || timelinePropertiesElement === null || timelinePropertiesBodyElement === null || timelinePropertiesCollapseElement === null || timelineSecondaryControlsElement === null || animationTagNameElement === null || animationTagFromElement === null || animationTagToElement === null || animationTagLoopElement === null || animationTagAddElement === null || animationTagListElement === null || timelineMarkerKindElement === null || timelineMarkerLabelElement === null || timelineMarkerAddElement === null || timelineMarkerListElement === null || linkedCelToggleElement === null || linkedCelStatusElement === null || addFrameButton === null || duplicateFrameButton === null || removeFrameButton === null || addLayerButton === null || reorderLayerButton === null || toggleLayerButton === null || toggleOnionButton === null || togglePlaybackButton === null || onionOptionsElement === null || onionPreviousElement === null || onionPreviousValueElement === null || onionNextElement === null || onionNextValueElement === null || onionOpacityElement === null || onionOpacityValueElement === null || onionColorModeElement === null || playbackFpsElement === null || playbackLoopElement === null || playbackFpsCustomElement === null || colorMapElement === null || paletteWheelElement === null || hueCursorElement === null || svCursorElement === null || colorRElement === null || colorGElement === null || colorBElement === null || colorAlphaElement === null || colorRValueElement === null || colorGValueElement === null || colorBValueElement === null || colorAlphaValueElement === null || colorHexElement === null || colorHexOutputElement === null || colorApplyButton === null || colorEditorStatusElement === null || gamePreviewStartButton === null || gamePreviewStopButton === null || gamePreviewRestartButton === null || gamePreviewPinButton === null || gamePreviewReloadButton === null || gamePreviewStatusElement === null || gamePreviewCanvasElement === null || advancedLoadButton === null || advancedPatternButton === null || advancedStampButton === null || advancedMirrorButton === null || advancedGridButton === null || advancedGuideButton === null || advancedStatusElement === null || languageElement === null || exportPanelStatusElement === null || exportNameElement === null || exportScaleElement === null || exportFormatCardsElement === null || exportSelectionSummaryElement === null || exportFormatOptionsElement === null || exportPackageSectionElement === null || exportPackageSingleElement === null || exportPackageZipElement === null || exportPreviewCanvasElement === null || exportPreviewSummaryElement === null || exportOutputFilesElement === null || exportProgressElement === null || exportProgressBarElement === null || exportProgressPercentElement === null || exportProgressTitleElement === null || exportProgressDetailElement === null || exportProgressCurrentElement === null || exportProgressCountElement === null || exportProgressTrackElement === null || exportExecuteButton === null || exportToMarketButton === null) {
+if (canvasElement === null || overlayElement === null || erasePreviewElement === null || viewportCenterButtonElement === null || pixelGridElement === null || pixelGridMinorPathElement === null || pixelGridMajorPathElement === null || selectionOverlayElement === null || mirrorGuideOverlayElement === null || mirrorGuideVerticalElement === null || mirrorGuideHorizontalElement === null || mirrorGuideDiagonalDownElement === null || mirrorGuideDiagonalUpElement === null || mirrorToggleXElement === null || mirrorToggleYElement === null || mirrorToggleDiagonalDownElement === null || mirrorToggleDiagonalUpElement === null || selectionOverlayRegionsElement === null || statusElement === null || metricsElement === null || selectionStatusElement === null || projectIdInputElement === null || tileSizeSelectElement === null || toolSelectElement === null || brushSizeElement === null || brushPatternElement === null || brushShapeElement === null || brushSizeControlElement === null || quickControlsElement === null || brushOptionsButtonElement === null || brushOptionsSummaryElement === null || brushOptionsFlyoutElement === null || brushOptionsCloseButtonElement === null || brushPresetElement === null || brushPresetNameElement === null || brushPresetSaveButton === null || brushPresetDeleteButton === null || mirrorModeToggleElement === null || viewportContextRailElement === null || similarityControlElement === null || similarityElement === null || similarityValueElement === null || colorSelectionModeElement === null || miniPreviewCanvasElement === null || miniPreviewContainerElement === null || miniPreviewPlayButtonElement === null || miniPreviewReferenceButtonElement === null || miniPreviewReferenceClearButtonElement === null || miniPreviewReferenceInputElement === null || miniPreviewReferenceStatusElement === null || miniPreviewCollapseButtonElement === null || miniPreviewRestoreButtonElement === null || miniPreviewResizeLeftElement === null || miniPreviewResizeBottomElement === null || miniPreviewResizeCornerElement === null || selectionXElement === null || selectionYElement === null || selectionWidthElement === null || selectionHeightElement === null || selectionModeElement === null || selectionExpandButton === null || selectionShrinkButton === null || selectionInvertButton === null || selectionBorderButton === null || transformOperationElement === null || transformDxElement === null || transformDyElement === null || transformFactorElement === null || selectButton === null || commitSelectionButton === null || cancelSelectionButton === null || selectionStampNameInputElement === null || selectionStampSaveButton === null || selectionStampListElement === null || selectionStampStatusElement === null || previewButton === null || commitButton === null || cancelButton === null || flipHorizontalButton === null || flipVerticalButton === null || rotateCCWButton === null || rotateCWButton === null || rotate180Button === null || copyButton === null || cutButton === null || pasteButton === null || undoButton === null || redoButton === null || timelineCardElement === null || timelineContextMenu === null || createButton === null || importPxdInput === null || timelineStatusElement === null || timelineViewportElement === null || timelineSpacerElement === null || timelineWindowElement === null || timelinePropertiesResizeElement === null || timelinePropertiesElement === null || timelinePropertiesBodyElement === null || timelinePropertiesCollapseElement === null || timelineSecondaryControlsElement === null || animationTagNameElement === null || animationTagFromElement === null || animationTagToElement === null || animationTagLoopElement === null || animationTagAddElement === null || animationTagListElement === null || timelineMarkerKindElement === null || timelineMarkerLabelElement === null || timelineMarkerAddElement === null || timelineMarkerListElement === null || linkedCelToggleElement === null || linkedCelStatusElement === null || addFrameButton === null || duplicateFrameButton === null || removeFrameButton === null || addLayerButton === null || reorderLayerButton === null || toggleLayerButton === null || toggleOnionButton === null || togglePlaybackButton === null || onionOptionsElement === null || onionPreviousElement === null || onionPreviousValueElement === null || onionNextElement === null || onionNextValueElement === null || onionOpacityElement === null || onionOpacityValueElement === null || onionColorModeElement === null || playbackFpsElement === null || playbackLoopElement === null || playbackFpsCustomElement === null || colorMapElement === null || paletteWheelElement === null || hueCursorElement === null || svCursorElement === null || colorRElement === null || colorGElement === null || colorBElement === null || colorAlphaElement === null || colorRValueElement === null || colorGValueElement === null || colorBValueElement === null || colorAlphaValueElement === null || colorHexElement === null || colorHexOutputElement === null || colorApplyButton === null || colorEditorStatusElement === null || gamePreviewStartButton === null || gamePreviewStopButton === null || gamePreviewRestartButton === null || gamePreviewPinButton === null || gamePreviewReloadButton === null || gamePreviewStatusElement === null || gamePreviewCanvasElement === null || advancedLoadButton === null || advancedPatternButton === null || advancedMirrorButton === null || advancedGridButton === null || advancedGuideButton === null || advancedStatusElement === null || languageElement === null || exportPanelStatusElement === null || exportNameElement === null || exportScaleElement === null || exportFormatCardsElement === null || exportSelectionSummaryElement === null || exportFormatOptionsElement === null || exportPackageSectionElement === null || exportPackageSingleElement === null || exportPackageZipElement === null || exportPreviewCanvasElement === null || exportPreviewSummaryElement === null || exportOutputFilesElement === null || exportProgressElement === null || exportProgressBarElement === null || exportProgressPercentElement === null || exportProgressTitleElement === null || exportProgressDetailElement === null || exportProgressCurrentElement === null || exportProgressCountElement === null || exportProgressTrackElement === null || exportExecuteButton === null || exportToMarketButton === null) {
   throw new Error("Draw2 isolated entry is missing a required element.");
 }
 if (canvasSettingsDialogElement === null || canvasSettingsProjectIdElement === null || canvasSettingsWidthElement === null || canvasSettingsHeightElement === null || canvasSettingsTileSizeElement === null || canvasSettingsApplyButton === null || openCanvasSettingsButton === null || openProjectDialogButton === null || projectDialogElement === null || projectDialogIdElement === null || projectDialogOpenButton === null || projectDialogNewButton === null || projectDialogStatusElement === null) {
@@ -13562,8 +14207,7 @@ var DRAW2_PERSISTENCE_DEBOUNCE_MS = 250;
 var drawPersistenceRevision = 0;
 var drawPersistenceSaveQueue = Promise.resolve();
 var drawPersistenceSaveTimer;
-var drawPersistenceSavePending = false;
-var drawPersistenceSaveReason = "edit";
+var drawPersistenceSavePending;
 function drawJournalSnapshot() {
   const operations = journal.operations.slice(-DRAW2_PERSISTED_JOURNAL_LIMIT);
   const dirtyTileWrites = journal.dirtyTileWrites.slice(-DRAW2_PERSISTED_JOURNAL_LIMIT);
@@ -13581,8 +14225,14 @@ function drawJournalSnapshot() {
   };
 }
 function queueDrawPersistenceSave(reason) {
-  drawPersistenceSavePending = true;
-  drawPersistenceSaveReason = reason;
+  drawPersistenceSavePending = {
+    reason,
+    state: cloneProjectStateShared(state),
+    history: history.snapshot(DRAW2_PERSISTED_HISTORY_LIMIT),
+    journal: drawJournalSnapshot(),
+    assetDefinitions: assetDefinitions.map(cloneAssetDefinitionEntry),
+    timelineMetadata: draw2TimelineMetadataSnapshot()
+  };
   if (drawPersistenceSaveTimer !== void 0) return;
   drawPersistenceSaveTimer = window.setTimeout(() => {
     drawPersistenceSaveTimer = void 0;
@@ -13590,35 +14240,32 @@ function queueDrawPersistenceSave(reason) {
   }, DRAW2_PERSISTENCE_DEBOUNCE_MS);
 }
 async function drainDrawPersistenceSave() {
-  if (!drawPersistenceSavePending) return;
-  const reason = drawPersistenceSaveReason;
-  drawPersistenceSavePending = false;
-  const snapshotState = state;
-  const snapshotHistory = history.snapshot(DRAW2_PERSISTED_HISTORY_LIMIT);
-  const snapshotJournal = drawJournalSnapshot();
-  const projectId = snapshotState.projectId;
+  const envelope = drawPersistenceSavePending;
+  if (envelope === void 0) return;
+  drawPersistenceSavePending = void 0;
+  const projectId = envelope.state.projectId;
   const revision = drawPersistenceRevision + 1;
   drawPersistenceRevision = revision;
   drawPersistenceSaveQueue = drawPersistenceSaveQueue.then(async () => {
-    const record2 = await createDraw2PersistenceRecord(snapshotState, snapshotHistory, snapshotJournal, revision, (/* @__PURE__ */ new Date()).toISOString(), assetDefinitions, draw2TimelineMetadataSnapshot());
+    const record2 = await createDraw2PersistenceRecord(envelope.state, envelope.history, envelope.journal, revision, (/* @__PURE__ */ new Date()).toISOString(), envelope.assetDefinitions, envelope.timelineMetadata);
     const saved = await drawPersistenceStore.save(record2);
     if (!saved.ok) {
       document.body.dataset.drawPersistenceState = "unavailable";
       return;
     }
-    document.body.dataset.drawPersistenceState = saved.stale ? "stale-write-ignored" : reason === "recovery" ? "restored" : "saved";
+    document.body.dataset.drawPersistenceState = saved.stale ? "stale-write-ignored" : envelope.reason === "recovery" ? "restored" : "saved";
     document.body.dataset.drawPersistenceRevision = String(revision);
     await workspaceManifestStore.updateModule(asWorkspaceProjectId(projectId), "draw", {
       status: "READY",
       revision,
       stateHash: record2.stateHash,
       savedAt: record2.savedAt
-    }, snapshotState.name);
+    }, envelope.state.name);
   }).catch(() => {
     document.body.dataset.drawPersistenceState = "error";
   });
   await drawPersistenceSaveQueue.catch(() => void 0);
-  if (drawPersistenceSavePending) await drainDrawPersistenceSave();
+  if (drawPersistenceSavePending !== void 0) await drainDrawPersistenceSave();
 }
 async function flushDrawPersistence() {
   while (true) {
@@ -13626,10 +14273,10 @@ async function flushDrawPersistence() {
       window.clearTimeout(drawPersistenceSaveTimer);
       drawPersistenceSaveTimer = void 0;
     }
-    if (drawPersistenceSavePending) await drainDrawPersistenceSave();
+    if (drawPersistenceSavePending !== void 0) await drainDrawPersistenceSave();
     const queue = drawPersistenceSaveQueue;
     await queue.catch(() => void 0);
-    if (!drawPersistenceSavePending && drawPersistenceSaveTimer === void 0 && queue === drawPersistenceSaveQueue) return;
+    if (drawPersistenceSavePending === void 0 && drawPersistenceSaveTimer === void 0 && queue === drawPersistenceSaveQueue) return;
   }
 }
 var flushDrawPersistenceOnPageExit = () => {
@@ -13734,6 +14381,10 @@ var transformDy = transformDyElement;
 var transformFactor = transformFactorElement;
 var commitSelectionControl = commitSelectionButton;
 var cancelSelectionControl = cancelSelectionButton;
+var selectionStampNameInput = selectionStampNameInputElement;
+var selectionStampSaveControl = selectionStampSaveButton;
+var selectionStampList = selectionStampListElement;
+var selectionStampStatus = selectionStampStatusElement;
 var cancelTransformControl = cancelButton;
 var copyControl = copyButton;
 var cutControl = cutButton;
@@ -14697,7 +15348,6 @@ var playbackRateGroup = playbackFpsControl.closest(".draw2-timeline-rate");
 var playbackLoopMode = "loop";
 var advancedLoadControl = advancedLoadButton;
 var advancedPatternControl = advancedPatternButton;
-var advancedStampControl = advancedStampButton;
 var advancedMirrorControl = advancedMirrorButton;
 var advancedGridControl = advancedGridButton;
 var advancedGuideControl = advancedGuideButton;
@@ -14767,9 +15417,23 @@ var exportPackageMode = "single";
 var core = new EditorCore(state, {
   instrumentation
 });
+var canonicalStateGeneration = 0;
 var history = new LocalUndoRedoHistory(state);
 var pixyncDrawActorId;
 var pixyncDrawClientId;
+var canonicalOperationQueue = Promise.resolve();
+function adoptCanonicalState(nextState) {
+  state = nextState;
+  core = new EditorCore(state, {
+    instrumentation
+  });
+  canonicalStateGeneration += 1;
+}
+function enqueueCanonicalOperation(operation) {
+  const queued = canonicalOperationQueue.then(operation);
+  canonicalOperationQueue = queued.then(() => void 0, () => void 0);
+  return queued;
+}
 window.addEventListener("draw2:pixync-binding", (event) => {
   const detail = event.detail;
   if (typeof detail?.actorId !== "string" || typeof detail?.clientId !== "string" || detail.projectId !== state.projectId) return;
@@ -14798,7 +15462,7 @@ var pixyncDrawStatePort = {
     undoDepth: history.undoDepth,
     redoDepth: history.redoDepth
   }),
-  applyRemote: async (input) => {
+  applyRemote: (input) => enqueueCanonicalOperation(async () => {
     const operation = input.operation;
     const command = {
       commandId: operation.commandId,
@@ -14821,14 +15485,14 @@ var pixyncDrawStatePort = {
     if (!applied.ok) {
       throw new Error(applied.diagnostics[0]?.code ?? "PIXYNC_DRAW_REMOTE_APPLY_FAILED");
     }
-    state = applied.state;
-    core = new EditorCore(state, {
-      instrumentation
-    });
-    saveDrawProjectState("pixync-remote");
-    notifyAssetStateChanged();
-    renderTimeline();
-    await present();
+    if (!applied.result.noOp) {
+      await history.rebaseRemoteRasterOperation(command, applied.state);
+      adoptCanonicalState(applied.state);
+      saveDrawProjectState("pixync-remote");
+      notifyAssetStateChanged();
+      renderTimeline();
+      await present();
+    }
     const rasterHash = await drawRasterHash(state, operation.assetId);
     return {
       operationId: operation.operationId,
@@ -14844,7 +15508,7 @@ var pixyncDrawStatePort = {
       localUndoDepth: history.undoDepth,
       localRedoDepth: history.redoDepth
     };
-  }
+  })
 };
 var pixyncProjectLifecycle;
 function projectPixyncState(phase, projectId, generation) {
@@ -15089,15 +15753,12 @@ function ensureTilemapFor(layerTrackId, frameId, cellSize = tilemapCellSizeFromC
     canvasHeight: source.height,
     cellSize
   });
-  state = {
+  adoptCanonicalState({
     ...state,
     tilemaps: {
       ...state.tilemaps ?? {},
       [id]: map
     }
-  };
-  core = new EditorCore(state, {
-    instrumentation
   });
   return map;
 }
@@ -15114,6 +15775,8 @@ tilesetGridElement?.addEventListener("click", (event) => {
   const sourceY = Number(yValue);
   const cellSize = Number(sizeValue);
   if (!Number.isSafeInteger(sourceX) || !Number.isSafeInteger(sourceY) || cellSize !== 16 && cellSize !== 32) return;
+  activeSelectionStampId = void 0;
+  renderSelectionStamps();
   selectedTileSource = {
     sourceAssetId: state.activeAssetId,
     sourceX,
@@ -15341,13 +16004,18 @@ var brushPresets = new BrushPresetStore(readStoredBrushPresets());
 var animationTags = new AnimationTagStore();
 var timelineMarkers = new TimelineMarkerStore();
 var drawAudioReferences = new DrawAudioReferenceStore();
+var selectionStampStore = new Draw2SelectionStampStore();
+var selectionStampSequence = 0;
+var activeSelectionStampId;
+var selectionStampToolActivation = false;
 var drawAudioCatalog = [];
 function draw2TimelineMetadataSnapshot() {
   return normalizeDraw2TimelineMetadata({
     schemaVersion: 2,
     animationTags: animationTags.list(),
     markers: timelineMarkers.list(),
-    audioReferences: drawAudioReferences.list()
+    audioReferences: drawAudioReferences.list(),
+    selectionStamps: selectionStampStore.list()
   }, state.frames.length);
 }
 function restoreDraw2TimelineMetadata(value) {
@@ -15366,6 +16034,13 @@ function restoreDraw2TimelineMetadata(value) {
   for (const reference of metadata.audioReferences) {
     drawAudioReferences.upsert(reference, state.frames.length);
   }
+  for (const stamp2 of selectionStampStore.list()) {
+    selectionStampStore.remove(stamp2.id);
+  }
+  for (const stamp2 of metadata.selectionStamps ?? []) {
+    selectionStampStore.save(stamp2);
+  }
+  activeSelectionStampId = void 0;
 }
 var linkedCelBindings = [];
 var selection;
@@ -15953,6 +16628,8 @@ var clipboard;
 var timelineSession = createTimelineSession(state);
 var timelineActivationPending = false;
 var timelineStateGeneration = 0;
+var timelineActivationRequestSequence = 0;
+var latestTimelineActivationRequestId = 0;
 var timelineViewportInitialized = false;
 var activeTimelineTab = "timeline";
 var timelineFrameElapsedById = /* @__PURE__ */ new Map();
@@ -16752,6 +17429,7 @@ async function commitColorEdit() {
   colorApply.disabled = true;
   const commandSequence = nextClientSequence(DRAW_CLIENT_ID);
   const before = state;
+  const paletteCanonicalGeneration = canonicalStateGeneration;
   const command = {
     commandId: `draw2-local-palette-${commandSequence}`,
     commandType: "palette.setColor",
@@ -16769,6 +17447,12 @@ async function commitColorEdit() {
     }
   };
   const result = await core.execute(command);
+  if (paletteCanonicalGeneration !== canonicalStateGeneration) {
+    syncClientSequencesFromState();
+    colorCommitInFlight = false;
+    colorApply.disabled = selectedColor === 0;
+    return;
+  }
   if (!result.ok) {
     syncClientSequencesFromState();
     colorCommitInFlight = false;
@@ -16776,11 +17460,16 @@ async function commitColorEdit() {
     setColorEditorStatus(result.diagnostics.map((item) => item.code).join(", "), "error");
     return;
   }
-  state = result.state;
+  if (!result.result.noOp) {
+    adoptCanonicalState(result.state);
+    refreshSelectionSnapshotForCurrentRaster();
+  }
   colorDraftDirty = false;
   colorCommitInFlight = false;
-  history.record(before, state, result.result.operation.operationId, result.result.operation.operationType);
-  saveDrawProjectState();
+  if (!result.result.noOp) {
+    history.record(before, state, result.result.operation.operationId, result.result.operation.operationType);
+    saveDrawProjectState();
+  }
   await autosave.record(state, result.result);
   renderPaletteButtons(state.assets[state.activeAssetId]?.palette ?? []);
   syncColorEditorFromSelection();
@@ -16798,6 +17487,7 @@ async function appendColorFromDraft() {
   }
   const commandSequence = nextClientSequence(DRAW_CLIENT_ID);
   const before = state;
+  const paletteCanonicalGeneration = canonicalStateGeneration;
   const command = {
     commandId: `draw2-local-palette-append-${commandSequence}`,
     commandType: "palette.appendColor",
@@ -16814,16 +17504,23 @@ async function appendColorFromDraft() {
     }
   };
   const result = await core.execute(command);
+  if (paletteCanonicalGeneration !== canonicalStateGeneration) {
+    syncClientSequencesFromState();
+    return;
+  }
   if (!result.ok) {
     syncClientSequencesFromState();
     setColorEditorStatus(result.diagnostics.map((item) => item.code).join(", "), "error");
     return;
   }
-  state = result.state;
-  selectedColor = asset.palette.length;
-  history.record(before, state, result.result.operation.operationId, result.result.operation.operationType);
-  saveDrawProjectState();
-  scheduleDraw2EditorPreferencesSave();
+  if (!result.result.noOp) {
+    adoptCanonicalState(result.state);
+    refreshSelectionSnapshotForCurrentRaster();
+    selectedColor = asset.palette.length;
+    history.record(before, state, result.result.operation.operationId, result.result.operation.operationType);
+    saveDrawProjectState();
+    scheduleDraw2EditorPreferencesSave();
+  }
   await autosave.record(state, result.result);
   renderPaletteButtons(state.assets[state.activeAssetId]?.palette ?? []);
   syncColorEditorFromSelection();
@@ -16870,9 +17567,195 @@ function updateHistoryButtons() {
 function updateSelectionStatus(message) {
   selectionStatus.textContent = translateDraw2Text(message, draw2Locale);
 }
+function selectionStampBounds(snapshot) {
+  const regions = snapshot.mask.regions;
+  if (regions.length === 0) return void 0;
+  const minX = Math.min(...regions.map((region) => region.x));
+  const minY = Math.min(...regions.map((region) => region.y));
+  const maxX = Math.max(...regions.map((region) => region.x + region.width));
+  const maxY = Math.max(...regions.map((region) => region.y + region.height));
+  return {
+    x: minX,
+    y: minY,
+    width: maxX - minX,
+    height: maxY - minY
+  };
+}
+function nextSelectionStampId() {
+  const safeProjectId = state.projectId.replace(/[^A-Za-z0-9._:-]+/gu, "-").slice(0, 72);
+  let candidate = "";
+  do {
+    selectionStampSequence += 1;
+    candidate = `selection-stamp-${safeProjectId || "project"}-${selectionStampSequence}`;
+  } while (selectionStampStore.load(candidate) !== void 0);
+  return candidate;
+}
+function selectionStampFromCurrentSelection(requestedName) {
+  if (selection === void 0 || !selectionScopeMatchesActiveCel()) {
+    setStatus("\u4FDD\u5B58\u3059\u308B\u9078\u629E\u7BC4\u56F2\u3092\u5148\u306B\u78BA\u5B9A\u3057\u3066\u304F\u3060\u3055\u3044\u3002", "error");
+    return void 0;
+  }
+  const asset = state.assets[selection.scope.assetId];
+  const bounds = selectionStampBounds(selection);
+  if (asset === void 0 || bounds === void 0 || selection.pixels.length === 0) {
+    setStatus("\u9078\u629E\u7BC4\u56F2\u306B\u4FDD\u5B58\u3067\u304D\u308B\u5185\u5BB9\u304C\u3042\u308A\u307E\u305B\u3093\u3002", "error");
+    return void 0;
+  }
+  try {
+    return normalizeDraw2SelectionStamp({
+      id: nextSelectionStampId(),
+      name: requestedName.trim() || `\u9078\u629E\u7BC4\u56F2 ${selectionStampStore.list().length + 1}`,
+      width: bounds.width,
+      height: bounds.height,
+      pixels: selection.pixels.map((pixel) => ({
+        x: pixel.x - bounds.x,
+        y: pixel.y - bounds.y,
+        colorIndex: asset.raster.getPixel(pixel.x, pixel.y)
+      })),
+      palette: [
+        ...asset.palette
+      ]
+    });
+  } catch (cause) {
+    setStatus(cause instanceof Error ? cause.message : "\u9078\u629E\u7BC4\u56F2\u3092\u4FDD\u5B58\u3067\u304D\u307E\u305B\u3093\u3002", "error");
+    return void 0;
+  }
+}
+function colorDistance(left, right) {
+  const a = decodeArgb(left);
+  const b = decodeArgb(right);
+  return (a.alpha - b.alpha) ** 2 + (a.red - b.red) ** 2 + (a.green - b.green) ** 2 + (a.blue - b.blue) ** 2;
+}
+function nearestPaletteIndexForStamp(color, palette) {
+  if (palette.length < 2) return 0;
+  let bestIndex = 1;
+  let bestDistance = colorDistance(color, palette[1] ?? 0);
+  for (let index = 2; index < palette.length; index += 1) {
+    const distance = colorDistance(color, palette[index] ?? 0);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestIndex = index;
+    }
+  }
+  return bestIndex;
+}
+function selectionStampSourceForAsset(stamp2, asset) {
+  const exactPalette = /* @__PURE__ */ new Map();
+  for (let index = 1; index < asset.palette.length; index += 1) {
+    const color = asset.palette[index];
+    if (color !== void 0 && !exactPalette.has(color)) {
+      exactPalette.set(color, index);
+    }
+  }
+  const pixels = new Array(stamp2.width * stamp2.height).fill(0);
+  let remappedColors = 0;
+  for (const pixel of stamp2.pixels) {
+    if (pixel.colorIndex === 0) continue;
+    const sourceColor = stamp2.palette[pixel.colorIndex];
+    if (sourceColor === void 0) continue;
+    const targetIndex = exactPalette.get(sourceColor) ?? nearestPaletteIndexForStamp(sourceColor, asset.palette);
+    if (!exactPalette.has(sourceColor)) remappedColors += 1;
+    pixels[pixel.y * stamp2.width + pixel.x] = targetIndex;
+  }
+  return {
+    width: stamp2.width,
+    height: stamp2.height,
+    pixels,
+    remappedColors
+  };
+}
+function renderSelectionStamps() {
+  const stamps = selectionStampStore.list();
+  if (activeSelectionStampId !== void 0 && selectionStampStore.load(activeSelectionStampId) === void 0) {
+    activeSelectionStampId = void 0;
+  }
+  selectionStampList.replaceChildren();
+  if (stamps.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "draw2-selection-stamp-empty";
+    empty.textContent = "\u4FDD\u5B58\u3057\u305F\u9078\u629E\u7BC4\u56F2\u30B9\u30BF\u30F3\u30D7\u306F\u3042\u308A\u307E\u305B\u3093\u3002";
+    selectionStampList.append(empty);
+  } else {
+    for (const stamp2 of stamps) {
+      const row = document.createElement("div");
+      row.className = "draw2-selection-stamp-entry";
+      row.dataset.selectionStampId = stamp2.id;
+      if (stamp2.id === activeSelectionStampId) {
+        row.dataset.active = "true";
+      }
+      row.setAttribute("role", "listitem");
+      const copy = document.createElement("span");
+      copy.className = "draw2-selection-stamp-copy";
+      const name = document.createElement("strong");
+      name.textContent = stamp2.name;
+      const detail = document.createElement("small");
+      detail.textContent = `${stamp2.width}\xD7${stamp2.height} \xB7 ${stamp2.pixels.length}px`;
+      copy.append(name, detail);
+      const use = document.createElement("button");
+      use.className = "draw2-button draw2-button-secondary";
+      use.type = "button";
+      use.textContent = "\u4F7F\u3046";
+      use.title = "\u3053\u306E\u9078\u629E\u7BC4\u56F2\u30B9\u30BF\u30F3\u30D7\u3092Canvas\u3078\u914D\u7F6E";
+      use.addEventListener("click", () => useSelectionStamp(stamp2.id));
+      const remove = document.createElement("button");
+      remove.className = "draw2-button draw2-button-secondary";
+      remove.type = "button";
+      remove.textContent = "\u524A\u9664";
+      remove.addEventListener("click", () => deleteSelectionStamp(stamp2.id));
+      row.append(copy, use, remove);
+      selectionStampList.append(row);
+    }
+  }
+  selectionStampSaveControl.disabled = selection === void 0 || !selectionScopeMatchesActiveCel() || selectionDraft !== void 0 || pendingSelectionGesture !== void 0;
+  const active = activeSelectionStampId === void 0 ? void 0 : selectionStampStore.load(activeSelectionStampId);
+  selectionStampStatus.textContent = active === void 0 ? "\u9078\u629E\u7BC4\u56F2\u3092\u78BA\u5B9A\u3059\u308B\u3068\u4FDD\u5B58\u3067\u304D\u307E\u3059\u3002\u4FDD\u5B58\u5F8C\u306F\u300C\u4F7F\u3046\u300D\u3067Canvas\u3078\u914D\u7F6E\u3057\u307E\u3059\u3002" : `\u300C${active.name}\u300D\u3092\u9078\u629E\u4E2D \xB7 Canvas\u3092\u30AF\u30EA\u30C3\u30AF\u3057\u3066\u914D\u7F6E\u3067\u304D\u307E\u3059\u3002`;
+}
+function saveSelectionStamp() {
+  if (selectionDraft !== void 0 || pendingSelectionGesture !== void 0) {
+    setStatus("\u9078\u629E\u7BC4\u56F2\u3092\u78BA\u5B9A\u3057\u3066\u304B\u3089\u4FDD\u5B58\u3057\u3066\u304F\u3060\u3055\u3044\u3002", "error");
+    return;
+  }
+  const candidate = selectionStampFromCurrentSelection(selectionStampNameInput.value);
+  if (candidate === void 0) return;
+  try {
+    const saved = selectionStampStore.save(candidate);
+    selectionStampNameInput.value = saved.name;
+    renderSelectionStamps();
+    queueDrawPersistenceSave("selection-stamp-save");
+    setStatus(`\u9078\u629E\u7BC4\u56F2\u30B9\u30BF\u30F3\u30D7\u300C${saved.name}\u300D\u3092\u4FDD\u5B58\u3057\u307E\u3057\u305F\u3002\u300C\u4F7F\u3046\u300D\u3067\u914D\u7F6E\u3067\u304D\u307E\u3059\u3002`);
+  } catch (cause) {
+    setStatus(cause instanceof Error ? cause.message : "\u9078\u629E\u7BC4\u56F2\u30B9\u30BF\u30F3\u30D7\u3092\u4FDD\u5B58\u3067\u304D\u307E\u305B\u3093\u3002", "error");
+  }
+}
+function useSelectionStamp(id) {
+  const stamp2 = selectionStampStore.load(id);
+  if (stamp2 === void 0) {
+    setStatus("\u9078\u629E\u7BC4\u56F2\u30B9\u30BF\u30F3\u30D7\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3002", "error");
+    renderSelectionStamps();
+    return;
+  }
+  activeSelectionStampId = stamp2.id;
+  selectedTileSource = void 0;
+  selectionStampToolActivation = true;
+  selectShortcutTool("tile-stamp");
+  renderSelectionStamps();
+  setStatus(`\u9078\u629E\u7BC4\u56F2\u30B9\u30BF\u30F3\u30D7\u300C${stamp2.name}\u300D\u3092\u9078\u629E\u4E2D \xB7 Canvas\u3092\u30AF\u30EA\u30C3\u30AF\u3057\u3066\u914D\u7F6E`);
+}
+function deleteSelectionStamp(id) {
+  const stamp2 = selectionStampStore.load(id);
+  if (stamp2 === void 0 || !selectionStampStore.remove(id)) {
+    setStatus("\u524A\u9664\u3059\u308B\u9078\u629E\u7BC4\u56F2\u30B9\u30BF\u30F3\u30D7\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3002", "error");
+    return;
+  }
+  if (activeSelectionStampId === id) activeSelectionStampId = void 0;
+  renderSelectionStamps();
+  queueDrawPersistenceSave("selection-stamp-delete");
+  setStatus(`\u9078\u629E\u7BC4\u56F2\u30B9\u30BF\u30F3\u30D7\u300C${stamp2.name}\u300D\u3092\u524A\u9664\u3057\u307E\u3057\u305F\u3002`);
+}
 function updateSelectionActionButtons() {
   commitSelectionControl.disabled = selectionDraft === void 0;
   cancelSelectionControl.disabled = selectionDraft === void 0 && pendingSelectionGesture === void 0;
+  renderSelectionStamps();
   syncWorkspaceEditCommandState();
 }
 function syncWorkspaceEditCommandState() {
@@ -16989,12 +17872,15 @@ function cyclePlaybackLoopMode() {
 function timelineCelId(frameId, layerTrackId) {
   return state.cels.find((item) => item.frameId === frameId && item.layerTrackId === layerTrackId)?.celId ?? `${state.projectId}:cel:${layerTrackId}:${frameId}`;
 }
-async function activateTimelineCell(frameId, layerTrackId) {
+async function activateTimelineCell(frameId, layerTrackId, immediate = false) {
+  const requestId = ++timelineActivationRequestSequence;
+  latestTimelineActivationRequestId = requestId;
   const celId = timelineCelId(frameId, layerTrackId);
   const target = state.cels.find((item) => item.celId === celId);
   const tilemapLayer = layerKind(layerTrackId) === "TILEMAP";
   if (tilemapLayer) ensureTilemapFor(layerTrackId, frameId);
   if ((target?.assetId !== void 0 && target.bindingMode !== "DUPLICATE_INDEPENDENT" || tilemapLayer && target?.bindingMode === "TILEMAP") && state.activeFrameId === frameId && state.activeLayerId === layerTrackId && state.activeCelId === celId && (tilemapLayer || state.activeAssetId === target?.assetId)) {
+    timelineActivationPending = false;
     await present();
     return true;
   }
@@ -17003,16 +17889,20 @@ async function activateTimelineCell(frameId, layerTrackId) {
   }
   timelineActivationPending = true;
   try {
-    return await runTimelineCommand("timeline.activateCel", {
+    const execute = immediate ? runTimelineCommandNow : runTimelineCommand;
+    return await execute("timeline.activateCel", {
       celId,
       frameId,
       layerTrackId
     }, {
       recordHistory: false,
-      announce: false
+      announce: false,
+      activationRequestId: requestId
     });
   } finally {
-    timelineActivationPending = false;
+    if (requestId === latestTimelineActivationRequestId) {
+      timelineActivationPending = false;
+    }
   }
 }
 function syncTimelinePlaybackFrame(frameId) {
@@ -18261,7 +19151,10 @@ function toggleActiveLinkedCel() {
     setStatus(cause instanceof Error ? cause.message : "Linked Cel is invalid.", "error");
   }
 }
-async function runTimelineCommand(commandType, payload, options = {}) {
+function runTimelineCommand(commandType, payload, options = {}) {
+  return enqueueCanonicalOperation(() => runTimelineCommandNow(commandType, payload, options));
+}
+async function runTimelineCommandNow(commandType, payload, options = {}) {
   timelineStateGeneration += 1;
   const commandSequence = nextClientSequence(TIMELINE_CLIENT_ID);
   const before = state;
@@ -18279,19 +19172,20 @@ async function runTimelineCommand(commandType, payload, options = {}) {
     payload
   };
   const result = await executeTimelineCommand(state, command);
+  if (options.activationRequestId !== void 0 && options.activationRequestId !== latestTimelineActivationRequestId) {
+    syncClientSequencesFromState();
+    return false;
+  }
   if (!result.ok) {
     syncClientSequencesFromState();
     setStatus(result.diagnostics.map((item) => item.code).join(", "), "error");
     return false;
   }
-  state = result.state;
+  if (!result.result.noOp) adoptCanonicalState(result.state);
   const timelineInvalidatesLocalSelection = timelineCommandInvalidatesSelection(before, state);
   if (timelineInvalidatesLocalSelection && (selection !== void 0 || hasUncommittedSelectionWork())) {
     clearCommittedSelection("Selection and transform preview cleared because the timeline target changed.");
   }
-  core = new EditorCore(state, {
-    instrumentation
-  });
   switch (commandType) {
     case "timeline.addFrame":
     case "timeline.duplicateFrame":
@@ -18337,7 +19231,7 @@ async function runTimelineCommand(commandType, payload, options = {}) {
     };
   }
   if (autoActivate !== void 0) {
-    await activateTimelineCell(autoActivate.frameId, autoActivate.layerTrackId);
+    await activateTimelineCell(autoActivate.frameId, autoActivate.layerTrackId, true);
   }
   if (options.recordHistory !== false) {
     history.record(before, state, result.result.operation.operationId, result.result.operation.operationType);
@@ -19268,6 +20162,26 @@ function selectionScopeMatchesActiveCel(snapshot = selection) {
   if (snapshot === void 0) return true;
   return snapshot.scope.assetId === state.activeAssetId && snapshot.scope.layerId === state.activeLayerId && snapshot.scope.frameId === state.activeFrameId && snapshot.scope.celId === state.activeCelId && snapshot.sourceStructureEpoch === state.structureEpoch;
 }
+function refreshSelectionSnapshotForCurrentRaster() {
+  if (selection === void 0 || !selectionScopeMatchesActiveCel()) return;
+  const asset = state.assets[selection.scope.assetId];
+  if (asset === void 0) return;
+  selection = {
+    ...selection,
+    mask: {
+      ...selection.mask,
+      regions: selection.mask.regions.map((region) => ({
+        ...region
+      }))
+    },
+    sourceRasterRevision: asset.revision,
+    sourceStructureEpoch: state.structureEpoch,
+    pixels: selection.pixels.map((pixel) => ({
+      ...pixel,
+      colorIndex: asset.raster.getPixel(pixel.x, pixel.y)
+    }))
+  };
+}
 function timelineCommandInvalidatesSelection(before, after) {
   return before.activeAssetId !== after.activeAssetId || before.activeLayerId !== after.activeLayerId || before.activeFrameId !== after.activeFrameId || before.activeCelId !== after.activeCelId || before.structureEpoch !== after.structureEpoch || activeRasterRevision(before) !== activeRasterRevision(after);
 }
@@ -19430,7 +20344,7 @@ function applySelectionMorphology(operation) {
   notifyAssetStateChanged();
   setStatus(`Selection ${operation.toLowerCase()} applied locally; confirm a Transform to mutate pixels.`);
 }
-async function commitWriteSet(writes, sourceOperationType, toolForMirroring = currentBasicTool()) {
+async function commitWriteSet(writes, sourceOperationType, toolForMirroring = currentBasicTool(), options = {}) {
   if (timelineActivationPending) {
     setStatus("Timeline cell is changing; drawing was not committed.", "error");
     return;
@@ -19442,7 +20356,7 @@ async function commitWriteSet(writes, sourceOperationType, toolForMirroring = cu
     return;
   }
   const mirroredWrites = mirrorWritesForTool(writes, asset, toolForMirroring);
-  const selectionKeys = selection === void 0 ? void 0 : new Set(selection.pixels.map(selectionPointKey));
+  const selectionKeys = options.respectSelection === false || selection === void 0 ? void 0 : new Set(selection.pixels.map(selectionPointKey));
   const committedWrites = selectionKeys === void 0 ? mirroredWrites : mirroredWrites.filter((write) => selectionKeys.has(selectionPointKey(write)));
   if (committedWrites.length === 0) return;
   const drawClientId = activeDrawClientId();
@@ -19464,8 +20378,9 @@ async function commitWriteSet(writes, sourceOperationType, toolForMirroring = cu
     }
   };
   const writeTimelineGeneration = timelineStateGeneration;
+  const writeCanonicalGeneration = canonicalStateGeneration;
   const result = await core.execute(command);
-  if (writeTimelineGeneration !== timelineStateGeneration) {
+  if (writeTimelineGeneration !== timelineStateGeneration || writeCanonicalGeneration !== canonicalStateGeneration) {
     syncClientSequencesFromState();
     setStatus("Timeline cell changed while drawing; the old-cell write was discarded.", "error");
     return;
@@ -19475,12 +20390,17 @@ async function commitWriteSet(writes, sourceOperationType, toolForMirroring = cu
     setStatus(result.diagnostics.map((item) => item.code).join(", "), "error");
     return;
   }
-  state = result.state;
-  history.record(before, state, result.result.operation.operationId, result.result.operation.operationType);
-  renderTimeline();
-  saveDrawProjectState();
+  if (!result.result.noOp) {
+    adoptCanonicalState(result.state);
+    refreshSelectionSnapshotForCurrentRaster();
+    history.record(before, state, result.result.operation.operationId, result.result.operation.operationType);
+    renderTimeline();
+    saveDrawProjectState();
+  }
   await autosave.record(state, result.result);
-  publishDrawRasterCommit(result.result, state, before.structureEpoch);
+  if (!result.result.noOp) {
+    publishDrawRasterCommit(result.result, state, before.structureEpoch);
+  }
   await present(result.result.dirtyRegions, result.result.dirtyTiles);
   updateHistoryButtons();
   setStatus(`${sourceOperationType} committed \xB7 ${committedWrites.length}px${mirrorEnabled && mirrorHasActiveAxis() ? ` \xB7 mirror=${mirrorAxisSummary()}` : ""} \xB7 one undo`);
@@ -19601,9 +20521,7 @@ async function resetProject(options = {}) {
   repository.save(state);
   projectIdInput.value = projectId;
   tileSizeSelect.value = String(tileSize);
-  core = new EditorCore(state, {
-    instrumentation
-  });
+  adoptCanonicalState(state);
   history = new LocalUndoRedoHistory(state);
   syncClientSequencesFromState();
   selectionInteractionGeneration += 1;
@@ -19627,6 +20545,7 @@ async function resetProject(options = {}) {
   onionSkinColorMode = "TINTED";
   onionSkinCache = void 0;
   restoreDraw2TimelineMetadata(restored?.timelineMetadata);
+  renderSelectionStamps();
   linkedCelBindings = [];
   journal.operations.length = 0;
   journal.dirtyTileWrites.length = 0;
@@ -20913,6 +21832,42 @@ async function exportSelectedToFile() {
   }
 }
 async function importPxdFile(file) {
+  const previousImportState = {
+    state: cloneProjectStateShared(state),
+    activeWorkspaceProjectId: readActiveWorkspaceProjectId(),
+    assetDefinitions: assetDefinitions.map(cloneAssetDefinitionEntry),
+    assetDefinitionSequence,
+    history: history.snapshot(),
+    drawPersistenceRevision,
+    clientSequence,
+    selection,
+    selectionDraft,
+    pendingSelectionGesture,
+    transformSession,
+    transformPreview,
+    pasteMode,
+    clipboard,
+    selectedTileSource,
+    tilesetSourceRenderKey,
+    lastTilemapGridLayoutKey,
+    timelineSession,
+    timelineViewportInitialized,
+    structureClientSequence,
+    onionSkinEnabled,
+    onionSkinPreviousFrames,
+    onionSkinNextFrames,
+    onionSkinOpacity,
+    onionSkinColorMode,
+    onionSkinCache,
+    activeSelectionStampId,
+    draw2EditorPreferencesReady,
+    timelineMetadata: draw2TimelineMetadataSnapshot(),
+    journal: drawJournalSnapshot(),
+    journalCheckpoints: journal.checkpoints.map((checkpoint) => cloneProjectStateShared(checkpoint))
+  };
+  let importCommitStarted = false;
+  let previousWorkspacePxdSnapshot;
+  let workspaceRollbackFailed = false;
   try {
     const bytes = new Uint8Array(await file.arrayBuffer());
     const legacyCompat = await loadLegacyCompatModule();
@@ -20960,16 +21915,21 @@ async function importPxdFile(file) {
       const diagnostic9 = inspection.diagnostics[0];
       throw new Error(diagnostic9?.message ?? "PXD format could not be identified.");
     }
+    if (importedState.assets[importedState.activeAssetId] === void 0) {
+      throw new Error("Imported PXD active asset is missing.");
+    }
+    if (importedWorkspace !== void 0) {
+      previousWorkspacePxdSnapshot = await getWorkspacePxdBridge().exportProjectPxdSnapshot();
+    }
     flushDrawPersistence();
     await flushDrawPersistence();
+    importCommitStarted = true;
     draw2EditorPreferencesReady = false;
     state = importedState;
     assetDefinitions = importedAssetDefinitions.map(cloneAssetDefinitionEntry);
     assetDefinitionSequence = 0;
     repository.save(state);
-    core = new EditorCore(state, {
-      instrumentation
-    });
+    adoptCanonicalState(state);
     history = new LocalUndoRedoHistory(state);
     const importedRecord = await drawPersistenceStore.load(state.projectId);
     drawPersistenceRevision = importedRecord?.revision ?? 0;
@@ -20987,6 +21947,7 @@ async function importPxdFile(file) {
     lastTilemapGridLayoutKey = "";
     timelineSession = createTimelineSession(state);
     restoreDraw2TimelineMetadata(importedTimelineMetadata);
+    renderSelectionStamps();
     timelineViewportInitialized = false;
     structureClientSequence = 0;
     onionSkinEnabled = false;
@@ -21027,7 +21988,73 @@ async function importPxdFile(file) {
     });
     setStatus(`PXD imported locally \xB7 ${importedStatus} \xB7 hash=${importedHash.slice(0, 12)}\u2026`);
   } catch (cause) {
-    setStatus(cause instanceof Error ? `PXD import rejected: ${cause.message}` : "PXD import rejected.", "error");
+    if (importCommitStarted) {
+      state = previousImportState.state;
+      assetDefinitions = previousImportState.assetDefinitions.map(cloneAssetDefinitionEntry);
+      assetDefinitionSequence = previousImportState.assetDefinitionSequence;
+      drawPersistenceRevision = previousImportState.drawPersistenceRevision;
+      clientSequence = previousImportState.clientSequence;
+      selection = previousImportState.selection;
+      selectionDraft = previousImportState.selectionDraft;
+      pendingSelectionGesture = previousImportState.pendingSelectionGesture;
+      transformSession = previousImportState.transformSession;
+      transformPreview = previousImportState.transformPreview;
+      pasteMode = previousImportState.pasteMode;
+      clipboard = previousImportState.clipboard;
+      selectedTileSource = previousImportState.selectedTileSource;
+      tilesetSourceRenderKey = previousImportState.tilesetSourceRenderKey;
+      lastTilemapGridLayoutKey = previousImportState.lastTilemapGridLayoutKey;
+      timelineSession = previousImportState.timelineSession;
+      timelineViewportInitialized = previousImportState.timelineViewportInitialized;
+      structureClientSequence = previousImportState.structureClientSequence;
+      onionSkinEnabled = previousImportState.onionSkinEnabled;
+      onionSkinPreviousFrames = previousImportState.onionSkinPreviousFrames;
+      onionSkinNextFrames = previousImportState.onionSkinNextFrames;
+      onionSkinOpacity = previousImportState.onionSkinOpacity;
+      onionSkinColorMode = previousImportState.onionSkinColorMode;
+      onionSkinCache = previousImportState.onionSkinCache;
+      activeSelectionStampId = previousImportState.activeSelectionStampId;
+      draw2EditorPreferencesReady = previousImportState.draw2EditorPreferencesReady;
+      repository.save(previousImportState.state);
+      adoptCanonicalState(previousImportState.state);
+      history = new LocalUndoRedoHistory(previousImportState.state);
+      history.restore(previousImportState.history);
+      restoreDraw2TimelineMetadata(previousImportState.timelineMetadata);
+      journal.operations.splice(0, journal.operations.length, ...previousImportState.journal.operations.map((operation) => ({
+        ...operation
+      })));
+      journal.dirtyTileWrites.splice(0, journal.dirtyTileWrites.length, ...previousImportState.journal.dirtyTileWrites.map((write) => ({
+        assetId: write.assetId,
+        tiles: write.tiles.map((tile) => ({
+          tileKey: tile.tileKey,
+          bytes: new Uint8Array(tile.bytes)
+        }))
+      })));
+      journal.checkpoints.splice(0, journal.checkpoints.length, ...previousImportState.journalCheckpoints.map((checkpoint) => cloneProjectStateShared(checkpoint)));
+      const restoredAsset = state.assets[state.activeAssetId];
+      if (restoredAsset !== void 0) {
+        syncRasterCanvasDimensions(restoredAsset.width, restoredAsset.height);
+        renderPaletteButtons(restoredAsset.palette);
+      }
+      renderTimeline();
+      await present();
+      updateHistoryButtons();
+      saveDrawProjectState("import-rollback");
+      writeActiveWorkspaceProjectId(previousImportState.activeWorkspaceProjectId);
+      if (previousWorkspacePxdSnapshot !== void 0) {
+        try {
+          await getWorkspacePxdBridge().restoreProjectPxdSnapshot(previousWorkspacePxdSnapshot);
+        } catch {
+          workspaceRollbackFailed = true;
+        }
+      }
+      announceWorkspaceProjectChanged(window, {
+        projectId: asWorkspaceProjectId(state.projectId),
+        name: state.name
+      });
+    }
+    const message = cause instanceof Error ? `PXD import rejected: ${cause.message}` : "PXD import rejected.";
+    setStatus(workspaceRollbackFailed ? `${message} Draw was restored, but the shared Audio/Game snapshot could not be restored.` : message, "error");
   } finally {
     importPxdControl.value = "";
   }
@@ -21165,6 +22192,19 @@ async function commitPointerPoints(points, fixedContext) {
     setStatus(`Picked palette index ${selectedColor}.`);
     return;
   }
+  const activeSelectionStamp = activeSelectionStampId === void 0 ? void 0 : selectionStampStore.load(activeSelectionStampId);
+  if (tool === "tile-stamp" && activeSelectionStamp !== void 0) {
+    const source = selectionStampSourceForAsset(activeSelectionStamp, asset);
+    const writes2 = tileStampWrites(asset.raster, source, first, Number(specialTileScaleElement?.value ?? 1));
+    await commitWriteSet(writes2, "tool.selection-stamp", tool, {
+      respectSelection: false
+    });
+    if (writes2.length > 0) {
+      const remapMessage = source.remappedColors > 0 ? ` \xB7 ${source.remappedColors}\u8272\u3092\u8FD1\u4F3C\u5909\u63DB` : "";
+      setStatus(`\u9078\u629E\u7BC4\u56F2\u30B9\u30BF\u30F3\u30D7\u300C${activeSelectionStamp.name}\u300D\u3092\u914D\u7F6E\u3057\u307E\u3057\u305F \xB7 ${writes2.length}px \xB7 1 undo${remapMessage}`);
+    }
+    return;
+  }
   if (tool === "tile-stamp") {
     const source = selectedTileSource === void 0 ? {
       width: 2,
@@ -21198,7 +22238,7 @@ async function commitPointerPoints(points, fixedContext) {
     const writes2 = tileStampWrites(asset.raster, source, first, Number(specialTileScaleElement?.value ?? 1));
     await commitWriteSet(writes2, "tool.tile-stamp", tool);
     if (writes2.length > 0) {
-      setStatus(`Tile Stamp committed \xB7 ${writes2.length}px \xB7 one undo`);
+      setStatus(`Tile placement committed \xB7 ${writes2.length}px \xB7 one undo`);
     }
     return;
   }
@@ -21256,8 +22296,9 @@ async function commitPointerPoints(points, fixedContext) {
       }
     };
     const fillTimelineGeneration = timelineStateGeneration;
+    const fillCanonicalGeneration = canonicalStateGeneration;
     const result = await core.execute(command);
-    if (fillTimelineGeneration !== timelineStateGeneration) {
+    if (fillTimelineGeneration !== timelineStateGeneration || fillCanonicalGeneration !== canonicalStateGeneration) {
       syncClientSequencesFromState();
       setStatus("Timeline cell changed while filling; the old-cell write was discarded.", "error");
       return;
@@ -21267,12 +22308,17 @@ async function commitPointerPoints(points, fixedContext) {
       setStatus(result.diagnostics.map((item) => item.code).join(", "), "error");
       return;
     }
-    state = result.state;
-    history.record(before, state, result.result.operation.operationId, result.result.operation.operationType);
-    renderTimeline();
-    saveDrawProjectState();
+    if (!result.result.noOp) {
+      adoptCanonicalState(result.state);
+      refreshSelectionSnapshotForCurrentRaster();
+      history.record(before, state, result.result.operation.operationId, result.result.operation.operationType);
+      renderTimeline();
+      saveDrawProjectState();
+    }
     await autosave.record(state, result.result);
-    publishDrawRasterCommit(result.result, state, before.structureEpoch);
+    if (!result.result.noOp) {
+      publishDrawRasterCommit(result.result, state, before.structureEpoch);
+    }
     await present(result.result.dirtyRegions, result.result.dirtyTiles);
     updateHistoryButtons();
     setStatus(`fill committed \xB7 ${result.result.dirtyTiles.length} tiles \xB7 one undo`);
@@ -21308,8 +22354,9 @@ async function commitPointerPoints(points, fixedContext) {
       }
     };
     const strokeTimelineGeneration = timelineStateGeneration;
+    const strokeCanonicalGeneration = canonicalStateGeneration;
     const result = await core.execute(command);
-    if (strokeTimelineGeneration !== timelineStateGeneration) {
+    if (strokeTimelineGeneration !== timelineStateGeneration || strokeCanonicalGeneration !== canonicalStateGeneration) {
       syncClientSequencesFromState();
       setStatus("Timeline cell changed while drawing; the old-cell write was discarded.", "error");
       return;
@@ -21319,12 +22366,17 @@ async function commitPointerPoints(points, fixedContext) {
       setStatus(result.diagnostics.map((item) => item.code).join(", "), "error");
       return;
     }
-    state = result.state;
-    history.record(before, state, result.result.operation.operationId, result.result.operation.operationType);
-    renderTimeline();
-    saveDrawProjectState();
+    if (!result.result.noOp) {
+      adoptCanonicalState(result.state);
+      refreshSelectionSnapshotForCurrentRaster();
+      history.record(before, state, result.result.operation.operationId, result.result.operation.operationType);
+      renderTimeline();
+      saveDrawProjectState();
+    }
     await autosave.record(state, result.result);
-    publishDrawRasterCommit(result.result, state, before.structureEpoch);
+    if (!result.result.noOp) {
+      publishDrawRasterCommit(result.result, state, before.structureEpoch);
+    }
     await present(result.result.dirtyRegions, result.result.dirtyTiles);
     updateHistoryButtons();
     setStatus(`${tool} committed \xB7 one stroke / one undo`);
@@ -21813,6 +22865,7 @@ async function commitActiveTransform() {
   const commandSequence = nextClientSequence(SELECTION_CLIENT_ID);
   const commandId = selectionCommandId(pasteMode ? "paste" : "transform", state.projectId, commandSequence);
   const interactionGeneration = selectionInteractionGeneration;
+  const canonicalGeneration = canonicalStateGeneration;
   const result = pasteMode && clipboard !== void 0 ? await pasteClipboard(state, {
     commandType: "clipboard.paste",
     commandId,
@@ -21844,7 +22897,7 @@ async function commitActiveTransform() {
       session: transformSession
     }
   });
-  if (interactionGeneration !== selectionInteractionGeneration) {
+  if (interactionGeneration !== selectionInteractionGeneration || canonicalGeneration !== canonicalStateGeneration) {
     return false;
   }
   if (result === void 0 || !result.ok) {
@@ -21859,7 +22912,7 @@ async function commitActiveTransform() {
     setStatus(result === void 0 ? "Transform selection is missing." : result.diagnostics.map((item) => item.code).join(", "), "error");
     return false;
   }
-  state = result.state;
+  if (!result.result.noOp) adoptCanonicalState(result.state);
   syncClientSequencesFromState();
   if (sourceSelection !== void 0 && previewPixels.length > 0) {
     const activeAsset = state.assets[state.activeAssetId];
@@ -21878,9 +22931,12 @@ async function commitActiveTransform() {
   } else {
     selection = void 0;
   }
-  history.record(before, state, result.result.operation.operationId, result.result.operation.operationType);
-  renderTimeline();
-  saveDrawProjectState();
+  refreshSelectionSnapshotForCurrentRaster();
+  if (!result.result.noOp) {
+    history.record(before, state, result.result.operation.operationId, result.result.operation.operationType);
+    renderTimeline();
+    saveDrawProjectState();
+  }
   await autosave.record(state, result.result);
   selectionDraft = void 0;
   pendingSelectionGesture = void 0;
@@ -21939,6 +22995,7 @@ cutButton.addEventListener("click", () => {
     const commandSequence = nextClientSequence(SELECTION_CLIENT_ID);
     const commandId = selectionCommandId("cut", state.projectId, commandSequence);
     const interactionGeneration = selectionInteractionGeneration;
+    const canonicalGeneration = canonicalStateGeneration;
     const result = await cutClipboard(state, {
       commandType: "clipboard.cut",
       commandId,
@@ -21955,17 +23012,20 @@ cutButton.addEventListener("click", () => {
         selection
       }
     });
-    if (interactionGeneration !== selectionInteractionGeneration) return;
+    if (interactionGeneration !== selectionInteractionGeneration || canonicalGeneration !== canonicalStateGeneration) return;
     if (!result.ok) {
       syncClientSequencesFromState();
       setStatus(result.diagnostics.map((item) => item.code).join(", "), "error");
       return;
     }
     syncClientSequencesFromState();
-    state = result.state;
-    history.record(before, state, result.result.operation.operationId, result.result.operation.operationType);
-    renderTimeline();
-    saveDrawProjectState();
+    if (!result.result.noOp) {
+      adoptCanonicalState(result.state);
+      refreshSelectionSnapshotForCurrentRaster();
+      history.record(before, state, result.result.operation.operationId, result.result.operation.operationType);
+      renderTimeline();
+      saveDrawProjectState();
+    }
     await autosave.record(state, result.result);
     selection = void 0;
     selectionDraft = void 0;
@@ -22018,10 +23078,7 @@ undoControl.addEventListener("click", async () => {
     setStatus("Nothing to undo.", "error");
     return;
   }
-  state = result.state;
-  core = new EditorCore(state, {
-    instrumentation
-  });
+  adoptCanonicalState(result.state);
   syncClientSequencesFromState();
   saveDrawProjectState();
   selection = void 0;
@@ -22031,9 +23088,9 @@ undoControl.addEventListener("click", async () => {
   transformSession = void 0;
   transformPreview = void 0;
   pasteMode = false;
+  normalizeTimelineSession();
   notifyAssetStateChanged();
   await present();
-  normalizeTimelineSession();
   renderTimeline();
   updateSelectionActionButtons();
   updateSelectionStatus(`scope=${state.activeCelId} \xB7 selection=none`);
@@ -22048,10 +23105,7 @@ redoControl.addEventListener("click", async () => {
     setStatus("Nothing to redo.", "error");
     return;
   }
-  state = result.state;
-  core = new EditorCore(state, {
-    instrumentation
-  });
+  adoptCanonicalState(result.state);
   syncClientSequencesFromState();
   saveDrawProjectState();
   selection = void 0;
@@ -22061,9 +23115,9 @@ redoControl.addEventListener("click", async () => {
   transformSession = void 0;
   transformPreview = void 0;
   pasteMode = false;
+  normalizeTimelineSession();
   notifyAssetStateChanged();
   await present();
-  normalizeTimelineSession();
   renderTimeline();
   updateSelectionActionButtons();
   updateSelectionStatus(`scope=${state.activeCelId} \xB7 selection=none`);
@@ -22072,6 +23126,10 @@ redoControl.addEventListener("click", async () => {
   setStatus(`Redo restored ${result.operationId} locally; no Realtime operation sent.`);
 });
 var drawInteraction;
+function sameTilemapCell(left, right) {
+  if (left === void 0 || right === void 0) return left === right;
+  return left.sourceAssetId === right.sourceAssetId && left.sourceX === right.sourceX && left.sourceY === right.sourceY && left.transform === right.transform;
+}
 var tilemapPointerGesture;
 var tilemapPresentFrame;
 var viewportPanPointerId;
@@ -22183,12 +23241,37 @@ function beginSelectionDrag(event, point) {
 function cancelTilemapPointerGestureForPinch() {
   const gesture = tilemapPointerGesture;
   if (gesture === void 0) return;
-  state = gesture.before;
-  core = new EditorCore(state, {
-    instrumentation
-  });
+  const isCurrent = !gesture.stale && canonicalStateGeneration === gesture.canonicalGeneration && state.structureEpoch === gesture.structureEpoch && state.tilemaps?.[gesture.mapId]?.revision === gesture.mapRevision;
+  if (isCurrent) {
+    adoptCanonicalState(gesture.before);
+  } else if (rollbackStaleTilemapGesture(gesture)) {
+    saveDrawProjectState("tilemap-cancel");
+    notifyAssetStateChanged();
+  }
   tilemapPointerGesture = void 0;
   scheduleTilemapPresent();
+}
+function rollbackStaleTilemapGesture(gesture) {
+  const map = state.tilemaps?.[gesture.mapId];
+  if (map === void 0) return false;
+  let nextMap = map;
+  for (const [key, beforeCell] of gesture.beforeCells) {
+    if (!sameTilemapCell(map.cells[key], gesture.localCells.get(key))) continue;
+    const [xText, yText] = key.split(":");
+    const x = Number(xText);
+    const y = Number(yText);
+    if (!Number.isSafeInteger(x) || !Number.isSafeInteger(y)) continue;
+    nextMap = beforeCell === void 0 ? clearDraw2TilemapCell(nextMap, x, y) : setDraw2TilemapCell(nextMap, x, y, beforeCell);
+  }
+  if (nextMap === map) return false;
+  adoptCanonicalState({
+    ...state,
+    tilemaps: {
+      ...state.tilemaps ?? {},
+      [map.id]: nextMap
+    }
+  });
+  return true;
 }
 function updateSelectionDragPreview(point) {
   if (selectionDrag === void 0 || selection === void 0) return;
@@ -22533,6 +23616,10 @@ function tilemapCellCoordinates(map, point) {
 function updateTilemapPointerGesture(point) {
   const gesture = tilemapPointerGesture;
   if (gesture === void 0) return;
+  if (gesture.stale || canonicalStateGeneration !== gesture.canonicalGeneration || state.structureEpoch !== gesture.structureEpoch || state.tilemaps?.[gesture.mapId]?.revision !== gesture.mapRevision) {
+    gesture.stale = true;
+    return;
+  }
   const map = state.tilemaps?.[gesture.mapId];
   if (map === void 0) return;
   const coordinates = tilemapCellCoordinates(map, point);
@@ -22540,6 +23627,9 @@ function updateTilemapPointerGesture(point) {
   const key = `${coordinates.x}:${coordinates.y}`;
   if (key === gesture.lastCellKey) return;
   gesture.lastCellKey = key;
+  if (!gesture.beforeCells.has(key)) {
+    gesture.beforeCells.set(key, map.cells[key]);
+  }
   const nextMap = gesture.erase ? clearDraw2TilemapCell(map, coordinates.x, coordinates.y) : selectedTileSource === void 0 ? map : setDraw2TilemapCell(map, coordinates.x, coordinates.y, {
     sourceAssetId: selectedTileSource.sourceAssetId,
     sourceX: selectedTileSource.sourceX,
@@ -22547,17 +23637,19 @@ function updateTilemapPointerGesture(point) {
     transform: "NONE"
   });
   if (nextMap === map) return;
-  state = {
+  adoptCanonicalState({
     ...state,
     tilemaps: {
       ...state.tilemaps ?? {},
       [map.id]: nextMap
     }
-  };
-  core = new EditorCore(state, {
-    instrumentation
   });
+  refreshSelectionSnapshotForCurrentRaster();
   gesture.changed = true;
+  gesture.canonicalGeneration = canonicalStateGeneration;
+  gesture.mapRevision = nextMap.revision;
+  gesture.structureEpoch = state.structureEpoch;
+  gesture.localCells.set(key, nextMap.cells[key]);
   scheduleTilemapPresent();
 }
 function beginTilemapPointerGesture(event, point) {
@@ -22565,6 +23657,10 @@ function beginTilemapPointerGesture(event, point) {
   const layer2 = state.layers.find((item) => item.layerTrackId === state.activeLayerId);
   if (layer2?.locked === true) {
     setStatus("\u30BF\u30A4\u30EB\u30DE\u30C3\u30D7\u30EC\u30A4\u30E4\u30FC\u304C\u30ED\u30C3\u30AF\u3055\u308C\u3066\u3044\u307E\u3059\u3002", "error");
+    return true;
+  }
+  if (activeSelectionStampId !== void 0) {
+    setStatus("\u9078\u629E\u7BC4\u56F2\u30B9\u30BF\u30F3\u30D7\u306F\u901A\u5E38\u30EC\u30A4\u30E4\u30FC\u3067\u4F7F\u7528\u3057\u307E\u3059\u3002\u901A\u5E38\u30EC\u30A4\u30E4\u30FC\u3092\u9078\u629E\u3057\u3066\u304F\u3060\u3055\u3044\u3002", "error");
     return true;
   }
   const map = activeTilemap() ?? ensureTilemapFor(state.activeLayerId, state.activeFrameId);
@@ -22585,9 +23681,15 @@ function beginTilemapPointerGesture(event, point) {
     pointerId: event.pointerId,
     mapId: map.id,
     before: state,
+    canonicalGeneration: canonicalStateGeneration,
+    mapRevision: map.revision,
+    structureEpoch: state.structureEpoch,
+    stale: false,
     erase,
     lastCellKey: "",
-    changed: false
+    changed: false,
+    beforeCells: /* @__PURE__ */ new Map(),
+    localCells: /* @__PURE__ */ new Map()
   };
   canvas.setPointerCapture(event.pointerId);
   updateTilemapPointerGesture(point);
@@ -22599,10 +23701,22 @@ async function finishTilemapPointerGesture(cancelled = false) {
   if (gesture === void 0) return;
   tilemapPointerGesture = void 0;
   if (cancelled) {
-    state = gesture.before;
-    core = new EditorCore(state, {
-      instrumentation
-    });
+    const isCurrent = !gesture.stale && canonicalStateGeneration === gesture.canonicalGeneration && state.structureEpoch === gesture.structureEpoch && state.tilemaps?.[gesture.mapId]?.revision === gesture.mapRevision;
+    if (isCurrent) {
+      adoptCanonicalState(gesture.before);
+    } else if (rollbackStaleTilemapGesture(gesture)) {
+      saveDrawProjectState("tilemap-cancel");
+      notifyAssetStateChanged();
+    }
+    await present();
+    return;
+  }
+  const isStale = gesture.stale || canonicalStateGeneration !== gesture.canonicalGeneration || state.structureEpoch !== gesture.structureEpoch || state.tilemaps?.[gesture.mapId]?.revision !== gesture.mapRevision;
+  if (isStale) {
+    if (rollbackStaleTilemapGesture(gesture)) {
+      saveDrawProjectState("tilemap-cancel");
+      notifyAssetStateChanged();
+    }
     await present();
     return;
   }
@@ -23301,7 +24415,7 @@ var TOOL_STUDIO_LABELS = {
   move: "Move / Duplicate",
   "select-color": "Color Selection",
   "select-polygon": "Polygon Select",
-  "tile-stamp": "Tile Stamp"
+  "tile-stamp": "Tile Placement"
 };
 function syncToolStudio() {
   const current = currentBasicTool();
@@ -23315,7 +24429,7 @@ function syncToolStudio() {
     card.setAttribute("aria-pressed", String(active));
   }
   if (toolStudioStatusElement !== null) {
-    const message = current === "pixel-pen" ? "Pixel Perfect Pen\u306F1px\u306EBresenham\u7DDA\u3092\u4F5C\u308A\u307E\u3059\u3002" : current === "move" ? "\u9078\u629E\u7BC4\u56F2\u3092\u30C9\u30E9\u30C3\u30B0\u3002Alt\u3092\u62BC\u3059\u3068\u8907\u88FD\u3057\u3066\u79FB\u52D5\u3057\u307E\u3059\u3002" : current === "select-polygon" ? "\u9802\u70B9\u3092\u30C9\u30E9\u30C3\u30B0\u3057\u3066\u591A\u89D2\u5F62\u3092\u63CF\u304D\u3001\u96E2\u3059\u3068\u9078\u629E\u7BC4\u56F2\u306B\u306A\u308A\u307E\u3059\u3002" : current === "select-color" ? `${colorSelectionModeLabel(normalizeColorSelectionMode(toolOptions.selectionMode))} color selection. Mode and tolerance are shown near the viewport.` : current === "fill" ? "\u30AF\u30EA\u30C3\u30AF\u5730\u70B9\u3068\u540C\u3058\u30D1\u30EC\u30C3\u30C8\u8272\u3067\u3064\u306A\u304C\u308B\u7BC4\u56F2\u3060\u3051\u3092\u5857\u308A\u3064\u3076\u3057\u307E\u3059\u3002" : current === "tile-stamp" ? "Tileset\u306E\u30BB\u30EB\u3092\u9078\u3073\u3001Canvas\u3078\u30B9\u30BF\u30F3\u30D7\u3057\u307E\u3059\u3002" : "\u30C4\u30FC\u30EB\u3092\u9078\u3076\u3068\u3001\u3053\u3053\u306B\u4F7F\u3044\u65B9\u3068\u8A2D\u5B9A\u304C\u8868\u793A\u3055\u308C\u307E\u3059\u3002";
+    const message = current === "pixel-pen" ? "Pixel Perfect Pen\u306F1px\u306EBresenham\u7DDA\u3092\u4F5C\u308A\u307E\u3059\u3002" : current === "move" ? "\u9078\u629E\u7BC4\u56F2\u3092\u30C9\u30E9\u30C3\u30B0\u3002Alt\u3092\u62BC\u3059\u3068\u8907\u88FD\u3057\u3066\u79FB\u52D5\u3057\u307E\u3059\u3002" : current === "select-polygon" ? "\u9802\u70B9\u3092\u30C9\u30E9\u30C3\u30B0\u3057\u3066\u591A\u89D2\u5F62\u3092\u63CF\u304D\u3001\u96E2\u3059\u3068\u9078\u629E\u7BC4\u56F2\u306B\u306A\u308A\u307E\u3059\u3002" : current === "select-color" ? `${colorSelectionModeLabel(normalizeColorSelectionMode(toolOptions.selectionMode))} color selection. Mode and tolerance are shown near the viewport.` : current === "fill" ? "\u30AF\u30EA\u30C3\u30AF\u5730\u70B9\u3068\u540C\u3058\u30D1\u30EC\u30C3\u30C8\u8272\u3067\u3064\u306A\u304C\u308B\u7BC4\u56F2\u3060\u3051\u3092\u5857\u308A\u3064\u3076\u3057\u307E\u3059\u3002" : current === "tile-stamp" ? activeSelectionStampId === void 0 ? "Tileset\u306E\u30BB\u30EB\u3092\u9078\u3073\u3001Canvas\u3078\u914D\u7F6E\u3057\u307E\u3059\u3002" : "\u4FDD\u5B58\u3057\u305F\u9078\u629E\u7BC4\u56F2\u30B9\u30BF\u30F3\u30D7\u3092Canvas\u3078\u914D\u7F6E\u3057\u307E\u3059\u3002" : "\u30C4\u30FC\u30EB\u3092\u9078\u3076\u3068\u3001\u3053\u3053\u306B\u4F7F\u3044\u65B9\u3068\u8A2D\u5B9A\u304C\u8868\u793A\u3055\u308C\u307E\u3059\u3002";
     toolStudioStatusElement.textContent = message;
   }
   if (toolStudioElement !== null) {
@@ -23776,6 +24890,12 @@ function deleteBrushPreset() {
   setStatus("Brush preset deleted locally.");
 }
 toolSelect.addEventListener("change", () => {
+  if (selectionStampToolActivation) {
+    selectionStampToolActivation = false;
+  } else if (activeSelectionStampId !== void 0) {
+    activeSelectionStampId = void 0;
+    renderSelectionStamps();
+  }
   cancelUncommittedSelectionWork("Selection/transform preview cancelled because the tool changed.");
   syncToolButtons();
   syncToolStudio();
@@ -23866,6 +24986,7 @@ selectionExpandButton.addEventListener("click", () => applySelectionMorphology("
 selectionShrinkButton.addEventListener("click", () => applySelectionMorphology("SHRINK"));
 selectionInvertButton.addEventListener("click", () => applySelectionMorphology("INVERT"));
 selectionBorderButton.addEventListener("click", () => applySelectionMorphology("BORDER"));
+selectionStampSaveButton.addEventListener("click", saveSelectionStamp);
 renderBrushPresetOptions();
 updateToolOptions();
 syncToolButtons();
@@ -24095,7 +25216,6 @@ function setAdvancedStatus(message, kind = "ready") {
 function advancedControlsEnabled(enabled) {
   for (const control of [
     advancedPatternControl,
-    advancedStampControl,
     advancedMirrorControl,
     advancedGridControl,
     advancedGuideControl
@@ -24162,41 +25282,6 @@ advancedPatternControl.addEventListener("click", () => {
     }
     advancedPreviewOperationId = operation.value.operationId;
     setAdvancedStatus(`Pattern preview planned \xB7 writes=${operation.value.writes.length} \xB7 dirtyTiles=${operation.value.dirtyTiles.length} \xB7 undo=none`);
-  })();
-});
-advancedStampControl.addEventListener("click", () => {
-  void (async () => {
-    const module = await ensureAdvancedModule();
-    if (module === void 0) return;
-    const stamp2 = module.planStamp(advancedTarget(), {
-      width: 2,
-      height: 2,
-      pixels: [
-        1,
-        0,
-        0,
-        1
-      ],
-      palette: [
-        0,
-        4294967295,
-        4278190335
-      ],
-      transparentIndex: 0
-    }, {
-      x: 24,
-      y: 24,
-      scale: 2,
-      transparent: "SKIP",
-      paletteCompatibility: "EXACT",
-      clipping: "CLIP"
-    });
-    if (!stamp2.ok) {
-      setAdvancedStatus(`Stamp preview blocked \xB7 ${stamp2.diagnostics[0]?.code ?? "UNKNOWN"}`, "error");
-      return;
-    }
-    advancedPreviewOperationId = stamp2.value.session.sessionId;
-    setAdvancedStatus(`Stamp preview ready \xB7 previewWrites=${stamp2.value.session.preview.writes.length} \xB7 commit=atomic \xB7 cancel=available`);
   })();
 });
 advancedMirrorControl.addEventListener("click", () => {
@@ -24431,12 +25516,19 @@ void resolveInitialProjectSettings().then(async (settings) => {
     return settings;
   }
   return await waitForProjectStart();
-}).then((settings) => resetProject(settings)).then(async () => {
+}).then(async (settings) => {
+  await resetProject(settings);
   await startPixyncProjectLifecycle();
-  return loadWorkspaceModule();
-}).then((module) => {
+  return {
+    module: await loadWorkspaceModule(),
+    initialProjectMode: settings.mode
+  };
+}).then(({ module, initialProjectMode }) => {
   const result = module.bootstrapDraw2Workspace(document, {
-    projectId: state.projectId
+    projectId: state.projectId,
+    ...initialProjectMode === void 0 ? {} : {
+      initialProjectMode
+    }
   });
   if (!result.ok) {
     setStatus(result.reason ?? "Workspace layer unavailable.", "error");

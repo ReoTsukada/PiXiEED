@@ -111,12 +111,34 @@ export type GameCollisionLayer =
   | "PROJECTILE";
 export type GameRigidbodyBodyType = "STATIC" | "DYNAMIC" | "KINEMATIC";
 
+export const GAME_TILEMAP_DOCUMENT_SCHEMA_VERSION = 1 as const;
+export type GameTilemapCellCollision = "NONE" | "SOLID";
+
+/** Sparse, Game-owned map data. It contains placement/collision only, never source pixels. */
+export interface GameTilemapCell {
+  readonly x: number;
+  readonly y: number;
+  readonly collision: GameTilemapCellCollision;
+  readonly triggerId?: string;
+}
+
+export interface GameTilemapDocument {
+  readonly schemaVersion: typeof GAME_TILEMAP_DOCUMENT_SCHEMA_VERSION;
+  readonly mapId: string;
+  readonly width: number;
+  readonly height: number;
+  readonly tileSize: number;
+  readonly cells: readonly GameTilemapCell[];
+}
+
 export interface TilemapComponent {
   readonly type: "TILEMAP";
   readonly componentId: ComponentId;
   readonly mapId: string;
   readonly tileSize: number;
   readonly collisionEnabled: boolean;
+  /** Optional canonical map authoring document; absent for legacy records. */
+  readonly document?: GameTilemapDocument;
 }
 
 export interface ColliderComponent {
@@ -185,6 +207,62 @@ export type GameComponentState =
     readonly enabled: boolean;
   };
 
+/**
+ * Game-owned template data. Templates are optional authoring helpers, not a
+ * genre lock: a project can use any combination of them or none at all.
+ * Values deliberately stay scalar so they remain portable across the local
+ * editor, Canonical Project, and future engine adapters.
+ */
+export type GameTemplateCategory =
+  | "CORE"
+  | "RPG"
+  | "ACTION"
+  | "SHOOTING"
+  | "RACING"
+  | "RHYTHM";
+export type GameTemplateTarget = "SCENE_OBJECT" | "GAME_DATA";
+export type GameTemplateKind =
+  | "CHARACTER"
+  | "WEAPON"
+  | "ARMOR"
+  | "SKILL"
+  | "STATUS"
+  | "TILE"
+  | "DAMAGE"
+  | "UI";
+export type GameTemplateValue = string | number | boolean;
+
+export interface GameTemplateInstance {
+  readonly instanceId: string;
+  readonly templateId: string;
+  readonly category: GameTemplateCategory;
+  readonly kind: GameTemplateKind;
+  readonly target: GameTemplateTarget;
+  readonly label: string;
+  readonly values: Readonly<Record<string, GameTemplateValue>>;
+  /** Scene object created by a template, or an optional Game-side attachment. */
+  readonly targetTrackId?: string;
+}
+
+export const GAME_TEMPLATE_CATEGORIES: readonly GameTemplateCategory[] = [
+  "CORE",
+  "RPG",
+  "ACTION",
+  "SHOOTING",
+  "RACING",
+  "RHYTHM",
+];
+export const GAME_TEMPLATE_KINDS: readonly GameTemplateKind[] = [
+  "CHARACTER",
+  "WEAPON",
+  "ARMOR",
+  "SKILL",
+  "STATUS",
+  "TILE",
+  "DAMAGE",
+  "UI",
+];
+
 export type Component =
   | TransformComponent
   | SpriteComponent
@@ -244,15 +322,23 @@ export interface BehaviorTrigger {
   readonly value?: string;
 }
 
-export interface BehaviorCondition {
-  readonly kind: "ALWAYS" | "VARIABLE_EQUALS" | "HAS_COMPONENT";
-  readonly key?: string;
-  readonly value?: string | number | boolean;
-}
+export type BehaviorCondition =
+  | { readonly kind: "ALWAYS" | "NEVER" }
+  | {
+    readonly kind: "VARIABLE_EQUALS" | "VARIABLE_NOT_EQUALS";
+    readonly key?: string;
+    readonly value?: string | number | boolean;
+  }
+  | {
+    readonly kind: "HAS_COMPONENT" | "NOT_HAS_COMPONENT";
+    readonly key?: string;
+  }
+  | { readonly kind: "NOT"; readonly condition: BehaviorCondition };
 
 export interface BehaviorAction {
   readonly kind:
     | "SET_VARIABLE"
+    | "ADD_VARIABLE"
     | "SET_COMPONENT_PROPERTY"
     | "PLAY_AUDIO"
     | "SPAWN_ENTITY";
@@ -284,6 +370,31 @@ export interface GameTimelineTrack {
   readonly activeFrames: readonly number[];
   readonly role?: GameObjectRole;
   readonly components?: readonly GameComponentState[];
+  readonly tilemap?: GameTilemapDocument;
+}
+
+export type GameAnimationLoopMode = "LOOP" | "ONCE" | "PING_PONG";
+
+/**
+ * Game-owned animation assignment.  It points at an iDRAW definition and
+ * clip, but deliberately contains no raster data or editable Draw metadata.
+ */
+export interface GameAnimationBinding {
+  readonly bindingId: string;
+  readonly trackId: string;
+  readonly assetDefinitionId: string;
+  readonly clipKey: string;
+  readonly motionName: string;
+  readonly direction?: string;
+  readonly frameIds: readonly string[];
+  readonly fps: number;
+  readonly loopMode: GameAnimationLoopMode;
+  readonly flipX: boolean;
+  readonly flipY: boolean;
+  readonly mode: AssetReferenceMode;
+  readonly sourceAssetId?: string;
+  readonly sourceRevisionId?: string;
+  readonly sourceContentHash?: string;
 }
 
 /** Canonical runtime-family selection; the executable module remains a GAME-350 boundary. */
@@ -295,6 +406,10 @@ export interface GameRuntimeProfileReference {
 export interface GameEditorTimeline {
   readonly frameCount: number;
   readonly tracks: readonly GameTimelineTrack[];
+  /** Optional Game-owned template instances; absent in legacy projects. */
+  readonly templateInstances?: readonly GameTemplateInstance[];
+  /** Optional Game-owned animation assignments; absent in legacy projects. */
+  readonly animationBindings?: readonly GameAnimationBinding[];
 }
 
 export interface GameProject {
@@ -403,6 +518,174 @@ export const asSha256 = (value: string): Sha256 => {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+const GAME_TILEMAP_DOCUMENT_KEYS = new Set([
+  "schemaVersion",
+  "mapId",
+  "width",
+  "height",
+  "tileSize",
+  "cells",
+]);
+const GAME_TILEMAP_CELL_KEYS = new Set([
+  "x",
+  "y",
+  "collision",
+  "triggerId",
+]);
+
+/** Validate sparse map data before it enters a canonical Project or timeline. */
+export function isValidGameTilemapDocument(
+  value: unknown,
+): value is GameTilemapDocument {
+  if (!isRecord(value)) return false;
+  const width = value.width;
+  const height = value.height;
+  const tileSize = value.tileSize;
+  const cells = value.cells;
+  if (
+    Object.keys(value).some((key) => !GAME_TILEMAP_DOCUMENT_KEYS.has(key)) ||
+    value.schemaVersion !== GAME_TILEMAP_DOCUMENT_SCHEMA_VERSION ||
+    typeof value.mapId !== "string" ||
+    !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(value.mapId) ||
+    !Number.isSafeInteger(width) || typeof width !== "number" || width < 1 ||
+    width > 256 ||
+    !Number.isSafeInteger(height) || typeof height !== "number" || height < 1 ||
+    height > 256 ||
+    !Number.isSafeInteger(tileSize) || typeof tileSize !== "number" ||
+    tileSize < 1 || tileSize > 4096 || !Array.isArray(cells) ||
+    cells.length > width * height
+  ) {
+    return false;
+  }
+  const seen = new Set<string>();
+  for (const rawCell of cells) {
+    if (!isRecord(rawCell)) return false;
+    const x = rawCell.x;
+    const y = rawCell.y;
+    const collision = rawCell.collision;
+    const triggerId = rawCell.triggerId;
+    if (
+      Object.keys(rawCell).some((key) => !GAME_TILEMAP_CELL_KEYS.has(key)) ||
+      !Number.isSafeInteger(x) || typeof x !== "number" || x < 0 ||
+      x >= width ||
+      !Number.isSafeInteger(y) || typeof y !== "number" || y < 0 ||
+      y >= height ||
+      (collision !== "NONE" && collision !== "SOLID") ||
+      (triggerId !== undefined &&
+        (typeof triggerId !== "string" ||
+          !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(triggerId))) ||
+      (collision === "NONE" && triggerId === undefined)
+    ) {
+      return false;
+    }
+    const key = `${x},${y}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+  }
+  return true;
+}
+
+const GAME_TEMPLATE_INSTANCE_KEYS = new Set([
+  "instanceId",
+  "templateId",
+  "category",
+  "kind",
+  "target",
+  "label",
+  "values",
+  "targetTrackId",
+]);
+const GAME_TEMPLATE_VALUE_KEY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u;
+
+/** Validate persisted Game-owned template data without loading a template catalog. */
+export function isValidGameTemplateInstance(
+  value: unknown,
+): value is GameTemplateInstance {
+  if (!isRecord(value)) return false;
+  if (
+    Object.keys(value).some((key) => !GAME_TEMPLATE_INSTANCE_KEYS.has(key)) ||
+    typeof value.instanceId !== "string" ||
+    !GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.instanceId) ||
+    typeof value.templateId !== "string" ||
+    !GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.templateId) ||
+    !GAME_TEMPLATE_CATEGORIES.includes(
+      value.category as GameTemplateCategory,
+    ) ||
+    !GAME_TEMPLATE_KINDS.includes(value.kind as GameTemplateKind) ||
+    (value.target !== "SCENE_OBJECT" && value.target !== "GAME_DATA") ||
+    typeof value.label !== "string" || value.label.trim().length === 0 ||
+    !isRecord(value.values) ||
+    (value.targetTrackId !== undefined &&
+      (typeof value.targetTrackId !== "string" ||
+        !GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.targetTrackId)))
+  ) return false;
+  if (value.target === "SCENE_OBJECT" && value.targetTrackId === undefined) {
+    return false;
+  }
+  const templateValues = value.values;
+  if (!isRecord(templateValues)) return false;
+  return Object.keys(templateValues).every((key) => {
+    if (!GAME_TEMPLATE_VALUE_KEY_PATTERN.test(key)) return false;
+    const templateValue = templateValues[key];
+    return (typeof templateValue === "string" ||
+      typeof templateValue === "boolean" ||
+      (typeof templateValue === "number" && Number.isFinite(templateValue)));
+  });
+}
+
+const GAME_ANIMATION_BINDING_KEYS = new Set([
+  "bindingId",
+  "trackId",
+  "assetDefinitionId",
+  "clipKey",
+  "motionName",
+  "direction",
+  "frameIds",
+  "fps",
+  "loopMode",
+  "flipX",
+  "flipY",
+  "mode",
+  "sourceAssetId",
+  "sourceRevisionId",
+  "sourceContentHash",
+]);
+
+/** Validate Game-side animation references without loading iDRAW. */
+export function isValidGameAnimationBinding(
+  value: unknown,
+): value is GameAnimationBinding {
+  if (!isRecord(value)) return false;
+  const id = (candidate: unknown): candidate is string =>
+    typeof candidate === "string" &&
+    GAME_TEMPLATE_VALUE_KEY_PATTERN.test(candidate);
+  const label = (candidate: unknown): candidate is string =>
+    typeof candidate === "string" && candidate.trim().length > 0 &&
+    candidate.length <= 128;
+  return Object.keys(value).every((key) =>
+    GAME_ANIMATION_BINDING_KEYS.has(key)
+  ) &&
+    id(value.bindingId) &&
+    id(value.trackId) &&
+    id(value.assetDefinitionId) &&
+    label(value.clipKey) &&
+    label(value.motionName) &&
+    (value.direction === undefined || label(value.direction)) &&
+    Array.isArray(value.frameIds) && value.frameIds.length > 0 &&
+    value.frameIds.length <= 512 &&
+    value.frameIds.every((frameId) => id(frameId)) &&
+    typeof value.fps === "number" && Number.isFinite(value.fps) &&
+    value.fps > 0 && value.fps <= 240 &&
+    ["LOOP", "ONCE", "PING_PONG"].includes(String(value.loopMode)) &&
+    typeof value.flipX === "boolean" && typeof value.flipY === "boolean" &&
+    (value.mode === "LIVE" || value.mode === "PINNED") &&
+    (value.sourceAssetId === undefined || id(value.sourceAssetId)) &&
+    (value.sourceRevisionId === undefined || id(value.sourceRevisionId)) &&
+    (value.sourceContentHash === undefined ||
+      (typeof value.sourceContentHash === "string" &&
+        /^[a-f0-9]{64}$/u.test(value.sourceContentHash)));
 }
 
 function diagnostic(
@@ -691,6 +974,18 @@ function validateComponent(
         ),
       );
     }
+    if (
+      component.document !== undefined &&
+      !isValidGameTilemapDocument(component.document)
+    ) {
+      diagnostics.push(
+        diagnostic(
+          "INVALID_COMPONENT",
+          `${path}.document`,
+          "Tilemap document is invalid.",
+        ),
+      );
+    }
   }
   if (component.type === "COLLIDER") {
     if (!["BOX", "CIRCLE", "CAPSULE"].includes(component.shape as string)) {
@@ -958,7 +1253,9 @@ function validateGameComponentState(
       !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(component.mapId) ||
       typeof component.tileSize !== "number" ||
       !Number.isSafeInteger(component.tileSize) || component.tileSize < 1 ||
-      typeof component.collisionEnabled !== "boolean")
+      typeof component.collisionEnabled !== "boolean" ||
+      (component.document !== undefined &&
+        !isValidGameTilemapDocument(component.document)))
   ) {
     diagnostics.push(
       diagnostic(
@@ -1472,6 +1769,112 @@ export function validateGameProject(
             }
           }
         }
+        if (
+          track.tilemap !== undefined &&
+          !isValidGameTilemapDocument(track.tilemap)
+        ) {
+          diagnostics.push(
+            diagnostic(
+              "INVALID_PROJECT",
+              `editorTimeline.tracks[${index}].tilemap`,
+              "Editor tilemap document is invalid.",
+            ),
+          );
+        }
+      }
+    }
+    if (timeline.templateInstances !== undefined) {
+      if (
+        !Array.isArray(timeline.templateInstances) ||
+        timeline.templateInstances.some((instance) =>
+          !isValidGameTemplateInstance(instance)
+        )
+      ) {
+        diagnostics.push(
+          diagnostic(
+            "INVALID_PROJECT",
+            "editorTimeline.templateInstances",
+            "Game template instances are invalid.",
+          ),
+        );
+      } else {
+        diagnostics.push(
+          ...duplicateDiagnostics(
+            timeline.templateInstances.map((instance) => instance.instanceId),
+            "editorTimeline.templateInstances.instanceId",
+          ),
+        );
+        const trackIds = new Set(
+          Array.isArray(timeline.tracks)
+            ? timeline.tracks.map((track) => track.trackId)
+            : [],
+        );
+        for (const [index, instance] of timeline.templateInstances.entries()) {
+          if (
+            instance.targetTrackId !== undefined &&
+            !trackIds.has(instance.targetTrackId)
+          ) {
+            diagnostics.push(
+              diagnostic(
+                "MISSING_REFERENCE",
+                `editorTimeline.templateInstances[${index}].targetTrackId`,
+                "Game template target track is missing.",
+              ),
+            );
+          }
+        }
+      }
+    }
+    if (timeline.animationBindings !== undefined) {
+      if (
+        !Array.isArray(timeline.animationBindings) ||
+        timeline.animationBindings.some((binding) =>
+          !isValidGameAnimationBinding(binding)
+        )
+      ) {
+        diagnostics.push(
+          diagnostic(
+            "INVALID_PROJECT",
+            "editorTimeline.animationBindings",
+            "Game animation bindings are invalid.",
+          ),
+        );
+      } else {
+        diagnostics.push(
+          ...duplicateDiagnostics(
+            timeline.animationBindings.map((binding) => binding.bindingId),
+            "editorTimeline.animationBindings.bindingId",
+          ),
+        );
+        const trackIds = new Set(
+          Array.isArray(timeline.tracks)
+            ? timeline.tracks.map((track) => track.trackId)
+            : [],
+        );
+        const keys = new Set<string>();
+        for (const [index, binding] of timeline.animationBindings.entries()) {
+          if (!trackIds.has(binding.trackId)) {
+            diagnostics.push(
+              diagnostic(
+                "MISSING_REFERENCE",
+                `editorTimeline.animationBindings[${index}].trackId`,
+                "Game animation target track is missing.",
+              ),
+            );
+          }
+          const key =
+            `${binding.trackId}\u0000${binding.assetDefinitionId}\u0000${binding.clipKey}`;
+          if (keys.has(key)) {
+            diagnostics.push(
+              diagnostic(
+                "DUPLICATE_ID",
+                `editorTimeline.animationBindings[${index}]`,
+                "A Game animation clip can only be assigned once per object.",
+              ),
+            );
+          }
+          keys.add(key);
+        }
       }
     }
   }
@@ -1550,6 +1953,27 @@ function canonicalProjectPayload(
             right,
           ) => left - right),
         })),
+        ...(project.editorTimeline.templateInstances === undefined ? {} : {
+          templateInstances: sortById(
+            project.editorTimeline.templateInstances as unknown as Record<
+              string,
+              unknown
+            >[],
+            "instanceId",
+          ),
+        }),
+        ...(project.editorTimeline.animationBindings === undefined ? {} : {
+          animationBindings: sortById(
+            project.editorTimeline.animationBindings as unknown as Record<
+              string,
+              unknown
+            >[],
+            "bindingId",
+          ).map((binding) => ({
+            ...binding,
+            frameIds: [...(binding.frameIds as string[])],
+          })),
+        }),
       },
     }),
   };

@@ -10,7 +10,7 @@
     <title>PiXiEEDstudio — iDRAW Workspace</title>
     <link
       rel="stylesheet"
-      href="./assets/draw2-shell.css?v=20260825-game-studio-systems-v82"
+      href="./assets/draw2-shell.css?v=20260827-igame-template-v1"
     >
   </head>
   <body>
@@ -121,6 +121,8 @@
                 alt="PiXiEED"
                 decoding="async"
               >
+              <strong class="draw2-workspace-brand-product">PiXiEED Studio</strong>
+              <span class="draw2-workspace-brand-context">同じ制作ツール</span>
               <span
                 class="draw2-workspace-status"
                 id="draw2WorkspaceStatus"
@@ -176,6 +178,13 @@
                     role="menuitem"
                   >
                     Export
+                  </button>
+                  <button
+                    data-workspace-command="billing-open"
+                    type="button"
+                    role="menuitem"
+                  >
+                    課金・外部Build
                   </button>
                   <span
                     class="draw2-menu-section-label"
@@ -1488,7 +1497,7 @@
           <nav
             class="draw2-creator-mode-bar"
             id="draw2CreatorModeBar"
-            aria-label="Creator workflow modes"
+            aria-label="PiXiEED Studio 制作モード。ページ移動ではなく同じツール内を切り替えます"
             role="tablist"
           >
             <button
@@ -1561,6 +1570,16 @@
               </svg><span>EXPORT</span>
             </button>
           </nav>
+          <div
+            class="draw2-mode-transition-banner"
+            id="draw2ModeTransitionBanner"
+            role="status"
+            aria-live="polite"
+            hidden
+          >
+            <strong id="draw2ModeTransitionLabel">PiXiEED Studio</strong>
+            <span id="draw2ModeTransitionDetail">同じプロジェクトを継続</span>
+          </div>
           <div class="draw2-workspace-context-row">
             <div
               class="draw2-workspace-quick-controls"
@@ -1729,29 +1748,48 @@
           >
             <header class="draw2-game-left-dock-header">
               <div>
-                <span class="draw2-eyebrow">iGAME</span>
-                <strong>Hierarchy</strong>
+                <span class="draw2-eyebrow">GAME SCENE</span>
+                <strong>シーン階層</strong>
               </div>
-              <button
-                class="draw2-button draw2-button-icon"
-                id="draw2GameHierarchyAdd"
-                type="button"
-                aria-label="Add game object"
-                title="Add game object"
-              >
-                <svg class="draw2-ui-icon" aria-hidden="true" focusable="false">
-                  <use href="./assets/icons/draw2-icons.svg#icon-add"></use>
-                </svg>
-              </button>
+              <div class="draw2-game-hierarchy-add-wrap">
+                <button
+                  class="draw2-button draw2-button-icon"
+                  id="draw2GameHierarchyAdd"
+                  type="button"
+                  aria-label="Gameオブジェクトを追加"
+                  aria-controls="draw2GameHierarchyAddMenu"
+                  aria-expanded="false"
+                  title="Gameオブジェクトを追加"
+                >
+                  <svg class="draw2-ui-icon" aria-hidden="true" focusable="false">
+                    <use href="./assets/icons/draw2-icons.svg#icon-add"></use>
+                  </svg><span class="draw2-button-label">追加</span>
+                </button>
+                <div
+                  class="draw2-game-hierarchy-add-menu"
+                  id="draw2GameHierarchyAddMenu"
+                  role="menu"
+                  aria-label="Gameオブジェクトの種類"
+                  hidden
+                >
+                  <button type="button" role="menuitem" data-game-object-template="RPG_STARTER">RPGスターター</button>
+                  <button type="button" role="menuitem" data-game-object-template="PLAYER">主人公</button>
+                  <button type="button" role="menuitem" data-game-object-template="NPC">NPC / 登場人物</button>
+                  <button type="button" role="menuitem" data-game-object-template="PROP">宝箱・扉・オブジェクト</button>
+                  <button type="button" role="menuitem" data-game-object-template="TRIGGER">イベント起点</button>
+                  <button type="button" role="menuitem" data-game-object-template="TILEMAP">マップ</button>
+                  <button type="button" role="menuitem" data-game-object-template="CAMERA">カメラ</button>
+                </div>
+              </div>
             </header>
             <div
               class="draw2-game-hierarchy-list"
               id="draw2GameHierarchyList"
               role="tree"
-              aria-label="Game scene objects"
+              aria-label="Gameシーンのオブジェクト"
             ></div>
             <p class="draw2-panel-status" id="draw2GameHierarchyStatus">
-              Scene objects are kept in the Game project.
+              Gameのマップ・登場人物・オブジェクト・システムをここで管理します。
             </p>
           </section>
           <div
@@ -2137,12 +2175,12 @@
               </div>
             </details>
             <details class="draw2-tool-group" data-workspace-tool-group="tile">
-              <summary class="draw2-tool-group-summary" data-workspace-tool="tile-stamp" data-tool-icon="icon-sheet" aria-haspopup="menu" aria-label="Tile tools" title="Stamp the selected tileset cell">
+              <summary class="draw2-tool-group-summary" data-workspace-tool="tile-stamp" data-tool-icon="icon-sheet" aria-haspopup="menu" aria-label="Tile tools" title="Place the selected tileset cell">
                 <svg class="draw2-ui-icon draw2-tool-icon" data-tool-group-icon aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-sheet"></use></svg><span class="draw2-tool-group-label">Tile</span>
               </summary>
               <div class="draw2-tool-popover" role="menu">
-                <button class="draw2-tool-button" data-workspace-tool="tile-stamp" data-tool-icon="icon-sheet" type="button" aria-pressed="false" title="Tile stamp (T)">
-                  <svg class="draw2-ui-icon draw2-tool-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-sheet"></use></svg><span>Stamp</span>
+                <button class="draw2-tool-button" data-workspace-tool="tile-stamp" data-tool-icon="icon-sheet" type="button" aria-pressed="false" title="Tile placement (T)">
+                  <svg class="draw2-ui-icon draw2-tool-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-sheet"></use></svg><span>Place Tile</span>
                 </button>
               </div>
             </details>
@@ -2488,6 +2526,41 @@
             </svg><span>Mini preview</span>
           </button>
           <div id="draw2WorkspaceCanvasSlot"></div>
+          <section
+            id="draw2GameSceneViewport"
+            class="draw2-game-scene-viewport"
+            aria-label="iGAME Scene View"
+            hidden
+          >
+            <header class="draw2-game-scene-viewport-header">
+              <div>
+                <span class="draw2-eyebrow">SCENE VIEW</span>
+                <strong>ゲーム配置</strong>
+              </div>
+              <div class="draw2-game-scene-legend" aria-label="表示凡例">
+                <span class="draw2-game-scene-legend-item draw2-game-scene-legend-collider">Collider</span>
+                <span class="draw2-game-scene-legend-item draw2-game-scene-legend-trigger">Trigger</span>
+              </div>
+            </header>
+            <div class="draw2-game-scene-viewport-stage">
+              <svg
+                id="draw2GameSceneSvg"
+                class="draw2-game-scene-svg"
+                viewBox="0 0 12 8"
+                preserveAspectRatio="xMidYMid meet"
+                role="img"
+                aria-label="ゲームオブジェクトの配置"
+              >
+                <title>ゲームオブジェクトの配置</title>
+              </svg>
+            </div>
+            <footer class="draw2-game-scene-viewport-footer">
+              <output id="draw2GameSceneViewportStatus" aria-live="polite">
+                Scene View · オブジェクトをクリックして選択
+              </output>
+              <span>クリックで選択 · ドラッグ配置 · Inspectorで編集</span>
+            </footer>
+          </section>
           <section
             id="draw2AudioWorkspace"
             class="draw2-audio-workspace"
@@ -3654,7 +3727,7 @@
                   <span class="draw2-tool-studio-glyph">◇</span><span><strong>Polygon Select</strong><small>多角形で範囲指定</small></span>
                 </button>
                 <button class="draw2-tool-studio-card" type="button" data-draw2-studio-tool="tile-stamp" role="listitem">
-                  <span class="draw2-tool-studio-glyph">▤</span><span><strong>Tile Stamp</strong><small>選択セルを連続配置</small></span>
+                  <span class="draw2-tool-studio-glyph">▤</span><span><strong>Tile Placement</strong><small>選択セルを連続配置</small></span>
                 </button>
               </div>
               <div class="draw2-tool-studio-actions">
@@ -5039,12 +5112,66 @@
             <div class="draw2-panel-shell">
               <div class="draw2-panel-heading">
               <div>
-                  <span class="draw2-eyebrow">GAME</span><strong>Scene</strong>
-                </div><span class="draw2-panel-badge">GAME ONLY</span>
+                <span class="draw2-eyebrow">iGAME</span><strong>ゲーム制作</strong>
+                </div><span class="draw2-panel-badge">ゲーム専用</span>
               </div>
               <p class="draw2-panel-note">
-                GameはScene・GameObject・Component・イベントを編集します。iDRAW / iAUDIOの原素材は参照専用で、原素材そのものは変更しません。
+                まっさらなSceneから自由に作るか、テンプレートを必要な時だけ追加できます。iDRAW / iAUDIOは素材を参照するだけで、原素材は変更しません。
               </p>
+              <section
+                class="draw2-game-creation-mode"
+                id="draw2GameCreationMode"
+                aria-labelledby="draw2GameCreationModeHeading"
+                hidden
+              >
+                <div class="draw2-game-guide-heading">
+                  <div>
+                    <span class="draw2-eyebrow">新規Game / NEW GAME</span>
+                    <strong id="draw2GameCreationModeHeading">ゲームの始め方</strong>
+                  </div>
+                  <span class="draw2-panel-badge">最初に選択</span>
+                </div>
+                <p class="draw2-panel-note">
+                  この新規Gameをテンプレートから始めるか、空白から始めるかを選びます。選択後は同じiGAME Studioで編集できます。
+                </p>
+                <div
+                  class="draw2-game-creation-mode-options"
+                  role="group"
+                  aria-label="新規Gameの開始方式"
+                >
+                  <button
+                    id="draw2GameCreationModeTemplate"
+                    class="draw2-game-creation-mode-option"
+                    type="button"
+                    data-game-creation-mode="RPG_TEMPLATE"
+                  >
+                    <span class="draw2-game-creation-mode-option-heading">
+                      <strong>RPGテンプレートから開始</strong>
+                      <span>おすすめ</span>
+                    </span>
+                    <small>マップ・主人公・NPC・カメラ・イベントの土台を配置</small>
+                  </button>
+                  <button
+                    id="draw2GameCreationModeBlank"
+                    class="draw2-game-creation-mode-option"
+                    type="button"
+                    data-game-creation-mode="BLANK"
+                  >
+                    <span class="draw2-game-creation-mode-option-heading">
+                      <strong>空白から開始</strong>
+                      <span>自由制作</span>
+                    </span>
+                    <small>最低限のGame画面から必要な要素を追加</small>
+                  </button>
+                </div>
+                <p
+                  class="draw2-panel-status"
+                  id="draw2GameCreationModeStatus"
+                  aria-live="polite"
+                >
+                  この新規Gameをどちらから始めるか選択してください。
+                </p>
+              </section>
               <section
                 class="draw2-game-creation-guide"
                 id="draw2GameCreationGuide"
@@ -5052,17 +5179,17 @@
               >
                 <div class="draw2-game-guide-heading">
                   <div>
-                    <span class="draw2-eyebrow">START HERE</span>
-                    <strong id="draw2GameCreationGuideHeading">Gameの作り方</strong>
+                  <span class="draw2-eyebrow">ここから開始</span>
+                    <strong id="draw2GameCreationGuideHeading">ゲームの作り方</strong>
                   </div>
-                  <span class="draw2-panel-badge">GAME ONLY</span>
+                  <span class="draw2-panel-badge">ゲーム専用</span>
                 </div>
                 <p
                   class="draw2-panel-status"
                   id="draw2GameCreationGuideStatus"
                   aria-live="polite"
                 >
-                  スターター → イベント → 素材参照 → Playの順で進めます。
+                  マップ → キャラクター → イベント → Play。素材は後から追加できます。
                 </p>
                 <div
                   class="draw2-game-creation-guide-list"
@@ -5083,10 +5210,10 @@
               >
                 <svg class="draw2-ui-icon" aria-hidden="true" focusable="false">
                   <use href="./assets/icons/draw2-icons.svg#icon-add"></use>
-                </svg><span class="draw2-button-label">Game Trackを追加</span>
+                </svg><span class="draw2-button-label">Gameオブジェクトを追加</span>
               </button>
               <p class="draw2-panel-status" id="draw2GameSceneStatus">
-                GameのScene変更はProject別に自動保存されます。
+                Gameシーンの変更はプロジェクト別に自動保存されます。
               </p>
             </div>
           </section>
@@ -5101,15 +5228,15 @@
             <div class="draw2-panel-shell">
               <div class="draw2-panel-heading">
                 <div>
-                  <span class="draw2-eyebrow">GAME</span><strong
-                  >Inspector</strong>
-                </div><span class="draw2-panel-badge">GAME ONLY</span>
+                <span class="draw2-eyebrow">GAME OBJECT</span><strong
+                  >オブジェクト設定</strong>
+                </div><span class="draw2-panel-badge">ゲーム専用</span>
               </div>
               <p class="draw2-panel-status" id="draw2GameInspectorSelection">
-                Trackを選択してください。
+                左のシーン階層からMap・主人公・NPCを選択してください。
               </p>
               <p class="draw2-panel-note">
-                UnityのGameObject / UnrealのActorに相当するGame Objectです。ここではGame側の名前・役割・Component・イベントを編集します。Drawの絵やAudioの音源は参照専用です。
+                ここではGameオブジェクト名・役割・機能・イベントを設定します。iDRAWの画像やiAUDIOの音源は参照専用です。
               </p>
               <label class="draw2-panel-field">名前<input
                   id="draw2GameInspectorName"
@@ -5119,23 +5246,32 @@
               <label class="draw2-panel-field">種類<select
                   id="draw2GameInspectorKind"
                 >
-                  <option value="SPRITE">Sprite</option>
-                  <option value="TILEMAP">Tilemap</option>
-                  <option value="AUDIO">Audio</option>
-                  <option value="EVENT">Event</option>
-                  <option value="CAMERA">Camera</option>
+                  <option value="SPRITE">キャラクター / 画像</option>
+                  <option value="TILEMAP">マップ</option>
+                  <option value="AUDIO">オーディオ</option>
+                  <option value="EVENT">イベント</option>
+                  <option value="CAMERA">カメラ</option>
                 </select></label>
               <label class="draw2-panel-field">役割<select
                   id="draw2GameInspectorRole"
                 >
-                  <option value="PLAYER">Player</option>
-                  <option value="NPC">NPC</option>
-                  <option value="PROP">Prop / Environment</option>
-                  <option value="TRIGGER">Trigger</option>
-                  <option value="TILEMAP">Tilemap / Map</option>
-                  <option value="CAMERA">Camera</option>
-                  <option value="AUDIO">Audio Emitter</option>
-                  <option value="CUSTOM">Custom</option>
+                  <option value="PLAYER">主人公 (Player)</option>
+                  <option value="NPC">登場人物 (NPC)</option>
+                  <option value="PROP">宝箱・扉・環境</option>
+                  <option value="TRIGGER">イベント起点 (Trigger)</option>
+                  <option value="TILEMAP">マップ (Tilemap)</option>
+                  <option value="CAMERA">カメラ (Camera)</option>
+                  <option value="AUDIO">音の発生源</option>
+                  <option value="CUSTOM">カスタム</option>
+                </select></label>
+              <label class="draw2-game-inspector-check">
+                <input id="draw2GameInspectorActive" type="checkbox" checked>
+                <span>Active（Play時に有効）</span>
+              </label>
+              <label class="draw2-panel-field">親<select
+                  id="draw2GameInspectorParent"
+                >
+                  <option value="">ルート（親なし）</option>
                 </select></label>
               <div class="draw2-panel-action-row">
                 <button
@@ -5150,12 +5286,39 @@
                   class="draw2-button draw2-button-secondary"
                   type="button"
                 >
-                  Sceneで表示
+                  シーンに表示
                 </button>
               </div>
               <p class="draw2-panel-status" id="draw2GameInspectorStatus">
                 Track名・種類をProjectへ保存できます。
               </p>
+              <section
+                class="draw2-game-physics-card"
+                aria-labelledby="draw2GamePhysicsHeading"
+              >
+                <div class="draw2-game-subheading">
+                  <div>
+                    <span class="draw2-eyebrow">SCENE PHYSICS 2D</span>
+                    <strong id="draw2GamePhysicsHeading">Scene物理設定</strong>
+                  </div>
+                  <span class="draw2-panel-badge">ゲーム専用</span>
+                </div>
+                <p class="draw2-panel-note">
+                  Unity2Dに近い固定stepの基本設定です。値はGAME-350の範囲内だけ保存します。
+                </p>
+                <div class="draw2-game-physics-grid">
+                  <label>重力 X<input id="draw2GamePhysicsGravityX" type="number" step="0.1"></label>
+                  <label>重力 Y<input id="draw2GamePhysicsGravityY" type="number" step="0.1"></label>
+                  <label>固定step<input id="draw2GamePhysicsFixedDeltaTime" type="number" min="0.0001" max="1" step="0.0001"></label>
+                  <label>最大sub-step<input id="draw2GamePhysicsMaxSubSteps" type="number" min="1" max="32" step="1"></label>
+                  <label>摩擦<input id="draw2GamePhysicsFriction" type="number" min="0" max="1" step="0.05"></label>
+                  <label>反発<input id="draw2GamePhysicsBounciness" type="number" min="0" max="1" step="0.05"></label>
+                </div>
+                <button id="draw2GamePhysicsApply" class="draw2-button draw2-button-secondary" type="button">Scene物理を適用</button>
+                <p class="draw2-panel-status" id="draw2GamePhysicsStatus" aria-live="polite">
+                  GAME-350の初期値を使用しています。
+                </p>
+              </section>
               <section
                 class="draw2-game-components"
                 aria-labelledby="draw2GameComponentsHeading"
@@ -5163,12 +5326,12 @@
                 <div class="draw2-game-subheading">
                   <div>
                     <span class="draw2-eyebrow">OBJECT MODEL</span>
-                    <strong id="draw2GameComponentsHeading">Components</strong>
+                    <strong id="draw2GameComponentsHeading">オブジェクトの機能</strong>
                   </div>
-                  <span class="draw2-panel-badge">GAME ONLY</span>
+                  <span class="draw2-panel-badge">ゲーム専用</span>
                 </div>
                 <p class="draw2-panel-note">
-                  Objectに機能を追加します。Colliderは当たり判定、Triggerは通過検知、Rigidbodyは重力・物理、Character Controllerは固定ステップ移動です。
+                  追加した機能がオブジェクトの性質になります。当たり判定・重力・プレイヤー移動・カメラ・イベントをここで設定します。
                 </p>
                 <div
                   id="draw2GameComponents"
@@ -5176,18 +5339,18 @@
                   role="list"
                 ></div>
                 <div class="draw2-game-component-add-row">
-                  <label class="draw2-panel-field">Componentを追加<select
+                  <label class="draw2-panel-field">機能を追加<select
                       id="draw2GameComponentType"
                     >
-                      <option value="TRANSFORM">Transform</option>
-                      <option value="SPRITE">Sprite Renderer</option>
-                      <option value="TILEMAP">Tilemap</option>
-                      <option value="COLLIDER">Collider</option>
-                      <option value="RIGIDBODY">Rigidbody</option>
-                      <option value="CHARACTER_CONTROLLER">Character Controller</option>
-                      <option value="CAMERA">Camera</option>
-                      <option value="AUDIO_SOURCE">Audio Source</option>
-                      <option value="BEHAVIOR">Behavior / Event</option>
+                      <option value="TRANSFORM">位置・向き</option>
+                      <option value="SPRITE">見た目</option>
+                      <option value="TILEMAP">マップ</option>
+                      <option value="COLLIDER">当たり判定</option>
+                      <option value="RIGIDBODY">重力・物理</option>
+                      <option value="CHARACTER_CONTROLLER">プレイヤー移動</option>
+                      <option value="CAMERA">カメラ</option>
+                      <option value="AUDIO_SOURCE">音</option>
+                      <option value="BEHAVIOR">イベント・ルール</option>
                     </select></label>
                   <button
                     id="draw2GameComponentAdd"
@@ -5196,12 +5359,44 @@
                   >追加</button>
                 </div>
                 <p class="draw2-panel-status" id="draw2GameComponentsStatus">
-                  Componentを追加すると、このObjectの役割が明確になります。
+                  機能を追加すると、このオブジェクトの役割が明確になります。
                 </p>
               </section>
-              <div class="draw2-game-event-editor">
+              <div class="draw2-game-logic-mode" role="tablist" aria-label="Game logic authoring mode">
+                <button
+                  id="draw2GameLogicSimple"
+                  class="draw2-button draw2-game-logic-tab is-active"
+                  type="button"
+                  role="tab"
+                  aria-selected="true"
+                  aria-controls="draw2GameLogicSimplePanel"
+                >イベント（かんたん）</button>
+                <button
+                  id="draw2GameLogicGraph"
+                  class="draw2-button draw2-game-logic-tab"
+                  type="button"
+                  role="tab"
+                  aria-selected="false"
+                  aria-controls="draw2GameGraphPanel"
+                >分岐ノード</button>
+                <button
+                  id="draw2GameLogicCode"
+                  class="draw2-button draw2-game-logic-tab"
+                  type="button"
+                  role="tab"
+                  aria-selected="false"
+                  aria-controls="draw2GameCodePanel"
+                >Code（上級者）</button>
+              </div>
+              <div
+                id="draw2GameLogicSimplePanel"
+                class="draw2-game-event-editor"
+                data-game-logic-panel="SIMPLE"
+                role="tabpanel"
+                aria-label="Event Sheet"
+              >
                 <p class="draw2-panel-note">
-                  ノーコードイベント。Trackの隣でInteractすると会話を再生します。
+                  かんたんモード。NPC・扉・宝箱を選び、条件とアクションを順番に設定します。
                 </p>
                 <label class="draw2-panel-field">トリガー<select
                     id="draw2GameEventTrigger"
@@ -5235,6 +5430,77 @@
                   Trackを選択するとイベントを編集できます。
                 </p>
               </div>
+              <section
+                id="draw2GameGraphPanel"
+                class="draw2-game-logic-panel"
+                data-game-logic-panel="GRAPH"
+                role="tabpanel"
+                aria-label="Node Graph"
+                hidden
+              >
+                <div class="draw2-game-subheading">
+                  <div>
+                    <span class="draw2-eyebrow">VISUAL LOGIC</span>
+                    <strong>Node Graph / A・B分岐</strong>
+                  </div>
+                  <span class="draw2-panel-badge">NO TIMELINE</span>
+                </div>
+                <p class="draw2-panel-note">
+                  Event → Condition → A / B → Action → End の順にノードを接続します。ゲームの流れを見ながら分岐を作れます。
+                </p>
+                <div class="draw2-panel-action-row">
+                  <button id="draw2GameGraphStarter" class="draw2-button" type="button">AB分岐テンプレート</button>
+                  <button id="draw2GameGraphAddCondition" class="draw2-button draw2-button-secondary" type="button">条件を追加</button>
+                  <button id="draw2GameGraphAddAction" class="draw2-button draw2-button-secondary" type="button">アクションを追加</button>
+                </div>
+                <div id="draw2GameGraphNodes" class="draw2-game-logic-graph" role="tree" aria-label="Game logic nodes"></div>
+                <div class="draw2-game-logic-connections">
+                  <strong>接続を追加</strong>
+                  <div class="draw2-panel-control-grid">
+                    <label>From<select id="draw2GameGraphFrom"></select></label>
+                    <label>Port<select id="draw2GameGraphPort">
+                      <option value="NEXT">次へ</option>
+                      <option value="TRUE">A / True</option>
+                      <option value="FALSE">B / False</option>
+                    </select></label>
+                    <label>To<select id="draw2GameGraphTo"></select></label>
+                  </div>
+                  <button id="draw2GameGraphConnect" class="draw2-button draw2-button-secondary" type="button">接続</button>
+                </div>
+                <div class="draw2-panel-action-row">
+                  <button id="draw2GameGraphCompile" class="draw2-button" type="button">Graphを適用</button>
+                </div>
+                <p class="draw2-panel-status" id="draw2GameGraphStatus" aria-live="polite">
+                  AB分岐テンプレートから始められます。
+                </p>
+              </section>
+              <section
+                id="draw2GameCodePanel"
+                class="draw2-game-logic-panel"
+                data-game-logic-panel="CODE"
+                role="tabpanel"
+                aria-label="Bounded Game Code"
+                hidden
+              >
+                <div class="draw2-game-subheading">
+                  <div>
+                    <span class="draw2-eyebrow">ADVANCED</span>
+                    <strong>Code / Bounded TypeScript</strong>
+                  </div>
+                  <span class="draw2-panel-badge">SAFE GAME API</span>
+                </div>
+                <p class="draw2-panel-note">
+                  Gameのイベント・条件・アクションだけをコードで拡張します。DOM・fetch・Storage・Network・無限ループは実行できません。
+                </p>
+                <textarea id="draw2GameCodeEditor" class="draw2-game-code-editor" rows="12" spellcheck="false" aria-label="Bounded Game Code"></textarea>
+                <div class="draw2-panel-action-row">
+                  <button id="draw2GameCodeStarter" class="draw2-button draw2-button-secondary" type="button">コード例を挿入</button>
+                  <button id="draw2GameCodeCompile" class="draw2-button" type="button">Codeを適用</button>
+                </div>
+                <p class="draw2-panel-status" id="draw2GameCodeStatus" aria-live="polite">
+                  コード例を編集してからCodeを適用します。
+                </p>
+              </section>
             </div>
           </section>
           <section
@@ -5248,12 +5514,39 @@
             <div class="draw2-panel-shell">
               <div class="draw2-panel-heading">
                 <div>
-                  <span class="draw2-eyebrow">GAME</span><strong>Assets</strong>
-                </div><span class="draw2-panel-badge">REFERENCE ONLY</span>
+                  <span class="draw2-eyebrow">GAME</span><strong>素材・テンプレート</strong>
+                </div><span class="draw2-panel-badge">GAME OWNED</span>
               </div>
               <p class="draw2-panel-note">
                 iDRAW / iAUDIO素材はGameから参照・配置できますが、原素材の編集・削除はできません。
               </p>
+              <section class="draw2-game-template-catalog" aria-labelledby="draw2GameTemplatesHeading">
+                <div class="draw2-game-template-heading">
+                  <div>
+                    <span class="draw2-eyebrow">OPTIONAL PACKS</span>
+                    <strong id="draw2GameTemplatesHeading">制作テンプレート</strong>
+                  </div>
+                  <label class="draw2-panel-field draw2-game-template-filter">ジャンル
+                    <select id="draw2GameTemplateCategory">
+                      <option value="ALL">すべて</option>
+                      <option value="CORE">汎用 / Core</option>
+                      <option value="RPG">RPG</option>
+                      <option value="ACTION">Action</option>
+                      <option value="SHOOTING">Shooting</option>
+                      <option value="RACING">Racing</option>
+                      <option value="RHYTHM">Rhythm</option>
+                    </select>
+                  </label>
+                </div>
+                <p class="draw2-panel-note">
+                  ジャンルは固定されません。必要な部品だけをGame側へ複製し、数値や名前を調整して使えます。テンプレートもiDRAW / iAUDIOの原素材には触れません。
+                </p>
+                <div class="draw2-game-template-list" id="draw2GameTemplateList" role="list"></div>
+                <div class="draw2-game-template-instances" id="draw2GameTemplateInstances" role="list"></div>
+                <p class="draw2-panel-status" id="draw2GameTemplateStatus" aria-live="polite">
+                  テンプレートは必要な時だけGame Projectへ追加されます。
+                </p>
+              </section>
               <div
                 class="draw2-game-assets-list"
                 id="draw2GameAssetsList"
@@ -5300,7 +5593,7 @@
                 </svg><span class="draw2-button-label">Game配置を追加</span>
               </button>
               <p class="draw2-panel-status" id="draw2GameAssetsStatus">
-                Game側の配置だけを編集できます。iDRAW / iAUDIOは参照専用です。
+                ゲーム側の配置だけを編集できます。iDRAW / iAUDIOは参照専用です。
               </p>
             </div>
           </section>
@@ -5315,7 +5608,7 @@
             <div class="draw2-panel-shell">
               <div class="draw2-panel-heading">
                 <div>
-                  <span class="draw2-eyebrow">GAME</span><strong>Build</strong>
+                  <span class="draw2-eyebrow">ゲーム</span><strong>ビルド</strong>
                 </div><span class="draw2-panel-badge">Local check</span>
               </div>
               <p class="draw2-panel-note">
@@ -6083,31 +6376,51 @@
                 class="draw2-mode-timeline-deck-tab is-active"
                 type="button"
                 role="tab"
-                aria-label="Game Scene systems view"
+                aria-label="ゲームシーンの仕組み"
                 aria-selected="true"
                 data-mode-deck-tab="game-scene"
               >
-                Scene
+                シーン
               </button>
               <button
                 class="draw2-mode-timeline-deck-tab"
                 type="button"
                 role="tab"
-                aria-label="Game object references view"
+                aria-label="ゲームアセットブラウザ"
                 aria-selected="false"
                 data-mode-deck-tab="game-assets"
               >
-                References
+                アセット
               </button>
               <button
                 class="draw2-mode-timeline-deck-tab"
                 type="button"
                 role="tab"
-                aria-label="Game logic systems view"
+                aria-label="ゲームアニメーション"
                 aria-selected="false"
-                data-mode-deck-tab="game-tracks"
+                data-mode-deck-tab="game-animation"
               >
-                Systems
+                アニメーション
+              </button>
+              <button
+                class="draw2-mode-timeline-deck-tab"
+                type="button"
+                role="tab"
+                aria-label="Gameデータ"
+                aria-selected="false"
+                data-mode-deck-tab="game-data"
+              >
+                Gameデータ
+              </button>
+              <button
+                class="draw2-mode-timeline-deck-tab"
+                type="button"
+                role="tab"
+                aria-label="ゲームイベント"
+                aria-selected="false"
+                data-mode-deck-tab="game-events"
+              >
+                イベント
               </button>
               <button
                 class="draw2-mode-timeline-deck-tab"
@@ -6207,7 +6520,7 @@
                     focusable="false"
                   >
                     <use href="./assets/icons/draw2-icons.svg#icon-add"></use>
-                  </svg><span class="draw2-button-label">Object</span>
+                  </svg><span class="draw2-button-label">オブジェクト</span>
                 </button>
                 <button
                   id="draw2GameDeckAddTrack"
@@ -6221,7 +6534,7 @@
                     focusable="false"
                   >
                     <use href="./assets/icons/draw2-icons.svg#icon-add"></use>
-                  </svg><span class="draw2-button-label">Event</span>
+                  </svg><span class="draw2-button-label">イベント</span>
                 </button>
                 <button
                   id="draw2GameDeckPlay"
@@ -6236,7 +6549,7 @@
                     focusable="false"
                   >
                     <use href="./assets/icons/draw2-icons.svg#icon-play"></use>
-                  </svg><span class="draw2-button-label">Play</span>
+                  </svg><span class="draw2-button-label">テストプレイ</span>
                 </button>
                 <button
                   id="draw2GameDeckRestart"
@@ -6246,16 +6559,140 @@
                 >
                   <svg class="draw2-ui-icon" aria-hidden="true" focusable="false">
                     <use href="./assets/icons/draw2-icons.svg#icon-rollback"></use>
-                  </svg><span class="draw2-button-label">Restart</span>
+                  </svg><span class="draw2-button-label">最初から</span>
                 </button>
               </div>
-              <div
-                class="draw2-game-systems-grid"
-                id="draw2GameAssetTracks"
-                role="grid"
-                aria-label="Game systems"
+              <section
+                class="draw2-game-rail-surface"
+                data-game-rail-surface="SCENE"
+                aria-label="Game Scene objects"
               >
-              </div>
+                <div
+                  class="draw2-game-systems-grid"
+                  id="draw2GameAssetTracks"
+                  role="grid"
+                  aria-label="Game systems"
+                >
+                </div>
+              </section>
+              <section
+                class="draw2-game-rail-surface"
+                data-game-rail-surface="ASSETS"
+                aria-label="Game asset browser"
+                hidden
+              >
+                <div class="draw2-game-rail-section-heading">
+                  <div>
+                    <span class="draw2-eyebrow">PROJECT BROWSER</span>
+                    <strong>すべてのアセット</strong>
+                  </div>
+                  <small>検索 → 選択 → Gameへ割り当て</small>
+                </div>
+                <div class="draw2-game-asset-browser-controls">
+                  <label class="draw2-panel-field draw2-game-asset-search">検索
+                    <input
+                      id="draw2GameAssetQuery"
+                      type="search"
+                      autocomplete="off"
+                      placeholder="オブジェクト、キャラクター、音素材…"
+                      aria-label="Gameアセットを検索"
+                    />
+                  </label>
+                  <label class="draw2-panel-field">種類
+                    <select id="draw2GameAssetFilter" aria-label="Gameアセットの種類">
+                      <option value="ALL">すべて</option>
+                      <option value="GAME">Gameオブジェクト</option>
+                      <option value="DRAW">iDRAW素材</option>
+                      <option value="AUDIO">iAUDIO素材</option>
+                      <option value="TEMPLATE">テンプレート</option>
+                    </select>
+                  </label>
+                </div>
+                <div
+                  class="draw2-game-asset-catalog"
+                  id="draw2GameAssetCatalog"
+                  role="list"
+                  aria-label="Gameアセット一覧"
+                ></div>
+                <p class="draw2-panel-status" id="draw2GameAssetCatalogStatus" aria-live="polite">
+                  Game Projectと連携中です。
+                </p>
+              </section>
+              <section
+                class="draw2-game-rail-surface"
+                data-game-rail-surface="ANIMATION"
+                aria-label="Game animation browser"
+                hidden
+              >
+                <div class="draw2-game-rail-section-heading">
+                  <div>
+                    <span class="draw2-eyebrow">ANIMATION CLIPS</span>
+                    <strong>アニメーション</strong>
+                  </div>
+                  <small>原素材はiDRAW参照専用</small>
+                </div>
+                <div id="draw2GameAnimationSelection" class="draw2-game-animation-selection">
+                  キャラクターを選択すると、Animation Clipが表示されます。
+                </div>
+                <div
+                  id="draw2GameAnimationClips"
+                  class="draw2-game-animation-clips"
+                  role="list"
+                  aria-label="Animation Clip一覧"
+                ></div>
+                <div class="draw2-game-animation-detail">
+                  <div
+                    id="draw2GameAnimationPreview"
+                    class="draw2-game-animation-preview"
+                    aria-label="Animation preview"
+                  ></div>
+                  <div
+                    id="draw2GameAnimationFrames"
+                    class="draw2-game-frame-strip"
+                    role="list"
+                    aria-label="Animation sprite frames"
+                  ></div>
+                </div>
+                <div id="draw2GameAnimationOverrides" class="draw2-game-animation-overrides"></div>
+                <div class="draw2-game-animation-actions" role="toolbar" aria-label="Animation preview actions">
+                  <button id="draw2GameAnimationPlay" class="draw2-button draw2-button-secondary" type="button">再生</button>
+                  <button id="draw2GameAnimationStop" class="draw2-button draw2-button-secondary" type="button">停止</button>
+                  <button id="draw2GameAnimationAssign" class="draw2-button" type="button">Gameに割り当て</button>
+                </div>
+                <p class="draw2-panel-status" id="draw2GameAnimationStatus" aria-live="polite">
+                  選択したClipの全フレームをここで確認できます。
+                </p>
+              </section>
+              <section
+                class="draw2-game-rail-surface"
+                data-game-rail-surface="GAME_DATA"
+                aria-label="Game data browser"
+                hidden
+              >
+                <div class="draw2-game-rail-section-heading">
+                  <div>
+                    <span class="draw2-eyebrow">GAME DATA</span>
+                    <strong>ゲームデータ</strong>
+                  </div>
+                  <small>RPG以外にも使えるGame所有データ</small>
+                </div>
+                <div id="draw2GameRailData" class="draw2-game-rail-summary"></div>
+              </section>
+              <section
+                class="draw2-game-rail-surface"
+                data-game-rail-surface="EVENTS"
+                aria-label="Game events browser"
+                hidden
+              >
+                <div class="draw2-game-rail-section-heading">
+                  <div>
+                    <span class="draw2-eyebrow">EVENTS & LOGIC</span>
+                    <strong>イベント</strong>
+                  </div>
+                  <small>ノード・条件・アクション</small>
+                </div>
+                <div id="draw2GameRailEvents" class="draw2-game-rail-summary"></div>
+              </section>
               <p
                 id="draw2GameDeckStatus"
                 class="draw2-mode-deck-status"
@@ -7184,7 +7621,7 @@
               <option value="select-color">Color Selection</option>
               <option value="select-polygon">Polygon Select</option>
               <option value="move">Move active cel content / Duplicate</option>
-              <option value="tile-stamp">Tile Stamp</option>
+              <option value="tile-stamp">Tile Placement</option>
               <option value="pan">Pan</option>
             </select></label>
           <button
@@ -7328,7 +7765,7 @@
           </p>
         </div>
         <p class="draw2-help">
-          Pattern／Stamp／Mirrorはキャンバス外でPreviewを計画します。Grid／GuideはOverlayです。CommitはローカルのEditor
+          Pattern／Mirrorはキャンバス外でPreviewを計画します。Grid／GuideはOverlayです。選択範囲スタンプは下のSelectionパネルで保存します。CommitはローカルのEditor
           Adapter境界を通る操作です。
         </p>
         <div
@@ -7346,14 +7783,6 @@
             disabled
           >
             Pattern Preview
-          </button>
-          <button
-            id="draw2AdvancedStamp"
-            class="draw2-button draw2-button-secondary"
-            type="button"
-            disabled
-          >
-            Stamp Preview
           </button>
           <button
             id="draw2AdvancedMirror"
@@ -7657,6 +8086,54 @@
             Redo
           </button>
         </div>
+        <section
+          class="draw2-selection-stamp-panel"
+          aria-labelledby="draw2SelectionStampHeading"
+        >
+          <div class="draw2-selection-stamp-heading">
+            <div>
+              <p class="draw2-eyebrow">REUSABLE DRAW MATERIAL</p>
+              <h3 id="draw2SelectionStampHeading">選択範囲スタンプ</h3>
+            </div>
+            <p
+              id="draw2SelectionStampStatus"
+              class="draw2-selection-stamp-status"
+              role="status"
+              aria-live="polite"
+            >
+              選択範囲を確定すると保存できます。保存後は「使う」でCanvasへ配置します。
+            </p>
+          </div>
+          <p class="draw2-help">
+            確定した範囲の形・透明部分・色をプロジェクトに保存します。保存したスタンプはiDRAW内で配置できます。元の選択範囲や他モードの素材は変更しません。
+          </p>
+          <div class="draw2-selection-stamp-form">
+            <label>
+              名前
+              <input
+                id="draw2SelectionStampName"
+                type="text"
+                maxlength="64"
+                value=""
+                placeholder="主人公の立ち絵"
+              >
+            </label>
+            <button
+              id="draw2SelectionStampSave"
+              class="draw2-button"
+              type="button"
+              disabled
+            >
+              選択範囲を保存
+            </button>
+          </div>
+          <div
+            id="draw2SelectionStampList"
+            class="draw2-selection-stamp-list"
+            role="list"
+            aria-label="保存した選択範囲スタンプ"
+          ></div>
+        </section>
         <p class="draw2-help">
           PreviewはOverlayのみを更新します。Commit時だけ1つのCanonical
           Operationとなり、CancelはRaster、Journal、COWを変更しません。
@@ -8809,6 +9286,74 @@
       </form>
     </dialog>
     <dialog
+      class="draw2-command-palette draw2-billing-dialog"
+      id="draw2BillingDialog"
+      aria-labelledby="draw2BillingTitle"
+    >
+      <form method="dialog">
+        <div class="draw2-command-palette-heading">
+          <div>
+            <p class="draw2-eyebrow">BILLING FRAMEWORK</p>
+            <h2 id="draw2BillingTitle">課金・外部Build</h2>
+          </div>
+          <button
+            class="draw2-panel-close"
+            value="cancel"
+            aria-label="課金画面を閉じる"
+          >
+            <svg class="draw2-ui-icon" aria-hidden="true" focusable="false">
+              <use href="./assets/icons/draw2-icons.svg#icon-close"></use>
+            </svg>
+          </button>
+        </div>
+        <p class="draw2-billing-dialog-lead">
+          PiXiEED内の制作・保存・Playはそのまま利用でき、外部へ持ち出すBuildだけを別の権限で管理します。
+        </p>
+        <div class="draw2-billing-overview-grid">
+          <section class="draw2-billing-card draw2-billing-card-included">
+            <span class="draw2-eyebrow">INCLUDED</span>
+            <strong>Studio内利用</strong>
+            <p>iDRAW / iAUDIO / iGAMEの制作、PXD保存、PiXiEED内Play</p>
+            <output>課金ゲートなし</output>
+          </section>
+          <section class="draw2-billing-card draw2-billing-card-locked">
+            <span class="draw2-eyebrow">EXTERNAL BUILD</span>
+            <strong>iGAME 外部Build</strong>
+            <p>Android APK / AABなどは、決済済みEntitlementとServer Proofが必要です。</p>
+            <output id="draw2BillingExternalStatus">LOCKED · NOT_PURCHASED</output>
+          </section>
+        </div>
+        <section class="draw2-billing-scope-card" aria-labelledby="draw2BillingScopeTitle">
+          <div class="draw2-billing-section-heading">
+            <div>
+              <span class="draw2-eyebrow">LOCKED SCOPE</span>
+              <strong id="draw2BillingScopeTitle">Build対象を固定</strong>
+            </div>
+            <span id="draw2BillingProviderStatus" class="draw2-billing-provider-state">Provider未接続</span>
+          </div>
+          <div class="draw2-billing-scope-grid">
+            <span>Project <code id="draw2BillingProjectId">local</code></span>
+            <span>Revision <code id="draw2BillingRevisionId">server確認待ち</code></span>
+            <span>Owner <code id="draw2BillingOwnerId">server確認待ち</code></span>
+            <span>Tenant <code id="draw2BillingTenantId">server確認待ち</code></span>
+          </div>
+          <label class="draw2-billing-target-field">外部Build対象<select id="draw2BillingTarget">
+              <option value="ANDROID_AAB">Android AAB</option>
+              <option value="ANDROID_APK">Android APK</option>
+              <option value="IOS_IPA">iOS IPA</option>
+              <option value="DESKTOP_PACKAGE">Desktop Package</option>
+            </select></label>
+          <p id="draw2BillingStatus" class="draw2-billing-status" role="status" aria-live="polite">
+            決済プロバイダ未接続のため、安全に停止しています。
+          </p>
+          <div class="draw2-panel-action-row">
+            <button id="draw2BillingRefresh" class="draw2-button draw2-button-secondary" type="button">状態を確認</button>
+            <button id="draw2BillingCheckout" class="draw2-button" type="button" disabled>Checkoutを開始</button>
+          </div>
+        </section>
+      </form>
+    </dialog>
+    <dialog
       class="draw2-command-palette draw2-shortcuts-dialog"
       id="draw2ShortcutsDialog"
       aria-labelledby="draw2ShortcutsTitle"
@@ -9172,7 +9717,7 @@
     <script src="../scripts/pixieed-account-supabase-client.js?v=20260824-pixync-root-1"></script>
     <script
       type="module"
-      src="./dist/draw2-entry.js?v=20260825-game-studio-systems-v82"
+      src="./dist/draw2-entry.js?v=20260827-igame-template-v1"
     ></script>
     <script
       type="module"

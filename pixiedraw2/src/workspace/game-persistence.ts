@@ -6,10 +6,26 @@ import { sha256Hex } from "../draw2-core.ts";
 import {
   type BehaviorIR,
   createGameProject,
+  type GameAnimationBinding,
   type GameComponentState,
   type GameObjectRole,
   type GameProject,
+  type GameTemplateInstance,
+  type GameTilemapDocument,
+  isValidGameAnimationBinding,
+  isValidGameTemplateInstance,
+  isValidGameTilemapDocument,
 } from "../game/game-300/core.ts";
+import {
+  validateBoundedGameScript,
+  validateVisualGameLogic,
+  type VisualGameLogicSource,
+} from "../game/game-350/visual-logic.ts";
+import {
+  normalizePhysics2DSettings,
+  type Physics2DSettings,
+  validatePhysics2DSettings,
+} from "../game/game-350/physics-2d.ts";
 
 export const GAME_EDITOR_PERSISTENCE_SCHEMA_VERSION =
   "GAME_EDITOR_PERSISTENCE_V1" as const;
@@ -23,10 +39,16 @@ export interface GameEditorTrack {
   readonly label: string;
   readonly kind: string;
   readonly filled: readonly number[];
+  /** Optional scene-tree parent. Omitted means that the track is a root. */
+  readonly parentTrackId?: string;
+  /** Optional authoring visibility/runtime flag; omitted keeps legacy records valid. */
+  readonly active?: boolean;
   /** Game-owned object role; Draw/Audio source metadata never enters here. */
   readonly role?: GameObjectRole;
   /** Component configuration owned by Game and projected into the canonical Scene. */
   readonly components?: readonly GameComponentState[];
+  /** Game-owned sparse map layout; source artwork remains in iDRAW. */
+  readonly tilemap?: GameTilemapDocument;
 }
 
 /**
@@ -64,6 +86,15 @@ function cloneComponents(
   ) => ({ ...component } as GameComponentState));
 }
 
+function cloneTilemap(
+  tilemap: GameTilemapDocument,
+): GameTilemapDocument {
+  return {
+    ...tilemap,
+    cells: tilemap.cells.map((cell) => ({ ...cell })),
+  };
+}
+
 function validEditorComponent(
   component: unknown,
 ): component is GameComponentState {
@@ -93,7 +124,9 @@ function validEditorComponent(
       return typeof value.mapId === "string" &&
         /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(value.mapId) &&
         Number.isSafeInteger(value.tileSize) && Number(value.tileSize) > 0 &&
-        typeof value.collisionEnabled === "boolean";
+        typeof value.collisionEnabled === "boolean" &&
+        (value.document === undefined ||
+          isValidGameTilemapDocument(value.document));
     case "COLLIDER":
       return ["BOX", "CIRCLE", "CAPSULE"].includes(String(value.shape)) &&
         ["DEFAULT", "WORLD", "PLAYER", "NPC", "SENSOR", "PROJECTILE"].includes(
@@ -140,6 +173,188 @@ const GAME_EDITOR_BINDING_KEYS = new Set([
   "label",
 ]);
 
+const GAME_EDITOR_TRACK_KEYS = new Set([
+  "id",
+  "label",
+  "kind",
+  "filled",
+  "parentTrackId",
+  "active",
+  "role",
+  "components",
+  "tilemap",
+]);
+const GAME_EDITOR_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u;
+const PHYSICS_2D_KEYS = new Set([
+  "gravity",
+  "fixedDeltaTime",
+  "maxSubSteps",
+  "defaultMaterial",
+]);
+const PHYSICS_2D_VECTOR_KEYS = new Set(["x", "y"]);
+const PHYSICS_2D_MATERIAL_KEYS = new Set(["friction", "bounciness"]);
+
+function validPersistedPhysics2D(value: unknown): value is Physics2DSettings {
+  if (!validatePhysics2DSettings(value).valid) return false;
+  const candidate = value as unknown as Record<string, unknown>;
+  const gravity = candidate.gravity as Record<string, unknown>;
+  const material = candidate.defaultMaterial as Record<string, unknown>;
+  return Object.keys(candidate).every((key) => PHYSICS_2D_KEYS.has(key)) &&
+    Object.keys(candidate).length === PHYSICS_2D_KEYS.size &&
+    Object.keys(gravity).every((key) => PHYSICS_2D_VECTOR_KEYS.has(key)) &&
+    Object.keys(gravity).length === PHYSICS_2D_VECTOR_KEYS.size &&
+    Object.keys(material).every((key) => PHYSICS_2D_MATERIAL_KEYS.has(key)) &&
+    Object.keys(material).length === PHYSICS_2D_MATERIAL_KEYS.size;
+}
+
+function assertValidTrackHierarchy(tracks: readonly GameEditorTrack[]): void {
+  const byId = new Map<string, GameEditorTrack>();
+  for (const track of tracks) {
+    if (
+      !GAME_EDITOR_ID_PATTERN.test(track.id) ||
+      typeof track.label !== "string" || typeof track.kind !== "string" ||
+      !Array.isArray(track.filled) || byId.has(track.id)
+    ) throw new Error("Invalid Game editor track identity.");
+    if (
+      track.parentTrackId !== undefined &&
+      (!GAME_EDITOR_ID_PATTERN.test(track.parentTrackId) ||
+        track.parentTrackId === track.id)
+    ) throw new Error("Invalid Game editor parent track.");
+    if (track.active !== undefined && typeof track.active !== "boolean") {
+      throw new Error("Invalid Game editor active flag.");
+    }
+    if (
+      track.tilemap !== undefined &&
+      !isValidGameTilemapDocument(track.tilemap)
+    ) {
+      throw new Error("Invalid Game editor tilemap.");
+    }
+    byId.set(track.id, track);
+  }
+  for (const track of tracks) {
+    if (
+      track.parentTrackId !== undefined && !byId.has(track.parentTrackId)
+    ) throw new Error("Game editor parent track is missing.");
+    const seen = new Set<string>([track.id]);
+    let parentId = track.parentTrackId;
+    while (parentId !== undefined) {
+      if (seen.has(parentId)) throw new Error("Game editor parent cycle.");
+      seen.add(parentId);
+      parentId = byId.get(parentId)?.parentTrackId;
+    }
+  }
+}
+
+export type GameBehaviorSourceMode = "SIMPLE" | "GRAPH" | "CODE";
+
+/**
+ * Authoring source kept beside canonical Behavior IR. Game owns this source;
+ * Draw and Audio assets are referenced by the compiled actions only.
+ */
+export interface GameBehaviorSourceSnapshot {
+  readonly behaviorId: string;
+  readonly mode: GameBehaviorSourceMode;
+  readonly graph?: VisualGameLogicSource;
+  readonly sourceText?: string;
+}
+
+function cloneVisualGameLogicSource(
+  source: VisualGameLogicSource,
+): VisualGameLogicSource {
+  return {
+    schemaVersion: source.schemaVersion,
+    sourceKind: source.sourceKind,
+    behaviorId: source.behaviorId,
+    nodes: source.nodes.map((node) => {
+      switch (node.kind) {
+        case "EVENT":
+          return { ...node, trigger: { ...node.trigger } };
+        case "CONDITION":
+          return { ...node, condition: { ...node.condition } };
+        case "ACTION":
+          return { ...node, action: { ...node.action } };
+        case "MERGE":
+        case "END":
+          return { ...node };
+      }
+    }),
+    edges: source.edges.map((edge) => ({ ...edge })),
+  };
+}
+
+function referenceOnlyBehaviorSource(
+  source: GameBehaviorSourceSnapshot,
+): GameBehaviorSourceSnapshot {
+  return {
+    behaviorId: source.behaviorId,
+    mode: source.mode,
+    ...(source.graph === undefined
+      ? {}
+      : { graph: cloneVisualGameLogicSource(source.graph) }),
+    ...(source.sourceText === undefined
+      ? {}
+      : { sourceText: source.sourceText }),
+  };
+}
+
+function validBehaviorSourceSnapshot(
+  source: unknown,
+): source is GameBehaviorSourceSnapshot {
+  if (
+    source === null || typeof source !== "object" || Array.isArray(source)
+  ) return false;
+  const candidate = source as Record<string, unknown>;
+  if (
+    typeof candidate.behaviorId !== "string" ||
+    !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(candidate.behaviorId) ||
+    !["SIMPLE", "GRAPH", "CODE"].includes(String(candidate.mode))
+  ) return false;
+  const mode = String(candidate.mode) as GameBehaviorSourceMode;
+  const graph = candidate.graph;
+  if (graph !== undefined) {
+    if (
+      graph === null || typeof graph !== "object" || Array.isArray(graph)
+    ) return false;
+    const graphCandidate = graph as Record<string, unknown>;
+    if (
+      graphCandidate.behaviorId !== candidate.behaviorId ||
+      !Array.isArray(graphCandidate.nodes) ||
+      !Array.isArray(graphCandidate.edges)
+    ) return false;
+    try {
+      if (!validateVisualGameLogic(graph as VisualGameLogicSource).valid) {
+        return false;
+      }
+    } catch {
+      return false;
+    }
+  }
+  if (mode === "GRAPH" && graph === undefined) return false;
+  if (mode === "CODE") {
+    if (
+      typeof candidate.sourceText !== "string" ||
+      candidate.sourceText.trim().length === 0
+    ) return false;
+    const sourceText = candidate.sourceText;
+    const scriptValidation = validateBoundedGameScript({
+      schemaVersion: 1,
+      sourceKind: "BOUNDED_SCRIPT",
+      behaviorId: candidate.behaviorId as VisualGameLogicSource["behaviorId"],
+      language: "typescript",
+      sourceText,
+    });
+    if (!scriptValidation.valid) return false;
+  }
+  if (
+    mode === "SIMPLE" &&
+    (graph !== undefined || candidate.sourceText !== undefined)
+  ) {
+    return false;
+  }
+  return candidate.sourceText === undefined ||
+    typeof candidate.sourceText === "string";
+}
+
 export interface GameEditorPersistenceRecord {
   readonly schemaVersion: typeof GAME_EDITOR_PERSISTENCE_SCHEMA_VERSION;
   readonly projectId: string;
@@ -147,9 +362,17 @@ export interface GameEditorPersistenceRecord {
   readonly savedAt: string;
   readonly stateHash: string;
   readonly tracks: readonly GameEditorTrack[];
+  /** Optional scene-wide physics settings; missing means GAME-350 defaults. */
+  readonly physics2D?: Physics2DSettings;
   readonly bindings?: readonly GameEditorBinding[];
-  /** Canonical no-code Behavior IR; source bytes are never persisted here. */
+  /** Canonical no-code Behavior IR; source is persisted separately below. */
   readonly behaviors?: readonly BehaviorIR[];
+  /** Visual graph or bounded code source for reopening the same authoring view. */
+  readonly behaviorSources?: readonly GameBehaviorSourceSnapshot[];
+  /** Game-owned reusable template instances; Draw/Audio source bytes never enter here. */
+  readonly templateInstances?: readonly GameTemplateInstance[];
+  /** Game-owned animation assignments; iDRAW frames remain source references. */
+  readonly animationBindings?: readonly GameAnimationBinding[];
   /** Exact PiXYNC canonical checkpoint; omitted by legacy/local-only records. */
   readonly canonicalProject?: GameProject;
   readonly appliedCommandIds?: readonly string[];
@@ -180,16 +403,43 @@ export async function createGameEditorPersistenceRecord(
   },
   bindings: readonly GameEditorBinding[] = [],
   behaviors: readonly BehaviorIR[] = [],
+  behaviorSources: readonly GameBehaviorSourceSnapshot[] = [],
+  physics2D?: Partial<Physics2DSettings>,
+  templateInstances: readonly GameTemplateInstance[] = [],
+  animationBindings: readonly GameAnimationBinding[] = [],
 ): Promise<GameEditorPersistenceRecord> {
+  assertValidTrackHierarchy(tracks);
+  if (
+    templateInstances.some((instance) =>
+      !isValidGameTemplateInstance(instance) ||
+      (instance.targetTrackId !== undefined &&
+        !tracks.some((track) => track.id === instance.targetTrackId))
+    ) ||
+    new Set(templateInstances.map((instance) => instance.instanceId)).size !==
+      templateInstances.length ||
+    animationBindings.some((binding) =>
+      !isValidGameAnimationBinding(binding) ||
+      !tracks.some((track) => track.id === binding.trackId)
+    ) ||
+    new Set(animationBindings.map((binding) => binding.bindingId)).size !==
+      animationBindings.length
+  ) throw new Error("Invalid Game template instances.");
   const normalizedTracks = tracks.map((track) => ({
     id: track.id,
     label: track.label,
     kind: track.kind,
     filled: [...track.filled],
+    ...(track.parentTrackId === undefined
+      ? {}
+      : { parentTrackId: track.parentTrackId }),
+    ...(track.active === undefined ? {} : { active: track.active }),
     ...(track.role === undefined ? {} : { role: track.role }),
     ...(track.components === undefined
       ? {}
       : { components: cloneComponents(track.components) }),
+    ...(track.tilemap === undefined
+      ? {}
+      : { tilemap: cloneTilemap(track.tilemap) }),
   }));
   const body = {
     schemaVersion: GAME_EDITOR_PERSISTENCE_SCHEMA_VERSION,
@@ -207,6 +457,24 @@ export async function createGameEditorPersistenceRecord(
         actions: rule.actions.map((action) => ({ ...action })),
       })),
     })),
+    ...(physics2D === undefined
+      ? {}
+      : { physics2D: normalizePhysics2DSettings(physics2D) }),
+    ...(behaviorSources.length === 0
+      ? {}
+      : { behaviorSources: behaviorSources.map(referenceOnlyBehaviorSource) }),
+    ...(templateInstances.length === 0 ? {} : {
+      templateInstances: templateInstances.map((instance) => ({
+        ...instance,
+        values: { ...instance.values },
+      })),
+    }),
+    ...(animationBindings.length === 0 ? {} : {
+      animationBindings: animationBindings.map((binding) => ({
+        ...binding,
+        frameIds: [...binding.frameIds],
+      })),
+    }),
     ...(canonical === undefined ? {} : {
       canonicalProject: canonical.project,
       appliedCommandIds: [...canonical.appliedCommandIds],
@@ -230,8 +498,18 @@ export async function validateGameEditorPersistenceRecord(
     revision: record.revision,
     savedAt: record.savedAt,
     tracks: record.tracks,
+    ...(record.physics2D === undefined ? {} : { physics2D: record.physics2D }),
     ...(record.bindings === undefined ? {} : { bindings: record.bindings }),
     ...(record.behaviors === undefined ? {} : { behaviors: record.behaviors }),
+    ...(record.behaviorSources === undefined
+      ? {}
+      : { behaviorSources: record.behaviorSources }),
+    ...(record.templateInstances === undefined
+      ? {}
+      : { templateInstances: record.templateInstances }),
+    ...(record.animationBindings === undefined
+      ? {}
+      : { animationBindings: record.animationBindings }),
     ...(record.canonicalProject === undefined
       ? {}
       : { canonicalProject: record.canonicalProject }),
@@ -240,6 +518,10 @@ export async function validateGameEditorPersistenceRecord(
       : { appliedCommandIds: record.appliedCommandIds }),
   });
   if (record.stateHash !== expected) return false;
+  if (
+    record.physics2D !== undefined &&
+    !validPersistedPhysics2D(record.physics2D)
+  ) return false;
   if (record.canonicalProject !== undefined) {
     try {
       const candidate = record.canonicalProject;
@@ -259,13 +541,68 @@ export async function validateGameEditorPersistenceRecord(
         label: track.label,
         kind: track.kind,
         filled: [...track.activeFrames],
+        ...((track as unknown as GameEditorTrack).parentTrackId === undefined
+          ? {}
+          : {
+            parentTrackId: (track as unknown as GameEditorTrack).parentTrackId,
+          }),
+        ...((track as unknown as GameEditorTrack).active === undefined
+          ? {}
+          : { active: (track as unknown as GameEditorTrack).active }),
         ...(track.role === undefined ? {} : { role: track.role }),
         ...(track.components === undefined
           ? {}
           : { components: cloneComponents(track.components) }),
+        ...(track.tilemap === undefined
+          ? {}
+          : { tilemap: cloneTilemap(track.tilemap) }),
       })) ?? [];
       if (await sha256Hex(canonicalTracks) !== await sha256Hex(record.tracks)) {
         return false;
+      }
+      if (
+        await sha256Hex(candidate.editorTimeline?.templateInstances ?? []) !==
+          await sha256Hex(record.templateInstances ?? [])
+      ) return false;
+      if (
+        await sha256Hex(candidate.editorTimeline?.animationBindings ?? []) !==
+          await sha256Hex(record.animationBindings ?? [])
+      ) return false;
+      const scene = candidate.scenes.find((item) =>
+        String(item.sceneId).startsWith("scene:pixieed-game:")
+      ) as
+        | (typeof candidate.scenes)[number] & {
+          readonly physics2D?: Physics2DSettings;
+        }
+        | undefined;
+      if (
+        await sha256Hex(scene?.physics2D) !==
+          await sha256Hex(record.physics2D)
+      ) return false;
+      const entityByTrackId = new Map(
+        (scene?.entities ?? []).map((entity) => [
+          String(entity.entityId).replace("entity:pixieed-game:", ""),
+          entity,
+        ]),
+      );
+      for (const track of record.tracks) {
+        const entity = entityByTrackId.get(track.id) as
+          | (typeof candidate.scenes)[number]["entities"][number] & {
+            readonly active?: boolean;
+          }
+          | undefined;
+        if (entity === undefined) return false;
+        const parentId = entity.parentEntityId === undefined
+          ? undefined
+          : String(entity.parentEntityId).replace(
+            "entity:pixieed-game:",
+            "",
+          );
+        if (
+          parentId !== track.parentTrackId || entity.active !== track.active
+        ) {
+          return false;
+        }
       }
     } catch {
       return false;
@@ -284,6 +621,33 @@ export async function validateGameEditorPersistenceRecord(
         (binding.mode !== "LIVE" && binding.mode !== "PINNED") ||
         typeof binding.label !== "string" ||
         Object.keys(binding).some((key) => !GAME_EDITOR_BINDING_KEYS.has(key))
+      ))
+  ) return false;
+  if (
+    record.behaviorSources !== undefined &&
+    (!Array.isArray(record.behaviorSources) ||
+      record.behaviorSources.some((source) =>
+        !validBehaviorSourceSnapshot(source)
+      ))
+  ) return false;
+  if (
+    record.templateInstances !== undefined &&
+    (!Array.isArray(record.templateInstances) ||
+      new Set(record.templateInstances.map((instance) => instance.instanceId))
+          .size !==
+        record.templateInstances.length ||
+      record.templateInstances.some((instance) =>
+        !isValidGameTemplateInstance(instance)
+      ))
+  ) return false;
+  if (
+    record.animationBindings !== undefined &&
+    (!Array.isArray(record.animationBindings) ||
+      new Set(record.animationBindings.map((binding) => binding.bindingId))
+          .size !== record.animationBindings.length ||
+      record.animationBindings.some((binding) =>
+        !isValidGameAnimationBinding(binding) ||
+        !record.tracks.some((track) => track.id === binding.trackId)
       ))
   ) return false;
   if (
@@ -312,8 +676,15 @@ export async function validateGameEditorPersistenceRecord(
         record.appliedCommandIds.every((id) => typeof id === "string"))) &&
     record.tracks.every((track) =>
       track !== null && typeof track === "object" &&
+      Object.keys(track).every((key) => GAME_EDITOR_TRACK_KEYS.has(key)) &&
       typeof track.id === "string" && typeof track.label === "string" &&
       typeof track.kind === "string" && Array.isArray(track.filled) &&
+      GAME_EDITOR_ID_PATTERN.test(track.id) &&
+      (track.parentTrackId === undefined ||
+        (typeof track.parentTrackId === "string" &&
+          GAME_EDITOR_ID_PATTERN.test(track.parentTrackId) &&
+          track.parentTrackId !== track.id)) &&
+      (track.active === undefined || typeof track.active === "boolean") &&
       track.filled.every((frame: number) =>
         Number.isSafeInteger(frame) && frame >= 0
       ) &&
@@ -335,8 +706,28 @@ export async function validateGameEditorPersistenceRecord(
                 String(component.componentId)
               ),
             ).size === track.components.length &&
-          track.components.every(validEditorComponent)))
-    )
+          track.components.every(validEditorComponent))) &&
+      (track.tilemap === undefined ||
+        isValidGameTilemapDocument(track.tilemap))
+    ) && (() => {
+      try {
+        assertValidTrackHierarchy(record.tracks);
+        for (const instance of record.templateInstances ?? []) {
+          if (
+            instance.targetTrackId !== undefined &&
+            !record.tracks.some((track) => track.id === instance.targetTrackId)
+          ) return false;
+        }
+        for (const binding of record.animationBindings ?? []) {
+          if (!record.tracks.some((track) => track.id === binding.trackId)) {
+            return false;
+          }
+        }
+        return true;
+      } catch {
+        return false;
+      }
+    })()
   );
 }
 

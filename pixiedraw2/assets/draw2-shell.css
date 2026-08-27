@@ -139,6 +139,13 @@
     visibility: hidden !important;
     pointer-events: none !important;
   }
+  .draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+    #draw2WorkspaceCanvasSlot {
+    position: absolute !important;
+    inset: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
   .draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
     .draw2-mini-preview:not([hidden]) {
     top: var(--draw2-space-2) !important;
@@ -1155,8 +1162,8 @@
   }
 
   /* GAME/AUDIO keep the same lower lane as DRAW, but replace its content with
-     a mode-specific deck.  The canvas remains visible as the visual reference
-     for scene and sound work. */
+     a mode-specific deck. The Draw canvas is never an editing surface for
+     those modes: Game uses Scene/Inspector/Preview and Audio uses its arranger. */
   .draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
     .draw2-workspace-left-dock,
   .draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
@@ -4694,6 +4701,119 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   min-height: 38px;
   padding: 0 11px;
   font-size: 0.8rem;
+}
+.draw2-selection-stamp-panel {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--draw2-border);
+}
+.draw2-selection-stamp-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.draw2-selection-stamp-heading h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+.draw2-selection-stamp-status {
+  max-width: 420px;
+  margin: 0;
+  color: var(--draw2-muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  text-align: right;
+}
+.draw2-selection-stamp-form {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+}
+.draw2-selection-stamp-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--draw2-muted);
+  font-size: 0.75rem;
+}
+.draw2-selection-stamp-form input {
+  min-width: 0;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--draw2-border);
+  border-radius: 8px;
+  background: var(--draw2-surface-raised);
+  color: var(--draw2-text);
+}
+.draw2-selection-stamp-list {
+  display: grid;
+  gap: 6px;
+}
+.draw2-selection-stamp-entry {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--draw2-border);
+  border-radius: 10px;
+  background: var(--draw2-surface-raised);
+}
+.draw2-selection-stamp-entry[data-active="true"] {
+  border-color: var(--draw2-accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--draw2-accent) 28%, transparent);
+}
+.draw2-selection-stamp-copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+.draw2-selection-stamp-copy strong,
+.draw2-selection-stamp-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.draw2-selection-stamp-copy strong {
+  color: var(--draw2-text);
+  font-size: 0.82rem;
+}
+.draw2-selection-stamp-copy small,
+.draw2-selection-stamp-empty {
+  color: var(--draw2-muted);
+  font-size: 0.72rem;
+}
+.draw2-selection-stamp-empty {
+  margin: 0;
+}
+@media (max-width: 700px) {
+  .draw2-selection-stamp-heading {
+    display: grid;
+    gap: 8px;
+  }
+  .draw2-selection-stamp-status {
+    max-width: none;
+    text-align: left;
+  }
+  .draw2-selection-stamp-form {
+    grid-template-columns: 1fr;
+  }
+  .draw2-selection-stamp-form .draw2-button {
+    width: 100%;
+  }
+  .draw2-selection-stamp-entry {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .draw2-selection-stamp-entry .draw2-selection-stamp-copy {
+    grid-column: 1 / -1;
+  }
+  .draw2-selection-stamp-entry .draw2-button {
+    min-width: 0;
+  }
 }
 .draw2-file-input {
   display: inline-flex;
@@ -13366,6 +13486,89 @@ body:has(#draw2WorkspaceFrame) {
 .draw2-game-asset-entry.is-active {
   border-color: var(--draw2-accent-strong);
 }
+.draw2-game-creation-mode {
+  display: grid;
+  gap: 6px;
+  margin: 2px 0 8px;
+  padding: 7px;
+  border: 1px solid
+    color-mix(in srgb, var(--draw2-accent-strong) 54%, var(--draw2-border-subtle));
+  border-radius: var(--draw2-radius-sm);
+  background: color-mix(
+    in srgb,
+    var(--draw2-accent-strong) 9%,
+    var(--draw2-surface-raised)
+  );
+}
+.draw2-game-creation-mode-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+}
+.draw2-game-creation-mode-option {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  min-height: 66px;
+  padding: 7px;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: var(--draw2-radius-sm);
+  background: var(--draw2-surface-raised);
+  color: var(--draw2-text-muted);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease,
+    transform 120ms ease;
+}
+.draw2-game-creation-mode-option:hover,
+.draw2-game-creation-mode-option:focus-visible {
+  border-color: var(--draw2-accent-strong);
+  background: color-mix(
+    in srgb,
+    var(--draw2-accent-strong) 13%,
+    var(--draw2-surface-raised)
+  );
+  color: var(--draw2-text-strong);
+  outline: none;
+}
+.draw2-game-creation-mode-option:active {
+  transform: translateY(1px);
+}
+.draw2-game-creation-mode-option-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 5px;
+  min-width: 0;
+}
+.draw2-game-creation-mode-option-heading strong,
+.draw2-game-creation-mode-option-heading span,
+.draw2-game-creation-mode-option small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.draw2-game-creation-mode-option-heading strong {
+  color: var(--draw2-text-strong);
+  font-size: 0.61rem;
+}
+.draw2-game-creation-mode-option-heading span {
+  flex: 0 0 auto;
+  color: var(--draw2-accent-strong);
+  font-size: 0.5rem;
+}
+.draw2-game-creation-mode-option small {
+  color: var(--draw2-text-muted);
+  font-size: 0.51rem;
+  line-height: 1.4;
+}
+@media (max-width: 700px) {
+  .draw2-game-creation-mode-options {
+    grid-template-columns: 1fr;
+  }
+}
 .draw2-game-creation-guide {
   display: grid;
   gap: 6px;
@@ -13469,6 +13672,111 @@ body:has(#draw2WorkspaceFrame) {
   padding-top: 8px;
   border-top: 1px solid var(--draw2-border-subtle);
 }
+.draw2-game-logic-mode {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--draw2-border-subtle);
+}
+.draw2-game-logic-tab {
+  min-height: 27px;
+  padding-inline: 8px;
+  font-size: 0.55rem;
+}
+.draw2-game-logic-tab.is-active {
+  border-color: var(--draw2-accent-strong);
+  background: color-mix(in srgb, var(--draw2-accent-strong) 14%, var(--draw2-surface-raised));
+  color: var(--draw2-text-strong);
+}
+.draw2-game-logic-panel {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--draw2-border-subtle);
+}
+.draw2-game-logic-graph {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 5px;
+  max-height: 360px;
+  overflow: auto;
+  padding: 2px;
+}
+.draw2-game-logic-node {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 7px;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: var(--draw2-radius-sm);
+  background: var(--draw2-surface-raised);
+}
+.draw2-game-logic-node[data-game-logic-node-kind="EVENT"] {
+  border-color: color-mix(in srgb, var(--draw2-accent-strong) 45%, var(--draw2-border-subtle));
+}
+.draw2-game-logic-node[data-game-logic-node-kind="CONDITION"] {
+  border-color: color-mix(in srgb, #d7a64a 55%, var(--draw2-border-subtle));
+}
+.draw2-game-logic-node[data-game-logic-node-kind="ACTION"] {
+  border-color: color-mix(in srgb, #6fa7e8 55%, var(--draw2-border-subtle));
+}
+.draw2-game-logic-node-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 5px;
+  align-items: center;
+}
+.draw2-game-logic-node-heading strong,
+.draw2-game-logic-node-heading span,
+.draw2-game-logic-node small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.draw2-game-logic-node-heading strong {
+  color: var(--draw2-text-strong);
+  font-size: 0.57rem;
+}
+.draw2-game-logic-node-heading span {
+  color: var(--draw2-text-muted);
+  font-size: 0.46rem;
+}
+.draw2-game-logic-node small {
+  color: var(--draw2-text-muted);
+  font-size: 0.49rem;
+  line-height: 1.35;
+}
+.draw2-game-logic-node-connections {
+  color: var(--draw2-text-muted) !important;
+}
+.draw2-game-logic-connections {
+  display: grid;
+  gap: 5px;
+  padding: 6px;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: var(--draw2-radius-sm);
+  background: var(--draw2-surface-raised);
+}
+.draw2-game-logic-connections > strong {
+  color: var(--draw2-text-strong);
+  font-size: 0.58rem;
+}
+.draw2-game-code-editor {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  resize: vertical;
+  padding: 8px;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: var(--draw2-radius-sm);
+  background: var(--draw2-surface-input);
+  color: var(--draw2-text-strong);
+  font: 0.57rem/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
 .draw2-game-event-list {
   display: grid;
   gap: 3px;
@@ -13528,6 +13836,97 @@ body:has(#draw2WorkspaceFrame) {
   max-height: 430px;
   overflow: auto;
   overscroll-behavior: contain;
+}
+.draw2-game-inspector-check {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 30px;
+  color: var(--draw2-text-muted);
+  font-size: 0.58rem;
+}
+.draw2-game-inspector-check input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--draw2-accent-strong);
+}
+.draw2-game-physics-card {
+  display: grid;
+  gap: 7px;
+  margin-top: 12px;
+  padding: 9px;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: var(--draw2-radius-sm);
+  background: color-mix(in srgb, var(--draw2-surface-raised) 92%, #0b1724);
+}
+.draw2-game-physics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+.draw2-game-physics-grid label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  color: var(--draw2-text-muted);
+  font-size: 0.53rem;
+}
+.draw2-game-physics-grid input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  min-height: 27px;
+  padding: 3px 5px;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: var(--draw2-radius-sm);
+  background: var(--draw2-surface-input);
+  color: var(--draw2-text-strong);
+  font-size: 0.56rem;
+}
+.draw2-game-physics-card > .draw2-button {
+  justify-self: start;
+}
+.draw2-game-hierarchy-node {
+  display: grid;
+  min-width: 0;
+}
+.draw2-game-hierarchy-node-row {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 3px;
+  min-width: 0;
+}
+.draw2-game-hierarchy-toggle,
+.draw2-game-hierarchy-toggle-spacer {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  min-height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--draw2-radius-sm);
+  background: transparent;
+  color: var(--draw2-text-muted);
+  font-size: 13px;
+}
+.draw2-game-hierarchy-toggle {
+  cursor: pointer;
+}
+.draw2-game-hierarchy-toggle:hover,
+.draw2-game-hierarchy-toggle:focus-visible {
+  background: var(--draw2-surface-raised);
+  color: var(--draw2-text-strong);
+  outline: none;
+}
+.draw2-game-hierarchy-children {
+  display: grid;
+  gap: 3px;
+  margin-left: 12px;
+  padding-left: 8px;
+  border-left: 1px solid var(--draw2-border-subtle);
+}
+.draw2-game-hierarchy-children[hidden] {
+  display: none;
 }
 .draw2-game-component-card {
   display: grid;
@@ -13773,6 +14172,453 @@ body:has(#draw2WorkspaceFrame) {
 .draw2-game-binding-readonly {
   color: var(--draw2-accent-strong) !important;
   font-weight: 700;
+}
+.draw2-game-template-catalog {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0;
+  padding: 8px;
+  border: 1px solid color-mix(
+    in srgb,
+    var(--draw2-accent-strong) 42%,
+    var(--draw2-border-subtle)
+  );
+  border-radius: var(--draw2-radius-sm);
+  background: color-mix(
+    in srgb,
+    var(--draw2-accent-strong) 6%,
+    var(--draw2-surface-raised)
+  );
+}
+.draw2-game-template-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 8px;
+}
+.draw2-game-template-heading strong {
+  display: block;
+  color: var(--draw2-text-strong);
+  font-size: 0.72rem;
+}
+.draw2-game-template-filter {
+  width: min(150px, 42%);
+}
+.draw2-game-template-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  max-height: 360px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.draw2-game-template-card {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 7px;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: var(--draw2-radius-sm);
+  background: var(--draw2-surface);
+}
+.draw2-game-template-card-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 5px;
+  min-width: 0;
+}
+.draw2-game-template-card strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--draw2-text-strong);
+  font-size: 0.62rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.draw2-game-template-card small {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--draw2-text-muted);
+  font-size: 0.52rem;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+}
+.draw2-game-template-badge {
+  flex: 0 0 auto;
+  padding: 2px 4px;
+  border: 1px solid color-mix(
+    in srgb,
+    var(--draw2-accent-strong) 50%,
+    var(--draw2-border-subtle)
+  );
+  border-radius: 999px;
+  color: var(--draw2-accent-strong) !important;
+  font-size: 0.45rem !important;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.draw2-game-template-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  min-width: 0;
+}
+.draw2-game-template-fields .draw2-panel-field {
+  min-width: 0;
+  font-size: 0.5rem;
+}
+.draw2-game-template-fields .draw2-panel-field input,
+.draw2-game-template-fields .draw2-panel-field select {
+  min-height: 26px;
+  font-size: 0.56rem;
+}
+.draw2-game-template-apply {
+  width: 100%;
+  min-height: 28px;
+  font-size: 0.56rem;
+}
+.draw2-game-template-instances {
+  display: grid;
+  gap: 4px;
+  max-height: 150px;
+  overflow: auto;
+}
+.draw2-game-template-instance {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 5px;
+  align-items: center;
+  min-width: 0;
+  padding: 5px;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: var(--draw2-radius-sm);
+  background: var(--draw2-surface-raised);
+}
+.draw2-game-template-instance strong,
+.draw2-game-template-instance small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.draw2-game-template-instance strong {
+  color: var(--draw2-text-strong);
+  font-size: 0.58rem;
+}
+.draw2-game-template-instance small {
+  color: var(--draw2-text-muted);
+  font-size: 0.5rem;
+}
+.draw2-game-template-instance button {
+  min-height: 26px;
+  padding-inline: 5px;
+  font-size: 0.5rem;
+}
+
+.draw2-game-rail-surface {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.draw2-game-rail-surface[hidden] {
+  display: none;
+}
+.draw2-game-rail-section-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+.draw2-game-rail-section-heading strong {
+  display: block;
+  color: var(--draw2-text-strong);
+  font-size: 0.75rem;
+}
+.draw2-game-rail-section-heading small {
+  color: var(--draw2-text-muted);
+  font-size: 0.55rem;
+  text-align: right;
+}
+.draw2-game-asset-browser-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(130px, 180px);
+  gap: 6px;
+  min-width: 0;
+}
+.draw2-game-asset-catalog {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 6px;
+  max-height: 220px;
+  min-width: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.draw2-game-asset-card {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  min-height: 58px;
+  padding: 7px;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: var(--draw2-radius-sm);
+  background: var(--draw2-surface-raised);
+  color: var(--draw2-text-strong);
+  text-align: left;
+}
+.draw2-game-asset-card:hover,
+.draw2-game-asset-card:focus-visible {
+  border-color: var(--draw2-accent-strong);
+  outline: none;
+}
+.draw2-game-asset-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px;
+  min-width: 0;
+}
+.draw2-game-asset-card strong,
+.draw2-game-asset-card small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.draw2-game-asset-card strong {
+  font-size: 0.62rem;
+}
+.draw2-game-asset-card small {
+  color: var(--draw2-text-muted);
+  font-size: 0.52rem;
+}
+.draw2-game-asset-card-badge {
+  flex: 0 0 auto;
+  padding: 2px 4px;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: 999px;
+  color: var(--draw2-accent-strong);
+  font-size: 0.46rem;
+  font-weight: 700;
+}
+.draw2-game-asset-card[data-game-asset-readonly="true"] {
+  background: color-mix(
+    in srgb,
+    var(--draw2-accent-strong) 5%,
+    var(--draw2-surface-raised)
+  );
+}
+.draw2-game-animation-selection {
+  min-width: 0;
+  padding: 7px 8px;
+  border: 1px solid color-mix(
+    in srgb,
+    var(--draw2-accent-strong) 42%,
+    var(--draw2-border-subtle)
+  );
+  border-radius: var(--draw2-radius-sm);
+  background: color-mix(
+    in srgb,
+    var(--draw2-accent-strong) 6%,
+    var(--draw2-surface-raised)
+  );
+  color: var(--draw2-text-strong);
+  font-size: 0.59rem;
+}
+.draw2-game-animation-clips {
+  display: flex;
+  gap: 5px;
+  min-width: 0;
+  max-width: 100%;
+  padding-bottom: 2px;
+  overflow-x: auto;
+  overscroll-behavior: contain;
+}
+.draw2-game-animation-clip {
+  display: grid;
+  flex: 0 0 auto;
+  gap: 3px;
+  min-width: 118px;
+  padding: 6px;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: var(--draw2-radius-sm);
+  background: var(--draw2-surface-raised);
+  color: var(--draw2-text-strong);
+  text-align: left;
+}
+.draw2-game-animation-clip.is-active,
+.draw2-game-animation-clip:hover,
+.draw2-game-animation-clip:focus-visible {
+  border-color: var(--draw2-accent-strong);
+  outline: none;
+}
+.draw2-game-animation-clip strong {
+  font-size: 0.6rem;
+}
+.draw2-game-animation-clip small {
+  color: var(--draw2-text-muted);
+  font-size: 0.5rem;
+}
+.draw2-game-animation-detail {
+  display: grid;
+  grid-template-columns: minmax(116px, 0.32fr) minmax(0, 1fr);
+  gap: 8px;
+  min-width: 0;
+}
+.draw2-game-animation-preview {
+  display: grid;
+  place-items: center;
+  min-height: 112px;
+  padding: 6px;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: var(--draw2-radius-sm);
+  background: repeating-conic-gradient(#263046 0 25%, #1d2638 0 50%) 50% / 12px
+    12px;
+}
+.draw2-game-animation-preview canvas,
+.draw2-game-frame-thumb canvas {
+  display: block;
+  max-width: 100%;
+  image-rendering: pixelated;
+  object-fit: contain;
+}
+.draw2-game-animation-preview canvas {
+  width: min(112px, 100%);
+  height: 100px;
+}
+.draw2-game-frame-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(58px, 1fr));
+  gap: 5px;
+  align-content: start;
+  max-height: 160px;
+  min-width: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.draw2-game-frame-thumb {
+  display: grid;
+  place-items: center;
+  gap: 3px;
+  min-width: 0;
+  min-height: 58px;
+  padding: 4px;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: var(--draw2-radius-sm);
+  background: var(--draw2-surface-raised);
+  color: var(--draw2-text-muted);
+  font-size: 0.48rem;
+}
+.draw2-game-frame-thumb.is-active {
+  border-color: var(--draw2-accent-strong);
+  color: var(--draw2-text-strong);
+  box-shadow: 0 0 0 1px color-mix(
+    in srgb,
+    var(--draw2-accent-strong) 35%,
+    transparent
+  );
+}
+.draw2-game-frame-thumb canvas {
+  width: 42px;
+  height: 42px;
+}
+.draw2-game-animation-overrides {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(80px, 1fr));
+  gap: 5px;
+  min-width: 0;
+}
+.draw2-game-animation-overrides .draw2-panel-field {
+  min-width: 0;
+  font-size: 0.5rem;
+}
+.draw2-game-animation-overrides .draw2-panel-field input,
+.draw2-game-animation-overrides .draw2-panel-field select {
+  min-height: 27px;
+  font-size: 0.55rem;
+}
+.draw2-game-animation-overrides .draw2-panel-field:has(input[type="checkbox"]) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: var(--draw2-radius-sm);
+  background: var(--draw2-surface-raised);
+}
+.draw2-game-animation-overrides .draw2-panel-field:has(input[type="checkbox"]) input {
+  width: auto;
+}
+.draw2-game-animation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: end;
+}
+.draw2-game-animation-actions .draw2-panel-field {
+  min-width: 82px;
+  flex: 0 1 100px;
+}
+.draw2-game-animation-actions .draw2-panel-field input,
+.draw2-game-animation-actions .draw2-panel-field select {
+  min-height: 28px;
+}
+.draw2-game-rail-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 6px;
+  min-width: 0;
+}
+.draw2-game-rail-summary-card {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: var(--draw2-radius-sm);
+  background: var(--draw2-surface-raised);
+}
+.draw2-game-rail-summary-card strong {
+  color: var(--draw2-text-strong);
+  font-size: 0.62rem;
+}
+.draw2-game-rail-summary-card small {
+  color: var(--draw2-text-muted);
+  font-size: 0.53rem;
+  line-height: 1.4;
+}
+.draw2-game-rail-summary-card .draw2-button {
+  width: fit-content;
+  min-height: 26px;
+  font-size: 0.53rem;
+}
+@media (max-width: 700px) {
+  .draw2-game-template-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .draw2-game-template-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .draw2-game-template-filter {
+    width: 100%;
+  }
+  .draw2-game-asset-browser-controls,
+  .draw2-game-animation-detail,
+  .draw2-game-animation-overrides {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .draw2-game-rail-section-heading {
+    align-items: start;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .draw2-game-rail-section-heading small {
+    text-align: left;
+  }
 }
 .draw2-build-check {
   grid-template-columns: 24px minmax(0, 1fr);
@@ -19320,6 +20166,60 @@ body:has(#draw2WorkspaceFrame) {
     min-height: 32px;
   }
 
+  .draw2-game-hierarchy-add-wrap {
+    position: relative;
+    flex: 0 0 auto;
+  }
+
+  .draw2-game-hierarchy-add-wrap > .draw2-button {
+    min-height: 30px;
+    padding-inline: 7px;
+    font-size: 11px;
+  }
+
+  .draw2-game-hierarchy-add-menu {
+    position: absolute;
+    top: calc(100% + 5px);
+    right: 0;
+    z-index: 50;
+    display: grid;
+    gap: 3px;
+    width: max-content;
+    min-width: 190px;
+    padding: 5px;
+    border: 1px solid var(--draw2-border-strong);
+    border-radius: var(--draw2-radius-sm);
+    background: var(--draw2-surface-raised);
+    box-shadow: var(--draw2-shadow-panel);
+  }
+
+  .draw2-game-hierarchy-add-menu[hidden] {
+    display: none !important;
+  }
+
+  .draw2-game-hierarchy-add-menu > button {
+    min-height: 29px;
+    padding: 5px 8px;
+    border: 1px solid transparent;
+    border-radius: var(--draw2-radius-sm);
+    background: transparent;
+    color: var(--draw2-text-muted);
+    font-size: 11px;
+    text-align: left;
+  }
+
+  .draw2-game-hierarchy-add-menu > button:hover,
+  .draw2-game-hierarchy-add-menu > button:focus-visible {
+    border-color: var(--draw2-accent-strong);
+    background: color-mix(
+      in srgb,
+      var(--draw2-accent-strong) 12%,
+      var(--draw2-surface-input)
+    );
+    color: var(--draw2-text-strong);
+    outline: none;
+  }
+
   .draw2-game-left-dock-header > div {
     display: grid;
     gap: 2px;
@@ -19338,12 +20238,102 @@ body:has(#draw2WorkspaceFrame) {
     overflow: auto;
   }
 
+  .draw2-game-hierarchy-group {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .draw2-game-hierarchy-group-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 4px 3px 2px;
+    border-bottom: 1px solid var(--draw2-border-subtle);
+  }
+
+  .draw2-game-hierarchy-group-heading strong {
+    color: var(--draw2-text-strong, #f4f7fb);
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .draw2-game-hierarchy-group-heading small {
+    color: var(--draw2-text-muted, #a9b4c4);
+    font-size: 9px;
+  }
+
+  .draw2-game-hierarchy-group-items {
+    display: grid;
+    gap: 3px;
+    padding-left: 5px;
+  }
+
   .draw2-game-hierarchy-entry {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 6px;
     width: 100%;
     min-width: 0;
     min-height: 34px;
     padding: 6px 8px;
+    border: 1px solid var(--draw2-border-subtle);
+    border-radius: var(--draw2-radius-sm);
+    background: var(--draw2-surface-raised);
+    color: var(--draw2-text-muted);
     text-align: left;
+  }
+
+  .draw2-game-hierarchy-entry:hover,
+  .draw2-game-hierarchy-entry:focus-visible,
+  .draw2-game-hierarchy-entry.is-active {
+    border-color: var(--draw2-accent-strong);
+    background: color-mix(
+      in srgb,
+      var(--draw2-accent-strong) 10%,
+      var(--draw2-surface-raised)
+    );
+    color: var(--draw2-text-strong);
+    outline: none;
+  }
+
+  .draw2-game-hierarchy-entry > span:first-child {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .draw2-game-hierarchy-entry strong,
+  .draw2-game-hierarchy-entry small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .draw2-game-hierarchy-entry strong {
+    color: var(--draw2-text-strong, #f4f7fb);
+    font-size: 11px;
+  }
+
+  .draw2-game-hierarchy-entry small {
+    color: var(--draw2-text-muted, #a9b4c4);
+    font-size: 9px;
+  }
+
+  .draw2-game-creation-guide-step[data-state="optional"] {
+    opacity: 0.78;
+    border-style: dashed;
+  }
+
+  .draw2-game-creation-guide-step[data-state="optional"] > span:first-child {
+    width: auto;
+    min-width: 17px;
+    padding-inline: 3px;
+    border-radius: 4px;
+    font-size: 0.46rem;
   }
 
   .draw2-game-left-dock .draw2-panel-status {
@@ -25168,12 +26158,12 @@ body:has(#draw2WorkspaceFrame) {
   display: none !important;
 }
 
-/* The right-dock plus button creates a second panel surface. Draw keeps
-   panel access in the grouped Details menu and exposes only the active
-   contextual dock here. */
+/* Draw keeps secondary panels out of the first-glance rail, but leaves the
+   right-dock plus button visible so Inspector and other tools are discoverable
+   without requiring the user to open a menu. */
 #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
   #draw2WorkspaceAddPanel {
-  display: none !important;
+  display: inline-flex !important;
 }
 
 /* Internal readiness text is useful for diagnostics but not for the artist's
@@ -26923,5 +27913,564 @@ body:has(#draw2WorkspaceFrame) {
     display: none !important;
     visibility: hidden !important;
     pointer-events: none !important;
+  }
+}
+
+/* Shared Studio continuity -------------------------------------------------
+ * The mode rail is a presentation switch inside one workspace. Keep the
+ * PiXiEED Studio identity stable, then animate only the mode-owned surfaces.
+ * This prevents iDRAW/iAUDIO/iGAME from reading as separate page routes. */
+.draw2-workspace-brand-product {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  color: var(--draw2-text-strong);
+  font-size: 0.76rem;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.draw2-workspace-brand-context {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  max-width: 92px;
+  overflow: hidden;
+  color: var(--draw2-text-muted);
+  font-size: 0.58rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.draw2-mode-transition-banner {
+  position: absolute;
+  z-index: 90;
+  top: 48px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(440px, calc(100% - 24px));
+  min-height: 30px;
+  padding: 6px 12px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--draw2-mode-accent, var(--draw2-accent)) 62%, var(--draw2-border-strong));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--draw2-surface-raised) 94%, #05070b);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 28%);
+  color: var(--draw2-text-strong);
+  pointer-events: none;
+  transform: translate(-50%, -4px);
+  white-space: nowrap;
+  animation: draw2-mode-transition-in 420ms cubic-bezier(.2, .8, .2, 1) both;
+}
+.draw2-mode-transition-banner strong {
+  color: var(--draw2-mode-accent, var(--draw2-accent));
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+}
+.draw2-mode-transition-banner span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--draw2-text-muted);
+  font-size: 0.62rem;
+  text-overflow: ellipsis;
+}
+#draw2WorkspaceFrame.is-mode-transitioning .draw2-workspace-topbar {
+  animation: draw2-mode-shell-pulse 420ms ease both;
+}
+#draw2WorkspaceFrame.is-mode-transitioning .draw2-workspace-canvas-region,
+#draw2WorkspaceFrame.is-mode-transitioning .draw2-workspace-left-dock,
+#draw2WorkspaceFrame.is-mode-transitioning .draw2-workspace-right-dock,
+#draw2WorkspaceFrame.is-mode-transitioning .draw2-workspace-timeline-region {
+  animation: draw2-mode-surface-enter 260ms cubic-bezier(.2, .8, .2, 1) both;
+}
+#draw2WorkspaceFrame.is-mode-transitioning .draw2-workspace-right-dock {
+  animation-delay: 24ms;
+}
+#draw2WorkspaceFrame.is-mode-transitioning .draw2-workspace-timeline-region {
+  animation-delay: 46ms;
+}
+@keyframes draw2-mode-transition-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -10px) scale(.96);
+  }
+  55% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -2px) scale(.99);
+  }
+}
+@keyframes draw2-mode-shell-pulse {
+  0%, 100% {
+    box-shadow: none;
+  }
+  42% {
+    box-shadow: inset 0 -2px 0 var(--draw2-mode-accent, var(--draw2-accent));
+  }
+}
+@keyframes draw2-mode-surface-enter {
+  from {
+    opacity: .72;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .draw2-mode-transition-banner,
+  #draw2WorkspaceFrame.is-mode-transitioning .draw2-workspace-topbar,
+  #draw2WorkspaceFrame.is-mode-transitioning .draw2-workspace-canvas-region,
+  #draw2WorkspaceFrame.is-mode-transitioning .draw2-workspace-left-dock,
+  #draw2WorkspaceFrame.is-mode-transitioning .draw2-workspace-right-dock,
+  #draw2WorkspaceFrame.is-mode-transitioning .draw2-workspace-timeline-region {
+    animation: none !important;
+    transform: none !important;
+  }
+}
+
+/* iGAME never exposes Draw's palette or color-resize handle.  The tablet
+ * projection has older flex rules with !important display values, so the
+ * explicit hidden state must win here as well as on desktop. */
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  #draw2WorkspacePaletteStrip[hidden],
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  #draw2WorkspacePaletteResize[hidden] {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Tablet landscape has a legacy fixed rail rule that intentionally wins over
+ * the HTML hidden attribute.  In Game mode that rail would still expose Pen,
+ * Shape, Fill and Select, so the whole Draw dock is removed explicitly. */
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  #draw2WorkspaceLeftDock[hidden] {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Billing framework surface ---------------------------------------------- */
+.draw2-billing-dialog {
+  width: min(720px, calc(100vw - 24px));
+  max-width: 720px;
+  max-height: min(760px, calc(100dvh - 24px));
+  overflow: auto;
+}
+.draw2-billing-dialog form {
+  display: grid;
+  gap: 14px;
+}
+.draw2-billing-dialog-lead {
+  margin: 0;
+  color: var(--draw2-text-muted);
+  font-size: 0.78rem;
+  line-height: 1.6;
+}
+.draw2-billing-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.draw2-billing-card,
+.draw2-billing-scope-card {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: var(--draw2-radius-md);
+  background: var(--draw2-surface-raised);
+}
+.draw2-billing-card-included {
+  border-color: color-mix(in srgb, var(--draw2-accent) 45%, var(--draw2-border-subtle));
+}
+.draw2-billing-card-locked {
+  border-color: color-mix(in srgb, var(--draw2-focus) 40%, var(--draw2-border-subtle));
+}
+.draw2-billing-card strong,
+.draw2-billing-section-heading strong {
+  color: var(--draw2-text-strong);
+  font-size: 0.82rem;
+}
+.draw2-billing-card p {
+  min-height: 38px;
+  margin: 0;
+  color: var(--draw2-text-muted);
+  font-size: 0.68rem;
+  line-height: 1.55;
+}
+.draw2-billing-card output {
+  color: var(--draw2-accent-strong);
+  font-size: 0.66rem;
+  font-weight: 700;
+}
+.draw2-billing-card-locked output {
+  color: var(--draw2-focus);
+}
+.draw2-billing-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.draw2-billing-section-heading > div {
+  display: grid;
+  gap: 3px;
+}
+.draw2-billing-provider-state {
+  flex: 0 0 auto;
+  padding: 4px 7px;
+  border: 1px solid color-mix(in srgb, var(--draw2-focus) 45%, var(--draw2-border-subtle));
+  border-radius: 999px;
+  color: var(--draw2-focus);
+  font-size: 0.62rem;
+  white-space: nowrap;
+}
+.draw2-billing-scope-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 12px;
+  color: var(--draw2-text-muted);
+  font-size: 0.64rem;
+}
+.draw2-billing-scope-grid span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.draw2-billing-scope-grid code {
+  color: var(--draw2-text-strong);
+  font-size: 0.62rem;
+}
+.draw2-billing-target-field {
+  display: grid;
+  gap: 5px;
+  color: var(--draw2-text-muted);
+  font-size: 0.66rem;
+}
+.draw2-billing-target-field select {
+  min-height: 34px;
+  padding-inline: 8px;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: var(--draw2-radius-sm);
+  background: var(--draw2-surface-input);
+  color: var(--draw2-text-strong);
+}
+.draw2-billing-status {
+  margin: 0;
+  color: var(--draw2-focus);
+  font-size: 0.68rem;
+  line-height: 1.5;
+}
+.draw2-billing-dialog #draw2BillingCheckout:disabled {
+  cursor: not-allowed;
+  opacity: .52;
+}
+@media (max-width: 700px) {
+  .draw2-workspace-brand-product,
+  .draw2-workspace-brand-context {
+    display: none;
+  }
+  .draw2-mode-transition-banner {
+    top: 5px;
+    max-width: calc(100% - 12px);
+  }
+  .draw2-billing-overview-grid,
+  .draw2-billing-scope-grid {
+    grid-template-columns: 1fr;
+  }
+  .draw2-billing-card p {
+    min-height: 0;
+  }
+}
+
+/* iGAME owns the central surface. It is an SVG scene projection rather than
+   a Draw canvas, so selecting and arranging GameObjects cannot mutate iDRAW
+   pixels or its history. */
+#draw2GameSceneViewport[hidden] {
+  display: none !important;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] #draw2WorkspaceCanvasRegion {
+  display: grid !important;
+  grid-template-rows: minmax(0, 1fr) !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  #draw2GameSceneViewport:not([hidden]) {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  padding: 10px;
+  box-sizing: border-box;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: var(--draw2-radius-md);
+  background:
+    radial-gradient(circle at 50% 20%, rgb(45 95 128 / 13%), transparent 46%),
+    var(--draw2-surface-canvas);
+}
+
+.draw2-game-scene-viewport-header,
+.draw2-game-scene-viewport-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.draw2-game-scene-viewport-header > div:first-child {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.draw2-game-scene-viewport-header strong {
+  color: var(--draw2-text-strong);
+  font-size: 0.78rem;
+}
+
+.draw2-game-scene-legend {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+  color: var(--draw2-text-muted);
+  font-size: 0.58rem;
+}
+
+.draw2-game-scene-legend-item::before {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 4px;
+  border: 1px solid currentColor;
+  content: "";
+  vertical-align: -1px;
+}
+
+.draw2-game-scene-legend-trigger::before {
+  border-style: dashed;
+}
+
+.draw2-game-scene-viewport-stage {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: var(--draw2-radius-sm);
+  background: #0b111b;
+}
+
+.draw2-game-scene-svg {
+  display: block;
+  width: min(100%, 960px);
+  height: 100%;
+  min-height: 0;
+  overflow: visible;
+  touch-action: none;
+}
+
+.draw2-game-scene-map {
+  fill: #101a27;
+}
+
+.draw2-game-scene-grid line {
+  stroke: rgb(120 168 194 / 18%);
+  stroke-width: 0.012;
+  vector-effect: non-scaling-stroke;
+}
+
+.draw2-game-scene-frame {
+  fill: none;
+  stroke: rgb(127 211 255 / 42%);
+  stroke-width: 0.04;
+  vector-effect: non-scaling-stroke;
+}
+
+.draw2-game-scene-tilemap {
+  cursor: pointer;
+  outline: none;
+}
+
+.draw2-game-scene-tilemap-frame {
+  fill: none;
+  stroke: rgb(125 211 252 / 24%);
+  stroke-width: 0.04;
+  pointer-events: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.draw2-game-scene-tilemap-hit {
+  fill: transparent;
+}
+
+.draw2-game-scene-map-cells {
+  pointer-events: none;
+}
+
+.draw2-game-scene-map-cell {
+  pointer-events: all;
+  stroke-width: 0.035;
+  vector-effect: non-scaling-stroke;
+}
+
+.draw2-game-scene-map-cell.is-solid {
+  fill: rgb(125 211 252 / 22%);
+  stroke: rgb(125 211 252 / 66%);
+}
+
+.draw2-game-scene-map-cell.is-trigger {
+  fill: rgb(200 139 255 / 19%);
+  stroke: rgb(200 139 255 / 88%);
+  stroke-dasharray: 0.12 0.08;
+}
+
+.draw2-game-scene-map-cell:hover,
+.draw2-game-scene-map-cell:focus-visible {
+  fill: rgb(255 255 255 / 26%);
+  stroke: #ffffff;
+  stroke-width: 0.08;
+}
+
+.draw2-game-scene-tilemap text {
+  fill: rgb(186 230 253 / 78%);
+  font-size: 0.28px;
+  font-weight: 700;
+  pointer-events: none;
+  paint-order: stroke;
+  stroke: #0b111b;
+  stroke-width: 0.06px;
+  vector-effect: non-scaling-stroke;
+}
+
+.draw2-game-scene-tilemap.is-selected .draw2-game-scene-tilemap-frame,
+.draw2-game-scene-tilemap:focus-visible .draw2-game-scene-tilemap-frame,
+.draw2-game-scene-tilemap:hover .draw2-game-scene-tilemap-frame {
+  stroke: #ffffff;
+  stroke-width: 0.1;
+}
+
+.draw2-game-scene-object {
+  cursor: pointer;
+  outline: none;
+  touch-action: none;
+}
+
+.draw2-game-scene-object text {
+  fill: var(--draw2-text-strong);
+  font-size: 0.28px;
+  font-weight: 700;
+  pointer-events: none;
+  paint-order: stroke;
+  stroke: #0b111b;
+  stroke-width: 0.06px;
+  vector-effect: non-scaling-stroke;
+}
+
+.draw2-game-scene-marker {
+  fill: #7dd3fc;
+  stroke: #e0f2fe;
+  stroke-width: 0.06;
+  vector-effect: non-scaling-stroke;
+}
+
+.draw2-game-scene-object.is-player .draw2-game-scene-marker {
+  fill: #66e3b4;
+  stroke: #d7fff0;
+}
+
+.draw2-game-scene-object.is-npc .draw2-game-scene-marker {
+  fill: #f5b86a;
+  stroke: #fff0d2;
+}
+
+.draw2-game-scene-object.is-camera .draw2-game-scene-marker {
+  fill: #c4b5fd;
+  stroke: #ede9fe;
+}
+
+.draw2-game-scene-object.is-audio .draw2-game-scene-marker {
+  fill: #f0a7e8;
+  stroke: #ffe5fb;
+}
+
+.draw2-game-scene-collider {
+  fill: rgb(87 200 255 / 7%);
+  stroke: rgb(87 200 255 / 80%);
+  stroke-width: 0.06;
+  pointer-events: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.draw2-game-scene-collider.is-trigger {
+  fill: rgb(200 139 255 / 8%);
+  stroke: rgb(200 139 255 / 88%);
+  stroke-dasharray: 0.16 0.1;
+}
+
+.draw2-game-scene-object.is-selected .draw2-game-scene-marker {
+  stroke: #ffffff;
+  stroke-width: 0.12;
+}
+
+.draw2-game-scene-object:focus-visible .draw2-game-scene-marker,
+.draw2-game-scene-object:hover .draw2-game-scene-marker {
+  stroke: #ffffff;
+  stroke-width: 0.1;
+}
+
+.draw2-game-scene-object.is-inactive {
+  opacity: 0.35;
+}
+
+.draw2-game-scene-viewport-footer {
+  color: var(--draw2-text-muted);
+  font-size: 0.58rem;
+  line-height: 1.4;
+}
+
+.draw2-game-scene-viewport-footer output {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 700px) {
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    #draw2GameSceneViewport:not([hidden]) {
+    padding: 6px;
+  }
+
+  .draw2-game-scene-viewport-header strong {
+    font-size: 0.68rem;
+  }
+
+  .draw2-game-scene-viewport-footer > span {
+    display: none;
+  }
+}
+
+@media (min-width: 1120px) {
+  #draw2WorkspaceFrame .draw2-workspace-brand-product {
+    flex: 0 0 auto;
+  }
+  #draw2WorkspaceFrame .draw2-workspace-brand-context {
+    display: none;
   }
 }
