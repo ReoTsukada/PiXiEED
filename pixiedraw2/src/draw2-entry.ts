@@ -29,7 +29,11 @@ import { drawRasterHash } from "./pixync/adapters.ts";
 import type { PixyncDrawProductStatePort } from "./pixync/draw-product-bridge.ts";
 import type { PixyncAudioProductStateSnapshot } from "./pixync/audio-product-bridge.ts";
 import type { PixyncGameProductSnapshot } from "./pixync/game-product-bridge.ts";
-import type { GameProject, JournalCommand } from "./game/game-300/core.ts";
+import type {
+  BehaviorIR,
+  GameProject,
+  JournalCommand,
+} from "./game/game-300/core.ts";
 import { PixyncAudioProductBridge } from "./pixync/audio-product-bridge.ts";
 import { PixyncDrawProductBridge } from "./pixync/draw-product-bridge.ts";
 import { PixyncGameProductBridge } from "./pixync/game-product-bridge.ts";
@@ -237,6 +241,22 @@ import {
   type Game350ProductSession,
   startGame350ProductPreview,
 } from "./game/game-350/product-path.ts";
+import {
+  clearGame351Dialogue,
+  createGame351PlayableState,
+  createGame351RpgTemplate,
+  createGame351RpgTemplateFromProject,
+  GAME351_INPUT_ACTIONS,
+  GAME351_INTERACT_ACTION,
+  GAME351_TAP_ACTION,
+  type Game351PlayableState,
+  type Game351RpgTemplate,
+  playGame351,
+  restartGame351,
+  stepGame351,
+  stopGame351,
+  triggerGame351Action,
+} from "./game/game-350/playable-slice.ts";
 import type { CanonicalAssetRevision } from "./game/game-340/core.ts";
 import type { CanonicalPixelTarget } from "./wp170-advanced-tools-core.ts";
 import {
@@ -338,6 +358,10 @@ interface WorkspacePxdBridge {
   ) => Promise<AudioApplyReceipt>;
   preparePixyncGameState?: () => Promise<void>;
   pixyncGameCurrent?: () => PixyncGameProductSnapshot;
+  gameCurrentProject?: () => GameProject;
+  refreshSite400IGameRoute?: (
+    operation: "create" | "open" | "reload",
+  ) => Promise<boolean>;
   resolvePixyncGameRevision?: (
     afterHash: string,
     revisionId: string,
@@ -391,12 +415,12 @@ function loadAdvancedModule(): Promise<AdvancedModule> {
 function loadWorkspaceModule(): Promise<WorkspaceModule> {
   const workspaceMobileProjectionMarker = "20260819-compare-final-1";
   const workspaceChunkUrl = new URL(
-    "wp180-workspace.js?v=20260825-igame-handoff-v77",
+    "wp180-workspace.js?v=20260825-game-studio-systems-v82",
     import.meta.url,
   );
   workspaceChunkUrl.searchParams.set(
     "v",
-    "20260825-studio-mode-query-v72",
+    "20260825-game-studio-systems-v82",
   );
   workspaceChunkUrl.searchParams.set(
     "mobile",
@@ -1061,6 +1085,12 @@ const importPxdInput = document.querySelector<HTMLInputElement>(
 const gamePreviewStartButton = document.querySelector<HTMLButtonElement>(
   "#draw2GamePreviewStart",
 );
+const gamePreviewStopButton = document.querySelector<HTMLButtonElement>(
+  "#draw2GamePreviewStop",
+);
+const gamePreviewRestartButton = document.querySelector<HTMLButtonElement>(
+  "#draw2GamePreviewRestart",
+);
 const gamePreviewPinButton = document.querySelector<HTMLButtonElement>(
   "#draw2GamePreviewPin",
 );
@@ -1276,6 +1306,7 @@ if (
   colorAlphaValueElement === null || colorHexElement === null ||
   colorHexOutputElement === null || colorApplyButton === null ||
   colorEditorStatusElement === null || gamePreviewStartButton === null ||
+  gamePreviewStopButton === null || gamePreviewRestartButton === null ||
   gamePreviewPinButton === null || gamePreviewReloadButton === null ||
   gamePreviewStatusElement === null || gamePreviewCanvasElement === null ||
   advancedLoadButton === null || advancedPatternButton === null ||
@@ -1590,6 +1621,8 @@ const copyControl = copyButton;
 const cutControl = cutButton;
 const pasteControl = pasteButton;
 const gamePreviewStartControl = gamePreviewStartButton;
+const gamePreviewStopControl = gamePreviewStopButton;
+const gamePreviewRestartControl = gamePreviewRestartButton;
 const gamePreviewPinControl = gamePreviewPinButton;
 const gamePreviewReloadControl = gamePreviewReloadButton;
 const gamePreviewStatus = gamePreviewStatusElement;
@@ -2178,7 +2211,7 @@ function applyDraw2Locale(nextLocale = draw2Locale, persist = true): void {
   if (persist) {
     try {
       window.localStorage.setItem("pixieed:draw2:locale:v1", draw2Locale);
-    } catch {
+    } catch (cause) {
       // Locale preference is optional and never blocks editing.
     }
   }
@@ -4559,6 +4592,10 @@ let onionSkinCache: {
 } | undefined;
 let runtimePreviewSession: RuntimePreviewSession | undefined;
 let game350ProductSession: Game350ProductSession | undefined;
+let game351PlayableState: Game351PlayableState | undefined;
+let game351Behaviors: readonly BehaviorIR[] = [];
+let game351InputSequence = 0;
+let game351PreviewMode: "LIVE" | "PINNED" = "LIVE";
 let runtimePreviewModule: RuntimeModule | undefined;
 let toolOptions: ToolOptions = {
   brushSize: 1,
@@ -4630,6 +4667,21 @@ function setGamePreviewStatus(
 ): void {
   gamePreviewStatus.textContent = translateDraw2Text(message, draw2Locale);
   gamePreviewStatus.dataset.state = kind;
+  const normalized = message.toLocaleUpperCase();
+  document.documentElement.dataset.gamePreviewState = kind === "error"
+    ? "error"
+    : normalized.includes("READY")
+    ? "ready"
+    : normalized.includes("STOPPED")
+    ? "stopped"
+    : "idle";
+  window.dispatchEvent(
+    new CustomEvent("draw2:game-preview-state", {
+      detail: {
+        state: document.documentElement.dataset.gamePreviewState,
+      },
+    }),
+  );
 }
 
 async function buildLocalDraw2GameProject(
@@ -4758,6 +4810,207 @@ function drawGamePreview(
   gamePreviewContext.putImageData(image, 0, 0);
 }
 
+function drawGame351Preview(
+  state: Game351PlayableState,
+  mode: "LIVE" | "PINNED",
+): void {
+  const { snapshot, runtime } = state;
+  const cellWidth = gamePreviewCanvas.width / 8;
+  const cellHeight = gamePreviewCanvas.height / 6;
+  gamePreviewContext.clearRect(
+    0,
+    0,
+    gamePreviewCanvas.width,
+    gamePreviewCanvas.height,
+  );
+  gamePreviewContext.fillStyle = "#10233b";
+  gamePreviewContext.fillRect(
+    0,
+    0,
+    gamePreviewCanvas.width,
+    gamePreviewCanvas.height,
+  );
+  gamePreviewContext.fillStyle = "#2d6b52";
+  gamePreviewContext.fillRect(
+    cellWidth,
+    cellHeight,
+    cellWidth * 6,
+    cellHeight * 4,
+  );
+  for (const solid of snapshot.solidCells) {
+    gamePreviewContext.fillStyle = solid.x === 0 || solid.y === 0 ||
+        solid.x === 7 || solid.y === 5
+      ? "#25334a"
+      : "#7f4a4a";
+    gamePreviewContext.fillRect(
+      solid.x * cellWidth,
+      solid.y * cellHeight,
+      cellWidth,
+      cellHeight,
+    );
+  }
+  gamePreviewContext.strokeStyle = "rgba(220, 237, 255, 0.22)";
+  gamePreviewContext.lineWidth = 1;
+  for (let x = 0; x <= 8; x += 1) {
+    gamePreviewContext.beginPath();
+    gamePreviewContext.moveTo(x * cellWidth + 0.5, 0);
+    gamePreviewContext.lineTo(x * cellWidth + 0.5, gamePreviewCanvas.height);
+    gamePreviewContext.stroke();
+  }
+  for (let y = 0; y <= 6; y += 1) {
+    gamePreviewContext.beginPath();
+    gamePreviewContext.moveTo(0, y * cellHeight + 0.5);
+    gamePreviewContext.lineTo(gamePreviewCanvas.width, y * cellHeight + 0.5);
+    gamePreviewContext.stroke();
+  }
+  const cameraX = Math.max(0, Math.min(6, runtime.playerPosition.x - 3));
+  const cameraY = Math.max(0, Math.min(4, runtime.playerPosition.y - 2));
+  gamePreviewContext.strokeStyle = "#b8e5ff";
+  gamePreviewContext.lineWidth = 1.5;
+  gamePreviewContext.strokeRect(
+    cameraX * cellWidth + 2,
+    cameraY * cellHeight + 2,
+    cellWidth * 6 - 4,
+    cellHeight * 4 - 4,
+  );
+  gamePreviewContext.fillStyle = "#f5a04f";
+  gamePreviewContext.fillRect(
+    runtime.npcPosition.x * cellWidth + 4,
+    runtime.npcPosition.y * cellHeight + 3,
+    cellWidth - 8,
+    cellHeight - 6,
+  );
+  gamePreviewContext.fillStyle = runtime.mode === "PLAYING"
+    ? "#6bd4ff"
+    : "#7b8fa5";
+  gamePreviewContext.fillRect(
+    runtime.playerPosition.x * cellWidth + 3,
+    runtime.playerPosition.y * cellHeight + 2,
+    cellWidth - 6,
+    cellHeight - 4,
+  );
+  if (runtime.dialogue !== null) {
+    gamePreviewContext.fillStyle = "rgba(8, 14, 25, 0.92)";
+    gamePreviewContext.fillRect(4, gamePreviewCanvas.height - 25, 152, 21);
+    gamePreviewContext.strokeStyle = "#f5d18b";
+    gamePreviewContext.strokeRect(
+      4.5,
+      gamePreviewCanvas.height - 24.5,
+      151,
+      20,
+    );
+    gamePreviewContext.fillStyle = "#fff2cc";
+    gamePreviewContext.font = "7px sans-serif";
+    gamePreviewContext.fillText(
+      runtime.dialogue.slice(0, 38),
+      8,
+      gamePreviewCanvas.height - 11,
+    );
+  }
+  delete gamePreviewCanvas.dataset.game351Error;
+  gamePreviewCanvas.dataset.game351Mode = runtime.mode;
+  gamePreviewCanvas.dataset.game351Player =
+    `${runtime.playerPosition.x},${runtime.playerPosition.y}`;
+  gamePreviewCanvas.dataset.game351Tick = String(runtime.tick);
+  gamePreviewCanvas.dataset.game351Dialogue = runtime.dialogue ?? "";
+  setGamePreviewStatus(
+    `Runtime ${
+      runtime.mode === "PLAYING" ? "READY" : "STOPPED"
+    } · GAME-351 RPG · ${mode} · tick=${runtime.tick} · Player ${runtime.playerPosition.x},${runtime.playerPosition.y} · Camera follow${
+      runtime.dialogue === null ? "" : " · dialogue"
+    }`,
+  );
+}
+
+async function startGame351Preview(
+  mode: "LIVE" | "PINNED",
+): Promise<void> {
+  game351PreviewMode = mode;
+  const workspace = getWorkspacePxdBridge();
+  await workspace.preparePixyncGameState?.();
+  const project = workspace.gameCurrentProject?.();
+  let template: Game351RpgTemplate;
+  let playable: Game351PlayableState | undefined;
+  try {
+    template = project === undefined
+      ? await createGame351RpgTemplate({
+        projectId: state.projectId,
+        ownerId: "draw2-local-owner",
+        revisionId: "game351-preview-revision",
+      })
+      : createGame351RpgTemplateFromProject(project);
+    playable = createGame351PlayableState(template);
+  } catch {
+    template = await createGame351RpgTemplate({
+      projectId: project?.projectId ?? state.projectId,
+      ownerId: project?.ownerId ?? "draw2-local-owner",
+      revisionId: project?.revision.revisionId ?? "game351-preview-revision",
+    });
+    playable = createGame351PlayableState(template);
+  }
+  if (playable === undefined) {
+    throw new Error("GAME-351 preview state could not be created.");
+  }
+  game351PlayableState = playGame351(playable);
+  game351InputSequence = 0;
+  game351Behaviors = project?.behaviors ?? [];
+  drawGame351Preview(game351PlayableState, mode);
+  if (typeof workspace.refreshSite400IGameRoute === "function") {
+    await workspace.refreshSite400IGameRoute("open");
+  }
+}
+
+function game351ActionForKey(key: string):
+  | (typeof GAME351_INPUT_ACTIONS)[keyof typeof GAME351_INPUT_ACTIONS]
+  | undefined {
+  if (key === "ArrowUp" || key.toLowerCase() === "w") {
+    return GAME351_INPUT_ACTIONS.MOVE_UP;
+  }
+  if (key === "ArrowDown" || key.toLowerCase() === "s") {
+    return GAME351_INPUT_ACTIONS.MOVE_DOWN;
+  }
+  if (key === "ArrowLeft" || key.toLowerCase() === "a") {
+    return GAME351_INPUT_ACTIONS.MOVE_LEFT;
+  }
+  if (key === "ArrowRight" || key.toLowerCase() === "d") {
+    return GAME351_INPUT_ACTIONS.MOVE_RIGHT;
+  }
+  return undefined;
+}
+
+function handleGame351PreviewKey(event: KeyboardEvent): void {
+  const current = game351PlayableState;
+  if (current === undefined) return;
+  if (event.key === "Escape") {
+    event.preventDefault();
+    game351PlayableState = clearGame351Dialogue(current);
+    drawGame351Preview(game351PlayableState, game351PreviewMode);
+    return;
+  }
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    game351PlayableState = triggerGame351Action(
+      current,
+      String(GAME351_INTERACT_ACTION),
+      game351Behaviors,
+    );
+    drawGame351Preview(game351PlayableState, game351PreviewMode);
+    return;
+  }
+  const action = game351ActionForKey(event.key);
+  if (action === undefined) return;
+  event.preventDefault();
+  game351InputSequence = Math.max(
+    game351InputSequence + 1,
+    current.input.lastSequence + 1,
+  );
+  game351PlayableState = stepGame351(current, {
+    sequence: game351InputSequence,
+    action,
+  });
+  drawGame351Preview(game351PlayableState, game351PreviewMode);
+}
+
 async function startGamePreview(
   mode: "LIVE" | "PINNED" = "LIVE",
 ): Promise<void> {
@@ -4817,6 +5070,17 @@ async function startGamePreview(
     setGamePreviewStatus(
       `Runtime READY · ${mode} · tick=${runtimePreviewSession.world.tick}`,
     );
+    try {
+      await startGame351Preview(mode);
+    } catch (cause) {
+      // Keep the existing GAME-350 preview usable while the Studio bridge is
+      // still hydrating or when this isolated entry is opened without it.
+      game351PlayableState = undefined;
+      game351Behaviors = [];
+      gamePreviewCanvas.dataset.game351Error = cause instanceof Error
+        ? cause.message
+        : "preview-unavailable";
+    }
   } catch (cause) {
     setGamePreviewStatus(
       cause instanceof Error ? cause.message : "Runtime preview failed.",
@@ -15349,11 +15613,35 @@ colorMap.addEventListener("keyup", (event) => {
 gamePreviewStartControl.addEventListener("click", () => {
   void startGamePreview("LIVE");
 });
+gamePreviewStopControl.addEventListener("click", () => {
+  if (game351PlayableState === undefined) return;
+  game351PlayableState = stopGame351(game351PlayableState);
+  drawGame351Preview(game351PlayableState, game351PreviewMode);
+});
+gamePreviewRestartControl.addEventListener("click", () => {
+  if (game351PlayableState === undefined) {
+    void startGamePreview("LIVE");
+    return;
+  }
+  game351PlayableState = restartGame351(game351PlayableState);
+  drawGame351Preview(game351PlayableState, game351PreviewMode);
+});
 gamePreviewReloadControl.addEventListener("click", () => {
   void startGamePreview("LIVE");
 });
 gamePreviewPinControl.addEventListener("click", () => {
   void startGamePreview("PINNED");
+});
+gamePreviewCanvas.addEventListener("keydown", handleGame351PreviewKey);
+gamePreviewCanvas.addEventListener("click", () => {
+  gamePreviewCanvas.focus();
+  if (game351PlayableState === undefined) return;
+  game351PlayableState = triggerGame351Action(
+    game351PlayableState,
+    String(GAME351_TAP_ACTION),
+    game351Behaviors,
+  );
+  drawGame351Preview(game351PlayableState, game351PreviewMode);
 });
 
 let advancedModule: AdvancedModule | undefined;

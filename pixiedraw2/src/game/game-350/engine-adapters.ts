@@ -99,6 +99,9 @@ function projectPayload(project: GameProject): Record<string, unknown> {
     prefabs: project.prefabs,
     dependencies: project.dependencies,
     behaviors: project.behaviors,
+    ...(project.runtimeProfile === undefined
+      ? {}
+      : { runtimeProfile: project.runtimeProfile }),
     editorTimeline: project.editorTimeline ?? null,
   };
 }

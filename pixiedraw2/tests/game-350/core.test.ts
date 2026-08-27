@@ -48,6 +48,7 @@ Deno.test("GAME350-STOP-001 gate and qualification modules have no host executio
   const paths = [
     "src/game/game-350/core.ts",
     "src/game/game-350/studio.ts",
+    "src/game/game-350/runtime-core.ts",
     "src/game/game-350/runtime-qualification.ts",
   ];
   for (const path of paths) {

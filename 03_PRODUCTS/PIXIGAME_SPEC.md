@@ -1,15 +1,37 @@
 ---
 spec_id: PROD-PIXIGAME-001
-title: PiXiGame Creator Platform Product Specification
+title: PiXiEEDstudio iGAME Product Specification
 status: RECONSTRUCTED_CANONICAL
 classification: PRIVATE_INTERNAL_ONLY
 audience: AI_AGENTS, PRODUCT, ENGINEERING
-version: 1.0.0
-updated: 2026-08-08
+version: 1.1.0
+updated: 2026-08-25
 source_status: RECONSTRUCTED_FROM_APPROVED_SOURCES
 ---
 
-# PiXiGame Creator Platform
+# PiXiEEDstudio iGAME
+
+## Current product decision
+
+公開名は **PiXiEEDstudio / iGAME** とする。既存文書内の `PiXiGame` は互換参照名であり、
+新しいUIや利用者向け文言には追加しない。
+
+同期機能の公開名と新しい契約名は **PiXYNC** に統一する。既存コード、保存データ、URL、migration、
+古い証拠に残る `PiXiSYNC` / `PiXSYNC` は互換識別子としてのみ読み、別製品や別同期方式として扱わない。
+互換識別子の破壊的renameは専用migrationとrollbackが用意されるまで行わない。
+
+初回リリースは、iDRAW、iAUDIO、PiXYNCを同一Projectで直接利用できるブラウザ中心の2D Pixel RPG制作環境から始める。
+最初の製品完成判定はRPG Golden Projectで行うが、これは最終製品をRPG専用に固定する決定ではない。
+長期的には同じCanonical modelへAction、Shooter、Racing、Rhythm、3D、Open World、Online、Simulation、
+Interactive体験などのRuntime Moduleを追加できる汎用リアルタイム制作基盤とする。広いGenre、任意Script、
+Visual Graph、外部Engine adapterは、共通Coreと拡張境界を通じて段階的に追加する。
+
+この境界の決定と実行順は次を正本とする。
+
+- `docs/decisions/ADR-20260825-IGAME-PIXEL-RPG-FIRST.md`
+- `docs/decisions/ADR-20260825-IGAME-GENERAL-RUNTIME.md`
+- `docs/manual/PIXIEED-IGAME-IMPLEMENTATION-RUNBOOK.md`
+- `09_ROADMAP/WORK_PACKAGES/GAME-350.md`
 
 ## Reconstruction boundary
 
@@ -96,6 +118,11 @@ Genre templates are starting configurations, not restrictions or separate engine
 racing, platformer, puzzle, adventure, visual novel, rhythm, simulation, and other templates may
 be added over the shared Core when their contracts and evidence exist.
 
+The long-term product boundary is defined by the genre-extensible Runtime Module contract, not by
+the first RPG template. Open-world streaming, online authority/replication, rhythm audio-clock
+judgement, and 3D physics are separate platform or module milestones; an unavailable module must
+remain explicitly marked as `FOUNDATION` or `PLANNED`.
+
 ## Requirement status
 
 | Requirement | Status | Target | Truthful state |
@@ -164,7 +191,7 @@ active content, unsafe external URLs, path traversal, unsupported formats, depen
 mismatches, and unauthorized dependencies. No user script may run with unrestricted host-process
 privileges.
 
-Current PiXiEEDraw, current PXD, PiXiSYNC, Market, existing URLs, Projects, Purchases,
+Current PiXiEEDraw, current PXD, PiXYNC, Market, existing URLs, Projects, Purchases,
 Entitlements, Licenses, Royalties, production Database/Storage, and public Navigation remain
 unchanged until separate compatibility, rollback, and release gates pass.
 

@@ -673,7 +673,7 @@ function validatePayload(state2, command) {
     }
   }
   if (command.commandType === "raster.writeSet") {
-    if (command.payload.writes.length < 1 || command.payload.writes.length > 1048576) {
+    if (command.payload.writes.length > 1048576) {
       diagnostics.push(diagnostic("WRITE_SET_COUNT_INVALID", "Write set must contain between 1 and 1048576 writes.", "payload.writes"));
     }
     for (const write of command.payload.writes) {
@@ -883,10 +883,14 @@ var EditorCore = class {
         }
       }
     }
+    const rasterChanged = command.commandType === "palette.setColor" || command.commandType === "palette.appendColor" ? false : points.some((point) => this.#state.assets[asset.id]?.raster.getPixel(point.x, point.y) !== asset.raster.getPixel(point.x, point.y));
+    const paletteChanged = command.commandType === "palette.setColor" ? asset.palette[command.payload.paletteIndex] !== command.payload.color : command.commandType === "palette.appendColor" ? true : rasterChanged;
+    const canonicalChanged = paletteChanged || rasterChanged;
+    const effectiveDirtyTileCount = canonicalChanged ? dirtyTiles.size : 0;
     const nextAsset = command.commandType === "palette.setColor" ? {
       ...asset,
       palette: asset.palette.map((color, index) => index === command.payload.paletteIndex ? command.payload.color : color),
-      revision: asset.revision + 1
+      revision: asset.revision + (paletteChanged ? 1 : 0)
     } : command.commandType === "palette.appendColor" ? {
       ...asset,
       palette: [
@@ -896,20 +900,22 @@ var EditorCore = class {
       revision: asset.revision + 1
     } : {
       ...asset,
-      revision: asset.revision + (dirtyTiles.size > 0 ? 1 : 0)
+      revision: asset.revision + (paletteChanged ? 1 : 0)
     };
     nextState.assets = {
       ...nextState.assets,
       [asset.id]: nextAsset
     };
-    nextState.appliedCommandIds = [
-      ...nextState.appliedCommandIds,
-      command.commandId
-    ];
-    nextState.lastClientSequenceByClient = {
-      ...nextState.lastClientSequenceByClient,
-      [command.clientId]: command.clientSequence
-    };
+    if (paletteChanged) {
+      nextState.appliedCommandIds = [
+        ...nextState.appliedCommandIds,
+        command.commandId
+      ];
+      nextState.lastClientSequenceByClient = {
+        ...nextState.lastClientSequenceByClient,
+        [command.clientId]: command.clientSequence
+      };
+    }
     this.#instrumentation.record({
       name: "command.commit",
       durationMs: this.#clock.now() - commitStarted
@@ -946,7 +952,7 @@ var EditorCore = class {
       paletteIndex: nextAsset.palette.length - 1
     } : {
       ...command.payload,
-      dirtyTileCount: dirtyTiles.size
+      dirtyTileCount: effectiveDirtyTileCount
     };
     const operationBody = {
       operationType: command.commandType,
@@ -964,33 +970,35 @@ var EditorCore = class {
       operationId: `op_${await sha256Hex(operationBody)}`,
       ...operationBody
     };
-    this.#state = nextState;
-    const dirtyRegions = command.commandType === "palette.setColor" || command.commandType === "palette.appendColor" ? [
+    const effectiveState = paletteChanged ? nextState : this.#state;
+    this.#state = effectiveState;
+    const dirtyRegions = paletteChanged && (command.commandType === "palette.setColor" || command.commandType === "palette.appendColor") ? [
       fullRegion(asset)
-    ] : dirtyTiles.size === 0 ? [] : [
+    ] : !paletteChanged ? [] : [
       regionFromPoints(asset.id, points)
     ];
     const strokeMetrics = command.commandType === "raster.strokeCommit" ? {
       inputPointCount: command.payload.points.length,
       interpolatedPixelCount: points.length,
       touchedTileCount: touchedTileKeys.size,
-      dirtyTileCount: dirtyTiles.size,
+      dirtyTileCount: effectiveDirtyTileCount,
       dirtyRegionCount: dirtyRegions.length,
       unrelatedFrameCount: Math.max(0, this.#state.frames.length - 1),
       unrelatedLayerCount: Math.max(0, this.#state.layers.length - 1)
     } : void 0;
     return {
       ok: true,
-      state: nextState,
+      state: effectiveState,
       result: {
         operation,
-        dirtyTiles: [
+        noOp: !canonicalChanged,
+        dirtyTiles: canonicalChanged ? [
           ...dirtyTiles.values()
-        ].sort((left, right) => left.tileKey.localeCompare(right.tileKey)),
+        ].sort((left, right) => left.tileKey.localeCompare(right.tileKey)) : [],
         dirtyRegions,
-        memory: nextAsset.raster.memoryMetrics(),
-        copiedBytes,
-        cowSplitCount,
+        memory: effectiveState.assets[asset.id]?.raster.memoryMetrics() ?? nextAsset.raster.memoryMetrics(),
+        copiedBytes: canonicalChanged ? copiedBytes : 0,
+        cowSplitCount: canonicalChanged ? cowSplitCount : 0,
         ...strokeMetrics === void 0 ? {} : {
           strokeMetrics
         },
@@ -1081,6 +1089,7 @@ var LocalAutosaveCoordinator = class {
     this.#instrumentation = instrumentation2;
   }
   async record(state2, result) {
+    if (result.noOp) return;
     const started = performance.now();
     await this.#journal.append(result.operation);
     const asset = state2.assets[result.operation.assetId];
@@ -1829,8 +1838,8 @@ function record(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value) ? value : void 0;
 }
 function entityId(payload, entityKey, idKey) {
-  const entity = record(payload[entityKey]);
-  const value = entity?.[idKey];
+  const entity2 = record(payload[entityKey]);
+  const value = entity2?.[idKey];
   return typeof value === "string" && value.length > 0 ? value : void 0;
 }
 function audioChangedAssetIds(command) {
@@ -4612,19 +4621,137 @@ var PixyncProductionCompositionRoot = class _PixyncProductionCompositionRoot {
 // src/game/game-300/core.ts
 var GAME_PROJECT_SCHEMA_VERSION = 1;
 var BEHAVIOR_IR_VERSION = 1;
+var GAME_RUNTIME_PROFILE_SCHEMA_VERSION = 1;
+var GAME_TILEMAP_DOCUMENT_SCHEMA_VERSION = 1;
+var GAME_TEMPLATE_CATEGORIES = [
+  "CORE",
+  "RPG",
+  "ACTION",
+  "SHOOTING",
+  "RACING",
+  "RHYTHM"
+];
+var GAME_TEMPLATE_KINDS = [
+  "CHARACTER",
+  "WEAPON",
+  "ARMOR",
+  "SKILL",
+  "STATUS",
+  "TILE",
+  "DAMAGE",
+  "UI"
+];
 function asId(value, label) {
-  if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(value)) throw new Error(`${label} must be a stable identifier.`);
+  if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(value)) {
+    throw new Error(`${label} must be a stable identifier.`);
+  }
   return value;
 }
 var asProjectId = (value) => asId(value, "ProjectId");
 var asOwnerId = (value) => asId(value, "OwnerId");
+var asSceneId = (value) => asId(value, "SceneId");
+var asEntityId = (value) => asId(value, "EntityId");
+var asComponentId = (value) => asId(value, "ComponentId");
 var asRevisionId = (value) => asId(value, "RevisionId");
 var asSha2562 = (value) => {
-  if (!/^[a-f0-9]{64}$/u.test(value)) throw new Error("Sha256 must be lowercase hexadecimal SHA-256.");
+  if (!/^[a-f0-9]{64}$/u.test(value)) {
+    throw new Error("Sha256 must be lowercase hexadecimal SHA-256.");
+  }
   return value;
 };
 function isRecord5(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+var GAME_TILEMAP_DOCUMENT_KEYS = /* @__PURE__ */ new Set([
+  "schemaVersion",
+  "mapId",
+  "width",
+  "height",
+  "tileSize",
+  "cells"
+]);
+var GAME_TILEMAP_CELL_KEYS = /* @__PURE__ */ new Set([
+  "x",
+  "y",
+  "collision",
+  "triggerId"
+]);
+function isValidGameTilemapDocument(value) {
+  if (!isRecord5(value)) return false;
+  const width = value.width;
+  const height = value.height;
+  const tileSize = value.tileSize;
+  const cells = value.cells;
+  if (Object.keys(value).some((key) => !GAME_TILEMAP_DOCUMENT_KEYS.has(key)) || value.schemaVersion !== GAME_TILEMAP_DOCUMENT_SCHEMA_VERSION || typeof value.mapId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(value.mapId) || !Number.isSafeInteger(width) || typeof width !== "number" || width < 1 || width > 256 || !Number.isSafeInteger(height) || typeof height !== "number" || height < 1 || height > 256 || !Number.isSafeInteger(tileSize) || typeof tileSize !== "number" || tileSize < 1 || tileSize > 4096 || !Array.isArray(cells) || cells.length > width * height) {
+    return false;
+  }
+  const seen = /* @__PURE__ */ new Set();
+  for (const rawCell of cells) {
+    if (!isRecord5(rawCell)) return false;
+    const x = rawCell.x;
+    const y = rawCell.y;
+    const collision = rawCell.collision;
+    const triggerId = rawCell.triggerId;
+    if (Object.keys(rawCell).some((key2) => !GAME_TILEMAP_CELL_KEYS.has(key2)) || !Number.isSafeInteger(x) || typeof x !== "number" || x < 0 || x >= width || !Number.isSafeInteger(y) || typeof y !== "number" || y < 0 || y >= height || collision !== "NONE" && collision !== "SOLID" || triggerId !== void 0 && (typeof triggerId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(triggerId)) || collision === "NONE" && triggerId === void 0) {
+      return false;
+    }
+    const key = `${x},${y}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+  }
+  return true;
+}
+var GAME_TEMPLATE_INSTANCE_KEYS = /* @__PURE__ */ new Set([
+  "instanceId",
+  "templateId",
+  "category",
+  "kind",
+  "target",
+  "label",
+  "values",
+  "targetTrackId"
+]);
+var GAME_TEMPLATE_VALUE_KEY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u;
+function isValidGameTemplateInstance(value) {
+  if (!isRecord5(value)) return false;
+  if (Object.keys(value).some((key) => !GAME_TEMPLATE_INSTANCE_KEYS.has(key)) || typeof value.instanceId !== "string" || !GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.instanceId) || typeof value.templateId !== "string" || !GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.templateId) || !GAME_TEMPLATE_CATEGORIES.includes(value.category) || !GAME_TEMPLATE_KINDS.includes(value.kind) || value.target !== "SCENE_OBJECT" && value.target !== "GAME_DATA" || typeof value.label !== "string" || value.label.trim().length === 0 || !isRecord5(value.values) || value.targetTrackId !== void 0 && (typeof value.targetTrackId !== "string" || !GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.targetTrackId))) return false;
+  if (value.target === "SCENE_OBJECT" && value.targetTrackId === void 0) {
+    return false;
+  }
+  const templateValues = value.values;
+  if (!isRecord5(templateValues)) return false;
+  return Object.keys(templateValues).every((key) => {
+    if (!GAME_TEMPLATE_VALUE_KEY_PATTERN.test(key)) return false;
+    const templateValue = templateValues[key];
+    return typeof templateValue === "string" || typeof templateValue === "boolean" || typeof templateValue === "number" && Number.isFinite(templateValue);
+  });
+}
+var GAME_ANIMATION_BINDING_KEYS = /* @__PURE__ */ new Set([
+  "bindingId",
+  "trackId",
+  "assetDefinitionId",
+  "clipKey",
+  "motionName",
+  "direction",
+  "frameIds",
+  "fps",
+  "loopMode",
+  "flipX",
+  "flipY",
+  "mode",
+  "sourceAssetId",
+  "sourceRevisionId",
+  "sourceContentHash"
+]);
+function isValidGameAnimationBinding(value) {
+  if (!isRecord5(value)) return false;
+  const id = (candidate) => typeof candidate === "string" && GAME_TEMPLATE_VALUE_KEY_PATTERN.test(candidate);
+  const label = (candidate) => typeof candidate === "string" && candidate.trim().length > 0 && candidate.length <= 128;
+  return Object.keys(value).every((key) => GAME_ANIMATION_BINDING_KEYS.has(key)) && id(value.bindingId) && id(value.trackId) && id(value.assetDefinitionId) && label(value.clipKey) && label(value.motionName) && (value.direction === void 0 || label(value.direction)) && Array.isArray(value.frameIds) && value.frameIds.length > 0 && value.frameIds.length <= 512 && value.frameIds.every((frameId) => id(frameId)) && typeof value.fps === "number" && Number.isFinite(value.fps) && value.fps > 0 && value.fps <= 240 && [
+    "LOOP",
+    "ONCE",
+    "PING_PONG"
+  ].includes(String(value.loopMode)) && typeof value.flipX === "boolean" && typeof value.flipY === "boolean" && (value.mode === "LIVE" || value.mode === "PINNED") && (value.sourceAssetId === void 0 || id(value.sourceAssetId)) && (value.sourceRevisionId === void 0 || id(value.sourceRevisionId)) && (value.sourceContentHash === void 0 || typeof value.sourceContentHash === "string" && /^[a-f0-9]{64}$/u.test(value.sourceContentHash));
 }
 function diagnostic2(code, path, message) {
   return {
@@ -4638,16 +4765,24 @@ function duplicateDiagnostics(values, path) {
   const seen = /* @__PURE__ */ new Set();
   const diagnostics = [];
   for (const value of values) {
-    if (seen.has(value)) diagnostics.push(diagnostic2("DUPLICATE_ID", path, `Duplicate id: ${value}`));
+    if (seen.has(value)) {
+      diagnostics.push(diagnostic2("DUPLICATE_ID", path, `Duplicate id: ${value}`));
+    }
     seen.add(value);
   }
   return diagnostics;
 }
 function validateCaller(project, caller) {
   const diagnostics = [];
-  if (project.projectId !== caller.projectId || project.revision.projectId !== caller.projectId) diagnostics.push(diagnostic2("PROJECT_ID_MISMATCH", "projectId", "Caller project identity does not match the project revision."));
-  if (project.ownerId !== caller.ownerId || project.revision.ownerId !== caller.ownerId) diagnostics.push(diagnostic2("CALLER_OWNER_MISMATCH", "ownerId", "Caller owner is not the project/revision owner."));
-  if (project.revision.revisionId !== caller.revisionId) diagnostics.push(diagnostic2("CALLER_REVISION_MISMATCH", "revision.revisionId", "Caller revision is not the current project revision."));
+  if (project.projectId !== caller.projectId || project.revision.projectId !== caller.projectId) {
+    diagnostics.push(diagnostic2("PROJECT_ID_MISMATCH", "projectId", "Caller project identity does not match the project revision."));
+  }
+  if (project.ownerId !== caller.ownerId || project.revision.ownerId !== caller.ownerId) {
+    diagnostics.push(diagnostic2("CALLER_OWNER_MISMATCH", "ownerId", "Caller owner is not the project/revision owner."));
+  }
+  if (project.revision.revisionId !== caller.revisionId) {
+    diagnostics.push(diagnostic2("CALLER_REVISION_MISMATCH", "revision.revisionId", "Caller revision is not the current project revision."));
+  }
   return diagnostics;
 }
 function validateAssetReference(reference, path, ownerId, diagnostics) {
@@ -4658,15 +4793,23 @@ function validateAssetReference(reference, path, ownerId, diagnostics) {
     diagnostics.push(diagnostic2("INVALID_REFERENCE", path, "Asset reference must declare DRAW or AUDIO."));
     return;
   }
-  if (reference.ownerId !== ownerId) diagnostics.push(diagnostic2("INVALID_REFERENCE", `${path}.ownerId`, "Asset owner must match the Game Project owner."));
+  if (reference.ownerId !== ownerId) {
+    diagnostics.push(diagnostic2("INVALID_REFERENCE", `${path}.ownerId`, "Asset owner must match the Game Project owner."));
+  }
   for (const key of [
     "assetId",
     "revisionId",
     "ownerId",
     "contentHash",
     "mode"
-  ]) if (typeof reference[key] !== "string") diagnostics.push(diagnostic2("INVALID_REFERENCE", `${path}.${key}`, "Asset revision reference field is invalid."));
-  if (typeof reference.contentHash === "string" && !/^[a-f0-9]{64}$/u.test(reference.contentHash)) diagnostics.push(diagnostic2("INVALID_REFERENCE", `${path}.contentHash`, "Asset content hash must be lowercase SHA-256."));
+  ]) {
+    if (typeof reference[key] !== "string") {
+      diagnostics.push(diagnostic2("INVALID_REFERENCE", `${path}.${key}`, "Asset revision reference field is invalid."));
+    }
+  }
+  if (typeof reference.contentHash === "string" && !/^[a-f0-9]{64}$/u.test(reference.contentHash)) {
+    diagnostics.push(diagnostic2("INVALID_REFERENCE", `${path}.contentHash`, "Asset content hash must be lowercase SHA-256."));
+  }
 }
 function validateComponent(component, path, ownerId, knownBehaviorIds, diagnostics) {
   if (!isRecord5(component) || typeof component.type !== "string" || typeof component.componentId !== "string") {
@@ -4678,27 +4821,202 @@ function validateComponent(component, path, ownerId, knownBehaviorIds, diagnosti
     "SPRITE",
     "AUDIO_SOURCE",
     "BEHAVIOR",
-    "CAMERA"
+    "CAMERA",
+    "TILEMAP",
+    "COLLIDER",
+    "RIGIDBODY",
+    "CHARACTER_CONTROLLER"
   ].includes(component.type)) {
     diagnostics.push(diagnostic2("INVALID_COMPONENT", path, `Unknown component type: ${component.type}`));
     return;
   }
-  if (typeof component.componentId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(component.componentId)) diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.componentId`, "Component id is invalid."));
+  if (typeof component.componentId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(component.componentId)) {
+    diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.componentId`, "Component id is invalid."));
+  }
   if (component.type === "TRANSFORM" && ![
     "x",
     "y",
     "rotation",
     "scaleX",
     "scaleY"
-  ].every((key) => typeof component[key] === "number" && Number.isFinite(component[key]))) diagnostics.push(diagnostic2("INVALID_COMPONENT", path, "Transform component contains a non-finite value."));
-  if (component.type === "SPRITE") validateAssetReference(component.asset, `${path}.asset`, ownerId, diagnostics);
+  ].every((key) => typeof component[key] === "number" && Number.isFinite(component[key]))) {
+    diagnostics.push(diagnostic2("INVALID_COMPONENT", path, "Transform component contains a non-finite value."));
+  }
+  if (component.type === "SPRITE") {
+    validateAssetReference(component.asset, `${path}.asset`, ownerId, diagnostics);
+  }
   if (component.type === "AUDIO_SOURCE") {
     validateAssetReference(component.asset, `${path}.asset`, ownerId, diagnostics);
-    if (!isRecord5(component.asset) || component.asset.kind !== "AUDIO") diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.asset`, "Audio Source requires an AUDIO asset revision."));
-    if (typeof component.volume !== "number" || !Number.isFinite(component.volume) || component.volume < 0 || component.volume > 1) diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.volume`, "Audio volume must be between 0 and 1."));
+    if (!isRecord5(component.asset) || component.asset.kind !== "AUDIO") {
+      diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.asset`, "Audio Source requires an AUDIO asset revision."));
+    }
+    if (typeof component.volume !== "number" || !Number.isFinite(component.volume) || component.volume < 0 || component.volume > 1) {
+      diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.volume`, "Audio volume must be between 0 and 1."));
+    }
   }
-  if (component.type === "BEHAVIOR" && (typeof component.behaviorId !== "string" || !knownBehaviorIds.has(component.behaviorId))) diagnostics.push(diagnostic2("MISSING_REFERENCE", `${path}.behaviorId`, "Behavior component references an unknown behavior."));
-  if (component.type === "CAMERA" && (typeof component.zoom !== "number" || !Number.isFinite(component.zoom) || component.zoom <= 0)) diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.zoom`, "Camera zoom must be a positive finite number."));
+  if (component.type === "BEHAVIOR" && (typeof component.behaviorId !== "string" || !knownBehaviorIds.has(component.behaviorId))) {
+    diagnostics.push(diagnostic2("MISSING_REFERENCE", `${path}.behaviorId`, "Behavior component references an unknown behavior."));
+  }
+  if (component.type === "CAMERA" && (typeof component.zoom !== "number" || !Number.isFinite(component.zoom) || component.zoom <= 0)) {
+    diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.zoom`, "Camera zoom must be a positive finite number."));
+  }
+  if (component.type === "TILEMAP") {
+    if (typeof component.mapId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(component.mapId)) {
+      diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.mapId`, "Tilemap map id is invalid."));
+    }
+    if (typeof component.tileSize !== "number" || !Number.isSafeInteger(component.tileSize) || component.tileSize < 1) {
+      diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.tileSize`, "Tilemap tile size must be a positive integer."));
+    }
+    if (typeof component.collisionEnabled !== "boolean") {
+      diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.collisionEnabled`, "Tilemap collisionEnabled must be boolean."));
+    }
+    if (component.document !== void 0 && !isValidGameTilemapDocument(component.document)) {
+      diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.document`, "Tilemap document is invalid."));
+    }
+  }
+  if (component.type === "COLLIDER") {
+    if (![
+      "BOX",
+      "CIRCLE",
+      "CAPSULE"
+    ].includes(component.shape)) {
+      diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.shape`, "Collider shape is unsupported."));
+    }
+    for (const key of [
+      "width",
+      "height",
+      "radius"
+    ]) {
+      if (typeof component[key] !== "number" || !Number.isFinite(component[key]) || component[key] <= 0) {
+        diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.${key}`, "Collider dimensions must be positive finite numbers."));
+      }
+    }
+    if (typeof component.isTrigger !== "boolean") {
+      diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.isTrigger`, "Collider isTrigger must be boolean."));
+    }
+    if (![
+      "DEFAULT",
+      "WORLD",
+      "PLAYER",
+      "NPC",
+      "SENSOR",
+      "PROJECTILE"
+    ].includes(component.layer)) {
+      diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.layer`, "Collider layer is unsupported."));
+    }
+    if (typeof component.enabled !== "boolean") {
+      diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.enabled`, "Collider enabled must be boolean."));
+    }
+  }
+  if (component.type === "RIGIDBODY") {
+    if (![
+      "STATIC",
+      "DYNAMIC",
+      "KINEMATIC"
+    ].includes(component.bodyType)) {
+      diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.bodyType`, "Rigidbody body type is unsupported."));
+    }
+    if (typeof component.mass !== "number" || !Number.isFinite(component.mass) || component.mass <= 0) {
+      diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.mass`, "Rigidbody mass must be positive."));
+    }
+    if (typeof component.gravityScale !== "number" || !Number.isFinite(component.gravityScale)) {
+      diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.gravityScale`, "Rigidbody gravity scale must be finite."));
+    }
+    if (typeof component.fixedRotation !== "boolean" || typeof component.enabled !== "boolean") {
+      diagnostics.push(diagnostic2("INVALID_COMPONENT", path, "Rigidbody flags are invalid."));
+    }
+  }
+  if (component.type === "CHARACTER_CONTROLLER") {
+    if (typeof component.moveSpeed !== "number" || !Number.isFinite(component.moveSpeed) || component.moveSpeed <= 0) {
+      diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.moveSpeed`, "Character Controller move speed must be positive."));
+    }
+    if (typeof component.stepHeight !== "number" || !Number.isFinite(component.stepHeight) || component.stepHeight < 0) {
+      diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.stepHeight`, "Character Controller step height must be non-negative."));
+    }
+    if (typeof component.fixedStep !== "number" || !Number.isSafeInteger(component.fixedStep) || component.fixedStep < 1) {
+      diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.fixedStep`, "Character Controller fixed step must be a positive integer."));
+    }
+    if (typeof component.enabled !== "boolean") {
+      diagnostics.push(diagnostic2("INVALID_COMPONENT", `${path}.enabled`, "Character Controller enabled must be boolean."));
+    }
+  }
+}
+function validateGameComponentState(component, path, diagnostics) {
+  if (!isRecord5(component) || typeof component.type !== "string" || typeof component.componentId !== "string") {
+    diagnostics.push(diagnostic2("INVALID_PROJECT", path, "Game editor component state is invalid."));
+    return;
+  }
+  if (![
+    "TRANSFORM",
+    "SPRITE",
+    "AUDIO_SOURCE",
+    "BEHAVIOR",
+    "CAMERA",
+    "TILEMAP",
+    "COLLIDER",
+    "RIGIDBODY",
+    "CHARACTER_CONTROLLER"
+  ].includes(component.type)) {
+    diagnostics.push(diagnostic2("INVALID_PROJECT", `${path}.type`, `Unknown Game editor component state: ${component.type}`));
+    return;
+  }
+  if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(component.componentId)) {
+    diagnostics.push(diagnostic2("INVALID_PROJECT", `${path}.componentId`, "Game editor component id is invalid."));
+  }
+  if (component.type === "TRANSFORM" && ![
+    "x",
+    "y",
+    "rotation",
+    "scaleX",
+    "scaleY"
+  ].every((key) => typeof component[key] === "number" && Number.isFinite(component[key]))) {
+    diagnostics.push(diagnostic2("INVALID_PROJECT", path, "Game editor Transform state contains a non-finite value."));
+  }
+  if (component.type === "SPRITE" && typeof component.visible !== "boolean") {
+    diagnostics.push(diagnostic2("INVALID_PROJECT", path, "Game editor Sprite state requires visible."));
+  }
+  if (component.type === "BEHAVIOR" && typeof component.enabled !== "boolean") {
+    diagnostics.push(diagnostic2("INVALID_PROJECT", path, "Game editor Behavior state requires enabled."));
+  }
+  if (component.type === "AUDIO_SOURCE" && (typeof component.loop !== "boolean" || typeof component.volume !== "number" || !Number.isFinite(component.volume) || component.volume < 0 || component.volume > 1)) {
+    diagnostics.push(diagnostic2("INVALID_PROJECT", path, "Game editor Audio Source state is invalid."));
+  }
+  if (component.type === "CAMERA" && (typeof component.active !== "boolean" || typeof component.zoom !== "number" || !Number.isFinite(component.zoom) || component.zoom <= 0)) {
+    diagnostics.push(diagnostic2("INVALID_PROJECT", path, "Game editor Camera state is invalid."));
+  }
+  if (component.type === "TILEMAP" && (typeof component.mapId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(component.mapId) || typeof component.tileSize !== "number" || !Number.isSafeInteger(component.tileSize) || component.tileSize < 1 || typeof component.collisionEnabled !== "boolean" || component.document !== void 0 && !isValidGameTilemapDocument(component.document))) {
+    diagnostics.push(diagnostic2("INVALID_PROJECT", path, "Game editor Tilemap state is invalid."));
+  }
+  if (component.type === "COLLIDER") {
+    if (![
+      "BOX",
+      "CIRCLE",
+      "CAPSULE"
+    ].includes(component.shape) || [
+      "width",
+      "height",
+      "radius"
+    ].some((key) => typeof component[key] !== "number" || !Number.isFinite(component[key]) || component[key] <= 0) || typeof component.isTrigger !== "boolean" || ![
+      "DEFAULT",
+      "WORLD",
+      "PLAYER",
+      "NPC",
+      "SENSOR",
+      "PROJECTILE"
+    ].includes(component.layer) || typeof component.enabled !== "boolean") {
+      diagnostics.push(diagnostic2("INVALID_PROJECT", path, "Game editor Collider state is invalid."));
+    }
+  }
+  if (component.type === "RIGIDBODY" && (![
+    "STATIC",
+    "DYNAMIC",
+    "KINEMATIC"
+  ].includes(component.bodyType) || typeof component.mass !== "number" || !Number.isFinite(component.mass) || component.mass <= 0 || typeof component.gravityScale !== "number" || !Number.isFinite(component.gravityScale) || typeof component.fixedRotation !== "boolean" || typeof component.enabled !== "boolean")) {
+    diagnostics.push(diagnostic2("INVALID_PROJECT", path, "Game editor Rigidbody state is invalid."));
+  }
+  if (component.type === "CHARACTER_CONTROLLER" && (typeof component.moveSpeed !== "number" || !Number.isFinite(component.moveSpeed) || component.moveSpeed <= 0 || typeof component.stepHeight !== "number" || !Number.isFinite(component.stepHeight) || component.stepHeight < 0 || typeof component.fixedStep !== "number" || !Number.isSafeInteger(component.fixedStep) || component.fixedStep < 1 || typeof component.enabled !== "boolean")) {
+    diagnostics.push(diagnostic2("INVALID_PROJECT", path, "Game editor Character Controller state is invalid."));
+  }
 }
 function validateDependencyCycles(dependencies, diagnostics) {
   const byId = new Map(dependencies.map((dependency) => [
@@ -4719,40 +5037,63 @@ function validateDependencyCycles(dependencies, diagnostics) {
       return;
     }
     visiting.add(id);
-    for (const target of dependency.dependsOn) visit(target, `${path}.dependsOn`);
+    for (const target of dependency.dependsOn) {
+      visit(target, `${path}.dependsOn`);
+    }
     visiting.delete(id);
     visited.add(id);
   };
-  for (const dependency of dependencies) visit(dependency.dependencyId, "dependencies");
+  for (const dependency of dependencies) {
+    visit(dependency.dependencyId, "dependencies");
+  }
 }
 function validateGameProject(value, caller) {
   const diagnostics = [];
-  if (!isRecord5(value)) return {
-    valid: false,
-    diagnostics: [
-      diagnostic2("INVALID_PROJECT", "project", "Game Project must be an object.")
-    ]
-  };
-  if (value.schemaVersion !== GAME_PROJECT_SCHEMA_VERSION) diagnostics.push(diagnostic2("UNKNOWN_SCHEMA", "schemaVersion", "Unsupported Game Project schema version."));
-  if (typeof value.projectId !== "string" || typeof value.ownerId !== "string" || typeof value.name !== "string" || !isRecord5(value.revision)) return {
-    valid: false,
-    diagnostics: [
-      ...diagnostics,
-      diagnostic2("INVALID_PROJECT", "project", "Required Game Project identity is missing.")
-    ]
-  };
+  if (!isRecord5(value)) {
+    return {
+      valid: false,
+      diagnostics: [
+        diagnostic2("INVALID_PROJECT", "project", "Game Project must be an object.")
+      ]
+    };
+  }
+  if (value.schemaVersion !== GAME_PROJECT_SCHEMA_VERSION) {
+    diagnostics.push(diagnostic2("UNKNOWN_SCHEMA", "schemaVersion", "Unsupported Game Project schema version."));
+  }
+  if (typeof value.projectId !== "string" || typeof value.ownerId !== "string" || typeof value.name !== "string" || !isRecord5(value.revision)) {
+    return {
+      valid: false,
+      diagnostics: [
+        ...diagnostics,
+        diagnostic2("INVALID_PROJECT", "project", "Required Game Project identity is missing.")
+      ]
+    };
+  }
   const project = value;
   if (caller) diagnostics.push(...validateCaller(project, caller));
-  if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(project.projectId) || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(project.ownerId)) diagnostics.push(diagnostic2("INVALID_PROJECT", "projectId/ownerId", "Project and owner ids must be stable identifiers."));
-  if (!project.name.trim()) diagnostics.push(diagnostic2("INVALID_PROJECT", "name", "Project name is required."));
-  if (project.revision.projectId !== project.projectId || project.revision.ownerId !== project.ownerId || !Number.isSafeInteger(project.revision.sequence) || project.revision.sequence < 1) diagnostics.push(diagnostic2("INVALID_REVISION", "revision", "Revision is not bound to the project owner or sequence."));
-  if (!Array.isArray(project.scenes) || !Array.isArray(project.prefabs) || !Array.isArray(project.dependencies) || !Array.isArray(project.behaviors)) return {
-    valid: false,
-    diagnostics: [
-      ...diagnostics,
-      diagnostic2("INVALID_PROJECT", "project", "Project collections are invalid.")
-    ]
-  };
+  if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(project.projectId) || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(project.ownerId)) {
+    diagnostics.push(diagnostic2("INVALID_PROJECT", "projectId/ownerId", "Project and owner ids must be stable identifiers."));
+  }
+  if (!project.name.trim()) {
+    diagnostics.push(diagnostic2("INVALID_PROJECT", "name", "Project name is required."));
+  }
+  if (project.revision.projectId !== project.projectId || project.revision.ownerId !== project.ownerId || !Number.isSafeInteger(project.revision.sequence) || project.revision.sequence < 1) {
+    diagnostics.push(diagnostic2("INVALID_REVISION", "revision", "Revision is not bound to the project owner or sequence."));
+  }
+  if (!Array.isArray(project.scenes) || !Array.isArray(project.prefabs) || !Array.isArray(project.dependencies) || !Array.isArray(project.behaviors)) {
+    return {
+      valid: false,
+      diagnostics: [
+        ...diagnostics,
+        diagnostic2("INVALID_PROJECT", "project", "Project collections are invalid.")
+      ]
+    };
+  }
+  if (project.runtimeProfile !== void 0) {
+    if (!isRecord5(project.runtimeProfile) || project.runtimeProfile.schemaVersion !== GAME_RUNTIME_PROFILE_SCHEMA_VERSION || typeof project.runtimeProfile.profileId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(project.runtimeProfile.profileId)) {
+      diagnostics.push(diagnostic2("INVALID_RUNTIME_PROFILE", "runtimeProfile", "Runtime profile reference is invalid."));
+    }
+  }
   diagnostics.push(...duplicateDiagnostics(project.scenes.map((scene) => String(scene.sceneId)), "scenes.sceneId"));
   diagnostics.push(...duplicateDiagnostics(project.prefabs.map((prefab) => String(prefab.prefabId)), "prefabs.prefabId"));
   diagnostics.push(...duplicateDiagnostics(project.dependencies.map((dependency) => String(dependency.dependencyId)), "dependencies.dependencyId"));
@@ -4765,28 +5106,36 @@ function validateGameProject(value, caller) {
       diagnostics.push(diagnostic2("INVALID_PROJECT", `scenes[${sceneIndex}]`, "Scene shape is invalid."));
       continue;
     }
-    const sceneEntityIds = new Set(scene.entities.map((entity) => String(entity.entityId)));
-    for (const rootId of scene.rootEntityIds) if (!sceneEntityIds.has(String(rootId))) diagnostics.push(diagnostic2("MISSING_REFERENCE", `scenes[${sceneIndex}].rootEntityIds`, `Root Entity ${String(rootId)} is missing.`));
-    diagnostics.push(...duplicateDiagnostics(scene.entities.map((entity) => String(entity.entityId)), `scenes[${sceneIndex}].entities.entityId`));
-    for (const [entityIndex, entity] of scene.entities.entries()) {
-      if (!isRecord5(entity) || typeof entity.entityId !== "string" || !Array.isArray(entity.components)) {
+    const sceneEntityIds = new Set(scene.entities.map((entity2) => String(entity2.entityId)));
+    for (const rootId of scene.rootEntityIds) {
+      if (!sceneEntityIds.has(String(rootId))) {
+        diagnostics.push(diagnostic2("MISSING_REFERENCE", `scenes[${sceneIndex}].rootEntityIds`, `Root Entity ${String(rootId)} is missing.`));
+      }
+    }
+    diagnostics.push(...duplicateDiagnostics(scene.entities.map((entity2) => String(entity2.entityId)), `scenes[${sceneIndex}].entities.entityId`));
+    for (const [entityIndex, entity2] of scene.entities.entries()) {
+      if (!isRecord5(entity2) || typeof entity2.entityId !== "string" || !Array.isArray(entity2.components)) {
         diagnostics.push(diagnostic2("INVALID_PROJECT", `scenes[${sceneIndex}].entities[${entityIndex}]`, "Entity shape is invalid."));
         continue;
       }
-      allEntityIds.push(entity.entityId);
-      if (entity.parentEntityId !== void 0 && !sceneEntityIds.has(String(entity.parentEntityId))) diagnostics.push(diagnostic2("MISSING_REFERENCE", `scenes[${sceneIndex}].entities[${entityIndex}].parentEntityId`, "Parent Entity is missing."));
-      diagnostics.push(...duplicateDiagnostics(entity.components.map((component) => String(isRecord5(component) ? component.componentId : "<invalid>")), `scenes[${sceneIndex}].entities[${entityIndex}].components.componentId`));
-      for (const [componentIndex, component] of entity.components.entries()) {
-        if (isRecord5(component) && typeof component.componentId === "string") allComponentIds.push(component.componentId);
+      allEntityIds.push(entity2.entityId);
+      if (entity2.parentEntityId !== void 0 && !sceneEntityIds.has(String(entity2.parentEntityId))) {
+        diagnostics.push(diagnostic2("MISSING_REFERENCE", `scenes[${sceneIndex}].entities[${entityIndex}].parentEntityId`, "Parent Entity is missing."));
+      }
+      diagnostics.push(...duplicateDiagnostics(entity2.components.map((component) => String(isRecord5(component) ? component.componentId : "<invalid>")), `scenes[${sceneIndex}].entities[${entityIndex}].components.componentId`));
+      for (const [componentIndex, component] of entity2.components.entries()) {
+        if (isRecord5(component) && typeof component.componentId === "string") {
+          allComponentIds.push(component.componentId);
+        }
         validateComponent(component, `scenes[${sceneIndex}].entities[${entityIndex}].components[${componentIndex}]`, project.ownerId, behaviorIds, diagnostics);
       }
     }
-    for (const entity of scene.entities) {
+    for (const entity2 of scene.entities) {
       const seen = /* @__PURE__ */ new Set();
-      let parentId = entity.parentEntityId;
+      let parentId = entity2.parentEntityId;
       while (parentId !== void 0) {
-        if (seen.has(String(parentId)) || parentId === entity.entityId) {
-          diagnostics.push(diagnostic2("DEPENDENCY_CYCLE", `scenes[${sceneIndex}].entities`, `Entity parent cycle includes ${String(entity.entityId)}.`));
+        if (seen.has(String(parentId)) || parentId === entity2.entityId) {
+          diagnostics.push(diagnostic2("DEPENDENCY_CYCLE", `scenes[${sceneIndex}].entities`, `Entity parent cycle includes ${String(entity2.entityId)}.`));
           break;
         }
         seen.add(String(parentId));
@@ -4797,23 +5146,93 @@ function validateGameProject(value, caller) {
   diagnostics.push(...duplicateDiagnostics(allEntityIds, "project.entities.entityId"));
   diagnostics.push(...duplicateDiagnostics(allComponentIds, "project.components.componentId"));
   for (const dependency of project.dependencies) {
-    if (!isRecord5(dependency) || typeof dependency.dependencyId !== "string" || !Array.isArray(dependency.dependsOn)) diagnostics.push(diagnostic2("INVALID_PROJECT", "dependencies", "Dependency shape is invalid."));
-    else if (dependency.ownerId !== project.ownerId || dependency.ownerRevisionId !== project.revision.revisionId) diagnostics.push(diagnostic2("INVALID_REFERENCE", `dependencies.${dependency.dependencyId}`, "Dependency owner/revision is not the current project revision."));
+    if (!isRecord5(dependency) || typeof dependency.dependencyId !== "string" || !Array.isArray(dependency.dependsOn)) {
+      diagnostics.push(diagnostic2("INVALID_PROJECT", "dependencies", "Dependency shape is invalid."));
+    } else if (dependency.ownerId !== project.ownerId || dependency.ownerRevisionId !== project.revision.revisionId) {
+      diagnostics.push(diagnostic2("INVALID_REFERENCE", `dependencies.${dependency.dependencyId}`, "Dependency owner/revision is not the current project revision."));
+    }
   }
   validateDependencyCycles(project.dependencies, diagnostics);
   for (const behavior of project.behaviors) {
-    if (behavior.version !== BEHAVIOR_IR_VERSION || behavior.ownership !== "CANONICAL_IR" || !Array.isArray(behavior.rules)) diagnostics.push(diagnostic2("UNKNOWN_SCHEMA", `behaviors.${String(behavior.behaviorId)}`, "Behavior IR schema is unsupported."));
+    if (behavior.version !== BEHAVIOR_IR_VERSION || behavior.ownership !== "CANONICAL_IR" || !Array.isArray(behavior.rules)) {
+      diagnostics.push(diagnostic2("UNKNOWN_SCHEMA", `behaviors.${String(behavior.behaviorId)}`, "Behavior IR schema is unsupported."));
+    }
   }
   if (project.editorTimeline !== void 0) {
     const timeline = project.editorTimeline;
-    if (!Number.isSafeInteger(timeline.frameCount) || timeline.frameCount < 1) diagnostics.push(diagnostic2("INVALID_PROJECT", "editorTimeline.frameCount", "Editor timeline frame count must be a positive integer."));
-    if (!Array.isArray(timeline.tracks)) diagnostics.push(diagnostic2("INVALID_PROJECT", "editorTimeline.tracks", "Editor timeline tracks must be an array."));
-    else {
+    if (!Number.isSafeInteger(timeline.frameCount) || timeline.frameCount < 1) {
+      diagnostics.push(diagnostic2("INVALID_PROJECT", "editorTimeline.frameCount", "Editor timeline frame count must be a positive integer."));
+    }
+    if (!Array.isArray(timeline.tracks)) {
+      diagnostics.push(diagnostic2("INVALID_PROJECT", "editorTimeline.tracks", "Editor timeline tracks must be an array."));
+    } else {
       diagnostics.push(...duplicateDiagnostics(timeline.tracks.map((track) => track.trackId), "editorTimeline.tracks.trackId"));
       for (const [index, track] of timeline.tracks.entries()) {
-        if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(track.trackId) || track.label.trim().length === 0 || track.kind.trim().length === 0) diagnostics.push(diagnostic2("INVALID_PROJECT", `editorTimeline.tracks[${index}]`, "Editor timeline track identity is invalid."));
-        if (!Array.isArray(track.activeFrames) || track.activeFrames.some((frame2) => !Number.isSafeInteger(frame2) || frame2 < 0 || frame2 >= timeline.frameCount)) diagnostics.push(diagnostic2("INVALID_PROJECT", `editorTimeline.tracks[${index}].activeFrames`, "Editor timeline frames must be in range."));
-        else if (new Set(track.activeFrames).size !== track.activeFrames.length) diagnostics.push(diagnostic2("DUPLICATE_ID", `editorTimeline.tracks[${index}].activeFrames`, "Editor timeline frames must be unique."));
+        if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(track.trackId) || track.label.trim().length === 0 || track.kind.trim().length === 0) {
+          diagnostics.push(diagnostic2("INVALID_PROJECT", `editorTimeline.tracks[${index}]`, "Editor timeline track identity is invalid."));
+        }
+        if (!Array.isArray(track.activeFrames) || track.activeFrames.some((frame2) => !Number.isSafeInteger(frame2) || frame2 < 0 || frame2 >= timeline.frameCount)) {
+          diagnostics.push(diagnostic2("INVALID_PROJECT", `editorTimeline.tracks[${index}].activeFrames`, "Editor timeline frames must be in range."));
+        } else if (new Set(track.activeFrames).size !== track.activeFrames.length) {
+          diagnostics.push(diagnostic2("DUPLICATE_ID", `editorTimeline.tracks[${index}].activeFrames`, "Editor timeline frames must be unique."));
+        }
+        if (track.role !== void 0 && ![
+          "PLAYER",
+          "NPC",
+          "PROP",
+          "TRIGGER",
+          "TILEMAP",
+          "CAMERA",
+          "AUDIO",
+          "CUSTOM"
+        ].includes(track.role)) {
+          diagnostics.push(diagnostic2("INVALID_PROJECT", `editorTimeline.tracks[${index}].role`, "Game object role is unsupported."));
+        }
+        if (track.components !== void 0) {
+          if (!Array.isArray(track.components)) {
+            diagnostics.push(diagnostic2("INVALID_PROJECT", `editorTimeline.tracks[${index}].components`, "Game editor components must be an array."));
+          } else {
+            diagnostics.push(...duplicateDiagnostics(track.components.map((component) => String(component.componentId)), `editorTimeline.tracks[${index}].components.componentId`));
+            for (const [componentIndex, component] of track.components.entries()) {
+              validateGameComponentState(component, `editorTimeline.tracks[${index}].components[${componentIndex}]`, diagnostics);
+            }
+          }
+        }
+        if (track.tilemap !== void 0 && !isValidGameTilemapDocument(track.tilemap)) {
+          diagnostics.push(diagnostic2("INVALID_PROJECT", `editorTimeline.tracks[${index}].tilemap`, "Editor tilemap document is invalid."));
+        }
+      }
+    }
+    if (timeline.templateInstances !== void 0) {
+      if (!Array.isArray(timeline.templateInstances) || timeline.templateInstances.some((instance) => !isValidGameTemplateInstance(instance))) {
+        diagnostics.push(diagnostic2("INVALID_PROJECT", "editorTimeline.templateInstances", "Game template instances are invalid."));
+      } else {
+        diagnostics.push(...duplicateDiagnostics(timeline.templateInstances.map((instance) => instance.instanceId), "editorTimeline.templateInstances.instanceId"));
+        const trackIds = new Set(Array.isArray(timeline.tracks) ? timeline.tracks.map((track) => track.trackId) : []);
+        for (const [index, instance] of timeline.templateInstances.entries()) {
+          if (instance.targetTrackId !== void 0 && !trackIds.has(instance.targetTrackId)) {
+            diagnostics.push(diagnostic2("MISSING_REFERENCE", `editorTimeline.templateInstances[${index}].targetTrackId`, "Game template target track is missing."));
+          }
+        }
+      }
+    }
+    if (timeline.animationBindings !== void 0) {
+      if (!Array.isArray(timeline.animationBindings) || timeline.animationBindings.some((binding) => !isValidGameAnimationBinding(binding))) {
+        diagnostics.push(diagnostic2("INVALID_PROJECT", "editorTimeline.animationBindings", "Game animation bindings are invalid."));
+      } else {
+        diagnostics.push(...duplicateDiagnostics(timeline.animationBindings.map((binding) => binding.bindingId), "editorTimeline.animationBindings.bindingId"));
+        const trackIds = new Set(Array.isArray(timeline.tracks) ? timeline.tracks.map((track) => track.trackId) : []);
+        const keys = /* @__PURE__ */ new Set();
+        for (const [index, binding] of timeline.animationBindings.entries()) {
+          if (!trackIds.has(binding.trackId)) {
+            diagnostics.push(diagnostic2("MISSING_REFERENCE", `editorTimeline.animationBindings[${index}].trackId`, "Game animation target track is missing."));
+          }
+          const key = `${binding.trackId}\0${binding.assetDefinitionId}\0${binding.clipKey}`;
+          if (keys.has(key)) {
+            diagnostics.push(diagnostic2("DUPLICATE_ID", `editorTimeline.animationBindings[${index}]`, "A Game animation clip can only be assigned once per object."));
+          }
+          keys.add(key);
+        }
       }
     }
   }
@@ -4842,9 +5261,9 @@ function canonicalProjectPayload(project) {
     revision,
     scenes: sortById(project.scenes, "sceneId").map((scene) => ({
       ...scene,
-      entities: sortById(scene.entities, "entityId").map((entity) => ({
-        ...entity,
-        components: sortById(entity.components, "componentId")
+      entities: sortById(scene.entities, "entityId").map((entity2) => ({
+        ...entity2,
+        components: sortById(entity2.components, "componentId")
       }))
     })),
     prefabs: sortById(project.prefabs, "prefabId"),
@@ -4858,6 +5277,9 @@ function canonicalProjectPayload(project) {
       ...behavior,
       rules: sortById(behavior.rules, "ruleId")
     })),
+    ...project.runtimeProfile === void 0 ? {} : {
+      runtimeProfile: project.runtimeProfile
+    },
     ...project.editorTimeline === void 0 ? {} : {
       editorTimeline: {
         frameCount: project.editorTimeline.frameCount,
@@ -4866,7 +5288,18 @@ function canonicalProjectPayload(project) {
           activeFrames: [
             ...track.activeFrames
           ].sort((left, right) => left - right)
-        }))
+        })),
+        ...project.editorTimeline.templateInstances === void 0 ? {} : {
+          templateInstances: sortById(project.editorTimeline.templateInstances, "instanceId")
+        },
+        ...project.editorTimeline.animationBindings === void 0 ? {} : {
+          animationBindings: sortById(project.editorTimeline.animationBindings, "bindingId").map((binding) => ({
+            ...binding,
+            frameIds: [
+              ...binding.frameIds
+            ]
+          }))
+        }
       }
     }
   };
@@ -4874,7 +5307,9 @@ function canonicalProjectPayload(project) {
 function canonicalJson3(value) {
   if (value === null || typeof value === "boolean" || typeof value === "number" || typeof value === "string") return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(canonicalJson3).join(",")}]`;
-  if (isRecord5(value)) return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson3(value[key])}`).join(",")}}`;
+  if (isRecord5(value)) {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson3(value[key])}`).join(",")}}`;
+  }
   throw new Error("Unsupported canonical value.");
 }
 async function sha256(value) {
@@ -4885,7 +5320,9 @@ async function sha256(value) {
 }
 async function createGameProject(draft, caller) {
   const validation = validateGameProject(draft, caller);
-  if (!validation.valid) throw new Error(validation.diagnostics.map((item) => `${item.code}:${item.path}`).join("; "));
+  if (!validation.valid) {
+    throw new Error(validation.diagnostics.map((item) => `${item.code}:${item.path}`).join("; "));
+  }
   const snapshotHash = await sha256(canonicalProjectPayload(draft));
   return {
     ...draft,
@@ -4893,6 +5330,17 @@ async function createGameProject(draft, caller) {
       ...draft.revision,
       snapshotHash
     }
+  };
+}
+function createJournal(initial, caller) {
+  const validation = validateGameProject(initial, caller);
+  if (!validation.valid) throw new Error("Cannot journal an invalid project.");
+  return {
+    current: initial,
+    sequence: 0,
+    past: [],
+    future: [],
+    checkpoints: []
   };
 }
 
@@ -5041,13 +5489,13 @@ function validateSnapshot(state2, asset, snapshot) {
   }
   return diagnostics;
 }
-function validateTransform(transform) {
+function validateTransform(transform2) {
   const diagnostics = [];
-  if (!isInteger(transform.dx) || !isInteger(transform.dy)) diagnostics.push(error("TRANSFORM_TRANSLATION_INVALID", "Transform translation must use integer coordinates.", "transform"));
-  if (transform.interpolationPolicy !== "NEAREST_NEIGHBOR") diagnostics.push(error("TRANSFORM_INTERPOLATION_UNSUPPORTED", "Only deterministic nearest-neighbor transform is supported.", "transform.interpolationPolicy"));
-  if (transform.outOfBoundsPolicy === "EXPAND_CANVAS_CANDIDATE") diagnostics.push(error("TRANSFORM_CANVAS_EXPANSION_UNSUPPORTED", "Canvas expansion is a future candidate and cannot mutate this Project.", "transform.outOfBoundsPolicy"));
-  if (transform.operation === "SCALE_INTEGER" && (!isInteger(transform.factor) || transform.factor < 1 || transform.factor > 8)) diagnostics.push(error("TRANSFORM_SCALE_INVALID", "Integer scale factor must be between 1 and 8.", "transform.factor"));
-  if (transform.operation === "SCALE_NEAREST" && (!Number.isFinite(transform.factor) || transform.factor < 0.125 || transform.factor > 8)) diagnostics.push(error("TRANSFORM_SCALE_INVALID", "Nearest-neighbor scale factor must be between 0.125 and 8.", "transform.factor"));
+  if (!isInteger(transform2.dx) || !isInteger(transform2.dy)) diagnostics.push(error("TRANSFORM_TRANSLATION_INVALID", "Transform translation must use integer coordinates.", "transform"));
+  if (transform2.interpolationPolicy !== "NEAREST_NEIGHBOR") diagnostics.push(error("TRANSFORM_INTERPOLATION_UNSUPPORTED", "Only deterministic nearest-neighbor transform is supported.", "transform.interpolationPolicy"));
+  if (transform2.outOfBoundsPolicy === "EXPAND_CANVAS_CANDIDATE") diagnostics.push(error("TRANSFORM_CANVAS_EXPANSION_UNSUPPORTED", "Canvas expansion is a future candidate and cannot mutate this Project.", "transform.outOfBoundsPolicy"));
+  if (transform2.operation === "SCALE_INTEGER" && (!isInteger(transform2.factor) || transform2.factor < 1 || transform2.factor > 8)) diagnostics.push(error("TRANSFORM_SCALE_INVALID", "Integer scale factor must be between 1 and 8.", "transform.factor"));
+  if (transform2.operation === "SCALE_NEAREST" && (!Number.isFinite(transform2.factor) || transform2.factor < 0.125 || transform2.factor > 8)) diagnostics.push(error("TRANSFORM_SCALE_INVALID", "Nearest-neighbor scale factor must be between 0.125 and 8.", "transform.factor"));
   return diagnostics;
 }
 function validateClipboard(clipboard2, asset) {
@@ -5104,11 +5552,11 @@ function createRectangleSelectionSnapshot(state2, bounds, selectionId = `selecti
     pixels
   };
 }
-function transformedPixels(snapshot, transform) {
+function transformedPixels(snapshot, transform2) {
   const bounds = boundsFromRegions(snapshot.mask.regions);
   const pixels = [];
-  if (transform.operation === "SCALE_INTEGER" || transform.operation === "SCALE_NEAREST") {
-    const factor = transform.factor;
+  if (transform2.operation === "SCALE_INTEGER" || transform2.operation === "SCALE_NEAREST") {
+    const factor = transform2.factor;
     const outputWidth = Math.max(1, Math.round(bounds.width * factor));
     const outputHeight = Math.max(1, Math.round(bounds.height * factor));
     const originX = Math.floor((bounds.width - outputWidth) / 2);
@@ -5122,8 +5570,8 @@ function transformedPixels(snapshot, transform) {
         const source = sourceByLocalPoint.get(`${sourceX}:${sourceY}`);
         if (source === void 0) continue;
         pixels.push({
-          x: bounds.x + originX + targetX + transform.dx,
-          y: bounds.y + originY + targetY + transform.dy,
+          x: bounds.x + originX + targetX + transform2.dx,
+          y: bounds.y + originY + targetY + transform2.dy,
           colorIndex: source.colorIndex
         });
       }
@@ -5133,67 +5581,67 @@ function transformedPixels(snapshot, transform) {
   for (const pixel of snapshot.pixels) {
     const localX = pixel.x - bounds.x;
     const localY = pixel.y - bounds.y;
-    if (transform.operation === "MOVE") pixels.push({
-      x: pixel.x + transform.dx,
-      y: pixel.y + transform.dy,
+    if (transform2.operation === "MOVE") pixels.push({
+      x: pixel.x + transform2.dx,
+      y: pixel.y + transform2.dy,
       colorIndex: pixel.colorIndex
     });
-    else if (transform.operation === "FLIP_HORIZONTAL") pixels.push({
-      x: bounds.x + bounds.width - 1 - localX + transform.dx,
-      y: pixel.y + transform.dy,
+    else if (transform2.operation === "FLIP_HORIZONTAL") pixels.push({
+      x: bounds.x + bounds.width - 1 - localX + transform2.dx,
+      y: pixel.y + transform2.dy,
       colorIndex: pixel.colorIndex
     });
-    else if (transform.operation === "FLIP_VERTICAL") pixels.push({
-      x: pixel.x + transform.dx,
-      y: bounds.y + bounds.height - 1 - localY + transform.dy,
+    else if (transform2.operation === "FLIP_VERTICAL") pixels.push({
+      x: pixel.x + transform2.dx,
+      y: bounds.y + bounds.height - 1 - localY + transform2.dy,
       colorIndex: pixel.colorIndex
     });
-    else if (transform.operation === "ROTATE_90_CW") pixels.push({
-      x: bounds.x + bounds.height - 1 - localY + transform.dx,
-      y: bounds.y + localX + transform.dy,
+    else if (transform2.operation === "ROTATE_90_CW") pixels.push({
+      x: bounds.x + bounds.height - 1 - localY + transform2.dx,
+      y: bounds.y + localX + transform2.dy,
       colorIndex: pixel.colorIndex
     });
-    else if (transform.operation === "ROTATE_90_CCW") pixels.push({
-      x: bounds.x + localY + transform.dx,
-      y: bounds.y + bounds.width - 1 - localX + transform.dy,
+    else if (transform2.operation === "ROTATE_90_CCW") pixels.push({
+      x: bounds.x + localY + transform2.dx,
+      y: bounds.y + bounds.width - 1 - localX + transform2.dy,
       colorIndex: pixel.colorIndex
     });
-    else if (transform.operation === "ROTATE_180") pixels.push({
-      x: bounds.x + bounds.width - 1 - localX + transform.dx,
-      y: bounds.y + bounds.height - 1 - localY + transform.dy,
+    else if (transform2.operation === "ROTATE_180") pixels.push({
+      x: bounds.x + bounds.width - 1 - localX + transform2.dx,
+      y: bounds.y + bounds.height - 1 - localY + transform2.dy,
       colorIndex: pixel.colorIndex
     });
   }
   return pixels;
 }
-function estimatedTransformBounds(snapshot, transform) {
+function estimatedTransformBounds(snapshot, transform2) {
   const bounds = boundsFromRegions(snapshot.mask.regions);
-  if (transform.operation === "ROTATE_90_CW" || transform.operation === "ROTATE_90_CCW") return {
+  if (transform2.operation === "ROTATE_90_CW" || transform2.operation === "ROTATE_90_CCW") return {
     ...bounds,
     width: bounds.height,
     height: bounds.width
   };
-  if (transform.operation === "SCALE_INTEGER" || transform.operation === "SCALE_NEAREST") {
+  if (transform2.operation === "SCALE_INTEGER" || transform2.operation === "SCALE_NEAREST") {
     return {
       ...bounds,
-      width: Math.max(1, Math.round(bounds.width * transform.factor)),
-      height: Math.max(1, Math.round(bounds.height * transform.factor))
+      width: Math.max(1, Math.round(bounds.width * transform2.factor)),
+      height: Math.max(1, Math.round(bounds.height * transform2.factor))
     };
   }
   return bounds;
 }
-function destinationBounds(snapshot, transform) {
-  const pixels = transformedPixels(snapshot, transform);
+function destinationBounds(snapshot, transform2) {
+  const pixels = transformedPixels(snapshot, transform2);
   return regionForPoints(pixels) ?? boundsFromRegions(snapshot.mask.regions);
 }
-function createTransformSession(snapshot, transform, sessionId = `transform-${snapshot.selectionId}-${snapshot.mask.selectionVersion}`) {
-  const destination = destinationBounds(snapshot, transform);
+function createTransformSession(snapshot, transform2, sessionId = `transform-${snapshot.selectionId}-${snapshot.mask.selectionVersion}`) {
+  const destination = destinationBounds(snapshot, transform2);
   return {
     sessionId,
     sourceSelectionVersion: snapshot.mask.selectionVersion,
     sourceRasterRevision: snapshot.sourceRasterRevision,
     sourceStructureEpoch: snapshot.sourceStructureEpoch,
-    transform,
+    transform: transform2,
     previewBounds: boundsFromRegions(snapshot.mask.regions),
     destinationBounds: destination,
     status: "PREVIEW"
@@ -5232,9 +5680,9 @@ function createClipboardSelectionSnapshot(state2, clipboard2) {
     }))
   };
 }
-function createClipboardPasteSession(state2, clipboard2, transform, sessionId = `paste-${state2.projectId}-${clipboard2.sourceSelectionVersion}`) {
+function createClipboardPasteSession(state2, clipboard2, transform2, sessionId = `paste-${state2.projectId}-${clipboard2.sourceSelectionVersion}`) {
   const snapshot = createClipboardSelectionSnapshot(state2, clipboard2);
-  return createTransformSession(snapshot, transform, sessionId);
+  return createTransformSession(snapshot, transform2, sessionId);
 }
 function previewTransform(snapshot, session) {
   return {
@@ -5338,7 +5786,7 @@ function changedRegions(assetId, points) {
     }
   ];
 }
-async function buildResult(state2, commandId, operationType, operationPayload2, asset, dirtyTiles, dirtyRegions, copiedBytes, cowSplitCount) {
+async function buildResult(state2, commandId, operationType, operationPayload2, asset, dirtyTiles, dirtyRegions, copiedBytes, cowSplitCount, noOp = false) {
   const operationBody = {
     operationType,
     schemaVersion: 1,
@@ -5367,6 +5815,7 @@ async function buildResult(state2, commandId, operationType, operationPayload2, 
   ]);
   return {
     operation,
+    noOp,
     metricScope: "COMMAND_TO_DIRTY",
     dirtyTiles: [
       ...dirtyTiles.values()
@@ -5424,9 +5873,33 @@ function applyPixelMutations(state2, assetId, sourcePixels, destinationPixels, c
   };
   if (clearSource) for (const pixel of sourcePixels) mutate(pixel, 0);
   for (const pixel of destinationPixels) mutate(pixel, pixel.colorIndex);
+  const uniqueDirtyPoints = new Map(dirtyPoints.map((point) => [
+    `${point.x}:${point.y}`,
+    point
+  ]));
+  const effectiveDirtyPoints = [
+    ...uniqueDirtyPoints.values()
+  ].filter((point) => state2.assets[assetId]?.raster.getPixel(point.x, point.y) !== asset.raster.getPixel(point.x, point.y));
+  if (effectiveDirtyPoints.length === 0) {
+    const originalAsset = state2.assets[assetId];
+    if (originalAsset === void 0) throw new Error("Selection target asset is missing.");
+    return {
+      state: state2,
+      asset: originalAsset,
+      dirtyTiles: /* @__PURE__ */ new Map(),
+      dirtyPoints: [],
+      copiedBytes: 0,
+      cowSplitCount: 0,
+      changed: false
+    };
+  }
+  const effectiveTileKeys = new Set(effectiveDirtyPoints.map((point) => `${Math.floor(point.x / asset.raster.tileSize)}:${Math.floor(point.y / asset.raster.tileSize)}`));
+  const effectiveDirtyTiles = new Map([
+    ...dirtyTiles
+  ].filter(([tileKey]) => effectiveTileKeys.has(tileKey)));
   const nextAsset = {
     ...asset,
-    revision: asset.revision + (dirtyTiles.size > 0 ? 1 : 0)
+    revision: asset.revision + 1
   };
   nextState.assets = {
     ...nextState.assets,
@@ -5435,10 +5908,11 @@ function applyPixelMutations(state2, assetId, sourcePixels, destinationPixels, c
   return {
     state: nextState,
     asset: nextAsset,
-    dirtyTiles,
-    dirtyPoints,
+    dirtyTiles: effectiveDirtyTiles,
+    dirtyPoints: effectiveDirtyPoints,
     copiedBytes,
-    cowSplitCount
+    cowSplitCount,
+    changed: true
   };
 }
 function commitState(state2, commandId) {
@@ -5483,13 +5957,27 @@ async function commitTransform(state2, command) {
     ]
   };
   const clipped = transformed.filter((pixel) => pixel.x >= 0 && pixel.y >= 0 && pixel.x < asset.width && pixel.y < asset.height);
+  const transform2 = command.payload.session.transform;
+  const identityTransform = transform2.operation === "MOVE" && transform2.dx === 0 && transform2.dy === 0;
+  if (identityTransform) {
+    const result = await buildResult(state2, command.commandId, "selection.transformCommit", {
+      selectionId: command.payload.selection.selectionId,
+      selectionVersion: command.payload.selection.mask.selectionVersion,
+      transform: transform2,
+      sourcePixelCount: command.payload.selection.pixels.length,
+      destinationPixelCount: clipped.length,
+      outOfBoundsClipped: false
+    }, asset, /* @__PURE__ */ new Map(), [], 0, 0, true);
+    return {
+      ok: true,
+      state: state2,
+      result
+    };
+  }
   const mutation = applyPixelMutations(state2, command.assetId, command.payload.selection.pixels, clipped, true);
   const sourcePoints = command.payload.selection.pixels;
   const destinationPoints = clipped;
-  const dirtyRegions = [
-    ...changedRegions(asset.id, sourcePoints),
-    ...changedRegions(asset.id, destinationPoints)
-  ];
+  const dirtyRegions = changedRegions(asset.id, mutation.dirtyPoints);
   const operationPayload2 = {
     selectionId: command.payload.selection.selectionId,
     selectionVersion: command.payload.selection.mask.selectionVersion,
@@ -5498,7 +5986,12 @@ async function commitTransform(state2, command) {
     destinationPixelCount: destinationPoints.length,
     outOfBoundsClipped: outOfBounds && command.payload.session.transform.outOfBoundsPolicy === "CLIP"
   };
-  const temporaryResult = await buildResult(mutation.state, command.commandId, "selection.transformCommit", operationPayload2, mutation.asset, mutation.dirtyTiles, dirtyRegions, mutation.copiedBytes, mutation.cowSplitCount);
+  const temporaryResult = await buildResult(mutation.state, command.commandId, "selection.transformCommit", operationPayload2, mutation.asset, mutation.dirtyTiles, dirtyRegions, mutation.copiedBytes, mutation.cowSplitCount, !mutation.changed);
+  if (!mutation.changed) return {
+    ok: true,
+    state: state2,
+    result: temporaryResult
+  };
   const nextState = commitState(mutation.state, command.commandId);
   return {
     ok: true,
@@ -5545,12 +6038,18 @@ async function cutClipboard(state2, command) {
     diagnostics
   };
   const mutation = applyPixelMutations(state2, command.assetId, command.payload.selection.pixels, [], true);
-  const dirtyRegions = changedRegions(asset.id, command.payload.selection.pixels);
+  const dirtyRegions = changedRegions(asset.id, mutation.dirtyPoints);
   const result = await buildResult(mutation.state, command.commandId, "clipboard.cut", {
     format: command.payload.clipboard.format,
     version: 1,
     pixelCount: command.payload.clipboard.pixels.length
-  }, mutation.asset, mutation.dirtyTiles, dirtyRegions, mutation.copiedBytes, mutation.cowSplitCount);
+  }, mutation.asset, mutation.dirtyTiles, dirtyRegions, mutation.copiedBytes, mutation.cowSplitCount, !mutation.changed);
+  if (!mutation.changed) return {
+    ok: true,
+    state: state2,
+    result,
+    clipboard: command.payload.clipboard
+  };
   const nextState = commitState(mutation.state, command.commandId);
   return {
     ok: true,
@@ -5646,7 +6145,13 @@ async function pasteClipboard(state2, command) {
     version: 1,
     pixelCount: clipped.length,
     paletteCompatibility: compatibility.result
-  }, mutation.asset, mutation.dirtyTiles, changedRegions(asset.id, clipped), mutation.copiedBytes, mutation.cowSplitCount);
+  }, mutation.asset, mutation.dirtyTiles, changedRegions(asset.id, mutation.dirtyPoints), mutation.copiedBytes, mutation.cowSplitCount, !mutation.changed);
+  if (!mutation.changed) return {
+    ok: true,
+    state: state2,
+    result,
+    clipboard: command.payload.clipboard
+  };
   const nextState = commitState(mutation.state, command.commandId);
   return {
     ok: true,
@@ -5724,6 +6229,52 @@ var LocalUndoRedoHistory = class {
     });
     this.#redo.length = 0;
     this.#state = cloneProjectStateShared(after);
+  }
+  /**
+   * Rebase local full-state history over a remote raster operation. Aseprite's
+   * local undo restores the user's previous edit without removing a later
+   * change; applying the remote command to both sides of every local entry
+   * gives the same invariant for Draw2's snapshot history.
+   */
+  async rebaseRemoteRasterOperation(command, currentState) {
+    if (!command.commandType.startsWith("raster.")) {
+      throw new Error("Only raster operations can rebase Draw2 history.");
+    }
+    const rebase = async (snapshot) => {
+      if (snapshot.appliedCommandIds.includes(command.commandId)) {
+        return snapshot;
+      }
+      const nextClientSequence2 = (snapshot.lastClientSequenceByClient[command.clientId] ?? 0) + 1;
+      const rebasedCommand = {
+        ...command,
+        projectId: snapshot.projectId,
+        baseStructureEpoch: snapshot.structureEpoch,
+        clientSequence: nextClientSequence2
+      };
+      const result = await new EditorCore(snapshot).execute(rebasedCommand);
+      if (!result.ok) {
+        throw new Error(`Remote history rebase failed: ${result.diagnostics[0]?.code ?? "unknown"}`);
+      }
+      return {
+        ...result.state,
+        lastClientSequenceByClient: {
+          ...result.state.lastClientSequenceByClient,
+          [command.clientId]: command.clientSequence
+        }
+      };
+    };
+    const rebaseEntry = async (entry) => ({
+      ...entry,
+      before: await rebase(entry.before),
+      after: await rebase(entry.after)
+    });
+    const [undo, redo] = await Promise.all([
+      Promise.all(this.#undo.map(rebaseEntry)),
+      Promise.all(this.#redo.map(rebaseEntry))
+    ]);
+    this.#undo.splice(0, this.#undo.length, ...undo);
+    this.#redo.splice(0, this.#redo.length, ...redo);
+    this.#state = cloneProjectStateShared(currentState);
   }
   undo() {
     const entry = this.#undo.pop();
@@ -5986,6 +6537,7 @@ async function resultFor(state2, command, operationType, domains) {
   const metricScope = "COMMAND_TO_DIRTY";
   return {
     operation,
+    noOp: false,
     metricScope,
     structuralDirtyDomains: domains,
     dirtyTiles: [],
@@ -6567,8 +7119,7 @@ function patternVisible(x, y, pattern) {
 }
 function stamp(center, options, bounds) {
   const size = options.brushSize;
-  const start = -Math.floor((size - 1) / 2);
-  const end = start + size - 1;
+  const start = -Math.floor(size / 2);
   const centerOffset = (size - 1) / 2;
   const radius = Math.max(0.5, size / 2);
   const points = [];
@@ -6604,6 +7155,64 @@ function rectanglePixels(rect, filled) {
     }
   }
   return points;
+}
+function isFilledShapeTool(tool) {
+  return tool === "rect-fill" || tool === "ellipse-fill" || tool === "circle-fill";
+}
+function isOutlineShapeTool(tool) {
+  return tool === "rect" || tool === "ellipse" || tool === "circle";
+}
+function patternedShapePixels(points, pattern, bounds) {
+  return sortedUnique(points.filter((point) => patternVisible(point.x, point.y, pattern)), bounds);
+}
+function insetBounds(rect, inset) {
+  const width = rect.width - inset * 2;
+  const height = rect.height - inset * 2;
+  if (width < 1 || height < 1) return void 0;
+  return {
+    x: rect.x + inset,
+    y: rect.y + inset,
+    width,
+    height
+  };
+}
+function circleRectForBounds(rect) {
+  const side = Math.min(rect.width, rect.height);
+  return {
+    x: rect.x + Math.floor((rect.width - side) / 2),
+    y: rect.y + Math.floor((rect.height - side) / 2),
+    width: side,
+    height: side
+  };
+}
+function shapeGeometryBounds(tool, rect) {
+  return tool === "circle" || tool === "circle-fill" ? circleRectForBounds(rect) : rect;
+}
+function subtractPixels(outer, inner, bounds) {
+  const innerKeys = new Set(inner.map(pointKey));
+  return sortedUnique(outer.filter((point) => !innerKeys.has(pointKey(point))), bounds);
+}
+function shapeStrokePixels(tool, from, to, brushSize2, bounds) {
+  const dragRect = normalizeBounds(from, to, bounds);
+  const geometryRect = shapeGeometryBounds(tool, dragRect);
+  if (brushSize2 <= 1) return shapePixels(tool, from, to, bounds);
+  const outer = tool === "rect" ? rectanglePixels(geometryRect, true) : ellipsePixels(geometryRect, true);
+  const innerRect = insetBounds(geometryRect, brushSize2);
+  if (innerRect === void 0) return sortedUnique(outer, bounds);
+  const inner = tool === "rect" ? rectanglePixels(innerRect, true) : ellipsePixels(innerRect, true);
+  return subtractPixels(outer, inner, bounds);
+}
+function shapeWritePixels(tool, from, to, options, bounds) {
+  const rect = normalizeBounds(from, to, bounds);
+  if (rect.width === 1 && rect.height === 1) {
+    return stampBrush([
+      clampPoint(from, bounds)
+    ], options, bounds);
+  }
+  if (isFilledShapeTool(tool)) {
+    return patternedShapePixels(shapePixels(tool, from, to, bounds), options.pattern, bounds);
+  }
+  return patternedShapePixels(shapeStrokePixels(tool, from, to, options.brushSize, bounds), options.pattern, bounds);
 }
 function ellipsePixels(rect, filled) {
   const points = [];
@@ -6724,21 +7333,15 @@ function shapePixels(tool, from, to, bounds) {
     return sortedUnique(ellipsePixels(rect, true), bounds);
   }
   if (tool === "circle" || tool === "circle-fill") {
-    const side = Math.min(rect.width, rect.height);
-    const circleRect = {
-      x: rect.x + Math.floor((rect.width - side) / 2),
-      y: rect.y + Math.floor((rect.height - side) / 2),
-      width: side,
-      height: side
-    };
+    const circleRect = circleRectForBounds(rect);
     return sortedUnique(ellipsePixels(circleRect, tool === "circle-fill"), bounds);
   }
   return [];
 }
 function createWriteSet(tool, from, to, colorIndex, options, bounds) {
   const safe = normalizeToolOptions(options);
-  const base = tool === "pen" || tool === "eraser" ? interpolatePixelLine(clampPoint(from, bounds), clampPoint(to, bounds)) : shapePixels(tool, from, to, bounds);
-  return stampBrush(base, safe, bounds).map((point) => ({
+  const base = tool === "pen" || tool === "eraser" ? stampBrush(interpolatePixelLine(clampPoint(from, bounds), clampPoint(to, bounds)), safe, bounds) : isFilledShapeTool(tool) || isOutlineShapeTool(tool) ? shapeWritePixels(tool, from, to, safe, bounds) : stampBrush(shapePixels(tool, from, to, bounds), safe, bounds);
+  return base.map((point) => ({
     ...point,
     colorIndex: tool === "eraser" ? 0 : colorIndex
   }));
@@ -8247,6 +8850,67 @@ var DrawAudioReferenceStore = class {
     ].sort((left, right) => left.startFrame - right.startFrame || left.id.localeCompare(right.id));
   }
 };
+var MAX_SELECTION_STAMP_DIMENSION = 4096;
+var MAX_SELECTION_STAMP_AREA = 1048576;
+function normalizeDraw2SelectionStamp(input) {
+  if (typeof input.id !== "string" || typeof input.name !== "string" || !Array.isArray(input.pixels) || !Array.isArray(input.palette)) {
+    throw new Error("Draw2 selection stamp shape is invalid.");
+  }
+  if (!Number.isSafeInteger(input.width) || !Number.isSafeInteger(input.height) || input.width < 1 || input.height < 1 || input.width > MAX_SELECTION_STAMP_DIMENSION || input.height > MAX_SELECTION_STAMP_DIMENSION || input.width * input.height > MAX_SELECTION_STAMP_AREA) {
+    throw new Error("Draw2 selection stamp dimensions are invalid.");
+  }
+  if (input.palette.length < 1 || input.palette.length > 256) {
+    throw new Error("Draw2 selection stamp palette is invalid.");
+  }
+  const palette = input.palette.map((color) => {
+    if (!Number.isSafeInteger(color) || color < 0 || color > 4294967295) throw new Error("Draw2 selection stamp palette color is invalid.");
+    return color >>> 0;
+  });
+  const pixels = /* @__PURE__ */ new Map();
+  for (const candidate of input.pixels) {
+    if (candidate === null || typeof candidate !== "object" || !Number.isSafeInteger(candidate.x) || !Number.isSafeInteger(candidate.y) || !Number.isSafeInteger(candidate.colorIndex) || candidate.x < 0 || candidate.y < 0 || candidate.x >= input.width || candidate.y >= input.height || candidate.colorIndex < 0 || candidate.colorIndex >= palette.length) {
+      throw new Error("Draw2 selection stamp pixel is invalid.");
+    }
+    pixels.set(`${candidate.x}:${candidate.y}`, {
+      x: candidate.x,
+      y: candidate.y,
+      colorIndex: candidate.colorIndex
+    });
+  }
+  return {
+    id: stableId(input.id, "Draw2 selection stamp ID"),
+    name: input.name.trim().slice(0, 64) || "Selection stamp",
+    width: input.width,
+    height: input.height,
+    pixels: [
+      ...pixels.values()
+    ].sort((left, right) => left.y - right.y || left.x - right.x),
+    palette,
+    schemaVersion: CREATOR_FEATURE_SCHEMA_VERSION
+  };
+}
+var Draw2SelectionStampStore = class {
+  #stamps = /* @__PURE__ */ new Map();
+  constructor(initial = []) {
+    for (const stamp2 of initial) this.save(stamp2);
+  }
+  save(input) {
+    const stamp2 = normalizeDraw2SelectionStamp(input);
+    this.#stamps.set(stamp2.id, stamp2);
+    return stamp2;
+  }
+  load(id) {
+    return this.#stamps.get(id);
+  }
+  remove(id) {
+    return this.#stamps.delete(id);
+  }
+  list() {
+    return [
+      ...this.#stamps.values()
+    ].sort((left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id));
+  }
+};
 var DRAW2_TIMELINE_METADATA_SCHEMA_VERSION = 2;
 function isMetadataRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -8278,6 +8942,10 @@ function normalizeDraw2TimelineMetadata(value, frameCount) {
   }
   if (!Array.isArray(value.animationTags) || !Array.isArray(value.markers) || !Array.isArray(value.audioReferences)) {
     throw new Error("Draw2 timeline metadata collections are invalid.");
+  }
+  const selectionStampCandidates = value.selectionStamps;
+  if (selectionStampCandidates !== void 0 && !Array.isArray(selectionStampCandidates)) {
+    throw new Error("Draw2 selection stamp collection is invalid.");
   }
   const tags = new AnimationTagStore();
   const tagIds = /* @__PURE__ */ new Set();
@@ -8318,6 +8986,19 @@ function normalizeDraw2TimelineMetadata(value, frameCount) {
     audioReferenceIds.add(candidate.id);
     audioReferences.upsert(candidate, frameCount);
   }
+  const selectionStamps = new Draw2SelectionStampStore();
+  const selectionStampIds = /* @__PURE__ */ new Set();
+  for (const candidate of selectionStampCandidates ?? []) {
+    if (candidate === null || typeof candidate !== "object" || typeof candidate.id !== "string") {
+      throw new Error("Draw2 selection stamp is invalid.");
+    }
+    const normalized = normalizeDraw2SelectionStamp(candidate);
+    if (selectionStampIds.has(normalized.id)) {
+      throw new Error("Draw2 selection stamp identity is duplicated.");
+    }
+    selectionStampIds.add(normalized.id);
+    selectionStamps.save(normalized);
+  }
   return {
     schemaVersion: DRAW2_TIMELINE_METADATA_SCHEMA_VERSION,
     animationTags: tags.list().map((tag) => ({
@@ -8326,7 +9007,18 @@ function normalizeDraw2TimelineMetadata(value, frameCount) {
     markers: markers.list().map(cloneTimelineMarker),
     audioReferences: audioReferences.list().map((reference) => ({
       ...reference
-    }))
+    })),
+    ...selectionStampCandidates === void 0 ? {} : {
+      selectionStamps: selectionStamps.list().map((stamp2) => ({
+        ...stamp2,
+        pixels: stamp2.pixels.map((pixel) => ({
+          ...pixel
+        })),
+        palette: [
+          ...stamp2.palette
+        ]
+      }))
+    }
   };
 }
 
@@ -8907,7 +9599,7 @@ var DRAW2_SHORTCUTS = [
     id: "tool-tile-stamp",
     version: 1,
     category: "Tools",
-    label: "Tile stamp",
+    label: "Tile placement",
     keys: "T",
     command: "tool-tile-stamp"
   },
@@ -10538,11 +11230,11 @@ function sampleAnimation(clip, elapsedMs) {
   if (clip.frames.length === 0) return void 0;
   for (const frame2 of clip.frames) if (!Number.isFinite(frame2.durationMs) || frame2.durationMs <= 0) throw new Error("Animation frame durations must be positive.");
   const duration = clip.frames.reduce((sum, frame2) => sum + frame2.durationMs, 0);
-  const position = clip.loop ? (Math.max(0, elapsedMs) % duration + duration) % duration : Math.min(Math.max(0, elapsedMs), duration - Number.EPSILON);
+  const position2 = clip.loop ? (Math.max(0, elapsedMs) % duration + duration) % duration : Math.min(Math.max(0, elapsedMs), duration - Number.EPSILON);
   let cursor = 0;
   for (const frame2 of clip.frames) {
     cursor += frame2.durationMs;
-    if (position < cursor) return frame2.frameId;
+    if (position2 < cursor) return frame2.frameId;
   }
   return clip.frames[clip.frames.length - 1]?.frameId;
 }
@@ -10593,12 +11285,23 @@ async function loadRuntimeAssets(session, requests, resolver) {
   const diagnostics = [
     ...session.diagnostics
   ];
+  const uniqueRequests = /* @__PURE__ */ new Map();
   for (const request of requests) {
+    const key = String(request.assetId);
+    const existing = uniqueRequests.get(key);
+    uniqueRequests.set(key, existing === void 0 ? request : {
+      ...existing,
+      required: existing.required || request.required
+    });
+  }
+  for (const request of uniqueRequests.values()) {
     const entry = dependencyEntry(session, request.assetId);
     if (entry === void 0) {
       diagnostics.push(diagnostic4(request.required ? "MISSING_REQUIRED_ASSET" : "OPTIONAL_ASSET_MISSING", `Asset ${request.assetId} is not declared by the locked dependency snapshot.`, !request.required));
       continue;
     }
+    const existing = loaded[request.assetId];
+    if (existing !== void 0 && existing.revisionId === entry.revisionId && existing.contentHash === entry.contentHash) continue;
     const payload = await resolver.resolve(request);
     if (payload === void 0) {
       diagnostics.push(diagnostic4(request.required ? "MISSING_REQUIRED_ASSET" : "OPTIONAL_ASSET_MISSING", `Asset ${request.assetId} could not be resolved.`, !request.required));
@@ -10656,6 +11359,45 @@ function stepRuntime(session, deltaMs, input, animation) {
   };
 }
 
+// src/game/game-350/runtime-performance.ts
+var GAME_RUNTIME_PERFORMANCE_SCHEMA_VERSION = 1;
+var GAME_RUNTIME_PERFORMANCE_PROFILES = Object.freeze({
+  "2D_BROWSER": Object.freeze({
+    schemaVersion: GAME_RUNTIME_PERFORMANCE_SCHEMA_VERSION,
+    profileId: "2D_BROWSER",
+    label: "2D Browser",
+    budget: Object.freeze({
+      startupMs: 1200,
+      sceneLoadMs: 800,
+      firstFrameMs: 500,
+      steadyFrameMs: 16.67,
+      memoryBytes: 256 * 1024 * 1024,
+      assetBytes: 32 * 1024 * 1024,
+      decodedBytes: 96 * 1024 * 1024,
+      maxLongTasks: 2
+    })
+  }),
+  "2D_MOBILE": Object.freeze({
+    schemaVersion: GAME_RUNTIME_PERFORMANCE_SCHEMA_VERSION,
+    profileId: "2D_MOBILE",
+    label: "2D Mobile",
+    budget: Object.freeze({
+      startupMs: 1800,
+      sceneLoadMs: 1200,
+      firstFrameMs: 800,
+      steadyFrameMs: 20,
+      memoryBytes: 128 * 1024 * 1024,
+      assetBytes: 12 * 1024 * 1024,
+      decodedBytes: 48 * 1024 * 1024,
+      maxLongTasks: 1
+    })
+  })
+});
+function resolveGameRuntimePerformanceProfile(options) {
+  if (options.requestedProfileId !== void 0) return GAME_RUNTIME_PERFORMANCE_PROFILES[options.requestedProfileId];
+  return options.screenWidth < 768 || options.touch && options.screenWidth < 900 ? GAME_RUNTIME_PERFORMANCE_PROFILES["2D_MOBILE"] : GAME_RUNTIME_PERFORMANCE_PROFILES["2D_BROWSER"];
+}
+
 // src/wp200-game-runtime-core.ts
 function diagnostic5(code, message, recoverable, severity = "ERROR") {
   return {
@@ -10671,16 +11413,19 @@ function safeText(value, label) {
 function referenceKey(reference) {
   return `${reference.kind}:${reference.assetId}:${reference.revisionId}:${reference.contentHash}`;
 }
-function collectReferences(project) {
+function collectReferencesFromScenes(scenes) {
   const references = [];
-  for (const scene of project.scenes) {
-    for (const entity of scene.entities) {
-      for (const component of entity.components) {
+  for (const scene of scenes) {
+    for (const entity2 of scene.entities) {
+      for (const component of entity2.components) {
         if (component.type === "SPRITE" || component.type === "ANIMATION" || component.type === "AUDIO_SOURCE") references.push(component.asset);
       }
     }
   }
   return references.sort((left, right) => referenceKey(left).localeCompare(referenceKey(right)));
+}
+function collectReferences(project) {
+  return collectReferencesFromScenes(project.scenes);
 }
 function dependencyMatchesReference(reference, dependencies) {
   return dependencies.entries.some((entry) => entry.assetId === reference.assetId && entry.revisionId === reference.revisionId && entry.contentHash === reference.contentHash && entry.byteLength === reference.byteLength && entry.mimeType === reference.mimeType && entry.mode === reference.mode);
@@ -10730,18 +11475,18 @@ function validateGameProject2(project) {
     }
     if (sceneIds.has(scene.sceneId)) diagnostics.push(diagnostic5("PACKAGE_INVALID", `Duplicate Game Scene ${scene.sceneId}.`, false));
     sceneIds.add(scene.sceneId);
-    const sceneEntityIds = new Set(scene.entities.map((entity) => entity.entityId));
+    const sceneEntityIds = new Set(scene.entities.map((entity2) => entity2.entityId));
     for (const rootId of scene.rootEntityIds) if (!sceneEntityIds.has(rootId)) diagnostics.push(diagnostic5("MISSING_REQUIRED_ASSET", `Scene root Entity ${rootId} is missing.`, false));
-    for (const entity of scene.entities) {
+    for (const entity2 of scene.entities) {
       try {
-        safeText(entity.entityId, "GameEntityId");
+        safeText(entity2.entityId, "GameEntityId");
       } catch (error2) {
         diagnostics.push(diagnostic5("PACKAGE_INVALID", error2 instanceof Error ? error2.message : "Entity ID is invalid.", false));
       }
-      if (entityIds.has(entity.entityId)) diagnostics.push(diagnostic5("PACKAGE_INVALID", `Duplicate Game Entity ${entity.entityId}.`, false));
-      entityIds.add(entity.entityId);
-      if (entity.parentEntityId !== void 0 && !sceneEntityIds.has(entity.parentEntityId)) diagnostics.push(diagnostic5("PACKAGE_INVALID", `Entity parent ${entity.parentEntityId} is missing.`, false));
-      for (const component of entity.components) {
+      if (entityIds.has(entity2.entityId)) diagnostics.push(diagnostic5("PACKAGE_INVALID", `Duplicate Game Entity ${entity2.entityId}.`, false));
+      entityIds.add(entity2.entityId);
+      if (entity2.parentEntityId !== void 0 && !sceneEntityIds.has(entity2.parentEntityId)) diagnostics.push(diagnostic5("PACKAGE_INVALID", `Entity parent ${entity2.parentEntityId} is missing.`, false));
+      for (const component of entity2.components) {
         try {
           safeText(component.componentId, "GameComponentId");
         } catch (error2) {
@@ -10757,12 +11502,12 @@ function validateGameProject2(project) {
         if (component.type === "AUDIO_SOURCE" && (component.volume < 0 || component.volume > 1)) diagnostics.push(diagnostic5("BUILD_INVALID_REQUEST", `Audio volume for ${component.componentId} must be between 0 and 1.`, false));
       }
     }
-    for (const entity of scene.entities) {
+    for (const entity2 of scene.entities) {
       const seenParents = /* @__PURE__ */ new Set();
-      let parentId = entity.parentEntityId;
+      let parentId = entity2.parentEntityId;
       while (parentId !== void 0) {
-        if (seenParents.has(parentId) || parentId === entity.entityId) {
-          diagnostics.push(diagnostic5("PACKAGE_INVALID", `Entity parent cycle includes ${entity.entityId}.`, false));
+        if (seenParents.has(parentId) || parentId === entity2.entityId) {
+          diagnostics.push(diagnostic5("PACKAGE_INVALID", `Entity parent cycle includes ${entity2.entityId}.`, false));
           break;
         }
         seenParents.add(parentId);
@@ -10807,9 +11552,9 @@ function gameInputActionMapToRuntime(inputMap) {
     bindings: inputMap.actions.flatMap((action) => action.bindings).sort((left, right) => `${left.action}:${left.source}:${left.code}`.localeCompare(`${right.action}:${right.source}:${right.code}`))
   };
 }
-function gameAssetRequests(project) {
+function assetRequestsFromScenes(scenes) {
   const unique = /* @__PURE__ */ new Map();
-  for (const reference of collectReferences(project)) unique.set(String(reference.assetId), {
+  for (const reference of collectReferencesFromScenes(scenes)) unique.set(String(reference.assetId), {
     assetId: reference.assetId,
     required: true,
     mode: reference.mode
@@ -10817,6 +11562,15 @@ function gameAssetRequests(project) {
   return [
     ...unique.values()
   ].sort((left, right) => left.assetId.localeCompare(right.assetId));
+}
+function gameAssetRequests(project) {
+  return assetRequestsFromScenes(project.scenes);
+}
+function gameAssetRequestsForScene(project, sceneId) {
+  const scene = project.scenes.find((candidate) => candidate.sceneId === sceneId);
+  return scene === void 0 ? [] : assetRequestsFromScenes([
+    scene
+  ]);
 }
 function featureEnabled(flags, feature, killSwitch) {
   return killSwitch !== true && flags[feature] === true;
@@ -10852,6 +11606,14 @@ async function createGameRuntimePreview(options) {
     ...runtime.diagnostics
   ];
   const running = runtime.running && validation.valid && featureEnabled(options.flags, "game-core-read", options.killSwitch) && featureEnabled(options.flags, "runtime-preview", options.killSwitch);
+  const performanceProfile = resolveGameRuntimePerformanceProfile(options.performanceProfileId === void 0 ? {
+    screenWidth: options.capabilities.screenWidth,
+    touch: options.capabilities.touch
+  } : {
+    screenWidth: options.capabilities.screenWidth,
+    touch: options.capabilities.touch,
+    requestedProfileId: options.performanceProfileId
+  });
   return {
     project: options.project,
     runtime: {
@@ -10859,6 +11621,7 @@ async function createGameRuntimePreview(options) {
       running,
       diagnostics: allDiagnostics
     },
+    performanceProfile,
     sceneId: options.project.scenes[0]?.sceneId ?? "",
     runtimeValues: {},
     recovery: validation.valid && running ? "VALID" : "BLOCKED",
@@ -10905,8 +11668,9 @@ function stepGameRuntime(session, deltaMs, input) {
     presentationChanged: stepped.presentationChanged
   };
 }
-async function loadGameRuntimeAssets(session, resolver) {
-  const runtime = await loadRuntimeAssets(session.runtime, gameAssetRequests(session.project), resolver);
+async function loadGameRuntimeAssets(session, resolver, options = {}) {
+  const requests = options.sceneId === void 0 ? gameAssetRequests(session.project) : gameAssetRequestsForScene(session.project, options.sceneId);
+  const runtime = await loadRuntimeAssets(session.runtime, requests, resolver);
   const blocked = runtime.diagnostics.some((item) => !item.recoverable && [
     "MISSING_REQUIRED_ASSET",
     "HASH_MISMATCH",
@@ -11046,7 +11810,7 @@ function resolveRuntimeIdentity(request) {
   if (!manifest.ok || manifest.value === void 0) return failure2(...manifest.diagnostics);
   const scene = project.scenes.find((candidate) => candidate.sceneId === request.sceneId);
   if (!scene) return failure2(diagnostic7("MISSING_SCENE", "sceneId", "Requested Scene is not part of the canonical Project."));
-  if (request.entityId !== void 0 && !scene.entities.some((entity) => entity.entityId === request.entityId)) {
+  if (request.entityId !== void 0 && !scene.entities.some((entity2) => entity2.entityId === request.entityId)) {
     return failure2(diagnostic7("WRONG_ENTITY", "entityId", "Requested Entity is not a member of the requested canonical Scene."));
   }
   return success2({
@@ -11224,9 +11988,9 @@ function prepareGame350Composition(request) {
   if (!identity.ok || identity.value === void 0) return failure2(...identity.diagnostics);
   const project = identity.value.project;
   const scene = project.scenes.find((item) => item.sceneId === identity.value.sceneId);
-  const entity = identity.value.entityId === void 0 ? void 0 : scene.entities.find((item) => item.entityId === identity.value.entityId);
-  const references = (entity ? [
-    entity
+  const entity2 = identity.value.entityId === void 0 ? void 0 : scene.entities.find((item) => item.entityId === identity.value.entityId);
+  const references = (entity2 ? [
+    entity2
   ] : scene.entities).flatMap((item) => item.components.flatMap((component) => {
     if (component.type !== "SPRITE" && component.type !== "ANIMATION" && component.type !== "AUDIO_SOURCE") return [];
     return [
@@ -11429,6 +12193,902 @@ async function startGame350ProductPreview(options) {
   } catch (error2) {
     return failure3(errorDiagnostic(error2 instanceof Error ? error2.message : "GAME-350 Runtime preview could not start."));
   }
+}
+
+// src/game/game-310/core.ts
+var asActionId = (value) => asIdentifier(value, "actionId");
+function asIdentifier(value, label) {
+  if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(value)) throw new Error(`${label} must be a stable identifier.`);
+  return value;
+}
+
+// src/game/game-350/runtime-core.ts
+var GAME_RUNTIME_CORE_SCHEMA_VERSION = 1;
+var GAME_RUNTIME_PROFILE_SCHEMA_VERSION2 = 1;
+var GAME_RUNTIME_PROFILE_IDS = Object.freeze({
+  TOP_DOWN_RPG: "top-down-rpg",
+  ACTION_2D: "action-2d",
+  SHOOTER_2D: "shooter-2d",
+  RACING_2D: "racing-2d",
+  RHYTHM: "rhythm",
+  ACTION_3D: "action-3d",
+  OPEN_WORLD_3D: "open-world-3d",
+  INTERACTIVE_3D: "interactive-3d"
+});
+var BUILT_IN_PROFILES = Object.freeze([
+  {
+    schemaVersion: GAME_RUNTIME_PROFILE_SCHEMA_VERSION2,
+    profileId: GAME_RUNTIME_PROFILE_IDS.TOP_DOWN_RPG,
+    genre: "TOP_DOWN_RPG",
+    label: "Top-down RPG",
+    dimension: "2D",
+    executionModel: "FIXED_STEP",
+    status: "AVAILABLE",
+    capabilities: [
+      "SCENE",
+      "ENTITY_COMPONENT",
+      "INPUT_ACTIONS",
+      "CAMERA",
+      "COLLISION_2D",
+      "SAVE_STATE",
+      "UI_OVERLAY"
+    ]
+  },
+  {
+    schemaVersion: GAME_RUNTIME_PROFILE_SCHEMA_VERSION2,
+    profileId: GAME_RUNTIME_PROFILE_IDS.ACTION_2D,
+    genre: "ACTION_2D",
+    label: "2D Action",
+    dimension: "2D",
+    executionModel: "FIXED_STEP",
+    status: "FOUNDATION",
+    capabilities: [
+      "SCENE",
+      "ENTITY_COMPONENT",
+      "INPUT_ACTIONS",
+      "CAMERA",
+      "PHYSICS_2D",
+      "SAVE_STATE",
+      "UI_OVERLAY"
+    ]
+  },
+  {
+    schemaVersion: GAME_RUNTIME_PROFILE_SCHEMA_VERSION2,
+    profileId: GAME_RUNTIME_PROFILE_IDS.SHOOTER_2D,
+    genre: "SHOOTER_2D",
+    label: "2D Shooter",
+    dimension: "2D",
+    executionModel: "FIXED_STEP",
+    status: "PLANNED",
+    capabilities: [
+      "SCENE",
+      "ENTITY_COMPONENT",
+      "INPUT_ACTIONS",
+      "CAMERA",
+      "PHYSICS_2D",
+      "SAVE_STATE",
+      "UI_OVERLAY"
+    ]
+  },
+  {
+    schemaVersion: GAME_RUNTIME_PROFILE_SCHEMA_VERSION2,
+    profileId: GAME_RUNTIME_PROFILE_IDS.RACING_2D,
+    genre: "RACING_2D",
+    label: "2D Racing",
+    dimension: "2D",
+    executionModel: "CONTINUOUS_PHYSICS",
+    status: "PLANNED",
+    capabilities: [
+      "SCENE",
+      "ENTITY_COMPONENT",
+      "INPUT_ACTIONS",
+      "CAMERA",
+      "PHYSICS_2D",
+      "VEHICLE_PHYSICS",
+      "SAVE_STATE",
+      "UI_OVERLAY"
+    ]
+  },
+  {
+    schemaVersion: GAME_RUNTIME_PROFILE_SCHEMA_VERSION2,
+    profileId: GAME_RUNTIME_PROFILE_IDS.RHYTHM,
+    genre: "RHYTHM",
+    label: "Rhythm",
+    dimension: "2D",
+    executionModel: "AUDIO_CLOCK",
+    status: "PLANNED",
+    capabilities: [
+      "SCENE",
+      "ENTITY_COMPONENT",
+      "INPUT_ACTIONS",
+      "AUDIO_TIMELINE",
+      "SAVE_STATE",
+      "UI_OVERLAY"
+    ]
+  },
+  {
+    schemaVersion: GAME_RUNTIME_PROFILE_SCHEMA_VERSION2,
+    profileId: GAME_RUNTIME_PROFILE_IDS.ACTION_3D,
+    genre: "ACTION_3D",
+    label: "3D Action",
+    dimension: "3D",
+    executionModel: "CONTINUOUS_PHYSICS",
+    status: "PLANNED",
+    capabilities: [
+      "SCENE",
+      "ENTITY_COMPONENT",
+      "INPUT_ACTIONS",
+      "CAMERA",
+      "PHYSICS_3D",
+      "SAVE_STATE",
+      "SCRIPT_EXTENSION",
+      "UI_OVERLAY"
+    ]
+  },
+  {
+    schemaVersion: GAME_RUNTIME_PROFILE_SCHEMA_VERSION2,
+    profileId: GAME_RUNTIME_PROFILE_IDS.OPEN_WORLD_3D,
+    genre: "OPEN_WORLD_3D",
+    label: "Open World 3D",
+    dimension: "3D",
+    executionModel: "NETWORK_AUTHORITATIVE",
+    status: "PLANNED",
+    capabilities: [
+      "SCENE",
+      "ENTITY_COMPONENT",
+      "INPUT_ACTIONS",
+      "CAMERA",
+      "PHYSICS_3D",
+      "WORLD_STREAMING",
+      "NETWORK_REPLICATION",
+      "SAVE_STATE",
+      "SCRIPT_EXTENSION",
+      "UI_OVERLAY"
+    ]
+  },
+  {
+    schemaVersion: GAME_RUNTIME_PROFILE_SCHEMA_VERSION2,
+    profileId: GAME_RUNTIME_PROFILE_IDS.INTERACTIVE_3D,
+    genre: "INTERACTIVE_3D",
+    label: "Interactive 3D",
+    dimension: "3D",
+    executionModel: "CUSTOM",
+    status: "PLANNED",
+    capabilities: [
+      "SCENE",
+      "ENTITY_COMPONENT",
+      "INPUT_ACTIONS",
+      "CAMERA",
+      "AUDIO_TIMELINE",
+      "UI_OVERLAY",
+      "SCRIPT_EXTENSION"
+    ]
+  }
+]);
+function stable2(value) {
+  return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(value);
+}
+function diagnostic8(code, path, message) {
+  return {
+    code,
+    path,
+    message
+  };
+}
+function validateGameRuntimeProfile(profile) {
+  const diagnostics = [];
+  if (profile.schemaVersion !== GAME_RUNTIME_PROFILE_SCHEMA_VERSION2) {
+    diagnostics.push(diagnostic8("INVALID_PROFILE", "schemaVersion", "Runtime profile schema is unsupported."));
+  }
+  if (!stable2(profile.profileId)) {
+    diagnostics.push(diagnostic8("INVALID_PROFILE", "profileId", "Runtime profile id is not stable."));
+  }
+  if (!profile.label.trim()) {
+    diagnostics.push(diagnostic8("INVALID_PROFILE", "label", "Runtime profile label is required."));
+  }
+  if (profile.genre === "CUSTOM" && profile.profileId.length === 0) {
+    diagnostics.push(diagnostic8("INVALID_PROFILE", "profileId", "Custom runtime profile id is required."));
+  }
+  if (profile.dimension !== "2D" && profile.dimension !== "3D") {
+    diagnostics.push(diagnostic8("INVALID_PROFILE", "dimension", "Runtime profile dimension is unsupported."));
+  }
+  if (!Array.isArray(profile.capabilities) || profile.capabilities.length === 0) {
+    diagnostics.push(diagnostic8("INVALID_PROFILE", "capabilities", "Runtime profile must declare capabilities."));
+  } else if (new Set(profile.capabilities).size !== profile.capabilities.length) {
+    diagnostics.push(diagnostic8("INVALID_PROFILE", "capabilities", "Runtime profile capabilities must be unique."));
+  }
+  if (profile.status !== "AVAILABLE" && profile.status !== "FOUNDATION" && profile.status !== "PLANNED") {
+    diagnostics.push(diagnostic8("INVALID_PROFILE", "status", "Runtime profile status is unsupported."));
+  }
+  return {
+    valid: diagnostics.length === 0,
+    diagnostics
+  };
+}
+function assertProfile(profile) {
+  const validation = validateGameRuntimeProfile(profile);
+  if (!validation.valid) {
+    throw new Error(validation.diagnostics.map((item) => `${item.code}:${item.path}`).join(", "));
+  }
+}
+function freezeProfile(profile) {
+  return Object.freeze({
+    ...profile,
+    capabilities: Object.freeze([
+      ...profile.capabilities
+    ])
+  });
+}
+function createRegistry(profiles) {
+  const byId = /* @__PURE__ */ new Map();
+  for (const profile of profiles) {
+    assertProfile(profile);
+    if (byId.has(profile.profileId)) {
+      throw new Error(`DUPLICATE_PROFILE:${profile.profileId}`);
+    }
+    byId.set(profile.profileId, freezeProfile(profile));
+  }
+  const ordered = Object.freeze([
+    ...byId.values()
+  ]);
+  return {
+    profiles: ordered,
+    resolve(profileId) {
+      return byId.get(profileId);
+    },
+    register(profile) {
+      return createRegistry([
+        ...ordered,
+        profile
+      ]);
+    }
+  };
+}
+var GAME_RUNTIME_PROFILES = createRegistry(BUILT_IN_PROFILES);
+var DEFAULT_GAME_RUNTIME_PROFILE_ID = GAME_RUNTIME_PROFILE_IDS.TOP_DOWN_RPG;
+function assertModule(module) {
+  assertProfile(module.profile);
+  if (!Number.isSafeInteger(module.fixedStepTicks) || module.fixedStepTicks < 1) {
+    throw new Error("Runtime fixed step must be a positive safe integer.");
+  }
+  if (module.profile.status === "PLANNED") {
+    throw new Error(`Runtime profile is not available: ${module.profile.profileId}`);
+  }
+}
+function createGameRuntimeState(input) {
+  assertModule(input.module);
+  return {
+    schemaVersion: GAME_RUNTIME_CORE_SCHEMA_VERSION,
+    profileId: input.module.profile.profileId,
+    journal: input.journal,
+    snapshot: input.snapshot,
+    input: {
+      lastSequence: 0,
+      lastAction: null
+    },
+    runtime: input.module.createInitialRuntime(input.snapshot)
+  };
+}
+function cloneGameRuntimeState(state2, module) {
+  return {
+    ...state2,
+    input: {
+      ...state2.input
+    },
+    runtime: module.cloneRuntime(state2.runtime)
+  };
+}
+function playGameRuntimeState(state2) {
+  return {
+    ...state2,
+    runtime: {
+      ...state2.runtime,
+      mode: "PLAYING"
+    }
+  };
+}
+function stopGameRuntimeState(state2, module) {
+  const stopped = module.stopRuntime === void 0 ? state2.runtime : module.stopRuntime(state2.runtime);
+  return {
+    ...state2,
+    input: {
+      lastSequence: 0,
+      lastAction: null
+    },
+    runtime: {
+      ...stopped,
+      mode: "STOPPED"
+    }
+  };
+}
+function restartGameRuntimeState(state2, module) {
+  const mode = state2.runtime.mode;
+  const initial = module.createInitialRuntime(state2.snapshot);
+  return {
+    ...state2,
+    input: {
+      lastSequence: 0,
+      lastAction: null
+    },
+    runtime: {
+      ...initial,
+      mode
+    }
+  };
+}
+function stepGameRuntimeState(state2, input, module) {
+  if (state2.runtime.mode !== "PLAYING" || !Number.isSafeInteger(input.sequence) || input.sequence <= state2.input.lastSequence || !module.isValidAction(input.action)) return cloneGameRuntimeState(state2, module);
+  const stepped = module.step(state2.snapshot, state2.runtime, input.action);
+  return {
+    ...state2,
+    input: {
+      lastSequence: input.sequence,
+      lastAction: input.action
+    },
+    runtime: {
+      ...stepped,
+      mode: "PLAYING",
+      tick: state2.runtime.tick + module.fixedStepTicks
+    }
+  };
+}
+
+// src/game/game-350/physics-2d.ts
+var GAME350_PHYSICS_LAYER_BITS = Object.freeze({
+  DEFAULT: 1 << 0,
+  WORLD: 1 << 1,
+  PLAYER: 1 << 2,
+  NPC: 1 << 3,
+  SENSOR: 1 << 4,
+  PROJECTILE: 1 << 5
+});
+var DEFAULT_PHYSICS_2D_SETTINGS = Object.freeze({
+  gravity: Object.freeze({
+    x: 0,
+    y: 9.8
+  }),
+  fixedDeltaTime: 1 / 60,
+  maxSubSteps: 4,
+  defaultMaterial: Object.freeze({
+    friction: 0.4,
+    bounciness: 0
+  })
+});
+
+// src/game/game-350/tilemap-authoring.ts
+var GAME350_TILEMAP_MAX_WIDTH = 256;
+var GAME350_TILEMAP_MAX_HEIGHT = 256;
+var GAME350_TILEMAP_MAX_CELLS = 65536;
+function freezeDeep(value) {
+  if (value !== null && typeof value === "object" && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    for (const child of Object.values(value)) {
+      freezeDeep(child);
+    }
+  }
+  return value;
+}
+function cellKey(x, y) {
+  return `${x},${y}`;
+}
+function cellSort(left, right) {
+  return left.y - right.y || left.x - right.x;
+}
+function idIsValid(value) {
+  return /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(value);
+}
+function assertDimensions(mapId, width, height, tileSize) {
+  if (!idIsValid(mapId)) throw new Error("Tilemap mapId is invalid.");
+  if (!Number.isSafeInteger(width) || width < 1 || width > GAME350_TILEMAP_MAX_WIDTH) {
+    throw new Error("Tilemap width must be an integer between 1 and 256.");
+  }
+  if (!Number.isSafeInteger(height) || height < 1 || height > GAME350_TILEMAP_MAX_HEIGHT) {
+    throw new Error("Tilemap height must be an integer between 1 and 256.");
+  }
+  if (width * height > GAME350_TILEMAP_MAX_CELLS) {
+    throw new Error("Tilemap cell capacity is limited to 65536 cells.");
+  }
+  if (!Number.isSafeInteger(tileSize) || tileSize < 1 || tileSize > 4096) {
+    throw new Error("Tilemap tileSize must be an integer between 1 and 4096.");
+  }
+}
+function normalizeCells(cells = [], width, height) {
+  const byKey = /* @__PURE__ */ new Map();
+  for (const cell of cells) {
+    if (!Number.isSafeInteger(cell.x) || !Number.isSafeInteger(cell.y) || cell.x < 0 || cell.x >= width || cell.y < 0 || cell.y >= height) {
+      throw new Error("Tilemap cell must be inside the document bounds.");
+    }
+    if (cell.collision !== "NONE" && cell.collision !== "SOLID") {
+      throw new Error("Tilemap cell collision must be NONE or SOLID.");
+    }
+    if (cell.triggerId !== void 0 && !idIsValid(cell.triggerId)) {
+      throw new Error("Tilemap triggerId is invalid.");
+    }
+    if (cell.collision === "NONE" && cell.triggerId === void 0) {
+      throw new Error("An empty tilemap cell must not be persisted.");
+    }
+    const key = cellKey(cell.x, cell.y);
+    if (byKey.has(key)) throw new Error(`Duplicate tilemap cell: ${key}`);
+    byKey.set(key, {
+      x: cell.x,
+      y: cell.y,
+      collision: cell.collision,
+      ...cell.triggerId === void 0 ? {} : {
+        triggerId: cell.triggerId
+      }
+    });
+  }
+  return [
+    ...byKey.values()
+  ].sort(cellSort);
+}
+function documentFrom(options) {
+  const tileSize = options.tileSize ?? 1;
+  assertDimensions(options.mapId, options.width, options.height, tileSize);
+  const cells = normalizeCells(options.cells, options.width, options.height);
+  if (cells.length > GAME350_TILEMAP_MAX_CELLS) {
+    throw new Error("Tilemap cell capacity is limited to 65536 cells.");
+  }
+  return freezeDeep({
+    schemaVersion: GAME_TILEMAP_DOCUMENT_SCHEMA_VERSION,
+    mapId: options.mapId,
+    width: options.width,
+    height: options.height,
+    tileSize,
+    cells
+  });
+}
+function createGameTilemapDocument(options) {
+  return documentFrom(options);
+}
+function solidGameTilemapCells(document2) {
+  return document2.cells.filter((cell) => cell.collision === "SOLID");
+}
+function triggerGameTilemapCells(document2) {
+  return document2.cells.filter((cell) => cell.triggerId !== void 0);
+}
+
+// src/game/game-350/playable-slice.ts
+var GAME351_PLAYABLE_SCHEMA_VERSION = 1;
+var GAME351_FIXED_STEP_TICKS = 1;
+var GAME351_INPUT_ACTIONS = Object.freeze({
+  MOVE_UP: asActionId("rpg.move.up"),
+  MOVE_DOWN: asActionId("rpg.move.down"),
+  MOVE_LEFT: asActionId("rpg.move.left"),
+  MOVE_RIGHT: asActionId("rpg.move.right")
+});
+var GAME351_INTERACT_ACTION = asActionId("rpg.interact");
+var GAME351_TAP_ACTION = asActionId("rpg.tap");
+function freezeDeep2(value) {
+  if (value !== null && typeof value === "object" && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    for (const child of Object.values(value)) {
+      freezeDeep2(child);
+    }
+  }
+  return value;
+}
+function position(x, y) {
+  return {
+    x,
+    y
+  };
+}
+function clonePosition(value) {
+  return position(value.x, value.y);
+}
+function cellKey2(value) {
+  return `${value.x},${value.y}`;
+}
+function defaultMap() {
+  return mapFromTilemapDocument(defaultMapDocument());
+}
+function mapFromTilemapDocument(document2) {
+  const bounds = {
+    minX: 0,
+    minY: 0,
+    maxX: document2.width - 1,
+    maxY: document2.height - 1
+  };
+  return freezeDeep2({
+    width: document2.width,
+    height: document2.height,
+    bounds,
+    solidCells: solidGameTilemapCells(document2).map((cell) => position(cell.x, cell.y)),
+    triggerCells: triggerGameTilemapCells(document2).map((cell) => ({
+      x: cell.x,
+      y: cell.y,
+      triggerId: cell.triggerId
+    }))
+  });
+}
+function defaultMapDocument() {
+  const bounds = {
+    minX: 0,
+    minY: 0,
+    maxX: 7,
+    maxY: 5
+  };
+  const cells = [];
+  for (let y = bounds.minY; y <= bounds.maxY; y += 1) {
+    for (let x = bounds.minX; x <= bounds.maxX; x += 1) {
+      if (x === bounds.minX || x === bounds.maxX || y === bounds.minY || y === bounds.maxY || x === 3 && y === 2 || x === 4 && y === 2) cells.push({
+        x,
+        y,
+        collision: "SOLID"
+      });
+    }
+  }
+  return createGameTilemapDocument({
+    mapId: "game351-rpg-map",
+    width: 8,
+    height: 6,
+    cells
+  });
+}
+function transform(componentId, x, y) {
+  return {
+    type: "TRANSFORM",
+    componentId: asComponentId(componentId),
+    x,
+    y,
+    rotation: 0,
+    scaleX: 1,
+    scaleY: 1
+  };
+}
+function camera(componentId) {
+  return {
+    type: "CAMERA",
+    componentId: asComponentId(componentId),
+    active: true,
+    zoom: 1
+  };
+}
+function collider(componentId, layer2) {
+  return {
+    type: "COLLIDER",
+    componentId: asComponentId(componentId),
+    shape: "BOX",
+    width: 0.8,
+    height: 0.8,
+    radius: 0.4,
+    isTrigger: false,
+    layer: layer2,
+    enabled: true
+  };
+}
+function rigidbody(componentId, bodyType) {
+  return {
+    type: "RIGIDBODY",
+    componentId: asComponentId(componentId),
+    bodyType,
+    mass: 1,
+    gravityScale: 0,
+    fixedRotation: true,
+    enabled: true
+  };
+}
+function characterController(componentId) {
+  return {
+    type: "CHARACTER_CONTROLLER",
+    componentId: asComponentId(componentId),
+    moveSpeed: 4,
+    stepHeight: 0.25,
+    fixedStep: GAME351_FIXED_STEP_TICKS,
+    enabled: true
+  };
+}
+function tilemap(componentId, document2 = defaultMapDocument()) {
+  return {
+    type: "TILEMAP",
+    componentId: asComponentId(componentId),
+    mapId: "game351-rpg-map",
+    tileSize: 1,
+    collisionEnabled: true,
+    document: document2
+  };
+}
+function entity(entityId2, name, components) {
+  return {
+    entityId: asEntityId(entityId2),
+    name,
+    components
+  };
+}
+async function createGame351RpgTemplate(options = {}) {
+  const projectId = asProjectId(options.projectId ?? "game351-rpg-template");
+  const ownerId = asOwnerId(options.ownerId ?? "game351-template-owner");
+  const revisionId = asRevisionId(options.revisionId ?? "game351-rpg-revision-1");
+  const sceneId = asSceneId("game351-rpg-scene");
+  const playerEntityId = asEntityId("game351-rpg-player");
+  const npcEntityId = asEntityId("game351-rpg-npc");
+  const mapEntityId = asEntityId("game351-rpg-map");
+  const cameraEntityId = asEntityId("game351-rpg-camera");
+  const caller = {
+    projectId,
+    ownerId,
+    revisionId
+  };
+  const scene = {
+    sceneId,
+    name: "RPG Main Scene",
+    rootEntityIds: [
+      mapEntityId,
+      playerEntityId,
+      npcEntityId,
+      cameraEntityId
+    ],
+    entities: [
+      entity(String(mapEntityId), "Map", [
+        transform("game351-rpg-map-transform", 0, 0),
+        tilemap("game351-rpg-map-tilemap"),
+        collider("game351-rpg-map-collider", "WORLD")
+      ]),
+      entity(String(playerEntityId), "Player", [
+        transform("game351-rpg-player-transform", 1, 1),
+        collider("game351-rpg-player-collider", "PLAYER"),
+        rigidbody("game351-rpg-player-rigidbody", "DYNAMIC"),
+        characterController("game351-rpg-player-controller")
+      ]),
+      entity(String(npcEntityId), "Guide NPC", [
+        transform("game351-rpg-npc-transform", 5, 3),
+        collider("game351-rpg-npc-collider", "NPC"),
+        rigidbody("game351-rpg-npc-rigidbody", "KINEMATIC")
+      ]),
+      entity(String(cameraEntityId), "Camera", [
+        camera("game351-rpg-camera-component")
+      ])
+    ]
+  };
+  const draft = {
+    schemaVersion: 1,
+    projectId,
+    ownerId,
+    name: options.name ?? "iGAME RPG Playable Slice",
+    revision: {
+      revisionId,
+      projectId,
+      ownerId,
+      sequence: 1
+    },
+    scenes: [
+      scene
+    ],
+    prefabs: [],
+    dependencies: [],
+    behaviors: [],
+    runtimeProfile: {
+      schemaVersion: 1,
+      profileId: DEFAULT_GAME_RUNTIME_PROFILE_ID
+    }
+  };
+  const project = await createGameProject(draft, caller);
+  return {
+    project,
+    caller,
+    sceneId,
+    playerEntityId,
+    npcEntityId,
+    map: defaultMap()
+  };
+}
+function createGame351RpgTemplateFromProject(project) {
+  const profileId = project.runtimeProfile?.profileId ?? DEFAULT_GAME_RUNTIME_PROFILE_ID;
+  if (profileId !== GAME_RUNTIME_PROFILE_IDS.TOP_DOWN_RPG) {
+    throw new Error(`GAME-351 RPG preview does not support runtime profile: ${profileId}`);
+  }
+  const scene = project.scenes.find((candidate) => String(candidate.sceneId).startsWith("scene:pixiedraw-game:")) ?? project.scenes[0];
+  const playerEntityId = asEntityId(`entity:pixieed-game:hero`);
+  const npcEntityId = asEntityId(`entity:pixieed-game:enemy`);
+  if (scene === void 0 || !scene.entities.some((entity2) => entity2.entityId === playerEntityId) || !scene.entities.some((entity2) => entity2.entityId === npcEntityId)) {
+    throw new Error("Studio Game Project does not contain the RPG Player/NPC pair.");
+  }
+  return {
+    project,
+    caller: {
+      projectId: project.projectId,
+      ownerId: project.ownerId,
+      revisionId: project.revision.revisionId
+    },
+    sceneId: scene.sceneId,
+    playerEntityId,
+    npcEntityId,
+    map: mapFromTilemapDocument(scene.entities.flatMap((entity2) => entity2.components).find((component) => component.type === "TILEMAP")?.document ?? defaultMapDocument())
+  };
+}
+function entityTransform(project, sceneId, entityId2) {
+  const scene = project.scenes.find((item) => item.sceneId === sceneId);
+  const target = scene?.entities.find((item) => item.entityId === entityId2);
+  const component = target?.components.find((item) => item.type === "TRANSFORM");
+  if (component === void 0 || !Number.isSafeInteger(component.x) || !Number.isSafeInteger(component.y)) {
+    throw new Error(`Entity ${String(entityId2)} must have an integer Transform.`);
+  }
+  return position(component.x, component.y);
+}
+function inBounds(bounds, value) {
+  return value.x >= bounds.minX && value.x <= bounds.maxX && value.y >= bounds.minY && value.y <= bounds.maxY;
+}
+function validateMap(map) {
+  if (!Number.isSafeInteger(map.width) || !Number.isSafeInteger(map.height) || map.width < 1 || map.height < 1) throw new Error("RPG map dimensions must be positive integers.");
+  if (map.bounds.minX > map.bounds.maxX || map.bounds.minY > map.bounds.maxY) {
+    throw new Error("RPG collision bounds are invalid.");
+  }
+  const seen = /* @__PURE__ */ new Set();
+  for (const cell of map.solidCells) {
+    if (!Number.isSafeInteger(cell.x) || !Number.isSafeInteger(cell.y) || !inBounds(map.bounds, cell)) {
+      throw new Error("RPG solid cells must be integer cells inside collision bounds.");
+    }
+    if (seen.has(cellKey2(cell))) {
+      throw new Error(`RPG solid cell is duplicated: ${cellKey2(cell)}`);
+    }
+    seen.add(cellKey2(cell));
+  }
+  const triggerIds = /* @__PURE__ */ new Set();
+  for (const cell of map.triggerCells) {
+    if (!Number.isSafeInteger(cell.x) || !Number.isSafeInteger(cell.y) || !inBounds(map.bounds, cell) || typeof cell.triggerId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(cell.triggerId)) {
+      throw new Error("RPG trigger cells must be valid integer cells with stable IDs.");
+    }
+    const key = cellKey2(cell);
+    if (seen.has(key)) {
+      throw new Error(`RPG map cell cannot be both solid and trigger: ${key}`);
+    }
+    if (triggerIds.has(cell.triggerId)) {
+      throw new Error(`RPG trigger id is duplicated: ${cell.triggerId}`);
+    }
+    triggerIds.add(cell.triggerId);
+    seen.add(key);
+  }
+}
+function createGame351PlayableSnapshot(template) {
+  const validation = validateGameProject(template.project, template.caller);
+  if (!validation.valid) {
+    throw new Error(`Cannot compile invalid RPG Project: ${validation.diagnostics.map((item) => item.code).join(",")}`);
+  }
+  validateMap(template.map);
+  const scene = template.project.scenes.find((item) => item.sceneId === template.sceneId);
+  if (scene === void 0) {
+    throw new Error(`Scene ${String(template.sceneId)} is not part of the Project.`);
+  }
+  const player = scene.entities.find((item) => item.entityId === template.playerEntityId);
+  const npc = scene.entities.find((item) => item.entityId === template.npcEntityId);
+  if (player === void 0 || npc === void 0) {
+    throw new Error("RPG template must contain Player and NPC entities in its Scene.");
+  }
+  const playerPosition = entityTransform(template.project, template.sceneId, template.playerEntityId);
+  const npcPosition = entityTransform(template.project, template.sceneId, template.npcEntityId);
+  if (!inBounds(template.map.bounds, playerPosition) || !inBounds(template.map.bounds, npcPosition)) throw new Error("RPG actors must start inside collision bounds.");
+  const solid = new Set(template.map.solidCells.map(cellKey2));
+  if (solid.has(cellKey2(playerPosition)) || solid.has(cellKey2(npcPosition))) {
+    throw new Error("RPG actors may not start on solid cells.");
+  }
+  return freezeDeep2({
+    schemaVersion: GAME351_PLAYABLE_SCHEMA_VERSION,
+    projectId: template.project.projectId,
+    ownerId: template.project.ownerId,
+    projectRevisionId: template.project.revision.revisionId,
+    projectHash: template.project.revision.snapshotHash,
+    sceneId: template.sceneId,
+    playerEntityId: template.playerEntityId,
+    playerPosition: clonePosition(playerPosition),
+    npcEntityId: template.npcEntityId,
+    npcPosition: clonePosition(npcPosition),
+    collisionBounds: {
+      ...template.map.bounds
+    },
+    solidCells: template.map.solidCells.map((cell) => clonePosition(cell)),
+    triggerCells: template.map.triggerCells.map((cell) => ({
+      ...cell
+    }))
+  });
+}
+function createGame351PlayableState(template) {
+  const snapshot = createGame351PlayableSnapshot(template);
+  return createGameRuntimeState({
+    journal: createJournal(template.project, template.caller),
+    snapshot,
+    module: GAME351_RPG_RUNTIME_MODULE
+  });
+}
+function playGame351(state2) {
+  return playGameRuntimeState(state2);
+}
+function stopGame351(state2) {
+  return stopGameRuntimeState(state2, GAME351_RPG_RUNTIME_MODULE);
+}
+function clearGame351Dialogue(state2) {
+  return {
+    ...cloneUnchangedState(state2),
+    runtime: {
+      ...state2.runtime,
+      dialogue: null
+    }
+  };
+}
+function restartGame351(state2) {
+  return restartGameRuntimeState(state2, GAME351_RPG_RUNTIME_MODULE);
+}
+function validAction(value) {
+  return value === null || Object.values(GAME351_INPUT_ACTIONS).includes(value);
+}
+function movement(action) {
+  if (action === GAME351_INPUT_ACTIONS.MOVE_UP) return position(0, -1);
+  if (action === GAME351_INPUT_ACTIONS.MOVE_DOWN) return position(0, 1);
+  if (action === GAME351_INPUT_ACTIONS.MOVE_LEFT) return position(-1, 0);
+  if (action === GAME351_INPUT_ACTIONS.MOVE_RIGHT) return position(1, 0);
+  return position(0, 0);
+}
+var GAME351_RPG_RUNTIME_MODULE = {
+  profile: GAME_RUNTIME_PROFILES.resolve(GAME_RUNTIME_PROFILE_IDS.TOP_DOWN_RPG),
+  fixedStepTicks: GAME351_FIXED_STEP_TICKS,
+  createInitialRuntime(snapshot) {
+    return {
+      mode: "STOPPED",
+      tick: 0,
+      sceneId: snapshot.sceneId,
+      playerPosition: clonePosition(snapshot.playerPosition),
+      npcPosition: clonePosition(snapshot.npcPosition),
+      dialogue: null
+    };
+  },
+  isValidAction(action) {
+    return validAction(action);
+  },
+  step(snapshot, runtime, action) {
+    const delta = movement(action);
+    const candidate = position(runtime.playerPosition.x + delta.x, runtime.playerPosition.y + delta.y);
+    const nextPlayerPosition = canEnterGame351Cell(snapshot, candidate) ? candidate : clonePosition(runtime.playerPosition);
+    return {
+      ...runtime,
+      playerPosition: nextPlayerPosition,
+      npcPosition: clonePosition(runtime.npcPosition)
+    };
+  },
+  cloneRuntime(runtime) {
+    return {
+      ...runtime,
+      playerPosition: clonePosition(runtime.playerPosition),
+      npcPosition: clonePosition(runtime.npcPosition)
+    };
+  },
+  stopRuntime(runtime) {
+    return {
+      ...runtime,
+      dialogue: null
+    };
+  }
+};
+function cloneUnchangedState(state2) {
+  return cloneGameRuntimeState(state2, GAME351_RPG_RUNTIME_MODULE);
+}
+function isAdjacent(left, right) {
+  return Math.abs(left.x - right.x) + Math.abs(left.y - right.y) === 1;
+}
+function triggerGame351Action(state2, actionId, behaviors) {
+  if (state2.runtime.mode !== "PLAYING" || actionId !== String(GAME351_INTERACT_ACTION) && actionId !== String(GAME351_TAP_ACTION) || !isAdjacent(state2.runtime.playerPosition, state2.runtime.npcPosition)) return cloneUnchangedState(state2);
+  for (const behavior of behaviors) {
+    for (const rule of behavior.rules) {
+      if (!rule.enabled || rule.trigger.type !== "ACTION" || rule.trigger.actionId !== actionId) continue;
+      for (const action of rule.actions) {
+        if (action.kind === "SET_VARIABLE" && action.property === "dialogue" && typeof action.value === "string" && action.value.trim().length > 0) {
+          return {
+            ...cloneUnchangedState(state2),
+            runtime: {
+              ...state2.runtime,
+              dialogue: action.value.trim()
+            }
+          };
+        }
+      }
+    }
+  }
+  return cloneUnchangedState(state2);
+}
+function canEnterGame351Cell(snapshot, value) {
+  return inBounds(snapshot.collisionBounds, value) && !new Set(snapshot.solidCells.map(cellKey2)).has(cellKey2(value)) && cellKey2(value) !== cellKey2(snapshot.npcPosition);
+}
+function stepGame351(state2, input) {
+  return stepGameRuntimeState(state2, input, GAME351_RPG_RUNTIME_MODULE);
 }
 
 // src/workspace/project-manifest.ts
@@ -12224,8 +13884,8 @@ function loadAdvancedModule() {
 }
 function loadWorkspaceModule() {
   const workspaceMobileProjectionMarker = "20260819-compare-final-1";
-  const workspaceChunkUrl = new URL("wp180-workspace.js?v=20260825-igame-handoff-v77", import.meta.url);
-  workspaceChunkUrl.searchParams.set("v", "20260825-studio-mode-query-v72");
+  const workspaceChunkUrl = new URL("wp180-workspace.js?v=20260827-igame-template-v1", import.meta.url);
+  workspaceChunkUrl.searchParams.set("v", "20260827-igame-template-v1");
   workspaceChunkUrl.searchParams.set("mobile", workspaceMobileProjectionMarker);
   workspaceModulePromise ??= import(workspaceChunkUrl.href);
   return workspaceModulePromise;
@@ -12336,6 +13996,10 @@ var transformFactorElement = document.querySelector("#draw2TransformFactor");
 var selectButton = document.querySelector("#draw2Select");
 var commitSelectionButton = document.querySelector("#draw2CommitSelection");
 var cancelSelectionButton = document.querySelector("#draw2CancelSelection");
+var selectionStampNameInputElement = document.querySelector("#draw2SelectionStampName");
+var selectionStampSaveButton = document.querySelector("#draw2SelectionStampSave");
+var selectionStampListElement = document.querySelector("#draw2SelectionStampList");
+var selectionStampStatusElement = document.querySelector("#draw2SelectionStampStatus");
 var previewButton = document.querySelector("#draw2PreviewTransform");
 var commitButton = document.querySelector("#draw2CommitTransform");
 var cancelButton = document.querySelector("#draw2CancelTransform");
@@ -12455,13 +14119,14 @@ var projectDialogNewButton = document.querySelector("#draw2ProjectNew");
 var projectDialogStatusElement = document.querySelector("#draw2ProjectDialogStatus");
 var importPxdInput = document.querySelector("#draw2ImportPxd");
 var gamePreviewStartButton = document.querySelector("#draw2GamePreviewStart");
+var gamePreviewStopButton = document.querySelector("#draw2GamePreviewStop");
+var gamePreviewRestartButton = document.querySelector("#draw2GamePreviewRestart");
 var gamePreviewPinButton = document.querySelector("#draw2GamePreviewPin");
 var gamePreviewReloadButton = document.querySelector("#draw2GamePreviewReload");
 var gamePreviewStatusElement = document.querySelector("#draw2GamePreviewStatus");
 var gamePreviewCanvasElement = document.querySelector("#draw2GamePreviewCanvas");
 var advancedLoadButton = document.querySelector("#draw2AdvancedLoad");
 var advancedPatternButton = document.querySelector("#draw2AdvancedPattern");
-var advancedStampButton = document.querySelector("#draw2AdvancedStamp");
 var advancedMirrorButton = document.querySelector("#draw2AdvancedMirror");
 var advancedGridButton = document.querySelector("#draw2AdvancedGrid");
 var advancedGuideButton = document.querySelector("#draw2AdvancedGuide");
@@ -12497,7 +14162,7 @@ var languageElement = document.querySelector("#draw2Language");
 var shortcutsDialogElement = document.querySelector("#draw2ShortcutsDialog");
 var shortcutSearchElement = document.querySelector("#draw2ShortcutSearch");
 var shortcutListElement = document.querySelector("#draw2ShortcutList");
-if (canvasElement === null || overlayElement === null || erasePreviewElement === null || viewportCenterButtonElement === null || pixelGridElement === null || pixelGridMinorPathElement === null || pixelGridMajorPathElement === null || selectionOverlayElement === null || mirrorGuideOverlayElement === null || mirrorGuideVerticalElement === null || mirrorGuideHorizontalElement === null || mirrorGuideDiagonalDownElement === null || mirrorGuideDiagonalUpElement === null || mirrorToggleXElement === null || mirrorToggleYElement === null || mirrorToggleDiagonalDownElement === null || mirrorToggleDiagonalUpElement === null || selectionOverlayRegionsElement === null || statusElement === null || metricsElement === null || selectionStatusElement === null || projectIdInputElement === null || tileSizeSelectElement === null || toolSelectElement === null || brushSizeElement === null || brushPatternElement === null || brushShapeElement === null || brushSizeControlElement === null || quickControlsElement === null || brushOptionsButtonElement === null || brushOptionsSummaryElement === null || brushOptionsFlyoutElement === null || brushOptionsCloseButtonElement === null || brushPresetElement === null || brushPresetNameElement === null || brushPresetSaveButton === null || brushPresetDeleteButton === null || mirrorModeToggleElement === null || viewportContextRailElement === null || similarityControlElement === null || similarityElement === null || similarityValueElement === null || colorSelectionModeElement === null || miniPreviewCanvasElement === null || miniPreviewContainerElement === null || miniPreviewPlayButtonElement === null || miniPreviewReferenceButtonElement === null || miniPreviewReferenceClearButtonElement === null || miniPreviewReferenceInputElement === null || miniPreviewReferenceStatusElement === null || miniPreviewCollapseButtonElement === null || miniPreviewRestoreButtonElement === null || miniPreviewResizeLeftElement === null || miniPreviewResizeBottomElement === null || miniPreviewResizeCornerElement === null || selectionXElement === null || selectionYElement === null || selectionWidthElement === null || selectionHeightElement === null || selectionModeElement === null || selectionExpandButton === null || selectionShrinkButton === null || selectionInvertButton === null || selectionBorderButton === null || transformOperationElement === null || transformDxElement === null || transformDyElement === null || transformFactorElement === null || selectButton === null || commitSelectionButton === null || cancelSelectionButton === null || previewButton === null || commitButton === null || cancelButton === null || flipHorizontalButton === null || flipVerticalButton === null || rotateCCWButton === null || rotateCWButton === null || rotate180Button === null || copyButton === null || cutButton === null || pasteButton === null || undoButton === null || redoButton === null || timelineCardElement === null || timelineContextMenu === null || createButton === null || importPxdInput === null || timelineStatusElement === null || timelineViewportElement === null || timelineSpacerElement === null || timelineWindowElement === null || timelinePropertiesResizeElement === null || timelinePropertiesElement === null || timelinePropertiesBodyElement === null || timelinePropertiesCollapseElement === null || timelineSecondaryControlsElement === null || animationTagNameElement === null || animationTagFromElement === null || animationTagToElement === null || animationTagLoopElement === null || animationTagAddElement === null || animationTagListElement === null || timelineMarkerKindElement === null || timelineMarkerLabelElement === null || timelineMarkerAddElement === null || timelineMarkerListElement === null || linkedCelToggleElement === null || linkedCelStatusElement === null || addFrameButton === null || duplicateFrameButton === null || removeFrameButton === null || addLayerButton === null || reorderLayerButton === null || toggleLayerButton === null || toggleOnionButton === null || togglePlaybackButton === null || onionOptionsElement === null || onionPreviousElement === null || onionPreviousValueElement === null || onionNextElement === null || onionNextValueElement === null || onionOpacityElement === null || onionOpacityValueElement === null || onionColorModeElement === null || playbackFpsElement === null || playbackLoopElement === null || playbackFpsCustomElement === null || colorMapElement === null || paletteWheelElement === null || hueCursorElement === null || svCursorElement === null || colorRElement === null || colorGElement === null || colorBElement === null || colorAlphaElement === null || colorRValueElement === null || colorGValueElement === null || colorBValueElement === null || colorAlphaValueElement === null || colorHexElement === null || colorHexOutputElement === null || colorApplyButton === null || colorEditorStatusElement === null || gamePreviewStartButton === null || gamePreviewPinButton === null || gamePreviewReloadButton === null || gamePreviewStatusElement === null || gamePreviewCanvasElement === null || advancedLoadButton === null || advancedPatternButton === null || advancedStampButton === null || advancedMirrorButton === null || advancedGridButton === null || advancedGuideButton === null || advancedStatusElement === null || languageElement === null || exportPanelStatusElement === null || exportNameElement === null || exportScaleElement === null || exportFormatCardsElement === null || exportSelectionSummaryElement === null || exportFormatOptionsElement === null || exportPackageSectionElement === null || exportPackageSingleElement === null || exportPackageZipElement === null || exportPreviewCanvasElement === null || exportPreviewSummaryElement === null || exportOutputFilesElement === null || exportProgressElement === null || exportProgressBarElement === null || exportProgressPercentElement === null || exportProgressTitleElement === null || exportProgressDetailElement === null || exportProgressCurrentElement === null || exportProgressCountElement === null || exportProgressTrackElement === null || exportExecuteButton === null || exportToMarketButton === null) {
+if (canvasElement === null || overlayElement === null || erasePreviewElement === null || viewportCenterButtonElement === null || pixelGridElement === null || pixelGridMinorPathElement === null || pixelGridMajorPathElement === null || selectionOverlayElement === null || mirrorGuideOverlayElement === null || mirrorGuideVerticalElement === null || mirrorGuideHorizontalElement === null || mirrorGuideDiagonalDownElement === null || mirrorGuideDiagonalUpElement === null || mirrorToggleXElement === null || mirrorToggleYElement === null || mirrorToggleDiagonalDownElement === null || mirrorToggleDiagonalUpElement === null || selectionOverlayRegionsElement === null || statusElement === null || metricsElement === null || selectionStatusElement === null || projectIdInputElement === null || tileSizeSelectElement === null || toolSelectElement === null || brushSizeElement === null || brushPatternElement === null || brushShapeElement === null || brushSizeControlElement === null || quickControlsElement === null || brushOptionsButtonElement === null || brushOptionsSummaryElement === null || brushOptionsFlyoutElement === null || brushOptionsCloseButtonElement === null || brushPresetElement === null || brushPresetNameElement === null || brushPresetSaveButton === null || brushPresetDeleteButton === null || mirrorModeToggleElement === null || viewportContextRailElement === null || similarityControlElement === null || similarityElement === null || similarityValueElement === null || colorSelectionModeElement === null || miniPreviewCanvasElement === null || miniPreviewContainerElement === null || miniPreviewPlayButtonElement === null || miniPreviewReferenceButtonElement === null || miniPreviewReferenceClearButtonElement === null || miniPreviewReferenceInputElement === null || miniPreviewReferenceStatusElement === null || miniPreviewCollapseButtonElement === null || miniPreviewRestoreButtonElement === null || miniPreviewResizeLeftElement === null || miniPreviewResizeBottomElement === null || miniPreviewResizeCornerElement === null || selectionXElement === null || selectionYElement === null || selectionWidthElement === null || selectionHeightElement === null || selectionModeElement === null || selectionExpandButton === null || selectionShrinkButton === null || selectionInvertButton === null || selectionBorderButton === null || transformOperationElement === null || transformDxElement === null || transformDyElement === null || transformFactorElement === null || selectButton === null || commitSelectionButton === null || cancelSelectionButton === null || selectionStampNameInputElement === null || selectionStampSaveButton === null || selectionStampListElement === null || selectionStampStatusElement === null || previewButton === null || commitButton === null || cancelButton === null || flipHorizontalButton === null || flipVerticalButton === null || rotateCCWButton === null || rotateCWButton === null || rotate180Button === null || copyButton === null || cutButton === null || pasteButton === null || undoButton === null || redoButton === null || timelineCardElement === null || timelineContextMenu === null || createButton === null || importPxdInput === null || timelineStatusElement === null || timelineViewportElement === null || timelineSpacerElement === null || timelineWindowElement === null || timelinePropertiesResizeElement === null || timelinePropertiesElement === null || timelinePropertiesBodyElement === null || timelinePropertiesCollapseElement === null || timelineSecondaryControlsElement === null || animationTagNameElement === null || animationTagFromElement === null || animationTagToElement === null || animationTagLoopElement === null || animationTagAddElement === null || animationTagListElement === null || timelineMarkerKindElement === null || timelineMarkerLabelElement === null || timelineMarkerAddElement === null || timelineMarkerListElement === null || linkedCelToggleElement === null || linkedCelStatusElement === null || addFrameButton === null || duplicateFrameButton === null || removeFrameButton === null || addLayerButton === null || reorderLayerButton === null || toggleLayerButton === null || toggleOnionButton === null || togglePlaybackButton === null || onionOptionsElement === null || onionPreviousElement === null || onionPreviousValueElement === null || onionNextElement === null || onionNextValueElement === null || onionOpacityElement === null || onionOpacityValueElement === null || onionColorModeElement === null || playbackFpsElement === null || playbackLoopElement === null || playbackFpsCustomElement === null || colorMapElement === null || paletteWheelElement === null || hueCursorElement === null || svCursorElement === null || colorRElement === null || colorGElement === null || colorBElement === null || colorAlphaElement === null || colorRValueElement === null || colorGValueElement === null || colorBValueElement === null || colorAlphaValueElement === null || colorHexElement === null || colorHexOutputElement === null || colorApplyButton === null || colorEditorStatusElement === null || gamePreviewStartButton === null || gamePreviewStopButton === null || gamePreviewRestartButton === null || gamePreviewPinButton === null || gamePreviewReloadButton === null || gamePreviewStatusElement === null || gamePreviewCanvasElement === null || advancedLoadButton === null || advancedPatternButton === null || advancedMirrorButton === null || advancedGridButton === null || advancedGuideButton === null || advancedStatusElement === null || languageElement === null || exportPanelStatusElement === null || exportNameElement === null || exportScaleElement === null || exportFormatCardsElement === null || exportSelectionSummaryElement === null || exportFormatOptionsElement === null || exportPackageSectionElement === null || exportPackageSingleElement === null || exportPackageZipElement === null || exportPreviewCanvasElement === null || exportPreviewSummaryElement === null || exportOutputFilesElement === null || exportProgressElement === null || exportProgressBarElement === null || exportProgressPercentElement === null || exportProgressTitleElement === null || exportProgressDetailElement === null || exportProgressCurrentElement === null || exportProgressCountElement === null || exportProgressTrackElement === null || exportExecuteButton === null || exportToMarketButton === null) {
   throw new Error("Draw2 isolated entry is missing a required element.");
 }
 if (canvasSettingsDialogElement === null || canvasSettingsProjectIdElement === null || canvasSettingsWidthElement === null || canvasSettingsHeightElement === null || canvasSettingsTileSizeElement === null || canvasSettingsApplyButton === null || openCanvasSettingsButton === null || openProjectDialogButton === null || projectDialogElement === null || projectDialogIdElement === null || projectDialogOpenButton === null || projectDialogNewButton === null || projectDialogStatusElement === null) {
@@ -12542,8 +14207,7 @@ var DRAW2_PERSISTENCE_DEBOUNCE_MS = 250;
 var drawPersistenceRevision = 0;
 var drawPersistenceSaveQueue = Promise.resolve();
 var drawPersistenceSaveTimer;
-var drawPersistenceSavePending = false;
-var drawPersistenceSaveReason = "edit";
+var drawPersistenceSavePending;
 function drawJournalSnapshot() {
   const operations = journal.operations.slice(-DRAW2_PERSISTED_JOURNAL_LIMIT);
   const dirtyTileWrites = journal.dirtyTileWrites.slice(-DRAW2_PERSISTED_JOURNAL_LIMIT);
@@ -12561,8 +14225,14 @@ function drawJournalSnapshot() {
   };
 }
 function queueDrawPersistenceSave(reason) {
-  drawPersistenceSavePending = true;
-  drawPersistenceSaveReason = reason;
+  drawPersistenceSavePending = {
+    reason,
+    state: cloneProjectStateShared(state),
+    history: history.snapshot(DRAW2_PERSISTED_HISTORY_LIMIT),
+    journal: drawJournalSnapshot(),
+    assetDefinitions: assetDefinitions.map(cloneAssetDefinitionEntry),
+    timelineMetadata: draw2TimelineMetadataSnapshot()
+  };
   if (drawPersistenceSaveTimer !== void 0) return;
   drawPersistenceSaveTimer = window.setTimeout(() => {
     drawPersistenceSaveTimer = void 0;
@@ -12570,35 +14240,32 @@ function queueDrawPersistenceSave(reason) {
   }, DRAW2_PERSISTENCE_DEBOUNCE_MS);
 }
 async function drainDrawPersistenceSave() {
-  if (!drawPersistenceSavePending) return;
-  const reason = drawPersistenceSaveReason;
-  drawPersistenceSavePending = false;
-  const snapshotState = state;
-  const snapshotHistory = history.snapshot(DRAW2_PERSISTED_HISTORY_LIMIT);
-  const snapshotJournal = drawJournalSnapshot();
-  const projectId = snapshotState.projectId;
+  const envelope = drawPersistenceSavePending;
+  if (envelope === void 0) return;
+  drawPersistenceSavePending = void 0;
+  const projectId = envelope.state.projectId;
   const revision = drawPersistenceRevision + 1;
   drawPersistenceRevision = revision;
   drawPersistenceSaveQueue = drawPersistenceSaveQueue.then(async () => {
-    const record2 = await createDraw2PersistenceRecord(snapshotState, snapshotHistory, snapshotJournal, revision, (/* @__PURE__ */ new Date()).toISOString(), assetDefinitions, draw2TimelineMetadataSnapshot());
+    const record2 = await createDraw2PersistenceRecord(envelope.state, envelope.history, envelope.journal, revision, (/* @__PURE__ */ new Date()).toISOString(), envelope.assetDefinitions, envelope.timelineMetadata);
     const saved = await drawPersistenceStore.save(record2);
     if (!saved.ok) {
       document.body.dataset.drawPersistenceState = "unavailable";
       return;
     }
-    document.body.dataset.drawPersistenceState = saved.stale ? "stale-write-ignored" : reason === "recovery" ? "restored" : "saved";
+    document.body.dataset.drawPersistenceState = saved.stale ? "stale-write-ignored" : envelope.reason === "recovery" ? "restored" : "saved";
     document.body.dataset.drawPersistenceRevision = String(revision);
     await workspaceManifestStore.updateModule(asWorkspaceProjectId(projectId), "draw", {
       status: "READY",
       revision,
       stateHash: record2.stateHash,
       savedAt: record2.savedAt
-    }, snapshotState.name);
+    }, envelope.state.name);
   }).catch(() => {
     document.body.dataset.drawPersistenceState = "error";
   });
   await drawPersistenceSaveQueue.catch(() => void 0);
-  if (drawPersistenceSavePending) await drainDrawPersistenceSave();
+  if (drawPersistenceSavePending !== void 0) await drainDrawPersistenceSave();
 }
 async function flushDrawPersistence() {
   while (true) {
@@ -12606,10 +14273,10 @@ async function flushDrawPersistence() {
       window.clearTimeout(drawPersistenceSaveTimer);
       drawPersistenceSaveTimer = void 0;
     }
-    if (drawPersistenceSavePending) await drainDrawPersistenceSave();
+    if (drawPersistenceSavePending !== void 0) await drainDrawPersistenceSave();
     const queue = drawPersistenceSaveQueue;
     await queue.catch(() => void 0);
-    if (!drawPersistenceSavePending && drawPersistenceSaveTimer === void 0 && queue === drawPersistenceSaveQueue) return;
+    if (drawPersistenceSavePending === void 0 && drawPersistenceSaveTimer === void 0 && queue === drawPersistenceSaveQueue) return;
   }
 }
 var flushDrawPersistenceOnPageExit = () => {
@@ -12714,11 +14381,17 @@ var transformDy = transformDyElement;
 var transformFactor = transformFactorElement;
 var commitSelectionControl = commitSelectionButton;
 var cancelSelectionControl = cancelSelectionButton;
+var selectionStampNameInput = selectionStampNameInputElement;
+var selectionStampSaveControl = selectionStampSaveButton;
+var selectionStampList = selectionStampListElement;
+var selectionStampStatus = selectionStampStatusElement;
 var cancelTransformControl = cancelButton;
 var copyControl = copyButton;
 var cutControl = cutButton;
 var pasteControl = pasteButton;
 var gamePreviewStartControl = gamePreviewStartButton;
+var gamePreviewStopControl = gamePreviewStopButton;
+var gamePreviewRestartControl = gamePreviewRestartButton;
 var gamePreviewPinControl = gamePreviewPinButton;
 var gamePreviewReloadControl = gamePreviewReloadButton;
 var gamePreviewStatus = gamePreviewStatusElement;
@@ -13100,7 +14773,7 @@ function applyDraw2Locale(nextLocale = draw2Locale, persist = true) {
   if (persist) {
     try {
       window.localStorage.setItem("pixieed:draw2:locale:v1", draw2Locale);
-    } catch {
+    } catch (cause) {
     }
   }
 }
@@ -13675,7 +15348,6 @@ var playbackRateGroup = playbackFpsControl.closest(".draw2-timeline-rate");
 var playbackLoopMode = "loop";
 var advancedLoadControl = advancedLoadButton;
 var advancedPatternControl = advancedPatternButton;
-var advancedStampControl = advancedStampButton;
 var advancedMirrorControl = advancedMirrorButton;
 var advancedGridControl = advancedGridButton;
 var advancedGuideControl = advancedGuideButton;
@@ -13745,9 +15417,23 @@ var exportPackageMode = "single";
 var core = new EditorCore(state, {
   instrumentation
 });
+var canonicalStateGeneration = 0;
 var history = new LocalUndoRedoHistory(state);
 var pixyncDrawActorId;
 var pixyncDrawClientId;
+var canonicalOperationQueue = Promise.resolve();
+function adoptCanonicalState(nextState) {
+  state = nextState;
+  core = new EditorCore(state, {
+    instrumentation
+  });
+  canonicalStateGeneration += 1;
+}
+function enqueueCanonicalOperation(operation) {
+  const queued = canonicalOperationQueue.then(operation);
+  canonicalOperationQueue = queued.then(() => void 0, () => void 0);
+  return queued;
+}
 window.addEventListener("draw2:pixync-binding", (event) => {
   const detail = event.detail;
   if (typeof detail?.actorId !== "string" || typeof detail?.clientId !== "string" || detail.projectId !== state.projectId) return;
@@ -13776,7 +15462,7 @@ var pixyncDrawStatePort = {
     undoDepth: history.undoDepth,
     redoDepth: history.redoDepth
   }),
-  applyRemote: async (input) => {
+  applyRemote: (input) => enqueueCanonicalOperation(async () => {
     const operation = input.operation;
     const command = {
       commandId: operation.commandId,
@@ -13799,14 +15485,14 @@ var pixyncDrawStatePort = {
     if (!applied.ok) {
       throw new Error(applied.diagnostics[0]?.code ?? "PIXYNC_DRAW_REMOTE_APPLY_FAILED");
     }
-    state = applied.state;
-    core = new EditorCore(state, {
-      instrumentation
-    });
-    saveDrawProjectState("pixync-remote");
-    notifyAssetStateChanged();
-    renderTimeline();
-    await present();
+    if (!applied.result.noOp) {
+      await history.rebaseRemoteRasterOperation(command, applied.state);
+      adoptCanonicalState(applied.state);
+      saveDrawProjectState("pixync-remote");
+      notifyAssetStateChanged();
+      renderTimeline();
+      await present();
+    }
     const rasterHash = await drawRasterHash(state, operation.assetId);
     return {
       operationId: operation.operationId,
@@ -13822,7 +15508,7 @@ var pixyncDrawStatePort = {
       localUndoDepth: history.undoDepth,
       localRedoDepth: history.redoDepth
     };
-  }
+  })
 };
 var pixyncProjectLifecycle;
 function projectPixyncState(phase, projectId, generation) {
@@ -14067,15 +15753,12 @@ function ensureTilemapFor(layerTrackId, frameId, cellSize = tilemapCellSizeFromC
     canvasHeight: source.height,
     cellSize
   });
-  state = {
+  adoptCanonicalState({
     ...state,
     tilemaps: {
       ...state.tilemaps ?? {},
       [id]: map
     }
-  };
-  core = new EditorCore(state, {
-    instrumentation
   });
   return map;
 }
@@ -14092,6 +15775,8 @@ tilesetGridElement?.addEventListener("click", (event) => {
   const sourceY = Number(yValue);
   const cellSize = Number(sizeValue);
   if (!Number.isSafeInteger(sourceX) || !Number.isSafeInteger(sourceY) || cellSize !== 16 && cellSize !== 32) return;
+  activeSelectionStampId = void 0;
+  renderSelectionStamps();
   selectedTileSource = {
     sourceAssetId: state.activeAssetId,
     sourceX,
@@ -14319,13 +16004,18 @@ var brushPresets = new BrushPresetStore(readStoredBrushPresets());
 var animationTags = new AnimationTagStore();
 var timelineMarkers = new TimelineMarkerStore();
 var drawAudioReferences = new DrawAudioReferenceStore();
+var selectionStampStore = new Draw2SelectionStampStore();
+var selectionStampSequence = 0;
+var activeSelectionStampId;
+var selectionStampToolActivation = false;
 var drawAudioCatalog = [];
 function draw2TimelineMetadataSnapshot() {
   return normalizeDraw2TimelineMetadata({
     schemaVersion: 2,
     animationTags: animationTags.list(),
     markers: timelineMarkers.list(),
-    audioReferences: drawAudioReferences.list()
+    audioReferences: drawAudioReferences.list(),
+    selectionStamps: selectionStampStore.list()
   }, state.frames.length);
 }
 function restoreDraw2TimelineMetadata(value) {
@@ -14344,6 +16034,13 @@ function restoreDraw2TimelineMetadata(value) {
   for (const reference of metadata.audioReferences) {
     drawAudioReferences.upsert(reference, state.frames.length);
   }
+  for (const stamp2 of selectionStampStore.list()) {
+    selectionStampStore.remove(stamp2.id);
+  }
+  for (const stamp2 of metadata.selectionStamps ?? []) {
+    selectionStampStore.save(stamp2);
+  }
+  activeSelectionStampId = void 0;
 }
 var linkedCelBindings = [];
 var selection;
@@ -14931,6 +16628,8 @@ var clipboard;
 var timelineSession = createTimelineSession(state);
 var timelineActivationPending = false;
 var timelineStateGeneration = 0;
+var timelineActivationRequestSequence = 0;
+var latestTimelineActivationRequestId = 0;
 var timelineViewportInitialized = false;
 var activeTimelineTab = "timeline";
 var timelineFrameElapsedById = /* @__PURE__ */ new Map();
@@ -14979,6 +16678,10 @@ var onionSkinColorMode = "TINTED";
 var onionSkinCache;
 var runtimePreviewSession;
 var game350ProductSession;
+var game351PlayableState;
+var game351Behaviors = [];
+var game351InputSequence = 0;
+var game351PreviewMode = "LIVE";
 var toolOptions = {
   brushSize: 1,
   brushShape: "square",
@@ -15034,6 +16737,13 @@ function nextClientSequence(clientId) {
 function setGamePreviewStatus(message, kind = "ready") {
   gamePreviewStatus.textContent = translateDraw2Text(message, draw2Locale);
   gamePreviewStatus.dataset.state = kind;
+  const normalized = message.toLocaleUpperCase();
+  document.documentElement.dataset.gamePreviewState = kind === "error" ? "error" : normalized.includes("READY") ? "ready" : normalized.includes("STOPPED") ? "stopped" : "idle";
+  window.dispatchEvent(new CustomEvent("draw2:game-preview-state", {
+    detail: {
+      state: document.documentElement.dataset.gamePreviewState
+    }
+  }));
 }
 async function buildLocalDraw2GameProject(mode) {
   const asset = state.assets[state.activeAssetId];
@@ -15146,6 +16856,131 @@ function drawGamePreview(session, asset) {
   }
   gamePreviewContext.putImageData(image, 0, 0);
 }
+function drawGame351Preview(state2, mode) {
+  const { snapshot, runtime } = state2;
+  const cellWidth = gamePreviewCanvas.width / 8;
+  const cellHeight = gamePreviewCanvas.height / 6;
+  gamePreviewContext.clearRect(0, 0, gamePreviewCanvas.width, gamePreviewCanvas.height);
+  gamePreviewContext.fillStyle = "#10233b";
+  gamePreviewContext.fillRect(0, 0, gamePreviewCanvas.width, gamePreviewCanvas.height);
+  gamePreviewContext.fillStyle = "#2d6b52";
+  gamePreviewContext.fillRect(cellWidth, cellHeight, cellWidth * 6, cellHeight * 4);
+  for (const solid of snapshot.solidCells) {
+    gamePreviewContext.fillStyle = solid.x === 0 || solid.y === 0 || solid.x === 7 || solid.y === 5 ? "#25334a" : "#7f4a4a";
+    gamePreviewContext.fillRect(solid.x * cellWidth, solid.y * cellHeight, cellWidth, cellHeight);
+  }
+  gamePreviewContext.strokeStyle = "rgba(220, 237, 255, 0.22)";
+  gamePreviewContext.lineWidth = 1;
+  for (let x = 0; x <= 8; x += 1) {
+    gamePreviewContext.beginPath();
+    gamePreviewContext.moveTo(x * cellWidth + 0.5, 0);
+    gamePreviewContext.lineTo(x * cellWidth + 0.5, gamePreviewCanvas.height);
+    gamePreviewContext.stroke();
+  }
+  for (let y = 0; y <= 6; y += 1) {
+    gamePreviewContext.beginPath();
+    gamePreviewContext.moveTo(0, y * cellHeight + 0.5);
+    gamePreviewContext.lineTo(gamePreviewCanvas.width, y * cellHeight + 0.5);
+    gamePreviewContext.stroke();
+  }
+  const cameraX = Math.max(0, Math.min(6, runtime.playerPosition.x - 3));
+  const cameraY = Math.max(0, Math.min(4, runtime.playerPosition.y - 2));
+  gamePreviewContext.strokeStyle = "#b8e5ff";
+  gamePreviewContext.lineWidth = 1.5;
+  gamePreviewContext.strokeRect(cameraX * cellWidth + 2, cameraY * cellHeight + 2, cellWidth * 6 - 4, cellHeight * 4 - 4);
+  gamePreviewContext.fillStyle = "#f5a04f";
+  gamePreviewContext.fillRect(runtime.npcPosition.x * cellWidth + 4, runtime.npcPosition.y * cellHeight + 3, cellWidth - 8, cellHeight - 6);
+  gamePreviewContext.fillStyle = runtime.mode === "PLAYING" ? "#6bd4ff" : "#7b8fa5";
+  gamePreviewContext.fillRect(runtime.playerPosition.x * cellWidth + 3, runtime.playerPosition.y * cellHeight + 2, cellWidth - 6, cellHeight - 4);
+  if (runtime.dialogue !== null) {
+    gamePreviewContext.fillStyle = "rgba(8, 14, 25, 0.92)";
+    gamePreviewContext.fillRect(4, gamePreviewCanvas.height - 25, 152, 21);
+    gamePreviewContext.strokeStyle = "#f5d18b";
+    gamePreviewContext.strokeRect(4.5, gamePreviewCanvas.height - 24.5, 151, 20);
+    gamePreviewContext.fillStyle = "#fff2cc";
+    gamePreviewContext.font = "7px sans-serif";
+    gamePreviewContext.fillText(runtime.dialogue.slice(0, 38), 8, gamePreviewCanvas.height - 11);
+  }
+  delete gamePreviewCanvas.dataset.game351Error;
+  gamePreviewCanvas.dataset.game351Mode = runtime.mode;
+  gamePreviewCanvas.dataset.game351Player = `${runtime.playerPosition.x},${runtime.playerPosition.y}`;
+  gamePreviewCanvas.dataset.game351Tick = String(runtime.tick);
+  gamePreviewCanvas.dataset.game351Dialogue = runtime.dialogue ?? "";
+  setGamePreviewStatus(`Runtime ${runtime.mode === "PLAYING" ? "READY" : "STOPPED"} \xB7 GAME-351 RPG \xB7 ${mode} \xB7 tick=${runtime.tick} \xB7 Player ${runtime.playerPosition.x},${runtime.playerPosition.y} \xB7 Camera follow${runtime.dialogue === null ? "" : " \xB7 dialogue"}`);
+}
+async function startGame351Preview(mode) {
+  game351PreviewMode = mode;
+  const workspace = getWorkspacePxdBridge();
+  await workspace.preparePixyncGameState?.();
+  const project = workspace.gameCurrentProject?.();
+  let template;
+  let playable;
+  try {
+    template = project === void 0 ? await createGame351RpgTemplate({
+      projectId: state.projectId,
+      ownerId: "draw2-local-owner",
+      revisionId: "game351-preview-revision"
+    }) : createGame351RpgTemplateFromProject(project);
+    playable = createGame351PlayableState(template);
+  } catch {
+    template = await createGame351RpgTemplate({
+      projectId: project?.projectId ?? state.projectId,
+      ownerId: project?.ownerId ?? "draw2-local-owner",
+      revisionId: project?.revision.revisionId ?? "game351-preview-revision"
+    });
+    playable = createGame351PlayableState(template);
+  }
+  if (playable === void 0) {
+    throw new Error("GAME-351 preview state could not be created.");
+  }
+  game351PlayableState = playGame351(playable);
+  game351InputSequence = 0;
+  game351Behaviors = project?.behaviors ?? [];
+  drawGame351Preview(game351PlayableState, mode);
+  if (typeof workspace.refreshSite400IGameRoute === "function") {
+    await workspace.refreshSite400IGameRoute("open");
+  }
+}
+function game351ActionForKey(key) {
+  if (key === "ArrowUp" || key.toLowerCase() === "w") {
+    return GAME351_INPUT_ACTIONS.MOVE_UP;
+  }
+  if (key === "ArrowDown" || key.toLowerCase() === "s") {
+    return GAME351_INPUT_ACTIONS.MOVE_DOWN;
+  }
+  if (key === "ArrowLeft" || key.toLowerCase() === "a") {
+    return GAME351_INPUT_ACTIONS.MOVE_LEFT;
+  }
+  if (key === "ArrowRight" || key.toLowerCase() === "d") {
+    return GAME351_INPUT_ACTIONS.MOVE_RIGHT;
+  }
+  return void 0;
+}
+function handleGame351PreviewKey(event) {
+  const current = game351PlayableState;
+  if (current === void 0) return;
+  if (event.key === "Escape") {
+    event.preventDefault();
+    game351PlayableState = clearGame351Dialogue(current);
+    drawGame351Preview(game351PlayableState, game351PreviewMode);
+    return;
+  }
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    game351PlayableState = triggerGame351Action(current, String(GAME351_INTERACT_ACTION), game351Behaviors);
+    drawGame351Preview(game351PlayableState, game351PreviewMode);
+    return;
+  }
+  const action = game351ActionForKey(event.key);
+  if (action === void 0) return;
+  event.preventDefault();
+  game351InputSequence = Math.max(game351InputSequence + 1, current.input.lastSequence + 1);
+  game351PlayableState = stepGame351(current, {
+    sequence: game351InputSequence,
+    action
+  });
+  drawGame351Preview(game351PlayableState, game351PreviewMode);
+}
 async function startGamePreview(mode = "LIVE") {
   try {
     const boundary = await buildLocalDraw2GameProject(mode);
@@ -15199,6 +17034,13 @@ async function startGamePreview(mode = "LIVE") {
     gamePreviewPinControl.disabled = false;
     gamePreviewReloadControl.disabled = false;
     setGamePreviewStatus(`Runtime READY \xB7 ${mode} \xB7 tick=${runtimePreviewSession.world.tick}`);
+    try {
+      await startGame351Preview(mode);
+    } catch (cause) {
+      game351PlayableState = void 0;
+      game351Behaviors = [];
+      gamePreviewCanvas.dataset.game351Error = cause instanceof Error ? cause.message : "preview-unavailable";
+    }
   } catch (cause) {
     setGamePreviewStatus(cause instanceof Error ? cause.message : "Runtime preview failed.", "error");
   }
@@ -15587,6 +17429,7 @@ async function commitColorEdit() {
   colorApply.disabled = true;
   const commandSequence = nextClientSequence(DRAW_CLIENT_ID);
   const before = state;
+  const paletteCanonicalGeneration = canonicalStateGeneration;
   const command = {
     commandId: `draw2-local-palette-${commandSequence}`,
     commandType: "palette.setColor",
@@ -15604,6 +17447,12 @@ async function commitColorEdit() {
     }
   };
   const result = await core.execute(command);
+  if (paletteCanonicalGeneration !== canonicalStateGeneration) {
+    syncClientSequencesFromState();
+    colorCommitInFlight = false;
+    colorApply.disabled = selectedColor === 0;
+    return;
+  }
   if (!result.ok) {
     syncClientSequencesFromState();
     colorCommitInFlight = false;
@@ -15611,11 +17460,16 @@ async function commitColorEdit() {
     setColorEditorStatus(result.diagnostics.map((item) => item.code).join(", "), "error");
     return;
   }
-  state = result.state;
+  if (!result.result.noOp) {
+    adoptCanonicalState(result.state);
+    refreshSelectionSnapshotForCurrentRaster();
+  }
   colorDraftDirty = false;
   colorCommitInFlight = false;
-  history.record(before, state, result.result.operation.operationId, result.result.operation.operationType);
-  saveDrawProjectState();
+  if (!result.result.noOp) {
+    history.record(before, state, result.result.operation.operationId, result.result.operation.operationType);
+    saveDrawProjectState();
+  }
   await autosave.record(state, result.result);
   renderPaletteButtons(state.assets[state.activeAssetId]?.palette ?? []);
   syncColorEditorFromSelection();
@@ -15633,6 +17487,7 @@ async function appendColorFromDraft() {
   }
   const commandSequence = nextClientSequence(DRAW_CLIENT_ID);
   const before = state;
+  const paletteCanonicalGeneration = canonicalStateGeneration;
   const command = {
     commandId: `draw2-local-palette-append-${commandSequence}`,
     commandType: "palette.appendColor",
@@ -15649,16 +17504,23 @@ async function appendColorFromDraft() {
     }
   };
   const result = await core.execute(command);
+  if (paletteCanonicalGeneration !== canonicalStateGeneration) {
+    syncClientSequencesFromState();
+    return;
+  }
   if (!result.ok) {
     syncClientSequencesFromState();
     setColorEditorStatus(result.diagnostics.map((item) => item.code).join(", "), "error");
     return;
   }
-  state = result.state;
-  selectedColor = asset.palette.length;
-  history.record(before, state, result.result.operation.operationId, result.result.operation.operationType);
-  saveDrawProjectState();
-  scheduleDraw2EditorPreferencesSave();
+  if (!result.result.noOp) {
+    adoptCanonicalState(result.state);
+    refreshSelectionSnapshotForCurrentRaster();
+    selectedColor = asset.palette.length;
+    history.record(before, state, result.result.operation.operationId, result.result.operation.operationType);
+    saveDrawProjectState();
+    scheduleDraw2EditorPreferencesSave();
+  }
   await autosave.record(state, result.result);
   renderPaletteButtons(state.assets[state.activeAssetId]?.palette ?? []);
   syncColorEditorFromSelection();
@@ -15705,9 +17567,195 @@ function updateHistoryButtons() {
 function updateSelectionStatus(message) {
   selectionStatus.textContent = translateDraw2Text(message, draw2Locale);
 }
+function selectionStampBounds(snapshot) {
+  const regions = snapshot.mask.regions;
+  if (regions.length === 0) return void 0;
+  const minX = Math.min(...regions.map((region) => region.x));
+  const minY = Math.min(...regions.map((region) => region.y));
+  const maxX = Math.max(...regions.map((region) => region.x + region.width));
+  const maxY = Math.max(...regions.map((region) => region.y + region.height));
+  return {
+    x: minX,
+    y: minY,
+    width: maxX - minX,
+    height: maxY - minY
+  };
+}
+function nextSelectionStampId() {
+  const safeProjectId = state.projectId.replace(/[^A-Za-z0-9._:-]+/gu, "-").slice(0, 72);
+  let candidate = "";
+  do {
+    selectionStampSequence += 1;
+    candidate = `selection-stamp-${safeProjectId || "project"}-${selectionStampSequence}`;
+  } while (selectionStampStore.load(candidate) !== void 0);
+  return candidate;
+}
+function selectionStampFromCurrentSelection(requestedName) {
+  if (selection === void 0 || !selectionScopeMatchesActiveCel()) {
+    setStatus("\u4FDD\u5B58\u3059\u308B\u9078\u629E\u7BC4\u56F2\u3092\u5148\u306B\u78BA\u5B9A\u3057\u3066\u304F\u3060\u3055\u3044\u3002", "error");
+    return void 0;
+  }
+  const asset = state.assets[selection.scope.assetId];
+  const bounds = selectionStampBounds(selection);
+  if (asset === void 0 || bounds === void 0 || selection.pixels.length === 0) {
+    setStatus("\u9078\u629E\u7BC4\u56F2\u306B\u4FDD\u5B58\u3067\u304D\u308B\u5185\u5BB9\u304C\u3042\u308A\u307E\u305B\u3093\u3002", "error");
+    return void 0;
+  }
+  try {
+    return normalizeDraw2SelectionStamp({
+      id: nextSelectionStampId(),
+      name: requestedName.trim() || `\u9078\u629E\u7BC4\u56F2 ${selectionStampStore.list().length + 1}`,
+      width: bounds.width,
+      height: bounds.height,
+      pixels: selection.pixels.map((pixel) => ({
+        x: pixel.x - bounds.x,
+        y: pixel.y - bounds.y,
+        colorIndex: asset.raster.getPixel(pixel.x, pixel.y)
+      })),
+      palette: [
+        ...asset.palette
+      ]
+    });
+  } catch (cause) {
+    setStatus(cause instanceof Error ? cause.message : "\u9078\u629E\u7BC4\u56F2\u3092\u4FDD\u5B58\u3067\u304D\u307E\u305B\u3093\u3002", "error");
+    return void 0;
+  }
+}
+function colorDistance(left, right) {
+  const a = decodeArgb(left);
+  const b = decodeArgb(right);
+  return (a.alpha - b.alpha) ** 2 + (a.red - b.red) ** 2 + (a.green - b.green) ** 2 + (a.blue - b.blue) ** 2;
+}
+function nearestPaletteIndexForStamp(color, palette) {
+  if (palette.length < 2) return 0;
+  let bestIndex = 1;
+  let bestDistance = colorDistance(color, palette[1] ?? 0);
+  for (let index = 2; index < palette.length; index += 1) {
+    const distance = colorDistance(color, palette[index] ?? 0);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestIndex = index;
+    }
+  }
+  return bestIndex;
+}
+function selectionStampSourceForAsset(stamp2, asset) {
+  const exactPalette = /* @__PURE__ */ new Map();
+  for (let index = 1; index < asset.palette.length; index += 1) {
+    const color = asset.palette[index];
+    if (color !== void 0 && !exactPalette.has(color)) {
+      exactPalette.set(color, index);
+    }
+  }
+  const pixels = new Array(stamp2.width * stamp2.height).fill(0);
+  let remappedColors = 0;
+  for (const pixel of stamp2.pixels) {
+    if (pixel.colorIndex === 0) continue;
+    const sourceColor = stamp2.palette[pixel.colorIndex];
+    if (sourceColor === void 0) continue;
+    const targetIndex = exactPalette.get(sourceColor) ?? nearestPaletteIndexForStamp(sourceColor, asset.palette);
+    if (!exactPalette.has(sourceColor)) remappedColors += 1;
+    pixels[pixel.y * stamp2.width + pixel.x] = targetIndex;
+  }
+  return {
+    width: stamp2.width,
+    height: stamp2.height,
+    pixels,
+    remappedColors
+  };
+}
+function renderSelectionStamps() {
+  const stamps = selectionStampStore.list();
+  if (activeSelectionStampId !== void 0 && selectionStampStore.load(activeSelectionStampId) === void 0) {
+    activeSelectionStampId = void 0;
+  }
+  selectionStampList.replaceChildren();
+  if (stamps.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "draw2-selection-stamp-empty";
+    empty.textContent = "\u4FDD\u5B58\u3057\u305F\u9078\u629E\u7BC4\u56F2\u30B9\u30BF\u30F3\u30D7\u306F\u3042\u308A\u307E\u305B\u3093\u3002";
+    selectionStampList.append(empty);
+  } else {
+    for (const stamp2 of stamps) {
+      const row = document.createElement("div");
+      row.className = "draw2-selection-stamp-entry";
+      row.dataset.selectionStampId = stamp2.id;
+      if (stamp2.id === activeSelectionStampId) {
+        row.dataset.active = "true";
+      }
+      row.setAttribute("role", "listitem");
+      const copy = document.createElement("span");
+      copy.className = "draw2-selection-stamp-copy";
+      const name = document.createElement("strong");
+      name.textContent = stamp2.name;
+      const detail = document.createElement("small");
+      detail.textContent = `${stamp2.width}\xD7${stamp2.height} \xB7 ${stamp2.pixels.length}px`;
+      copy.append(name, detail);
+      const use = document.createElement("button");
+      use.className = "draw2-button draw2-button-secondary";
+      use.type = "button";
+      use.textContent = "\u4F7F\u3046";
+      use.title = "\u3053\u306E\u9078\u629E\u7BC4\u56F2\u30B9\u30BF\u30F3\u30D7\u3092Canvas\u3078\u914D\u7F6E";
+      use.addEventListener("click", () => useSelectionStamp(stamp2.id));
+      const remove = document.createElement("button");
+      remove.className = "draw2-button draw2-button-secondary";
+      remove.type = "button";
+      remove.textContent = "\u524A\u9664";
+      remove.addEventListener("click", () => deleteSelectionStamp(stamp2.id));
+      row.append(copy, use, remove);
+      selectionStampList.append(row);
+    }
+  }
+  selectionStampSaveControl.disabled = selection === void 0 || !selectionScopeMatchesActiveCel() || selectionDraft !== void 0 || pendingSelectionGesture !== void 0;
+  const active = activeSelectionStampId === void 0 ? void 0 : selectionStampStore.load(activeSelectionStampId);
+  selectionStampStatus.textContent = active === void 0 ? "\u9078\u629E\u7BC4\u56F2\u3092\u78BA\u5B9A\u3059\u308B\u3068\u4FDD\u5B58\u3067\u304D\u307E\u3059\u3002\u4FDD\u5B58\u5F8C\u306F\u300C\u4F7F\u3046\u300D\u3067Canvas\u3078\u914D\u7F6E\u3057\u307E\u3059\u3002" : `\u300C${active.name}\u300D\u3092\u9078\u629E\u4E2D \xB7 Canvas\u3092\u30AF\u30EA\u30C3\u30AF\u3057\u3066\u914D\u7F6E\u3067\u304D\u307E\u3059\u3002`;
+}
+function saveSelectionStamp() {
+  if (selectionDraft !== void 0 || pendingSelectionGesture !== void 0) {
+    setStatus("\u9078\u629E\u7BC4\u56F2\u3092\u78BA\u5B9A\u3057\u3066\u304B\u3089\u4FDD\u5B58\u3057\u3066\u304F\u3060\u3055\u3044\u3002", "error");
+    return;
+  }
+  const candidate = selectionStampFromCurrentSelection(selectionStampNameInput.value);
+  if (candidate === void 0) return;
+  try {
+    const saved = selectionStampStore.save(candidate);
+    selectionStampNameInput.value = saved.name;
+    renderSelectionStamps();
+    queueDrawPersistenceSave("selection-stamp-save");
+    setStatus(`\u9078\u629E\u7BC4\u56F2\u30B9\u30BF\u30F3\u30D7\u300C${saved.name}\u300D\u3092\u4FDD\u5B58\u3057\u307E\u3057\u305F\u3002\u300C\u4F7F\u3046\u300D\u3067\u914D\u7F6E\u3067\u304D\u307E\u3059\u3002`);
+  } catch (cause) {
+    setStatus(cause instanceof Error ? cause.message : "\u9078\u629E\u7BC4\u56F2\u30B9\u30BF\u30F3\u30D7\u3092\u4FDD\u5B58\u3067\u304D\u307E\u305B\u3093\u3002", "error");
+  }
+}
+function useSelectionStamp(id) {
+  const stamp2 = selectionStampStore.load(id);
+  if (stamp2 === void 0) {
+    setStatus("\u9078\u629E\u7BC4\u56F2\u30B9\u30BF\u30F3\u30D7\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3002", "error");
+    renderSelectionStamps();
+    return;
+  }
+  activeSelectionStampId = stamp2.id;
+  selectedTileSource = void 0;
+  selectionStampToolActivation = true;
+  selectShortcutTool("tile-stamp");
+  renderSelectionStamps();
+  setStatus(`\u9078\u629E\u7BC4\u56F2\u30B9\u30BF\u30F3\u30D7\u300C${stamp2.name}\u300D\u3092\u9078\u629E\u4E2D \xB7 Canvas\u3092\u30AF\u30EA\u30C3\u30AF\u3057\u3066\u914D\u7F6E`);
+}
+function deleteSelectionStamp(id) {
+  const stamp2 = selectionStampStore.load(id);
+  if (stamp2 === void 0 || !selectionStampStore.remove(id)) {
+    setStatus("\u524A\u9664\u3059\u308B\u9078\u629E\u7BC4\u56F2\u30B9\u30BF\u30F3\u30D7\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3002", "error");
+    return;
+  }
+  if (activeSelectionStampId === id) activeSelectionStampId = void 0;
+  renderSelectionStamps();
+  queueDrawPersistenceSave("selection-stamp-delete");
+  setStatus(`\u9078\u629E\u7BC4\u56F2\u30B9\u30BF\u30F3\u30D7\u300C${stamp2.name}\u300D\u3092\u524A\u9664\u3057\u307E\u3057\u305F\u3002`);
+}
 function updateSelectionActionButtons() {
   commitSelectionControl.disabled = selectionDraft === void 0;
   cancelSelectionControl.disabled = selectionDraft === void 0 && pendingSelectionGesture === void 0;
+  renderSelectionStamps();
   syncWorkspaceEditCommandState();
 }
 function syncWorkspaceEditCommandState() {
@@ -15824,12 +17872,15 @@ function cyclePlaybackLoopMode() {
 function timelineCelId(frameId, layerTrackId) {
   return state.cels.find((item) => item.frameId === frameId && item.layerTrackId === layerTrackId)?.celId ?? `${state.projectId}:cel:${layerTrackId}:${frameId}`;
 }
-async function activateTimelineCell(frameId, layerTrackId) {
+async function activateTimelineCell(frameId, layerTrackId, immediate = false) {
+  const requestId = ++timelineActivationRequestSequence;
+  latestTimelineActivationRequestId = requestId;
   const celId = timelineCelId(frameId, layerTrackId);
   const target = state.cels.find((item) => item.celId === celId);
   const tilemapLayer = layerKind(layerTrackId) === "TILEMAP";
   if (tilemapLayer) ensureTilemapFor(layerTrackId, frameId);
   if ((target?.assetId !== void 0 && target.bindingMode !== "DUPLICATE_INDEPENDENT" || tilemapLayer && target?.bindingMode === "TILEMAP") && state.activeFrameId === frameId && state.activeLayerId === layerTrackId && state.activeCelId === celId && (tilemapLayer || state.activeAssetId === target?.assetId)) {
+    timelineActivationPending = false;
     await present();
     return true;
   }
@@ -15838,16 +17889,20 @@ async function activateTimelineCell(frameId, layerTrackId) {
   }
   timelineActivationPending = true;
   try {
-    return await runTimelineCommand("timeline.activateCel", {
+    const execute = immediate ? runTimelineCommandNow : runTimelineCommand;
+    return await execute("timeline.activateCel", {
       celId,
       frameId,
       layerTrackId
     }, {
       recordHistory: false,
-      announce: false
+      announce: false,
+      activationRequestId: requestId
     });
   } finally {
-    timelineActivationPending = false;
+    if (requestId === latestTimelineActivationRequestId) {
+      timelineActivationPending = false;
+    }
   }
 }
 function syncTimelinePlaybackFrame(frameId) {
@@ -17096,7 +19151,10 @@ function toggleActiveLinkedCel() {
     setStatus(cause instanceof Error ? cause.message : "Linked Cel is invalid.", "error");
   }
 }
-async function runTimelineCommand(commandType, payload, options = {}) {
+function runTimelineCommand(commandType, payload, options = {}) {
+  return enqueueCanonicalOperation(() => runTimelineCommandNow(commandType, payload, options));
+}
+async function runTimelineCommandNow(commandType, payload, options = {}) {
   timelineStateGeneration += 1;
   const commandSequence = nextClientSequence(TIMELINE_CLIENT_ID);
   const before = state;
@@ -17114,19 +19172,20 @@ async function runTimelineCommand(commandType, payload, options = {}) {
     payload
   };
   const result = await executeTimelineCommand(state, command);
+  if (options.activationRequestId !== void 0 && options.activationRequestId !== latestTimelineActivationRequestId) {
+    syncClientSequencesFromState();
+    return false;
+  }
   if (!result.ok) {
     syncClientSequencesFromState();
     setStatus(result.diagnostics.map((item) => item.code).join(", "), "error");
     return false;
   }
-  state = result.state;
+  if (!result.result.noOp) adoptCanonicalState(result.state);
   const timelineInvalidatesLocalSelection = timelineCommandInvalidatesSelection(before, state);
   if (timelineInvalidatesLocalSelection && (selection !== void 0 || hasUncommittedSelectionWork())) {
     clearCommittedSelection("Selection and transform preview cleared because the timeline target changed.");
   }
-  core = new EditorCore(state, {
-    instrumentation
-  });
   switch (commandType) {
     case "timeline.addFrame":
     case "timeline.duplicateFrame":
@@ -17172,7 +19231,7 @@ async function runTimelineCommand(commandType, payload, options = {}) {
     };
   }
   if (autoActivate !== void 0) {
-    await activateTimelineCell(autoActivate.frameId, autoActivate.layerTrackId);
+    await activateTimelineCell(autoActivate.frameId, autoActivate.layerTrackId, true);
   }
   if (options.recordHistory !== false) {
     history.record(before, state, result.result.operation.operationId, result.result.operation.operationType);
@@ -17804,16 +19863,16 @@ function compositeRegion(region, frameId = timelineSession.activeFrameId, previe
   const image = canonicalContext.createImageData(region.width, region.height);
   const orderedLayers = state.timeline.layerTrackOrder.map((layerTrackId) => state.layers.find((item) => item.layerTrackId === layerTrackId)).filter((item) => item !== void 0 && item.visible && item.opacity > 0);
   for (const layer2 of orderedLayers) {
-    const tilemap = layer2.kind === "TILEMAP" ? state.tilemaps?.[tilemapIdFor(layer2.layerTrackId, frameId)] : void 0;
-    const cel2 = state.cels.find((item) => item.layerTrackId === layer2.layerTrackId && item.frameId === frameId && item.lifecycle === "ACTIVE" && (item.assetId !== void 0 || tilemap !== void 0));
+    const tilemap2 = layer2.kind === "TILEMAP" ? state.tilemaps?.[tilemapIdFor(layer2.layerTrackId, frameId)] : void 0;
+    const cel2 = state.cels.find((item) => item.layerTrackId === layer2.layerTrackId && item.frameId === frameId && item.lifecycle === "ACTIVE" && (item.assetId !== void 0 || tilemap2 !== void 0));
     const source = cel2?.assetId === void 0 ? void 0 : state.assets[cel2.assetId];
-    if (source === void 0 && tilemap === void 0) continue;
+    if (source === void 0 && tilemap2 === void 0) continue;
     const pixels = source === void 0 ? void 0 : source.raster.readRegion(region.x, region.y, region.width, region.height).pixels;
     const pixelCount = region.width * region.height;
     for (let index = 0; index < pixelCount; index += 1) {
       const globalX = region.x + index % region.width;
       const globalY = region.y + Math.floor(index / region.width);
-      const tilePixel = tilemap === void 0 ? void 0 : tilemapSourcePixel(tilemap, globalX, globalY);
+      const tilePixel = tilemap2 === void 0 ? void 0 : tilemapSourcePixel(tilemap2, globalX, globalY);
       const sourceAsset = tilePixel?.asset ?? source;
       const sourceColorIndex = tilePixel?.colorIndex ?? pixels?.[index];
       if (sourceAsset === void 0 || sourceColorIndex === void 0) continue;
@@ -18103,6 +20162,26 @@ function selectionScopeMatchesActiveCel(snapshot = selection) {
   if (snapshot === void 0) return true;
   return snapshot.scope.assetId === state.activeAssetId && snapshot.scope.layerId === state.activeLayerId && snapshot.scope.frameId === state.activeFrameId && snapshot.scope.celId === state.activeCelId && snapshot.sourceStructureEpoch === state.structureEpoch;
 }
+function refreshSelectionSnapshotForCurrentRaster() {
+  if (selection === void 0 || !selectionScopeMatchesActiveCel()) return;
+  const asset = state.assets[selection.scope.assetId];
+  if (asset === void 0) return;
+  selection = {
+    ...selection,
+    mask: {
+      ...selection.mask,
+      regions: selection.mask.regions.map((region) => ({
+        ...region
+      }))
+    },
+    sourceRasterRevision: asset.revision,
+    sourceStructureEpoch: state.structureEpoch,
+    pixels: selection.pixels.map((pixel) => ({
+      ...pixel,
+      colorIndex: asset.raster.getPixel(pixel.x, pixel.y)
+    }))
+  };
+}
 function timelineCommandInvalidatesSelection(before, after) {
   return before.activeAssetId !== after.activeAssetId || before.activeLayerId !== after.activeLayerId || before.activeFrameId !== after.activeFrameId || before.activeCelId !== after.activeCelId || before.structureEpoch !== after.structureEpoch || activeRasterRevision(before) !== activeRasterRevision(after);
 }
@@ -18265,7 +20344,7 @@ function applySelectionMorphology(operation) {
   notifyAssetStateChanged();
   setStatus(`Selection ${operation.toLowerCase()} applied locally; confirm a Transform to mutate pixels.`);
 }
-async function commitWriteSet(writes, sourceOperationType, toolForMirroring = currentBasicTool()) {
+async function commitWriteSet(writes, sourceOperationType, toolForMirroring = currentBasicTool(), options = {}) {
   if (timelineActivationPending) {
     setStatus("Timeline cell is changing; drawing was not committed.", "error");
     return;
@@ -18277,7 +20356,7 @@ async function commitWriteSet(writes, sourceOperationType, toolForMirroring = cu
     return;
   }
   const mirroredWrites = mirrorWritesForTool(writes, asset, toolForMirroring);
-  const selectionKeys = selection === void 0 ? void 0 : new Set(selection.pixels.map(selectionPointKey));
+  const selectionKeys = options.respectSelection === false || selection === void 0 ? void 0 : new Set(selection.pixels.map(selectionPointKey));
   const committedWrites = selectionKeys === void 0 ? mirroredWrites : mirroredWrites.filter((write) => selectionKeys.has(selectionPointKey(write)));
   if (committedWrites.length === 0) return;
   const drawClientId = activeDrawClientId();
@@ -18299,8 +20378,9 @@ async function commitWriteSet(writes, sourceOperationType, toolForMirroring = cu
     }
   };
   const writeTimelineGeneration = timelineStateGeneration;
+  const writeCanonicalGeneration = canonicalStateGeneration;
   const result = await core.execute(command);
-  if (writeTimelineGeneration !== timelineStateGeneration) {
+  if (writeTimelineGeneration !== timelineStateGeneration || writeCanonicalGeneration !== canonicalStateGeneration) {
     syncClientSequencesFromState();
     setStatus("Timeline cell changed while drawing; the old-cell write was discarded.", "error");
     return;
@@ -18310,12 +20390,17 @@ async function commitWriteSet(writes, sourceOperationType, toolForMirroring = cu
     setStatus(result.diagnostics.map((item) => item.code).join(", "), "error");
     return;
   }
-  state = result.state;
-  history.record(before, state, result.result.operation.operationId, result.result.operation.operationType);
-  renderTimeline();
-  saveDrawProjectState();
+  if (!result.result.noOp) {
+    adoptCanonicalState(result.state);
+    refreshSelectionSnapshotForCurrentRaster();
+    history.record(before, state, result.result.operation.operationId, result.result.operation.operationType);
+    renderTimeline();
+    saveDrawProjectState();
+  }
   await autosave.record(state, result.result);
-  publishDrawRasterCommit(result.result, state, before.structureEpoch);
+  if (!result.result.noOp) {
+    publishDrawRasterCommit(result.result, state, before.structureEpoch);
+  }
   await present(result.result.dirtyRegions, result.result.dirtyTiles);
   updateHistoryButtons();
   setStatus(`${sourceOperationType} committed \xB7 ${committedWrites.length}px${mirrorEnabled && mirrorHasActiveAxis() ? ` \xB7 mirror=${mirrorAxisSummary()}` : ""} \xB7 one undo`);
@@ -18436,9 +20521,7 @@ async function resetProject(options = {}) {
   repository.save(state);
   projectIdInput.value = projectId;
   tileSizeSelect.value = String(tileSize);
-  core = new EditorCore(state, {
-    instrumentation
-  });
+  adoptCanonicalState(state);
   history = new LocalUndoRedoHistory(state);
   syncClientSequencesFromState();
   selectionInteractionGeneration += 1;
@@ -18462,6 +20545,7 @@ async function resetProject(options = {}) {
   onionSkinColorMode = "TINTED";
   onionSkinCache = void 0;
   restoreDraw2TimelineMetadata(restored?.timelineMetadata);
+  renderSelectionStamps();
   linkedCelBindings = [];
   journal.operations.length = 0;
   journal.dirtyTileWrites.length = 0;
@@ -19748,6 +21832,42 @@ async function exportSelectedToFile() {
   }
 }
 async function importPxdFile(file) {
+  const previousImportState = {
+    state: cloneProjectStateShared(state),
+    activeWorkspaceProjectId: readActiveWorkspaceProjectId(),
+    assetDefinitions: assetDefinitions.map(cloneAssetDefinitionEntry),
+    assetDefinitionSequence,
+    history: history.snapshot(),
+    drawPersistenceRevision,
+    clientSequence,
+    selection,
+    selectionDraft,
+    pendingSelectionGesture,
+    transformSession,
+    transformPreview,
+    pasteMode,
+    clipboard,
+    selectedTileSource,
+    tilesetSourceRenderKey,
+    lastTilemapGridLayoutKey,
+    timelineSession,
+    timelineViewportInitialized,
+    structureClientSequence,
+    onionSkinEnabled,
+    onionSkinPreviousFrames,
+    onionSkinNextFrames,
+    onionSkinOpacity,
+    onionSkinColorMode,
+    onionSkinCache,
+    activeSelectionStampId,
+    draw2EditorPreferencesReady,
+    timelineMetadata: draw2TimelineMetadataSnapshot(),
+    journal: drawJournalSnapshot(),
+    journalCheckpoints: journal.checkpoints.map((checkpoint) => cloneProjectStateShared(checkpoint))
+  };
+  let importCommitStarted = false;
+  let previousWorkspacePxdSnapshot;
+  let workspaceRollbackFailed = false;
   try {
     const bytes = new Uint8Array(await file.arrayBuffer());
     const legacyCompat = await loadLegacyCompatModule();
@@ -19792,19 +21912,24 @@ async function importPxdFile(file) {
         game: imported.game
       };
     } else {
-      const diagnostic8 = inspection.diagnostics[0];
-      throw new Error(diagnostic8?.message ?? "PXD format could not be identified.");
+      const diagnostic9 = inspection.diagnostics[0];
+      throw new Error(diagnostic9?.message ?? "PXD format could not be identified.");
+    }
+    if (importedState.assets[importedState.activeAssetId] === void 0) {
+      throw new Error("Imported PXD active asset is missing.");
+    }
+    if (importedWorkspace !== void 0) {
+      previousWorkspacePxdSnapshot = await getWorkspacePxdBridge().exportProjectPxdSnapshot();
     }
     flushDrawPersistence();
     await flushDrawPersistence();
+    importCommitStarted = true;
     draw2EditorPreferencesReady = false;
     state = importedState;
     assetDefinitions = importedAssetDefinitions.map(cloneAssetDefinitionEntry);
     assetDefinitionSequence = 0;
     repository.save(state);
-    core = new EditorCore(state, {
-      instrumentation
-    });
+    adoptCanonicalState(state);
     history = new LocalUndoRedoHistory(state);
     const importedRecord = await drawPersistenceStore.load(state.projectId);
     drawPersistenceRevision = importedRecord?.revision ?? 0;
@@ -19822,6 +21947,7 @@ async function importPxdFile(file) {
     lastTilemapGridLayoutKey = "";
     timelineSession = createTimelineSession(state);
     restoreDraw2TimelineMetadata(importedTimelineMetadata);
+    renderSelectionStamps();
     timelineViewportInitialized = false;
     structureClientSequence = 0;
     onionSkinEnabled = false;
@@ -19862,7 +21988,73 @@ async function importPxdFile(file) {
     });
     setStatus(`PXD imported locally \xB7 ${importedStatus} \xB7 hash=${importedHash.slice(0, 12)}\u2026`);
   } catch (cause) {
-    setStatus(cause instanceof Error ? `PXD import rejected: ${cause.message}` : "PXD import rejected.", "error");
+    if (importCommitStarted) {
+      state = previousImportState.state;
+      assetDefinitions = previousImportState.assetDefinitions.map(cloneAssetDefinitionEntry);
+      assetDefinitionSequence = previousImportState.assetDefinitionSequence;
+      drawPersistenceRevision = previousImportState.drawPersistenceRevision;
+      clientSequence = previousImportState.clientSequence;
+      selection = previousImportState.selection;
+      selectionDraft = previousImportState.selectionDraft;
+      pendingSelectionGesture = previousImportState.pendingSelectionGesture;
+      transformSession = previousImportState.transformSession;
+      transformPreview = previousImportState.transformPreview;
+      pasteMode = previousImportState.pasteMode;
+      clipboard = previousImportState.clipboard;
+      selectedTileSource = previousImportState.selectedTileSource;
+      tilesetSourceRenderKey = previousImportState.tilesetSourceRenderKey;
+      lastTilemapGridLayoutKey = previousImportState.lastTilemapGridLayoutKey;
+      timelineSession = previousImportState.timelineSession;
+      timelineViewportInitialized = previousImportState.timelineViewportInitialized;
+      structureClientSequence = previousImportState.structureClientSequence;
+      onionSkinEnabled = previousImportState.onionSkinEnabled;
+      onionSkinPreviousFrames = previousImportState.onionSkinPreviousFrames;
+      onionSkinNextFrames = previousImportState.onionSkinNextFrames;
+      onionSkinOpacity = previousImportState.onionSkinOpacity;
+      onionSkinColorMode = previousImportState.onionSkinColorMode;
+      onionSkinCache = previousImportState.onionSkinCache;
+      activeSelectionStampId = previousImportState.activeSelectionStampId;
+      draw2EditorPreferencesReady = previousImportState.draw2EditorPreferencesReady;
+      repository.save(previousImportState.state);
+      adoptCanonicalState(previousImportState.state);
+      history = new LocalUndoRedoHistory(previousImportState.state);
+      history.restore(previousImportState.history);
+      restoreDraw2TimelineMetadata(previousImportState.timelineMetadata);
+      journal.operations.splice(0, journal.operations.length, ...previousImportState.journal.operations.map((operation) => ({
+        ...operation
+      })));
+      journal.dirtyTileWrites.splice(0, journal.dirtyTileWrites.length, ...previousImportState.journal.dirtyTileWrites.map((write) => ({
+        assetId: write.assetId,
+        tiles: write.tiles.map((tile) => ({
+          tileKey: tile.tileKey,
+          bytes: new Uint8Array(tile.bytes)
+        }))
+      })));
+      journal.checkpoints.splice(0, journal.checkpoints.length, ...previousImportState.journalCheckpoints.map((checkpoint) => cloneProjectStateShared(checkpoint)));
+      const restoredAsset = state.assets[state.activeAssetId];
+      if (restoredAsset !== void 0) {
+        syncRasterCanvasDimensions(restoredAsset.width, restoredAsset.height);
+        renderPaletteButtons(restoredAsset.palette);
+      }
+      renderTimeline();
+      await present();
+      updateHistoryButtons();
+      saveDrawProjectState("import-rollback");
+      writeActiveWorkspaceProjectId(previousImportState.activeWorkspaceProjectId);
+      if (previousWorkspacePxdSnapshot !== void 0) {
+        try {
+          await getWorkspacePxdBridge().restoreProjectPxdSnapshot(previousWorkspacePxdSnapshot);
+        } catch {
+          workspaceRollbackFailed = true;
+        }
+      }
+      announceWorkspaceProjectChanged(window, {
+        projectId: asWorkspaceProjectId(state.projectId),
+        name: state.name
+      });
+    }
+    const message = cause instanceof Error ? `PXD import rejected: ${cause.message}` : "PXD import rejected.";
+    setStatus(workspaceRollbackFailed ? `${message} Draw was restored, but the shared Audio/Game snapshot could not be restored.` : message, "error");
   } finally {
     importPxdControl.value = "";
   }
@@ -20000,6 +22192,19 @@ async function commitPointerPoints(points, fixedContext) {
     setStatus(`Picked palette index ${selectedColor}.`);
     return;
   }
+  const activeSelectionStamp = activeSelectionStampId === void 0 ? void 0 : selectionStampStore.load(activeSelectionStampId);
+  if (tool === "tile-stamp" && activeSelectionStamp !== void 0) {
+    const source = selectionStampSourceForAsset(activeSelectionStamp, asset);
+    const writes2 = tileStampWrites(asset.raster, source, first, Number(specialTileScaleElement?.value ?? 1));
+    await commitWriteSet(writes2, "tool.selection-stamp", tool, {
+      respectSelection: false
+    });
+    if (writes2.length > 0) {
+      const remapMessage = source.remappedColors > 0 ? ` \xB7 ${source.remappedColors}\u8272\u3092\u8FD1\u4F3C\u5909\u63DB` : "";
+      setStatus(`\u9078\u629E\u7BC4\u56F2\u30B9\u30BF\u30F3\u30D7\u300C${activeSelectionStamp.name}\u300D\u3092\u914D\u7F6E\u3057\u307E\u3057\u305F \xB7 ${writes2.length}px \xB7 1 undo${remapMessage}`);
+    }
+    return;
+  }
   if (tool === "tile-stamp") {
     const source = selectedTileSource === void 0 ? {
       width: 2,
@@ -20033,7 +22238,7 @@ async function commitPointerPoints(points, fixedContext) {
     const writes2 = tileStampWrites(asset.raster, source, first, Number(specialTileScaleElement?.value ?? 1));
     await commitWriteSet(writes2, "tool.tile-stamp", tool);
     if (writes2.length > 0) {
-      setStatus(`Tile Stamp committed \xB7 ${writes2.length}px \xB7 one undo`);
+      setStatus(`Tile placement committed \xB7 ${writes2.length}px \xB7 one undo`);
     }
     return;
   }
@@ -20091,8 +22296,9 @@ async function commitPointerPoints(points, fixedContext) {
       }
     };
     const fillTimelineGeneration = timelineStateGeneration;
+    const fillCanonicalGeneration = canonicalStateGeneration;
     const result = await core.execute(command);
-    if (fillTimelineGeneration !== timelineStateGeneration) {
+    if (fillTimelineGeneration !== timelineStateGeneration || fillCanonicalGeneration !== canonicalStateGeneration) {
       syncClientSequencesFromState();
       setStatus("Timeline cell changed while filling; the old-cell write was discarded.", "error");
       return;
@@ -20102,12 +22308,17 @@ async function commitPointerPoints(points, fixedContext) {
       setStatus(result.diagnostics.map((item) => item.code).join(", "), "error");
       return;
     }
-    state = result.state;
-    history.record(before, state, result.result.operation.operationId, result.result.operation.operationType);
-    renderTimeline();
-    saveDrawProjectState();
+    if (!result.result.noOp) {
+      adoptCanonicalState(result.state);
+      refreshSelectionSnapshotForCurrentRaster();
+      history.record(before, state, result.result.operation.operationId, result.result.operation.operationType);
+      renderTimeline();
+      saveDrawProjectState();
+    }
     await autosave.record(state, result.result);
-    publishDrawRasterCommit(result.result, state, before.structureEpoch);
+    if (!result.result.noOp) {
+      publishDrawRasterCommit(result.result, state, before.structureEpoch);
+    }
     await present(result.result.dirtyRegions, result.result.dirtyTiles);
     updateHistoryButtons();
     setStatus(`fill committed \xB7 ${result.result.dirtyTiles.length} tiles \xB7 one undo`);
@@ -20143,8 +22354,9 @@ async function commitPointerPoints(points, fixedContext) {
       }
     };
     const strokeTimelineGeneration = timelineStateGeneration;
+    const strokeCanonicalGeneration = canonicalStateGeneration;
     const result = await core.execute(command);
-    if (strokeTimelineGeneration !== timelineStateGeneration) {
+    if (strokeTimelineGeneration !== timelineStateGeneration || strokeCanonicalGeneration !== canonicalStateGeneration) {
       syncClientSequencesFromState();
       setStatus("Timeline cell changed while drawing; the old-cell write was discarded.", "error");
       return;
@@ -20154,12 +22366,17 @@ async function commitPointerPoints(points, fixedContext) {
       setStatus(result.diagnostics.map((item) => item.code).join(", "), "error");
       return;
     }
-    state = result.state;
-    history.record(before, state, result.result.operation.operationId, result.result.operation.operationType);
-    renderTimeline();
-    saveDrawProjectState();
+    if (!result.result.noOp) {
+      adoptCanonicalState(result.state);
+      refreshSelectionSnapshotForCurrentRaster();
+      history.record(before, state, result.result.operation.operationId, result.result.operation.operationType);
+      renderTimeline();
+      saveDrawProjectState();
+    }
     await autosave.record(state, result.result);
-    publishDrawRasterCommit(result.result, state, before.structureEpoch);
+    if (!result.result.noOp) {
+      publishDrawRasterCommit(result.result, state, before.structureEpoch);
+    }
     await present(result.result.dirtyRegions, result.result.dirtyTiles);
     updateHistoryButtons();
     setStatus(`${tool} committed \xB7 one stroke / one undo`);
@@ -20648,6 +22865,7 @@ async function commitActiveTransform() {
   const commandSequence = nextClientSequence(SELECTION_CLIENT_ID);
   const commandId = selectionCommandId(pasteMode ? "paste" : "transform", state.projectId, commandSequence);
   const interactionGeneration = selectionInteractionGeneration;
+  const canonicalGeneration = canonicalStateGeneration;
   const result = pasteMode && clipboard !== void 0 ? await pasteClipboard(state, {
     commandType: "clipboard.paste",
     commandId,
@@ -20679,7 +22897,7 @@ async function commitActiveTransform() {
       session: transformSession
     }
   });
-  if (interactionGeneration !== selectionInteractionGeneration) {
+  if (interactionGeneration !== selectionInteractionGeneration || canonicalGeneration !== canonicalStateGeneration) {
     return false;
   }
   if (result === void 0 || !result.ok) {
@@ -20694,7 +22912,7 @@ async function commitActiveTransform() {
     setStatus(result === void 0 ? "Transform selection is missing." : result.diagnostics.map((item) => item.code).join(", "), "error");
     return false;
   }
-  state = result.state;
+  if (!result.result.noOp) adoptCanonicalState(result.state);
   syncClientSequencesFromState();
   if (sourceSelection !== void 0 && previewPixels.length > 0) {
     const activeAsset = state.assets[state.activeAssetId];
@@ -20713,9 +22931,12 @@ async function commitActiveTransform() {
   } else {
     selection = void 0;
   }
-  history.record(before, state, result.result.operation.operationId, result.result.operation.operationType);
-  renderTimeline();
-  saveDrawProjectState();
+  refreshSelectionSnapshotForCurrentRaster();
+  if (!result.result.noOp) {
+    history.record(before, state, result.result.operation.operationId, result.result.operation.operationType);
+    renderTimeline();
+    saveDrawProjectState();
+  }
   await autosave.record(state, result.result);
   selectionDraft = void 0;
   pendingSelectionGesture = void 0;
@@ -20774,6 +22995,7 @@ cutButton.addEventListener("click", () => {
     const commandSequence = nextClientSequence(SELECTION_CLIENT_ID);
     const commandId = selectionCommandId("cut", state.projectId, commandSequence);
     const interactionGeneration = selectionInteractionGeneration;
+    const canonicalGeneration = canonicalStateGeneration;
     const result = await cutClipboard(state, {
       commandType: "clipboard.cut",
       commandId,
@@ -20790,17 +23012,20 @@ cutButton.addEventListener("click", () => {
         selection
       }
     });
-    if (interactionGeneration !== selectionInteractionGeneration) return;
+    if (interactionGeneration !== selectionInteractionGeneration || canonicalGeneration !== canonicalStateGeneration) return;
     if (!result.ok) {
       syncClientSequencesFromState();
       setStatus(result.diagnostics.map((item) => item.code).join(", "), "error");
       return;
     }
     syncClientSequencesFromState();
-    state = result.state;
-    history.record(before, state, result.result.operation.operationId, result.result.operation.operationType);
-    renderTimeline();
-    saveDrawProjectState();
+    if (!result.result.noOp) {
+      adoptCanonicalState(result.state);
+      refreshSelectionSnapshotForCurrentRaster();
+      history.record(before, state, result.result.operation.operationId, result.result.operation.operationType);
+      renderTimeline();
+      saveDrawProjectState();
+    }
     await autosave.record(state, result.result);
     selection = void 0;
     selectionDraft = void 0;
@@ -20853,10 +23078,7 @@ undoControl.addEventListener("click", async () => {
     setStatus("Nothing to undo.", "error");
     return;
   }
-  state = result.state;
-  core = new EditorCore(state, {
-    instrumentation
-  });
+  adoptCanonicalState(result.state);
   syncClientSequencesFromState();
   saveDrawProjectState();
   selection = void 0;
@@ -20866,9 +23088,9 @@ undoControl.addEventListener("click", async () => {
   transformSession = void 0;
   transformPreview = void 0;
   pasteMode = false;
+  normalizeTimelineSession();
   notifyAssetStateChanged();
   await present();
-  normalizeTimelineSession();
   renderTimeline();
   updateSelectionActionButtons();
   updateSelectionStatus(`scope=${state.activeCelId} \xB7 selection=none`);
@@ -20883,10 +23105,7 @@ redoControl.addEventListener("click", async () => {
     setStatus("Nothing to redo.", "error");
     return;
   }
-  state = result.state;
-  core = new EditorCore(state, {
-    instrumentation
-  });
+  adoptCanonicalState(result.state);
   syncClientSequencesFromState();
   saveDrawProjectState();
   selection = void 0;
@@ -20896,9 +23115,9 @@ redoControl.addEventListener("click", async () => {
   transformSession = void 0;
   transformPreview = void 0;
   pasteMode = false;
+  normalizeTimelineSession();
   notifyAssetStateChanged();
   await present();
-  normalizeTimelineSession();
   renderTimeline();
   updateSelectionActionButtons();
   updateSelectionStatus(`scope=${state.activeCelId} \xB7 selection=none`);
@@ -20907,6 +23126,10 @@ redoControl.addEventListener("click", async () => {
   setStatus(`Redo restored ${result.operationId} locally; no Realtime operation sent.`);
 });
 var drawInteraction;
+function sameTilemapCell(left, right) {
+  if (left === void 0 || right === void 0) return left === right;
+  return left.sourceAssetId === right.sourceAssetId && left.sourceX === right.sourceX && left.sourceY === right.sourceY && left.transform === right.transform;
+}
 var tilemapPointerGesture;
 var tilemapPresentFrame;
 var viewportPanPointerId;
@@ -20995,18 +23218,18 @@ function beginSelectionDrag(event, point) {
   transformOperation.value = "MOVE";
   transformDx.value = "0";
   transformDy.value = "0";
-  const transform = {
+  const transform2 = {
     ...currentTransform(),
     operation: "MOVE"
   };
   if (duplicate) {
     clipboard = createClipboardPayload(state, currentSelection, "draw2-selection-alt-drag");
     pasteMode = true;
-    transformSession = createClipboardPasteSession(state, clipboard, transform, `paste-drag-${state.projectId}-${currentSelection.mask.selectionVersion}-0-0`);
+    transformSession = createClipboardPasteSession(state, clipboard, transform2, `paste-drag-${state.projectId}-${currentSelection.mask.selectionVersion}-0-0`);
     transformPreview = previewClipboardPaste(state, clipboard, transformSession);
   } else {
     pasteMode = false;
-    transformSession = createTransformSession(currentSelection, transform, `transform-drag-${state.projectId}-${currentSelection.mask.selectionVersion}-0-0`);
+    transformSession = createTransformSession(currentSelection, transform2, `transform-drag-${state.projectId}-${currentSelection.mask.selectionVersion}-0-0`);
     transformPreview = previewTransform(currentSelection, transformSession);
   }
   syncWorkspaceEditCommandState();
@@ -21018,12 +23241,37 @@ function beginSelectionDrag(event, point) {
 function cancelTilemapPointerGestureForPinch() {
   const gesture = tilemapPointerGesture;
   if (gesture === void 0) return;
-  state = gesture.before;
-  core = new EditorCore(state, {
-    instrumentation
-  });
+  const isCurrent = !gesture.stale && canonicalStateGeneration === gesture.canonicalGeneration && state.structureEpoch === gesture.structureEpoch && state.tilemaps?.[gesture.mapId]?.revision === gesture.mapRevision;
+  if (isCurrent) {
+    adoptCanonicalState(gesture.before);
+  } else if (rollbackStaleTilemapGesture(gesture)) {
+    saveDrawProjectState("tilemap-cancel");
+    notifyAssetStateChanged();
+  }
   tilemapPointerGesture = void 0;
   scheduleTilemapPresent();
+}
+function rollbackStaleTilemapGesture(gesture) {
+  const map = state.tilemaps?.[gesture.mapId];
+  if (map === void 0) return false;
+  let nextMap = map;
+  for (const [key, beforeCell] of gesture.beforeCells) {
+    if (!sameTilemapCell(map.cells[key], gesture.localCells.get(key))) continue;
+    const [xText, yText] = key.split(":");
+    const x = Number(xText);
+    const y = Number(yText);
+    if (!Number.isSafeInteger(x) || !Number.isSafeInteger(y)) continue;
+    nextMap = beforeCell === void 0 ? clearDraw2TilemapCell(nextMap, x, y) : setDraw2TilemapCell(nextMap, x, y, beforeCell);
+  }
+  if (nextMap === map) return false;
+  adoptCanonicalState({
+    ...state,
+    tilemaps: {
+      ...state.tilemaps ?? {},
+      [map.id]: nextMap
+    }
+  });
+  return true;
 }
 function updateSelectionDragPreview(point) {
   if (selectionDrag === void 0 || selection === void 0) return;
@@ -21039,7 +23287,7 @@ function updateSelectionDragPreview(point) {
   transformOperation.value = "MOVE";
   transformDx.value = String(dx);
   transformDy.value = String(dy);
-  const transform = {
+  const transform2 = {
     ...currentTransform(),
     operation: "MOVE",
     dx,
@@ -21047,11 +23295,11 @@ function updateSelectionDragPreview(point) {
   };
   if (selectionDrag.duplicate && clipboard !== void 0) {
     pasteMode = true;
-    transformSession = createClipboardPasteSession(state, clipboard, transform, `paste-drag-${state.projectId}-${selection.mask.selectionVersion}-${dx}-${dy}`);
+    transformSession = createClipboardPasteSession(state, clipboard, transform2, `paste-drag-${state.projectId}-${selection.mask.selectionVersion}-${dx}-${dy}`);
     transformPreview = previewClipboardPaste(state, clipboard, transformSession);
   } else {
     pasteMode = false;
-    transformSession = createTransformSession(selection, transform, `transform-drag-${state.projectId}-${selection.mask.selectionVersion}-${dx}-${dy}`);
+    transformSession = createTransformSession(selection, transform2, `transform-drag-${state.projectId}-${selection.mask.selectionVersion}-${dx}-${dy}`);
   }
   if (!selectionDrag.duplicate || clipboard === void 0) {
     transformPreview = previewTransform(selection, transformSession);
@@ -21368,6 +23616,10 @@ function tilemapCellCoordinates(map, point) {
 function updateTilemapPointerGesture(point) {
   const gesture = tilemapPointerGesture;
   if (gesture === void 0) return;
+  if (gesture.stale || canonicalStateGeneration !== gesture.canonicalGeneration || state.structureEpoch !== gesture.structureEpoch || state.tilemaps?.[gesture.mapId]?.revision !== gesture.mapRevision) {
+    gesture.stale = true;
+    return;
+  }
   const map = state.tilemaps?.[gesture.mapId];
   if (map === void 0) return;
   const coordinates = tilemapCellCoordinates(map, point);
@@ -21375,6 +23627,9 @@ function updateTilemapPointerGesture(point) {
   const key = `${coordinates.x}:${coordinates.y}`;
   if (key === gesture.lastCellKey) return;
   gesture.lastCellKey = key;
+  if (!gesture.beforeCells.has(key)) {
+    gesture.beforeCells.set(key, map.cells[key]);
+  }
   const nextMap = gesture.erase ? clearDraw2TilemapCell(map, coordinates.x, coordinates.y) : selectedTileSource === void 0 ? map : setDraw2TilemapCell(map, coordinates.x, coordinates.y, {
     sourceAssetId: selectedTileSource.sourceAssetId,
     sourceX: selectedTileSource.sourceX,
@@ -21382,17 +23637,19 @@ function updateTilemapPointerGesture(point) {
     transform: "NONE"
   });
   if (nextMap === map) return;
-  state = {
+  adoptCanonicalState({
     ...state,
     tilemaps: {
       ...state.tilemaps ?? {},
       [map.id]: nextMap
     }
-  };
-  core = new EditorCore(state, {
-    instrumentation
   });
+  refreshSelectionSnapshotForCurrentRaster();
   gesture.changed = true;
+  gesture.canonicalGeneration = canonicalStateGeneration;
+  gesture.mapRevision = nextMap.revision;
+  gesture.structureEpoch = state.structureEpoch;
+  gesture.localCells.set(key, nextMap.cells[key]);
   scheduleTilemapPresent();
 }
 function beginTilemapPointerGesture(event, point) {
@@ -21400,6 +23657,10 @@ function beginTilemapPointerGesture(event, point) {
   const layer2 = state.layers.find((item) => item.layerTrackId === state.activeLayerId);
   if (layer2?.locked === true) {
     setStatus("\u30BF\u30A4\u30EB\u30DE\u30C3\u30D7\u30EC\u30A4\u30E4\u30FC\u304C\u30ED\u30C3\u30AF\u3055\u308C\u3066\u3044\u307E\u3059\u3002", "error");
+    return true;
+  }
+  if (activeSelectionStampId !== void 0) {
+    setStatus("\u9078\u629E\u7BC4\u56F2\u30B9\u30BF\u30F3\u30D7\u306F\u901A\u5E38\u30EC\u30A4\u30E4\u30FC\u3067\u4F7F\u7528\u3057\u307E\u3059\u3002\u901A\u5E38\u30EC\u30A4\u30E4\u30FC\u3092\u9078\u629E\u3057\u3066\u304F\u3060\u3055\u3044\u3002", "error");
     return true;
   }
   const map = activeTilemap() ?? ensureTilemapFor(state.activeLayerId, state.activeFrameId);
@@ -21420,9 +23681,15 @@ function beginTilemapPointerGesture(event, point) {
     pointerId: event.pointerId,
     mapId: map.id,
     before: state,
+    canonicalGeneration: canonicalStateGeneration,
+    mapRevision: map.revision,
+    structureEpoch: state.structureEpoch,
+    stale: false,
     erase,
     lastCellKey: "",
-    changed: false
+    changed: false,
+    beforeCells: /* @__PURE__ */ new Map(),
+    localCells: /* @__PURE__ */ new Map()
   };
   canvas.setPointerCapture(event.pointerId);
   updateTilemapPointerGesture(point);
@@ -21434,10 +23701,22 @@ async function finishTilemapPointerGesture(cancelled = false) {
   if (gesture === void 0) return;
   tilemapPointerGesture = void 0;
   if (cancelled) {
-    state = gesture.before;
-    core = new EditorCore(state, {
-      instrumentation
-    });
+    const isCurrent = !gesture.stale && canonicalStateGeneration === gesture.canonicalGeneration && state.structureEpoch === gesture.structureEpoch && state.tilemaps?.[gesture.mapId]?.revision === gesture.mapRevision;
+    if (isCurrent) {
+      adoptCanonicalState(gesture.before);
+    } else if (rollbackStaleTilemapGesture(gesture)) {
+      saveDrawProjectState("tilemap-cancel");
+      notifyAssetStateChanged();
+    }
+    await present();
+    return;
+  }
+  const isStale = gesture.stale || canonicalStateGeneration !== gesture.canonicalGeneration || state.structureEpoch !== gesture.structureEpoch || state.tilemaps?.[gesture.mapId]?.revision !== gesture.mapRevision;
+  if (isStale) {
+    if (rollbackStaleTilemapGesture(gesture)) {
+      saveDrawProjectState("tilemap-cancel");
+      notifyAssetStateChanged();
+    }
     await present();
     return;
   }
@@ -22136,7 +24415,7 @@ var TOOL_STUDIO_LABELS = {
   move: "Move / Duplicate",
   "select-color": "Color Selection",
   "select-polygon": "Polygon Select",
-  "tile-stamp": "Tile Stamp"
+  "tile-stamp": "Tile Placement"
 };
 function syncToolStudio() {
   const current = currentBasicTool();
@@ -22150,7 +24429,7 @@ function syncToolStudio() {
     card.setAttribute("aria-pressed", String(active));
   }
   if (toolStudioStatusElement !== null) {
-    const message = current === "pixel-pen" ? "Pixel Perfect Pen\u306F1px\u306EBresenham\u7DDA\u3092\u4F5C\u308A\u307E\u3059\u3002" : current === "move" ? "\u9078\u629E\u7BC4\u56F2\u3092\u30C9\u30E9\u30C3\u30B0\u3002Alt\u3092\u62BC\u3059\u3068\u8907\u88FD\u3057\u3066\u79FB\u52D5\u3057\u307E\u3059\u3002" : current === "select-polygon" ? "\u9802\u70B9\u3092\u30C9\u30E9\u30C3\u30B0\u3057\u3066\u591A\u89D2\u5F62\u3092\u63CF\u304D\u3001\u96E2\u3059\u3068\u9078\u629E\u7BC4\u56F2\u306B\u306A\u308A\u307E\u3059\u3002" : current === "select-color" ? `${colorSelectionModeLabel(normalizeColorSelectionMode(toolOptions.selectionMode))} color selection. Mode and tolerance are shown near the viewport.` : current === "fill" ? "\u30AF\u30EA\u30C3\u30AF\u5730\u70B9\u3068\u540C\u3058\u30D1\u30EC\u30C3\u30C8\u8272\u3067\u3064\u306A\u304C\u308B\u7BC4\u56F2\u3060\u3051\u3092\u5857\u308A\u3064\u3076\u3057\u307E\u3059\u3002" : current === "tile-stamp" ? "Tileset\u306E\u30BB\u30EB\u3092\u9078\u3073\u3001Canvas\u3078\u30B9\u30BF\u30F3\u30D7\u3057\u307E\u3059\u3002" : "\u30C4\u30FC\u30EB\u3092\u9078\u3076\u3068\u3001\u3053\u3053\u306B\u4F7F\u3044\u65B9\u3068\u8A2D\u5B9A\u304C\u8868\u793A\u3055\u308C\u307E\u3059\u3002";
+    const message = current === "pixel-pen" ? "Pixel Perfect Pen\u306F1px\u306EBresenham\u7DDA\u3092\u4F5C\u308A\u307E\u3059\u3002" : current === "move" ? "\u9078\u629E\u7BC4\u56F2\u3092\u30C9\u30E9\u30C3\u30B0\u3002Alt\u3092\u62BC\u3059\u3068\u8907\u88FD\u3057\u3066\u79FB\u52D5\u3057\u307E\u3059\u3002" : current === "select-polygon" ? "\u9802\u70B9\u3092\u30C9\u30E9\u30C3\u30B0\u3057\u3066\u591A\u89D2\u5F62\u3092\u63CF\u304D\u3001\u96E2\u3059\u3068\u9078\u629E\u7BC4\u56F2\u306B\u306A\u308A\u307E\u3059\u3002" : current === "select-color" ? `${colorSelectionModeLabel(normalizeColorSelectionMode(toolOptions.selectionMode))} color selection. Mode and tolerance are shown near the viewport.` : current === "fill" ? "\u30AF\u30EA\u30C3\u30AF\u5730\u70B9\u3068\u540C\u3058\u30D1\u30EC\u30C3\u30C8\u8272\u3067\u3064\u306A\u304C\u308B\u7BC4\u56F2\u3060\u3051\u3092\u5857\u308A\u3064\u3076\u3057\u307E\u3059\u3002" : current === "tile-stamp" ? activeSelectionStampId === void 0 ? "Tileset\u306E\u30BB\u30EB\u3092\u9078\u3073\u3001Canvas\u3078\u914D\u7F6E\u3057\u307E\u3059\u3002" : "\u4FDD\u5B58\u3057\u305F\u9078\u629E\u7BC4\u56F2\u30B9\u30BF\u30F3\u30D7\u3092Canvas\u3078\u914D\u7F6E\u3057\u307E\u3059\u3002" : "\u30C4\u30FC\u30EB\u3092\u9078\u3076\u3068\u3001\u3053\u3053\u306B\u4F7F\u3044\u65B9\u3068\u8A2D\u5B9A\u304C\u8868\u793A\u3055\u308C\u307E\u3059\u3002";
     toolStudioStatusElement.textContent = message;
   }
   if (toolStudioElement !== null) {
@@ -22611,6 +24890,12 @@ function deleteBrushPreset() {
   setStatus("Brush preset deleted locally.");
 }
 toolSelect.addEventListener("change", () => {
+  if (selectionStampToolActivation) {
+    selectionStampToolActivation = false;
+  } else if (activeSelectionStampId !== void 0) {
+    activeSelectionStampId = void 0;
+    renderSelectionStamps();
+  }
   cancelUncommittedSelectionWork("Selection/transform preview cancelled because the tool changed.");
   syncToolButtons();
   syncToolStudio();
@@ -22701,6 +24986,7 @@ selectionExpandButton.addEventListener("click", () => applySelectionMorphology("
 selectionShrinkButton.addEventListener("click", () => applySelectionMorphology("SHRINK"));
 selectionInvertButton.addEventListener("click", () => applySelectionMorphology("INVERT"));
 selectionBorderButton.addEventListener("click", () => applySelectionMorphology("BORDER"));
+selectionStampSaveButton.addEventListener("click", saveSelectionStamp);
 renderBrushPresetOptions();
 updateToolOptions();
 syncToolButtons();
@@ -22880,11 +25166,31 @@ colorMap.addEventListener("keyup", (event) => {
 gamePreviewStartControl.addEventListener("click", () => {
   void startGamePreview("LIVE");
 });
+gamePreviewStopControl.addEventListener("click", () => {
+  if (game351PlayableState === void 0) return;
+  game351PlayableState = stopGame351(game351PlayableState);
+  drawGame351Preview(game351PlayableState, game351PreviewMode);
+});
+gamePreviewRestartControl.addEventListener("click", () => {
+  if (game351PlayableState === void 0) {
+    void startGamePreview("LIVE");
+    return;
+  }
+  game351PlayableState = restartGame351(game351PlayableState);
+  drawGame351Preview(game351PlayableState, game351PreviewMode);
+});
 gamePreviewReloadControl.addEventListener("click", () => {
   void startGamePreview("LIVE");
 });
 gamePreviewPinControl.addEventListener("click", () => {
   void startGamePreview("PINNED");
+});
+gamePreviewCanvas.addEventListener("keydown", handleGame351PreviewKey);
+gamePreviewCanvas.addEventListener("click", () => {
+  gamePreviewCanvas.focus();
+  if (game351PlayableState === void 0) return;
+  game351PlayableState = triggerGame351Action(game351PlayableState, String(GAME351_TAP_ACTION), game351Behaviors);
+  drawGame351Preview(game351PlayableState, game351PreviewMode);
 });
 var advancedModule;
 var advancedOverlayState;
@@ -22910,7 +25216,6 @@ function setAdvancedStatus(message, kind = "ready") {
 function advancedControlsEnabled(enabled) {
   for (const control of [
     advancedPatternControl,
-    advancedStampControl,
     advancedMirrorControl,
     advancedGridControl,
     advancedGuideControl
@@ -22977,41 +25282,6 @@ advancedPatternControl.addEventListener("click", () => {
     }
     advancedPreviewOperationId = operation.value.operationId;
     setAdvancedStatus(`Pattern preview planned \xB7 writes=${operation.value.writes.length} \xB7 dirtyTiles=${operation.value.dirtyTiles.length} \xB7 undo=none`);
-  })();
-});
-advancedStampControl.addEventListener("click", () => {
-  void (async () => {
-    const module = await ensureAdvancedModule();
-    if (module === void 0) return;
-    const stamp2 = module.planStamp(advancedTarget(), {
-      width: 2,
-      height: 2,
-      pixels: [
-        1,
-        0,
-        0,
-        1
-      ],
-      palette: [
-        0,
-        4294967295,
-        4278190335
-      ],
-      transparentIndex: 0
-    }, {
-      x: 24,
-      y: 24,
-      scale: 2,
-      transparent: "SKIP",
-      paletteCompatibility: "EXACT",
-      clipping: "CLIP"
-    });
-    if (!stamp2.ok) {
-      setAdvancedStatus(`Stamp preview blocked \xB7 ${stamp2.diagnostics[0]?.code ?? "UNKNOWN"}`, "error");
-      return;
-    }
-    advancedPreviewOperationId = stamp2.value.session.sessionId;
-    setAdvancedStatus(`Stamp preview ready \xB7 previewWrites=${stamp2.value.session.preview.writes.length} \xB7 commit=atomic \xB7 cancel=available`);
   })();
 });
 advancedMirrorControl.addEventListener("click", () => {
@@ -23246,12 +25516,19 @@ void resolveInitialProjectSettings().then(async (settings) => {
     return settings;
   }
   return await waitForProjectStart();
-}).then((settings) => resetProject(settings)).then(async () => {
+}).then(async (settings) => {
+  await resetProject(settings);
   await startPixyncProjectLifecycle();
-  return loadWorkspaceModule();
-}).then((module) => {
+  return {
+    module: await loadWorkspaceModule(),
+    initialProjectMode: settings.mode
+  };
+}).then(({ module, initialProjectMode }) => {
   const result = module.bootstrapDraw2Workspace(document, {
-    projectId: state.projectId
+    projectId: state.projectId,
+    ...initialProjectMode === void 0 ? {} : {
+      initialProjectMode
+    }
   });
   if (!result.ok) {
     setStatus(result.reason ?? "Workspace layer unavailable.", "error");

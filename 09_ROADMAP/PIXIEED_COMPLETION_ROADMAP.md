@@ -56,7 +56,7 @@ no package starts automatically; further progression requires Owner decision or 
 - Tablet: adaptive workspace; landscape is compact dock, portrait is Canvas-first with a contextual Side/Bottom Sheet.
 - Mobile: current PiXiEEDraw portrait Canvas-first presentation; Tool and Color remain reachable, Timeline/Layer use
   tab or sheet presentation when not primary.
-- All profiles use one Core and one Project/PXD meaning. Workspace state is local and never becomes a PiXiSYNC
+- All profiles use one Core and one Project/PXD meaning. Workspace state is local and never becomes a PiXYNC
   canonical operation. No document/page scroll; scrolling is confined to owning panels and virtualized lists.
 - Menu, Shortcut, Command Palette, Help, QA enumeration, and high-risk actions use the versioned Command Registry.
 
@@ -143,6 +143,22 @@ until every dependency named by the Registry is accepted.
   document scrollWidth/scrollHeight overflow=0.
 - Audio: AUDIO-200 through AUDIO-240, lazy and without raw-byte authority.
 - Game: GAME-300 through GAME-350, with editable Project State separate from Runtime Save State.
+  GAME-300〜350は基盤Contractとlocal editor evidenceの段階であり、iGAME製品完成とは扱わない。
+  Ownerが開始を承認した場合に限り、次のproduct execution overlayをRegistryへ登録する。
+
+  ```text
+  C0 Contract / Context / Acceptance ID freeze
+    ├─ GAME-351 Playable RPG Slice
+    └─ SITE-400 iGAME route/provider extension
+         GAME-351 → GAME-352 RPG Core
+         [GAME-352 + SITE extension + GAME-340] → GAME-353 Draw/Audio/PiXYNC
+         [GAME-353 + Market boundary] → GAME-354 Web Publish/Handoff
+         GAME-354 → Qualification gates
+  ```
+
+  `GAME-351`〜`GAME-354`は本書更新時点では候補IDであり、未登録・未開始である。正確な
+  write scope、acceptance、performance budget、stop ruleは
+  `docs/manual/PIXIEED-IGAME-IMPLEMENTATION-RUNBOOK.md` に固定する。
 - Platform/site: SITE-400, MARKET-410, WORK-420, SOCIAL-430, OPS-440, PLATFORM-450.
 - Native: NATIVE-500 defines the cross-platform host boundary. Browser/PWA is first and remains fallback.
   NATIVE-510 evaluates direct desktop distribution; signing, macOS notarization, auto-update, rollback,
@@ -157,5 +173,5 @@ until every dependency named by the Registry is accepted.
 
 Source presence, isolated tests, synthetic fixtures, a desktop browser, or a local benchmark cannot alone
 establish production readiness. Required device, browser, security, compatibility, rollback, and migration
-evidence must be cited; unavailable evidence remains `UNTESTED`. Current Market, PiXiSYNC, URLs,
+evidence must be cited; unavailable evidence remains `UNTESTED`. Current Market, PiXYNC, URLs,
 data, production database/storage, and current PiXiEEDraw remain the fallback.

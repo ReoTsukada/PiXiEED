@@ -154,7 +154,7 @@
     const script = document.createElement('script');
     script.async = false;
     script.dataset.pixieedSharedLocale = 'true';
-    script.src = asset('./shared-locale.js?v=20260825-locale21');
+    script.src = asset('./shared-locale.js?v=20260825-locale22');
     return new Promise((resolve) => {
       script.addEventListener('load', () => resolve(window.PiXiEEDLocale), { once: true });
       script.addEventListener('error', () => resolve(undefined), { once: true });

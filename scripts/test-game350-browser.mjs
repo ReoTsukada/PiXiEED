@@ -47,7 +47,10 @@ try {
           .some((button) => button.textContent?.includes("iGAME")),
         hierarchy: rect("#draw2GameLeftDock"),
         viewport: rect("#draw2GamePreviewCard"),
-        timeline: rect("#draw2ModeDeckGame"),
+        systems: rect("#draw2ModeDeckGame"),
+        gameTimelineCells: document.querySelectorAll('[data-mode-deck-cell="game"]').length,
+        systemCards: document.querySelectorAll("[data-game-system-card]").length,
+        inputActions: document.querySelectorAll(".draw2-game-input-action").length,
         overflow: [
           document.documentElement.scrollWidth,
           document.documentElement.clientWidth,
@@ -61,7 +64,10 @@ try {
     assert.equal(rails.viewport, true, `${width}: viewport rail`);
     if (width >= 1280) {
       assert.equal(rails.hierarchy, true, "desktop hierarchy rail");
-      assert.equal(rails.timeline, true, "desktop timeline rail");
+      assert.equal(rails.systems, true, "desktop systems rail");
+      assert.equal(rails.gameTimelineCells, 0, "Game has no frame timeline cells");
+      assert.equal(rails.systemCards, 8, "Game systems cards");
+      assert.equal(rails.inputActions, 6, "Game input actions");
     }
 
     if (width >= 1280) {
@@ -89,6 +95,51 @@ try {
         `${command} panel exists`,
       );
     }
+    await page.locator('[data-workspace-command="game-panel-scene"]').evaluate((element) => {
+      element.click();
+    });
+    const creationGuide = await page.evaluate(() => ({
+      visible: document.querySelector("#draw2GameCreationGuide") !== null,
+      steps: document.querySelectorAll("#draw2GameCreationGuideSteps [data-game-guide-step]").length,
+      text: document.querySelector("#draw2GameCreationGuide")?.textContent || "",
+    }));
+    assert.equal(creationGuide.visible, true, `${width}: Game creation guide exists`);
+    assert.equal(creationGuide.steps, 4, `${width}: Game creation guide has four steps`);
+    assert.match(creationGuide.text, /スターター/);
+    assert.match(creationGuide.text, /素材を参照/);
+
+    await page.locator('#draw2GameSceneList [data-game-track-id="hero"]').click();
+    await page.locator('[data-workspace-command="game-panel-inspector"]').evaluate((element) => {
+      element.click();
+    });
+    await page.waitForTimeout(100);
+    const componentPanel = await page.evaluate(() => ({
+      cards: document.querySelectorAll("#draw2GameComponents [data-game-component-type]").length,
+      text: document.querySelector("#draw2GameComponents")?.textContent || "",
+    }));
+    assert.ok(componentPanel.cards >= 5, `${width}: component inspector cards`);
+    assert.match(componentPanel.text, /Transform/);
+    assert.match(componentPanel.text, /Collider/);
+    assert.match(componentPanel.text, /Rigidbody/);
+
+    await page.locator('[data-workspace-command="game-panel-assets"]').evaluate((element) => {
+      element.click();
+    });
+    const assetBoundary = await page.evaluate(() => ({
+      badge: document.querySelector("#draw2WorkspacePanelGameAssets .draw2-panel-badge")?.textContent || "",
+      note: document.querySelector("#draw2WorkspacePanelGameAssets .draw2-panel-note")?.textContent || "",
+      drawButton: document.querySelector("#draw2GameBindDraw")?.textContent || "",
+      audioButton: document.querySelector("#draw2GameBindAudio")?.textContent || "",
+      sourceEditControls: document.querySelectorAll('[data-game-source-editable="true"], [data-game-source-edit]').length,
+    }));
+    assert.equal(assetBoundary.badge, "REFERENCE ONLY", `${width}: Game Assets are reference-only`);
+    assert.match(assetBoundary.note, /原素材の(?:編集|Edit)・削除はできません/);
+    assert.match(assetBoundary.drawButton, /参照を(?:追加|Add)/);
+    assert.match(assetBoundary.audioButton, /参照を(?:追加|Add)/);
+    assert.equal(assetBoundary.sourceEditControls, 0, `${width}: no source edit controls in Game`);
+    await page.locator('[data-workspace-command="game-panel-build"]').evaluate((element) => {
+      element.click();
+    });
     const target = page.locator("#draw2GameBuildTarget");
     for (const engine of ["UNITY", "GODOT", "UNREAL"]) {
       await target.selectOption(engine);

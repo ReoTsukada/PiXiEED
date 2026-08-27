@@ -1,14 +1,15 @@
 # GAME-350 — Game Completion Gate
 
-status: IN_PROGRESS
+status: COMPLETE_CANDIDATE
 phase: game
 kind: gate
 depends_on: GAME-340
-implementation_model: Terra High
+coordinator_model: Sol MAX
+implementation_model: Luna MAX
 implementation_parallelism: max-4-disjoint-tracks
-review_model: Sol MAX
+review_model: Terra MAX
 independent_review: true
-next_package: SITE-400
+next_package: OWNER_DECISION
 auto_start_next: false
 verification_level: isolated-reference+targeted-tests+independent-review
 
@@ -32,6 +33,13 @@ For the requested product goal, iGAME completion means
 editor milestone and must not unlock or market iGAME as a finished product;
 `CONTRACT_COMPLETE_CANDIDATE` is even earlier and is never sufficient by
 itself.
+
+The RPG slice is the first executable module, not the final genre boundary.
+The long-term direction is the genre-extensible Runtime Module architecture
+defined in `docs/decisions/ADR-20260825-IGAME-GENERAL-RUNTIME.md`. Action,
+Shooter, Racing, Rhythm, 3D, Open World, Online, and other modules require
+their own contracts and evidence; a `PLANNED` module must never be presented
+as an available playable runtime.
 
 ## Five-rail editor contract (inferred from the current repository layout)
 
@@ -150,13 +158,13 @@ The real local seller-page composition interaction is recorded in
 
 ## Non-scope
 
-- Production deploy、Store publish、Market sale、購入/権利/台帳変更、current routes/PXD/PiXiSYNC/Project/Asset dataの置換
+- Production deploy、Store publish、Market sale、購入/権利/台帳変更、current routes/PXD/PiXYNC/Project/Asset dataの置換
 
 ## Workflows
 
 1. New Game Project→Scene/Entity→Behavior/Input/Control→Draw/Audio refs→preview/save→build→package→runtime verify。
 2. LIVE/PINNED revision、missing/tamper/license/lock mismatch、rollbackを横断する。
-3. Desktop/Mobile/Tabletの同一Projectで操作し、workspace stateがcanonical state/PiXiSYNCへ混入しないことを確認する。
+3. Desktop/Mobile/Tabletの同一Projectで操作し、workspace stateがcanonical state/PiXYNCへ混入しないことを確認する。
 
 ## Failure / attack tests
 
@@ -174,7 +182,7 @@ The real local seller-page composition interaction is recorded in
 
 - `docs/inventory/game-350-evidence.json` にend-to-end trace、schema/hash/lock/license、artifact/runtime/save、bundle/perf/memory/a11y/visualを記録
 - positive/negative/attack/recovery matrix、screenshots、screen-reader/keyboard/touch results、`git diff --check` exit codeを保存
-- baseline failure identityが既存と一致し新規0、current-system/Market/PiXiSYNC/Runtime non-intrusionレビューをCheckpointへ記録
+- baseline failure identityが既存と一致し新規0、current-system/Market/PiXYNC/Runtime non-intrusionレビューをCheckpointへ記録
 - Gate承認までは`SITE-400`を自動開始せず、UNTESTED/PARTIALは明示する
 
 ## Additional product-level acceptance IDs
@@ -200,6 +208,17 @@ decision remains `NOT_READY`.
 ## Registry acceptance IDs
 
 - `GAME350-SCOPE-001`、`GAME350-EVIDENCE-001`、`GAME350-STOP-001`
+
+## Acceptance ID normalization
+
+Product-levelの正規IDは `GAME350-RAIL-001`、`GAME350-STUDIO-001`、
+`GAME350-CROSS-001`、`GAME350-PIXYNC-001`、`GAME350-COMMERCE-BOUNDARY-001` とする。
+旧資料の `GAME350-CROSS-TOOL-001` は `GAME350-CROSS-001` の互換別名としてのみ読み、
+新しいContract、Evidence、Test名には使用しない。候補となる後続PackageはRegistryへ登録されるまで
+開始せず、`docs/manual/PIXIEED-IGAME-IMPLEMENTATION-RUNBOOK.md` を実装Contextとして使う。
+
+公開名と新規Contractは `PiXYNC` を使う。既存コード、Storage、migration、URL、旧Evidence内の
+`PiXiSYNC` / `PiXSYNC` は互換識別子であり、専用migrationなしに破壊的renameしない。
 
 ## Bounded write scope
 
