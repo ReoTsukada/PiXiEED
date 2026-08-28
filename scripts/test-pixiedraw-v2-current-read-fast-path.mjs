@@ -141,6 +141,12 @@ try {
     });
     db.close();
     const fallbackRead = await indexed.readSchemaV2Project('large-project');
+    const cleanupFailureWrite = await indexed.writeSchemaV2Project(createProject(3, 'cleanup-pending'), {
+      simulateCleanupFailure: true,
+    });
+    const recordsAfterCleanupFailure = await indexed.loadAllProjectSchemaRecords('large-project');
+    const cleanupRecoveryWrite = await indexed.writeSchemaV2Project(createProject(4, 'cleanup-recovered'));
+    const recordsAfterCleanupRecovery = await indexed.loadAllProjectSchemaRecords('large-project');
     await new Promise((resolve, reject) => {
       const request = indexedDB.deleteDatabase(dbName);
       request.onsuccess = resolve;
@@ -173,6 +179,28 @@ try {
       fallbackFastPathUsed: fallbackRead.fastPathUsed,
       fallbackUsed: fallbackRead.fallbackUsed,
       fallbackDocumentName: fallbackRead.packaged.document.documentName,
+      cleanupFailure: {
+        committed: cleanupFailureWrite.committed,
+        cleanupError: cleanupFailureWrite.cleanupError?.message || '',
+        manifestRevision: cleanupFailureWrite.manifest.revision,
+        recordCountsBeforeRecovery: {
+          manifests: recordsAfterCleanupFailure.manifests.length,
+          checkpoints: recordsAfterCleanupFailure.checkpoints.length,
+          journals: recordsAfterCleanupFailure.journals.length,
+          thumbnails: recordsAfterCleanupFailure.thumbnails.length,
+        },
+      },
+      cleanupRecovery: {
+        committed: cleanupRecoveryWrite.committed,
+        cleanupError: cleanupRecoveryWrite.cleanupError?.message || '',
+        manifestRevision: cleanupRecoveryWrite.manifest.revision,
+        recordCounts: {
+          manifests: recordsAfterCleanupRecovery.manifests.length,
+          checkpoints: recordsAfterCleanupRecovery.checkpoints.length,
+          journals: recordsAfterCleanupRecovery.journals.length,
+          thumbnails: recordsAfterCleanupRecovery.thumbnails.length,
+        },
+      },
     };
   });
 
@@ -193,6 +221,24 @@ try {
   assert.equal(result.fallbackFastPathUsed, false);
   assert.equal(result.fallbackUsed, true);
   assert.equal(result.fallbackDocumentName, 'old');
+  assert.equal(result.cleanupFailure.committed, true);
+  assert.equal(result.cleanupFailure.cleanupError, 'Simulated autosave schema V2 cleanup failure');
+  assert.equal(result.cleanupFailure.manifestRevision, 3);
+  assert.deepEqual(result.cleanupFailure.recordCountsBeforeRecovery, {
+    manifests: 3,
+    checkpoints: 3,
+    journals: 3,
+    thumbnails: 3,
+  });
+  assert.equal(result.cleanupRecovery.committed, true);
+  assert.equal(result.cleanupRecovery.cleanupError, '');
+  assert.equal(result.cleanupRecovery.manifestRevision, 4);
+  assert.deepEqual(result.cleanupRecovery.recordCounts, {
+    manifests: 2,
+    checkpoints: 2,
+    journals: 2,
+    thumbnails: 2,
+  });
   console.log(JSON.stringify(result, null, 2));
 } finally {
   if (browser) await browser.close();

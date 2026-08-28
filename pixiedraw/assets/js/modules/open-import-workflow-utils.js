@@ -451,20 +451,29 @@
         console.warn('Failed to restore V2 recent project payload', error);
       }
     }
+    // The recent-project list is metadata-only so startup does not clone
+    // every legacy canvas into memory. Resolve the full row only when a
+    // legacy project is actually opened or migrated.
+    const resolvedEntry = (!entry.project && entry.id && typeof loadRecentProjectMetadataById === 'function')
+      ? (await loadRecentProjectMetadataById(entry.id, {
+        includeAllAccounts: true,
+        includePayload: true,
+      }) || entry)
+      : entry;
     if (typeof reconstructLocalRecentProjectPayload === 'function') {
-      const reconstructed = reconstructLocalRecentProjectPayload(entry);
+      const reconstructed = reconstructLocalRecentProjectPayload(resolvedEntry);
       if (reconstructed && typeof reconstructed === 'object') {
         return reconstructed;
       }
     }
-    if (entry.project && typeof entry.project === 'object') {
-      return entry.project;
+    if (resolvedEntry.project && typeof resolvedEntry.project === 'object') {
+      return resolvedEntry.project;
     }
-    if (!entry.handle || typeof entry.handle.getFile !== 'function') {
+    if (!resolvedEntry.handle || typeof resolvedEntry.handle.getFile !== 'function') {
       return null;
     }
     try {
-      const file = await entry.handle.getFile();
+      const file = await resolvedEntry.handle.getFile();
       const text = await file.text();
       return tryParseJsonSafe(text);
     } catch (error) {

@@ -21,6 +21,8 @@ import type {
 } from "./contracts.ts";
 
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u;
+const PRESENCE_TEXT_MAX = 80;
+const ISO_TIMESTAMP_MAX = 64;
 
 export type PixyncTransportStatus =
   | "CONNECTING"
@@ -68,6 +70,32 @@ export interface PixyncTransportBinding {
   readonly sessionGeneration: number;
 }
 
+export type PixyncTransportPresenceMode = "iDRAW" | "iAUDIO" | "iGAME";
+
+/** Ephemeral metadata shown to collaborators; it never enters the journal. */
+export interface PixyncTransportPresenceDraft {
+  readonly displayName: string;
+  readonly mode: PixyncTransportPresenceMode;
+  readonly selectionLabel: string;
+}
+
+export interface PixyncTransportPresence extends PixyncTransportPresenceDraft {
+  readonly actorId: string;
+  readonly clientId: string;
+  readonly updatedAt: string;
+}
+
+export type PixyncTransportPresenceEvent =
+  | {
+    readonly kind: "sync";
+    readonly presence: readonly PixyncTransportPresence[];
+  }
+  | {
+    readonly kind: "upsert";
+    readonly presence: PixyncTransportPresence;
+  }
+  | { readonly kind: "remove"; readonly clientId: string };
+
 export interface PixyncAuthoritativeOperationEvent {
   readonly origin: "AUTHORITATIVE_TAIL";
   readonly operation: PixyncCommittedOperation;
@@ -81,7 +109,12 @@ export interface PixyncTransportConnectInput {
     event: PixyncAuthoritativeOperationEvent,
   ) => void | Promise<void>;
   readonly onBroadcastHint?: () => void;
+  readonly onPresence?: (
+    event: PixyncTransportPresenceEvent,
+  ) => void | Promise<void>;
+  readonly presence?: PixyncTransportPresenceDraft;
   readonly onStatus?: (status: PixyncTransportStatus) => void;
+  readonly onReconnected?: () => void | Promise<void>;
 }
 
 export interface PixyncTransportProviderOpenInput {
@@ -92,6 +125,10 @@ export interface PixyncTransportProviderOpenInput {
     event: PixyncAuthoritativeOperationEvent,
   ) => void | Promise<void>;
   readonly onBroadcastHint: () => void;
+  readonly onPresence?: (
+    event: PixyncTransportPresenceEvent,
+  ) => void | Promise<void>;
+  readonly presence?: PixyncTransportPresenceDraft;
   readonly onStatus: (status: PixyncTransportStatus) => void;
 }
 
@@ -111,6 +148,8 @@ export interface PixyncTransportProviderConnection {
   fetchSince(
     afterProjectRevision: number,
   ): Promise<readonly PixyncCommittedOperation[]>;
+  /** Presence is ephemeral and intentionally has no journal/ACK semantics. */
+  publishPresence?(presence: PixyncTransportPresenceDraft): Promise<void>;
   close(reason?: string): Promise<void>;
 }
 
@@ -150,6 +189,72 @@ function assertRevision(value: unknown, path: string): asserts value is number {
   if (!Number.isSafeInteger(value) || (value as number) < 0) {
     invalid("A non-negative safe integer is required.", path);
   }
+}
+
+function assertPresenceText(
+  value: unknown,
+  path: string,
+): asserts value is string {
+  if (
+    typeof value !== "string" || value.trim().length === 0 ||
+    value.length > PRESENCE_TEXT_MAX
+  ) {
+    invalid("Presence text must be short, non-empty text.", path);
+  }
+}
+
+function assertPresenceDraft(
+  value: unknown,
+  path = "presence",
+): asserts value is PixyncTransportPresenceDraft {
+  if (!isRecord(value)) {
+    invalid("Presence must be a bounded metadata object.", path);
+  }
+  assertPresenceText(value.displayName, `${path}.displayName`);
+  if (
+    value.mode !== "iDRAW" && value.mode !== "iAUDIO" &&
+    value.mode !== "iGAME"
+  ) {
+    invalid("Presence mode is invalid.", `${path}.mode`);
+  }
+  assertPresenceText(value.selectionLabel, `${path}.selectionLabel`);
+}
+
+function isPresence(value: unknown): value is PixyncTransportPresence {
+  if (!isRecord(value)) return false;
+  if (
+    typeof value.actorId !== "string" || !SAFE_ID.test(value.actorId) ||
+    typeof value.clientId !== "string" || !SAFE_ID.test(value.clientId)
+  ) return false;
+  if (
+    typeof value.displayName !== "string" ||
+    value.displayName.trim().length === 0 ||
+    value.displayName.length > PRESENCE_TEXT_MAX
+  ) return false;
+  if (
+    value.mode !== "iDRAW" && value.mode !== "iAUDIO" &&
+    value.mode !== "iGAME"
+  ) return false;
+  if (
+    typeof value.selectionLabel !== "string" ||
+    value.selectionLabel.trim().length === 0 ||
+    value.selectionLabel.length > PRESENCE_TEXT_MAX
+  ) return false;
+  return typeof value.updatedAt === "string" &&
+    value.updatedAt.length <= ISO_TIMESTAMP_MAX &&
+    Number.isFinite(Date.parse(value.updatedAt));
+}
+
+function isPresenceEvent(
+  value: unknown,
+): value is PixyncTransportPresenceEvent {
+  if (!isRecord(value)) return false;
+  if (value.kind === "sync") {
+    return Array.isArray(value.presence) && value.presence.every(isPresence);
+  }
+  if (value.kind === "upsert") return isPresence(value.presence);
+  return value.kind === "remove" && typeof value.clientId === "string" &&
+    SAFE_ID.test(value.clientId);
 }
 
 function assertBindingId(
@@ -319,8 +424,17 @@ export class PixyncTransportAdapter {
     if (input.onBroadcastHint !== undefined) {
       assertCallback(input.onBroadcastHint, "onBroadcastHint");
     }
+    if (input.onPresence !== undefined) {
+      assertCallback(input.onPresence, "onPresence");
+    }
+    if (input.presence !== undefined) {
+      assertPresenceDraft(input.presence);
+    }
     if (input.onStatus !== undefined) {
       assertCallback(input.onStatus, "onStatus");
+    }
+    if (input.onReconnected !== undefined) {
+      assertCallback(input.onReconnected, "onReconnected");
     }
     if (input.sessionGeneration <= this.#highestSessionGeneration) {
       transportFailure(
@@ -336,6 +450,7 @@ export class PixyncTransportAdapter {
     this.#statusSink = input.onStatus;
     this.#setStatus("CONNECTING");
     let authoritativeBinding: PixyncTransportBinding | undefined;
+    const pendingPresence: PixyncTransportPresenceEvent[] = [];
 
     const providerInput: PixyncTransportProviderOpenInput = {
       projectId: input.projectId,
@@ -385,10 +500,46 @@ export class PixyncTransportAdapter {
         ) return;
         input.onBroadcastHint?.();
       },
+      ...(input.presence === undefined ? {} : { presence: input.presence }),
+      ...(input.onPresence === undefined ? {} : {
+        onPresence: async (event: PixyncTransportPresenceEvent) => {
+          if (token !== this.#attempt || !isPresenceEvent(event)) return;
+          const active = this.#active;
+          if (
+            authoritativeBinding === undefined || active?.token !== token ||
+            this.#status !== "SUBSCRIBED" ||
+            !sameBinding(active.binding, authoritativeBinding)
+          ) {
+            if (authoritativeBinding === undefined) pendingPresence.push(event);
+            return;
+          }
+          try {
+            await input.onPresence?.(event);
+          } catch {
+            // Presence is ephemeral; a UI listener must not break transport.
+          }
+        },
+      }),
       onStatus: (status) => {
         if (token !== this.#attempt) return;
         if (status === "SUBSCRIBED" && this.#active?.token !== token) return;
+        const wasUnavailable = this.#status === "RECONNECTING" ||
+          this.#status === "OFFLINE";
         this.#setStatus(status);
+        if (
+          status === "SUBSCRIBED" && wasUnavailable &&
+          this.#active?.token === token
+        ) {
+          try {
+            const result = input.onReconnected?.();
+            if (result !== undefined) {
+              void Promise.resolve(result).catch(() => undefined);
+            }
+          } catch {
+            // Reconnection recovery reports its own errors through the
+            // coordinator; a user callback must not break the transport.
+          }
+        }
       },
     };
 
@@ -424,6 +575,12 @@ export class PixyncTransportAdapter {
 
     authoritativeBinding = binding;
     this.#active = { token, binding, connection };
+    if (input.onPresence !== undefined && pendingPresence.length > 0) {
+      const initialPresence = pendingPresence.splice(0);
+      for (const event of initialPresence) {
+        void Promise.resolve(input.onPresence(event)).catch(() => undefined);
+      }
+    }
     if (this.#status === "CONNECTING") this.#setStatus("SUBSCRIBED");
   }
 
@@ -458,6 +615,27 @@ export class PixyncTransportAdapter {
       );
     }
     return this.#validateAck(operation, ack);
+  }
+
+  async publishPresence(
+    presence: PixyncTransportPresenceDraft,
+  ): Promise<void> {
+    const active = this.#requireActive();
+    assertPresenceDraft(presence);
+    if (typeof active.connection.publishPresence !== "function") {
+      transportFailure(
+        "INVALID_INPUT",
+        "The active provider does not support Presence.",
+        "presence",
+      );
+    }
+    await active.connection.publishPresence(presence);
+    if (!this.#isCurrent(active)) {
+      transportFailure(
+        "STALE_SESSION",
+        "The authenticated session changed while Presence was published.",
+      );
+    }
   }
 
   async catchUp(

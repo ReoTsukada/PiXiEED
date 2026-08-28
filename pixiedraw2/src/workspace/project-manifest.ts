@@ -72,6 +72,8 @@ export interface WorkspaceProjectManifest {
 export interface WorkspaceManifestStore {
   load(projectId: WorkspaceProjectId): Promise<WorkspaceProjectManifest | null>;
   save(manifest: WorkspaceProjectManifest): Promise<void>;
+  /** Removes the manifest; the operation is idempotent for retryable cleanup. */
+  clear(projectId: WorkspaceProjectId): Promise<boolean>;
   updateModule(
     projectId: WorkspaceProjectId,
     surface: WorkspaceSurface,
@@ -436,6 +438,34 @@ export function createIndexedDbWorkspaceManifestStore(
         // The module stores remain usable when the optional manifest host is unavailable.
       }
     },
+    async clear(projectId) {
+      try {
+        const database = await openManifestDatabase(databaseName);
+        return await new Promise<boolean>((resolve) => {
+          const transaction = database.transaction(
+            WORKSPACE_MANIFEST_STORE_NAME,
+            "readwrite",
+          );
+          transaction.objectStore(WORKSPACE_MANIFEST_STORE_NAME).delete(
+            projectId,
+          );
+          transaction.oncomplete = () => {
+            database.close();
+            resolve(true);
+          };
+          transaction.onerror = () => {
+            database.close();
+            resolve(false);
+          };
+          transaction.onabort = () => {
+            database.close();
+            resolve(false);
+          };
+        });
+      } catch {
+        return false;
+      }
+    },
     async updateModule(projectId, surface, patch, name) {
       const current = await this.load(projectId) ??
         createWorkspaceProjectManifest(
@@ -497,6 +527,10 @@ export function createMemoryWorkspaceManifestStore(): WorkspaceManifestStore {
       if (current === undefined || canonical.revision >= current.revision) {
         records.set(canonical.projectId, cloneManifest(canonical));
       }
+    },
+    async clear(projectId) {
+      records.delete(projectId);
+      return true;
     },
     async updateModule(projectId, surface, patch, name) {
       const current = await this.load(projectId) ??

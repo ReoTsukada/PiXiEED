@@ -12,10 +12,12 @@ import {
   createGameProjectRevision,
   createGameRuntimePreview,
   loadGameRuntimeAssets,
+  loadGameRuntimeSceneAssets,
   restoreGameRuntimeSaveState,
   safeGameHotReload,
   serializeGameRuntimeSaveState,
   stepGameRuntime,
+  gameAssetRequestsForScene,
   type GameProjectRevisionInput,
   type GameRuntimeFeatureFlags,
 } from "../src/wp200-game-runtime-core.ts";
@@ -138,6 +140,7 @@ Deno.test("WP-200 Runtime Preview is flag-gated, maps controls, and keeps runtim
   const project = await projectFixture();
   const session = await previewFixture(project);
   assert(session.recovery === "VALID" && session.runtime.running, "explicit preview flag should allow isolated Runtime Preview");
+  assert(session.performanceProfile.profileId === "2D_BROWSER", "Runtime Preview must retain the selected 2D performance guardrail");
   const stepped = stepGameRuntime(session, 16, [{ source: "KEYBOARD", code: "Space", phase: "DOWN" }]);
   assert(stepped.actions[0] === "jump" && stepped.session.runtimeValues.score === 1, "semantic input must execute the bounded behavior");
   const loaded = await loadGameRuntimeAssets(session, { resolve: async (request) => request.assetId === asAssetId("draw/player")
@@ -151,6 +154,33 @@ Deno.test("WP-200 Runtime Preview is flag-gated, maps controls, and keeps runtim
   const off = await createGameRuntimePreview({ ...({ project, previewId: "preview-off", runtime: { runtimeId: "pixie-runtime", runtimeVersion: "0.2.0", supportedManifestVersion: 1 }, supportedRuntimeVersion: "0.2.0", capabilities, flags: {}, killSwitch: false }) });
   assert(!off.runtime.running && off.diagnostics.some((item) => item.code === "UNSUPPORTED_CAPABILITY"), "unknown/off preview flag must fail closed");
   assert(blocked.runtime.projectRevisionId === "game-rev-1", "preview must retain the source revision reference");
+});
+
+Deno.test("WP-200 resolves only the selected Scene and does not request an already loaded asset twice", async () => {
+  const baseProject = await projectFixture();
+  const project = await projectFixture({
+    scenes: [
+      ...baseProject.scenes,
+      { sceneId: "scene-empty", name: "Empty", rootEntityIds: [], entities: [] },
+    ],
+  });
+  assert(gameAssetRequestsForScene(project, "scene-empty").length === 0, "an empty Scene must not pull references from another Scene");
+  assert(gameAssetRequestsForScene(project, "scene-main").length === 2, "the selected Scene must expose only its own Draw/Audio references");
+  const session = await previewFixture(project);
+  const resolveCount = { value: 0 };
+  const resolver = {
+    resolve: async (request: { readonly assetId: string }) => {
+      resolveCount.value += 1;
+      return request.assetId === asAssetId("draw/player")
+        ? { assetId: asAssetId("draw/player"), revisionId: asAssetRevisionId("draw-rev-1"), contentHash: HASH_DRAW, byteLength: 128, mimeType: "image/png" }
+        : { assetId: asAssetId("audio/theme"), revisionId: asAssetRevisionId("audio-rev-1"), contentHash: HASH_AUDIO, byteLength: 128, mimeType: "audio/ogg" };
+    },
+  };
+  const empty = await loadGameRuntimeSceneAssets(session, "scene-empty", resolver);
+  assert(resolveCount.value === 0 && Object.keys(empty.runtime.loadedAssets).length === 0, "loading an empty Scene must remain lazy");
+  const loaded = await loadGameRuntimeSceneAssets(session, "scene-main", resolver);
+  const loadedAgain = await loadGameRuntimeSceneAssets(loaded, "scene-main", resolver);
+  assert(Number(resolveCount.value) === 2 && Object.keys(loadedAgain.runtime.loadedAssets).length === 2, "the second load must reuse the locked asset payloads");
 });
 
 Deno.test("WP-200 hot reload accepts compatible revisions and recovers from PINNED incompatibility", async () => {

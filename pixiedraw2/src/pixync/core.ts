@@ -26,6 +26,15 @@ const FORBIDDEN_KEY_PARTS = [
   "rawaudioblob",
   "audioblob",
   "blob",
+  "bytes",
+  "pixels",
+  "pixeldata",
+  "pcm",
+  "samples",
+  "sampledata",
+  "audiobuffer",
+  "arraybuffer",
+  "imagedata",
   "dom",
 ];
 const REVISION_REFERENCE_KEYS = new Set([

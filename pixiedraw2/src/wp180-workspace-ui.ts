@@ -15,10 +15,12 @@ import {
   resolveInputOwner,
   resolvePresentationProfile,
   resolveShortcut,
+  resolveWorkspaceDetailMode,
   resolveTabletDeckSurface,
   snapshotWorkspaceState,
   transitionPanelMount,
   type WorkspaceCommand,
+  type WorkspaceDetailMode,
   type WorkspaceState,
 } from "./wp180-workspace-contracts.ts";
 import {
@@ -147,6 +149,8 @@ import type {
 import { GameEditorCanonicalStore } from "./pixync/game-editor-canonical-store.ts";
 import {
   asBehaviorId,
+  asSha256 as asGameSha256,
+  canonicalJson,
   type BehaviorIR,
   compileNoCodeBehavior,
   type GameAnimationBinding,
@@ -157,6 +161,22 @@ import {
   type JournalCommand,
   validateGameProject,
 } from "./game/game-300/core.ts";
+import {
+  createGoldenProject,
+  type GoldenProjectBuildResult,
+} from "./studio/golden-project.ts";
+import {
+  createStudioPublishIntent,
+  createStudioReleaseCandidate,
+  type StudioAssetRegistryEntry,
+  type StudioPublishIntent,
+  type StudioReleaseCandidate,
+} from "./studio/package-publish.ts";
+import {
+  materializeStudioReleaseArtifact,
+  type StudioReleaseArtifactBundle,
+  type StudioMaterializationSource,
+} from "./studio/artifact-materializer.ts";
 import {
   type Game350EditorSnapshot,
   prepareGame350BuildPlan,
@@ -264,7 +284,7 @@ type Audio270FreezeModule = typeof import("./audio/audio-270/index.ts");
 
 function loadAudio200WorkspaceModule(): Promise<Audio200WorkspaceModule> {
   const chunkUrl = new URL(
-    "audio-200-workspace.js?v=20260823-audio-eq-preview-2",
+    "audio-200-workspace.js?v=20260828-project-cas-v2",
     import.meta.url,
   ).href;
   return import(chunkUrl) as unknown as Promise<Audio200WorkspaceModule>;
@@ -330,12 +350,17 @@ export interface WorkspaceAudioRenderSnapshot {
   readonly channels: 1 | 2;
   readonly bitDepth: 8 | 16 | 24 | 32;
   readonly durationSeconds: number;
+  readonly sourceProjectId: string;
+  readonly sourceStateHash: string;
+  readonly sourceProjectRevision: number;
 }
 
 export interface WorkspaceBootstrapOptions {
   readonly projectId?: string;
   /** The entry flow that selected the initial Project, when known. */
   readonly initialProjectMode?: "OPEN" | "NEW";
+  /** The creator surface selected before the Project was opened. */
+  readonly initialCreatorMode?: DesktopCreatorMode;
 }
 
 interface WorkspaceDebugSurface {
@@ -350,6 +375,16 @@ interface WorkspaceDebugSurface {
   };
   rollback: () => void;
   exportProjectPxdSnapshot: () => Promise<WorkspacePxdSnapshot>;
+  exportProjectPxdArtifact?: () => Promise<{
+    readonly bytes: Uint8Array;
+    readonly mimeType: string;
+    readonly packageHash: string;
+    readonly sourceReference: {
+      readonly assetId: string;
+      readonly revisionId: string;
+      readonly contentHash: string;
+    };
+  }>;
   setDrawTimelineFrames: (
     frames: readonly {
       readonly frameId: string;
@@ -359,6 +394,7 @@ interface WorkspaceDebugSurface {
   ) => void;
   renderAudioWavForExport: (
     durationSeconds?: number,
+    selection?: "CURRENT" | "FULL",
   ) => Promise<WorkspaceAudioRenderSnapshot | null>;
   restoreProjectPxdSnapshot: (
     snapshot: WorkspacePxdImportSnapshot,
@@ -390,6 +426,14 @@ interface WorkspaceDebugSurface {
       readonly baseProjectRevision: number;
     };
   }) => Promise<GameApplyReceipt>;
+  readonly buildGoldenProject: (
+    mode: "LIVE" | "PINNED",
+  ) => Promise<GoldenProjectBuildResult>;
+  readonly applyGoldenProject: (
+    mode: "LIVE" | "PINNED",
+  ) => Promise<GoldenProjectBuildResult>;
+  readonly startGoldenAudioPreview: () => boolean;
+  readonly stopGoldenAudioPreview: () => void;
 }
 
 type Wp190AudioModule = typeof import("./wp190-audio-bundle-entry.ts");
@@ -558,6 +602,7 @@ const RIGHT_DOCK_STORAGE_KEY = "pixieed:draw2:right-dock:v1";
 const AUDIO_DOCK_STORAGE_KEY = "pixieed:draw2:audio-dock:v2";
 const RAIL_LAYOUT_STORAGE_KEY = "pixieed:draw2:rail-layout:v1";
 const DRAW2_THEME_STORAGE_KEY = "pixieed:draw2:theme:v1";
+const DRAW2_DETAIL_MODE_STORAGE_KEY = "pixieed:draw2:detail-mode:v1";
 const RIGHT_DOCK_DEFAULT_PALETTE_RATIO = 0.3;
 
 type AudioDockPanelId =
@@ -724,6 +769,30 @@ function writeRailLayoutPreference(
     // Layout preferences are best effort and never block editing.
   }
 }
+
+function readWorkspaceDetailMode(storage: Storage | undefined): WorkspaceDetailMode {
+  if (storage === undefined) return "guided";
+  try {
+    return resolveWorkspaceDetailMode(
+      storage.getItem(DRAW2_DETAIL_MODE_STORAGE_KEY),
+    );
+  } catch {
+    return "guided";
+  }
+}
+
+function writeWorkspaceDetailMode(
+  storage: Storage | undefined,
+  mode: WorkspaceDetailMode,
+): void {
+  if (storage === undefined) return;
+  try {
+    storage.setItem(DRAW2_DETAIL_MODE_STORAGE_KEY, mode);
+  } catch {
+    // Detail preference is best effort and never blocks editing.
+  }
+}
+
 const WORKSPACE_COMMANDS: WorkspaceCommand[] = [
   {
     id: "project-open",
@@ -1006,6 +1075,12 @@ const WORKSPACE_COMMANDS: WorkspaceCommand[] = [
     regions: ["topbar", "canvas"],
   },
   {
+    id: "toggle-detail-mode",
+    version: 1,
+    label: "Toggle Guided / Detailed Mode",
+    regions: ["topbar", "right_dock", "overlay"],
+  },
+  {
     id: "workspace-preset-pixel",
     version: 1,
     label: "Pixel Workspace",
@@ -1221,6 +1296,8 @@ export function bootstrapDraw2Workspace(
   const workspaceManifestStore = createIndexedDbWorkspaceManifestStore();
   const gamePersistenceStore = createIndexedDbGameEditorPersistenceStore();
   let gamePersistenceRevision = 0;
+  let gamePersistenceExpectedRevision = 0;
+  let gamePersistenceExpectedStateHash: string | null = null;
   let gamePersistenceSaveQueue: Promise<void> = Promise.resolve();
   let pixyncGameStore: GameEditorCanonicalStore | undefined;
   let workspaceProjectSwitchQueue: Promise<void> = Promise.resolve();
@@ -1456,6 +1533,18 @@ export function bootstrapDraw2Workspace(
   const modeSummaryDescription = query<HTMLElement>(
     documentRef,
     "#draw2WorkspaceModeSummaryDescription",
+  );
+  const detailModeToggles = queryAll<HTMLButtonElement>(
+    documentRef,
+    "[data-workspace-detail-mode-toggle]",
+  );
+  const detailModeLabel = query<HTMLElement>(
+    documentRef,
+    "[data-workspace-detail-mode-label]",
+  );
+  const detailModeDescription = query<HTMLElement>(
+    documentRef,
+    "[data-workspace-detail-mode-description]",
   );
   const modeTransitionBanner = query<HTMLElement>(
     documentRef,
@@ -1871,6 +1960,7 @@ export function bootstrapDraw2Workspace(
       return undefined;
     }
   })();
+  let detailMode = readWorkspaceDetailMode(rightDockStorage);
   const rightDockPreference = readRightDockPreference(rightDockStorage);
   let railLayoutPreference = readRailLayoutPreference(rightDockStorage);
   const applyRailLayoutPreference = (): void => {
@@ -3497,6 +3587,34 @@ export function bootstrapDraw2Workspace(
     documentRef,
     "#draw2GameBuildStatus",
   );
+  const draw2GameStudioReleaseCandidate = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2GameStudioReleaseCandidate",
+  );
+  const draw2GameStudioReleaseManifest = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2GameStudioReleaseManifest",
+  );
+  const draw2GameStudioPublishIntent = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2GameStudioPublishIntent",
+  );
+  const draw2GameStudioReleaseArtifact = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2GameStudioReleaseArtifact",
+  );
+  const draw2GameStudioReleaseArtifactDownload = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2GameStudioReleaseArtifactDownload",
+  );
+  const draw2GameStudioReleaseManifestPreview = query<HTMLElement>(
+    documentRef,
+    "#draw2GameStudioReleaseManifestPreview",
+  );
+  const draw2GameStudioReleaseStatus = query<HTMLElement>(
+    documentRef,
+    "#draw2GameStudioReleaseStatus",
+  );
   const draw2AudioPanelOpenTimeline = query<HTMLButtonElement>(
     documentRef,
     "#draw2AudioPanelOpenTimeline",
@@ -3699,12 +3817,19 @@ export function bootstrapDraw2Workspace(
   let gameAssetBrowserQuery = "";
   let gameAssetBrowserSource: GameAssetBrowserSource | "ALL" = "ALL";
   let selectedGameAnimationClipId: string | undefined;
+  let selectedGameAssetDefinitionId: string | undefined;
   let gameAnimationPreviewFrame = 0;
   let gameAnimationPreviewTimer: number | undefined;
   type GameLogicMode = "SIMPLE" | "GRAPH" | "CODE";
   let gameLogicMode: GameLogicMode = "SIMPLE";
   let gameLogicModeBehaviorId: string | undefined;
   let lastGameEngineAdapterPackage: EngineAdapterPackage | undefined;
+  let lastStudioReleaseCandidate: StudioReleaseCandidate | undefined;
+  let lastStudioPublishIntent: StudioPublishIntent | undefined;
+  let lastStudioReleaseArtifactBundle: StudioReleaseArtifactBundle | undefined;
+  let studioReleaseCandidateGameRevision: number | undefined;
+  let studioReleaseBusy = false;
+  let studioReleaseArtifactBusy = false;
   let renderGameAssetRail: () => void = () => {};
   const bindingsFromCanonicalProject = (
     project: GameProject,
@@ -3848,55 +3973,72 @@ export function bootstrapDraw2Workspace(
     },
   });
   let site400RouteOperationSequence = 0;
-  const refreshSite400IGameRoute = async (
+  let site400RouteRefreshQueue: Promise<void> = Promise.resolve();
+  const refreshSite400IGameRoute = (
     operation: "create" | "open" | "reload",
   ): Promise<boolean> => {
-    if (igameFeatureFlag !== "on") {
-      root.dataset.site400IgameRoute = igameFeatureFlag === "off"
-        ? "off"
-        : "unknown";
-      return false;
-    }
-    const project = pixyncGameStore?.project;
-    if (project === undefined) {
-      root.dataset.site400IgameRoute = "awaiting-project";
-      return false;
-    }
-    const projectId = String(project.projectId);
-    const request = {
-      requestId: `request:studio-igame:${projectId}`,
-      sessionReference: `session:studio-igame:${projectId}`,
-      correlationId: `correlation:studio-igame:${projectId}`,
-      assetId: site400AssetFor(projectId),
-      requestedTenantId: site400TenantFor(projectId),
-    } as const;
-    const operationId = `studio-igame-${operation}:${projectId}:${
-      operation === "reload"
-        ? ++site400RouteOperationSequence
-        : String(project.revision.revisionId)
-    }`;
-    const result = operation === "create"
-      ? await site400IGameRoute.dispatch({
-        operationId,
-        type: "create",
-        createInput: { project },
-        registryRequest: request,
-      })
-      : operation === "open"
-      ? await site400IGameRoute.dispatch({
-        operationId,
-        type: "open",
-        projectId,
-        registryRequest: request,
-      })
-      : await site400IGameRoute.dispatch({ operationId, type: "reload" });
-    root.dataset.site400IgameRoute = result.status.toLowerCase();
-    if (result.reason !== undefined) {
-      root.dataset.site400IgameReason = result.reason;
-    } else {
-      delete root.dataset.site400IgameReason;
-    }
-    return result.status === "READY";
+    const run = async (): Promise<boolean> => {
+      if (igameFeatureFlag !== "on") {
+        root.dataset.site400IgameRoute = igameFeatureFlag === "off"
+          ? "off"
+          : "unknown";
+        return false;
+      }
+      const project = pixyncGameStore?.project;
+      if (project === undefined) {
+        root.dataset.site400IgameRoute = "awaiting-project";
+        return false;
+      }
+      const projectId = String(project.projectId);
+      const request = {
+        requestId: `request:studio-igame:${projectId}`,
+        sessionReference: `session:studio-igame:${projectId}`,
+        correlationId: `correlation:studio-igame:${projectId}`,
+        assetId: site400AssetFor(projectId),
+        requestedTenantId: site400TenantFor(projectId),
+      } as const;
+      // setCreatorMode() and restoreGameEditorState() can request the first
+      // route at the same time. Serialize those UI requests, then downgrade a
+      // queued duplicate create to an open of the accepted Project. The
+      // generic SITE-400 controller keeps its strict create safety contract;
+      // only this internal caller becomes idempotent.
+      const currentRouteProject = site400IGameRoute.currentProject();
+      const effectiveOperation = operation === "create" &&
+          currentRouteProject !== undefined &&
+          currentRouteProject.identity.projectId === projectId
+        ? "open"
+        : operation;
+      const operationId = `studio-igame-${effectiveOperation}:${projectId}:${
+        effectiveOperation === "reload"
+          ? ++site400RouteOperationSequence
+          : String(project.revision.revisionId)
+      }`;
+      const result = effectiveOperation === "create"
+        ? await site400IGameRoute.dispatch({
+          operationId,
+          type: "create",
+          createInput: { project },
+          registryRequest: request,
+        })
+        : effectiveOperation === "open"
+        ? await site400IGameRoute.dispatch({
+          operationId,
+          type: "open",
+          projectId,
+          registryRequest: request,
+        })
+        : await site400IGameRoute.dispatch({ operationId, type: "reload" });
+      root.dataset.site400IgameRoute = result.status.toLowerCase();
+      if (result.reason !== undefined) {
+        root.dataset.site400IgameReason = result.reason;
+      } else {
+        delete root.dataset.site400IgameReason;
+      }
+      return result.status === "READY";
+    };
+    const scheduled = site400RouteRefreshQueue.then(run, run);
+    site400RouteRefreshQueue = scheduled.then(() => undefined, () => undefined);
+    return scheduled;
   };
   let selectedGameTrackId: string | undefined = gameDeckTracks[0]?.id;
   let renderGameCustomPanels: () => void = () => {};
@@ -4065,6 +4207,8 @@ export function bootstrapDraw2Workspace(
     const revision = gamePersistenceRevision + 1;
     gamePersistenceRevision = revision;
     gamePersistenceSaveQueue = gamePersistenceSaveQueue.then(async () => {
+      const expectedRevision = gamePersistenceExpectedRevision;
+      const expectedStateHash = gamePersistenceExpectedStateHash;
       const record = await createGameEditorPersistenceRecord(
         projectId,
         tracks,
@@ -4078,7 +4222,10 @@ export function bootstrapDraw2Workspace(
         templateInstances,
         animationBindings,
       );
-      const saved = await gamePersistenceStore.save(record);
+      const saved = await gamePersistenceStore.save(record, {
+        expectedRevision,
+        expectedStateHash,
+      });
       if (!saved.ok) {
         root.dataset.gamePersistenceState = "unavailable";
         return;
@@ -4090,7 +4237,10 @@ export function bootstrapDraw2Workspace(
         : "saved";
       root.dataset.gamePersistenceRevision = String(revision);
       if (!saved.stale) {
+        gamePersistenceExpectedRevision = revision;
+        gamePersistenceExpectedStateHash = record.stateHash;
         const command = await commitCanonicalGameRecord(record);
+        let canonicalSaveConflict = false;
         if (pixyncGameStore !== undefined) {
           const canonicalRecord = await createGameEditorPersistenceRecord(
             projectId,
@@ -4108,26 +4258,39 @@ export function bootstrapDraw2Workspace(
             templateInstances,
             animationBindings,
           );
-          await gamePersistenceStore.save(canonicalRecord);
+          const canonicalSaved = await gamePersistenceStore.save(
+            canonicalRecord,
+            {
+              expectedRevision: gamePersistenceExpectedRevision,
+              expectedStateHash: gamePersistenceExpectedStateHash,
+            },
+          );
+          if (canonicalSaved.ok && !canonicalSaved.stale) {
+            gamePersistenceExpectedStateHash = canonicalRecord.stateHash;
+          } else if (canonicalSaved.ok && canonicalSaved.stale) {
+            canonicalSaveConflict = true;
+            root.dataset.gamePersistenceState = "stale-write-ignored";
+          }
         }
+        if (canonicalSaveConflict) return;
         windowRef.dispatchEvent(
           new CustomEvent("draw2:game-editor-committed", {
             detail: { reason, record, command },
           }),
         );
-      }
-      await workspaceManifestStore.updateModule(
-        asWorkspaceProjectId(projectId),
-        "game",
-        {
-          status: "READY",
-          revision,
-          stateHash: record.stateHash,
-          savedAt: record.savedAt,
-        },
-      );
-      if (root.dataset.creatorMode === "GAME") {
-        void refreshSite400IGameRoute("open");
+        await workspaceManifestStore.updateModule(
+          asWorkspaceProjectId(projectId),
+          "game",
+          {
+            status: "READY",
+            revision,
+            stateHash: record.stateHash,
+            savedAt: record.savedAt,
+          },
+        );
+        if (root.dataset.creatorMode === "GAME") {
+          void refreshSite400IGameRoute("open");
+        }
       }
     }).catch(() => {
       root.dataset.gamePersistenceState = "error";
@@ -5840,12 +6003,14 @@ export function bootstrapDraw2Workspace(
   let audioPersistenceStore:
     | import("./audio/audio-200/persistence.ts").AudioPersistenceStore
     | undefined;
+  let audioPersistenceExpectedRevision = 0;
+  let audioPersistenceExpectedStateHash: string | null = null;
   let audioPersistenceSaveQueue: Promise<void> = Promise.resolve();
   const AUDIO_PERSISTENCE_AUTOSAVE_DEBOUNCE_MS = 250;
   let audioPersistenceSaveTimer: number | undefined;
   let audioPersistenceMutationPending = false;
   const setAudioPersistenceState = (
-    state: "pending" | "ready" | "restored" | "saved" | "unavailable" | "error",
+    state: "pending" | "ready" | "restored" | "saved" | "stale-write-ignored" | "unavailable" | "error",
     message?: string,
   ): void => {
     root.dataset.audioPersistenceState = state;
@@ -5861,6 +6026,8 @@ export function bootstrapDraw2Workspace(
           ? "Ready · Local"
           : state === "restored"
           ? "Restored · Local"
+          : state === "stale-write-ignored"
+          ? "Conflict · Reload"
           : "Saved · Local",
       );
     }
@@ -6257,7 +6424,10 @@ export function bootstrapDraw2Workspace(
       );
       return;
     }
-    const saved = await audioPersistenceStore.save(record.value);
+    const saved = await audioPersistenceStore.save(record.value, {
+      expectedProjectRevision: audioPersistenceExpectedRevision,
+      expectedStateHash: audioPersistenceExpectedStateHash,
+    });
     if (!saved.ok) {
       setAudioPersistenceState(
         "error",
@@ -6267,6 +6437,18 @@ export function bootstrapDraw2Workspace(
       );
       return;
     }
+    const stale = saved.diagnostics.some((diagnostic) =>
+      diagnostic.code === "AUDIO_STALE_PROJECT_REVISION"
+    );
+    if (stale) {
+      setAudioPersistenceState(
+        "stale-write-ignored",
+        "Save skipped · another tab changed Audio. Reload before continuing.",
+      );
+      return;
+    }
+    audioPersistenceExpectedRevision = record.value.checkpoint.projectRevision;
+    audioPersistenceExpectedStateHash = record.value.checkpoint.stateHash;
     root.dataset.audioPersistenceRevision = String(
       record.value.checkpoint.projectRevision,
     );
@@ -6787,6 +6969,12 @@ export function bootstrapDraw2Workspace(
           workspaceProjectId,
         );
         const loaded = await audioPersistenceStore.load(audioProjectId);
+        audioPersistenceExpectedRevision = loaded.ok
+          ? loaded.value?.checkpoint.projectRevision ?? 0
+          : 0;
+        audioPersistenceExpectedStateHash = loaded.ok
+          ? loaded.value?.checkpoint.stateHash ?? null
+          : null;
         if (!loaded.ok) {
           setAudioPersistenceState(
             "unavailable",
@@ -7940,7 +8128,20 @@ export function bootstrapDraw2Workspace(
           : { components: cloneGameComponents(track.components) }),
         ...(track.tilemap === undefined ? {} : { tilemap: track.tilemap }),
       }));
-      gameDeckBindings = bindingsFromCanonicalProject(input.next);
+      const previousGameBindings = gameDeckBindings;
+      gameDeckBindings = bindingsFromCanonicalProject(input.next).map(
+        (binding) => {
+          const previous = previousGameBindings.find((candidate) =>
+            candidate.trackId === binding.trackId &&
+            candidate.kind === binding.kind &&
+            candidate.assetId === binding.assetId &&
+            candidate.revisionId === binding.revisionId
+          );
+          return previous?.assetDefinitionId === undefined
+            ? binding
+            : { ...binding, assetDefinitionId: previous.assetDefinitionId };
+        },
+      );
       gamePersistenceRevision = Math.max(
         gamePersistenceRevision,
         input.next.revision.sequence - 1,
@@ -7963,7 +8164,16 @@ export function bootstrapDraw2Workspace(
         gameTemplateInstances,
         gameAnimationBindings,
       );
-      await gamePersistenceStore.save(record);
+      const saved = await gamePersistenceStore.save(record, {
+        expectedRevision: gamePersistenceExpectedRevision,
+        expectedStateHash: gamePersistenceExpectedStateHash,
+      });
+      if (saved.ok && !saved.stale) {
+        gamePersistenceExpectedRevision = record.revision;
+        gamePersistenceExpectedStateHash = record.stateHash;
+      } else if (saved.ok && saved.stale) {
+        root.dataset.gamePersistenceState = "stale-write-ignored";
+      }
     }
     return {
       operationId: input.operation.operationId,
@@ -8521,6 +8731,8 @@ export function bootstrapDraw2Workspace(
     audioExportSelectionProjectId = undefined;
     pixyncRemoteAudioEntryIds.clear();
     audioPersistenceStore = undefined;
+    audioPersistenceExpectedRevision = 0;
+    audioPersistenceExpectedStateHash = null;
     audioProjectedProjectId = undefined;
     audioProjectedMixer = undefined;
     audioProjectedEffects = undefined;
@@ -9234,6 +9446,8 @@ export function bootstrapDraw2Workspace(
       gameCreationMode = "UNSELECTED";
       gameCreationModePromptVisible = true;
       gamePersistenceRevision = 0;
+      gamePersistenceExpectedRevision = 0;
+      gamePersistenceExpectedStateHash = null;
       gameDeckTracks = [];
       gameDeckBindings = [];
       gameAnimationBindings = [];
@@ -9259,6 +9473,8 @@ export function bootstrapDraw2Workspace(
     }
     const record = await gamePersistenceStore.load(projectId);
     gamePersistenceRevision = record?.revision ?? 0;
+    gamePersistenceExpectedRevision = gamePersistenceRevision;
+    gamePersistenceExpectedStateHash = record?.stateHash ?? null;
     let restored = false;
     if (
       record !== null && record.projectId === projectId &&
@@ -16488,22 +16704,24 @@ export function bootstrapDraw2Workspace(
   };
   const renderAudioWavForExport = async (
     durationSeconds?: number,
+    selection: "CURRENT" | "FULL" = "CURRENT",
   ): Promise<WorkspaceAudioRenderSnapshot | null> => {
     await ensureAudioWorkspaceSession();
     const session = audioWorkspaceSession;
     if (session === undefined) return null;
     const selectedTrackIds = audioRenderTrackIds();
     const selectedClipIds = audioRenderClipIds();
-    if (selectedTrackIds.length === 0) return null;
-    const renderProject =
-      selectedTrackIds.length === session.project.tracks.length &&
-        selectedClipIds.length === session.project.clips.length
-        ? session.project
-        : audioProjectForRenderSelection(
-          session.project,
-          selectedTrackIds,
-          selectedClipIds,
-        );
+    if (selection !== "FULL" && selectedTrackIds.length === 0) return null;
+    const renderProject = selection === "FULL"
+      ? session.project
+      : selectedTrackIds.length === session.project.tracks.length &&
+          selectedClipIds.length === session.project.clips.length
+      ? session.project
+      : audioProjectForRenderSelection(
+        session.project,
+        selectedTrackIds,
+        selectedClipIds,
+      );
     if (renderProject === undefined) return null;
     if (
       renderProject.clips.length === 0 && renderProject.notes.length === 0
@@ -16545,6 +16763,9 @@ export function bootstrapDraw2Workspace(
       channels: rendered.value.channels,
       bitDepth: rendered.value.bitDepth,
       durationSeconds: rendered.value.durationSeconds,
+      sourceProjectId: String(renderProject.projectId),
+      sourceStateHash: String(renderProject.stateHash),
+      sourceProjectRevision: renderProject.projectRevision,
     };
   };
   audioRender?.addEventListener("click", () => {
@@ -19741,6 +19962,8 @@ export function bootstrapDraw2Workspace(
         rightDockVisibleTabs.has(panel) &&
         isPanelAllowedForCurrentMode(panel);
       tab.hidden = !visible;
+      tab.inert = !visible;
+      tab.setAttribute("aria-hidden", String(!visible));
       tab.dataset.rightTabVisible = String(visible);
       const selected = visible && panel === state.activePanel;
       tab.classList.toggle("is-active", selected);
@@ -19799,6 +20022,31 @@ export function bootstrapDraw2Workspace(
     if (workspaceStatus !== undefined) workspaceStatus.textContent = compact;
     if (statusbarMessage !== undefined) statusbarMessage.textContent = compact;
   };
+
+  const renderDetailMode = (): void => {
+    const guided = detailMode === "guided";
+    root.dataset.detailMode = detailMode;
+    for (const toggle of detailModeToggles) {
+      toggle.setAttribute("aria-pressed", String(!guided));
+      toggle.setAttribute(
+        "aria-label",
+        guided ? "詳細モードへ切り替え" : "ガイドモードへ切り替え",
+      );
+      toggle.setAttribute(
+        "title",
+        guided ? "詳細モードへ切り替え" : "ガイドモードへ切り替え",
+      );
+    }
+    if (detailModeLabel !== undefined) {
+      detailModeLabel.textContent = guided ? "ガイド" : "詳細";
+    }
+    if (detailModeDescription !== undefined) {
+      detailModeDescription.textContent = guided
+        ? "基本操作を中心に表示"
+        : "高度な設定も表示";
+    }
+  };
+  renderDetailMode();
 
   type Draw2SyncUiState =
     | "local"
@@ -19940,10 +20188,12 @@ export function bootstrapDraw2Workspace(
   const setPanel = (panel: PanelKind, openMobileSheet = true): void => {
     if (!PANELS.includes(panel)) return;
     const modeProfile = currentDesktopModeProfile();
-    const nextPanel =
-      modeProfile !== undefined && !modeProfile.allowedPanels.includes(panel)
-        ? modeProfile.defaultPanel
-        : panel;
+    const detailRestricted = detailMode === "guided" && panel === "advanced";
+    const nextPanel = detailRestricted
+      ? modeProfile?.defaultPanel ?? (isAudioMobileMode() ? "audio" : "color")
+      : modeProfile !== undefined && !modeProfile.allowedPanels.includes(panel)
+      ? modeProfile.defaultPanel
+      : panel;
     rightDockVisibleTabs.add(nextPanel);
     root.classList.remove("is-right-dock-collapsed");
     root.classList.remove("is-mobile-timeline-open");
@@ -19983,16 +20233,28 @@ export function bootstrapDraw2Workspace(
       );
     }
     for (const content of panelContents) {
-      content.hidden = content.dataset.workspacePanelContent !== nextPanel;
+      const selected = content.dataset.workspacePanelContent === nextPanel;
+      content.hidden = !selected;
+      content.inert = !selected;
+      content.setAttribute("aria-hidden", String(!selected));
     }
     const assetPanelActive = nextPanel === "assets";
     if (creatorAssetSurface !== undefined) {
-      creatorAssetSurface.hidden = !assetPanelActive &&
-        creatorState.activeMode !== "ASSET";
+      const assetSurfaceActive = assetPanelActive ||
+        creatorState.activeMode === "ASSET";
+      creatorAssetSurface.hidden = !assetSurfaceActive;
+      creatorAssetSurface.inert = !assetSurfaceActive;
+      creatorAssetSurface.setAttribute(
+        "aria-hidden",
+        String(!assetSurfaceActive),
+      );
     }
     if (creatorAssetUnavailable !== undefined) {
-      creatorAssetUnavailable.hidden = assetPanelActive ||
+      const unavailable = assetPanelActive ||
         creatorState.activeMode === "ASSET";
+      creatorAssetUnavailable.hidden = unavailable;
+      creatorAssetUnavailable.inert = unavailable;
+      creatorAssetUnavailable.setAttribute("aria-hidden", String(unavailable));
     }
     const colorEditor = query<HTMLElement>(
       documentRef,
@@ -20023,6 +20285,25 @@ export function bootstrapDraw2Workspace(
       `${capability.profile} · ${
         panelLabel(nextPanel)
       } panel · local workspace state`,
+    );
+  };
+
+  const toggleDetailMode = (): void => {
+    detailMode = detailMode === "guided" ? "detailed" : "guided";
+    writeWorkspaceDetailMode(rightDockStorage, detailMode);
+    renderDetailMode();
+    if (detailMode === "guided" && state.activePanel === "advanced") {
+      setPanel(currentDesktopModeProfile()?.defaultPanel ?? "color", false);
+    }
+    windowRef.dispatchEvent(
+      new CustomEvent("draw2:detail-mode", {
+        detail: { mode: detailMode },
+      }),
+    );
+    updateStatus(
+      `${capability.profile} · ${
+        detailMode === "guided" ? "Guided view" : "Detailed view"
+      } · local workspace state`,
     );
   };
 
@@ -20768,6 +21049,11 @@ export function bootstrapDraw2Workspace(
     creatorState = transitionCreatorWorkspaceMode(creatorState, projectedMode);
     root.dataset.creatorMode = projectedMode;
     windowRef.dispatchEvent(
+      new CustomEvent("draw2:creator-mode", {
+        detail: { mode: projectedMode },
+      }),
+    );
+    windowRef.dispatchEvent(
       new CustomEvent("draw2:game-editor-demand", {
         detail: { active: projectedMode === "GAME" },
       }),
@@ -20872,6 +21158,133 @@ export function bootstrapDraw2Workspace(
     (windowRef as Window & {
       __pixiedraw2AssetBridge?: Draw2AssetBridge;
     }).__pixiedraw2AssetBridge;
+  const buildGoldenProject = async (
+    mode: "LIVE" | "PINNED",
+  ): Promise<GoldenProjectBuildResult> => {
+    const bridge = getAssetBridge();
+    if (bridge === undefined) {
+      throw new Error("iDRAW Asset bridge is unavailable.");
+    }
+    const drawSnapshot = bridge.snapshot();
+    if (drawSnapshot.projectId !== workspaceProjectId) {
+      throw new Error("iDRAW and workspace Project IDs do not match.");
+    }
+    const drawReference = await bridge.resolveCurrentReference({ mode });
+    if (drawReference === undefined) {
+      throw new Error("Active iDRAW Asset is unavailable.");
+    }
+    await ensureAudioWorkspaceSession();
+    const audioProject = audioWorkspaceSession?.project;
+    if (audioProject === undefined) {
+      throw new Error("iAUDIO Project is unavailable.");
+    }
+    const ownerId = `studio-owner:${workspaceProjectId}`;
+    return createGoldenProject({
+      projectId: workspaceProjectId,
+      ownerId,
+      name: `${workspaceProjectId} · Golden Project`,
+      draw: {
+        projectId: workspaceProjectId,
+        ownerId,
+        kind: "DRAW",
+        assetId: drawReference.assetId,
+        revisionId: drawReference.revisionId,
+        contentHash: drawReference.contentHash,
+        licenseId: "draw2-local-preview",
+        permission: "READ",
+        reviewStatus: "APPROVED",
+        label: drawReference.label,
+      },
+      audio: {
+        projectId: workspaceProjectId,
+        ownerId,
+        kind: "AUDIO",
+        assetId: `audio-project:${String(audioProject.projectId)}`,
+        revisionId: `audio-project-revision:${audioProject.projectRevision}`,
+        contentHash: String(audioProject.stateHash),
+        licenseId: `audio2-local-preview:${workspaceProjectId}`,
+        permission: "READ",
+        reviewStatus: "APPROVED",
+        label: "Audio全体ミックス",
+      },
+      drawPlacement: { x: 1, y: 1 },
+      audioSettings: { loop: true, volume: 1 },
+    }, mode);
+  };
+  const applyGoldenProject = async (
+    mode: "LIVE" | "PINNED",
+  ): Promise<GoldenProjectBuildResult> => {
+    const result = await buildGoldenProject(mode);
+    if (!result.ok || result.value === undefined) return result;
+    const drawLock = result.value.manifest.assetLocks.find((lock) =>
+      lock.kind === "DRAW"
+    );
+    const audioLock = result.value.manifest.assetLocks.find((lock) =>
+      lock.kind === "AUDIO"
+    );
+    if (drawLock === undefined || audioLock === undefined) {
+      throw new Error("Golden Project asset locks are incomplete.");
+    }
+    const existingHero = gameDeckTracks.find((track) => track.id === "hero");
+    const existingMusic = gameDeckTracks.find((track) => track.id === "music");
+    const heroTrack: ModeDeckTrack = {
+      ...(existingHero ?? {
+        id: "hero",
+        filled: [0],
+        components: defaultGameObjectComponents("hero", "SPRITE"),
+      }),
+      label: result.value.project.scenes[0]?.entities[0]?.name ?? "主人公",
+      kind: "SPRITE",
+      active: true,
+      role: "PLAYER",
+    };
+    const musicTrack: ModeDeckTrack = {
+      ...(existingMusic ?? {
+        id: "music",
+        filled: [0],
+        components: defaultGameObjectComponents("music", "AUDIO"),
+      }),
+      label: result.value.project.scenes[0]?.entities[1]?.name ??
+        "Audio全体ミックス",
+      kind: "MUSIC",
+      active: true,
+      role: "AUDIO",
+    };
+    const withoutGoldenTracks = gameDeckTracks.filter((track) =>
+      track.id !== "hero" && track.id !== "music"
+    );
+    gameDeckTracks = [heroTrack, musicTrack, ...withoutGoldenTracks];
+    gameDeckBindings = [
+      ...gameDeckBindings.filter((binding) =>
+        binding.trackId !== "hero" && binding.trackId !== "music"
+      ),
+      {
+        trackId: "hero",
+        kind: "DRAW",
+        assetId: drawLock.assetId,
+        revisionId: drawLock.revisionId,
+        contentHash: String(drawLock.contentHash),
+        mode,
+        label: heroTrack.label,
+      },
+      {
+        trackId: "music",
+        kind: "AUDIO",
+        assetId: audioLock.assetId,
+        revisionId: audioLock.revisionId,
+        contentHash: String(audioLock.contentHash),
+        mode,
+        label: musicTrack.label,
+      },
+    ];
+    gameCreationMode = "RPG_TEMPLATE";
+    gameCreationModePromptVisible = false;
+    root.dataset.gameCreationMode = gameCreationMode;
+    renderGameCustomPanels();
+    queueGameEditorPersistenceSave("golden-project-apply");
+    await flushGameEditorPersistence();
+    return result;
+  };
   const assetKinds = [
     "CHARACTER",
     "OBJECT",
@@ -26014,6 +26427,9 @@ export function bootstrapDraw2Workspace(
       ...(drawBinding === undefined
         ? {}
         : { boundDrawAssetId: drawBinding.assetId }),
+      ...(drawBinding?.assetDefinitionId === undefined
+        ? {}
+        : { boundDrawDefinitionId: drawBinding.assetDefinitionId }),
     });
     return references.find((reference) =>
       reference.id === selectedGameAnimationClipId
@@ -26125,6 +26541,9 @@ export function bootstrapDraw2Workspace(
       ...(drawBinding === undefined
         ? {}
         : { boundDrawAssetId: drawBinding.assetId }),
+      ...(drawBinding?.assetDefinitionId === undefined
+        ? {}
+        : { boundDrawDefinitionId: drawBinding.assetDefinitionId }),
     });
     if (
       !references.some((reference) =>
@@ -26296,6 +26715,14 @@ export function bootstrapDraw2Workspace(
       query: gameAssetBrowserQuery,
       source: gameAssetBrowserSource,
     });
+    if (
+      selectedGameAssetDefinitionId !== undefined &&
+      !drawDefinitions.some((entry) =>
+        entry.definitionId === selectedGameAssetDefinitionId
+      )
+    ) {
+      selectedGameAssetDefinitionId = undefined;
+    }
     if (entries.length === 0) {
       const empty = documentRef.createElement("small");
       empty.className = "draw2-panel-status";
@@ -26319,6 +26746,11 @@ export function bootstrapDraw2Workspace(
           button.dataset.gameAssetId = entry.id;
           button.dataset.gameAssetSource = entry.source;
           button.dataset.gameAssetReadonly = String(entry.readOnly);
+          button.classList.toggle(
+            "is-active",
+            entry.source === "DRAW" &&
+              entry.definitionId === selectedGameAssetDefinitionId,
+          );
           const head = documentRef.createElement("span");
           head.className = "draw2-game-asset-card-head";
           const title = documentRef.createElement("strong");
@@ -26331,6 +26763,10 @@ export function bootstrapDraw2Workspace(
           detail.textContent = entry.detail;
           button.append(head, detail);
           button.addEventListener("click", () => {
+            if (entry.source === "DRAW" && entry.definitionId !== undefined) {
+              selectedGameAssetDefinitionId = entry.definitionId;
+              button.classList.add("is-active");
+            }
             if (entry.source === "GAME" && entry.trackId !== undefined) {
               const track = gameDeckTracks.find((candidate) =>
                 candidate.id === entry.trackId
@@ -26360,13 +26796,19 @@ export function bootstrapDraw2Workspace(
                   gameAnimationPreviewFrame = 0;
                   activateGameRailTab("ANIMATION");
                   renderGameAnimationBrowser();
+                  if (draw2GameAssetCatalogStatus !== undefined) {
+                    draw2GameAssetCatalogStatus.textContent =
+                      `${entry.label}を選択中。Game配置を追加すると、このAssetをSpriteとして配置できます。`;
+                  }
                   return;
                 }
               }
             }
             if (entry.source === "TEMPLATE") setPanel("game-assets");
             if (draw2GameAssetCatalogStatus !== undefined) {
-              draw2GameAssetCatalogStatus.textContent = entry.readOnly
+              draw2GameAssetCatalogStatus.textContent = entry.source === "DRAW"
+                ? `${entry.label}を選択中。Game配置を追加すると、このAssetをSpriteとして配置できます。`
+                : entry.readOnly
                 ? `${entry.label} · 参照専用です。Game側では配置・割り当てだけを変更できます。`
                 : `${entry.label} · Game側で使用できます。原素材は変更されません。`;
             }
@@ -26668,24 +27110,9 @@ export function bootstrapDraw2Workspace(
       draw2GameSceneStatus.textContent = "Scene Trackを追加しました。";
     }
   });
-  draw2GameAssetsAdd?.addEventListener("click", () => {
-    gameDeckAddAsset?.click();
-    if (draw2GameAssetsStatus !== undefined) {
-      draw2GameAssetsStatus.textContent =
-        "Game配置を追加しました。原素材は参照専用です。";
-    }
-  });
-  draw2GameTemplateCategory?.addEventListener("change", () => {
-    const selected = draw2GameTemplateCategory.value;
-    gameTemplateCategory =
-      ["CORE", "RPG", "ACTION", "SHOOTING", "RACING", "RHYTHM"].includes(
-          selected,
-        )
-        ? selected as GameTemplateCategory
-        : "ALL";
-    renderGameTemplates();
-  });
-  draw2GameBindDraw?.addEventListener("click", () => {
+  const bindDrawReferenceToSelectedTrack = (
+    definitionId?: string,
+  ): void => {
     const permission = decideGameAssetMutation(
       "DRAW_REFERENCE",
       "ATTACH_REFERENCE",
@@ -26714,11 +27141,15 @@ export function bootstrapDraw2Workspace(
       }
       return;
     }
-    void bridge.resolveCurrentReference({ mode }).then((reference) => {
+    const referenceResolution = definitionId === undefined
+      ? bridge.resolveCurrentReference({ mode })
+      : bridge.resolveDefinitionReference({ definitionId, mode });
+    void referenceResolution.then((reference) => {
       if (reference === undefined) {
         if (draw2GameAssetsStatus !== undefined) {
-          draw2GameAssetsStatus.textContent =
-            "iDRAWのアクティブAssetを取得できません。";
+          draw2GameAssetsStatus.textContent = definitionId === undefined
+            ? "iDRAWのアクティブAssetを取得できません。"
+            : "選択したiDRAW Assetを取得できません。再読込後にもう一度選択してください。";
         }
         return;
       }
@@ -26733,9 +27164,39 @@ export function bootstrapDraw2Workspace(
       queueGameEditorPersistenceSave("bind-draw");
       if (draw2GameAssetsStatus !== undefined) {
         draw2GameAssetsStatus.textContent =
-          `${track.label}にiDRAW ${mode}参照を追加しました。原素材は編集不可です。`;
+          `${track.label}に${reference.label} · iDRAW ${mode}参照を追加しました。原素材は編集不可です。`;
+      }
+    }).catch(() => {
+      if (draw2GameAssetsStatus !== undefined) {
+        draw2GameAssetsStatus.textContent =
+          "iDRAW Assetの参照作成に失敗しました。編集状態は変更していません。";
       }
     });
+  };
+  draw2GameAssetsAdd?.addEventListener("click", () => {
+    const selectedDefinitionId = selectedGameAssetDefinitionId;
+    gameDeckAddAsset?.click();
+    if (draw2GameAssetsStatus !== undefined) {
+      draw2GameAssetsStatus.textContent = selectedDefinitionId === undefined
+        ? "Game配置を追加しました。原素材は参照専用です。"
+        : "選択したiDRAW AssetをGameへ配置し、Sprite参照を追加しています。";
+    }
+    if (selectedDefinitionId !== undefined) {
+      bindDrawReferenceToSelectedTrack(selectedDefinitionId);
+    }
+  });
+  draw2GameTemplateCategory?.addEventListener("change", () => {
+    const selected = draw2GameTemplateCategory.value;
+    gameTemplateCategory =
+      ["CORE", "RPG", "ACTION", "SHOOTING", "RACING", "RHYTHM"].includes(
+          selected,
+        )
+        ? selected as GameTemplateCategory
+        : "ALL";
+    renderGameTemplates();
+  });
+  draw2GameBindDraw?.addEventListener("click", () => {
+    bindDrawReferenceToSelectedTrack(selectedGameAssetDefinitionId);
   });
   draw2GameBindAudio?.addEventListener("click", () => {
     const permission = decideGameAssetMutation(
@@ -27242,6 +27703,25 @@ export function bootstrapDraw2Workspace(
       ...instance,
       values: { ...instance.values },
     })),
+    studioRelease: lastStudioReleaseCandidate === undefined ? null : {
+      status: lastStudioReleaseCandidate.status,
+      packageHash: lastStudioReleaseCandidate.manifest.packageHash,
+      projectRevisionId: lastStudioReleaseCandidate.manifest.projectRevisionId,
+      reproducibleBuildIdentity:
+        lastStudioReleaseCandidate.manifest.reproducibleBuildIdentity,
+      publishIntent: lastStudioPublishIntent?.kind ?? null,
+      artifactBundle: lastStudioReleaseArtifactBundle === undefined ? null : {
+        status: lastStudioReleaseArtifactBundle.status,
+        zipHash: lastStudioReleaseArtifactBundle.zip.contentHash,
+        zipBytes: lastStudioReleaseArtifactBundle.zip.bytes.byteLength,
+        artifacts: lastStudioReleaseArtifactBundle.artifacts.map((artifact) => ({
+          kind: artifact.kind,
+          path: artifact.path,
+          bytes: artifact.byteLength,
+          contentHash: artifact.contentHash,
+        })),
+      },
+    },
     engineAdapter: lastGameEngineAdapterPackage === undefined ? null : {
       adapterId: lastGameEngineAdapterPackage.adapterId,
       target: lastGameEngineAdapterPackage.target,
@@ -27463,6 +27943,433 @@ export function bootstrapDraw2Workspace(
         : `構成OK · ${target} · Canonical Projectを確認済み`;
     }
   };
+  const syncStudioReleaseControls = (): void => {
+    if (draw2GameStudioReleaseCandidate !== undefined) {
+      draw2GameStudioReleaseCandidate.disabled = studioReleaseBusy ||
+        studioReleaseArtifactBusy;
+      draw2GameStudioReleaseCandidate.setAttribute(
+        "aria-busy",
+        String(studioReleaseBusy),
+      );
+    }
+    if (draw2GameStudioReleaseManifest !== undefined) {
+      draw2GameStudioReleaseManifest.disabled = studioReleaseBusy ||
+        studioReleaseArtifactBusy ||
+        lastStudioReleaseCandidate === undefined;
+    }
+    if (draw2GameStudioPublishIntent !== undefined) {
+      draw2GameStudioPublishIntent.disabled = studioReleaseBusy ||
+        studioReleaseArtifactBusy ||
+        lastStudioReleaseCandidate === undefined;
+    }
+    if (draw2GameStudioReleaseArtifact !== undefined) {
+      draw2GameStudioReleaseArtifact.disabled = studioReleaseBusy ||
+        studioReleaseArtifactBusy || lastStudioReleaseCandidate === undefined;
+      draw2GameStudioReleaseArtifact.setAttribute(
+        "aria-busy",
+        String(studioReleaseArtifactBusy),
+      );
+    }
+    if (draw2GameStudioReleaseArtifactDownload !== undefined) {
+      draw2GameStudioReleaseArtifactDownload.disabled = studioReleaseBusy ||
+        studioReleaseArtifactBusy || lastStudioReleaseArtifactBundle === undefined;
+    }
+  };
+  const studioReleaseInputFromGolden = (
+    value: Extract<GoldenProjectBuildResult, { readonly ok: true }>["value"],
+  ) => ({
+    packageId: `studio-release:${workspaceProjectId}`,
+    packageVersion: "1.0.0",
+    project: value.project,
+    integration: value.manifest,
+    caller: value.caller,
+    assetRegistry: value.manifest.assetLocks.map((lock) => ({
+      kind: lock.kind,
+      assetId: lock.assetId,
+      revisionId: lock.revisionId,
+      contentHash: lock.contentHash,
+      ownerId: lock.ownerId,
+      licenseId: lock.licenseId,
+      // Source bytes remain owned by iDRAW/iAUDIO. Zero is explicit here:
+      // this UI candidate is metadata-only and must not claim materialization.
+      byteLength: 0,
+      mimeType: lock.kind === "DRAW"
+        ? "application/vnd.pixieed.indexed-raster"
+        : "application/vnd.pixieed.audio-project",
+      sourcePackage: lock.kind === "DRAW" ? "PXD" : "AUDIO",
+    })) satisfies readonly StudioAssetRegistryEntry[],
+  });
+  const setStudioReleaseStatus = (
+    message: string,
+    state: "idle" | "success" | "error" = "idle",
+  ): void => {
+    if (draw2GameStudioReleaseStatus === undefined) return;
+    draw2GameStudioReleaseStatus.dataset.state = state;
+    draw2GameStudioReleaseStatus.textContent = message;
+  };
+  const buildStudioReleaseCandidate = async (): Promise<void> => {
+    if (studioReleaseBusy) return;
+    studioReleaseBusy = true;
+    lastStudioReleaseCandidate = undefined;
+    lastStudioPublishIntent = undefined;
+    lastStudioReleaseArtifactBundle = undefined;
+    studioReleaseCandidateGameRevision = undefined;
+    if (draw2GameStudioReleaseManifestPreview !== undefined) {
+      draw2GameStudioReleaseManifestPreview.hidden = true;
+      draw2GameStudioReleaseManifestPreview.textContent = "";
+    }
+    syncStudioReleaseControls();
+    setStudioReleaseStatus("Game構成とiDRAW／iAUDIOの固定参照を検証中です…");
+    try {
+      await validateGameBuild();
+      const canonical = pixyncGameStore?.project;
+      if (canonical === undefined) {
+        setStudioReleaseStatus(
+          "Game Projectを読み込み中です。読み込み完了後に再実行してください。",
+          "error",
+        );
+        return;
+      }
+      const canonicalValidation = validateGameProject(canonical);
+      if (!canonicalValidation.valid) {
+        setStudioReleaseStatus(
+          canonicalValidation.diagnostics[0]?.message ??
+            "Game Projectを検証できません。",
+          "error",
+        );
+        return;
+      }
+      const golden = await buildGoldenProject("PINNED");
+      if (!golden.ok || golden.value === undefined) {
+        setStudioReleaseStatus(
+          golden.diagnostics[0]?.message ??
+            "iDRAW／iAUDIOの固定参照を作成できません。",
+          "error",
+        );
+        return;
+      }
+      const result = await createStudioReleaseCandidate(
+        studioReleaseInputFromGolden(golden.value),
+      );
+      if (!result.ok || result.value === undefined) {
+        const diagnostic = result.diagnostics[0];
+        setStudioReleaseStatus(
+          diagnostic === undefined
+            ? "Release Candidateを検証できません。"
+            : `${diagnostic.code}: ${diagnostic.message}`,
+          "error",
+        );
+        return;
+      }
+      lastStudioReleaseCandidate = result.value;
+      studioReleaseCandidateGameRevision = gamePersistenceRevision;
+      setStudioReleaseStatus(
+        `検証済み · PXD / AUDIO / GAME · Package Hash ${
+          result.value.manifest.packageHash.slice(0, 12)
+        } · Artifact生成待ち`,
+        "success",
+      );
+    } catch (error) {
+      setStudioReleaseStatus(
+        error instanceof Error
+          ? error.message
+          : "Release Candidateを検証できません。",
+        "error",
+      );
+    } finally {
+      studioReleaseBusy = false;
+      syncStudioReleaseControls();
+    }
+  };
+  const showStudioReleaseManifest = (): void => {
+    const candidate = lastStudioReleaseCandidate;
+    if (candidate === undefined) {
+      setStudioReleaseStatus(
+        "先にRelease Candidateを検証してください。",
+        "error",
+      );
+      return;
+    }
+    if (draw2GameStudioReleaseManifestPreview !== undefined) {
+      draw2GameStudioReleaseManifestPreview.hidden = false;
+      draw2GameStudioReleaseManifestPreview.textContent = JSON.stringify(
+        {
+          manifest: candidate.manifest,
+          verification: candidate.verification,
+          artifactBundle: lastStudioReleaseArtifactBundle?.manifest ?? null,
+        },
+        null,
+        2,
+      );
+    }
+    setStudioReleaseStatus(
+      lastStudioReleaseArtifactBundle === undefined
+        ? "Manifestを表示しました。Artifact生成前の固定参照です。"
+        : "Manifestを表示しました。Artifactの実バイトHashも含まれています。",
+      "success",
+    );
+  };
+  const materializeStudioRelease = async (): Promise<void> => {
+    const candidate = lastStudioReleaseCandidate;
+    if (candidate === undefined) {
+      setStudioReleaseStatus(
+        "先にRelease Candidateを検証してください。",
+        "error",
+      );
+      return;
+    }
+    if (studioReleaseCandidateGameRevision !== gamePersistenceRevision) {
+      lastStudioReleaseCandidate = undefined;
+      lastStudioPublishIntent = undefined;
+      lastStudioReleaseArtifactBundle = undefined;
+      studioReleaseCandidateGameRevision = undefined;
+      syncStudioReleaseControls();
+      setStudioReleaseStatus(
+        "Game編集後の古いCandidateです。変更を保存して再検証してください。",
+        "error",
+      );
+      return;
+    }
+    if (studioReleaseArtifactBusy) return;
+    studioReleaseArtifactBusy = true;
+    lastStudioReleaseArtifactBundle = undefined;
+    syncStudioReleaseControls();
+    setStudioReleaseStatus(
+      "PXD・AUDIO・GAMEの実体を取得し、HashとProject固定参照を検証中です…",
+    );
+    try {
+      const golden = await buildGoldenProject("PINNED");
+      if (!golden.ok || golden.value === undefined) {
+        setStudioReleaseStatus(
+          golden.diagnostics[0]?.message ??
+            "現在の固定参照を確認できません。",
+          "error",
+        );
+        return;
+      }
+      const current = await createStudioReleaseCandidate(
+        studioReleaseInputFromGolden(golden.value),
+      );
+      if (!current.ok || current.value === undefined) {
+        setStudioReleaseStatus(
+          current.diagnostics[0]?.message ??
+            "現在の参照を検証できません。",
+          "error",
+        );
+        return;
+      }
+      if (current.value.manifest.packageHash !== candidate.manifest.packageHash) {
+        lastStudioReleaseCandidate = undefined;
+        lastStudioPublishIntent = undefined;
+        studioReleaseCandidateGameRevision = undefined;
+        syncStudioReleaseControls();
+        setStudioReleaseStatus(
+          "iDRAWまたはiAUDIOが変更されています。再検証してください。",
+          "error",
+        );
+        return;
+      }
+      const workspaceDebug = (windowRef as Window & {
+        __pixiedraw2WorkspaceDebug?: WorkspaceDebugSurface;
+      }).__pixiedraw2WorkspaceDebug;
+      const pxd = await workspaceDebug?.exportProjectPxdArtifact?.();
+      if (pxd === undefined) {
+        throw new Error("PXDのArtifact出力経路を利用できません。");
+      }
+      const audio = await workspaceDebug?.renderAudioWavForExport(
+        undefined,
+        "FULL",
+      );
+      if (audio === undefined || audio === null) {
+        throw new Error("iAUDIOに書き出せる音源がありません。");
+      }
+      const sources: StudioMaterializationSource[] = [
+        {
+          kind: "PXD",
+          bytes: pxd.bytes,
+          mimeType: "application/vnd.pixieed.pxd",
+          sourceReference: {
+            assetId: pxd.sourceReference.assetId,
+            revisionId: pxd.sourceReference.revisionId,
+            contentHash: asGameSha256(pxd.sourceReference.contentHash),
+          },
+        },
+        {
+          kind: "AUDIO",
+          bytes: audio.bytes,
+          mimeType: "audio/wav",
+          sourceProjectId: audio.sourceProjectId,
+          sourceStateHash: asGameSha256(audio.sourceStateHash),
+          sourceProjectRevision: audio.sourceProjectRevision,
+        },
+        {
+          kind: "GAME",
+          bytes: new TextEncoder().encode(canonicalJson(golden.value.project)),
+          mimeType: "application/json",
+          project: golden.value.project,
+        },
+      ];
+      const materialized = await materializeStudioReleaseArtifact({
+        candidate,
+        sources,
+      });
+      if (!materialized.ok || materialized.value === undefined) {
+        setStudioReleaseStatus(
+          materialized.diagnostics[0] === undefined
+            ? "Artifactを検証できません。"
+            : `${materialized.diagnostics[0].code}: ${materialized.diagnostics[0].message}`,
+          "error",
+        );
+        return;
+      }
+      lastStudioReleaseArtifactBundle = materialized.value;
+      if (draw2GameStudioReleaseManifestPreview !== undefined) {
+        draw2GameStudioReleaseManifestPreview.hidden = false;
+        draw2GameStudioReleaseManifestPreview.textContent = JSON.stringify(
+          {
+            candidate: candidate.manifest,
+            artifact: materialized.value.manifest,
+          },
+          null,
+          2,
+        );
+      }
+      const artifactBytes = materialized.value.artifacts.map((artifact) =>
+        `${artifact.kind} ${artifact.byteLength}B`
+      ).join(" · ");
+      setStudioReleaseStatus(
+        `Artifact生成済み · ${artifactBytes} · ZIP ${
+          materialized.value.zip.bytes.byteLength
+        }B · Hash ${materialized.value.zip.contentHash.slice(0, 12)}`,
+        "success",
+      );
+    } catch (error) {
+      setStudioReleaseStatus(
+        error instanceof Error ? error.message : "Artifactを生成できません。",
+        "error",
+      );
+    } finally {
+      studioReleaseArtifactBusy = false;
+      syncStudioReleaseControls();
+    }
+  };
+  const downloadStudioReleaseArtifact = (): void => {
+    const bundle = lastStudioReleaseArtifactBundle;
+    if (bundle === undefined) {
+      setStudioReleaseStatus(
+        "先にArtifactを生成してください。",
+        "error",
+      );
+      return;
+    }
+    const blob = new Blob([bundle.zip.bytes.slice().buffer as ArrayBuffer], {
+      type: bundle.zip.mimeType,
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = documentRef.createElement("a");
+    anchor.href = url;
+    anchor.download = bundle.zip.filename;
+    anchor.click();
+    windowRef.setTimeout(() => URL.revokeObjectURL(url), 0);
+    setStudioReleaseStatus(
+      `ZIPを取得しました · ${bundle.zip.bytes.byteLength}B · Hash ${
+        bundle.zip.contentHash.slice(0, 12)
+      }`,
+      "success",
+    );
+  };
+  const createStudioPublishIntentFromUi = async (): Promise<void> => {
+    const candidate = lastStudioReleaseCandidate;
+    if (candidate === undefined) {
+      setStudioReleaseStatus(
+        "先にRelease Candidateを検証してください。",
+        "error",
+      );
+      return;
+    }
+    if (studioReleaseCandidateGameRevision !== gamePersistenceRevision) {
+      lastStudioReleaseCandidate = undefined;
+      lastStudioPublishIntent = undefined;
+      lastStudioReleaseArtifactBundle = undefined;
+      studioReleaseCandidateGameRevision = undefined;
+      syncStudioReleaseControls();
+      setStudioReleaseStatus(
+        "Game編集後の古いCandidateです。変更を保存して再検証してください。",
+        "error",
+      );
+      return;
+    }
+    studioReleaseBusy = true;
+    syncStudioReleaseControls();
+    setStudioReleaseStatus(
+      "現在のiDRAW／iAUDIO参照を再確認してからIntentを作成中です…",
+    );
+    try {
+      const golden = await buildGoldenProject("PINNED");
+      if (!golden.ok || golden.value === undefined) {
+        setStudioReleaseStatus(
+          golden.diagnostics[0]?.message ??
+            "現在の固定参照を確認できません。",
+          "error",
+        );
+        return;
+      }
+      const current = await createStudioReleaseCandidate(
+        studioReleaseInputFromGolden(golden.value),
+      );
+      if (!current.ok || current.value === undefined) {
+        setStudioReleaseStatus(
+          current.diagnostics[0]?.message ??
+            "現在の参照を検証できません。",
+          "error",
+        );
+        return;
+      }
+      if (
+        current.value.manifest.packageHash !== candidate.manifest.packageHash
+      ) {
+        lastStudioReleaseCandidate = undefined;
+        lastStudioPublishIntent = undefined;
+        lastStudioReleaseArtifactBundle = undefined;
+        studioReleaseCandidateGameRevision = undefined;
+        syncStudioReleaseControls();
+        setStudioReleaseStatus(
+          "iDRAWまたはiAUDIOが変更されています。再検証してください。",
+          "error",
+        );
+        return;
+      }
+      const result = await createStudioPublishIntent(
+        candidate,
+        `studio-ui:${workspaceProjectId}`,
+      );
+      if (!result.ok || result.value === undefined) {
+        setStudioReleaseStatus(
+          result.diagnostics[0]?.message ??
+            "Publish Intentを作成できません。",
+          "error",
+        );
+        return;
+      }
+      lastStudioPublishIntent = result.value;
+      setStudioReleaseStatus(
+        `Publish Intentを作成しました · ${
+          result.value.packageHash.slice(0, 12)
+        } · 外部公開は未実行です。`,
+        "success",
+      );
+    } catch (error) {
+      setStudioReleaseStatus(
+        error instanceof Error
+          ? error.message
+          : "Publish Intentを作成できません。",
+        "error",
+      );
+    } finally {
+      studioReleaseBusy = false;
+      syncStudioReleaseControls();
+    }
+  };
   draw2GameBuildValidate?.addEventListener("click", () => {
     void validateGameBuild();
   });
@@ -27481,6 +28388,26 @@ export function bootstrapDraw2Workspace(
         "Manifestを表示しました。PXD内のGame subdocumentから生成したローカル確認値です。";
     }
   });
+  draw2GameStudioReleaseCandidate?.addEventListener("click", () => {
+    void buildStudioReleaseCandidate();
+  });
+  draw2GameStudioReleaseManifest?.addEventListener(
+    "click",
+    showStudioReleaseManifest,
+  );
+  draw2GameStudioPublishIntent?.addEventListener(
+    "click",
+    () => void createStudioPublishIntentFromUi(),
+  );
+  draw2GameStudioReleaseArtifact?.addEventListener(
+    "click",
+    () => void materializeStudioRelease(),
+  );
+  draw2GameStudioReleaseArtifactDownload?.addEventListener(
+    "click",
+    downloadStudioReleaseArtifact,
+  );
+  syncStudioReleaseControls();
   renderGameCustomPanels();
 
   renderAudioCustomPanels = (): void => {
@@ -28113,6 +29040,9 @@ export function bootstrapDraw2Workspace(
         break;
       case "focus-mode":
         toggleFocusMode();
+        break;
+      case "toggle-detail-mode":
+        toggleDetailMode();
         break;
       case "workspace-preset-pixel":
         applyWorkspacePreset("pixel");
@@ -29261,6 +30191,12 @@ export function bootstrapDraw2Workspace(
       if (record.projectId !== module.asAudioProjectId(projectId)) {
         throw new Error("PXD_AUDIO_PROJECT_MISMATCH");
       }
+      const currentAudioRecord = await targetAudioStore.load(
+        module.asAudioProjectId(projectId),
+      );
+      if (!currentAudioRecord.ok) {
+        throw new Error("PXD_AUDIO_RESTORE_FAILED");
+      }
       const restored = await module.restoreAudioPersistenceRecord(record);
       if (!restored.ok) throw new Error("PXD_AUDIO_RECORD_INVALID");
       const sources = new Map(
@@ -29283,8 +30219,22 @@ export function bootstrapDraw2Workspace(
           );
         }
       }
-      const saved = await targetAudioStore.save(record);
+      const saved = await targetAudioStore.save(record, {
+        expectedProjectRevision: currentAudioRecord.value?.checkpoint
+          .projectRevision ?? 0,
+        expectedStateHash: currentAudioRecord.value?.checkpoint.stateHash ??
+          null,
+      });
       if (!saved.ok) throw new Error("PXD_AUDIO_RESTORE_FAILED");
+      if (
+        saved.diagnostics.some((diagnostic) =>
+          diagnostic.code === "AUDIO_STALE_PROJECT_REVISION"
+        )
+      ) throw new Error("PXD_AUDIO_RESTORE_CONFLICT");
+      if (sameProject) {
+        audioPersistenceExpectedRevision = record.checkpoint.projectRevision;
+        audioPersistenceExpectedStateHash = record.checkpoint.stateHash;
+      }
     }
 
     if (snapshot.game === null) {
@@ -29308,8 +30258,17 @@ export function bootstrapDraw2Workspace(
       ) {
         throw new Error("PXD_GAME_RECORD_INVALID");
       }
-      const saved = await gamePersistenceStore.save(gameRecord);
+      const currentGameRecord = await gamePersistenceStore.load(projectId);
+      const saved = await gamePersistenceStore.save(gameRecord, {
+        expectedRevision: currentGameRecord?.revision ?? 0,
+        expectedStateHash: currentGameRecord?.stateHash ?? null,
+      });
       if (!saved.ok) throw new Error("PXD_GAME_RESTORE_FAILED");
+      if (saved.stale) throw new Error("PXD_GAME_RESTORE_CONFLICT");
+      if (sameProject) {
+        gamePersistenceExpectedRevision = gameRecord.revision;
+        gamePersistenceExpectedStateHash = gameRecord.stateHash;
+      }
     }
 
     const audioRecord = snapshot.audio?.record as
@@ -29349,6 +30308,34 @@ export function bootstrapDraw2Workspace(
     }
   };
 
+  let goldenAudioPreviewOwned = false;
+  const startGoldenAudioPreview = (): boolean => {
+    const session = audioWorkspaceSession;
+    if (session === undefined || audioCompositionHasPlayingSource()) {
+      return false;
+    }
+    if (session.project.notes.length > 0 && audioChipPlay !== undefined) {
+      goldenAudioPreviewOwned = true;
+      audioChipPlay.click();
+      return true;
+    }
+    if (audioPlaybackClips(session).length > 0 && audioDeckPlay !== undefined) {
+      goldenAudioPreviewOwned = true;
+      audioDeckPlay.click();
+      return true;
+    }
+    return false;
+  };
+  const stopGoldenAudioPreview = (): void => {
+    if (!goldenAudioPreviewOwned) return;
+    goldenAudioPreviewOwned = false;
+    if (chipDeckPlaying) audioChipPlay?.click();
+    if (
+      audioDeckPlaying ||
+      [...audioStreamingRuntimes.values()].some((runtime) => runtime.isPlaying)
+    ) audioDeckPlay?.click();
+  };
+
   const debugSurface: WorkspaceDebugSurface = {
     snapshot: () => ({
       state: snapshotWorkspaceState(state),
@@ -29381,6 +30368,10 @@ export function bootstrapDraw2Workspace(
     refreshSite400IGameRoute,
     resolvePixyncGameRevision,
     applyPixyncGameRemote,
+    buildGoldenProject,
+    applyGoldenProject,
+    startGoldenAudioPreview,
+    stopGoldenAudioPreview,
   };
   const debugWindow = windowRef as Window & {
     __pixiedraw2WorkspaceDebug?: WorkspaceDebugSurface;
@@ -29427,7 +30418,8 @@ export function bootstrapDraw2Workspace(
     );
   }
   syncTabletDeckSurface(false);
-  const requestedMode = params.get("mode")?.trim().toUpperCase();
+  const requestedMode = options.initialCreatorMode ??
+    params.get("mode")?.trim().toUpperCase();
   const requestedCreatorMode = requestedMode !== undefined &&
       isCreatorWorkspaceMode(requestedMode)
     ? requestedMode

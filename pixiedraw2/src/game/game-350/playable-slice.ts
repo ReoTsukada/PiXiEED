@@ -20,6 +20,7 @@ import {
   type Entity,
   type GameProject,
   type GameProjectDraft,
+  type GameTilemapDocument,
   type OwnerId,
   type ProjectId,
   redoJournal,
@@ -43,6 +44,21 @@ import {
   stepGameRuntimeState,
   stopGameRuntimeState,
 } from "./runtime-core.ts";
+import {
+  createPhysics2DWorld,
+  normalizePhysics2DSettings,
+  stepPhysics2D,
+  type Physics2DEntity,
+  type Physics2DScene,
+  type Physics2DSettings,
+  type Physics2DStepResult,
+  type Physics2DWorld,
+} from "./physics-2d.ts";
+import {
+  createGameTilemapDocument,
+  solidGameTilemapCells,
+  triggerGameTilemapCells,
+} from "./tilemap-authoring.ts";
 
 export const GAME351_PLAYABLE_SCHEMA_VERSION = 1 as const;
 export const GAME351_FIXED_STEP_TICKS = 1 as const;
@@ -62,6 +78,10 @@ export interface Game351GridPosition {
   readonly y: number;
 }
 
+export interface Game351TriggerCell extends Game351GridPosition {
+  readonly triggerId: string;
+}
+
 export interface Game351CollisionBounds {
   readonly minX: number;
   readonly minY: number;
@@ -74,6 +94,7 @@ export interface Game351RpgMap {
   readonly height: number;
   readonly bounds: Game351CollisionBounds;
   readonly solidCells: readonly Game351GridPosition[];
+  readonly triggerCells: readonly Game351TriggerCell[];
 }
 
 export interface Game351RpgTemplate {
@@ -106,6 +127,7 @@ export interface Game351PlayableSnapshot {
   readonly npcPosition: Game351GridPosition;
   readonly collisionBounds: Game351CollisionBounds;
   readonly solidCells: readonly Game351GridPosition[];
+  readonly triggerCells: readonly Game351TriggerCell[];
 }
 
 export type Game351RuntimeMode = "STOPPED" | "PLAYING";
@@ -138,6 +160,21 @@ export interface Game351PlayableState extends
   readonly schemaVersion: typeof GAME351_PLAYABLE_SCHEMA_VERSION;
 }
 
+/**
+ * Physics2D preview input. Coordinates use the existing RPG convention:
+ * +x is right, +y is down, and a directional action is a world-units/second
+ * velocity for exactly one fixed Physics2D step.
+ */
+export interface Game351Physics2DInput {
+  readonly action?: Game351MoveAction | null;
+}
+
+export const GAME351_PHYSICS2D_MOVE_SPEED = 4;
+
+export interface Game351Physics2DSceneOptions {
+  readonly settings?: Partial<Physics2DSettings>;
+}
+
 function freezeDeep<T>(value: T): T {
   if (value !== null && typeof value === "object" && !Object.isFrozen(value)) {
     Object.freeze(value);
@@ -160,23 +197,53 @@ function cellKey(value: Game351GridPosition): string {
 }
 
 function defaultMap(): Game351RpgMap {
-  const bounds: Game351CollisionBounds = { minX: 0, minY: 0, maxX: 7, maxY: 5 };
-  const solidCells: Game351GridPosition[] = [];
+  return mapFromTilemapDocument(defaultMapDocument());
+}
+
+function mapFromTilemapDocument(
+  document: GameTilemapDocument,
+): Game351RpgMap {
+  const bounds: Game351CollisionBounds = {
+    minX: 0,
+    minY: 0,
+    maxX: document.width - 1,
+    maxY: document.height - 1,
+  };
+  return freezeDeep({
+    width: document.width,
+    height: document.height,
+    bounds,
+    solidCells: solidGameTilemapCells(document).map((cell) =>
+      position(cell.x, cell.y)
+    ),
+    triggerCells: triggerGameTilemapCells(document).map((cell) => ({
+      x: cell.x,
+      y: cell.y,
+      triggerId: cell.triggerId!,
+    })),
+  });
+}
+
+function defaultMapDocument(): GameTilemapDocument {
+  const bounds = { minX: 0, minY: 0, maxX: 7, maxY: 5 };
+  const cells = [] as {
+    readonly x: number;
+    readonly y: number;
+    readonly collision: "SOLID";
+  }[];
   for (let y = bounds.minY; y <= bounds.maxY; y += 1) {
     for (let x = bounds.minX; x <= bounds.maxX; x += 1) {
       if (
         x === bounds.minX || x === bounds.maxX || y === bounds.minY ||
         y === bounds.maxY || (x === 3 && y === 2) || (x === 4 && y === 2)
-      ) {
-        solidCells.push(position(x, y));
-      }
+      ) cells.push({ x, y, collision: "SOLID" });
     }
   }
-  return freezeDeep({
-    width: bounds.maxX - bounds.minX + 1,
-    height: bounds.maxY - bounds.minY + 1,
-    bounds,
-    solidCells,
+  return createGameTilemapDocument({
+    mapId: "game351-rpg-map",
+    width: 8,
+    height: 6,
+    cells,
   });
 }
 
@@ -237,13 +304,17 @@ function characterController(componentId: string) {
     enabled: true,
   };
 }
-function tilemap(componentId: string) {
+function tilemap(
+  componentId: string,
+  document: GameTilemapDocument = defaultMapDocument(),
+) {
   return {
     type: "TILEMAP" as const,
     componentId: asComponentId(componentId),
     mapId: "game351-rpg-map",
     tileSize: 1,
     collisionEnabled: true,
+    document,
   };
 }
 function entity(
@@ -362,7 +433,12 @@ export function createGame351RpgTemplateFromProject(
     sceneId: scene.sceneId,
     playerEntityId,
     npcEntityId,
-    map: defaultMap(),
+    map: mapFromTilemapDocument(
+      scene.entities
+        .flatMap((entity) => entity.components)
+        .find((component) => component.type === "TILEMAP")?.document ??
+        defaultMapDocument(),
+    ),
   };
 }
 
@@ -418,6 +494,115 @@ function validateMap(map: Game351RpgMap): void {
     }
     seen.add(cellKey(cell));
   }
+  const triggerIds = new Set<string>();
+  for (const cell of map.triggerCells) {
+    if (
+      !Number.isSafeInteger(cell.x) || !Number.isSafeInteger(cell.y) ||
+      !inBounds(map.bounds, cell) || typeof cell.triggerId !== "string" ||
+      !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(cell.triggerId)
+    ) {
+      throw new Error(
+        "RPG trigger cells must be valid integer cells with stable IDs.",
+      );
+    }
+    const key = cellKey(cell);
+    if (seen.has(key)) {
+      throw new Error(`RPG map cell cannot be both solid and trigger: ${key}`);
+    }
+    if (triggerIds.has(cell.triggerId)) {
+      throw new Error(`RPG trigger id is duplicated: ${cell.triggerId}`);
+    }
+    triggerIds.add(cell.triggerId);
+    seen.add(key);
+  }
+}
+
+function validatePhysics2DMap(map: Game351RpgMap): void {
+  validateMap(map);
+  const { minX, minY, maxX, maxY } = map.bounds;
+  if (![minX, minY, maxX, maxY].every(Number.isSafeInteger)) {
+    throw new Error("RPG collision bounds must be safe integer coordinates.");
+  }
+  if (
+    map.width !== maxX - minX + 1 || map.height !== maxY - minY + 1
+  ) {
+    throw new Error("RPG map dimensions must match collision bounds.");
+  }
+}
+
+function coordinateId(value: number): string {
+  return value < 0 ? `n${Math.abs(value)}` : `p${value}`;
+}
+
+function physics2DId(
+  sceneId: SceneId,
+  kind: string,
+  suffix: string,
+): string {
+  return `physics2d:${String(sceneId)}:${kind}:${suffix}`;
+}
+
+function staticWorldEntity(
+  entityId: string,
+  componentPrefix: string,
+  name: string,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+): Physics2DEntity {
+  const worldCollider = collider(`${componentPrefix}:collider`, "WORLD");
+  return {
+    entityId: asEntityId(entityId),
+    name,
+    components: [
+      transform(`${componentPrefix}:transform`, x, y),
+      {
+        ...worldCollider,
+        width,
+        height,
+        radius: Math.min(width, height) / 2,
+        mask: ["PLAYER", "NPC"] as const,
+      },
+      rigidbody(`${componentPrefix}:rigidbody`, "STATIC"),
+    ],
+  };
+}
+
+function staticTriggerEntity(
+  entityId: string,
+  componentPrefix: string,
+  triggerId: string,
+  x: number,
+  y: number,
+): Physics2DEntity {
+  const triggerCollider = collider(`${componentPrefix}:collider`, "WORLD");
+  return {
+    entityId: asEntityId(entityId),
+    name: `RPG Trigger (${triggerId})`,
+    components: [
+      transform(`${componentPrefix}:transform`, x, y),
+      {
+        ...triggerCollider,
+        layer: "SENSOR" as const,
+        isTrigger: true,
+        mask: ["PLAYER", "NPC"] as const,
+      },
+      rigidbody(`${componentPrefix}:rigidbody`, "STATIC"),
+    ],
+  };
+}
+
+function physics2DPlayerBody(world: Physics2DWorld) {
+  const players = world.bodies.filter((body) =>
+    body.bodyType === "DYNAMIC" && body.collider.layer === "PLAYER"
+  );
+  if (players.length !== 1) {
+    throw new Error(
+      "GAME-351 Physics2D preview requires exactly one dynamic PLAYER body.",
+    );
+  }
+  return players[0]!;
 }
 
 /** Compile the canonical Project into the immutable GAME-351 preview input. */
@@ -483,6 +668,234 @@ export function createGame351PlayableSnapshot(
     npcPosition: clonePosition(npcPosition),
     collisionBounds: { ...template.map.bounds },
     solidCells: template.map.solidCells.map((cell) => clonePosition(cell)),
+    triggerCells: template.map.triggerCells.map((cell) => ({ ...cell })),
+  });
+}
+
+/**
+ * Project the canonical GAME-300 Scene into a separate Physics2D Scene.
+ *
+ * The source Project is never mutated. Canonical entities/components are
+ * copied as-is; only the RPG map's generated 1x1 cells and four outer walls
+ * are appended as static WORLD bodies. This is an explicit preview adapter,
+ * not a replacement for the existing fixed-cell runtime.
+ */
+export function createGame351Physics2DScene(
+  template: Game351RpgTemplate,
+  options: Game351Physics2DSceneOptions = {},
+): Physics2DScene {
+  createGame351PlayableSnapshot(template);
+  validatePhysics2DMap(template.map);
+  const sourceScene = template.project.scenes.find((scene) =>
+    scene.sceneId === template.sceneId
+  );
+  if (sourceScene === undefined) {
+    throw new Error(
+      `Scene ${String(template.sceneId)} is not part of the Project.`,
+    );
+  }
+  const player = sourceScene.entities.find((entity) =>
+    entity.entityId === template.playerEntityId
+  );
+  const playerCollider = player?.components.find((component) =>
+    component.type === "COLLIDER"
+  );
+  const playerRigidbody = player?.components.find((component) =>
+    component.type === "RIGIDBODY"
+  );
+  if (
+    player === undefined || playerCollider?.type !== "COLLIDER" ||
+    playerRigidbody?.type !== "RIGIDBODY" ||
+    playerCollider.layer !== "PLAYER" ||
+    playerRigidbody.bodyType !== "DYNAMIC" ||
+    playerCollider.enabled === false || playerRigidbody.enabled === false
+  ) {
+    throw new Error(
+      "GAME-351 Physics2D preview requires an enabled dynamic PLAYER Collider and Rigidbody.",
+    );
+  }
+
+  const entities: Physics2DEntity[] = sourceScene.entities.map((entity) => ({
+    ...entity,
+    components: entity.components.map((component) => ({ ...component })),
+  }));
+  const entityIds = new Set(entities.map((entity) => String(entity.entityId)));
+  const componentIds = new Set(
+    entities.flatMap((entity) =>
+      entity.components.map((component) => String(component.componentId))
+    ),
+  );
+  const appendGenerated = (generated: Physics2DEntity): void => {
+    const entityKey = String(generated.entityId);
+    if (entityIds.has(entityKey)) {
+      throw new Error(`Physics2D generated Entity ID collides: ${entityKey}`);
+    }
+    const generatedComponentIds = generated.components.map((component) =>
+      String(component.componentId)
+    );
+    if (
+      new Set(generatedComponentIds).size !== generatedComponentIds.length ||
+      generatedComponentIds.some((componentId) => componentIds.has(componentId))
+    ) {
+      throw new Error(
+        `Physics2D generated Component ID collides for Entity: ${entityKey}`,
+      );
+    }
+    entityIds.add(entityKey);
+    generatedComponentIds.forEach((componentId) => componentIds.add(componentId));
+    entities.push(generated);
+  };
+
+  const cells = [...template.map.solidCells].sort((left, right) =>
+    left.y - right.y || left.x - right.x
+  );
+  for (const cell of cells) {
+    const suffix = `${coordinateId(cell.x)}:${coordinateId(cell.y)}`;
+    const id = physics2DId(template.sceneId, "solid", suffix);
+    appendGenerated(
+      staticWorldEntity(
+        id,
+        id,
+        `RPG Solid Cell (${cell.x},${cell.y})`,
+        cell.x,
+        cell.y,
+        1,
+        1,
+      ),
+    );
+  }
+
+  const triggers = [...template.map.triggerCells].sort((left, right) =>
+    left.y - right.y || left.x - right.x ||
+    left.triggerId.localeCompare(right.triggerId)
+  );
+  for (const trigger of triggers) {
+    const id = physics2DId(
+      template.sceneId,
+      "trigger",
+      `${coordinateId(trigger.x)}:${coordinateId(trigger.y)}:${trigger.triggerId}`,
+    );
+    appendGenerated(
+      staticTriggerEntity(
+        id,
+        id,
+        trigger.triggerId,
+        trigger.x,
+        trigger.y,
+      ),
+    );
+  }
+
+  const { minX, minY, maxX, maxY } = template.map.bounds;
+  const spanX = maxX - minX + 1;
+  const spanY = maxY - minY + 1;
+  const boundaries = [
+    {
+      name: "left",
+      x: minX - 0.5,
+      y: (minY + maxY) / 2,
+      width: 1,
+      height: spanY + 1,
+    },
+    {
+      name: "right",
+      x: maxX + 0.5,
+      y: (minY + maxY) / 2,
+      width: 1,
+      height: spanY + 1,
+    },
+    {
+      name: "top",
+      x: (minX + maxX) / 2,
+      y: minY - 0.5,
+      width: spanX + 1,
+      height: 1,
+    },
+    {
+      name: "bottom",
+      x: (minX + maxX) / 2,
+      y: maxY + 0.5,
+      width: spanX + 1,
+      height: 1,
+    },
+  ] as const;
+  for (const boundary of boundaries) {
+    const id = physics2DId(template.sceneId, "boundary", boundary.name);
+    appendGenerated(
+      staticWorldEntity(
+        id,
+        id,
+        `RPG Map Boundary (${boundary.name})`,
+        boundary.x,
+        boundary.y,
+        boundary.width,
+        boundary.height,
+      ),
+    );
+  }
+
+  const sourceSettings = (sourceScene as Physics2DScene).physics2D;
+  return {
+    ...sourceScene,
+    rootEntityIds: [
+      ...sourceScene.rootEntityIds,
+      ...entities.slice(sourceScene.entities.length).map((entity) => entity.entityId),
+    ],
+    entities,
+    physics2D: normalizePhysics2DSettings({
+      ...sourceSettings,
+      ...(options.settings ?? {}),
+    }),
+  };
+}
+
+/** Create a deterministic immutable Physics2D World for the RPG preview. */
+export function createGame351Physics2DWorld(
+  template: Game351RpgTemplate,
+  options: Game351Physics2DSceneOptions = {},
+): Physics2DWorld {
+  const world = createPhysics2DWorld(
+    createGame351Physics2DScene(template, options),
+  );
+  const player = physics2DPlayerBody(world);
+  if (player.entityId !== String(template.playerEntityId)) {
+    throw new Error("GAME-351 Physics2D PLAYER body is not template-bound.");
+  }
+  return world;
+}
+
+/**
+ * Advance the separate Physics2D preview by exactly one fixed step.
+ * Omitted/null action lets the physics world apply its own current velocity
+ * and gravity. A direction replaces the Player's requested velocity with
+ * moveSpeed in the +x/right, -x/left, +y/down, -y/up coordinate system; one
+ * fixed-step gravity increment is included because Physics2D supplied input
+ * velocities intentionally replace acceleration for that step.
+ */
+export function stepGame351Physics2D(
+  world: Physics2DWorld,
+  input: Game351Physics2DInput = {},
+): Physics2DStepResult {
+  const player = physics2DPlayerBody(world);
+  const action = input.action;
+  if (action !== undefined && !validAction(action)) {
+    throw new Error(`Invalid GAME-351 Physics2D action: ${String(action)}`);
+  }
+  if (action === undefined || action === null) return stepPhysics2D(world);
+  const delta = movement(action);
+  const gravity = {
+    x: world.settings.gravity.x * player.gravityScale *
+      world.settings.fixedDeltaTime,
+    y: world.settings.gravity.y * player.gravityScale *
+      world.settings.fixedDeltaTime,
+  };
+  return stepPhysics2D(world, {
+    velocityByEntityId: {
+      [player.entityId]: {
+        x: delta.x * GAME351_PHYSICS2D_MOVE_SPEED + gravity.x,
+        y: delta.y * GAME351_PHYSICS2D_MOVE_SPEED + gravity.y,
+      },
+    },
   });
 }
 

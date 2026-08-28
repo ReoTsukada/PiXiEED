@@ -2,6 +2,54 @@
 
 export const GAME_CREATION_GUIDE_SCHEMA_VERSION = 1 as const;
 
+/**
+ * The creation choice is a first-entry UI state, not part of the persisted
+ * Game editor record. Once a project has been created, OPEN restores the
+ * project directly and the choice is no longer shown.
+ */
+export type GameCreationMode = "UNSELECTED" | "RPG_TEMPLATE" | "BLANK";
+export type SelectedGameCreationMode = Exclude<
+  GameCreationMode,
+  "UNSELECTED"
+>;
+
+export interface GameCreationModeOption {
+  readonly id: SelectedGameCreationMode;
+  readonly title: string;
+  readonly badge: string;
+  readonly detail: string;
+  readonly recommended: boolean;
+}
+
+export const GAME_CREATION_MODE_OPTIONS: readonly GameCreationModeOption[] = [
+  {
+    id: "RPG_TEMPLATE",
+    title: "RPGテンプレートから開始",
+    badge: "おすすめ",
+    detail: "マップ・主人公・NPC・カメラ・イベントの土台を配置します。",
+    recommended: true,
+  },
+  {
+    id: "BLANK",
+    title: "空白から開始",
+    badge: "自由制作",
+    detail: "空のGameから、必要なオブジェクトや仕組みを追加します。",
+    recommended: false,
+  },
+] as const;
+
+export function normalizeGameCreationMode(value: unknown): GameCreationMode {
+  return value === "RPG_TEMPLATE" || value === "BLANK"
+    ? value
+    : "UNSELECTED";
+}
+
+export function isSelectedGameCreationMode(
+  value: unknown,
+): value is SelectedGameCreationMode {
+  return value === "RPG_TEMPLATE" || value === "BLANK";
+}
+
 export type GameCreationGuideStepId =
   | "STARTER"
   | "EVENT"
@@ -35,6 +83,8 @@ export interface GameCreationGuideStep {
   readonly action: GameCreationGuideAction;
   readonly actionLabel: string;
   readonly complete: boolean;
+  /** Asset references are useful for a finished game but not required to start a test play. */
+  readonly required: boolean;
 }
 
 export interface GameCreationGuide {
@@ -58,9 +108,10 @@ function hasTrack(
 }
 
 /**
- * The first recipe is intentionally small: a starter scene, one no-code
- * event, a read-only Draw/Audio reference, then Preview. Future genre
- * templates can reuse this shape without changing the editor contract.
+ * The first recipe follows an RPG Maker-like path: create a map and actors,
+ * add an event, test it immediately, then optionally attach Draw/Audio
+ * references. Future genre templates can reuse this shape without changing
+ * the editor contract.
  */
 export function createGameCreationGuide(
   input: GameCreationGuideInput,
@@ -76,51 +127,55 @@ export function createGameCreationGuide(
     {
       id: "STARTER",
       order: 1,
-      title: "ゲームの土台を用意",
+      title: "マップと登場人物を用意",
       detail: starterReady
-        ? "RPGスターターのPlayer・NPC・MapがGame側にあります。"
-        : "RPGスターターでPlayer・NPC・Mapをまとめて配置します。",
+        ? "RPGスターターのマップ・主人公・NPC・カメラがあります。"
+        : "RPGスターターでマップ・主人公・NPC・カメラをまとめて配置します。",
       action: "ADD_STARTER",
-      actionLabel: starterReady ? "Game側を確認" : "スターターを配置",
+      actionLabel: starterReady ? "Game側を確認" : "RPGスターターを配置",
       complete: starterReady,
+      required: true,
     },
     {
       id: "EVENT",
       order: 2,
-      title: "ルールを作る",
+      title: "会話・イベントを作る",
       detail: eventReady
-        ? "ノーコードイベントが1件以上あります。"
-        : "NPCを選んで、会話やアクションを設定します。",
+        ? "NPC・扉・宝箱などのイベントを編集できます。"
+        : "NPCを選び、会話・条件・アクションを設定します。",
       action: "EDIT_EVENT",
-      actionLabel: eventReady ? "イベントを編集" : "NPCイベントを作る",
+      actionLabel: eventReady ? "イベントを編集" : "会話を作る",
       complete: eventReady,
-    },
-    {
-      id: "ASSET_REFERENCE",
-      order: 3,
-      title: "素材を参照する",
-      detail: assetReferenceReady
-        ? "iDRAW / iAUDIO素材をGameから参照しています。"
-        : "iDRAW / iAUDIOは参照だけを追加します。原素材は変更しません。",
-      action: "OPEN_ASSETS",
-      actionLabel: assetReferenceReady ? "参照を管理" : "参照を追加",
-      complete: assetReferenceReady,
+      required: true,
     },
     {
       id: "PREVIEW",
-      order: 4,
-      title: "Playで確認する",
+      order: 3,
+      title: "Playでテストする",
       detail: input.previewReady
         ? "Previewが起動しています。"
-        : "Play / Stop / RestartでGameの動きを確認します。",
+        : "素材がなくても、まず動きをPlayで確認できます。",
       action: "START_PREVIEW",
       actionLabel: input.previewReady ? "Previewを開く" : "Playを開始",
       complete: input.previewReady,
+      required: true,
+    },
+    {
+      id: "ASSET_REFERENCE",
+      order: 4,
+      title: "素材を追加する（任意）",
+      detail: assetReferenceReady
+        ? "iDRAW / iAUDIO素材をGameから参照しています。"
+        : "iDRAW / iAUDIO素材は後から参照できます。原素材は変更しません。",
+      action: "OPEN_ASSETS",
+      actionLabel: assetReferenceReady ? "参照を管理" : "素材を選ぶ",
+      complete: assetReferenceReady,
+      required: false,
     },
   ];
   return {
     schemaVersion: GAME_CREATION_GUIDE_SCHEMA_VERSION,
     steps,
-    nextStep: steps.find((step) => !step.complete),
+    nextStep: steps.find((step) => step.required && !step.complete),
   };
 }

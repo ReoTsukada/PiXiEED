@@ -14659,6 +14659,34 @@ body:has(#draw2WorkspaceFrame) {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+.draw2-studio-release-card {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--draw2-accent) 34%, var(--draw2-border-subtle));
+  border-radius: var(--draw2-radius-md);
+  background: color-mix(in srgb, var(--draw2-accent-soft, #edf8ff) 62%, var(--draw2-surface));
+}
+.draw2-studio-release-card .draw2-panel-heading {
+  margin: 0;
+  padding: 0 0 5px;
+}
+.draw2-studio-release-actions {
+  align-items: stretch;
+}
+.draw2-studio-release-actions .draw2-button {
+  min-height: 34px;
+}
+.draw2-studio-release-manifest-preview {
+  max-height: 220px;
+}
+.draw2-studio-release-card .draw2-panel-status[data-state="success"] {
+  color: var(--draw2-accent-strong);
+}
+.draw2-studio-release-card .draw2-panel-status[data-state="error"] {
+  color: var(--draw2-danger-strong);
+}
 
 @media (max-width: 700px) {
   .draw2-panel-action-row {
@@ -14666,6 +14694,9 @@ body:has(#draw2WorkspaceFrame) {
   }
   .draw2-panel-action-row .draw2-button {
     flex: 1 1 45%;
+  }
+  .draw2-studio-release-actions .draw2-button {
+    flex: 1 1 100%;
   }
   .draw2-tileset-grid {
     grid-template-columns: repeat(4, minmax(44px, 1fr));
@@ -24008,6 +24039,24 @@ body:has(#draw2WorkspaceFrame) {
   margin: 0;
 }
 
+#draw2WorkspaceFrame .draw2-sync-checkpoint-actions {
+  display: grid;
+  gap: 6px;
+}
+
+#draw2WorkspaceFrame .draw2-sync-checkpoint-actions .draw2-button {
+  justify-self: start;
+  min-height: 30px;
+  padding-inline: 9px;
+  font-size: 0.62rem;
+}
+
+#draw2WorkspaceFrame .draw2-sync-checkpoint-actions small {
+  color: var(--draw2-text-muted, #aeb8c8);
+  font-size: 0.58rem;
+  line-height: 1.4;
+}
+
 #draw2WorkspaceFrame .draw2-statusbar-sync {
   display: inline-flex;
   align-items: center;
@@ -24293,7 +24342,7 @@ body:has(#draw2WorkspaceFrame) {
 
 .draw2-project-start-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   margin-top: clamp(28px, 5vw, 52px);
 }
@@ -24315,6 +24364,12 @@ body:has(#draw2WorkspaceFrame) {
   width: 100%;
   text-align: left;
   cursor: pointer;
+}
+
+.draw2-project-start-card.is-selected {
+  border-color: var(--draw2-accent-strong);
+  background: color-mix(in srgb, var(--draw2-accent-strong) 12%, var(--draw2-surface-raised));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--draw2-accent-strong) 34%, transparent);
 }
 
 .draw2-project-start-card:hover,
@@ -24358,6 +24413,7 @@ body:has(#draw2WorkspaceFrame) {
 
 .draw2-project-start-open {
   align-content: center;
+  grid-column: 1 / -1;
 }
 
 .draw2-project-start-open label {
@@ -24418,6 +24474,13 @@ body:has(#draw2WorkspaceFrame) {
   margin-top: 12px;
 }
 
+.draw2-project-recent-item-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  min-width: 0;
+}
+
 .draw2-project-recent-item {
   display: grid;
   gap: 6px;
@@ -24430,6 +24493,26 @@ body:has(#draw2WorkspaceFrame) {
   color: var(--draw2-text-strong);
   text-align: left;
   cursor: pointer;
+}
+
+.draw2-project-recent-delete {
+  align-self: stretch;
+  min-width: 48px;
+  padding: 0 9px;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--draw2-surface-raised) 68%, transparent);
+  color: var(--draw2-text-muted);
+  font-size: 0.64rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.draw2-project-recent-delete:hover,
+.draw2-project-recent-delete:focus-visible {
+  border-color: color-mix(in srgb, #ff7f8a 58%, var(--draw2-border-subtle));
+  background: color-mix(in srgb, #ff7f8a 12%, var(--draw2-surface-raised));
+  color: #ffb1b8;
 }
 
 .draw2-project-recent-item:hover,
@@ -28472,5 +28555,218 @@ body:has(#draw2WorkspaceFrame) {
   }
   #draw2WorkspaceFrame .draw2-workspace-brand-context {
     display: none;
+  }
+}
+
+/* Stage 3 detail-density projection. Guided mode keeps the first creative
+   action visible while Detailed mode exposes technical controls without
+   changing Project, Core, or undo ownership. */
+#draw2WorkspaceFrame[data-detail-mode="guided"]
+  [data-detail-level="detailed"] {
+  display: none !important;
+}
+#draw2WorkspaceFrame[data-detail-mode="guided"]
+  .draw2-mode-deck-surface[data-mode-deck-surface="audio"]
+  .draw2-audio-advanced-control {
+  display: none !important;
+}
+#draw2WorkspaceFrame[data-detail-mode="guided"]
+  .draw2-mode-deck-surface[data-mode-deck-surface="audio"]
+  .draw2-audio-advanced-toggle {
+  display: none !important;
+}
+.draw2-workspace-mode-summary {
+  display: grid !important;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--draw2-space-2);
+  min-width: 0;
+}
+.draw2-workspace-mode-summary > div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+.draw2-workspace-mode-summary > span:not(.draw2-workspace-detail-toggle-description) {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--draw2-text-muted);
+  font-size: 0.64rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.draw2-workspace-detail-toggle {
+  display: grid;
+  min-width: 74px;
+  min-height: 32px;
+  gap: 1px;
+  padding: 4px 7px;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: var(--draw2-radius-sm);
+  background: var(--draw2-surface-raised);
+  color: var(--draw2-text-strong);
+  cursor: pointer;
+  text-align: left;
+}
+.draw2-workspace-detail-toggle:hover,
+.draw2-workspace-detail-toggle:focus-visible,
+.draw2-workspace-detail-toggle[aria-pressed="true"] {
+  border-color: var(--draw2-accent-strong);
+  background: color-mix(in srgb, var(--draw2-accent-strong) 14%, var(--draw2-surface-raised));
+}
+.draw2-workspace-detail-toggle:focus-visible {
+  outline: 2px solid var(--draw2-focus-ring);
+  outline-offset: 1px;
+}
+.draw2-workspace-detail-toggle-label {
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1;
+}
+.draw2-workspace-detail-toggle-description {
+  overflow: hidden;
+  color: var(--draw2-text-muted);
+  font-size: 0.55rem;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 700px) {
+  .draw2-workspace-detail-toggle-description {
+    display: none;
+  }
+  .draw2-workspace-detail-toggle {
+    min-width: 56px;
+    min-height: 36px;
+    place-items: center;
+    padding-inline: 8px;
+  }
+}
+
+/* The detail-density switch belongs to the shared command rail, not to a
+   mode-local dock. Keep it reachable in Draw, Game and Audio, and reserve a
+   compact slot for it before the wider desktop rail is available. */
+.draw2-workspace-command-bar > .draw2-workspace-detail-toggle {
+  box-sizing: border-box;
+  display: grid !important;
+  align-content: center;
+  justify-items: center;
+  flex: 0 0 44px;
+  width: 44px;
+  min-width: 44px;
+  max-width: 44px;
+  min-height: 32px;
+  padding: 3px 4px;
+  overflow: hidden;
+  text-align: center;
+}
+.draw2-workspace-command-bar
+  > .draw2-workspace-detail-toggle
+  .draw2-workspace-detail-toggle-label {
+  overflow: hidden;
+  max-width: 100%;
+  font-size: 0.62rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.draw2-workspace-command-bar
+  > .draw2-workspace-detail-toggle
+  .draw2-workspace-detail-toggle-description {
+  display: none;
+}
+
+@media (min-width: 1120px) and (max-width: 1399px) {
+  /* The compact desktop rail contains only four high-frequency actions. This
+     prevents sync/zoom controls from spilling past the viewport at 1280px. */
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"]
+    .draw2-workspace-command-bar {
+    width: 160px !important;
+    min-width: 160px !important;
+    max-width: 160px !important;
+  }
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"]
+    .draw2-workspace-command-bar
+    > * {
+    display: none !important;
+  }
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"]
+    .draw2-workspace-command-bar
+    > [data-workspace-command="undo"],
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"]
+    .draw2-workspace-command-bar
+    > [data-workspace-command="redo"],
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"]
+    .draw2-workspace-command-bar
+    > [data-mode-playback] {
+    display: grid !important;
+    place-items: center;
+    flex: 0 0 32px !important;
+    width: 32px !important;
+    min-width: 32px !important;
+    max-width: 32px !important;
+    height: 32px !important;
+    min-height: 32px !important;
+    padding: 0 !important;
+  }
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"]
+    .draw2-workspace-command-bar
+    > .draw2-workspace-detail-toggle {
+    display: grid !important;
+    flex: 0 0 44px !important;
+    width: 44px !important;
+    min-width: 44px !important;
+    max-width: 44px !important;
+    height: 32px !important;
+    min-height: 32px !important;
+  }
+}
+
+@media (min-width: 1400px) {
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"]
+    .draw2-workspace-command-bar
+    > .draw2-workspace-detail-toggle {
+    display: grid !important;
+    flex: 0 0 40px !important;
+    width: 40px !important;
+    min-width: 40px !important;
+    max-width: 40px !important;
+    height: 32px !important;
+    min-height: 32px !important;
+  }
+}
+
+@media (min-width: 701px) {
+  /* Leave a real hit-area between the logo-side Details menu and the mode
+     tabs. The Details menu is intentionally mounted beside the brand. */
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"]
+    .draw2-creator-mode-bar {
+    left: 184px !important;
+  }
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"]
+    .draw2-workspace-context-row {
+    left: 424px !important;
+  }
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    #draw2AudioGlobalControls {
+    left: 424px !important;
+  }
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-creator-mode-bar {
+    left: 184px !important;
+  }
+}
+
+/* On a compact desktop viewport the Game deck can be shorter than the first
+   entry choice. A new Game is a beginner-first decision, so keep that choice
+   at the top of the scrollable panel until a template or blank scene is
+   selected. Existing Game panels keep their normal document order. */
+@media (min-width: 701px) {
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+    #draw2WorkspacePanelGameScene {
+    scroll-padding-block-start: 8px;
+  }
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+    #draw2GameCreationMode:not([hidden]) {
+    order: -1;
   }
 }

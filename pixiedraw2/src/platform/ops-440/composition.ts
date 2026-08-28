@@ -875,7 +875,9 @@ export function createOps440ServerComposition(
       eventId: command.eventId,
       eventName: command.eventName,
       surface: wp240Surface(command.surface),
-      properties: command.properties,
+      ...(command.properties === undefined
+        ? {}
+        : { properties: command.properties }),
     });
     if (!event.ok) return wpFailure(event);
     return finish(

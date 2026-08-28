@@ -6,6 +6,12 @@ const migration = await Deno.readTextFile(
     import.meta.url,
   ),
 );
+const presenceMigration = await Deno.readTextFile(
+  new URL(
+    "../../../supabase/migrations/20260827202238_pixync_draw2_presence_authorization.sql",
+    import.meta.url,
+  ),
+);
 
 Deno.test("PIXYNC-DRAW2-290 keeps Draw2 authority separate from legacy pixel revisions", () => {
   assert.match(migration, /collab_v1\.draw2_project_heads/u);
@@ -49,6 +55,14 @@ Deno.test("PIXYNC-DRAW2-290 validates canonical payloads and emits hint-only Bro
   assert.match(migration, /draw2_canonical_json/u);
   assert.match(migration, /pixync_draw2_payload_hash_mismatch/u);
   assert.match(migration, /draw2_has_forbidden_key/u);
+  assert.match(migration, /draw2_payload_is_bounded/u);
+  assert.match(
+    migration,
+    /bytes\|pixels\|pixeldata\|pcm\|samples\|sampledata\|audiobuffer\|arraybuffer\|imagedata/u,
+  );
+  assert.match(migration, /p_depth > 8/u);
+  assert.match(migration, /jsonb_array_length\(p_value\) > 96/u);
+  assert.match(migration, /clientSequence'\)::numeric <= 0/u);
   assert.match(
     migration,
     /perform realtime\.send\([\s\S]*?'pixync_hint'[\s\S]*?true/u,
@@ -58,6 +72,69 @@ Deno.test("PIXYNC-DRAW2-290 validates canonical payloads and emits hint-only Bro
     migration.indexOf("perform realtime.send(") + 300,
   );
   assert.doesNotMatch(broadcast, /v_committed/u);
+});
+
+Deno.test("PIXYNC-DRAW2-290 fails closed for null-shaped JSON and deep walks", () => {
+  assert.match(
+    migration,
+    /if p_operation is null[\s\S]*?jsonb_typeof\(p_operation\) is distinct from 'object'/u,
+  );
+  assert.match(
+    migration,
+    /jsonb_typeof\(p_operation->'payload'\) is distinct from 'object'/u,
+  );
+  assert.match(
+    migration,
+    /jsonb_typeof\(p_operation->'compensation'\) is distinct from 'object'/u,
+  );
+  assert.match(
+    migration,
+    /draw2_has_forbidden_key\(v_child, p_depth \+ 1\)/u,
+  );
+  assert.match(migration, /if p_depth > 8 then return true;/u);
+  assert.match(
+    migration,
+    /jsonb_typeof\(p_game_project\) is distinct from 'object'/u,
+  );
+  assert.match(
+    migration,
+    /p_game_project#>>'\{revision,sequence\}' is null/u,
+  );
+});
+
+Deno.test("PIXYNC-DRAW2-290 keeps internal helper functions unreachable", () => {
+  for (const signature of [
+    "draw2_canonical_json(jsonb)",
+    "draw2_has_forbidden_key(jsonb, integer)",
+    "draw2_payload_is_bounded(jsonb, integer)",
+    "draw2_membership_revision(uuid, uuid)",
+  ]) {
+    const escapedSignature = signature.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+    assert.match(
+      migration,
+      new RegExp(
+        `revoke all on function collab_v1\\.${escapedSignature}\\s+from public, anon, authenticated`,
+      ),
+    );
+  }
+});
+
+Deno.test("PIXYNC-DRAW2-290 enforces a per-user Room rate window after idempotency", () => {
+  assert.match(
+    migration,
+    /insert into collab_v1\.rate_windows as rate_window[\s\S]*?on conflict \(room_id, user_id\) do update/u,
+  );
+  assert.match(migration, /v_rate_operation_count integer/u);
+  assert.match(migration, /v_rate_operation_count > 120/u);
+  assert.match(migration, /pixync_draw2_rate_limited/u);
+  const duplicateBoundary = migration.indexOf("if found then");
+  const rateWindow = migration.indexOf(
+    "insert into collab_v1.rate_windows as rate_window",
+  );
+  assert.ok(
+    duplicateBoundary >= 0 && rateWindow > duplicateBoundary,
+    "Rate counting must happen after the exact duplicate/idempotency return.",
+  );
 });
 
 Deno.test("PIXYNC-DRAW2-290 grants only authenticated RPC execution", () => {
@@ -75,4 +152,19 @@ Deno.test("PIXYNC-DRAW2-290 grants only authenticated RPC execution", () => {
       new RegExp(`grant execute on function public\\.${name}`),
     );
   }
+});
+
+Deno.test("PIXYNC-DRAW2-290 separates editor Broadcast from member Presence", () => {
+  assert.match(
+    presenceMigration,
+    /for select[\s\S]*realtime\.messages\.extension in \('broadcast', 'presence'\)[\s\S]*pixisync_can_access_realtime_topic\(realtime\.topic\(\), false\)/u,
+  );
+  assert.match(
+    presenceMigration,
+    /for insert[\s\S]*extension = 'broadcast'[\s\S]*pixisync_can_access_realtime_topic\(realtime\.topic\(\), true\)[\s\S]*extension = 'presence'[\s\S]*pixisync_can_access_realtime_topic\(realtime\.topic\(\), false\)/u,
+  );
+  assert.doesNotMatch(
+    presenceMigration,
+    /extension = 'presence'[\s\S]*pixisync_can_access_realtime_topic\(realtime\.topic\(\), true\)/u,
+  );
 });

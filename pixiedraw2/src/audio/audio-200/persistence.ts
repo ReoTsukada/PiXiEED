@@ -105,12 +105,22 @@ export interface AudioWorkspacePersistenceRecord {
   readonly savedAt: string;
 }
 
+/**
+ * Optional compare-and-swap guard for a save based on a previously loaded
+ * Audio Project. Revision 0 and a null hash represent a missing record.
+ */
+export interface AudioPersistenceSaveOptions {
+  readonly expectedProjectRevision?: number;
+  readonly expectedStateHash?: string | null;
+}
+
 export interface AudioPersistenceStore {
   load(
     projectId: AudioProjectId,
   ): Promise<Audio200Result<AudioWorkspacePersistenceRecord | null>>;
   save(
     record: AudioWorkspacePersistenceRecord,
+    options?: AudioPersistenceSaveOptions,
   ): Promise<Audio200Result<true>>;
   clear(projectId: AudioProjectId): Promise<Audio200Result<true>>;
 }
@@ -151,6 +161,33 @@ function validPersistenceSettings(
       ["1/4", "1/8", "1/16"].includes(settings.snap as string));
 }
 
+function projectRevisionOf(
+  record: AudioWorkspacePersistenceRecord | undefined,
+): number {
+  return record?.projectRevision ?? record?.checkpoint.projectRevision ?? 0;
+}
+
+function stateHashOf(
+  record: AudioWorkspacePersistenceRecord | undefined,
+): string | null {
+  return record?.checkpoint.stateHash ?? null;
+}
+
+function matchesExpected(
+  current: AudioWorkspacePersistenceRecord | undefined,
+  options: AudioPersistenceSaveOptions | undefined,
+): boolean {
+  if (options?.expectedProjectRevision !== undefined &&
+    projectRevisionOf(current) !== options.expectedProjectRevision) {
+    return false;
+  }
+  if (options?.expectedStateHash !== undefined &&
+    stateHashOf(current) !== options.expectedStateHash) {
+    return false;
+  }
+  return true;
+}
+
 function isNewerPersistenceRecord(
   incoming: AudioWorkspacePersistenceRecord,
   previous: AudioWorkspacePersistenceRecord | undefined,
@@ -164,6 +201,12 @@ function isNewerPersistenceRecord(
     incomingRevision !== previousRevision
   ) {
     return incomingRevision > previousRevision;
+  }
+  // Same-revision metadata edits (FPS/PPQ/settings) keep the canonical
+  // Project hash stable. A different hash is a competing Project snapshot,
+  // not a harmless clock update, and must never win by timestamp alone.
+  if (incoming.checkpoint.stateHash !== previous.checkpoint.stateHash) {
+    return false;
   }
   // FPS/PPQ changes are session metadata and may keep the same Project
   // revision. savedAt prevents an older same-revision write from rolling them
@@ -784,11 +827,14 @@ export function createMemoryAudioPersistenceStore(): AudioPersistenceStore {
     async load(projectId) {
       return audioOk(records.get(projectId) ?? null);
     },
-    async save(record) {
+    async save(record, options) {
       const shape = persistenceShape(record);
       if (!shape.ok) return shape as Audio200Result<true>;
       const previous = records.get(record.projectId);
-      if (!isNewerPersistenceRecord(record, previous)) {
+      if (
+        !matchesExpected(previous, options) ||
+        !isNewerPersistenceRecord(record, previous)
+      ) {
         return audioOk(true, [
           audioDiagnostic(
             "AUDIO_STALE_PROJECT_REVISION",
@@ -819,9 +865,9 @@ export function createLatestWriteAudioPersistenceStore(
   return {
     load: (projectId) => inner.load(projectId),
     clear: (projectId) => inner.clear(projectId),
-    async save(record) {
+    async save(record, options) {
       const ticket = ++latestTicket;
-      const result = await inner.save(record);
+      const result = await inner.save(record, options);
       if (ticket !== latestTicket && result.ok) {
         return audioOk(true, [
           audioDiagnostic(

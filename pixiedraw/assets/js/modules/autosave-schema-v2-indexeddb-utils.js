@@ -94,19 +94,24 @@
           });
         }
 
-        function waitForTransaction(tx, db, { abortMessage = '' } = {}) {
+        function waitForTransaction(tx, db, { abortMessage = '', getAbortMessage = null } = {}) {
+          const resolveAbortMessage = () => (
+            typeof getAbortMessage === 'function'
+              ? getAbortMessage()
+              : abortMessage
+          );
           return new Promise((resolve, reject) => {
             tx.oncomplete = () => {
               db.close();
               resolve();
             };
             tx.onerror = () => {
-              const error = tx.error || new Error(abortMessage || 'Autosave schema V2 IndexedDB transaction failed');
+              const error = tx.error || new Error(resolveAbortMessage() || 'Autosave schema V2 IndexedDB transaction failed');
               db.close();
               reject(error);
             };
             tx.onabort = () => {
-              const error = tx.error || new Error(abortMessage || 'Autosave schema V2 IndexedDB transaction aborted');
+              const error = tx.error || new Error(resolveAbortMessage() || 'Autosave schema V2 IndexedDB transaction aborted');
               db.close();
               reject(error);
             };
@@ -124,6 +129,69 @@
           return typeof value === 'string' ? value.trim() : '';
         }
 
+        // A project can be touched by more than one autosave trigger (and by
+        // more than one tab).  Keep writes for one project ordered inside this
+        // module instance, then use the small current-manifest tombstone below
+        // as the cross-tab guard.  The document bodies are still removed; the
+        // tombstone only prevents a delayed writer from recreating them after
+        // an explicit delete.
+        const projectWriteTails = new Map();
+        const projectLifecycles = new Map();
+        const projectRemovalPromises = new Map();
+
+        function getProjectLifecycle(projectId) {
+          const id = normalizeProjectId(projectId);
+          let lifecycle = projectLifecycles.get(id);
+          if (!lifecycle) {
+            lifecycle = { deleting: false, deleted: false, epoch: 0 };
+            projectLifecycles.set(id, lifecycle);
+          }
+          return lifecycle;
+        }
+
+        function createDeletedProjectError(projectId) {
+          const error = new Error('Autosave schema V2 project has been deleted');
+          error.code = 'ERR_AUTOSAVE_PROJECT_DELETED';
+          error.projectId = normalizeProjectId(projectId);
+          return error;
+        }
+
+        function isDeletedProjectMarker(value) {
+          return Boolean(value && typeof value === 'object' && value.deleted === true);
+        }
+
+        function queueProjectTask(projectId, task) {
+          const id = normalizeProjectId(projectId);
+          const lifecycle = getProjectLifecycle(id);
+          if (!id || lifecycle.deleting || lifecycle.deleted) {
+            return Promise.reject(createDeletedProjectError(id));
+          }
+          const previous = projectWriteTails.get(id) || Promise.resolve();
+          const next = previous
+            .catch(() => {})
+            .then(async () => {
+              if (lifecycle.deleting || lifecycle.deleted) {
+                throw createDeletedProjectError(id);
+              }
+              return await task();
+            });
+          const tracked = next.finally(() => {
+            if (projectWriteTails.get(id) === tracked) {
+              projectWriteTails.delete(id);
+            }
+          });
+          projectWriteTails.set(id, tracked);
+          return tracked;
+        }
+
+        async function flushProjectTasks(projectId) {
+          const id = normalizeProjectId(projectId);
+          const tail = projectWriteTails.get(id);
+          if (tail) {
+            await tail.catch(() => {});
+          }
+        }
+
         async function readCurrentManifestReference(projectId) {
           assertSchemaDependencies();
           const id = normalizeProjectId(projectId);
@@ -134,7 +202,7 @@
             const tx = db.transaction([LOCAL_PROJECT_CURRENT_MANIFESTS_STORE], 'readonly');
             const request = tx.objectStore(LOCAL_PROJECT_CURRENT_MANIFESTS_STORE).get(id);
             const [value] = await Promise.all([requestValue(request), waitForTransaction(tx, db)]);
-            return value && typeof value === 'object' ? value : null;
+            return value && typeof value === 'object' && !isDeletedProjectMarker(value) ? value : null;
           } catch (error) {
             try { db.close(); } catch (_error) {}
             throw error;
@@ -161,11 +229,12 @@
           }
         }
 
-        async function commitSchemaV2Bundle(bundle, { simulateAbortAt = '', simulateCleanupFailure = false, skipCleanup = false, keepManifestRevisions = 2 } = {}) {
+        async function commitSchemaV2BundleNow(bundle, { simulateAbortAt = '', simulateCleanupFailure = false, skipCleanup = false, keepManifestRevisions = 2 } = {}) {
           assertSchemaDependencies();
           if (!bundle?.manifest?.projectId || !Array.isArray(bundle.checkpoints) || !Array.isArray(bundle.journals)) {
             throw new Error('Invalid autosave schema V2 commit bundle');
           }
+          const projectId = normalizeProjectId(bundle.manifest.projectId);
           const db = await openSchemaV2Database();
           let abortMessage = '';
           try {
@@ -176,6 +245,15 @@
             const journals = tx.objectStore(LOCAL_PROJECT_JOURNALS_STORE);
             const thumbnails = tx.objectStore(LOCAL_PROJECT_THUMBNAILS_STORE);
             const current = tx.objectStore(LOCAL_PROJECT_CURRENT_MANIFESTS_STORE);
+            const transactionDone = waitForTransaction(tx, db, {
+              getAbortMessage: () => abortMessage,
+            });
+            const currentValue = await requestValue(current.get(projectId));
+            if (isDeletedProjectMarker(currentValue)) {
+              tx.abort();
+              try { await transactionDone; } catch (_error) {}
+              throw createDeletedProjectError(projectId);
+            }
             let aborted = false;
             const abortAt = stage => {
               if (simulateAbortAt === stage) {
@@ -215,7 +293,7 @@
               });
               abortAt('current-ref');
             }
-            await waitForTransaction(tx, db, { abortMessage });
+            await transactionDone;
           } catch (error) {
             try { db.close(); } catch (_error) {}
             throw error;
@@ -227,7 +305,7 @@
               if (simulateCleanupFailure) {
                 throw new Error('Simulated autosave schema V2 cleanup failure');
               }
-              await cleanupSchemaV2Revisions(bundle.manifest.projectId, { keepManifestRevisions });
+              await cleanupSchemaV2RevisionsNow(bundle.manifest.projectId, { keepManifestRevisions });
             } catch (error) {
               cleanupError = error;
             }
@@ -239,7 +317,15 @@
           };
         }
 
-        async function writeSchemaV2Project(projectState, { revision = 0, parentRevision = 0, ...options } = {}) {
+        async function commitSchemaV2Bundle(bundle, options = {}) {
+          const projectId = normalizeProjectId(bundle?.manifest?.projectId);
+          if (!projectId) {
+            throw new Error('Invalid autosave schema V2 commit bundle');
+          }
+          return await queueProjectTask(projectId, () => commitSchemaV2BundleNow(bundle, options));
+        }
+
+        async function writeSchemaV2ProjectNow(projectState, { revision = 0, parentRevision = 0, ...options } = {}) {
           const projectId = normalizeProjectId(projectState?.projectId);
           if (!projectId) {
             throw new Error('Autosave schema V2 projectId is required');
@@ -253,26 +339,34 @@
             revision: nextRevision,
             parentRevision: Math.max(0, Math.round(Number(parentRevision) || 0) || Math.round(Number(current?.revision) || 0)),
           });
-          const result = await commitSchemaV2Bundle(bundle, options);
+          const result = await commitSchemaV2BundleNow(bundle, options);
           return { ...result, bundle };
         }
 
-        async function writeSchemaV2JournalRevision(projectId, journalsBySheet, options = {}) {
+        async function writeSchemaV2Project(projectState, options = {}) {
+          const projectId = normalizeProjectId(projectState?.projectId);
+          if (!projectId) {
+            throw new Error('Autosave schema V2 projectId is required');
+          }
+          return await queueProjectTask(projectId, () => writeSchemaV2ProjectNow(projectState, options));
+        }
+
+        async function writeSchemaV2JournalRevisionNow(projectId, journalsBySheet, options = {}) {
           const id = normalizeProjectId(projectId);
           if (!id) {
             throw new Error('Autosave schema V2 projectId is required');
           }
           const readStartedAt = globalThis.performance?.now?.() ?? Date.now();
-          const records = await loadAllProjectSchemaRecords(id);
+          const baseManifest = await readCurrentSchemaV2Manifest(id);
           logAutosaveV2Performance('pixiedraw:autosave:journal-read:await', readStartedAt, {
             projectId: id,
-            manifestCount: records.manifests.length,
-            checkpointCount: records.checkpoints.length,
-            journalCount: records.journals.length,
-            thumbnailCount: records.thumbnails.length,
+            recordReadMode: 'manifest-only',
+            manifestCount: baseManifest ? 1 : 0,
+            checkpointCount: 0,
+            journalCount: 0,
+            thumbnailCount: 0,
           });
-          const baseManifest = records.manifests.find(record => record?.key === records.current?.manifestKey) || null;
-          if (!baseManifest) {
+          if (!baseManifest || baseManifest.projectId !== id) {
             throw new Error('Autosave schema V2 current manifest is unavailable for journal save');
           }
           const nextRevision = Math.max(
@@ -290,12 +384,20 @@
             journalWriteCount: bundle.journals.length,
           });
           const writeStartedAt = globalThis.performance?.now?.() ?? Date.now();
-          const result = await commitSchemaV2Bundle(bundle, options);
+          const result = await commitSchemaV2BundleNow(bundle, options);
           logAutosaveV2Performance('pixiedraw:autosave:journal-write:await', writeStartedAt, {
             projectId: id,
             journalWriteCount: bundle.journals.length,
           });
           return { ...result, bundle };
+        }
+
+        async function writeSchemaV2JournalRevision(projectId, journalsBySheet, options = {}) {
+          const id = normalizeProjectId(projectId);
+          if (!id) {
+            throw new Error('Autosave schema V2 projectId is required');
+          }
+          return await queueProjectTask(id, () => writeSchemaV2JournalRevisionNow(id, journalsBySheet, options));
         }
 
         async function loadAllProjectSchemaRecords(projectId) {
@@ -324,7 +426,56 @@
               checkpoints: Array.isArray(checkpointValues) ? checkpointValues : [],
               journals: Array.isArray(journalValues) ? journalValues : [],
               thumbnails: Array.isArray(thumbnailValues) ? thumbnailValues : [],
-              current: currentValue && typeof currentValue === 'object' ? currentValue : null,
+              // A deleted marker is intentionally not exposed as a current
+              // project.  It remains in the small reference store only as a
+              // cross-tab write barrier.
+              current: currentValue && typeof currentValue === 'object' && !isDeletedProjectMarker(currentValue)
+                ? currentValue
+                : null,
+            };
+          } catch (error) {
+            try { db.close(); } catch (_error) {}
+            throw error;
+          }
+        }
+
+        async function readProjectSchemaRecordCounts(projectId) {
+          assertSchemaDependencies();
+          const id = normalizeProjectId(projectId);
+          if (!id) {
+            return {
+              manifests: 0,
+              checkpoints: 0,
+              journals: 0,
+              thumbnails: 0,
+              current: 0,
+              deletedMarker: false,
+            };
+          }
+          const db = await openSchemaV2Database();
+          try {
+            ensureStoresExist(db);
+            const tx = db.transaction(requiredStoreNames(), 'readonly');
+            const manifestKeys = tx.objectStore(LOCAL_PROJECT_MANIFESTS_STORE).index('projectId').getAllKeys(id);
+            const checkpointKeys = tx.objectStore(LOCAL_PROJECT_SHEET_CHECKPOINTS_STORE).index('projectId').getAllKeys(id);
+            const journalKeys = tx.objectStore(LOCAL_PROJECT_JOURNALS_STORE).index('projectId').getAllKeys(id);
+            const thumbnailKeys = tx.objectStore(LOCAL_PROJECT_THUMBNAILS_STORE).index('projectId').getAllKeys(id);
+            const current = tx.objectStore(LOCAL_PROJECT_CURRENT_MANIFESTS_STORE).get(id);
+            const [manifestValues, checkpointValues, journalValues, thumbnailValues, currentValue] = await Promise.all([
+              requestValue(manifestKeys),
+              requestValue(checkpointKeys),
+              requestValue(journalKeys),
+              requestValue(thumbnailKeys),
+              requestValue(current),
+              waitForTransaction(tx, db),
+            ]);
+            return {
+              manifests: Array.isArray(manifestValues) ? manifestValues.length : 0,
+              checkpoints: Array.isArray(checkpointValues) ? checkpointValues.length : 0,
+              journals: Array.isArray(journalValues) ? journalValues.length : 0,
+              thumbnails: Array.isArray(thumbnailValues) ? thumbnailValues.length : 0,
+              current: currentValue && typeof currentValue === 'object' && !isDeletedProjectMarker(currentValue) ? 1 : 0,
+              deletedMarker: isDeletedProjectMarker(currentValue),
             };
           } catch (error) {
             try { db.close(); } catch (_error) {}
@@ -349,6 +500,37 @@
             journalKeys: sheets.map(sheet => sheet?.journalRef?.key).filter(Boolean),
             thumbnailKey: manifest.thumbnailRef?.key || '',
           };
+        }
+
+        // Delete by indexed primary keys instead of reading and cloning the
+        // checkpoint/journal/thumbnail bodies.  The callbacks enqueue deletes
+        // while the same transaction is active, so a large project is not
+        // exposed to a read-then-delete race with another writer.
+        function queueProjectKeyDeletes(tx, storeName, projectId, retainedKeys = null) {
+          const objectStore = tx.objectStore(storeName);
+          const projectIndex = objectStore.index('projectId');
+          const deleteKey = key => {
+            if (!retainedKeys || !retainedKeys.has(key)) {
+              objectStore.delete(key);
+            }
+          };
+          if (typeof projectIndex.getAllKeys === 'function') {
+            const request = projectIndex.getAllKeys(projectId);
+            request.onsuccess = () => {
+              for (const key of request.result || []) {
+                deleteKey(key);
+              }
+            };
+            return request;
+          }
+          const request = projectIndex.openKeyCursor(projectId);
+          request.onsuccess = () => {
+            const cursor = request.result;
+            if (!cursor) return;
+            deleteKey(cursor.primaryKey);
+            cursor.continue();
+          };
+          return request;
         }
 
         async function readSchemaRecordByKey(storeName, key) {
@@ -528,29 +710,11 @@
           };
         }
 
-        async function cleanupSchemaV2Revisions(projectId, { keepManifestRevisions = 2 } = {}) {
+        async function cleanupSchemaV2RevisionsNow(projectId, { keepManifestRevisions = 2 } = {}) {
           const id = normalizeProjectId(projectId);
           if (!id) return { removedRevisionCount: 0 };
-          const records = await loadAllProjectSchemaRecords(id);
-          const sorted = records.manifests
-            .filter(manifest => manifest?.projectId === id)
-            .sort((left, right) => Math.round(Number(right.revision) || 0) - Math.round(Number(left.revision) || 0));
-          const retainedManifests = sorted.slice(0, Math.max(1, Math.round(Number(keepManifestRevisions) || 2)));
-          const retainedManifestKeys = new Set(retainedManifests.map(manifest => manifest.key));
-          const retainedCheckpointKeys = new Set(retainedManifests.flatMap(manifest => (
-            manifest?.projectLayout === 'single-project'
-              ? [manifest?.project?.checkpointRef?.key].filter(Boolean)
-              : (Array.isArray(manifest?.sheets) ? manifest.sheets.map(sheet => sheet?.checkpointRef?.key).filter(Boolean) : [])
-          )));
-          const retainedJournalKeys = new Set(retainedManifests.flatMap(manifest => (
-            manifest?.projectLayout === 'single-project'
-              ? [manifest?.project?.journalRef?.key].filter(Boolean)
-              : (Array.isArray(manifest?.sheets) ? manifest.sheets.map(sheet => sheet?.journalRef?.key).filter(Boolean) : [])
-          )));
-          const retainedThumbnailKeys = new Set(retainedManifests.map(manifest => manifest?.thumbnailRef?.key).filter(Boolean));
-          const removable = sorted.filter(manifest => !retainedManifestKeys.has(manifest.key));
-          if (!removable.length) return { removedRevisionCount: 0 };
           const db = await openSchemaV2Database();
+          let removedRevisionCount = 0;
           try {
             ensureStoresExist(db);
             const tx = db.transaction([
@@ -559,48 +723,118 @@
               LOCAL_PROJECT_JOURNALS_STORE,
               LOCAL_PROJECT_THUMBNAILS_STORE,
             ], 'readwrite');
-            const deletes = [
-              [LOCAL_PROJECT_MANIFESTS_STORE, removable],
-              [LOCAL_PROJECT_SHEET_CHECKPOINTS_STORE, records.checkpoints.filter(record => !retainedCheckpointKeys.has(record?.key))],
-              [LOCAL_PROJECT_JOURNALS_STORE, records.journals.filter(record => !retainedJournalKeys.has(record?.key))],
-              [LOCAL_PROJECT_THUMBNAILS_STORE, records.thumbnails.filter(record => !retainedThumbnailKeys.has(record?.key))],
-            ];
-            deletes.forEach(([storeName, values]) => {
-              const objectStore = tx.objectStore(storeName);
-              values.forEach(value => objectStore.delete(value.key));
-            });
+            const manifestRequest = tx
+              .objectStore(LOCAL_PROJECT_MANIFESTS_STORE)
+              .index('projectId')
+              .getAll(id);
+            manifestRequest.onsuccess = () => {
+              const sorted = (manifestRequest.result || [])
+                .filter(manifest => manifest?.projectId === id)
+                .sort((left, right) => Math.round(Number(right.revision) || 0) - Math.round(Number(left.revision) || 0));
+              const retainedManifests = sorted.slice(
+                0,
+                Math.max(1, Math.round(Number(keepManifestRevisions) || 2))
+              );
+              const retainedManifestKeys = new Set(retainedManifests.map(manifest => manifest.key));
+              const retainedCheckpointKeys = new Set();
+              const retainedJournalKeys = new Set();
+              const retainedThumbnailKeys = new Set();
+              for (const manifest of retainedManifests) {
+                const referenced = getManifestReferencedKeys(manifest);
+                referenced.checkpointKeys.forEach(key => retainedCheckpointKeys.add(key));
+                referenced.journalKeys.forEach(key => retainedJournalKeys.add(key));
+                if (referenced.thumbnailKey) retainedThumbnailKeys.add(referenced.thumbnailKey);
+              }
+              const removable = sorted.filter(manifest => !retainedManifestKeys.has(manifest.key));
+              removedRevisionCount = removable.length;
+              if (!removable.length) return;
+              queueProjectKeyDeletes(tx, LOCAL_PROJECT_MANIFESTS_STORE, id, retainedManifestKeys);
+              queueProjectKeyDeletes(tx, LOCAL_PROJECT_SHEET_CHECKPOINTS_STORE, id, retainedCheckpointKeys);
+              queueProjectKeyDeletes(tx, LOCAL_PROJECT_JOURNALS_STORE, id, retainedJournalKeys);
+              queueProjectKeyDeletes(tx, LOCAL_PROJECT_THUMBNAILS_STORE, id, retainedThumbnailKeys);
+            };
             await waitForTransaction(tx, db);
           } catch (error) {
             try { db.close(); } catch (_error) {}
             throw error;
           }
-          return { removedRevisionCount: removable.length };
+          return { removedRevisionCount };
+        }
+
+        async function cleanupSchemaV2Revisions(projectId, options = {}) {
+          const id = normalizeProjectId(projectId);
+          if (!id) return { removedRevisionCount: 0 };
+          return await queueProjectTask(id, () => cleanupSchemaV2RevisionsNow(id, options));
         }
 
         async function deleteSchemaV2Project(projectId) {
           const id = normalizeProjectId(projectId);
           if (!id) return false;
-          const records = await loadAllProjectSchemaRecords(id);
-          const db = await openSchemaV2Database();
-          try {
-            ensureStoresExist(db);
-            const tx = db.transaction(requiredStoreNames(), 'readwrite');
-            const deletes = [
-              [LOCAL_PROJECT_MANIFESTS_STORE, records.manifests],
-              [LOCAL_PROJECT_SHEET_CHECKPOINTS_STORE, records.checkpoints],
-              [LOCAL_PROJECT_JOURNALS_STORE, records.journals],
-              [LOCAL_PROJECT_THUMBNAILS_STORE, records.thumbnails],
-            ];
-            deletes.forEach(([storeName, values]) => {
-              const objectStore = tx.objectStore(storeName);
-              values.forEach(value => objectStore.delete(value.key));
-            });
-            tx.objectStore(LOCAL_PROJECT_CURRENT_MANIFESTS_STORE).delete(id);
-            await waitForTransaction(tx, db);
+          const existingRemoval = projectRemovalPromises.get(id);
+          if (existingRemoval) return await existingRemoval;
+          const lifecycle = getProjectLifecycle(id);
+          if (lifecycle.deleted) return true;
+          lifecycle.deleting = true;
+          lifecycle.epoch += 1;
+          const removalPromise = (async () => {
+            // Complete writes already admitted to this module before the
+            // tombstone transaction. New writes are rejected immediately by
+            // queueProjectTask and, after this transaction, by other tabs.
+            await flushProjectTasks(id);
+            assertSchemaDependencies();
+            const db = await openSchemaV2Database();
+            try {
+              ensureStoresExist(db);
+              const tx = db.transaction(requiredStoreNames(), 'readwrite');
+              const manifests = tx.objectStore(LOCAL_PROJECT_MANIFESTS_STORE);
+              const checkpoints = tx.objectStore(LOCAL_PROJECT_SHEET_CHECKPOINTS_STORE);
+              const journals = tx.objectStore(LOCAL_PROJECT_JOURNALS_STORE);
+              const thumbnails = tx.objectStore(LOCAL_PROJECT_THUMBNAILS_STORE);
+              const current = tx.objectStore(LOCAL_PROJECT_CURRENT_MANIFESTS_STORE);
+              const transactionDone = waitForTransaction(tx, db);
+              await requestValue(current.get(id));
+              queueProjectKeyDeletes(tx, LOCAL_PROJECT_MANIFESTS_STORE, id);
+              queueProjectKeyDeletes(tx, LOCAL_PROJECT_SHEET_CHECKPOINTS_STORE, id);
+              queueProjectKeyDeletes(tx, LOCAL_PROJECT_JOURNALS_STORE, id);
+              queueProjectKeyDeletes(tx, LOCAL_PROJECT_THUMBNAILS_STORE, id);
+              // Keep only a tiny tombstone in the reference store. It is
+              // hidden from project reads but prevents a second tab that has
+              // not yet observed the delete from recreating project bodies.
+              current.put({
+                projectId: id,
+                deleted: true,
+                deletedAt: new Date().toISOString(),
+              });
+              await transactionDone;
+            } catch (error) {
+              try { db.close(); } catch (_error) {}
+              throw error;
+            }
+            const remaining = await readProjectSchemaRecordCounts(id);
+            if (
+              remaining.manifests > 0
+              || remaining.checkpoints > 0
+              || remaining.journals > 0
+              || remaining.thumbnails > 0
+              || remaining.current > 0
+              || remaining.deletedMarker !== true
+            ) {
+              throw new Error('autosave-schema-v2-project-delete-incomplete');
+            }
+            lifecycle.deleted = true;
+            lifecycle.deleting = false;
             return true;
-          } catch (error) {
-            try { db.close(); } catch (_error) {}
+          })().catch(error => {
+            lifecycle.deleting = false;
             throw error;
+          });
+          projectRemovalPromises.set(id, removalPromise);
+          try {
+            return await removalPromise;
+          } finally {
+            if (projectRemovalPromises.get(id) === removalPromise) {
+              projectRemovalPromises.delete(id);
+            }
           }
         }
 

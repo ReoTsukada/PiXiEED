@@ -60,23 +60,93 @@
       return total;
     }
 
+    function estimateValueBytes(value, elementSize = 1) {
+      if (!value) return 0;
+      try {
+        return Math.max(0, Number(estimateEncodedByteLength(value, elementSize)) || 0);
+      } catch (_error) {
+        return 0;
+      }
+    }
+
+    function estimateIndexBytes(value) {
+      return estimateValueBytes(value, Number(value?.BYTES_PER_ELEMENT) === 1 ? 1 : 2);
+    }
+
+    function estimatePixelValueBytes(value) {
+      if (!value || typeof value !== 'object') return 0;
+      return 8
+        + estimateValueBytes(value.direct, 1)
+        + estimateValueBytes(value.importSourceDirect, 1);
+    }
+
+    function estimateTypedHistoryEntryBytes(snapshot) {
+      const kind = String(snapshot?.kind || '');
+      if (kind === 'solid-fill-runs') {
+        return 96
+          + estimateValueBytes(snapshot.runs, 4)
+          + estimateIndexBytes(snapshot.beforeIndices)
+          + estimateValueBytes(snapshot.beforeDirect, 1);
+      }
+      if (kind === 'raster-tile-patch' || kind === 'raster-tile-patch-pending') {
+        const tiles = Array.isArray(snapshot.tiles)
+          ? snapshot.tiles
+          : (snapshot.tilesByKey instanceof Map ? Array.from(snapshot.tilesByKey.values()) : []);
+        return 128 + tiles.reduce((sum, tile) => sum + 32
+          + estimateIndexBytes(tile?.beforeIndices)
+          + estimateIndexBytes(tile?.afterIndices)
+          + estimateValueBytes(tile?.beforeDirect, 1)
+          + estimateValueBytes(tile?.afterDirect, 1), 0);
+      }
+      if (kind === 'layer-raster-snapshot' || kind === 'layer-raster-snapshot-pending') {
+        return 128
+          + estimateIndexBytes(snapshot.beforeIndices)
+          + estimateIndexBytes(snapshot.afterIndices)
+          + estimateValueBytes(snapshot.beforeDirect, 1)
+          + estimateValueBytes(snapshot.afterDirect, 1)
+          + estimateValueBytes(snapshot.beforeImportSourceDirect, 1)
+          + estimateValueBytes(snapshot.afterImportSourceDirect, 1);
+      }
+      if (kind === 'selection-move-compressed') {
+        return 160
+          + estimateValueBytes(snapshot.sourceMask, 1)
+          + estimateIndexBytes(snapshot.sourceIndices)
+          + estimateValueBytes(snapshot.sourceDirect, 1)
+          + estimateValueBytes(snapshot.targetPositions, 4)
+          + estimateIndexBytes(snapshot.targetBeforeIndices)
+          + estimateIndexBytes(snapshot.targetAfterIndices)
+          + estimateValueBytes(snapshot.targetBeforeDirect, 1)
+          + estimateValueBytes(snapshot.targetAfterDirect, 1);
+      }
+      return 0;
+    }
+
     function estimateSnapshotBytes(snapshot) {
       if (!snapshot || typeof snapshot !== 'object') return 0;
-      if (snapshotByteEstimateCache.has(snapshot)) {
+      const isPending = String(snapshot.kind || '').endsWith('-pending')
+        || Boolean(snapshot.compressedSelectionMove || snapshot.compressedSolidFill);
+      if (!isPending && snapshotByteEstimateCache.has(snapshot)) {
         return snapshotByteEstimateCache.get(snapshot) || 0;
       }
       if (isPixelPatchHistoryEntry(snapshot)) {
+        const compressed = snapshot.compressedSelectionMove || snapshot.compressedSolidFill;
+        if (compressed && typeof compressed === 'object') {
+          const total = 96 + estimateSnapshotBytes(compressed);
+          if (!isPending) snapshotByteEstimateCache.set(snapshot, total);
+          return total;
+        }
+        const typedHistoryBytes = estimateTypedHistoryEntryBytes(snapshot);
+        if (typedHistoryBytes > 0) {
+          if (!isPending) snapshotByteEstimateCache.set(snapshot, typedHistoryBytes);
+          return typedHistoryBytes;
+        }
         const changes = Array.isArray(snapshot.changes) ? snapshot.changes : [];
         const total = changes.reduce((sum, change) => {
-          const valueBytes = value => {
-            if (!value || typeof value !== 'object') return 0;
-            return 8
-              + (Array.isArray(value.direct) ? value.direct.length : 0)
-              + (Array.isArray(value.importSourceDirect) ? value.importSourceDirect.length : 0);
-          };
-          return sum + 40 + valueBytes(change?.before) + valueBytes(change?.after);
+          return sum + 40
+            + estimatePixelValueBytes(change?.before)
+            + estimatePixelValueBytes(change?.after);
         }, 96);
-        snapshotByteEstimateCache.set(snapshot, total);
+        if (!isPending) snapshotByteEstimateCache.set(snapshot, total);
         return total;
       }
       if (snapshot.kind === 'resize-canvas' && Array.isArray(snapshot.cells)) {
@@ -87,7 +157,7 @@
           return sum + bytesForLayer(layer, seenBuffers)
             + estimateEncodedByteLength(layer.importSourceDirect, 1);
         }, 128);
-        snapshotByteEstimateCache.set(snapshot, total);
+        if (!isPending) snapshotByteEstimateCache.set(snapshot, total);
         return total;
       }
       let total = 0;
@@ -109,7 +179,7 @@
       if (Array.isArray(snapshot.palette)) {
         total += snapshot.palette.length * 16;
       }
-      snapshotByteEstimateCache.set(snapshot, total);
+      if (!isPending) snapshotByteEstimateCache.set(snapshot, total);
       return total;
     }
 

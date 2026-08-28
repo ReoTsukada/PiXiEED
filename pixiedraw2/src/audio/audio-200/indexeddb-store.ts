@@ -6,6 +6,7 @@ import {
   AUDIO200_PERSISTENCE_DB_NAME,
   AUDIO200_PERSISTENCE_DB_VERSION,
   AUDIO200_PERSISTENCE_STORE_NAME,
+  type AudioPersistenceSaveOptions,
   type AudioPersistenceStore,
   type AudioWorkspacePersistenceRecord,
 } from "./persistence.ts";
@@ -69,9 +70,43 @@ function isNewer(
   if (incoming.checkpoint.projectRevision !== currentRevision) {
     return incoming.checkpoint.projectRevision > currentRevision;
   }
+  const currentHash = currentStateHash(current);
+  if (currentHash !== null &&
+    incoming.checkpoint.stateHash !== currentHash) return false;
   const currentSavedAt = candidate.savedAt;
   return typeof currentSavedAt !== "string" ||
     incoming.savedAt >= currentSavedAt;
+}
+
+function currentProjectRevision(current: unknown): number | undefined {
+  if (current === null || typeof current !== "object") return undefined;
+  const candidate = current as Record<string, unknown>;
+  const checkpoint = candidate.checkpoint;
+  if (checkpoint === null || typeof checkpoint !== "object") {
+    return undefined;
+  }
+  const revision = (checkpoint as Record<string, unknown>).projectRevision;
+  return typeof revision === "number" ? revision : undefined;
+}
+
+function currentStateHash(current: unknown): string | null {
+  if (current === null || typeof current !== "object") return null;
+  const checkpoint = (current as Record<string, unknown>).checkpoint;
+  if (checkpoint === null || typeof checkpoint !== "object") return null;
+  const hash = (checkpoint as Record<string, unknown>).stateHash;
+  return typeof hash === "string" ? hash : null;
+}
+
+function matchesExpected(
+  current: unknown,
+  options: AudioPersistenceSaveOptions | undefined,
+): boolean {
+  if (options?.expectedProjectRevision !== undefined &&
+    (currentProjectRevision(current) ?? 0) !==
+      options.expectedProjectRevision) return false;
+  if (options?.expectedStateHash !== undefined &&
+    currentStateHash(current) !== options.expectedStateHash) return false;
+  return true;
 }
 
 export function createIndexedDbAudioPersistenceStore(
@@ -118,7 +153,7 @@ export function createIndexedDbAudioPersistenceStore(
         return hostFailure("IndexedDB is unavailable.", "indexedDB.load");
       }
     },
-    async save(record) {
+    async save(record, options) {
       try {
         const database = await openDatabase(databaseName);
         return await new Promise(
@@ -133,7 +168,9 @@ export function createIndexedDbAudioPersistenceStore(
             );
             const read = store.get(record.projectId);
             read.onsuccess = () => {
-              if (isNewer(record, read.result)) {
+              if (!matchesExpected(read.result, options)) {
+                stale = true;
+              } else if (isNewer(record, read.result)) {
                 store.put(record);
               } else {
                 stale = true;

@@ -28,7 +28,10 @@ const PROJECT = "pixync-draw2-170";
 type FakeMode = "readonly" | "readwrite";
 type FakeState = {
   readonly records: Map<string, unknown>;
+  readonly deletedProjects: Map<string, unknown>;
   storeExists: boolean;
+  deletedStoreExists: boolean;
+  version: number;
 };
 
 class FakeRequest<T> {
@@ -52,7 +55,8 @@ class FakeStoreNames {
   constructor(private readonly state: FakeState) {}
 
   contains(name: string): boolean {
-    return name === "snapshots" && this.state.storeExists;
+    return (name === "snapshots" && this.state.storeExists) ||
+      (name === "deletedProjects" && this.state.deletedStoreExists);
   }
 }
 
@@ -61,7 +65,8 @@ class FakeTransaction {
   onerror: ((event: unknown) => void) | null = null;
   onabort: ((event: unknown) => void) | null = null;
   oncomplete: ((event: unknown) => void) | null = null;
-  readonly staged: Map<string, unknown>;
+  readonly stagedSnapshots: Map<string, unknown>;
+  readonly stagedDeletedProjects: Map<string, unknown>;
   private finished = false;
   private completionScheduled = false;
 
@@ -70,14 +75,25 @@ class FakeTransaction {
     private readonly mode: FakeMode,
     private readonly factory: FakeIndexedDbFactory,
   ) {
-    this.staged = new Map(state.records);
+    this.stagedSnapshots = new Map(state.records);
+    this.stagedDeletedProjects = new Map(state.deletedProjects);
+  }
+
+  stagedStore(name: string): Map<string, unknown> {
+    if (name === "snapshots") return this.stagedSnapshots;
+    if (name === "deletedProjects") return this.stagedDeletedProjects;
+    throw new Error("missing store");
   }
 
   objectStore(name: string): FakeObjectStore {
-    if (name !== "snapshots" || !this.state.storeExists) {
+    if (
+      (name === "snapshots" && !this.state.storeExists) ||
+      (name === "deletedProjects" && !this.state.deletedStoreExists) ||
+      (name !== "snapshots" && name !== "deletedProjects")
+    ) {
       throw new Error("missing store");
     }
-    return new FakeObjectStore(this, this.mode, this.factory);
+    return new FakeObjectStore(this, name, this.mode, this.factory);
   }
 
   abort(): void {
@@ -90,8 +106,11 @@ class FakeTransaction {
     setTimeout(() => {
       if (this.finished) return;
       this.finished = true;
-      for (const [key, value] of this.staged) {
+      for (const [key, value] of this.stagedSnapshots) {
         this.state.records.set(key, structuredClone(value));
+      }
+      for (const [key, value] of this.stagedDeletedProjects) {
+        this.state.deletedProjects.set(key, structuredClone(value));
       }
       this.oncomplete?.(new Event("complete"));
     }, delayMs);
@@ -108,6 +127,7 @@ class FakeTransaction {
 class FakeObjectStore {
   constructor(
     private readonly transaction: FakeTransaction,
+    private readonly name: string,
     private readonly mode: FakeMode,
     private readonly factory: FakeIndexedDbFactory,
   ) {}
@@ -115,7 +135,7 @@ class FakeObjectStore {
   get(key: string): FakeRequest<unknown> {
     const request = new FakeRequest<unknown>();
     queueMicrotask(() => {
-      request.succeed(structuredClone(this.transaction.staged.get(key)));
+      request.succeed(structuredClone(this.transaction.stagedStore(this.name).get(key)));
       // A readwrite CAS that does not put still completes after comparison.
       this.transaction.finishComplete();
     });
@@ -133,7 +153,7 @@ class FakeObjectStore {
       });
       return request;
     }
-    this.transaction.staged.set(value.projectId, structuredClone(value));
+    this.transaction.stagedStore(this.name).set(value.projectId, structuredClone(value));
     queueMicrotask(() => {
       request.succeed(value.projectId);
       this.transaction.finishComplete();
@@ -163,12 +183,13 @@ class FakeDatabase {
     this.objectStoreNames = new FakeStoreNames(state);
   }
 
-  createObjectStore(): object {
-    this.state.storeExists = true;
+  createObjectStore(name: string): object {
+    if (name === "snapshots") this.state.storeExists = true;
+    if (name === "deletedProjects") this.state.deletedStoreExists = true;
     return {};
   }
 
-  transaction(_storeName: string, mode: FakeMode): FakeTransaction {
+  transaction(_storeName: string | readonly string[], mode: FakeMode): FakeTransaction {
     this.factory.transactionModes.push(mode);
     return new FakeTransaction(this.state, mode, this.factory);
   }
@@ -187,18 +208,25 @@ class FakeIndexedDbFactory {
   readonly transactionModes: FakeMode[] = [];
   failNextWrite = false;
 
-  open(name: string, _version = 1): FakeOpenRequest {
+  open(name: string, version = 1): FakeOpenRequest {
     const request = new FakeOpenRequest();
     queueMicrotask(() => {
       let state = this.databases.get(name);
       const isNew = state === undefined;
       if (state === undefined) {
-        state = { records: new Map(), storeExists: false };
+        state = {
+          records: new Map(),
+          deletedProjects: new Map(),
+          storeExists: false,
+          deletedStoreExists: false,
+          version: 0,
+        };
         this.databases.set(name, state);
       }
       const db = new FakeDatabase(state, this);
       request.result = db;
-      if (isNew) {
+      if (isNew || state.version < version) {
+        state.version = version;
         request.transaction = new FakeUpgradeTransaction();
         request.onupgradeneeded?.(new Event("upgradeneeded"));
       }

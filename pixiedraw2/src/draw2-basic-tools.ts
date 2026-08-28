@@ -3,6 +3,11 @@ import {
   interpolatePixelPath,
   type PixelPoint,
 } from "./draw2-core.ts";
+import {
+  createShapeWriteSet as createCompactShapeWriteSet,
+  shapePixelsInBounds as compactShapePixels,
+  type ShapeTool,
+} from "./draw2-shape-geometry.ts";
 
 export type BasicTool =
   | "pen"
@@ -25,6 +30,20 @@ export type BasicTool =
   | "move"
   | "tile-stamp"
   | "pan";
+
+const COMPACT_SHAPE_TOOLS: ReadonlySet<ShapeTool> = new Set([
+  "line",
+  "rect",
+  "rect-fill",
+  "ellipse",
+  "ellipse-fill",
+  "circle",
+  "circle-fill",
+]);
+
+function isCompactShapeTool(tool: BasicTool): tool is ShapeTool {
+  return COMPACT_SHAPE_TOOLS.has(tool as ShapeTool);
+}
 
 /** Selection behavior exposed by the unified color-selection tool. */
 export type ColorSelectionMode = "similar" | "exact" | "magic" | "opaque";
@@ -216,8 +235,10 @@ function stamp(
   bounds: RasterBounds,
 ): readonly PixelPoint[] {
   const size = options.brushSize;
-  const start = -Math.floor((size - 1) / 2);
-  const end = start + size - 1;
+  // Even brushes are centred on the half-pixel between the anchor pixel and
+  // its upper-left neighbour.  The previous `(size - 1) / 2` start placed a
+  // 6px brush at -2..+3, visibly biasing every stroke toward the lower-right.
+  const start = -Math.floor(size / 2);
   const centerOffset = (size - 1) / 2;
   const radius = Math.max(0.5, size / 2);
   const points: PixelPoint[] = [];
@@ -268,6 +289,136 @@ function rectanglePixels(
     }
   }
   return points;
+}
+
+type FilledShapeTool = "rect-fill" | "ellipse-fill" | "circle-fill";
+type OutlineShapeTool = "rect" | "ellipse" | "circle";
+
+function isFilledShapeTool(tool: BasicTool): tool is FilledShapeTool {
+  return tool === "rect-fill" || tool === "ellipse-fill" ||
+    tool === "circle-fill";
+}
+
+function isOutlineShapeTool(tool: BasicTool): tool is OutlineShapeTool {
+  return tool === "rect" || tool === "ellipse" || tool === "circle";
+}
+
+function patternedShapePixels(
+  points: readonly PixelPoint[],
+  pattern: BrushPattern,
+  bounds: RasterBounds,
+): readonly PixelPoint[] {
+  return sortedUnique(
+    points.filter((point) => patternVisible(point.x, point.y, pattern)),
+    bounds,
+  );
+}
+
+function insetBounds(
+  rect: { x: number; y: number; width: number; height: number },
+  inset: number,
+): { x: number; y: number; width: number; height: number } | undefined {
+  const width = rect.width - inset * 2;
+  const height = rect.height - inset * 2;
+  if (width < 1 || height < 1) return undefined;
+  return {
+    x: rect.x + inset,
+    y: rect.y + inset,
+    width,
+    height,
+  };
+}
+
+function circleRectForBounds(
+  rect: { x: number; y: number; width: number; height: number },
+): { x: number; y: number; width: number; height: number } {
+  const side = Math.min(rect.width, rect.height);
+  return {
+    x: rect.x + Math.floor((rect.width - side) / 2),
+    y: rect.y + Math.floor((rect.height - side) / 2),
+    width: side,
+    height: side,
+  };
+}
+
+function shapeGeometryBounds(
+  tool: BasicTool,
+  rect: { x: number; y: number; width: number; height: number },
+): { x: number; y: number; width: number; height: number } {
+  return tool === "circle" || tool === "circle-fill"
+    ? circleRectForBounds(rect)
+    : rect;
+}
+
+function subtractPixels(
+  outer: readonly PixelPoint[],
+  inner: readonly PixelPoint[],
+  bounds: RasterBounds,
+): readonly PixelPoint[] {
+  const innerKeys = new Set(inner.map(pointKey));
+  return sortedUnique(
+    outer.filter((point) => !innerKeys.has(pointKey(point))),
+    bounds,
+  );
+}
+
+/**
+ * Builds a fixed-bounds outline for the geometric shape tools.
+ *
+ * The drag rectangle is the outer edge of the shape.  A thick outline is
+ * therefore an outer filled shape minus an inset filled shape, rather than a
+ * brush stamp applied around every one-pixel boundary.  This keeps corners,
+ * extents, and even brush sizes deterministic in both preview and commit.
+ */
+function shapeStrokePixels(
+  tool: "rect" | "ellipse" | "circle",
+  from: PixelPoint,
+  to: PixelPoint,
+  brushSize: number,
+  bounds: RasterBounds,
+): readonly PixelPoint[] {
+  const dragRect = normalizeBounds(from, to, bounds);
+  const geometryRect = shapeGeometryBounds(tool, dragRect);
+  if (brushSize <= 1) return shapePixels(tool, from, to, bounds);
+
+  const outer = tool === "rect"
+    ? rectanglePixels(geometryRect, true)
+    : ellipsePixels(geometryRect, true);
+  const innerRect = insetBounds(geometryRect, brushSize);
+  if (innerRect === undefined) return sortedUnique(outer, bounds);
+  const inner = tool === "rect"
+    ? rectanglePixels(innerRect, true)
+    : ellipsePixels(innerRect, true);
+  return subtractPixels(outer, inner, bounds);
+}
+
+function shapeWritePixels(
+  tool: FilledShapeTool | OutlineShapeTool,
+  from: PixelPoint,
+  to: PixelPoint,
+  options: ToolOptions,
+  bounds: RasterBounds,
+): readonly PixelPoint[] {
+  const rect = normalizeBounds(from, to, bounds);
+  // A single-pixel shape is also a useful brush-sized click target. Preserve
+  // that behaviour while keeping dragged shapes fixed to their outer bounds.
+  if (rect.width === 1 && rect.height === 1) {
+    return stampBrush([clampPoint(from, bounds)], options, bounds);
+  }
+  if (isFilledShapeTool(tool)) {
+    // Fill is a geometric operation; brush size and brush shape must not
+    // dilate the requested filled region. Patterns still apply to its pixels.
+    return patternedShapePixels(
+      shapePixels(tool, from, to, bounds),
+      options.pattern,
+      bounds,
+    );
+  }
+  return patternedShapePixels(
+    shapeStrokePixels(tool, from, to, options.brushSize, bounds),
+    options.pattern,
+    bounds,
+  );
 }
 
 /**
@@ -380,42 +531,9 @@ export function shapePixels(
   to: PixelPoint,
   bounds: RasterBounds,
 ): readonly PixelPoint[] {
-  const rect = normalizeBounds(from, to, bounds);
-  if (tool === "line") {
-    return sortedUnique(
-      interpolatePixelLine(clampPoint(from, bounds), clampPoint(to, bounds)),
-      bounds,
-    );
-  }
-  if (tool === "rect") {
-    return sortedUnique(rectanglePixels(rect, false), bounds);
-  }
-  if (tool === "rect-fill") {
-    return sortedUnique(rectanglePixels(rect, true), bounds);
-  }
-  if (tool === "ellipse") {
-    return sortedUnique(ellipsePixels(rect, false), bounds);
-  }
-  if (tool === "ellipse-fill") {
-    return sortedUnique(ellipsePixels(rect, true), bounds);
-  }
-  if (tool === "circle" || tool === "circle-fill") {
-    // A circle is fitted inside the drag rectangle. Enlarging to the longest
-    // axis clips the opposite axis at the raster edge; fitting to the short
-    // axis keeps every generated pixel inside the user's intended bounds.
-    const side = Math.min(rect.width, rect.height);
-    const circleRect = {
-      x: rect.x + Math.floor((rect.width - side) / 2),
-      y: rect.y + Math.floor((rect.height - side) / 2),
-      width: side,
-      height: side,
-    };
-    return sortedUnique(
-      ellipsePixels(circleRect, tool === "circle-fill"),
-      bounds,
-    );
-  }
-  return [];
+  return isCompactShapeTool(tool)
+    ? compactShapePixels(tool, from, to, bounds)
+    : [];
 }
 
 export function createWriteSet(
@@ -428,9 +546,26 @@ export function createWriteSet(
 ): readonly ColoredPixel[] {
   const safe = normalizeToolOptions(options);
   const base = tool === "pen" || tool === "eraser"
-    ? interpolatePixelLine(clampPoint(from, bounds), clampPoint(to, bounds))
-    : shapePixels(tool, from, to, bounds);
-  return stampBrush(base, safe, bounds).map((point) => ({
+    ? stampBrush(
+      interpolatePixelLine(clampPoint(from, bounds), clampPoint(to, bounds)),
+      safe,
+      bounds,
+    )
+    : isCompactShapeTool(tool)
+    ? createCompactShapeWriteSet(
+      tool,
+      from,
+      to,
+      colorIndex,
+      {
+        brushSize: safe.brushSize,
+        brushShape: safe.brushShape,
+        pattern: safe.pattern,
+      },
+      bounds,
+    )
+    : stampBrush(shapePixels(tool, from, to, bounds), safe, bounds);
+  return base.map((point) => ({
     ...point,
     colorIndex: tool === "eraser" ? 0 : colorIndex,
   }));

@@ -14,7 +14,7 @@ import {
   stopRuntime,
   type RuntimeCallerClaim,
 } from "../../src/game/game-320/core.ts";
-import { asOwnerId, asProjectId, asRevisionId, asSha256, createGameProject, asSceneId, asEntityId, asComponentId, asBehaviorId, compileNoCodeBehavior, type CallerContext, type GameProjectDraft } from "../../src/game/game-300/core.ts";
+import { asAssetId, asAssetRevisionId, asBehaviorId, asComponentId, asDependencyId, asEntityId, asOwnerId, asProjectId, asRevisionId, asSceneId, asSha256, compileNoCodeBehavior, createGameProject, type CallerContext, type GameProjectDraft } from "../../src/game/game-300/core.ts";
 
 function assert(condition: unknown, message: string): asserts condition { if (!condition) throw new Error(message); }
 const owner = asOwnerId("owner-game-320");
@@ -22,10 +22,24 @@ const project = asProjectId("project-game-320");
 const revision = asRevisionId("revision-game-320-1");
 const caller: CallerContext = { projectId: project, ownerId: owner, revisionId: revision };
 const runtimeCaller: RuntimeCallerClaim = { projectId: String(project), ownerId: String(owner), revisionId: String(revision) };
+const drawAsset = { kind: "DRAW" as const, assetId: asAssetId("draw/player"), revisionId: asAssetRevisionId("draw/player-1"), ownerId: owner, contentHash: asSha256("a".repeat(64)), mode: "PINNED" as const };
+const audioAsset = { kind: "AUDIO" as const, assetId: asAssetId("audio/jump"), revisionId: asAssetRevisionId("audio/jump-1"), ownerId: owner, contentHash: asSha256("b".repeat(64)), mode: "PINNED" as const };
 
 async function fixture() {
   const behavior = compileNoCodeBehavior({ behaviorId: asBehaviorId("behavior-main"), rules: [] });
-  const draft: GameProjectDraft = { schemaVersion: 1, projectId: project, ownerId: owner, name: "GAME-320", revision: { revisionId: revision, projectId: project, ownerId: owner, sequence: 1 }, scenes: [{ sceneId: asSceneId("scene-main"), name: "Main", rootEntityIds: [asEntityId("entity-player")], entities: [{ entityId: asEntityId("entity-player"), name: "Player", components: [{ type: "TRANSFORM", componentId: asComponentId("component-transform"), x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 }, { type: "BEHAVIOR", componentId: asComponentId("component-behavior"), behaviorId: behavior.behaviorId }] }] }], prefabs: [], dependencies: [], behaviors: [behavior] };
+  const draft: GameProjectDraft = { schemaVersion: 1, projectId: project, ownerId: owner, name: "GAME-320", revision: { revisionId: revision, projectId: project, ownerId: owner, sequence: 1 }, scenes: [{ sceneId: asSceneId("scene-main"), name: "Main", rootEntityIds: [asEntityId("entity-player")], entities: [{ entityId: asEntityId("entity-player"), name: "Player", components: [
+    { type: "TRANSFORM", componentId: asComponentId("component-transform"), x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 },
+    { type: "SPRITE", componentId: asComponentId("component-sprite"), asset: drawAsset, visible: true },
+    { type: "AUDIO_SOURCE", componentId: asComponentId("component-audio"), asset: audioAsset, loop: false, volume: 0.75 },
+    { type: "TILEMAP", componentId: asComponentId("component-tilemap"), mapId: "map-main", tileSize: 16, collisionEnabled: true },
+    { type: "COLLIDER", componentId: asComponentId("component-collider"), shape: "BOX", width: 16, height: 24, radius: 8, isTrigger: false, layer: "PLAYER", enabled: true },
+    { type: "RIGIDBODY", componentId: asComponentId("component-rigidbody"), bodyType: "DYNAMIC", mass: 1, gravityScale: 1, fixedRotation: true, enabled: true },
+    { type: "CHARACTER_CONTROLLER", componentId: asComponentId("component-controller"), moveSpeed: 120, stepHeight: 4, fixedStep: 1, enabled: true },
+    { type: "BEHAVIOR", componentId: asComponentId("component-behavior"), behaviorId: behavior.behaviorId },
+  ] }] }], prefabs: [], dependencies: [
+    { dependencyId: asDependencyId("dependency-draw"), kind: "ASSET", ownerId: owner, ownerRevisionId: revision, targetId: String(drawAsset.assetId), targetRevisionId: String(drawAsset.revisionId), dependsOn: [] },
+    { dependencyId: asDependencyId("dependency-audio"), kind: "ASSET", ownerId: owner, ownerRevisionId: revision, targetId: String(audioAsset.assetId), targetRevisionId: String(audioAsset.revisionId), dependsOn: [] },
+  ], behaviors: [behavior] };
   return createGameProject(draft, caller);
 }
 
@@ -42,6 +56,29 @@ Deno.test("GAME320-SCOPE-001 snapshot and preview loop are deterministic and aut
   assert(pauseRuntime(stepped.value!).ok, "pause must work");
   assert(stopRuntime(stepped.value!).world.mode === "stopped", "stop must be explicit");
   assert(resetRuntime(stepped.value!).world.tick === 0, "reset must restore initial Runtime world");
+});
+
+Deno.test("GAME320-SCOPE-001 snapshot preserves every Game-300 runtime component property", async () => {
+  const project = await fixture();
+  const snapshot = (await createRuntimeSnapshot(project, caller)).value!;
+  const byType = new Map(snapshot.components.map((component) => [component.type, component.properties]));
+  assert(byType.size === 8, "all fixture components must be represented");
+  assert(byType.get("SPRITE")?.assetId === "draw/player" && byType.get("SPRITE")?.assetRevisionId === "draw/player-1" && byType.get("SPRITE")?.visible === true, "sprite asset identity and visibility must be preserved");
+  assert(byType.get("AUDIO_SOURCE")?.assetId === "audio/jump" && byType.get("AUDIO_SOURCE")?.assetRevisionId === "audio/jump-1" && byType.get("AUDIO_SOURCE")?.volume === 0.75, "audio asset identity and playback properties must be preserved");
+  assert(byType.get("TILEMAP")?.mapId === "map-main" && byType.get("TILEMAP")?.collisionEnabled === true, "tilemap properties must be preserved");
+  assert(byType.get("COLLIDER")?.shape === "BOX" && byType.get("COLLIDER")?.isTrigger === false && byType.get("COLLIDER")?.layer === "PLAYER", "collider properties must be preserved");
+  assert(byType.get("RIGIDBODY")?.bodyType === "DYNAMIC" && byType.get("RIGIDBODY")?.gravityScale === 1 && byType.get("RIGIDBODY")?.fixedRotation === true, "rigidbody properties must be preserved");
+  assert(byType.get("CHARACTER_CONTROLLER")?.moveSpeed === 120 && byType.get("CHARACTER_CONTROLLER")?.fixedStep === 1, "character controller properties must be preserved");
+  assert(byType.get("BEHAVIOR")?.behaviorId === "behavior-main", "behavior identity must be preserved");
+});
+
+Deno.test("GAME320-SCOPE-001 rejects incomplete or invalid Runtime component properties", async () => {
+  const project = await fixture();
+  const snapshot = (await createRuntimeSnapshot(project, caller)).value!;
+  const component = snapshot.components.find((item) => item.type === "COLLIDER")!;
+  const invalid = { ...snapshot, components: snapshot.components.map((item) => item === component ? { ...item, properties: { shape: "BOX", width: "wide" } } : item) };
+  const result = createRuntimeSession(invalid, runtimeCaller);
+  assert(!result.ok && result.diagnostics.some((item) => item.code === "INVALID_SNAPSHOT"), "invalid component properties must fail closed");
 });
 
 Deno.test("GAME320-SCOPE-001 save/checkpoint restore never mutates Project state", async () => {

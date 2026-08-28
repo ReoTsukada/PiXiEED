@@ -94,6 +94,9 @@ function isDesktopCreatorMode(value) {
 function resolveDesktopCreatorModeProfile(mode) {
   return DESKTOP_CREATOR_MODE_PROFILES[mode];
 }
+function resolveWorkspaceDetailMode(value, fallback = "guided") {
+  return value === "guided" || value === "detailed" ? value : fallback;
+}
 var DEFAULT_PANEL_SIZES = {
   topbar: 56,
   left_dock: 56,
@@ -260,6 +263,49 @@ function transitionCreatorWorkspaceMode(state, mode) {
     activeMode: mode
   };
 }
+function isAssetSourceKind(value) {
+  return [
+    "LAYER_GROUP",
+    "SELECTED_LAYERS",
+    "VISIBLE_COMPOSITE",
+    "ANIMATION_RANGE"
+  ].includes(value);
+}
+function isCreatorAssetKind(value) {
+  return [
+    "CHARACTER",
+    "OBJECT",
+    "TILE",
+    "BACKGROUND",
+    "EFFECT"
+  ].includes(value);
+}
+function isAssetAnimationName(value) {
+  return value.trim().length > 0 && value.length <= 128;
+}
+function isAssetPivot(value) {
+  return [
+    "CENTER",
+    "FEET",
+    "CUSTOM"
+  ].includes(value);
+}
+function normalizeReferences(values) {
+  return [
+    ...new Set((values ?? []).map((value) => value.trim()).filter((value) => value.length > 0))
+  ].sort();
+}
+function normalizeOrderedReferences(values) {
+  const seen = /* @__PURE__ */ new Set();
+  const normalized = [];
+  for (const value of values) {
+    const trimmed = value.trim();
+    if (trimmed.length === 0 || seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    normalized.push(trimmed);
+  }
+  return normalized;
+}
 var LEGACY_DIRECTION_SUFFIXES = [
   "UP",
   "DOWN",
@@ -288,6 +334,93 @@ function assetAnimationDirectionName(clip) {
 }
 function assetAnimationClipKey(clip) {
   return `${assetAnimationMotionName(clip)}::${assetAnimationDirectionName(clip) ?? "DEFAULT"}`;
+}
+function isPositiveInteger(value) {
+  return Number.isSafeInteger(value) && value > 0;
+}
+function isFiniteInteger(value) {
+  return Number.isSafeInteger(value);
+}
+function isValidLayerSelection(selection) {
+  if (selection.kind === "CURRENT_LAYER") return selection.layerId.trim().length > 0;
+  if (selection.kind === "LAYER_GROUP") return selection.groupId.trim().length > 0;
+  if (selection.kind === "SELECTED_LAYERS") return normalizeReferences(selection.layerIds).length > 0;
+  return selection.kind === "VISIBLE_LAYERS";
+}
+function isValidFrameSelection(selection) {
+  if (selection.kind === "CURRENT_FRAME") return selection.frameId.trim().length > 0;
+  if (selection.kind === "RANGE") return selection.startFrameId.trim().length > 0 && selection.endFrameId.trim().length > 0;
+  if (selection.kind === "TAG") return selection.tagId.trim().length > 0;
+  return selection.frameIds.length > 0 && normalizeReferences(selection.frameIds).length === selection.frameIds.length;
+}
+function isValidRegionSelection(region) {
+  if (region.kind === "FULL_CANVAS") return true;
+  if (![
+    region.x,
+    region.y
+  ].every(isFiniteInteger) || region.x < 0 || region.y < 0) return false;
+  if (region.kind === "MANUAL") return isPositiveInteger(region.width) && isPositiveInteger(region.height);
+  if (region.kind === "GRID") return (region.cellSize === 16 || region.cellSize === 32) && isPositiveInteger(region.columns) && isPositiveInteger(region.rows);
+  return isPositiveInteger(region.cellWidth) && isPositiveInteger(region.cellHeight) && isPositiveInteger(region.columns) && isPositiveInteger(region.rows);
+}
+function isValidAnimationMapping(mapping) {
+  const seenKeys = /* @__PURE__ */ new Set();
+  return mapping.every((clip) => {
+    const motionName = assetAnimationMotionName(clip).trim();
+    const direction = assetAnimationDirectionName(clip);
+    const key2 = assetAnimationClipKey(clip);
+    const hasSourceFrames = clip.sourceFrames !== void 0;
+    const normalizedFrameIds = clip.frameIds.map((frameId) => frameId.trim()).filter((frameId) => frameId.length > 0);
+    if (!isAssetAnimationName(clip.name) || motionName.length === 0 || seenKeys.has(key2) || clip.frameIds.length === 0 || normalizedFrameIds.length !== clip.frameIds.length || !hasSourceFrames && normalizeOrderedReferences(clip.frameIds).length !== clip.frameIds.length) return false;
+    seenKeys.add(key2);
+    if (clip.name === "CUSTOM" && (clip.customName ?? "").trim().length === 0) return false;
+    if (clip.motionName !== void 0 && clip.motionName.trim().length === 0) return false;
+    if (direction !== void 0 && direction.trim().length === 0) return false;
+    if (clip.sourceReference !== void 0 && clip.sourceReference.trim().length === 0) return false;
+    if (clip.flipX !== void 0 && typeof clip.flipX !== "boolean") return false;
+    if (clip.flipY !== void 0 && typeof clip.flipY !== "boolean") return false;
+    if (clip.sourceFrames !== void 0 && (clip.sourceFrames.length !== clip.frameIds.length || clip.sourceFrames.some((frame) => frame.sourceFrameId.trim().length === 0 || normalizeReferences(frame.layerIds).length === 0 || !Number.isSafeInteger(frame.rect.x) || !Number.isSafeInteger(frame.rect.y) || frame.rect.x < 0 || frame.rect.y < 0 || !isPositiveInteger(frame.rect.width) || !isPositiveInteger(frame.rect.height) || frame.durationMs !== void 0 && (!Number.isFinite(frame.durationMs) || frame.durationMs <= 0) || frame.flipX !== void 0 && typeof frame.flipX !== "boolean" || frame.flipY !== void 0 && typeof frame.flipY !== "boolean"))) return false;
+    if (clip.frameDurationsMs !== void 0 && (clip.frameDurationsMs.length !== clip.frameIds.length || clip.frameDurationsMs.some((duration) => !Number.isFinite(duration) || duration <= 0))) return false;
+    return [
+      "LOOP",
+      "ONCE",
+      "PING_PONG"
+    ].includes(clip.loopMode) && (clip.fps === void 0 || Number.isFinite(clip.fps) && clip.fps > 0);
+  });
+}
+function isValidPivotDefinition(pivot) {
+  return pivot.kind !== "CUSTOM" || [
+    pivot.x,
+    pivot.y
+  ].every(Number.isFinite);
+}
+function isValidProtection(protection) {
+  return typeof protection.locked === "boolean" && protection.sourceReadOnly === true && [
+    "LIVE",
+    "PINNED",
+    "REVIEW",
+    "FORKED"
+  ].includes(protection.referencePolicy);
+}
+function isValidDefinition(definition) {
+  const validFrames = isPositiveInteger(definition.frameStart) && isPositiveInteger(definition.frameEnd) && definition.frameEnd >= definition.frameStart;
+  return definition.sourceProjectId.length > 0 && definition.sourceProjectId === definition.sourceProjectId.trim() && definition.sourceCanvasId.length > 0 && definition.sourceCanvasId === definition.sourceCanvasId.trim() && validFrames && isAssetSourceKind(definition.sourceKind) && isCreatorAssetKind(definition.assetKind) && isAssetPivot(definition.pivot) && isValidLayerSelection(definition.layerSelection) && isValidFrameSelection(definition.frameSelection) && isValidRegionSelection(definition.region) && isValidAnimationMapping(definition.animationMapping) && isValidPivotDefinition(definition.pivotDefinition) && isValidProtection(definition.protection) && definition.metadata.name.length > 0;
+}
+function validateAssetDefinitionDraft(draft) {
+  if (draft.persistence !== "LOCAL_DRAFT" || !isValidDefinition(draft)) {
+    return {
+      ok: false,
+      code: "INVALID_ASSET_DEFINITION",
+      message: "Asset\u5B9A\u7FA9\u306E\u53C2\u7167\u3001\u7BC4\u56F2\u3001\u30E1\u30BF\u30C7\u30FC\u30BF\u3001\u4FDD\u8B77\u8A2D\u5B9A\u3092\u78BA\u8A8D\u3057\u3066\u304F\u3060\u3055\u3044\u3002"
+    };
+  }
+  return {
+    ok: true,
+    value: {
+      ...draft,
+      persistence: "VALIDATED_DEFINITION"
+    }
+  };
 }
 
 // src/wp160-contracts.ts
@@ -382,7 +515,7 @@ function success(value, diagnostics = []) {
   };
 }
 function failure(code, message, path) {
-  const diagnostic7 = path === void 0 ? {
+  const diagnostic11 = path === void 0 ? {
     code,
     message
   } : {
@@ -393,7 +526,7 @@ function failure(code, message, path) {
   return {
     ok: false,
     diagnostics: [
-      diagnostic7
+      diagnostic11
     ]
   };
 }
@@ -1712,7 +1845,7 @@ function audioOk(value, diagnostics = []) {
   };
 }
 function audioFail(code, message, path, recoverable = false) {
-  const diagnostic7 = {
+  const diagnostic11 = {
     code,
     message,
     ...path === void 0 ? {} : {
@@ -1723,7 +1856,7 @@ function audioFail(code, message, path, recoverable = false) {
   return {
     ok: false,
     diagnostics: [
-      diagnostic7
+      diagnostic11
     ]
   };
 }
@@ -3946,6 +4079,313 @@ async function sha256Hex2(value) {
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
+var IndexedTileRaster = class _IndexedTileRaster {
+  width;
+  height;
+  tileSize;
+  #tiles;
+  #nonTransparentPixelCount;
+  #cowSplitCount = 0;
+  #copiedBytes = 0;
+  constructor(width, height, tileSize, tiles, nonTransparentPixelCount = 0) {
+    this.width = width;
+    this.height = height;
+    this.tileSize = tileSize;
+    this.#tiles = tiles;
+    this.#nonTransparentPixelCount = nonTransparentPixelCount;
+  }
+  static empty(width, height, tileSize) {
+    if (!Number.isSafeInteger(width) || width < 1 || !Number.isSafeInteger(height) || height < 1) {
+      throw new Error("Raster dimensions must be positive safe integers.");
+    }
+    return new _IndexedTileRaster(width, height, tileSize, /* @__PURE__ */ new Map());
+  }
+  /** Rehydrates a sparse raster from its canonical tile snapshots. */
+  static fromTileSnapshots(width, height, tileSize, snapshots) {
+    const raster = _IndexedTileRaster.empty(width, height, tileSize);
+    const tiles = /* @__PURE__ */ new Map();
+    const expectedByteLength = tileSize * tileSize;
+    const tileColumns = Math.ceil(width / tileSize);
+    const tileRows = Math.ceil(height / tileSize);
+    let nonTransparentPixelCount = 0;
+    for (const snapshot of snapshots) {
+      if (!/^\d+:\d+$/.test(snapshot.tileKey)) {
+        throw new Error("Raster tile key is invalid.");
+      }
+      const [tileXText, tileYText] = snapshot.tileKey.split(":");
+      const tileX = Number(tileXText);
+      const tileY = Number(tileYText);
+      if (!Number.isSafeInteger(tileX) || !Number.isSafeInteger(tileY) || tileX < 0 || tileY < 0 || tileX >= tileColumns || tileY >= tileRows) {
+        throw new Error("Raster tile key is outside the raster.");
+      }
+      if (!(snapshot.bytes instanceof Uint8Array) || snapshot.bytes.byteLength !== expectedByteLength) {
+        throw new Error("Raster tile byte length is invalid.");
+      }
+      for (const value of snapshot.bytes) {
+        if (value !== 0) nonTransparentPixelCount += 1;
+      }
+      if (tiles.has(snapshot.tileKey)) {
+        throw new Error("Raster tile key is duplicated.");
+      }
+      tiles.set(snapshot.tileKey, {
+        bytes: new Uint8Array(snapshot.bytes),
+        references: 1
+      });
+    }
+    return new _IndexedTileRaster(raster.width, raster.height, raster.tileSize, tiles, nonTransparentPixelCount);
+  }
+  /** Shares immutable Tile buffers; the next mutation splits only its affected Tile. */
+  sharedClone() {
+    const tiles = /* @__PURE__ */ new Map();
+    for (const [key2, cell] of this.#tiles) {
+      cell.references += 1;
+      tiles.set(key2, cell);
+    }
+    return new _IndexedTileRaster(this.width, this.height, this.tileSize, tiles, this.#nonTransparentPixelCount);
+  }
+  #tileCoordinates(x, y) {
+    const tileX = Math.floor(x / this.tileSize);
+    const tileY = Math.floor(y / this.tileSize);
+    const localX = x % this.tileSize;
+    const localY = y % this.tileSize;
+    return {
+      tileX,
+      tileY,
+      localIndex: localY * this.tileSize + localX,
+      tileKey: `${tileX}:${tileY}`
+    };
+  }
+  getPixel(x, y) {
+    if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0 || x >= this.width || y >= this.height) {
+      throw new Error("Pixel coordinate is outside the raster.");
+    }
+    const coordinates = this.#tileCoordinates(x, y);
+    return this.#tiles.get(coordinates.tileKey)?.bytes[coordinates.localIndex] ?? 0;
+  }
+  /** Returns whether the raster contains any non-transparent indexed pixel. */
+  hasNonTransparentPixel() {
+    return this.#nonTransparentPixelCount > 0;
+  }
+  setPixel(assetId, x, y, colorIndex) {
+    if (!Number.isInteger(colorIndex) || colorIndex < 0 || colorIndex > 255) {
+      throw new Error("Canonical palette index must be an integer from 0 through 255.");
+    }
+    if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0 || x >= this.width || y >= this.height) {
+      throw new Error("Pixel coordinate is outside the raster.");
+    }
+    const coordinates = this.#tileCoordinates(x, y);
+    let cell = this.#tiles.get(coordinates.tileKey);
+    const previous = cell?.bytes[coordinates.localIndex] ?? 0;
+    const tile = {
+      assetId,
+      tileX: coordinates.tileX,
+      tileY: coordinates.tileY,
+      tileKey: coordinates.tileKey
+    };
+    if (previous === colorIndex) {
+      return {
+        changed: false,
+        tile,
+        copiedBytes: 0,
+        cowSplit: false
+      };
+    }
+    let copiedBytes = 0;
+    let cowSplit = false;
+    if (cell === void 0) {
+      cell = {
+        bytes: new Uint8Array(this.tileSize * this.tileSize),
+        references: 1
+      };
+      this.#tiles.set(coordinates.tileKey, cell);
+    } else if (cell.references > 1) {
+      cell.references -= 1;
+      cell = {
+        bytes: new Uint8Array(cell.bytes),
+        references: 1
+      };
+      this.#tiles.set(coordinates.tileKey, cell);
+      copiedBytes = cell.bytes.byteLength;
+      cowSplit = true;
+      this.#cowSplitCount += 1;
+      this.#copiedBytes += copiedBytes;
+    }
+    cell.bytes[coordinates.localIndex] = colorIndex;
+    if (previous === 0 && colorIndex !== 0) {
+      this.#nonTransparentPixelCount += 1;
+    } else if (previous !== 0 && colorIndex === 0) {
+      this.#nonTransparentPixelCount -= 1;
+    }
+    return {
+      changed: true,
+      tile,
+      copiedBytes,
+      cowSplit
+    };
+  }
+  snapshotTiles() {
+    return Array.from(this.#tiles.entries()).sort(([left], [right]) => left.localeCompare(right)).map(([tileKey, cell]) => ({
+      tileKey,
+      bytes: new Uint8Array(cell.bytes)
+    }));
+  }
+  /** Full canonical read is reserved for Golden Fixture equivalence, not active dirty rendering. */
+  toUint8Array() {
+    const pixels = new Uint8Array(this.width * this.height);
+    for (let y = 0; y < this.height; y += 1) {
+      for (let x = 0; x < this.width; x += 1) {
+        pixels[y * this.width + x] = this.getPixel(x, y);
+      }
+    }
+    return pixels;
+  }
+  /** Reads only the requested presentation region; active editing must not call toUint8Array(). */
+  readRegion(x, y, width, height) {
+    if (!Number.isSafeInteger(x) || !Number.isSafeInteger(y) || !Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width < 1 || height < 1 || x < 0 || y < 0 || x + width > this.width || y + height > this.height) {
+      throw new Error("Raster region is outside the raster.");
+    }
+    const pixels = new Uint8Array(width * height);
+    let implicitTransparentPixelCount = 0;
+    for (let regionY = 0; regionY < height; regionY += 1) {
+      for (let regionX = 0; regionX < width; regionX += 1) {
+        const sourceX = x + regionX;
+        const sourceY = y + regionY;
+        const coordinates = this.#tileCoordinates(sourceX, sourceY);
+        const cell = this.#tiles.get(coordinates.tileKey);
+        if (cell === void 0) implicitTransparentPixelCount += 1;
+        pixels[regionY * width + regionX] = cell?.bytes[coordinates.localIndex] ?? 0;
+      }
+    }
+    return {
+      x,
+      y,
+      width,
+      height,
+      pixels,
+      implicitTransparentPixelCount
+    };
+  }
+  memoryMetrics() {
+    let sharedTileBytes = 0;
+    for (const cell of this.#tiles.values()) {
+      if (cell.references > 1) sharedTileBytes += cell.bytes.byteLength;
+    }
+    const tileColumns = Math.ceil(this.width / this.tileSize);
+    const tileRows = Math.ceil(this.height / this.tileSize);
+    return {
+      logicalRasterBytes: this.width * this.height,
+      allocatedTileBytes: this.#tiles.size * this.tileSize * this.tileSize,
+      sharedTileBytes,
+      tileCount: this.#tiles.size,
+      implicitTransparentTileCount: tileColumns * tileRows - this.#tiles.size,
+      cowSplitCount: this.#cowSplitCount,
+      copiedBytes: this.#copiedBytes
+    };
+  }
+};
+function validatePalette(palette) {
+  if (palette.length < 1 || palette.length > 256) {
+    throw new Error("Palette must contain 1 through 256 entries.");
+  }
+  if (palette[0] !== 0) throw new Error("Palette index 0 must be transparent.");
+  for (const color of palette) {
+    if (!Number.isSafeInteger(color) || color < 0 || color > 4294967295) {
+      throw new Error("Palette colors must be uint32 values.");
+    }
+  }
+  return [
+    ...palette
+  ];
+}
+function createProject(options) {
+  if (!options.projectId) throw new Error("Project ID is required.");
+  const width = options.width ?? 256;
+  const height = options.height ?? 256;
+  const palette = validatePalette(options.palette ?? [
+    0,
+    4294967295,
+    4278190335,
+    65535
+  ]);
+  const assetId = `${options.projectId}:draw:main`;
+  const asset = {
+    id: assetId,
+    width,
+    height,
+    palette,
+    raster: IndexedTileRaster.empty(width, height, options.tileSize ?? 32),
+    revision: 0
+  };
+  const layerId = `${options.projectId}:layer:0`;
+  const frameId = `${options.projectId}:frame:0`;
+  const celId = `${options.projectId}:cel:0:0`;
+  return {
+    schemaVersion: 1,
+    projectId: options.projectId,
+    name: options.name ?? "Untitled Draw2 Project",
+    structureEpoch: 1,
+    activeAssetId: assetId,
+    layers: [
+      {
+        id: layerId,
+        layerTrackId: layerId,
+        name: "Layer 1",
+        order: 0,
+        orderingKey: "00000000",
+        visible: true,
+        opacity: 1,
+        blendMode: "NORMAL",
+        locked: false,
+        lifecycle: "ACTIVE",
+        kind: "RASTER"
+      }
+    ],
+    frames: [
+      {
+        id: frameId,
+        frameId,
+        index: 0,
+        orderKey: "00000000",
+        durationMs: 100,
+        timingUnit: "MILLISECONDS",
+        metadataVersion: 1
+      }
+    ],
+    cels: [
+      {
+        id: celId,
+        celId,
+        layerId,
+        layerTrackId: layerId,
+        frameId,
+        assetId,
+        bindingMode: "RASTER",
+        recordVersion: 1,
+        lifecycle: "ACTIVE"
+      }
+    ],
+    timeline: {
+      id: `${options.projectId}:timeline:0`,
+      timelineId: `${options.projectId}:timeline:0`,
+      frameOrder: [
+        frameId
+      ],
+      layerTrackOrder: [
+        layerId
+      ],
+      metadataVersion: 1
+    },
+    activeLayerId: layerId,
+    activeFrameId: frameId,
+    activeCelId: celId,
+    assets: {
+      [assetId]: asset
+    },
+    tilemaps: {},
+    appliedCommandIds: [],
+    lastClientSequenceByClient: {}
+  };
+}
 
 // src/game/game-300/core.ts
 var GAME_PROJECT_SCHEMA_VERSION = 1;
@@ -3983,6 +4423,7 @@ var asEntityId = (value) => asId(value, "EntityId");
 var asComponentId = (value) => asId(value, "ComponentId");
 var asBehaviorId = (value) => asId(value, "BehaviorId");
 var asRevisionId = (value) => asId(value, "RevisionId");
+var asDependencyId = (value) => asId(value, "DependencyId");
 var asAssetId = (value) => asId(value, "AssetId");
 var asAssetRevisionId = (value) => asId(value, "AssetRevisionId");
 var asSha2562 = (value) => {
@@ -5414,7 +5855,10 @@ function referenceOnlyBinding(binding) {
     revisionId: binding.revisionId,
     contentHash: binding.contentHash,
     mode: binding.mode,
-    label: binding.label
+    label: binding.label,
+    ...binding.assetDefinitionId === void 0 ? {} : {
+      assetDefinitionId: binding.assetDefinitionId
+    }
   };
 }
 function cloneComponents(components) {
@@ -5494,7 +5938,8 @@ var GAME_EDITOR_BINDING_KEYS = /* @__PURE__ */ new Set([
   "revisionId",
   "contentHash",
   "mode",
-  "label"
+  "label",
+  "assetDefinitionId"
 ]);
 var GAME_EDITOR_TRACK_KEYS = /* @__PURE__ */ new Set([
   "id",
@@ -5824,7 +6269,7 @@ async function validateGameEditorPersistenceRecord(record) {
       return false;
     }
   }
-  if (record.bindings !== void 0 && (!Array.isArray(record.bindings) || record.bindings.some((binding) => binding === null || typeof binding !== "object" || typeof binding.trackId !== "string" || binding.kind !== "DRAW" && binding.kind !== "AUDIO" || typeof binding.assetId !== "string" || typeof binding.revisionId !== "string" || !/^[a-f0-9]{64}$/u.test(binding.contentHash) || binding.mode !== "LIVE" && binding.mode !== "PINNED" || typeof binding.label !== "string" || Object.keys(binding).some((key2) => !GAME_EDITOR_BINDING_KEYS.has(key2))))) return false;
+  if (record.bindings !== void 0 && (!Array.isArray(record.bindings) || record.bindings.some((binding) => binding === null || typeof binding !== "object" || typeof binding.trackId !== "string" || binding.kind !== "DRAW" && binding.kind !== "AUDIO" || typeof binding.assetId !== "string" || typeof binding.revisionId !== "string" || !/^[a-f0-9]{64}$/u.test(binding.contentHash) || binding.mode !== "LIVE" && binding.mode !== "PINNED" || typeof binding.label !== "string" || binding.assetDefinitionId !== void 0 && (binding.kind !== "DRAW" || typeof binding.assetDefinitionId !== "string" || !GAME_EDITOR_ID_PATTERN.test(binding.assetDefinitionId)) || Object.keys(binding).some((key2) => !GAME_EDITOR_BINDING_KEYS.has(key2))))) return false;
   if (record.behaviorSources !== void 0 && (!Array.isArray(record.behaviorSources) || record.behaviorSources.some((source) => !validBehaviorSourceSnapshot(source)))) return false;
   if (record.templateInstances !== void 0 && (!Array.isArray(record.templateInstances) || new Set(record.templateInstances.map((instance) => instance.instanceId)).size !== record.templateInstances.length || record.templateInstances.some((instance) => !isValidGameTemplateInstance(instance)))) return false;
   if (record.animationBindings !== void 0 && (!Array.isArray(record.animationBindings) || new Set(record.animationBindings.map((binding) => binding.bindingId)).size !== record.animationBindings.length || record.animationBindings.some((binding) => !isValidGameAnimationBinding(binding) || !record.tracks.some((track) => track.id === binding.trackId)))) return false;
@@ -5865,6 +6310,11 @@ function isNewer(incoming, current) {
     return incoming.revision > current.revision;
   }
   return incoming.savedAt >= current.savedAt;
+}
+function matchesExpected(current, options) {
+  if (options?.expectedRevision !== void 0 && (current?.revision ?? 0) !== options.expectedRevision) return false;
+  if (options?.expectedStateHash !== void 0 && (current?.stateHash ?? null) !== options.expectedStateHash) return false;
+  return true;
 }
 function openGameDatabase(name) {
   return new Promise((resolve, reject) => {
@@ -5908,7 +6358,7 @@ function createIndexedDbGameEditorPersistenceStore(databaseName = GAME_EDITOR_PE
         return null;
       }
     },
-    async save(record) {
+    async save(record, options) {
       if (!available) return {
         ok: false,
         stale: false
@@ -5922,7 +6372,8 @@ function createIndexedDbGameEditorPersistenceStore(databaseName = GAME_EDITOR_PE
           const read = store.get(record.projectId);
           read.onsuccess = () => {
             const current = read.result;
-            if (isNewer(record, current)) store.put(record);
+            if (!matchesExpected(current, options)) stale = true;
+            else if (isNewer(record, current)) store.put(record);
             else stale = true;
           };
           read.onerror = () => transaction.abort();
@@ -6522,11 +6973,11 @@ function validateProjectShape(project) {
     return fail("AUDIO_INVALID_PROJECT", "Synth preset identifiers are invalid or duplicated.", "project.synthPresets");
   }
   for (const [index, preset] of synthPresets.entries()) {
-    const diagnostic7 = validateSynthPreset(preset, `project.synthPresets[${index}]`);
-    if (diagnostic7 !== null) return {
+    const diagnostic11 = validateSynthPreset(preset, `project.synthPresets[${index}]`);
+    if (diagnostic11 !== null) return {
       ok: false,
       diagnostics: [
-        diagnostic7
+        diagnostic11
       ]
     };
   }
@@ -6632,50 +7083,50 @@ function validateProjectShape(project) {
     };
   }
   for (const [index, revision] of revisions.entries()) {
-    const diagnostic7 = validateRevision(revision, `project.revisions[${index}]`);
-    if (diagnostic7 !== null) return {
+    const diagnostic11 = validateRevision(revision, `project.revisions[${index}]`);
+    if (diagnostic11 !== null) return {
       ok: false,
       diagnostics: [
-        diagnostic7
+        diagnostic11
       ]
     };
   }
   for (const [index, track] of tracks.entries()) {
-    const diagnostic7 = validateTrack(track, `project.tracks[${index}]`);
-    if (diagnostic7 !== null) return {
+    const diagnostic11 = validateTrack(track, `project.tracks[${index}]`);
+    if (diagnostic11 !== null) return {
       ok: false,
       diagnostics: [
-        diagnostic7
+        diagnostic11
       ]
     };
   }
   for (const [index, clip] of clips.entries()) {
     const valueClip = clip;
-    const diagnostic7 = valueClip === null || typeof valueClip !== "object" || !validId3(valueClip.clipId) || !validId3(valueClip.trackId) || !validId3(valueClip.revisionId) || validTimeRange(valueClip.timeline, `project.clips[${index}].timeline`) !== null || !boundedInteger(valueClip.sourceOffsetUs, 0, Number.MAX_SAFE_INTEGER) || !boundedInteger(valueClip.gainMilliDb, -12e4, 24e3) || !boundedInteger(valueClip.fadeInTick, 0, AUDIO200_MAX_TICK) || !boundedInteger(valueClip.fadeOutTick, 0, AUDIO200_MAX_TICK) || typeof valueClip.loop !== "boolean" || valueClip.playbackRate !== void 0 && !boundedNumber(valueClip.playbackRate, 0.25, 4) ? {
+    const diagnostic11 = valueClip === null || typeof valueClip !== "object" || !validId3(valueClip.clipId) || !validId3(valueClip.trackId) || !validId3(valueClip.revisionId) || validTimeRange(valueClip.timeline, `project.clips[${index}].timeline`) !== null || !boundedInteger(valueClip.sourceOffsetUs, 0, Number.MAX_SAFE_INTEGER) || !boundedInteger(valueClip.gainMilliDb, -12e4, 24e3) || !boundedInteger(valueClip.fadeInTick, 0, AUDIO200_MAX_TICK) || !boundedInteger(valueClip.fadeOutTick, 0, AUDIO200_MAX_TICK) || typeof valueClip.loop !== "boolean" || valueClip.playbackRate !== void 0 && !boundedNumber(valueClip.playbackRate, 0.25, 4) ? {
       code: "AUDIO_INVALID_CLIP",
       message: "Clip fields or timeline are invalid.",
       path: `project.clips[${index}]`,
       recoverable: false
     } : null;
-    if (diagnostic7 !== null) return {
+    if (diagnostic11 !== null) return {
       ok: false,
       diagnostics: [
-        diagnostic7
+        diagnostic11
       ]
     };
   }
   for (const [index, note] of notes.entries()) {
     const valueNote = note;
-    const diagnostic7 = valueNote === null || typeof valueNote !== "object" || !validId3(valueNote.noteId) || !validId3(valueNote.trackId) || !boundedInteger(valueNote.pitchMidi, 0, 127) || validTimeRange(valueNote.timeline, `project.notes[${index}].timeline`) !== null || !boundedInteger(valueNote.velocityMilli, 0, 1e3) ? {
+    const diagnostic11 = valueNote === null || typeof valueNote !== "object" || !validId3(valueNote.noteId) || !validId3(valueNote.trackId) || !boundedInteger(valueNote.pitchMidi, 0, 127) || validTimeRange(valueNote.timeline, `project.notes[${index}].timeline`) !== null || !boundedInteger(valueNote.velocityMilli, 0, 1e3) ? {
       code: "AUDIO_INVALID_NOTE",
       message: "Note fields or timeline are invalid.",
       path: `project.notes[${index}]`,
       recoverable: false
     } : null;
-    if (diagnostic7 !== null) return {
+    if (diagnostic11 !== null) return {
       ok: false,
       diagnostics: [
-        diagnostic7
+        diagnostic11
       ]
     };
   }
@@ -6683,7 +7134,7 @@ function validateProjectShape(project) {
     const valueAutomation = automation;
     const target = valueAutomation?.target;
     const points = valueAutomation?.points;
-    const diagnostic7 = valueAutomation === null || typeof valueAutomation !== "object" || !validId3(valueAutomation.automationId) || target === null || ![
+    const diagnostic11 = valueAutomation === null || typeof valueAutomation !== "object" || !validId3(valueAutomation.automationId) || target === null || ![
       "TRACK_GAIN",
       "TRACK_PAN",
       "MIXER_CHANNEL_GAIN",
@@ -6701,10 +7152,10 @@ function validateProjectShape(project) {
       path: `project.automations[${index}]`,
       recoverable: false
     } : null;
-    if (diagnostic7 !== null) return {
+    if (diagnostic11 !== null) return {
       ok: false,
       diagnostics: [
-        diagnostic7
+        diagnostic11
       ]
     };
   }
@@ -7455,16 +7906,16 @@ async function applyAudioCommand(project, command) {
     }
     case "SYNTH_PRESET_REPLACE": {
       const synthPreset = entityFromPayload(payload, "synthPreset");
-      const diagnostic7 = synthPreset === null ? {
+      const diagnostic11 = synthPreset === null ? {
         code: "AUDIO_INVALID_PROJECT",
         message: "Synth preset payload is invalid.",
         path: "command.payload.synthPreset",
         recoverable: false
       } : validateSynthPreset(synthPreset, "command.payload.synthPreset");
-      if (diagnostic7 !== null) return {
+      if (diagnostic11 !== null) return {
         ok: false,
         diagnostics: [
-          diagnostic7
+          diagnostic11
         ]
       };
       next = {
@@ -8153,8 +8604,8 @@ var GameEditorCanonicalStore = class _GameEditorCanonicalStore {
   }
 };
 
-// src/game/game-330/core.ts
-var GAME_BUILD_SCHEMA_VERSION = 1;
+// src/game/game-340/core.ts
+var GAME_INTEGRATION_SCHEMA_VERSION = 1;
 function diagnostic4(code, path, message, recoverable = true) {
   return {
     code,
@@ -8179,10 +8630,2214 @@ function failure2(...diagnostics) {
 function stable2(value) {
   return /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(value);
 }
+function byKey(a, b) {
+  return `${a.kind}:${a.assetId}:${a.revisionId}`.localeCompare(`${b.kind}:${b.assetId}:${b.revisionId}`);
+}
+function callerDiagnostics(project, caller2) {
+  const out = [];
+  if (String(project.projectId) !== String(caller2.projectId)) out.push(diagnostic4("WRONG_PROJECT", "caller.projectId", "Caller project claim does not match."));
+  if (String(project.ownerId) !== String(caller2.ownerId)) out.push(diagnostic4("WRONG_OWNER", "caller.ownerId", "Caller owner claim does not match."));
+  if (String(project.revision.revisionId) !== String(caller2.revisionId)) out.push(diagnostic4("STALE_REVISION", "caller.revisionId", "Caller project revision is stale."));
+  return out;
+}
+function detectCycle(locks) {
+  const graph = new Map(locks.map((lock) => [
+    lock.dependencyId,
+    lock.dependsOn
+  ]));
+  const visiting = /* @__PURE__ */ new Set();
+  const visited = /* @__PURE__ */ new Set();
+  const visit = (id) => {
+    if (visiting.has(id)) return true;
+    if (visited.has(id)) return false;
+    visiting.add(id);
+    for (const next of graph.get(id) ?? []) if (visit(next)) return true;
+    visiting.delete(id);
+    visited.add(id);
+    return false;
+  };
+  return locks.some((lock) => visit(lock.dependencyId));
+}
+function resolveAssetBinding(binding, authority, caller2) {
+  const claim = [
+    binding.projectId === String(caller2.projectId) ? void 0 : diagnostic4("WRONG_PROJECT", "binding.projectId", "Asset binding belongs to another project."),
+    binding.ownerId === String(caller2.ownerId) ? void 0 : diagnostic4("WRONG_OWNER", "binding.ownerId", "Asset binding belongs to another owner."),
+    binding.permission === "PREVIEW" || binding.permission === "READ" ? void 0 : diagnostic4("PERMISSION_DENIED", "binding.permission", "Preview permission is required.")
+  ].filter((item) => item !== void 0);
+  if (claim.length) return failure2(...claim);
+  if (!stable2(binding.assetId) || !stable2(binding.licenseId)) return failure2(diagnostic4("INVALID_CLAIM", "binding", "Binding identifiers are invalid."));
+  const matches = authority.filter((item) => item.projectId === binding.projectId && item.ownerId === binding.ownerId && item.kind === binding.kind && item.assetId === binding.assetId);
+  if (matches.length === 0) return failure2(diagnostic4("MISSING_ASSET", "binding.assetId", "Canonical asset revision is missing."));
+  const current = matches.slice().sort((a, b) => a.revisionId.localeCompare(b.revisionId)).at(-1);
+  const selected = binding.mode === "LIVE" ? current : matches.find((item) => item.revisionId === binding.revisionId);
+  if (!selected) return failure2(diagnostic4("STALE_REVISION", "binding.revisionId", "Requested asset revision is not canonical."));
+  if (binding.mode === "LIVE" && (binding.revisionId !== void 0 || binding.contentHash !== void 0)) return failure2(diagnostic4("INVALID_CLAIM", "binding", "LIVE cannot carry a caller revision or hash override."));
+  if (binding.mode !== "LIVE" && binding.revisionId !== selected.revisionId) return failure2(diagnostic4("REVISION_MISMATCH", "binding.revisionId", "Revision claim does not match canonical authority."));
+  if (binding.contentHash !== void 0 && binding.contentHash !== selected.contentHash) return failure2(diagnostic4("HASH_MISMATCH", "binding.contentHash", "Caller hash is not authoritative."));
+  if (binding.licenseId !== selected.licenseId) return failure2(diagnostic4("LICENSE_MISSING", "binding.licenseId", "License claim does not match canonical authority."));
+  if (binding.mode === "REVIEW" && selected.reviewStatus !== "APPROVED") return failure2(diagnostic4("REVIEW_REQUIRED", "binding.mode", "Review mode requires APPROVED authority."));
+  if (binding.mode === "FORKED" && selected.forkId !== binding.forkId) return failure2(diagnostic4("FORK_MISMATCH", "binding.forkId", "Fork binding does not match canonical authority."));
+  return success2({
+    ...binding,
+    revisionId: selected.revisionId,
+    contentHash: selected.contentHash,
+    licenseId: selected.licenseId
+  });
+}
+function projectBindings(project, caller2) {
+  return project.scenes.flatMap((scene) => scene.entities.flatMap((entity) => entity.components.flatMap((component) => {
+    if (component.type !== "SPRITE" && component.type !== "AUDIO_SOURCE") return [];
+    const base = {
+      componentId: String(component.componentId),
+      projectId: String(project.projectId),
+      ownerId: String(project.ownerId),
+      kind: component.asset.kind,
+      assetId: String(component.asset.assetId),
+      mode: component.asset.mode,
+      licenseId: "",
+      permission: "PREVIEW"
+    };
+    return [
+      component.asset.mode === "PINNED" ? {
+        ...base,
+        revisionId: String(component.asset.revisionId)
+      } : base
+    ];
+  })));
+}
+async function createIntegratedPackage(project, caller2, bindings, authority, dependencyLocks, licenses) {
+  const projectResult = validateGameProject(project, caller2);
+  if (!projectResult.valid) return failure2(diagnostic4("INVALID_PROJECT", "project", "GAME-300 project validation failed."));
+  const callerIssues = callerDiagnostics(project, caller2);
+  if (callerIssues.length) return failure2(...callerIssues);
+  const expected = projectBindings(project, caller2);
+  const expectedKeys = new Set(expected.map((item) => item.componentId));
+  if (bindings.length !== expected.length || bindings.some((item) => !expectedKeys.has(item.componentId))) return failure2(diagnostic4("PARTIAL_PACKAGE", "bindings", "Every Draw/Audio component must have exactly one integration binding."));
+  const seen = /* @__PURE__ */ new Set();
+  const resolved = [];
+  for (const binding of bindings) {
+    if (seen.has(binding.componentId)) return failure2(diagnostic4("DUPLICATE_REFERENCE", `bindings.${binding.componentId}`, "Duplicate component binding."));
+    seen.add(binding.componentId);
+    const result = resolveAssetBinding(binding, authority, caller2);
+    if (!result.ok) return failure2(...result.diagnostics);
+    resolved.push(result.value);
+  }
+  const depIds = new Set(project.dependencies.map((item) => String(item.dependencyId)));
+  const lockIds = /* @__PURE__ */ new Set();
+  for (const lock of dependencyLocks) {
+    if (lockIds.has(lock.dependencyId)) return failure2(diagnostic4("DUPLICATE_DEPENDENCY", "dependencyLocks", "Duplicate dependency lock."));
+    lockIds.add(lock.dependencyId);
+    if (!depIds.has(lock.dependencyId)) return failure2(diagnostic4("MISSING_DEPENDENCY", "dependencyLocks", "Dependency lock is not declared by the project."));
+  }
+  if (lockIds.size !== depIds.size) return failure2(diagnostic4("PARTIAL_PACKAGE", "dependencyLocks", "Dependency locks are incomplete."));
+  if (detectCycle(dependencyLocks)) return failure2(diagnostic4("DEPENDENCY_CYCLE", "dependencyLocks", "Dependency lock graph contains a cycle."));
+  const requiredLicenseIds = /* @__PURE__ */ new Set([
+    ...resolved.map((item) => item.licenseId),
+    ...dependencyLocks.map((item) => item.licenseId)
+  ]);
+  if (licenses.some((item, index) => licenses.findIndex((other) => other.licenseId === item.licenseId) !== index) || [
+    ...requiredLicenseIds
+  ].some((id) => !licenses.some((item) => item.licenseId === id))) return failure2(diagnostic4("LICENSE_MISSING", "licenses", "License snapshots are incomplete or duplicated."));
+  const assetLocks = resolved.slice().sort(byKey);
+  const sortedDeps = dependencyLocks.slice().sort((a, b) => a.dependencyId.localeCompare(b.dependencyId));
+  const sortedLicenses2 = licenses.slice().sort((a, b) => a.licenseId.localeCompare(b.licenseId));
+  const base = {
+    schemaVersion: GAME_INTEGRATION_SCHEMA_VERSION,
+    projectId: String(project.projectId),
+    ownerId: String(project.ownerId),
+    projectRevisionId: String(project.revision.revisionId),
+    projectHash: project.revision.snapshotHash,
+    assetLocks,
+    dependencyLocks: sortedDeps,
+    licenses: sortedLicenses2
+  };
+  return success2({
+    ...base,
+    packageHash: await sha256(base)
+  });
+}
+function verifyManifest(manifest, caller2) {
+  if (manifest.schemaVersion !== GAME_INTEGRATION_SCHEMA_VERSION) return failure2(diagnostic4("UNSUPPORTED_SCHEMA", "schemaVersion", "Package schema is unsupported."));
+  if (manifest.projectId !== caller2.projectId || manifest.ownerId !== caller2.ownerId || manifest.projectRevisionId !== caller2.revisionId) return failure2(diagnostic4("CALLER_CLAIM_MISMATCH", "caller", "Manifest caller claims do not match."));
+  if (manifest.assetLocks.length === 0 && manifest.dependencyLocks.length === 0) return failure2(diagnostic4("PARTIAL_PACKAGE", "manifest", "Package has no locked dependencies."));
+  return success2(manifest);
+}
+
+// src/studio/golden-project.ts
+var GOLDEN_PROJECT_SCHEMA_VERSION = 1;
+var DRAW_ENTITY_ID = "golden:entity:hero";
+var AUDIO_ENTITY_ID = "golden:entity:music";
+var DRAW_COMPONENT_ID = "golden:component:hero-sprite";
+var AUDIO_COMPONENT_ID = "golden:component:music-source";
+var DRAW_DEPENDENCY_ID = "golden:dependency:draw";
+var AUDIO_DEPENDENCY_ID = "golden:dependency:audio";
+var GOLDEN_SCENE_ID = "golden:scene:main";
+function diagnostic5(code, path, message, recoverable = true) {
+  return {
+    code,
+    path,
+    message,
+    recoverable
+  };
+}
+function failure3(...diagnostics) {
+  return {
+    ok: false,
+    diagnostics
+  };
+}
+function assertFiniteNumber(value, path) {
+  return Number.isFinite(value) ? [] : [
+    diagnostic5("INVALID_CLAIM", path, "Number must be finite.")
+  ];
+}
+function validateAsset(asset, expectedKind, path, projectId, ownerId) {
+  const diagnostics = [];
+  if (asset.kind !== expectedKind) {
+    diagnostics.push(diagnostic5("INVALID_CLAIM", `${path}.kind`, `${expectedKind} asset is required for the Golden Project.`));
+  }
+  if (asset.projectId !== projectId) {
+    diagnostics.push(diagnostic5("WRONG_PROJECT", `${path}.projectId`, "Asset project does not match."));
+  }
+  if (asset.ownerId !== ownerId) {
+    diagnostics.push(diagnostic5("WRONG_OWNER", `${path}.ownerId`, "Asset owner does not match."));
+  }
+  if (!asset.label.trim()) {
+    diagnostics.push(diagnostic5("INVALID_CLAIM", `${path}.label`, "Asset label is required."));
+  }
+  if (!asset.licenseId.trim()) {
+    diagnostics.push(diagnostic5("LICENSE_MISSING", `${path}.licenseId`, "License id is required."));
+  }
+  try {
+    asAssetId(asset.assetId);
+    asAssetRevisionId(asset.revisionId);
+    asSha2562(asset.contentHash);
+  } catch (error) {
+    diagnostics.push(diagnostic5("INVALID_CLAIM", path, error instanceof Error ? error.message : "Asset identity is invalid."));
+  }
+  return diagnostics;
+}
+function buildAssetReference(asset, mode) {
+  return {
+    kind: asset.kind,
+    assetId: asAssetId(asset.assetId),
+    revisionId: asAssetRevisionId(asset.revisionId),
+    ownerId: asOwnerId(asset.ownerId),
+    contentHash: asSha2562(asset.contentHash),
+    mode
+  };
+}
+function createDependency(dependencyId, ownerId, projectRevisionId, asset) {
+  return {
+    dependencyId: asDependencyId(dependencyId),
+    kind: "ASSET",
+    ownerId,
+    ownerRevisionId: projectRevisionId,
+    targetId: asset.assetId,
+    targetRevisionId: asset.revisionId,
+    dependsOn: []
+  };
+}
+function createBinding(componentId, asset, projectId, ownerId, mode) {
+  const base = {
+    componentId,
+    projectId,
+    ownerId,
+    kind: asset.kind,
+    assetId: asset.assetId,
+    mode,
+    licenseId: asset.licenseId,
+    permission: asset.permission
+  };
+  return mode === "PINNED" ? {
+    ...base,
+    revisionId: asset.revisionId,
+    contentHash: asSha2562(asset.contentHash)
+  } : base;
+}
+function createAuthority(asset) {
+  return {
+    projectId: asset.projectId,
+    ownerId: asset.ownerId,
+    kind: asset.kind,
+    assetId: asset.assetId,
+    revisionId: asset.revisionId,
+    contentHash: asSha2562(asset.contentHash),
+    licenseId: asset.licenseId,
+    permission: asset.permission,
+    reviewStatus: asset.reviewStatus
+  };
+}
+function createDependencyLock(dependency, asset) {
+  return {
+    dependencyId: String(dependency.dependencyId),
+    targetId: asset.assetId,
+    targetRevisionId: asset.revisionId,
+    contentHash: asSha2562(asset.contentHash),
+    licenseId: asset.licenseId,
+    dependsOn: []
+  };
+}
+function createLicenseSnapshots(assets, mode, projectRevisionId) {
+  const scope = mode === "PINNED" ? "PACKAGE" : "PREVIEW";
+  const unique3 = /* @__PURE__ */ new Map();
+  for (const asset of assets) {
+    if (!unique3.has(asset.licenseId)) {
+      unique3.set(asset.licenseId, {
+        licenseId: asset.licenseId,
+        ownerId: asset.ownerId,
+        scope,
+        revisionId: projectRevisionId
+      });
+    }
+  }
+  return [
+    ...unique3.values()
+  ];
+}
+function createSteps(draw, audio, mode) {
+  return [
+    {
+      id: "DRAW_SOURCE",
+      status: "READY",
+      label: "iDRAW\u7D20\u6750",
+      detail: `${draw.label} / ${draw.revisionId}`
+    },
+    {
+      id: "DRAW_SPRITE",
+      status: "READY",
+      label: "Sprite\u767B\u9332",
+      detail: "Game Scene\u306E\u30AD\u30E3\u30E9\u30AF\u30BF\u30FCSprite\u3068\u3057\u3066\u767B\u9332\u6E08\u307F"
+    },
+    {
+      id: "AUDIO_SOURCE",
+      status: "READY",
+      label: "iAUDIO\u7D20\u6750",
+      detail: `${audio.label} / ${audio.revisionId}`
+    },
+    {
+      id: "AUDIO_BINDING",
+      status: "READY",
+      label: "BGM\u8A2D\u5B9A",
+      detail: "Game Scene\u306EAudio Source\u3078\u63A5\u7D9A\u6E08\u307F"
+    },
+    {
+      id: "GAME_SCENE",
+      status: "READY",
+      label: "Game Scene",
+      detail: "\u30AD\u30E3\u30E9\u30AF\u30BF\u30FC\u3068BGM\u3092\u540C\u4E00Project\u3078\u7D71\u5408\u6E08\u307F"
+    },
+    {
+      id: "PLAY_PREVIEW",
+      status: "READY",
+      label: "\u30D7\u30EC\u30A4",
+      detail: `${mode}\u53C2\u7167\u3067Play Preview\u3092\u958B\u59CB\u3067\u304D\u307E\u3059`
+    },
+    {
+      id: "PINNED_PACKAGE",
+      status: mode === "PINNED" ? "READY" : "NEXT",
+      label: "\u56FA\u5B9APackage",
+      detail: mode === "PINNED" ? "Draw/Audio\u306ERevision\u3068Hash\u3092\u56FA\u5B9A\u6E08\u307F" : "\u516C\u958B\u524D\u306BPINNED\u3078\u5207\u308A\u66FF\u3048\u3066\u518D\u73FE\u53EF\u80FD\u306APackage\u3092\u4F5C\u6210"
+    }
+  ];
+}
+async function createGoldenProject(input, mode) {
+  const inputDiagnostics = [
+    ...validateAsset(input.draw, "DRAW", "draw", input.projectId, input.ownerId),
+    ...validateAsset(input.audio, "AUDIO", "audio", input.projectId, input.ownerId),
+    ...input.name.trim() ? [] : [
+      diagnostic5("INVALID_CLAIM", "name", "Project name is required.")
+    ],
+    ...input.drawPlacement === void 0 ? [] : [
+      ...assertFiniteNumber(input.drawPlacement.x, "drawPlacement.x"),
+      ...assertFiniteNumber(input.drawPlacement.y, "drawPlacement.y"),
+      ...input.drawPlacement.scaleX === void 0 ? [] : assertFiniteNumber(input.drawPlacement.scaleX, "drawPlacement.scaleX"),
+      ...input.drawPlacement.scaleY === void 0 ? [] : assertFiniteNumber(input.drawPlacement.scaleY, "drawPlacement.scaleY")
+    ],
+    ...input.audioSettings?.volume === void 0 ? [] : assertFiniteNumber(input.audioSettings.volume, "audioSettings.volume")
+  ];
+  if (inputDiagnostics.length > 0) return failure3(...inputDiagnostics);
+  try {
+    const projectId = asProjectId(input.projectId);
+    const ownerId = asOwnerId(input.ownerId);
+    const projectRevisionId = asRevisionId(input.revisionId ?? "golden:project-revision:1");
+    const caller2 = {
+      projectId,
+      ownerId,
+      revisionId: projectRevisionId
+    };
+    const drawReference = buildAssetReference(input.draw, mode);
+    const audioReference = buildAssetReference(input.audio, mode);
+    const drawDependency = createDependency(DRAW_DEPENDENCY_ID, ownerId, projectRevisionId, input.draw);
+    const audioDependency = createDependency(AUDIO_DEPENDENCY_ID, ownerId, projectRevisionId, input.audio);
+    const drawX = input.drawPlacement?.x ?? 0;
+    const drawY = input.drawPlacement?.y ?? 0;
+    const scaleX = input.drawPlacement?.scaleX ?? 1;
+    const scaleY = input.drawPlacement?.scaleY ?? 1;
+    const audioVolume = input.audioSettings?.volume ?? 1;
+    const audioLoop = input.audioSettings?.loop ?? true;
+    const sceneId = asSceneId(GOLDEN_SCENE_ID);
+    const drawEntityId = asEntityId(DRAW_ENTITY_ID);
+    const audioEntityId = asEntityId(AUDIO_ENTITY_ID);
+    const drawComponentId = asComponentId(DRAW_COMPONENT_ID);
+    const audioComponentId = asComponentId(AUDIO_COMPONENT_ID);
+    const draft = {
+      schemaVersion: 1,
+      projectId,
+      ownerId,
+      name: input.name.trim(),
+      revision: {
+        revisionId: projectRevisionId,
+        projectId,
+        ownerId,
+        sequence: 1
+      },
+      scenes: [
+        {
+          sceneId,
+          name: "Main Scene",
+          rootEntityIds: [
+            drawEntityId,
+            audioEntityId
+          ],
+          entities: [
+            {
+              entityId: drawEntityId,
+              name: input.draw.label,
+              components: [
+                {
+                  type: "TRANSFORM",
+                  componentId: asComponentId("golden:component:hero-transform"),
+                  x: drawX,
+                  y: drawY,
+                  rotation: 0,
+                  scaleX,
+                  scaleY
+                },
+                {
+                  type: "SPRITE",
+                  componentId: drawComponentId,
+                  asset: drawReference,
+                  visible: true
+                }
+              ]
+            },
+            {
+              entityId: audioEntityId,
+              name: input.audio.label,
+              components: [
+                {
+                  type: "AUDIO_SOURCE",
+                  componentId: audioComponentId,
+                  asset: audioReference,
+                  loop: audioLoop,
+                  volume: audioVolume
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      prefabs: [],
+      dependencies: [
+        drawDependency,
+        audioDependency
+      ],
+      behaviors: [],
+      editorTimeline: {
+        frameCount: 1,
+        tracks: [
+          {
+            trackId: "golden:track:hero",
+            label: input.draw.label,
+            kind: "SPRITE",
+            activeFrames: [
+              0
+            ],
+            role: "PLAYER",
+            components: [
+              {
+                type: "TRANSFORM",
+                componentId: asComponentId("golden:timeline:hero-transform"),
+                x: drawX,
+                y: drawY,
+                rotation: 0,
+                scaleX,
+                scaleY
+              },
+              {
+                type: "SPRITE",
+                componentId: asComponentId("golden:timeline:hero-sprite"),
+                visible: true
+              }
+            ]
+          },
+          {
+            trackId: "golden:track:music",
+            label: input.audio.label,
+            kind: "MUSIC",
+            activeFrames: [
+              0
+            ],
+            role: "AUDIO",
+            components: [
+              {
+                type: "AUDIO_SOURCE",
+                componentId: asComponentId("golden:timeline:music-source"),
+                loop: audioLoop,
+                volume: audioVolume
+              }
+            ]
+          }
+        ]
+      }
+    };
+    const project = await createGameProject(draft, caller2);
+    const bindings = [
+      createBinding(DRAW_COMPONENT_ID, input.draw, input.projectId, input.ownerId, mode),
+      createBinding(AUDIO_COMPONENT_ID, input.audio, input.projectId, input.ownerId, mode)
+    ];
+    const authority = [
+      createAuthority(input.draw),
+      createAuthority(input.audio)
+    ];
+    const dependencyLocks = [
+      createDependencyLock(drawDependency, input.draw),
+      createDependencyLock(audioDependency, input.audio)
+    ];
+    const licenses = createLicenseSnapshots([
+      input.draw,
+      input.audio
+    ], mode, String(project.revision.revisionId));
+    const packageResult = await createIntegratedPackage(project, caller2, bindings, authority, dependencyLocks, licenses);
+    if (!packageResult.ok || packageResult.value === void 0) {
+      return failure3(...packageResult.diagnostics);
+    }
+    return {
+      ok: true,
+      value: {
+        schemaVersion: GOLDEN_PROJECT_SCHEMA_VERSION,
+        mode,
+        project,
+        manifest: packageResult.value,
+        caller: caller2,
+        steps: createSteps(input.draw, input.audio, mode),
+        previewReady: true,
+        packageReady: mode === "PINNED"
+      },
+      diagnostics: []
+    };
+  } catch (error) {
+    return failure3(diagnostic5("INVALID_CLAIM", "input", error instanceof Error ? error.message : "Golden Project input is invalid."));
+  }
+}
+
+// src/studio/package-publish.ts
+var STUDIO_PACKAGE_SCHEMA_VERSION = 1;
+var FORBIDDEN_PAYLOAD_KEYS = /* @__PURE__ */ new Set([
+  "bytes",
+  "rawbytes",
+  "pixels",
+  "pixeldata",
+  "pcm",
+  "samples",
+  "sampledata",
+  "audiobuffer",
+  "imagedata"
+]);
+function diagnostic6(code, path, message, recoverable = false) {
+  return {
+    code,
+    path,
+    message,
+    recoverable
+  };
+}
+function failure4(...diagnostics) {
+  return {
+    ok: false,
+    diagnostics
+  };
+}
+function success3(value) {
+  return {
+    ok: true,
+    value,
+    diagnostics: []
+  };
+}
+function stable3(value) {
+  return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(value);
+}
+function validHash(value) {
+  return typeof value === "string" && /^[a-f0-9]{64}$/u.test(value);
+}
+function registryKey(value) {
+  return `${value.kind}:${value.assetId}:${value.revisionId}`;
+}
+function sourcePackageFor(kind) {
+  return kind === "DRAW" ? "PXD" : "AUDIO";
+}
+function sortedRegistry(entries) {
+  return entries.slice().sort((left, right) => registryKey(left).localeCompare(registryKey(right)));
+}
+function sortedLicenses(licenses) {
+  return licenses.slice().sort((left, right) => left.licenseId.localeCompare(right.licenseId));
+}
+function forbiddenPayloadPath(value) {
+  const visited = /* @__PURE__ */ new Set();
+  const visit = (candidate, path) => {
+    if (candidate === null || typeof candidate !== "object") return void 0;
+    if (visited.has(candidate)) return void 0;
+    visited.add(candidate);
+    if (Array.isArray(candidate)) {
+      for (let index = 0; index < candidate.length; index += 1) {
+        const found = visit(candidate[index], `${path}[${index}]`);
+        if (found !== void 0) return found;
+      }
+      return void 0;
+    }
+    for (const key2 of Object.keys(candidate)) {
+      const normalized = key2.toLowerCase().replaceAll("_", "").replaceAll("-", "");
+      if (FORBIDDEN_PAYLOAD_KEYS.has(normalized)) {
+        return `${path}.${key2}`;
+      }
+      const found = visit(candidate[key2], `${path}.${key2}`);
+      if (found !== void 0) return found;
+    }
+    return void 0;
+  };
+  return visit(value, "input");
+}
+async function verifyIntegrationManifest(input) {
+  const diagnostics = [];
+  const projectValidation = validateGameProject(input.project, input.caller);
+  if (!projectValidation.valid) {
+    diagnostics.push(diagnostic6("INVALID_PROJECT", "project", "Canonical Game Project validation failed."));
+  }
+  const verified = verifyManifest(input.integration, {
+    projectId: String(input.caller.projectId),
+    ownerId: String(input.caller.ownerId),
+    revisionId: String(input.caller.revisionId)
+  });
+  if (!verified.ok) diagnostics.push(...verified.diagnostics);
+  if (!stable3(input.packageId)) {
+    diagnostics.push(diagnostic6("INVALID_CLAIM", "packageId", "Package ID is unstable."));
+  }
+  if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,63}$/u.test(input.packageVersion)) {
+    diagnostics.push(diagnostic6("INVALID_CLAIM", "packageVersion", "Package version is not a stable identifier."));
+  }
+  if (String(input.project.projectId) !== input.integration.projectId) {
+    diagnostics.push(diagnostic6("WRONG_PROJECT", "integration.projectId", "Integration manifest belongs to another project."));
+  }
+  if (String(input.project.ownerId) !== input.integration.ownerId) {
+    diagnostics.push(diagnostic6("WRONG_OWNER", "integration.ownerId", "Integration manifest belongs to another owner."));
+  }
+  if (String(input.project.revision.revisionId) !== input.integration.projectRevisionId) {
+    diagnostics.push(diagnostic6("STALE_REVISION", "integration.projectRevisionId", "Integration manifest is not bound to the current Project revision."));
+  }
+  if (input.project.revision.snapshotHash !== input.integration.projectHash) {
+    diagnostics.push(diagnostic6("HASH_MISMATCH", "integration.projectHash", "Integration project hash does not match the canonical Project."));
+  }
+  const { packageHash: integrationPackageHash, ...integrationBase } = input.integration;
+  if (!validHash(integrationPackageHash) || await sha256(integrationBase) !== integrationPackageHash) {
+    diagnostics.push(diagnostic6("HASH_MISMATCH", "integration.packageHash", "Integration manifest hash does not match its contents."));
+  }
+  const seenLocks = /* @__PURE__ */ new Set();
+  for (const lock of input.integration.assetLocks) {
+    const key2 = registryKey(lock);
+    if (seenLocks.has(key2)) {
+      diagnostics.push(diagnostic6("DUPLICATE_REFERENCE", "integration.assetLocks", `Duplicate locked asset: ${key2}`));
+    }
+    seenLocks.add(key2);
+    if (lock.mode !== "PINNED") {
+      diagnostics.push(diagnostic6("MODE_MISMATCH", `integration.assetLocks.${key2}.mode`, "Publish input must pin every asset Revision."));
+    }
+    if (!validHash(lock.contentHash)) {
+      diagnostics.push(diagnostic6("HASH_MISMATCH", `integration.assetLocks.${key2}.contentHash`, "Asset lock hash is not a lowercase SHA-256 value."));
+    }
+  }
+  const seenLicenses = /* @__PURE__ */ new Set();
+  for (const license of input.integration.licenses) {
+    if (seenLicenses.has(license.licenseId)) {
+      diagnostics.push(diagnostic6("DUPLICATE_REFERENCE", "integration.licenses", `Duplicate license snapshot: ${license.licenseId}`));
+    }
+    seenLicenses.add(license.licenseId);
+    if (license.scope !== "PACKAGE" || license.ownerId !== String(input.project.ownerId) || license.revisionId !== String(input.project.revision.revisionId)) {
+      diagnostics.push(diagnostic6("LICENSE_MISSING", `integration.licenses.${license.licenseId}`, "Package license is not bound to the Project owner and Revision."));
+    }
+  }
+  const requiredLicenseIds = new Set(input.integration.assetLocks.map((lock) => lock.licenseId));
+  for (const licenseId of requiredLicenseIds) {
+    if (!seenLicenses.has(licenseId)) {
+      diagnostics.push(diagnostic6("LICENSE_MISSING", "integration.licenses", `Missing package license snapshot: ${licenseId}`));
+    }
+  }
+  return diagnostics;
+}
+function verifyRegistry(input) {
+  const diagnostics = [];
+  const locks = input.integration.assetLocks;
+  const lockByKey = new Map(locks.map((lock) => [
+    registryKey(lock),
+    lock
+  ]));
+  const registryByKey = /* @__PURE__ */ new Map();
+  for (const entry of input.assetRegistry) {
+    const key2 = registryKey(entry);
+    if (registryByKey.has(key2)) {
+      diagnostics.push(diagnostic6("DUPLICATE_REFERENCE", "assetRegistry", `Duplicate registry entry: ${key2}`));
+      continue;
+    }
+    registryByKey.set(key2, entry);
+    if (!stable3(entry.assetId) || !stable3(entry.revisionId) || !stable3(entry.ownerId) || !stable3(entry.licenseId)) {
+      diagnostics.push(diagnostic6("INVALID_CLAIM", `assetRegistry.${key2}`, "Registry identity is not stable."));
+    }
+    if (!validHash(entry.contentHash)) {
+      diagnostics.push(diagnostic6("HASH_MISMATCH", `assetRegistry.${key2}.contentHash`, "Registry hash is not a lowercase SHA-256 value."));
+    }
+    if (!Number.isSafeInteger(entry.byteLength) || entry.byteLength < 0) {
+      diagnostics.push(diagnostic6("INVALID_CLAIM", `assetRegistry.${key2}.byteLength`, "Registry byteLength must be a non-negative safe integer."));
+    }
+    if (typeof entry.mimeType !== "string" || entry.mimeType.trim().length === 0 || /[\u0000-\u001f]/u.test(entry.mimeType)) {
+      diagnostics.push(diagnostic6("INVALID_CLAIM", `assetRegistry.${key2}.mimeType`, "Registry MIME type is invalid."));
+    }
+    const expectedPackage = sourcePackageFor(entry.kind);
+    if (entry.sourcePackage !== expectedPackage) {
+      diagnostics.push(diagnostic6("INVALID_CLAIM", `assetRegistry.${key2}.sourcePackage`, `Expected ${expectedPackage} for ${entry.kind} assets.`));
+    }
+    const lock = lockByKey.get(key2);
+    if (lock === void 0) {
+      diagnostics.push(diagnostic6("PARTIAL_PACKAGE", `assetRegistry.${key2}`, "Registry entry is not locked by the integration manifest."));
+      continue;
+    }
+    if (entry.kind !== lock.kind || entry.assetId !== lock.assetId || entry.revisionId !== lock.revisionId || entry.contentHash !== lock.contentHash || entry.ownerId !== input.integration.ownerId || entry.licenseId !== lock.licenseId) {
+      diagnostics.push(diagnostic6("HASH_MISMATCH", `assetRegistry.${key2}`, "Registry metadata does not match the locked Asset Revision."));
+    }
+  }
+  for (const lock of locks) {
+    if (!registryByKey.has(registryKey(lock))) {
+      diagnostics.push(diagnostic6("PARTIAL_PACKAGE", "assetRegistry", `Missing registry entry: ${registryKey(lock)}`));
+    }
+  }
+  if (registryByKey.size !== lockByKey.size) {
+    diagnostics.push(diagnostic6("PARTIAL_PACKAGE", "assetRegistry", "Asset Registry must exactly cover the locked Draw and Audio assets."));
+  }
+  if (!input.assetRegistry.some((entry) => entry.kind === "DRAW")) {
+    diagnostics.push(diagnostic6("PARTIAL_PACKAGE", "assetRegistry", "PXD source is missing."));
+  }
+  if (!input.assetRegistry.some((entry) => entry.kind === "AUDIO")) {
+    diagnostics.push(diagnostic6("PARTIAL_PACKAGE", "assetRegistry", "Audio source is missing."));
+  }
+  return diagnostics;
+}
+function packageReferences(entries, kind) {
+  const filtered = kind === "GAME" ? entries : entries.filter((entry) => entry.sourcePackage === kind);
+  return sortedRegistry(filtered).map((entry) => ({
+    ...entry
+  }));
+}
+async function createPackageArtifact(input, integrationManifestHash, kind) {
+  const references = packageReferences(input.assetRegistry, kind);
+  const base = {
+    kind,
+    packageId: input.packageId,
+    packageVersion: input.packageVersion,
+    projectId: String(input.project.projectId),
+    projectRevisionId: String(input.project.revision.revisionId),
+    projectHash: input.project.revision.snapshotHash,
+    integrationManifestHash,
+    references
+  };
+  return {
+    ...base,
+    contentHash: await sha256(base)
+  };
+}
+async function verifyReleaseManifest(manifest) {
+  const diagnostics = [];
+  if (manifest.schemaVersion !== STUDIO_PACKAGE_SCHEMA_VERSION) {
+    diagnostics.push(diagnostic6("UNSUPPORTED_SCHEMA", "schemaVersion", "Studio Package schema is unsupported."));
+  }
+  if (!validHash(manifest.packageHash) || !validHash(manifest.reproducibleBuildIdentity)) {
+    diagnostics.push(diagnostic6("HASH_MISMATCH", "manifest", "Studio Package hashes are malformed."));
+    return diagnostics;
+  }
+  const { packageHash, reproducibleBuildIdentity, ...base } = manifest;
+  if (await sha256(base) !== packageHash) {
+    diagnostics.push(diagnostic6("HASH_MISMATCH", "manifest.packageHash", "Studio Package hash does not match its contents."));
+  }
+  if (await sha256({
+    packageHash,
+    packages: manifest.packages
+  }) !== reproducibleBuildIdentity) {
+    diagnostics.push(diagnostic6("HASH_MISMATCH", "manifest.reproducibleBuildIdentity", "Reproducible Build identity does not match the Package."));
+  }
+  const expectedKinds = [
+    "PXD",
+    "AUDIO",
+    "GAME"
+  ];
+  if (manifest.packages.length !== expectedKinds.length || expectedKinds.some((kind) => manifest.packages.filter((item) => item.kind === kind).length !== 1)) {
+    diagnostics.push(diagnostic6("PARTIAL_PACKAGE", "manifest.packages", "PXD, Audio, and Game packages must each be present exactly once."));
+  }
+  for (const artifact of manifest.packages) {
+    const { contentHash, ...artifactBase } = artifact;
+    if (!validHash(contentHash) || await sha256(artifactBase) !== contentHash) {
+      diagnostics.push(diagnostic6("HASH_MISMATCH", `manifest.packages.${artifact.kind}.contentHash`, "Sub-package hash does not match its references."));
+    }
+  }
+  return diagnostics;
+}
+async function createStudioReleaseCandidate(input) {
+  const forbidden = forbiddenPayloadPath(input);
+  if (forbidden !== void 0) {
+    return failure4(diagnostic6("INVALID_CLAIM", forbidden, "Raw media or executable payloads cannot enter a Studio Package."));
+  }
+  const manifestDiagnostics = await verifyIntegrationManifest(input);
+  const registryDiagnostics = verifyRegistry(input);
+  if (manifestDiagnostics.length > 0 || registryDiagnostics.length > 0) {
+    return failure4(...manifestDiagnostics, ...registryDiagnostics);
+  }
+  const sortedEntries = sortedRegistry(input.assetRegistry);
+  const integrationManifestHash = await sha256(input.integration);
+  const assetRegistryHash = await sha256(sortedEntries);
+  const licenseHash = await sha256(sortedLicenses(input.integration.licenses));
+  const packages = [
+    "PXD",
+    "AUDIO",
+    "GAME"
+  ];
+  const artifacts = [];
+  for (const kind of packages) {
+    artifacts.push(await createPackageArtifact(input, integrationManifestHash, kind));
+  }
+  const manifestBase = {
+    schemaVersion: STUDIO_PACKAGE_SCHEMA_VERSION,
+    packageId: input.packageId,
+    packageVersion: input.packageVersion,
+    projectId: String(input.project.projectId),
+    ownerId: String(input.project.ownerId),
+    projectRevisionId: String(input.project.revision.revisionId),
+    projectHash: input.project.revision.snapshotHash,
+    integrationManifestHash,
+    assetRegistryHash,
+    licenseHash,
+    packages: artifacts
+  };
+  const packageHash = await sha256(manifestBase);
+  const reproducibleBuildIdentity = await sha256({
+    packageHash,
+    packages: artifacts
+  });
+  const manifest = {
+    ...manifestBase,
+    packageHash,
+    reproducibleBuildIdentity
+  };
+  const integrityDiagnostics = await verifyReleaseManifest(manifest);
+  if (integrityDiagnostics.length > 0) return failure4(...integrityDiagnostics);
+  return success3({
+    status: "VERIFIED",
+    manifest,
+    verification: {
+      referencesLocked: true,
+      rightsVerified: true,
+      packageHashesDeterministic: true,
+      sourcePayloadsExternal: true
+    }
+  });
+}
+async function verifyStudioReleaseCandidate(candidate) {
+  if (candidate.status !== "VERIFIED") {
+    return failure4(diagnostic6("PARTIAL_PACKAGE", "candidate.status", "Only a verified Studio Package can be published."));
+  }
+  if (!Object.values(candidate.verification).every((item) => item === true)) {
+    return failure4(diagnostic6("INVALID_CLAIM", "candidate.verification", "Every Studio Package verification flag must remain true."));
+  }
+  const forbidden = forbiddenPayloadPath(candidate.manifest);
+  if (forbidden !== void 0) {
+    return failure4(diagnostic6("INVALID_CLAIM", forbidden, "Raw media or executable payloads cannot enter a Studio Package."));
+  }
+  const diagnostics = await verifyReleaseManifest(candidate.manifest);
+  return diagnostics.length === 0 ? success3(candidate) : failure4(...diagnostics);
+}
+async function createStudioPublishIntent(candidate, requestedBy) {
+  const verified = await verifyStudioReleaseCandidate(candidate);
+  if (!verified.ok) return failure4(...verified.diagnostics);
+  if (!stable3(requestedBy)) {
+    return failure4(diagnostic6("PERMISSION_DENIED", "requestedBy", "Publish requester must be a stable identity."));
+  }
+  const manifest = candidate.manifest;
+  return success3({
+    kind: "STUDIO_PUBLISH_INTENT",
+    packageId: manifest.packageId,
+    packageVersion: manifest.packageVersion,
+    projectRevisionId: manifest.projectRevisionId,
+    packageHash: manifest.packageHash,
+    requestedBy,
+    explicit: true,
+    note: "External distribution requires a separate approved operation."
+  });
+}
+
+// src/draw2-creator-features.ts
+var CREATOR_FEATURE_SCHEMA_VERSION = 1;
+function boundedInteger2(value, min, max, fallback) {
+  return Number.isSafeInteger(value) ? Math.max(min, Math.min(max, value)) : fallback;
+}
+function boundedNumber2(value, min, max, fallback) {
+  return Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback;
+}
+function stableId(value, kind) {
+  if (!/^[A-Za-z0-9:_./-]{1,128}$/.test(value)) {
+    throw new Error(`${kind} must be a bounded stable identifier.`);
+  }
+  return value;
+}
+var AnimationTagStore = class {
+  #tags = /* @__PURE__ */ new Map();
+  upsert(tag, frameCount) {
+    const errors = validateAnimationTag(tag, frameCount);
+    if (errors.length > 0) throw new Error(errors.join(","));
+    const normalized = {
+      ...tag,
+      id: stableId(tag.id, "Animation tag ID"),
+      name: tag.name.trim().slice(0, 64)
+    };
+    this.#tags.set(normalized.id, normalized);
+    return normalized;
+  }
+  remove(id) {
+    return this.#tags.delete(id);
+  }
+  get(id) {
+    return this.#tags.get(id);
+  }
+  list() {
+    return [
+      ...this.#tags.values()
+    ].sort((a, b) => a.fromFrameIndex - b.fromFrameIndex || a.id.localeCompare(b.id));
+  }
+};
+function validateAnimationTag(tag, frameCount) {
+  const errors = [];
+  if (!tag.id.trim() || !tag.name.trim()) {
+    errors.push("TAG_ID_OR_NAME_REQUIRED");
+  }
+  if (!Number.isSafeInteger(tag.fromFrameIndex) || !Number.isSafeInteger(tag.toFrameIndex) || tag.fromFrameIndex < 0 || tag.toFrameIndex < tag.fromFrameIndex || tag.toFrameIndex >= frameCount) errors.push("TAG_FRAME_RANGE_INVALID");
+  if (tag.color !== void 0 && (!Number.isSafeInteger(tag.color) || tag.color < 0 || tag.color > 4294967295)) errors.push("TAG_COLOR_INVALID");
+  return errors;
+}
+var TimelineMarkerStore = class {
+  #markers = /* @__PURE__ */ new Map();
+  upsert(marker) {
+    if (!marker.id.trim() || !marker.label.trim() || !Number.isSafeInteger(marker.frameIndex) || marker.frameIndex < 0 || ![
+      "AUDIO",
+      "GAME_EVENT",
+      "NOTE"
+    ].includes(marker.kind)) throw new Error("Timeline marker is invalid.");
+    const normalized = {
+      ...marker,
+      id: stableId(marker.id, "Timeline marker ID"),
+      label: marker.label.trim().slice(0, 128),
+      payload: marker.payload === void 0 ? void 0 : {
+        ...marker.payload
+      }
+    };
+    this.#markers.set(normalized.id, normalized);
+    return normalized;
+  }
+  remove(id) {
+    return this.#markers.delete(id);
+  }
+  list(frameIndex) {
+    return [
+      ...this.#markers.values()
+    ].filter((marker) => frameIndex === void 0 || marker.frameIndex === frameIndex).sort((a, b) => a.frameIndex - b.frameIndex || a.id.localeCompare(b.id));
+  }
+};
+var DrawAudioReferenceStore = class {
+  #references = /* @__PURE__ */ new Map();
+  upsert(reference, frameCount) {
+    if (!Number.isSafeInteger(frameCount) || frameCount < 1) {
+      throw new Error("Draw Audio reference requires a valid frame count.");
+    }
+    const normalized = {
+      id: stableId(reference.id, "Draw Audio reference ID"),
+      audioAssetId: stableId(reference.audioAssetId, "Audio Asset ID"),
+      audioRevisionId: stableId(reference.audioRevisionId, "Audio Revision ID"),
+      kind: reference.kind === "SE" ? "SE" : "BGM",
+      label: reference.label.trim().slice(0, 128) || reference.kind,
+      startFrame: boundedInteger2(reference.startFrame, 0, frameCount - 1, 0),
+      durationFrames: boundedInteger2(reference.durationFrames, 1, frameCount, reference.kind === "SE" ? 1 : frameCount),
+      loop: reference.kind === "BGM" && reference.loop === true,
+      gain: boundedNumber2(reference.gain, 0, 2, 1)
+    };
+    this.#references.set(normalized.id, normalized);
+    return normalized;
+  }
+  remove(id) {
+    return this.#references.delete(id);
+  }
+  list() {
+    return [
+      ...this.#references.values()
+    ].sort((left, right) => left.startFrame - right.startFrame || left.id.localeCompare(right.id));
+  }
+};
+var MAX_SELECTION_STAMP_DIMENSION = 4096;
+var MAX_SELECTION_STAMP_AREA = 1048576;
+function normalizeDraw2SelectionStamp(input) {
+  if (typeof input.id !== "string" || typeof input.name !== "string" || !Array.isArray(input.pixels) || !Array.isArray(input.palette)) {
+    throw new Error("Draw2 selection stamp shape is invalid.");
+  }
+  if (!Number.isSafeInteger(input.width) || !Number.isSafeInteger(input.height) || input.width < 1 || input.height < 1 || input.width > MAX_SELECTION_STAMP_DIMENSION || input.height > MAX_SELECTION_STAMP_DIMENSION || input.width * input.height > MAX_SELECTION_STAMP_AREA) {
+    throw new Error("Draw2 selection stamp dimensions are invalid.");
+  }
+  if (input.palette.length < 1 || input.palette.length > 256) {
+    throw new Error("Draw2 selection stamp palette is invalid.");
+  }
+  const palette = input.palette.map((color) => {
+    if (!Number.isSafeInteger(color) || color < 0 || color > 4294967295) throw new Error("Draw2 selection stamp palette color is invalid.");
+    return color >>> 0;
+  });
+  const pixels = /* @__PURE__ */ new Map();
+  for (const candidate of input.pixels) {
+    if (candidate === null || typeof candidate !== "object" || !Number.isSafeInteger(candidate.x) || !Number.isSafeInteger(candidate.y) || !Number.isSafeInteger(candidate.colorIndex) || candidate.x < 0 || candidate.y < 0 || candidate.x >= input.width || candidate.y >= input.height || candidate.colorIndex < 0 || candidate.colorIndex >= palette.length) {
+      throw new Error("Draw2 selection stamp pixel is invalid.");
+    }
+    pixels.set(`${candidate.x}:${candidate.y}`, {
+      x: candidate.x,
+      y: candidate.y,
+      colorIndex: candidate.colorIndex
+    });
+  }
+  return {
+    id: stableId(input.id, "Draw2 selection stamp ID"),
+    name: input.name.trim().slice(0, 64) || "Selection stamp",
+    width: input.width,
+    height: input.height,
+    pixels: [
+      ...pixels.values()
+    ].sort((left, right) => left.y - right.y || left.x - right.x),
+    palette,
+    schemaVersion: CREATOR_FEATURE_SCHEMA_VERSION
+  };
+}
+var Draw2SelectionStampStore = class {
+  #stamps = /* @__PURE__ */ new Map();
+  constructor(initial = []) {
+    for (const stamp of initial) this.save(stamp);
+  }
+  save(input) {
+    const stamp = normalizeDraw2SelectionStamp(input);
+    this.#stamps.set(stamp.id, stamp);
+    return stamp;
+  }
+  load(id) {
+    return this.#stamps.get(id);
+  }
+  remove(id) {
+    return this.#stamps.delete(id);
+  }
+  list() {
+    return [
+      ...this.#stamps.values()
+    ].sort((left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id));
+  }
+};
+var DRAW2_TIMELINE_METADATA_SCHEMA_VERSION = 2;
+function isMetadataRecord(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+function cloneTimelineMarker(marker) {
+  return marker.payload === void 0 ? {
+    ...marker
+  } : {
+    ...marker,
+    payload: {
+      ...marker.payload
+    }
+  };
+}
+function normalizeDraw2TimelineMetadata(value, frameCount) {
+  if (!Number.isSafeInteger(frameCount) || frameCount < 1) {
+    throw new Error("Draw2 timeline metadata requires a valid frame count.");
+  }
+  if (value === void 0) {
+    return {
+      schemaVersion: DRAW2_TIMELINE_METADATA_SCHEMA_VERSION,
+      animationTags: [],
+      markers: [],
+      audioReferences: []
+    };
+  }
+  if (!isMetadataRecord(value) || value.schemaVersion !== DRAW2_TIMELINE_METADATA_SCHEMA_VERSION) {
+    throw new Error("Draw2 timeline metadata schema is unsupported.");
+  }
+  if (!Array.isArray(value.animationTags) || !Array.isArray(value.markers) || !Array.isArray(value.audioReferences)) {
+    throw new Error("Draw2 timeline metadata collections are invalid.");
+  }
+  const selectionStampCandidates = value.selectionStamps;
+  if (selectionStampCandidates !== void 0 && !Array.isArray(selectionStampCandidates)) {
+    throw new Error("Draw2 selection stamp collection is invalid.");
+  }
+  const tags = new AnimationTagStore();
+  const tagIds = /* @__PURE__ */ new Set();
+  for (const candidate of value.animationTags) {
+    if (!isMetadataRecord(candidate) || typeof candidate.id !== "string") {
+      throw new Error("Draw2 animation tag is invalid.");
+    }
+    if (tagIds.has(candidate.id)) {
+      throw new Error("Draw2 animation tag identity is duplicated.");
+    }
+    tagIds.add(candidate.id);
+    tags.upsert(candidate, frameCount);
+  }
+  const markers = new TimelineMarkerStore();
+  const markerIds = /* @__PURE__ */ new Set();
+  for (const candidate of value.markers) {
+    if (!isMetadataRecord(candidate) || typeof candidate.id !== "string") {
+      throw new Error("Draw2 timeline marker is invalid.");
+    }
+    if (!Number.isSafeInteger(candidate.frameIndex) || candidate.frameIndex < 0 || candidate.frameIndex >= frameCount) {
+      throw new Error("Draw2 timeline marker frame is invalid.");
+    }
+    if (markerIds.has(candidate.id)) {
+      throw new Error("Draw2 timeline marker identity is duplicated.");
+    }
+    markerIds.add(candidate.id);
+    markers.upsert(candidate);
+  }
+  const audioReferences = new DrawAudioReferenceStore();
+  const audioReferenceIds = /* @__PURE__ */ new Set();
+  for (const candidate of value.audioReferences) {
+    if (!isMetadataRecord(candidate) || typeof candidate.id !== "string") {
+      throw new Error("Draw Audio reference is invalid.");
+    }
+    if (audioReferenceIds.has(candidate.id)) {
+      throw new Error("Draw Audio reference identity is duplicated.");
+    }
+    audioReferenceIds.add(candidate.id);
+    audioReferences.upsert(candidate, frameCount);
+  }
+  const selectionStamps = new Draw2SelectionStampStore();
+  const selectionStampIds = /* @__PURE__ */ new Set();
+  for (const candidate of selectionStampCandidates ?? []) {
+    if (candidate === null || typeof candidate !== "object" || typeof candidate.id !== "string") {
+      throw new Error("Draw2 selection stamp is invalid.");
+    }
+    const normalized = normalizeDraw2SelectionStamp(candidate);
+    if (selectionStampIds.has(normalized.id)) {
+      throw new Error("Draw2 selection stamp identity is duplicated.");
+    }
+    selectionStampIds.add(normalized.id);
+    selectionStamps.save(normalized);
+  }
+  return {
+    schemaVersion: DRAW2_TIMELINE_METADATA_SCHEMA_VERSION,
+    animationTags: tags.list().map((tag) => ({
+      ...tag
+    })),
+    markers: markers.list().map(cloneTimelineMarker),
+    audioReferences: audioReferences.list().map((reference) => ({
+      ...reference
+    })),
+    ...selectionStampCandidates === void 0 ? {} : {
+      selectionStamps: selectionStamps.list().map((stamp) => ({
+        ...stamp,
+        pixels: stamp.pixels.map((pixel) => ({
+          ...pixel
+        })),
+        palette: [
+          ...stamp.palette
+        ]
+      }))
+    }
+  };
+}
+
+// src/draw2-export-registry.ts
+var PNG_EXPORT_MAX_PIXELS = 4096 * 4096;
+var PNG_EXPORT_SCALE_PRESETS = Object.freeze([
+  1,
+  2,
+  3,
+  4,
+  6,
+  8,
+  12,
+  16,
+  24,
+  32,
+  48,
+  64,
+  96,
+  128,
+  192,
+  256
+]);
+var EXPORT_FORMATS = Object.freeze([
+  {
+    id: "png",
+    category: "image",
+    label: "PNG",
+    description: "\u900F\u904E\u3092\u4FDD\u3063\u305F\u753B\u50CF",
+    extension: "png",
+    mimeType: "image/png",
+    visible: true,
+    supported: true,
+    supportsScale: true
+  },
+  {
+    id: "jpeg",
+    category: "image",
+    label: "JPEG",
+    description: "\u8EFD\u91CF\u306A\u753B\u50CF",
+    extension: "jpg",
+    mimeType: "image/jpeg",
+    visible: true,
+    supported: true,
+    supportsScale: true
+  },
+  {
+    id: "webp",
+    category: "image",
+    label: "WebP",
+    description: "\u8EFD\u91CF\u30FB\u900F\u904E\u5BFE\u5FDC\u306E\u753B\u50CF",
+    extension: "webp",
+    mimeType: "image/webp",
+    visible: true,
+    supported: true,
+    supportsScale: true
+  },
+  {
+    id: "avif",
+    category: "image",
+    label: "AVIF",
+    description: "\u30D6\u30E9\u30A6\u30B6\u5BFE\u5FDC\u6642\u306E\u9AD8\u5727\u7E2E\u753B\u50CF",
+    extension: "avif",
+    mimeType: "image/avif",
+    visible: true,
+    supported: true,
+    supportsScale: true
+  },
+  {
+    id: "bmp",
+    category: "image",
+    label: "BMP",
+    description: "\u4E92\u63DB\u6027\u91CD\u8996\u306E\u30D3\u30C3\u30C8\u30DE\u30C3\u30D7",
+    extension: "bmp",
+    mimeType: "image/bmp",
+    visible: true,
+    supported: true,
+    supportsScale: true
+  },
+  {
+    id: "tiff",
+    category: "image",
+    label: "TIFF",
+    description: "\u5370\u5237\u30FB\u4FDD\u5B58\u5411\u3051\u306E\u9AD8\u54C1\u8CEA\u753B\u50CF",
+    extension: "tiff",
+    mimeType: "image/tiff",
+    visible: true,
+    supported: true,
+    supportsScale: true
+  },
+  {
+    id: "gif",
+    category: "animation",
+    label: "GIF",
+    description: "\u30A2\u30CB\u30E1\u30FC\u30B7\u30E7\u30F3\u753B\u50CF",
+    extension: "gif",
+    mimeType: "image/gif",
+    visible: true,
+    supported: true,
+    supportsScale: true
+  },
+  {
+    id: "apng",
+    category: "animation",
+    label: "APNG",
+    description: "\u900F\u904E\u5BFE\u5FDC\u30A2\u30CB\u30E1\u30FC\u30B7\u30E7\u30F3",
+    extension: "apng",
+    mimeType: "image/apng",
+    visible: true,
+    supported: true,
+    supportsScale: true
+  },
+  {
+    id: "webm",
+    category: "animation",
+    label: "WebM Draw + Audio",
+    description: "Draw\u30A2\u30CB\u30E1\u30FC\u30B7\u30E7\u30F3\u3068\u9078\u629E\u3057\u305FAudio\u3092\u4E00\u4F53\u5316\u3057\u305F\u52D5\u753B",
+    extension: "webm",
+    mimeType: "video/webm",
+    visible: true,
+    supported: true,
+    supportsScale: false
+  },
+  {
+    id: "wav",
+    category: "audio",
+    label: "WAV Mix",
+    description: "\u9078\u629E\u3057\u305FBGM\u30FBSE\u30FB\u697D\u5668\u3092\u542B\u3080\u975E\u5727\u7E2E\u30DF\u30C3\u30AF\u30B9",
+    extension: "wav",
+    mimeType: "audio/wav",
+    visible: true,
+    supported: true,
+    supportsScale: false
+  },
+  {
+    id: "audio-webm",
+    category: "audio",
+    label: "WebM Audio (Opus)",
+    description: "\u9078\u629E\u3057\u305FBGM\u30FBSE\u30FB\u697D\u5668\u3092\u8EFD\u91CF\u306AOpus\u97F3\u58F0\u3067\u4FDD\u5B58",
+    extension: "webm",
+    mimeType: "audio/webm",
+    visible: true,
+    supported: true,
+    supportsScale: false
+  },
+  {
+    id: "audio-ogg",
+    category: "audio",
+    label: "Ogg Audio (Opus)",
+    description: "\u5BFE\u5FDC\u30D6\u30E9\u30A6\u30B6\u3067\u9078\u629E\u3057\u305FAudio\u3092Ogg/Opus\u3067\u4FDD\u5B58",
+    extension: "ogg",
+    mimeType: "audio/ogg",
+    visible: true,
+    supported: true,
+    supportsScale: false
+  },
+  {
+    id: "svg",
+    category: "image",
+    label: "SVG",
+    description: "\u30D9\u30AF\u30BF\u30FC\u753B\u50CF",
+    extension: "svg",
+    mimeType: "image/svg+xml",
+    visible: true,
+    supported: true,
+    supportsScale: true
+  },
+  {
+    id: "sprite-sheet",
+    category: "animation",
+    label: "Sprite Sheet",
+    description: "\u5168\u30D5\u30EC\u30FC\u30E0\u3092\u4E26\u3079\u305F\u753B\u50CF",
+    extension: "png",
+    mimeType: "image/png",
+    visible: true,
+    supported: true,
+    supportsScale: true
+  },
+  {
+    id: "atlas-json",
+    category: "animation",
+    label: "Atlas metadata",
+    description: "Sprite Sheet\u306E\u5EA7\u6A19\u30E1\u30BF\u30C7\u30FC\u30BF",
+    extension: "json",
+    mimeType: "application/json",
+    visible: true,
+    supported: true,
+    supportsScale: false
+  },
+  {
+    id: "tileset",
+    category: "tiles",
+    label: "Tileset",
+    description: "\u30BF\u30A4\u30EB\u7D20\u6750\u3068\u914D\u7F6E\u60C5\u5831",
+    extension: "png",
+    mimeType: "image/png",
+    visible: true,
+    supported: true,
+    supportsScale: true
+  },
+  {
+    id: "pxd",
+    category: "project",
+    label: "PXD Project",
+    description: "Draw / Audio / Game\u3092\u542B\u3080\u30D7\u30ED\u30B8\u30A7\u30AF\u30C8",
+    extension: "pxd",
+    mimeType: "application/vnd.pixieed.pxd",
+    visible: true,
+    supported: true,
+    supportsScale: false
+  },
+  {
+    id: "glb",
+    category: "game",
+    label: "GLB",
+    description: "3D\u30B2\u30FC\u30E0\u7D20\u6750\uFF08\u5C06\u6765\u5BFE\u5FDC\uFF09",
+    extension: "glb",
+    mimeType: "model/gltf-binary",
+    visible: false,
+    supported: false,
+    supportsScale: false
+  }
+]);
+var EXPORT_FORMAT_BY_ID = new Map(EXPORT_FORMATS.map((definition) => [
+  definition.id,
+  definition
+]));
+
+// src/draw2-export.ts
+var PXD_FORMAT = "pxd";
+var PXD_MAGIC = new Uint8Array([
+  80,
+  88,
+  68,
+  0
+]);
+var PXD_HEADER_BYTES = 9;
+var PXD_CREATED_BY = Object.freeze({
+  application: "PiXiEED",
+  version: "2.0.0-reference"
+});
+var PXD_PROJECT_SCHEMA_VERSION = 2;
+var PXD_PROJECT_ARCHIVE_VERSION = 2;
+function assert(condition, code, message) {
+  if (!condition) throw Object.assign(new Error(message), {
+    code
+  });
+}
+function readUint32(bytes, offset, label) {
+  assert(offset >= 0 && offset + 4 <= bytes.length, "PXD_TRUNCATED", `${label} is truncated.`);
+  return (bytes[offset] ?? 0) * 16777216 + ((bytes[offset + 1] ?? 0) << 16) + ((bytes[offset + 2] ?? 0) << 8) + (bytes[offset + 3] ?? 0);
+}
+function writeUint16LittleEndian(value) {
+  assert(Number.isSafeInteger(value) && value >= 0 && value <= 65535, "ZIP_NUMBER_INVALID", "ZIP uint16 value is invalid.");
+  return new Uint8Array([
+    value & 255,
+    value >>> 8 & 255
+  ]);
+}
+function writeUint32LittleEndian(value) {
+  assert(Number.isSafeInteger(value) && value >= 0 && value <= 4294967295, "ZIP_NUMBER_INVALID", "ZIP uint32 value is invalid.");
+  return new Uint8Array([
+    value & 255,
+    value >>> 8 & 255,
+    value >>> 16 & 255,
+    value >>> 24 & 255
+  ]);
+}
+async function sha256BytesHex(bytes) {
+  const digest = await crypto.subtle.digest("SHA-256", new Uint8Array(bytes).buffer);
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+function concatBytes(...parts) {
+  const total = parts.reduce((sum, part) => sum + part.byteLength, 0);
+  const output = new Uint8Array(total);
+  let offset = 0;
+  for (const part of parts) {
+    output.set(part, offset);
+    offset += part.byteLength;
+  }
+  return output;
+}
+function crc32(bytes) {
+  let crc = 4294967295;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) crc = crc >>> 1 ^ ((crc & 1) === 1 ? 3988292384 : 0);
+  }
+  return (crc ^ 4294967295) >>> 0;
+}
+function zipFilenameIsSafe(filename) {
+  return filename.length > 0 && filename.length <= 255 && !filename.startsWith("/") && !filename.includes("\\") && !filename.split("/").some((segment) => segment.length === 0 || segment === "." || segment === "..") && !/[\u0000-\u001f]/u.test(filename);
+}
+function encodeStoredZip(entries) {
+  assert(entries.length > 0, "ZIP_ENTRIES_EMPTY", "ZIP requires at least one output.");
+  assert(entries.length <= 65535, "ZIP_ENTRIES_TOO_MANY", "ZIP has too many entries.");
+  const encoder = new TextEncoder();
+  const localParts = [];
+  const centralParts = [];
+  const filenames = /* @__PURE__ */ new Set();
+  let localOffset = 0;
+  for (const entry of entries) {
+    assert(zipFilenameIsSafe(entry.filename), "ZIP_FILENAME_INVALID", `ZIP filename ${entry.filename} is unsafe.`);
+    assert(!filenames.has(entry.filename), "ZIP_FILENAME_DUPLICATE", `ZIP filename ${entry.filename} is duplicated.`);
+    filenames.add(entry.filename);
+    const nameBytes = encoder.encode(entry.filename);
+    const bytes = new Uint8Array(entry.bytes);
+    assert(nameBytes.byteLength <= 65535, "ZIP_FILENAME_TOO_LONG", "ZIP filename is too long.");
+    assert(bytes.byteLength <= 4294967295, "ZIP_ENTRY_TOO_LARGE", `ZIP entry ${entry.filename} is too large.`);
+    assert(localOffset <= 4294967295, "ZIP_OFFSET_INVALID", "ZIP local entry offset is too large.");
+    const checksum = crc32(bytes);
+    const localHeader = concatBytes(writeUint32LittleEndian(67324752), writeUint16LittleEndian(20), writeUint16LittleEndian(2048), writeUint16LittleEndian(0), writeUint16LittleEndian(0), writeUint16LittleEndian(0), writeUint32LittleEndian(checksum), writeUint32LittleEndian(bytes.byteLength), writeUint32LittleEndian(bytes.byteLength), writeUint16LittleEndian(nameBytes.byteLength), writeUint16LittleEndian(0));
+    const localRecord = concatBytes(localHeader, nameBytes, bytes);
+    localParts.push(localRecord);
+    centralParts.push(concatBytes(writeUint32LittleEndian(33639248), writeUint16LittleEndian(20), writeUint16LittleEndian(20), writeUint16LittleEndian(2048), writeUint16LittleEndian(0), writeUint16LittleEndian(0), writeUint16LittleEndian(0), writeUint32LittleEndian(checksum), writeUint32LittleEndian(bytes.byteLength), writeUint32LittleEndian(bytes.byteLength), writeUint16LittleEndian(nameBytes.byteLength), writeUint16LittleEndian(0), writeUint16LittleEndian(0), writeUint16LittleEndian(0), writeUint16LittleEndian(0), writeUint32LittleEndian(0), writeUint32LittleEndian(localOffset), nameBytes));
+    localOffset += localRecord.byteLength;
+  }
+  const centralDirectory = concatBytes(...centralParts);
+  assert(localOffset <= 4294967295, "ZIP_OFFSET_INVALID", "ZIP local entries are too large.");
+  assert(centralDirectory.byteLength <= 4294967295, "ZIP_DIRECTORY_TOO_LARGE", "ZIP central directory is too large.");
+  const endOfCentralDirectory = concatBytes(writeUint32LittleEndian(101010256), writeUint16LittleEndian(0), writeUint16LittleEndian(0), writeUint16LittleEndian(entries.length), writeUint16LittleEndian(entries.length), writeUint32LittleEndian(centralDirectory.byteLength), writeUint32LittleEndian(localOffset), writeUint16LittleEndian(0));
+  return concatBytes(...localParts, centralDirectory, endOfCentralDirectory);
+}
+function isRecord2(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+function assertNoEmbeddedAssetPayload(value, path) {
+  if (Array.isArray(value)) {
+    value.forEach((entry, index) => assertNoEmbeddedAssetPayload(entry, `${path}[${index}]`));
+    return;
+  }
+  if (!isRecord2(value)) return;
+  for (const [key2, entry] of Object.entries(value)) {
+    assert(![
+      "pixels",
+      "pixelData",
+      "raster",
+      "blob",
+      "dataUrl",
+      "rgba",
+      "indexedBytes",
+      "payload"
+    ].includes(key2), "PXD_ASSET_DEFINITION_EMBEDDED_DATA", `${path}.${key2} must not contain embedded asset data.`);
+    assertNoEmbeddedAssetPayload(entry, `${path}.${key2}`);
+  }
+}
+function assertAssetDefinitionShape(value, path) {
+  assert(isRecord2(value), "PXD_ASSET_DEFINITION_INVALID", `${path} must be an object.`);
+  const definition = value;
+  assert(definition.schemaVersion === 1, "PXD_ASSET_DEFINITION_VERSION_UNSUPPORTED", `${path}.schemaVersion is unsupported.`);
+  assert(definition.persistence === "LOCAL_DRAFT" || definition.persistence === "VALIDATED_DEFINITION", "PXD_ASSET_DEFINITION_PERSISTENCE_INVALID", `${path}.persistence must be LOCAL_DRAFT or VALIDATED_DEFINITION.`);
+  const candidate = {
+    ...definition,
+    persistence: "LOCAL_DRAFT"
+  };
+  const validation = validateAssetDefinitionDraft(candidate);
+  assert(validation.ok, "PXD_ASSET_DEFINITION_INVALID", `${path} failed Asset Definition validation.`);
+  const normalized = {
+    ...validation.value,
+    persistence: definition.persistence
+  };
+  assert(canonicalJson2(normalized) === canonicalJson2(definition), "PXD_ASSET_DEFINITION_NOT_NORMALIZED", `${path} is not normalized.`);
+}
+function validateAssetDefinitionEntry(value, index) {
+  const path = `assetDefinitions[${index}]`;
+  assert(isRecord2(value), "PXD_ASSET_DEFINITION_INVALID", `${path} must be an object.`);
+  assertNoEmbeddedAssetPayload(value, path);
+  assert(typeof value.definitionId === "string" && value.definitionId.trim() === value.definitionId && value.definitionId.length > 0, "PXD_ASSET_DEFINITION_ID_INVALID", `${path}.definitionId is invalid.`);
+  assertAssetDefinitionShape(value.definition, `${path}.definition`);
+  if (value.registryIdentity !== void 0) {
+    assert(isRecord2(value.registryIdentity), "PXD_REGISTRY_IDENTITY_INVALID", `${path}.registryIdentity is invalid.`);
+    assert(typeof value.registryIdentity.assetId === "string" && value.registryIdentity.assetId.trim() === value.registryIdentity.assetId && value.registryIdentity.assetId.length > 0, "PXD_REGISTRY_IDENTITY_INVALID", `${path}.registryIdentity.assetId is invalid.`);
+    assert(typeof value.registryIdentity.revisionId === "string" && value.registryIdentity.revisionId.trim() === value.registryIdentity.revisionId && value.registryIdentity.revisionId.length > 0, "PXD_REGISTRY_IDENTITY_INVALID", `${path}.registryIdentity.revisionId is invalid.`);
+  }
+  return value;
+}
+var PXD_PRODUCT_MODULES = [
+  "DRAW",
+  "AUDIO",
+  "GAME"
+];
+var PXD_PRODUCT_KINDS = [
+  "GAME_PROJECT",
+  "DRAW_IMAGE",
+  "DRAW_ANIMATION",
+  "DRAW_CHARACTER_ANIMATION",
+  "AUDIO_ASSET",
+  "PROJECT"
+];
+var PXD_PRODUCT_RIGHTS = [
+  "PERSONAL_USE",
+  "COMMERCIAL_USE",
+  "DERIVATIVE",
+  "EMBEDDING",
+  "RESALE"
+];
+function normalizePxdProductReferences(value, path) {
+  assert(Array.isArray(value), "PXD_PRODUCT_REFERENCE_INVALID", `${path} must be an array.`);
+  const normalized = value.map((entry, index) => {
+    assert(typeof entry === "string" && entry.trim() === entry && entry.length > 0, "PXD_PRODUCT_REFERENCE_INVALID", `${path}[${index}] is invalid.`);
+    return entry;
+  });
+  assert(new Set(normalized).size === normalized.length, "PXD_PRODUCT_REFERENCE_DUPLICATE", `${path} contains a duplicate reference.`);
+  return normalized.sort(compareStrings);
+}
+function normalizePxdProductDefinition(value, index, assetDefinitionIds, audioRevisionIds, availableModules) {
+  const path = `productDefinitions[${index}]`;
+  assert(isRecord2(value), "PXD_PRODUCT_DEFINITION_INVALID", `${path} must be an object.`);
+  assertNoEmbeddedAssetPayload(value, path);
+  const allowedKeys = /* @__PURE__ */ new Set([
+    "schemaVersion",
+    "persistence",
+    "productId",
+    "kind",
+    "name",
+    "description",
+    "includedModules",
+    "assetDefinitionIds",
+    "audioRevisionIds",
+    "rights",
+    "edition"
+  ]);
+  assert(Object.keys(value).every((key2) => allowedKeys.has(key2)), "PXD_PRODUCT_DEFINITION_FIELD_INVALID", `${path} contains an unsupported field.`);
+  assert(value.schemaVersion === 1, "PXD_PRODUCT_DEFINITION_VERSION_UNSUPPORTED", `${path}.schemaVersion is unsupported.`);
+  assert(value.persistence === "LOCAL_DRAFT", "PXD_PRODUCT_DEFINITION_PERSISTENCE_INVALID", `${path}.persistence must be LOCAL_DRAFT.`);
+  assert(typeof value.productId === "string" && /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(value.productId), "PXD_PRODUCT_ID_INVALID", `${path}.productId is invalid.`);
+  assert(typeof value.kind === "string" && PXD_PRODUCT_KINDS.includes(value.kind), "PXD_PRODUCT_KIND_INVALID", `${path}.kind is invalid.`);
+  assert(typeof value.name === "string" && value.name.trim() === value.name && value.name.length > 0 && value.name.length <= 128, "PXD_PRODUCT_NAME_INVALID", `${path}.name is invalid.`);
+  assert(typeof value.description === "string" && value.description.trim() === value.description && value.description.length <= 4096, "PXD_PRODUCT_DESCRIPTION_INVALID", `${path}.description is invalid.`);
+  const includedModules = normalizePxdProductReferences(value.includedModules, `${path}.includedModules`);
+  assert(includedModules.every((module) => PXD_PRODUCT_MODULES.includes(module)), "PXD_PRODUCT_MODULE_INVALID", `${path}.includedModules contains an unsupported module.`);
+  assert(includedModules.length > 0, "PXD_PRODUCT_MODULE_REQUIRED", `${path}.includedModules must not be empty.`);
+  const assetIds = normalizePxdProductReferences(value.assetDefinitionIds, `${path}.assetDefinitionIds`);
+  const audioIds = normalizePxdProductReferences(value.audioRevisionIds, `${path}.audioRevisionIds`);
+  for (const assetId of assetIds) assert(assetDefinitionIds.has(assetId), "PXD_PRODUCT_ASSET_REFERENCE_MISSING", `${path} references missing Asset Definition ${assetId}.`);
+  for (const audioId of audioIds) assert(audioRevisionIds.has(audioId), "PXD_PRODUCT_AUDIO_REFERENCE_MISSING", `${path} references missing Audio revision ${audioId}.`);
+  assert(assetIds.length === 0 || includedModules.includes("DRAW"), "PXD_PRODUCT_DRAW_MODULE_REQUIRED", `${path} uses Draw Asset Definitions without including DRAW.`);
+  assert(audioIds.length === 0 || includedModules.includes("AUDIO"), "PXD_PRODUCT_AUDIO_MODULE_REQUIRED", `${path} uses Audio revisions without including AUDIO.`);
+  if (value.kind === "GAME_PROJECT") assert(includedModules.includes("GAME"), "PXD_PRODUCT_GAME_MODULE_REQUIRED", `${path} GAME_PROJECT must include GAME.`);
+  if ([
+    "DRAW_IMAGE",
+    "DRAW_ANIMATION",
+    "DRAW_CHARACTER_ANIMATION"
+  ].includes(value.kind)) {
+    assert(includedModules.includes("DRAW") && assetIds.length > 0, "PXD_PRODUCT_DRAW_SOURCE_REQUIRED", `${path} Draw products require DRAW and at least one Asset Definition.`);
+  }
+  if (value.kind === "AUDIO_ASSET") {
+    assert(includedModules.includes("AUDIO") && audioIds.length > 0, "PXD_PRODUCT_AUDIO_SOURCE_REQUIRED", `${path} AUDIO_ASSET products require AUDIO and at least one Audio revision.`);
+  }
+  const rights = normalizePxdProductReferences(value.rights, `${path}.rights`);
+  assert(rights.every((right) => PXD_PRODUCT_RIGHTS.includes(right)), "PXD_PRODUCT_RIGHT_INVALID", `${path}.rights contains an unsupported right.`);
+  assert(rights.length > 0, "PXD_PRODUCT_RIGHT_REQUIRED", `${path}.rights must not be empty.`);
+  assert(isRecord2(value.edition), "PXD_PRODUCT_EDITION_INVALID", `${path}.edition is invalid.`);
+  const editionValue = value.edition;
+  let edition;
+  if (editionValue.kind === "UNLIMITED") {
+    assert(Object.keys(editionValue).length === 1, "PXD_PRODUCT_EDITION_INVALID", `${path}.edition contains an unsupported field.`);
+    edition = {
+      kind: "UNLIMITED"
+    };
+  } else {
+    assert(editionValue.kind === "LIMITED" && Object.keys(editionValue).length === 2, "PXD_PRODUCT_EDITION_INVALID", `${path}.edition kind is invalid.`);
+    const maxUnits = editionValue.maxUnits;
+    assert(typeof maxUnits === "number" && Number.isSafeInteger(maxUnits) && maxUnits > 0, "PXD_PRODUCT_EDITION_LIMIT_INVALID", `${path}.edition.maxUnits must be a positive safe integer.`);
+    edition = {
+      kind: "LIMITED",
+      maxUnits
+    };
+  }
+  for (const module of includedModules) assert(availableModules.has(module), "PXD_PRODUCT_MODULE_MISSING", `${path} requires unavailable module ${module}.`);
+  return {
+    schemaVersion: 1,
+    persistence: "LOCAL_DRAFT",
+    productId: value.productId,
+    kind: value.kind,
+    name: value.name,
+    description: value.description,
+    includedModules,
+    assetDefinitionIds: assetIds,
+    audioRevisionIds: audioIds,
+    rights,
+    edition
+  };
+}
+function normalizePxdProductDefinitions(entries, assetDefinitions, audioRevisionIds, availableModules) {
+  const assetDefinitionIds = new Set(assetDefinitions.map((entry) => entry.definitionId));
+  const audioIds = new Set(audioRevisionIds);
+  const normalized = [
+    ...entries ?? []
+  ].map((entry, index) => normalizePxdProductDefinition(entry, index, assetDefinitionIds, audioIds, availableModules));
+  normalized.sort((left, right) => compareStrings(left.productId, right.productId));
+  for (let index = 1; index < normalized.length; index += 1) {
+    assert(normalized[index - 1]?.productId !== normalized[index]?.productId, "PXD_PRODUCT_DEFINITION_DUPLICATE", `Product Definition ${normalized[index]?.productId ?? ""} is duplicated.`);
+  }
+  return normalized;
+}
+function validateProjectMetadata(value) {
+  assert(value !== null && typeof value === "object", "PXD_PROJECT_INVALID", "PXD project metadata is invalid.");
+  const project = value;
+  assert(typeof project.name === "string", "PXD_PROJECT_INVALID", "PXD project name is invalid.");
+  assert(Number.isSafeInteger(project.structureEpoch) && project.structureEpoch >= 1, "PXD_PROJECT_INVALID", "PXD structure epoch is invalid.");
+  assert(Array.isArray(project.layers) && Array.isArray(project.frames) && Array.isArray(project.cels), "PXD_PROJECT_INVALID", "PXD timeline collections are invalid.");
+  assert(project.timeline !== null && typeof project.timeline === "object", "PXD_PROJECT_INVALID", "PXD timeline metadata is invalid.");
+  return project;
+}
+function buildImportedAsset(entry, bytes) {
+  assert(bytes.byteLength === entry.bytes && bytes.byteLength === entry.width * entry.height, "PXD_ASSET_SIZE_MISMATCH", `PXD asset ${entry.assetId} byte size does not match its dimensions.`);
+  const raster = IndexedTileRaster.empty(entry.width, entry.height, entry.tileSize);
+  for (let index = 0; index < bytes.length; index += 1) {
+    const colorIndex = bytes[index] ?? 0;
+    assert(colorIndex < entry.palette.length, "PXD_PIXEL_INDEX_INVALID", `PXD asset ${entry.assetId} contains an out-of-range palette index.`);
+    if (colorIndex === 0) continue;
+    const x = index % entry.width;
+    const y = Math.floor(index / entry.width);
+    raster.setPixel(entry.assetId, x, y, colorIndex);
+  }
+  return {
+    id: entry.assetId,
+    width: entry.width,
+    height: entry.height,
+    palette: [
+      ...entry.palette
+    ],
+    raster,
+    revision: entry.revision
+  };
+}
+function compareStrings(left, right) {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+function projectPayloadPathIsSafe(path) {
+  return path.length > 0 && path.length <= 512 && !path.startsWith("/") && !path.includes("\\") && !path.split("/").some((segment) => segment.length === 0 || segment === "." || segment === "..") && !/[\u0000\u0009\u000a\u000d]/u.test(path);
+}
+function validateProjectPayloadEntry(value, path) {
+  assert(value !== null && typeof value === "object" && !Array.isArray(value), "PXD_ENTRY_INVALID", `${path} is invalid.`);
+  const entry = value;
+  assert(projectPayloadPathIsSafe(entry.path), "PXD_PATH_UNSAFE", `${path}.path is unsafe.`);
+  assert(typeof entry.mediaType === "string" && entry.mediaType.length > 0, "PXD_MEDIA_TYPE_INVALID", `${path}.mediaType is invalid.`);
+  assert(/^[a-f0-9]{64}$/u.test(entry.sha256), "PXD_ENTRY_HASH_INVALID", `${path}.sha256 is invalid.`);
+  assert(Number.isSafeInteger(entry.bytes) && entry.bytes > 0, "PXD_ENTRY_SIZE_INVALID", `${path}.bytes is invalid.`);
+  assert(Number.isSafeInteger(entry.offset) && entry.offset >= 0, "PXD_OFFSET_INVALID", `${path}.offset is invalid.`);
+  return entry;
+}
+function validateProjectModuleManifest(value, path) {
+  assert(value !== null && typeof value === "object" && !Array.isArray(value), "PXD_MODULE_INVALID", `${path} is invalid.`);
+  const module = value;
+  assert(module.schemaVersion === null || typeof module.schemaVersion === "string" && module.schemaVersion.length > 0, "PXD_MODULE_SCHEMA_INVALID", `${path}.schemaVersion is invalid.`);
+  assert(module.status === "EMPTY" || module.status === "EMBEDDED", "PXD_MODULE_STATUS_INVALID", `${path}.status is invalid.`);
+  assert(module.state === null || typeof module.state === "object", "PXD_MODULE_STATE_INVALID", `${path}.state is invalid.`);
+  const state = module.state === null ? null : validateProjectPayloadEntry(module.state, `${path}.state`);
+  assert(Array.isArray(module.assets), "PXD_MODULE_ASSETS_INVALID", `${path}.assets is invalid.`);
+  const assets = module.assets.map((asset, index) => {
+    const entry = validateProjectPayloadEntry(asset, `${path}.assets[${index}]`);
+    const candidate = asset;
+    assert(typeof candidate.revisionId === "string" && candidate.revisionId.length > 0, "PXD_AUDIO_REVISION_INVALID", `${path}.assets[${index}].revisionId is invalid.`);
+    return {
+      ...entry,
+      revisionId: candidate.revisionId
+    };
+  });
+  if (module.status === "EMPTY") {
+    assert(module.schemaVersion === null && state === null && assets.length === 0, "PXD_MODULE_EMPTY_INVALID", `${path} empty module must not contain state or assets.`);
+  } else {
+    assert(module.schemaVersion !== null && state !== null, "PXD_MODULE_STATE_MISSING", `${path} embedded module state is missing.`);
+  }
+  return {
+    schemaVersion: module.schemaVersion,
+    status: module.status,
+    state,
+    assets
+  };
+}
+function validateProjectManifestAsset(value, index) {
+  assert(value !== null && typeof value === "object" && !Array.isArray(value), "PXD_ASSET_INVALID", `modules.draw.assets[${index}] is invalid.`);
+  const asset = value;
+  assert(typeof asset.assetId === "string" && typeof asset.revisionId === "string", "PXD_ASSET_INVALID", `modules.draw.assets[${index}] identity is invalid.`);
+  assert(asset.mediaType === "application/vnd.pixieed.indexed-raster", "PXD_ASSET_TYPE_UNSUPPORTED", `modules.draw.assets[${index}] media type is unsupported.`);
+  assert(/^objects\/asset-\d{4}\.raster$/u.test(asset.path), "PXD_PATH_UNSAFE", `modules.draw.assets[${index}].path is invalid.`);
+  assert(/^[a-f0-9]{64}$/u.test(asset.sha256), "PXD_ASSET_HASH_INVALID", `modules.draw.assets[${index}].sha256 is invalid.`);
+  assert(Number.isSafeInteger(asset.bytes) && asset.bytes > 0, "PXD_ASSET_SIZE_INVALID", `modules.draw.assets[${index}].bytes is invalid.`);
+  assert(Number.isSafeInteger(asset.width) && asset.width > 0 && Number.isSafeInteger(asset.height) && asset.height > 0, "PXD_ASSET_DIMENSIONS_INVALID", `modules.draw.assets[${index}] dimensions are invalid.`);
+  assert(asset.tileSize === 32 || asset.tileSize === 64, "PXD_TILE_SIZE_INVALID", `modules.draw.assets[${index}].tileSize is invalid.`);
+  assert(Array.isArray(asset.palette) && asset.palette.length >= 1 && asset.palette.length <= 256 && asset.palette[0] === 0, "PXD_PALETTE_INVALID", `modules.draw.assets[${index}].palette is invalid.`);
+  assert(Number.isSafeInteger(asset.revision) && asset.revision >= 0, "PXD_REVISION_INVALID", `modules.draw.assets[${index}].revision is invalid.`);
+  assert(Number.isSafeInteger(asset.offset) && asset.offset >= 0, "PXD_OFFSET_INVALID", `modules.draw.assets[${index}].offset is invalid.`);
+  return asset;
+}
+function validateProjectManifest(value) {
+  assert(value !== null && typeof value === "object" && !Array.isArray(value), "PXD_MANIFEST_INVALID", "PXD v2 manifest must be an object.");
+  const manifest = value;
+  assert(manifest.format === PXD_FORMAT, "PXD_FORMAT_UNSUPPORTED", "Unsupported PXD format.");
+  assert(manifest.schemaVersion === PXD_PROJECT_SCHEMA_VERSION && manifest.archiveVersion === PXD_PROJECT_ARCHIVE_VERSION, "PXD_VERSION_UNSUPPORTED", "Unsupported PXD project schema or archive version.");
+  assert(manifest.packageKind === "PROJECT_PACKAGE", "PXD_PACKAGE_KIND_UNSUPPORTED", "Unsupported PXD package kind.");
+  assert(typeof manifest.packageId === "string" && manifest.packageId.length > 0 && typeof manifest.projectId === "string" && manifest.projectId.length > 0, "PXD_MANIFEST_INVALID", "PXD project identity is invalid.");
+  assert(Array.isArray(manifest.entries), "PXD_ENTRIES_INVALID", "PXD entries are invalid.");
+  const entries = manifest.entries.map((entry, index) => validateProjectPayloadEntry(entry, `entries[${index}]`));
+  for (let index = 1; index < entries.length; index += 1) {
+    assert(entries[index - 1].path < entries[index].path, "PXD_ENTRY_ORDER_INVALID", "PXD entries must be in canonical path order.");
+  }
+  assert(typeof manifest.canonicalManifestHash === "string" && /^[a-f0-9]{64}$/u.test(manifest.canonicalManifestHash), "PXD_MANIFEST_HASH_INVALID", "PXD manifest hash is invalid.");
+  assert(Array.isArray(manifest.dependencies) && manifest.dependencies.length === 0, "PXD_DEPENDENCIES_UNSUPPORTED", "PXD project dependencies must be empty.");
+  validateProjectMetadata(manifest.project);
+  if (manifest.drawTimelineMetadata !== void 0) {
+    const normalized = normalizeDraw2TimelineMetadata(manifest.drawTimelineMetadata, manifest.project.frames.length);
+    assert(canonicalJson2(normalized) === canonicalJson2(manifest.drawTimelineMetadata), "PXD_TIMELINE_METADATA_NOT_NORMALIZED", "PXD Draw timeline metadata must be canonically normalized.");
+  }
+  assert(manifest.modules !== null && typeof manifest.modules === "object", "PXD_MODULES_INVALID", "PXD modules are missing.");
+  const draw = manifest.modules.draw;
+  assert(draw !== null && typeof draw === "object" && draw.schemaVersion === "DRAW2_PROJECT_V1" && draw.status === "EMBEDDED" && draw.state === null && Array.isArray(draw.assets) && draw.assets.length > 0, "PXD_DRAW_MODULE_INVALID", "PXD Draw module is invalid.");
+  const drawAssets = draw.assets.map((asset, index) => validateProjectManifestAsset(asset, index));
+  const audio = validateProjectModuleManifest(manifest.modules.audio, "modules.audio");
+  const game = validateProjectModuleManifest(manifest.modules.game, "modules.game");
+  if (manifest.assetDefinitions !== void 0) {
+    assert(Array.isArray(manifest.assetDefinitions), "PXD_ASSET_DEFINITION_INVALID", "PXD assetDefinitions must be an array.");
+  }
+  const assetDefinitions = manifest.assetDefinitions === void 0 ? [] : manifest.assetDefinitions.map((entry, index) => validateAssetDefinitionEntry(entry, index));
+  for (let index = 1; index < assetDefinitions.length; index += 1) {
+    assert(assetDefinitions[index - 1].definitionId < assetDefinitions[index].definitionId, "PXD_ASSET_DEFINITION_ORDER_INVALID", "PXD assetDefinitions must be in canonical definitionId order.");
+  }
+  const availableModules = /* @__PURE__ */ new Set([
+    "DRAW"
+  ]);
+  if (audio.status === "EMBEDDED") availableModules.add("AUDIO");
+  if (game.status === "EMBEDDED") availableModules.add("GAME");
+  if (manifest.productDefinitions !== void 0) {
+    assert(Array.isArray(manifest.productDefinitions), "PXD_PRODUCT_DEFINITION_INVALID", "PXD productDefinitions must be an array.");
+  }
+  const productDefinitions = normalizePxdProductDefinitions(manifest.productDefinitions, assetDefinitions, audio.assets.map((asset) => asset.revisionId), availableModules);
+  if (manifest.productDefinitions !== void 0) {
+    assert(canonicalJson2(productDefinitions) === canonicalJson2(manifest.productDefinitions), "PXD_PRODUCT_DEFINITION_NOT_NORMALIZED", "PXD productDefinitions must be canonically normalized.");
+  }
+  const entryPaths = new Set(entries.map((entry) => entry.path));
+  for (const asset of drawAssets) assert(entryPaths.has(asset.path), "PXD_ENTRY_MISSING", `PXD Draw entry ${asset.path} is missing.`);
+  for (const module of [
+    audio,
+    game
+  ]) {
+    if (module.state !== null) assert(entryPaths.has(module.state.path), "PXD_ENTRY_MISSING", `PXD module entry ${module.state.path} is missing.`);
+    for (const asset of module.assets) assert(entryPaths.has(asset.path), "PXD_ENTRY_MISSING", `PXD module entry ${asset.path} is missing.`);
+  }
+  return {
+    ...manifest,
+    modules: {
+      draw: {
+        ...draw,
+        assets: drawAssets
+      },
+      audio,
+      game
+    },
+    entries
+  };
+}
+function parseProjectJsonPayload(entry, payloads) {
+  const bytes = payloads.get(entry.path);
+  assert(bytes !== void 0, "PXD_ENTRY_MISSING", `PXD entry ${entry.path} is missing.`);
+  try {
+    return JSON.parse(new TextDecoder().decode(bytes));
+  } catch (cause) {
+    if (cause instanceof SyntaxError) throw Object.assign(new Error(`PXD module JSON ${entry.path} is invalid.`), {
+      code: "PXD_MODULE_JSON_INVALID"
+    });
+    throw cause;
+  }
+}
+async function importPxdProject(bytes, options = {}) {
+  assert(bytes.byteLength >= PXD_HEADER_BYTES, "PXD_TRUNCATED", "PXD project header is truncated.");
+  for (let index = 0; index < PXD_MAGIC.length; index += 1) assert(bytes[index] === PXD_MAGIC[index], "PXD_MAGIC_INVALID", "PXD magic header is invalid.");
+  assert(bytes[4] === PXD_PROJECT_ARCHIVE_VERSION, "PXD_VERSION_UNSUPPORTED", "Unsupported PXD project archive version.");
+  const manifestLength = readUint32(bytes, 5, "PXD project manifest");
+  const manifestStart = PXD_HEADER_BYTES;
+  const payloadStart = manifestStart + manifestLength;
+  assert(payloadStart <= bytes.byteLength, "PXD_TRUNCATED", "PXD project manifest is truncated.");
+  let manifest;
+  try {
+    manifest = validateProjectManifest(JSON.parse(new TextDecoder().decode(bytes.subarray(manifestStart, payloadStart))));
+  } catch (cause) {
+    if (cause instanceof SyntaxError) throw Object.assign(new Error("PXD project manifest JSON is invalid."), {
+      code: "PXD_MANIFEST_JSON_INVALID"
+    });
+    throw cause;
+  }
+  const manifestBase = {
+    ...manifest
+  };
+  delete manifestBase.canonicalManifestHash;
+  const actualManifestHash = await sha256BytesHex(new TextEncoder().encode(canonicalJson2(manifestBase)));
+  assert(actualManifestHash === manifest.canonicalManifestHash, "PXD_MANIFEST_HASH_MISMATCH", "PXD project manifest hash does not match its contents.");
+  const packageHash = await sha256BytesHex(bytes);
+  if (options.expectedPackageHash !== void 0) assert(packageHash === options.expectedPackageHash, "PXD_PACKAGE_HASH_MISMATCH", "PXD package hash does not match the expected hash.");
+  const payloads = /* @__PURE__ */ new Map();
+  let expectedOffset = 0;
+  for (const entry of manifest.entries) {
+    assert(entry.offset === expectedOffset, "PXD_ENTRY_OFFSET_INVALID", `PXD entry ${entry.path} is not in canonical payload order.`);
+    const start = payloadStart + entry.offset;
+    const end = start + entry.bytes;
+    assert(end <= bytes.byteLength, "PXD_TRUNCATED", `PXD entry ${entry.path} is truncated.`);
+    const entryBytes = bytes.slice(start, end);
+    assert(await sha256BytesHex(entryBytes) === entry.sha256, "PXD_ENTRY_HASH_MISMATCH", `PXD entry ${entry.path} hash does not match its contents.`);
+    payloads.set(entry.path, entryBytes);
+    expectedOffset += entry.bytes;
+  }
+  assert(payloadStart + expectedOffset === bytes.byteLength, "PXD_TRAILING_BYTES", "PXD project contains unexpected trailing bytes.");
+  const assets = {};
+  for (const entry of manifest.modules.draw.assets) {
+    const rasterBytes = payloads.get(entry.path);
+    assert(rasterBytes !== void 0, "PXD_ENTRY_MISSING", `PXD Draw entry ${entry.path} is missing.`);
+    assert(await sha256BytesHex(rasterBytes) === entry.sha256, "PXD_ASSET_HASH_MISMATCH", `PXD asset ${entry.assetId} hash does not match its contents.`);
+    assert(assets[entry.assetId] === void 0, "PXD_ASSET_DUPLICATE", `PXD asset ${entry.assetId} is duplicated.`);
+    assets[entry.assetId] = buildImportedAsset(entry, rasterBytes);
+  }
+  const primary = manifest.modules.draw.assets[0];
+  assert(primary !== void 0, "PXD_ASSETS_EMPTY", "PXD project has no Draw asset.");
+  const project = manifest.project;
+  const created = createProject({
+    projectId: manifest.projectId,
+    name: project.name,
+    width: primary.width,
+    height: primary.height,
+    tileSize: primary.tileSize,
+    palette: primary.palette
+  });
+  const state = {
+    ...created,
+    structureEpoch: project.structureEpoch,
+    activeAssetId: project.activeAssetId,
+    activeLayerId: project.activeLayerId,
+    activeFrameId: project.activeFrameId,
+    activeCelId: project.activeCelId,
+    layers: project.layers.map((layer) => ({
+      ...layer
+    })),
+    frames: project.frames.map((frame) => ({
+      ...frame
+    })),
+    cels: project.cels.map((cel) => ({
+      ...cel
+    })),
+    timeline: {
+      ...project.timeline,
+      frameOrder: [
+        ...project.timeline.frameOrder
+      ],
+      layerTrackOrder: [
+        ...project.timeline.layerTrackOrder
+      ]
+    },
+    tilemaps: project.tilemaps ?? {},
+    assets,
+    appliedCommandIds: [],
+    lastClientSequenceByClient: {}
+  };
+  assert(state.assets[state.activeAssetId] !== void 0, "PXD_ACTIVE_ASSET_MISSING", "PXD active Draw asset is missing.");
+  const audio = manifest.modules.audio.status === "EMPTY" || manifest.modules.audio.state === null ? null : {
+    schemaVersion: manifest.modules.audio.schemaVersion,
+    record: parseProjectJsonPayload(manifest.modules.audio.state, payloads),
+    assets: manifest.modules.audio.assets.map((asset) => ({
+      revisionId: asset.revisionId,
+      mediaType: asset.mediaType,
+      bytes: payloads.get(asset.path)
+    }))
+  };
+  const game = manifest.modules.game.status === "EMPTY" || manifest.modules.game.state === null ? null : {
+    schemaVersion: manifest.modules.game.schemaVersion,
+    record: parseProjectJsonPayload(manifest.modules.game.state, payloads)
+  };
+  const assetDefinitions = manifest.assetDefinitions === void 0 ? [] : manifest.assetDefinitions;
+  return {
+    state,
+    packageHash,
+    manifestHash: manifest.canonicalManifestHash,
+    manifest,
+    assetDefinitions,
+    drawTimelineMetadata: manifest.drawTimelineMetadata === void 0 ? normalizeDraw2TimelineMetadata(void 0, state.frames.length) : normalizeDraw2TimelineMetadata(manifest.drawTimelineMetadata, state.frames.length),
+    productDefinitions: manifest.productDefinitions === void 0 ? [] : manifest.productDefinitions,
+    audio,
+    game
+  };
+}
+
+// src/studio/artifact-materializer.ts
+var STUDIO_ARTIFACT_MATERIALIZATION_SCHEMA_VERSION = 1;
+var STUDIO_RELEASE_ZIP_MIME_TYPE = "application/zip";
+var STUDIO_MAX_ARTIFACT_BYTES = 256 * 1024 * 1024;
+var STUDIO_ARTIFACT_PATHS = Object.freeze({
+  PXD: "packages/pxd/project.pxd",
+  AUDIO: "packages/audio/master.wav",
+  GAME: "packages/game/game-project.json"
+});
+function success4(value) {
+  return {
+    ok: true,
+    value,
+    diagnostics: []
+  };
+}
+function failure5(...diagnostics) {
+  return {
+    ok: false,
+    diagnostics
+  };
+}
+function diagnostic7(code, path, message) {
+  return {
+    code,
+    path,
+    message,
+    recoverable: false
+  };
+}
+function validHash2(value) {
+  return typeof value === "string" && /^[a-f0-9]{64}$/u.test(value);
+}
+function validIdentity(value) {
+  return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$/u.test(value);
+}
+function cloneBytes(bytes) {
+  return new Uint8Array(bytes);
+}
+async function sha256Bytes(bytes) {
+  const digest = await crypto.subtle.digest("SHA-256", cloneBytes(bytes).buffer);
+  return [
+    ...new Uint8Array(digest)
+  ].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+function boundedBytes(bytes, path) {
+  if (!(bytes instanceof Uint8Array)) {
+    return diagnostic7("INVALID_CLAIM", path, "Artifact bytes must be Uint8Array.");
+  }
+  if (bytes.byteLength < 1 || bytes.byteLength > STUDIO_MAX_ARTIFACT_BYTES) {
+    return diagnostic7("PARTIAL_PACKAGE", `${path}.byteLength`, `Artifact bytes must be between 1 and ${STUDIO_MAX_ARTIFACT_BYTES}.`);
+  }
+  return void 0;
+}
+function packageArtifact(candidate, kind) {
+  return candidate.manifest.packages.find((item) => item.kind === kind);
+}
+function sourceKinds(sources) {
+  const diagnostics = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const [index, source] of sources.entries()) {
+    if (seen.has(source.kind)) {
+      diagnostics.push(diagnostic7("DUPLICATE_REFERENCE", `sources[${index}].kind`, `${source.kind} materialization source is duplicated.`));
+    }
+    seen.add(source.kind);
+  }
+  for (const kind of [
+    "PXD",
+    "AUDIO",
+    "GAME"
+  ]) {
+    if (!seen.has(kind)) {
+      diagnostics.push(diagnostic7("PARTIAL_PACKAGE", "sources", `${kind} materialization source is missing.`));
+    }
+  }
+  return diagnostics;
+}
+function candidateReference(candidate, kind) {
+  const packageKind = kind === "DRAW" ? "PXD" : "AUDIO";
+  return packageArtifact(candidate, packageKind)?.references.find((entry) => entry.kind === kind);
+}
+function validWav(bytes) {
+  if (bytes.byteLength < 44) return false;
+  const ascii = (offset, value) => [
+    ...value
+  ].every((character, index) => bytes[offset + index] === character.charCodeAt(0));
+  return ascii(0, "RIFF") && ascii(8, "WAVE") && ascii(12, "fmt ") && ascii(36, "data");
+}
+function jsonBytes(value) {
+  return new TextEncoder().encode(canonicalJson3(value));
+}
+async function verifyPxdSource(candidate, source) {
+  const diagnostics = [];
+  const bounds = boundedBytes(source.bytes, "sources.PXD");
+  if (bounds !== void 0) diagnostics.push(bounds);
+  if (source.mimeType !== "application/vnd.pixieed.pxd") {
+    diagnostics.push(diagnostic7("INVALID_CLAIM", "sources.PXD.mimeType", "PXD MIME type is invalid."));
+  }
+  if (!validIdentity(source.sourceReference.assetId) || !validIdentity(source.sourceReference.revisionId) || !validHash2(source.sourceReference.contentHash)) {
+    diagnostics.push(diagnostic7("INVALID_CLAIM", "sources.PXD.sourceReference", "PXD source reference identity is invalid."));
+  }
+  const locked = candidateReference(candidate, "DRAW");
+  if (locked === void 0 || locked.assetId !== source.sourceReference.assetId || locked.revisionId !== source.sourceReference.revisionId || locked.contentHash !== source.sourceReference.contentHash) {
+    diagnostics.push(diagnostic7("HASH_MISMATCH", "sources.PXD.sourceReference", "PXD source reference does not match the locked Draw Revision."));
+  }
+  if (diagnostics.length > 0) return diagnostics;
+  try {
+    const imported = await importPxdProject(source.bytes);
+    if (imported.manifest.projectId !== candidate.manifest.projectId) {
+      diagnostics.push(diagnostic7("WRONG_PROJECT", "sources.PXD.manifest.projectId", "PXD Project ID does not match the Release Candidate."));
+    }
+    if (!imported.manifest.modules.draw.assets.some((asset) => asset.assetId === source.sourceReference.assetId)) {
+      diagnostics.push(diagnostic7("MISSING_ASSET", "sources.PXD.manifest.modules.draw.assets", "Locked Draw Asset is not present in the PXD artifact."));
+    }
+  } catch (error) {
+    diagnostics.push(diagnostic7("HASH_MISMATCH", "sources.PXD.bytes", error instanceof Error ? `PXD artifact verification failed: ${error.message}` : "PXD artifact verification failed."));
+  }
+  return diagnostics;
+}
+function verifyAudioSource(candidate, source) {
+  const diagnostics = [];
+  const bounds = boundedBytes(source.bytes, "sources.AUDIO");
+  if (bounds !== void 0) diagnostics.push(bounds);
+  if (source.mimeType !== "audio/wav" || !validWav(source.bytes)) {
+    diagnostics.push(diagnostic7("INVALID_CLAIM", "sources.AUDIO.bytes", "AUDIO artifact must be a valid WAV output."));
+  }
+  if (!validIdentity(source.sourceProjectId)) {
+    diagnostics.push(diagnostic7("INVALID_CLAIM", "sources.AUDIO.sourceProjectId", "Audio source Project ID is invalid."));
+  }
+  if (!validHash2(source.sourceStateHash)) {
+    diagnostics.push(diagnostic7("HASH_MISMATCH", "sources.AUDIO.sourceStateHash", "Audio source state hash is invalid."));
+  }
+  if (!Number.isSafeInteger(source.sourceProjectRevision) || source.sourceProjectRevision < 0) {
+    diagnostics.push(diagnostic7("INVALID_CLAIM", "sources.AUDIO.sourceProjectRevision", "Audio source Project revision is invalid."));
+  }
+  if (source.sourceProjectId !== candidate.manifest.projectId) {
+    diagnostics.push(diagnostic7("WRONG_PROJECT", "sources.AUDIO.sourceProjectId", "Audio source Project ID does not match the Release Candidate."));
+  }
+  const locked = candidateReference(candidate, "AUDIO");
+  if (locked === void 0 || locked.contentHash !== source.sourceStateHash) {
+    diagnostics.push(diagnostic7("HASH_MISMATCH", "sources.AUDIO.sourceStateHash", "Audio source state hash does not match the locked Audio Revision."));
+  }
+  return diagnostics;
+}
+function verifyGameSource(candidate, source) {
+  const diagnostics = [];
+  const bounds = boundedBytes(source.bytes, "sources.GAME");
+  if (bounds !== void 0) diagnostics.push(bounds);
+  if (source.mimeType !== "application/json") {
+    diagnostics.push(diagnostic7("INVALID_CLAIM", "sources.GAME.mimeType", "Game MIME type is invalid."));
+  }
+  const projectValidation = validateGameProject(source.project, {
+    projectId: source.project.projectId,
+    ownerId: source.project.ownerId,
+    revisionId: source.project.revision.revisionId
+  });
+  if (!projectValidation.valid) {
+    diagnostics.push(diagnostic7("INVALID_PROJECT", "sources.GAME.project", "Canonical GameProject validation failed."));
+  }
+  if (String(source.project.projectId) !== candidate.manifest.projectId) {
+    diagnostics.push(diagnostic7("WRONG_PROJECT", "sources.GAME.project.projectId", "Game Project ID does not match the Release Candidate."));
+  }
+  if (String(source.project.revision.revisionId) !== candidate.manifest.projectRevisionId) {
+    diagnostics.push(diagnostic7("STALE_REVISION", "sources.GAME.project.revision.revisionId", "Game Project Revision does not match the Release Candidate."));
+  }
+  if (source.project.revision.snapshotHash !== candidate.manifest.projectHash) {
+    diagnostics.push(diagnostic7("HASH_MISMATCH", "sources.GAME.project.revision.snapshotHash", "Game Project hash does not match the Release Candidate."));
+  }
+  try {
+    const decoded = new TextDecoder().decode(source.bytes);
+    const parsed = JSON.parse(decoded);
+    if (canonicalJson3(parsed) !== decoded || canonicalJson3(source.project) !== decoded) {
+      diagnostics.push(diagnostic7("HASH_MISMATCH", "sources.GAME.bytes", "Game artifact is not the canonical JSON of the locked GameProject."));
+    }
+  } catch {
+    diagnostics.push(diagnostic7("INVALID_CLAIM", "sources.GAME.bytes", "Game artifact JSON is invalid."));
+  }
+  return diagnostics;
+}
+async function verifySource(candidate, source) {
+  if (source.kind === "PXD") return await verifyPxdSource(candidate, source);
+  if (source.kind === "AUDIO") return verifyAudioSource(candidate, source);
+  return verifyGameSource(candidate, source);
+}
+function artifactRecords(artifacts) {
+  return artifacts.map(({ bytes: _bytes, ...record }) => record);
+}
+async function createBundle(candidate, artifacts) {
+  const records = artifactRecords(artifacts);
+  const manifestBase = {
+    schemaVersion: STUDIO_ARTIFACT_MATERIALIZATION_SCHEMA_VERSION,
+    packageId: candidate.manifest.packageId,
+    packageVersion: candidate.manifest.packageVersion,
+    projectId: candidate.manifest.projectId,
+    projectRevisionId: candidate.manifest.projectRevisionId,
+    candidatePackageHash: candidate.manifest.packageHash,
+    candidateReproducibleBuildIdentity: candidate.manifest.reproducibleBuildIdentity,
+    artifacts: records
+  };
+  const manifestHash = await sha256Bytes(jsonBytes(manifestBase));
+  const reproducibleBuildIdentity = await sha256Bytes(jsonBytes({
+    candidatePackageHash: candidate.manifest.packageHash,
+    candidateReproducibleBuildIdentity: candidate.manifest.reproducibleBuildIdentity,
+    artifacts: records
+  }));
+  const manifest = {
+    ...manifestBase,
+    manifestHash,
+    reproducibleBuildIdentity
+  };
+  const manifestBytes = jsonBytes(manifest);
+  const zipEntries = [
+    {
+      filename: "manifest.json",
+      bytes: manifestBytes
+    },
+    ...artifacts.map((artifact) => ({
+      filename: artifact.path,
+      bytes: artifact.bytes
+    }))
+  ].sort((left, right) => left.filename.localeCompare(right.filename));
+  const zipBytes = encodeStoredZip(zipEntries);
+  return {
+    status: "MATERIALIZED",
+    candidate,
+    manifest,
+    manifestBytes,
+    artifacts,
+    zip: {
+      filename: `${candidate.manifest.packageId}-${candidate.manifest.packageVersion}.studio.zip`,
+      mimeType: STUDIO_RELEASE_ZIP_MIME_TYPE,
+      bytes: zipBytes,
+      contentHash: await sha256Bytes(zipBytes)
+    }
+  };
+}
+async function materializeStudioReleaseArtifact(input) {
+  const verified = await verifyStudioReleaseCandidate(input.candidate);
+  if (!verified.ok) return failure5(...verified.diagnostics);
+  const sourceDiagnostics = sourceKinds(input.sources);
+  if (sourceDiagnostics.length > 0) return failure5(...sourceDiagnostics);
+  const diagnostics = [];
+  for (const source of input.sources) {
+    diagnostics.push(...await verifySource(input.candidate, source));
+  }
+  if (diagnostics.length > 0) return failure5(...diagnostics);
+  const artifacts = [];
+  for (const kind of [
+    "PXD",
+    "AUDIO",
+    "GAME"
+  ]) {
+    const source = input.sources.find((item) => item.kind === kind);
+    const locked = packageArtifact(input.candidate, kind);
+    if (source === void 0 || locked === void 0) {
+      diagnostics.push(diagnostic7("PARTIAL_PACKAGE", `sources.${kind}`, `${kind} source is missing.`));
+      continue;
+    }
+    const bytes = cloneBytes(source.bytes);
+    artifacts.push({
+      kind,
+      path: STUDIO_ARTIFACT_PATHS[kind],
+      mimeType: source.mimeType,
+      bytes,
+      byteLength: bytes.byteLength,
+      contentHash: await sha256Bytes(bytes),
+      lockedPackageHash: locked.contentHash
+    });
+  }
+  if (diagnostics.length > 0) return failure5(...diagnostics);
+  return success4(await createBundle(input.candidate, artifacts));
+}
+
+// src/game/game-330/core.ts
+var GAME_BUILD_SCHEMA_VERSION = 1;
+function diagnostic8(code, path, message, recoverable = true) {
+  return {
+    code,
+    path,
+    message,
+    recoverable
+  };
+}
+function success5(value) {
+  return {
+    ok: true,
+    value,
+    diagnostics: []
+  };
+}
+function failure6(...diagnostics) {
+  return {
+    ok: false,
+    diagnostics
+  };
+}
+function stable4(value) {
+  return /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(value);
+}
 function hash(value) {
   return sha256(value);
 }
-function validHash(value) {
+function validHash3(value) {
   return typeof value === "string" && /^[a-f0-9]{64}$/u.test(value);
 }
 function key(kind, id, revision) {
@@ -8192,21 +10847,21 @@ function unique2(values, path) {
   const seen = /* @__PURE__ */ new Set();
   const result = [];
   for (const value of values) {
-    if (seen.has(value)) result.push(diagnostic4("DUPLICATE_ID", path, `Duplicate identifier: ${value}`));
+    if (seen.has(value)) result.push(diagnostic8("DUPLICATE_ID", path, `Duplicate identifier: ${value}`));
     seen.add(value);
   }
   return result;
 }
-function callerDiagnostics(plan, caller2) {
+function callerDiagnostics2(plan, caller2) {
   const result = [];
-  if (plan.projectId !== caller2.projectId) result.push(diagnostic4("PROJECT_ID_MISMATCH", "caller.projectId", "Caller project does not match the build plan."));
-  if (plan.ownerId !== caller2.ownerId) result.push(diagnostic4("OWNER_MISMATCH", "caller.ownerId", "Caller owner does not match the build plan."));
-  if (plan.projectRevisionId !== caller2.revisionId) result.push(diagnostic4("REVISION_MISMATCH", "caller.revisionId", "Caller revision does not match the build plan."));
+  if (plan.projectId !== caller2.projectId) result.push(diagnostic8("PROJECT_ID_MISMATCH", "caller.projectId", "Caller project does not match the build plan."));
+  if (plan.ownerId !== caller2.ownerId) result.push(diagnostic8("OWNER_MISMATCH", "caller.ownerId", "Caller owner does not match the build plan."));
+  if (plan.projectRevisionId !== caller2.revisionId) result.push(diagnostic8("REVISION_MISMATCH", "caller.revisionId", "Caller revision does not match the build plan."));
   return result;
 }
 function targetDiagnostics(request) {
   const result = [];
-  if (!stable2(request.module)) result.push(diagnostic4("INVALID_MODULE", "module", "Module must be a stable identifier."));
+  if (!stable4(request.module)) result.push(diagnostic8("INVALID_MODULE", "module", "Module must be a stable identifier."));
   const allowed = {
     WEB: [
       "TYPESCRIPT"
@@ -8240,7 +10895,7 @@ function targetDiagnostics(request) {
       "TYPESCRIPT"
     ]
   };
-  if (!allowed[request.target]?.includes(request.language)) result.push(diagnostic4("UNSUPPORTED_LANGUAGE", "language", `${request.language} is not supported for ${request.target}.`));
+  if (!allowed[request.target]?.includes(request.language)) result.push(diagnostic8("UNSUPPORTED_LANGUAGE", "language", `${request.language} is not supported for ${request.target}.`));
   const supported = /* @__PURE__ */ new Set([
     "INPUT",
     "AUDIO",
@@ -8249,8 +10904,8 @@ function targetDiagnostics(request) {
     "SAVE_STATE",
     "NETWORK_BRIDGE"
   ]);
-  for (const capability of request.capabilities) if (!supported.has(capability)) result.push(diagnostic4("UNSUPPORTED_CAPABILITY", "capabilities", `Unsupported capability: ${capability}`));
-  if (request.target === "WEB" && request.capabilities.includes("NETWORK_BRIDGE")) result.push(diagnostic4("UNSUPPORTED_CAPABILITY", "capabilities", "WEB build cannot request NETWORK_BRIDGE in the isolated builder."));
+  for (const capability of request.capabilities) if (!supported.has(capability)) result.push(diagnostic8("UNSUPPORTED_CAPABILITY", "capabilities", `Unsupported capability: ${capability}`));
+  if (request.target === "WEB" && request.capabilities.includes("NETWORK_BRIDGE")) result.push(diagnostic8("UNSUPPORTED_CAPABILITY", "capabilities", "WEB build cannot request NETWORK_BRIDGE in the isolated builder."));
   return result;
 }
 function assetReferences(project) {
@@ -8283,13 +10938,13 @@ function cycleDiagnostics(locks) {
   const result = [];
   const visit = (id) => {
     if (visiting.has(id)) {
-      result.push(diagnostic4("DEPENDENCY_CYCLE", "dependencyLocks", `Dependency cycle includes ${id}.`));
+      result.push(diagnostic8("DEPENDENCY_CYCLE", "dependencyLocks", `Dependency cycle includes ${id}.`));
       return;
     }
     if (visited.has(id)) return;
     const lock = byId.get(id);
     if (!lock) {
-      result.push(diagnostic4("MISSING_LOCK", "dependencyLocks.dependsOn", `Missing dependency lock: ${id}`));
+      result.push(diagnostic8("MISSING_LOCK", "dependencyLocks.dependsOn", `Missing dependency lock: ${id}`));
       return;
     }
     visiting.add(id);
@@ -8308,28 +10963,28 @@ function lockDiagnostics(request, project) {
   for (const lock of [
     ...request.dependencyLocks,
     ...request.assetLocks
-  ]) if (!validHash(lock.contentHash)) result.push(diagnostic4("TAMPERED_HASH", "locks.contentHash", "Lock content hash must be lowercase SHA-256."));
+  ]) if (!validHash3(lock.contentHash)) result.push(diagnostic8("TAMPERED_HASH", "locks.contentHash", "Lock content hash must be lowercase SHA-256."));
   const expectedAssets = assetReferences(project).map((item) => key(item.kind, item.assetId, item.revisionId));
   const actualAssets = request.assetLocks.map((item) => key(item.kind, item.assetId, item.revisionId));
-  for (const expected of expectedAssets) if (!actualAssets.includes(expected)) result.push(diagnostic4("MISSING_LOCK", "assetLocks", `Missing asset lock: ${expected}`));
-  for (const actual of actualAssets) if (!expectedAssets.includes(actual)) result.push(diagnostic4("STALE_LOCK", "assetLocks", `Asset lock is not referenced by the project: ${actual}`));
-  for (const lock of request.assetLocks) if (lock.mode !== "PINNED") result.push(diagnostic4("STALE_LOCK", "assetLocks.mode", "Build assets must be pinned to an immutable revision."));
+  for (const expected of expectedAssets) if (!actualAssets.includes(expected)) result.push(diagnostic8("MISSING_LOCK", "assetLocks", `Missing asset lock: ${expected}`));
+  for (const actual of actualAssets) if (!expectedAssets.includes(actual)) result.push(diagnostic8("STALE_LOCK", "assetLocks", `Asset lock is not referenced by the project: ${actual}`));
+  for (const lock of request.assetLocks) if (lock.mode !== "PINNED") result.push(diagnostic8("STALE_LOCK", "assetLocks.mode", "Build assets must be pinned to an immutable revision."));
   const expectedDependencies = dependencyIds(project);
   const actualDependencies = request.dependencyLocks.map((item) => item.dependencyId).sort();
-  if (canonicalJson3(expectedDependencies) !== canonicalJson3(actualDependencies)) result.push(diagnostic4("MISSING_LOCK", "dependencyLocks", "Dependency lock set does not exactly match the project dependencies."));
+  if (canonicalJson3(expectedDependencies) !== canonicalJson3(actualDependencies)) result.push(diagnostic8("MISSING_LOCK", "dependencyLocks", "Dependency lock set does not exactly match the project dependencies."));
   for (const lock of request.dependencyLocks) {
     const license = request.licenses.find((item) => item.licenseId === lock.licenseId);
-    if (!license) result.push(diagnostic4("MISSING_LICENSE", `licenses.${lock.licenseId}`, "Dependency license grant is missing."));
-    else if (license.scope !== "BUILD" || license.ownerId !== project.ownerId || license.revisionId !== project.revision.revisionId) result.push(diagnostic4("INVALID_LICENSE", `licenses.${lock.licenseId}`, "License grant is not bound to this owner, revision, and build."));
+    if (!license) result.push(diagnostic8("MISSING_LICENSE", `licenses.${lock.licenseId}`, "Dependency license grant is missing."));
+    else if (license.scope !== "BUILD" || license.ownerId !== project.ownerId || license.revisionId !== project.revision.revisionId) result.push(diagnostic8("INVALID_LICENSE", `licenses.${lock.licenseId}`, "License grant is not bound to this owner, revision, and build."));
   }
   result.push(...cycleDiagnostics(request.dependencyLocks));
   return result;
 }
 async function createBuildPlan(project, caller2, request) {
   const validation = validateGameProject(project, caller2);
-  if (!validation.valid) return failure2(...validation.diagnostics.map((item) => {
+  if (!validation.valid) return failure6(...validation.diagnostics.map((item) => {
     const code = item.code === "CALLER_OWNER_MISMATCH" ? "OWNER_MISMATCH" : item.code === "PROJECT_ID_MISMATCH" ? "PROJECT_ID_MISMATCH" : item.code === "CALLER_REVISION_MISMATCH" ? "REVISION_MISMATCH" : "INVALID_PLAN";
-    return diagnostic4(code, item.path, item.message);
+    return diagnostic8(code, item.path, item.message);
   }));
   const callerClaim = {
     projectId: String(caller2.projectId),
@@ -8338,7 +10993,7 @@ async function createBuildPlan(project, caller2, request) {
   };
   const target = targetDiagnostics(request);
   const locks = lockDiagnostics(request, project);
-  if (target.length || locks.length) return failure2(...target, ...locks);
+  if (target.length || locks.length) return failure6(...target, ...locks);
   const base = {
     schemaVersion: GAME_BUILD_SCHEMA_VERSION,
     projectId: String(project.projectId),
@@ -8368,38 +11023,38 @@ async function createBuildPlan(project, caller2, request) {
     ...base,
     planHash
   };
-  const callerCheck = callerDiagnostics(plan, callerClaim);
-  return callerCheck.length ? failure2(...callerCheck) : success2(plan);
+  const callerCheck = callerDiagnostics2(plan, callerClaim);
+  return callerCheck.length ? failure6(...callerCheck) : success5(plan);
 }
 async function validateBuildPlan(plan, caller2) {
   const diagnostics = [
-    ...callerDiagnostics(plan, caller2),
+    ...callerDiagnostics2(plan, caller2),
     ...targetDiagnostics(plan),
     ...cycleDiagnostics(plan.dependencyLocks)
   ];
-  if (plan.schemaVersion !== GAME_BUILD_SCHEMA_VERSION) diagnostics.push(diagnostic4("INVALID_PLAN", "schemaVersion", "Unsupported build plan schema."));
-  if (!validHash(plan.projectHash) || !validHash(plan.behaviorIrHash) || !validHash(plan.planHash)) diagnostics.push(diagnostic4("TAMPERED_HASH", "planHash", "Build plan hash fields are invalid."));
+  if (plan.schemaVersion !== GAME_BUILD_SCHEMA_VERSION) diagnostics.push(diagnostic8("INVALID_PLAN", "schemaVersion", "Unsupported build plan schema."));
+  if (!validHash3(plan.projectHash) || !validHash3(plan.behaviorIrHash) || !validHash3(plan.planHash)) diagnostics.push(diagnostic8("TAMPERED_HASH", "planHash", "Build plan hash fields are invalid."));
   const { planHash, ...base } = plan;
-  if (validHash(planHash) && await hash(base) !== planHash) diagnostics.push(diagnostic4("TAMPERED_HASH", "planHash", "Build plan content hash does not match its contents."));
-  return diagnostics.length ? failure2(...diagnostics) : success2(plan);
+  if (validHash3(planHash) && await hash(base) !== planHash) diagnostics.push(diagnostic8("TAMPERED_HASH", "planHash", "Build plan content hash does not match its contents."));
+  return diagnostics.length ? failure6(...diagnostics) : success5(plan);
 }
 
 // src/game/game-350/editor-adapter.ts
 var GAME350_EDITOR_SCHEMA_VERSION = 1;
-function success3(value) {
+function success6(value) {
   return {
     ok: true,
     value,
     diagnostics: []
   };
 }
-function failure3(...diagnostics) {
+function failure7(...diagnostics) {
   return {
     ok: false,
     diagnostics
   };
 }
-function diagnostic5(code, path, message, recoverable = true) {
+function diagnostic9(code, path, message, recoverable = true) {
   return {
     code,
     path,
@@ -8407,40 +11062,40 @@ function diagnostic5(code, path, message, recoverable = true) {
     recoverable
   };
 }
-function stable3(value) {
+function stable5(value) {
   return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(value);
 }
-function validHash2(value) {
+function validHash4(value) {
   return typeof value === "string" && /^[a-f0-9]{64}$/u.test(value);
 }
 function assetReferenceDiagnostics(asset, ownerId, path) {
   const diagnostics = [];
-  if (asset.ownerId !== ownerId) diagnostics.push(diagnostic5("INVALID_ASSET_REFERENCE", `${path}.ownerId`, "Asset owner must match the canonical Project owner."));
-  if (asset.mode !== "LIVE" && asset.mode !== "PINNED") diagnostics.push(diagnostic5("INVALID_ASSET_REFERENCE", `${path}.mode`, "Asset reference mode must be LIVE or PINNED."));
-  if (!stable3(String(asset.assetId)) || !stable3(String(asset.revisionId))) diagnostics.push(diagnostic5("INVALID_ASSET_REFERENCE", path, "Asset id and revision id must be stable identifiers."));
-  if (!validHash2(asset.contentHash)) diagnostics.push(diagnostic5("INVALID_ASSET_REFERENCE", `${path}.contentHash`, "Asset content hash must be lowercase SHA-256."));
+  if (asset.ownerId !== ownerId) diagnostics.push(diagnostic9("INVALID_ASSET_REFERENCE", `${path}.ownerId`, "Asset owner must match the canonical Project owner."));
+  if (asset.mode !== "LIVE" && asset.mode !== "PINNED") diagnostics.push(diagnostic9("INVALID_ASSET_REFERENCE", `${path}.mode`, "Asset reference mode must be LIVE or PINNED."));
+  if (!stable5(String(asset.assetId)) || !stable5(String(asset.revisionId))) diagnostics.push(diagnostic9("INVALID_ASSET_REFERENCE", path, "Asset id and revision id must be stable identifiers."));
+  if (!validHash4(asset.contentHash)) diagnostics.push(diagnostic9("INVALID_ASSET_REFERENCE", `${path}.contentHash`, "Asset content hash must be lowercase SHA-256."));
   try {
     asAssetId(String(asset.assetId));
     asAssetRevisionId(String(asset.revisionId));
     asSha2562(String(asset.contentHash));
   } catch (error) {
-    diagnostics.push(diagnostic5("INVALID_ASSET_REFERENCE", path, error instanceof Error ? error.message : "Asset reference is invalid."));
+    diagnostics.push(diagnostic9("INVALID_ASSET_REFERENCE", path, error instanceof Error ? error.message : "Asset reference is invalid."));
   }
   return diagnostics;
 }
 function rail(value) {
   return value === "ACTION" || value === "HIERARCHY" || value === "VIEWPORT" || value === "INSPECTOR" || value === "TIMELINE";
 }
-function callerDiagnostics2(project, caller2) {
+function callerDiagnostics3(project, caller2) {
   const result = [];
   if (project.projectId !== caller2.projectId || project.revision.projectId !== caller2.projectId) {
-    result.push(diagnostic5("CALLER_MISMATCH", "caller.projectId", "Caller Project does not match the canonical Project."));
+    result.push(diagnostic9("CALLER_MISMATCH", "caller.projectId", "Caller Project does not match the canonical Project."));
   }
   if (project.ownerId !== caller2.ownerId || project.revision.ownerId !== caller2.ownerId) {
-    result.push(diagnostic5("CALLER_MISMATCH", "caller.ownerId", "Caller owner does not match the canonical Project."));
+    result.push(diagnostic9("CALLER_MISMATCH", "caller.ownerId", "Caller owner does not match the canonical Project."));
   }
   if (project.revision.revisionId !== caller2.revisionId) {
-    result.push(diagnostic5("CALLER_MISMATCH", "caller.revisionId", "Caller revision is stale or belongs to another Project."));
+    result.push(diagnostic9("CALLER_MISMATCH", "caller.revisionId", "Caller revision is stale or belongs to another Project."));
   }
   return result;
 }
@@ -8448,66 +11103,66 @@ function selectionDiagnostics(snapshot) {
   const { project, selection } = snapshot;
   if (selection.entityId !== void 0 && selection.sceneId === void 0) {
     return [
-      diagnostic5("INVALID_SNAPSHOT", "selection.entityId", "An Entity selection requires a Scene selection.")
+      diagnostic9("INVALID_SNAPSHOT", "selection.entityId", "An Entity selection requires a Scene selection.")
     ];
   }
   if (selection.componentId !== void 0 && selection.entityId === void 0) {
     return [
-      diagnostic5("INVALID_SNAPSHOT", "selection.componentId", "A Component selection requires an Entity selection.")
+      diagnostic9("INVALID_SNAPSHOT", "selection.componentId", "A Component selection requires an Entity selection.")
     ];
   }
   if (selection.sceneId === void 0) return [];
   const scene = project.scenes.find((item) => item.sceneId === selection.sceneId);
   if (scene === void 0) return [
-    diagnostic5("MISSING_SCENE", "selection.sceneId", `Scene ${String(selection.sceneId)} is not in the Project.`)
+    diagnostic9("MISSING_SCENE", "selection.sceneId", `Scene ${String(selection.sceneId)} is not in the Project.`)
   ];
   if (selection.entityId === void 0) return [];
   const entity = scene.entities.find((item) => item.entityId === selection.entityId);
   if (entity === void 0) return [
-    diagnostic5("MISSING_ENTITY", "selection.entityId", `Entity ${String(selection.entityId)} is not in the selected Scene.`)
+    diagnostic9("MISSING_ENTITY", "selection.entityId", `Entity ${String(selection.entityId)} is not in the selected Scene.`)
   ];
   if (selection.componentId !== void 0 && !entity.components.some((item) => item.componentId === selection.componentId)) {
     return [
-      diagnostic5("MISSING_COMPONENT", "selection.componentId", `Component ${String(selection.componentId)} is not in the selected Entity.`)
+      diagnostic9("MISSING_COMPONENT", "selection.componentId", `Component ${String(selection.componentId)} is not in the selected Entity.`)
     ];
   }
   return [];
 }
 function coreProjectDiagnostics(project, caller2) {
   const validation = validateGameProject(project, caller2);
-  const diagnostics = validation.diagnostics.map((item) => diagnostic5(item.code === "CALLER_OWNER_MISMATCH" || item.code === "CALLER_REVISION_MISMATCH" || item.code === "PROJECT_ID_MISMATCH" ? "CALLER_MISMATCH" : "INVALID_SNAPSHOT", item.path, item.message));
+  const diagnostics = validation.diagnostics.map((item) => diagnostic9(item.code === "CALLER_OWNER_MISMATCH" || item.code === "CALLER_REVISION_MISMATCH" || item.code === "PROJECT_ID_MISMATCH" ? "CALLER_MISMATCH" : "INVALID_SNAPSHOT", item.path, item.message));
   for (const asset of referencedAssets(project)) diagnostics.push(...assetReferenceDiagnostics(asset, project.ownerId, `asset.${String(asset.assetId)}`));
   return diagnostics;
 }
 function validateGame350EditorSnapshot(snapshot, caller2) {
-  if (snapshot.schemaVersion !== GAME350_EDITOR_SCHEMA_VERSION) return failure3(diagnostic5("INVALID_SNAPSHOT", "schemaVersion", "Unsupported GAME-350 editor snapshot schema."));
-  if (!rail(snapshot.activeRail)) return failure3(diagnostic5("INVALID_SNAPSHOT", "activeRail", "Editor rail is not supported."));
+  if (snapshot.schemaVersion !== GAME350_EDITOR_SCHEMA_VERSION) return failure7(diagnostic9("INVALID_SNAPSHOT", "schemaVersion", "Unsupported GAME-350 editor snapshot schema."));
+  if (!rail(snapshot.activeRail)) return failure7(diagnostic9("INVALID_SNAPSHOT", "activeRail", "Editor rail is not supported."));
   const diagnostics = [
-    ...callerDiagnostics2(snapshot.project, caller2),
+    ...callerDiagnostics3(snapshot.project, caller2),
     ...coreProjectDiagnostics(snapshot.project, caller2),
     ...selectionDiagnostics(snapshot)
   ];
-  return diagnostics.length > 0 ? failure3(...diagnostics) : success3(snapshot);
+  return diagnostics.length > 0 ? failure7(...diagnostics) : success6(snapshot);
 }
 function referencedAssets(project) {
-  const byKey = /* @__PURE__ */ new Map();
+  const byKey2 = /* @__PURE__ */ new Map();
   for (const scene of project.scenes) for (const entity of scene.entities) for (const component of entity.components) {
     if (component.type !== "SPRITE" && component.type !== "AUDIO_SOURCE") continue;
     const asset = component.asset;
-    byKey.set(`${asset.kind}:${String(asset.assetId)}:${String(asset.revisionId)}:${String(asset.contentHash)}`, asset);
+    byKey2.set(`${asset.kind}:${String(asset.assetId)}:${String(asset.revisionId)}:${String(asset.contentHash)}`, asset);
   }
   return [
-    ...byKey.values()
+    ...byKey2.values()
   ].sort((left, right) => `${left.kind}:${String(left.assetId)}:${String(left.revisionId)}`.localeCompare(`${right.kind}:${String(right.assetId)}:${String(right.revisionId)}`));
 }
 function projectGame350BuildPlanRequest(snapshot, caller2, input) {
   const checked = validateGame350EditorSnapshot(snapshot, caller2);
-  if (!checked.ok) return failure3(...checked.diagnostics);
+  if (!checked.ok) return failure7(...checked.diagnostics);
   const assetLocks = [];
   for (const asset of referencedAssets(snapshot.project)) {
     const assetIssues = assetReferenceDiagnostics(asset, snapshot.project.ownerId, `asset.${String(asset.assetId)}`);
-    if (assetIssues.length > 0) return failure3(...assetIssues);
-    if (asset.mode !== "PINNED") return failure3(diagnostic5("LIVE_BUILD_REFERENCE", `asset.${String(asset.assetId)}`, "Build projection requires PINNED Draw/Audio references; LIVE is preview-only."));
+    if (assetIssues.length > 0) return failure7(...assetIssues);
+    if (asset.mode !== "PINNED") return failure7(diagnostic9("LIVE_BUILD_REFERENCE", `asset.${String(asset.assetId)}`, "Build projection requires PINNED Draw/Audio references; LIVE is preview-only."));
     assetLocks.push({
       assetId: String(asset.assetId),
       revisionId: String(asset.revisionId),
@@ -8516,17 +11171,17 @@ function projectGame350BuildPlanRequest(snapshot, caller2, input) {
       mode: "PINNED"
     });
   }
-  return success3({
+  return success6({
     ...input,
     assetLocks
   });
 }
 async function prepareGame350BuildPlan(snapshot, caller2, input) {
   const projected = projectGame350BuildPlanRequest(snapshot, caller2, input);
-  if (!projected.ok || projected.value === void 0) return failure3(...projected.diagnostics);
+  if (!projected.ok || projected.value === void 0) return failure7(...projected.diagnostics);
   const result = await createBuildPlan(snapshot.project, caller2, projected.value);
-  if (!result.ok || result.value === void 0) return failure3(...result.diagnostics.map((item) => diagnostic5("BUILD_INVALID", item.path, item.message)));
-  return success3(result.value);
+  if (!result.ok || result.value === void 0) return failure7(...result.diagnostics.map((item) => diagnostic9("BUILD_INVALID", item.path, item.message)));
+  return success6(result.value);
 }
 
 // src/game/game-350/asset-boundary.ts
@@ -9078,7 +11733,7 @@ function assertDimensions(mapId, width, height, tileSize) {
   }
 }
 function normalizeCells(cells = [], width, height) {
-  const byKey = /* @__PURE__ */ new Map();
+  const byKey2 = /* @__PURE__ */ new Map();
   for (const cell of cells) {
     if (!Number.isSafeInteger(cell.x) || !Number.isSafeInteger(cell.y) || cell.x < 0 || cell.x >= width || cell.y < 0 || cell.y >= height) {
       throw new Error("Tilemap cell must be inside the document bounds.");
@@ -9093,8 +11748,8 @@ function normalizeCells(cells = [], width, height) {
       throw new Error("An empty tilemap cell must not be persisted.");
     }
     const key2 = cellKey(cell.x, cell.y);
-    if (byKey.has(key2)) throw new Error(`Duplicate tilemap cell: ${key2}`);
-    byKey.set(key2, {
+    if (byKey2.has(key2)) throw new Error(`Duplicate tilemap cell: ${key2}`);
+    byKey2.set(key2, {
       x: cell.x,
       y: cell.y,
       collision: cell.collision,
@@ -9104,7 +11759,7 @@ function normalizeCells(cells = [], width, height) {
     });
   }
   return [
-    ...byKey.values()
+    ...byKey2.values()
   ].sort(cellSort);
 }
 function documentFrom(options) {
@@ -10302,8 +12957,9 @@ function characterLike(track) {
   return track.role === "PLAYER" || track.role === "NPC" || track.role === "CUSTOM" && track.kind === "SPRITE" || track.kind === "SPRITE";
 }
 function findGameAnimationClips(input) {
+  const definitionsByBoundDefinition = input.boundDrawDefinitionId === void 0 ? [] : input.drawDefinitions.filter((entry) => entry.definitionId === input.boundDrawDefinitionId);
   const definitionsByBoundAsset = input.boundDrawAssetId === void 0 ? [] : input.drawDefinitions.filter((entry) => entry.registryIdentity?.assetId === input.boundDrawAssetId);
-  const definitions = definitionsByBoundAsset.length > 0 ? definitionsByBoundAsset : characterLike(input.track) ? input.drawDefinitions.filter((entry) => entry.definition.assetKind === "CHARACTER") : input.drawDefinitions;
+  const definitions = definitionsByBoundDefinition.length > 0 ? definitionsByBoundDefinition : definitionsByBoundAsset.length > 0 ? definitionsByBoundAsset : characterLike(input.track) ? input.drawDefinitions.filter((entry) => entry.definition.assetKind === "CHARACTER") : input.drawDefinitions;
   const seen = /* @__PURE__ */ new Set();
   const result = [];
   for (const definition of definitions) {
@@ -10370,20 +13026,20 @@ function upsertGameAnimationBinding(current, next) {
 // src/game/game-350/engine-adapters.ts
 var ENGINE_HANDOFF_SCHEMA_VERSION = "ENGINE_HANDOFF_V2";
 var GAME350_ENGINE_ADAPTER_SCHEMA_VERSION = 2;
-function success4(value) {
+function success7(value) {
   return {
     ok: true,
     value,
     diagnostics: []
   };
 }
-function failure4(...diagnostics) {
+function failure8(...diagnostics) {
   return {
     ok: false,
     diagnostics
   };
 }
-function diagnostic6(path, message, recoverable = true) {
+function diagnostic10(path, message, recoverable = true) {
   return {
     code: "INVALID_PACKAGE",
     path,
@@ -10831,20 +13487,20 @@ function targetEntries(target, project, plan) {
 async function createGame350EngineAdapterPackage(project, plan, caller2) {
   const projectValidation = validateGameProject(project, caller2);
   if (!projectValidation.valid) {
-    return failure4(diagnostic6("project", "Canonical GameProject is invalid for engine packaging."));
+    return failure8(diagnostic10("project", "Canonical GameProject is invalid for engine packaging."));
   }
   if (plan.target !== "UNITY" && plan.target !== "GODOT" && plan.target !== "UNREAL") {
-    return failure4(diagnostic6("plan.target", "The native target adapter accepts Unity, Godot, or Unreal only."));
+    return failure8(diagnostic10("plan.target", "The native target adapter accepts Unity, Godot, or Unreal only."));
   }
   const planValidation = await validateBuildPlan(plan, {
     projectId: String(caller2.projectId),
     ownerId: String(caller2.ownerId),
     revisionId: String(caller2.revisionId)
   });
-  if (!planValidation.ok) return failure4(...planValidation.diagnostics);
+  if (!planValidation.ok) return failure8(...planValidation.diagnostics);
   const references = referencePayload(project);
   if (references.some((reference) => reference.mode !== "PINNED")) {
-    return failure4(diagnostic6("project.scenes", "Native engine packages require PINNED Draw/Audio references."));
+    return failure8(diagnostic10("project.scenes", "Native engine packages require PINNED Draw/Audio references."));
   }
   const metadata = targetMetadata(plan.target);
   const entries = targetEntries(plan.target, project, plan);
@@ -10861,7 +13517,7 @@ async function createGame350EngineAdapterPackage(project, plan, caller2) {
       contentHash: await sha256(entry.content)
     })))
   });
-  return success4({
+  return success7({
     schemaVersion: GAME350_ENGINE_ADAPTER_SCHEMA_VERSION,
     handoffSchemaVersion: ENGINE_HANDOFF_SCHEMA_VERSION,
     target: plan.target,
@@ -10891,7 +13547,7 @@ var OPERATION_TYPES = [
   "open",
   "reload"
 ];
-function isRecord2(value) {
+function isRecord3(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 function isStableId(value) {
@@ -10902,11 +13558,11 @@ function hasOnlyKeys(value, keys) {
   return Object.keys(value).every((key2) => allowed.has(key2)) && keys.every((key2) => Object.prototype.hasOwnProperty.call(value, key2));
 }
 function isProjectRecord(value) {
-  if (!isRecord2(value) || value.project === null || value.project === void 0) {
+  if (!isRecord3(value) || value.project === null || value.project === void 0) {
     return false;
   }
   const identity = value.identity;
-  return isRecord2(identity) && isStableId(identity.projectId) && isStableId(identity.ownerId) && isStableId(identity.tenantId) && isStableId(identity.revisionId);
+  return isRecord3(identity) && isStableId(identity.projectId) && isStableId(identity.ownerId) && isStableId(identity.tenantId) && isStableId(identity.revisionId);
 }
 function freezeProjectRecord(record) {
   return Object.freeze({
@@ -10917,7 +13573,7 @@ function freezeProjectRecord(record) {
   });
 }
 function isRegistryRequest(value) {
-  if (!isRecord2(value)) return false;
+  if (!isRecord3(value)) return false;
   const allowed = /* @__PURE__ */ new Set([
     "requestId",
     "sessionReference",
@@ -10929,7 +13585,7 @@ function isRegistryRequest(value) {
   return isStableId(value.requestId) && isStableId(value.sessionReference) && isStableId(value.correlationId) && isStableId(value.assetId) && (value.requestedTenantId === void 0 || isStableId(value.requestedTenantId));
 }
 function isOperation(value) {
-  if (!isRecord2(value) || !isStableId(value.operationId)) return false;
+  if (!isRecord3(value) || !isStableId(value.operationId)) return false;
   if (!OPERATION_TYPES.includes(value.type)) {
     return false;
   }
@@ -10956,7 +13612,7 @@ function isOperation(value) {
   ]) && isStableId(value.projectId);
 }
 function invalidOperation(value) {
-  const record = isRecord2(value) ? value : {};
+  const record = isRecord3(value) ? value : {};
   const type = OPERATION_TYPES.includes(record.type) ? record.type : "reload";
   return {
     operationId: isStableId(record.operationId) ? record.operationId : "invalid-operation",
@@ -11019,7 +13675,7 @@ function unavailable(operation, flag) {
     status: flag === "off" ? "OFF" : "UNKNOWN_FLAG"
   };
 }
-function failure5(operation, status, reason, sequence) {
+function failure9(operation, status, reason, sequence) {
   return sequence === void 0 ? {
     operationId: operation.operationId,
     type: operation.type,
@@ -11071,7 +13727,7 @@ async function resolveMetadata(input) {
       reason: "REGISTRY_PROVIDER_EXCEPTION"
     };
   }
-  if (!isRecord2(result)) {
+  if (!isRecord3(result)) {
     return {
       ok: false,
       status: "ERROR",
@@ -11086,7 +13742,7 @@ async function resolveMetadata(input) {
     };
   }
   const resolved = result.value;
-  if (!isRecord2(resolved) || !isRecord2(resolved.identity)) {
+  if (!isRecord3(resolved) || !isRecord3(resolved.identity)) {
     return {
       ok: false,
       status: "ERROR",
@@ -11167,7 +13823,7 @@ function createSite400IGameRoute(options) {
       try {
         options.host.projectResolvedMetadata(metadata);
       } catch {
-        return failure5(operation, "ERROR", "HOST_PROJECTION_FAILED", operationSequence);
+        return failure9(operation, "ERROR", "HOST_PROJECTION_FAILED", operationSequence);
       }
     }
     const accepted = freezeProjectRecord(record);
@@ -11185,17 +13841,17 @@ function createSite400IGameRoute(options) {
     try {
       if (featureFlag !== "on") return unavailable(operation, featureFlag);
       if (!isStableId(operation.operationId)) {
-        return failure5(operation, "ERROR", "INVALID_OPERATION_ID");
+        return failure9(operation, "ERROR", "INVALID_OPERATION_ID");
       }
       const operationSequence = ++sequence;
       if (operation.type === "create") {
         const created = await options.creator.create(operation.createInput);
         if (!isProjectRecord(created)) {
-          return failure5(operation, "ERROR", "PROJECT_CREATOR_RESPONSE_INVALID", operationSequence);
+          return failure9(operation, "ERROR", "PROJECT_CREATOR_RESPONSE_INVALID", operationSequence);
         }
         const accepted2 = freezeProjectRecord(created);
         if (current !== void 0 && current.identity.projectId === accepted2.identity.projectId) {
-          return failure5(operation, "ERROR", "CREATE_REUSES_ACTIVE_PROJECT", operationSequence);
+          return failure9(operation, "ERROR", "CREATE_REUSES_ACTIVE_PROJECT", operationSequence);
         }
         const resolved2 = await resolveMetadata({
           record: accepted2,
@@ -11203,7 +13859,7 @@ function createSite400IGameRoute(options) {
           resolveRegisteredAsset: options.resolveRegisteredAsset
         });
         if (!resolved2.ok) {
-          return failure5(operation, resolved2.status, resolved2.reason, operationSequence);
+          return failure9(operation, resolved2.status, resolved2.reason, operationSequence);
         }
         if (featureFlag !== "on") return unavailable(operation, featureFlag);
         const entry2 = await loadEntry();
@@ -11214,14 +13870,14 @@ function createSite400IGameRoute(options) {
           projectId: operation.projectId
         });
         if (loaded === null) {
-          return failure5(operation, "DENIED", "PROJECT_NOT_FOUND", operationSequence);
+          return failure9(operation, "DENIED", "PROJECT_NOT_FOUND", operationSequence);
         }
         if (!isProjectRecord(loaded)) {
-          return failure5(operation, "ERROR", "PROJECT_LOADER_RESPONSE_INVALID", operationSequence);
+          return failure9(operation, "ERROR", "PROJECT_LOADER_RESPONSE_INVALID", operationSequence);
         }
         const accepted2 = freezeProjectRecord(loaded);
         if (accepted2.identity.projectId !== operation.projectId) {
-          return failure5(operation, "DENIED", "PROJECT_MISMATCH", operationSequence);
+          return failure9(operation, "DENIED", "PROJECT_MISMATCH", operationSequence);
         }
         const resolved2 = await resolveMetadata({
           record: accepted2,
@@ -11229,14 +13885,14 @@ function createSite400IGameRoute(options) {
           resolveRegisteredAsset: options.resolveRegisteredAsset
         });
         if (!resolved2.ok) {
-          return failure5(operation, resolved2.status, resolved2.reason, operationSequence);
+          return failure9(operation, resolved2.status, resolved2.reason, operationSequence);
         }
         if (featureFlag !== "on") return unavailable(operation, featureFlag);
         const entry2 = await loadEntry();
         return await commit(operation, entry2, accepted2, operation.registryRequest, resolved2.metadata, operationSequence);
       }
       if (current === void 0 || activeRegistryRequest === void 0) {
-        return failure5(operation, "DENIED", "NO_ACTIVE_PROJECT", operationSequence);
+        return failure9(operation, "DENIED", "NO_ACTIVE_PROJECT", operationSequence);
       }
       const accepted = current;
       const reloaded = await options.loader.load({
@@ -11244,14 +13900,14 @@ function createSite400IGameRoute(options) {
         acceptedRevisionId: accepted.identity.revisionId
       });
       if (reloaded === null) {
-        return failure5(operation, "DENIED", "PROJECT_NOT_FOUND", operationSequence);
+        return failure9(operation, "DENIED", "PROJECT_NOT_FOUND", operationSequence);
       }
       if (!isProjectRecord(reloaded)) {
-        return failure5(operation, "ERROR", "PROJECT_LOADER_RESPONSE_INVALID", operationSequence);
+        return failure9(operation, "ERROR", "PROJECT_LOADER_RESPONSE_INVALID", operationSequence);
       }
       const acceptedRecord = freezeProjectRecord(reloaded);
       if (acceptedRecord.identity.projectId !== accepted.identity.projectId || acceptedRecord.identity.ownerId !== accepted.identity.ownerId || acceptedRecord.identity.tenantId !== accepted.identity.tenantId || acceptedRecord.identity.revisionId !== accepted.identity.revisionId) {
-        return failure5(operation, "DENIED", "STALE_ACCEPTED_REVISION", operationSequence);
+        return failure9(operation, "DENIED", "STALE_ACCEPTED_REVISION", operationSequence);
       }
       const resolved = await resolveMetadata({
         record: acceptedRecord,
@@ -11259,13 +13915,13 @@ function createSite400IGameRoute(options) {
         resolveRegisteredAsset: options.resolveRegisteredAsset
       });
       if (!resolved.ok) {
-        return failure5(operation, resolved.status, resolved.reason, operationSequence);
+        return failure9(operation, resolved.status, resolved.reason, operationSequence);
       }
       if (featureFlag !== "on") return unavailable(operation, featureFlag);
       const entry = await loadEntry();
       return await commit(operation, entry, acceptedRecord, activeRegistryRequest, resolved.metadata, operationSequence);
     } catch {
-      return failure5(operation, "ERROR", "IGAME_ROUTE_EXCEPTION");
+      return failure9(operation, "ERROR", "IGAME_ROUTE_EXCEPTION");
     }
   };
   return {
@@ -11277,12 +13933,12 @@ function createSite400IGameRoute(options) {
         return Promise.resolve(unavailable(operation, featureFlag));
       }
       if (!isStableId(operation.operationId)) {
-        return Promise.resolve(failure5(operation, "ERROR", "INVALID_OPERATION_ID"));
+        return Promise.resolve(failure9(operation, "ERROR", "INVALID_OPERATION_ID"));
       }
       const acceptedOperation = copyOperation(operation);
       const duplicate = operations.get(acceptedOperation.operationId);
       if (duplicate !== void 0) {
-        return sameOperation(duplicate.operation, acceptedOperation) ? duplicate.promise : Promise.resolve(failure5(acceptedOperation, "ERROR", "DUPLICATE_OPERATION_ID"));
+        return sameOperation(duplicate.operation, acceptedOperation) ? duplicate.promise : Promise.resolve(failure9(acceptedOperation, "ERROR", "DUPLICATE_OPERATION_ID"));
       }
       const scheduled = queue.then(() => execute(acceptedOperation));
       operations.set(acceptedOperation.operationId, {
@@ -11313,315 +13969,6 @@ function createSite400LazyEntry(loader = async () => {
       return modulePromise;
     }
   });
-}
-
-// src/draw2-export-registry.ts
-var PNG_EXPORT_MAX_PIXELS = 4096 * 4096;
-var PNG_EXPORT_SCALE_PRESETS = Object.freeze([
-  1,
-  2,
-  3,
-  4,
-  6,
-  8,
-  12,
-  16,
-  24,
-  32,
-  48,
-  64,
-  96,
-  128,
-  192,
-  256
-]);
-var EXPORT_FORMATS = Object.freeze([
-  {
-    id: "png",
-    category: "image",
-    label: "PNG",
-    description: "\u900F\u904E\u3092\u4FDD\u3063\u305F\u753B\u50CF",
-    extension: "png",
-    mimeType: "image/png",
-    visible: true,
-    supported: true,
-    supportsScale: true
-  },
-  {
-    id: "jpeg",
-    category: "image",
-    label: "JPEG",
-    description: "\u8EFD\u91CF\u306A\u753B\u50CF",
-    extension: "jpg",
-    mimeType: "image/jpeg",
-    visible: true,
-    supported: true,
-    supportsScale: true
-  },
-  {
-    id: "webp",
-    category: "image",
-    label: "WebP",
-    description: "\u8EFD\u91CF\u30FB\u900F\u904E\u5BFE\u5FDC\u306E\u753B\u50CF",
-    extension: "webp",
-    mimeType: "image/webp",
-    visible: true,
-    supported: true,
-    supportsScale: true
-  },
-  {
-    id: "avif",
-    category: "image",
-    label: "AVIF",
-    description: "\u30D6\u30E9\u30A6\u30B6\u5BFE\u5FDC\u6642\u306E\u9AD8\u5727\u7E2E\u753B\u50CF",
-    extension: "avif",
-    mimeType: "image/avif",
-    visible: true,
-    supported: true,
-    supportsScale: true
-  },
-  {
-    id: "bmp",
-    category: "image",
-    label: "BMP",
-    description: "\u4E92\u63DB\u6027\u91CD\u8996\u306E\u30D3\u30C3\u30C8\u30DE\u30C3\u30D7",
-    extension: "bmp",
-    mimeType: "image/bmp",
-    visible: true,
-    supported: true,
-    supportsScale: true
-  },
-  {
-    id: "tiff",
-    category: "image",
-    label: "TIFF",
-    description: "\u5370\u5237\u30FB\u4FDD\u5B58\u5411\u3051\u306E\u9AD8\u54C1\u8CEA\u753B\u50CF",
-    extension: "tiff",
-    mimeType: "image/tiff",
-    visible: true,
-    supported: true,
-    supportsScale: true
-  },
-  {
-    id: "gif",
-    category: "animation",
-    label: "GIF",
-    description: "\u30A2\u30CB\u30E1\u30FC\u30B7\u30E7\u30F3\u753B\u50CF",
-    extension: "gif",
-    mimeType: "image/gif",
-    visible: true,
-    supported: true,
-    supportsScale: true
-  },
-  {
-    id: "apng",
-    category: "animation",
-    label: "APNG",
-    description: "\u900F\u904E\u5BFE\u5FDC\u30A2\u30CB\u30E1\u30FC\u30B7\u30E7\u30F3",
-    extension: "apng",
-    mimeType: "image/apng",
-    visible: true,
-    supported: true,
-    supportsScale: true
-  },
-  {
-    id: "webm",
-    category: "animation",
-    label: "WebM Draw + Audio",
-    description: "Draw\u30A2\u30CB\u30E1\u30FC\u30B7\u30E7\u30F3\u3068\u9078\u629E\u3057\u305FAudio\u3092\u4E00\u4F53\u5316\u3057\u305F\u52D5\u753B",
-    extension: "webm",
-    mimeType: "video/webm",
-    visible: true,
-    supported: true,
-    supportsScale: false
-  },
-  {
-    id: "wav",
-    category: "audio",
-    label: "WAV Mix",
-    description: "\u9078\u629E\u3057\u305FBGM\u30FBSE\u30FB\u697D\u5668\u3092\u542B\u3080\u975E\u5727\u7E2E\u30DF\u30C3\u30AF\u30B9",
-    extension: "wav",
-    mimeType: "audio/wav",
-    visible: true,
-    supported: true,
-    supportsScale: false
-  },
-  {
-    id: "audio-webm",
-    category: "audio",
-    label: "WebM Audio (Opus)",
-    description: "\u9078\u629E\u3057\u305FBGM\u30FBSE\u30FB\u697D\u5668\u3092\u8EFD\u91CF\u306AOpus\u97F3\u58F0\u3067\u4FDD\u5B58",
-    extension: "webm",
-    mimeType: "audio/webm",
-    visible: true,
-    supported: true,
-    supportsScale: false
-  },
-  {
-    id: "audio-ogg",
-    category: "audio",
-    label: "Ogg Audio (Opus)",
-    description: "\u5BFE\u5FDC\u30D6\u30E9\u30A6\u30B6\u3067\u9078\u629E\u3057\u305FAudio\u3092Ogg/Opus\u3067\u4FDD\u5B58",
-    extension: "ogg",
-    mimeType: "audio/ogg",
-    visible: true,
-    supported: true,
-    supportsScale: false
-  },
-  {
-    id: "svg",
-    category: "image",
-    label: "SVG",
-    description: "\u30D9\u30AF\u30BF\u30FC\u753B\u50CF",
-    extension: "svg",
-    mimeType: "image/svg+xml",
-    visible: true,
-    supported: true,
-    supportsScale: true
-  },
-  {
-    id: "sprite-sheet",
-    category: "animation",
-    label: "Sprite Sheet",
-    description: "\u5168\u30D5\u30EC\u30FC\u30E0\u3092\u4E26\u3079\u305F\u753B\u50CF",
-    extension: "png",
-    mimeType: "image/png",
-    visible: true,
-    supported: true,
-    supportsScale: true
-  },
-  {
-    id: "atlas-json",
-    category: "animation",
-    label: "Atlas metadata",
-    description: "Sprite Sheet\u306E\u5EA7\u6A19\u30E1\u30BF\u30C7\u30FC\u30BF",
-    extension: "json",
-    mimeType: "application/json",
-    visible: true,
-    supported: true,
-    supportsScale: false
-  },
-  {
-    id: "tileset",
-    category: "tiles",
-    label: "Tileset",
-    description: "\u30BF\u30A4\u30EB\u7D20\u6750\u3068\u914D\u7F6E\u60C5\u5831",
-    extension: "png",
-    mimeType: "image/png",
-    visible: true,
-    supported: true,
-    supportsScale: true
-  },
-  {
-    id: "pxd",
-    category: "project",
-    label: "PXD Project",
-    description: "Draw / Audio / Game\u3092\u542B\u3080\u30D7\u30ED\u30B8\u30A7\u30AF\u30C8",
-    extension: "pxd",
-    mimeType: "application/vnd.pixieed.pxd",
-    visible: true,
-    supported: true,
-    supportsScale: false
-  },
-  {
-    id: "glb",
-    category: "game",
-    label: "GLB",
-    description: "3D\u30B2\u30FC\u30E0\u7D20\u6750\uFF08\u5C06\u6765\u5BFE\u5FDC\uFF09",
-    extension: "glb",
-    mimeType: "model/gltf-binary",
-    visible: false,
-    supported: false,
-    supportsScale: false
-  }
-]);
-var EXPORT_FORMAT_BY_ID = new Map(EXPORT_FORMATS.map((definition) => [
-  definition.id,
-  definition
-]));
-
-// src/draw2-export.ts
-var PXD_MAGIC = new Uint8Array([
-  80,
-  88,
-  68,
-  0
-]);
-var PXD_CREATED_BY = Object.freeze({
-  application: "PiXiEED",
-  version: "2.0.0-reference"
-});
-function assert(condition, code, message) {
-  if (!condition) throw Object.assign(new Error(message), {
-    code
-  });
-}
-function writeUint16LittleEndian(value) {
-  assert(Number.isSafeInteger(value) && value >= 0 && value <= 65535, "ZIP_NUMBER_INVALID", "ZIP uint16 value is invalid.");
-  return new Uint8Array([
-    value & 255,
-    value >>> 8 & 255
-  ]);
-}
-function writeUint32LittleEndian(value) {
-  assert(Number.isSafeInteger(value) && value >= 0 && value <= 4294967295, "ZIP_NUMBER_INVALID", "ZIP uint32 value is invalid.");
-  return new Uint8Array([
-    value & 255,
-    value >>> 8 & 255,
-    value >>> 16 & 255,
-    value >>> 24 & 255
-  ]);
-}
-function concatBytes(...parts) {
-  const total = parts.reduce((sum, part) => sum + part.byteLength, 0);
-  const output = new Uint8Array(total);
-  let offset = 0;
-  for (const part of parts) {
-    output.set(part, offset);
-    offset += part.byteLength;
-  }
-  return output;
-}
-function crc32(bytes) {
-  let crc = 4294967295;
-  for (const byte of bytes) {
-    crc ^= byte;
-    for (let bit = 0; bit < 8; bit += 1) crc = crc >>> 1 ^ ((crc & 1) === 1 ? 3988292384 : 0);
-  }
-  return (crc ^ 4294967295) >>> 0;
-}
-function zipFilenameIsSafe(filename) {
-  return filename.length > 0 && filename.length <= 255 && !filename.startsWith("/") && !filename.includes("\\") && !filename.split("/").some((segment) => segment.length === 0 || segment === "." || segment === "..") && !/[\u0000-\u001f]/u.test(filename);
-}
-function encodeStoredZip(entries) {
-  assert(entries.length > 0, "ZIP_ENTRIES_EMPTY", "ZIP requires at least one output.");
-  assert(entries.length <= 65535, "ZIP_ENTRIES_TOO_MANY", "ZIP has too many entries.");
-  const encoder = new TextEncoder();
-  const localParts = [];
-  const centralParts = [];
-  const filenames = /* @__PURE__ */ new Set();
-  let localOffset = 0;
-  for (const entry of entries) {
-    assert(zipFilenameIsSafe(entry.filename), "ZIP_FILENAME_INVALID", `ZIP filename ${entry.filename} is unsafe.`);
-    assert(!filenames.has(entry.filename), "ZIP_FILENAME_DUPLICATE", `ZIP filename ${entry.filename} is duplicated.`);
-    filenames.add(entry.filename);
-    const nameBytes = encoder.encode(entry.filename);
-    const bytes = new Uint8Array(entry.bytes);
-    assert(nameBytes.byteLength <= 65535, "ZIP_FILENAME_TOO_LONG", "ZIP filename is too long.");
-    assert(bytes.byteLength <= 4294967295, "ZIP_ENTRY_TOO_LARGE", `ZIP entry ${entry.filename} is too large.`);
-    assert(localOffset <= 4294967295, "ZIP_OFFSET_INVALID", "ZIP local entry offset is too large.");
-    const checksum = crc32(bytes);
-    const localHeader = concatBytes(writeUint32LittleEndian(67324752), writeUint16LittleEndian(20), writeUint16LittleEndian(2048), writeUint16LittleEndian(0), writeUint16LittleEndian(0), writeUint16LittleEndian(0), writeUint32LittleEndian(checksum), writeUint32LittleEndian(bytes.byteLength), writeUint32LittleEndian(bytes.byteLength), writeUint16LittleEndian(nameBytes.byteLength), writeUint16LittleEndian(0));
-    const localRecord = concatBytes(localHeader, nameBytes, bytes);
-    localParts.push(localRecord);
-    centralParts.push(concatBytes(writeUint32LittleEndian(33639248), writeUint16LittleEndian(20), writeUint16LittleEndian(20), writeUint16LittleEndian(2048), writeUint16LittleEndian(0), writeUint16LittleEndian(0), writeUint16LittleEndian(0), writeUint32LittleEndian(checksum), writeUint32LittleEndian(bytes.byteLength), writeUint32LittleEndian(bytes.byteLength), writeUint16LittleEndian(nameBytes.byteLength), writeUint16LittleEndian(0), writeUint16LittleEndian(0), writeUint16LittleEndian(0), writeUint16LittleEndian(0), writeUint32LittleEndian(0), writeUint32LittleEndian(localOffset), nameBytes));
-    localOffset += localRecord.byteLength;
-  }
-  const centralDirectory = concatBytes(...centralParts);
-  assert(localOffset <= 4294967295, "ZIP_OFFSET_INVALID", "ZIP local entries are too large.");
-  assert(centralDirectory.byteLength <= 4294967295, "ZIP_DIRECTORY_TOO_LARGE", "ZIP central directory is too large.");
-  const endOfCentralDirectory = concatBytes(writeUint32LittleEndian(101010256), writeUint16LittleEndian(0), writeUint16LittleEndian(0), writeUint16LittleEndian(entries.length), writeUint16LittleEndian(entries.length), writeUint32LittleEndian(centralDirectory.byteLength), writeUint32LittleEndian(localOffset), writeUint16LittleEndian(0));
-  return concatBytes(...localParts, centralDirectory, endOfCentralDirectory);
 }
 
 // src/audio/audio-200/metadata-authority.ts
@@ -12462,7 +14809,7 @@ function translateDraw2Text(text2, locale) {
 
 // src/wp180-workspace-ui.ts
 function loadAudio200WorkspaceModule() {
-  const chunkUrl = new URL("audio-200-workspace.js?v=20260823-audio-eq-preview-2", import.meta.url).href;
+  const chunkUrl = new URL("audio-200-workspace.js?v=20260828-project-cas-v2", import.meta.url).href;
   return import(chunkUrl);
 }
 function loadAudio250RecordingModule() {
@@ -12688,6 +15035,7 @@ var RIGHT_DOCK_STORAGE_KEY = "pixieed:draw2:right-dock:v1";
 var AUDIO_DOCK_STORAGE_KEY = "pixieed:draw2:audio-dock:v2";
 var RAIL_LAYOUT_STORAGE_KEY = "pixieed:draw2:rail-layout:v1";
 var DRAW2_THEME_STORAGE_KEY = "pixieed:draw2:theme:v1";
+var DRAW2_DETAIL_MODE_STORAGE_KEY = "pixieed:draw2:detail-mode:v1";
 var RIGHT_DOCK_DEFAULT_PALETTE_RATIO = 0.3;
 var AUDIO_DOCK_PANEL_REGISTRY = [
   {
@@ -12800,6 +15148,21 @@ function writeRailLayoutPreference(storage, preference) {
   if (storage === void 0) return;
   try {
     storage.setItem(RAIL_LAYOUT_STORAGE_KEY, JSON.stringify(preference));
+  } catch {
+  }
+}
+function readWorkspaceDetailMode(storage) {
+  if (storage === void 0) return "guided";
+  try {
+    return resolveWorkspaceDetailMode(storage.getItem(DRAW2_DETAIL_MODE_STORAGE_KEY));
+  } catch {
+    return "guided";
+  }
+}
+function writeWorkspaceDetailMode(storage, mode) {
+  if (storage === void 0) return;
+  try {
+    storage.setItem(DRAW2_DETAIL_MODE_STORAGE_KEY, mode);
   } catch {
   }
 }
@@ -13239,6 +15602,16 @@ var WORKSPACE_COMMANDS = [
     ]
   },
   {
+    id: "toggle-detail-mode",
+    version: 1,
+    label: "Toggle Guided / Detailed Mode",
+    regions: [
+      "topbar",
+      "right_dock",
+      "overlay"
+    ]
+  },
+  {
     id: "workspace-preset-pixel",
     version: 1,
     label: "Pixel Workspace",
@@ -13403,6 +15776,8 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
   const workspaceManifestStore = createIndexedDbWorkspaceManifestStore();
   const gamePersistenceStore = createIndexedDbGameEditorPersistenceStore();
   let gamePersistenceRevision = 0;
+  let gamePersistenceExpectedRevision = 0;
+  let gamePersistenceExpectedStateHash = null;
   let gamePersistenceSaveQueue = Promise.resolve();
   let pixyncGameStore;
   let workspaceProjectSwitchQueue = Promise.resolve();
@@ -13530,6 +15905,9 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
   const modeSummary = query(documentRef, "#draw2WorkspaceModeSummary");
   const modeSummaryLabel = query(documentRef, "#draw2WorkspaceModeSummaryLabel");
   const modeSummaryDescription = query(documentRef, "#draw2WorkspaceModeSummaryDescription");
+  const detailModeToggles = queryAll(documentRef, "[data-workspace-detail-mode-toggle]");
+  const detailModeLabel = query(documentRef, "[data-workspace-detail-mode-label]");
+  const detailModeDescription = query(documentRef, "[data-workspace-detail-mode-description]");
   const modeTransitionBanner = query(documentRef, "#draw2ModeTransitionBanner");
   const modeTransitionLabel = query(documentRef, "#draw2ModeTransitionLabel");
   const modeTransitionDetail = query(documentRef, "#draw2ModeTransitionDetail");
@@ -13654,6 +16032,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       return void 0;
     }
   })();
+  let detailMode = readWorkspaceDetailMode(rightDockStorage);
   const rightDockPreference = readRightDockPreference(rightDockStorage);
   let railLayoutPreference = readRailLayoutPreference(rightDockStorage);
   const applyRailLayoutPreference = () => {
@@ -14160,6 +16539,13 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
   const draw2GameBuildChecks = query(documentRef, "#draw2GameBuildChecks");
   const draw2GameBuildManifestPreview = query(documentRef, "#draw2GameBuildManifestPreview");
   const draw2GameBuildStatus = query(documentRef, "#draw2GameBuildStatus");
+  const draw2GameStudioReleaseCandidate = query(documentRef, "#draw2GameStudioReleaseCandidate");
+  const draw2GameStudioReleaseManifest = query(documentRef, "#draw2GameStudioReleaseManifest");
+  const draw2GameStudioPublishIntent = query(documentRef, "#draw2GameStudioPublishIntent");
+  const draw2GameStudioReleaseArtifact = query(documentRef, "#draw2GameStudioReleaseArtifact");
+  const draw2GameStudioReleaseArtifactDownload = query(documentRef, "#draw2GameStudioReleaseArtifactDownload");
+  const draw2GameStudioReleaseManifestPreview = query(documentRef, "#draw2GameStudioReleaseManifestPreview");
+  const draw2GameStudioReleaseStatus = query(documentRef, "#draw2GameStudioReleaseStatus");
   const draw2AudioPanelOpenTimeline = query(documentRef, "#draw2AudioPanelOpenTimeline");
   const draw2AudioPanelAddTrack = query(documentRef, "#draw2AudioPanelAddTrack");
   const draw2AudioPanelStatus = query(documentRef, "#draw2AudioPanelStatus");
@@ -14339,11 +16725,18 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
   let gameAssetBrowserQuery = "";
   let gameAssetBrowserSource = "ALL";
   let selectedGameAnimationClipId;
+  let selectedGameAssetDefinitionId;
   let gameAnimationPreviewFrame = 0;
   let gameAnimationPreviewTimer;
   let gameLogicMode = "SIMPLE";
   let gameLogicModeBehaviorId;
   let lastGameEngineAdapterPackage;
+  let lastStudioReleaseCandidate;
+  let lastStudioPublishIntent;
+  let lastStudioReleaseArtifactBundle;
+  let studioReleaseCandidateGameRevision;
+  let studioReleaseBusy = false;
+  let studioReleaseArtifactBusy = false;
   let renderGameAssetRail = () => {
   };
   const bindingsFromCanonicalProject = (project) => {
@@ -14471,48 +16864,56 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     }
   });
   let site400RouteOperationSequence = 0;
-  const refreshSite400IGameRoute = async (operation) => {
-    if (igameFeatureFlag !== "on") {
-      root.dataset.site400IgameRoute = igameFeatureFlag === "off" ? "off" : "unknown";
-      return false;
-    }
-    const project = pixyncGameStore?.project;
-    if (project === void 0) {
-      root.dataset.site400IgameRoute = "awaiting-project";
-      return false;
-    }
-    const projectId = String(project.projectId);
-    const request = {
-      requestId: `request:studio-igame:${projectId}`,
-      sessionReference: `session:studio-igame:${projectId}`,
-      correlationId: `correlation:studio-igame:${projectId}`,
-      assetId: site400AssetFor(projectId),
-      requestedTenantId: site400TenantFor(projectId)
+  let site400RouteRefreshQueue = Promise.resolve();
+  const refreshSite400IGameRoute = (operation) => {
+    const run = async () => {
+      if (igameFeatureFlag !== "on") {
+        root.dataset.site400IgameRoute = igameFeatureFlag === "off" ? "off" : "unknown";
+        return false;
+      }
+      const project = pixyncGameStore?.project;
+      if (project === void 0) {
+        root.dataset.site400IgameRoute = "awaiting-project";
+        return false;
+      }
+      const projectId = String(project.projectId);
+      const request = {
+        requestId: `request:studio-igame:${projectId}`,
+        sessionReference: `session:studio-igame:${projectId}`,
+        correlationId: `correlation:studio-igame:${projectId}`,
+        assetId: site400AssetFor(projectId),
+        requestedTenantId: site400TenantFor(projectId)
+      };
+      const currentRouteProject = site400IGameRoute.currentProject();
+      const effectiveOperation = operation === "create" && currentRouteProject !== void 0 && currentRouteProject.identity.projectId === projectId ? "open" : operation;
+      const operationId = `studio-igame-${effectiveOperation}:${projectId}:${effectiveOperation === "reload" ? ++site400RouteOperationSequence : String(project.revision.revisionId)}`;
+      const result = effectiveOperation === "create" ? await site400IGameRoute.dispatch({
+        operationId,
+        type: "create",
+        createInput: {
+          project
+        },
+        registryRequest: request
+      }) : effectiveOperation === "open" ? await site400IGameRoute.dispatch({
+        operationId,
+        type: "open",
+        projectId,
+        registryRequest: request
+      }) : await site400IGameRoute.dispatch({
+        operationId,
+        type: "reload"
+      });
+      root.dataset.site400IgameRoute = result.status.toLowerCase();
+      if (result.reason !== void 0) {
+        root.dataset.site400IgameReason = result.reason;
+      } else {
+        delete root.dataset.site400IgameReason;
+      }
+      return result.status === "READY";
     };
-    const operationId = `studio-igame-${operation}:${projectId}:${operation === "reload" ? ++site400RouteOperationSequence : String(project.revision.revisionId)}`;
-    const result = operation === "create" ? await site400IGameRoute.dispatch({
-      operationId,
-      type: "create",
-      createInput: {
-        project
-      },
-      registryRequest: request
-    }) : operation === "open" ? await site400IGameRoute.dispatch({
-      operationId,
-      type: "open",
-      projectId,
-      registryRequest: request
-    }) : await site400IGameRoute.dispatch({
-      operationId,
-      type: "reload"
-    });
-    root.dataset.site400IgameRoute = result.status.toLowerCase();
-    if (result.reason !== void 0) {
-      root.dataset.site400IgameReason = result.reason;
-    } else {
-      delete root.dataset.site400IgameReason;
-    }
-    return result.status === "READY";
+    const scheduled = site400RouteRefreshQueue.then(run, run);
+    site400RouteRefreshQueue = scheduled.then(() => void 0, () => void 0);
+    return scheduled;
   };
   let selectedGameTrackId = gameDeckTracks[0]?.id;
   let renderGameCustomPanels = () => {
@@ -14682,8 +17083,13 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     const revision = gamePersistenceRevision + 1;
     gamePersistenceRevision = revision;
     gamePersistenceSaveQueue = gamePersistenceSaveQueue.then(async () => {
+      const expectedRevision = gamePersistenceExpectedRevision;
+      const expectedStateHash = gamePersistenceExpectedStateHash;
       const record = await createGameEditorPersistenceRecord(projectId, tracks, revision, (/* @__PURE__ */ new Date()).toISOString(), void 0, gameDeckBindings, behaviors, behaviorSources, gamePhysics2D, templateInstances, animationBindings);
-      const saved = await gamePersistenceStore.save(record);
+      const saved = await gamePersistenceStore.save(record, {
+        expectedRevision,
+        expectedStateHash
+      });
       if (!saved.ok) {
         root.dataset.gamePersistenceState = "unavailable";
         return;
@@ -14691,14 +17097,27 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       root.dataset.gamePersistenceState = saved.stale ? "stale-write-ignored" : reason === "recovery" ? "restored" : "saved";
       root.dataset.gamePersistenceRevision = String(revision);
       if (!saved.stale) {
+        gamePersistenceExpectedRevision = revision;
+        gamePersistenceExpectedStateHash = record.stateHash;
         const command = await commitCanonicalGameRecord(record);
+        let canonicalSaveConflict = false;
         if (pixyncGameStore !== void 0) {
           const canonicalRecord = await createGameEditorPersistenceRecord(projectId, tracks, revision, record.savedAt, {
             project: pixyncGameStore.project,
             appliedCommandIds: pixyncGameStore.appliedCommandIds
           }, gameDeckBindings, behaviors, behaviorSources, gamePhysics2D, templateInstances, animationBindings);
-          await gamePersistenceStore.save(canonicalRecord);
+          const canonicalSaved = await gamePersistenceStore.save(canonicalRecord, {
+            expectedRevision: gamePersistenceExpectedRevision,
+            expectedStateHash: gamePersistenceExpectedStateHash
+          });
+          if (canonicalSaved.ok && !canonicalSaved.stale) {
+            gamePersistenceExpectedStateHash = canonicalRecord.stateHash;
+          } else if (canonicalSaved.ok && canonicalSaved.stale) {
+            canonicalSaveConflict = true;
+            root.dataset.gamePersistenceState = "stale-write-ignored";
+          }
         }
+        if (canonicalSaveConflict) return;
         windowRef.dispatchEvent(new CustomEvent("draw2:game-editor-committed", {
           detail: {
             reason,
@@ -14706,15 +17125,15 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
             command
           }
         }));
-      }
-      await workspaceManifestStore.updateModule(asWorkspaceProjectId(projectId), "game", {
-        status: "READY",
-        revision,
-        stateHash: record.stateHash,
-        savedAt: record.savedAt
-      });
-      if (root.dataset.creatorMode === "GAME") {
-        void refreshSite400IGameRoute("open");
+        await workspaceManifestStore.updateModule(asWorkspaceProjectId(projectId), "game", {
+          status: "READY",
+          revision,
+          stateHash: record.stateHash,
+          savedAt: record.savedAt
+        });
+        if (root.dataset.creatorMode === "GAME") {
+          void refreshSite400IGameRoute("open");
+        }
       }
     }).catch(() => {
       root.dataset.gamePersistenceState = "error";
@@ -16138,6 +18557,8 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
   const audioWaveformCacheUnavailable = /* @__PURE__ */ new Set();
   const audioClipPreviewInputs = /* @__PURE__ */ new Map();
   let audioPersistenceStore;
+  let audioPersistenceExpectedRevision = 0;
+  let audioPersistenceExpectedStateHash = null;
   let audioPersistenceSaveQueue = Promise.resolve();
   const AUDIO_PERSISTENCE_AUTOSAVE_DEBOUNCE_MS = 250;
   let audioPersistenceSaveTimer;
@@ -16145,7 +18566,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
   const setAudioPersistenceState = (state2, message) => {
     root.dataset.audioPersistenceState = state2;
     if (audioGlobalSaveState !== void 0) {
-      audioGlobalSaveState.textContent = localizeAudioText(state2 === "pending" ? "Saving\u2026" : state2 === "error" ? "Save error" : state2 === "unavailable" ? "Local only" : state2 === "ready" ? "Ready \xB7 Local" : state2 === "restored" ? "Restored \xB7 Local" : "Saved \xB7 Local");
+      audioGlobalSaveState.textContent = localizeAudioText(state2 === "pending" ? "Saving\u2026" : state2 === "error" ? "Save error" : state2 === "unavailable" ? "Local only" : state2 === "ready" ? "Ready \xB7 Local" : state2 === "restored" ? "Restored \xB7 Local" : state2 === "stale-write-ignored" ? "Conflict \xB7 Reload" : "Saved \xB7 Local");
     }
     if (message !== void 0 && audioSettingsStatus !== void 0) {
       audioSettingsStatus.textContent = localizeAudioText(message);
@@ -16391,11 +18812,21 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       setAudioPersistenceState("error", `Save failed \xB7 ${record.diagnostics[0]?.code ?? "AUDIO_CHECKPOINT_INVALID"}`);
       return;
     }
-    const saved = await audioPersistenceStore.save(record.value);
+    const saved = await audioPersistenceStore.save(record.value, {
+      expectedProjectRevision: audioPersistenceExpectedRevision,
+      expectedStateHash: audioPersistenceExpectedStateHash
+    });
     if (!saved.ok) {
       setAudioPersistenceState("error", `Save failed \xB7 ${saved.diagnostics[0]?.code ?? "AUDIO_HOST_BOUNDARY_INVALID"}`);
       return;
     }
+    const stale = saved.diagnostics.some((diagnostic11) => diagnostic11.code === "AUDIO_STALE_PROJECT_REVISION");
+    if (stale) {
+      setAudioPersistenceState("stale-write-ignored", "Save skipped \xB7 another tab changed Audio. Reload before continuing.");
+      return;
+    }
+    audioPersistenceExpectedRevision = record.value.checkpoint.projectRevision;
+    audioPersistenceExpectedStateHash = record.value.checkpoint.stateHash;
     root.dataset.audioPersistenceRevision = String(record.value.checkpoint.projectRevision);
     await workspaceManifestStore.updateModule(asWorkspaceProjectId(record.value.projectId), "audio", {
       status: "READY",
@@ -16762,6 +19193,8 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
         setAudioPersistenceState("pending", "Loading local Project state\u2026");
         const audioProjectId = audio200WorkspaceModule.asAudioProjectId(workspaceProjectId);
         const loaded = await audioPersistenceStore.load(audioProjectId);
+        audioPersistenceExpectedRevision = loaded.ok ? loaded.value?.checkpoint.projectRevision ?? 0 : 0;
+        audioPersistenceExpectedStateHash = loaded.ok ? loaded.value?.checkpoint.stateHash ?? null : null;
         if (!loaded.ok) {
           setAudioPersistenceState("unavailable", "IndexedDB unavailable \xB7 this session will remain local");
           audioPersistenceStore = audio200WorkspaceModule.createLatestWriteAudioPersistenceStore(audio200WorkspaceModule.createMemoryAudioPersistenceStore());
@@ -17623,7 +20056,14 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
           tilemap: track.tilemap
         }
       }));
-      gameDeckBindings = bindingsFromCanonicalProject(input.next);
+      const previousGameBindings = gameDeckBindings;
+      gameDeckBindings = bindingsFromCanonicalProject(input.next).map((binding) => {
+        const previous = previousGameBindings.find((candidate) => candidate.trackId === binding.trackId && candidate.kind === binding.kind && candidate.assetId === binding.assetId && candidate.revisionId === binding.revisionId);
+        return previous?.assetDefinitionId === void 0 ? binding : {
+          ...binding,
+          assetDefinitionId: previous.assetDefinitionId
+        };
+      });
       gamePersistenceRevision = Math.max(gamePersistenceRevision, input.next.revision.sequence - 1);
       renderModeDeckTracks(gameAssetTracks, gameDeckTracks, "game");
       renderGameCustomPanels();
@@ -17631,7 +20071,16 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
         project: store.project,
         appliedCommandIds: store.appliedCommandIds
       }, gameDeckBindings, gameBehaviors, gameBehaviorSources, gamePhysics2D, gameTemplateInstances, gameAnimationBindings);
-      await gamePersistenceStore.save(record);
+      const saved = await gamePersistenceStore.save(record, {
+        expectedRevision: gamePersistenceExpectedRevision,
+        expectedStateHash: gamePersistenceExpectedStateHash
+      });
+      if (saved.ok && !saved.stale) {
+        gamePersistenceExpectedRevision = record.revision;
+        gamePersistenceExpectedStateHash = record.stateHash;
+      } else if (saved.ok && saved.stale) {
+        root.dataset.gamePersistenceState = "stale-write-ignored";
+      }
     }
     return {
       operationId: input.operation.operationId,
@@ -17982,6 +20431,8 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     audioExportSelectionProjectId = void 0;
     pixyncRemoteAudioEntryIds.clear();
     audioPersistenceStore = void 0;
+    audioPersistenceExpectedRevision = 0;
+    audioPersistenceExpectedStateHash = null;
     audioProjectedProjectId = void 0;
     audioProjectedMixer = void 0;
     audioProjectedEffects = void 0;
@@ -18441,6 +20892,8 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       gameCreationMode = "UNSELECTED";
       gameCreationModePromptVisible = true;
       gamePersistenceRevision = 0;
+      gamePersistenceExpectedRevision = 0;
+      gamePersistenceExpectedStateHash = null;
       gameDeckTracks = [];
       gameDeckBindings = [];
       gameAnimationBindings = [];
@@ -18463,6 +20916,8 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     }
     const record = await gamePersistenceStore.load(projectId);
     gamePersistenceRevision = record?.revision ?? 0;
+    gamePersistenceExpectedRevision = gamePersistenceRevision;
+    gamePersistenceExpectedStateHash = record?.stateHash ?? null;
     let restored = false;
     if (record !== null && record.projectId === projectId && await validateGameEditorPersistenceRecord(record)) {
       gameDeckTracks = record.tracks.map((track) => ({
@@ -23379,14 +25834,14 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       audioRenderStatus?.removeAttribute("aria-busy");
     }
   };
-  const renderAudioWavForExport = async (durationSeconds) => {
+  const renderAudioWavForExport = async (durationSeconds, selection = "CURRENT") => {
     await ensureAudioWorkspaceSession();
     const session = audioWorkspaceSession;
     if (session === void 0) return null;
     const selectedTrackIds = audioRenderTrackIds();
     const selectedClipIds = audioRenderClipIds();
-    if (selectedTrackIds.length === 0) return null;
-    const renderProject = selectedTrackIds.length === session.project.tracks.length && selectedClipIds.length === session.project.clips.length ? session.project : audioProjectForRenderSelection(session.project, selectedTrackIds, selectedClipIds);
+    if (selection !== "FULL" && selectedTrackIds.length === 0) return null;
+    const renderProject = selection === "FULL" ? session.project : selectedTrackIds.length === session.project.tracks.length && selectedClipIds.length === session.project.clips.length ? session.project : audioProjectForRenderSelection(session.project, selectedTrackIds, selectedClipIds);
     if (renderProject === void 0) return null;
     if (renderProject.clips.length === 0 && renderProject.notes.length === 0) {
       return null;
@@ -23422,7 +25877,10 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       sampleRateHz: rendered.value.sampleRateHz,
       channels: rendered.value.channels,
       bitDepth: rendered.value.bitDepth,
-      durationSeconds: rendered.value.durationSeconds
+      durationSeconds: rendered.value.durationSeconds,
+      sourceProjectId: String(renderProject.projectId),
+      sourceStateHash: String(renderProject.stateHash),
+      sourceProjectRevision: renderProject.projectRevision
     };
   };
   audioRender?.addEventListener("click", () => {
@@ -25697,6 +28155,8 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       const panel = tab.dataset.workspacePanel;
       const visible = panel !== void 0 && isPanelKind(panel) && rightDockVisibleTabs.has(panel) && isPanelAllowedForCurrentMode(panel);
       tab.hidden = !visible;
+      tab.inert = !visible;
+      tab.setAttribute("aria-hidden", String(!visible));
       tab.dataset.rightTabVisible = String(visible);
       const selected = visible && panel === state.activePanel;
       tab.classList.toggle("is-active", selected);
@@ -25723,6 +28183,22 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     if (workspaceStatus !== void 0) workspaceStatus.textContent = compact;
     if (statusbarMessage !== void 0) statusbarMessage.textContent = compact;
   };
+  const renderDetailMode = () => {
+    const guided = detailMode === "guided";
+    root.dataset.detailMode = detailMode;
+    for (const toggle of detailModeToggles) {
+      toggle.setAttribute("aria-pressed", String(!guided));
+      toggle.setAttribute("aria-label", guided ? "\u8A73\u7D30\u30E2\u30FC\u30C9\u3078\u5207\u308A\u66FF\u3048" : "\u30AC\u30A4\u30C9\u30E2\u30FC\u30C9\u3078\u5207\u308A\u66FF\u3048");
+      toggle.setAttribute("title", guided ? "\u8A73\u7D30\u30E2\u30FC\u30C9\u3078\u5207\u308A\u66FF\u3048" : "\u30AC\u30A4\u30C9\u30E2\u30FC\u30C9\u3078\u5207\u308A\u66FF\u3048");
+    }
+    if (detailModeLabel !== void 0) {
+      detailModeLabel.textContent = guided ? "\u30AC\u30A4\u30C9" : "\u8A73\u7D30";
+    }
+    if (detailModeDescription !== void 0) {
+      detailModeDescription.textContent = guided ? "\u57FA\u672C\u64CD\u4F5C\u3092\u4E2D\u5FC3\u306B\u8868\u793A" : "\u9AD8\u5EA6\u306A\u8A2D\u5B9A\u3082\u8868\u793A";
+    }
+  };
+  renderDetailMode();
   const DRAW2_SYNC_UI_COPY = {
     local: {
       short: "Local",
@@ -25827,7 +28303,8 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
   const setPanel = (panel, openMobileSheet = true) => {
     if (!PANELS.includes(panel)) return;
     const modeProfile = currentDesktopModeProfile();
-    const nextPanel = modeProfile !== void 0 && !modeProfile.allowedPanels.includes(panel) ? modeProfile.defaultPanel : panel;
+    const detailRestricted = detailMode === "guided" && panel === "advanced";
+    const nextPanel = detailRestricted ? modeProfile?.defaultPanel ?? (isAudioMobileMode() ? "audio" : "color") : modeProfile !== void 0 && !modeProfile.allowedPanels.includes(panel) ? modeProfile.defaultPanel : panel;
     rightDockVisibleTabs.add(nextPanel);
     root.classList.remove("is-right-dock-collapsed");
     root.classList.remove("is-mobile-timeline-open");
@@ -25854,14 +28331,23 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       launcher.setAttribute("aria-pressed", String(launcher.dataset.workspacePanel === nextPanel));
     }
     for (const content of panelContents) {
-      content.hidden = content.dataset.workspacePanelContent !== nextPanel;
+      const selected = content.dataset.workspacePanelContent === nextPanel;
+      content.hidden = !selected;
+      content.inert = !selected;
+      content.setAttribute("aria-hidden", String(!selected));
     }
     const assetPanelActive = nextPanel === "assets";
     if (creatorAssetSurface !== void 0) {
-      creatorAssetSurface.hidden = !assetPanelActive && creatorState.activeMode !== "ASSET";
+      const assetSurfaceActive = assetPanelActive || creatorState.activeMode === "ASSET";
+      creatorAssetSurface.hidden = !assetSurfaceActive;
+      creatorAssetSurface.inert = !assetSurfaceActive;
+      creatorAssetSurface.setAttribute("aria-hidden", String(!assetSurfaceActive));
     }
     if (creatorAssetUnavailable !== void 0) {
-      creatorAssetUnavailable.hidden = assetPanelActive || creatorState.activeMode === "ASSET";
+      const unavailable2 = assetPanelActive || creatorState.activeMode === "ASSET";
+      creatorAssetUnavailable.hidden = unavailable2;
+      creatorAssetUnavailable.inert = unavailable2;
+      creatorAssetUnavailable.setAttribute("aria-hidden", String(unavailable2));
     }
     const colorEditor2 = query(documentRef, "#draw2WorkspaceColorEditor");
     if (colorEditor2 !== void 0) {
@@ -25882,6 +28368,20 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     hotPath.workspaceUpdates += 1;
     saveRightDockPreference();
     updateStatus(`${capability.profile} \xB7 ${panelLabel(nextPanel)} panel \xB7 local workspace state`);
+  };
+  const toggleDetailMode = () => {
+    detailMode = detailMode === "guided" ? "detailed" : "guided";
+    writeWorkspaceDetailMode(rightDockStorage, detailMode);
+    renderDetailMode();
+    if (detailMode === "guided" && state.activePanel === "advanced") {
+      setPanel(currentDesktopModeProfile()?.defaultPanel ?? "color", false);
+    }
+    windowRef.dispatchEvent(new CustomEvent("draw2:detail-mode", {
+      detail: {
+        mode: detailMode
+      }
+    }));
+    updateStatus(`${capability.profile} \xB7 ${detailMode === "guided" ? "Guided view" : "Detailed view"} \xB7 local workspace state`);
   };
   const creatorModeMessage = (mode) => {
     if (capability.profile === "desktop" && isDesktopCreatorMode(mode)) {
@@ -26437,6 +28937,11 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     void workspaceManifestStore.setActiveMode(asWorkspaceProjectId(workspaceProjectId), activeSurface);
     creatorState = transitionCreatorWorkspaceMode(creatorState, projectedMode);
     root.dataset.creatorMode = projectedMode;
+    windowRef.dispatchEvent(new CustomEvent("draw2:creator-mode", {
+      detail: {
+        mode: projectedMode
+      }
+    }));
     windowRef.dispatchEvent(new CustomEvent("draw2:game-editor-demand", {
       detail: {
         active: projectedMode === "GAME"
@@ -26513,6 +29018,136 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     });
   }
   const getAssetBridge = () => windowRef.__pixiedraw2AssetBridge;
+  const buildGoldenProject = async (mode) => {
+    const bridge = getAssetBridge();
+    if (bridge === void 0) {
+      throw new Error("iDRAW Asset bridge is unavailable.");
+    }
+    const drawSnapshot = bridge.snapshot();
+    if (drawSnapshot.projectId !== workspaceProjectId) {
+      throw new Error("iDRAW and workspace Project IDs do not match.");
+    }
+    const drawReference = await bridge.resolveCurrentReference({
+      mode
+    });
+    if (drawReference === void 0) {
+      throw new Error("Active iDRAW Asset is unavailable.");
+    }
+    await ensureAudioWorkspaceSession();
+    const audioProject = audioWorkspaceSession?.project;
+    if (audioProject === void 0) {
+      throw new Error("iAUDIO Project is unavailable.");
+    }
+    const ownerId = `studio-owner:${workspaceProjectId}`;
+    return createGoldenProject({
+      projectId: workspaceProjectId,
+      ownerId,
+      name: `${workspaceProjectId} \xB7 Golden Project`,
+      draw: {
+        projectId: workspaceProjectId,
+        ownerId,
+        kind: "DRAW",
+        assetId: drawReference.assetId,
+        revisionId: drawReference.revisionId,
+        contentHash: drawReference.contentHash,
+        licenseId: "draw2-local-preview",
+        permission: "READ",
+        reviewStatus: "APPROVED",
+        label: drawReference.label
+      },
+      audio: {
+        projectId: workspaceProjectId,
+        ownerId,
+        kind: "AUDIO",
+        assetId: `audio-project:${String(audioProject.projectId)}`,
+        revisionId: `audio-project-revision:${audioProject.projectRevision}`,
+        contentHash: String(audioProject.stateHash),
+        licenseId: `audio2-local-preview:${workspaceProjectId}`,
+        permission: "READ",
+        reviewStatus: "APPROVED",
+        label: "Audio\u5168\u4F53\u30DF\u30C3\u30AF\u30B9"
+      },
+      drawPlacement: {
+        x: 1,
+        y: 1
+      },
+      audioSettings: {
+        loop: true,
+        volume: 1
+      }
+    }, mode);
+  };
+  const applyGoldenProject = async (mode) => {
+    const result = await buildGoldenProject(mode);
+    if (!result.ok || result.value === void 0) return result;
+    const drawLock = result.value.manifest.assetLocks.find((lock) => lock.kind === "DRAW");
+    const audioLock = result.value.manifest.assetLocks.find((lock) => lock.kind === "AUDIO");
+    if (drawLock === void 0 || audioLock === void 0) {
+      throw new Error("Golden Project asset locks are incomplete.");
+    }
+    const existingHero = gameDeckTracks.find((track) => track.id === "hero");
+    const existingMusic = gameDeckTracks.find((track) => track.id === "music");
+    const heroTrack = {
+      ...existingHero ?? {
+        id: "hero",
+        filled: [
+          0
+        ],
+        components: defaultGameObjectComponents("hero", "SPRITE")
+      },
+      label: result.value.project.scenes[0]?.entities[0]?.name ?? "\u4E3B\u4EBA\u516C",
+      kind: "SPRITE",
+      active: true,
+      role: "PLAYER"
+    };
+    const musicTrack = {
+      ...existingMusic ?? {
+        id: "music",
+        filled: [
+          0
+        ],
+        components: defaultGameObjectComponents("music", "AUDIO")
+      },
+      label: result.value.project.scenes[0]?.entities[1]?.name ?? "Audio\u5168\u4F53\u30DF\u30C3\u30AF\u30B9",
+      kind: "MUSIC",
+      active: true,
+      role: "AUDIO"
+    };
+    const withoutGoldenTracks = gameDeckTracks.filter((track) => track.id !== "hero" && track.id !== "music");
+    gameDeckTracks = [
+      heroTrack,
+      musicTrack,
+      ...withoutGoldenTracks
+    ];
+    gameDeckBindings = [
+      ...gameDeckBindings.filter((binding) => binding.trackId !== "hero" && binding.trackId !== "music"),
+      {
+        trackId: "hero",
+        kind: "DRAW",
+        assetId: drawLock.assetId,
+        revisionId: drawLock.revisionId,
+        contentHash: String(drawLock.contentHash),
+        mode,
+        label: heroTrack.label
+      },
+      {
+        trackId: "music",
+        kind: "AUDIO",
+        assetId: audioLock.assetId,
+        revisionId: audioLock.revisionId,
+        contentHash: String(audioLock.contentHash),
+        mode,
+        label: musicTrack.label
+      }
+    ];
+    gameCreationMode = "RPG_TEMPLATE";
+    gameCreationModePromptVisible = false;
+    root.dataset.gameCreationMode = gameCreationMode;
+    renderGameCustomPanels();
+    queueGameEditorPersistenceSave("golden-project-apply");
+    await flushGameEditorPersistence();
+    return result;
+  };
   const assetKinds = [
     "CHARACTER",
     "OBJECT",
@@ -30446,6 +33081,9 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       drawDefinitions: drawSnapshot?.assetDefinitions ?? [],
       ...drawBinding === void 0 ? {} : {
         boundDrawAssetId: drawBinding.assetId
+      },
+      ...drawBinding?.assetDefinitionId === void 0 ? {} : {
+        boundDrawDefinitionId: drawBinding.assetDefinitionId
       }
     });
     return references.find((reference) => reference.id === selectedGameAnimationClipId) ?? references[0];
@@ -30513,6 +33151,9 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       drawDefinitions: drawSnapshot?.assetDefinitions ?? [],
       ...drawBinding === void 0 ? {} : {
         boundDrawAssetId: drawBinding.assetId
+      },
+      ...drawBinding?.assetDefinitionId === void 0 ? {} : {
+        boundDrawDefinitionId: drawBinding.assetDefinitionId
       }
     });
     if (!references.some((reference2) => reference2.id === selectedGameAnimationClipId)) {
@@ -30645,6 +33286,9 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       query: gameAssetBrowserQuery,
       source: gameAssetBrowserSource
     });
+    if (selectedGameAssetDefinitionId !== void 0 && !drawDefinitions.some((entry) => entry.definitionId === selectedGameAssetDefinitionId)) {
+      selectedGameAssetDefinitionId = void 0;
+    }
     if (entries.length === 0) {
       const empty = documentRef.createElement("small");
       empty.className = "draw2-panel-status";
@@ -30659,6 +33303,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
         button.dataset.gameAssetId = entry.id;
         button.dataset.gameAssetSource = entry.source;
         button.dataset.gameAssetReadonly = String(entry.readOnly);
+        button.classList.toggle("is-active", entry.source === "DRAW" && entry.definitionId === selectedGameAssetDefinitionId);
         const head = documentRef.createElement("span");
         head.className = "draw2-game-asset-card-head";
         const title = documentRef.createElement("strong");
@@ -30671,6 +33316,10 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
         detail.textContent = entry.detail;
         button.append(head, detail);
         button.addEventListener("click", () => {
+          if (entry.source === "DRAW" && entry.definitionId !== void 0) {
+            selectedGameAssetDefinitionId = entry.definitionId;
+            button.classList.add("is-active");
+          }
           if (entry.source === "GAME" && entry.trackId !== void 0) {
             const track = gameDeckTracks.find((candidate) => candidate.id === entry.trackId);
             if (track !== void 0) {
@@ -30694,13 +33343,16 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
                 gameAnimationPreviewFrame = 0;
                 activateGameRailTab("ANIMATION");
                 renderGameAnimationBrowser();
+                if (draw2GameAssetCatalogStatus !== void 0) {
+                  draw2GameAssetCatalogStatus.textContent = `${entry.label}\u3092\u9078\u629E\u4E2D\u3002Game\u914D\u7F6E\u3092\u8FFD\u52A0\u3059\u308B\u3068\u3001\u3053\u306EAsset\u3092Sprite\u3068\u3057\u3066\u914D\u7F6E\u3067\u304D\u307E\u3059\u3002`;
+                }
                 return;
               }
             }
           }
           if (entry.source === "TEMPLATE") setPanel("game-assets");
           if (draw2GameAssetCatalogStatus !== void 0) {
-            draw2GameAssetCatalogStatus.textContent = entry.readOnly ? `${entry.label} \xB7 \u53C2\u7167\u5C02\u7528\u3067\u3059\u3002Game\u5074\u3067\u306F\u914D\u7F6E\u30FB\u5272\u308A\u5F53\u3066\u3060\u3051\u3092\u5909\u66F4\u3067\u304D\u307E\u3059\u3002` : `${entry.label} \xB7 Game\u5074\u3067\u4F7F\u7528\u3067\u304D\u307E\u3059\u3002\u539F\u7D20\u6750\u306F\u5909\u66F4\u3055\u308C\u307E\u305B\u3093\u3002`;
+            draw2GameAssetCatalogStatus.textContent = entry.source === "DRAW" ? `${entry.label}\u3092\u9078\u629E\u4E2D\u3002Game\u914D\u7F6E\u3092\u8FFD\u52A0\u3059\u308B\u3068\u3001\u3053\u306EAsset\u3092Sprite\u3068\u3057\u3066\u914D\u7F6E\u3067\u304D\u307E\u3059\u3002` : entry.readOnly ? `${entry.label} \xB7 \u53C2\u7167\u5C02\u7528\u3067\u3059\u3002Game\u5074\u3067\u306F\u914D\u7F6E\u30FB\u5272\u308A\u5F53\u3066\u3060\u3051\u3092\u5909\u66F4\u3067\u304D\u307E\u3059\u3002` : `${entry.label} \xB7 Game\u5074\u3067\u4F7F\u7528\u3067\u304D\u307E\u3059\u3002\u539F\u7D20\u6750\u306F\u5909\u66F4\u3055\u308C\u307E\u305B\u3093\u3002`;
           }
         });
         return button;
@@ -30908,25 +33560,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       draw2GameSceneStatus.textContent = "Scene Track\u3092\u8FFD\u52A0\u3057\u307E\u3057\u305F\u3002";
     }
   });
-  draw2GameAssetsAdd?.addEventListener("click", () => {
-    gameDeckAddAsset?.click();
-    if (draw2GameAssetsStatus !== void 0) {
-      draw2GameAssetsStatus.textContent = "Game\u914D\u7F6E\u3092\u8FFD\u52A0\u3057\u307E\u3057\u305F\u3002\u539F\u7D20\u6750\u306F\u53C2\u7167\u5C02\u7528\u3067\u3059\u3002";
-    }
-  });
-  draw2GameTemplateCategory?.addEventListener("change", () => {
-    const selected = draw2GameTemplateCategory.value;
-    gameTemplateCategory = [
-      "CORE",
-      "RPG",
-      "ACTION",
-      "SHOOTING",
-      "RACING",
-      "RHYTHM"
-    ].includes(selected) ? selected : "ALL";
-    renderGameTemplates();
-  });
-  draw2GameBindDraw?.addEventListener("click", () => {
+  const bindDrawReferenceToSelectedTrack = (definitionId) => {
     const permission = decideGameAssetMutation("DRAW_REFERENCE", "ATTACH_REFERENCE");
     if (!permission.allowed) {
       if (draw2GameAssetsStatus !== void 0) {
@@ -30949,12 +33583,16 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       }
       return;
     }
-    void bridge.resolveCurrentReference({
+    const referenceResolution = definitionId === void 0 ? bridge.resolveCurrentReference({
       mode
-    }).then((reference) => {
+    }) : bridge.resolveDefinitionReference({
+      definitionId,
+      mode
+    });
+    void referenceResolution.then((reference) => {
       if (reference === void 0) {
         if (draw2GameAssetsStatus !== void 0) {
-          draw2GameAssetsStatus.textContent = "iDRAW\u306E\u30A2\u30AF\u30C6\u30A3\u30D6Asset\u3092\u53D6\u5F97\u3067\u304D\u307E\u305B\u3093\u3002";
+          draw2GameAssetsStatus.textContent = definitionId === void 0 ? "iDRAW\u306E\u30A2\u30AF\u30C6\u30A3\u30D6Asset\u3092\u53D6\u5F97\u3067\u304D\u307E\u305B\u3093\u3002" : "\u9078\u629E\u3057\u305FiDRAW Asset\u3092\u53D6\u5F97\u3067\u304D\u307E\u305B\u3093\u3002\u518D\u8AAD\u8FBC\u5F8C\u306B\u3082\u3046\u4E00\u5EA6\u9078\u629E\u3057\u3066\u304F\u3060\u3055\u3044\u3002";
         }
         return;
       }
@@ -30968,9 +33606,38 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       renderGameCustomPanels();
       queueGameEditorPersistenceSave("bind-draw");
       if (draw2GameAssetsStatus !== void 0) {
-        draw2GameAssetsStatus.textContent = `${track.label}\u306BiDRAW ${mode}\u53C2\u7167\u3092\u8FFD\u52A0\u3057\u307E\u3057\u305F\u3002\u539F\u7D20\u6750\u306F\u7DE8\u96C6\u4E0D\u53EF\u3067\u3059\u3002`;
+        draw2GameAssetsStatus.textContent = `${track.label}\u306B${reference.label} \xB7 iDRAW ${mode}\u53C2\u7167\u3092\u8FFD\u52A0\u3057\u307E\u3057\u305F\u3002\u539F\u7D20\u6750\u306F\u7DE8\u96C6\u4E0D\u53EF\u3067\u3059\u3002`;
+      }
+    }).catch(() => {
+      if (draw2GameAssetsStatus !== void 0) {
+        draw2GameAssetsStatus.textContent = "iDRAW Asset\u306E\u53C2\u7167\u4F5C\u6210\u306B\u5931\u6557\u3057\u307E\u3057\u305F\u3002\u7DE8\u96C6\u72B6\u614B\u306F\u5909\u66F4\u3057\u3066\u3044\u307E\u305B\u3093\u3002";
       }
     });
+  };
+  draw2GameAssetsAdd?.addEventListener("click", () => {
+    const selectedDefinitionId = selectedGameAssetDefinitionId;
+    gameDeckAddAsset?.click();
+    if (draw2GameAssetsStatus !== void 0) {
+      draw2GameAssetsStatus.textContent = selectedDefinitionId === void 0 ? "Game\u914D\u7F6E\u3092\u8FFD\u52A0\u3057\u307E\u3057\u305F\u3002\u539F\u7D20\u6750\u306F\u53C2\u7167\u5C02\u7528\u3067\u3059\u3002" : "\u9078\u629E\u3057\u305FiDRAW Asset\u3092Game\u3078\u914D\u7F6E\u3057\u3001Sprite\u53C2\u7167\u3092\u8FFD\u52A0\u3057\u3066\u3044\u307E\u3059\u3002";
+    }
+    if (selectedDefinitionId !== void 0) {
+      bindDrawReferenceToSelectedTrack(selectedDefinitionId);
+    }
+  });
+  draw2GameTemplateCategory?.addEventListener("change", () => {
+    const selected = draw2GameTemplateCategory.value;
+    gameTemplateCategory = [
+      "CORE",
+      "RPG",
+      "ACTION",
+      "SHOOTING",
+      "RACING",
+      "RHYTHM"
+    ].includes(selected) ? selected : "ALL";
+    renderGameTemplates();
+  });
+  draw2GameBindDraw?.addEventListener("click", () => {
+    bindDrawReferenceToSelectedTrack(selectedGameAssetDefinitionId);
   });
   draw2GameBindAudio?.addEventListener("click", () => {
     const permission = decideGameAssetMutation("AUDIO_REFERENCE", "ATTACH_REFERENCE");
@@ -31370,6 +34037,24 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
         ...instance.values
       }
     })),
+    studioRelease: lastStudioReleaseCandidate === void 0 ? null : {
+      status: lastStudioReleaseCandidate.status,
+      packageHash: lastStudioReleaseCandidate.manifest.packageHash,
+      projectRevisionId: lastStudioReleaseCandidate.manifest.projectRevisionId,
+      reproducibleBuildIdentity: lastStudioReleaseCandidate.manifest.reproducibleBuildIdentity,
+      publishIntent: lastStudioPublishIntent?.kind ?? null,
+      artifactBundle: lastStudioReleaseArtifactBundle === void 0 ? null : {
+        status: lastStudioReleaseArtifactBundle.status,
+        zipHash: lastStudioReleaseArtifactBundle.zip.contentHash,
+        zipBytes: lastStudioReleaseArtifactBundle.zip.bytes.byteLength,
+        artifacts: lastStudioReleaseArtifactBundle.artifacts.map((artifact) => ({
+          kind: artifact.kind,
+          path: artifact.path,
+          bytes: artifact.byteLength,
+          contentHash: artifact.contentHash
+        }))
+      }
+    },
     engineAdapter: lastGameEngineAdapterPackage === void 0 ? null : {
       adapterId: lastGameEngineAdapterPackage.adapterId,
       target: lastGameEngineAdapterPackage.target,
@@ -31511,6 +34196,282 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       draw2GameBuildStatus.textContent = hasError ? "\u69CB\u6210\u306B\u4FEE\u6B63\u304C\u5FC5\u8981\u3067\u3059\u3002" : nativeTarget && enginePackage?.ok === true ? `\u69CB\u6210OK \xB7 ${target} \xB7 ${enginePackage.value?.entries.length ?? 0}\u30D5\u30A1\u30A4\u30EB\u306E\u30A2\u30C0\u30D7\u30BF\u30FC\u30D1\u30C3\u30B1\u30FC\u30B8\u3092\u751F\u6210\u6E08\u307F\u3002\u5916\u90E8\u30B3\u30F3\u30D1\u30A4\u30EB\u306F\u5225\u5DE5\u7A0B\u3067\u3059` : buildPlan?.ok === true ? `\u69CB\u6210OK \xB7 ${target} \xB7 \u30ED\u30FC\u30AB\u30EBBuildPlan\u3092\u78BA\u8A8D\u6E08\u307F\u3002\u5916\u90E8\u30B3\u30F3\u30D1\u30A4\u30EB\u306F\u5225\u5DE5\u7A0B\u3067\u3059` : `\u69CB\u6210OK \xB7 ${target} \xB7 Canonical Project\u3092\u78BA\u8A8D\u6E08\u307F`;
     }
   };
+  const syncStudioReleaseControls = () => {
+    if (draw2GameStudioReleaseCandidate !== void 0) {
+      draw2GameStudioReleaseCandidate.disabled = studioReleaseBusy || studioReleaseArtifactBusy;
+      draw2GameStudioReleaseCandidate.setAttribute("aria-busy", String(studioReleaseBusy));
+    }
+    if (draw2GameStudioReleaseManifest !== void 0) {
+      draw2GameStudioReleaseManifest.disabled = studioReleaseBusy || studioReleaseArtifactBusy || lastStudioReleaseCandidate === void 0;
+    }
+    if (draw2GameStudioPublishIntent !== void 0) {
+      draw2GameStudioPublishIntent.disabled = studioReleaseBusy || studioReleaseArtifactBusy || lastStudioReleaseCandidate === void 0;
+    }
+    if (draw2GameStudioReleaseArtifact !== void 0) {
+      draw2GameStudioReleaseArtifact.disabled = studioReleaseBusy || studioReleaseArtifactBusy || lastStudioReleaseCandidate === void 0;
+      draw2GameStudioReleaseArtifact.setAttribute("aria-busy", String(studioReleaseArtifactBusy));
+    }
+    if (draw2GameStudioReleaseArtifactDownload !== void 0) {
+      draw2GameStudioReleaseArtifactDownload.disabled = studioReleaseBusy || studioReleaseArtifactBusy || lastStudioReleaseArtifactBundle === void 0;
+    }
+  };
+  const studioReleaseInputFromGolden = (value) => ({
+    packageId: `studio-release:${workspaceProjectId}`,
+    packageVersion: "1.0.0",
+    project: value.project,
+    integration: value.manifest,
+    caller: value.caller,
+    assetRegistry: value.manifest.assetLocks.map((lock) => ({
+      kind: lock.kind,
+      assetId: lock.assetId,
+      revisionId: lock.revisionId,
+      contentHash: lock.contentHash,
+      ownerId: lock.ownerId,
+      licenseId: lock.licenseId,
+      // Source bytes remain owned by iDRAW/iAUDIO. Zero is explicit here:
+      // this UI candidate is metadata-only and must not claim materialization.
+      byteLength: 0,
+      mimeType: lock.kind === "DRAW" ? "application/vnd.pixieed.indexed-raster" : "application/vnd.pixieed.audio-project",
+      sourcePackage: lock.kind === "DRAW" ? "PXD" : "AUDIO"
+    }))
+  });
+  const setStudioReleaseStatus = (message, state2 = "idle") => {
+    if (draw2GameStudioReleaseStatus === void 0) return;
+    draw2GameStudioReleaseStatus.dataset.state = state2;
+    draw2GameStudioReleaseStatus.textContent = message;
+  };
+  const buildStudioReleaseCandidate = async () => {
+    if (studioReleaseBusy) return;
+    studioReleaseBusy = true;
+    lastStudioReleaseCandidate = void 0;
+    lastStudioPublishIntent = void 0;
+    lastStudioReleaseArtifactBundle = void 0;
+    studioReleaseCandidateGameRevision = void 0;
+    if (draw2GameStudioReleaseManifestPreview !== void 0) {
+      draw2GameStudioReleaseManifestPreview.hidden = true;
+      draw2GameStudioReleaseManifestPreview.textContent = "";
+    }
+    syncStudioReleaseControls();
+    setStudioReleaseStatus("Game\u69CB\u6210\u3068iDRAW\uFF0FiAUDIO\u306E\u56FA\u5B9A\u53C2\u7167\u3092\u691C\u8A3C\u4E2D\u3067\u3059\u2026");
+    try {
+      await validateGameBuild();
+      const canonical = pixyncGameStore?.project;
+      if (canonical === void 0) {
+        setStudioReleaseStatus("Game Project\u3092\u8AAD\u307F\u8FBC\u307F\u4E2D\u3067\u3059\u3002\u8AAD\u307F\u8FBC\u307F\u5B8C\u4E86\u5F8C\u306B\u518D\u5B9F\u884C\u3057\u3066\u304F\u3060\u3055\u3044\u3002", "error");
+        return;
+      }
+      const canonicalValidation = validateGameProject(canonical);
+      if (!canonicalValidation.valid) {
+        setStudioReleaseStatus(canonicalValidation.diagnostics[0]?.message ?? "Game Project\u3092\u691C\u8A3C\u3067\u304D\u307E\u305B\u3093\u3002", "error");
+        return;
+      }
+      const golden = await buildGoldenProject("PINNED");
+      if (!golden.ok || golden.value === void 0) {
+        setStudioReleaseStatus(golden.diagnostics[0]?.message ?? "iDRAW\uFF0FiAUDIO\u306E\u56FA\u5B9A\u53C2\u7167\u3092\u4F5C\u6210\u3067\u304D\u307E\u305B\u3093\u3002", "error");
+        return;
+      }
+      const result = await createStudioReleaseCandidate(studioReleaseInputFromGolden(golden.value));
+      if (!result.ok || result.value === void 0) {
+        const diagnostic11 = result.diagnostics[0];
+        setStudioReleaseStatus(diagnostic11 === void 0 ? "Release Candidate\u3092\u691C\u8A3C\u3067\u304D\u307E\u305B\u3093\u3002" : `${diagnostic11.code}: ${diagnostic11.message}`, "error");
+        return;
+      }
+      lastStudioReleaseCandidate = result.value;
+      studioReleaseCandidateGameRevision = gamePersistenceRevision;
+      setStudioReleaseStatus(`\u691C\u8A3C\u6E08\u307F \xB7 PXD / AUDIO / GAME \xB7 Package Hash ${result.value.manifest.packageHash.slice(0, 12)} \xB7 Artifact\u751F\u6210\u5F85\u3061`, "success");
+    } catch (error) {
+      setStudioReleaseStatus(error instanceof Error ? error.message : "Release Candidate\u3092\u691C\u8A3C\u3067\u304D\u307E\u305B\u3093\u3002", "error");
+    } finally {
+      studioReleaseBusy = false;
+      syncStudioReleaseControls();
+    }
+  };
+  const showStudioReleaseManifest = () => {
+    const candidate = lastStudioReleaseCandidate;
+    if (candidate === void 0) {
+      setStudioReleaseStatus("\u5148\u306BRelease Candidate\u3092\u691C\u8A3C\u3057\u3066\u304F\u3060\u3055\u3044\u3002", "error");
+      return;
+    }
+    if (draw2GameStudioReleaseManifestPreview !== void 0) {
+      draw2GameStudioReleaseManifestPreview.hidden = false;
+      draw2GameStudioReleaseManifestPreview.textContent = JSON.stringify({
+        manifest: candidate.manifest,
+        verification: candidate.verification,
+        artifactBundle: lastStudioReleaseArtifactBundle?.manifest ?? null
+      }, null, 2);
+    }
+    setStudioReleaseStatus(lastStudioReleaseArtifactBundle === void 0 ? "Manifest\u3092\u8868\u793A\u3057\u307E\u3057\u305F\u3002Artifact\u751F\u6210\u524D\u306E\u56FA\u5B9A\u53C2\u7167\u3067\u3059\u3002" : "Manifest\u3092\u8868\u793A\u3057\u307E\u3057\u305F\u3002Artifact\u306E\u5B9F\u30D0\u30A4\u30C8Hash\u3082\u542B\u307E\u308C\u3066\u3044\u307E\u3059\u3002", "success");
+  };
+  const materializeStudioRelease = async () => {
+    const candidate = lastStudioReleaseCandidate;
+    if (candidate === void 0) {
+      setStudioReleaseStatus("\u5148\u306BRelease Candidate\u3092\u691C\u8A3C\u3057\u3066\u304F\u3060\u3055\u3044\u3002", "error");
+      return;
+    }
+    if (studioReleaseCandidateGameRevision !== gamePersistenceRevision) {
+      lastStudioReleaseCandidate = void 0;
+      lastStudioPublishIntent = void 0;
+      lastStudioReleaseArtifactBundle = void 0;
+      studioReleaseCandidateGameRevision = void 0;
+      syncStudioReleaseControls();
+      setStudioReleaseStatus("Game\u7DE8\u96C6\u5F8C\u306E\u53E4\u3044Candidate\u3067\u3059\u3002\u5909\u66F4\u3092\u4FDD\u5B58\u3057\u3066\u518D\u691C\u8A3C\u3057\u3066\u304F\u3060\u3055\u3044\u3002", "error");
+      return;
+    }
+    if (studioReleaseArtifactBusy) return;
+    studioReleaseArtifactBusy = true;
+    lastStudioReleaseArtifactBundle = void 0;
+    syncStudioReleaseControls();
+    setStudioReleaseStatus("PXD\u30FBAUDIO\u30FBGAME\u306E\u5B9F\u4F53\u3092\u53D6\u5F97\u3057\u3001Hash\u3068Project\u56FA\u5B9A\u53C2\u7167\u3092\u691C\u8A3C\u4E2D\u3067\u3059\u2026");
+    try {
+      const golden = await buildGoldenProject("PINNED");
+      if (!golden.ok || golden.value === void 0) {
+        setStudioReleaseStatus(golden.diagnostics[0]?.message ?? "\u73FE\u5728\u306E\u56FA\u5B9A\u53C2\u7167\u3092\u78BA\u8A8D\u3067\u304D\u307E\u305B\u3093\u3002", "error");
+        return;
+      }
+      const current = await createStudioReleaseCandidate(studioReleaseInputFromGolden(golden.value));
+      if (!current.ok || current.value === void 0) {
+        setStudioReleaseStatus(current.diagnostics[0]?.message ?? "\u73FE\u5728\u306E\u53C2\u7167\u3092\u691C\u8A3C\u3067\u304D\u307E\u305B\u3093\u3002", "error");
+        return;
+      }
+      if (current.value.manifest.packageHash !== candidate.manifest.packageHash) {
+        lastStudioReleaseCandidate = void 0;
+        lastStudioPublishIntent = void 0;
+        studioReleaseCandidateGameRevision = void 0;
+        syncStudioReleaseControls();
+        setStudioReleaseStatus("iDRAW\u307E\u305F\u306FiAUDIO\u304C\u5909\u66F4\u3055\u308C\u3066\u3044\u307E\u3059\u3002\u518D\u691C\u8A3C\u3057\u3066\u304F\u3060\u3055\u3044\u3002", "error");
+        return;
+      }
+      const workspaceDebug = windowRef.__pixiedraw2WorkspaceDebug;
+      const pxd = await workspaceDebug?.exportProjectPxdArtifact?.();
+      if (pxd === void 0) {
+        throw new Error("PXD\u306EArtifact\u51FA\u529B\u7D4C\u8DEF\u3092\u5229\u7528\u3067\u304D\u307E\u305B\u3093\u3002");
+      }
+      const audio = await workspaceDebug?.renderAudioWavForExport(void 0, "FULL");
+      if (audio === void 0 || audio === null) {
+        throw new Error("iAUDIO\u306B\u66F8\u304D\u51FA\u305B\u308B\u97F3\u6E90\u304C\u3042\u308A\u307E\u305B\u3093\u3002");
+      }
+      const sources = [
+        {
+          kind: "PXD",
+          bytes: pxd.bytes,
+          mimeType: "application/vnd.pixieed.pxd",
+          sourceReference: {
+            assetId: pxd.sourceReference.assetId,
+            revisionId: pxd.sourceReference.revisionId,
+            contentHash: asSha2562(pxd.sourceReference.contentHash)
+          }
+        },
+        {
+          kind: "AUDIO",
+          bytes: audio.bytes,
+          mimeType: "audio/wav",
+          sourceProjectId: audio.sourceProjectId,
+          sourceStateHash: asSha2562(audio.sourceStateHash),
+          sourceProjectRevision: audio.sourceProjectRevision
+        },
+        {
+          kind: "GAME",
+          bytes: new TextEncoder().encode(canonicalJson3(golden.value.project)),
+          mimeType: "application/json",
+          project: golden.value.project
+        }
+      ];
+      const materialized = await materializeStudioReleaseArtifact({
+        candidate,
+        sources
+      });
+      if (!materialized.ok || materialized.value === void 0) {
+        setStudioReleaseStatus(materialized.diagnostics[0] === void 0 ? "Artifact\u3092\u691C\u8A3C\u3067\u304D\u307E\u305B\u3093\u3002" : `${materialized.diagnostics[0].code}: ${materialized.diagnostics[0].message}`, "error");
+        return;
+      }
+      lastStudioReleaseArtifactBundle = materialized.value;
+      if (draw2GameStudioReleaseManifestPreview !== void 0) {
+        draw2GameStudioReleaseManifestPreview.hidden = false;
+        draw2GameStudioReleaseManifestPreview.textContent = JSON.stringify({
+          candidate: candidate.manifest,
+          artifact: materialized.value.manifest
+        }, null, 2);
+      }
+      const artifactBytes = materialized.value.artifacts.map((artifact) => `${artifact.kind} ${artifact.byteLength}B`).join(" \xB7 ");
+      setStudioReleaseStatus(`Artifact\u751F\u6210\u6E08\u307F \xB7 ${artifactBytes} \xB7 ZIP ${materialized.value.zip.bytes.byteLength}B \xB7 Hash ${materialized.value.zip.contentHash.slice(0, 12)}`, "success");
+    } catch (error) {
+      setStudioReleaseStatus(error instanceof Error ? error.message : "Artifact\u3092\u751F\u6210\u3067\u304D\u307E\u305B\u3093\u3002", "error");
+    } finally {
+      studioReleaseArtifactBusy = false;
+      syncStudioReleaseControls();
+    }
+  };
+  const downloadStudioReleaseArtifact = () => {
+    const bundle = lastStudioReleaseArtifactBundle;
+    if (bundle === void 0) {
+      setStudioReleaseStatus("\u5148\u306BArtifact\u3092\u751F\u6210\u3057\u3066\u304F\u3060\u3055\u3044\u3002", "error");
+      return;
+    }
+    const blob = new Blob([
+      bundle.zip.bytes.slice().buffer
+    ], {
+      type: bundle.zip.mimeType
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = documentRef.createElement("a");
+    anchor.href = url;
+    anchor.download = bundle.zip.filename;
+    anchor.click();
+    windowRef.setTimeout(() => URL.revokeObjectURL(url), 0);
+    setStudioReleaseStatus(`ZIP\u3092\u53D6\u5F97\u3057\u307E\u3057\u305F \xB7 ${bundle.zip.bytes.byteLength}B \xB7 Hash ${bundle.zip.contentHash.slice(0, 12)}`, "success");
+  };
+  const createStudioPublishIntentFromUi = async () => {
+    const candidate = lastStudioReleaseCandidate;
+    if (candidate === void 0) {
+      setStudioReleaseStatus("\u5148\u306BRelease Candidate\u3092\u691C\u8A3C\u3057\u3066\u304F\u3060\u3055\u3044\u3002", "error");
+      return;
+    }
+    if (studioReleaseCandidateGameRevision !== gamePersistenceRevision) {
+      lastStudioReleaseCandidate = void 0;
+      lastStudioPublishIntent = void 0;
+      lastStudioReleaseArtifactBundle = void 0;
+      studioReleaseCandidateGameRevision = void 0;
+      syncStudioReleaseControls();
+      setStudioReleaseStatus("Game\u7DE8\u96C6\u5F8C\u306E\u53E4\u3044Candidate\u3067\u3059\u3002\u5909\u66F4\u3092\u4FDD\u5B58\u3057\u3066\u518D\u691C\u8A3C\u3057\u3066\u304F\u3060\u3055\u3044\u3002", "error");
+      return;
+    }
+    studioReleaseBusy = true;
+    syncStudioReleaseControls();
+    setStudioReleaseStatus("\u73FE\u5728\u306EiDRAW\uFF0FiAUDIO\u53C2\u7167\u3092\u518D\u78BA\u8A8D\u3057\u3066\u304B\u3089Intent\u3092\u4F5C\u6210\u4E2D\u3067\u3059\u2026");
+    try {
+      const golden = await buildGoldenProject("PINNED");
+      if (!golden.ok || golden.value === void 0) {
+        setStudioReleaseStatus(golden.diagnostics[0]?.message ?? "\u73FE\u5728\u306E\u56FA\u5B9A\u53C2\u7167\u3092\u78BA\u8A8D\u3067\u304D\u307E\u305B\u3093\u3002", "error");
+        return;
+      }
+      const current = await createStudioReleaseCandidate(studioReleaseInputFromGolden(golden.value));
+      if (!current.ok || current.value === void 0) {
+        setStudioReleaseStatus(current.diagnostics[0]?.message ?? "\u73FE\u5728\u306E\u53C2\u7167\u3092\u691C\u8A3C\u3067\u304D\u307E\u305B\u3093\u3002", "error");
+        return;
+      }
+      if (current.value.manifest.packageHash !== candidate.manifest.packageHash) {
+        lastStudioReleaseCandidate = void 0;
+        lastStudioPublishIntent = void 0;
+        lastStudioReleaseArtifactBundle = void 0;
+        studioReleaseCandidateGameRevision = void 0;
+        syncStudioReleaseControls();
+        setStudioReleaseStatus("iDRAW\u307E\u305F\u306FiAUDIO\u304C\u5909\u66F4\u3055\u308C\u3066\u3044\u307E\u3059\u3002\u518D\u691C\u8A3C\u3057\u3066\u304F\u3060\u3055\u3044\u3002", "error");
+        return;
+      }
+      const result = await createStudioPublishIntent(candidate, `studio-ui:${workspaceProjectId}`);
+      if (!result.ok || result.value === void 0) {
+        setStudioReleaseStatus(result.diagnostics[0]?.message ?? "Publish Intent\u3092\u4F5C\u6210\u3067\u304D\u307E\u305B\u3093\u3002", "error");
+        return;
+      }
+      lastStudioPublishIntent = result.value;
+      setStudioReleaseStatus(`Publish Intent\u3092\u4F5C\u6210\u3057\u307E\u3057\u305F \xB7 ${result.value.packageHash.slice(0, 12)} \xB7 \u5916\u90E8\u516C\u958B\u306F\u672A\u5B9F\u884C\u3067\u3059\u3002`, "success");
+    } catch (error) {
+      setStudioReleaseStatus(error instanceof Error ? error.message : "Publish Intent\u3092\u4F5C\u6210\u3067\u304D\u307E\u305B\u3093\u3002", "error");
+    } finally {
+      studioReleaseBusy = false;
+      syncStudioReleaseControls();
+    }
+  };
   draw2GameBuildValidate?.addEventListener("click", () => {
     void validateGameBuild();
   });
@@ -31524,6 +34485,14 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       draw2GameBuildStatus.textContent = "Manifest\u3092\u8868\u793A\u3057\u307E\u3057\u305F\u3002PXD\u5185\u306EGame subdocument\u304B\u3089\u751F\u6210\u3057\u305F\u30ED\u30FC\u30AB\u30EB\u78BA\u8A8D\u5024\u3067\u3059\u3002";
     }
   });
+  draw2GameStudioReleaseCandidate?.addEventListener("click", () => {
+    void buildStudioReleaseCandidate();
+  });
+  draw2GameStudioReleaseManifest?.addEventListener("click", showStudioReleaseManifest);
+  draw2GameStudioPublishIntent?.addEventListener("click", () => void createStudioPublishIntentFromUi());
+  draw2GameStudioReleaseArtifact?.addEventListener("click", () => void materializeStudioRelease());
+  draw2GameStudioReleaseArtifactDownload?.addEventListener("click", downloadStudioReleaseArtifact);
+  syncStudioReleaseControls();
   renderGameCustomPanels();
   renderAudioCustomPanels = () => {
     renderAudioVoiceEditor();
@@ -32053,6 +35022,9 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
         break;
       case "focus-mode":
         toggleFocusMode();
+        break;
+      case "toggle-detail-mode":
+        toggleDetailMode();
         break;
       case "workspace-preset-pixel":
         applyWorkspacePreset("pixel");
@@ -32916,6 +35888,10 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       if (record.projectId !== module.asAudioProjectId(projectId)) {
         throw new Error("PXD_AUDIO_PROJECT_MISMATCH");
       }
+      const currentAudioRecord = await targetAudioStore.load(module.asAudioProjectId(projectId));
+      if (!currentAudioRecord.ok) {
+        throw new Error("PXD_AUDIO_RESTORE_FAILED");
+      }
       const restored = await module.restoreAudioPersistenceRecord(record);
       if (!restored.ok) throw new Error("PXD_AUDIO_RECORD_INVALID");
       const sources = new Map(snapshot.audio.assets.map((asset) => [
@@ -32933,8 +35909,16 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
           throw new Error(`PXD_AUDIO_SOURCE_STORAGE_UNAVAILABLE:${String(revision.revisionId)}`);
         }
       }
-      const saved = await targetAudioStore.save(record);
+      const saved = await targetAudioStore.save(record, {
+        expectedProjectRevision: currentAudioRecord.value?.checkpoint.projectRevision ?? 0,
+        expectedStateHash: currentAudioRecord.value?.checkpoint.stateHash ?? null
+      });
       if (!saved.ok) throw new Error("PXD_AUDIO_RESTORE_FAILED");
+      if (saved.diagnostics.some((diagnostic11) => diagnostic11.code === "AUDIO_STALE_PROJECT_REVISION")) throw new Error("PXD_AUDIO_RESTORE_CONFLICT");
+      if (sameProject) {
+        audioPersistenceExpectedRevision = record.checkpoint.projectRevision;
+        audioPersistenceExpectedStateHash = record.checkpoint.stateHash;
+      }
     }
     if (snapshot.game === null) {
       if (!await gamePersistenceStore.clear(projectId)) {
@@ -32949,8 +35933,17 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       if (gameRecord2.projectId !== projectId || !await validateGameEditorPersistenceRecord(gameRecord2)) {
         throw new Error("PXD_GAME_RECORD_INVALID");
       }
-      const saved = await gamePersistenceStore.save(gameRecord2);
+      const currentGameRecord = await gamePersistenceStore.load(projectId);
+      const saved = await gamePersistenceStore.save(gameRecord2, {
+        expectedRevision: currentGameRecord?.revision ?? 0,
+        expectedStateHash: currentGameRecord?.stateHash ?? null
+      });
       if (!saved.ok) throw new Error("PXD_GAME_RESTORE_FAILED");
+      if (saved.stale) throw new Error("PXD_GAME_RESTORE_CONFLICT");
+      if (sameProject) {
+        gamePersistenceExpectedRevision = gameRecord2.revision;
+        gamePersistenceExpectedStateHash = gameRecord2.stateHash;
+      }
     }
     const audioRecord2 = snapshot.audio?.record;
     await workspaceManifestStore.updateModule(asWorkspaceProjectId(projectId), "audio", audioRecord2 === void 0 ? {
@@ -32980,6 +35973,32 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       await restoreGameEditorState(projectId);
       await ensureAudioWorkspaceSession();
     }
+  };
+  let goldenAudioPreviewOwned = false;
+  const startGoldenAudioPreview = () => {
+    const session = audioWorkspaceSession;
+    if (session === void 0 || audioCompositionHasPlayingSource()) {
+      return false;
+    }
+    if (session.project.notes.length > 0 && audioChipPlay !== void 0) {
+      goldenAudioPreviewOwned = true;
+      audioChipPlay.click();
+      return true;
+    }
+    if (audioPlaybackClips(session).length > 0 && audioDeckPlay !== void 0) {
+      goldenAudioPreviewOwned = true;
+      audioDeckPlay.click();
+      return true;
+    }
+    return false;
+  };
+  const stopGoldenAudioPreview = () => {
+    if (!goldenAudioPreviewOwned) return;
+    goldenAudioPreviewOwned = false;
+    if (chipDeckPlaying) audioChipPlay?.click();
+    if (audioDeckPlaying || [
+      ...audioStreamingRuntimes.values()
+    ].some((runtime) => runtime.isPlaying)) audioDeckPlay?.click();
   };
   const debugSurface = {
     snapshot: () => ({
@@ -33018,7 +36037,11 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     gameCurrentProject,
     refreshSite400IGameRoute,
     resolvePixyncGameRevision,
-    applyPixyncGameRemote
+    applyPixyncGameRemote,
+    buildGoldenProject,
+    applyGoldenProject,
+    startGoldenAudioPreview,
+    stopGoldenAudioPreview
   };
   const debugWindow = windowRef;
   debugWindow.__pixiedraw2WorkspaceDebug = debugSurface;
@@ -33044,7 +36067,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     updateStatus(`${capability.profile} \xB7 No custom panel \xB7 use \uFF0B to add a panel`);
   }
   syncTabletDeckSurface(false);
-  const requestedMode = params.get("mode")?.trim().toUpperCase();
+  const requestedMode = options.initialCreatorMode ?? params.get("mode")?.trim().toUpperCase();
   const requestedCreatorMode = requestedMode !== void 0 && isCreatorWorkspaceMode(requestedMode) ? requestedMode : void 0;
   setCreatorMode(requestedCreatorMode ?? creatorState.activeMode, requestedCreatorMode !== void 0);
   if (unknownFlag) {

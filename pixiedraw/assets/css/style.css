@@ -10981,6 +10981,28 @@ body.is-startup-active .pixieed-shared-top-ad {
   overflow: visible;
 }
 
+.startup-workspace__load-more {
+  grid-column: 1 / -1;
+  justify-self: center;
+  min-height: 36px;
+  margin: 4px 0 2px;
+  padding: 7px 14px;
+  border: 1px solid rgba(var(--ui-rgb), 0.34);
+  border-radius: 8px;
+  color: rgba(236, 248, 255, 0.9);
+  background: rgba(10, 22, 32, 0.86);
+  font: inherit;
+  font-size: 0.74rem;
+  cursor: pointer;
+}
+
+.startup-workspace__load-more:hover,
+.startup-workspace__load-more:focus-visible {
+  border-color: rgba(var(--ui-rgb-focus), 0.84);
+  background: rgba(22, 45, 64, 0.96);
+  outline: none;
+}
+
 .startup-workspace__project:hover,
 .startup-workspace__project:focus-within {
   border-color: rgba(var(--ui-rgb-focus), 0.76);

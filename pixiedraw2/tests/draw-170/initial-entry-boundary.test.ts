@@ -8,8 +8,9 @@ Deno.test("DRAW-170 keeps Export out of the initial editor entry", async () => {
   const config = await Deno.readTextFile(new URL("../../deno.json", import.meta.url));
 
   assert(!source.includes('from "./draw2-export.ts"'), "Initial source must not statically import the Export module.");
-  assert(source.includes('new URL("draw2-export.js", import.meta.url).href'), "Initial source must declare the Export lazy URL.");
+  const lazyExportUrl = /new URL\(\s*"draw2-export\.js(?:\?[^"\\]+)?"\s*,\s*import\.meta\.url\s*,?\s*\)\.href/s;
+  assert(lazyExportUrl.test(source), "Initial source must declare the Export lazy URL.");
   assert(!bundle.includes("// src/draw2-export.ts"), "Initial bundle must not contain the Export implementation.");
-  assert(bundle.includes('new URL("draw2-export.js", import.meta.url).href'), "Initial bundle must retain the Export lazy boundary.");
+  assert(lazyExportUrl.test(bundle), "Initial bundle must retain the Export lazy boundary.");
   assert(config.includes('"build:export"'), "The isolated Export chunk must have an explicit build task.");
 });

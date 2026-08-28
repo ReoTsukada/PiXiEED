@@ -217,12 +217,20 @@ export async function createRuntimePreview(options: CreateRuntimePreviewOptions)
 export async function loadRuntimeAssets(session: RuntimePreviewSession, requests: readonly RuntimeAssetRequest[], resolver: RuntimeAssetResolver): Promise<RuntimePreviewSession> {
   const loaded = { ...session.loadedAssets };
   const diagnostics = [...session.diagnostics];
+  const uniqueRequests = new Map<string, RuntimeAssetRequest>();
   for (const request of requests) {
+    const key = String(request.assetId);
+    const existing = uniqueRequests.get(key);
+    uniqueRequests.set(key, existing === undefined ? request : { ...existing, required: existing.required || request.required });
+  }
+  for (const request of uniqueRequests.values()) {
     const entry = dependencyEntry(session, request.assetId);
     if (entry === undefined) {
       diagnostics.push(diagnostic(request.required ? "MISSING_REQUIRED_ASSET" : "OPTIONAL_ASSET_MISSING", `Asset ${request.assetId} is not declared by the locked dependency snapshot.`, !request.required));
       continue;
     }
+    const existing = loaded[request.assetId];
+    if (existing !== undefined && existing.revisionId === entry.revisionId && existing.contentHash === entry.contentHash) continue;
     const payload = await resolver.resolve(request);
     if (payload === undefined) {
       diagnostics.push(diagnostic(request.required ? "MISSING_REQUIRED_ASSET" : "OPTIONAL_ASSET_MISSING", `Asset ${request.assetId} could not be resolved.`, !request.required));

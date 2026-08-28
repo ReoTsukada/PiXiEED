@@ -520,8 +520,13 @@
     if (!AUTOSAVE_SUPPORTED || !normalizedProjectId || safeExpectedCount <= 1) {
       return true;
     }
-    const entries = await loadRecentProjectsMetadata({ includeAllAccounts: true });
-    const savedEntry = entries.find(entry => normalizeAutosaveProjectId(entry?.id || '') === normalizedProjectId) || null;
+    const savedEntry = typeof loadRecentProjectMetadataById === 'function'
+      ? await loadRecentProjectMetadataById(normalizedProjectId, {
+        includeAllAccounts: true,
+        includePayload: true,
+      })
+      : (await loadRecentProjectsMetadata({ includeAllAccounts: true, includePayload: true }))
+        .find(entry => normalizeAutosaveProjectId(entry?.id || '') === normalizedProjectId) || null;
     const savedSheetCount = countPackagedProjectSheets(savedEntry?.project || null);
     if (savedSheetCount < safeExpectedCount) {
       console.warn('[project-sheets] saved sheet count mismatch', {
@@ -653,12 +658,27 @@
             buildAutosaveSessionPayload: buildProjectSessionPayload,
           })
           : null);
+        let previousPackagedProject = previousEntry?.project && typeof previousEntry.project === 'object'
+          ? previousEntry.project
+          : null;
+        if (savePlan?.journalOnly === true
+          && !previousPackagedProject
+          && resolvedProjectId
+          && typeof loadRecentProjectMetadataById === 'function') {
+          const hydratedEntry = await loadRecentProjectMetadataById(resolvedProjectId, {
+            includeAllAccounts: true,
+            includePayload: true,
+          });
+          previousPackagedProject = hydratedEntry?.project && typeof hydratedEntry.project === 'object'
+            ? hydratedEntry.project
+            : null;
+        }
         packaged = savePlan?.packagedPayload && typeof savePlan.packagedPayload === 'object'
           ? savePlan.packagedPayload
           : (
             packagedPayload && typeof packagedPayload === 'object'
               ? packagedPayload
-              : (savePlan?.journalOnly === true ? previousEntry?.project || null : buildPackagedProjectPayload(snapshot))
+              : (savePlan?.journalOnly === true ? previousPackagedProject : buildPackagedProjectPayload(snapshot))
           );
         if (!packaged || typeof packaged !== 'object') {
           throw new Error('Missing local project checkpoint for journal-only save');

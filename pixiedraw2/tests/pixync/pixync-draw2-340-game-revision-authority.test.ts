@@ -11,10 +11,10 @@ Deno.test("PIXYNC-DRAW2-340 stores Game revisions separately from lightweight op
   );
   assert.match(sql, /pixync_draw2_put_game_revision_v1/);
   assert.match(sql, /pixync_draw2_get_game_revision_v1/);
-  assert.match(sql, /p_game_project->>'projectId' <> p_project_id/);
+  assert.match(sql, /p_game_project->>'projectId' is distinct from p_project_id/);
   assert.match(
     sql,
-    /p_game_project#>>'\{revision,snapshotHash\}' <> p_snapshot_hash/,
+    /p_game_project#>>'\{revision,snapshotHash\}' is distinct from p_snapshot_hash/,
   );
   assert.match(sql, /octet_length\([\s\S]*p_game_project[\s\S]*> 524288/);
   assert.match(

@@ -64,6 +64,8 @@ export interface GameEditorBinding {
   readonly contentHash: string;
   readonly mode: "LIVE" | "PINNED";
   readonly label: string;
+  /** Named iDRAW Asset Definition; source bytes never cross this boundary. */
+  readonly assetDefinitionId?: string;
 }
 
 function referenceOnlyBinding(binding: GameEditorBinding): GameEditorBinding {
@@ -75,6 +77,9 @@ function referenceOnlyBinding(binding: GameEditorBinding): GameEditorBinding {
     contentHash: binding.contentHash,
     mode: binding.mode,
     label: binding.label,
+    ...(binding.assetDefinitionId === undefined
+      ? {}
+      : { assetDefinitionId: binding.assetDefinitionId }),
   };
 }
 
@@ -171,6 +176,7 @@ const GAME_EDITOR_BINDING_KEYS = new Set([
   "contentHash",
   "mode",
   "label",
+  "assetDefinitionId",
 ]);
 
 const GAME_EDITOR_TRACK_KEYS = new Set([
@@ -383,11 +389,19 @@ export interface GameEditorPersistenceSaveResult {
   readonly stale: boolean;
 }
 
+/** Optional compare-and-swap guard for a Game editor snapshot. */
+export interface GameEditorPersistenceSaveOptions {
+  /** Revision 0 and a null hash represent a missing Project record. */
+  readonly expectedRevision?: number;
+  readonly expectedStateHash?: string | null;
+}
+
 export interface GameEditorPersistenceStore {
   readonly available: boolean;
   load(projectId: string): Promise<GameEditorPersistenceRecord | null>;
   save(
     record: GameEditorPersistenceRecord,
+    options?: GameEditorPersistenceSaveOptions,
   ): Promise<GameEditorPersistenceSaveResult>;
   clear(projectId: string): Promise<boolean>;
 }
@@ -620,6 +634,10 @@ export async function validateGameEditorPersistenceRecord(
         !/^[a-f0-9]{64}$/u.test(binding.contentHash) ||
         (binding.mode !== "LIVE" && binding.mode !== "PINNED") ||
         typeof binding.label !== "string" ||
+        (binding.assetDefinitionId !== undefined &&
+          (binding.kind !== "DRAW" ||
+            typeof binding.assetDefinitionId !== "string" ||
+            !GAME_EDITOR_ID_PATTERN.test(binding.assetDefinitionId))) ||
         Object.keys(binding).some((key) => !GAME_EDITOR_BINDING_KEYS.has(key))
       ))
   ) return false;
@@ -742,6 +760,17 @@ function isNewer(
   return incoming.savedAt >= current.savedAt;
 }
 
+function matchesExpected(
+  current: GameEditorPersistenceRecord | undefined,
+  options: GameEditorPersistenceSaveOptions | undefined,
+): boolean {
+  if (options?.expectedRevision !== undefined &&
+    (current?.revision ?? 0) !== options.expectedRevision) return false;
+  if (options?.expectedStateHash !== undefined &&
+    (current?.stateHash ?? null) !== options.expectedStateHash) return false;
+  return true;
+}
+
 function openGameDatabase(name: string): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     if (typeof indexedDB === "undefined") {
@@ -800,7 +829,7 @@ export function createIndexedDbGameEditorPersistenceStore(
         return null;
       }
     },
-    async save(record) {
+    async save(record, options) {
       if (!available) return { ok: false, stale: false };
       try {
         const database = await openGameDatabase(databaseName);
@@ -818,7 +847,8 @@ export function createIndexedDbGameEditorPersistenceStore(
             const current = read.result as
               | GameEditorPersistenceRecord
               | undefined;
-            if (isNewer(record, current)) store.put(record);
+            if (!matchesExpected(current, options)) stale = true;
+            else if (isNewer(record, current)) store.put(record);
             else stale = true;
           };
           read.onerror = () => transaction.abort();
@@ -878,9 +908,11 @@ export function createMemoryGameEditorPersistenceStore(): GameEditorPersistenceS
     async load(projectId) {
       return records.get(projectId) ?? null;
     },
-    async save(record) {
+    async save(record, options) {
       const current = records.get(record.projectId);
-      if (!isNewer(record, current)) return { ok: true, stale: true };
+      if (!matchesExpected(current, options) || !isNewer(record, current)) {
+        return { ok: true, stale: true };
+      }
       records.set(record.projectId, record);
       return { ok: true, stale: false };
     },

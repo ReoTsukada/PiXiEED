@@ -373,3 +373,77 @@ Deno.test("AUDIO-200 persistence protects same-revision clock metadata", async (
     "An older same-revision write rolled back the animation clock.",
   );
 });
+
+Deno.test("AUDIO-200 persistence rejects competing snapshots from one CAS base", async () => {
+  const base = await fixture();
+  const baseRecord = await createAudioPersistenceRecord(
+    base,
+    "audio-checkpoint:cas-base",
+    timestamp(12),
+  );
+  assert(baseRecord.ok, JSON.stringify(baseRecord.diagnostics));
+  const store = createMemoryAudioPersistenceStore();
+  const baseSaved = await store.save(baseRecord.value);
+  assert(baseSaved.ok, JSON.stringify(baseSaved.diagnostics));
+
+  const firstEdit = await journalWorkspaceNoteUpsert(
+    base,
+    note("note:cas-first", 4),
+    { commandId: "persistence-cas-first", issuedAt: timestamp(13) },
+  );
+  const secondEdit = await journalWorkspaceNoteUpsert(
+    base,
+    note("note:cas-second", 16),
+    { commandId: "persistence-cas-second", issuedAt: timestamp(14) },
+  );
+  assert(firstEdit.ok, JSON.stringify(firstEdit.diagnostics));
+  assert(secondEdit.ok, JSON.stringify(secondEdit.diagnostics));
+  const [firstRecord, secondRecord] = await Promise.all([
+    createAudioPersistenceRecord(
+      firstEdit.value,
+      "audio-checkpoint:cas-first",
+      timestamp(15),
+    ),
+    createAudioPersistenceRecord(
+      secondEdit.value,
+      "audio-checkpoint:cas-second",
+      timestamp(16),
+    ),
+  ]);
+  assert(firstRecord.ok, JSON.stringify(firstRecord.diagnostics));
+  assert(secondRecord.ok, JSON.stringify(secondRecord.diagnostics));
+  assert(
+    firstRecord.value.checkpoint.projectRevision ===
+        secondRecord.value.checkpoint.projectRevision &&
+      firstRecord.value.checkpoint.stateHash !==
+        secondRecord.value.checkpoint.stateHash,
+    "Competing Audio edits must share a revision but carry different state hashes.",
+  );
+
+  const options = {
+    expectedProjectRevision: baseRecord.value.checkpoint.projectRevision,
+    expectedStateHash: baseRecord.value.checkpoint.stateHash,
+  };
+  const results = await Promise.all([
+    store.save(firstRecord.value, options),
+    store.save(secondRecord.value, options),
+  ]);
+  const staleCount = results.filter((result) =>
+    result.ok && result.diagnostics.some((item) =>
+      item.code === "AUDIO_STALE_PROJECT_REVISION"
+    )
+  ).length;
+  assert(staleCount === 1, "Two Audio tabs must not both persist competing edits.");
+  assert(
+    results.filter((result) => result.ok && result.diagnostics.length === 0)
+      .length === 1,
+    "Exactly one Audio CAS write should become the persisted snapshot.",
+  );
+  const loaded = await store.load(base.project.projectId);
+  assert(loaded.ok && loaded.value !== null, "Audio CAS record disappeared.");
+  assert(
+    loaded.value.checkpoint.stateHash === firstRecord.value.checkpoint.stateHash ||
+      loaded.value.checkpoint.stateHash === secondRecord.value.checkpoint.stateHash,
+    "Persisted Audio state is not one of the accepted competing edits.",
+  );
+});

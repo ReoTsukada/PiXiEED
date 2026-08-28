@@ -5,10 +5,12 @@ import {
   comparePixelRevisions,
   createLinkedCelBinding,
   createSelectionMask,
+  Draw2SelectionStampStore,
   DrawAudioReferenceStore,
   GuideStore,
   MacroRecorder,
   nineSliceRegions,
+  normalizeDraw2SelectionStamp,
   normalizeDraw2TimelineMetadata,
   packAtlas,
   PaletteManager,
@@ -58,6 +60,65 @@ Deno.test("creator P0 brush presets normalize and round-trip all editing attribu
     store.list().length === 1 && store.remove("preset:ink") &&
       store.list().length === 0,
     "brush preset lifecycle is not deterministic",
+  );
+});
+
+Deno.test("creator P0 selection stamps preserve transparent holes and lifecycle", () => {
+  const store = new Draw2SelectionStampStore();
+  const saved = store.save({
+    id: "selection-stamp:hero",
+    name: "  Hero  ",
+    width: 3,
+    height: 2,
+    pixels: [
+      { x: 2, y: 1, colorIndex: 2 },
+      { x: 0, y: 0, colorIndex: 1 },
+      { x: 1, y: 0, colorIndex: 0 },
+    ],
+    palette: [0, 0xff112233, 0xff445566],
+  });
+  assert(
+    saved.name === "Hero" && saved.pixels[0]?.x === 0 &&
+      saved.pixels[1]?.colorIndex === 0 && store.load(saved.id) !== undefined,
+    "selection stamp normalization lost the selected transparent hole",
+  );
+  const metadata = normalizeDraw2TimelineMetadata({
+    schemaVersion: 2,
+    animationTags: [],
+    markers: [],
+    audioReferences: [],
+    selectionStamps: [saved],
+  }, 1);
+  assert(
+    metadata.selectionStamps?.[0]?.name === "Hero" &&
+      metadata.selectionStamps?.[0]?.pixels.length === 3,
+    "selection stamp metadata did not round-trip",
+  );
+  const legacy = normalizeDraw2TimelineMetadata({
+    schemaVersion: 2,
+    animationTags: [],
+    markers: [],
+    audioReferences: [],
+  }, 1);
+  assert(
+    !Object.prototype.hasOwnProperty.call(legacy, "selectionStamps"),
+    "legacy timeline metadata was changed when no stamp collection existed",
+  );
+  assert(
+    store.remove(saved.id) && store.list().length === 0,
+    "selection stamp removal failed",
+  );
+  const normalized = normalizeDraw2SelectionStamp({
+    id: "selection-stamp:empty",
+    name: "",
+    width: 1,
+    height: 1,
+    pixels: [],
+    palette: [0],
+  });
+  assert(
+    normalized.name === "Selection stamp",
+    "empty stamp name was not normalized",
   );
 });
 

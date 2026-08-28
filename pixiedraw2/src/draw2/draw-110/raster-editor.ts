@@ -136,6 +136,10 @@ export class Draw110Editor {
   #sequence = 0;
   #undo: Draw110HistoryEntry[] = [];
   #redo: Draw110HistoryEntry[] = [];
+  // A pointer stream can finish more than one stroke in the same task.  The
+  // core command is async because it hashes the canonical operation, so an
+  // unqueued burst would let every command read the same state and sequence.
+  #executionTail: Promise<void> = Promise.resolve();
   readonly #actorId: string;
   readonly #clientId: string;
   readonly #renderer = new ReferenceRenderer();
@@ -162,7 +166,7 @@ export class Draw110Editor {
 
   async commitStroke(stroke: StrokeRecord): Promise<Draw110Execution> {
     const colorIndex = stroke.tool === "eraser" ? 0 : 1;
-    return this.#executeRaster({
+    return this.#enqueueRaster({
       commandType: "raster.strokeCommit",
       payload: { points: pointsFromStroke(stroke), colorIndex },
     });
@@ -172,7 +176,7 @@ export class Draw110Editor {
     points: readonly PixelPoint[],
     colorIndex: number,
   ): Promise<Draw110Execution> {
-    return this.#executeRaster({
+    return this.#enqueueRaster({
       commandType: "raster.strokeCommit",
       payload: { points, colorIndex },
     });
@@ -183,9 +187,9 @@ export class Draw110Editor {
     colorIndex: number,
     maxPixels = 1_048_576,
   ): Promise<Draw110Execution> {
-    return this.#executeRaster({
+    return this.#enqueueRaster({
       commandType: "raster.fill",
-      payload: { seedX: seed.x, seedY: seed.y, colorIndex, maxPixels },
+      payload: { seedX: seed.x, seedY: seed.y, colorIndex, maxCells: maxPixels },
     });
   }
 
@@ -235,6 +239,19 @@ export class Draw110Editor {
     return sha256Hex(asset.raster.toUint8Array());
   }
 
+  #enqueueRaster(
+    input: {
+      readonly commandType: "raster.strokeCommit" | "raster.fill";
+      readonly payload: unknown;
+    },
+  ): Promise<Draw110Execution> {
+    const execution = this.#executionTail.then(() => this.#executeRaster(input));
+    // Keep the queue usable after a rejected command.  The rejection must
+    // still reach the caller that submitted that command.
+    this.#executionTail = execution.then(() => undefined, () => undefined);
+    return execution;
+  }
+
   async #executeRaster(
     input: {
       readonly commandType: "raster.strokeCommit" | "raster.fill";
@@ -269,16 +286,18 @@ export class Draw110Editor {
         redoDepth: this.redoDepth,
       };
     }
-    this.#sequence = nextSequence;
+    if (!execution.result.noOp) this.#sequence = nextSequence;
     this.#state = execution.state;
     this.#core = new EditorCore(this.#state);
-    this.#undo.push({
-      operationId: execution.result.operation.operationId,
-      operationType: execution.result.operation.operationType,
-      before: cloneProjectStateShared(before),
-      after: cloneProjectStateShared(this.#state),
-    });
-    this.#redo = [];
+    if (!execution.result.noOp) {
+      this.#undo.push({
+        operationId: execution.result.operation.operationId,
+        operationType: execution.result.operation.operationType,
+        before: cloneProjectStateShared(before),
+        after: cloneProjectStateShared(this.#state),
+      });
+      this.#redo = [];
+    }
     return {
       state: this.#state,
       result: execution.result,

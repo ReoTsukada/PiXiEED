@@ -148,12 +148,42 @@ function cloneWorld(value: RuntimeWorldState): RuntimeWorldState { return JSON.p
 function componentProperties(component: Component): Readonly<Record<string, string | number | boolean>> {
   switch (component.type) {
     case "TRANSFORM": return { x: component.x, y: component.y, rotation: component.rotation, scaleX: component.scaleX, scaleY: component.scaleY };
-    case "SPRITE": return { visible: component.visible };
-    case "AUDIO_SOURCE": return { loop: component.loop, volume: component.volume };
-    case "BEHAVIOR": return {};
+    case "SPRITE": return {
+      assetId: String(component.asset.assetId), assetRevisionId: String(component.asset.revisionId),
+      assetContentHash: String(component.asset.contentHash), visible: component.visible,
+    };
+    case "AUDIO_SOURCE": return {
+      assetId: String(component.asset.assetId), assetRevisionId: String(component.asset.revisionId),
+      assetContentHash: String(component.asset.contentHash), loop: component.loop, volume: component.volume,
+    };
+    case "BEHAVIOR": return { behaviorId: String(component.behaviorId) };
     case "CAMERA": return { active: component.active, zoom: component.zoom };
+    case "TILEMAP": return { mapId: component.mapId, tileSize: component.tileSize, collisionEnabled: component.collisionEnabled };
+    case "COLLIDER": return {
+      shape: component.shape, width: component.width, height: component.height, radius: component.radius,
+      isTrigger: component.isTrigger, layer: component.layer, enabled: component.enabled,
+    };
+    case "RIGIDBODY": return {
+      bodyType: component.bodyType, mass: component.mass, gravityScale: component.gravityScale,
+      fixedRotation: component.fixedRotation, enabled: component.enabled,
+    };
+    case "CHARACTER_CONTROLLER": return {
+      moveSpeed: component.moveSpeed, stepHeight: component.stepHeight, fixedStep: component.fixedStep, enabled: component.enabled,
+    };
   }
 }
+
+const componentPropertyTypes: Readonly<Record<Component["type"], Readonly<Record<string, "string" | "number" | "boolean">>>> = {
+  TRANSFORM: { x: "number", y: "number", rotation: "number", scaleX: "number", scaleY: "number" },
+  SPRITE: { assetId: "string", assetRevisionId: "string", assetContentHash: "string", visible: "boolean" },
+  AUDIO_SOURCE: { assetId: "string", assetRevisionId: "string", assetContentHash: "string", loop: "boolean", volume: "number" },
+  BEHAVIOR: { behaviorId: "string" },
+  CAMERA: { active: "boolean", zoom: "number" },
+  TILEMAP: { mapId: "string", tileSize: "number", collisionEnabled: "boolean" },
+  COLLIDER: { shape: "string", width: "number", height: "number", radius: "number", isTrigger: "boolean", layer: "string", enabled: "boolean" },
+  RIGIDBODY: { bodyType: "string", mass: "number", gravityScale: "number", fixedRotation: "boolean", enabled: "boolean" },
+  CHARACTER_CONTROLLER: { moveSpeed: "number", stepHeight: "number", fixedStep: "number", enabled: "boolean" },
+};
 
 function collectAssets(project: GameProject): AssetRevisionLock[] {
   const locks = new Map<string, AssetRevisionLock>();
@@ -198,7 +228,17 @@ function snapshotDiagnostics(snapshot: RuntimeProjectSnapshot): RuntimeDiagnosti
   for (const component of snapshot.components) {
     if (!stableId(component.componentId) || !stableId(component.entityId) || componentIds.has(component.componentId)) diagnostics.push(diagnostic("INVALID_SNAPSHOT", "components", "Component ids must be unique stable identifiers."));
     componentIds.add(component.componentId);
-    for (const value of Object.values(component.properties)) if (!scalar(value)) diagnostics.push(diagnostic("INVALID_SNAPSHOT", `components.${component.componentId}`, "Component properties must be deterministic scalar values."));
+    const expected = componentPropertyTypes[component.type];
+    if (!expected) diagnostics.push(diagnostic("UNKNOWN_COMPONENT", `components.${component.componentId}.type`, "Runtime snapshot contains an unknown component type."));
+    if (!isRecord(component.properties)) {
+      diagnostics.push(diagnostic("INVALID_SNAPSHOT", `components.${component.componentId}.properties`, "Runtime component properties must be an object."));
+      continue;
+    }
+    for (const [key, value] of Object.entries(component.properties)) {
+      if (!scalar(value)) diagnostics.push(diagnostic("INVALID_SNAPSHOT", `components.${component.componentId}.${key}`, "Component properties must be deterministic scalar values."));
+      if (!expected?.[key] || typeof value !== expected[key] || (typeof value === "number" && !finite(value))) diagnostics.push(diagnostic("INVALID_SNAPSHOT", `components.${component.componentId}.${key}`, "Component property has an unknown key or invalid value type."));
+    }
+    if (expected && Object.keys(component.properties).length !== Object.keys(expected).length) diagnostics.push(diagnostic("INVALID_SNAPSHOT", `components.${component.componentId}.properties`, "Runtime component properties must be complete."));
   }
   return diagnostics;
 }

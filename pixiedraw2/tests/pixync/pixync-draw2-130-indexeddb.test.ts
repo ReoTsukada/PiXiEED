@@ -20,7 +20,10 @@ import { canonicalJson, sha256Hex } from "../../src/wp160-contracts.ts";
 
 type FakeState = {
   readonly records: Map<string, unknown>;
+  readonly deletedProjects: Map<string, unknown>;
   storeExists: boolean;
+  deletedStoreExists: boolean;
+  version: number;
 };
 type FakeMode = "readonly" | "readwrite";
 
@@ -45,7 +48,8 @@ class FakeStoreNames {
   constructor(private readonly state: FakeState) {}
 
   contains(name: string): boolean {
-    return name === "snapshots" && this.state.storeExists;
+    return (name === "snapshots" && this.state.storeExists) ||
+      (name === "deletedProjects" && this.state.deletedStoreExists);
   }
 }
 
@@ -54,7 +58,8 @@ class FakeTransaction {
   onerror: ((event: unknown) => void) | null = null;
   onabort: ((event: unknown) => void) | null = null;
   oncomplete: ((event: unknown) => void) | null = null;
-  readonly staged: Map<string, unknown>;
+  readonly stagedSnapshots: Map<string, unknown>;
+  readonly stagedDeletedProjects: Map<string, unknown>;
   private finished = false;
 
   constructor(
@@ -62,14 +67,38 @@ class FakeTransaction {
     private readonly mode: FakeMode,
     private readonly factory: FakeIndexedDbFactory,
   ) {
-    this.staged = new Map(state.records);
+    this.stagedSnapshots = new Map(state.records);
+    this.stagedDeletedProjects = new Map(state.deletedProjects);
+  }
+
+  private readonly deletedSnapshotKeys = new Set<string>();
+  private readonly deletedProjectKeys = new Set<string>();
+
+  stagedStore(name: string): Map<string, unknown> {
+    if (name === "snapshots") return this.stagedSnapshots;
+    if (name === "deletedProjects") return this.stagedDeletedProjects;
+    throw new Error("missing store");
+  }
+
+  stageDelete(name: string, key: string): void {
+    this.stagedStore(name).delete(key);
+    (name === "snapshots" ? this.deletedSnapshotKeys : this.deletedProjectKeys).add(key);
+  }
+
+  stagePut(name: string, key: string, value: unknown): void {
+    this.stagedStore(name).set(key, value);
+    (name === "snapshots" ? this.deletedSnapshotKeys : this.deletedProjectKeys).delete(key);
   }
 
   objectStore(name: string): FakeObjectStore {
-    if (name !== "snapshots" || !this.state.storeExists) {
+    if (
+      (name === "snapshots" && !this.state.storeExists) ||
+      (name === "deletedProjects" && !this.state.deletedStoreExists) ||
+      (name !== "snapshots" && name !== "deletedProjects")
+    ) {
       throw new Error("missing store");
     }
-    return new FakeObjectStore(this, this.mode, this.factory);
+    return new FakeObjectStore(this, name, this.mode, this.factory);
   }
 
   abort(): void {
@@ -81,8 +110,13 @@ class FakeTransaction {
     setTimeout(() => {
       if (this.finished) return;
       this.finished = true;
-      for (const [key, value] of this.staged) {
+      for (const key of this.deletedSnapshotKeys) this.state.records.delete(key);
+      for (const [key, value] of this.stagedSnapshots) {
         this.state.records.set(key, structuredClone(value));
+      }
+      for (const key of this.deletedProjectKeys) this.state.deletedProjects.delete(key);
+      for (const [key, value] of this.stagedDeletedProjects) {
+        this.state.deletedProjects.set(key, structuredClone(value));
       }
       this.oncomplete?.(new Event("complete"));
     }, delayMs);
@@ -99,14 +133,27 @@ class FakeTransaction {
 class FakeObjectStore {
   constructor(
     private readonly transaction: FakeTransaction,
+    private readonly name: string,
     private readonly mode: FakeMode,
     private readonly factory: FakeIndexedDbFactory,
   ) {}
 
   get(key: string): object {
     const request = new FakeRequest<unknown>();
+    if (this.name === "snapshots") this.factory.snapshotGets += 1;
     queueMicrotask(() => {
-      request.succeed(structuredClone(this.transaction.staged.get(key)));
+      request.succeed(structuredClone(this.transaction.stagedStore(this.name).get(key)));
+      this.transaction.finishComplete(0);
+    });
+    return request;
+  }
+
+  delete(key: string): object {
+    if (this.mode !== "readwrite") throw new Error("write mode required");
+    const request = new FakeRequest<unknown>();
+    this.transaction.stageDelete(this.name, key);
+    queueMicrotask(() => {
+      request.succeed(undefined);
       this.transaction.finishComplete(0);
     });
     return request;
@@ -123,7 +170,7 @@ class FakeObjectStore {
       });
       return request;
     }
-    this.transaction.staged.set(value.projectId, structuredClone(value));
+    this.transaction.stagePut(this.name, value.projectId, structuredClone(value));
     const delay = this.factory.writeDelays.shift() ?? 0;
     queueMicrotask(() => {
       request.succeed(value.projectId);
@@ -154,13 +201,14 @@ class FakeDatabase {
     this.objectStoreNames = new FakeStoreNames(state);
   }
 
-  createObjectStore(): object {
-    this.state.storeExists = true;
+  createObjectStore(name: string): object {
+    if (name === "snapshots") this.state.storeExists = true;
+    if (name === "deletedProjects") this.state.deletedStoreExists = true;
     return {};
   }
 
   transaction(
-    _storeName: string,
+    _storeName: string | readonly string[],
     mode: FakeMode,
   ): object {
     return new FakeTransaction(this.state, mode, this.factory);
@@ -179,19 +227,27 @@ class FakeIndexedDbFactory {
   readonly databases = new Map<string, FakeState>();
   failNextWrite = false;
   writeDelays: number[] = [];
+  snapshotGets = 0;
 
-  open(name: string, _version = 1): object {
+  open(name: string, version = 1): object {
     const request = new FakeOpenRequest();
     queueMicrotask(() => {
       let state = this.databases.get(name);
       const isNew = state === undefined;
       if (state === undefined) {
-        state = { records: new Map(), storeExists: false };
+        state = {
+          records: new Map(),
+          deletedProjects: new Map(),
+          storeExists: false,
+          deletedStoreExists: false,
+          version: 0,
+        };
         this.databases.set(name, state);
       }
       const db = new FakeDatabase(state, this);
       request.result = db;
-      if (isNew) {
+      if (isNew || state.version < version) {
+        state.version = version;
         const upgrade = new FakeUpgradeTransaction();
         request.transaction = upgrade;
         request.onupgradeneeded?.(new Event("upgradeneeded"));
@@ -340,5 +396,119 @@ Deno.test("PIXYNC-DRAW2-130-06 constructor supports an injected factory without 
       "project-a",
       options(factory, "injected"),
     )
+  );
+});
+
+Deno.test("PIXYNC-DRAW2-130-07 clear removes only the requested project snapshot", async () => {
+  const factory = new FakeIndexedDbFactory();
+  const first = createPixyncIndexedDbPersistence(
+    "project-a",
+    options(factory, "clear"),
+  );
+  const second = createPixyncIndexedDbPersistence(
+    "project-b",
+    options(factory, "clear"),
+  );
+  await first.atomicReplace(await seal((await PixyncDurableJournal.open("project-a", first)).snapshot(), 1));
+  await second.atomicReplace(await seal((await PixyncDurableJournal.open("project-b", second)).snapshot(), 1));
+  await first.clear();
+  assert.equal(await first.load(), undefined);
+  assert.equal((await second.load())?.projectId, "project-b");
+  await first.clear();
+});
+
+Deno.test("PIXYNC-DRAW2-130-08 permanent remove blocks late writers without reading the snapshot body", async () => {
+  const factory = new FakeIndexedDbFactory();
+  const dbName = "permanent-remove";
+  const first = createPixyncIndexedDbPersistence(
+    "project-a",
+    options(factory, dbName),
+  );
+  const second = createPixyncIndexedDbPersistence(
+    "project-a",
+    options(factory, dbName),
+  );
+  const journal = await PixyncDurableJournal.open("project-a", first);
+  const snapshot = await seal(journal.snapshot(), 1);
+  await first.atomicReplace(snapshot);
+
+  const snapshotGetsBeforeRemove = factory.snapshotGets;
+  assert.equal(await first.remove(), true);
+  assert.equal(
+    factory.snapshotGets,
+    snapshotGetsBeforeRemove,
+    "Permanent removal must delete by key without reading the snapshot body.",
+  );
+  assert.equal(await first.load(), undefined);
+  assert.equal(await second.load(), undefined);
+  await assert.rejects(
+    second.atomicReplace(snapshot),
+    (error: unknown) =>
+      error instanceof PixyncIndexedDbPersistenceError &&
+      error.code === "PROJECT_DELETED",
+  );
+  await assert.rejects(
+    PixyncDurableJournal.open(
+      "project-a",
+      createPixyncIndexedDbPersistence("project-a", options(factory, dbName)),
+    ),
+    (error: unknown) =>
+      error instanceof PixyncIndexedDbPersistenceError &&
+      error.code === "PROJECT_DELETED",
+  );
+
+  // A retry must be idempotent and must not remove the deletion barrier.
+  assert.equal(await second.remove(), true);
+  await second.clear();
+  await assert.rejects(
+    second.atomicReplace(snapshot),
+    (error: unknown) =>
+      error instanceof PixyncIndexedDbPersistenceError &&
+      error.code === "PROJECT_DELETED",
+  );
+  assert.equal(factory.databases.get(dbName)?.records.has("project-a"), false);
+  assert.equal(
+    factory.databases.get(dbName)?.deletedProjects.has("project-a"),
+    true,
+  );
+});
+
+Deno.test("PIXYNC-DRAW2-130-09 upgrades an existing V1 snapshot before permanent removal", async () => {
+  const seedFactory = new FakeIndexedDbFactory();
+  const seedPersistence = createPixyncIndexedDbPersistence(
+    "project-a",
+    options(seedFactory, "seed"),
+  );
+  const seedJournal = await PixyncDurableJournal.open(
+    "project-a",
+    seedPersistence,
+  );
+  const legacySnapshot = await seal(seedJournal.snapshot(), 1);
+
+  const factory = new FakeIndexedDbFactory();
+  const dbName = "legacy-v1";
+  factory.databases.set(dbName, {
+    records: new Map([[
+      "project-a",
+      { projectId: "project-a", snapshot: legacySnapshot },
+    ]]),
+    deletedProjects: new Map(),
+    storeExists: true,
+    deletedStoreExists: false,
+    version: 1,
+  });
+
+  const persistence = createPixyncIndexedDbPersistence(
+    "project-a",
+    options(factory, dbName),
+  );
+  assert.equal((await persistence.load())?.revision, 1);
+  assert.equal(factory.databases.get(dbName)?.deletedStoreExists, true);
+  await persistence.remove();
+  assert.equal(await persistence.load(), undefined);
+  assert.equal(factory.databases.get(dbName)?.records.has("project-a"), false);
+  assert.equal(
+    factory.databases.get(dbName)?.deletedProjects.has("project-a"),
+    true,
   );
 });

@@ -958,8 +958,10 @@
       uiTheme: state.uiTheme,
       palettePreset: normalizedPalettePreset,
     });
-    const newProjectId = createAutosaveProjectId();
-    await preparePiXiSyncProjectSwitch?.(newProjectId);
+    // Dispose the previous PiXYNC runtime before changing the document. A new
+    // project has no existing binding, so an empty target is the explicit
+    // switch request and avoids allocating an identity before the clean reset.
+    await preparePiXiSyncProjectSwitch?.();
 
     applyHistorySnapshot(snapshot);
     setCurrentPalettePresetId(normalizedPalettePreset, { syncControl: true });
@@ -976,6 +978,7 @@
     setTrackedProjectDotBaseline(snapshot, null);
     resetOpenedDocumentViewport({ defer: true });
 
+    const newProjectId = createAutosaveProjectId();
     setActiveAutosaveProjectId(newProjectId);
     clearActiveLocalProjectJournal?.();
     clearActiveSharedProjectSession();
@@ -1483,6 +1486,9 @@
   let startupWorkspaceEntries = [];
   let startupWorkspaceSearchQuery = '';
   let startupWorkspaceJoinBusy = false;
+  const STARTUP_WORKSPACE_INITIAL_RENDER_LIMIT = 60;
+  const STARTUP_WORKSPACE_RENDER_BATCH = 60;
+  let startupWorkspaceRenderLimit = STARTUP_WORKSPACE_INITIAL_RENDER_LIMIT;
 
   function setStartupWorkspaceStatus(message, tone = 'info') {
     const node = dom.startup?.workspaceStatus;
@@ -1597,12 +1603,17 @@
   function renderStartupWorkspaceProjects(entries = []) {
     const list = dom.startup?.workspaceProjectList;
     if (!(list instanceof HTMLElement)) return;
+    const isSameEntrySet = entries === startupWorkspaceEntries;
     startupWorkspaceEntries = Array.isArray(entries) ? entries.slice() : [];
-    const visibleEntries = startupWorkspaceSearchQuery
+    if (!isSameEntrySet) {
+      startupWorkspaceRenderLimit = STARTUP_WORKSPACE_INITIAL_RENDER_LIMIT;
+    }
+    const matchingEntries = startupWorkspaceSearchQuery
       ? startupWorkspaceEntries.filter(entry => String(entry?.name || entry?.fileName || '')
           .toLocaleLowerCase()
           .includes(startupWorkspaceSearchQuery))
       : startupWorkspaceEntries;
+    const visibleEntries = matchingEntries.slice(0, startupWorkspaceRenderLimit);
     const renderId = String(Number(list.dataset.pixieedFeedRenderId || '0') + 1);
     list.dataset.pixieedFeedRenderId = renderId;
     list.replaceChildren();
@@ -1613,7 +1624,7 @@
       list.appendChild(empty);
       return;
     }
-    if (!visibleEntries.length) {
+    if (!matchingEntries.length) {
       const empty = document.createElement('p');
       empty.className = 'startup-workspace__empty';
       empty.textContent = localizeText('一致するプロジェクトがありません。', 'No matching projects.');
@@ -1761,6 +1772,23 @@
       }
       cards.push(card);
     });
+    const remainingCount = Math.max(0, matchingEntries.length - visibleEntries.length);
+    const appendLoadMoreControl = () => {
+      if (remainingCount <= 0 || list.dataset.pixieedFeedRenderId !== renderId) return;
+      const loadMore = document.createElement('button');
+      loadMore.type = 'button';
+      loadMore.className = 'startup-workspace__load-more';
+      loadMore.dataset.workspaceProjectMore = 'true';
+      loadMore.textContent = localizeText(
+        `さらに${Math.min(remainingCount, STARTUP_WORKSPACE_RENDER_BATCH)}件表示（残り${remainingCount}件）`,
+        `Show ${Math.min(remainingCount, STARTUP_WORKSPACE_RENDER_BATCH)} more ( ${remainingCount} remaining )`
+      );
+      loadMore.setAttribute('aria-label', localizeText(
+        `プロジェクトをさらに${Math.min(remainingCount, STARTUP_WORKSPACE_RENDER_BATCH)}件表示`,
+        `Show ${Math.min(remainingCount, STARTUP_WORKSPACE_RENDER_BATCH)} more projects`
+      ));
+      list.appendChild(loadMore);
+    };
     const createWorkspaceAd = ({ placement = 'between-batches' } = {}) => {
       const isLeading = placement === 'leading';
       const adCard = document.createElement('div');
@@ -1797,10 +1825,12 @@
         requestAd: () => queueStartupRecentAdRender(),
         isCurrent: () => list.dataset.pixieedFeedRenderId === renderId,
       }).then(() => {
+        appendLoadMoreControl();
         if (list.dataset.pixieedFeedRenderId === renderId && startupVisible) queueStartupRecentAdRender();
       });
     } else {
       list.append(...cards);
+      appendLoadMoreControl();
     }
     if (startupVisible) {
       window.requestAnimationFrame(() => queueStartupRecentAdRender());
@@ -1813,10 +1843,17 @@
     // large or broken V1 entry cannot block the chooser or new-project flow.
     const localEntries = await loadDeviceLocalWorkspaceEntries();
     renderStartupWorkspaceProjects(localEntries);
+    const windowedProjectCount = Math.min(localEntries.length, STARTUP_WORKSPACE_INITIAL_RENDER_LIMIT);
+    const listWindowHint = localEntries.length > windowedProjectCount
+      ? localizeText(
+        `（最初の${windowedProjectCount}件を表示。さらに表示できます）`,
+        `(showing the first ${windowedProjectCount}; more are available)`
+      )
+      : '';
     setStartupWorkspaceStatus(
       localizeText(
-        `端末内プロジェクト ${localEntries.length}件。プロジェクトを選ぶと、そのプロジェクトだけを必要に応じて自動変換します。`,
-        `${localEntries.length} on-device project(s). Select a project to automatically convert only that project when needed.`
+        `端末内プロジェクト ${localEntries.length}件${listWindowHint}。プロジェクトを選ぶと、そのプロジェクトだけを必要に応じて自動変換します。`,
+        `${localEntries.length} on-device project(s) ${listWindowHint}. Select a project to automatically convert only that project when needed.`
       ),
       'info'
     );
@@ -1846,6 +1883,12 @@
     projectList.addEventListener('click', async event => {
       const source = event.target instanceof Element ? event.target : null;
       if (!source) return;
+      const loadMoreButton = source.closest('button[data-workspace-project-more]');
+      if (loadMoreButton instanceof HTMLButtonElement) {
+        startupWorkspaceRenderLimit += STARTUP_WORKSPACE_RENDER_BATCH;
+        renderStartupWorkspaceProjects(startupWorkspaceEntries);
+        return;
+      }
       const menuButton = source.closest('button[data-workspace-project-menu-index]');
       if (menuButton instanceof HTMLButtonElement) {
         const card = menuButton.closest('.startup-workspace__project');

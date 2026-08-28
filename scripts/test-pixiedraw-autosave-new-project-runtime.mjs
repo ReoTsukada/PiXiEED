@@ -25,6 +25,15 @@ try {
   ).catch(() => {});
   await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 20_000 });
   await page.waitForTimeout(2_500);
+  const pixisyncResumeNotice = page.locator('#pixisyncResumeNoticeDialog[open]');
+  if (await pixisyncResumeNotice.count()) {
+    await page.locator('#pixisyncResumeNoticeClose').click({ timeout: 5_000 });
+    await page.waitForFunction(
+      () => !document.getElementById('pixisyncResumeNoticeDialog')?.open,
+      null,
+      { timeout: 5_000 }
+    );
+  }
   console.log('autosave-runtime: app-ready');
 
   async function createProject(name, fromStartup) {
@@ -68,6 +77,23 @@ try {
           database.close();
         }
       };
+      const readKeys = async (databaseName, storeName) => {
+        const database = await new Promise((resolve, reject) => {
+          const request = indexedDB.open(databaseName);
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+        try {
+          return await new Promise((resolve, reject) => {
+            const transaction = database.transaction([storeName], 'readonly');
+            const request = transaction.objectStore(storeName).getAllKeys();
+            request.onsuccess = () => resolve(Array.from(request.result || []));
+            request.onerror = () => reject(request.error);
+          });
+        } finally {
+          database.close();
+        }
+      };
       // Read sequentially. Safari and Chromium can both keep an upgrade/write
       // transaction pending when multiple connections to the same V2 database
       // are opened concurrently during a deferred thumbnail refresh.
@@ -80,17 +106,23 @@ try {
       console.log('autosave-runtime:idb:manifests:complete');
       const checkpoints = await readAll('pixieedraw-autosave-v2-experimental', 'localProjectSheetCheckpoints');
       console.log('autosave-runtime:idb:checkpoints:complete');
+      const metadataKeys = await readKeys('pixieedraw-autosave', 'handles');
+      const deletedProjectIds = current
+        .filter(entry => entry?.deleted === true)
+        .map(entry => entry?.projectId || '')
+        .filter(Boolean);
       return {
         recent: recent.map(entry => ({
           id: entry?.id || '',
           name: entry?.name || '',
           manifestKey: entry?.manifestKey || '',
         })),
-        current: current.map(entry => ({
+        current: current.filter(entry => entry?.deleted !== true).map(entry => ({
           projectId: entry?.projectId || '',
           manifestKey: entry?.manifestKey || '',
           revision: Number(entry?.revision) || 0,
         })),
+        deletedProjectIds,
         manifests: manifests.map(entry => ({
           projectId: entry?.projectId || '',
           key: entry?.key || '',
@@ -100,8 +132,13 @@ try {
           projectId: entry?.projectId || '',
           key: entry?.key || '',
           indicesType: entry?.project?.document?.frames?.[0]?.layers?.[0]?.indices?.constructor?.name || '',
+          indicesEncoding: entry?.project?.document?.frames?.[0]?.layers?.[0]?.indicesEncoding || '',
           directType: entry?.project?.document?.frames?.[0]?.layers?.[0]?.direct?.constructor?.name || '',
         })),
+        metadataKeys: metadataKeys
+          .filter(key => typeof key === 'string' && key.startsWith('recentProjectMetadata:v1:')),
+        deletionKeys: metadataKeys
+          .filter(key => typeof key === 'string' && key.startsWith('recentProjectDeletion:v1:')),
       };
     });
   }
@@ -183,10 +220,15 @@ try {
   assert.ok(firstCurrent, 'the previous project current revision must remain after creating a new project');
   assert.ok(secondCurrent?.revision >= 1, 'the new blank project must be saved under its own id');
   const secondCheckpoint = finalPersistence.checkpoints.find(entry => entry.projectId === second.projectId);
-  assert.equal(
-    secondCheckpoint?.indicesType,
-    'Int16Array',
-    'the production autosave path must persist indexed pixels as Int16Array, not Base64 or a numeric object'
+  assert.ok(
+    secondCheckpoint?.indicesType === 'Int16Array'
+      || (
+        secondCheckpoint?.indicesType === 'Uint8Array'
+        && ['uint8-palette-zero-transparent-v2', 'uint8-tiled-zero-transparent-v1'].includes(
+          secondCheckpoint?.indicesEncoding
+        )
+      ),
+    'the production autosave path must persist indexed pixels as a supported typed-array encoding, not Base64 or a numeric object'
   );
   // A brand-new INDEX project has no RGB raster yet. When it does exist, it
   // must remain a typed array through the same production autosave route.
@@ -196,6 +238,10 @@ try {
   );
   assert.equal(finalPersistence.recent.filter(entry => entry.id === first.projectId).length, 1);
   assert.equal(finalPersistence.recent.filter(entry => entry.id === second.projectId).length, 1);
+  assert.ok(
+    finalPersistence.metadataKeys.includes(`recentProjectMetadata:v1:${first.projectId}`),
+    'saved project must have a recent metadata sidecar before deletion'
+  );
   assert.equal(
     finalPersistence.recent.find(entry => entry.id === first.projectId)?.manifestKey,
     firstCurrent.manifestKey,
@@ -212,6 +258,66 @@ try {
   );
   assert.deepEqual(sessionErrors, [], 'project replacement must not emit session mismatch or page errors');
 
+  // Exercise the real startup delete flow against the synthetic project just
+  // created by this isolated browser context. The active second project must
+  // remain open while the first project's V2 and auxiliary records are
+  // removed, then the recent card may disappear.
+  await page.evaluate(() => document.getElementById('showLocalProjects')?.click());
+  await page.waitForFunction(
+    () => document.body.classList.contains('is-startup-active'),
+    null,
+    { timeout: 5_000 }
+  );
+  const firstProjectCard = page.locator('#startupWorkspaceProjectList .startup-workspace__project')
+    .filter({ hasText: 'autosave-project-a' });
+  await firstProjectCard.waitFor({ state: 'visible', timeout: 5_000 });
+  await firstProjectCard.locator('button[data-workspace-project-menu-index]').click();
+  await firstProjectCard.locator('button[data-workspace-project-delete-index]').click();
+  await page.waitForSelector('#recentProjectDeleteConfirmDialog[open]', { timeout: 5_000 });
+  await page.locator('#recentProjectDeleteConfirmConfirm').click();
+  await page.waitForFunction(
+    () => !Array.from(document.querySelectorAll('#startupWorkspaceProjectList .startup-workspace__project'))
+      .some(node => node.textContent?.includes('autosave-project-a')),
+    null,
+    { timeout: 15_000 }
+  );
+  const afterDeletePersistence = await readPersistenceSummary();
+  assert.equal(
+    afterDeletePersistence.recent.some(entry => entry.id === first.projectId),
+    false,
+    'deleted project must leave the recent-project store'
+  );
+  assert.equal(
+    afterDeletePersistence.current.some(entry => entry.projectId === first.projectId),
+    false,
+    'deleted project must leave the current-manifest store'
+  );
+  assert.equal(
+    afterDeletePersistence.manifests.some(entry => entry.projectId === first.projectId),
+    false,
+    'deleted project must leave no retained V2 manifest'
+  );
+  assert.equal(
+    afterDeletePersistence.checkpoints.some(entry => entry.projectId === first.projectId),
+    false,
+    'deleted project must leave no V2 checkpoint'
+  );
+  assert.equal(
+    afterDeletePersistence.metadataKeys.includes(`recentProjectMetadata:v1:${first.projectId}`),
+    false,
+    'deleted project must leave no recent metadata sidecar'
+  );
+  assert.equal(
+    afterDeletePersistence.deletedProjectIds.includes(first.projectId),
+    true,
+    'deleted project must leave only a small V2 deletion tombstone'
+  );
+  assert.equal(
+    afterDeletePersistence.deletionKeys.includes(`recentProjectDeletion:v1:${first.projectId}`),
+    true,
+    'deleted project must leave a recent-project deletion marker'
+  );
+
   console.log(JSON.stringify({
     firstProjectId: first.projectId,
     firstInitialRevision: firstInitialCurrent.revision,
@@ -219,13 +325,19 @@ try {
     secondProjectId: second.projectId,
     secondRevision: secondCurrent.revision,
     recentRows: finalPersistence.recent.length,
+    recentMetadataSidecarCount: finalPersistence.metadataKeys.length,
+    recentDeletionMarkerCount: afterDeletePersistence.deletionKeys.length,
     firstRetainedRevisions: finalPersistence.manifests.filter(entry => entry.projectId === first.projectId).length,
     secondBlankVisiblePixels: blankPixelCount,
     newProjectUndoDisabled: true,
     residentTabPayloadCount: memoryDiagnostics?.activeDocument?.residentTabPayloadCount,
     sessionMismatchCount: sessionErrors.length,
     checkpointIndicesType: secondCheckpoint.indicesType,
+    checkpointIndicesEncoding: secondCheckpoint.indicesEncoding,
     checkpointDirectType: secondCheckpoint.directType,
+    deletedFirstProject: true,
+    deletedFirstProjectDataRemaining: false,
+    deletedFirstProjectTombstone: afterDeletePersistence.deletedProjectIds.includes(first.projectId),
   }, null, 2));
 } finally {
   await browser.close();

@@ -7,10 +7,10 @@
       content="width=device-width, initial-scale=1, viewport-fit=cover"
     >
     <meta name="robots" content="noindex,nofollow">
-    <title>PiXiEEDstudio — iDRAW Workspace</title>
+    <title>PiXiEEDstudio — Studio</title>
     <link
       rel="stylesheet"
-      href="./assets/draw2-shell.css?v=20260827-igame-template-v1"
+      href="./assets/draw2-shell.css?v=20260828-project-data-retention-delete-v1"
     >
   </head>
   <body>
@@ -18,10 +18,9 @@
       <header class="draw2-header">
         <div>
           <p class="draw2-eyebrow">ISOLATED / LOCAL ONLY</p>
-          <h1 id="draw2Title">iDRAW Workspace</h1>
+          <h1 id="draw2Title">PiXiEED Studio</h1>
           <p class="draw2-description">
-            WP-180のProfessional
-            iDRAW Workspaceを確認するための隔離Entryです。既存のプロジェクトデータは変更しません。
+            iDRAW・iAUDIO・iGAMEをひとつのProjectで扱うProfessional Workspaceの隔離Entryです。既存のプロジェクトデータは変更しません。
           </p>
         </div>
         <span class="draw2-badge">Feature Flag OFF</span>
@@ -46,7 +45,7 @@
               <p class="draw2-eyebrow">CREATE YOUR WORLD</p>
               <h1 id="draw2ProjectStartTitle">What do you want to create?</h1>
               <p>
-                Open a recent project or start a new Draw, Audio, and Game workspace.
+                iDRAW・iAUDIO・iGAMEを、ひとつのProjectで始められます。
               </p>
             </div>
           </div>
@@ -57,16 +56,48 @@
           <button
             class="draw2-project-start-card draw2-project-start-card-primary"
             id="draw2ProjectStartNew"
+            data-project-start-mode="DRAW"
             type="button"
+            aria-pressed="true"
           >
-            <span class="draw2-project-start-card-icon" aria-hidden="true">＋</span>
+            <span class="draw2-project-start-card-icon" aria-hidden="true">
+              <svg class="draw2-ui-icon"><use href="./assets/icons/draw2-icons.svg#icon-pen"></use></svg>
+            </span>
             <span>
-              <strong>New project</strong>
-              <small>Start with a blank canvas and shared timeline.</small>
+              <strong>iDRAW</strong>
+              <small>キャラクター、背景、タイル、Objectを制作</small>
+            </span>
+          </button>
+          <button
+            class="draw2-project-start-card"
+            data-project-start-mode="AUDIO"
+            type="button"
+            aria-pressed="false"
+          >
+            <span class="draw2-project-start-card-icon" aria-hidden="true">
+              <svg class="draw2-ui-icon"><use href="./assets/icons/draw2-icons.svg#icon-wave"></use></svg>
+            </span>
+            <span>
+              <strong>iAUDIO</strong>
+              <small>音楽、効果音、Clipを制作</small>
+            </span>
+          </button>
+          <button
+            class="draw2-project-start-card"
+            data-project-start-mode="GAME"
+            type="button"
+            aria-pressed="false"
+          >
+            <span class="draw2-project-start-card-icon" aria-hidden="true">
+              <svg class="draw2-ui-icon"><use href="./assets/icons/draw2-icons.svg#icon-play"></use></svg>
+            </span>
+            <span>
+              <strong>iGAME</strong>
+              <small>Spriteと音楽を組み合わせてSceneを制作</small>
             </span>
           </button>
           <div class="draw2-project-start-open">
-            <label for="draw2ProjectStartId">Open by project ID</label>
+            <label for="draw2ProjectStartId">Project IDで開く</label>
             <div>
               <input
                 id="draw2ProjectStartId"
@@ -80,7 +111,7 @@
                 id="draw2ProjectStartOpen"
                 type="button"
               >
-                Open
+                開く
               </button>
             </div>
           </div>
@@ -107,7 +138,7 @@
         data-workspace-layout="color-left-tools-right"
         id="draw2WorkspaceFrame"
         hidden
-        aria-label="PiXiEEDstudio iDRAW Professional Workspace"
+        aria-label="PiXiEEDstudio Professional Workspace"
       >
         <header class="draw2-workspace-topbar" id="draw2WorkspaceTopbar">
           <div class="draw2-workspace-global-row">
@@ -650,6 +681,13 @@
                     role="menuitem"
                   >
                     集中モード
+                  </button>
+                  <button
+                    data-workspace-command="toggle-detail-mode"
+                    type="button"
+                    role="menuitem"
+                  >
+                    ガイド / 詳細表示
                   </button>
                   <button
                     data-workspace-command="close-panel"
@@ -1283,6 +1321,25 @@
                 </svg><span>Preview</span>
               </button>
               <button
+                class="draw2-workspace-detail-toggle"
+                id="draw2WorkspaceDetailToggle"
+                data-workspace-command="toggle-detail-mode"
+                data-workspace-detail-mode-toggle
+                type="button"
+                aria-pressed="false"
+                aria-label="詳細モードへ切り替え"
+                title="詳細モードへ切り替え"
+              >
+                <span
+                  class="draw2-workspace-detail-toggle-label"
+                  data-workspace-detail-mode-label
+                >ガイド</span>
+                <span
+                  class="draw2-workspace-detail-toggle-description"
+                  data-workspace-detail-mode-description
+                >基本操作を中心に表示</span>
+              </button>
+              <button
                 class="draw2-icon-button"
                 data-workspace-command="command-palette"
                 type="button"
@@ -1298,7 +1355,7 @@
                 id="draw2SyncStatus"
                 data-sync-state="local"
               >
-                <summary aria-label="Realtime sync status: local only">
+                <summary aria-label="Project session status: local only">
                   <i class="draw2-sync-dot" aria-hidden="true"></i>
                   <span data-draw2-sync-summary>Local</span>
                 </summary>
@@ -1309,7 +1366,7 @@
                 >
                   <div class="draw2-sync-heading">
                     <div>
-                      <span class="draw2-eyebrow">REALTIME SYNC</span>
+                      <span class="draw2-eyebrow">PROJECT SESSION</span>
                       <strong>共有状態</strong>
                     </div>
                     <span
@@ -1328,7 +1385,7 @@
                   </div>
                   <div
                     class="draw2-sync-metrics"
-                    aria-label="Realtime sync metrics"
+                  aria-label="Project session metrics"
                   >
                     <div>
                       <small>Room</small>
@@ -1350,6 +1407,21 @@
                   <p class="draw2-sync-note" data-draw2-sync-message>
                     PiXYNC接続時はここだけが状態を表示します。描画中に詳細パネルを開く必要はありません。
                   </p>
+                  <div class="draw2-sync-checkpoint-actions">
+                    <button
+                      class="draw2-button draw2-button-secondary"
+                      id="draw2ProjectSessionCheckpoint"
+                      type="button"
+                    >
+                      Checkpointを保存
+                    </button>
+                    <small
+                      id="draw2ProjectSessionCheckpointStatus"
+                      aria-live="polite"
+                    >
+                      Local Sessionの確定Revisionを保存します。
+                    </small>
+                  </div>
                 </section>
               </details>
               <div
@@ -3701,6 +3773,7 @@
           <section
             class="draw2-workspace-panel"
             data-workspace-panel-content="advanced"
+            data-detail-level="detailed"
             id="draw2WorkspacePanelAdvanced"
             role="tabpanel"
             aria-labelledby="draw2WorkspaceTabAdvanced"
@@ -4717,7 +4790,7 @@
                     まだアセットはありません。Drawで範囲を選択して追加します。
                   </p>
                 </fieldset>
-                <details class="draw2-asset-advanced">
+                <details class="draw2-asset-advanced" data-detail-level="detailed">
                   <summary>3. 詳細設定（フレーム範囲・速度・ループ）</summary>
                   <fieldset class="draw2-creator-fieldset">
                     <legend>ポーズ詳細</legend>
@@ -5294,6 +5367,7 @@
               </p>
               <section
                 class="draw2-game-physics-card"
+                data-detail-level="detailed"
                 aria-labelledby="draw2GamePhysicsHeading"
               >
                 <div class="draw2-game-subheading">
@@ -5554,6 +5628,9 @@
               >
               </div>
               <div class="draw2-game-binding-controls">
+                <p class="draw2-panel-note">
+                  下のゲームアセットブラウザでiDRAW素材を選択してから「ゲーム配置を追加」を押すと、Game ObjectとSprite参照をまとめて設定できます。
+                </p>
                 <label class="draw2-panel-field">参照<select
                     id="draw2GameBindingMode"
                   >
@@ -5647,6 +5724,72 @@
                   ZIPを取得
                 </button>
               </div>
+              <section
+                class="draw2-studio-release-card"
+                aria-labelledby="draw2GameStudioReleaseHeading"
+              >
+                <div class="draw2-panel-heading">
+                  <div>
+                    <span class="draw2-eyebrow">STUDIO</span><strong id="draw2GameStudioReleaseHeading">Release Candidate</strong>
+                  </div><span class="draw2-panel-badge">Verified metadata</span>
+                </div>
+                <p class="draw2-panel-note">
+                  iDRAW・iAUDIO・iGAMEの参照、権利、Hashを固定して検証します。検証後は素材本体をローカルでArtifact化し、決定的なZIPにまとめられます。外部アップロード・公開は行いません。
+                </p>
+                <div class="draw2-panel-action-row draw2-studio-release-actions">
+                  <button
+                    id="draw2GameStudioReleaseCandidate"
+                    class="draw2-button"
+                    type="button"
+                  >
+                    Candidateを検証
+                  </button>
+                  <button
+                    id="draw2GameStudioReleaseManifest"
+                    class="draw2-button draw2-button-secondary"
+                    type="button"
+                    disabled
+                  >
+                    Manifest表示
+                  </button>
+                  <button
+                    id="draw2GameStudioPublishIntent"
+                    class="draw2-button draw2-button-secondary"
+                    type="button"
+                    disabled
+                  >
+                    Publish Intentを作成
+                  </button>
+                  <button
+                    id="draw2GameStudioReleaseArtifact"
+                    class="draw2-button draw2-button-secondary"
+                    type="button"
+                    disabled
+                  >
+                    Artifactを生成
+                  </button>
+                  <button
+                    id="draw2GameStudioReleaseArtifactDownload"
+                    class="draw2-button draw2-button-secondary"
+                    type="button"
+                    disabled
+                  >
+                    ZIPを取得
+                  </button>
+                </div>
+                <pre
+                  class="draw2-build-manifest-preview draw2-studio-release-manifest-preview"
+                  id="draw2GameStudioReleaseManifestPreview"
+                  hidden
+                ></pre>
+                <p
+                  class="draw2-panel-status"
+                  id="draw2GameStudioReleaseStatus"
+                  aria-live="polite"
+                >
+                  未検証です。公開には別途承認が必要です。
+                </p>
+              </section>
               <div
                 class="draw2-build-check-list"
                 id="draw2GameBuildChecks"
@@ -5974,7 +6117,7 @@
               >
                 Select a note, clip or track.
               </p>
-              <details class="draw2-audio-inspector-details">
+              <details class="draw2-audio-inspector-details" data-detail-level="detailed">
                 <summary>Routing diagnostics <small>Playback / graph</small></summary>
                 <section
                   id="draw2AudioRoutingDiagnostics"
@@ -6080,7 +6223,7 @@
                 </div>
                 <output id="draw2AudioVoiceStatus" class="draw2-audio-voice-status" aria-live="polite"></output>
               </section>
-              <details class="draw2-audio-inspector-details">
+              <details class="draw2-audio-inspector-details" data-detail-level="detailed">
                 <summary>Track FX <small>Open FX editor below</small></summary>
                 <div class="draw2-audio-right-section">
                   <ol id="draw2AudioRightFxList" class="draw2-audio-right-list">
@@ -6891,6 +7034,7 @@
                 <button
                   id="draw2AudioAdvancedToggle"
                   class="draw2-button draw2-button-secondary draw2-audio-advanced-toggle"
+                  data-detail-level="detailed"
                   type="button"
                   aria-label="Show advanced audio controls"
                   aria-controls="draw2ModeDeckAudio"
@@ -7730,6 +7874,25 @@
             Refresh LIVE
           </button>
         </div>
+        <div class="draw2-game-rail-summary" aria-label="Golden Project status">
+          <div class="draw2-game-rail-summary-card">
+            <strong>Golden Project</strong>
+            <small id="draw2GoldenProjectStatus">Play時にiDRAWとiAUDIOを同じGame Projectへ接続します。</small>
+          </div>
+          <div class="draw2-game-rail-summary-card">
+            <strong>接続状態</strong>
+            <small id="draw2GoldenProjectRefs">Sprite + Audio Source · metadata only</small>
+          </div>
+        </div>
+        <div class="draw2-action-row">
+          <button
+            id="draw2GoldenProjectApply"
+            class="draw2-button draw2-button-secondary"
+            type="button"
+          >
+            Golden ProjectをGameへ適用
+          </button>
+        </div>
         <div class="draw2-runtime-preview-viewport">
           <canvas
             id="draw2GamePreviewCanvas"
@@ -7746,6 +7909,7 @@
 
       <section
         class="draw2-card draw2-advanced-card"
+        data-detail-level="detailed"
         id="draw2AdvancedCard"
         aria-labelledby="draw2AdvancedHeading"
       >
@@ -9248,6 +9412,13 @@
             Visual Settings
           </button>
           <button
+            data-command-palette-command="toggle-detail-mode"
+            type="button"
+            role="option"
+          >
+            Guided / Detailed View
+          </button>
+          <button
             data-command-palette-command="add-frame"
             type="button"
             role="option"
@@ -9714,10 +9885,10 @@
         </div>
       </form>
     </dialog>
-    <script src="../scripts/pixieed-account-supabase-client.js?v=20260824-pixync-root-1"></script>
+    <script src="../scripts/pixieed-account-supabase-client.js?v=20260828-staging-config-v1"></script>
     <script
       type="module"
-      src="./dist/draw2-entry.js?v=20260827-igame-template-v1"
+      src="./dist/draw2-entry.js?v=20260828-project-data-retention-delete-v4"
     ></script>
     <script
       type="module"

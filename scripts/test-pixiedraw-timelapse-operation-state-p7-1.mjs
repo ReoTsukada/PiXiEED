@@ -27,10 +27,16 @@ requireText(store, /timelapseCheckpoints/, 'replay checkpoint store');
 requireText(store, /recordBaselineIfMissing/, 'baseline persistence');
 requireText(store, /readBaseline/, 'baseline restore');
 requireText(store, /projectSequence/, 'project-scoped sequence index');
-requireText(store, /nextSequence: sequence \+ 1/, 'atomic nextSequence update');
+requireText(store, /sequence: sequence \+ 1/, 'atomic nextSequence update');
 requireText(store, /\['active', 'undone', 'discarded'\]/, 'three operation states');
 requireText(store, /state\?\.state === 'active'/, 'active-only replay query');
 requireText(store, /projectWriteTails/, 'per-project write serialization');
+requireText(store, /projectRemovalPromises/, 'shared project-removal serialization');
+requireText(store, /lifecycle\.deleting = true/, 'write barrier during project removal');
+requireText(store, /readProjectRecordCounts/, 'post-delete empty verification');
+requireText(store, /DEFAULT_MAX_EVENT_COUNT = 240/, 'bounded timelapse event retention');
+requireText(store, /DEFAULT_MAX_CHECKPOINT_COUNT = 16/, 'bounded replay checkpoint retention');
+requireText(store, /recordingPauseReason: 'capacity'/, 'capacity pause marker');
 requireText(store, /async function flush\(projectId = ''\)/, 'pending-write flush');
 requireText(store, /async function removeProject\(projectId\)/, 'project cleanup');
 requireText(history, /recordTimelapseHistoryEntry\(historyEntry, pendingLabel, history\.pending\.timelapseBaselineSnapshot\)/, 'commit-to-operation binding');
@@ -40,7 +46,7 @@ requireText(dialog, /await store\.flush\?\.\(projectId\)/, 'latest operation flu
 requireText(dialog, /async function exportGif\(\)/, 'GIF export workflow');
 requireText(dialog, /maxFrames = 240/, 'bounded GIF frame export');
 requireText(dialog, /exportCancelled/, 'GIF export cancellation');
-requireText(html, /timelapse-operation-store-utils\.js\?v=20260729-resize-placement1/, 'runtime module load');
+requireText(html, /timelapse-operation-store-utils\.js\?v=20260828-timelapse-safety1/, 'runtime module load');
 requireText(html, /id="exportTimelapse"/, 'GIF export control');
 
 console.log('P7.1 timelapse operation-state contract passed');

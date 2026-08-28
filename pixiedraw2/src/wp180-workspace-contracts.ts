@@ -127,6 +127,7 @@ export function resolveDesktopCreatorModeProfile(
 export type PanelMountState = "hidden" | "mounted" | "active";
 export type WorkspacePreset = "professional" | "canvas_first" | "tablet_focus";
 export type ThemeMode = "light" | "dark" | "system";
+export type WorkspaceDetailMode = "guided" | "detailed";
 export type PresentationProfile = "desktop" | "tablet" | "mobile" | "split";
 export type TabletOrientation = "portrait" | "landscape";
 export type TabletContextSurface = "compact_dock" | "split_deck";
@@ -140,6 +141,14 @@ export const TABLET_PORTRAIT_DECK_CONTROLS = [
   "markers",
   "audio",
 ] as const;
+
+export function resolveWorkspaceDetailMode(
+  value: unknown,
+  fallback: WorkspaceDetailMode = "guided",
+): WorkspaceDetailMode {
+  return value === "guided" || value === "detailed" ? value : fallback;
+}
+
 export type WorkspaceTool =
   | "pen"
   | "eraser"

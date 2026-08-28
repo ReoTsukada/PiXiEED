@@ -36,6 +36,13 @@ export const DRAW2_PERSISTENCE_SCHEMA_VERSION =
 export const DRAW2_PERSISTENCE_DB_NAME = "pixiedraw2-draw-subdocuments" as const;
 export const DRAW2_PERSISTENCE_DB_VERSION = 1 as const;
 export const DRAW2_PERSISTENCE_STORE_NAME = "projects" as const;
+/**
+ * Durable undo is a recovery window, not an archive of the whole session.
+ * Each entry owns before/after structural snapshots, so both a count and a
+ * byte ceiling are required to keep broad-paint autosaves responsive.
+ */
+export const DRAW2_PERSISTED_HISTORY_LIMIT = 8 as const;
+export const DRAW2_PERSISTED_HISTORY_MAX_BYTES = 786432 as const;
 
 export interface SerializedDraw2Tile {
   readonly tileKey: string;
@@ -75,6 +82,11 @@ export interface SerializedDraw2HistorySnapshot {
   readonly redo: readonly SerializedDraw2HistoryEntry[];
 }
 
+export interface SerializeDraw2HistoryOptions {
+  readonly maxEntries?: number;
+  readonly maxBytes?: number;
+}
+
 export interface SerializedDraw2DirtyTileWrite {
   readonly assetId: string;
   readonly tiles: readonly SerializedDraw2Tile[];
@@ -105,10 +117,24 @@ export interface Draw2PersistenceSaveResult {
   readonly stale: boolean;
 }
 
+/**
+ * Optional compare-and-swap guard for a save produced from a previously
+ * loaded Project snapshot. A missing record is represented by revision 0 and
+ * a null state hash. When omitted, the store still applies its monotonic
+ * revision guard for backwards-compatible callers.
+ */
+export interface Draw2PersistenceSaveOptions {
+  readonly expectedRevision?: number;
+  readonly expectedStateHash?: string | null;
+}
+
 export interface Draw2PersistenceStore {
   readonly available: boolean;
   load(projectId: string): Promise<Draw2PersistenceRecord | null>;
-  save(record: Draw2PersistenceRecord): Promise<Draw2PersistenceSaveResult>;
+  save(
+    record: Draw2PersistenceRecord,
+    options?: Draw2PersistenceSaveOptions,
+  ): Promise<Draw2PersistenceSaveResult>;
   clear(projectId: string): Promise<boolean>;
 }
 
@@ -292,11 +318,42 @@ function deserializeHistoryEntry(
 
 export function serializeDraw2History(
   history: UndoRedoHistorySnapshot,
+  options: SerializeDraw2HistoryOptions = {},
 ): SerializedDraw2HistorySnapshot {
-  return {
-    undo: history.undo.map(serializeHistoryEntry),
-    redo: history.redo.map(serializeHistoryEntry),
+  const maxEntries = typeof options.maxEntries === "number" &&
+      Number.isSafeInteger(options.maxEntries) && options.maxEntries >= 0
+    ? options.maxEntries
+    : DRAW2_PERSISTED_HISTORY_LIMIT;
+  const maxBytes = typeof options.maxBytes === "number" &&
+      Number.isSafeInteger(options.maxBytes) && options.maxBytes >= 0
+    ? options.maxBytes
+    : DRAW2_PERSISTED_HISTORY_MAX_BYTES;
+  const serialized: {
+    undo: SerializedDraw2HistoryEntry[];
+    redo: SerializedDraw2HistoryEntry[];
+  } = {
+    undo: (maxEntries === 0 ? [] : history.undo.slice(-maxEntries)).map(
+      serializeHistoryEntry,
+    ),
+    redo: (maxEntries === 0 ? [] : history.redo.slice(-maxEntries)).map(
+      serializeHistoryEntry,
+    ),
   };
+  const encodedBytes = (): number =>
+    new TextEncoder().encode(JSON.stringify(serialized)).byteLength;
+  while (
+    (serialized.undo.length > 0 || serialized.redo.length > 0) &&
+    encodedBytes() > maxBytes
+  ) {
+    if (serialized.undo.length >= serialized.redo.length && serialized.undo.length > 0) {
+      serialized.undo.shift();
+    } else if (serialized.redo.length > 0) {
+      serialized.redo.shift();
+    } else {
+      break;
+    }
+  }
+  return serialized;
 }
 
 export function deserializeDraw2History(
@@ -420,7 +477,25 @@ function isNewer(
   if (incoming.revision !== current.revision) {
     return incoming.revision > current.revision;
   }
-  return incoming.savedAt >= current.savedAt;
+  // savedAt is diagnostic metadata, not an ordering authority. Two tabs can
+  // produce the same local revision with different snapshots; accepting the
+  // later timestamp would silently discard the other tab's work.
+  return incoming.stateHash === current.stateHash;
+}
+
+function matchesExpected(
+  current: Draw2PersistenceRecord | undefined,
+  options: Draw2PersistenceSaveOptions | undefined,
+): boolean {
+  if (options?.expectedRevision !== undefined) {
+    const currentRevision = current?.revision ?? 0;
+    if (currentRevision !== options.expectedRevision) return false;
+  }
+  if (options?.expectedStateHash !== undefined) {
+    const currentStateHash = current?.stateHash ?? null;
+    if (currentStateHash !== options.expectedStateHash) return false;
+  }
+  return true;
 }
 
 function openDrawDatabase(name: string): Promise<IDBDatabase> {
@@ -471,7 +546,7 @@ export function createIndexedDbDraw2PersistenceStore(
         return null;
       }
     },
-    async save(record) {
+    async save(record, options) {
       if (!available) return { ok: false, stale: false };
       try {
         const database = await openDrawDatabase(databaseName);
@@ -485,7 +560,8 @@ export function createIndexedDbDraw2PersistenceStore(
           const read = store.get(record.projectId);
           read.onsuccess = () => {
             const current = read.result as Draw2PersistenceRecord | undefined;
-            if (isNewer(record, current)) store.put(record);
+            if (!matchesExpected(current, options)) stale = true;
+            else if (isNewer(record, current)) store.put(record);
             else stale = true;
           };
           read.onerror = () => transaction.abort();
@@ -536,14 +612,17 @@ export function createMemoryDraw2PersistenceStore(): Draw2PersistenceStore {
     async load(projectId) {
       return records.get(projectId) ?? null;
     },
-    async save(record) {
+    async save(record, options) {
       const current = records.get(record.projectId);
-      if (!isNewer(record, current)) return { ok: true, stale: true };
+      if (!matchesExpected(current, options) || !isNewer(record, current)) {
+        return { ok: true, stale: true };
+      }
       records.set(record.projectId, record);
       return { ok: true, stale: false };
     },
     async clear(projectId) {
-      return records.delete(projectId);
+      records.delete(projectId);
+      return true;
     },
   };
 }

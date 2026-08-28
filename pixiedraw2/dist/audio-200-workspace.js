@@ -3777,12 +3777,30 @@ function validPersistenceSettings(value) {
     "1/16"
   ].includes(settings.snap));
 }
+function projectRevisionOf(record) {
+  return record?.projectRevision ?? record?.checkpoint.projectRevision ?? 0;
+}
+function stateHashOf(record) {
+  return record?.checkpoint.stateHash ?? null;
+}
+function matchesExpected(current, options) {
+  if (options?.expectedProjectRevision !== void 0 && projectRevisionOf(current) !== options.expectedProjectRevision) {
+    return false;
+  }
+  if (options?.expectedStateHash !== void 0 && stateHashOf(current) !== options.expectedStateHash) {
+    return false;
+  }
+  return true;
+}
 function isNewerPersistenceRecord(incoming, previous) {
   if (previous === void 0) return true;
   const incomingRevision = incoming.projectRevision ?? incoming.checkpoint.projectRevision;
   const previousRevision = previous.projectRevision ?? previous.checkpoint.projectRevision;
   if (incomingRevision !== previousRevision) {
     return incomingRevision > previousRevision;
+  }
+  if (incoming.checkpoint.stateHash !== previous.checkpoint.stateHash) {
+    return false;
   }
   return incoming.savedAt >= previous.savedAt;
 }
@@ -4115,11 +4133,11 @@ function createMemoryAudioPersistenceStore() {
     async load(projectId) {
       return audioOk(records.get(projectId) ?? null);
     },
-    async save(record) {
+    async save(record, options) {
       const shape = persistenceShape(record);
       if (!shape.ok) return shape;
       const previous = records.get(record.projectId);
-      if (!isNewerPersistenceRecord(record, previous)) {
+      if (!matchesExpected(previous, options) || !isNewerPersistenceRecord(record, previous)) {
         return audioOk(true, [
           audioDiagnostic("AUDIO_STALE_PROJECT_REVISION", "An older persistence write was ignored.", "record.checkpoint.projectRevision", true)
         ]);
@@ -4138,9 +4156,9 @@ function createLatestWriteAudioPersistenceStore(inner) {
   return {
     load: (projectId) => inner.load(projectId),
     clear: (projectId) => inner.clear(projectId),
-    async save(record) {
+    async save(record, options) {
       const ticket = ++latestTicket;
-      const result = await inner.save(record);
+      const result = await inner.save(record, options);
       if (ticket !== latestTicket && result.ok) {
         return audioOk(true, [
           audioDiagnostic("AUDIO_STALE_PROJECT_REVISION", "A superseded persistence write completed without becoming current.", "record.checkpoint.projectRevision", true)
@@ -4184,8 +4202,32 @@ function isNewer(incoming, current) {
   if (incoming.checkpoint.projectRevision !== currentRevision) {
     return incoming.checkpoint.projectRevision > currentRevision;
   }
+  const currentHash = currentStateHash(current);
+  if (currentHash !== null && incoming.checkpoint.stateHash !== currentHash) return false;
   const currentSavedAt = candidate.savedAt;
   return typeof currentSavedAt !== "string" || incoming.savedAt >= currentSavedAt;
+}
+function currentProjectRevision(current) {
+  if (current === null || typeof current !== "object") return void 0;
+  const candidate = current;
+  const checkpoint = candidate.checkpoint;
+  if (checkpoint === null || typeof checkpoint !== "object") {
+    return void 0;
+  }
+  const revision = checkpoint.projectRevision;
+  return typeof revision === "number" ? revision : void 0;
+}
+function currentStateHash(current) {
+  if (current === null || typeof current !== "object") return null;
+  const checkpoint = current.checkpoint;
+  if (checkpoint === null || typeof checkpoint !== "object") return null;
+  const hash = checkpoint.stateHash;
+  return typeof hash === "string" ? hash : null;
+}
+function matchesExpected2(current, options) {
+  if (options?.expectedProjectRevision !== void 0 && (currentProjectRevision(current) ?? 0) !== options.expectedProjectRevision) return false;
+  if (options?.expectedStateHash !== void 0 && currentStateHash(current) !== options.expectedStateHash) return false;
+  return true;
 }
 function createIndexedDbAudioPersistenceStore(options = {}) {
   const databaseName = options.databaseName ?? AUDIO200_PERSISTENCE_DB_NAME;
@@ -4210,7 +4252,7 @@ function createIndexedDbAudioPersistenceStore(options = {}) {
         return hostFailure("IndexedDB is unavailable.", "indexedDB.load");
       }
     },
-    async save(record) {
+    async save(record, options2) {
       try {
         const database = await openDatabase(databaseName);
         return await new Promise((resolve) => {
@@ -4219,7 +4261,9 @@ function createIndexedDbAudioPersistenceStore(options = {}) {
           const store = transaction.objectStore(AUDIO200_PERSISTENCE_STORE_NAME);
           const read = store.get(record.projectId);
           read.onsuccess = () => {
-            if (isNewer(record, read.result)) {
+            if (!matchesExpected2(read.result, options2)) {
+              stale = true;
+            } else if (isNewer(record, read.result)) {
               store.put(record);
             } else {
               stale = true;

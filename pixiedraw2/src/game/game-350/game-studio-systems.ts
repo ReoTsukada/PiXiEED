@@ -24,31 +24,31 @@ export interface GameStudioRailDefinition {
 export const GAME_STUDIO_RAILS: readonly GameStudioRailDefinition[] = [
   {
     rail: "ACTION",
-    label: "Create / Test",
+    label: "作成・テスト",
     purpose: "作る・保存する・Play / Stop / Restartする",
     systems: ["Project", "Undo / Redo", "Play", "Stop", "Restart", "Build"],
   },
   {
     rail: "HIERARCHY",
-    label: "Scenes & Objects",
-    purpose: "Scene、親子関係、Player、NPC、Map、Triggerを管理する",
-    systems: ["Scene", "GameObject", "Parenting", "Visibility", "Lock"],
+    label: "シーン階層",
+    purpose: "Map、Characters、Objects、Systemsを迷わず管理する",
+    systems: ["Scene", "Map", "Characters", "Objects", "Camera"],
   },
   {
     rail: "VIEWPORT",
-    label: "Scene View",
+    label: "シーン表示",
     purpose: "配置とPlay中の結果を同じ座標系で確認する",
     systems: ["2D / 3D View", "Camera", "Gizmo", "Collision Overlay"],
   },
   {
     rail: "INSPECTOR",
-    label: "Object & Components",
-    purpose: "選択ObjectのComponentと値を編集する",
+    label: "オブジェクト設定",
+    purpose: "選択Objectに見た目・当たり判定・移動・イベントを追加する",
     systems: ["Transform", "Sprite", "Collider", "Rigidbody", "Behavior"],
   },
   {
     rail: "TIMELINE",
-    label: "Systems & Events",
+    label: "ロジック・データ",
     purpose: "時間軸ではなく、入力・条件・イベント・参照を組み立てる",
     systems: [
       "Input Actions",
@@ -78,58 +78,81 @@ export interface GameStudioSystemCard {
 export const GAME_STUDIO_SYSTEM_CARDS: readonly GameStudioSystemCard[] = [
   {
     id: "OBJECTS",
-    title: "Objects",
-    detail: "Sceneに置くGameObjectと親子関係",
+    title: "オブジェクト",
+    detail: "Sceneに置くMap・Characters・Objects",
     rail: "HIERARCHY",
   },
   {
     id: "COMPONENTS",
-    title: "Components",
-    detail: "Objectの見た目・物理・動作",
+    title: "コンポーネント",
+    detail: "見た目・当たり判定・重力・移動・イベント",
     rail: "INSPECTOR",
   },
   {
     id: "PHYSICS",
-    title: "Physics",
-    detail: "Collider / Trigger / Rigidbody / 重力",
+    title: "当たり判定・物理",
+    detail: "重力・固定step・壁・Trigger・Rigidbody・Collider",
     rail: "INSPECTOR",
   },
   {
     id: "INPUT",
-    title: "Input Actions",
-    detail: "move / jump / attackを論理名で接続",
+    title: "入力",
+    detail: "Move / Interact / Attackを論理名で接続",
     rail: "TIMELINE",
   },
   {
     id: "EVENTS",
-    title: "Event Sheet",
-    detail: "条件 → アクションを順番に実行",
+    title: "イベント・分岐",
+    detail: "条件 → A/B分岐 → アクションを組み立てる",
     rail: "TIMELINE",
   },
   {
     id: "ASSETS",
-    title: "References",
-    detail: "iDRAW / iAUDIOを参照だけで使用",
+    title: "素材・テンプレート",
+    detail: "iDRAW / iAUDIO参照とGameテンプレートを必要な時だけ追加",
     rail: "TIMELINE",
   },
   {
     id: "PLAY",
-    title: "Play Test",
+    title: "テストプレイ",
     detail: "編集状態と実行状態を分離して確認",
     rail: "ACTION",
   },
   {
     id: "BUILD",
-    title: "Build",
-    detail: "Web / Unity / Godot / Unrealへ受け渡す",
+    title: "販売用ビルド",
+    detail: "Web / Android / Unity / Godot / Unrealへ受け渡す",
     rail: "ACTION",
   },
 ];
 
+/** Inspector vocabulary for the GAME-350 Physics 2D foundation. */
+export const GAME_STUDIO_PHYSICS_INSPECTOR_FIELDS = Object.freeze({
+  scene: Object.freeze([
+    { id: "gravity", label: "重力 (Gravity)", detail: "X / Y のワールド重力" },
+    { id: "fixedDeltaTime", label: "固定step", detail: "決定的な物理更新間隔" },
+    { id: "maxSubSteps", label: "最大sub-step", detail: "遅延時のcatch-up上限" },
+  ]),
+  collider: Object.freeze([
+    { id: "offset", label: "Offset", detail: "当たり判定中心のずれ" },
+    { id: "mask", label: "Layer Mask", detail: "判定するレイヤー" },
+    { id: "material", label: "Physics Material 2D", detail: "摩擦 / 反発" },
+    { id: "isTrigger", label: "Trigger", detail: "通過可能なイベント領域" },
+  ]),
+  rigidbody: Object.freeze([
+    { id: "linearDrag", label: "Linear Drag", detail: "移動速度の減衰" },
+    { id: "angularDrag", label: "Angular Drag", detail: "回転速度の減衰" },
+    { id: "freezePosition", label: "Freeze Position", detail: "X / Y の移動を固定" },
+    { id: "simulated", label: "Simulated", detail: "物理シミュレーション参加" },
+    { id: "collisionDetection", label: "Collision Detection", detail: "Discrete / Continuous" },
+    { id: "interpolation", label: "Interpolation", detail: "描画補間" },
+  ]),
+} as const);
+
 export const GAME_STUDIO_INPUT_ACTIONS = Object.freeze(
   [
     { id: "move", label: "Move", detail: "方向入力 / 固定ステップ移動" },
-    { id: "interact", label: "Interact", detail: "近くのNPC・Triggerを起動" },
+    { id: "interact", label: "Interact", detail: "近くのNPC・扉・宝箱を起動" },
     { id: "jump", label: "Jump", detail: "Character Controllerの上方向動作" },
     { id: "attack", label: "Attack", detail: "攻撃・射撃イベントの起点" },
     { id: "brake", label: "Brake", detail: "レーシングの減速イベントの起点" },
@@ -309,15 +332,15 @@ export function defaultGameObjectComponents(
 
 export function componentLabel(type: GameEditorComponent["type"]): string {
   const labels: Record<GameEditorComponent["type"], string> = {
-    TRANSFORM: "Transform",
-    SPRITE: "Sprite Renderer",
-    AUDIO_SOURCE: "Audio Source",
-    TILEMAP: "Tilemap",
-    COLLIDER: "Collider",
-    RIGIDBODY: "Rigidbody",
-    CHARACTER_CONTROLLER: "Character Controller",
-    CAMERA: "Camera",
-    BEHAVIOR: "Behavior / Event",
+    TRANSFORM: "位置・向き (Transform)",
+    SPRITE: "見た目 (Sprite)",
+    AUDIO_SOURCE: "音 (Audio)",
+    TILEMAP: "マップ (Tilemap)",
+    COLLIDER: "当たり判定 (Collider)",
+    RIGIDBODY: "重力・物理 (Rigidbody)",
+    CHARACTER_CONTROLLER: "プレイヤー移動",
+    CAMERA: "カメラ (Camera)",
+    BEHAVIOR: "イベント・ルール",
   };
   return labels[type];
 }
@@ -325,31 +348,29 @@ export function componentLabel(type: GameEditorComponent["type"]): string {
 export function componentSummary(component: GameEditorComponent): string {
   switch (component.type) {
     case "TRANSFORM":
-      return `位置 ${component.x}, ${component.y}`;
+      return `位置 ${component.x}, ${component.y} · 回転 ${component.rotation}`;
     case "SPRITE":
-      return component.visible ? "iDRAW参照を表示" : "非表示";
+      return component.visible ? "iDRAW素材を表示" : "非表示";
     case "AUDIO_SOURCE":
-      return `${component.loop ? "Loop" : "One shot"} · 音量 ${
+      return `${component.loop ? "ループ" : "1回再生"} · 音量 ${
         Math.round(component.volume * 100)
       }%`;
     case "TILEMAP":
-      return `${component.mapId} · ${component.tileSize} tile · collision ${
-        component.collisionEnabled ? "on" : "off"
+      return `${component.mapId} · ${component.tileSize}マス · 当たり判定 ${
+        component.collisionEnabled ? "有効" : "無効"
       }`;
     case "COLLIDER":
       return `${component.shape} · ${
-        component.isTrigger ? "Trigger" : "Block"
-      } · ${component.layer}`;
+        component.isTrigger ? "Trigger" : "壁"
+      } · レイヤー ${component.layer}`;
     case "RIGIDBODY":
-      return `${component.bodyType} · gravity ${component.gravityScale}`;
+      return `${component.bodyType} · 重力 ${component.gravityScale}`;
     case "CHARACTER_CONTROLLER":
-      return `${component.moveSpeed} speed · fixed ${component.fixedStep}`;
+      return `${component.moveSpeed} speed · 固定ステップ ${component.fixedStep}`;
     case "CAMERA":
-      return `${
-        component.active ? "Active" : "Inactive"
-      } · zoom ${component.zoom}`;
+      return `${component.active ? "有効" : "無効"} · ズーム ${component.zoom}`;
     case "BEHAVIOR":
-      return component.enabled ? "Event rules enabled" : "Disabled";
+      return component.enabled ? "イベントを実行" : "無効";
   }
 }
 

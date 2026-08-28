@@ -36,8 +36,18 @@
 
   function getTimelapseOperationStore() {
     if (timelapseOperationStore) return timelapseOperationStore;
+    const lightweight = typeof isLightweightPersistenceMode === 'function'
+      && isLightweightPersistenceMode();
     timelapseOperationStore = window.PiXiEEDrawModules?.timelapseOperationStore
-      ?.createTimelapseOperationStore?.() || null;
+      ?.createTimelapseOperationStore?.({
+        maxEventCount: lightweight ? 120 : 240,
+        maxEventBytes: lightweight ? 8 * 1024 * 1024 : 16 * 1024 * 1024,
+        maxCheckpointCount: lightweight ? 8 : 16,
+        maxCheckpointBytes: lightweight ? 16 * 1024 * 1024 : 32 * 1024 * 1024,
+        onStatus: typeof updateAutosaveStatus === 'function'
+          ? (message, tone) => updateAutosaveStatus(message, tone)
+          : null,
+      }) || null;
     return timelapseOperationStore;
   }
 

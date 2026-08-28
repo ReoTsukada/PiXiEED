@@ -419,6 +419,35 @@ Deno.test("PIXYNC-DRAW2-200-07 Broadcast is only a hint for authoritative catch-
   assert.equal(provider.fetchCount, 1);
 });
 
+Deno.test("PIXYNC-DRAW2-200 reconnect recovery requests authoritative catch-up", async () => {
+  const persistence = new PixyncInMemorySnapshotPersistence();
+  const provider = new FakeProvider();
+  const applied: string[] = [];
+  const current = await openCoordinator(persistence, provider, { applied });
+  await current.transport.close("rebind-through-coordinator");
+  await current.coordinator.connect({
+    projectId: PROJECT,
+    clientId: CLIENT,
+    sessionGeneration: 1,
+  });
+  const remoteDraft = await draft("reconnect-catch-up", {
+    aggregate: "game",
+  });
+  provider.committed.push({
+    ...remoteDraft,
+    projectRevision: 1,
+    aggregateRevision: 1,
+    committedAt: "2026-08-23T00:00:00.321Z",
+  });
+  provider.serverRevision = 1;
+  const open = provider.opens.at(-1)!;
+  open.input.onStatus("RECONNECTING");
+  open.input.onStatus("SUBSCRIBED");
+  await current.coordinator.settleBroadcastHints();
+  assert.deepEqual(applied, ["reconnect-catch-up"]);
+  assert.equal(provider.fetchCount, 1);
+});
+
 Deno.test("PIXYNC-DRAW2-200-07 stale lease rejects authoritative ACK", async () => {
   const persistence = new PixyncInMemorySnapshotPersistence();
   const journal = await PixyncDurableJournal.open(PROJECT, persistence, {
@@ -626,3 +655,60 @@ Deno.test("PIXYNC-DRAW2-200-12 reconcile resends a retryable Outbox operation", 
   assert.deepEqual(applied, ["retryable-outbox"]);
   assert.deepEqual(provider.submitted, ["retryable-outbox"]);
 });
+
+Deno.test(
+  "PIXYNC-DRAW2-200-13 repeated commits compact completed durable records",
+  async () => {
+    time = Date.parse("2026-08-23T00:00:00.000Z");
+    const persistence = new PixyncInMemorySnapshotPersistence();
+    const provider = new FakeProvider();
+    const current = await openCoordinator(persistence, provider);
+    const total = 160;
+    const firstDraft = await draft("compact-1", {
+      clientSequence: 1,
+      aggregateRevision: 0,
+      baseProjectRevision: 0,
+    });
+    for (let index = 1; index <= total; index += 1) {
+      await current.coordinator.submit(
+        index === 1
+          ? firstDraft
+          : await draft(`compact-${index}`, {
+            clientSequence: index,
+            aggregateRevision: 0,
+            baseProjectRevision: index - 1,
+          }),
+      );
+    }
+
+    const snapshot = current.journal.snapshot();
+    assert.equal(snapshot.revision, total);
+    assert.equal(snapshot.appliedOperationFingerprints.length, total);
+    assert.equal(snapshot.inbox.length, 0);
+    assert.ok(snapshot.vault.committed.length <= 8);
+    assert.ok(snapshot.outbox.length <= 8);
+    assert.ok(JSON.stringify(snapshot).length < 512 * 1024);
+
+    const restoredJournal = await PixyncDurableJournal.open(
+      PROJECT,
+      persistence,
+      { now, leaseMs: 10, retryDelayMs: 1 },
+    );
+    assert.equal(
+      restoredJournal.orderKeeperInitialState().projectRevision,
+      total,
+    );
+    const restored = await openCoordinator(persistence, provider);
+    await restored.coordinator.reconcile();
+    const duplicate = await restored.coordinator.submit(firstDraft);
+    assert.equal(duplicate.kind, "DUPLICATE");
+    await restored.coordinator.submit(
+      await draft("compact-next", {
+        clientSequence: total + 1,
+        aggregateRevision: 0,
+        baseProjectRevision: total,
+      }),
+    );
+    assert.equal(restored.keeper.snapshot().projectRevision, total + 1);
+  },
+);

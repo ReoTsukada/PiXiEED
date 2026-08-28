@@ -180,6 +180,35 @@ Deno.test("SITE400-IGAME-ROUTE-001 create/open/reload share one ordered controll
   );
 });
 
+Deno.test("SITE400-IGAME-ROUTE-002 direct concurrent create stays fail-closed", async () => {
+  const route = createSite400IGameRoute<Project, string>({
+    ...baseOptions(),
+    creator: {
+      create: async () => record("project:concurrent", "revision:created"),
+    },
+  });
+  const firstPromise = route.dispatch({
+    operationId: "op:concurrent-create-1",
+    type: "create",
+    createInput: "RPG",
+    registryRequest,
+  });
+  const secondPromise = route.dispatch({
+    operationId: "op:concurrent-create-2",
+    type: "create",
+    createInput: "RPG",
+    registryRequest,
+  });
+  const first = await firstPromise;
+  const second = await secondPromise;
+  assert(first.status === "READY", "the first create must be accepted");
+  assert(
+    second.status === "ERROR" &&
+      second.reason === "CREATE_REUSES_ACTIVE_PROJECT",
+    "the generic controller must reject a direct duplicate create",
+  );
+});
+
 Deno.test("SITE400-IGAME-REGISTRY-001 uses server resolver identity and fails closed", async () => {
   const projected: Site400IGameResolvedMetadata[] = [];
   const resolverRequests: string[] = [];

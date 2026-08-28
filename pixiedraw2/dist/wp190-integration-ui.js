@@ -141,7 +141,7 @@ function bootstrapPopulatedWorkspaceFixture(documentRef = document) {
   const panel = params.get("panel") ?? "layers";
   const supported = [
     "layers",
-    "palette",
+    "color",
     "inspector",
     "timeline",
     "tool-options"

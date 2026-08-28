@@ -19,8 +19,11 @@ import type {
 const RASTER_OPERATIONS = new Set([
   "raster.setPixel",
   "raster.strokeCommit",
+  "raster.shapeCommit",
   "raster.writeSet",
+  "raster.tileStamp",
   "raster.fill",
+  "selection.transformCommit",
 ]);
 
 export class PixyncDrawProductBridgeError extends Error {
@@ -103,7 +106,7 @@ export class PixyncDrawProductBridge {
     if (!RASTER_OPERATIONS.has(operation.operationType)) {
       throw new PixyncDrawProductBridgeError(
         "OPERATION_UNSUPPORTED",
-        "Only ordinary raster commands enter the first Draw sync slice.",
+        "Only bounded Draw raster and selection-transform commands enter the Draw sync slice.",
       );
     }
     if (
@@ -160,19 +163,10 @@ export class PixyncDrawProductBridge {
       );
     }
     if (before.state.appliedCommandIds.includes(input.operation.commandId)) {
-      const rasterHash = await drawRasterHash(
-        before.state,
-        input.operation.assetId,
-      );
-      if (
-        rasterHash !== input.expectedRasterHash ||
-        before.state.structureEpoch !== input.expectedStructureEpoch
-      ) {
-        throw new PixyncDrawProductBridgeError(
-          "SELF_ECHO_MISMATCH",
-          "Self echo differs from the locally committed Draw state.",
-        );
-      }
+      // A Realtime self-echo can arrive after later local commands have
+      // changed the Canvas. The command ID is the local apply marker, so the
+      // current full-raster hash must not be compared with this operation's
+      // historical post-apply hash.
       return {
         operationId: input.operation.operationId,
         projectId: input.operation.projectId,
@@ -182,8 +176,8 @@ export class PixyncDrawProductBridge {
         baseProjectRevision: input.baseProjectRevision,
         assetId: input.operation.assetId,
         baseStructureEpoch: input.baseStructureEpoch,
-        structureEpoch: before.state.structureEpoch,
-        rasterHash,
+        structureEpoch: input.expectedStructureEpoch,
+        rasterHash: input.expectedRasterHash,
         localUndoDepth: before.undoDepth,
         localRedoDepth: before.redoDepth,
       };

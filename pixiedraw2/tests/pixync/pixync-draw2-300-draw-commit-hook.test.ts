@@ -9,13 +9,19 @@ Deno.test("PIXYNC-DRAW2-300 binds authenticated Draw identity only to the active
   assert.match(draw, /function activeDrawClientId/u);
 });
 
-Deno.test("PIXYNC-DRAW2-300 publishes all first-slice raster commit families", () => {
+Deno.test("PIXYNC-DRAW2-300 publishes all first-slice Draw commit families", () => {
   assert.equal(
-    draw.match(/publishDrawRasterCommit\(result\.result, state, before\.structureEpoch\)/gu)?.length,
-    3,
+    draw.match(
+      /publishDrawRasterCommit\(result\.result, state, before\.structureEpoch\)/gu,
+    )?.length,
+    6,
   );
   assert.match(draw, /"draw2:raster-operation-committed"/u);
   assert.match(draw, /commandType: "raster\.writeSet"/u);
   assert.match(draw, /commandType: "raster\.fill"/u);
   assert.match(draw, /commandType: "raster\.strokeCommit"/u);
+  assert.match(draw, /commandType: "raster\.shapeCommit"/u);
+  assert.match(draw, /commandType: "raster\.tileStamp"/u);
+  assert.match(draw, /selection\.transformCommit/u);
+  assert.match(draw, /compactPixelPath\(/u);
 });

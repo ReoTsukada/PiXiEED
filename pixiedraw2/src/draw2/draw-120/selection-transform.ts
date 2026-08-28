@@ -656,12 +656,6 @@ export class Draw120Editor {
       }
     }
     const orderedWrites = [...writes.values()].sort(comparePoints);
-    if (orderedWrites.length === 0) {
-      return this.#rejected(
-        "WRITE_SET_NOOP",
-        "Write set does not change the active Cel.",
-      );
-    }
     const nextSequence = this.#sequence + 1;
     const command: EditorCommand = {
       commandId: `draw120-${nextSequence}`,
@@ -694,19 +688,21 @@ export class Draw120Editor {
         redoDepth: this.redoDepth,
       };
     }
-    this.#sequence = nextSequence;
+    if (!execution.result.noOp) this.#sequence = nextSequence;
     this.#state = execution.state;
     this.#core = new EditorCore(this.#state);
     const beforeSelection = cloneSelection(this.#selection);
     this.#selection = cloneSelection(afterSelection);
-    this.#undo.push({
-      before: cloneProjectStateShared(before),
-      after: cloneProjectStateShared(this.#state),
-      beforeSelection,
-      afterSelection: cloneSelection(this.#selection),
-      operationType,
-    });
-    this.#redo = [];
+    if (!execution.result.noOp) {
+      this.#undo.push({
+        before: cloneProjectStateShared(before),
+        after: cloneProjectStateShared(this.#state),
+        beforeSelection,
+        afterSelection: cloneSelection(this.#selection),
+        operationType,
+      });
+      this.#redo = [];
+    }
     this.#preview = undefined;
     return {
       state: this.#state,

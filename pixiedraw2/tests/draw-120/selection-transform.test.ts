@@ -150,6 +150,47 @@ Deno.test("DRAW-120 cancel, flip, rotate, and scale keep mutation behind commit"
   );
 });
 
+Deno.test("DRAW-120 move then write then move keeps the current raster", async () => {
+  const editor = new Draw120Editor(
+    createDraw120Project({
+      projectId: "draw120-move-write-move",
+      width: 12,
+      height: 8,
+      palette: [0, 0xffffffff, 0xffff0000],
+    }),
+  );
+  const seed = await editor.commitRasterWrites([
+    { x: 1, y: 1, colorIndex: 1 },
+  ], "test.seed");
+  assert("result" in seed, "Seed write should commit.");
+  editor.selectRectangle({ x: 1, y: 1 }, { x: 1, y: 1 });
+  assert(
+    "writes" in editor.beginTransform({ translateX: 2 }),
+    "Move preview should exist.",
+  );
+  assert(
+    "result" in await editor.commitTransform(),
+    "First move should commit.",
+  );
+  const write = await editor.commitRasterWrites([
+    { x: 3, y: 1, colorIndex: 2 },
+  ], "tool.pen");
+  assert("result" in write, "Write inside the moved selection should commit.");
+  assert(
+    "writes" in editor.beginTransform({ translateX: 2 }),
+    "Second move preview should exist.",
+  );
+  assert(
+    "result" in await editor.commitTransform(),
+    "Second move should commit.",
+  );
+  assert(
+    pixel(editor, 1, 1) === 0 && pixel(editor, 3, 1) === 0 &&
+      pixel(editor, 5, 1) === 2,
+    "A later move resurrected the pre-write raster.",
+  );
+});
+
 Deno.test("DRAW-120 copy/cut/paste preserves palette indices and atomic undo", async () => {
   const editor = new Draw120Editor(
     createDraw120Project({
@@ -239,4 +280,22 @@ Deno.test("DRAW-120 empty selection and invalid selection are fail-closed", asyn
     await editor.canonicalRasterHash() === beforeHash && editor.undoDepth === 0,
     "Rejected selection operations must not mutate state or history.",
   );
+});
+
+Deno.test("DRAW-120 zero-pixel move is a successful no-op without undo", async () => {
+  const editor = new Draw120Editor(createDraw120Project({
+    projectId: "draw120-zero-move",
+    width: 8,
+    height: 8,
+    palette: [0, 0xffffffff],
+  }));
+  editor.selectRectangle({ x: 2, y: 2 }, { x: 3, y: 3 });
+  const preview = editor.beginTransform({
+    translateX: 0,
+    translateY: 0,
+  });
+  assert(!isRejected(preview), "Zero-pixel move should create a preview.");
+  const committed = await editor.commitTransform();
+  assert("result" in committed && committed.result.noOp, "Zero-pixel move should commit as no-op.");
+  assert(editor.undoDepth === 0 && editor.redoDepth === 0, "Zero-pixel move should not create history.");
 });

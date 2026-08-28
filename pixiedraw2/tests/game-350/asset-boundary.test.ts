@@ -68,6 +68,7 @@ Deno.test("GAME350-BOUNDARY-003 persists only reference metadata", async () => {
     contentHash: "a".repeat(64),
     mode: "PINNED" as const,
     label: "Hero",
+    assetDefinitionId: "asset-definition-hero",
     sourceBytes: "must-not-cross-the-boundary",
   } as unknown as GameEditorBinding;
   const record = await createGameEditorPersistenceRecord(
@@ -83,7 +84,33 @@ Deno.test("GAME350-BOUNDARY-003 persists only reference metadata", async () => {
     "source payloads must be stripped before Game persistence",
   );
   assert(
+    record.bindings?.[0]?.assetDefinitionId === "asset-definition-hero",
+    "the named Draw Definition identity must survive Game persistence",
+  );
+  assert(
     await validateGameEditorPersistenceRecord(record),
     "reference-only persistence record must validate",
+  );
+
+  const invalidAudioBinding = await createGameEditorPersistenceRecord(
+    "game-project",
+    [{ id: "audio", label: "Audio", kind: "MUSIC", filled: [] }],
+    1,
+    undefined,
+    undefined,
+    [{
+      trackId: "audio",
+      kind: "AUDIO",
+      assetId: "audio-theme",
+      revisionId: "audio-revision-1",
+      contentHash: "b".repeat(64),
+      mode: "LIVE",
+      label: "Theme",
+      assetDefinitionId: "must-not-bind-audio",
+    }],
+  );
+  assert(
+    !(await validateGameEditorPersistenceRecord(invalidAudioBinding)),
+    "a Draw Definition identity must not be accepted on an Audio binding",
   );
 });

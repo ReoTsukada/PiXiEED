@@ -49,6 +49,8 @@ export interface Draw2AssetReferenceRecord {
   readonly contentHash: string;
   readonly mode: "LIVE" | "PINNED";
   readonly label: string;
+  /** Optional local Asset Definition identity for named Draw -> Game binding. */
+  readonly assetDefinitionId?: string;
 }
 
 export type Draw2AssetMutationResult =
@@ -59,6 +61,11 @@ export interface Draw2AssetBridge {
   readonly snapshot: () => Draw2AssetBridgeSnapshot;
   /** Resolve the active Draw revision for an iGAME binding. */
   readonly resolveCurrentReference: (input: {
+    readonly mode: "LIVE" | "PINNED";
+  }) => Promise<Draw2AssetReferenceRecord | undefined>;
+  /** Resolve a named Draw Asset Definition for an iGAME binding. */
+  readonly resolveDefinitionReference: (input: {
+    readonly definitionId: string;
     readonly mode: "LIVE" | "PINNED";
   }) => Promise<Draw2AssetReferenceRecord | undefined>;
   /** Render a saved source reference without changing the active Draw frame. */

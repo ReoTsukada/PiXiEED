@@ -160,7 +160,31 @@ Deno.test("GAME350-ASSET-BROWSER-002 resolves all Character clips, directions an
   );
 });
 
-Deno.test("GAME350-ASSET-BROWSER-003 rejects duplicate assignments without growing Game history", () => {
+Deno.test("GAME350-ASSET-BROWSER-003 prioritizes the exact bound Draw Definition", () => {
+  const target = definition("draw:hero-target", [idleDown]);
+  const sibling = definition("draw:hero-sibling", [walkUp]);
+  const clips = findGameAnimationClips({
+    track: { id: "hero", label: "主人公", kind: "SPRITE", role: "PLAYER" },
+    drawDefinitions: [
+      {
+        ...target,
+        registryIdentity: { assetId: "asset:hero", revisionId: "revision:1" },
+      },
+      {
+        ...sibling,
+        registryIdentity: { assetId: "asset:hero", revisionId: "revision:1" },
+      },
+    ],
+    boundDrawAssetId: "asset:hero",
+    boundDrawDefinitionId: "draw:hero-target",
+  });
+  assert(
+    clips.length === 1 && clips[0]?.definitionId === "draw:hero-target",
+    "an exact Definition binding must take precedence over sibling definitions",
+  );
+});
+
+Deno.test("GAME350-ASSET-BROWSER-004 rejects duplicate assignments without growing Game history", () => {
   const base: GameAnimationBinding = {
     bindingId: gameAnimationBindingIdFor("hero", "draw:hero", "IDLE_DOWN"),
     trackId: "hero",
@@ -197,7 +221,7 @@ Deno.test("GAME350-ASSET-BROWSER-003 rejects duplicate assignments without growi
   );
 });
 
-Deno.test("GAME350-ASSET-BROWSER-004 persists animation references in the canonical timeline without source pixels", async () => {
+Deno.test("GAME350-ASSET-BROWSER-005 persists animation references in the canonical timeline without source pixels", async () => {
   const binding: GameAnimationBinding = {
     bindingId: gameAnimationBindingIdFor("hero", "draw:hero", "IDLE_DOWN"),
     trackId: "hero",

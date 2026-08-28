@@ -476,7 +476,7 @@
 
 
 
-<link href="assets/css/style.css?v=20260805-pixisync-avatar-fixed1" rel="stylesheet"/>
+<link href="assets/css/style.css?v=20260828-project-list-window1" rel="stylesheet"/>
 <link rel="icon" type="image/png" sizes="192x192" href="../icon/icon-192-4.png"/>
 <link rel="icon" type="image/png" sizes="512x512" href="../icon/icon-512-4.png"/>
 <style>
@@ -1959,10 +1959,10 @@
 	<script defer="" src="assets/js/modules/autosave-database-utils.js?v=2026.07.02-startup-helper-split-v1"></script>
 	<script defer="" src="assets/js/modules/open-performance-utils.js?v=20260723-open-perf1"></script>
 	<script defer="" src="assets/js/modules/autosave-schema-v2-utils.js?v=20260728-sparse-journal-replay1"></script>
-	<script defer="" src="assets/js/modules/autosave-schema-v2-indexeddb-utils.js?v=20260729-startup-manifest1"></script>
+	<script defer="" src="assets/js/modules/autosave-schema-v2-indexeddb-utils.js?v=20260828-delete-barrier1"></script>
 	<script defer="" src="assets/js/modules/autosave-schema-v2-restore-preview-utils.js?v=20260713-047"></script>
 	<script defer="" src="assets/js/modules/autosave-schema-v2-recovery-utils.js?v=20260727-cleanup2"></script>
-	<script defer="" src="assets/js/modules/project-storage-utils.js?v=20260715-local-true-v2-cleanup1"></script>
+	<script defer="" src="assets/js/modules/project-storage-utils.js?v=20260828-recent-delete-tombstone1"></script>
 	<script defer="" src="assets/js/modules/project-canvas-validation-utils.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/navigation.js?v=2026.07.17-icons1"></script>
 	<script defer="" src="assets/js/modules/clipboard-utils.js?v=2026.07.04-shared-copy-url-fix1"></script>
@@ -1985,12 +1985,12 @@
 	<script defer="" src="assets/js/modules/open-project-tab-interactions.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/local-project-journal-utils.js?v=20260728-replay-safe-checkpoint1"></script>
 	<script defer="" src="assets/js/modules/pixel-patch-history-utils.js?v=20260802-pixisync-offscreen-color1"></script>
-	<script defer="" src="assets/js/modules/timelapse-operation-store-utils.js?v=20260729-resize-placement1"></script>
+	<script defer="" src="assets/js/modules/timelapse-operation-store-utils.js?v=20260828-timelapse-safety1"></script>
 	<script defer="" src="assets/js/modules/timelapse-replay-utils.js?v=20260802-layer-transparency-visibility1"></script>
 	<script defer="" src="assets/js/modules/timelapse-dialog-utils.js?v=20260729-resize-placement2"></script>
-	<script defer="" src="assets/js/modules/cold-history-store-utils.js?v=20260715-cold-history-p6"></script>
+	<script defer="" src="assets/js/modules/cold-history-store-utils.js?v=20260828-cold-history-delete1"></script>
 	<script defer="" src="assets/js/modules/history-snapshot-workflow-utils.js?v=20260724-cow-raster1"></script>
-	<script defer="" src="assets/js/modules/memory-utils.js?v=20260724-cow-raster3"></script>
+	<script defer="" src="assets/js/modules/memory-utils.js?v=20260828-history-retention1"></script>
 	<script defer="" src="assets/js/modules/playback-cache-utils.js?v=20260724-presentation-proxy1"></script>
 	<script defer="" src="assets/js/modules/reload-snapshot-utils.js?v=2026.06.30-reload-snapshot-v1"></script>
 	<script defer="" src="assets/js/modules/reload-session-workflow-utils.js?v=20260717-session-history1"></script>
@@ -2043,12 +2043,12 @@
 	<script defer="" src="assets/js/modules/timeline-navigation-workflow-utils.js?v=20260802-pixisync-lazy-cell1"></script>
 		<script defer="" src="assets/js/modules/autosave-workflow-utils.js?v=20260728-commit-ready-save1"></script>
 	<script defer="" src="assets/js/modules/project-provenance-utils.js?v=20260714-provenance-v1"></script>
-	<script defer="" src="assets/js/modules/open-import-workflow-utils.js?v=20260802-project-share-scope1"></script>
+	<script defer="" src="assets/js/modules/open-import-workflow-utils.js?v=20260828-project-list-light1"></script>
 	<script defer="" src="assets/js/modules/export-format-workflow-utils.js?v=20260720-export-grid-format1"></script>
 	<script defer="" src="assets/js/modules/export-dialog-workflow-utils.js?v=20260729-timelapse-export1"></script>
-		<script defer="" src="assets/js/modules/startup-workflow-utils.js?v=20260805-pixisync-share-badge1"></script>
-		<script defer="" src="assets/js/modules/recent-project-workflow-utils.js?v=20260803-pixisync-delete1"></script>
-		<script defer="" src="assets/js/modules/project-package-workflow-utils.js?v=20260728-autosave-delta1"></script>
+		<script defer="" src="assets/js/modules/startup-workflow-utils.js?v=20260828-project-list-window1"></script>
+		<script defer="" src="assets/js/modules/recent-project-workflow-utils.js?v=20260828-project-list-light2"></script>
+		<script defer="" src="assets/js/modules/project-package-workflow-utils.js?v=20260828-project-list-light1"></script>
 		<script defer="" src="assets/js/modules/project-storage-adapter-utils.js?v=20260715-legacy-project-card-recovery1"></script>
 		<script defer="" src="assets/js/modules/project-storage-v1-json-adapter.js?v=20260720-pxd2"></script>
 		<script defer="" src="assets/js/modules/project-storage-v2-archive-codec.js?v=20260720-pxd3"></script>
@@ -2082,7 +2082,7 @@
 	<script defer="" src="assets/js/modules/local-project-v2-migration-utils.js?v=20260715-local-true-v2-cleanup1"></script>
 	<script defer="" src="assets/js/modules/pre-update-checkpoint-utils.js?v=20260712-pre-update-checkpoint-u3"></script>
 	<script defer="" src="assets/js/active-project-session-utils.js?v=20260715-local-true-v2-cleanup1"></script>
-    <script defer="" src="assets/js/app.js?v=20260805-pixisync-members-profile1"></script>
+	<script defer="" src="assets/js/app.js?v=20260828-delete-guard1"></script>
 	<script defer="" src="assets/js/modules/update-detection-utils.js?v=20260719-file-protocol1"></script>
   <script>
     (function initPanelAdDocking() {

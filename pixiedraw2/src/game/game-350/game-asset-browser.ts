@@ -135,13 +135,21 @@ export function findGameAnimationClips(input: {
   readonly track: GameAssetBrowserTrack;
   readonly drawDefinitions: readonly PxdAssetDefinitionEntry[];
   readonly boundDrawAssetId?: string;
+  readonly boundDrawDefinitionId?: string;
 }): readonly GameAnimationClipReference[] {
+  const definitionsByBoundDefinition = input.boundDrawDefinitionId === undefined
+    ? []
+    : input.drawDefinitions.filter((entry) =>
+      entry.definitionId === input.boundDrawDefinitionId
+    );
   const definitionsByBoundAsset = input.boundDrawAssetId === undefined
     ? []
     : input.drawDefinitions.filter((entry) =>
       entry.registryIdentity?.assetId === input.boundDrawAssetId
     );
-  const definitions = definitionsByBoundAsset.length > 0
+  const definitions = definitionsByBoundDefinition.length > 0
+    ? definitionsByBoundDefinition
+    : definitionsByBoundAsset.length > 0
     ? definitionsByBoundAsset
     : characterLike(input.track)
     ? input.drawDefinitions.filter((entry) =>

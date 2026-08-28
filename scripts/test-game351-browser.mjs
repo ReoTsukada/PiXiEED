@@ -14,6 +14,17 @@ async function waitForGameInspector(page) {
   await page.waitForSelector("#draw2GameEventMessage");
 }
 
+async function chooseRpgStarterForNewGame(page) {
+  await page.waitForFunction(() => {
+    const prompt = document.querySelector("#draw2GameCreationMode");
+    return prompt instanceof HTMLElement && !prompt.hidden;
+  });
+  await page.locator("#draw2GameCreationModeTemplate").click();
+  await page.waitForFunction(() =>
+    document.querySelector('button[data-game-track-id="enemy"]') !== null
+  );
+}
+
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   const pageErrors = [];
@@ -25,6 +36,7 @@ try {
     document.querySelector("#draw2WorkspaceFrame")?.dataset.site400IgameRoute ===
       "ready"
   );
+  await chooseRpgStarterForNewGame(page);
   const projectId = await page.evaluate(() =>
     String(window.__pixiedraw2WorkspaceDebug?.gameCurrentProject?.().projectId)
   );

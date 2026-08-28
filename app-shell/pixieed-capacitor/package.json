@@ -14,6 +14,7 @@
     "cap:open:android": "npx cap open android",
     "cap:open:ios": "npx cap open ios",
     "doctor": "node scripts/stage-web-assets.mjs --check",
+    "test:native-runtime": "node scripts/test-native-runtime-assets.mjs",
     "doctor:android": "bash scripts/doctor-android.sh",
     "doctor:ios": "bash scripts/doctor-ios.sh",
     "android:keystore:generate": "bash scripts/android-generate-upload-keystore.sh",

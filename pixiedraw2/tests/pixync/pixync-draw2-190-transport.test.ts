@@ -4,12 +4,14 @@ import {
   operationFingerprint,
 } from "../../src/pixync/index.ts";
 import {
-  PixyncTransportAdapter,
-  PixyncTransportError,
   type PixyncAuthoritativeOperationEvent,
   type PixyncTransportAck,
+  PixyncTransportAdapter,
   type PixyncTransportBinding,
   type PixyncTransportConnectInput,
+  PixyncTransportError,
+  type PixyncTransportPresenceDraft,
+  type PixyncTransportPresenceEvent,
   type PixyncTransportProvider,
   type PixyncTransportProviderConnection,
   type PixyncTransportProviderOpenInput,
@@ -37,6 +39,7 @@ type OpenRecord = {
   connection: PixyncTransportProviderConnection;
   closed: boolean;
   closeReason: string | undefined;
+  readonly publishedPresence: PixyncTransportPresenceDraft[];
 };
 
 async function draft(
@@ -98,6 +101,7 @@ class FakeProvider implements PixyncTransportProvider {
       connection: undefined as unknown as PixyncTransportProviderConnection,
       closed: false,
       closeReason: undefined,
+      publishedPresence: [],
     };
     const connection: PixyncTransportProviderConnection = {
       submit: async (operation) => {
@@ -122,6 +126,9 @@ class FakeProvider implements PixyncTransportProvider {
         return result;
       },
       fetchSince: async () => this.catchUpOperations,
+      publishPresence: async (presence) => {
+        record.publishedPresence.push(presence);
+      },
       close: async (reason) => {
         record.closed = true;
         record.closeReason = reason;
@@ -157,7 +164,10 @@ async function openAdapter(
       event: PixyncAuthoritativeOperationEvent,
     ) => void | Promise<void>;
     onBroadcastHint?: () => void;
+    onPresence?: (event: PixyncTransportPresenceEvent) => void | Promise<void>;
+    presence?: PixyncTransportPresenceDraft;
     onStatus?: (status: string) => void;
+    onReconnected?: () => void | Promise<void>;
   } = {},
 ): Promise<PixyncTransportAdapter> {
   const adapter = new PixyncTransportAdapter(provider);
@@ -169,7 +179,14 @@ async function openAdapter(
     ...(options.onBroadcastHint === undefined
       ? {}
       : { onBroadcastHint: options.onBroadcastHint }),
+    ...(options.onPresence === undefined
+      ? {}
+      : { onPresence: options.onPresence }),
+    ...(options.presence === undefined ? {} : { presence: options.presence }),
     ...(options.onStatus === undefined ? {} : { onStatus: options.onStatus }),
+    ...(options.onReconnected === undefined
+      ? {}
+      : { onReconnected: options.onReconnected }),
   };
   await adapter.connect(connectInput);
   return adapter;
@@ -192,6 +209,62 @@ Deno.test("PIXYNC-DRAW2-190-CONTRACT authenticates binding and submits", async (
     role: "editor",
     sessionGeneration: 0,
   });
+});
+
+Deno.test("PIXYNC-DRAW2-190 Presence forwards metadata without entering durable transport", async () => {
+  const provider = new FakeProvider();
+  const received: PixyncTransportPresenceEvent[] = [];
+  const adapter = await openAdapter(provider, {
+    presence: {
+      displayName: "This tab",
+      mode: "iDRAW",
+      selectionLabel: "Canvas",
+    },
+    onPresence: (event) => {
+      received.push(event);
+    },
+  });
+  const record = provider.opens[0];
+  assert.ok(record);
+  assert.deepEqual(record.input.presence, {
+    displayName: "This tab",
+    mode: "iDRAW",
+    selectionLabel: "Canvas",
+  });
+  await adapter.publishPresence({
+    displayName: "This tab",
+    mode: "iGAME",
+    selectionLabel: "Scene",
+  });
+  assert.deepEqual(record.publishedPresence, [{
+    displayName: "This tab",
+    mode: "iGAME",
+    selectionLabel: "Scene",
+  }]);
+  await record.input.onPresence?.({ kind: "sync", presence: [] });
+  assert.deepEqual(received, [{ kind: "sync", presence: [] }]);
+  await adapter.close("presence-test");
+  await record.input.onPresence?.({ kind: "sync", presence: [] });
+  assert.deepEqual(received, [{ kind: "sync", presence: [] }]);
+});
+
+Deno.test("PIXYNC-DRAW2-190 reconnect callback runs only after an unavailable session recovers", async () => {
+  const provider = new FakeProvider();
+  let reconnects = 0;
+  const adapter = await openAdapter(provider, {
+    onReconnected: () => {
+      reconnects += 1;
+    },
+  });
+  const open = provider.opens[0]!;
+  open.input.onStatus("SUBSCRIBED");
+  await Promise.resolve();
+  assert.equal(reconnects, 0);
+  open.input.onStatus("RECONNECTING");
+  open.input.onStatus("SUBSCRIBED");
+  await Promise.resolve();
+  assert.equal(reconnects, 1);
+  assert.equal(adapter.status, "SUBSCRIBED");
 });
 
 Deno.test("AUTHORITY-ROOT-001 caller cannot replace composition-root provider", async () => {
@@ -457,13 +530,15 @@ Deno.test("PIXYNC-DRAW2-190-PUBLIC-API keeps transport internal and enables the 
     false,
     "TRANSPORT_NOT_IN_PUBLIC_API_GRAPH",
   );
-  for (const symbol of [
-    "PixyncTransportAdapter",
-    "PixyncTransportProvider",
-    "PixyncTransportProviderConnection",
-    "PixyncTransportProviderOpenInput",
-    "PixyncTransportProviderOpenResult",
-  ]) {
+  for (
+    const symbol of [
+      "PixyncTransportAdapter",
+      "PixyncTransportProvider",
+      "PixyncTransportProviderConnection",
+      "PixyncTransportProviderOpenInput",
+      "PixyncTransportProviderOpenResult",
+    ]
+  ) {
     assert.equal(
       new RegExp(`\\b${symbol}\\b`, "u").test(publicIndex),
       false,

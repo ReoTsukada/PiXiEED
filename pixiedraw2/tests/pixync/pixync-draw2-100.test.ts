@@ -104,6 +104,22 @@ Deno.test("PIXYNC-DRAW2-100-ENVELOPE rejects hash mutation and forbidden command
     () => draft("op-audio-blob", "audio", { rawAudioBlob: "not-a-command" }),
     "PAYLOAD_FORBIDDEN",
   );
+  for (const [index, key] of [
+    "bytes",
+    "pixels",
+    "pixelData",
+    "pcm",
+    "samples",
+    "sampleData",
+    "audioBuffer",
+    "arrayBuffer",
+    "imageData",
+  ].entries()) {
+    await expectCode(
+      () => draft(`op-raw-${index}`, "draw", { [key]: "not-a-command" }),
+      "PAYLOAD_FORBIDDEN",
+    );
+  }
 });
 
 Deno.test("PIXYNC-DRAW2-100-SEQUENCE converges two clients with one project revision authority", async () => {

@@ -17,6 +17,7 @@
     const safeChunkSize = Math.max(1, Math.round(Number(chunkSize) || 20));
     const safeMaxEntries = Math.max(safeChunkSize, Math.round(Number(maxEntriesPerDirection) || 1000));
     const fallbackProjects = new Map();
+    const projectLifecycles = new Map();
     let databasePromise = null;
     let operationQueue = Promise.resolve();
 
@@ -106,6 +107,20 @@
       return value;
     }
 
+    function getProjectLifecycle(projectId) {
+      let lifecycle = projectLifecycles.get(projectId);
+      if (!lifecycle) {
+        lifecycle = { deleting: false, deleted: false };
+        projectLifecycles.set(projectId, lifecycle);
+      }
+      return lifecycle;
+    }
+
+    function canWriteProject(projectId) {
+      const lifecycle = getProjectLifecycle(projectId);
+      return lifecycle.deleting !== true && lifecycle.deleted !== true;
+    }
+
     function appendEntriesToRecords(meta, chunks, direction, entries) {
       const keysName = direction === 'future' ? 'futureKeys' : 'pastKeys';
       const countName = direction === 'future' ? 'futureCount' : 'pastCount';
@@ -157,7 +172,20 @@
       if (!normalizedProjectId || !safeEntries.length) {
         return getStatus(normalizedProjectId);
       }
+      if (!canWriteProject(normalizedProjectId)) {
+        return getStatus(normalizedProjectId);
+      }
       return enqueue(async () => {
+        if (!canWriteProject(normalizedProjectId)) {
+          // Do not await getStatus() from inside this queue: a delete may be
+          // the queue item currently executing. The caller only needs a
+          // non-writing result here; the subsequent delete owns the record.
+          return {
+            projectId: normalizedProjectId,
+            pastCount: 0,
+            futureCount: 0,
+          };
+        }
         const database = await openDatabase();
         if (!database) {
           const project = getFallbackProject(normalizedProjectId, { create: true });
@@ -189,6 +217,9 @@
       const normalizedDirection = normalizeDirection(direction);
       if (!normalizedProjectId) return [];
       return enqueue(async () => {
+        if (getProjectLifecycle(normalizedProjectId).deleting || getProjectLifecycle(normalizedProjectId).deleted) {
+          return [];
+        }
         const database = await openDatabase();
         if (!database) {
           const project = getFallbackProject(normalizedProjectId);
@@ -228,6 +259,9 @@
       const normalizedDirection = normalizeDirection(direction);
       if (!normalizedProjectId) return false;
       return enqueue(async () => {
+        if (getProjectLifecycle(normalizedProjectId).deleting || getProjectLifecycle(normalizedProjectId).deleted) {
+          return false;
+        }
         const database = await openDatabase();
         if (!database) {
           const project = getFallbackProject(normalizedProjectId);
@@ -262,17 +296,62 @@
     async function removeProject(projectId) {
       const normalizedProjectId = normalizeProjectId(projectId);
       if (!normalizedProjectId) return false;
+      const lifecycle = getProjectLifecycle(normalizedProjectId);
+      if (lifecycle.deleted) return false;
+      lifecycle.deleting = true;
       return enqueue(async () => {
-        const database = await openDatabase();
-        if (!database) return fallbackProjects.delete(normalizedProjectId);
-        const transaction = database.transaction([META_STORE, CHUNK_STORE], 'readwrite');
-        const metaStore = transaction.objectStore(META_STORE);
-        const chunkStore = transaction.objectStore(CHUNK_STORE);
-        const meta = await requestResult(metaStore.get(normalizedProjectId));
-        [...(meta?.pastKeys || []), ...(meta?.futureKeys || [])].forEach(key => chunkStore.delete(key));
-        metaStore.delete(normalizedProjectId);
-        await transactionDone(transaction);
-        return Boolean(meta);
+        try {
+          const database = await openDatabase();
+          if (!database) {
+            const removed = fallbackProjects.delete(normalizedProjectId);
+            lifecycle.deleted = true;
+            return removed;
+          }
+          const transaction = database.transaction([META_STORE, CHUNK_STORE], 'readwrite');
+          const metaStore = transaction.objectStore(META_STORE);
+          const chunkStore = transaction.objectStore(CHUNK_STORE);
+          const meta = await requestResult(metaStore.get(normalizedProjectId));
+          [...(meta?.pastKeys || []), ...(meta?.futureKeys || [])].forEach(key => chunkStore.delete(key));
+          metaStore.delete(normalizedProjectId);
+          await transactionDone(transaction);
+          lifecycle.deleted = true;
+          return Boolean(meta);
+        } catch (error) {
+          lifecycle.deleting = false;
+          throw error;
+        }
+      });
+    }
+
+    async function resetProject(projectId) {
+      const normalizedProjectId = normalizeProjectId(projectId);
+      if (!normalizedProjectId) return false;
+      const lifecycle = getProjectLifecycle(normalizedProjectId);
+      if (lifecycle.deleting) return false;
+      lifecycle.deleting = true;
+      return enqueue(async () => {
+        try {
+          const database = await openDatabase();
+          if (!database) {
+            const removed = fallbackProjects.delete(normalizedProjectId);
+            lifecycle.deleting = false;
+            lifecycle.deleted = false;
+            return removed;
+          }
+          const transaction = database.transaction([META_STORE, CHUNK_STORE], 'readwrite');
+          const metaStore = transaction.objectStore(META_STORE);
+          const chunkStore = transaction.objectStore(CHUNK_STORE);
+          const meta = await requestResult(metaStore.get(normalizedProjectId));
+          [...(meta?.pastKeys || []), ...(meta?.futureKeys || [])].forEach(key => chunkStore.delete(key));
+          metaStore.delete(normalizedProjectId);
+          await transactionDone(transaction);
+          lifecycle.deleting = false;
+          lifecycle.deleted = false;
+          return Boolean(meta);
+        } catch (error) {
+          lifecycle.deleting = false;
+          throw error;
+        }
       });
     }
 
@@ -298,6 +377,7 @@
       push,
       popLatest,
       clearDirection,
+      resetProject,
       removeProject,
       getStatus,
       flush: () => operationQueue,

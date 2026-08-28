@@ -96,7 +96,10 @@ begin
 end;
 $$;
 
-create or replace function collab_v1.draw2_has_forbidden_key(p_value jsonb)
+create or replace function collab_v1.draw2_has_forbidden_key(
+  p_value jsonb,
+  p_depth integer default 0
+)
 returns boolean
 language plpgsql immutable strict
 set search_path = ''
@@ -105,19 +108,59 @@ declare
   v_key text;
   v_child jsonb;
 begin
+  -- Keep this defensive walk bounded even if the caller evaluates it before
+  -- draw2_payload_is_bounded().
+  if p_depth > 8 then return true; end if;
   if jsonb_typeof(p_value) = 'array' then
     for v_child in select value from jsonb_array_elements(p_value) loop
-      if collab_v1.draw2_has_forbidden_key(v_child) then return true; end if;
+      if collab_v1.draw2_has_forbidden_key(v_child, p_depth + 1) then
+        return true;
+      end if;
     end loop;
   elsif jsonb_typeof(p_value) = 'object' then
     for v_key, v_child in select key, value from jsonb_each(p_value) loop
-      if replace(lower(v_key), '_', '') ~ '(pointer|preview|snapshot|rawaudioblob|audioblob|blob|dom)' then
+      if replace(lower(v_key), '_', '') ~ '(pointer|preview|snapshot|rawaudioblob|audioblob|blob|bytes|pixels|pixeldata|pcm|samples|sampledata|audiobuffer|arraybuffer|imagedata|dom)' then
         return true;
       end if;
-      if collab_v1.draw2_has_forbidden_key(v_child) then return true; end if;
+      if collab_v1.draw2_has_forbidden_key(v_child, p_depth + 1) then
+        return true;
+      end if;
     end loop;
   end if;
   return false;
+end;
+$$;
+
+create or replace function collab_v1.draw2_payload_is_bounded(
+  p_value jsonb,
+  p_depth integer default 0
+)
+returns boolean
+language plpgsql immutable strict
+set search_path = ''
+as $$
+declare
+  v_child jsonb;
+begin
+  if p_depth > 8 then return false; end if;
+  if jsonb_typeof(p_value) = 'array' then
+    if jsonb_array_length(p_value) > 96 then return false; end if;
+    for v_child in select value from jsonb_array_elements(p_value) loop
+      if not collab_v1.draw2_payload_is_bounded(v_child, p_depth + 1) then
+        return false;
+      end if;
+    end loop;
+  elsif jsonb_typeof(p_value) = 'object' then
+    if (select count(*) from jsonb_object_keys(p_value)) > 96 then
+      return false;
+    end if;
+    for v_child in select value from jsonb_each(p_value) loop
+      if not collab_v1.draw2_payload_is_bounded(v_child, p_depth + 1) then
+        return false;
+      end if;
+    end loop;
+  end if;
+  return true;
 end;
 $$;
 
@@ -137,6 +180,17 @@ as $$
   from collab_v1.room_members as member
   where member.room_id = p_room_id and member.user_id = p_user_id;
 $$;
+
+-- These helpers are implementation details. Keep them unavailable to browser
+-- roles even if schema exposure or default privileges change later.
+revoke all on function collab_v1.draw2_canonical_json(jsonb)
+  from public, anon, authenticated;
+revoke all on function collab_v1.draw2_has_forbidden_key(jsonb, integer)
+  from public, anon, authenticated;
+revoke all on function collab_v1.draw2_payload_is_bounded(jsonb, integer)
+  from public, anon, authenticated;
+revoke all on function collab_v1.draw2_membership_revision(uuid, uuid)
+  from public, anon, authenticated;
 
 create or replace function public.pixync_draw2_open_session_v1(
   p_project_id text,
@@ -232,6 +286,7 @@ declare
   v_committed_fingerprint text;
   v_committed jsonb;
   v_committed_at timestamptz := timezone('utc', now());
+  v_rate_operation_count integer;
 begin
   if v_user_id is null then raise exception 'authentication_required'; end if;
   begin v_room_id := p_project_id::uuid;
@@ -246,8 +301,11 @@ begin
        collab_v1.draw2_membership_revision(v_room_id, v_user_id) then
     raise exception 'pixync_draw2_stale_session';
   end if;
-  if jsonb_typeof(p_operation) <> 'object'
-     or not (p_operation ?& array[
+  if p_operation is null
+     or jsonb_typeof(p_operation) is distinct from 'object' then
+    raise exception 'pixync_draw2_invalid_operation';
+  end if;
+  if not (p_operation ?& array[
        'schemaVersion', 'operationId', 'projectId', 'aggregate', 'actorId',
        'clientId', 'clientSequence', 'baseProjectRevision',
        'aggregateRevision', 'payloadHash', 'payload'
@@ -260,23 +318,85 @@ begin
          'aggregateRevision', 'payloadHash', 'payload', 'compensation'
        )
      )
-     or p_operation->>'schemaVersion' <> 'PIXYNC_DRAW2_OPERATION_V1'
-     or p_operation->>'projectId' <> p_project_id or p_operation->>'clientId' <> p_client_id
-     or p_operation->>'actorId' <> v_user_id::text
-     or coalesce(p_operation->>'operationId', '') !~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'
-     or p_operation->>'aggregate' not in ('draw', 'audio', 'game')
-     or jsonb_typeof(p_operation->'payload') <> 'object'
-     or octet_length(convert_to(collab_v1.draw2_canonical_json(p_operation), 'utf8')) > 24576
-     or octet_length(convert_to(collab_v1.draw2_canonical_json(p_operation->'payload'), 'utf8')) > 16384
-     or collab_v1.draw2_has_forbidden_key(p_operation->'payload')
-     or (p_operation ? 'compensation' and jsonb_typeof(p_operation->'compensation') <> 'object')
      or (p_operation ? 'projectRevision') or (p_operation ? 'committedAt') then
     raise exception 'pixync_draw2_invalid_operation';
   end if;
-  if (p_operation->>'clientSequence')::bigint < 0
-     or (p_operation->>'baseProjectRevision')::bigint < 0
-     or (p_operation->>'aggregateRevision')::bigint < 0 then
+  if jsonb_typeof(p_operation->'schemaVersion') is distinct from 'string'
+     or jsonb_typeof(p_operation->'operationId') is distinct from 'string'
+     or jsonb_typeof(p_operation->'projectId') is distinct from 'string'
+     or jsonb_typeof(p_operation->'aggregate') is distinct from 'string'
+     or jsonb_typeof(p_operation->'actorId') is distinct from 'string'
+     or jsonb_typeof(p_operation->'clientId') is distinct from 'string'
+     or jsonb_typeof(p_operation->'clientSequence') is distinct from 'number'
+     or jsonb_typeof(p_operation->'baseProjectRevision') is distinct from 'number'
+     or jsonb_typeof(p_operation->'aggregateRevision') is distinct from 'number'
+     or jsonb_typeof(p_operation->'payloadHash') is distinct from 'string'
+     or jsonb_typeof(p_operation->'payload') is distinct from 'object'
+     or (p_operation ? 'compensation' and
+       jsonb_typeof(p_operation->'compensation') is distinct from 'object')
+     or p_operation->>'schemaVersion' is distinct from 'PIXYNC_DRAW2_OPERATION_V1'
+     or p_operation->>'projectId' is distinct from p_project_id
+     or p_operation->>'clientId' is distinct from p_client_id
+     or p_operation->>'actorId' is distinct from v_user_id::text
+     or p_operation->>'operationId' !~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'
+     or p_operation->>'aggregate' not in ('draw', 'audio', 'game')
+     or p_operation->>'payloadHash' !~ '^[a-f0-9]{64}$' then
+    raise exception 'pixync_draw2_invalid_operation';
+  end if;
+  if (p_operation ? 'compensation') then
+    if not (p_operation->'compensation' ? 'targetOperationId')
+       or exists (
+         select 1 from jsonb_object_keys(p_operation->'compensation') as supplied(key)
+         where supplied.key not in (
+           'targetOperationId', 'expectedAggregateRevision', 'writerGuard'
+         )
+       )
+       or jsonb_typeof(p_operation->'compensation'->'targetOperationId') is distinct from 'string'
+       or p_operation->'compensation'->>'targetOperationId' !~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'
+       or not (
+         p_operation->'compensation' ? 'expectedAggregateRevision'
+         or p_operation->'compensation' ? 'writerGuard'
+       ) then
+      raise exception 'pixync_draw2_invalid_operation';
+    end if;
+    if (p_operation->'compensation' ? 'expectedAggregateRevision') then
+      if jsonb_typeof(p_operation->'compensation'->'expectedAggregateRevision') is distinct from 'number' then
+        raise exception 'pixync_draw2_invalid_operation';
+      end if;
+      if (p_operation->'compensation'->>'expectedAggregateRevision')::numeric < 0
+         or (p_operation->'compensation'->>'expectedAggregateRevision')::numeric <> trunc((p_operation->'compensation'->>'expectedAggregateRevision')::numeric)
+         or (p_operation->'compensation'->>'expectedAggregateRevision')::numeric > 9223372036854775807 then
+        raise exception 'pixync_draw2_invalid_operation';
+      end if;
+    end if;
+    if (p_operation->'compensation' ? 'writerGuard') and
+       (jsonb_typeof(p_operation->'compensation'->'writerGuard') is distinct from 'string'
+        or p_operation->'compensation'->>'writerGuard' !~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$') then
+      raise exception 'pixync_draw2_invalid_operation';
+    end if;
+  end if;
+  if (p_operation->>'clientSequence')::numeric <> trunc((p_operation->>'clientSequence')::numeric)
+     or (p_operation->>'clientSequence')::numeric <= 0
+     or (p_operation->>'clientSequence')::numeric > 9223372036854775807
+     or (p_operation->>'baseProjectRevision')::numeric <> trunc((p_operation->>'baseProjectRevision')::numeric)
+     or (p_operation->>'baseProjectRevision')::numeric < 0
+     or (p_operation->>'baseProjectRevision')::numeric > 9223372036854775807
+     or (p_operation->>'aggregateRevision')::numeric <> trunc((p_operation->>'aggregateRevision')::numeric)
+     or (p_operation->>'aggregateRevision')::numeric < 0
+     or (p_operation->>'aggregateRevision')::numeric > 9223372036854775807 then
     raise exception 'pixync_draw2_invalid_revision';
+  end if;
+  if not collab_v1.draw2_payload_is_bounded(p_operation->'payload', 0)
+     or (p_operation ? 'compensation' and
+       not collab_v1.draw2_payload_is_bounded(p_operation->'compensation', 0))
+     or collab_v1.draw2_has_forbidden_key(p_operation->'payload')
+     or (p_operation ? 'compensation' and
+       collab_v1.draw2_has_forbidden_key(p_operation->'compensation')) then
+    raise exception 'pixync_draw2_invalid_operation';
+  end if;
+  if octet_length(convert_to(collab_v1.draw2_canonical_json(p_operation), 'utf8')) > 24576
+     or octet_length(convert_to(collab_v1.draw2_canonical_json(p_operation->'payload'), 'utf8')) > 16384 then
+    raise exception 'pixync_draw2_invalid_operation';
   end if;
   if p_operation->>'payloadHash' <>
     encode(extensions.digest(convert_to(collab_v1.draw2_canonical_json(p_operation->'payload'), 'utf8'), 'sha256'), 'hex') then
@@ -331,6 +451,25 @@ begin
     else v_head.game_revision end;
   if (p_operation->>'aggregateRevision')::bigint <> v_aggregate_base then
     raise exception 'pixync_draw2_aggregate_revision_stale';
+  end if;
+  insert into collab_v1.rate_windows as rate_window (
+    room_id, user_id, window_started_at, operation_count
+  ) values (
+    v_room_id, v_user_id, v_committed_at, 1
+  ) on conflict (room_id, user_id) do update set
+    window_started_at = case
+      when rate_window.window_started_at <= v_committed_at - interval '1 second'
+        then v_committed_at
+      else rate_window.window_started_at
+    end,
+    operation_count = case
+      when rate_window.window_started_at <= v_committed_at - interval '1 second'
+        then 1
+      else rate_window.operation_count + 1
+    end
+  returning operation_count into v_rate_operation_count;
+  if v_rate_operation_count > 120 then
+    raise exception 'pixync_draw2_rate_limited';
   end if;
   v_project_next := v_head.project_revision + 1;
   v_aggregate_next := v_aggregate_base + 1;
@@ -449,15 +588,29 @@ begin
        collab_v1.draw2_membership_revision(v_room_id, v_user_id) then
     raise exception 'pixync_draw2_stale_session';
   end if;
-  if p_snapshot_hash !~ '^[a-f0-9]{64}$'
+  if p_snapshot_hash is null
+     or p_snapshot_hash !~ '^[a-f0-9]{64}$'
+     or p_revision_id is null
      or p_revision_id !~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'
      or p_sequence is null or p_sequence < 1
-     or jsonb_typeof(p_game_project) <> 'object'
-     or p_game_project->>'projectId' <> p_project_id
-     or p_game_project#>>'{revision,snapshotHash}' <> p_snapshot_hash
-     or p_game_project#>>'{revision,revisionId}' <> p_revision_id
-     or (p_game_project#>>'{revision,sequence}')::bigint <> p_sequence
-     or octet_length(convert_to(collab_v1.draw2_canonical_json(p_game_project), 'utf8')) > 524288 then
+     or p_game_project is null
+     or jsonb_typeof(p_game_project) is distinct from 'object' then
+    raise exception 'pixync_draw2_invalid_game_revision';
+  end if;
+  if jsonb_typeof(p_game_project->'projectId') is distinct from 'string'
+     or jsonb_typeof(p_game_project#>'{revision}') is distinct from 'object'
+     or jsonb_typeof(p_game_project#>'{revision,snapshotHash}') is distinct from 'string'
+     or jsonb_typeof(p_game_project#>'{revision,revisionId}') is distinct from 'string'
+     or jsonb_typeof(p_game_project#>'{revision,sequence}') is distinct from 'number'
+     or p_game_project->>'projectId' is distinct from p_project_id
+     or p_game_project#>>'{revision,snapshotHash}' is distinct from p_snapshot_hash
+     or p_game_project#>>'{revision,revisionId}' is distinct from p_revision_id
+     or p_game_project#>>'{revision,sequence}' is null
+     or p_game_project#>>'{revision,sequence}' !~ '^[0-9]+$'
+     or (p_game_project#>>'{revision,sequence}')::numeric <> p_sequence then
+    raise exception 'pixync_draw2_invalid_game_revision';
+  end if;
+  if octet_length(convert_to(collab_v1.draw2_canonical_json(p_game_project), 'utf8')) > 524288 then
     raise exception 'pixync_draw2_invalid_game_revision';
   end if;
   insert into collab_v1.draw2_game_revisions (

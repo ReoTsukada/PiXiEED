@@ -37,6 +37,11 @@ import {
   stepRuntime,
   type PreviewStepResult,
 } from "./wp160-game-runtime-core.ts";
+import {
+  resolveGameRuntimePerformanceProfile,
+  type GameRuntimePerformanceProfile,
+  type GameRuntimePerformanceProfileId,
+} from "./game/game-350/runtime-performance.ts";
 
 export type GameProjectRevisionId = string;
 export type GameSceneId = string;
@@ -215,6 +220,7 @@ export interface GameRuntimeFeatureFlags {
 export interface GameRuntimeSession {
   readonly project: GameProjectRevision;
   readonly runtime: RuntimePreviewSession;
+  readonly performanceProfile: GameRuntimePerformanceProfile;
   readonly sceneId: GameSceneId;
   readonly runtimeValues: Readonly<Record<string, number | string | boolean>>;
   readonly recovery: "VALID" | "RECOVERED" | "BLOCKED";
@@ -229,6 +235,7 @@ export interface CreateGameRuntimeOptions {
   readonly capabilities: RuntimeCapabilityProfile;
   readonly flags: GameRuntimeFeatureFlags;
   readonly killSwitch: boolean;
+  readonly performanceProfileId?: GameRuntimePerformanceProfileId;
   readonly inputMap?: InputActionMap;
   readonly renderer?: "CANVAS2D" | "WEBGPU" | "NONE";
 }
@@ -276,9 +283,9 @@ function referenceKey(reference: GameAssetReference): string {
   return `${reference.kind}:${reference.assetId}:${reference.revisionId}:${reference.contentHash}`;
 }
 
-function collectReferences(project: Omit<GameProjectRevision, "snapshotHash">): readonly GameAssetReference[] {
+function collectReferencesFromScenes(scenes: readonly GameScene[]): readonly GameAssetReference[] {
   const references: GameAssetReference[] = [];
-  for (const scene of project.scenes) {
+  for (const scene of scenes) {
     for (const entity of scene.entities) {
       for (const component of entity.components) {
         if (component.type === "SPRITE" || component.type === "ANIMATION" || component.type === "AUDIO_SOURCE") references.push(component.asset);
@@ -286,6 +293,10 @@ function collectReferences(project: Omit<GameProjectRevision, "snapshotHash">): 
     }
   }
   return references.sort((left, right) => referenceKey(left).localeCompare(referenceKey(right)));
+}
+
+function collectReferences(project: Omit<GameProjectRevision, "snapshotHash">): readonly GameAssetReference[] {
+  return collectReferencesFromScenes(project.scenes);
 }
 
 function dependencyMatchesReference(reference: GameAssetReference, dependencies: DependencySnapshot): boolean {
@@ -379,10 +390,20 @@ export function gameInputActionMapToRuntime(inputMap: GameInputActionMap): Input
   return { bindings: inputMap.actions.flatMap((action) => action.bindings).sort((left, right) => `${left.action}:${left.source}:${left.code}`.localeCompare(`${right.action}:${right.source}:${right.code}`)) };
 }
 
-export function gameAssetRequests(project: GameProjectRevision): readonly { readonly assetId: AssetId; readonly required: boolean; readonly mode: AssetReferenceMode }[] {
+function assetRequestsFromScenes(scenes: readonly GameScene[]): readonly { readonly assetId: AssetId; readonly required: boolean; readonly mode: AssetReferenceMode }[] {
   const unique = new Map<string, { readonly assetId: AssetId; readonly required: boolean; readonly mode: AssetReferenceMode }>();
-  for (const reference of collectReferences(project)) unique.set(String(reference.assetId), { assetId: reference.assetId, required: true, mode: reference.mode });
+  for (const reference of collectReferencesFromScenes(scenes)) unique.set(String(reference.assetId), { assetId: reference.assetId, required: true, mode: reference.mode });
   return [...unique.values()].sort((left, right) => left.assetId.localeCompare(right.assetId));
+}
+
+export function gameAssetRequests(project: GameProjectRevision): readonly { readonly assetId: AssetId; readonly required: boolean; readonly mode: AssetReferenceMode }[] {
+  return assetRequestsFromScenes(project.scenes);
+}
+
+/** Resolve only the references needed by one Scene; other Scenes remain lazy. */
+export function gameAssetRequestsForScene(project: GameProjectRevision, sceneId: GameSceneId): readonly { readonly assetId: AssetId; readonly required: boolean; readonly mode: AssetReferenceMode }[] {
+  const scene = project.scenes.find((candidate) => candidate.sceneId === sceneId);
+  return scene === undefined ? [] : assetRequestsFromScenes([scene]);
 }
 
 function featureEnabled(flags: GameRuntimeFeatureFlags, feature: GameRuntimeFeature, killSwitch: boolean): boolean {
@@ -415,9 +436,13 @@ export async function createGameRuntimePreview(options: CreateGameRuntimeOptions
     : await createRuntimePreview({ ...runtimeBase, renderer: options.renderer });
   const allDiagnostics = [...diagnostics, ...runtime.diagnostics];
   const running = runtime.running && validation.valid && featureEnabled(options.flags, "game-core-read", options.killSwitch) && featureEnabled(options.flags, "runtime-preview", options.killSwitch);
+  const performanceProfile = resolveGameRuntimePerformanceProfile(options.performanceProfileId === undefined
+    ? { screenWidth: options.capabilities.screenWidth, touch: options.capabilities.touch }
+    : { screenWidth: options.capabilities.screenWidth, touch: options.capabilities.touch, requestedProfileId: options.performanceProfileId });
   return {
     project: options.project,
     runtime: { ...runtime, running, diagnostics: allDiagnostics },
+    performanceProfile,
     sceneId: options.project.scenes[0]?.sceneId ?? "",
     runtimeValues: {},
     recovery: validation.valid && running ? "VALID" : "BLOCKED",
@@ -450,10 +475,19 @@ export function stepGameRuntime(session: GameRuntimeSession, deltaMs: number, in
   return { session: { ...session, runtime: nextRuntime, runtimeValues, diagnostics: nextRuntime.diagnostics }, actions: stepped.actions, presentationChanged: stepped.presentationChanged };
 }
 
-export async function loadGameRuntimeAssets(session: GameRuntimeSession, resolver: RuntimeAssetResolver): Promise<GameRuntimeSession> {
-  const runtime = await loadRuntimeAssets(session.runtime, gameAssetRequests(session.project), resolver);
+export interface GameRuntimeAssetLoadOptions {
+  readonly sceneId?: GameSceneId;
+}
+
+export async function loadGameRuntimeAssets(session: GameRuntimeSession, resolver: RuntimeAssetResolver, options: GameRuntimeAssetLoadOptions = {}): Promise<GameRuntimeSession> {
+  const requests = options.sceneId === undefined ? gameAssetRequests(session.project) : gameAssetRequestsForScene(session.project, options.sceneId);
+  const runtime = await loadRuntimeAssets(session.runtime, requests, resolver);
   const blocked = runtime.diagnostics.some((item) => !item.recoverable && ["MISSING_REQUIRED_ASSET", "HASH_MISMATCH", "ASSET_QUARANTINED"].includes(item.code));
   return { ...session, runtime: { ...runtime, running: runtime.running && !blocked }, recovery: blocked ? "BLOCKED" : session.recovery, diagnostics: runtime.diagnostics };
+}
+
+export async function loadGameRuntimeSceneAssets(session: GameRuntimeSession, sceneId: GameSceneId, resolver: RuntimeAssetResolver): Promise<GameRuntimeSession> {
+  return loadGameRuntimeAssets(session, resolver, { sceneId });
 }
 
 export function stopGameRuntime(session: GameRuntimeSession): GameRuntimeSession {

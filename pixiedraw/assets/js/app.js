@@ -1350,6 +1350,8 @@
     AUTOSAVE_DB_VERSION,
     AUTOSAVE_STORE_NAME,
     RECENT_PROJECTS_STORE,
+    RECENT_PROJECT_METADATA_KEY_PREFIX,
+    RECENT_PROJECT_DELETION_KEY_PREFIX,
     FLOATING_PREVIEW_REFERENCE_MEDIA_KEY_PREFIX,
     SHARED_LOCAL_OP_JOURNAL_STORE,
     LOCAL_PROJECT_MANIFESTS_STORE,
@@ -6418,8 +6420,14 @@
   set accountState(value) { accountState = value; },
   get buildSharedRecentProjectId() { return buildSharedRecentProjectId; },
   set buildSharedRecentProjectId(value) { buildSharedRecentProjectId = value; },
+  get claimRecentProjectDeletion() { return claimRecentProjectDeletion; },
+  set claimRecentProjectDeletion(value) { claimRecentProjectDeletion = value; },
   get closeOpenProjectTabsForDeletedProject() { return closeOpenProjectTabsForDeletedProject; },
   set closeOpenProjectTabsForDeletedProject(value) { closeOpenProjectTabsForDeletedProject = value; },
+  get cancelRecentProjectDeletion() { return cancelRecentProjectDeletion; },
+  set cancelRecentProjectDeletion(value) { cancelRecentProjectDeletion = value; },
+  get completeRecentProjectDeletion() { return completeRecentProjectDeletion; },
+  set completeRecentProjectDeletion(value) { completeRecentProjectDeletion = value; },
   get createAutosaveProjectId() { return createAutosaveProjectId; },
   set createAutosaveProjectId(value) { createAutosaveProjectId = value; },
   get createSharedProjectSnapshotTitle() { return createSharedProjectSnapshotTitle; },
@@ -6452,6 +6460,8 @@
   set isOwnedSharedRecentProjectEntry(value) { isOwnedSharedRecentProjectEntry = value; },
   get isSharedRecentProjectEntry() { return isSharedRecentProjectEntry; },
   set isSharedRecentProjectEntry(value) { isSharedRecentProjectEntry = value; },
+  get loadRecentProjectMetadataById() { return loadRecentProjectMetadataById; },
+  set loadRecentProjectMetadataById(value) { loadRecentProjectMetadataById = value; },
   get loadRecentProjectsMetadata() { return loadRecentProjectsMetadata; },
   set loadRecentProjectsMetadata(value) { loadRecentProjectsMetadata = value; },
   get loadSharedProjectSnapshotRecord() { return loadSharedProjectSnapshotRecord; },
@@ -6498,6 +6508,8 @@
   set updateAutosaveStatus(value) { updateAutosaveStatus = value; },
   get updatePixieedAccountUi() { return updatePixieedAccountUi; },
   set updatePixieedAccountUi(value) { updatePixieedAccountUi = value; },
+  get waitForAutosaveWriteIdle() { return waitForAutosaveWriteIdle; },
+  set waitForAutosaveWriteIdle(value) { waitForAutosaveWriteIdle = value; },
   }) || {};
 
   const projectPackageWorkflowUtilsModule = window.PiXiEEDrawModules?.projectPackageWorkflowUtils?.createProjectPackageWorkflowUtils?.({
@@ -6575,6 +6587,8 @@
   set extractLocalProjectSheetPayload(value) { extractLocalProjectSheetPayload = value; },
   get isSharedRecentProjectEntry() { return isSharedRecentProjectEntry; },
   set isSharedRecentProjectEntry(value) { isSharedRecentProjectEntry = value; },
+  get loadRecentProjectMetadataById() { return loadRecentProjectMetadataById; },
+  set loadRecentProjectMetadataById(value) { loadRecentProjectMetadataById = value; },
   get loadRecentProjectsMetadata() { return loadRecentProjectsMetadata; },
   set loadRecentProjectsMetadata(value) { loadRecentProjectsMetadata = value; },
   get localizeText() { return localizeText; },
@@ -8620,6 +8634,41 @@
   updateGridDecorations();
   const pointerState = createPointerState();
   const recentProjectsCache = new Map();
+  let recentProjectsCacheHydrated = false;
+  // Keep an in-memory delete barrier alongside the IndexedDB tombstones. A
+  // delayed autosave can finish after the storage delete transaction and
+  // otherwise repopulate the chooser cache until the next reload.
+  const recentProjectDeletionStates = new Map();
+
+  function claimRecentProjectDeletion(projectId = '') {
+    const normalizedProjectId = normalizeAutosaveProjectId(projectId || '');
+    if (!normalizedProjectId) return false;
+    const currentState = recentProjectDeletionStates.get(normalizedProjectId);
+    if (currentState === 'deleting' || currentState === 'deleted') return false;
+    recentProjectDeletionStates.set(normalizedProjectId, 'deleting');
+    return true;
+  }
+
+  function completeRecentProjectDeletion(projectId = '') {
+    const normalizedProjectId = normalizeAutosaveProjectId(projectId || '');
+    if (normalizedProjectId) recentProjectDeletionStates.set(normalizedProjectId, 'deleted');
+  }
+
+  function cancelRecentProjectDeletion(projectId = '') {
+    const normalizedProjectId = normalizeAutosaveProjectId(projectId || '');
+    if (!normalizedProjectId) return;
+    if (recentProjectDeletionStates.get(normalizedProjectId) === 'deleting') {
+      recentProjectDeletionStates.delete(normalizedProjectId);
+    }
+  }
+
+  function isRecentProjectDeletionBlocked(projectId = '') {
+    const normalizedProjectId = normalizeAutosaveProjectId(projectId || '');
+    return Boolean(
+      normalizedProjectId
+      && recentProjectDeletionStates.get(normalizedProjectId)
+    );
+  }
   // One history entry represents one committed editor operation (stroke,
   // shape, paste, structural edit, undo/redo), never one individual pixel.
   const LOCAL_PROJECT_CHECKPOINT_HISTORY_INTERVAL = 10;
@@ -9115,17 +9164,20 @@
   const DEFAULT_HISTORY_LIMIT = isLightweightPersistenceMode()
     ? LIGHTWEIGHT_HISTORY_LIMIT
     : DESKTOP_HISTORY_LIMIT;
+  // Cold history is a session-local Undo extension, not a project archive.
+  // Bound both dimensions so repeated broad strokes cannot grow IndexedDB
+  // without limit while the editor remains open.
+  const COLD_HISTORY_MAX_ENTRIES_PER_DIRECTION = isLightweightPersistenceMode() ? 32 : 64;
+  const COLD_HISTORY_MAX_ENTRY_BYTES = 512 * 1024;
   const history = { past: [], future: [], pending: null, limit: DEFAULT_HISTORY_LIMIT };
   const coldHistoryStore = window.PiXiEEDrawModules?.coldHistoryStoreUtils?.createColdHistoryStoreUtils?.({
     chunkSize: 20,
-    // Cold history belongs only to the current editing session. Keep every
-    // evicted drawing operation for that session instead of applying a count
-    // cap; the next project-open boundary clears it before editing resumes.
-    maxEntriesPerDirection: Number.MAX_SAFE_INTEGER,
+    maxEntriesPerDirection: COLD_HISTORY_MAX_ENTRIES_PER_DIRECTION,
   }) || null;
   const coldHistoryStatusCache = new Map();
   const coldHistoryStatusRequests = new Map();
   const coldHistoryRefillRequests = new Map();
+  const coldHistoryOversizeNoticeKeys = new Set();
   let coldHistorySessionGeneration = 0;
 
   function getActiveColdHistoryProjectId() {
@@ -9156,8 +9208,13 @@
       return false;
     }
     cacheColdHistoryStatus(normalizedProjectId, { pastCount: 0, futureCount: 0 });
+    coldHistoryOversizeNoticeKeys.delete(`${normalizedProjectId}\u0000past`);
+    coldHistoryOversizeNoticeKeys.delete(`${normalizedProjectId}\u0000future`);
     const generation = coldHistorySessionGeneration;
-    coldHistoryStore.removeProject(normalizedProjectId)
+    const resetHistory = typeof coldHistoryStore.resetProject === 'function'
+      ? coldHistoryStore.resetProject.bind(coldHistoryStore)
+      : coldHistoryStore.removeProject.bind(coldHistoryStore);
+    resetHistory(normalizedProjectId)
       .then(() => {
         if (generation !== coldHistorySessionGeneration) return null;
         return refreshColdHistoryStatus(normalizedProjectId);
@@ -9217,6 +9274,33 @@
         ...coldHistoryStatusCache.get(projectId),
         [`${normalizedDirection}Count`]: 0,
       });
+      return false;
+    }
+    const estimatedBytes = typeof estimateSnapshotBytes === 'function'
+      ? Math.max(0, Number(estimateSnapshotBytes(entry)) || 0)
+      : 0;
+    if (estimatedBytes > COLD_HISTORY_MAX_ENTRY_BYTES) {
+      // A single oversized entry can be larger than the rest of the session's
+      // cold-history budget. Do not persist it just because it is a pixel
+      // patch; clear the direction so Undo never crosses an incomplete gap.
+      coldHistoryStore.clearDirection(projectId, normalizedDirection)
+        .then(() => refreshColdHistoryStatus(projectId))
+        .catch(error => console.warn('Failed to reset oversized cold history.', error));
+      cacheColdHistoryStatus(projectId, {
+        ...coldHistoryStatusCache.get(projectId),
+        [`${normalizedDirection}Count`]: 0,
+      });
+      const noticeKey = `${projectId}\u0000${normalizedDirection}`;
+      if (!coldHistoryOversizeNoticeKeys.has(noticeKey)) {
+        coldHistoryOversizeNoticeKeys.add(noticeKey);
+        updateAutosaveStatus(
+          localizeText(
+            '大きな描画の古いUndo履歴は端末へ退避せず、現在の上限内で保持します。',
+            'Older Undo data for a large drawing stays within the current history limit instead of growing device storage.'
+          ),
+          'info'
+        );
+      }
       return false;
     }
     const cached = coldHistoryStatusCache.get(projectId) || { pastCount: 0, futureCount: 0 };
@@ -10120,6 +10204,15 @@
           || activeTab?.deferredProjectPayload && typeof activeTab.deferredProjectPayload === 'object'
         ),
         canvasCompositeCache: getCanvasCompositeFrameCacheStats(),
+      },
+      historyRetention: {
+        liveEntriesPerDirection: history.limit,
+        coldEntriesPerDirection: COLD_HISTORY_MAX_ENTRIES_PER_DIRECTION,
+        coldEntryMaxMiB: bytesToMiB(COLD_HISTORY_MAX_ENTRY_BYTES),
+        coldHistory: coldHistoryStatusCache.get(getActiveColdHistoryProjectId()) || {
+          pastCount: 0,
+          futureCount: 0,
+        },
       },
       page: {
         homeVisible: Boolean(projectHomeVisible),
@@ -14994,6 +15087,8 @@
   set invalidateOnionSkinCache(value) { invalidateOnionSkinCache = value; },
   get isLargeDocumentPerformanceMode() { return isLargeDocumentPerformanceMode; },
   set isLargeDocumentPerformanceMode(value) { isLargeDocumentPerformanceMode = value; },
+  get isLightweightPersistenceMode() { return isLightweightPersistenceMode; },
+  set isLightweightPersistenceMode(value) { isLightweightPersistenceMode = value; },
   get isLocalOnlyMultiHistoryLabel() { return isLocalOnlyMultiHistoryLabel; },
   set isLocalOnlyMultiHistoryLabel(value) { isLocalOnlyMultiHistoryLabel = value; },
   get isMultiClientScopedHistoryMode() { return isMultiClientScopedHistoryMode; },
@@ -15088,6 +15183,8 @@
   set state(value) { state = value; },
   get trimHistoryToByteBudget() { return trimHistoryToByteBudget; },
   set trimHistoryToByteBudget(value) { trimHistoryToByteBudget = value; },
+  get updateAutosaveStatus() { return updateAutosaveStatus; },
+  set updateAutosaveStatus(value) { updateAutosaveStatus = value; },
   get updateMemoryStatus() { return updateMemoryStatus; },
   set updateMemoryStatus(value) { updateMemoryStatus = value; },
   get updateColorTabSwatch() { return updateColorTabSwatch; },
@@ -16615,7 +16712,12 @@
   }
 
   function enforceSharedRecentProjectLimit(entries = []) {
-    return sharedRecentProjectUtilsModule.enforceSharedRecentProjectLimit(...arguments);
+    const normalizedEntries = Array.isArray(entries) ? entries : [];
+    const limitedEntries = sharedRecentProjectUtilsModule.enforceSharedRecentProjectLimit?.(...arguments);
+    // The legacy shared-project module is intentionally disabled in this
+    // editor. Its compatibility proxy returns undefined for this non-boolean
+    // helper, but startup still needs the local Project catalog unchanged.
+    return Array.isArray(limitedEntries) ? limitedEntries : normalizedEntries;
   }
 
   function buildSharedProjectLimitMessage(maxSharedProjects = getMaxSharedProjectCount()) {
@@ -17101,23 +17203,337 @@
     return setActiveAutosaveProjectId(createAutosaveProjectId());
   }
 
-  async function loadRecentProjectsMetadata({ includeAllAccounts = false } = {}) {
+  function stripRecentProjectPayload(entry) {
+    if (!entry || typeof entry !== 'object') {
+      return entry;
+    }
+    const hasProjectPayload = Boolean(entry.project && typeof entry.project === 'object');
+    const hasProjectJournal = Boolean(entry.projectJournal && typeof entry.projectJournal === 'object');
+    if (!hasProjectPayload && !hasProjectJournal) {
+      return entry;
+    }
+    const metadata = { ...entry };
+    if (hasProjectPayload) {
+      delete metadata.project;
+      // This marker is only a read-side hint. It lets a metadata write keep
+      // the legacy payload intact until the project is migrated or deleted.
+      metadata.payloadAvailable = true;
+    }
+    if (hasProjectJournal) {
+      delete metadata.projectJournal;
+      metadata.journalAvailable = true;
+    }
+    return metadata;
+  }
+
+  function createRecentProjectMetadataKey(projectId = '') {
+    const normalizedProjectId = normalizeAutosaveProjectId(projectId);
+    return normalizedProjectId && RECENT_PROJECT_METADATA_KEY_PREFIX
+      ? `${RECENT_PROJECT_METADATA_KEY_PREFIX}${normalizedProjectId}`
+      : '';
+  }
+
+  function createRecentProjectDeletionKey(projectId = '') {
+    const normalizedProjectId = normalizeAutosaveProjectId(projectId);
+    return normalizedProjectId && RECENT_PROJECT_DELETION_KEY_PREFIX
+      ? `${RECENT_PROJECT_DELETION_KEY_PREFIX}${normalizedProjectId}`
+      : '';
+  }
+
+  function isRecentProjectDeletionMarker(value, expectedProjectId = '') {
+    if (!value || typeof value !== 'object' || value.recentProjectDeletionVersion !== 1) {
+      return false;
+    }
+    const normalizedId = normalizeAutosaveProjectId(value.id || '');
+    const normalizedExpectedId = normalizeAutosaveProjectId(expectedProjectId || '');
+    return Boolean(normalizedId && (!normalizedExpectedId || normalizedId === normalizedExpectedId));
+  }
+
+  function createRecentProjectMetadataEntry(entry = {}) {
+    const normalizedProjectId = normalizeAutosaveProjectId(entry?.id || '');
+    if (!normalizedProjectId) return null;
+    const metadata = stripRecentProjectPayload(entry);
+    if (!metadata || typeof metadata !== 'object') return null;
+    const sidecar = { ...metadata };
+    delete sidecar.project;
+    delete sidecar.projectJournal;
+    sidecar.id = normalizedProjectId;
+    sidecar.recentProjectMetadataVersion = 1;
+    return sidecar;
+  }
+
+  function readRecentProjectMetadataEntry(value, expectedProjectId = '') {
+    if (!value || typeof value !== 'object' || value.recentProjectMetadataVersion !== 1) {
+      return null;
+    }
+    const metadata = { ...value };
+    delete metadata.recentProjectMetadataVersion;
+    const normalizedId = normalizeAutosaveProjectId(metadata.id || '');
+    const normalizedExpectedId = normalizeAutosaveProjectId(expectedProjectId || '');
+    if (!normalizedId || (normalizedExpectedId && normalizedId !== normalizedExpectedId)) {
+      return null;
+    }
+    return metadata;
+  }
+
+  async function loadRecentProjectMetadataSidecars() {
+    if (!RECENT_PROJECT_METADATA_KEY_PREFIX || !AUTOSAVE_STORE_NAME) return null;
+    const db = await openAutosaveDatabase();
+    if (!db.objectStoreNames.contains(AUTOSAVE_STORE_NAME)) {
+      db.close();
+      return null;
+    }
+    try {
+      return await new Promise((resolve, reject) => {
+        const entries = new Map();
+        const tx = db.transaction([AUTOSAVE_STORE_NAME], 'readonly');
+        const store = tx.objectStore(AUTOSAVE_STORE_NAME);
+        const metadataKeyRange = typeof IDBKeyRange !== 'undefined'
+          ? IDBKeyRange.bound(
+            RECENT_PROJECT_METADATA_KEY_PREFIX,
+            `${RECENT_PROJECT_METADATA_KEY_PREFIX}\uffff`
+          )
+          : null;
+        const keysRequest = metadataKeyRange
+          ? store.getAllKeys(metadataKeyRange)
+          : store.getAllKeys();
+        keysRequest.onsuccess = () => {
+          for (const key of keysRequest.result || []) {
+            if (typeof key !== 'string' || !key.startsWith(RECENT_PROJECT_METADATA_KEY_PREFIX)) {
+              continue;
+            }
+            const request = store.get(key);
+            request.onsuccess = () => {
+              const expectedProjectId = key.slice(RECENT_PROJECT_METADATA_KEY_PREFIX.length);
+              const metadata = readRecentProjectMetadataEntry(request.result, expectedProjectId);
+              if (metadata) entries.set(metadata.id, metadata);
+            };
+            request.onerror = () => reject(request.error || new Error('Recent project metadata read failed'));
+          }
+        };
+        keysRequest.onerror = () => reject(keysRequest.error || new Error('Recent project metadata keys read failed'));
+        tx.oncomplete = () => {
+          db.close();
+          resolve(entries);
+        };
+        tx.onerror = () => {
+          const error = tx.error || new Error('Recent project metadata transaction failed');
+          db.close();
+          reject(error);
+        };
+      });
+    } catch (error) {
+      try { db.close(); } catch (_closeError) {}
+      throw error;
+    }
+  }
+
+  async function loadRecentProjectKeys() {
+    const db = await openAutosaveDatabase();
+    try {
+      return await new Promise((resolve, reject) => {
+        let keys = [];
+        const hasDeletionStore = Boolean(
+          RECENT_PROJECT_DELETION_KEY_PREFIX
+            && AUTOSAVE_STORE_NAME
+            && db.objectStoreNames.contains(AUTOSAVE_STORE_NAME)
+        );
+        const tx = db.transaction(
+          hasDeletionStore ? [RECENT_PROJECTS_STORE, AUTOSAVE_STORE_NAME] : [RECENT_PROJECTS_STORE],
+          'readonly'
+        );
+        const request = tx.objectStore(RECENT_PROJECTS_STORE).getAllKeys();
+        const deletedProjectIds = new Set();
+        const deletedKeysRequest = hasDeletionStore
+          ? tx.objectStore(AUTOSAVE_STORE_NAME).getAllKeys(
+            typeof IDBKeyRange !== 'undefined'
+              ? IDBKeyRange.bound(
+                RECENT_PROJECT_DELETION_KEY_PREFIX,
+                `${RECENT_PROJECT_DELETION_KEY_PREFIX}\uffff`
+              )
+              : undefined
+          )
+          : null;
+        request.onsuccess = () => {
+          keys = Array.from(request.result || [])
+            .map(key => normalizeAutosaveProjectId(key || ''))
+            .filter(Boolean);
+        };
+        request.onerror = () => reject(request.error || new Error('Recent project keys read failed'));
+        if (deletedKeysRequest) {
+          deletedKeysRequest.onsuccess = () => {
+            for (const key of deletedKeysRequest.result || []) {
+              if (typeof key !== 'string' || !key.startsWith(RECENT_PROJECT_DELETION_KEY_PREFIX)) continue;
+              const id = normalizeAutosaveProjectId(key.slice(RECENT_PROJECT_DELETION_KEY_PREFIX.length));
+              if (id) deletedProjectIds.add(id);
+            }
+          };
+          deletedKeysRequest.onerror = () => reject(deletedKeysRequest.error || new Error('Recent project deletion marker read failed'));
+        }
+        tx.oncomplete = () => {
+          db.close();
+          resolve(keys.filter(key => !deletedProjectIds.has(key)));
+        };
+        tx.onerror = () => {
+          const error = tx.error || new Error('Recent project keys transaction failed');
+          db.close();
+          reject(error);
+        };
+      });
+    } catch (error) {
+      try { db.close(); } catch (_closeError) {}
+      throw error;
+    }
+  }
+
+  async function loadRecentProjectEntriesByIds(projectIds = []) {
+    const normalizedIds = Array.from(new Set(
+      (projectIds || []).map(projectId => normalizeAutosaveProjectId(projectId || '')).filter(Boolean)
+    ));
+    if (!normalizedIds.length) return [];
+    const db = await openAutosaveDatabase();
+    try {
+      return await new Promise((resolve, reject) => {
+        const values = new Map();
+        const tx = db.transaction([RECENT_PROJECTS_STORE], 'readonly');
+        const store = tx.objectStore(RECENT_PROJECTS_STORE);
+        normalizedIds.forEach(projectId => {
+          const request = store.get(projectId);
+          request.onsuccess = () => {
+            const entry = request.result && typeof request.result === 'object'
+              ? request.result
+              : null;
+            if (entry) values.set(projectId, entry);
+          };
+          request.onerror = () => reject(request.error || new Error('Recent project migration read failed'));
+        });
+        tx.oncomplete = () => {
+          db.close();
+          resolve(normalizedIds.map(projectId => values.get(projectId)).filter(Boolean));
+        };
+        tx.onerror = () => {
+          const error = tx.error || new Error('Recent project migration transaction failed');
+          db.close();
+          reject(error);
+        };
+      });
+    } catch (error) {
+      try { db.close(); } catch (_closeError) {}
+      throw error;
+    }
+  }
+
+  async function persistRecentProjectMetadataSidecars(entries = []) {
+    if (!RECENT_PROJECT_METADATA_KEY_PREFIX || !AUTOSAVE_STORE_NAME) return;
+    const metadataEntries = Array.from(new Map(
+      (entries || [])
+        .map(entry => createRecentProjectMetadataEntry(entry))
+        .filter(Boolean)
+        .map(entry => [entry.id, entry])
+    ).values());
+    if (!metadataEntries.length) return;
+    const db = await openAutosaveDatabase();
+    try {
+      if (!db.objectStoreNames.contains(AUTOSAVE_STORE_NAME)) return;
+      await new Promise((resolve, reject) => {
+        // Migration is intentionally conditional.  A user may delete a
+        // legacy Project while this startup repair is still in flight; do not
+        // resurrect its metadata sidecar after the delete transaction.
+        const tx = db.transaction([RECENT_PROJECTS_STORE, AUTOSAVE_STORE_NAME], 'readwrite');
+        const recentStore = tx.objectStore(RECENT_PROJECTS_STORE);
+        const store = tx.objectStore(AUTOSAVE_STORE_NAME);
+        metadataEntries.forEach(entry => {
+          const key = createRecentProjectMetadataKey(entry.id);
+          if (!key) return;
+          const recentKeyRequest = recentStore.getKey(entry.id);
+          recentKeyRequest.onsuccess = () => {
+            if (typeof recentKeyRequest.result === 'undefined') return;
+            const deletionKey = createRecentProjectDeletionKey(entry.id);
+            const deletionRequest = deletionKey ? store.get(deletionKey) : null;
+            const readExistingMetadata = () => {
+              const existingRequest = store.get(key);
+              existingRequest.onsuccess = () => {
+                if (!readRecentProjectMetadataEntry(existingRequest.result, entry.id)) {
+                  store.put(entry, key);
+                }
+              };
+              existingRequest.onerror = () => reject(existingRequest.error || new Error('Recent project metadata existence read failed'));
+            };
+            if (deletionRequest) {
+              deletionRequest.onsuccess = () => {
+                if (!isRecentProjectDeletionMarker(deletionRequest.result, entry.id)) readExistingMetadata();
+              };
+              deletionRequest.onerror = () => reject(deletionRequest.error || new Error('Recent project deletion marker read failed'));
+            } else {
+              readExistingMetadata();
+            }
+          };
+          recentKeyRequest.onerror = () => reject(recentKeyRequest.error || new Error('Recent project migration key read failed'));
+        });
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error || new Error('Recent project metadata write failed'));
+        tx.onabort = () => reject(tx.error || new Error('Recent project metadata write aborted'));
+      });
+    } finally {
+      try { db.close(); } catch (_closeError) {}
+    }
+  }
+
+  async function loadRecentProjectsMetadataFromRecentStore({ includeAllAccounts = false, includePayload = false } = {}) {
     if (!AUTOSAVE_SUPPORTED) return [];
     try {
       const db = await openAutosaveDatabase();
       return await new Promise((resolve, reject) => {
         let entries = [];
-        const tx = db.transaction([RECENT_PROJECTS_STORE], 'readonly');
+        const hasDeletionStore = Boolean(
+          RECENT_PROJECT_DELETION_KEY_PREFIX
+            && AUTOSAVE_STORE_NAME
+            && db.objectStoreNames.contains(AUTOSAVE_STORE_NAME)
+        );
+        const tx = db.transaction(
+          hasDeletionStore ? [RECENT_PROJECTS_STORE, AUTOSAVE_STORE_NAME] : [RECENT_PROJECTS_STORE],
+          'readonly'
+        );
         const store = tx.objectStore(RECENT_PROJECTS_STORE);
-        const request = store.getAll();
+        const deletedProjectIds = new Set();
+        const request = store.openCursor();
+        const deletedKeysRequest = hasDeletionStore
+          ? tx.objectStore(AUTOSAVE_STORE_NAME).getAllKeys(
+            typeof IDBKeyRange !== 'undefined'
+              ? IDBKeyRange.bound(
+                RECENT_PROJECT_DELETION_KEY_PREFIX,
+                `${RECENT_PROJECT_DELETION_KEY_PREFIX}\uffff`
+              )
+              : undefined
+          )
+          : null;
         request.onsuccess = () => {
-          entries = Array.isArray(request.result) ? request.result.slice() : [];
+          const cursor = request.result;
+          if (!cursor) return;
+          const entry = cursor.value && typeof cursor.value === 'object'
+            ? cursor.value
+            : null;
+          if (entry) {
+            entries.push(includePayload ? entry : stripRecentProjectPayload(entry));
+          }
+          cursor.continue();
         };
         request.onerror = () => {
           reject(request.error);
         };
+        if (deletedKeysRequest) {
+          deletedKeysRequest.onsuccess = () => {
+            for (const key of deletedKeysRequest.result || []) {
+              if (typeof key !== 'string' || !key.startsWith(RECENT_PROJECT_DELETION_KEY_PREFIX)) continue;
+              const id = normalizeAutosaveProjectId(key.slice(RECENT_PROJECT_DELETION_KEY_PREFIX.length));
+              if (id) deletedProjectIds.add(id);
+            }
+          };
+          deletedKeysRequest.onerror = () => reject(deletedKeysRequest.error || new Error('Recent project deletion marker read failed'));
+        }
         tx.oncomplete = () => {
           db.close();
+          entries = entries.filter(entry => !deletedProjectIds.has(normalizeAutosaveProjectId(entry?.id || '')));
           entries.sort((a, b) => {
             const aTime = typeof a?.updatedAt === 'string' ? a.updatedAt : '';
             const bTime = typeof b?.updatedAt === 'string' ? b.updatedAt : '';
@@ -17141,32 +17557,124 @@
     }
   }
 
-  async function loadRecentProjectMetadataById(projectId, { includeAllAccounts = false } = {}) {
+  async function loadRecentProjectsMetadata({ includeAllAccounts = false, includePayload = false } = {}) {
+    if (!AUTOSAVE_SUPPORTED) return [];
+    if (!RECENT_PROJECT_METADATA_KEY_PREFIX || includePayload) {
+      return loadRecentProjectsMetadataFromRecentStore({ includeAllAccounts, includePayload });
+    }
+    try {
+      const sidecars = await loadRecentProjectMetadataSidecars();
+      if (!(sidecars instanceof Map)) {
+        return loadRecentProjectsMetadataFromRecentStore({ includeAllAccounts, includePayload });
+      }
+      const recentProjectIds = await loadRecentProjectKeys();
+      const missingProjectIds = recentProjectIds.filter(projectId => !sidecars.has(projectId));
+      const legacyEntries = await loadRecentProjectEntriesByIds(missingProjectIds);
+      const migratedEntries = legacyEntries.map(entry => stripRecentProjectPayload(entry));
+      if (migratedEntries.length) {
+        persistRecentProjectMetadataSidecars(migratedEntries).catch(error => {
+          console.warn('Failed to migrate recent project metadata sidecars', error);
+        });
+      }
+      const entries = recentProjectIds
+        .map(projectId => sidecars.get(projectId) || migratedEntries.find(entry => entry?.id === projectId) || null)
+        .filter(Boolean);
+      entries.sort((a, b) => {
+        const aTime = typeof a?.updatedAt === 'string' ? a.updatedAt : '';
+        const bTime = typeof b?.updatedAt === 'string' ? b.updatedAt : '';
+        return bTime.localeCompare(aTime);
+      });
+      return includeAllAccounts
+        ? entries
+        : entries.filter(entry => isRecentProjectEntryVisibleForCurrentAccount(entry));
+    } catch (error) {
+      console.warn('Failed to load recent project metadata sidecars', error);
+      return loadRecentProjectsMetadataFromRecentStore({ includeAllAccounts, includePayload });
+    }
+  }
+
+  async function loadRecentProjectMetadataById(projectId, { includeAllAccounts = false, includePayload = true } = {}) {
     if (!AUTOSAVE_SUPPORTED) return null;
     const normalizedProjectId = normalizeAutosaveProjectId(projectId || '');
     if (!normalizedProjectId) return null;
     try {
       const db = await openAutosaveDatabase();
       return await new Promise((resolve, reject) => {
-        let entry = null;
-        const tx = db.transaction([RECENT_PROJECTS_STORE], 'readonly');
-        const request = tx.objectStore(RECENT_PROJECTS_STORE).get(normalizedProjectId);
-        request.onsuccess = () => {
-          entry = request.result && typeof request.result === 'object'
-            ? request.result
-            : null;
+        let recentEntry = null;
+        let sidecarEntry = null;
+        let recentProjectExists = false;
+        let recentProjectDeleted = false;
+        const hasSidecarStore = Boolean(
+          RECENT_PROJECT_METADATA_KEY_PREFIX
+            && AUTOSAVE_STORE_NAME
+            && db.objectStoreNames.contains(AUTOSAVE_STORE_NAME)
+        );
+        const storeNames = hasSidecarStore
+          ? [RECENT_PROJECTS_STORE, AUTOSAVE_STORE_NAME]
+          : [RECENT_PROJECTS_STORE];
+        const tx = db.transaction(storeNames, 'readonly');
+        const recentStore = tx.objectStore(RECENT_PROJECTS_STORE);
+        const sidecarStore = hasSidecarStore ? tx.objectStore(AUTOSAVE_STORE_NAME) : null;
+        const deletionRequest = hasSidecarStore && RECENT_PROJECT_DELETION_KEY_PREFIX
+          ? sidecarStore.get(createRecentProjectDeletionKey(normalizedProjectId))
+          : null;
+        const sidecarRequest = hasSidecarStore
+          ? sidecarStore.get(createRecentProjectMetadataKey(normalizedProjectId))
+          : null;
+        const readRecentEntry = () => {
+          const request = recentStore.get(normalizedProjectId);
+          request.onsuccess = () => {
+            recentEntry = request.result && typeof request.result === 'object'
+              ? request.result
+              : null;
+            recentProjectExists = Boolean(recentEntry);
+          };
+          request.onerror = () => reject(request.error || new Error('Recent project read failed'));
         };
-        request.onerror = () => reject(request.error);
+        if (includePayload || !hasSidecarStore) {
+          readRecentEntry();
+        } else {
+          const existenceRequest = recentStore.getKey(normalizedProjectId);
+          existenceRequest.onsuccess = () => {
+            recentProjectExists = typeof existenceRequest.result !== 'undefined';
+          };
+          existenceRequest.onerror = () => reject(existenceRequest.error || new Error('Recent project key read failed'));
+        }
+        if (sidecarRequest) {
+          sidecarRequest.onsuccess = () => {
+            sidecarEntry = readRecentProjectMetadataEntry(sidecarRequest.result, normalizedProjectId);
+            if (!includePayload && !sidecarEntry) {
+              readRecentEntry();
+            }
+          };
+          sidecarRequest.onerror = () => reject(sidecarRequest.error || new Error('Recent project metadata read failed'));
+        }
+        if (deletionRequest) {
+          deletionRequest.onsuccess = () => {
+            recentProjectDeleted = isRecentProjectDeletionMarker(deletionRequest.result, normalizedProjectId);
+          };
+          deletionRequest.onerror = () => reject(deletionRequest.error || new Error('Recent project deletion marker read failed'));
+        }
         tx.oncomplete = () => {
           db.close();
-          resolve(
-            entry && (includeAllAccounts || isRecentProjectEntryVisibleForCurrentAccount(entry))
-              ? entry
-              : null
-          );
+          if (recentProjectDeleted) {
+            resolve(null);
+            return;
+          }
+          const metadata = sidecarEntry || (recentEntry ? stripRecentProjectPayload(recentEntry) : null);
+          const entry = includePayload
+            ? (recentEntry ? { ...recentEntry, ...(sidecarEntry || {}) } : sidecarEntry)
+            : (recentProjectExists ? metadata : null);
+          const visible = entry && (includeAllAccounts || isRecentProjectEntryVisibleForCurrentAccount(entry));
+          if (!sidecarEntry && recentEntry) {
+            persistRecentProjectMetadataSidecars([recentEntry]).catch(error => {
+              console.warn('Failed to migrate recent project metadata sidecar', error);
+            });
+          }
+          resolve(visible ? (includePayload ? entry : stripRecentProjectPayload(entry)) : null);
         };
         tx.onerror = () => {
-          const error = tx.error;
+          const error = tx.error || new Error('Recent project transaction failed');
           db.close();
           reject(error);
         };
@@ -17216,29 +17724,145 @@
         const removedIds = currentEntries
           .filter(entry => entry?.id && !nextIds.has(entry.id))
           .map(entry => entry.id);
+        const useRecentProjectMetadataSidecar = Boolean(
+          RECENT_PROJECT_METADATA_KEY_PREFIX && AUTOSAVE_STORE_NAME
+        );
+        const useRecentProjectDeletionTombstone = Boolean(
+          RECENT_PROJECT_DELETION_KEY_PREFIX && AUTOSAVE_STORE_NAME
+        );
+        let entriesToWrite = changedEntries;
+        let recentEntriesToWrite = changedEntries;
+        let metadataEntriesToWrite = [];
+        if (useRecentProjectMetadataSidecar) {
+          // A legacy payload stays in recentProjects until the Project is
+          // explicitly opened/migrated or deleted. Its changed metadata is
+          // written only to the small sidecar, so an autosave does not clone
+          // the legacy document merely to update its card.
+          metadataEntriesToWrite = changedEntries
+            .map(entry => createRecentProjectMetadataEntry(entry))
+            .filter(Boolean);
+          recentEntriesToWrite = changedEntries.filter(entry => {
+            const previous = existingById.get(entry.id);
+            const hasV2Reference = Number(entry.autosaveSchemaVersion) === 2
+              && typeof entry.manifestKey === 'string'
+              && entry.manifestKey.length > 0;
+            const hasEntryPayload = Boolean(
+              (entry.project && typeof entry.project === 'object')
+                || (entry.projectJournal && typeof entry.projectJournal === 'object')
+            );
+            const previousHasLegacyPayload = Boolean(
+              previous && (
+                previous.payloadAvailable === true
+                  || (previous.project && typeof previous.project === 'object')
+                  || (previous.projectJournal && typeof previous.projectJournal === 'object')
+              )
+            );
+            return hasV2Reference || hasEntryPayload || !previousHasLegacyPayload;
+          });
+        } else {
+          entriesToWrite = await Promise.all(changedEntries.map(async entry => {
+            const previous = existingById.get(entry.id);
+            const hasV2Reference = Number(entry.autosaveSchemaVersion) === 2
+              && typeof entry.manifestKey === 'string'
+              && entry.manifestKey.length > 0;
+            if (
+              !hasV2Reference
+              && entry.payloadAvailable === true
+              && !(entry.project && typeof entry.project === 'object')
+              && previous
+              && !(previous.project && typeof previous.project === 'object')
+            ) {
+              // The list reader deliberately omits legacy payloads. If a
+              // metadata-only repair touches such a row, merge the original
+              // payload back into this one write so a legacy project cannot be
+              // lost before its explicit migration or deletion.
+              const fullEntry = await loadRecentProjectMetadataById(entry.id, {
+                includeAllAccounts: true,
+                includePayload: true,
+              });
+              if (fullEntry?.project && typeof fullEntry.project === 'object') {
+                return { ...fullEntry, ...entry, project: fullEntry.project };
+              }
+            }
+            return entry;
+          }));
+          recentEntriesToWrite = entriesToWrite;
+        }
         console.info('[pixiedraw:performance]', {
           phase: 'pixiedraw:autosave:recent-list:build-entries:sync',
           elapsedMs: Math.round(performance.now() - buildStartedAt),
           readCount: 0,
-          writeCount: changedEntries.length,
+          writeCount: recentEntriesToWrite.length,
+          metadataWriteCount: metadataEntriesToWrite.length,
           deleteCount: removedIds.length,
         });
         const writeStartedAt = performance.now();
         const db = await openAutosaveDatabase();
         await new Promise((resolve, reject) => {
-          const tx = db.transaction([RECENT_PROJECTS_STORE], 'readwrite');
+          const transactionStoreNames = [RECENT_PROJECTS_STORE];
+          if (useRecentProjectMetadataSidecar || useRecentProjectDeletionTombstone) {
+            transactionStoreNames.push(AUTOSAVE_STORE_NAME);
+          }
+          const tx = db.transaction(transactionStoreNames, 'readwrite');
           const store = tx.objectStore(RECENT_PROJECTS_STORE);
+          const metadataStore = useRecentProjectMetadataSidecar || useRecentProjectDeletionTombstone
+            ? tx.objectStore(AUTOSAVE_STORE_NAME)
+            : null;
           const enqueueStartedAt = performance.now();
-          changedEntries.forEach(entry => {
-            store.put(entry, entry.id);
+          const metadataById = new Map(metadataEntriesToWrite.map(entry => [entry.id, entry]));
+          const queuedEntryIds = new Set();
+          const enqueueEntryIfNotDeleted = (entry, metadataEntry = null) => {
+            const deletionKey = useRecentProjectDeletionTombstone
+              ? createRecentProjectDeletionKey(entry?.id || metadataEntry?.id || '')
+              : '';
+            const putEntry = () => {
+              if (entry?.id) store.put(entry, entry.id);
+              const key = createRecentProjectMetadataKey(metadataEntry?.id || entry?.id || '');
+              if (metadataEntry && key && metadataStore) metadataStore.put(metadataEntry, key);
+            };
+            if (!deletionKey || !metadataStore) {
+              putEntry();
+              return;
+            }
+            const deletionRequest = metadataStore.get(deletionKey);
+            deletionRequest.onsuccess = () => {
+              if (!isRecentProjectDeletionMarker(
+                deletionRequest.result,
+                entry?.id || metadataEntry?.id || ''
+              )) {
+                putEntry();
+              }
+            };
+            deletionRequest.onerror = () => {
+              reject(deletionRequest.error || new Error('Recent project deletion marker read failed'));
+            };
+          };
+          recentEntriesToWrite.forEach(entry => {
+            queuedEntryIds.add(entry.id);
+            enqueueEntryIfNotDeleted(entry, metadataById.get(entry.id) || null);
+          });
+          metadataEntriesToWrite.forEach(entry => {
+            if (queuedEntryIds.has(entry.id)) return;
+            enqueueEntryIfNotDeleted(null, entry);
           });
           removedIds.forEach(id => {
             store.delete(id);
+            const key = createRecentProjectMetadataKey(id);
+            if (key) metadataStore?.delete(key);
+            const deletionKey = createRecentProjectDeletionKey(id);
+            if (deletionKey && metadataStore) {
+              metadataStore.put({
+                recentProjectDeletionVersion: 1,
+                id,
+                deletedAt: new Date().toISOString(),
+              }, deletionKey);
+            }
           });
           console.info('[pixiedraw:performance]', {
             phase: 'pixiedraw:autosave:recent-list:put-enqueue:sync',
             elapsedMs: Math.round(performance.now() - enqueueStartedAt),
-            writeCount: changedEntries.length,
+            writeCount: recentEntriesToWrite.length,
+            metadataWriteCount: metadataEntriesToWrite.length,
             deleteCount: removedIds.length,
           });
           tx.oncomplete = () => {
@@ -17254,7 +17878,8 @@
         console.info('[pixiedraw:performance]', {
           phase: 'pixiedraw:autosave:recent-list:put-all:await',
           elapsedMs: Math.round(performance.now() - writeStartedAt),
-          writeCount: changedEntries.length,
+          writeCount: recentEntriesToWrite.length,
+          metadataWriteCount: metadataEntriesToWrite.length,
           deleteCount: removedIds.length,
         });
       } catch (error) {
@@ -17267,6 +17892,28 @@
       .then(writeTask);
     recentProjectsWritePromise = nextWrite.catch(() => {});
     await nextWrite;
+  }
+
+  async function saveRecentProjectEntryOnly(previousEntry, nextEntry) {
+    if (!nextEntry || typeof nextEntry !== 'object' || !nextEntry.id) {
+      return [];
+    }
+    await saveRecentProjectsList(
+      previousEntry && typeof previousEntry === 'object' ? [previousEntry] : [],
+      [nextEntry],
+    );
+    if (!recentProjectsCacheHydrated) {
+      // Before the startup catalog is hydrated, perform one complete read so
+      // the first autosave cannot replace an unseen project list in memory.
+      const entries = await loadRecentProjectsMetadata();
+      setRecentProjectsCache(entries);
+      return entries;
+    }
+    const nextEntries = Array.from(recentProjectsCache.values())
+      .filter(entry => entry?.id !== nextEntry.id)
+      .concat(nextEntry);
+    setRecentProjectsCache(nextEntries);
+    return nextEntries;
   }
 
   /** @type {any} */
@@ -17357,7 +18004,13 @@
   }
 
   function setRecentProjectsCache(...args) {
-    return recentProjectWorkflowUtilsModule.setRecentProjectsCache(...args);
+    const [entries, ...rest] = args;
+    const filteredEntries = Array.isArray(entries)
+      ? entries.filter(entry => !isRecentProjectDeletionBlocked(entry?.id || ''))
+      : entries;
+    const result = recentProjectWorkflowUtilsModule.setRecentProjectsCache(filteredEntries, ...rest);
+    recentProjectsCacheHydrated = true;
+    return result;
   }
 
   function syncStartupResumeState(...args) {
@@ -17369,7 +18022,9 @@
   }
 
   async function refreshRecentProjectsUI(...args) {
-    return recentProjectWorkflowUtilsModule.refreshRecentProjectsUI(...args);
+    const result = await recentProjectWorkflowUtilsModule.refreshRecentProjectsUI(...args);
+    recentProjectsCacheHydrated = true;
+    return result;
   }
 
   const localProjectJournalUtilsModule = window.PiXiEEDrawModules?.localProjectJournalUtils?.createLocalProjectJournalUtils?.({
@@ -17549,13 +18204,21 @@
     }
     const projectState = buildAutosaveSchemaV2ExperimentalProjectState(options);
     const result = await autosaveSchemaV2IndexedDbUtilsModule.writeSchemaV2Project(projectState, options);
+    const cleanupError = await retryAutosaveSchemaV2Cleanup(
+      projectState.projectId,
+      result.cleanupError || null,
+      { keepManifestRevisions: options.keepManifestRevisions },
+    );
+    const normalizedResult = cleanupError === result.cleanupError
+      ? result
+      : { ...result, cleanupError };
     console.info('[PiXiEEDraw DEV] autosave schema V2 experimental write', {
       projectId: projectState.projectId,
-      revision: result.manifest?.revision || 0,
-      projectLayout: result.manifest?.projectLayout || 'legacy-sheets',
-      cleanupError: result.cleanupError?.message || '',
+      revision: normalizedResult.manifest?.revision || 0,
+      projectLayout: normalizedResult.manifest?.projectLayout || 'legacy-sheets',
+      cleanupError: normalizedResult.cleanupError?.message || '',
     });
-    return result;
+    return normalizedResult;
   }
 
   async function readAutosaveSchemaV2Experimental(projectId, options = {}) {
@@ -18195,21 +18858,26 @@
     const normalizedProjectId = normalizeAutosaveProjectId(projectId || '');
     if (!normalizedProjectId) return false;
     autosaveV2CheckpointReadyProjectIds.delete(normalizedProjectId);
-    const [removedProject] = await Promise.all([
+    const timelapseStore = window.PiXiEEDrawModules?.timelapseOperationStore
+      ?.createTimelapseOperationStore?.();
+    const removals = [
       autosaveSchemaV2IndexedDbUtilsModule.deleteSchemaV2Project(normalizedProjectId),
-      coldHistoryStore?.removeProject?.(normalizedProjectId).catch(error => {
-        console.warn('Failed to remove file-backed history for deleted project.', error);
-        return false;
-      }),
-      window.PiXiEEDrawModules?.timelapseOperationStore?.createTimelapseOperationStore?.()
-        ?.removeProject?.(normalizedProjectId)
-        .catch(error => {
-          console.warn('Failed to remove timelapse operations for deleted project.', error);
-          return false;
-        }),
-    ]);
+      typeof coldHistoryStore?.removeProject === 'function'
+        ? coldHistoryStore.removeProject(normalizedProjectId)
+        : Promise.resolve(true),
+      typeof timelapseStore?.removeProject === 'function'
+        ? timelapseStore.removeProject(normalizedProjectId)
+        : Promise.resolve(true),
+    ];
+    try {
+      const [removedProject] = await Promise.all(removals);
+      if (removedProject !== true) return false;
+    } catch (error) {
+      console.warn('Failed to remove local autosave data for deleted project.', error);
+      throw error;
+    }
     coldHistoryStatusCache.delete(normalizedProjectId);
-    return removedProject;
+    return true;
   }
 
   function scheduleAutosaveThumbnailRefresh(projectId, { expectedUpdatedAt = '', delayMs = 1800 } = {}) {
@@ -18252,8 +18920,9 @@
         ) {
           return;
         }
-        const latestEntries = await loadRecentProjectsMetadata();
-        const latestEntry = latestEntries.find(entry => entry?.id === normalizedProjectId) || null;
+        const latestEntry = await loadRecentProjectMetadataById(normalizedProjectId, {
+          includePayload: false,
+        });
         if (!latestEntry) return;
         if (expectedUpdatedAt && latestEntry.updatedAt !== expectedUpdatedAt) {
           scheduleAutosaveThumbnailRefresh(normalizedProjectId, {
@@ -18262,15 +18931,11 @@
           });
           return;
         }
-        const nextEntries = latestEntries.map(entry => entry?.id === normalizedProjectId
-          ? {
-              ...entry,
-              thumbnail,
-              thumbnailUpdatedAt: new Date().toISOString(),
-            }
-          : entry);
-        await saveRecentProjectsList(latestEntries, nextEntries);
-        setRecentProjectsCache(nextEntries);
+        await saveRecentProjectEntryOnly(latestEntry, {
+          ...latestEntry,
+          thumbnail,
+          thumbnailUpdatedAt: new Date().toISOString(),
+        });
       } catch (error) {
         console.warn('Deferred autosave thumbnail refresh failed', error);
       } finally {
@@ -18282,6 +18947,30 @@
     };
     autosaveThumbnailRefreshTimer = window.setTimeout(run, Math.max(250, Math.round(Number(delayMs) || 1800)));
     return true;
+  }
+
+  async function retryAutosaveSchemaV2Cleanup(projectId, initialError, { keepManifestRevisions = 2 } = {}) {
+    if (!initialError || typeof autosaveSchemaV2IndexedDbUtilsModule.cleanupSchemaV2Revisions !== 'function') {
+      return initialError || null;
+    }
+    try {
+      await autosaveSchemaV2IndexedDbUtilsModule.cleanupSchemaV2Revisions(projectId, {
+        keepManifestRevisions: Math.max(1, Math.round(Number(keepManifestRevisions) || 2)),
+      });
+      console.info('[pixiedraw:v2-cleanup]', {
+        phase: 'retry-success',
+        projectId,
+      });
+      return null;
+    } catch (retryError) {
+      console.warn('[pixiedraw:v2-cleanup]', {
+        phase: 'retry-failed',
+        projectId,
+        initialError: initialError?.message || String(initialError),
+        retryError: retryError?.message || String(retryError),
+      });
+      return retryError || initialError;
+    }
   }
 
   async function writeAutosaveV2Primary({ projectId, snapshot, thumbnailIntervalMs = 0, savePlan = null } = {}) {
@@ -18298,8 +18987,9 @@
     if (normalizeAutosaveProjectId(autosaveProjectId || '') !== normalizedProjectId) {
       return createSkippedResult(null);
     }
-    const existingEntries = await loadRecentProjectsMetadata();
-    const previousEntry = existingEntries.find(entry => entry?.id === normalizedProjectId) || null;
+    const previousEntry = await loadRecentProjectMetadataById(normalizedProjectId, {
+      includePayload: false,
+    });
     if (normalizeAutosaveProjectId(autosaveProjectId || '') !== normalizedProjectId) {
       return createSkippedResult(previousEntry);
     }
@@ -18368,6 +19058,14 @@
     if (!manifest?.key) {
       throw new Error('V2 autosave manifest was not committed');
     }
+    // The manifest/checkpoint transaction is already durable when cleanup
+    // fails. Retry cleanup once without discarding the saved document; a
+    // second failure is surfaced to the autosave status instead of being
+    // silently reported as a completely healthy save.
+    const cleanupError = await retryAutosaveSchemaV2Cleanup(
+      normalizedProjectId,
+      written?.cleanupError || null,
+    );
     const metadata = {
       id: normalizedProjectId,
       accountUserId: getCurrentRecentProjectAccountUserId(),
@@ -18386,10 +19084,7 @@
       // new bindings are discovered from the real workspace file list.
       workspaceFileName: previousEntry?.workspaceFileName || '',
     };
-    const nextEntries = existingEntries.filter(entry => entry?.id !== normalizedProjectId);
-    nextEntries.unshift(metadata);
-    await saveRecentProjectsList(existingEntries, nextEntries);
-    setRecentProjectsCache(nextEntries);
+    await saveRecentProjectEntryOnly(previousEntry, metadata);
     if (!journalOnly && deferThumbnailRefresh) {
       scheduleAutosaveThumbnailRefresh(normalizedProjectId, { expectedUpdatedAt: manifest.updatedAt });
     }
@@ -18398,7 +19093,11 @@
       markActiveLocalProjectJournalCheckpointPersisted(normalizedProjectId);
       releasePersistedInactiveOpenProjectTabPayloads(normalizedProjectId);
     }
-    return metadata;
+    return {
+      ...metadata,
+      cleanupPending: Boolean(cleanupError),
+      cleanupErrorMessage: cleanupError?.message || '',
+    };
   }
 
   const preUpdateCheckpointUtilsModule = window.PiXiEEDrawModules?.preUpdateCheckpointUtils?.createPreUpdateCheckpointUtils?.({
@@ -27681,7 +28380,7 @@
       return { disposed: false, kept: false, targetProjectKey };
     }
     const targetEntry = targetProjectKey
-      ? ((await loadRecentProjectMetadataById(targetProjectKey)) || recentProjectsCache.get(targetProjectKey))
+      ? ((await loadRecentProjectMetadataById(targetProjectKey, { includePayload: false })) || recentProjectsCache.get(targetProjectKey))
       : null;
     if (window.__PIXISYNC_V1_RUNTIME__ !== runtime) {
       throw buildSupersededError();
@@ -27744,7 +28443,7 @@
     );
     if (!isTargetActive()) return buildStaleResult();
     const persistedEntry = targetProjectKey
-      ? await loadRecentProjectMetadataById(targetProjectKey)
+      ? await loadRecentProjectMetadataById(targetProjectKey, { includePayload: false })
       : null;
     const entry = persistedEntry
       || suppliedEntry
@@ -27782,7 +28481,7 @@
       }
     }
     const resumed = await resumePiXiSyncProjectCard(entry);
-    const refreshedEntry = await loadRecentProjectMetadataById(targetProjectKey);
+    const refreshedEntry = await loadRecentProjectMetadataById(targetProjectKey, { includePayload: false });
     const refreshedBinding = refreshedEntry?.pixisync && typeof refreshedEntry.pixisync === 'object'
       ? refreshedEntry.pixisync
       : null;
@@ -27867,8 +28566,39 @@
       p_room_id: roomId,
     });
     if (error) throw error;
-    const result = Array.isArray(data) ? data[0] : data;
-    if (!['owner_localized', 'participant_left', 'already_detached'].includes(String(result?.action || ''))) {
+    const result = Array.isArray(data)
+      ? data.length === 1 ? data[0] : null
+      : data;
+    const resultRecord = result && typeof result === 'object' && !Array.isArray(result)
+      ? result
+      : null;
+    const resultKeys = resultRecord ? Object.keys(resultRecord).sort() : [];
+    const expectedResultKeys = ['action', 'room_id', 'room_status', 'session_generation'];
+    const exactResultShape = resultKeys.length === expectedResultKeys.length
+      && expectedResultKeys.every((key, index) => resultKeys[index] === key);
+    const resultRoomId = String(resultRecord?.room_id || '').trim().toLowerCase();
+    const resultAction = String(resultRecord?.action || '');
+    const resultStatus = String(resultRecord?.room_status || '').trim().toLowerCase();
+    const rawGeneration = resultRecord?.session_generation;
+    const resultGeneration = typeof rawGeneration === 'number'
+      ? rawGeneration
+      : typeof rawGeneration === 'string' && rawGeneration.trim().length > 0
+        ? Number(rawGeneration)
+        : NaN;
+    const validActionStatus = (
+      resultAction === 'already_detached' && resultStatus === 'missing'
+    ) || (
+      resultAction === 'owner_localized' && resultStatus === 'archived'
+    ) || (
+      resultAction === 'participant_left' && resultStatus !== 'missing'
+    );
+    if (!exactResultShape
+      || resultRoomId !== roomId
+      || !['owner_localized', 'participant_left', 'already_detached'].includes(resultAction)
+      || !['initializing', 'active', 'archived', 'missing'].includes(resultStatus)
+      || !validActionStatus
+      || !Number.isSafeInteger(resultGeneration)
+      || resultGeneration < 0) {
       throw new Error('PiXiSYNC project deletion: remote-detach-unconfirmed');
     }
     return true;
@@ -27939,7 +28669,7 @@
         return {
           id,
           name: state.documentName || DEFAULT_DOCUMENT_NAME,
-          entry: id ? await loadRecentProjectMetadataById(id) : null,
+          entry: id ? await loadRecentProjectMetadataById(id, { includePayload: false }) : null,
         };
       },
       disconnectCurrentRuntime: async () => {
@@ -27957,7 +28687,7 @@
       createSharedWorkingProject: async () => {
         const currentProjectId = normalizeAutosaveProjectId(autosaveProjectId || '');
         const currentEntry = currentProjectId
-          ? await loadRecentProjectMetadataById(currentProjectId)
+          ? await loadRecentProjectMetadataById(currentProjectId, { includePayload: false })
           : null;
         if (
           currentProjectId === pendingProjectId

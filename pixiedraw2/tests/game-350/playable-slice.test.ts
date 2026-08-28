@@ -4,7 +4,10 @@ import {
   createGame351PlayableState,
   createGame351RpgTemplate,
   createGame351RpgTemplateFromProject,
+  createGame351Physics2DScene,
+  createGame351Physics2DWorld,
   GAME351_INPUT_ACTIONS,
+  stepGame351Physics2D,
   GAME351_INTERACT_ACTION,
   playGame351,
   redoGame351Authoring,
@@ -14,12 +17,29 @@ import {
   triggerGame351Action,
   undoGame351Authoring,
 } from "../../src/game/game-350/playable-slice.ts";
-import { asBehaviorId } from "../../src/game/game-300/core.ts";
+import { asBehaviorId, createGameProject } from "../../src/game/game-300/core.ts";
 import { GameEditorCanonicalStore } from "../../src/pixync/game-editor-canonical-store.ts";
 import { createGameEditorPersistenceRecord } from "../../src/workspace/game-persistence.ts";
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
+}
+
+async function rebuildTemplateProject(
+  template: Awaited<ReturnType<typeof createGame351RpgTemplate>>,
+  update: (entity: Awaited<ReturnType<typeof createGame351RpgTemplate>>["project"]["scenes"][number]["entities"][number]) => Awaited<ReturnType<typeof createGame351RpgTemplate>>["project"]["scenes"][number]["entities"][number],
+) {
+  const project = await createGameProject(
+    {
+      ...template.project,
+      scenes: template.project.scenes.map((scene) => ({
+        ...scene,
+        entities: scene.entities.map(update),
+      })),
+    },
+    template.caller,
+  );
+  return { ...template, project };
 }
 
 Deno.test("GAME351-TEMPLATE-001 creates a canonical RPG Project and explicit immutable playable snapshot", async () => {
@@ -287,5 +307,135 @@ Deno.test("GAME351-NONINTRUSION-001 keeps the slice host-neutral and source/proj
   assert(
     next.snapshot === state.snapshot && next.journal === state.journal,
     "runtime state must retain immutable snapshot and canonical Journal references",
+  );
+});
+
+Deno.test("GAME351-PHYSICS2D-001 projects canonical entities, solid cells, and stable map boundaries", async () => {
+  const template = await createGame351RpgTemplate();
+  const scene = createGame351Physics2DScene(template);
+  const generated = scene.entities.filter((entity) =>
+    String(entity.entityId).startsWith("physics2d:")
+  );
+  assert(
+    generated.length === template.map.solidCells.length + 4,
+    "Physics2D scene must add one body per solid cell and four map boundaries",
+  );
+  assert(
+    scene.entities.some((entity) => entity.entityId === template.playerEntityId &&
+      entity.components.some((component) =>
+        component.type === "COLLIDER" &&
+        component.componentId === "game351-rpg-player-collider"
+      )),
+    "canonical Player Collider must be projected without replacement",
+  );
+  assert(
+    generated.every((entity) =>
+      entity.components.some((component) =>
+        component.type === "RIGIDBODY" && component.bodyType === "STATIC"
+      )
+    ),
+    "generated map bodies must be static",
+  );
+  const first = createGame351Physics2DWorld(template);
+  const second = createGame351Physics2DWorld(await createGame351RpgTemplate());
+  assert(
+    JSON.stringify(first) === JSON.stringify(second),
+    "the canonical Physics2D World must be deterministic",
+  );
+  assert(
+    Object.isFrozen(first) && Object.isFrozen(first.bodies),
+    "Physics2D World must be immutable",
+  );
+});
+
+Deno.test("GAME351-PHYSICS2D-002 applies directional speed and gravity while blocking solid cells", async () => {
+  const template = await createGame351RpgTemplate();
+  let world = createGame351Physics2DWorld(template, {
+    settings: { gravity: { x: 0, y: 0 } },
+  });
+  let collisionSeen = false;
+  for (let index = 0; index < 15; index += 1) {
+    const stepped = stepGame351Physics2D(world, {
+      action: GAME351_INPUT_ACTIONS.MOVE_DOWN,
+    });
+    world = stepped.world;
+  }
+  for (let index = 0; index < 40; index += 1) {
+    const stepped = stepGame351Physics2D(world, {
+      action: GAME351_INPUT_ACTIONS.MOVE_RIGHT,
+    });
+    collisionSeen ||= stepped.events.some((event) => event.kind === "COLLISION");
+    world = stepped.world;
+  }
+  const player = world.bodies.find((body) =>
+    body.entityId === String(template.playerEntityId)
+  )!;
+  assert(player.position.x < 3, "dynamic Player must stop before the solid cell");
+  assert(collisionSeen, "solid cell contact must produce a COLLISION event");
+  const repeated = stepGame351Physics2D(
+    createGame351Physics2DWorld(template, { settings: { gravity: { x: 0, y: 0 } } }),
+    { action: GAME351_INPUT_ACTIONS.MOVE_RIGHT },
+  );
+  const repeatedAgain = stepGame351Physics2D(
+    createGame351Physics2DWorld(await createGame351RpgTemplate(), { settings: { gravity: { x: 0, y: 0 } } }),
+    { action: GAME351_INPUT_ACTIONS.MOVE_RIGHT },
+  );
+  assert(
+    JSON.stringify(repeated) === JSON.stringify(repeatedAgain),
+    "one Physics2D input step must be deterministic and non-mutating",
+  );
+
+  const gravityTemplate = await rebuildTemplateProject(template, (entity) => ({
+    ...entity,
+    components: entity.components.map((component) =>
+      entity.entityId === template.playerEntityId && component.type === "RIGIDBODY"
+        ? { ...component, gravityScale: 1 }
+        : component
+    ),
+  }));
+  const gravityWorld = createGame351Physics2DWorld(gravityTemplate, {
+    settings: { gravity: { x: 0, y: 60 } },
+  });
+  const gravityStep = stepGame351Physics2D(gravityWorld);
+  const gravityPlayer = gravityStep.world.bodies.find((body) =>
+    body.entityId === String(gravityTemplate.playerEntityId)
+  )!;
+  assert(
+    gravityPlayer.gravityScale === 1 && gravityPlayer.position.y > 1,
+    "dynamic Player must follow canonical gravityScale and Physics2D gravity",
+  );
+});
+
+Deno.test("GAME351-PHYSICS2D-003 distinguishes canonical NPC trigger events from blocking collisions", async () => {
+  const template = await createGame351RpgTemplate();
+  const triggerTemplate = await rebuildTemplateProject(template, (entity) => ({
+    ...entity,
+    components: entity.components.map((component) =>
+      entity.entityId === template.npcEntityId && component.type === "COLLIDER"
+        ? { ...component, isTrigger: true }
+        : component
+    ),
+  }));
+  let world = createGame351Physics2DWorld(triggerTemplate, {
+    settings: { gravity: { x: 0, y: 0 } },
+  });
+  let triggerSeen = false;
+  for (let index = 0; index < 62; index += 1) {
+    const stepped = stepGame351Physics2D(world, {
+      action: GAME351_INPUT_ACTIONS.MOVE_RIGHT,
+    });
+    world = stepped.world;
+  }
+  for (let index = 0; index < 32; index += 1) {
+    const stepped = stepGame351Physics2D(world, {
+      action: GAME351_INPUT_ACTIONS.MOVE_DOWN,
+    });
+    triggerSeen ||= stepped.events.some((event) => event.kind === "TRIGGER");
+    world = stepped.world;
+  }
+  assert(triggerSeen, "canonical NPC trigger overlap must produce a TRIGGER event");
+  assert(
+    !world.activeContactIds.some((id) => id.startsWith("COLLISION|") && id.includes(String(triggerTemplate.npcEntityId))),
+    "NPC trigger must not become a blocking COLLISION contact",
   );
 });

@@ -1,7 +1,10 @@
 import { strict as assert } from "node:assert";
 import { PixyncProductionCompositionRoot } from "../../src/pixync/composition-root.ts";
 import { PixyncInMemorySnapshotPersistence } from "../../src/pixync/durability.ts";
-import type { PixyncAggregate, PixyncAggregateAdapter } from "../../src/pixync/contracts.ts";
+import type {
+  PixyncAggregate,
+  PixyncAggregateAdapter,
+} from "../../src/pixync/contracts.ts";
 import type { PixyncSupabaseSdkClient } from "../../src/pixync/supabase-sdk-port.ts";
 
 const PROJECT = "11111111-1111-4111-8111-111111111111";
@@ -16,12 +19,23 @@ Deno.test("PIXYNC-DRAW2-310 production root authenticates, binds events, and clo
   const gameHydrationLevels: string[] = [];
   let audioCommits = 0;
   let bindingDetail: unknown;
+  let realtimeAuthCalls = 0;
+  let authPrepared = false;
+  let subscribeSawAuth = false;
+  const statuses: string[] = [];
+  let channelStatus: ((status: string, error?: unknown) => void) | undefined;
   target.addEventListener("draw2:pixync-binding", (event) => {
     bindingDetail = (event as CustomEvent).detail;
   });
   const sdk = {
     auth: {
       getUser: async () => ({ data: { user: { id: USER } }, error: null }),
+    },
+    realtime: {
+      setAuth: () => {
+        realtimeAuthCalls += 1;
+        authPrepared = true;
+      },
     },
     rpc: async (name: string) => {
       if (name === "pixync_draw2_open_session_v1") {
@@ -49,7 +63,11 @@ Deno.test("PIXYNC-DRAW2-310 production root authenticates, binds events, and clo
       privateChannel = options.config.private;
       const channel = {
         on: () => channel,
-        subscribe: (callback: (status: string) => void) => callback("SUBSCRIBED"),
+        subscribe: (callback: (status: string, error?: unknown) => void) => {
+          subscribeSawAuth = authPrepared;
+          channelStatus = callback;
+          callback("SUBSCRIBED");
+        },
         unsubscribe: () => {
           unsubscribed = true;
         },
@@ -94,9 +112,12 @@ Deno.test("PIXYNC-DRAW2-310 production root authenticates, binds events, and clo
         audioCommits += 1;
       },
     }),
+    onStatus: (status) => statuses.push(status),
   });
   await root.connect();
   assert.equal(privateChannel, true);
+  assert.equal(realtimeAuthCalls, 1);
+  assert.equal(subscribeSawAuth, true);
   assert.deepEqual(bindingDetail, {
     projectId: PROJECT,
     actorId: USER,
@@ -104,23 +125,104 @@ Deno.test("PIXYNC-DRAW2-310 production root authenticates, binds events, and clo
     role: "editor",
   });
   target.dispatchEvent(new Event("draw2:audio-catalog-request"));
-  target.dispatchEvent(new CustomEvent("draw2:audio-journal-committed", {
-    detail: { entry: {} },
-  }));
+  target.dispatchEvent(
+    new CustomEvent("draw2:audio-journal-committed", {
+      detail: { entry: {} },
+    }),
+  );
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.equal(audioHydrations, 1);
   assert.equal(audioCommits, 1);
   target.dispatchEvent(new Event("draw2:game-catalog-request"));
   await new Promise((resolve) => setTimeout(resolve, 0));
-  target.dispatchEvent(new CustomEvent("draw2:game-editor-demand", {
-    detail: { active: true },
-  }));
+  target.dispatchEvent(
+    new CustomEvent("draw2:game-editor-demand", {
+      detail: { active: true },
+    }),
+  );
   await new Promise((resolve) => setTimeout(resolve, 0));
-  target.dispatchEvent(new CustomEvent("draw2:game-build-demand", {
-    detail: { active: true },
-  }));
+  target.dispatchEvent(
+    new CustomEvent("draw2:game-build-demand", {
+      detail: { active: true },
+    }),
+  );
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.deepEqual(gameHydrationLevels, ["CATALOG", "EDITOR", "BUILD"]);
+  channelStatus?.("CHANNEL_ERROR", new Error("temporary realtime error"));
+  channelStatus?.("SUBSCRIBED");
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(statuses.includes("RECONNECTING"), true);
+  assert.equal(statuses.at(-1), "SUBSCRIBED");
   await root.close();
+  assert.equal(unsubscribed, true);
+});
+
+Deno.test("PIXYNC-DRAW2-310 failed production bootstrap closes an opened Realtime channel", async () => {
+  let unsubscribed = false;
+  const sdk = {
+    auth: {
+      getUser: async () => ({ data: { user: { id: USER } }, error: null }),
+    },
+    rpc: async (name: string) => {
+      if (name === "pixync_draw2_open_session_v1") {
+        return {
+          data: {
+            principal_id: USER,
+            project_id: PROJECT,
+            room_id: PROJECT,
+            actor_id: USER,
+            membership_id: "33333333-3333-4333-8333-333333333333",
+            membership_revision: "membership-1",
+            client_id: CLIENT,
+            session_generation: 2,
+            role: "editor",
+          },
+          error: null,
+        };
+      }
+      if (name === "pixync_draw2_get_operations_since_v1") {
+        return { data: null, error: new Error("catch-up unavailable") };
+      }
+      throw new Error(`unexpected RPC ${name}`);
+    },
+    channel: () => {
+      const channel = {
+        on: () => channel,
+        subscribe: (callback: (status: string, error?: unknown) => void) =>
+          callback("SUBSCRIBED"),
+        unsubscribe: () => {
+          unsubscribed = true;
+        },
+      };
+      return channel;
+    },
+  } satisfies PixyncSupabaseSdkClient;
+  const adapters = ("draw|audio|game".split("|") as PixyncAggregate[]).map(
+    (aggregate): PixyncAggregateAdapter => ({ aggregate, apply: () => {} }),
+  );
+  const root = await PixyncProductionCompositionRoot.create({
+    projectId: PROJECT,
+    clientId: CLIENT,
+    sessionGeneration: 2,
+    workerId: "worker-310-failed",
+    supabase: sdk,
+    persistence: new PixyncInMemorySnapshotPersistence(),
+    audioHydration: {
+      hydrateAudio: async (request) => ({
+        projectId: PROJECT,
+        audioRevision: request.minimumAudioRevision,
+        level: request.level,
+      }),
+    },
+    gameHydration: {
+      hydrateGame: async (request) => ({
+        projectId: PROJECT,
+        gameRevision: request.minimumGameRevision,
+        level: request.level,
+      }),
+    },
+    createProducts: () => ({ adapters }),
+  });
+  await assert.rejects(() => root.connect(), /catch-up unavailable/u);
   assert.equal(unsubscribed, true);
 });

@@ -205,6 +205,8 @@ class FakeBuffer {
 }
 
 class FakeSource extends FakeNode {
+  /** Mirrors the mandatory Web Audio API AudioBufferSourceNode property. */
+  readonly playbackRate = new FakeParam();
   private ended: (() => void) | undefined;
   addEventListener(
     type: string,

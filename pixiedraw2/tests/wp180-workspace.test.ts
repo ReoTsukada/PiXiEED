@@ -16,10 +16,60 @@ import {
   resolvePresentationProfile,
   resolveShortcut,
   resolveTabletDeckSurface,
+  resolveWorkspaceDetailMode,
   TABLET_PORTRAIT_DECK_CONTROLS,
   TABLET_SQUARE_CONTROL_SIZE,
   transitionPanelMount,
 } from "../src/wp180-workspace-contracts.ts";
+
+Deno.test("WP-180 guided and detailed workspace density is explicit", async () => {
+  if (
+    resolveWorkspaceDetailMode("guided") !== "guided" ||
+    resolveWorkspaceDetailMode("detailed") !== "detailed" ||
+    resolveWorkspaceDetailMode("tampered") !== "guided"
+  ) {
+    throw new Error("Workspace detail mode must fail closed to guided");
+  }
+  const html = await Deno.readTextFile(
+    new URL("../index.html", import.meta.url),
+  );
+  const source = await Deno.readTextFile(
+    new URL("../src/wp180-workspace-ui.ts", import.meta.url),
+  );
+  const css = await Deno.readTextFile(
+    new URL("../assets/draw2-shell.css", import.meta.url),
+  );
+  for (const required of [
+    'id="draw2WorkspaceDetailToggle"',
+    'data-workspace-command="toggle-detail-mode"',
+    "data-workspace-detail-mode-label",
+    'data-detail-level="detailed"',
+  ]) {
+    if (!html.includes(required)) {
+      throw new Error(`Detail-density markup missing: ${required}`);
+    }
+  }
+  for (const required of [
+    "readWorkspaceDetailMode",
+    "writeWorkspaceDetailMode",
+    "renderDetailMode",
+    'case \"toggle-detail-mode\"',
+    "draw2:detail-mode",
+  ]) {
+    if (!source.includes(required)) {
+      throw new Error(`Detail-density behavior missing: ${required}`);
+    }
+  }
+  for (const required of [
+    'data-detail-mode="guided"',
+    '[data-detail-level="detailed"]',
+    ".draw2-workspace-detail-toggle",
+  ]) {
+    if (!css.includes(required)) {
+      throw new Error(`Detail-density styling missing: ${required}`);
+    }
+  }
+});
 
 Deno.test("WP-180 capability profiles use Canvas-first mobile and adaptive tablet", () => {
   const mobile = resolvePresentationProfile({
@@ -411,5 +461,154 @@ Deno.test("PC Timeline entry controls the visible Timeline surface", async () =>
     if (!source.includes(required)) {
       throw new Error(`PC Timeline control contract missing: ${required}`);
     }
+  }
+});
+
+Deno.test("Asset dock reactivates visible tabs and panel content", async () => {
+  const html = await Deno.readTextFile(
+    new URL("../index.html", import.meta.url),
+  );
+  const source = await Deno.readTextFile(
+    new URL("../src/wp180-workspace-ui.ts", import.meta.url),
+  );
+  if (
+    !html.includes('id="draw2WorkspaceTabAssets"') ||
+    !html.includes('id="draw2WorkspacePanelAssets"') ||
+    !html.includes('id="draw2CreatorAssetSurface"')
+  ) {
+    throw new Error("Asset dock markup is missing");
+  }
+  for (const required of [
+    "tab.inert = !visible;",
+    'tab.setAttribute("aria-hidden", String(!visible));',
+    "content.inert = !selected;",
+    "creatorAssetSurface.inert = !assetSurfaceActive;",
+  ]) {
+    if (!source.includes(required)) {
+      throw new Error(`Asset dock accessibility contract missing: ${required}`);
+    }
+  }
+});
+
+Deno.test("iGAME hierarchy and physics Inspector stay in the Game-only boundary", async () => {
+  const html = await Deno.readTextFile(
+    new URL("../index.html", import.meta.url),
+  );
+  const source = await Deno.readTextFile(
+    new URL("../src/wp180-workspace-ui.ts", import.meta.url),
+  );
+  const css = await Deno.readTextFile(
+    new URL("../assets/draw2-shell.css", import.meta.url),
+  );
+  for (const required of [
+    "draw2GameInspectorActive",
+    "draw2GameInspectorParent",
+    "draw2GamePhysicsGravityX",
+    "draw2GamePhysicsFixedDeltaTime",
+    "draw2GamePhysicsMaxSubSteps",
+    "draw2GamePhysicsFriction",
+    "draw2GamePhysicsBounciness",
+    "parentTrackId",
+    "gameHierarchyCollapsed",
+    "normalizePhysics2DSettings",
+    "queueGameEditorPersistenceSave(\"physics-edit\")",
+    "draw2-game-hierarchy-children",
+    "draw2GameSceneViewport",
+    "draw2GameSceneSvg",
+    "renderGameSceneViewport",
+    "draw2-game-scene-tilemap-hit",
+    "createDefaultRpgTilemapDocument",
+    "paintGameTilemapCell",
+    "draw2-game-scene-map-cell",
+    "gameTilemapPaintMode",
+    'className === "draw2-game-scene-entry"',
+    'className === "draw2-game-hierarchy-entry"',
+    "documentRef.addEventListener(\"pointermove\"",
+    "ドラッグ配置",
+  ]) {
+    if (!html.includes(required) && !source.includes(required) && !css.includes(required)) {
+      throw new Error(`iGAME UI contract missing: ${required}`);
+    }
+  }
+  if (html.includes("sourceBytes")) {
+    throw new Error("iGAME Inspector must not expose source bytes");
+  }
+  if (
+    !source.includes("isGameTrackUnder(requestedParent, selected.id)") ||
+    !source.includes("自分自身・子孫・存在しない対象は選べません")
+  ) {
+    throw new Error("iGAME parent selection must reject unsafe targets");
+  }
+});
+
+Deno.test("iGAME startup route refresh is idempotent across async initialization", async () => {
+  const source = await Deno.readTextFile(
+    new URL("../src/wp180-workspace-ui.ts", import.meta.url),
+  );
+  for (const required of [
+    "let site400RouteRefreshQueue: Promise<void> = Promise.resolve();",
+    "const currentRouteProject = site400IGameRoute.currentProject();",
+    "const effectiveOperation = operation === \"create\"",
+    "site400RouteRefreshQueue.then(run, run)",
+  ]) {
+    if (!source.includes(required)) {
+      throw new Error(`iGAME startup route race guard missing: ${required}`);
+    }
+  }
+});
+
+Deno.test("iGAME new-project choice stays reachable in a compact desktop dock", async () => {
+  const css = await Deno.readTextFile(
+    new URL("../assets/draw2-shell.css", import.meta.url),
+  );
+  for (const required of [
+    '[data-workspace-profile="desktop"][data-creator-mode="GAME"]',
+    "#draw2WorkspacePanelGameScene",
+    "#draw2GameCreationMode:not([hidden])",
+    "scroll-padding-block-start: 8px",
+    "order: -1",
+  ]) {
+    if (!css.includes(required)) {
+      throw new Error(`iGAME creation choice reachability guard missing: ${required}`);
+    }
+  }
+});
+
+Deno.test("Studio Game Build exposes a safe Release Candidate boundary", async () => {
+  const html = await Deno.readTextFile(
+    new URL("../index.html", import.meta.url),
+  );
+  const source = await Deno.readTextFile(
+    new URL("../src/wp180-workspace-ui.ts", import.meta.url),
+  );
+  for (
+    const required of [
+      'id="draw2GameStudioReleaseCandidate"',
+      'id="draw2GameStudioReleaseManifest"',
+      'id="draw2GameStudioPublishIntent"',
+      'id="draw2GameStudioReleaseArtifact"',
+      'id="draw2GameStudioReleaseArtifactDownload"',
+      'id="draw2GameStudioReleaseManifestPreview"',
+      'id="draw2GameStudioReleaseStatus"',
+      "createStudioReleaseCandidate",
+      "createStudioPublishIntent",
+      "materializeStudioReleaseArtifact",
+      "exportProjectPxdArtifact",
+      "sourceStateHash",
+      "外部アップロード・公開は行いません",
+    ]
+  ) {
+    if (!html.includes(required) && !source.includes(required)) {
+      throw new Error(
+        `Studio Release Candidate UI contract missing: ${required}`,
+      );
+    }
+  }
+  if (
+    !source.includes(
+      "current.value.manifest.packageHash !== candidate.manifest.packageHash",
+    )
+  ) {
+    throw new Error("Publish Intent must reject stale Draw/Audio references.");
   }
 });

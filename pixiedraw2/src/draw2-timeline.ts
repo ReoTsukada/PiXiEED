@@ -294,6 +294,7 @@ async function resultFor(
   const metricScope: Draw2MetricScope = "COMMAND_TO_DIRTY";
   return {
     operation,
+    noOp: false,
     metricScope,
     structuralDirtyDomains: domains,
     dirtyTiles: [] as readonly DirtyTile[],

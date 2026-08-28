@@ -49,7 +49,11 @@ Deno.test("PIXYNC-DRAW2-160 uses the common workspace event and canonical startu
 Deno.test("PIXYNC-DRAW2-160 creates project-bound IndexedDB persistence and opens the durable journal", () => {
   assert.match(
     lifecycleWiring,
-    /createPersistence:\s*\(projectId\)\s*=>\s*\n?\s*createPixyncIndexedDbPersistence\(projectId\)/u,
+    /createPersistence:\s*\(projectId\)\s*=>\s*\n?\s*pixyncPersistenceFor\(projectId\)/u,
+  );
+  assert.match(
+    entry,
+    /const inner = createPixyncIndexedDbPersistence\(projectId\)/u,
   );
   assert.match(
     lifecycleWiring,

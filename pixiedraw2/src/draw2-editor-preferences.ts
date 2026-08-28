@@ -272,3 +272,17 @@ export function withDraw2ProjectEditorPreferences(
     },
   };
 }
+
+export function withoutDraw2ProjectEditorPreferences(
+  preferences: Draw2EditorPreferences,
+  projectId: string,
+): Draw2EditorPreferences {
+  const projects = {
+    ...preferences.projects,
+  } as Record<string, Draw2ProjectEditorPreferences>;
+  delete projects[projectId];
+  return {
+    ...preferences,
+    projects,
+  };
+}

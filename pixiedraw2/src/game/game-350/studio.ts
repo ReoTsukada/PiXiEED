@@ -26,6 +26,12 @@ import {
   type RevisionId,
   type Sha256,
 } from "../game-300/core.ts";
+import {
+  compileBoundedGameScript,
+  compileVisualGameLogicGraph,
+  type BoundedGameScriptSource,
+  type VisualGameLogicSource,
+} from "./visual-logic.ts";
 
 export const GAME_STUDIO_SCHEMA_VERSION = 1 as const;
 
@@ -85,7 +91,7 @@ export interface BehaviorEditIntent {
   readonly sourceHash: Sha256;
 }
 
-export type BehaviorSource = NoCodeBehaviorSource | GraphBehaviorSource | ScriptBehaviorSource;
+export type BehaviorSource = NoCodeBehaviorSource | GraphBehaviorSource | ScriptBehaviorSource | VisualGameLogicSource | BoundedGameScriptSource;
 
 function success<T>(value: T): StudioResult<T> {
   return { ok: true, value, diagnostics: [] };
@@ -200,6 +206,8 @@ export function creationGuide(): readonly CreationGuideStep[] {
 
 function compileSource(source: BehaviorSource): StudioResult<BehaviorIR> {
   try {
+    if ("sourceKind" in source && source.sourceKind === "VISUAL_GRAPH") return success(compileVisualGameLogicGraph(source).behavior);
+    if ("sourceKind" in source && source.sourceKind === "BOUNDED_SCRIPT") return success(compileBoundedGameScript(source).behavior);
     if ("language" in source) return success(compileScriptBehavior(source));
     if ("nodes" in source) return success(compileGraphBehavior(source));
     return success(compileNoCodeBehavior(source));
@@ -218,6 +226,14 @@ export async function createBehaviorEditIntent(
   const compiled = compileSource(source);
   if (!compiled.ok || compiled.value === undefined) return failure(...compiled.diagnostics);
   const sourceHash = await sha256({ commandId, projectId: state.projectId, baseRevisionId: state.revisionId, source: JSON.parse(canonicalJson(source)) });
-  const sourceMode: StudioMode = "language" in source ? "CODE" : "nodes" in source ? "DETAIL" : "SIMPLE";
+  const sourceMode: StudioMode = "sourceKind" in source && source.sourceKind === "BOUNDED_SCRIPT"
+    ? "CODE"
+    : "sourceKind" in source && source.sourceKind === "VISUAL_GRAPH"
+    ? "DETAIL"
+    : "language" in source
+    ? "CODE"
+    : "nodes" in source
+    ? "DETAIL"
+    : "SIMPLE";
   return success({ schemaVersion: GAME_STUDIO_SCHEMA_VERSION, commandId, projectId: state.projectId, baseRevisionId: state.revisionId, behaviorId: compiled.value.behaviorId, sourceMode, behavior: compiled.value, sourceHash });
 }

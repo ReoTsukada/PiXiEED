@@ -9,19 +9,55 @@ var IndexedTileRaster = class _IndexedTileRaster {
   height;
   tileSize;
   #tiles;
+  #nonTransparentPixelCount;
   #cowSplitCount = 0;
   #copiedBytes = 0;
-  constructor(width, height, tileSize, tiles) {
+  constructor(width, height, tileSize, tiles, nonTransparentPixelCount = 0) {
     this.width = width;
     this.height = height;
     this.tileSize = tileSize;
     this.#tiles = tiles;
+    this.#nonTransparentPixelCount = nonTransparentPixelCount;
   }
   static empty(width, height, tileSize) {
     if (!Number.isSafeInteger(width) || width < 1 || !Number.isSafeInteger(height) || height < 1) {
       throw new Error("Raster dimensions must be positive safe integers.");
     }
     return new _IndexedTileRaster(width, height, tileSize, /* @__PURE__ */ new Map());
+  }
+  /** Rehydrates a sparse raster from its canonical tile snapshots. */
+  static fromTileSnapshots(width, height, tileSize, snapshots) {
+    const raster = _IndexedTileRaster.empty(width, height, tileSize);
+    const tiles = /* @__PURE__ */ new Map();
+    const expectedByteLength = tileSize * tileSize;
+    const tileColumns = Math.ceil(width / tileSize);
+    const tileRows = Math.ceil(height / tileSize);
+    let nonTransparentPixelCount = 0;
+    for (const snapshot of snapshots) {
+      if (!/^\d+:\d+$/.test(snapshot.tileKey)) {
+        throw new Error("Raster tile key is invalid.");
+      }
+      const [tileXText, tileYText] = snapshot.tileKey.split(":");
+      const tileX = Number(tileXText);
+      const tileY = Number(tileYText);
+      if (!Number.isSafeInteger(tileX) || !Number.isSafeInteger(tileY) || tileX < 0 || tileY < 0 || tileX >= tileColumns || tileY >= tileRows) {
+        throw new Error("Raster tile key is outside the raster.");
+      }
+      if (!(snapshot.bytes instanceof Uint8Array) || snapshot.bytes.byteLength !== expectedByteLength) {
+        throw new Error("Raster tile byte length is invalid.");
+      }
+      for (const value of snapshot.bytes) {
+        if (value !== 0) nonTransparentPixelCount += 1;
+      }
+      if (tiles.has(snapshot.tileKey)) {
+        throw new Error("Raster tile key is duplicated.");
+      }
+      tiles.set(snapshot.tileKey, {
+        bytes: new Uint8Array(snapshot.bytes),
+        references: 1
+      });
+    }
+    return new _IndexedTileRaster(raster.width, raster.height, raster.tileSize, tiles, nonTransparentPixelCount);
   }
   /** Shares immutable Tile buffers; the next mutation splits only its affected Tile. */
   sharedClone() {
@@ -30,7 +66,7 @@ var IndexedTileRaster = class _IndexedTileRaster {
       cell.references += 1;
       tiles.set(key, cell);
     }
-    return new _IndexedTileRaster(this.width, this.height, this.tileSize, tiles);
+    return new _IndexedTileRaster(this.width, this.height, this.tileSize, tiles, this.#nonTransparentPixelCount);
   }
   #tileCoordinates(x, y) {
     const tileX = Math.floor(x / this.tileSize);
@@ -51,6 +87,10 @@ var IndexedTileRaster = class _IndexedTileRaster {
     const coordinates = this.#tileCoordinates(x, y);
     return this.#tiles.get(coordinates.tileKey)?.bytes[coordinates.localIndex] ?? 0;
   }
+  /** Returns whether the raster contains any non-transparent indexed pixel. */
+  hasNonTransparentPixel() {
+    return this.#nonTransparentPixelCount > 0;
+  }
   setPixel(assetId, x, y, colorIndex) {
     if (!Number.isInteger(colorIndex) || colorIndex < 0 || colorIndex > 255) {
       throw new Error("Canonical palette index must be an integer from 0 through 255.");
@@ -67,12 +107,14 @@ var IndexedTileRaster = class _IndexedTileRaster {
       tileY: coordinates.tileY,
       tileKey: coordinates.tileKey
     };
-    if (previous === colorIndex) return {
-      changed: false,
-      tile,
-      copiedBytes: 0,
-      cowSplit: false
-    };
+    if (previous === colorIndex) {
+      return {
+        changed: false,
+        tile,
+        copiedBytes: 0,
+        cowSplit: false
+      };
+    }
     let copiedBytes = 0;
     let cowSplit = false;
     if (cell === void 0) {
@@ -94,6 +136,11 @@ var IndexedTileRaster = class _IndexedTileRaster {
       this.#copiedBytes += copiedBytes;
     }
     cell.bytes[coordinates.localIndex] = colorIndex;
+    if (previous === 0 && colorIndex !== 0) {
+      this.#nonTransparentPixelCount += 1;
+    } else if (previous !== 0 && colorIndex === 0) {
+      this.#nonTransparentPixelCount -= 1;
+    }
     return {
       changed: true,
       tile,
@@ -111,7 +158,9 @@ var IndexedTileRaster = class _IndexedTileRaster {
   toUint8Array() {
     const pixels = new Uint8Array(this.width * this.height);
     for (let y = 0; y < this.height; y += 1) {
-      for (let x = 0; x < this.width; x += 1) pixels[y * this.width + x] = this.getPixel(x, y);
+      for (let x = 0; x < this.width; x += 1) {
+        pixels[y * this.width + x] = this.getPixel(x, y);
+      }
     }
     return pixels;
   }
@@ -143,7 +192,9 @@ var IndexedTileRaster = class _IndexedTileRaster {
   }
   memoryMetrics() {
     let sharedTileBytes = 0;
-    for (const cell of this.#tiles.values()) if (cell.references > 1) sharedTileBytes += cell.bytes.byteLength;
+    for (const cell of this.#tiles.values()) {
+      if (cell.references > 1) sharedTileBytes += cell.bytes.byteLength;
+    }
     const tileColumns = Math.ceil(this.width / this.tileSize);
     const tileRows = Math.ceil(this.height / this.tileSize);
     return {
@@ -158,9 +209,15 @@ var IndexedTileRaster = class _IndexedTileRaster {
   }
 };
 function validatePalette(palette) {
-  if (palette.length < 1 || palette.length > 256) throw new Error("Palette must contain 1 through 256 entries.");
+  if (palette.length < 1 || palette.length > 256) {
+    throw new Error("Palette must contain 1 through 256 entries.");
+  }
   if (palette[0] !== 0) throw new Error("Palette index 0 must be transparent.");
-  for (const color of palette) if (!Number.isSafeInteger(color) || color < 0 || color > 4294967295) throw new Error("Palette colors must be uint32 values.");
+  for (const color of palette) {
+    if (!Number.isSafeInteger(color) || color < 0 || color > 4294967295) {
+      throw new Error("Palette colors must be uint32 values.");
+    }
+  }
   return [
     ...palette
   ];
@@ -204,7 +261,8 @@ function createProject(options) {
         opacity: 1,
         blendMode: "NORMAL",
         locked: false,
-        lifecycle: "ACTIVE"
+        lifecycle: "ACTIVE",
+        kind: "RASTER"
       }
     ],
     frames: [
@@ -248,6 +306,7 @@ function createProject(options) {
     assets: {
       [assetId]: asset
     },
+    tilemaps: {},
     appliedCommandIds: [],
     lastClientSequenceByClient: {}
   };
@@ -717,8 +776,10 @@ async function parseLegacyBytes(bytes) {
   const sourceHash = await sha256BytesHex(sourceBytes);
   const baseSource = sourceIdentity("UNKNOWN", sourceBytes, sourceHash);
   if (hasBytes(sourceBytes, DRAW2_PXD_V1_MAGIC)) {
+    const identity = sourceBytes[4] === 2 ? "NEW_DRAW2_PXD_V2" : "NEW_DRAW2_PXD_V1";
+    const version = identity === "NEW_DRAW2_PXD_V2" ? "v2" : "v1";
     const inspection2 = {
-      source: sourceIdentity("NEW_DRAW2_PXD_V1", sourceBytes, sourceHash),
+      source: sourceIdentity(identity, sourceBytes, sourceHash),
       status: "UNSUPPORTED",
       unknownFieldPaths: [],
       unknownEntryPaths: [],
@@ -726,7 +787,7 @@ async function parseLegacyBytes(bytes) {
         {
           code: "NEW_PXD_NOT_LEGACY",
           severity: "error",
-          message: "Draw2 PXD v1 must be handled by the new PXD importer, never by the legacy adapter.",
+          message: `Draw2 PXD ${version} must be handled by the new PXD importer, never by the legacy adapter.`,
           disposition: "UNSUPPORTED"
         }
       ]
@@ -874,7 +935,7 @@ async function inspectPxd(bytes) {
     const sourceBytes = bytes instanceof Uint8Array ? bytes.slice() : new Uint8Array();
     const sourceHash = sourceBytes.byteLength === 0 ? "" : await sha256BytesHex(sourceBytes);
     const error = cause instanceof LegacyPxdCompatibilityError ? cause : new LegacyPxdCompatibilityError("LEGACY_INSPECTION_FAILED", String(cause));
-    const identity = hasBytes(sourceBytes, DRAW2_PXD_V1_MAGIC) ? "NEW_DRAW2_PXD_V1" : isZipLocalSignature(sourceBytes) ? "LEGACY_PXD_ARCHIVE_V2" : "UNKNOWN";
+    const identity = hasBytes(sourceBytes, DRAW2_PXD_V1_MAGIC) ? sourceBytes[4] === 2 ? "NEW_DRAW2_PXD_V2" : "NEW_DRAW2_PXD_V1" : isZipLocalSignature(sourceBytes) ? "LEGACY_PXD_ARCHIVE_V2" : "UNKNOWN";
     return {
       source: sourceIdentity(identity, sourceBytes, sourceHash),
       status: error.status,

@@ -119,6 +119,42 @@ Deno.test("DRAW-110 Fill is bounded and rejects invalid input without mutation",
   );
 });
 
+Deno.test("DRAW-110 serializes a burst of concurrent commits without losing raster history", async () => {
+  const target = await editor();
+  const results = await Promise.all(
+    Array.from({ length: 16 }, (_, x) =>
+      target.commitPencil([{ x, y: 0 }], x % 2 === 0 ? 1 : 2)
+    ),
+  );
+  assert(
+    results.every((result) => "result" in result),
+    "every queued burst command must commit",
+  );
+  const sequences = results.map((result) =>
+    "result" in result ? result.result.operation.clientSequence : -1
+  );
+  assert(
+    sequences.join(",") === "1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16",
+    "concurrent commits must receive contiguous client sequences",
+  );
+  for (let x = 0; x < 16; x += 1) {
+    assert(
+      target.state.assets[target.state.activeAssetId]?.raster.getPixel(x, 0) ===
+        (x % 2 === 0 ? 1 : 2),
+      `burst pixel was lost at ${x}`,
+    );
+  }
+  assert(target.undoDepth === 16, "each committed stroke must remain undoable");
+  target.undo();
+  assert(
+    target.state.assets[target.state.activeAssetId]?.raster.getPixel(15, 0) ===
+      0 &&
+      target.state.assets[target.state.activeAssetId]?.raster.getPixel(14, 0) ===
+        1,
+    "undo must restore only the latest burst command",
+  );
+});
+
 Deno.test("DRAW-110 temporary Eyedropper and Hand never create canonical commands", async () => {
   const target = await editor();
   await target.commitPencil([{ x: 3, y: 3 }], 2);

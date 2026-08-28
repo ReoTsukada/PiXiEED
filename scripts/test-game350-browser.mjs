@@ -12,6 +12,17 @@ async function readDownload(download) {
   return Buffer.concat(chunks);
 }
 
+async function chooseRpgStarterForNewGame(page) {
+  await page.waitForFunction(() => {
+    const prompt = document.querySelector("#draw2GameCreationMode");
+    return prompt instanceof HTMLElement && !prompt.hidden;
+  });
+  await page.locator("#draw2GameCreationModeTemplate").click();
+  await page.waitForFunction(() =>
+    document.querySelector('button[data-game-track-id="hero"]') !== null
+  );
+}
+
 function storedZipEntryNames(bytes) {
   const names = [];
   let offset = 0;
@@ -35,6 +46,15 @@ try {
       timeout: 30_000,
     });
     await page.waitForTimeout(2_600);
+    await chooseRpgStarterForNewGame(page);
+    await page.locator('[data-workspace-command="game-panel-preview"]').evaluate((element) => {
+      element.click();
+    });
+    await page.waitForFunction(() => {
+      const element = document.querySelector("#draw2GamePreviewCard");
+      const box = element?.getBoundingClientRect();
+      return box !== undefined && box.width > 0 && box.height > 0;
+    });
 
     const rails = await page.evaluate(() => {
       const rect = (selector) => {
@@ -71,10 +91,11 @@ try {
     }
 
     if (width >= 1280) {
-      await page.locator("#draw2GameHierarchyAdd").click();
-      await page.waitForFunction(() => /4 scene objects/.test(
-        document.querySelector("#draw2GameHierarchyStatus")?.textContent || "",
-      ));
+      await page.waitForFunction(() =>
+        document.querySelectorAll(
+          "#draw2GameHierarchyList .draw2-game-hierarchy-entry",
+        ).length === 4
+      );
     }
     await page.locator("#draw2GamePreviewStart").click();
     await page.waitForFunction(() => /Runtime READY/.test(
@@ -106,7 +127,7 @@ try {
     assert.equal(creationGuide.visible, true, `${width}: Game creation guide exists`);
     assert.equal(creationGuide.steps, 4, `${width}: Game creation guide has four steps`);
     assert.match(creationGuide.text, /スターター/);
-    assert.match(creationGuide.text, /素材を参照/);
+    assert.match(creationGuide.text, /素材を(?:参照|選ぶ)/);
 
     await page.locator('#draw2GameSceneList [data-game-track-id="hero"]').click();
     await page.locator('[data-workspace-command="game-panel-inspector"]').evaluate((element) => {
@@ -132,7 +153,7 @@ try {
       audioButton: document.querySelector("#draw2GameBindAudio")?.textContent || "",
       sourceEditControls: document.querySelectorAll('[data-game-source-editable="true"], [data-game-source-edit]').length,
     }));
-    assert.equal(assetBoundary.badge, "REFERENCE ONLY", `${width}: Game Assets are reference-only`);
+    assert.equal(assetBoundary.badge, "GAME OWNED", `${width}: Game Assets panel is game-owned`);
     assert.match(assetBoundary.note, /原素材の(?:編集|Edit)・削除はできません/);
     assert.match(assetBoundary.drawButton, /参照を(?:追加|Add)/);
     assert.match(assetBoundary.audioButton, /参照を(?:追加|Add)/);

@@ -102,9 +102,866 @@ function buildTilemapGridSvgPath(width, height, layoutWidth, layoutHeight, cellS
   };
 }
 
+// src/draw2-shape-geometry.ts
+var MAX_STAMPED_STROKE_PIXELS = 1048576;
+function clampPoint(point, bounds) {
+  return {
+    x: Math.max(0, Math.min(bounds.width - 1, Math.round(point.x))),
+    y: Math.max(0, Math.min(bounds.height - 1, Math.round(point.y)))
+  };
+}
+function normalizeBounds(from, to, bounds) {
+  const a = clampPoint(from, bounds);
+  const b = clampPoint(to, bounds);
+  return {
+    x: Math.min(a.x, b.x),
+    y: Math.min(a.y, b.y),
+    width: Math.max(1, Math.abs(a.x - b.x) + 1),
+    height: Math.max(1, Math.abs(a.y - b.y) + 1)
+  };
+}
+function pointKey(point) {
+  return `${point.x}:${point.y}`;
+}
+function sortedUnique(points, bounds) {
+  const unique = /* @__PURE__ */ new Map();
+  for (const point of points) {
+    const clamped = clampPoint(point, bounds);
+    unique.set(pointKey(clamped), clamped);
+  }
+  return [
+    ...unique.values()
+  ].sort((left, right) => left.y - right.y || left.x - right.x);
+}
+function patternVisible(x, y, pattern) {
+  if (pattern === "checker") return (x + y) % 2 === 0;
+  if (pattern === "dots") return x % 2 === 0 && y % 2 === 0;
+  if (pattern === "bayer-2x2") return (x & 1) + (y & 1) * 2 !== 3;
+  return true;
+}
+function interpolatePixelLine(from, to) {
+  const points = [];
+  let x0 = Math.round(from.x);
+  let y0 = Math.round(from.y);
+  const x1 = Math.round(to.x);
+  const y1 = Math.round(to.y);
+  const dx = Math.abs(x1 - x0);
+  const sx = x0 < x1 ? 1 : -1;
+  const dy = -Math.abs(y1 - y0);
+  const sy = y0 < y1 ? 1 : -1;
+  let error2 = dx + dy;
+  while (true) {
+    points.push({
+      x: x0,
+      y: y0
+    });
+    if (x0 === x1 && y0 === y1) break;
+    const doubleError = 2 * error2;
+    if (doubleError >= dy) {
+      error2 += dy;
+      x0 += sx;
+    }
+    if (doubleError <= dx) {
+      error2 += dx;
+      y0 += sy;
+    }
+  }
+  return points;
+}
+function stamp(center, options, bounds) {
+  const size = options.brushSize;
+  const start = -Math.floor(size / 2);
+  const centerOffset = (size - 1) / 2;
+  const radius = Math.max(0.5, size / 2);
+  const points = [];
+  for (let row = 0; row < size; row += 1) {
+    for (let column = 0; column < size; column += 1) {
+      const x = start + column;
+      const y = start + row;
+      if (options.brushShape === "circle" && (column - centerOffset) ** 2 + (row - centerOffset) ** 2 > radius ** 2) continue;
+      if (!patternVisible(center.x + x, center.y + y, options.pattern)) {
+        continue;
+      }
+      points.push({
+        x: center.x + x,
+        y: center.y + y
+      });
+    }
+  }
+  return points.filter((point) => point.x >= 0 && point.y >= 0 && point.x < bounds.width && point.y < bounds.height);
+}
+function stampBrush(points, options, bounds) {
+  const stamped = [];
+  for (const point of points) {
+    const next = stamp(clampPoint(point, bounds), options, bounds);
+    if (stamped.length + next.length > MAX_STAMPED_STROKE_PIXELS) {
+      throw new Error("Expanded Stroke exceeds the bounded pixel budget.");
+    }
+    stamped.push(...next);
+  }
+  return sortedUnique(stamped, bounds);
+}
+function rectanglePixels(rect, filled) {
+  const points = [];
+  for (let y = rect.y; y < rect.y + rect.height; y += 1) {
+    for (let x = rect.x; x < rect.x + rect.width; x += 1) {
+      if (filled || x === rect.x || y === rect.y || x === rect.x + rect.width - 1 || y === rect.y + rect.height - 1) points.push({
+        x,
+        y
+      });
+    }
+  }
+  return points;
+}
+function insetBounds(rect, inset) {
+  const width = rect.width - inset * 2;
+  const height = rect.height - inset * 2;
+  if (width < 1 || height < 1) return void 0;
+  return {
+    x: rect.x + inset,
+    y: rect.y + inset,
+    width,
+    height
+  };
+}
+function circleRectForBounds(rect) {
+  const side = Math.min(rect.width, rect.height);
+  return {
+    x: rect.x + Math.floor((rect.width - side) / 2),
+    y: rect.y + Math.floor((rect.height - side) / 2),
+    width: side,
+    height: side
+  };
+}
+function shapeGeometryBounds(tool, rect) {
+  return tool === "circle" || tool === "circle-fill" ? circleRectForBounds(rect) : rect;
+}
+function subtractPixels(outer, inner, bounds) {
+  const innerKeys = new Set(inner.map(pointKey));
+  return sortedUnique(outer.filter((point) => !innerKeys.has(pointKey(point))), bounds);
+}
+function ellipsePixels(rect, filled) {
+  const points = [];
+  const minX = rect.x;
+  const maxX = rect.x + rect.width - 1;
+  const minY = rect.y;
+  const maxY = rect.y + rect.height - 1;
+  if (maxX < minX || maxY < minY) return points;
+  if (minX === maxX || minY === maxY) {
+    if (filled) {
+      for (let y = minY; y <= maxY; y += 1) {
+        for (let x = minX; x <= maxX; x += 1) points.push({
+          x,
+          y
+        });
+      }
+    } else if (minX === maxX) {
+      for (let y = minY; y <= maxY; y += 1) points.push({
+        x: minX,
+        y
+      });
+    } else {
+      for (let x = minX; x <= maxX; x += 1) points.push({
+        x,
+        y: minY
+      });
+    }
+    return points;
+  }
+  const fillRanges = filled ? /* @__PURE__ */ new Map() : void 0;
+  const record2 = (x, y) => {
+    if (x < minX || x > maxX || y < minY || y > maxY) return;
+    if (fillRanges !== void 0) {
+      const existing = fillRanges.get(y);
+      if (existing === void 0) fillRanges.set(y, {
+        min: x,
+        max: x
+      });
+      else {
+        existing.min = Math.min(existing.min, x);
+        existing.max = Math.max(existing.max, x);
+      }
+      return;
+    }
+    points.push({
+      x,
+      y
+    });
+  };
+  let x0 = minX;
+  let x1 = maxX;
+  let y0 = minY;
+  let y1 = maxY;
+  let a = Math.abs(x1 - x0);
+  const b = Math.abs(y1 - y0);
+  const b1 = b & 1;
+  let dx = 4 * (1 - a) * b * b;
+  let dy = 4 * (b1 + 1) * a * a;
+  let err = dx + dy + b1 * a * a;
+  y0 += Math.floor((b + 1) / 2);
+  y1 = y0 - b1;
+  a *= 8 * a;
+  const b8 = 8 * b * b;
+  do {
+    record2(x1, y0);
+    record2(x0, y0);
+    record2(x0, y1);
+    record2(x1, y1);
+    const e2 = 2 * err;
+    if (e2 <= dy) {
+      y0 += 1;
+      y1 -= 1;
+      dy += a;
+      err += dy;
+    }
+    if (e2 >= dx || 2 * err > dy) {
+      x0 += 1;
+      x1 -= 1;
+      dx += b8;
+      err += dx;
+    }
+  } while (x0 <= x1);
+  while (y0 - y1 < b) {
+    record2(x0 - 1, y0);
+    record2(x1 + 1, y0);
+    record2(x0 - 1, y1);
+    record2(x1 + 1, y1);
+    y0 += 1;
+    y1 -= 1;
+  }
+  if (fillRanges !== void 0) {
+    for (const [y, range] of fillRanges) {
+      for (let x = range.min; x <= range.max; x += 1) points.push({
+        x,
+        y
+      });
+    }
+  }
+  return points;
+}
+function shapePixels(tool, from, to, bounds) {
+  const rect = normalizeBounds(from, to, bounds);
+  if (tool === "line") {
+    return sortedUnique(interpolatePixelLine(clampPoint(from, bounds), clampPoint(to, bounds)), bounds);
+  }
+  if (tool === "rect") {
+    return sortedUnique(rectanglePixels(rect, false), bounds);
+  }
+  if (tool === "rect-fill") {
+    return sortedUnique(rectanglePixels(rect, true), bounds);
+  }
+  if (tool === "ellipse") {
+    return sortedUnique(ellipsePixels(rect, false), bounds);
+  }
+  if (tool === "ellipse-fill") {
+    return sortedUnique(ellipsePixels(rect, true), bounds);
+  }
+  const circleRect = circleRectForBounds(rect);
+  return sortedUnique(ellipsePixels(circleRect, tool === "circle-fill"), bounds);
+}
+function shapeStrokePixels(tool, from, to, brushSize2, bounds) {
+  const dragRect = normalizeBounds(from, to, bounds);
+  const geometryRect = shapeGeometryBounds(tool, dragRect);
+  if (brushSize2 <= 1) return shapePixels(tool, from, to, bounds);
+  const outer = tool === "rect" ? rectanglePixels(geometryRect, true) : ellipsePixels(geometryRect, true);
+  const innerRect = insetBounds(geometryRect, brushSize2);
+  if (innerRect === void 0) return sortedUnique(outer, bounds);
+  const inner = tool === "rect" ? rectanglePixels(innerRect, true) : ellipsePixels(innerRect, true);
+  return subtractPixels(outer, inner, bounds);
+}
+function isFilledShape(tool) {
+  return tool === "rect-fill" || tool === "ellipse-fill" || tool === "circle-fill";
+}
+function isOutlineShape(tool) {
+  return tool === "rect" || tool === "ellipse" || tool === "circle";
+}
+function normalizeOptions(options) {
+  return {
+    brushSize: Number.isSafeInteger(options.brushSize) ? Math.max(1, Math.min(32, options.brushSize)) : 1,
+    brushShape: options.brushShape === "circle" ? "circle" : "square",
+    pattern: options.pattern === "checker" || options.pattern === "dots" || options.pattern === "bayer-2x2" ? options.pattern : "solid"
+  };
+}
+function shapePixelsInBounds(tool, from, to, bounds) {
+  return shapePixels(tool, from, to, {
+    width: Math.max(1, Math.floor(bounds.width)),
+    height: Math.max(1, Math.floor(bounds.height))
+  });
+}
+function stampShapeBrushInBounds(points, options, bounds) {
+  const safeBounds = {
+    width: Math.max(1, Math.floor(bounds.width)),
+    height: Math.max(1, Math.floor(bounds.height))
+  };
+  return stampBrush(points, normalizeOptions(options), safeBounds);
+}
+function createShapeWriteSet(tool, from, to, colorIndex, options, bounds) {
+  const safeBounds = {
+    width: Math.max(1, Math.floor(bounds.width)),
+    height: Math.max(1, Math.floor(bounds.height))
+  };
+  const safeOptions = normalizeOptions(options);
+  const rect = normalizeBounds(from, to, safeBounds);
+  let points;
+  if (tool === "line") {
+    points = stampBrush(shapePixels(tool, from, to, safeBounds), safeOptions, safeBounds);
+  } else if (rect.width === 1 && rect.height === 1) {
+    points = stampBrush([
+      clampPoint(from, safeBounds)
+    ], safeOptions, safeBounds);
+  } else if (isFilledShape(tool)) {
+    points = shapePixels(tool, from, to, safeBounds).filter((point) => patternVisible(point.x, point.y, safeOptions.pattern));
+  } else if (isOutlineShape(tool)) {
+    points = shapeStrokePixels(tool, from, to, safeOptions.brushSize, safeBounds).filter((point) => patternVisible(point.x, point.y, safeOptions.pattern));
+  } else {
+    points = [];
+  }
+  return sortedUnique(points, safeBounds).map((point) => ({
+    ...point,
+    colorIndex: Math.max(0, Math.floor(colorIndex))
+  }));
+}
+
+// src/draw2-raster-mask.ts
+var BASE64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+var MAX_UINT16 = 65535;
+function assertInteger(value, label) {
+  if (!Number.isSafeInteger(value)) {
+    throw new Error(`${label} must be a safe integer.`);
+  }
+}
+function encodeBase64(bytes) {
+  let output = "";
+  for (let index = 0; index < bytes.length; index += 3) {
+    const first = bytes[index] ?? 0;
+    const second = bytes[index + 1];
+    const third = bytes[index + 2];
+    output += BASE64_ALPHABET[first >> 2];
+    output += BASE64_ALPHABET[(first & 3) << 4 | (second ?? 0) >> 4];
+    output += second === void 0 ? "=" : BASE64_ALPHABET[(second & 15) << 2 | (third ?? 0) >> 6];
+    output += third === void 0 ? "=" : BASE64_ALPHABET[third & 63];
+  }
+  return output;
+}
+function decodeBase64(value) {
+  if (value.length === 0 || value.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/u.test(value)) {
+    throw new Error("Selection mask data is not valid base64.");
+  }
+  const output = [];
+  const decode = (character) => {
+    const index = BASE64_ALPHABET.indexOf(character);
+    if (index < 0) throw new Error("Selection mask data has an invalid byte.");
+    return index;
+  };
+  for (let index = 0; index < value.length; index += 4) {
+    const first = decode(value[index] ?? "");
+    const second = decode(value[index + 1] ?? "");
+    const thirdCharacter = value[index + 2] ?? "=";
+    const fourthCharacter = value[index + 3] ?? "=";
+    const third = thirdCharacter === "=" ? 0 : decode(thirdCharacter);
+    const fourth = fourthCharacter === "=" ? 0 : decode(fourthCharacter);
+    if (thirdCharacter === "=" && (second & 15) !== 0) {
+      throw new Error("Selection mask base64 padding is not canonical.");
+    }
+    if (fourthCharacter === "=" && (third & 3) !== 0) {
+      throw new Error("Selection mask base64 padding is not canonical.");
+    }
+    output.push(first << 2 | second >> 4);
+    if (thirdCharacter !== "=") {
+      output.push((second & 15) << 4 | third >> 2);
+    }
+    if (fourthCharacter !== "=") {
+      output.push((third & 3) << 6 | fourth);
+    }
+  }
+  return Uint8Array.from(output);
+}
+function pushUint16(bytes, value) {
+  assertInteger(value, "Selection mask binary value");
+  if (value < 0 || value > MAX_UINT16) {
+    throw new Error("Selection mask binary value exceeds uint16.");
+  }
+  bytes.push(value >>> 8 & 255, value & 255);
+}
+function readUint16(bytes, offset) {
+  return (bytes[offset] ?? 0) << 8 | (bytes[offset + 1] ?? 0);
+}
+function normalizeRows(points) {
+  if (points.length === 0) throw new Error("Selection mask cannot be empty.");
+  const rowPoints = /* @__PURE__ */ new Map();
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  for (const point of points) {
+    assertInteger(point.x, "Selection mask x");
+    assertInteger(point.y, "Selection mask y");
+    if (point.x < 0 || point.y < 0) {
+      throw new Error("Selection mask coordinates must be non-negative.");
+    }
+    minX = Math.min(minX, point.x);
+    minY = Math.min(minY, point.y);
+    maxX = Math.max(maxX, point.x);
+    maxY = Math.max(maxY, point.y);
+    const row = rowPoints.get(point.y) ?? /* @__PURE__ */ new Set();
+    row.add(point.x);
+    rowPoints.set(point.y, row);
+  }
+  const width = maxX - minX + 1;
+  const height = maxY - minY + 1;
+  if (width > MAX_UINT16 || height > MAX_UINT16) {
+    throw new Error("Selection mask bounds exceed the compact coordinate range.");
+  }
+  const rows = [];
+  let selectedCount = 0;
+  for (const absoluteY of [
+    ...rowPoints.keys()
+  ].sort((left, right) => left - right)) {
+    const xs = [
+      ...rowPoints.get(absoluteY) ?? []
+    ].sort((left, right) => left - right);
+    const spans = [];
+    const first = xs[0];
+    if (first === void 0) continue;
+    let start = first;
+    let previous = first;
+    for (let index = 1; index < xs.length; index += 1) {
+      const current = xs[index];
+      if (current === void 0) continue;
+      if (current !== previous + 1) {
+        spans.push({
+          x: start - minX,
+          width: previous - start + 1
+        });
+        selectedCount += previous - start + 1;
+        start = current;
+      }
+      previous = current;
+    }
+    spans.push({
+      x: start - minX,
+      width: previous - start + 1
+    });
+    selectedCount += previous - start + 1;
+    rows.push({
+      y: absoluteY - minY,
+      spans
+    });
+  }
+  return {
+    x: minX,
+    y: minY,
+    width,
+    height,
+    rows,
+    selectedCount
+  };
+}
+function createRasterSelectionMask(points) {
+  if (points.length === 0) return void 0;
+  const normalized = normalizeRows(points);
+  const bytes = [];
+  for (const row of normalized.rows) {
+    pushUint16(bytes, row.y);
+    pushUint16(bytes, row.spans.length);
+    for (const span of row.spans) {
+      pushUint16(bytes, span.x);
+      pushUint16(bytes, span.width);
+    }
+  }
+  return {
+    kind: "runs",
+    encoding: "rle-u16-base64-v1",
+    x: normalized.x,
+    y: normalized.y,
+    width: normalized.width,
+    height: normalized.height,
+    selectedCount: normalized.selectedCount,
+    data: encodeBase64(Uint8Array.from(bytes))
+  };
+}
+function decodeRasterSelectionMask(value) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Selection mask must be an object.");
+  }
+  const mask = value;
+  if (mask.kind !== "runs" || mask.encoding !== "rle-u16-base64-v1") {
+    throw new Error("Selection mask encoding is not supported.");
+  }
+  for (const key of [
+    "x",
+    "y",
+    "width",
+    "height",
+    "selectedCount"
+  ]) {
+    const item = mask[key];
+    if (!Number.isSafeInteger(item)) {
+      throw new Error(`Selection mask ${key} must be a safe integer.`);
+    }
+  }
+  const x = mask.x;
+  const y = mask.y;
+  const width = mask.width;
+  const height = mask.height;
+  const selectedCount = mask.selectedCount;
+  if (x < 0 || y < 0 || width < 1 || height < 1 || width > MAX_UINT16 || height > MAX_UINT16) {
+    throw new Error("Selection mask bounds are invalid.");
+  }
+  if (selectedCount < 1 || selectedCount > width * height) {
+    throw new Error("Selection mask selectedCount is invalid.");
+  }
+  if (typeof mask.data !== "string") {
+    throw new Error("Selection mask data must be a string.");
+  }
+  const bytes = decodeBase64(mask.data);
+  if (bytes.length < 4) throw new Error("Selection mask data is empty.");
+  const rows = [];
+  const rowIndex = /* @__PURE__ */ new Map();
+  let offset = 0;
+  let previousRow = -1;
+  let counted = 0;
+  while (offset < bytes.length) {
+    if (bytes.length - offset < 4) {
+      throw new Error("Selection mask row header is truncated.");
+    }
+    const rowY = readUint16(bytes, offset);
+    const spanCount = readUint16(bytes, offset + 2);
+    offset += 4;
+    if (rowY <= previousRow || rowY >= height || spanCount < 1) {
+      throw new Error("Selection mask rows are not canonical.");
+    }
+    const spans = [];
+    let previousEnd = -1;
+    for (let index = 0; index < spanCount; index += 1) {
+      if (bytes.length - offset < 4) {
+        throw new Error("Selection mask span is truncated.");
+      }
+      const spanX = readUint16(bytes, offset);
+      const spanWidth = readUint16(bytes, offset + 2);
+      offset += 4;
+      if (spanWidth < 1 || spanX + spanWidth > width || spanX <= previousEnd) {
+        throw new Error("Selection mask spans are not canonical.");
+      }
+      spans.push({
+        x: spanX + x,
+        width: spanWidth
+      });
+      previousEnd = spanX + spanWidth - 1;
+      counted += spanWidth;
+    }
+    const absoluteY = rowY + y;
+    const immutableSpans = spans.map((span) => ({
+      ...span
+    }));
+    rows.push({
+      y: absoluteY,
+      spans: immutableSpans
+    });
+    rowIndex.set(absoluteY, immutableSpans);
+    previousRow = rowY;
+  }
+  if (counted !== selectedCount || rows.length === 0) {
+    throw new Error("Selection mask selectedCount does not match its data.");
+  }
+  return {
+    kind: "runs",
+    x,
+    y,
+    width,
+    height,
+    selectedCount,
+    rows,
+    rowIndex
+  };
+}
+function rasterSelectionMaskIncludes(mask, point) {
+  const spans = mask.rowIndex.get(point.y);
+  if (spans === void 0) return false;
+  for (const span of spans) {
+    if (point.x < span.x) return false;
+    if (point.x < span.x + span.width) return true;
+  }
+  return false;
+}
+
+// src/draw2-raster-stamp.ts
+var RASTER_STAMP_ENCODING = "indexed-rle-u16-u8-base64-v1";
+var MAX_RASTER_STAMP_DIMENSION = 65535;
+var MAX_RASTER_STAMP_CELLS = 65536;
+var MAX_RASTER_STAMP_PALETTE = 256;
+var MAX_RASTER_STAMP_DATA_BYTES = 1048576;
+var BASE64_ALPHABET2 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+function isSafeNonNegativeInteger(value) {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+}
+function assertUInt16(value, label) {
+  if (!isSafeNonNegativeInteger(value) || value > MAX_RASTER_STAMP_DIMENSION) {
+    throw new Error(`${label} must be a uint16 value.`);
+  }
+}
+function assertPalette(palette) {
+  if (palette.length < 1 || palette.length > MAX_RASTER_STAMP_PALETTE) {
+    throw new Error("Raster stamp palette is invalid.");
+  }
+  return palette.map((color, index) => {
+    if (!isSafeNonNegativeInteger(color) || color > 4294967295) {
+      throw new Error(`Raster stamp palette color ${index} is invalid.`);
+    }
+    return color >>> 0;
+  });
+}
+function encodeBase642(bytes) {
+  let output = "";
+  for (let index = 0; index < bytes.length; index += 3) {
+    const first = bytes[index] ?? 0;
+    const second = bytes[index + 1];
+    const third = bytes[index + 2];
+    output += BASE64_ALPHABET2[first >> 2];
+    output += BASE64_ALPHABET2[(first & 3) << 4 | (second ?? 0) >> 4];
+    output += second === void 0 ? "=" : BASE64_ALPHABET2[(second & 15) << 2 | (third ?? 0) >> 6];
+    output += third === void 0 ? "=" : BASE64_ALPHABET2[third & 63];
+  }
+  return output;
+}
+function decodeBase642(value) {
+  if (value.length === 0 || value.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/u.test(value)) {
+    throw new Error("Raster stamp data is not valid base64.");
+  }
+  const output = [];
+  const decode = (character) => {
+    const index = BASE64_ALPHABET2.indexOf(character);
+    if (index < 0) throw new Error("Raster stamp data has an invalid byte.");
+    return index;
+  };
+  for (let index = 0; index < value.length; index += 4) {
+    const first = decode(value[index] ?? "");
+    const second = decode(value[index + 1] ?? "");
+    const thirdCharacter = value[index + 2] ?? "=";
+    const fourthCharacter = value[index + 3] ?? "=";
+    const third = thirdCharacter === "=" ? 0 : decode(thirdCharacter);
+    const fourth = fourthCharacter === "=" ? 0 : decode(fourthCharacter);
+    if (thirdCharacter === "=" && (second & 15) !== 0) {
+      throw new Error("Raster stamp base64 padding is not canonical.");
+    }
+    if (fourthCharacter === "=" && (third & 3) !== 0) {
+      throw new Error("Raster stamp base64 padding is not canonical.");
+    }
+    output.push(first << 2 | second >> 4);
+    if (thirdCharacter !== "=") {
+      output.push((second & 15) << 4 | third >> 2);
+    }
+    if (fourthCharacter !== "=") {
+      output.push((third & 3) << 6 | fourth);
+    }
+  }
+  if (output.length > MAX_RASTER_STAMP_DATA_BYTES) {
+    throw new Error("Raster stamp data exceeds the bounded byte budget.");
+  }
+  return Uint8Array.from(output);
+}
+function encodePalette(palette) {
+  const bytes = new Uint8Array(palette.length * 4);
+  palette.forEach((color, index) => {
+    const offset = index * 4;
+    bytes[offset] = color >>> 24 & 255;
+    bytes[offset + 1] = color >>> 16 & 255;
+    bytes[offset + 2] = color >>> 8 & 255;
+    bytes[offset + 3] = color & 255;
+  });
+  return encodeBase642(bytes);
+}
+function decodePalette(value, count) {
+  if (!isSafeNonNegativeInteger(count) || count < 1 || count > MAX_RASTER_STAMP_PALETTE) {
+    throw new Error("Raster stamp palette count is invalid.");
+  }
+  const bytes = decodeBase642(value);
+  if (bytes.byteLength !== count * 4) {
+    throw new Error("Raster stamp palette data length is invalid.");
+  }
+  const palette = [];
+  for (let index = 0; index < count; index += 1) {
+    const offset = index * 4;
+    palette.push(((bytes[offset] ?? 0) << 24 | (bytes[offset + 1] ?? 0) << 16 | (bytes[offset + 2] ?? 0) << 8 | (bytes[offset + 3] ?? 0)) >>> 0);
+  }
+  return palette;
+}
+function pushUint162(bytes, value, label) {
+  assertUInt16(value, label);
+  bytes.push(value >>> 8 & 255, value & 255);
+}
+function readUint162(bytes, offset) {
+  return (bytes[offset] ?? 0) << 8 | (bytes[offset + 1] ?? 0);
+}
+function normalizeCells(width, height, palette, cells) {
+  if (!isSafeNonNegativeInteger(width) || width < 1 || width > MAX_RASTER_STAMP_DIMENSION || !isSafeNonNegativeInteger(height) || height < 1 || height > MAX_RASTER_STAMP_DIMENSION || width * height > MAX_RASTER_STAMP_CELLS) {
+    throw new Error("Raster stamp dimensions are outside the bounded range.");
+  }
+  const normalizedPalette = assertPalette(palette);
+  const rowsByY = /* @__PURE__ */ new Map();
+  for (const cell of cells) {
+    if (cell === null || typeof cell !== "object" || !isSafeNonNegativeInteger(cell.x) || !isSafeNonNegativeInteger(cell.y) || !isSafeNonNegativeInteger(cell.colorIndex) || cell.x >= width || cell.y >= height || cell.colorIndex >= normalizedPalette.length) {
+      throw new Error("Raster stamp cell is invalid.");
+    }
+    if (cell.colorIndex === 0) continue;
+    const row = rowsByY.get(cell.y) ?? /* @__PURE__ */ new Map();
+    row.set(cell.x, cell.colorIndex);
+    rowsByY.set(cell.y, row);
+  }
+  const rows = [];
+  let occupiedCount = 0;
+  for (const y of [
+    ...rowsByY.keys()
+  ].sort((left, right) => left - right)) {
+    const entries = [
+      ...rowsByY.get(y)?.entries() ?? []
+    ].sort((left, right) => left[0] - right[0]);
+    const runs = [];
+    for (const [x, colorIndex] of entries) {
+      const previous = runs[runs.length - 1];
+      if (previous !== void 0 && previous.x + previous.width === x && previous.colorIndex === colorIndex) {
+        runs[runs.length - 1] = {
+          ...previous,
+          width: previous.width + 1
+        };
+      } else {
+        runs.push({
+          x,
+          width: 1,
+          colorIndex
+        });
+      }
+    }
+    if (runs.length > 0) {
+      rows.push({
+        y,
+        runs
+      });
+      occupiedCount += entries.length;
+    }
+  }
+  if (occupiedCount < 1) throw new Error("Raster stamp cannot be empty.");
+  return {
+    palette: normalizedPalette,
+    rows,
+    occupiedCount
+  };
+}
+function createIndexedRasterStampSource(input) {
+  const normalized = normalizeCells(input.width, input.height, input.palette, input.cells);
+  const bytes = [];
+  for (const row of normalized.rows) {
+    pushUint162(bytes, row.y, "Raster stamp row");
+    pushUint162(bytes, row.runs.length, "Raster stamp run count");
+    for (const run of row.runs) {
+      pushUint162(bytes, run.x, "Raster stamp run x");
+      pushUint162(bytes, run.width, "Raster stamp run width");
+      if (!isSafeNonNegativeInteger(run.colorIndex) || run.colorIndex < 1 || run.colorIndex >= normalized.palette.length || run.colorIndex > 255) {
+        throw new Error("Raster stamp run color is invalid.");
+      }
+      bytes.push(run.colorIndex);
+    }
+  }
+  if (bytes.length > MAX_RASTER_STAMP_DATA_BYTES) {
+    throw new Error("Raster stamp data exceeds the bounded byte budget.");
+  }
+  return {
+    kind: "indexed-runs",
+    encoding: RASTER_STAMP_ENCODING,
+    width: input.width,
+    height: input.height,
+    paletteEncoding: "argb-u32-base64-v1",
+    paletteCount: normalized.palette.length,
+    paletteData: encodePalette(normalized.palette),
+    occupiedCount: normalized.occupiedCount,
+    data: encodeBase642(Uint8Array.from(bytes))
+  };
+}
+function decodeIndexedRasterStampSource(value) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Raster stamp source must be an object.");
+  }
+  const source = value;
+  if (source.kind !== "indexed-runs" || source.encoding !== RASTER_STAMP_ENCODING) {
+    throw new Error("Raster stamp source encoding is not supported.");
+  }
+  if (!isSafeNonNegativeInteger(source.width) || source.width < 1 || source.width > MAX_RASTER_STAMP_DIMENSION || !isSafeNonNegativeInteger(source.height) || source.height < 1 || source.width * source.height > MAX_RASTER_STAMP_CELLS || !isSafeNonNegativeInteger(source.occupiedCount) || source.occupiedCount < 1 || source.occupiedCount > source.width * source.height || source.paletteEncoding !== "argb-u32-base64-v1" || !isSafeNonNegativeInteger(source.paletteCount) || typeof source.paletteData !== "string" || typeof source.data !== "string") {
+    throw new Error("Raster stamp source metadata is invalid.");
+  }
+  const palette = decodePalette(source.paletteData, source.paletteCount);
+  const bytes = decodeBase642(source.data);
+  const rows = [];
+  const rowIndex = /* @__PURE__ */ new Map();
+  let offset = 0;
+  let previousY = -1;
+  let occupiedCount = 0;
+  while (offset < bytes.length) {
+    if (bytes.length - offset < 4) {
+      throw new Error("Raster stamp row header is truncated.");
+    }
+    const y = readUint162(bytes, offset);
+    const runCount = readUint162(bytes, offset + 2);
+    offset += 4;
+    if (y >= source.height || y <= previousY || runCount < 1) {
+      throw new Error("Raster stamp row order is invalid.");
+    }
+    previousY = y;
+    const runs = [];
+    let previousEnd = -1;
+    for (let index = 0; index < runCount; index += 1) {
+      if (bytes.length - offset < 5) {
+        throw new Error("Raster stamp run is truncated.");
+      }
+      const x = readUint162(bytes, offset);
+      const width = readUint162(bytes, offset + 2);
+      const colorIndex = bytes[offset + 4] ?? 0;
+      offset += 5;
+      if (width < 1 || x >= source.width || x + width > source.width || x <= previousEnd || colorIndex < 1 || colorIndex >= palette.length) {
+        throw new Error("Raster stamp run is invalid.");
+      }
+      previousEnd = x + width - 1;
+      occupiedCount += width;
+      if (occupiedCount > source.occupiedCount) {
+        throw new Error("Raster stamp occupiedCount is smaller than its data.");
+      }
+      runs.push({
+        x,
+        width,
+        colorIndex
+      });
+    }
+    const row = {
+      y,
+      runs
+    };
+    rows.push(row);
+    rowIndex.set(y, runs);
+  }
+  if (occupiedCount !== source.occupiedCount) {
+    throw new Error("Raster stamp occupiedCount does not match its data.");
+  }
+  return {
+    kind: "indexed-runs",
+    width: source.width,
+    height: source.height,
+    palette,
+    occupiedCount,
+    rows,
+    rowIndex
+  };
+}
+function rasterStampColorAt(source, x, y) {
+  if (!isSafeNonNegativeInteger(x) || !isSafeNonNegativeInteger(y) || x >= source.width || y >= source.height) return 0;
+  for (const run of source.rowIndex.get(y) ?? []) {
+    if (x < run.x) return 0;
+    if (x < run.x + run.width) return run.colorIndex;
+  }
+  return 0;
+}
+
 // src/draw2-core.ts
 var MAX_INTERPOLATED_STROKE_PIXELS = 65536;
-function interpolatePixelLine(from, to) {
+function interpolatePixelLine2(from, to) {
   const points = [];
   let x = from.x;
   let y = from.y;
@@ -146,7 +1003,7 @@ function interpolatePixelPath(points) {
     const from = points[index - 1];
     const to = points[index];
     if (from === void 0 || to === void 0) continue;
-    for (const point of interpolatePixelLine(from, to).slice(1)) {
+    for (const point of interpolatePixelLine2(from, to).slice(1)) {
       if (interpolated.length >= MAX_INTERPOLATED_STROKE_PIXELS) {
         throw new Error("Interpolated Stroke exceeds the bounded pixel budget.");
       }
@@ -157,6 +1014,31 @@ function interpolatePixelPath(points) {
     }
   }
   return interpolated;
+}
+function compactPixelPath(points, maxPoints) {
+  if (points.length === 0) return [];
+  if (!Number.isSafeInteger(maxPoints) || maxPoints < 1) {
+    throw new Error("maxPoints must be a positive safe integer.");
+  }
+  const unique = [];
+  for (const point of points) {
+    const previous = unique[unique.length - 1];
+    if (previous?.x !== point.x || previous.y !== point.y) unique.push(point);
+  }
+  if (unique.length <= maxPoints) return unique;
+  if (maxPoints === 1) return [
+    unique[0]
+  ];
+  const reduced = [];
+  const lastIndex = unique.length - 1;
+  for (let index = 0; index < maxPoints; index += 1) {
+    const sourceIndex = Math.round(index * lastIndex / (maxPoints - 1));
+    const point = unique[sourceIndex];
+    if (point === void 0) continue;
+    const previous = reduced[reduced.length - 1];
+    if (previous?.x !== point.x || previous.y !== point.y) reduced.push(point);
+  }
+  return reduced;
 }
 var SampledInstrumentation = class {
   #sampleRate;
@@ -617,6 +1499,222 @@ function validateEnvelope(state2, command) {
   }
   return diagnostics;
 }
+var SHAPE_COMMIT_TOOLS = /* @__PURE__ */ new Set([
+  "line",
+  "rect",
+  "rect-fill",
+  "ellipse",
+  "ellipse-fill",
+  "circle",
+  "circle-fill"
+]);
+var MAX_TILE_STAMP_SOURCE_CELLS = 65536;
+var MAX_TILE_STAMP_OUTPUT_CELLS = 1048576;
+var MAX_TILE_STAMP_ORIGIN = 1048576;
+function isShapeCommitTool(value) {
+  return typeof value === "string" && SHAPE_COMMIT_TOOLS.has(value);
+}
+function isRasterPoint(value) {
+  if (value === null || typeof value !== "object") return false;
+  const point = value;
+  return Number.isSafeInteger(point.x) && Number.isSafeInteger(point.y);
+}
+function pointInsideRasterClip(point, clip) {
+  return point.x >= clip.x && point.y >= clip.y && point.x < clip.x + clip.width && point.y < clip.y + clip.height;
+}
+function validateRasterClip(value, asset, path = "payload.clip") {
+  if (value === void 0) return [];
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return [
+      diagnostic("RASTER_CLIP_INVALID", "Raster clip must be an object.", path)
+    ];
+  }
+  const clip = value;
+  const diagnostics = [];
+  for (const key of [
+    "x",
+    "y",
+    "width",
+    "height"
+  ]) {
+    const coordinate = clip[key];
+    const valid = Number.isSafeInteger(coordinate) && (key === "width" || key === "height" ? coordinate >= 1 : coordinate >= 0);
+    if (!valid) {
+      diagnostics.push(diagnostic("RASTER_CLIP_COORDINATE_INVALID", "Raster clip coordinates and dimensions must be bounded integers.", `${path}.${key}`));
+    }
+  }
+  if (diagnostics.length === 0 && (clip.x + clip.width > asset.width || clip.y + clip.height > asset.height)) {
+    diagnostics.push(diagnostic("RASTER_CLIP_OUT_OF_BOUNDS", "Raster clip rectangle is outside the asset bounds.", path));
+  }
+  return diagnostics;
+}
+function validateRasterSelectionMask(value, asset, path = "payload.selectionMask") {
+  if (value === void 0) return [];
+  let decoded;
+  try {
+    decoded = decodeRasterSelectionMask(value);
+  } catch (cause) {
+    return [
+      diagnostic("RASTER_SELECTION_MASK_INVALID", cause instanceof Error ? cause.message : "Raster selection mask is invalid.", path)
+    ];
+  }
+  if (decoded.x + decoded.width > asset.width || decoded.y + decoded.height > asset.height) {
+    return [
+      diagnostic("RASTER_SELECTION_MASK_OUT_OF_BOUNDS", "Raster selection mask is outside the asset bounds.", path)
+    ];
+  }
+  return [];
+}
+function validateRasterStampSource(value, path = "payload.inlineSource") {
+  if (value === void 0) return [];
+  try {
+    decodeIndexedRasterStampSource(value);
+    return [];
+  } catch (cause) {
+    return [
+      diagnostic("RASTER_STAMP_SOURCE_INVALID", cause instanceof Error ? cause.message : "Raster stamp source is invalid.", path)
+    ];
+  }
+}
+function readUnknownRecordInteger(value, key) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return void 0;
+  }
+  const candidate = value[key];
+  return Number.isSafeInteger(candidate) ? candidate : void 0;
+}
+function decodeSelectionMask(value) {
+  return value === void 0 ? void 0 : decodeRasterSelectionMask(value);
+}
+function pointInsideSelectionMask(point, mask) {
+  return mask === void 0 || rasterSelectionMaskIncludes(mask, point);
+}
+function validateSelectionConstraintCombination(clip, selectionMask) {
+  if (clip === void 0 || selectionMask === void 0) return [];
+  return [
+    diagnostic("RASTER_SELECTION_CONSTRAINT_CONFLICT", "A raster command cannot combine a rectangular clip and a selection mask.", "payload.selectionMask")
+  ];
+}
+function isMirrorAxis(value) {
+  return value === "x" || value === "y" || value === "diagonal-down" || value === "diagonal-up";
+}
+function validateMirrorCommitSpec(value, asset, path = "payload.mirror") {
+  if (value === void 0) return [];
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return [
+      diagnostic("MIRROR_SPEC_INVALID", "Mirror metadata must be an object.", path)
+    ];
+  }
+  const spec = value;
+  const diagnostics = [];
+  const axes = spec.axes;
+  if (!Array.isArray(axes) || axes.length < 1 || axes.length > 4) {
+    diagnostics.push(diagnostic("MIRROR_AXES_INVALID", "Mirror metadata must contain one through four axes.", `${path}.axes`));
+  } else {
+    const seen = /* @__PURE__ */ new Set();
+    axes.forEach((axis, index) => {
+      if (!isMirrorAxis(axis)) {
+        diagnostics.push(diagnostic("MIRROR_AXIS_INVALID", "Mirror axis is not supported.", `${path}.axes[${index}]`));
+      } else if (seen.has(axis)) {
+        diagnostics.push(diagnostic("MIRROR_AXIS_DUPLICATE", "Mirror axes must be unique.", `${path}.axes[${index}]`));
+      } else {
+        seen.add(axis);
+      }
+    });
+  }
+  const guide = spec.guide;
+  if (guide === null || typeof guide !== "object" || Array.isArray(guide)) {
+    diagnostics.push(diagnostic("MIRROR_GUIDE_INVALID", "Mirror metadata must contain a guide object.", `${path}.guide`));
+    return diagnostics;
+  }
+  const guideRecord = guide;
+  const guideBounds = [
+    [
+      "x",
+      guideRecord.x,
+      -0.5,
+      asset.width - 0.5
+    ],
+    [
+      "y",
+      guideRecord.y,
+      -0.5,
+      asset.height - 0.5
+    ]
+  ];
+  for (const [key, coordinate, minimum, maximum] of guideBounds) {
+    if (typeof coordinate !== "number" || !Number.isFinite(coordinate) || coordinate < minimum || coordinate > maximum) {
+      diagnostics.push(diagnostic("MIRROR_GUIDE_COORDINATE_INVALID", "Mirror guide coordinate is outside the raster bounds.", `${path}.guide.${key}`));
+    }
+  }
+  for (const key of [
+    "diagonalDown",
+    "diagonalUp"
+  ]) {
+    const offset = guideRecord[key];
+    if (typeof offset !== "number" || !Number.isFinite(offset) || offset < -1 || offset > 1) {
+      diagnostics.push(diagnostic("MIRROR_GUIDE_OFFSET_INVALID", "Diagonal mirror guide offset must be between -1 and 1.", `${path}.guide.${key}`));
+    }
+  }
+  return diagnostics;
+}
+function mirrorPixelPointsInBounds(points, spec, bounds) {
+  const maxX = Math.max(1, bounds.width - 1);
+  const maxY = Math.max(1, bounds.height - 1);
+  const reflectPoint = (point, axis) => {
+    if (axis === "x") {
+      return {
+        x: spec.guide.x * 2 - point.x,
+        y: point.y
+      };
+    }
+    if (axis === "y") {
+      return {
+        x: point.x,
+        y: spec.guide.y * 2 - point.y
+      };
+    }
+    const normalizedX = point.x / maxX;
+    const normalizedY = point.y / maxY;
+    if (axis === "diagonal-down") {
+      return {
+        x: (normalizedY - spec.guide.diagonalDown) * maxX,
+        y: (normalizedX + spec.guide.diagonalDown) * maxY
+      };
+    }
+    return {
+      x: (1 + spec.guide.diagonalUp - normalizedY) * maxX,
+      y: (1 + spec.guide.diagonalUp - normalizedX) * maxY
+    };
+  };
+  const unique = /* @__PURE__ */ new Map();
+  for (const point of points) {
+    const transformed = [
+      {
+        x: point.x,
+        y: point.y
+      }
+    ];
+    for (const axis of spec.axes) {
+      transformed.push(...transformed.map((item) => reflectPoint(item, axis)));
+    }
+    for (const transformedPoint of transformed) {
+      const x = Math.round(transformedPoint.x);
+      const y = Math.round(transformedPoint.y);
+      if (x < 0 || y < 0 || x >= bounds.width || y >= bounds.height) continue;
+      unique.set(`${x}:${y}`, {
+        x,
+        y
+      });
+    }
+  }
+  return [
+    ...unique.values()
+  ].sort((left, right) => left.y - right.y || left.x - right.x);
+}
+function clipPixelPoints(points, clip) {
+  return clip === void 0 ? points : points.filter((point) => pointInsideRasterClip(point, clip));
+}
 function validatePayload(state2, command) {
   const asset = state2.assets[command.assetId];
   if (asset === void 0) {
@@ -643,21 +1741,175 @@ function validatePayload(state2, command) {
     }
     return diagnostics;
   }
+  if (command.commandType === "raster.tileStamp") {
+    const payload = command.payload;
+    diagnostics.push(...validateRasterClip(payload.clip, asset), ...validateRasterSelectionMask(payload.selectionMask, asset), ...validateSelectionConstraintCombination(payload.clip, payload.selectionMask));
+    const isChecker = "pattern" in payload;
+    const isInline = "inlineSource" in payload;
+    const inlineSourceValue = isInline ? payload.inlineSource : void 0;
+    const sourceAssetId = isChecker || isInline ? void 0 : payload.sourceAssetId;
+    const sourceWidth = isChecker ? 2 : isInline ? readUnknownRecordInteger(inlineSourceValue, "width") : payload.sourceWidth;
+    const sourceHeight = isChecker ? 2 : isInline ? readUnknownRecordInteger(inlineSourceValue, "height") : payload.sourceHeight;
+    const { originX, originY, scale } = payload;
+    const sourceAsset = typeof sourceAssetId === "string" ? state2.assets[sourceAssetId] : void 0;
+    if (isChecker && isInline) {
+      diagnostics.push(diagnostic("TILE_VARIANT_INVALID", "Tile stamp cannot combine checker and inline source variants.", "payload"));
+    }
+    if (isChecker) {
+      if (payload.pattern !== "checker") {
+        diagnostics.push(diagnostic("TILE_PATTERN_INVALID", "Tile stamp pattern is not supported.", "payload.pattern"));
+      }
+      if (!Number.isSafeInteger(payload.colorIndex) || payload.colorIndex < 0 || payload.colorIndex > 255 || payload.colorIndex >= asset.palette.length) {
+        diagnostics.push(diagnostic("RASTER_COLOR_INDEX_INVALID", "colorIndex must reference palette index 0..255.", "payload.colorIndex"));
+      }
+    } else if (isInline) {
+      diagnostics.push(...validateRasterStampSource(inlineSourceValue));
+    } else {
+      if (typeof sourceAssetId !== "string" || sourceAssetId.length === 0) {
+        diagnostics.push(diagnostic("TILE_SOURCE_ASSET_INVALID", "Tile stamp sourceAssetId is required.", "payload.sourceAssetId"));
+      } else if (sourceAsset === void 0) {
+        diagnostics.push(diagnostic("TILE_SOURCE_ASSET_NOT_FOUND", "Tile stamp source asset was not found.", "payload.sourceAssetId"));
+      }
+      if (!Number.isSafeInteger(payload.sourceAssetRevision) || payload.sourceAssetRevision < 0) {
+        diagnostics.push(diagnostic("TILE_SOURCE_REVISION_INVALID", "Tile stamp sourceAssetRevision must be a non-negative safe integer.", "payload.sourceAssetRevision"));
+      } else if (sourceAsset !== void 0 && sourceAsset.revision !== payload.sourceAssetRevision) {
+        diagnostics.push(diagnostic("TILE_SOURCE_REVISION_STALE", "Tile stamp source asset revision is stale.", "payload.sourceAssetRevision"));
+      }
+      if (!Number.isSafeInteger(payload.sourceX) || payload.sourceX < 0) {
+        diagnostics.push(diagnostic("TILE_SOURCE_X_INVALID", "Tile stamp sourceX must be a non-negative safe integer.", "payload.sourceX"));
+      }
+      if (!Number.isSafeInteger(payload.sourceY) || payload.sourceY < 0) {
+        diagnostics.push(diagnostic("TILE_SOURCE_Y_INVALID", "Tile stamp sourceY must be a non-negative safe integer.", "payload.sourceY"));
+      }
+    }
+    if (!isChecker && !isInline && sourceAsset !== void 0) {
+      if (Number.isSafeInteger(payload.sourceX) && Number.isSafeInteger(payload.sourceY) && typeof sourceWidth === "number" && typeof sourceHeight === "number" && Number.isSafeInteger(sourceWidth) && Number.isSafeInteger(sourceHeight) && payload.sourceX >= 0 && payload.sourceY >= 0 && sourceWidth >= 1 && sourceHeight >= 1 && (payload.sourceX + sourceWidth > sourceAsset.width || payload.sourceY + sourceHeight > sourceAsset.height)) {
+        diagnostics.push(diagnostic("TILE_SOURCE_BOUNDS_INVALID", "Tile stamp source rectangle is outside the source raster.", "payload.sourceX"));
+      }
+    }
+    if (typeof sourceWidth !== "number" || !Number.isSafeInteger(sourceWidth) || sourceWidth < 1 || typeof sourceHeight !== "number" || !Number.isSafeInteger(sourceHeight) || sourceHeight < 1) {
+      diagnostics.push(diagnostic("TILE_SOURCE_SIZE_INVALID", "Tile stamp source dimensions must be positive safe integers.", "payload.sourceWidth"));
+    } else if (sourceWidth * sourceHeight > MAX_TILE_STAMP_SOURCE_CELLS) {
+      diagnostics.push(diagnostic("TILE_SOURCE_AREA_INVALID", `Tile stamp source area must not exceed ${MAX_TILE_STAMP_SOURCE_CELLS} cells.`, "payload.sourceWidth"));
+    }
+    const sourceArea = typeof sourceWidth === "number" && typeof sourceHeight === "number" ? sourceWidth * sourceHeight : void 0;
+    if (!Number.isSafeInteger(originX) || Math.abs(originX) > MAX_TILE_STAMP_ORIGIN) {
+      diagnostics.push(diagnostic("TILE_ORIGIN_X_INVALID", "Tile stamp originX is outside the bounded coordinate range.", "payload.originX"));
+    }
+    if (!Number.isSafeInteger(originY) || Math.abs(originY) > MAX_TILE_STAMP_ORIGIN) {
+      diagnostics.push(diagnostic("TILE_ORIGIN_Y_INVALID", "Tile stamp originY is outside the bounded coordinate range.", "payload.originY"));
+    }
+    if (!Number.isSafeInteger(scale) || scale < 1 || scale > 16) {
+      diagnostics.push(diagnostic("TILE_SCALE_INVALID", "Tile stamp scale must be between 1 and 16.", "payload.scale"));
+    } else if (sourceArea !== void 0 && Number.isSafeInteger(sourceArea) && sourceArea >= 1 && sourceArea * scale * scale > MAX_TILE_STAMP_OUTPUT_CELLS) {
+      diagnostics.push(diagnostic("TILE_OUTPUT_AREA_INVALID", `Tile stamp output area must not exceed ${MAX_TILE_STAMP_OUTPUT_CELLS} cells.`, "payload.scale"));
+    }
+    return diagnostics;
+  }
   if (command.commandType === "raster.fill") {
-    const { seedX, seedY, colorIndex, maxPixels } = command.payload;
+    const { seedX, seedY, colorIndex, maxCells, gradientToX, gradientToY } = command.payload;
+    const clipDiagnostics = validateRasterClip(command.payload.clip, asset);
+    diagnostics.push(...clipDiagnostics);
+    diagnostics.push(...validateRasterSelectionMask(command.payload.selectionMask, asset), ...validateSelectionConstraintCombination(command.payload.clip, command.payload.selectionMask));
     if (!Number.isSafeInteger(seedX) || seedX < 0 || seedX >= asset.width) {
       diagnostics.push(diagnostic("FILL_SEED_X_OUT_OF_BOUNDS", "Fill seed x is outside the raster.", "payload.seedX"));
     }
     if (!Number.isSafeInteger(seedY) || seedY < 0 || seedY >= asset.height) {
       diagnostics.push(diagnostic("FILL_SEED_Y_OUT_OF_BOUNDS", "Fill seed y is outside the raster.", "payload.seedY"));
     }
-    if (!Number.isSafeInteger(maxPixels) || maxPixels < 1 || maxPixels > 1048576) {
-      diagnostics.push(diagnostic("FILL_PIXEL_LIMIT_INVALID", "maxPixels must be between 1 and 1048576.", "payload.maxPixels"));
+    if (clipDiagnostics.length === 0 && command.payload.clip !== void 0 && Number.isSafeInteger(seedX) && Number.isSafeInteger(seedY) && !pointInsideRasterClip({
+      x: seedX,
+      y: seedY
+    }, command.payload.clip)) {
+      diagnostics.push(diagnostic("FILL_SEED_OUTSIDE_CLIP", "Fill seed must be inside the raster clip.", "payload.clip"));
+    }
+    if (command.payload.selectionMask !== void 0 && validateRasterSelectionMask(command.payload.selectionMask, asset).length === 0 && Number.isSafeInteger(seedX) && Number.isSafeInteger(seedY) && !pointInsideSelectionMask({
+      x: seedX,
+      y: seedY
+    }, decodeSelectionMask(command.payload.selectionMask))) {
+      diagnostics.push(diagnostic("FILL_SEED_OUTSIDE_SELECTION_MASK", "Fill seed must be inside the raster selection mask.", "payload.selectionMask"));
+    }
+    if (!Number.isSafeInteger(maxCells) || maxCells < 1 || maxCells > 1048576) {
+      diagnostics.push(diagnostic("FILL_PIXEL_LIMIT_INVALID", "maxCells must be between 1 and 1048576.", "payload.maxCells"));
     }
     if (!Number.isSafeInteger(colorIndex) || colorIndex < 0 || colorIndex > 255 || colorIndex >= asset.palette.length) {
       diagnostics.push(diagnostic("RASTER_COLOR_INDEX_INVALID", "colorIndex must reference palette index 0..255.", "payload.colorIndex"));
     }
+    if (gradientToX === void 0 !== (gradientToY === void 0)) {
+      diagnostics.push(diagnostic("FILL_GRADIENT_ENDPOINT_INVALID", "Gradient endpoint must contain both x and y coordinates.", "payload.gradientTo"));
+    }
+    for (const [path, coordinate, limit] of [
+      [
+        "payload.gradientToX",
+        gradientToX,
+        asset.width
+      ],
+      [
+        "payload.gradientToY",
+        gradientToY,
+        asset.height
+      ]
+    ]) {
+      if (coordinate !== void 0 && (!Number.isSafeInteger(coordinate) || coordinate < 0 || coordinate >= limit)) {
+        diagnostics.push(diagnostic("FILL_GRADIENT_ENDPOINT_OUT_OF_BOUNDS", "Gradient endpoint is outside the raster.", path));
+      }
+    }
     return diagnostics;
+  }
+  if (command.commandType === "raster.shapeCommit") {
+    const payload = command.payload;
+    diagnostics.push(...validateRasterClip(payload.clip, asset), ...validateRasterSelectionMask(payload.selectionMask, asset), ...validateSelectionConstraintCombination(payload.clip, payload.selectionMask));
+    diagnostics.push(...validateMirrorCommitSpec(payload.mirror, asset));
+    if (!isShapeCommitTool(payload.tool)) {
+      diagnostics.push(diagnostic("SHAPE_TOOL_INVALID", "Shape tool is not supported by the canonical raster command.", "payload.tool"));
+    }
+    if (!isRasterPoint(payload.from)) {
+      diagnostics.push(diagnostic("SHAPE_POINT_INVALID", "Shape start point must contain integer x and y coordinates.", "payload.from"));
+    }
+    if (!isRasterPoint(payload.to)) {
+      diagnostics.push(diagnostic("SHAPE_POINT_INVALID", "Shape end point must contain integer x and y coordinates.", "payload.to"));
+    }
+    for (const [path, point] of [
+      [
+        "payload.from",
+        payload.from
+      ],
+      [
+        "payload.to",
+        payload.to
+      ]
+    ]) {
+      if (isRasterPoint(point) && (point.x < 0 || point.x >= asset.width || point.y < 0 || point.y >= asset.height)) {
+        diagnostics.push(diagnostic("SHAPE_POINT_OUT_OF_BOUNDS", "Shape point is outside the raster.", path));
+      }
+    }
+    if (!Number.isSafeInteger(payload.brushSize) || payload.brushSize < 1 || payload.brushSize > 32) {
+      diagnostics.push(diagnostic("SHAPE_BRUSH_SIZE_INVALID", "Shape brushSize must be between 1 and 32.", "payload.brushSize"));
+    }
+    if (payload.brushShape !== "square" && payload.brushShape !== "circle") {
+      diagnostics.push(diagnostic("SHAPE_BRUSH_SHAPE_INVALID", "Shape brushShape must be square or circle.", "payload.brushShape"));
+    }
+    if (payload.pattern !== "solid" && payload.pattern !== "checker" && payload.pattern !== "dots" && payload.pattern !== "bayer-2x2") {
+      diagnostics.push(diagnostic("SHAPE_PATTERN_INVALID", "Shape pattern is not supported.", "payload.pattern"));
+    }
+    if (!Number.isSafeInteger(payload.colorIndex) || payload.colorIndex < 0 || payload.colorIndex > 255 || payload.colorIndex >= asset.palette.length) {
+      diagnostics.push(diagnostic("RASTER_COLOR_INDEX_INVALID", "colorIndex must reference palette index 0..255.", "payload.colorIndex"));
+    }
+    return diagnostics;
+  }
+  if (command.commandType === "raster.strokeCommit") {
+    const { brushSize: brushSize2, brushShape: brushShape2, pattern } = command.payload;
+    diagnostics.push(...validateRasterClip(command.payload.clip, asset), ...validateRasterSelectionMask(command.payload.selectionMask, asset), ...validateSelectionConstraintCombination(command.payload.clip, command.payload.selectionMask));
+    diagnostics.push(...validateMirrorCommitSpec(command.payload.mirror, asset));
+    if (brushSize2 !== void 0 && (!Number.isSafeInteger(brushSize2) || brushSize2 < 1 || brushSize2 > 32)) {
+      diagnostics.push(diagnostic("STROKE_BRUSH_SIZE_INVALID", "Stroke brushSize must be between 1 and 32.", "payload.brushSize"));
+    }
+    if (brushShape2 !== void 0 && brushShape2 !== "square" && brushShape2 !== "circle") {
+      diagnostics.push(diagnostic("STROKE_BRUSH_SHAPE_INVALID", "Stroke brushShape must be square or circle.", "payload.brushShape"));
+    }
+    if (pattern !== void 0 && pattern !== "solid" && pattern !== "checker" && pattern !== "dots" && pattern !== "bayer-2x2") {
+      diagnostics.push(diagnostic("STROKE_PATTERN_INVALID", "Stroke pattern is not supported.", "payload.pattern"));
+    }
   }
   const points = command.commandType === "raster.setPixel" ? [
     command.payload
@@ -667,7 +1919,16 @@ function validatePayload(state2, command) {
   }
   if (command.commandType === "raster.strokeCommit" && diagnostics.length === 0) {
     try {
-      interpolatePixelPath(command.payload.points);
+      const interpolated = interpolatePixelPath(command.payload.points);
+      try {
+        stampShapeBrushInBounds(interpolated, {
+          brushSize: command.payload.brushSize ?? 1,
+          brushShape: command.payload.brushShape ?? "square",
+          pattern: command.payload.pattern ?? "solid"
+        }, asset);
+      } catch (cause) {
+        diagnostics.push(diagnostic("STROKE_PIXEL_COUNT_INVALID", cause instanceof Error ? cause.message : "Expanded Stroke exceeded its bounded pixel budget.", "payload.points"));
+      }
     } catch (cause) {
       diagnostics.push(diagnostic("STROKE_POINT_COUNT_INVALID", cause instanceof Error ? cause.message : "Stroke interpolation exceeded its bounded pixel budget.", "payload.points"));
     }
@@ -719,7 +1980,57 @@ function fullRegion(asset) {
     height: asset.height
   };
 }
+function argbChannels(color) {
+  return [
+    color >>> 24 & 255,
+    color >>> 16 & 255,
+    color >>> 8 & 255,
+    color & 255
+  ];
+}
+function interpolateArgb(start, end, progress) {
+  const alpha = Math.round((start[0] ?? 0) + ((end[0] ?? 0) - (start[0] ?? 0)) * progress);
+  const red = Math.round((start[1] ?? 0) + ((end[1] ?? 0) - (start[1] ?? 0)) * progress);
+  const green = Math.round((start[2] ?? 0) + ((end[2] ?? 0) - (start[2] ?? 0)) * progress);
+  const blue = Math.round((start[3] ?? 0) + ((end[3] ?? 0) - (start[3] ?? 0)) * progress);
+  return ((alpha & 255) << 24 | (red & 255) << 16 | (green & 255) << 8 | blue & 255) >>> 0;
+}
+function nearestPaletteIndex(color, palette) {
+  const target = argbChannels(color);
+  let bestIndex = 0;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (let index = 0; index < palette.length; index += 1) {
+    const candidate = argbChannels(palette[index] ?? 0);
+    const alphaDistance = (target[0] ?? 0) - (candidate[0] ?? 0);
+    const redDistance = (target[1] ?? 0) - (candidate[1] ?? 0);
+    const greenDistance = (target[2] ?? 0) - (candidate[2] ?? 0);
+    const blueDistance = (target[3] ?? 0) - (candidate[3] ?? 0);
+    const distance = alphaDistance * alphaDistance + redDistance * redDistance + greenDistance * greenDistance + blueDistance * blueDistance;
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestIndex = index;
+    }
+  }
+  return bestIndex;
+}
+function fillGradientColorIndex(asset, point, payload) {
+  if (payload.gradientToX === void 0 || payload.gradientToY === void 0) {
+    return payload.colorIndex;
+  }
+  const dx = payload.gradientToX - payload.seedX;
+  const dy = payload.gradientToY - payload.seedY;
+  const lengthSquared = dx * dx + dy * dy;
+  const progress = lengthSquared === 0 ? 1 : Math.max(0, Math.min(1, ((point.x - payload.seedX) * dx + (point.y - payload.seedY) * dy) / lengthSquared));
+  const start = argbChannels(asset.palette[asset.raster.getPixel(payload.seedX, payload.seedY)] ?? 0);
+  const end = argbChannels(asset.palette[payload.colorIndex] ?? 0);
+  if (progress <= 0) return asset.raster.getPixel(point.x, point.y);
+  if (progress >= 1) return payload.colorIndex;
+  return nearestPaletteIndex(interpolateArgb(start, end, progress), asset.palette);
+}
 function fillPlan(asset, payload, options) {
+  const clip = payload.clip;
+  const selectionMask = decodeSelectionMask(payload.selectionMask);
+  const pointAllowed = (point) => (clip === void 0 || pointInsideRasterClip(point, clip)) && pointInsideSelectionMask(point, selectionMask);
   const targetColor = asset.raster.getPixel(payload.seedX, payload.seedY);
   if (targetColor === payload.colorIndex) {
     return {
@@ -745,36 +2056,127 @@ function fillPlan(asset, payload, options) {
     const point = queue[cursor];
     cursor += 1;
     if (point === void 0) continue;
+    if (!pointAllowed(point)) continue;
     const key = point.y * asset.width + point.x;
     if (visited.has(key)) continue;
     visited.add(key);
     if (asset.raster.getPixel(point.x, point.y) !== targetColor) continue;
-    if (points.length >= payload.maxPixels) {
+    if (points.length >= payload.maxCells) {
       return [
-        diagnostic("FILL_PIXEL_LIMIT_EXCEEDED", "Fill exceeded its bounded pixel budget.", "payload.maxPixels")
+        diagnostic("FILL_PIXEL_LIMIT_EXCEEDED", "Fill exceeded its bounded pixel budget.", "payload.maxCells")
       ];
     }
     points.push(point);
-    if (point.x > 0) queue.push({
+    const enqueue = (candidate) => {
+      if (pointAllowed(candidate)) queue.push(candidate);
+    };
+    if (point.x > 0) enqueue({
       x: point.x - 1,
       y: point.y
     });
-    if (point.x + 1 < asset.width) queue.push({
+    if (point.x + 1 < asset.width) enqueue({
       x: point.x + 1,
       y: point.y
     });
-    if (point.y > 0) queue.push({
+    if (point.y > 0) enqueue({
       x: point.x,
       y: point.y - 1
     });
-    if (point.y + 1 < asset.height) queue.push({
+    if (point.y + 1 < asset.height) enqueue({
       x: point.x,
       y: point.y + 1
     });
   }
+  if (payload.gradientToX === void 0 || payload.gradientToY === void 0) {
+    return {
+      points,
+      visitedCount: visited.size
+    };
+  }
+  const writeColors = /* @__PURE__ */ new Map();
+  for (const point of points) {
+    writeColors.set(`${point.x}:${point.y}`, fillGradientColorIndex(asset, point, payload));
+  }
   return {
     points,
-    visitedCount: visited.size
+    visitedCount: visited.size,
+    writeColors
+  };
+}
+function nearestOpaquePaletteIndex(color, palette) {
+  if (palette.length < 2) return 0;
+  const target = argbChannels(color);
+  let bestIndex = 1;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (let index = 1; index < palette.length; index += 1) {
+    const candidate = argbChannels(palette[index] ?? 0);
+    const alphaDistance = (target[0] ?? 0) - (candidate[0] ?? 0);
+    const redDistance = (target[1] ?? 0) - (candidate[1] ?? 0);
+    const greenDistance = (target[2] ?? 0) - (candidate[2] ?? 0);
+    const blueDistance = (target[3] ?? 0) - (candidate[3] ?? 0);
+    const distance = alphaDistance * alphaDistance + redDistance * redDistance + greenDistance * greenDistance + blueDistance * blueDistance;
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestIndex = index;
+    }
+  }
+  return bestIndex;
+}
+function tileStampPlan(targetAsset, sourceAsset, payload) {
+  const isChecker = "pattern" in payload;
+  const isInline = "inlineSource" in payload;
+  const selectionMask = decodeSelectionMask(payload.selectionMask);
+  const inlineSource = isInline ? decodeIndexedRasterStampSource(payload.inlineSource) : void 0;
+  const sourceWidth = isChecker ? 2 : isInline ? inlineSource.width : payload.sourceWidth;
+  const sourceHeight = isChecker ? 2 : isInline ? inlineSource.height : payload.sourceHeight;
+  const exactPalette = /* @__PURE__ */ new Map();
+  for (let index = 1; index < targetAsset.palette.length; index += 1) {
+    const color = targetAsset.palette[index];
+    if (color !== void 0 && !exactPalette.has(color)) {
+      exactPalette.set(color, index);
+    }
+  }
+  const sourceColors = /* @__PURE__ */ new Map();
+  const points = [];
+  const writeColors = /* @__PURE__ */ new Map();
+  let sourceCellCount = 0;
+  for (let sourceOffsetY = 0; sourceOffsetY < sourceHeight; sourceOffsetY += 1) {
+    for (let sourceOffsetX = 0; sourceOffsetX < sourceWidth; sourceOffsetX += 1) {
+      const sourceColorIndex = isChecker ? (sourceOffsetX + sourceOffsetY) % 2 === 0 ? payload.colorIndex : 0 : isInline ? rasterStampColorAt(inlineSource, sourceOffsetX, sourceOffsetY) : sourceAsset?.raster.getPixel(payload.sourceX + sourceOffsetX, payload.sourceY + sourceOffsetY) ?? 0;
+      if (sourceColorIndex === 0) continue;
+      sourceCellCount += 1;
+      let targetColorIndex = sourceColors.get(sourceColorIndex);
+      if (targetColorIndex === void 0) {
+        const sourceColor = isChecker ? targetAsset.palette[sourceColorIndex] ?? 0 : isInline ? inlineSource.palette[sourceColorIndex] ?? 0 : sourceAsset?.palette[sourceColorIndex] ?? 0;
+        targetColorIndex = exactPalette.get(sourceColor) ?? nearestOpaquePaletteIndex(sourceColor, targetAsset.palette);
+        sourceColors.set(sourceColorIndex, targetColorIndex);
+      }
+      for (let dy = 0; dy < payload.scale; dy += 1) {
+        for (let dx = 0; dx < payload.scale; dx += 1) {
+          const x = payload.originX + sourceOffsetX * payload.scale + dx;
+          const y = payload.originY + sourceOffsetY * payload.scale + dy;
+          if (x < 0 || y < 0 || x >= targetAsset.width || y >= targetAsset.height) continue;
+          if (payload.clip !== void 0 && !pointInsideRasterClip({
+            x,
+            y
+          }, payload.clip)) continue;
+          if (!pointInsideSelectionMask({
+            x,
+            y
+          }, selectionMask)) continue;
+          points.push({
+            x,
+            y
+          });
+          writeColors.set(`${x}:${y}`, targetColorIndex);
+        }
+      }
+    }
+  }
+  return {
+    points,
+    writeColors,
+    sourceCellCount
   };
 }
 var EditorCore = class {
@@ -822,13 +2224,54 @@ var EditorCore = class {
     }
     let points = [];
     let fillVisitedCount = 0;
+    let fillWriteColors;
+    let tileWriteColors;
+    let tileSourceCellCount = 0;
+    let interpolatedStrokePixelCount = 0;
+    let commandSelectionMask;
+    if (command.commandType === "raster.strokeCommit" || command.commandType === "raster.shapeCommit" || command.commandType === "raster.fill" || command.commandType === "raster.tileStamp") {
+      commandSelectionMask = decodeSelectionMask(command.payload.selectionMask);
+    }
     if (command.commandType === "raster.setPixel") points = [
       command.payload
     ];
     else if (command.commandType === "raster.strokeCommit") {
-      points = interpolatePixelPath(command.payload.points);
+      const interpolated = interpolatePixelPath(command.payload.points);
+      interpolatedStrokePixelCount = interpolated.length;
+      const strokedPoints = stampShapeBrushInBounds(interpolated, {
+        brushSize: command.payload.brushSize ?? 1,
+        brushShape: command.payload.brushShape ?? "square",
+        pattern: command.payload.pattern ?? "solid"
+      }, sourceAsset);
+      const mirroredPoints = command.payload.mirror === void 0 ? strokedPoints : mirrorPixelPointsInBounds(strokedPoints, command.payload.mirror, sourceAsset);
+      const clipped = clipPixelPoints(mirroredPoints, command.payload.clip);
+      points = clipped.filter((point) => pointInsideSelectionMask(point, commandSelectionMask));
+    } else if (command.commandType === "raster.shapeCommit") {
+      const shapePoints = createShapeWriteSet(command.payload.tool, command.payload.from, command.payload.to, command.payload.colorIndex, {
+        brushSize: command.payload.brushSize,
+        brushShape: command.payload.brushShape,
+        pattern: command.payload.pattern
+      }, sourceAsset);
+      const mirroredPoints = command.payload.mirror === void 0 ? shapePoints : mirrorPixelPointsInBounds(shapePoints, command.payload.mirror, sourceAsset);
+      const clipped = clipPixelPoints(mirroredPoints, command.payload.clip);
+      points = clipped.filter((point) => pointInsideSelectionMask(point, commandSelectionMask));
     } else if (command.commandType === "raster.writeSet") {
       points = command.payload.writes;
+    } else if (command.commandType === "raster.tileStamp") {
+      const tileSourceAsset = "sourceAssetId" in command.payload ? this.#state.assets[command.payload.sourceAssetId] : void 0;
+      if ("sourceAssetId" in command.payload && tileSourceAsset === void 0) {
+        return {
+          ok: false,
+          state: this.#state,
+          diagnostics: [
+            diagnostic("TILE_SOURCE_ASSET_NOT_FOUND", "Tile stamp source asset was not found.", "payload.sourceAssetId")
+          ]
+        };
+      }
+      const planned = tileStampPlan(sourceAsset, tileSourceAsset, command.payload);
+      points = planned.points;
+      tileWriteColors = planned.writeColors;
+      tileSourceCellCount = planned.sourceCellCount;
     } else if (command.commandType === "raster.fill") {
       const fillStarted = this.#clock.now();
       const planned = fillPlan(sourceAsset, command.payload, options);
@@ -848,6 +2291,7 @@ var EditorCore = class {
       }
       points = planned.points;
       fillVisitedCount = planned.visitedCount;
+      fillWriteColors = planned.writeColors;
     }
     const nextState = cloneStateShared(this.#state);
     const asset = nextState.assets[command.assetId];
@@ -869,12 +2313,13 @@ var EditorCore = class {
       const writeColors = command.commandType === "raster.writeSet" ? new Map(command.payload.writes.map((write) => [
         `${write.x}:${write.y}`,
         write.colorIndex
-      ])) : void 0;
+      ])) : command.commandType === "raster.tileStamp" ? tileWriteColors : command.commandType === "raster.fill" ? fillWriteColors : void 0;
+      const fallbackColorIndex = command.commandType === "raster.setPixel" || command.commandType === "raster.strokeCommit" || command.commandType === "raster.shapeCommit" || command.commandType === "raster.fill" ? command.payload.colorIndex : 0;
       for (const point of points) {
         const tileX = Math.floor(point.x / asset.raster.tileSize);
         const tileY = Math.floor(point.y / asset.raster.tileSize);
         touchedTileKeys.add(`${asset.id}:${tileX}:${tileY}`);
-        const colorIndex = writeColors?.get(`${point.x}:${point.y}`) ?? (command.commandType === "raster.writeSet" ? 0 : command.payload.colorIndex);
+        const colorIndex = writeColors?.get(`${point.x}:${point.y}`) ?? fallbackColorIndex;
         const mutation = asset.raster.setPixel(asset.id, point.x, point.y, colorIndex);
         if (mutation.changed) {
           dirtyTiles.set(mutation.tile.tileKey, mutation.tile);
@@ -942,8 +2387,12 @@ var EditorCore = class {
       previousColorIndex: this.#state.assets[asset.id]?.raster.getPixel(command.payload.x, command.payload.y) ?? 0
     } : command.commandType === "raster.fill" ? {
       ...command.payload,
-      filledPixelCount: points.length,
+      filledCellCount: points.length,
       visitedCount: fillVisitedCount
+    } : command.commandType === "raster.tileStamp" ? {
+      ...command.payload,
+      stampedCellCount: points.length,
+      sourceCellCount: tileSourceCellCount
     } : command.commandType === "palette.setColor" ? {
       ...command.payload,
       previousColor: this.#state.assets[asset.id]?.palette[command.payload.paletteIndex] ?? 0
@@ -979,7 +2428,7 @@ var EditorCore = class {
     ];
     const strokeMetrics = command.commandType === "raster.strokeCommit" ? {
       inputPointCount: command.payload.points.length,
-      interpolatedPixelCount: points.length,
+      interpolatedPixelCount: interpolatedStrokePixelCount,
       touchedTileCount: touchedTileKeys.size,
       dirtyTileCount: effectiveDirtyTileCount,
       dirtyRegionCount: dirtyRegions.length,
@@ -1219,6 +2668,15 @@ var FORBIDDEN_KEY_PARTS = [
   "rawaudioblob",
   "audioblob",
   "blob",
+  "bytes",
+  "pixels",
+  "pixeldata",
+  "pcm",
+  "samples",
+  "sampledata",
+  "audiobuffer",
+  "arraybuffer",
+  "imagedata",
   "dom"
 ];
 var REVISION_REFERENCE_KEYS = /* @__PURE__ */ new Set([
@@ -1965,8 +3423,11 @@ var PixyncAudioProductBridge = class {
 var RASTER_OPERATIONS = /* @__PURE__ */ new Set([
   "raster.setPixel",
   "raster.strokeCommit",
+  "raster.shapeCommit",
   "raster.writeSet",
-  "raster.fill"
+  "raster.tileStamp",
+  "raster.fill",
+  "selection.transformCommit"
 ]);
 var PixyncDrawProductBridgeError = class extends Error {
   code;
@@ -1997,7 +3458,7 @@ var PixyncDrawProductBridge = class {
     }
     const operation = result.operation;
     if (!RASTER_OPERATIONS.has(operation.operationType)) {
-      throw new PixyncDrawProductBridgeError("OPERATION_UNSUPPORTED", "Only ordinary raster commands enter the first Draw sync slice.");
+      throw new PixyncDrawProductBridgeError("OPERATION_UNSUPPORTED", "Only bounded Draw raster and selection-transform commands enter the Draw sync slice.");
     }
     if (operation.projectId !== binding.projectId || nextState.projectId !== binding.projectId) {
       throw new PixyncDrawProductBridgeError("PROJECT_MISMATCH", "Draw state does not belong to the authenticated PiXYNC project.");
@@ -2034,10 +3495,6 @@ var PixyncDrawProductBridge = class {
       throw new PixyncDrawProductBridgeError("PROJECT_MISMATCH", "Remote Draw operation belongs to another active project.");
     }
     if (before.state.appliedCommandIds.includes(input.operation.commandId)) {
-      const rasterHash = await drawRasterHash(before.state, input.operation.assetId);
-      if (rasterHash !== input.expectedRasterHash || before.state.structureEpoch !== input.expectedStructureEpoch) {
-        throw new PixyncDrawProductBridgeError("SELF_ECHO_MISMATCH", "Self echo differs from the locally committed Draw state.");
-      }
       return {
         operationId: input.operation.operationId,
         projectId: input.operation.projectId,
@@ -2047,8 +3504,8 @@ var PixyncDrawProductBridge = class {
         baseProjectRevision: input.baseProjectRevision,
         assetId: input.operation.assetId,
         baseStructureEpoch: input.baseStructureEpoch,
-        structureEpoch: before.state.structureEpoch,
-        rasterHash,
+        structureEpoch: input.expectedStructureEpoch,
+        rasterHash: input.expectedRasterHash,
         localUndoDepth: before.undoDepth,
         localRedoDepth: before.redoDepth
       };
@@ -2309,6 +3766,72 @@ function findByOperationId(snapshot, operationId) {
   }
   return void 0;
 }
+var RETAINED_COMPLETED_COMMITTED = 8;
+var RETAINED_COMPLETED_OUTBOX = 8;
+function receiptSourceOperation(snapshot, operationId) {
+  return snapshot.inbox.find((item) => item.operationId === operationId)?.envelope ?? snapshot.vault.committed.find((item) => item.envelope.operationId === operationId)?.envelope;
+}
+function resolveApplyReceipt(snapshot, receipt) {
+  const source = receiptSourceOperation(snapshot, receipt.operationId);
+  const aggregate = receipt.aggregate ?? source?.aggregate;
+  const aggregateRevision = receipt.aggregateRevision ?? source?.aggregateRevision;
+  if (aggregate !== "draw" && aggregate !== "audio" && aggregate !== "game" || !validPositive(aggregateRevision)) {
+    throw new PixyncDurabilityError("INVALID_STATE", "Applied receipt is missing its canonical aggregate identity.");
+  }
+  if (source !== void 0 && (source.aggregate !== aggregate || source.aggregateRevision !== aggregateRevision || source.projectRevision !== receipt.projectRevision)) {
+    throw new PixyncDurabilityError("INBOX_CONFLICT", "Applied receipt aggregate identity does not match its canonical operation.");
+  }
+  return {
+    operationId: receipt.operationId,
+    fingerprint: receipt.fingerprint,
+    projectRevision: receipt.projectRevision,
+    aggregate,
+    aggregateRevision
+  };
+}
+function sameApplyReceipt(left, right) {
+  return left.operationId === right.operationId && left.fingerprint === right.fingerprint && left.projectRevision === right.projectRevision && left.aggregate === right.aggregate && left.aggregateRevision === right.aggregateRevision;
+}
+function mergeAppliedReceipts(snapshot, incoming) {
+  const merged = /* @__PURE__ */ new Map();
+  for (const receipt of [
+    ...snapshot.appliedOperationFingerprints,
+    ...incoming
+  ]) {
+    const resolved = resolveApplyReceipt(snapshot, receipt);
+    const existing = merged.get(resolved.operationId);
+    if (existing !== void 0 && !sameApplyReceipt(existing, resolved)) {
+      throw new PixyncDurabilityError("INBOX_CONFLICT", "Applied receipt identity is not deterministic.");
+    }
+    merged.set(resolved.operationId, resolved);
+  }
+  return [
+    ...merged.values()
+  ].sort((left, right) => left.projectRevision - right.projectRevision);
+}
+function compactCompletedRecords(snapshot, receipts) {
+  const receiptIds = new Set(receipts.map((receipt) => receipt.operationId));
+  const activeReceiptIds = new Set(snapshot.inbox.filter((record2) => record2.receipt !== void 0 && record2.state !== "COMPLETED").map((record2) => record2.operationId));
+  const completedCommitted = snapshot.vault.committed.filter((record2) => receiptIds.has(record2.envelope.operationId)).sort((left, right) => left.envelope.projectRevision - right.envelope.projectRevision);
+  const retainedCommittedIds = new Set(completedCommitted.slice(-RETAINED_COMPLETED_COMMITTED).map((record2) => record2.envelope.operationId));
+  const committed = snapshot.vault.committed.filter((record2) => {
+    const operationId = record2.envelope.operationId;
+    return !receiptIds.has(operationId) || activeReceiptIds.has(operationId) || retainedCommittedIds.has(operationId);
+  });
+  const completedOutbox = snapshot.outbox.filter((record2) => record2.state === "DISPATCHED" && receiptIds.has(record2.operationId)).sort((left, right) => (left.confirmedRevision ?? 0) - (right.confirmedRevision ?? 0));
+  const retainedOutboxIds = new Set(completedOutbox.slice(-RETAINED_COMPLETED_OUTBOX).map((record2) => record2.operationId));
+  const outbox = snapshot.outbox.filter((record2) => record2.state !== "DISPATCHED" || !receiptIds.has(record2.operationId) || retainedOutboxIds.has(record2.operationId));
+  return {
+    ...snapshot,
+    vault: {
+      ...snapshot.vault,
+      committed
+    },
+    outbox,
+    inbox: snapshot.inbox.filter((record2) => record2.receipt === void 0 || record2.state !== "COMPLETED"),
+    appliedOperationFingerprints: receipts
+  };
+}
 function validateLease(lease) {
   if (lease === void 0) return;
   if (typeof lease.owner !== "string" || lease.owner.length === 0 || typeof lease.token !== "string" || lease.token.length === 0 || !validDate(lease.acquiredAt) || !validDate(lease.expiresAt) || !validPositive(lease.attempt)) throw new Error("Invalid PiXYNC lease in restart snapshot.");
@@ -2367,7 +3890,7 @@ async function validatePixyncDurableSnapshot(snapshot, projectId) {
       "CONFLICT"
     ].includes(item.state) || !validNonNegative(item.attempt) || !validDate(item.nextAttemptAt)) throw new Error("PiXYNC Inbox restart record is malformed.");
     validateLease(item.lease);
-    if (item.receipt !== void 0 && (item.receipt.operationId !== item.operationId || item.receipt.fingerprint !== item.fingerprint || item.receipt.projectRevision !== item.envelope.projectRevision)) throw new Error("PiXYNC Inbox apply receipt is malformed.");
+    if (item.receipt !== void 0 && (item.receipt.operationId !== item.operationId || item.receipt.fingerprint !== item.fingerprint || item.receipt.projectRevision !== item.envelope.projectRevision || item.receipt.aggregate !== void 0 && item.receipt.aggregate !== item.envelope.aggregate || item.receipt.aggregateRevision !== void 0 && item.receipt.aggregateRevision !== item.envelope.aggregateRevision)) throw new Error("PiXYNC Inbox apply receipt is malformed.");
     const prior = revisions.get(item.envelope.projectRevision);
     if (prior !== void 0 && prior !== item.operationId && item.state !== "CONFLICT") {
       throw new Error("PiXYNC snapshot has two identities at one revision.");
@@ -2375,13 +3898,34 @@ async function validatePixyncDurableSnapshot(snapshot, projectId) {
     revisions.set(item.envelope.projectRevision, item.operationId);
     operationIds.add(item.operationId);
   }
+  const appliedIds = /* @__PURE__ */ new Set();
+  const appliedRevisions = /* @__PURE__ */ new Map();
   for (const item of snapshot.appliedOperationFingerprints) {
-    if (typeof item.operationId !== "string" || typeof item.fingerprint !== "string" || !validPositive(item.projectRevision)) throw new Error("PiXYNC applied operation fingerprint is malformed.");
+    if (typeof item.operationId !== "string" || !/^[a-f0-9]{64}$/u.test(item.fingerprint) || !validPositive(item.projectRevision)) throw new Error("PiXYNC applied operation fingerprint is malformed.");
+    const resolved = resolveApplyReceipt(snapshot, item);
+    const priorId = appliedRevisions.get(resolved.projectRevision);
+    if (appliedIds.has(resolved.operationId) || priorId !== void 0 && priorId !== resolved.operationId) {
+      throw new Error("PiXYNC applied receipts contain duplicate identity.");
+    }
+    appliedIds.add(resolved.operationId);
+    appliedRevisions.set(resolved.projectRevision, resolved.operationId);
+  }
+  for (const item of snapshot.vault.committed) {
+    const appliedId = appliedRevisions.get(item.envelope.projectRevision);
+    if (appliedId !== void 0 && appliedId !== item.envelope.operationId) {
+      throw new Error("PiXYNC snapshot has a committed revision collision.");
+    }
+  }
+  for (const item of snapshot.inbox) {
+    const appliedId = appliedRevisions.get(item.envelope.projectRevision);
+    if (appliedId !== void 0 && appliedId !== item.envelope.operationId) {
+      throw new Error("PiXYNC snapshot has an Inbox revision collision.");
+    }
   }
   for (const item of snapshot.retrySchedule) {
     if (typeof item.recordId !== "string" || item.kind !== "outbox" && item.kind !== "inbox" || !validNonNegative(item.attempt) || !validDate(item.nextAttemptAt)) throw new Error("PiXYNC retry schedule is malformed.");
   }
-  if (snapshot.revision < Math.max(0, ...snapshot.vault.committed.map((x) => x.envelope.projectRevision))) {
+  if (snapshot.revision < Math.max(0, ...snapshot.vault.committed.map((x) => x.envelope.projectRevision), ...snapshot.appliedOperationFingerprints.map((x) => x.projectRevision))) {
     throw new Error("PiXYNC snapshot revision regressed.");
   }
 }
@@ -2597,7 +4141,7 @@ var PixyncDurableJournal = class _PixyncDurableJournal {
     if (record2.state !== "LEASED" || !sameLease(record2.lease, fencingToken) || !leaseLive(record2.lease, this.#now())) {
       throw new PixyncDurabilityError("LEASE_STALE", "Only the current live Outbox lease may acknowledge.");
     }
-    const legacyAggregateRevision = record2.envelope.aggregateRevision || this.#state.vault.committed.filter((item) => item.envelope.aggregate === record2.envelope.aggregate).reduce((highest, item) => Math.max(highest, item.envelope.aggregateRevision), 0) + 1;
+    const legacyAggregateRevision = record2.envelope.aggregateRevision || Math.max(...this.#state.vault.committed.filter((item) => item.envelope.aggregate === record2.envelope.aggregate).map((item) => item.envelope.aggregateRevision), ...this.#state.appliedOperationFingerprints.filter((item) => item.aggregate === record2.envelope.aggregate).map((item) => item.aggregateRevision ?? 0), 0) + 1;
     const committed = {
       ...clone(record2.envelope),
       projectRevision: confirmedRevision,
@@ -2651,8 +4195,9 @@ var PixyncDurableJournal = class _PixyncDurableJournal {
       throw new PixyncDurabilityError("INBOX_CONFLICT", "Provider ACK committed fingerprint is not canonical.");
     }
     const existingRevision = this.#state.vault.committed.find((item) => item.envelope.projectRevision === ack.operation.projectRevision);
+    const existingAppliedRevision = this.#state.appliedOperationFingerprints.find((item) => item.projectRevision === ack.operation.projectRevision);
     const existingInboxRevision = this.#state.inbox.find((item) => item.envelope.projectRevision === ack.operation.projectRevision && item.operationId !== operationId);
-    if (existingRevision !== void 0 && existingRevision.envelope.operationId !== operationId || existingInboxRevision !== void 0) {
+    if (existingRevision !== void 0 && existingRevision.envelope.operationId !== operationId || existingAppliedRevision !== void 0 && existingAppliedRevision.operationId !== operationId || existingInboxRevision !== void 0) {
       throw new PixyncDurabilityError("REVISION_CONFLICT", "Confirmed revision is bound to another operation.");
     }
     const nextRecord = {
@@ -2751,7 +4296,28 @@ var PixyncDurableJournal = class _PixyncDurableJournal {
         conflict: true
       };
     }
-    const sameRevision = this.#state.inbox.find((item) => item.envelope.projectRevision === committed.projectRevision && item.operationId !== committed.operationId) ?? this.#state.vault.committed.find((item) => item.envelope.projectRevision === committed.projectRevision && item.envelope.operationId !== committed.operationId);
+    const applied = this.#state.appliedOperationFingerprints.find((item) => item.operationId === committed.operationId);
+    if (applied !== void 0) {
+      if (applied.fingerprint !== fingerprint || applied.projectRevision !== committed.projectRevision) {
+        throw new PixyncDurabilityError("INBOX_CONFLICT", "Incoming operation conflicts with a compact applied receipt.");
+      }
+      const receipt = resolveApplyReceipt(this.#state, applied);
+      const completed = {
+        operationId: committed.operationId,
+        projectId: this.#projectId,
+        envelope: clone(committed),
+        fingerprint,
+        state: "COMPLETED",
+        attempt: 0,
+        nextAttemptAt: nowIso(this.#now()),
+        receipt
+      };
+      return {
+        record: completed,
+        duplicate: true
+      };
+    }
+    const sameRevision = this.#state.appliedOperationFingerprints.find((item) => item.projectRevision === committed.projectRevision && item.operationId !== committed.operationId) ?? this.#state.inbox.find((item) => item.envelope.projectRevision === committed.projectRevision && item.operationId !== committed.operationId) ?? this.#state.vault.committed.find((item) => item.envelope.projectRevision === committed.projectRevision && item.envelope.operationId !== committed.operationId);
     const record2 = {
       operationId: committed.operationId,
       projectId: this.#projectId,
@@ -2906,7 +4472,9 @@ var PixyncDurableJournal = class _PixyncDurableJournal {
     const receipt = {
       operationId,
       fingerprint: record2.fingerprint,
-      projectRevision: record2.envelope.projectRevision
+      projectRevision: record2.envelope.projectRevision,
+      aggregate: record2.envelope.aggregate,
+      aggregateRevision: record2.envelope.aggregateRevision
     };
     const withReceipt = {
       ...record2,
@@ -2936,23 +4504,19 @@ var PixyncDurableJournal = class _PixyncDurableJournal {
   orderKeeperInitialState() {
     const receipts = /* @__PURE__ */ new Map();
     for (const receipt of this.#state.appliedOperationFingerprints) {
-      const inbox = this.#state.inbox.find((item2) => item2.operationId === receipt.operationId);
-      if (inbox === void 0 || inbox.receipt === void 0 || inbox.receipt.fingerprint !== receipt.fingerprint || inbox.envelope.projectRevision !== receipt.projectRevision) {
-        throw new PixyncDurabilityError("INVALID_STATE", "Applied receipt has no matching canonical Inbox envelope.");
-      }
-      const operation = inbox.envelope;
-      const existing = receipts.get(operation.operationId);
+      const resolved = resolveApplyReceipt(this.#state, receipt);
+      const existing = receipts.get(resolved.operationId);
       const item = {
-        operationId: operation.operationId,
-        fingerprint: receipt.fingerprint,
-        projectRevision: operation.projectRevision,
-        aggregate: operation.aggregate,
-        aggregateRevision: operation.aggregateRevision
+        operationId: resolved.operationId,
+        fingerprint: resolved.fingerprint,
+        projectRevision: resolved.projectRevision,
+        aggregate: resolved.aggregate,
+        aggregateRevision: resolved.aggregateRevision
       };
       if (existing !== void 0 && JSON.stringify(existing) !== JSON.stringify(item)) {
         throw new PixyncDurabilityError("INBOX_CONFLICT", "Applied receipt identity is not deterministic.");
       }
-      receipts.set(operation.operationId, item);
+      receipts.set(resolved.operationId, item);
     }
     const appliedOperations = [
       ...receipts.values()
@@ -2984,20 +4548,24 @@ var PixyncDurableJournal = class _PixyncDurableJournal {
     for (const injector of this.#faultInjectors) injector(point);
   }
   async #commit(next, injectResponseCrash = true) {
-    const staged = await sealSnapshot({
+    const appliedOperationFingerprints = mergeAppliedReceipts(next, next.inbox.flatMap((record2) => record2.receipt === void 0 ? [] : [
+      clone(record2.receipt)
+    ]));
+    const compacted = compactCompletedRecords({
       ...clone(next),
-      confirmedProjectRevision: next.revision,
-      appliedOperationFingerprints: next.inbox.flatMap((record2) => record2.receipt === void 0 ? [] : [
-        clone(record2.receipt)
-      ]),
+      appliedOperationFingerprints
+    }, appliedOperationFingerprints);
+    const staged = await sealSnapshot({
+      ...compacted,
+      confirmedProjectRevision: compacted.revision,
       retrySchedule: [
-        ...next.outbox.filter((record2) => record2.state === "PENDING").map((record2) => ({
+        ...compacted.outbox.filter((record2) => record2.state === "PENDING").map((record2) => ({
           recordId: record2.operationId,
           kind: "outbox",
           attempt: record2.attempt,
           nextAttemptAt: record2.nextAttemptAt
         })),
-        ...next.inbox.filter((record2) => record2.state === "RETRYABLE").map((record2) => ({
+        ...compacted.inbox.filter((record2) => record2.state === "RETRYABLE").map((record2) => ({
           recordId: record2.operationId,
           kind: "inbox",
           attempt: record2.attempt,
@@ -3074,9 +4642,18 @@ var PixyncDurableTransportCoordinator = class {
       ...input.onStatus === void 0 ? {} : {
         onStatus: input.onStatus
       },
+      ...input.onPresence === void 0 ? {} : {
+        onPresence: input.onPresence
+      },
+      ...input.presence === void 0 ? {} : {
+        presence: input.presence
+      },
       onOperation: (event) => this.receiveRemote(event),
       onBroadcastHint: () => {
         input.onBroadcastHint?.();
+        this.#requestHintCatchUp();
+      },
+      onReconnected: () => {
         this.#requestHintCatchUp();
       }
     };
@@ -3084,6 +4661,9 @@ var PixyncDurableTransportCoordinator = class {
   }
   async submit(draft) {
     return this.#serial(() => this.#submit(draft));
+  }
+  async publishPresence(presence) {
+    await this.#transport.publishPresence(presence);
   }
   async receiveRemote(event) {
     return this.#serial(() => this.#receiveRemote(event));
@@ -3669,16 +5249,17 @@ var PixyncLazyAggregateSync = class {
 };
 
 // src/pixync/supabase-sdk-port.ts
-function channelPort(channel) {
-  return {
+function channelPort(channel, prepareAuth) {
+  const port = {
     on(type, filter, callback) {
       channel.on(type, filter, callback);
       return this;
     },
-    subscribe() {
+    subscribe(onStatus) {
       return new Promise((resolve) => {
         let settled = false;
-        channel.subscribe((status2, error2) => {
+        const handleStatus = (status2, error2) => {
+          onStatus?.(status2, error2);
           if (settled) return;
           if (status2 === "SUBSCRIBED") {
             settled = true;
@@ -3693,7 +5274,20 @@ function channelPort(channel) {
               error: error2 ?? new Error(`Realtime ${status2}`)
             });
           }
-        });
+        };
+        void (async () => {
+          try {
+            await prepareAuth?.();
+            await Promise.resolve(channel.subscribe(handleStatus));
+          } catch (error2) {
+            if (settled) return;
+            settled = true;
+            resolve({
+              data: null,
+              error: error2
+            });
+          }
+        })();
       });
     },
     async unsubscribe() {
@@ -3711,6 +5305,79 @@ function channelPort(channel) {
       }
     }
   };
+  const registerPresence = typeof channel.onPresence === "function" ? channel.onPresence.bind(channel) : (event, callback) => channel.on("presence", {
+    event
+  }, callback);
+  port.onPresence = (event, callback) => {
+    registerPresence(event, callback);
+    return port;
+  };
+  if (typeof channel.presenceState === "function") {
+    port.presenceState = () => channel.presenceState?.() ?? {};
+  }
+  if (typeof channel.track === "function") {
+    port.track = async (presence) => {
+      try {
+        const result = await channel.track?.(presence);
+        if (result === void 0 || result === "ok") {
+          return {
+            data: null,
+            error: null
+          };
+        }
+        if (result === "error" || result === "timeout" || result === "timed out") {
+          return {
+            data: null,
+            error: new Error(`Realtime Presence track ${result}.`)
+          };
+        }
+        if (result !== null && typeof result === "object" && "data" in result && "error" in result) {
+          return result;
+        }
+        return {
+          data: null,
+          error: new Error("Realtime Presence track returned an invalid result.")
+        };
+      } catch (error2) {
+        return {
+          data: null,
+          error: error2
+        };
+      }
+    };
+  }
+  if (typeof channel.untrack === "function") {
+    port.untrack = async () => {
+      try {
+        const result = await channel.untrack?.();
+        if (result === void 0 || result === "ok") {
+          return {
+            data: null,
+            error: null
+          };
+        }
+        if (result === "error" || result === "timeout" || result === "timed out") {
+          return {
+            data: null,
+            error: new Error(`Realtime Presence untrack ${result}.`)
+          };
+        }
+        if (result !== null && typeof result === "object" && "data" in result && "error" in result) {
+          return result;
+        }
+        return {
+          data: null,
+          error: new Error("Realtime Presence untrack returned an invalid result.")
+        };
+      } catch (error2) {
+        return {
+          data: null,
+          error: error2
+        };
+      }
+    };
+  }
+  return port;
 }
 function createPixyncSupabaseSdkPort(client) {
   return {
@@ -3720,7 +5387,7 @@ function createPixyncSupabaseSdkPort(client) {
       config: {
         private: true
       }
-    }))
+    }), () => client.realtime?.setAuth?.())
   };
 }
 
@@ -3786,6 +5453,76 @@ function assertExactKeys(value, keys, path) {
   if (actual.length !== expected.size || actual.some((key) => !expected.has(key))) {
     fail2("ROW_INVALID", "RPC row contains an unexpected or missing field.", path);
   }
+}
+function assertPresenceText(value, path) {
+  if (typeof value !== "string" || value.trim().length === 0 || value.length > 80) {
+    fail2("INVALID_INPUT", "Presence text must be short, non-empty text.", path);
+  }
+}
+function assertPresenceDraft(value, path = "presence") {
+  if (!isRecord3(value)) {
+    fail2("INVALID_INPUT", "Presence must be a bounded metadata object.", path);
+  }
+  assertPresenceText(value.displayName, `${path}.displayName`);
+  if (value.mode !== "iDRAW" && value.mode !== "iAUDIO" && value.mode !== "iGAME") {
+    fail2("INVALID_INPUT", "Presence mode is invalid.", `${path}.mode`);
+  }
+  assertPresenceText(value.selectionLabel, `${path}.selectionLabel`);
+}
+function parsePresence(value) {
+  if (!isRecord3(value)) return void 0;
+  if (typeof value.actorId !== "string" || !SAFE_ID3.test(value.actorId) || typeof value.clientId !== "string" || !SAFE_ID3.test(value.clientId) || typeof value.displayName !== "string" || value.displayName.trim().length === 0 || value.displayName.length > 80 || value.mode !== "iDRAW" && value.mode !== "iAUDIO" && value.mode !== "iGAME" || typeof value.selectionLabel !== "string" || value.selectionLabel.trim().length === 0 || value.selectionLabel.length > 80 || typeof value.updatedAt !== "string" || value.updatedAt.length > 64 || !Number.isFinite(Date.parse(value.updatedAt))) return void 0;
+  return Object.freeze({
+    actorId: value.actorId,
+    clientId: value.clientId,
+    displayName: value.displayName,
+    mode: value.mode,
+    selectionLabel: value.selectionLabel,
+    updatedAt: value.updatedAt
+  });
+}
+function parsePresenceState(value) {
+  if (!isRecord3(value)) return [];
+  const byClientId = /* @__PURE__ */ new Map();
+  for (const entries of Object.values(value)) {
+    if (!Array.isArray(entries)) continue;
+    for (const entry of entries) {
+      const presence = parsePresence(entry);
+      if (presence !== void 0) byClientId.set(presence.clientId, presence);
+    }
+  }
+  return [
+    ...byClientId.values()
+  ].sort((left, right) => left.clientId.localeCompare(right.clientId));
+}
+function parsePresenceList(value) {
+  if (!Array.isArray(value)) return [];
+  const byClientId = /* @__PURE__ */ new Map();
+  for (const entry of value) {
+    const presence = parsePresence(entry);
+    if (presence !== void 0) byClientId.set(presence.clientId, presence);
+  }
+  return [
+    ...byClientId.values()
+  ];
+}
+function presencePayload(binding, draft) {
+  assertPresenceDraft(draft);
+  return Object.freeze({
+    actorId: binding.actorId,
+    clientId: binding.clientId,
+    displayName: draft.displayName,
+    mode: draft.mode,
+    selectionLabel: draft.selectionLabel,
+    updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+  });
+}
+async function trackPresenceOnChannel(channel, binding, draft) {
+  if (typeof channel.track !== "function") {
+    fail2("REALTIME_ERROR", "The Realtime channel does not support Presence.", "channel.track");
+  }
+  const result = await Promise.resolve(channel.track(presencePayload(binding, draft)));
+  if (result !== void 0) assertPortResult(result, "channel.track");
 }
 function resultError(error2) {
   if (error2 instanceof Error) return error2.message;
@@ -3989,6 +5726,10 @@ var PixyncSupabaseProvider = class {
     if (typeof input.onStatus !== "function") {
       fail2("INVALID_INPUT", "A status callback is required.", "onStatus");
     }
+    if (input.onPresence !== void 0 && typeof input.onPresence !== "function") {
+      fail2("INVALID_INPUT", "A Presence callback is required.", "onPresence");
+    }
+    if (input.presence !== void 0) assertPresenceDraft(input.presence);
     input.onStatus("CONNECTING");
     let session;
     try {
@@ -4004,29 +5745,101 @@ var PixyncSupabaseProvider = class {
       if (!isRecord3(channel) || typeof channel.on !== "function" || typeof channel.subscribe !== "function" || typeof channel.unsubscribe !== "function") {
         fail2("REALTIME_ERROR", "The Realtime port is incomplete.", "channel");
       }
+      if (input.onPresence !== void 0 && (typeof channel.presenceState !== "function" || typeof channel.onPresence !== "function")) {
+        fail2("REALTIME_ERROR", "The Realtime channel does not expose Presence state.", "channel.presenceState");
+      }
+      if (input.presence !== void 0 && typeof channel.track !== "function") {
+        fail2("REALTIME_ERROR", "The Realtime channel does not support Presence tracking.", "channel.track");
+      }
     } catch (error2) {
       input.onStatus("OFFLINE");
       if (error2 instanceof PixyncSupabaseProviderError) throw error2;
       fail2("REALTIME_ERROR", error2 instanceof Error ? error2.message : "Realtime channel creation failed.");
     }
     let active;
+    let initialSubscriptionSettled = false;
     try {
+      const notifyPresence = (event) => {
+        if (active.closed || input.onPresence === void 0) return;
+        try {
+          void Promise.resolve(input.onPresence(event)).catch(() => void 0);
+        } catch {
+        }
+      };
+      let configuredChannel = channel.on("broadcast", {
+        event: REALTIME_EVENT
+      }, () => {
+        if (active.closed) return;
+        input.onBroadcastHint();
+      });
+      if (input.onPresence !== void 0) {
+        const registerPresence = (event, callback) => {
+          const handler = configuredChannel.onPresence;
+          if (typeof handler !== "function") {
+            fail2("REALTIME_ERROR", "The Realtime channel does not expose Presence events.", "channel.onPresence");
+          }
+          configuredChannel = handler.call(configuredChannel, event, callback);
+        };
+        registerPresence("sync", () => {
+          try {
+            notifyPresence({
+              kind: "sync",
+              presence: parsePresenceState(configuredChannel.presenceState?.())
+            });
+          } catch {
+          }
+        });
+        registerPresence("join", (payload) => {
+          const entries = isRecord3(payload) ? payload.newPresences : void 0;
+          for (const presence of parsePresenceList(entries)) {
+            notifyPresence({
+              kind: "upsert",
+              presence
+            });
+          }
+        });
+        registerPresence("leave", (payload) => {
+          const entries = isRecord3(payload) ? payload.leftPresences : void 0;
+          for (const presence of parsePresenceList(entries)) {
+            notifyPresence({
+              kind: "remove",
+              clientId: presence.clientId
+            });
+          }
+        });
+      }
       active = {
         binding,
         session,
         input,
-        channel: channel.on("broadcast", {
-          event: REALTIME_EVENT
-        }, () => {
-          if (active.closed) return;
-          input.onBroadcastHint();
-        }),
+        channel: configuredChannel,
+        trackPresence: (presence) => trackPresenceOnChannel(configuredChannel, binding, presence),
+        presenceDraft: input.presence,
         closed: false
       };
-      const subscribed = await channel.subscribe();
+      const subscribed = await configuredChannel.subscribe((status2) => {
+        if (!initialSubscriptionSettled || active.closed) return;
+        if (status2 === "SUBSCRIBED") {
+          input.onStatus("SUBSCRIBED");
+          const presence = active.presenceDraft;
+          if (presence !== void 0) {
+            void active.trackPresence(presence).catch(() => {
+              if (!active.closed) input.onStatus("RECONNECTING");
+            });
+          }
+        } else if (status2 === "CHANNEL_ERROR" || status2 === "TIMED_OUT") {
+          input.onStatus("RECONNECTING");
+        } else if (status2 === "CLOSED") {
+          input.onStatus("OFFLINE");
+        }
+      });
       if (subscribed !== void 0) {
         assertPortResult(subscribed, "channel.subscribe");
       }
+      if (input.presence !== void 0) {
+        await active.trackPresence(input.presence);
+      }
+      initialSubscriptionSettled = true;
     } catch (error2) {
       await Promise.resolve(channel.unsubscribe());
       input.onStatus("OFFLINE");
@@ -4092,6 +5905,7 @@ var PixyncSupabaseProvider = class {
       if (active.closed) return;
       active.closed = true;
       try {
+        await Promise.resolve(active.channel.untrack?.()).catch(() => void 0);
         await Promise.resolve(active.channel.unsubscribe());
       } finally {
         active.input.onStatus("CLOSED");
@@ -4143,6 +5957,12 @@ var PixyncSupabaseProvider = class {
         assertPortResult(result, FETCH_RPC);
         return parseFetchRows(result.data, active.binding.projectId, afterProjectRevision);
       },
+      publishPresence: async (presence) => {
+        await recheck();
+        ensureOpen();
+        await active.trackPresence(presence);
+        active.presenceDraft = presence;
+      },
       close: async (reason = "closed") => {
         void reason;
         await closeActive(reason);
@@ -4159,6 +5979,8 @@ var PIXYNC_SUPABASE_RPC_NAMES = Object.freeze({
 
 // src/pixync/transport.ts
 var SAFE_ID4 = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u;
+var PRESENCE_TEXT_MAX = 80;
+var ISO_TIMESTAMP_MAX = 64;
 var PixyncTransportError = class extends Error {
   code;
   path;
@@ -4184,6 +6006,37 @@ function assertRevision2(value, path) {
   if (!Number.isSafeInteger(value) || value < 0) {
     invalid("A non-negative safe integer is required.", path);
   }
+}
+function assertPresenceText2(value, path) {
+  if (typeof value !== "string" || value.trim().length === 0 || value.length > PRESENCE_TEXT_MAX) {
+    invalid("Presence text must be short, non-empty text.", path);
+  }
+}
+function assertPresenceDraft2(value, path = "presence") {
+  if (!isRecord4(value)) {
+    invalid("Presence must be a bounded metadata object.", path);
+  }
+  assertPresenceText2(value.displayName, `${path}.displayName`);
+  if (value.mode !== "iDRAW" && value.mode !== "iAUDIO" && value.mode !== "iGAME") {
+    invalid("Presence mode is invalid.", `${path}.mode`);
+  }
+  assertPresenceText2(value.selectionLabel, `${path}.selectionLabel`);
+}
+function isPresence(value) {
+  if (!isRecord4(value)) return false;
+  if (typeof value.actorId !== "string" || !SAFE_ID4.test(value.actorId) || typeof value.clientId !== "string" || !SAFE_ID4.test(value.clientId)) return false;
+  if (typeof value.displayName !== "string" || value.displayName.trim().length === 0 || value.displayName.length > PRESENCE_TEXT_MAX) return false;
+  if (value.mode !== "iDRAW" && value.mode !== "iAUDIO" && value.mode !== "iGAME") return false;
+  if (typeof value.selectionLabel !== "string" || value.selectionLabel.trim().length === 0 || value.selectionLabel.length > PRESENCE_TEXT_MAX) return false;
+  return typeof value.updatedAt === "string" && value.updatedAt.length <= ISO_TIMESTAMP_MAX && Number.isFinite(Date.parse(value.updatedAt));
+}
+function isPresenceEvent(value) {
+  if (!isRecord4(value)) return false;
+  if (value.kind === "sync") {
+    return Array.isArray(value.presence) && value.presence.every(isPresence);
+  }
+  if (value.kind === "upsert") return isPresence(value.presence);
+  return value.kind === "remove" && typeof value.clientId === "string" && SAFE_ID4.test(value.clientId);
 }
 function assertBindingId(value, path) {
   if (typeof value !== "string" || !SAFE_ID4.test(value)) {
@@ -4279,8 +6132,17 @@ var PixyncTransportAdapter = class {
     if (input.onBroadcastHint !== void 0) {
       assertCallback(input.onBroadcastHint, "onBroadcastHint");
     }
+    if (input.onPresence !== void 0) {
+      assertCallback(input.onPresence, "onPresence");
+    }
+    if (input.presence !== void 0) {
+      assertPresenceDraft2(input.presence);
+    }
     if (input.onStatus !== void 0) {
       assertCallback(input.onStatus, "onStatus");
+    }
+    if (input.onReconnected !== void 0) {
+      assertCallback(input.onReconnected, "onReconnected");
     }
     if (input.sessionGeneration <= this.#highestSessionGeneration) {
       transportFailure("STALE_SESSION", "A transport session generation must increase monotonically.", "sessionGeneration");
@@ -4291,6 +6153,7 @@ var PixyncTransportAdapter = class {
     this.#statusSink = input.onStatus;
     this.#setStatus("CONNECTING");
     let authoritativeBinding;
+    const pendingPresence = [];
     const providerInput = {
       projectId: input.projectId,
       clientId: input.clientId,
@@ -4317,10 +6180,37 @@ var PixyncTransportAdapter = class {
         if (token !== this.#attempt || active?.token !== token || this.#status !== "SUBSCRIBED" || authoritativeBinding === void 0 || !sameBinding2(active.binding, authoritativeBinding)) return;
         input.onBroadcastHint?.();
       },
+      ...input.presence === void 0 ? {} : {
+        presence: input.presence
+      },
+      ...input.onPresence === void 0 ? {} : {
+        onPresence: async (event) => {
+          if (token !== this.#attempt || !isPresenceEvent(event)) return;
+          const active = this.#active;
+          if (authoritativeBinding === void 0 || active?.token !== token || this.#status !== "SUBSCRIBED" || !sameBinding2(active.binding, authoritativeBinding)) {
+            if (authoritativeBinding === void 0) pendingPresence.push(event);
+            return;
+          }
+          try {
+            await input.onPresence?.(event);
+          } catch {
+          }
+        }
+      },
       onStatus: (status2) => {
         if (token !== this.#attempt) return;
         if (status2 === "SUBSCRIBED" && this.#active?.token !== token) return;
+        const wasUnavailable = this.#status === "RECONNECTING" || this.#status === "OFFLINE";
         this.#setStatus(status2);
+        if (status2 === "SUBSCRIBED" && wasUnavailable && this.#active?.token === token) {
+          try {
+            const result2 = input.onReconnected?.();
+            if (result2 !== void 0) {
+              void Promise.resolve(result2).catch(() => void 0);
+            }
+          } catch {
+          }
+        }
       }
     };
     let result;
@@ -4352,6 +6242,12 @@ var PixyncTransportAdapter = class {
       binding,
       connection
     };
+    if (input.onPresence !== void 0 && pendingPresence.length > 0) {
+      const initialPresence = pendingPresence.splice(0);
+      for (const event of initialPresence) {
+        void Promise.resolve(input.onPresence(event)).catch(() => void 0);
+      }
+    }
     if (this.#status === "CONNECTING") this.#setStatus("SUBSCRIBED");
   }
   async submit(operation) {
@@ -4368,6 +6264,17 @@ var PixyncTransportAdapter = class {
       transportFailure("STALE_SESSION", "The authenticated session changed while the operation was submitted.");
     }
     return this.#validateAck(operation, ack);
+  }
+  async publishPresence(presence) {
+    const active = this.#requireActive();
+    assertPresenceDraft2(presence);
+    if (typeof active.connection.publishPresence !== "function") {
+      transportFailure("INVALID_INPUT", "The active provider does not support Presence.", "presence");
+    }
+    await active.connection.publishPresence(presence);
+    if (!this.#isCurrent(active)) {
+      transportFailure("STALE_SESSION", "The authenticated session changed while Presence was published.");
+    }
   }
   async catchUp(afterProjectRevision) {
     const active = this.#requireActive();
@@ -4556,36 +6463,57 @@ var PixyncProductionCompositionRoot = class _PixyncProductionCompositionRoot {
   get binding() {
     return this.#transport.binding;
   }
+  async publishPresence(presence) {
+    if (!this.#connected) {
+      throw new Error("Production PiXYNC is not connected.");
+    }
+    await this.#coordinator.publishPresence(presence);
+  }
   async connect() {
     if (this.#connected) return;
-    await this.#coordinator.connect({
-      projectId: this.#options.projectId,
-      clientId: this.#options.clientId,
-      sessionGeneration: this.#options.sessionGeneration,
-      ...this.#options.onStatus === void 0 ? {} : {
-        onStatus: this.#options.onStatus
-      },
-      ...this.#options.onError === void 0 ? {} : {
-        onCatchUpError: this.#options.onError
+    try {
+      await this.#coordinator.connect({
+        projectId: this.#options.projectId,
+        clientId: this.#options.clientId,
+        sessionGeneration: this.#options.sessionGeneration,
+        ...this.#options.onStatus === void 0 ? {} : {
+          onStatus: this.#options.onStatus
+        },
+        ...this.#options.presence === void 0 ? {} : {
+          presence: this.#options.presence
+        },
+        ...this.#options.onPresence === void 0 ? {} : {
+          onPresence: this.#options.onPresence
+        },
+        ...this.#options.onError === void 0 ? {} : {
+          onCatchUpError: this.#options.onError
+        }
+      });
+      await this.#coordinator.reconcile();
+      await this.#coordinator.catchUp();
+      const binding = this.#transport.binding;
+      if (binding === void 0) {
+        throw new Error("Authenticated PiXYNC binding is unavailable.");
       }
-    });
-    await this.#coordinator.reconcile();
-    await this.#coordinator.catchUp();
-    const binding = this.#transport.binding;
-    if (binding === void 0) throw new Error("Authenticated PiXYNC binding is unavailable.");
-    this.#eventTarget.dispatchEvent(new CustomEvent("draw2:pixync-binding", {
-      detail: {
-        projectId: binding.projectId,
-        actorId: binding.actorId,
-        clientId: binding.clientId,
-        role: binding.role
-      }
-    }));
-    this.#installEvents();
-    this.#connected = true;
+      this.#eventTarget.dispatchEvent(new CustomEvent("draw2:pixync-binding", {
+        detail: {
+          projectId: binding.projectId,
+          actorId: binding.actorId,
+          clientId: binding.clientId,
+          role: binding.role
+        }
+      }));
+      this.#installEvents();
+      this.#connected = true;
+    } catch (error2) {
+      this.#removeEvents();
+      this.#lazy.dispose();
+      this.#connected = false;
+      await this.#coordinator.close("connect-failed").catch(() => void 0);
+      throw error2;
+    }
   }
   async close(reason = "closed") {
-    if (!this.#connected) return;
     this.#removeEvents();
     this.#lazy.dispose();
     this.#connected = false;
@@ -5404,8 +7332,13 @@ var PixyncGameRevisionRemoteStore = class {
 };
 
 // src/draw2-selection.ts
+var DRAW2_LIVE_HISTORY_LIMIT = 128;
 var MAX_SELECTION_PIXELS = 1048576;
 var MAX_CLIPBOARD_DIMENSION = 4096;
+var DEFAULT_SELECTION_OPERATION_IDENTITY = {
+  actorId: "draw2-selection-local",
+  clientId: "draw2-selection-local"
+};
 function error(code, message, path) {
   return path === void 0 ? {
     code,
@@ -5420,6 +7353,9 @@ function error(code, message, path) {
 }
 function isInteger(value) {
   return Number.isSafeInteger(value);
+}
+function isSelectionShapeKind(value) {
+  return value === "rectangle" || value === "ellipse" || value === "freehand" || value === "magic" || value === "alpha" || value === "multi-region";
 }
 function boundsFromRegions(regions) {
   if (regions.length === 0) throw new Error("Selection requires at least one region.");
@@ -5786,16 +7722,36 @@ function changedRegions(assetId, points) {
     }
   ];
 }
-async function buildResult(state2, commandId, operationType, operationPayload2, asset, dirtyTiles, dirtyRegions, copiedBytes, cowSplitCount, noOp = false) {
+function createSelectionTransformWirePayload(snapshot, transform2, destinationCount, outOfBoundsClipped) {
+  const selectionMask = createRasterSelectionMask(snapshot.pixels);
+  if (selectionMask === void 0) {
+    throw new Error("Selection transform requires a non-empty selection mask.");
+  }
+  return {
+    selectionId: snapshot.selectionId,
+    selectionVersion: snapshot.mask.selectionVersion,
+    selectionKind: snapshot.mask.kind,
+    selectionBounds: boundsFromRegions(snapshot.mask.regions),
+    scope: snapshot.scope,
+    sourceRasterRevision: snapshot.sourceRasterRevision,
+    sourceStructureEpoch: snapshot.sourceStructureEpoch,
+    selectionMask,
+    transform: transform2,
+    sourceCount: snapshot.pixels.length,
+    destinationCount,
+    outOfBoundsClipped
+  };
+}
+async function buildResult(state2, commandId, operationType, operationPayload2, asset, dirtyTiles, dirtyRegions, copiedBytes, cowSplitCount, noOp = false, identity = DEFAULT_SELECTION_OPERATION_IDENTITY) {
   const operationBody = {
     operationType,
     schemaVersion: 1,
     commandId,
     projectId: state2.projectId,
     assetId: asset.id,
-    actorId: "draw2-selection-local",
-    clientId: "draw2-selection-local",
-    clientSequence: state2.lastClientSequenceByClient["draw2-selection-local"] ?? 0,
+    actorId: identity.actorId,
+    clientId: identity.clientId,
+    clientSequence: identity.clientSequence ?? state2.lastClientSequenceByClient[identity.clientId] ?? 0,
     structureEpoch: state2.structureEpoch,
     payload: operationPayload2
   };
@@ -5915,15 +7871,17 @@ function applyPixelMutations(state2, assetId, sourcePixels, destinationPixels, c
     changed: true
   };
 }
-function commitState(state2, commandId) {
+function commitState(state2, commandId, identity = DEFAULT_SELECTION_OPERATION_IDENTITY) {
   const next = cloneProjectStateShared(state2);
   next.appliedCommandIds = [
     ...next.appliedCommandIds,
     commandId
   ];
+  const previousSequence = next.lastClientSequenceByClient[identity.clientId] ?? 0;
+  const nextSequence = identity.clientSequence === void 0 ? previousSequence + 1 : Math.max(previousSequence + 1, identity.clientSequence);
   next.lastClientSequenceByClient = {
     ...next.lastClientSequenceByClient,
-    ["draw2-selection-local"]: (next.lastClientSequenceByClient["draw2-selection-local"] ?? 0) + 1
+    [identity.clientId]: nextSequence
   };
   return next;
 }
@@ -5960,14 +7918,7 @@ async function commitTransform(state2, command) {
   const transform2 = command.payload.session.transform;
   const identityTransform = transform2.operation === "MOVE" && transform2.dx === 0 && transform2.dy === 0;
   if (identityTransform) {
-    const result = await buildResult(state2, command.commandId, "selection.transformCommit", {
-      selectionId: command.payload.selection.selectionId,
-      selectionVersion: command.payload.selection.mask.selectionVersion,
-      transform: transform2,
-      sourcePixelCount: command.payload.selection.pixels.length,
-      destinationPixelCount: clipped.length,
-      outOfBoundsClipped: false
-    }, asset, /* @__PURE__ */ new Map(), [], 0, 0, true);
+    const result = await buildResult(state2, command.commandId, "selection.transformCommit", createSelectionTransformWirePayload(command.payload.selection, transform2, clipped.length, false), asset, /* @__PURE__ */ new Map(), [], 0, 0, true, command);
     return {
       ok: true,
       state: state2,
@@ -5978,21 +7929,14 @@ async function commitTransform(state2, command) {
   const sourcePoints = command.payload.selection.pixels;
   const destinationPoints = clipped;
   const dirtyRegions = changedRegions(asset.id, mutation.dirtyPoints);
-  const operationPayload2 = {
-    selectionId: command.payload.selection.selectionId,
-    selectionVersion: command.payload.selection.mask.selectionVersion,
-    transform: command.payload.session.transform,
-    sourcePixelCount: sourcePoints.length,
-    destinationPixelCount: destinationPoints.length,
-    outOfBoundsClipped: outOfBounds && command.payload.session.transform.outOfBoundsPolicy === "CLIP"
-  };
-  const temporaryResult = await buildResult(mutation.state, command.commandId, "selection.transformCommit", operationPayload2, mutation.asset, mutation.dirtyTiles, dirtyRegions, mutation.copiedBytes, mutation.cowSplitCount, !mutation.changed);
+  const operationPayload2 = createSelectionTransformWirePayload(command.payload.selection, command.payload.session.transform, destinationPoints.length, outOfBounds && command.payload.session.transform.outOfBoundsPolicy === "CLIP");
+  const temporaryResult = await buildResult(mutation.state, command.commandId, "selection.transformCommit", operationPayload2, mutation.asset, mutation.dirtyTiles, dirtyRegions, mutation.copiedBytes, mutation.cowSplitCount, !mutation.changed, command);
   if (!mutation.changed) return {
     ok: true,
     state: state2,
     result: temporaryResult
   };
-  const nextState = commitState(mutation.state, command.commandId);
+  const nextState = commitState(mutation.state, command.commandId, command);
   return {
     ok: true,
     state: nextState,
@@ -6000,10 +7944,154 @@ async function commitTransform(state2, command) {
       ...temporaryResult,
       operation: {
         ...temporaryResult.operation,
-        clientSequence: nextState.lastClientSequenceByClient["draw2-selection-local"] ?? 0
+        clientSequence: nextState.lastClientSequenceByClient[command.clientId] ?? command.clientSequence
       }
     }
   };
+}
+function wireSelectionPixels(asset, mask) {
+  const pixels = [];
+  for (const row of mask.rows) {
+    for (const span of row.spans) {
+      for (let offset = 0; offset < span.width; offset += 1) {
+        const x = span.x + offset;
+        const y = row.y;
+        pixels.push({
+          x,
+          y,
+          colorIndex: asset.raster.getPixel(x, y)
+        });
+      }
+    }
+  }
+  return pixels;
+}
+async function applyCompactSelectionTransform(state2, command) {
+  const asset = state2.assets[command.assetId];
+  if (asset === void 0) {
+    return {
+      ok: false,
+      state: state2,
+      diagnostics: [
+        error("TRANSFORM_ASSET_NOT_FOUND", "Transform asset was not found.")
+      ]
+    };
+  }
+  const payload = command.payload;
+  const diagnostics = [];
+  if (command.projectId !== state2.projectId) {
+    diagnostics.push(error("TRANSFORM_COMMAND_SCOPE_INVALID", "Transform command project is stale or mismatched.", "projectId"));
+  }
+  if (command.assetId !== payload.scope?.assetId) {
+    diagnostics.push(error("TRANSFORM_COMMAND_SCOPE_INVALID", "Transform command asset does not match the selection scope.", "scope.assetId"));
+  }
+  if (command.baseStructureEpoch !== state2.structureEpoch) {
+    diagnostics.push(error("TRANSFORM_COMMAND_SCOPE_INVALID", "Transform command structure epoch is stale or mismatched.", "baseStructureEpoch"));
+  }
+  if (state2.appliedCommandIds.includes(command.commandId)) {
+    diagnostics.push(error("TRANSFORM_DUPLICATE_COMMAND", "Transform command was already applied.", "commandId"));
+  }
+  if (typeof payload.selectionId !== "string" || payload.selectionId.length < 1 || payload.selectionId.length > 128) {
+    diagnostics.push(error("SELECTION_ID_INVALID", "Selection ID must be a bounded non-empty string.", "selectionId"));
+  }
+  if (!isInteger(payload.selectionVersion) || payload.selectionVersion < 1) {
+    diagnostics.push(error("SELECTION_VERSION_INVALID", "Selection version must be positive.", "selectionVersion"));
+  }
+  if (!isSelectionShapeKind(payload.selectionKind)) {
+    diagnostics.push(error("SELECTION_KIND_INVALID", "Selection kind is unsupported.", "selectionKind"));
+  }
+  if (!isInteger(payload.sourceRasterRevision) || payload.sourceRasterRevision < 0) {
+    diagnostics.push(error("STALE_SELECTION_RASTER", "Selection source raster revision is invalid.", "sourceRasterRevision"));
+  }
+  if (!isInteger(payload.sourceStructureEpoch) || payload.sourceStructureEpoch !== command.baseStructureEpoch) {
+    diagnostics.push(error("STALE_SELECTION_STRUCTURE", "Selection source structure epoch is stale.", "sourceStructureEpoch"));
+  }
+  if (!isInteger(payload.sourceCount) || payload.sourceCount < 1 || payload.sourceCount > MAX_SELECTION_PIXELS) {
+    diagnostics.push(error("SELECTION_PIXEL_LIMIT_EXCEEDED", "Selection source count is outside its bounded limit.", "sourceCount"));
+  }
+  if (!isInteger(payload.destinationCount) || payload.destinationCount < 0 || payload.destinationCount > MAX_SELECTION_PIXELS) {
+    diagnostics.push(error("TRANSFORM_PIXEL_LIMIT_EXCEEDED", "Transform destination count is outside its bounded limit.", "destinationCount"));
+  }
+  if (typeof payload.outOfBoundsClipped !== "boolean") {
+    diagnostics.push(error("TRANSFORM_METADATA_INVALID", "Transform clipping metadata must be boolean.", "outOfBoundsClipped"));
+  }
+  const scope = payload.scope;
+  const validScope = scope !== null && typeof scope === "object" && !Array.isArray(scope);
+  if (!validScope) {
+    diagnostics.push(error("SELECTION_SCOPE_INVALID", "Selection scope is required.", "scope"));
+  } else {
+    diagnostics.push(...validateStructureScope(state2, scope, command.assetId));
+  }
+  const selectionBounds = payload.selectionBounds;
+  const validBounds = selectionBounds !== null && typeof selectionBounds === "object" && !Array.isArray(selectionBounds);
+  if (!validBounds) {
+    diagnostics.push(error("SELECTION_REGION_INVALID", "Selection bounds are required.", "selectionBounds"));
+  } else {
+    diagnostics.push(...validateRegion(asset, selectionBounds, "selectionBounds"));
+    if (selectionBounds.width * selectionBounds.height > MAX_SELECTION_PIXELS) {
+      diagnostics.push(error("TRANSFORM_PIXEL_LIMIT_EXCEEDED", "Selection bounds exceed the bounded pixel limit.", "selectionBounds"));
+    }
+  }
+  let decodedMask;
+  try {
+    decodedMask = decodeRasterSelectionMask(payload.selectionMask);
+  } catch (cause) {
+    diagnostics.push(error("RASTER_SELECTION_MASK_INVALID", cause instanceof Error ? cause.message : "Selection mask is invalid.", "selectionMask"));
+  }
+  if (decodedMask !== void 0) {
+    if (decodedMask.selectedCount > MAX_SELECTION_PIXELS) {
+      diagnostics.push(error("SELECTION_PIXEL_LIMIT_EXCEEDED", "Selection mask exceeds the bounded pixel limit.", "selectionMask.selectedCount"));
+    }
+    if (decodedMask.x + decodedMask.width > asset.width || decodedMask.y + decodedMask.height > asset.height) {
+      diagnostics.push(error("SELECTION_OUTSIDE_BOUNDS", "Selection mask is outside the raster.", "selectionMask"));
+    }
+    if (validBounds && (decodedMask.x < selectionBounds.x || decodedMask.y < selectionBounds.y || decodedMask.x + decodedMask.width > selectionBounds.x + selectionBounds.width || decodedMask.y + decodedMask.height > selectionBounds.y + selectionBounds.height)) {
+      diagnostics.push(error("SELECTION_MASK_SCOPE_INVALID", "Selection mask is outside the declared selection bounds.", "selectionMask"));
+    }
+    if (isInteger(payload.sourceCount) && payload.sourceCount !== decodedMask.selectedCount) {
+      diagnostics.push(error("TRANSFORM_METADATA_INVALID", "Selection source count does not match the selection mask.", "sourceCount"));
+    }
+  }
+  const transform2 = payload.transform;
+  const validTransform = transform2 !== null && typeof transform2 === "object" && !Array.isArray(transform2);
+  if (!validTransform) {
+    diagnostics.push(error("TRANSFORM_INVALID", "Transform descriptor is required.", "transform"));
+  } else {
+    diagnostics.push(...validateTransform(transform2));
+  }
+  if (diagnostics.length > 0 || decodedMask === void 0 || !validScope || !validBounds || !validTransform) {
+    return {
+      ok: false,
+      state: state2,
+      diagnostics
+    };
+  }
+  const selection2 = {
+    selectionId: payload.selectionId,
+    mask: {
+      kind: payload.selectionKind,
+      regions: [
+        selectionBounds
+      ],
+      selectionVersion: payload.selectionVersion
+    },
+    scope,
+    // The source revision is intentionally rebound to this peer's current
+    // raster. The operation is ordered by PiXYNC; the wire never transports
+    // an unbounded color array, so selected colors come from this canonical
+    // raster immediately before the ordered transform is applied.
+    sourceRasterRevision: asset.revision,
+    sourceStructureEpoch: state2.structureEpoch,
+    pixels: wireSelectionPixels(asset, decodedMask)
+  };
+  const session = createTransformSession(selection2, transform2, `remote-transform-${command.commandId}`);
+  return commitTransform(state2, {
+    ...command,
+    payload: {
+      selection: selection2,
+      session
+    }
+  });
 }
 async function cutClipboard(state2, command) {
   const asset = state2.assets[command.assetId];
@@ -6173,8 +8261,11 @@ var LocalUndoRedoHistory = class {
   #state;
   #undo = [];
   #redo = [];
-  constructor(state2) {
+  #maxEntries;
+  constructor(state2, options = {}) {
     this.#state = state2;
+    const maxEntries = options.maxEntries;
+    this.#maxEntries = typeof maxEntries === "number" && Number.isSafeInteger(maxEntries) && maxEntries >= 1 && maxEntries <= 1024 ? maxEntries : DRAW2_LIVE_HISTORY_LIMIT;
   }
   get state() {
     return this.#state;
@@ -6184,6 +8275,13 @@ var LocalUndoRedoHistory = class {
   }
   get redoDepth() {
     return this.#redo.length;
+  }
+  get maxEntries() {
+    return this.#maxEntries;
+  }
+  #trim(entries) {
+    if (entries.length <= this.#maxEntries) return;
+    entries.splice(0, entries.length - this.#maxEntries);
   }
   snapshot(maxEntries = Number.MAX_SAFE_INTEGER) {
     const limit = Number.isSafeInteger(maxEntries) && maxEntries >= 0 ? maxEntries : Number.MAX_SAFE_INTEGER;
@@ -6217,7 +8315,9 @@ var LocalUndoRedoHistory = class {
         after: cloneProjectStateShared(entry.after)
       });
     }
-    this.#state = cloneProjectStateShared(snapshot.undo.at(-1)?.after ?? snapshot.redo.at(-1)?.before ?? this.#state);
+    this.#trim(this.#undo);
+    this.#trim(this.#redo);
+    this.#state = cloneProjectStateShared(this.#undo.at(-1)?.after ?? this.#redo.at(-1)?.before ?? this.#state);
   }
   record(before, after, operationId, operationType, actionId = operationId) {
     this.#undo.push({
@@ -6227,6 +8327,7 @@ var LocalUndoRedoHistory = class {
       before: cloneProjectStateShared(before),
       after: cloneProjectStateShared(after)
     });
+    this.#trim(this.#undo);
     this.#redo.length = 0;
     this.#state = cloneProjectStateShared(after);
   }
@@ -6274,12 +8375,64 @@ var LocalUndoRedoHistory = class {
     ]);
     this.#undo.splice(0, this.#undo.length, ...undo);
     this.#redo.splice(0, this.#redo.length, ...redo);
+    this.#trim(this.#undo);
+    this.#trim(this.#redo);
+    this.#state = cloneProjectStateShared(currentState);
+  }
+  /** Rebase a compact remote selection transform without dropping local history. */
+  async rebaseRemoteSelectionTransformOperation(command, currentState) {
+    const rebase = async (snapshot) => {
+      if (snapshot.appliedCommandIds.includes(command.commandId)) {
+        return snapshot;
+      }
+      const asset = snapshot.assets[command.assetId];
+      if (asset === void 0) {
+        throw new Error("Remote selection transform history rebase asset is missing.");
+      }
+      const nextClientSequence2 = (snapshot.lastClientSequenceByClient[command.clientId] ?? 0) + 1;
+      const rebasedCommand = {
+        ...command,
+        projectId: snapshot.projectId,
+        baseStructureEpoch: snapshot.structureEpoch,
+        clientSequence: nextClientSequence2,
+        payload: {
+          ...command.payload,
+          sourceRasterRevision: asset.revision,
+          sourceStructureEpoch: snapshot.structureEpoch
+        }
+      };
+      const result = await applyCompactSelectionTransform(snapshot, rebasedCommand);
+      if (!result.ok) {
+        throw new Error(`Remote selection transform history rebase failed: ${result.diagnostics[0]?.code ?? "unknown"}`);
+      }
+      return {
+        ...result.state,
+        lastClientSequenceByClient: {
+          ...result.state.lastClientSequenceByClient,
+          [command.clientId]: command.clientSequence
+        }
+      };
+    };
+    const rebaseEntry = async (entry) => ({
+      ...entry,
+      before: await rebase(entry.before),
+      after: await rebase(entry.after)
+    });
+    const [undo, redo] = await Promise.all([
+      Promise.all(this.#undo.map(rebaseEntry)),
+      Promise.all(this.#redo.map(rebaseEntry))
+    ]);
+    this.#undo.splice(0, this.#undo.length, ...undo);
+    this.#redo.splice(0, this.#redo.length, ...redo);
+    this.#trim(this.#undo);
+    this.#trim(this.#redo);
     this.#state = cloneProjectStateShared(currentState);
   }
   undo() {
     const entry = this.#undo.pop();
     if (entry === void 0) return void 0;
     this.#redo.push(entry);
+    this.#trim(this.#redo);
     this.#state = cloneProjectStateShared(entry.before);
     return {
       state: this.#state,
@@ -6293,6 +8446,7 @@ var LocalUndoRedoHistory = class {
     const entry = this.#redo.pop();
     if (entry === void 0) return void 0;
     this.#undo.push(entry);
+    this.#trim(this.#undo);
     this.#state = cloneProjectStateShared(entry.after);
     return {
       state: this.#state,
@@ -7032,6 +9186,18 @@ function resolvePlaybackProjection(state2, currentFrameId, elapsedMs) {
 }
 
 // src/draw2-basic-tools.ts
+var COMPACT_SHAPE_TOOLS = /* @__PURE__ */ new Set([
+  "line",
+  "rect",
+  "rect-fill",
+  "ellipse",
+  "ellipse-fill",
+  "circle",
+  "circle-fill"
+]);
+function isCompactShapeTool(tool) {
+  return COMPACT_SHAPE_TOOLS.has(tool);
+}
 var DEFAULT_TOOL_OPTIONS = {
   brushSize: 1,
   brushShape: "square",
@@ -7061,15 +9227,15 @@ function normalizeToolOptions(options = {}) {
     selectionMode
   };
 }
-function clampPoint(point, bounds) {
+function clampPoint2(point, bounds) {
   return {
     x: Math.max(0, Math.min(bounds.width - 1, Math.round(point.x))),
     y: Math.max(0, Math.min(bounds.height - 1, Math.round(point.y)))
   };
 }
-function normalizeBounds(from, to, bounds) {
-  const a = clampPoint(from, bounds);
-  const b = clampPoint(to, bounds);
+function normalizeBounds2(from, to, bounds) {
+  const a = clampPoint2(from, bounds);
+  const b = clampPoint2(to, bounds);
   const x = Math.min(a.x, b.x);
   const y = Math.min(a.y, b.y);
   return {
@@ -7081,8 +9247,8 @@ function normalizeBounds(from, to, bounds) {
 }
 function snapSelectionBoundsToGrid(from, to, bounds, gridSize = 16) {
   const safeGridSize = Number.isSafeInteger(gridSize) ? Math.max(1, gridSize) : 16;
-  const a = clampPoint(from, bounds);
-  const b = clampPoint(to, bounds);
+  const a = clampPoint2(from, bounds);
+  const b = clampPoint2(to, bounds);
   const cellX = Math.min(Math.floor(a.x / safeGridSize), Math.floor(b.x / safeGridSize));
   const cellY = Math.min(Math.floor(a.y / safeGridSize), Math.floor(b.y / safeGridSize));
   const endCellX = Math.max(Math.floor(a.x / safeGridSize), Math.floor(b.x / safeGridSize));
@@ -7098,26 +9264,26 @@ function snapSelectionBoundsToGrid(from, to, bounds, gridSize = 16) {
     height: Math.max(1, maxY - y)
   };
 }
-function pointKey(point) {
+function pointKey2(point) {
   return `${point.x}:${point.y}`;
 }
-function sortedUnique(points, bounds) {
+function sortedUnique2(points, bounds) {
   const unique = /* @__PURE__ */ new Map();
   for (const point of points) {
-    const clamped = clampPoint(point, bounds);
-    unique.set(pointKey(clamped), clamped);
+    const clamped = clampPoint2(point, bounds);
+    unique.set(pointKey2(clamped), clamped);
   }
   return [
     ...unique.values()
   ].sort((left, right) => left.y - right.y || left.x - right.x);
 }
-function patternVisible(x, y, pattern) {
+function patternVisible2(x, y, pattern) {
   if (pattern === "checker") return (x + y) % 2 === 0;
   if (pattern === "dots") return x % 2 === 0 && y % 2 === 0;
   if (pattern === "bayer-2x2") return (x & 1) + (y & 1) * 2 !== 3;
   return true;
 }
-function stamp(center, options, bounds) {
+function stamp2(center, options, bounds) {
   const size = options.brushSize;
   const start = -Math.floor(size / 2);
   const centerOffset = (size - 1) / 2;
@@ -7128,7 +9294,7 @@ function stamp(center, options, bounds) {
       const x = start + column;
       const y = start + row;
       if (options.brushShape === "circle" && (column - centerOffset) ** 2 + (row - centerOffset) ** 2 > radius ** 2) continue;
-      if (!patternVisible(center.x + x, center.y + y, options.pattern)) {
+      if (!patternVisible2(center.x + x, center.y + y, options.pattern)) {
         continue;
       }
       points.push({
@@ -7139,208 +9305,21 @@ function stamp(center, options, bounds) {
   }
   return points.filter((point) => point.x >= 0 && point.y >= 0 && point.x < bounds.width && point.y < bounds.height);
 }
-function stampBrush(points, options, bounds) {
+function stampBrush2(points, options, bounds) {
   const safe = normalizeToolOptions(options);
-  const stamped = points.flatMap((point) => stamp(clampPoint(point, bounds), safe, bounds));
-  return sortedUnique(stamped, bounds);
+  const stamped = points.flatMap((point) => stamp2(clampPoint2(point, bounds), safe, bounds));
+  return sortedUnique2(stamped, bounds);
 }
-function rectanglePixels(rect, filled) {
-  const points = [];
-  for (let y = rect.y; y < rect.y + rect.height; y += 1) {
-    for (let x = rect.x; x < rect.x + rect.width; x += 1) {
-      if (filled || x === rect.x || y === rect.y || x === rect.x + rect.width - 1 || y === rect.y + rect.height - 1) points.push({
-        x,
-        y
-      });
-    }
-  }
-  return points;
-}
-function isFilledShapeTool(tool) {
-  return tool === "rect-fill" || tool === "ellipse-fill" || tool === "circle-fill";
-}
-function isOutlineShapeTool(tool) {
-  return tool === "rect" || tool === "ellipse" || tool === "circle";
-}
-function patternedShapePixels(points, pattern, bounds) {
-  return sortedUnique(points.filter((point) => patternVisible(point.x, point.y, pattern)), bounds);
-}
-function insetBounds(rect, inset) {
-  const width = rect.width - inset * 2;
-  const height = rect.height - inset * 2;
-  if (width < 1 || height < 1) return void 0;
-  return {
-    x: rect.x + inset,
-    y: rect.y + inset,
-    width,
-    height
-  };
-}
-function circleRectForBounds(rect) {
-  const side = Math.min(rect.width, rect.height);
-  return {
-    x: rect.x + Math.floor((rect.width - side) / 2),
-    y: rect.y + Math.floor((rect.height - side) / 2),
-    width: side,
-    height: side
-  };
-}
-function shapeGeometryBounds(tool, rect) {
-  return tool === "circle" || tool === "circle-fill" ? circleRectForBounds(rect) : rect;
-}
-function subtractPixels(outer, inner, bounds) {
-  const innerKeys = new Set(inner.map(pointKey));
-  return sortedUnique(outer.filter((point) => !innerKeys.has(pointKey(point))), bounds);
-}
-function shapeStrokePixels(tool, from, to, brushSize2, bounds) {
-  const dragRect = normalizeBounds(from, to, bounds);
-  const geometryRect = shapeGeometryBounds(tool, dragRect);
-  if (brushSize2 <= 1) return shapePixels(tool, from, to, bounds);
-  const outer = tool === "rect" ? rectanglePixels(geometryRect, true) : ellipsePixels(geometryRect, true);
-  const innerRect = insetBounds(geometryRect, brushSize2);
-  if (innerRect === void 0) return sortedUnique(outer, bounds);
-  const inner = tool === "rect" ? rectanglePixels(innerRect, true) : ellipsePixels(innerRect, true);
-  return subtractPixels(outer, inner, bounds);
-}
-function shapeWritePixels(tool, from, to, options, bounds) {
-  const rect = normalizeBounds(from, to, bounds);
-  if (rect.width === 1 && rect.height === 1) {
-    return stampBrush([
-      clampPoint(from, bounds)
-    ], options, bounds);
-  }
-  if (isFilledShapeTool(tool)) {
-    return patternedShapePixels(shapePixels(tool, from, to, bounds), options.pattern, bounds);
-  }
-  return patternedShapePixels(shapeStrokePixels(tool, from, to, options.brushSize, bounds), options.pattern, bounds);
-}
-function ellipsePixels(rect, filled) {
-  const points = [];
-  const minX = rect.x;
-  const maxX = rect.x + rect.width - 1;
-  const minY = rect.y;
-  const maxY = rect.y + rect.height - 1;
-  if (maxX < minX || maxY < minY) return points;
-  if (minX === maxX || minY === maxY) {
-    if (filled) {
-      for (let y = minY; y <= maxY; y += 1) {
-        for (let x = minX; x <= maxX; x += 1) {
-          points.push({
-            x,
-            y
-          });
-        }
-      }
-    } else if (minX === maxX) {
-      for (let y = minY; y <= maxY; y += 1) points.push({
-        x: minX,
-        y
-      });
-    } else {
-      for (let x = minX; x <= maxX; x += 1) points.push({
-        x,
-        y: minY
-      });
-    }
-    return points;
-  }
-  const fillRanges = filled ? /* @__PURE__ */ new Map() : void 0;
-  const record2 = (x, y) => {
-    if (x < minX || x > maxX || y < minY || y > maxY) return;
-    if (fillRanges !== void 0) {
-      const existing = fillRanges.get(y);
-      if (existing === void 0) fillRanges.set(y, {
-        min: x,
-        max: x
-      });
-      else {
-        existing.min = Math.min(existing.min, x);
-        existing.max = Math.max(existing.max, x);
-      }
-      return;
-    }
-    points.push({
-      x,
-      y
-    });
-  };
-  let x0 = minX;
-  let x1 = maxX;
-  let y0 = minY;
-  let y1 = maxY;
-  let a = Math.abs(x1 - x0);
-  const b = Math.abs(y1 - y0);
-  const b1 = b & 1;
-  let dx = 4 * (1 - a) * b * b;
-  let dy = 4 * (b1 + 1) * a * a;
-  let err = dx + dy + b1 * a * a;
-  y0 += Math.floor((b + 1) / 2);
-  y1 = y0 - b1;
-  a *= 8 * a;
-  const b8 = 8 * b * b;
-  do {
-    record2(x1, y0);
-    record2(x0, y0);
-    record2(x0, y1);
-    record2(x1, y1);
-    const e2 = 2 * err;
-    if (e2 <= dy) {
-      y0 += 1;
-      y1 -= 1;
-      dy += a;
-      err += dy;
-    }
-    if (e2 >= dx || 2 * err > dy) {
-      x0 += 1;
-      x1 -= 1;
-      dx += b8;
-      err += dx;
-    }
-  } while (x0 <= x1);
-  while (y0 - y1 < b) {
-    record2(x0 - 1, y0);
-    record2(x1 + 1, y0);
-    record2(x0 - 1, y1);
-    record2(x1 + 1, y1);
-    y0 += 1;
-    y1 -= 1;
-  }
-  if (fillRanges !== void 0) {
-    for (const [y, range] of fillRanges) {
-      for (let x = range.min; x <= range.max; x += 1) points.push({
-        x,
-        y
-      });
-    }
-  }
-  return points;
-}
-function shapePixels(tool, from, to, bounds) {
-  const rect = normalizeBounds(from, to, bounds);
-  if (tool === "line") {
-    return sortedUnique(interpolatePixelLine(clampPoint(from, bounds), clampPoint(to, bounds)), bounds);
-  }
-  if (tool === "rect") {
-    return sortedUnique(rectanglePixels(rect, false), bounds);
-  }
-  if (tool === "rect-fill") {
-    return sortedUnique(rectanglePixels(rect, true), bounds);
-  }
-  if (tool === "ellipse") {
-    return sortedUnique(ellipsePixels(rect, false), bounds);
-  }
-  if (tool === "ellipse-fill") {
-    return sortedUnique(ellipsePixels(rect, true), bounds);
-  }
-  if (tool === "circle" || tool === "circle-fill") {
-    const circleRect = circleRectForBounds(rect);
-    return sortedUnique(ellipsePixels(circleRect, tool === "circle-fill"), bounds);
-  }
-  return [];
+function shapePixels2(tool, from, to, bounds) {
+  return isCompactShapeTool(tool) ? shapePixelsInBounds(tool, from, to, bounds) : [];
 }
 function createWriteSet(tool, from, to, colorIndex, options, bounds) {
   const safe = normalizeToolOptions(options);
-  const base = tool === "pen" || tool === "eraser" ? stampBrush(interpolatePixelLine(clampPoint(from, bounds), clampPoint(to, bounds)), safe, bounds) : isFilledShapeTool(tool) || isOutlineShapeTool(tool) ? shapeWritePixels(tool, from, to, safe, bounds) : stampBrush(shapePixels(tool, from, to, bounds), safe, bounds);
+  const base = tool === "pen" || tool === "eraser" ? stampBrush2(interpolatePixelLine2(clampPoint2(from, bounds), clampPoint2(to, bounds)), safe, bounds) : isCompactShapeTool(tool) ? createShapeWriteSet(tool, from, to, colorIndex, {
+    brushSize: safe.brushSize,
+    brushShape: safe.brushShape,
+    pattern: safe.pattern
+  }, bounds) : stampBrush2(shapePixels2(tool, from, to, bounds), safe, bounds);
   return base.map((point) => ({
     ...point,
     colorIndex: tool === "eraser" ? 0 : colorIndex
@@ -7367,8 +9346,8 @@ function createToolPreviewWriteSet(tool, point, colorIndex, options, bounds) {
 }
 function createPathWriteSet(tool, points, colorIndex, options, bounds) {
   if (points.length === 0) return [];
-  const path = interpolatePixelPath(points.map((point) => clampPoint(point, bounds)));
-  return stampBrush(path, normalizeToolOptions(options), bounds).map((point) => ({
+  const path = interpolatePixelPath(points.map((point) => clampPoint2(point, bounds)));
+  return stampBrush2(path, normalizeToolOptions(options), bounds).map((point) => ({
     ...point,
     colorIndex: tool === "eraser" ? 0 : colorIndex
   }));
@@ -7387,7 +9366,7 @@ function createIndexedGradientWriteSet(reader, region, from, to, startColorIndex
   const writes = [];
   for (const point of region) {
     const progress = lengthSquared === 0 ? 1 : Math.max(0, Math.min(1, ((point.x - from.x) * dx + (point.y - from.y) * dy) / lengthSquared));
-    const targetIndex = progress <= 0 ? safeStartIndex : progress >= 1 ? safeEndIndex : nearestPaletteIndex(interpolateArgb(start, end, progress), palette);
+    const targetIndex = progress <= 0 ? safeStartIndex : progress >= 1 ? safeEndIndex : nearestPaletteIndex2(interpolateArgb2(start, end, progress), palette);
     if (reader.getPixel(point.x, point.y) !== targetIndex) {
       writes.push({
         ...point,
@@ -7397,14 +9376,14 @@ function createIndexedGradientWriteSet(reader, region, from, to, startColorIndex
   }
   return writes;
 }
-function interpolateArgb(start, end, progress) {
+function interpolateArgb2(start, end, progress) {
   const alpha = Math.round((start[0] ?? 0) + ((end[0] ?? 0) - (start[0] ?? 0)) * progress);
   const red = Math.round((start[1] ?? 0) + ((end[1] ?? 0) - (start[1] ?? 0)) * progress);
   const green = Math.round((start[2] ?? 0) + ((end[2] ?? 0) - (start[2] ?? 0)) * progress);
   const blue = Math.round((start[3] ?? 0) + ((end[3] ?? 0) - (start[3] ?? 0)) * progress);
   return ((alpha & 255) << 24 | (red & 255) << 16 | (green & 255) << 8 | blue & 255) >>> 0;
 }
-function nearestPaletteIndex(color, palette) {
+function nearestPaletteIndex2(color, palette) {
   const target = colorChannels(color);
   let bestIndex = 0;
   let bestDistance = Number.POSITIVE_INFINITY;
@@ -7476,7 +9455,7 @@ function selectByOpaque(reader, palette) {
   };
 }
 function selectByContiguousColor(reader, seed, mode, palette, threshold = 0, maxPixels = Math.min(1048576, reader.width * reader.height)) {
-  const start = clampPoint(seed, reader);
+  const start = clampPoint2(seed, reader);
   const targetIndex = reader.getPixel(start.x, start.y);
   const target = palette[targetIndex] ?? 0;
   const queue = [
@@ -7525,7 +9504,7 @@ function selectByContiguousColor(reader, seed, mode, palette, threshold = 0, max
   };
 }
 function selectByEllipse(reader, from, to) {
-  const bounds = normalizeBounds(from, to, reader);
+  const bounds = normalizeBounds2(from, to, reader);
   const centerX = bounds.x + (bounds.width - 1) / 2;
   const centerY = bounds.y + (bounds.height - 1) / 2;
   const radiusX = Math.max(0.5, bounds.width / 2);
@@ -7648,30 +9627,6 @@ function polygonSelectionPoints(reader, vertices) {
     }
   }
   return pixels;
-}
-function tileStampWrites(reader, source, origin, scale = 1) {
-  const safeScale = Math.max(1, Math.min(16, Math.round(scale)));
-  const writes = [];
-  for (let sourceY = 0; sourceY < source.height; sourceY += 1) {
-    for (let sourceX = 0; sourceX < source.width; sourceX += 1) {
-      const colorIndex = source.pixels[sourceY * source.width + sourceX] ?? 0;
-      if (colorIndex === 0) continue;
-      for (let dy = 0; dy < safeScale; dy += 1) {
-        for (let dx = 0; dx < safeScale; dx += 1) {
-          const x = origin.x + sourceX * safeScale + dx;
-          const y = origin.y + sourceY * safeScale + dy;
-          if (x >= 0 && y >= 0 && x < reader.width && y < reader.height) {
-            writes.push({
-              x,
-              y,
-              colorIndex
-            });
-          }
-        }
-      }
-    }
-  }
-  return writes;
 }
 
 // src/fp-006/contracts.ts
@@ -8892,12 +10847,12 @@ function normalizeDraw2SelectionStamp(input) {
 var Draw2SelectionStampStore = class {
   #stamps = /* @__PURE__ */ new Map();
   constructor(initial = []) {
-    for (const stamp2 of initial) this.save(stamp2);
+    for (const stamp3 of initial) this.save(stamp3);
   }
   save(input) {
-    const stamp2 = normalizeDraw2SelectionStamp(input);
-    this.#stamps.set(stamp2.id, stamp2);
-    return stamp2;
+    const stamp3 = normalizeDraw2SelectionStamp(input);
+    this.#stamps.set(stamp3.id, stamp3);
+    return stamp3;
   }
   load(id) {
     return this.#stamps.get(id);
@@ -9009,13 +10964,13 @@ function normalizeDraw2TimelineMetadata(value, frameCount) {
       ...reference
     })),
     ...selectionStampCandidates === void 0 ? {} : {
-      selectionStamps: selectionStamps.list().map((stamp2) => ({
-        ...stamp2,
-        pixels: stamp2.pixels.map((pixel) => ({
+      selectionStamps: selectionStamps.list().map((stamp3) => ({
+        ...stamp3,
+        pixels: stamp3.pixels.map((pixel) => ({
           ...pixel
         })),
         palette: [
-          ...stamp2.palette
+          ...stamp3.palette
         ]
       }))
     }
@@ -9027,6 +10982,8 @@ var DRAW2_PERSISTENCE_SCHEMA_VERSION = "DRAW2_PERSISTENCE_V1";
 var DRAW2_PERSISTENCE_DB_NAME = "pixiedraw2-draw-subdocuments";
 var DRAW2_PERSISTENCE_DB_VERSION = 1;
 var DRAW2_PERSISTENCE_STORE_NAME = "projects";
+var DRAW2_PERSISTED_HISTORY_LIMIT = 8;
+var DRAW2_PERSISTED_HISTORY_MAX_BYTES = 786432;
 function normalizeAssetDefinitions(entries) {
   const normalized = [
     ...entries ?? []
@@ -9216,11 +11173,24 @@ function deserializeHistoryEntry(entry) {
     after: deserializeDraw2ProjectState(entry.after)
   };
 }
-function serializeDraw2History(history2) {
-  return {
-    undo: history2.undo.map(serializeHistoryEntry),
-    redo: history2.redo.map(serializeHistoryEntry)
+function serializeDraw2History(history2, options = {}) {
+  const maxEntries = typeof options.maxEntries === "number" && Number.isSafeInteger(options.maxEntries) && options.maxEntries >= 0 ? options.maxEntries : DRAW2_PERSISTED_HISTORY_LIMIT;
+  const maxBytes = typeof options.maxBytes === "number" && Number.isSafeInteger(options.maxBytes) && options.maxBytes >= 0 ? options.maxBytes : DRAW2_PERSISTED_HISTORY_MAX_BYTES;
+  const serialized = {
+    undo: (maxEntries === 0 ? [] : history2.undo.slice(-maxEntries)).map(serializeHistoryEntry),
+    redo: (maxEntries === 0 ? [] : history2.redo.slice(-maxEntries)).map(serializeHistoryEntry)
   };
+  const encodedBytes = () => new TextEncoder().encode(JSON.stringify(serialized)).byteLength;
+  while ((serialized.undo.length > 0 || serialized.redo.length > 0) && encodedBytes() > maxBytes) {
+    if (serialized.undo.length >= serialized.redo.length && serialized.undo.length > 0) {
+      serialized.undo.shift();
+    } else if (serialized.redo.length > 0) {
+      serialized.redo.shift();
+    } else {
+      break;
+    }
+  }
+  return serialized;
 }
 function deserializeDraw2History(history2) {
   return {
@@ -9298,7 +11268,18 @@ function isNewer(incoming, current) {
   if (incoming.revision !== current.revision) {
     return incoming.revision > current.revision;
   }
-  return incoming.savedAt >= current.savedAt;
+  return incoming.stateHash === current.stateHash;
+}
+function matchesExpected(current, options) {
+  if (options?.expectedRevision !== void 0) {
+    const currentRevision = current?.revision ?? 0;
+    if (currentRevision !== options.expectedRevision) return false;
+  }
+  if (options?.expectedStateHash !== void 0) {
+    const currentStateHash = current?.stateHash ?? null;
+    if (currentStateHash !== options.expectedStateHash) return false;
+  }
+  return true;
 }
 function openDrawDatabase(name) {
   return new Promise((resolve, reject2) => {
@@ -9342,7 +11323,7 @@ function createIndexedDbDraw2PersistenceStore(databaseName = DRAW2_PERSISTENCE_D
         return null;
       }
     },
-    async save(record2) {
+    async save(record2, options) {
       if (!available) return {
         ok: false,
         stale: false
@@ -9356,7 +11337,8 @@ function createIndexedDbDraw2PersistenceStore(databaseName = DRAW2_PERSISTENCE_D
           const read = store.get(record2.projectId);
           read.onsuccess = () => {
             const current = read.result;
-            if (isNewer(record2, current)) store.put(record2);
+            if (!matchesExpected(current, options)) stale = true;
+            else if (isNewer(record2, current)) store.put(record2);
             else stale = true;
           };
           read.onerror = () => transaction.abort();
@@ -10116,6 +12098,16 @@ function withDraw2ProjectEditorPreferences(preferences, projectId, projectPrefer
       ...preferences.projects,
       [projectId]: normalizeProjectPreferences(projectPreferences)
     }
+  };
+}
+function withoutDraw2ProjectEditorPreferences(preferences, projectId) {
+  const projects = {
+    ...preferences.projects
+  };
+  delete projects[projectId];
+  return {
+    ...preferences,
+    projects
   };
 }
 
@@ -12592,7 +14584,7 @@ function assertDimensions(mapId, width, height, tileSize) {
     throw new Error("Tilemap tileSize must be an integer between 1 and 4096.");
   }
 }
-function normalizeCells(cells = [], width, height) {
+function normalizeCells2(cells = [], width, height) {
   const byKey = /* @__PURE__ */ new Map();
   for (const cell of cells) {
     if (!Number.isSafeInteger(cell.x) || !Number.isSafeInteger(cell.y) || cell.x < 0 || cell.x >= width || cell.y < 0 || cell.y >= height) {
@@ -12625,7 +14617,7 @@ function normalizeCells(cells = [], width, height) {
 function documentFrom(options) {
   const tileSize = options.tileSize ?? 1;
   assertDimensions(options.mapId, options.width, options.height, tileSize);
-  const cells = normalizeCells(options.cells, options.width, options.height);
+  const cells = normalizeCells2(options.cells, options.width, options.height);
   if (cells.length > GAME350_TILEMAP_MAX_CELLS) {
     throw new Error("Tilemap cell capacity is limited to 65536 cells.");
   }
@@ -13343,6 +15335,29 @@ function createIndexedDbWorkspaceManifestStore(databaseName = WORKSPACE_MANIFEST
       } catch {
       }
     },
+    async clear(projectId) {
+      try {
+        const database = await openManifestDatabase(databaseName);
+        return await new Promise((resolve) => {
+          const transaction = database.transaction(WORKSPACE_MANIFEST_STORE_NAME, "readwrite");
+          transaction.objectStore(WORKSPACE_MANIFEST_STORE_NAME).delete(projectId);
+          transaction.oncomplete = () => {
+            database.close();
+            resolve(true);
+          };
+          transaction.onerror = () => {
+            database.close();
+            resolve(false);
+          };
+          transaction.onabort = () => {
+            database.close();
+            resolve(false);
+          };
+        });
+      } catch {
+        return false;
+      }
+    },
     async updateModule(projectId, surface, patch, name) {
       const current = await this.load(projectId) ?? createWorkspaceProjectManifest(projectId, name);
       const now = (/* @__PURE__ */ new Date()).toISOString();
@@ -13407,6 +15422,43 @@ function announceWorkspaceProjectChanged(windowRef, detail) {
   }));
 }
 
+// src/workspace/project-data-deletion.ts
+var MODULE_STEPS = [
+  "draw",
+  "audio",
+  "game",
+  "pixync"
+];
+async function deleteWorkspaceProjectLocalData(projectId, ports) {
+  const normalizedProjectId = asWorkspaceProjectId(projectId);
+  const cleared = [];
+  const failed = [];
+  for (const step of MODULE_STEPS) {
+    try {
+      const removed = await ports[step].clear(normalizedProjectId);
+      if (removed === true) cleared.push(step);
+      else failed.push(step);
+    } catch {
+      failed.push(step);
+    }
+  }
+  if (failed.length === 0) {
+    try {
+      const removed = await ports.manifest.clear(normalizedProjectId);
+      if (removed === true) cleared.push("manifest");
+      else failed.push("manifest");
+    } catch {
+      failed.push("manifest");
+    }
+  }
+  return {
+    ok: failed.length === 0,
+    projectId: normalizedProjectId,
+    cleared,
+    failed
+  };
+}
+
 // src/pixync/indexeddb-persistence.ts
 var PIXYNC_INDEXEDDB_PERSISTENCE_SCHEMA = "PIXYNC_DRAW2_INDEXEDDB_SNAPSHOT_V1";
 var PIXYNC_INDEXEDDB_PERSISTENCE_STATUS = Object.freeze({
@@ -13415,7 +15467,8 @@ var PIXYNC_INDEXEDDB_PERSISTENCE_STATUS = Object.freeze({
   crossTabConcurrency: "TRANSACTION_CAS",
   crossProcessConcurrency: "UNTESTED",
   atomicReplaceScope: "SINGLE_ADAPTER_INSTANCE_QUEUE",
-  compareAndSwapScope: "INDEXEDDB_READWRITE_TRANSACTION"
+  compareAndSwapScope: "INDEXEDDB_READWRITE_TRANSACTION",
+  deletionBarrier: "SEPARATE_TOMBSTONE_STORE"
 });
 var PixyncIndexedDbPersistenceError = class extends Error {
   code;
@@ -13425,8 +15478,9 @@ var PixyncIndexedDbPersistenceError = class extends Error {
     this.code = code;
   }
 };
-var DB_VERSION = 1;
+var DB_VERSION = 2;
 var STORE_NAME = "snapshots";
+var DELETED_STORE_NAME = "deletedProjects";
 function clone2(value) {
   if (typeof structuredClone !== "function") {
     throw new PixyncIndexedDbPersistenceError("INDEXEDDB_UNAVAILABLE", "structuredClone is required by the IndexedDB persistence boundary.");
@@ -13476,6 +15530,11 @@ function openDatabase(factory, dbName) {
               keyPath: "projectId"
             });
           }
+          if (!db.objectStoreNames.contains(DELETED_STORE_NAME)) {
+            db.createObjectStore(DELETED_STORE_NAME, {
+              keyPath: "projectId"
+            });
+          }
         } catch (error2) {
           try {
             request.transaction?.abort();
@@ -13489,7 +15548,7 @@ function openDatabase(factory, dbName) {
           request.result.close();
           return;
         }
-        if (!request.result.objectStoreNames.contains(STORE_NAME)) {
+        if (!request.result.objectStoreNames.contains(STORE_NAME) || !request.result.objectStoreNames.contains(DELETED_STORE_NAME)) {
           request.result.close();
           rejectOnce(new PixyncIndexedDbPersistenceError("STORE_MISSING", "IndexedDB snapshot object store is missing."));
           return;
@@ -13519,10 +15578,16 @@ function readRecord(db, projectId) {
   return new Promise((resolve, reject2) => {
     let transaction;
     try {
-      transaction = db.transaction(STORE_NAME, "readonly");
+      transaction = db.transaction([
+        STORE_NAME,
+        DELETED_STORE_NAME
+      ], "readonly");
       const request = transaction.objectStore(STORE_NAME).get(projectId);
+      const deletedRequest = transaction.objectStore(DELETED_STORE_NAME).get(projectId);
       let record2;
       let requestFinished = false;
+      let deleted = false;
+      let deletedRequestFinished = false;
       let settled = false;
       const rejectOnce = (error2) => {
         if (settled) return;
@@ -13534,34 +15599,124 @@ function readRecord(db, projectId) {
         requestFinished = true;
         record2 = request.result;
       };
+      deletedRequest.onerror = () => rejectOnce(deletedRequest.error);
+      deletedRequest.onsuccess = () => {
+        deletedRequestFinished = true;
+        deleted = deletedRequest.result !== void 0;
+      };
       transaction.onerror = () => rejectOnce(transactionError(transaction, false));
       transaction.onabort = () => rejectOnce(transactionError(transaction, true));
       transaction.oncomplete = () => {
         if (settled) return;
-        if (!requestFinished) {
-          rejectOnce(new Error("IndexedDB read completed without a request result."));
+        if (!requestFinished || !deletedRequestFinished) {
+          rejectOnce(new Error("IndexedDB read completed without all request results."));
           return;
         }
         settled = true;
-        resolve(record2);
+        resolve({
+          record: record2,
+          deleted
+        });
       };
     } catch (error2) {
       reject2(asError(error2, "TRANSACTION_FAILED", "IndexedDB read failed."));
     }
   });
 }
+function readDeletionMarker(db, projectId) {
+  return new Promise((resolve, reject2) => {
+    let transaction;
+    let settled = false;
+    const rejectOnce = (error2) => {
+      if (settled) return;
+      settled = true;
+      reject2(asError(error2, "TRANSACTION_FAILED", "IndexedDB deletion marker read failed."));
+    };
+    try {
+      transaction = db.transaction(DELETED_STORE_NAME, "readonly");
+      const request = transaction.objectStore(DELETED_STORE_NAME).get(projectId);
+      request.onerror = () => rejectOnce(request.error);
+      request.onsuccess = () => {
+        const deleted = request.result !== void 0;
+        transaction.oncomplete = () => {
+          if (settled) return;
+          settled = true;
+          resolve(deleted);
+        };
+      };
+      transaction.onerror = () => rejectOnce(transactionError(transaction, false));
+      transaction.onabort = () => rejectOnce(transactionError(transaction, true));
+    } catch (error2) {
+      rejectOnce(error2);
+    }
+  });
+}
 function writeRecord(db, record2) {
   return new Promise((resolve, reject2) => {
     let transaction;
+    let deletedProject;
+    let conflict;
+    let settled = false;
+    const rejectOnce = (error2) => {
+      if (settled) return;
+      settled = true;
+      reject2(asError(error2, "TRANSACTION_FAILED", "IndexedDB write failed."));
+    };
     try {
-      transaction = db.transaction(STORE_NAME, "readwrite");
-      const request = transaction.objectStore(STORE_NAME).put(clone2(record2));
-      let settled = false;
-      const rejectOnce = (error2) => {
+      transaction = db.transaction([
+        STORE_NAME,
+        DELETED_STORE_NAME
+      ], "readwrite");
+      const snapshots = transaction.objectStore(STORE_NAME);
+      const deletedProjects = transaction.objectStore(DELETED_STORE_NAME);
+      const deletionRead = deletedProjects.get(record2.projectId);
+      deletionRead.onerror = () => rejectOnce(deletionRead.error);
+      deletionRead.onsuccess = () => {
+        deletedProject = deletionRead.result;
+        if (deletedProject !== void 0) {
+          conflict = new PixyncIndexedDbPersistenceError("PROJECT_DELETED", "PiXYNC IndexedDB project has been deleted.");
+          transaction.abort();
+          return;
+        }
+        try {
+          const request = snapshots.put(clone2(record2));
+          request.onerror = () => rejectOnce(request.error);
+        } catch (error2) {
+          rejectOnce(error2);
+          try {
+            transaction.abort();
+          } catch {
+          }
+        }
+      };
+      transaction.onerror = () => {
+        if (conflict === void 0) {
+          rejectOnce(transactionError(transaction, false));
+        }
+      };
+      transaction.onabort = () => rejectOnce(conflict ?? transactionError(transaction, true));
+      transaction.oncomplete = () => {
         if (settled) return;
         settled = true;
-        reject2(asError(error2, "TRANSACTION_FAILED", "IndexedDB write failed."));
+        resolve();
       };
+    } catch (error2) {
+      reject2(asError(error2, "TRANSACTION_FAILED", "IndexedDB write failed."));
+    }
+  });
+}
+function deleteRecord(db, projectId) {
+  return new Promise((resolve, reject2) => {
+    let transaction;
+    let settled = false;
+    const rejectOnce = (error2) => {
+      if (settled) return;
+      settled = true;
+      reject2(asError(error2, "TRANSACTION_FAILED", "IndexedDB delete failed."));
+    };
+    try {
+      transaction = db.transaction(STORE_NAME, "readwrite");
+      const request = transaction.objectStore(STORE_NAME).delete(projectId);
       request.onerror = () => rejectOnce(request.error);
       transaction.onerror = () => rejectOnce(transactionError(transaction, false));
       transaction.onabort = () => rejectOnce(transactionError(transaction, true));
@@ -13571,7 +15726,40 @@ function writeRecord(db, record2) {
         resolve();
       };
     } catch (error2) {
-      reject2(asError(error2, "TRANSACTION_FAILED", "IndexedDB write failed."));
+      rejectOnce(error2);
+    }
+  });
+}
+function removeRecord(db, projectId) {
+  return new Promise((resolve, reject2) => {
+    let transaction;
+    let settled = false;
+    const rejectOnce = (error2) => {
+      if (settled) return;
+      settled = true;
+      reject2(asError(error2, "TRANSACTION_FAILED", "IndexedDB project removal failed."));
+    };
+    try {
+      transaction = db.transaction([
+        STORE_NAME,
+        DELETED_STORE_NAME
+      ], "readwrite");
+      const snapshotDelete = transaction.objectStore(STORE_NAME).delete(projectId);
+      const deletionPut = transaction.objectStore(DELETED_STORE_NAME).put({
+        projectId,
+        deletedAt: (/* @__PURE__ */ new Date()).toISOString()
+      });
+      snapshotDelete.onerror = () => rejectOnce(snapshotDelete.error);
+      deletionPut.onerror = () => rejectOnce(deletionPut.error);
+      transaction.onerror = () => rejectOnce(transactionError(transaction, false));
+      transaction.onabort = () => rejectOnce(transactionError(transaction, true));
+      transaction.oncomplete = () => {
+        if (settled) return;
+        settled = true;
+        resolve();
+      };
+    } catch (error2) {
+      rejectOnce(error2);
     }
   });
 }
@@ -13586,31 +15774,44 @@ function compareAndSwapRecord(db, projectId, snapshot, expectedSnapshotHash) {
       reject2(asError(error2, "TRANSACTION_FAILED", "IndexedDB CAS failed."));
     };
     try {
-      transaction = db.transaction(STORE_NAME, "readwrite");
+      transaction = db.transaction([
+        STORE_NAME,
+        DELETED_STORE_NAME
+      ], "readwrite");
       const store = transaction.objectStore(STORE_NAME);
-      const read = store.get(projectId);
-      read.onerror = () => rejectOnce(read.error);
-      read.onsuccess = () => {
-        try {
-          const current = normalizeRecord(read.result, projectId);
-          if ((current?.snapshotHash ?? null) !== expectedSnapshotHash) {
-            conflict = new PixyncIndexedDbPersistenceError("SNAPSHOT_CONFLICT", "PiXYNC IndexedDB snapshot changed in another writer.");
-            transaction.abort();
-            return;
-          }
-          const write = store.put({
-            projectId,
-            snapshot: clone2(snapshot)
-          });
-          write.onerror = () => rejectOnce(write.error);
-        } catch (error2) {
-          if (error2 instanceof PixyncIndexedDbPersistenceError && error2.code === "SNAPSHOT_CONFLICT") conflict = error2;
-          try {
-            transaction.abort();
-          } catch {
-            rejectOnce(error2);
-          }
+      const deletedProjects = transaction.objectStore(DELETED_STORE_NAME);
+      const deletionRead = deletedProjects.get(projectId);
+      deletionRead.onerror = () => rejectOnce(deletionRead.error);
+      deletionRead.onsuccess = () => {
+        if (deletionRead.result !== void 0) {
+          conflict = new PixyncIndexedDbPersistenceError("PROJECT_DELETED", "PiXYNC IndexedDB project has been deleted.");
+          transaction.abort();
+          return;
         }
+        const read = store.get(projectId);
+        read.onerror = () => rejectOnce(read.error);
+        read.onsuccess = () => {
+          try {
+            const current = normalizeRecord(read.result, projectId);
+            if ((current?.snapshotHash ?? null) !== expectedSnapshotHash) {
+              conflict = new PixyncIndexedDbPersistenceError("SNAPSHOT_CONFLICT", "PiXYNC IndexedDB snapshot changed in another writer.");
+              transaction.abort();
+              return;
+            }
+            const write = store.put({
+              projectId,
+              snapshot: clone2(snapshot)
+            });
+            write.onerror = () => rejectOnce(write.error);
+          } catch (error2) {
+            if (error2 instanceof PixyncIndexedDbPersistenceError && error2.code === "SNAPSHOT_CONFLICT") conflict = error2;
+            try {
+              transaction.abort();
+            } catch {
+              rejectOnce(error2);
+            }
+          }
+        };
       };
       transaction.onerror = () => {
         if (conflict === void 0) {
@@ -13639,6 +15840,7 @@ var PixyncIndexedDbSnapshotPersistence = class {
   projectId;
   dbName;
   #factory;
+  #deleted = false;
   #operationTail = Promise.resolve();
   constructor(projectId, options = {}) {
     if (typeof projectId !== "string" || projectId.length === 0) {
@@ -13653,12 +15855,28 @@ var PixyncIndexedDbSnapshotPersistence = class {
   }
   load() {
     return this.#enqueue(async () => {
-      const record2 = await withDatabase(this.#factory, this.dbName, (db) => readRecord(db, this.projectId));
-      return normalizeRecord(record2, this.projectId);
+      const result = await withDatabase(this.#factory, this.dbName, (db) => readRecord(db, this.projectId));
+      if (result.deleted) {
+        this.#deleted = true;
+        return void 0;
+      }
+      return normalizeRecord(result.record, this.projectId);
+    });
+  }
+  /** Reads only the deletion marker so cached callers can detect another tab's removal. */
+  isDeleted() {
+    return this.#enqueue(async () => {
+      if (this.#deleted) return true;
+      const deleted = await withDatabase(this.#factory, this.dbName, (db) => readDeletionMarker(db, this.projectId));
+      if (deleted) this.#deleted = true;
+      return deleted;
     });
   }
   atomicReplace(snapshot) {
     return this.#enqueue(async () => {
+      if (this.#deleted) {
+        throw new PixyncIndexedDbPersistenceError("PROJECT_DELETED", "PiXYNC IndexedDB project has been deleted.");
+      }
       if (snapshot.projectId !== this.projectId) {
         throw new PixyncIndexedDbPersistenceError("PROJECT_MISMATCH", "IndexedDB snapshot belongs to another project.");
       }
@@ -13671,6 +15889,9 @@ var PixyncIndexedDbSnapshotPersistence = class {
   }
   compareAndSwap(snapshot, expectedSnapshotHash) {
     return this.#enqueue(async () => {
+      if (this.#deleted) {
+        throw new PixyncIndexedDbPersistenceError("PROJECT_DELETED", "PiXYNC IndexedDB project has been deleted.");
+      }
       if (snapshot.projectId !== this.projectId) {
         throw new PixyncIndexedDbPersistenceError("PROJECT_MISMATCH", "IndexedDB snapshot belongs to another project.");
       }
@@ -13678,6 +15899,21 @@ var PixyncIndexedDbSnapshotPersistence = class {
         throw new PixyncIndexedDbPersistenceError("RECORD_MALFORMED", "IndexedDB expected snapshot hash is invalid.");
       }
       await withDatabase(this.#factory, this.dbName, (db) => compareAndSwapRecord(db, this.projectId, clone2(snapshot), expectedSnapshotHash));
+    });
+  }
+  /** Removes this project's local snapshot; safe to call again during retry. */
+  clear() {
+    return this.#enqueue(async () => {
+      await withDatabase(this.#factory, this.dbName, (db) => deleteRecord(db, this.projectId));
+    });
+  }
+  /** Permanently removes this project's snapshot and blocks late writers. */
+  remove() {
+    return this.#enqueue(async () => {
+      if (this.#deleted) return true;
+      await withDatabase(this.#factory, this.dbName, (db) => removeRecord(db, this.projectId));
+      this.#deleted = true;
+      return true;
     });
   }
   #enqueue(operation) {
@@ -13688,6 +15924,531 @@ var PixyncIndexedDbSnapshotPersistence = class {
 };
 function createPixyncIndexedDbPersistence(projectId, options = {}) {
   return new PixyncIndexedDbSnapshotPersistence(projectId, options);
+}
+
+// src/pixync/room-provisioning.ts
+var PIXYNC_INITIAL_CHECKPOINT_BUCKET = "pixisync-checkpoints";
+var PIXYNC_INITIAL_CHECKPOINT_CODEC_VERSION = 1;
+var PIXYNC_INITIAL_CHECKPOINT_MAX_BYTES = 52428800;
+var PIXYNC_INITIAL_CHECKPOINT_MEDIA_TYPE = "application/vnd.pixieed.pxd";
+
+// src/pixync/checkpoint-publishing.ts
+var UUID2 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
+var SHA2564 = /^[a-f0-9]{64}$/u;
+var PixyncCheckpointPublishError = class extends Error {
+  code;
+  constructor(code, message, options) {
+    super(message, options), this.code = code;
+    this.name = "PixyncCheckpointPublishError";
+  }
+};
+function isRecord6(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+function exactlyOneRow(value, label) {
+  const row = Array.isArray(value) ? value.length === 1 ? value[0] : void 0 : value;
+  if (!isRecord6(row)) {
+    throw new PixyncCheckpointPublishError("SERVER_RESPONSE_INVALID", `${label} did not return exactly one object row.`);
+  }
+  return row;
+}
+function assertExactKeys2(row, keys, label) {
+  const expected = new Set(keys);
+  const actual = Object.keys(row);
+  if (actual.length !== expected.size || actual.some((key) => !expected.has(key))) {
+    throw new PixyncCheckpointPublishError("SERVER_RESPONSE_INVALID", `${label} returned an unexpected response shape.`);
+  }
+}
+function stringField(row, key, label) {
+  const value = row[key];
+  if (typeof value !== "string" || value.length === 0) {
+    throw new PixyncCheckpointPublishError("SERVER_RESPONSE_INVALID", `${label}.${key} is invalid.`);
+  }
+  return value;
+}
+function integerField(row, key, label, minimum) {
+  const raw = row[key];
+  const value = typeof raw === "number" ? raw : Number(raw);
+  if (!Number.isSafeInteger(value) || value < minimum) {
+    throw new PixyncCheckpointPublishError("SERVER_RESPONSE_INVALID", `${label}.${key} is invalid.`);
+  }
+  return value;
+}
+async function authenticatedClientUser(client) {
+  let result;
+  try {
+    result = await client.auth.getUser();
+  } catch (cause) {
+    throw new PixyncCheckpointPublishError("AUTHENTICATION_FAILED", "PiXYNC authentication could not be checked.", {
+      cause
+    });
+  }
+  if (result.error !== null) {
+    throw new PixyncCheckpointPublishError("AUTHENTICATION_FAILED", "PiXYNC authentication could not be checked.", {
+      cause: result.error
+    });
+  }
+  if (result.data?.user === null || result.data?.user === void 0) {
+    throw new PixyncCheckpointPublishError("AUTHENTICATION_REQUIRED", "Sign in is required before publishing a shared Project checkpoint.");
+  }
+}
+async function rpcData(client, functionName, args) {
+  let result;
+  try {
+    result = await client.rpc(functionName, args);
+  } catch (cause) {
+    throw new PixyncCheckpointPublishError("RPC_FAILED", `${functionName} could not be called.`, {
+      cause
+    });
+  }
+  if (result.error !== null) {
+    throw new PixyncCheckpointPublishError("RPC_FAILED", `${functionName} was rejected by the server.`, {
+      cause: result.error
+    });
+  }
+  if (result.data === null) {
+    throw new PixyncCheckpointPublishError("SERVER_RESPONSE_INVALID", `${functionName} returned no data.`);
+  }
+  return result.data;
+}
+function uploadBody(bytes) {
+  return new Blob([
+    bytes.slice().buffer
+  ], {
+    type: PIXYNC_INITIAL_CHECKPOINT_MEDIA_TYPE
+  });
+}
+function validateInput(input) {
+  const roomId = typeof input.projectId === "string" ? input.projectId.trim().toLowerCase() : "";
+  const bytes = input.checkpointBytes instanceof Uint8Array ? new Uint8Array(input.checkpointBytes) : void 0;
+  if (!UUID2.test(roomId) || bytes === void 0 || bytes.byteLength < 1 || bytes.byteLength > PIXYNC_INITIAL_CHECKPOINT_MAX_BYTES || !UUID2.test(input.attestationClientId)) {
+    throw new PixyncCheckpointPublishError("INVALID_INPUT", "The PiXYNC checkpoint publish input is invalid.");
+  }
+  return {
+    roomId,
+    bytes
+  };
+}
+async function publishPixyncCheckpoint(client, input) {
+  const { roomId, bytes } = validateInput(input);
+  await authenticatedClientUser(client);
+  const storage = client.storage?.from(PIXYNC_INITIAL_CHECKPOINT_BUCKET);
+  if (storage === void 0) {
+    throw new PixyncCheckpointPublishError("STORAGE_UNAVAILABLE", "PiXYNC checkpoint Storage is unavailable in this client.");
+  }
+  const packageHash = await sha256Hex2(bytes);
+  if (!SHA2564.test(packageHash)) {
+    throw new PixyncCheckpointPublishError("SERVER_RESPONSE_INVALID", "The checkpoint hash could not be created.");
+  }
+  const requestedCheckpointId = crypto.randomUUID().toLowerCase();
+  const prepare = exactlyOneRow(await rpcData(client, "pixisync_prepare_checkpoint", {
+    p_room_id: roomId,
+    p_checkpoint_id: requestedCheckpointId,
+    p_state_sha256: `\\x${packageHash}`,
+    p_encoded_bytes: bytes.byteLength,
+    p_codec_version: PIXYNC_INITIAL_CHECKPOINT_CODEC_VERSION
+  }), "pixisync_prepare_checkpoint");
+  assertExactKeys2(prepare, [
+    "checkpoint_id",
+    "revision",
+    "storage_path"
+  ], "pixisync_prepare_checkpoint");
+  const preparedCheckpointId = stringField(prepare, "checkpoint_id", "pixisync_prepare_checkpoint").toLowerCase();
+  const revision = integerField(prepare, "revision", "pixisync_prepare_checkpoint", 0);
+  const storagePath = stringField(prepare, "storage_path", "pixisync_prepare_checkpoint");
+  const expectedPath = `rooms/${roomId}/checkpoints/${revision}/${preparedCheckpointId}.pxd`;
+  if (!UUID2.test(preparedCheckpointId) || preparedCheckpointId !== requestedCheckpointId || storagePath !== expectedPath) {
+    throw new PixyncCheckpointPublishError("SERVER_PATH_MISMATCH", "The server returned an unexpected checkpoint identity or path.");
+  }
+  let uploadResult;
+  try {
+    uploadResult = await storage.upload(storagePath, uploadBody(bytes), {
+      contentType: PIXYNC_INITIAL_CHECKPOINT_MEDIA_TYPE,
+      upsert: false
+    });
+  } catch (cause) {
+    throw new PixyncCheckpointPublishError("UPLOAD_FAILED", "The PiXYNC checkpoint could not be uploaded.", {
+      cause
+    });
+  }
+  if (uploadResult.error !== null || uploadResult.data === null) {
+    throw new PixyncCheckpointPublishError("UPLOAD_FAILED", "The PiXYNC checkpoint could not be uploaded.", {
+      cause: uploadResult.error
+    });
+  }
+  const registered = exactlyOneRow(await rpcData(client, "pixisync_register_checkpoint", {
+    p_room_id: roomId,
+    p_checkpoint_id: preparedCheckpointId
+  }), "pixisync_register_checkpoint");
+  assertExactKeys2(registered, [
+    "checkpoint_id",
+    "revision",
+    "status"
+  ], "pixisync_register_checkpoint");
+  const checkpointId = stringField(registered, "checkpoint_id", "pixisync_register_checkpoint").toLowerCase();
+  const registeredRevision = integerField(registered, "revision", "pixisync_register_checkpoint", 0);
+  const registeredStatus = stringField(registered, "status", "pixisync_register_checkpoint");
+  if (!UUID2.test(checkpointId) || registeredRevision !== revision || registeredStatus !== "candidate" && registeredStatus !== "verified") {
+    throw new PixyncCheckpointPublishError("SERVER_RESPONSE_INVALID", "The registered PiXYNC checkpoint did not match the prepared revision.");
+  }
+  const attested = exactlyOneRow(await rpcData(client, "pixisync_attest_checkpoint", {
+    p_checkpoint_id: checkpointId,
+    p_client_id: input.attestationClientId.toLowerCase(),
+    p_state_sha256: `\\x${packageHash}`
+  }), "pixisync_attest_checkpoint");
+  assertExactKeys2(attested, [
+    "checkpoint_id",
+    "status",
+    "attested_user_count",
+    "required_user_count"
+  ], "pixisync_attest_checkpoint");
+  const attestedCheckpointId = stringField(attested, "checkpoint_id", "pixisync_attest_checkpoint").toLowerCase();
+  const attestedStatus = stringField(attested, "status", "pixisync_attest_checkpoint");
+  const attestedUserCount = integerField(attested, "attested_user_count", "pixisync_attest_checkpoint", 0);
+  const requiredUserCount = integerField(attested, "required_user_count", "pixisync_attest_checkpoint", 1);
+  if (attestedCheckpointId !== checkpointId || attestedStatus !== "candidate" && attestedStatus !== "verified" || attestedUserCount > requiredUserCount || attestedStatus === "verified" && attestedUserCount < requiredUserCount || attestedStatus === "candidate" && attestedUserCount >= requiredUserCount) {
+    throw new PixyncCheckpointPublishError("ATTESTATION_FAILED", "PiXYNC returned an unexpected checkpoint attestation state.");
+  }
+  if (attestedStatus === "candidate") {
+    return {
+      requestedCheckpointId,
+      checkpointId,
+      revision,
+      storagePath,
+      packageHash,
+      encodedBytes: bytes.byteLength,
+      status: "candidate",
+      attestedUserCount,
+      requiredUserCount,
+      active: false
+    };
+  }
+  const activated = exactlyOneRow(await rpcData(client, "pixisync_activate_verified_checkpoint", {
+    p_room_id: roomId,
+    p_checkpoint_id: checkpointId
+  }), "pixisync_activate_verified_checkpoint");
+  assertExactKeys2(activated, [
+    "checkpoint_id",
+    "checkpoint_revision",
+    "head_revision",
+    "structure_epoch"
+  ], "pixisync_activate_verified_checkpoint");
+  const activatedCheckpointId = stringField(activated, "checkpoint_id", "pixisync_activate_verified_checkpoint").toLowerCase();
+  const checkpointRevision = integerField(activated, "checkpoint_revision", "pixisync_activate_verified_checkpoint", 0);
+  const headRevision = integerField(activated, "head_revision", "pixisync_activate_verified_checkpoint", revision);
+  const structureEpoch = integerField(activated, "structure_epoch", "pixisync_activate_verified_checkpoint", 0);
+  if (activatedCheckpointId !== checkpointId || checkpointRevision !== revision || headRevision < revision) {
+    throw new PixyncCheckpointPublishError("ACTIVATION_FAILED", "PiXYNC returned an unexpected active checkpoint state.");
+  }
+  return {
+    requestedCheckpointId,
+    checkpointId,
+    revision,
+    storagePath,
+    packageHash,
+    encodedBytes: bytes.byteLength,
+    status: "verified",
+    attestedUserCount,
+    requiredUserCount,
+    active: true,
+    headRevision,
+    structureEpoch
+  };
+}
+
+// src/pixync/project-deletion.ts
+var UUID3 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+var SAFE_TEXT = /^[^\u0000-\u001f\u007f]{1,80}$/u;
+var ROOM_STATUSES = /* @__PURE__ */ new Set([
+  "initializing",
+  "active",
+  "archived",
+  "missing"
+]);
+var PixyncProjectDeletionError = class extends Error {
+  code;
+  constructor(code, message, options) {
+    super(message, options), this.code = code;
+    this.name = "PixyncProjectDeletionError";
+  }
+};
+function isRecord7(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+function fail3(code, message, cause) {
+  throw new PixyncProjectDeletionError(code, message, cause === void 0 ? void 0 : {
+    cause
+  });
+}
+function normalizedRoomId(projectId) {
+  const roomId = typeof projectId === "string" ? projectId.trim().toLowerCase() : "";
+  if (!UUID3.test(roomId)) {
+    fail3("INVALID_INPUT", "A canonical PiXYNC Room UUID is required for remote detach.");
+  }
+  return roomId;
+}
+async function requireAuthenticatedUser(client) {
+  let result;
+  try {
+    result = await client.auth.getUser();
+  } catch (cause) {
+    fail3("AUTHENTICATION_FAILED", "PiXYNC authentication could not be checked.", cause);
+  }
+  if (result.error !== null) {
+    fail3("AUTHENTICATION_FAILED", "PiXYNC authentication could not be checked.", result.error);
+  }
+  const user = result.data?.user;
+  if (!isRecord7(user) || typeof user.id !== "string" || !UUID3.test(user.id)) {
+    fail3("AUTHENTICATION_REQUIRED", "Sign in is required before detaching a shared PiXYNC Project.");
+  }
+}
+function exactlyOneRow2(value) {
+  const row = Array.isArray(value) ? value.length === 1 ? value[0] : void 0 : value;
+  if (!isRecord7(row)) {
+    fail3("SERVER_RESPONSE_INVALID", "PiXYNC detach returned an unexpected response shape.");
+  }
+  return row;
+}
+function parseDetachResult(value, expectedRoomId) {
+  const row = exactlyOneRow2(value);
+  const keys = [
+    "room_id",
+    "action",
+    "room_status",
+    "session_generation"
+  ];
+  const actualKeys = Object.keys(row);
+  if (actualKeys.length !== keys.length || actualKeys.some((key) => !keys.includes(key))) {
+    fail3("SERVER_RESPONSE_INVALID", "PiXYNC detach returned unsupported fields.");
+  }
+  const roomId = typeof row.room_id === "string" ? row.room_id.trim().toLowerCase() : "";
+  if (!UUID3.test(roomId) || roomId !== expectedRoomId) {
+    fail3("SERVER_RESPONSE_INVALID", "PiXYNC detach returned a different Room identity.");
+  }
+  const action = row.action;
+  if (action !== "owner_localized" && action !== "participant_left" && action !== "already_detached") {
+    if (action === "localization_required") {
+      fail3("LOCALIZATION_REQUIRED", "Owner localization is required before this shared Project can be detached.");
+    }
+    fail3("SERVER_RESPONSE_INVALID", "PiXYNC detach returned an unsupported action.");
+  }
+  const roomStatus = typeof row.room_status === "string" ? row.room_status.trim().toLowerCase() : "";
+  if (!SAFE_TEXT.test(roomStatus) || !ROOM_STATUSES.has(roomStatus)) {
+    fail3("SERVER_RESPONSE_INVALID", "PiXYNC detach returned an invalid Room status.");
+  }
+  if (action === "already_detached" && roomStatus !== "missing" || action === "owner_localized" && roomStatus !== "archived" || action === "participant_left" && roomStatus === "missing") {
+    fail3("SERVER_RESPONSE_INVALID", "PiXYNC detach returned an invalid action/status combination.");
+  }
+  const sessionGeneration = typeof row.session_generation === "number" ? row.session_generation : Number(row.session_generation);
+  if (!Number.isSafeInteger(sessionGeneration) || sessionGeneration < 0) {
+    fail3("SERVER_RESPONSE_INVALID", "PiXYNC detach returned an invalid session generation.");
+  }
+  return {
+    roomId,
+    action,
+    roomStatus,
+    sessionGeneration
+  };
+}
+async function detachPixyncProject(client, projectId) {
+  const roomId = normalizedRoomId(projectId);
+  await requireAuthenticatedUser(client);
+  let result;
+  try {
+    result = await client.rpc("pixisync_detach_deleted_project", {
+      p_room_id: roomId
+    });
+  } catch (cause) {
+    fail3("RPC_FAILED", "PiXYNC remote detach could not be completed.", cause);
+  }
+  if (result.error !== null) {
+    const message = isRecord7(result.error) && typeof result.error.message === "string" ? result.error.message : "";
+    if (/locali[sz]ation_required/iu.test(message)) {
+      fail3("LOCALIZATION_REQUIRED", "Owner localization is required before this shared Project can be detached.", result.error);
+    }
+    fail3("RPC_FAILED", "PiXYNC remote detach was rejected by the server.", result.error);
+  }
+  if (result.data === null || result.data === void 0) {
+    fail3("SERVER_RESPONSE_INVALID", "PiXYNC remote detach returned no result.");
+  }
+  return parseDetachResult(result.data, roomId);
+}
+
+// src/pixync/remote-checkpoint.ts
+var UUID4 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
+var SHA2565 = /^[a-f0-9]{64}$/u;
+var OPEN_SESSION_FIELDS = [
+  "room_id",
+  "status",
+  "role",
+  "can_edit",
+  "head_revision",
+  "structure_epoch",
+  "session_generation",
+  "checkpoint_id",
+  "checkpoint_revision",
+  "storage_path",
+  "state_sha256_hex",
+  "encoded_bytes",
+  "codec_version"
+];
+var PixyncRemoteCheckpointError = class extends Error {
+  code;
+  constructor(code, message, options) {
+    super(message, options), this.code = code;
+    this.name = "PixyncRemoteCheckpointError";
+  }
+};
+function isRecord8(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+function exactlyOneRow3(value) {
+  const row = Array.isArray(value) ? value.length === 1 ? value[0] : void 0 : value;
+  if (!isRecord8(row)) {
+    throw new PixyncRemoteCheckpointError("SERVER_RESPONSE_INVALID", "pixisync_open_session did not return exactly one checkpoint row.");
+  }
+  const keys = Object.keys(row);
+  if (keys.length !== OPEN_SESSION_FIELDS.length || keys.some((key) => !OPEN_SESSION_FIELDS.includes(key))) {
+    throw new PixyncRemoteCheckpointError("SERVER_RESPONSE_INVALID", "pixisync_open_session returned an unexpected checkpoint shape.");
+  }
+  return row;
+}
+function stringField2(row, key) {
+  const value = row[key];
+  if (typeof value !== "string" || value.length === 0) {
+    throw new PixyncRemoteCheckpointError("SERVER_RESPONSE_INVALID", `pixisync_open_session.${key} is invalid.`);
+  }
+  return value;
+}
+function integerField2(row, key, minimum) {
+  const raw = row[key];
+  const value = typeof raw === "number" ? raw : Number(raw);
+  if (!Number.isSafeInteger(value) || value < minimum) {
+    throw new PixyncRemoteCheckpointError("SERVER_RESPONSE_INVALID", `pixisync_open_session.${key} is invalid.`);
+  }
+  return value;
+}
+async function authenticatedClientUser2(client) {
+  let result;
+  try {
+    result = await client.auth.getUser();
+  } catch (cause) {
+    throw new PixyncRemoteCheckpointError("AUTHENTICATION_FAILED", "PiXYNC authentication could not be checked.", {
+      cause
+    });
+  }
+  if (result.error !== null) {
+    throw new PixyncRemoteCheckpointError("AUTHENTICATION_FAILED", "PiXYNC authentication could not be checked.", {
+      cause: result.error
+    });
+  }
+  if (result.data?.user === null || result.data?.user === void 0) {
+    throw new PixyncRemoteCheckpointError("AUTHENTICATION_REQUIRED", "Sign in is required before restoring a shared Project.");
+  }
+}
+async function rpcData2(client, args) {
+  let result;
+  try {
+    result = await client.rpc("pixisync_open_session", args);
+  } catch (cause) {
+    throw new PixyncRemoteCheckpointError("RPC_FAILED", "The active PiXYNC Project session could not be opened.", {
+      cause
+    });
+  }
+  if (result.error !== null) {
+    throw new PixyncRemoteCheckpointError("RPC_FAILED", "The active PiXYNC Project session was rejected by the server.", {
+      cause: result.error
+    });
+  }
+  if (result.data === null) {
+    throw new PixyncRemoteCheckpointError("SERVER_RESPONSE_INVALID", "The active PiXYNC Project session returned no data.");
+  }
+  return result.data;
+}
+async function downloadedBytes(storage, path) {
+  let result;
+  try {
+    result = await storage.download(path);
+  } catch (cause) {
+    throw new PixyncRemoteCheckpointError("DOWNLOAD_FAILED", "The PiXYNC checkpoint could not be downloaded.", {
+      cause
+    });
+  }
+  if (result.error !== null || result.data === null) {
+    throw new PixyncRemoteCheckpointError("DOWNLOAD_FAILED", "The PiXYNC checkpoint could not be downloaded.", {
+      cause: result.error
+    });
+  }
+  if (result.data instanceof Blob) {
+    return new Uint8Array(await result.data.arrayBuffer());
+  }
+  if (result.data instanceof ArrayBuffer) {
+    return new Uint8Array(result.data.slice(0));
+  }
+  if (result.data instanceof Uint8Array) {
+    return new Uint8Array(result.data);
+  }
+  throw new PixyncRemoteCheckpointError("DOWNLOAD_FAILED", "The PiXYNC checkpoint download returned an unsupported body.");
+}
+async function readPixyncActiveCheckpoint(client, projectId) {
+  const roomId = typeof projectId === "string" ? projectId.trim().toLowerCase() : "";
+  if (!UUID4.test(roomId)) {
+    throw new PixyncRemoteCheckpointError("INVALID_INPUT", "A UUID PiXYNC Room ID is required to restore a shared Project.");
+  }
+  await authenticatedClientUser2(client);
+  const storage = client.storage?.from(PIXYNC_INITIAL_CHECKPOINT_BUCKET);
+  if (storage === void 0) {
+    throw new PixyncRemoteCheckpointError("STORAGE_UNAVAILABLE", "PiXYNC checkpoint Storage is unavailable in this client.");
+  }
+  const row = exactlyOneRow3(await rpcData2(client, {
+    p_room_id: roomId
+  }));
+  const returnedRoomId = stringField2(row, "room_id").toLowerCase();
+  const status2 = stringField2(row, "status");
+  const role = stringField2(row, "role");
+  const canEdit = row.can_edit;
+  const headRevision = integerField2(row, "head_revision", 0);
+  const structureEpoch = integerField2(row, "structure_epoch", 0);
+  const sessionGeneration = integerField2(row, "session_generation", 1);
+  const checkpointId = stringField2(row, "checkpoint_id").toLowerCase();
+  const checkpointRevision = integerField2(row, "checkpoint_revision", 0);
+  const storagePath = stringField2(row, "storage_path");
+  const stateSha256Hex = stringField2(row, "state_sha256_hex");
+  const encodedBytes = integerField2(row, "encoded_bytes", 1);
+  const codecVersion = integerField2(row, "codec_version", 1);
+  const expectedPath = `rooms/${returnedRoomId}/checkpoints/${checkpointRevision}/${checkpointId}.pxd`;
+  if (!UUID4.test(returnedRoomId) || returnedRoomId !== roomId || status2 !== "active" || ![
+    "owner",
+    "editor",
+    "viewer"
+  ].includes(role) || typeof canEdit !== "boolean" || canEdit !== (role === "owner" || role === "editor") || !UUID4.test(checkpointId) || checkpointRevision > headRevision || storagePath !== expectedPath || !SHA2565.test(stateSha256Hex) || encodedBytes > PIXYNC_INITIAL_CHECKPOINT_MAX_BYTES || codecVersion !== PIXYNC_INITIAL_CHECKPOINT_CODEC_VERSION) {
+    throw new PixyncRemoteCheckpointError("SERVER_PATH_MISMATCH", "The active PiXYNC checkpoint identity did not match the Room contract.");
+  }
+  const bytes = await downloadedBytes(storage, storagePath);
+  if (bytes.byteLength !== encodedBytes) {
+    throw new PixyncRemoteCheckpointError("CHECKPOINT_SIZE_MISMATCH", "The downloaded PiXYNC checkpoint size did not match the server record.");
+  }
+  const packageHash = await sha256Hex2(bytes);
+  if (packageHash !== stateSha256Hex) {
+    throw new PixyncRemoteCheckpointError("CHECKPOINT_HASH_MISMATCH", "The downloaded PiXYNC checkpoint hash did not match the server record.");
+  }
+  return {
+    roomId: returnedRoomId,
+    status: "active",
+    role,
+    canEdit,
+    headRevision,
+    structureEpoch,
+    sessionGeneration,
+    checkpointId,
+    checkpointRevision,
+    storagePath,
+    stateSha256Hex,
+    encodedBytes,
+    codecVersion: 1,
+    bytes,
+    packageHash
+  };
 }
 
 // src/pixync/project-lifecycle.ts
@@ -13853,6 +16614,25 @@ var PixyncProjectLifecycleCoordinator = class {
   }
 };
 
+// src/studio/project-start.ts
+function isCreatorStartMode(value) {
+  return value === "DRAW" || value === "AUDIO" || value === "GAME";
+}
+function resolveCreatorStartMode(value, fallback = "DRAW") {
+  const normalized = value?.trim().toUpperCase();
+  return isCreatorStartMode(normalized) ? normalized : fallback;
+}
+function createProjectStartIntent(input) {
+  const projectId = input.projectId?.trim();
+  return {
+    ...projectId === void 0 || projectId.length === 0 ? {} : {
+      projectId
+    },
+    kind: input.kind,
+    mode: resolveCreatorStartMode(input.mode)
+  };
+}
+
 // src/draw2-entry.ts
 var DRAW2_ICON_SPRITE = "./assets/icons/draw2-icons.svg#";
 function createDraw2Icon(iconId, className = "draw2-ui-icon") {
@@ -13871,6 +16651,8 @@ function setDraw2Icon(target, iconId) {
 var legacyCompatModulePromise;
 var advancedModulePromise;
 var workspaceModulePromise;
+var projectSessionModulePromise;
+var projectDataStorageModulePromise;
 var exportModulePromise;
 function loadLegacyCompatModule() {
   const legacyChunkUrl = new URL("draw2-legacy-compat.js", import.meta.url).href;
@@ -13884,11 +16666,21 @@ function loadAdvancedModule() {
 }
 function loadWorkspaceModule() {
   const workspaceMobileProjectionMarker = "20260819-compare-final-1";
-  const workspaceChunkUrl = new URL("wp180-workspace.js?v=20260827-igame-template-v1", import.meta.url);
-  workspaceChunkUrl.searchParams.set("v", "20260827-igame-template-v1");
+  const workspaceChunkUrl = new URL("wp180-workspace.js?v=20260828-pixync-presence-v1", import.meta.url);
+  workspaceChunkUrl.searchParams.set("v", "20260828-pixync-presence-v1");
   workspaceChunkUrl.searchParams.set("mobile", workspaceMobileProjectionMarker);
   workspaceModulePromise ??= import(workspaceChunkUrl.href);
   return workspaceModulePromise;
+}
+function loadProjectSessionModule() {
+  const sessionChunkUrl = new URL("project-session.js?v=20260828-studio-route-race-v2", import.meta.url);
+  projectSessionModulePromise ??= import(sessionChunkUrl.href);
+  return projectSessionModulePromise;
+}
+function loadProjectDataStorageModule() {
+  const storageChunkUrl = new URL("project-data-storage.js?v=20260828-project-delete-v1", import.meta.url).href;
+  projectDataStorageModulePromise ??= import(storageChunkUrl);
+  return projectDataStorageModulePromise;
 }
 function getWorkspacePxdBridge() {
   const candidate = window.__pixiedraw2WorkspaceDebug;
@@ -13967,7 +16759,7 @@ var viewportCenterButtonElement = document.querySelector("#draw2ViewportCenter")
 var canvasStackElement = document.querySelector(".draw2-canvas-stack");
 var workspaceFrameElement = document.querySelector("#draw2WorkspaceFrame");
 var projectStartElement = document.querySelector("#draw2ProjectStart");
-var projectStartNewButton = document.querySelector("#draw2ProjectStartNew");
+var projectStartModeButtons = Array.from(document.querySelectorAll("[data-project-start-mode]"));
 var projectStartOpenButton = document.querySelector("#draw2ProjectStartOpen");
 var projectStartIdElement = document.querySelector("#draw2ProjectStartId");
 var projectStartRecentListElement = document.querySelector("#draw2ProjectRecentList");
@@ -14124,6 +16916,11 @@ var gamePreviewRestartButton = document.querySelector("#draw2GamePreviewRestart"
 var gamePreviewPinButton = document.querySelector("#draw2GamePreviewPin");
 var gamePreviewReloadButton = document.querySelector("#draw2GamePreviewReload");
 var gamePreviewStatusElement = document.querySelector("#draw2GamePreviewStatus");
+var goldenProjectStatusElement = document.querySelector("#draw2GoldenProjectStatus");
+var goldenProjectRefsElement = document.querySelector("#draw2GoldenProjectRefs");
+var goldenProjectApplyButton = document.querySelector("#draw2GoldenProjectApply");
+var projectSessionCheckpointButton = document.querySelector("#draw2ProjectSessionCheckpoint");
+var projectSessionCheckpointStatusElement = document.querySelector("#draw2ProjectSessionCheckpointStatus");
 var gamePreviewCanvasElement = document.querySelector("#draw2GamePreviewCanvas");
 var advancedLoadButton = document.querySelector("#draw2AdvancedLoad");
 var advancedPatternButton = document.querySelector("#draw2AdvancedPattern");
@@ -14162,7 +16959,7 @@ var languageElement = document.querySelector("#draw2Language");
 var shortcutsDialogElement = document.querySelector("#draw2ShortcutsDialog");
 var shortcutSearchElement = document.querySelector("#draw2ShortcutSearch");
 var shortcutListElement = document.querySelector("#draw2ShortcutList");
-if (canvasElement === null || overlayElement === null || erasePreviewElement === null || viewportCenterButtonElement === null || pixelGridElement === null || pixelGridMinorPathElement === null || pixelGridMajorPathElement === null || selectionOverlayElement === null || mirrorGuideOverlayElement === null || mirrorGuideVerticalElement === null || mirrorGuideHorizontalElement === null || mirrorGuideDiagonalDownElement === null || mirrorGuideDiagonalUpElement === null || mirrorToggleXElement === null || mirrorToggleYElement === null || mirrorToggleDiagonalDownElement === null || mirrorToggleDiagonalUpElement === null || selectionOverlayRegionsElement === null || statusElement === null || metricsElement === null || selectionStatusElement === null || projectIdInputElement === null || tileSizeSelectElement === null || toolSelectElement === null || brushSizeElement === null || brushPatternElement === null || brushShapeElement === null || brushSizeControlElement === null || quickControlsElement === null || brushOptionsButtonElement === null || brushOptionsSummaryElement === null || brushOptionsFlyoutElement === null || brushOptionsCloseButtonElement === null || brushPresetElement === null || brushPresetNameElement === null || brushPresetSaveButton === null || brushPresetDeleteButton === null || mirrorModeToggleElement === null || viewportContextRailElement === null || similarityControlElement === null || similarityElement === null || similarityValueElement === null || colorSelectionModeElement === null || miniPreviewCanvasElement === null || miniPreviewContainerElement === null || miniPreviewPlayButtonElement === null || miniPreviewReferenceButtonElement === null || miniPreviewReferenceClearButtonElement === null || miniPreviewReferenceInputElement === null || miniPreviewReferenceStatusElement === null || miniPreviewCollapseButtonElement === null || miniPreviewRestoreButtonElement === null || miniPreviewResizeLeftElement === null || miniPreviewResizeBottomElement === null || miniPreviewResizeCornerElement === null || selectionXElement === null || selectionYElement === null || selectionWidthElement === null || selectionHeightElement === null || selectionModeElement === null || selectionExpandButton === null || selectionShrinkButton === null || selectionInvertButton === null || selectionBorderButton === null || transformOperationElement === null || transformDxElement === null || transformDyElement === null || transformFactorElement === null || selectButton === null || commitSelectionButton === null || cancelSelectionButton === null || selectionStampNameInputElement === null || selectionStampSaveButton === null || selectionStampListElement === null || selectionStampStatusElement === null || previewButton === null || commitButton === null || cancelButton === null || flipHorizontalButton === null || flipVerticalButton === null || rotateCCWButton === null || rotateCWButton === null || rotate180Button === null || copyButton === null || cutButton === null || pasteButton === null || undoButton === null || redoButton === null || timelineCardElement === null || timelineContextMenu === null || createButton === null || importPxdInput === null || timelineStatusElement === null || timelineViewportElement === null || timelineSpacerElement === null || timelineWindowElement === null || timelinePropertiesResizeElement === null || timelinePropertiesElement === null || timelinePropertiesBodyElement === null || timelinePropertiesCollapseElement === null || timelineSecondaryControlsElement === null || animationTagNameElement === null || animationTagFromElement === null || animationTagToElement === null || animationTagLoopElement === null || animationTagAddElement === null || animationTagListElement === null || timelineMarkerKindElement === null || timelineMarkerLabelElement === null || timelineMarkerAddElement === null || timelineMarkerListElement === null || linkedCelToggleElement === null || linkedCelStatusElement === null || addFrameButton === null || duplicateFrameButton === null || removeFrameButton === null || addLayerButton === null || reorderLayerButton === null || toggleLayerButton === null || toggleOnionButton === null || togglePlaybackButton === null || onionOptionsElement === null || onionPreviousElement === null || onionPreviousValueElement === null || onionNextElement === null || onionNextValueElement === null || onionOpacityElement === null || onionOpacityValueElement === null || onionColorModeElement === null || playbackFpsElement === null || playbackLoopElement === null || playbackFpsCustomElement === null || colorMapElement === null || paletteWheelElement === null || hueCursorElement === null || svCursorElement === null || colorRElement === null || colorGElement === null || colorBElement === null || colorAlphaElement === null || colorRValueElement === null || colorGValueElement === null || colorBValueElement === null || colorAlphaValueElement === null || colorHexElement === null || colorHexOutputElement === null || colorApplyButton === null || colorEditorStatusElement === null || gamePreviewStartButton === null || gamePreviewStopButton === null || gamePreviewRestartButton === null || gamePreviewPinButton === null || gamePreviewReloadButton === null || gamePreviewStatusElement === null || gamePreviewCanvasElement === null || advancedLoadButton === null || advancedPatternButton === null || advancedMirrorButton === null || advancedGridButton === null || advancedGuideButton === null || advancedStatusElement === null || languageElement === null || exportPanelStatusElement === null || exportNameElement === null || exportScaleElement === null || exportFormatCardsElement === null || exportSelectionSummaryElement === null || exportFormatOptionsElement === null || exportPackageSectionElement === null || exportPackageSingleElement === null || exportPackageZipElement === null || exportPreviewCanvasElement === null || exportPreviewSummaryElement === null || exportOutputFilesElement === null || exportProgressElement === null || exportProgressBarElement === null || exportProgressPercentElement === null || exportProgressTitleElement === null || exportProgressDetailElement === null || exportProgressCurrentElement === null || exportProgressCountElement === null || exportProgressTrackElement === null || exportExecuteButton === null || exportToMarketButton === null) {
+if (canvasElement === null || overlayElement === null || erasePreviewElement === null || viewportCenterButtonElement === null || pixelGridElement === null || pixelGridMinorPathElement === null || pixelGridMajorPathElement === null || selectionOverlayElement === null || mirrorGuideOverlayElement === null || mirrorGuideVerticalElement === null || mirrorGuideHorizontalElement === null || mirrorGuideDiagonalDownElement === null || mirrorGuideDiagonalUpElement === null || mirrorToggleXElement === null || mirrorToggleYElement === null || mirrorToggleDiagonalDownElement === null || mirrorToggleDiagonalUpElement === null || selectionOverlayRegionsElement === null || statusElement === null || metricsElement === null || selectionStatusElement === null || projectIdInputElement === null || tileSizeSelectElement === null || toolSelectElement === null || brushSizeElement === null || brushPatternElement === null || brushShapeElement === null || brushSizeControlElement === null || quickControlsElement === null || brushOptionsButtonElement === null || brushOptionsSummaryElement === null || brushOptionsFlyoutElement === null || brushOptionsCloseButtonElement === null || brushPresetElement === null || brushPresetNameElement === null || brushPresetSaveButton === null || brushPresetDeleteButton === null || mirrorModeToggleElement === null || viewportContextRailElement === null || similarityControlElement === null || similarityElement === null || similarityValueElement === null || colorSelectionModeElement === null || miniPreviewCanvasElement === null || miniPreviewContainerElement === null || miniPreviewPlayButtonElement === null || miniPreviewReferenceButtonElement === null || miniPreviewReferenceClearButtonElement === null || miniPreviewReferenceInputElement === null || miniPreviewReferenceStatusElement === null || miniPreviewCollapseButtonElement === null || miniPreviewRestoreButtonElement === null || miniPreviewResizeLeftElement === null || miniPreviewResizeBottomElement === null || miniPreviewResizeCornerElement === null || selectionXElement === null || selectionYElement === null || selectionWidthElement === null || selectionHeightElement === null || selectionModeElement === null || selectionExpandButton === null || selectionShrinkButton === null || selectionInvertButton === null || selectionBorderButton === null || transformOperationElement === null || transformDxElement === null || transformDyElement === null || transformFactorElement === null || selectButton === null || commitSelectionButton === null || cancelSelectionButton === null || selectionStampNameInputElement === null || selectionStampSaveButton === null || selectionStampListElement === null || selectionStampStatusElement === null || previewButton === null || commitButton === null || cancelButton === null || flipHorizontalButton === null || flipVerticalButton === null || rotateCCWButton === null || rotateCWButton === null || rotate180Button === null || copyButton === null || cutButton === null || pasteButton === null || undoButton === null || redoButton === null || timelineCardElement === null || timelineContextMenu === null || createButton === null || importPxdInput === null || timelineStatusElement === null || timelineViewportElement === null || timelineSpacerElement === null || timelineWindowElement === null || timelinePropertiesResizeElement === null || timelinePropertiesElement === null || timelinePropertiesBodyElement === null || timelinePropertiesCollapseElement === null || timelineSecondaryControlsElement === null || animationTagNameElement === null || animationTagFromElement === null || animationTagToElement === null || animationTagLoopElement === null || animationTagAddElement === null || animationTagListElement === null || timelineMarkerKindElement === null || timelineMarkerLabelElement === null || timelineMarkerAddElement === null || timelineMarkerListElement === null || linkedCelToggleElement === null || linkedCelStatusElement === null || addFrameButton === null || duplicateFrameButton === null || removeFrameButton === null || addLayerButton === null || reorderLayerButton === null || toggleLayerButton === null || toggleOnionButton === null || togglePlaybackButton === null || onionOptionsElement === null || onionPreviousElement === null || onionPreviousValueElement === null || onionNextElement === null || onionNextValueElement === null || onionOpacityElement === null || onionOpacityValueElement === null || onionColorModeElement === null || playbackFpsElement === null || playbackLoopElement === null || playbackFpsCustomElement === null || colorMapElement === null || paletteWheelElement === null || hueCursorElement === null || svCursorElement === null || colorRElement === null || colorGElement === null || colorBElement === null || colorAlphaElement === null || colorRValueElement === null || colorGValueElement === null || colorBValueElement === null || colorAlphaValueElement === null || colorHexElement === null || colorHexOutputElement === null || colorApplyButton === null || colorEditorStatusElement === null || gamePreviewStartButton === null || gamePreviewStopButton === null || gamePreviewRestartButton === null || gamePreviewPinButton === null || gamePreviewReloadButton === null || gamePreviewStatusElement === null || goldenProjectStatusElement === null || goldenProjectRefsElement === null || goldenProjectApplyButton === null || projectSessionCheckpointButton === null || projectSessionCheckpointStatusElement === null || gamePreviewCanvasElement === null || advancedLoadButton === null || advancedPatternButton === null || advancedMirrorButton === null || advancedGridButton === null || advancedGuideButton === null || advancedStatusElement === null || languageElement === null || exportPanelStatusElement === null || exportNameElement === null || exportScaleElement === null || exportFormatCardsElement === null || exportSelectionSummaryElement === null || exportFormatOptionsElement === null || exportPackageSectionElement === null || exportPackageSingleElement === null || exportPackageZipElement === null || exportPreviewCanvasElement === null || exportPreviewSummaryElement === null || exportOutputFilesElement === null || exportProgressElement === null || exportProgressBarElement === null || exportProgressPercentElement === null || exportProgressTitleElement === null || exportProgressDetailElement === null || exportProgressCurrentElement === null || exportProgressCountElement === null || exportProgressTrackElement === null || exportExecuteButton === null || exportToMarketButton === null) {
   throw new Error("Draw2 isolated entry is missing a required element.");
 }
 if (canvasSettingsDialogElement === null || canvasSettingsProjectIdElement === null || canvasSettingsWidthElement === null || canvasSettingsHeightElement === null || canvasSettingsTileSizeElement === null || canvasSettingsApplyButton === null || openCanvasSettingsButton === null || openProjectDialogButton === null || projectDialogElement === null || projectDialogIdElement === null || projectDialogOpenButton === null || projectDialogNewButton === null || projectDialogStatusElement === null) {
@@ -14201,10 +16998,11 @@ var canvasResizePreviewFrame = canvasResizePreviewFrameElement;
 var canvasResizePreviewContent = canvasResizePreviewContentElement;
 var drawPersistenceStore = createIndexedDbDraw2PersistenceStore();
 var workspaceManifestStore = createIndexedDbWorkspaceManifestStore();
-var DRAW2_PERSISTED_HISTORY_LIMIT = 32;
 var DRAW2_PERSISTED_JOURNAL_LIMIT = 32;
 var DRAW2_PERSISTENCE_DEBOUNCE_MS = 250;
 var drawPersistenceRevision = 0;
+var drawPersistenceExpectedRevision = 0;
+var drawPersistenceExpectedStateHash = null;
 var drawPersistenceSaveQueue = Promise.resolve();
 var drawPersistenceSaveTimer;
 var drawPersistenceSavePending;
@@ -14247,11 +17045,20 @@ async function drainDrawPersistenceSave() {
   const revision = drawPersistenceRevision + 1;
   drawPersistenceRevision = revision;
   drawPersistenceSaveQueue = drawPersistenceSaveQueue.then(async () => {
+    const expectedRevision = drawPersistenceExpectedRevision;
+    const expectedStateHash = drawPersistenceExpectedStateHash;
     const record2 = await createDraw2PersistenceRecord(envelope.state, envelope.history, envelope.journal, revision, (/* @__PURE__ */ new Date()).toISOString(), envelope.assetDefinitions, envelope.timelineMetadata);
-    const saved = await drawPersistenceStore.save(record2);
+    const saved = await drawPersistenceStore.save(record2, {
+      expectedRevision,
+      expectedStateHash
+    });
     if (!saved.ok) {
       document.body.dataset.drawPersistenceState = "unavailable";
       return;
+    }
+    if (!saved.stale) {
+      drawPersistenceExpectedRevision = revision;
+      drawPersistenceExpectedStateHash = record2.stateHash;
     }
     document.body.dataset.drawPersistenceState = saved.stale ? "stale-write-ignored" : envelope.reason === "recovery" ? "restored" : "saved";
     document.body.dataset.drawPersistenceRevision = String(revision);
@@ -14265,7 +17072,9 @@ async function drainDrawPersistenceSave() {
     document.body.dataset.drawPersistenceState = "error";
   });
   await drawPersistenceSaveQueue.catch(() => void 0);
-  if (drawPersistenceSavePending !== void 0) await drainDrawPersistenceSave();
+  if (drawPersistenceSavePending !== void 0) {
+    await drainDrawPersistenceSave();
+  }
 }
 async function flushDrawPersistence() {
   while (true) {
@@ -14273,7 +17082,9 @@ async function flushDrawPersistence() {
       window.clearTimeout(drawPersistenceSaveTimer);
       drawPersistenceSaveTimer = void 0;
     }
-    if (drawPersistenceSavePending !== void 0) await drainDrawPersistenceSave();
+    if (drawPersistenceSavePending !== void 0) {
+      await drainDrawPersistenceSave();
+    }
     const queue = drawPersistenceSaveQueue;
     await queue.catch(() => void 0);
     if (drawPersistenceSavePending === void 0 && drawPersistenceSaveTimer === void 0 && queue === drawPersistenceSaveQueue) return;
@@ -15455,6 +18266,19 @@ function publishDrawRasterCommit(result, nextState, baseStructureEpoch) {
     }
   }));
 }
+function productionPayloadExceedsRealtimeBytes(payload) {
+  if (pixyncProductionRoot === void 0) return false;
+  try {
+    return new TextEncoder().encode(JSON.stringify(payload)).byteLength > PIXYNC_DRAW2_MAX_PAYLOAD_BYTES;
+  } catch {
+    return true;
+  }
+}
+function rejectOversizedProductionPayload(payload) {
+  if (!productionPayloadExceedsRealtimeBytes(payload)) return false;
+  setStatus("\u3053\u306E\u64CD\u4F5C\u306F\u30EA\u30A2\u30EB\u30BF\u30A4\u30E0\u540C\u671F\u306E\u4E0A\u9650\u3092\u8D85\u3048\u308B\u305F\u3081\u3001\u5909\u66F4\u3092\u78BA\u5B9A\u3057\u307E\u305B\u3093\u3002\u9078\u629E\u7BC4\u56F2\u3092\u5C0F\u3055\u304F\u3059\u308B\u304B\u3001\u64CD\u4F5C\u3092\u5206\u5272\u3057\u3066\u304F\u3060\u3055\u3044\u3002", "error");
+  return true;
+}
 var pixyncDrawStatePort = {
   preservesLocalHistory: true,
   current: () => ({
@@ -15478,15 +18302,26 @@ var pixyncDrawStatePort = {
       commandType: operation.operationType,
       payload: operation.payload
     };
-    const remoteCore = new EditorCore(state, {
+    const applied = operation.operationType === "selection.transformCommit" ? await applyCompactSelectionTransform(state, {
+      ...command,
+      commandType: "selection.transformCommit",
+      payload: operation.payload
+    }) : await new EditorCore(state, {
       instrumentation
-    });
-    const applied = await remoteCore.execute(command);
+    }).execute(command);
     if (!applied.ok) {
       throw new Error(applied.diagnostics[0]?.code ?? "PIXYNC_DRAW_REMOTE_APPLY_FAILED");
     }
     if (!applied.result.noOp) {
-      await history.rebaseRemoteRasterOperation(command, applied.state);
+      if (operation.operationType === "selection.transformCommit") {
+        await history.rebaseRemoteSelectionTransformOperation({
+          ...command,
+          commandType: "selection.transformCommit",
+          payload: operation.payload
+        }, applied.state);
+      } else {
+        await history.rebaseRemoteRasterOperation(command, applied.state);
+      }
       adoptCanonicalState(applied.state);
       saveDrawProjectState("pixync-remote");
       notifyAssetStateChanged();
@@ -15511,6 +18346,281 @@ var pixyncDrawStatePort = {
   })
 };
 var pixyncProjectLifecycle;
+var sharedPixyncPersistence;
+function clonePixyncSnapshot(snapshot) {
+  return snapshot === void 0 ? void 0 : structuredClone(snapshot);
+}
+function pixyncPersistenceFor(projectId) {
+  if (sharedPixyncPersistence?.projectId === projectId) {
+    return sharedPixyncPersistence.port;
+  }
+  const inner = createPixyncIndexedDbPersistence(projectId);
+  let loaded = false;
+  let cached;
+  let loadPromise;
+  const port = {
+    async load() {
+      if (!loaded) {
+        loadPromise ??= inner.load().then((snapshot) => {
+          cached = clonePixyncSnapshot(snapshot);
+          loaded = true;
+          loadPromise = void 0;
+        }).catch((error2) => {
+          loadPromise = void 0;
+          throw error2;
+        });
+        await loadPromise;
+      } else if (await inner.isDeleted()) {
+        cached = void 0;
+      }
+      return clonePixyncSnapshot(cached);
+    },
+    async atomicReplace(snapshot) {
+      await inner.atomicReplace(snapshot);
+      cached = clonePixyncSnapshot(snapshot);
+      loaded = true;
+    },
+    async compareAndSwap(snapshot, expectedSnapshotHash) {
+      try {
+        await inner.compareAndSwap(snapshot, expectedSnapshotHash);
+        cached = clonePixyncSnapshot(snapshot);
+        loaded = true;
+      } catch (error2) {
+        cached = void 0;
+        loaded = false;
+        throw error2;
+      }
+    }
+  };
+  const removablePort = port;
+  removablePort.remove = async () => {
+    await inner.remove();
+    cached = void 0;
+    loaded = false;
+    loadPromise = void 0;
+    return true;
+  };
+  sharedPixyncPersistence = {
+    projectId,
+    port: removablePort
+  };
+  return removablePort;
+}
+var LOCAL_SESSION_AGGREGATES = [
+  "draw",
+  "audio",
+  "game"
+];
+function createLocalProjectSessionAdapters() {
+  return LOCAL_SESSION_AGGREGATES.map((aggregate) => ({
+    aggregate,
+    // The session proves ordering and presence independently from product
+    // state. Product bridges remain the only owners of Draw/Audio/Game data.
+    apply: () => void 0
+  }));
+}
+function creatorStartModeFromValue(value) {
+  return value === "AUDIO" ? "AUDIO" : value === "GAME" ? "GAME" : "DRAW";
+}
+function projectSessionModeFromCreatorMode(value) {
+  const mode = creatorStartModeFromValue(value);
+  return mode === "AUDIO" ? "iAUDIO" : mode === "GAME" ? "iGAME" : "iDRAW";
+}
+function projectSessionSelectionLabel(mode) {
+  return mode === "iAUDIO" ? "Arrangement" : mode === "iGAME" ? "Scene" : "Canvas";
+}
+var localProjectSession;
+var localProjectSessionUnsubscribe;
+var localProjectSessionRequestGeneration = 0;
+async function stopLocalProjectSession() {
+  localProjectSessionRequestGeneration += 1;
+  const previous = localProjectSession;
+  localProjectSession = void 0;
+  localProjectSessionUnsubscribe?.();
+  localProjectSessionUnsubscribe = void 0;
+  await previous?.disconnect().catch(() => void 0);
+}
+function publishLocalProjectSessionStatus(snapshot) {
+  const viewState = snapshot.status === "CONFLICT" ? "conflict" : snapshot.status === "OFFLINE" || snapshot.status === "ERROR" ? "offline" : snapshot.status === "RECOVERING" || snapshot.status === "PENDING" || snapshot.status === "LOCAL_OPTIMISTIC" ? "connecting" : "local";
+  const error2 = snapshot.lastError === void 0 ? "" : ` \xB7 ${snapshot.lastError.code}`;
+  document.body.dataset.projectSessionStatus = snapshot.status.toLowerCase();
+  document.body.dataset.projectSessionMode = snapshot.activeMode;
+  document.body.dataset.projectSessionRevision = String(snapshot.projectRevision);
+  document.body.dataset.projectSessionPending = String(snapshot.pendingOperationIds.length);
+  document.body.dataset.projectSessionRole = snapshot.role;
+  document.body.dataset.projectSessionCheckpoints = String(snapshot.checkpoints.length);
+  if (projectSessionCheckpointStatusElement !== null) {
+    projectSessionCheckpointStatusElement.textContent = `r${snapshot.projectRevision} \xB7 ${snapshot.checkpoints.length}\u4FDD\u5B58\u70B9 \xB7 ${snapshot.role}`;
+  }
+  window.dispatchEvent(new CustomEvent("draw2:pixync-status", {
+    detail: {
+      state: viewState,
+      roomId: `local:${snapshot.projectId}`,
+      revision: `r${snapshot.projectRevision}`,
+      members: String(Math.max(1, snapshot.presence.length)),
+      latencyMs: 0,
+      message: `Project Session ${snapshot.status} \xB7 ${snapshot.activeMode} \xB7 \u30ED\u30FC\u30AB\u30EB\u5171\u540C\u7DE8\u96C6\u30EA\u30CF\u30FC\u30B5\u30EB\uFF08\u672C\u756APiXYNC\u672A\u63A5\u7D9A\uFF09${error2}`
+    }
+  }));
+}
+async function startLocalProjectSession(projectId, creatorMode) {
+  const requestGeneration = ++localProjectSessionRequestGeneration;
+  localProjectSessionUnsubscribe?.();
+  localProjectSessionUnsubscribe = void 0;
+  const previous = localProjectSession;
+  localProjectSession = void 0;
+  await previous?.disconnect().catch(() => void 0);
+  if (requestGeneration !== localProjectSessionRequestGeneration) return;
+  const sessionModule = await loadProjectSessionModule();
+  if (requestGeneration !== localProjectSessionRequestGeneration) return;
+  const adapters = createLocalProjectSessionAdapters();
+  const broker = new sessionModule.LocalProjectSessionBroker({
+    projectId,
+    adapters
+  });
+  const session = new sessionModule.ProjectSessionClient({
+    broker,
+    projectId,
+    actorId: pixyncTabIdentity("pixiedraw2:project-session-actor:v1", "local-actor"),
+    clientId: pixyncTabIdentity("pixiedraw2:project-session-client:v1", "local-client"),
+    displayName: "This tab",
+    activeMode: projectSessionModeFromCreatorMode(creatorMode),
+    adapters
+  });
+  if (requestGeneration !== localProjectSessionRequestGeneration) {
+    await session.disconnect();
+    return;
+  }
+  localProjectSession = session;
+  localProjectSessionUnsubscribe = session.onState(publishLocalProjectSessionStatus);
+  window.__pixiedraw2ProjectSession = session;
+  try {
+    await session.connect();
+    await session.publishPresence(projectSessionSelectionLabel(session.state().activeMode));
+  } catch {
+    publishLocalProjectSessionStatus(session.state());
+  }
+}
+var pixyncProductionPresence = /* @__PURE__ */ new Map();
+var pixyncProductionTransportStatus = "CLOSED";
+function applyPixyncProductionPresence(event, projectId) {
+  if (event.kind === "sync") {
+    pixyncProductionPresence.clear();
+    for (const presence of event.presence) {
+      pixyncProductionPresence.set(presence.clientId, presence);
+    }
+  } else if (event.kind === "upsert") {
+    pixyncProductionPresence.set(event.presence.clientId, event.presence);
+  } else {
+    pixyncProductionPresence.delete(event.clientId);
+  }
+  publishPixyncProductionStatus(pixyncProductionTransportStatus, projectId);
+}
+function publishPixyncProductionStatus(status2, projectId = state.projectId, message) {
+  pixyncProductionTransportStatus = status2;
+  const syncState = status2 === "SUBSCRIBED" ? "synced" : status2 === "OFFLINE" || status2 === "CLOSED" ? "offline" : "connecting";
+  document.body.dataset.pixyncState = status2.toLowerCase();
+  window.dispatchEvent(new CustomEvent("draw2:pixync-status", {
+    detail: {
+      state: syncState,
+      roomId: projectId,
+      revision: "\u2014",
+      members: pixyncProductionPresence.size === 0 ? "\u2014" : String(pixyncProductionPresence.size),
+      message: message ?? (status2 === "SUBSCRIBED" ? "PiXYNC Realtime\u3067Project\u3092\u540C\u671F\u3057\u3066\u3044\u307E\u3059\u3002" : status2 === "OFFLINE" || status2 === "CLOSED" ? "\u540C\u671F\u304C\u5207\u65AD\u3055\u308C\u307E\u3057\u305F\u3002\u30ED\u30FC\u30AB\u30EB\u5909\u66F4\u3092\u4FDD\u6301\u3057\u3066\u518D\u63A5\u7D9A\u3092\u5F85\u6A5F\u3057\u307E\u3059\u3002" : "PiXYNC Realtime\u3078\u63A5\u7D9A\u3057\u3066\u3044\u307E\u3059\u3002")
+    }
+  }));
+}
+async function publishProductionCheckpoint() {
+  const checkpointButton = projectSessionCheckpointButton;
+  const checkpointStatus = projectSessionCheckpointStatusElement;
+  if (checkpointButton === null || checkpointStatus === null) return;
+  const projectId = state.projectId;
+  const client = await availablePixyncSupabaseClient();
+  if (client === void 0) {
+    checkpointStatus.textContent = "\u30ED\u30B0\u30A4\u30F3\u3092\u78BA\u8A8D\u3067\u304D\u306A\u3044\u305F\u3081\u3001\u5171\u6709Checkpoint\u3092\u4FDD\u5B58\u3067\u304D\u307E\u305B\u3093\u3002";
+    return;
+  }
+  checkpointButton.disabled = true;
+  checkpointStatus.textContent = "Draw\u30FBAudio\u30FBGame\u3092\u542B\u3080Checkpoint\u3092\u691C\u8A3C\u4E2D\u2026";
+  try {
+    await flushDrawPersistence();
+    const exportState = state;
+    const exportModule = await loadExportModule();
+    const artifact = await createPxdProjectArtifact(exportModule, safeExportBaseName());
+    if (state !== exportState || state.projectId !== projectId) {
+      throw new Error("\u4FDD\u5B58\u4E2D\u306BProject\u304C\u5909\u66F4\u3055\u308C\u307E\u3057\u305F\u3002\u3082\u3046\u4E00\u5EA6Checkpoint\u3092\u4FDD\u5B58\u3057\u3066\u304F\u3060\u3055\u3044\u3002");
+    }
+    const key = "pixiedraw2:pixync-attestation-client-id:v1";
+    const storedClientId = sessionStorage.getItem(key);
+    const attestationClientId = storedClientId ?? crypto.randomUUID();
+    if (storedClientId === null) {
+      sessionStorage.setItem(key, attestationClientId);
+    }
+    const result = await publishPixyncCheckpoint(client, {
+      projectId,
+      checkpointBytes: artifact.bytes,
+      attestationClientId
+    });
+    if (state.projectId !== projectId) {
+      throw new Error("\u4FDD\u5B58\u5F8C\u306BProject\u304C\u5909\u66F4\u3055\u308C\u307E\u3057\u305F\u3002\u73FE\u5728\u306EProject\u3092\u78BA\u8A8D\u3057\u3066\u304F\u3060\u3055\u3044\u3002");
+    }
+    document.body.dataset.pixyncCheckpointRevision = String(result.revision);
+    document.body.dataset.pixyncCheckpointStatus = result.status;
+    checkpointStatus.textContent = result.active ? `Checkpoint r${result.revision} \u3092\u5171\u6709\u4FDD\u5B58\u3057\u307E\u3057\u305F \xB7 verified \xB7 ${result.packageHash.slice(0, 12)}\u2026` : `Checkpoint r${result.revision} \u306F\u5019\u88DC\u3068\u3057\u3066\u4FDD\u5B58\u3057\u307E\u3057\u305F \xB7 ${result.attestedUserCount}/${result.requiredUserCount}\u4EBA\u306E\u691C\u8A3C\u5F85\u3061`;
+  } catch (error2) {
+    checkpointStatus.textContent = error2 instanceof Error ? `\u5171\u6709Checkpoint\u3092\u4FDD\u5B58\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F: ${error2.message}` : "\u5171\u6709Checkpoint\u3092\u4FDD\u5B58\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002";
+  } finally {
+    checkpointButton.disabled = false;
+  }
+}
+window.addEventListener("draw2:creator-mode", (event) => {
+  const mode = event.detail?.mode;
+  const session = localProjectSession;
+  const sessionMode = projectSessionModeFromCreatorMode(mode);
+  if (session !== void 0) {
+    session.setActiveMode(sessionMode);
+    void session.publishPresence(projectSessionSelectionLabel(sessionMode)).catch(() => publishLocalProjectSessionStatus(session.state()));
+  }
+  const production = pixyncProductionRoot;
+  if (production !== void 0) {
+    void production.publishPresence({
+      displayName: "This tab",
+      mode: sessionMode,
+      selectionLabel: projectSessionSelectionLabel(sessionMode)
+    }).catch(() => void 0);
+  }
+});
+projectSessionCheckpointButton.addEventListener("click", async () => {
+  if (document.body.dataset.pixyncComposition === "production") {
+    await publishProductionCheckpoint();
+    return;
+  }
+  const session = localProjectSession;
+  if (session === void 0) {
+    projectSessionCheckpointStatusElement.textContent = "Project Session\u304C\u307E\u3060\u63A5\u7D9A\u3055\u308C\u3066\u3044\u307E\u305B\u3093\u3002";
+    return;
+  }
+  projectSessionCheckpointButton.disabled = true;
+  projectSessionCheckpointStatusElement.textContent = "Checkpoint\u3092\u4FDD\u5B58\u4E2D\u2026";
+  try {
+    const checkpoint = await session.createCheckpoint({
+      checkpointId: `checkpoint:local:${crypto.randomUUID()}`,
+      label: `Project revision r${session.state().projectRevision}`,
+      kind: "MANUAL"
+    });
+    projectSessionCheckpointStatusElement.textContent = `Checkpoint r${checkpoint.projectRevision} \u3092\u4FDD\u5B58\u3057\u307E\u3057\u305F \xB7 Local Session`;
+  } catch (error2) {
+    projectSessionCheckpointStatusElement.textContent = error2 instanceof Error ? `Checkpoint\u3092\u4FDD\u5B58\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F: ${error2.message}` : "Checkpoint\u3092\u4FDD\u5B58\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002";
+  } finally {
+    projectSessionCheckpointButton.disabled = false;
+  }
+});
+window.addEventListener(WORKSPACE_PROJECT_CHANGED_EVENT, (event) => {
+  const session = localProjectSession;
+  const projectId = event.detail?.projectId;
+  if (session === void 0 || typeof projectId !== "string" || projectId === session.state().projectId) return;
+  void startLocalProjectSession(projectId, creatorStartModeFromValue(document.querySelector("#draw2WorkspaceFrame")?.dataset.creatorMode)).catch(() => void 0);
+});
 function projectPixyncState(phase, projectId, generation) {
   document.body.dataset.pixyncState = phase.toLowerCase();
   document.body.dataset.pixyncProjectId = projectId ?? "";
@@ -15522,7 +18632,7 @@ async function startPixyncProjectLifecycle() {
     eventTarget: window,
     eventName: WORKSPACE_PROJECT_CHANGED_EVENT,
     initialProjectId: state.projectId,
-    createPersistence: (projectId) => createPixyncIndexedDbPersistence(projectId),
+    createPersistence: (projectId) => pixyncPersistenceFor(projectId),
     openJournal: async (projectId, persistence) => ({
       projectId,
       journal: await PixyncDurableJournal.open(projectId, persistence)
@@ -15547,6 +18657,11 @@ window.addEventListener("pagehide", (event) => {
   const lifecycle = pixyncProjectLifecycle;
   pixyncProjectLifecycle = void 0;
   void lifecycle?.dispose();
+  void localProjectSession?.disconnect();
+  localProjectSessionRequestGeneration += 1;
+  localProjectSession = void 0;
+  localProjectSessionUnsubscribe?.();
+  localProjectSessionUnsubscribe = void 0;
   void pixyncProductionRoot?.close("pagehide");
   pixyncProductionRoot = void 0;
 });
@@ -15586,9 +18701,11 @@ function requireWorkspacePixyncBridge() {
   return bridge;
 }
 async function startPixyncProductionRoot(suppliedClient) {
-  if (!PIXYNC_ROOM_ID.test(state.projectId)) {
+  const projectId = state.projectId;
+  if (!PIXYNC_ROOM_ID.test(projectId)) {
     await pixyncProductionRoot?.close("local-project");
     pixyncProductionRoot = void 0;
+    pixyncProductionPresence.clear();
     document.body.dataset.pixyncComposition = "local";
     await startPixyncProjectLifecycle();
     return false;
@@ -15597,25 +18714,32 @@ async function startPixyncProductionRoot(suppliedClient) {
   if (client === void 0) {
     await pixyncProductionRoot?.close("authentication-unavailable");
     pixyncProductionRoot = void 0;
+    pixyncProductionPresence.clear();
     document.body.dataset.pixyncComposition = "awaiting-auth";
     return false;
   }
   const workspace = requireWorkspacePixyncBridge();
+  try {
+    await hydratePixyncCheckpointIfNeeded(client, projectId);
+  } catch (error2) {
+    if (error2 instanceof PixyncRemoteCheckpointError) {
+      document.body.dataset.pixyncComposition = error2.code === "AUTHENTICATION_REQUIRED" || error2.code === "AUTHENTICATION_FAILED" ? "awaiting-auth" : "awaiting-checkpoint";
+      publishPixyncProductionStatus("OFFLINE", projectId, error2.code === "AUTHENTICATION_REQUIRED" ? "\u5171\u6709Project\u3092\u5FA9\u5143\u3059\u308B\u306B\u306F\u30ED\u30B0\u30A4\u30F3\u304C\u5FC5\u8981\u3067\u3059\u3002\u30ED\u30FC\u30AB\u30EB\u7DE8\u96C6\u3092\u7D99\u7D9A\u3057\u307E\u3059\u3002" : "\u5171\u6709Project\u306E\u521D\u671FCheckpoint\u3092\u691C\u8A3C\u3067\u304D\u306A\u3044\u305F\u3081\u3001\u30ED\u30FC\u30AB\u30EB\u7DE8\u96C6\u3092\u7D99\u7D9A\u3057\u307E\u3059\u3002");
+    }
+    throw error2;
+  }
   await Promise.all([
     workspace.preparePixyncAudioState(),
     workspace.preparePixyncGameState()
   ]);
   await pixyncProductionRoot?.close("project-transition");
   pixyncProductionRoot = void 0;
-  if (pixyncProjectLifecycle !== void 0) {
-    const localLifecycle = pixyncProjectLifecycle;
-    pixyncProjectLifecycle = void 0;
-    await localLifecycle.dispose();
-  }
-  const projectId = state.projectId;
+  pixyncProductionPresence.clear();
+  const localLifecycle = pixyncProjectLifecycle;
   const clientId = pixyncTabIdentity("pixiedraw2:pixync-client-id", "draw2-client");
   const sessionGeneration = Date.now();
   const workerId = pixyncTabIdentity("pixiedraw2:pixync-worker-id", "draw2-worker");
+  const currentCreatorMode = projectSessionModeFromCreatorMode(creatorStartModeFromValue(document.querySelector("#draw2WorkspaceFrame")?.dataset.creatorMode));
   let root;
   const gameRevisions = new PixyncGameRevisionRemoteStore(client, () => root?.binding);
   root = await PixyncProductionCompositionRoot.create({
@@ -15624,8 +18748,14 @@ async function startPixyncProductionRoot(suppliedClient) {
     sessionGeneration,
     workerId,
     supabase: client,
-    persistence: createPixyncIndexedDbPersistence(projectId),
+    persistence: pixyncPersistenceFor(projectId),
     eventTarget: window,
+    presence: {
+      displayName: "This tab",
+      mode: currentCreatorMode,
+      selectionLabel: projectSessionSelectionLabel(currentCreatorMode)
+    },
+    onPresence: (event) => applyPixyncProductionPresence(event, projectId),
     audioHydration: {
       hydrateAudio: async (request) => {
         await workspace.preparePixyncAudioState();
@@ -15686,17 +18816,75 @@ async function startPixyncProductionRoot(suppliedClient) {
         }
       };
     },
-    onStatus: (status2) => {
-      document.body.dataset.pixyncState = status2.toLowerCase();
-    },
+    onStatus: (status2) => publishPixyncProductionStatus(status2, projectId),
     onError: (error2) => {
       document.body.dataset.pixyncState = "error";
       document.body.dataset.pixyncError = error2 instanceof Error ? error2.message : "PIXYNC_RUNTIME_ERROR";
+      publishPixyncProductionStatus("OFFLINE", projectId, "PiXYNC\u3067\u30A8\u30E9\u30FC\u304C\u767A\u751F\u3057\u307E\u3057\u305F\u3002\u30ED\u30FC\u30AB\u30EB\u5909\u66F4\u3092\u4FDD\u6301\u3057\u3066\u3044\u307E\u3059\u3002");
     }
   });
   await root.connect();
+  if (state.projectId !== projectId) {
+    if (pixyncProjectLifecycle === localLifecycle) {
+      pixyncProjectLifecycle = void 0;
+    }
+    await localLifecycle?.dispose();
+    await root.close("project-changed-during-connect");
+    return false;
+  }
+  if (pixyncProjectLifecycle === localLifecycle) {
+    pixyncProjectLifecycle = void 0;
+  }
+  await localLifecycle?.dispose();
+  await stopLocalProjectSession();
   pixyncProductionRoot = root;
   document.body.dataset.pixyncComposition = "production";
+  publishPixyncProductionStatus("SUBSCRIBED", projectId);
+  return true;
+}
+function currentDrawStateHasLocalWork() {
+  if (state.structureEpoch > 1 || assetDefinitions.length > 0) return true;
+  if (history.undoDepth > 0 || history.redoDepth > 0) return true;
+  if (journal.operations.length > 0 || journal.dirtyTileWrites.length > 0) {
+    return true;
+  }
+  for (const tilemap2 of Object.values(state.tilemaps ?? {})) {
+    if (Object.keys(tilemap2.cells).length > 0) return true;
+  }
+  for (const asset of Object.values(state.assets)) {
+    for (const tile of asset.raster.snapshotTiles()) {
+      if (tile.bytes.some((value) => value !== 0)) return true;
+    }
+  }
+  return false;
+}
+async function hydratePixyncCheckpointIfNeeded(client, projectId) {
+  if (currentDrawStateHasLocalWork()) return false;
+  if (state.projectId !== projectId) {
+    throw new Error("The Project changed before PiXYNC checkpoint restore.");
+  }
+  const checkpoint = await readPixyncActiveCheckpoint(client, projectId);
+  if (state.projectId !== projectId) {
+    throw new Error("The Project changed during PiXYNC checkpoint restore.");
+  }
+  const file = new File([
+    checkpoint.bytes.slice().buffer
+  ], `${projectId}.pxd`, {
+    type: "application/vnd.pixieed.pxd"
+  });
+  try {
+    await importPxdFile(file, {
+      expectedPackageHash: checkpoint.packageHash,
+      expectedProjectId: projectId,
+      announceProjectChange: false,
+      source: "REMOTE_CHECKPOINT"
+    });
+  } catch (cause) {
+    if (cause instanceof PixyncRemoteCheckpointError) throw cause;
+    throw new PixyncRemoteCheckpointError("SERVER_RESPONSE_INVALID", "The verified PiXYNC checkpoint could not be restored as a Studio Project.", {
+      cause
+    });
+  }
   return true;
 }
 function queuePixyncProductionStart(client) {
@@ -16034,16 +19222,18 @@ function restoreDraw2TimelineMetadata(value) {
   for (const reference of metadata.audioReferences) {
     drawAudioReferences.upsert(reference, state.frames.length);
   }
-  for (const stamp2 of selectionStampStore.list()) {
-    selectionStampStore.remove(stamp2.id);
+  for (const stamp3 of selectionStampStore.list()) {
+    selectionStampStore.remove(stamp3.id);
   }
-  for (const stamp2 of metadata.selectionStamps ?? []) {
-    selectionStampStore.save(stamp2);
+  for (const stamp3 of metadata.selectionStamps ?? []) {
+    selectionStampStore.save(stamp3);
   }
   activeSelectionStampId = void 0;
 }
 var linkedCelBindings = [];
 var selection;
+var rectangleSelectionClipCache;
+var rasterSelectionMaskCache;
 var selectionInteractionGeneration = 0;
 var selectionEditMode = "REPLACE";
 var selectionDraft;
@@ -16596,9 +19786,40 @@ async function resolveCurrentDrawReference(input) {
     label: asset.id
   };
 }
+async function resolveDrawDefinitionReference(input) {
+  const entry = assetDefinitions.find((candidate) => candidate.definitionId === input.definitionId);
+  if (entry === void 0 || entry.definition.sourceProjectId !== state.projectId) {
+    return void 0;
+  }
+  const sourceAsset = state.assets[entry.definition.sourceCanvasId];
+  if (sourceAsset === void 0) return void 0;
+  const assetId = entry.registryIdentity?.assetId ?? sourceAsset.id;
+  const revisionId = entry.registryIdentity?.revisionId ?? `draw-revision-${sourceAsset.revision}`;
+  const contentHash = String(await hashCanonical({
+    definitionId: entry.definitionId,
+    definition: entry.definition,
+    source: {
+      id: sourceAsset.id,
+      width: sourceAsset.width,
+      height: sourceAsset.height,
+      palette: sourceAsset.palette,
+      pixels: sourceAsset.raster.toUint8Array()
+    }
+  }));
+  return {
+    kind: "DRAW",
+    assetId,
+    revisionId,
+    contentHash,
+    mode: input.mode,
+    label: entry.definition.metadata.name || entry.definitionId,
+    assetDefinitionId: entry.definitionId
+  };
+}
 var draw2AssetBridge = {
   snapshot: getAssetBridgeSnapshot,
   resolveCurrentReference: resolveCurrentDrawReference,
+  resolveDefinitionReference: resolveDrawDefinitionReference,
   renderReference: renderAssetReference,
   prepareSelection: prepareAssetSelection,
   createDefinition: createEmptyAssetDefinition,
@@ -16983,6 +20204,22 @@ function handleGame351PreviewKey(event) {
 }
 async function startGamePreview(mode = "LIVE") {
   try {
+    const workspace = getWorkspacePxdBridge();
+    workspace.startGoldenAudioPreview?.();
+    const goldenProject = await workspace.buildGoldenProject?.(mode);
+    if (goldenProject !== void 0) {
+      if (!goldenProject.ok || goldenProject.value === void 0) {
+        throw new Error(goldenProject.diagnostics.map((item) => item.message).join(" ") || "Golden Project could not be composed.");
+      }
+      const { value } = goldenProject;
+      if (goldenProjectStatusElement !== null) {
+        goldenProjectStatusElement.textContent = value.packageReady ? "READY \xB7 Draw Sprite + Audio Source + PINNED Package" : "READY \xB7 Draw Sprite + Audio Source \xB7 LIVE Preview";
+      }
+      if (goldenProjectRefsElement !== null) {
+        goldenProjectRefsElement.textContent = `Sprite: ${value.project.scenes[0]?.entities[0]?.name ?? "iDRAW"} \xB7 Audio: ${value.project.scenes[0]?.entities[1]?.name ?? "iAUDIO"} \xB7 Refs: ${value.manifest.assetLocks.length}`;
+      }
+      workspace.startGoldenAudioPreview?.();
+    }
     const boundary = await buildLocalDraw2GameProject(mode);
     const ownerId = "draw2-local-owner";
     const product = await startGame350ProductPreview({
@@ -17410,7 +20647,10 @@ function setColorEditorFromWheel(clientX, clientY, mode) {
   colorApply.disabled = selectedColor === 0;
   setColorEditorStatus(selectedColor === 0 ? "Index 0\u306F\u900F\u660E\u8272\u3067\u3059" : "Color preview \xB7 release to commit");
 }
-async function commitColorEdit() {
+function commitColorEdit() {
+  return enqueueCanonicalOperation(() => commitColorEditNow());
+}
+async function commitColorEditNow() {
   if (selectedColor === 0) {
     setColorEditorStatus("Index 0\u306F\u900F\u660E\u8272\u306E\u305F\u3081\u5909\u66F4\u3067\u304D\u307E\u305B\u3093", "error");
     return;
@@ -17478,7 +20718,10 @@ async function commitColorEdit() {
   setColorEditorStatus(`Index ${selectedColor} \xB7 committed on release \xB7 1 undo`);
   setStatus(`Palette index ${selectedColor} updated locally \xB7 canonical color changed.`);
 }
-async function appendColorFromDraft() {
+function appendColorFromDraft() {
+  return enqueueCanonicalOperation(() => appendColorFromDraftNow());
+}
+async function appendColorFromDraftNow() {
   const asset = state.assets[state.activeAssetId];
   const color = parseHexColor(colorHex.value);
   if (asset === void 0 || color === void 0) {
@@ -17639,7 +20882,7 @@ function nearestPaletteIndexForStamp(color, palette) {
   }
   return bestIndex;
 }
-function selectionStampSourceForAsset(stamp2, asset) {
+function selectionStampSourceForAsset(stamp3, asset) {
   const exactPalette = /* @__PURE__ */ new Map();
   for (let index = 1; index < asset.palette.length; index += 1) {
     const color = asset.palette[index];
@@ -17647,22 +20890,38 @@ function selectionStampSourceForAsset(stamp2, asset) {
       exactPalette.set(color, index);
     }
   }
-  const pixels = new Array(stamp2.width * stamp2.height).fill(0);
+  const cells = [];
   let remappedColors = 0;
-  for (const pixel of stamp2.pixels) {
+  for (const pixel of stamp3.pixels) {
     if (pixel.colorIndex === 0) continue;
-    const sourceColor = stamp2.palette[pixel.colorIndex];
+    const sourceColor = stamp3.palette[pixel.colorIndex];
     if (sourceColor === void 0) continue;
     const targetIndex = exactPalette.get(sourceColor) ?? nearestPaletteIndexForStamp(sourceColor, asset.palette);
     if (!exactPalette.has(sourceColor)) remappedColors += 1;
-    pixels[pixel.y * stamp2.width + pixel.x] = targetIndex;
+    cells.push({
+      x: pixel.x,
+      y: pixel.y,
+      colorIndex: targetIndex
+    });
   }
-  return {
-    width: stamp2.width,
-    height: stamp2.height,
-    pixels,
-    remappedColors
-  };
+  if (cells.length === 0) {
+    setStatus("\u9078\u629E\u7BC4\u56F2\u30B9\u30BF\u30F3\u30D7\u306B\u914D\u7F6E\u3067\u304D\u308B\u4E0D\u900F\u660E\u306A\u8272\u304C\u3042\u308A\u307E\u305B\u3093\u3002", "error");
+    return void 0;
+  }
+  try {
+    return {
+      inlineSource: createIndexedRasterStampSource({
+        width: stamp3.width,
+        height: stamp3.height,
+        palette: asset.palette,
+        cells
+      }),
+      remappedColors
+    };
+  } catch (cause) {
+    setStatus(cause instanceof Error ? cause.message : "\u9078\u629E\u7BC4\u56F2\u30B9\u30BF\u30F3\u30D7\u304C\u540C\u671F\u53EF\u80FD\u306A\u30B5\u30A4\u30BA\u3092\u8D85\u3048\u3066\u3044\u307E\u3059\u3002", "error");
+    return void 0;
+  }
 }
 function renderSelectionStamps() {
   const stamps = selectionStampStore.list();
@@ -17676,32 +20935,32 @@ function renderSelectionStamps() {
     empty.textContent = "\u4FDD\u5B58\u3057\u305F\u9078\u629E\u7BC4\u56F2\u30B9\u30BF\u30F3\u30D7\u306F\u3042\u308A\u307E\u305B\u3093\u3002";
     selectionStampList.append(empty);
   } else {
-    for (const stamp2 of stamps) {
+    for (const stamp3 of stamps) {
       const row = document.createElement("div");
       row.className = "draw2-selection-stamp-entry";
-      row.dataset.selectionStampId = stamp2.id;
-      if (stamp2.id === activeSelectionStampId) {
+      row.dataset.selectionStampId = stamp3.id;
+      if (stamp3.id === activeSelectionStampId) {
         row.dataset.active = "true";
       }
       row.setAttribute("role", "listitem");
       const copy = document.createElement("span");
       copy.className = "draw2-selection-stamp-copy";
       const name = document.createElement("strong");
-      name.textContent = stamp2.name;
+      name.textContent = stamp3.name;
       const detail = document.createElement("small");
-      detail.textContent = `${stamp2.width}\xD7${stamp2.height} \xB7 ${stamp2.pixels.length}px`;
+      detail.textContent = `${stamp3.width}\xD7${stamp3.height} \xB7 ${stamp3.pixels.length}px`;
       copy.append(name, detail);
       const use = document.createElement("button");
       use.className = "draw2-button draw2-button-secondary";
       use.type = "button";
       use.textContent = "\u4F7F\u3046";
       use.title = "\u3053\u306E\u9078\u629E\u7BC4\u56F2\u30B9\u30BF\u30F3\u30D7\u3092Canvas\u3078\u914D\u7F6E";
-      use.addEventListener("click", () => useSelectionStamp(stamp2.id));
+      use.addEventListener("click", () => useSelectionStamp(stamp3.id));
       const remove = document.createElement("button");
       remove.className = "draw2-button draw2-button-secondary";
       remove.type = "button";
       remove.textContent = "\u524A\u9664";
-      remove.addEventListener("click", () => deleteSelectionStamp(stamp2.id));
+      remove.addEventListener("click", () => deleteSelectionStamp(stamp3.id));
       row.append(copy, use, remove);
       selectionStampList.append(row);
     }
@@ -17728,29 +20987,29 @@ function saveSelectionStamp() {
   }
 }
 function useSelectionStamp(id) {
-  const stamp2 = selectionStampStore.load(id);
-  if (stamp2 === void 0) {
+  const stamp3 = selectionStampStore.load(id);
+  if (stamp3 === void 0) {
     setStatus("\u9078\u629E\u7BC4\u56F2\u30B9\u30BF\u30F3\u30D7\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3002", "error");
     renderSelectionStamps();
     return;
   }
-  activeSelectionStampId = stamp2.id;
+  activeSelectionStampId = stamp3.id;
   selectedTileSource = void 0;
   selectionStampToolActivation = true;
   selectShortcutTool("tile-stamp");
   renderSelectionStamps();
-  setStatus(`\u9078\u629E\u7BC4\u56F2\u30B9\u30BF\u30F3\u30D7\u300C${stamp2.name}\u300D\u3092\u9078\u629E\u4E2D \xB7 Canvas\u3092\u30AF\u30EA\u30C3\u30AF\u3057\u3066\u914D\u7F6E`);
+  setStatus(`\u9078\u629E\u7BC4\u56F2\u30B9\u30BF\u30F3\u30D7\u300C${stamp3.name}\u300D\u3092\u9078\u629E\u4E2D \xB7 Canvas\u3092\u30AF\u30EA\u30C3\u30AF\u3057\u3066\u914D\u7F6E`);
 }
 function deleteSelectionStamp(id) {
-  const stamp2 = selectionStampStore.load(id);
-  if (stamp2 === void 0 || !selectionStampStore.remove(id)) {
+  const stamp3 = selectionStampStore.load(id);
+  if (stamp3 === void 0 || !selectionStampStore.remove(id)) {
     setStatus("\u524A\u9664\u3059\u308B\u9078\u629E\u7BC4\u56F2\u30B9\u30BF\u30F3\u30D7\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3002", "error");
     return;
   }
   if (activeSelectionStampId === id) activeSelectionStampId = void 0;
   renderSelectionStamps();
   queueDrawPersistenceSave("selection-stamp-delete");
-  setStatus(`\u9078\u629E\u7BC4\u56F2\u30B9\u30BF\u30F3\u30D7\u300C${stamp2.name}\u300D\u3092\u524A\u9664\u3057\u307E\u3057\u305F\u3002`);
+  setStatus(`\u9078\u629E\u7BC4\u56F2\u30B9\u30BF\u30F3\u30D7\u300C${stamp3.name}\u300D\u3092\u524A\u9664\u3057\u307E\u3057\u305F\u3002`);
 }
 function updateSelectionActionButtons() {
   commitSelectionControl.disabled = selectionDraft === void 0;
@@ -19333,6 +22592,31 @@ function normalizeMirrorGuide(asset) {
 function mirrorHasActiveAxis() {
   return mirrorAxes.x || mirrorAxes.y || mirrorAxes.diagonalDown || mirrorAxes.diagonalUp;
 }
+function mirrorCommitSpecForTool(asset, tool) {
+  if (!mirrorAppliesToTool(tool)) return void 0;
+  mirrorGuide = normalizeMirrorGuide(asset);
+  const axes = [
+    ...mirrorAxes.x ? [
+      "x"
+    ] : [],
+    ...mirrorAxes.y ? [
+      "y"
+    ] : [],
+    ...mirrorAxes.diagonalDown ? [
+      "diagonal-down"
+    ] : [],
+    ...mirrorAxes.diagonalUp ? [
+      "diagonal-up"
+    ] : []
+  ];
+  if (axes.length === 0) return void 0;
+  return {
+    axes,
+    guide: {
+      ...mirrorGuide
+    }
+  };
+}
 function mirrorAxisLabel(axis) {
   switch (axis) {
     case "x":
@@ -19720,8 +23004,10 @@ function previewWriteSet(asset, tool, points) {
   const last = points[points.length - 1] ?? first;
   if (first === void 0 || last === void 0) return [];
   const writes = tool === "pen" || tool === "eraser" ? mirrorWritesForTool(createPathWriteSet(tool, points, selectedColor, toolOptions, asset.raster), asset, tool) : points.length === 1 ? mirrorWritesForTool(createToolPreviewWriteSet(tool, first, selectedColor, toolOptions, asset.raster), asset, tool) : mirrorWritesForTool(createWriteSet(tool, first, last, selectedColor, toolOptions, asset.raster), asset, tool);
-  const selectionKeys = selection === void 0 ? void 0 : new Set(selection.pixels.map(selectionPointKey));
-  return (selectionKeys === void 0 ? writes : writes.filter((write) => selectionKeys.has(selectionPointKey(write)))).map(({ x, y }) => ({
+  const selectionClip = activeRectangleSelectionClip();
+  const selectionKeys = selectionClip === void 0 && selection !== void 0 ? new Set(selection.pixels.map(selectionPointKey)) : void 0;
+  const selectedWrites = selectionClip === void 0 ? selectionKeys === void 0 ? writes : writes.filter((write) => selectionKeys.has(selectionPointKey(write))) : writes.filter((write) => write.x >= selectionClip.x && write.y >= selectionClip.y && write.x < selectionClip.x + selectionClip.width && write.y < selectionClip.y + selectionClip.height);
+  return selectedWrites.map(({ x, y }) => ({
     x,
     y
   }));
@@ -20097,7 +23383,7 @@ function mirrorWritesForTool(writes, asset, tool) {
   ].sort((left, right) => left.y - right.y || left.x - right.x);
 }
 function normalizeToolBounds(from, to, asset) {
-  return normalizeBounds(from, to, asset);
+  return normalizeBounds2(from, to, asset);
 }
 function rectanglePointList(bounds) {
   const points = [];
@@ -20161,6 +23447,79 @@ function activeRasterRevision(snapshot) {
 function selectionScopeMatchesActiveCel(snapshot = selection) {
   if (snapshot === void 0) return true;
   return snapshot.scope.assetId === state.activeAssetId && snapshot.scope.layerId === state.activeLayerId && snapshot.scope.frameId === state.activeFrameId && snapshot.scope.celId === state.activeCelId && snapshot.sourceStructureEpoch === state.structureEpoch;
+}
+function activeRectangleSelectionClip() {
+  const snapshot = selection;
+  if (snapshot === void 0 || !selectionScopeMatchesActiveCel(snapshot) || snapshot.mask.kind !== "rectangle" || snapshot.mask.regions.length !== 1) {
+    rectangleSelectionClipCache = void 0;
+    return void 0;
+  }
+  const region = snapshot.mask.regions[0];
+  const cacheKey = region === void 0 ? "" : [
+    snapshot.selectionId,
+    snapshot.mask.selectionVersion,
+    region.x,
+    region.y,
+    region.width,
+    region.height,
+    snapshot.pixels.length
+  ].join(":");
+  if (cacheKey !== "" && rectangleSelectionClipCache?.key === cacheKey) return rectangleSelectionClipCache.clip;
+  if (region === void 0 || !Number.isSafeInteger(region.x) || !Number.isSafeInteger(region.y) || !Number.isSafeInteger(region.width) || !Number.isSafeInteger(region.height) || region.x < 0 || region.y < 0 || region.width < 1 || region.height < 1 || snapshot.pixels.length !== region.width * region.height) {
+    rectangleSelectionClipCache = void 0;
+    return void 0;
+  }
+  const seen = /* @__PURE__ */ new Set();
+  for (const pixel of snapshot.pixels) {
+    if (pixel.x < region.x || pixel.y < region.y || pixel.x >= region.x + region.width || pixel.y >= region.y + region.height) {
+      rectangleSelectionClipCache = void 0;
+      return void 0;
+    }
+    seen.add(selectionPointKey(pixel));
+  }
+  if (seen.size !== snapshot.pixels.length) {
+    rectangleSelectionClipCache = void 0;
+    return void 0;
+  }
+  const clip = {
+    ...region
+  };
+  rectangleSelectionClipCache = {
+    key: cacheKey,
+    clip
+  };
+  return clip;
+}
+function activeRasterSelectionMask() {
+  const snapshot = selection;
+  if (snapshot === void 0 || !selectionScopeMatchesActiveCel(snapshot) || activeRectangleSelectionClip() !== void 0) {
+    rasterSelectionMaskCache = void 0;
+    return void 0;
+  }
+  const cacheKey = [
+    snapshot.selectionId,
+    snapshot.mask.selectionVersion,
+    snapshot.scope.celId,
+    snapshot.pixels.length
+  ].join(":");
+  if (rasterSelectionMaskCache?.key === cacheKey) {
+    return rasterSelectionMaskCache.mask;
+  }
+  try {
+    const mask = createRasterSelectionMask(snapshot.pixels);
+    if (mask === void 0) {
+      rasterSelectionMaskCache = void 0;
+      return void 0;
+    }
+    rasterSelectionMaskCache = {
+      key: cacheKey,
+      mask
+    };
+    return mask;
+  } catch {
+    rasterSelectionMaskCache = void 0;
+    return void 0;
+  }
 }
 function refreshSelectionSnapshotForCurrentRaster() {
   if (selection === void 0 || !selectionScopeMatchesActiveCel()) return;
@@ -20344,7 +23703,7 @@ function applySelectionMorphology(operation) {
   notifyAssetStateChanged();
   setStatus(`Selection ${operation.toLowerCase()} applied locally; confirm a Transform to mutate pixels.`);
 }
-async function commitWriteSet(writes, sourceOperationType, toolForMirroring = currentBasicTool(), options = {}) {
+async function commitWriteSetNow(writes, sourceOperationType, toolForMirroring = currentBasicTool(), options = {}) {
   if (timelineActivationPending) {
     setStatus("Timeline cell is changing; drawing was not committed.", "error");
     return;
@@ -20359,6 +23718,12 @@ async function commitWriteSet(writes, sourceOperationType, toolForMirroring = cu
   const selectionKeys = options.respectSelection === false || selection === void 0 ? void 0 : new Set(selection.pixels.map(selectionPointKey));
   const committedWrites = selectionKeys === void 0 ? mirroredWrites : mirroredWrites.filter((write) => selectionKeys.has(selectionPointKey(write)));
   if (committedWrites.length === 0) return;
+  if (pixyncProductionRoot !== void 0 && (committedWrites.length > PIXYNC_DRAW2_MAX_PAYLOAD_KEYS || new TextEncoder().encode(JSON.stringify({
+    writes: committedWrites
+  })).byteLength > PIXYNC_DRAW2_MAX_PAYLOAD_BYTES)) {
+    setStatus("\u3053\u306E\u64CD\u4F5C\u306F\u30EA\u30A2\u30EB\u30BF\u30A4\u30E0\u540C\u671F\u306E\u4E0A\u9650\u3092\u8D85\u3048\u308B\u305F\u3081\u3001\u5909\u66F4\u3092\u78BA\u5B9A\u3057\u307E\u305B\u3093\u3002\u7BC4\u56F2\u3092\u5C0F\u3055\u304F\u3059\u308B\u304B\u3001\u30DF\u30E9\u30FC\uFF0F\u9078\u629E\u7BC4\u56F2\u3092\u89E3\u9664\u3057\u3066\u304F\u3060\u3055\u3044\u3002", "error");
+    return;
+  }
   const drawClientId = activeDrawClientId();
   const commandSequence = nextClientSequence(drawClientId);
   const before = state;
@@ -20499,6 +23864,8 @@ async function resetProject(options = {}) {
     }
   }
   drawPersistenceRevision = persistedRecord?.revision ?? 0;
+  drawPersistenceExpectedRevision = drawPersistenceRevision;
+  drawPersistenceExpectedStateHash = persistedRecord?.stateHash ?? null;
   const parsedTileSize = Number(options.tileSize ?? tileSizeSelect.value);
   const tileSize = parsedTileSize === 64 ? 64 : 32;
   const createOptions = {
@@ -21181,7 +24548,24 @@ async function createPxdProjectArtifact(exportModule, baseName) {
     format: "pxd",
     filename: `${baseName}.pxd`,
     bytes: output.bytes,
-    mimeType: output.mimeType
+    mimeType: output.mimeType,
+    packageHash: output.packageHash
+  };
+}
+async function exportCurrentPxdArtifactForWorkspace() {
+  const exportModule = await loadExportModule();
+  const artifact = await createPxdProjectArtifact(exportModule, safeExportBaseName());
+  const sourceReference = await resolveCurrentDrawReference({
+    mode: "PINNED"
+  });
+  if (artifact.packageHash === void 0 || sourceReference === void 0) {
+    throw new Error("PXD release source identity is unavailable.");
+  }
+  return {
+    bytes: artifact.bytes,
+    mimeType: artifact.mimeType,
+    packageHash: artifact.packageHash,
+    sourceReference
   };
 }
 async function storePxdMarketTransfer(file) {
@@ -21831,7 +25215,7 @@ async function exportSelectedToFile() {
     }, 1400);
   }
 }
-async function importPxdFile(file) {
+async function importPxdFile(file, options = {}) {
   const previousImportState = {
     state: cloneProjectStateShared(state),
     activeWorkspaceProjectId: readActiveWorkspaceProjectId(),
@@ -21839,6 +25223,8 @@ async function importPxdFile(file) {
     assetDefinitionSequence,
     history: history.snapshot(),
     drawPersistenceRevision,
+    drawPersistenceExpectedRevision,
+    drawPersistenceExpectedStateHash,
     clientSequence,
     selection,
     selectionDraft,
@@ -21869,9 +25255,15 @@ async function importPxdFile(file) {
   let previousWorkspacePxdSnapshot;
   let workspaceRollbackFailed = false;
   try {
+    if (options.expectedProjectId !== void 0 && state.projectId !== options.expectedProjectId) {
+      throw new Error("The Project changed before the PXD restore began.");
+    }
     const bytes = new Uint8Array(await file.arrayBuffer());
     const legacyCompat = await loadLegacyCompatModule();
     const inspection = await legacyCompat.inspectPxd(bytes);
+    if (options.source === "REMOTE_CHECKPOINT" && inspection.source.identity !== "NEW_DRAW2_PXD_V2") {
+      throw new Error("A shared PiXYNC checkpoint must be an integrated PXD v2 Project.");
+    }
     let importedState;
     let importedAssetDefinitions = [];
     let importedTimelineMetadata;
@@ -21900,7 +25292,9 @@ async function importPxdFile(file) {
       importedHash = imported.packageHash;
     } else if (inspection.source.identity === "NEW_DRAW2_PXD_V2") {
       const exportModule = await loadExportModule();
-      const imported = await exportModule.importPxdProject(bytes);
+      const imported = await exportModule.importPxdProject(bytes, options.expectedPackageHash === void 0 ? {} : {
+        expectedPackageHash: options.expectedPackageHash
+      });
       importedState = imported.state;
       importedAssetDefinitions = imported.assetDefinitions;
       importedTimelineMetadata = imported.drawTimelineMetadata;
@@ -21915,14 +25309,26 @@ async function importPxdFile(file) {
       const diagnostic9 = inspection.diagnostics[0];
       throw new Error(diagnostic9?.message ?? "PXD format could not be identified.");
     }
+    if (options.expectedProjectId !== void 0 && importedState.projectId !== options.expectedProjectId) {
+      throw new Error("The PXD Project ID does not match the active Room.");
+    }
+    if (options.expectedProjectId !== void 0 && state.projectId !== options.expectedProjectId) {
+      throw new Error("The Project changed during the PXD restore.");
+    }
     if (importedState.assets[importedState.activeAssetId] === void 0) {
       throw new Error("Imported PXD active asset is missing.");
     }
     if (importedWorkspace !== void 0) {
       previousWorkspacePxdSnapshot = await getWorkspacePxdBridge().exportProjectPxdSnapshot();
     }
+    if (options.expectedProjectId !== void 0 && state.projectId !== options.expectedProjectId) {
+      throw new Error("The Project changed before the PXD restore commit.");
+    }
     flushDrawPersistence();
     await flushDrawPersistence();
+    if (options.expectedProjectId !== void 0 && state.projectId !== options.expectedProjectId) {
+      throw new Error("The Project changed before the PXD restore commit.");
+    }
     importCommitStarted = true;
     draw2EditorPreferencesReady = false;
     state = importedState;
@@ -21933,6 +25339,8 @@ async function importPxdFile(file) {
     history = new LocalUndoRedoHistory(state);
     const importedRecord = await drawPersistenceStore.load(state.projectId);
     drawPersistenceRevision = importedRecord?.revision ?? 0;
+    drawPersistenceExpectedRevision = drawPersistenceRevision;
+    drawPersistenceExpectedStateHash = importedRecord?.stateHash ?? null;
     clientSequence = 0;
     selectionInteractionGeneration += 1;
     selection = void 0;
@@ -21982,17 +25390,22 @@ async function importPxdFile(file) {
     if (importedWorkspace !== void 0) {
       await getWorkspacePxdBridge().restoreProjectPxdSnapshot(importedWorkspace);
     }
-    announceWorkspaceProjectChanged(window, {
-      projectId: asWorkspaceProjectId(state.projectId),
-      name: state.name
-    });
-    setStatus(`PXD imported locally \xB7 ${importedStatus} \xB7 hash=${importedHash.slice(0, 12)}\u2026`);
+    if (options.announceProjectChange !== false) {
+      announceWorkspaceProjectChanged(window, {
+        projectId: asWorkspaceProjectId(state.projectId),
+        name: state.name
+      });
+    }
+    const sourceLabel = options.source === "REMOTE_CHECKPOINT" ? "PiXYNC checkpoint restored" : "PXD imported locally";
+    setStatus(`${sourceLabel} \xB7 ${importedStatus} \xB7 hash=${importedHash.slice(0, 12)}\u2026`);
   } catch (cause) {
     if (importCommitStarted) {
       state = previousImportState.state;
       assetDefinitions = previousImportState.assetDefinitions.map(cloneAssetDefinitionEntry);
       assetDefinitionSequence = previousImportState.assetDefinitionSequence;
       drawPersistenceRevision = previousImportState.drawPersistenceRevision;
+      drawPersistenceExpectedRevision = previousImportState.drawPersistenceExpectedRevision;
+      drawPersistenceExpectedStateHash = previousImportState.drawPersistenceExpectedStateHash;
       clientSequence = previousImportState.clientSequence;
       selection = previousImportState.selection;
       selectionDraft = previousImportState.selectionDraft;
@@ -22048,13 +25461,18 @@ async function importPxdFile(file) {
           workspaceRollbackFailed = true;
         }
       }
-      announceWorkspaceProjectChanged(window, {
-        projectId: asWorkspaceProjectId(state.projectId),
-        name: state.name
-      });
+      if (options.announceProjectChange !== false) {
+        announceWorkspaceProjectChanged(window, {
+          projectId: asWorkspaceProjectId(state.projectId),
+          name: state.name
+        });
+      }
     }
     const message = cause instanceof Error ? `PXD import rejected: ${cause.message}` : "PXD import rejected.";
     setStatus(workspaceRollbackFailed ? `${message} Draw was restored, but the shared Audio/Game snapshot could not be restored.` : message, "error");
+    if (options.source === "REMOTE_CHECKPOINT") {
+      throw cause instanceof Error ? cause : new Error(message);
+    }
   } finally {
     importPxdControl.value = "";
   }
@@ -22167,7 +25585,124 @@ function selectConfiguredColor(asset, seed, options) {
   }
   return selectByPaletteColor(asset.raster, asset.raster.getPixel(seed.x, seed.y), mode === "exact" ? "exact" : "similar", asset.palette, threshold);
 }
-async function commitPointerPoints(points, fixedContext) {
+function commitPointerPoints(points, fixedContext) {
+  return enqueueCanonicalOperation(() => commitPointerPointsNow(points, fixedContext));
+}
+async function commitTileStampCommandNow(asset, payload, label = "Tile placement") {
+  const drawClientId = activeDrawClientId();
+  const commandSequence = nextClientSequence(drawClientId);
+  const before = state;
+  const command = {
+    commandId: `draw2-local-tile-stamp-${commandSequence}`,
+    commandType: "raster.tileStamp",
+    schemaVersion: 1,
+    projectId: state.projectId,
+    assetId: asset.id,
+    actorId: activeDrawActorId(),
+    clientId: drawClientId,
+    clientSequence: commandSequence,
+    baseStructureEpoch: state.structureEpoch,
+    createdAtMonotonicMs: performance.now(),
+    payload
+  };
+  if (rejectOversizedProductionPayload(payload)) {
+    syncClientSequencesFromState();
+    return false;
+  }
+  const tileTimelineGeneration = timelineStateGeneration;
+  const tileCanonicalGeneration = canonicalStateGeneration;
+  const result = await core.execute(command);
+  if (tileTimelineGeneration !== timelineStateGeneration || tileCanonicalGeneration !== canonicalStateGeneration) {
+    syncClientSequencesFromState();
+    setStatus("Timeline cell changed while placing the tile; the old-cell write was discarded.", "error");
+    return false;
+  }
+  if (!result.ok) {
+    syncClientSequencesFromState();
+    setStatus(result.diagnostics.map((item) => item.code).join(", "), "error");
+    return false;
+  }
+  if (!result.result.noOp) {
+    adoptCanonicalState(result.state);
+    refreshSelectionSnapshotForCurrentRaster();
+    history.record(before, state, result.result.operation.operationId, result.result.operation.operationType);
+    renderTimeline();
+    saveDrawProjectState();
+  }
+  await autosave.record(state, result.result);
+  if (!result.result.noOp) {
+    publishDrawRasterCommit(result.result, state, before.structureEpoch);
+  }
+  await present(result.result.dirtyRegions, result.result.dirtyTiles);
+  updateHistoryButtons();
+  setStatus(`${label} committed \xB7 ${result.result.dirtyTiles.length} tiles \xB7 one undo`);
+  return !result.result.noOp;
+}
+async function commitFillCommandNow(asset, seed, colorIndex, gradientTo, clip, selectionMask) {
+  const drawClientId = activeDrawClientId();
+  const commandSequence = nextClientSequence(drawClientId);
+  const before = state;
+  const command = {
+    commandId: `draw2-local-fill-${commandSequence}`,
+    commandType: "raster.fill",
+    schemaVersion: 1,
+    projectId: state.projectId,
+    assetId: asset.id,
+    actorId: activeDrawActorId(),
+    clientId: drawClientId,
+    clientSequence: commandSequence,
+    baseStructureEpoch: state.structureEpoch,
+    createdAtMonotonicMs: performance.now(),
+    payload: {
+      seedX: seed.x,
+      seedY: seed.y,
+      colorIndex,
+      maxCells: Math.min(1048576, asset.width * asset.height),
+      ...gradientTo === void 0 ? {} : {
+        gradientToX: gradientTo.x,
+        gradientToY: gradientTo.y
+      },
+      ...clip === void 0 ? {} : {
+        clip
+      },
+      ...selectionMask === void 0 ? {} : {
+        selectionMask
+      }
+    }
+  };
+  if (rejectOversizedProductionPayload(command.payload)) {
+    syncClientSequencesFromState();
+    return;
+  }
+  const fillTimelineGeneration = timelineStateGeneration;
+  const fillCanonicalGeneration = canonicalStateGeneration;
+  const result = await core.execute(command);
+  if (fillTimelineGeneration !== timelineStateGeneration || fillCanonicalGeneration !== canonicalStateGeneration) {
+    syncClientSequencesFromState();
+    setStatus("Timeline cell changed while filling; the old-cell write was discarded.", "error");
+    return;
+  }
+  if (!result.ok) {
+    syncClientSequencesFromState();
+    setStatus(result.diagnostics.map((item) => item.code).join(", "), "error");
+    return;
+  }
+  if (!result.result.noOp) {
+    adoptCanonicalState(result.state);
+    refreshSelectionSnapshotForCurrentRaster();
+    history.record(before, state, result.result.operation.operationId, result.result.operation.operationType);
+    renderTimeline();
+    saveDrawProjectState();
+  }
+  await autosave.record(state, result.result);
+  if (!result.result.noOp) {
+    publishDrawRasterCommit(result.result, state, before.structureEpoch);
+  }
+  await present(result.result.dirtyRegions, result.result.dirtyTiles);
+  updateHistoryButtons();
+  setStatus(`${gradientTo === void 0 ? "fill" : "gradient fill"} committed \xB7 ${result.result.dirtyTiles.length} tiles \xB7 one undo`);
+}
+async function commitPointerPointsNow(points, fixedContext) {
   if (timelineActivationPending) {
     setStatus("Timeline cell is changing; drawing was not committed.", "error");
     return;
@@ -22181,6 +25716,8 @@ async function commitPointerPoints(points, fixedContext) {
   const tool = fixedContext?.tool ?? currentBasicTool();
   const colorIndex = fixedContext?.colorIndex ?? selectedColor;
   const fixedToolOptions = fixedContext?.toolOptions ?? toolOptions;
+  const selectionClip = activeRectangleSelectionClip();
+  const selectionMask = activeRasterSelectionMask();
   const first = points[0] ?? points[points.length - 1];
   const last = points[points.length - 1] ?? first;
   if (tool === "pan") return;
@@ -22195,51 +25732,57 @@ async function commitPointerPoints(points, fixedContext) {
   const activeSelectionStamp = activeSelectionStampId === void 0 ? void 0 : selectionStampStore.load(activeSelectionStampId);
   if (tool === "tile-stamp" && activeSelectionStamp !== void 0) {
     const source = selectionStampSourceForAsset(activeSelectionStamp, asset);
-    const writes2 = tileStampWrites(asset.raster, source, first, Number(specialTileScaleElement?.value ?? 1));
-    await commitWriteSet(writes2, "tool.selection-stamp", tool, {
-      respectSelection: false
-    });
-    if (writes2.length > 0) {
-      const remapMessage = source.remappedColors > 0 ? ` \xB7 ${source.remappedColors}\u8272\u3092\u8FD1\u4F3C\u5909\u63DB` : "";
-      setStatus(`\u9078\u629E\u7BC4\u56F2\u30B9\u30BF\u30F3\u30D7\u300C${activeSelectionStamp.name}\u300D\u3092\u914D\u7F6E\u3057\u307E\u3057\u305F \xB7 ${writes2.length}px \xB7 1 undo${remapMessage}`);
-    }
+    if (source === void 0) return;
+    const scale = Math.max(1, Math.min(16, Math.round(Number(specialTileScaleElement?.value ?? 1))));
+    const remapMessage = source.remappedColors > 0 ? ` \xB7 ${source.remappedColors}\u8272\u3092\u8FD1\u4F3C\u5909\u63DB` : "";
+    await commitTileStampCommandNow(asset, {
+      inlineSource: source.inlineSource,
+      originX: first.x,
+      originY: first.y,
+      scale
+    }, `\u9078\u629E\u7BC4\u56F2\u30B9\u30BF\u30F3\u30D7\u300C${activeSelectionStamp.name}\u300D\u3092\u914D\u7F6E\u3057\u307E\u3057\u305F${remapMessage}`);
     return;
   }
   if (tool === "tile-stamp") {
-    const source = selectedTileSource === void 0 ? {
-      width: 2,
-      height: 2,
-      pixels: [
+    const scale = Math.max(1, Math.min(16, Math.round(Number(specialTileScaleElement?.value ?? 1))));
+    if (selectedTileSource === void 0) {
+      await commitTileStampCommandNow(asset, {
+        pattern: "checker",
         colorIndex,
-        0,
-        0,
-        colorIndex
-      ]
-    } : (() => {
-      const sourceAsset = state.assets[selectedTileSource.sourceAssetId];
-      if (sourceAsset === void 0) return void 0;
-      const pixels = [];
-      for (let sourceY = 0; sourceY < selectedTileSource.cellSize; sourceY += 1) {
-        for (let sourceX = 0; sourceX < selectedTileSource.cellSize; sourceX += 1) {
-          const index = sourceAsset.raster.getPixel(selectedTileSource.sourceX + sourceX, selectedTileSource.sourceY + sourceY);
-          pixels.push(index < asset.palette.length ? index : colorIndex);
+        originX: first.x,
+        originY: first.y,
+        scale,
+        ...selectionClip === void 0 ? {} : {
+          clip: selectionClip
+        },
+        ...selectionMask === void 0 ? {} : {
+          selectionMask
         }
-      }
-      return {
-        width: selectedTileSource.cellSize,
-        height: selectedTileSource.cellSize,
-        pixels
-      };
-    })();
-    if (source === void 0) {
+      });
+      return;
+    }
+    const sourceAsset = state.assets[selectedTileSource.sourceAssetId];
+    if (sourceAsset === void 0) {
       setStatus("Tile source is unavailable; choose a Tileset cell first.", "error");
       return;
     }
-    const writes2 = tileStampWrites(asset.raster, source, first, Number(specialTileScaleElement?.value ?? 1));
-    await commitWriteSet(writes2, "tool.tile-stamp", tool);
-    if (writes2.length > 0) {
-      setStatus(`Tile placement committed \xB7 ${writes2.length}px \xB7 one undo`);
-    }
+    await commitTileStampCommandNow(asset, {
+      sourceAssetId: sourceAsset.id,
+      sourceAssetRevision: sourceAsset.revision,
+      sourceX: selectedTileSource.sourceX,
+      sourceY: selectedTileSource.sourceY,
+      sourceWidth: selectedTileSource.cellSize,
+      sourceHeight: selectedTileSource.cellSize,
+      originX: first.x,
+      originY: first.y,
+      scale,
+      ...selectionClip === void 0 ? {} : {
+        clip: selectionClip
+      },
+      ...selectionMask === void 0 ? {} : {
+        selectionMask
+      }
+    });
     return;
   }
   if (tool === "select-color") {
@@ -22265,73 +25808,47 @@ async function commitPointerPoints(points, fixedContext) {
     return;
   }
   if (tool === "fill") {
-    if (selection !== void 0 || points.length > 1) {
+    if (selectionClip !== void 0 || selectionMask !== void 0) {
+      await commitFillCommandNow(asset, first, colorIndex, points.length > 1 ? last : void 0, selectionClip, selectionMask);
+      return;
+    }
+    if (selection !== void 0) {
       const writes2 = createFillGradientWriteSet(asset, first, last, colorIndex);
       if (writes2.length === 0) {
         setStatus(selection === void 0 || selection.pixels.some((point) => point.x === first.x && point.y === first.y) ? "Fill has no pixels to change." : "Fill seed is outside the active selection.", "error");
         return;
       }
-      await commitWriteSet(writes2, points.length > 1 ? "tool.fill.gradient" : "tool.fill.selection");
+      await commitWriteSetNow(writes2, points.length > 1 ? "tool.fill.gradient" : "tool.fill.selection");
       return;
     }
-    const drawClientId = activeDrawClientId();
-    const commandSequence = nextClientSequence(drawClientId);
-    const before = state;
-    const command = {
-      commandId: `draw2-local-fill-${commandSequence}`,
-      commandType: "raster.fill",
-      schemaVersion: 1,
-      projectId: state.projectId,
-      assetId: asset.id,
-      actorId: activeDrawActorId(),
-      clientId: drawClientId,
-      clientSequence: commandSequence,
-      baseStructureEpoch: state.structureEpoch,
-      createdAtMonotonicMs: performance.now(),
-      payload: {
-        seedX: first.x,
-        seedY: first.y,
-        colorIndex,
-        maxPixels: Math.min(1048576, asset.width * asset.height)
-      }
-    };
-    const fillTimelineGeneration = timelineStateGeneration;
-    const fillCanonicalGeneration = canonicalStateGeneration;
-    const result = await core.execute(command);
-    if (fillTimelineGeneration !== timelineStateGeneration || fillCanonicalGeneration !== canonicalStateGeneration) {
-      syncClientSequencesFromState();
-      setStatus("Timeline cell changed while filling; the old-cell write was discarded.", "error");
-      return;
-    }
-    if (!result.ok) {
-      syncClientSequencesFromState();
-      setStatus(result.diagnostics.map((item) => item.code).join(", "), "error");
-      return;
-    }
-    if (!result.result.noOp) {
-      adoptCanonicalState(result.state);
-      refreshSelectionSnapshotForCurrentRaster();
-      history.record(before, state, result.result.operation.operationId, result.result.operation.operationType);
-      renderTimeline();
-      saveDrawProjectState();
-    }
-    await autosave.record(state, result.result);
-    if (!result.result.noOp) {
-      publishDrawRasterCommit(result.result, state, before.structureEpoch);
-    }
-    await present(result.result.dirtyRegions, result.result.dirtyTiles);
-    updateHistoryButtons();
-    setStatus(`fill committed \xB7 ${result.result.dirtyTiles.length} tiles \xB7 one undo`);
+    await commitFillCommandNow(asset, first, colorIndex, points.length > 1 ? last : void 0);
     return;
   }
-  const useStrokeCommand = (tool === "pen" || tool === "eraser") && fixedToolOptions.brushSize === 1 && fixedToolOptions.pattern === "solid" && (!mirrorEnabled || !mirrorHasActiveAxis()) && selection === void 0;
+  const useShapeCommand = (tool === "rect" || tool === "rect-fill" || tool === "ellipse" || tool === "ellipse-fill" || tool === "circle" || tool === "circle-fill") && (selection === void 0 || selectionClip !== void 0 || selectionMask !== void 0);
+  if (useShapeCommand) {
+    await commitShapePointsNow(tool, first, last, colorIndex, fixedToolOptions);
+    return;
+  }
+  const useStrokeCommand = (tool === "pen" || tool === "eraser" || tool === "pixel-pen" || tool === "line") && (selection === void 0 || selectionClip !== void 0 || selectionMask !== void 0);
   if (useStrokeCommand) {
     const drawClientId = activeDrawClientId();
     const commandSequence = nextClientSequence(drawClientId);
     const before = state;
-    let canonicalStrokePoints;
+    const strokeOptions = normalizeToolOptions(fixedToolOptions);
+    const mirror = mirrorCommitSpecForTool(asset, tool);
+    let strokePoints;
     try {
-      canonicalStrokePoints = interpolatePixelPath(points);
+      const sourcePoints = tool === "line" ? [
+        first,
+        last
+      ] : points;
+      const rawStrokePoints = sourcePoints.map((point) => ({
+        x: point.x,
+        y: point.y
+      }));
+      interpolatePixelPath(rawStrokePoints);
+      strokePoints = compactPixelPath(rawStrokePoints, PIXYNC_DRAW2_MAX_PAYLOAD_KEYS);
+      interpolatePixelPath(strokePoints);
     } catch (cause) {
       syncClientSequencesFromState();
       setStatus(cause instanceof Error ? cause.message : "Stroke interpolation failed.", "error");
@@ -22349,10 +25866,26 @@ async function commitPointerPoints(points, fixedContext) {
       baseStructureEpoch: state.structureEpoch,
       createdAtMonotonicMs: performance.now(),
       payload: {
-        points: canonicalStrokePoints,
-        colorIndex: tool === "eraser" ? 0 : colorIndex
+        points: strokePoints,
+        colorIndex: tool === "eraser" ? 0 : colorIndex,
+        brushSize: strokeOptions.brushSize,
+        brushShape: strokeOptions.brushShape,
+        pattern: strokeOptions.pattern,
+        ...mirror === void 0 ? {} : {
+          mirror
+        },
+        ...selectionClip === void 0 ? {} : {
+          clip: selectionClip
+        },
+        ...selectionMask === void 0 ? {} : {
+          selectionMask
+        }
       }
     };
+    if (rejectOversizedProductionPayload(command.payload)) {
+      syncClientSequencesFromState();
+      return;
+    }
     const strokeTimelineGeneration = timelineStateGeneration;
     const strokeCanonicalGeneration = canonicalStateGeneration;
     const result = await core.execute(command);
@@ -22383,13 +25916,96 @@ async function commitPointerPoints(points, fixedContext) {
     return;
   }
   const writes = tool === "pen" || tool === "eraser" ? createPathWriteSet(tool, points, colorIndex, fixedToolOptions, asset.raster) : createWriteSet(tool, first, last, colorIndex, fixedToolOptions, asset.raster);
-  await commitWriteSet(writes, `tool.${tool}`);
+  await commitWriteSetNow(writes, `tool.${tool}`);
+}
+async function commitShapePointsNow(tool, from, to, colorIndex, toolOptions2) {
+  const asset = state.assets[state.activeAssetId];
+  if (asset === void 0) return;
+  const options = normalizeToolOptions(toolOptions2);
+  const mirror = mirrorCommitSpecForTool(asset, tool);
+  const clip = activeRectangleSelectionClip();
+  const selectionMask = activeRasterSelectionMask();
+  const drawClientId = activeDrawClientId();
+  const commandSequence = nextClientSequence(drawClientId);
+  const before = state;
+  const command = {
+    commandId: `draw2-local-shape-${commandSequence}`,
+    commandType: "raster.shapeCommit",
+    schemaVersion: 1,
+    projectId: state.projectId,
+    assetId: asset.id,
+    actorId: activeDrawActorId(),
+    clientId: drawClientId,
+    clientSequence: commandSequence,
+    baseStructureEpoch: state.structureEpoch,
+    createdAtMonotonicMs: performance.now(),
+    payload: {
+      tool,
+      from: {
+        x: from.x,
+        y: from.y
+      },
+      to: {
+        x: to.x,
+        y: to.y
+      },
+      colorIndex,
+      brushSize: options.brushSize,
+      brushShape: options.brushShape,
+      pattern: options.pattern,
+      ...mirror === void 0 ? {} : {
+        mirror
+      },
+      ...clip === void 0 ? {} : {
+        clip
+      },
+      ...selectionMask === void 0 ? {} : {
+        selectionMask
+      }
+    }
+  };
+  if (rejectOversizedProductionPayload(command.payload)) {
+    syncClientSequencesFromState();
+    return;
+  }
+  const shapeTimelineGeneration = timelineStateGeneration;
+  const shapeCanonicalGeneration = canonicalStateGeneration;
+  const result = await core.execute(command);
+  if (shapeTimelineGeneration !== timelineStateGeneration || shapeCanonicalGeneration !== canonicalStateGeneration) {
+    syncClientSequencesFromState();
+    setStatus("Timeline cell changed while drawing; the old-cell shape was discarded.", "error");
+    return;
+  }
+  if (!result.ok) {
+    syncClientSequencesFromState();
+    setStatus(result.diagnostics.map((item) => item.code).join(", "), "error");
+    return;
+  }
+  if (!result.result.noOp) {
+    adoptCanonicalState(result.state);
+    refreshSelectionSnapshotForCurrentRaster();
+    history.record(before, state, result.result.operation.operationId, result.result.operation.operationType);
+    renderTimeline();
+    saveDrawProjectState();
+  }
+  await autosave.record(state, result.result);
+  if (!result.result.noOp) {
+    publishDrawRasterCommit(result.result, state, before.structureEpoch);
+  }
+  await present(result.result.dirtyRegions, result.result.dirtyTiles);
+  updateHistoryButtons();
+  setStatus(`${tool} committed \xB7 one shape / one undo`);
 }
 async function commitInteractionSession(commit) {
   const fixedContext = {
     tool: commit.tool,
     colorIndex: commit.colorIndex,
-    toolOptions: commit.toolOptions
+    toolOptions: commit.tool === "pixel-pen" ? {
+      ...commit.toolOptions,
+      brushSize: 1,
+      brushShape: "square",
+      pattern: "solid"
+    } : commit.toolOptions
   };
   if (commit.kind === "immediate") {
     await commitPointerPoints(commit.tool === "fill" ? commit.points : [
@@ -22397,11 +26013,11 @@ async function commitInteractionSession(commit) {
     ], fixedContext);
     return;
   }
-  const writeTools = [
-    "pen",
-    "pixel-pen",
-    "eraser",
-    "line",
+  if (commit.tool === "pen" || commit.tool === "eraser" || commit.tool === "pixel-pen" || commit.tool === "line") {
+    await commitPointerPoints(commit.points, fixedContext);
+    return;
+  }
+  const shapeTools = [
     "rect",
     "rect-fill",
     "ellipse",
@@ -22409,8 +26025,8 @@ async function commitInteractionSession(commit) {
     "circle",
     "circle-fill"
   ];
-  if (writeTools.includes(commit.tool)) {
-    await commitWriteSet(commit.writes, commit.sourceOperationType, commit.tool);
+  if (shapeTools.includes(commit.tool)) {
+    await commitPointerPoints(commit.points, fixedContext);
     return;
   }
   await commitPointerPoints(commit.points, fixedContext);
@@ -22862,8 +26478,23 @@ async function commitActiveTransform() {
   const sourceSelection = selection;
   const previewPixels = transformPreview?.pixels ?? [];
   const before = state;
-  const commandSequence = nextClientSequence(SELECTION_CLIENT_ID);
+  const isClipboardPaste = pasteMode && clipboard !== void 0;
+  const commandActorId = isClipboardPaste ? SELECTION_CLIENT_ID : activeDrawActorId();
+  const commandClientId = isClipboardPaste ? SELECTION_CLIENT_ID : activeDrawClientId();
+  const commandSequence = nextClientSequence(commandClientId);
   const commandId = selectionCommandId(pasteMode ? "paste" : "transform", state.projectId, commandSequence);
+  if (!isClipboardPaste && sourceSelection !== void 0) {
+    const activeAsset = state.assets[state.activeAssetId];
+    const destinationCount = activeAsset === void 0 ? 0 : previewPixels.filter((pixel) => pixel.x >= 0 && pixel.y >= 0 && pixel.x < activeAsset.width && pixel.y < activeAsset.height).length;
+    const transformPayload = createSelectionTransformWirePayload(sourceSelection, transformSession.transform, destinationCount, previewPixels.some((pixel) => {
+      if (activeAsset === void 0) return true;
+      return pixel.x < 0 || pixel.y < 0 || pixel.x >= activeAsset.width || pixel.y >= activeAsset.height;
+    }) && transformSession.transform.outOfBoundsPolicy === "CLIP");
+    if (rejectOversizedProductionPayload(transformPayload)) {
+      syncClientSequencesFromState();
+      return false;
+    }
+  }
   const interactionGeneration = selectionInteractionGeneration;
   const canonicalGeneration = canonicalStateGeneration;
   const result = pasteMode && clipboard !== void 0 ? await pasteClipboard(state, {
@@ -22872,8 +26503,8 @@ async function commitActiveTransform() {
     schemaVersion: 1,
     projectId: state.projectId,
     assetId: state.activeAssetId,
-    actorId: SELECTION_CLIENT_ID,
-    clientId: SELECTION_CLIENT_ID,
+    actorId: commandActorId,
+    clientId: commandClientId,
     clientSequence: commandSequence,
     baseStructureEpoch: state.structureEpoch,
     createdAtMonotonicMs: performance.now(),
@@ -22887,8 +26518,8 @@ async function commitActiveTransform() {
     schemaVersion: 1,
     projectId: state.projectId,
     assetId: state.activeAssetId,
-    actorId: SELECTION_CLIENT_ID,
-    clientId: SELECTION_CLIENT_ID,
+    actorId: commandActorId,
+    clientId: commandClientId,
     clientSequence: commandSequence,
     baseStructureEpoch: state.structureEpoch,
     createdAtMonotonicMs: performance.now(),
@@ -22938,6 +26569,9 @@ async function commitActiveTransform() {
     saveDrawProjectState();
   }
   await autosave.record(state, result.result);
+  if (!result.result.noOp && !isClipboardPaste) {
+    publishDrawRasterCommit(result.result, state, before.structureEpoch);
+  }
   selectionDraft = void 0;
   pendingSelectionGesture = void 0;
   transformSession = void 0;
@@ -25166,7 +28800,33 @@ colorMap.addEventListener("keyup", (event) => {
 gamePreviewStartControl.addEventListener("click", () => {
   void startGamePreview("LIVE");
 });
+goldenProjectApplyButton.addEventListener("click", () => {
+  const workspace = getWorkspacePxdBridge();
+  goldenProjectApplyButton.disabled = true;
+  goldenProjectApplyButton.setAttribute("aria-busy", "true");
+  void (async () => {
+    try {
+      const result = await workspace.applyGoldenProject?.("LIVE");
+      if (result === void 0) {
+        throw new Error("Golden Project bridge is unavailable.");
+      }
+      if (!result.ok || result.value === void 0) {
+        throw new Error(result.diagnostics.map((item) => item.message).join(" ") || "Golden Project could not be applied.");
+      }
+      goldenProjectStatusElement.textContent = "APPLIED \xB7 \u4E3B\u4EBA\u516CSprite\u3068Audio Source\u3092Game\u3078\u4FDD\u5B58\u3057\u307E\u3057\u305F";
+      goldenProjectRefsElement.textContent = `Game\u914D\u7F6E: ${result.value.project.scenes[0]?.entities.length ?? 0} \xB7 Refs: ${result.value.manifest.assetLocks.length} \xB7 Project\u5225\u81EA\u52D5\u4FDD\u5B58`;
+      setGamePreviewStatus("Golden Project applied \xB7 Draw Sprite + Audio Source are ready");
+    } catch (cause) {
+      goldenProjectStatusElement.textContent = cause instanceof Error ? `APPLY BLOCKED \xB7 ${cause.message}` : "APPLY BLOCKED \xB7 Golden Project could not be applied.";
+      setGamePreviewStatus(cause instanceof Error ? cause.message : "Golden Project apply failed.", "error");
+    } finally {
+      goldenProjectApplyButton.disabled = false;
+      goldenProjectApplyButton.removeAttribute("aria-busy");
+    }
+  })();
+});
 gamePreviewStopControl.addEventListener("click", () => {
+  getWorkspacePxdBridge().stopGoldenAudioPreview?.();
   if (game351PlayableState === void 0) return;
   game351PlayableState = stopGame351(game351PlayableState);
   drawGame351Preview(game351PlayableState, game351PreviewMode);
@@ -25183,7 +28843,17 @@ gamePreviewReloadControl.addEventListener("click", () => {
   void startGamePreview("LIVE");
 });
 gamePreviewPinControl.addEventListener("click", () => {
-  void startGamePreview("PINNED");
+  const workspace = getWorkspacePxdBridge();
+  void (async () => {
+    const applied = await workspace.applyGoldenProject?.("PINNED");
+    if (applied !== void 0 && !applied.ok) {
+      setGamePreviewStatus(applied.diagnostics.map((item) => item.message).join(" ") || "Pinned Golden Project could not be applied.", "error");
+      return;
+    }
+    await startGamePreview("PINNED");
+  })().catch((cause) => {
+    setGamePreviewStatus(cause instanceof Error ? cause.message : "Pinned Preview failed.", "error");
+  });
 });
 gamePreviewCanvas.addEventListener("keydown", handleGame351PreviewKey);
 gamePreviewCanvas.addEventListener("click", () => {
@@ -25345,13 +29015,17 @@ function readRecentProjects() {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
     const projects = [];
+    const seen = /* @__PURE__ */ new Set();
     for (const entry of parsed) {
       if (entry === null || typeof entry !== "object") continue;
       const candidate = entry;
       if (typeof candidate.projectId !== "string" || typeof candidate.name !== "string" || typeof candidate.updatedAt !== "string") continue;
       try {
+        const projectId = asWorkspaceProjectId(candidate.projectId);
+        if (seen.has(projectId)) continue;
+        seen.add(projectId);
         projects.push({
-          projectId: asWorkspaceProjectId(candidate.projectId),
+          projectId,
           name: candidate.name.trim() || `Draw2 ${candidate.projectId}`,
           updatedAt: candidate.updatedAt
         });
@@ -25386,6 +29060,85 @@ function setProjectStartStatus(message, isError = false) {
   projectStartStatusElement.textContent = message;
   projectStartStatusElement.dataset.state = isError ? "error" : "ready";
 }
+var deletingProjectIds = /* @__PURE__ */ new Set();
+async function deleteRecentProject(project) {
+  const projectId = asWorkspaceProjectId(project.projectId);
+  const isPixyncProject = PIXYNC_ROOM_ID.test(projectId);
+  if (state.projectId === projectId) {
+    setProjectStartStatus("\u7DE8\u96C6\u4E2D\u306EProject\u306F\u524A\u9664\u3067\u304D\u307E\u305B\u3093\u3002\u5148\u306B\u5225\u306EProject\u3092\u958B\u3044\u3066\u304F\u3060\u3055\u3044\u3002", true);
+    return;
+  }
+  if (deletingProjectIds.has(projectId)) return;
+  if (!window.confirm(`\u300C${project.name}\u300D\u306E\u7AEF\u672B\u5185\u30C7\u30FC\u30BF\u3092\u524A\u9664\u3057\u307E\u3059\u304B\uFF1F`)) return;
+  deletingProjectIds.add(projectId);
+  setProjectStartStatus("Project data\u3092\u5B89\u5168\u306B\u524A\u9664\u3057\u3066\u3044\u307E\u3059\u2026");
+  try {
+    if (isPixyncProject) {
+      const client = await availablePixyncSupabaseClient();
+      if (client === void 0) {
+        setProjectStartStatus("\u5171\u6709Project\u3092\u524A\u9664\u3059\u308B\u306B\u306F\u3001PiXYNC\u3078\u30ED\u30B0\u30A4\u30F3\u3057\u3066\u3044\u308B\u5FC5\u8981\u304C\u3042\u308A\u307E\u3059\u3002Project data\u306F\u6B8B\u3057\u3066\u3044\u307E\u3059\u3002", true);
+        return;
+      }
+      try {
+        const detachResult = await detachPixyncProject(client, projectId);
+        setProjectStartStatus(detachResult.action === "participant_left" ? "\u5171\u6709Project\u304B\u3089\u9000\u51FA\u3057\u307E\u3057\u305F\u3002\u7AEF\u672B\u5185\u306EProject data\u3092\u524A\u9664\u3057\u3066\u3044\u307E\u3059\u2026" : "\u5171\u6709Project\u306E\u7D42\u4E86\u3092\u78BA\u8A8D\u3057\u307E\u3057\u305F\u3002\u7AEF\u672B\u5185\u306EProject data\u3092\u524A\u9664\u3057\u3066\u3044\u307E\u3059\u2026");
+      } catch (error2) {
+        const message = error2 instanceof PixyncProjectDeletionError && error2.code === "LOCALIZATION_REQUIRED" ? "\u6240\u6709\u8005\u306E\u5171\u6709Project\u306F\u3001\u30ED\u30FC\u30AB\u30E9\u30A4\u30BA\u6E08\u307F\u306E\u7AEF\u672B\u30B3\u30D4\u30FC\u3092\u78BA\u5B9A\u3057\u3066\u304B\u3089\u524A\u9664\u3067\u304D\u307E\u3059\u3002\u5171\u6709Project\u753B\u9762\u3067Checkpoint\u3092\u78BA\u5B9A\u3057\u3066\u304F\u3060\u3055\u3044\u3002" : error2 instanceof PixyncProjectDeletionError && error2.code === "AUTHENTICATION_REQUIRED" ? "\u5171\u6709Project\u3092\u524A\u9664\u3059\u308B\u306B\u306F\u3001PiXYNC\u3078\u30ED\u30B0\u30A4\u30F3\u3057\u3066\u3044\u308B\u5FC5\u8981\u304C\u3042\u308A\u307E\u3059\u3002" : error2 instanceof Error ? `\u5171\u6709Project\u3092\u524A\u9664\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002${error2.message}` : "\u5171\u6709Project\u3092\u524A\u9664\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002";
+        setProjectStartStatus(`${message} Project data\u306F\u6B8B\u3057\u3066\u3044\u307E\u3059\u3002`, true);
+        return;
+      }
+    }
+    const storage = await loadProjectDataStorageModule();
+    const gameStore = storage.createIndexedDbGameEditorPersistenceStore();
+    const ports = {
+      draw: {
+        clear: (id) => drawPersistenceStore.clear(id)
+      },
+      audio: {
+        clear: (id) => storage.deleteIndexedDbAudioProjectData(String(id))
+      },
+      game: {
+        clear: (id) => gameStore.clear(String(id))
+      },
+      pixync: {
+        clear: async (id) => {
+          return await pixyncPersistenceFor(String(id)).remove();
+        }
+      },
+      manifest: {
+        clear: (id) => workspaceManifestStore.clear(id)
+      }
+    };
+    const result = await deleteWorkspaceProjectLocalData(projectId, ports);
+    if (!result.ok) {
+      setProjectStartStatus(`Project data\u3092\u524A\u9664\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\uFF08${result.failed.join(", ")}\uFF09\u3002\u30C7\u30FC\u30BF\u306F\u6B8B\u3057\u3066\u3044\u308B\u305F\u3081\u3001\u518D\u8A66\u884C\u3067\u304D\u307E\u3059\u3002`, true);
+      return;
+    }
+    writeRecentProjects(readRecentProjects().filter((item) => item.projectId !== projectId));
+    const preferences = withoutDraw2ProjectEditorPreferences(draw2EditorPreferences, projectId);
+    draw2EditorPreferences = preferences;
+    writeDraw2EditorPreferences(window.localStorage, preferences);
+    if (readActiveWorkspaceProjectId() === projectId) {
+      writeActiveWorkspaceProjectId(asWorkspaceProjectId(DEFAULT_WORKSPACE_PROJECT_ID));
+    }
+    renderProjectStart();
+    setProjectStartStatus(`\u300C${project.name}\u300D\u3092\u524A\u9664\u3057\u307E\u3057\u305F\u3002`);
+  } catch (cause) {
+    setProjectStartStatus(cause instanceof Error ? `Project data\u3092\u524A\u9664\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002${cause.message}` : "Project data\u3092\u524A\u9664\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002\u30C7\u30FC\u30BF\u306F\u6B8B\u3057\u3066\u3044\u307E\u3059\u3002", true);
+  } finally {
+    deletingProjectIds.delete(projectId);
+  }
+}
+var projectStartMode = resolveCreatorStartMode(new URLSearchParams(window.location.search).get("mode"));
+function setProjectStartMode(mode) {
+  projectStartMode = mode;
+  for (const button of projectStartModeButtons) {
+    const selected = button.dataset.projectStartMode === mode;
+    button.classList.toggle("is-selected", selected);
+    button.setAttribute("aria-pressed", String(selected));
+  }
+}
+setProjectStartMode(projectStartMode);
 function formatRecentProjectDate(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Local project";
@@ -25417,23 +29170,39 @@ function renderProjectStart() {
     return;
   }
   for (const project of projects) {
+    const item = document.createElement("div");
+    item.className = "draw2-project-recent-item-row";
+    item.dataset.projectId = project.projectId;
+    item.setAttribute("role", "listitem");
     const button = document.createElement("button");
     button.type = "button";
     button.className = "draw2-project-recent-item";
-    button.dataset.projectId = project.projectId;
-    button.setAttribute("role", "listitem");
+    button.setAttribute("aria-label", `${project.name}\u3092\u958B\u304F`);
     const name = document.createElement("strong");
     name.textContent = project.name;
     const meta = document.createElement("small");
-    meta.textContent = `${project.projectId} \xB7 ${formatRecentProjectDate(project.updatedAt)}`;
+    meta.textContent = `${PIXYNC_ROOM_ID.test(project.projectId) ? "PiXYNC shared" : "Local Project"} \xB7 ${formatRecentProjectDate(project.updatedAt)}`;
+    meta.title = project.projectId;
+    meta.setAttribute("aria-label", `Project ID ${project.projectId}`);
     button.append(name, meta);
     button.addEventListener("click", () => {
       resolveProjectStart({
         projectIdOverride: project.projectId,
-        mode: "OPEN"
+        mode: "OPEN",
+        initialCreatorMode: projectStartMode
       });
     });
-    projectStartRecentListElement.append(button);
+    const deleteButton = document.createElement("button");
+    deleteButton.type = "button";
+    deleteButton.className = "draw2-project-recent-delete";
+    deleteButton.textContent = "\u524A\u9664";
+    deleteButton.setAttribute("aria-label", `${project.name}\u3092\u524A\u9664`);
+    deleteButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      void deleteRecentProject(project);
+    });
+    item.append(button, deleteButton);
+    projectStartRecentListElement.append(item);
   }
 }
 var resolveProjectStartRequest;
@@ -25457,24 +29226,34 @@ function waitForProjectStart() {
     resolveProjectStartRequest = resolve;
   });
 }
-projectStartNewButton?.addEventListener("click", () => {
+async function startFreshProject(mode) {
+  setProjectStartMode(mode);
   setProjectStartStatus("Preparing a blank project\u2026");
-  void createFreshWorkspaceProjectId().then((projectId) => {
+  try {
+    const projectId = await createFreshWorkspaceProjectId();
     resolveProjectStart({
       projectIdOverride: projectId,
-      mode: "NEW"
+      mode: "NEW",
+      initialCreatorMode: mode
     });
-  }).catch((cause) => {
+  } catch (cause) {
     setProjectStartStatus(cause instanceof Error ? cause.message : "A new project could not be created.", true);
+  }
+}
+for (const button of projectStartModeButtons) {
+  button.addEventListener("click", () => {
+    const mode = button.dataset.projectStartMode?.trim().toUpperCase();
+    if (isCreatorStartMode(mode)) void startFreshProject(mode);
   });
-});
+}
 function openProjectFromStart() {
   const raw = projectStartIdElement?.value.trim() ?? "";
   try {
     const projectId = asWorkspaceProjectId(raw || DEFAULT_WORKSPACE_PROJECT_ID);
     resolveProjectStart({
       projectIdOverride: projectId,
-      mode: "OPEN"
+      mode: "OPEN",
+      initialCreatorMode: projectStartMode
     });
   } catch {
     setProjectStartStatus("Project ID must start with a letter or number and use stable identifier characters.", true);
@@ -25490,18 +29269,32 @@ projectStartIdElement?.addEventListener("keydown", (event) => {
 async function resolveInitialProjectSettings() {
   try {
     const params = new URLSearchParams(window.location.search);
+    const requestedMode = params.get("mode");
     const projectId = params.get("project")?.trim();
     if (projectId !== void 0 && projectId.length > 0) {
+      const intent = createProjectStartIntent({
+        projectId,
+        kind: "OPEN",
+        mode: requestedMode
+      });
       return {
-        projectIdOverride: projectId,
-        mode: "OPEN"
+        ...intent.projectId === void 0 ? {} : {
+          projectIdOverride: intent.projectId
+        },
+        mode: intent.kind,
+        initialCreatorMode: intent.mode
       };
     }
     if (params.get("new_project") === "1") {
       const freshProjectId = await createFreshWorkspaceProjectId();
+      const intent = createProjectStartIntent({
+        kind: "NEW",
+        mode: requestedMode
+      });
       return {
         projectIdOverride: freshProjectId,
-        mode: "NEW"
+        mode: intent.kind,
+        initialCreatorMode: intent.mode
       };
     }
   } catch {
@@ -25521,24 +29314,44 @@ void resolveInitialProjectSettings().then(async (settings) => {
   await startPixyncProjectLifecycle();
   return {
     module: await loadWorkspaceModule(),
-    initialProjectMode: settings.mode
+    initialProjectMode: settings.mode,
+    initialCreatorMode: settings.initialCreatorMode
   };
-}).then(({ module, initialProjectMode }) => {
+}).then(({ module, initialProjectMode, initialCreatorMode }) => {
   const result = module.bootstrapDraw2Workspace(document, {
     projectId: state.projectId,
     ...initialProjectMode === void 0 ? {} : {
       initialProjectMode
+    },
+    ...initialCreatorMode === void 0 ? {} : {
+      initialCreatorMode
     }
   });
   if (!result.ok) {
     setStatus(result.reason ?? "Workspace layer unavailable.", "error");
     return;
   }
+  const workspaceDebug = window.__pixiedraw2WorkspaceDebug;
+  if (workspaceDebug !== void 0) {
+    workspaceDebug.exportProjectPxdArtifact = exportCurrentPxdArtifactForWorkspace;
+  }
   const workspaceFrame = document.querySelector("#draw2WorkspaceFrame");
   if (workspaceFrame !== null) translateDraw2Subtree(workspaceFrame);
   window.requestAnimationFrame(() => {
     renderTimeline();
     window.requestAnimationFrame(() => renderTimeline());
+  });
+  void startLocalProjectSession(state.projectId, initialCreatorMode ?? "DRAW").catch(() => {
+    document.body.dataset.projectSessionStatus = "unavailable";
+    window.dispatchEvent(new CustomEvent("draw2:pixync-status", {
+      detail: {
+        state: "offline",
+        roomId: "local",
+        revision: "\u2014",
+        members: "\u2014",
+        message: "Project Session\u3092\u8AAD\u307F\u8FBC\u3081\u307E\u305B\u3093\u3067\u3057\u305F\u3002\u30ED\u30FC\u30AB\u30EB\u7DE8\u96C6\u3092\u7D99\u7D9A\u3057\u307E\u3059\u3002"
+      }
+    }));
   });
   void queuePixyncProductionStart();
 }).catch((cause) => {

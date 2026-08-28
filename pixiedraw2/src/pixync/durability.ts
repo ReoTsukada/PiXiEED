@@ -13,6 +13,7 @@ import {
 } from "./core.ts";
 import { canonicalJson, sha256Hex } from "../wp160-contracts.ts";
 import type {
+  PixyncAggregate,
   PixyncCommittedOperation,
   PixyncOperationDraft,
 } from "./contracts.ts";
@@ -69,6 +70,10 @@ export interface PixyncApplyReceipt {
   readonly operationId: string;
   readonly fingerprint: string;
   readonly projectRevision: number;
+  /** Added after the initial V1 snapshot shape; legacy receipts may omit it. */
+  readonly aggregate?: PixyncAggregate;
+  /** Added after the initial V1 snapshot shape; legacy receipts may omit it. */
+  readonly aggregateRevision?: number;
 }
 
 export interface PixyncInboxRecord {
@@ -344,6 +349,155 @@ function findByOperationId(
   return undefined;
 }
 
+interface ResolvedPixyncApplyReceipt extends PixyncApplyReceipt {
+  readonly aggregate: PixyncAggregate;
+  readonly aggregateRevision: number;
+}
+
+const RETAINED_COMPLETED_COMMITTED = 8;
+const RETAINED_COMPLETED_OUTBOX = 8;
+
+function receiptSourceOperation(
+  snapshot: PixyncDurableSnapshot,
+  operationId: string,
+): PixyncCommittedOperation | undefined {
+  return snapshot.inbox.find((item) => item.operationId === operationId)
+      ?.envelope ??
+    snapshot.vault.committed.find((item) =>
+      item.envelope.operationId === operationId
+    )?.envelope;
+}
+
+function resolveApplyReceipt(
+  snapshot: PixyncDurableSnapshot,
+  receipt: PixyncApplyReceipt,
+): ResolvedPixyncApplyReceipt {
+  const source = receiptSourceOperation(snapshot, receipt.operationId);
+  const aggregate = receipt.aggregate ?? source?.aggregate;
+  const aggregateRevision = receipt.aggregateRevision ??
+    source?.aggregateRevision;
+  if (
+    (aggregate !== "draw" && aggregate !== "audio" && aggregate !== "game") ||
+    !validPositive(aggregateRevision)
+  ) {
+    throw new PixyncDurabilityError(
+      "INVALID_STATE",
+      "Applied receipt is missing its canonical aggregate identity.",
+    );
+  }
+  if (source !== undefined && (
+    source.aggregate !== aggregate ||
+    source.aggregateRevision !== aggregateRevision ||
+    source.projectRevision !== receipt.projectRevision
+  )) {
+    throw new PixyncDurabilityError(
+      "INBOX_CONFLICT",
+      "Applied receipt aggregate identity does not match its canonical operation.",
+    );
+  }
+  return {
+    operationId: receipt.operationId,
+    fingerprint: receipt.fingerprint,
+    projectRevision: receipt.projectRevision,
+    aggregate,
+    aggregateRevision,
+  };
+}
+
+function sameApplyReceipt(
+  left: ResolvedPixyncApplyReceipt,
+  right: ResolvedPixyncApplyReceipt,
+): boolean {
+  return left.operationId === right.operationId &&
+    left.fingerprint === right.fingerprint &&
+    left.projectRevision === right.projectRevision &&
+    left.aggregate === right.aggregate &&
+    left.aggregateRevision === right.aggregateRevision;
+}
+
+function mergeAppliedReceipts(
+  snapshot: PixyncDurableSnapshot,
+  incoming: readonly PixyncApplyReceipt[],
+): readonly ResolvedPixyncApplyReceipt[] {
+  const merged = new Map<string, ResolvedPixyncApplyReceipt>();
+  for (const receipt of [
+    ...snapshot.appliedOperationFingerprints,
+    ...incoming,
+  ]) {
+    const resolved = resolveApplyReceipt(snapshot, receipt);
+    const existing = merged.get(resolved.operationId);
+    if (existing !== undefined && !sameApplyReceipt(existing, resolved)) {
+      throw new PixyncDurabilityError(
+        "INBOX_CONFLICT",
+        "Applied receipt identity is not deterministic.",
+      );
+    }
+    merged.set(resolved.operationId, resolved);
+  }
+  return [...merged.values()].sort((left, right) =>
+    left.projectRevision - right.projectRevision
+  );
+}
+
+/**
+ * Completed envelopes are retained only as a small canonical tail. The
+ * compact receipt list remains the restart/order boundary; pending or
+ * crash-recovery records are never compacted away.
+ */
+function compactCompletedRecords(
+  snapshot: PixyncDurableSnapshot,
+  receipts: readonly ResolvedPixyncApplyReceipt[],
+): PixyncDurableSnapshot {
+  const receiptIds = new Set(receipts.map((receipt) => receipt.operationId));
+  const activeReceiptIds = new Set(
+    snapshot.inbox.filter((record) =>
+      record.receipt !== undefined && record.state !== "COMPLETED"
+    ).map((record) => record.operationId),
+  );
+  const completedCommitted = snapshot.vault.committed
+    .filter((record) => receiptIds.has(record.envelope.operationId))
+    .sort((left, right) =>
+      left.envelope.projectRevision - right.envelope.projectRevision
+    );
+  const retainedCommittedIds = new Set(
+    completedCommitted.slice(-RETAINED_COMPLETED_COMMITTED).map((record) =>
+      record.envelope.operationId
+    ),
+  );
+  const committed = snapshot.vault.committed.filter((record) => {
+    const operationId = record.envelope.operationId;
+    return !receiptIds.has(operationId) || activeReceiptIds.has(operationId) ||
+      retainedCommittedIds.has(operationId);
+  });
+
+  const completedOutbox = snapshot.outbox
+    .filter((record) =>
+      record.state === "DISPATCHED" && receiptIds.has(record.operationId)
+    )
+    .sort((left, right) =>
+      (left.confirmedRevision ?? 0) - (right.confirmedRevision ?? 0)
+    );
+  const retainedOutboxIds = new Set(
+    completedOutbox.slice(-RETAINED_COMPLETED_OUTBOX).map((record) =>
+      record.operationId
+    ),
+  );
+  const outbox = snapshot.outbox.filter((record) =>
+    record.state !== "DISPATCHED" || !receiptIds.has(record.operationId) ||
+    retainedOutboxIds.has(record.operationId)
+  );
+
+  return {
+    ...snapshot,
+    vault: { ...snapshot.vault, committed },
+    outbox,
+    inbox: snapshot.inbox.filter((record) =>
+      record.receipt === undefined || record.state !== "COMPLETED"
+    ),
+    appliedOperationFingerprints: receipts,
+  };
+}
+
 function validateLease(lease: PixyncLease | undefined): void {
   if (lease === undefined) return;
   if (
@@ -439,7 +593,11 @@ export async function validatePixyncDurableSnapshot(
       item.receipt !== undefined && (
         item.receipt.operationId !== item.operationId ||
         item.receipt.fingerprint !== item.fingerprint ||
-        item.receipt.projectRevision !== item.envelope.projectRevision
+        item.receipt.projectRevision !== item.envelope.projectRevision ||
+        (item.receipt.aggregate !== undefined &&
+          item.receipt.aggregate !== item.envelope.aggregate) ||
+        (item.receipt.aggregateRevision !== undefined &&
+          item.receipt.aggregateRevision !== item.envelope.aggregateRevision)
       )
     ) throw new Error("PiXYNC Inbox apply receipt is malformed.");
     const prior = revisions.get(item.envelope.projectRevision);
@@ -452,12 +610,36 @@ export async function validatePixyncDurableSnapshot(
     revisions.set(item.envelope.projectRevision, item.operationId);
     operationIds.add(item.operationId);
   }
+  const appliedIds = new Set<string>();
+  const appliedRevisions = new Map<number, string>();
   for (const item of snapshot.appliedOperationFingerprints) {
     if (
       typeof item.operationId !== "string" ||
-      typeof item.fingerprint !== "string" ||
+      !/^[a-f0-9]{64}$/u.test(item.fingerprint) ||
       !validPositive(item.projectRevision)
     ) throw new Error("PiXYNC applied operation fingerprint is malformed.");
+    const resolved = resolveApplyReceipt(snapshot, item);
+    const priorId = appliedRevisions.get(resolved.projectRevision);
+    if (
+      appliedIds.has(resolved.operationId) ||
+      (priorId !== undefined && priorId !== resolved.operationId)
+    ) {
+      throw new Error("PiXYNC applied receipts contain duplicate identity.");
+    }
+    appliedIds.add(resolved.operationId);
+    appliedRevisions.set(resolved.projectRevision, resolved.operationId);
+  }
+  for (const item of snapshot.vault.committed) {
+    const appliedId = appliedRevisions.get(item.envelope.projectRevision);
+    if (appliedId !== undefined && appliedId !== item.envelope.operationId) {
+      throw new Error("PiXYNC snapshot has a committed revision collision.");
+    }
+  }
+  for (const item of snapshot.inbox) {
+    const appliedId = appliedRevisions.get(item.envelope.projectRevision);
+    if (appliedId !== undefined && appliedId !== item.envelope.operationId) {
+      throw new Error("PiXYNC snapshot has an Inbox revision collision.");
+    }
   }
   for (const item of snapshot.retrySchedule) {
     if (
@@ -470,6 +652,7 @@ export async function validatePixyncDurableSnapshot(
     snapshot.revision < Math.max(
       0,
       ...snapshot.vault.committed.map((x) => x.envelope.projectRevision),
+      ...snapshot.appliedOperationFingerprints.map((x) => x.projectRevision),
     )
   ) {
     throw new Error("PiXYNC snapshot revision regressed.");
@@ -752,15 +935,17 @@ export class PixyncDurableJournal {
       );
     }
     const legacyAggregateRevision = record.envelope.aggregateRevision ||
-      this.#state.vault.committed
+      Math.max(
+        ...this.#state.vault.committed
           .filter((item) =>
             item.envelope.aggregate === record.envelope.aggregate
           )
-          .reduce(
-            (highest, item) =>
-              Math.max(highest, item.envelope.aggregateRevision),
-            0,
-          ) + 1;
+          .map((item) => item.envelope.aggregateRevision),
+        ...this.#state.appliedOperationFingerprints
+          .filter((item) => item.aggregate === record.envelope.aggregate)
+          .map((item) => item.aggregateRevision ?? 0),
+        0,
+      ) + 1;
     const committed: PixyncCommittedOperation = {
       ...clone(record.envelope),
       projectRevision: confirmedRevision,
@@ -867,6 +1052,10 @@ export class PixyncDurableJournal {
     const existingRevision = this.#state.vault.committed.find((item) =>
       item.envelope.projectRevision === ack.operation.projectRevision
     );
+    const existingAppliedRevision =
+      this.#state.appliedOperationFingerprints.find((item) =>
+        item.projectRevision === ack.operation.projectRevision
+      );
     const existingInboxRevision = this.#state.inbox.find((item) =>
       item.envelope.projectRevision === ack.operation.projectRevision &&
       item.operationId !== operationId
@@ -874,6 +1063,8 @@ export class PixyncDurableJournal {
     if (
       (existingRevision !== undefined &&
         existingRevision.envelope.operationId !== operationId) ||
+      (existingAppliedRevision !== undefined &&
+        existingAppliedRevision.operationId !== operationId) ||
       existingInboxRevision !== undefined
     ) {
       throw new PixyncDurabilityError(
@@ -1009,7 +1200,37 @@ export class PixyncDurableJournal {
       await this.#commit(next);
       return { record: clone(conflict), conflict: true };
     }
+    const applied = this.#state.appliedOperationFingerprints.find((item) =>
+      item.operationId === committed.operationId
+    );
+    if (applied !== undefined) {
+      if (
+        applied.fingerprint !== fingerprint ||
+        applied.projectRevision !== committed.projectRevision
+      ) {
+        throw new PixyncDurabilityError(
+          "INBOX_CONFLICT",
+          "Incoming operation conflicts with a compact applied receipt.",
+        );
+      }
+      const receipt = resolveApplyReceipt(this.#state, applied);
+      const completed: PixyncInboxRecord = {
+        operationId: committed.operationId,
+        projectId: this.#projectId,
+        envelope: clone(committed),
+        fingerprint,
+        state: "COMPLETED",
+        attempt: 0,
+        nextAttemptAt: nowIso(this.#now()),
+        receipt,
+      };
+      return { record: completed, duplicate: true };
+    }
     const sameRevision =
+      this.#state.appliedOperationFingerprints.find((item) =>
+        item.projectRevision === committed.projectRevision &&
+        item.operationId !== committed.operationId
+      ) ??
       this.#state.inbox.find((item) =>
         item.envelope.projectRevision === committed.projectRevision &&
         item.operationId !== committed.operationId
@@ -1192,6 +1413,8 @@ export class PixyncDurableJournal {
       operationId,
       fingerprint: record.fingerprint,
       projectRevision: record.envelope.projectRevision,
+      aggregate: record.envelope.aggregate,
+      aggregateRevision: record.envelope.aggregateRevision,
     };
     const withReceipt: PixyncInboxRecord = { ...record, receipt };
     // Receipt persistence is the restart recovery boundary after an adapter
@@ -1226,27 +1449,14 @@ export class PixyncDurableJournal {
       PixyncOrderKeeperInitialState["appliedOperations"][number]
     >();
     for (const receipt of this.#state.appliedOperationFingerprints) {
-      const inbox = this.#state.inbox.find((item) =>
-        item.operationId === receipt.operationId
-      );
-      if (
-        inbox === undefined || inbox.receipt === undefined ||
-        inbox.receipt.fingerprint !== receipt.fingerprint ||
-        inbox.envelope.projectRevision !== receipt.projectRevision
-      ) {
-        throw new PixyncDurabilityError(
-          "INVALID_STATE",
-          "Applied receipt has no matching canonical Inbox envelope.",
-        );
-      }
-      const operation = inbox.envelope;
-      const existing = receipts.get(operation.operationId);
+      const resolved = resolveApplyReceipt(this.#state, receipt);
+      const existing = receipts.get(resolved.operationId);
       const item = {
-        operationId: operation.operationId,
-        fingerprint: receipt.fingerprint,
-        projectRevision: operation.projectRevision,
-        aggregate: operation.aggregate,
-        aggregateRevision: operation.aggregateRevision,
+        operationId: resolved.operationId,
+        fingerprint: resolved.fingerprint,
+        projectRevision: resolved.projectRevision,
+        aggregate: resolved.aggregate,
+        aggregateRevision: resolved.aggregateRevision,
       } as PixyncOrderKeeperInitialState["appliedOperations"][number];
       if (
         existing !== undefined &&
@@ -1257,7 +1467,7 @@ export class PixyncDurableJournal {
           "Applied receipt identity is not deterministic.",
         );
       }
-      receipts.set(operation.operationId, item);
+      receipts.set(resolved.operationId, item);
     }
     const appliedOperations = [...receipts.values()].sort((left, right) =>
       left.projectRevision - right.projectRevision
@@ -1302,14 +1512,21 @@ export class PixyncDurableJournal {
     next: PixyncDurableSnapshot,
     injectResponseCrash = true,
   ): Promise<void> {
-    const staged = await sealSnapshot({
-      ...clone(next),
-      confirmedProjectRevision: next.revision,
-      appliedOperationFingerprints: next.inbox.flatMap((record) =>
+    const appliedOperationFingerprints = mergeAppliedReceipts(
+      next,
+      next.inbox.flatMap((record) =>
         record.receipt === undefined ? [] : [clone(record.receipt)]
       ),
+    );
+    const compacted = compactCompletedRecords({
+      ...clone(next),
+      appliedOperationFingerprints,
+    }, appliedOperationFingerprints);
+    const staged = await sealSnapshot({
+      ...compacted,
+      confirmedProjectRevision: compacted.revision,
       retrySchedule: [
-        ...next.outbox.filter((record) => record.state === "PENDING").map((
+        ...compacted.outbox.filter((record) => record.state === "PENDING").map((
           record,
         ) => ({
           recordId: record.operationId,
@@ -1317,7 +1534,7 @@ export class PixyncDurableJournal {
           attempt: record.attempt,
           nextAttemptAt: record.nextAttemptAt,
         })),
-        ...next.inbox.filter((record) => record.state === "RETRYABLE").map((
+        ...compacted.inbox.filter((record) => record.state === "RETRYABLE").map((
           record,
         ) => ({
           recordId: record.operationId,

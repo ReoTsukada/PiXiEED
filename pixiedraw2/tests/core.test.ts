@@ -7,6 +7,8 @@ import {
   ReferenceRenderer,
   SampledInstrumentation,
   canonicalJson,
+  createIndexedRasterStampSource,
+  createRasterSelectionMask,
   createProject,
   interpolatePixelPath,
   type PixelPoint,
@@ -15,6 +17,7 @@ import {
   type RendererAdapter,
 } from "../src/draw2-core.ts";
 import {
+  applyCompactSelectionTransform,
   assessClipboardPalette,
   commitTransform,
   createClipboardPasteSession,
@@ -28,6 +31,8 @@ import {
   previewTransform,
   type ClipboardPayload,
   type SelectionPixel,
+  type SelectionSnapshot,
+  type SelectionTransformWireCommand,
   type TransformDescriptor,
 } from "../src/draw2-selection.ts";
 import {
@@ -292,7 +297,7 @@ Deno.test("supports pen, eraser, bounded fill, and palette definition without pi
     clientSequence: 3,
     baseStructureEpoch: 1,
     createdAtMonotonicMs: 3,
-    payload: { seedX: 0, seedY: 0, colorIndex: 2, maxPixels: 64 },
+    payload: { seedX: 0, seedY: 0, colorIndex: 2, maxCells: 64 },
   });
   if (!filled.ok || filled.result.operation.operationType !== "raster.fill") throw new Error("bounded fill failed");
   if (filled.state.assets[state.activeAssetId]?.raster.getPixel(7, 7) !== 2) throw new Error("fill did not reach the bounded raster");
@@ -329,6 +334,480 @@ Deno.test("supports pen, eraser, bounded fill, and palette definition without pi
   if (appended.result.dirtyTiles.length !== 0 || appended.result.operation.operationType !== "palette.appendColor") throw new Error("palette append emitted raster work or the wrong operation type");
 });
 
+Deno.test("keeps mirrored broad strokes and shapes in one bounded canonical command", async () => {
+  const initial = createProject({
+    projectId: "project-mirror-bounded",
+    width: 256,
+    height: 256,
+    tileSize: 32,
+  });
+  const mirror = {
+    axes: ["x"] as const,
+    guide: {
+      x: 127.5,
+      y: 127.5,
+      diagonalDown: 0,
+      diagonalUp: 0,
+    },
+  };
+  const stroke = await new EditorCore(initial).execute({
+    commandId: "mirror-stroke-1",
+    commandType: "raster.strokeCommit",
+    schemaVersion: 1,
+    projectId: initial.projectId,
+    assetId: initial.activeAssetId,
+    actorId: "mirror-actor",
+    clientId: "mirror-client",
+    clientSequence: 1,
+    baseStructureEpoch: initial.structureEpoch,
+    createdAtMonotonicMs: 1,
+    payload: {
+      points: [{ x: 32, y: 24 }, { x: 95, y: 24 }],
+      colorIndex: 2,
+      mirror,
+    },
+  });
+  if (!stroke.ok) throw new Error("mirrored broad Stroke failed");
+  const strokeAsset = stroke.state.assets[stroke.state.activeAssetId];
+  if (
+    strokeAsset?.raster.getPixel(32, 24) !== 2 ||
+    strokeAsset.raster.getPixel(95, 24) !== 2 ||
+    strokeAsset.raster.getPixel(160, 24) !== 2 ||
+    strokeAsset.raster.getPixel(223, 24) !== 2
+  ) throw new Error("mirrored Stroke did not preserve both reflected spans");
+  if (stroke.result.operation.payload &&
+    JSON.stringify(stroke.result.operation.payload).length >= 2_000) {
+    throw new Error("mirrored Stroke expanded into an oversized operation payload");
+  }
+
+  const shape = await new EditorCore(stroke.state).execute({
+    commandId: "mirror-shape-2",
+    commandType: "raster.shapeCommit",
+    schemaVersion: 1,
+    projectId: initial.projectId,
+    assetId: initial.activeAssetId,
+    actorId: "mirror-actor",
+    clientId: "mirror-client",
+    clientSequence: 2,
+    baseStructureEpoch: initial.structureEpoch,
+    createdAtMonotonicMs: 2,
+    payload: {
+      tool: "rect-fill",
+      from: { x: 16, y: 64 },
+      to: { x: 63, y: 95 },
+      colorIndex: 3,
+      brushSize: 1,
+      brushShape: "square",
+      pattern: "solid",
+      mirror,
+    },
+  });
+  if (!shape.ok) throw new Error("mirrored broad shape failed");
+  const shapeAsset = shape.state.assets[shape.state.activeAssetId];
+  if (
+    shapeAsset?.raster.getPixel(16, 64) !== 3 ||
+    shapeAsset.raster.getPixel(63, 95) !== 3 ||
+    shapeAsset.raster.getPixel(192, 64) !== 3 ||
+    shapeAsset.raster.getPixel(239, 95) !== 3
+  ) throw new Error("mirrored shape did not preserve both reflected regions");
+});
+
+Deno.test("keeps rectangle-clipped broad raster commands bounded", async () => {
+  const initial = createProject({
+    projectId: "project-rectangle-clip-bounded",
+    width: 256,
+    height: 256,
+    tileSize: 32,
+  });
+  const core = new EditorCore(initial);
+  const fillClip = { x: 48, y: 48, width: 160, height: 16 };
+  const filled = await core.execute({
+    commandId: "rectangle-clip-fill-1",
+    commandType: "raster.fill",
+    schemaVersion: 1,
+    projectId: initial.projectId,
+    assetId: initial.activeAssetId,
+    actorId: "rectangle-clip-actor",
+    clientId: "rectangle-clip-client",
+    clientSequence: 1,
+    baseStructureEpoch: initial.structureEpoch,
+    createdAtMonotonicMs: 1,
+    payload: {
+      seedX: 50,
+      seedY: 50,
+      colorIndex: 1,
+      maxCells: 1_048_576,
+      clip: fillClip,
+    },
+  });
+  if (!filled.ok) throw new Error("rectangle-clipped fill failed");
+  const filledAsset = filled.state.assets[initial.activeAssetId];
+  if (
+    filledAsset?.raster.getPixel(48, 48) !== 1 ||
+    filledAsset.raster.getPixel(207, 63) !== 1 ||
+    filledAsset.raster.getPixel(47, 50) !== 0 ||
+    filledAsset.raster.getPixel(208, 50) !== 0 ||
+    filledAsset.raster.getPixel(50, 64) !== 0
+  ) throw new Error("rectangle-clipped fill escaped its selection bounds");
+  if (
+    JSON.stringify(filled.result.operation.payload).length >= 1_000
+  ) throw new Error("rectangle-clipped fill expanded into a pixel write-set");
+
+  const strokeClip = { x: 48, y: 96, width: 160, height: 1 };
+  const stroked = await core.execute({
+    commandId: "rectangle-clip-stroke-2",
+    commandType: "raster.strokeCommit",
+    schemaVersion: 1,
+    projectId: initial.projectId,
+    assetId: initial.activeAssetId,
+    actorId: "rectangle-clip-actor",
+    clientId: "rectangle-clip-client",
+    clientSequence: 2,
+    baseStructureEpoch: initial.structureEpoch,
+    createdAtMonotonicMs: 2,
+    payload: {
+      points: [{ x: 0, y: 96 }, { x: 255, y: 96 }],
+      colorIndex: 2,
+      clip: strokeClip,
+    },
+  });
+  if (!stroked.ok) throw new Error("rectangle-clipped stroke failed");
+  const strokedAsset = stroked.state.assets[initial.activeAssetId];
+  if (
+    strokedAsset?.raster.getPixel(48, 96) !== 2 ||
+    strokedAsset.raster.getPixel(207, 96) !== 2 ||
+    strokedAsset.raster.getPixel(47, 96) !== 0 ||
+    strokedAsset.raster.getPixel(208, 96) !== 0
+  ) throw new Error("rectangle-clipped stroke escaped its selection bounds");
+
+  const shapeClip = { x: 48, y: 64, width: 160, height: 128 };
+  const shaped = await core.execute({
+    commandId: "rectangle-clip-shape-3",
+    commandType: "raster.shapeCommit",
+    schemaVersion: 1,
+    projectId: initial.projectId,
+    assetId: initial.activeAssetId,
+    actorId: "rectangle-clip-actor",
+    clientId: "rectangle-clip-client",
+    clientSequence: 3,
+    baseStructureEpoch: initial.structureEpoch,
+    createdAtMonotonicMs: 3,
+    payload: {
+      tool: "rect-fill",
+      from: { x: 0, y: 64 },
+      to: { x: 255, y: 191 },
+      colorIndex: 3,
+      brushSize: 1,
+      brushShape: "square",
+      pattern: "solid",
+      clip: shapeClip,
+    },
+  });
+  if (!shaped.ok) throw new Error("rectangle-clipped shape failed");
+  const shapedAsset = shaped.state.assets[initial.activeAssetId];
+  if (
+    shapedAsset?.raster.getPixel(48, 64) !== 3 ||
+    shapedAsset.raster.getPixel(207, 191) !== 3 ||
+    shapedAsset.raster.getPixel(47, 64) !== 0 ||
+    shapedAsset.raster.getPixel(208, 191) !== 0 ||
+    shapedAsset.raster.getPixel(48, 192) !== 0
+  ) throw new Error("rectangle-clipped shape escaped its selection bounds");
+  if (
+    JSON.stringify(shaped.result.operation.payload).length >= 1_000
+  ) throw new Error("rectangle-clipped shape expanded into a pixel write-set");
+
+  const rejected = await core.execute({
+    commandId: "rectangle-clip-invalid-4",
+    commandType: "raster.fill",
+    schemaVersion: 1,
+    projectId: initial.projectId,
+    assetId: initial.activeAssetId,
+    actorId: "rectangle-clip-actor",
+    clientId: "rectangle-clip-client",
+    clientSequence: 4,
+    baseStructureEpoch: initial.structureEpoch,
+    createdAtMonotonicMs: 4,
+    payload: {
+      seedX: 47,
+      seedY: 50,
+      colorIndex: 4,
+      maxCells: 1_048_576,
+      clip: fillClip,
+    },
+  });
+  if (
+    rejected.ok ||
+    !rejected.diagnostics.some((item) => item.code === "FILL_SEED_OUTSIDE_CLIP")
+  ) throw new Error("fill accepted a seed outside its rectangle clip");
+});
+
+Deno.test("keeps non-rectangular selection raster commands compact and bounded", async () => {
+  const initial = createProject({
+    projectId: "project-selection-mask-raster",
+    width: 64,
+    height: 64,
+    tileSize: 32,
+  });
+  const selected: PixelPoint[] = [];
+  for (let y = 8; y < 56; y += 1) {
+    for (let x = 8; x < 56; x += 1) {
+      const dx = x - 31.5;
+      const dy = y - 31.5;
+      if ((dx * dx) / (24 * 24) + (dy * dy) / (24 * 24) <= 1) {
+        selected.push({ x, y });
+      }
+    }
+  }
+  const selectionMask = createRasterSelectionMask(selected);
+  if (selectionMask === undefined) throw new Error("selection mask was empty");
+  if (
+    selectionMask.selectedCount !== selected.length ||
+    selectionMask.data.length >= 10_000 ||
+    Array.isArray(selectionMask.data)
+  ) throw new Error("non-rectangular selection mask was not compact");
+
+  let state = initial;
+  const execute = async (command: EditorCommand) => {
+    const result = await new EditorCore(state).execute(command);
+    if (!result.ok) {
+      throw new Error(
+        `selection mask command failed: ${result.diagnostics.map((item) => item.code).join(",")}`,
+      );
+    }
+    state = result.state;
+    return result;
+  };
+  const base = {
+    projectId: initial.projectId,
+    assetId: initial.activeAssetId,
+    actorId: "selection-mask-actor",
+    clientId: "selection-mask-client",
+    baseStructureEpoch: initial.structureEpoch,
+  } as const;
+  const filled = await execute({
+    ...base,
+    commandId: "selection-mask-fill",
+    commandType: "raster.fill",
+    schemaVersion: 1,
+    clientSequence: 1,
+    createdAtMonotonicMs: 1,
+    payload: {
+      seedX: 32,
+      seedY: 32,
+      colorIndex: 1,
+      maxCells: 4_096,
+      selectionMask,
+    },
+  });
+  const filledAsset = state.assets[initial.activeAssetId];
+  if (
+    filledAsset?.raster.getPixel(32, 32) !== 1 ||
+    filledAsset.raster.getPixel(7, 32) !== 0 ||
+    filledAsset.raster.getPixel(32, 7) !== 0
+  ) throw new Error("masked fill escaped the non-rectangular selection");
+  if ((filled.result.operation.payload as Record<string, unknown>).writes !== undefined) {
+    throw new Error("masked fill expanded into a write-set");
+  }
+
+  const stroked = await execute({
+    ...base,
+    commandId: "selection-mask-stroke",
+    commandType: "raster.strokeCommit",
+    schemaVersion: 1,
+    clientSequence: 2,
+    createdAtMonotonicMs: 2,
+    payload: {
+      points: [{ x: 0, y: 32 }, { x: 63, y: 32 }],
+      colorIndex: 2,
+      selectionMask,
+    },
+  });
+  const strokedAsset = state.assets[initial.activeAssetId];
+  if (
+    strokedAsset?.raster.getPixel(0, 32) !== 0 ||
+    strokedAsset.raster.getPixel(7, 32) !== 0 ||
+    strokedAsset.raster.getPixel(32, 32) !== 2 ||
+    strokedAsset.raster.getPixel(56, 32) !== 0
+  ) throw new Error("masked stroke escaped the non-rectangular selection");
+  if ((stroked.result.operation.payload as Record<string, unknown>).writes !== undefined) {
+    throw new Error("masked stroke expanded into a write-set");
+  }
+
+  const shaped = await execute({
+    ...base,
+    commandId: "selection-mask-shape",
+    commandType: "raster.shapeCommit",
+    schemaVersion: 1,
+    clientSequence: 3,
+    createdAtMonotonicMs: 3,
+    payload: {
+      tool: "rect-fill",
+      from: { x: 0, y: 0 },
+      to: { x: 63, y: 63 },
+      colorIndex: 3,
+      brushSize: 1,
+      brushShape: "square",
+      pattern: "solid",
+      selectionMask,
+    },
+  });
+  const shapedAsset = state.assets[initial.activeAssetId];
+  if (
+    shapedAsset?.raster.getPixel(32, 32) !== 3 ||
+    shapedAsset.raster.getPixel(7, 32) !== 0 ||
+    shapedAsset.raster.getPixel(0, 0) !== 0
+  ) throw new Error("masked shape escaped the non-rectangular selection");
+  if ((shaped.result.operation.payload as Record<string, unknown>).writes !== undefined) {
+    throw new Error("masked shape expanded into a write-set");
+  }
+
+  const stamped = await execute({
+    ...base,
+    commandId: "selection-mask-tile",
+    commandType: "raster.tileStamp",
+    schemaVersion: 1,
+    clientSequence: 4,
+    createdAtMonotonicMs: 4,
+    payload: {
+      pattern: "checker",
+      colorIndex: 1,
+      originX: 31,
+      originY: 31,
+      scale: 1,
+      selectionMask,
+    },
+  });
+  const stampedAsset = state.assets[initial.activeAssetId];
+  if (
+    stampedAsset?.raster.getPixel(0, 0) !== 0 ||
+    stampedAsset.raster.getPixel(32, 32) !== 1 ||
+    (stamped.result.operation.payload as Record<string, unknown>).writes !== undefined
+  ) throw new Error(`masked tile stamp was not bounded or compact: ${JSON.stringify({
+    outside: stampedAsset?.raster.getPixel(0, 0),
+    center: stampedAsset?.raster.getPixel(32, 32),
+    payload: stamped.result.operation.payload,
+  })}`);
+
+  const rejected = await new EditorCore(state).execute({
+    ...base,
+    commandId: "selection-mask-seed-outside",
+    commandType: "raster.fill",
+    schemaVersion: 1,
+    clientSequence: 5,
+    createdAtMonotonicMs: 5,
+    payload: {
+      seedX: 0,
+      seedY: 0,
+      colorIndex: 1,
+      maxCells: 4_096,
+      selectionMask,
+    },
+  });
+  if (
+    rejected.ok ||
+    !rejected.diagnostics.some((item) =>
+      item.code === "FILL_SEED_OUTSIDE_SELECTION_MASK"
+    )
+  ) throw new Error("masked fill accepted an outside seed");
+});
+
+Deno.test("keeps saved selection stamps as compact inline tile operations", async () => {
+  const initial = createProject({
+    projectId: "project-inline-stamp",
+    width: 256,
+    height: 256,
+    tileSize: 32,
+  });
+  const asset = initial.assets[initial.activeAssetId];
+  if (asset === undefined) throw new Error("inline stamp asset is missing");
+  const cells: { x: number; y: number; colorIndex: number }[] = [];
+  for (let y = 0; y < 256; y += 1) {
+    cells.push({ x: 0, y, colorIndex: y % 2 === 0 ? 1 : 2 });
+    cells.push({ x: 1, y, colorIndex: y % 2 === 0 ? 1 : 2 });
+  }
+  const inlineSource = createIndexedRasterStampSource({
+    width: 2,
+    height: 256,
+    palette: asset.palette,
+    cells,
+  });
+  const payload = {
+    inlineSource,
+    originX: 32,
+    originY: 0,
+    scale: 1,
+  } as const;
+  const serialized = JSON.stringify(payload);
+  if (
+    serialized.length >= 16_384 ||
+    serialized.includes("writes") ||
+    serialized.includes("pixels") ||
+    Array.isArray((inlineSource as unknown as Record<string, unknown>).palette)
+  ) {
+    throw new Error("selection stamp expanded into an unbounded wire payload");
+  }
+  const command: EditorCommand = {
+    commandId: "inline-stamp-1",
+    commandType: "raster.tileStamp",
+    schemaVersion: 1,
+    projectId: initial.projectId,
+    assetId: initial.activeAssetId,
+    actorId: "inline-stamp-actor",
+    clientId: "inline-stamp-client",
+    clientSequence: 1,
+    baseStructureEpoch: initial.structureEpoch,
+    createdAtMonotonicMs: 1,
+    payload,
+  };
+  const local = await new EditorCore(initial).execute(command);
+  if (!local.ok) {
+    throw new Error(
+      `inline stamp failed: ${local.diagnostics.map((item) => item.code).join(",")}`,
+    );
+  }
+  const resultAsset = local.state.assets[initial.activeAssetId];
+  if (
+    resultAsset?.raster.getPixel(32, 0) !== 1 ||
+    resultAsset.raster.getPixel(33, 0) !== 1 ||
+    resultAsset.raster.getPixel(32, 1) !== 2 ||
+    resultAsset.raster.getPixel(33, 1) !== 2 ||
+    resultAsset.raster.getPixel(34, 0) !== 0
+  ) {
+    throw new Error("inline selection stamp did not reproduce its indexed runs");
+  }
+  const operationPayload = local.result.operation.payload as Record<string, unknown>;
+  if (
+    operationPayload.writes !== undefined ||
+    operationPayload.inlineSource === undefined ||
+    operationPayload.stampedCellCount !== 512
+  ) {
+    throw new Error("inline selection stamp operation was not canonical and compact");
+  }
+  const remote = await new EditorCore(initial).execute(command);
+  if (!remote.ok) throw new Error("inline stamp did not replay on a peer");
+  if (
+    canonicalJson(local.state.assets[initial.activeAssetId]?.raster.toUint8Array()) !==
+      canonicalJson(remote.state.assets[initial.activeAssetId]?.raster.toUint8Array())
+  ) {
+    throw new Error("inline selection stamp diverged between peers");
+  }
+  const malformed = await new EditorCore(initial).execute({
+    ...command,
+    commandId: "inline-stamp-malformed",
+    payload: {
+      ...payload,
+      inlineSource: { ...inlineSource, data: "!!!!" },
+    },
+  });
+  if (
+    malformed.ok ||
+    malformed.state !== initial ||
+    !malformed.diagnostics.some((item) => item.code === "RASTER_STAMP_SOURCE_INVALID")
+  ) {
+    throw new Error("malformed inline stamp crossed the commit boundary");
+  }
+});
+
 Deno.test("keeps fill cancellation, malformed commands, and renderer fallback fail-closed", async () => {
   const state = createProject({ projectId: "project-wp110-failures", width: 8, height: 8, tileSize: 32 });
   const fill = {
@@ -342,11 +821,11 @@ Deno.test("keeps fill cancellation, malformed commands, and renderer fallback fa
     clientSequence: 1,
     baseStructureEpoch: 1,
     createdAtMonotonicMs: 1,
-    payload: { seedX: 0, seedY: 0, colorIndex: 1, maxPixels: 64 },
+    payload: { seedX: 0, seedY: 0, colorIndex: 1, maxCells: 64 },
   };
   const cancelled = await new EditorCore(state).execute(fill, { cancelRequested: () => true });
   if (cancelled.ok || !cancelled.diagnostics.some((item) => item.code === "FILL_CANCELLED") || cancelled.state !== state) throw new Error("cancelled fill crossed the commit boundary");
-  const limited = await new EditorCore(state).execute({ ...fill, commandId: "fill-limited", payload: { ...fill.payload, maxPixels: 1 } });
+  const limited = await new EditorCore(state).execute({ ...fill, commandId: "fill-limited", payload: { ...fill.payload, maxCells: 1 } });
   if (limited.ok || !limited.diagnostics.some((item) => item.code === "FILL_PIXEL_LIMIT_EXCEEDED")) throw new Error("fill boundary did not fail closed");
   const malformed = await new EditorCore(state).execute({ ...fill, commandId: "fill-malformed", payload: { ...fill.payload, seedX: 99 } });
   if (malformed.ok || !malformed.diagnostics.some((item) => item.code === "FILL_SEED_X_OUT_OF_BOUNDS")) throw new Error("fill boundary diagnostic missing");
@@ -508,6 +987,146 @@ Deno.test("commits deterministic transforms with affected-tile COW only", async 
   if (a.state.assets[a.state.activeAssetId]?.raster.getPixel(34, 2) !== 1 || a.state.assets[a.state.activeAssetId]?.raster.getPixel(2, 2) !== 0) throw new Error("move transform pixels are incorrect");
   const stale = await commitTransform(a.state, command);
   if (stale.ok || !stale.diagnostics.some((item) => item.code === "STALE_SELECTION_RASTER")) throw new Error("stale transform commit was accepted");
+});
+
+Deno.test("keeps non-rectangular selection transforms compact and rebases remote history", async () => {
+  const initial = createProject({ projectId: "project-wp120-transform-wire", width: 48, height: 32, tileSize: 32 });
+  const seeded = await new EditorCore(initial).execute({
+    commandId: "transform-wire-seed",
+    commandType: "raster.writeSet",
+    schemaVersion: 1,
+    projectId: initial.projectId,
+    assetId: initial.activeAssetId,
+    actorId: "seed-actor",
+    clientId: "seed-client",
+    clientSequence: 1,
+    baseStructureEpoch: initial.structureEpoch,
+    createdAtMonotonicMs: 1,
+    payload: {
+      writes: [
+        { x: 12, y: 12, colorIndex: 1 },
+        { x: 24, y: 18, colorIndex: 2 },
+      ],
+    },
+  });
+  if (!seeded.ok) throw new Error("transform wire seed failed");
+  const asset = seeded.state.assets[seeded.state.activeAssetId];
+  if (asset === undefined) throw new Error("transform wire asset missing");
+  const selectedPoints: { x: number; y: number }[] = [];
+  for (let y = 8; y < 24; y += 1) {
+    for (let x = 8; x < 32; x += 1) {
+      const normalizedX = (x - 19.5) / 12;
+      const normalizedY = (y - 15.5) / 8;
+      if (normalizedX * normalizedX + normalizedY * normalizedY <= 1) {
+        selectedPoints.push({ x, y });
+      }
+    }
+  }
+  const selection: SelectionSnapshot = {
+    selectionId: "ellipse-transform-wire",
+    mask: {
+      kind: "ellipse",
+      regions: [{ x: 8, y: 8, width: 24, height: 16 }],
+      selectionVersion: 1,
+    },
+    scope: {
+      assetId: asset.id,
+      layerId: seeded.state.activeLayerId,
+      frameId: seeded.state.activeFrameId,
+      celId: seeded.state.activeCelId,
+    },
+    sourceRasterRevision: asset.revision,
+    sourceStructureEpoch: seeded.state.structureEpoch,
+    pixels: selectedPoints.map((point) => ({
+      ...point,
+      colorIndex: asset.raster.getPixel(point.x, point.y),
+    })),
+  };
+  const transform: TransformDescriptor = {
+    operation: "MOVE",
+    dx: 8,
+    dy: 0,
+    factor: 1,
+    interpolationPolicy: "NEAREST_NEIGHBOR",
+    outOfBoundsPolicy: "CLIP",
+  };
+  const command = {
+    commandType: "selection.transformCommit" as const,
+    commandId: "ellipse-transform-wire-1",
+    schemaVersion: 1 as const,
+    projectId: seeded.state.projectId,
+    assetId: asset.id,
+    actorId: "transform-actor",
+    clientId: "transform-client",
+    clientSequence: 1,
+    baseStructureEpoch: seeded.state.structureEpoch,
+    createdAtMonotonicMs: 2,
+    payload: { selection, session: createTransformSession(selection, transform, "ellipse-transform-wire-session") },
+  };
+  const local = await commitTransform(seeded.state, command);
+  if (!local.ok) throw new Error(`compact transform commit failed: ${JSON.stringify(local.diagnostics)}`);
+  const wirePayload = local.result.operation.payload as Record<string, unknown>;
+  if ("pixels" in wirePayload || "writes" in wirePayload || typeof wirePayload.selectionMask !== "object") {
+    throw new Error("selection transform operation leaked an unbounded raster array");
+  }
+  if (JSON.stringify(wirePayload).length >= 8_000) {
+    throw new Error("selection transform wire payload exceeded the compact bound");
+  }
+  if (local.result.operation.actorId !== command.actorId || local.result.operation.clientId !== command.clientId || local.result.operation.clientSequence !== command.clientSequence) {
+    throw new Error("selection transform operation identity was not preserved");
+  }
+  const wireCommand: SelectionTransformWireCommand = {
+    commandType: "selection.transformCommit",
+    commandId: local.result.operation.commandId,
+    schemaVersion: 1,
+    projectId: local.result.operation.projectId,
+    assetId: local.result.operation.assetId,
+    actorId: local.result.operation.actorId,
+    clientId: local.result.operation.clientId,
+    clientSequence: local.result.operation.clientSequence,
+    baseStructureEpoch: seeded.state.structureEpoch,
+    createdAtMonotonicMs: 2,
+    payload: wirePayload as unknown as SelectionTransformWireCommand["payload"],
+  };
+  const remote = await applyCompactSelectionTransform(seeded.state, wireCommand);
+  if (!remote.ok) throw new Error(`compact transform remote apply failed: ${JSON.stringify(remote.diagnostics)}`);
+  if (await sha256Hex(remote.state.assets[remote.state.activeAssetId]?.raster.toUint8Array()) !== await sha256Hex(local.state.assets[local.state.activeAssetId]?.raster.toUint8Array())) {
+    throw new Error("compact transform local and remote raster hashes diverged");
+  }
+  if (remote.state.assets[remote.state.activeAssetId]?.raster.getPixel(12, 12) !== 0 || remote.state.assets[remote.state.activeAssetId]?.raster.getPixel(20, 12) !== 1) {
+    throw new Error("compact transform did not move the selected source color");
+  }
+
+  const localHistory = new LocalUndoRedoHistory(seeded.state);
+  const localEdit = await new EditorCore(seeded.state).execute({
+    commandId: "transform-wire-local-edit",
+    commandType: "raster.setPixel",
+    schemaVersion: 1,
+    projectId: seeded.state.projectId,
+    assetId: seeded.state.activeAssetId,
+    actorId: "local-actor",
+    clientId: "local-client",
+    clientSequence: 1,
+    baseStructureEpoch: seeded.state.structureEpoch,
+    createdAtMonotonicMs: 3,
+    payload: { x: 0, y: 0, colorIndex: 3 },
+  });
+  if (!localEdit.ok) throw new Error("transform wire local history edit failed");
+  localHistory.record(seeded.state, localEdit.state, localEdit.result.operation.operationId, localEdit.result.operation.operationType);
+  const appliedAfterLocal = await applyCompactSelectionTransform(localEdit.state, wireCommand);
+  if (!appliedAfterLocal.ok) throw new Error("compact transform local history apply failed");
+  await localHistory.rebaseRemoteSelectionTransformOperation(wireCommand, appliedAfterLocal.state);
+  const undone = localHistory.undo();
+  if (undone === undefined || undone.state.assets[undone.state.activeAssetId]?.raster.getPixel(0, 0) !== 0 || undone.state.assets[undone.state.activeAssetId]?.raster.getPixel(20, 12) !== 1) {
+    throw new Error("selection transform rebase removed the remote edit or kept local edit during undo");
+  }
+  const redone = localHistory.redo();
+  if (redone === undefined || redone.state.assets[redone.state.activeAssetId]?.raster.getPixel(0, 0) !== 3 || redone.state.assets[redone.state.activeAssetId]?.raster.getPixel(20, 12) !== 1) {
+    throw new Error("selection transform rebase did not preserve local redo");
+  }
+  if (redone.state.lastClientSequenceByClient[wireCommand.clientId] !== wireCommand.clientSequence) {
+    throw new Error("selection transform rebase changed the remote client sequence");
+  }
 });
 
 Deno.test("supports PiXiEEDraw-style nearest scale and quarter-turn selection transforms", () => {
@@ -673,4 +1292,74 @@ Deno.test("keeps Timeline virtualization, Onion Skin, Playback, and personal ses
   const playback = resolvePlaybackProjection(state, activeFrameId, 12_345);
   const afterHash = await sha256Hex(state.assets[state.activeAssetId]?.raster.toUint8Array());
   if (playbackAtStart.frameId !== activeFrameId || playback.canonicalMutation !== false || playback.requestFrameIds.length !== 1 || beforeHash !== afterHash) throw new Error("Playback mutated Canonical Raster or ignored the active Frame session");
+});
+
+Deno.test("does not promote raster or palette no-ops to canonical history", async () => {
+  const state = createProject({ projectId: "core-no-op", width: 8, height: 8, tileSize: 32 });
+  const asset = state.assets[state.activeAssetId];
+  if (asset === undefined) throw new Error("no-op asset missing");
+  const core = new EditorCore(state);
+  const raster = await core.execute(setPixel(state.projectId, asset.id, 1, {
+    payload: { x: 0, y: 0, colorIndex: 0 },
+  }));
+  if (!raster.ok || !raster.result.noOp || raster.state !== state || raster.state.appliedCommandIds.length !== 0) throw new Error("same-pixel raster command became canonical");
+  const palette = await core.execute({
+    ...setPixel(state.projectId, asset.id, 1),
+    commandId: "palette-no-op",
+    commandType: "palette.setColor",
+    payload: { paletteIndex: 1, color: asset.palette[1] },
+  } as EditorCommand);
+  if (!palette.ok || !palette.result.noOp || palette.state !== state || palette.state.appliedCommandIds.length !== 0) throw new Error("same-color palette command became canonical");
+});
+
+Deno.test("rebases local undo snapshots without removing a later remote raster edit", async () => {
+  const state = {
+    ...createProject({ projectId: "history-rebase", width: 8, height: 8, tileSize: 32 }),
+    lastClientSequenceByClient: { "remote-client": 4 },
+  };
+  const asset = state.assets[state.activeAssetId];
+  if (asset === undefined) throw new Error("history rebase asset missing");
+  const localCore = new EditorCore(state);
+  const local = await localCore.execute(setPixel(state.projectId, asset.id, 1, {
+    payload: { x: 0, y: 0, colorIndex: 1 },
+  }));
+  if (!local.ok) throw new Error("local history fixture failed");
+  const history = new LocalUndoRedoHistory(state);
+  history.record(state, local.state, local.result.operation.operationId, local.result.operation.operationType);
+  const remote = setPixel(state.projectId, asset.id, 1, {
+    commandId: "remote-raster-1",
+    actorId: "remote-actor",
+    clientId: "remote-client",
+    clientSequence: 5,
+    payload: { x: 1, y: 0, colorIndex: 2 },
+  });
+  const remoteResult = await new EditorCore(local.state).execute(remote);
+  if (!remoteResult.ok) throw new Error("remote history fixture failed");
+  await history.rebaseRemoteRasterOperation(remote, remoteResult.state);
+  const undone = history.undo();
+  if (undone === undefined) throw new Error("rebased local history disappeared");
+  const undoneAsset = undone.state.assets[asset.id];
+  if (undoneAsset?.raster.getPixel(0, 0) !== 0 || undoneAsset.raster.getPixel(1, 0) !== 2) {
+    throw new Error("Undo removed a later remote raster edit");
+  }
+  const redone = history.redo();
+  if (redone === undefined) throw new Error("rebased local redo disappeared");
+  const redoneAsset = redone.state.assets[asset.id];
+  if (redoneAsset?.raster.getPixel(0, 0) !== 1 || redoneAsset.raster.getPixel(1, 0) !== 2) {
+    throw new Error("Redo failed to preserve the remote raster edit");
+  }
+  if (redone.state.lastClientSequenceByClient["remote-client"] !== 5) {
+    throw new Error("Undo/Redo changed the remote client sequence");
+  }
+  const nextRemote = setPixel(state.projectId, asset.id, 6, {
+    commandId: "remote-raster-2",
+    actorId: "remote-actor",
+    clientId: "remote-client",
+    clientSequence: 6,
+    payload: { x: 2, y: 0, colorIndex: 3 },
+  });
+  const nextRemoteResult = await new EditorCore(redone.state).execute(nextRemote);
+  if (!nextRemoteResult.ok || nextRemoteResult.state.assets[asset.id]?.raster.getPixel(2, 0) !== 3) {
+    throw new Error("The next remote raster operation was rejected after Undo/Redo");
+  }
 });

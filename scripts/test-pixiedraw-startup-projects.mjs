@@ -97,6 +97,9 @@ assert.match(app, /startupReady = true;[\s\S]{0,350}scheduleLegacyProjectReopenN
 assert.match(app, /timelineMatrixViewportPan = \{[\s\S]{0,120}startedOnControl: false/);
 assert.match(await read('pixiedraw\/assets\/js\/modules\/timeline-layers.js'), /activationThreshold[\s\S]{0,220}startedOnControl/);
 assert.match(startup, /startupWorkspaceSearchQuery/);
+assert.match(startup, /STARTUP_WORKSPACE_INITIAL_RENDER_LIMIT = 60/);
+assert.match(startup, /workspaceProjectMore/);
+assert.match(css, /\.startup-workspace__load-more\s*\{/);
 assert.match(startup, /joinPiXiSyncFromStartupWorkspace\(inviteToken\)/);
 assert.match(app, /runSafeProjectJoin\([\s\S]{0,2200}createNewProject\([\s\S]{0,900}initializePiXiSyncRuntime\(\)/);
 assert.match(app, /restoreProject:[\s\S]{0,500}openRecentProject\(entry,[\s\S]{0,300}replaceOpenProjectTabs: true/);

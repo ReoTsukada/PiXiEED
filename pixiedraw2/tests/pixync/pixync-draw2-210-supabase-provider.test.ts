@@ -21,6 +21,9 @@ import {
 import type {
   PixyncAuthoritativeOperationEvent,
   PixyncTransportBinding,
+  PixyncTransportPresence,
+  PixyncTransportPresenceDraft,
+  PixyncTransportPresenceEvent,
   PixyncTransportProviderOpenInput,
   PixyncTransportStatus,
 } from "../../src/pixync/transport.ts";
@@ -119,6 +122,14 @@ async function ackRow(
 
 class FakeChannel implements PixyncSupabaseRealtimeChannelPort {
   callback: ((payload: unknown) => void) | undefined;
+  readonly presenceCallbacks = new Map<
+    "sync" | "join" | "leave",
+    (payload: unknown) => void
+  >();
+  presenceStateValue: Record<string, readonly PixyncTransportPresence[]> = {};
+  readonly trackedPresence: PixyncTransportPresence[] = [];
+  presenceUntracked = false;
+  statusCallback: ((status: string, error?: unknown) => void) | undefined;
   subscribed = false;
   unsubscribed = false;
   subscribeError: unknown | null = null;
@@ -132,9 +143,38 @@ class FakeChannel implements PixyncSupabaseRealtimeChannelPort {
     return this;
   }
 
-  async subscribe(): Promise<PixyncSupabasePortResult<null> | void> {
-    if (this.subscribeError !== null) return result(null, this.subscribeError);
+  onPresence(
+    event: "sync" | "join" | "leave",
+    callback: (payload: unknown) => void,
+  ): PixyncSupabaseRealtimeChannelPort {
+    this.presenceCallbacks.set(event, callback);
+    return this;
+  }
+
+  presenceState(): unknown {
+    return this.presenceStateValue;
+  }
+
+  track(presence: PixyncTransportPresence): PixyncSupabasePortResult<null> {
+    this.trackedPresence.push(presence);
+    return result(null);
+  }
+
+  untrack(): PixyncSupabasePortResult<null> {
+    this.presenceUntracked = true;
+    return result(null);
+  }
+
+  async subscribe(
+    onStatus?: (status: string, error?: unknown) => void,
+  ): Promise<PixyncSupabasePortResult<null> | void> {
+    this.statusCallback = onStatus;
+    if (this.subscribeError !== null) {
+      onStatus?.("CHANNEL_ERROR", this.subscribeError);
+      return result(null, this.subscribeError);
+    }
     this.subscribed = true;
+    onStatus?.("SUBSCRIBED");
   }
 
   unsubscribe(): Promise<PixyncSupabasePortResult<null> | void> {
@@ -144,6 +184,17 @@ class FakeChannel implements PixyncSupabaseRealtimeChannelPort {
 
   emit(payload: unknown): void {
     this.callback?.(payload);
+  }
+
+  emitStatus(status: string, error?: unknown): void {
+    this.statusCallback?.(status, error);
+  }
+
+  emitPresence(
+    event: "sync" | "join" | "leave",
+    payload: unknown,
+  ): void {
+    this.presenceCallbacks.get(event)?.(payload);
   }
 }
 
@@ -217,6 +268,8 @@ async function openProvider(
       event: PixyncAuthoritativeOperationEvent,
     ) => void | Promise<void>;
     onHint: () => void;
+    onPresence: (event: PixyncTransportPresenceEvent) => void | Promise<void>;
+    presence: PixyncTransportPresenceDraft;
     onStatus: (status: PixyncTransportStatus) => void;
   }> = {},
 ) {
@@ -227,6 +280,10 @@ async function openProvider(
     sessionGeneration: options.sessionGeneration ?? 0,
     onAuthoritativeOperation: options.onOperation ?? (() => {}),
     onBroadcastHint: options.onHint ?? (() => {}),
+    ...(options.onPresence === undefined
+      ? {}
+      : { onPresence: options.onPresence }),
+    ...(options.presence === undefined ? {} : { presence: options.presence }),
     onStatus: options.onStatus ?? ((status) => statuses.push(status)),
   };
   const provider = new PixyncSupabaseProvider({ port });
@@ -319,6 +376,90 @@ Deno.test("PIXYNC-DRAW2-210 Realtime payload is ignored and stale callbacks are 
   assert.equal(hints, 1);
   assert.equal(operations, 0);
   assert.equal(port.channels[0]?.unsubscribed, true);
+});
+
+Deno.test("PIXYNC-DRAW2-210 Presence is bounded, identity-bound, and ephemeral", async () => {
+  const port = new FakeSupabaseLikePort();
+  const events: PixyncTransportPresenceEvent[] = [];
+  const opened = await openProvider(port, {
+    presence: {
+      displayName: "This tab",
+      mode: "iDRAW",
+      selectionLabel: "Canvas",
+    },
+    onPresence: (event) => {
+      events.push(event);
+    },
+  });
+  const channel = port.channels[0];
+  assert.ok(channel);
+  assert.equal(channel.trackedPresence.length, 1);
+  assert.deepEqual(
+    channel.trackedPresence[0],
+    {
+      actorId: ACTOR,
+      clientId: CLIENT,
+      displayName: "This tab",
+      mode: "iDRAW",
+      selectionLabel: "Canvas",
+      updatedAt: channel.trackedPresence[0]?.updatedAt,
+    },
+  );
+  assert.equal(
+    Number.isFinite(Date.parse(channel.trackedPresence[0]?.updatedAt ?? "")),
+    true,
+  );
+
+  const peer: PixyncTransportPresence = {
+    actorId: ACTOR_B,
+    clientId: "client-peer",
+    displayName: "Peer",
+    mode: "iGAME",
+    selectionLabel: "Scene",
+    updatedAt: "2026-08-28T00:00:00.000Z",
+  };
+  channel.presenceStateValue = {
+    peer: [peer, { ...peer, clientId: "", selectionLabel: "forged" }],
+  };
+  channel.emitPresence("sync", {});
+  assert.deepEqual(events, [{ kind: "sync", presence: [peer] }]);
+
+  channel.emitPresence("join", { newPresences: [peer] });
+  assert.deepEqual(events.at(-1), { kind: "upsert", presence: peer });
+  channel.emitPresence("leave", { leftPresences: [peer] });
+  assert.deepEqual(events.at(-1), { kind: "remove", clientId: peer.clientId });
+
+  await opened.connection.publishPresence?.({
+    displayName: "This tab",
+    mode: "iAUDIO",
+    selectionLabel: "BGM",
+  });
+  assert.equal(channel.trackedPresence.length, 2);
+  assert.equal(channel.trackedPresence[1]?.actorId, ACTOR);
+  assert.equal(channel.trackedPresence[1]?.clientId, CLIENT);
+  assert.equal(channel.trackedPresence[1]?.mode, "iAUDIO");
+  await opened.connection.close("presence-test");
+  assert.equal(channel.presenceUntracked, true);
+  channel.emitPresence("join", { newPresences: [peer] });
+  assert.equal(events.length, 3);
+});
+
+Deno.test("PIXYNC-DRAW2-210 Realtime status changes expose reconnect and offline states", async () => {
+  const port = new FakeSupabaseLikePort();
+  const opened = await openProvider(port);
+  const channel = port.channels[0];
+  assert.ok(channel);
+  channel.emitStatus("CHANNEL_ERROR", new Error("temporary channel error"));
+  channel.emitStatus("SUBSCRIBED");
+  channel.emitStatus("CLOSED");
+  assert.deepEqual(opened.statuses, [
+    "CONNECTING",
+    "SUBSCRIBED",
+    "RECONNECTING",
+    "SUBSCRIBED",
+    "OFFLINE",
+  ]);
+  await opened.connection.close("status-test");
 });
 
 Deno.test("PIXYNC-DRAW2-210 RPC errors never become successful operations", async () => {

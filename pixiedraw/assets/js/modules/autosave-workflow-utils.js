@@ -602,12 +602,18 @@
       autosaveDirty = false;
       markDocumentDurablySaved();
       pruneInactiveCanvasDirectCaches?.();
+      const cleanupPending = savedEntry.cleanupPending === true;
       updateAutosaveStatus(
-        localizeText(
-          '自動保存: 端末内へ保存済み（完全ファイルは手動保存できます）',
-          'Autosave: saved to on-device V2 storage (complete file can be saved manually)'
-        ),
-        'success'
+        cleanupPending
+          ? localizeText(
+              '自動保存: 内容は保存済み（古い履歴の整理が保留中です）',
+              'Autosave: document saved (old history cleanup is pending)'
+            )
+          : localizeText(
+              '自動保存: 端末内へ保存済み（完全ファイルは手動保存できます）',
+              'Autosave: saved to on-device V2 storage (complete file can be saved manually)'
+            ),
+        cleanupPending ? 'warn' : 'success'
       );
       return true;
     } finally {

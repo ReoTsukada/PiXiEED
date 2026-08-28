@@ -166,7 +166,7 @@ export const DRAW2_SHORTCUTS: readonly Draw2Shortcut[] = [
     id: "tool-tile-stamp",
     version: 1,
     category: "Tools",
-    label: "Tile stamp",
+    label: "Tile placement",
     keys: "T",
     command: "tool-tile-stamp",
   },

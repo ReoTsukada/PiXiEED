@@ -8,6 +8,10 @@
 
 import {
   cloneProjectStateShared,
+  createRasterSelectionMask,
+  decodeRasterSelectionMask,
+  EditorCore,
+  type EditorCommand,
   sha256Hex,
   type CanonicalOperation,
   type CommandResult,
@@ -22,6 +26,7 @@ import {
   type PixelPoint,
   type RasterAsset,
   type RasterMemoryMetrics,
+  type RasterSelectionMask,
 } from "./draw2-core.ts";
 
 export type SelectionShapeKind = "rectangle" | "ellipse" | "freehand" | "magic" | "alpha" | "multi-region";
@@ -149,6 +154,31 @@ export interface SelectionTransformCommand {
   readonly payload: { readonly selection: SelectionSnapshot; readonly session: TransformSession };
 }
 
+/**
+ * Wire-safe selection transform payload.  The selected colors are resolved
+ * from the receiving peer's canonical raster; the wire carries only the
+ * deterministic selection mask, scope, and transform descriptor.
+ */
+export interface SelectionTransformWirePayload {
+  readonly selectionId: string;
+  readonly selectionVersion: number;
+  readonly selectionKind: SelectionShapeKind;
+  readonly selectionBounds: SelectionRegion;
+  readonly scope: SelectionScope;
+  readonly sourceRasterRevision: number;
+  readonly sourceStructureEpoch: number;
+  readonly selectionMask: RasterSelectionMask;
+  readonly transform: TransformDescriptor;
+  readonly sourceCount: number;
+  readonly destinationCount: number;
+  readonly outOfBoundsClipped: boolean;
+}
+
+export interface SelectionTransformWireCommand
+  extends Omit<SelectionTransformCommand, "payload"> {
+  readonly payload: SelectionTransformWirePayload;
+}
+
 export interface ClipboardCopyCommand {
   readonly commandType: "clipboard.copy";
   readonly commandId: string;
@@ -205,6 +235,19 @@ export interface HistoryEntry {
   readonly after: ProjectState;
 }
 
+/**
+ * A Draw2 history entry owns a full structural snapshot (with shared raster
+ * tiles). Keeping the in-memory stack unbounded makes a long painting session
+ * grow without a recovery boundary, even though the persisted history is
+ * already truncated. The recent tail is the useful undo window for the local
+ * editor; PiXYNC history remains a separate authority.
+ */
+export const DRAW2_LIVE_HISTORY_LIMIT = 128 as const;
+
+export interface LocalUndoRedoHistoryOptions {
+  readonly maxEntries?: number;
+}
+
 export interface HistoryResult {
   readonly state: ProjectState;
   readonly actionId: string;
@@ -216,11 +259,28 @@ export interface HistoryResult {
 const MAX_SELECTION_PIXELS = 1_048_576;
 const MAX_CLIPBOARD_DIMENSION = 4096;
 
+interface SelectionOperationIdentity {
+  readonly actorId: string;
+  readonly clientId: string;
+  readonly clientSequence?: number;
+}
+
+const DEFAULT_SELECTION_OPERATION_IDENTITY: SelectionOperationIdentity = {
+  actorId: "draw2-selection-local",
+  clientId: "draw2-selection-local",
+};
+
 function error(code: string, message: string, path?: string): Diagnostic {
   return path === undefined ? { code, severity: "error", message } : { code, severity: "error", message, path };
 }
 
 function isInteger(value: number): boolean { return Number.isSafeInteger(value); }
+
+function isSelectionShapeKind(value: unknown): value is SelectionShapeKind {
+  return value === "rectangle" || value === "ellipse" ||
+    value === "freehand" || value === "magic" || value === "alpha" ||
+    value === "multi-region";
+}
 
 function boundsFromRegions(regions: readonly SelectionRegion[]): SelectionRegion {
   if (regions.length === 0) throw new Error("Selection requires at least one region.");
@@ -501,6 +561,32 @@ function changedRegions(assetId: string, points: readonly PixelPoint[]): readonl
   return region === undefined ? [] : [{ assetId, ...region }];
 }
 
+export function createSelectionTransformWirePayload(
+  snapshot: SelectionSnapshot,
+  transform: TransformDescriptor,
+  destinationCount: number,
+  outOfBoundsClipped: boolean,
+): SelectionTransformWirePayload {
+  const selectionMask = createRasterSelectionMask(snapshot.pixels);
+  if (selectionMask === undefined) {
+    throw new Error("Selection transform requires a non-empty selection mask.");
+  }
+  return {
+    selectionId: snapshot.selectionId,
+    selectionVersion: snapshot.mask.selectionVersion,
+    selectionKind: snapshot.mask.kind,
+    selectionBounds: boundsFromRegions(snapshot.mask.regions),
+    scope: snapshot.scope,
+    sourceRasterRevision: snapshot.sourceRasterRevision,
+    sourceStructureEpoch: snapshot.sourceStructureEpoch,
+    selectionMask,
+    transform,
+    sourceCount: snapshot.pixels.length,
+    destinationCount,
+    outOfBoundsClipped,
+  };
+}
+
 async function buildResult(
   state: ProjectState,
   commandId: string,
@@ -511,6 +597,8 @@ async function buildResult(
   dirtyRegions: readonly DirtyRegion[],
   copiedBytes: number,
   cowSplitCount: number,
+  noOp = false,
+  identity: SelectionOperationIdentity = DEFAULT_SELECTION_OPERATION_IDENTITY,
 ): Promise<CommandResult> {
   const operationBody = {
     operationType,
@@ -518,9 +606,10 @@ async function buildResult(
     commandId,
     projectId: state.projectId,
     assetId: asset.id,
-    actorId: "draw2-selection-local",
-    clientId: "draw2-selection-local",
-    clientSequence: state.lastClientSequenceByClient["draw2-selection-local"] ?? 0,
+    actorId: identity.actorId,
+    clientId: identity.clientId,
+    clientSequence: identity.clientSequence ??
+      state.lastClientSequenceByClient[identity.clientId] ?? 0,
     structureEpoch: state.structureEpoch,
     payload: operationPayload,
   };
@@ -528,6 +617,7 @@ async function buildResult(
   const points = dirtyRegions.flatMap((region) => [{ x: region.x, y: region.y }, { x: region.x + region.width - 1, y: region.y + region.height - 1 }]);
   return {
     operation,
+    noOp,
     metricScope: "COMMAND_TO_DIRTY" satisfies Draw2MetricScope,
     dirtyTiles: [...dirtyTiles.values()].sort((left, right) => left.tileKey.localeCompare(right.tileKey)),
     dirtyRegions,
@@ -543,7 +633,21 @@ async function canonicalOperationId(value: unknown): Promise<string> {
   return (await sha256Hex(value)).slice(0, 32);
 }
 
-function applyPixelMutations(state: ProjectState, assetId: string, sourcePixels: readonly SelectionPixel[], destinationPixels: readonly SelectionPixel[], clearSource: boolean): { state: ProjectState; asset: RasterAsset; dirtyTiles: Map<string, DirtyTile>; dirtyPoints: PixelPoint[]; copiedBytes: number; cowSplitCount: number } {
+function applyPixelMutations(
+  state: ProjectState,
+  assetId: string,
+  sourcePixels: readonly SelectionPixel[],
+  destinationPixels: readonly SelectionPixel[],
+  clearSource: boolean,
+): {
+  state: ProjectState;
+  asset: RasterAsset;
+  dirtyTiles: Map<string, DirtyTile>;
+  dirtyPoints: PixelPoint[];
+  copiedBytes: number;
+  cowSplitCount: number;
+  changed: boolean;
+} {
   const nextState = cloneProjectStateShared(state);
   const asset = nextState.assets[assetId];
   if (asset === undefined) throw new Error("Selection target asset is missing.");
@@ -561,15 +665,62 @@ function applyPixelMutations(state: ProjectState, assetId: string, sourcePixels:
   };
   if (clearSource) for (const pixel of sourcePixels) mutate(pixel, 0);
   for (const pixel of destinationPixels) mutate(pixel, pixel.colorIndex);
-  const nextAsset = { ...asset, revision: asset.revision + (dirtyTiles.size > 0 ? 1 : 0) };
+  const uniqueDirtyPoints = new Map(
+    dirtyPoints.map((point) => [`${point.x}:${point.y}`, point]),
+  );
+  const effectiveDirtyPoints = [...uniqueDirtyPoints.values()].filter((point) =>
+    state.assets[assetId]?.raster.getPixel(point.x, point.y) !==
+      asset.raster.getPixel(point.x, point.y)
+  );
+  if (effectiveDirtyPoints.length === 0) {
+    const originalAsset = state.assets[assetId];
+    if (originalAsset === undefined) throw new Error("Selection target asset is missing.");
+    return {
+      state,
+      asset: originalAsset,
+      dirtyTiles: new Map(),
+      dirtyPoints: [],
+      copiedBytes: 0,
+      cowSplitCount: 0,
+      changed: false,
+    };
+  }
+  const effectiveTileKeys = new Set(
+    effectiveDirtyPoints.map((point) =>
+      `${Math.floor(point.x / asset.raster.tileSize)}:${Math.floor(point.y / asset.raster.tileSize)}`
+    ),
+  );
+  const effectiveDirtyTiles = new Map(
+    [...dirtyTiles].filter(([tileKey]) => effectiveTileKeys.has(tileKey)),
+  );
+  const nextAsset = { ...asset, revision: asset.revision + 1 };
   nextState.assets = { ...nextState.assets, [assetId]: nextAsset };
-  return { state: nextState, asset: nextAsset, dirtyTiles, dirtyPoints, copiedBytes, cowSplitCount };
+  return {
+    state: nextState,
+    asset: nextAsset,
+    dirtyTiles: effectiveDirtyTiles,
+    dirtyPoints: effectiveDirtyPoints,
+    copiedBytes,
+    cowSplitCount,
+    changed: true,
+  };
 }
 
-function commitState(state: ProjectState, commandId: string): ProjectState {
+function commitState(
+  state: ProjectState,
+  commandId: string,
+  identity: SelectionOperationIdentity = DEFAULT_SELECTION_OPERATION_IDENTITY,
+): ProjectState {
   const next = cloneProjectStateShared(state);
   next.appliedCommandIds = [...next.appliedCommandIds, commandId];
-  next.lastClientSequenceByClient = { ...next.lastClientSequenceByClient, ["draw2-selection-local"]: (next.lastClientSequenceByClient["draw2-selection-local"] ?? 0) + 1 };
+  const previousSequence = next.lastClientSequenceByClient[identity.clientId] ?? 0;
+  const nextSequence = identity.clientSequence === undefined
+    ? previousSequence + 1
+    : Math.max(previousSequence + 1, identity.clientSequence);
+  next.lastClientSequenceByClient = {
+    ...next.lastClientSequenceByClient,
+    [identity.clientId]: nextSequence,
+  };
   return next;
 }
 
@@ -584,14 +735,222 @@ export async function commitTransform(state: ProjectState, command: SelectionTra
   const outOfBounds = transformed.some((pixel) => pixel.x < 0 || pixel.y < 0 || pixel.x >= asset.width || pixel.y >= asset.height);
   if (outOfBounds && command.payload.session.transform.outOfBoundsPolicy === "CANCEL") return { ok: false, state, diagnostics: [error("TRANSFORM_OUT_OF_BOUNDS", "Transform destination is outside the raster and policy is CANCEL.")] };
   const clipped = transformed.filter((pixel) => pixel.x >= 0 && pixel.y >= 0 && pixel.x < asset.width && pixel.y < asset.height);
+  const transform = command.payload.session.transform;
+  const identityTransform = transform.operation === "MOVE" &&
+    transform.dx === 0 && transform.dy === 0;
+  if (identityTransform) {
+    const result = await buildResult(
+      state,
+      command.commandId,
+      "selection.transformCommit",
+      createSelectionTransformWirePayload(
+        command.payload.selection,
+        transform,
+        clipped.length,
+        false,
+      ),
+      asset,
+      new Map(),
+      [],
+      0,
+      0,
+      true,
+      command,
+    );
+    return { ok: true, state, result };
+  }
   const mutation = applyPixelMutations(state, command.assetId, command.payload.selection.pixels, clipped, true);
   const sourcePoints = command.payload.selection.pixels;
   const destinationPoints = clipped;
-  const dirtyRegions = [...changedRegions(asset.id, sourcePoints), ...changedRegions(asset.id, destinationPoints)];
-  const operationPayload = { selectionId: command.payload.selection.selectionId, selectionVersion: command.payload.selection.mask.selectionVersion, transform: command.payload.session.transform, sourcePixelCount: sourcePoints.length, destinationPixelCount: destinationPoints.length, outOfBoundsClipped: outOfBounds && command.payload.session.transform.outOfBoundsPolicy === "CLIP" };
-  const temporaryResult = await buildResult(mutation.state, command.commandId, "selection.transformCommit", operationPayload, mutation.asset, mutation.dirtyTiles, dirtyRegions, mutation.copiedBytes, mutation.cowSplitCount);
-  const nextState = commitState(mutation.state, command.commandId);
-  return { ok: true, state: nextState, result: { ...temporaryResult, operation: { ...temporaryResult.operation, clientSequence: nextState.lastClientSequenceByClient["draw2-selection-local"] ?? 0 } } };
+  const dirtyRegions = changedRegions(asset.id, mutation.dirtyPoints);
+  const operationPayload = createSelectionTransformWirePayload(
+    command.payload.selection,
+    command.payload.session.transform,
+    destinationPoints.length,
+    outOfBounds && command.payload.session.transform.outOfBoundsPolicy === "CLIP",
+  );
+  const temporaryResult = await buildResult(
+    mutation.state,
+    command.commandId,
+    "selection.transformCommit",
+    operationPayload,
+    mutation.asset,
+    mutation.dirtyTiles,
+    dirtyRegions,
+    mutation.copiedBytes,
+    mutation.cowSplitCount,
+    !mutation.changed,
+    command,
+  );
+  if (!mutation.changed) return { ok: true, state, result: temporaryResult };
+  const nextState = commitState(mutation.state, command.commandId, command);
+  return {
+    ok: true,
+    state: nextState,
+    result: {
+      ...temporaryResult,
+      operation: {
+        ...temporaryResult.operation,
+        clientSequence: nextState.lastClientSequenceByClient[command.clientId] ??
+          command.clientSequence,
+      },
+    },
+  };
+}
+
+function wireSelectionPixels(
+  asset: RasterAsset,
+  mask: ReturnType<typeof decodeRasterSelectionMask>,
+): SelectionPixel[] {
+  const pixels: SelectionPixel[] = [];
+  for (const row of mask.rows) {
+    for (const span of row.spans) {
+      for (let offset = 0; offset < span.width; offset += 1) {
+        // Decoded rows/spans already contain absolute raster coordinates.
+        const x = span.x + offset;
+        const y = row.y;
+        pixels.push({ x, y, colorIndex: asset.raster.getPixel(x, y) });
+      }
+    }
+  }
+  return pixels;
+}
+
+/** Applies the compact selection-transform form received from PiXYNC. */
+export async function applyCompactSelectionTransform(
+  state: ProjectState,
+  command: SelectionTransformWireCommand,
+): Promise<SelectionExecutionResult> {
+  const asset = state.assets[command.assetId];
+  if (asset === undefined) {
+    return {
+      ok: false,
+      state,
+      diagnostics: [error("TRANSFORM_ASSET_NOT_FOUND", "Transform asset was not found.")],
+    };
+  }
+  const payload = command.payload;
+  const diagnostics: Diagnostic[] = [];
+  if (command.projectId !== state.projectId) {
+    diagnostics.push(error("TRANSFORM_COMMAND_SCOPE_INVALID", "Transform command project is stale or mismatched.", "projectId"));
+  }
+  if (command.assetId !== payload.scope?.assetId) {
+    diagnostics.push(error("TRANSFORM_COMMAND_SCOPE_INVALID", "Transform command asset does not match the selection scope.", "scope.assetId"));
+  }
+  if (command.baseStructureEpoch !== state.structureEpoch) {
+    diagnostics.push(error("TRANSFORM_COMMAND_SCOPE_INVALID", "Transform command structure epoch is stale or mismatched.", "baseStructureEpoch"));
+  }
+  if (state.appliedCommandIds.includes(command.commandId)) {
+    diagnostics.push(error("TRANSFORM_DUPLICATE_COMMAND", "Transform command was already applied.", "commandId"));
+  }
+  if (typeof payload.selectionId !== "string" || payload.selectionId.length < 1 || payload.selectionId.length > 128) {
+    diagnostics.push(error("SELECTION_ID_INVALID", "Selection ID must be a bounded non-empty string.", "selectionId"));
+  }
+  if (!isInteger(payload.selectionVersion) || payload.selectionVersion < 1) {
+    diagnostics.push(error("SELECTION_VERSION_INVALID", "Selection version must be positive.", "selectionVersion"));
+  }
+  if (!isSelectionShapeKind(payload.selectionKind)) {
+    diagnostics.push(error("SELECTION_KIND_INVALID", "Selection kind is unsupported.", "selectionKind"));
+  }
+  if (!isInteger(payload.sourceRasterRevision) || payload.sourceRasterRevision < 0) {
+    diagnostics.push(error("STALE_SELECTION_RASTER", "Selection source raster revision is invalid.", "sourceRasterRevision"));
+  }
+  if (!isInteger(payload.sourceStructureEpoch) || payload.sourceStructureEpoch !== command.baseStructureEpoch) {
+    diagnostics.push(error("STALE_SELECTION_STRUCTURE", "Selection source structure epoch is stale.", "sourceStructureEpoch"));
+  }
+  if (!isInteger(payload.sourceCount) || payload.sourceCount < 1 || payload.sourceCount > MAX_SELECTION_PIXELS) {
+    diagnostics.push(error("SELECTION_PIXEL_LIMIT_EXCEEDED", "Selection source count is outside its bounded limit.", "sourceCount"));
+  }
+  if (!isInteger(payload.destinationCount) || payload.destinationCount < 0 || payload.destinationCount > MAX_SELECTION_PIXELS) {
+    diagnostics.push(error("TRANSFORM_PIXEL_LIMIT_EXCEEDED", "Transform destination count is outside its bounded limit.", "destinationCount"));
+  }
+  if (typeof payload.outOfBoundsClipped !== "boolean") {
+    diagnostics.push(error("TRANSFORM_METADATA_INVALID", "Transform clipping metadata must be boolean.", "outOfBoundsClipped"));
+  }
+
+  const scope = payload.scope;
+  const validScope = scope !== null && typeof scope === "object" && !Array.isArray(scope);
+  if (!validScope) {
+    diagnostics.push(error("SELECTION_SCOPE_INVALID", "Selection scope is required.", "scope"));
+  } else {
+    diagnostics.push(...validateStructureScope(state, scope, command.assetId));
+  }
+
+  const selectionBounds = payload.selectionBounds;
+  const validBounds = selectionBounds !== null && typeof selectionBounds === "object" && !Array.isArray(selectionBounds);
+  if (!validBounds) {
+    diagnostics.push(error("SELECTION_REGION_INVALID", "Selection bounds are required.", "selectionBounds"));
+  } else {
+    diagnostics.push(...validateRegion(asset, selectionBounds, "selectionBounds"));
+    if (selectionBounds.width * selectionBounds.height > MAX_SELECTION_PIXELS) {
+      diagnostics.push(error("TRANSFORM_PIXEL_LIMIT_EXCEEDED", "Selection bounds exceed the bounded pixel limit.", "selectionBounds"));
+    }
+  }
+
+  let decodedMask: ReturnType<typeof decodeRasterSelectionMask> | undefined;
+  try {
+    decodedMask = decodeRasterSelectionMask(payload.selectionMask);
+  } catch (cause) {
+    diagnostics.push(error(
+      "RASTER_SELECTION_MASK_INVALID",
+      cause instanceof Error ? cause.message : "Selection mask is invalid.",
+      "selectionMask",
+    ));
+  }
+  if (decodedMask !== undefined) {
+    if (decodedMask.selectedCount > MAX_SELECTION_PIXELS) {
+      diagnostics.push(error("SELECTION_PIXEL_LIMIT_EXCEEDED", "Selection mask exceeds the bounded pixel limit.", "selectionMask.selectedCount"));
+    }
+    if (decodedMask.x + decodedMask.width > asset.width || decodedMask.y + decodedMask.height > asset.height) {
+      diagnostics.push(error("SELECTION_OUTSIDE_BOUNDS", "Selection mask is outside the raster.", "selectionMask"));
+    }
+    if (validBounds && (
+      decodedMask.x < selectionBounds.x || decodedMask.y < selectionBounds.y ||
+      decodedMask.x + decodedMask.width > selectionBounds.x + selectionBounds.width ||
+      decodedMask.y + decodedMask.height > selectionBounds.y + selectionBounds.height
+    )) {
+      diagnostics.push(error("SELECTION_MASK_SCOPE_INVALID", "Selection mask is outside the declared selection bounds.", "selectionMask"));
+    }
+    if (isInteger(payload.sourceCount) && payload.sourceCount !== decodedMask.selectedCount) {
+      diagnostics.push(error("TRANSFORM_METADATA_INVALID", "Selection source count does not match the selection mask.", "sourceCount"));
+    }
+  }
+  const transform = payload.transform;
+  const validTransform = transform !== null && typeof transform === "object" && !Array.isArray(transform);
+  if (!validTransform) {
+    diagnostics.push(error("TRANSFORM_INVALID", "Transform descriptor is required.", "transform"));
+  } else {
+    diagnostics.push(...validateTransform(transform));
+  }
+  if (diagnostics.length > 0 || decodedMask === undefined || !validScope || !validBounds || !validTransform) {
+    return { ok: false, state, diagnostics };
+  }
+
+  const selection: SelectionSnapshot = {
+    selectionId: payload.selectionId,
+    mask: {
+      kind: payload.selectionKind,
+      regions: [selectionBounds],
+      selectionVersion: payload.selectionVersion,
+    },
+    scope,
+    // The source revision is intentionally rebound to this peer's current
+    // raster. The operation is ordered by PiXYNC; the wire never transports
+    // an unbounded color array, so selected colors come from this canonical
+    // raster immediately before the ordered transform is applied.
+    sourceRasterRevision: asset.revision,
+    sourceStructureEpoch: state.structureEpoch,
+    pixels: wireSelectionPixels(asset, decodedMask),
+  };
+  const session = createTransformSession(
+    selection,
+    transform,
+    `remote-transform-${command.commandId}`,
+  );
+  return commitTransform(state, {
+    ...command,
+    payload: { selection, session },
+  });
 }
 
 export async function copyClipboard(state: ProjectState, command: ClipboardCopyCommand): Promise<SelectionExecutionResult> {
@@ -613,8 +972,9 @@ export async function cutClipboard(state: ProjectState, command: ClipboardCutCom
   const diagnostics = [...validateClipboard(command.payload.clipboard, asset), ...validateSnapshot(state, asset, command.payload.selection)];
   if (diagnostics.length > 0) return { ok: false, state, diagnostics };
   const mutation = applyPixelMutations(state, command.assetId, command.payload.selection.pixels, [], true);
-  const dirtyRegions = changedRegions(asset.id, command.payload.selection.pixels);
-  const result = await buildResult(mutation.state, command.commandId, "clipboard.cut", { format: command.payload.clipboard.format, version: 1, pixelCount: command.payload.clipboard.pixels.length }, mutation.asset, mutation.dirtyTiles, dirtyRegions, mutation.copiedBytes, mutation.cowSplitCount);
+  const dirtyRegions = changedRegions(asset.id, mutation.dirtyPoints);
+  const result = await buildResult(mutation.state, command.commandId, "clipboard.cut", { format: command.payload.clipboard.format, version: 1, pixelCount: command.payload.clipboard.pixels.length }, mutation.asset, mutation.dirtyTiles, dirtyRegions, mutation.copiedBytes, mutation.cowSplitCount, !mutation.changed);
+  if (!mutation.changed) return { ok: true, state, result, clipboard: command.payload.clipboard };
   const nextState = commitState(mutation.state, command.commandId);
   return { ok: true, state: nextState, result: { ...result, operation: { ...result.operation, clientSequence: nextState.lastClientSequenceByClient["draw2-selection-local"] ?? 0 } }, clipboard: command.payload.clipboard };
 }
@@ -644,7 +1004,8 @@ export async function pasteClipboard(state: ProjectState, command: ClipboardPast
   if (outOfBounds && command.payload.session.transform.outOfBoundsPolicy === "CANCEL") return { ok: false, state, diagnostics: [error("PASTE_OUT_OF_BOUNDS", "Paste destination is outside the raster and policy is CANCEL.")] };
   const clipped = destinationPixels.filter((pixel) => pixel.x >= 0 && pixel.y >= 0 && pixel.x < asset.width && pixel.y < asset.height);
   const mutation = applyPixelMutations(state, command.assetId, [], clipped, false);
-  const result = await buildResult(mutation.state, command.commandId, "clipboard.paste", { format: command.payload.clipboard.format, version: 1, pixelCount: clipped.length, paletteCompatibility: compatibility.result }, mutation.asset, mutation.dirtyTiles, changedRegions(asset.id, clipped), mutation.copiedBytes, mutation.cowSplitCount);
+  const result = await buildResult(mutation.state, command.commandId, "clipboard.paste", { format: command.payload.clipboard.format, version: 1, pixelCount: clipped.length, paletteCompatibility: compatibility.result }, mutation.asset, mutation.dirtyTiles, changedRegions(asset.id, mutation.dirtyPoints), mutation.copiedBytes, mutation.cowSplitCount, !mutation.changed);
+  if (!mutation.changed) return { ok: true, state, result, clipboard: command.payload.clipboard };
   const nextState = commitState(mutation.state, command.commandId);
   return { ok: true, state: nextState, result: { ...result, operation: { ...result.operation, clientSequence: nextState.lastClientSequenceByClient["draw2-selection-local"] ?? 0 } }, clipboard: command.payload.clipboard };
 }
@@ -655,11 +1016,28 @@ export class LocalUndoRedoHistory {
   #state: ProjectState;
   readonly #undo: HistoryEntry[] = [];
   readonly #redo: HistoryEntry[] = [];
+  readonly #maxEntries: number;
 
-  constructor(state: ProjectState) { this.#state = state; }
+  constructor(
+    state: ProjectState,
+    options: LocalUndoRedoHistoryOptions = {},
+  ) {
+    this.#state = state;
+    const maxEntries = options.maxEntries;
+    this.#maxEntries = typeof maxEntries === "number" &&
+        Number.isSafeInteger(maxEntries) &&
+        maxEntries >= 1 && maxEntries <= 1024
+      ? maxEntries
+      : DRAW2_LIVE_HISTORY_LIMIT;
+  }
   get state(): ProjectState { return this.#state; }
   get undoDepth(): number { return this.#undo.length; }
   get redoDepth(): number { return this.#redo.length; }
+  get maxEntries(): number { return this.#maxEntries; }
+  #trim(entries: HistoryEntry[]): void {
+    if (entries.length <= this.#maxEntries) return;
+    entries.splice(0, entries.length - this.#maxEntries);
+  }
   snapshot(maxEntries = Number.MAX_SAFE_INTEGER): UndoRedoHistorySnapshot {
     const limit = Number.isSafeInteger(maxEntries) && maxEntries >= 0
       ? maxEntries
@@ -694,19 +1072,135 @@ export class LocalUndoRedoHistory {
         after: cloneProjectStateShared(entry.after),
       });
     }
+    this.#trim(this.#undo);
+    this.#trim(this.#redo);
     this.#state = cloneProjectStateShared(
-      snapshot.undo.at(-1)?.after ?? snapshot.redo.at(-1)?.before ?? this.#state,
+      this.#undo.at(-1)?.after ?? this.#redo.at(-1)?.before ?? this.#state,
     );
   }
   record(before: ProjectState, after: ProjectState, operationId: string, operationType: string, actionId = operationId): void {
     this.#undo.push({ actionId, operationId, operationType, before: cloneProjectStateShared(before), after: cloneProjectStateShared(after) });
+    this.#trim(this.#undo);
     this.#redo.length = 0;
     this.#state = cloneProjectStateShared(after);
+  }
+  /**
+   * Rebase local full-state history over a remote raster operation. Aseprite's
+   * local undo restores the user's previous edit without removing a later
+   * change; applying the remote command to both sides of every local entry
+   * gives the same invariant for Draw2's snapshot history.
+   */
+  async rebaseRemoteRasterOperation(
+    command: EditorCommand,
+    currentState: ProjectState,
+  ): Promise<void> {
+    if (!command.commandType.startsWith("raster.")) {
+      throw new Error("Only raster operations can rebase Draw2 history.");
+    }
+    const rebase = async (snapshot: ProjectState): Promise<ProjectState> => {
+      if (snapshot.appliedCommandIds.includes(command.commandId)) {
+        return snapshot;
+      }
+      const nextClientSequence =
+        (snapshot.lastClientSequenceByClient[command.clientId] ?? 0) + 1;
+      const rebasedCommand = {
+        ...command,
+        projectId: snapshot.projectId,
+        baseStructureEpoch: snapshot.structureEpoch,
+        clientSequence: nextClientSequence,
+      } as EditorCommand;
+      const result = await new EditorCore(snapshot).execute(rebasedCommand);
+      if (!result.ok) {
+        throw new Error(
+          `Remote history rebase failed: ${result.diagnostics[0]?.code ?? "unknown"}`,
+        );
+      }
+      // The snapshot only needs a locally contiguous sequence while the
+      // command is replayed. Restore the remote sequence afterwards so an
+      // Undo followed by the next remote operation remains gap-free.
+      return {
+        ...result.state,
+        lastClientSequenceByClient: {
+          ...result.state.lastClientSequenceByClient,
+          [command.clientId]: command.clientSequence,
+        },
+      };
+    };
+    const rebaseEntry = async (entry: HistoryEntry): Promise<HistoryEntry> => ({
+      ...entry,
+      before: await rebase(entry.before),
+      after: await rebase(entry.after),
+    });
+    const [undo, redo] = await Promise.all([
+      Promise.all(this.#undo.map(rebaseEntry)),
+      Promise.all(this.#redo.map(rebaseEntry)),
+    ]);
+    this.#undo.splice(0, this.#undo.length, ...undo);
+    this.#redo.splice(0, this.#redo.length, ...redo);
+    this.#trim(this.#undo);
+    this.#trim(this.#redo);
+    this.#state = cloneProjectStateShared(currentState);
+  }
+  /** Rebase a compact remote selection transform without dropping local history. */
+  async rebaseRemoteSelectionTransformOperation(
+    command: SelectionTransformWireCommand,
+    currentState: ProjectState,
+  ): Promise<void> {
+    const rebase = async (snapshot: ProjectState): Promise<ProjectState> => {
+      if (snapshot.appliedCommandIds.includes(command.commandId)) {
+        return snapshot;
+      }
+      const asset = snapshot.assets[command.assetId];
+      if (asset === undefined) {
+        throw new Error("Remote selection transform history rebase asset is missing.");
+      }
+      const nextClientSequence =
+        (snapshot.lastClientSequenceByClient[command.clientId] ?? 0) + 1;
+      const rebasedCommand: SelectionTransformWireCommand = {
+        ...command,
+        projectId: snapshot.projectId,
+        baseStructureEpoch: snapshot.structureEpoch,
+        clientSequence: nextClientSequence,
+        payload: {
+          ...command.payload,
+          sourceRasterRevision: asset.revision,
+          sourceStructureEpoch: snapshot.structureEpoch,
+        },
+      };
+      const result = await applyCompactSelectionTransform(snapshot, rebasedCommand);
+      if (!result.ok) {
+        throw new Error(
+          `Remote selection transform history rebase failed: ${result.diagnostics[0]?.code ?? "unknown"}`,
+        );
+      }
+      return {
+        ...result.state,
+        lastClientSequenceByClient: {
+          ...result.state.lastClientSequenceByClient,
+          [command.clientId]: command.clientSequence,
+        },
+      };
+    };
+    const rebaseEntry = async (entry: HistoryEntry): Promise<HistoryEntry> => ({
+      ...entry,
+      before: await rebase(entry.before),
+      after: await rebase(entry.after),
+    });
+    const [undo, redo] = await Promise.all([
+      Promise.all(this.#undo.map(rebaseEntry)),
+      Promise.all(this.#redo.map(rebaseEntry)),
+    ]);
+    this.#undo.splice(0, this.#undo.length, ...undo);
+    this.#redo.splice(0, this.#redo.length, ...redo);
+    this.#trim(this.#undo);
+    this.#trim(this.#redo);
+    this.#state = cloneProjectStateShared(currentState);
   }
   undo(): HistoryResult | undefined {
     const entry = this.#undo.pop();
     if (entry === undefined) return undefined;
     this.#redo.push(entry);
+    this.#trim(this.#redo);
     this.#state = cloneProjectStateShared(entry.before);
     return { state: this.#state, actionId: entry.actionId, operationId: entry.operationId, direction: "UNDO", transport: "LOCAL_ONLY" };
   }
@@ -714,6 +1208,7 @@ export class LocalUndoRedoHistory {
     const entry = this.#redo.pop();
     if (entry === undefined) return undefined;
     this.#undo.push(entry);
+    this.#trim(this.#undo);
     this.#state = cloneProjectStateShared(entry.after);
     return { state: this.#state, actionId: entry.actionId, operationId: entry.operationId, direction: "REDO", transport: "LOCAL_ONLY" };
   }

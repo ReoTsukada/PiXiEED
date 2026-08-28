@@ -166,12 +166,23 @@ async function loadRuntimeAssets(session, requests, resolver) {
   const diagnostics = [
     ...session.diagnostics
   ];
+  const uniqueRequests = /* @__PURE__ */ new Map();
   for (const request of requests) {
+    const key = String(request.assetId);
+    const existing = uniqueRequests.get(key);
+    uniqueRequests.set(key, existing === void 0 ? request : {
+      ...existing,
+      required: existing.required || request.required
+    });
+  }
+  for (const request of uniqueRequests.values()) {
     const entry = dependencyEntry(session, request.assetId);
     if (entry === void 0) {
       diagnostics.push(diagnostic(request.required ? "MISSING_REQUIRED_ASSET" : "OPTIONAL_ASSET_MISSING", `Asset ${request.assetId} is not declared by the locked dependency snapshot.`, !request.required));
       continue;
     }
+    const existing = loaded[request.assetId];
+    if (existing !== void 0 && existing.revisionId === entry.revisionId && existing.contentHash === entry.contentHash) continue;
     const payload = await resolver.resolve(request);
     if (payload === void 0) {
       diagnostics.push(diagnostic(request.required ? "MISSING_REQUIRED_ASSET" : "OPTIONAL_ASSET_MISSING", `Asset ${request.assetId} could not be resolved.`, !request.required));
@@ -275,6 +286,84 @@ function serializeRuntimeState(session) {
   });
 }
 
+// src/game/game-350/runtime-performance.ts
+var GAME_RUNTIME_PERFORMANCE_SCHEMA_VERSION = 1;
+var GAME_RUNTIME_PERFORMANCE_PROFILES = Object.freeze({
+  "2D_BROWSER": Object.freeze({
+    schemaVersion: GAME_RUNTIME_PERFORMANCE_SCHEMA_VERSION,
+    profileId: "2D_BROWSER",
+    label: "2D Browser",
+    budget: Object.freeze({
+      startupMs: 1200,
+      sceneLoadMs: 800,
+      firstFrameMs: 500,
+      steadyFrameMs: 16.67,
+      memoryBytes: 256 * 1024 * 1024,
+      assetBytes: 32 * 1024 * 1024,
+      decodedBytes: 96 * 1024 * 1024,
+      maxLongTasks: 2
+    })
+  }),
+  "2D_MOBILE": Object.freeze({
+    schemaVersion: GAME_RUNTIME_PERFORMANCE_SCHEMA_VERSION,
+    profileId: "2D_MOBILE",
+    label: "2D Mobile",
+    budget: Object.freeze({
+      startupMs: 1800,
+      sceneLoadMs: 1200,
+      firstFrameMs: 800,
+      steadyFrameMs: 20,
+      memoryBytes: 128 * 1024 * 1024,
+      assetBytes: 12 * 1024 * 1024,
+      decodedBytes: 48 * 1024 * 1024,
+      maxLongTasks: 1
+    })
+  })
+});
+function resolveGameRuntimePerformanceProfile(options) {
+  if (options.requestedProfileId !== void 0) return GAME_RUNTIME_PERFORMANCE_PROFILES[options.requestedProfileId];
+  return options.screenWidth < 768 || options.touch && options.screenWidth < 900 ? GAME_RUNTIME_PERFORMANCE_PROFILES["2D_MOBILE"] : GAME_RUNTIME_PERFORMANCE_PROFILES["2D_BROWSER"];
+}
+var PERFORMANCE_METRICS = [
+  "startupMs",
+  "sceneLoadMs",
+  "firstFrameMs",
+  "steadyFrameMs",
+  "memoryBytes",
+  "assetBytes",
+  "decodedBytes",
+  "maxLongTasks"
+];
+function evaluateGameRuntimePerformance(profile, sample) {
+  const missingMetrics = [];
+  const violations = [];
+  for (const metric of PERFORMANCE_METRICS) {
+    const sampleMetric = metric === "maxLongTasks" ? sample.longTaskCount : sample[metric];
+    if (sampleMetric === void 0) {
+      missingMetrics.push(metric);
+      continue;
+    }
+    const budget = profile.budget[metric];
+    if (!Number.isFinite(sampleMetric) || sampleMetric < 0 || sampleMetric > budget) {
+      violations.push({
+        metric,
+        actual: sampleMetric,
+        budget
+      });
+    }
+  }
+  const status = violations.length > 0 ? "OVER_BUDGET" : missingMetrics.length > 0 ? "INCOMPLETE" : "WITHIN_BUDGET";
+  return {
+    profileId: profile.profileId,
+    status,
+    missingMetrics,
+    violations
+  };
+}
+function sumLoadedRuntimeAssetBytes(assets) {
+  return Object.values(assets).reduce((total, asset) => total + (Number.isSafeInteger(asset.byteLength) && asset.byteLength >= 0 ? asset.byteLength : 0), 0);
+}
+
 // src/wp200-game-runtime-core.ts
 function diagnostic2(code, message, recoverable, severity = "ERROR") {
   return {
@@ -290,9 +379,9 @@ function safeText(value, label) {
 function referenceKey(reference) {
   return `${reference.kind}:${reference.assetId}:${reference.revisionId}:${reference.contentHash}`;
 }
-function collectReferences(project) {
+function collectReferencesFromScenes(scenes) {
   const references = [];
-  for (const scene of project.scenes) {
+  for (const scene of scenes) {
     for (const entity of scene.entities) {
       for (const component of entity.components) {
         if (component.type === "SPRITE" || component.type === "ANIMATION" || component.type === "AUDIO_SOURCE") references.push(component.asset);
@@ -300,6 +389,9 @@ function collectReferences(project) {
     }
   }
   return references.sort((left, right) => referenceKey(left).localeCompare(referenceKey(right)));
+}
+function collectReferences(project) {
+  return collectReferencesFromScenes(project.scenes);
 }
 function dependencyMatchesReference(reference, dependencies) {
   return dependencies.entries.some((entry) => entry.assetId === reference.assetId && entry.revisionId === reference.revisionId && entry.contentHash === reference.contentHash && entry.byteLength === reference.byteLength && entry.mimeType === reference.mimeType && entry.mode === reference.mode);
@@ -413,9 +505,9 @@ function gameInputActionMapToRuntime(inputMap) {
     bindings: inputMap.actions.flatMap((action) => action.bindings).sort((left, right) => `${left.action}:${left.source}:${left.code}`.localeCompare(`${right.action}:${right.source}:${right.code}`))
   };
 }
-function gameAssetRequests(project) {
+function assetRequestsFromScenes(scenes) {
   const unique = /* @__PURE__ */ new Map();
-  for (const reference of collectReferences(project)) unique.set(String(reference.assetId), {
+  for (const reference of collectReferencesFromScenes(scenes)) unique.set(String(reference.assetId), {
     assetId: reference.assetId,
     required: true,
     mode: reference.mode
@@ -423,6 +515,15 @@ function gameAssetRequests(project) {
   return [
     ...unique.values()
   ].sort((left, right) => left.assetId.localeCompare(right.assetId));
+}
+function gameAssetRequests(project) {
+  return assetRequestsFromScenes(project.scenes);
+}
+function gameAssetRequestsForScene(project, sceneId) {
+  const scene = project.scenes.find((candidate) => candidate.sceneId === sceneId);
+  return scene === void 0 ? [] : assetRequestsFromScenes([
+    scene
+  ]);
 }
 function featureEnabled(flags, feature, killSwitch) {
   return killSwitch !== true && flags[feature] === true;
@@ -458,6 +559,14 @@ async function createGameRuntimePreview(options) {
     ...runtime.diagnostics
   ];
   const running = runtime.running && validation.valid && featureEnabled(options.flags, "game-core-read", options.killSwitch) && featureEnabled(options.flags, "runtime-preview", options.killSwitch);
+  const performanceProfile = resolveGameRuntimePerformanceProfile(options.performanceProfileId === void 0 ? {
+    screenWidth: options.capabilities.screenWidth,
+    touch: options.capabilities.touch
+  } : {
+    screenWidth: options.capabilities.screenWidth,
+    touch: options.capabilities.touch,
+    requestedProfileId: options.performanceProfileId
+  });
   return {
     project: options.project,
     runtime: {
@@ -465,6 +574,7 @@ async function createGameRuntimePreview(options) {
       running,
       diagnostics: allDiagnostics
     },
+    performanceProfile,
     sceneId: options.project.scenes[0]?.sceneId ?? "",
     runtimeValues: {},
     recovery: validation.valid && running ? "VALID" : "BLOCKED",
@@ -511,8 +621,9 @@ function stepGameRuntime(session, deltaMs, input) {
     presentationChanged: stepped.presentationChanged
   };
 }
-async function loadGameRuntimeAssets(session, resolver) {
-  const runtime = await loadRuntimeAssets(session.runtime, gameAssetRequests(session.project), resolver);
+async function loadGameRuntimeAssets(session, resolver, options = {}) {
+  const requests = options.sceneId === void 0 ? gameAssetRequests(session.project) : gameAssetRequestsForScene(session.project, options.sceneId);
+  const runtime = await loadRuntimeAssets(session.runtime, requests, resolver);
   const blocked = runtime.diagnostics.some((item) => !item.recoverable && [
     "MISSING_REQUIRED_ASSET",
     "HASH_MISMATCH",
@@ -527,6 +638,11 @@ async function loadGameRuntimeAssets(session, resolver) {
     recovery: blocked ? "BLOCKED" : session.recovery,
     diagnostics: runtime.diagnostics
   };
+}
+async function loadGameRuntimeSceneAssets(session, sceneId, resolver) {
+  return loadGameRuntimeAssets(session, resolver, {
+    sceneId
+  });
 }
 function stopGameRuntime(session) {
   return {
@@ -668,14 +784,20 @@ async function gameRuntimeStateFingerprint(session) {
   }));
 }
 export {
+  GAME_RUNTIME_PERFORMANCE_PROFILES,
   createGameRuntimePreview,
+  evaluateGameRuntimePerformance,
   gameAssetRequests,
+  gameAssetRequestsForScene,
   gameInputActionMapToRuntime,
   gameRuntimeStateFingerprint,
   loadGameRuntimeAssets,
+  loadGameRuntimeSceneAssets,
+  resolveGameRuntimePerformanceProfile,
   restoreGameRuntimeSaveState,
   safeGameHotReload,
   serializeGameRuntimeSaveState,
   stepGameRuntime,
-  stopGameRuntime
+  stopGameRuntime,
+  sumLoadedRuntimeAssetBytes
 };

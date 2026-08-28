@@ -21,6 +21,8 @@ import type {
   PixyncAuthoritativeOperationEvent,
   PixyncTransportAck,
   PixyncTransportBinding,
+  PixyncTransportPresence,
+  PixyncTransportPresenceDraft,
   PixyncTransportProvider,
   PixyncTransportProviderConnection,
   PixyncTransportProviderOpenInput,
@@ -79,14 +81,31 @@ export interface PixyncSupabaseAuthPort {
   >;
 }
 
-/** Payloads are intentionally ignored by the provider. Only the event is a hint. */
+/** Realtime carries only hints and ephemeral Presence; durable operations use RPC. */
 export interface PixyncSupabaseRealtimeChannelPort {
   on(
     type: "broadcast",
     filter: { readonly event: typeof REALTIME_EVENT },
     callback: (payload: unknown) => void,
   ): PixyncSupabaseRealtimeChannelPort;
-  subscribe(): Promise<PixyncSupabasePortResult<null> | void>;
+  onPresence?(
+    event: "sync" | "join" | "leave",
+    callback: (payload: unknown) => void,
+  ): PixyncSupabaseRealtimeChannelPort;
+  presenceState?(): unknown;
+  track?(
+    presence: PixyncTransportPresence,
+  ):
+    | Promise<PixyncSupabasePortResult<null> | void>
+    | PixyncSupabasePortResult<null>
+    | void;
+  untrack?():
+    | Promise<PixyncSupabasePortResult<null> | void>
+    | PixyncSupabasePortResult<null>
+    | void;
+  subscribe(
+    onStatus?: (status: string, error?: unknown) => void,
+  ): Promise<PixyncSupabasePortResult<null> | void>;
   unsubscribe(): Promise<PixyncSupabasePortResult<null> | void> | void;
 }
 
@@ -125,6 +144,10 @@ type ActiveConnection = {
   readonly session: SessionRow;
   readonly input: PixyncTransportProviderOpenInput;
   readonly channel: PixyncSupabaseRealtimeChannelPort;
+  readonly trackPresence: (
+    presence: PixyncTransportPresenceDraft,
+  ) => Promise<void>;
+  presenceDraft: PixyncTransportPresenceDraft | undefined;
   closed: boolean;
 };
 
@@ -203,6 +226,120 @@ function assertExactKeys(
       path,
     );
   }
+}
+
+function assertPresenceText(
+  value: unknown,
+  path: string,
+): asserts value is string {
+  if (
+    typeof value !== "string" || value.trim().length === 0 ||
+    value.length > 80
+  ) {
+    fail("INVALID_INPUT", "Presence text must be short, non-empty text.", path);
+  }
+}
+
+function assertPresenceDraft(
+  value: unknown,
+  path = "presence",
+): asserts value is PixyncTransportPresenceDraft {
+  if (!isRecord(value)) {
+    fail("INVALID_INPUT", "Presence must be a bounded metadata object.", path);
+  }
+  assertPresenceText(value.displayName, `${path}.displayName`);
+  if (
+    value.mode !== "iDRAW" && value.mode !== "iAUDIO" &&
+    value.mode !== "iGAME"
+  ) {
+    fail("INVALID_INPUT", "Presence mode is invalid.", `${path}.mode`);
+  }
+  assertPresenceText(value.selectionLabel, `${path}.selectionLabel`);
+}
+
+function parsePresence(value: unknown): PixyncTransportPresence | undefined {
+  if (!isRecord(value)) return undefined;
+  if (
+    typeof value.actorId !== "string" || !SAFE_ID.test(value.actorId) ||
+    typeof value.clientId !== "string" || !SAFE_ID.test(value.clientId) ||
+    typeof value.displayName !== "string" ||
+    value.displayName.trim().length === 0 || value.displayName.length > 80 ||
+    (value.mode !== "iDRAW" && value.mode !== "iAUDIO" &&
+      value.mode !== "iGAME") ||
+    typeof value.selectionLabel !== "string" ||
+    value.selectionLabel.trim().length === 0 ||
+    value.selectionLabel.length > 80 ||
+    typeof value.updatedAt !== "string" || value.updatedAt.length > 64 ||
+    !Number.isFinite(Date.parse(value.updatedAt))
+  ) return undefined;
+  return Object.freeze({
+    actorId: value.actorId,
+    clientId: value.clientId,
+    displayName: value.displayName,
+    mode: value.mode,
+    selectionLabel: value.selectionLabel,
+    updatedAt: value.updatedAt,
+  });
+}
+
+function parsePresenceState(
+  value: unknown,
+): readonly PixyncTransportPresence[] {
+  if (!isRecord(value)) return [];
+  const byClientId = new Map<string, PixyncTransportPresence>();
+  for (const entries of Object.values(value)) {
+    if (!Array.isArray(entries)) continue;
+    for (const entry of entries) {
+      const presence = parsePresence(entry);
+      if (presence !== undefined) byClientId.set(presence.clientId, presence);
+    }
+  }
+  return [...byClientId.values()].sort((left, right) =>
+    left.clientId.localeCompare(right.clientId)
+  );
+}
+
+function parsePresenceList(value: unknown): readonly PixyncTransportPresence[] {
+  if (!Array.isArray(value)) return [];
+  const byClientId = new Map<string, PixyncTransportPresence>();
+  for (const entry of value) {
+    const presence = parsePresence(entry);
+    if (presence !== undefined) byClientId.set(presence.clientId, presence);
+  }
+  return [...byClientId.values()];
+}
+
+function presencePayload(
+  binding: PixyncTransportBinding,
+  draft: PixyncTransportPresenceDraft,
+): PixyncTransportPresence {
+  assertPresenceDraft(draft);
+  return Object.freeze({
+    actorId: binding.actorId,
+    clientId: binding.clientId,
+    displayName: draft.displayName,
+    mode: draft.mode,
+    selectionLabel: draft.selectionLabel,
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+async function trackPresenceOnChannel(
+  channel: PixyncSupabaseRealtimeChannelPort,
+  binding: PixyncTransportBinding,
+  draft: PixyncTransportPresenceDraft,
+): Promise<void> {
+  if (typeof channel.track !== "function") {
+    fail(
+      "REALTIME_ERROR",
+      "The Realtime channel does not support Presence.",
+      "channel.track",
+    );
+  }
+  const result = await Promise.resolve(
+    channel.track(presencePayload(binding, draft)),
+  );
+  if (result !== undefined) assertPortResult(result, "channel.track");
 }
 
 function resultError(error: unknown): string {
@@ -548,6 +685,12 @@ export class PixyncSupabaseProvider implements PixyncTransportProvider {
     if (typeof input.onStatus !== "function") {
       fail("INVALID_INPUT", "A status callback is required.", "onStatus");
     }
+    if (
+      input.onPresence !== undefined && typeof input.onPresence !== "function"
+    ) {
+      fail("INVALID_INPUT", "A Presence callback is required.", "onPresence");
+    }
+    if (input.presence !== undefined) assertPresenceDraft(input.presence);
 
     input.onStatus("CONNECTING");
     let session: SessionRow;
@@ -568,6 +711,26 @@ export class PixyncSupabaseProvider implements PixyncTransportProvider {
       ) {
         fail("REALTIME_ERROR", "The Realtime port is incomplete.", "channel");
       }
+      if (
+        input.onPresence !== undefined &&
+        (typeof channel.presenceState !== "function" ||
+          typeof channel.onPresence !== "function")
+      ) {
+        fail(
+          "REALTIME_ERROR",
+          "The Realtime channel does not expose Presence state.",
+          "channel.presenceState",
+        );
+      }
+      if (
+        input.presence !== undefined && typeof channel.track !== "function"
+      ) {
+        fail(
+          "REALTIME_ERROR",
+          "The Realtime channel does not support Presence tracking.",
+          "channel.track",
+        );
+      }
     } catch (error) {
       input.onStatus("OFFLINE");
       if (error instanceof PixyncSupabaseProviderError) throw error;
@@ -580,23 +743,107 @@ export class PixyncSupabaseProvider implements PixyncTransportProvider {
     }
 
     let active: ActiveConnection;
+    let initialSubscriptionSettled = false;
     try {
+      const notifyPresence = (
+        event:
+          | {
+            readonly kind: "sync";
+            readonly presence: readonly PixyncTransportPresence[];
+          }
+          | {
+            readonly kind: "upsert";
+            readonly presence: PixyncTransportPresence;
+          }
+          | { readonly kind: "remove"; readonly clientId: string },
+      ): void => {
+        if (active.closed || input.onPresence === undefined) return;
+        try {
+          void Promise.resolve(input.onPresence(event)).catch(() => undefined);
+        } catch {
+          // Presence is ephemeral; a UI listener must not break transport.
+        }
+      };
+      let configuredChannel = channel.on(
+        "broadcast",
+        { event: REALTIME_EVENT },
+        () => {
+          if (active.closed) return;
+          // The payload is intentionally discarded. Realtime never injects an operation.
+          input.onBroadcastHint();
+        },
+      );
+      if (input.onPresence !== undefined) {
+        const registerPresence = (
+          event: "sync" | "join" | "leave",
+          callback: (payload: unknown) => void,
+        ): void => {
+          const handler = configuredChannel.onPresence;
+          if (typeof handler !== "function") {
+            fail(
+              "REALTIME_ERROR",
+              "The Realtime channel does not expose Presence events.",
+              "channel.onPresence",
+            );
+          }
+          configuredChannel = handler.call(configuredChannel, event, callback);
+        };
+        registerPresence("sync", () => {
+          try {
+            notifyPresence({
+              kind: "sync",
+              presence: parsePresenceState(configuredChannel.presenceState?.()),
+            });
+          } catch {
+            // Malformed or unavailable ephemeral state is ignored.
+          }
+        });
+        registerPresence("join", (payload) => {
+          const entries = isRecord(payload) ? payload.newPresences : undefined;
+          for (const presence of parsePresenceList(entries)) {
+            notifyPresence({ kind: "upsert", presence });
+          }
+        });
+        registerPresence("leave", (payload) => {
+          const entries = isRecord(payload) ? payload.leftPresences : undefined;
+          for (const presence of parsePresenceList(entries)) {
+            notifyPresence({ kind: "remove", clientId: presence.clientId });
+          }
+        });
+      }
       active = {
         binding,
         session,
         input,
-        channel: channel
-          .on("broadcast", { event: REALTIME_EVENT }, () => {
-            if (active.closed) return;
-            // The payload is intentionally discarded. Realtime never injects an operation.
-            input.onBroadcastHint();
-          }),
+        channel: configuredChannel,
+        trackPresence: (presence) =>
+          trackPresenceOnChannel(configuredChannel, binding, presence),
+        presenceDraft: input.presence,
         closed: false,
       };
-      const subscribed = await channel.subscribe();
+      const subscribed = await configuredChannel.subscribe((status) => {
+        if (!initialSubscriptionSettled || active.closed) return;
+        if (status === "SUBSCRIBED") {
+          input.onStatus("SUBSCRIBED");
+          const presence = active.presenceDraft;
+          if (presence !== undefined) {
+            void active.trackPresence(presence).catch(() => {
+              if (!active.closed) input.onStatus("RECONNECTING");
+            });
+          }
+        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          input.onStatus("RECONNECTING");
+        } else if (status === "CLOSED") {
+          input.onStatus("OFFLINE");
+        }
+      });
       if (subscribed !== undefined) {
         assertPortResult(subscribed, "channel.subscribe");
       }
+      if (input.presence !== undefined) {
+        await active.trackPresence(input.presence);
+      }
+      initialSubscriptionSettled = true;
     } catch (error) {
       await Promise.resolve(channel.unsubscribe());
       input.onStatus("OFFLINE");
@@ -693,6 +940,9 @@ export class PixyncSupabaseProvider implements PixyncTransportProvider {
       if (active.closed) return;
       active.closed = true;
       try {
+        await Promise.resolve(active.channel.untrack?.()).catch(() =>
+          undefined
+        );
         await Promise.resolve(active.channel.unsubscribe());
       } finally {
         active.input.onStatus("CLOSED");
@@ -766,6 +1016,14 @@ export class PixyncSupabaseProvider implements PixyncTransportProvider {
           active.binding.projectId,
           afterProjectRevision,
         );
+      },
+      publishPresence: async (
+        presence: PixyncTransportPresenceDraft,
+      ): Promise<void> => {
+        await recheck();
+        ensureOpen();
+        await active.trackPresence(presence);
+        active.presenceDraft = presence;
       },
       close: async (reason = "closed"): Promise<void> => {
         void reason;

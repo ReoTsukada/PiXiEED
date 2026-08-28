@@ -27,6 +27,8 @@ import {
   type PixyncTransportAck,
   PixyncTransportAdapter,
   type PixyncTransportConnectInput,
+  type PixyncTransportPresenceDraft,
+  type PixyncTransportPresenceEvent,
   type PixyncTransportStatus,
 } from "./transport.ts";
 
@@ -48,6 +50,10 @@ export interface PixyncDurableTransportConnectInput {
   readonly clientId: string;
   readonly sessionGeneration: number;
   readonly onBroadcastHint?: () => void;
+  readonly onPresence?: (
+    event: PixyncTransportPresenceEvent,
+  ) => void | Promise<void>;
+  readonly presence?: PixyncTransportPresenceDraft;
   readonly onCatchUpError?: (error: unknown) => void;
   readonly onStatus?: (status: PixyncTransportStatus) => void;
 }
@@ -113,9 +119,16 @@ export class PixyncDurableTransportCoordinator {
       clientId: input.clientId,
       sessionGeneration: input.sessionGeneration,
       ...(input.onStatus === undefined ? {} : { onStatus: input.onStatus }),
+      ...(input.onPresence === undefined
+        ? {}
+        : { onPresence: input.onPresence }),
+      ...(input.presence === undefined ? {} : { presence: input.presence }),
       onOperation: (event) => this.receiveRemote(event),
       onBroadcastHint: () => {
         input.onBroadcastHint?.();
+        this.#requestHintCatchUp();
+      },
+      onReconnected: () => {
         this.#requestHintCatchUp();
       },
     };
@@ -124,6 +137,12 @@ export class PixyncDurableTransportCoordinator {
 
   async submit(draft: PixyncOperationDraft): Promise<PixyncTransportAck> {
     return this.#serial(() => this.#submit(draft));
+  }
+
+  async publishPresence(
+    presence: PixyncTransportPresenceDraft,
+  ): Promise<void> {
+    await this.#transport.publishPresence(presence);
   }
 
   async receiveRemote(

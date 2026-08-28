@@ -1078,6 +1078,120 @@ export class DrawAudioReferenceStore {
   }
 }
 
+export interface Draw2SelectionStampPixel {
+  readonly x: number;
+  readonly y: number;
+  readonly colorIndex: number;
+}
+
+export interface Draw2SelectionStamp {
+  readonly id: string;
+  readonly name: string;
+  readonly width: number;
+  readonly height: number;
+  /** Only selected pixels are stored; unlisted cells remain transparent. */
+  readonly pixels: readonly Draw2SelectionStampPixel[];
+  readonly palette: readonly number[];
+  readonly schemaVersion: typeof CREATOR_FEATURE_SCHEMA_VERSION;
+}
+
+export type Draw2SelectionStampInput = Omit<
+  Draw2SelectionStamp,
+  "schemaVersion"
+>;
+
+const MAX_SELECTION_STAMP_DIMENSION = 4_096;
+const MAX_SELECTION_STAMP_AREA = 1_048_576;
+
+export function normalizeDraw2SelectionStamp(
+  input: Draw2SelectionStampInput | Draw2SelectionStamp,
+): Draw2SelectionStamp {
+  if (
+    typeof input.id !== "string" || typeof input.name !== "string" ||
+    !Array.isArray(input.pixels) || !Array.isArray(input.palette)
+  ) {
+    throw new Error("Draw2 selection stamp shape is invalid.");
+  }
+  if (
+    !Number.isSafeInteger(input.width) ||
+    !Number.isSafeInteger(input.height) || input.width < 1 ||
+    input.height < 1 || input.width > MAX_SELECTION_STAMP_DIMENSION ||
+    input.height > MAX_SELECTION_STAMP_DIMENSION ||
+    input.width * input.height > MAX_SELECTION_STAMP_AREA
+  ) {
+    throw new Error("Draw2 selection stamp dimensions are invalid.");
+  }
+  if (input.palette.length < 1 || input.palette.length > 256) {
+    throw new Error("Draw2 selection stamp palette is invalid.");
+  }
+  const palette = input.palette.map((color) => {
+    if (
+      !Number.isSafeInteger(color) || color < 0 || color > 0xffffffff
+    ) throw new Error("Draw2 selection stamp palette color is invalid.");
+    return color >>> 0;
+  });
+  const pixels = new Map<string, Draw2SelectionStampPixel>();
+  for (const candidate of input.pixels) {
+    if (
+      candidate === null || typeof candidate !== "object" ||
+      !Number.isSafeInteger(candidate.x) ||
+      !Number.isSafeInteger(candidate.y) ||
+      !Number.isSafeInteger(candidate.colorIndex) ||
+      candidate.x < 0 || candidate.y < 0 || candidate.x >= input.width ||
+      candidate.y >= input.height || candidate.colorIndex < 0 ||
+      candidate.colorIndex >= palette.length
+    ) {
+      throw new Error("Draw2 selection stamp pixel is invalid.");
+    }
+    pixels.set(`${candidate.x}:${candidate.y}`, {
+      x: candidate.x,
+      y: candidate.y,
+      colorIndex: candidate.colorIndex,
+    });
+  }
+  return {
+    id: stableId(input.id, "Draw2 selection stamp ID"),
+    name: input.name.trim().slice(0, 64) || "Selection stamp",
+    width: input.width,
+    height: input.height,
+    pixels: [...pixels.values()].sort((left, right) =>
+      left.y - right.y || left.x - right.x
+    ),
+    palette,
+    schemaVersion: CREATOR_FEATURE_SCHEMA_VERSION,
+  };
+}
+
+export class Draw2SelectionStampStore {
+  readonly #stamps = new Map<string, Draw2SelectionStamp>();
+
+  constructor(initial: readonly Draw2SelectionStamp[] = []) {
+    for (const stamp of initial) this.save(stamp);
+  }
+
+  save(
+    input: Draw2SelectionStampInput | Draw2SelectionStamp,
+  ): Draw2SelectionStamp {
+    const stamp = normalizeDraw2SelectionStamp(input);
+    this.#stamps.set(stamp.id, stamp);
+    return stamp;
+  }
+
+  load(id: string): Draw2SelectionStamp | undefined {
+    return this.#stamps.get(id);
+  }
+
+  remove(id: string): boolean {
+    return this.#stamps.delete(id);
+  }
+
+  list(): readonly Draw2SelectionStamp[] {
+    return [...this.#stamps.values()].sort((left, right) =>
+      left.name.localeCompare(right.name) || left.id.localeCompare(right.id)
+    );
+  }
+}
+
 export const DRAW2_TIMELINE_METADATA_SCHEMA_VERSION = 2 as const;
 
 export interface Draw2TimelineMetadata {
@@ -1085,6 +1199,8 @@ export interface Draw2TimelineMetadata {
   readonly animationTags: readonly AnimationTag[];
   readonly markers: readonly TimelineMarker[];
   readonly audioReferences: readonly DrawAudioReference[];
+  /** Optional for backward compatibility with pre-selection-stamp records. */
+  readonly selectionStamps?: readonly Draw2SelectionStamp[];
 }
 
 function isMetadataRecord(
@@ -1129,6 +1245,13 @@ export function normalizeDraw2TimelineMetadata(
     !Array.isArray(value.audioReferences)
   ) {
     throw new Error("Draw2 timeline metadata collections are invalid.");
+  }
+  const selectionStampCandidates = value.selectionStamps;
+  if (
+    selectionStampCandidates !== undefined &&
+    !Array.isArray(selectionStampCandidates)
+  ) {
+    throw new Error("Draw2 selection stamp collection is invalid.");
   }
   const tags = new AnimationTagStore();
   const tagIds = new Set<string>();
@@ -1176,6 +1299,24 @@ export function normalizeDraw2TimelineMetadata(
       frameCount,
     );
   }
+  const selectionStamps = new Draw2SelectionStampStore();
+  const selectionStampIds = new Set<string>();
+  for (const candidate of selectionStampCandidates ?? []) {
+    if (
+      candidate === null || typeof candidate !== "object" ||
+      typeof candidate.id !== "string"
+    ) {
+      throw new Error("Draw2 selection stamp is invalid.");
+    }
+    const normalized = normalizeDraw2SelectionStamp(
+      candidate as unknown as Draw2SelectionStamp,
+    );
+    if (selectionStampIds.has(normalized.id)) {
+      throw new Error("Draw2 selection stamp identity is duplicated.");
+    }
+    selectionStampIds.add(normalized.id);
+    selectionStamps.save(normalized);
+  }
   return {
     schemaVersion: DRAW2_TIMELINE_METADATA_SCHEMA_VERSION,
     animationTags: tags.list().map((tag) => ({ ...tag })),
@@ -1183,5 +1324,12 @@ export function normalizeDraw2TimelineMetadata(
     audioReferences: audioReferences.list().map((reference) => ({
       ...reference,
     })),
+    ...(selectionStampCandidates === undefined ? {} : {
+      selectionStamps: selectionStamps.list().map((stamp) => ({
+        ...stamp,
+        pixels: stamp.pixels.map((pixel) => ({ ...pixel })),
+        palette: [...stamp.palette],
+      })),
+    }),
   };
 }

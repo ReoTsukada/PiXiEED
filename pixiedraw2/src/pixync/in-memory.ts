@@ -112,6 +112,7 @@ export class PixyncInMemorySequencer {
   readonly #now: () => Date;
   readonly #operations: PixyncCommittedOperation[] = [];
   readonly #byId = new Map<string, PixyncCommittedOperation>();
+  #commitTail: Promise<void> = Promise.resolve();
   #projectRevision = 0;
   #aggregateRevisions = emptyRevisions();
 
@@ -145,6 +146,20 @@ export class PixyncInMemorySequencer {
   }
 
   async commit(
+    draft: PixyncOperationDraft,
+  ): Promise<PixyncOperationResult> {
+    const result = this.#commitTail.then(
+      () => this.#commit(draft),
+      () => this.#commit(draft),
+    );
+    this.#commitTail = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
+  }
+
+  async #commit(
     draft: PixyncOperationDraft,
   ): Promise<PixyncOperationResult> {
     await validatePixyncDraft(draft);

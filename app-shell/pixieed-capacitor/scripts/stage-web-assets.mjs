@@ -70,6 +70,46 @@ const includeEntries = Object.freeze([
   "terms",
 ]);
 
+// The repository copy of pixiedraw2 also contains source, tests, benchmarks,
+// fixtures, and authoring notes. Native/web distribution staging must carry
+// only the files that an entry can load at runtime. Keep this list explicit so
+// a new build artifact cannot silently expand the shipped payload.
+const PIXIEDRAW2_RUNTIME_FILES = Object.freeze([
+  "index.html",
+  "igame-player.html",
+  "assets/brand/pixieed-logo-48.png",
+  "assets/brand/pixieed-logo-retina.png",
+  "assets/draw2-shell.css",
+  "assets/igame-player.css",
+  "assets/icons/draw2-icons.svg",
+  "dist/draw2-entry.js",
+  "dist/draw2-legacy-compat.js",
+  "dist/wp160-runtime-core.js",
+  "dist/wp170-advanced-tools.js",
+  "dist/wp180-workspace.js",
+  "dist/project-session.js",
+  "dist/project-data-storage.js",
+  "dist/draw2-export.js",
+  "dist/site460-browser-entry.js",
+  "dist/igame-player.js",
+  "dist/audio-200-workspace.js",
+  "dist/audio-240-long-runtime.js",
+  "dist/audio-250-recording.js",
+  "dist/audio-260-rendering.js",
+  "dist/audio-270-freeze.js",
+  "dist/wp190-audio-core.js",
+  "dist/wp190-integration-ui.js",
+]);
+
+const RUNTIME_FILES_BY_ENTRY = Object.freeze({
+  pixiedraw2: PIXIEDRAW2_RUNTIME_FILES,
+});
+
+function getRuntimeEntryFiles(entry) {
+  const files = RUNTIME_FILES_BY_ENTRY[entry];
+  return files === undefined ? null : [...files];
+}
+
 async function pathExists(targetPath) {
   try {
     await stat(targetPath);
@@ -355,6 +395,16 @@ async function copyEntry(
   }
   const sourcePath = path.join(sourceRoot, entry);
   const targetPath = path.join(outputRoot, entry);
+  const runtimeFiles = getRuntimeEntryFiles(entry);
+  if (runtimeFiles !== null) {
+    for (const relativePath of runtimeFiles) {
+      const sourceFilePath = path.join(sourcePath, relativePath);
+      const targetFilePath = path.join(targetPath, relativePath);
+      await mkdir(path.dirname(targetFilePath), { recursive: true });
+      await cp(sourceFilePath, targetFilePath, { force: true });
+    }
+    return;
+  }
   await mkdir(path.dirname(targetPath), { recursive: true });
   await cp(sourcePath, targetPath, {
     recursive: true,
@@ -403,6 +453,29 @@ async function validateEntries(
     const sourcePath = path.join(sourceRoot, entry);
     if (!(await pathExists(sourcePath))) {
       missing.push(entry);
+      continue;
+    }
+    const runtimeFiles = getRuntimeEntryFiles(entry);
+    if (runtimeFiles === null) continue;
+    for (const relativePath of runtimeFiles) {
+      validateEntryName(relativePath);
+      const sourceFilePath = path.join(sourcePath, relativePath);
+      let sourceFileStat;
+      try {
+        sourceFileStat = await lstat(sourceFilePath);
+      } catch (error) {
+        if (error && error.code === "ENOENT") {
+          missing.push(`${entry}/${relativePath}`);
+          continue;
+        }
+        throw error;
+      }
+      if (sourceFileStat.isSymbolicLink()) {
+        throw new Error(`SOURCE_SYMLINK: ${entry}/${relativePath}`);
+      }
+      if (!sourceFileStat.isFile()) {
+        throw new Error(`UNSUPPORTED_RUNTIME_FILE: ${entry}/${relativePath}`);
+      }
     }
   }
   if (missing.length) {
@@ -640,6 +713,7 @@ export {
   createCopyPlan,
   EXTERNAL_OUTPUT_BOUNDARY_REQUIRED,
   EXTERNAL_OUTPUT_NOT_EMPTY,
+  getRuntimeEntryFiles,
   includeEntries,
   OUTPUT_BOUNDARY_INVALID,
   OUTPUT_PATH_SYMLINK,

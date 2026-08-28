@@ -1,7 +1,11 @@
 /// <reference lib="dom" />
 
 import {
+  cloneProjectStateShared,
   type CommandResult,
+  compactPixelPath,
+  createIndexedRasterStampSource,
+  createRasterSelectionMask,
   createProject,
   type DirtyRegion,
   type DirtyTile,
@@ -12,11 +16,16 @@ import {
   InMemoryProjectRepository,
   interpolatePixelPath,
   LocalAutosaveCoordinator,
+  type MirrorCommitSpec,
   type ProjectState,
   type RasterAsset,
   ReferenceRenderer,
+  type RasterClipRect,
+  type RasterSelectionMask,
   SampledInstrumentation,
+  type ShapeCommitPayload,
   type TileSize,
+  type TileStampPayload,
 } from "./draw2-core.ts";
 import type {
   AudioApplyInput,
@@ -34,19 +43,31 @@ import type {
   GameProject,
   JournalCommand,
 } from "./game/game-300/core.ts";
+import type { GoldenProjectBuildResult } from "./studio/golden-project.ts";
 import { PixyncAudioProductBridge } from "./pixync/audio-product-bridge.ts";
 import { PixyncDrawProductBridge } from "./pixync/draw-product-bridge.ts";
 import { PixyncGameProductBridge } from "./pixync/game-product-bridge.ts";
 import { PixyncProductionCompositionRoot } from "./pixync/composition-root.ts";
 import { PixyncGameRevisionRemoteStore } from "./pixync/game-revision-remote-store.ts";
 import type { PixyncSupabaseSdkClient } from "./pixync/supabase-sdk-port.ts";
+import type {
+  PixyncTransportPresence,
+  PixyncTransportPresenceEvent,
+  PixyncTransportStatus,
+} from "./pixync/transport.ts";
+import {
+  PIXYNC_DRAW2_MAX_PAYLOAD_BYTES,
+  PIXYNC_DRAW2_MAX_PAYLOAD_KEYS,
+} from "./pixync/core.ts";
 import {
   assessClipboardPalette,
+  applyCompactSelectionTransform,
   type ClipboardPayload,
   commitTransform,
   createClipboardPasteSession,
   createClipboardPayload,
   createRectangleSelectionSnapshot,
+  createSelectionTransformWirePayload,
   createTransformSession,
   cutClipboard,
   LocalUndoRedoHistory,
@@ -54,6 +75,7 @@ import {
   previewClipboardPaste,
   previewTransform,
   selectionCommandId,
+  type SelectionTransformWireCommand,
   type SelectionSnapshot,
   type TransformDescriptor,
   type TransformPreview,
@@ -81,6 +103,7 @@ import {
   createWriteSet,
   decodeArgb,
   normalizeBounds,
+  normalizeToolOptions,
   selectByContiguousColor,
   selectByEllipse,
   selectByLasso,
@@ -93,7 +116,6 @@ import {
 import {
   pixelPerfectPath,
   polygonSelectionPoints,
-  tileStampWrites,
 } from "./draw2-special-tools.ts";
 import {
   Draw2InteractionKernel,
@@ -101,6 +123,7 @@ import {
   type ToolSessionCommit,
 } from "./draw2-interaction.ts";
 import {
+  DRAW2_PERSISTED_HISTORY_LIMIT,
   createDraw2PersistenceRecord,
   createIndexedDbDraw2PersistenceStore,
   type Draw2JournalSnapshot,
@@ -130,10 +153,10 @@ import {
 import {
   DRAW2_ASSET_STATE_CHANGED_EVENT,
   type Draw2AssetBridge,
-  type Draw2AssetReferenceRecord,
   type Draw2AssetBridgeSnapshot,
   type Draw2AssetMutationResult,
   type Draw2AssetReferenceProjection,
+  type Draw2AssetReferenceRecord,
   type Draw2AssetSelectionSnapshot,
 } from "./draw2-asset-bridge-contract.ts";
 import { DRAW2_SHORTCUTS, resolveDraw2Shortcut } from "./draw2-shortcuts.ts";
@@ -158,10 +181,13 @@ import {
   BrushPresetStore,
   createLinkedCelBinding,
   createSelectionMask,
+  type Draw2SelectionStamp,
+  Draw2SelectionStampStore,
   type Draw2TimelineMetadata,
   type DrawAudioReference,
   DrawAudioReferenceStore,
   type LinkedCelBinding,
+  normalizeDraw2SelectionStamp,
   normalizeDraw2TimelineMetadata,
   selectionBorder,
   selectionExpand,
@@ -182,6 +208,7 @@ import {
   type Draw2ProjectEditorPreferences,
   draw2ProjectEditorPreferences,
   readDraw2EditorPreferences,
+  withoutDraw2ProjectEditorPreferences,
   withDraw2ProjectEditorPreferences,
   writeDraw2EditorPreferences,
 } from "./draw2-editor-preferences.ts";
@@ -270,9 +297,38 @@ import {
   type WorkspaceProjectId,
   writeActiveWorkspaceProjectId,
 } from "./workspace/project-manifest.ts";
-import { PixyncDurableJournal } from "./pixync/durability.ts";
+import {
+  deleteWorkspaceProjectLocalData,
+  type WorkspaceProjectDataDeletionPorts,
+} from "./workspace/project-data-deletion.ts";
+import {
+  PixyncDurableJournal,
+  type PixyncDurableSnapshot,
+  type PixyncSnapshotPersistencePort,
+} from "./pixync/durability.ts";
 import { createPixyncIndexedDbPersistence } from "./pixync/indexeddb-persistence.ts";
+import { publishPixyncCheckpoint } from "./pixync/checkpoint-publishing.ts";
+import {
+  detachPixyncProject,
+  PixyncProjectDeletionError,
+} from "./pixync/project-deletion.ts";
+import {
+  PixyncRemoteCheckpointError,
+  readPixyncActiveCheckpoint,
+} from "./pixync/remote-checkpoint.ts";
 import { PixyncProjectLifecycleCoordinator } from "./pixync/project-lifecycle.ts";
+import type { PixyncAggregateAdapter } from "./pixync/contracts.ts";
+import type {
+  ProjectSessionClient,
+  ProjectSessionMode,
+  ProjectSessionState,
+} from "./pixync/project-session.ts";
+import {
+  createProjectStartIntent,
+  type CreatorStartMode,
+  isCreatorStartMode,
+  resolveCreatorStartMode,
+} from "./studio/project-start.ts";
 
 const DRAW2_ICON_SPRITE = "./assets/icons/draw2-icons.svg#";
 
@@ -309,6 +365,14 @@ let advancedModulePromise: Promise<AdvancedModule> | undefined;
 type WorkspaceModule = typeof import("./wp180-workspace-ui.ts");
 let workspaceModulePromise: Promise<WorkspaceModule> | undefined;
 
+type ProjectSessionModule = typeof import("./pixync/project-session.ts");
+let projectSessionModulePromise: Promise<ProjectSessionModule> | undefined;
+
+type ProjectDataStorageModule = typeof import(
+  "./workspace/project-data-storage-entry.ts"
+);
+let projectDataStorageModulePromise: Promise<ProjectDataStorageModule> | undefined;
+
 interface WorkspacePxdBridgeAsset {
   readonly revisionId: string;
   readonly mediaType: string;
@@ -334,10 +398,21 @@ interface WorkspaceAudioRenderSnapshot {
   readonly channels: 1 | 2;
   readonly bitDepth: 8 | 16 | 24 | 32;
   readonly durationSeconds: number;
+  readonly sourceProjectId: string;
+  readonly sourceStateHash: string;
+  readonly sourceProjectRevision: number;
+}
+
+interface WorkspacePxdArtifactSnapshot {
+  readonly bytes: Uint8Array;
+  readonly mimeType: string;
+  readonly packageHash: string;
+  readonly sourceReference: Draw2AssetReferenceRecord;
 }
 
 interface WorkspacePxdBridge {
   exportProjectPxdSnapshot: () => Promise<WorkspacePxdBridgeSnapshot>;
+  exportProjectPxdArtifact?: () => Promise<WorkspacePxdArtifactSnapshot>;
   setDrawTimelineFrames?: (
     frames: readonly {
       readonly frameId: string;
@@ -347,6 +422,7 @@ interface WorkspacePxdBridge {
   ) => void;
   renderAudioWavForExport?: (
     durationSeconds?: number,
+    selection?: "CURRENT" | "FULL",
   ) => Promise<WorkspaceAudioRenderSnapshot | null>;
   restoreProjectPxdSnapshot: (
     snapshot: WorkspacePxdBridgeSnapshot,
@@ -378,6 +454,14 @@ interface WorkspacePxdBridge {
       readonly baseProjectRevision: number;
     };
   }) => Promise<GameApplyReceipt>;
+  buildGoldenProject?: (
+    mode: "LIVE" | "PINNED",
+  ) => Promise<GoldenProjectBuildResult>;
+  applyGoldenProject?: (
+    mode: "LIVE" | "PINNED",
+  ) => Promise<GoldenProjectBuildResult>;
+  startGoldenAudioPreview?: () => boolean;
+  stopGoldenAudioPreview?: () => void;
 }
 
 type ExportModule = typeof import("./draw2-export.ts");
@@ -415,12 +499,12 @@ function loadAdvancedModule(): Promise<AdvancedModule> {
 function loadWorkspaceModule(): Promise<WorkspaceModule> {
   const workspaceMobileProjectionMarker = "20260819-compare-final-1";
   const workspaceChunkUrl = new URL(
-    "wp180-workspace.js?v=20260825-game-studio-systems-v82",
+    "wp180-workspace.js?v=20260828-pixync-presence-v1",
     import.meta.url,
   );
   workspaceChunkUrl.searchParams.set(
     "v",
-    "20260825-game-studio-systems-v82",
+    "20260828-pixync-presence-v1",
   );
   workspaceChunkUrl.searchParams.set(
     "mobile",
@@ -432,6 +516,28 @@ function loadWorkspaceModule(): Promise<WorkspaceModule> {
     WorkspaceModule
   >;
   return workspaceModulePromise;
+}
+
+function loadProjectSessionModule(): Promise<ProjectSessionModule> {
+  const sessionChunkUrl = new URL(
+    "project-session.js?v=20260828-studio-route-race-v2",
+    import.meta.url,
+  );
+  projectSessionModulePromise ??= import(
+    sessionChunkUrl.href
+  ) as unknown as Promise<ProjectSessionModule>;
+  return projectSessionModulePromise;
+}
+
+function loadProjectDataStorageModule(): Promise<ProjectDataStorageModule> {
+  const storageChunkUrl = new URL(
+    "project-data-storage.js?v=20260828-project-delete-v1",
+    import.meta.url,
+  ).href;
+  projectDataStorageModulePromise ??= import(
+    storageChunkUrl
+  ) as unknown as Promise<ProjectDataStorageModule>;
+  return projectDataStorageModulePromise;
 }
 
 function getWorkspacePxdBridge(): WorkspacePxdBridge {
@@ -667,8 +773,8 @@ const workspaceFrameElement = document.querySelector<HTMLElement>(
 const projectStartElement = document.querySelector<HTMLElement>(
   "#draw2ProjectStart",
 );
-const projectStartNewButton = document.querySelector<HTMLButtonElement>(
-  "#draw2ProjectStartNew",
+const projectStartModeButtons = Array.from(
+  document.querySelectorAll<HTMLButtonElement>("[data-project-start-mode]"),
 );
 const projectStartOpenButton = document.querySelector<HTMLButtonElement>(
   "#draw2ProjectStartOpen",
@@ -747,6 +853,18 @@ const commitSelectionButton = document.querySelector<HTMLButtonElement>(
 );
 const cancelSelectionButton = document.querySelector<HTMLButtonElement>(
   "#draw2CancelSelection",
+);
+const selectionStampNameInputElement = document.querySelector<HTMLInputElement>(
+  "#draw2SelectionStampName",
+);
+const selectionStampSaveButton = document.querySelector<HTMLButtonElement>(
+  "#draw2SelectionStampSave",
+);
+const selectionStampListElement = document.querySelector<HTMLElement>(
+  "#draw2SelectionStampList",
+);
+const selectionStampStatusElement = document.querySelector<HTMLElement>(
+  "#draw2SelectionStampStatus",
 );
 const previewButton = document.querySelector<HTMLButtonElement>(
   "#draw2PreviewTransform",
@@ -1100,6 +1218,25 @@ const gamePreviewReloadButton = document.querySelector<HTMLButtonElement>(
 const gamePreviewStatusElement = document.querySelector<HTMLElement>(
   "#draw2GamePreviewStatus",
 );
+const goldenProjectStatusElement = document.querySelector<HTMLElement>(
+  "#draw2GoldenProjectStatus",
+);
+const goldenProjectRefsElement = document.querySelector<HTMLElement>(
+  "#draw2GoldenProjectRefs",
+);
+const goldenProjectApplyButton = document.querySelector<HTMLButtonElement>(
+  "#draw2GoldenProjectApply",
+);
+const projectSessionCheckpointButton = document.querySelector<
+  HTMLButtonElement
+>(
+  "#draw2ProjectSessionCheckpoint",
+);
+const projectSessionCheckpointStatusElement = document.querySelector<
+  HTMLElement
+>(
+  "#draw2ProjectSessionCheckpointStatus",
+);
 const gamePreviewCanvasElement = document.querySelector<HTMLCanvasElement>(
   "#draw2GamePreviewCanvas",
 );
@@ -1108,9 +1245,6 @@ const advancedLoadButton = document.querySelector<HTMLButtonElement>(
 );
 const advancedPatternButton = document.querySelector<HTMLButtonElement>(
   "#draw2AdvancedPattern",
-);
-const advancedStampButton = document.querySelector<HTMLButtonElement>(
-  "#draw2AdvancedStamp",
 );
 const advancedMirrorButton = document.querySelector<HTMLButtonElement>(
   "#draw2AdvancedMirror",
@@ -1267,6 +1401,9 @@ if (
   transformDxElement === null || transformDyElement === null ||
   transformFactorElement === null || selectButton === null ||
   commitSelectionButton === null || cancelSelectionButton === null ||
+  selectionStampNameInputElement === null ||
+  selectionStampSaveButton === null ||
+  selectionStampListElement === null || selectionStampStatusElement === null ||
   previewButton === null || commitButton === null || cancelButton === null ||
   flipHorizontalButton === null || flipVerticalButton === null ||
   rotateCCWButton === null || rotateCWButton === null ||
@@ -1308,10 +1445,13 @@ if (
   colorEditorStatusElement === null || gamePreviewStartButton === null ||
   gamePreviewStopButton === null || gamePreviewRestartButton === null ||
   gamePreviewPinButton === null || gamePreviewReloadButton === null ||
-  gamePreviewStatusElement === null || gamePreviewCanvasElement === null ||
+  gamePreviewStatusElement === null || goldenProjectStatusElement === null ||
+  goldenProjectRefsElement === null || goldenProjectApplyButton === null ||
+  projectSessionCheckpointButton === null ||
+  projectSessionCheckpointStatusElement === null ||
+  gamePreviewCanvasElement === null ||
   advancedLoadButton === null || advancedPatternButton === null ||
-  advancedStampButton === null || advancedMirrorButton === null ||
-  advancedGridButton === null ||
+  advancedMirrorButton === null || advancedGridButton === null ||
   advancedGuideButton === null ||
   advancedStatusElement === null || languageElement === null ||
   exportPanelStatusElement === null || exportNameElement === null ||
@@ -1386,14 +1526,25 @@ const canvasResizePreviewContent = canvasResizePreviewContentElement;
 
 const drawPersistenceStore = createIndexedDbDraw2PersistenceStore();
 const workspaceManifestStore = createIndexedDbWorkspaceManifestStore();
-const DRAW2_PERSISTED_HISTORY_LIMIT = 32;
 const DRAW2_PERSISTED_JOURNAL_LIMIT = 32;
 const DRAW2_PERSISTENCE_DEBOUNCE_MS = 250;
 let drawPersistenceRevision = 0;
+// The local revision counter is allowed to advance while a save is in flight;
+// these two values describe the last snapshot that this tab actually
+// observed as persisted. They form the CAS base for the next save.
+let drawPersistenceExpectedRevision = 0;
+let drawPersistenceExpectedStateHash: string | null = null;
 let drawPersistenceSaveQueue: Promise<void> = Promise.resolve();
 let drawPersistenceSaveTimer: number | undefined;
-let drawPersistenceSavePending = false;
-let drawPersistenceSaveReason = "edit";
+interface DrawPersistenceSnapshotEnvelope {
+  readonly reason: string;
+  readonly state: ProjectState;
+  readonly history: ReturnType<LocalUndoRedoHistory["snapshot"]>;
+  readonly journal: Draw2JournalSnapshot;
+  readonly assetDefinitions: readonly PxdAssetDefinitionEntry[];
+  readonly timelineMetadata: Draw2TimelineMetadata;
+}
+let drawPersistenceSavePending: DrawPersistenceSnapshotEnvelope | undefined;
 
 function drawJournalSnapshot(): Draw2JournalSnapshot {
   const operations = journal.operations.slice(-DRAW2_PERSISTED_JOURNAL_LIMIT);
@@ -1413,8 +1564,14 @@ function drawJournalSnapshot(): Draw2JournalSnapshot {
 }
 
 function queueDrawPersistenceSave(reason: string): void {
-  drawPersistenceSavePending = true;
-  drawPersistenceSaveReason = reason;
+  drawPersistenceSavePending = {
+    reason,
+    state: cloneProjectStateShared(state),
+    history: history.snapshot(DRAW2_PERSISTED_HISTORY_LIMIT),
+    journal: drawJournalSnapshot(),
+    assetDefinitions: assetDefinitions.map(cloneAssetDefinitionEntry),
+    timelineMetadata: draw2TimelineMetadataSnapshot(),
+  };
   if (drawPersistenceSaveTimer !== undefined) return;
   drawPersistenceSaveTimer = window.setTimeout(() => {
     drawPersistenceSaveTimer = undefined;
@@ -1423,33 +1580,39 @@ function queueDrawPersistenceSave(reason: string): void {
 }
 
 async function drainDrawPersistenceSave(): Promise<void> {
-  if (!drawPersistenceSavePending) return;
-  const reason = drawPersistenceSaveReason;
-  drawPersistenceSavePending = false;
-  const snapshotState = state;
-  const snapshotHistory = history.snapshot(DRAW2_PERSISTED_HISTORY_LIMIT);
-  const snapshotJournal = drawJournalSnapshot();
-  const projectId = snapshotState.projectId;
+  const envelope = drawPersistenceSavePending;
+  if (envelope === undefined) return;
+  drawPersistenceSavePending = undefined;
+  const projectId = envelope.state.projectId;
   const revision = drawPersistenceRevision + 1;
   drawPersistenceRevision = revision;
   drawPersistenceSaveQueue = drawPersistenceSaveQueue.then(async () => {
+    const expectedRevision = drawPersistenceExpectedRevision;
+    const expectedStateHash = drawPersistenceExpectedStateHash;
     const record = await createDraw2PersistenceRecord(
-      snapshotState,
-      snapshotHistory,
-      snapshotJournal,
+      envelope.state,
+      envelope.history,
+      envelope.journal,
       revision,
       new Date().toISOString(),
-      assetDefinitions,
-      draw2TimelineMetadataSnapshot(),
+      envelope.assetDefinitions,
+      envelope.timelineMetadata,
     );
-    const saved = await drawPersistenceStore.save(record);
+    const saved = await drawPersistenceStore.save(record, {
+      expectedRevision,
+      expectedStateHash,
+    });
     if (!saved.ok) {
       document.body.dataset.drawPersistenceState = "unavailable";
       return;
     }
+    if (!saved.stale) {
+      drawPersistenceExpectedRevision = revision;
+      drawPersistenceExpectedStateHash = record.stateHash;
+    }
     document.body.dataset.drawPersistenceState = saved.stale
       ? "stale-write-ignored"
-      : reason === "recovery"
+      : envelope.reason === "recovery"
       ? "restored"
       : "saved";
     document.body.dataset.drawPersistenceRevision = String(revision);
@@ -1462,13 +1625,15 @@ async function drainDrawPersistenceSave(): Promise<void> {
         stateHash: record.stateHash,
         savedAt: record.savedAt,
       },
-      snapshotState.name,
+      envelope.state.name,
     );
   }).catch(() => {
     document.body.dataset.drawPersistenceState = "error";
   });
   await drawPersistenceSaveQueue.catch(() => undefined);
-  if (drawPersistenceSavePending) await drainDrawPersistenceSave();
+  if (drawPersistenceSavePending !== undefined) {
+    await drainDrawPersistenceSave();
+  }
 }
 
 async function flushDrawPersistence(): Promise<void> {
@@ -1477,11 +1642,14 @@ async function flushDrawPersistence(): Promise<void> {
       window.clearTimeout(drawPersistenceSaveTimer);
       drawPersistenceSaveTimer = undefined;
     }
-    if (drawPersistenceSavePending) await drainDrawPersistenceSave();
+    if (drawPersistenceSavePending !== undefined) {
+      await drainDrawPersistenceSave();
+    }
     const queue = drawPersistenceSaveQueue;
     await queue.catch(() => undefined);
     if (
-      !drawPersistenceSavePending && drawPersistenceSaveTimer === undefined &&
+      drawPersistenceSavePending === undefined &&
+      drawPersistenceSaveTimer === undefined &&
       queue === drawPersistenceSaveQueue
     ) return;
   }
@@ -1616,6 +1784,10 @@ const transformDy = transformDyElement;
 const transformFactor = transformFactorElement;
 const commitSelectionControl = commitSelectionButton;
 const cancelSelectionControl = cancelSelectionButton;
+const selectionStampNameInput = selectionStampNameInputElement;
+const selectionStampSaveControl = selectionStampSaveButton;
+const selectionStampList = selectionStampListElement;
+const selectionStampStatus = selectionStampStatusElement;
 const cancelTransformControl = cancelButton;
 const copyControl = copyButton;
 const cutControl = cutButton;
@@ -3019,7 +3191,6 @@ type PlaybackLoopMode = "off" | "loop" | "bounce";
 let playbackLoopMode: PlaybackLoopMode = "loop";
 const advancedLoadControl = advancedLoadButton;
 const advancedPatternControl = advancedPatternButton;
-const advancedStampControl = advancedStampButton;
 const advancedMirrorControl = advancedMirrorButton;
 const advancedGridControl = advancedGridButton;
 const advancedGuideControl = advancedGuideButton;
@@ -3090,9 +3261,27 @@ let state: ProjectState = createProject({
 const selectedExportFormats = new Set<ExportFormat>(["png"]);
 let exportPackageMode: ExportPackageMode = "single";
 let core = new EditorCore(state, { instrumentation });
+let canonicalStateGeneration = 0;
 let history = new LocalUndoRedoHistory(state);
 let pixyncDrawActorId: string | undefined;
 let pixyncDrawClientId: string | undefined;
+let canonicalOperationQueue: Promise<void> = Promise.resolve();
+
+/** Adopt a canonical result and rebuild the command facade from that result. */
+function adoptCanonicalState(nextState: ProjectState): void {
+  state = nextState;
+  core = new EditorCore(state, { instrumentation });
+  canonicalStateGeneration += 1;
+}
+
+/** Serialize every async operation that can replace the canonical state. */
+function enqueueCanonicalOperation<T>(
+  operation: () => Promise<T>,
+): Promise<T> {
+  const queued = canonicalOperationQueue.then(operation);
+  canonicalOperationQueue = queued.then(() => undefined, () => undefined);
+  return queued;
+}
 
 window.addEventListener("draw2:pixync-binding", (event) => {
   const detail = (event as CustomEvent<{
@@ -3128,6 +3317,25 @@ function publishDrawRasterCommit(
   );
 }
 
+function productionPayloadExceedsRealtimeBytes(payload: unknown): boolean {
+  if (pixyncProductionRoot === undefined) return false;
+  try {
+    return new TextEncoder().encode(JSON.stringify(payload)).byteLength >
+      PIXYNC_DRAW2_MAX_PAYLOAD_BYTES;
+  } catch {
+    return true;
+  }
+}
+
+function rejectOversizedProductionPayload(payload: unknown): boolean {
+  if (!productionPayloadExceedsRealtimeBytes(payload)) return false;
+  setStatus(
+    "この操作はリアルタイム同期の上限を超えるため、変更を確定しません。選択範囲を小さくするか、操作を分割してください。",
+    "error",
+  );
+  return true;
+}
+
 const pixyncDrawStatePort: PixyncDrawProductStatePort = {
   preservesLocalHistory: true,
   current: () => ({
@@ -3135,51 +3343,70 @@ const pixyncDrawStatePort: PixyncDrawProductStatePort = {
     undoDepth: history.undoDepth,
     redoDepth: history.redoDepth,
   }),
-  applyRemote: async (input: DrawApplyInput): Promise<DrawApplyReceipt> => {
-    const operation = input.operation;
-    const command: EditorCommand = {
-      commandId: operation.commandId,
-      projectId: operation.projectId,
-      assetId: operation.assetId,
-      actorId: operation.actorId,
-      clientId: operation.clientId,
-      clientSequence: operation.clientSequence,
-      structureEpoch: input.baseStructureEpoch,
-      schemaVersion: 1,
-      baseStructureEpoch: input.baseStructureEpoch,
-      createdAtMonotonicMs: performance.now(),
-      commandType: operation.operationType as EditorCommand["commandType"],
-      payload: operation.payload as EditorCommand["payload"],
-    } as unknown as EditorCommand;
-    const remoteCore = new EditorCore(state, { instrumentation });
-    const applied = await remoteCore.execute(command);
-    if (!applied.ok) {
-      throw new Error(
-        applied.diagnostics[0]?.code ?? "PIXYNC_DRAW_REMOTE_APPLY_FAILED",
-      );
-    }
-    state = applied.state;
-    core = new EditorCore(state, { instrumentation });
-    saveDrawProjectState("pixync-remote");
-    notifyAssetStateChanged();
-    renderTimeline();
-    await present();
-    const rasterHash = await drawRasterHash(state, operation.assetId);
-    return {
-      operationId: operation.operationId,
-      projectId: operation.projectId,
-      actorId: operation.actorId,
-      clientId: operation.clientId,
-      clientSequence: operation.clientSequence,
-      baseProjectRevision: input.baseProjectRevision,
-      assetId: operation.assetId,
-      baseStructureEpoch: input.baseStructureEpoch,
-      structureEpoch: state.structureEpoch,
-      rasterHash,
-      localUndoDepth: history.undoDepth,
-      localRedoDepth: history.redoDepth,
-    };
-  },
+  applyRemote: (input: DrawApplyInput): Promise<DrawApplyReceipt> =>
+    enqueueCanonicalOperation(async () => {
+      const operation = input.operation;
+      const command: EditorCommand = {
+        commandId: operation.commandId,
+        projectId: operation.projectId,
+        assetId: operation.assetId,
+        actorId: operation.actorId,
+        clientId: operation.clientId,
+        clientSequence: operation.clientSequence,
+        structureEpoch: input.baseStructureEpoch,
+        schemaVersion: 1,
+        baseStructureEpoch: input.baseStructureEpoch,
+        createdAtMonotonicMs: performance.now(),
+        commandType: operation.operationType as EditorCommand["commandType"],
+        payload: operation.payload as EditorCommand["payload"],
+      } as unknown as EditorCommand;
+      const applied = operation.operationType === "selection.transformCommit"
+        ? await applyCompactSelectionTransform(state, {
+          ...command,
+          commandType: "selection.transformCommit",
+          payload: operation.payload,
+        } as unknown as SelectionTransformWireCommand)
+        : await new EditorCore(state, { instrumentation }).execute(command);
+      if (!applied.ok) {
+        throw new Error(
+          applied.diagnostics[0]?.code ?? "PIXYNC_DRAW_REMOTE_APPLY_FAILED",
+        );
+      }
+      if (!applied.result.noOp) {
+        if (operation.operationType === "selection.transformCommit") {
+          await history.rebaseRemoteSelectionTransformOperation(
+            {
+              ...command,
+              commandType: "selection.transformCommit",
+              payload: operation.payload,
+            } as unknown as SelectionTransformWireCommand,
+            applied.state,
+          );
+        } else {
+          await history.rebaseRemoteRasterOperation(command, applied.state);
+        }
+        adoptCanonicalState(applied.state);
+        saveDrawProjectState("pixync-remote");
+        notifyAssetStateChanged();
+        renderTimeline();
+        await present();
+      }
+      const rasterHash = await drawRasterHash(state, operation.assetId);
+      return {
+        operationId: operation.operationId,
+        projectId: operation.projectId,
+        actorId: operation.actorId,
+        clientId: operation.clientId,
+        clientSequence: operation.clientSequence,
+        baseProjectRevision: input.baseProjectRevision,
+        assetId: operation.assetId,
+        baseStructureEpoch: input.baseStructureEpoch,
+        structureEpoch: state.structureEpoch,
+        rasterHash,
+        localUndoDepth: history.undoDepth,
+        localRedoDepth: history.redoDepth,
+      };
+    }),
 };
 
 interface Draw2PixyncJournalBinding {
@@ -3190,6 +3417,402 @@ interface Draw2PixyncJournalBinding {
 let pixyncProjectLifecycle:
   | PixyncProjectLifecycleCoordinator<Draw2PixyncJournalBinding>
   | undefined;
+
+interface SharedPixyncPersistence {
+  readonly projectId: string;
+  readonly port: PixyncSnapshotPersistencePort & {
+    remove(): Promise<boolean>;
+  };
+}
+
+let sharedPixyncPersistence: SharedPixyncPersistence | undefined;
+
+function clonePixyncSnapshot(
+  snapshot: PixyncDurableSnapshot | undefined,
+): PixyncDurableSnapshot | undefined {
+  return snapshot === undefined ? undefined : structuredClone(snapshot);
+}
+
+function pixyncPersistenceFor(
+  projectId: string,
+): PixyncSnapshotPersistencePort & { remove(): Promise<boolean> } {
+  if (sharedPixyncPersistence?.projectId === projectId) {
+    return sharedPixyncPersistence.port;
+  }
+  const inner = createPixyncIndexedDbPersistence(projectId);
+  let loaded = false;
+  let cached: PixyncDurableSnapshot | undefined;
+  let loadPromise: Promise<void> | undefined;
+  const port: PixyncSnapshotPersistencePort = {
+    async load() {
+      if (!loaded) {
+        loadPromise ??= inner.load().then((snapshot) => {
+          cached = clonePixyncSnapshot(snapshot);
+          loaded = true;
+          loadPromise = undefined;
+        }).catch((error) => {
+          loadPromise = undefined;
+          throw error;
+        });
+        await loadPromise;
+      } else if (await inner.isDeleted()) {
+        // A second tab can delete this Project after the active port was
+        // cached. Check only the tiny deletion store before returning a
+        // cached Snapshot, so a stale Project can never be reopened.
+        cached = undefined;
+      }
+      return clonePixyncSnapshot(cached);
+    },
+    async atomicReplace(snapshot) {
+      await inner.atomicReplace(snapshot);
+      cached = clonePixyncSnapshot(snapshot);
+      loaded = true;
+    },
+    async compareAndSwap(snapshot, expectedSnapshotHash) {
+      try {
+        await inner.compareAndSwap(snapshot, expectedSnapshotHash);
+        cached = clonePixyncSnapshot(snapshot);
+        loaded = true;
+      } catch (error) {
+        // A CAS conflict means this tab no longer knows the durable base. The
+        // next open must read the authoritative IndexedDB snapshot again.
+        cached = undefined;
+        loaded = false;
+        throw error;
+      }
+    },
+  };
+  const removablePort = port as PixyncSnapshotPersistencePort & {
+    remove(): Promise<boolean>;
+  };
+  removablePort.remove = async () => {
+    await inner.remove();
+    cached = undefined;
+    loaded = false;
+    loadPromise = undefined;
+    return true;
+  };
+  sharedPixyncPersistence = { projectId, port: removablePort };
+  return removablePort;
+}
+
+const LOCAL_SESSION_AGGREGATES = ["draw", "audio", "game"] as const;
+
+function createLocalProjectSessionAdapters(): readonly PixyncAggregateAdapter[] {
+  return LOCAL_SESSION_AGGREGATES.map((aggregate) => ({
+    aggregate,
+    // The session proves ordering and presence independently from product
+    // state. Product bridges remain the only owners of Draw/Audio/Game data.
+    apply: () => undefined,
+  }));
+}
+
+function creatorStartModeFromValue(value: unknown): CreatorStartMode {
+  return value === "AUDIO" ? "AUDIO" : value === "GAME" ? "GAME" : "DRAW";
+}
+
+function projectSessionModeFromCreatorMode(value: unknown): ProjectSessionMode {
+  const mode = creatorStartModeFromValue(value);
+  return mode === "AUDIO" ? "iAUDIO" : mode === "GAME" ? "iGAME" : "iDRAW";
+}
+
+function projectSessionSelectionLabel(mode: ProjectSessionMode): string {
+  return mode === "iAUDIO"
+    ? "Arrangement"
+    : mode === "iGAME"
+    ? "Scene"
+    : "Canvas";
+}
+
+let localProjectSession: ProjectSessionClient | undefined;
+let localProjectSessionUnsubscribe: (() => void) | undefined;
+let localProjectSessionRequestGeneration = 0;
+
+async function stopLocalProjectSession(): Promise<void> {
+  localProjectSessionRequestGeneration += 1;
+  const previous = localProjectSession;
+  localProjectSession = undefined;
+  localProjectSessionUnsubscribe?.();
+  localProjectSessionUnsubscribe = undefined;
+  await previous?.disconnect().catch(() => undefined);
+}
+
+function publishLocalProjectSessionStatus(snapshot: ProjectSessionState): void {
+  const viewState = snapshot.status === "CONFLICT"
+    ? "conflict"
+    : snapshot.status === "OFFLINE" || snapshot.status === "ERROR"
+    ? "offline"
+    : snapshot.status === "RECOVERING" || snapshot.status === "PENDING" ||
+        snapshot.status === "LOCAL_OPTIMISTIC"
+    ? "connecting"
+    : "local";
+  const error = snapshot.lastError === undefined
+    ? ""
+    : ` · ${snapshot.lastError.code}`;
+  document.body.dataset.projectSessionStatus = snapshot.status.toLowerCase();
+  document.body.dataset.projectSessionMode = snapshot.activeMode;
+  document.body.dataset.projectSessionRevision = String(
+    snapshot.projectRevision,
+  );
+  document.body.dataset.projectSessionPending = String(
+    snapshot.pendingOperationIds.length,
+  );
+  document.body.dataset.projectSessionRole = snapshot.role;
+  document.body.dataset.projectSessionCheckpoints = String(
+    snapshot.checkpoints.length,
+  );
+  if (projectSessionCheckpointStatusElement !== null) {
+    projectSessionCheckpointStatusElement.textContent =
+      `r${snapshot.projectRevision} · ${snapshot.checkpoints.length}保存点 · ${snapshot.role}`;
+  }
+  window.dispatchEvent(
+    new CustomEvent("draw2:pixync-status", {
+      detail: {
+        state: viewState,
+        roomId: `local:${snapshot.projectId}`,
+        revision: `r${snapshot.projectRevision}`,
+        members: String(Math.max(1, snapshot.presence.length)),
+        latencyMs: 0,
+        message:
+          `Project Session ${snapshot.status} · ${snapshot.activeMode} · ` +
+          `ローカル共同編集リハーサル（本番PiXYNC未接続）${error}`,
+      },
+    }),
+  );
+}
+
+async function startLocalProjectSession(
+  projectId: string,
+  creatorMode: CreatorStartMode,
+): Promise<void> {
+  const requestGeneration = ++localProjectSessionRequestGeneration;
+  localProjectSessionUnsubscribe?.();
+  localProjectSessionUnsubscribe = undefined;
+  const previous = localProjectSession;
+  localProjectSession = undefined;
+  await previous?.disconnect().catch(() => undefined);
+  if (requestGeneration !== localProjectSessionRequestGeneration) return;
+
+  const sessionModule = await loadProjectSessionModule();
+  if (requestGeneration !== localProjectSessionRequestGeneration) return;
+  const adapters = createLocalProjectSessionAdapters();
+  const broker = new sessionModule.LocalProjectSessionBroker({
+    projectId,
+    adapters,
+  });
+  const session = new sessionModule.ProjectSessionClient({
+    broker,
+    projectId,
+    actorId: pixyncTabIdentity(
+      "pixiedraw2:project-session-actor:v1",
+      "local-actor",
+    ),
+    clientId: pixyncTabIdentity(
+      "pixiedraw2:project-session-client:v1",
+      "local-client",
+    ),
+    displayName: "This tab",
+    activeMode: projectSessionModeFromCreatorMode(creatorMode),
+    adapters,
+  });
+  if (requestGeneration !== localProjectSessionRequestGeneration) {
+    await session.disconnect();
+    return;
+  }
+  localProjectSession = session;
+  localProjectSessionUnsubscribe = session.onState(
+    publishLocalProjectSessionStatus,
+  );
+  (window as Window & {
+    __pixiedraw2ProjectSession?: ProjectSessionClient;
+  }).__pixiedraw2ProjectSession = session;
+  try {
+    await session.connect();
+    await session.publishPresence(
+      projectSessionSelectionLabel(session.state().activeMode),
+    );
+  } catch {
+    publishLocalProjectSessionStatus(session.state());
+  }
+}
+
+const pixyncProductionPresence = new Map<string, PixyncTransportPresence>();
+let pixyncProductionTransportStatus: PixyncTransportStatus = "CLOSED";
+
+function applyPixyncProductionPresence(
+  event: PixyncTransportPresenceEvent,
+  projectId: string,
+): void {
+  if (event.kind === "sync") {
+    pixyncProductionPresence.clear();
+    for (const presence of event.presence) {
+      pixyncProductionPresence.set(presence.clientId, presence);
+    }
+  } else if (event.kind === "upsert") {
+    pixyncProductionPresence.set(event.presence.clientId, event.presence);
+  } else {
+    pixyncProductionPresence.delete(event.clientId);
+  }
+  publishPixyncProductionStatus(pixyncProductionTransportStatus, projectId);
+}
+
+function publishPixyncProductionStatus(
+  status: PixyncTransportStatus,
+  projectId = state.projectId,
+  message?: string,
+): void {
+  pixyncProductionTransportStatus = status;
+  const syncState = status === "SUBSCRIBED"
+    ? "synced"
+    : status === "OFFLINE" || status === "CLOSED"
+    ? "offline"
+    : "connecting";
+  document.body.dataset.pixyncState = status.toLowerCase();
+  window.dispatchEvent(
+    new CustomEvent("draw2:pixync-status", {
+      detail: {
+        state: syncState,
+        roomId: projectId,
+        revision: "—",
+        members: pixyncProductionPresence.size === 0
+          ? "—"
+          : String(pixyncProductionPresence.size),
+        message: message ??
+          (status === "SUBSCRIBED"
+            ? "PiXYNC RealtimeでProjectを同期しています。"
+            : status === "OFFLINE" || status === "CLOSED"
+            ? "同期が切断されました。ローカル変更を保持して再接続を待機します。"
+            : "PiXYNC Realtimeへ接続しています。"),
+      },
+    }),
+  );
+}
+
+async function publishProductionCheckpoint(): Promise<void> {
+  const checkpointButton = projectSessionCheckpointButton;
+  const checkpointStatus = projectSessionCheckpointStatusElement;
+  if (checkpointButton === null || checkpointStatus === null) return;
+  const projectId = state.projectId;
+  const client = await availablePixyncSupabaseClient();
+  if (client === undefined) {
+    checkpointStatus.textContent =
+      "ログインを確認できないため、共有Checkpointを保存できません。";
+    return;
+  }
+  checkpointButton.disabled = true;
+  checkpointStatus.textContent = "Draw・Audio・Gameを含むCheckpointを検証中…";
+  try {
+    await flushDrawPersistence();
+    const exportState = state;
+    const exportModule = await loadExportModule();
+    const artifact = await createPxdProjectArtifact(
+      exportModule,
+      safeExportBaseName(),
+    );
+    if (state !== exportState || state.projectId !== projectId) {
+      throw new Error(
+        "保存中にProjectが変更されました。もう一度Checkpointを保存してください。",
+      );
+    }
+    const key = "pixiedraw2:pixync-attestation-client-id:v1";
+    const storedClientId = sessionStorage.getItem(key);
+    const attestationClientId = storedClientId ?? crypto.randomUUID();
+    if (storedClientId === null) {
+      sessionStorage.setItem(key, attestationClientId);
+    }
+    const result = await publishPixyncCheckpoint(client, {
+      projectId,
+      checkpointBytes: artifact.bytes,
+      attestationClientId,
+    });
+    if (state.projectId !== projectId) {
+      throw new Error(
+        "保存後にProjectが変更されました。現在のProjectを確認してください。",
+      );
+    }
+    document.body.dataset.pixyncCheckpointRevision = String(result.revision);
+    document.body.dataset.pixyncCheckpointStatus = result.status;
+    checkpointStatus.textContent = result.active
+      ? `Checkpoint r${result.revision} を共有保存しました · verified · ${
+        result.packageHash.slice(0, 12)
+      }…`
+      : `Checkpoint r${result.revision} は候補として保存しました · ${result.attestedUserCount}/${result.requiredUserCount}人の検証待ち`;
+  } catch (error) {
+    checkpointStatus.textContent = error instanceof Error
+      ? `共有Checkpointを保存できませんでした: ${error.message}`
+      : "共有Checkpointを保存できませんでした。";
+  } finally {
+    checkpointButton.disabled = false;
+  }
+}
+
+window.addEventListener("draw2:creator-mode", (event) => {
+  const mode = (event as CustomEvent<{ readonly mode?: unknown }>).detail?.mode;
+  const session = localProjectSession;
+  const sessionMode = projectSessionModeFromCreatorMode(mode);
+  if (session !== undefined) {
+    session.setActiveMode(sessionMode);
+    void session.publishPresence(projectSessionSelectionLabel(sessionMode))
+      .catch(
+        () => publishLocalProjectSessionStatus(session.state()),
+      );
+  }
+  const production = pixyncProductionRoot;
+  if (production !== undefined) {
+    void production.publishPresence({
+      displayName: "This tab",
+      mode: sessionMode,
+      selectionLabel: projectSessionSelectionLabel(sessionMode),
+    }).catch(() => undefined);
+  }
+});
+
+projectSessionCheckpointButton.addEventListener("click", async () => {
+  if (document.body.dataset.pixyncComposition === "production") {
+    await publishProductionCheckpoint();
+    return;
+  }
+  const session = localProjectSession;
+  if (session === undefined) {
+    projectSessionCheckpointStatusElement.textContent =
+      "Project Sessionがまだ接続されていません。";
+    return;
+  }
+  projectSessionCheckpointButton.disabled = true;
+  projectSessionCheckpointStatusElement.textContent = "Checkpointを保存中…";
+  try {
+    const checkpoint = await session.createCheckpoint({
+      checkpointId: `checkpoint:local:${crypto.randomUUID()}`,
+      label: `Project revision r${session.state().projectRevision}`,
+      kind: "MANUAL",
+    });
+    projectSessionCheckpointStatusElement.textContent =
+      `Checkpoint r${checkpoint.projectRevision} を保存しました · Local Session`;
+  } catch (error) {
+    projectSessionCheckpointStatusElement.textContent = error instanceof Error
+      ? `Checkpointを保存できませんでした: ${error.message}`
+      : "Checkpointを保存できませんでした。";
+  } finally {
+    projectSessionCheckpointButton.disabled = false;
+  }
+});
+
+window.addEventListener(WORKSPACE_PROJECT_CHANGED_EVENT, (event) => {
+  const session = localProjectSession;
+  const projectId = (event as CustomEvent<{ readonly projectId?: unknown }>)
+    .detail?.projectId;
+  if (
+    session === undefined || typeof projectId !== "string" ||
+    projectId === session.state().projectId
+  ) return;
+  void startLocalProjectSession(
+    projectId,
+    creatorStartModeFromValue(
+      document.querySelector<HTMLElement>("#draw2WorkspaceFrame")?.dataset
+        .creatorMode,
+    ),
+  ).catch(() => undefined);
+});
 
 function projectPixyncState(
   phase: string,
@@ -3210,7 +3833,7 @@ async function startPixyncProjectLifecycle(): Promise<void> {
     eventName: WORKSPACE_PROJECT_CHANGED_EVENT,
     initialProjectId: state.projectId,
     createPersistence: (projectId) =>
-      createPixyncIndexedDbPersistence(projectId),
+      pixyncPersistenceFor(projectId),
     openJournal: async (projectId, persistence) => ({
       projectId,
       journal: await PixyncDurableJournal.open(projectId, persistence),
@@ -3234,11 +3857,16 @@ async function startPixyncProjectLifecycle(): Promise<void> {
 
 window.addEventListener("pagehide", (event) => {
   // A bfcache page remains live and must keep the same listener. A real page
-  // exit disposes the local lifecycle; Realtime is intentionally not wired.
+  // exit disposes both the local lifecycle and the production Realtime root.
   if (event.persisted) return;
   const lifecycle = pixyncProjectLifecycle;
   pixyncProjectLifecycle = undefined;
   void lifecycle?.dispose();
+  void localProjectSession?.disconnect();
+  localProjectSessionRequestGeneration += 1;
+  localProjectSession = undefined;
+  localProjectSessionUnsubscribe?.();
+  localProjectSessionUnsubscribe = undefined;
   void pixyncProductionRoot?.close("pagehide");
   pixyncProductionRoot = undefined;
 });
@@ -3324,9 +3952,11 @@ function requireWorkspacePixyncBridge(): Required<
 async function startPixyncProductionRoot(
   suppliedClient?: PixyncSupabaseSdkClient,
 ): Promise<boolean> {
-  if (!PIXYNC_ROOM_ID.test(state.projectId)) {
+  const projectId = state.projectId;
+  if (!PIXYNC_ROOM_ID.test(projectId)) {
     await pixyncProductionRoot?.close("local-project");
     pixyncProductionRoot = undefined;
+    pixyncProductionPresence.clear();
     document.body.dataset.pixyncComposition = "local";
     await startPixyncProjectLifecycle();
     return false;
@@ -3335,22 +3965,41 @@ async function startPixyncProductionRoot(
   if (client === undefined) {
     await pixyncProductionRoot?.close("authentication-unavailable");
     pixyncProductionRoot = undefined;
+    pixyncProductionPresence.clear();
     document.body.dataset.pixyncComposition = "awaiting-auth";
     return false;
   }
   const workspace = requireWorkspacePixyncBridge();
+  try {
+    await hydratePixyncCheckpointIfNeeded(client, projectId);
+  } catch (error) {
+    if (error instanceof PixyncRemoteCheckpointError) {
+      document.body.dataset.pixyncComposition =
+        error.code === "AUTHENTICATION_REQUIRED" ||
+          error.code === "AUTHENTICATION_FAILED"
+          ? "awaiting-auth"
+          : "awaiting-checkpoint";
+      publishPixyncProductionStatus(
+        "OFFLINE",
+        projectId,
+        error.code === "AUTHENTICATION_REQUIRED"
+          ? "共有Projectを復元するにはログインが必要です。ローカル編集を継続します。"
+          : "共有Projectの初期Checkpointを検証できないため、ローカル編集を継続します。",
+      );
+    }
+    throw error;
+  }
   await Promise.all([
     workspace.preparePixyncAudioState(),
     workspace.preparePixyncGameState(),
   ]);
   await pixyncProductionRoot?.close("project-transition");
   pixyncProductionRoot = undefined;
-  if (pixyncProjectLifecycle !== undefined) {
-    const localLifecycle = pixyncProjectLifecycle;
-    pixyncProjectLifecycle = undefined;
-    await localLifecycle.dispose();
-  }
-  const projectId = state.projectId;
+  pixyncProductionPresence.clear();
+  // Keep the local lifecycle alive until the authenticated root has fully
+  // connected. If authentication, membership, or Realtime fails, local
+  // editing remains available without losing the current session boundary.
+  const localLifecycle = pixyncProjectLifecycle;
   const clientId = pixyncTabIdentity(
     "pixiedraw2:pixync-client-id",
     "draw2-client",
@@ -3359,6 +4008,12 @@ async function startPixyncProductionRoot(
   const workerId = pixyncTabIdentity(
     "pixiedraw2:pixync-worker-id",
     "draw2-worker",
+  );
+  const currentCreatorMode = projectSessionModeFromCreatorMode(
+    creatorStartModeFromValue(
+      document.querySelector<HTMLElement>("#draw2WorkspaceFrame")?.dataset
+        .creatorMode,
+    ),
   );
   let root: PixyncProductionCompositionRoot | undefined;
   const gameRevisions = new PixyncGameRevisionRemoteStore(
@@ -3371,8 +4026,14 @@ async function startPixyncProductionRoot(
     sessionGeneration,
     workerId,
     supabase: client,
-    persistence: createPixyncIndexedDbPersistence(projectId),
+    persistence: pixyncPersistenceFor(projectId),
     eventTarget: window,
+    presence: {
+      displayName: "This tab",
+      mode: currentCreatorMode,
+      selectionLabel: projectSessionSelectionLabel(currentCreatorMode),
+    },
+    onPresence: (event) => applyPixyncProductionPresence(event, projectId),
     audioHydration: {
       hydrateAudio: async (request) => {
         await workspace.preparePixyncAudioState();
@@ -3437,19 +4098,98 @@ async function startPixyncProductionRoot(
         },
       };
     },
-    onStatus: (status) => {
-      document.body.dataset.pixyncState = status.toLowerCase();
-    },
+    onStatus: (status) => publishPixyncProductionStatus(status, projectId),
     onError: (error) => {
       document.body.dataset.pixyncState = "error";
       document.body.dataset.pixyncError = error instanceof Error
         ? error.message
         : "PIXYNC_RUNTIME_ERROR";
+      publishPixyncProductionStatus(
+        "OFFLINE",
+        projectId,
+        "PiXYNCでエラーが発生しました。ローカル変更を保持しています。",
+      );
     },
   });
   await root.connect();
+  if (state.projectId !== projectId) {
+    if (pixyncProjectLifecycle === localLifecycle) {
+      pixyncProjectLifecycle = undefined;
+    }
+    await localLifecycle?.dispose();
+    await root.close("project-changed-during-connect");
+    return false;
+  }
+  if (pixyncProjectLifecycle === localLifecycle) {
+    pixyncProjectLifecycle = undefined;
+  }
+  await localLifecycle?.dispose();
+  await stopLocalProjectSession();
   pixyncProductionRoot = root;
   document.body.dataset.pixyncComposition = "production";
+  publishPixyncProductionStatus("SUBSCRIBED", projectId);
+  return true;
+}
+
+interface PxdEntryImportOptions {
+  readonly expectedPackageHash?: string;
+  readonly expectedProjectId?: string;
+  readonly announceProjectChange?: boolean;
+  readonly source?: "LOCAL_FILE" | "REMOTE_CHECKPOINT";
+}
+
+function currentDrawStateHasLocalWork(): boolean {
+  if (state.structureEpoch > 1 || assetDefinitions.length > 0) return true;
+  if (history.undoDepth > 0 || history.redoDepth > 0) return true;
+  if (journal.operations.length > 0 || journal.dirtyTileWrites.length > 0) {
+    return true;
+  }
+  for (const tilemap of Object.values(state.tilemaps ?? {})) {
+    if (Object.keys(tilemap.cells).length > 0) return true;
+  }
+  for (const asset of Object.values(state.assets)) {
+    for (const tile of asset.raster.snapshotTiles()) {
+      if (tile.bytes.some((value) => value !== 0)) return true;
+    }
+  }
+  return false;
+}
+
+async function hydratePixyncCheckpointIfNeeded(
+  client: PixyncSupabaseSdkClient,
+  projectId: string,
+): Promise<boolean> {
+  // A valid local session may contain edits that have not reached PiXYNC yet.
+  // Never replace those edits with a remote checkpoint merely because the
+  // Room URL is a UUID.
+  if (currentDrawStateHasLocalWork()) return false;
+  if (state.projectId !== projectId) {
+    throw new Error("The Project changed before PiXYNC checkpoint restore.");
+  }
+  const checkpoint = await readPixyncActiveCheckpoint(client, projectId);
+  if (state.projectId !== projectId) {
+    throw new Error("The Project changed during PiXYNC checkpoint restore.");
+  }
+  const file = new File(
+    [checkpoint.bytes.slice().buffer as ArrayBuffer],
+    `${projectId}.pxd`,
+    { type: "application/vnd.pixieed.pxd" },
+  );
+  try {
+    await importPxdFile(file, {
+      expectedPackageHash: checkpoint.packageHash,
+      expectedProjectId: projectId,
+      announceProjectChange: false,
+      source: "REMOTE_CHECKPOINT",
+    });
+  } catch (cause) {
+    if (cause instanceof PixyncRemoteCheckpointError) throw cause;
+    throw new PixyncRemoteCheckpointError(
+      "SERVER_RESPONSE_INVALID",
+      "The verified PiXYNC checkpoint could not be restored as a Studio Project.",
+      { cause },
+    );
+  }
   return true;
 }
 
@@ -3531,11 +4271,10 @@ function ensureTilemapFor(
     canvasHeight: source.height,
     cellSize,
   });
-  state = {
+  adoptCanonicalState({
     ...state,
     tilemaps: { ...(state.tilemaps ?? {}), [id]: map },
-  };
-  core = new EditorCore(state, { instrumentation });
+  });
   return map;
 }
 
@@ -3561,6 +4300,8 @@ tilesetGridElement?.addEventListener("click", (event) => {
     !Number.isSafeInteger(sourceX) || !Number.isSafeInteger(sourceY) ||
     (cellSize !== 16 && cellSize !== 32)
   ) return;
+  activeSelectionStampId = undefined;
+  renderSelectionStamps();
   selectedTileSource = {
     sourceAssetId: state.activeAssetId,
     sourceX,
@@ -3877,6 +4618,10 @@ const brushPresets = new BrushPresetStore(readStoredBrushPresets());
 const animationTags = new AnimationTagStore();
 const timelineMarkers = new TimelineMarkerStore();
 const drawAudioReferences = new DrawAudioReferenceStore();
+const selectionStampStore = new Draw2SelectionStampStore();
+let selectionStampSequence = 0;
+let activeSelectionStampId: string | undefined;
+let selectionStampToolActivation = false;
 
 interface DrawAudioCatalogItem {
   readonly audioAssetId: string;
@@ -3893,6 +4638,7 @@ function draw2TimelineMetadataSnapshot(): Draw2TimelineMetadata {
     animationTags: animationTags.list(),
     markers: timelineMarkers.list(),
     audioReferences: drawAudioReferences.list(),
+    selectionStamps: selectionStampStore.list(),
   }, state.frames.length);
 }
 
@@ -3912,10 +4658,25 @@ function restoreDraw2TimelineMetadata(value: unknown): void {
   for (const reference of metadata.audioReferences) {
     drawAudioReferences.upsert(reference, state.frames.length);
   }
+  for (const stamp of selectionStampStore.list()) {
+    selectionStampStore.remove(stamp.id);
+  }
+  for (const stamp of metadata.selectionStamps ?? []) {
+    selectionStampStore.save(stamp);
+  }
+  activeSelectionStampId = undefined;
 }
 
 let linkedCelBindings: LinkedCelBinding[] = [];
 let selection: SelectionSnapshot | undefined;
+let rectangleSelectionClipCache: {
+  readonly key: string;
+  readonly clip: RasterClipRect;
+} | undefined;
+let rasterSelectionMaskCache: {
+  readonly key: string;
+  readonly mask: RasterSelectionMask;
+} | undefined;
 let selectionInteractionGeneration = 0;
 let selectionEditMode: SelectionEditMode = "REPLACE";
 let selectionDraft: {
@@ -4454,13 +5215,15 @@ async function resolveCurrentDrawReference(input: {
   const asset = state.assets[state.activeAssetId];
   if (asset === undefined) return undefined;
   const revisionId = `draw-revision-${asset.revision}`;
-  const contentHash = String(await hashCanonical({
-    id: asset.id,
-    width: asset.width,
-    height: asset.height,
-    palette: asset.palette,
-    pixels: asset.raster.toUint8Array(),
-  }));
+  const contentHash = String(
+    await hashCanonical({
+      id: asset.id,
+      width: asset.width,
+      height: asset.height,
+      palette: asset.palette,
+      pixels: asset.raster.toUint8Array(),
+    }),
+  );
   return {
     kind: "DRAW",
     assetId: asset.id,
@@ -4471,9 +5234,51 @@ async function resolveCurrentDrawReference(input: {
   };
 }
 
+async function resolveDrawDefinitionReference(input: {
+  readonly definitionId: string;
+  readonly mode: "LIVE" | "PINNED";
+}): Promise<Draw2AssetReferenceRecord | undefined> {
+  const entry = assetDefinitions.find((candidate) =>
+    candidate.definitionId === input.definitionId
+  );
+  if (
+    entry === undefined || entry.definition.sourceProjectId !== state.projectId
+  ) {
+    return undefined;
+  }
+  const sourceAsset = state.assets[entry.definition.sourceCanvasId];
+  if (sourceAsset === undefined) return undefined;
+  const assetId = entry.registryIdentity?.assetId ?? sourceAsset.id;
+  const revisionId = entry.registryIdentity?.revisionId ??
+    `draw-revision-${sourceAsset.revision}`;
+  const contentHash = String(
+    await hashCanonical({
+      definitionId: entry.definitionId,
+      definition: entry.definition,
+      source: {
+        id: sourceAsset.id,
+        width: sourceAsset.width,
+        height: sourceAsset.height,
+        palette: sourceAsset.palette,
+        pixels: sourceAsset.raster.toUint8Array(),
+      },
+    }),
+  );
+  return {
+    kind: "DRAW",
+    assetId,
+    revisionId,
+    contentHash,
+    mode: input.mode,
+    label: entry.definition.metadata.name || entry.definitionId,
+    assetDefinitionId: entry.definitionId,
+  };
+}
+
 const draw2AssetBridge: Draw2AssetBridge = {
   snapshot: getAssetBridgeSnapshot,
   resolveCurrentReference: resolveCurrentDrawReference,
+  resolveDefinitionReference: resolveDrawDefinitionReference,
   renderReference: renderAssetReference,
   prepareSelection: prepareAssetSelection,
   createDefinition: createEmptyAssetDefinition,
@@ -4527,6 +5332,8 @@ let clipboard: ClipboardPayload | undefined;
 let timelineSession: TimelineSessionState = createTimelineSession(state);
 let timelineActivationPending = false;
 let timelineStateGeneration = 0;
+let timelineActivationRequestSequence = 0;
+let latestTimelineActivationRequestId = 0;
 let timelineViewportInitialized = false;
 type TimelineTab = "timeline" | "tags" | "markers" | "audio";
 let activeTimelineTab: TimelineTab = "timeline";
@@ -5015,6 +5822,36 @@ async function startGamePreview(
   mode: "LIVE" | "PINNED" = "LIVE",
 ): Promise<void> {
   try {
+    const workspace = getWorkspacePxdBridge();
+    workspace.startGoldenAudioPreview?.();
+    const goldenProject = await workspace.buildGoldenProject?.(mode);
+    if (goldenProject !== undefined) {
+      if (!goldenProject.ok || goldenProject.value === undefined) {
+        throw new Error(
+          goldenProject.diagnostics.map((item) => item.message).join(" ") ||
+            "Golden Project could not be composed.",
+        );
+      }
+      const { value } = goldenProject;
+      if (goldenProjectStatusElement !== null) {
+        goldenProjectStatusElement.textContent = value.packageReady
+          ? "READY · Draw Sprite + Audio Source + PINNED Package"
+          : "READY · Draw Sprite + Audio Source · LIVE Preview";
+      }
+      if (goldenProjectRefsElement !== null) {
+        goldenProjectRefsElement.textContent =
+          `Sprite: ${
+            value.project.scenes[0]?.entities[0]?.name ?? "iDRAW"
+          } · ` +
+          `Audio: ${
+            value.project.scenes[0]?.entities[1]?.name ?? "iAUDIO"
+          } · ` +
+          `Refs: ${value.manifest.assetLocks.length}`;
+      }
+      // Retry after a cold Audio Project finishes hydrating. When playback
+      // already started, the bridge treats this as a no-op.
+      workspace.startGoldenAudioPreview?.();
+    }
     const boundary = await buildLocalDraw2GameProject(mode);
     const ownerId = "draw2-local-owner";
     const product = await startGame350ProductPreview({
@@ -5514,7 +6351,11 @@ function setColorEditorFromWheel(
   );
 }
 
-async function commitColorEdit(): Promise<void> {
+function commitColorEdit(): Promise<void> {
+  return enqueueCanonicalOperation(() => commitColorEditNow());
+}
+
+async function commitColorEditNow(): Promise<void> {
   if (selectedColor === 0) {
     setColorEditorStatus("Index 0は透明色のため変更できません", "error");
     return;
@@ -5533,6 +6374,7 @@ async function commitColorEdit(): Promise<void> {
   colorApply.disabled = true;
   const commandSequence = nextClientSequence(DRAW_CLIENT_ID);
   const before = state;
+  const paletteCanonicalGeneration = canonicalStateGeneration;
   const command = {
     commandId: `draw2-local-palette-${commandSequence}`,
     commandType: "palette.setColor" as const,
@@ -5550,6 +6392,12 @@ async function commitColorEdit(): Promise<void> {
     },
   };
   const result = await core.execute(command);
+  if (paletteCanonicalGeneration !== canonicalStateGeneration) {
+    syncClientSequencesFromState();
+    colorCommitInFlight = false;
+    colorApply.disabled = selectedColor === 0;
+    return;
+  }
   if (!result.ok) {
     syncClientSequencesFromState();
     colorCommitInFlight = false;
@@ -5560,16 +6408,21 @@ async function commitColorEdit(): Promise<void> {
     );
     return;
   }
-  state = result.state;
+  if (!result.result.noOp) {
+    adoptCanonicalState(result.state);
+    refreshSelectionSnapshotForCurrentRaster();
+  }
   colorDraftDirty = false;
   colorCommitInFlight = false;
-  history.record(
-    before,
-    state,
-    result.result.operation.operationId,
-    result.result.operation.operationType,
-  );
-  saveDrawProjectState();
+  if (!result.result.noOp) {
+    history.record(
+      before,
+      state,
+      result.result.operation.operationId,
+      result.result.operation.operationType,
+    );
+    saveDrawProjectState();
+  }
   await autosave.record(state, result.result);
   renderPaletteButtons(state.assets[state.activeAssetId]?.palette ?? []);
   syncColorEditorFromSelection();
@@ -5583,7 +6436,11 @@ async function commitColorEdit(): Promise<void> {
   );
 }
 
-async function appendColorFromDraft(): Promise<void> {
+function appendColorFromDraft(): Promise<void> {
+  return enqueueCanonicalOperation(() => appendColorFromDraftNow());
+}
+
+async function appendColorFromDraftNow(): Promise<void> {
   const asset = state.assets[state.activeAssetId];
   const color = parseHexColor(colorHex.value);
   if (asset === undefined || color === undefined) {
@@ -5592,6 +6449,7 @@ async function appendColorFromDraft(): Promise<void> {
   }
   const commandSequence = nextClientSequence(DRAW_CLIENT_ID);
   const before = state;
+  const paletteCanonicalGeneration = canonicalStateGeneration;
   const command = {
     commandId: `draw2-local-palette-append-${commandSequence}`,
     commandType: "palette.appendColor" as const,
@@ -5606,6 +6464,10 @@ async function appendColorFromDraft(): Promise<void> {
     payload: { color: argbFromRgb(color, colorDraftAlpha) },
   };
   const result = await core.execute(command);
+  if (paletteCanonicalGeneration !== canonicalStateGeneration) {
+    syncClientSequencesFromState();
+    return;
+  }
   if (!result.ok) {
     syncClientSequencesFromState();
     setColorEditorStatus(
@@ -5614,16 +6476,19 @@ async function appendColorFromDraft(): Promise<void> {
     );
     return;
   }
-  state = result.state;
-  selectedColor = asset.palette.length;
-  history.record(
-    before,
-    state,
-    result.result.operation.operationId,
-    result.result.operation.operationType,
-  );
-  saveDrawProjectState();
-  scheduleDraw2EditorPreferencesSave();
+  if (!result.result.noOp) {
+    adoptCanonicalState(result.state);
+    refreshSelectionSnapshotForCurrentRaster();
+    selectedColor = asset.palette.length;
+    history.record(
+      before,
+      state,
+      result.result.operation.operationId,
+      result.result.operation.operationType,
+    );
+    saveDrawProjectState();
+    scheduleDraw2EditorPreferencesSave();
+  }
   await autosave.record(state, result.result);
   renderPaletteButtons(state.assets[state.activeAssetId]?.palette ?? []);
   syncColorEditorFromSelection();
@@ -5688,10 +6553,270 @@ function updateSelectionStatus(message: string): void {
   selectionStatus.textContent = translateDraw2Text(message, draw2Locale);
 }
 
+function selectionStampBounds(
+  snapshot: SelectionSnapshot,
+): { x: number; y: number; width: number; height: number } | undefined {
+  const regions = snapshot.mask.regions;
+  if (regions.length === 0) return undefined;
+  const minX = Math.min(...regions.map((region) => region.x));
+  const minY = Math.min(...regions.map((region) => region.y));
+  const maxX = Math.max(
+    ...regions.map((region) => region.x + region.width),
+  );
+  const maxY = Math.max(
+    ...regions.map((region) => region.y + region.height),
+  );
+  return {
+    x: minX,
+    y: minY,
+    width: maxX - minX,
+    height: maxY - minY,
+  };
+}
+
+function nextSelectionStampId(): string {
+  const safeProjectId = state.projectId.replace(/[^A-Za-z0-9._:-]+/gu, "-")
+    .slice(0, 72);
+  let candidate = "";
+  do {
+    selectionStampSequence += 1;
+    candidate = `selection-stamp-${
+      safeProjectId || "project"
+    }-${selectionStampSequence}`;
+  } while (selectionStampStore.load(candidate) !== undefined);
+  return candidate;
+}
+
+function selectionStampFromCurrentSelection(
+  requestedName: string,
+): Draw2SelectionStamp | undefined {
+  if (selection === undefined || !selectionScopeMatchesActiveCel()) {
+    setStatus("保存する選択範囲を先に確定してください。", "error");
+    return undefined;
+  }
+  const asset = state.assets[selection.scope.assetId];
+  const bounds = selectionStampBounds(selection);
+  if (
+    asset === undefined || bounds === undefined || selection.pixels.length === 0
+  ) {
+    setStatus("選択範囲に保存できる内容がありません。", "error");
+    return undefined;
+  }
+  try {
+    return normalizeDraw2SelectionStamp({
+      id: nextSelectionStampId(),
+      name: requestedName.trim() ||
+        `選択範囲 ${selectionStampStore.list().length + 1}`,
+      width: bounds.width,
+      height: bounds.height,
+      pixels: selection.pixels.map((pixel) => ({
+        x: pixel.x - bounds.x,
+        y: pixel.y - bounds.y,
+        colorIndex: asset.raster.getPixel(pixel.x, pixel.y),
+      })),
+      palette: [...asset.palette],
+    });
+  } catch (cause) {
+    setStatus(
+      cause instanceof Error ? cause.message : "選択範囲を保存できません。",
+      "error",
+    );
+    return undefined;
+  }
+}
+
+function colorDistance(left: number, right: number): number {
+  const a = decodeArgb(left);
+  const b = decodeArgb(right);
+  return (a.alpha - b.alpha) ** 2 + (a.red - b.red) ** 2 +
+    (a.green - b.green) ** 2 + (a.blue - b.blue) ** 2;
+}
+
+function nearestPaletteIndexForStamp(
+  color: number,
+  palette: readonly number[],
+): number {
+  if (palette.length < 2) return 0;
+  let bestIndex = 1;
+  let bestDistance = colorDistance(color, palette[1] ?? 0);
+  for (let index = 2; index < palette.length; index += 1) {
+    const distance = colorDistance(color, palette[index] ?? 0);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestIndex = index;
+    }
+  }
+  return bestIndex;
+}
+
+function selectionStampSourceForAsset(
+  stamp: Draw2SelectionStamp,
+  asset: RasterAsset,
+): {
+  readonly inlineSource: ReturnType<typeof createIndexedRasterStampSource>;
+  readonly remappedColors: number;
+} | undefined {
+  const exactPalette = new Map<number, number>();
+  for (let index = 1; index < asset.palette.length; index += 1) {
+    const color = asset.palette[index];
+    if (color !== undefined && !exactPalette.has(color)) {
+      exactPalette.set(color, index);
+    }
+  }
+  const cells: { x: number; y: number; colorIndex: number }[] = [];
+  let remappedColors = 0;
+  for (const pixel of stamp.pixels) {
+    if (pixel.colorIndex === 0) continue;
+    const sourceColor = stamp.palette[pixel.colorIndex];
+    if (sourceColor === undefined) continue;
+    const targetIndex = exactPalette.get(sourceColor) ??
+      nearestPaletteIndexForStamp(sourceColor, asset.palette);
+    if (!exactPalette.has(sourceColor)) remappedColors += 1;
+    cells.push({ x: pixel.x, y: pixel.y, colorIndex: targetIndex });
+  }
+  if (cells.length === 0) {
+    setStatus("選択範囲スタンプに配置できる不透明な色がありません。", "error");
+    return undefined;
+  }
+  try {
+    return {
+      inlineSource: createIndexedRasterStampSource({
+        width: stamp.width,
+        height: stamp.height,
+        palette: asset.palette,
+        cells,
+      }),
+      remappedColors,
+    };
+  } catch (cause) {
+    setStatus(
+      cause instanceof Error
+        ? cause.message
+        : "選択範囲スタンプが同期可能なサイズを超えています。",
+      "error",
+    );
+    return undefined;
+  }
+}
+
+function renderSelectionStamps(): void {
+  const stamps = selectionStampStore.list();
+  if (
+    activeSelectionStampId !== undefined &&
+    selectionStampStore.load(activeSelectionStampId) === undefined
+  ) {
+    activeSelectionStampId = undefined;
+  }
+  selectionStampList.replaceChildren();
+  if (stamps.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "draw2-selection-stamp-empty";
+    empty.textContent = "保存した選択範囲スタンプはありません。";
+    selectionStampList.append(empty);
+  } else {
+    for (const stamp of stamps) {
+      const row = document.createElement("div");
+      row.className = "draw2-selection-stamp-entry";
+      row.dataset.selectionStampId = stamp.id;
+      if (stamp.id === activeSelectionStampId) {
+        row.dataset.active = "true";
+      }
+      row.setAttribute("role", "listitem");
+      const copy = document.createElement("span");
+      copy.className = "draw2-selection-stamp-copy";
+      const name = document.createElement("strong");
+      name.textContent = stamp.name;
+      const detail = document.createElement("small");
+      detail.textContent =
+        `${stamp.width}×${stamp.height} · ${stamp.pixels.length}px`;
+      copy.append(name, detail);
+      const use = document.createElement("button");
+      use.className = "draw2-button draw2-button-secondary";
+      use.type = "button";
+      use.textContent = "使う";
+      use.title = "この選択範囲スタンプをCanvasへ配置";
+      use.addEventListener("click", () => useSelectionStamp(stamp.id));
+      const remove = document.createElement("button");
+      remove.className = "draw2-button draw2-button-secondary";
+      remove.type = "button";
+      remove.textContent = "削除";
+      remove.addEventListener("click", () => deleteSelectionStamp(stamp.id));
+      row.append(copy, use, remove);
+      selectionStampList.append(row);
+    }
+  }
+  selectionStampSaveControl.disabled = selection === undefined ||
+    !selectionScopeMatchesActiveCel() || selectionDraft !== undefined ||
+    pendingSelectionGesture !== undefined;
+  const active = activeSelectionStampId === undefined
+    ? undefined
+    : selectionStampStore.load(activeSelectionStampId);
+  selectionStampStatus.textContent = active === undefined
+    ? "選択範囲を確定すると保存できます。保存後は「使う」でCanvasへ配置します。"
+    : `「${active.name}」を選択中 · Canvasをクリックして配置できます。`;
+}
+
+function saveSelectionStamp(): void {
+  if (selectionDraft !== undefined || pendingSelectionGesture !== undefined) {
+    setStatus("選択範囲を確定してから保存してください。", "error");
+    return;
+  }
+  const candidate = selectionStampFromCurrentSelection(
+    selectionStampNameInput.value,
+  );
+  if (candidate === undefined) return;
+  try {
+    const saved = selectionStampStore.save(candidate);
+    selectionStampNameInput.value = saved.name;
+    renderSelectionStamps();
+    queueDrawPersistenceSave("selection-stamp-save");
+    setStatus(
+      `選択範囲スタンプ「${saved.name}」を保存しました。「使う」で配置できます。`,
+    );
+  } catch (cause) {
+    setStatus(
+      cause instanceof Error
+        ? cause.message
+        : "選択範囲スタンプを保存できません。",
+      "error",
+    );
+  }
+}
+
+function useSelectionStamp(id: string): void {
+  const stamp = selectionStampStore.load(id);
+  if (stamp === undefined) {
+    setStatus("選択範囲スタンプが見つかりません。", "error");
+    renderSelectionStamps();
+    return;
+  }
+  activeSelectionStampId = stamp.id;
+  selectedTileSource = undefined;
+  selectionStampToolActivation = true;
+  selectShortcutTool("tile-stamp");
+  renderSelectionStamps();
+  setStatus(
+    `選択範囲スタンプ「${stamp.name}」を選択中 · Canvasをクリックして配置`,
+  );
+}
+
+function deleteSelectionStamp(id: string): void {
+  const stamp = selectionStampStore.load(id);
+  if (stamp === undefined || !selectionStampStore.remove(id)) {
+    setStatus("削除する選択範囲スタンプが見つかりません。", "error");
+    return;
+  }
+  if (activeSelectionStampId === id) activeSelectionStampId = undefined;
+  renderSelectionStamps();
+  queueDrawPersistenceSave("selection-stamp-delete");
+  setStatus(`選択範囲スタンプ「${stamp.name}」を削除しました。`);
+}
+
 function updateSelectionActionButtons(): void {
   commitSelectionControl.disabled = selectionDraft === undefined;
   cancelSelectionControl.disabled = selectionDraft === undefined &&
     pendingSelectionGesture === undefined;
+  renderSelectionStamps();
   syncWorkspaceEditCommandState();
 }
 
@@ -5846,6 +6971,7 @@ function cyclePlaybackLoopMode(): void {
 interface TimelineCommandRunOptions {
   readonly recordHistory?: boolean;
   readonly announce?: boolean;
+  readonly activationRequestId?: number;
 }
 
 function timelineCelId(frameId: string, layerTrackId: string): string {
@@ -5858,7 +6984,10 @@ function timelineCelId(frameId: string, layerTrackId: string): string {
 async function activateTimelineCell(
   frameId: string,
   layerTrackId: string,
+  immediate = false,
 ): Promise<boolean> {
+  const requestId = ++timelineActivationRequestSequence;
+  latestTimelineActivationRequestId = requestId;
   const celId = timelineCelId(frameId, layerTrackId);
   const target = state.cels.find((item) => item.celId === celId);
   const tilemapLayer = layerKind(layerTrackId) === "TILEMAP";
@@ -5871,6 +7000,9 @@ async function activateTimelineCell(
     state.activeCelId === celId &&
     (tilemapLayer || state.activeAssetId === target?.assetId)
   ) {
+    // A newer request may have superseded an older in-flight activation. The
+    // old finally block must not be responsible for clearing this flag.
+    timelineActivationPending = false;
     await present();
     return true;
   }
@@ -5881,13 +7013,20 @@ async function activateTimelineCell(
   }
   timelineActivationPending = true;
   try {
-    return await runTimelineCommand("timeline.activateCel", {
+    const execute = immediate ? runTimelineCommandNow : runTimelineCommand;
+    return await execute("timeline.activateCel", {
       celId,
       frameId,
       layerTrackId,
-    }, { recordHistory: false, announce: false });
+    }, {
+      recordHistory: false,
+      announce: false,
+      activationRequestId: requestId,
+    });
   } finally {
-    timelineActivationPending = false;
+    if (requestId === latestTimelineActivationRequestId) {
+      timelineActivationPending = false;
+    }
   }
 }
 
@@ -7656,7 +8795,17 @@ function toggleActiveLinkedCel(): void {
   }
 }
 
-async function runTimelineCommand(
+function runTimelineCommand(
+  commandType: TimelineCommand["commandType"],
+  payload: unknown,
+  options: TimelineCommandRunOptions = {},
+): Promise<boolean> {
+  return enqueueCanonicalOperation(() =>
+    runTimelineCommandNow(commandType, payload, options)
+  );
+}
+
+async function runTimelineCommandNow(
   commandType: TimelineCommand["commandType"],
   payload: unknown,
   options: TimelineCommandRunOptions = {},
@@ -7679,12 +8828,19 @@ async function runTimelineCommand(
     payload,
   } as TimelineCommand;
   const result = await executeTimelineCommand(state, command);
+  if (
+    options.activationRequestId !== undefined &&
+    options.activationRequestId !== latestTimelineActivationRequestId
+  ) {
+    syncClientSequencesFromState();
+    return false;
+  }
   if (!result.ok) {
     syncClientSequencesFromState();
     setStatus(result.diagnostics.map((item) => item.code).join(", "), "error");
     return false;
   }
-  state = result.state;
+  if (!result.result.noOp) adoptCanonicalState(result.state);
   const timelineInvalidatesLocalSelection = timelineCommandInvalidatesSelection(
     before,
     state,
@@ -7697,7 +8853,6 @@ async function runTimelineCommand(
       "Selection and transform preview cleared because the timeline target changed.",
     );
   }
-  core = new EditorCore(state, { instrumentation });
   // A structural edit replaces the visible frame/layer matrix. Clear the
   // local selection projection before auto-activation so the previous cel
   // cannot retain an active-looking state after Add/Duplicate/Remove.
@@ -7763,7 +8918,11 @@ async function runTimelineCommand(
     };
   }
   if (autoActivate !== undefined) {
-    await activateTimelineCell(autoActivate.frameId, autoActivate.layerTrackId);
+    await activateTimelineCell(
+      autoActivate.frameId,
+      autoActivate.layerTrackId,
+      true,
+    );
   }
   if (options.recordHistory !== false) {
     history.record(
@@ -7941,6 +9100,25 @@ function normalizeMirrorGuide(
 function mirrorHasActiveAxis(): boolean {
   return mirrorAxes.x || mirrorAxes.y || mirrorAxes.diagonalDown ||
     mirrorAxes.diagonalUp;
+}
+
+function mirrorCommitSpecForTool(
+  asset: Pick<RasterAsset, "width" | "height">,
+  tool: BasicTool,
+): MirrorCommitSpec | undefined {
+  if (!mirrorAppliesToTool(tool)) return undefined;
+  mirrorGuide = normalizeMirrorGuide(asset);
+  const axes: MirrorCommitSpec["axes"] = [
+    ...(mirrorAxes.x ? ["x" as const] : []),
+    ...(mirrorAxes.y ? ["y" as const] : []),
+    ...(mirrorAxes.diagonalDown ? ["diagonal-down" as const] : []),
+    ...(mirrorAxes.diagonalUp ? ["diagonal-up" as const] : []),
+  ];
+  if (axes.length === 0) return undefined;
+  return {
+    axes,
+    guide: { ...mirrorGuide },
+  };
 }
 
 function mirrorAxisLabel(axis: MirrorGuideAxis): string {
@@ -8588,12 +9766,20 @@ function previewWriteSet(
       asset,
       tool,
     );
-  const selectionKeys = selection === undefined
-    ? undefined
-    : new Set(selection.pixels.map(selectionPointKey));
-  return (selectionKeys === undefined
-    ? writes
-    : writes.filter((write) => selectionKeys.has(selectionPointKey(write))))
+  const selectionClip = activeRectangleSelectionClip();
+  const selectionKeys = selectionClip === undefined && selection !== undefined
+    ? new Set(selection.pixels.map(selectionPointKey))
+    : undefined;
+  const selectedWrites = selectionClip === undefined
+    ? selectionKeys === undefined
+      ? writes
+      : writes.filter((write) => selectionKeys.has(selectionPointKey(write)))
+    : writes.filter((write) =>
+      write.x >= selectionClip.x && write.y >= selectionClip.y &&
+      write.x < selectionClip.x + selectionClip.width &&
+      write.y < selectionClip.y + selectionClip.height
+    );
+  return selectedWrites
     .map(({ x, y }) => ({ x, y }));
 }
 
@@ -9198,6 +10384,111 @@ function selectionScopeMatchesActiveCel(
     snapshot.sourceStructureEpoch === state.structureEpoch;
 }
 
+function activeRectangleSelectionClip(): RasterClipRect | undefined {
+  const snapshot = selection;
+  if (
+    snapshot === undefined || !selectionScopeMatchesActiveCel(snapshot) ||
+    snapshot.mask.kind !== "rectangle" ||
+    snapshot.mask.regions.length !== 1
+  ) {
+    rectangleSelectionClipCache = undefined;
+    return undefined;
+  }
+  const region = snapshot.mask.regions[0];
+  const cacheKey = region === undefined ? "" : [
+    snapshot.selectionId,
+    snapshot.mask.selectionVersion,
+    region.x,
+    region.y,
+    region.width,
+    region.height,
+    snapshot.pixels.length,
+  ].join(":");
+  if (
+    cacheKey !== "" && rectangleSelectionClipCache?.key === cacheKey
+  ) return rectangleSelectionClipCache.clip;
+  if (
+    region === undefined || !Number.isSafeInteger(region.x) ||
+    !Number.isSafeInteger(region.y) || !Number.isSafeInteger(region.width) ||
+    !Number.isSafeInteger(region.height) || region.x < 0 || region.y < 0 ||
+    region.width < 1 || region.height < 1 ||
+    snapshot.pixels.length !== region.width * region.height
+  ) {
+    rectangleSelectionClipCache = undefined;
+    return undefined;
+  }
+  const seen = new Set<string>();
+  for (const pixel of snapshot.pixels) {
+    if (
+      pixel.x < region.x || pixel.y < region.y ||
+      pixel.x >= region.x + region.width ||
+      pixel.y >= region.y + region.height
+    ) {
+      rectangleSelectionClipCache = undefined;
+      return undefined;
+    }
+    seen.add(selectionPointKey(pixel));
+  }
+  if (seen.size !== snapshot.pixels.length) {
+    rectangleSelectionClipCache = undefined;
+    return undefined;
+  }
+  const clip = { ...region };
+  rectangleSelectionClipCache = { key: cacheKey, clip };
+  return clip;
+}
+
+function activeRasterSelectionMask(): RasterSelectionMask | undefined {
+  const snapshot = selection;
+  if (
+    snapshot === undefined || !selectionScopeMatchesActiveCel(snapshot) ||
+    activeRectangleSelectionClip() !== undefined
+  ) {
+    rasterSelectionMaskCache = undefined;
+    return undefined;
+  }
+  const cacheKey = [
+    snapshot.selectionId,
+    snapshot.mask.selectionVersion,
+    snapshot.scope.celId,
+    snapshot.pixels.length,
+  ].join(":");
+  if (rasterSelectionMaskCache?.key === cacheKey) {
+    return rasterSelectionMaskCache.mask;
+  }
+  try {
+    const mask = createRasterSelectionMask(snapshot.pixels);
+    if (mask === undefined) {
+      rasterSelectionMaskCache = undefined;
+      return undefined;
+    }
+    rasterSelectionMaskCache = { key: cacheKey, mask };
+    return mask;
+  } catch {
+    rasterSelectionMaskCache = undefined;
+    return undefined;
+  }
+}
+
+function refreshSelectionSnapshotForCurrentRaster(): void {
+  if (selection === undefined || !selectionScopeMatchesActiveCel()) return;
+  const asset = state.assets[selection.scope.assetId];
+  if (asset === undefined) return;
+  selection = {
+    ...selection,
+    mask: {
+      ...selection.mask,
+      regions: selection.mask.regions.map((region) => ({ ...region })),
+    },
+    sourceRasterRevision: asset.revision,
+    sourceStructureEpoch: state.structureEpoch,
+    pixels: selection.pixels.map((pixel) => ({
+      ...pixel,
+      colorIndex: asset.raster.getPixel(pixel.x, pixel.y),
+    })),
+  };
+}
+
 function timelineCommandInvalidatesSelection(
   before: ProjectState,
   after: ProjectState,
@@ -9442,10 +10733,22 @@ function applySelectionMorphology(operation: SelectionMorphology): void {
   );
 }
 
-async function commitWriteSet(
+function commitWriteSet(
   writes: readonly { x: number; y: number; colorIndex: number }[],
   sourceOperationType: string,
   toolForMirroring: BasicTool = currentBasicTool(),
+  options: { readonly respectSelection?: boolean } = {},
+): Promise<void> {
+  return enqueueCanonicalOperation(() =>
+    commitWriteSetNow(writes, sourceOperationType, toolForMirroring, options)
+  );
+}
+
+async function commitWriteSetNow(
+  writes: readonly { x: number; y: number; colorIndex: number }[],
+  sourceOperationType: string,
+  toolForMirroring: BasicTool = currentBasicTool(),
+  options: { readonly respectSelection?: boolean } = {},
 ): Promise<void> {
   if (timelineActivationPending) {
     setStatus("Timeline cell is changing; drawing was not committed.", "error");
@@ -9460,15 +10763,28 @@ async function commitWriteSet(
     return;
   }
   const mirroredWrites = mirrorWritesForTool(writes, asset, toolForMirroring);
-  const selectionKeys = selection === undefined
-    ? undefined
-    : new Set(selection.pixels.map(selectionPointKey));
+  const selectionKeys =
+    options.respectSelection === false || selection === undefined
+      ? undefined
+      : new Set(selection.pixels.map(selectionPointKey));
   const committedWrites = selectionKeys === undefined
     ? mirroredWrites
     : mirroredWrites.filter((write) =>
       selectionKeys.has(selectionPointKey(write))
     );
   if (committedWrites.length === 0) return;
+  if (
+    pixyncProductionRoot !== undefined &&
+    (committedWrites.length > PIXYNC_DRAW2_MAX_PAYLOAD_KEYS ||
+      new TextEncoder().encode(JSON.stringify({ writes: committedWrites }))
+          .byteLength > PIXYNC_DRAW2_MAX_PAYLOAD_BYTES)
+  ) {
+    setStatus(
+      "この操作はリアルタイム同期の上限を超えるため、変更を確定しません。範囲を小さくするか、ミラー／選択範囲を解除してください。",
+      "error",
+    );
+    return;
+  }
   const drawClientId = activeDrawClientId();
   const commandSequence = nextClientSequence(drawClientId);
   const before = state;
@@ -9488,8 +10804,12 @@ async function commitWriteSet(
     },
   };
   const writeTimelineGeneration = timelineStateGeneration;
+  const writeCanonicalGeneration = canonicalStateGeneration;
   const result = await core.execute(command);
-  if (writeTimelineGeneration !== timelineStateGeneration) {
+  if (
+    writeTimelineGeneration !== timelineStateGeneration ||
+    writeCanonicalGeneration !== canonicalStateGeneration
+  ) {
     syncClientSequencesFromState();
     setStatus(
       "Timeline cell changed while drawing; the old-cell write was discarded.",
@@ -9502,17 +10822,22 @@ async function commitWriteSet(
     setStatus(result.diagnostics.map((item) => item.code).join(", "), "error");
     return;
   }
-  state = result.state;
-  history.record(
-    before,
-    state,
-    result.result.operation.operationId,
-    result.result.operation.operationType,
-  );
-  renderTimeline();
-  saveDrawProjectState();
+  if (!result.result.noOp) {
+    adoptCanonicalState(result.state);
+    refreshSelectionSnapshotForCurrentRaster();
+    history.record(
+      before,
+      state,
+      result.result.operation.operationId,
+      result.result.operation.operationType,
+    );
+    renderTimeline();
+    saveDrawProjectState();
+  }
   await autosave.record(state, result.result);
-  publishDrawRasterCommit(result.result, state, before.structureEpoch);
+  if (!result.result.noOp) {
+    publishDrawRasterCommit(result.result, state, before.structureEpoch);
+  }
   await present(result.result.dirtyRegions, result.result.dirtyTiles);
   updateHistoryButtons();
   setStatus(
@@ -9527,6 +10852,7 @@ async function commitWriteSet(
 interface CanvasProjectSettings {
   readonly forceCreate?: boolean;
   readonly mode?: "OPEN" | "NEW";
+  readonly initialCreatorMode?: CreatorStartMode;
   readonly projectIdOverride?: string;
   readonly anchor?: CanvasResizeAnchor;
   readonly width?: number;
@@ -9695,6 +11021,8 @@ async function resetProject(
     }
   }
   drawPersistenceRevision = persistedRecord?.revision ?? 0;
+  drawPersistenceExpectedRevision = drawPersistenceRevision;
+  drawPersistenceExpectedStateHash = persistedRecord?.stateHash ?? null;
   const parsedTileSize = Number(options.tileSize ?? tileSizeSelect.value);
   const tileSize: TileSize = parsedTileSize === 64 ? 64 : 32;
   const createOptions = {
@@ -9726,7 +11054,7 @@ async function resetProject(
   repository.save(state);
   projectIdInput.value = projectId;
   tileSizeSelect.value = String(tileSize);
-  core = new EditorCore(state, { instrumentation });
+  adoptCanonicalState(state);
   history = new LocalUndoRedoHistory(state);
   syncClientSequencesFromState();
   selectionInteractionGeneration += 1;
@@ -9750,6 +11078,7 @@ async function resetProject(
   onionSkinColorMode = "TINTED";
   onionSkinCache = undefined;
   restoreDraw2TimelineMetadata(restored?.timelineMetadata);
+  renderSelectionStamps();
   linkedCelBindings = [];
   journal.operations.length = 0;
   journal.dirtyTileWrites.length = 0;
@@ -9919,6 +11248,7 @@ interface Draw2ExportArtifact {
   readonly filename: string;
   readonly bytes: Uint8Array;
   readonly mimeType: string;
+  readonly packageHash?: string;
 }
 
 interface Draw2ExportProgressUpdate {
@@ -10642,6 +11972,27 @@ async function createPxdProjectArtifact(
     filename: `${baseName}.pxd`,
     bytes: output.bytes,
     mimeType: output.mimeType,
+    packageHash: output.packageHash,
+  };
+}
+
+async function exportCurrentPxdArtifactForWorkspace(): Promise<
+  WorkspacePxdArtifactSnapshot
+> {
+  const exportModule = await loadExportModule();
+  const artifact = await createPxdProjectArtifact(
+    exportModule,
+    safeExportBaseName(),
+  );
+  const sourceReference = await resolveCurrentDrawReference({ mode: "PINNED" });
+  if (artifact.packageHash === undefined || sourceReference === undefined) {
+    throw new Error("PXD release source identity is unavailable.");
+  }
+  return {
+    bytes: artifact.bytes,
+    mimeType: artifact.mimeType,
+    packageHash: artifact.packageHash,
+    sourceReference,
   };
 }
 
@@ -10660,7 +12011,9 @@ async function storePxdMarketTransfer(file: File): Promise<string> {
       request.result.createObjectStore("transfers", { keyPath: "id" });
     };
     request.onerror = () => {
-      reject(request.error ?? new Error("Market transfer storage unavailable."));
+      reject(
+        request.error ?? new Error("Market transfer storage unavailable."),
+      );
     };
     request.onsuccess = () => {
       const database = request.result;
@@ -10681,12 +12034,16 @@ async function storePxdMarketTransfer(file: File): Promise<string> {
           expiresAt: Date.now() + (15 * 60 * 1000),
         });
         transaction.oncomplete = () => finish();
-        transaction.onerror = () => finish(
-          transaction.error ?? new Error("Market transfer storage write failed."),
-        );
-        transaction.onabort = () => finish(
-          transaction.error ?? new Error("Market transfer storage write aborted."),
-        );
+        transaction.onerror = () =>
+          finish(
+            transaction.error ??
+              new Error("Market transfer storage write failed."),
+          );
+        transaction.onabort = () =>
+          finish(
+            transaction.error ??
+              new Error("Market transfer storage write aborted."),
+          );
       } catch (error) {
         finish(error);
       }
@@ -11430,11 +12787,68 @@ async function exportSelectedToFile(): Promise<void> {
   }
 }
 
-async function importPxdFile(file: File): Promise<void> {
+async function importPxdFile(
+  file: File,
+  options: PxdEntryImportOptions = {},
+): Promise<void> {
+  const previousImportState = {
+    state: cloneProjectStateShared(state),
+    activeWorkspaceProjectId: readActiveWorkspaceProjectId(),
+    assetDefinitions: assetDefinitions.map(cloneAssetDefinitionEntry),
+    assetDefinitionSequence,
+    history: history.snapshot(),
+    drawPersistenceRevision,
+    drawPersistenceExpectedRevision,
+    drawPersistenceExpectedStateHash,
+    clientSequence,
+    selection,
+    selectionDraft,
+    pendingSelectionGesture,
+    transformSession,
+    transformPreview,
+    pasteMode,
+    clipboard,
+    selectedTileSource,
+    tilesetSourceRenderKey,
+    lastTilemapGridLayoutKey,
+    timelineSession,
+    timelineViewportInitialized,
+    structureClientSequence,
+    onionSkinEnabled,
+    onionSkinPreviousFrames,
+    onionSkinNextFrames,
+    onionSkinOpacity,
+    onionSkinColorMode,
+    onionSkinCache,
+    activeSelectionStampId,
+    draw2EditorPreferencesReady,
+    timelineMetadata: draw2TimelineMetadataSnapshot(),
+    journal: drawJournalSnapshot(),
+    journalCheckpoints: journal.checkpoints.map((checkpoint) =>
+      cloneProjectStateShared(checkpoint)
+    ),
+  };
+  let importCommitStarted = false;
+  let previousWorkspacePxdSnapshot: WorkspacePxdBridgeSnapshot | undefined;
+  let workspaceRollbackFailed = false;
   try {
+    if (
+      options.expectedProjectId !== undefined &&
+      state.projectId !== options.expectedProjectId
+    ) {
+      throw new Error("The Project changed before the PXD restore began.");
+    }
     const bytes = new Uint8Array(await file.arrayBuffer());
     const legacyCompat = await loadLegacyCompatModule();
     const inspection = await legacyCompat.inspectPxd(bytes);
+    if (
+      options.source === "REMOTE_CHECKPOINT" &&
+      inspection.source.identity !== "NEW_DRAW2_PXD_V2"
+    ) {
+      throw new Error(
+        "A shared PiXYNC checkpoint must be an integrated PXD v2 Project.",
+      );
+    }
     let importedState: ProjectState;
     let importedAssetDefinitions: readonly PxdAssetDefinitionEntry[] = [];
     let importedTimelineMetadata: Draw2TimelineMetadata | undefined;
@@ -11465,7 +12879,12 @@ async function importPxdFile(file: File): Promise<void> {
       importedHash = imported.packageHash;
     } else if (inspection.source.identity === "NEW_DRAW2_PXD_V2") {
       const exportModule = await loadExportModule();
-      const imported = await exportModule.importPxdProject(bytes);
+      const imported = await exportModule.importPxdProject(
+        bytes,
+        options.expectedPackageHash === undefined
+          ? {}
+          : { expectedPackageHash: options.expectedPackageHash },
+      );
       importedState = imported.state;
       importedAssetDefinitions = imported.assetDefinitions;
       importedTimelineMetadata = imported.drawTimelineMetadata;
@@ -11482,17 +12901,51 @@ async function importPxdFile(file: File): Promise<void> {
         diagnostic?.message ?? "PXD format could not be identified.",
       );
     }
+    if (
+      options.expectedProjectId !== undefined &&
+      importedState.projectId !== options.expectedProjectId
+    ) {
+      throw new Error("The PXD Project ID does not match the active Room.");
+    }
+    if (
+      options.expectedProjectId !== undefined &&
+      state.projectId !== options.expectedProjectId
+    ) {
+      throw new Error("The Project changed during the PXD restore.");
+    }
+    if (importedState.assets[importedState.activeAssetId] === undefined) {
+      throw new Error("Imported PXD active asset is missing.");
+    }
+    if (importedWorkspace !== undefined) {
+      previousWorkspacePxdSnapshot = await getWorkspacePxdBridge()
+        .exportProjectPxdSnapshot();
+    }
+    if (
+      options.expectedProjectId !== undefined &&
+      state.projectId !== options.expectedProjectId
+    ) {
+      throw new Error("The Project changed before the PXD restore commit.");
+    }
     flushDrawPersistence();
     await flushDrawPersistence();
+    if (
+      options.expectedProjectId !== undefined &&
+      state.projectId !== options.expectedProjectId
+    ) {
+      throw new Error("The Project changed before the PXD restore commit.");
+    }
+    importCommitStarted = true;
     draw2EditorPreferencesReady = false;
     state = importedState;
     assetDefinitions = importedAssetDefinitions.map(cloneAssetDefinitionEntry);
     assetDefinitionSequence = 0;
     repository.save(state);
-    core = new EditorCore(state, { instrumentation });
+    adoptCanonicalState(state);
     history = new LocalUndoRedoHistory(state);
     const importedRecord = await drawPersistenceStore.load(state.projectId);
     drawPersistenceRevision = importedRecord?.revision ?? 0;
+    drawPersistenceExpectedRevision = drawPersistenceRevision;
+    drawPersistenceExpectedStateHash = importedRecord?.stateHash ?? null;
     clientSequence = 0;
     selectionInteractionGeneration += 1;
     selection = undefined;
@@ -11507,6 +12960,7 @@ async function importPxdFile(file: File): Promise<void> {
     lastTilemapGridLayoutKey = "";
     timelineSession = createTimelineSession(state);
     restoreDraw2TimelineMetadata(importedTimelineMetadata);
+    renderSelectionStamps();
     timelineViewportInitialized = false;
     structureClientSequence = 0;
     onionSkinEnabled = false;
@@ -11545,22 +12999,124 @@ async function importPxdFile(file: File): Promise<void> {
         importedWorkspace,
       );
     }
-    announceWorkspaceProjectChanged(window, {
-      projectId: asWorkspaceProjectId(state.projectId),
-      name: state.name,
-    });
+    if (options.announceProjectChange !== false) {
+      announceWorkspaceProjectChanged(window, {
+        projectId: asWorkspaceProjectId(state.projectId),
+        name: state.name,
+      });
+    }
+    const sourceLabel = options.source === "REMOTE_CHECKPOINT"
+      ? "PiXYNC checkpoint restored"
+      : "PXD imported locally";
     setStatus(
-      `PXD imported locally · ${importedStatus} · hash=${
-        importedHash.slice(0, 12)
-      }…`,
+      `${sourceLabel} · ${importedStatus} · hash=${importedHash.slice(0, 12)}…`,
     );
   } catch (cause) {
+    if (importCommitStarted) {
+      state = previousImportState.state;
+      assetDefinitions = previousImportState.assetDefinitions.map(
+        cloneAssetDefinitionEntry,
+      );
+      assetDefinitionSequence = previousImportState.assetDefinitionSequence;
+      drawPersistenceRevision = previousImportState.drawPersistenceRevision;
+      drawPersistenceExpectedRevision =
+        previousImportState.drawPersistenceExpectedRevision;
+      drawPersistenceExpectedStateHash =
+        previousImportState.drawPersistenceExpectedStateHash;
+      clientSequence = previousImportState.clientSequence;
+      selection = previousImportState.selection;
+      selectionDraft = previousImportState.selectionDraft;
+      pendingSelectionGesture = previousImportState.pendingSelectionGesture;
+      transformSession = previousImportState.transformSession;
+      transformPreview = previousImportState.transformPreview;
+      pasteMode = previousImportState.pasteMode;
+      clipboard = previousImportState.clipboard;
+      selectedTileSource = previousImportState.selectedTileSource;
+      tilesetSourceRenderKey = previousImportState.tilesetSourceRenderKey;
+      lastTilemapGridLayoutKey = previousImportState.lastTilemapGridLayoutKey;
+      timelineSession = previousImportState.timelineSession;
+      timelineViewportInitialized =
+        previousImportState.timelineViewportInitialized;
+      structureClientSequence = previousImportState.structureClientSequence;
+      onionSkinEnabled = previousImportState.onionSkinEnabled;
+      onionSkinPreviousFrames = previousImportState.onionSkinPreviousFrames;
+      onionSkinNextFrames = previousImportState.onionSkinNextFrames;
+      onionSkinOpacity = previousImportState.onionSkinOpacity;
+      onionSkinColorMode = previousImportState.onionSkinColorMode;
+      onionSkinCache = previousImportState.onionSkinCache;
+      activeSelectionStampId = previousImportState.activeSelectionStampId;
+      draw2EditorPreferencesReady =
+        previousImportState.draw2EditorPreferencesReady;
+      repository.save(previousImportState.state);
+      adoptCanonicalState(previousImportState.state);
+      history = new LocalUndoRedoHistory(previousImportState.state);
+      history.restore(previousImportState.history);
+      restoreDraw2TimelineMetadata(previousImportState.timelineMetadata);
+      journal.operations.splice(
+        0,
+        journal.operations.length,
+        ...previousImportState.journal.operations.map((operation) => ({
+          ...operation,
+        })),
+      );
+      journal.dirtyTileWrites.splice(
+        0,
+        journal.dirtyTileWrites.length,
+        ...previousImportState.journal.dirtyTileWrites.map((write) => ({
+          assetId: write.assetId,
+          tiles: write.tiles.map((tile) => ({
+            tileKey: tile.tileKey,
+            bytes: new Uint8Array(tile.bytes),
+          })),
+        })),
+      );
+      journal.checkpoints.splice(
+        0,
+        journal.checkpoints.length,
+        ...previousImportState.journalCheckpoints.map((checkpoint) =>
+          cloneProjectStateShared(checkpoint)
+        ),
+      );
+      const restoredAsset = state.assets[state.activeAssetId];
+      if (restoredAsset !== undefined) {
+        syncRasterCanvasDimensions(restoredAsset.width, restoredAsset.height);
+        renderPaletteButtons(restoredAsset.palette);
+      }
+      renderTimeline();
+      await present();
+      updateHistoryButtons();
+      saveDrawProjectState("import-rollback");
+      writeActiveWorkspaceProjectId(
+        previousImportState.activeWorkspaceProjectId,
+      );
+      if (previousWorkspacePxdSnapshot !== undefined) {
+        try {
+          await getWorkspacePxdBridge().restoreProjectPxdSnapshot(
+            previousWorkspacePxdSnapshot,
+          );
+        } catch {
+          workspaceRollbackFailed = true;
+        }
+      }
+      if (options.announceProjectChange !== false) {
+        announceWorkspaceProjectChanged(window, {
+          projectId: asWorkspaceProjectId(state.projectId),
+          name: state.name,
+        });
+      }
+    }
+    const message = cause instanceof Error
+      ? `PXD import rejected: ${cause.message}`
+      : "PXD import rejected.";
     setStatus(
-      cause instanceof Error
-        ? `PXD import rejected: ${cause.message}`
-        : "PXD import rejected.",
+      workspaceRollbackFailed
+        ? `${message} Draw was restored, but the shared Audio/Game snapshot could not be restored.`
+        : message,
       "error",
     );
+    if (options.source === "REMOTE_CHECKPOINT") {
+      throw cause instanceof Error ? cause : new Error(message);
+    }
   } finally {
     importPxdControl.value = "";
   }
@@ -11761,7 +13317,172 @@ function selectConfiguredColor(
   );
 }
 
-async function commitPointerPoints(
+function commitPointerPoints(
+  points: readonly { x: number; y: number }[],
+  fixedContext?: FixedToolContext,
+): Promise<void> {
+  return enqueueCanonicalOperation(() =>
+    commitPointerPointsNow(points, fixedContext)
+  );
+}
+
+async function commitTileStampCommandNow(
+  asset: RasterAsset,
+  payload: TileStampPayload,
+  label = "Tile placement",
+): Promise<boolean> {
+  const drawClientId = activeDrawClientId();
+  const commandSequence = nextClientSequence(drawClientId);
+  const before = state;
+  const command = {
+    commandId: `draw2-local-tile-stamp-${commandSequence}`,
+    commandType: "raster.tileStamp" as const,
+    schemaVersion: 1 as const,
+    projectId: state.projectId,
+    assetId: asset.id,
+    actorId: activeDrawActorId(),
+    clientId: drawClientId,
+    clientSequence: commandSequence,
+    baseStructureEpoch: state.structureEpoch,
+    createdAtMonotonicMs: performance.now(),
+    payload,
+  };
+  if (rejectOversizedProductionPayload(payload)) {
+    syncClientSequencesFromState();
+    return false;
+  }
+  const tileTimelineGeneration = timelineStateGeneration;
+  const tileCanonicalGeneration = canonicalStateGeneration;
+  const result = await core.execute(command);
+  if (
+    tileTimelineGeneration !== timelineStateGeneration ||
+    tileCanonicalGeneration !== canonicalStateGeneration
+  ) {
+    syncClientSequencesFromState();
+    setStatus(
+      "Timeline cell changed while placing the tile; the old-cell write was discarded.",
+      "error",
+    );
+    return false;
+  }
+  if (!result.ok) {
+    syncClientSequencesFromState();
+    setStatus(
+      result.diagnostics.map((item) => item.code).join(", "),
+      "error",
+    );
+    return false;
+  }
+  if (!result.result.noOp) {
+    adoptCanonicalState(result.state);
+    refreshSelectionSnapshotForCurrentRaster();
+    history.record(
+      before,
+      state,
+      result.result.operation.operationId,
+      result.result.operation.operationType,
+    );
+    renderTimeline();
+    saveDrawProjectState();
+  }
+  await autosave.record(state, result.result);
+  if (!result.result.noOp) {
+    publishDrawRasterCommit(result.result, state, before.structureEpoch);
+  }
+  await present(result.result.dirtyRegions, result.result.dirtyTiles);
+  updateHistoryButtons();
+  setStatus(
+    `${label} committed · ${result.result.dirtyTiles.length} tiles · one undo`,
+  );
+  return !result.result.noOp;
+}
+
+async function commitFillCommandNow(
+  asset: RasterAsset,
+  seed: { readonly x: number; readonly y: number },
+  colorIndex: number,
+  gradientTo?: { readonly x: number; readonly y: number },
+  clip?: RasterClipRect,
+  selectionMask?: RasterSelectionMask,
+): Promise<void> {
+  const drawClientId = activeDrawClientId();
+  const commandSequence = nextClientSequence(drawClientId);
+  const before = state;
+  const command = {
+    commandId: `draw2-local-fill-${commandSequence}`,
+    commandType: "raster.fill" as const,
+    schemaVersion: 1 as const,
+    projectId: state.projectId,
+    assetId: asset.id,
+    actorId: activeDrawActorId(),
+    clientId: drawClientId,
+    clientSequence: commandSequence,
+    baseStructureEpoch: state.structureEpoch,
+    createdAtMonotonicMs: performance.now(),
+    payload: {
+      seedX: seed.x,
+      seedY: seed.y,
+      colorIndex,
+      maxCells: Math.min(1_048_576, asset.width * asset.height),
+      ...(gradientTo === undefined
+        ? {}
+        : { gradientToX: gradientTo.x, gradientToY: gradientTo.y }),
+      ...(clip === undefined ? {} : { clip }),
+      ...(selectionMask === undefined ? {} : { selectionMask }),
+    },
+  };
+  if (rejectOversizedProductionPayload(command.payload)) {
+    syncClientSequencesFromState();
+    return;
+  }
+  const fillTimelineGeneration = timelineStateGeneration;
+  const fillCanonicalGeneration = canonicalStateGeneration;
+  const result = await core.execute(command);
+  if (
+    fillTimelineGeneration !== timelineStateGeneration ||
+    fillCanonicalGeneration !== canonicalStateGeneration
+  ) {
+    syncClientSequencesFromState();
+    setStatus(
+      "Timeline cell changed while filling; the old-cell write was discarded.",
+      "error",
+    );
+    return;
+  }
+  if (!result.ok) {
+    syncClientSequencesFromState();
+    setStatus(
+      result.diagnostics.map((item) => item.code).join(", "),
+      "error",
+    );
+    return;
+  }
+  if (!result.result.noOp) {
+    adoptCanonicalState(result.state);
+    refreshSelectionSnapshotForCurrentRaster();
+    history.record(
+      before,
+      state,
+      result.result.operation.operationId,
+      result.result.operation.operationType,
+    );
+    renderTimeline();
+    saveDrawProjectState();
+  }
+  await autosave.record(state, result.result);
+  if (!result.result.noOp) {
+    publishDrawRasterCommit(result.result, state, before.structureEpoch);
+  }
+  await present(result.result.dirtyRegions, result.result.dirtyTiles);
+  updateHistoryButtons();
+  setStatus(
+    `${
+      gradientTo === undefined ? "fill" : "gradient fill"
+    } committed · ${result.result.dirtyTiles.length} tiles · one undo`,
+  );
+}
+
+async function commitPointerPointsNow(
   points: readonly { x: number; y: number }[],
   fixedContext?: FixedToolContext,
 ): Promise<void> {
@@ -11780,6 +13501,8 @@ async function commitPointerPoints(
   const tool = fixedContext?.tool ?? currentBasicTool();
   const colorIndex = fixedContext?.colorIndex ?? selectedColor;
   const fixedToolOptions = fixedContext?.toolOptions ?? toolOptions;
+  const selectionClip = activeRectangleSelectionClip();
+  const selectionMask = activeRasterSelectionMask();
   const first = points[0] ?? points[points.length - 1]!;
   const last = points[points.length - 1] ?? first;
   if (tool === "pan") return;
@@ -11791,53 +13514,69 @@ async function commitPointerPoints(
     setStatus(`Picked palette index ${selectedColor}.`);
     return;
   }
+  const activeSelectionStamp = activeSelectionStampId === undefined
+    ? undefined
+    : selectionStampStore.load(activeSelectionStampId);
+  if (tool === "tile-stamp" && activeSelectionStamp !== undefined) {
+    const source = selectionStampSourceForAsset(activeSelectionStamp, asset);
+    if (source === undefined) return;
+    const scale = Math.max(
+      1,
+      Math.min(16, Math.round(Number(specialTileScaleElement?.value ?? 1))),
+    );
+    const remapMessage = source.remappedColors > 0
+      ? ` · ${source.remappedColors}色を近似変換`
+      : "";
+    await commitTileStampCommandNow(
+      asset,
+      {
+        inlineSource: source.inlineSource,
+        originX: first.x,
+        originY: first.y,
+        scale,
+      },
+      `選択範囲スタンプ「${activeSelectionStamp.name}」を配置しました${remapMessage}`,
+    );
+    return;
+  }
   if (tool === "tile-stamp") {
-    const source = selectedTileSource === undefined
-      ? { width: 2, height: 2, pixels: [colorIndex, 0, 0, colorIndex] }
-      : (() => {
-        const sourceAsset = state.assets[selectedTileSource.sourceAssetId];
-        if (sourceAsset === undefined) return undefined;
-        const pixels: number[] = [];
-        for (
-          let sourceY = 0;
-          sourceY < selectedTileSource.cellSize;
-          sourceY += 1
-        ) {
-          for (
-            let sourceX = 0;
-            sourceX < selectedTileSource.cellSize;
-            sourceX += 1
-          ) {
-            const index = sourceAsset.raster.getPixel(
-              selectedTileSource.sourceX + sourceX,
-              selectedTileSource.sourceY + sourceY,
-            );
-            pixels.push(index < asset.palette.length ? index : colorIndex);
-          }
-        }
-        return {
-          width: selectedTileSource.cellSize,
-          height: selectedTileSource.cellSize,
-          pixels,
-        };
-      })();
-    if (source === undefined) {
+    const scale = Math.max(
+      1,
+      Math.min(16, Math.round(Number(specialTileScaleElement?.value ?? 1))),
+    );
+    if (selectedTileSource === undefined) {
+      await commitTileStampCommandNow(asset, {
+        pattern: "checker",
+        colorIndex,
+        originX: first.x,
+        originY: first.y,
+        scale,
+        ...(selectionClip === undefined ? {} : { clip: selectionClip }),
+        ...(selectionMask === undefined ? {} : { selectionMask }),
+      });
+      return;
+    }
+    const sourceAsset = state.assets[selectedTileSource.sourceAssetId];
+    if (sourceAsset === undefined) {
       setStatus(
         "Tile source is unavailable; choose a Tileset cell first.",
         "error",
       );
       return;
     }
-    const writes = tileStampWrites(
-      asset.raster,
-      source,
-      first,
-      Number(specialTileScaleElement?.value ?? 1),
-    );
-    await commitWriteSet(writes, "tool.tile-stamp", tool);
-    if (writes.length > 0) {
-      setStatus(`Tile Stamp committed · ${writes.length}px · one undo`);
-    }
+    await commitTileStampCommandNow(asset, {
+      sourceAssetId: sourceAsset.id,
+      sourceAssetRevision: sourceAsset.revision,
+      sourceX: selectedTileSource.sourceX,
+      sourceY: selectedTileSource.sourceY,
+      sourceWidth: selectedTileSource.cellSize,
+      sourceHeight: selectedTileSource.cellSize,
+      originX: first.x,
+      originY: first.y,
+      scale,
+      ...(selectionClip === undefined ? {} : { clip: selectionClip }),
+      ...(selectionMask === undefined ? {} : { selectionMask }),
+    });
     return;
   }
   if (tool === "select-color") {
@@ -11883,7 +13622,18 @@ async function commitPointerPoints(
     return;
   }
   if (tool === "fill") {
-    if (selection !== undefined || points.length > 1) {
+    if (selectionClip !== undefined || selectionMask !== undefined) {
+      await commitFillCommandNow(
+        asset,
+        first,
+        colorIndex,
+        points.length > 1 ? last : undefined,
+        selectionClip,
+        selectionMask,
+      );
+      return;
+    }
+    if (selection !== undefined) {
       const writes = createFillGradientWriteSet(asset, first, last, colorIndex);
       if (writes.length === 0) {
         setStatus(
@@ -11897,80 +13647,67 @@ async function commitPointerPoints(
         );
         return;
       }
-      await commitWriteSet(
+      await commitWriteSetNow(
         writes,
         points.length > 1 ? "tool.fill.gradient" : "tool.fill.selection",
       );
       return;
     }
-    const drawClientId = activeDrawClientId();
-    const commandSequence = nextClientSequence(drawClientId);
-    const before = state;
-    const command = {
-      commandId: `draw2-local-fill-${commandSequence}`,
-      commandType: "raster.fill" as const,
-      schemaVersion: 1 as const,
-      projectId: state.projectId,
-      assetId: asset.id,
-      actorId: activeDrawActorId(),
-      clientId: drawClientId,
-      clientSequence: commandSequence,
-      baseStructureEpoch: state.structureEpoch,
-      createdAtMonotonicMs: performance.now(),
-      payload: {
-        seedX: first.x,
-        seedY: first.y,
-        colorIndex,
-        maxPixels: Math.min(1_048_576, asset.width * asset.height),
-      },
-    };
-    const fillTimelineGeneration = timelineStateGeneration;
-    const result = await core.execute(command);
-    if (fillTimelineGeneration !== timelineStateGeneration) {
-      syncClientSequencesFromState();
-      setStatus(
-        "Timeline cell changed while filling; the old-cell write was discarded.",
-        "error",
-      );
-      return;
-    }
-    if (!result.ok) {
-      syncClientSequencesFromState();
-      setStatus(
-        result.diagnostics.map((item) => item.code).join(", "),
-        "error",
-      );
-      return;
-    }
-    state = result.state;
-    history.record(
-      before,
-      state,
-      result.result.operation.operationId,
-      result.result.operation.operationType,
-    );
-    renderTimeline();
-    saveDrawProjectState();
-    await autosave.record(state, result.result);
-    publishDrawRasterCommit(result.result, state, before.structureEpoch);
-    await present(result.result.dirtyRegions, result.result.dirtyTiles);
-    updateHistoryButtons();
-    setStatus(
-      `fill committed · ${result.result.dirtyTiles.length} tiles · one undo`,
+    await commitFillCommandNow(
+      asset,
+      first,
+      colorIndex,
+      points.length > 1 ? last : undefined,
     );
     return;
   }
-  const useStrokeCommand = (tool === "pen" || tool === "eraser") &&
-    fixedToolOptions.brushSize === 1 && fixedToolOptions.pattern === "solid" &&
-    (!mirrorEnabled || !mirrorHasActiveAxis()) &&
-    selection === undefined;
+  const useShapeCommand =
+    (tool === "rect" || tool === "rect-fill" || tool === "ellipse" ||
+      tool === "ellipse-fill" || tool === "circle" || tool === "circle-fill") &&
+    (selection === undefined || selectionClip !== undefined ||
+      selectionMask !== undefined);
+  if (useShapeCommand) {
+    await commitShapePointsNow(
+      tool,
+      first,
+      last,
+      colorIndex,
+      fixedToolOptions,
+    );
+    return;
+  }
+  const useStrokeCommand =
+    (tool === "pen" || tool === "eraser" || tool === "pixel-pen" ||
+      tool === "line") &&
+    (selection === undefined || selectionClip !== undefined ||
+      selectionMask !== undefined);
   if (useStrokeCommand) {
     const drawClientId = activeDrawClientId();
     const commandSequence = nextClientSequence(drawClientId);
     const before = state;
-    let canonicalStrokePoints: readonly { x: number; y: number }[];
+    const strokeOptions = normalizeToolOptions(fixedToolOptions);
+    const mirror = mirrorCommitSpecForTool(asset, tool);
+    let strokePoints: readonly { x: number; y: number }[];
     try {
-      canonicalStrokePoints = interpolatePixelPath(points);
+      // Keep the bounded pointer path in the sync payload. EditorCore owns
+      // deterministic interpolation, so expanding a 256px gesture into one
+      // entry per painted pixel would make a valid stroke exceed the PiXYNC
+      // command-array bound before it reaches the transport.
+      const sourcePoints = tool === "line" ? [first, last] : points;
+      const rawStrokePoints = sourcePoints.map((point) => ({
+        x: point.x,
+        y: point.y,
+      }));
+      // Validate the full gesture before reducing it so an unbounded input
+      // cannot silently bypass the canonical interpolation budget.
+      interpolatePixelPath(rawStrokePoints);
+      strokePoints = compactPixelPath(
+        rawStrokePoints,
+        PIXYNC_DRAW2_MAX_PAYLOAD_KEYS,
+      );
+      // The reduced path is the canonical command input and must remain safe
+      // even when the source contains dense, rapidly coalesced samples.
+      interpolatePixelPath(strokePoints);
     } catch (cause) {
       syncClientSequencesFromState();
       setStatus(
@@ -11991,13 +13728,27 @@ async function commitPointerPoints(
       baseStructureEpoch: state.structureEpoch,
       createdAtMonotonicMs: performance.now(),
       payload: {
-        points: canonicalStrokePoints,
+        points: strokePoints,
         colorIndex: tool === "eraser" ? 0 : colorIndex,
+        brushSize: strokeOptions.brushSize,
+        brushShape: strokeOptions.brushShape,
+        pattern: strokeOptions.pattern,
+        ...(mirror === undefined ? {} : { mirror }),
+        ...(selectionClip === undefined ? {} : { clip: selectionClip }),
+        ...(selectionMask === undefined ? {} : { selectionMask }),
       },
     };
+    if (rejectOversizedProductionPayload(command.payload)) {
+      syncClientSequencesFromState();
+      return;
+    }
     const strokeTimelineGeneration = timelineStateGeneration;
+    const strokeCanonicalGeneration = canonicalStateGeneration;
     const result = await core.execute(command);
-    if (strokeTimelineGeneration !== timelineStateGeneration) {
+    if (
+      strokeTimelineGeneration !== timelineStateGeneration ||
+      strokeCanonicalGeneration !== canonicalStateGeneration
+    ) {
       syncClientSequencesFromState();
       setStatus(
         "Timeline cell changed while drawing; the old-cell write was discarded.",
@@ -12013,17 +13764,22 @@ async function commitPointerPoints(
       );
       return;
     }
-    state = result.state;
-    history.record(
-      before,
-      state,
-      result.result.operation.operationId,
-      result.result.operation.operationType,
-    );
-    renderTimeline();
-    saveDrawProjectState();
+    if (!result.result.noOp) {
+      adoptCanonicalState(result.state);
+      refreshSelectionSnapshotForCurrentRaster();
+      history.record(
+        before,
+        state,
+        result.result.operation.operationId,
+        result.result.operation.operationType,
+      );
+      renderTimeline();
+      saveDrawProjectState();
+    }
     await autosave.record(state, result.result);
-    publishDrawRasterCommit(result.result, state, before.structureEpoch);
+    if (!result.result.noOp) {
+      publishDrawRasterCommit(result.result, state, before.structureEpoch);
+    }
     await present(result.result.dirtyRegions, result.result.dirtyTiles);
     updateHistoryButtons();
     setStatus(`${tool} committed · one stroke / one undo`);
@@ -12045,7 +13801,91 @@ async function commitPointerPoints(
       fixedToolOptions,
       asset.raster,
     );
-  await commitWriteSet(writes, `tool.${tool}`);
+  await commitWriteSetNow(writes, `tool.${tool}`);
+}
+
+async function commitShapePointsNow(
+  tool: ShapeCommitPayload["tool"],
+  from: { readonly x: number; readonly y: number },
+  to: { readonly x: number; readonly y: number },
+  colorIndex: number,
+  toolOptions: Partial<ToolOptions>,
+): Promise<void> {
+  const asset = state.assets[state.activeAssetId];
+  if (asset === undefined) return;
+  const options = normalizeToolOptions(toolOptions);
+  const mirror = mirrorCommitSpecForTool(asset, tool);
+  const clip = activeRectangleSelectionClip();
+  const selectionMask = activeRasterSelectionMask();
+  const drawClientId = activeDrawClientId();
+  const commandSequence = nextClientSequence(drawClientId);
+  const before = state;
+  const command = {
+    commandId: `draw2-local-shape-${commandSequence}`,
+    commandType: "raster.shapeCommit" as const,
+    schemaVersion: 1 as const,
+    projectId: state.projectId,
+    assetId: asset.id,
+    actorId: activeDrawActorId(),
+    clientId: drawClientId,
+    clientSequence: commandSequence,
+    baseStructureEpoch: state.structureEpoch,
+    createdAtMonotonicMs: performance.now(),
+    payload: {
+      tool,
+      from: { x: from.x, y: from.y },
+      to: { x: to.x, y: to.y },
+      colorIndex,
+      brushSize: options.brushSize,
+      brushShape: options.brushShape,
+      pattern: options.pattern,
+      ...(mirror === undefined ? {} : { mirror }),
+      ...(clip === undefined ? {} : { clip }),
+      ...(selectionMask === undefined ? {} : { selectionMask }),
+    },
+  };
+  if (rejectOversizedProductionPayload(command.payload)) {
+    syncClientSequencesFromState();
+    return;
+  }
+  const shapeTimelineGeneration = timelineStateGeneration;
+  const shapeCanonicalGeneration = canonicalStateGeneration;
+  const result = await core.execute(command);
+  if (
+    shapeTimelineGeneration !== timelineStateGeneration ||
+    shapeCanonicalGeneration !== canonicalStateGeneration
+  ) {
+    syncClientSequencesFromState();
+    setStatus(
+      "Timeline cell changed while drawing; the old-cell shape was discarded.",
+      "error",
+    );
+    return;
+  }
+  if (!result.ok) {
+    syncClientSequencesFromState();
+    setStatus(result.diagnostics.map((item) => item.code).join(", "), "error");
+    return;
+  }
+  if (!result.result.noOp) {
+    adoptCanonicalState(result.state);
+    refreshSelectionSnapshotForCurrentRaster();
+    history.record(
+      before,
+      state,
+      result.result.operation.operationId,
+      result.result.operation.operationType,
+    );
+    renderTimeline();
+    saveDrawProjectState();
+  }
+  await autosave.record(state, result.result);
+  if (!result.result.noOp) {
+    publishDrawRasterCommit(result.result, state, before.structureEpoch);
+  }
+  await present(result.result.dirtyRegions, result.result.dirtyTiles);
+  updateHistoryButtons();
+  setStatus(`${tool} committed · one shape / one undo`);
 }
 
 async function commitInteractionSession(
@@ -12054,7 +13894,14 @@ async function commitInteractionSession(
   const fixedContext: FixedToolContext = {
     tool: commit.tool,
     colorIndex: commit.colorIndex,
-    toolOptions: commit.toolOptions,
+    toolOptions: commit.tool === "pixel-pen"
+      ? {
+        ...commit.toolOptions,
+        brushSize: 1,
+        brushShape: "square",
+        pattern: "solid",
+      }
+      : commit.toolOptions,
   };
   if (commit.kind === "immediate") {
     // Fill uses the full gesture to distinguish a click from a directional
@@ -12066,11 +13913,19 @@ async function commitInteractionSession(
     );
     return;
   }
-  const writeTools: readonly BasicTool[] = [
-    "pen",
-    "pixel-pen",
-    "eraser",
-    "line",
+  if (
+    commit.tool === "pen" || commit.tool === "eraser" ||
+    commit.tool === "pixel-pen" || commit.tool === "line"
+  ) {
+    // A simple pen stroke is already represented by its pointer path. Let
+    // EditorCore interpolate it during the canonical command instead of
+    // putting every painted pixel into a sync write-set array. This keeps a
+    // fast full-width stroke within the bounded PiXYNC payload contract while
+    // preserving the same one-stroke/one-undo behavior.
+    await commitPointerPoints(commit.points, fixedContext);
+    return;
+  }
+  const shapeTools: readonly BasicTool[] = [
     "rect",
     "rect-fill",
     "ellipse",
@@ -12078,12 +13933,8 @@ async function commitInteractionSession(
     "circle",
     "circle-fill",
   ];
-  if (writeTools.includes(commit.tool)) {
-    await commitWriteSet(
-      commit.writes,
-      commit.sourceOperationType,
-      commit.tool,
-    );
+  if (shapeTools.includes(commit.tool)) {
+    await commitPointerPoints(commit.points, fixedContext);
     return;
   }
   await commitPointerPoints(commit.points, fixedContext);
@@ -12688,13 +14539,44 @@ async function commitActiveTransform(): Promise<boolean> {
   const sourceSelection = selection;
   const previewPixels = transformPreview?.pixels ?? [];
   const before = state;
-  const commandSequence = nextClientSequence(SELECTION_CLIENT_ID);
+  const isClipboardPaste = pasteMode && clipboard !== undefined;
+  const commandActorId = isClipboardPaste
+    ? SELECTION_CLIENT_ID
+    : activeDrawActorId();
+  const commandClientId = isClipboardPaste
+    ? SELECTION_CLIENT_ID
+    : activeDrawClientId();
+  const commandSequence = nextClientSequence(commandClientId);
   const commandId = selectionCommandId(
     pasteMode ? "paste" : "transform",
     state.projectId,
     commandSequence,
   );
+  if (!isClipboardPaste && sourceSelection !== undefined) {
+    const activeAsset = state.assets[state.activeAssetId];
+    const destinationCount = activeAsset === undefined
+      ? 0
+      : previewPixels.filter((pixel) =>
+        pixel.x >= 0 && pixel.y >= 0 && pixel.x < activeAsset.width &&
+        pixel.y < activeAsset.height
+      ).length;
+    const transformPayload = createSelectionTransformWirePayload(
+      sourceSelection,
+      transformSession.transform,
+      destinationCount,
+      previewPixels.some((pixel) => {
+        if (activeAsset === undefined) return true;
+        return pixel.x < 0 || pixel.y < 0 || pixel.x >= activeAsset.width ||
+          pixel.y >= activeAsset.height;
+      }) && transformSession.transform.outOfBoundsPolicy === "CLIP",
+    );
+    if (rejectOversizedProductionPayload(transformPayload)) {
+      syncClientSequencesFromState();
+      return false;
+    }
+  }
   const interactionGeneration = selectionInteractionGeneration;
+  const canonicalGeneration = canonicalStateGeneration;
   const result = pasteMode && clipboard !== undefined
     ? await pasteClipboard(state, {
       commandType: "clipboard.paste",
@@ -12702,8 +14584,8 @@ async function commitActiveTransform(): Promise<boolean> {
       schemaVersion: 1,
       projectId: state.projectId,
       assetId: state.activeAssetId,
-      actorId: SELECTION_CLIENT_ID,
-      clientId: SELECTION_CLIENT_ID,
+      actorId: commandActorId,
+      clientId: commandClientId,
       clientSequence: commandSequence,
       baseStructureEpoch: state.structureEpoch,
       createdAtMonotonicMs: performance.now(),
@@ -12717,14 +14599,17 @@ async function commitActiveTransform(): Promise<boolean> {
       schemaVersion: 1,
       projectId: state.projectId,
       assetId: state.activeAssetId,
-      actorId: SELECTION_CLIENT_ID,
-      clientId: SELECTION_CLIENT_ID,
+      actorId: commandActorId,
+      clientId: commandClientId,
       clientSequence: commandSequence,
       baseStructureEpoch: state.structureEpoch,
       createdAtMonotonicMs: performance.now(),
       payload: { selection, session: transformSession },
     });
-  if (interactionGeneration !== selectionInteractionGeneration) {
+  if (
+    interactionGeneration !== selectionInteractionGeneration ||
+    canonicalGeneration !== canonicalStateGeneration
+  ) {
     // A timeline/tool/clipboard action cancelled this session while the
     // command was being prepared. Never let the late result overwrite the
     // newer state or resurrect the old preview.
@@ -12755,7 +14640,7 @@ async function commitActiveTransform(): Promise<boolean> {
     );
     return false;
   }
-  state = result.state;
+  if (!result.result.noOp) adoptCanonicalState(result.state);
   syncClientSequencesFromState();
   if (sourceSelection !== undefined && previewPixels.length > 0) {
     const activeAsset = state.assets[state.activeAssetId];
@@ -12779,15 +14664,21 @@ async function commitActiveTransform(): Promise<boolean> {
   } else {
     selection = undefined;
   }
-  history.record(
-    before,
-    state,
-    result.result.operation.operationId,
-    result.result.operation.operationType,
-  );
-  renderTimeline();
-  saveDrawProjectState();
+  refreshSelectionSnapshotForCurrentRaster();
+  if (!result.result.noOp) {
+    history.record(
+      before,
+      state,
+      result.result.operation.operationId,
+      result.result.operation.operationType,
+    );
+    renderTimeline();
+    saveDrawProjectState();
+  }
   await autosave.record(state, result.result);
+  if (!result.result.noOp && !isClipboardPaste) {
+    publishDrawRasterCommit(result.result, state, before.structureEpoch);
+  }
   selectionDraft = undefined;
   pendingSelectionGesture = undefined;
   transformSession = undefined;
@@ -12886,6 +14777,7 @@ cutButton.addEventListener("click", () => {
       commandSequence,
     );
     const interactionGeneration = selectionInteractionGeneration;
+    const canonicalGeneration = canonicalStateGeneration;
     const result = await cutClipboard(state, {
       commandType: "clipboard.cut",
       commandId,
@@ -12899,7 +14791,10 @@ cutButton.addEventListener("click", () => {
       createdAtMonotonicMs: performance.now(),
       payload: { clipboard, selection },
     });
-    if (interactionGeneration !== selectionInteractionGeneration) return;
+    if (
+      interactionGeneration !== selectionInteractionGeneration ||
+      canonicalGeneration !== canonicalStateGeneration
+    ) return;
     if (!result.ok) {
       syncClientSequencesFromState();
       setStatus(
@@ -12909,15 +14804,18 @@ cutButton.addEventListener("click", () => {
       return;
     }
     syncClientSequencesFromState();
-    state = result.state;
-    history.record(
-      before,
-      state,
-      result.result.operation.operationId,
-      result.result.operation.operationType,
-    );
-    renderTimeline();
-    saveDrawProjectState();
+    if (!result.result.noOp) {
+      adoptCanonicalState(result.state);
+      refreshSelectionSnapshotForCurrentRaster();
+      history.record(
+        before,
+        state,
+        result.result.operation.operationId,
+        result.result.operation.operationType,
+      );
+      renderTimeline();
+      saveDrawProjectState();
+    }
     await autosave.record(state, result.result);
     selection = undefined;
     selectionDraft = undefined;
@@ -12983,8 +14881,7 @@ undoControl.addEventListener("click", async () => {
     setStatus("Nothing to undo.", "error");
     return;
   }
-  state = result.state;
-  core = new EditorCore(state, { instrumentation });
+  adoptCanonicalState(result.state);
   syncClientSequencesFromState();
   saveDrawProjectState();
   selection = undefined;
@@ -12994,9 +14891,9 @@ undoControl.addEventListener("click", async () => {
   transformSession = undefined;
   transformPreview = undefined;
   pasteMode = false;
+  normalizeTimelineSession();
   notifyAssetStateChanged();
   await present();
-  normalizeTimelineSession();
   renderTimeline();
   updateSelectionActionButtons();
   updateSelectionStatus(`scope=${state.activeCelId} · selection=none`);
@@ -13018,8 +14915,7 @@ redoControl.addEventListener("click", async () => {
     setStatus("Nothing to redo.", "error");
     return;
   }
-  state = result.state;
-  core = new EditorCore(state, { instrumentation });
+  adoptCanonicalState(result.state);
   syncClientSequencesFromState();
   saveDrawProjectState();
   selection = undefined;
@@ -13029,9 +14925,9 @@ redoControl.addEventListener("click", async () => {
   transformSession = undefined;
   transformPreview = undefined;
   pasteMode = false;
+  normalizeTimelineSession();
   notifyAssetStateChanged();
   await present();
-  normalizeTimelineSession();
   renderTimeline();
   updateSelectionActionButtons();
   updateSelectionStatus(`scope=${state.activeCelId} · selection=none`);
@@ -13043,13 +14939,30 @@ redoControl.addEventListener("click", async () => {
 });
 
 let drawInteraction: Draw2InteractionKernel | undefined;
+
+function sameTilemapCell(
+  left: Draw2TilemapCell | undefined,
+  right: Draw2TilemapCell | undefined,
+): boolean {
+  if (left === undefined || right === undefined) return left === right;
+  return left.sourceAssetId === right.sourceAssetId &&
+    left.sourceX === right.sourceX && left.sourceY === right.sourceY &&
+    left.transform === right.transform;
+}
+
 let tilemapPointerGesture: {
   readonly pointerId: number;
   readonly mapId: string;
   readonly before: ProjectState;
+  canonicalGeneration: number;
+  mapRevision: number;
+  structureEpoch: number;
+  stale: boolean;
   readonly erase: boolean;
   lastCellKey: string;
   changed: boolean;
+  readonly beforeCells: Map<string, Draw2TilemapCell | undefined>;
+  readonly localCells: Map<string, Draw2TilemapCell | undefined>;
 } | undefined;
 let tilemapPresentFrame: number | undefined;
 let viewportPanPointerId: number | undefined;
@@ -13221,10 +15134,45 @@ function beginSelectionDrag(
 function cancelTilemapPointerGestureForPinch(): void {
   const gesture = tilemapPointerGesture;
   if (gesture === undefined) return;
-  state = gesture.before;
-  core = new EditorCore(state, { instrumentation });
+  const isCurrent = !gesture.stale &&
+    canonicalStateGeneration === gesture.canonicalGeneration &&
+    state.structureEpoch === gesture.structureEpoch &&
+    state.tilemaps?.[gesture.mapId]?.revision === gesture.mapRevision;
+  if (isCurrent) {
+    adoptCanonicalState(gesture.before);
+  } else if (rollbackStaleTilemapGesture(gesture)) {
+    saveDrawProjectState("tilemap-cancel");
+    notifyAssetStateChanged();
+  }
   tilemapPointerGesture = undefined;
   scheduleTilemapPresent();
+}
+
+function rollbackStaleTilemapGesture(
+  gesture: NonNullable<typeof tilemapPointerGesture>,
+): boolean {
+  const map = state.tilemaps?.[gesture.mapId];
+  if (map === undefined) return false;
+  let nextMap = map;
+  for (const [key, beforeCell] of gesture.beforeCells) {
+    // If another canonical operation changed the same cell after this
+    // gesture, leave that newer value untouched. This is the tilemap
+    // equivalent of rebasing a local edit over a later remote edit.
+    if (!sameTilemapCell(map.cells[key], gesture.localCells.get(key))) continue;
+    const [xText, yText] = key.split(":");
+    const x = Number(xText);
+    const y = Number(yText);
+    if (!Number.isSafeInteger(x) || !Number.isSafeInteger(y)) continue;
+    nextMap = beforeCell === undefined
+      ? clearDraw2TilemapCell(nextMap, x, y)
+      : setDraw2TilemapCell(nextMap, x, y, beforeCell);
+  }
+  if (nextMap === map) return false;
+  adoptCanonicalState({
+    ...state,
+    tilemaps: { ...(state.tilemaps ?? {}), [map.id]: nextMap },
+  });
+  return true;
 }
 
 function updateSelectionDragPreview(point: { x: number; y: number }): void {
@@ -13693,6 +15641,14 @@ function updateTilemapPointerGesture(
 ): void {
   const gesture = tilemapPointerGesture;
   if (gesture === undefined) return;
+  if (
+    gesture.stale || canonicalStateGeneration !== gesture.canonicalGeneration ||
+    state.structureEpoch !== gesture.structureEpoch ||
+    state.tilemaps?.[gesture.mapId]?.revision !== gesture.mapRevision
+  ) {
+    gesture.stale = true;
+    return;
+  }
   const map = state.tilemaps?.[gesture.mapId];
   if (map === undefined) return;
   const coordinates = tilemapCellCoordinates(map, point);
@@ -13700,6 +15656,9 @@ function updateTilemapPointerGesture(
   const key = `${coordinates.x}:${coordinates.y}`;
   if (key === gesture.lastCellKey) return;
   gesture.lastCellKey = key;
+  if (!gesture.beforeCells.has(key)) {
+    gesture.beforeCells.set(key, map.cells[key]);
+  }
   const nextMap = gesture.erase
     ? clearDraw2TilemapCell(map, coordinates.x, coordinates.y)
     : selectedTileSource === undefined
@@ -13716,12 +15675,16 @@ function updateTilemapPointerGesture(
       } satisfies Draw2TilemapCell,
     );
   if (nextMap === map) return;
-  state = {
+  adoptCanonicalState({
     ...state,
     tilemaps: { ...(state.tilemaps ?? {}), [map.id]: nextMap },
-  };
-  core = new EditorCore(state, { instrumentation });
+  });
+  refreshSelectionSnapshotForCurrentRaster();
   gesture.changed = true;
+  gesture.canonicalGeneration = canonicalStateGeneration;
+  gesture.mapRevision = nextMap.revision;
+  gesture.structureEpoch = state.structureEpoch;
+  gesture.localCells.set(key, nextMap.cells[key]);
   scheduleTilemapPresent();
 }
 
@@ -13735,6 +15698,13 @@ function beginTilemapPointerGesture(
   );
   if (layer?.locked === true) {
     setStatus("タイルマップレイヤーがロックされています。", "error");
+    return true;
+  }
+  if (activeSelectionStampId !== undefined) {
+    setStatus(
+      "選択範囲スタンプは通常レイヤーで使用します。通常レイヤーを選択してください。",
+      "error",
+    );
     return true;
   }
   const map = activeTilemap() ?? ensureTilemapFor(
@@ -13764,9 +15734,15 @@ function beginTilemapPointerGesture(
     pointerId: event.pointerId,
     mapId: map.id,
     before: state,
+    canonicalGeneration: canonicalStateGeneration,
+    mapRevision: map.revision,
+    structureEpoch: state.structureEpoch,
+    stale: false,
     erase,
     lastCellKey: "",
     changed: false,
+    beforeCells: new Map(),
+    localCells: new Map(),
   };
   canvas.setPointerCapture(event.pointerId);
   updateTilemapPointerGesture(point);
@@ -13781,8 +15757,28 @@ async function finishTilemapPointerGesture(
   if (gesture === undefined) return;
   tilemapPointerGesture = undefined;
   if (cancelled) {
-    state = gesture.before;
-    core = new EditorCore(state, { instrumentation });
+    const isCurrent = !gesture.stale &&
+      canonicalStateGeneration === gesture.canonicalGeneration &&
+      state.structureEpoch === gesture.structureEpoch &&
+      state.tilemaps?.[gesture.mapId]?.revision === gesture.mapRevision;
+    if (isCurrent) {
+      adoptCanonicalState(gesture.before);
+    } else if (rollbackStaleTilemapGesture(gesture)) {
+      saveDrawProjectState("tilemap-cancel");
+      notifyAssetStateChanged();
+    }
+    await present();
+    return;
+  }
+  const isStale = gesture.stale ||
+    canonicalStateGeneration !== gesture.canonicalGeneration ||
+    state.structureEpoch !== gesture.structureEpoch ||
+    state.tilemaps?.[gesture.mapId]?.revision !== gesture.mapRevision;
+  if (isStale) {
+    if (rollbackStaleTilemapGesture(gesture)) {
+      saveDrawProjectState("tilemap-cancel");
+      notifyAssetStateChanged();
+    }
     await present();
     return;
   }
@@ -14603,7 +16599,7 @@ const TOOL_STUDIO_LABELS: Readonly<Record<string, string>> = {
   move: "Move / Duplicate",
   "select-color": "Color Selection",
   "select-polygon": "Polygon Select",
-  "tile-stamp": "Tile Stamp",
+  "tile-stamp": "Tile Placement",
 };
 
 function syncToolStudio(): void {
@@ -14637,7 +16633,9 @@ function syncToolStudio(): void {
       : current === "fill"
       ? "クリック地点と同じパレット色でつながる範囲だけを塗りつぶします。"
       : current === "tile-stamp"
-      ? "Tilesetのセルを選び、Canvasへスタンプします。"
+      ? activeSelectionStampId === undefined
+        ? "Tilesetのセルを選び、Canvasへ配置します。"
+        : "保存した選択範囲スタンプをCanvasへ配置します。"
       : "ツールを選ぶと、ここに使い方と設定が表示されます。";
     toolStudioStatusElement.textContent = message;
   }
@@ -15222,6 +17220,12 @@ function deleteBrushPreset(): void {
 }
 
 toolSelect.addEventListener("change", () => {
+  if (selectionStampToolActivation) {
+    selectionStampToolActivation = false;
+  } else if (activeSelectionStampId !== undefined) {
+    activeSelectionStampId = undefined;
+    renderSelectionStamps();
+  }
   cancelUncommittedSelectionWork(
     "Selection/transform preview cancelled because the tool changed.",
   );
@@ -15344,6 +17348,7 @@ selectionBorderButton.addEventListener(
   "click",
   () => applySelectionMorphology("BORDER"),
 );
+selectionStampSaveButton.addEventListener("click", saveSelectionStamp);
 renderBrushPresetOptions();
 updateToolOptions();
 syncToolButtons();
@@ -15613,7 +17618,46 @@ colorMap.addEventListener("keyup", (event) => {
 gamePreviewStartControl.addEventListener("click", () => {
   void startGamePreview("LIVE");
 });
+goldenProjectApplyButton.addEventListener("click", () => {
+  const workspace = getWorkspacePxdBridge();
+  goldenProjectApplyButton.disabled = true;
+  goldenProjectApplyButton.setAttribute("aria-busy", "true");
+  void (async () => {
+    try {
+      const result = await workspace.applyGoldenProject?.("LIVE");
+      if (result === undefined) {
+        throw new Error("Golden Project bridge is unavailable.");
+      }
+      if (!result.ok || result.value === undefined) {
+        throw new Error(
+          result.diagnostics.map((item) => item.message).join(" ") ||
+            "Golden Project could not be applied.",
+        );
+      }
+      goldenProjectStatusElement.textContent =
+        "APPLIED · 主人公SpriteとAudio SourceをGameへ保存しました";
+      goldenProjectRefsElement.textContent =
+        `Game配置: ${result.value.project.scenes[0]?.entities.length ?? 0} · ` +
+        `Refs: ${result.value.manifest.assetLocks.length} · Project別自動保存`;
+      setGamePreviewStatus(
+        "Golden Project applied · Draw Sprite + Audio Source are ready",
+      );
+    } catch (cause) {
+      goldenProjectStatusElement.textContent = cause instanceof Error
+        ? `APPLY BLOCKED · ${cause.message}`
+        : "APPLY BLOCKED · Golden Project could not be applied.";
+      setGamePreviewStatus(
+        cause instanceof Error ? cause.message : "Golden Project apply failed.",
+        "error",
+      );
+    } finally {
+      goldenProjectApplyButton.disabled = false;
+      goldenProjectApplyButton.removeAttribute("aria-busy");
+    }
+  })();
+});
 gamePreviewStopControl.addEventListener("click", () => {
+  getWorkspacePxdBridge().stopGoldenAudioPreview?.();
   if (game351PlayableState === undefined) return;
   game351PlayableState = stopGame351(game351PlayableState);
   drawGame351Preview(game351PlayableState, game351PreviewMode);
@@ -15630,7 +17674,24 @@ gamePreviewReloadControl.addEventListener("click", () => {
   void startGamePreview("LIVE");
 });
 gamePreviewPinControl.addEventListener("click", () => {
-  void startGamePreview("PINNED");
+  const workspace = getWorkspacePxdBridge();
+  void (async () => {
+    const applied = await workspace.applyGoldenProject?.("PINNED");
+    if (applied !== undefined && !applied.ok) {
+      setGamePreviewStatus(
+        applied.diagnostics.map((item) => item.message).join(" ") ||
+          "Pinned Golden Project could not be applied.",
+        "error",
+      );
+      return;
+    }
+    await startGamePreview("PINNED");
+  })().catch((cause) => {
+    setGamePreviewStatus(
+      cause instanceof Error ? cause.message : "Pinned Preview failed.",
+      "error",
+    );
+  });
 });
 gamePreviewCanvas.addEventListener("keydown", handleGame351PreviewKey);
 gamePreviewCanvas.addEventListener("click", () => {
@@ -15677,7 +17738,6 @@ function advancedControlsEnabled(enabled: boolean): void {
   for (
     const control of [
       advancedPatternControl,
-      advancedStampControl,
       advancedMirrorControl,
       advancedGridControl,
       advancedGuideControl,
@@ -15745,37 +17805,6 @@ advancedPatternControl.addEventListener("click", () => {
     advancedPreviewOperationId = operation.value.operationId;
     setAdvancedStatus(
       `Pattern preview planned · writes=${operation.value.writes.length} · dirtyTiles=${operation.value.dirtyTiles.length} · undo=none`,
-    );
-  })();
-});
-advancedStampControl.addEventListener("click", () => {
-  void (async () => {
-    const module = await ensureAdvancedModule();
-    if (module === undefined) return;
-    const stamp = module.planStamp(advancedTarget(), {
-      width: 2,
-      height: 2,
-      pixels: [1, 0, 0, 1],
-      palette: [0, 0xffffffff, 0xff0000ff],
-      transparentIndex: 0,
-    }, {
-      x: 24,
-      y: 24,
-      scale: 2,
-      transparent: "SKIP",
-      paletteCompatibility: "EXACT",
-      clipping: "CLIP",
-    });
-    if (!stamp.ok) {
-      setAdvancedStatus(
-        `Stamp preview blocked · ${stamp.diagnostics[0]?.code ?? "UNKNOWN"}`,
-        "error",
-      );
-      return;
-    }
-    advancedPreviewOperationId = stamp.value.session.sessionId;
-    setAdvancedStatus(
-      `Stamp preview ready · previewWrites=${stamp.value.session.preview.writes.length} · commit=atomic · cancel=available`,
     );
   })();
 });
@@ -15861,6 +17890,7 @@ function readRecentProjects(): Draw2RecentProject[] {
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
     const projects: Draw2RecentProject[] = [];
+    const seen = new Set<string>();
     for (const entry of parsed) {
       if (entry === null || typeof entry !== "object") continue;
       const candidate = entry as Record<string, unknown>;
@@ -15870,8 +17900,11 @@ function readRecentProjects(): Draw2RecentProject[] {
         typeof candidate.updatedAt !== "string"
       ) continue;
       try {
+        const projectId = asWorkspaceProjectId(candidate.projectId);
+        if (seen.has(projectId)) continue;
+        seen.add(projectId);
         projects.push({
-          projectId: asWorkspaceProjectId(candidate.projectId),
+          projectId,
           name: candidate.name.trim() || `Draw2 ${candidate.projectId}`,
           updatedAt: candidate.updatedAt,
         });
@@ -15920,6 +17953,125 @@ function setProjectStartStatus(message: string, isError = false): void {
   projectStartStatusElement.dataset.state = isError ? "error" : "ready";
 }
 
+const deletingProjectIds = new Set<string>();
+
+async function deleteRecentProject(project: Draw2RecentProject): Promise<void> {
+  const projectId = asWorkspaceProjectId(project.projectId);
+  const isPixyncProject = PIXYNC_ROOM_ID.test(projectId);
+  if (state.projectId === projectId) {
+    setProjectStartStatus(
+      "編集中のProjectは削除できません。先に別のProjectを開いてください。",
+      true,
+    );
+    return;
+  }
+  if (deletingProjectIds.has(projectId)) return;
+  if (!window.confirm(`「${project.name}」の端末内データを削除しますか？`)) return;
+
+  deletingProjectIds.add(projectId);
+  setProjectStartStatus("Project dataを安全に削除しています…");
+  try {
+    if (isPixyncProject) {
+      const client = await availablePixyncSupabaseClient();
+      if (client === undefined) {
+        setProjectStartStatus(
+          "共有Projectを削除するには、PiXYNCへログインしている必要があります。Project dataは残しています。",
+          true,
+        );
+        return;
+      }
+      try {
+        const detachResult = await detachPixyncProject(client, projectId);
+        setProjectStartStatus(
+          detachResult.action === "participant_left"
+            ? "共有Projectから退出しました。端末内のProject dataを削除しています…"
+            : "共有Projectの終了を確認しました。端末内のProject dataを削除しています…",
+        );
+      } catch (error) {
+        const message = error instanceof PixyncProjectDeletionError &&
+            error.code === "LOCALIZATION_REQUIRED"
+          ? "所有者の共有Projectは、ローカライズ済みの端末コピーを確定してから削除できます。共有Project画面でCheckpointを確定してください。"
+          : error instanceof PixyncProjectDeletionError &&
+              error.code === "AUTHENTICATION_REQUIRED"
+          ? "共有Projectを削除するには、PiXYNCへログインしている必要があります。"
+          : error instanceof Error
+          ? `共有Projectを削除できませんでした。${error.message}`
+          : "共有Projectを削除できませんでした。";
+        setProjectStartStatus(`${message} Project dataは残しています。`, true);
+        return;
+      }
+    }
+    const storage = await loadProjectDataStorageModule();
+    const gameStore = storage.createIndexedDbGameEditorPersistenceStore();
+    const ports: WorkspaceProjectDataDeletionPorts = {
+      draw: {
+        clear: (id) => drawPersistenceStore.clear(id),
+      },
+      audio: {
+        clear: (id) =>
+          storage.deleteIndexedDbAudioProjectData(String(id)),
+      },
+      game: {
+        clear: (id) => gameStore.clear(String(id)),
+      },
+      pixync: {
+        clear: async (id) => {
+          return await pixyncPersistenceFor(String(id)).remove();
+        },
+      },
+      manifest: {
+        clear: (id) => workspaceManifestStore.clear(id),
+      },
+    };
+    const result = await deleteWorkspaceProjectLocalData(projectId, ports);
+    if (!result.ok) {
+      setProjectStartStatus(
+        `Project dataを削除できませんでした（${result.failed.join(", ")}）。データは残しているため、再試行できます。`,
+        true,
+      );
+      return;
+    }
+    writeRecentProjects(readRecentProjects().filter((item) =>
+      item.projectId !== projectId
+    ));
+    const preferences = withoutDraw2ProjectEditorPreferences(
+      draw2EditorPreferences,
+      projectId,
+    );
+    draw2EditorPreferences = preferences;
+    writeDraw2EditorPreferences(window.localStorage, preferences);
+    if (readActiveWorkspaceProjectId() === projectId) {
+      writeActiveWorkspaceProjectId(asWorkspaceProjectId(DEFAULT_WORKSPACE_PROJECT_ID));
+    }
+    renderProjectStart();
+    setProjectStartStatus(`「${project.name}」を削除しました。`);
+  } catch (cause) {
+    setProjectStartStatus(
+      cause instanceof Error
+        ? `Project dataを削除できませんでした。${cause.message}`
+        : "Project dataを削除できませんでした。データは残しています。",
+      true,
+    );
+  } finally {
+    deletingProjectIds.delete(projectId);
+  }
+}
+
+let projectStartMode: CreatorStartMode = resolveCreatorStartMode(
+  new URLSearchParams(window.location.search).get("mode"),
+);
+
+function setProjectStartMode(mode: CreatorStartMode): void {
+  projectStartMode = mode;
+  for (const button of projectStartModeButtons) {
+    const selected = button.dataset.projectStartMode === mode;
+    button.classList.toggle("is-selected", selected);
+    button.setAttribute("aria-pressed", String(selected));
+  }
+}
+
+setProjectStartMode(projectStartMode);
+
 function formatRecentProjectDate(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Local project";
@@ -15945,8 +18097,9 @@ function renderProjectStart(): void {
   }
   projectStartRecentListElement.replaceChildren();
   if (projectStartRecentCountElement !== null) {
-    projectStartRecentCountElement.textContent =
-      `${projects.length} project${projects.length === 1 ? "" : "s"}`;
+    projectStartRecentCountElement.textContent = `${projects.length} project${
+      projects.length === 1 ? "" : "s"
+    }`;
   }
   if (projects.length === 0) {
     const empty = document.createElement("p");
@@ -15956,23 +18109,41 @@ function renderProjectStart(): void {
     return;
   }
   for (const project of projects) {
+    const item = document.createElement("div");
+    item.className = "draw2-project-recent-item-row";
+    item.dataset.projectId = project.projectId;
+    item.setAttribute("role", "listitem");
     const button = document.createElement("button");
     button.type = "button";
     button.className = "draw2-project-recent-item";
-    button.dataset.projectId = project.projectId;
-    button.setAttribute("role", "listitem");
+    button.setAttribute("aria-label", `${project.name}を開く`);
     const name = document.createElement("strong");
     name.textContent = project.name;
     const meta = document.createElement("small");
-    meta.textContent = `${project.projectId} · ${formatRecentProjectDate(project.updatedAt)}`;
+    meta.textContent = `${PIXYNC_ROOM_ID.test(project.projectId) ? "PiXYNC shared" : "Local Project"} · ${
+      formatRecentProjectDate(project.updatedAt)
+    }`;
+    meta.title = project.projectId;
+    meta.setAttribute("aria-label", `Project ID ${project.projectId}`);
     button.append(name, meta);
     button.addEventListener("click", () => {
       resolveProjectStart({
         projectIdOverride: project.projectId,
         mode: "OPEN",
+        initialCreatorMode: projectStartMode,
       });
     });
-    projectStartRecentListElement.append(button);
+    const deleteButton = document.createElement("button");
+    deleteButton.type = "button";
+    deleteButton.className = "draw2-project-recent-delete";
+    deleteButton.textContent = "削除";
+    deleteButton.setAttribute("aria-label", `${project.name}を削除`);
+    deleteButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      void deleteRecentProject(project);
+    });
+    item.append(button, deleteButton);
+    projectStartRecentListElement.append(item);
   }
 }
 
@@ -16002,23 +18173,42 @@ function waitForProjectStart(): Promise<CanvasProjectSettings> {
   });
 }
 
-projectStartNewButton?.addEventListener("click", () => {
+async function startFreshProject(mode: CreatorStartMode): Promise<void> {
+  setProjectStartMode(mode);
   setProjectStartStatus("Preparing a blank project…");
-  void createFreshWorkspaceProjectId().then((projectId) => {
-    resolveProjectStart({ projectIdOverride: projectId, mode: "NEW" });
-  }).catch((cause) => {
+  try {
+    const projectId = await createFreshWorkspaceProjectId();
+    resolveProjectStart({
+      projectIdOverride: projectId,
+      mode: "NEW",
+      initialCreatorMode: mode,
+    });
+  } catch (cause) {
     setProjectStartStatus(
-      cause instanceof Error ? cause.message : "A new project could not be created.",
+      cause instanceof Error
+        ? cause.message
+        : "A new project could not be created.",
       true,
     );
+  }
+}
+
+for (const button of projectStartModeButtons) {
+  button.addEventListener("click", () => {
+    const mode = button.dataset.projectStartMode?.trim().toUpperCase();
+    if (isCreatorStartMode(mode)) void startFreshProject(mode);
   });
-});
+}
 
 function openProjectFromStart(): void {
   const raw = projectStartIdElement?.value.trim() ?? "";
   try {
     const projectId = asWorkspaceProjectId(raw || DEFAULT_WORKSPACE_PROJECT_ID);
-    resolveProjectStart({ projectIdOverride: projectId, mode: "OPEN" });
+    resolveProjectStart({
+      projectIdOverride: projectId,
+      mode: "OPEN",
+      initialCreatorMode: projectStartMode,
+    });
   } catch {
     setProjectStartStatus(
       "Project ID must start with a letter or number and use stable identifier characters.",
@@ -16038,13 +18228,33 @@ projectStartIdElement?.addEventListener("keydown", (event) => {
 async function resolveInitialProjectSettings(): Promise<CanvasProjectSettings> {
   try {
     const params = new URLSearchParams(window.location.search);
+    const requestedMode = params.get("mode");
     const projectId = params.get("project")?.trim();
     if (projectId !== undefined && projectId.length > 0) {
-      return { projectIdOverride: projectId, mode: "OPEN" };
+      const intent = createProjectStartIntent({
+        projectId,
+        kind: "OPEN",
+        mode: requestedMode,
+      });
+      return {
+        ...(intent.projectId === undefined
+          ? {}
+          : { projectIdOverride: intent.projectId }),
+        mode: intent.kind,
+        initialCreatorMode: intent.mode,
+      };
     }
     if (params.get("new_project") === "1") {
       const freshProjectId = await createFreshWorkspaceProjectId();
-      return { projectIdOverride: freshProjectId, mode: "NEW" };
+      const intent = createProjectStartIntent({
+        kind: "NEW",
+        mode: requestedMode,
+      });
+      return {
+        projectIdOverride: freshProjectId,
+        mode: intent.kind,
+        initialCreatorMode: intent.mode,
+      };
     }
   } catch {
     // A malformed or unavailable URL must keep the normal local entry path.
@@ -16053,24 +18263,38 @@ async function resolveInitialProjectSettings(): Promise<CanvasProjectSettings> {
 }
 
 void resolveInitialProjectSettings().then(async (settings) => {
-  const hasDirectProjectTarget =
-    settings.mode !== undefined || settings.projectIdOverride !== undefined;
+  const hasDirectProjectTarget = settings.mode !== undefined ||
+    settings.projectIdOverride !== undefined;
   if (hasDirectProjectTarget) {
     if (projectStartElement !== null) projectStartElement.hidden = true;
     if (workspaceFrameElement !== null) workspaceFrameElement.hidden = false;
     return settings;
   }
   return await waitForProjectStart();
-}).then((settings) => resetProject(settings)).then(async () => {
+}).then(async (settings) => {
+  await resetProject(settings);
   await startPixyncProjectLifecycle();
-  return loadWorkspaceModule();
-}).then((module) => {
+  return {
+    module: await loadWorkspaceModule(),
+    initialProjectMode: settings.mode,
+    initialCreatorMode: settings.initialCreatorMode,
+  };
+}).then(({ module, initialProjectMode, initialCreatorMode }) => {
   const result = module.bootstrapDraw2Workspace(document, {
     projectId: state.projectId,
+    ...(initialProjectMode === undefined ? {} : { initialProjectMode }),
+    ...(initialCreatorMode === undefined ? {} : { initialCreatorMode }),
   });
   if (!result.ok) {
     setStatus(result.reason ?? "Workspace layer unavailable.", "error");
     return;
+  }
+  const workspaceDebug = (window as Window & {
+    __pixiedraw2WorkspaceDebug?: Partial<WorkspacePxdBridge>;
+  }).__pixiedraw2WorkspaceDebug;
+  if (workspaceDebug !== undefined) {
+    workspaceDebug.exportProjectPxdArtifact =
+      exportCurrentPxdArtifactForWorkspace;
   }
   // The lazy Workspace chunk mounts Audio/Draw/Game labels after the initial
   // locale pass. Translate only the mounted workspace once; do not rescan the
@@ -16086,6 +18310,24 @@ void resolveInitialProjectSettings().then(async (settings) => {
   window.requestAnimationFrame(() => {
     renderTimeline();
     window.requestAnimationFrame(() => renderTimeline());
+  });
+  void startLocalProjectSession(
+    state.projectId,
+    initialCreatorMode ?? "DRAW",
+  ).catch(() => {
+    document.body.dataset.projectSessionStatus = "unavailable";
+    window.dispatchEvent(
+      new CustomEvent("draw2:pixync-status", {
+        detail: {
+          state: "offline",
+          roomId: "local",
+          revision: "—",
+          members: "—",
+          message:
+            "Project Sessionを読み込めませんでした。ローカル編集を継続します。",
+        },
+      }),
+    );
   });
   void queuePixyncProductionStart();
 }).catch((cause) => {

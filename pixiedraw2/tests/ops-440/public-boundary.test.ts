@@ -66,7 +66,7 @@ Deno.test("OPS440-STOP-001: public commands contain no authority, state, consent
       "royaltyMutation",
     ]
   ) {
-    const commandSection = source.split("export type Ops440Command =")[0]
+    const commandSection = (source.split("export type Ops440Command =")[0] ?? "")
       .replace(/\/\*[\s\S]*?\*\//gu, "")
       .replace(/\/\/.*$/gmu, "");
     assert.equal(

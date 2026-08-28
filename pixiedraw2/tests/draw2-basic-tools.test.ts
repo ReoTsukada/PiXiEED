@@ -24,6 +24,18 @@ function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
 
+function pixelBounds(
+  pixels: readonly { x: number; y: number }[],
+): { minX: number; minY: number; maxX: number; maxY: number } {
+  assert(pixels.length > 0, "pixel set is empty");
+  return {
+    minX: Math.min(...pixels.map((point) => point.x)),
+    minY: Math.min(...pixels.map((point) => point.y)),
+    maxX: Math.max(...pixels.map((point) => point.x)),
+    maxY: Math.max(...pixels.map((point) => point.y)),
+  };
+}
+
 Deno.test("Draw2 basic tool geometry is deterministic and bounded", () => {
   const bounds = { width: 16, height: 16 };
   const rectangle = shapePixels("rect", { x: 2, y: 3 }, { x: 7, y: 8 }, bounds);
@@ -57,9 +69,19 @@ Deno.test("Draw2 ellipse uses inclusive midpoint bounds with four-way symmetry",
   assert(filled.length > ellipse.length && filled.some((point) => point.x === 23 && point.y === 20), "ellipse fill did not cover its midpoint");
 });
 
-Deno.test("Draw2 brush size remains exact for even circular stamps", () => {
-  const points = stampBrush([{ x: 8, y: 8 }], { brushSize: 4, brushShape: "square" }, { width: 32, height: 32 });
-  assert(points.length === 16, "even brush size produced a non-square footprint");
+Deno.test("Draw2 even brush stamps use a stable half-pixel centre", () => {
+  const points = stampBrush([{ x: 16, y: 16 }], { brushSize: 6, brushShape: "square" }, { width: 32, height: 32 });
+  assert(points.length === 36, "even brush size produced a non-square footprint");
+  const bounds = pixelBounds(points);
+  assert(
+    bounds.minX === 13 && bounds.maxX === 18 && bounds.minY === 13 &&
+      bounds.maxY === 18,
+    "even brush footprint drifted away from its half-pixel centre",
+  );
+  const keys = new Set(points.map((point) => `${point.x}:${point.y}`));
+  for (const point of points) {
+    assert(keys.has(`${31 - point.x}:${31 - point.y}`), "even brush footprint is not symmetric");
+  }
 });
 
 Deno.test("Draw2 cursor footprint follows brush size and shape", () => {
@@ -68,7 +90,62 @@ Deno.test("Draw2 cursor footprint follows brush size and shape", () => {
   const circle = nearestBrushCursor({ x: 16, y: 16 }, { brushSize: 4, brushShape: "circle" }, bounds);
   assert(square.length === 16, "square cursor footprint did not match brush size");
   assert(circle.length < square.length && circle.some((point) => point.x === 16 && point.y === 16), "circle cursor footprint did not match brush shape");
-  assert(square.every((point) => point.x >= 15 && point.x <= 18 && point.y >= 15 && point.y <= 18), "cursor footprint escaped the brush bounds");
+  assert(square.every((point) => point.x >= 14 && point.x <= 17 && point.y >= 14 && point.y <= 17), "cursor footprint escaped the brush bounds");
+});
+
+Deno.test("Draw2 filled shapes keep their drag bounds regardless of brush size", () => {
+  const bounds = { width: 64, height: 64 };
+  for (const tool of ["rect-fill", "ellipse-fill", "circle-fill"] as const) {
+    const thin = createWriteSet(
+      tool,
+      { x: 16, y: 16 },
+      { x: 47, y: 39 },
+      2,
+      { brushSize: 1, brushShape: "square", pattern: "solid" },
+      bounds,
+    );
+    const thick = createWriteSet(
+      tool,
+      { x: 16, y: 16 },
+      { x: 47, y: 39 },
+      2,
+      { brushSize: 6, brushShape: "circle", pattern: "solid" },
+      bounds,
+    );
+    assert(
+      JSON.stringify(thick) === JSON.stringify(thin),
+      `${tool} changed its filled geometry when brush size changed`,
+    );
+  }
+});
+
+Deno.test("Draw2 thick shape outlines stay inside the drag bounds", () => {
+  const bounds = { width: 64, height: 64 };
+  for (const tool of ["rect", "ellipse", "circle"] as const) {
+    const writes = createWriteSet(
+      tool,
+      { x: 16, y: 16 },
+      { x: 47, y: 39 },
+      2,
+      { brushSize: 6, brushShape: "circle", pattern: "solid" },
+      bounds,
+    );
+    assert(
+      writes.length > 0 && writes.every((point) =>
+        point.x >= 16 && point.x <= 47 && point.y >= 16 && point.y <= 39
+      ),
+      `${tool} escaped its drag bounds at brush size 6`,
+    );
+    if (tool === "rect") {
+      const keys = new Set(writes.map((point) => `${point.x}:${point.y}`));
+      for (const point of writes) {
+        assert(
+          keys.has(`${63 - point.x}:${55 - point.y}`),
+          "thick rectangle outline lost four-way symmetry",
+        );
+      }
+    }
+  }
 });
 
 Deno.test("Draw2 brush patterns and write sets deduplicate to one atomic pixel list", () => {

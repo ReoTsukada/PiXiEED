@@ -51,7 +51,10 @@
         continue;
       }
       const originalId = normalizeAutosaveProjectId(original.id || '');
-      const canRecoverAsLocalProject = Boolean(original.project && typeof original.project === 'object') || Boolean(original.handle);
+      const canRecoverAsLocalProject = Boolean(original.project && typeof original.project === 'object')
+        || original.payloadAvailable === true
+        || original.journalAvailable === true
+        || Boolean(original.handle);
       let normalizedId = originalId;
       if (!normalizedId && canRecoverAsLocalProject) {
         normalizedId = createAutosaveProjectId();
@@ -107,7 +110,10 @@
         if (entryChanged) {
           changed = true;
           repairedCount += 1;
-        } else if (!isV2Reference && !original.handle) {
+        } else if (!isV2Reference
+          && !original.handle
+          && original.payloadAvailable !== true
+          && original.journalAvailable !== true) {
           nextEntry.openError = 'missing-project-payload';
         }
         sanitizedEntries.push(nextEntry);
@@ -202,39 +208,73 @@
     if (!AUTOSAVE_SUPPORTED) return false;
     const normalizedId = normalizeAutosaveProjectId(projectId || '');
     if (!normalizedId) return false;
-    const existingEntries = await loadRecentProjectsMetadata();
-    const removedEntry = existingEntries.find(entry => entry?.id === normalizedId) || null;
-    const nextEntries = existingEntries.filter(entry => entry?.id !== normalizedId);
-    if (nextEntries.length === existingEntries.length) {
+    if (typeof claimRecentProjectDeletion === 'function'
+      && claimRecentProjectDeletion(normalizedId) !== true) {
       return false;
     }
-    if (removedEntry?.pixisync?.roomId) {
-      const disconnected = await disconnectPiXiSyncDeletedProject(removedEntry);
-      if (disconnected !== true) {
-        throw new Error('PiXiSYNC project deletion: remote-detach-required');
+    try {
+      if (typeof waitForAutosaveWriteIdle === 'function') {
+        const idle = await waitForAutosaveWriteIdle();
+        if (!idle) {
+          throw new Error('PiXiSYNC project deletion: autosave-busy');
+        }
       }
+      const existingEntries = await loadRecentProjectsMetadata();
+      const removedEntry = existingEntries.find(entry => entry?.id === normalizedId) || null;
+      const nextEntries = existingEntries.filter(entry => entry?.id !== normalizedId);
+      if (nextEntries.length === existingEntries.length) {
+        if (typeof cancelRecentProjectDeletion === 'function') {
+          cancelRecentProjectDeletion(normalizedId);
+        }
+        return false;
+      }
+      if (removedEntry?.pixisync?.roomId) {
+        const disconnected = await disconnectPiXiSyncDeletedProject(removedEntry);
+        if (disconnected !== true) {
+          throw new Error('PiXiSYNC project deletion: remote-detach-required');
+        }
+      }
+      // The cleanup boundary also owns cold Undo and timelapse data, which can
+      // outlive the legacy recent-project row. Run it for every local project,
+      // not only V2 cards, so deleting an older project cannot leave orphaned
+      // history that later makes storage and recovery scans heavier.
+      if (typeof removeAutosaveV2ProjectData !== 'function') {
+        throw new Error('PiXiSYNC project deletion: local-cleanup-unavailable');
+      }
+      const removed = await removeAutosaveV2ProjectData(normalizedId);
+      if (removed !== true) {
+        throw new Error('PiXiSYNC project deletion: local-cleanup-unconfirmed');
+      }
+      // Keep the card as a retry pointer until every local Project record has
+      // been removed. Remote PiXYNC detachment above is likewise authoritative
+      // and must still complete before any local deletion work begins.
+      await saveRecentProjectsList(existingEntries, nextEntries);
+      if (typeof completeRecentProjectDeletion === 'function') {
+        completeRecentProjectDeletion(normalizedId);
+      }
+      setRecentProjectsCache(nextEntries);
+      closeOpenProjectTabsForDeletedProject({
+        projectId: normalizedId,
+        projectKey: isSharedRecentProjectEntry(removedEntry)
+          ? removedEntry.sharedProjectKey || ''
+          : getSharedProjectKeyFromProjectId(normalizedId),
+        backendId: typeof removedEntry?.sharedProjectBackendId === 'string'
+          ? removedEntry.sharedProjectBackendId
+          : '',
+        reason: 'recent-project-delete-tab',
+        showHome: true,
+      });
+      if (announce) {
+        const reasonSuffix = reason ? `（${reason}）` : '';
+        updateAutosaveStatus(`読込できない端末内プロジェクトを除外しました${reasonSuffix}`, 'warn');
+      }
+      return true;
+    } catch (error) {
+      if (typeof cancelRecentProjectDeletion === 'function') {
+        cancelRecentProjectDeletion(normalizedId);
+      }
+      throw error;
     }
-    await saveRecentProjectsList(existingEntries, nextEntries);
-    if (Number(removedEntry?.autosaveSchemaVersion) === 2) {
-      await removeAutosaveV2ProjectData?.(normalizedId);
-    }
-    setRecentProjectsCache(nextEntries);
-    closeOpenProjectTabsForDeletedProject({
-      projectId: normalizedId,
-      projectKey: isSharedRecentProjectEntry(removedEntry)
-        ? removedEntry.sharedProjectKey || ''
-        : getSharedProjectKeyFromProjectId(normalizedId),
-      backendId: typeof removedEntry?.sharedProjectBackendId === 'string'
-        ? removedEntry.sharedProjectBackendId
-        : '',
-      reason: 'recent-project-delete-tab',
-      showHome: true,
-    });
-    if (announce) {
-      const reasonSuffix = reason ? `（${reason}）` : '';
-      updateAutosaveStatus(`読込できない端末内プロジェクトを除外しました${reasonSuffix}`, 'warn');
-    }
-    return true;
   }
 
   async function upsertSharedRecentProjectEntry({
