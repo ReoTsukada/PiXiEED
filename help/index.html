@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <title>ヘルプ | PiXiEED</title>
-  <meta name="description" content="PiXiEEDstudioのログイン、iDRAW、PiXiEELENS、QR、マーケットに関する使い方と問い合わせ先をまとめたヘルプです。">
+  <meta name="description" content="PiXiEEDのアカウント、マーケット、Bridge移行に関する案内と問い合わせ先をまとめたヘルプです。">
   <link rel="canonical" href="https://pixieed.jp/help/">
   <link rel="icon" type="image/png" href="../icon/icon-512-4.png">
   <link rel="stylesheet" href="../site/landing.css?v=2026.07.17-home-menu3">
@@ -22,30 +22,27 @@
 
       <section class="help-section" aria-labelledby="helpAccountTitle">
         <h2 id="helpAccountTitle" data-i18n-key="helpAccountTitle">ログイン・マイページ</h2>
-        <p data-i18n-key="helpAccountCopy">ログイン、プロフィール、購入済み商品、端末内プロジェクトはマイページで確認できます。</p>
+        <p data-i18n-key="helpAccountCopy">ログイン、プロフィール、購入済み商品、Bridgeプロジェクトの状態はマイページで確認できます。</p>
         <a class="help-card" href="../account/index.html">
-          <img src="../pixiedraw/assets/icons/ecticon_frame_01.png" alt="">
+          <img src="../icon/icon-192-4.png" alt="">
           <span><strong data-i18n-key="helpAccountCard">マイページ・ログイン</strong><small data-i18n-key="helpAccountCardCopy">Google・メールでログイン、プロフィールや購入履歴を管理</small></span>
         </a>
       </section>
 
-      <section class="help-section" aria-labelledby="helpToolsTitle">
-        <h2 id="helpToolsTitle" data-i18n-key="helpToolsTitle">制作ツールの使い方</h2>
+      <section class="help-section" id="bridge" aria-labelledby="helpToolsTitle">
+        <h2 id="helpToolsTitle">PiXiEED Bridge の準備状況</h2>
+        <p>外部制作アプリを PiXiEED Realtime Protocol で接続する Bridge と Connector SDK を準備しています。最初の接続対象は Aseprite と Unity です。</p>
         <div class="help-grid">
-          <a class="help-card" href="../projects/pixiedraw/">
-            <img src="../icon/icon-192-4.png" alt="">
-            <span><strong>iDRAW</strong><small data-i18n-key="helpDrawCardCopy">描画、保存、出力、ショートカットの使い方</small></span>
-          </a>
-          <a class="help-card" href="../projects/pixiee-lens/">
-            <img src="../assets/icons/Camera.png" alt="">
-            <span><strong>PiXiEELENS</strong><small data-i18n-key="helpLensCardCopy">カメラ、画像読み込み、ドット化の使い方</small></span>
-          </a>
-          <a class="help-card" href="../projects/qr-maker/">
-            <img src="../assets/icons/QR.png" alt="">
-            <span><strong>QR</strong><small data-i18n-key="helpQrCardCopy">QRコードの作成と保存の使い方</small></span>
-          </a>
+          <div class="help-card">
+            <img src="../assets/icons/help.png" alt="">
+            <span><strong>Realtime Protocol</strong><small>revision、conflict、presence、asset同期の共通仕様</small></span>
+          </div>
+          <div class="help-card">
+            <img src="../assets/icons/help.png" alt="">
+            <span><strong>Connector SDK</strong><small>Aseprite Lua と Unity Editor Connector から段階的に対応</small></span>
+          </div>
           <a class="help-card" href="../glossary/index.html">
-          <img src="../assets/icons/Word.png?v=2026.07.19-icons2" alt="">
+            <img src="../assets/icons/Word.png?v=2026.07.19-icons2" alt="">
             <span><strong data-i18n-key="helpGlossaryCard">用語集</strong><small data-i18n-key="helpGlossaryCardCopy">ドット絵・ピクセルアートの基本用語</small></span>
           </a>
         </div>
@@ -73,6 +70,6 @@
     </main>
   </div>
   <script src="../scripts/shared-profile-header.js?v=20260825-common-shell15"></script>
-  <script src="../scripts/shared-bottom-nav.js?v=20260825-studio-brand1"></script>
+  <script src="../scripts/shared-bottom-nav.js?v=20260830-bridge-shell1"></script>
 </body>
 </html>

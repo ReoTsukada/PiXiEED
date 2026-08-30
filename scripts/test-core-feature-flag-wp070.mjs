@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
-const modulePath = fileURLToPath(new URL('../pixiedraw/assets/js/modules/core-feature-flag-rollback-utils.js', import.meta.url));
+const modulePath = fileURLToPath(new URL('../core-shell/assets/core-feature-flag-rollback-utils.js', import.meta.url));
 const source = await readFile(modulePath, 'utf8');
 const appWindow = {};
 const load = new Function('window', `${source}\nreturn window.PiXiEEDrawModules.coreFeatureFlagRollbackUtils;`);

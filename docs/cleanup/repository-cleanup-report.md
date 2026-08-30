@@ -1,4 +1,53 @@
-# Repository Cleanup Report
+# Repository Cleanup Report — Bridge cutover addendum (2026-08-30)
+
+> この追補が今回のBridge切替の現行記録です。以下の旧記録は、過去のWP-005監査証跡として削除せず保持しています。
+
+## Current cleanup run
+
+- Baseline commit: `d8cde9d143ca7227b8164f82d99074e44dd1872f`.
+- Branch/worktree: `main`; cleanup changes are staged but uncommitted.
+- Rollback reference: `cleanup/bridge-cutover-20260830` points to the baseline commit.
+- The user explicitly authorized removal of the former tool groups and current correction work, while requiring the linked Bridge work and reusable PiXYNC/PiXiSYNC points to be preserved.
+- The external Bridge MVP at `/Users/tsukadareine/Documents/Codex/2026-08-30/referenced-chatgpt-conversation-this-is-an/outputs/pixieed-bridge/` was excluded and not modified.
+- Current approved deletion batches contain **1,501 staged direct deletions; with two required source relocations, 1,503 former tracked paths are gone from their old locations**. No commit, push, deploy, database, Storage, Realtime, Stripe, or publication action was performed.
+
+Deleted groups:
+
+- Former applications: `pixiedraw/`, `pixiedraw2/`, `pixfind/`, `pixiee-lens/`, `qr/`, `qr-maker/`, `maoitu/`, and `studio/`.
+- Former corporate/portfolio surface: `portfolio/`, its portfolio-only gallery builders, and the old downloadable gallery administration note.
+- Former tool project pages: `projects/index.html` and old `projects/` tool subdirectories.
+- Retired top-level legacy site script and tests that directly required removed tools, removed Capacitor pages, or obsolete old-tool UI contracts.
+- Tracked Capacitor source under `app-shell/pixieed-capacitor/`.
+- Retired PiXiSYNC room/slot/payment Supabase functions and migrations.
+- Old tool measurement, browser-smoke, release-integrity, PiXiSYNC audit, and PiXiSYNC test scripts.
+- Retired PiXiSYNC v1 deployment, purchase, browser-smoke, concurrency, final-design, and lifecycle reports.
+- Unreferenced former-tool/home/portfolio screenshots, former-tool icons/hero images, and obsolete old-tool test guards.
+
+Preserved boundaries:
+
+- `docs/bridge-migration/pixisync-reuse-notes.md` records revision authority, idempotent operation IDs, canonical deltas, checkpoint/journal recovery, conflicts, lifecycle, transport/provider/connector separation, and capability negotiation.
+- Detailed PiXiSYNC contracts/inventories and the journal-recovery reference test remain as migration evidence.
+- `core-shell/`, `16_IMPLEMENTATION_STARTER/`, Market `pixiedraw-project` compatibility and purchased-file handling, public PiXFiND/OGP production paths, `pixiedraw/_backup/`, and legal/terms pages were not removed or rewritten.
+- `/contact/` was retained only as a Bridge support endpoint; its corporate commission, portfolio, press, and production-request copy was replaced with Bridge setup/Protocol/Connector support copy.
+- The Market color codec was moved to `market/color-codec-utils.js` so purchased GIF/file compatibility remains without restoring the editor tree.
+- The generic feature-flag rollback utility was moved into `core-shell/assets/` so the protected Core Shell remains self-contained without restoring the editor tree.
+- Physical ignored/generated remnants (`PiXiEEDrawDEV/` and native/build/signing material under `app-shell/pixieed-capacitor/`) remain pending separate exact path approval.
+
+Current verification boundary:
+
+- `git diff --cached --check` and `git diff --check` pass; changed JavaScript syntax checks pass.
+- Active HTML route/script scans contain no links to the removed tool, project, portfolio, or studio routes; the old cache-buster labels were also removed.
+- Core Shell WP-070/WP-080/WP-090 contract tests and Market listing/GIF compatibility tests pass after the two generic utility relocations.
+- The external Bridge MVP path exists with its own harness; it was inspected only for existence and not modified.
+- Former-tool builds/tests, Capacitor builds, and Bridge end-to-end acceptance are `UNTESTED` in this repository because the former sources were intentionally removed and Bridge lives in the protected external output.
+- PiXiSYNC PASS results retained from the old repository are migration evidence only, not Bridge production qualification.
+
+Remaining separate decisions:
+
+- Whether to remove the PiXiSYNC payment/return wording in `legal/index.html` and `terms/index.html` (exact legal-text approval required).
+- Whether to physically remove ignored/generated native remnants after path-level review.
+
+# Historical Repository Cleanup Report
 
 ## Baseline
 

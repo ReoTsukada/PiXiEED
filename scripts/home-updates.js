@@ -82,9 +82,7 @@
 
   function formatType(value) {
     const key = String(value || '').toLowerCase();
-    if (key === 'site') return 'Home';
-    if (key === 'maoitu') return 'Game';
-    if (key.includes('lens') || key.includes('draw') || key.includes('qr')) return 'Tool';
+    if (key === 'site') return 'Bridge';
     return 'Update';
   }
 

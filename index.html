@@ -5,20 +5,20 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#070d1b">
-  <link rel="manifest" href="manifest.webmanifest?v=20260825-studio-brand1">
+  <link rel="manifest" href="manifest.webmanifest?v=20260830-bridge-shell1">
   <meta name="robots" content="index,follow">
-  <title>PiXiEEDstudio｜打って、奏でて、作品にする制作プラットフォーム | PiXiEED</title>
-  <meta name="description" content="PiXiEEDstudioは、ブラウザでドット絵、音楽、ゲームを制作し、リアルタイム同期、共有、公開、マーケット連携まで進められる制作プラットフォームです。">
+  <title>PiXiEED Bridge｜外部制作アプリをリアルタイム接続</title>
+  <meta name="description" content="PiXiEED Bridgeは、AsepriteやUnityなどの外部制作アプリをPiXiEED Realtime Protocolで接続するネイティブ連携基盤です。">
   <link rel="canonical" href="https://pixieed.jp/">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="PiXiEED">
   <meta property="og:locale" content="ja_JP">
-  <meta property="og:title" content="PiXiEEDstudio｜打って、奏でて、作品にする。">
-  <meta property="og:description" content="ブラウザで始められるPiXiEEDの新しいドット絵制作ワークスペース。描画、アニメーション、共有を一つの流れに。">
+  <meta property="og:title" content="PiXiEED Bridge｜外部制作アプリをリアルタイム接続">
+  <meta property="og:description" content="AsepriteやUnityなどの外部制作アプリをPiXiEED Realtime Protocolで接続するネイティブ連携基盤。">
   <meta property="og:url" content="https://pixieed.jp/">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="PiXiEEDstudio｜打って、奏でて、作品にする。">
-  <meta name="twitter:description" content="ブラウザで始められるPiXiEEDのドット絵・アニメーション制作ワークスペース。">
+  <meta name="twitter:title" content="PiXiEED Bridge｜外部制作アプリをリアルタイム接続">
+  <meta name="twitter:description" content="AsepriteやUnityなどの外部制作アプリをPiXiEED Realtime Protocolで接続するネイティブ連携基盤。">
   <link rel="icon" type="image/png" href="icon/icon-512-4.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -34,7 +34,7 @@
         "@id": "https://pixieed.jp/#website",
         "name": "PiXiEED",
         "url": "https://pixieed.jp/",
-        "description": "PiXiEEDは、ドット絵の制作、アニメーション、音声、ゲーム、作品共有、マーケットをつなぐクリエイティブプラットフォームです。"
+        "description": "PiXiEED Bridge、Realtime Protocol、Connector SDKで外部制作アプリをつなぐクリエイティブ連携基盤です。"
       },
       {
         "@type": "Organization",
@@ -44,29 +44,13 @@
         "logo": "https://pixieed.jp/icon/icon-512-4.png"
       },
       {
-        "@type": ["SoftwareApplication", "WebApplication"],
-        "@id": "https://pixieed.jp/#studio",
-        "name": "PiXiEEDstudio",
-        "alternateName": "PiXiEEDstudio",
-        "applicationCategory": "DesignApplication",
-        "operatingSystem": "Web",
-        "url": "https://pixieed.jp/studio/",
-        "description": "ブラウザでドット絵を描き、色、ミラー、レイヤー、アニメーションを扱えるピクセルアート制作ツールです。",
-        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
-        "featureList": ["ドット絵描画", "インデックスカラーとパレット", "ミラー描画", "レイヤーとアニメーションタイムライン", "PNG・アニメーション出力"],
-        "isPartOf": { "@id": "https://pixieed.jp/#website" },
-        "publisher": { "@id": "https://pixieed.jp/#organization" }
-      },
-      {
         "@type": "ItemList",
-        "name": "PiXiEEDの制作・共有サービス",
+        "name": "PiXiEEDのBridge・共有サービス",
         "itemListElement": [
-          { "@type": "ListItem", "position": 1, "name": "PiXiEEDstudio", "url": "https://pixieed.jp/studio/" },
-          { "@type": "ListItem", "position": 2, "name": "コミュニティ", "url": "https://pixieed.jp/community/" },
-          { "@type": "ListItem", "position": 3, "name": "マーケット", "url": "https://pixieed.jp/market/" },
-          { "@type": "ListItem", "position": 4, "name": "PiXiEELENS", "url": "https://pixieed.jp/pixiee-lens/" },
-          { "@type": "ListItem", "position": 5, "name": "PiXFiND", "url": "https://pixieed.jp/pixfind/" },
-          { "@type": "ListItem", "position": 6, "name": "マイページ", "url": "https://pixieed.jp/account/" }
+          { "@type": "ListItem", "position": 1, "name": "コミュニティ", "url": "https://pixieed.jp/community/" },
+          { "@type": "ListItem", "position": 2, "name": "マーケット", "url": "https://pixieed.jp/market/" },
+          { "@type": "ListItem", "position": 3, "name": "マイページ", "url": "https://pixieed.jp/account/" },
+          { "@type": "ListItem", "position": 4, "name": "ヘルプ", "url": "https://pixieed.jp/help/" }
         ]
       }
     ]
@@ -77,74 +61,73 @@
   <main class="home-shell-v2" id="main-content-v2">
     <section class="home-shell-v2__hero" aria-labelledby="homeHeroTitleV2">
       <div class="home-shell-v2__hero-copy">
-        <div class="home-shell-v2__kicker"><span aria-hidden="true"></span><span data-i18n-key="homeHeroKicker">PIXEL CREATION WORKSPACE</span></div>
-        <h1 id="homeHeroTitleV2"><span data-i18n-key="homeHeroTitleA">打って、奏でて、</span><br><em data-i18n-key="homeHeroTitleB">作品にする。</em></h1>
-        <p class="home-shell-v2__lead" data-i18n-key="homeHeroLead">PiXiEEDstudioは、ドット絵、音楽、ゲームをブラウザで始められる制作ワークスペースです。打って、奏でて、作品にする流れを一つにまとめます。</p>
+        <div class="home-shell-v2__kicker"><span aria-hidden="true"></span><span>REALTIME CREATIVE BRIDGE</span></div>
+        <h1 id="homeHeroTitleV2">制作アプリを、<br><em>リアルタイムにつなぐ。</em></h1>
+        <p class="home-shell-v2__lead">PiXiEED Bridgeは、AsepriteやUnityなどの外部制作アプリをUniversal Protocolで接続し、制作データと操作の流れを共有するネイティブアプリです。</p>
         <div class="home-shell-v2__actions">
-          <a class="home-shell-v2__button home-shell-v2__button--primary" href="studio/"><span data-i18n-key="homeDrawButton">PiXiEEDstudioを開く</span> <span aria-hidden="true">↗</span></a>
-          <a class="home-shell-v2__button home-shell-v2__button--quiet" href="market/" data-i18n-key="homeMarketButton">マーケットを見る</a>
+          <a class="home-shell-v2__button home-shell-v2__button--primary" href="help/index.html#bridge">Bridgeの準備状況を見る <span aria-hidden="true">↗</span></a>
+          <a class="home-shell-v2__button home-shell-v2__button--quiet" href="market/">マーケットを見る</a>
         </div>
-        <div class="home-shell-v2__meta" aria-label="PiXiEEDstudioの特徴" data-i18n-aria-label="homeMetaAria">
-          <span><strong>Web</strong> <span data-i18n-key="homeNoInstall">インストール不要</span></span>
-          <span><strong>Free</strong> <span data-i18n-key="homeTryFree">すぐ試せる</span></span>
-          <span><strong>Sync</strong> <span data-i18n-key="homeConnectWork">作品をつなぐ</span></span>
+        <div class="home-shell-v2__meta" aria-label="PiXiEED Bridgeの特徴">
+          <span><strong>Native</strong> デスクトップ常駐</span>
+          <span><strong>Realtime</strong> 操作と状態を同期</span>
+          <span><strong>SDK</strong> Connectorを拡張</span>
         </div>
       </div>
       <div class="home-shell-v2__hero-visual">
         <figure class="home-shell-v2__screenshot home-shell-v2__screenshot--hero">
-          <div class="home-shell-v2__window-bar"><span></span><span></span><span></span><small>PiXiEEDstudio</small></div>
-          <div class="home-shell-v2__workspace-preview home-shell-v2__workspace-preview--flow" role="img" aria-label="iDRAWでドット絵を描き、iAUDIOで音を重ね、iGAMEで遊べる作品にする流れ" data-i18n-aria-label="homePreviewAria">
-            <div class="home-shell-v2__preview-toolbar"><span class="home-shell-v2__preview-brand">STUDIO</span><span class="home-shell-v2__preview-mode is-active">iDRAW</span><span class="home-shell-v2__preview-mode">iAUDIO</span><span class="home-shell-v2__preview-mode">iGAME</span><span class="home-shell-v2__preview-spacer"></span><i></i><i></i></div>
+          <div class="home-shell-v2__window-bar"><span></span><span></span><span></span><small>PiXiEED Bridge</small></div>
+          <div class="home-shell-v2__workspace-preview home-shell-v2__workspace-preview--flow" role="img" aria-label="AsepriteとUnityをPiXiEED Bridgeで接続する流れ">
+            <div class="home-shell-v2__preview-toolbar"><span class="home-shell-v2__preview-brand">BRIDGE</span><span class="home-shell-v2__preview-mode is-active">PROTOCOL</span><span class="home-shell-v2__preview-mode">CONNECTOR</span><span class="home-shell-v2__preview-mode">PRESENCE</span><span class="home-shell-v2__preview-spacer"></span><i></i><i></i></div>
             <div class="home-shell-v2__preview-flow">
               <article class="home-shell-v2__flow-stage home-shell-v2__flow-stage--draw">
-                <header><span>01</span><strong data-i18n-key="homePreviewDraw">iDRAW</strong></header>
-                <div class="home-shell-v2__flow-art home-shell-v2__flow-art--draw"><span class="home-shell-v2__flow-grid" aria-hidden="true"></span><img src="character-dots/mao1.png" width="16" height="16" alt=""><i class="home-shell-v2__flow-cursor" aria-hidden="true"></i></div>
-                <small data-i18n-key="homePreviewDrawCopy">PIXEL ART</small>
+                <header><span>01</span><strong>Aseprite</strong></header>
+                <div class="home-shell-v2__flow-art home-shell-v2__flow-art--draw"><span class="home-shell-v2__flow-grid" aria-hidden="true"></span><i class="home-shell-v2__flow-cursor" aria-hidden="true"></i></div>
+                <small>PIXEL SOURCE</small>
               </article>
               <div class="home-shell-v2__flow-connector" aria-hidden="true"><span>→</span></div>
               <article class="home-shell-v2__flow-stage home-shell-v2__flow-stage--audio">
-                <header><span>02</span><strong data-i18n-key="homePreviewAudio">iAUDIO</strong></header>
-                <div class="home-shell-v2__flow-art home-shell-v2__flow-art--audio"><img src="character-dots/mao1.png" width="16" height="16" alt=""><span class="home-shell-v2__flow-note home-shell-v2__flow-note--one">♪</span><span class="home-shell-v2__flow-note home-shell-v2__flow-note--two">♫</span><span class="home-shell-v2__flow-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></div>
-                <small data-i18n-key="homePreviewAudioCopy">BGM + SE</small>
+                <header><span>02</span><strong>Protocol</strong></header>
+                <div class="home-shell-v2__flow-art home-shell-v2__flow-art--audio"><span class="home-shell-v2__flow-note home-shell-v2__flow-note--one">↔</span><span class="home-shell-v2__flow-note home-shell-v2__flow-note--two">◆</span><span class="home-shell-v2__flow-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></div>
+                <small>REVISION / OPERATION</small>
               </article>
               <div class="home-shell-v2__flow-connector" aria-hidden="true"><span>→</span></div>
               <article class="home-shell-v2__flow-stage home-shell-v2__flow-stage--game">
-                <header><span>03</span><strong data-i18n-key="homePreviewGame">iGAME</strong></header>
-                <div class="home-shell-v2__flow-art home-shell-v2__flow-art--game"><span class="home-shell-v2__flow-sky" aria-hidden="true"></span><img src="character-dots/mao1.png" width="16" height="16" alt=""><span class="home-shell-v2__flow-ground" aria-hidden="true"></span><i class="home-shell-v2__flow-play" aria-hidden="true">▶</i></div>
-                <small data-i18n-key="homePreviewGameCopy">PLAYABLE WORLD</small>
+                <header><span>03</span><strong>Unity</strong></header>
+                <div class="home-shell-v2__flow-art home-shell-v2__flow-art--game"><span class="home-shell-v2__flow-sky" aria-hidden="true"></span><span class="home-shell-v2__flow-ground" aria-hidden="true"></span><i class="home-shell-v2__flow-play" aria-hidden="true">▶</i></div>
+                <small>SCENE UPDATE</small>
               </article>
             </div>
           </div>
-          <figcaption><span>PiXiEEDstudio</span><span>iDRAW / ANIMATION</span></figcaption>
+          <figcaption><span>PiXiEED Bridge</span><span>ASEPRITE ↔ UNITY</span></figcaption>
         </figure>
-        <div class="home-shell-v2__badge home-shell-v2__badge--top"><strong>01</strong><span data-i18n-key="homeBadgeStart">描画から始める</span></div>
-        <div class="home-shell-v2__badge home-shell-v2__badge--bottom"><strong>PiXYNC</strong><span data-i18n-key="homeBadgeSync">制作の流れを同期</span></div>
+        <div class="home-shell-v2__badge home-shell-v2__badge--top"><strong>MVP</strong><span>Aseprite ↔ Unity</span></div>
+        <div class="home-shell-v2__badge home-shell-v2__badge--bottom"><strong>RPC</strong><span>revision / conflict / presence</span></div>
       </div>
     </section>
 
     <section class="home-shell-v2__section home-shell-v2__section--workspace" aria-labelledby="workspaceTitleV2">
-      <div class="home-shell-v2__section-heading"><div><p class="home-shell-v2__eyebrow" data-i18n-key="homeWorkspaceEyebrow">ONE WORKSPACE</p><h2 id="workspaceTitleV2" data-i18n-key="homeWorkspaceTitle">作業に合わせて、必要な場所だけ。</h2></div><p data-i18n-key="homeWorkspaceCopy">PiXiEEDstudioの中でiDRAW・iAUDIO・iGAMEを切り替えて制作します。別ページを増やさず、同じ作品の時間軸を保ちます。</p></div>
+      <div class="home-shell-v2__section-heading"><div><p class="home-shell-v2__eyebrow">UNIVERSAL PROTOCOL</p><h2 id="workspaceTitleV2">制作アプリの境界を越えて。</h2></div><p>アプリごとの操作感を置き換えず、Project・Asset・Object・Operation・Revision・Presenceを共通の契約でつなぎます。</p></div>
       <div class="home-shell-v2__workspace-grid">
-          <a class="home-shell-v2__workspace-card is-primary" href="studio/"><span class="home-shell-v2__workspace-icon"><img src="pixiedraw2/assets/icons/export-v040/icon-pen.svg" alt=""></span><span><strong>iDRAW</strong><small data-i18n-key="homeDrawCopy">ドット絵とアニメーションを制作</small></span><b aria-hidden="true">↗</b></a>
-        <a class="home-shell-v2__workspace-card" href="studio/"><span class="home-shell-v2__workspace-icon"><img src="pixiedraw2/assets/icons/export-v040/icon-note.svg" alt=""></span><span><strong>iAUDIO</strong><small data-i18n-key="homeAudioCopy">PiXiEEDstudio内でBGM・SEを確認</small></span><b aria-hidden="true">↗</b></a>
-        <a class="home-shell-v2__workspace-card" href="studio/"><span class="home-shell-v2__workspace-icon"><img src="pixiedraw2/assets/icons/export-v040/icon-play.svg" alt=""></span><span><strong>iGAME</strong><small data-i18n-key="homeGameCopy">作品の動きと体験を確認</small></span><b aria-hidden="true">↗</b></a>
+        <article class="home-shell-v2__workspace-card is-primary"><span class="home-shell-v2__workspace-icon">01</span><span><strong>Connector</strong><small>Aseprite Lua / Unity Editor から接続</small></span></article>
+        <article class="home-shell-v2__workspace-card"><span class="home-shell-v2__workspace-icon">02</span><span><strong>Realtime Protocol</strong><small>操作、リビジョン、競合、再接続を共通化</small></span></article>
+        <article class="home-shell-v2__workspace-card"><span class="home-shell-v2__workspace-icon">03</span><span><strong>Bridge UI</strong><small>接続状態、ログ、競合、履歴を確認</small></span></article>
       </div>
     </section>
 
     <section class="home-shell-v2__section home-shell-v2__section--toolkit" aria-labelledby="toolkitTitleV2">
-      <div class="home-shell-v2__section-heading"><div><p class="home-shell-v2__eyebrow" data-i18n-key="homeToolkitEyebrow">PIXiEED TOOLKIT</p><h2 id="toolkitTitleV2" data-i18n-key="homeToolkitTitle">作る、変換する、遊ぶ。</h2></div><p data-i18n-key="homeToolkitCopy">PiXiEEDstudioを中心に、既存のPiXiEEDツールも同じ入口からすぐ開けます。</p></div>
+      <div class="home-shell-v2__section-heading"><div><p class="home-shell-v2__eyebrow">CONNECTOR ROADMAP</p><h2 id="toolkitTitleV2">対応アプリを増やせる構造。</h2></div><p>最初は Aseprite ↔ Unity。将来は Blender、REAPER、Ableton、Figma、Photoshop、Unreal、Godot、OBSへ広げます。</p></div>
       <div class="home-shell-v2__tool-grid">
-        <a class="home-shell-v2__tool-card" href="pixiee-lens/"><span class="home-shell-v2__tool-icon"><img src="assets/icons/Camera.png" alt=""></span><strong>PiXiEELENS</strong><small data-i18n-key="toolLens">写真をドット化</small><b aria-hidden="true">↗</b></a>
-        <a class="home-shell-v2__tool-card" href="qr/"><span class="home-shell-v2__tool-icon"><img src="assets/icons/QR.png" alt=""></span><strong>QR</strong><small data-i18n-key="toolQr">QRを作成</small><b aria-hidden="true">↗</b></a>
-        <a class="home-shell-v2__tool-card" href="pixfind/"><span class="home-shell-v2__tool-icon"><img src="assets/icons/Preview.png" alt=""></span><strong>PiXFiND</strong><small data-i18n-key="toolPixfind">遊ぶ・共有する</small><b aria-hidden="true">↗</b></a>
-        <a class="home-shell-v2__tool-card" href="maoitu/"><span class="home-shell-v2__tool-icon"><img src="assets/icons/Draw.png" alt=""></span><strong>まおいつ</strong><small data-i18n-key="toolMaoitu">ゲームで遊ぶ</small><b aria-hidden="true">↗</b></a>
+        <div class="home-shell-v2__tool-card"><span class="home-shell-v2__tool-icon">A</span><strong>Aseprite</strong><small>最初のソースアプリ</small></div>
+        <div class="home-shell-v2__tool-card"><span class="home-shell-v2__tool-icon">U</span><strong>Unity</strong><small>最初の接続先</small></div>
+        <div class="home-shell-v2__tool-card"><span class="home-shell-v2__tool-icon">+</span><strong>Future</strong><small>Connectorで拡張</small></div>
       </div>
     </section>
 
     <section class="home-shell-v2__section home-shell-v2__section--split" aria-labelledby="flowTitleV2">
       <div class="home-shell-v2__split-card">
-        <div class="home-shell-v2__split-copy"><p class="home-shell-v2__eyebrow" data-i18n-key="homeFlowEyebrow">FROM PIXEL TO MOTION</p><h2 id="flowTitleV2"><span data-i18n-key="homeFlowTitleA">ひとつの作品を、</span><br><span data-i18n-key="homeFlowTitleB">最後まで見失わない。</span></h2><p data-i18n-key="homeFlowCopy">キャンバス、パレット、レイヤー、フレーム、タイムラインを近くに置き、制作の途中で画面を探し回らない構成にしています。</p><a class="home-shell-v2__text-link" href="studio/"><span data-i18n-key="homeFlowLink">PiXiEEDstudioを開く</span> <span aria-hidden="true">→</span></a></div>
-        <figure class="home-shell-v2__screenshot home-shell-v2__screenshot--detail"><div class="home-shell-v2__detail-preview" role="img" aria-label="PiXiEEDstudioのキャンバス、パレット、グリッドを表すプレビュー"><div class="home-shell-v2__detail-grid"></div><div class="home-shell-v2__detail-palette"><i></i><i></i><i></i><i></i><i></i></div></div><figcaption><span>CANVAS</span><span>PALETTE / GRID</span></figcaption></figure>
+        <div class="home-shell-v2__split-copy"><p class="home-shell-v2__eyebrow">MVP FLOW</p><h2 id="flowTitleV2">接続して、同期して、<br>制作へ戻る。</h2><p>ローカル WebSocket / IPC、capability negotiation、journal、checkpoint、reconnect を Bridge の中心に置き、各アプリの状態を追跡可能にします。</p><a class="home-shell-v2__text-link" href="help/index.html#bridge">要点を確認 <span aria-hidden="true">→</span></a></div>
+        <figure class="home-shell-v2__screenshot home-shell-v2__screenshot--detail"><div class="home-shell-v2__detail-preview" role="img" aria-label="Bridgeの接続状態、リビジョン、競合を表すプレビュー"><div class="home-shell-v2__detail-grid"></div><div class="home-shell-v2__detail-palette"><i></i><i></i><i></i><i></i><i></i></div></div><figcaption><span>CONNECTION</span><span>REVISION / CONFLICT</span></figcaption></figure>
       </div>
     </section>
 
@@ -161,9 +144,9 @@
     <section class="home-shell-v2__section home-shell-v2__section--answers" aria-labelledby="faqTitleV2">
       <div class="home-shell-v2__section-heading"><div><p class="home-shell-v2__eyebrow" data-i18n-key="homeAnswersEyebrow">QUICK ANSWERS</p><h2 id="faqTitleV2" data-i18n-key="homeAnswersTitle">はじめる前に。</h2></div><p data-i18n-key="homeAnswersCopy">迷いやすい部分は短くまとめています。</p></div>
       <div class="home-shell-v2__faq-grid">
-        <details><summary data-i18n-key="homeFaqDrawQ">PiXiEEDstudioでは何ができますか？</summary><p data-i18n-key="homeFaqDrawA">iDRAW・iAUDIO・iGAMEを切り替えながら、ドット絵、音楽、ゲームを一つの作品として制作できます。</p></details>
-        <details><summary data-i18n-key="homeFaqAudioQ">iAUDIOとiGAMEは別ページですか？</summary><p data-i18n-key="homeFaqAudioA">別ページを増やさず、PiXiEEDstudio内のモードとして扱います。作品データと再生速度を分離せず、同じ作品の時間軸で確認できます。</p></details>
-        <details><summary data-i18n-key="homeFaqMarketQ">マーケットは使えますか？</summary><p data-i18n-key="homeFaqMarketA">はい。マーケットの閲覧、商品詳細、購入済み素材のマイページ利用に対応しています。販売やアプリ内決済は段階的に拡張します。</p></details>
+        <details><summary>Bridgeの最初の接続対象は？</summary><p>Aseprite ↔ Unity を最優先のMVPとして、Lua ConnectorとUnity Editor Connectorを用意します。</p></details>
+        <details><summary>何を同期しますか？</summary><p>Project、Asset、Object、Operation、Revision、Conflict、PresenceをUniversal Protocolで扱います。</p></details>
+        <details><summary>マーケットは使えますか？</summary><p>マーケットの閲覧、商品詳細、購入済み素材の確認は継続します。旧形式の購入ファイルは互換性確認のため保持します。</p></details>
       </div>
     </section>
   </main>
@@ -171,12 +154,10 @@
   <footer>
     <p>© <span id="year">2026</span> PiXiEED. All rights reserved.</p>
     <div class="footer-links">
-        <a href="studio/">PiXiEEDstudio</a>
       <a href="community/">コミュニティ</a>
       <a href="market/">マーケット</a>
       <a href="account/index.html">マイページ</a>
-      <a href="pixiee-lens/index.html">PiXiEELENS</a>
-      <a href="pixfind/index.html">PiXFiND</a>
+      <a href="help/index.html#bridge">PiXiEED Bridge</a>
       <a href="glossary/index.html">用語集</a>
       <a href="terms/index.html">利用規約</a>
       <a href="privacy/index.html">プライバシーポリシー</a>
@@ -190,14 +171,14 @@
       <a class="bottom-nav__item" data-tab="market" href="market/">
         <span class="icon"><img src="assets/icons/Market.png" alt=""></span><span>マーケット</span>
       </a>
-      <a class="bottom-nav__item bottom-nav__item--primary" data-tab="draw" href="studio/">
-        <span class="icon"><img src="assets/icons/Draw.png?v=2026.07.19-ui-icons1" alt=""></span><span>PiXiEEDstudio</span>
+      <a class="bottom-nav__item" data-tab="community" href="community/">
+        <span class="icon"><img src="assets/icons/HOME.png?v=2026.07.19-ui-icons1" alt=""></span><span>コミュニティ</span>
       </a>
-      <a class="bottom-nav__item" data-tab="camera" href="pixiee-lens/index.html">
-        <span class="icon"><img src="assets/icons/Camera.png" alt=""></span><span>カメラ</span>
+      <a class="bottom-nav__item" data-tab="help" href="help/index.html">
+        <span class="icon"><img src="assets/icons/help.png" alt=""></span><span>ヘルプ</span>
       </a>
       <a class="bottom-nav__item" data-tab="account" href="account/index.html">
-        <span class="icon"><img src="pixiedraw/assets/icons/ecticon_frame_01.png" alt=""></span><span>マイページ</span>
+        <span class="icon"><img src="icon/icon-192-4.png" alt=""></span><span>マイページ</span>
       </a>
   </nav>
 
@@ -244,7 +225,7 @@
       </div>
     </div>
   </div>
-  <script src="scripts/shared-bottom-nav.js?v=20260825-studio-brand1"></script>
+  <script src="scripts/shared-bottom-nav.js?v=20260830-bridge-shell1"></script>
   <script src="scripts/pixel-art-fit.js"></script>
 </body>
 </html>

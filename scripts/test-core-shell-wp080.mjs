@@ -11,7 +11,7 @@ const [html, css, shell, contracts, serverRouteContract, flagSource, draw2Route]
   read('core-shell/assets/core-shell.js'),
   read('core-shell/assets/core-shell-contracts.js'),
   read('core-shell/assets/core-shell-server-route-contract.js'),
-  read('pixiedraw/assets/js/modules/core-feature-flag-rollback-utils.js'),
+  read('core-shell/assets/core-feature-flag-rollback-utils.js'),
   read('core-shell/assets/routes/draw2-route.js'),
 ]);
 
@@ -107,7 +107,7 @@ const event = recorder.record({ eventName: 'test', routeId: 'home', email: 'hidd
 assert.deepEqual(event, { eventName: 'test', routeId: 'home', theme: 'dark' });
 
 const flagModule = await import('node:fs/promises');
-const flagText = await flagModule.readFile(path.join(root, 'pixiedraw/assets/js/modules/core-feature-flag-rollback-utils.js'), 'utf8');
+const flagText = await flagModule.readFile(path.join(root, 'core-shell/assets/core-feature-flag-rollback-utils.js'), 'utf8');
 const fakeWindow = {};
 const loadFlag = new Function('window', `${flagText}\nreturn window.PiXiEEDrawModules.coreFeatureFlagRollbackUtils;`);
 const flags = loadFlag(fakeWindow).createCoreFeatureFlagRollback({ flags: [{ flagId: 'core-shell-read', domain: 'core', currentPath: '/core-shell/' }] });

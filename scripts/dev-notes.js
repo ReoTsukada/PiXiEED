@@ -6,94 +6,30 @@
   const baseNotes = [
     {
       id: 'site',
-      name: 'PiXiEED 全体',
+      name: 'PiXiEED Bridge',
       nameKey: 'notesSite',
       url: '../index.html',
-      entries: [
-        {
-          date: '2026-03-20',
-          items: [
-            'ホームの最近の更新に、iDRAWの最新変更と紹介ページの広告調整を反映',
-            '各ツール紹介ページの広告配置を最適化し、下部広告を追加',
-            'iDRAWのファイル/カラーUI間隔調整を更新状況に反映'
-          ]
-        },
-        {
-          date: '2026-03-15',
-          items: [
-            'ホームの更新状況カードに、最新の iDRAW / 各ツール / 関連ページ更新を反映',
-            '開発ノートに最新の iDRAW とサイト更新メモを追加'
-          ]
-        },
-        {
-          date: '2026-02-05',
-          items: [
-            '開発ノートまとめページを追加',
-            'プロジェクト紹介ページに更新メモを追加',
-            'ホームの最近更新を直近5件表示に変更',
-            'フッターの空き枠にPiXiEELENSボタンを配置'
-          ]
-        }
-      ]
+      entries: []
     },
-    { id: 'pixiedraw', name: 'iDRAW', nameKey: 'notesDraw', url: '../pixiedraw/index.html', entries: [] },
-    { id: 'pixiee-lens', name: 'PiXiEELENS', nameKey: 'notesLens', url: '../pixiee-lens/index.html', entries: [] },
-    { id: 'qr-maker', name: 'QRコードメーカー', nameKey: 'notesQr', url: '../qr-maker/index.html', entries: [] }
+    {
+      id: 'bridge',
+      name: 'PiXiEED Bridge MVP',
+      nameKey: 'notesBridge',
+      url: '../help/index.html#bridge',
+      entries: []
+    }
   ];
 
-  // file:// 直開きなど fetch が失敗する環境でも主要ツールだけは空欄にしない
-  const fallbackAutoNotes = Object.freeze({
-    pixiedraw: [
-      {
-        date: '2026-03-20',
-        items: [
-          '設定内のアカウント欄追加 / ログアウト時の即時UI反映 / 出力は広告→閉じる→出力開始 / 出力後ログイン促しパネル / ファイル・パレット操作の間隔調整'
-        ]
-      },
-      {
-        date: '2026-03-15',
-        items: [
-          'マルチキャンバス追加 / 選択プレビューとミラーの選択中キャンバス参照修正 / 共同制作の再同期・参加者セル再配置改善 / コメント欄のログスクロール化 / タブ終了確認を追加'
-        ]
-      },
-      {
-        date: '2026-02-25',
-        items: [
-          'ツール/カラーパネルを統合 / 左レーンコンパクト時を1列固定+フライアウト化 / ボタンサイズ44px統一 / カラーパネルを縦スクロール最適化'
-        ]
-      },
-      {
-        date: '2026-02-19',
-        items: [
-          '共有モード（マルチ）を強化（マスター/参加者、セル割当、差分同期） / 共有キー操作と役割フローを改善 / 共同制作ルーム導線を調整'
-        ]
-      }
-    ],
-    'pixiee-lens': [
-      {
-        date: '2026-02-16',
-        items: [
-          'ボタン長押しGIF撮影（最大5秒） / FPS設定（5・8・10・20・30） / PNG保存のドット倍率 / 5MB超過時の自動調整 / GIF保存の5MB制御を追加'
-        ]
-      }
-    ]
-  });
+  const fallbackAutoNotes = Object.freeze({});
 
   const indexLinkToNoteId = Object.freeze({
     'index.html': 'site',
     'notes/index.html': 'site',
     'glossary/index.html': 'site',
-    'portfolio/index.html': 'site',
-    'pixiedraw/index.html': 'pixiedraw',
-    'pixiee-lens/index.html': 'pixiee-lens',
-    'qr-maker/index.html': 'qr-maker'
+    'help/index.html': 'bridge'
   });
 
-  const readmeSources = Object.freeze({
-    pixiedraw: '../pixiedraw/README.md',
-    'pixiee-lens': '../pixiee-lens/README.md',
-    'qr-maker': '../qr-maker/README.md'
-  });
+  const readmeSources = Object.freeze({});
 
   const notes = cloneNotes(baseNotes);
   applyFallbackNotes(notes);
@@ -274,8 +210,7 @@
   function resolveNoteId(link, title) {
     if (indexLinkToNoteId[link]) return indexLinkToNoteId[link];
     if (!title) return '';
-    if (/PiXiEEDraw/i.test(title)) return 'pixiedraw';
-    if (/PiXiEELENS/i.test(title)) return 'pixiee-lens';
+    if (/PiXiEED Bridge|Realtime Protocol|Connector SDK/i.test(title)) return 'bridge';
     return '';
   }
 
@@ -419,10 +354,8 @@
       notesOpen: english ? 'Open' : '開く',
       notesOpenAria: english ? 'Open {name}' : '{name} を開く',
       notesPreparing: english ? 'Coming soon' : '準備中',
-      notesSite: english ? 'PiXiEED overall' : 'PiXiEED 全体',
-      notesDraw: 'iDRAW',
-      notesLens: 'PiXiEELENS',
-      notesQr: english ? 'QR Maker' : 'QRコードメーカー'
+      notesSite: english ? 'PiXiEED Bridge' : 'PiXiEED Bridge',
+      notesBridge: english ? 'PiXiEED Bridge MVP' : 'PiXiEED Bridge MVP'
     };
     return messages[key] || fallback || '';
   }

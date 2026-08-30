@@ -14,7 +14,7 @@ const initialBundleFiles = [
   'core-shell/assets/core-shell.css',
   'core-shell/assets/core-shell.js',
   'core-shell/assets/core-shell-contracts.js',
-  'pixiedraw/assets/js/modules/core-feature-flag-rollback-utils.js',
+  'core-shell/assets/core-feature-flag-rollback-utils.js',
 ];
 const initialBundleSourceBytes = (await Promise.all(initialBundleFiles.map(async (file) => (await stat(path.join(root, file))).size))).reduce((sum, size) => sum + size, 0);
 
@@ -60,7 +60,7 @@ try {
     assert.equal(summary.initialFlag, 'CORE_SHELL_SERVER_ROUTE_UNAVAILABLE');
     assert.ok(summary.initialJsBytes >= 0);
     assert.equal(requests.some((request) => /\/(market|pixfind|pixiee-lens|account)\//.test(new URL(request).pathname)), false);
-    assert.equal(requests.some((request) => /\/pixiedraw\/(?!assets\/js\/modules\/core-feature-flag-rollback-utils\.js)/.test(new URL(request).pathname)), false);
+    assert.equal(requests.some((request) => /\/pixiedraw\//.test(new URL(request).pathname)), false);
     if (expectedMobile) {
       await page.getByRole('button', { name: 'サイドナビゲーションを開閉' }).click();
       assert.equal(await page.locator('.core-shell__sidebar').isVisible(), true);

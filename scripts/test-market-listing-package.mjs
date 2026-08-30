@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 globalThis.window = globalThis;
-await import('../pixiedraw/assets/js/modules/color-codec-utils.js');
+await import('../market/color-codec-utils.js');
 await import('../market/listing-package-utils.js');
 const { detectFormat, detectMediaKind, collectFilesFromHandle, extractPixieeDrawPreviewPng, optimizeGifIntegerScale, readRasterDimensions } = globalThis.PiXiEEDMarketPackage;
 const file = (name, bytes, type = '') => new File([Uint8Array.from(bytes)], name, { type });

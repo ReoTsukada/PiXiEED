@@ -2,105 +2,32 @@
   "port": 4173,
   "entries": [
     {
-      "id": "pixiedraw_editor",
-      "urlPath": "/pixiedraw/index.html",
-      "waitFor": "#appRoot",
-      "clickSelectors": ["#startupActionSkip", "#updateToastCloseBtn"],
-      "hideSelectors": ["#startupScreen", "#updateToast"],
-      "waitAfterActionsMs": 500,
-      "viewport": { "width": 1440, "height": 960 },
-      "output": "assets/screenshots/generated/pixiedraw-editor.png"
+      "id": "bridge_home",
+      "urlPath": "/index.html",
+      "waitFor": "#main-content-v2",
+      "viewport": { "width": 1440, "height": 900 },
+      "output": "assets/screenshots/generated/bridge-home.png"
     },
     {
-      "id": "pixiedraw_left_rail",
-      "urlPath": "/pixiedraw/index.html",
-      "waitFor": "#appRoot",
-      "initLocalStorage": {
-        "pixieedraw:sessionState": {
-          "leftTab": "color",
-          "rightTab": "frames",
-          "leftRailWidth": 360,
-          "rightRailWidth": 78
-        }
-      },
-      "clickSelectors": ["#startupActionSkip", "#updateToastCloseBtn"],
-      "hideSelectors": ["#startupScreen", "#updateToast"],
-      "waitAfterActionsMs": 700,
-      "viewport": { "width": 1440, "height": 960 },
-      "output": "assets/screenshots/generated/pixiedraw-left-rail.png"
+      "id": "bridge_help",
+      "urlPath": "/help/index.html",
+      "waitFor": "#bridge",
+      "viewport": { "width": 1440, "height": 900 },
+      "output": "assets/screenshots/generated/bridge-help.png"
     },
     {
-      "id": "pixiedraw_right_rail",
-      "urlPath": "/pixiedraw/index.html",
-      "waitFor": "#appRoot",
-      "initLocalStorage": {
-        "pixieedraw:sessionState": {
-          "leftTab": "tools",
-          "rightTab": "file",
-          "leftRailWidth": 78,
-          "rightRailWidth": 360
-        }
-      },
-      "clickSelectors": ["#startupActionSkip", "#updateToastCloseBtn"],
-      "hideSelectors": ["#startupScreen", "#updateToast"],
-      "waitAfterActionsMs": 700,
-      "viewport": { "width": 1440, "height": 960 },
-      "output": "assets/screenshots/generated/pixiedraw-right-rail.png"
+      "id": "bridge_community",
+      "urlPath": "/community/",
+      "waitFor": "#socialFeed",
+      "viewport": { "width": 1440, "height": 900 },
+      "output": "assets/screenshots/generated/bridge-community.png"
     },
     {
-      "id": "pixiee_lens_scene",
-      "urlPath": "/pixiee-lens/index.html",
-      "waitFor": "#cameraFeed",
-      "hideSelectors": ["#cameraStartOverlay", "#capturePreviewOverlay", "#updateToast"],
-      "evaluateScripts": [
-        "(async () => { const scenicSrc = '/portfolio/dots/apple.png'; const video = document.getElementById('cameraFeed'); if (!video) return; video.style.opacity = '1'; video.style.backgroundImage = `url(${scenicSrc})`; video.style.backgroundSize = 'cover'; video.style.backgroundPosition = 'center center'; video.style.backgroundRepeat = 'no-repeat'; video.style.backgroundColor = '#0b1224'; video.style.filter = 'saturate(1.05) contrast(1.02)'; })()"
-      ],
-      "waitAfterActionsMs": 300,
-      "viewport": { "width": 1280, "height": 900 },
-      "output": "assets/screenshots/generated/pixiee-lens-scene.png"
-    },
-    {
-      "id": "pixiee_lens_dot_scene",
-      "urlPath": "/pixiee-lens/index.html",
-      "waitFor": "#cameraFeed",
-      "hideSelectors": ["#cameraStartOverlay", "#capturePreviewOverlay", "#updateToast"],
-      "evaluateScripts": [
-        "(async () => { const scenicSrc = '/portfolio/dots/apple.png'; const video = document.getElementById('cameraFeed'); const dotCanvas = document.getElementById('dotCanvas'); const paletteMenu = document.getElementById('paletteMenu'); const existing = document.getElementById('captureSceneMock'); if (existing) existing.remove(); const img = new Image(); img.src = scenicSrc; await img.decode().catch(() => {}); const stageWidth = Math.max(window.innerWidth, 1280); const stageHeight = Math.max(window.innerHeight, 900); const work = document.createElement('canvas'); work.width = 96; work.height = Math.max(54, Math.round(work.width * (img.naturalHeight || 720) / (img.naturalWidth || 1280))); const workCtx = work.getContext('2d'); workCtx.imageSmoothingEnabled = true; workCtx.drawImage(img, 0, 0, work.width, work.height); if (video) { video.style.opacity = '0'; video.style.background = 'transparent'; } if (dotCanvas) { dotCanvas.hidden = false; dotCanvas.width = work.width; dotCanvas.height = work.height; dotCanvas.style.position = 'fixed'; dotCanvas.style.left = '0'; dotCanvas.style.top = '0'; dotCanvas.style.width = stageWidth + 'px'; dotCanvas.style.height = stageHeight + 'px'; dotCanvas.style.objectFit = 'cover'; dotCanvas.style.zIndex = '1'; const ctx = dotCanvas.getContext('2d'); ctx.imageSmoothingEnabled = false; ctx.clearRect(0, 0, dotCanvas.width, dotCanvas.height); ctx.drawImage(work, 0, 0); } if (paletteMenu) { paletteMenu.hidden = false; paletteMenu.style.display = 'block'; paletteMenu.style.zIndex = '40'; } })()"
-      ],
-      "waitAfterActionsMs": 300,
-      "viewport": { "width": 1280, "height": 900 },
-      "output": "assets/screenshots/generated/pixiee-lens-dot-scene.png"
-    },
-    {
-      "id": "pixiee_lens_4color_256_dither",
-      "urlPath": "/pixiee-lens/index.html",
-      "waitFor": "#cameraFeed",
-      "selector": "#captureSceneMock",
-      "hideSelectors": ["#cameraStartOverlay", "#capturePreviewOverlay", "#updateToast"],
-      "evaluateScripts": [
-        "(async () => { const scenicSrc = '/assets/screenshots/generated/pixiee-lens-generated-landscape-source.png'; const existing = document.getElementById('captureSceneMock'); if (existing) existing.remove(); const img = new Image(); img.src = scenicSrc; await img.decode().catch(() => {}); const size = 256; const temp = document.createElement('canvas'); temp.width = size; temp.height = size; const tctx = temp.getContext('2d', { willReadFrequently: true }); const sw = img.naturalWidth || size; const sh = img.naturalHeight || size; const scale = Math.max(size / sw, size / sh); const dw = sw * scale; const dh = sh * scale; const dx = (size - dw) / 2; const dy = (size - dh) / 2; tctx.imageSmoothingEnabled = true; tctx.clearRect(0, 0, size, size); tctx.drawImage(img, dx, dy, dw, dh); const imageData = tctx.getImageData(0, 0, size, size); const data = imageData.data; const palette = [[224, 248, 208], [168, 192, 112], [88, 120, 48], [32, 56, 16]]; const matrix = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]]; const clamp = (value) => Math.max(0, Math.min(255, value)); for (let y = 0; y < size; y += 1) { for (let x = 0; x < size; x += 1) { const index = (y * size + x) * 4; const r = data[index]; const g = data[index + 1]; const b = data[index + 2]; let luminance = (0.299 * r) + (0.587 * g) + (0.114 * b); luminance = ((luminance - 128) * 1.1) + 128; const threshold = (matrix[y % 4][x % 4] - 7.5) * 7; const adjusted = clamp(luminance + threshold); let level = 3 - Math.round(adjusted / 85); level = Math.max(0, Math.min(3, level)); const color = palette[level]; data[index] = color[0]; data[index + 1] = color[1]; data[index + 2] = color[2]; data[index + 3] = 255; } } const wrapper = document.createElement('div'); wrapper.id = 'captureSceneMock'; wrapper.style.width = '512px'; wrapper.style.height = '512px'; wrapper.style.display = 'grid'; wrapper.style.placeItems = 'center'; wrapper.style.padding = '0'; wrapper.style.borderRadius = '40px'; wrapper.style.overflow = 'hidden'; wrapper.style.background = 'radial-gradient(circle at 18% 16%, rgba(243, 250, 225, 0.72), rgba(15, 23, 42, 0.9) 72%)'; wrapper.style.boxShadow = '0 28px 70px rgba(0,0,0,0.42)'; wrapper.style.border = '1px solid rgba(255,255,255,0.16)'; const canvas = document.createElement('canvas'); canvas.width = size; canvas.height = size; canvas.style.width = '100%'; canvas.style.height = '100%'; canvas.style.display = 'block'; canvas.style.imageRendering = 'pixelated'; const ctx = canvas.getContext('2d'); ctx.imageSmoothingEnabled = false; ctx.putImageData(imageData, 0, 0); wrapper.appendChild(canvas); document.body.innerHTML = ''; document.body.style.margin = '0'; document.body.style.minHeight = '100vh'; document.body.style.display = 'grid'; document.body.style.placeItems = 'center'; document.body.style.background = '#020617'; document.body.appendChild(wrapper); })()"
-      ],
-      "waitAfterActionsMs": 300,
-      "viewport": { "width": 1280, "height": 900 },
-      "output": "assets/screenshots/generated/pixiee-lens-4color-256-dither.png"
-    },
-    {
-      "id": "qr_maker_basic",
-      "urlPath": "/qr-maker/index.html",
-      "waitFor": "#qrCanvas",
-      "viewport": { "width": 1280, "height": 900 },
-      "output": "assets/screenshots/generated/qr-maker-basic.png"
-    },
-    {
-      "id": "qr_maker_style",
-      "urlPath": "/qr-maker/index.html",
-      "waitFor": "#qrCanvas",
-      "evaluateScripts": [
-        "(async () => { qrInput.value = 'https://pixieed.jp/portfolio/index.html'; qrLevel.value = 'H'; qrMargin.value = '2'; qrSize.value = '480'; qrDark.value = '#1d4ed8'; qrLight.value = '#fef3c7'; [qrInput, qrLevel, qrMargin, qrSize, qrDark, qrLight].forEach((el) => { el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); }); if (typeof syncLabels === 'function') syncLabels(); if (typeof renderQRCode === 'function') await renderQRCode(); })()"
-      ],
-      "waitAfterActionsMs": 200,
-      "viewport": { "width": 1280, "height": 900 },
-      "output": "assets/screenshots/generated/qr-maker-style.png"
+      "id": "market_overview",
+      "urlPath": "/market/",
+      "waitFor": "#marketGrid",
+      "viewport": { "width": 1440, "height": 900 },
+      "output": "assets/screenshots/generated/market-overview.png"
     }
   ]
 }

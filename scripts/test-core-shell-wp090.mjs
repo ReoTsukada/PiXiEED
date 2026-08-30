@@ -88,7 +88,7 @@ assert.equal(server.createCoreShellRouteResponse({ serverDecision: authorized, f
 assert.equal(server.createCoreShellRouteResponse({ serverDecision: authorized, flagDecision: { decision: 'enabled' } }).status, 200);
 assert.equal(server.createCoreShellRouteResponse({ routeId: 'home', serverDecision: denied, flagDecision: { decision: 'enabled' } }).doNotPrefetch, true);
 
-const initialFiles = [files.html, files.css, files.shell, files.shellContracts, files.interaction, files.async, files.performance, 'pixiedraw/assets/js/modules/core-feature-flag-rollback-utils.js'];
+const initialFiles = [files.html, files.css, files.shell, files.shellContracts, files.interaction, files.async, files.performance, 'core-shell/assets/core-feature-flag-rollback-utils.js'];
 const initialBytes = Buffer.concat(await Promise.all(initialFiles.map(async (file) => Buffer.from(await read(file)))));
 const initialStats = await Promise.all(initialFiles.map(async (file) => ({ file, bytes: (await stat(path.join(root, file))).size })));
 const summary = performance.summarizeShellPerformance({ sourceBytes: initialBytes.length, gzipBytes: gzipSync(initialBytes).length, brotliBytes: brotliCompressSync(initialBytes).length, resources: [{ name: 'http://local/core-shell/assets/core-shell.js' }], longTasks: [{ duration: 4 }, { duration: 51 }] });

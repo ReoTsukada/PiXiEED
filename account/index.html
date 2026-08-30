@@ -302,7 +302,7 @@
           <h1 class="section-title account-title" id="accountTitle" data-i18n-key="accountTitle">マイページ</h1>
         </div>
         <div class="account-titlebar__actions">
-          <a href="../studio/" data-i18n-key="accountNewProject">新規作成</a>
+          <a href="../help/index.html#bridge">Bridge概要</a>
           <a href="../market/">マーケット</a>
         </div>
       </section>
@@ -318,7 +318,7 @@
             <div>
               <p class="account-eyebrow">REVENUE ANALYTICS</p>
               <h2 class="section-title" id="accountRewardDashboardTitle" data-i18n-key="accountRevenueTitle">売上・報酬の推移</h2>
-              <p class="helper" data-i18n-key="accountRevenueHelper">表示は2点を作品系列で、PiXFiNDの有効プレイは3点を作者へ加算し、月次報酬予算をポイント比で配分します。</p>
+              <p class="helper" data-i18n-key="accountRevenueHelper">作品系列の表示や販売など、対象となる活動を集計して月次報酬予算をポイント比で配分します。</p>
             </div>
             <label class="account-chart-period"><span data-i18n-key="accountPeriodLabel">表示期間</span>
               <select id="accountRewardPeriod">
@@ -416,15 +416,15 @@
               <div class="profile-block profile-block--login" id="pixieedSharedAuthLoginBlock">
                 <div class="account-login-visual" aria-labelledby="accountLoginVisualTitle">
                   <div class="account-login-visual__copy">
-                    <p class="account-eyebrow">PiXiEEDstudio</p>
-                    <h2 id="accountLoginVisualTitle" data-i18n-key="accountLoginContinue">描く時間を、そのまま続ける。</h2>
-                    <p data-i18n-key="accountLoginLead">ログインすると、作品・購入した素材・共有プロジェクトへすぐ戻れます。</p>
+                    <p class="account-eyebrow">PiXiEED Bridge</p>
+                    <h2 id="accountLoginVisualTitle">制作アプリをつなぐ準備を進めています。</h2>
+                    <p>ログインすると、プロフィール、購入した素材、今後のBridgeプロジェクトへ戻れます。</p>
                   </div>
                   <figure class="account-login-visual__workspace">
-                    <div class="account-login-visual__workspace-preview" role="img" aria-label="PiXiEEDstudioのキャンバス、パレット、タイムライン"><div class="account-login-visual__toolbar"><span>STUDIO</span><b>iDRAW</b><b>iAUDIO</b><b>iGAME</b></div><div class="account-login-visual__canvas"><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="account-login-visual__timeline"><b></b><b></b><b></b><b></b><b></b></div></div>
-                    <figcaption><span>iDRAW</span><span>ANIMATION</span><span>PALETTE</span></figcaption>
+                    <div class="account-login-visual__workspace-preview" role="img" aria-label="PiXiEED Bridgeの接続、プロトコル、Connectorを表すプレビュー"><div class="account-login-visual__toolbar"><span>BRIDGE</span><b>PROTOCOL</b><b>CONNECTOR</b><b>SYNC</b></div><div class="account-login-visual__canvas"><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="account-login-visual__timeline"><b></b><b></b><b></b><b></b><b></b></div></div>
+                    <figcaption><span>ASEPRITE</span><span>UNITY</span><span>REALTIME</span></figcaption>
                   </figure>
-                  <div class="account-login-visual__footer"><span>Web workspace</span><span>PiXYNC ready</span></div>
+                  <div class="account-login-visual__footer"><span>Native Bridge</span><span>Connector readying</span></div>
                 </div>
                 <div class="account-login-content">
                 <p class="auth-session-check" id="authSessionCheck" role="status" aria-live="polite" data-i18n-key="accountChecking">ログイン状態を確認しています…</p>
@@ -486,11 +486,11 @@
           <section class="account-panel account-collection" id="accountProjects" data-account-tab="library" data-account-collection>
             <div class="account-panel__head">
               <div>
-                <p class="account-eyebrow">iDRAW</p>
+                <p class="account-eyebrow">BRIDGE PROJECTS</p>
                 <h2 class="section-title" data-i18n-key="accountWorks">作品</h2>
               </div>
               <div class="account-panel__actions">
-                <a class="account-text-action" href="../studio/" data-i18n-key="accountNewProject">新規作成</a>
+                <a class="account-text-action" href="../help/index.html#bridge">Bridge概要</a>
                 <span class="account-chip" id="localProjectCount">確認中</span>
                 <button class="account-text-action account-collection-toggle" type="button" data-account-collection-toggle aria-controls="localProjectList" aria-expanded="false" hidden data-i18n-key="accountSeeAll">全て見る</button>
               </div>
@@ -502,7 +502,7 @@
                 </div>
                 <div class="account-item__body">
                   <strong data-i18n-key="accountEmptyWorks">作品がありません</strong>
-                  <span data-i18n-key="accountLocalWorks">iDRAWの端末内保存がここに出ます。</span>
+                  <span>Bridge接続プロジェクトの一覧は準備中です。</span>
                 </div>
                 <span class="account-chip">0件</span>
               </div>
@@ -565,30 +565,6 @@
             </div>
             <p class="account-share-status" id="marketListingShareStatus" role="status" aria-live="polite"></p>
           </section>
-          <section class="account-panel account-collection" id="accountPixfind" data-account-tab="library" data-account-collection>
-            <div class="account-panel__head">
-              <div>
-                <p class="account-eyebrow">PIXfind</p>
-                <h2 class="section-title" data-i18n-key="accountPosts">投稿したもの</h2>
-              </div>
-              <div class="account-panel__actions">
-                <a class="account-text-action" href="../pixfind/index.html#creator" data-i18n-key="accountMake">作る</a>
-                <span class="account-chip" id="pixfindPostCount">確認中</span>
-                <button class="account-text-action account-collection-toggle" type="button" data-account-collection-toggle aria-controls="pixfindPostList" aria-expanded="false" hidden data-i18n-key="accountSeeAll">全て見る</button>
-              </div>
-            </div>
-            <p class="helper">有効プレイ数を記録しています。将来のプレイ報酬はPiXiEEDの売上の一部を原資とし、月次配分の実装後に金額を表示します。</p>
-            <div class="account-pixfind-grid account-collection-grid" id="pixfindPostList" data-account-collection-list aria-label="投稿したPiXFiND" aria-live="polite">
-              <div class="account-item">
-                <div class="account-cover"><img src="../icon/icon-192-2.png" alt=""></div>
-                <div class="account-item__body">
-                  <strong>投稿を確認しています</strong>
-                  <span>投稿したPiXFiNDを読み込んでいます。</span>
-                </div>
-                <span class="account-chip">...</span>
-              </div>
-            </div>
-          </section>
           <section class="account-panel account-seller-panel" id="accountSeller" data-account-tab="rewards" hidden>
             <div class="account-panel__head">
               <h2 class="section-title" data-i18n-key="accountSeller">販売</h2>
@@ -613,10 +589,8 @@
   <script src="../scripts/account-pageview-rewards.js?v=2026.07.19-lineage-rewards1"></script>
   <script src="../scripts/account-ad-permissions.js?v=2026.07.18-auth-stability1"></script>
   <script src="../scripts/shared-profile-header.js?v=20260825-common-shell15"></script>
-  <script src="../scripts/shared-bottom-nav.js?v=20260825-studio-brand1"></script>
-  <script src="../scripts/account-local-projects.js?v=20260825-studio-labels1"></script>
-  <script src="../scripts/account-pixfind-posts.js?v=20260728-individual-ogp-share1"></script>
-  <script src="../pixiedraw/assets/js/modules/color-codec-utils.js?v=2026.06.30-color-codec-v1"></script>
+  <script src="../scripts/shared-bottom-nav.js?v=20260830-bridge-shell1"></script>
+  <script src="../market/color-codec-utils.js?v=2026.06.30-color-codec-v1"></script>
   <script src="../scripts/market-purchase-delivery.js?v=20260720-pxd2"></script>
   <script src="../scripts/account-market-purchases.js?v=20260825-audio-composition1"></script>
   <script src="../scripts/account-market-listings.js?v=20260726-signed-thumb1"></script>

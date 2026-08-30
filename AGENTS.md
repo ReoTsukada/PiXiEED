@@ -11,39 +11,33 @@
 
 ## Project Map
 
-- `pixiedraw/` is the production PiXiEEDraw app. It uses the single-file `pixiedraw/assets/js/app.js` flow.
-- `PiXiEEDDraw.dev/` is the ignored local split-work area for PiXiEEDraw. Do not treat it as production output.
-- `pixiedraw/_backup/` is an ignored safety backup. Do not commit it.
-- `app-shell/pixieed-capacitor/` is the Capacitor shell for Google Play and App Store builds.
+- The former web tool roots (`pixiedraw/`, `pixiedraw2/`, `pixfind/`, `pixiee-lens/`, `qr/`, `qr-maker/`, `maoitu/`, and `studio/`) were removed during the Bridge cutover.
+- The former corporate/portfolio surface (`portfolio/`) and its portfolio-only gallery builders/admin guide were removed; `/contact/` remains only as a PiXiEED Bridge support page.
+- The retired top-level `scripts.js` and tests that directly required removed tools or Capacitor pages were removed with the cutover.
+- The external PiXiEED Bridge MVP is intentionally outside this repository at `Documents/Codex/2026-08-30/referenced-chatgpt-conversation-this-is-an/outputs/pixieed-bridge/`; preserve it and treat its own `AGENTS.md` as authoritative for Bridge implementation.
+- `docs/bridge-migration/pixisync-reuse-notes.md` is the handoff note for PiXYNC/PiXiSYNC concepts that may be reused by the Bridge protocol.
+- `pixiedraw/_backup/` and ignored `PiXiEEDrawDEV/` content are protected safety remnants; do not remove or commit them without a separate, exact approval.
+- Tracked Capacitor source under `app-shell/pixieed-capacitor/` was removed as part of the cutover. Any remaining ignored native/build/signing files are not Bridge source and require separate cleanup approval.
 - `supabase/` contains migrations, functions, and local Supabase configuration.
-- `docs/project-file-map.md` has the broader file map when the target area is unclear.
+- `docs/project-file-map.md` is a historical map; verify each path before using it.
 
 ## Local Server
 
 - Use `node scripts/static-server.mjs` from the repo root for local viewing.
 - The usual URL is `http://localhost:8000/`.
-- PiXiEEDraw is usually checked at `http://localhost:8000/pixiedraw/`.
-- PiXiEEDDraw split work is usually checked at `http://localhost:8000/PiXiEEDDraw.dev/`.
+- Remaining public pages include the site shell, community, Market, account, help, notes, and other content pages; removed tool URLs must not be reintroduced as active routes.
 - If sandboxed localhost checks fail, do not assume the server is down. See `docs/codex-workflow-notes.md`.
 
 ## Verification
 
 - For JavaScript edits, run the most specific `node --check` command available for the edited file.
 - Before finishing code edits, run `git diff --check`.
-- For PiXiEEDraw production changes, normally run:
-  - `node --check pixiedraw/assets/js/app.js`
-  - `git diff --check -- pixiedraw/index.html pixiedraw/assets/css/style.css pixiedraw/assets/js/app.js`
-- For PiXiEEDDraw.dev split-work changes, normally run:
-  - `node --check PiXiEEDDraw.dev/assets/js/app.js`
-  - `node scripts/check-pixiedraw-dev-tdz.mjs`
-- For Capacitor work, use `app-shell/pixieed-capacitor` as the working directory and prefer the scripts in its `package.json`.
+- For Bridge implementation, use the external Bridge output directory and follow its own `AGENTS.md`, protocol checks, and MVP test instructions.
+- For this repository's cutover work, syntax-check only the remaining changed scripts, run `git diff --check`, and distinguish static route/reference checks from a full Bridge runtime acceptance test.
 
 ## App Shell Notes
 
-- Stage web assets with `npm run build:web` from `app-shell/pixieed-capacitor`.
-- Use `npm run cap:sync` after web changes that need to be reflected in native projects.
-- Android release output is under `app-shell/pixieed-capacitor/android/app/build/outputs/`.
-- iOS archive/export output is under `app-shell/pixieed-capacitor/ios/build/`.
+- The former Capacitor build shell is outside the active Bridge repository scope. Do not recreate or stage it from ignored output during cleanup.
 - Do not commit local signing files, keystores, Apple account data, or generated secrets.
 
 ## Git Hooks
@@ -59,5 +53,6 @@
 - Never infer safe deletion from a single text search.
 - Do not delete `UNKNOWN` candidates.
 - Use a dedicated branch/worktree and small deletion batches.
-- Run build, tests, route smoke checks, Market baseline checks, and PiXiSYNC baseline checks.
+- Preserve the external Bridge output and the PiXYNC/PiXiSYNC reuse note while deleting old tool implementation.
+- For this cutover, record build/test checks that are no longer runnable because their source was intentionally removed as `UNTESTED`; run remaining static/syntax checks and Market compatibility checks where applicable.
 - Production Storage, database rows, purchased files, and PiXiSYNC data are outside this cleanup scope.

@@ -36,9 +36,9 @@
         <div class="social-home__empty-mark" aria-hidden="true"><span></span><span></span><span></span></div>
         <p class="social-home__empty-eyebrow">EXPLORE / COMMUNITY</p>
         <h2 id="socialFeedEmptyTitle" data-i18n-key="communityEmptyTitle">作品を見つける場所を、ここから。</h2>
-        <p class="social-home__empty-copy" data-i18n-key="communityEmptyCopy">PiXiEEDで生まれたドット絵、音、ゲームがここに集まります。まずはStudioで作品を作るか、マーケットから素材を探せます。</p>
+        <p class="social-home__empty-copy" data-i18n-key="communityEmptyCopy">PiXiEEDで共有された作品を見つけられます。外部制作アプリとの接続は PiXiEED Bridge で順次対応します。</p>
         <div class="social-home__empty-actions">
-          <a class="social-home__empty-action social-home__empty-action--primary" href="../studio/" data-i18n-key="communityEmptyStudio">PiXiEEDstudioで作る</a>
+          <a class="social-home__empty-action social-home__empty-action--primary" href="../help/index.html#bridge">Bridgeの準備状況</a>
           <a class="social-home__empty-action" href="../market/" data-i18n-key="communityEmptyMarket">マーケットを見る</a>
         </div>
       </section>
@@ -83,12 +83,10 @@
   <footer>
     <p>© <span id="year">2026</span> PiXiEED. All rights reserved.</p>
     <div class="footer-links">
-      <a href="../studio/">PiXiEEDstudio</a>
       <a href="./">コミュニティ</a>
       <a href="../market/">マーケット</a>
       <a href="../account/index.html">マイページ</a>
-      <a href="../pixiee-lens/index.html">PiXiEELENS</a>
-      <a href="../pixfind/index.html">PiXFiND</a>
+      <a href="../help/index.html#bridge">PiXiEED Bridge</a>
       <a href="../glossary/">用語集</a>
       <a href="../terms/">利用規約</a>
       <a href="../privacy/">プライバシーポリシー</a>
@@ -99,9 +97,8 @@
   <nav class="bottom-nav" aria-label="下部ナビ">
     <a class="bottom-nav__item" data-tab="home" href="../index.html"><span class="icon"><img src="../assets/icons/HOME.png?v=2026.07.19-ui-icons1" alt=""></span><span>ホーム</span></a>
     <a class="bottom-nav__item" data-tab="market" href="../market/"><span class="icon"><img src="../assets/icons/Market.png" alt=""></span><span>マーケット</span></a>
-    <a class="bottom-nav__item bottom-nav__item--primary" data-tab="draw" href="../studio/"><span class="icon"><img src="../assets/icons/Draw.png?v=2026.07.19-ui-icons1" alt=""></span><span>PiXiEEDstudio</span></a>
-    <a class="bottom-nav__item" data-tab="camera" href="../pixiee-lens/index.html"><span class="icon"><img src="../assets/icons/Camera.png" alt=""></span><span>カメラ</span></a>
-    <a class="bottom-nav__item" data-tab="account" href="../account/index.html"><span class="icon"><img src="../pixiedraw/assets/icons/ecticon_frame_01.png" alt=""></span><span>マイページ</span></a>
+    <a class="bottom-nav__item" data-tab="help" href="../help/index.html"><span class="icon"><img src="../assets/icons/help.png" alt=""></span><span>ヘルプ</span></a>
+    <a class="bottom-nav__item" data-tab="account" href="../account/index.html"><span class="icon"><img src="../icon/icon-192-4.png" alt=""></span><span>マイページ</span></a>
   </nav>
 
   <script src="../scripts/ad-account-control.js?v=20260719-no-ad-fallback1"></script>
@@ -110,7 +107,7 @@
   <script src="../scripts/home-social-feed.js?v=20260825-social-empty-state1"></script>
   <script src="../scripts/ads-lazy.js?v=20260719-no-ad-fallback1"></script>
   <script src="../scripts/shared-profile-header.js?v=20260825-common-shell15"></script>
-  <script src="../scripts/shared-bottom-nav.js?v=20260825-studio-brand1"></script>
+  <script src="../scripts/shared-bottom-nav.js?v=20260830-bridge-shell1"></script>
   <script src="../scripts/pixel-art-fit.js"></script>
   <script>const year = document.getElementById('year'); if (year) year.textContent = new Date().getFullYear();</script>
 </body>

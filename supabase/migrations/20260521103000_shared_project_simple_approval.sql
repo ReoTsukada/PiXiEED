@@ -1,2 +1,0 @@
--- Historical migration version retained because it was already applied remotely.
--- Shared-project approval is disabled by 20260521130000_disable_shared_project_approval.sql.

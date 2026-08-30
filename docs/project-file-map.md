@@ -1,8 +1,8 @@
 # PiXiEED file map
 
-This document summarizes the current repository layout and separates production-facing files from development-only work areas.
+This document is a historical pre-Bridge repository map. The 2026-08-30 Bridge cutover removed the former editor/tool and portfolio roots; use `AGENTS.md` and `docs/inventory/current-public-routes.md` for the current boundary.
 
-## Current PiXiEEDDraw split policy
+## Historical PiXiEEDraw split policy
 
 | Path | Role | Notes |
 | --- | --- | --- |
@@ -10,7 +10,7 @@ This document summarizes the current repository layout and separates production-
 | `PiXiEEDDraw.dev/` | PiXiEEDDraw file-split work area | Development-only copy that keeps the in-progress split modules and split `app.js`. Ignored by Git. |
 | `pixiedraw/_backup/` | Safety backup | Local backup of the split work snapshot. Ignored by Git. |
 
-## Main site areas
+## Historical main site areas
 
 | Path | Role |
 | --- | --- |
@@ -23,7 +23,7 @@ This document summarizes the current repository layout and separates production-
 | `docs/` | Repository notes and structure documentation. |
 | `site/` | Site-specific support files. |
 
-## Products and feature pages
+## Historical products and feature pages
 
 | Path | Role |
 | --- | --- |
@@ -49,7 +49,7 @@ This document summarizes the current repository layout and separates production-
 | `downloads/` | Download-related files/pages. |
 | `glossary/` | Glossary content. |
 
-## App and backend support
+## Historical app and backend support
 
 | Path | Role |
 | --- | --- |

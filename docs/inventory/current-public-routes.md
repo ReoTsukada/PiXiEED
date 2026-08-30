@@ -1,4 +1,20 @@
-# Current public routes — WP-000
+# Current public routes — Bridge cutover update (2026-08-30)
+
+今回のPiXiEED Bridge切替で、旧制作ツール、旧プロジェクト一覧、Portfolio、企業向けギャラリー導線は公開対象から除外しました。現在の公開入口はホーム、Bridgeサポート、コミュニティ、Market、アカウント、情報・規約ページです。以下の旧WP-000表は監査証跡として保持しています。
+
+## Current Bridge-era routes
+
+| Area | Routes |
+| --- | --- |
+| Bridge/site | `/`, `/help/`, `/contact/`, `/community/`, `/notes/`, `/glossary/`, `/events/`, `/notice/` |
+| Account | `/account/`, `/account/admin.html`, `/account-deletion/` |
+| Market | `/market/`, `/market/about.html`, `/market/help.html`, `/market/item.html`, `/market/review.html`, `/market/sell.html`, `/market/seller.html`, four `/market/items/<uuid>/` pages |
+| Policy | `/privacy/`, `/terms/`, `/legal/` |
+| Public verification files | `/google10107469bdcc60fa.html`, `/google92ae386aca6917c9.html`, `/googlee776c49d223e1a38.html` |
+
+旧ツールURL（`/pixiedraw/`、`/pixiedraw2/`、`/pixfind/`、`/pixiee-lens/`、`/qr/`、`/qr-maker/`、`/maoitu/`、`/studio/`）、旧Projects/Portfolio URLは、今回の変更でアクティブな公開ルートではありません。
+
+# Historical WP-000 inventory
 
 調査日: 2026-08-06
 

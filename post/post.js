@@ -69,11 +69,8 @@
       return;
     }
     if (post.post_kind === 'pixfind') {
-      distributionLabel.textContent = 'PiXFiNDで遊べる作品';
-      distributionNote.textContent = 'この作品を使った間違い探し・もの探しを遊べます。';
-      primaryAction.textContent = 'PiXFiNDで遊ぶ';
-      primaryAction.href = `/pixfind/index.html?puzzle=${encodeURIComponent(post.pixfind_puzzle_id)}`;
-      primaryAction.hidden = false;
+      distributionLabel.textContent = '旧ゲーム投稿（閲覧のみ）';
+      distributionNote.textContent = '旧形式の投稿データです。現在は作品画像と説明のみ表示します。';
       return;
     }
     if (post.distribution_mode === 'free') {

@@ -14,14 +14,19 @@
   }
 
   function navIcon(symbolId) {
-    const sprite = rootAsset('pixiedraw2/assets/icons/draw2-icons.svg');
-    return `<svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="${sprite}#icon-${symbolId}"></use></svg>`;
+    const iconPaths = {
+      view: 'assets/icons/HOME.png',
+      community: 'assets/icons/HOME.png',
+      folder: 'assets/icons/Market.png',
+      inspector: 'icon/icon-192-4.png',
+      help: 'assets/icons/help.png',
+    };
+    const iconPath = iconPaths[symbolId] || iconPaths.view;
+    return `<img src="${rootAsset(iconPath)}" alt="" aria-hidden="true">`;
   }
 
   function isStandalonePage() {
-    const path = String(window.location.pathname || '').toLowerCase();
-    if (path.includes('/projects/')) return false;
-    return /(?:^|\/)(?:pixiedraw|pixiedraw2|pixiee-lens|pixfind|qr|qr-maker|maoitu)(?:\/|\/index\.html)?$/.test(path);
+    return false;
   }
 
   function currentSection() {
@@ -29,11 +34,7 @@
     if (path.includes('/community/') || path.includes('/post/')) return 'community';
     if (path.includes('/market/')) return 'market';
     if (path.includes('/account/')) return 'account';
-    if (path.includes('/studio/')) return 'studio';
-    if (path.includes('/qr/') || path.includes('/qr-maker/')) return 'qr';
-    if (path.includes('/pixiee-lens/')) return 'lens';
-    if (path.includes('/pixfind/')) return 'pixfind';
-    if (path.includes('/maoitu/')) return 'maoitu';
+    if (path.includes('/help/')) return 'help';
     if (path === '/' || path.endsWith('/index.html')) return 'home';
     return '';
   }
@@ -69,32 +70,23 @@
     header.innerHTML = `
       <div class="pixieed-site-header__inner">
         <div class="pixieed-site-header__brand-row">
-          <a class="pixieed-site-header__brand" href="${rootAsset('index.html')}" aria-label="PiXiEEDstudio ホーム">
-            <span class="pixieed-site-header__brand-mark"><img src="${rootAsset('pixiedraw2/assets/brand/pixieed-logo-48.png')}" alt="PiXiEEDstudio"></span>
-            <span class="pixieed-site-header__brand-copy"><strong>PiXiEEDstudio</strong><small>CREATIVE WORKSPACE</small></span>
+          <a class="pixieed-site-header__brand" href="${rootAsset('index.html')}" aria-label="PiXiEED Bridge ホーム">
+            <span class="pixieed-site-header__brand-mark"><img src="${rootAsset('icon/icon-192-4.png')}" alt="PiXiEED Bridge"></span>
+            <span class="pixieed-site-header__brand-copy"><strong>PiXiEED Bridge</strong><small>REALTIME CONNECTION</small></span>
           </a>
           <button class="pixieed-site-header__collapse" type="button" data-pixieed-shell-toggle aria-label="メニューを折りたたむ" aria-expanded="true">‹</button>
         </div>
         <nav class="pixieed-site-header__nav" aria-label="主要ページ">
           <a href="${rootAsset('index.html')}" data-section="home"><span class="pixieed-site-header__nav-icon">${navIcon('view')}</span><span data-i18n-key="home">ホーム</span></a>
-          <a href="${rootAsset('studio/')}" data-section="studio"><span class="pixieed-site-header__nav-icon">${navIcon('pen')}</span><span>PiXiEEDstudio</span></a>
-          <a href="${rootAsset('community/')}" data-section="community"><span class="pixieed-site-header__nav-icon">${navIcon('star')}</span><span data-i18n-key="community">コミュニティ</span></a>
+          <a href="${rootAsset('help/index.html#bridge')}" data-section="help"><span class="pixieed-site-header__nav-icon">${navIcon('help')}</span><span>Bridge</span></a>
+          <a href="${rootAsset('community/')}" data-section="community"><span class="pixieed-site-header__nav-icon">${navIcon('community')}</span><span data-i18n-key="community">コミュニティ</span></a>
           <a href="${rootAsset('market/')}" data-section="market"><span class="pixieed-site-header__nav-icon">${navIcon('folder')}</span><span data-i18n-key="market">マーケット</span></a>
           <a href="${rootAsset('account/index.html')}" data-section="account"><span class="pixieed-site-header__nav-icon">${navIcon('inspector')}</span><span data-i18n-key="account">マイページ</span></a>
-          <details class="pixieed-site-header__tool-group">
-            <summary><span class="pixieed-site-header__nav-icon">${navIcon('tools')}</span><span data-i18n-key="tools">ツール</span></summary>
-            <div class="pixieed-site-header__tool-links">
-              <a href="${rootAsset('qr/')}" data-tool-section="qr"><span data-i18n-key="toolQrNav">QR</span></a>
-              <a href="${rootAsset('pixiee-lens/')}" data-tool-section="lens"><span data-i18n-key="toolLensNav">PiXiEELENS</span></a>
-              <a href="${rootAsset('pixfind/')}" data-tool-section="pixfind"><span data-i18n-key="toolPixfindNav">PiXFiND</span></a>
-              <a href="${rootAsset('maoitu/')}" data-tool-section="maoitu"><span data-i18n-key="toolMaoituNav">まおいつ</span></a>
-            </div>
-          </details>
         </nav>
         <div class="pixieed-site-header__actions">
           <button class="pixieed-site-header__language" type="button" data-pixieed-locale-toggle aria-label="表示言語: 日本語">English</button>
           <a href="${rootAsset('account/index.html')}" data-auth-entry data-i18n-key="login">ログイン</a>
-          <a class="pixieed-site-header__primary" href="${rootAsset('studio/')}" data-i18n-key="create">今すぐ作る</a>
+          <a class="pixieed-site-header__primary" href="${rootAsset('help/index.html#bridge')}">Bridge概要</a>
         </div>
       </div>`;
 

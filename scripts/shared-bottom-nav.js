@@ -13,41 +13,23 @@
   const currentPath = String(pageUrl.pathname || '').toLowerCase();
   const currentTab = resolveCurrentTab(currentPath);
   let lastPixiedrawMobileChromeActive = null;
-  let toolsToggle = null;
-  let toolsLayer = null;
-  let toolsCloseButton = null;
-  let toolsReturnFocus = null;
 
   const chromeMessages = Object.freeze({
     ja: Object.freeze({
       bottomNavAria: '下部ナビ',
       navHome: 'ホーム',
       navMarket: 'マーケット',
-      navDraw: 'PiXiEEDstudio',
-      navTools: 'ツール',
+      navCommunity: 'コミュニティ',
+      navHelp: 'ヘルプ',
       navAccount: 'マイページ',
-      toolsEyebrow: 'PIXIEED TOOLS',
-      toolsTitle: 'ツール',
-      toolsClose: 'ツールを閉じる',
-      toolDrawDescription: '制作をはじめる',
-      toolLensDescription: '写真をドット絵にする',
-      toolQrDescription: 'QRコードを作る',
-      toolPixfindDescription: '作る・遊ぶ',
-      toolMaoituDescription: 'ドット絵ゲーム',
-      footerDraw: 'PiXiEEDstudio',
       footerCommunity: 'コミュニティ',
       footerMarket: 'マーケット',
       footerAccount: 'マイページ',
-      footerLens: 'PiXiEELENS',
-      footerPixfind: 'PiXFiND',
-      footerQr: 'QR',
-      footerMaoitu: 'まおいつ',
       footerHelp: 'ヘルプ',
       footerContact: 'お問い合わせ',
       footerEvents: 'イベント',
       footerNotice: 'お知らせ',
       footerNotes: '開発ノート',
-      footerPortfolio: '企業向け',
       footerProjects: 'プロジェクト一覧',
       footerGlossary: '用語集',
       footerTerms: '利用規約',
@@ -58,31 +40,17 @@
       bottomNavAria: 'Bottom navigation',
       navHome: 'Home',
       navMarket: 'Market',
-      navDraw: 'PiXiEEDstudio',
-      navTools: 'Tools',
+      navCommunity: 'Community',
+      navHelp: 'Help',
       navAccount: 'Profile',
-      toolsEyebrow: 'PIXIEED TOOLS',
-      toolsTitle: 'Tools',
-      toolsClose: 'Close tools',
-      toolDrawDescription: 'Start creating',
-      toolLensDescription: 'Turn photos into pixel art',
-      toolQrDescription: 'Create a QR code',
-      toolPixfindDescription: 'Create and play',
-      toolMaoituDescription: 'Pixel art game',
-      footerDraw: 'PiXiEEDstudio',
       footerCommunity: 'Community',
       footerMarket: 'Market',
       footerAccount: 'Profile',
-      footerLens: 'PiXiEELENS',
-      footerPixfind: 'PiXFiND',
-      footerQr: 'QR',
-      footerMaoitu: 'Maoitu',
       footerHelp: 'Help',
       footerContact: 'Contact',
       footerEvents: 'Events',
       footerNotice: 'News',
       footerNotes: 'Development notes',
-      footerPortfolio: 'For business',
       footerProjects: 'Projects',
       footerGlossary: 'Glossary',
       footerTerms: 'Terms of service',
@@ -104,23 +72,8 @@
     });
     const nav = doc.querySelector('.bottom-nav');
     if (nav) nav.setAttribute('aria-label', copy.bottomNavAria);
-    const closeButton = doc.querySelector('.pixieed-tools-panel__close');
-    if (closeButton) closeButton.setAttribute('aria-label', copy.toolsClose);
   }
 
-  if (!currentPath.includes('/projects/') && /(?:^|\/)(?:pixiedraw|pixiedraw2|pixieedrawdev)(?:\/|\/index\.html)?$/.test(currentPath)) {
-    body.dataset.pixieedPage = 'pixiedraw';
-    doc.documentElement.dataset.pixieedPage = 'pixiedraw';
-  } else if (!currentPath.includes('/projects/') && /(?:^|\/)pixiee-lens(?:\/|\/index\.html)?$/.test(currentPath)) {
-    body.dataset.pixieedPage = 'pixiee-lens';
-    doc.documentElement.dataset.pixieedPage = 'pixiee-lens';
-  } else if (!currentPath.includes('/projects/') && /(?:^|\/)maoitu(?:\/|\/index\.html)?$/.test(currentPath)) {
-    body.dataset.pixieedPage = 'maoitu';
-    doc.documentElement.dataset.pixieedPage = 'maoitu';
-  } else if (!currentPath.includes('/projects/') && /(?:^|\/)pixfind(?:\/|\/index\.html)?$/.test(currentPath)) {
-    body.dataset.pixieedPage = 'pixfind';
-    doc.documentElement.dataset.pixieedPage = 'pixfind';
-  }
   if (!isStandaloneToolOrGamePage()) {
     body.classList.add('pixieed-seamless-page');
   }
@@ -132,17 +85,14 @@
   refreshLocalizedChrome();
   window.addEventListener('pixieed:locale-changed', refreshLocalizedChrome);
   ensureAdAccountControl(() => {
-    ensureCommonTabBarController();
     if (script.dataset.pixieedFooterAd !== 'false') ensureFooterAdController();
   });
 
   function resolveCurrentTab(pathname) {
     const path = String(pathname || '').toLowerCase();
-    if (path.includes('/studio/')) return 'draw';
-    if (path.includes('/pixiedraw/') || path.includes('/pixiedraw2/') || path.includes('/pixieedrawdev/')) return 'draw';
+    if (path.includes('/community/')) return 'community';
     if (path.includes('/market/')) return 'market';
-    if (path.includes('/qr/') || path.includes('/qr-maker/')) return 'tools';
-    if (path.includes('/pixiee-lens/') || path.includes('/pixfind/') || path.includes('/maoitu/')) return 'tools';
+    if (path.includes('/help/')) return 'help';
     if (/(?:^|\/)account(?:\/|\/index\.html)?$/.test(path)) return 'account';
     return 'home';
   }
@@ -215,14 +165,11 @@
   }
 
   function isPixiedrawPage() {
-    return !currentPath.includes('/projects/') && /(?:^|\/)(?:pixiedraw|pixiedraw2|pixieedrawdev)(?:\/|\/index\.html)?$/.test(currentPath);
+    return false;
   }
 
   function isStandaloneToolOrGamePage() {
-    if (currentPath.includes('/projects/')) {
-      return false;
-    }
-    return /(?:^|\/)(?:pixiedraw|pixiedraw2|pixieedrawdev|pixiee-lens|qr|qr-maker|maoitu|pixfind)(?:\/|\/index\.html)?$/.test(currentPath);
+    return false;
   }
 
   function applyResponsivePageState() {
@@ -255,15 +202,6 @@
         || node.classList.contains('modal__footer')
         || Boolean(node.closest('dialog'));
     };
-    if (isPixiedrawPage() || (!currentPath.includes('/projects/') && /(?:^|\/)pixiee-lens(?:\/|\/index\.html)?$/.test(currentPath))) {
-      doc.querySelectorAll('footer').forEach((node) => {
-        if (shouldPreserveFooter(node)) {
-          return;
-        }
-        node.remove();
-      });
-      return;
-    }
     doc.querySelectorAll('footer').forEach((node) => {
       if (shouldPreserveFooter(node)) {
         return;
@@ -316,18 +254,11 @@
     nav.setAttribute('aria-label', getChromeCopy().bottomNavAria);
 
     getNavItems().forEach((entry) => {
-      const item = doc.createElement(entry.disabled ? 'span' : entry.action ? 'button' : 'a');
+      const item = doc.createElement(entry.disabled ? 'span' : 'a');
       item.className = `bottom-nav__item${entry.primary ? ' bottom-nav__item--primary' : ''}${entry.key === currentTab ? ' is-active' : ''}`;
       item.dataset.tab = entry.key;
       if (entry.disabled) {
         item.setAttribute('aria-disabled', 'true');
-      } else if (entry.action === 'tools') {
-        item.type = 'button';
-        item.setAttribute('aria-haspopup', 'dialog');
-        item.setAttribute('aria-expanded', 'false');
-        item.setAttribute('aria-controls', 'pixieedToolsPanel');
-        item.addEventListener('click', () => setToolsPanelOpen(toolsLayer?.hidden !== false));
-        toolsToggle = item;
       } else {
         item.href = relHref(entry.path);
       }
@@ -348,123 +279,18 @@
     });
 
     body.appendChild(nav);
-    ensureToolsPanel();
-  }
-
-  function ensureToolsPanel() {
-    doc.querySelectorAll('.pixieed-tools-layer').forEach((node) => node.remove());
-
-    const layer = doc.createElement('div');
-    layer.className = 'pixieed-tools-layer';
-    layer.hidden = true;
-
-    const panel = doc.createElement('section');
-    panel.className = 'pixieed-tools-panel';
-    panel.id = 'pixieedToolsPanel';
-    panel.setAttribute('role', 'dialog');
-    panel.setAttribute('aria-modal', 'true');
-    panel.setAttribute('aria-labelledby', 'pixieedToolsTitle');
-
-    const header = doc.createElement('header');
-    header.className = 'pixieed-tools-panel__header';
-    const heading = doc.createElement('div');
-    const eyebrow = doc.createElement('small');
-    eyebrow.dataset.pixieedChromeKey = 'toolsEyebrow';
-    eyebrow.textContent = 'PIXIEED TOOLS';
-    const title = doc.createElement('h2');
-    title.id = 'pixieedToolsTitle';
-    title.dataset.pixieedChromeKey = 'toolsTitle';
-    title.textContent = 'ツール';
-    heading.append(eyebrow, title);
-
-    const close = doc.createElement('button');
-    close.className = 'pixieed-tools-panel__close';
-    close.type = 'button';
-    close.setAttribute('aria-label', getChromeCopy().toolsClose);
-    close.textContent = '×';
-    close.addEventListener('click', () => setToolsPanelOpen(false));
-    toolsCloseButton = close;
-    header.append(heading, close);
-
-    const grid = doc.createElement('div');
-    grid.className = 'pixieed-tools-grid';
-    getToolItems().forEach((entry) => {
-      const link = doc.createElement('a');
-      link.className = 'pixieed-tools-card';
-      link.href = relHref(entry.path);
-
-      const icon = doc.createElement('span');
-      icon.className = 'pixieed-tools-card__icon';
-      const image = doc.createElement('img');
-      image.src = relHref(entry.icon);
-      image.alt = '';
-      icon.appendChild(image);
-
-      const copy = doc.createElement('span');
-      copy.className = 'pixieed-tools-card__copy';
-      const name = doc.createElement('strong');
-      name.dataset.pixieedChromeKey = entry.labelKey || '';
-      name.textContent = entry.label;
-      const description = doc.createElement('small');
-      description.dataset.pixieedChromeKey = entry.descriptionKey || '';
-      description.textContent = entry.description;
-      copy.append(name, description);
-
-      link.append(icon, copy);
-      grid.appendChild(link);
-    });
-
-    panel.append(header, grid);
-    layer.appendChild(panel);
-    layer.addEventListener('click', (event) => {
-      if (event.target === layer) setToolsPanelOpen(false);
-    });
-    body.appendChild(layer);
-    toolsLayer = layer;
-  }
-
-  function setToolsPanelOpen(open) {
-    if (!toolsLayer || !toolsToggle) return;
-    const shouldOpen = Boolean(open);
-    if (shouldOpen) toolsReturnFocus = doc.activeElement;
-    toolsLayer.hidden = !shouldOpen;
-    toolsToggle.setAttribute('aria-expanded', String(shouldOpen));
-    body.classList.toggle('is-pixieed-tools-open', shouldOpen);
-    if (shouldOpen) {
-      requestAnimationFrame(() => toolsCloseButton?.focus());
-    } else if (toolsReturnFocus instanceof HTMLElement) {
-      toolsReturnFocus.focus();
-      toolsReturnFocus = null;
-    }
-  }
-
-  function getToolItems() {
-    return [
-      { label: 'PiXiEEDstudio', labelKey: 'navDraw', description: '制作をはじめる', descriptionKey: 'toolDrawDescription', path: 'studio/index.html', icon: 'assets/icons/Draw.png?v=2026.07.19-ui-icons1' },
-      { label: 'PiXiEELENS', labelKey: 'footerLens', description: '写真をドット絵にする', descriptionKey: 'toolLensDescription', path: 'pixiee-lens/index.html', icon: 'assets/icons/Camera.png' },
-      { label: 'QR', labelKey: 'footerQr', description: 'QRコードを作る', descriptionKey: 'toolQrDescription', path: 'qr/index.html', icon: 'assets/icons/QR.png' },
-      { label: 'PiXFiND', labelKey: 'footerPixfind', description: '作る・遊ぶ', descriptionKey: 'toolPixfindDescription', path: 'pixfind/index.html', icon: 'icon/icon-192-2.png' },
-      { label: 'まおいつ', labelKey: 'footerMaoitu', description: 'ドット絵ゲーム', descriptionKey: 'toolMaoituDescription', path: 'maoitu/index.html', icon: 'icon/icon-192-3.png' }
-    ];
   }
 
   function getFooterLinks() {
     return [
-      { label: 'PiXiEEDstudio', labelKey: 'footerDraw', path: 'studio/index.html' },
       { label: 'コミュニティ', labelKey: 'footerCommunity', path: 'community/' },
       { label: 'マーケット', labelKey: 'footerMarket', path: 'market/' },
       { label: 'マイページ', labelKey: 'footerAccount', path: 'account/index.html' },
-      { label: 'PiXiEELENS', labelKey: 'footerLens', path: 'pixiee-lens/index.html' },
-      { label: 'PiXFiND', labelKey: 'footerPixfind', path: 'pixfind/index.html' },
-      { label: 'QR', labelKey: 'footerQr', path: 'qr/index.html' },
-      { label: 'まおいつ', labelKey: 'footerMaoitu', path: 'maoitu/index.html' },
       { label: 'ヘルプ', labelKey: 'footerHelp', path: 'help/index.html' },
       { label: 'お問い合わせ', labelKey: 'footerContact', path: 'contact/index.html' },
       { label: 'イベント', labelKey: 'footerEvents', path: 'events/index.html' },
       { label: 'お知らせ', labelKey: 'footerNotice', path: 'notice/index.html' },
       { label: '開発ノート', labelKey: 'footerNotes', path: 'notes/index.html' },
-      { label: '企業向け', labelKey: 'footerPortfolio', path: 'portfolio/index.html' },
-      { label: 'プロジェクト一覧', labelKey: 'footerProjects', path: 'projects/index.html' },
       { label: '用語集', labelKey: 'footerGlossary', path: 'glossary/index.html' },
       { label: '利用規約', labelKey: 'footerTerms', path: 'terms/index.html' },
       { label: 'プライバシーポリシー', labelKey: 'footerPrivacy', path: 'privacy/index.html' },
@@ -475,10 +301,10 @@
   function getNavItems() {
     return [
       { key: 'home', label: 'ホーム', labelKey: 'navHome', path: 'index.html', icon: 'assets/icons/HOME.png?v=2026.07.19-ui-icons1' },
+      { key: 'community', label: 'コミュニティ', labelKey: 'navCommunity', path: 'community/', icon: 'assets/icons/HOME.png?v=2026.07.19-ui-icons1' },
       { key: 'market', label: 'マーケット', labelKey: 'navMarket', path: 'market/', icon: 'assets/icons/Market.png' },
-      { key: 'draw', label: 'PiXiEEDstudio', labelKey: 'navDraw', path: 'studio/index.html', icon: 'assets/icons/Draw.png?v=2026.07.19-ui-icons1', primary: true },
-      { key: 'tools', label: 'ツール', labelKey: 'navTools', action: 'tools', icon: 'pixiedraw/assets/icons/menu-tools.png' },
-      { key: 'account', label: 'マイページ', labelKey: 'navAccount', path: 'account/index.html', icon: 'pixiedraw/assets/icons/ecticon_frame_01.png' }
+      { key: 'help', label: 'ヘルプ', labelKey: 'navHelp', path: 'help/index.html', icon: 'assets/icons/help.png' },
+      { key: 'account', label: 'マイページ', labelKey: 'navAccount', path: 'account/index.html', icon: 'icon/icon-192-4.png' }
     ];
   }
 
@@ -950,13 +776,6 @@
   if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', applyResponsivePageState, { passive: true });
   }
-  doc.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && toolsLayer?.hidden === false) {
-      event.preventDefault();
-      setToolsPanelOpen(false);
-    }
-  });
-
   function toRelativeHref(fromDirUrl, targetUrl) {
     if (fromDirUrl.origin !== targetUrl.origin) return targetUrl.href;
     const fromParts = fromDirUrl.pathname.split('/').filter(Boolean);

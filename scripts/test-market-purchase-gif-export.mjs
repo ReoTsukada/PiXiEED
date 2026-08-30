@@ -43,7 +43,7 @@ globalThis.document = {
   body: { appendChild() {} },
 };
 
-await import('../pixiedraw/assets/js/modules/color-codec-utils.js');
+await import('../market/color-codec-utils.js');
 await import('./market-purchase-delivery.js');
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, Number(value) || 0));

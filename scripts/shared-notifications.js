@@ -12,7 +12,7 @@
   // surface them even before a visitor signs in.
   const UPDATE_NOTICE_STORAGE_KEY = 'pixieed:notifications:last-read-product-update';
   const UPDATE_FEED_PATH = 'data/project-updates.json';
-  const UPDATE_PROJECT_ID = 'pixiedraw';
+  const UPDATE_PROJECT_ID = 'site';
   const script = document.currentScript;
   const rootUrl = new URL('../', script?.src || window.location.href);
   let clientPromise = null;
@@ -152,12 +152,7 @@
     button.textContent = '最新のアップデートがあります';
     button.addEventListener('click', () => {
       markProductUpdateRead();
-      if (/\/pixiedraw(?:\/|$)/.test(window.location.pathname || '')) {
-        document.dispatchEvent(new CustomEvent('pixieed:open-update-history'));
-        close();
-        return;
-      }
-      window.location.href = href('studio/');
+      window.location.href = href('help/index.html#bridge');
     });
     return button;
   }

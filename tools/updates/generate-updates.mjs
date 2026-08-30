@@ -15,27 +15,9 @@ const outputPath = path.join(projectRoot, 'data', 'project-updates.json');
 const PROJECTS = [
   {
     id: 'site',
-    name: 'PiXiEED 全体',
+    name: 'PiXiEED Bridge',
     url: '/index.html',
-    paths: ['index.html', 'notes', 'glossary', 'portfolio', 'projects', 'sitemap.xml', 'robots.txt', 'scripts/dev-notes.js']
-  },
-  {
-    id: 'pixiedraw',
-    name: 'PiXiEEDraw',
-    url: '/projects/pixiedraw/',
-    paths: ['pixiedraw']
-  },
-  {
-    id: 'pixiee-lens',
-    name: 'PiXiEELENS',
-    url: '/projects/pixiee-lens/',
-    paths: ['pixiee-lens']
-  },
-  {
-    id: 'qr-maker',
-    name: 'QRコードメーカー',
-    url: '/projects/qr-maker/',
-    paths: ['qr-maker']
+    paths: ['index.html', 'notes', 'glossary', 'help', 'sitemap.xml', 'robots.txt']
   }
 ];
 
@@ -44,11 +26,7 @@ const MAX_RECENT_DATES = 8;
 
 // Keep release-facing notes precise when a broad refactor would otherwise be
 // reduced to generic file categories by the automatic history summary.
-const ENTRY_SUMMARY_OVERRIDES = Object.freeze({
-  pixiedraw: Object.freeze({
-    '2026-07-24': '描画・塗りつぶし・貼り付け・小窓プレビューを軽量化し、大きなキャンバスでの操作性を改善',
-  }),
-});
+const ENTRY_SUMMARY_OVERRIDES = Object.freeze({});
 
 function normalizePath(value) {
   return String(value || '').replace(/\\/g, '/').replace(/^\.?\//, '');

@@ -22,13 +22,14 @@ HTML/CSS を実際に描画した状態から、各ツールのスクリーン�
 - `setInputFiles`: ファイル入力へ差し込むローカル画像
 - `output`: 出力先
 
-## 登録済みプロジェクト
+## 登録済みページ
 
-- `pixiedraw`
-- `pixiee-lens`
-- `qr-maker`
+- `bridge_home`
+- `bridge_help`
+- `bridge_community`
+- `market_overview`
 
-各プロジェクトは基本的に `OGP/代表画像 + 実画面2枚` を作る前提で、状態差分が分かるスクリーンショットを登録しています。
+旧iDRAW、PiXiEELENS、QR Maker、Portfolioの撮影設定は削除済みです。
 
 ## 備考
 
