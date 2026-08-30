@@ -1,11 +1,17 @@
 {
-  "generatedAt": "2026-08-30T12:24:03.478Z",
+  "generatedAt": "2026-08-30T13:02:50.992Z",
   "projects": [
     {
       "id": "site",
       "name": "PiXiEED Bridge",
       "url": "/index.html",
       "entries": [
+        {
+          "date": "2026-08-30",
+          "items": [
+            "画面 / ドキュメント / SEOを更新"
+          ]
+        },
         {
           "date": "2026-08-27",
           "items": [
@@ -47,17 +53,22 @@
           "items": [
             "画面 / ドキュメントを更新"
           ]
-        },
-        {
-          "date": "2026-07-23",
-          "items": [
-            "画面 / ドキュメントを更新"
-          ]
         }
       ]
     }
   ],
   "recentByDate": [
+    {
+      "date": "2026-08-30",
+      "updates": [
+        {
+          "id": "site",
+          "name": "PiXiEED Bridge",
+          "url": "/index.html",
+          "summary": "画面 / ドキュメント / SEOを更新"
+        }
+      ]
+    },
     {
       "date": "2026-08-27",
       "updates": [
@@ -126,17 +137,6 @@
     },
     {
       "date": "2026-07-24",
-      "updates": [
-        {
-          "id": "site",
-          "name": "PiXiEED Bridge",
-          "url": "/index.html",
-          "summary": "画面 / ドキュメントを更新"
-        }
-      ]
-    },
-    {
-      "date": "2026-07-23",
       "updates": [
         {
           "id": "site",
