@@ -143,6 +143,35 @@ Deno.test("Draw2 palette add uses nearby colors and drag grids", () => {
   );
 });
 
+Deno.test("Draw2 mirror handles keep click toggles separate from dragging", () => {
+  const mirrorStart = source.indexOf(
+    'viewportWrapElement?.addEventListener("pointerdown", (event) => {',
+  );
+  const mirrorEnd = source.indexOf("type StepControl", mirrorStart);
+  const mirrorSource = source.slice(mirrorStart, mirrorEnd);
+  assert(
+    mirrorStart >= 0 && mirrorEnd > mirrorStart &&
+      mirrorSource.includes("mirrorGuideClickSuppressed = false") &&
+      mirrorSource.includes("handle: mirrorHandle") &&
+      mirrorSource.includes("updateMirrorGuideDragFromPointer(event)") &&
+      mirrorSource.includes(
+        "Do not capture or cancel the pointer on pointerdown",
+      ) &&
+      mirrorSource.includes(
+        'window.addEventListener("pointerup", finishMirrorGuideDrag)',
+      ) &&
+      mirrorSource.includes(
+        'window.addEventListener("pointercancel", finishMirrorGuideDrag)',
+      ) &&
+      source.includes('".draw2-workspace-context-row"') &&
+      source.includes("contextRowBottom - viewport.top") &&
+      source.includes("diagonalDownCanvasY") &&
+      source.includes("diagonalUpCanvasX") &&
+      source.includes("canvasCoordinateToDiagonalMirrorGuideOffset"),
+    "Mirror handles must keep native click toggles and promote to drag only after movement.",
+  );
+});
+
 Deno.test("Draw2 Project start deletion detaches PiXYNC before local cleanup", () => {
   assert(
     source.includes("deleteWorkspaceProjectLocalData") &&

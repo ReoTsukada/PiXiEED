@@ -1,5 +1,7 @@
 import {
+  canvasCoordinateToDiagonalMirrorGuideOffset,
   canvasCoordinateToMirrorGuide,
+  diagonalMirrorGuideOffsetToCanvasCoordinate,
   mirrorGuideCenter,
   mirrorGuideToCanvasCoordinate,
   snapMirrorGuideCoordinate,
@@ -55,4 +57,22 @@ Deno.test("mirror guide canvas conversion is reversible at half steps", () => {
       `conversion lost guide coordinate ${guide}`,
     );
   }
+});
+
+Deno.test("diagonal mirror offsets map to a reversible edge coordinate", () => {
+  for (const offset of [-1, -0.5, 0, 0.5, 1]) {
+    const coordinate = diagonalMirrorGuideOffsetToCanvasCoordinate(offset, 256);
+    assert(
+      canvasCoordinateToDiagonalMirrorGuideOffset(coordinate, 256) === offset,
+      `diagonal conversion lost offset ${offset}`,
+    );
+  }
+  assert(
+    diagonalMirrorGuideOffsetToCanvasCoordinate(0, 256) === 128,
+    "the default diagonal guide must stay at the edge midpoint",
+  );
+  assert(
+    canvasCoordinateToDiagonalMirrorGuideOffset(192, 256) === 0.5,
+    "edge dragging must produce a positive diagonal offset",
+  );
 });

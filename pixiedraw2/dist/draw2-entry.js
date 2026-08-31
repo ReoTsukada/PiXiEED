@@ -11938,6 +11938,16 @@ function canvasCoordinateToMirrorGuide(value, size) {
   const safeValue = Number.isFinite(value) ? value : safeSize / 2;
   return clampMirrorGuideCoordinate(safeValue - 0.5, safeSize);
 }
+function diagonalMirrorGuideOffsetToCanvasCoordinate(offset, size) {
+  const safeSize = safeRasterSize(size);
+  const safeOffset = Number.isFinite(offset) ? Math.max(-1, Math.min(1, offset)) : 0;
+  return (safeOffset + 1) / 2 * safeSize;
+}
+function canvasCoordinateToDiagonalMirrorGuideOffset(value, size) {
+  const safeSize = safeRasterSize(size);
+  const safeValue = Number.isFinite(value) ? Math.max(0, Math.min(safeSize, value)) : safeSize / 2;
+  return safeValue / safeSize * 2 - 1;
+}
 
 // src/draw2-settings.ts
 var DRAW2_SETTINGS_STORAGE_KEY = "pixieedraw2:visual-settings:v1";
@@ -17366,6 +17376,7 @@ var brushPatternElement = document.querySelector("#draw2BrushPattern");
 var brushShapeElement = document.querySelector("#draw2BrushShape");
 var brushSizeControlElement = document.querySelector("#draw2QuickBrushSizeControl");
 var quickControlsElement = document.querySelector("#draw2WorkspaceQuickControls");
+var workspaceContextRowElement = document.querySelector(".draw2-workspace-context-row");
 var brushOptionsButtonElement = document.querySelector("#draw2BrushOptionsButton");
 var brushOptionsSummaryElement = document.querySelector("#draw2BrushOptionsSummary");
 var brushOptionsFlyoutElement = document.querySelector("#draw2BrushOptionsFlyout");
@@ -20559,6 +20570,37 @@ var mirrorGuide = {
 var mirrorGuideDrag;
 var mirrorGuideClickSuppressed = false;
 var MIRROR_GUIDE_DRAG_THRESHOLD_PX = 6;
+function clearMirrorGuideDragVisualState(drag) {
+  drag.handle?.classList.remove("is-dragging");
+  viewportWrapElement?.classList.remove("is-mirror-guide-dragging");
+}
+function finishMirrorGuideDrag(event) {
+  const drag = mirrorGuideDrag;
+  if (drag?.pointerId !== event.pointerId) return;
+  mirrorGuideDrag = void 0;
+  mirrorGuideClickSuppressed = drag.moved;
+  clearMirrorGuideDragVisualState(drag);
+  if (viewportWrapElement?.hasPointerCapture(event.pointerId)) {
+    viewportWrapElement.releasePointerCapture(event.pointerId);
+  }
+  if (drag.moved) scheduleDraw2EditorPreferencesSave();
+  drawOverlay();
+}
+function updateMirrorGuideDragFromPointer(event) {
+  const drag = mirrorGuideDrag;
+  if (drag?.pointerId !== event.pointerId) return;
+  if (!drag.moved) {
+    const distance2 = Math.hypot(event.clientX - drag.start.x, event.clientY - drag.start.y);
+    if (distance2 < MIRROR_GUIDE_DRAG_THRESHOLD_PX) return;
+    drag.moved = true;
+    viewportWrapElement?.setPointerCapture(event.pointerId);
+    viewportWrapElement?.classList.add("is-mirror-guide-dragging");
+    drag.handle?.classList.add("is-dragging");
+  }
+  moveMirrorGuideFromClient(drag.axis, event.clientX, event.clientY);
+  scheduleDraw2EditorPreferencesSave();
+  if (event.cancelable) event.preventDefault();
+}
 function syncClientSequencesFromState() {
   clientSequence = state.lastClientSequenceByClient[DRAW_CLIENT_ID] ?? 0;
   selectionClientSequence = state.lastClientSequenceByClient[SELECTION_CLIENT_ID] ?? 0;
@@ -23679,20 +23721,25 @@ function positionMirrorLineToggles(asset) {
   const handleYHalf = Math.max(1, mirrorToggleY.offsetHeight / 2);
   const xCenter = clampHandleCenter(x, handleXHalf, viewport.width);
   const yCenter = clampHandleCenter(y, handleYHalf, viewport.height);
+  const contextRowBounds = workspaceContextRowElement?.getBoundingClientRect();
+  const contextRowBottom = contextRowBounds?.bottom ?? viewport.top;
+  const xHandleCenter = clampHandleCenter(Math.max(handleXHalf + inset, contextRowBottom - viewport.top + inset + handleXHalf), handleXHalf, viewport.height);
   mirrorToggleX.style.left = `${xCenter - handleXHalf}px`;
-  mirrorToggleX.style.top = `${inset}px`;
+  mirrorToggleX.style.top = `${xHandleCenter - handleXHalf}px`;
   mirrorToggleY.style.left = `${inset}px`;
   mirrorToggleY.style.top = `${yCenter - handleYHalf}px`;
-  const placeOnViewportEdge = (button, edge) => {
+  const placeOnViewportEdge = (button, edge, edgePosition = edge === "right" ? viewport.height / 2 : viewport.width / 2) => {
     const halfWidth = Math.max(1, button.offsetWidth / 2);
     const halfHeight = Math.max(1, button.offsetHeight / 2);
-    const centerX = clampHandleCenter(edge === "right" ? viewport.width - halfWidth - inset : viewport.width / 2, halfWidth, viewport.width);
-    const centerY = clampHandleCenter(edge === "right" ? viewport.height / 2 : viewport.height - halfHeight - inset, halfHeight, viewport.height);
+    const centerX = clampHandleCenter(edge === "right" ? viewport.width - halfWidth - inset : clampHandleCenter(edgePosition, halfWidth, viewport.width), halfWidth, viewport.width);
+    const centerY = clampHandleCenter(edge === "right" ? edgePosition : viewport.height - halfHeight - inset, halfHeight, viewport.height);
     button.style.left = `${centerX - halfWidth}px`;
     button.style.top = `${centerY - halfHeight}px`;
   };
-  placeOnViewportEdge(mirrorToggleDiagonalDown, "right");
-  placeOnViewportEdge(mirrorToggleDiagonalUp, "bottom");
+  const diagonalDownCanvasY = diagonalMirrorGuideOffsetToCanvasCoordinate(mirrorGuide.diagonalDown, asset.height);
+  const diagonalUpCanvasX = diagonalMirrorGuideOffsetToCanvasCoordinate(mirrorGuide.diagonalUp, asset.width);
+  placeOnViewportEdge(mirrorToggleDiagonalDown, "right", canvasTop + diagonalDownCanvasY / Math.max(1, asset.height) * canvasBounds.height);
+  placeOnViewportEdge(mirrorToggleDiagonalUp, "bottom", canvasLeft + diagonalUpCanvasX / Math.max(1, asset.width) * canvasBounds.width);
 }
 function syncMirrorGuideOverlay(asset) {
   if (mirrorGuideOverlayElement === null || mirrorGuideVerticalElement === null || mirrorGuideHorizontalElement === null || mirrorGuideDiagonalDownElement === null || mirrorGuideDiagonalUpElement === null) return;
@@ -26431,16 +26478,12 @@ function moveMirrorGuideFromClient(axis, clientX, clientY) {
   } else if (axis === "y") {
     mirrorGuide.y = snapMirrorGuideCoordinate(source.y, asset.height);
   } else {
-    const maxX = Math.max(1, asset.width - 1);
-    const maxY = Math.max(1, asset.height - 1);
-    const snappedX = snapMirrorGuideCoordinate(source.x, asset.width);
-    const snappedY = snapMirrorGuideCoordinate(source.y, asset.height);
-    const normalizedX = snappedX / maxX;
-    const normalizedY = snappedY / maxY;
     if (axis === "diagonal-down") {
-      mirrorGuide.diagonalDown = normalizedY - normalizedX;
+      const snappedY = snapMirrorGuideCoordinate(source.y, asset.height);
+      mirrorGuide.diagonalDown = canvasCoordinateToDiagonalMirrorGuideOffset(mirrorGuideToCanvasCoordinate(snappedY, asset.height), asset.height);
     } else {
-      mirrorGuide.diagonalUp = normalizedX + normalizedY - 1;
+      const snappedX = snapMirrorGuideCoordinate(source.x, asset.width);
+      mirrorGuide.diagonalUp = canvasCoordinateToDiagonalMirrorGuideOffset(mirrorGuideToCanvasCoordinate(snappedX, asset.width), asset.width);
     }
   }
   mirrorGuide = normalizeMirrorGuide({
@@ -28351,8 +28394,7 @@ canvas.addEventListener("pointermove", (event) => {
     return;
   }
   if (mirrorGuideDrag?.pointerId === event.pointerId) {
-    moveMirrorGuideFromClient(mirrorGuideDrag.axis, event.clientX, event.clientY);
-    if (event.cancelable) event.preventDefault();
+    updateMirrorGuideDragFromPointer(event);
     return;
   }
   if (viewportPanPointerId === event.pointerId) {
@@ -28409,12 +28451,7 @@ canvas.addEventListener("pointerup", (event) => {
     return;
   }
   if (mirrorGuideDrag?.pointerId === event.pointerId) {
-    mirrorGuideClickSuppressed = mirrorGuideDrag.moved;
-    mirrorGuideDrag = void 0;
-    if (canvas.hasPointerCapture(event.pointerId)) {
-      canvas.releasePointerCapture(event.pointerId);
-    }
-    drawOverlay();
+    finishMirrorGuideDrag(event);
     return;
   }
   if (viewportPanPointerId === event.pointerId) {
@@ -28480,9 +28517,7 @@ canvas.addEventListener("pointercancel", (event) => {
     return;
   }
   if (mirrorGuideDrag?.pointerId === event.pointerId) {
-    mirrorGuideClickSuppressed = mirrorGuideDrag.moved;
-    mirrorGuideDrag = void 0;
-    drawOverlay();
+    finishMirrorGuideDrag(event);
     return;
   }
   if (selectionDrag?.pointerId === event.pointerId) {
@@ -28518,9 +28553,7 @@ canvas.addEventListener("lostpointercapture", (event) => {
     return;
   }
   if (mirrorGuideDrag?.pointerId === event.pointerId) {
-    mirrorGuideClickSuppressed = mirrorGuideDrag.moved;
-    mirrorGuideDrag = void 0;
-    drawOverlay();
+    finishMirrorGuideDrag(event);
     return;
   }
   if (selectionDrag?.pointerId === event.pointerId) {
@@ -28667,6 +28700,7 @@ viewportWrapElement?.addEventListener("pointerdown", (event) => {
   const mirrorHandle = targetElement?.closest(".draw2-mirror-line-toggle");
   const handleAxis = mirrorHandle === mirrorToggleX ? "x" : mirrorHandle === mirrorToggleY ? "y" : mirrorHandle === mirrorToggleDiagonalDown ? "diagonal-down" : mirrorHandle === mirrorToggleDiagonalUp ? "diagonal-up" : void 0;
   if (mirrorEnabled && handleAxis !== void 0) {
+    mirrorGuideClickSuppressed = false;
     mirrorGuideDrag = {
       pointerId: event.pointerId,
       axis: handleAxis,
@@ -28674,9 +28708,9 @@ viewportWrapElement?.addEventListener("pointerdown", (event) => {
       start: {
         x: event.clientX,
         y: event.clientY
-      }
+      },
+      handle: mirrorHandle ?? void 0
     };
-    viewportWrapElement.setPointerCapture(event.pointerId);
     return;
   }
   if (event.target === canvas || !isOutsideCanvasClient(event.clientX, event.clientY)) return;
@@ -28690,7 +28724,8 @@ viewportWrapElement?.addEventListener("pointerdown", (event) => {
         start: {
           x: event.clientX,
           y: event.clientY
-        }
+        },
+        handle: void 0
       };
       viewportWrapElement.setPointerCapture(event.pointerId);
       if (event.cancelable) event.preventDefault();
@@ -28705,36 +28740,15 @@ viewportWrapElement?.addEventListener("pointerdown", (event) => {
 });
 viewportWrapElement?.addEventListener("pointermove", (event) => {
   if (mirrorGuideDrag?.pointerId !== event.pointerId) return;
-  if (!mirrorGuideDrag.moved) {
-    const distance2 = Math.hypot(event.clientX - mirrorGuideDrag.start.x, event.clientY - mirrorGuideDrag.start.y);
-    if (distance2 < MIRROR_GUIDE_DRAG_THRESHOLD_PX) return;
-    mirrorGuideDrag.moved = true;
-  }
-  moveMirrorGuideFromClient(mirrorGuideDrag.axis, event.clientX, event.clientY);
-  scheduleDraw2EditorPreferencesSave();
-  if (event.cancelable) event.preventDefault();
+  updateMirrorGuideDragFromPointer(event);
 });
-var finishMirrorGuideDrag = (event) => {
-  if (mirrorGuideDrag?.pointerId !== event.pointerId) return;
-  const moved = mirrorGuideDrag.moved;
-  mirrorGuideDrag = void 0;
-  mirrorGuideClickSuppressed = moved;
-  if (viewportWrapElement?.hasPointerCapture(event.pointerId)) {
-    viewportWrapElement.releasePointerCapture(event.pointerId);
-  }
-  if (moved) scheduleDraw2EditorPreferencesSave();
-  drawOverlay();
-};
 viewportWrapElement?.addEventListener("pointerup", finishMirrorGuideDrag);
 viewportWrapElement?.addEventListener("pointercancel", finishMirrorGuideDrag);
 viewportWrapElement?.addEventListener("lostpointercapture", (event) => {
-  const pointerId = event.pointerId;
-  if (mirrorGuideDrag?.pointerId === pointerId) {
-    mirrorGuideClickSuppressed = mirrorGuideDrag.moved;
-    mirrorGuideDrag = void 0;
-    drawOverlay();
-  }
+  finishMirrorGuideDrag(event);
 });
+window.addEventListener("pointerup", finishMirrorGuideDrag);
+window.addEventListener("pointercancel", finishMirrorGuideDrag);
 function isStepControl(target) {
   return target instanceof HTMLSelectElement || target instanceof HTMLInputElement && target.type === "range";
 }

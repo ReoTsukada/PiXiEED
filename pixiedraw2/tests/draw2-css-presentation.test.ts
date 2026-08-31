@@ -44,6 +44,12 @@ Deno.test("stable presentation defaults live in CSS", async () => {
     css.includes("inset: 0 auto auto 0"),
     "MIDI canvas edge anchoring must be CSS-owned",
   );
+  assert(
+    css.includes(".draw2-mirror-line-toggle.is-dragging") &&
+      css.includes("cursor: pointer") &&
+      css.includes("cursor: grabbing"),
+    "Mirror handles must show a click cursor until a real drag starts.",
+  );
 });
 
 Deno.test("presentation-only inline writes are not reintroduced", async () => {

@@ -17596,7 +17596,7 @@ body:has(#draw2WorkspaceFrame) {
     var(--draw2-accent-strong)
   );
   color: var(--draw2-text-muted);
-  cursor: grab;
+  cursor: pointer;
   touch-action: none;
   transition: border-color 120ms ease, background-color 120ms ease,
     color 120ms ease, transform 120ms ease;
@@ -17625,8 +17625,11 @@ body:has(#draw2WorkspaceFrame) {
   color: var(--draw2-warning, #f5b14c);
 }
 .draw2-mirror-line-toggle:active {
-  cursor: grabbing;
   transform: scale(0.96);
+}
+.draw2-mirror-line-toggle.is-dragging,
+.draw2-viewport-wrap.is-mirror-guide-dragging {
+  cursor: grabbing;
 }
 
 /* Shared mini preview command ------------------------------------------------

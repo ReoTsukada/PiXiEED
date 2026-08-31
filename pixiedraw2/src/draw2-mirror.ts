@@ -55,3 +55,27 @@ export function canvasCoordinateToMirrorGuide(
   const safeValue = Number.isFinite(value) ? value : safeSize / 2;
   return clampMirrorGuideCoordinate(safeValue - 0.5, safeSize);
 }
+
+/** Map a diagonal guide offset [-1, 1] to a canvas coordinate [0, size]. */
+export function diagonalMirrorGuideOffsetToCanvasCoordinate(
+  offset: number,
+  size: number,
+): number {
+  const safeSize = safeRasterSize(size);
+  const safeOffset = Number.isFinite(offset)
+    ? Math.max(-1, Math.min(1, offset))
+    : 0;
+  return ((safeOffset + 1) / 2) * safeSize;
+}
+
+/** Convert a canvas coordinate [0, size] back to a diagonal guide offset. */
+export function canvasCoordinateToDiagonalMirrorGuideOffset(
+  value: number,
+  size: number,
+): number {
+  const safeSize = safeRasterSize(size);
+  const safeValue = Number.isFinite(value)
+    ? Math.max(0, Math.min(safeSize, value))
+    : safeSize / 2;
+  return (safeValue / safeSize) * 2 - 1;
+}
