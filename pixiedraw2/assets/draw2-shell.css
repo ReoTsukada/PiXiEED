@@ -4970,6 +4970,9 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   align-items: stretch;
   margin-top: 20px;
 }
+.draw2-workspace[hidden] {
+  display: none !important;
+}
 .draw2-canvas-card {
   min-width: 0;
   flex: 1 1 680px;
@@ -29076,6 +29079,30 @@ body:has(#draw2WorkspaceFrame) {
   letter-spacing: 0.02em;
 }
 
+/* Right-dock surface refinement (2026-08-31): the active tab and palette
+   already identify the editing surface. Remove the redundant context and
+   mode-summary copy, including the older Inspector pseudo-header, without
+   deleting their DOM hooks used by mode switching and accessibility wiring. */
+#draw2WorkspaceFrame.draw2-workspace-frame[data-creator-mode]
+  #draw2WorkspaceRightContext,
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode]
+  #draw2WorkspaceRightContext,
+#draw2WorkspaceFrame.draw2-workspace-frame[data-creator-mode]
+  #draw2WorkspaceModeSummary,
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode]
+  #draw2WorkspaceModeSummary {
+  display: none !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-creator-mode="DRAW"]
+  #draw2WorkspaceRightDock::before,
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+  #draw2WorkspaceRightDock::before {
+  display: none !important;
+  flex: 0 0 0 !important;
+  content: none !important;
+}
+
 /* Color-wheel containment contract (2026-08-31): the right dock is
    user-resizable and can become shorter than the wheel's preferred square.
    draw2-entry.ts supplies the measured square size through this custom
@@ -29106,4 +29133,87 @@ body:has(#draw2WorkspaceFrame) {
   #draw2WorkspacePanelColor.is-color-wheel-compact
   .draw2-color-editor-heading {
   display: none !important;
+}
+
+/* Right-dock palette split contract (2026-08-31): the palette is always the
+   first, bounded grid row. The active Color/other panel owns the remaining
+   height, and the middle handle is the only element that changes the split.
+   This keeps an old oversized preference from hiding the authoring surface. */
+@media (min-width: 701px) {
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+    #draw2WorkspaceRightDock {
+    --draw2-right-palette-default-ratio: 18%;
+    --draw2-right-palette-max-ratio: 42%;
+    --draw2-right-palette-min-height: 64px;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows:
+      minmax(
+        var(--draw2-right-palette-min-height),
+        min(
+          var(
+            --draw2-right-palette-ratio,
+            var(--draw2-right-palette-default-ratio)
+          ),
+          var(--draw2-right-palette-max-ratio)
+        )
+      )
+      12px minmax(100px, 1fr) !important;
+    align-content: stretch !important;
+    overflow: hidden !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+    #draw2WorkspaceRightDock
+    > #draw2WorkspacePaletteStrip {
+    display: block !important;
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    align-self: stretch !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    padding: 8px !important;
+    overflow: auto !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+    #draw2WorkspaceRightDock
+    > #draw2WorkspacePaletteResize {
+    display: block !important;
+    grid-column: 1 !important;
+    grid-row: 2 !important;
+    align-self: stretch !important;
+    width: 100% !important;
+    height: 12px !important;
+    min-height: 12px !important;
+    margin: 0 !important;
+    cursor: ns-resize !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+    #draw2WorkspaceRightDock
+    > #draw2WorkspaceRightCustomDock {
+    grid-column: 1 !important;
+    grid-row: 3 !important;
+    align-self: stretch !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: hidden !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-creator-mode="DRAW"]
+    #draw2WorkspaceRightCustomDock
+    > .draw2-workspace-tabs {
+    flex: 0 0 32px !important;
+    min-height: 32px !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-creator-mode="DRAW"]
+    #draw2WorkspaceRightCustomDock
+    > .draw2-workspace-panel:not([hidden]) {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+    overflow: auto !important;
+  }
 }

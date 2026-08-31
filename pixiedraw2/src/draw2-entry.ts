@@ -97,6 +97,7 @@ import {
   type BrushShape,
   type ColorSelectionMode,
   colorTolerancePercentToDistance,
+  createFillPreviewWriteSet,
   createIndexedGradientWriteSet,
   createPathWriteSet,
   createToolPreviewWriteSet,
@@ -111,6 +112,7 @@ import {
   selectByPaletteColor,
   shapePixels,
   snapSelectionBoundsToGrid,
+  type ColoredPixel,
   type ToolOptions,
 } from "./draw2-basic-tools.ts";
 import {
@@ -121,6 +123,7 @@ import {
   Draw2InteractionKernel,
   SerializedCommitIngress,
   type ToolSessionCommit,
+  type ToolSessionSnapshot,
 } from "./draw2-interaction.ts";
 import {
   DRAW2_PERSISTED_HISTORY_LIMIT,
@@ -4627,6 +4630,10 @@ let rasterSelectionMaskCache: {
   readonly key: string;
   readonly mask: RasterSelectionMask;
 } | undefined;
+let fillPreviewRegionCache: {
+  readonly key: string;
+  readonly region: readonly { x: number; y: number }[];
+} | undefined;
 let selectionInteractionGeneration = 0;
 let selectionEditMode: SelectionEditMode = "REPLACE";
 let selectionDraft: {
@@ -6742,7 +6749,12 @@ function syncPaletteWheelLayout(): void {
     editor.clientWidth - parseFloat(editorStyles.paddingLeft) -
       parseFloat(editorStyles.paddingRight),
   );
-  const preferredSize = Math.max(1, Math.min(180, editorContentWidth));
+  // The wheel should use all of the width the dock gives it (bounded only
+  // by the available height below, via nextSize's Math.min against
+  // availableHeight) so it renders as large as the layout allows while the
+  // CSS aspect-ratio: 1/1 rule keeps it a perfect square. A hardcoded 180px
+  // ceiling used to cap this regardless of how much wider the dock was.
+  const preferredSize = Math.max(1, editorContentWidth);
   // Add scrollTop so the available height is stable while the panel itself is
   // scrolled. This prevents the wheel from growing as the user inspects the
   // lower slider controls.
@@ -10145,8 +10157,16 @@ function clearErasePreview(): void {
 function drawErasePreview(
   asset: RasterAsset,
   points: readonly { x: number; y: number }[],
+  cachedWrites?: readonly { x: number; y: number; colorIndex: number }[],
 ): void {
-  const writes = previewWriteSet(asset, "eraser", points);
+  const writes = previewWriteSet(asset, "eraser", points, cachedWrites);
+  drawErasePreviewWrites(asset, writes);
+}
+
+function drawErasePreviewWrites(
+  asset: RasterAsset,
+  writes: readonly { x: number; y: number }[],
+): void {
   if (writes.length === 0) return;
   let minX = asset.width;
   let minY = asset.height;
@@ -10192,6 +10212,42 @@ function drawErasePreview(
   erasePreview.hidden = false;
 }
 
+/**
+ * Overlay rendering is a visual projection only. Coalesced pointer samples
+ * can arrive much faster than the display refresh, so keep input collection
+ * synchronous but render at most once per animation frame.
+ */
+function scheduleDrawOverlay(): void {
+  if (overlayDrawFrame !== undefined) return;
+  const draw = (): void => {
+    overlayDrawFrame = undefined;
+    overlayDrawFrameKind = undefined;
+    drawOverlay();
+  };
+  if (typeof window.requestAnimationFrame === "function") {
+    overlayDrawFrameKind = "raf";
+    overlayDrawFrame = window.requestAnimationFrame(draw);
+    return;
+  }
+  // Older embedded WebViews may not expose rAF. Keep the same coalescing
+  // contract with a single short timer rather than rendering per pointermove.
+  overlayDrawFrameKind = "timeout";
+  overlayDrawFrame = window.setTimeout(draw, 16);
+}
+
+function flushDrawOverlay(): void {
+  if (overlayDrawFrame !== undefined) {
+    if (overlayDrawFrameKind === "raf") {
+      window.cancelAnimationFrame(overlayDrawFrame);
+    } else if (overlayDrawFrameKind === "timeout") {
+      window.clearTimeout(overlayDrawFrame);
+    }
+    overlayDrawFrame = undefined;
+    overlayDrawFrameKind = undefined;
+  }
+  drawOverlay();
+}
+
 function drawOverlay(): void {
   selectionOverlayContext.clearRect(0, 0, overlay.width, overlay.height);
   clearErasePreview();
@@ -10202,8 +10258,11 @@ function drawOverlay(): void {
   const asset = state.assets[state.activeAssetId];
   const tilemapMode = activeLayerIsTilemap();
   if (asset !== undefined && !tilemapMode) drawOnionSkinProjection(asset);
+  if (asset !== undefined && !tilemapMode) drawPendingDrawPreviews(asset);
   const tool = currentBasicTool();
-  const interactionPoints = drawInteraction?.session?.points ?? [];
+  const interactionSession = drawInteraction?.session;
+  const interactionPoints = interactionSession?.points ?? [];
+  const interactionPreviewWrites = interactionSession?.previewWrites;
   const previewPoints = interactionPoints.length > 0
     ? interactionPoints
     : virtualCursorEnabled && hoverPoint !== undefined
@@ -10211,8 +10270,15 @@ function drawOverlay(): void {
     : [];
   if (asset !== undefined && !tilemapMode && previewPoints.length > 0) {
     try {
-      if (tool === "eraser") drawErasePreview(asset, previewPoints);
-      drawCurrentToolPreview(asset, tool, previewPoints);
+      if (tool === "eraser") {
+        drawErasePreview(asset, previewPoints, interactionPreviewWrites);
+      }
+      drawCurrentToolPreview(
+        asset,
+        tool,
+        previewPoints,
+        interactionPreviewWrites,
+      );
     } catch {
       // A bounded preview failure must never mutate Canonical Raster.
     }
@@ -10279,6 +10345,29 @@ function drawTransformPreviewPixels(
   selectionOverlayContext.save();
   selectionOverlayContext.imageSmoothingEnabled = false;
   selectionOverlayContext.globalAlpha = 0.86;
+  const firstColorIndex = pixels[0]?.colorIndex;
+  if (
+    firstColorIndex !== undefined && pixels.every((pixel) =>
+      pixel.colorIndex === firstColorIndex
+    )
+  ) {
+    const color = decodeArgb(
+      paletteColorForRender(asset, firstColorIndex),
+    );
+    if (color.alpha > 0) {
+      selectionOverlayContext.fillStyle =
+        `rgba(${color.red}, ${color.green}, ${color.blue}, ${color.alpha / 255})`;
+      for (const pixel of pixels) {
+        if (
+          pixel.x < 0 || pixel.y < 0 || pixel.x >= asset.width ||
+          pixel.y >= asset.height
+        ) continue;
+        selectionOverlayContext.fillRect(pixel.x, pixel.y, 1, 1);
+      }
+    }
+    selectionOverlayContext.restore();
+    return;
+  }
   for (const pixel of pixels) {
     if (
       pixel.x < 0 || pixel.y < 0 || pixel.x >= asset.width ||
@@ -10297,6 +10386,7 @@ function previewWriteSet(
   asset: RasterAsset,
   tool: BasicTool,
   points: readonly { x: number; y: number }[],
+  cachedWrites?: readonly { x: number; y: number; colorIndex: number }[],
 ): readonly { x: number; y: number }[] {
   // A timeline switch must never let a previous cel's selection become a
   // coordinate-only write mask for the newly active cel. Fail closed until
@@ -10305,7 +10395,10 @@ function previewWriteSet(
   const first = points[0];
   const last = points[points.length - 1] ?? first;
   if (first === undefined || last === undefined) return [];
-  const writes = tool === "pen" || tool === "eraser"
+  const writes = cachedWrites !== undefined &&
+      (tool === "pen" || tool === "pixel-pen" || tool === "eraser")
+    ? mirrorWritesForTool(cachedWrites, asset, tool)
+    : tool === "pen" || tool === "eraser"
     ? mirrorWritesForTool(
       createPathWriteSet(
         tool,
@@ -10367,26 +10460,108 @@ function guideColor(
     : decodeArgb(paletteColorForRender(asset, selectedColor));
 }
 
+function fillPreviewCacheKey(
+  asset: RasterAsset,
+  seed: { readonly x: number; readonly y: number },
+): string {
+  const selectionKey = selection === undefined
+    ? "none"
+    : [
+      selection.selectionId,
+      selection.mask.selectionVersion,
+      selection.pixels.length,
+      selectionInteractionGeneration,
+    ].join(":");
+  return [
+    state.projectId,
+    asset.id,
+    asset.revision,
+    state.activeLayerId,
+    state.activeFrameId,
+    state.activeCelId,
+    selectedColor,
+    seed.x,
+    seed.y,
+    selectionKey,
+  ].join("|");
+}
+
+/**
+ * Builds the same bounded flood region used by the real fill operation.
+ * The region is cached for a gesture because a gradient drag changes only
+ * the colour projection, not the connected pixels.
+ */
+function fillPreviewRegion(
+  asset: RasterAsset,
+  seed: { readonly x: number; readonly y: number },
+): readonly { x: number; y: number }[] {
+  const key = fillPreviewCacheKey(asset, seed);
+  if (fillPreviewRegionCache?.key === key) {
+    return fillPreviewRegionCache.region;
+  }
+  if (selection !== undefined && !selectionScopeMatchesActiveCel()) {
+    fillPreviewRegionCache = { key, region: [] };
+    return [];
+  }
+  const clip = activeRectangleSelectionClip();
+  const selectedPointKeys = clip === undefined && selection !== undefined
+    ? new Set(selection.pixels.map(selectionPointKey))
+    : undefined;
+  const isAllowed = selection === undefined
+    ? undefined
+    : (point: { readonly x: number; readonly y: number }): boolean => {
+      if (clip !== undefined) {
+        return point.x >= clip.x && point.y >= clip.y &&
+          point.x < clip.x + clip.width &&
+          point.y < clip.y + clip.height;
+      }
+      return selectedPointKeys?.has(selectionPointKey(point)) ?? false;
+    };
+  const writes = createFillPreviewWriteSet(
+    asset.raster,
+    seed,
+    selectedColor,
+    32_768,
+    isAllowed,
+  );
+  const region = writes.map(({ x, y }) => ({ x, y }));
+  fillPreviewRegionCache = { key, region };
+  return region;
+}
+
+function fillPreviewWrites(
+  asset: RasterAsset,
+  from: { readonly x: number; readonly y: number },
+  to: { readonly x: number; readonly y: number },
+  colorIndex = selectedColor,
+): readonly ColoredPixel[] {
+  const region = fillPreviewRegion(asset, from);
+  if (region.length === 0) return [];
+  return createIndexedGradientWriteSet(
+    asset.raster,
+    region,
+    from,
+    to,
+    asset.raster.getPixel(from.x, from.y),
+    colorIndex,
+    asset.palette,
+  );
+}
+
 function drawCurrentToolPreview(
   asset: RasterAsset,
   tool: BasicTool,
   points: readonly { x: number; y: number }[],
+  cachedWrites?: readonly { x: number; y: number; colorIndex: number }[],
 ): void {
   const first = points[0];
   const last = points[points.length - 1] ?? first;
   if (first === undefined || last === undefined || tool === "pan") return;
   if (tool === "eraser") return;
   if (tool === "fill") {
-    if (points.length > 1) {
-      const writes = createFillGradientWriteSet(
-        asset,
-        first,
-        last,
-        selectedColor,
-        32_768,
-      );
-      if (writes.length > 0) drawTransformPreviewPixels(asset, writes);
-    }
+    if (selection !== undefined && !selectionScopeMatchesActiveCel()) return;
+    const writes = fillPreviewWrites(asset, first, last);
+    if (writes.length > 0) drawTransformPreviewPixels(asset, writes);
     // Keep a cursor for hover and for large regions where a full preview would
     // be more expensive than useful. The committed operation remains bounded.
     if (selection === undefined || pointIsSelectedPixel(selection, last)) {
@@ -10421,7 +10596,7 @@ function drawCurrentToolPreview(
     return;
   }
   drawToolPreviewGuide(
-    previewWriteSet(asset, tool, points),
+    previewWriteSet(asset, tool, points, cachedWrites),
     guideColor(asset, tool),
   );
 }
@@ -14246,15 +14421,15 @@ async function commitPointerPointsNow(
         x: point.x,
         y: point.y,
       }));
-      // Validate the full gesture before reducing it so an unbounded input
-      // cannot silently bypass the canonical interpolation budget.
-      interpolatePixelPath(rawStrokePoints);
+      // Coalesced input can contain a very dense/repeated path. Reduce it
+      // before canonical interpolation; the bounded command path is the
+      // actual transport contract and preserves the gesture endpoints.
       strokePoints = compactPixelPath(
         rawStrokePoints,
         PIXYNC_DRAW2_MAX_PAYLOAD_KEYS,
       );
-      // The reduced path is the canonical command input and must remain safe
-      // even when the source contains dense, rapidly coalesced samples.
+      // Validate only the reduced path so input density does not reject an
+      // otherwise drawable gesture.
       interpolatePixelPath(strokePoints);
     } catch (cause) {
       syncClientSequencesFromState();
@@ -14439,53 +14614,57 @@ async function commitShapePointsNow(
 async function commitInteractionSession(
   commit: ToolSessionCommit,
 ): Promise<void> {
-  const fixedContext: FixedToolContext = {
-    tool: commit.tool,
-    colorIndex: commit.colorIndex,
-    toolOptions: commit.tool === "pixel-pen"
-      ? {
-        ...commit.toolOptions,
-        brushSize: 1,
-        brushShape: "square",
-        pattern: "solid",
-      }
-      : commit.toolOptions,
-  };
-  if (commit.kind === "immediate") {
-    // Fill uses the full gesture to distinguish a click from a directional
-    // gradient drag. Other immediate tools intentionally commit only their
-    // final point (for example the eyedropper and tile stamp).
-    await commitPointerPoints(
-      commit.tool === "fill" ? commit.points : [commit.point],
-      fixedContext,
-    );
-    return;
-  }
-  if (
-    commit.tool === "pen" || commit.tool === "eraser" ||
-    commit.tool === "pixel-pen" || commit.tool === "line"
-  ) {
-    // A simple pen stroke is already represented by its pointer path. Let
-    // EditorCore interpolate it during the canonical command instead of
-    // putting every painted pixel into a sync write-set array. This keeps a
-    // fast full-width stroke within the bounded PiXYNC payload contract while
-    // preserving the same one-stroke/one-undo behavior.
+  try {
+    const fixedContext: FixedToolContext = {
+      tool: commit.tool,
+      colorIndex: commit.colorIndex,
+      toolOptions: commit.tool === "pixel-pen"
+        ? {
+          ...commit.toolOptions,
+          brushSize: 1,
+          brushShape: "square",
+          pattern: "solid",
+        }
+        : commit.toolOptions,
+    };
+    if (commit.kind === "immediate") {
+      // Fill uses the full gesture to distinguish a click from a directional
+      // gradient drag. Other immediate tools intentionally commit only their
+      // final point (for example the eyedropper and tile stamp).
+      await commitPointerPoints(
+        commit.tool === "fill" ? commit.points : [commit.point],
+        fixedContext,
+      );
+      return;
+    }
+    if (
+      commit.tool === "pen" || commit.tool === "eraser" ||
+      commit.tool === "pixel-pen" || commit.tool === "line"
+    ) {
+      // A simple pen stroke is already represented by its pointer path. Let
+      // EditorCore interpolate it during the canonical command instead of
+      // putting every painted pixel into a sync write-set array. This keeps a
+      // fast full-width stroke within the bounded PiXYNC payload contract while
+      // preserving the same one-stroke/one-undo behavior.
+      await commitPointerPoints(commit.points, fixedContext);
+      return;
+    }
+    const shapeTools: readonly BasicTool[] = [
+      "rect",
+      "rect-fill",
+      "ellipse",
+      "ellipse-fill",
+      "circle",
+      "circle-fill",
+    ];
+    if (shapeTools.includes(commit.tool)) {
+      await commitPointerPoints(commit.points, fixedContext);
+      return;
+    }
     await commitPointerPoints(commit.points, fixedContext);
-    return;
+  } finally {
+    removePendingDrawPreview(commit.sessionId);
   }
-  const shapeTools: readonly BasicTool[] = [
-    "rect",
-    "rect-fill",
-    "ellipse",
-    "ellipse-fill",
-    "circle",
-    "circle-fill",
-  ];
-  if (shapeTools.includes(commit.tool)) {
-    await commitPointerPoints(commit.points, fixedContext);
-    return;
-  }
-  await commitPointerPoints(commit.points, fixedContext);
 }
 
 createButton.addEventListener("click", openProjectDialog);
@@ -15505,6 +15684,119 @@ redoControl.addEventListener("click", async () => {
 });
 
 let drawInteraction: Draw2InteractionKernel | undefined;
+let overlayDrawFrame: number | undefined;
+let overlayDrawFrameKind: "raf" | "timeout" | undefined;
+
+interface PendingDrawPreview {
+  readonly sessionId: string;
+  readonly projectId: string;
+  readonly assetId: string;
+  readonly layerId: string;
+  readonly frameId: string;
+  readonly celId: string;
+  readonly structureEpoch: number;
+  readonly selectionGeneration: number;
+  readonly tool: BasicTool;
+  readonly points: readonly { x: number; y: number }[];
+  readonly writes: readonly ColoredPixel[];
+}
+
+/**
+ * A pointerup ends the transient session before the async canonical command
+ * finishes. Keep its final projection alive so a slow commit cannot make a
+ * valid stroke appear to disappear between pointerup and present().
+ */
+let pendingDrawPreviews: PendingDrawPreview[] = [];
+
+function projectPendingPreviewWrites(
+  asset: RasterAsset,
+  tool: BasicTool,
+  writes: readonly ColoredPixel[],
+): readonly ColoredPixel[] {
+  if (selection !== undefined && !selectionScopeMatchesActiveCel()) return [];
+  const mirrored = mirrorWritesForTool(writes, asset, tool);
+  const clip = activeRectangleSelectionClip();
+  const selectionKeys = clip === undefined && selection !== undefined
+    ? new Set(selection.pixels.map(selectionPointKey))
+    : undefined;
+  if (clip !== undefined) {
+    return mirrored.filter((write) =>
+      write.x >= clip.x && write.y >= clip.y &&
+      write.x < clip.x + clip.width && write.y < clip.y + clip.height
+    );
+  }
+  if (selectionKeys !== undefined) {
+    return mirrored.filter((write) =>
+      selectionKeys.has(selectionPointKey(write))
+    );
+  }
+  return mirrored;
+}
+
+function queuePendingDrawPreview(
+  commit: ToolSessionCommit,
+  snapshot: ToolSessionSnapshot,
+): void {
+  const asset = state.assets[state.activeAssetId];
+  if (asset === undefined || snapshot.points.length === 0) return;
+  const first = snapshot.points[0]!;
+  const last = snapshot.points.at(-1) ?? first;
+  const writes = snapshot.previewWrites.length > 0
+    ? projectPendingPreviewWrites(asset, commit.tool, snapshot.previewWrites)
+    : commit.tool === "fill"
+    ? fillPreviewWrites(asset, first, last, commit.colorIndex)
+    : [];
+  pendingDrawPreviews.push({
+    sessionId: snapshot.sessionId,
+    projectId: state.projectId,
+    assetId: asset.id,
+    layerId: state.activeLayerId,
+    frameId: state.activeFrameId,
+    celId: state.activeCelId,
+    structureEpoch: state.structureEpoch,
+    selectionGeneration: selectionInteractionGeneration,
+    tool: commit.tool,
+    points: [...snapshot.points],
+    writes: [...writes],
+  });
+}
+
+function removePendingDrawPreview(sessionId: string): void {
+  const next = pendingDrawPreviews.filter((preview) =>
+    preview.sessionId !== sessionId
+  );
+  if (next.length === pendingDrawPreviews.length) return;
+  pendingDrawPreviews = next;
+  flushDrawOverlay();
+}
+
+function pendingDrawPreviewMatchesCurrent(
+  preview: PendingDrawPreview,
+  asset: RasterAsset,
+): boolean {
+  return preview.projectId === state.projectId &&
+    preview.assetId === asset.id &&
+    preview.layerId === state.activeLayerId &&
+    preview.frameId === state.activeFrameId &&
+    preview.celId === state.activeCelId &&
+    preview.structureEpoch === state.structureEpoch &&
+    preview.selectionGeneration === selectionInteractionGeneration;
+}
+
+function drawPendingDrawPreviews(asset: RasterAsset): void {
+  for (const preview of pendingDrawPreviews) {
+    if (!pendingDrawPreviewMatchesCurrent(preview, asset)) continue;
+    try {
+      if (preview.tool === "eraser") {
+        drawErasePreviewWrites(asset, preview.writes);
+      } else if (preview.writes.length > 0) {
+        drawTransformPreviewPixels(asset, preview.writes);
+      }
+    } catch {
+      // A stale or bounded pending projection must never block canonical draw.
+    }
+  }
+}
 
 function sameTilemapCell(
   left: Draw2TilemapCell | undefined,
@@ -15590,7 +15882,7 @@ function cancelActiveStroke(): void {
   ) canvas.releasePointerCapture(pointerId);
   drawInteraction?.cancel("EXPLICIT_CANCEL");
   drawInteraction = undefined;
-  drawOverlay();
+  flushDrawOverlay();
 }
 
 function selectionToolCanMove(): boolean {
@@ -16175,9 +16467,22 @@ function pointerSampleFromEvent(
 
 function addPointerSamples(event: PointerEvent): void {
   if (drawInteraction === undefined) return;
-  const coalesced =
-    (event as PointerEvent & { getCoalescedEvents?: () => PointerEvent[] })
-      .getCoalescedEvents?.() ?? [event];
+  let sampled: readonly PointerEvent[] | undefined;
+  try {
+    sampled =
+      (event as PointerEvent & {
+        getCoalescedEvents?: () => readonly PointerEvent[];
+      }).getCoalescedEvents?.();
+  } catch {
+    sampled = undefined;
+  }
+  // Some browser/pen implementations expose the method but return an empty
+  // array for a frame. The outer pointermove is still the authoritative
+  // latest sample and must not be dropped. Some implementations also return
+  // a non-empty coalesced array that does not contain that latest sample.
+  const coalesced = sampled === undefined || sampled.length === 0
+    ? [event]
+    : [...sampled, event];
   for (const sample of coalesced) {
     const pointerSample = pointerSampleFromEvent(sample, "move");
     if (pointerSample !== undefined) drawInteraction.handle(pointerSample);
@@ -16439,6 +16744,7 @@ canvas.addEventListener("pointerdown", (event) => {
     colorIndex: selectedColor,
     toolOptions: { ...toolOptions },
     commitIngress: drawCommitIngress,
+    onCommitQueued: queuePendingDrawPreview,
     onCommit: (commit) => commitInteractionSession(commit),
     onCommitError: (error) => {
       syncClientSequencesFromState();
@@ -16502,14 +16808,13 @@ canvas.addEventListener("pointermove", (event) => {
     return;
   }
   if (
-    drawInteraction?.activePointerId !== event.pointerId ||
-    (event.buttons & 1) === 0
+    drawInteraction?.activePointerId !== event.pointerId
   ) {
-    drawOverlay();
+    scheduleDrawOverlay();
     return;
   }
   addPointerSamples(event);
-  drawOverlay();
+  scheduleDrawOverlay();
 });
 canvas.addEventListener("pointerup", (event) => {
   if (event.pointerType === "touch") {
@@ -16581,7 +16886,7 @@ canvas.addEventListener("pointerup", (event) => {
     canvas.releasePointerCapture(event.pointerId);
   }
   drawInteraction = undefined;
-  drawOverlay();
+  flushDrawOverlay();
 });
 canvas.addEventListener("pointercancel", (event) => {
   if (event.pointerType === "touch") {
@@ -16627,7 +16932,7 @@ canvas.addEventListener("pointercancel", (event) => {
   const pointerSample = pointerSampleFromEvent(event, "cancel");
   if (pointerSample !== undefined) drawInteraction.handle(pointerSample);
   drawInteraction = undefined;
-  drawOverlay();
+  flushDrawOverlay();
   setStatus("Drawing cancelled before commit.", "error");
 });
 canvas.addEventListener("lostpointercapture", (event) => {
@@ -16669,10 +16974,19 @@ canvas.addEventListener("lostpointercapture", (event) => {
     return;
   }
   if (drawInteraction?.activePointerId !== event.pointerId) return;
+  if (event.buttons === 0) {
+    // Some browsers lose capture after the button is already released and
+    // suppress pointerup. Treat that boundary as the final commit.
+    const pointerSample = pointerSampleFromEvent(event, "up");
+    if (pointerSample !== undefined) drawInteraction.handle(pointerSample);
+    drawInteraction = undefined;
+    flushDrawOverlay();
+    return;
+  }
   const pointerSample = pointerSampleFromEvent(event, "lost_capture");
   if (pointerSample !== undefined) drawInteraction.handle(pointerSample);
   drawInteraction = undefined;
-  drawOverlay();
+  flushDrawOverlay();
   setStatus("Drawing cancelled after pointer capture was lost.", "error");
 });
 window.addEventListener("blur", () => {

@@ -9395,6 +9395,58 @@ function createPathWriteSet(tool, points, colorIndex, options, bounds) {
     colorIndex: tool === "eraser" ? 0 : colorIndex
   }));
 }
+function createFillPreviewWriteSet(reader, seed, colorIndex, maxPixels = Math.min(1048576, reader.width * reader.height), isAllowed) {
+  const start = clampPoint2(seed, reader);
+  const targetColor = reader.getPixel(start.x, start.y);
+  if (targetColor === colorIndex) return [];
+  const queue = [
+    start
+  ];
+  const visited = /* @__PURE__ */ new Set();
+  const writes = [];
+  let cursor = 0;
+  while (cursor < queue.length) {
+    const point2 = queue[cursor];
+    cursor += 1;
+    if (point2 === void 0) continue;
+    if (isAllowed?.(point2) === false) continue;
+    const key = point2.y * reader.width + point2.x;
+    if (visited.has(key)) continue;
+    visited.add(key);
+    if (reader.getPixel(point2.x, point2.y) !== targetColor) continue;
+    if (writes.length >= maxPixels) return [];
+    writes.push({
+      x: point2.x,
+      y: point2.y,
+      colorIndex
+    });
+    const enqueue = (candidate) => {
+      if (isAllowed?.(candidate) === false) return;
+      queue.push(candidate);
+    };
+    if (point2.x > 0) enqueue({
+      x: point2.x - 1,
+      y: point2.y
+    });
+    if (point2.x + 1 < reader.width) {
+      enqueue({
+        x: point2.x + 1,
+        y: point2.y
+      });
+    }
+    if (point2.y > 0) enqueue({
+      x: point2.x,
+      y: point2.y - 1
+    });
+    if (point2.y + 1 < reader.height) {
+      enqueue({
+        x: point2.x,
+        y: point2.y + 1
+      });
+    }
+  }
+  return writes;
+}
 function createIndexedGradientWriteSet(reader, region, from, to, startColorIndex, endColorIndex, palette) {
   if (region.length === 0 || palette.length === 0) return [];
   const safeStartIndex = Math.max(0, Math.min(palette.length - 1, Math.round(startColorIndex)));
@@ -9874,7 +9926,8 @@ var StrokeInputController = class {
   #move(sample) {
     if (this.#owner === "draw" && this.#stroke?.pointerId === sample.pointerId) {
       if ((sample.buttons & 1) === 0) {
-        return this.#cancelStroke("BUTTON_RELEASE_WITHOUT_POINTERUP");
+        this.#pointers.set(sample.pointerId, sample);
+        return [];
       }
       const point2 = pointFrom(sample);
       const previous = this.#stroke.points[this.#stroke.points.length - 1];
@@ -10024,11 +10077,32 @@ function pointFromSample(sample) {
 function samePoint(left, right) {
   return left?.x === right.x && left.y === right.y;
 }
+function clampPoint3(point2, bounds) {
+  return {
+    x: Math.max(0, Math.min(bounds.width - 1, Math.round(point2.x))),
+    y: Math.max(0, Math.min(bounds.height - 1, Math.round(point2.y)))
+  };
+}
+function previewPointKey(point2) {
+  return `${point2.x}:${point2.y}`;
+}
+function isPathPreviewTool(tool) {
+  return tool === "pen" || tool === "eraser" || tool === "pixel-pen";
+}
+function sortedColoredPixels(writes) {
+  return [
+    ...writes
+  ].sort((left, right) => left.y - right.y || left.x - right.x);
+}
 var ToolSession = class {
   #options;
   #tracePolicy;
+  #pathPreviewOptions;
   #points = [];
+  #previewWritesCache = [];
+  #previewWriteKeys = /* @__PURE__ */ new Set();
   #lifecycle = "NEW";
+  #previewInterpolatedPixelCount = 0;
   constructor(options) {
     this.#options = {
       ...options,
@@ -10039,6 +10113,12 @@ var ToolSession = class {
       }
     };
     this.#tracePolicy = tracePolicyForTool(options.tool);
+    this.#pathPreviewOptions = normalizeToolOptions(options.tool === "pixel-pen" ? {
+      ...options.toolOptions ?? {},
+      brushSize: 1,
+      brushShape: "square",
+      pattern: "solid"
+    } : options.toolOptions);
   }
   get lifecycle() {
     return this.#lifecycle;
@@ -10068,12 +10148,19 @@ var ToolSession = class {
     this.#require("NEW", "begin");
     this.#points.push(point2);
     this.#lifecycle = "ACTIVE";
+    if (isPathPreviewTool(this.#options.tool)) {
+      this.#appendPathPreview(void 0, point2);
+    }
     return this.snapshot();
   }
   update(point2) {
     this.#require("ACTIVE", "update");
     if (!samePoint(this.#points[this.#points.length - 1], point2)) {
+      const previous = this.#points[this.#points.length - 1];
       this.#points.push(point2);
+      if (isPathPreviewTool(this.#options.tool)) {
+        this.#appendPathPreview(previous, point2);
+      }
     }
     return this.snapshot();
   }
@@ -10119,6 +10206,9 @@ var ToolSession = class {
   cancel(reason) {
     this.#require("ACTIVE", "cancel");
     this.#points.length = 0;
+    this.#previewWritesCache.length = 0;
+    this.#previewWriteKeys.clear();
+    this.#previewInterpolatedPixelCount = 0;
     this.#lifecycle = "CANCELLED";
     return {
       sessionId: this.#options.sessionId,
@@ -10135,6 +10225,9 @@ var ToolSession = class {
     if (this.#lifecycle !== "ACTIVE" || this.#tracePolicy === "IMMEDIATE") {
       return [];
     }
+    if (isPathPreviewTool(this.#options.tool)) {
+      return this.#previewWritesCache;
+    }
     return this.#writeSet();
   }
   #writeSet() {
@@ -10145,14 +10238,34 @@ var ToolSession = class {
       if (this.#options.tool !== "pen" && this.#options.tool !== "eraser" && this.#options.tool !== "pixel-pen") {
         return [];
       }
-      return createPathWriteSet(this.#options.tool === "pixel-pen" ? "pen" : this.#options.tool, this.#points, this.#options.colorIndex, this.#options.tool === "pixel-pen" ? {
-        ...this.#options.toolOptions ?? {},
-        brushSize: 1,
-        brushShape: "square",
-        pattern: "solid"
-      } : this.#options.toolOptions ?? {}, this.#options.bounds);
+      return sortedColoredPixels(this.#previewWritesCache);
     }
     return createWriteSet(this.#options.tool, first, last, this.#options.colorIndex, this.#options.toolOptions ?? {}, this.#options.bounds);
+  }
+  #appendPathPreview(from, to) {
+    const start = clampPoint3(from ?? to, this.#options.bounds);
+    const end = clampPoint3(to, this.#options.bounds);
+    const remaining = MAX_INTERPOLATED_STROKE_PIXELS - this.#previewInterpolatedPixelCount;
+    if (remaining <= 0) return;
+    let segment;
+    try {
+      segment = interpolatePixelLine2(start, end);
+    } catch {
+      return;
+    }
+    const newSegment = from === void 0 ? segment : segment.slice(1);
+    const boundedSegment = newSegment.length > remaining ? newSegment.slice(0, remaining) : newSegment;
+    this.#previewInterpolatedPixelCount += boundedSegment.length;
+    const colorIndex = this.#options.tool === "eraser" ? 0 : this.#options.colorIndex;
+    for (const point2 of stampBrush2(boundedSegment, this.#pathPreviewOptions, this.#options.bounds)) {
+      const key = previewPointKey(point2);
+      if (this.#previewWriteKeys.has(key)) continue;
+      this.#previewWriteKeys.add(key);
+      this.#previewWritesCache.push({
+        ...point2,
+        colorIndex
+      });
+    }
   }
 };
 var Draw2InteractionKernel = class {
@@ -10242,8 +10355,10 @@ var Draw2InteractionKernel = class {
   #commit() {
     const session = this.#session;
     if (session === void 0) return;
+    const preview = session.snapshot();
     const commit = session.commit();
     this.#session = void 0;
+    this.#options.onCommitQueued?.(commit, preview);
     this.#options.onPreview?.(void 0);
     this.#commitIngress.enqueue(commit, this.#options.onCommit, this.#options.onCommitError);
   }
@@ -19851,6 +19966,7 @@ var linkedCelBindings = [];
 var selection;
 var rectangleSelectionClipCache;
 var rasterSelectionMaskCache;
+var fillPreviewRegionCache;
 var selectionInteractionGeneration = 0;
 var selectionEditMode = "REPLACE";
 var selectionDraft;
@@ -21496,7 +21612,7 @@ function syncPaletteWheelLayout() {
   if (panelBounds.width <= 0 || panelBounds.height <= 0 || mapBounds.width <= 0 || mapBounds.height <= 0) return;
   const editorStyles = getComputedStyle(editor);
   const editorContentWidth = Math.max(1, editor.clientWidth - parseFloat(editorStyles.paddingLeft) - parseFloat(editorStyles.paddingRight));
-  const preferredSize = Math.max(1, Math.min(180, editorContentWidth));
+  const preferredSize = Math.max(1, editorContentWidth);
   let mapContentTop = mapBounds.top - panelBounds.top + panel.scrollTop;
   let availableHeight = Math.max(1, panel.clientHeight - mapContentTop - 2);
   const compact = availableHeight < 120;
@@ -23851,8 +23967,11 @@ function clearErasePreview() {
   erasePreview.hidden = true;
   erasePreview.style.removeProperty("clip-path");
 }
-function drawErasePreview(asset, points) {
-  const writes = previewWriteSet(asset, "eraser", points);
+function drawErasePreview(asset, points, cachedWrites) {
+  const writes = previewWriteSet(asset, "eraser", points, cachedWrites);
+  drawErasePreviewWrites(asset, writes);
+}
+function drawErasePreviewWrites(asset, writes) {
   if (writes.length === 0) return;
   let minX = asset.width;
   let minY = asset.height;
@@ -23887,6 +24006,33 @@ function drawErasePreview(asset, points) {
   erasePreview.style.clipPath = `inset(${top}% ${right}% ${bottom}% ${left}%)`;
   erasePreview.hidden = false;
 }
+function scheduleDrawOverlay() {
+  if (overlayDrawFrame !== void 0) return;
+  const draw = () => {
+    overlayDrawFrame = void 0;
+    overlayDrawFrameKind = void 0;
+    drawOverlay();
+  };
+  if (typeof window.requestAnimationFrame === "function") {
+    overlayDrawFrameKind = "raf";
+    overlayDrawFrame = window.requestAnimationFrame(draw);
+    return;
+  }
+  overlayDrawFrameKind = "timeout";
+  overlayDrawFrame = window.setTimeout(draw, 16);
+}
+function flushDrawOverlay() {
+  if (overlayDrawFrame !== void 0) {
+    if (overlayDrawFrameKind === "raf") {
+      window.cancelAnimationFrame(overlayDrawFrame);
+    } else if (overlayDrawFrameKind === "timeout") {
+      window.clearTimeout(overlayDrawFrame);
+    }
+    overlayDrawFrame = void 0;
+    overlayDrawFrameKind = void 0;
+  }
+  drawOverlay();
+}
 function drawOverlay() {
   selectionOverlayContext.clearRect(0, 0, overlay.width, overlay.height);
   clearErasePreview();
@@ -23897,15 +24043,20 @@ function drawOverlay() {
   const asset = state.assets[state.activeAssetId];
   const tilemapMode = activeLayerIsTilemap();
   if (asset !== void 0 && !tilemapMode) drawOnionSkinProjection(asset);
+  if (asset !== void 0 && !tilemapMode) drawPendingDrawPreviews(asset);
   const tool = currentBasicTool();
-  const interactionPoints = drawInteraction?.session?.points ?? [];
+  const interactionSession = drawInteraction?.session;
+  const interactionPoints = interactionSession?.points ?? [];
+  const interactionPreviewWrites = interactionSession?.previewWrites;
   const previewPoints = interactionPoints.length > 0 ? interactionPoints : virtualCursorEnabled && hoverPoint !== void 0 ? [
     hoverPoint
   ] : [];
   if (asset !== void 0 && !tilemapMode && previewPoints.length > 0) {
     try {
-      if (tool === "eraser") drawErasePreview(asset, previewPoints);
-      drawCurrentToolPreview(asset, tool, previewPoints);
+      if (tool === "eraser") {
+        drawErasePreview(asset, previewPoints, interactionPreviewWrites);
+      }
+      drawCurrentToolPreview(asset, tool, previewPoints, interactionPreviewWrites);
     } catch {
     }
   }
@@ -23938,6 +24089,19 @@ function drawTransformPreviewPixels(asset, pixels) {
   selectionOverlayContext.save();
   selectionOverlayContext.imageSmoothingEnabled = false;
   selectionOverlayContext.globalAlpha = 0.86;
+  const firstColorIndex = pixels[0]?.colorIndex;
+  if (firstColorIndex !== void 0 && pixels.every((pixel) => pixel.colorIndex === firstColorIndex)) {
+    const color = decodeArgb(paletteColorForRender(asset, firstColorIndex));
+    if (color.alpha > 0) {
+      selectionOverlayContext.fillStyle = `rgba(${color.red}, ${color.green}, ${color.blue}, ${color.alpha / 255})`;
+      for (const pixel of pixels) {
+        if (pixel.x < 0 || pixel.y < 0 || pixel.x >= asset.width || pixel.y >= asset.height) continue;
+        selectionOverlayContext.fillRect(pixel.x, pixel.y, 1, 1);
+      }
+    }
+    selectionOverlayContext.restore();
+    return;
+  }
   for (const pixel of pixels) {
     if (pixel.x < 0 || pixel.y < 0 || pixel.x >= asset.width || pixel.y >= asset.height) continue;
     const color = decodeArgb(paletteColorForRender(asset, pixel.colorIndex));
@@ -23947,12 +24111,12 @@ function drawTransformPreviewPixels(asset, pixels) {
   }
   selectionOverlayContext.restore();
 }
-function previewWriteSet(asset, tool, points) {
+function previewWriteSet(asset, tool, points, cachedWrites) {
   if (selection !== void 0 && !selectionScopeMatchesActiveCel()) return [];
   const first = points[0];
   const last = points[points.length - 1] ?? first;
   if (first === void 0 || last === void 0) return [];
-  const writes = tool === "pen" || tool === "eraser" ? mirrorWritesForTool(createPathWriteSet(tool, points, selectedColor, toolOptions, asset.raster), asset, tool) : points.length === 1 ? mirrorWritesForTool(createToolPreviewWriteSet(tool, first, selectedColor, toolOptions, asset.raster), asset, tool) : mirrorWritesForTool(createWriteSet(tool, first, last, selectedColor, toolOptions, asset.raster), asset, tool);
+  const writes = cachedWrites !== void 0 && (tool === "pen" || tool === "pixel-pen" || tool === "eraser") ? mirrorWritesForTool(cachedWrites, asset, tool) : tool === "pen" || tool === "eraser" ? mirrorWritesForTool(createPathWriteSet(tool, points, selectedColor, toolOptions, asset.raster), asset, tool) : points.length === 1 ? mirrorWritesForTool(createToolPreviewWriteSet(tool, first, selectedColor, toolOptions, asset.raster), asset, tool) : mirrorWritesForTool(createWriteSet(tool, first, last, selectedColor, toolOptions, asset.raster), asset, tool);
   const selectionClip = activeRectangleSelectionClip();
   const selectionKeys = selectionClip === void 0 && selection !== void 0 ? new Set(selection.pixels.map(selectionPointKey)) : void 0;
   const selectedWrites = selectionClip === void 0 ? selectionKeys === void 0 ? writes : writes.filter((write) => selectionKeys.has(selectionPointKey(write))) : writes.filter((write) => write.x >= selectionClip.x && write.y >= selectionClip.y && write.x < selectionClip.x + selectionClip.width && write.y < selectionClip.y + selectionClip.height);
@@ -23969,16 +24133,71 @@ function guideColor(asset, tool) {
     blue: 124
   } : decodeArgb(paletteColorForRender(asset, selectedColor));
 }
-function drawCurrentToolPreview(asset, tool, points) {
+function fillPreviewCacheKey(asset, seed) {
+  const selectionKey = selection === void 0 ? "none" : [
+    selection.selectionId,
+    selection.mask.selectionVersion,
+    selection.pixels.length,
+    selectionInteractionGeneration
+  ].join(":");
+  return [
+    state.projectId,
+    asset.id,
+    asset.revision,
+    state.activeLayerId,
+    state.activeFrameId,
+    state.activeCelId,
+    selectedColor,
+    seed.x,
+    seed.y,
+    selectionKey
+  ].join("|");
+}
+function fillPreviewRegion(asset, seed) {
+  const key = fillPreviewCacheKey(asset, seed);
+  if (fillPreviewRegionCache?.key === key) {
+    return fillPreviewRegionCache.region;
+  }
+  if (selection !== void 0 && !selectionScopeMatchesActiveCel()) {
+    fillPreviewRegionCache = {
+      key,
+      region: []
+    };
+    return [];
+  }
+  const clip = activeRectangleSelectionClip();
+  const selectedPointKeys = clip === void 0 && selection !== void 0 ? new Set(selection.pixels.map(selectionPointKey)) : void 0;
+  const isAllowed = selection === void 0 ? void 0 : (point2) => {
+    if (clip !== void 0) {
+      return point2.x >= clip.x && point2.y >= clip.y && point2.x < clip.x + clip.width && point2.y < clip.y + clip.height;
+    }
+    return selectedPointKeys?.has(selectionPointKey(point2)) ?? false;
+  };
+  const writes = createFillPreviewWriteSet(asset.raster, seed, selectedColor, 32768, isAllowed);
+  const region = writes.map(({ x, y }) => ({
+    x,
+    y
+  }));
+  fillPreviewRegionCache = {
+    key,
+    region
+  };
+  return region;
+}
+function fillPreviewWrites(asset, from, to, colorIndex = selectedColor) {
+  const region = fillPreviewRegion(asset, from);
+  if (region.length === 0) return [];
+  return createIndexedGradientWriteSet(asset.raster, region, from, to, asset.raster.getPixel(from.x, from.y), colorIndex, asset.palette);
+}
+function drawCurrentToolPreview(asset, tool, points, cachedWrites) {
   const first = points[0];
   const last = points[points.length - 1] ?? first;
   if (first === void 0 || last === void 0 || tool === "pan") return;
   if (tool === "eraser") return;
   if (tool === "fill") {
-    if (points.length > 1) {
-      const writes = createFillGradientWriteSet(asset, first, last, selectedColor, 32768);
-      if (writes.length > 0) drawTransformPreviewPixels(asset, writes);
-    }
+    if (selection !== void 0 && !selectionScopeMatchesActiveCel()) return;
+    const writes = fillPreviewWrites(asset, first, last);
+    if (writes.length > 0) drawTransformPreviewPixels(asset, writes);
     if (selection === void 0 || pointIsSelectedPixel(selection, last)) {
       drawToolCursor(last, guideColor(asset, tool));
     }
@@ -24010,7 +24229,7 @@ function drawCurrentToolPreview(asset, tool, points) {
     });
     return;
   }
-  drawToolPreviewGuide(previewWriteSet(asset, tool, points), guideColor(asset, tool));
+  drawToolPreviewGuide(previewWriteSet(asset, tool, points, cachedWrites), guideColor(asset, tool));
 }
 function drawToolCursor(point2, color) {
   const luminance = color.red * 0.299 + color.green * 0.587 + color.blue * 0.114;
@@ -26773,7 +26992,6 @@ async function commitPointerPointsNow(points, fixedContext) {
         x: point2.x,
         y: point2.y
       }));
-      interpolatePixelPath(rawStrokePoints);
       strokePoints = compactPixelPath(rawStrokePoints, PIXYNC_DRAW2_MAX_PAYLOAD_KEYS);
       interpolatePixelPath(strokePoints);
     } catch (cause) {
@@ -26924,39 +27142,43 @@ async function commitShapePointsNow(tool, from, to, colorIndex, toolOptions2) {
   setStatus(`${tool} committed \xB7 one shape / one undo`);
 }
 async function commitInteractionSession(commit) {
-  const fixedContext = {
-    tool: commit.tool,
-    colorIndex: commit.colorIndex,
-    toolOptions: commit.tool === "pixel-pen" ? {
-      ...commit.toolOptions,
-      brushSize: 1,
-      brushShape: "square",
-      pattern: "solid"
-    } : commit.toolOptions
-  };
-  if (commit.kind === "immediate") {
-    await commitPointerPoints(commit.tool === "fill" ? commit.points : [
-      commit.point
-    ], fixedContext);
-    return;
-  }
-  if (commit.tool === "pen" || commit.tool === "eraser" || commit.tool === "pixel-pen" || commit.tool === "line") {
+  try {
+    const fixedContext = {
+      tool: commit.tool,
+      colorIndex: commit.colorIndex,
+      toolOptions: commit.tool === "pixel-pen" ? {
+        ...commit.toolOptions,
+        brushSize: 1,
+        brushShape: "square",
+        pattern: "solid"
+      } : commit.toolOptions
+    };
+    if (commit.kind === "immediate") {
+      await commitPointerPoints(commit.tool === "fill" ? commit.points : [
+        commit.point
+      ], fixedContext);
+      return;
+    }
+    if (commit.tool === "pen" || commit.tool === "eraser" || commit.tool === "pixel-pen" || commit.tool === "line") {
+      await commitPointerPoints(commit.points, fixedContext);
+      return;
+    }
+    const shapeTools = [
+      "rect",
+      "rect-fill",
+      "ellipse",
+      "ellipse-fill",
+      "circle",
+      "circle-fill"
+    ];
+    if (shapeTools.includes(commit.tool)) {
+      await commitPointerPoints(commit.points, fixedContext);
+      return;
+    }
     await commitPointerPoints(commit.points, fixedContext);
-    return;
+  } finally {
+    removePendingDrawPreview(commit.sessionId);
   }
-  const shapeTools = [
-    "rect",
-    "rect-fill",
-    "ellipse",
-    "ellipse-fill",
-    "circle",
-    "circle-fill"
-  ];
-  if (shapeTools.includes(commit.tool)) {
-    await commitPointerPoints(commit.points, fixedContext);
-    return;
-  }
-  await commitPointerPoints(commit.points, fixedContext);
 }
 createButton.addEventListener("click", openProjectDialog);
 openProjectDialogTrigger.addEventListener("click", openProjectDialog);
@@ -27699,6 +27921,68 @@ redoControl.addEventListener("click", async () => {
   setStatus(`Redo restored ${result.operationId} locally; no Realtime operation sent.`);
 });
 var drawInteraction;
+var overlayDrawFrame;
+var overlayDrawFrameKind;
+var pendingDrawPreviews = [];
+function projectPendingPreviewWrites(asset, tool, writes) {
+  if (selection !== void 0 && !selectionScopeMatchesActiveCel()) return [];
+  const mirrored = mirrorWritesForTool(writes, asset, tool);
+  const clip = activeRectangleSelectionClip();
+  const selectionKeys = clip === void 0 && selection !== void 0 ? new Set(selection.pixels.map(selectionPointKey)) : void 0;
+  if (clip !== void 0) {
+    return mirrored.filter((write) => write.x >= clip.x && write.y >= clip.y && write.x < clip.x + clip.width && write.y < clip.y + clip.height);
+  }
+  if (selectionKeys !== void 0) {
+    return mirrored.filter((write) => selectionKeys.has(selectionPointKey(write)));
+  }
+  return mirrored;
+}
+function queuePendingDrawPreview(commit, snapshot) {
+  const asset = state.assets[state.activeAssetId];
+  if (asset === void 0 || snapshot.points.length === 0) return;
+  const first = snapshot.points[0];
+  const last = snapshot.points.at(-1) ?? first;
+  const writes = snapshot.previewWrites.length > 0 ? projectPendingPreviewWrites(asset, commit.tool, snapshot.previewWrites) : commit.tool === "fill" ? fillPreviewWrites(asset, first, last, commit.colorIndex) : [];
+  pendingDrawPreviews.push({
+    sessionId: snapshot.sessionId,
+    projectId: state.projectId,
+    assetId: asset.id,
+    layerId: state.activeLayerId,
+    frameId: state.activeFrameId,
+    celId: state.activeCelId,
+    structureEpoch: state.structureEpoch,
+    selectionGeneration: selectionInteractionGeneration,
+    tool: commit.tool,
+    points: [
+      ...snapshot.points
+    ],
+    writes: [
+      ...writes
+    ]
+  });
+}
+function removePendingDrawPreview(sessionId) {
+  const next = pendingDrawPreviews.filter((preview) => preview.sessionId !== sessionId);
+  if (next.length === pendingDrawPreviews.length) return;
+  pendingDrawPreviews = next;
+  flushDrawOverlay();
+}
+function pendingDrawPreviewMatchesCurrent(preview, asset) {
+  return preview.projectId === state.projectId && preview.assetId === asset.id && preview.layerId === state.activeLayerId && preview.frameId === state.activeFrameId && preview.celId === state.activeCelId && preview.structureEpoch === state.structureEpoch && preview.selectionGeneration === selectionInteractionGeneration;
+}
+function drawPendingDrawPreviews(asset) {
+  for (const preview of pendingDrawPreviews) {
+    if (!pendingDrawPreviewMatchesCurrent(preview, asset)) continue;
+    try {
+      if (preview.tool === "eraser") {
+        drawErasePreviewWrites(asset, preview.writes);
+      } else if (preview.writes.length > 0) {
+        drawTransformPreviewPixels(asset, preview.writes);
+      }
+    } catch {
+    }
+  }
+}
 function sameTilemapCell(left, right) {
   if (left === void 0 || right === void 0) return left === right;
   return left.sourceAssetId === right.sourceAssetId && left.sourceX === right.sourceX && left.sourceY === right.sourceY && left.transform === right.transform;
@@ -27743,7 +28027,7 @@ function cancelActiveStroke() {
   if (pointerId !== void 0 && canvas.hasPointerCapture(pointerId)) canvas.releasePointerCapture(pointerId);
   drawInteraction?.cancel("EXPLICIT_CANCEL");
   drawInteraction = void 0;
-  drawOverlay();
+  flushDrawOverlay();
 }
 function selectionToolCanMove() {
   const tool = currentBasicTool();
@@ -28162,7 +28446,16 @@ function pointerSampleFromEvent(event, phase) {
 }
 function addPointerSamples(event) {
   if (drawInteraction === void 0) return;
-  const coalesced = event.getCoalescedEvents?.() ?? [
+  let sampled;
+  try {
+    sampled = event.getCoalescedEvents?.();
+  } catch {
+    sampled = void 0;
+  }
+  const coalesced = sampled === void 0 || sampled.length === 0 ? [
+    event
+  ] : [
+    ...sampled,
     event
   ];
   for (const sample of coalesced) {
@@ -28362,6 +28655,7 @@ canvas.addEventListener("pointerdown", (event) => {
       ...toolOptions
     },
     commitIngress: drawCommitIngress,
+    onCommitQueued: queuePendingDrawPreview,
     onCommit: (commit) => commitInteractionSession(commit),
     onCommitError: (error2) => {
       syncClientSequencesFromState();
@@ -28422,12 +28716,12 @@ canvas.addEventListener("pointermove", (event) => {
     if (event.cancelable) event.preventDefault();
     return;
   }
-  if (drawInteraction?.activePointerId !== event.pointerId || (event.buttons & 1) === 0) {
-    drawOverlay();
+  if (drawInteraction?.activePointerId !== event.pointerId) {
+    scheduleDrawOverlay();
     return;
   }
   addPointerSamples(event);
-  drawOverlay();
+  scheduleDrawOverlay();
 });
 canvas.addEventListener("pointerup", (event) => {
   if (event.pointerType === "touch") {
@@ -28491,7 +28785,7 @@ canvas.addEventListener("pointerup", (event) => {
     canvas.releasePointerCapture(event.pointerId);
   }
   drawInteraction = void 0;
-  drawOverlay();
+  flushDrawOverlay();
 });
 canvas.addEventListener("pointercancel", (event) => {
   if (event.pointerType === "touch") {
@@ -28537,7 +28831,7 @@ canvas.addEventListener("pointercancel", (event) => {
   const pointerSample = pointerSampleFromEvent(event, "cancel");
   if (pointerSample !== void 0) drawInteraction.handle(pointerSample);
   drawInteraction = void 0;
-  drawOverlay();
+  flushDrawOverlay();
   setStatus("Drawing cancelled before commit.", "error");
 });
 canvas.addEventListener("lostpointercapture", (event) => {
@@ -28570,10 +28864,17 @@ canvas.addEventListener("lostpointercapture", (event) => {
     return;
   }
   if (drawInteraction?.activePointerId !== event.pointerId) return;
+  if (event.buttons === 0) {
+    const pointerSample2 = pointerSampleFromEvent(event, "up");
+    if (pointerSample2 !== void 0) drawInteraction.handle(pointerSample2);
+    drawInteraction = void 0;
+    flushDrawOverlay();
+    return;
+  }
   const pointerSample = pointerSampleFromEvent(event, "lost_capture");
   if (pointerSample !== void 0) drawInteraction.handle(pointerSample);
   drawInteraction = void 0;
-  drawOverlay();
+  flushDrawOverlay();
   setStatus("Drawing cancelled after pointer capture was lost.", "error");
 });
 window.addEventListener("blur", () => {
