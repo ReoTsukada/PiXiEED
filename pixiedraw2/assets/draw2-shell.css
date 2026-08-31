@@ -24983,57 +24983,16 @@ body:has(#draw2WorkspaceFrame) {
     background: var(--draw2-surface) !important;
   }
 
-  #draw2WorkspaceFrame.draw2-workspace-frame[data-creator-mode="DRAW"]
-    .draw2-workspace-brand {
-    position: static !important;
-    display: grid !important;
-    grid-column: 1 !important;
-    grid-template-columns: 24px minmax(0, 1fr) !important;
-    grid-template-rows: 18px 14px !important;
-    column-gap: 8px !important;
-    row-gap: 2px !important;
-    width: auto !important;
-    max-width: none !important;
-    height: auto !important;
-    min-width: 0 !important;
-    white-space: nowrap !important;
-  }
-
-  #draw2WorkspaceFrame.draw2-workspace-frame[data-creator-mode="DRAW"]
-    .draw2-brand-logo {
-    grid-row: 1 / -1 !important;
-    align-self: center !important;
-    width: 24px !important;
-    height: 24px !important;
-  }
-
-  #draw2WorkspaceFrame.draw2-workspace-frame[data-creator-mode="DRAW"]
-    .draw2-workspace-brand-product {
-    min-width: 0 !important;
-    overflow: hidden !important;
-    color: var(--draw2-text-strong) !important;
-    font-size: 0.78rem !important;
-    font-weight: 750 !important;
-    letter-spacing: 0.01em !important;
-    text-overflow: ellipsis !important;
-  }
-
-  #draw2WorkspaceFrame.draw2-workspace-frame[data-creator-mode="DRAW"]
-    .draw2-workspace-brand-context {
-    display: block !important;
-    overflow: hidden !important;
-    color: var(--draw2-text-muted) !important;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace !important;
-    font-size: 0.53rem !important;
-    letter-spacing: 0.08em !important;
-    text-overflow: ellipsis !important;
-    text-transform: uppercase !important;
-  }
-
-  #draw2WorkspaceFrame.draw2-workspace-frame[data-creator-mode="DRAW"]
-    .draw2-workspace-status {
-    display: none !important;
-  }
+  /* DRAW used to carry its own brand block here (grid layout, 24px logo,
+     0.78rem/750 product text, a visible subtitle row) that partially
+     collided with the shared desktop-profile brand rule below (same
+     specificity, tied by source order) -- DRAW ended up rendering a hybrid
+     of both instead of either cleanly. Removed so the top-left brand
+     (logo/"PiXiEEDstudio"/subtitle) renders from one single rule across
+     DRAW/AUDIO/GAME, which both fixes the "DRAW looks subtly different"
+     drift and lets the brand element keep a stable box across a mode
+     switch (needed for it to participate in a per-element view transition
+     instead of forcing a whole-viewport crossfade). */
 
   #draw2WorkspaceFrame.draw2-workspace-frame[data-creator-mode="DRAW"]
     .draw2-workspace-menu-bar {

@@ -32,6 +32,56 @@
   animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/*
+ * Named regions (2026-08-31 follow-up): a root-only transition captures the
+ * whole viewport as one before/after image and can only cross-fade the two
+ * -- every panel that changes size appears to "jump" to its new size the
+ * instant the fade lands. iDRAW/iAUDIO/iGAME already share one stable shell
+ * (#draw2WorkspaceTopbar / #draw2WorkspaceLeftDock /
+ * #draw2WorkspaceCanvasRegion / #draw2WorkspaceRightDock /
+ * #draw2WorkspaceTimelineRegion -- confirmed present in all three modes,
+ * same element, never duplicated), so naming those five lets the browser
+ * animate each region's own position/size independently: a rail going from
+ * open to a narrower fixed width visibly closes over the transition instead
+ * of snapping, and nothing needs to know about any other mode's DOM to get
+ * this -- the browser interpolates whatever box each named element has at
+ * the moment of the switch. Same 400ms/easing as the root fade so every
+ * region settles in lockstep; no separate duration to justify.
+ *
+ * Deliberately NOT naming anything inside these five (individual tool
+ * buttons, palette rows, tabs): those change *within* a mode too, and
+ * giving them a transition-name would also animate ordinary same-mode
+ * interactions, not just mode switches. If a name is reused by an
+ * unrelated simultaneously-visible element this silently degrades to the
+ * browser's own duplicate-name handling for that one region, not a hard
+ * failure, so this list can safely grow later without needing to audit
+ * every other view-transition-name in the codebase (there are none yet).
+ */
+#draw2WorkspaceTopbar { view-transition-name: draw2-vt-topbar; }
+#draw2WorkspaceLeftDock { view-transition-name: draw2-vt-left-dock; }
+#draw2WorkspaceCanvasRegion { view-transition-name: draw2-vt-canvas; }
+#draw2WorkspaceRightDock { view-transition-name: draw2-vt-right-dock; }
+#draw2WorkspaceTimelineRegion { view-transition-name: draw2-vt-timeline; }
+
+::view-transition-group(draw2-vt-topbar),
+::view-transition-group(draw2-vt-left-dock),
+::view-transition-group(draw2-vt-canvas),
+::view-transition-group(draw2-vt-right-dock),
+::view-transition-group(draw2-vt-timeline),
+::view-transition-old(draw2-vt-topbar),
+::view-transition-new(draw2-vt-topbar),
+::view-transition-old(draw2-vt-left-dock),
+::view-transition-new(draw2-vt-left-dock),
+::view-transition-old(draw2-vt-canvas),
+::view-transition-new(draw2-vt-canvas),
+::view-transition-old(draw2-vt-right-dock),
+::view-transition-new(draw2-vt-right-dock),
+::view-transition-old(draw2-vt-timeline),
+::view-transition-new(draw2-vt-timeline) {
+  animation-duration: 400ms;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 @media (prefers-reduced-motion: reduce) {
   /* Defense in depth: src/wp180-workspace-ui.ts already checks
      prefers-reduced-motion in JS and skips calling startViewTransition()
