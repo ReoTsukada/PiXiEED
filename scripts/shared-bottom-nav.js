@@ -20,7 +20,7 @@
       navHome: 'ホーム',
       navMarket: 'マーケット',
       navCommunity: 'コミュニティ',
-      navDraw: 'PiXiEEDraw',
+      navDraw: 'iDRAW',
       navAccount: 'マイページ',
       footerCommunity: 'コミュニティ',
       footerMarket: 'マーケット',
@@ -38,7 +38,7 @@
       navHome: 'Home',
       navMarket: 'Market',
       navCommunity: 'Community',
-      navDraw: 'PiXiEEDraw',
+      navDraw: 'iDRAW',
       navAccount: 'Profile',
       footerCommunity: 'Community',
       footerMarket: 'Market',
@@ -314,7 +314,7 @@
     return [
       { key: 'home', label: 'ホーム', labelKey: 'navHome', path: 'index.html', icon: 'assets/icons/HOME.png?v=2026.07.19-ui-icons1' },
       { key: 'community', label: 'コミュニティ', labelKey: 'navCommunity', path: 'community/', icon: 'assets/icons/HOME.png?v=2026.07.19-ui-icons1' },
-      { key: 'draw', label: 'PiXiEEDraw', labelKey: 'navDraw', path: 'pixiedraw2/', icon: 'assets/icons/Draw.png', primary: true },
+      { key: 'draw', label: 'iDRAW', labelKey: 'navDraw', path: 'pixiedraw2/', icon: 'assets/icons/Draw.png', primary: true },
       { key: 'market', label: 'マーケット', labelKey: 'navMarket', path: 'market/', icon: 'assets/icons/Market.png' },
       { key: 'account', label: 'マイページ', labelKey: 'navAccount', path: 'account/index.html', icon: 'icon/icon-192-4.png' }
     ];

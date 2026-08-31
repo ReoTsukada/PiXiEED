@@ -1,122 +1,61 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <title>PiXiEED | イベント・特集</title>
-  <meta name="description" content="PiXiEEDで開催中のイベントや注目特集をまとめて確認できるページです。">
-  <link rel="canonical" href="https://pixieed.jp/events/">
-  <meta property="og:type" content="website">
-  <meta property="og:site_name" content="PiXiEED">
-  <meta property="og:title" content="PiXiEED | イベント・特集">
-  <meta property="og:description" content="PiXiEEDで開催中のイベントや注目特集をまとめて確認できるページです。">
-  <meta property="og:url" content="https://pixieed.jp/events/">
-  <meta property="og:image" content="https://pixieed.jp/PiXiEEDogp.png">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="PiXiEED | イベント・特集">
-  <meta name="twitter:description" content="PiXiEEDで開催中のイベントや注目特集をまとめて確認できるページです。">
-  <meta name="twitter:image" content="https://pixieed.jp/PiXiEEDogp.png">
-  <link rel="icon" type="image/png" href="../character-dots/mao1.png">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet">
-  <script src="../scripts/ad-account-control.js?v=20260719-no-ad-fallback1"></script>
-  <link rel="stylesheet" href="../site/landing.css?v=2026.07.15-home-clear-entry1">
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>このページは終了しました | PiXiEED</title>
+<meta name="robots" content="noindex,nofollow"/>
+<meta name="description" content="このページは終了しました。"/>
+<link rel="icon" type="image/png" href="../character-dots/mao1.png"/>
+<style>
+  :root{ color-scheme: light dark; }
+  *{ box-sizing:border-box; }
+  body{
+    margin:0;
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:#f4f5f9;
+    color:#12141f;
+    font-family:"Hiragino Sans","Yu Gothic",system-ui,sans-serif;
+    padding:32px;
+  }
+  @media (prefers-color-scheme: dark){
+    body{ background:#0c0d13; color:#eceef6; }
+    .card{ background:#15171f !important; border-color:#2a2d3a !important; }
+    .muted{ color:#a4a9bb !important; }
+  }
+  .card{
+    max-width:440px;
+    width:100%;
+    background:#ffffff;
+    border:1px solid #dadde8;
+    border-radius:16px;
+    padding:36px 32px;
+    text-align:center;
+  }
+  h1{ font-size:19px; margin:0 0 12px; }
+  p{ font-size:14.5px; line-height:1.7; margin:0 0 22px; }
+  .muted{ color:#5a6072; }
+  a.home{
+    display:inline-block;
+    padding:10px 22px;
+    border-radius:999px;
+    background:#3d3af0;
+    color:#fff;
+    text-decoration:none;
+    font-size:14px;
+    font-weight:600;
+  }
+  a.home:focus-visible{ outline:2px solid #3d3af0; outline-offset:3px; }
+</style>
 </head>
 <body>
-  <header class="site-header" aria-label="top-nav">
-      <div class="header-inner header-inner--app">
-        <button class="brand" id="openProfilePanel" type="button">
-          <span class="brand-icon" id="brandAvatar"><img src="../character-dots/mao1.png" alt="logo"></span>
-          <div class="brand-text">
-            <p class="brand-title">PiXiEED</p>
-            <p class="brand-sub" id="brandUser">ユーザー</p>
-          </div>
-        </button>
-        <div class="header-actions">
-        </div>
-      </div>
-    </header>
-<div class="page">
-    
-
-    <main class="page-shell home-app">
-      <div class="info-page">
-        <section class="card info-hero">
-          <p class="info-hero__eyebrow">Events & Features</p>
-          <h1 class="info-hero__title" data-i18n-key="eventsTitle">イベントと特集をまとめて確認できます</h1>
-          <p class="info-hero__copy" data-i18n-key="eventsIntro">開催中の企画、注目してほしい作品、PiXiEED内の見どころをここからまとめて確認できます。気になった内容は、そのまま各ページへ進めます。</p>
-          <div class="inline-actions">
-            <a class="button-secondary" href="../help/index.html#bridge">Bridgeの準備状況を見る</a>
-          </div>
-        </section>
-
-        <section class="card info-list" aria-label="イベント一覧" data-i18n-aria-label="eventsListAria">
-          <article class="info-card">
-            <div class="info-card__head">
-              <p class="info-card__eyebrow">Bridge</p>
-              <h2 class="info-card__title">外部制作アプリの接続計画</h2>
-            </div>
-            <p class="info-card__copy">Aseprite と Unity を最初のMVPとして、プロジェクト・アセット・オブジェクト・操作・リビジョンをリアルタイムに接続します。</p>
-            <div class="info-card__actions">
-              <a class="button-secondary" href="../help/index.html#bridge">概要を確認</a>
-            </div>
-          </article>
-          <article class="info-card">
-            <div class="info-card__head">
-              <p class="info-card__eyebrow">Status</p>
-              <h2 class="info-card__title">対応アプリは順次拡張</h2>
-            </div>
-            <p class="info-card__copy">Blender、REAPER、Ableton、Figma、Photoshop などは Connector の設計を確認しながら追加します。</p>
-            <div class="info-card__actions">
-              <a class="button-secondary" href="../help/index.html#bridge">Bridgeの概要を見る</a>
-            </div>
-          </article>
-        </section>
-      </div>
-    </main>
-
-    <footer>
-      <p>© <span id="year">2026</span> PiXiEED. All rights reserved.</p>
-      <div class="footer-links">
-        <a href="#" aria-disabled="true" onclick="return false;">会話</a>
-        <a href="../terms/index.html">利用規約</a>
-        <a href="../privacy/index.html">プライバシーポリシー</a>
-      </div>
-    </footer>
+  <div class="card">
+    <h1>このページは終了しました</h1>
+    <p class="muted">「イベント・特集」ページは終了しました。最新のお知らせはお知らせページをご覧ください。</p>
+    <a class="home" href="../">ホームへ戻る</a>
   </div>
-
-  <nav class="bottom-nav" aria-label="下部ナビ">
-    <a class="bottom-nav__item" data-tab="home" href="../index.html"><span class="icon"><img src="../assets/icons/HOME.png?v=2026.07.19-ui-icons1" alt=""></span><span>ホーム</span></a>
-    <a class="bottom-nav__item" data-tab="community" href="../community/"><span class="icon"><img src="../assets/icons/HOME.png?v=2026.07.19-ui-icons1" alt=""></span><span>コミュニティ</span></a>
-    <a class="bottom-nav__item bottom-nav__item--primary" data-tab="draw" href="../pixiedraw2/"><span class="icon"><img src="../assets/icons/Draw.png" alt=""></span><span>PiXiEEDraw</span></a>
-    <a class="bottom-nav__item" data-tab="market" href="../market/"><span class="icon"><img src="../assets/icons/Market.png" alt=""></span><span>マーケット</span></a>
-    <a class="bottom-nav__item" data-tab="account" href="../account/index.html"><span class="icon"><img src="../icon/icon-192-4.png" alt=""></span><span>マイページ</span></a>
-  </nav>
-
-  <script src="../scripts/shared-profile-header.js?v=20260825-common-shell15"></script>
-  <script src="../scripts/pixieed-dot-stats.js"></script>
-  <script src="../scripts/bottom-nav-footer-ad.js?v=20260719-shared-top-resume1"></script>
-  <script>const year=document.getElementById('year'); if(year) year.textContent=new Date().getFullYear();</script>
-  <div class="auth-panel" id="authPanel" aria-hidden="true">
-    <div class="auth-card">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
-        <h3 style="margin:0;font-size:16px;color:#f9fafb;">プロフィール</h3>
-        <button class="close-btn" type="button" id="closeAuthPanel">閉じる</button>
-      </div>
-      <div class="profile-block">
-        <div class="profile-row">
-          <button class="avatar-toggle" id="avatarToggle" type="button" aria-label="アイコンを変更" aria-expanded="false" aria-controls="avatarPanel"><span class="avatar-toggle__img" id="avatarPreview"></span></button>
-          <label class="profile-name"><span style="font-weight:700; color:#e5e7eb;">ニックネーム</span><input class="auth-input" id="profileNickname" type="text" placeholder="なまえ" maxlength="32"></label>
-        </div>
-        <div class="avatar-panel" id="avatarPanel" hidden><div class="avatar-grid" id="avatarGrid"></div></div>
-        <label class="profile-name"><span style="font-weight:700; color:#e5e7eb;">X (旧Twitter)</span><input class="auth-input" id="profileX" type="url" placeholder="https://x.com/username" maxlength="200" inputmode="url"></label>
-        <button class="auth-btn" id="saveProfile" type="button">プロフィールを保存</button>
-        <p class="auth-status" id="authStatus"></p>
-      </div>
-    </div>
-  </div>
-  <script src="../scripts/shared-bottom-nav.js?v=20260830-bridge-shell1"></script>
-  <script src="../scripts/pixel-art-fit.js"></script>
 </body>
 </html>
