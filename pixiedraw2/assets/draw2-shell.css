@@ -22595,14 +22595,14 @@ body:has(#draw2WorkspaceFrame) {
     gap: 0 !important;
   }
 
-  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
-    #draw2AudioWorkspace
-    > .draw2-audio-arranger-overview {
-    display: flex !important;
-    flex: 0 0 clamp(240px, 42%, 420px) !important;
-    min-height: 220px !important;
-    height: auto !important;
-  }
+  /* This used to re-show .draw2-audio-arranger-overview at
+     flex:0 0 clamp(240px,42%,420px) here, which tied the specificity of
+     (and, being later in the file, beat) the "Audio workstation hierarchy"
+     rule above that hides it -- so the center kept rendering a second,
+     redundant ruler+lanes+playhead timeline on top of the one already
+     shown in the permanent lower deck. Removed so that earlier
+     display:none rule is the only one left and actually applies; the
+     center is the selected Piano/Wave/Drum/Sampler/Draw editor only. */
 
   #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
     #draw2AudioWorkspace
