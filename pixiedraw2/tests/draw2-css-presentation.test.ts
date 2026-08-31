@@ -79,3 +79,118 @@ Deno.test("presentation-only inline writes are not reintroduced", async () => {
     );
   }
 });
+
+Deno.test("right dock omits redundant context and mode headings", async () => {
+  const css = await readProjectFile("../assets/draw2-shell.css");
+  const refinementStart = css.lastIndexOf(
+    "Right-dock surface refinement (2026-08-31)",
+  );
+  assert(
+    refinementStart >= 0,
+    "Right-dock heading refinement must remain explicit in the final cascade.",
+  );
+  const refinement = css.slice(refinementStart);
+  for (const required of [
+    "#draw2WorkspaceRightContext",
+    "#draw2WorkspaceModeSummary",
+    "#draw2WorkspaceRightDock::before",
+    "display: none !important",
+    "content: none !important",
+  ]) {
+    assert(
+      refinement.includes(required),
+      `Right-dock heading removal contract missing: ${required}`,
+    );
+  }
+});
+
+Deno.test("right dock keeps the palette bounded above the active panel", async () => {
+  const css = await readProjectFile("../assets/draw2-shell.css");
+  const source = await readProjectFile("../src/wp180-workspace-ui.ts");
+  const refinementStart = css.lastIndexOf(
+    "Right-dock palette split contract (2026-08-31)",
+  );
+  assert(
+    refinementStart >= 0,
+    "Right-dock palette split contract must remain explicit in the final cascade.",
+  );
+  const refinement = css.slice(refinementStart);
+  for (const required of [
+    "grid-template-rows:",
+    "minmax(var(--draw2-right-custom-min-height), 1fr)",
+    "--draw2-right-palette-max-ratio: 88%",
+    "--draw2-right-palette-min-height: 40px",
+    "--draw2-right-custom-min-height: 176px",
+    "#draw2WorkspacePaletteStrip",
+    "display: block !important",
+    "grid-row: 1 !important",
+    "#draw2WorkspacePaletteResize",
+    "grid-row: 2 !important",
+    "#draw2WorkspaceRightCustomDock",
+    "grid-row: 3 !important",
+    "overflow: auto !important",
+  ]) {
+    assert(
+      refinement.includes(required),
+      `Right-dock palette split contract missing: ${required}`,
+    );
+  }
+  for (const required of [
+    "RIGHT_DOCK_MAX_PALETTE_RATIO",
+    "storedRatio > RIGHT_DOCK_MAX_PALETTE_RATIO",
+    "RIGHT_DOCK_RESIZE_HANDLE_PX",
+    "clientY - contentTop",
+  ]) {
+    assert(
+      source.includes(required),
+      `Right-dock splitter behavior contract missing: ${required}`,
+    );
+  }
+});
+
+Deno.test("all adjustable rails share a reachable collapse contract", async () => {
+  const css = await readProjectFile("../assets/draw2-shell.css");
+  const source = await readProjectFile("../src/wp180-workspace-ui.ts");
+  const finalRailStart = css.lastIndexOf(
+    "Final adjustable-rail contract (2026-08-31)",
+  );
+  assert(finalRailStart >= 0, "Final adjustable rail contract is missing.");
+  const finalRail = css.slice(finalRailStart);
+  for (const required of [
+    "--draw2-rail-layer: 20",
+    "--draw2-rail-handle-layer: 60",
+    "#draw2WorkspaceTimelineRegion",
+    "#draw2WorkspaceRightResize",
+    "left: -14px !important",
+    "@media (max-width: 700px)",
+  ]) {
+    assert(
+      finalRail.includes(required),
+      `Adjustable rail contract missing: ${required}`,
+    );
+  }
+  for (const required of [
+    'handle.setAttribute("role", "separator")',
+    'handle.setAttribute("aria-orientation", orientation)',
+    "gameLeftCollapsed",
+    "audioLeftCollapsed",
+    "timelineCollapsed",
+    "ArrowLeft",
+    "ArrowRight",
+    "ArrowUp",
+    "ArrowDown",
+  ]) {
+    assert(
+      source.includes(required),
+      `Adjustable rail behavior contract missing: ${required}`,
+    );
+  }
+  const timelineStart = source.indexOf("const setDesktopTimelineCollapsed");
+  const timelineEnd = source.indexOf("const toggleTimelineSurface", timelineStart);
+  const timelineBody = source.slice(timelineStart, timelineEnd);
+  assert(
+    !timelineBody.includes('currentCreatorMode() === "GAME") return false'),
+    "Timeline collapse must not exclude GAME mode.",
+  );
+  assert(!finalRail.includes("&.is-"), "Final rail CSS must stay flat CSS.");
+});

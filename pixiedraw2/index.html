@@ -10,7 +10,7 @@
     <title>PiXiEEDstudio — Studio</title>
     <link
       rel="stylesheet"
-      href="./assets/draw2-shell.min.css?v=20260831-css-min-v2"
+      href="./assets/draw2-shell.min.css?v=20260831-adjustable-rails-v1"
     >
     <link
       rel="stylesheet"
@@ -517,32 +517,18 @@
                     data-details-mode="AUDIO"
                   >オーディオエディター</span>
                   <button
-                    data-workspace-command="audio-editor-piano"
+                    data-workspace-command="audio-editor-roll"
                     type="button"
                     role="menuitem"
                   >
-                    MIDIピアノロール
+                    MIDIロール
                   </button>
                   <button
-                    data-workspace-command="audio-editor-wave"
+                    data-workspace-command="audio-editor-draw"
                     type="button"
                     role="menuitem"
                   >
-                    波形エディター
-                  </button>
-                  <button
-                    data-workspace-command="audio-editor-drum"
-                    type="button"
-                    role="menuitem"
-                  >
-                    ドラムグリッド
-                  </button>
-                  <button
-                    data-workspace-command="audio-editor-sampler"
-                    type="button"
-                    role="menuitem"
-                  >
-                    Sampler
+                    DRAWプレビュー
                   </button>
                   <span
                     class="draw2-menu-section-label"
@@ -2564,7 +2550,7 @@
                   role="tab"
                   aria-selected="true"
                   aria-controls="draw2AudioPanelPianoRoll"
-                  data-audio-editor-tab="PIANO"
+                  data-audio-editor-tab="ROLL"
                 >
                   <span class="draw2-audio-editor-icon" aria-hidden="true"><svg
                       class="draw2-ui-icon"
@@ -2573,63 +2559,7 @@
                       <use href="./assets/icons/draw2-icons.svg#icon-note">
                       </use>
                     </svg></span><span class="draw2-audio-editor-label"
-                  >PIANO</span><small>MIDI</small>
-                </button>
-                <button
-                  class="draw2-audio-editor-tab"
-                  type="button"
-                  role="tab"
-                  aria-selected="false"
-                  aria-controls="draw2AudioEditorWave"
-                  data-audio-editor-tab="WAVE"
-                  tabindex="-1"
-                >
-                  <span class="draw2-audio-editor-icon" aria-hidden="true"><svg
-                      class="draw2-ui-icon"
-                      focusable="false"
-                    >
-                      <use href="./assets/icons/draw2-icons.svg#icon-wave">
-                      </use>
-                    </svg></span><span class="draw2-audio-editor-label"
-                  >WAVE</span><small>CLIP</small>
-                </button>
-                <button
-                  class="draw2-audio-editor-tab"
-                  type="button"
-                  role="tab"
-                  aria-selected="false"
-                  aria-controls="draw2AudioEditorDrum"
-                  data-audio-editor-tab="DRUM"
-                  tabindex="-1"
-                >
-                  <span class="draw2-audio-editor-icon" aria-hidden="true"><svg
-                      class="draw2-ui-icon"
-                      focusable="false"
-                    >
-                      <use href="./assets/icons/draw2-icons.svg#icon-timeline">
-                      </use>
-                    </svg></span><span class="draw2-audio-editor-label"
-                  >DRUM</span><small>STEP</small>
-                </button>
-                <button
-                  class="draw2-audio-editor-tab"
-                  type="button"
-                  role="tab"
-                  aria-selected="false"
-                  aria-controls="draw2AudioEditorSampler"
-                  data-audio-editor-tab="SAMPLER"
-                  tabindex="-1"
-                >
-                  <span class="draw2-audio-editor-icon" aria-hidden="true"><svg
-                      class="draw2-ui-icon"
-                      focusable="false"
-                    >
-                      <use
-                        href="./assets/icons/draw2-icons.svg#icon-instrument"
-                      >
-                      </use>
-                    </svg></span><span class="draw2-audio-editor-label"
-                  >SAMPLER</span><small>ONE-SHOT</small>
+                  >MIDI ROLL</span><small>NOTES</small>
                 </button>
                 <button
                   class="draw2-audio-editor-tab draw2-audio-editor-tab--draw"
@@ -2674,9 +2604,9 @@
               class="draw2-audio-panel"
               id="draw2AudioPanelPianoRoll"
               data-audio-panel-surface="piano-roll"
-              data-audio-editor-surface="PIANO"
+              data-audio-editor-surface="ROLL"
               role="tabpanel"
-              aria-label="MIDI piano roll workspace"
+              aria-label="MIDI note roll workspace"
               hidden
             >
               <div
@@ -2696,14 +2626,14 @@
                 <div
                   class="draw2-audio-midi-zoom"
                   role="group"
-                  aria-label="Piano Roll horizontal zoom"
+                  aria-label="MIDI Roll horizontal zoom"
                   title="Control + scroll: horizontal zoom"
                 >
                   <button
                     id="draw2AudioMidiZoomOut"
                     class="draw2-button draw2-button-secondary draw2-button-icon"
                     type="button"
-                    aria-label="Piano Roll zoom out"
+                    aria-label="MIDI Roll zoom out"
                     title="Zoom out horizontally"
                   >−</button>
                   <output id="draw2AudioMidiZoomValue" aria-live="polite"
@@ -2712,7 +2642,7 @@
                     id="draw2AudioMidiZoomIn"
                     class="draw2-button draw2-button-secondary draw2-button-icon"
                     type="button"
-                    aria-label="Piano Roll zoom in"
+                    aria-label="MIDI Roll zoom in"
                     title="Zoom in horizontally"
                   >＋</button>
                 </div>
@@ -2790,13 +2720,13 @@
                   class="draw2-audio-midi-status"
                   role="status"
                   aria-live="polite"
-                >PIANO · 1/16 · 1 note</output>
+                >MIDI ROLL · 1/16 · 1 note</output>
               </div>
               <div
                 class="draw2-audio-midi-grid"
                 id="draw2AudioMidiGrid"
                 role="grid"
-                aria-label="MIDI piano roll with bar, beat and subdivision grid"
+                aria-label="MIDI note roll with bar, beat and subdivision grid"
               >
               </div>
               <section
@@ -2830,123 +2760,6 @@
                   aria-label="Editable MIDI expression points"
                 ></div>
               </section>
-            </section>
-            <section
-              class="draw2-audio-editor-surface"
-              id="draw2AudioEditorWave"
-              data-audio-editor-surface="WAVE"
-              role="tabpanel"
-              aria-label="Audio waveform editor"
-              hidden
-            >
-              <div
-                class="draw2-audio-editor-placeholder draw2-audio-wave-editor"
-              >
-                <div class="draw2-audio-wave-toolbar">
-                  <strong>Waveform Editor</strong>
-                  <span>Non-destructive clip view</span>
-                  <button
-                    id="draw2AudioWaveOpenBrowser"
-                    class="draw2-button draw2-button-secondary"
-                    type="button"
-                  >
-                    Open Browser
-                  </button>
-                </div>
-                <div
-                  id="draw2AudioWaveformViewport"
-                  class="draw2-audio-waveform-viewport"
-                  role="button"
-                  tabindex="0"
-                  aria-label="Open Audio Clip editing"
-                  title="Open Clips to edit this waveform"
-                >
-                  <span class="draw2-audio-waveform-line"></span>
-                  <span class="draw2-audio-waveform-line"></span>
-                  <span class="draw2-audio-waveform-line"></span>
-                </div>
-                <p id="draw2AudioWaveStatus" class="draw2-audio-editor-status">
-                  Select an Audio Clip to edit its waveform, fades and gain.
-                </p>
-              </div>
-            </section>
-            <section
-              class="draw2-audio-editor-surface"
-              id="draw2AudioEditorDrum"
-              data-audio-editor-surface="DRUM"
-              role="tabpanel"
-              aria-label="Drum editor"
-              hidden
-            >
-              <div
-                class="draw2-audio-editor-placeholder draw2-audio-drum-editor"
-              >
-                <div class="draw2-audio-drum-toolbar">
-                  <div class="draw2-audio-wave-toolbar">
-                    <strong>Drum Roll</strong>
-                    <span>5 lanes · click or drag across the musical timeline</span>
-                  </div>
-                  <label class="draw2-audio-drum-kit-control">
-                    <span>Kit</span>
-                    <select id="draw2AudioDrumKit" aria-label="Drum kit">
-                      <option value="BASIC">Basic · clean</option>
-                      <option value="ARCADE">Arcade · chip</option>
-                      <option value="SOFT">Soft · mellow</option>
-                    </select>
-                  </label>
-                </div>
-                <div
-                  class="draw2-audio-drum-grid"
-                  id="draw2AudioDrumGrid"
-                  role="grid"
-                  aria-label="Drum Roll with kick, snare and percussion lanes"
-                >
-                </div>
-                <p class="draw2-audio-drum-help">
-                  KICK / SNARE / CLOSED HAT / OPEN HAT / PERC · 16 steps = one
-                  bar. The horizontal axis follows the full musical timeline.
-                  Click to toggle · drag to paint or erase · right-click to erase.
-                </p>
-                <p
-                  class="draw2-audio-editor-status"
-                  id="draw2AudioDrumStatus"
-                  role="status"
-                  aria-live="polite"
-                >
-                  Select a step to add a lightweight drum note.
-                </p>
-              </div>
-            </section>
-            <section
-              class="draw2-audio-editor-surface"
-              id="draw2AudioEditorSampler"
-              data-audio-editor-surface="SAMPLER"
-              role="tabpanel"
-              aria-label="Sampler editor"
-              hidden
-            >
-              <div
-                class="draw2-audio-editor-placeholder draw2-audio-sampler-editor"
-              >
-                <div class="draw2-audio-wave-toolbar">
-                  <strong>Sampler</strong>
-                  <span>One-shot / loop source</span>
-                  <button
-                    id="draw2AudioSamplerOpenBrowser"
-                    class="draw2-button draw2-button-secondary"
-                    type="button"
-                  >
-                    Choose Sample
-                  </button>
-                </div>
-                <div class="draw2-audio-sampler-pad" aria-hidden="true">
-                  <span>Sample</span><span>Attack</span><span
-                  >Release</span><span>Loop</span>
-                </div>
-                <p class="draw2-audio-editor-status">
-                  Sampler processing is mounted only for a Sampler Track.
-                </p>
-              </div>
             </section>
             <section
               class="draw2-audio-editor-surface"
@@ -9885,7 +9698,7 @@
     <script src="../scripts/pixieed-account-supabase-client.js?v=20260828-staging-config-v1"></script>
     <script
       type="module"
-      src="./dist/draw2-entry.js?v=20260831-mirror-handles-v1"
+      src="./dist/draw2-entry.js?v=20260831-adjustable-rails-v1"
     ></script>
     <script
       type="module"

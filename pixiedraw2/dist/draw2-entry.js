@@ -17433,7 +17433,7 @@ function loadAdvancedModule() {
 }
 function loadWorkspaceModule() {
   const workspaceChunkUrl = new URL("wp180-workspace.js", import.meta.url);
-  workspaceChunkUrl.searchParams.set("v", "20260831-css-presentation-v1");
+  workspaceChunkUrl.searchParams.set("v", "20260831-adjustable-rails-v1");
   workspaceModulePromise ??= import(workspaceChunkUrl.href);
   return workspaceModulePromise;
 }

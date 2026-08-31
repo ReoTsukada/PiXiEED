@@ -674,8 +674,11 @@ const DRAW2_DETAIL_MODE_STORAGE_KEY = "pixieed:draw2:detail-mode:v1";
 // its default small enough that the Color surface remains usable, while
 // retaining a bounded ratio for the user-controlled splitter.
 const RIGHT_DOCK_DEFAULT_PALETTE_RATIO = 0.18;
-const RIGHT_DOCK_MIN_PALETTE_RATIO = 0.1;
-const RIGHT_DOCK_MAX_PALETTE_RATIO = 0.42;
+// Widened so the splitter can travel almost to either extreme (Aseprite-style
+// fully variable panels), while RIGHT_DOCK_MIN_PALETTE_PX/RIGHT_DOCK_MIN_CUSTOM_PX
+// below still keep each side from shrinking below a usable floor.
+const RIGHT_DOCK_MIN_PALETTE_RATIO = 0.04;
+const RIGHT_DOCK_MAX_PALETTE_RATIO = 0.88;
 const RIGHT_DOCK_RESIZE_HANDLE_PX = 12;
 
 type AudioDockPanelId =
@@ -755,25 +758,40 @@ function writeAudioDockLayout(
   }
 }
 
-// Shared desktop rail bounds.
-const RIGHT_DOCK_MIN_PALETTE_PX = 64;
-const RIGHT_DOCK_MIN_CUSTOM_PX = 100;
-// The PC rail must keep the color editor, form controls, and focus rings
-// usable. Narrower values make the rail look compact while clipping the
-// actual authoring surface, so 280px is the smallest supported desktop size.
+// Shared desktop rail bounds. The palette keeps one compact swatch row at its
+// minimum; the custom dock keeps its tab strip plus a small scroll viewport so
+// the active editor never becomes an invisible sliver while the splitter is
+// moved toward the palette maximum.
+const RIGHT_DOCK_MIN_PALETTE_PX = 40;
+const RIGHT_DOCK_MIN_CUSTOM_PX = 176;
+// The PC rail keeps the color editor, form controls, and focus rings usable
+// down to this width while being dragged open. Dragging past
+// WORKSPACE_RAIL_SNAP_PX instead snaps the rail fully closed (see
+// WORKSPACE_RAIL_SNAP_PX below) rather than forcing that authoring surface
+// into an unusably tiny sliver -- this is how every rail in this workspace
+// now reaches "minimum" Aseprite-style: snap-closed, not infinite squeeze.
 const WORKSPACE_RIGHT_RAIL_MIN_PX = 280;
+const WORKSPACE_RIGHT_RAIL_RESPONSIVE_MIN_PX = 200;
 const WORKSPACE_RIGHT_RAIL_MAX_PX = 760;
 const WORKSPACE_GAME_LEFT_RAIL_MIN_PX = 224;
 const WORKSPACE_AUDIO_LEFT_RAIL_MIN_PX = 220;
 const WORKSPACE_LEFT_RAIL_MAX_PX = 320;
-const WORKSPACE_TIMELINE_MIN_PX = 96;
+const WORKSPACE_TIMELINE_MIN_PX = 132;
 const WORKSPACE_TIMELINE_MAX_PX = 640;
+// Dragging a rail's handle past this point (from its open side) snaps that
+// rail fully closed instead of clamping to its MIN_PX; dragging back out
+// past the same point reopens it at a usable width. Shared by the left,
+// right, and timeline resize handles so every rail closes the same way.
+const WORKSPACE_RAIL_SNAP_PX = 96;
 
 interface RailLayoutPreference {
   readonly sharedLeftWidth: number;
   readonly audioLeftWidth: number;
   readonly rightWidth: number;
   readonly timelineHeight: number;
+  readonly gameLeftCollapsed: boolean;
+  readonly audioLeftCollapsed: boolean;
+  readonly timelineCollapsed: boolean;
 }
 
 const clampRailLayoutValue = (
@@ -788,6 +806,9 @@ function defaultRailLayoutPreference(): RailLayoutPreference {
     audioLeftWidth: 244,
     rightWidth: 320,
     timelineHeight: 260,
+    gameLeftCollapsed: false,
+    audioLeftCollapsed: false,
+    timelineCollapsed: false,
   };
 }
 
@@ -804,6 +825,9 @@ function readRailLayoutPreference(
       audioLeftWidth?: unknown;
       rightWidth?: unknown;
       timelineHeight?: unknown;
+      gameLeftCollapsed?: unknown;
+      audioLeftCollapsed?: unknown;
+      timelineCollapsed?: unknown;
     };
     const numberOr = (value: unknown, defaultValue: number): number =>
       typeof value === "number" && Number.isFinite(value)
@@ -822,7 +846,7 @@ function readRailLayoutPreference(
       ),
       rightWidth: clampRailLayoutValue(
         numberOr(parsed.rightWidth, fallback.rightWidth),
-        WORKSPACE_RIGHT_RAIL_MIN_PX,
+        WORKSPACE_RIGHT_RAIL_RESPONSIVE_MIN_PX,
         WORKSPACE_RIGHT_RAIL_MAX_PX,
       ),
       timelineHeight: clampRailLayoutValue(
@@ -830,6 +854,15 @@ function readRailLayoutPreference(
         WORKSPACE_TIMELINE_MIN_PX,
         WORKSPACE_TIMELINE_MAX_PX,
       ),
+      gameLeftCollapsed: typeof parsed.gameLeftCollapsed === "boolean"
+        ? parsed.gameLeftCollapsed
+        : fallback.gameLeftCollapsed,
+      audioLeftCollapsed: typeof parsed.audioLeftCollapsed === "boolean"
+        ? parsed.audioLeftCollapsed
+        : fallback.audioLeftCollapsed,
+      timelineCollapsed: typeof parsed.timelineCollapsed === "boolean"
+        ? parsed.timelineCollapsed
+        : fallback.timelineCollapsed,
     };
   } catch {
     return fallback;
@@ -1973,6 +2006,69 @@ export function bootstrapDraw2Workspace(
       ? new windowRef.ResizeObserver(() => desktopLayoutRefreshScheduler.request())
     : undefined;
   workspaceResizeObserver?.observe(root);
+
+  const setRailResizeHandleValue = (
+    handle: HTMLElement | undefined,
+    value: number,
+    minimum: number,
+    maximum: number,
+  ): void => {
+    if (handle === undefined) return;
+    handle.setAttribute("aria-valuemin", String(minimum));
+    handle.setAttribute("aria-valuemax", String(maximum));
+    handle.setAttribute("aria-valuenow", String(Math.round(value * 10) / 10));
+  };
+  const workspaceViewportWidth = (): number => {
+    const measured = root.getBoundingClientRect().width;
+    return measured > 0 ? measured : windowRef.innerWidth;
+  };
+  const workspaceViewportHeight = (): number => {
+    const measured = root.getBoundingClientRect().height;
+    return measured > 0 ? measured : windowRef.innerHeight;
+  };
+  const rightRailMinimumForViewport = (): number =>
+    workspaceViewportWidth() < 1120
+      ? WORKSPACE_RIGHT_RAIL_RESPONSIVE_MIN_PX
+      : WORKSPACE_RIGHT_RAIL_MIN_PX;
+  const rightRailMaximumForViewport = (): number => {
+    const width = workspaceViewportWidth();
+    if (width <= 700) return 240;
+    if (width < 1120) return 320;
+    return WORKSPACE_RIGHT_RAIL_MAX_PX;
+  };
+  const timelineMaximumForViewport = (): number => {
+    const width = workspaceViewportWidth();
+    const height = workspaceViewportHeight();
+    const breakpointMaximum = width < 1120
+      ? height <= 520 ? 132 : 220
+      : 420;
+    return Math.min(
+      WORKSPACE_TIMELINE_MAX_PX,
+      breakpointMaximum,
+      Math.max(180, height * 0.72),
+    );
+  };
+  const syncRightDockCollapsedState = (collapsed: boolean): void => {
+    root.classList.toggle("is-right-dock-collapsed", collapsed);
+    rightDock?.classList.toggle("is-open", !collapsed);
+    rightResizeHandle?.setAttribute("aria-expanded", String(!collapsed));
+    rightResizeHandle?.setAttribute(
+      "data-rail-state",
+      collapsed ? "collapsed" : "expanded",
+    );
+    setRailResizeHandleValue(
+      rightResizeHandle,
+      collapsed
+        ? 0
+        : Math.round(
+          rightDock?.getBoundingClientRect().width ??
+            rightRailMinimumForViewport(),
+        ),
+      0,
+      rightRailMaximumForViewport(),
+    );
+  };
+
   const rightDockStorage = (() => {
     try {
       return windowRef.localStorage;
@@ -1983,6 +2079,95 @@ export function bootstrapDraw2Workspace(
   let detailMode = readWorkspaceDetailMode(rightDockStorage);
   const rightDockPreference = readRightDockPreference(rightDockStorage);
   let railLayoutPreference = readRailLayoutPreference(rightDockStorage);
+  const applyRailCollapsePreference = (mode: DesktopCreatorMode): void => {
+    const leftCollapsed = mode === "GAME"
+      ? railLayoutPreference.gameLeftCollapsed
+      : mode === "AUDIO"
+      ? railLayoutPreference.audioLeftCollapsed
+      : false;
+    root.classList.toggle("is-left-dock-collapsed", leftCollapsed);
+    workspaceLeftDock?.classList.toggle("is-open", !leftCollapsed);
+    leftResizeHandle?.setAttribute("aria-expanded", String(!leftCollapsed));
+    leftResizeHandle?.setAttribute(
+      "data-rail-state",
+      leftCollapsed ? "collapsed" : "expanded",
+    );
+    setRailResizeHandleValue(
+      leftResizeHandle,
+      leftCollapsed
+        ? 0
+        : mode === "AUDIO"
+        ? railLayoutPreference.audioLeftWidth
+        : mode === "GAME"
+        ? railLayoutPreference.sharedLeftWidth
+        : 0,
+      0,
+      WORKSPACE_LEFT_RAIL_MAX_PX,
+    );
+
+    const timelineCollapsed = railLayoutPreference.timelineCollapsed;
+    root.classList.toggle("is-timeline-collapsed", timelineCollapsed);
+    if (timelineRegion !== undefined) {
+      const state = timelineCollapsed ? "collapsed" : "expanded";
+      timelineRegion.dataset.timelineCollapse = state;
+      timelineCard?.setAttribute("data-timeline-collapse", state);
+      if (timelineCollapsed) {
+        root.style.setProperty("--draw2-timeline-height", "32px");
+        timelineRegion.style.setProperty("height", "32px", "important");
+        timelineRegion.style.setProperty("min-height", "32px", "important");
+      } else {
+        root.style.setProperty(
+          "--draw2-timeline-height",
+          `${railLayoutPreference.timelineHeight}px`,
+        );
+        timelineRegion.style.removeProperty("height");
+        timelineRegion.style.removeProperty("min-height");
+      }
+    }
+    timelineCollapseButton?.setAttribute(
+      "aria-expanded",
+      String(!timelineCollapsed),
+    );
+    timelineCollapseButton?.setAttribute(
+      "aria-label",
+      timelineCollapsed ? "Expand timeline" : "Collapse timeline",
+    );
+    timelineCollapseButton?.setAttribute(
+      "title",
+      timelineCollapsed ? "Expand timeline" : "Collapse timeline",
+    );
+    timelineResizeHandle?.setAttribute(
+      "aria-expanded",
+      String(!timelineCollapsed),
+    );
+    timelineResizeHandle?.setAttribute(
+      "data-rail-state",
+      timelineCollapsed ? "collapsed" : "expanded",
+    );
+    const timelineIcon = timelineCollapseButton === undefined
+      ? undefined
+      : query<SVGUseElement>(
+        timelineCollapseButton,
+        "[data-timeline-collapse-icon]",
+      );
+    timelineIcon?.setAttribute(
+      "href",
+      `./assets/icons/draw2-icons.svg#${
+        timelineCollapsed ? "icon-expand" : "icon-shrink"
+      }`,
+    );
+    setRailResizeHandleValue(
+      timelineResizeHandle,
+      timelineCollapsed
+        ? 0
+        : Math.min(
+          railLayoutPreference.timelineHeight,
+          timelineMaximumForViewport(),
+        ),
+      0,
+      timelineMaximumForViewport(),
+    );
+  };
   const applyRailLayoutPreference = (): void => {
     root.style.setProperty(
       "--draw2-left-rail-width",
@@ -2016,11 +2201,16 @@ export function bootstrapDraw2Workspace(
       "--draw2-timeline-height",
       `${railLayoutPreference.timelineHeight}px`,
     );
+    const modeValue = root.dataset.creatorMode;
+    applyRailCollapsePreference(
+      modeValue !== undefined && isDesktopCreatorMode(modeValue)
+        ? modeValue
+        : "DRAW",
+    );
   };
   const saveRailLayoutPreference = (): void => {
     writeRailLayoutPreference(rightDockStorage, railLayoutPreference);
   };
-  applyRailLayoutPreference();
   try {
     const storedTheme = rightDockStorage?.getItem(DRAW2_THEME_STORAGE_KEY);
     if (
@@ -2299,10 +2489,57 @@ export function bootstrapDraw2Workspace(
     documentRef,
     "#draw2AudioLeftResize",
   );
+  const configureRailResizeHandle = (
+    handle: HTMLElement | undefined,
+    orientation: "horizontal" | "vertical",
+    controls: string,
+    minimum: number,
+    maximum: number,
+  ): void => {
+    if (handle === undefined) return;
+    handle.setAttribute("role", "separator");
+    handle.setAttribute("aria-orientation", orientation);
+    handle.setAttribute("aria-controls", controls);
+    handle.setAttribute("aria-valuemin", String(minimum));
+    handle.setAttribute("aria-valuemax", String(maximum));
+    handle.tabIndex = 0;
+  };
+  configureRailResizeHandle(
+    leftResizeHandle,
+    "vertical",
+    "draw2WorkspaceLeftDock",
+    0,
+    WORKSPACE_LEFT_RAIL_MAX_PX,
+  );
+  configureRailResizeHandle(
+    rightResizeHandle,
+    "vertical",
+    "draw2WorkspaceRightDock",
+    0,
+    WORKSPACE_RIGHT_RAIL_MAX_PX,
+  );
+  configureRailResizeHandle(
+    paletteResizeHandle,
+    "horizontal",
+    "draw2WorkspacePaletteStrip draw2WorkspaceRightCustomDock",
+    RIGHT_DOCK_MIN_PALETTE_RATIO * 100,
+    RIGHT_DOCK_MAX_PALETTE_RATIO * 100,
+  );
+  configureRailResizeHandle(
+    timelineResizeHandle,
+    "horizontal",
+    "draw2WorkspaceTimelineRegion",
+    0,
+    WORKSPACE_TIMELINE_MAX_PX,
+  );
   const workspaceLeftDock = query<HTMLElement>(
     documentRef,
     "#draw2WorkspaceLeftDock",
   );
+  // Apply the initial rail state only after every rail reference used by the
+  // collapse helper has been initialized. This keeps bootstrap safe while
+  // preserving the persisted layout before the first mode projection.
+  applyRailLayoutPreference();
   const workspaceContextRow = query<HTMLElement>(
     documentRef,
     ".draw2-workspace-context-row",
@@ -2577,18 +2814,6 @@ export function bootstrapDraw2Workspace(
   const audioMidiZoomValue = query<HTMLOutputElement>(
     documentRef,
     "#draw2AudioMidiZoomValue",
-  );
-  const audioDrumGrid = query<HTMLElement>(
-    documentRef,
-    "#draw2AudioDrumGrid",
-  );
-  const audioDrumStatus = query<HTMLElement>(
-    documentRef,
-    "#draw2AudioDrumStatus",
-  );
-  const audioDrumKit = query<HTMLSelectElement>(
-    documentRef,
-    "#draw2AudioDrumKit",
   );
   const audioAnimationGuide = query<HTMLElement>(
     documentRef,
@@ -3283,22 +3508,6 @@ export function bootstrapDraw2Workspace(
   const audioRightImport = query<HTMLButtonElement>(
     documentRef,
     "#draw2AudioRightImport",
-  );
-  const audioWaveOpenBrowser = query<HTMLButtonElement>(
-    documentRef,
-    "#draw2AudioWaveOpenBrowser",
-  );
-  const audioSamplerOpenBrowser = query<HTMLButtonElement>(
-    documentRef,
-    "#draw2AudioSamplerOpenBrowser",
-  );
-  const audioWaveformViewport = query<HTMLElement>(
-    documentRef,
-    "#draw2AudioWaveformViewport",
-  );
-  const audioWaveStatus = query<HTMLElement>(
-    documentRef,
-    "#draw2AudioWaveStatus",
   );
   const gameDeckAddAsset = query<HTMLButtonElement>(
     documentRef,
@@ -4786,7 +4995,7 @@ export function bootstrapDraw2Workspace(
   const flushGameEditorPersistence = async (): Promise<void> => {
     await gamePersistenceSaveQueue.catch(() => undefined);
   };
-  type AudioEditorTab = "PIANO" | "WAVE" | "DRUM" | "SAMPLER" | "DRAW";
+  type AudioEditorTab = "ROLL" | "DRAW";
   type AudioRightTab = "inspector" | "browser" | "master";
   const audioLocale = (): "en" | "ja" =>
     documentRef.documentElement.lang === "ja" ? "ja" : "en";
@@ -4800,7 +5009,7 @@ export function bootstrapDraw2Workspace(
     return translateDraw2Text(value, locale);
   };
   let modeDeckActiveTab = "game-scene";
-  let audioEditorActiveTab: AudioEditorTab = "PIANO";
+  let audioEditorActiveTab: AudioEditorTab = "ROLL";
   let audioEditorPinned = false;
   let audioRightActiveTab: AudioRightTab = "inspector";
   const gameRailTabForModeDeck = (
@@ -4869,8 +5078,7 @@ export function bootstrapDraw2Workspace(
     }
   };
   const isAudioEditorTab = (value: string): value is AudioEditorTab =>
-    value === "PIANO" || value === "WAVE" || value === "DRUM" ||
-    value === "SAMPLER" || value === "DRAW";
+    value === "ROLL" || value === "DRAW";
   const isAudioRightTab = (value: string): value is AudioRightTab =>
     value === "inspector" || value === "browser" || value === "master";
   const selectAudioEditor = (
@@ -4892,20 +5100,13 @@ export function bootstrapDraw2Workspace(
       surface.inert = !selected;
       surface.setAttribute("aria-hidden", String(!selected));
     }
-    renderAudioDrumGrid();
     if (audioEditorSelection !== undefined) {
       const instrumentLabel = AUDIO_INSTRUMENTS.find((instrument) =>
         instrument.id === audioInstrumentId
       )?.label ?? audioInstrumentId;
       const localizedInstrumentLabel = localizeAudioText(instrumentLabel);
-      const label = tab === "PIANO"
+      const label = tab === "ROLL"
         ? `${localizeAudioText("Track")}: ${localizedInstrumentLabel}`
-        : tab === "WAVE"
-        ? localizeAudioText("Audio Clip: Waveform")
-        : tab === "DRUM"
-        ? localizeAudioText("Track: Drums")
-        : tab === "SAMPLER"
-        ? localizeAudioText("Track: Sampler")
         : localizeAudioText("Draw Preview: Audio-linked");
       audioEditorSelection.textContent = localizeAudioText(label);
     }
@@ -5008,7 +5209,7 @@ export function bootstrapDraw2Workspace(
         const meta = documentRef.createElement("small");
         meta.textContent = `${localizedCategory} · ${
           localizeAudioText(
-            instrument.editor === "DRUM" ? "Drum Step" : "Piano Roll",
+            "MIDI Roll",
           )
         } · ${localizeAudioText("lightweight voice")}`;
         item.append(icon, label, meta);
@@ -5644,7 +5845,7 @@ export function bootstrapDraw2Workspace(
     | "Synth"
     | "Chip"
     | "Percussion";
-  type AudioInstrumentEditor = "PIANO" | "DRUM";
+  type AudioInstrumentEditor = "ROLL";
   const AUDIO_INSTRUMENTS: readonly {
     readonly id: PianoRollInstrumentId;
     readonly label: string;
@@ -5658,7 +5859,7 @@ export function bootstrapDraw2Workspace(
       label: "Piano",
       preset: "triangle",
       category: "Keys",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Acoustic piano · lightweight voice",
     },
     {
@@ -5666,7 +5867,7 @@ export function bootstrapDraw2Workspace(
       label: "Piano 2",
       preset: "triangle",
       category: "Keys",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Soft piano layer · lightweight voice",
     },
     {
@@ -5674,7 +5875,7 @@ export function bootstrapDraw2Workspace(
       label: "Electric Piano",
       preset: "pulse-50",
       category: "Keys",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Warm electric keys · lightweight voice",
     },
     {
@@ -5682,7 +5883,7 @@ export function bootstrapDraw2Workspace(
       label: "Organ",
       preset: "pulse-50",
       category: "Keys",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Sustained organ tone · lightweight voice",
     },
     {
@@ -5690,7 +5891,7 @@ export function bootstrapDraw2Workspace(
       label: "Clavinet",
       preset: "pulse-25",
       category: "Keys",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Bright percussive keys · lightweight voice",
     },
     {
@@ -5698,7 +5899,7 @@ export function bootstrapDraw2Workspace(
       label: "Guitar",
       preset: "sawtooth",
       category: "Strings",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Guitar-style pluck · lightweight voice",
     },
     {
@@ -5706,7 +5907,7 @@ export function bootstrapDraw2Workspace(
       label: "Electric Guitar",
       preset: "sawtooth",
       category: "Strings",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Electric guitar-style lead · lightweight voice",
     },
     {
@@ -5714,7 +5915,7 @@ export function bootstrapDraw2Workspace(
       label: "Bass",
       preset: "triangle",
       category: "Strings",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Low bass voice · lightweight voice",
     },
     {
@@ -5722,7 +5923,7 @@ export function bootstrapDraw2Workspace(
       label: "Strings",
       preset: "sawtooth",
       category: "Strings",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Ensemble string pad · lightweight voice",
     },
     {
@@ -5730,7 +5931,7 @@ export function bootstrapDraw2Workspace(
       label: "Violin",
       preset: "sawtooth",
       category: "Strings",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Violin-style bowed voice · lightweight voice",
     },
     {
@@ -5738,7 +5939,7 @@ export function bootstrapDraw2Workspace(
       label: "Cello",
       preset: "triangle",
       category: "Strings",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Cello-style low strings · lightweight voice",
     },
     {
@@ -5746,7 +5947,7 @@ export function bootstrapDraw2Workspace(
       label: "Harp",
       preset: "triangle",
       category: "Strings",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Harp-style pluck · lightweight voice",
     },
     {
@@ -5754,7 +5955,7 @@ export function bootstrapDraw2Workspace(
       label: "Marimba",
       preset: "triangle",
       category: "Mallets",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Marimba-style mallet tone · lightweight voice",
     },
     {
@@ -5762,7 +5963,7 @@ export function bootstrapDraw2Workspace(
       label: "Kalimba",
       preset: "pulse-25",
       category: "Mallets",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Kalimba-style pluck · lightweight voice",
     },
     {
@@ -5770,7 +5971,7 @@ export function bootstrapDraw2Workspace(
       label: "Vibraphone",
       preset: "triangle",
       category: "Mallets",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Vibraphone-style bell tone · lightweight voice",
     },
     {
@@ -5778,7 +5979,7 @@ export function bootstrapDraw2Workspace(
       label: "Xylophone",
       preset: "triangle",
       category: "Mallets",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Xylophone-style mallet tone · lightweight voice",
     },
     {
@@ -5786,7 +5987,7 @@ export function bootstrapDraw2Workspace(
       label: "Celesta",
       preset: "triangle",
       category: "Mallets",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Celesta-style bell tone · lightweight voice",
     },
     {
@@ -5794,7 +5995,7 @@ export function bootstrapDraw2Workspace(
       label: "Tubular Bells",
       preset: "triangle",
       category: "Mallets",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Tubular bell-style tone · lightweight voice",
     },
     {
@@ -5802,7 +6003,7 @@ export function bootstrapDraw2Workspace(
       label: "Steel Drum",
       preset: "triangle",
       category: "Mallets",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Steel drum-style tone · lightweight voice",
     },
     {
@@ -5810,7 +6011,7 @@ export function bootstrapDraw2Workspace(
       label: "Flute",
       preset: "triangle",
       category: "Winds",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Flute-style breathy voice · lightweight voice",
     },
     {
@@ -5818,7 +6019,7 @@ export function bootstrapDraw2Workspace(
       label: "Clarinet",
       preset: "pulse-25",
       category: "Winds",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Clarinet-style reed voice · lightweight voice",
     },
     {
@@ -5826,7 +6027,7 @@ export function bootstrapDraw2Workspace(
       label: "Saxophone",
       preset: "sawtooth",
       category: "Winds",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Saxophone-style lead voice · lightweight voice",
     },
     {
@@ -5834,7 +6035,7 @@ export function bootstrapDraw2Workspace(
       label: "Trumpet",
       preset: "sawtooth",
       category: "Winds",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Trumpet-style brass voice · lightweight voice",
     },
     {
@@ -5842,7 +6043,7 @@ export function bootstrapDraw2Workspace(
       label: "Brass",
       preset: "pulse-50",
       category: "Winds",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Brass section-style voice · lightweight voice",
     },
     {
@@ -5850,7 +6051,7 @@ export function bootstrapDraw2Workspace(
       label: "Synth Lead",
       preset: "sawtooth",
       category: "Synth",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Focused synth lead · lightweight voice",
     },
     {
@@ -5858,7 +6059,7 @@ export function bootstrapDraw2Workspace(
       label: "Synth Pad",
       preset: "triangle",
       category: "Synth",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Soft synth pad · lightweight voice",
     },
     {
@@ -5866,7 +6067,7 @@ export function bootstrapDraw2Workspace(
       label: "Chip",
       preset: "pulse-25",
       category: "Synth",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Chip-tune pulse voice · lightweight voice",
     },
     {
@@ -5874,7 +6075,7 @@ export function bootstrapDraw2Workspace(
       label: "GB Pulse 1",
       preset: "pulse-25",
       category: "Chip",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Game Boy square channel 1 · 25% duty",
     },
     {
@@ -5882,7 +6083,7 @@ export function bootstrapDraw2Workspace(
       label: "GB Pulse 2",
       preset: "pulse-50",
       category: "Chip",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Game Boy square channel 2 · 50% duty",
     },
     {
@@ -5890,7 +6091,7 @@ export function bootstrapDraw2Workspace(
       label: "GB Wave",
       preset: "triangle",
       category: "Chip",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Game Boy 32-step wave-style triangle approximation",
     },
     {
@@ -5898,7 +6099,7 @@ export function bootstrapDraw2Workspace(
       label: "GB Noise",
       preset: "noise",
       category: "Chip",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Game Boy-style LFSR noise channel",
     },
     {
@@ -5906,7 +6107,7 @@ export function bootstrapDraw2Workspace(
       label: "NES Pulse 1",
       preset: "pulse-25",
       category: "Chip",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Famicom square channel 1 · 12.5% duty",
     },
     {
@@ -5914,7 +6115,7 @@ export function bootstrapDraw2Workspace(
       label: "NES Pulse 2",
       preset: "pulse-25",
       category: "Chip",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Famicom square channel 2 · 25% duty",
     },
     {
@@ -5922,7 +6123,7 @@ export function bootstrapDraw2Workspace(
       label: "NES Triangle",
       preset: "triangle",
       category: "Chip",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Famicom triangle bass channel",
     },
     {
@@ -5930,7 +6131,7 @@ export function bootstrapDraw2Workspace(
       label: "NES Noise",
       preset: "noise",
       category: "Chip",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Famicom-style long LFSR noise channel",
     },
     {
@@ -5938,15 +6139,15 @@ export function bootstrapDraw2Workspace(
       label: "Drums",
       preset: "noise",
       category: "Percussion",
-      editor: "DRUM",
-      hint: "Kick, snare, hat and percussion step grid",
+      editor: "ROLL",
+      hint: "Kick, snare, hat and percussion MIDI notes",
     },
     {
       id: "TAMBOURINE",
       label: "Tambourine",
       preset: "noise",
       category: "Percussion",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Tambourine-style noise hit · lightweight voice",
     },
     {
@@ -5954,7 +6155,7 @@ export function bootstrapDraw2Workspace(
       label: "Shaker",
       preset: "noise",
       category: "Percussion",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Shaker-style noise hit · lightweight voice",
     },
   ]);
@@ -6056,7 +6257,7 @@ export function bootstrapDraw2Workspace(
     instrument: PianoRollInstrumentId,
   ): AudioInstrumentEditor =>
     AUDIO_INSTRUMENTS.find((item) => item.id === instrument)?.editor ??
-      "PIANO";
+      "ROLL";
   const populateAudioInstrumentSelectors = (): void => {
     const makeOption = (value: string, label: string): HTMLOptionElement => {
       const option = documentRef.createElement("option");
@@ -6179,7 +6380,7 @@ export function bootstrapDraw2Workspace(
     );
     for (const category of AUDIO_INSTRUMENT_CATEGORY_ORDER) {
       const instruments = sortedAudioInstruments().filter((instrument) =>
-        instrument.editor === "PIANO" && instrument.category === category
+        instrument.editor === "ROLL" && instrument.category === category
       );
       appendAudioTrackTemplateSection(
         audioTrackAddOptions,
@@ -6195,42 +6396,7 @@ export function bootstrapDraw2Workspace(
         })),
       );
     }
-    appendAudioTrackTemplateSection(
-      audioTrackAddOptions,
-      `${localizeAudioText("Drum Track")} · ${localizeAudioText("Percussion")}`,
-      "Step grid for rhythm programming",
-      sortedAudioInstruments().filter((instrument) =>
-        instrument.editor === "DRUM"
-      )
-        .map((instrument) => ({
-          value: instrument.id,
-          label: instrument.label,
-          detail: instrument.hint,
-          tone: "drums",
-        })),
-    );
   };
-  const AUDIO_DRUM_ROWS: readonly {
-    readonly id: string;
-    readonly label: string;
-    readonly pitchMidi: number;
-    readonly velocity: number;
-  }[] = Object.freeze([
-    { id: "kick", label: "KICK", pitchMidi: 36, velocity: 0.9 },
-    { id: "snare", label: "SNARE", pitchMidi: 38, velocity: 0.82 },
-    { id: "closed-hat", label: "CLOSED HAT", pitchMidi: 42, velocity: 0.68 },
-    { id: "open-hat", label: "OPEN HAT", pitchMidi: 46, velocity: 0.64 },
-    { id: "perc", label: "PERC", pitchMidi: 45, velocity: 0.72 },
-  ]);
-  const AUDIO_DRUM_KITS: readonly {
-    readonly id: AudioDrumKitId;
-    readonly label: string;
-    readonly hint: string;
-  }[] = Object.freeze([
-    { id: "BASIC", label: "Basic · clean", hint: "clean electronic kit" },
-    { id: "ARCADE", label: "Arcade · chip", hint: "bright chip-style kit" },
-    { id: "SOFT", label: "Soft · mellow", hint: "soft low-impact kit" },
-  ]);
   const AUDIO_DRUM_KIT_PRESETS: Readonly<
     Record<AudioDrumKitId, Readonly<Record<number, ChipSynthPresetId>>>
   > = Object.freeze({
@@ -6258,7 +6424,6 @@ export function bootstrapDraw2Workspace(
   });
   let audioDrumKitId: AudioDrumKitId = "BASIC";
   let audioChipMachineId: AudioChipMachineId = "NONE";
-  const AUDIO_DRUM_STEPS = 16;
   let audioChipPresetId: ChipSynthPresetId = "pulse-25";
   let audioInstrumentId: PianoRollInstrumentId = "PIANO";
   let audioVoiceDraft: AudioSynthPreset | undefined;
@@ -6294,7 +6459,7 @@ export function bootstrapDraw2Workspace(
   ): AudioSynthPreset => {
     const profile = getChipSynthVoice(
       instrument.id,
-      instrument.editor === "DRUM" ? 38 : 60,
+      instrument.id === "DRUMS" ? 38 : 60,
       instrument.preset,
       undefined,
       audioChipMachineId,
@@ -7323,7 +7488,6 @@ export function bootstrapDraw2Workspace(
     audioPpq = session.ppq;
     audioBpm = session.project.tempo.milliBpm / 1_000;
     audioDrumKitId = session.project.drumKitId ?? "BASIC";
-    if (audioDrumKit !== undefined) audioDrumKit.value = audioDrumKitId;
     audioChipMachineId = isAudioChipMachineId(session.project.chipMachineId)
       ? session.project.chipMachineId
       : "NONE";
@@ -8832,7 +8996,6 @@ export function bootstrapDraw2Workspace(
       if (audioSurfacesReady) {
         renderAudioTimelineTracks();
         renderAudioMidiGrid();
-        if (audioEditorActiveTab === "DRUM") renderAudioDrumGrid();
       }
       setModeDeckStatus(
         "audio",
@@ -8897,7 +9060,6 @@ export function bootstrapDraw2Workspace(
     if (audioSurfacesReady) {
       renderAudioTimelineTracks();
       renderAudioMidiGrid();
-      if (audioEditorActiveTab === "DRUM") renderAudioDrumGrid();
     }
     setModeDeckStatus("audio", `${actionLabel} · Undo restores every Track`);
     return true;
@@ -9393,7 +9555,6 @@ export function bootstrapDraw2Workspace(
     audioWorkspaceMeasureEnd.value = audioFrameCount;
     audioRangeClipboard = undefined;
     audioDrumKitId = "BASIC";
-    if (audioDrumKit !== undefined) audioDrumKit.value = audioDrumKitId;
     audioAnimationFrame = 1;
     audioSelectedNoteKey = undefined;
     audioNoteVelocity = 0.82;
@@ -11212,7 +11373,7 @@ export function bootstrapDraw2Workspace(
     if (track === undefined) return;
     audioInspectorTargetKind = "deck";
     audioSelectedTrackId = track.id;
-    selectAudioEditor("WAVE", true);
+    selectAudioEditor("ROLL", true);
     selectAudioRightPanel("inspector");
     syncAudioRightInspector(
       `Track: ${track.label}`,
@@ -11305,7 +11466,6 @@ export function bootstrapDraw2Workspace(
       renderAudioTimelineTracks();
       renderAudioArrangerOverview();
       renderAudioMidiGrid();
-      if (audioEditorActiveTab === "DRUM") renderAudioDrumGrid();
       renderAudioDock();
       setModeDeckStatus("audio", `${label} を削除しました`);
     });
@@ -11333,7 +11493,7 @@ export function bootstrapDraw2Workspace(
     revealAudioVoiceEditor();
     setModeDeckStatus(
       "audio",
-      `${instrument.editor === "DRUM" ? "Drum Roll" : "Piano Roll"} · ` +
+      `MIDI Roll · ` +
         `${instrument.label} lane selected`,
     );
     renderAudioDock();
@@ -12460,9 +12620,7 @@ export function bootstrapDraw2Workspace(
       selectAudioRightPanel("inspector");
       syncAudioRightInspector(
         `Instrument: ${instrument.label}`,
-        editor === "DRUM"
-          ? "Arranger lane selected · edit steps in Drum Roll"
-          : "Arranger lane selected · edit notes in Piano Roll",
+        "Arranger lane selected · edit notes in MIDI Roll",
       );
       renderAudioTimelineTracks();
       renderAudioMidiGrid();
@@ -12470,7 +12628,7 @@ export function bootstrapDraw2Workspace(
       renderAudioArrangerOverview();
       setModeDeckStatus(
         "audio",
-        `${editor === "DRUM" ? "Drum Roll" : "Piano Roll"} · ` +
+        `MIDI Roll · ` +
           `${instrument.label} lane selected`,
       );
       return;
@@ -13553,9 +13711,6 @@ export function bootstrapDraw2Workspace(
     // only when the bounded frame window itself moves.
     if (audioWindowChanged || audioMeasureChanged) renderAudioMidiGrid();
     if (audioMeasureChanged) syncAudioBarSelection();
-    if (audioEditorActiveTab === "DRUM" && audioMeasureChanged) {
-      renderAudioDrumGrid();
-    }
     if (audioFrameCursor !== undefined) {
       audioFrameCursor.max = String(audioFrameCount);
       audioFrameCursor.value = String(audioAnimationFrame);
@@ -14402,7 +14557,7 @@ export function bootstrapDraw2Workspace(
     if (audioMidiInstrument !== undefined) {
       audioMidiInstrument.value = firstInstrument;
     }
-    selectAudioEditor(firstInstrument === "DRUMS" ? "DRUM" : "PIANO", true);
+    selectAudioEditor("ROLL", true);
     const committed = await queueAudioWorkspaceMutation(
       async (module, session) => {
         let current = session;
@@ -14685,191 +14840,6 @@ export function bootstrapDraw2Workspace(
     } finally {
       if (audioMidiConnect !== undefined) audioMidiConnect.disabled = false;
     }
-  };
-  const audioDrumStepFrame = (step: number): number => {
-    const safeStep = Math.max(0, Math.trunc(step));
-    const measureFrames = Math.max(
-      AUDIO_DRUM_STEPS,
-      audioMeasureFrameCount(),
-    );
-    const barIndex = Math.floor(safeStep / AUDIO_DRUM_STEPS);
-    const stepInBar = safeStep % AUDIO_DRUM_STEPS;
-    const frame = barIndex * measureFrames + Math.min(
-      measureFrames - 1,
-      Math.round((stepInBar * measureFrames) / AUDIO_DRUM_STEPS),
-    );
-    return Math.min(
-      Math.max(0, audioFrameCount - 1),
-      frame,
-    );
-  };
-  const audioDrumStepTick = (step: number): AudioTick => {
-    const safeStep = Math.max(0, Math.trunc(step));
-    const barIndex = Math.floor(safeStep / AUDIO_DRUM_STEPS);
-    const stepInBar = safeStep % AUDIO_DRUM_STEPS;
-    return (
-      barIndex * audioBarTick() +
-      Math.round((stepInBar * audioBarTick()) / AUDIO_DRUM_STEPS)
-    ) as AudioTick;
-  };
-  function renderAudioDrumGrid(): void {
-    if (audioDrumGrid === undefined) return;
-    if (audioEditorActiveTab !== "DRUM") {
-      audioDrumGrid.replaceChildren();
-      audioDrumGrid.removeAttribute("aria-busy");
-      return;
-    }
-    if (audioDrumKit !== undefined) audioDrumKit.value = audioDrumKitId;
-    audioDrumGrid.setAttribute("aria-busy", "true");
-    audioDrumGrid.dataset.audioRollEditor = "drum";
-    audioDrumGrid.replaceChildren();
-    const totalSteps = Math.max(
-      AUDIO_DRUM_STEPS,
-      audioTotalBars() * AUDIO_DRUM_STEPS,
-    );
-    audioDrumGrid.style.gridTemplateColumns =
-      `112px repeat(${totalSteps}, minmax(30px, 1fr))`;
-    const blank = documentRef.createElement("span");
-    blank.className = "draw2-audio-drum-step-label";
-    blank.textContent = "DRUM ROLL";
-    blank.setAttribute("aria-hidden", "true");
-    audioDrumGrid.append(blank);
-    for (let step = 0; step < totalSteps; step += 1) {
-      const header = documentRef.createElement("span");
-      header.className = "draw2-audio-drum-step-label";
-      const stepInBar = step % AUDIO_DRUM_STEPS;
-      const bar = Math.floor(step / AUDIO_DRUM_STEPS) + 1;
-      header.classList.toggle("is-bar", stepInBar === 0);
-      header.classList.toggle("is-beat", stepInBar % 4 === 0);
-      header.textContent = stepInBar === 0
-        ? `B${bar}`
-        : stepInBar % 4 === 0
-        ? String(stepInBar + 1)
-        : "";
-      header.title = `Bar ${bar} · step ${stepInBar + 1}`;
-      header.setAttribute("aria-hidden", "true");
-      audioDrumGrid.append(header);
-    }
-    for (const row of AUDIO_DRUM_ROWS) {
-      const label = documentRef.createElement("span");
-      label.className = "draw2-audio-drum-label";
-      label.textContent = row.label;
-      label.dataset.audioDrumRowLabel = row.id;
-      label.setAttribute("role", "rowheader");
-      audioDrumGrid.append(label);
-      for (let step = 0; step < totalSteps; step += 1) {
-        const frame = audioDrumStepFrame(step);
-        const note = audioNoteAtFrame(row.pitchMidi, frame, "DRUMS");
-        const cell = documentRef.createElement("button");
-        cell.type = "button";
-        cell.className = "draw2-audio-drum-step";
-        cell.dataset.audioDrumRow = row.id;
-        cell.dataset.audioDrumStep = String(step);
-        cell.setAttribute("role", "gridcell");
-        cell.setAttribute("aria-pressed", String(note !== undefined));
-        cell.setAttribute(
-          "aria-label",
-          `${row.label} bar ${Math.floor(step / AUDIO_DRUM_STEPS) + 1} step ${
-            (step % AUDIO_DRUM_STEPS) + 1
-          } · ${audioFramePositionLabel(frame)} · musical grid`,
-        );
-        cell.title =
-          `${row.label} · Bar ${Math.floor(step / AUDIO_DRUM_STEPS) + 1} · ` +
-          `step ${(step % AUDIO_DRUM_STEPS) + 1} · ${
-            audioFramePositionLabel(frame)
-          }`;
-        cell.classList.toggle("is-bar-start", step % AUDIO_DRUM_STEPS === 0);
-        cell.classList.toggle("is-beat", step % 4 === 0);
-        cell.classList.toggle("is-active", note !== undefined);
-        audioDrumGrid.append(cell);
-      }
-    }
-    audioDrumGrid.setAttribute("aria-busy", "false");
-    const active =
-      [...audioMidiNotes.values()].filter((note) => note.instrument === "DRUMS")
-        .length;
-    if (audioDrumStatus !== undefined) {
-      const kit = AUDIO_DRUM_KITS.find((item) => item.id === audioDrumKitId);
-      audioDrumStatus.textContent = localizeAudioText(
-        active === 0
-          ? `${
-            kit?.label ?? audioDrumKitId
-          } · click a row to add · drag to paint · right-click to erase · ${audioTotalBars()} bar${
-            audioTotalBars() === 1 ? "" : "s"
-          } visible.`
-          : `${active} drum event${active === 1 ? "" : "s"} active · ${
-            kit?.hint ?? "kit"
-          } · drag across the grid to paint or erase.`,
-      );
-    }
-  }
-  const setAudioDrumStep = (
-    rowId: string,
-    step: number,
-    active?: boolean,
-  ): void => {
-    audioInspectorTargetKind = "instrument";
-    const row = AUDIO_DRUM_ROWS.find((candidate) => candidate.id === rowId);
-    if (row === undefined || !Number.isInteger(step) || step < 0) return;
-    const clock = audioPianoRollClock();
-    const tick = audioDrumStepTick(step);
-    const frame = audioTickToFrame(tick, clock);
-    const existing = audioNoteAtFrame(row.pitchMidi, frame, "DRUMS");
-    const shouldBeActive = active ?? existing === undefined;
-    if (existing !== undefined && shouldBeActive) return;
-    if (existing !== undefined) {
-      audioMidiNotes.delete(existing.id);
-      unindexAudioNote(existing);
-      if (audioSelectedNoteKey === existing.id) {
-        audioSelectedNoteKey = undefined;
-      }
-      void queueAudioWorkspaceMutation((module, session) =>
-        module.journalWorkspaceNoteRemove(
-          session,
-          existing.id,
-          nextAudioWorkspaceMutation("drum-remove"),
-        )
-      );
-      refreshAudioNoteVisuals(undefined, existing);
-      setModeDeckStatus("audio", `${row.label} step ${step + 1} removed`);
-    } else {
-      const note = pianoRollNoteFromTicks(
-        {
-          id: audioNoteKey("DRUMS", row.pitchMidi, frame),
-          pitchMidi: row.pitchMidi,
-          startTick: tick,
-          durationTick: Math.max(
-            1,
-            Math.round(audioBarTick() / AUDIO_DRUM_STEPS),
-          ) as AudioTick,
-          velocity: row.velocity,
-          instrument: "DRUMS",
-        },
-        clock,
-        audioFrameCount,
-      );
-      if (note === undefined) return;
-      const canonicalNote = note;
-      audioMidiNotes.set(canonicalNote.id, canonicalNote);
-      indexAudioNote(canonicalNote);
-      audioSelectedNoteKey = canonicalNote.id;
-      primeAudioPlaybackFromGesture(
-        audioRuntimeTrackId(canonicalNote.instrument),
-      );
-      requestAudioNotePreviewOnGesture(canonicalNote);
-      void queueAudioNoteUpsert(canonicalNote, "drum-add").then((committed) => {
-        if (committed && !audioNotePreviewCompleted.has(canonicalNote)) {
-          void playAudioNotePreview(canonicalNote);
-        }
-      });
-      refreshAudioNoteVisuals(canonicalNote);
-      setModeDeckStatus("audio", `${row.label} step ${step + 1} added`);
-    }
-    renderAudioDrumGrid();
-    syncAudioMidiStatus();
-  };
-  const toggleAudioDrumStep = (rowId: string, step: number): void => {
-    setAudioDrumStep(rowId, step);
   };
   const audioInstrumentLaneKey = (
     instrument: PianoRollInstrumentId,
@@ -15441,7 +15411,6 @@ export function bootstrapDraw2Workspace(
     renderAudioAnimationCells();
     renderAudioMidiGrid();
     renderAudioMidiExpression();
-    if (audioEditorActiveTab === "DRUM") renderAudioDrumGrid();
     // Keep the first Audio paint limited to the active editor. Timeline rows,
     // custom status, and optional detail lanes yield to the next task so the
     // mode switch can return control before those bounded projections mount.
@@ -15527,7 +15496,6 @@ export function bootstrapDraw2Workspace(
       ) return;
       renderAudioTimelineTracks();
       renderAudioMidiGrid();
-      if (audioEditorActiveTab === "DRUM") renderAudioDrumGrid();
       renderAudioCustomPanels();
       // Keep hidden Audio panels lazy.  A session update while the Timeline
       // is open must not hydrate clip waveforms, mixer rows or automation
@@ -15976,7 +15944,6 @@ export function bootstrapDraw2Workspace(
       )
     );
     refreshAudioNoteVisuals(undefined, note);
-    if (audioEditorActiveTab === "DRUM") renderAudioDrumGrid();
     syncAudioMidiStatus();
     syncAudioRightInspector(
       `${pitchLabel(note.pitchMidi)} · F${note.startFrame + 1}`,
@@ -16138,7 +16105,7 @@ export function bootstrapDraw2Workspace(
     syncAudioMidiStatus();
   };
   const applyAudioMidiCell = (target: AudioMidiPointerTarget): void => {
-    selectAudioEditor("PIANO", true);
+    selectAudioEditor("ROLL", true);
     selectAudioRightPanel("inspector");
     audioInspectorTargetKind = "instrument";
     const clock = audioPianoRollClock();
@@ -16345,7 +16312,7 @@ export function bootstrapDraw2Workspace(
     }
     const target = audioMidiCellFromPointer(event);
     if (target === null) return;
-    selectAudioEditor("PIANO", true);
+    selectAudioEditor("ROLL", true);
     selectAudioRightPanel("inspector");
     const clock = audioPianoRollClock();
     const pitchMidi = target.pitchMidi;
@@ -16456,7 +16423,7 @@ export function bootstrapDraw2Workspace(
     removeAudioMidiNote(note, "MIDI note deleted · right-click action");
   });
   audioMidiGrid?.addEventListener("keydown", (event) => {
-    if (audioEditorActiveTab !== "PIANO") return;
+    if (audioEditorActiveTab !== "ROLL") return;
     const key = event.key.toLowerCase();
     const selected = audioSelectedNoteKey === undefined
       ? undefined
@@ -16761,7 +16728,7 @@ export function bootstrapDraw2Workspace(
       ) {
         audioSelectedTrackId = trackId;
       }
-      selectAudioEditor("WAVE", true);
+      selectAudioEditor("ROLL", true);
       selectAudioRightPanel("inspector");
       syncAudioRightInspector(
         `Track: ${
@@ -16955,7 +16922,7 @@ export function bootstrapDraw2Workspace(
       : null;
     if (trackLabel !== null && audioTracks.contains(trackLabel)) {
       audioInspectorTargetKind = "deck";
-      selectAudioEditor("WAVE", true);
+      selectAudioEditor("ROLL", true);
       selectAudioRightPanel("inspector");
       const trackId = trackLabel.dataset.modeDeckTrack;
       if (
@@ -19519,7 +19486,7 @@ export function bootstrapDraw2Workspace(
     if (track !== undefined) {
       audioInspectorTargetKind = "deck";
       audioSelectedTrackId = track.id;
-      selectAudioEditor("WAVE", true);
+      selectAudioEditor("ROLL", true);
       selectAudioRightPanel("inspector");
       syncAudioRightInspector(
         `Track: ${track.label}`,
@@ -19788,7 +19755,7 @@ export function bootstrapDraw2Workspace(
       const selected = inWorkspace
         ? audioWorkspaceActive &&
           (panel.dataset.audioEditorSurface === audioEditorActiveTab ||
-            (audioEditorActiveTab === "PIANO" &&
+            (audioEditorActiveTab === "ROLL" &&
               panel.dataset.audioPanelSurface === "piano-roll"))
         : audioSurface !== undefined &&
           panel.dataset.audioPanelSurface === audioSurface;
@@ -19880,139 +19847,6 @@ export function bootstrapDraw2Workspace(
       }
     });
   }
-  type AudioDrumPaintState = {
-    readonly pointerId: number;
-    readonly active: boolean;
-    readonly visited: Set<string>;
-  };
-  let audioDrumPaint: AudioDrumPaintState | undefined;
-  let audioDrumSkipNextClick = false;
-  const audioDrumCellFromEvent = (event: Event): HTMLButtonElement | null => {
-    const target = event.target instanceof Element
-      ? event.target.closest<HTMLButtonElement>(
-        "[data-audio-drum-row][data-audio-drum-step]",
-      )
-      : null;
-    return target !== null && audioDrumGrid?.contains(target) === true
-      ? target
-      : null;
-  };
-  const audioDrumCellFromPointer = (
-    event: PointerEvent,
-  ): HTMLButtonElement | null => {
-    const hit = documentRef.elementFromPoint(event.clientX, event.clientY);
-    return hit instanceof Element
-      ? hit.closest<HTMLButtonElement>(
-        "[data-audio-drum-row][data-audio-drum-step]",
-      )
-      : null;
-  };
-  audioDrumGrid?.addEventListener("pointerdown", (event) => {
-    if (event.button !== 0) return;
-    const target = audioDrumCellFromEvent(event);
-    if (target === null) return;
-    event.preventDefault();
-    const pointerId = event.pointerId;
-    const active = target.getAttribute("aria-pressed") !== "true";
-    audioDrumPaint = {
-      pointerId,
-      active,
-      visited: new Set(),
-    };
-    audioDrumSkipNextClick = true;
-    audioDrumGrid?.setPointerCapture?.(pointerId);
-    const key =
-      `${target.dataset.audioDrumRow}:${target.dataset.audioDrumStep}`;
-    audioDrumPaint.visited.add(key);
-    setAudioDrumStep(
-      target.dataset.audioDrumRow ?? "",
-      Number(target.dataset.audioDrumStep ?? "NaN"),
-      active,
-    );
-  });
-  audioDrumGrid?.addEventListener("pointermove", (event) => {
-    const paint = audioDrumPaint;
-    if (paint === undefined || paint.pointerId !== event.pointerId) return;
-    const target = audioDrumCellFromPointer(event);
-    if (target === null || !audioDrumGrid?.contains(target)) return;
-    event.preventDefault();
-    const key =
-      `${target.dataset.audioDrumRow}:${target.dataset.audioDrumStep}`;
-    if (paint.visited.has(key)) return;
-    paint.visited.add(key);
-    setAudioDrumStep(
-      target.dataset.audioDrumRow ?? "",
-      Number(target.dataset.audioDrumStep ?? "NaN"),
-      paint.active,
-    );
-  });
-  const finishAudioDrumPaint = (event: PointerEvent): void => {
-    if (audioDrumPaint?.pointerId !== event.pointerId) return;
-    try {
-      audioDrumGrid?.releasePointerCapture?.(event.pointerId);
-    } catch {
-      // The browser may release capture before pointerup.
-    }
-    audioDrumPaint = undefined;
-    windowRef.setTimeout(() => {
-      audioDrumSkipNextClick = false;
-    }, 250);
-  };
-  audioDrumGrid?.addEventListener("pointerup", finishAudioDrumPaint);
-  audioDrumGrid?.addEventListener("pointercancel", finishAudioDrumPaint);
-  audioDrumGrid?.addEventListener("contextmenu", (event) => {
-    const target = audioDrumCellFromEvent(event);
-    if (target === null) return;
-    event.preventDefault();
-    event.stopPropagation();
-    setAudioDrumStep(
-      target.dataset.audioDrumRow ?? "",
-      Number(target.dataset.audioDrumStep ?? "NaN"),
-      false,
-    );
-  });
-  audioDrumGrid?.addEventListener("click", (event) => {
-    if (audioDrumSkipNextClick) {
-      audioDrumSkipNextClick = false;
-      return;
-    }
-    const target = event.target instanceof Element
-      ? event.target.closest<HTMLButtonElement>(
-        "[data-audio-drum-row][data-audio-drum-step]",
-      )
-      : null;
-    if (target === null) return;
-    toggleAudioDrumStep(
-      target.dataset.audioDrumRow ?? "",
-      Number(target.dataset.audioDrumStep ?? "NaN"),
-    );
-  });
-  audioDrumKit?.addEventListener("change", () => {
-    const value = audioDrumKit.value;
-    if (!AUDIO_DRUM_KITS.some((kit) => kit.id === value)) return;
-    audioDrumKitId = value as AudioDrumKitId;
-    renderAudioDrumGrid();
-    setModeDeckStatus(
-      "audio",
-      `${
-        AUDIO_DRUM_KITS.find((kit) => kit.id === audioDrumKitId)?.label ??
-          audioDrumKitId
-      } selected · existing drum notes are kept`,
-    );
-    void queueAudioWorkspaceMutation((module, session) =>
-      module.journalWorkspaceDrumKitSet(
-        session,
-        audioDrumKitId,
-        nextAudioWorkspaceMutation("drum-kit"),
-      )
-    ).then((ok) => {
-      if (!ok) {
-        syncAudioWorkspaceUiFromSession();
-        renderAudioDrumGrid();
-        setModeDeckStatus("audio", "Drum kit could not be saved");
-      }
-    });
-  });
   audioEditorPin?.addEventListener("click", () => {
     audioEditorPinned = !audioEditorPinned;
     audioEditorPin.setAttribute("aria-pressed", String(audioEditorPinned));
@@ -20079,7 +19913,7 @@ export function bootstrapDraw2Workspace(
     const revision = audioWorkspaceSession?.project.revisions.find((entry) =>
       String(entry.revisionId) === item.dataset.audioBrowserRevision
     );
-    selectAudioEditor("WAVE", true);
+    selectAudioEditor("ROLL", true);
     selectAudioRightPanel("inspector");
     syncAudioRightInspector(
       `Asset: ${
@@ -20260,44 +20094,6 @@ export function bootstrapDraw2Workspace(
   audioRightFxList?.addEventListener("change", handleAudioFxAction);
   audioFxChain?.addEventListener("dblclick", handleAudioFxAction);
   audioRightFxList?.addEventListener("dblclick", handleAudioFxAction);
-  audioWaveOpenBrowser?.addEventListener("click", () => {
-    selectAudioRightPanel("browser");
-  });
-  const openAudioWaveEditing = (): void => {
-    const hasClip = (audioWorkspaceSession?.project.clips.length ?? 0) > 0;
-    if (hasClip) {
-      selectModeDeckTab("audio-library");
-      if (audioWaveStatus !== undefined) {
-        audioWaveStatus.textContent = localizeAudioText(
-          "Clip library opened · choose a Clip to edit gain, fades and split.",
-        );
-      }
-      setModeDeckStatus(
-        "audio",
-        "Waveform editing moved to the active Clip row",
-      );
-    } else {
-      selectAudioRightPanel("browser");
-      if (audioWaveStatus !== undefined) {
-        audioWaveStatus.textContent = localizeAudioText(
-          "No Audio Clip yet · Browser opened so you can import one.",
-        );
-      }
-      setModeDeckStatus(
-        "audio",
-        "Import an Audio Clip before editing its waveform",
-      );
-    }
-  };
-  audioWaveformViewport?.addEventListener("click", openAudioWaveEditing);
-  audioWaveformViewport?.addEventListener("keydown", (event) => {
-    if (event.key !== "Enter") return;
-    event.preventDefault();
-    openAudioWaveEditing();
-  });
-  audioSamplerOpenBrowser?.addEventListener("click", () => {
-    selectAudioRightPanel("browser");
-  });
   audioRightImport?.addEventListener("click", () => {
     audioDeckFileInput?.click();
   });
@@ -20682,10 +20478,77 @@ export function bootstrapDraw2Workspace(
       !tab.hidden && tab.dataset.workspacePanel !== undefined
     );
   };
-  const applyPaletteRatio = (): void => {
+  const paletteRatioBounds = (): {
+    minimum: number;
+    maximum: number;
+    contentTop: number;
+    trackHeight: number;
+  } => {
+    if (rightDock === undefined) {
+      return {
+        minimum: RIGHT_DOCK_MIN_PALETTE_RATIO,
+        maximum: RIGHT_DOCK_MAX_PALETTE_RATIO,
+        contentTop: 0,
+        trackHeight: 1,
+      };
+    }
+    const rect = rightDock.getBoundingClientRect();
+    if (rect.height <= 0) {
+      return {
+        minimum: RIGHT_DOCK_MIN_PALETTE_RATIO,
+        maximum: RIGHT_DOCK_MAX_PALETTE_RATIO,
+        contentTop: rect.top,
+        trackHeight: 1,
+      };
+    }
+    const styles = windowRef.getComputedStyle(rightDock);
+    const paddingTop = Number.parseFloat(styles.paddingTop) || 0;
+    const paddingBottom = Number.parseFloat(styles.paddingBottom) || 0;
+    const rowGap = Number.parseFloat(styles.rowGap) || 0;
+    const contentTop = rect.top + paddingTop;
+    const trackHeight = Math.max(
+      1,
+      rect.height - paddingTop - paddingBottom - rowGap * 2,
+    );
+    const customMinimum = Math.max(
+      80,
+      Math.min(
+        RIGHT_DOCK_MIN_CUSTOM_PX,
+        trackHeight - RIGHT_DOCK_MIN_PALETTE_PX -
+          RIGHT_DOCK_RESIZE_HANDLE_PX,
+      ),
+    );
+    const minimum = Math.max(
+      RIGHT_DOCK_MIN_PALETTE_RATIO,
+      Math.min(
+        RIGHT_DOCK_MAX_PALETTE_RATIO,
+        RIGHT_DOCK_MIN_PALETTE_PX / trackHeight,
+      ),
+    );
+    const maximum = Math.max(
+      minimum,
+      Math.min(
+        RIGHT_DOCK_MAX_PALETTE_RATIO,
+        1 - (customMinimum + RIGHT_DOCK_RESIZE_HANDLE_PX) / trackHeight,
+      ),
+    );
+    return { minimum, maximum, contentTop, trackHeight };
+  };
+  const applyPaletteRatio = (
+    accessibleBounds?: { minimum: number; maximum: number },
+  ): void => {
+    const measuredBounds = accessibleBounds ?? paletteRatioBounds();
+    const minimum = measuredBounds.minimum;
+    const maximum = measuredBounds.maximum;
     rightDock?.style.setProperty(
       "--draw2-right-palette-ratio",
       `${Math.round(rightDockPaletteRatio * 1000) / 10}%`,
+    );
+    setRailResizeHandleValue(
+      paletteResizeHandle,
+      rightDockPaletteRatio * 100,
+      minimum * 100,
+      maximum * 100,
     );
   };
   applyPaletteRatio();
@@ -20922,7 +20785,10 @@ export function bootstrapDraw2Workspace(
       ? modeProfile.defaultPanel
       : panel;
     rightDockVisibleTabs.add(nextPanel);
-    root.classList.remove("is-right-dock-collapsed");
+    syncRightDockCollapsedState(false);
+    // Re-measure the palette split after the workspace leaves the project
+    // start screen so aria bounds match the now-visible right rail.
+    applyPaletteRatio();
     state = {
       ...state,
       activePanel: nextPanel,
@@ -21644,6 +21510,7 @@ export function bootstrapDraw2Workspace(
     if (!profile.allowedPanels.includes(state.activePanel)) {
       setPanel(profile.defaultPanel);
     }
+    applyRailCollapsePreference(mode);
     syncModePlaybackButton();
   };
 
@@ -31459,8 +31326,7 @@ export function bootstrapDraw2Workspace(
 
   const toggleRightDock = (): void => {
     const collapsed = !root.classList.contains("is-right-dock-collapsed");
-    root.classList.toggle("is-right-dock-collapsed", collapsed);
-    rightDock?.classList.toggle("is-open", !collapsed);
+    syncRightDockCollapsedState(collapsed);
     updateStatus(
       `${capability.profile} · ${
         collapsed ? "Dock collapsed" : "Dock restored"
@@ -31619,34 +31485,40 @@ export function bootstrapDraw2Workspace(
   };
 
   let desktopTimelineHeightBeforeCollapse: string | undefined;
+  // All desktop modes share the same lower rail. DRAW shows the animation
+  // timeline, GAME shows its mode deck, and AUDIO shows its musical deck, but
+  // the resize/collapse contract is intentionally identical for each one.
   const setDesktopTimelineCollapsed = (collapsed: boolean): boolean => {
     if (
-      capability.profile !== "desktop" || currentCreatorMode() === "GAME" ||
-      currentCreatorMode() === "AUDIO" || timelineRegion === undefined ||
+      capability.profile !== "desktop" ||
+      timelineRegion === undefined ||
       timelineCard === undefined
     ) return false;
-    const state = collapsed ? "collapsed" : "expanded";
-    timelineRegion.dataset.timelineCollapse = state;
-    timelineCard.dataset.timelineCollapse = state;
-    if (collapsed) {
-      desktopTimelineHeightBeforeCollapse = root.style.getPropertyValue(
-        "--draw2-timeline-height",
-      ) || undefined;
-      root.style.setProperty("--draw2-timeline-height", "32px");
-      timelineRegion.style.setProperty("height", "32px", "important");
-      timelineRegion.style.setProperty("min-height", "32px", "important");
-    } else {
-      if (desktopTimelineHeightBeforeCollapse === undefined) {
-        root.style.removeProperty("--draw2-timeline-height");
-      } else {
-        root.style.setProperty(
-          "--draw2-timeline-height",
-          desktopTimelineHeightBeforeCollapse,
-        );
-      }
+    const currentState = timelineRegion.dataset.timelineCollapse;
+    const storedHeight = `${railLayoutPreference.timelineHeight}px`;
+    const expandedHeight = currentState === "collapsed"
+      ? desktopTimelineHeightBeforeCollapse ?? storedHeight
+      : root.style.getPropertyValue("--draw2-timeline-height") || storedHeight;
+    if (collapsed && currentState !== "collapsed") {
+      desktopTimelineHeightBeforeCollapse = expandedHeight;
+    }
+    if (!collapsed) {
+      desktopTimelineHeightBeforeCollapse = expandedHeight;
+    }
+    railLayoutPreference = {
+      ...railLayoutPreference,
+      timelineCollapsed: collapsed,
+    };
+    applyRailCollapsePreference(
+      currentCreatorMode() === "GAME"
+        ? "GAME"
+        : currentCreatorMode() === "AUDIO"
+        ? "AUDIO"
+        : "DRAW",
+    );
+    if (!collapsed) {
+      root.style.setProperty("--draw2-timeline-height", expandedHeight);
       desktopTimelineHeightBeforeCollapse = undefined;
-      timelineRegion.style.removeProperty("height");
-      timelineRegion.style.removeProperty("min-height");
     }
     timelineCollapseButton?.setAttribute("aria-expanded", String(!collapsed));
     timelineCollapseButton?.setAttribute(
@@ -31670,6 +31542,7 @@ export function bootstrapDraw2Workspace(
       }`,
     );
     windowRef.dispatchEvent(new Event("resize"));
+    saveRailLayoutPreference();
     updateStatus(
       `desktop · Timeline ${
         collapsed ? "collapsed" : "expanded"
@@ -31846,17 +31719,11 @@ export function bootstrapDraw2Workspace(
         setPanel("game-build");
         clickElement(documentRef, "#draw2GameBuildManifest");
         break;
-      case "audio-editor-piano":
-        clickElement(documentRef, '[data-audio-editor-tab="PIANO"]');
+      case "audio-editor-roll":
+        clickElement(documentRef, '[data-audio-editor-tab="ROLL"]');
         break;
-      case "audio-editor-wave":
-        clickElement(documentRef, '[data-audio-editor-tab="WAVE"]');
-        break;
-      case "audio-editor-drum":
-        clickElement(documentRef, '[data-audio-editor-tab="DRUM"]');
-        break;
-      case "audio-editor-sampler":
-        clickElement(documentRef, '[data-audio-editor-tab="SAMPLER"]');
+      case "audio-editor-draw":
+        clickElement(documentRef, '[data-audio-editor-tab="DRAW"]');
         break;
       case "audio-panel-editor":
         setPanel("audio");
@@ -32003,10 +31870,21 @@ export function bootstrapDraw2Workspace(
         applyWorkspacePreset("focused");
         break;
       case "workspace-reset": {
-        root.classList.remove("is-focus-mode", "is-right-dock-collapsed");
+        root.classList.remove(
+          "is-focus-mode",
+          "is-left-dock-collapsed",
+        );
+        syncRightDockCollapsedState(false);
+        workspaceLeftDock?.classList.add("is-open");
+        railLayoutPreference = {
+          ...railLayoutPreference,
+          gameLeftCollapsed: false,
+          audioLeftCollapsed: false,
+          timelineCollapsed: false,
+        };
+        setDesktopTimelineCollapsed(false);
         root.dataset.workspacePreset = "pixel";
-        if (rightDock !== undefined) rightDock.classList.add("is-open");
-    setPanel("color");
+        setPanel("color");
         updateStatus(
           `${capability.profile} · Pixel workspace reset · local layout only`,
         );
@@ -32486,51 +32364,88 @@ export function bootstrapDraw2Workspace(
     let pointerId: number | undefined;
     let startX = 0;
     let startWidth = 0;
+    const setLeftDockCollapsed = (collapsed: boolean): void => {
+      root.classList.toggle("is-left-dock-collapsed", collapsed);
+      workspaceLeftDock.classList.toggle("is-open", !collapsed);
+      leftResizeHandle.setAttribute("aria-expanded", String(!collapsed));
+      leftResizeHandle.setAttribute(
+        "data-rail-state",
+        collapsed ? "collapsed" : "expanded",
+      );
+      const mode = root.dataset.creatorMode;
+      if (mode === "AUDIO") {
+        railLayoutPreference = {
+          ...railLayoutPreference,
+          audioLeftCollapsed: collapsed,
+        };
+      } else if (mode === "GAME") {
+        railLayoutPreference = {
+          ...railLayoutPreference,
+          gameLeftCollapsed: collapsed,
+        };
+      }
+      setRailResizeHandleValue(
+        leftResizeHandle,
+        collapsed
+          ? 0
+          : Math.round(workspaceLeftDock.getBoundingClientRect().width),
+        0,
+        WORKSPACE_LEFT_RAIL_MAX_PX,
+      );
+    };
+    const applyLeftRailWidth = (mode: "AUDIO" | "GAME", value: number): void => {
+      const width = Math.round(clamp(
+        value,
+        mode === "AUDIO"
+          ? WORKSPACE_AUDIO_LEFT_RAIL_MIN_PX
+          : WORKSPACE_GAME_LEFT_RAIL_MIN_PX,
+        WORKSPACE_LEFT_RAIL_MAX_PX,
+      ));
+      if (mode === "AUDIO") {
+        root.style.setProperty("--draw2-audio-left-user-width", `${width}px`);
+        root.style.setProperty("--draw2-audio-left-width", `${width}px`);
+        railLayoutPreference = {
+          ...railLayoutPreference,
+          audioLeftWidth: width,
+        };
+      } else {
+        root.style.setProperty("--draw2-left-rail-width", `${width}px`);
+        root.style.setProperty("--draw2-tool-dock-width", `${width}px`);
+        railLayoutPreference = {
+          ...railLayoutPreference,
+          sharedLeftWidth: width,
+        };
+      }
+      setRailResizeHandleValue(
+        leftResizeHandle,
+        width,
+        0,
+        WORKSPACE_LEFT_RAIL_MAX_PX,
+      );
+    };
     const updateLeftRailWidth = (clientX: number): void => {
       const mode = root.dataset.creatorMode;
       const audio = mode === "AUDIO";
       const game = mode === "GAME";
       if (!audio && !game) return;
-      const width = clamp(
-        startWidth + clientX - startX,
-        audio
-          ? WORKSPACE_AUDIO_LEFT_RAIL_MIN_PX
-          : WORKSPACE_GAME_LEFT_RAIL_MIN_PX,
-        WORKSPACE_LEFT_RAIL_MAX_PX,
-      );
-      if (audio) {
-        root.style.setProperty(
-          "--draw2-audio-left-user-width",
-          `${Math.round(width)}px`,
-        );
-        root.style.setProperty(
-          "--draw2-audio-left-width",
-          `${Math.round(width)}px`,
-        );
-        railLayoutPreference = {
-          ...railLayoutPreference,
-          audioLeftWidth: Math.round(width),
-        };
-      } else {
-        root.style.setProperty(
-          "--draw2-left-rail-width",
-          `${Math.round(width)}px`,
-        );
-        root.style.setProperty(
-          "--draw2-tool-dock-width",
-          `${Math.round(width)}px`,
-        );
-        railLayoutPreference = {
-          ...railLayoutPreference,
-          sharedLeftWidth: Math.round(width),
-        };
+      const rawWidth = startWidth + clientX - startX;
+      if (rawWidth < WORKSPACE_RAIL_SNAP_PX) {
+        setLeftDockCollapsed(true);
+        return;
       }
+      setLeftDockCollapsed(false);
+      applyLeftRailWidth(audio ? "AUDIO" : "GAME", rawWidth);
     };
     leftResizeHandle.addEventListener("pointerdown", (event) => {
       pointerId = event.pointerId;
       startX = event.clientX;
       startWidth = workspaceLeftDock.getBoundingClientRect().width;
-      leftResizeHandle.setPointerCapture(event.pointerId);
+      try {
+        leftResizeHandle.setPointerCapture(event.pointerId);
+      } catch {
+        // The window listeners keep the drag alive in embedded surfaces that
+        // do not expose pointer capture.
+      }
       leftResizeHandle.classList.add("is-resizing");
       event.preventDefault();
     });
@@ -32548,6 +32463,43 @@ export function bootstrapDraw2Workspace(
     });
     windowRef.addEventListener("pointerup", finishLeftResize);
     windowRef.addEventListener("pointercancel", finishLeftResize);
+    leftResizeHandle.addEventListener("keydown", (event) => {
+      const mode = root.dataset.creatorMode;
+      if (mode !== "AUDIO" && mode !== "GAME") return;
+      const isCollapsed = root.classList.contains("is-left-dock-collapsed");
+      const minimum = mode === "AUDIO"
+        ? WORKSPACE_AUDIO_LEFT_RAIL_MIN_PX
+        : WORKSPACE_GAME_LEFT_RAIL_MIN_PX;
+      if (event.key === "Home") {
+        event.preventDefault();
+        setLeftDockCollapsed(true);
+        saveRailLayoutPreference();
+        return;
+      }
+      if (event.key === "End") {
+        event.preventDefault();
+        setLeftDockCollapsed(false);
+        applyLeftRailWidth(mode, WORKSPACE_LEFT_RAIL_MAX_PX);
+        saveRailLayoutPreference();
+        return;
+      }
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      const direction = event.key === "ArrowRight" ? 1 : -1;
+      if (isCollapsed && direction < 0) return;
+      event.preventDefault();
+      const step = event.shiftKey ? 48 : 16;
+      const current = isCollapsed
+        ? 0
+        : workspaceLeftDock.getBoundingClientRect().width;
+      const next = isCollapsed ? minimum : current + direction * step;
+      if (next < WORKSPACE_RAIL_SNAP_PX) {
+        setLeftDockCollapsed(true);
+      } else {
+        setLeftDockCollapsed(false);
+        applyLeftRailWidth(mode, next);
+      }
+      saveRailLayoutPreference();
+    });
     leftResizeHandle.addEventListener("lostpointercapture", () => {
       if (pointerId === undefined) return;
       pointerId = undefined;
@@ -32559,42 +32511,52 @@ export function bootstrapDraw2Workspace(
     let pointerId: number | undefined;
     let startX = 0;
     let startWidth = 0;
-    const updateColorDockWidth = (clientX: number): void => {
-      const frameWidth = root.getBoundingClientRect().width;
-      // The rail handle lives on the dock's left edge: dragging left expands
-      // the right rail, while dragging right gives space back to the Canvas.
-      const width = clamp(
-        startWidth + startX - clientX,
-        WORKSPACE_RIGHT_RAIL_MIN_PX,
-        Math.min(
-          WORKSPACE_RIGHT_RAIL_MAX_PX,
-          Math.max(360, frameWidth * 0.62),
-        ),
-      );
-      root.style.setProperty(
-        "--draw2-color-dock-width",
-        `${Math.round(width)}px`,
-      );
-      root.style.setProperty(
-        "--draw2-right-dock-width",
-        `${Math.round(width)}px`,
-      );
+    const setRightDockCollapsed = (collapsed: boolean): void => {
+      syncRightDockCollapsedState(collapsed);
+    };
+    const applyRightRailWidth = (value: number): void => {
+      const width = Math.round(clamp(
+        value,
+        rightRailMinimumForViewport(),
+        rightRailMaximumForViewport(),
+      ));
+      root.style.setProperty("--draw2-color-dock-width", `${width}px`);
+      root.style.setProperty("--draw2-right-dock-width", `${width}px`);
       // Audio uses its own desktop shell width variable. Keep it in the same
       // projection so the shared right-dock handle works in every mode.
-      root.style.setProperty(
-        "--draw2-audio-right-width",
-        `${Math.round(width)}px`,
-      );
+      root.style.setProperty("--draw2-audio-right-width", `${width}px`);
       railLayoutPreference = {
         ...railLayoutPreference,
-        rightWidth: Math.round(width),
+        rightWidth: width,
       };
+      setRailResizeHandleValue(
+        rightResizeHandle,
+        width,
+        0,
+        rightRailMaximumForViewport(),
+      );
+    };
+    const updateColorDockWidth = (clientX: number): void => {
+      const rawWidth = startWidth + startX - clientX;
+      if (rawWidth < WORKSPACE_RAIL_SNAP_PX) {
+        setRightDockCollapsed(true);
+        return;
+      }
+      setRightDockCollapsed(false);
+      // The rail handle lives on the dock's left edge: dragging left expands
+      // the right rail, while dragging right gives space back to the Canvas.
+      applyRightRailWidth(rawWidth);
     };
     rightResizeHandle.addEventListener("pointerdown", (event) => {
       pointerId = event.pointerId;
       startX = event.clientX;
       startWidth = rightDock.getBoundingClientRect().width;
-      rightResizeHandle.setPointerCapture(event.pointerId);
+      try {
+        rightResizeHandle.setPointerCapture(event.pointerId);
+      } catch {
+        // The window listeners keep the drag alive in embedded surfaces that
+        // do not expose pointer capture.
+      }
       event.preventDefault();
     });
     const finishRightResize = (event: PointerEvent): void => {
@@ -32610,6 +32572,38 @@ export function bootstrapDraw2Workspace(
     });
     windowRef.addEventListener("pointerup", finishRightResize);
     windowRef.addEventListener("pointercancel", finishRightResize);
+    rightResizeHandle.addEventListener("keydown", (event) => {
+      const isCollapsed = root.classList.contains("is-right-dock-collapsed");
+      if (event.key === "Home") {
+        event.preventDefault();
+        setRightDockCollapsed(true);
+        saveRailLayoutPreference();
+        return;
+      }
+      if (event.key === "End") {
+        event.preventDefault();
+        setRightDockCollapsed(false);
+        applyRightRailWidth(rightRailMaximumForViewport());
+        saveRailLayoutPreference();
+        return;
+      }
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      const direction = event.key === "ArrowLeft" ? 1 : -1;
+      if (isCollapsed && direction < 0) return;
+      event.preventDefault();
+      const step = event.shiftKey ? 48 : 16;
+      const current = isCollapsed ? 0 : rightDock.getBoundingClientRect().width;
+      const next = isCollapsed
+        ? rightRailMinimumForViewport()
+        : current + direction * step;
+      if (next < WORKSPACE_RAIL_SNAP_PX) {
+        setRightDockCollapsed(true);
+      } else {
+        setRightDockCollapsed(false);
+        applyRightRailWidth(next);
+      }
+      saveRailLayoutPreference();
+    });
     rightResizeHandle.addEventListener("lostpointercapture", () => {
       pointerId = undefined;
       saveRailLayoutPreference();
@@ -32618,41 +32612,25 @@ export function bootstrapDraw2Workspace(
   if (paletteResizeHandle !== undefined && rightDock !== undefined) {
     let pointerId: number | undefined;
     const updatePaletteRatio = (clientY: number): void => {
-      const rect = rightDock.getBoundingClientRect();
-      const styles = windowRef.getComputedStyle(rightDock);
-      const paddingTop = Number.parseFloat(styles.paddingTop) || 0;
-      const paddingBottom = Number.parseFloat(styles.paddingBottom) || 0;
-      const rowGap = Number.parseFloat(styles.rowGap) || 0;
-      const contentTop = rect.top + paddingTop;
-      const trackHeight = Math.max(
-        1,
-        rect.height - paddingTop - paddingBottom - rowGap * 2,
-      );
-      const minimum = clamp(
-        RIGHT_DOCK_MIN_PALETTE_PX / trackHeight,
-        RIGHT_DOCK_MIN_PALETTE_RATIO,
-        RIGHT_DOCK_MAX_PALETTE_RATIO,
-      );
-      const maximum = Math.max(
-        minimum,
-        Math.min(
-          RIGHT_DOCK_MAX_PALETTE_RATIO,
-          1 - (RIGHT_DOCK_MIN_CUSTOM_PX + RIGHT_DOCK_RESIZE_HANDLE_PX) /
-            trackHeight,
-        ),
-      );
+      const { minimum, maximum, contentTop, trackHeight } =
+        paletteRatioBounds();
       // The palette is the first grid row. Dragging the handle down must
       // increase that row; the old bottom-origin calculation did the reverse.
       rightDockPaletteRatio = clamp(
-        (clientY - contentTop) / trackHeight,
+        (clientY - contentTop - RIGHT_DOCK_RESIZE_HANDLE_PX / 2) / trackHeight,
         minimum,
         maximum,
       );
-      applyPaletteRatio();
+      applyPaletteRatio({ minimum, maximum });
     };
     paletteResizeHandle.addEventListener("pointerdown", (event) => {
       pointerId = event.pointerId;
-      paletteResizeHandle.setPointerCapture(event.pointerId);
+      try {
+        paletteResizeHandle.setPointerCapture(event.pointerId);
+      } catch {
+        // Window listeners below keep the drag alive in embedded surfaces that
+        // do not expose pointer capture.
+      }
       rightDock.classList.add("is-palette-resizing");
       paletteResizeHandle.classList.add("is-resizing");
       event.preventDefault();
@@ -32682,10 +32660,34 @@ export function bootstrapDraw2Workspace(
     });
     windowRef.addEventListener("pointerup", finishPaletteResize);
     windowRef.addEventListener("pointercancel", finishPaletteResize);
+    paletteResizeHandle.addEventListener("keydown", (event) => {
+      if (event.key !== "Home" && event.key !== "End" &&
+        event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+      event.preventDefault();
+      const { minimum, maximum } = paletteRatioBounds();
+      if (event.key === "Home") rightDockPaletteRatio = minimum;
+      else if (event.key === "End") rightDockPaletteRatio = maximum;
+      else {
+        const step = event.shiftKey ? 0.08 : 0.04;
+        const direction = event.key === "ArrowDown" ? 1 : -1;
+        rightDockPaletteRatio = clamp(
+          rightDockPaletteRatio + direction * step,
+          minimum,
+          maximum,
+        );
+      }
+      applyPaletteRatio({ minimum, maximum });
+      saveRightDockPreference();
+    });
     paletteResizeHandle.addEventListener("dblclick", (event) => {
       event.preventDefault();
-      rightDockPaletteRatio = RIGHT_DOCK_DEFAULT_PALETTE_RATIO;
-      applyPaletteRatio();
+      const { minimum, maximum } = paletteRatioBounds();
+      rightDockPaletteRatio = clamp(
+        RIGHT_DOCK_DEFAULT_PALETTE_RATIO,
+        minimum,
+        maximum,
+      );
+      applyPaletteRatio({ minimum, maximum });
       saveRightDockPreference();
     });
   }
@@ -32699,14 +32701,23 @@ export function bootstrapDraw2Workspace(
       startHeight = timelineRegion.getBoundingClientRect().height;
     };
     const updateTimelineHeight = (clientY: number): void => {
-      const frameHeight = root.getBoundingClientRect().height;
+      const rawHeight = startHeight + startY - clientY;
+      // Aseprite-style: past WORKSPACE_RAIL_SNAP_PX this snaps to the same
+      // thin collapsed strip the timeline's own collapse button already
+      // produces for DRAW, GAME, and AUDIO, instead of forcing
+      // WORKSPACE_TIMELINE_MIN_PX. Dragging back out past the same point
+      // reopens it at the dragged height.
+      if (rawHeight < WORKSPACE_RAIL_SNAP_PX) {
+        setDesktopTimelineCollapsed(true);
+        return;
+      }
+      if (timelineRegion.dataset.timelineCollapse === "collapsed") {
+        setDesktopTimelineCollapsed(false);
+      }
       const height = clamp(
-        startHeight + startY - clientY,
+        rawHeight,
         WORKSPACE_TIMELINE_MIN_PX,
-        Math.min(
-          WORKSPACE_TIMELINE_MAX_PX,
-          Math.max(180, frameHeight * 0.72),
-        ),
+        timelineMaximumForViewport(),
       );
       root.style.setProperty(
         "--draw2-timeline-height",
@@ -32716,6 +32727,12 @@ export function bootstrapDraw2Workspace(
         ...railLayoutPreference,
         timelineHeight: Math.round(height),
       };
+      setRailResizeHandleValue(
+        timelineResizeHandle,
+        Math.round(height),
+        0,
+        timelineMaximumForViewport(),
+      );
     };
     timelineResizeHandle.addEventListener("pointerdown", (event) => {
       pointerId = event.pointerId;
@@ -32773,6 +32790,61 @@ export function bootstrapDraw2Workspace(
       passive: false,
     });
     window.addEventListener("mouseup", finishMouseTimelineResize);
+    timelineResizeHandle.addEventListener("keydown", (event) => {
+      if (event.key !== "Home" && event.key !== "End" &&
+        event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+      event.preventDefault();
+      if (event.key === "Home") {
+        setDesktopTimelineCollapsed(true);
+        saveRailLayoutPreference();
+        return;
+      }
+      const maximum = timelineMaximumForViewport();
+      if (event.key === "End") {
+        setDesktopTimelineCollapsed(false);
+        root.style.setProperty("--draw2-timeline-height", `${Math.round(maximum)}px`);
+        railLayoutPreference = {
+          ...railLayoutPreference,
+          timelineHeight: Math.round(maximum),
+        };
+        setRailResizeHandleValue(
+          timelineResizeHandle,
+          Math.round(maximum),
+          0,
+          maximum,
+        );
+        saveRailLayoutPreference();
+        return;
+      }
+      const isCollapsed = timelineRegion.dataset.timelineCollapse === "collapsed";
+      const direction = event.key === "ArrowUp" ? 1 : -1;
+      if (isCollapsed && direction < 0) return;
+      const step = event.shiftKey ? 48 : 16;
+      const current = isCollapsed
+        ? 0
+        : timelineRegion.getBoundingClientRect().height;
+      const next = isCollapsed
+        ? WORKSPACE_TIMELINE_MIN_PX
+        : current + direction * step;
+      if (next < WORKSPACE_RAIL_SNAP_PX) {
+        setDesktopTimelineCollapsed(true);
+      } else {
+        setDesktopTimelineCollapsed(false);
+        const height = Math.round(clamp(next, WORKSPACE_TIMELINE_MIN_PX, maximum));
+        root.style.setProperty("--draw2-timeline-height", `${height}px`);
+        railLayoutPreference = {
+          ...railLayoutPreference,
+          timelineHeight: height,
+        };
+        setRailResizeHandleValue(
+          timelineResizeHandle,
+          height,
+          0,
+          maximum,
+        );
+      }
+      saveRailLayoutPreference();
+    });
     timelineResizeHandle.addEventListener("lostpointercapture", () => {
       pointerId = undefined;
       mouseResizing = false;

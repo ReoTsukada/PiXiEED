@@ -1270,6 +1270,442 @@
   }
 }
 
+/* Adjustable rail layer contract (2026-08-31) ----------------------------
+ * All workspace rails share one stacking plane. Resize handles are the only
+ * controls above that plane, so a handle remains targetable at the exact
+ * edge where its rail closes. DRAW's left tool lane is deliberately absent
+ * from the adjustable selectors below: it keeps its existing fixed width and
+ * flyout behavior. */
+@media (min-width: 701px) {
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"] {
+    --draw2-rail-layer: 20;
+    --draw2-rail-handle-layer: 60;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"]
+    :is(
+      #draw2WorkspaceLeftDock,
+      #draw2WorkspaceRightDock,
+      #draw2WorkspaceTimelineRegion
+    ) {
+    position: relative !important;
+    z-index: var(--draw2-rail-layer) !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"]
+    #draw2WorkspaceRightDock {
+    overflow: visible !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"]
+    #draw2WorkspaceTimelineRegion {
+    overflow: visible !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"]
+    :is(
+      #draw2AudioLeftResize,
+      #draw2WorkspaceRightResize,
+      #draw2WorkspacePaletteResize,
+      #draw2WorkspaceTimelineResize
+    ) {
+    z-index: var(--draw2-rail-handle-layer) !important;
+    pointer-events: auto !important;
+    touch-action: none !important;
+  }
+
+  /* A collapsed side rail leaves only its boundary handle painted. The
+     handle is positioned inside the workspace by 14px so hit testing still
+     succeeds after the parent track reaches zero. */
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-left-dock-collapsed
+    :is([data-creator-mode="GAME"], [data-creator-mode="AUDIO"])
+    #draw2WorkspaceLeftDock {
+    overflow: visible !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-left-dock-collapsed[data-creator-mode="GAME"]
+    #draw2WorkspaceLeftDock,
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-left-dock-collapsed[data-creator-mode="AUDIO"]
+    #draw2WorkspaceLeftDock {
+    overflow: visible !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-left-dock-collapsed[data-creator-mode="GAME"]
+    #draw2WorkspaceLeftDock
+    > :not(#draw2AudioLeftResize),
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-left-dock-collapsed[data-creator-mode="AUDIO"]
+    #draw2WorkspaceLeftDock
+    > :not(#draw2AudioLeftResize) {
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-left-dock-collapsed
+    #draw2AudioLeftResize {
+    right: auto !important;
+    left: 0 !important;
+    width: 14px !important;
+    min-width: 14px !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-right-dock-collapsed
+    #draw2WorkspaceRightDock {
+    overflow: visible !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-right-dock-collapsed
+    #draw2WorkspaceRightDock
+    > :not(#draw2WorkspaceRightResize) {
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-right-dock-collapsed
+    #draw2WorkspaceRightResize {
+    right: auto !important;
+    left: -14px !important;
+    width: 14px !important;
+  }
+}
+
+/* Keep a real canvas on tablet widths. Side rails remain draggable, but their
+ * width is capped by the available viewport instead of consuming the middle
+ * column before it gets a usable minimum. */
+@media (min-width: 701px) and (max-width: 1119px) {
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"] {
+    --draw2-responsive-bottom-height: max(
+      32px,
+      min(220px, var(--draw2-timeline-height, 132px))
+    );
+    grid-template-rows:
+      64px minmax(0, 1fr) var(--draw2-responsive-bottom-height)
+      var(--draw2-statusbar-height) !important;
+    grid-template-areas:
+      "top top top"
+      "left canvas right"
+      "timeline timeline timeline"
+      "status status status" !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"] {
+    grid-template-columns:
+      52px minmax(0, 1fr)
+      minmax(200px, min(320px, max(200px, var(--draw2-right-dock-width, 280px)))) !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"] {
+    grid-template-columns:
+      minmax(220px, min(320px, max(220px, var(--draw2-left-rail-width, 244px))))
+      minmax(0, 1fr)
+      minmax(200px, min(320px, max(200px, var(--draw2-right-dock-width, 280px)))) !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"] {
+    grid-template-columns:
+      minmax(220px, min(320px, max(220px, var(--draw2-audio-left-user-width, 244px))))
+      minmax(0, 1fr)
+      minmax(200px, min(320px, max(200px, var(--draw2-right-dock-width, 280px)))) !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-left-dock-collapsed[data-creator-mode="GAME"],
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-left-dock-collapsed[data-creator-mode="AUDIO"] {
+    grid-template-columns:
+      0 minmax(0, 1fr)
+      minmax(200px, min(320px, max(200px, var(--draw2-right-dock-width, 280px)))) !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-right-dock-collapsed[data-creator-mode="DRAW"] {
+    grid-template-columns: 52px minmax(0, 1fr) 0 !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-right-dock-collapsed[data-creator-mode="GAME"],
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-right-dock-collapsed[data-creator-mode="AUDIO"] {
+    grid-template-columns:
+      minmax(220px, min(320px, max(220px, var(--draw2-left-rail-width, 244px))))
+      minmax(0, 1fr) 0 !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-left-dock-collapsed.is-right-dock-collapsed[data-creator-mode="GAME"],
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-left-dock-collapsed.is-right-dock-collapsed[data-creator-mode="AUDIO"] {
+    grid-template-columns: 0 minmax(0, 1fr) 0 !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"]
+    #draw2WorkspaceLeftDock,
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"]
+    #draw2WorkspaceRightDock {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"]
+    #draw2WorkspaceTimelineRegion {
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    height: 100% !important;
+  }
+}
+
+/* On phones the rails become edge overlays so Canvas keeps the full middle
+ * column. Their existing resize handles still close them to a zero-width
+ * edge, and the fixed DRAW tool lane remains the only left rail exception. */
+@media (max-width: 700px) {
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"] {
+    --draw2-responsive-bottom-height: max(
+      32px,
+      min(220px, var(--draw2-timeline-height, 132px))
+    );
+    grid-template-columns: 48px minmax(0, 1fr) 0 !important;
+    grid-template-rows:
+      64px minmax(0, 1fr) var(--draw2-responsive-bottom-height)
+      var(--draw2-statusbar-height) !important;
+    grid-template-areas:
+      "top top top"
+      "left canvas right"
+      "timeline timeline timeline"
+      "status status status" !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"],
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"] {
+    grid-template-columns: 0 minmax(0, 1fr) 0 !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"]
+    #draw2WorkspaceLeftDock {
+    box-sizing: border-box !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+    #draw2WorkspaceLeftDock {
+    position: relative !important;
+    grid-area: left !important;
+    width: 48px !important;
+    min-width: 48px !important;
+    padding-inline: 4px !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+    #draw2WorkspaceLeftDock,
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    #draw2WorkspaceLeftDock {
+    position: absolute !important;
+    z-index: var(--draw2-rail-layer, 20) !important;
+    top: 64px !important;
+    bottom: calc(var(--draw2-responsive-bottom-height) + var(--draw2-statusbar-height)) !important;
+    left: 0 !important;
+    width: min(280px, 82vw) !important;
+    min-width: 0 !important;
+    padding: 8px !important;
+    overflow: visible !important;
+    border-right: 1px solid var(--draw2-window-border, var(--draw2-border-subtle)) !important;
+    background: var(--draw2-surface, #111722) !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"]
+    #draw2WorkspaceRightDock {
+    position: absolute !important;
+    z-index: var(--draw2-rail-layer, 20) !important;
+    top: 64px !important;
+    right: 0 !important;
+    bottom: calc(var(--draw2-responsive-bottom-height) + var(--draw2-statusbar-height)) !important;
+    width: min(300px, calc(100vw - 8px)) !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    padding: 8px !important;
+    overflow: visible !important;
+    border-left: 1px solid var(--draw2-border-subtle) !important;
+    background: var(--draw2-surface, #111722) !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-left-dock-collapsed[data-creator-mode="GAME"]
+    #draw2WorkspaceLeftDock,
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-left-dock-collapsed[data-creator-mode="AUDIO"]
+    #draw2WorkspaceLeftDock {
+    width: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-left-dock-collapsed[data-creator-mode="GAME"]
+    #draw2WorkspaceLeftDock
+    > :not(#draw2AudioLeftResize),
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-left-dock-collapsed[data-creator-mode="AUDIO"]
+    #draw2WorkspaceLeftDock
+    > :not(#draw2AudioLeftResize) {
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"]
+    #draw2AudioLeftResize {
+    right: -7px !important;
+    width: 14px !important;
+    min-width: 14px !important;
+    pointer-events: auto !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-left-dock-collapsed
+    #draw2AudioLeftResize {
+    right: auto !important;
+    left: 0 !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-right-dock-collapsed
+    #draw2WorkspaceRightDock {
+    width: 0 !important;
+    min-width: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-right-dock-collapsed
+    #draw2WorkspaceRightDock
+    > :not(#draw2WorkspaceRightResize) {
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"]
+    #draw2WorkspaceRightResize {
+    left: -7px !important;
+    width: 14px !important;
+    pointer-events: auto !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-right-dock-collapsed
+    #draw2WorkspaceRightResize {
+    left: -14px !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"]
+    #draw2WorkspaceTimelineRegion {
+    position: relative !important;
+    z-index: var(--draw2-rail-layer, 20) !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    height: 100% !important;
+    overflow: visible !important;
+  }
+}
+
+/* The DRAW split is shared by desktop, tablet, and the phone edge overlay.
+ * The final row uses the same dynamic custom-panel floor that the pointer
+ * calculation in wp180-workspace-ui.ts uses, so the visible row follows the
+ * handle all the way to both safe extremes. */
+@media (min-width: 701px), (max-width: 700px) {
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+    #draw2WorkspaceRightDock {
+    --draw2-right-palette-default-ratio: 18%;
+    --draw2-right-palette-max-ratio: 88%;
+    --draw2-right-palette-min-height: 40px;
+    --draw2-right-custom-min-height: 176px;
+    --draw2-right-palette-splitter-height: 12px;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows:
+      minmax(
+        var(--draw2-right-palette-min-height),
+        min(
+          var(
+            --draw2-right-palette-ratio,
+            var(--draw2-right-palette-default-ratio)
+          ),
+          var(--draw2-right-palette-max-ratio),
+          calc(
+            100% - var(--draw2-right-palette-splitter-height) -
+              var(--draw2-right-custom-min-height)
+          )
+        )
+      )
+      var(--draw2-right-palette-splitter-height)
+      minmax(var(--draw2-right-custom-min-height), 1fr) !important;
+    gap: 0 !important;
+    align-content: stretch !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+    #draw2WorkspaceRightDock
+    > #draw2WorkspacePaletteStrip.draw2-palette-strip {
+    display: block !important;
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    height: auto !important;
+    padding: 4px 8px !important;
+    overflow: auto !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+    #draw2WorkspacePaletteGrid {
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: auto !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+    #draw2WorkspaceRightDock
+    > #draw2WorkspacePaletteResize {
+    display: block !important;
+    grid-column: 1 !important;
+    grid-row: 2 !important;
+    align-self: stretch !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+    height: var(--draw2-right-palette-splitter-height) !important;
+    min-height: var(--draw2-right-palette-splitter-height) !important;
+    margin: 0 !important;
+    cursor: ns-resize !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+    #draw2WorkspaceRightDock
+    > #draw2WorkspaceRightCustomDock {
+    grid-column: 1 !important;
+    grid-row: 3 !important;
+    align-self: stretch !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: hidden !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+    #draw2WorkspaceRightCustomDock
+    > .draw2-workspace-tabs {
+    flex: 0 0 32px !important;
+    min-height: 32px !important;
+    height: 32px !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+    #draw2WorkspaceRightCustomDock
+    > .draw2-workspace-panel:not([hidden]) {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+    overflow: auto !important;
+  }
+}
+
 /* Piano Roll is the Audio central workspace.  The clip timeline remains in
  * the lower deck so notes can be entered while the artwork-aligned lanes stay
  * visible below. */
@@ -11034,7 +11470,7 @@ body:has(#draw2WorkspaceFrame) {
 .draw2-workspace-right-dock > #draw2WorkspacePaletteResize {
   grid-column: 1;
   grid-row: 2;
-  z-index: 30;
+  z-index: 40;
   width: 100%;
   height: 8px;
   min-height: 8px;
@@ -15626,7 +16062,7 @@ body:has(#draw2WorkspaceFrame) {
     bottom: 8px !important;
     left: -6px !important;
     width: 12px !important;
-    z-index: 8 !important;
+    z-index: 40 !important;
   }
   .draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
     #draw2AudioRightDock {
@@ -27596,7 +28032,7 @@ body:has(#draw2WorkspaceFrame) {
     right: auto !important;
     bottom: 0 !important;
     left: -7px !important;
-    z-index: 20 !important;
+    z-index: 40 !important;
     box-sizing: border-box !important;
     width: 14px !important;
     height: auto !important;
@@ -28387,6 +28823,37 @@ body:has(#draw2WorkspaceFrame) {
       minmax(0, 1fr) 0 !important;
   }
 
+  /* Left rail closes the same way the right dock already does above:
+   * dragging the handle past WORKSPACE_RAIL_SNAP_PX (wp180-workspace-ui.ts)
+   * snaps this class on instead of forcing GAME/AUDIO's own minimum floor,
+   * and the resize handle itself stays visible at the collapsed edge so the
+   * same drag reopens it -- verified live, same as the right dock above.
+   * DRAW's left rail is the fixed iDRAW tool lane and has no variant here:
+   * it never receives this class (updateLeftRailWidth's mode guard). */
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"]:not(.is-focus-mode).is-left-dock-collapsed[data-creator-mode="GAME"] {
+    grid-template-columns: 0 minmax(0, 1fr) var(--studio-right-rail-width) !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"]:not(.is-focus-mode).is-left-dock-collapsed[data-creator-mode="AUDIO"] {
+    grid-template-columns: 0 minmax(0, 1fr) var(--studio-right-rail-width) !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"]:not(.is-focus-mode).is-left-dock-collapsed.is-right-dock-collapsed[data-creator-mode="GAME"],
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"]:not(.is-focus-mode).is-left-dock-collapsed.is-right-dock-collapsed[data-creator-mode="AUDIO"] {
+    grid-template-columns: 0 minmax(0, 1fr) 0 !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-left-dock-collapsed[data-creator-mode="GAME"]
+    #draw2WorkspaceLeftDock,
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-left-dock-collapsed[data-creator-mode="AUDIO"]
+    #draw2WorkspaceLeftDock {
+    width: 0 !important;
+    min-width: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    border-right: 0 !important;
+  }
+
   #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"]
     #draw2WorkspaceLeftDock {
     position: relative !important;
@@ -29174,5 +29641,583 @@ body:has(#draw2WorkspaceFrame) {
     min-height: 0 !important;
     max-height: 100% !important;
     overflow: auto !important;
+  }
+}
+
+/* Final adjustable-rail contract (2026-08-31) ----------------------------
+ * The workspace has one rail plane: left content, right content, and the
+ * lower deck share the same stacking level. Handles are the only controls
+ * above that plane and remain targetable when a rail is closed. DRAW keeps
+ * its 64px iDRAW tool lane fixed; every other rail is user-variable. */
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"] {
+  --draw2-rail-layer: 20;
+  --draw2-rail-handle-layer: 60;
+  --draw2-right-palette-default-ratio: 18%;
+  --draw2-right-palette-max-ratio: 88%;
+  --draw2-right-palette-min-height: 40px;
+  --draw2-right-custom-min-height: 176px;
+  --draw2-right-custom-min-height: max(
+    80px,
+    min(
+      176px,
+      calc(
+        100% - var(--draw2-right-palette-min-height) -
+          var(--draw2-right-palette-splitter-height)
+      )
+    )
+  );
+  --draw2-right-palette-splitter-height: 12px;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"]
+  :is(
+    #draw2WorkspaceLeftDock,
+    #draw2WorkspaceRightDock,
+    #draw2WorkspaceTimelineRegion
+  ) {
+  position: relative !important;
+  z-index: var(--draw2-rail-layer) !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"]
+  :is(
+    #draw2AudioLeftResize,
+    #draw2WorkspaceRightResize,
+    #draw2WorkspacePaletteResize,
+    #draw2WorkspaceTimelineResize
+  ) {
+  z-index: var(--draw2-rail-handle-layer) !important;
+  pointer-events: auto !important;
+  touch-action: none !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"]
+  :is(#draw2WorkspaceRightDock, #draw2WorkspaceTimelineRegion) {
+  overflow: visible !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"]
+  #draw2WorkspaceRightResize {
+  position: absolute !important;
+  top: 0 !important;
+  right: auto !important;
+  bottom: 0 !important;
+  left: -7px !important;
+  width: 14px !important;
+  min-width: 14px !important;
+  height: auto !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  pointer-events: auto !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"]
+  #draw2AudioLeftResize {
+  right: -7px !important;
+  width: 14px !important;
+  min-width: 14px !important;
+  pointer-events: auto !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"]
+  #draw2WorkspaceTimelineRegion {
+  display: flex !important;
+  flex-direction: column !important;
+  box-sizing: border-box !important;
+  min-width: 0 !important;
+  overflow: visible !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"]
+  #draw2WorkspaceTimelineResize {
+  z-index: var(--draw2-rail-handle-layer) !important;
+  pointer-events: auto !important;
+}
+
+/* A zero-width parent must not clip the one control that reopens it. */
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"]
+  :is(.is-left-dock-collapsed, .is-right-dock-collapsed) {
+  overflow: visible !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-left-dock-collapsed[data-creator-mode="GAME"]
+  #draw2WorkspaceLeftDock,
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-left-dock-collapsed[data-creator-mode="AUDIO"]
+  #draw2WorkspaceLeftDock,
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-right-dock-collapsed
+  #draw2WorkspaceRightDock {
+  width: 0 !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  overflow: visible !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-left-dock-collapsed[data-creator-mode="GAME"]
+  #draw2WorkspaceLeftDock
+  > :not(#draw2AudioLeftResize),
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-left-dock-collapsed[data-creator-mode="AUDIO"]
+  #draw2WorkspaceLeftDock
+  > :not(#draw2AudioLeftResize),
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-right-dock-collapsed
+  #draw2WorkspaceRightDock
+  > :not(#draw2WorkspaceRightResize) {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-left-dock-collapsed
+  #draw2AudioLeftResize {
+  right: auto !important;
+  left: 0 !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-right-dock-collapsed
+  #draw2WorkspaceRightResize {
+  right: auto !important;
+  left: -14px !important;
+}
+
+@media (min-width: 1120px) {
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"] {
+    width: 100vw !important;
+    height: 100dvh !important;
+    min-height: 0 !important;
+    max-height: 100dvh !important;
+    grid-template-rows:
+      var(--draw2-pc-topbar-height, 64px)
+      minmax(0, 1fr)
+      max(32px, min(420px, var(--draw2-timeline-height, 220px)))
+      var(--draw2-statusbar-height, 28px) !important;
+    grid-template-areas:
+      "top top top"
+      "left canvas right"
+      "timeline timeline timeline"
+      "status status status" !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"] {
+    grid-template-columns:
+      64px minmax(0, 1fr)
+      minmax(280px, min(760px, max(280px, var(--draw2-right-dock-width, 320px)))) !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"] {
+    grid-template-columns:
+      minmax(224px, min(320px, max(224px, var(--draw2-left-rail-width, 244px))))
+      minmax(0, 1fr)
+      minmax(280px, min(760px, max(280px, var(--draw2-right-dock-width, 320px)))) !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"] {
+    grid-template-columns:
+      minmax(
+        220px,
+        min(
+          320px,
+          max(
+            220px,
+            var(
+              --draw2-audio-left-user-width,
+              var(--draw2-audio-left-width, 244px)
+            )
+          )
+        )
+      )
+      minmax(0, 1fr)
+      minmax(280px, min(760px, max(280px, var(--draw2-right-dock-width, 320px)))) !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-right-dock-collapsed[data-creator-mode="DRAW"] {
+    grid-template-columns: 64px minmax(0, 1fr) 0 !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-right-dock-collapsed:is([data-creator-mode="GAME"], [data-creator-mode="AUDIO"]) {
+    grid-template-columns:
+      minmax(224px, min(320px, max(224px, var(--draw2-left-rail-width, 244px))))
+      minmax(0, 1fr) 0 !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-left-dock-collapsed:is([data-creator-mode="GAME"], [data-creator-mode="AUDIO"]) {
+    grid-template-columns: 0 minmax(0, 1fr)
+      minmax(280px, min(760px, max(280px, var(--draw2-right-dock-width, 320px)))) !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-left-dock-collapsed.is-right-dock-collapsed:is([data-creator-mode="GAME"], [data-creator-mode="AUDIO"]) {
+    grid-template-columns: 0 minmax(0, 1fr) 0 !important;
+  }
+}
+
+@media (min-width: 701px) and (max-width: 1119px) {
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"] {
+    --draw2-responsive-bottom-height: max(
+      32px,
+      min(220px, var(--draw2-timeline-height, 132px))
+    );
+    grid-template-rows:
+      64px minmax(0, 1fr) var(--draw2-responsive-bottom-height)
+      var(--draw2-statusbar-height, 28px) !important;
+    grid-template-areas:
+      "top top top"
+      "left canvas right"
+      "timeline timeline timeline"
+      "status status status" !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"] {
+    grid-template-columns:
+      64px minmax(0, 1fr)
+      minmax(200px, min(320px, max(200px, var(--draw2-right-dock-width, 280px)))) !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"]:is([data-creator-mode="GAME"], [data-creator-mode="AUDIO"]) {
+    grid-template-columns:
+      minmax(220px, min(320px, max(220px, var(--draw2-left-rail-width, 244px))))
+      minmax(0, 1fr)
+      minmax(200px, min(320px, max(200px, var(--draw2-right-dock-width, 280px)))) !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-right-dock-collapsed[data-creator-mode="DRAW"] {
+    grid-template-columns: 64px minmax(0, 1fr) 0 !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-right-dock-collapsed:is([data-creator-mode="GAME"], [data-creator-mode="AUDIO"]) {
+    grid-template-columns:
+      minmax(220px, min(320px, max(220px, var(--draw2-left-rail-width, 244px))))
+      minmax(0, 1fr) 0 !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-left-dock-collapsed:is([data-creator-mode="GAME"], [data-creator-mode="AUDIO"]) {
+    grid-template-columns:
+      0 minmax(0, 1fr)
+      minmax(200px, min(320px, max(200px, var(--draw2-right-dock-width, 280px)))) !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-left-dock-collapsed.is-right-dock-collapsed:is([data-creator-mode="GAME"], [data-creator-mode="AUDIO"]) {
+    grid-template-columns: 0 minmax(0, 1fr) 0 !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"]
+    :is(#draw2WorkspaceLeftDock, #draw2WorkspaceRightDock) {
+    box-sizing: border-box !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    width: 100% !important;
+  }
+}
+
+@media (max-width: 700px) {
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"] {
+    --draw2-responsive-bottom-height: max(
+      32px,
+      min(220px, var(--draw2-timeline-height, 132px))
+    );
+    grid-template-columns: 64px minmax(0, 1fr) 0 !important;
+    grid-template-rows:
+      64px minmax(0, 1fr) var(--draw2-responsive-bottom-height)
+      var(--draw2-statusbar-height, 28px) !important;
+    grid-template-areas:
+      "top top top"
+      "left canvas right"
+      "timeline timeline timeline"
+      "status status status" !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"]:is([data-creator-mode="GAME"], [data-creator-mode="AUDIO"]) {
+    grid-template-columns: 0 minmax(0, 1fr) 0 !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+    #draw2WorkspaceLeftDock {
+    position: relative !important;
+    grid-area: left !important;
+    width: 64px !important;
+    min-width: 64px !important;
+    max-width: 64px !important;
+    padding-inline: 6px !important;
+    overflow: visible !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"]:is([data-creator-mode="GAME"], [data-creator-mode="AUDIO"])
+    #draw2WorkspaceLeftDock {
+    position: absolute !important;
+    top: 64px !important;
+    bottom: calc(var(--draw2-responsive-bottom-height) + var(--draw2-statusbar-height, 28px)) !important;
+    left: 0 !important;
+    z-index: var(--draw2-rail-layer) !important;
+    width: min(
+      320px,
+      max(
+        220px,
+        var(--draw2-left-rail-width, var(--draw2-audio-left-user-width, 244px))
+      )
+    ) !important;
+    min-width: 0 !important;
+    padding: 8px !important;
+    overflow: visible !important;
+    border-right: 1px solid var(--studio-window-border, var(--draw2-border-subtle)) !important;
+    background: var(--draw2-surface) !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"]
+    #draw2WorkspaceRightDock {
+    position: absolute !important;
+    top: 64px !important;
+    right: 0 !important;
+    bottom: calc(var(--draw2-responsive-bottom-height) + var(--draw2-statusbar-height, 28px)) !important;
+    z-index: var(--draw2-rail-layer) !important;
+    box-sizing: border-box !important;
+    width: min(
+      240px,
+      max(200px, var(--draw2-right-dock-width, 280px))
+    ) !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    padding: 8px !important;
+    overflow: visible !important;
+    border-left: 1px solid var(--draw2-border-subtle) !important;
+    background: var(--draw2-surface) !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-left-dock-collapsed:is([data-creator-mode="GAME"], [data-creator-mode="AUDIO"])
+    #draw2WorkspaceLeftDock,
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"].is-right-dock-collapsed
+    #draw2WorkspaceRightDock {
+    width: 0 !important;
+    min-width: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    overflow: visible !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+    #draw2WorkspaceLeftDock {
+    width: min(
+      320px,
+      max(224px, var(--draw2-left-rail-width, 244px))
+    ) !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    #draw2WorkspaceLeftDock {
+    width: min(
+      320px,
+      max(
+        220px,
+        var(--draw2-audio-left-user-width, var(--draw2-audio-left-width, 244px))
+      )
+    ) !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"]
+    #draw2WorkspaceTimelineRegion {
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    height: 100% !important;
+  }
+}
+
+/* Right-dock palette split contract (2026-08-31): DRAW's palette is a bounded
+ * three-row grid. The custom panel owns all
+ * remaining height and scrolls internally, so the splitter can approach
+ * both safe extremes without hiding the authoring controls. */
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+  #draw2WorkspaceRightDock {
+  --draw2-right-palette-default-ratio: 18%;
+  --draw2-right-palette-max-ratio: 88%;
+  --draw2-right-palette-min-height: 40px;
+  --draw2-right-custom-min-height: 176px;
+  --draw2-right-custom-min-height: max(
+    80px,
+    min(
+      176px,
+      calc(
+        100% - var(--draw2-right-palette-min-height) -
+          var(--draw2-right-palette-splitter-height)
+      )
+    )
+  );
+  --draw2-right-palette-splitter-height: 12px;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-template-rows:
+    minmax(
+      var(--draw2-right-palette-min-height),
+      min(
+        var(--draw2-right-palette-ratio, var(--draw2-right-palette-default-ratio)),
+        var(--draw2-right-palette-max-ratio),
+        calc(
+          100% - var(--draw2-right-palette-splitter-height) -
+            var(--draw2-right-custom-min-height)
+        )
+      )
+    )
+    var(--draw2-right-palette-splitter-height)
+    minmax(var(--draw2-right-custom-min-height), 1fr) !important;
+  gap: 0 !important;
+  align-content: stretch !important;
+  overflow: visible !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+  #draw2WorkspaceRightDock
+  > :is(#draw2WorkspaceRightContext, #draw2WorkspaceModeSummary) {
+  display: none !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+  #draw2WorkspaceRightDock
+  > #draw2WorkspacePaletteStrip.draw2-palette-strip {
+  display: block !important;
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  height: auto !important;
+  padding: 4px 8px !important;
+  overflow: auto !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+  #draw2WorkspacePaletteGrid {
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: auto !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+  #draw2WorkspaceRightDock
+  > #draw2WorkspacePaletteResize {
+  display: block !important;
+  grid-column: 1 !important;
+  grid-row: 2 !important;
+  align-self: stretch !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  height: var(--draw2-right-palette-splitter-height) !important;
+  min-height: var(--draw2-right-palette-splitter-height) !important;
+  margin: 0 !important;
+  cursor: ns-resize !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+  #draw2WorkspaceRightDock
+  > #draw2WorkspaceRightCustomDock {
+  grid-column: 1 !important;
+  grid-row: 3 !important;
+  align-self: stretch !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: hidden !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+  #draw2WorkspaceRightCustomDock
+  > .draw2-workspace-tabs {
+  flex: 0 0 32px !important;
+  min-height: 32px !important;
+  height: 32px !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+  #draw2WorkspaceRightCustomDock
+  > .draw2-workspace-panel:not([hidden]) {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+  overflow: auto !important;
+}
+
+/* Specificity guard for the shared handle plane: legacy Audio selectors use
+ * the dock and handle IDs together, so repeat that exact shape here to keep
+ * every rail handle at the same accessible layer. */
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode]
+  #draw2WorkspaceLeftDock
+  #draw2AudioLeftResize,
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode]
+  #draw2WorkspaceRightDock
+  #draw2WorkspaceRightResize,
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode]
+  #draw2WorkspaceRightDock
+  #draw2WorkspacePaletteResize,
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode]
+  #draw2WorkspaceTimelineRegion
+  #draw2WorkspaceTimelineResize {
+  z-index: var(--draw2-rail-handle-layer) !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode]
+  #draw2WorkspaceTimelineRegion {
+  overflow: visible !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode].is-right-dock-collapsed
+  #draw2WorkspaceRightDock
+  #draw2WorkspaceRightResize {
+  top: 0 !important;
+  right: auto !important;
+  bottom: 0 !important;
+  left: -14px !important;
+  width: 14px !important;
+  min-width: 14px !important;
+  height: auto !important;
+}
+
+/* Tablet precedence guard: the legacy Draw projection uses a :has() selector
+ * with panel IDs, which is more specific than the shared rail rule even when
+ * the Asset panel is not active. Use the always-present right dock as the
+ * anchor so the guard also applies before a panel projection is mounted. */
+@media (min-width: 701px) and (max-width: 1119px) {
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]:has(#draw2WorkspaceRightDock) {
+    grid-template-columns:
+      64px minmax(0, 1fr)
+      minmax(200px, min(320px, max(200px, var(--draw2-right-dock-width, 280px)))) !important;
+    grid-template-rows:
+      64px minmax(0, 1fr)
+      max(32px, min(220px, var(--draw2-timeline-height, 132px)))
+      var(--draw2-statusbar-height, 28px) !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"].is-right-dock-collapsed:has(#draw2WorkspaceRightDock) {
+    grid-template-columns: 64px minmax(0, 1fr) 0 !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]:has(#draw2WorkspaceRightDock)
+    #draw2WorkspaceLeftDock {
+    width: 64px !important;
+    min-width: 64px !important;
+    max-width: 64px !important;
+    padding-inline: 6px !important;
+    overflow: visible !important;
+  }
+}
+
+/* Short landscape guard: preserve a usable central editor before allowing
+ * the lower rail to consume the entire height. The custom panel then has
+ * enough room for its tab strip plus an internal scroll viewport. */
+@media (min-width: 701px) and (max-width: 1119px) and (max-height: 520px) {
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]:has(#draw2WorkspaceRightDock) {
+    grid-template-rows:
+      64px minmax(0, 1fr)
+      max(32px, min(132px, var(--draw2-timeline-height, 132px)))
+      var(--draw2-statusbar-height, 28px) !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]:has(#draw2WorkspaceRightDock),
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]:has(#draw2WorkspaceRightDock) {
+    grid-template-rows:
+      64px minmax(0, 1fr)
+      max(32px, min(132px, var(--draw2-timeline-height, 132px)))
+      var(--draw2-statusbar-height, 28px) !important;
   }
 }

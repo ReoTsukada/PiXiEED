@@ -16354,7 +16354,10 @@ var AUDIO_DOCK_STORAGE_KEY = "pixieed:draw2:audio-dock:v2";
 var RAIL_LAYOUT_STORAGE_KEY = "pixieed:draw2:rail-layout:v1";
 var DRAW2_THEME_STORAGE_KEY = "pixieed:draw2:theme:v1";
 var DRAW2_DETAIL_MODE_STORAGE_KEY = "pixieed:draw2:detail-mode:v1";
-var RIGHT_DOCK_DEFAULT_PALETTE_RATIO = 0.3;
+var RIGHT_DOCK_DEFAULT_PALETTE_RATIO = 0.18;
+var RIGHT_DOCK_MIN_PALETTE_RATIO = 0.04;
+var RIGHT_DOCK_MAX_PALETTE_RATIO = 0.88;
+var RIGHT_DOCK_RESIZE_HANDLE_PX = 12;
 var AUDIO_DOCK_PANEL_REGISTRY = [
   {
     id: "browser",
@@ -16429,22 +16432,27 @@ function writeAudioDockLayout(storage, panels) {
   } catch {
   }
 }
-var RIGHT_DOCK_MIN_PALETTE_PX = 88;
-var RIGHT_DOCK_MIN_CUSTOM_PX = 72;
+var RIGHT_DOCK_MIN_PALETTE_PX = 40;
+var RIGHT_DOCK_MIN_CUSTOM_PX = 176;
 var WORKSPACE_RIGHT_RAIL_MIN_PX = 280;
+var WORKSPACE_RIGHT_RAIL_RESPONSIVE_MIN_PX = 200;
 var WORKSPACE_RIGHT_RAIL_MAX_PX = 760;
 var WORKSPACE_GAME_LEFT_RAIL_MIN_PX = 224;
 var WORKSPACE_AUDIO_LEFT_RAIL_MIN_PX = 220;
 var WORKSPACE_LEFT_RAIL_MAX_PX = 320;
-var WORKSPACE_TIMELINE_MIN_PX = 96;
+var WORKSPACE_TIMELINE_MIN_PX = 132;
 var WORKSPACE_TIMELINE_MAX_PX = 640;
+var WORKSPACE_RAIL_SNAP_PX = 96;
 var clampRailLayoutValue = (value, minimum, maximum) => Math.max(minimum, Math.min(maximum, Math.round(value)));
 function defaultRailLayoutPreference() {
   return {
     sharedLeftWidth: 52,
     audioLeftWidth: 244,
     rightWidth: 320,
-    timelineHeight: 260
+    timelineHeight: 260,
+    gameLeftCollapsed: false,
+    audioLeftCollapsed: false,
+    timelineCollapsed: false
   };
 }
 function readRailLayoutPreference(storage) {
@@ -16458,8 +16466,11 @@ function readRailLayoutPreference(storage) {
     return {
       sharedLeftWidth: clampRailLayoutValue(numberOr(parsed.sharedLeftWidth, fallback.sharedLeftWidth), 40, 520),
       audioLeftWidth: clampRailLayoutValue(numberOr(parsed.audioLeftWidth, fallback.audioLeftWidth), WORKSPACE_AUDIO_LEFT_RAIL_MIN_PX, WORKSPACE_LEFT_RAIL_MAX_PX),
-      rightWidth: clampRailLayoutValue(numberOr(parsed.rightWidth, fallback.rightWidth), WORKSPACE_RIGHT_RAIL_MIN_PX, WORKSPACE_RIGHT_RAIL_MAX_PX),
-      timelineHeight: clampRailLayoutValue(numberOr(parsed.timelineHeight, fallback.timelineHeight), WORKSPACE_TIMELINE_MIN_PX, WORKSPACE_TIMELINE_MAX_PX)
+      rightWidth: clampRailLayoutValue(numberOr(parsed.rightWidth, fallback.rightWidth), WORKSPACE_RIGHT_RAIL_RESPONSIVE_MIN_PX, WORKSPACE_RIGHT_RAIL_MAX_PX),
+      timelineHeight: clampRailLayoutValue(numberOr(parsed.timelineHeight, fallback.timelineHeight), WORKSPACE_TIMELINE_MIN_PX, WORKSPACE_TIMELINE_MAX_PX),
+      gameLeftCollapsed: typeof parsed.gameLeftCollapsed === "boolean" ? parsed.gameLeftCollapsed : fallback.gameLeftCollapsed,
+      audioLeftCollapsed: typeof parsed.audioLeftCollapsed === "boolean" ? parsed.audioLeftCollapsed : fallback.audioLeftCollapsed,
+      timelineCollapsed: typeof parsed.timelineCollapsed === "boolean" ? parsed.timelineCollapsed : fallback.timelineCollapsed
     };
   } catch {
     return fallback;
@@ -17036,7 +17047,8 @@ function readRightDockPreference(storage) {
     const raw = storage.getItem(RIGHT_DOCK_STORAGE_KEY);
     if (raw === null) throw new Error("missing right dock preference");
     const parsed = JSON.parse(raw);
-    const ratio = typeof parsed.paletteRatio === "number" && Number.isFinite(parsed.paletteRatio) ? Math.max(0.1, Math.min(0.75, parsed.paletteRatio)) : RIGHT_DOCK_DEFAULT_PALETTE_RATIO;
+    const storedRatio = typeof parsed.paletteRatio === "number" && Number.isFinite(parsed.paletteRatio) ? parsed.paletteRatio : void 0;
+    const ratio = storedRatio === void 0 || storedRatio > RIGHT_DOCK_MAX_PALETTE_RATIO ? RIGHT_DOCK_DEFAULT_PALETTE_RATIO : Math.max(RIGHT_DOCK_MIN_PALETTE_RATIO, Math.min(RIGHT_DOCK_MAX_PALETTE_RATIO, storedRatio));
     const tabs = Array.isArray(parsed.tabs) ? [
       ...new Set(parsed.tabs.filter((value) => typeof value === "string" && isPanelKind(value)))
     ].map((value) => value) : [
@@ -17294,6 +17306,40 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
   windowRef.addEventListener("resize", desktopLayoutRefreshScheduler.request);
   const workspaceResizeObserver = typeof windowRef.ResizeObserver === "function" ? new windowRef.ResizeObserver(() => desktopLayoutRefreshScheduler.request()) : void 0;
   workspaceResizeObserver?.observe(root);
+  const setRailResizeHandleValue = (handle, value, minimum, maximum) => {
+    if (handle === void 0) return;
+    handle.setAttribute("aria-valuemin", String(minimum));
+    handle.setAttribute("aria-valuemax", String(maximum));
+    handle.setAttribute("aria-valuenow", String(Math.round(value * 10) / 10));
+  };
+  const workspaceViewportWidth = () => {
+    const measured = root.getBoundingClientRect().width;
+    return measured > 0 ? measured : windowRef.innerWidth;
+  };
+  const workspaceViewportHeight = () => {
+    const measured = root.getBoundingClientRect().height;
+    return measured > 0 ? measured : windowRef.innerHeight;
+  };
+  const rightRailMinimumForViewport = () => workspaceViewportWidth() < 1120 ? WORKSPACE_RIGHT_RAIL_RESPONSIVE_MIN_PX : WORKSPACE_RIGHT_RAIL_MIN_PX;
+  const rightRailMaximumForViewport = () => {
+    const width = workspaceViewportWidth();
+    if (width <= 700) return 240;
+    if (width < 1120) return 320;
+    return WORKSPACE_RIGHT_RAIL_MAX_PX;
+  };
+  const timelineMaximumForViewport = () => {
+    const width = workspaceViewportWidth();
+    const height = workspaceViewportHeight();
+    const breakpointMaximum = width < 1120 ? height <= 520 ? 132 : 220 : 420;
+    return Math.min(WORKSPACE_TIMELINE_MAX_PX, breakpointMaximum, Math.max(180, height * 0.72));
+  };
+  const syncRightDockCollapsedState = (collapsed) => {
+    root.classList.toggle("is-right-dock-collapsed", collapsed);
+    rightDock?.classList.toggle("is-open", !collapsed);
+    rightResizeHandle?.setAttribute("aria-expanded", String(!collapsed));
+    rightResizeHandle?.setAttribute("data-rail-state", collapsed ? "collapsed" : "expanded");
+    setRailResizeHandleValue(rightResizeHandle, collapsed ? 0 : Math.round(rightDock?.getBoundingClientRect().width ?? rightRailMinimumForViewport()), 0, rightRailMaximumForViewport());
+  };
   const rightDockStorage = (() => {
     try {
       return windowRef.localStorage;
@@ -17304,6 +17350,38 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
   let detailMode = readWorkspaceDetailMode(rightDockStorage);
   const rightDockPreference = readRightDockPreference(rightDockStorage);
   let railLayoutPreference = readRailLayoutPreference(rightDockStorage);
+  const applyRailCollapsePreference = (mode) => {
+    const leftCollapsed = mode === "GAME" ? railLayoutPreference.gameLeftCollapsed : mode === "AUDIO" ? railLayoutPreference.audioLeftCollapsed : false;
+    root.classList.toggle("is-left-dock-collapsed", leftCollapsed);
+    workspaceLeftDock?.classList.toggle("is-open", !leftCollapsed);
+    leftResizeHandle?.setAttribute("aria-expanded", String(!leftCollapsed));
+    leftResizeHandle?.setAttribute("data-rail-state", leftCollapsed ? "collapsed" : "expanded");
+    setRailResizeHandleValue(leftResizeHandle, leftCollapsed ? 0 : mode === "AUDIO" ? railLayoutPreference.audioLeftWidth : mode === "GAME" ? railLayoutPreference.sharedLeftWidth : 0, 0, WORKSPACE_LEFT_RAIL_MAX_PX);
+    const timelineCollapsed = railLayoutPreference.timelineCollapsed;
+    root.classList.toggle("is-timeline-collapsed", timelineCollapsed);
+    if (timelineRegion !== void 0) {
+      const state2 = timelineCollapsed ? "collapsed" : "expanded";
+      timelineRegion.dataset.timelineCollapse = state2;
+      timelineCard?.setAttribute("data-timeline-collapse", state2);
+      if (timelineCollapsed) {
+        root.style.setProperty("--draw2-timeline-height", "32px");
+        timelineRegion.style.setProperty("height", "32px", "important");
+        timelineRegion.style.setProperty("min-height", "32px", "important");
+      } else {
+        root.style.setProperty("--draw2-timeline-height", `${railLayoutPreference.timelineHeight}px`);
+        timelineRegion.style.removeProperty("height");
+        timelineRegion.style.removeProperty("min-height");
+      }
+    }
+    timelineCollapseButton?.setAttribute("aria-expanded", String(!timelineCollapsed));
+    timelineCollapseButton?.setAttribute("aria-label", timelineCollapsed ? "Expand timeline" : "Collapse timeline");
+    timelineCollapseButton?.setAttribute("title", timelineCollapsed ? "Expand timeline" : "Collapse timeline");
+    timelineResizeHandle?.setAttribute("aria-expanded", String(!timelineCollapsed));
+    timelineResizeHandle?.setAttribute("data-rail-state", timelineCollapsed ? "collapsed" : "expanded");
+    const timelineIcon = timelineCollapseButton === void 0 ? void 0 : query(timelineCollapseButton, "[data-timeline-collapse-icon]");
+    timelineIcon?.setAttribute("href", `./assets/icons/draw2-icons.svg#${timelineCollapsed ? "icon-expand" : "icon-shrink"}`);
+    setRailResizeHandleValue(timelineResizeHandle, timelineCollapsed ? 0 : Math.min(railLayoutPreference.timelineHeight, timelineMaximumForViewport()), 0, timelineMaximumForViewport());
+  };
   const applyRailLayoutPreference = () => {
     root.style.setProperty("--draw2-left-rail-width", `${railLayoutPreference.sharedLeftWidth}px`);
     root.style.setProperty("--draw2-tool-dock-width", `${railLayoutPreference.sharedLeftWidth}px`);
@@ -17313,11 +17391,12 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     root.style.setProperty("--draw2-audio-right-user-width", `${railLayoutPreference.rightWidth}px`);
     root.style.setProperty("--draw2-audio-right-width", `${railLayoutPreference.rightWidth}px`);
     root.style.setProperty("--draw2-timeline-height", `${railLayoutPreference.timelineHeight}px`);
+    const modeValue = root.dataset.creatorMode;
+    applyRailCollapsePreference(modeValue !== void 0 && isDesktopCreatorMode(modeValue) ? modeValue : "DRAW");
   };
   const saveRailLayoutPreference = () => {
     writeRailLayoutPreference(rightDockStorage, railLayoutPreference);
   };
-  applyRailLayoutPreference();
   try {
     const storedTheme = rightDockStorage?.getItem(DRAW2_THEME_STORAGE_KEY);
     if (storedTheme === "light" || storedTheme === "dark" || storedTheme === "system") {
@@ -17455,7 +17534,21 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
   const timelineCollapseButton = query(documentRef, "#draw2TimelineCollapse");
   const timelineResizeHandle = query(documentRef, "#draw2WorkspaceTimelineResize");
   const leftResizeHandle = query(documentRef, "#draw2AudioLeftResize");
+  const configureRailResizeHandle = (handle, orientation, controls, minimum, maximum) => {
+    if (handle === void 0) return;
+    handle.setAttribute("role", "separator");
+    handle.setAttribute("aria-orientation", orientation);
+    handle.setAttribute("aria-controls", controls);
+    handle.setAttribute("aria-valuemin", String(minimum));
+    handle.setAttribute("aria-valuemax", String(maximum));
+    handle.tabIndex = 0;
+  };
+  configureRailResizeHandle(leftResizeHandle, "vertical", "draw2WorkspaceLeftDock", 0, WORKSPACE_LEFT_RAIL_MAX_PX);
+  configureRailResizeHandle(rightResizeHandle, "vertical", "draw2WorkspaceRightDock", 0, WORKSPACE_RIGHT_RAIL_MAX_PX);
+  configureRailResizeHandle(paletteResizeHandle, "horizontal", "draw2WorkspacePaletteStrip draw2WorkspaceRightCustomDock", RIGHT_DOCK_MIN_PALETTE_RATIO * 100, RIGHT_DOCK_MAX_PALETTE_RATIO * 100);
+  configureRailResizeHandle(timelineResizeHandle, "horizontal", "draw2WorkspaceTimelineRegion", 0, WORKSPACE_TIMELINE_MAX_PX);
   const workspaceLeftDock = query(documentRef, "#draw2WorkspaceLeftDock");
+  applyRailLayoutPreference();
   const workspaceContextRow = query(documentRef, ".draw2-workspace-context-row");
   const audioWorkspace = query(documentRef, "#draw2AudioWorkspace");
   const audioLeftDock = query(documentRef, "#draw2AudioLeftDock");
@@ -29872,8 +29965,46 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     }
     rightDockEmptyState.hidden = tabs.some((tab) => !tab.hidden && tab.dataset.workspacePanel !== void 0);
   };
-  const applyPaletteRatio = () => {
+  const paletteRatioBounds = () => {
+    if (rightDock === void 0) {
+      return {
+        minimum: RIGHT_DOCK_MIN_PALETTE_RATIO,
+        maximum: RIGHT_DOCK_MAX_PALETTE_RATIO,
+        contentTop: 0,
+        trackHeight: 1
+      };
+    }
+    const rect = rightDock.getBoundingClientRect();
+    if (rect.height <= 0) {
+      return {
+        minimum: RIGHT_DOCK_MIN_PALETTE_RATIO,
+        maximum: RIGHT_DOCK_MAX_PALETTE_RATIO,
+        contentTop: rect.top,
+        trackHeight: 1
+      };
+    }
+    const styles = windowRef.getComputedStyle(rightDock);
+    const paddingTop = Number.parseFloat(styles.paddingTop) || 0;
+    const paddingBottom = Number.parseFloat(styles.paddingBottom) || 0;
+    const rowGap = Number.parseFloat(styles.rowGap) || 0;
+    const contentTop = rect.top + paddingTop;
+    const trackHeight = Math.max(1, rect.height - paddingTop - paddingBottom - rowGap * 2);
+    const customMinimum = Math.max(80, Math.min(RIGHT_DOCK_MIN_CUSTOM_PX, trackHeight - RIGHT_DOCK_MIN_PALETTE_PX - RIGHT_DOCK_RESIZE_HANDLE_PX));
+    const minimum = Math.max(RIGHT_DOCK_MIN_PALETTE_RATIO, Math.min(RIGHT_DOCK_MAX_PALETTE_RATIO, RIGHT_DOCK_MIN_PALETTE_PX / trackHeight));
+    const maximum = Math.max(minimum, Math.min(RIGHT_DOCK_MAX_PALETTE_RATIO, 1 - (customMinimum + RIGHT_DOCK_RESIZE_HANDLE_PX) / trackHeight));
+    return {
+      minimum,
+      maximum,
+      contentTop,
+      trackHeight
+    };
+  };
+  const applyPaletteRatio = (accessibleBounds) => {
+    const measuredBounds = accessibleBounds ?? paletteRatioBounds();
+    const minimum = measuredBounds.minimum;
+    const maximum = measuredBounds.maximum;
     rightDock?.style.setProperty("--draw2-right-palette-ratio", `${Math.round(rightDockPaletteRatio * 1e3) / 10}%`);
+    setRailResizeHandleValue(paletteResizeHandle, rightDockPaletteRatio * 100, minimum * 100, maximum * 100);
   };
   applyPaletteRatio();
   syncRightDockTabs();
@@ -30022,7 +30153,8 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     const detailRestricted = detailMode === "guided" && panel === "advanced";
     const nextPanel = detailRestricted ? modeProfile.defaultPanel : modeProfile !== void 0 && !modeProfile.allowedPanels.includes(panel) ? modeProfile.defaultPanel : panel;
     rightDockVisibleTabs.add(nextPanel);
-    root.classList.remove("is-right-dock-collapsed");
+    syncRightDockCollapsedState(false);
+    applyPaletteRatio();
     state = {
       ...state,
       activePanel: nextPanel,
@@ -30557,9 +30689,29 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     if (!profile.allowedPanels.includes(state.activePanel)) {
       setPanel(profile.defaultPanel);
     }
+    applyRailCollapsePreference(mode);
     syncModePlaybackButton();
   };
+  const prefersReducedMotionForModeSwitch = () => {
+    try {
+      return windowRef.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    } catch {
+      return false;
+    }
+  };
   const setCreatorMode = (mode, activateSurface = true) => {
+    const vtDocument = documentRef;
+    if (typeof vtDocument.startViewTransition !== "function" || prefersReducedMotionForModeSwitch()) {
+      applyCreatorModeChange(mode, activateSurface);
+      return;
+    }
+    const transition = vtDocument.startViewTransition(() => {
+      applyCreatorModeChange(mode, activateSurface);
+    });
+    transition.finished.catch(() => {
+    });
+  };
+  const applyCreatorModeChange = (mode, activateSurface = true) => {
     const previousMode = currentCreatorMode();
     const projectedMode = capability.profile === "desktop" && !isDesktopCreatorMode(mode) ? "DRAW" : mode;
     animateCreatorModeTransition(previousMode, projectedMode);
@@ -38043,8 +38195,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
   renderAudioCustomPanels();
   const toggleRightDock = () => {
     const collapsed = !root.classList.contains("is-right-dock-collapsed");
-    root.classList.toggle("is-right-dock-collapsed", collapsed);
-    rightDock?.classList.toggle("is-open", !collapsed);
+    syncRightDockCollapsedState(collapsed);
     updateStatus(`${capability.profile} \xB7 ${collapsed ? "Dock collapsed" : "Dock restored"} \xB7 Canvas-first`);
   };
   const renderPanelOptions = () => {
@@ -38173,24 +38324,24 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
   };
   let desktopTimelineHeightBeforeCollapse;
   const setDesktopTimelineCollapsed = (collapsed) => {
-    if (capability.profile !== "desktop" || currentCreatorMode() === "GAME" || currentCreatorMode() === "AUDIO" || timelineRegion === void 0 || timelineCard === void 0) return false;
-    const state2 = collapsed ? "collapsed" : "expanded";
-    timelineRegion.dataset.timelineCollapse = state2;
-    timelineCard.dataset.timelineCollapse = state2;
-    if (collapsed) {
-      desktopTimelineHeightBeforeCollapse = root.style.getPropertyValue("--draw2-timeline-height") || void 0;
-      root.style.setProperty("--draw2-timeline-height", "32px");
-      timelineRegion.style.setProperty("height", "32px", "important");
-      timelineRegion.style.setProperty("min-height", "32px", "important");
-    } else {
-      if (desktopTimelineHeightBeforeCollapse === void 0) {
-        root.style.removeProperty("--draw2-timeline-height");
-      } else {
-        root.style.setProperty("--draw2-timeline-height", desktopTimelineHeightBeforeCollapse);
-      }
+    if (capability.profile !== "desktop" || timelineRegion === void 0 || timelineCard === void 0) return false;
+    const currentState = timelineRegion.dataset.timelineCollapse;
+    const storedHeight = `${railLayoutPreference.timelineHeight}px`;
+    const expandedHeight = currentState === "collapsed" ? desktopTimelineHeightBeforeCollapse ?? storedHeight : root.style.getPropertyValue("--draw2-timeline-height") || storedHeight;
+    if (collapsed && currentState !== "collapsed") {
+      desktopTimelineHeightBeforeCollapse = expandedHeight;
+    }
+    if (!collapsed) {
+      desktopTimelineHeightBeforeCollapse = expandedHeight;
+    }
+    railLayoutPreference = {
+      ...railLayoutPreference,
+      timelineCollapsed: collapsed
+    };
+    applyRailCollapsePreference(currentCreatorMode() === "GAME" ? "GAME" : currentCreatorMode() === "AUDIO" ? "AUDIO" : "DRAW");
+    if (!collapsed) {
+      root.style.setProperty("--draw2-timeline-height", expandedHeight);
       desktopTimelineHeightBeforeCollapse = void 0;
-      timelineRegion.style.removeProperty("height");
-      timelineRegion.style.removeProperty("min-height");
     }
     timelineCollapseButton?.setAttribute("aria-expanded", String(!collapsed));
     timelineCollapseButton?.setAttribute("aria-label", collapsed ? "Expand timeline" : "Collapse timeline");
@@ -38198,6 +38349,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     const icon = timelineCollapseButton === void 0 ? void 0 : query(timelineCollapseButton, "[data-timeline-collapse-icon]");
     icon?.setAttribute("href", `./assets/icons/draw2-icons.svg#${collapsed ? "icon-expand" : "icon-shrink"}`);
     windowRef.dispatchEvent(new Event("resize"));
+    saveRailLayoutPreference();
     updateStatus(`desktop \xB7 Timeline ${collapsed ? "collapsed" : "expanded"} \xB7 local layout only`);
     return true;
   };
@@ -38493,9 +38645,17 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
         applyWorkspacePreset("focused");
         break;
       case "workspace-reset": {
-        root.classList.remove("is-focus-mode", "is-right-dock-collapsed");
+        root.classList.remove("is-focus-mode", "is-left-dock-collapsed");
+        syncRightDockCollapsedState(false);
+        workspaceLeftDock?.classList.add("is-open");
+        railLayoutPreference = {
+          ...railLayoutPreference,
+          gameLeftCollapsed: false,
+          audioLeftCollapsed: false,
+          timelineCollapsed: false
+        };
+        setDesktopTimelineCollapsed(false);
         root.dataset.workspacePreset = "pixel";
-        if (rightDock !== void 0) rightDock.classList.add("is-open");
         setPanel("color");
         updateStatus(`${capability.profile} \xB7 Pixel workspace reset \xB7 local layout only`);
         break;
@@ -38877,33 +39037,65 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     let pointerId;
     let startX = 0;
     let startWidth = 0;
+    const setLeftDockCollapsed = (collapsed) => {
+      root.classList.toggle("is-left-dock-collapsed", collapsed);
+      workspaceLeftDock.classList.toggle("is-open", !collapsed);
+      leftResizeHandle.setAttribute("aria-expanded", String(!collapsed));
+      leftResizeHandle.setAttribute("data-rail-state", collapsed ? "collapsed" : "expanded");
+      const mode = root.dataset.creatorMode;
+      if (mode === "AUDIO") {
+        railLayoutPreference = {
+          ...railLayoutPreference,
+          audioLeftCollapsed: collapsed
+        };
+      } else if (mode === "GAME") {
+        railLayoutPreference = {
+          ...railLayoutPreference,
+          gameLeftCollapsed: collapsed
+        };
+      }
+      setRailResizeHandleValue(leftResizeHandle, collapsed ? 0 : Math.round(workspaceLeftDock.getBoundingClientRect().width), 0, WORKSPACE_LEFT_RAIL_MAX_PX);
+    };
+    const applyLeftRailWidth = (mode, value) => {
+      const width = Math.round(clamp5(value, mode === "AUDIO" ? WORKSPACE_AUDIO_LEFT_RAIL_MIN_PX : WORKSPACE_GAME_LEFT_RAIL_MIN_PX, WORKSPACE_LEFT_RAIL_MAX_PX));
+      if (mode === "AUDIO") {
+        root.style.setProperty("--draw2-audio-left-user-width", `${width}px`);
+        root.style.setProperty("--draw2-audio-left-width", `${width}px`);
+        railLayoutPreference = {
+          ...railLayoutPreference,
+          audioLeftWidth: width
+        };
+      } else {
+        root.style.setProperty("--draw2-left-rail-width", `${width}px`);
+        root.style.setProperty("--draw2-tool-dock-width", `${width}px`);
+        railLayoutPreference = {
+          ...railLayoutPreference,
+          sharedLeftWidth: width
+        };
+      }
+      setRailResizeHandleValue(leftResizeHandle, width, 0, WORKSPACE_LEFT_RAIL_MAX_PX);
+    };
     const updateLeftRailWidth = (clientX) => {
       const mode = root.dataset.creatorMode;
       const audio = mode === "AUDIO";
       const game = mode === "GAME";
       if (!audio && !game) return;
-      const width = clamp5(startWidth + clientX - startX, audio ? WORKSPACE_AUDIO_LEFT_RAIL_MIN_PX : WORKSPACE_GAME_LEFT_RAIL_MIN_PX, WORKSPACE_LEFT_RAIL_MAX_PX);
-      if (audio) {
-        root.style.setProperty("--draw2-audio-left-user-width", `${Math.round(width)}px`);
-        root.style.setProperty("--draw2-audio-left-width", `${Math.round(width)}px`);
-        railLayoutPreference = {
-          ...railLayoutPreference,
-          audioLeftWidth: Math.round(width)
-        };
-      } else {
-        root.style.setProperty("--draw2-left-rail-width", `${Math.round(width)}px`);
-        root.style.setProperty("--draw2-tool-dock-width", `${Math.round(width)}px`);
-        railLayoutPreference = {
-          ...railLayoutPreference,
-          sharedLeftWidth: Math.round(width)
-        };
+      const rawWidth = startWidth + clientX - startX;
+      if (rawWidth < WORKSPACE_RAIL_SNAP_PX) {
+        setLeftDockCollapsed(true);
+        return;
       }
+      setLeftDockCollapsed(false);
+      applyLeftRailWidth(audio ? "AUDIO" : "GAME", rawWidth);
     };
     leftResizeHandle.addEventListener("pointerdown", (event) => {
       pointerId = event.pointerId;
       startX = event.clientX;
       startWidth = workspaceLeftDock.getBoundingClientRect().width;
-      leftResizeHandle.setPointerCapture(event.pointerId);
+      try {
+        leftResizeHandle.setPointerCapture(event.pointerId);
+      } catch {
+      }
       leftResizeHandle.classList.add("is-resizing");
       event.preventDefault();
     });
@@ -38921,6 +39113,39 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     });
     windowRef.addEventListener("pointerup", finishLeftResize);
     windowRef.addEventListener("pointercancel", finishLeftResize);
+    leftResizeHandle.addEventListener("keydown", (event) => {
+      const mode = root.dataset.creatorMode;
+      if (mode !== "AUDIO" && mode !== "GAME") return;
+      const isCollapsed = root.classList.contains("is-left-dock-collapsed");
+      const minimum = mode === "AUDIO" ? WORKSPACE_AUDIO_LEFT_RAIL_MIN_PX : WORKSPACE_GAME_LEFT_RAIL_MIN_PX;
+      if (event.key === "Home") {
+        event.preventDefault();
+        setLeftDockCollapsed(true);
+        saveRailLayoutPreference();
+        return;
+      }
+      if (event.key === "End") {
+        event.preventDefault();
+        setLeftDockCollapsed(false);
+        applyLeftRailWidth(mode, WORKSPACE_LEFT_RAIL_MAX_PX);
+        saveRailLayoutPreference();
+        return;
+      }
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      const direction = event.key === "ArrowRight" ? 1 : -1;
+      if (isCollapsed && direction < 0) return;
+      event.preventDefault();
+      const step = event.shiftKey ? 48 : 16;
+      const current = isCollapsed ? 0 : workspaceLeftDock.getBoundingClientRect().width;
+      const next = isCollapsed ? minimum : current + direction * step;
+      if (next < WORKSPACE_RAIL_SNAP_PX) {
+        setLeftDockCollapsed(true);
+      } else {
+        setLeftDockCollapsed(false);
+        applyLeftRailWidth(mode, next);
+      }
+      saveRailLayoutPreference();
+    });
     leftResizeHandle.addEventListener("lostpointercapture", () => {
       if (pointerId === void 0) return;
       pointerId = void 0;
@@ -38932,22 +39157,37 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     let pointerId;
     let startX = 0;
     let startWidth = 0;
-    const updateColorDockWidth = (clientX) => {
-      const frameWidth = root.getBoundingClientRect().width;
-      const width = clamp5(startWidth + startX - clientX, WORKSPACE_RIGHT_RAIL_MIN_PX, Math.min(WORKSPACE_RIGHT_RAIL_MAX_PX, Math.max(360, frameWidth * 0.62)));
-      root.style.setProperty("--draw2-color-dock-width", `${Math.round(width)}px`);
-      root.style.setProperty("--draw2-right-dock-width", `${Math.round(width)}px`);
-      root.style.setProperty("--draw2-audio-right-width", `${Math.round(width)}px`);
+    const setRightDockCollapsed = (collapsed) => {
+      syncRightDockCollapsedState(collapsed);
+    };
+    const applyRightRailWidth = (value) => {
+      const width = Math.round(clamp5(value, rightRailMinimumForViewport(), rightRailMaximumForViewport()));
+      root.style.setProperty("--draw2-color-dock-width", `${width}px`);
+      root.style.setProperty("--draw2-right-dock-width", `${width}px`);
+      root.style.setProperty("--draw2-audio-right-width", `${width}px`);
       railLayoutPreference = {
         ...railLayoutPreference,
-        rightWidth: Math.round(width)
+        rightWidth: width
       };
+      setRailResizeHandleValue(rightResizeHandle, width, 0, rightRailMaximumForViewport());
+    };
+    const updateColorDockWidth = (clientX) => {
+      const rawWidth = startWidth + startX - clientX;
+      if (rawWidth < WORKSPACE_RAIL_SNAP_PX) {
+        setRightDockCollapsed(true);
+        return;
+      }
+      setRightDockCollapsed(false);
+      applyRightRailWidth(rawWidth);
     };
     rightResizeHandle.addEventListener("pointerdown", (event) => {
       pointerId = event.pointerId;
       startX = event.clientX;
       startWidth = rightDock.getBoundingClientRect().width;
-      rightResizeHandle.setPointerCapture(event.pointerId);
+      try {
+        rightResizeHandle.setPointerCapture(event.pointerId);
+      } catch {
+      }
       event.preventDefault();
     });
     const finishRightResize = (event) => {
@@ -38963,6 +39203,36 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     });
     windowRef.addEventListener("pointerup", finishRightResize);
     windowRef.addEventListener("pointercancel", finishRightResize);
+    rightResizeHandle.addEventListener("keydown", (event) => {
+      const isCollapsed = root.classList.contains("is-right-dock-collapsed");
+      if (event.key === "Home") {
+        event.preventDefault();
+        setRightDockCollapsed(true);
+        saveRailLayoutPreference();
+        return;
+      }
+      if (event.key === "End") {
+        event.preventDefault();
+        setRightDockCollapsed(false);
+        applyRightRailWidth(rightRailMaximumForViewport());
+        saveRailLayoutPreference();
+        return;
+      }
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      const direction = event.key === "ArrowLeft" ? 1 : -1;
+      if (isCollapsed && direction < 0) return;
+      event.preventDefault();
+      const step = event.shiftKey ? 48 : 16;
+      const current = isCollapsed ? 0 : rightDock.getBoundingClientRect().width;
+      const next = isCollapsed ? rightRailMinimumForViewport() : current + direction * step;
+      if (next < WORKSPACE_RAIL_SNAP_PX) {
+        setRightDockCollapsed(true);
+      } else {
+        setRightDockCollapsed(false);
+        applyRightRailWidth(next);
+      }
+      saveRailLayoutPreference();
+    });
     rightResizeHandle.addEventListener("lostpointercapture", () => {
       pointerId = void 0;
       saveRailLayoutPreference();
@@ -38970,17 +39240,20 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
   }
   if (paletteResizeHandle !== void 0 && rightDock !== void 0) {
     let pointerId;
-    const updatePaletteRatio = (clientX, clientY) => {
-      const rect = rightDock.getBoundingClientRect();
-      const height = Math.max(1, rect.height);
-      const minimum = clamp5(RIGHT_DOCK_MIN_PALETTE_PX / height, 0.1, 0.75);
-      const maximum = clamp5(1 - RIGHT_DOCK_MIN_CUSTOM_PX / height, minimum, 0.9);
-      rightDockPaletteRatio = clamp5(1 - (clientY - rect.top) / height, minimum, maximum);
-      applyPaletteRatio();
+    const updatePaletteRatio = (clientY) => {
+      const { minimum, maximum, contentTop, trackHeight } = paletteRatioBounds();
+      rightDockPaletteRatio = clamp5((clientY - contentTop - RIGHT_DOCK_RESIZE_HANDLE_PX / 2) / trackHeight, minimum, maximum);
+      applyPaletteRatio({
+        minimum,
+        maximum
+      });
     };
     paletteResizeHandle.addEventListener("pointerdown", (event) => {
       pointerId = event.pointerId;
-      paletteResizeHandle.setPointerCapture(event.pointerId);
+      try {
+        paletteResizeHandle.setPointerCapture(event.pointerId);
+      } catch {
+      }
       rightDock.classList.add("is-palette-resizing");
       paletteResizeHandle.classList.add("is-resizing");
       event.preventDefault();
@@ -39005,15 +39278,36 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     });
     windowRef.addEventListener("pointermove", (event) => {
       if (pointerId === event.pointerId) {
-        updatePaletteRatio(event.clientX, event.clientY);
+        updatePaletteRatio(event.clientY);
       }
     });
     windowRef.addEventListener("pointerup", finishPaletteResize);
     windowRef.addEventListener("pointercancel", finishPaletteResize);
+    paletteResizeHandle.addEventListener("keydown", (event) => {
+      if (event.key !== "Home" && event.key !== "End" && event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+      event.preventDefault();
+      const { minimum, maximum } = paletteRatioBounds();
+      if (event.key === "Home") rightDockPaletteRatio = minimum;
+      else if (event.key === "End") rightDockPaletteRatio = maximum;
+      else {
+        const step = event.shiftKey ? 0.08 : 0.04;
+        const direction = event.key === "ArrowDown" ? 1 : -1;
+        rightDockPaletteRatio = clamp5(rightDockPaletteRatio + direction * step, minimum, maximum);
+      }
+      applyPaletteRatio({
+        minimum,
+        maximum
+      });
+      saveRightDockPreference();
+    });
     paletteResizeHandle.addEventListener("dblclick", (event) => {
       event.preventDefault();
-      rightDockPaletteRatio = RIGHT_DOCK_DEFAULT_PALETTE_RATIO;
-      applyPaletteRatio();
+      const { minimum, maximum } = paletteRatioBounds();
+      rightDockPaletteRatio = clamp5(RIGHT_DOCK_DEFAULT_PALETTE_RATIO, minimum, maximum);
+      applyPaletteRatio({
+        minimum,
+        maximum
+      });
       saveRightDockPreference();
     });
   }
@@ -39027,13 +39321,21 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       startHeight = timelineRegion.getBoundingClientRect().height;
     };
     const updateTimelineHeight = (clientY) => {
-      const frameHeight = root.getBoundingClientRect().height;
-      const height = clamp5(startHeight + startY - clientY, WORKSPACE_TIMELINE_MIN_PX, Math.min(WORKSPACE_TIMELINE_MAX_PX, Math.max(180, frameHeight * 0.72)));
+      const rawHeight = startHeight + startY - clientY;
+      if (rawHeight < WORKSPACE_RAIL_SNAP_PX) {
+        setDesktopTimelineCollapsed(true);
+        return;
+      }
+      if (timelineRegion.dataset.timelineCollapse === "collapsed") {
+        setDesktopTimelineCollapsed(false);
+      }
+      const height = clamp5(rawHeight, WORKSPACE_TIMELINE_MIN_PX, timelineMaximumForViewport());
       root.style.setProperty("--draw2-timeline-height", `${Math.round(height)}px`);
       railLayoutPreference = {
         ...railLayoutPreference,
         timelineHeight: Math.round(height)
       };
+      setRailResizeHandleValue(timelineResizeHandle, Math.round(height), 0, timelineMaximumForViewport());
     };
     timelineResizeHandle.addEventListener("pointerdown", (event) => {
       pointerId = event.pointerId;
@@ -39085,6 +39387,46 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       passive: false
     });
     window.addEventListener("mouseup", finishMouseTimelineResize);
+    timelineResizeHandle.addEventListener("keydown", (event) => {
+      if (event.key !== "Home" && event.key !== "End" && event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+      event.preventDefault();
+      if (event.key === "Home") {
+        setDesktopTimelineCollapsed(true);
+        saveRailLayoutPreference();
+        return;
+      }
+      const maximum = timelineMaximumForViewport();
+      if (event.key === "End") {
+        setDesktopTimelineCollapsed(false);
+        root.style.setProperty("--draw2-timeline-height", `${Math.round(maximum)}px`);
+        railLayoutPreference = {
+          ...railLayoutPreference,
+          timelineHeight: Math.round(maximum)
+        };
+        setRailResizeHandleValue(timelineResizeHandle, Math.round(maximum), 0, maximum);
+        saveRailLayoutPreference();
+        return;
+      }
+      const isCollapsed = timelineRegion.dataset.timelineCollapse === "collapsed";
+      const direction = event.key === "ArrowUp" ? 1 : -1;
+      if (isCollapsed && direction < 0) return;
+      const step = event.shiftKey ? 48 : 16;
+      const current = isCollapsed ? 0 : timelineRegion.getBoundingClientRect().height;
+      const next = isCollapsed ? WORKSPACE_TIMELINE_MIN_PX : current + direction * step;
+      if (next < WORKSPACE_RAIL_SNAP_PX) {
+        setDesktopTimelineCollapsed(true);
+      } else {
+        setDesktopTimelineCollapsed(false);
+        const height = Math.round(clamp5(next, WORKSPACE_TIMELINE_MIN_PX, maximum));
+        root.style.setProperty("--draw2-timeline-height", `${height}px`);
+        railLayoutPreference = {
+          ...railLayoutPreference,
+          timelineHeight: height
+        };
+        setRailResizeHandleValue(timelineResizeHandle, height, 0, maximum);
+      }
+      saveRailLayoutPreference();
+    });
     timelineResizeHandle.addEventListener("lostpointercapture", () => {
       pointerId = void 0;
       mouseResizing = false;

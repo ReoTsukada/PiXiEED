@@ -66,6 +66,38 @@ Deno.test("WP-180 guided and detailed workspace density is explicit", async () =
   }
 });
 
+Deno.test("Draw2 keeps the legacy canvas source hidden on the project start screen", async () => {
+  const html = await Deno.readTextFile(
+    new URL("../index.html", import.meta.url),
+  );
+  const css = await Deno.readTextFile(
+    new URL("../assets/draw2-shell.css", import.meta.url),
+  );
+  const workspaceClassMarker = html.indexOf('class="draw2-workspace"');
+  const legacyWorkspaceStart = html.lastIndexOf(
+    "<section",
+    workspaceClassMarker,
+  );
+  if (workspaceClassMarker < 0 || legacyWorkspaceStart < 0) {
+    throw new Error("Legacy canvas source section is missing");
+  }
+  const openingTagEnd = html.indexOf(">", legacyWorkspaceStart);
+  const openingTag = html.slice(legacyWorkspaceStart, openingTagEnd);
+  if (!/\shidden(?:\s|$)/u.test(openingTag)) {
+    throw new Error(
+      "Legacy canvas source must stay hidden until a project opens the workspace",
+    );
+  }
+  if (
+    !css.includes(".draw2-workspace[hidden]") ||
+    !css.includes("display: none !important")
+  ) {
+    throw new Error(
+      "Legacy canvas source must not be restored by the workspace display rule",
+    );
+  }
+});
+
 Deno.test("WP-180 viewport controls use canonical steps and measured display dimensions", async () => {
   const entry = await Deno.readTextFile(
     new URL("../src/draw2-entry.ts", import.meta.url),
@@ -126,7 +158,7 @@ Deno.test("WP-180 color wheel stays inside a short resizable color panel", async
   }
 });
 
-Deno.test("PiXiEEDstudio desktop shell has no mobile or tablet presentation", async () => {
+Deno.test("PiXiEEDstudio keeps the desktop rail contract on smaller viewports", async () => {
   const html = await Deno.readTextFile(
     new URL("../index.html", import.meta.url),
   );
@@ -152,8 +184,8 @@ Deno.test("PiXiEEDstudio desktop shell has no mobile or tablet presentation", as
       throw new Error(`Retired mobile/tablet presentation remains: ${forbidden}`);
     }
   }
-  if (/@media[^{}]*max-width/i.test(shellCss) || /@media[^{}]*max-width/i.test(playerCss)) {
-    throw new Error("Mobile/tablet max-width projections must be absent");
+  if (!/@media\s*\(max-width:\s*700px\)/i.test(shellCss)) {
+    throw new Error("The adjustable rail shell must define a small-viewport projection");
   }
   if (html.includes("viewport-fit=cover")) {
     throw new Error("Mobile safe-area viewport presentation must be absent");
