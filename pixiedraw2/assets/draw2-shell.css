@@ -29146,6 +29146,7 @@ body:has(#draw2WorkspaceFrame) {
     --draw2-right-palette-max-ratio: 42%;
     --draw2-right-palette-min-height: 64px;
     display: grid !important;
+    gap: 0 !important;
     grid-template-columns: minmax(0, 1fr) !important;
     grid-template-rows:
       minmax(
@@ -29165,14 +29166,13 @@ body:has(#draw2WorkspaceFrame) {
 
   #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
     #draw2WorkspaceRightDock
-    > #draw2WorkspacePaletteStrip {
+    > #draw2WorkspacePaletteStrip.draw2-palette-strip {
     display: block !important;
     grid-column: 1 !important;
     grid-row: 1 !important;
     align-self: stretch !important;
     min-height: 0 !important;
     max-height: none !important;
-    padding: 8px !important;
     overflow: auto !important;
   }
 
