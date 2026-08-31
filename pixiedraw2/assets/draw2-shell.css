@@ -25395,8 +25395,19 @@ body:has(#draw2WorkspaceFrame) {
     max-height: 100dvh !important;
     margin: 0 !important;
     overflow: hidden !important;
-    border: 0 !important;
-    border-radius: 0 !important;
+    /* iDRAW is edge-to-edge (no margin, fills the viewport) rather than a
+       margined "card" like iAUDIO/iGAME, but the body background behind it
+       is the same near-black as the frame itself, so the same mode-accent
+       border + radius iAUDIO/iGAME use reads fine here too -- there is no
+       visible seam at the rounded corners. box-shadow stays off: with zero
+       margin there is no room outside the frame for it to render into. */
+    border: 1px solid
+      color-mix(
+        in srgb,
+        var(--draw2-mode-accent, var(--draw2-accent)) 42%,
+        var(--draw2-border)
+      ) !important;
+    border-radius: 9px !important;
     box-shadow: none !important;
     grid-template-columns: 64px minmax(0, 1fr) 332px !important;
     grid-template-rows: 116px minmax(0, 1fr) clamp(148px, 20dvh, 180px) 28px !important;
