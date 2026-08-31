@@ -63,15 +63,15 @@
 
     <section class="pxv2-section" style="padding-top:64px;">
       <div class="pxv2-shell" style="display:grid; grid-template-columns:1.1fr 0.9fr; gap:56px; align-items:center;">
-        <div>
-          <p class="eyebrow">PiXiEED Studio</p>
-          <h1 style="font-size:clamp(32px,4.6vw,54px); line-height:1.08;">ドット絵も、音も、<br>ゲームも。<span style="color:var(--idraw);">ひとつの作品</span>として作る。</h1>
-          <p style="font-size:16.5px; color:var(--muted); max-width:46ch; margin:22px 0 0;">iDRAWで描き、iAUDIOで音を重ね、iGAMEで遊べる形にする。同じプロジェクトの中で作業を行き来できる、創作のためのワークスペースです。</p>
-          <div style="display:flex; flex-wrap:wrap; gap:12px; margin-top:30px;">
+        <div class="pxv2-hero-seq">
+          <p class="eyebrow" style="--pxv2-delay:.02s;">PiXiEED Studio</p>
+          <h1 style="--pxv2-delay:.1s; font-size:clamp(32px,4.6vw,54px); line-height:1.08;">ドット絵も、音も、<br>ゲームも。<span style="color:var(--idraw);">ひとつの作品</span>として作る。</h1>
+          <p style="--pxv2-delay:.2s; font-size:16.5px; color:var(--muted); max-width:46ch; margin:22px 0 0;">iDRAWで描き、iAUDIOで音を重ね、iGAMEで遊べる形にする。同じプロジェクトの中で作業を行き来できる、創作のためのワークスペースです。</p>
+          <div style="--pxv2-delay:.3s; display:flex; flex-wrap:wrap; gap:12px; margin-top:30px;">
             <a class="pxv2-btn pxv2-btn-idraw" href="pixiedraw2/">iDRAWを開く <span aria-hidden="true">→</span></a>
             <a class="pxv2-btn pxv2-btn-ghost" href="market/">マーケットを見る</a>
           </div>
-          <div style="display:flex; flex-wrap:wrap; gap:10px 22px; margin-top:34px; font-size:12.5px; color:var(--muted-2);">
+          <div style="--pxv2-delay:.38s; display:flex; flex-wrap:wrap; gap:10px 22px; margin-top:34px; font-size:12.5px; color:var(--muted-2);">
             <span>登録不要ですぐ開ける</span>
             <span>·</span>
             <span>ブラウザだけで完結</span>
@@ -80,7 +80,7 @@
           </div>
         </div>
 
-        <div style="position:relative;">
+        <div style="position:relative; animation:pxv2-fade-up .9s cubic-bezier(.16,.8,.24,1) both; animation-delay:.22s;">
           <div class="pxv2-pixel-field pxv2-card" style="border-radius:var(--radius-lg); padding:28px; display:flex; flex-direction:column; gap:14px;">
             <div style="display:flex; align-items:center; justify-content:space-between;">
               <span class="eyebrow" style="margin:0;">Project</span>
@@ -107,23 +107,23 @@
 
     <section class="pxv2-section" aria-labelledby="pxv2ModesTitle">
       <div class="pxv2-shell">
-        <div class="pxv2-section-head">
+        <div class="pxv2-section-head pxv2-reveal">
           <p class="eyebrow">3つのモード</p>
           <h2 id="pxv2ModesTitle" style="font-size:26px;">1つのプロジェクトを、行き来しながら作る。</h2>
           <p>別々のツールにファイルを持ち込むのではなく、同じ作品の中でモードを切り替えます。</p>
         </div>
-        <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:18px;">
-          <a href="pixiedraw2/" class="pxv2-mode-card is-idraw" style="text-decoration:none;">
+        <div class="pxv2-stagger" style="display:grid; grid-template-columns:repeat(3,1fr); gap:18px;">
+          <a href="pixiedraw2/" class="pxv2-mode-card pxv2-reveal is-idraw" style="text-decoration:none;">
             <span class="pxv2-mode-tag">iDRAW</span>
             <h3>ドット絵・アニメーション</h3>
             <p>レイヤー、オニオンスキン、タイムラインでキャラクターやパターンを描く。</p>
           </a>
-          <a href="pixiedraw2/" class="pxv2-mode-card is-iaudio" style="text-decoration:none;">
+          <a href="pixiedraw2/" class="pxv2-mode-card pxv2-reveal is-iaudio" style="text-decoration:none;">
             <span class="pxv2-mode-tag">iAUDIO</span>
             <h3>音楽・効果音</h3>
             <p>BGMやSEを作品のイベントに紐づけて、iDRAWの動きに音を重ねる。</p>
           </a>
-          <a href="pixiedraw2/" class="pxv2-mode-card is-igame" style="text-decoration:none;">
+          <a href="pixiedraw2/" class="pxv2-mode-card pxv2-reveal is-igame" style="text-decoration:none;">
             <span class="pxv2-mode-tag">iGAME</span>
             <h3>Scene・Runtime</h3>
             <p>描いた絵と音を、実際に遊べるシーンとして組み立てて確認する。</p>
@@ -134,13 +134,13 @@
 
     <section class="pxv2-section" aria-labelledby="pxv2MarketTitle">
       <div class="pxv2-shell" style="display:grid; grid-template-columns:1fr 1fr; gap:48px; align-items:center;">
-        <div>
+        <div class="pxv2-reveal">
           <p class="eyebrow">Market</p>
           <h2 id="pxv2MarketTitle" style="font-size:26px;">作った作品は、そのままマーケットで届けられる。</h2>
           <p style="color:var(--muted); font-size:15px; margin:16px 0 26px;">iDRAWで作った作品や素材をマーケットに出品できます。購入した素材はマイページからすぐに使えます。</p>
           <a class="pxv2-btn pxv2-btn-primary" href="market/">マーケットを見る</a>
         </div>
-        <div class="pxv2-card" style="padding:24px; display:grid; gap:12px;">
+        <div class="pxv2-card pxv2-reveal" style="--pxv2-delay:.1s; padding:24px; display:grid; gap:12px;">
           <div style="display:flex; justify-content:space-between; font-size:12.5px; color:var(--muted);">
             <span>出品する</span><span>→</span><span>購入される</span><span>→</span><span>使う</span>
           </div>
@@ -152,17 +152,17 @@
 
     <section class="pxv2-section" aria-labelledby="pxv2CommunityTitle">
       <div class="pxv2-shell">
-        <div class="pxv2-section-head">
+        <div class="pxv2-section-head pxv2-reveal">
           <p class="eyebrow">Community</p>
           <h2 id="pxv2CommunityTitle" style="font-size:26px;">作った作品を、見てもらう場所がある。</h2>
           <p>投稿、コメント、共有。作品づくりの続きは、コミュニティで。</p>
         </div>
-        <a class="pxv2-btn pxv2-btn-ghost" href="community/">コミュニティを見る</a>
+        <a class="pxv2-btn pxv2-btn-ghost pxv2-reveal" style="--pxv2-delay:.1s;" href="community/">コミュニティを見る</a>
       </div>
     </section>
 
     <section class="pxv2-section" aria-labelledby="pxv2BridgeTitle">
-      <div class="pxv2-shell pxv2-card" style="padding:36px; display:grid; grid-template-columns:1fr auto; gap:24px; align-items:center;">
+      <div class="pxv2-shell pxv2-card pxv2-reveal" style="padding:36px; display:grid; grid-template-columns:1fr auto; gap:24px; align-items:center;">
         <div>
           <p class="eyebrow">PiXiEED Bridge</p>
           <h2 id="pxv2BridgeTitle" style="font-size:21px;">デスクトップアプリでも制作をつなげる。</h2>
@@ -249,5 +249,6 @@
   </div>
   <script src="scripts/shared-bottom-nav.js?v=20260831-user-nav2"></script>
   <script src="scripts/pixel-art-fit.js"></script>
+  <script src="site/pixieed-v2-motion.js?v=20260831-motion1"></script>
 </body>
 </html>

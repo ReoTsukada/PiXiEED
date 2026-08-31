@@ -330,3 +330,141 @@ body.pxv2 .button-secondary{
   border-radius:var(--radius-pill);
 }
 body.pxv2 .button-secondary:hover{ background:var(--surface-raised); }
+
+/* ---------------------------------------------------------------------
+ * Motion system — lightweight, GPU-friendly (transform/opacity only),
+ * fully disabled under prefers-reduced-motion. Driven by site/pixieed-
+ * v2-motion.js for the scroll-reveal + pointer-tilt bits; everything
+ * else here is pure CSS (hover states, load-in sequence, ambient glow).
+ * --------------------------------------------------------------------- */
+html{ scroll-behavior:smooth; }
+
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{
+    animation-duration:.001ms !important;
+    animation-iteration-count:1 !important;
+    transition-duration:.001ms !important;
+    scroll-behavior:auto !important;
+  }
+}
+
+@keyframes pxv2-fade-up{
+  from{ opacity:0; transform:translateY(20px); }
+  to{ opacity:1; transform:translateY(0); }
+}
+@keyframes pxv2-drift{
+  0%,100%{ transform:translate3d(-4%,-6%,0) scale(1); }
+  50%{ transform:translate3d(4%,4%,0) scale(1.08); }
+}
+@keyframes pxv2-blink{ 0%,100%{ opacity:1; } 50%{ opacity:.32; } }
+
+/* scroll-triggered reveal (site/pixieed-v2-motion.js toggles .is-in) */
+.pxv2-reveal{
+  opacity:0;
+  transform:translateY(22px);
+  transition:opacity .7s cubic-bezier(.16,.8,.24,1), transform .7s cubic-bezier(.16,.8,.24,1);
+  transition-delay:var(--pxv2-delay,0s);
+}
+.pxv2-reveal.is-in{ opacity:1; transform:translateY(0); }
+
+/* staggered children inside a .pxv2-stagger grid/row */
+.pxv2-stagger > .pxv2-reveal:nth-child(1){ --pxv2-delay:.02s; }
+.pxv2-stagger > .pxv2-reveal:nth-child(2){ --pxv2-delay:.11s; }
+.pxv2-stagger > .pxv2-reveal:nth-child(3){ --pxv2-delay:.20s; }
+.pxv2-stagger > .pxv2-reveal:nth-child(4){ --pxv2-delay:.29s; }
+.pxv2-stagger > .pxv2-reveal:nth-child(5){ --pxv2-delay:.38s; }
+.pxv2-stagger > .pxv2-reveal:nth-child(6){ --pxv2-delay:.47s; }
+
+/* hero load-in sequence: children fade up in order the moment the page paints */
+.pxv2-hero-seq > *{
+  animation:pxv2-fade-up .9s cubic-bezier(.16,.8,.24,1) both;
+  animation-delay:var(--pxv2-delay,0s);
+}
+
+/* eyebrow marker gets a slow, quiet pulse instead of sitting static */
+.pxv2 .eyebrow::before{ animation:pxv2-blink 2.6s ease-in-out infinite; }
+
+/* ambient drifting glow behind the hero pixel field */
+.pxv2-pixel-field{ position:relative; overflow:hidden; isolation:isolate; }
+.pxv2-pixel-field::before{
+  content:"";
+  position:absolute; inset:-30%;
+  background:radial-gradient(closest-side, color-mix(in srgb, var(--idraw) 20%, transparent), transparent 72%);
+  animation:pxv2-drift 11s ease-in-out infinite;
+  pointer-events:none;
+  z-index:0;
+}
+.pxv2-pixel-field > *{ position:relative; z-index:1; }
+
+/* buttons: lift on hover, soft press, a single light-sweep on the primary/idraw CTAs */
+.pxv2-btn{ position:relative; overflow:hidden; }
+.pxv2-btn:hover{ transform:translateY(-2px); }
+.pxv2-btn:active{ transform:translateY(1px) scale(.98); }
+.pxv2-btn-primary::after,
+.pxv2-btn-idraw::after{
+  content:"";
+  position:absolute; top:0; left:-60%; width:40%; height:100%;
+  background:linear-gradient(115deg, transparent, rgba(255,255,255,.4), transparent);
+  transform:skewX(-18deg);
+  transition:left .6s ease;
+  pointer-events:none;
+}
+.pxv2-btn-primary:hover::after,
+.pxv2-btn-idraw:hover::after{ left:130%; }
+
+/* mode cards: lift + colored glow + a light pointer-tilt (JS sets --pxv2-rx/--pxv2-ry) */
+.pxv2-mode-card{
+  transform:perspective(900px) rotateX(var(--pxv2-rx,0deg)) rotateY(var(--pxv2-ry,0deg)) translateY(0);
+  transition:transform .35s cubic-bezier(.16,.8,.24,1), box-shadow .35s ease, border-color .35s ease;
+}
+.pxv2-mode-card:hover{
+  transform:perspective(900px) rotateX(var(--pxv2-rx,0deg)) rotateY(var(--pxv2-ry,0deg)) translateY(-6px);
+  border-color:var(--mode-color, var(--brand));
+  box-shadow:0 20px 40px -18px color-mix(in srgb, var(--mode-color, var(--brand)) 45%, transparent), var(--shadow-md);
+}
+.pxv2-mode-card .pxv2-mode-tag{ transition:letter-spacing .3s ease; }
+.pxv2-mode-card:hover .pxv2-mode-tag{ letter-spacing:.03em; }
+
+/* generic card lift, used by the plain .pxv2-card blocks on info pages */
+.pxv2-card{ transition:transform .3s cubic-bezier(.16,.8,.24,1), box-shadow .3s ease, border-color .3s ease; }
+a.pxv2-card:hover{
+  transform:translateY(-3px);
+  box-shadow:var(--shadow-md);
+  border-color:var(--line-strong);
+}
+
+/* underline-grow link hover, used on footer + info-page nav links */
+.pxv2-footer-links a,
+.help-links a{
+  background-image:linear-gradient(currentColor,currentColor);
+  background-position:0 100%; background-repeat:no-repeat; background-size:0 1px;
+  transition:background-size .25s ease, color .15s ease;
+}
+.pxv2-footer-links a:hover,
+.help-links a:hover{ background-size:100% 1px; }
+
+/* ---------------------------------------------------------------------
+ * Same hover polish applied to the CSS-only reskinned pages (market/
+ * account/community). No selectors here touch structure or IDs — just
+ * adds a transition so their existing :hover states ease in instead of
+ * snapping, matching the feel of the redesigned pages.
+ * --------------------------------------------------------------------- */
+body.pxv2 .product-card,
+body.pxv2 .market-card{
+  transition:transform .25s cubic-bezier(.16,.8,.24,1), box-shadow .25s ease, border-color .25s ease;
+}
+body.pxv2 .product-card:hover,
+body.pxv2 .market-card:hover{ transform:translateY(-3px); }
+body.pxv2 .footer-links a{
+  background-image:linear-gradient(currentColor,currentColor);
+  background-position:0 100%; background-repeat:no-repeat; background-size:0 1px;
+  transition:background-size .25s ease, color .15s ease;
+  padding-bottom:1px;
+}
+body.pxv2 .footer-links a:hover{ background-size:100% 1px; }
+body.pxv2 .social-home__empty-action,
+body.pxv2 .button-secondary,
+body.pxv2 .pxv2-topnav a{
+  transition:transform .2s ease, background .2s ease, color .15s ease, border-color .15s ease;
+}
+body.pxv2 .social-home__empty-action:hover{ transform:translateY(-1px); }
