@@ -371,7 +371,7 @@ class Draw2MobileV2 {
         this.openTimeline();
         return;
       case "audio-piano":
-        clickFirst('[data-audio-editor-tab="PIANO"]');
+        clickFirst('[data-audio-editor-tab="ROLL"]');
         return;
       case "audio-timeline":
         this.openAudioDeck("audio-timeline");

@@ -625,6 +625,7 @@ export function createFillPreviewWriteSet(
   seed: PixelPoint,
   colorIndex: number,
   maxPixels = Math.min(1_048_576, reader.width * reader.height),
+  isAllowed?: (point: PixelPoint) => boolean,
 ): readonly ColoredPixel[] {
   const start = clampPoint(seed, reader);
   const targetColor = reader.getPixel(start.x, start.y);
@@ -637,16 +638,25 @@ export function createFillPreviewWriteSet(
     const point = queue[cursor];
     cursor += 1;
     if (point === undefined) continue;
+    if (isAllowed?.(point) === false) continue;
     const key = point.y * reader.width + point.x;
     if (visited.has(key)) continue;
     visited.add(key);
     if (reader.getPixel(point.x, point.y) !== targetColor) continue;
     if (writes.length >= maxPixels) return [];
     writes.push({ x: point.x, y: point.y, colorIndex });
-    if (point.x > 0) queue.push({ x: point.x - 1, y: point.y });
-    if (point.x + 1 < reader.width) queue.push({ x: point.x + 1, y: point.y });
-    if (point.y > 0) queue.push({ x: point.x, y: point.y - 1 });
-    if (point.y + 1 < reader.height) queue.push({ x: point.x, y: point.y + 1 });
+    const enqueue = (candidate: PixelPoint): void => {
+      if (isAllowed?.(candidate) === false) return;
+      queue.push(candidate);
+    };
+    if (point.x > 0) enqueue({ x: point.x - 1, y: point.y });
+    if (point.x + 1 < reader.width) {
+      enqueue({ x: point.x + 1, y: point.y });
+    }
+    if (point.y > 0) enqueue({ x: point.x, y: point.y - 1 });
+    if (point.y + 1 < reader.height) {
+      enqueue({ x: point.x, y: point.y + 1 });
+    }
   }
   return writes;
 }

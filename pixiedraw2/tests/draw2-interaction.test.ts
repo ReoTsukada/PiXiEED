@@ -4,8 +4,14 @@ import {
   ToolSession,
   ToolSessionLifecycleError,
 } from "../src/draw2-interaction.ts";
-import type { ToolSessionCommit } from "../src/draw2-interaction.ts";
-import type { BasicTool } from "../src/draw2-basic-tools.ts";
+import type {
+  ToolSessionCommit,
+  ToolSessionSnapshot,
+} from "../src/draw2-interaction.ts";
+import {
+  type BasicTool,
+  createPathWriteSet,
+} from "../src/draw2-basic-tools.ts";
 import type { PointerPhase, PointerSample } from "../src/fp-006/contracts.ts";
 import { createProject, EditorCore } from "../src/draw2-core.ts";
 
@@ -92,6 +98,48 @@ Deno.test("Interaction Kernel keeps preview local and commits exactly once on po
   assert(
     controller.snapshot().editorState === "IDLE",
     "committed session must return to IDLE",
+  );
+});
+
+Deno.test("pointerup exposes the final preview while canonical commit is queued", async () => {
+  const commits: ToolSessionCommit[] = [];
+  const queued: Array<{
+    commit: ToolSessionCommit;
+    preview: ToolSessionSnapshot;
+  }> = [];
+  const controller = new Draw2InteractionKernel({
+    tool: "pen",
+    bounds: { width: 32, height: 32 },
+    colorIndex: 2,
+    toolOptions: { brushSize: 1, brushShape: "square", pattern: "solid" },
+    onCommitQueued: (commit, preview) => {
+      queued.push({ commit, preview });
+    },
+    onCommit: (commit) => {
+      commits.push(commit);
+    },
+  });
+  controller.handle(sample({ x: 1, y: 1 }));
+  controller.handle(sample({ phase: "move", x: 18, y: 6, timeMs: 2 }));
+  controller.handle(
+    sample({ phase: "up", x: 24, y: 10, buttons: 0, timeMs: 3 }),
+  );
+  assert(queued.length === 1, "pointerup must expose one queued preview");
+  assert(
+    queued[0]?.preview.lifecycle === "ACTIVE" &&
+      queued[0].preview.points.at(-1)?.x === 24 &&
+      queued[0].preview.points.at(-1)?.y === 10 &&
+      queued[0].preview.previewWrites.length > 0,
+    "queued preview must retain the final gesture projection",
+  );
+  assert(
+    (commits.length as number) === 0,
+    "commit callback must remain serialized",
+  );
+  await controller.flushCommits();
+  assert(
+    (commits.length as number) === 1,
+    "queued commit must eventually be delivered",
   );
 });
 
@@ -215,6 +263,50 @@ Deno.test("pen fast/reverse/diagonal input remains one accumulated session", asy
     commits[0]?.points.length === 6,
     "fast/reverse/diagonal points must remain in one trace",
   );
+});
+
+Deno.test("path previews accumulate per segment and stay equivalent for long input", () => {
+  const points = [
+    { x: -3, y: 2 },
+    { x: 5, y: 10 },
+    { x: 27, y: 4 },
+    { x: 14, y: 28 },
+    { x: 31, y: 31 },
+  ] as const;
+  for (const tool of ["pen", "eraser", "pixel-pen"] as const) {
+    const options = {
+      brushSize: 3,
+      brushShape: "circle" as const,
+      pattern: "checker" as const,
+    };
+    const session = new ToolSession({
+      sessionId: `cached-${tool}`,
+      tool,
+      bounds: { width: 32, height: 32 },
+      colorIndex: 7,
+      toolOptions: options,
+    });
+    session.begin(points[0]);
+    for (const point of points.slice(1)) session.update(point);
+    const actual = [...session.snapshot().previewWrites].sort((left, right) =>
+      left.y - right.y || left.x - right.x || left.colorIndex - right.colorIndex
+    );
+    const expected = [...createPathWriteSet(
+      tool === "pixel-pen" ? "pen" : tool,
+      points,
+      7,
+      tool === "pixel-pen"
+        ? { ...options, brushSize: 1, brushShape: "square", pattern: "solid" }
+        : options,
+      { width: 32, height: 32 },
+    )].sort((left, right) =>
+      left.y - right.y || left.x - right.x || left.colorIndex - right.colorIndex
+    );
+    assert(
+      JSON.stringify(actual) === JSON.stringify(expected),
+      `${tool} cached preview must match the canonical path writer`,
+    );
+  }
 });
 
 Deno.test("shape sessions replace LAST preview and eyedropper is IMMEDIATE without raster writes", async () => {

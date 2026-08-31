@@ -83,6 +83,33 @@ Deno.test("FP-006 commits horizontal, vertical, diagonal, fast, reverse, and era
   assert(committed.length === 0, "duplicate pointerup must not commit twice");
 });
 
+Deno.test("FP-006 keeps a stroke alive when a move sample briefly reports no button", () => {
+  const controller = new StrokeInputController({ tool: "pen" });
+  controller.handle(sample({ phase: "down", x: 1, y: 1 }));
+  const transientRelease = controller.handle(
+    sample({ phase: "move", x: 24, y: 24, buttons: 0 }),
+  );
+  assert(
+    transientRelease.length === 0,
+    "a transient buttons=0 move must not emit a cancellation",
+  );
+  assert(
+    controller.snapshot().activeStrokePointCount === 1,
+    "the active stroke must remain available for the following pointerup",
+  );
+  const committed = controller.handle(
+    sample({ phase: "up", x: 24, y: 24, buttons: 0 }),
+  );
+  assert(
+    committed.some((event) => event.kind === "stroke_committed"),
+    "the following pointerup must commit the stroke",
+  );
+  assert(
+    controller.snapshot().cancelledStrokeCount === 0,
+    "a transient buttons=0 move must not increment cancellations",
+  );
+});
+
 Deno.test("FP-006 pointer capture loss and browser interruption never leave a stuck stroke", () => {
   for (
     const phase of [

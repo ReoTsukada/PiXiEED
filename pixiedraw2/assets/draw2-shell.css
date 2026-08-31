@@ -5801,6 +5801,22 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   background: color-mix(in srgb, #c88bff 40%, #171e2b);
   box-shadow: 0 0 12px rgb(200 139 255 / 20%);
 }
+#draw2AudioWorkspace > .draw2-audio-panel.is-entering,
+#draw2AudioWorkspace > .draw2-audio-editor-surface.is-entering {
+  animation: draw2-audio-editor-surface-enter 180ms
+    cubic-bezier(.2, .8, .2, 1) both;
+  will-change: opacity, transform;
+}
+@keyframes draw2-audio-editor-surface-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 
 .draw2-audio-track-lane-label {
   position: relative;

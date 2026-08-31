@@ -217,7 +217,13 @@ export class StrokeInputController {
       this.#owner === "draw" && this.#stroke?.pointerId === sample.pointerId
     ) {
       if ((sample.buttons & 1) === 0) {
-        return this.#cancelStroke("BUTTON_RELEASE_WITHOUT_POINTERUP");
+        // `buttons` can briefly be zero on a coalesced pen/touch sample even
+        // though the browser will still deliver the authoritative pointerup.
+        // Do not throw away the in-flight stroke here; pointercancel,
+        // lostpointercapture, and browser interruption are the cancellation
+        // boundaries, while pointerup owns the commit boundary.
+        this.#pointers.set(sample.pointerId, sample);
+        return [];
       }
       const point = pointFrom(sample);
       const previous = this.#stroke.points[this.#stroke.points.length - 1];

@@ -99,6 +99,64 @@ Deno.test("Draw2 entry serializes every local canonical raster mutation", () => 
   );
 });
 
+Deno.test("Draw2 live previews batch frames and keep empty coalesced samples", () => {
+  assert(
+    source.includes("window.requestAnimationFrame") &&
+      source.includes("function flushDrawOverlay()") &&
+      source.includes("window.cancelAnimationFrame"),
+    "Live overlay rendering must be coalesced to the display frame and flush on gesture end.",
+  );
+  assert(
+    source.includes("sampled === undefined || sampled.length === 0") &&
+      source.includes("? [event]\n    : [...sampled, event]") &&
+      source.includes("sampled = undefined"),
+    "Coalesced input must retain the authoritative outer pointermove, including empty or throwing implementations.",
+  );
+  assert(
+    source.includes("onCommitQueued: queuePendingDrawPreview") &&
+      source.includes("let pendingDrawPreviews") &&
+      source.includes('pointerSampleFromEvent(event, "up")'),
+    "The final preview must remain visible through delayed commits and capture-loss pointerup recovery.",
+  );
+  const pointerMoveStart = source.indexOf(
+    'canvas.addEventListener("pointermove", (event) => {',
+  );
+  const pointerMoveEnd = source.indexOf(
+    'canvas.addEventListener("pointerup", (event) => {',
+    pointerMoveStart,
+  );
+  const pointerMove = source.slice(pointerMoveStart, pointerMoveEnd);
+  assert(
+    pointerMove.includes("scheduleDrawOverlay()") &&
+      !pointerMove.includes("(event.buttons & 1) === 0"),
+    "The active pointer must reach the input state machine even when buttons briefly reports zero.",
+  );
+});
+
+Deno.test("Draw2 stroke serialization compacts dense input before interpolation validation", () => {
+  const strokeStart = source.indexOf("const rawStrokePoints = sourcePoints.map");
+  const strokeEnd = source.indexOf("const command = {", strokeStart);
+  const strokeSource = source.slice(strokeStart, strokeEnd);
+  assert(
+    strokeStart >= 0 && strokeEnd > strokeStart &&
+      strokeSource.indexOf("compactPixelPath(") >= 0 &&
+      strokeSource.indexOf("compactPixelPath(") <
+        strokeSource.indexOf("interpolatePixelPath(strokePoints)") &&
+      !strokeSource.includes("interpolatePixelPath(rawStrokePoints)"),
+    "Dense pointer input must be reduced before bounded canonical interpolation.",
+  );
+});
+
+Deno.test("Draw2 fill live preview uses the bounded canonical flood geometry", () => {
+  assert(
+    source.includes("function fillPreviewRegion(") &&
+      source.includes("createFillPreviewWriteSet(") &&
+      source.includes("createIndexedGradientWriteSet(") &&
+      source.includes("const writes = fillPreviewWrites(asset, first, last);"),
+    "Fill preview must derive from the same bounded connected region and indexed gradient as the real operation.",
+  );
+});
+
 Deno.test("Draw2 palette add uses nearby colors and drag grids", () => {
   const renderStart = source.indexOf("function renderPaletteButtons(");
   const renderEnd = source.indexOf(

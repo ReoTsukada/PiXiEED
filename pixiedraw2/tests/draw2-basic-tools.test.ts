@@ -200,6 +200,25 @@ Deno.test("Draw2 fill preview plans the same bounded connected region without mu
   assert(createFillPreviewWriteSet(reader, { x: 0, y: 0 }, 0).length === 0, "same-color fill preview should be empty");
 });
 
+Deno.test("Draw2 fill preview respects a selection boundary while traversing", () => {
+  const reader = {
+    width: 5,
+    height: 3,
+    getPixel(): number { return 0; },
+  };
+  const preview = createFillPreviewWriteSet(
+    reader,
+    { x: 0, y: 1 },
+    1,
+    100,
+    (point) => point.x < 3,
+  );
+  assert(
+    preview.length === 9 && preview.every((point) => point.x < 3),
+    "fill preview crossed the active selection boundary",
+  );
+});
+
 Deno.test("Draw2 indexed gradient quantises a drag back to the active palette", () => {
   const reader = {
     width: 5,

@@ -991,6 +991,9 @@ Deno.test("Audio desktop shell keeps editor, dock and workspace surfaces explici
   const shell = await Deno.readTextFile(
     new URL("../assets/draw2-shell.css", import.meta.url),
   );
+  const mobileShell = await Deno.readTextFile(
+    new URL("../assets/draw2-mobile-workspace.css", import.meta.url),
+  );
   for (
     const required of [
       'id="draw2AudioGlobalControls"',
@@ -998,13 +1001,9 @@ Deno.test("Audio desktop shell keeps editor, dock and workspace surfaces explici
       'data-audio-global-action="record"',
       'id="draw2AudioGlobalSaveState"',
       'id="draw2AudioEditorTabs"',
-      'data-audio-editor-tab="PIANO"',
-      'data-audio-editor-tab="WAVE"',
-      'data-audio-editor-tab="DRUM"',
-      'data-audio-editor-tab="SAMPLER"',
-      'id="draw2AudioDrumKit"',
-      "CLOSED HAT",
-      "OPEN HAT",
+      'data-audio-editor-tab="ROLL"',
+      'data-audio-editor-tab="DRAW"',
+      'id="draw2AudioDrawPreviewCanvas"',
       "draw2-audio-editor-icon",
       "draw2-audio-knob",
       "draw2AudioRightGainValue",
@@ -1039,11 +1038,10 @@ Deno.test("Audio desktop shell keeps editor, dock and workspace surfaces explici
       "audioFxParameterSpecs",
       "data-audio-fx-param",
       "syncAudioMasterMeter",
-      "renderAudioDrumGrid",
-      "toggleAudioDrumStep",
-      "journalWorkspaceDrumKitSet",
-      "draw2AudioDrumStatus",
-      "openAudioWaveEditing",
+      "audioEditorForInstrument",
+      'type AudioEditorTab = "ROLL" | "DRAW"',
+      'audioEditorActiveTab: AudioEditorTab = "ROLL"',
+      "audioDrawPreviewMonitor",
     ]
   ) {
     if (!source.includes(required)) {
@@ -1051,8 +1049,38 @@ Deno.test("Audio desktop shell keeps editor, dock and workspace surfaces explici
     }
   }
   for (
+    const removed of [
+      'data-audio-editor-tab="PIANO"',
+      'data-audio-editor-tab="WAVE"',
+      'data-audio-editor-tab="DRUM"',
+      'data-audio-editor-tab="SAMPLER"',
+      'id="draw2AudioDrumGrid"',
+      'id="draw2AudioWaveformViewport"',
+      'id="draw2AudioSamplerOpenBrowser"',
+    ]
+  ) {
+    if (html.includes(removed)) {
+      throw new Error(`Obsolete Audio editor surface remains: ${removed}`);
+    }
+  }
+  for (
+    const removed of [
+      "renderAudioDrumGrid",
+      "toggleAudioDrumStep",
+      "openAudioWaveEditing",
+      'data-audio-editor-tab="PIANO"',
+      'data-audio-editor-tab="WAVE"',
+      'data-audio-editor-tab="DRUM"',
+      'data-audio-editor-tab="SAMPLER"',
+    ]
+  ) {
+    if (source.includes(removed)) {
+      throw new Error(`Obsolete Audio editor behavior remains: ${removed}`);
+    }
+  }
+  for (
     const required of [
-      "Audio compact DAW shell",
+      ".draw2-audio-workspace",
       '[data-creator-mode="AUDIO"]',
       "draw2-audio-global-controls",
       "draw2-audio-editor-tab",
@@ -1062,7 +1090,7 @@ Deno.test("Audio desktop shell keeps editor, dock and workspace surfaces explici
       "--draw2-timeline-height",
       "--draw2-audio-right-width",
       "@media (min-width: 1120px)",
-      "Audio workstation visual controls",
+      ".draw2-audio-midi-grid",
       "draw2-audio-track-lane-cell.is-waveform",
       "draw2-audio-knob-field",
       "draw2-audio-browser-item",
@@ -1076,7 +1104,7 @@ Deno.test("Audio desktop shell keeps editor, dock and workspace surfaces explici
     }
   }
   if (
-    !shell.includes('draw2-workspace-frame[data-workspace-profile="mobile"]')
+    !mobileShell.includes('draw2-workspace-frame[data-workspace-profile="mobile"]')
   ) {
     throw new Error("Existing mobile projection anchor must remain present");
   }

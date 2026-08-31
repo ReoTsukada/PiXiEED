@@ -17619,9 +17619,6 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
   const audioMidiZoomOut = query(documentRef, "#draw2AudioMidiZoomOut");
   const audioMidiZoomIn = query(documentRef, "#draw2AudioMidiZoomIn");
   const audioMidiZoomValue = query(documentRef, "#draw2AudioMidiZoomValue");
-  const audioDrumGrid = query(documentRef, "#draw2AudioDrumGrid");
-  const audioDrumStatus = query(documentRef, "#draw2AudioDrumStatus");
-  const audioDrumKit = query(documentRef, "#draw2AudioDrumKit");
   const audioAnimationGuide = query(documentRef, "#draw2AudioAnimationGuide");
   const audioFrameCursor = query(documentRef, "#draw2AudioFrameCursor");
   const audioTimebaseSummary = query(documentRef, "#draw2AudioTimebaseSummary");
@@ -17842,10 +17839,6 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
   const audioFxTrackLabel = query(documentRef, "#draw2AudioFxTrackLabel");
   const audioRightFxList = query(documentRef, "#draw2AudioRightFxList");
   const audioRightImport = query(documentRef, "#draw2AudioRightImport");
-  const audioWaveOpenBrowser = query(documentRef, "#draw2AudioWaveOpenBrowser");
-  const audioSamplerOpenBrowser = query(documentRef, "#draw2AudioSamplerOpenBrowser");
-  const audioWaveformViewport = query(documentRef, "#draw2AudioWaveformViewport");
-  const audioWaveStatus = query(documentRef, "#draw2AudioWaveStatus");
   const gameDeckAddAsset = query(documentRef, "#draw2GameDeckAddAsset");
   const gameDeckAddTrack = query(documentRef, "#draw2GameDeckAddTrack");
   const draw2GameCreateSprite = query(documentRef, "#draw2GameCreateSprite");
@@ -18810,7 +18803,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     return translateDraw2Text(value, locale);
   };
   let modeDeckActiveTab = "game-scene";
-  let audioEditorActiveTab = "PIANO";
+  let audioEditorActiveTab = "ROLL";
   let audioEditorPinned = false;
   let audioRightActiveTab = "inspector";
   const gameRailTabForModeDeck = (tab) => {
@@ -18872,10 +18865,20 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       renderGameAssetRail();
     }
   };
-  const isAudioEditorTab = (value) => value === "PIANO" || value === "WAVE" || value === "DRUM" || value === "SAMPLER" || value === "DRAW";
+  const isAudioEditorTab = (value) => value === "ROLL" || value === "DRAW";
   const isAudioRightTab = (value) => value === "inspector" || value === "browser" || value === "master";
+  const dispatchAudioEditorState = (tab, force = false) => {
+    if (tab !== "DRAW") return;
+    windowRef.dispatchEvent(new CustomEvent("draw2:audio-editor-state", {
+      detail: {
+        editor: tab,
+        force
+      }
+    }));
+  };
   const selectAudioEditor = (tab, automatic = false) => {
     if (automatic && audioEditorPinned) return;
+    const editorChanged = audioEditorActiveTab !== tab;
     audioEditorActiveTab = tab;
     root.dataset.audioEditor = tab;
     for (const button of audioEditorTabs) {
@@ -18889,17 +18892,27 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       surface.hidden = !selected;
       surface.inert = !selected;
       surface.setAttribute("aria-hidden", String(!selected));
+      surface.classList.toggle("is-active", selected);
+      if (selected) {
+        if (editorChanged) {
+          surface.classList.remove("is-entering");
+          void surface.offsetWidth;
+          surface.classList.add("is-entering");
+        }
+      } else {
+        surface.classList.remove("is-active", "is-entering");
+      }
     }
-    renderAudioDrumGrid();
     if (audioEditorSelection !== void 0) {
       const instrumentLabel = AUDIO_INSTRUMENTS.find((instrument) => instrument.id === audioInstrumentId)?.label ?? audioInstrumentId;
       const localizedInstrumentLabel = localizeAudioText(instrumentLabel);
-      const label = tab === "PIANO" ? `${localizeAudioText("Track")}: ${localizedInstrumentLabel}` : tab === "WAVE" ? localizeAudioText("Audio Clip: Waveform") : tab === "DRUM" ? localizeAudioText("Track: Drums") : tab === "SAMPLER" ? localizeAudioText("Track: Sampler") : localizeAudioText("Draw Preview: Audio-linked");
+      const label = tab === "ROLL" ? `${localizeAudioText("Track")}: ${localizedInstrumentLabel}` : localizeAudioText("Draw Preview: Audio-linked");
       audioEditorSelection.textContent = localizeAudioText(label);
     }
     if (audioDrawPreviewStatus !== void 0 && tab === "DRAW") {
       audioDrawPreviewStatus.textContent = localizeAudioText(audioDrawMonitorVisible ? "Draw preview follows the Audio playhead." : "Press Monitor or select a Draw frame to follow the Audio playhead.");
     }
+    if (editorChanged) dispatchAudioEditorState(tab);
   };
   const selectAudioRightPanel = (tab) => {
     audioRightActiveTab = tab;
@@ -18971,7 +18984,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
         const label = documentRef.createElement("span");
         label.textContent = localizedLabel;
         const meta = documentRef.createElement("small");
-        meta.textContent = `${localizedCategory} \xB7 ${localizeAudioText(instrument.editor === "DRUM" ? "Drum Step" : "Piano Roll")} \xB7 ${localizeAudioText("lightweight voice")}`;
+        meta.textContent = `${localizedCategory} \xB7 ${localizeAudioText("MIDI Roll")} \xB7 ${localizeAudioText("lightweight voice")}`;
         item.append(icon, label, meta);
         audioBrowserRecent.append(item);
       }
@@ -19539,7 +19552,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       label: "Piano",
       preset: "triangle",
       category: "Keys",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Acoustic piano \xB7 lightweight voice"
     },
     {
@@ -19547,7 +19560,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       label: "Piano 2",
       preset: "triangle",
       category: "Keys",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Soft piano layer \xB7 lightweight voice"
     },
     {
@@ -19555,7 +19568,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       label: "Electric Piano",
       preset: "pulse-50",
       category: "Keys",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Warm electric keys \xB7 lightweight voice"
     },
     {
@@ -19563,7 +19576,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       label: "Organ",
       preset: "pulse-50",
       category: "Keys",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Sustained organ tone \xB7 lightweight voice"
     },
     {
@@ -19571,7 +19584,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       label: "Clavinet",
       preset: "pulse-25",
       category: "Keys",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Bright percussive keys \xB7 lightweight voice"
     },
     {
@@ -19579,7 +19592,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       label: "Guitar",
       preset: "sawtooth",
       category: "Strings",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Guitar-style pluck \xB7 lightweight voice"
     },
     {
@@ -19587,7 +19600,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       label: "Electric Guitar",
       preset: "sawtooth",
       category: "Strings",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Electric guitar-style lead \xB7 lightweight voice"
     },
     {
@@ -19595,7 +19608,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       label: "Bass",
       preset: "triangle",
       category: "Strings",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Low bass voice \xB7 lightweight voice"
     },
     {
@@ -19603,7 +19616,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       label: "Strings",
       preset: "sawtooth",
       category: "Strings",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Ensemble string pad \xB7 lightweight voice"
     },
     {
@@ -19611,7 +19624,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       label: "Violin",
       preset: "sawtooth",
       category: "Strings",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Violin-style bowed voice \xB7 lightweight voice"
     },
     {
@@ -19619,7 +19632,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       label: "Cello",
       preset: "triangle",
       category: "Strings",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Cello-style low strings \xB7 lightweight voice"
     },
     {
@@ -19627,7 +19640,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       label: "Harp",
       preset: "triangle",
       category: "Strings",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Harp-style pluck \xB7 lightweight voice"
     },
     {
@@ -19635,7 +19648,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       label: "Marimba",
       preset: "triangle",
       category: "Mallets",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Marimba-style mallet tone \xB7 lightweight voice"
     },
     {
@@ -19643,7 +19656,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       label: "Kalimba",
       preset: "pulse-25",
       category: "Mallets",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Kalimba-style pluck \xB7 lightweight voice"
     },
     {
@@ -19651,7 +19664,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       label: "Vibraphone",
       preset: "triangle",
       category: "Mallets",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Vibraphone-style bell tone \xB7 lightweight voice"
     },
     {
@@ -19659,7 +19672,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       label: "Xylophone",
       preset: "triangle",
       category: "Mallets",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Xylophone-style mallet tone \xB7 lightweight voice"
     },
     {
@@ -19667,7 +19680,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       label: "Celesta",
       preset: "triangle",
       category: "Mallets",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Celesta-style bell tone \xB7 lightweight voice"
     },
     {
@@ -19675,7 +19688,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       label: "Tubular Bells",
       preset: "triangle",
       category: "Mallets",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Tubular bell-style tone \xB7 lightweight voice"
     },
     {
@@ -19683,7 +19696,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       label: "Steel Drum",
       preset: "triangle",
       category: "Mallets",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Steel drum-style tone \xB7 lightweight voice"
     },
     {
@@ -19691,7 +19704,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       label: "Flute",
       preset: "triangle",
       category: "Winds",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Flute-style breathy voice \xB7 lightweight voice"
     },
     {
@@ -19699,7 +19712,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       label: "Clarinet",
       preset: "pulse-25",
       category: "Winds",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Clarinet-style reed voice \xB7 lightweight voice"
     },
     {
@@ -19707,7 +19720,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       label: "Saxophone",
       preset: "sawtooth",
       category: "Winds",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Saxophone-style lead voice \xB7 lightweight voice"
     },
     {
@@ -19715,7 +19728,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       label: "Trumpet",
       preset: "sawtooth",
       category: "Winds",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Trumpet-style brass voice \xB7 lightweight voice"
     },
     {
@@ -19723,7 +19736,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       label: "Brass",
       preset: "pulse-50",
       category: "Winds",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Brass section-style voice \xB7 lightweight voice"
     },
     {
@@ -19731,7 +19744,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       label: "Synth Lead",
       preset: "sawtooth",
       category: "Synth",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Focused synth lead \xB7 lightweight voice"
     },
     {
@@ -19739,7 +19752,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       label: "Synth Pad",
       preset: "triangle",
       category: "Synth",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Soft synth pad \xB7 lightweight voice"
     },
     {
@@ -19747,7 +19760,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       label: "Chip",
       preset: "pulse-25",
       category: "Synth",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Chip-tune pulse voice \xB7 lightweight voice"
     },
     {
@@ -19755,7 +19768,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       label: "GB Pulse 1",
       preset: "pulse-25",
       category: "Chip",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Game Boy square channel 1 \xB7 25% duty"
     },
     {
@@ -19763,7 +19776,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       label: "GB Pulse 2",
       preset: "pulse-50",
       category: "Chip",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Game Boy square channel 2 \xB7 50% duty"
     },
     {
@@ -19771,7 +19784,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       label: "GB Wave",
       preset: "triangle",
       category: "Chip",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Game Boy 32-step wave-style triangle approximation"
     },
     {
@@ -19779,7 +19792,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       label: "GB Noise",
       preset: "noise",
       category: "Chip",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Game Boy-style LFSR noise channel"
     },
     {
@@ -19787,7 +19800,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       label: "NES Pulse 1",
       preset: "pulse-25",
       category: "Chip",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Famicom square channel 1 \xB7 12.5% duty"
     },
     {
@@ -19795,7 +19808,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       label: "NES Pulse 2",
       preset: "pulse-25",
       category: "Chip",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Famicom square channel 2 \xB7 25% duty"
     },
     {
@@ -19803,7 +19816,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       label: "NES Triangle",
       preset: "triangle",
       category: "Chip",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Famicom triangle bass channel"
     },
     {
@@ -19811,7 +19824,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       label: "NES Noise",
       preset: "noise",
       category: "Chip",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Famicom-style long LFSR noise channel"
     },
     {
@@ -19819,15 +19832,15 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       label: "Drums",
       preset: "noise",
       category: "Percussion",
-      editor: "DRUM",
-      hint: "Kick, snare, hat and percussion step grid"
+      editor: "ROLL",
+      hint: "Kick, snare, hat and percussion MIDI notes"
     },
     {
       id: "TAMBOURINE",
       label: "Tambourine",
       preset: "noise",
       category: "Percussion",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Tambourine-style noise hit \xB7 lightweight voice"
     },
     {
@@ -19835,7 +19848,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       label: "Shaker",
       preset: "noise",
       category: "Percussion",
-      editor: "PIANO",
+      editor: "ROLL",
       hint: "Shaker-style noise hit \xB7 lightweight voice"
     }
   ]);
@@ -19900,7 +19913,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     if (instrument === "CHIP" || instrument.startsWith("GB_") || instrument.startsWith("NES_")) return "chip";
     return "keys";
   };
-  const audioEditorForInstrument = (instrument) => AUDIO_INSTRUMENTS.find((item) => item.id === instrument)?.editor ?? "PIANO";
+  const audioEditorForInstrument = (instrument) => AUDIO_INSTRUMENTS.find((item) => item.id === instrument)?.editor ?? "ROLL";
   const populateAudioInstrumentSelectors = () => {
     const makeOption = (value, label) => {
       const option = documentRef.createElement("option");
@@ -19992,7 +20005,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       }
     ]);
     for (const category of AUDIO_INSTRUMENT_CATEGORY_ORDER) {
-      const instruments = sortedAudioInstruments().filter((instrument) => instrument.editor === "PIANO" && instrument.category === category);
+      const instruments = sortedAudioInstruments().filter((instrument) => instrument.editor === "ROLL" && instrument.category === category);
       appendAudioTrackTemplateSection(audioTrackAddOptions, `${localizeAudioText("Instrument Track")} \xB7 ${localizeAudioText(category)}`, "MIDI notes \u2192 lightweight Web Audio voice", instruments.map((instrument) => ({
         value: instrument.id,
         label: instrument.label,
@@ -20000,62 +20013,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
         tone: instrument.category.toLowerCase()
       })));
     }
-    appendAudioTrackTemplateSection(audioTrackAddOptions, `${localizeAudioText("Drum Track")} \xB7 ${localizeAudioText("Percussion")}`, "Step grid for rhythm programming", sortedAudioInstruments().filter((instrument) => instrument.editor === "DRUM").map((instrument) => ({
-      value: instrument.id,
-      label: instrument.label,
-      detail: instrument.hint,
-      tone: "drums"
-    })));
   };
-  const AUDIO_DRUM_ROWS = Object.freeze([
-    {
-      id: "kick",
-      label: "KICK",
-      pitchMidi: 36,
-      velocity: 0.9
-    },
-    {
-      id: "snare",
-      label: "SNARE",
-      pitchMidi: 38,
-      velocity: 0.82
-    },
-    {
-      id: "closed-hat",
-      label: "CLOSED HAT",
-      pitchMidi: 42,
-      velocity: 0.68
-    },
-    {
-      id: "open-hat",
-      label: "OPEN HAT",
-      pitchMidi: 46,
-      velocity: 0.64
-    },
-    {
-      id: "perc",
-      label: "PERC",
-      pitchMidi: 45,
-      velocity: 0.72
-    }
-  ]);
-  const AUDIO_DRUM_KITS = Object.freeze([
-    {
-      id: "BASIC",
-      label: "Basic \xB7 clean",
-      hint: "clean electronic kit"
-    },
-    {
-      id: "ARCADE",
-      label: "Arcade \xB7 chip",
-      hint: "bright chip-style kit"
-    },
-    {
-      id: "SOFT",
-      label: "Soft \xB7 mellow",
-      hint: "soft low-impact kit"
-    }
-  ]);
   const AUDIO_DRUM_KIT_PRESETS = Object.freeze({
     BASIC: Object.freeze({
       36: "triangle",
@@ -20081,7 +20039,6 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
   });
   let audioDrumKitId = "BASIC";
   let audioChipMachineId = "NONE";
-  const AUDIO_DRUM_STEPS = 16;
   let audioChipPresetId = "pulse-25";
   let audioInstrumentId = "PIANO";
   let audioVoiceDraft;
@@ -20109,7 +20066,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     vibratoRateHz: preset.vibratoRateHz
   });
   const audioVoicePresetFromProfile = (instrument) => {
-    const profile = getChipSynthVoice(instrument.id, instrument.editor === "DRUM" ? 38 : 60, instrument.preset, void 0, audioChipMachineId);
+    const profile = getChipSynthVoice(instrument.id, instrument.id === "DRUMS" ? 38 : 60, instrument.preset, void 0, audioChipMachineId);
     const profileFilter = profile.filter ?? {
       type: "lowpass",
       frequencyHz: 6e3,
@@ -20776,7 +20733,6 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     audioPpq = session.ppq;
     audioBpm = session.project.tempo.milliBpm / 1e3;
     audioDrumKitId = session.project.drumKitId ?? "BASIC";
-    if (audioDrumKit !== void 0) audioDrumKit.value = audioDrumKitId;
     audioChipMachineId = isAudioChipMachineId(session.project.chipMachineId) ? session.project.chipMachineId : "NONE";
     if (audioChipMachine !== void 0) {
       audioChipMachine.value = audioChipMachineId;
@@ -21873,7 +21829,6 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       if (audioSurfacesReady) {
         renderAudioTimelineTracks();
         renderAudioMidiGrid();
-        if (audioEditorActiveTab === "DRUM") renderAudioDrumGrid();
       }
       setModeDeckStatus("audio", `${selectedRange.endBar - selectedRange.startBar === 1 ? "Bar" : "Bars"} ${selectedRange.startBar + 1}${selectedRange.endBar - selectedRange.startBar === 1 ? "" : `\u2013${selectedRange.endBar}`} cleared \xB7 Undo restores the bar`);
     });
@@ -21907,7 +21862,6 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     if (audioSurfacesReady) {
       renderAudioTimelineTracks();
       renderAudioMidiGrid();
-      if (audioEditorActiveTab === "DRUM") renderAudioDrumGrid();
     }
     setModeDeckStatus("audio", `${actionLabel} \xB7 Undo restores every Track`);
     return true;
@@ -22252,7 +22206,6 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     audioWorkspaceMeasureEnd.value = audioFrameCount;
     audioRangeClipboard = void 0;
     audioDrumKitId = "BASIC";
-    if (audioDrumKit !== void 0) audioDrumKit.value = audioDrumKitId;
     audioAnimationFrame = 1;
     audioSelectedNoteKey = void 0;
     audioNoteVelocity = 0.82;
@@ -23435,7 +23388,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     if (track === void 0) return;
     audioInspectorTargetKind = "deck";
     audioSelectedTrackId = track.id;
-    selectAudioEditor("WAVE", true);
+    selectAudioEditor("ROLL", true);
     selectAudioRightPanel("inspector");
     syncAudioRightInspector(`Track: ${track.label}`, "Track selected \xB7 Browser, Mixer and FX stay available");
     renderAudioTimelineTracks();
@@ -23496,7 +23449,6 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       renderAudioTimelineTracks();
       renderAudioArrangerOverview();
       renderAudioMidiGrid();
-      if (audioEditorActiveTab === "DRUM") renderAudioDrumGrid();
       renderAudioDock();
       setModeDeckStatus("audio", `${label} \u3092\u524A\u9664\u3057\u307E\u3057\u305F`);
     });
@@ -23519,7 +23471,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     syncAudioRightInspector(`Instrument: ${instrument.label}`, `${instrument.category} lane selected \xB7 ${instrument.hint}`);
     renderAudioVoiceEditor();
     revealAudioVoiceEditor();
-    setModeDeckStatus("audio", `${instrument.editor === "DRUM" ? "Drum Roll" : "Piano Roll"} \xB7 ${instrument.label} lane selected`);
+    setModeDeckStatus("audio", `MIDI Roll \xB7 ${instrument.label} lane selected`);
     renderAudioDock();
   };
   const renderAudioDockPicker = () => {
@@ -24336,12 +24288,12 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       const editor = audioEditorForInstrument(instrument.id);
       selectAudioEditor(editor);
       selectAudioRightPanel("inspector");
-      syncAudioRightInspector(`Instrument: ${instrument.label}`, editor === "DRUM" ? "Arranger lane selected \xB7 edit steps in Drum Roll" : "Arranger lane selected \xB7 edit notes in Piano Roll");
+      syncAudioRightInspector(`Instrument: ${instrument.label}`, "Arranger lane selected \xB7 edit notes in MIDI Roll");
       renderAudioTimelineTracks();
       renderAudioMidiGrid();
       syncAudioMidiStatus();
       renderAudioArrangerOverview();
-      setModeDeckStatus("audio", `${editor === "DRUM" ? "Drum Roll" : "Piano Roll"} \xB7 ${instrument.label} lane selected`);
+      setModeDeckStatus("audio", `MIDI Roll \xB7 ${instrument.label} lane selected`);
       return;
     }
     selectAudioDockTrack(trackId);
@@ -25088,9 +25040,6 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     }
     if (audioWindowChanged || audioMeasureChanged) renderAudioMidiGrid();
     if (audioMeasureChanged) syncAudioBarSelection();
-    if (audioEditorActiveTab === "DRUM" && audioMeasureChanged) {
-      renderAudioDrumGrid();
-    }
     if (audioFrameCursor !== void 0) {
       audioFrameCursor.max = String(audioFrameCount);
       audioFrameCursor.value = String(audioAnimationFrame);
@@ -25664,7 +25613,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     if (audioMidiInstrument !== void 0) {
       audioMidiInstrument.value = firstInstrument;
     }
-    selectAudioEditor(firstInstrument === "DRUMS" ? "DRUM" : "PIANO", true);
+    selectAudioEditor("ROLL", true);
     const committed = await queueAudioWorkspaceMutation(async (module, session) => {
       let current = session;
       const addedTracks = /* @__PURE__ */ new Set();
@@ -25874,133 +25823,6 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     } finally {
       if (audioMidiConnect !== void 0) audioMidiConnect.disabled = false;
     }
-  };
-  const audioDrumStepFrame = (step) => {
-    const safeStep = Math.max(0, Math.trunc(step));
-    const measureFrames = Math.max(AUDIO_DRUM_STEPS, audioMeasureFrameCount());
-    const barIndex = Math.floor(safeStep / AUDIO_DRUM_STEPS);
-    const stepInBar = safeStep % AUDIO_DRUM_STEPS;
-    const frame = barIndex * measureFrames + Math.min(measureFrames - 1, Math.round(stepInBar * measureFrames / AUDIO_DRUM_STEPS));
-    return Math.min(Math.max(0, audioFrameCount - 1), frame);
-  };
-  const audioDrumStepTick = (step) => {
-    const safeStep = Math.max(0, Math.trunc(step));
-    const barIndex = Math.floor(safeStep / AUDIO_DRUM_STEPS);
-    const stepInBar = safeStep % AUDIO_DRUM_STEPS;
-    return barIndex * audioBarTick() + Math.round(stepInBar * audioBarTick() / AUDIO_DRUM_STEPS);
-  };
-  function renderAudioDrumGrid() {
-    if (audioDrumGrid === void 0) return;
-    if (audioEditorActiveTab !== "DRUM") {
-      audioDrumGrid.replaceChildren();
-      audioDrumGrid.removeAttribute("aria-busy");
-      return;
-    }
-    if (audioDrumKit !== void 0) audioDrumKit.value = audioDrumKitId;
-    audioDrumGrid.setAttribute("aria-busy", "true");
-    audioDrumGrid.dataset.audioRollEditor = "drum";
-    audioDrumGrid.replaceChildren();
-    const totalSteps = Math.max(AUDIO_DRUM_STEPS, audioTotalBars() * AUDIO_DRUM_STEPS);
-    audioDrumGrid.style.gridTemplateColumns = `112px repeat(${totalSteps}, minmax(30px, 1fr))`;
-    const blank = documentRef.createElement("span");
-    blank.className = "draw2-audio-drum-step-label";
-    blank.textContent = "DRUM ROLL";
-    blank.setAttribute("aria-hidden", "true");
-    audioDrumGrid.append(blank);
-    for (let step = 0; step < totalSteps; step += 1) {
-      const header = documentRef.createElement("span");
-      header.className = "draw2-audio-drum-step-label";
-      const stepInBar = step % AUDIO_DRUM_STEPS;
-      const bar = Math.floor(step / AUDIO_DRUM_STEPS) + 1;
-      header.classList.toggle("is-bar", stepInBar === 0);
-      header.classList.toggle("is-beat", stepInBar % 4 === 0);
-      header.textContent = stepInBar === 0 ? `B${bar}` : stepInBar % 4 === 0 ? String(stepInBar + 1) : "";
-      header.title = `Bar ${bar} \xB7 step ${stepInBar + 1}`;
-      header.setAttribute("aria-hidden", "true");
-      audioDrumGrid.append(header);
-    }
-    for (const row of AUDIO_DRUM_ROWS) {
-      const label = documentRef.createElement("span");
-      label.className = "draw2-audio-drum-label";
-      label.textContent = row.label;
-      label.dataset.audioDrumRowLabel = row.id;
-      label.setAttribute("role", "rowheader");
-      audioDrumGrid.append(label);
-      for (let step = 0; step < totalSteps; step += 1) {
-        const frame = audioDrumStepFrame(step);
-        const note = audioNoteAtFrame(row.pitchMidi, frame, "DRUMS");
-        const cell = documentRef.createElement("button");
-        cell.type = "button";
-        cell.className = "draw2-audio-drum-step";
-        cell.dataset.audioDrumRow = row.id;
-        cell.dataset.audioDrumStep = String(step);
-        cell.setAttribute("role", "gridcell");
-        cell.setAttribute("aria-pressed", String(note !== void 0));
-        cell.setAttribute("aria-label", `${row.label} bar ${Math.floor(step / AUDIO_DRUM_STEPS) + 1} step ${step % AUDIO_DRUM_STEPS + 1} \xB7 ${audioFramePositionLabel(frame)} \xB7 musical grid`);
-        cell.title = `${row.label} \xB7 Bar ${Math.floor(step / AUDIO_DRUM_STEPS) + 1} \xB7 step ${step % AUDIO_DRUM_STEPS + 1} \xB7 ${audioFramePositionLabel(frame)}`;
-        cell.classList.toggle("is-bar-start", step % AUDIO_DRUM_STEPS === 0);
-        cell.classList.toggle("is-beat", step % 4 === 0);
-        cell.classList.toggle("is-active", note !== void 0);
-        audioDrumGrid.append(cell);
-      }
-    }
-    audioDrumGrid.setAttribute("aria-busy", "false");
-    const active = [
-      ...audioMidiNotes.values()
-    ].filter((note) => note.instrument === "DRUMS").length;
-    if (audioDrumStatus !== void 0) {
-      const kit = AUDIO_DRUM_KITS.find((item) => item.id === audioDrumKitId);
-      audioDrumStatus.textContent = localizeAudioText(active === 0 ? `${kit?.label ?? audioDrumKitId} \xB7 click a row to add \xB7 drag to paint \xB7 right-click to erase \xB7 ${audioTotalBars()} bar${audioTotalBars() === 1 ? "" : "s"} visible.` : `${active} drum event${active === 1 ? "" : "s"} active \xB7 ${kit?.hint ?? "kit"} \xB7 drag across the grid to paint or erase.`);
-    }
-  }
-  const setAudioDrumStep = (rowId, step, active) => {
-    audioInspectorTargetKind = "instrument";
-    const row = AUDIO_DRUM_ROWS.find((candidate) => candidate.id === rowId);
-    if (row === void 0 || !Number.isInteger(step) || step < 0) return;
-    const clock = audioPianoRollClock();
-    const tick = audioDrumStepTick(step);
-    const frame = audioTickToFrame(tick, clock);
-    const existing = audioNoteAtFrame(row.pitchMidi, frame, "DRUMS");
-    const shouldBeActive = active ?? existing === void 0;
-    if (existing !== void 0 && shouldBeActive) return;
-    if (existing !== void 0) {
-      audioMidiNotes.delete(existing.id);
-      unindexAudioNote(existing);
-      if (audioSelectedNoteKey === existing.id) {
-        audioSelectedNoteKey = void 0;
-      }
-      void queueAudioWorkspaceMutation((module, session) => module.journalWorkspaceNoteRemove(session, existing.id, nextAudioWorkspaceMutation("drum-remove")));
-      refreshAudioNoteVisuals(void 0, existing);
-      setModeDeckStatus("audio", `${row.label} step ${step + 1} removed`);
-    } else {
-      const note = pianoRollNoteFromTicks({
-        id: audioNoteKey("DRUMS", row.pitchMidi, frame),
-        pitchMidi: row.pitchMidi,
-        startTick: tick,
-        durationTick: Math.max(1, Math.round(audioBarTick() / AUDIO_DRUM_STEPS)),
-        velocity: row.velocity,
-        instrument: "DRUMS"
-      }, clock, audioFrameCount);
-      if (note === void 0) return;
-      const canonicalNote = note;
-      audioMidiNotes.set(canonicalNote.id, canonicalNote);
-      indexAudioNote(canonicalNote);
-      audioSelectedNoteKey = canonicalNote.id;
-      primeAudioPlaybackFromGesture(audioRuntimeTrackId(canonicalNote.instrument));
-      requestAudioNotePreviewOnGesture(canonicalNote);
-      void queueAudioNoteUpsert(canonicalNote, "drum-add").then((committed) => {
-        if (committed && !audioNotePreviewCompleted.has(canonicalNote)) {
-          void playAudioNotePreview(canonicalNote);
-        }
-      });
-      refreshAudioNoteVisuals(canonicalNote);
-      setModeDeckStatus("audio", `${row.label} step ${step + 1} added`);
-    }
-    renderAudioDrumGrid();
-    syncAudioMidiStatus();
-  };
-  const toggleAudioDrumStep = (rowId, step) => {
-    setAudioDrumStep(rowId, step);
   };
   const audioInstrumentLaneKey = (instrument, frame) => `${instrument}:${frame}`;
   const syncAudioMidiCell = (pitchMidi, frame, instrument = audioInstrumentId) => {
@@ -26341,7 +26163,9 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     renderAudioAnimationCells();
     renderAudioMidiGrid();
     renderAudioMidiExpression();
-    if (audioEditorActiveTab === "DRUM") renderAudioDrumGrid();
+    if (audioEditorActiveTab === "DRAW") {
+      dispatchAudioEditorState("DRAW", true);
+    }
     windowRef.setTimeout(() => {
       if (renderGeneration !== audioSurfaceRenderGeneration || !audioSurfacesReady || root.dataset.creatorMode !== "AUDIO") return;
       renderAudioTimelineTracks();
@@ -26381,7 +26205,6 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       if (!audioSurfacesReady || root.dataset.creatorMode !== "AUDIO") return;
       renderAudioTimelineTracks();
       renderAudioMidiGrid();
-      if (audioEditorActiveTab === "DRUM") renderAudioDrumGrid();
       renderAudioCustomPanels();
       if (modeDeckActiveTab === "audio-library") renderAudioClipLibrary();
       if (modeDeckActiveTab === "audio-mixer") renderAudioMixerRows();
@@ -26666,7 +26489,6 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     if (audioSelectedNoteKey === note.id) audioSelectedNoteKey = void 0;
     void queueAudioWorkspaceMutation((module, session) => module.journalWorkspaceNoteRemove(session, note.id, nextAudioWorkspaceMutation("note-delete")));
     refreshAudioNoteVisuals(void 0, note);
-    if (audioEditorActiveTab === "DRUM") renderAudioDrumGrid();
     syncAudioMidiStatus();
     syncAudioRightInspector(`${pitchLabel(note.pitchMidi)} \xB7 F${note.startFrame + 1}`, status);
     setModeDeckStatus("audio", `${pitchLabel(note.pitchMidi)} \xB7 F${note.startFrame + 1} \xB7 note deleted`);
@@ -26765,7 +26587,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     syncAudioMidiStatus();
   };
   const applyAudioMidiCell = (target) => {
-    selectAudioEditor("PIANO", true);
+    selectAudioEditor("ROLL", true);
     selectAudioRightPanel("inspector");
     audioInspectorTargetKind = "instrument";
     const clock = audioPianoRollClock();
@@ -26920,7 +26742,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     }
     const target = audioMidiCellFromPointer(event);
     if (target === null) return;
-    selectAudioEditor("PIANO", true);
+    selectAudioEditor("ROLL", true);
     selectAudioRightPanel("inspector");
     const clock = audioPianoRollClock();
     const pitchMidi = target.pitchMidi;
@@ -26995,7 +26817,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     removeAudioMidiNote(note, "MIDI note deleted \xB7 right-click action");
   });
   audioMidiGrid?.addEventListener("keydown", (event) => {
-    if (audioEditorActiveTab !== "PIANO") return;
+    if (audioEditorActiveTab !== "ROLL") return;
     const key2 = event.key.toLowerCase();
     const selected = audioSelectedNoteKey === void 0 ? void 0 : audioMidiNotes.get(audioSelectedNoteKey);
     if (event.key === "Delete" || event.key === "Backspace") {
@@ -27215,7 +27037,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       if (trackId !== void 0 && audioDeckTracks.some((track) => track.id === trackId)) {
         audioSelectedTrackId = trackId;
       }
-      selectAudioEditor("WAVE", true);
+      selectAudioEditor("ROLL", true);
       selectAudioRightPanel("inspector");
       syncAudioRightInspector(`Track: ${audioDeckTracks.find((track) => track.id === audioSelectedTrackId)?.label ?? "Audio"}`, "Timeline selection \xB7 clips and track controls are available in Inspector");
     }
@@ -27289,8 +27111,8 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
         renderAudioTimelineTracks();
         renderAudioMidiGrid();
         syncAudioMidiStatus();
-        setModeDeckStatus("audio", `${audioEditorForInstrument(value) === "DRUM" ? "Drum Roll" : "Piano Roll"} \xB7 ${AUDIO_INSTRUMENTS.find((item) => item.id === value)?.label ?? value} lane selected \xB7 edit any bar in the project`);
-        syncAudioRightInspector(`Instrument: ${AUDIO_INSTRUMENTS.find((item) => item.id === value)?.label ?? value}`, "Piano Roll lane selected \xB7 Draw frame timing remains unchanged");
+        setModeDeckStatus("audio", `MIDI Roll \xB7 ${AUDIO_INSTRUMENTS.find((item) => item.id === value)?.label ?? value} lane selected \xB7 edit any bar in the project`);
+        syncAudioRightInspector(`Instrument: ${AUDIO_INSTRUMENTS.find((item) => item.id === value)?.label ?? value}`, "MIDI Roll lane selected \xB7 Draw frame timing remains unchanged");
       }
       return;
     }
@@ -27311,15 +27133,15 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
         renderAudioTimelineTracks();
         renderAudioMidiGrid();
         syncAudioMidiStatus();
-        setModeDeckStatus("audio", `${audioEditorForInstrument(value) === "DRUM" ? "Drum Roll" : "Piano Roll"} \xB7 ${AUDIO_INSTRUMENTS.find((item) => item.id === value)?.label ?? value} \xB7 F${frame2 + 1} selected \xB7 edit any bar in the project`);
-        syncAudioRightInspector(`Instrument: ${AUDIO_INSTRUMENTS.find((item) => item.id === value)?.label ?? value} \xB7 F${frame2 + 1}`, "Piano Roll is Tick-based \xB7 Draw FPS is a monitor projection");
+        setModeDeckStatus("audio", `MIDI Roll \xB7 ${AUDIO_INSTRUMENTS.find((item) => item.id === value)?.label ?? value} \xB7 F${frame2 + 1} selected \xB7 edit any bar in the project`);
+        syncAudioRightInspector(`Instrument: ${AUDIO_INSTRUMENTS.find((item) => item.id === value)?.label ?? value} \xB7 F${frame2 + 1}`, "MIDI Roll is Tick-based \xB7 Draw FPS is a monitor projection");
       }
       return;
     }
     const trackLabel = event.target instanceof Element ? event.target.closest("[data-mode-deck-track-label]") : null;
     if (trackLabel !== null && audioTracks.contains(trackLabel)) {
       audioInspectorTargetKind = "deck";
-      selectAudioEditor("WAVE", true);
+      selectAudioEditor("ROLL", true);
       selectAudioRightPanel("inspector");
       const trackId = trackLabel.dataset.modeDeckTrack;
       if (trackId !== void 0 && audioDeckTracks.some((track) => track.id === trackId)) {
@@ -29151,7 +28973,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     if (track !== void 0) {
       audioInspectorTargetKind = "deck";
       audioSelectedTrackId = track.id;
-      selectAudioEditor("WAVE", true);
+      selectAudioEditor("ROLL", true);
       selectAudioRightPanel("inspector");
       syncAudioRightInspector(`Track: ${track.label}`, "Audio Clip track selected \xB7 waveform editing is ready");
       if (audioSurfacesReady) {
@@ -29345,7 +29167,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     }
     for (const panel of audioPanelSurfaces) {
       const inWorkspace = panel.closest("#draw2AudioWorkspace") !== null;
-      const selected = inWorkspace ? audioWorkspaceActive && (panel.dataset.audioEditorSurface === audioEditorActiveTab || audioEditorActiveTab === "PIANO" && panel.dataset.audioPanelSurface === "piano-roll") : audioSurface !== void 0 && panel.dataset.audioPanelSurface === audioSurface;
+      const selected = inWorkspace ? audioWorkspaceActive && (panel.dataset.audioEditorSurface === audioEditorActiveTab || audioEditorActiveTab === "ROLL" && panel.dataset.audioPanelSurface === "piano-roll") : audioSurface !== void 0 && panel.dataset.audioPanelSurface === audioSurface;
       panel.hidden = !selected;
       panel.inert = !selected;
     }
@@ -29392,88 +29214,6 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       }
     });
   }
-  let audioDrumPaint;
-  let audioDrumSkipNextClick = false;
-  const audioDrumCellFromEvent = (event) => {
-    const target = event.target instanceof Element ? event.target.closest("[data-audio-drum-row][data-audio-drum-step]") : null;
-    return target !== null && audioDrumGrid?.contains(target) === true ? target : null;
-  };
-  const audioDrumCellFromPointer = (event) => {
-    const hit = documentRef.elementFromPoint(event.clientX, event.clientY);
-    return hit instanceof Element ? hit.closest("[data-audio-drum-row][data-audio-drum-step]") : null;
-  };
-  audioDrumGrid?.addEventListener("pointerdown", (event) => {
-    if (event.button !== 0) return;
-    const target = audioDrumCellFromEvent(event);
-    if (target === null) return;
-    event.preventDefault();
-    const pointerId = event.pointerId;
-    const active = target.getAttribute("aria-pressed") !== "true";
-    audioDrumPaint = {
-      pointerId,
-      active,
-      visited: /* @__PURE__ */ new Set()
-    };
-    audioDrumSkipNextClick = true;
-    audioDrumGrid?.setPointerCapture?.(pointerId);
-    const key2 = `${target.dataset.audioDrumRow}:${target.dataset.audioDrumStep}`;
-    audioDrumPaint.visited.add(key2);
-    setAudioDrumStep(target.dataset.audioDrumRow ?? "", Number(target.dataset.audioDrumStep ?? "NaN"), active);
-  });
-  audioDrumGrid?.addEventListener("pointermove", (event) => {
-    const paint = audioDrumPaint;
-    if (paint === void 0 || paint.pointerId !== event.pointerId) return;
-    const target = audioDrumCellFromPointer(event);
-    if (target === null || !audioDrumGrid?.contains(target)) return;
-    event.preventDefault();
-    const key2 = `${target.dataset.audioDrumRow}:${target.dataset.audioDrumStep}`;
-    if (paint.visited.has(key2)) return;
-    paint.visited.add(key2);
-    setAudioDrumStep(target.dataset.audioDrumRow ?? "", Number(target.dataset.audioDrumStep ?? "NaN"), paint.active);
-  });
-  const finishAudioDrumPaint = (event) => {
-    if (audioDrumPaint?.pointerId !== event.pointerId) return;
-    try {
-      audioDrumGrid?.releasePointerCapture?.(event.pointerId);
-    } catch {
-    }
-    audioDrumPaint = void 0;
-    windowRef.setTimeout(() => {
-      audioDrumSkipNextClick = false;
-    }, 250);
-  };
-  audioDrumGrid?.addEventListener("pointerup", finishAudioDrumPaint);
-  audioDrumGrid?.addEventListener("pointercancel", finishAudioDrumPaint);
-  audioDrumGrid?.addEventListener("contextmenu", (event) => {
-    const target = audioDrumCellFromEvent(event);
-    if (target === null) return;
-    event.preventDefault();
-    event.stopPropagation();
-    setAudioDrumStep(target.dataset.audioDrumRow ?? "", Number(target.dataset.audioDrumStep ?? "NaN"), false);
-  });
-  audioDrumGrid?.addEventListener("click", (event) => {
-    if (audioDrumSkipNextClick) {
-      audioDrumSkipNextClick = false;
-      return;
-    }
-    const target = event.target instanceof Element ? event.target.closest("[data-audio-drum-row][data-audio-drum-step]") : null;
-    if (target === null) return;
-    toggleAudioDrumStep(target.dataset.audioDrumRow ?? "", Number(target.dataset.audioDrumStep ?? "NaN"));
-  });
-  audioDrumKit?.addEventListener("change", () => {
-    const value = audioDrumKit.value;
-    if (!AUDIO_DRUM_KITS.some((kit) => kit.id === value)) return;
-    audioDrumKitId = value;
-    renderAudioDrumGrid();
-    setModeDeckStatus("audio", `${AUDIO_DRUM_KITS.find((kit) => kit.id === audioDrumKitId)?.label ?? audioDrumKitId} selected \xB7 existing drum notes are kept`);
-    void queueAudioWorkspaceMutation((module, session) => module.journalWorkspaceDrumKitSet(session, audioDrumKitId, nextAudioWorkspaceMutation("drum-kit"))).then((ok) => {
-      if (!ok) {
-        syncAudioWorkspaceUiFromSession();
-        renderAudioDrumGrid();
-        setModeDeckStatus("audio", "Drum kit could not be saved");
-      }
-    });
-  });
   audioEditorPin?.addEventListener("click", () => {
     audioEditorPinned = !audioEditorPinned;
     audioEditorPin.setAttribute("aria-pressed", String(audioEditorPinned));
@@ -29517,7 +29257,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     }
     const asset = audioWorkspaceSession?.assetCatalog.assets.find((entry) => String(entry.assetId) === assetId);
     const revision = audioWorkspaceSession?.project.revisions.find((entry) => String(entry.revisionId) === item.dataset.audioBrowserRevision);
-    selectAudioEditor("WAVE", true);
+    selectAudioEditor("ROLL", true);
     selectAudioRightPanel("inspector");
     syncAudioRightInspector(`Asset: ${item?.querySelector("span:nth-child(2)")?.textContent ?? assetId}`, asset === void 0 ? "Asset metadata is unavailable" : revision === void 0 ? `Revision ${asset.latestRevisionId} is missing \xB7 re-import the source` : `${asset.kind} \xB7 Revision ${asset.revisionIds.length} \xB7 ${audioWorkspaceSession?.project.clips.filter((clip) => asset.revisionIds.includes(clip.revisionId)).length ?? 0} Clip reference(s) \xB7 ready to edit`);
   });
@@ -29629,34 +29369,6 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
   audioRightFxList?.addEventListener("change", handleAudioFxAction);
   audioFxChain?.addEventListener("dblclick", handleAudioFxAction);
   audioRightFxList?.addEventListener("dblclick", handleAudioFxAction);
-  audioWaveOpenBrowser?.addEventListener("click", () => {
-    selectAudioRightPanel("browser");
-  });
-  const openAudioWaveEditing = () => {
-    const hasClip = (audioWorkspaceSession?.project.clips.length ?? 0) > 0;
-    if (hasClip) {
-      selectModeDeckTab("audio-library");
-      if (audioWaveStatus !== void 0) {
-        audioWaveStatus.textContent = localizeAudioText("Clip library opened \xB7 choose a Clip to edit gain, fades and split.");
-      }
-      setModeDeckStatus("audio", "Waveform editing moved to the active Clip row");
-    } else {
-      selectAudioRightPanel("browser");
-      if (audioWaveStatus !== void 0) {
-        audioWaveStatus.textContent = localizeAudioText("No Audio Clip yet \xB7 Browser opened so you can import one.");
-      }
-      setModeDeckStatus("audio", "Import an Audio Clip before editing its waveform");
-    }
-  };
-  audioWaveformViewport?.addEventListener("click", openAudioWaveEditing);
-  audioWaveformViewport?.addEventListener("keydown", (event) => {
-    if (event.key !== "Enter") return;
-    event.preventDefault();
-    openAudioWaveEditing();
-  });
-  audioSamplerOpenBrowser?.addEventListener("click", () => {
-    selectAudioRightPanel("browser");
-  });
   audioRightImport?.addEventListener("click", () => {
     audioDeckFileInput?.click();
   });
@@ -38492,17 +38204,11 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
         setPanel("game-build");
         clickElement(documentRef, "#draw2GameBuildManifest");
         break;
-      case "audio-editor-piano":
-        clickElement(documentRef, '[data-audio-editor-tab="PIANO"]');
+      case "audio-editor-roll":
+        clickElement(documentRef, '[data-audio-editor-tab="ROLL"]');
         break;
-      case "audio-editor-wave":
-        clickElement(documentRef, '[data-audio-editor-tab="WAVE"]');
-        break;
-      case "audio-editor-drum":
-        clickElement(documentRef, '[data-audio-editor-tab="DRUM"]');
-        break;
-      case "audio-editor-sampler":
-        clickElement(documentRef, '[data-audio-editor-tab="SAMPLER"]');
+      case "audio-editor-draw":
+        clickElement(documentRef, '[data-audio-editor-tab="DRAW"]');
         break;
       case "audio-panel-editor":
         setPanel("audio");

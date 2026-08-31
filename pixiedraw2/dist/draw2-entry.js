@@ -17433,7 +17433,7 @@ function loadAdvancedModule() {
 }
 function loadWorkspaceModule() {
   const workspaceChunkUrl = new URL("wp180-workspace.js", import.meta.url);
-  workspaceChunkUrl.searchParams.set("v", "20260831-adjustable-rails-v1");
+  workspaceChunkUrl.searchParams.set("v", "20260901-audio-editor-animation-v1");
   workspaceModulePromise ??= import(workspaceChunkUrl.href);
   return workspaceModulePromise;
 }
@@ -22426,6 +22426,19 @@ window.addEventListener("draw2:audio-monitor-state", (event) => {
     syncMiniPreviewLayout();
     syncMiniPreviewPlaybackControl();
   }
+});
+window.addEventListener("draw2:audio-editor-state", (event) => {
+  const detail = event.detail;
+  if (detail?.editor !== "DRAW") return;
+  if (workspaceFrameElement?.dataset.creatorMode !== "AUDIO") return;
+  const frameId = state.timeline.frameOrder.includes(timelineSession.activeFrameId) ? timelineSession.activeFrameId : state.timeline.frameOrder[0];
+  if (frameId === void 0) {
+    drawAudioDrawPreviewProjection();
+    return;
+  }
+  playbackFrameId = frameId;
+  canvas.dataset.playbackFrameId = frameId;
+  void presentAudioLinkedPlaybackFrame(frameId);
 });
 window.addEventListener("draw2:audio-frame-sync", (event) => {
   const detail = event.detail;

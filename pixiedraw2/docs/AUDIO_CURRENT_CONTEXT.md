@@ -22,14 +22,14 @@ index.html
   -> dist/wp180-workspace.js
   -> bootstrapDraw2Workspace()
   -> PCでAUDIOを選択
-  -> Audio Timeline / Piano Roll / local preview
+  -> Audio Timeline / MIDI Roll / DRAW preview / local preview
 ```
 
 実際のAudio UIは次のファイルで構成される。
 
 | ファイル                                   | 現在の責務                                                                                        |
 | ------------------------------------------ | ------------------------------------------------------------------------------------------------- |
-| `index.html`                               | Audio mode deck、Piano Roll、Timeline、Clip、Mixer、Automation、Marker、SettingsのDOM             |
+| `index.html`                               | Audio mode deck、MIDI Roll、DRAW preview、Timeline、Clip、Mixer、Automation、Marker、SettingsのDOM |
 | `src/draw2-entry.ts`                       | `wp180-workspace.js`の動的ロードとEntry起動                                                       |
 | `src/wp180-workspace-ui.ts`                | Audio状態、DOM描画、入力イベント、Draw同期、再生制御                                              |
 | `src/workspace/project-manifest.ts`        | Draw/Audio/Game共通のProject ID、Manifest、module pointer、migration status                |
@@ -102,7 +102,7 @@ FPS       24
 BPM       120
 Meter     4/4
 PPQ       480
-Quantize  1/16（Piano Rollの配置・ドラッグ時にSnap。Offは自由Tick）
+Quantize  1/16（MIDI Rollの配置・ドラッグ時にSnap。Offは自由Tick）
 Frame     256（下部Timelineの安全Window）
 ```
 
@@ -141,13 +141,13 @@ bootstrap baselineとしてJournalへ入れず、最初のユーザー編集か�
 
 ## 5. UIとデータの実態
 
-- Piano RollはA0〜C8の88鍵。
-- Piano RollはProject全体の連続したTick軸を横スクロールでき、初期表示だけ1小節を基準にする。
-- Piano Rollのノート位置・長さはPPQ Tickを正本とし、QuantizeはOff、1/4、1/8、1/16、1/32、1/64を選べる。ノート長プリセットは1/64（30 Tick）から2小節までで、Offではクリック位置を丸めずに保存する。
+- MIDI RollはA0〜C8の88鍵。
+- MIDI RollはProject全体の連続したTick軸を横スクロールでき、初期表示だけ1小節を基準にする。
+- MIDI Rollのノート位置・長さはPPQ Tickを正本とし、QuantizeはOff、1/4、1/8、1/16、1/32、1/64を選べる。ノート長プリセットは1/64（30 Tick）から2小節までで、Offではクリック位置を丸めずに保存する。
 - 軽量音源カタログはPiano、Electric Piano、Organ、Guitar、Electric Guitar、Bass、Strings、Violin、Cello、Harp、Marimba、Kalimba、Vibraphone、Xylophone、Celesta、Tubular Bells、Steel Drum、Flute、Clarinet、Saxophone、Trumpet、Brass、Synth Lead、Synth Pad、Chip、Drums、Tambourine、Shakerを含む。追加時は必要なレーンだけを生成する。
 - 上記の音源名は現段階では5種類のWeb Audio手続き音（pulse、triangle、saw、noise）へ遅延マッピングする軽量ボイスであり、巨大なサンプルバンクを初期読込しない。高品位サンプル／奏法切替は別の音源アセットを追加できる境界にしている。
-- Audioは上部Transport、左Track Navigator、中央Timeline＋下部Piano Roll、右Inspector、必要時だけ開く下部Detail Deckの5ゾーンで構成する。左はBrowser／Mixer／FXの要約ではなく、BGM/SFX/Voiceと選択済みMIDIレーンのナビゲーションを担当する。その他のパネルは左の＋から必要時だけ追加する。
-- Track追加は常設セレクトから即時追加するのではなく、`＋ Track`からAudio Track、Instrument Track、Drum Trackのテンプレートを選ぶDAW型ポップオーバーを使う。音源の追加とレーンの生成を一つの操作にまとめ、追加後は新しいレーンを選択状態にする。
+- Audioは上部Transport、左Track Navigator、中央Timeline＋MIDI Roll／DRAW preview、右Inspector、必要時だけ開く下部Detail Deckの5ゾーンで構成する。左はBrowser／Mixer／FXの要約ではなく、BGM/SFX/Voiceと選択済みMIDIレーンのナビゲーションを担当する。その他のパネルは左の＋から必要時だけ追加する。
+- Track追加は常設セレクトから即時追加するのではなく、`＋ Track`からAudio TrackまたはInstrument Trackのテンプレートを選ぶDAW型ポップオーバーを使う。DrumsもInstrument TrackとしてMIDI Rollへ追加し、音源の追加とレーンの生成を一つの操作にまとめる。追加後は新しいレーンを選択状態にする。
 - 論理上はProjectのTick×88音域だが、DOMはViewport周辺のcanvasタイルだけを描画する。
 - `draw2-audio-midi-canvas-layer`が全体のスクロール領域を保持し、空セルのbuttonを全件生成しない。
 - 仮想化の固定値は行高20px、鍵盤列44px、行overscan 4、列overscan 3。
@@ -156,18 +156,17 @@ bootstrap baselineとしてJournalへ入れず、最初のユーザー編集か�
 - 空セルにはノート情報を付与せず、生成コストを抑える。
 - ノート追加・選択・削除・複製・長さ・Velocity変更はUIの`audioMidiNotes`へ即時反映し、同じ操作をAudio-200
   Journalへ順序付けて反映する。
-- Piano Rollはクリック選択、ドラッグ入力、Delete／Backspace、右クリック削除、Ctrl／⌘+D複製を使う。
-- Drum Stepはクリック切替、ポインタドラッグによる連続ペイント／消去、右クリック消去を使う。
+- MIDI Rollはクリック選択、ドラッグ入力、Delete／Backspace、右クリック削除、Ctrl／⌘+D複製を使う。Drumsも同じMIDIノート編集経路を使う。
 - DrawのFrame/FPSは`MutationObserver`でAudioへ同期できる。
 - Playheadは`setInterval()`でフレームを進める。
 
 ### 5.1 P0表示負荷対策
 
-`src/wp180-workspace-ui.ts`の`renderAudioMidiGrid()`は、現在のスクロール位置からTickの表示範囲を計算し、Piano
+`src/wp180-workspace-ui.ts`の`renderAudioMidiGrid()`は、現在のスクロール位置からTickの表示範囲を計算し、MIDI
 Rollの可視canvasタイルだけを生成する。スクロールは`requestAnimationFrame()`でまとめて再描画し、再描画前後の`scrollTop`/`scrollLeft`を維持する。ノートの追加・削除・選択・複製・Velocity変更・フレーム同期はMap/イベント経路を使用する。
 
 Safari実測JSON（`/Users/tsukadareine/Downloads/index.html-recording.json`）では、変更前のPaint
-8,559件中8,453件が1,724×1,780pxの巨大Paintだった。現在のPiano Rollは空セルのbuttonを全件生成せず、Tick軸の可視範囲をcanvasタイルへ描画する。Safari収録の再取得はまだ行っていないため、Paint時間の改善値は未確定である。
+8,559件中8,453件が1,724×1,780pxの巨大Paintだった。現在のMIDI Rollは空セルのbuttonを全件生成せず、Tick軸の可視範囲をcanvasタイルへ描画する。Safari収録の再取得はまだ行っていないため、Paint時間の改善値は未確定である。
 
 ## 6. 再生経路
 
@@ -190,7 +189,7 @@ cacheを必要時に再構築する。HTMLAudioのlocal previewはMixer Runtime�
 Audio-210は再生前にEvent GraphとPlayback Planを検証する。host-neutralなDecode／
 Export adapter自体はこのEntryの権威境界へ接続しない。
 
-### Piano Roll / Chip Synth
+### MIDI Roll / Chip Synth
 
 ```text
 Piano Roll notes -> SampleAccurateScheduler lookahead queue
@@ -215,7 +214,7 @@ Previewの音符タイミングには使用しない。Schedulerのlookaheadは1
 - Mixerの各TrackはAudio-200のcanonical Mixer channelへ解決される。GainはdBから
   `gainMilliDb`、Panは-1〜+1から`panMilli`（-1000〜+1000）へ固定小数化し、
   Mute/Soloと一緒に1つの`MIXER_REPLACE` Journal commandへ記録する。
-- Mixer UIはBGM/SFX/VoiceとPiano Rollのinstrument Trackを同じcanonical graphへ
+- Mixer UIはBGM/SFX/VoiceとMIDI Rollのinstrument Trackを同じcanonical graphへ
   投影する。Notes Previewとlocal clip previewも同じruntime graphを通る。
 - Runtime Soloは「1つでもSoloがあればSolo Trackだけ」、Muteは常に優先する。
 - Runtime
@@ -223,7 +222,7 @@ Previewの音符タイミングには使用しない。Schedulerのlookaheadは1
   Web Audio nodeを保存しない。
 - AutomationのGain/Pan/Filterはlocal pointのみ。
 - Metronomeはbar gridのPreview中にbrowser-local clickを発音する。
-- QuantizeはPiano Rollのnote追加・ドラッグ時に音楽グリッドへSnapする。
+- QuantizeはMIDI Rollのnote追加・ドラッグ時に音楽グリッドへSnapする。
 - Clip Libraryの`Use`は選択Trackを変更し、新規import・録音・Automationの対象へ反映する。
 - Track追加はAudio-200のcanonical `TRACK_ADD` JournalとProject autosaveへ接続する。
 - Track追加の表示基準は、一般的なDAWに合わせて「Track Type → Source / Instrument → Track created and selected」の順とする。将来のBus／Aux／VCA、外部MIDI、入力・出力ルーティングはこのテンプレート境界へ追加し、未接続の機能を先に表示しない。
@@ -277,7 +276,7 @@ PXD全体を再生成しない。PXDは明示的な持ち運び・バックア�
 | AUDIO-210 | Event Graph、Preview、Playback、Decode、Export契約                         | Event Graph／Preview前Playback PlanをWorkspaceへ接続。host Decode／Export adapterは未接続 |
 | AUDIO-220 | Package、License、Provenance、Dependency Lock                              | PXD v2のAudio entry/hash境界へ接続。License/販売は未接続                                                  |
 | AUDIO-230 | Device、Geometry、Projection、Performance Counter                          | 契約・テストのみ                                                                                            |
-| AUDIO-240 | Gate、Evidence、Piano Roll、ChipTune、Synth                                | Piano Roll/ChipTune/Synthのみ直接利用                                                                       |
+| AUDIO-240 | Gate、Evidence、MIDI Roll、ChipTune、Synth                                | MIDI Roll/ChipTune/Synthのみ直接利用                                                                       |
 | WP-190    | 別系統のAudio Project/Revision/Bridge契約                                  | `?audio=on`でBridgeだけlazy load                                                                            |
 
 `?audio=on`はWP-190 bundleをロードするだけで、Audio-200
@@ -286,7 +285,7 @@ modeのローカルUI表示条件とは別のフラグである。
 
 ## 9. 端末別の現在状態
 
-- PC: 専用AUDIO mode、Audio Timeline、Piano Rollを表示可能。
+- PC: 専用AUDIO mode、Audio Timeline、MIDI Roll、DRAW previewを表示可能。
 - Tablet/Mobile: 専用Audio mode
   deckはmountしない。既存の汎用Timeline投影とこのAudio editorを混同しない。
 - 2026-08-21に試作した専用Mobile IAは廃止済みで、現在のRuntime Entryには読み込まない。
@@ -308,7 +307,7 @@ deno task test:wp190
 
 ## 11. 現在の結論
 
-現在のAudioは「Drawのフレームに同期するPiano Roll／sample-accurate Chip Synth
+現在のAudioは「Drawのフレームに同期するMIDI Roll／DRAW preview／sample-accurate Chip Synth
 Preview／Audio Clip preview」に加え、Audio-200のcanonical Project State、Asset
 Catalog、非破壊Clip操作、Journal、Checkpointをmetadata-onlyでIndexedDBへ保存・
 復元する。File importは検証済みRevisionをOPFSへ保存し、OPFS非対応時は明示的な

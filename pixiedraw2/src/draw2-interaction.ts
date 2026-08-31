@@ -10,12 +10,17 @@
 import {
   type BasicTool,
   type ColoredPixel,
-  createPathWriteSet,
   createWriteSet,
+  normalizeToolOptions,
   type RasterBounds,
+  stampBrush,
   type ToolOptions,
 } from "./draw2-basic-tools.ts";
-import type { PixelPoint } from "./draw2-core.ts";
+import {
+  interpolatePixelLine,
+  MAX_INTERPOLATED_STROKE_PIXELS,
+  type PixelPoint,
+} from "./draw2-core.ts";
 import { StrokeInputController } from "./fp-006/input-state.ts";
 import type {
   EditorInteractionState,
@@ -155,12 +160,39 @@ function samePoint(left: PixelPoint | undefined, right: PixelPoint): boolean {
   return left?.x === right.x && left.y === right.y;
 }
 
+function clampPoint(point: PixelPoint, bounds: RasterBounds): PixelPoint {
+  return {
+    x: Math.max(0, Math.min(bounds.width - 1, Math.round(point.x))),
+    y: Math.max(0, Math.min(bounds.height - 1, Math.round(point.y))),
+  };
+}
+
+function previewPointKey(point: PixelPoint): string {
+  return `${point.x}:${point.y}`;
+}
+
+function isPathPreviewTool(tool: BasicTool): boolean {
+  return tool === "pen" || tool === "eraser" || tool === "pixel-pen";
+}
+
+function sortedColoredPixels(
+  writes: readonly ColoredPixel[],
+): readonly ColoredPixel[] {
+  return [...writes].sort((left, right) =>
+    left.y - right.y || left.x - right.x
+  );
+}
+
 /** One transient tool lifecycle; it never mutates Canonical Project/Raster. */
 export class ToolSession {
   readonly #options: ToolSessionOptions;
   readonly #tracePolicy: TracePolicy;
+  readonly #pathPreviewOptions: ToolOptions;
   readonly #points: PixelPoint[] = [];
+  readonly #previewWritesCache: ColoredPixel[] = [];
+  readonly #previewWriteKeys = new Set<string>();
   #lifecycle: ToolSessionLifecycle = "NEW";
+  #previewInterpolatedPixelCount = 0;
 
   constructor(options: ToolSessionOptions) {
     this.#options = {
@@ -170,6 +202,16 @@ export class ToolSession {
         : { toolOptions: { ...options.toolOptions } }),
     };
     this.#tracePolicy = tracePolicyForTool(options.tool);
+    this.#pathPreviewOptions = normalizeToolOptions(
+      options.tool === "pixel-pen"
+        ? {
+          ...(options.toolOptions ?? {}),
+          brushSize: 1,
+          brushShape: "square",
+          pattern: "solid",
+        }
+        : options.toolOptions,
+    );
   }
 
   get lifecycle(): ToolSessionLifecycle {
@@ -202,13 +244,20 @@ export class ToolSession {
     this.#require("NEW", "begin");
     this.#points.push(point);
     this.#lifecycle = "ACTIVE";
+    if (isPathPreviewTool(this.#options.tool)) {
+      this.#appendPathPreview(undefined, point);
+    }
     return this.snapshot();
   }
 
   update(point: PixelPoint): ToolSessionSnapshot {
     this.#require("ACTIVE", "update");
     if (!samePoint(this.#points[this.#points.length - 1], point)) {
+      const previous = this.#points[this.#points.length - 1];
       this.#points.push(point);
+      if (isPathPreviewTool(this.#options.tool)) {
+        this.#appendPathPreview(previous, point);
+      }
     }
     return this.snapshot();
   }
@@ -252,6 +301,9 @@ export class ToolSession {
   cancel(reason: string): ToolSessionCancellation {
     this.#require("ACTIVE", "cancel");
     this.#points.length = 0;
+    this.#previewWritesCache.length = 0;
+    this.#previewWriteKeys.clear();
+    this.#previewInterpolatedPixelCount = 0;
     this.#lifecycle = "CANCELLED";
     return {
       sessionId: this.#options.sessionId,
@@ -272,6 +324,9 @@ export class ToolSession {
     if (this.#lifecycle !== "ACTIVE" || this.#tracePolicy === "IMMEDIATE") {
       return [];
     }
+    if (isPathPreviewTool(this.#options.tool)) {
+      return this.#previewWritesCache;
+    }
     return this.#writeSet();
   }
 
@@ -286,20 +341,11 @@ export class ToolSession {
       ) {
         return [];
       }
-      return createPathWriteSet(
-        this.#options.tool === "pixel-pen" ? "pen" : this.#options.tool,
-        this.#points,
-        this.#options.colorIndex,
-        this.#options.tool === "pixel-pen"
-          ? {
-            ...(this.#options.toolOptions ?? {}),
-            brushSize: 1,
-            brushShape: "square",
-            pattern: "solid",
-          }
-          : this.#options.toolOptions ?? {},
-        this.#options.bounds,
-      );
+      // The transient path is accumulated segment-by-segment as input
+      // arrives. Sorting is deferred until commit so pointermove stays close
+      // to O(the newly traversed pixels), rather than rebuilding the whole
+      // path for every sample.
+      return sortedColoredPixels(this.#previewWritesCache);
     }
     return createWriteSet(
       this.#options.tool,
@@ -310,12 +356,61 @@ export class ToolSession {
       this.#options.bounds,
     );
   }
+
+  #appendPathPreview(
+    from: PixelPoint | undefined,
+    to: PixelPoint,
+  ): void {
+    const start = clampPoint(from ?? to, this.#options.bounds);
+    const end = clampPoint(to, this.#options.bounds);
+    const remaining = MAX_INTERPOLATED_STROKE_PIXELS -
+      this.#previewInterpolatedPixelCount;
+    if (remaining <= 0) return;
+    let segment: readonly PixelPoint[];
+    try {
+      segment = interpolatePixelLine(start, end);
+    } catch {
+      // Preview input is disposable. A malformed or oversized segment must
+      // never strand the active pointer session; canonical commit validation
+      // remains responsible for rejecting the same invalid gesture.
+      return;
+    }
+    const newSegment = from === undefined ? segment : segment.slice(1);
+    const boundedSegment = newSegment.length > remaining
+      ? newSegment.slice(0, remaining)
+      : newSegment;
+    this.#previewInterpolatedPixelCount += boundedSegment.length;
+    const colorIndex = this.#options.tool === "eraser"
+      ? 0
+      : this.#options.colorIndex;
+    for (
+      const point of stampBrush(
+        boundedSegment,
+        this.#pathPreviewOptions,
+        this.#options.bounds,
+      )
+    ) {
+      const key = previewPointKey(point);
+      if (this.#previewWriteKeys.has(key)) continue;
+      this.#previewWriteKeys.add(key);
+      this.#previewWritesCache.push({ ...point, colorIndex });
+    }
+  }
 }
 
 export interface InteractionKernelOptions
   extends Omit<ToolSessionOptions, "sessionId"> {
   readonly nextSessionId?: () => string;
   readonly onPreview?: (preview: ToolSessionSnapshot | undefined) => void;
+  /**
+   * Receives the final transient projection before the canonical commit is
+   * queued. Adapters can keep that projection visible while async persistence
+   * and rendering complete.
+   */
+  readonly onCommitQueued?: (
+    commit: ToolSessionCommit,
+    preview: ToolSessionSnapshot,
+  ) => void;
   readonly onCommit: (commit: ToolSessionCommit) => void | Promise<void>;
   readonly onCommitError?: CommitErrorHandler;
   readonly commitIngress?: SerializedCommitIngress;
@@ -435,8 +530,10 @@ export class Draw2InteractionKernel {
   #commit(): void {
     const session = this.#session;
     if (session === undefined) return;
+    const preview = session.snapshot();
     const commit = session.commit();
     this.#session = undefined;
+    this.#options.onCommitQueued?.(commit, preview);
     this.#options.onPreview?.(undefined);
     this.#commitIngress.enqueue(
       commit,

@@ -5081,11 +5081,23 @@ export function bootstrapDraw2Workspace(
     value === "ROLL" || value === "DRAW";
   const isAudioRightTab = (value: string): value is AudioRightTab =>
     value === "inspector" || value === "browser" || value === "master";
+  const dispatchAudioEditorState = (
+    tab: AudioEditorTab,
+    force = false,
+  ): void => {
+    if (tab !== "DRAW") return;
+    windowRef.dispatchEvent(
+      new CustomEvent("draw2:audio-editor-state", {
+        detail: { editor: tab, force },
+      }),
+    );
+  };
   const selectAudioEditor = (
     tab: AudioEditorTab,
     automatic = false,
   ): void => {
     if (automatic && audioEditorPinned) return;
+    const editorChanged = audioEditorActiveTab !== tab;
     audioEditorActiveTab = tab;
     root.dataset.audioEditor = tab;
     for (const button of audioEditorTabs) {
@@ -5099,6 +5111,18 @@ export function bootstrapDraw2Workspace(
       surface.hidden = !selected;
       surface.inert = !selected;
       surface.setAttribute("aria-hidden", String(!selected));
+      surface.classList.toggle("is-active", selected);
+      if (selected) {
+        if (editorChanged) {
+          // Reflow only on an actual editor switch so Safari reliably starts
+          // the short surface-enter animation after hidden is removed.
+          surface.classList.remove("is-entering");
+          void surface.offsetWidth;
+          surface.classList.add("is-entering");
+        }
+      } else {
+        surface.classList.remove("is-active", "is-entering");
+      }
     }
     if (audioEditorSelection !== undefined) {
       const instrumentLabel = AUDIO_INSTRUMENTS.find((instrument) =>
@@ -5117,6 +5141,7 @@ export function bootstrapDraw2Workspace(
           : "Press Monitor or select a Draw frame to follow the Audio playhead.",
       );
     }
+    if (editorChanged) dispatchAudioEditorState(tab);
   };
   const selectAudioRightPanel = (tab: AudioRightTab): void => {
     audioRightActiveTab = tab;
@@ -12615,7 +12640,7 @@ export function bootstrapDraw2Workspace(
       const editor = audioEditorForInstrument(instrument.id);
       // A timeline lane click is an explicit user selection. Do not treat it
       // as an automatic refresh: the selected instrument must drive the
-      // lower editor, including Drum Roll for the drum lane.
+      // lower editor, including the shared MIDI Roll for the drum lane.
       selectAudioEditor(editor);
       selectAudioRightPanel("inspector");
       syncAudioRightInspector(
@@ -13958,7 +13983,7 @@ export function bootstrapDraw2Workspace(
     pitchMidi?: number,
   ): ChipSynthPresetId => {
     if (instrument === "CHIP") return audioChipPresetId;
-    // Keep the Drum Grid lightweight: kit profiles select bounded existing
+    // Keep drum voices lightweight: kit profiles select bounded existing
     // synth presets, so switching kits never loads a sample bank.
     if (instrument === "DRUMS") {
       const pitch = Math.trunc(pitchMidi ?? 38);
@@ -15411,6 +15436,12 @@ export function bootstrapDraw2Workspace(
     renderAudioAnimationCells();
     renderAudioMidiGrid();
     renderAudioMidiExpression();
+    if (audioEditorActiveTab === "DRAW") {
+      // A mode return can keep DRAW selected while the surface was hidden.
+      // Request one authoritative frame projection so the dedicated canvas
+      // never depends on whatever the hidden main canvas painted last.
+      dispatchAudioEditorState("DRAW", true);
+    }
     // Keep the first Audio paint limited to the active editor. Timeline rows,
     // custom status, and optional detail lanes yield to the next task so the
     // mode switch can return control before those bounded projections mount.
@@ -16851,11 +16882,7 @@ export function bootstrapDraw2Workspace(
         syncAudioMidiStatus();
         setModeDeckStatus(
           "audio",
-          `${
-            audioEditorForInstrument(value) === "DRUM"
-              ? "Drum Roll"
-              : "Piano Roll"
-          } · ${
+          `MIDI Roll · ${
             AUDIO_INSTRUMENTS.find((item) => item.id === value)?.label ?? value
           } lane selected · edit any bar in the project`,
         );
@@ -16863,7 +16890,7 @@ export function bootstrapDraw2Workspace(
           `Instrument: ${
             AUDIO_INSTRUMENTS.find((item) => item.id === value)?.label ?? value
           }`,
-          "Piano Roll lane selected · Draw frame timing remains unchanged",
+          "MIDI Roll lane selected · Draw frame timing remains unchanged",
         );
       }
       return;
@@ -16898,11 +16925,7 @@ export function bootstrapDraw2Workspace(
         syncAudioMidiStatus();
         setModeDeckStatus(
           "audio",
-          `${
-            audioEditorForInstrument(value) === "DRUM"
-              ? "Drum Roll"
-              : "Piano Roll"
-          } · ${
+          `MIDI Roll · ${
             AUDIO_INSTRUMENTS.find((item) => item.id === value)?.label ?? value
           } · F${frame + 1} selected · edit any bar in the project`,
         );
@@ -16910,7 +16933,7 @@ export function bootstrapDraw2Workspace(
           `Instrument: ${
             AUDIO_INSTRUMENTS.find((item) => item.id === value)?.label ?? value
           } · F${frame + 1}`,
-          "Piano Roll is Tick-based · Draw FPS is a monitor projection",
+          "MIDI Roll is Tick-based · Draw FPS is a monitor projection",
         );
       }
       return;
