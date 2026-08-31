@@ -10,7 +10,7 @@
     <title>PiXiEEDstudio — Studio</title>
     <link
       rel="stylesheet"
-      href="./assets/draw2-shell.min.css?v=20260901-idraw-frame-border-v2"
+      href="./assets/draw2-shell.min.css?v=20260901-audio-midi-tools-v1"
     >
     <link
       rel="stylesheet"
@@ -2664,6 +2664,39 @@
                     value="0.82"
                     aria-label="MIDI note velocity"
                   ><output id="draw2AudioMidiVelocityValue">82%</output></label>
+                <div
+                  class="draw2-audio-midi-tools"
+                  role="toolbar"
+                  aria-label="MIDI note tools"
+                >
+                  <button
+                    class="draw2-tool-button is-active"
+                    data-audio-midi-tool="pen"
+                    type="button"
+                    aria-pressed="true"
+                    title="Pen · click or drag to place/lengthen notes"
+                  >
+                    <svg class="draw2-ui-icon draw2-tool-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-pen"></use></svg><span>Pen</span>
+                  </button>
+                  <button
+                    class="draw2-tool-button"
+                    data-audio-midi-tool="eraser"
+                    type="button"
+                    aria-pressed="false"
+                    title="Eraser · click or drag to remove notes"
+                  >
+                    <svg class="draw2-ui-icon draw2-tool-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-eraser"></use></svg><span>Eraser</span>
+                  </button>
+                  <button
+                    class="draw2-tool-button"
+                    data-audio-midi-tool="select"
+                    type="button"
+                    aria-pressed="false"
+                    title="Select · drag a rectangle to select notes"
+                  >
+                    <svg class="draw2-ui-icon draw2-tool-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-select-rect"></use></svg><span>Select</span>
+                  </button>
+                </div>
                 <div
                   class="draw2-audio-midi-actions"
                   role="group"
@@ -9698,7 +9731,7 @@
     <script src="../scripts/pixieed-account-supabase-client.js?v=20260828-staging-config-v1"></script>
     <script
       type="module"
-      src="./dist/draw2-entry.js?v=20260901-audio-editor-animation-v1"
+      src="./dist/draw2-entry.js?v=20260901-audio-midi-tools-v1"
     ></script>
     <script
       type="module"

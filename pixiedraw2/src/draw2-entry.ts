@@ -519,7 +519,7 @@ function loadAdvancedModule(): Promise<AdvancedModule> {
 
 function loadWorkspaceModule(): Promise<WorkspaceModule> {
   const workspaceChunkUrl = new URL("wp180-workspace.js", import.meta.url);
-  workspaceChunkUrl.searchParams.set("v", "20260901-mode-vt-doubleinvoke-fix-v1");
+  workspaceChunkUrl.searchParams.set("v", "20260901-audio-midi-tools-v1");
   workspaceModulePromise ??= import(
     workspaceChunkUrl.href
   ) as unknown as Promise<
