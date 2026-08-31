@@ -21572,10 +21572,25 @@ export function bootstrapDraw2Workspace(
     // unconditionally -- including when the mode was already current, which
     // some callers rely on to force a panel reset. Keep that behavior
     // identical here; only the *wrapping* in a view transition is
-    // conditional, since animating a no-visual-change frame is harmless but
-    // pointless.
+    // conditional.
+    //
+    // A same-mode call must never START a *new* view transition. Switching
+    // modes changes #draw2WorkspaceFrame's own box size (rail/dock widths
+    // differ per mode), so the ResizeObserver a few hundred lines up reacts
+    // to every real mode switch by scheduling reprojectCreatorMode() on the
+    // next frame -- which recomputes the (by then already-applied, so now
+    // unchanged) mode and calls right back in here. If that reentrant,
+    // nothing-actually-changed call were also wrapped in
+    // startViewTransition(), it would finish/skip the *real*, still-playing
+    // transition from the original click early (per spec, starting a new
+    // view transition ends the active one) after only ~60-70ms of its
+    // ~400ms crossfade. That is what made switching to iDRAW look
+    // unanimated: iDRAW's smaller old/new visual delta made a crossfade
+    // truncated to ~65ms imperceptible, while iAUDIO/iGAME's busier
+    // layouts still read as "smooth" even cut that short.
     const vtDocument = documentRef as unknown as ViewTransitionCapableDocument;
     if (
+      mode === currentCreatorMode() ||
       typeof vtDocument.startViewTransition !== "function" ||
       prefersReducedMotionForModeSwitch()
     ) {

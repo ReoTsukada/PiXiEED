@@ -30413,7 +30413,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
   };
   const setCreatorMode = (mode, activateSurface = true) => {
     const vtDocument = documentRef;
-    if (typeof vtDocument.startViewTransition !== "function" || prefersReducedMotionForModeSwitch()) {
+    if (mode === currentCreatorMode() || typeof vtDocument.startViewTransition !== "function" || prefersReducedMotionForModeSwitch()) {
       applyCreatorModeChange(mode, activateSurface);
       return;
     }
