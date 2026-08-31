@@ -22,8 +22,9 @@
   <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet">
   <script src="../scripts/ad-account-control.js?v=20260719-no-ad-fallback1"></script>
   <link rel="stylesheet" href="../site/landing.css?v=2026.07.15-home-clear-entry1">
+  <link rel="stylesheet" href="../site/pixieed-v2.css?v=20260831-v2-1">
 </head>
-<body>
+<body class="pxv2">
   <header class="site-header" aria-label="top-nav">
       <div class="header-inner header-inner--app">
         <button class="brand" id="openProfilePanel" type="button">
@@ -41,27 +42,25 @@
     
 
     <main class="page-shell home-app">
-      <div class="info-page">
-        <section class="card info-hero">
-          <p class="info-hero__eyebrow">Notices</p>
-          <h1 class="info-hero__title" data-i18n-key="noticeTitle">お知らせをまとめて確認できます</h1>
-          <p class="info-hero__copy" data-i18n-key="noticeIntro">運営からの案内とPiXiEED Bridgeの進捗をまとめています。接続仕様や対応状況はヘルプで確認できます。</p>
-          <div class="inline-actions">
-            <a class="button" href="../help/index.html#bridge" data-i18n-key="noticeBridgeButton">Bridge概要を見る</a>
-            <a class="button-secondary" href="../index.html" data-i18n-key="noticeHomeButton">ホームに戻る</a>
+      <div class="info-page pxv2">
+        <section class="pxv2-section" style="padding:24px 0 0;">
+          <div class="pxv2-card" style="padding:32px;">
+          <p class="eyebrow">Notices</p>
+          <h1 data-i18n-key="noticeTitle" style="font-size:clamp(24px,4vw,32px); margin:6px 0 10px;">お知らせをまとめて確認できます</h1>
+          <p data-i18n-key="noticeIntro" style="color:var(--muted); max-width:56ch;">運営からの案内とPiXiEED Bridgeの進捗をまとめています。接続仕様や対応状況はヘルプで確認できます。</p>
+          <div style="display:flex; flex-wrap:wrap; gap:12px; margin-top:18px;">
+            <a class="pxv2-btn pxv2-btn-primary" href="../help/index.html#bridge" data-i18n-key="noticeBridgeButton">Bridge概要を見る</a>
+            <a class="pxv2-btn pxv2-btn-ghost" href="../index.html" data-i18n-key="noticeHomeButton">ホームに戻る</a>
+          </div>
           </div>
         </section>
 
-        <section class="card info-list" aria-label="お知らせ一覧" data-i18n-aria-label="noticeListAria">
-          <article class="info-card">
-            <div class="info-card__head">
-              <p class="info-card__eyebrow">Support</p>
-              <h2 class="info-card__title" data-i18n-key="noticeSupportTitle">サポートからサポートできます</h2>
-            </div>
-            <p class="info-card__copy" data-i18n-key="noticeSupportCopy">PiXiEEDの活動を応援したい場合は、ヘッダーのサポートからサポートできます。今後の改善や継続運営につながります。</p>
-            <div class="info-card__actions">
-              <a class="button-secondary" href="../index.html" data-i18n-key="noticeHomeButton2">ホームへ戻る</a>
-            </div>
+        <section class="pxv2-section" aria-label="お知らせ一覧" data-i18n-aria-label="noticeListAria" style="padding:8px 0 0;">
+          <article class="pxv2-card" style="padding:28px;">
+            <p class="eyebrow" style="margin-bottom:6px;">Support</p>
+            <h2 data-i18n-key="noticeSupportTitle" style="font-size:19px; margin:0 0 10px;">サポートからサポートできます</h2>
+            <p data-i18n-key="noticeSupportCopy" style="color:var(--muted); margin:0 0 16px;">PiXiEEDの活動を応援したい場合は、ヘッダーのサポートからサポートできます。今後の改善や継続運営につながります。</p>
+            <a class="pxv2-btn pxv2-btn-ghost" href="../index.html" data-i18n-key="noticeHomeButton2">ホームへ戻る</a>
           </article>
         </section>
       </div>

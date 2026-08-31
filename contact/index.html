@@ -24,6 +24,7 @@
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700&amp;family=Noto+Sans+JP:wght@400;700&amp;display=swap" rel="stylesheet"/>
 <link href="../styles.css" rel="stylesheet"/>
+<link href="../site/pixieed-v2.css?v=20260831-v2-1" rel="stylesheet"/>
 <script src="../scripts/ad-account-control.js?v=20260719-no-ad-fallback1"></script>
 <link href="../character-dots/mao1.png" rel="icon" type="image/png"/>  <style id="ads-safe">
   html, body {
@@ -119,7 +120,7 @@
 <script src="../scripts/ads-lazy.js?v=20260719-no-ad-fallback1"></script>
 <link rel="apple-touch-icon" href="/icon/PiXiEED.icon512.png"/>
 </head>
-<body class="contact-page">
+<body class="contact-page pxv2">
 <header class="site-header">
 <div class="site-brand">
 <a class="logo" href="../index.html">PiXiEED</a>
@@ -134,101 +135,109 @@
 </ul>
 </nav>
 </header>
-<main>
-<section class="hero hero--contact">
-<div class="hero-copy">
-<h1 data-i18n-key="contactTitle">お問い合わせ</h1>
-<p data-i18n-key="contactIntro">PiXiEEDの作品づくり、コミュニティ、マーケット、Bridgeについてのお問い合わせを受け付けています。</p>
-<div class="hero-cta">
-<a class="cta-primary" href="mailto:pixieed.arta@gmail.com" data-i18n-key="contactEmailAction">メールを送る</a>
-<a class="cta-secondary" href="https://x.com/PiXiEED_arta" rel="noopener" target="_blank" data-i18n-key="contactXAction">X のDM</a>
+<main class="pxv2">
+<section class="pxv2-section" style="padding-top:56px;">
+<div class="pxv2-shell" style="max-width:760px;">
+<p class="eyebrow">Contact</p>
+<h1 data-i18n-key="contactTitle" style="font-size:clamp(26px,4vw,38px);">お問い合わせ</h1>
+<p data-i18n-key="contactIntro" style="color:var(--muted); max-width:56ch;">PiXiEEDの作品づくり、コミュニティ、マーケット、Bridgeについてのお問い合わせを受け付けています。</p>
+<div style="display:flex; flex-wrap:wrap; gap:12px; margin-top:20px;">
+<a class="pxv2-btn pxv2-btn-primary" href="mailto:pixieed.arta@gmail.com" data-i18n-key="contactEmailAction">メールを送る</a>
+<a class="pxv2-btn pxv2-btn-ghost" href="https://x.com/PiXiEED_arta" rel="noopener" target="_blank" data-i18n-key="contactXAction">X のDM</a>
 </div>
 </div>
 </section>
-<section class="section" id="about-alt">
-<div class="section-inner">
-<h2 data-i18n-key="contactAbout">PiXiEEDについて</h2>
+
+<section class="pxv2-section" id="about-alt">
+<div class="pxv2-shell">
+<div class="pxv2-section-head">
+<h2 data-i18n-key="contactAbout" style="font-size:22px;">PiXiEEDについて</h2>
 <p data-i18n-key="contactAboutCopy">PiXiEEDは、作品をつくる人が制作・共有・発表までを楽しめる場所です。ドット絵や音楽、映像、ゲームなどの作品を、自由な形で広げられます。</p>
-<div class="content-grid" role="list">
-<article class="content-card" role="listitem">
-<h3 data-i18n-key="contactDot">作品づくり</h3>
-<p data-i18n-key="contactDotCopy">ドット絵、音楽、映像、ゲームなど、作品づくりについてのご相談を受け付けています。</p>
-<ul class="news-list">
-<li class="news-item" data-i18n-key="contactDotList1">作品を作る方法</li>
-<li class="news-item" data-i18n-key="contactDotList2">保存・共有について</li>
-<li class="news-item" data-i18n-key="contactDotList3">作品を公開する方法</li>
+</div>
+<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px;" role="list">
+<article class="pxv2-card" style="padding:22px;" role="listitem">
+<h3 data-i18n-key="contactDot" style="font-size:15.5px; margin:0 0 8px;">作品づくり</h3>
+<p data-i18n-key="contactDotCopy" style="color:var(--muted); font-size:13.5px; margin:0 0 12px;">ドット絵、音楽、映像、ゲームなど、作品づくりについてのご相談を受け付けています。</p>
+<ul style="margin:0; padding-left:18px; color:var(--muted); font-size:13px; display:grid; gap:4px;">
+<li data-i18n-key="contactDotList1">作品を作る方法</li>
+<li data-i18n-key="contactDotList2">保存・共有について</li>
+<li data-i18n-key="contactDotList3">作品を公開する方法</li>
 </ul>
 </article>
-<article class="content-card" role="listitem">
-<h3 data-i18n-key="contactWeb">マーケット</h3>
-<p data-i18n-key="contactWebCopy">素材の購入、販売、購入した素材の利用についてご案内します。</p>
-<ul class="news-list">
-<li class="news-item" data-i18n-key="contactWebList1">素材を探す・購入する</li>
-<li class="news-item" data-i18n-key="contactWebList2">作品を販売する</li>
-<li class="news-item" data-i18n-key="contactWebList3">利用条件を確認する</li>
+<article class="pxv2-card" style="padding:22px;" role="listitem">
+<h3 data-i18n-key="contactWeb" style="font-size:15.5px; margin:0 0 8px;">マーケット</h3>
+<p data-i18n-key="contactWebCopy" style="color:var(--muted); font-size:13.5px; margin:0 0 12px;">素材の購入、販売、購入した素材の利用についてご案内します。</p>
+<ul style="margin:0; padding-left:18px; color:var(--muted); font-size:13px; display:grid; gap:4px;">
+<li data-i18n-key="contactWebList1">素材を探す・購入する</li>
+<li data-i18n-key="contactWebList2">作品を販売する</li>
+<li data-i18n-key="contactWebList3">利用条件を確認する</li>
 </ul>
 </article>
-<article class="content-card" role="listitem">
-<h3 data-i18n-key="contactCollab">コミュニティと共有</h3>
-<p data-i18n-key="contactCollabCopy">投稿、コメント、作品の共有についてご案内します。</p>
-<ul class="news-list">
-<li class="news-item" data-i18n-key="contactCollabList1">作品を投稿する</li>
-<li class="news-item" data-i18n-key="contactCollabList2">コメントと交流</li>
-<li class="news-item" data-i18n-key="contactCollabList3">チームで作品を進める</li>
+<article class="pxv2-card" style="padding:22px;" role="listitem">
+<h3 data-i18n-key="contactCollab" style="font-size:15.5px; margin:0 0 8px;">コミュニティと共有</h3>
+<p data-i18n-key="contactCollabCopy" style="color:var(--muted); font-size:13.5px; margin:0 0 12px;">投稿、コメント、作品の共有についてご案内します。</p>
+<ul style="margin:0; padding-left:18px; color:var(--muted); font-size:13px; display:grid; gap:4px;">
+<li data-i18n-key="contactCollabList1">作品を投稿する</li>
+<li data-i18n-key="contactCollabList2">コメントと交流</li>
+<li data-i18n-key="contactCollabList3">チームで作品を進める</li>
 </ul>
 </article>
 </div>
 </div>
 </section>
-<section class="section" id="contact-methods">
-<div class="section-inner">
-<h2 data-i18n-key="contactMethods">お問い合わせ方法</h2>
+
+<section class="pxv2-section" id="contact-methods">
+<div class="pxv2-shell">
+<div class="pxv2-section-head">
+<h2 data-i18n-key="contactMethods" style="font-size:22px;">お問い合わせ方法</h2>
 <p data-i18n-key="contactMethodsCopy">ご都合のよい窓口からご連絡ください。内容を確認して順番にお返事します。</p>
-<div class="content-grid" role="list">
-<article class="content-card" role="listitem">
-<h3 data-i18n-key="contactEmail">メール</h3>
-<p data-i18n-key="contactEmailCopy">詳しい内容や画面の状況を伝える場合はメールをご利用ください。</p>
-<div class="contact-card__meta">
-<strong data-i18n-key="contactRecipientLabel">宛先</strong>
-<p><a href="mailto:pixieed.arta@gmail.com">pixieed.arta@gmail.com</a></p>
+</div>
+<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:16px;" role="list">
+<article class="pxv2-card" style="padding:22px;" role="listitem">
+<h3 data-i18n-key="contactEmail" style="font-size:15.5px; margin:0 0 8px;">メール</h3>
+<p data-i18n-key="contactEmailCopy" style="color:var(--muted); font-size:13.5px; margin:0 0 12px;">詳しい内容や画面の状況を伝える場合はメールをご利用ください。</p>
+<div style="border-top:1px solid var(--line); padding-top:10px; font-size:13px;">
+<strong data-i18n-key="contactRecipientLabel" style="display:block; color:var(--muted-2); font-size:11px; text-transform:uppercase; letter-spacing:.04em;">宛先</strong>
+<p style="margin:4px 0 0;"><a href="mailto:pixieed.arta@gmail.com">pixieed.arta@gmail.com</a></p>
 </div>
 </article>
-<article class="content-card" role="listitem">
-<h3 data-i18n-key="contactX">X (旧Twitter) DM</h3>
-<p data-i18n-key="contactXCopy">短いご質問やお知らせについてはこちらからご連絡ください。</p>
-<div class="contact-card__meta">
-<strong data-i18n-key="contactAccountLabel">アカウント</strong>
-<p><a href="https://x.com/PiXiEED_arta" rel="noopener" target="_blank">@PiXiEED_arta</a></p>
+<article class="pxv2-card" style="padding:22px;" role="listitem">
+<h3 data-i18n-key="contactX" style="font-size:15.5px; margin:0 0 8px;">X (旧Twitter) DM</h3>
+<p data-i18n-key="contactXCopy" style="color:var(--muted); font-size:13.5px; margin:0 0 12px;">短いご質問やお知らせについてはこちらからご連絡ください。</p>
+<div style="border-top:1px solid var(--line); padding-top:10px; font-size:13px;">
+<strong data-i18n-key="contactAccountLabel" style="display:block; color:var(--muted-2); font-size:11px; text-transform:uppercase; letter-spacing:.04em;">アカウント</strong>
+<p style="margin:4px 0 0;"><a href="https://x.com/PiXiEED_arta" rel="noopener" target="_blank">@PiXiEED_arta</a></p>
 </div>
 </article>
-<article class="content-card" role="listitem">
-<h3 data-i18n-key="contactProduction">PiXiEED Bridge</h3>
-<p data-i18n-key="contactProductionCopy">作品やプロジェクトの共有、使い方について確認したい点を添えてご連絡ください。</p>
-<div class="contact-card__meta">
-<strong data-i18n-key="contactScopeLabel">対応範囲</strong>
-<p data-i18n-key="contactScopeValue">作品共有、制作環境、マーケット、アカウント など</p>
+<article class="pxv2-card" style="padding:22px;" role="listitem">
+<h3 data-i18n-key="contactProduction" style="font-size:15.5px; margin:0 0 8px;">PiXiEED Bridge</h3>
+<p data-i18n-key="contactProductionCopy" style="color:var(--muted); font-size:13.5px; margin:0 0 12px;">作品やプロジェクトの共有、使い方について確認したい点を添えてご連絡ください。</p>
+<div style="border-top:1px solid var(--line); padding-top:10px; font-size:13px;">
+<strong data-i18n-key="contactScopeLabel" style="display:block; color:var(--muted-2); font-size:11px; text-transform:uppercase; letter-spacing:.04em;">対応範囲</strong>
+<p data-i18n-key="contactScopeValue" style="margin:4px 0 0; color:var(--muted);">作品共有、制作環境、マーケット、アカウント など</p>
 </div>
 </article>
-<article class="content-card" role="listitem">
-<h3 data-i18n-key="contactDeletion">アカウント削除・データ削除</h3>
-<p data-i18n-key="contactDeletionCopy">PiXiEED アプリや関連サービスのアカウント削除、投稿データ削除の依頼方法はこちらから確認できます。</p>
-<div class="contact-card__meta">
-<strong data-i18n-key="contactGuideLabel">案内ページ</strong>
-<p><a href="../account-deletion/index.html" data-i18n-key="contactDeletionLink">アカウント削除・データ削除案内</a></p>
+<article class="pxv2-card" style="padding:22px;" role="listitem">
+<h3 data-i18n-key="contactDeletion" style="font-size:15.5px; margin:0 0 8px;">アカウント削除・データ削除</h3>
+<p data-i18n-key="contactDeletionCopy" style="color:var(--muted); font-size:13.5px; margin:0 0 12px;">PiXiEED アプリや関連サービスのアカウント削除、投稿データ削除の依頼方法はこちらから確認できます。</p>
+<div style="border-top:1px solid var(--line); padding-top:10px; font-size:13px;">
+<strong data-i18n-key="contactGuideLabel" style="display:block; color:var(--muted-2); font-size:11px; text-transform:uppercase; letter-spacing:.04em;">案内ページ</strong>
+<p style="margin:4px 0 0;"><a href="../account-deletion/index.html" data-i18n-key="contactDeletionLink">アカウント削除・データ削除案内</a></p>
 </div>
 </article>
 </div>
 </div>
 </section>
-<section class="section section--accent" id="policy">
-<div class="section-inner">
-<h2 data-i18n-key="contactFaq">よくあるお問い合わせ</h2>
-<p data-i18n-key="contactFaqCopy">ご連絡の際は、困っていることと利用している画面をお知らせください。</p>
-<ul class="news-list">
-<li class="news-item" data-i18n-key="contactFaqList1">ログイン・マイページについて</li>
-<li class="news-item" data-i18n-key="contactFaqList2">作品の投稿・コメントについて</li>
-<li class="news-item" data-i18n-key="contactFaqList3">素材の購入・販売について</li>
-<li class="news-item" data-i18n-key="contactFaqList4">作品の共有について</li>
+
+<section class="pxv2-section" id="policy">
+<div class="pxv2-shell pxv2-card" style="padding:32px;">
+<h2 data-i18n-key="contactFaq" style="font-size:19px; margin:0 0 8px;">よくあるお問い合わせ</h2>
+<p data-i18n-key="contactFaqCopy" style="color:var(--muted); margin:0 0 14px;">ご連絡の際は、困っていることと利用している画面をお知らせください。</p>
+<ul style="margin:0; padding-left:18px; color:var(--muted); font-size:13.5px; display:grid; gap:6px;">
+<li data-i18n-key="contactFaqList1">ログイン・マイページについて</li>
+<li data-i18n-key="contactFaqList2">作品の投稿・コメントについて</li>
+<li data-i18n-key="contactFaqList3">素材の購入・販売について</li>
+<li data-i18n-key="contactFaqList4">作品の共有について</li>
 </ul>
 </div>
 </section>

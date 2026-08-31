@@ -1,0 +1,332 @@
+/*
+ * PiXiEED v2 front-end redesign — shared design system.
+ * Presentation only: no data-fetching, no auth, no payment logic here.
+ * Pages that already have live data (market/account) keep their existing
+ * <script> includes untouched; this file only restyles markup around them.
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Unbounded:wght@500;600;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=DotGothic16&display=swap');
+
+:root{
+  /* -- ink / paper -- */
+  --ink:#161522;
+  --ink-soft:#33314a;
+  --muted:#615d78;
+  --muted-2:#918dab;
+  --paper:#f5f3fb;
+  --surface:#ffffff;
+  --surface-raised:#ffffff;
+  --line:#e3e0f0;
+  --line-strong:#cfcbe6;
+
+  /* -- brand + mode colors -- */
+  --brand:#5b3df6;
+  --brand-ink:#ffffff;
+  --brand-soft:#ece8ff;
+  --idraw:#ff6a3d;
+  --idraw-soft:#ffe7dc;
+  --iaudio:#0f9d81;
+  --iaudio-soft:#d9f3ec;
+  --igame:#e83d8f;
+  --igame-soft:#fbe1ee;
+
+  --ok:#1a8a52;
+  --ok-soft:#dcf3e6;
+
+  --shadow-sm: 0 1px 2px rgba(22,21,34,.06);
+  --shadow-md: 0 8px 28px -12px rgba(22,21,34,.22);
+  --shadow-lg: 0 24px 64px -20px rgba(22,21,34,.32);
+
+  --radius-sm:10px;
+  --radius-md:16px;
+  --radius-lg:26px;
+  --radius-pill:999px;
+
+  --content-w:1160px;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark){
+  :root{
+    --ink:#f1eff9;
+    --ink-soft:#d8d5ea;
+    --muted:#a39fc0;
+    --muted-2:#716d8e;
+    --paper:#0e0d16;
+    --surface:#17151f;
+    --surface-raised:#1d1b28;
+    --line:#2c293a;
+    --line-strong:#3c384f;
+
+    --brand:#9284ff;
+    --brand-ink:#161522;
+    --brand-soft:#241f47;
+    --idraw:#ff8f6a;
+    --idraw-soft:#3a2416;
+    --iaudio:#4bdcc0;
+    --iaudio-soft:#0f2b25;
+    --igame:#f56bb0;
+    --igame-soft:#341227;
+
+    --ok:#49cd8b;
+    --ok-soft:#0f2b1e;
+
+    --shadow-sm: 0 1px 2px rgba(0,0,0,.4);
+    --shadow-md: 0 8px 28px -12px rgba(0,0,0,.55);
+    --shadow-lg: 0 24px 64px -20px rgba(0,0,0,.7);
+  }
+}
+
+*, *::before, *::after{ box-sizing:border-box; }
+
+html{ background:var(--paper); }
+
+body.pxv2{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
+  line-height:1.75;
+  -webkit-font-smoothing:antialiased;
+  padding-bottom:96px; /* clears the floating bottom-nav dock */
+}
+
+.pxv2 h1,.pxv2 h2,.pxv2 h3{
+  font-family:"Unbounded","Zen Kaku Gothic New",sans-serif;
+  font-weight:700;
+  letter-spacing:-0.01em;
+  text-wrap:balance;
+  margin:0;
+  color:var(--ink);
+}
+
+.pxv2 .eyebrow{
+  font-family:"DotGothic16","Unbounded",monospace;
+  font-size:12px;
+  letter-spacing:0.14em;
+  text-transform:uppercase;
+  color:var(--brand);
+  margin:0 0 10px;
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+}
+.pxv2 .eyebrow::before{
+  content:"";
+  width:7px;height:7px;
+  background:currentColor;
+  display:inline-block;
+}
+
+.pxv2 a{ color:inherit; }
+
+/* ---------- layout shell ---------- */
+.pxv2-shell{ max-width:var(--content-w); margin:0 auto; padding:0 24px; }
+.pxv2-section{ padding:76px 0; }
+.pxv2-section + .pxv2-section{ border-top:1px solid var(--line); }
+.pxv2-section-head{ max-width:640px; margin:0 0 40px; }
+.pxv2-section-head p{ color:var(--muted); font-size:15.5px; margin:14px 0 0; }
+
+@media (max-width:720px){
+  .pxv2-section{ padding:52px 0; }
+  .pxv2-shell{ padding:0 18px; }
+}
+
+/* ---------- top brand bar (site-header replacement) ---------- */
+.pxv2-topbar{
+  position:sticky; top:0; z-index:40;
+  background:color-mix(in srgb, var(--paper) 88%, transparent);
+  backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line);
+}
+.pxv2-topbar-inner{
+  max-width:var(--content-w); margin:0 auto; padding:14px 24px;
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+}
+.pxv2-brand{ display:flex; align-items:center; gap:10px; text-decoration:none; }
+.pxv2-brand img{ width:30px; height:30px; border-radius:8px; display:block; }
+.pxv2-brand span{
+  font-family:"Unbounded",sans-serif; font-weight:700; font-size:16px; color:var(--ink);
+}
+.pxv2-topnav{ display:flex; align-items:center; gap:4px; }
+.pxv2-topnav a{
+  text-decoration:none; font-size:13.5px; font-weight:500; color:var(--muted);
+  padding:8px 14px; border-radius:var(--radius-pill);
+  transition:color .15s ease, background .15s ease;
+}
+.pxv2-topnav a:hover, .pxv2-topnav a:focus-visible{ color:var(--ink); background:var(--surface-raised); }
+.pxv2-topnav a.is-idraw{ color:var(--idraw); font-weight:700; }
+@media (max-width:760px){ .pxv2-topnav{ display:none; } }
+
+/* ---------- buttons ---------- */
+.pxv2-btn{
+  display:inline-flex; align-items:center; gap:8px;
+  font-family:"Zen Kaku Gothic New",sans-serif; font-weight:700; font-size:14.5px;
+  padding:13px 24px; border-radius:var(--radius-pill);
+  text-decoration:none; border:1px solid transparent; cursor:pointer;
+  transition:transform .12s ease, box-shadow .12s ease, background .12s ease, border-color .12s ease;
+}
+.pxv2-btn:active{ transform:translateY(1px); }
+.pxv2-btn-primary{ background:var(--brand); color:var(--brand-ink); box-shadow:var(--shadow-sm); }
+.pxv2-btn-primary:hover,.pxv2-btn-primary:focus-visible{ box-shadow:var(--shadow-md); }
+.pxv2-btn-idraw{ background:var(--idraw); color:#1a0e08; box-shadow:var(--shadow-sm); }
+.pxv2-btn-idraw:hover,.pxv2-btn-idraw:focus-visible{ box-shadow:var(--shadow-md); }
+.pxv2-btn-ghost{ background:transparent; color:var(--ink); border-color:var(--line-strong); }
+.pxv2-btn-ghost:hover,.pxv2-btn-ghost:focus-visible{ background:var(--surface-raised); }
+.pxv2-btn:focus-visible{ outline:2px solid var(--brand); outline-offset:2px; }
+
+/* ---------- cards ---------- */
+.pxv2-card{
+  background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md);
+  box-shadow:var(--shadow-sm);
+}
+.pxv2-mode-card{
+  padding:26px 24px; border-radius:var(--radius-md);
+  border:1px solid var(--line); background:var(--surface);
+  display:flex; flex-direction:column; gap:12px;
+  border-top:4px solid var(--mode-color, var(--brand));
+}
+.pxv2-mode-card .pxv2-mode-tag{
+  font-family:"Unbounded",sans-serif; font-weight:700; font-size:13px;
+  color:var(--mode-color, var(--brand));
+}
+.pxv2-mode-card h3{ font-size:19px; }
+.pxv2-mode-card p{ color:var(--muted); font-size:14px; margin:0; }
+.pxv2-mode-card.is-idraw{ --mode-color:var(--idraw); }
+.pxv2-mode-card.is-iaudio{ --mode-color:var(--iaudio); }
+.pxv2-mode-card.is-igame{ --mode-color:var(--igame); }
+
+/* ---------- pixel motif ---------- */
+.pxv2-pixel-field{
+  --cell:22px;
+  background-image:
+    linear-gradient(90deg, color-mix(in srgb, var(--ink) 6%, transparent) 1px, transparent 1px),
+    linear-gradient(color-mix(in srgb, var(--ink) 6%, transparent) 1px, transparent 1px);
+  background-size:var(--cell) var(--cell);
+}
+
+/* ---------- floating bottom nav dock ---------- */
+.pxv2-dock{
+  position:fixed; left:50%; bottom:18px; transform:translateX(-50%);
+  z-index:50;
+  display:flex; align-items:center; gap:2px;
+  background:var(--surface-raised); border:1px solid var(--line);
+  border-radius:var(--radius-pill); box-shadow:var(--shadow-lg);
+  padding:6px;
+}
+.pxv2-dock a{
+  display:flex; flex-direction:column; align-items:center; gap:3px;
+  text-decoration:none; color:var(--muted);
+  font-size:10.5px; font-weight:600;
+  padding:8px 14px; border-radius:var(--radius-pill);
+  transition:color .15s ease, background .15s ease;
+}
+.pxv2-dock a img{ width:19px; height:19px; opacity:.85; }
+.pxv2-dock a:hover, .pxv2-dock a:focus-visible{ background:var(--paper); color:var(--ink); }
+.pxv2-dock a.is-primary{
+  background:var(--idraw-soft); color:var(--idraw); font-weight:800;
+}
+.pxv2-dock a.is-primary img{ opacity:1; }
+.pxv2-dock a.is-primary:hover, .pxv2-dock a.is-primary:focus-visible{ background:var(--idraw); color:#1a0e08; }
+
+/* ---------- footer ---------- */
+.pxv2-footer{ border-top:1px solid var(--line); padding:44px 0 140px; }
+.pxv2-footer-inner{ display:flex; flex-wrap:wrap; gap:20px 28px; align-items:center; justify-content:space-between; }
+.pxv2-footer-links{ display:flex; flex-wrap:wrap; gap:6px 22px; }
+.pxv2-footer-links a{ font-size:12.5px; color:var(--muted); text-decoration:none; }
+.pxv2-footer-links a:hover{ color:var(--ink); }
+.pxv2-footer-copy{ font-size:12px; color:var(--muted-2); }
+
+@media (max-width:640px){
+  .pxv2-footer{ padding-bottom:120px; }
+}
+
+/* ---------------------------------------------------------------------
+ * Light skin for the JS-generated nav/footer (scripts/shared-bottom-nav.js,
+ * scripts/shared-profile-header.js). Those scripts own the DOM/behavior —
+ * this only recolors and retypes what they render, on pages that opt in
+ * via body.pxv2. The script injects its own !important rules, so a few
+ * !important overrides here are intentional, not accidental.
+ * --------------------------------------------------------------------- */
+body.pxv2 .bottom-nav{
+  background:var(--surface-raised) !important;
+  border-top-color:var(--line) !important;
+}
+body.pxv2 .bottom-nav__item{
+  font-family:"Zen Kaku Gothic New",sans-serif !important;
+  color:var(--muted) !important;
+}
+body.pxv2 .bottom-nav__item.is-active{ color:var(--ink) !important; }
+body.pxv2 .bottom-nav__item--primary{
+  color:var(--idraw) !important;
+}
+body.pxv2 .pixieed-shared-footer,
+body.pxv2 footer{
+  font-family:"Zen Kaku Gothic New",sans-serif;
+}
+body.pxv2 .footer-links a{ color:var(--muted); }
+body.pxv2 .footer-links a:hover{ color:var(--ink); }
+body.pxv2 .site-header,
+body.pxv2 .header-inner{
+  background:color-mix(in srgb, var(--paper) 88%, transparent) !important;
+  border-bottom-color:var(--line) !important;
+}
+body.pxv2 .brand-title{ font-family:"Unbounded",sans-serif !important; color:var(--ink) !important; }
+body.pxv2 .brand-sub{ color:var(--muted) !important; }
+
+/* ---------------------------------------------------------------------
+ * CSS-only reskin for the market/social feed shell (community/, market/,
+ * market/item.html all share this class vocabulary). Structure, IDs, and
+ * every script that queries them are untouched — colors and type only.
+ * --------------------------------------------------------------------- */
+body.pxv2{ background:var(--paper); color:var(--ink); font-family:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",system-ui,sans-serif; }
+body.pxv2 .market-shell{ background:transparent; }
+body.pxv2 .market-titlebar{ border-bottom-color:var(--line); }
+body.pxv2 .market-titlebar h1,
+body.pxv2 .market-titlebar__title h1{
+  font-family:"Unbounded",sans-serif; font-weight:700; color:var(--ink); letter-spacing:-0.01em;
+}
+body.pxv2 .market-section{ background:var(--surface); border-color:var(--line); border-radius:var(--radius-md); }
+
+body.pxv2 .social-feed-tabs button{
+  font-family:"Zen Kaku Gothic New",sans-serif; color:var(--muted); border-color:var(--line);
+}
+body.pxv2 .social-feed-tabs button.is-active{
+  background:var(--idraw-soft); color:var(--idraw); border-color:var(--idraw);
+}
+body.pxv2 .draw2-home__community-intro,
+body.pxv2 .social-home__status{ color:var(--muted); }
+
+body.pxv2 .social-home__empty{ background:var(--surface); border-color:var(--line); border-radius:var(--radius-lg); }
+body.pxv2 .social-home__empty h2{ font-family:"Unbounded",sans-serif; color:var(--ink); }
+body.pxv2 .social-home__empty-copy{ color:var(--muted); }
+body.pxv2 .social-home__empty-eyebrow{ font-family:"DotGothic16",monospace; color:var(--brand); }
+body.pxv2 .social-home__empty-action{
+  font-family:"Zen Kaku Gothic New",sans-serif; font-weight:700; border-radius:var(--radius-pill);
+}
+body.pxv2 .social-home__empty-action--primary{ background:var(--idraw); color:#1a0e08; }
+
+/* market grid product cards (community feed reuses the same card markup) */
+body.pxv2 .market-grid{ gap:16px; }
+body.pxv2 .product-card,
+body.pxv2 .market-card{
+  background:var(--surface); border-color:var(--line); border-radius:var(--radius-md);
+  font-family:"Zen Kaku Gothic New",sans-serif;
+}
+body.pxv2 .product-card:hover,
+body.pxv2 .market-card:hover{ border-color:var(--line-strong); box-shadow:var(--shadow-md); }
+
+/* filter/search controls shared across market + community */
+body.pxv2 input,
+body.pxv2 select,
+body.pxv2 textarea{
+  font-family:"Zen Kaku Gothic New",sans-serif; border-color:var(--line-strong); color:var(--ink);
+  background:var(--surface); border-radius:var(--radius-sm);
+}
+body.pxv2 button{ font-family:"Zen Kaku Gothic New",sans-serif; }
+body.pxv2 a{ color:inherit; }
+body.pxv2 .button-secondary{
+  font-family:"Zen Kaku Gothic New",sans-serif; font-weight:700; color:var(--ink); border-color:var(--line-strong);
+  border-radius:var(--radius-pill);
+}
+body.pxv2 .button-secondary:hover{ background:var(--surface-raised); }
