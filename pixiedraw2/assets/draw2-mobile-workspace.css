@@ -1,0 +1,5152 @@
+/* PiXiEEDraw2 phone workspace.
+   This layer only projects existing Draw2 controls into a contextual mobile
+   shell. Core, Raster, Timeline, Undo and Project state keep their owners. */
+.draw2-mobile-drawer-header {
+  display: none;
+}
+
+/* Short portrait phones still need a visible HALF/FULL difference. */
+@media (max-width: 700px) and (max-height: 720px) {
+  .draw2-workspace-frame[data-workspace-profile="mobile"] {
+    --draw2-mobile-canvas-min-height: 192px !important;
+  }
+}
+
+@media (max-width: 700px) {
+  .draw2-workspace-frame[data-workspace-profile="mobile"] {
+    --draw2-mobile-square: 40px;
+    --draw2-mobile-top-height: 132px;
+    --draw2-mobile-drawer-height: 160px;
+    --draw2-mobile-status-height: 24px;
+    --draw2-mobile-detail-half: clamp(140px, 28dvh, 236px);
+    --draw2-mobile-canvas-min-height: 256px;
+    --draw2-mobile-detail-full: max(
+      var(--draw2-mobile-detail-half),
+      min(
+        46dvh,
+        calc(
+          100dvh - env(safe-area-inset-bottom, 0px) -
+            var(--draw2-mobile-top-height) -
+            var(--draw2-mobile-drawer-height) -
+            var(--draw2-mobile-canvas-min-height)
+        )
+      )
+    );
+    position: relative !important;
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    height: calc(
+      100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
+    ) !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows:
+      var(--draw2-mobile-top-height) minmax(132px, 1fr) var(
+        --draw2-mobile-drawer-height
+      ) 0 var(--draw2-mobile-status-height) !important;
+    grid-template-areas: "top" "canvas" "left" "timeline" "status" !important;
+    overflow: hidden !important;
+    border-inline: 0 !important;
+    border-radius: 0 !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"]:not(
+      [data-creator-mode="DRAW"]
+    ) {
+    --draw2-mobile-top-height: 92px;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"].is-mobile-sheet-open[data-mobile-drawer-mode="half"],
+  .draw2-workspace-frame[data-workspace-profile="mobile"].is-mobile-timeline-open[data-mobile-drawer-mode="half"] {
+    grid-template-rows:
+      var(--draw2-mobile-top-height) minmax(88px, 1fr) var(
+        --draw2-mobile-drawer-height
+      ) var(--draw2-mobile-detail-height, var(--draw2-mobile-detail-half)) var(
+        --draw2-mobile-status-height
+      ) !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"].is-mobile-sheet-open[data-mobile-drawer-mode="full"],
+  .draw2-workspace-frame[data-workspace-profile="mobile"].is-mobile-timeline-open[data-mobile-drawer-mode="full"] {
+    grid-template-rows:
+      var(--draw2-mobile-top-height) minmax(72px, 1fr) var(
+        --draw2-mobile-drawer-height
+      ) var(--draw2-mobile-detail-full) var(--draw2-mobile-status-height)
+      !important;
+  }
+
+  /* One stable top lane: file, project identity, undo, redo and all commands. */
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-workspace-topbar {
+    grid-area: top !important;
+    display: block !important;
+    width: 100% !important;
+    height: var(--draw2-mobile-top-height) !important;
+    min-height: var(--draw2-mobile-top-height) !important;
+    max-height: var(--draw2-mobile-top-height) !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* Phone mode switching is a product switch, not a second tool palette.
+   * Animation, asset definition and export remain available from panels and
+   * commands; keeping only the three product surfaces leaves each top button
+   * with one clear meaning and prevents a horizontal mode maze. */
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-creator-mode[data-creator-mode="ANIMATE"],
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-creator-mode[data-creator-mode="ASSET"],
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-creator-mode[data-creator-mode="EXPORT"] {
+    display: none !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-workspace-global-row {
+    display: grid !important;
+    grid-template-columns:
+      var(--draw2-mobile-square) minmax(0, 1fr) calc(
+        var(--draw2-mobile-square) * 3
+      ) !important;
+    grid-template-rows: var(--draw2-mobile-square) !important;
+    width: 100% !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    padding: 2px 4px !important;
+    gap: 4px !important;
+    overflow: visible !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-workspace-brand,
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-creator-mode-bar {
+    display: none !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-workspace-context-row {
+    display: flex !important;
+    align-items: center !important;
+    width: 100% !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    padding: 2px 4px !important;
+    overflow: hidden !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"]:not(
+      [data-creator-mode="DRAW"]
+    )
+    .draw2-workspace-context-row {
+    display: none !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-workspace-menu-bar {
+    grid-column: 1 !important;
+    display: block !important;
+    width: var(--draw2-mobile-square) !important;
+    min-width: var(--draw2-mobile-square) !important;
+    height: var(--draw2-mobile-square) !important;
+    overflow: visible !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-workspace-menu-bar
+    > .draw2-menu {
+    display: none !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-workspace-menu-bar
+    > .draw2-menu:first-child {
+    display: block !important;
+    width: var(--draw2-mobile-square) !important;
+    min-width: var(--draw2-mobile-square) !important;
+    height: var(--draw2-mobile-square) !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-workspace-menu-bar
+    > .draw2-menu:first-child
+    > summary {
+    display: grid !important;
+    place-items: center !important;
+    width: var(--draw2-mobile-square) !important;
+    min-width: var(--draw2-mobile-square) !important;
+    max-width: var(--draw2-mobile-square) !important;
+    height: var(--draw2-mobile-square) !important;
+    min-height: var(--draw2-mobile-square) !important;
+    padding: 0 !important;
+    font-size: 0 !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-workspace-project-slot {
+    grid-column: 2 !important;
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    overflow: hidden !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    #draw2WorkspaceProjectSlot
+    > #draw2ProjectCard,
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    #draw2WorkspaceProjectSlot
+    .draw2-controls,
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    #draw2WorkspaceProjectSlot
+    #draw2ProjectId {
+    width: 100% !important;
+    max-width: none !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    #draw2WorkspaceProjectSlot
+    #draw2ProjectId {
+    height: var(--draw2-mobile-square) !important;
+    min-height: var(--draw2-mobile-square) !important;
+    padding-inline: 8px !important;
+    text-overflow: ellipsis !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-workspace-command-bar {
+    grid-column: 3 !important;
+    display: grid !important;
+    grid-template-columns: repeat(4, var(--draw2-mobile-square)) !important;
+    width: calc(var(--draw2-mobile-square) * 4) !important;
+    min-width: calc(var(--draw2-mobile-square) * 4) !important;
+    height: var(--draw2-mobile-square) !important;
+    gap: 0 !important;
+    overflow: visible !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-workspace-command-bar
+    > * {
+    display: none !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-workspace-command-bar
+    > [data-workspace-command="undo"],
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-workspace-command-bar
+    > [data-workspace-command="redo"],
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-workspace-command-bar
+    > [data-workspace-command="command-palette"] {
+    display: grid !important;
+    place-items: center !important;
+    width: var(--draw2-mobile-square) !important;
+    min-width: var(--draw2-mobile-square) !important;
+    max-width: var(--draw2-mobile-square) !important;
+    height: var(--draw2-mobile-square) !important;
+    min-height: var(--draw2-mobile-square) !important;
+    max-height: var(--draw2-mobile-square) !important;
+    padding: 0 !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-quick-control-opacity {
+    width: 124px !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-quick-control-opacity
+    input {
+    flex: 1 1 auto !important;
+    min-width: 64px !important;
+  }
+
+  /* Canvas owns every pixel between the two rails. */
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-workspace-canvas-region {
+    grid-area: canvas !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    padding: 4px !important;
+    overflow: hidden !important;
+    border: 0 !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    #draw2WorkspaceCanvasSlot,
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    #draw2WorkspaceCanvasSlot
+    > .draw2-canvas-card,
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    #draw2WorkspaceCanvasSlot
+    .draw2-viewport-wrap {
+    width: 100% !important;
+    height: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    #draw2WorkspaceCanvasSlot
+    > .draw2-canvas-card,
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    #draw2WorkspaceCanvasSlot
+    .draw2-viewport-wrap {
+    display: grid !important;
+    place-items: center !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    #draw2WorkspaceCanvasSlot
+    .draw2-card-heading,
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    #draw2WorkspaceCanvasSlot
+    .draw2-help,
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    #draw2WorkspaceCanvasSlot
+    .draw2-metrics,
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    #draw2WorkspaceCanvasSlot
+    .draw2-quick-palette,
+  .draw2-workspace-frame[data-workspace-profile="mobile"] .draw2-mini-preview {
+    display: none !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    #draw2WorkspaceCanvasSlot
+    .draw2-canvas-stack {
+    width: var(--draw2-canvas-display-width, min(100cqw, 100cqh)) !important;
+    height: var(--draw2-canvas-display-height, min(100cqw, 100cqh)) !important;
+    max-width: none !important;
+    max-height: none !important;
+    aspect-ratio: auto !important;
+    flex: 0 0 auto !important;
+  }
+
+  /* Bottom shell: handle -> priority tools/colors -> contextual detail rail. */
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-workspace-left-dock {
+    position: static !important;
+    display: grid !important;
+    grid-area: left !important;
+    grid-template-columns: var(--draw2-mobile-square) minmax(0, 1fr) !important;
+    grid-template-rows:
+      var(--draw2-mobile-square) calc(var(--draw2-mobile-square) * 2) var(
+        --draw2-mobile-square
+      ) !important;
+    grid-template-areas: "tools tools" "color color" "handle rail" !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    height: var(--draw2-mobile-drawer-height) !important;
+    min-height: var(--draw2-mobile-drawer-height) !important;
+    max-height: var(--draw2-mobile-drawer-height) !important;
+    padding: 0 4px !important;
+    gap: 0 !important;
+    overflow: visible !important;
+    border: 0 !important;
+    border-top: 0 !important;
+    background: var(--draw2-surface) !important;
+    box-shadow:
+      inset 0 1px var(--draw2-border-subtle),
+      0 -8px 24px rgb(0 0 0 / 20%) !important;
+  }
+  .draw2-mobile-drawer-header {
+    grid-area: handle !important;
+    display: block !important;
+    width: var(--draw2-mobile-square) !important;
+    height: var(--draw2-mobile-square) !important;
+    min-height: var(--draw2-mobile-square) !important;
+    overflow: hidden !important;
+    border-top: 1px solid var(--draw2-border-subtle) !important;
+  }
+  .draw2-mobile-drawer-handle {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 4px !important;
+    width: var(--draw2-mobile-square) !important;
+    height: var(--draw2-mobile-square) !important;
+    min-height: var(--draw2-mobile-square) !important;
+    max-height: var(--draw2-mobile-square) !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+    color: var(--draw2-text-muted) !important;
+    touch-action: none !important;
+  }
+  .draw2-mobile-drawer-grip {
+    width: 20px !important;
+    height: 3px !important;
+    border-radius: 3px !important;
+    background: var(--draw2-border-strong) !important;
+  }
+  .draw2-mobile-drawer-mode {
+    font:
+      700 0.55rem/1 ui-monospace,
+      SFMono-Regular,
+      Menlo,
+      monospace !important;
+  }
+  .draw2-mobile-drawer-summary {
+    display: none !important;
+  }
+
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-workspace-toolbar {
+    grid-area: tools !important;
+    display: flex !important;
+    align-items: center !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    height: var(--draw2-mobile-square) !important;
+    min-height: var(--draw2-mobile-square) !important;
+    max-height: var(--draw2-mobile-square) !important;
+    gap: 0 !important;
+    padding: 0 !important;
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+    scrollbar-width: none !important;
+    overscroll-behavior-x: contain !important;
+    touch-action: pan-x !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-workspace-toolbar::-webkit-scrollbar,
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-workspace-panel-launcher::-webkit-scrollbar {
+    display: none !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-workspace-toolbar
+    > .draw2-tool-group,
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-workspace-toolbar
+    > .draw2-tool-button,
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-tool-group-summary {
+    flex: 0 0 var(--draw2-mobile-square) !important;
+    width: var(--draw2-mobile-square) !important;
+    min-width: var(--draw2-mobile-square) !important;
+    max-width: var(--draw2-mobile-square) !important;
+    height: var(--draw2-mobile-square) !important;
+    min-height: var(--draw2-mobile-square) !important;
+    max-height: var(--draw2-mobile-square) !important;
+    padding: 0 !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-tool-group-summary,
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-workspace-toolbar
+    > .draw2-tool-button {
+    display: grid !important;
+    place-items: center !important;
+  }
+  #draw2WorkspaceLeftDock .draw2-workspace-toolbar > .draw2-tool-button {
+    flex: 0 0 var(--draw2-mobile-square) !important;
+    width: var(--draw2-mobile-square) !important;
+    min-width: var(--draw2-mobile-square) !important;
+    max-width: var(--draw2-mobile-square) !important;
+    height: var(--draw2-mobile-square) !important;
+    min-height: var(--draw2-mobile-square) !important;
+    max-height: var(--draw2-mobile-square) !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"] .draw2-tool-popover {
+    grid-template-columns: repeat(4, var(--draw2-mobile-square)) !important;
+    width: calc(var(--draw2-mobile-square) * 4 + 17px) !important;
+    max-width: calc(100vw - 16px) !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    [data-workspace-tool-group="draw"]
+    .draw2-tool-popover,
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    [data-workspace-tool-group="fill"]
+    .draw2-tool-popover {
+    grid-template-columns: repeat(2, var(--draw2-mobile-square)) !important;
+    width: calc(var(--draw2-mobile-square) * 2 + 11px) !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-tool-popover
+    .draw2-tool-button {
+    width: var(--draw2-mobile-square) !important;
+    min-width: var(--draw2-mobile-square) !important;
+    max-width: var(--draw2-mobile-square) !important;
+    height: var(--draw2-mobile-square) !important;
+    min-height: var(--draw2-mobile-square) !important;
+    max-height: var(--draw2-mobile-square) !important;
+    padding: 0 !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-tool-popover
+    .draw2-tool-button
+    span {
+    display: none !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-tool-group-label,
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-workspace-toolbar
+    > .draw2-tool-button
+    span {
+    display: none !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-mobile-color-rail {
+    grid-area: color !important;
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    height: calc(var(--draw2-mobile-square) * 2) !important;
+    min-height: calc(var(--draw2-mobile-square) * 2) !important;
+    padding: 0 !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    scrollbar-width: none !important;
+    overscroll-behavior-x: contain !important;
+    touch-action: pan-x !important;
+    border-top: 1px solid var(--draw2-border-subtle) !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-mobile-color-rail::-webkit-scrollbar {
+    display: none !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-mobile-color-active {
+    display: none !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-mobile-color-rail
+    .draw2-palette-grid {
+    display: grid !important;
+    grid-auto-flow: column !important;
+    grid-template-columns: none !important;
+    grid-template-rows: repeat(2, var(--draw2-mobile-square)) !important;
+    grid-auto-columns: var(--draw2-mobile-square) !important;
+    width: max-content !important;
+    min-width: 100% !important;
+    height: calc(var(--draw2-mobile-square) * 2) !important;
+    min-height: calc(var(--draw2-mobile-square) * 2) !important;
+    max-height: calc(var(--draw2-mobile-square) * 2) !important;
+    margin: 0 !important;
+    gap: 0 !important;
+    align-content: start !important;
+    place-content: start !important;
+    overflow: visible !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-mobile-color-rail
+    .draw2-color {
+    display: block !important;
+    width: var(--draw2-mobile-square) !important;
+    min-width: var(--draw2-mobile-square) !important;
+    max-width: var(--draw2-mobile-square) !important;
+    height: var(--draw2-mobile-square) !important;
+    min-height: var(--draw2-mobile-square) !important;
+    max-height: var(--draw2-mobile-square) !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-mobile-color-rail
+    .draw2-color-add {
+    display: grid !important;
+    place-items: center !important;
+    width: var(--draw2-mobile-square) !important;
+    min-width: var(--draw2-mobile-square) !important;
+    max-width: var(--draw2-mobile-square) !important;
+    height: var(--draw2-mobile-square) !important;
+    min-height: var(--draw2-mobile-square) !important;
+    max-height: var(--draw2-mobile-square) !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    font-size: 0.65rem !important;
+  }
+
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-workspace-panel-launcher {
+    grid-area: rail !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    height: var(--draw2-mobile-square) !important;
+    min-height: var(--draw2-mobile-square) !important;
+    max-height: var(--draw2-mobile-square) !important;
+    padding: 0 !important;
+    gap: 0 !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    scrollbar-width: none !important;
+    border-top: 1px solid var(--draw2-border-subtle) !important;
+    background: var(--draw2-surface) !important;
+  }
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2WorkspaceLeftDock
+    .draw2-workspace-panel-launcher
+    > .draw2-panel-launcher {
+    display: none !important;
+  }
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"][data-mobile-rail-context="primary"]
+    #draw2WorkspaceLeftDock
+    .draw2-workspace-panel-launcher
+    > [data-mobile-rail-slot~="primary"],
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"][data-mobile-rail-context="timeline"]
+    #draw2WorkspaceLeftDock
+    .draw2-workspace-panel-launcher
+    > [data-mobile-rail-slot~="timeline"],
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"][data-mobile-rail-context="more"]
+    #draw2WorkspaceLeftDock
+    .draw2-workspace-panel-launcher
+    > [data-mobile-rail-slot~="more"] {
+    display: grid !important;
+    place-items: center !important;
+    flex: 0 0 var(--draw2-mobile-square) !important;
+    order: 0 !important;
+    width: var(--draw2-mobile-square) !important;
+    min-width: var(--draw2-mobile-square) !important;
+    max-width: var(--draw2-mobile-square) !important;
+    height: var(--draw2-mobile-square) !important;
+    min-height: var(--draw2-mobile-square) !important;
+    max-height: var(--draw2-mobile-square) !important;
+    padding: 3px 2px 2px !important;
+    gap: 1px !important;
+    border: 0 !important;
+    border-bottom: 2px solid transparent !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    color: var(--draw2-text-muted) !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-workspace-panel-launcher
+    .draw2-panel-launcher.is-active {
+    color: var(--draw2-text-strong) !important;
+    border-bottom-color: var(--draw2-accent-strong) !important;
+    background: color-mix(in srgb, var(--draw2-accent-strong) 9%, transparent)
+      !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-workspace-panel-launcher
+    .draw2-panel-launcher
+    .draw2-ui-icon {
+    display: block !important;
+    width: 17px !important;
+    height: 17px !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-workspace-panel-launcher
+    .draw2-panel-launcher
+    span,
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-workspace-panel-launcher
+    .draw2-panel-launcher[data-workspace-panel="inspector"]
+    span {
+    display: block !important;
+    max-width: 44px !important;
+    overflow: hidden !important;
+    font-size: 0.5rem !important;
+    line-height: 1 !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-workspace-panel-launcher
+    .draw2-panel-launcher[data-workspace-panel="inspector"]
+    span::after {
+    content: none !important;
+  }
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"][data-mobile-rail-context="timeline"]
+    [data-mobile-rail-action="back"] {
+    order: 0 !important;
+  }
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"][data-mobile-rail-context="timeline"]
+    [data-workspace-timeline-toggle] {
+    order: 1 !important;
+  }
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"][data-mobile-rail-context="timeline"]
+    [data-workspace-panel="layers"] {
+    order: 2 !important;
+  }
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"][data-mobile-rail-context="timeline"]
+    [data-draw2-mobile-timeline-tab] {
+    order: 3 !important;
+  }
+
+  /* Layer, color and every detail panel share the same grid row as Timeline.
+     Switching a rail button replaces this row instead of stacking a sheet. */
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-workspace-right-dock,
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-right-custom-dock {
+    display: contents !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    #draw2WorkspacePaletteStrip,
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    #draw2WorkspaceRightResize,
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    #draw2WorkspacePaletteResize,
+  .draw2-workspace-frame[data-workspace-profile="mobile"] .draw2-workspace-tabs,
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-right-panel-picker {
+    display: none !important;
+  }
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2WorkspaceRightDock
+    .draw2-workspace-panel {
+    display: none !important;
+  }
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"].is-mobile-sheet-open
+    #draw2WorkspaceRightDock
+    .draw2-workspace-panel:not([hidden]) {
+    position: static !important;
+    inset: auto !important;
+    grid-area: timeline !important;
+    z-index: auto !important;
+    display: block !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    padding: 10px !important;
+    overflow: auto !important;
+    overscroll-behavior: contain !important;
+    border: 0 !important;
+    border-top: 1px solid var(--draw2-border-strong) !important;
+    border-radius: 0 !important;
+    background: var(--draw2-surface) !important;
+    box-shadow: none !important;
+  }
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2WorkspacePanelColor
+    #draw2WorkspaceColorEditor:not([hidden]) {
+    position: static !important;
+    inset: auto !important;
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    #draw2WorkspaceTimelineRegion {
+    position: static !important;
+    inset: auto !important;
+    grid-area: timeline !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 3px 4px !important;
+    overflow: hidden !important;
+    border: 0 !important;
+    border-top: 1px solid var(--draw2-border-subtle) !important;
+    border-radius: 0 !important;
+    background: var(--draw2-surface) !important;
+    box-shadow: none !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"] #draw2TimelineTabs {
+    display: none !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    #draw2WorkspaceTimelineRegion {
+    display: none !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"].is-mobile-timeline-open
+    #draw2WorkspaceTimelineRegion {
+    display: flex !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"][data-mobile-drawer-mode="half"]
+    .draw2-timeline-layer-properties,
+  .draw2-workspace-frame[data-workspace-profile="mobile"][data-mobile-drawer-mode="half"]
+    .draw2-timeline-properties-resize {
+    display: none !important;
+  }
+
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-workspace-statusbar {
+    grid-area: status !important;
+    height: var(--draw2-mobile-status-height) !important;
+    min-height: var(--draw2-mobile-status-height) !important;
+    max-height: var(--draw2-mobile-status-height) !important;
+    overflow: hidden !important;
+  }
+}
+
+/* Mobile interaction contract / stage 5 --------------------------------
+ * Every visible Draw2 button uses the same 40px touch square.  The drawer
+ * follows PiXiEEDraw's grip-only handle: the label is intentionally absent,
+ * the grip is draggable, and its extra hit area stays horizontal so it does
+ * not steal the last palette row above it. */
+@media (max-width: 700px) {
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"] {
+    --draw2-mobile-square: 40px !important;
+    --draw2-mobile-drawer-height: 160px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"] button {
+    box-sizing: border-box !important;
+    min-width: 40px !important;
+    width: auto;
+    min-height: 40px !important;
+    height: 40px !important;
+    max-height: 40px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-left-dock {
+    position: relative !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: 40px 80px 40px !important;
+    grid-template-areas: "tools" "color" "rail" !important;
+    height: var(--draw2-mobile-drawer-height) !important;
+    min-height: var(--draw2-mobile-drawer-height) !important;
+    max-height: var(--draw2-mobile-drawer-height) !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-drawer-header {
+    position: absolute !important;
+    right: 4px !important;
+    bottom: 0 !important;
+    z-index: 80 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 40px !important;
+    min-width: 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    border: 0 !important;
+    pointer-events: auto !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-drawer-handle {
+    position: relative !important;
+    display: flex !important;
+    flex: 0 0 40px !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 40px !important;
+    min-width: 40px !important;
+    max-width: 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 1px solid color-mix(
+      in srgb,
+      var(--draw2-accent-strong) 78%,
+      var(--draw2-border-strong)
+    ) !important;
+    border-bottom: 0 !important;
+    border-radius: 6px 6px 0 0 !important;
+    background: var(--draw2-surface-input) !important;
+    color: var(--draw2-accent-strong) !important;
+    cursor: ns-resize !important;
+    touch-action: none !important;
+    overflow: visible !important;
+    z-index: 80 !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-drawer-handle::before {
+    position: absolute;
+    inset: 0 -8px;
+    content: "";
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-drawer-handle::after {
+    display: none !important;
+    content: none !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-drawer-grip {
+    position: absolute !important;
+    left: 50% !important;
+    top: 50% !important;
+    width: 18px !important;
+    height: 14px !important;
+    transform: translate(-50%, -50%) !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: linear-gradient(
+      0deg,
+      color-mix(in srgb, var(--draw2-accent-strong) 92%, transparent) 0 3px,
+      transparent 3px 6px,
+      color-mix(in srgb, var(--draw2-accent-strong) 92%, transparent) 6px 9px,
+      transparent 9px 12px,
+      color-mix(in srgb, var(--draw2-accent-strong) 92%, transparent) 12px 14px
+    ) !important;
+    box-shadow: none !important;
+    clip-path: none !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-drawer-handle:hover
+    .draw2-mobile-drawer-grip,
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-drawer-handle:focus-visible
+    .draw2-mobile-drawer-grip {
+    background: linear-gradient(
+      0deg,
+      var(--draw2-accent-strong) 0 3px,
+      transparent 3px 6px,
+      var(--draw2-accent-strong) 6px 9px,
+      transparent 9px 12px,
+      var(--draw2-accent-strong) 12px 14px
+    ) !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-drawer-handle:focus-visible {
+    outline: 2px solid var(--draw2-accent-strong) !important;
+    outline-offset: -2px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-drawer-mode,
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-drawer-action-label {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-panel-launcher {
+    position: relative !important;
+    z-index: 1 !important;
+    padding-right: 48px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-command-bar {
+    grid-template-columns: repeat(4, 40px) !important;
+    gap: 4px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-command-bar
+    > [data-workspace-command="undo"],
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-command-bar
+    > [data-workspace-command="redo"],
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-command-bar
+    > [data-workspace-command="panel-export"],
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-command-bar
+    > [data-shared-control="playback"] {
+    width: 40px !important;
+    min-width: 40px !important;
+    max-width: 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-creator-mode,
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2WorkspaceTimelineSlot
+    .draw2-timeline-tab {
+    min-height: 40px !important;
+    height: 40px !important;
+    max-height: 40px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2WorkspaceTimelineSlot
+    .draw2-timeline-tabs-shell,
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2WorkspaceTimelineSlot
+    .draw2-timeline-tabs {
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2MobileCanvasHud {
+    gap: 4px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-canvas-context {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    min-height: 40px !important;
+    height: 40px !important;
+    max-height: 40px !important;
+    padding-inline: 6px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-viewport-controls {
+    flex: 0 0 auto !important;
+    gap: 0 !important;
+    min-height: 40px !important;
+    height: 40px !important;
+    max-height: 40px !important;
+    padding: 0 !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-viewport-button {
+    flex: 0 0 40px !important;
+    width: 40px !important;
+    min-width: 40px !important;
+    max-width: 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-viewport-readout {
+    min-width: 42px !important;
+  }
+}
+
+/* The split phone profile uses the same 40px contract on its vertical rail
+ * and viewport controls.  The desktop/tablet 44px contract is untouched. */
+@media (min-width: 701px) and (max-height: 480px) {
+  #draw2WorkspaceFrame[data-workspace-profile="split"] {
+    --draw2-mobile-square: 40px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="split"] button {
+    box-sizing: border-box !important;
+    min-width: 40px !important;
+    min-height: 40px !important;
+    height: 40px !important;
+    max-height: 40px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-mobile-toolbar {
+    width: 40px !important;
+    min-width: 40px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-mobile-toolbar
+    > .draw2-tool-button {
+    flex: 0 0 40px !important;
+    width: 40px !important;
+    min-width: 40px !important;
+    max-width: 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-mobile-viewport-button {
+    flex: 0 0 40px !important;
+    width: 40px !important;
+    min-width: 40px !important;
+    max-width: 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+  }
+}
+
+/* Current mobile touch contract: use 48px targets.  This final block owns
+ * the live phone/split surface; the earlier 40px rules remain as historical
+ * projection scaffolding but cannot shrink the rendered controls. */
+@media (max-width: 700px) {
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"] {
+    --draw2-mobile-square: 48px !important;
+    --draw2-mobile-drawer-height: 192px !important;
+    --draw2-mobile-top-height: 96px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    button {
+    box-sizing: border-box !important;
+    min-width: 48px !important;
+    min-height: 48px !important;
+    height: 48px !important;
+    max-height: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-topbar {
+    grid-template-rows: 48px 48px !important;
+    height: 96px !important;
+    min-height: 96px !important;
+    max-height: 96px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-global-row {
+    grid-template-rows: 48px !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-context-row {
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-left-dock {
+    grid-template-rows: 48px 96px 48px !important;
+    height: 192px !important;
+    min-height: 192px !important;
+    max-height: 192px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-color-rail {
+    height: 96px !important;
+    min-height: 96px !important;
+    max-height: 96px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-color-rail
+    .draw2-palette-grid {
+    grid-template-rows: repeat(2, 48px) !important;
+    grid-auto-columns: 48px !important;
+    height: 96px !important;
+    min-height: 96px !important;
+    max-height: 96px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-drawer-header {
+    top: 0 !important;
+    right: 4px !important;
+    bottom: auto !important;
+    width: 48px !important;
+    min-width: 48px !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-drawer-handle {
+    flex: 0 0 48px !important;
+    width: 48px !important;
+    min-width: 48px !important;
+    max-width: 48px !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-toolbar,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-toolbar {
+    width: calc(100% - 56px) !important;
+    max-width: calc(100% - 56px) !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-command-bar {
+    grid-template-columns: repeat(4, 48px) !important;
+    gap: 4px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    justify-content: center !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-command-bar
+    > [data-workspace-command="undo"],
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-command-bar
+    > [data-workspace-command="redo"],
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-command-bar
+    > [data-workspace-command="panel-export"],
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-command-bar
+    > [data-shared-control="playback"] {
+    width: 48px !important;
+    min-width: 48px !important;
+    max-width: 48px !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-creator-mode,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2WorkspaceTimelineSlot
+    .draw2-timeline-tab,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2WorkspaceTimelineSlot
+    .draw2-timeline-tabs-shell,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2WorkspaceTimelineSlot
+    .draw2-timeline-tabs {
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-canvas-context,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-viewport-controls {
+    min-height: 48px !important;
+    height: 48px !important;
+    max-height: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-viewport-button {
+    flex: 0 0 48px !important;
+    width: 48px !important;
+    min-width: 48px !important;
+    max-width: 48px !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-viewport-readout {
+    min-width: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2WorkspaceTimelineSlot
+    .draw2-timeline-viewport {
+    --draw2-timeline-cell-size: 48px !important;
+    --draw2-timeline-cell-width: 48px !important;
+    --draw2-timeline-row-height: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2WorkspaceTimelineSlot
+    .draw2-timeline-corner,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2WorkspaceTimelineSlot
+    .draw2-timeline-corner-controls,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2WorkspaceTimelineSlot
+    .draw2-timeline-row-label {
+    min-height: 48px !important;
+    height: 48px !important;
+  }
+}
+
+@media (max-width: 700px) and (max-height: 680px) {
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"] {
+    --draw2-mobile-top-height: 48px !important;
+    --draw2-mobile-canvas-min-height: 160px !important;
+    --draw2-mobile-detail-half: 140px !important;
+    --draw2-mobile-detail-full: 160px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-topbar {
+    grid-template-rows: 48px !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-context-row {
+    display: none !important;
+  }
+}
+
+@media (min-width: 701px) and (max-height: 480px) {
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"] {
+    --draw2-mobile-square: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    button {
+    box-sizing: border-box !important;
+    min-width: 48px !important;
+    min-height: 48px !important;
+    height: 48px !important;
+    max-height: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-workspace-topbar {
+    grid-template-rows: 48px 48px 0 !important;
+    height: 96px !important;
+    min-height: 96px !important;
+    max-height: 96px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-workspace-global-row,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-creator-mode-bar {
+    grid-template-rows: 48px !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-mobile-toolbar,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-mobile-toolbar
+    > .draw2-tool-button {
+    width: 48px !important;
+    min-width: 48px !important;
+    max-width: 48px !important;
+    flex-basis: 48px !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-mobile-viewport-button {
+    flex: 0 0 48px !important;
+    width: 48px !important;
+    min-width: 48px !important;
+    max-width: 48px !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-palette-grid {
+    grid-template-columns: repeat(auto-fill, 48px) !important;
+    grid-auto-columns: 48px !important;
+    grid-auto-rows: 48px !important;
+  }
+}
+
+/* Audio projection for the landscape phone/split profile.  Keep the three
+ * horizontal touch lanes explicit: commands, transport and mode switching at
+ * the top; one editor in the middle; the composition deck at the bottom. */
+@media (min-width: 701px) and (max-height: 480px) {
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"] {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: 120px minmax(0, 1fr) 0 132px 24px !important;
+    grid-template-areas: "top" "canvas" "left" "timeline" "status" !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-workspace-topbar {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: 40px 40px 40px !important;
+    height: 120px !important;
+    min-height: 120px !important;
+    max-height: 120px !important;
+    overflow: visible !important;
+    z-index: 40 !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-workspace-global-row {
+    position: relative !important;
+    grid-row: 1 !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    overflow: visible !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-global-controls:not([hidden]) {
+    position: absolute !important;
+    z-index: 50 !important;
+    top: 40px !important;
+    right: 4px !important;
+    left: 4px !important;
+    display: flex !important;
+    align-items: stretch !important;
+    gap: 4px !important;
+    width: auto !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    padding: 0 !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    border: 1px solid color-mix(in srgb, #61d9ff 42%, var(--draw2-border));
+    border-radius: 6px !important;
+    background: #0d131d !important;
+    scrollbar-width: none !important;
+    touch-action: pan-x !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-global-controls::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-global-button {
+    flex: 0 0 40px !important;
+    width: 40px !important;
+    min-width: 40px !important;
+    max-width: 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-global-field {
+    flex: 0 0 auto !important;
+    height: 40px !important;
+    font-size: 0.52rem !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-global-field input,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-global-field select {
+    width: 64px !important;
+    min-width: 64px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    padding: 0 4px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-global-readout,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-global-save {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-creator-mode-bar {
+    grid-row: 3 !important;
+    display: flex !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+    padding: 0 4px !important;
+    gap: 4px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    border-top: 1px solid var(--draw2-border-subtle) !important;
+    background: var(--draw2-surface) !important;
+    scrollbar-width: none !important;
+    touch-action: pan-x !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-creator-mode-bar::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-creator-mode {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-creator-mode[data-creator-mode="DRAW"],
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-creator-mode[data-creator-mode="AUDIO"] {
+    display: grid !important;
+    flex: 0 0 40px !important;
+    place-items: center !important;
+    width: 40px !important;
+    min-width: 40px !important;
+    max-width: 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+    padding: 0 !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-creator-mode span {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    overflow: hidden !important;
+    clip: rect(0 0 0 0) !important;
+    white-space: nowrap !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-workspace-context-row,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2WorkspaceLeftDock,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2AudioRightDock,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2WorkspaceRightDock,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2WorkspaceRightResize {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-workspace-canvas-region {
+    grid-area: canvas !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    background: #0b0f19 !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2WorkspaceCanvasSlot,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2MobileCanvasHud {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2AudioWorkspace:not([hidden]) {
+    position: static !important;
+    inset: auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: #0b0f19 !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-editor-header {
+    display: flex !important;
+    align-items: stretch !important;
+    justify-content: space-between !important;
+    flex: 0 0 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    gap: 4px !important;
+    overflow: hidden !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-editor-tabs {
+    display: flex !important;
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    scrollbar-width: none !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-editor-tabs::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-editor-tab {
+    flex: 0 0 76px !important;
+    min-width: 76px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    padding: 0 6px !important;
+    font-size: 0.56rem !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-editor-context {
+    display: flex !important;
+    align-items: center !important;
+    flex: 0 0 40px !important;
+    min-width: 40px !important;
+    height: 40px !important;
+    padding: 0 !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-editor-context output,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-midi-status {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-editor-pin {
+    flex: 0 0 40px !important;
+    width: 40px !important;
+    min-width: 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    padding: 0 !important;
+    font-size: 0 !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2AudioWorkspace > .draw2-audio-panel,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2AudioWorkspace > .draw2-audio-editor-surface {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2AudioWorkspace button,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2AudioWorkspace input,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2AudioWorkspace select,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2ModeTimelineDeck button,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2ModeTimelineDeck input,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2ModeTimelineDeck select {
+    box-sizing: border-box !important;
+    min-height: 40px !important;
+    height: 40px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2WorkspaceTimelineRegion {
+    grid-area: timeline !important;
+    display: flex !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 4px !important;
+    overflow: hidden !important;
+    border-top: 1px solid #3a2d4d !important;
+    background: #111522 !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2ModeTimelineDeck:not([hidden]) {
+    display: flex !important;
+    flex: 1 1 auto !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    gap: 4px !important;
+    padding: 4px !important;
+    overflow: hidden !important;
+    border: 1px solid color-mix(in srgb, #c88bff 54%, var(--draw2-border));
+    border-radius: 6px !important;
+    background: #0d111c !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-mode-timeline-deck-heading {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-mode-timeline-deck-tabs {
+    display: flex !important;
+    flex: 0 0 40px !important;
+    min-height: 40px !important;
+    height: 40px !important;
+    gap: 3px !important;
+    overflow-x: auto !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-mode-timeline-deck-tab {
+    flex: 0 0 78px !important;
+    min-width: 78px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    padding: 0 7px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2ModeDeckAudio:not([hidden]) {
+    display: flex !important;
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    gap: 4px !important;
+    overflow: hidden !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2ModeDeckAudio > .draw2-mode-deck-toolbar {
+    display: flex !important;
+    flex: 0 0 40px !important;
+    min-height: 40px !important;
+    height: 40px !important;
+    gap: 4px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2ModeDeckAudio > .draw2-mode-deck-toolbar .draw2-button,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2ModeDeckAudio > .draw2-mode-deck-toolbar select {
+    flex: 0 0 auto !important;
+    min-height: 40px !important;
+    height: 40px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2ModeDeckAudio > .draw2-audio-timebase {
+    flex: 0 0 40px !important;
+    min-height: 40px !important;
+    height: 40px !important;
+    overflow-x: auto !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2ModeDeckAudio .draw2-audio-ruler {
+    flex-basis: 32px !important;
+    min-height: 32px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2ModeDeckAudio .draw2-audio-animation-cells,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2ModeDeckAudio .draw2-audio-animation-cell,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2ModeDeckAudio .draw2-audio-track-lane {
+    min-height: 40px !important;
+  }
+}
+
+/* Audio mobile projection -------------------------------------------------
+ * Audio is opt-in through ?audio=on in the isolated entry.  When enabled on
+ * a phone, keep the same three priorities as a compact DAW: transport at the
+ * top, one editor in the canvas lane, and the composition deck below it.
+ * Drawing tools/palette stay out of this surface so Audio never looks like a
+ * broken Draw fallback. */
+@media (max-width: 700px) {
+  /* Audio-enabled phones keep a small, explicit product switch reachable
+   * from Draw as well.  Without this override the shared mobile projection
+   * hides the mode rail before Audio can be opened. */
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"] {
+    --draw2-mobile-top-height: 132px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"]
+    .draw2-workspace-topbar {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: 48px 40px 40px !important;
+    height: 132px !important;
+    min-height: 132px !important;
+    max-height: 132px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"]
+    .draw2-workspace-global-row {
+    grid-row: 1 !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"]
+    .draw2-creator-mode-bar {
+    grid-row: 2 !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"]
+    .draw2-workspace-context-row {
+    grid-row: 3 !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"]
+    .draw2-creator-mode-bar {
+    display: flex !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+    padding: 0 4px !important;
+    gap: 4px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    scrollbar-width: none !important;
+    touch-action: pan-x !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"]
+    .draw2-creator-mode-bar::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"]
+    .draw2-creator-mode {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"]
+    .draw2-creator-mode[data-creator-mode="DRAW"],
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"]
+    .draw2-creator-mode[data-creator-mode="AUDIO"] {
+    display: grid !important;
+    flex: 0 0 40px !important;
+    place-items: center !important;
+    width: 40px !important;
+    min-width: 40px !important;
+    max-width: 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+    padding: 0 !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"] {
+    --draw2-mobile-top-height: 128px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"] {
+    grid-template-rows:
+      128px minmax(0, 1fr) 0 minmax(176px, 32dvh) 0 !important;
+    grid-template-areas: "top" "canvas" "left" "timeline" "status" !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-workspace-topbar {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: 48px 40px 40px !important;
+    height: 128px !important;
+    min-height: 128px !important;
+    max-height: 128px !important;
+    overflow: visible !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-workspace-global-row {
+    position: relative !important;
+    grid-row: 1 !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    overflow: visible !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-global-controls:not([hidden]) {
+    position: absolute !important;
+    z-index: 20 !important;
+    top: 48px !important;
+    right: 4px !important;
+    left: 4px !important;
+    display: flex !important;
+    align-items: stretch !important;
+    gap: 4px !important;
+    width: auto !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    padding: 0 !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    border: 1px solid color-mix(in srgb, #61d9ff 42%, var(--draw2-border));
+    border-radius: 6px !important;
+    background: #0d131d !important;
+    scrollbar-width: none !important;
+    touch-action: pan-x !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-global-controls::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-global-button {
+    flex: 0 0 40px !important;
+    width: 40px !important;
+    min-width: 40px !important;
+    max-width: 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+    border-radius: 4px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-global-field {
+    flex: 0 0 auto !important;
+    height: 40px !important;
+    gap: 2px !important;
+    font-size: 0.52rem !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-global-field input,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-global-field select {
+    width: 64px !important;
+    min-width: 64px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    padding: 0 4px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-global-readout {
+    flex: 0 0 auto !important;
+    min-width: 106px !important;
+    margin-left: 0 !important;
+    padding-inline: 6px !important;
+    line-height: 40px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-global-save {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-creator-mode-bar {
+    grid-row: 3 !important;
+    display: flex !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+    padding: 0 4px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    border-top: 1px solid var(--draw2-border-subtle) !important;
+    background: var(--draw2-surface) !important;
+    scrollbar-width: none !important;
+    touch-action: pan-x !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-creator-mode-bar::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-creator-mode {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-creator-mode[data-creator-mode="DRAW"],
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-creator-mode[data-creator-mode="AUDIO"] {
+    display: grid !important;
+    flex: 0 0 40px !important;
+    place-items: center !important;
+    width: 40px !important;
+    min-width: 40px !important;
+    max-width: 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-bottom: 2px solid transparent !important;
+    border-radius: 0 !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-creator-mode.is-active {
+    border-bottom-color: #c88bff !important;
+    background: rgb(200 139 255 / 14%) !important;
+    color: #f0ddff !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-creator-mode span {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    overflow: hidden !important;
+    clip: rect(0 0 0 0) !important;
+    white-space: nowrap !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-workspace-context-row,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2WorkspaceLeftDock {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-workspace-canvas-region {
+    grid-area: canvas !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    background: #0b0f19 !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2WorkspaceCanvasSlot,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2MobileCanvasHud {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2AudioWorkspace:not([hidden]) {
+    position: static !important;
+    inset: auto !important;
+    z-index: 2 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: #0b0f19 !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-editor-header {
+    display: flex !important;
+    align-items: stretch !important;
+    justify-content: space-between !important;
+    flex: 0 0 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    gap: 4px !important;
+    overflow: hidden !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-editor-tabs {
+    display: flex !important;
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    scrollbar-width: none !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-editor-tabs::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-editor-tab {
+    flex: 0 0 76px !important;
+    min-width: 76px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    padding: 0 6px !important;
+    font-size: 0.56rem !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-editor-icon {
+    width: 20px !important;
+    height: 20px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-editor-context {
+    display: flex !important;
+    align-items: center !important;
+    flex: 0 0 40px !important;
+    min-width: 40px !important;
+    height: 40px !important;
+    padding: 0 !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-editor-context output {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-editor-pin {
+    flex: 0 0 40px !important;
+    width: 40px !important;
+    min-width: 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    padding: 0 !important;
+    font-size: 0 !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2AudioWorkspace button,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2AudioWorkspace input,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2AudioWorkspace select,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2ModeTimelineDeck button,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2ModeTimelineDeck input,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2ModeTimelineDeck select {
+    box-sizing: border-box !important;
+    min-height: 40px !important;
+    height: 40px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2AudioWorkspace > .draw2-audio-panel,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2AudioWorkspace > .draw2-audio-editor-surface {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-animation-guide {
+    flex: 0 0 40px !important;
+    min-height: 40px !important;
+    height: 40px !important;
+    gap: 6px !important;
+    padding-inline: 6px !important;
+    border-radius: 0 !important;
+    overflow: hidden !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-animation-guide > span {
+    max-width: 68px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-animation-guide input {
+    min-width: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-midi-status {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-editor-placeholder {
+    gap: 8px !important;
+    padding: 8px !important;
+    overflow: auto !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-wave-toolbar,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-drum-toolbar {
+    flex-wrap: wrap !important;
+    min-height: 40px !important;
+    gap: 6px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-wave-toolbar button,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-drum-toolbar select {
+    min-height: 40px !important;
+    height: 40px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-waveform-viewport {
+    min-height: 160px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2AudioRightDock {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2WorkspaceTimelineRegion {
+    grid-area: timeline !important;
+    display: flex !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 4px !important;
+    overflow: hidden !important;
+    border-top: 1px solid #3a2d4d !important;
+    background: #111522 !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2ModeTimelineDeck:not([hidden]) {
+    display: flex !important;
+    flex: 1 1 auto !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    gap: 4px !important;
+    padding: 4px !important;
+    overflow: hidden !important;
+    border: 1px solid color-mix(in srgb, #c88bff 54%, var(--draw2-border));
+    border-radius: 6px !important;
+    background: #0d111c !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-mode-timeline-deck-heading {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-mode-timeline-deck-tabs {
+    flex: 0 0 40px !important;
+    min-height: 40px !important;
+    height: 40px !important;
+    gap: 3px !important;
+    overflow-x: auto !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-mode-timeline-deck-tab {
+    flex: 0 0 78px !important;
+    min-width: 78px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    padding: 0 7px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2ModeDeckAudio:not([hidden]) {
+    display: flex !important;
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    gap: 4px !important;
+    overflow: hidden !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2ModeDeckAudio > .draw2-mode-deck-toolbar {
+    flex: 0 0 40px !important;
+    min-height: 40px !important;
+    height: 40px !important;
+    gap: 4px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2ModeDeckAudio > .draw2-mode-deck-toolbar .draw2-button,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2ModeDeckAudio > .draw2-mode-deck-toolbar select {
+    flex: 0 0 auto !important;
+    min-height: 40px !important;
+    height: 40px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2ModeDeckAudio > .draw2-audio-timebase {
+    flex: 0 0 40px !important;
+    min-height: 40px !important;
+    height: 40px !important;
+    overflow-x: auto !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2ModeDeckAudio .draw2-audio-ruler {
+    flex-basis: 32px !important;
+    min-height: 32px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2ModeDeckAudio .draw2-audio-animation-cells {
+    flex-basis: 40px !important;
+    min-height: 40px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2ModeDeckAudio .draw2-audio-animation-cell {
+    min-height: 40px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2ModeDeckAudio .draw2-audio-track-lane {
+    flex-basis: 40px !important;
+    min-height: 40px !important;
+  }
+}
+
+/* The brush summary is useful on desktop, but its text makes one mobile
+ * control wider than the shared 40px touch square.  Keep the brush glyph as
+ * the compact affordance; the full state remains available via aria-label,
+ * title and the opened brush options dialog. */
+@media (max-width: 700px) {
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2BrushOptionsButton {
+    box-sizing: border-box !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0 !important;
+    width: 40px !important;
+    min-width: 40px !important;
+    max-width: 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+    padding: 0 !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2BrushOptionsButton
+    #draw2BrushOptionsSummary,
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2BrushOptionsButton
+    .draw2-brush-options-chevron {
+    display: none !important;
+  }
+}
+
+/* The initial closed state has a deliberately stronger legacy selector for
+ * the former full-width Open row.  Override that state explicitly so the
+ * grip remains a 40px button at the panel's upper-right corner. */
+@media (max-width: 700px) {
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]:not(
+      .is-mobile-panel-menu-open
+    ):not(.is-mobile-sheet-open):not(.is-mobile-timeline-open)
+    .draw2-mobile-drawer-header {
+    width: 40px !important;
+    min-width: 40px !important;
+    max-width: 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+    right: 4px !important;
+    top: 0 !important;
+    bottom: auto !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]:not(
+      .is-mobile-panel-menu-open
+    ):not(.is-mobile-sheet-open):not(.is-mobile-timeline-open)
+    .draw2-mobile-drawer-handle {
+    width: 40px !important;
+    min-width: 40px !important;
+    max-width: 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+  }
+}
+
+@media (max-width: 700px) and (min-width: 560px) and (max-height: 480px) {
+  .draw2-workspace-frame[data-workspace-profile="mobile"] {
+    --draw2-mobile-top-height: 48px;
+    --draw2-mobile-drawer-height: 160px;
+    --draw2-mobile-status-height: 20px;
+    --draw2-mobile-detail-half: 72px;
+    --draw2-mobile-detail-full: 96px;
+    grid-template-rows:
+      var(--draw2-mobile-top-height) minmax(24px, 1fr) var(
+        --draw2-mobile-drawer-height
+      ) 0 var(--draw2-mobile-status-height) !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"].is-mobile-sheet-open[data-mobile-drawer-mode="half"],
+  .draw2-workspace-frame[data-workspace-profile="mobile"].is-mobile-timeline-open[data-mobile-drawer-mode="half"] {
+    grid-template-rows:
+      var(--draw2-mobile-top-height) minmax(8px, 1fr) var(
+        --draw2-mobile-drawer-height
+      ) var(--draw2-mobile-detail-half) var(--draw2-mobile-status-height)
+      !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"].is-mobile-sheet-open[data-mobile-drawer-mode="full"],
+  .draw2-workspace-frame[data-workspace-profile="mobile"].is-mobile-timeline-open[data-mobile-drawer-mode="full"] {
+    grid-template-rows:
+      var(--draw2-mobile-top-height) minmax(8px, 1fr) var(
+        --draw2-mobile-drawer-height
+      ) var(--draw2-mobile-detail-full) var(--draw2-mobile-status-height)
+      !important;
+  }
+}
+
+/* Product-facing mobile polish: the grip communicates HALF/FULL without
+ * exposing implementation vocabulary, and the development status strip does
+ * not consume drawing space.  The grid row is removed together with display
+ * so the canvas receives the recovered height. */
+@media (max-width: 700px) {
+  .draw2-workspace-frame[data-workspace-profile="mobile"] {
+    --draw2-mobile-status-height: 0px;
+  }
+
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-mobile-drawer-mode,
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    [data-mobile-rail-action]
+    span {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0 0 0 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+  }
+
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-mobile-drawer-handle::after {
+    content: "";
+    width: 10px;
+    height: 5px;
+    border-inline: 2px solid currentColor;
+    border-top: 2px solid currentColor;
+    opacity: 0.78;
+  }
+
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-workspace-statusbar {
+    display: none !important;
+  }
+}
+
+/* Mobile navigation contract: creator modes stay in the second top lane and
+ * every primary detail surface is a direct, one-row lower-rail destination.
+ * The old Back/More -> contextual rail is intentionally removed; Timeline
+ * subviews remain inside the Timeline surface where their content is visible.
+ */
+@media (max-width: 700px) {
+  .draw2-workspace-frame[data-workspace-profile="mobile"] {
+    --draw2-mobile-top-height: 132px;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"]:not(
+      [data-creator-mode="DRAW"]
+    ) {
+    --draw2-mobile-top-height: 92px;
+  }
+
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-workspace-topbar {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: 48px 44px 40px !important;
+    height: var(--draw2-mobile-top-height) !important;
+    min-height: var(--draw2-mobile-top-height) !important;
+    max-height: var(--draw2-mobile-top-height) !important;
+  }
+
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-workspace-global-row {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+  }
+
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-workspace-context-row {
+    grid-column: 1 !important;
+    grid-row: 3 !important;
+    display: flex !important;
+    align-items: center !important;
+    width: 100% !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    padding: 2px 4px !important;
+    overflow: hidden !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"]:not(
+      [data-creator-mode="DRAW"]
+    )
+    .draw2-workspace-topbar {
+    grid-template-rows: 48px 44px 0 !important;
+  }
+  .draw2-workspace-frame[data-workspace-profile="mobile"]:not(
+      [data-creator-mode="DRAW"]
+    )
+    .draw2-workspace-context-row {
+    display: none !important;
+  }
+
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-creator-mode-bar {
+    grid-column: 1 !important;
+    grid-row: 2 !important;
+    display: flex !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+    padding: 0 4px !important;
+    gap: 0 !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    scrollbar-width: none !important;
+    border-top: 1px solid var(--draw2-border-subtle) !important;
+    touch-action: pan-x !important;
+  }
+
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-creator-mode-bar::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .draw2-workspace-frame[data-workspace-profile="mobile"] .draw2-creator-mode {
+    display: grid !important;
+    flex: 0 0 var(--draw2-mobile-square) !important;
+    place-items: center !important;
+    width: var(--draw2-mobile-square) !important;
+    min-width: var(--draw2-mobile-square) !important;
+    max-width: var(--draw2-mobile-square) !important;
+    height: var(--draw2-mobile-square) !important;
+    min-height: var(--draw2-mobile-square) !important;
+    max-height: var(--draw2-mobile-square) !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-bottom: 2px solid transparent !important;
+    border-radius: 0 !important;
+  }
+
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-creator-mode.is-active {
+    color: var(--draw2-text-strong) !important;
+    border-bottom-color: var(--draw2-accent-strong) !important;
+    background: color-mix(in srgb, var(--draw2-accent-strong) 12%, transparent)
+      !important;
+  }
+
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-creator-mode
+    span {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    overflow: hidden !important;
+    clip: rect(0 0 0 0) !important;
+    white-space: nowrap !important;
+  }
+
+  /* One direct lower rail: Layers, Color, Options, Timeline and all
+   * registered panels are peers. Back/More and duplicate mobile Timeline
+   * buttons are not rendered, so no second contextual tab stage is needed. */
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-workspace-panel-launcher {
+    grid-area: rail !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    height: var(--draw2-mobile-square) !important;
+    min-height: var(--draw2-mobile-square) !important;
+    max-height: var(--draw2-mobile-square) !important;
+    padding: 0 !important;
+    gap: 0 !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    scrollbar-width: none !important;
+    border-top: 1px solid var(--draw2-border-subtle) !important;
+    background: var(--draw2-surface) !important;
+    touch-action: pan-x !important;
+  }
+
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-workspace-panel-launcher::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"][data-mobile-rail-context]
+    #draw2WorkspaceLeftDock
+    .draw2-workspace-panel-launcher
+    > [data-mobile-rail-action],
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"][data-mobile-rail-context]
+    #draw2WorkspaceLeftDock
+    .draw2-workspace-panel-launcher
+    > [data-draw2-mobile-timeline-tab] {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2WorkspaceLeftDock
+    .draw2-workspace-panel-launcher
+    > [data-workspace-panel] {
+    display: grid !important;
+    flex: 0 0 var(--draw2-mobile-square) !important;
+    place-items: center !important;
+    width: var(--draw2-mobile-square) !important;
+    min-width: var(--draw2-mobile-square) !important;
+    max-width: var(--draw2-mobile-square) !important;
+    height: var(--draw2-mobile-square) !important;
+    min-height: var(--draw2-mobile-square) !important;
+    max-height: var(--draw2-mobile-square) !important;
+    padding: 3px 2px 2px !important;
+    gap: 1px !important;
+    border: 0 !important;
+    border-bottom: 2px solid transparent !important;
+    border-radius: 0 !important;
+  }
+
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-workspace-panel-launcher
+    > [data-workspace-timeline-toggle] {
+    display: grid !important;
+  }
+
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-workspace-panel-launcher
+    > [data-workspace-panel].is-active,
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    .draw2-workspace-panel-launcher
+    > [data-workspace-timeline-toggle].is-active {
+    color: var(--draw2-text-strong) !important;
+    border-bottom-color: var(--draw2-accent-strong) !important;
+    background: color-mix(in srgb, var(--draw2-accent-strong) 9%, transparent)
+      !important;
+  }
+
+  /* Timeline owns Timeline/Tags/Markers/Audio navigation in its own detail
+   * surface. This is a single horizontal tab row, not another lower rail. */
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    #draw2WorkspaceTimelineSlot
+    .draw2-timeline-tabs-shell {
+    display: flex !important;
+    flex: 0 0 44px !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    scrollbar-width: none !important;
+  }
+  #draw2WorkspaceTimelineSlot .draw2-timeline-tabs-shell {
+    min-width: 0 !important;
+  }
+
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    #draw2WorkspaceTimelineSlot
+    .draw2-timeline-tabs-shell::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    #draw2WorkspaceTimelineSlot
+    .draw2-timeline-tabs {
+    display: flex !important;
+    flex: 0 0 auto !important;
+    width: max-content !important;
+    min-width: max-content !important;
+    height: 44px !important;
+  }
+
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    #draw2WorkspaceTimelineSlot
+    .draw2-timeline-tab {
+    flex: 0 0 auto !important;
+    min-width: 74px !important;
+    width: auto !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    padding-inline: 10px !important;
+  }
+}
+
+/* Keep the first mobile rail glanceable.  Secondary panels are still direct
+ * destinations, but only appear after More/Timeline is chosen.  This avoids
+ * a row of eight tiny labels competing with the palette and tools. */
+/* Direct rail contract: #draw2WorkspaceLeftDock .draw2-workspace-panel-launcher > [data-workspace-panel]
+ * and .draw2-workspace-panel-launcher > [data-mobile-rail-action] remain
+ * single-button destinations even when the visible context is reduced.
+ * #draw2WorkspaceTimelineSlot .draw2-timeline-tabs-shell stays the desktop
+ * Timeline surface contract; phone navigation uses the contextual rail. */
+@media (max-width: 700px) {
+  /* Game/Audio adapters are PC-only until their mobile surfaces are mounted.
+   * Do not expose a mode that falls back to the Draw canvas with unrelated
+   * color/tool controls; the mobile mode bar should contain only a usable
+   * surface.  The desktop mode buttons remain untouched. */
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-creator-mode[data-creator-mode="GAME"],
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-creator-mode[data-creator-mode="AUDIO"] {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2WorkspaceLeftDock
+    .draw2-workspace-panel-launcher
+    > [data-workspace-panel],
+  #draw2WorkspaceLeftDock
+    .draw2-workspace-panel-launcher
+    > [data-workspace-panel],
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2WorkspaceLeftDock
+    .draw2-workspace-panel-launcher
+    > [data-workspace-timeline-toggle],
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2WorkspaceLeftDock
+    .draw2-workspace-panel-launcher
+    > [data-mobile-rail-action],
+  #draw2WorkspaceLeftDock
+    .draw2-workspace-panel-launcher
+    > [data-mobile-rail-action],
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2WorkspaceLeftDock
+    .draw2-workspace-panel-launcher
+    > [data-draw2-mobile-timeline-tab] {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"][data-mobile-rail-context="primary"]
+    #draw2WorkspaceLeftDock
+    .draw2-workspace-panel-launcher
+    > [data-workspace-panel="layers"],
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"][data-mobile-rail-context="primary"]
+    #draw2WorkspaceLeftDock
+    .draw2-workspace-panel-launcher
+    > [data-workspace-panel="color"],
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"][data-mobile-rail-context="primary"]
+    #draw2WorkspaceLeftDock
+    .draw2-workspace-panel-launcher
+    > [data-workspace-timeline-toggle],
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"][data-mobile-rail-context="primary"]
+    #draw2WorkspaceLeftDock
+    .draw2-workspace-panel-launcher
+    > [data-mobile-rail-action="more"],
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"][data-mobile-rail-context="more"]
+    #draw2WorkspaceLeftDock
+    .draw2-workspace-panel-launcher
+    > [data-mobile-rail-action="back"],
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"][data-mobile-rail-context="more"]
+    #draw2WorkspaceLeftDock
+    .draw2-workspace-panel-launcher
+    > [data-workspace-panel="advanced"],
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"][data-mobile-rail-context="more"]
+    #draw2WorkspaceLeftDock
+    .draw2-workspace-panel-launcher
+    > [data-workspace-panel="preview"],
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"][data-mobile-rail-context="more"]
+    #draw2WorkspaceLeftDock
+    .draw2-workspace-panel-launcher
+    > [data-workspace-panel="assets"],
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"][data-mobile-rail-context="more"]
+    #draw2WorkspaceLeftDock
+    .draw2-workspace-panel-launcher
+    > [data-workspace-panel="export"],
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"][data-mobile-rail-context="timeline"]
+    #draw2WorkspaceLeftDock
+    .draw2-workspace-panel-launcher
+    > [data-mobile-rail-action="back"],
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"][data-mobile-rail-context="timeline"]
+    #draw2WorkspaceLeftDock
+    .draw2-workspace-panel-launcher
+    > [data-workspace-timeline-toggle],
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"][data-mobile-rail-context="timeline"]
+    #draw2WorkspaceLeftDock
+    .draw2-workspace-panel-launcher
+    > [data-workspace-panel="layers"],
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"][data-mobile-rail-context="timeline"]
+    #draw2WorkspaceLeftDock
+    .draw2-workspace-panel-launcher
+    > [data-draw2-mobile-timeline-tab] {
+    display: grid !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"][data-mobile-rail-context="primary"]
+    #draw2WorkspaceLeftDock
+    .draw2-workspace-panel-launcher
+    > [data-workspace-panel]:not([data-workspace-panel="layers"]):not(
+      [data-workspace-panel="color"]
+    ) {
+    display: none !important;
+  }
+
+  /* The rail owns Timeline/Tags/Markers/Audio selection on a phone.  The
+   * desktop tab row is hidden so Timeline never becomes a two-level tab bar. */
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2WorkspaceTimelineSlot
+    .draw2-timeline-tabs-shell {
+    display: none !important;
+  }
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2WorkspaceTimelineSlot
+    .draw2-timeline-viewport {
+    height: calc(100% - 8px) !important;
+    max-height: none !important;
+    margin-top: 0 !important;
+  }
+}
+
+/* Short landscape phones cannot fit two top lanes, the four-row lower rail,
+ * and a usable detail row in one vertical stack. Keep the requested two top
+ * lanes, move the active detail surface to a side sheet, and reserve the
+ * recovered center strip for the canvas. Portrait and tablet projections are
+ * intentionally unaffected. */
+@media (max-width: 700px) and (max-height: 480px) {
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]:not(
+    .is-mobile-timeline-open
+  ),
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"].is-mobile-sheet-open,
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"].is-mobile-timeline-open {
+    grid-template-rows:
+      var(--draw2-mobile-top-height) minmax(88px, 1fr) var(
+        --draw2-mobile-drawer-height
+      ) 0 var(--draw2-mobile-status-height) !important;
+    grid-template-areas: "top" "canvas" "left" "timeline" "status" !important;
+  }
+
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    #draw2WorkspaceCanvasSlot
+    > .draw2-canvas-card,
+  .draw2-workspace-frame[data-workspace-profile="mobile"]
+    #draw2WorkspaceCanvasSlot
+    .draw2-viewport-wrap {
+    place-items: center start !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"].is-mobile-sheet-open
+    #draw2WorkspaceRightDock
+    .draw2-workspace-panel:not([hidden]),
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"].is-mobile-sheet-open
+    #draw2WorkspaceColorEditor:not([hidden]) {
+    position: fixed !important;
+    inset: var(--draw2-mobile-top-height) 0
+      calc(var(--draw2-mobile-drawer-height) + env(safe-area-inset-bottom, 0px))
+      auto !important;
+    z-index: 120 !important;
+    display: block !important;
+    width: min(46vw, 320px) !important;
+    min-width: 240px !important;
+    height: auto !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    padding: 8px !important;
+    overflow: auto !important;
+    border: 1px solid var(--draw2-border-strong) !important;
+    border-radius: 4px 0 0 4px !important;
+    background: var(--draw2-surface) !important;
+    box-shadow: var(--draw2-shadow-panel) !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2WorkspaceTimelineRegion {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"].is-mobile-timeline-open
+    #draw2WorkspaceTimelineRegion {
+    position: fixed !important;
+    inset: var(--draw2-mobile-top-height) 0
+      calc(var(--draw2-mobile-drawer-height) + env(safe-area-inset-bottom, 0px))
+      auto !important;
+    z-index: 120 !important;
+    display: flex !important;
+    width: min(58vw, 420px) !important;
+    min-width: 300px !important;
+    height: auto !important;
+    max-height: none !important;
+    padding: 0 4px 4px !important;
+    overflow: hidden !important;
+    border: 1px solid var(--draw2-border-strong) !important;
+    border-radius: 4px 0 0 4px !important;
+    background: var(--draw2-surface) !important;
+    box-shadow: var(--draw2-shadow-panel) !important;
+  }
+}
+
+/* Shared top commands keep the same three actions on a phone: Undo, Redo,
+   and the active mode's Play/Preview. Menu-only actions stay in Details so
+   the visible command group does not change meaning by viewport. */
+@media (max-width: 700px) {
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-command-bar {
+    display: grid !important;
+    grid-template-columns: repeat(4, 32px) !important;
+    width: 134px !important;
+    min-width: 134px !important;
+    gap: 2px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-command-bar
+    > * {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-command-bar
+    > [data-workspace-command="undo"],
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-command-bar
+    > [data-workspace-command="redo"],
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-command-bar
+    > [data-shared-control="playback"] {
+    display: grid !important;
+    place-items: center !important;
+    flex: 0 0 32px !important;
+    width: 32px !important;
+    min-width: 32px !important;
+    height: 32px !important;
+    min-height: 32px !important;
+    padding: 0 !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-command-bar
+    > .draw2-icon-button
+    span {
+    display: none !important;
+  }
+}
+
+/* Draw2 mobile polish / stage 1 -----------------------------------------
+ * The Core still owns tool selection and project state.  This presentation
+ * layer only makes the high-frequency tools directly reachable on a phone,
+ * keeps the canvas usable on short screens, and gives Color a compact
+ * half-sheet before the full editor is needed. */
+@media (max-width: 700px) {
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-toolbar {
+    display: flex !important;
+    flex-flow: row nowrap !important;
+    align-items: center !important;
+    gap: 2px !important;
+    padding: 0 2px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    overscroll-behavior-x: contain !important;
+    scroll-snap-type: x proximity;
+    touch-action: pan-x !important;
+  }
+
+  /* On phones every child tool is a real rail item.  Desktop keeps the
+     bounded exclusive flyouts defined in draw2-shell.css. */
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-toolbar
+    > .draw2-tool-group {
+    display: contents !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-toolbar
+    > .draw2-tool-group
+    > .draw2-tool-group-summary {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-toolbar
+    > .draw2-tool-group
+    > .draw2-tool-popover {
+    position: static !important;
+    display: contents !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+    width: auto !important;
+    max-width: none !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-toolbar
+    > .draw2-tool-group
+    > .draw2-tool-popover
+    > .draw2-tool-button,
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-toolbar
+    > .draw2-tool-button {
+    position: relative !important;
+    flex: 0 0 var(--draw2-mobile-square) !important;
+    width: var(--draw2-mobile-square) !important;
+    min-width: var(--draw2-mobile-square) !important;
+    max-width: var(--draw2-mobile-square) !important;
+    height: var(--draw2-mobile-square) !important;
+    min-height: var(--draw2-mobile-square) !important;
+    max-height: var(--draw2-mobile-square) !important;
+    padding: 0 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+    scroll-snap-align: start;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-toolbar
+    .draw2-tool-button
+    span {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0 0 0 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+  }
+
+  /* A quiet divider preserves the old group rhythm without bringing back a
+     second tap. */
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    [data-workspace-tool-group="shapes"]
+    > .draw2-tool-popover,
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    [data-workspace-tool-group="fill"]
+    > .draw2-tool-popover,
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    [data-workspace-tool-group="color"]
+    > .draw2-tool-popover,
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    [data-workspace-tool-group="selection"]
+    > .draw2-tool-popover,
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    [data-workspace-tool-group="transform"]
+    > .draw2-tool-popover,
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    [data-workspace-tool-group="tile"]
+    > .draw2-tool-popover {
+    border-inline-start: 0 !important;
+    padding-inline-start: 0 !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    [data-workspace-tool-group="shapes"]
+    > .draw2-tool-popover
+    > .draw2-tool-button:first-child,
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    [data-workspace-tool-group="fill"]
+    > .draw2-tool-popover
+    > .draw2-tool-button:first-child,
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    [data-workspace-tool-group="color"]
+    > .draw2-tool-popover
+    > .draw2-tool-button:first-child,
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    [data-workspace-tool-group="selection"]
+    > .draw2-tool-popover
+    > .draw2-tool-button:first-child,
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    [data-workspace-tool-group="transform"]
+    > .draw2-tool-popover
+    > .draw2-tool-button:first-child,
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    [data-workspace-tool-group="tile"]
+    > .draw2-tool-popover
+    > .draw2-tool-button:first-child {
+    margin-inline-start: 3px !important;
+    border-inline-start: 1px solid var(--draw2-border-subtle) !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2WorkspacePanelColor:not([hidden]) {
+    padding: 8px !important;
+    overflow: auto !important;
+    overscroll-behavior: contain !important;
+    scrollbar-width: thin;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2WorkspacePanelColor
+    #draw2WorkspaceColorEditor:not([hidden]) {
+    display: grid !important;
+    grid-template-columns: minmax(112px, 42vw) minmax(0, 1fr) !important;
+    grid-template-areas:
+      "heading heading"
+      "picker sliders"
+      "footer footer"
+      "status status" !important;
+    align-items: start !important;
+    gap: 6px 8px !important;
+    width: 100% !important;
+    height: auto !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2WorkspaceColorEditor
+    > .draw2-color-editor-heading {
+    grid-area: heading !important;
+    min-height: 24px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2WorkspaceColorEditor
+    > .draw2-color-picker {
+    grid-area: picker !important;
+    justify-self: center !important;
+    width: min(100%, 156px) !important;
+    max-width: 156px !important;
+    aspect-ratio: 1 / 1 !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2WorkspaceColorEditor
+    > .draw2-color-sliders {
+    grid-area: sliders !important;
+    align-self: center !important;
+    gap: 3px !important;
+    min-width: 0 !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2WorkspaceColorEditor
+    > .draw2-color-sliders
+    label {
+    grid-template-columns: 14px minmax(0, 1fr) 28px !important;
+    gap: 3px !important;
+    min-height: 22px !important;
+    font-size: 0.62rem !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2WorkspaceColorEditor
+    > .draw2-color-editor-footer {
+    grid-area: footer !important;
+    min-width: 0 !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2WorkspaceColorEditor
+    > .draw2-color-editor-status {
+    grid-area: status !important;
+    min-height: 14px !important;
+  }
+}
+
+/* Short portrait phones: reclaim the hidden context row and one palette row
+ * before reducing the Canvas.  The previous cascade left only 88px for the
+ * artwork at 320x568 while a Color sheet was open. */
+@media (max-width: 700px) and (max-height: 680px) {
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"] {
+    --draw2-mobile-top-height: 92px !important;
+    --draw2-mobile-drawer-height: 132px !important;
+    --draw2-mobile-detail-half: 140px !important;
+    --draw2-mobile-detail-full: 160px !important;
+    --draw2-mobile-canvas-min-height: 160px !important;
+    grid-template-rows:
+      var(--draw2-mobile-top-height) minmax(
+        var(--draw2-mobile-canvas-min-height),
+        1fr
+      ) var(--draw2-mobile-drawer-height) 0 var(--draw2-mobile-status-height) !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-topbar {
+    grid-template-rows: 48px 44px 0 !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-context-row {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-left-dock {
+    grid-template-rows:
+      var(--draw2-mobile-square) var(--draw2-mobile-square)
+      var(--draw2-mobile-square) !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-color-rail {
+    height: var(--draw2-mobile-square) !important;
+    min-height: var(--draw2-mobile-square) !important;
+    max-height: var(--draw2-mobile-square) !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-color-rail
+    .draw2-palette-grid {
+    grid-template-rows: var(--draw2-mobile-square) !important;
+    height: var(--draw2-mobile-square) !important;
+    min-height: var(--draw2-mobile-square) !important;
+    max-height: var(--draw2-mobile-square) !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"].is-mobile-sheet-open[data-mobile-drawer-mode="half"] {
+    grid-template-rows:
+      var(--draw2-mobile-top-height) minmax(
+        var(--draw2-mobile-canvas-min-height),
+        1fr
+      ) var(--draw2-mobile-drawer-height)
+      var(--draw2-mobile-detail-half) var(--draw2-mobile-status-height) !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"].is-mobile-sheet-open[data-mobile-drawer-mode="full"] {
+    grid-template-rows:
+      var(--draw2-mobile-top-height) minmax(
+        var(--draw2-mobile-canvas-min-height),
+        1fr
+      ) var(--draw2-mobile-drawer-height)
+      var(--draw2-mobile-detail-full) var(--draw2-mobile-status-height) !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2WorkspacePanelColor
+    #draw2WorkspaceColorEditor
+    > .draw2-color-picker {
+    width: min(100%, 116px) !important;
+    max-width: 116px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"][data-mobile-drawer-mode="half"]
+    #draw2WorkspaceColorEditor
+    > .draw2-color-sliders {
+    display: none !important;
+  }
+}
+
+/* The mobile rail is a separate presentation projection.  Keeping the
+ * desktop grouped toolbar in the DOM preserves its keyboard/command wiring,
+ * while this compact row gives touch users direct high-frequency actions. */
+.draw2-mobile-toolbar {
+  display: none;
+}
+
+@media (max-width: 700px) {
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-toolbar {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-toolbar {
+    grid-area: tools !important;
+    display: flex !important;
+    flex-flow: row nowrap !important;
+    align-items: center !important;
+    gap: 2px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    height: var(--draw2-mobile-square) !important;
+    min-height: var(--draw2-mobile-square) !important;
+    max-height: var(--draw2-mobile-square) !important;
+    padding: 0 2px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    scrollbar-width: none !important;
+    overscroll-behavior-x: contain !important;
+    scroll-snap-type: x proximity;
+    touch-action: pan-x !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-toolbar::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-toolbar
+    > .draw2-tool-button {
+    position: relative !important;
+    display: grid !important;
+    flex: 0 0 var(--draw2-mobile-square) !important;
+    place-items: center !important;
+    width: var(--draw2-mobile-square) !important;
+    min-width: var(--draw2-mobile-square) !important;
+    max-width: var(--draw2-mobile-square) !important;
+    height: var(--draw2-mobile-square) !important;
+    min-height: var(--draw2-mobile-square) !important;
+    max-height: var(--draw2-mobile-square) !important;
+    padding: 0 !important;
+    scroll-snap-align: start;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-toolbar
+    > .draw2-tool-button
+    span {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0 0 0 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+  }
+}
+
+/* Landscape phones use the split workspace: keep the rail compact and direct. */
+@media (min-width: 701px) and (max-height: 480px) {
+  #draw2WorkspaceFrame[data-workspace-profile="split"] .draw2-workspace-toolbar {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="split"] .draw2-mobile-toolbar {
+    display: flex !important;
+    flex: 1 1 auto;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    width: 44px;
+    min-width: 44px;
+    height: 100%;
+    min-height: 0;
+    max-height: none;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: 0;
+    scroll-snap-type: y proximity;
+    scrollbar-width: none;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="split"] .draw2-mobile-toolbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="split"] .draw2-mobile-toolbar > .draw2-tool-button {
+    flex: 0 0 44px;
+    width: 44px;
+    min-width: 44px;
+    max-width: 44px;
+    height: 44px;
+    min-height: 44px;
+    max-height: 44px;
+    scroll-snap-align: start;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="split"] #draw2WorkspacePanelColor:not([hidden]) {
+    overflow: auto;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="split"] #draw2WorkspaceColorEditor:not([hidden]) {
+    display: grid;
+    grid-template-columns: 56px minmax(0, 1fr);
+    grid-template-areas: "picker sliders";
+    gap: 2px;
+    align-items: start;
+    min-width: 0;
+    height: 60px;
+    max-height: 60px;
+    overflow: hidden;
+    padding: 2px;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="split"] #draw2WorkspaceColorEditor > .draw2-color-editor-heading,
+  #draw2WorkspaceFrame[data-workspace-profile="split"] #draw2WorkspaceColorEditor > .draw2-color-editor-status {
+    display: none;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="split"] #draw2WorkspaceColorEditor > .draw2-color-picker {
+    grid-area: picker;
+    width: 56px;
+    height: 56px;
+    min-width: 56px;
+    min-height: 56px;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="split"] #draw2WorkspaceColorEditor > .draw2-color-sliders {
+    grid-area: sliders;
+    min-width: 0;
+    height: 56px;
+    min-height: 0;
+    gap: 0;
+    align-content: stretch;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="split"] #draw2WorkspaceColorEditor > .draw2-color-sliders label {
+    grid-template-columns: 10px minmax(0, 1fr) 22px;
+    min-height: 0;
+    height: 14px;
+    min-height: 14px;
+    line-height: 1;
+    font-size: 0.45rem;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="split"] #draw2WorkspaceColorEditor > .draw2-color-editor-footer {
+    display: none;
+  }
+}
+
+@media (max-width: 340px) {
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2MobileCanvasHud
+    #draw2MobileCanvasColor,
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2MobileCanvasHud
+    .draw2-mobile-canvas-separator {
+    display: none;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2MobileCanvasHud
+    #draw2MobileCanvasFrame {
+    flex: 0 0 auto;
+    width: auto;
+  }
+}
+
+/* Mobile navigation / stage 3 -------------------------------------------
+ * Keep the first glance focused on drawing: tools and palette are permanent,
+ * while panel destinations live behind one explicit grip interaction.  The project
+ * identity remains available from Details / Project, not as an editable field
+ * in the high-frequency top lane. */
+@media (max-width: 700px) {
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"] {
+    --draw2-mobile-top-height: 88px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-creator-mode-bar {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-topbar {
+    grid-template-rows: 48px 40px !important;
+    height: var(--draw2-mobile-top-height) !important;
+    min-height: var(--draw2-mobile-top-height) !important;
+    max-height: var(--draw2-mobile-top-height) !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-context-row {
+    grid-column: 1 !important;
+    grid-row: 2 !important;
+    display: flex !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-project-slot {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-global-row {
+    grid-template-columns:
+      var(--draw2-mobile-square) minmax(0, 1fr) !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-command-bar {
+    grid-column: 2 !important;
+    display: grid !important;
+    grid-template-columns: repeat(4, 40px) !important;
+    justify-content: center !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    gap: 4px !important;
+    overflow: visible !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-command-bar
+    > * {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-command-bar
+    > [data-workspace-command="undo"],
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-command-bar
+    > [data-workspace-command="redo"],
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-command-bar
+    > [data-workspace-command="panel-export"],
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-command-bar
+    > [data-shared-control="playback"] {
+    display: grid !important;
+    place-items: center !important;
+    width: 40px !important;
+    min-width: 40px !important;
+    max-width: 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+    padding: 0 !important;
+    border-radius: 8px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-command-bar
+    > [data-workspace-command="undo"],
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-command-bar
+    > [data-workspace-command="redo"] {
+    border-color: var(--draw2-border-strong) !important;
+    background: color-mix(in srgb, var(--draw2-accent-strong) 8%, transparent) !important;
+  }
+
+  /* Mini Preview remains available from Details; it must not become a lone
+     second-row button after the command group is compacted. */
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-command-bar
+    > .draw2-global-mini-preview-toggle {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-drawer-action-label {
+    display: inline-block !important;
+    color: var(--draw2-text-muted) !important;
+    font:
+      800 0.56rem/1 ui-monospace,
+      SFMono-Regular,
+      Menlo,
+      monospace !important;
+    letter-spacing: 0.04em !important;
+    text-transform: uppercase !important;
+    white-space: nowrap !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-drawer-handle {
+    flex-direction: row !important;
+    gap: 7px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]:not(
+      .is-mobile-panel-menu-open
+    ):not(.is-mobile-sheet-open):not(.is-mobile-timeline-open)
+    .draw2-mobile-drawer-header {
+    grid-column: 1 / -1 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]:not(
+      .is-mobile-panel-menu-open
+    ):not(.is-mobile-sheet-open):not(.is-mobile-timeline-open)
+    .draw2-mobile-drawer-handle {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: none !important;
+    justify-content: center !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]:not(
+      .is-mobile-panel-menu-open
+    ):not(.is-mobile-sheet-open):not(.is-mobile-timeline-open)
+    .draw2-workspace-panel-launcher {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"].is-mobile-panel-menu-open
+    .draw2-mobile-drawer-header,
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"].is-mobile-sheet-open
+    .draw2-mobile-drawer-header,
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"].is-mobile-timeline-open
+    .draw2-mobile-drawer-header {
+    grid-column: 1 !important;
+    width: var(--draw2-mobile-square) !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"].is-mobile-panel-menu-open
+    .draw2-workspace-panel-launcher,
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"].is-mobile-sheet-open
+    .draw2-workspace-panel-launcher,
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"].is-mobile-timeline-open
+    .draw2-workspace-panel-launcher {
+    display: flex !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-panel-launcher
+    > [data-workspace-panel="color"] {
+    order: 1 !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-panel-launcher
+    > [data-workspace-panel="layers"] {
+    order: 2 !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-panel-launcher
+    > [data-workspace-timeline-toggle] {
+    order: 3 !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-panel-launcher
+    > [data-mobile-rail-action="more"] {
+    order: 4 !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"][data-mobile-rail-context="primary"]
+    #draw2WorkspaceLeftDock
+    .draw2-workspace-panel-launcher
+    > [data-workspace-panel="color"] {
+    order: 1 !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"][data-mobile-rail-context="primary"]
+    #draw2WorkspaceLeftDock
+    .draw2-workspace-panel-launcher
+    > [data-workspace-panel="layers"] {
+    order: 2 !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"][data-mobile-rail-context="primary"]
+    #draw2WorkspaceLeftDock
+    .draw2-workspace-panel-launcher
+    > [data-workspace-timeline-toggle] {
+    order: 3 !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"][data-mobile-rail-context="primary"]
+    #draw2WorkspaceLeftDock
+    .draw2-workspace-panel-launcher
+    > [data-mobile-rail-action="more"] {
+    order: 4 !important;
+  }
+}
+
+@media (max-width: 700px) and (max-height: 680px) {
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"] {
+    --draw2-mobile-top-height: 48px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-topbar {
+    grid-template-rows: 48px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-context-row {
+    display: none !important;
+  }
+}
+
+/* Canvas HUD / stage 2 --------------------------------------------------
+ * The HUD is deliberately pointer-transparent except for its small
+ * viewport toolbar.  Drawing can continue through the status surface while
+ * zoom and centering remain one tap away from the artwork. */
+.draw2-mobile-canvas-hud {
+  display: none;
+}
+
+@media (max-width: 700px) {
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2MobileCanvasHud {
+    position: absolute;
+    inset: auto 6px 6px;
+    z-index: 30;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 6px;
+    width: auto;
+    min-width: 0;
+    pointer-events: none;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-canvas-context,
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-viewport-controls {
+    min-height: 30px;
+    border: 1px solid color-mix(in srgb, var(--draw2-border-strong) 82%, transparent);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--draw2-surface-input) 88%, transparent);
+    box-shadow: 0 3px 12px rgb(0 0 0 / 24%);
+    backdrop-filter: blur(8px);
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-canvas-context {
+    display: inline-flex;
+    flex: 0 1 auto;
+    align-items: center;
+    gap: 5px;
+    max-width: min(44vw, 180px);
+    padding: 0 8px;
+    overflow: hidden;
+    color: var(--draw2-text-strong);
+    font:
+      700 0.58rem/1 ui-monospace,
+      SFMono-Regular,
+      Menlo,
+      monospace;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-canvas-context
+    output {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-canvas-color-swatch {
+    flex: 0 0 11px;
+    width: 11px;
+    height: 11px;
+    border: 1px solid var(--draw2-border-strong);
+    border-radius: 3px;
+    background: #fff;
+    box-shadow: inset 0 0 0 1px rgb(0 0 0 / 18%);
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-canvas-separator {
+    color: var(--draw2-text-muted);
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-viewport-controls {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 2px;
+    padding: 2px;
+    pointer-events: auto;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-viewport-button {
+    display: grid;
+    flex: 0 0 26px;
+    place-items: center;
+    width: 26px;
+    min-width: 26px;
+    height: 26px;
+    min-height: 26px;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--draw2-text-muted);
+    font:
+      800 0.62rem/1 ui-monospace,
+      SFMono-Regular,
+      Menlo,
+      monospace;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-viewport-button:hover,
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-viewport-button:focus-visible {
+    background: color-mix(in srgb, var(--draw2-accent-strong) 18%, transparent);
+    color: var(--draw2-text-strong);
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-viewport-button:active {
+    transform: scale(0.94);
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-viewport-button
+    .draw2-ui-icon {
+    width: 15px;
+    height: 15px;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-viewport-readout {
+    display: inline-grid;
+    min-width: 58px;
+    place-items: center;
+    color: var(--draw2-text-strong);
+    font:
+      700 0.57rem/1 ui-monospace,
+      SFMono-Regular,
+      Menlo,
+      monospace;
+    white-space: nowrap;
+  }
+}
+
+@media (min-width: 701px) and (max-height: 480px) {
+  #draw2WorkspaceFrame[data-workspace-profile="split"]
+    #draw2MobileCanvasHud {
+    position: absolute;
+    inset: auto 4px 4px;
+    z-index: 30;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 4px;
+    pointer-events: none;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-mobile-canvas-context,
+  #draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-mobile-viewport-controls {
+    min-height: 24px;
+    border: 1px solid color-mix(in srgb, var(--draw2-border-strong) 80%, transparent);
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--draw2-surface-input) 90%, transparent);
+    box-shadow: 0 2px 8px rgb(0 0 0 / 22%);
+    backdrop-filter: blur(6px);
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-mobile-canvas-context {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    max-width: 110px;
+    padding: 0 5px;
+    overflow: hidden;
+    color: var(--draw2-text-strong);
+    font:
+      700 0.48rem/1 ui-monospace,
+      SFMono-Regular,
+      Menlo,
+      monospace;
+    white-space: nowrap;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-mobile-canvas-color-swatch {
+    flex: 0 0 8px;
+    width: 8px;
+    height: 8px;
+    border: 1px solid var(--draw2-border-strong);
+    border-radius: 2px;
+    background: #fff;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-mobile-viewport-controls {
+    display: inline-flex;
+    align-items: center;
+    gap: 1px;
+    padding: 1px;
+    pointer-events: auto;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-mobile-viewport-button {
+    display: grid;
+    flex: 0 0 20px;
+    place-items: center;
+    width: 20px;
+    min-width: 20px;
+    height: 20px;
+    min-height: 20px;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--draw2-text-muted);
+    font: 800 0.48rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-mobile-viewport-button
+    .draw2-ui-icon {
+    width: 12px;
+    height: 12px;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-mobile-viewport-readout {
+    display: inline-grid;
+    min-width: 38px;
+    place-items: center;
+    color: var(--draw2-text-strong);
+    font: 700 0.42rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    white-space: nowrap;
+  }
+}
+
+/* Mobile polish / stage 4 -----------------------------------------------
+ * Make the current tool, scrollable tool rail and panel state legible at a
+ * glance without changing the 40px touch contract or changing the owners
+ * of drawing, color and panel state. */
+@media (max-width: 700px) {
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-toolbar {
+    position: relative !important;
+    scroll-padding-inline: 0 18px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-toolbar::after {
+    position: absolute;
+    inset: 0 0 0 auto;
+    z-index: 2;
+    width: 16px;
+    pointer-events: none;
+    content: "";
+    background: linear-gradient(
+      90deg,
+      transparent,
+      var(--draw2-surface) 88%
+    );
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-toolbar
+    > .draw2-tool-button.is-active {
+    border-color: var(--draw2-accent-strong) !important;
+    background: color-mix(
+      in srgb,
+      var(--draw2-accent-strong) 12%,
+      var(--draw2-surface-input)
+    ) !important;
+    box-shadow:
+      inset 0 -3px 0 var(--draw2-accent-strong),
+      0 0 0 1px color-mix(in srgb, var(--draw2-accent-strong) 48%, transparent) !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-color-rail
+    .draw2-color[aria-pressed="true"] {
+    position: relative;
+    z-index: 1;
+    border-color: var(--draw2-accent-strong) !important;
+    box-shadow:
+      inset 0 0 0 2px var(--draw2-surface),
+      inset 0 0 0 4px var(--draw2-accent-strong) !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-drawer-action-label {
+    color: var(--draw2-accent-strong) !important;
+    font-size: 0.62rem !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-drawer-handle::after {
+    transition: transform 120ms ease, opacity 120ms ease;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"].is-mobile-panel-menu-open
+    .draw2-mobile-drawer-handle {
+    color: var(--draw2-accent-strong) !important;
+    background: color-mix(
+      in srgb,
+      var(--draw2-accent-strong) 8%,
+      transparent
+    ) !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"].is-mobile-panel-menu-open
+    .draw2-mobile-drawer-handle::after {
+    transform: rotate(180deg);
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-panel-launcher
+    > .draw2-panel-launcher {
+    font-weight: 700 !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-panel-launcher
+    > .draw2-panel-launcher.is-active {
+    border-color: var(--draw2-accent-strong) !important;
+    background: color-mix(
+      in srgb,
+      var(--draw2-accent-strong) 14%,
+      var(--draw2-surface-input)
+    ) !important;
+    color: var(--draw2-text-strong) !important;
+    box-shadow: inset 0 -3px 0 var(--draw2-accent-strong) !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-toolbar
+    > .draw2-tool-button:focus-visible,
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-panel-launcher
+    > .draw2-panel-launcher:focus-visible,
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-drawer-handle:focus-visible {
+    outline: 2px solid var(--draw2-accent-strong) !important;
+    outline-offset: -2px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-command-bar
+    > button:disabled {
+    opacity: 0.42 !important;
+    filter: saturate(0.65) !important;
+  }
+}
+
+/* Final specificity guard for the original closed-state full-width rule. */
+@media (max-width: 700px) {
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]:not(
+      .is-mobile-panel-menu-open
+    ):not(.is-mobile-sheet-open):not(.is-mobile-timeline-open)
+    .draw2-mobile-drawer-header,
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]:not(
+      .is-mobile-panel-menu-open
+    ):not(.is-mobile-sheet-open):not(.is-mobile-timeline-open)
+    .draw2-mobile-drawer-handle {
+    width: 40px !important;
+    min-width: 40px !important;
+    max-width: 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+  }
+}
+
+/* Final high-specificity touch target guard for nested timeline surfaces. */
+@media (max-width: 700px) {
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    button,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2WorkspaceTimelineSlot
+    button {
+    box-sizing: border-box !important;
+    min-width: 40px !important;
+    min-height: 40px !important;
+    height: 40px !important;
+    max-height: 40px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mini-preview,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mini-preview-restore {
+    display: none !important;
+  }
+}
+
+@media (min-width: 701px) and (max-height: 480px) {
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    button,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    #draw2WorkspaceTimelineSlot
+    button {
+    box-sizing: border-box !important;
+    min-width: 40px !important;
+    min-height: 40px !important;
+    height: 40px !important;
+    max-height: 40px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-color,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-color-add,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-mini-preview,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-mini-preview-restore {
+    width: 40px !important;
+    min-width: 40px !important;
+    max-width: 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-mini-preview,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-mini-preview-restore {
+    display: none !important;
+  }
+}
+
+/* Keep the timeline grid step aligned with the 40px button contract.  The
+ * shell's late DRAW sizing otherwise leaves 30/32px column steps underneath
+ * 40px buttons, which makes adjacent frames steal each other's taps. */
+@media (max-width: 700px) {
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2WorkspaceTimelineSlot
+    .draw2-timeline-viewport {
+    --draw2-timeline-cell-size: 40px !important;
+    --draw2-timeline-cell-width: 40px !important;
+    --draw2-timeline-row-height: 40px !important;
+    --draw2-timeline-label-width: 132px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2WorkspaceTimelineSlot
+    .draw2-timeline-corner,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2WorkspaceTimelineSlot
+    .draw2-timeline-corner-controls {
+    min-height: 40px !important;
+    height: 40px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2WorkspaceTimelineSlot
+    .draw2-timeline-row-label {
+    min-height: 40px !important;
+    height: 40px !important;
+  }
+}
+
+@media (min-width: 701px) and (max-height: 480px) {
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    #draw2WorkspaceTimelineSlot
+    .draw2-timeline-viewport {
+    --draw2-timeline-cell-size: 40px !important;
+    --draw2-timeline-cell-width: 40px !important;
+    --draw2-timeline-row-height: 40px !important;
+    --draw2-timeline-label-width: 148px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    #draw2WorkspaceTimelineSlot
+    .draw2-timeline-corner,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    #draw2WorkspaceTimelineSlot
+    .draw2-timeline-corner-controls {
+    min-height: 40px !important;
+    height: 40px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    #draw2WorkspaceTimelineSlot
+    .draw2-timeline-row-label {
+    min-height: 40px !important;
+    height: 40px !important;
+  }
+}
+
+/* Keep the two-row palette exactly above the lower rail.  The rail's border
+ * creates a half-pixel fractional edge on narrow viewport widths; nudging the
+ * grid up keeps adjacent 40px hit boxes edge-to-edge without overlap. */
+@media (max-width: 700px) {
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-color-rail
+    .draw2-palette-grid {
+    transform: translateY(-0.5px) !important;
+  }
+}
+
+/* Short landscape phones keep the two 40px top lanes separate.  Resize
+ * handles are desktop affordances and are removed here so they cannot sit on
+ * top of the vertical tool rail or the timeline tabs. */
+@media (min-width: 701px) and (max-height: 480px) {
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-workspace-topbar {
+    grid-template-rows: 40px 40px 0 !important;
+    height: 80px !important;
+    min-height: 80px !important;
+    max-height: 80px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-workspace-global-row {
+    grid-template-rows: 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    padding: 0 4px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-creator-mode-bar {
+    grid-column: 1 / -1 !important;
+    grid-row: 2 !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-workspace-quick-controls,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-dock-resize-handle,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-palette-resize-handle,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-timeline-resize-handle,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-timeline-properties-resize {
+    display: none !important;
+  }
+}
+
+/* Keep split-mode controls inside their own rows and use a 40px palette step
+ * so adjacent colors do not overlap after the touch target is enlarged. */
+@media (min-width: 701px) and (max-height: 480px) {
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-creator-mode-bar {
+    align-items: stretch !important;
+    padding: 0 4px !important;
+    border-top: 0 !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-palette-grid {
+    grid-template-columns: repeat(auto-fill, 40px) !important;
+    grid-auto-columns: 40px !important;
+    grid-auto-rows: 40px !important;
+    gap: 0 !important;
+  }
+}
+
+/* Final mobile contract override.  Keep this block last so the older
+ * projections cannot bring back smaller controls or the old Open/Close row.
+ * Draw2 keeps the grip inside the lower panel at its upper-right corner;
+ * unlike the production drawer it does not protrude over the canvas. */
+@media (max-width: 700px) {
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"] {
+    --draw2-mobile-square: 40px !important;
+    --draw2-mobile-drawer-height: 160px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"] button {
+    box-sizing: border-box !important;
+    min-width: 40px !important;
+    min-height: 40px !important;
+    height: 40px !important;
+    max-height: 40px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-left-dock {
+    position: relative !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: 40px 80px 40px !important;
+    grid-template-areas: "tools" "color" "rail" !important;
+    height: 160px !important;
+    min-height: 160px !important;
+    max-height: 160px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-drawer-header {
+    position: absolute !important;
+    top: 0 !important;
+    right: 4px !important;
+    bottom: auto !important;
+    z-index: 80 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 40px !important;
+    min-width: 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    border: 0 !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-toolbar,
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-toolbar {
+    width: calc(100% - 48px) !important;
+    max-width: calc(100% - 48px) !important;
+    padding-right: 0 !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mini-preview,
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mini-preview-restore {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-drawer-handle {
+    position: relative !important;
+    display: flex !important;
+    flex: 0 0 40px !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 40px !important;
+    min-width: 40px !important;
+    max-width: 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 1px solid color-mix(
+      in srgb,
+      var(--draw2-accent-strong) 78%,
+      var(--draw2-border-strong)
+    ) !important;
+    border-radius: 6px !important;
+    background: var(--draw2-surface-input) !important;
+    color: var(--draw2-accent-strong) !important;
+    cursor: ns-resize !important;
+    touch-action: none !important;
+    overflow: visible !important;
+    z-index: 80 !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-drawer-handle::before {
+    position: absolute !important;
+    inset: 0 -8px !important;
+    content: "" !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-drawer-handle::after {
+    display: none !important;
+    content: none !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-drawer-grip {
+    position: absolute !important;
+    left: 50% !important;
+    top: 50% !important;
+    width: 18px !important;
+    height: 14px !important;
+    transform: translate(-50%, -50%) !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: linear-gradient(
+      0deg,
+      var(--draw2-accent-strong) 0 3px,
+      transparent 3px 6px,
+      var(--draw2-accent-strong) 6px 9px,
+      transparent 9px 12px,
+      var(--draw2-accent-strong) 12px 14px
+    ) !important;
+    box-shadow: none !important;
+    clip-path: none !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-drawer-handle:focus-visible {
+    outline: 2px solid var(--draw2-accent-strong) !important;
+    outline-offset: -2px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-drawer-mode,
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-drawer-action-label {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-panel-launcher {
+    position: relative !important;
+    z-index: 1 !important;
+    padding-right: 48px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-command-bar {
+    grid-template-columns: repeat(4, 40px) !important;
+    gap: 4px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-command-bar
+    > [data-workspace-command="undo"],
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-command-bar
+    > [data-workspace-command="redo"],
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-command-bar
+    > [data-workspace-command="panel-export"],
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-command-bar
+    > [data-shared-control="playback"] {
+    width: 40px !important;
+    min-width: 40px !important;
+    max-width: 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-creator-mode,
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2WorkspaceTimelineSlot
+    .draw2-timeline-tab {
+    min-height: 40px !important;
+    height: 40px !important;
+    max-height: 40px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2WorkspaceTimelineSlot
+    .draw2-timeline-tabs-shell,
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2WorkspaceTimelineSlot
+    .draw2-timeline-tabs {
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2MobileCanvasHud {
+    gap: 4px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-canvas-context {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    min-height: 40px !important;
+    height: 40px !important;
+    max-height: 40px !important;
+    padding-inline: 6px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-viewport-controls {
+    flex: 0 0 auto !important;
+    gap: 0 !important;
+    min-height: 40px !important;
+    height: 40px !important;
+    max-height: 40px !important;
+    padding: 0 !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-viewport-button {
+    flex: 0 0 40px !important;
+    width: 40px !important;
+    min-width: 40px !important;
+    max-width: 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-viewport-readout {
+    min-width: 42px !important;
+  }
+}
+
+@media (min-width: 701px) and (max-height: 480px) {
+  #draw2WorkspaceFrame[data-workspace-profile="split"] {
+    --draw2-mobile-square: 40px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="split"] button {
+    box-sizing: border-box !important;
+    min-width: 40px !important;
+    min-height: 40px !important;
+    height: 40px !important;
+    max-height: 40px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-mobile-toolbar,
+  #draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-mobile-toolbar
+    > .draw2-tool-button {
+    width: 40px !important;
+    min-width: 40px !important;
+    max-width: 40px !important;
+    flex-basis: 40px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-mobile-viewport-button {
+    flex: 0 0 40px !important;
+    width: 40px !important;
+    min-width: 40px !important;
+    max-width: 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+  }
+}
+/* EOF mobile touch overrides follow. */
+
+@media (max-width: 700px) {
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"] {
+    --draw2-mobile-square: 48px !important;
+    --draw2-mobile-drawer-height: 192px !important;
+    --draw2-mobile-top-height: 96px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    button {
+    box-sizing: border-box !important;
+    min-width: 48px !important;
+    min-height: 48px !important;
+    height: 48px !important;
+    max-height: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-topbar {
+    grid-template-rows: 48px 48px !important;
+    height: 96px !important;
+    min-height: 96px !important;
+    max-height: 96px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-global-row,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-context-row {
+    min-height: 48px !important;
+    height: 48px !important;
+    max-height: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-left-dock {
+    grid-template-rows: 48px 96px 48px !important;
+    height: 192px !important;
+    min-height: 192px !important;
+    max-height: 192px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-color-rail {
+    height: 96px !important;
+    min-height: 96px !important;
+    max-height: 96px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-color-rail
+    .draw2-palette-grid {
+    grid-template-rows: repeat(2, 48px) !important;
+    grid-auto-columns: 48px !important;
+    height: 96px !important;
+    min-height: 96px !important;
+    max-height: 96px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-drawer-header {
+    top: 0 !important;
+    right: 4px !important;
+    bottom: auto !important;
+    width: 48px !important;
+    min-width: 48px !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-drawer-handle {
+    flex: 0 0 48px !important;
+    width: 48px !important;
+    min-width: 48px !important;
+    max-width: 48px !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-toolbar,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-toolbar {
+    width: calc(100% - 56px) !important;
+    max-width: calc(100% - 56px) !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-tool-button,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-quick-control,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-color,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-color-add {
+    width: 48px !important;
+    min-width: 48px !important;
+    max-width: 48px !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+    flex-basis: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-command-bar {
+    grid-template-columns: repeat(4, 48px) !important;
+    gap: 4px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    justify-content: center !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-command-bar
+    > button,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-viewport-button,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-creator-mode,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2WorkspaceTimelineSlot
+    button {
+    min-width: 48px !important;
+    width: 48px !important;
+    max-width: 48px !important;
+    min-height: 48px !important;
+    height: 48px !important;
+    max-height: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-canvas-context,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-viewport-controls {
+    min-height: 48px !important;
+    height: 48px !important;
+    max-height: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-mobile-viewport-readout {
+    min-width: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2WorkspaceTimelineSlot
+    .draw2-timeline-viewport {
+    --draw2-timeline-cell-size: 48px !important;
+    --draw2-timeline-cell-width: 48px !important;
+    --draw2-timeline-row-height: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2WorkspaceTimelineSlot
+    .draw2-timeline-corner,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2WorkspaceTimelineSlot
+    .draw2-timeline-corner-controls,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    #draw2WorkspaceTimelineSlot
+    .draw2-timeline-row-label {
+    min-height: 48px !important;
+    height: 48px !important;
+  }
+}
+
+@media (max-width: 700px) and (max-height: 680px) {
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"] {
+    --draw2-mobile-top-height: 48px !important;
+    --draw2-mobile-canvas-min-height: 160px !important;
+    --draw2-mobile-detail-half: 140px !important;
+    --draw2-mobile-detail-full: 160px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-topbar {
+    grid-template-rows: 48px !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    .draw2-workspace-context-row {
+    display: none !important;
+  }
+}
+
+@media (min-width: 701px) and (max-height: 480px) {
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"] {
+    --draw2-mobile-square: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    button {
+    box-sizing: border-box !important;
+    min-width: 48px !important;
+    min-height: 48px !important;
+    height: 48px !important;
+    max-height: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-workspace-topbar {
+    grid-template-rows: 48px 48px 0 !important;
+    height: 96px !important;
+    min-height: 96px !important;
+    max-height: 96px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-workspace-global-row,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-creator-mode-bar {
+    grid-template-rows: 48px !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-mobile-toolbar,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-mobile-toolbar
+    > .draw2-tool-button {
+    width: 48px !important;
+    min-width: 48px !important;
+    max-width: 48px !important;
+    flex-basis: 48px !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-mobile-viewport-button {
+    flex: 0 0 48px !important;
+    width: 48px !important;
+    min-width: 48px !important;
+    max-width: 48px !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-palette-grid {
+    grid-template-columns: repeat(auto-fill, 48px) !important;
+    grid-auto-columns: 48px !important;
+    grid-auto-rows: 48px !important;
+  }
+}
+/* Split-phone controls keep the same 48px minimum, including timeline cells
+ * and the text buttons whose earlier rules have a more specific selector. */
+@media (min-width: 701px) and (max-height: 480px) {
+  #draw2WorkspaceFrame#draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    button {
+    min-width: 48px !important;
+    min-height: 48px !important;
+    height: 48px !important;
+    max-height: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-color,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-color-add,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-timeline-cell,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-timeline-frame-header,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    .draw2-timeline-row-visibility {
+    width: 48px !important;
+    min-width: 48px !important;
+    max-width: 48px !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    #draw2WorkspaceTimelineSlot
+    button {
+    min-height: 48px !important;
+    height: 48px !important;
+    max-height: 48px !important;
+  }
+}
+/* Audio's mode-specific selectors have the same specificity as its local
+ * 40px rules, so repeat the exact surface selector last for the 48px contract. */
+@media (max-width: 700px), (min-width: 701px) and (max-height: 480px) {
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-editor-tab,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-right-tab,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-mode-timeline-deck-tab,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2AudioWorkspace button,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2ModeTimelineDeck button,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-editor-tab,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-right-tab,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-mode-timeline-deck-tab,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2AudioWorkspace button,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2ModeTimelineDeck button {
+    min-height: 48px !important;
+    height: 48px !important;
+    max-height: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2ModeDeckAudio .draw2-audio-animation-cell,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2ModeDeckAudio .draw2-audio-ruler-cell,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2ModeDeckAudio .draw2-audio-track-lane-cell,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2ModeDeckAudio .draw2-audio-animation-cell,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2ModeDeckAudio .draw2-audio-ruler-cell,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2ModeDeckAudio .draw2-audio-track-lane-cell {
+    min-height: 48px !important;
+    height: 48px !important;
+    max-height: 48px !important;
+  }
+}
+/* Audio deck toolbar controls inherit a more specific 40px rule. Keep that
+ * selector shape here so the shared 48px touch contract wins on narrow and
+ * split-phone layouts as well. */
+@media (max-width: 700px), (min-width: 701px) and (max-height: 480px) {
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"] #draw2ModeDeckAudio > .draw2-mode-deck-toolbar .draw2-button,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"] #draw2ModeDeckAudio > .draw2-mode-deck-toolbar select,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"] #draw2ModeDeckAudio > .draw2-mode-deck-toolbar .draw2-button,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"] #draw2ModeDeckAudio > .draw2-mode-deck-toolbar select {
+    min-height: 48px !important;
+    height: 48px !important;
+    max-height: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"] #draw2ModeDeckAudio > .draw2-mode-deck-toolbar,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"] #draw2ModeDeckAudio > .draw2-mode-deck-toolbar {
+    min-height: 48px !important;
+    height: 48px !important;
+    max-height: 48px !important;
+  }
+}
+/* Audio field selects are another mode-local 40px surface. Give them the
+ * same 48px hit area as the buttons, including the compact beat controls. */
+@media (max-width: 700px), (min-width: 701px) and (max-height: 480px) {
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"] .draw2-audio-global-field input,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"] .draw2-audio-global-field select,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"] #draw2ModeDeckAudio input,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"] #draw2ModeDeckAudio select,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"] .draw2-audio-global-field input,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"] .draw2-audio-global-field select,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"] #draw2ModeDeckAudio input,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"] #draw2ModeDeckAudio select {
+    min-height: 48px !important;
+    height: 48px !important;
+    max-height: 48px !important;
+  }
+}
+/* Native selects are interactive controls too; keep their hit boxes aligned
+ * with the surrounding buttons on portrait and split-phone layouts. */
+@media (max-width: 700px), (min-width: 701px) and (max-height: 480px) {
+  #draw2WorkspaceFrame#draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    select,
+  #draw2WorkspaceFrame#draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"]
+    select {
+    min-height: 48px !important;
+    height: 48px !important;
+    max-height: 48px !important;
+  }
+}
+/* Audio portrait mode also uses three 48px interaction lanes: transport,
+ * global controls, and the Draw/Audio switch. This prevents the mode-local
+ * 40px rules from creating a smaller control island above the editor. */
+@media (max-width: 700px) {
+  #draw2WorkspaceFrame#draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"]
+    button {
+    box-sizing: border-box !important;
+    min-width: 48px !important;
+    min-height: 48px !important;
+    height: 48px !important;
+    max-height: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"] {
+    --draw2-mobile-top-height: 144px !important;
+    grid-template-rows: 144px minmax(0, 1fr) 0 minmax(176px, 32dvh) 0 !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-workspace-topbar {
+    grid-template-rows: 48px 48px 48px !important;
+    height: 144px !important;
+    min-height: 144px !important;
+    max-height: 144px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-global-controls:not([hidden]) {
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-global-button {
+    flex: 0 0 48px !important;
+    width: 48px !important;
+    min-width: 48px !important;
+    max-width: 48px !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-global-field {
+    height: 48px !important;
+    min-height: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-creator-mode-bar {
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-creator-mode[data-creator-mode="DRAW"],
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-creator-mode[data-creator-mode="AUDIO"] {
+    flex: 0 0 48px !important;
+    width: 48px !important;
+    min-width: 48px !important;
+    max-width: 48px !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-audio-editor-pin {
+    flex: 0 0 48px !important;
+    width: 48px !important;
+    min-width: 48px !important;
+    max-width: 48px !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+  }
+}
+/* When Audio is enabled but Draw is still the active mode, short phones need
+ * a real second top row for the Draw/Audio switch. Without it the row spills
+ * over the canvas and the canvas receives the tap instead of the button. */
+@media (max-width: 700px) {
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"]:not([data-creator-mode="AUDIO"]) {
+    --draw2-mobile-top-height: 96px !important;
+    grid-template-rows: 96px minmax(0, 1fr) 0 minmax(176px, 32dvh) 0 !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"]:not([data-creator-mode="AUDIO"])
+    .draw2-workspace-topbar {
+    position: relative !important;
+    z-index: 20 !important;
+    grid-template-rows: 48px 48px !important;
+    height: 96px !important;
+    min-height: 96px !important;
+    max-height: 96px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"]:not([data-creator-mode="AUDIO"])
+    .draw2-workspace-global-row {
+    grid-row: 1 !important;
+    min-height: 48px !important;
+    height: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"]:not([data-creator-mode="AUDIO"])
+    .draw2-creator-mode-bar {
+    grid-row: 2 !important;
+    display: flex !important;
+    align-items: stretch !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+    z-index: 21 !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"]:not([data-creator-mode="AUDIO"])
+    .draw2-creator-mode[data-creator-mode="DRAW"],
+  #draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"]:not([data-creator-mode="AUDIO"])
+    .draw2-creator-mode[data-creator-mode="AUDIO"] {
+    flex: 0 0 48px !important;
+    width: 48px !important;
+    min-width: 48px !important;
+    max-width: 48px !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+  }
+}
+
+/* Mobile UX closure --------------------------------------------------------
+ * The product switch is a first-class Draw/Audio navigation affordance when
+ * the isolated Audio preview is enabled. The old hidden timeline slot must
+ * not reserve layout space, and compact phones need the Draw timeline's
+ * secondary controls to remain inside the viewport. These rules are kept at
+ * the end of the mobile sheet so they close the earlier compatibility layers
+ * without changing the desktop or Game surfaces. */
+@media (max-width: 700px) {
+  #draw2WorkspaceFrame#draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"]
+    .draw2-creator-mode-bar {
+    align-items: stretch !important;
+    gap: 4px !important;
+    padding-inline: 4px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"]
+    .draw2-creator-mode[data-creator-mode="DRAW"],
+  #draw2WorkspaceFrame#draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"]
+    .draw2-creator-mode[data-creator-mode="AUDIO"] {
+    display: flex !important;
+    flex: 1 1 0 !important;
+    width: auto !important;
+    min-width: 112px !important;
+    max-width: none !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 6px !important;
+    padding-inline: 12px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"]
+    .draw2-creator-mode span {
+    position: static !important;
+    width: auto !important;
+    height: auto !important;
+    overflow: visible !important;
+    clip: auto !important;
+    white-space: normal !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2WorkspaceTimelineSlot[hidden] {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2ModeTimelineDeck:not([hidden]),
+  #draw2WorkspaceFrame#draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2ModeDeckAudio:not([hidden]) {
+    min-height: 0 !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2AudioPanelTimeline {
+    min-height: 0 !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2AudioTrackLanes {
+    min-height: 0 !important;
+    overflow: auto !important;
+    overscroll-behavior: contain !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"] {
+    grid-template-rows: 144px minmax(0, 1fr) 0 minmax(256px, 40dvh) 0 !important;
+  }
+}
+
+@media (max-width: 700px) and (max-height: 820px) {
+  #draw2WorkspaceFrame#draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-creator-mode="DRAW"]
+    #draw2WorkspaceTimelineSlot
+    .draw2-timeline-viewport {
+    --draw2-timeline-cell-size: 48px !important;
+    --draw2-timeline-cell-width: 48px !important;
+    --draw2-timeline-row-height: 48px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="mobile"][data-creator-mode="DRAW"]
+    #draw2WorkspaceTimelineSlot
+    .draw2-timeline-layer-add-header {
+    min-height: 44px !important;
+    height: 44px !important;
+    max-height: 44px !important;
+  }
+}
+
+/* Landscape phones have enough width for a two-pane Audio workspace. Keep
+ * the editor and composition deck visible side by side instead of reducing
+ * both to unusable vertical slivers. The animation-cell overview is a lower
+ * priority here; the ruler and audio lanes remain the primary timeline. */
+@media (min-width: 701px) and (max-height: 480px) {
+  #draw2WorkspaceFrame#draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"] {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+    grid-template-rows: 120px minmax(0, 1fr) 0 24px !important;
+    grid-template-areas:
+      "top top"
+      "canvas timeline"
+      "left left"
+      "status status" !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    .draw2-workspace-canvas-region {
+    grid-area: canvas !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2WorkspaceTimelineRegion {
+    grid-area: timeline !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2AudioAnimationCells {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"][data-creator-mode="AUDIO"]
+    #draw2AudioRuler {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"]
+    .draw2-creator-mode[data-creator-mode="DRAW"],
+  #draw2WorkspaceFrame#draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"]
+    .draw2-creator-mode[data-creator-mode="AUDIO"] {
+    display: flex !important;
+    flex: 0 0 128px !important;
+    width: 128px !important;
+    min-width: 128px !important;
+    max-width: 128px !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 6px !important;
+    padding-inline: 12px !important;
+  }
+
+  #draw2WorkspaceFrame#draw2WorkspaceFrame#draw2WorkspaceFrame[data-workspace-profile="split"][data-audio-feature-flag="on"]
+    .draw2-creator-mode span {
+    position: static !important;
+    width: auto !important;
+    height: auto !important;
+    overflow: visible !important;
+    clip: auto !important;
+    white-space: normal !important;
+  }
+}

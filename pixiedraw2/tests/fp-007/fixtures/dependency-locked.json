@@ -1,0 +1,21 @@
+{
+  "manifest": {
+    "dependencies": {
+      "example-package": "1.2.3"
+    }
+  },
+  "lock": {
+    "packages": {
+      "": {
+        "dependencies": {
+          "example-package": "1.2.3"
+        }
+      },
+      "node_modules/example-package": {
+        "version": "1.2.3",
+        "resolved": "https://registry.npmjs.org/example-package/-/example-package-1.2.3.tgz",
+        "license": "MIT"
+      }
+    }
+  }
+}

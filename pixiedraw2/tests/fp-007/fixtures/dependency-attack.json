@@ -1,0 +1,10 @@
+{
+  "nested": {
+    "unexpectedField": "redacted",
+    "payload": [
+      "synthetic-value",
+      "synthetic-blob",
+      "redacted"
+    ]
+  }
+}

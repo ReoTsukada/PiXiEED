@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PiXYNC Draw2 cross-tab CAS qualification harness</title>
+  </head>
+  <body>
+    <p id="status">loading</p>
+    <textarea id="command" aria-label="command"></textarea>
+    <button id="bridge" type="button">run</button>
+    <pre id="result"></pre>
+    <script>
+      window.__pixyncDraw2CrossTabCasLoad = { state: "LOADING", error: null };
+      window.addEventListener("error", (event) => {
+        window.__pixyncDraw2CrossTabCasLoad = {
+          state: "ERROR",
+          error: event.error?.stack || event.message || "module load failed",
+        };
+        document.querySelector("#status").textContent = "ERROR";
+      });
+      window.addEventListener("unhandledrejection", (event) => {
+        window.__pixyncDraw2CrossTabCasLoad = {
+          state: "ERROR",
+          error: event.reason?.stack || String(event.reason),
+        };
+        document.querySelector("#status").textContent = "ERROR";
+      });
+    </script>
+    <script
+      type="module"
+      src="./pixync-cross-tab-cas-browser-harness.js"
+      onload="document.querySelector('#status').textContent='loaded'"
+      onerror="document.querySelector('#status').textContent='load-error'"
+    ></script>
+  </body>
+</html>

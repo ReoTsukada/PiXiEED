@@ -52,9 +52,21 @@
       const designLink = document.createElement('link');
       designLink.rel = 'stylesheet';
       designLink.dataset.pixieedPublicDesignSystem = 'true';
-      designLink.href = rootAsset('site/public-design-system.css?v=20260825-public-shell15');
+      designLink.href = rootAsset('site/public-design-system.css?v=20260831-public-shell16');
       document.head.appendChild(designLink);
     }
+
+    // The profile header is injected after the shared bottom rail on some
+    // pages. Keep the transition layer last so its state rules win over the
+    // legacy shell defaults without changing those defaults themselves.
+    let motionLink = document.querySelector('link[data-pixieed-shared-motion="true"]');
+    if (!motionLink) {
+      motionLink = document.createElement('link');
+      motionLink.rel = 'stylesheet';
+      motionLink.dataset.pixieedSharedMotion = 'true';
+      motionLink.href = rootAsset('site/shared-ui-transition.css?v=20260831-public-motion1');
+    }
+    document.head.appendChild(motionLink);
   }
 
   function ensureSharedSiteHeader() {

@@ -20,18 +20,15 @@
       navHome: 'ホーム',
       navMarket: 'マーケット',
       navCommunity: 'コミュニティ',
-      navHelp: 'ヘルプ',
+      navDraw: 'PiXiEEDraw',
       navAccount: 'マイページ',
       footerCommunity: 'コミュニティ',
       footerMarket: 'マーケット',
       footerAccount: 'マイページ',
-      footerHelp: 'ヘルプ',
+      footerHelp: '使い方',
       footerContact: 'お問い合わせ',
-      footerEvents: 'イベント',
       footerNotice: 'お知らせ',
-      footerNotes: '開発ノート',
       footerProjects: 'プロジェクト一覧',
-      footerGlossary: '用語集',
       footerTerms: '利用規約',
       footerPrivacy: 'プライバシーポリシー',
       footerLegal: '特定商取引法に基づく表記'
@@ -41,18 +38,15 @@
       navHome: 'Home',
       navMarket: 'Market',
       navCommunity: 'Community',
-      navHelp: 'Help',
+      navDraw: 'PiXiEEDraw',
       navAccount: 'Profile',
       footerCommunity: 'Community',
       footerMarket: 'Market',
       footerAccount: 'Profile',
-      footerHelp: 'Help',
+      footerHelp: 'Guide',
       footerContact: 'Contact',
-      footerEvents: 'Events',
       footerNotice: 'News',
-      footerNotes: 'Development notes',
       footerProjects: 'Projects',
-      footerGlossary: 'Glossary',
       footerTerms: 'Terms of service',
       footerPrivacy: 'Privacy policy',
       footerLegal: 'Commercial transaction notice'
@@ -80,6 +74,8 @@
 
   applyResponsivePageState();
   injectStyles();
+  ensureSharedMotionStyles();
+  ensurePageMotionController();
   replaceFooter();
   replaceBottomNav();
   refreshLocalizedChrome();
@@ -92,6 +88,7 @@
     const path = String(pathname || '').toLowerCase();
     if (path.includes('/community/')) return 'community';
     if (path.includes('/market/')) return 'market';
+    if (/(?:^|\/)pixiedraw2?(?:\/|$)/.test(path)) return 'draw';
     if (path.includes('/help/')) return 'help';
     if (/(?:^|\/)account(?:\/|\/index\.html)?$/.test(path)) return 'account';
     return 'home';
@@ -161,6 +158,24 @@
     controller.async = false;
     controller.dataset.pixieedNotificationController = 'true';
     controller.src = relHref('scripts/shared-notifications.js?v=20260724-product-update-notice1');
+    doc.body.appendChild(controller);
+  }
+
+  function ensureSharedMotionStyles() {
+    if (doc.querySelector('link[data-pixieed-shared-motion="true"]')) return;
+    const link = doc.createElement('link');
+    link.rel = 'stylesheet';
+    link.dataset.pixieedSharedMotion = 'true';
+    link.href = relHref('site/shared-ui-transition.css?v=20260831-public-motion1');
+    doc.head.appendChild(link);
+  }
+
+  function ensurePageMotionController() {
+    if (window.__PIXIEED_SHARED_PAGE_MOTION__ || doc.querySelector('script[data-pixieed-page-motion="true"]')) return;
+    const controller = doc.createElement('script');
+    controller.defer = true;
+    controller.dataset.pixieedPageMotion = 'true';
+    controller.src = relHref('scripts/shared-page-motion.js?v=20260831-public-motion1');
     doc.body.appendChild(controller);
   }
 
@@ -286,12 +301,9 @@
       { label: 'コミュニティ', labelKey: 'footerCommunity', path: 'community/' },
       { label: 'マーケット', labelKey: 'footerMarket', path: 'market/' },
       { label: 'マイページ', labelKey: 'footerAccount', path: 'account/index.html' },
-      { label: 'ヘルプ', labelKey: 'footerHelp', path: 'help/index.html' },
+      { label: '使い方', labelKey: 'footerHelp', path: 'help/index.html' },
       { label: 'お問い合わせ', labelKey: 'footerContact', path: 'contact/index.html' },
-      { label: 'イベント', labelKey: 'footerEvents', path: 'events/index.html' },
       { label: 'お知らせ', labelKey: 'footerNotice', path: 'notice/index.html' },
-      { label: '開発ノート', labelKey: 'footerNotes', path: 'notes/index.html' },
-      { label: '用語集', labelKey: 'footerGlossary', path: 'glossary/index.html' },
       { label: '利用規約', labelKey: 'footerTerms', path: 'terms/index.html' },
       { label: 'プライバシーポリシー', labelKey: 'footerPrivacy', path: 'privacy/index.html' },
       { label: '特定商取引法に基づく表記', labelKey: 'footerLegal', path: 'legal/index.html' }
@@ -302,8 +314,8 @@
     return [
       { key: 'home', label: 'ホーム', labelKey: 'navHome', path: 'index.html', icon: 'assets/icons/HOME.png?v=2026.07.19-ui-icons1' },
       { key: 'community', label: 'コミュニティ', labelKey: 'navCommunity', path: 'community/', icon: 'assets/icons/HOME.png?v=2026.07.19-ui-icons1' },
+      { key: 'draw', label: 'PiXiEEDraw', labelKey: 'navDraw', path: 'pixiedraw2/', icon: 'assets/icons/Draw.png', primary: true },
       { key: 'market', label: 'マーケット', labelKey: 'navMarket', path: 'market/', icon: 'assets/icons/Market.png' },
-      { key: 'help', label: 'ヘルプ', labelKey: 'navHelp', path: 'help/index.html', icon: 'assets/icons/help.png' },
       { key: 'account', label: 'マイページ', labelKey: 'navAccount', path: 'account/index.html', icon: 'icon/icon-192-4.png' }
     ];
   }

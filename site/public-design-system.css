@@ -42,7 +42,7 @@ body.pixieed-public-shell .pixieed-common-tabbar {
 /* The discovery header is the desktop navigation surface. Keep the compact
    bottom rail for touch layouts, but do not let the legacy rail become a
    second vertical navigation column on wide public pages. */
-@media (min-width: 721px) {
+@media (min-width: 861px) {
   body.pixieed-public-shell > .bottom-nav {
     display: none !important;
   }

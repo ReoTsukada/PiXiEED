@@ -1,6 +1,7 @@
 # SITE-400 — Site Shell and Cross-Tool Integration
 
-status: IN_PROGRESS
+status: COMPLETE_CANDIDATE
+# [2026-08-31] status synced to COMPLETE_CANDIDATE to match 00_START_HERE/WORK_PACKAGE_REGISTRY.json (Registry is the execution-order/state source of truth per LATEST_CANONICAL_DECISIONS.md). Previously stale as IN_PROGRESS since the 2026-08-25 09:13:53 +0900 commit that updated the Registry but not this header.
 phase: platform-site
 kind: site
 depends_on: [DRAW-170, AUDIO-240, GAME-350]

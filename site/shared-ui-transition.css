@@ -1,0 +1,226 @@
+/* Shared transition layer for the public shell and the common mobile rail.
+   State still belongs to the existing shell scripts; this file only animates
+   the state changes so every public surface keeps the same rhythm. */
+:root {
+  --pixieed-motion-ease: cubic-bezier(.2, .8, .2, 1);
+  --pixieed-motion-ease-emphasized: cubic-bezier(.22, 1, .36, 1);
+  --pixieed-motion-fast: 140ms;
+  --pixieed-motion-ui: 220ms;
+  --pixieed-motion-layout: 360ms;
+  --pixieed-motion-route: 240ms;
+}
+
+@keyframes pixieed-page-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Page-level navigation is multi-page today, so each new surface gets a
+     small entrance motion without delaying or replacing native link loading. */
+  body.pixieed-motion-enabled > :where(.pixieed-site-header, .page, .page-shell, main, footer) {
+    animation: pixieed-page-enter var(--pixieed-motion-route) var(--pixieed-motion-ease-emphasized) both;
+  }
+}
+
+/* Desktop public shell: the content column follows the rail while the rail
+   itself opens and closes. Explicit max sizes keep labels animatable; a
+   display:none switch would make the same interaction feel discontinuous. */
+@media (prefers-reduced-motion: no-preference) and (min-width: 861px) {
+    body.pixieed-public-shell {
+      transition: padding-left var(--pixieed-motion-layout) var(--pixieed-motion-ease);
+    }
+
+    body.pixieed-public-shell .pixieed-site-header {
+      transition:
+        width var(--pixieed-motion-layout) var(--pixieed-motion-ease),
+        box-shadow var(--pixieed-motion-ui) var(--pixieed-motion-ease),
+        background-color var(--pixieed-motion-ui) ease;
+      will-change: width;
+    }
+
+    body.pixieed-public-shell .pixieed-site-header__inner {
+      transition: padding-inline var(--pixieed-motion-layout) var(--pixieed-motion-ease);
+    }
+
+    body.pixieed-public-shell .pixieed-site-header__brand-row {
+      transition: flex-direction var(--pixieed-motion-layout) var(--pixieed-motion-ease), gap var(--pixieed-motion-layout) var(--pixieed-motion-ease);
+    }
+
+    body.pixieed-public-shell .pixieed-site-header__brand-copy {
+      max-inline-size: 170px;
+      opacity: 1;
+      overflow: hidden;
+      transform: translate3d(0, 0, 0);
+      transition:
+        max-inline-size var(--pixieed-motion-layout) var(--pixieed-motion-ease),
+        opacity var(--pixieed-motion-ui) var(--pixieed-motion-ease),
+        transform var(--pixieed-motion-ui) var(--pixieed-motion-ease);
+      visibility: visible;
+    }
+
+    body.pixieed-public-shell .pixieed-site-header__nav {
+      transition: gap var(--pixieed-motion-layout) var(--pixieed-motion-ease), margin-top var(--pixieed-motion-layout) var(--pixieed-motion-ease);
+    }
+
+    body.pixieed-public-shell .pixieed-site-header__nav a {
+      transition:
+        min-height var(--pixieed-motion-layout) var(--pixieed-motion-ease),
+        padding-inline var(--pixieed-motion-layout) var(--pixieed-motion-ease),
+        background-color var(--pixieed-motion-ui) ease,
+        border-color var(--pixieed-motion-ui) ease,
+        color var(--pixieed-motion-ui) ease;
+    }
+
+    body.pixieed-public-shell .pixieed-site-header__nav a > span:not(.pixieed-site-header__nav-icon) {
+      display: inline-block !important;
+      max-inline-size: 7rem;
+      opacity: 1;
+      overflow: hidden;
+      transform: translate3d(0, 0, 0);
+      transition:
+        max-inline-size var(--pixieed-motion-layout) var(--pixieed-motion-ease),
+        opacity var(--pixieed-motion-ui) var(--pixieed-motion-ease),
+        transform var(--pixieed-motion-ui) var(--pixieed-motion-ease);
+      visibility: visible;
+    }
+
+    body.pixieed-public-shell .pixieed-site-header__nav-icon {
+      transition:
+        width var(--pixieed-motion-layout) var(--pixieed-motion-ease),
+        margin-right var(--pixieed-motion-layout) var(--pixieed-motion-ease),
+        font-size var(--pixieed-motion-layout) var(--pixieed-motion-ease),
+        color var(--pixieed-motion-ui) ease;
+    }
+
+    body.pixieed-public-shell .pixieed-site-header__actions {
+      transition: gap var(--pixieed-motion-layout) var(--pixieed-motion-ease);
+    }
+
+    body.pixieed-public-shell .pixieed-site-header__actions a,
+    body.pixieed-public-shell .pixieed-site-header__language {
+      max-inline-size: 12rem;
+      opacity: 1;
+      overflow: hidden;
+      transform: translate3d(0, 0, 0);
+      transition:
+        max-inline-size var(--pixieed-motion-layout) var(--pixieed-motion-ease),
+        opacity var(--pixieed-motion-ui) var(--pixieed-motion-ease),
+        transform var(--pixieed-motion-ui) var(--pixieed-motion-ease),
+        background-color var(--pixieed-motion-ui) ease,
+        border-color var(--pixieed-motion-ui) ease;
+      visibility: visible;
+    }
+
+    body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header__brand-copy {
+      display: grid !important;
+      max-inline-size: 0;
+      opacity: 0;
+      transform: translate3d(-6px, 0, 0);
+      visibility: hidden;
+    }
+
+    body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header__nav a > span:not(.pixieed-site-header__nav-icon) {
+      display: inline-block !important;
+      max-inline-size: 0;
+      opacity: 0;
+      transform: translate3d(-6px, 0, 0);
+      visibility: hidden;
+    }
+
+    body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header__actions a,
+    body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header__language {
+      display: inline-flex !important;
+      max-inline-size: 0;
+      opacity: 0;
+      transform: translate3d(-6px, 0, 0);
+      visibility: hidden;
+    }
+
+    body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header:hover .pixieed-site-header__brand-copy,
+    body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header:focus-within .pixieed-site-header__brand-copy {
+      max-inline-size: 170px;
+      opacity: 1;
+      transform: translate3d(0, 0, 0);
+      visibility: visible;
+    }
+
+    body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header:hover .pixieed-site-header__nav a > span:not(.pixieed-site-header__nav-icon),
+    body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header:focus-within .pixieed-site-header__nav a > span:not(.pixieed-site-header__nav-icon) {
+      max-inline-size: 7rem;
+      opacity: 1;
+      transform: translate3d(0, 0, 0);
+      visibility: visible;
+    }
+
+    body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header:hover .pixieed-site-header__actions a,
+    body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header:hover .pixieed-site-header__language,
+    body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header:focus-within .pixieed-site-header__actions a,
+    body.pixieed-public-shell.is-public-nav-collapsed .pixieed-site-header:focus-within .pixieed-site-header__language {
+      max-inline-size: 12rem;
+      opacity: 1;
+      transform: translate3d(0, 0, 0);
+      visibility: visible;
+    }
+  }
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Shared mobile rail and its items also move as a single surface when the
+     browser rotates or the page changes between compact layouts. */
+  body.pixieed-seamless-page .bottom-nav,
+  body.pixieed-public-shell .bottom-nav,
+  body.pixieed-seamless-page .pixieed-shared-footer,
+  body.pixieed-public-shell .pixieed-shared-footer {
+    transition:
+      transform var(--pixieed-motion-layout) var(--pixieed-motion-ease),
+      width var(--pixieed-motion-layout) var(--pixieed-motion-ease),
+      height var(--pixieed-motion-layout) var(--pixieed-motion-ease),
+      padding var(--pixieed-motion-layout) var(--pixieed-motion-ease),
+      opacity var(--pixieed-motion-ui) var(--pixieed-motion-ease);
+  }
+
+  body.pixieed-seamless-page .bottom-nav__item,
+  body.pixieed-public-shell .bottom-nav__item {
+    transition:
+      flex-basis var(--pixieed-motion-layout) var(--pixieed-motion-ease),
+      padding var(--pixieed-motion-layout) var(--pixieed-motion-ease),
+      background-color var(--pixieed-motion-ui) ease,
+      border-color var(--pixieed-motion-ui) ease,
+      transform var(--pixieed-motion-ui) var(--pixieed-motion-ease);
+  }
+
+  body.pixieed-seamless-page .bottom-nav__item .icon,
+  body.pixieed-public-shell .bottom-nav__item .icon,
+  body.pixieed-seamless-page .bottom-nav__item img,
+  body.pixieed-public-shell .bottom-nav__item img {
+    transition: width var(--pixieed-motion-layout) var(--pixieed-motion-ease), height var(--pixieed-motion-layout) var(--pixieed-motion-ease), transform var(--pixieed-motion-ui) var(--pixieed-motion-ease), opacity var(--pixieed-motion-ui) ease;
+  }
+
+  body.pixieed-public-shell :where(.page, .page-shell, main, .market-grid, .social-feed, .home-shell-v2__workspace-grid, .home-shell-v2__tool-grid) {
+    transition:
+      width var(--pixieed-motion-layout) var(--pixieed-motion-ease),
+      max-width var(--pixieed-motion-layout) var(--pixieed-motion-ease),
+      grid-template-columns var(--pixieed-motion-layout) var(--pixieed-motion-ease),
+      gap var(--pixieed-motion-layout) var(--pixieed-motion-ease);
+  }
+
+  body.pixieed-public-shell :where(.card, .link-card, .help-card, .market-card, .social-post-card) {
+    transition:
+      transform var(--pixieed-motion-ui) var(--pixieed-motion-ease),
+      opacity var(--pixieed-motion-ui) var(--pixieed-motion-ease),
+      border-color var(--pixieed-motion-ui) ease,
+      background-color var(--pixieed-motion-ui) ease;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.pixieed-motion-enabled > :where(.pixieed-site-header, .page, .page-shell, main, footer) {
+    animation: none;
+  }
+}

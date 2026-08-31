@@ -1,0 +1,85 @@
+{
+  "documentId": "PIXIEED-FP007-NPM-AUDIT-RECEIPTS-001",
+  "schemaVersion": "1.0.0",
+  "scopes": [
+    {
+      "scopeId": "app-shell/pixieed-capacitor",
+      "execution": {
+        "commandIdentity": "npm audit --json",
+        "evidenceId": "synthetic-app-shell-pixieed-capacitor",
+        "exitClassification": "ZERO_COUNTS"
+      },
+      "receipt": {
+        "commandIdentity": "npm audit --json",
+        "evidenceId": "synthetic-app-shell-pixieed-capacitor",
+        "lockfilePath": "app-shell/pixieed-capacitor/package-lock.json",
+        "lockfileSha256": "35ef52d06bd4a4b78a47f639698c093294a0cf408a2be08449e455f2020bf5fd",
+        "packageManager": "npm",
+        "schemaVersion": "1",
+        "scopeId": "app-shell/pixieed-capacitor",
+        "summary": {
+          "knownVulnerabilitiesTotal": 0,
+          "severityCounts": {
+            "critical": 0,
+            "high": 0,
+            "low": 0,
+            "moderate": 0
+          }
+        }
+      }
+    },
+    {
+      "scopeId": "root",
+      "execution": {
+        "commandIdentity": "npm audit --json",
+        "evidenceId": "synthetic-root",
+        "exitClassification": "ZERO_COUNTS"
+      },
+      "receipt": {
+        "commandIdentity": "npm audit --json",
+        "evidenceId": "synthetic-root",
+        "lockfilePath": "package-lock.json",
+        "lockfileSha256": "d9f1c9e729322fc37012fe32c4e76007df8ae6a63186f0ac739bf065940dc84b",
+        "packageManager": "npm",
+        "schemaVersion": "1",
+        "scopeId": "root",
+        "summary": {
+          "knownVulnerabilitiesTotal": 0,
+          "severityCounts": {
+            "critical": 0,
+            "high": 0,
+            "low": 0,
+            "moderate": 0
+          }
+        }
+      }
+    },
+    {
+      "scopeId": "tools/screenshots",
+      "execution": {
+        "commandIdentity": "npm audit --json",
+        "evidenceId": "synthetic-tools-screenshots",
+        "exitClassification": "ZERO_COUNTS"
+      },
+      "receipt": {
+        "commandIdentity": "npm audit --json",
+        "evidenceId": "synthetic-tools-screenshots",
+        "lockfilePath": "tools/screenshots/package-lock.json",
+        "lockfileSha256": "a3bfdd72439da783a0e5e6b049018294c12b7380b3225c99860efc05c278ddf1",
+        "packageManager": "npm",
+        "schemaVersion": "1",
+        "scopeId": "tools/screenshots",
+        "summary": {
+          "knownVulnerabilitiesTotal": 0,
+          "severityCounts": {
+            "critical": 0,
+            "high": 0,
+            "low": 0,
+            "moderate": 0
+          }
+        }
+      }
+    }
+  ],
+  "artifactDigest": "cd4d173cd1540189590668b6c282bcb3fbd9a7545346d4a18797da45cfe2ee5a"
+}

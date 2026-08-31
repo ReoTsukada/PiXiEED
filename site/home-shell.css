@@ -1393,7 +1393,7 @@ body.draw2-home-body .bottom-nav {
     padding-bottom: 0 !important;
   }
 
-  body.draw2-home-body .bottom-nav,
+  body.draw2-home-body:not(.pixieed-public-shell) .bottom-nav,
   body.draw2-home-body > .pixieed-common-tabbar {
     display: none !important;
   }
