@@ -1,0 +1,46 @@
+/*
+ * iDRAW / iAUDIO / iGAME mode-switch motion.
+ *
+ * Deliberately kept separate from draw2-shell.css (which is large and under
+ * active development elsewhere): this file only tunes the timing of the
+ * native View Transition that wraps setCreatorMode() in
+ * src/wp180-workspace-ui.ts. It does not define, override, or depend on any
+ * mode-scoped [data-creator-mode="..."] selector -- the browser screenshots
+ * the whole workspace before/after the mode switch and cross-fades between
+ * the two images, so this file works regardless of how any given rule in
+ * draw2-shell.css implements its mode-specific colors/panels.
+ *
+ * Duration/easing are not arbitrary -- see the "Motion Research Notes"
+ * reference for the full evidence trail:
+ *   - 400ms sits exactly at the oft-cited "Doherty threshold" and matches
+ *     Material Design's Medium4 duration token, while staying well inside
+ *     Nielsen's ~1.0s "flow of thought stays uninterrupted" ceiling.
+ *   - The click that triggers a switch is acknowledged same-frame (~16.7ms
+ *     at 60Hz, via the button's own :active/aria-pressed state in the
+ *     existing UI) -- this 400ms only governs how long the *settle*
+ *     animation after that instant acknowledgement takes.
+ *   - Both figures are, honestly, industry convention (Material's tokens)
+ *     layered on a widely-cited-but-not-rigorously-controlled 1982 IBM
+ *     study (Doherty & Thadhani) -- not a hard perceptual law. They were
+ *     chosen because they're a reasonable, well-precedented default, not
+ *     because either number is uniquely "correct."
+ */
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 400ms;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Defense in depth: src/wp180-workspace-ui.ts already checks
+     prefers-reduced-motion in JS and skips calling startViewTransition()
+     entirely in that case, so in practice this rule should rarely, if
+     ever, run. It stays here so a browser/environment where the JS check
+     somehow doesn't fire still gets a correct, motion-free result. */
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}

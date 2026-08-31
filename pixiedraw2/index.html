@@ -12,6 +12,10 @@
       rel="stylesheet"
       href="./assets/draw2-shell.min.css?v=20260831-css-min-v2"
     >
+    <link
+      rel="stylesheet"
+      href="./assets/draw2-mode-motion.css?v=20260831-mode-motion1"
+    >
   </head>
   <body>
     <main class="draw2-shell" aria-labelledby="draw2Title">
@@ -9030,7 +9034,11 @@
         </div>
       </section>
 
-      <section class="draw2-workspace" aria-label="Drawing canvas">
+      <section
+        class="draw2-workspace"
+        aria-label="Drawing canvas"
+        hidden
+      >
         <div class="draw2-canvas-card" id="draw2CanvasCard">
           <output
             id="draw2Metrics"

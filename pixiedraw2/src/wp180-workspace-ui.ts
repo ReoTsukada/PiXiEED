@@ -670,7 +670,13 @@ const AUDIO_DOCK_STORAGE_KEY = "pixieed:draw2:audio-dock:v2";
 const RAIL_LAYOUT_STORAGE_KEY = "pixieed:draw2:rail-layout:v1";
 const DRAW2_THEME_STORAGE_KEY = "pixieed:draw2:theme:v1";
 const DRAW2_DETAIL_MODE_STORAGE_KEY = "pixieed:draw2:detail-mode:v1";
-const RIGHT_DOCK_DEFAULT_PALETTE_RATIO = 0.3;
+// The palette is a compact, persistent strip above the active panel. Keep
+// its default small enough that the Color surface remains usable, while
+// retaining a bounded ratio for the user-controlled splitter.
+const RIGHT_DOCK_DEFAULT_PALETTE_RATIO = 0.18;
+const RIGHT_DOCK_MIN_PALETTE_RATIO = 0.1;
+const RIGHT_DOCK_MAX_PALETTE_RATIO = 0.42;
+const RIGHT_DOCK_RESIZE_HANDLE_PX = 12;
 
 type AudioDockPanelId =
   | "browser"
@@ -750,8 +756,8 @@ function writeAudioDockLayout(
 }
 
 // Shared desktop rail bounds.
-const RIGHT_DOCK_MIN_PALETTE_PX = 88;
-const RIGHT_DOCK_MIN_CUSTOM_PX = 72;
+const RIGHT_DOCK_MIN_PALETTE_PX = 64;
+const RIGHT_DOCK_MIN_CUSTOM_PX = 100;
 // The PC rail must keep the color editor, form controls, and focus rings
 // usable. Narrower values make the rail look compact while clipping the
 // actual authoring surface, so 280px is the smallest supported desktop size.
@@ -1292,10 +1298,20 @@ function readRightDockPreference(
       tabs?: unknown;
       activeTab?: unknown;
     };
-    const ratio = typeof parsed.paletteRatio === "number" &&
+    const storedRatio = typeof parsed.paletteRatio === "number" &&
         Number.isFinite(parsed.paletteRatio)
-      ? Math.max(0.1, Math.min(0.75, parsed.paletteRatio))
-      : RIGHT_DOCK_DEFAULT_PALETTE_RATIO;
+      ? parsed.paletteRatio
+      : undefined;
+    // Older builds allowed the splitter to consume almost the whole dock.
+    // Treat those stale values as a layout migration instead of restoring a
+    // palette viewport that hides the active Color/panel surface.
+    const ratio = storedRatio === undefined ||
+        storedRatio > RIGHT_DOCK_MAX_PALETTE_RATIO
+      ? RIGHT_DOCK_DEFAULT_PALETTE_RATIO
+      : Math.max(
+        RIGHT_DOCK_MIN_PALETTE_RATIO,
+        Math.min(RIGHT_DOCK_MAX_PALETTE_RATIO, storedRatio),
+      );
     const tabs: PanelKind[] = Array.isArray(parsed.tabs)
       ? [
         ...new Set(parsed.tabs.filter((value): value is string =>
@@ -21631,7 +21647,62 @@ export function bootstrapDraw2Workspace(
     syncModePlaybackButton();
   };
 
+  // Same-document View Transition wrapper around applyCreatorModeChange().
+  // This intentionally does not touch draw2-shell.css: the browser
+  // screenshots the whole workspace before/after applyCreatorModeChange()
+  // runs and cross-fades between the two images, so every mode-scoped
+  // [data-creator-mode="..."] rule already in that stylesheet benefits
+  // without needing to know how any of them are implemented. Timing is
+  // tuned in assets/draw2-mode-motion.css (kept separate on purpose, see
+  // that file's header comment for the evidence behind the 400ms figure).
+  //
+  // Falls back to the exact previous (synchronous, unanimated) behavior
+  // whenever startViewTransition is unsupported or motion is reduced -- so
+  // this is a no-op in any environment (including the existing test suite)
+  // that lacks the API.
+  interface ViewTransitionCapableDocument {
+    startViewTransition?: (
+      callback: () => void,
+    ) => { finished: Promise<void> };
+  }
+
+  const prefersReducedMotionForModeSwitch = (): boolean => {
+    try {
+      return windowRef.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    } catch {
+      return false;
+    }
+  };
+
   const setCreatorMode = (
+    mode: CreatorWorkspaceMode,
+    activateSurface = true,
+  ): void => {
+    // Every call site historically ran applyCreatorModeChange()
+    // unconditionally -- including when the mode was already current, which
+    // some callers rely on to force a panel reset. Keep that behavior
+    // identical here; only the *wrapping* in a view transition is
+    // conditional, since animating a no-visual-change frame is harmless but
+    // pointless.
+    const vtDocument = documentRef as unknown as ViewTransitionCapableDocument;
+    if (
+      typeof vtDocument.startViewTransition !== "function" ||
+      prefersReducedMotionForModeSwitch()
+    ) {
+      applyCreatorModeChange(mode, activateSurface);
+      return;
+    }
+    const transition = vtDocument.startViewTransition(() => {
+      applyCreatorModeChange(mode, activateSurface);
+    });
+    transition.finished.catch(() => {
+      // A rapid re-switch can abort the in-flight transition; the DOM
+      // mutation above already committed synchronously either way, so
+      // there is nothing to recover here.
+    });
+  };
+
+  const applyCreatorModeChange = (
     mode: CreatorWorkspaceMode,
     activateSurface = true,
   ): void => {
@@ -32546,19 +32617,34 @@ export function bootstrapDraw2Workspace(
   }
   if (paletteResizeHandle !== undefined && rightDock !== undefined) {
     let pointerId: number | undefined;
-    const updatePaletteRatio = (clientX: number, clientY: number): void => {
+    const updatePaletteRatio = (clientY: number): void => {
       const rect = rightDock.getBoundingClientRect();
-      const height = Math.max(1, rect.height);
-      const minimum = clamp(RIGHT_DOCK_MIN_PALETTE_PX / height, 0.1, 0.75);
-      const maximum = clamp(
-        1 - RIGHT_DOCK_MIN_CUSTOM_PX / height,
-        minimum,
-        0.9,
+      const styles = windowRef.getComputedStyle(rightDock);
+      const paddingTop = Number.parseFloat(styles.paddingTop) || 0;
+      const paddingBottom = Number.parseFloat(styles.paddingBottom) || 0;
+      const rowGap = Number.parseFloat(styles.rowGap) || 0;
+      const contentTop = rect.top + paddingTop;
+      const trackHeight = Math.max(
+        1,
+        rect.height - paddingTop - paddingBottom - rowGap * 2,
       );
-      // The desktop Draw projection places the palette below the upper panel,
-      // so its ratio is measured from the bottom edge.
+      const minimum = clamp(
+        RIGHT_DOCK_MIN_PALETTE_PX / trackHeight,
+        RIGHT_DOCK_MIN_PALETTE_RATIO,
+        RIGHT_DOCK_MAX_PALETTE_RATIO,
+      );
+      const maximum = Math.max(
+        minimum,
+        Math.min(
+          RIGHT_DOCK_MAX_PALETTE_RATIO,
+          1 - (RIGHT_DOCK_MIN_CUSTOM_PX + RIGHT_DOCK_RESIZE_HANDLE_PX) /
+            trackHeight,
+        ),
+      );
+      // The palette is the first grid row. Dragging the handle down must
+      // increase that row; the old bottom-origin calculation did the reverse.
       rightDockPaletteRatio = clamp(
-        1 - (clientY - rect.top) / height,
+        (clientY - contentTop) / trackHeight,
         minimum,
         maximum,
       );
@@ -32591,7 +32677,7 @@ export function bootstrapDraw2Workspace(
     });
     windowRef.addEventListener("pointermove", (event) => {
       if (pointerId === event.pointerId) {
-        updatePaletteRatio(event.clientX, event.clientY);
+        updatePaletteRatio(event.clientY);
       }
     });
     windowRef.addEventListener("pointerup", finishPaletteResize);
