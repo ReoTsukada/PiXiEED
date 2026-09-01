@@ -12002,9 +12002,14 @@ body:has(#draw2WorkspaceFrame) {
     var(--draw2-surface-raised)
   );
 }
+/* This right-dock rail is narrow enough by default (~200px) that a fixed
+   2-column grid squeezes each card down to ~100px, forcing titles to
+   character-wrap into unreadable vertical towers. auto-fit lets the grid
+   fall back to a single column at that width and only pack 2-up once
+   there is genuinely enough room per card. */
 .draw2-game-creation-mode-options {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 5px;
 }
 .draw2-game-creation-mode-option {
@@ -12040,21 +12045,32 @@ body:has(#draw2WorkspaceFrame) {
 }
 .draw2-game-creation-mode-option-heading {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 5px;
   min-width: 0;
 }
-.draw2-game-creation-mode-option-heading strong,
 .draw2-game-creation-mode-option-heading span,
 .draw2-game-creation-mode-option small {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* The title is the card's primary identifier alongside its icon, so let it
+   wrap onto a second line at narrow rail widths instead of ellipsis-cutting
+   into an unreadable fragment (e.g. "RPGテ..."). Cards sit in an
+   auto-sized grid row, so a taller wrapped title does not clip. */
 .draw2-game-creation-mode-option-heading strong {
+  overflow-wrap: break-word;
+  white-space: normal;
   color: var(--draw2-text-strong);
   font-size: 0.61rem;
+}
+.draw2-game-creation-mode-option-icon {
+  flex: 0 0 14px;
+  width: 14px;
+  height: 14px;
+  color: var(--draw2-accent-strong);
 }
 .draw2-game-creation-mode-option-heading span {
   flex: 0 0 auto;
@@ -12885,13 +12901,17 @@ body:has(#draw2WorkspaceFrame) {
   gap: 5px;
   min-width: 0;
 }
+/* Card names (e.g. "2D Character Body") are the primary way to tell
+   templates apart in this catalog, so let a long one wrap onto a second
+   line at narrow rail widths instead of ellipsis-cutting into an
+   unreadable fragment (e.g. "2D Character ..."). */
 .draw2-game-template-card strong {
+  flex: 1 1 auto;
   min-width: 0;
-  overflow: hidden;
+  overflow-wrap: break-word;
   color: var(--draw2-text-strong);
   font-size: 0.62rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
 }
 .draw2-game-template-card small {
   display: block;
