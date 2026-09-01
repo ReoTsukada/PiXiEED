@@ -10,7 +10,7 @@
     <title>PiXiEEDstudio — Studio</title>
     <link
       rel="stylesheet"
-      href="./assets/draw2-shell.min.css?v=20260901-icons-v10"
+      href="./assets/draw2-shell.min.css?v=20260901-icons-v11"
     >
     <link
       rel="stylesheet"
@@ -1781,6 +1781,12 @@
             aria-label="Game scene hierarchy"
             hidden
           >
+            <div class="draw2-game-left-dock-panels" id="draw2GameLeftDockPanels">
+            <div
+              class="draw2-game-left-dock-panel"
+              id="draw2GameLeftDockHierarchyPanel"
+              data-game-left-dock-panel="hierarchy"
+            >
             <header class="draw2-game-left-dock-header">
               <div>
                 <span class="draw2-eyebrow">GAME SCENE</span>
@@ -1836,6 +1842,152 @@
             <p class="draw2-panel-status" id="draw2GameHierarchyStatus">
               Gameのマップ・登場人物・オブジェクト・システムをここで管理します。
             </p>
+            </div>
+            <div
+              class="draw2-game-left-dock-panel"
+              id="draw2GameLeftDockNodeBoxPanel"
+              data-game-left-dock-panel="node-box"
+              hidden
+            >
+            <header class="draw2-game-left-dock-header">
+              <div>
+                <span class="draw2-eyebrow">OBJECT MODEL</span>
+                <strong>ノードボックス</strong>
+              </div>
+            </header>
+            <p class="draw2-panel-note">
+              シーン階層でオブジェクトを選ぶと、ここからドラッグ&ドロップ、またはクリックで機能を追加できます。
+            </p>
+            <div class="draw2-game-node-box" id="draw2GameNodeBox" role="group" aria-label="機能を追加">
+                  <div class="draw2-game-node-category" data-node-category="display">
+                    <span class="draw2-game-node-category-label">表示・配置</span>
+                    <div class="draw2-game-node-tiles">
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="TRANSFORM" title="位置・向き (Transform)">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-anchor"></use></svg><span>位置・向き</span>
+                      </button>
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="SPRITE" title="見た目 (Sprite)">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-image"></use></svg><span>見た目</span>
+                      </button>
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="TILEMAP" title="マップ (Tilemap)">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-sheet"></use></svg><span>マップ</span>
+                      </button>
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="CAMERA" title="カメラ (Camera)">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-view"></use></svg><span>カメラ</span>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="draw2-game-node-category" data-node-category="physics">
+                    <span class="draw2-game-node-category-label">ボディ・物理</span>
+                    <div class="draw2-game-node-tiles">
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="COLLIDER" title="当たり判定 (Collider)">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-border"></use></svg><span>当たり判定</span>
+                      </button>
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="RIGIDBODY" title="重力・物理 (Rigidbody)">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-bounce"></use></svg><span>重力・物理</span>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="draw2-game-node-category" data-node-category="movement">
+                    <span class="draw2-game-node-category-label">移動</span>
+                    <div class="draw2-game-node-tiles">
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="CHARACTER_CONTROLLER" title="プレイヤー移動 (Character Controller)">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-pan"></use></svg><span>移動</span>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="draw2-game-node-category" data-node-category="audio-event">
+                    <span class="draw2-game-node-category-label">音・イベント</span>
+                    <div class="draw2-game-node-tiles">
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="AUDIO_SOURCE" title="音 (Audio)">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-wave"></use></svg><span>音</span>
+                      </button>
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="BEHAVIOR" title="イベント・ルール (Behavior)">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-commands"></use></svg><span>イベント</span>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="draw2-game-node-category" data-node-category="status">
+                    <span class="draw2-game-node-category-label">ステータス</span>
+                    <div class="draw2-game-node-tiles">
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="STATUS" title="ステータス (Status)">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-star"></use></svg><span>ステータス</span>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="draw2-game-node-category" data-node-category="skill">
+                    <span class="draw2-game-node-category-label">スキル</span>
+                    <div class="draw2-game-node-tiles">
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="SKILL" data-game-component-preset="ATTACK" title="攻撃 (Attack Skill)">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-fx"></use></svg><span>攻撃</span>
+                      </button>
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="SKILL" data-game-component-preset="SHOOT" title="弾を撃つ (Shoot Skill)">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-focus"></use></svg><span>弾を撃つ</span>
+                      </button>
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="SKILL" data-game-component-preset="MAGIC" title="魔法 (Magic Skill)">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-magic-wand"></use></svg><span>魔法</span>
+                      </button>
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="SKILL" data-game-component-preset="DASH_ATTACK" title="ダッシュ攻撃 (Dash Attack Skill)">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-bounce"></use></svg><span>ダッシュ攻撃</span>
+                      </button>
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="SKILL" data-game-component-preset="HEAL" title="回復 (Heal Skill)">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-add"></use></svg><span>回復</span>
+                      </button>
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="SKILL" data-game-component-preset="SHIELD" title="シールド (Shield Skill)">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-border"></use></svg><span>シールド</span>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="draw2-game-node-category" data-node-category="brain">
+                    <span class="draw2-game-node-category-label">ブレイン・AI</span>
+                    <div class="draw2-game-node-tiles">
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="BRAIN" data-game-component-preset="PLAYER_CONTROL" title="プレイヤー操作 (Player Control)">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-select"></use></svg><span>プレイヤー操作</span>
+                      </button>
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="BRAIN" data-game-component-preset="AI" title="AI">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-tools"></use></svg><span>AI</span>
+                      </button>
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="BRAIN" data-game-component-preset="PATROL" title="パトロール (Patrol)">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-loop"></use></svg><span>パトロール</span>
+                      </button>
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="BRAIN" data-game-component-preset="PURSUE" title="追跡 (Pursue)">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-center"></use></svg><span>追跡</span>
+                      </button>
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="BRAIN" data-game-component-preset="AVOID" title="避ける (Avoid)">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-shrink"></use></svg><span>避ける</span>
+                      </button>
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="BRAIN" data-game-component-preset="WAIT" title="待機 (Wait)">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-pause"></use></svg><span>待機</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+            </div>
+            </div>
+            <nav
+              class="draw2-game-left-dock-tabs"
+              id="draw2GameLeftDockTabs"
+              role="tablist"
+              aria-label="左パネルの切り替え"
+            >
+              <button
+                type="button"
+                id="draw2GameLeftDockTabHierarchy"
+                class="draw2-button draw2-game-left-dock-tab is-active"
+                role="tab"
+                aria-selected="true"
+                aria-controls="draw2GameLeftDockHierarchyPanel"
+                data-game-left-dock-tab="hierarchy"
+              ><svg class="draw2-ui-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-layers"></use></svg><span>階層</span></button>
+              <button
+                type="button"
+                id="draw2GameLeftDockTabNodeBox"
+                class="draw2-button draw2-game-left-dock-tab"
+                role="tab"
+                aria-selected="false"
+                aria-controls="draw2GameLeftDockNodeBoxPanel"
+                data-game-left-dock-tab="node-box"
+              ><svg class="draw2-ui-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-tools"></use></svg><span>ノードボックス</span></button>
+            </nav>
           </section>
           <div
             class="draw2-workspace-toolbar"
@@ -5189,6 +5341,37 @@
                   カメラを選ぶと設定できます。
                 </p>
               </section>
+              <section
+                class="draw2-game-components"
+                aria-labelledby="draw2GameComponentsHeading"
+              >
+                <div class="draw2-game-subheading">
+                  <div>
+                    <span class="draw2-eyebrow">OBJECT MODEL</span>
+                    <strong id="draw2GameComponentsHeading">オブジェクトの機能</strong>
+                  </div>
+                  <span class="draw2-panel-badge">ゲーム専用</span>
+                </div>
+                <p class="draw2-panel-note">
+                  追加した機能がオブジェクトの性質になります。当たり判定・重力・プレイヤー移動・カメラ・イベントをここで設定します。
+                </p>
+                <div
+                  id="draw2GameComponents"
+                  class="draw2-game-component-list"
+                  role="list"
+                ></div>
+                <button
+                  type="button"
+                  class="draw2-game-components-drop-hint"
+                  id="draw2GameComponentsDropHint"
+                >
+                  <svg class="draw2-ui-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-add"></use></svg><span>+ ここにドロップ、またはクリックしてノードボックスを開く</span>
+                </button>
+                
+                <p class="draw2-panel-status" id="draw2GameComponentsStatus">
+                  機能を追加すると、このオブジェクトの役割が明確になります。
+                </p>
+                </section>
               <details class="draw2-game-advanced-settings">
                 <summary>詳細設定（上級者向け）</summary>
                 <p class="draw2-panel-note">
@@ -5231,132 +5414,7 @@
                   GAME-350の初期値を使用しています。
                 </p>
                 </section>
-                <section
-                class="draw2-game-components"
-                aria-labelledby="draw2GameComponentsHeading"
-              >
-                <div class="draw2-game-subheading">
-                  <div>
-                    <span class="draw2-eyebrow">OBJECT MODEL</span>
-                    <strong id="draw2GameComponentsHeading">オブジェクトの機能</strong>
-                  </div>
-                  <span class="draw2-panel-badge">ゲーム専用</span>
-                </div>
-                <p class="draw2-panel-note">
-                  追加した機能がオブジェクトの性質になります。当たり判定・重力・プレイヤー移動・カメラ・イベントをここで設定します。
-                </p>
-                <div
-                  id="draw2GameComponents"
-                  class="draw2-game-component-list"
-                  role="list"
-                ></div>
-                <div class="draw2-game-node-box" id="draw2GameNodeBox" role="group" aria-label="機能を追加">
-                  <div class="draw2-game-node-category" data-node-category="display">
-                    <span class="draw2-game-node-category-label">表示・配置</span>
-                    <div class="draw2-game-node-tiles">
-                      <button type="button" class="draw2-game-node-tile" data-game-component-type="TRANSFORM" title="位置・向き (Transform)">
-                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-anchor"></use></svg><span>位置・向き</span>
-                      </button>
-                      <button type="button" class="draw2-game-node-tile" data-game-component-type="SPRITE" title="見た目 (Sprite)">
-                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-image"></use></svg><span>見た目</span>
-                      </button>
-                      <button type="button" class="draw2-game-node-tile" data-game-component-type="TILEMAP" title="マップ (Tilemap)">
-                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-sheet"></use></svg><span>マップ</span>
-                      </button>
-                      <button type="button" class="draw2-game-node-tile" data-game-component-type="CAMERA" title="カメラ (Camera)">
-                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-view"></use></svg><span>カメラ</span>
-                      </button>
-                    </div>
-                  </div>
-                  <div class="draw2-game-node-category" data-node-category="physics">
-                    <span class="draw2-game-node-category-label">ボディ・物理</span>
-                    <div class="draw2-game-node-tiles">
-                      <button type="button" class="draw2-game-node-tile" data-game-component-type="COLLIDER" title="当たり判定 (Collider)">
-                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-border"></use></svg><span>当たり判定</span>
-                      </button>
-                      <button type="button" class="draw2-game-node-tile" data-game-component-type="RIGIDBODY" title="重力・物理 (Rigidbody)">
-                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-bounce"></use></svg><span>重力・物理</span>
-                      </button>
-                    </div>
-                  </div>
-                  <div class="draw2-game-node-category" data-node-category="movement">
-                    <span class="draw2-game-node-category-label">移動</span>
-                    <div class="draw2-game-node-tiles">
-                      <button type="button" class="draw2-game-node-tile" data-game-component-type="CHARACTER_CONTROLLER" title="プレイヤー移動 (Character Controller)">
-                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-pan"></use></svg><span>移動</span>
-                      </button>
-                    </div>
-                  </div>
-                  <div class="draw2-game-node-category" data-node-category="audio-event">
-                    <span class="draw2-game-node-category-label">音・イベント</span>
-                    <div class="draw2-game-node-tiles">
-                      <button type="button" class="draw2-game-node-tile" data-game-component-type="AUDIO_SOURCE" title="音 (Audio)">
-                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-wave"></use></svg><span>音</span>
-                      </button>
-                      <button type="button" class="draw2-game-node-tile" data-game-component-type="BEHAVIOR" title="イベント・ルール (Behavior)">
-                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-commands"></use></svg><span>イベント</span>
-                      </button>
-                    </div>
-                  </div>
-                  <div class="draw2-game-node-category" data-node-category="status">
-                    <span class="draw2-game-node-category-label">ステータス</span>
-                    <div class="draw2-game-node-tiles">
-                      <button type="button" class="draw2-game-node-tile" data-game-component-type="STATUS" title="ステータス (Status)">
-                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-star"></use></svg><span>ステータス</span>
-                      </button>
-                    </div>
-                  </div>
-                  <div class="draw2-game-node-category" data-node-category="skill">
-                    <span class="draw2-game-node-category-label">スキル</span>
-                    <div class="draw2-game-node-tiles">
-                      <button type="button" class="draw2-game-node-tile" data-game-component-type="SKILL" data-game-component-preset="ATTACK" title="攻撃 (Attack Skill)">
-                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-fx"></use></svg><span>攻撃</span>
-                      </button>
-                      <button type="button" class="draw2-game-node-tile" data-game-component-type="SKILL" data-game-component-preset="SHOOT" title="弾を撃つ (Shoot Skill)">
-                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-focus"></use></svg><span>弾を撃つ</span>
-                      </button>
-                      <button type="button" class="draw2-game-node-tile" data-game-component-type="SKILL" data-game-component-preset="MAGIC" title="魔法 (Magic Skill)">
-                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-magic-wand"></use></svg><span>魔法</span>
-                      </button>
-                      <button type="button" class="draw2-game-node-tile" data-game-component-type="SKILL" data-game-component-preset="DASH_ATTACK" title="ダッシュ攻撃 (Dash Attack Skill)">
-                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-bounce"></use></svg><span>ダッシュ攻撃</span>
-                      </button>
-                      <button type="button" class="draw2-game-node-tile" data-game-component-type="SKILL" data-game-component-preset="HEAL" title="回復 (Heal Skill)">
-                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-add"></use></svg><span>回復</span>
-                      </button>
-                      <button type="button" class="draw2-game-node-tile" data-game-component-type="SKILL" data-game-component-preset="SHIELD" title="シールド (Shield Skill)">
-                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-border"></use></svg><span>シールド</span>
-                      </button>
-                    </div>
-                  </div>
-                  <div class="draw2-game-node-category" data-node-category="brain">
-                    <span class="draw2-game-node-category-label">ブレイン・AI</span>
-                    <div class="draw2-game-node-tiles">
-                      <button type="button" class="draw2-game-node-tile" data-game-component-type="BRAIN" data-game-component-preset="PLAYER_CONTROL" title="プレイヤー操作 (Player Control)">
-                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-select"></use></svg><span>プレイヤー操作</span>
-                      </button>
-                      <button type="button" class="draw2-game-node-tile" data-game-component-type="BRAIN" data-game-component-preset="AI" title="AI">
-                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-tools"></use></svg><span>AI</span>
-                      </button>
-                      <button type="button" class="draw2-game-node-tile" data-game-component-type="BRAIN" data-game-component-preset="PATROL" title="パトロール (Patrol)">
-                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-loop"></use></svg><span>パトロール</span>
-                      </button>
-                      <button type="button" class="draw2-game-node-tile" data-game-component-type="BRAIN" data-game-component-preset="PURSUE" title="追跡 (Pursue)">
-                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-center"></use></svg><span>追跡</span>
-                      </button>
-                      <button type="button" class="draw2-game-node-tile" data-game-component-type="BRAIN" data-game-component-preset="AVOID" title="避ける (Avoid)">
-                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-shrink"></use></svg><span>避ける</span>
-                      </button>
-                      <button type="button" class="draw2-game-node-tile" data-game-component-type="BRAIN" data-game-component-preset="WAIT" title="待機 (Wait)">
-                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-pause"></use></svg><span>待機</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                <p class="draw2-panel-status" id="draw2GameComponentsStatus">
-                  機能を追加すると、このオブジェクトの役割が明確になります。
-                </p>
-                </section>
+                
               </details>
               <div class="draw2-game-logic-mode" role="tablist" aria-label="Game logic authoring mode">
                 <button
@@ -9860,7 +9918,7 @@
     <script src="../scripts/pixieed-account-supabase-client.js?v=20260828-staging-config-v1"></script>
     <script
       type="module"
-      src="./dist/draw2-entry.js?v=20260901-icons-v10"
+      src="./dist/draw2-entry.js?v=20260901-icons-v11"
     ></script>
     <script
       type="module"

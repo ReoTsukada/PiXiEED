@@ -3847,6 +3847,26 @@ export function bootstrapDraw2Workspace(
     documentRef,
     "#draw2GameComponentsStatus",
   );
+  const draw2GameComponentsDropHint = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2GameComponentsDropHint",
+  );
+  const draw2GameLeftDockTabHierarchy = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2GameLeftDockTabHierarchy",
+  );
+  const draw2GameLeftDockTabNodeBox = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2GameLeftDockTabNodeBox",
+  );
+  const draw2GameLeftDockHierarchyPanel = query<HTMLElement>(
+    documentRef,
+    "#draw2GameLeftDockHierarchyPanel",
+  );
+  const draw2GameLeftDockNodeBoxPanel = query<HTMLElement>(
+    documentRef,
+    "#draw2GameLeftDockNodeBoxPanel",
+  );
   const draw2GameEventTrigger = query<HTMLSelectElement>(
     documentRef,
     "#draw2GameEventTrigger",
@@ -30662,6 +30682,78 @@ export function bootstrapDraw2Workspace(
     }
     event.preventDefault();
     draw2GameComponents.classList.remove("is-drag-over");
+    const raw = event.dataTransfer.getData(GAME_NODE_TILE_DRAG_MIME);
+    if (raw === "") return;
+    try {
+      const payload = JSON.parse(raw) as { type?: string; preset?: string };
+      const type = payload.type === "" ? undefined : payload.type as
+        | GameEditorComponent["type"]
+        | undefined;
+      const preset = payload.preset === "" ? undefined : payload.preset;
+      addGameComponentFromNodeTile(type, preset);
+    } catch {
+      // 不正なドロップペイロードは無視する。
+    }
+  });
+  const setGameLeftDockTab = (tab: "hierarchy" | "node-box"): void => {
+    const isNodeBox = tab === "node-box";
+    if (draw2GameLeftDockHierarchyPanel !== undefined) {
+      draw2GameLeftDockHierarchyPanel.hidden = isNodeBox;
+    }
+    if (draw2GameLeftDockNodeBoxPanel !== undefined) {
+      draw2GameLeftDockNodeBoxPanel.hidden = !isNodeBox;
+    }
+    if (draw2GameLeftDockTabHierarchy !== undefined) {
+      draw2GameLeftDockTabHierarchy.classList.toggle("is-active", !isNodeBox);
+      draw2GameLeftDockTabHierarchy.setAttribute(
+        "aria-selected",
+        isNodeBox ? "false" : "true",
+      );
+    }
+    if (draw2GameLeftDockTabNodeBox !== undefined) {
+      draw2GameLeftDockTabNodeBox.classList.toggle("is-active", isNodeBox);
+      draw2GameLeftDockTabNodeBox.setAttribute(
+        "aria-selected",
+        isNodeBox ? "true" : "false",
+      );
+    }
+  };
+  draw2GameLeftDockTabHierarchy?.addEventListener("click", () => {
+    setGameLeftDockTab("hierarchy");
+  });
+  draw2GameLeftDockTabNodeBox?.addEventListener("click", () => {
+    setGameLeftDockTab("node-box");
+  });
+  draw2GameComponentsDropHint?.addEventListener("click", () => {
+    setGameLeftDockTab("node-box");
+    if (draw2GameComponentsStatus !== undefined) {
+      draw2GameComponentsStatus.textContent =
+        "左のノードボックスから機能をクリックまたはドラッグ&ドロップで追加してください。";
+    }
+  });
+  draw2GameComponentsDropHint?.addEventListener("dragover", (event) => {
+    if (
+      event.dataTransfer === null ||
+      !event.dataTransfer.types.includes(GAME_NODE_TILE_DRAG_MIME)
+    ) {
+      return;
+    }
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    draw2GameComponentsDropHint.classList.add("is-drag-over");
+  });
+  draw2GameComponentsDropHint?.addEventListener("dragleave", () => {
+    draw2GameComponentsDropHint.classList.remove("is-drag-over");
+  });
+  draw2GameComponentsDropHint?.addEventListener("drop", (event) => {
+    if (
+      event.dataTransfer === null ||
+      !event.dataTransfer.types.includes(GAME_NODE_TILE_DRAG_MIME)
+    ) {
+      return;
+    }
+    event.preventDefault();
+    draw2GameComponentsDropHint.classList.remove("is-drag-over");
     const raw = event.dataTransfer.getData(GAME_NODE_TILE_DRAG_MIME);
     if (raw === "") return;
     try {

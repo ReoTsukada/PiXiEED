@@ -18050,6 +18050,11 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
   const draw2GameComponents = query(documentRef, "#draw2GameComponents");
   const draw2GameNodeBox = query(documentRef, "#draw2GameNodeBox");
   const draw2GameComponentsStatus = query(documentRef, "#draw2GameComponentsStatus");
+  const draw2GameComponentsDropHint = query(documentRef, "#draw2GameComponentsDropHint");
+  const draw2GameLeftDockTabHierarchy = query(documentRef, "#draw2GameLeftDockTabHierarchy");
+  const draw2GameLeftDockTabNodeBox = query(documentRef, "#draw2GameLeftDockTabNodeBox");
+  const draw2GameLeftDockHierarchyPanel = query(documentRef, "#draw2GameLeftDockHierarchyPanel");
+  const draw2GameLeftDockNodeBoxPanel = query(documentRef, "#draw2GameLeftDockNodeBoxPanel");
   const draw2GameEventTrigger = query(documentRef, "#draw2GameEventTrigger");
   const draw2GameEventWho = query(documentRef, "#draw2GameEventWho");
   const draw2GameEventCondition = query(documentRef, "#draw2GameEventCondition");
@@ -37506,6 +37511,62 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     }
     event.preventDefault();
     draw2GameComponents.classList.remove("is-drag-over");
+    const raw = event.dataTransfer.getData(GAME_NODE_TILE_DRAG_MIME);
+    if (raw === "") return;
+    try {
+      const payload = JSON.parse(raw);
+      const type = payload.type === "" ? void 0 : payload.type;
+      const preset = payload.preset === "" ? void 0 : payload.preset;
+      addGameComponentFromNodeTile(type, preset);
+    } catch {
+    }
+  });
+  const setGameLeftDockTab = (tab) => {
+    const isNodeBox = tab === "node-box";
+    if (draw2GameLeftDockHierarchyPanel !== void 0) {
+      draw2GameLeftDockHierarchyPanel.hidden = isNodeBox;
+    }
+    if (draw2GameLeftDockNodeBoxPanel !== void 0) {
+      draw2GameLeftDockNodeBoxPanel.hidden = !isNodeBox;
+    }
+    if (draw2GameLeftDockTabHierarchy !== void 0) {
+      draw2GameLeftDockTabHierarchy.classList.toggle("is-active", !isNodeBox);
+      draw2GameLeftDockTabHierarchy.setAttribute("aria-selected", isNodeBox ? "false" : "true");
+    }
+    if (draw2GameLeftDockTabNodeBox !== void 0) {
+      draw2GameLeftDockTabNodeBox.classList.toggle("is-active", isNodeBox);
+      draw2GameLeftDockTabNodeBox.setAttribute("aria-selected", isNodeBox ? "true" : "false");
+    }
+  };
+  draw2GameLeftDockTabHierarchy?.addEventListener("click", () => {
+    setGameLeftDockTab("hierarchy");
+  });
+  draw2GameLeftDockTabNodeBox?.addEventListener("click", () => {
+    setGameLeftDockTab("node-box");
+  });
+  draw2GameComponentsDropHint?.addEventListener("click", () => {
+    setGameLeftDockTab("node-box");
+    if (draw2GameComponentsStatus !== void 0) {
+      draw2GameComponentsStatus.textContent = "\u5DE6\u306E\u30CE\u30FC\u30C9\u30DC\u30C3\u30AF\u30B9\u304B\u3089\u6A5F\u80FD\u3092\u30AF\u30EA\u30C3\u30AF\u307E\u305F\u306F\u30C9\u30E9\u30C3\u30B0&\u30C9\u30ED\u30C3\u30D7\u3067\u8FFD\u52A0\u3057\u3066\u304F\u3060\u3055\u3044\u3002";
+    }
+  });
+  draw2GameComponentsDropHint?.addEventListener("dragover", (event) => {
+    if (event.dataTransfer === null || !event.dataTransfer.types.includes(GAME_NODE_TILE_DRAG_MIME)) {
+      return;
+    }
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    draw2GameComponentsDropHint.classList.add("is-drag-over");
+  });
+  draw2GameComponentsDropHint?.addEventListener("dragleave", () => {
+    draw2GameComponentsDropHint.classList.remove("is-drag-over");
+  });
+  draw2GameComponentsDropHint?.addEventListener("drop", (event) => {
+    if (event.dataTransfer === null || !event.dataTransfer.types.includes(GAME_NODE_TILE_DRAG_MIME)) {
+      return;
+    }
+    event.preventDefault();
+    draw2GameComponentsDropHint.classList.remove("is-drag-over");
     const raw = event.dataTransfer.getData(GAME_NODE_TILE_DRAG_MIME);
     if (raw === "") return;
     try {

@@ -12451,6 +12451,35 @@ body:has(#draw2WorkspaceFrame) {
   border-color: var(--draw2-accent-strong);
   background: color-mix(in srgb, var(--draw2-accent-strong) 10%, transparent);
 }
+.draw2-game-components-drop-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 8px 10px;
+  border: 1px dashed var(--draw2-border-subtle);
+  border-radius: var(--draw2-radius-sm);
+  background: color-mix(in srgb, var(--draw2-accent-strong) 6%, var(--draw2-surface-raised));
+  color: var(--draw2-text-muted);
+  font-size: 0.56rem;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease, color 120ms ease;
+}
+.draw2-game-components-drop-hint:hover,
+.draw2-game-components-drop-hint:focus-visible {
+  border-color: var(--draw2-accent-strong);
+  color: var(--draw2-text-strong);
+  outline: none;
+}
+.draw2-game-components-drop-hint.is-drag-over {
+  border-style: solid;
+  border-color: var(--draw2-accent-strong);
+  background: color-mix(in srgb, var(--draw2-accent-strong) 16%, var(--draw2-surface-raised));
+  color: var(--draw2-text-strong);
+}
 .draw2-game-inspector-check {
   display: flex;
   align-items: center;
@@ -16146,7 +16175,7 @@ body:has(#draw2WorkspaceFrame) {
     min-width: 0;
     height: 100%;
     padding: 12px 10px;
-    overflow: auto;
+    overflow: hidden;
     background: var(--draw2-panel-surface, #151d2b);
   }
 
@@ -16331,6 +16360,56 @@ body:has(#draw2WorkspaceFrame) {
   .draw2-game-left-dock .draw2-panel-status {
     margin-top: auto;
     font-size: 11px;
+  }
+
+  .draw2-game-left-dock-panels {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .draw2-game-left-dock-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 0;
+  }
+
+  .draw2-game-left-dock-panel[hidden] {
+    display: none;
+  }
+
+  .draw2-game-left-dock-panel:not([hidden]) {
+    flex: 1 1 auto;
+    overflow: auto;
+  }
+
+  .draw2-game-left-dock-tabs {
+    display: flex;
+    flex: none;
+    gap: 4px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--draw2-border-subtle);
+  }
+
+  .draw2-game-left-dock-tab {
+    display: flex;
+    flex: 1 1 0;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-height: 27px;
+    padding-inline: 8px;
+    font-size: 0.55rem;
+  }
+
+  .draw2-game-left-dock-tab.is-active {
+    border-color: var(--draw2-accent-strong);
+    background: color-mix(in srgb, var(--draw2-accent-strong) 14%, var(--draw2-surface-raised));
+    color: var(--draw2-text-strong);
   }
 
   .draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"] {
