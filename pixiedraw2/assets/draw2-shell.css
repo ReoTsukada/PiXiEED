@@ -13271,9 +13271,51 @@ body:has(#draw2WorkspaceFrame) {
 }
 .draw2-game-asset-browser-controls {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(130px, 180px);
+  grid-template-columns: 1fr;
   gap: 6px;
   min-width: 0;
+}
+
+.draw2-game-asset-filter-field {
+  gap: 4px;
+}
+
+.draw2-game-asset-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.draw2-game-asset-filter-chip {
+  padding: 4px 8px;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: 999px;
+  background: var(--draw2-surface-input);
+  color: var(--draw2-text-muted);
+  font-size: 0.58rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.draw2-game-asset-filter-chip:hover,
+.draw2-game-asset-filter-chip:focus-visible {
+  border-color: var(--draw2-accent-strong);
+  color: var(--draw2-text-strong);
+  outline: none;
+}
+
+.draw2-game-asset-filter-chip.is-active {
+  border-color: var(--draw2-accent-strong);
+  background: color-mix(
+    in srgb,
+    var(--draw2-accent-strong) 22%,
+    var(--draw2-surface-input)
+  );
+  color: var(--draw2-text-strong);
 }
 .draw2-game-asset-catalog {
   display: grid;
@@ -13337,6 +13379,69 @@ body:has(#draw2WorkspaceFrame) {
     var(--draw2-accent-strong) 5%,
     var(--draw2-surface-raised)
   );
+}
+
+.draw2-game-asset-catalog[data-game-asset-catalog-layout="tiles"] {
+  grid-template-columns: repeat(auto-fill, minmax(72px, 96px));
+}
+
+.draw2-game-asset-catalog[data-game-asset-catalog-layout="tiles"]
+  .draw2-game-asset-card {
+  --draw2-node-category-color: #7dd3fc;
+  justify-items: center;
+  gap: 4px;
+  min-height: 0;
+  padding: 8px 4px 6px;
+  border-color: color-mix(
+    in srgb,
+    var(--draw2-node-category-color) 26%,
+    var(--draw2-border-subtle)
+  );
+  background: color-mix(
+    in srgb,
+    var(--draw2-node-category-color) 18%,
+    var(--draw2-surface-raised)
+  );
+  text-align: center;
+}
+
+.draw2-game-asset-catalog[data-game-asset-catalog-layout="tiles"]
+  .draw2-game-asset-card[data-game-asset-role="player"] {
+  --draw2-node-category-color: #66e3b4;
+}
+
+.draw2-game-asset-catalog[data-game-asset-catalog-layout="tiles"]
+  .draw2-game-asset-card[data-game-asset-role="npc"] {
+  --draw2-node-category-color: #f5b86a;
+}
+
+.draw2-game-asset-catalog[data-game-asset-catalog-layout="tiles"]
+  .draw2-game-asset-card[data-game-asset-role="camera"] {
+  --draw2-node-category-color: #c4b5fd;
+}
+
+.draw2-game-asset-catalog[data-game-asset-catalog-layout="tiles"]
+  .draw2-game-asset-card-head {
+  flex-direction: column;
+  gap: 2px;
+}
+
+.draw2-game-asset-catalog[data-game-asset-catalog-layout="tiles"]
+  .draw2-game-asset-card strong {
+  overflow-wrap: break-word;
+  font-size: 0.58rem;
+  white-space: normal;
+  text-align: center;
+}
+
+.draw2-game-asset-catalog[data-game-asset-catalog-layout="tiles"]
+  .draw2-game-asset-card-badge,
+.draw2-game-asset-catalog[data-game-asset-catalog-layout="tiles"]
+  .draw2-game-asset-card-main
+  small,
+.draw2-game-asset-catalog[data-game-asset-catalog-layout="tiles"]
+  .draw2-game-asset-card-action {
+  display: none;
 }
 .draw2-game-animation-selection {
   min-width: 0;

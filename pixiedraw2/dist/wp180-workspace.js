@@ -17720,7 +17720,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
   const gameAssetTracks = query(documentRef, "#draw2GameAssetTracks");
   const gameRailSurfaces = queryAll(documentRef, "[data-game-rail-surface]");
   const draw2GameAssetQuery = query(documentRef, "#draw2GameAssetQuery");
-  const draw2GameAssetFilter = query(documentRef, "#draw2GameAssetFilter");
+  const draw2GameAssetFilterChips = queryAll(documentRef, "[data-game-asset-filter]");
   const draw2GameAssetCatalog = query(documentRef, "#draw2GameAssetCatalog");
   const draw2GameAssetCatalogStatus = query(documentRef, "#draw2GameAssetCatalogStatus");
   const draw2GameAnimationSelection = query(documentRef, "#draw2GameAnimationSelection");
@@ -35943,6 +35943,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
   };
   const renderGameAssetCatalog = () => {
     if (draw2GameAssetCatalog === void 0) return;
+    draw2GameAssetCatalog.dataset.gameAssetCatalogLayout = gameAssetBrowserSource === "GAME" ? "tiles" : "list";
     const drawDefinitions = getAssetBridge()?.snapshot().assetDefinitions ?? [];
     const audioAssets = audioWorkspaceSession?.assetCatalog.assets ?? [];
     const templates = getGameTemplates().map((definition) => ({
@@ -35974,6 +35975,13 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
         card.dataset.gameAssetId = entry.id;
         card.dataset.gameAssetSource = entry.source;
         card.dataset.gameAssetReadonly = String(entry.readOnly);
+        if (entry.source === "GAME" && entry.trackId !== void 0) {
+          const ownerTrack = gameDeckTracks.find((candidate) => candidate.id === entry.trackId);
+          if (ownerTrack !== void 0) {
+            const ownerRole = ownerTrack.role ?? gameObjectRoleFor(ownerTrack.id, ownerTrack.kind);
+            card.dataset.gameAssetRole = ownerRole.toLocaleLowerCase();
+          }
+        }
         card.setAttribute("role", "listitem");
         card.classList.toggle("is-active", entry.source === "DRAW" && entry.definitionId === selectedGameAssetDefinitionId);
         const head = documentRef.createElement("span");
@@ -36107,16 +36115,23 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     gameAssetBrowserQuery = draw2GameAssetQuery.value;
     renderGameAssetRail();
   });
-  draw2GameAssetFilter?.addEventListener("change", () => {
-    const value = draw2GameAssetFilter.value;
-    gameAssetBrowserSource = [
-      "GAME",
-      "DRAW",
-      "AUDIO",
-      "TEMPLATE"
-    ].includes(value) ? value : "ALL";
-    renderGameAssetRail();
-  });
+  for (const chip of draw2GameAssetFilterChips) {
+    chip.addEventListener("click", () => {
+      const value = chip.dataset.gameAssetFilter ?? "ALL";
+      gameAssetBrowserSource = [
+        "GAME",
+        "DRAW",
+        "AUDIO",
+        "TEMPLATE"
+      ].includes(value) ? value : "ALL";
+      for (const candidate of draw2GameAssetFilterChips) {
+        const active = candidate === chip;
+        candidate.classList.toggle("is-active", active);
+        candidate.setAttribute("aria-selected", String(active));
+      }
+      renderGameAssetRail();
+    });
+  }
   draw2GameAnimationPlay?.addEventListener("click", () => {
     const reference = selectedGameAnimationReference();
     if (reference === void 0 || gameAnimationPreviewTimer !== void 0) {

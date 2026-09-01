@@ -10,7 +10,7 @@
     <title>PiXiEEDstudio — Studio</title>
     <link
       rel="stylesheet"
-      href="./assets/draw2-shell.min.css?v=20260901-icons-v18"
+      href="./assets/draw2-shell.min.css?v=20260901-icons-v20"
     >
     <link
       rel="stylesheet"
@@ -6793,15 +6793,21 @@
                       aria-label="Gameアセットを検索"
                     />
                   </label>
-                  <label class="draw2-panel-field">種類
-                    <select id="draw2GameAssetFilter" aria-label="Gameアセットの種類">
-                      <option value="ALL">すべて</option>
-                      <option value="GAME">Gameオブジェクト</option>
-                      <option value="DRAW">iDRAW素材</option>
-                      <option value="AUDIO">iAUDIO素材</option>
-                      <option value="TEMPLATE">テンプレート</option>
-                    </select>
-                  </label>
+                  <div class="draw2-panel-field draw2-game-asset-filter-field">
+                    <span>種類</span>
+                    <div
+                      class="draw2-game-asset-filter-chips"
+                      id="draw2GameAssetFilterChips"
+                      role="tablist"
+                      aria-label="Gameアセットの種類"
+                    >
+                      <button type="button" class="draw2-game-asset-filter-chip is-active" role="tab" aria-selected="true" data-game-asset-filter="ALL">すべて</button>
+                      <button type="button" class="draw2-game-asset-filter-chip" role="tab" aria-selected="false" data-game-asset-filter="GAME">Gameオブジェクト</button>
+                      <button type="button" class="draw2-game-asset-filter-chip" role="tab" aria-selected="false" data-game-asset-filter="DRAW">iDRAW素材</button>
+                      <button type="button" class="draw2-game-asset-filter-chip" role="tab" aria-selected="false" data-game-asset-filter="AUDIO">iAUDIO素材</button>
+                      <button type="button" class="draw2-game-asset-filter-chip" role="tab" aria-selected="false" data-game-asset-filter="TEMPLATE">テンプレート</button>
+                    </div>
+                  </div>
                 </div>
                 <div
                   class="draw2-game-asset-catalog"
@@ -9929,7 +9935,7 @@
     <script src="../scripts/pixieed-account-supabase-client.js?v=20260828-staging-config-v1"></script>
     <script
       type="module"
-      src="./dist/draw2-entry.js?v=20260901-icons-v18"
+      src="./dist/draw2-entry.js?v=20260901-icons-v20"
     ></script>
     <script
       type="module"

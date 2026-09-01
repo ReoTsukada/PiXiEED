@@ -2716,9 +2716,9 @@ export function bootstrapDraw2Workspace(
     documentRef,
     "#draw2GameAssetQuery",
   );
-  const draw2GameAssetFilter = query<HTMLSelectElement>(
+  const draw2GameAssetFilterChips = queryAll<HTMLButtonElement>(
     documentRef,
-    "#draw2GameAssetFilter",
+    "[data-game-asset-filter]",
   );
   const draw2GameAssetCatalog = query<HTMLElement>(
     documentRef,
@@ -28768,6 +28768,8 @@ export function bootstrapDraw2Workspace(
   };
   const renderGameAssetCatalog = (): void => {
     if (draw2GameAssetCatalog === undefined) return;
+    draw2GameAssetCatalog.dataset.gameAssetCatalogLayout =
+      gameAssetBrowserSource === "GAME" ? "tiles" : "list";
     const drawDefinitions = getAssetBridge()?.snapshot().assetDefinitions ?? [];
     const audioAssets = audioWorkspaceSession?.assetCatalog.assets ?? [];
     const templates = getGameTemplates().map((definition) => ({
@@ -28815,6 +28817,16 @@ export function bootstrapDraw2Workspace(
           card.dataset.gameAssetId = entry.id;
           card.dataset.gameAssetSource = entry.source;
           card.dataset.gameAssetReadonly = String(entry.readOnly);
+          if (entry.source === "GAME" && entry.trackId !== undefined) {
+            const ownerTrack = gameDeckTracks.find((candidate) =>
+              candidate.id === entry.trackId
+            );
+            if (ownerTrack !== undefined) {
+              const ownerRole = ownerTrack.role ??
+                gameObjectRoleFor(ownerTrack.id, ownerTrack.kind);
+              card.dataset.gameAssetRole = ownerRole.toLocaleLowerCase();
+            }
+          }
           card.setAttribute("role", "listitem");
           card.classList.toggle(
             "is-active",
@@ -29016,14 +29028,21 @@ export function bootstrapDraw2Workspace(
     gameAssetBrowserQuery = draw2GameAssetQuery.value;
     renderGameAssetRail();
   });
-  draw2GameAssetFilter?.addEventListener("change", () => {
-    const value = draw2GameAssetFilter.value;
-    gameAssetBrowserSource =
-      ["GAME", "DRAW", "AUDIO", "TEMPLATE"].includes(value)
-        ? value as GameAssetBrowserSource
-        : "ALL";
-    renderGameAssetRail();
-  });
+  for (const chip of draw2GameAssetFilterChips) {
+    chip.addEventListener("click", () => {
+      const value = chip.dataset.gameAssetFilter ?? "ALL";
+      gameAssetBrowserSource =
+        ["GAME", "DRAW", "AUDIO", "TEMPLATE"].includes(value)
+          ? value as GameAssetBrowserSource
+          : "ALL";
+      for (const candidate of draw2GameAssetFilterChips) {
+        const active = candidate === chip;
+        candidate.classList.toggle("is-active", active);
+        candidate.setAttribute("aria-selected", String(active));
+      }
+      renderGameAssetRail();
+    });
+  }
   draw2GameAnimationPlay?.addEventListener("click", () => {
     const reference = selectedGameAnimationReference();
     if (reference === undefined || gameAnimationPreviewTimer !== undefined) {
