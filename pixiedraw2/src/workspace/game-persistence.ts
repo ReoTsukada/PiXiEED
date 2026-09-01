@@ -194,6 +194,21 @@ function validEditorComponent(
         ].every((key) =>
           typeof value[key] === "number" && Number.isFinite(value[key])
         ) && typeof value.enabled === "boolean";
+    case "SKILL":
+      return ["ATTACK", "SHOOT", "MAGIC", "DASH_ATTACK", "HEAL", "SHIELD"]
+          .includes(String(value.kind)) &&
+        typeof value.power === "number" && Number.isFinite(value.power) &&
+        typeof value.cooldown === "number" &&
+        Number.isFinite(value.cooldown) && Number(value.cooldown) >= 0 &&
+        typeof value.enabled === "boolean";
+    case "BRAIN":
+      return ["PLAYER_CONTROL", "AI", "PATROL", "PURSUE", "AVOID", "WAIT"]
+          .includes(String(value.mode)) &&
+        typeof value.speed === "number" && Number.isFinite(value.speed) &&
+        Number(value.speed) >= 0 &&
+        typeof value.range === "number" && Number.isFinite(value.range) &&
+        Number(value.range) >= 0 &&
+        typeof value.enabled === "boolean";
     default:
       return false;
   }

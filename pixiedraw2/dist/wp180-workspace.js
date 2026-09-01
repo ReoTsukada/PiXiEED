@@ -5043,7 +5043,9 @@ function validateGameComponentState(component, path, diagnostics) {
     "COLLIDER",
     "RIGIDBODY",
     "CHARACTER_CONTROLLER",
-    "STATUS"
+    "STATUS",
+    "SKILL",
+    "BRAIN"
   ].includes(component.type)) {
     diagnostics.push(diagnostic("INVALID_PROJECT", `${path}.type`, `Unknown Game editor component state: ${component.type}`));
     return;
@@ -5120,6 +5122,26 @@ function validateGameComponentState(component, path, diagnostics) {
     "level"
   ].every((key2) => typeof component[key2] === "number" && Number.isFinite(component[key2])) || typeof component.enabled !== "boolean")) {
     diagnostics.push(diagnostic("INVALID_PROJECT", path, "Game editor Status state is invalid."));
+  }
+  if (component.type === "SKILL" && (![
+    "ATTACK",
+    "SHOOT",
+    "MAGIC",
+    "DASH_ATTACK",
+    "HEAL",
+    "SHIELD"
+  ].includes(component.kind) || typeof component.power !== "number" || !Number.isFinite(component.power) || typeof component.cooldown !== "number" || !Number.isFinite(component.cooldown) || component.cooldown < 0 || typeof component.enabled !== "boolean")) {
+    diagnostics.push(diagnostic("INVALID_PROJECT", path, "Game editor Skill state is invalid."));
+  }
+  if (component.type === "BRAIN" && (![
+    "PLAYER_CONTROL",
+    "AI",
+    "PATROL",
+    "PURSUE",
+    "AVOID",
+    "WAIT"
+  ].includes(component.mode) || typeof component.speed !== "number" || !Number.isFinite(component.speed) || component.speed < 0 || typeof component.range !== "number" || !Number.isFinite(component.range) || component.range < 0 || typeof component.enabled !== "boolean")) {
+    diagnostics.push(diagnostic("INVALID_PROJECT", path, "Game editor Brain state is invalid."));
   }
 }
 function validateDependencyCycles(dependencies, diagnostics) {
@@ -6614,6 +6636,10 @@ function validEditorComponent(component) {
         "defense",
         "level"
       ].every((key) => typeof value[key] === "number" && Number.isFinite(value[key])) && typeof value.enabled === "boolean";
+    case "SKILL":
+      return ["ATTACK", "SHOOT", "MAGIC", "DASH_ATTACK", "HEAL", "SHIELD"].includes(String(value.kind)) && typeof value.power === "number" && Number.isFinite(value.power) && typeof value.cooldown === "number" && Number.isFinite(value.cooldown) && Number(value.cooldown) >= 0 && typeof value.enabled === "boolean";
+    case "BRAIN":
+      return ["PLAYER_CONTROL", "AI", "PATROL", "PURSUE", "AVOID", "WAIT"].includes(String(value.mode)) && typeof value.speed === "number" && Number.isFinite(value.speed) && Number(value.speed) >= 0 && typeof value.range === "number" && Number.isFinite(value.range) && Number(value.range) >= 0 && typeof value.enabled === "boolean";
     default:
       return false;
   }
@@ -12447,6 +12473,28 @@ function status(trackId, options = {}) {
     ...options
   };
 }
+function skill(trackId, options = {}) {
+  return {
+    type: "SKILL",
+    componentId: componentIdFor(trackId, "SKILL"),
+    kind: "ATTACK",
+    power: 10,
+    cooldown: 1,
+    enabled: true,
+    ...options
+  };
+}
+function brain(trackId, options = {}) {
+  return {
+    type: "BRAIN",
+    componentId: componentIdFor(trackId, "BRAIN"),
+    mode: "PLAYER_CONTROL",
+    speed: 3,
+    range: 5,
+    enabled: true,
+    ...options
+  };
+}
 function defaultGameObjectComponents(trackId, kind, roleOverride) {
   const role = roleOverride ?? gameObjectRoleFor(trackId, kind);
   const base = [
@@ -12581,7 +12629,9 @@ function componentLabel(type) {
     CHARACTER_CONTROLLER: "\u30D7\u30EC\u30A4\u30E4\u30FC\u79FB\u52D5",
     CAMERA: "\u30AB\u30E1\u30E9 (Camera)",
     BEHAVIOR: "\u30A4\u30D9\u30F3\u30C8\u30FB\u30EB\u30FC\u30EB",
-    STATUS: "\u30B9\u30C6\u30FC\u30BF\u30B9 (Status)"
+    STATUS: "\u30B9\u30C6\u30FC\u30BF\u30B9 (Status)",
+    SKILL: "\u30B9\u30AD\u30EB (Skill)",
+    BRAIN: "\u30D6\u30EC\u30A4\u30F3\u30FBAI (Brain)"
   };
   return labels[type];
 }
@@ -12607,6 +12657,28 @@ function componentSummary(component) {
       return component.enabled ? "\u30A4\u30D9\u30F3\u30C8\u3092\u5B9F\u884C" : "\u7121\u52B9";
     case "STATUS":
       return `HP ${component.hp}/${component.maxHp} \xB7 Lv.${component.level} \xB7 \u653B\u6483${component.attack}/\u9632\u5FA1${component.defense}`;
+    case "SKILL": {
+      const skillKindLabel = {
+        ATTACK: "\u653B\u6483",
+        SHOOT: "\u5F3E\u3092\u6483\u3064",
+        MAGIC: "\u9B54\u6CD5",
+        DASH_ATTACK: "\u30C0\u30C3\u30B7\u30E5\u653B\u6483",
+        HEAL: "\u56DE\u5FA9",
+        SHIELD: "\u30B7\u30FC\u30EB\u30C9"
+      };
+      return `${skillKindLabel[component.kind]} \xB7 \u5A01\u529B${component.power} \xB7 CT${component.cooldown}s`;
+    }
+    case "BRAIN": {
+      const brainModeLabel = {
+        PLAYER_CONTROL: "\u30D7\u30EC\u30A4\u30E4\u30FC\u64CD\u4F5C",
+        AI: "AI",
+        PATROL: "\u30D1\u30C8\u30ED\u30FC\u30EB",
+        PURSUE: "\u8FFD\u8DE1",
+        AVOID: "\u907F\u3051\u308B",
+        WAIT: "\u5F85\u6A5F"
+      };
+      return `${brainModeLabel[component.mode]} \xB7 \u901F\u5EA6${component.speed}`;
+    }
   }
 }
 function cloneGameComponents(components) {
@@ -34006,7 +34078,13 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       draw2GameComponentsStatus.textContent = status;
     }
   };
-  const componentForAdd = (track, type) => {
+  const componentForAdd = (track, type, preset) => {
+    if (type === "SKILL") {
+      return skill(track.id, preset === void 0 ? {} : { kind: preset });
+    }
+    if (type === "BRAIN") {
+      return brain(track.id, preset === void 0 ? {} : { mode: preset });
+    }
     const sources = {
       TRANSFORM: "SPRITE",
       SPRITE: "SPRITE",
@@ -34491,6 +34569,53 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
           defense.addEventListener("change", apply);
           level.addEventListener("change", apply);
           statusEnabled.addEventListener("change", apply);
+          break;
+        }
+        case "SKILL": {
+          const kind = selectControl(["ATTACK", "SHOOT", "MAGIC", "DASH_ATTACK", "HEAL", "SHIELD"], component.kind);
+          const power = numberControl(component.power, "1");
+          const cooldown = numberControl(component.cooldown, "0.1");
+          cooldown.min = "0";
+          const skillEnabled = checkboxControl(component.enabled);
+          appendComponentField(card, "Kind", kind);
+          appendComponentField(card, "Power", power);
+          appendComponentField(card, "Cooldown", cooldown);
+          appendComponentField(card, "Enabled", skillEnabled);
+          const apply = () => updateSelectedGameComponents((items) => items.map((item) => item.componentId === component.componentId && item.type === "SKILL" ? {
+            ...item,
+            kind: kind.value,
+            power: Number(power.value) || 0,
+            cooldown: Math.max(0, Number(cooldown.value) || 0),
+            enabled: skillEnabled.checked
+          } : item));
+          kind.addEventListener("change", apply);
+          power.addEventListener("change", apply);
+          cooldown.addEventListener("change", apply);
+          skillEnabled.addEventListener("change", apply);
+          break;
+        }
+        case "BRAIN": {
+          const mode = selectControl(["PLAYER_CONTROL", "AI", "PATROL", "PURSUE", "AVOID", "WAIT"], component.mode);
+          const speed = numberControl(component.speed, "0.1");
+          speed.min = "0";
+          const range = numberControl(component.range, "0.1");
+          range.min = "0";
+          const brainEnabled = checkboxControl(component.enabled);
+          appendComponentField(card, "Mode", mode);
+          appendComponentField(card, "Speed", speed);
+          appendComponentField(card, "Range", range);
+          appendComponentField(card, "Enabled", brainEnabled);
+          const apply = () => updateSelectedGameComponents((items) => items.map((item) => item.componentId === component.componentId && item.type === "BRAIN" ? {
+            ...item,
+            mode: mode.value,
+            speed: Math.max(0, Number(speed.value) || 0),
+            range: Math.max(0, Number(range.value) || 0),
+            enabled: brainEnabled.checked
+          } : item));
+          mode.addEventListener("change", apply);
+          speed.addEventListener("change", apply);
+          range.addEventListener("change", apply);
+          brainEnabled.addEventListener("change", apply);
           break;
         }
       }
@@ -37273,6 +37398,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     const tile = event.target?.closest(".draw2-game-node-tile");
     if (tile === null || tile === void 0 || tile.disabled) return;
     const type = tile.dataset.gameComponentType;
+    const preset = tile.dataset.gameComponentPreset;
     const selected = selectedGameTrack();
     if (selected === void 0 || type === void 0) {
       if (draw2GameComponentsStatus !== void 0) {
@@ -37287,7 +37413,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       }
       return;
     }
-    const next = componentForAdd(selected, type);
+    const next = componentForAdd(selected, type, preset);
     if (next === void 0) {
       if (draw2GameComponentsStatus !== void 0) {
         draw2GameComponentsStatus.textContent = `${componentLabel(type)}\u306E\u521D\u671F\u5024\u3092\u4F5C\u6210\u3067\u304D\u307E\u305B\u3093\u3002`;

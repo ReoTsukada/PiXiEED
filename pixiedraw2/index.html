@@ -10,7 +10,7 @@
     <title>PiXiEEDstudio — Studio</title>
     <link
       rel="stylesheet"
-      href="./assets/draw2-shell.min.css?v=20260901-icons-v7"
+      href="./assets/draw2-shell.min.css?v=20260901-icons-v8"
     >
     <link
       rel="stylesheet"
@@ -5306,11 +5306,51 @@
                       </button>
                     </div>
                   </div>
-                  <div class="draw2-game-node-category is-coming-soon" data-node-category="skill" aria-disabled="true">
-                    <span class="draw2-game-node-category-label">スキル<small class="draw2-game-node-category-badge">近日公開</small></span>
+                  <div class="draw2-game-node-category" data-node-category="skill">
+                    <span class="draw2-game-node-category-label">スキル</span>
+                    <div class="draw2-game-node-tiles">
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="SKILL" data-game-component-preset="ATTACK" title="攻撃 (Attack Skill)">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-fx"></use></svg><span>攻撃</span>
+                      </button>
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="SKILL" data-game-component-preset="SHOOT" title="弾を撃つ (Shoot Skill)">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-focus"></use></svg><span>弾を撃つ</span>
+                      </button>
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="SKILL" data-game-component-preset="MAGIC" title="魔法 (Magic Skill)">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-magic-wand"></use></svg><span>魔法</span>
+                      </button>
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="SKILL" data-game-component-preset="DASH_ATTACK" title="ダッシュ攻撃 (Dash Attack Skill)">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-bounce"></use></svg><span>ダッシュ攻撃</span>
+                      </button>
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="SKILL" data-game-component-preset="HEAL" title="回復 (Heal Skill)">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-add"></use></svg><span>回復</span>
+                      </button>
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="SKILL" data-game-component-preset="SHIELD" title="シールド (Shield Skill)">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-border"></use></svg><span>シールド</span>
+                      </button>
+                    </div>
                   </div>
-                  <div class="draw2-game-node-category is-coming-soon" data-node-category="brain" aria-disabled="true">
-                    <span class="draw2-game-node-category-label">ブレイン・AI<small class="draw2-game-node-category-badge">近日公開</small></span>
+                  <div class="draw2-game-node-category" data-node-category="brain">
+                    <span class="draw2-game-node-category-label">ブレイン・AI</span>
+                    <div class="draw2-game-node-tiles">
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="BRAIN" data-game-component-preset="PLAYER_CONTROL" title="プレイヤー操作 (Player Control)">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-select"></use></svg><span>プレイヤー操作</span>
+                      </button>
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="BRAIN" data-game-component-preset="AI" title="AI">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-tools"></use></svg><span>AI</span>
+                      </button>
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="BRAIN" data-game-component-preset="PATROL" title="パトロール (Patrol)">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-loop"></use></svg><span>パトロール</span>
+                      </button>
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="BRAIN" data-game-component-preset="PURSUE" title="追跡 (Pursue)">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-center"></use></svg><span>追跡</span>
+                      </button>
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="BRAIN" data-game-component-preset="AVOID" title="避ける (Avoid)">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-shrink"></use></svg><span>避ける</span>
+                      </button>
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="BRAIN" data-game-component-preset="WAIT" title="待機 (Wait)">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-pause"></use></svg><span>待機</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
                 <p class="draw2-panel-status" id="draw2GameComponentsStatus">
@@ -9820,7 +9860,7 @@
     <script src="../scripts/pixieed-account-supabase-client.js?v=20260828-staging-config-v1"></script>
     <script
       type="module"
-      src="./dist/draw2-entry.js?v=20260901-icons-v7"
+      src="./dist/draw2-entry.js?v=20260901-icons-v8"
     ></script>
     <script
       type="module"

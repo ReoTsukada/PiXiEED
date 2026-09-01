@@ -280,6 +280,46 @@ function status(
   };
 }
 
+/**
+ * Skill and Brain are opt-in only (added explicitly from the node box), so
+ * unlike status() they are exported directly rather than routed through
+ * defaultGameObjectComponents()/PLAYER role defaults - adding one should not
+ * silently attach a skill or control mode to every new object.
+ */
+export function skill(
+  trackId: string,
+  options: Partial<
+    Extract<GameEditorComponent, { readonly type: "SKILL" }>
+  > = {},
+): GameEditorComponent {
+  return {
+    type: "SKILL",
+    componentId: componentIdFor(trackId, "SKILL"),
+    kind: "ATTACK",
+    power: 10,
+    cooldown: 1,
+    enabled: true,
+    ...options,
+  };
+}
+
+export function brain(
+  trackId: string,
+  options: Partial<
+    Extract<GameEditorComponent, { readonly type: "BRAIN" }>
+  > = {},
+): GameEditorComponent {
+  return {
+    type: "BRAIN",
+    componentId: componentIdFor(trackId, "BRAIN"),
+    mode: "PLAYER_CONTROL",
+    speed: 3,
+    range: 5,
+    enabled: true,
+    ...options,
+  };
+}
+
 export function defaultGameObjectComponents(
   trackId: string,
   kind: string,
@@ -377,6 +417,8 @@ export function componentLabel(type: GameEditorComponent["type"]): string {
     CAMERA: "カメラ (Camera)",
     BEHAVIOR: "イベント・ルール",
     STATUS: "ステータス (Status)",
+    SKILL: "スキル (Skill)",
+    BRAIN: "ブレイン・AI (Brain)",
   };
   return labels[type];
 }
@@ -411,6 +453,28 @@ export function componentSummary(component: GameEditorComponent): string {
       return component.enabled ? "イベントを実行" : "無効";
     case "STATUS":
       return `HP ${component.hp}/${component.maxHp} · Lv.${component.level} · 攻撃${component.attack}/防御${component.defense}`;
+    case "SKILL": {
+      const skillKindLabel: Record<typeof component.kind, string> = {
+        ATTACK: "攻撃",
+        SHOOT: "弾を撃つ",
+        MAGIC: "魔法",
+        DASH_ATTACK: "ダッシュ攻撃",
+        HEAL: "回復",
+        SHIELD: "シールド",
+      };
+      return `${skillKindLabel[component.kind]} · 威力${component.power} · CT${component.cooldown}s`;
+    }
+    case "BRAIN": {
+      const brainModeLabel: Record<typeof component.mode, string> = {
+        PLAYER_CONTROL: "プレイヤー操作",
+        AI: "AI",
+        PATROL: "パトロール",
+        PURSUE: "追跡",
+        AVOID: "避ける",
+        WAIT: "待機",
+      };
+      return `${brainModeLabel[component.mode]} · 速度${component.speed}`;
+    }
   }
 }
 

@@ -206,6 +206,7 @@ import {
   type VisualGameLogicSource,
 } from "./game/game-350/visual-logic.ts";
 import {
+  brain,
   cloneGameComponents,
   componentLabel,
   componentSummary,
@@ -214,6 +215,7 @@ import {
   GAME_STUDIO_SYSTEM_CARDS,
   type GameEditorComponent,
   gameObjectRoleFor,
+  skill,
 } from "./game/game-350/game-studio-systems.ts";
 import {
   DEFAULT_CAMERA_2D_SETTINGS,
@@ -26289,7 +26291,24 @@ export function bootstrapDraw2Workspace(
   const componentForAdd = (
     track: ModeDeckTrack,
     type: GameEditorComponent["type"],
+    preset?: string,
   ): GameEditorComponent | undefined => {
+    if (type === "SKILL") {
+      return skill(
+        track.id,
+        preset === undefined
+          ? {}
+          : { kind: preset as Extract<GameEditorComponent, { type: "SKILL" }>["kind"] },
+      );
+    }
+    if (type === "BRAIN") {
+      return brain(
+        track.id,
+        preset === undefined
+          ? {}
+          : { mode: preset as Extract<GameEditorComponent, { type: "BRAIN" }>["mode"] },
+      );
+    }
     const sources: Record<string, string> = {
       TRANSFORM: "SPRITE",
       SPRITE: "SPRITE",
@@ -26990,6 +27009,75 @@ export function bootstrapDraw2Workspace(
             defense.addEventListener("change", apply);
             level.addEventListener("change", apply);
             statusEnabled.addEventListener("change", apply);
+            break;
+          }
+          case "SKILL": {
+            const kind = selectControl(
+              ["ATTACK", "SHOOT", "MAGIC", "DASH_ATTACK", "HEAL", "SHIELD"],
+              component.kind,
+            );
+            const power = numberControl(component.power, "1");
+            const cooldown = numberControl(component.cooldown, "0.1");
+            cooldown.min = "0";
+            const skillEnabled = checkboxControl(component.enabled);
+            appendComponentField(card, "Kind", kind);
+            appendComponentField(card, "Power", power);
+            appendComponentField(card, "Cooldown", cooldown);
+            appendComponentField(card, "Enabled", skillEnabled);
+            const apply = () =>
+              updateSelectedGameComponents((items) =>
+                items.map((item) =>
+                  item.componentId === component.componentId &&
+                    item.type === "SKILL"
+                    ? {
+                      ...item,
+                      kind: kind.value as typeof item.kind,
+                      power: Number(power.value) || 0,
+                      cooldown: Math.max(0, Number(cooldown.value) || 0),
+                      enabled: skillEnabled.checked,
+                    }
+                    : item
+                )
+              );
+            kind.addEventListener("change", apply);
+            power.addEventListener("change", apply);
+            cooldown.addEventListener("change", apply);
+            skillEnabled.addEventListener("change", apply);
+            break;
+          }
+          case "BRAIN": {
+            const mode = selectControl(
+              ["PLAYER_CONTROL", "AI", "PATROL", "PURSUE", "AVOID", "WAIT"],
+              component.mode,
+            );
+            const speed = numberControl(component.speed, "0.1");
+            speed.min = "0";
+            const range = numberControl(component.range, "0.1");
+            range.min = "0";
+            const brainEnabled = checkboxControl(component.enabled);
+            appendComponentField(card, "Mode", mode);
+            appendComponentField(card, "Speed", speed);
+            appendComponentField(card, "Range", range);
+            appendComponentField(card, "Enabled", brainEnabled);
+            const apply = () =>
+              updateSelectedGameComponents((items) =>
+                items.map((item) =>
+                  item.componentId === component.componentId &&
+                    item.type === "BRAIN"
+                    ? {
+                      ...item,
+                      mode: mode.value as typeof item.mode,
+                      speed: Math.max(0, Number(speed.value) || 0),
+                      range: Math.max(0, Number(range.value) || 0),
+                      enabled: brainEnabled.checked,
+                    }
+                    : item
+                )
+              );
+            mode.addEventListener("change", apply);
+            speed.addEventListener("change", apply);
+            range.addEventListener("change", apply);
+            brainEnabled.addEventListener("change", apply);
             break;
           }
         }
@@ -30428,6 +30516,7 @@ export function bootstrapDraw2Workspace(
     const type = tile.dataset.gameComponentType as
       | GameEditorComponent["type"]
       | undefined;
+    const preset = tile.dataset.gameComponentPreset;
     const selected = selectedGameTrack();
     if (selected === undefined || type === undefined) {
       if (draw2GameComponentsStatus !== undefined) {
@@ -30445,7 +30534,7 @@ export function bootstrapDraw2Workspace(
       }
       return;
     }
-    const next = componentForAdd(selected, type);
+    const next = componentForAdd(selected, type, preset);
     if (next === undefined) {
       if (draw2GameComponentsStatus !== undefined) {
         draw2GameComponentsStatus.textContent = `${

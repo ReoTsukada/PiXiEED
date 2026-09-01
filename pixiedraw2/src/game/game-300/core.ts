@@ -413,6 +413,47 @@ export interface StatusComponent {
   readonly enabled: boolean;
 }
 
+/**
+ * Genre-agnostic action/skill slot (attack, ranged shot, magic, dash-attack,
+ * heal, shield). Same editor-authoring-only scope as StatusComponent: not
+ * part of the canonical `Component` union, so it cannot affect Build/Publish
+ * until a future phase adds runtime support.
+ */
+export interface SkillComponent {
+  readonly type: "SKILL";
+  readonly componentId: ComponentId;
+  readonly kind:
+    | "ATTACK"
+    | "SHOOT"
+    | "MAGIC"
+    | "DASH_ATTACK"
+    | "HEAL"
+    | "SHIELD";
+  readonly power: number;
+  readonly cooldown: number;
+  readonly enabled: boolean;
+}
+
+/**
+ * Genre-agnostic control mode (player input, or one of a few simple AI
+ * behaviors). Same editor-authoring-only scope as StatusComponent/
+ * SkillComponent: not part of the canonical `Component` union.
+ */
+export interface BrainComponent {
+  readonly type: "BRAIN";
+  readonly componentId: ComponentId;
+  readonly mode:
+    | "PLAYER_CONTROL"
+    | "AI"
+    | "PATROL"
+    | "PURSUE"
+    | "AVOID"
+    | "WAIT";
+  readonly speed: number;
+  readonly range: number;
+  readonly enabled: boolean;
+}
+
 /** Editor-side component configuration persisted with the canonical timeline. */
 export type GameObjectRole =
   | "PLAYER"
@@ -443,6 +484,8 @@ export type GameComponentState =
   | CharacterControllerComponent
   | CameraComponent
   | StatusComponent
+  | SkillComponent
+  | BrainComponent
   | {
     readonly type: "BEHAVIOR";
     readonly componentId: ComponentId;
@@ -1432,6 +1475,8 @@ function validateGameComponentState(
       "RIGIDBODY",
       "CHARACTER_CONTROLLER",
       "STATUS",
+      "SKILL",
+      "BRAIN",
     ].includes(component.type)
   ) {
     diagnostics.push(
@@ -1621,6 +1666,54 @@ function validateGameComponentState(
         "INVALID_PROJECT",
         path,
         "Game editor Status state is invalid.",
+      ),
+    );
+  }
+  if (
+    component.type === "SKILL" &&
+    (![
+        "ATTACK",
+        "SHOOT",
+        "MAGIC",
+        "DASH_ATTACK",
+        "HEAL",
+        "SHIELD",
+      ].includes(component.kind as string) ||
+      typeof component.power !== "number" ||
+      !Number.isFinite(component.power) ||
+      typeof component.cooldown !== "number" ||
+      !Number.isFinite(component.cooldown) || component.cooldown < 0 ||
+      typeof component.enabled !== "boolean")
+  ) {
+    diagnostics.push(
+      diagnostic(
+        "INVALID_PROJECT",
+        path,
+        "Game editor Skill state is invalid.",
+      ),
+    );
+  }
+  if (
+    component.type === "BRAIN" &&
+    (![
+        "PLAYER_CONTROL",
+        "AI",
+        "PATROL",
+        "PURSUE",
+        "AVOID",
+        "WAIT",
+      ].includes(component.mode as string) ||
+      typeof component.speed !== "number" ||
+      !Number.isFinite(component.speed) || component.speed < 0 ||
+      typeof component.range !== "number" ||
+      !Number.isFinite(component.range) || component.range < 0 ||
+      typeof component.enabled !== "boolean")
+  ) {
+    diagnostics.push(
+      diagnostic(
+        "INVALID_PROJECT",
+        path,
+        "Game editor Brain state is invalid.",
       ),
     );
   }
