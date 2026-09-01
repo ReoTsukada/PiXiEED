@@ -5794,6 +5794,18 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   padding: 4px 8px;
   text-align: left;
 }
+/* Icon + aria-label/title already identify these tabs (MIDI Roll / Draw
+ * Preview) without needing the redundant visible text, which was also the
+ * thing truncating to "M..." / "D..." in the narrow center-rail header.
+ * Collapse the tab down to just its icon column once the text is gone. */
+.draw2-audio-editor-tab {
+  grid-template-columns: 22px;
+  padding: 4px 6px;
+}
+.draw2-audio-editor-label,
+.draw2-audio-editor-tab small {
+  display: none;
+}
 .draw2-audio-editor-icon {
   display: grid;
   grid-row: 1 / -1;
