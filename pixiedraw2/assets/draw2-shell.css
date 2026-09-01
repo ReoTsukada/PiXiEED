@@ -12443,6 +12443,13 @@ body:has(#draw2WorkspaceFrame) {
   max-height: 430px;
   overflow: auto;
   overscroll-behavior: contain;
+  border-radius: var(--draw2-radius-sm);
+  border: 1px dashed transparent;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+.draw2-game-component-list.is-drag-over {
+  border-color: var(--draw2-accent-strong);
+  background: color-mix(in srgb, var(--draw2-accent-strong) 10%, transparent);
 }
 .draw2-game-inspector-check {
   display: flex;

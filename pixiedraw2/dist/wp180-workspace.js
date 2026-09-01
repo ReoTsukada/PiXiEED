@@ -35073,6 +35073,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     if (draw2GameNodeBox !== void 0) {
       for (const tile of draw2GameNodeBox.querySelectorAll(".draw2-game-node-tile")) {
         tile.disabled = selected === void 0;
+        tile.draggable = selected !== void 0;
       }
     }
     renderGameComponentCards();
@@ -37440,11 +37441,8 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       draw2GameCameraQuickStatus.textContent = "\u30AB\u30E1\u30E9\u306E\u63FA\u308C\u3092\u30D7\u30EC\u30D3\u30E5\u30FC\u3057\u307E\u3057\u305F\u3002";
     }
   });
-  draw2GameNodeBox?.addEventListener("click", (event) => {
-    const tile = event.target?.closest(".draw2-game-node-tile");
-    if (tile === null || tile === void 0 || tile.disabled) return;
-    const type = tile.dataset.gameComponentType;
-    const preset = tile.dataset.gameComponentPreset;
+  const GAME_NODE_TILE_DRAG_MIME = "application/x-draw2-game-component";
+  const addGameComponentFromNodeTile = (type, preset) => {
     const selected = selectedGameTrack();
     if (selected === void 0 || type === void 0) {
       if (draw2GameComponentsStatus !== void 0) {
@@ -37470,6 +37468,53 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       ...items,
       next
     ], `${componentLabel(type)}\u3092\u8FFD\u52A0\u3057\u307E\u3057\u305F\u3002`);
+  };
+  draw2GameNodeBox?.addEventListener("click", (event) => {
+    const tile = event.target?.closest(".draw2-game-node-tile");
+    if (tile === null || tile === void 0 || tile.disabled) return;
+    const type = tile.dataset.gameComponentType;
+    const preset = tile.dataset.gameComponentPreset;
+    addGameComponentFromNodeTile(type, preset);
+  });
+  draw2GameNodeBox?.addEventListener("dragstart", (event) => {
+    const tile = event.target?.closest(".draw2-game-node-tile");
+    if (tile === null || tile === void 0 || tile.disabled || event.dataTransfer === null) {
+      return;
+    }
+    const type = tile.dataset.gameComponentType ?? "";
+    const preset = tile.dataset.gameComponentPreset ?? "";
+    event.dataTransfer.effectAllowed = "copy";
+    event.dataTransfer.setData(GAME_NODE_TILE_DRAG_MIME, JSON.stringify({ type, preset }));
+    event.dataTransfer.setData("text/plain", type);
+  });
+  draw2GameComponents?.addEventListener("dragover", (event) => {
+    if (event.dataTransfer === null || !event.dataTransfer.types.includes(GAME_NODE_TILE_DRAG_MIME)) {
+      return;
+    }
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    draw2GameComponents.classList.add("is-drag-over");
+  });
+  draw2GameComponents?.addEventListener("dragleave", (event) => {
+    if (event.currentTarget === event.target || !event.currentTarget.contains(event.relatedTarget)) {
+      draw2GameComponents.classList.remove("is-drag-over");
+    }
+  });
+  draw2GameComponents?.addEventListener("drop", (event) => {
+    if (event.dataTransfer === null || !event.dataTransfer.types.includes(GAME_NODE_TILE_DRAG_MIME)) {
+      return;
+    }
+    event.preventDefault();
+    draw2GameComponents.classList.remove("is-drag-over");
+    const raw = event.dataTransfer.getData(GAME_NODE_TILE_DRAG_MIME);
+    if (raw === "") return;
+    try {
+      const payload = JSON.parse(raw);
+      const type = payload.type === "" ? void 0 : payload.type;
+      const preset = payload.preset === "" ? void 0 : payload.preset;
+      addGameComponentFromNodeTile(type, preset);
+    } catch {
+    }
   });
   draw2GameLogicSimpleButton?.addEventListener("click", () => {
     setGameLogicMode("SIMPLE");

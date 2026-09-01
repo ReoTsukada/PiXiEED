@@ -27627,6 +27627,7 @@ export function bootstrapDraw2Workspace(
         )
       ) {
         tile.disabled = selected === undefined;
+        tile.draggable = selected !== undefined;
       }
     }
     renderGameComponentCards();
@@ -30565,15 +30566,11 @@ export function bootstrapDraw2Workspace(
         "カメラの揺れをプレビューしました。";
     }
   });
-  draw2GameNodeBox?.addEventListener("click", (event) => {
-    const tile = (event.target as HTMLElement | null)?.closest<
-      HTMLButtonElement
-    >(".draw2-game-node-tile");
-    if (tile === null || tile === undefined || tile.disabled) return;
-    const type = tile.dataset.gameComponentType as
-      | GameEditorComponent["type"]
-      | undefined;
-    const preset = tile.dataset.gameComponentPreset;
+  const GAME_NODE_TILE_DRAG_MIME = "application/x-draw2-game-component";
+  const addGameComponentFromNodeTile = (
+    type: GameEditorComponent["type"] | undefined,
+    preset: string | undefined,
+  ): void => {
     const selected = selectedGameTrack();
     if (selected === undefined || type === undefined) {
       if (draw2GameComponentsStatus !== undefined) {
@@ -30604,6 +30601,79 @@ export function bootstrapDraw2Workspace(
       (items) => [...items, next],
       `${componentLabel(type)}を追加しました。`,
     );
+  };
+  draw2GameNodeBox?.addEventListener("click", (event) => {
+    const tile = (event.target as HTMLElement | null)?.closest<
+      HTMLButtonElement
+    >(".draw2-game-node-tile");
+    if (tile === null || tile === undefined || tile.disabled) return;
+    const type = tile.dataset.gameComponentType as
+      | GameEditorComponent["type"]
+      | undefined;
+    const preset = tile.dataset.gameComponentPreset;
+    addGameComponentFromNodeTile(type, preset);
+  });
+  draw2GameNodeBox?.addEventListener("dragstart", (event) => {
+    const tile = (event.target as HTMLElement | null)?.closest<
+      HTMLButtonElement
+    >(".draw2-game-node-tile");
+    if (
+      tile === null || tile === undefined || tile.disabled ||
+      event.dataTransfer === null
+    ) {
+      return;
+    }
+    const type = tile.dataset.gameComponentType ?? "";
+    const preset = tile.dataset.gameComponentPreset ?? "";
+    event.dataTransfer.effectAllowed = "copy";
+    event.dataTransfer.setData(
+      GAME_NODE_TILE_DRAG_MIME,
+      JSON.stringify({ type, preset }),
+    );
+    event.dataTransfer.setData("text/plain", type);
+  });
+  draw2GameComponents?.addEventListener("dragover", (event) => {
+    if (
+      event.dataTransfer === null ||
+      !event.dataTransfer.types.includes(GAME_NODE_TILE_DRAG_MIME)
+    ) {
+      return;
+    }
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    draw2GameComponents.classList.add("is-drag-over");
+  });
+  draw2GameComponents?.addEventListener("dragleave", (event) => {
+    if (
+      event.currentTarget === event.target ||
+      !(event.currentTarget as HTMLElement).contains(
+        event.relatedTarget as Node | null,
+      )
+    ) {
+      draw2GameComponents.classList.remove("is-drag-over");
+    }
+  });
+  draw2GameComponents?.addEventListener("drop", (event) => {
+    if (
+      event.dataTransfer === null ||
+      !event.dataTransfer.types.includes(GAME_NODE_TILE_DRAG_MIME)
+    ) {
+      return;
+    }
+    event.preventDefault();
+    draw2GameComponents.classList.remove("is-drag-over");
+    const raw = event.dataTransfer.getData(GAME_NODE_TILE_DRAG_MIME);
+    if (raw === "") return;
+    try {
+      const payload = JSON.parse(raw) as { type?: string; preset?: string };
+      const type = payload.type === "" ? undefined : payload.type as
+        | GameEditorComponent["type"]
+        | undefined;
+      const preset = payload.preset === "" ? undefined : payload.preset;
+      addGameComponentFromNodeTile(type, preset);
+    } catch {
+      // 不正なドロップペイロードは無視する。
+    }
   });
   draw2GameLogicSimpleButton?.addEventListener("click", () => {
     setGameLogicMode("SIMPLE");
