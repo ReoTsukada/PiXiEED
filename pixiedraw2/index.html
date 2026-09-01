@@ -10,7 +10,7 @@
     <title>PiXiEEDstudio — Studio</title>
     <link
       rel="stylesheet"
-      href="./assets/draw2-shell.min.css?v=20260901-icons-v2"
+      href="./assets/draw2-shell.min.css?v=20260901-icons-v3"
     >
     <link
       rel="stylesheet"
@@ -2342,16 +2342,18 @@
               <div class="draw2-igame-scene-actions">
                 <button
                   id="draw2GameSceneFocusSelected"
-                  class="draw2-button draw2-button-secondary"
+                  class="draw2-button draw2-button-secondary draw2-button-icon"
                   type="button"
-                  title="選択中のオブジェクトへフォーカス"
-                >選択を表示</button>
+                  aria-label="Focus Selection"
+                  title="Focus Selection"
+                ><svg class="draw2-ui-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-focus"></use></svg><span class="draw2-visually-hidden">選択を表示</span></button>
                 <button
                   id="draw2GameSceneFit"
-                  class="draw2-button draw2-button-secondary"
+                  class="draw2-button draw2-button-secondary draw2-button-icon"
                   type="button"
-                  title="Scene全体を表示"
-                >全体表示</button>
+                  aria-label="Fit Scene"
+                  title="Fit Scene"
+                ><svg class="draw2-ui-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-fit-canvas"></use></svg><span class="draw2-visually-hidden">全体表示</span></button>
               </div>
             </div>
             <div class="draw2-game-scene-viewport-stage">
@@ -7738,17 +7740,21 @@
           </button>
           <button
             id="draw2GamePreviewStop"
-            class="draw2-button draw2-button-secondary"
+            class="draw2-button draw2-button-secondary draw2-button-icon"
             type="button"
+            aria-label="Stop"
+            title="Stop"
           >
-            Stop
+            <svg class="draw2-ui-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-stop"></use></svg><span class="draw2-visually-hidden">Stop</span>
           </button>
           <button
             id="draw2GamePreviewRestart"
-            class="draw2-button draw2-button-secondary"
+            class="draw2-button draw2-button-secondary draw2-button-icon"
             type="button"
+            aria-label="Restart"
+            title="Restart"
           >
-            Restart
+            <svg class="draw2-ui-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-rollback"></use></svg><span class="draw2-visually-hidden">Restart</span>
           </button>
           <button
             id="draw2GamePreviewPin"
@@ -9766,7 +9772,7 @@
     <script src="../scripts/pixieed-account-supabase-client.js?v=20260828-staging-config-v1"></script>
     <script
       type="module"
-      src="./dist/draw2-entry.js?v=20260901-icons-v2"
+      src="./dist/draw2-entry.js?v=20260901-icons-v3"
     ></script>
     <script
       type="module"
