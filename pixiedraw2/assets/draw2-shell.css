@@ -23939,7 +23939,10 @@ body:has(#draw2WorkspaceFrame) {
 
 .draw2-game-scene-viewport-stage {
   display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
   place-items: center;
+  position: relative;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -25506,25 +25509,34 @@ body:has(#draw2WorkspaceFrame) {
 }
 
 .draw2-igame-scene-toolbar {
+  position: absolute;
+  grid-row: 1;
+  grid-column: 1;
+  top: 10px;
+  left: 10px;
+  z-index: 2;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
   min-width: 0;
-  padding: 9px 10px;
+  max-width: calc(100% - 20px);
+  padding: 6px 8px;
   border: 1px solid var(--draw2-border-subtle);
-  border-radius: var(--draw2-radius-sm);
+  border-radius: 999px;
   background: color-mix(
     in srgb,
-    var(--draw2-surface-raised) 76%,
+    var(--draw2-surface-raised) 88%,
     transparent
   );
+  box-shadow: 0 4px 14px rgb(0 0 0 / 28%);
+  backdrop-filter: blur(6px);
 }
 
 .draw2-igame-scene-selection {
   display: grid;
   min-width: 0;
-  gap: 3px;
+  gap: 1px;
+  padding-inline: 4px;
 }
 
 .draw2-igame-scene-selection strong {
@@ -25538,11 +25550,14 @@ body:has(#draw2WorkspaceFrame) {
 .draw2-igame-scene-actions {
   display: flex;
   flex: 0 0 auto;
-  gap: 6px;
+  gap: 4px;
 }
 
 .draw2-igame-scene-actions .draw2-button {
-  min-height: 32px;
+  min-height: 26px;
+  min-width: 26px;
+  padding-inline: 5px;
+  border-radius: 999px;
   font-size: var(--igame-text-meta);
 }
 
@@ -27323,7 +27338,7 @@ body:has(#draw2WorkspaceFrame) {
 
   #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
     #draw2GameSceneViewport:not([hidden]) {
-    grid-template-rows: 48px 34px minmax(0, 1fr) 20px !important;
+    grid-template-rows: 48px minmax(0, 1fr) 20px !important;
     gap: 6px !important;
   }
 
@@ -27331,15 +27346,6 @@ body:has(#draw2WorkspaceFrame) {
     .draw2-game-scene-viewport-header {
     grid-row: 1 !important;
     min-height: 0 !important;
-  }
-
-  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
-    .draw2-igame-scene-toolbar {
-    grid-row: 2 !important;
-    box-sizing: border-box !important;
-    height: 34px !important;
-    min-height: 34px !important;
-    padding: 0 10px !important;
   }
 
   #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
@@ -27382,13 +27388,13 @@ body:has(#draw2WorkspaceFrame) {
 
   #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
     .draw2-game-scene-viewport-stage {
-    grid-row: 3 !important;
+    grid-row: 2 !important;
     min-height: 0 !important;
   }
 
   #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
     .draw2-game-scene-viewport-footer {
-    grid-row: 4 !important;
+    grid-row: 3 !important;
     box-sizing: border-box !important;
     height: 20px !important;
     min-height: 20px !important;
