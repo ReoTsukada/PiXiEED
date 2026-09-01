@@ -17652,6 +17652,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
   const workspaceCanvasSlot = query(documentRef, "#draw2WorkspaceCanvasSlot");
   const draw2GameSceneViewport = query(documentRef, "#draw2GameSceneViewport");
   const draw2GameSceneSvg = query(documentRef, "#draw2GameSceneSvg");
+  const draw2GameSceneMinimapSvg = query(documentRef, "#draw2GameSceneMinimapSvg");
   const draw2GameSceneViewportStatus = query(documentRef, "#draw2GameSceneViewportStatus");
   const draw2GameSceneSelection = query(documentRef, "#draw2GameSceneSelection");
   const draw2GameSceneViewButtons = queryAll(documentRef, "[data-game-view-mode]");
@@ -33628,6 +33629,12 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     });
     frame.setAttribute("class", "draw2-game-scene-frame");
     svg.replaceChildren(map, tilemapLayer, grid, frame, objects);
+    if (draw2GameSceneMinimapSvg !== void 0) {
+      draw2GameSceneMinimapSvg.setAttribute("viewBox", `0 0 ${mapWidth} ${mapHeight}`);
+      draw2GameSceneMinimapSvg.replaceChildren(
+        ...[map, tilemapLayer, grid, frame, objects].map((node) => node.cloneNode(true))
+      );
+    }
     if (draw2GameSceneViewportStatus !== void 0) {
       const activeCount = gameDeckTracks.filter((track) => track.active !== false).length;
       draw2GameSceneViewportStatus.textContent = `${activeCount}\u30AA\u30D6\u30B8\u30A7\u30AF\u30C8 \xB7 ${mapWidth}\xD7${mapHeight}\u30B0\u30EA\u30C3\u30C9 \xB7 \u58C1 ${tilemapDocument === void 0 ? 0 : solidGameTilemapCells(tilemapDocument).length} \xB7 Trigger ${tilemapDocument === void 0 ? 0 : triggerGameTilemapCells(tilemapDocument).length}`;

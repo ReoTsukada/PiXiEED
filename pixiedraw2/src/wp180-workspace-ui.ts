@@ -2458,6 +2458,10 @@ export function bootstrapDraw2Workspace(
     documentRef,
     "#draw2GameSceneSvg",
   );
+  const draw2GameSceneMinimapSvg = query<SVGSVGElement>(
+    documentRef,
+    "#draw2GameSceneMinimapSvg",
+  );
   const draw2GameSceneViewportStatus = query<HTMLOutputElement>(
     documentRef,
     "#draw2GameSceneViewportStatus",
@@ -25687,6 +25691,17 @@ export function bootstrapDraw2Workspace(
     });
     frame.setAttribute("class", "draw2-game-scene-frame");
     svg.replaceChildren(map, tilemapLayer, grid, frame, objects);
+    if (draw2GameSceneMinimapSvg !== undefined) {
+      draw2GameSceneMinimapSvg.setAttribute(
+        "viewBox",
+        `0 0 ${mapWidth} ${mapHeight}`,
+      );
+      draw2GameSceneMinimapSvg.replaceChildren(
+        ...[map, tilemapLayer, grid, frame, objects].map((node) =>
+          node.cloneNode(true)
+        ),
+      );
+    }
     if (draw2GameSceneViewportStatus !== undefined) {
       const activeCount = gameDeckTracks.filter((track) =>
         track.active !== false

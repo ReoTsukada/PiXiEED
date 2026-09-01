@@ -10,7 +10,7 @@
     <title>PiXiEEDstudio — Studio</title>
     <link
       rel="stylesheet"
-      href="./assets/draw2-shell.min.css?v=20260901-icons-v17"
+      href="./assets/draw2-shell.min.css?v=20260901-icons-v18"
     >
     <link
       rel="stylesheet"
@@ -2519,6 +2519,17 @@
               >
                 <title>ゲームオブジェクトの配置</title>
               </svg>
+              <div class="draw2-igame-scene-minimap" id="draw2GameSceneMinimap" aria-hidden="true">
+                <span class="draw2-igame-scene-minimap-label">マップ全体</span>
+                <svg
+                  id="draw2GameSceneMinimapSvg"
+                  class="draw2-igame-scene-minimap-svg"
+                  viewBox="0 0 12 8"
+                  preserveAspectRatio="xMidYMid meet"
+                  role="presentation"
+                  focusable="false"
+                ></svg>
+              </div>
             </div>
             <footer class="draw2-game-scene-viewport-footer">
               <output id="draw2GameSceneViewportStatus" aria-live="polite">
@@ -9918,7 +9929,7 @@
     <script src="../scripts/pixieed-account-supabase-client.js?v=20260828-staging-config-v1"></script>
     <script
       type="module"
-      src="./dist/draw2-entry.js?v=20260901-icons-v17"
+      src="./dist/draw2-entry.js?v=20260901-icons-v18"
     ></script>
     <script
       type="module"
