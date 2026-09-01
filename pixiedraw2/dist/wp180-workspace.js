@@ -34095,6 +34095,14 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
   const componentsForGameTrack = (track) => track.components === void 0 ? [
     ...defaultGameObjectComponents(track.id, track.kind)
   ] : cloneGameComponents(track.components);
+  const deriveGameObjectRole = (track, components) => {
+    const baseline = gameObjectRoleFor(track.id, track.kind);
+    const hasPlayerControl = components.some((component) => component.type === "CHARACTER_CONTROLLER" || component.type === "BRAIN" && component.mode === "PLAYER_CONTROL");
+    if (hasPlayerControl) return "PLAYER";
+    const hasAiBrain = components.some((component) => component.type === "BRAIN" && component.mode !== "PLAYER_CONTROL");
+    if (hasAiBrain && (baseline === "PROP" || baseline === "CUSTOM")) return "NPC";
+    return baseline;
+  };
   const updateSelectedGameComponents = (update, status = "\u6A5F\u80FD\u8A2D\u5B9A\u3092Project\u3078\u4FDD\u5B58\u3057\u307E\u3057\u305F\u3002") => {
     const selected = selectedGameTrack();
     if (selected === void 0) return;
@@ -34110,9 +34118,11 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
         cells: currentTilemap.cells
       }
     }) : currentTilemap;
+    const previousRole = selected.role ?? gameObjectRoleFor(selected.id, selected.kind);
+    const nextRole = deriveGameObjectRole(selected, components);
     gameDeckTracks = gameDeckTracks.map((track) => track.id === selected.id ? {
       ...track,
-      role: track.role ?? gameObjectRoleFor(track.id, track.kind),
+      role: nextRole,
       components,
       ...nextTilemap === void 0 ? {} : {
         tilemap: nextTilemap
@@ -34122,7 +34132,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     renderGameCustomPanels();
     queueGameEditorPersistenceSave("component-edit");
     if (draw2GameComponentsStatus !== void 0) {
-      draw2GameComponentsStatus.textContent = status;
+      draw2GameComponentsStatus.textContent = nextRole !== previousRole ? `${status} \u5F79\u5272\u304C${gameRoleLabel(previousRole)}\u304B\u3089${gameRoleLabel(nextRole)}\u306B\u5909\u308F\u308A\u307E\u3057\u305F\u3002` : status;
     }
   };
   const componentForAdd = (track, type, preset) => {

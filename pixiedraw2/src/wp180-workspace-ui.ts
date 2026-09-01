@@ -156,6 +156,7 @@ import {
   compileNoCodeBehavior,
   type GameEventCard,
   type GameAnimationBinding,
+  type GameObjectRole,
   type GameProject,
   type GameSceneRules,
   type GameTemplateCategory,
@@ -26328,6 +26329,35 @@ export function bootstrapDraw2Workspace(
     track.components === undefined
       ? [...defaultGameObjectComponents(track.id, track.kind)]
       : cloneGameComponents(track.components);
+  /**
+   * An object's role is not just a fixed label chosen at placement time: it
+   * is derived from which nodes are attached, so that placing a blank
+   * Object and then attaching a Player Control (or other Brain) node is
+   * what actually turns it into a player / NPC. `gameObjectRoleFor` supplies
+   * the naming-based baseline (kept for objects whose role was fixed by a
+   * dedicated template, e.g. an explicit NPC or Camera placement); Brain /
+   * Character Controller nodes can upgrade that baseline, and removing them
+   * lets it fall back down, so attaching and detaching a node has a real,
+   * reversible effect on what the object is.
+   */
+  const deriveGameObjectRole = (
+    track: Pick<ModeDeckTrack, "id" | "kind">,
+    components: readonly GameEditorComponent[],
+  ): GameObjectRole => {
+    const baseline = gameObjectRoleFor(track.id, track.kind);
+    const hasPlayerControl = components.some((component) =>
+      component.type === "CHARACTER_CONTROLLER" ||
+      (component.type === "BRAIN" && component.mode === "PLAYER_CONTROL")
+    );
+    if (hasPlayerControl) return "PLAYER";
+    const hasAiBrain = components.some((component) =>
+      component.type === "BRAIN" && component.mode !== "PLAYER_CONTROL"
+    );
+    if (
+      hasAiBrain && (baseline === "PROP" || baseline === "CUSTOM")
+    ) return "NPC";
+    return baseline;
+  };
   const updateSelectedGameComponents = (
     update: (components: GameEditorComponent[]) => GameEditorComponent[],
     status = "機能設定をProjectへ保存しました。",
@@ -26353,11 +26383,14 @@ export function bootstrapDraw2Workspace(
           : { cells: currentTilemap.cells }),
       })
       : currentTilemap;
+    const previousRole = selected.role ??
+      gameObjectRoleFor(selected.id, selected.kind);
+    const nextRole = deriveGameObjectRole(selected, components);
     gameDeckTracks = gameDeckTracks.map((track) =>
       track.id === selected.id
         ? {
           ...track,
-          role: track.role ?? gameObjectRoleFor(track.id, track.kind),
+          role: nextRole,
           components,
           ...(nextTilemap === undefined ? {} : { tilemap: nextTilemap }),
         }
@@ -26367,7 +26400,11 @@ export function bootstrapDraw2Workspace(
     renderGameCustomPanels();
     queueGameEditorPersistenceSave("component-edit");
     if (draw2GameComponentsStatus !== undefined) {
-      draw2GameComponentsStatus.textContent = status;
+      draw2GameComponentsStatus.textContent = nextRole !== previousRole
+        ? `${status} 役割が${gameRoleLabel(previousRole)}から${
+          gameRoleLabel(nextRole)
+        }に変わりました。`
+        : status;
     }
   };
   const componentForAdd = (
