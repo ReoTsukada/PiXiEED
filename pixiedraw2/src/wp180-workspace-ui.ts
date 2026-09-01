@@ -25578,6 +25578,8 @@ export function bootstrapDraw2Workspace(
           animationBinding?.flipY ?? sourceFrame.flipY ??
             animationReference.clip.flipY ?? false,
         );
+      let selectionHalfWidth = 0.21;
+      let selectionHalfHeight = 0.21;
       if (spriteDataUrl !== undefined && sourceFrame !== undefined) {
         const image = createSvgElement("image");
         const sourceWidth = Math.max(1, sourceFrame.rect.width);
@@ -25602,6 +25604,8 @@ export function bootstrapDraw2Workspace(
         image.setAttribute("aria-hidden", "true");
         group.classList.add("has-sprite");
         group.append(image);
+        selectionHalfWidth = spriteWidth / 2;
+        selectionHalfHeight = spriteHeight / 2;
       }
       const marker = role === "NPC" || role === "AUDIO"
         ? createSvgElement("circle")
@@ -25619,6 +25623,49 @@ export function bootstrapDraw2Workspace(
       }
       marker.setAttribute("class", "draw2-game-scene-marker");
       group.append(marker);
+      if (track.id === selectedGameTrackId) {
+        const selectionPadding = 0.08;
+        const selectionBox = createSvgElement("rect");
+        setAttributes(selectionBox, {
+          x: x - selectionHalfWidth - selectionPadding,
+          y: y - selectionHalfHeight - selectionPadding,
+          width: (selectionHalfWidth + selectionPadding) * 2,
+          height: (selectionHalfHeight + selectionPadding) * 2,
+          rx: 0.06,
+        });
+        selectionBox.setAttribute("class", "draw2-game-scene-selection-box");
+        group.append(selectionBox);
+        const handlePositions: ReadonlyArray<readonly [number, number]> = [
+          [
+            x - selectionHalfWidth - selectionPadding,
+            y - selectionHalfHeight - selectionPadding,
+          ],
+          [
+            x + selectionHalfWidth + selectionPadding,
+            y - selectionHalfHeight - selectionPadding,
+          ],
+          [
+            x - selectionHalfWidth - selectionPadding,
+            y + selectionHalfHeight + selectionPadding,
+          ],
+          [
+            x + selectionHalfWidth + selectionPadding,
+            y + selectionHalfHeight + selectionPadding,
+          ],
+        ];
+        for (const [handleX, handleY] of handlePositions) {
+          const handle = createSvgElement("rect");
+          setAttributes(handle, {
+            x: handleX - 0.045,
+            y: handleY - 0.045,
+            width: 0.09,
+            height: 0.09,
+            rx: 0.015,
+          });
+          handle.setAttribute("class", "draw2-game-scene-selection-handle");
+          group.append(handle);
+        }
+      }
       const labelX = role === "CAMERA"
         ? Math.min(Math.max(0.5, mapWidth - 0.5), x + 0.45)
         : x;

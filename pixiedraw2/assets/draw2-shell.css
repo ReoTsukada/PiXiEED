@@ -24100,6 +24100,23 @@ body:has(#draw2WorkspaceFrame) {
   stroke-width: 0.12;
 }
 
+.draw2-game-scene-selection-box {
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 0.045;
+  stroke-dasharray: 0.09 0.07;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.draw2-game-scene-selection-handle {
+  fill: #ffffff;
+  stroke: #0b111b;
+  stroke-width: 0.02;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
 .draw2-game-scene-object:focus-visible .draw2-game-scene-marker,
 .draw2-game-scene-object:hover .draw2-game-scene-marker {
   stroke: #ffffff;
