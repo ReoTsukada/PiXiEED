@@ -17923,8 +17923,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
   const draw2GamePhysicsApply = query(documentRef, "#draw2GamePhysicsApply");
   const draw2GamePhysicsStatus = query(documentRef, "#draw2GamePhysicsStatus");
   const draw2GameComponents = query(documentRef, "#draw2GameComponents");
-  const draw2GameComponentType = query(documentRef, "#draw2GameComponentType");
-  const draw2GameComponentAdd = query(documentRef, "#draw2GameComponentAdd");
+  const draw2GameNodeBox = query(documentRef, "#draw2GameNodeBox");
   const draw2GameComponentsStatus = query(documentRef, "#draw2GameComponentsStatus");
   const draw2GameEventTrigger = query(documentRef, "#draw2GameEventTrigger");
   const draw2GameEventWho = query(documentRef, "#draw2GameEventWho");
@@ -34799,11 +34798,10 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     }
     syncGameCameraQuickSettings();
     syncGameEventCardEditor();
-    if (draw2GameComponentAdd !== void 0) {
-      draw2GameComponentAdd.disabled = selected === void 0;
-    }
-    if (draw2GameComponentType !== void 0) {
-      draw2GameComponentType.disabled = selected === void 0;
+    if (draw2GameNodeBox !== void 0) {
+      for (const tile of draw2GameNodeBox.querySelectorAll(".draw2-game-node-tile")) {
+        tile.disabled = selected === void 0;
+      }
     }
     renderGameComponentCards();
     setGameLogicMode(gameLogicMode);
@@ -37170,9 +37168,11 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       draw2GameCameraQuickStatus.textContent = "\u30AB\u30E1\u30E9\u306E\u63FA\u308C\u3092\u30D7\u30EC\u30D3\u30E5\u30FC\u3057\u307E\u3057\u305F\u3002";
     }
   });
-  draw2GameComponentAdd?.addEventListener("click", () => {
+  draw2GameNodeBox?.addEventListener("click", (event) => {
+    const tile = event.target?.closest(".draw2-game-node-tile");
+    if (tile === null || tile === void 0 || tile.disabled) return;
+    const type = tile.dataset.gameComponentType;
     const selected = selectedGameTrack();
-    const type = draw2GameComponentType?.value;
     if (selected === void 0 || type === void 0) {
       if (draw2GameComponentsStatus !== void 0) {
         draw2GameComponentsStatus.textContent = "\u5148\u306BHierarchy\u3067GameObject\u3092\u9078\u629E\u3057\u3066\u304F\u3060\u3055\u3044\u3002";

@@ -12689,6 +12689,124 @@ body:has(#draw2WorkspaceFrame) {
 .draw2-game-component-add-row .draw2-panel-field {
   margin: 0;
 }
+/* Node box: categorized, icon-first tiles for adding a GameObject
+   component, replacing a plain <select>+button. Clicking a tile calls the
+   exact same add-component path the old dropdown used - only the trigger
+   UI changed. Categories with no shipped component yet (Status/Skill/
+   Brain) are shown, not hidden, with an explicit "coming later" badge so
+   the eventual Unity-like breadth of node types has a visible home already,
+   without pretending they work today. */
+.draw2-game-node-box {
+  display: grid;
+  gap: 8px;
+}
+.draw2-game-node-category {
+  display: grid;
+  gap: 5px;
+  padding: 6px 7px;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: var(--draw2-radius-sm);
+  background: color-mix(
+    in srgb,
+    var(--draw2-node-category-color, var(--draw2-accent-strong)) 7%,
+    var(--draw2-surface-raised)
+  );
+  border-color: color-mix(
+    in srgb,
+    var(--draw2-node-category-color, var(--draw2-accent-strong)) 28%,
+    var(--draw2-border-subtle)
+  );
+}
+.draw2-game-node-category[data-node-category="display"] {
+  --draw2-node-category-color: #38bdf8;
+}
+.draw2-game-node-category[data-node-category="physics"] {
+  --draw2-node-category-color: #60a5fa;
+}
+.draw2-game-node-category[data-node-category="movement"] {
+  --draw2-node-category-color: #34d399;
+}
+.draw2-game-node-category[data-node-category="audio-event"] {
+  --draw2-node-category-color: #fbbf24;
+}
+.draw2-game-node-category[data-node-category="status"] {
+  --draw2-node-category-color: #f87171;
+}
+.draw2-game-node-category[data-node-category="skill"] {
+  --draw2-node-category-color: #a78bfa;
+}
+.draw2-game-node-category[data-node-category="brain"] {
+  --draw2-node-category-color: #fb923c;
+}
+.draw2-game-node-category-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--draw2-node-category-color, var(--draw2-text-strong));
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.draw2-game-node-category-badge {
+  padding: 1px 5px;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: 999px;
+  color: var(--draw2-text-muted);
+  font-size: 0.48rem;
+  font-weight: 600;
+}
+.draw2-game-node-category.is-coming-soon {
+  opacity: 0.55;
+}
+.draw2-game-node-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(58px, 1fr));
+  gap: 5px;
+}
+.draw2-game-node-tile {
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  padding: 6px 4px;
+  border: 1px solid transparent;
+  border-radius: var(--draw2-radius-sm);
+  background: var(--draw2-surface);
+  color: var(--draw2-text-muted);
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease,
+    transform 120ms ease;
+}
+.draw2-game-node-tile:hover,
+.draw2-game-node-tile:focus-visible {
+  border-color: var(--draw2-node-category-color, var(--draw2-accent-strong));
+  background: color-mix(
+    in srgb,
+    var(--draw2-node-category-color, var(--draw2-accent-strong)) 16%,
+    var(--draw2-surface)
+  );
+  color: var(--draw2-text-strong);
+  outline: none;
+}
+.draw2-game-node-tile:active {
+  transform: translateY(1px);
+}
+.draw2-game-node-tile:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.draw2-game-node-tile-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--draw2-node-category-color, var(--draw2-accent-strong));
+}
+.draw2-game-node-tile span {
+  overflow-wrap: break-word;
+  font-size: 0.52rem;
+  line-height: 1.25;
+  text-align: center;
+}
 .draw2-game-system-object,
 .draw2-game-system-card {
   display: grid;

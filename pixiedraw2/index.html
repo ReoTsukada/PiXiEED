@@ -10,7 +10,7 @@
     <title>PiXiEEDstudio — Studio</title>
     <link
       rel="stylesheet"
-      href="./assets/draw2-shell.min.css?v=20260901-icons-v4"
+      href="./assets/draw2-shell.min.css?v=20260901-icons-v5"
     >
     <link
       rel="stylesheet"
@@ -5250,25 +5250,63 @@
                   class="draw2-game-component-list"
                   role="list"
                 ></div>
-                <div class="draw2-game-component-add-row">
-                  <label class="draw2-panel-field">機能を追加<select
-                      id="draw2GameComponentType"
-                    >
-                      <option value="TRANSFORM">位置・向き</option>
-                      <option value="SPRITE">見た目</option>
-                      <option value="TILEMAP">マップ</option>
-                      <option value="COLLIDER">当たり判定</option>
-                      <option value="RIGIDBODY">重力・物理</option>
-                      <option value="CHARACTER_CONTROLLER">プレイヤー移動</option>
-                      <option value="CAMERA">カメラ</option>
-                      <option value="AUDIO_SOURCE">音</option>
-                      <option value="BEHAVIOR">イベント・ルール</option>
-                    </select></label>
-                  <button
-                    id="draw2GameComponentAdd"
-                    class="draw2-button draw2-button-secondary"
-                    type="button"
-                  >追加</button>
+                <div class="draw2-game-node-box" id="draw2GameNodeBox" role="group" aria-label="機能を追加">
+                  <div class="draw2-game-node-category" data-node-category="display">
+                    <span class="draw2-game-node-category-label">表示・配置</span>
+                    <div class="draw2-game-node-tiles">
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="TRANSFORM" title="位置・向き (Transform)">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-anchor"></use></svg><span>位置・向き</span>
+                      </button>
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="SPRITE" title="見た目 (Sprite)">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-image"></use></svg><span>見た目</span>
+                      </button>
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="TILEMAP" title="マップ (Tilemap)">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-sheet"></use></svg><span>マップ</span>
+                      </button>
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="CAMERA" title="カメラ (Camera)">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-view"></use></svg><span>カメラ</span>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="draw2-game-node-category" data-node-category="physics">
+                    <span class="draw2-game-node-category-label">ボディ・物理</span>
+                    <div class="draw2-game-node-tiles">
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="COLLIDER" title="当たり判定 (Collider)">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-border"></use></svg><span>当たり判定</span>
+                      </button>
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="RIGIDBODY" title="重力・物理 (Rigidbody)">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-bounce"></use></svg><span>重力・物理</span>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="draw2-game-node-category" data-node-category="movement">
+                    <span class="draw2-game-node-category-label">移動</span>
+                    <div class="draw2-game-node-tiles">
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="CHARACTER_CONTROLLER" title="プレイヤー移動 (Character Controller)">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-pan"></use></svg><span>移動</span>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="draw2-game-node-category" data-node-category="audio-event">
+                    <span class="draw2-game-node-category-label">音・イベント</span>
+                    <div class="draw2-game-node-tiles">
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="AUDIO_SOURCE" title="音 (Audio)">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-wave"></use></svg><span>音</span>
+                      </button>
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="BEHAVIOR" title="イベント・ルール (Behavior)">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-commands"></use></svg><span>イベント</span>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="draw2-game-node-category is-coming-soon" data-node-category="status" aria-disabled="true">
+                    <span class="draw2-game-node-category-label">ステータス<small class="draw2-game-node-category-badge">近日公開</small></span>
+                  </div>
+                  <div class="draw2-game-node-category is-coming-soon" data-node-category="skill" aria-disabled="true">
+                    <span class="draw2-game-node-category-label">スキル<small class="draw2-game-node-category-badge">近日公開</small></span>
+                  </div>
+                  <div class="draw2-game-node-category is-coming-soon" data-node-category="brain" aria-disabled="true">
+                    <span class="draw2-game-node-category-label">ブレイン・AI<small class="draw2-game-node-category-badge">近日公開</small></span>
+                  </div>
                 </div>
                 <p class="draw2-panel-status" id="draw2GameComponentsStatus">
                   機能を追加すると、このオブジェクトの役割が明確になります。
@@ -9777,7 +9815,7 @@
     <script src="../scripts/pixieed-account-supabase-client.js?v=20260828-staging-config-v1"></script>
     <script
       type="module"
-      src="./dist/draw2-entry.js?v=20260901-icons-v4"
+      src="./dist/draw2-entry.js?v=20260901-icons-v5"
     ></script>
     <script
       type="module"

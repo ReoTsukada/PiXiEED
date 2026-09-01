@@ -3837,13 +3837,9 @@ export function bootstrapDraw2Workspace(
     documentRef,
     "#draw2GameComponents",
   );
-  const draw2GameComponentType = query<HTMLSelectElement>(
+  const draw2GameNodeBox = query<HTMLElement>(
     documentRef,
-    "#draw2GameComponentType",
-  );
-  const draw2GameComponentAdd = query<HTMLButtonElement>(
-    documentRef,
-    "#draw2GameComponentAdd",
+    "#draw2GameNodeBox",
   );
   const draw2GameComponentsStatus = query<HTMLElement>(
     documentRef,
@@ -27423,11 +27419,14 @@ export function bootstrapDraw2Workspace(
     }
     syncGameCameraQuickSettings();
     syncGameEventCardEditor();
-    if (draw2GameComponentAdd !== undefined) {
-      draw2GameComponentAdd.disabled = selected === undefined;
-    }
-    if (draw2GameComponentType !== undefined) {
-      draw2GameComponentType.disabled = selected === undefined;
+    if (draw2GameNodeBox !== undefined) {
+      for (
+        const tile of draw2GameNodeBox.querySelectorAll<HTMLButtonElement>(
+          ".draw2-game-node-tile",
+        )
+      ) {
+        tile.disabled = selected === undefined;
+      }
     }
     renderGameComponentCards();
     setGameLogicMode(gameLogicMode);
@@ -30365,11 +30364,15 @@ export function bootstrapDraw2Workspace(
         "カメラの揺れをプレビューしました。";
     }
   });
-  draw2GameComponentAdd?.addEventListener("click", () => {
-    const selected = selectedGameTrack();
-    const type = draw2GameComponentType?.value as
+  draw2GameNodeBox?.addEventListener("click", (event) => {
+    const tile = (event.target as HTMLElement | null)?.closest<
+      HTMLButtonElement
+    >(".draw2-game-node-tile");
+    if (tile === null || tile === undefined || tile.disabled) return;
+    const type = tile.dataset.gameComponentType as
       | GameEditorComponent["type"]
       | undefined;
+    const selected = selectedGameTrack();
     if (selected === undefined || type === undefined) {
       if (draw2GameComponentsStatus !== undefined) {
         draw2GameComponentsStatus.textContent =
