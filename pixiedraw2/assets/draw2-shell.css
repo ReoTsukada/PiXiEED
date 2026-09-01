@@ -12747,6 +12747,14 @@ body:has(#draw2WorkspaceFrame) {
   font-weight: 700;
   letter-spacing: 0.04em;
 }
+.draw2-game-node-category-label::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--draw2-node-category-color, var(--draw2-accent-strong));
+  flex: none;
+}
 .draw2-game-node-category-badge {
   padding: 1px 5px;
   border: 1px solid var(--draw2-border-subtle);
@@ -12760,52 +12768,79 @@ body:has(#draw2WorkspaceFrame) {
 }
 .draw2-game-node-tiles {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(58px, 1fr));
-  gap: 5px;
+  grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
+  gap: 6px;
 }
 .draw2-game-node-tile {
   display: grid;
   justify-items: center;
-  gap: 3px;
-  padding: 6px 4px;
-  border: 1px solid transparent;
-  border-radius: var(--draw2-radius-sm);
-  background: var(--draw2-surface);
-  color: var(--draw2-text-muted);
+  gap: 5px;
+  padding: 10px 5px 8px;
+  border: 1px solid color-mix(
+    in srgb,
+    var(--draw2-node-category-color, var(--draw2-accent-strong)) 24%,
+    var(--draw2-border-subtle)
+  );
+  border-radius: 10px;
+  background: color-mix(
+    in srgb,
+    var(--draw2-node-category-color, var(--draw2-accent-strong)) 22%,
+    var(--draw2-surface-raised)
+  );
+  color: var(--draw2-text-strong);
   cursor: pointer;
   transition:
     border-color 120ms ease,
     background-color 120ms ease,
-    transform 120ms ease;
+    transform 120ms ease,
+    box-shadow 120ms ease;
 }
 .draw2-game-node-tile:hover,
 .draw2-game-node-tile:focus-visible {
   border-color: var(--draw2-node-category-color, var(--draw2-accent-strong));
   background: color-mix(
     in srgb,
-    var(--draw2-node-category-color, var(--draw2-accent-strong)) 16%,
-    var(--draw2-surface)
+    var(--draw2-node-category-color, var(--draw2-accent-strong)) 38%,
+    var(--draw2-surface-raised)
   );
   color: var(--draw2-text-strong);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px color-mix(
+    in srgb,
+    var(--draw2-node-category-color, var(--draw2-accent-strong)) 35%,
+    transparent
+  );
   outline: none;
 }
 .draw2-game-node-tile:active {
-  transform: translateY(1px);
+  transform: translateY(0);
+  box-shadow: none;
 }
 .draw2-game-node-tile:disabled {
-  opacity: 0.4;
+  opacity: 0.35;
   cursor: not-allowed;
+  box-shadow: none;
 }
 .draw2-game-node-tile-icon {
-  width: 16px;
-  height: 16px;
-  color: var(--draw2-node-category-color, var(--draw2-accent-strong));
+  width: 18px;
+  height: 18px;
+  padding: 5px;
+  border-radius: 8px;
+  background: color-mix(
+    in srgb,
+    var(--draw2-node-category-color, var(--draw2-accent-strong)) 60%,
+    transparent
+  );
+  color: #ffffff;
+  box-sizing: content-box;
 }
 .draw2-game-node-tile span {
   overflow-wrap: break-word;
-  font-size: 0.52rem;
-  line-height: 1.25;
+  font-size: 0.58rem;
+  font-weight: 600;
+  line-height: 1.2;
   text-align: center;
+  color: var(--draw2-text-strong);
 }
 .draw2-game-system-object,
 .draw2-game-system-card {
