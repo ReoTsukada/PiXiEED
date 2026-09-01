@@ -12537,40 +12537,101 @@ body:has(#draw2WorkspaceFrame) {
 }
 .draw2-game-component-card {
   display: grid;
-  gap: 5px;
+  gap: 0;
   min-width: 0;
-  padding: 6px;
-  border: 1px solid var(--draw2-border-subtle);
+  padding: 0;
+  border: 1px solid color-mix(
+    in srgb,
+    var(--draw2-node-category-color, var(--draw2-border-subtle)) 30%,
+    var(--draw2-border-subtle)
+  );
   border-radius: var(--draw2-radius-sm);
-  background: var(--draw2-surface-raised);
+  background: color-mix(
+    in srgb,
+    var(--draw2-node-category-color, var(--draw2-accent-strong)) 10%,
+    var(--draw2-surface-raised)
+  );
+  overflow: hidden;
 }
 .draw2-game-component-card-heading {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 6px;
+}
+.draw2-game-component-chip-toggle {
+  flex: 1 1 auto;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 2px 6px;
   align-items: center;
+  gap: 2px 6px;
+  min-width: 0;
+  padding: 2px 4px;
+  border: none;
+  border-radius: var(--draw2-radius-sm);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
 }
-.draw2-game-component-card-heading strong,
-.draw2-game-component-card-heading small {
+.draw2-game-component-chip-toggle:hover,
+.draw2-game-component-chip-toggle:focus-visible {
+  background: color-mix(
+    in srgb,
+    var(--draw2-node-category-color, var(--draw2-accent-strong)) 16%,
+    transparent
+  );
+  outline: none;
+}
+.draw2-game-component-chip-toggle strong,
+.draw2-game-component-chip-toggle small {
+  grid-column: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.draw2-game-component-card-heading strong {
-  color: var(--draw2-text-strong);
+.draw2-game-component-chip-toggle strong {
+  grid-row: 1;
+  color: var(--draw2-node-category-color, var(--draw2-text-strong));
   font-size: 0.62rem;
 }
-.draw2-game-component-card-heading small {
+.draw2-game-component-chip-toggle small {
+  grid-row: 2;
   color: var(--draw2-text-muted);
-  font-size: 0.52rem;
+  font-size: 0.5rem;
 }
-.draw2-game-component-card-heading .draw2-button {
+.draw2-game-component-chip-chevron {
   grid-column: 2;
   grid-row: 1 / span 2;
-  min-height: 24px;
+  width: 12px;
+  height: 12px;
+  color: var(--draw2-text-muted);
+  transition: transform 120ms ease;
+}
+.draw2-game-component-card.is-expanded .draw2-game-component-chip-chevron {
+  transform: rotate(180deg);
+}
+.draw2-game-component-card-heading .draw2-button {
+  flex: none;
+  align-self: center;
+  min-height: 22px;
   padding-inline: 5px;
-  font-size: 0.52rem;
+  font-size: 0.5rem;
+}
+.draw2-game-component-card-body {
+  display: grid;
+  gap: 5px;
+  padding: 6px 8px 8px;
+  border-top: 1px solid color-mix(
+    in srgb,
+    var(--draw2-node-category-color, var(--draw2-border-subtle)) 24%,
+    var(--draw2-border-subtle)
+  );
+}
+.draw2-game-component-card-body[hidden] {
+  display: none;
 }
 .draw2-game-component-field {
   display: grid;

@@ -26363,6 +26363,34 @@ export function bootstrapDraw2Workspace(
     select.value = selected;
     return select;
   };
+  const expandedGameComponentIds = new Set<string>();
+  const componentCategoryColor = (
+    type: GameEditorComponent["type"],
+  ): string => {
+    switch (type) {
+      case "TRANSFORM":
+      case "SPRITE":
+      case "TILEMAP":
+      case "CAMERA":
+        return "#38bdf8";
+      case "COLLIDER":
+      case "RIGIDBODY":
+        return "#60a5fa";
+      case "CHARACTER_CONTROLLER":
+        return "#34d399";
+      case "AUDIO_SOURCE":
+      case "BEHAVIOR":
+        return "#fbbf24";
+      case "STATUS":
+        return "#f87171";
+      case "SKILL":
+        return "#a78bfa";
+      case "BRAIN":
+        return "#fb923c";
+      default:
+        return "#94a3b8";
+    }
+  };
   const renderGameComponentCards = (): void => {
     if (draw2GameComponents === undefined) return;
     const selected = selectedGameTrack();
@@ -26380,12 +26408,33 @@ export function bootstrapDraw2Workspace(
         card.className = "draw2-game-component-card";
         card.dataset.gameComponentType = component.type;
         card.setAttribute("role", "listitem");
+        card.style.setProperty(
+          "--draw2-node-category-color",
+          componentCategoryColor(component.type),
+        );
         const heading = documentRef.createElement("div");
         heading.className = "draw2-game-component-card-heading";
+        const toggle = documentRef.createElement("button");
+        toggle.type = "button";
+        toggle.className = "draw2-game-component-chip-toggle";
         const title = documentRef.createElement("strong");
         title.textContent = componentLabel(component.type);
         const summary = documentRef.createElement("small");
         summary.textContent = componentSummary(component);
+        const chevron = createDraw2Icon(
+          documentRef,
+          "icon-chevron-down",
+          "draw2-game-component-chip-chevron",
+        );
+        toggle.append(title, summary, chevron);
+        toggle.addEventListener("click", () => {
+          if (expandedGameComponentIds.has(component.componentId)) {
+            expandedGameComponentIds.delete(component.componentId);
+          } else {
+            expandedGameComponentIds.add(component.componentId);
+          }
+          renderGameComponentCards();
+        });
         const remove = documentRef.createElement("button");
         remove.type = "button";
         remove.className = "draw2-button draw2-button-secondary";
@@ -26400,8 +26449,15 @@ export function bootstrapDraw2Workspace(
             `${componentLabel(component.type)}を削除しました。`,
           );
         });
-        heading.append(title, summary, remove);
+        heading.append(toggle, remove);
         card.append(heading);
+        const body = documentRef.createElement("div");
+        body.className = "draw2-game-component-card-body";
+        const isExpanded = expandedGameComponentIds.has(
+          component.componentId,
+        );
+        card.classList.toggle("is-expanded", isExpanded);
+        body.hidden = !isExpanded;
         switch (component.type) {
           case "TRANSFORM": {
             const x = numberControl(component.x);
@@ -26410,8 +26466,8 @@ export function bootstrapDraw2Workspace(
               gameObjectRoleFor(selected.id, selected.kind);
             const snapToRpgGrid = selectedRole === "PLAYER" ||
               selectedRole === "NPC";
-            appendComponentField(card, "X", x);
-            appendComponentField(card, "Y", y);
+            appendComponentField(body, "X", x);
+            appendComponentField(body, "Y", y);
             x.addEventListener(
               "change",
               () =>
@@ -26450,7 +26506,7 @@ export function bootstrapDraw2Workspace(
           }
           case "SPRITE": {
             const visible = checkboxControl(component.visible);
-            appendComponentField(card, "Visible", visible);
+            appendComponentField(body, "Visible", visible);
             const binding = gameDeckBindings.find((candidate) =>
               candidate.trackId === selected.id && candidate.kind === "DRAW"
             );
@@ -26459,7 +26515,7 @@ export function bootstrapDraw2Workspace(
             reference.textContent = binding === undefined
               ? "iDRAW参照なし · Assetsで追加"
               : `iDRAW参照 · ${binding.label} · 原素材は編集不可`;
-            card.append(reference);
+            body.append(reference);
             visible.addEventListener(
               "change",
               () =>
@@ -26479,8 +26535,8 @@ export function bootstrapDraw2Workspace(
             const volume = numberControl(component.volume, "0.05");
             volume.min = "0";
             volume.max = "1";
-            appendComponentField(card, "Loop", loop);
-            appendComponentField(card, "Volume", volume);
+            appendComponentField(body, "Loop", loop);
+            appendComponentField(body, "Volume", volume);
             const binding = gameDeckBindings.find((candidate) =>
               candidate.trackId === selected.id && candidate.kind === "AUDIO"
             );
@@ -26489,7 +26545,7 @@ export function bootstrapDraw2Workspace(
             reference.textContent = binding === undefined
               ? "iAUDIO参照なし · Assetsで追加"
               : `iAUDIO参照 · ${binding.label} · 原素材は編集不可`;
-            card.append(reference);
+            body.append(reference);
             loop.addEventListener(
               "change",
               () =>
@@ -26530,9 +26586,9 @@ export function bootstrapDraw2Workspace(
             tileSize.min = "1";
             tileSize.max = "4096";
             const collision = checkboxControl(component.collisionEnabled);
-            appendComponentField(card, "Map ID", mapId);
-            appendComponentField(card, "Tile Size", tileSize);
-            appendComponentField(card, "Map Collision", collision);
+            appendComponentField(body, "Map ID", mapId);
+            appendComponentField(body, "Tile Size", tileSize);
+            appendComponentField(body, "Map Collision", collision);
             mapId.addEventListener(
               "change",
               () => {
@@ -26594,7 +26650,7 @@ export function bootstrapDraw2Workspace(
               gameTilemapPaintMode,
             );
             paintMode.dataset.gameTilemapPaintMode = "true";
-            appendComponentField(card, "Sceneセル編集", paintMode);
+            appendComponentField(body, "Sceneセル編集", paintMode);
             const mapStatus = documentRef.createElement("small");
             mapStatus.className = "draw2-game-component-reference";
             mapStatus.textContent =
@@ -26602,7 +26658,7 @@ export function bootstrapDraw2Workspace(
               `壁 ${solidGameTilemapCells(mapDocument).length} · ` +
               `Trigger ${triggerGameTilemapCells(mapDocument).length} · ` +
               "Scene Viewのマスをクリック";
-            card.append(mapStatus);
+            body.append(mapStatus);
             paintMode.addEventListener("change", () => {
               const value = paintMode.value;
               if (
@@ -26630,11 +26686,11 @@ export function bootstrapDraw2Workspace(
             const width = numberControl(component.width);
             const height = numberControl(component.height);
             const trigger = checkboxControl(component.isTrigger);
-            appendComponentField(card, "Shape", shape);
-            appendComponentField(card, "Layer", layer);
-            appendComponentField(card, "Width", width);
-            appendComponentField(card, "Height", height);
-            appendComponentField(card, "Is Trigger", trigger);
+            appendComponentField(body, "Shape", shape);
+            appendComponentField(body, "Layer", layer);
+            appendComponentField(body, "Width", width);
+            appendComponentField(body, "Height", height);
+            appendComponentField(body, "Is Trigger", trigger);
             const apply = () =>
               updateSelectedGameComponents(
                 (items) =>
@@ -26676,10 +26732,10 @@ export function bootstrapDraw2Workspace(
             const mass = numberControl(component.mass);
             const gravity = numberControl(component.gravityScale);
             const fixedRotation = checkboxControl(component.fixedRotation);
-            appendComponentField(card, "Body Type", bodyType);
-            appendComponentField(card, "Mass", mass);
-            appendComponentField(card, "Gravity Scale", gravity);
-            appendComponentField(card, "Fixed Rotation", fixedRotation);
+            appendComponentField(body, "Body Type", bodyType);
+            appendComponentField(body, "Mass", mass);
+            appendComponentField(body, "Gravity Scale", gravity);
+            appendComponentField(body, "Fixed Rotation", fixedRotation);
             const apply = () =>
               updateSelectedGameComponents((items) =>
                 items.map((item) =>
@@ -26709,9 +26765,9 @@ export function bootstrapDraw2Workspace(
             const stepHeight = numberControl(component.stepHeight);
             const fixedStep = numberControl(component.fixedStep, "1");
             fixedStep.min = "1";
-            appendComponentField(card, "Move Speed", speed);
-            appendComponentField(card, "Step Height", stepHeight);
-            appendComponentField(card, "Fixed Step", fixedStep);
+            appendComponentField(body, "Move Speed", speed);
+            appendComponentField(body, "Step Height", stepHeight);
+            appendComponentField(body, "Fixed Step", fixedStep);
             const apply = () =>
               updateSelectedGameComponents((items) =>
                 items.map((item) =>
@@ -26741,8 +26797,8 @@ export function bootstrapDraw2Workspace(
             const active = checkboxControl(component.active);
             const zoom = numberControl(component.zoom);
             zoom.min = "0.1";
-            appendComponentField(card, "Active", active);
-            appendComponentField(card, "Zoom", zoom);
+            appendComponentField(body, "Active", active);
+            appendComponentField(body, "Zoom", zoom);
             const settings = normalizeCamera2DSettings(component.camera2D);
             const cameraSettings = documentRef.createElement("details");
             cameraSettings.className = "draw2-game-camera-settings";
@@ -26859,7 +26915,7 @@ export function bootstrapDraw2Workspace(
             cameraActionRow.append(testShake);
             cameraFields.append(cameraActionRow);
             cameraSettings.append(cameraDetailsSummary, cameraFields);
-            card.append(cameraSettings);
+            body.append(cameraSettings);
             const apply = () =>
               updateSelectedGameComponents((items) => {
                 const nextSettings = normalizeCamera2DSettings({
@@ -26937,11 +26993,11 @@ export function bootstrapDraw2Workspace(
           }
           case "BEHAVIOR": {
             const enabled = checkboxControl(component.enabled);
-            appendComponentField(card, "Enabled", enabled);
+            appendComponentField(body, "Enabled", enabled);
             const hint = documentRef.createElement("small");
             hint.className = "draw2-game-component-reference";
             hint.textContent = "Event Sheetで条件とアクションを追加";
-            card.append(hint);
+            body.append(hint);
             enabled.addEventListener(
               "change",
               () =>
@@ -26968,16 +27024,16 @@ export function bootstrapDraw2Workspace(
             const level = numberControl(component.level, "1");
             level.min = "1";
             const statusEnabled = checkboxControl(component.enabled);
-            appendComponentField(card, "HP", hp);
-            appendComponentField(card, "Max HP", maxHp);
-            appendComponentField(card, "Stamina", stamina);
-            appendComponentField(card, "Max Stamina", maxStamina);
-            appendComponentField(card, "MP", mp);
-            appendComponentField(card, "Max MP", maxMp);
-            appendComponentField(card, "Attack", attack);
-            appendComponentField(card, "Defense", defense);
-            appendComponentField(card, "Level", level);
-            appendComponentField(card, "Enabled", statusEnabled);
+            appendComponentField(body, "HP", hp);
+            appendComponentField(body, "Max HP", maxHp);
+            appendComponentField(body, "Stamina", stamina);
+            appendComponentField(body, "Max Stamina", maxStamina);
+            appendComponentField(body, "MP", mp);
+            appendComponentField(body, "Max MP", maxMp);
+            appendComponentField(body, "Attack", attack);
+            appendComponentField(body, "Defense", defense);
+            appendComponentField(body, "Level", level);
+            appendComponentField(body, "Enabled", statusEnabled);
             const apply = () =>
               updateSelectedGameComponents((items) =>
                 items.map((item) =>
@@ -27020,10 +27076,10 @@ export function bootstrapDraw2Workspace(
             const cooldown = numberControl(component.cooldown, "0.1");
             cooldown.min = "0";
             const skillEnabled = checkboxControl(component.enabled);
-            appendComponentField(card, "Kind", kind);
-            appendComponentField(card, "Power", power);
-            appendComponentField(card, "Cooldown", cooldown);
-            appendComponentField(card, "Enabled", skillEnabled);
+            appendComponentField(body, "Kind", kind);
+            appendComponentField(body, "Power", power);
+            appendComponentField(body, "Cooldown", cooldown);
+            appendComponentField(body, "Enabled", skillEnabled);
             const apply = () =>
               updateSelectedGameComponents((items) =>
                 items.map((item) =>
@@ -27055,10 +27111,10 @@ export function bootstrapDraw2Workspace(
             const range = numberControl(component.range, "0.1");
             range.min = "0";
             const brainEnabled = checkboxControl(component.enabled);
-            appendComponentField(card, "Mode", mode);
-            appendComponentField(card, "Speed", speed);
-            appendComponentField(card, "Range", range);
-            appendComponentField(card, "Enabled", brainEnabled);
+            appendComponentField(body, "Mode", mode);
+            appendComponentField(body, "Speed", speed);
+            appendComponentField(body, "Range", range);
+            appendComponentField(body, "Enabled", brainEnabled);
             const apply = () =>
               updateSelectedGameComponents((items) =>
                 items.map((item) =>
@@ -27081,6 +27137,7 @@ export function bootstrapDraw2Workspace(
             break;
           }
         }
+        card.append(body);
         return card;
       }),
     );
