@@ -2311,13 +2311,17 @@
                     type="button"
                     data-game-view-mode="SCENE"
                     aria-pressed="true"
-                  >Scene</button>
+                    aria-label="Scene"
+                    title="Scene · edit layout"
+                  ><svg class="draw2-ui-icon draw2-igame-view-toggle-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-edit"></use></svg></button>
                   <button
                     id="draw2GameGameView"
                     type="button"
                     data-game-view-mode="GAME"
                     aria-pressed="false"
-                  >Game</button>
+                    aria-label="Game"
+                    title="Game · live preview"
+                  ><svg class="draw2-ui-icon draw2-igame-view-toggle-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-play"></use></svg></button>
                 </div>
                 <span class="draw2-igame-scene-name">Main Scene</span>
               </div>
@@ -2674,6 +2678,7 @@
                     data-audio-midi-tool="pen"
                     type="button"
                     aria-pressed="true"
+                    aria-label="Pen"
                     title="Pen · click or drag to place/lengthen notes"
                   >
                     <svg class="draw2-ui-icon draw2-tool-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-pen"></use></svg><span>Pen</span>
@@ -2683,6 +2688,7 @@
                     data-audio-midi-tool="eraser"
                     type="button"
                     aria-pressed="false"
+                    aria-label="Eraser"
                     title="Eraser · click or drag to remove notes"
                   >
                     <svg class="draw2-ui-icon draw2-tool-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-eraser"></use></svg><span>Eraser</span>
@@ -2692,6 +2698,7 @@
                     data-audio-midi-tool="select"
                     type="button"
                     aria-pressed="false"
+                    aria-label="Select"
                     title="Select · drag a rectangle to select notes"
                   >
                     <svg class="draw2-ui-icon draw2-tool-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-select-rect"></use></svg><span>Select</span>
@@ -3023,8 +3030,10 @@
                 aria-selected="true"
                 aria-controls="draw2WorkspacePanelColor"
                 type="button"
+                aria-label="Color"
+                title="Color"
               >
-                Color
+                <svg class="draw2-ui-icon draw2-workspace-tab-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-color"></use></svg>
               </button>
               <button
                 class="draw2-workspace-tab"
@@ -3037,8 +3046,10 @@
                 type="button"
                 tabindex="-1"
                 hidden
+                aria-label="Layers"
+                title="Layers"
               >
-                Layers
+                <svg class="draw2-ui-icon draw2-workspace-tab-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-layers"></use></svg>
               </button>
               <button
                 class="draw2-workspace-tab"
@@ -3051,8 +3062,10 @@
                 type="button"
                 tabindex="-1"
                 hidden
+                aria-label="Inspector"
+                title="Inspector"
               >
-                Inspector
+                <svg class="draw2-ui-icon draw2-workspace-tab-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-inspector"></use></svg>
               </button>
               <button
                 class="draw2-workspace-tab"
@@ -3065,8 +3078,10 @@
                 type="button"
                 tabindex="-1"
                 hidden
+                aria-label="Tools"
+                title="Tools"
               >
-                Tools
+                <svg class="draw2-ui-icon draw2-workspace-tab-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-tools"></use></svg>
               </button>
               <button
                 class="draw2-workspace-tab"
@@ -3079,8 +3094,10 @@
                 type="button"
                 tabindex="-1"
                 hidden
+                aria-label="Play"
+                title="Play"
               >
-                Play
+                <svg class="draw2-ui-icon draw2-workspace-tab-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-play"></use></svg>
               </button>
               <button
                 class="draw2-workspace-tab"
@@ -3109,8 +3126,10 @@
                 type="button"
                 tabindex="-1"
                 hidden
+                aria-label="Export"
+                title="Export"
               >
-                Export
+                <svg class="draw2-ui-icon draw2-workspace-tab-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-export"></use></svg>
               </button>
               <button
                 class="draw2-workspace-tab draw2-workspace-tab-add"
@@ -5823,8 +5842,10 @@
                 aria-selected="true"
                 aria-controls="draw2AudioRightInspector"
                 data-audio-right-tab="inspector"
+                aria-label="Inspector"
+                title="Inspector"
               >
-                INSPECTOR
+                <svg class="draw2-ui-icon draw2-audio-right-tab-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-inspector"></use></svg>
               </button>
               <button
                 class="draw2-audio-right-tab"
@@ -5834,8 +5855,10 @@
                 aria-controls="draw2AudioRightBrowser"
                 data-audio-right-tab="browser"
                 tabindex="-1"
+                aria-label="Library"
+                title="Library"
               >
-                LIBRARY
+                <svg class="draw2-ui-icon draw2-audio-right-tab-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-folder"></use></svg>
               </button>
               <button
                 class="draw2-audio-right-tab"
@@ -5845,8 +5868,10 @@
                 aria-controls="draw2AudioRightMaster"
                 data-audio-right-tab="master"
                 tabindex="-1"
+                aria-label="Master"
+                title="Master"
               >
-                MASTER
+                <svg class="draw2-ui-icon draw2-audio-right-tab-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-wave"></use></svg>
               </button>
             </nav>
             <div
@@ -5932,6 +5957,8 @@
                   class="draw2-audio-right-chip"
                   type="button"
                   data-audio-inspector-action="mute"
+                  aria-label="Mute"
+                  title="Mute"
                 >
                   M
                 </button>
@@ -5939,6 +5966,8 @@
                   class="draw2-audio-right-chip"
                   type="button"
                   data-audio-inspector-action="solo"
+                  aria-label="Solo"
+                  title="Solo"
                 >
                   S
                 </button>
@@ -5946,8 +5975,10 @@
                   class="draw2-audio-right-chip"
                   type="button"
                   data-audio-inspector-action="fx"
+                  aria-label="Effects"
+                  title="Effects"
                 >
-                  FX
+                  <svg class="draw2-ui-icon draw2-audio-right-chip-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-fx"></use></svg>
                 </button>
               </div>
               <p
