@@ -406,6 +406,8 @@ const EN_TO_JA: Readonly<Record<string, string>> = {
   Output: "出力",
   Peak: "ピーク",
   Gain: "ゲイン",
+  Volume: "音量",
+  "Master Volume": "マスター音量",
   Mute: "ミュート",
   Solo: "ソロ",
   Expression: "エクスプレッション",

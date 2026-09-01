@@ -12652,6 +12652,8 @@ var EN_TO_JA = {
   Output: "\u51FA\u529B",
   Peak: "\u30D4\u30FC\u30AF",
   Gain: "\u30B2\u30A4\u30F3",
+  Volume: "\u97F3\u91CF",
+  "Master Volume": "\u30DE\u30B9\u30BF\u30FC\u97F3\u91CF",
   Mute: "\u30DF\u30E5\u30FC\u30C8",
   Solo: "\u30BD\u30ED",
   Expression: "\u30A8\u30AF\u30B9\u30D7\u30EC\u30C3\u30B7\u30E7\u30F3",

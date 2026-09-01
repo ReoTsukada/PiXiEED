@@ -10,7 +10,7 @@
     <title>PiXiEEDstudio — Studio</title>
     <link
       rel="stylesheet"
-      href="./assets/draw2-shell.min.css?v=20260901-audio-midi-tools-v1"
+      href="./assets/draw2-shell.min.css?v=20260901-panel-volume-v4"
     >
     <link
       rel="stylesheet"
@@ -2654,8 +2654,8 @@
                 >88 KEYS · A0–C8</output>
                 <label
                   class="draw2-audio-midi-velocity"
-                  title="Selected note velocity · double-click the slider to reset"
-                >VEL <input
+                  title="Drag to change this note's loudness (velocity) · double-click to reset"
+                >Volume <input
                     id="draw2AudioMidiVelocity"
                     type="range"
                     min="0.05"
@@ -5888,7 +5888,7 @@
               <div class="draw2-audio-inspector-controls">
                 <label class="draw2-audio-knob-field">
                   <span class="draw2-audio-control-heading"><span
-                    >Gain</span><output id="draw2AudioRightGainValue"
+                    >Volume</span><output id="draw2AudioRightGainValue"
                     >0.0 dB</output></span>
                   <span
                     class="draw2-audio-knob"
@@ -6283,7 +6283,7 @@
               </div>
               <label class="draw2-audio-master-gain draw2-audio-knob-field">
                 <span class="draw2-audio-control-heading"><span>Master
-                    Gain</span><output id="draw2AudioMasterGainValue"
+                    Volume</span><output id="draw2AudioMasterGainValue"
                   >0.0 dB</output></span>
                 <span
                   class="draw2-audio-knob"
@@ -9731,7 +9731,7 @@
     <script src="../scripts/pixieed-account-supabase-client.js?v=20260828-staging-config-v1"></script>
     <script
       type="module"
-      src="./dist/draw2-entry.js?v=20260901-audio-midi-tools-v1"
+      src="./dist/draw2-entry.js?v=20260901-panel-volume-v4"
     ></script>
     <script
       type="module"

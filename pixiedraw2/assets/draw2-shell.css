@@ -5213,6 +5213,20 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   letter-spacing: 0.14em;
   margin: 0 0 8px;
 }
+/* Heading wrappers below already control the eyebrow/title spacing with
+ * their own grid or flex `gap`. The eyebrow's default bottom margin above
+ * then stacks on top of that gap, doubling the visible space between the
+ * two lines across DRAW/GAME/AUDIO panel headers alike. Zero it out only
+ * inside these gap-managed wrappers so standalone eyebrows (landing page
+ * section labels, etc.) keep their normal spacing. */
+:is(
+  .draw2-panel-heading > div,
+  .draw2-audio-right-heading,
+  .draw2-audio-compact-master-title,
+  .draw2-game-scene-viewport-header > div:first-child
+) > .draw2-eyebrow {
+  margin-bottom: 0;
+}
 .draw2-badge {
   border: 1px solid var(--draw2-border);
   color: var(--draw2-muted);
@@ -28376,6 +28390,16 @@ body:has(#draw2WorkspaceFrame) {
     overflow: hidden !important;
     border: 1px solid var(--studio-window-border) !important;
     border-radius: var(--studio-card-radius) !important;
+  }
+
+  /* The Master tab's own panel already shows this same L/R meter, peak and
+   * LUFS readout in full, so the compact strip above it is pure duplicate
+   * space in that one case -- drop it there and let the Master panel use
+   * the freed height instead. */
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    #draw2AudioRightDock:has(> .draw2-audio-right-tabs > [data-audio-right-tab="master"].is-active)
+    #draw2AudioCompactMaster {
+    display: none !important;
   }
 
   #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
