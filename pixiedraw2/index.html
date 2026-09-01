@@ -10,7 +10,7 @@
     <title>PiXiEEDstudio — Studio</title>
     <link
       rel="stylesheet"
-      href="./assets/draw2-shell.min.css?v=20260901-icons-v5"
+      href="./assets/draw2-shell.min.css?v=20260901-icons-v6"
     >
     <link
       rel="stylesheet"
@@ -5298,8 +5298,13 @@
                       </button>
                     </div>
                   </div>
-                  <div class="draw2-game-node-category is-coming-soon" data-node-category="status" aria-disabled="true">
-                    <span class="draw2-game-node-category-label">ステータス<small class="draw2-game-node-category-badge">近日公開</small></span>
+                  <div class="draw2-game-node-category" data-node-category="status">
+                    <span class="draw2-game-node-category-label">ステータス</span>
+                    <div class="draw2-game-node-tiles">
+                      <button type="button" class="draw2-game-node-tile" data-game-component-type="STATUS" title="ステータス (Status)">
+                        <svg class="draw2-ui-icon draw2-game-node-tile-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-star"></use></svg><span>ステータス</span>
+                      </button>
+                    </div>
                   </div>
                   <div class="draw2-game-node-category is-coming-soon" data-node-category="skill" aria-disabled="true">
                     <span class="draw2-game-node-category-label">スキル<small class="draw2-game-node-category-badge">近日公開</small></span>
@@ -9815,7 +9820,7 @@
     <script src="../scripts/pixieed-account-supabase-client.js?v=20260828-staging-config-v1"></script>
     <script
       type="module"
-      src="./dist/draw2-entry.js?v=20260901-icons-v5"
+      src="./dist/draw2-entry.js?v=20260901-icons-v6"
     ></script>
     <script
       type="module"

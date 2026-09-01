@@ -5042,7 +5042,8 @@ function validateGameComponentState(component, path, diagnostics) {
     "TILEMAP",
     "COLLIDER",
     "RIGIDBODY",
-    "CHARACTER_CONTROLLER"
+    "CHARACTER_CONTROLLER",
+    "STATUS"
   ].includes(component.type)) {
     diagnostics.push(diagnostic("INVALID_PROJECT", `${path}.type`, `Unknown Game editor component state: ${component.type}`));
     return;
@@ -5106,6 +5107,19 @@ function validateGameComponentState(component, path, diagnostics) {
   }
   if (component.type === "CHARACTER_CONTROLLER" && (typeof component.moveSpeed !== "number" || !Number.isFinite(component.moveSpeed) || component.moveSpeed <= 0 || typeof component.stepHeight !== "number" || !Number.isFinite(component.stepHeight) || component.stepHeight < 0 || typeof component.fixedStep !== "number" || !Number.isSafeInteger(component.fixedStep) || component.fixedStep < 1 || typeof component.enabled !== "boolean")) {
     diagnostics.push(diagnostic("INVALID_PROJECT", path, "Game editor Character Controller state is invalid."));
+  }
+  if (component.type === "STATUS" && (![
+    "hp",
+    "maxHp",
+    "stamina",
+    "maxStamina",
+    "mp",
+    "maxMp",
+    "attack",
+    "defense",
+    "level"
+  ].every((key2) => typeof component[key2] === "number" && Number.isFinite(component[key2])) || typeof component.enabled !== "boolean")) {
+    diagnostics.push(diagnostic("INVALID_PROJECT", path, "Game editor Status state is invalid."));
   }
 }
 function validateDependencyCycles(dependencies, diagnostics) {
@@ -6588,6 +6602,18 @@ function validEditorComponent(component) {
       return typeof value.active === "boolean" && typeof value.zoom === "number" && Number.isFinite(value.zoom) && value.zoom > 0 && (value.camera2D === void 0 || isValidGameCamera2DSettings(value.camera2D));
     case "BEHAVIOR":
       return typeof value.enabled === "boolean";
+    case "STATUS":
+      return [
+        "hp",
+        "maxHp",
+        "stamina",
+        "maxStamina",
+        "mp",
+        "maxMp",
+        "attack",
+        "defense",
+        "level"
+      ].every((key) => typeof value[key] === "number" && Number.isFinite(value[key])) && typeof value.enabled === "boolean";
     default:
       return false;
   }
@@ -12404,6 +12430,23 @@ function rigidbody(trackId, options = {}) {
     ...options
   };
 }
+function status(trackId, options = {}) {
+  return {
+    type: "STATUS",
+    componentId: componentIdFor(trackId, "STATUS"),
+    hp: 100,
+    maxHp: 100,
+    stamina: 100,
+    maxStamina: 100,
+    mp: 50,
+    maxMp: 50,
+    attack: 10,
+    defense: 5,
+    level: 1,
+    enabled: true,
+    ...options
+  };
+}
 function defaultGameObjectComponents(trackId, kind, roleOverride) {
   const role = roleOverride ?? gameObjectRoleFor(trackId, kind);
   const base = [
@@ -12484,7 +12527,8 @@ function defaultGameObjectComponents(trackId, kind, roleOverride) {
           stepHeight: 0.25,
           fixedStep: 1,
           enabled: true
-        }
+        },
+        status(trackId)
       ];
     case "NPC":
       return [
@@ -12503,7 +12547,13 @@ function defaultGameObjectComponents(trackId, kind, roleOverride) {
           type: "BEHAVIOR",
           componentId: componentIdFor(trackId, "BEHAVIOR"),
           enabled: true
-        }
+        },
+        status(trackId, {
+          hp: 30,
+          maxHp: 30,
+          attack: 5,
+          defense: 2
+        })
       ];
     case "PROP":
       return [
@@ -12530,7 +12580,8 @@ function componentLabel(type) {
     RIGIDBODY: "\u91CD\u529B\u30FB\u7269\u7406 (Rigidbody)",
     CHARACTER_CONTROLLER: "\u30D7\u30EC\u30A4\u30E4\u30FC\u79FB\u52D5",
     CAMERA: "\u30AB\u30E1\u30E9 (Camera)",
-    BEHAVIOR: "\u30A4\u30D9\u30F3\u30C8\u30FB\u30EB\u30FC\u30EB"
+    BEHAVIOR: "\u30A4\u30D9\u30F3\u30C8\u30FB\u30EB\u30FC\u30EB",
+    STATUS: "\u30B9\u30C6\u30FC\u30BF\u30B9 (Status)"
   };
   return labels[type];
 }
@@ -12554,6 +12605,8 @@ function componentSummary(component) {
       return `${component.active ? "\u6709\u52B9" : "\u7121\u52B9"} \xB7 \u30BA\u30FC\u30E0 ${component.zoom} \xB7 ${component.camera2D?.pixelPerfect === false ? "Pixel OFF" : "Pixel ON"}`;
     case "BEHAVIOR":
       return component.enabled ? "\u30A4\u30D9\u30F3\u30C8\u3092\u5B9F\u884C" : "\u7121\u52B9";
+    case "STATUS":
+      return `HP ${component.hp}/${component.maxHp} \xB7 Lv.${component.level} \xB7 \u653B\u6483${component.attack}/\u9632\u5FA1${component.defense}`;
   }
 }
 function cloneGameComponents(components) {
@@ -33963,7 +34016,8 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       RIGIDBODY: "PLAYER",
       CHARACTER_CONTROLLER: "PLAYER",
       CAMERA: "CAMERA",
-      BEHAVIOR: "EVENT"
+      BEHAVIOR: "EVENT",
+      STATUS: "PLAYER"
     };
     return defaultGameObjectComponents(track.id, sources[type] ?? track.kind).find((component) => component.type === type);
   };
@@ -34390,6 +34444,53 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
             ...item,
             enabled: enabled.checked
           } : item)));
+          break;
+        }
+        case "STATUS": {
+          const hp = numberControl(component.hp, "1");
+          const maxHp = numberControl(component.maxHp, "1");
+          const stamina = numberControl(component.stamina, "1");
+          const maxStamina = numberControl(component.maxStamina, "1");
+          const mp = numberControl(component.mp, "1");
+          const maxMp = numberControl(component.maxMp, "1");
+          const attack = numberControl(component.attack, "1");
+          const defense = numberControl(component.defense, "1");
+          const level = numberControl(component.level, "1");
+          level.min = "1";
+          const statusEnabled = checkboxControl(component.enabled);
+          appendComponentField(card, "HP", hp);
+          appendComponentField(card, "Max HP", maxHp);
+          appendComponentField(card, "Stamina", stamina);
+          appendComponentField(card, "Max Stamina", maxStamina);
+          appendComponentField(card, "MP", mp);
+          appendComponentField(card, "Max MP", maxMp);
+          appendComponentField(card, "Attack", attack);
+          appendComponentField(card, "Defense", defense);
+          appendComponentField(card, "Level", level);
+          appendComponentField(card, "Enabled", statusEnabled);
+          const apply = () => updateSelectedGameComponents((items) => items.map((item) => item.componentId === component.componentId && item.type === "STATUS" ? {
+            ...item,
+            hp: Number(hp.value) || 0,
+            maxHp: Math.max(1, Number(maxHp.value) || 1),
+            stamina: Number(stamina.value) || 0,
+            maxStamina: Math.max(0, Number(maxStamina.value) || 0),
+            mp: Number(mp.value) || 0,
+            maxMp: Math.max(0, Number(maxMp.value) || 0),
+            attack: Number(attack.value) || 0,
+            defense: Number(defense.value) || 0,
+            level: Math.max(1, Math.round(Number(level.value) || 1)),
+            enabled: statusEnabled.checked
+          } : item));
+          hp.addEventListener("change", apply);
+          maxHp.addEventListener("change", apply);
+          stamina.addEventListener("change", apply);
+          maxStamina.addEventListener("change", apply);
+          mp.addEventListener("change", apply);
+          maxMp.addEventListener("change", apply);
+          attack.addEventListener("change", apply);
+          defense.addEventListener("change", apply);
+          level.addEventListener("change", apply);
+          statusEnabled.addEventListener("change", apply);
           break;
         }
       }

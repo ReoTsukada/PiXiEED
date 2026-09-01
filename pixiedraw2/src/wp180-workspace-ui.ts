@@ -26300,6 +26300,7 @@ export function bootstrapDraw2Workspace(
       CHARACTER_CONTROLLER: "PLAYER",
       CAMERA: "CAMERA",
       BEHAVIOR: "EVENT",
+      STATUS: "PLAYER",
     };
     return defaultGameObjectComponents(track.id, sources[type] ?? track.kind)
       .find((component) => component.type === type);
@@ -26934,6 +26935,61 @@ export function bootstrapDraw2Workspace(
                   )
                 ),
             );
+            break;
+          }
+          case "STATUS": {
+            const hp = numberControl(component.hp, "1");
+            const maxHp = numberControl(component.maxHp, "1");
+            const stamina = numberControl(component.stamina, "1");
+            const maxStamina = numberControl(component.maxStamina, "1");
+            const mp = numberControl(component.mp, "1");
+            const maxMp = numberControl(component.maxMp, "1");
+            const attack = numberControl(component.attack, "1");
+            const defense = numberControl(component.defense, "1");
+            const level = numberControl(component.level, "1");
+            level.min = "1";
+            const statusEnabled = checkboxControl(component.enabled);
+            appendComponentField(card, "HP", hp);
+            appendComponentField(card, "Max HP", maxHp);
+            appendComponentField(card, "Stamina", stamina);
+            appendComponentField(card, "Max Stamina", maxStamina);
+            appendComponentField(card, "MP", mp);
+            appendComponentField(card, "Max MP", maxMp);
+            appendComponentField(card, "Attack", attack);
+            appendComponentField(card, "Defense", defense);
+            appendComponentField(card, "Level", level);
+            appendComponentField(card, "Enabled", statusEnabled);
+            const apply = () =>
+              updateSelectedGameComponents((items) =>
+                items.map((item) =>
+                  item.componentId === component.componentId &&
+                    item.type === "STATUS"
+                    ? {
+                      ...item,
+                      hp: Number(hp.value) || 0,
+                      maxHp: Math.max(1, Number(maxHp.value) || 1),
+                      stamina: Number(stamina.value) || 0,
+                      maxStamina: Math.max(0, Number(maxStamina.value) || 0),
+                      mp: Number(mp.value) || 0,
+                      maxMp: Math.max(0, Number(maxMp.value) || 0),
+                      attack: Number(attack.value) || 0,
+                      defense: Number(defense.value) || 0,
+                      level: Math.max(1, Math.round(Number(level.value) || 1)),
+                      enabled: statusEnabled.checked,
+                    }
+                    : item
+                )
+              );
+            hp.addEventListener("change", apply);
+            maxHp.addEventListener("change", apply);
+            stamina.addEventListener("change", apply);
+            maxStamina.addEventListener("change", apply);
+            mp.addEventListener("change", apply);
+            maxMp.addEventListener("change", apply);
+            attack.addEventListener("change", apply);
+            defense.addEventListener("change", apply);
+            level.addEventListener("change", apply);
+            statusEnabled.addEventListener("change", apply);
             break;
           }
         }

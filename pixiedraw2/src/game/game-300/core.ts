@@ -391,6 +391,28 @@ export interface CharacterControllerComponent {
   readonly enabled: boolean;
 }
 
+/**
+ * Genre-agnostic RPG-style stat block (HP/Stamina/MP/Attack/Defense/Level).
+ * Editor-authoring only for now: it is not yet part of the canonical
+ * `Component` union consumed by the GAME-350 build pipeline, so adding it
+ * here cannot affect Build/Publish. Runtime behavior (taking damage,
+ * leveling up, etc.) is not implemented yet - this is authoring data only.
+ */
+export interface StatusComponent {
+  readonly type: "STATUS";
+  readonly componentId: ComponentId;
+  readonly hp: number;
+  readonly maxHp: number;
+  readonly stamina: number;
+  readonly maxStamina: number;
+  readonly mp: number;
+  readonly maxMp: number;
+  readonly attack: number;
+  readonly defense: number;
+  readonly level: number;
+  readonly enabled: boolean;
+}
+
 /** Editor-side component configuration persisted with the canonical timeline. */
 export type GameObjectRole =
   | "PLAYER"
@@ -420,6 +442,7 @@ export type GameComponentState =
   | RigidbodyComponent
   | CharacterControllerComponent
   | CameraComponent
+  | StatusComponent
   | {
     readonly type: "BEHAVIOR";
     readonly componentId: ComponentId;
@@ -1408,6 +1431,7 @@ function validateGameComponentState(
       "COLLIDER",
       "RIGIDBODY",
       "CHARACTER_CONTROLLER",
+      "STATUS",
     ].includes(component.type)
   ) {
     diagnostics.push(
@@ -1573,6 +1597,30 @@ function validateGameComponentState(
         "INVALID_PROJECT",
         path,
         "Game editor Character Controller state is invalid.",
+      ),
+    );
+  }
+  if (
+    component.type === "STATUS" &&
+    (![
+        "hp",
+        "maxHp",
+        "stamina",
+        "maxStamina",
+        "mp",
+        "maxMp",
+        "attack",
+        "defense",
+        "level",
+      ].every((key) =>
+        typeof component[key] === "number" && Number.isFinite(component[key])
+      ) || typeof component.enabled !== "boolean")
+  ) {
+    diagnostics.push(
+      diagnostic(
+        "INVALID_PROJECT",
+        path,
+        "Game editor Status state is invalid.",
       ),
     );
   }

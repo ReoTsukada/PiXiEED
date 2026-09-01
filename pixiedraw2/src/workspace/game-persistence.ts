@@ -180,6 +180,20 @@ function validEditorComponent(
           isValidGameCamera2DSettings(value.camera2D));
     case "BEHAVIOR":
       return typeof value.enabled === "boolean";
+    case "STATUS":
+      return [
+          "hp",
+          "maxHp",
+          "stamina",
+          "maxStamina",
+          "mp",
+          "maxMp",
+          "attack",
+          "defense",
+          "level",
+        ].every((key) =>
+          typeof value[key] === "number" && Number.isFinite(value[key])
+        ) && typeof value.enabled === "boolean";
     default:
       return false;
   }

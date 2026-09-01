@@ -257,6 +257,29 @@ function rigidbody(
   };
 }
 
+function status(
+  trackId: string,
+  options: Partial<
+    Extract<GameEditorComponent, { readonly type: "STATUS" }>
+  > = {},
+): GameEditorComponent {
+  return {
+    type: "STATUS",
+    componentId: componentIdFor(trackId, "STATUS"),
+    hp: 100,
+    maxHp: 100,
+    stamina: 100,
+    maxStamina: 100,
+    mp: 50,
+    maxMp: 50,
+    attack: 10,
+    defense: 5,
+    level: 1,
+    enabled: true,
+    ...options,
+  };
+}
+
 export function defaultGameObjectComponents(
   trackId: string,
   kind: string,
@@ -320,6 +343,7 @@ export function defaultGameObjectComponents(
           fixedStep: 1,
           enabled: true,
         },
+        status(trackId),
       ];
     case "NPC":
       return [
@@ -332,6 +356,7 @@ export function defaultGameObjectComponents(
           componentId: componentIdFor(trackId, "BEHAVIOR"),
           enabled: true,
         },
+        status(trackId, { hp: 30, maxHp: 30, attack: 5, defense: 2 }),
       ];
     case "PROP":
       return [...base, sprite(trackId), collider(trackId, { layer: "WORLD" })];
@@ -351,6 +376,7 @@ export function componentLabel(type: GameEditorComponent["type"]): string {
     CHARACTER_CONTROLLER: "プレイヤー移動",
     CAMERA: "カメラ (Camera)",
     BEHAVIOR: "イベント・ルール",
+    STATUS: "ステータス (Status)",
   };
   return labels[type];
 }
@@ -383,6 +409,8 @@ export function componentSummary(component: GameEditorComponent): string {
       }`;
     case "BEHAVIOR":
       return component.enabled ? "イベントを実行" : "無効";
+    case "STATUS":
+      return `HP ${component.hp}/${component.maxHp} · Lv.${component.level} · 攻撃${component.attack}/防御${component.defense}`;
   }
 }
 
