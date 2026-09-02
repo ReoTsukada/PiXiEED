@@ -299,6 +299,13 @@ import {
   type Site400IGameRouteController,
 } from "./platform/site-400/igame-route.ts";
 import { createSite400LazyEntry } from "./platform/site-400/lazy-entry.ts";
+import {
+  createGameGenreRuntime,
+  playGameGenre,
+  stepGameGenre,
+  type GameGenreRuntimeInput,
+  type GameGenreRuntimeState,
+} from "./game/game-350/genre-runtime.ts";
 import type { Site400ResolveResult } from "./platform/site-400/server-authorized-registry-provider.ts";
 import { encodeStoredZip } from "./draw2-export.ts";
 import { createEventGraph, planPlayback } from "./audio/audio-210/core.ts";
@@ -4880,6 +4887,12 @@ export function bootstrapDraw2Workspace(
       cell.setAttribute("aria-current", active ? "step" : "false");
     }
   };
+  const stopGameScenePlayRuntime = (): void => {
+    if (gameScenePlayState === undefined) return;
+    gameScenePlayState = undefined;
+    gameScenePlayHeldInput = {};
+    renderGameSceneViewport();
+  };
   const stopGameDeckPlayback = (): void => {
     if (gameDeckPlaybackTimer !== undefined) {
       windowRef.clearInterval(gameDeckPlaybackTimer);
@@ -4889,18 +4902,43 @@ export function bootstrapDraw2Workspace(
     gameDeckPlay?.setAttribute("aria-pressed", "false");
     setDraw2ButtonIcon(gameDeckPlay, "icon-play", "Play");
     syncModePlaybackButton();
+    stopGameScenePlayRuntime();
+  };
+  const startGameScenePlayRuntime = (): void => {
+    try {
+      const project = gameCurrentProject();
+      gameScenePlayState = playGameGenre(createGameGenreRuntime(project));
+      gameScenePlayHeldInput = {};
+      gameSceneViewMode = "GAME";
+      syncGameSceneViewMode();
+      renderGameSceneViewport();
+    } catch {
+      // No Game Project is ready yet (e.g. Scene not saved once). Fall back
+      // to the animation-frame playhead below; entities keep showing their
+      // authored (static) Transform position instead of a live simulation.
+      gameScenePlayState = undefined;
+    }
   };
   const startGameDeckPlayback = (): void => {
     if (gameDeckPlaybackTimer !== undefined) return;
     gameDeckPlaying = true;
     syncGameDeckPlayhead();
+    startGameScenePlayRuntime();
     gameDeckPlaybackTimer = windowRef.setInterval(() => {
       if (!gameDeckPlaying) return;
       gameDeckFrame = (gameDeckFrame + 1) % 16;
       syncGameDeckPlayhead();
+      if (gameScenePlayState !== undefined) {
+        gameScenePlayState = stepGameGenre(
+          gameScenePlayState,
+          gameScenePlayHeldInput,
+        );
+        renderGameSceneViewport();
+      }
       if (gameDeckStatus !== undefined) {
-        gameDeckStatus.textContent =
-          "Play preview · fixed-step runtime active · edit state is protected";
+        gameDeckStatus.textContent = gameScenePlayState !== undefined
+          ? "Play · スプライト未設定のオブジェクトも既定アイコンで表示中"
+          : "Play preview · fixed-step runtime active · edit state is protected";
       }
     }, Math.round(1000 / 12));
   };
@@ -5717,6 +5755,16 @@ export function bootstrapDraw2Workspace(
     }
   };
   let gameDeckPlaying = false;
+  // GAME-350: real gameplay simulation driving the Scene View during Play,
+  // separate from the animation-clip playhead above. When undefined, the
+  // Scene View renders each track's authored Transform as before; while
+  // Play is active it renders this runtime's live positions instead, so
+  // entities without a sprite still visibly move as their existing marker
+  // icon (see draw2-game-scene-marker in the CSS) and entities with a
+  // sprite keep rendering their pixel art.
+  let gameScenePlayState: GameGenreRuntimeState | undefined;
+  let gameScenePlayHeldInput: GameGenreRuntimeInput = {};
+
   let gameDeckFrame = 0;
   let gameDeckPlaybackTimer: number | undefined;
   let audioDeckPlaying = false;
@@ -17380,6 +17428,48 @@ export function bootstrapDraw2Workspace(
       "Restart · runtime stateを初期化しました。編集内容は保持されています。",
     );
   });
+
+  // GAME-350 Controller defaults: attaching a "プレイヤー操作" node ships with
+  // these key bindings already set (see ControllerComponent.dc.html) — the
+  // user only needs to click a key cap to rebind it, never wire input from
+  // scratch. Space is intentionally not used here: it already toggles
+  // Play/Stop for every mode (see the global keydown handler below), so
+  // reusing it for jump would stop playback instead of jumping.
+  const gameScenePlayKeyMap: ReadonlyMap<
+    string,
+    keyof GameGenreRuntimeInput | readonly (keyof GameGenreRuntimeInput)[]
+  > = new Map([
+    ["ArrowLeft", "left"],
+    ["KeyA", "left"],
+    ["ArrowRight", "right"],
+    ["KeyD", "right"],
+    ["ArrowUp", ["up", "jump"]],
+    ["KeyW", ["up", "jump"]],
+    ["ArrowDown", "down"],
+    ["KeyS", "down"],
+  ]);
+  const setGameScenePlayInput = (code: string, held: boolean): void => {
+    const fields = gameScenePlayKeyMap.get(code);
+    if (fields === undefined) return;
+    const list = typeof fields === "string" ? [fields] : fields;
+    gameScenePlayHeldInput = { ...gameScenePlayHeldInput };
+    for (const field of list) {
+      (gameScenePlayHeldInput as Record<string, boolean>)[field] = held;
+    }
+  };
+  documentRef.addEventListener("keydown", (event) => {
+    if (
+      gameScenePlayState === undefined || currentCreatorMode() !== "GAME" ||
+      isEditableTarget(event.target) || event.isComposing
+    ) return;
+    if (!gameScenePlayKeyMap.has(event.code)) return;
+    event.preventDefault();
+    setGameScenePlayInput(event.code, true);
+  });
+  documentRef.addEventListener("keyup", (event) => {
+    if (!gameScenePlayKeyMap.has(event.code)) return;
+    setGameScenePlayInput(event.code, false);
+  });
   const commitAudioRecordingTake = async (
     take: AudioRecordedTake,
   ): Promise<boolean> => {
@@ -25460,8 +25550,21 @@ export function bootstrapDraw2Workspace(
       const collider = components.find((component) =>
         component.type === "COLLIDER"
       );
-      const rawX = transform?.type === "TRANSFORM" ? transform.x : 0;
-      const rawY = transform?.type === "TRANSFORM" ? transform.y : 0;
+      // While a live Play runtime is active, entities move by the actual
+      // simulation (gravity, jump, movement, camera follow) instead of their
+      // authored/static Transform. The existing sprite-or-marker rendering
+      // below is untouched, so an object with no sprite bound still shows up
+      // as its role-colored icon while playing.
+      const livePosition = gameScenePlayState === undefined
+        ? undefined
+        : track.id === gameScenePlayState.playerId
+        ? gameScenePlayState.playerPosition
+        : gameScenePlayState.objects.find((object) => object.id === track.id)
+          ?.position;
+      const rawX = livePosition?.x ??
+        (transform?.type === "TRANSFORM" ? transform.x : 0);
+      const rawY = livePosition?.y ??
+        (transform?.type === "TRANSFORM" ? transform.y : 0);
       const x = Math.min(
         Math.max(0.5, mapWidth - 0.5),
         Math.max(0.5, (Number(rawX) || 0) + 0.5),
