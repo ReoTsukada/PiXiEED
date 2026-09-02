@@ -213,10 +213,12 @@ Deno.test("GAME350-GENRE-004 default STATUS combat defeats an unarmed NPC over t
     enemyBefore?.status?.hp === 10,
     "an NPC with no STATUS node should still get a default hp of 10",
   );
-  // The fixture's enemy sits within touch distance of the player's spawn
-  // and never moves, so standing still resolves five throttled combat
-  // ticks (every 30 ticks) well within 160 steps.
-  for (let index = 0; index < 160; index += 1) {
+  // The fixture's enemy sits within touch distance of the player's landing
+  // spot and never moves, but the player first needs ~80 ticks just to fall
+  // onto the floor -- only once grounded does the throttled contact-combat
+  // (one resolution every 30 ticks) start landing hits, so five hits to
+  // fully deplete a 10 hp default NPC needs real margin past 80 + 5*30.
+  for (let index = 0; index < 260; index += 1) {
     state = stepGameGenre(state);
   }
   assert(
@@ -248,3 +250,138 @@ Deno.test("GAME350-GENRE-005 completes the Scroll scene at its goal", async () =
     "Scroll camera should follow the player across the world",
   );
 });
+
+/**
+ * Minimal project for Inventory & Crafting tests: no enemy, no goal track --
+ * just a hero, a floor, and a project-wide item/recipe vocabulary the
+ * author would define once and reference from Sentence Logic rows.
+ */
+async function projectForInventory() {
+  const template = await createGame351RpgTemplate({
+    projectId: "genre-runtime-inventory-test",
+    ownerId: "genre-runtime-inventory-owner",
+    revisionId: "genre-runtime-inventory-revision",
+  });
+  const width = 12;
+  const height = 10;
+  const floor = Array.from({ length: width }, (_, x) => ({
+    x,
+    y: height - 1,
+    collision: "SOLID" as const,
+  }));
+  const tracks: GameTimelineTrack[] = [
+    {
+      trackId: "hero",
+      label: "主人公",
+      kind: "SPRITE",
+      activeFrames: [0],
+      role: "PLAYER",
+      components: [
+        {
+          type: "TRANSFORM",
+          componentId: asComponentId("hero-transform"),
+          x: 1,
+          y: 1,
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+        },
+      ],
+    },
+    {
+      trackId: "tilemap",
+      label: "ステージ",
+      kind: "TILEMAP",
+      activeFrames: [0],
+      role: "TILEMAP",
+      tilemap: createGameTilemapDocument({
+        mapId: "map:genre-runtime-inventory-test",
+        width,
+        height,
+        cells: floor,
+      }),
+    },
+  ];
+  return createGameProject({
+    ...template.project,
+    editorTimeline: {
+      frameCount: 16,
+      creationMode: "ACTION_2D",
+      sceneRules: sceneRulesForCreationMode("ACTION_2D"),
+      tracks,
+      items: [
+        { itemId: "herb", label: "薬草", stackable: true, maxStack: 9 },
+        { itemId: "potion", label: "ポーション", stackable: true, maxStack: 9 },
+      ],
+      recipes: [
+        {
+          recipeId: "brew-potion",
+          label: "ポーション調合",
+          ingredients: [{ itemId: "herb", amount: 2 }],
+          result: { itemId: "potion", amount: 1 },
+        },
+      ],
+      eventCards: [
+        {
+          eventId: "event:start-give-herb",
+          label: "開始時に薬草を渡す",
+          enabled: true,
+          who: "PLAYER",
+          condition: "START",
+          action: "GIVE_ITEM",
+          itemId: "herb",
+          amount: 2,
+        },
+        {
+          eventId: "event:auto-craft-potion",
+          label: "薬草が集まったらポーションを調合",
+          enabled: true,
+          who: "PLAYER",
+          condition: "HAS_ITEM",
+          itemId: "herb",
+          amount: 2,
+          action: "CRAFT_ITEM",
+          recipeId: "brew-potion",
+        },
+        {
+          eventId: "event:potion-complete",
+          label: "ポーションを持っていればクリア",
+          enabled: true,
+          who: "PLAYER",
+          condition: "HAS_ITEM",
+          itemId: "potion",
+          amount: 1,
+          action: "COMPLETE_SCENE",
+        },
+      ],
+    },
+  }, template.caller);
+}
+
+Deno.test("GAME350-GENRE-006 GIVE_ITEM/CRAFT_ITEM/HAS_ITEM drive the inventory without a script", async () => {
+  const project = await projectForInventory();
+  const created = createGameGenreRuntime(project);
+  assert(
+    created.inventory.herb === 2,
+    "a START card's GIVE_ITEM should stock the inventory before Play even starts",
+  );
+  assert(
+    (created.inventory.potion ?? 0) === 0,
+    "no potion should exist until the craft recipe actually runs",
+  );
+  let state = playGameGenre(created);
+  state = stepGameGenre(state);
+  assert(
+    state.inventory.herb === 0,
+    "CRAFT_ITEM should consume the recipe's ingredients from the inventory",
+  );
+  assert(
+    state.inventory.potion === 1,
+    "CRAFT_ITEM should add the recipe's result to the inventory",
+  );
+  assert(
+    state.sceneComplete,
+    "a HAS_ITEM condition should be able to trigger COMPLETE_SCENE the same tick the item is crafted",
+  );
+});
+

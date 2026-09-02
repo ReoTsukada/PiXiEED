@@ -193,6 +193,8 @@ const GAME_EVENT_CARD_KEYS = new Set([
   "message",
   "amount",
   "audioTrackId",
+  "itemId",
+  "recipeId",
 ]);
 
 export function isValidGameSceneRules(value: unknown): value is GameSceneRules {
@@ -234,7 +236,15 @@ export function isValidGameEventCard(value: unknown): value is GameEventCard {
     value.label.length <= 128 &&
     typeof value.enabled === "boolean" &&
     ["PLAYER", "TOUCHED_OBJECT", "ANYONE"].includes(String(value.who)) &&
-    ["START", "ENTER_RANGE", "TOUCH", "TAP", "INTERACT", "REACH_GOAL"].includes(
+    [
+      "START",
+      "ENTER_RANGE",
+      "TOUCH",
+      "TAP",
+      "INTERACT",
+      "REACH_GOAL",
+      "HAS_ITEM",
+    ].includes(
       String(value.condition),
     ) &&
     validReference(value.sourceTrackId) && validReference(value.targetTrackId) &&
@@ -245,8 +255,12 @@ export function isValidGameEventCard(value: unknown): value is GameEventCard {
       "PLAY_AUDIO",
       "COMPLETE_SCENE",
       "SET_VARIABLE",
+      "GIVE_ITEM",
+      "TAKE_ITEM",
+      "CRAFT_ITEM",
     ].includes(String(value.action)) &&
     validText(value.message) && validReference(value.audioTrackId) &&
+    validReference(value.itemId) && validReference(value.recipeId) &&
     (value.amount === undefined ||
       (typeof value.amount === "number" && Number.isFinite(value.amount) &&
         value.amount >= 0 && value.amount <= 999999));
@@ -293,14 +307,18 @@ export type GameEventCondition =
   | "TOUCH"
   | "TAP"
   | "INTERACT"
-  | "REACH_GOAL";
+  | "REACH_GOAL"
+  | "HAS_ITEM";
 export type GameEventAction =
   | "SHOW_DIALOGUE"
   | "DAMAGE"
   | "SHAKE_CAMERA"
   | "PLAY_AUDIO"
   | "COMPLETE_SCENE"
-  | "SET_VARIABLE";
+  | "SET_VARIABLE"
+  | "GIVE_ITEM"
+  | "TAKE_ITEM"
+  | "CRAFT_ITEM";
 
 /**
  * Small, serializable event card.  It is the public authoring shape; the
@@ -318,6 +336,38 @@ export interface GameEventCard {
   readonly message?: string;
   readonly amount?: number;
   readonly audioTrackId?: string;
+  /** HAS_ITEM condition target, or GIVE_ITEM/TAKE_ITEM action target. */
+  readonly itemId?: string;
+  /** CRAFT_ITEM action target; looked up in GameEditorTimeline.recipes. */
+  readonly recipeId?: string;
+}
+
+/**
+ * Inventory & crafting primitives (editor-authored, project-wide
+ * vocabulary): a Thing the author defines once, then references from any
+ * number of Sentence Logic rows via HAS_ITEM / GIVE_ITEM / TAKE_ITEM /
+ * CRAFT_ITEM. Never a fixed game — an author combines these the same way
+ * they combine any other condition/action to build whatever game they want
+ * (an RPG's key item, a racer's fuel, a crafting game's material, ...).
+ */
+export interface GameItemDefinition {
+  readonly itemId: string;
+  readonly label: string;
+  readonly icon?: AssetRevisionReference;
+  readonly stackable: boolean;
+  readonly maxStack: number;
+}
+
+export interface GameRecipeIngredient {
+  readonly itemId: string;
+  readonly amount: number;
+}
+
+export interface GameRecipeDefinition {
+  readonly recipeId: string;
+  readonly label: string;
+  readonly ingredients: readonly GameRecipeIngredient[];
+  readonly result: GameRecipeIngredient;
 }
 
 export type GameColliderShape = "BOX" | "CIRCLE" | "CAPSULE";
@@ -706,6 +756,17 @@ export interface GameEditorTimeline {
   readonly templateInstances?: readonly GameTemplateInstance[];
   /** Optional Game-owned animation assignments; absent in legacy projects. */
   readonly animationBindings?: readonly GameAnimationBinding[];
+  /**
+   * Author-defined, project-wide vocabulary for Inventory & Crafting.
+   * These are never a fixed game's content -- they are Things the author
+   * defines once (a key, a fuel resource, a crafting material, ...) and
+   * then references from any number of Sentence Logic rows via
+   * HAS_ITEM / GIVE_ITEM / TAKE_ITEM / CRAFT_ITEM, the same way any other
+   * condition/action chip is combined. Absent in legacy projects.
+   */
+  readonly items?: readonly GameItemDefinition[];
+  /** Author-defined crafting recipes referencing `items` above. */
+  readonly recipes?: readonly GameRecipeDefinition[];
 }
 
 export interface GameProject {
@@ -982,6 +1043,102 @@ export function isValidGameAnimationBinding(
     (value.sourceContentHash === undefined ||
       (typeof value.sourceContentHash === "string" &&
         /^[a-f0-9]{64}$/u.test(value.sourceContentHash)));
+}
+
+const GAME_ASSET_REVISION_REFERENCE_KEYS = new Set([
+  "kind",
+  "assetId",
+  "revisionId",
+  "ownerId",
+  "contentHash",
+  "mode",
+]);
+
+function isValidAssetRevisionReference(
+  value: unknown,
+): value is AssetRevisionReference {
+  if (!isRecord(value)) return false;
+  const id = (candidate: unknown): candidate is string =>
+    typeof candidate === "string" &&
+    GAME_TEMPLATE_VALUE_KEY_PATTERN.test(candidate);
+  return Object.keys(value).every((key) =>
+    GAME_ASSET_REVISION_REFERENCE_KEYS.has(key)
+  ) &&
+    (value.kind === "DRAW" || value.kind === "AUDIO") &&
+    id(value.assetId) && id(value.revisionId) && id(value.ownerId) &&
+    typeof value.contentHash === "string" &&
+    /^[a-f0-9]{64}$/u.test(value.contentHash) &&
+    (value.mode === "PINNED" || value.mode === "LIVE");
+}
+
+const GAME_ITEM_DEFINITION_KEYS = new Set([
+  "itemId",
+  "label",
+  "icon",
+  "stackable",
+  "maxStack",
+]);
+
+/**
+ * Inventory & Crafting (decision: author-defined, project-wide vocabulary
+ * combined via HAS_ITEM/GIVE_ITEM/TAKE_ITEM/CRAFT_ITEM the same way any
+ * other Sentence Logic chip is combined -- never a fixed game's content).
+ */
+export function isValidGameItemDefinition(
+  value: unknown,
+): value is GameItemDefinition {
+  if (!isRecord(value)) return false;
+  return Object.keys(value).every((key) => GAME_ITEM_DEFINITION_KEYS.has(key)) &&
+    typeof value.itemId === "string" &&
+    GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.itemId) &&
+    typeof value.label === "string" && value.label.trim().length > 0 &&
+    value.label.length <= 128 &&
+    (value.icon === undefined || isValidAssetRevisionReference(value.icon)) &&
+    typeof value.stackable === "boolean" &&
+    typeof value.maxStack === "number" && Number.isFinite(value.maxStack) &&
+    value.maxStack >= 1 && value.maxStack <= 999999 &&
+    (value.stackable || value.maxStack === 1);
+}
+
+const GAME_RECIPE_INGREDIENT_KEYS = new Set(["itemId", "amount"]);
+
+function isValidGameRecipeIngredient(
+  value: unknown,
+): value is GameRecipeIngredient {
+  if (!isRecord(value)) return false;
+  return Object.keys(value).every((key) =>
+    GAME_RECIPE_INGREDIENT_KEYS.has(key)
+  ) &&
+    typeof value.itemId === "string" &&
+    GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.itemId) &&
+    typeof value.amount === "number" && Number.isFinite(value.amount) &&
+    value.amount >= 1 && value.amount <= 999999;
+}
+
+const GAME_RECIPE_DEFINITION_KEYS = new Set([
+  "recipeId",
+  "label",
+  "ingredients",
+  "result",
+]);
+
+export function isValidGameRecipeDefinition(
+  value: unknown,
+): value is GameRecipeDefinition {
+  if (!isRecord(value)) return false;
+  return Object.keys(value).every((key) =>
+    GAME_RECIPE_DEFINITION_KEYS.has(key)
+  ) &&
+    typeof value.recipeId === "string" &&
+    GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.recipeId) &&
+    typeof value.label === "string" && value.label.trim().length > 0 &&
+    value.label.length <= 128 &&
+    Array.isArray(value.ingredients) && value.ingredients.length > 0 &&
+    value.ingredients.length <= 32 &&
+    value.ingredients.every((ingredient) =>
+      isValidGameRecipeIngredient(ingredient)
+    ) &&
+    isValidGameRecipeIngredient(value.result);
 }
 
 function diagnostic(
@@ -2234,6 +2391,16 @@ export function validateGameProject(
             ? timeline.tracks.map((track) => track.trackId)
             : [],
         );
+        const itemIds = new Set(
+          Array.isArray(timeline.items)
+            ? timeline.items.map((item) => item.itemId)
+            : [],
+        );
+        const recipeIds = new Set(
+          Array.isArray(timeline.recipes)
+            ? timeline.recipes.map((recipe) => recipe.recipeId)
+            : [],
+        );
         for (const [index, card] of timeline.eventCards.entries()) {
           for (const [key, trackId] of [
             ["sourceTrackId", card.sourceTrackId],
@@ -2248,6 +2415,89 @@ export function validateGameProject(
                   "Game event card track reference is missing.",
                 ),
               );
+            }
+          }
+          if (card.itemId !== undefined && !itemIds.has(card.itemId)) {
+            diagnostics.push(
+              diagnostic(
+                "MISSING_REFERENCE",
+                `editorTimeline.eventCards[${index}].itemId`,
+                "Game event card item reference is missing.",
+              ),
+            );
+          }
+          if (card.recipeId !== undefined && !recipeIds.has(card.recipeId)) {
+            diagnostics.push(
+              diagnostic(
+                "MISSING_REFERENCE",
+                `editorTimeline.eventCards[${index}].recipeId`,
+                "Game event card recipe reference is missing.",
+              ),
+            );
+          }
+        }
+      }
+    }
+    if (timeline.items !== undefined) {
+      if (
+        !Array.isArray(timeline.items) ||
+        timeline.items.some((item) => !isValidGameItemDefinition(item))
+      ) {
+        diagnostics.push(
+          diagnostic(
+            "INVALID_PROJECT",
+            "editorTimeline.items",
+            "Game item definitions are invalid.",
+          ),
+        );
+      } else {
+        diagnostics.push(
+          ...duplicateDiagnostics(
+            timeline.items.map((item) => item.itemId),
+            "editorTimeline.items.itemId",
+          ),
+        );
+      }
+    }
+    if (timeline.recipes !== undefined) {
+      if (
+        !Array.isArray(timeline.recipes) ||
+        timeline.recipes.some((recipe) => !isValidGameRecipeDefinition(recipe))
+      ) {
+        diagnostics.push(
+          diagnostic(
+            "INVALID_PROJECT",
+            "editorTimeline.recipes",
+            "Game recipe definitions are invalid.",
+          ),
+        );
+      } else {
+        diagnostics.push(
+          ...duplicateDiagnostics(
+            timeline.recipes.map((recipe) => recipe.recipeId),
+            "editorTimeline.recipes.recipeId",
+          ),
+        );
+        const knownItemIds = new Set(
+          Array.isArray(timeline.items)
+            ? timeline.items.map((item) => item.itemId)
+            : [],
+        );
+        for (const [index, recipe] of timeline.recipes.entries()) {
+          const referenced = [
+            ...recipe.ingredients.map((ingredient) => ingredient.itemId),
+            recipe.result.itemId,
+          ];
+          for (const itemId of referenced) {
+            if (!knownItemIds.has(itemId)) {
+              diagnostics.push(
+                diagnostic(
+                  "MISSING_REFERENCE",
+                  `editorTimeline.recipes[${index}]`,
+                  "Game recipe references an unknown item.",
+                ),
+              );
+              break;
             }
           }
         }
@@ -2457,6 +2707,27 @@ function canonicalProjectPayload(
           ).map((binding) => ({
             ...binding,
             frameIds: [...(binding.frameIds as string[])],
+          })),
+        }),
+        ...(project.editorTimeline.items === undefined ? {} : {
+          items: sortById(
+            project.editorTimeline.items as unknown as Record<
+              string,
+              unknown
+            >[],
+            "itemId",
+          ),
+        }),
+        ...(project.editorTimeline.recipes === undefined ? {} : {
+          recipes: sortById(
+            project.editorTimeline.recipes as unknown as Record<
+              string,
+              unknown
+            >[],
+            "recipeId",
+          ).map((recipe) => ({
+            ...recipe,
+            ingredients: [...(recipe.ingredients as unknown[])],
           })),
         }),
       },

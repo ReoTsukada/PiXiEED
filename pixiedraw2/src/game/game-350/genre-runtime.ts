@@ -13,6 +13,7 @@ import type {
   GameEventCard,
   GameObjectRole,
   GameProject,
+  GameRecipeDefinition,
   GameSceneRules,
   GameTimelineTrack,
 } from "../game-300/core.ts";
@@ -106,6 +107,15 @@ export interface GameGenreRuntimeState {
   readonly lastAudioTrackId: string | null;
   readonly sceneComplete: boolean;
   readonly variables: Readonly<Record<string, string | number | boolean>>;
+  /**
+   * Inventory & Crafting (decision: author-defined, project-wide vocabulary,
+   * never a fixed game's content). itemId -> count the player is currently
+   * holding; absent keys mean zero. Updated by GIVE_ITEM/TAKE_ITEM/
+   * CRAFT_ITEM, read by the HAS_ITEM condition.
+   */
+  readonly inventory: Readonly<Record<string, number>>;
+  /** Author-defined recipes this project's CRAFT_ITEM cards may reference. */
+  readonly recipes: readonly GameRecipeDefinition[];
 }
 
 const POINT_ZERO: GameGenreRuntimePoint = { x: 0, y: 0 };
@@ -356,6 +366,16 @@ function cardIsNearTarget(
   state: GameGenreRuntimeState,
   card: GameEventCard,
 ): boolean {
+  // Inventory & Crafting (decision): HAS_ITEM is a state check, not a
+  // spatial one -- it reuses the same "near"/edge-triggered plumbing as
+  // TOUCH/ENTER_RANGE so a Sentence Logic row reading
+  // "HAS_ITEM(鍵) -> COMPLETE_SCENE" fires exactly once when the threshold
+  // is crossed, and can fire again if the item is later taken away and
+  // re-collected.
+  if (card.condition === "HAS_ITEM") {
+    const have = state.inventory[card.itemId ?? ""] ?? 0;
+    return have >= Math.max(1, card.amount ?? 1);
+  }
   const target = targetPosition(state, card);
   // A side-scrolling goal is a finish line, not a point that must be hit at
   // the exact same height. This keeps the beginner path predictable even if
@@ -368,6 +388,44 @@ function cardIsNearTarget(
   }
   return target === undefined || distance(state.playerPosition, target) <=
     TOUCH_DISTANCE;
+}
+
+/**
+ * Inventory & Crafting (decision): GIVE_ITEM/TAKE_ITEM only ever touch
+ * `inventory`, the same shape SET_VARIABLE already uses for `variables` --
+ * no new subsystem, just one more author-defined record.
+ */
+function addToInventory(
+  inventory: Readonly<Record<string, number>>,
+  itemId: string,
+  amount: number,
+): Readonly<Record<string, number>> {
+  const next = Math.max(0, (inventory[itemId] ?? 0) + amount);
+  return { ...inventory, [itemId]: next };
+}
+
+/**
+ * CRAFT_ITEM looks the recipe up by id and only applies it when every
+ * ingredient is fully available -- an incomplete recipe is simply a no-op,
+ * matching the "no advanced error detection needed" design: the row just
+ * quietly does nothing until the author (or player) has what it needs.
+ */
+function craftRecipe(
+  inventory: Readonly<Record<string, number>>,
+  recipes: readonly GameRecipeDefinition[],
+  recipeId: string | undefined,
+): Readonly<Record<string, number>> {
+  const recipe = recipes.find((candidate) => candidate.recipeId === recipeId);
+  if (recipe === undefined) return inventory;
+  const canCraft = recipe.ingredients.every((ingredient) =>
+    (inventory[ingredient.itemId] ?? 0) >= ingredient.amount
+  );
+  if (!canCraft) return inventory;
+  let next = inventory;
+  for (const ingredient of recipe.ingredients) {
+    next = addToInventory(next, ingredient.itemId, -ingredient.amount);
+  }
+  return addToInventory(next, recipe.result.itemId, recipe.result.amount);
 }
 
 function applyEventCard(
@@ -412,6 +470,31 @@ function applyEventCard(
           ...state.variables,
           state: card.message?.trim() || true,
         },
+      };
+    case "GIVE_ITEM":
+      if (card.itemId === undefined) return state;
+      return {
+        ...state,
+        inventory: addToInventory(
+          state.inventory,
+          card.itemId,
+          Math.max(1, card.amount ?? 1),
+        ),
+      };
+    case "TAKE_ITEM":
+      if (card.itemId === undefined) return state;
+      return {
+        ...state,
+        inventory: addToInventory(
+          state.inventory,
+          card.itemId,
+          -Math.max(1, card.amount ?? 1),
+        ),
+      };
+    case "CRAFT_ITEM":
+      return {
+        ...state,
+        inventory: craftRecipe(state.inventory, state.recipes, card.recipeId),
       };
   }
 }
@@ -476,7 +559,8 @@ function processEventCards(
       : false;
     const rangeTriggered = card.condition === "TOUCH" ||
       card.condition === "ENTER_RANGE" ||
-      card.condition === "REACH_GOAL";
+      card.condition === "REACH_GOAL" ||
+      card.condition === "HAS_ITEM";
     const triggered = rangeTriggered ? near : inputTriggered && near;
     if (!triggered) continue;
     if (rangeTriggered) activeEventIds.push(card.eventId);
@@ -651,6 +735,8 @@ export function createGameGenreRuntime(
     lastAudioTrackId: null,
     sceneComplete: false,
     variables: {},
+    inventory: {},
+    recipes: project.editorTimeline?.recipes ?? [],
   };
   return initialEventState(state);
 }
