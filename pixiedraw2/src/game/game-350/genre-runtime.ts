@@ -8,6 +8,7 @@
  * authoring data.
  */
 import type {
+  BrainComponent,
   GameCamera2DSettings,
   GameEventCard,
   GameObjectRole,
@@ -37,11 +38,31 @@ export interface GameGenreRuntimePoint {
   readonly y: number;
 }
 
+export interface GameGenreRuntimeStatus {
+  readonly hp: number;
+  readonly maxHp: number;
+  readonly attack: number;
+  readonly defense: number;
+}
+
 export interface GameGenreRuntimeObject {
   readonly id: string;
   readonly label: string;
   readonly role: GameObjectRole | undefined;
   readonly position: GameGenreRuntimePoint;
+  /**
+   * Default genre rule engine (decision 2): every NPC-role object gets a
+   * working STATUS (hp/attack/defense) whether or not the author placed a
+   * STATUS node, so contact combat "just works" out of the box. Present for
+   * every non-tilemap object; only NPC-role objects currently fight.
+   */
+  readonly status?: GameGenreRuntimeStatus;
+  /** BRAIN runtime effect (decision 2): drives stepBrain's PURSUE/AVOID. */
+  readonly brain?: {
+    readonly mode: BrainComponent["mode"];
+    readonly speed: number;
+    readonly range: number;
+  };
 }
 
 export interface GameGenreRuntimeInput {
@@ -66,6 +87,7 @@ export interface GameGenreRuntimeState {
   readonly velocity: GameGenreRuntimePoint;
   readonly grounded: boolean;
   readonly health: number;
+  readonly playerStatus: GameGenreRuntimeStatus;
   readonly survivalSeconds: number;
   readonly gameOver: boolean;
   readonly camera2D: GameCamera2DSettings;
@@ -97,6 +119,25 @@ export const DODGE_SURVIVAL_TICKS = DODGE_SURVIVAL_SECONDS * 60;
 const DODGE_MOVE_SPEED = 4.5;
 const DODGE_ENEMY_SPEED = 0.045;
 
+// Default genre rule engine (decision 2): these are the "just works" combat
+// numbers an author gets before ever touching a STATUS node — RPG Maker's
+// Database plays the same role for JRPG math. COMBAT_TICK_INTERVAL throttles
+// contact damage to twice a second instead of every frame (60/s), so simply
+// touching an enemy doesn't delete both sides in a single tick.
+const DEFAULT_NPC_STATUS: GameGenreRuntimeStatus = {
+  hp: 10,
+  maxHp: 10,
+  attack: 2,
+  defense: 0,
+};
+const DEFAULT_PLAYER_STATUS: GameGenreRuntimeStatus = {
+  hp: 10,
+  maxHp: 10,
+  attack: 2,
+  defense: 1,
+};
+const COMBAT_TICK_INTERVAL = 30;
+
 function point(x: number, y: number): GameGenreRuntimePoint {
   return { x, y };
 }
@@ -112,6 +153,129 @@ function isDodgeEnemy(object: GameGenreRuntimeObject): boolean {
 
 function trackRole(track: GameTimelineTrack): GameObjectRole | undefined {
   return track.role;
+}
+
+/**
+ * Default genre rule engine (decision 2): a STATUS node's fields override
+ * the default when present and enabled; an object with no STATUS node still
+ * gets a working one so combat never silently does nothing.
+ */
+function trackStatus(
+  track: GameTimelineTrack | undefined,
+  fallback: GameGenreRuntimeStatus,
+): GameGenreRuntimeStatus {
+  const status = track?.components?.find((component) =>
+    component.type === "STATUS"
+  );
+  if (status?.type !== "STATUS" || !status.enabled) return fallback;
+  return {
+    hp: Math.max(0, status.hp),
+    maxHp: Math.max(1, status.maxHp),
+    attack: Math.max(0, status.attack),
+    defense: Math.max(0, status.defense),
+  };
+}
+
+function trackBrainMode(
+  track: GameTimelineTrack | undefined,
+): { readonly mode: BrainComponent["mode"]; readonly speed: number; readonly range: number } | undefined {
+  const brain = track?.components?.find((component) =>
+    component.type === "BRAIN"
+  );
+  if (brain?.type !== "BRAIN" || !brain.enabled) return undefined;
+  return { mode: brain.mode, speed: brain.speed, range: brain.range };
+}
+
+/**
+ * BRAIN runtime effect (decision 2): PURSUE/AVOID move every NPC-role
+ * object toward or away from the player at the node's own speed, gated by
+ * its range so idle enemies outside range stay put; PATROL/WAIT/AI/
+ * PLAYER_CONTROL are left as authored positions here (PATROL needs a path,
+ * which is a later Phase 3a/5 authoring concern, not this default engine).
+ */
+function stepBrain(
+  object: GameGenreRuntimeObject,
+  playerPosition: GameGenreRuntimePoint,
+  world: { readonly width: number; readonly height: number },
+): GameGenreRuntimeObject {
+  const brain = object.brain;
+  if (brain === undefined) return object;
+  if (brain.mode !== "PURSUE" && brain.mode !== "AVOID") return object;
+  const dx = playerPosition.x - object.position.x;
+  const dy = playerPosition.y - object.position.y;
+  const length = Math.hypot(dx, dy);
+  if (length <= 0.001 || length > brain.range) return object;
+  const speed = Math.max(0, brain.speed) * 0.01;
+  const move = Math.min(speed, length);
+  const direction = brain.mode === "PURSUE" ? 1 : -1;
+  return {
+    ...object,
+    position: point(
+      Math.min(
+        world.width - PLAYER_HALF_WIDTH,
+        Math.max(
+          PLAYER_HALF_WIDTH,
+          object.position.x + (dx / length) * move * direction,
+        ),
+      ),
+      Math.min(
+        world.height - PLAYER_HALF_HEIGHT,
+        Math.max(
+          PLAYER_HALF_HEIGHT,
+          object.position.y + (dy / length) * move * direction,
+        ),
+      ),
+    ),
+  };
+}
+
+/**
+ * Default genre rule engine (decision 2): contact combat that "just works"
+ * without any authored Rule — bump into an NPC and both sides trade
+ * attack-minus-defense damage (floored at 1 so combat always progresses),
+ * an NPC at 0 HP is defeated (removed from the world), and the player at 0
+ * HP ends the run. Throttled to COMBAT_TICK_INTERVAL so standing in contact
+ * doesn't resolve 60 hits a second.
+ */
+function applyContactCombat(
+  playerStatus: GameGenreRuntimeStatus,
+  playerPosition: GameGenreRuntimePoint,
+  objects: readonly GameGenreRuntimeObject[],
+): {
+  readonly objects: readonly GameGenreRuntimeObject[];
+  readonly playerStatus: GameGenreRuntimeStatus;
+} {
+  let nextPlayerStatus = playerStatus;
+  const nextObjects: GameGenreRuntimeObject[] = [];
+  for (const object of objects) {
+    if (
+      object.role !== "NPC" || object.status === undefined ||
+      nextPlayerStatus.hp <= 0
+    ) {
+      nextObjects.push(object);
+      continue;
+    }
+    if (distance(playerPosition, object.position) > TOUCH_DISTANCE) {
+      nextObjects.push(object);
+      continue;
+    }
+    const damageToObject = Math.max(
+      1,
+      nextPlayerStatus.attack - object.status.defense,
+    );
+    const damageToPlayer = Math.max(
+      1,
+      object.status.attack - nextPlayerStatus.defense,
+    );
+    const objectHp = Math.max(0, object.status.hp - damageToObject);
+    nextPlayerStatus = {
+      ...nextPlayerStatus,
+      hp: Math.max(0, nextPlayerStatus.hp - damageToPlayer),
+    };
+    if (objectHp <= 0) continue;
+    nextObjects.push({ ...object, status: { ...object.status, hp: objectHp } });
+  }
+  return { objects: nextObjects, playerStatus: nextPlayerStatus };
 }
 
 function trackPosition(track: GameTimelineTrack): GameGenreRuntimePoint {
@@ -441,12 +605,20 @@ export function createGameGenreRuntime(
       (track as GameTimelineTrack & { readonly active?: boolean }).active !==
         false
     )
-    .map((track) => ({
-      id: track.trackId,
-      label: track.label,
-      role: trackRole(track),
-      position: trackPosition(track),
-    }));
+    .map((track) => {
+      const role = trackRole(track);
+      const brain = trackBrainMode(track);
+      return {
+        id: track.trackId,
+        label: track.label,
+        role,
+        position: trackPosition(track),
+        ...(role === "NPC"
+          ? { status: trackStatus(track, DEFAULT_NPC_STATUS) }
+          : {}),
+        ...(brain === undefined ? {} : { brain }),
+      };
+    });
   const state: GameGenreRuntimeState = {
     schemaVersion: GAME_GENRE_RUNTIME_SCHEMA_VERSION,
     projectId: project.projectId,
@@ -464,6 +636,7 @@ export function createGameGenreRuntime(
     velocity: POINT_ZERO,
     grounded: false,
     health: 3,
+    playerStatus: trackStatus(player, DEFAULT_PLAYER_STATUS),
     survivalSeconds: 0,
     gameOver: false,
     camera2D,
@@ -519,9 +692,12 @@ export function stepGameGenre(
   if (
     state.mode !== "PLAYING" || state.gameOver || state.sceneComplete
   ) return state;
-  const nextObjects = state.runtimeFamily === "DODGE_ARENA"
+  // Legacy DODGE_ARENA default chase stays for any enemy without an
+  // authored BRAIN node (backward compatible); an object with a BRAIN node
+  // is driven by stepBrain below instead, using its own speed/range.
+  const chasedObjects = state.runtimeFamily === "DODGE_ARENA"
     ? state.objects.map((object) => {
-      if (!isDodgeEnemy(object)) return object;
+      if (object.brain !== undefined || !isDodgeEnemy(object)) return object;
       const dx = state.playerPosition.x - object.position.x;
       const dy = state.playerPosition.y - object.position.y;
       const length = Math.hypot(dx, dy);
@@ -542,11 +718,22 @@ export function stepGameGenre(
       };
     })
     : state.objects;
+  // BRAIN runtime effect (decision 2): PURSUE/AVOID objects move toward or
+  // away from the player every tick, in every runtime family.
+  const brainObjects = chasedObjects.map((object) =>
+    stepBrain(object, state.playerPosition, state.world)
+  );
   const movement = stepMovement(state, input);
+  // Default genre rule engine (decision 2): contact combat runs on a
+  // throttled cadence so touching an enemy doesn't resolve 60 hits/second.
+  const combat = (state.tick + 1) % COMBAT_TICK_INTERVAL === 0
+    ? applyContactCombat(state.playerStatus, movement.playerPosition, brainObjects)
+    : { objects: brainObjects, playerStatus: state.playerStatus };
   const nextBase: GameGenreRuntimeState = {
     ...state,
     tick: state.tick + 1,
-    objects: nextObjects,
+    objects: combat.objects,
+    playerStatus: combat.playerStatus,
     playerPosition: movement.playerPosition,
     velocity: movement.velocity,
     grounded: movement.grounded,
@@ -562,6 +749,7 @@ export function stepGameGenre(
     dialogue: input.interact === true || input.tap === true
       ? null
       : state.dialogue,
+    gameOver: state.gameOver || combat.playerStatus.hp <= 0,
   };
   const eventState = processEventCards(nextBase, input);
   if (

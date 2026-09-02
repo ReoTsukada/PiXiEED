@@ -198,7 +198,39 @@ Deno.test("GAME350-GENRE-002 maps touch and damage cards to runtime effects", as
   );
 });
 
-Deno.test("GAME350-GENRE-003 completes the Scroll scene at its goal", async () => {
+Deno.test("GAME350-GENRE-004 default STATUS combat defeats an unarmed NPC over time", async () => {
+  const project = await projectFor("ACTION_PLATFORM");
+  let state = playGameGenre(createGameGenreRuntime(project));
+  // No STATUS node was authored on "enemy" or "hero" in this fixture, so
+  // both sides must run on the default genre rule engine's numbers
+  // (decision 2): hp 10, attack 2, defense 0/1.
+  assert(
+    state.playerStatus.hp === 10 && state.playerStatus.maxHp === 10,
+    "player should start with the default STATUS preset when no node is authored",
+  );
+  const enemyBefore = state.objects.find((object) => object.id === "enemy");
+  assert(
+    enemyBefore?.status?.hp === 10,
+    "an NPC with no STATUS node should still get a default hp of 10",
+  );
+  // The fixture's enemy sits within touch distance of the player's spawn
+  // and never moves, so standing still resolves five throttled combat
+  // ticks (every 30 ticks) well within 160 steps.
+  for (let index = 0; index < 160; index += 1) {
+    state = stepGameGenre(state);
+  }
+  assert(
+    state.objects.find((object) => object.id === "enemy") === undefined,
+    "an NPC reduced to 0 hp should be removed from the world (defeated)",
+  );
+  assert(
+    state.playerStatus.hp > 0 && state.playerStatus.hp < 10,
+    "the player should take contact damage too, but survive a single weak NPC",
+  );
+  assert(!state.gameOver, "losing partial hp to one NPC should not end the run");
+});
+
+Deno.test("GAME350-GENRE-005 completes the Scroll scene at its goal", async () => {
   const project = await projectFor("SCROLL_SIDE");
   let state = playGameGenre(createGameGenreRuntime(project));
   for (let index = 0; index < 90; index += 1) {
