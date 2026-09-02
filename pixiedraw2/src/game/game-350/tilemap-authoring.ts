@@ -93,7 +93,17 @@ function normalizeCells(
     if (cell.triggerId !== undefined && !idIsValid(cell.triggerId)) {
       throw new Error("Tilemap triggerId is invalid.");
     }
-    if (cell.collision === "NONE" && cell.triggerId === undefined) {
+    if (cell.blockTypeId !== undefined && !idIsValid(cell.blockTypeId)) {
+      throw new Error("Tilemap blockTypeId is invalid.");
+    }
+    // Block Building (decision: 2D, existing tilemap): a cell with only a
+    // blockTypeId (no collision, no trigger -- e.g. a walkable decorative
+    // block) is meaningful and must be kept, same as a NONE cell that only
+    // carries a triggerId.
+    if (
+      cell.collision === "NONE" && cell.triggerId === undefined &&
+      cell.blockTypeId === undefined
+    ) {
       throw new Error("An empty tilemap cell must not be persisted.");
     }
     const key = cellKey(cell.x, cell.y);
@@ -103,6 +113,7 @@ function normalizeCells(
       y: cell.y,
       collision: cell.collision,
       ...(cell.triggerId === undefined ? {} : { triggerId: cell.triggerId }),
+      ...(cell.blockTypeId === undefined ? {} : { blockTypeId: cell.blockTypeId }),
     });
   }
   return [...byKey.values()].sort(cellSort);

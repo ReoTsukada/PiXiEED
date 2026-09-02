@@ -195,6 +195,7 @@ const GAME_EVENT_CARD_KEYS = new Set([
   "audioTrackId",
   "itemId",
   "recipeId",
+  "blockTypeId",
 ]);
 
 export function isValidGameSceneRules(value: unknown): value is GameSceneRules {
@@ -258,9 +259,12 @@ export function isValidGameEventCard(value: unknown): value is GameEventCard {
       "GIVE_ITEM",
       "TAKE_ITEM",
       "CRAFT_ITEM",
+      "BREAK_BLOCK",
+      "PLACE_BLOCK",
     ].includes(String(value.action)) &&
     validText(value.message) && validReference(value.audioTrackId) &&
     validReference(value.itemId) && validReference(value.recipeId) &&
+    validReference(value.blockTypeId) &&
     (value.amount === undefined ||
       (typeof value.amount === "number" && Number.isFinite(value.amount) &&
         value.amount >= 0 && value.amount <= 999999));
@@ -318,7 +322,9 @@ export type GameEventAction =
   | "SET_VARIABLE"
   | "GIVE_ITEM"
   | "TAKE_ITEM"
-  | "CRAFT_ITEM";
+  | "CRAFT_ITEM"
+  | "BREAK_BLOCK"
+  | "PLACE_BLOCK";
 
 /**
  * Small, serializable event card.  It is the public authoring shape; the
@@ -340,6 +346,8 @@ export interface GameEventCard {
   readonly itemId?: string;
   /** CRAFT_ITEM action target; looked up in GameEditorTimeline.recipes. */
   readonly recipeId?: string;
+  /** PLACE_BLOCK action target; looked up in GameEditorTimeline.blockTypes. */
+  readonly blockTypeId?: string;
 }
 
 /**
@@ -370,6 +378,22 @@ export interface GameRecipeDefinition {
   readonly result: GameRecipeIngredient;
 }
 
+/**
+ * Block Building (decision: 2D, reuses the existing tilemap -- no 3D voxel
+ * space). An author-defined block type painted onto GameTilemapCell.
+ * BREAK_BLOCK/PLACE_BLOCK reference these by id the same way GIVE_ITEM/
+ * CRAFT_ITEM reference GameItemDefinition/GameRecipeDefinition.
+ */
+export interface GameBlockTypeDefinition {
+  readonly blockTypeId: string;
+  readonly label: string;
+  readonly icon?: AssetRevisionReference;
+  readonly breakable: boolean;
+  /** Item granted to the inventory when this block is broken. */
+  readonly dropItemId?: string;
+  readonly placeable: boolean;
+}
+
 export type GameColliderShape = "BOX" | "CIRCLE" | "CAPSULE";
 export type GameCollisionLayer =
   | "DEFAULT"
@@ -389,6 +413,14 @@ export interface GameTilemapCell {
   readonly y: number;
   readonly collision: GameTilemapCellCollision;
   readonly triggerId?: string;
+  /**
+   * Block Building (decision: reuses the existing tilemap, no new spatial
+   * data structure). Author-defined block type painted at this cell; absent
+   * means "air" as before. A NONE-collision cell may still carry a
+   * blockTypeId (a walkable/decorative block, e.g. grass), so this does not
+   * require collision === "SOLID".
+   */
+  readonly blockTypeId?: string;
 }
 
 export interface GameTilemapDocument {
@@ -767,6 +799,12 @@ export interface GameEditorTimeline {
   readonly items?: readonly GameItemDefinition[];
   /** Author-defined crafting recipes referencing `items` above. */
   readonly recipes?: readonly GameRecipeDefinition[];
+  /**
+   * Block Building (decision: 2D, existing tilemap, no new spatial data
+   * structure). Author-defined block vocabulary referenced by
+   * GameTilemapCell.blockTypeId and by BREAK_BLOCK/PLACE_BLOCK cards.
+   */
+  readonly blockTypes?: readonly GameBlockTypeDefinition[];
 }
 
 export interface GameProject {
@@ -890,6 +928,7 @@ const GAME_TILEMAP_CELL_KEYS = new Set([
   "y",
   "collision",
   "triggerId",
+  "blockTypeId",
 ]);
 
 /** Validate sparse map data before it enters a canonical Project or timeline. */
@@ -923,6 +962,7 @@ export function isValidGameTilemapDocument(
     const y = rawCell.y;
     const collision = rawCell.collision;
     const triggerId = rawCell.triggerId;
+    const blockTypeId = rawCell.blockTypeId;
     if (
       Object.keys(rawCell).some((key) => !GAME_TILEMAP_CELL_KEYS.has(key)) ||
       !Number.isSafeInteger(x) || typeof x !== "number" || x < 0 ||
@@ -933,7 +973,13 @@ export function isValidGameTilemapDocument(
       (triggerId !== undefined &&
         (typeof triggerId !== "string" ||
           !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(triggerId))) ||
-      (collision === "NONE" && triggerId === undefined)
+      (blockTypeId !== undefined &&
+        (typeof blockTypeId !== "string" ||
+          !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(blockTypeId))) ||
+      // A cell with none of the three is indistinguishable from an absent
+      // (air) cell, so the sparse list rejects it to stay canonical.
+      (collision === "NONE" && triggerId === undefined &&
+        blockTypeId === undefined)
     ) {
       return false;
     }
@@ -1139,6 +1185,34 @@ export function isValidGameRecipeDefinition(
       isValidGameRecipeIngredient(ingredient)
     ) &&
     isValidGameRecipeIngredient(value.result);
+}
+
+const GAME_BLOCK_TYPE_DEFINITION_KEYS = new Set([
+  "blockTypeId",
+  "label",
+  "icon",
+  "breakable",
+  "dropItemId",
+  "placeable",
+]);
+
+export function isValidGameBlockTypeDefinition(
+  value: unknown,
+): value is GameBlockTypeDefinition {
+  if (!isRecord(value)) return false;
+  return Object.keys(value).every((key) =>
+    GAME_BLOCK_TYPE_DEFINITION_KEYS.has(key)
+  ) &&
+    typeof value.blockTypeId === "string" &&
+    GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.blockTypeId) &&
+    typeof value.label === "string" && value.label.trim().length > 0 &&
+    value.label.length <= 128 &&
+    (value.icon === undefined || isValidAssetRevisionReference(value.icon)) &&
+    typeof value.breakable === "boolean" &&
+    (value.dropItemId === undefined ||
+      (typeof value.dropItemId === "string" &&
+        GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.dropItemId))) &&
+    typeof value.placeable === "boolean";
 }
 
 function diagnostic(
@@ -2401,6 +2475,11 @@ export function validateGameProject(
             ? timeline.recipes.map((recipe) => recipe.recipeId)
             : [],
         );
+        const blockTypeIds = new Set(
+          Array.isArray(timeline.blockTypes)
+            ? timeline.blockTypes.map((blockType) => blockType.blockTypeId)
+            : [],
+        );
         for (const [index, card] of timeline.eventCards.entries()) {
           for (const [key, trackId] of [
             ["sourceTrackId", card.sourceTrackId],
@@ -2432,6 +2511,18 @@ export function validateGameProject(
                 "MISSING_REFERENCE",
                 `editorTimeline.eventCards[${index}].recipeId`,
                 "Game event card recipe reference is missing.",
+              ),
+            );
+          }
+          if (
+            card.blockTypeId !== undefined &&
+            !blockTypeIds.has(card.blockTypeId)
+          ) {
+            diagnostics.push(
+              diagnostic(
+                "MISSING_REFERENCE",
+                `editorTimeline.eventCards[${index}].blockTypeId`,
+                "Game event card block type reference is missing.",
               ),
             );
           }
@@ -2499,6 +2590,48 @@ export function validateGameProject(
               );
               break;
             }
+          }
+        }
+      }
+    }
+    if (timeline.blockTypes !== undefined) {
+      if (
+        !Array.isArray(timeline.blockTypes) ||
+        timeline.blockTypes.some((blockType) =>
+          !isValidGameBlockTypeDefinition(blockType)
+        )
+      ) {
+        diagnostics.push(
+          diagnostic(
+            "INVALID_PROJECT",
+            "editorTimeline.blockTypes",
+            "Game block type definitions are invalid.",
+          ),
+        );
+      } else {
+        diagnostics.push(
+          ...duplicateDiagnostics(
+            timeline.blockTypes.map((blockType) => blockType.blockTypeId),
+            "editorTimeline.blockTypes.blockTypeId",
+          ),
+        );
+        const knownItemIdsForBlocks = new Set(
+          Array.isArray(timeline.items)
+            ? timeline.items.map((item) => item.itemId)
+            : [],
+        );
+        for (const [index, blockType] of timeline.blockTypes.entries()) {
+          if (
+            blockType.dropItemId !== undefined &&
+            !knownItemIdsForBlocks.has(blockType.dropItemId)
+          ) {
+            diagnostics.push(
+              diagnostic(
+                "MISSING_REFERENCE",
+                `editorTimeline.blockTypes[${index}].dropItemId`,
+                "Game block type drop item reference is missing.",
+              ),
+            );
           }
         }
       }
@@ -2729,6 +2862,15 @@ function canonicalProjectPayload(
             ...recipe,
             ingredients: [...(recipe.ingredients as unknown[])],
           })),
+        }),
+        ...(project.editorTimeline.blockTypes === undefined ? {} : {
+          blockTypes: sortById(
+            project.editorTimeline.blockTypes as unknown as Record<
+              string,
+              unknown
+            >[],
+            "blockTypeId",
+          ),
         }),
       },
     }),

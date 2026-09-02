@@ -6,6 +6,7 @@ import {
 import {
   defaultGameEventCardsForRuntimeFamily,
   sceneRulesForCreationMode,
+  sceneRulesForRuntimeFamily,
 } from "../../src/game/game-350/authoring-model.ts";
 import {
   DEFAULT_CAMERA_2D_SETTINGS,
@@ -382,6 +383,142 @@ Deno.test("GAME350-GENRE-006 GIVE_ITEM/CRAFT_ITEM/HAS_ITEM drive the inventory w
   assert(
     state.sceneComplete,
     "a HAS_ITEM condition should be able to trigger COMPLETE_SCENE the same tick the item is crafted",
+  );
+});
+
+/**
+ * Minimal project for Block Building tests (decision: 2D, existing
+ * tilemap). Gravity/floor collision are switched off (RPG_GRID's rule
+ * preset) so the player sits exactly at its spawn cell every tick -- the
+ * test is about BREAK_BLOCK/PLACE_BLOCK's cell targeting, not physics.
+ */
+async function projectForBlockBuilding() {
+  const template = await createGame351RpgTemplate({
+    projectId: "genre-runtime-block-test",
+    ownerId: "genre-runtime-block-owner",
+    revisionId: "genre-runtime-block-revision",
+  });
+  const width = 8;
+  const height = 8;
+  const tracks: GameTimelineTrack[] = [
+    {
+      trackId: "hero",
+      label: "主人公",
+      kind: "SPRITE",
+      activeFrames: [0],
+      role: "PLAYER",
+      components: [
+        {
+          type: "TRANSFORM",
+          componentId: asComponentId("hero-transform"),
+          x: 2.5,
+          y: 2.5,
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+        },
+      ],
+    },
+    {
+      trackId: "tilemap",
+      label: "ステージ",
+      kind: "TILEMAP",
+      activeFrames: [0],
+      role: "TILEMAP",
+      tilemap: createGameTilemapDocument({
+        mapId: "map:genre-runtime-block-test",
+        width,
+        height,
+        // One breakable "dirt" wall directly beside the player's spawn.
+        cells: [{ x: 3, y: 2, collision: "SOLID", blockTypeId: "dirt" }],
+      }),
+    },
+  ];
+  return createGameProject({
+    ...template.project,
+    editorTimeline: {
+      frameCount: 16,
+      sceneRules: sceneRulesForRuntimeFamily("RPG_GRID"),
+      tracks,
+      items: [
+        { itemId: "dirt_chunk", label: "土", stackable: true, maxStack: 99 },
+      ],
+      blockTypes: [
+        {
+          blockTypeId: "dirt",
+          label: "土ブロック",
+          breakable: true,
+          dropItemId: "dirt_chunk",
+          placeable: true,
+        },
+      ],
+      eventCards: [
+        {
+          eventId: "event:break-dirt",
+          label: "タップでブロックを壊す",
+          enabled: true,
+          who: "PLAYER",
+          condition: "TAP",
+          action: "BREAK_BLOCK",
+        },
+        {
+          eventId: "event:place-dirt",
+          label: "話しかけでブロックを置く",
+          enabled: true,
+          who: "PLAYER",
+          condition: "INTERACT",
+          action: "PLACE_BLOCK",
+          itemId: "dirt_chunk",
+          blockTypeId: "dirt",
+        },
+      ],
+    },
+  }, template.caller);
+}
+
+Deno.test("GAME350-GENRE-007 BREAK_BLOCK/PLACE_BLOCK dig and rebuild the tilemap without a script", async () => {
+  const project = await projectForBlockBuilding();
+  let state = playGameGenre(createGameGenreRuntime(project));
+  assert(
+    state.world.blockTypeIds["3,2"] === "dirt",
+    "the authored dirt cell should seed the runtime's block map",
+  );
+  assert(
+    state.world.solidCells.some((cell) => cell.x === 3 && cell.y === 2),
+    "a SOLID block cell should also seed the collision map",
+  );
+  state = stepGameGenre(state, { tap: true });
+  assert(
+    state.world.blockTypeIds["3,2"] === undefined,
+    "BREAK_BLOCK should clear the nearby breakable block from the map",
+  );
+  assert(
+    !state.world.solidCells.some((cell) => cell.x === 3 && cell.y === 2),
+    "breaking a block should also clear its collision cell",
+  );
+  assert(
+    state.inventory.dirt_chunk === 1,
+    "a breakable block's dropItemId should land in the inventory",
+  );
+  state = stepGameGenre(state, { interact: true });
+  assert(
+    state.inventory.dirt_chunk === 0,
+    "PLACE_BLOCK should consume one of the placed block's item from the inventory",
+  );
+  const placedCells = Object.entries(state.world.blockTypeIds).filter((
+    [, blockTypeId],
+  ) => blockTypeId === "dirt");
+  assert(
+    placedCells.length === 1,
+    "placing a block should add exactly one dirt cell back to the map",
+  );
+  const [placedKey] = placedCells[0];
+  const [placedX, placedY] = placedKey.split(",").map(Number);
+  assert(
+    state.world.solidCells.some((cell) =>
+      cell.x === placedX && cell.y === placedY
+    ),
+    "a newly placed block should also become a collision cell",
   );
 });
 

@@ -9,6 +9,7 @@
  */
 import type {
   BrainComponent,
+  GameBlockTypeDefinition,
   GameCamera2DSettings,
   GameEventCard,
   GameObjectRole,
@@ -98,6 +99,13 @@ export interface GameGenreRuntimeState {
     readonly width: number;
     readonly height: number;
     readonly solidCells: readonly GameGenreRuntimePoint[];
+    /**
+     * Block Building (decision: 2D, reuses this tilemap -- no 3D voxel
+     * space). "x,y" -> blockTypeId for every painted cell (solid or not).
+     * Mutated in place by BREAK_BLOCK/PLACE_BLOCK, together with
+     * solidCells, so collision/landing and rendering stay in sync.
+     */
+    readonly blockTypeIds: Readonly<Record<string, string>>;
   };
   readonly objects: readonly GameGenreRuntimeObject[];
   readonly eventCards: readonly GameEventCard[];
@@ -116,6 +124,8 @@ export interface GameGenreRuntimeState {
   readonly inventory: Readonly<Record<string, number>>;
   /** Author-defined recipes this project's CRAFT_ITEM cards may reference. */
   readonly recipes: readonly GameRecipeDefinition[];
+  /** Author-defined block vocabulary this project's PLACE_BLOCK cards may reference. */
+  readonly blockTypes: readonly GameBlockTypeDefinition[];
 }
 
 const POINT_ZERO: GameGenreRuntimePoint = { x: 0, y: 0 };
@@ -147,9 +157,50 @@ const DEFAULT_PLAYER_STATUS: GameGenreRuntimeStatus = {
   defense: 1,
 };
 const COMBAT_TICK_INTERVAL = 30;
+// Block Building (decision: 2D, existing tilemap): how far from the
+// player's center BREAK_BLOCK/PLACE_BLOCK will reach -- "the cell you are
+// standing on or right next to", matching the design's "faced/touched
+// cell" default without needing a new facing-direction concept.
+const BLOCK_REACH_DISTANCE = 1.4;
 
 function point(x: number, y: number): GameGenreRuntimePoint {
   return { x, y };
+}
+
+function cellKey(x: number, y: number): string {
+  return `${x},${y}`;
+}
+
+/**
+ * The player's own grid cell plus its four neighbors, closest first. Both
+ * BREAK_BLOCK and PLACE_BLOCK pick their target from this small, fixed
+ * candidate set rather than scanning the whole map.
+ */
+function nearbyCellCandidates(
+  playerPosition: GameGenreRuntimePoint,
+  world: GameGenreRuntimeState["world"],
+): GameGenreRuntimePoint[] {
+  const cx = Math.floor(playerPosition.x);
+  const cy = Math.floor(playerPosition.y);
+  const candidates: GameGenreRuntimePoint[] = [
+    point(cx, cy),
+    point(cx - 1, cy),
+    point(cx + 1, cy),
+    point(cx, cy - 1),
+    point(cx, cy + 1),
+  ].filter((cell) =>
+    cell.x >= 0 && cell.x < world.width && cell.y >= 0 && cell.y < world.height
+  );
+  return candidates
+    .map((cell) => ({
+      cell,
+      // Compare against the cell's center, not its corner, for a fair
+      // "which cell is actually closest to me" ordering.
+      d: distance(playerPosition, point(cell.x + 0.5, cell.y + 0.5)),
+    }))
+    .filter(({ d }) => d <= BLOCK_REACH_DISTANCE)
+    .sort((a, b) => a.d - b.d)
+    .map(({ cell }) => cell);
 }
 
 function distance(left: GameGenreRuntimePoint, right: GameGenreRuntimePoint): number {
@@ -310,6 +361,7 @@ function mapFromTracks(tracks: readonly GameTimelineTrack[]): {
   readonly width: number;
   readonly height: number;
   readonly solidCells: readonly GameGenreRuntimePoint[];
+  readonly blockTypeIds: Readonly<Record<string, string>>;
 } {
   const mapTrack = tracks.find((track) =>
     track.role === "TILEMAP" || track.kind === "TILEMAP"
@@ -327,7 +379,13 @@ function mapFromTracks(tracks: readonly GameTimelineTrack[]): {
     .filter((cell) => cell.collision === "SOLID")
     .map((cell) => point(cell.x, cell.y)) ??
     Array.from({ length: width }, (_, x) => point(x, height - 1));
-  return { width, height, solidCells };
+  const blockTypeIds: Record<string, string> = {};
+  for (const cell of document?.cells ?? []) {
+    if (cell.blockTypeId !== undefined) {
+      blockTypeIds[`${cell.x},${cell.y}`] = cell.blockTypeId;
+    }
+  }
+  return { width, height, solidCells, blockTypeIds };
 }
 
 function objectById(
@@ -496,6 +554,69 @@ function applyEventCard(
         ...state,
         inventory: craftRecipe(state.inventory, state.recipes, card.recipeId),
       };
+    case "BREAK_BLOCK": {
+      // Default target: the nearest of the player's own cell and its four
+      // neighbors that actually carries a *breakable* block -- a plain
+      // legacy floor cell with no authored block type is left alone, so
+      // projects that never touch Block Building are unaffected.
+      for (const cell of nearbyCellCandidates(state.playerPosition, state.world)) {
+        const key = cellKey(cell.x, cell.y);
+        const blockTypeId = state.world.blockTypeIds[key];
+        if (blockTypeId === undefined) continue;
+        const blockType = state.blockTypes.find((candidate) =>
+          candidate.blockTypeId === blockTypeId
+        );
+        if (blockType === undefined || !blockType.breakable) continue;
+        const nextBlockTypeIds = { ...state.world.blockTypeIds };
+        delete nextBlockTypeIds[key];
+        return {
+          ...state,
+          world: {
+            ...state.world,
+            blockTypeIds: nextBlockTypeIds,
+            solidCells: state.world.solidCells.filter((solid) =>
+              !(solid.x === cell.x && solid.y === cell.y)
+            ),
+          },
+          inventory: blockType.dropItemId === undefined
+            ? state.inventory
+            : addToInventory(state.inventory, blockType.dropItemId, 1),
+        };
+      }
+      return state;
+    }
+    case "PLACE_BLOCK": {
+      if (card.blockTypeId === undefined || card.itemId === undefined) {
+        return state;
+      }
+      const blockType = state.blockTypes.find((candidate) =>
+        candidate.blockTypeId === card.blockTypeId
+      );
+      if (
+        blockType === undefined || !blockType.placeable ||
+        (state.inventory[card.itemId] ?? 0) < 1
+      ) {
+        return state;
+      }
+      const playerCellX = Math.floor(state.playerPosition.x);
+      const playerCellY = Math.floor(state.playerPosition.y);
+      for (const cell of nearbyCellCandidates(state.playerPosition, state.world)) {
+        // Never bury the player's own standing cell under a new block.
+        if (cell.x === playerCellX && cell.y === playerCellY) continue;
+        const key = cellKey(cell.x, cell.y);
+        if (state.world.blockTypeIds[key] !== undefined) continue;
+        return {
+          ...state,
+          world: {
+            ...state.world,
+            blockTypeIds: { ...state.world.blockTypeIds, [key]: card.blockTypeId },
+            solidCells: [...state.world.solidCells, cell],
+          },
+          inventory: addToInventory(state.inventory, card.itemId, -1),
+        };
+      }
+      return state;
+    }
   }
 }
 
@@ -737,6 +858,7 @@ export function createGameGenreRuntime(
     variables: {},
     inventory: {},
     recipes: project.editorTimeline?.recipes ?? [],
+    blockTypes: project.editorTimeline?.blockTypes ?? [],
   };
   return initialEventState(state);
 }
