@@ -4,6 +4,7 @@ import {
   isSelectedGameCreationMode,
   normalizeGameCreationMode,
 } from "../../src/game/game-350/creation-guide.ts";
+import { resolveDesktopCreatorModeProfile } from "../../src/wp180-workspace-contracts.ts";
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
@@ -111,6 +112,7 @@ Deno.test("GAME350-CREATION-004 wires NEW through the lazy Game bootstrap", asyn
   const workspace = await Deno.readTextFile(
     new URL("../../src/wp180-workspace-ui.ts", import.meta.url),
   );
+  const compactWorkspace = workspace.replace(/\s+/gu, " ");
   assert(
     html.includes('id="draw2GameCreationModeTemplate"') &&
       html.includes('id="draw2GameCreationModeAction"') &&
@@ -125,9 +127,11 @@ Deno.test("GAME350-CREATION-004 wires NEW through the lazy Game bootstrap", asyn
   );
   assert(
     workspace.includes('blank: options.initialProjectMode === "NEW"') &&
-      workspace.includes(
-        'gameCreationModePromptVisible ? "game-scene" : "preview"',
-      ),
-    "NEW must restore blank Game state and land on the creation Scene",
+      compactWorkspace.includes(
+        'gameCreationModePromptVisible ? "game-scene" : currentDesktopModeProfile().defaultPanel',
+      ) &&
+      resolveDesktopCreatorModeProfile("GAME").defaultPanel ===
+        "game-inspector",
+    "NEW must restore blank Game state to Scene while existing Games use the GAME profile default",
   );
 });

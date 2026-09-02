@@ -54,7 +54,7 @@ var DESKTOP_CREATOR_MODE_PROFILES = {
   GAME: {
     mode: "GAME",
     family: "game",
-    defaultPanel: "preview",
+    defaultPanel: "game-inspector",
     allowedPanels: [
       "preview",
       "game-scene",
@@ -1441,17 +1441,17 @@ function parseTrack(bytes, trackIndex) {
   };
   while (reader.remaining > 0) {
     tick += readVariableLength(reader);
-    let status = reader.byte();
-    if (status < 128) {
+    let status2 = reader.byte();
+    if (status2 < 128) {
       if (runningStatus < 128) {
         throw new RangeError("MIDI running status is missing.");
       }
       reader.seek(reader.position - 1);
-      status = runningStatus;
-    } else if (status < 240) {
-      runningStatus = status;
+      status2 = runningStatus;
+    } else if (status2 < 240) {
+      runningStatus = status2;
     }
-    if (status === 255) {
+    if (status2 === 255) {
       const metaType = reader.byte();
       const length = readVariableLength(reader);
       const payload = reader.bytesOf(length);
@@ -1471,21 +1471,21 @@ function parseTrack(bytes, trackIndex) {
       }
       continue;
     }
-    if (status === 240 || status === 247) {
+    if (status2 === 240 || status2 === 247) {
       const length = readVariableLength(reader);
       reader.bytesOf(length);
       continue;
     }
-    if (status >= 240) {
-      if (status === 241 || status === 243 || status === 246) reader.byte();
-      if (status === 242) {
+    if (status2 >= 240) {
+      if (status2 === 241 || status2 === 243 || status2 === 246) reader.byte();
+      if (status2 === 242) {
         reader.byte();
         reader.byte();
       }
       continue;
     }
-    const eventType = status & 240;
-    channel = status & 15;
+    const eventType = status2 & 240;
+    channel = status2 & 15;
     if (eventType === 192 || eventType === 208) {
       const value = reader.byte();
       if (eventType === 192) program = value & 127;
@@ -1793,15 +1793,15 @@ function portsFromAccess(access) {
 }
 function decodeMessage(data) {
   if (data.length < 3) return void 0;
-  const status = data[0];
+  const status2 = data[0];
   const data1 = data[1];
   const data2 = data[2];
-  const type = status & 240;
+  const type = status2 & 240;
   if (type !== 128 && type !== 144) return void 0;
   const velocity = Math.min(127, Math.max(0, data2 & 127));
   return {
     type: type === 128 || velocity === 0 ? "noteoff" : "noteon",
-    channel: status & 15,
+    channel: status2 & 15,
     pitchMidi: Math.min(127, Math.max(0, data1 & 127)),
     velocity
   };
@@ -3981,12 +3981,12 @@ function normalizeWorkspaceProjectId(value, fallback = asWorkspaceProjectId(DEFA
     return fallback;
   }
 }
-function moduleManifest(surface, projectId, status = "EMPTY") {
+function moduleManifest(surface, projectId, status2 = "EMPTY") {
   return {
     stateRef: `${surface}:${projectId}:state`,
     checkpointRef: `${surface}:${projectId}:checkpoint`,
     journalRef: `${surface}:${projectId}:journal`,
-    status,
+    status: status2,
     revision: 0,
     stateHash: null,
     savedAt: null
@@ -6635,11 +6635,25 @@ function validEditorComponent(component) {
         "attack",
         "defense",
         "level"
-      ].every((key) => typeof value[key] === "number" && Number.isFinite(value[key])) && typeof value.enabled === "boolean";
+      ].every((key2) => typeof value[key2] === "number" && Number.isFinite(value[key2])) && typeof value.enabled === "boolean";
     case "SKILL":
-      return ["ATTACK", "SHOOT", "MAGIC", "DASH_ATTACK", "HEAL", "SHIELD"].includes(String(value.kind)) && typeof value.power === "number" && Number.isFinite(value.power) && typeof value.cooldown === "number" && Number.isFinite(value.cooldown) && Number(value.cooldown) >= 0 && typeof value.enabled === "boolean";
+      return [
+        "ATTACK",
+        "SHOOT",
+        "MAGIC",
+        "DASH_ATTACK",
+        "HEAL",
+        "SHIELD"
+      ].includes(String(value.kind)) && typeof value.power === "number" && Number.isFinite(value.power) && typeof value.cooldown === "number" && Number.isFinite(value.cooldown) && Number(value.cooldown) >= 0 && typeof value.enabled === "boolean";
     case "BRAIN":
-      return ["PLAYER_CONTROL", "AI", "PATROL", "PURSUE", "AVOID", "WAIT"].includes(String(value.mode)) && typeof value.speed === "number" && Number.isFinite(value.speed) && Number(value.speed) >= 0 && typeof value.range === "number" && Number.isFinite(value.range) && Number(value.range) >= 0 && typeof value.enabled === "boolean";
+      return [
+        "PLAYER_CONTROL",
+        "AI",
+        "PATROL",
+        "PURSUE",
+        "AVOID",
+        "WAIT"
+      ].includes(String(value.mode)) && typeof value.speed === "number" && Number.isFinite(value.speed) && Number(value.speed) >= 0 && typeof value.range === "number" && Number.isFinite(value.range) && Number(value.range) >= 0 && typeof value.enabled === "boolean";
     default:
       return false;
   }
@@ -15092,16 +15106,16 @@ function unavailable(operation, flag) {
     status: flag === "off" ? "OFF" : "UNKNOWN_FLAG"
   };
 }
-function failure9(operation, status, reason, sequence) {
+function failure9(operation, status2, reason, sequence) {
   return sequence === void 0 ? {
     operationId: operation.operationId,
     type: operation.type,
-    status,
+    status: status2,
     reason
   } : {
     operationId: operation.operationId,
     type: operation.type,
-    status,
+    status: status2,
     reason,
     sequence
   };
@@ -18050,6 +18064,9 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
   const draw2GamePhysicsStatus = query(documentRef, "#draw2GamePhysicsStatus");
   const draw2GameComponents = query(documentRef, "#draw2GameComponents");
   const draw2GameNodeBox = query(documentRef, "#draw2GameNodeBox");
+  const draw2GameNodeBoxSearch = query(documentRef, "#draw2GameNodeBoxSearch");
+  const draw2GameNodeBoxEmpty = query(documentRef, "#draw2GameNodeBoxEmpty");
+  const draw2GameNodeBoxHierarchyCta = query(documentRef, "#draw2GameNodeBoxHierarchyCta");
   const draw2GameComponentsStatus = query(documentRef, "#draw2GameComponentsStatus");
   const draw2GameComponentsDropHint = query(documentRef, "#draw2GameComponentsDropHint");
   const draw2GameLeftDockTabHierarchy = query(documentRef, "#draw2GameLeftDockTabHierarchy");
@@ -18500,10 +18517,11 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
   let gameBehaviorSources = [];
   let gameTemplateInstances = [];
   let gameTemplateCategory = "ALL";
-  let gameRailTab = "SCENE";
+  let gameRailTab = "ASSETS";
   let gameAssetBrowserQuery = "";
   let gameAssetBrowserSource = "ALL";
   let gameHierarchyBrowserQuery = "";
+  let gameNodeBoxQuery = "";
   let gameSceneViewMode = "SCENE";
   const gameSceneSpriteDataCache = /* @__PURE__ */ new Map();
   let selectedGameAnimationClipId;
@@ -18935,7 +18953,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     }
     return translateDraw2Text(value, locale);
   };
-  let modeDeckActiveTab = "game-scene";
+  let modeDeckActiveTab = "game-assets";
   let audioEditorActiveTab = "ROLL";
   let audioEditorPinned = false;
   let audioRightActiveTab = "inspector";
@@ -22152,7 +22170,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       return module.journalWorkspaceNoteUpsert(current, audioWorkspaceNoteInput(note), nextAudioWorkspaceMutation(reason));
     });
   };
-  const commitPianoRollAssist = (transformed, reason, status) => {
+  const commitPianoRollAssist = (transformed, reason, status2) => {
     if (transformed.length === 0) {
       setModeDeckStatus("audio", "\u3053\u306E\u697D\u5668\u30EC\u30FC\u30F3\u306B\u306F\u9069\u7528\u3067\u304D\u308B\u30CE\u30FC\u30C8\u304C\u3042\u308A\u307E\u305B\u3093");
       return;
@@ -22186,7 +22204,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
         diagnostics: []
       };
     }).then((committed) => {
-      setModeDeckStatus("audio", committed ? status + " \xB7 Tick\u57FA\u6E96\u3067\u4FDD\u5B58\u3057\u307E\u3057\u305F" : status + " \xB7 \u4FDD\u5B58\u306B\u5931\u6557\u3057\u307E\u3057\u305F");
+      setModeDeckStatus("audio", committed ? status2 + " \xB7 Tick\u57FA\u6E96\u3067\u4FDD\u5B58\u3057\u307E\u3057\u305F" : status2 + " \xB7 \u4FDD\u5B58\u306B\u5931\u6557\u3057\u307E\u3057\u305F");
     });
   };
   const applyPianoRollSwing = () => {
@@ -26233,7 +26251,10 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
           context.fillStyle = "rgba(116,224,207,.16)";
           context.fillRect(rectLeft, rectTop, rectRight - rectLeft, rectBottom - rectTop);
           context.strokeStyle = "#74e0cf";
-          context.setLineDash([4, 3]);
+          context.setLineDash([
+            4,
+            3
+          ]);
           context.strokeRect(rectLeft + 0.5, rectTop + 0.5, Math.max(1, rectRight - rectLeft - 1), Math.max(1, rectBottom - rectTop - 1));
           context.setLineDash([]);
         }
@@ -26639,7 +26660,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       trackId
     ]);
   };
-  const removeAudioMidiNote = (note, status = "MIDI note deleted \xB7 Undo restores it") => {
+  const removeAudioMidiNote = (note, status2 = "MIDI note deleted \xB7 Undo restores it") => {
     if (audioMidiNotes.get(note.id) !== note) return;
     audioMidiNotes.delete(note.id);
     unindexAudioNote(note);
@@ -26647,7 +26668,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     void queueAudioWorkspaceMutation((module, session) => module.journalWorkspaceNoteRemove(session, note.id, nextAudioWorkspaceMutation("note-delete")));
     refreshAudioNoteVisuals(void 0, note);
     syncAudioMidiStatus();
-    syncAudioRightInspector(`${pitchLabel(note.pitchMidi)} \xB7 F${note.startFrame + 1}`, status);
+    syncAudioRightInspector(`${pitchLabel(note.pitchMidi)} \xB7 F${note.startFrame + 1}`, status2);
     setModeDeckStatus("audio", `${pitchLabel(note.pitchMidi)} \xB7 F${note.startFrame + 1} \xB7 note deleted`);
   };
   const duplicateAudioMidiNote = (note) => {
@@ -26899,16 +26920,19 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       }
     }
   };
-  const eraseAudioMidiCellAt = (target, state) => {
+  const eraseAudioMidiCellAt = (target, state2) => {
     const note = audioNoteAtFrame(target.pitchMidi, target.frame);
-    if (note === void 0 || state.erasedIds.has(note.id)) return;
-    state.erasedIds.add(note.id);
+    if (note === void 0 || state2.erasedIds.has(note.id)) return;
+    state2.erasedIds.add(note.id);
     removeAudioMidiNote(note, "MIDI note erased");
   };
   const beginAudioMidiErase = (event) => {
     const pointer = event;
     const pointerId = Number.isFinite(pointer.pointerId) ? pointer.pointerId : -1;
-    audioMidiErase = { pointerId, erasedIds: /* @__PURE__ */ new Set() };
+    audioMidiErase = {
+      pointerId,
+      erasedIds: /* @__PURE__ */ new Set()
+    };
     audioMidiGrid?.classList.add("is-midi-erasing");
     if (pointerId >= 0) audioMidiGrid?.setPointerCapture?.(pointerId);
     const target = audioMidiCellFromPointer(event);
@@ -26916,19 +26940,19 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
   };
   const updateAudioMidiErase = (event) => {
     const pointer = event;
-    const state = audioMidiErase;
+    const state2 = audioMidiErase;
     const pointerId = Number.isFinite(pointer.pointerId) ? pointer.pointerId : -1;
-    if (state === void 0 || state.pointerId !== pointerId) return;
+    if (state2 === void 0 || state2.pointerId !== pointerId) return;
     const target = audioMidiCellFromPointer(event);
     if (target === null) return;
-    eraseAudioMidiCellAt(target, state);
+    eraseAudioMidiCellAt(target, state2);
     pointer.preventDefault();
   };
   const finishAudioMidiErase = (event) => {
     const pointer = event;
-    const state = audioMidiErase;
+    const state2 = audioMidiErase;
     const pointerId = Number.isFinite(pointer.pointerId) ? pointer.pointerId : -1;
-    if (state === void 0 || state.pointerId !== pointerId) return;
+    if (state2 === void 0 || state2.pointerId !== pointerId) return;
     audioMidiErase = void 0;
     audioMidiGrid?.classList.remove("is-midi-erasing");
     audioMidiIgnoreClick = true;
@@ -26957,22 +26981,22 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
   };
   const updateAudioMidiMarquee = (event) => {
     const pointer = event;
-    const state = audioMidiMarquee;
+    const state2 = audioMidiMarquee;
     const pointerId = Number.isFinite(pointer.pointerId) ? pointer.pointerId : -1;
-    if (state === void 0 || state.pointerId !== pointerId) return;
+    if (state2 === void 0 || state2.pointerId !== pointerId) return;
     const target = audioMidiCellFromPointer(event);
     if (target === null) return;
-    state.currentTick = target.tick;
-    state.currentPitchIndex = audioMidiPitchIndexFromMidi(target.pitchMidi);
+    state2.currentTick = target.tick;
+    state2.currentPitchIndex = audioMidiPitchIndexFromMidi(target.pitchMidi);
     audioMidiGridLastRenderKey = void 0;
     if (audioSurfacesReady) renderAudioMidiGrid();
     pointer.preventDefault();
   };
   const finishAudioMidiMarquee = (event) => {
     const pointer = event;
-    const state = audioMidiMarquee;
+    const state2 = audioMidiMarquee;
     const pointerId = Number.isFinite(pointer.pointerId) ? pointer.pointerId : -1;
-    if (state === void 0 || state.pointerId !== pointerId) return;
+    if (state2 === void 0 || state2.pointerId !== pointerId) return;
     audioMidiMarquee = void 0;
     audioMidiGrid?.classList.remove("is-midi-marquee");
     audioMidiIgnoreClick = true;
@@ -26980,10 +27004,10 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       if (pointerId >= 0) audioMidiGrid?.releasePointerCapture?.(pointerId);
     } catch {
     }
-    const tickLo = Math.min(state.startTick, state.currentTick);
-    const tickHi = Math.max(state.startTick, state.currentTick);
-    const pitchLo = Math.min(state.startPitchIndex, state.currentPitchIndex);
-    const pitchHi = Math.max(state.startPitchIndex, state.currentPitchIndex);
+    const tickLo = Math.min(state2.startTick, state2.currentTick);
+    const tickHi = Math.max(state2.startTick, state2.currentTick);
+    const pitchLo = Math.min(state2.startPitchIndex, state2.currentPitchIndex);
+    const pitchHi = Math.max(state2.startPitchIndex, state2.currentPitchIndex);
     const clock = audioPianoRollClock();
     const matched = /* @__PURE__ */ new Set();
     for (const note of audioMidiNotes.values()) {
@@ -26996,14 +27020,13 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       matched.add(note.id);
     }
     audioMultiSelectedNoteKeys = matched;
-    audioSelectedNoteKey = matched.size === 1 ? [...matched][0] : void 0;
+    audioSelectedNoteKey = matched.size === 1 ? [
+      ...matched
+    ][0] : void 0;
     audioMidiGridLastRenderKey = void 0;
     if (audioSurfacesReady) renderAudioMidiGrid();
     syncAudioMidiStatus();
-    setModeDeckStatus(
-      "audio",
-      matched.size > 0 ? `${matched.size} note${matched.size === 1 ? "" : "s"} selected · Delete to remove` : "No notes in selection"
-    );
+    setModeDeckStatus("audio", matched.size > 0 ? `${matched.size} note${matched.size === 1 ? "" : "s"} selected \xB7 Delete to remove` : "No notes in selection");
   };
   audioMidiGrid?.addEventListener("pointerdown", beginAudioMidiDrag);
   audioMidiGrid?.addEventListener("pointermove", updateAudioMidiDrag);
@@ -27111,7 +27134,9 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       event.preventDefault();
       event.stopPropagation();
       if (audioMultiSelectedNoteKeys.size > 0) {
-        const ids = [...audioMultiSelectedNoteKeys];
+        const ids = [
+          ...audioMultiSelectedNoteKeys
+        ];
         audioMultiSelectedNoteKeys = /* @__PURE__ */ new Set();
         for (const id of ids) {
           const note = audioMidiNotes.get(id);
@@ -27209,10 +27234,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     if (audioMidiGrid !== void 0) {
       audioMidiGrid.dataset.audioMidiTool = tool;
     }
-    setModeDeckStatus(
-      "audio",
-      tool === "pen" ? "Pen · click or drag to place/lengthen notes" : tool === "eraser" ? "Eraser · click or drag to remove notes" : "Select · drag a rectangle to select notes"
-    );
+    setModeDeckStatus("audio", tool === "pen" ? "Pen \xB7 click or drag to place/lengthen notes" : tool === "eraser" ? "Eraser \xB7 click or drag to remove notes" : "Select \xB7 drag a rectangle to select notes");
   };
   for (const button of audioMidiToolButtons) {
     button.addEventListener("click", () => {
@@ -27409,7 +27431,6 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     if (trackLabel !== null && gameAssetTracks.contains(trackLabel) && trackLabel.dataset.modeDeckTrackLabel !== void 0) {
       selectedGameTrackId = trackLabel.dataset.modeDeckTrackLabel;
       const track = gameDeckTracks.find((candidate) => candidate.id === selectedGameTrackId);
-      if (track !== void 0) focusGameAnimationForTrack(track);
       renderGameCustomPanels();
     }
     selectModeDeckCell(event, "game");
@@ -29464,6 +29485,45 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       button.setAttribute("aria-selected", String(selected));
       button.tabIndex = selected ? 0 : -1;
     }
+    const gameDeckHeading = {
+      "game-scene": {
+        eyebrow: "GAME SCENE",
+        title: "\u30B7\u30FC\u30F3\u30D3\u30E5\u30FC",
+        description: "\u30B7\u30FC\u30F3\u306B\u914D\u7F6E\u3057\u305F\u30AA\u30D6\u30B8\u30A7\u30AF\u30C8\u3092\u7DE8\u96C6"
+      },
+      "game-assets": {
+        eyebrow: "GAME INVENTORY",
+        title: "\u30A4\u30F3\u30D9\u30F3\u30C8\u30EA",
+        description: "Game\u3067\u4F7F\u3046\u30AA\u30D6\u30B8\u30A7\u30AF\u30C8\u3084\u30A8\u30D5\u30A7\u30AF\u30C8\u3092\u914D\u7F6E"
+      },
+      "game-animation": {
+        eyebrow: "GAME ANIMATION",
+        title: "\u30A2\u30CB\u30E1\u30FC\u30B7\u30E7\u30F3",
+        description: "Character\u3084Sprite\u306E\u52D5\u304D\u3092\u7BA1\u7406"
+      },
+      "game-data": {
+        eyebrow: "GAME DATA",
+        title: "\u30B2\u30FC\u30E0\u30C7\u30FC\u30BF",
+        description: "Game\u30AA\u30D6\u30B8\u30A7\u30AF\u30C8\u306E\u6570\u5024\u3068\u30C6\u30F3\u30D7\u30EC\u30FC\u30C8"
+      },
+      "game-events": {
+        eyebrow: "GAME EVENTS",
+        title: "\u30A4\u30D9\u30F3\u30C8",
+        description: "\u30CE\u30FC\u30C9\u3067\u30B2\u30FC\u30E0\u306E\u51E6\u7406\u3092\u7D44\u307F\u7ACB\u3066"
+      }
+    };
+    const selectedGameDeckHeading = gameDeckHeading[tab];
+    if (selectedGameDeckHeading !== void 0) {
+      if (modeTimelineDeckEyebrow !== void 0) {
+        modeTimelineDeckEyebrow.textContent = selectedGameDeckHeading.eyebrow;
+      }
+      if (modeTimelineDeckTitle !== void 0) {
+        modeTimelineDeckTitle.textContent = selectedGameDeckHeading.title;
+      }
+      if (modeTimelineDeckDescription !== void 0) {
+        modeTimelineDeckDescription.textContent = selectedGameDeckHeading.description;
+      }
+    }
     const selectedGameRailTab = gameRailTabForModeDeck(tab);
     if (selectedGameRailTab !== void 0) {
       gameRailTab = selectedGameRailTab;
@@ -29831,9 +29891,24 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     button.addEventListener("click", () => {
       const tab = button.dataset.modeDeckTab;
       if (tab !== void 0) selectModeDeckTab(tab);
-      if (tab === "game-assets" && root.dataset.creatorMode === "GAME") {
-        windowRef.setTimeout(() => setPanel("game-assets"), 0);
-      }
+    });
+  }
+  const visibleGameModeDeckTabs = () => modeTimelineDeckTabs.filter((button) => !button.hidden && gameRailTabForModeDeck(button.dataset.modeDeckTab ?? "") !== void 0);
+  for (const button of modeTimelineDeckTabs.filter((candidate) => gameRailTabForModeDeck(candidate.dataset.modeDeckTab ?? "") !== void 0)) {
+    button.addEventListener("keydown", (event) => {
+      if (button.hidden) return;
+      const key2 = event.key;
+      if (key2 !== "ArrowLeft" && key2 !== "ArrowRight" && key2 !== "ArrowUp" && key2 !== "ArrowDown" && key2 !== "Home" && key2 !== "End") return;
+      const tabs2 = visibleGameModeDeckTabs();
+      const currentIndex = tabs2.indexOf(button);
+      if (currentIndex < 0 || tabs2.length === 0) return;
+      const nextIndex = key2 === "Home" ? 0 : key2 === "End" ? tabs2.length - 1 : (currentIndex + (key2 === "ArrowLeft" || key2 === "ArrowUp" ? -1 : 1) + tabs2.length) % tabs2.length;
+      const nextTab = tabs2[nextIndex];
+      const nextTabId = nextTab?.dataset.modeDeckTab;
+      if (nextTab === void 0 || nextTabId === void 0) return;
+      event.preventDefault();
+      selectModeDeckTab(nextTabId);
+      nextTab.focus();
     });
   }
   audioAdvancedToggle?.addEventListener("click", () => {
@@ -29955,7 +30030,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       modeDeckAudio.hidden = !audioSurface;
       modeDeckAudio.inert = !audioSurface;
     }
-    const firstTab = gameSurface ? "game-scene" : "audio-timeline";
+    const firstTab = gameSurface ? "game-assets" : "audio-timeline";
     const audioBottomTabs = /* @__PURE__ */ new Set([
       "audio-timeline",
       "audio-mixer",
@@ -30810,7 +30885,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       else if (projectedMode === "ASSET") {
         setPanel("assets");
       } else if (projectedMode === "GAME") {
-        setPanel(gameCreationModePromptVisible ? "game-scene" : "preview");
+        setPanel(gameCreationModePromptVisible ? "game-scene" : currentDesktopModeProfile().defaultPanel);
       } else if (projectedMode === "AUDIO" && audioFeatureFlag === "on") {
         setPanel("audio");
       } else if (projectedMode === "EXPORT") setPanel("export");
@@ -33067,6 +33142,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     const detail = documentRef.createElement("small");
     const components = track.components ?? defaultGameObjectComponents(track.id, track.kind);
     const role = track.role ?? gameObjectRoleFor(track.id, track.kind);
+    button.dataset.gameTrackRole = role.toLocaleLowerCase();
     detail.textContent = `${gameRoleLabel(role)} \xB7 ${track.active === false ? "\u7121\u52B9" : "Active"} \xB7 ${components.length}\u500B\u306E\u6A5F\u80FD`;
     const eventCount = gameEventCards.filter((card) => card.sourceTrackId === track.id || card.targetTrackId === track.id).length;
     detail.textContent = gameRoleLabel(role) + " \xB7 " + gameRoleCapabilitySummary(track) + " \xB7 " + (track.active === false ? "\u7121\u52B9" : "\u6709\u52B9") + (eventCount === 0 ? "" : " \xB7 \u30A4\u30D9\u30F3\u30C8" + eventCount + "\u4EF6");
@@ -33086,7 +33162,6 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       const source = gameBehaviorSources.find((candidate) => candidate.behaviorId === gameBehaviorIdForTrack(track.id));
       gameLogicMode = source?.mode ?? "SIMPLE";
       gameLogicModeBehaviorId = gameBehaviorIdForTrack(track.id);
-      focusGameAnimationForTrack(track);
       renderGameCustomPanels();
       if (className === "draw2-game-hierarchy-entry" || className === "draw2-game-scene-entry") setPanel("game-inspector");
     });
@@ -33271,7 +33346,6 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       const source = gameBehaviorSources.find((candidate) => candidate.behaviorId === gameBehaviorIdForTrack(track.id));
       gameLogicMode = source?.mode ?? "SIMPLE";
       gameLogicModeBehaviorId = gameBehaviorIdForTrack(track.id);
-      focusGameAnimationForTrack(track);
       renderGameCustomPanels();
       setPanel("game-inspector");
     };
@@ -33592,10 +33666,22 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
         selectionBox.setAttribute("class", "draw2-game-scene-selection-box");
         group.append(selectionBox);
         const handlePositions = [
-          [x - selectionHalfWidth - selectionPadding, y - selectionHalfHeight - selectionPadding],
-          [x + selectionHalfWidth + selectionPadding, y - selectionHalfHeight - selectionPadding],
-          [x - selectionHalfWidth - selectionPadding, y + selectionHalfHeight + selectionPadding],
-          [x + selectionHalfWidth + selectionPadding, y + selectionHalfHeight + selectionPadding]
+          [
+            x - selectionHalfWidth - selectionPadding,
+            y - selectionHalfHeight - selectionPadding
+          ],
+          [
+            x + selectionHalfWidth + selectionPadding,
+            y - selectionHalfHeight - selectionPadding
+          ],
+          [
+            x - selectionHalfWidth - selectionPadding,
+            y + selectionHalfHeight + selectionPadding
+          ],
+          [
+            x + selectionHalfWidth + selectionPadding,
+            y + selectionHalfHeight + selectionPadding
+          ]
         ];
         for (const [handleX, handleY] of handlePositions) {
           const handle = createSvgElement("rect");
@@ -33631,9 +33717,13 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     svg.replaceChildren(map, tilemapLayer, grid, frame, objects);
     if (draw2GameSceneMinimapSvg !== void 0) {
       draw2GameSceneMinimapSvg.setAttribute("viewBox", `0 0 ${mapWidth} ${mapHeight}`);
-      draw2GameSceneMinimapSvg.replaceChildren(
-        ...[map, tilemapLayer, grid, frame, objects].map((node) => node.cloneNode(true))
-      );
+      draw2GameSceneMinimapSvg.replaceChildren(...[
+        map,
+        tilemapLayer,
+        grid,
+        frame,
+        objects
+      ].map((node) => node.cloneNode(true)));
     }
     if (draw2GameSceneViewportStatus !== void 0) {
       const activeCount = gameDeckTracks.filter((track) => track.active !== false).length;
@@ -33991,7 +34081,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     if (mode === "GRAPH") renderGameLogicGraph();
     if (mode === "CODE") syncGameCodeEditor();
   };
-  const commitVisualGameLogicSource = (source, status) => {
+  const commitVisualGameLogicSource = (source, status2) => {
     try {
       const compiled = compileVisualGameLogicGraph(source);
       replaceGameBehaviorAndSource(compiled.behavior, {
@@ -34002,7 +34092,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       renderGameCustomPanels();
       setGameLogicMode("GRAPH");
       if (draw2GameGraphStatus !== void 0) {
-        draw2GameGraphStatus.textContent = status;
+        draw2GameGraphStatus.textContent = status2;
       }
       queueGameEditorPersistenceSave("graph-edit");
       return true;
@@ -34075,7 +34165,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     const component = componentsForGameTrack(track).find((candidate) => candidate.type === "TILEMAP");
     return createDefaultRpgTilemapDocument(component?.type === "TILEMAP" ? component.mapId : `map:${track.id}`);
   };
-  const updateSelectedGameTilemap = (update, status = "\u30DE\u30C3\u30D7\u30BB\u30EB\u3092Project\u3078\u4FDD\u5B58\u3057\u307E\u3057\u305F\u3002") => {
+  const updateSelectedGameTilemap = (update, status2 = "\u30DE\u30C3\u30D7\u30BB\u30EB\u3092Project\u3078\u4FDD\u5B58\u3057\u307E\u3057\u305F\u3002") => {
     const selected = selectedGameTrack();
     if (selected === void 0 || (selected.role ?? gameObjectRoleFor(selected.id, selected.kind)) !== "TILEMAP") return;
     const current = tilemapDocumentForTrack(selected);
@@ -34089,7 +34179,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     renderGameCustomPanels();
     queueGameEditorPersistenceSave("tilemap-edit");
     if (draw2GameComponentsStatus !== void 0) {
-      draw2GameComponentsStatus.textContent = status;
+      draw2GameComponentsStatus.textContent = status2;
     }
   };
   const componentsForGameTrack = (track) => track.components === void 0 ? [
@@ -34103,7 +34193,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     if (hasAiBrain && (baseline === "PROP" || baseline === "CUSTOM")) return "NPC";
     return baseline;
   };
-  const updateSelectedGameComponents = (update, status = "\u6A5F\u80FD\u8A2D\u5B9A\u3092Project\u3078\u4FDD\u5B58\u3057\u307E\u3057\u305F\u3002") => {
+  const updateSelectedGameComponents = (update, status2 = "\u6A5F\u80FD\u8A2D\u5B9A\u3092Project\u3078\u4FDD\u5B58\u3057\u307E\u3057\u305F\u3002") => {
     const selected = selectedGameTrack();
     if (selected === void 0) return;
     const components = update(componentsForGameTrack(selected));
@@ -34132,15 +34222,19 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     renderGameCustomPanels();
     queueGameEditorPersistenceSave("component-edit");
     if (draw2GameComponentsStatus !== void 0) {
-      draw2GameComponentsStatus.textContent = nextRole !== previousRole ? `${status} \u5F79\u5272\u304C${gameRoleLabel(previousRole)}\u304B\u3089${gameRoleLabel(nextRole)}\u306B\u5909\u308F\u308A\u307E\u3057\u305F\u3002` : status;
+      draw2GameComponentsStatus.textContent = nextRole !== previousRole ? `${status2} \u5F79\u5272\u304C${gameRoleLabel(previousRole)}\u304B\u3089${gameRoleLabel(nextRole)}\u306B\u5909\u308F\u308A\u307E\u3057\u305F\u3002` : status2;
     }
   };
   const componentForAdd = (track, type, preset) => {
     if (type === "SKILL") {
-      return skill(track.id, preset === void 0 ? {} : { kind: preset });
+      return skill(track.id, preset === void 0 ? {} : {
+        kind: preset
+      });
     }
     if (type === "BRAIN") {
-      return brain(track.id, preset === void 0 ? {} : { mode: preset });
+      return brain(track.id, preset === void 0 ? {} : {
+        mode: preset
+      });
     }
     const sources = {
       TRANSFORM: "SPRITE",
@@ -34155,6 +34249,39 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       STATUS: "PLAYER"
     };
     return defaultGameObjectComponents(track.id, sources[type] ?? track.kind).find((component) => component.type === type);
+  };
+  const normalizeGameNodeSearchText = (value) => value.normalize("NFKC").toLocaleLowerCase();
+  const renderGameNodeBoxFilter = () => {
+    if (draw2GameNodeBox === void 0) return;
+    const query2 = normalizeGameNodeSearchText(gameNodeBoxQuery.trim());
+    let visibleTileCount = 0;
+    for (const category of draw2GameNodeBox.querySelectorAll(".draw2-game-node-category")) {
+      const categoryLabel = category.querySelector(".draw2-game-node-category-label")?.textContent ?? "";
+      const categoryMatches = query2.length > 0 && normalizeGameNodeSearchText(categoryLabel).includes(query2);
+      let categoryHasVisibleTile = false;
+      for (const tile of category.querySelectorAll(".draw2-game-node-tile")) {
+        const tileSearchText = [
+          tile.textContent ?? "",
+          tile.title,
+          tile.dataset.gameComponentType ?? "",
+          tile.dataset.gameComponentPreset ?? ""
+        ].join(" ");
+        const visible = query2.length === 0 || categoryMatches || normalizeGameNodeSearchText(tileSearchText).includes(query2);
+        tile.hidden = !visible;
+        tile.setAttribute("aria-hidden", String(!visible));
+        if (visible) {
+          categoryHasVisibleTile = true;
+          visibleTileCount += 1;
+        }
+      }
+      category.hidden = !categoryHasVisibleTile;
+      category.setAttribute("aria-hidden", String(!categoryHasVisibleTile));
+    }
+    if (draw2GameNodeBoxEmpty !== void 0) {
+      const hasQuery = query2.length > 0;
+      draw2GameNodeBoxEmpty.hidden = !hasQuery || visibleTileCount > 0;
+      draw2GameNodeBoxEmpty.textContent = hasQuery && visibleTileCount === 0 ? "\u4E00\u81F4\u3059\u308B\u30CE\u30FC\u30C9\u304C\u3042\u308A\u307E\u305B\u3093\u3002\u691C\u7D22\u8A9E\u3092\u5909\u3048\u3066\u304F\u3060\u3055\u3044\u3002" : "";
+    }
   };
   const appendComponentField = (card, labelText, control) => {
     const label = documentRef.createElement("label");
@@ -34674,7 +34801,14 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
           break;
         }
         case "SKILL": {
-          const kind = selectControl(["ATTACK", "SHOOT", "MAGIC", "DASH_ATTACK", "HEAL", "SHIELD"], component.kind);
+          const kind = selectControl([
+            "ATTACK",
+            "SHOOT",
+            "MAGIC",
+            "DASH_ATTACK",
+            "HEAL",
+            "SHIELD"
+          ], component.kind);
           const power = numberControl(component.power, "1");
           const cooldown = numberControl(component.cooldown, "0.1");
           cooldown.min = "0";
@@ -34697,7 +34831,14 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
           break;
         }
         case "BRAIN": {
-          const mode = selectControl(["PLAYER_CONTROL", "AI", "PATROL", "PURSUE", "AVOID", "WAIT"], component.mode);
+          const mode = selectControl([
+            "PLAYER_CONTROL",
+            "AI",
+            "PATROL",
+            "PURSUE",
+            "AVOID",
+            "WAIT"
+          ], component.mode);
           const speed = numberControl(component.speed, "0.1");
           speed.min = "0";
           const range = numberControl(component.range, "0.1");
@@ -35133,6 +35274,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
         tile.draggable = selected !== void 0;
       }
     }
+    renderGameNodeBoxFilter();
     renderGameComponentCards();
     setGameLogicMode(gameLogicMode);
   };
@@ -35732,10 +35874,6 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       draw2GameTemplateStatus.textContent = `${gameTemplateInstances.length}\u4EF6\u306E\u30C6\u30F3\u30D7\u30EC\u30FC\u30C8\u3092Game\u5074\u3067\u4F7F\u7528\u4E2D\u3067\u3059\u3002`;
     }
   };
-  const gameTrackSupportsAnimation = (track) => {
-    const role = track.role ?? gameObjectRoleFor(track.id, track.kind);
-    return role === "PLAYER" || role === "NPC" || role === "CUSTOM" && track.kind === "SPRITE" || track.kind === "SPRITE";
-  };
   const activateGameRailTab = (tab) => {
     gameRailTab = tab;
     modeDeckActiveTab = modeDeckTabForGameRail(tab);
@@ -35743,14 +35881,6 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     syncGameModeDeckTabButtons(modeDeckActiveTab);
     syncGameRailTabSurface();
     renderGameAssetRail();
-  };
-  const focusGameAnimationForTrack = (track) => {
-    if (!gameTrackSupportsAnimation(track)) return;
-    gameRailTab = "ANIMATION";
-    modeDeckActiveTab = modeDeckTabForGameRail("ANIMATION");
-    root.dataset.modeDeckTab = modeDeckActiveTab;
-    syncGameModeDeckTabButtons(modeDeckActiveTab);
-    syncGameRailTabSurface();
   };
   const selectedGameAnimationReference = () => {
     const track = gameDeckTracks.find((candidate) => candidate.id === selectedGameTrackId);
@@ -36038,7 +36168,6 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
             const track = gameDeckTracks.find((candidate) => candidate.id === entry.trackId);
             if (track !== void 0) {
               selectedGameTrackId = track.id;
-              focusGameAnimationForTrack(track);
               renderGameCustomPanels();
               setPanel("game-inspector");
             }
@@ -37254,6 +37383,10 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     gameHierarchyBrowserQuery = gameHierarchyQuery.value;
     renderGameHierarchyGroups();
   });
+  draw2GameNodeBoxSearch?.addEventListener("input", () => {
+    gameNodeBoxQuery = draw2GameNodeBoxSearch.value;
+    renderGameNodeBoxFilter();
+  });
   for (const button of draw2GameSceneViewButtons) {
     button.addEventListener("click", () => {
       const mode = button.dataset.gameViewMode;
@@ -37556,7 +37689,10 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     const type = tile.dataset.gameComponentType ?? "";
     const preset = tile.dataset.gameComponentPreset ?? "";
     event.dataTransfer.effectAllowed = "copy";
-    event.dataTransfer.setData(GAME_NODE_TILE_DRAG_MIME, JSON.stringify({ type, preset }));
+    event.dataTransfer.setData(GAME_NODE_TILE_DRAG_MIME, JSON.stringify({
+      type,
+      preset
+    }));
     event.dataTransfer.setData("text/plain", type);
   });
   draw2GameComponents?.addEventListener("dragover", (event) => {
@@ -37592,16 +37728,22 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     const isNodeBox = tab === "node-box";
     if (draw2GameLeftDockHierarchyPanel !== void 0) {
       draw2GameLeftDockHierarchyPanel.hidden = isNodeBox;
+      draw2GameLeftDockHierarchyPanel.inert = isNodeBox;
+      draw2GameLeftDockHierarchyPanel.setAttribute("aria-hidden", String(isNodeBox));
     }
     if (draw2GameLeftDockNodeBoxPanel !== void 0) {
       draw2GameLeftDockNodeBoxPanel.hidden = !isNodeBox;
+      draw2GameLeftDockNodeBoxPanel.inert = !isNodeBox;
+      draw2GameLeftDockNodeBoxPanel.setAttribute("aria-hidden", String(!isNodeBox));
     }
     if (draw2GameLeftDockTabHierarchy !== void 0) {
       draw2GameLeftDockTabHierarchy.classList.toggle("is-active", !isNodeBox);
+      draw2GameLeftDockTabHierarchy.tabIndex = isNodeBox ? -1 : 0;
       draw2GameLeftDockTabHierarchy.setAttribute("aria-selected", isNodeBox ? "false" : "true");
     }
     if (draw2GameLeftDockTabNodeBox !== void 0) {
       draw2GameLeftDockTabNodeBox.classList.toggle("is-active", isNodeBox);
+      draw2GameLeftDockTabNodeBox.tabIndex = isNodeBox ? 0 : -1;
       draw2GameLeftDockTabNodeBox.setAttribute("aria-selected", isNodeBox ? "true" : "false");
     }
   };
@@ -37610,6 +37752,41 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
   });
   draw2GameLeftDockTabNodeBox?.addEventListener("click", () => {
     setGameLeftDockTab("node-box");
+  });
+  const visibleGameLeftDockTabs = () => [
+    draw2GameLeftDockTabHierarchy,
+    draw2GameLeftDockTabNodeBox
+  ].filter((button) => button !== void 0 && !button.hidden);
+  for (const button of [
+    draw2GameLeftDockTabHierarchy,
+    draw2GameLeftDockTabNodeBox
+  ]) {
+    button?.addEventListener("keydown", (event) => {
+      if (button.hidden || gameLeftDock?.hidden) return;
+      const key2 = event.key;
+      if (key2 !== "ArrowLeft" && key2 !== "ArrowRight" && key2 !== "ArrowUp" && key2 !== "ArrowDown" && key2 !== "Home" && key2 !== "End") return;
+      const tabs2 = visibleGameLeftDockTabs();
+      const currentIndex = tabs2.indexOf(button);
+      if (currentIndex < 0 || tabs2.length === 0) return;
+      const nextIndex = key2 === "Home" ? 0 : key2 === "End" ? tabs2.length - 1 : (currentIndex + (key2 === "ArrowLeft" || key2 === "ArrowUp" ? -1 : 1) + tabs2.length) % tabs2.length;
+      const nextTab = tabs2[nextIndex];
+      const nextTabId = nextTab?.dataset.gameLeftDockTab;
+      if (nextTab === void 0 || nextTabId !== "hierarchy" && nextTabId !== "node-box") return;
+      event.preventDefault();
+      setGameLeftDockTab(nextTabId);
+      nextTab.focus();
+    });
+  }
+  const focusGameHierarchyNextAction = () => {
+    if (gameDeckTracks.length === 0) {
+      gameHierarchyAdd?.focus();
+      return;
+    }
+    gameHierarchyQuery?.focus();
+  };
+  draw2GameNodeBoxHierarchyCta?.addEventListener("click", () => {
+    setGameLeftDockTab("hierarchy");
+    focusGameHierarchyNextAction();
   });
   draw2GameComponentsDropHint?.addEventListener("click", () => {
     setGameLeftDockTab("node-box");
@@ -39376,6 +39553,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     if (!isEditableTarget(event.target)) event.preventDefault();
   });
   root.addEventListener("dragstart", (event) => {
+    if (event.target instanceof Element && event.target.closest(".draw2-game-node-tile") !== null) return;
     event.preventDefault();
   });
   root.addEventListener("selectstart", (event) => {

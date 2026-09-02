@@ -118,6 +118,46 @@ Deno.test("GAME350-EDITOR-002 applies Scene, Entity, Component, and asset-bindin
   assert(rebound.value.selection.componentId === asComponentId("hero-sprite"), "binding should select the changed component");
 });
 
+Deno.test("GAME350-EDITOR-006 updates and removes Components immutably", async () => {
+  const initial = await snapshotFixture();
+  const entityAdded = await applyGame350EditorCommand(initial, caller, addEntityCommand(String(caller.revisionId), "game350-rev-2b"));
+  assert(entityAdded.ok && entityAdded.value !== undefined, "entity command should succeed");
+  const spriteComponent: Component = { type: "SPRITE", componentId: asComponentId("hero-sprite"), asset: drawAsset, visible: true };
+  const componentAdded = await applyGame350EditorCommand(entityAdded.value, { ...caller, revisionId: asRevisionId("game350-rev-2b") }, {
+    type: "ADD_COMPONENT", commandId: "game350-add-sprite-b", baseRevisionId: asRevisionId("game350-rev-2b"), nextRevisionId: asRevisionId("game350-rev-3b"), sceneId: asSceneId("scene-main"), entityId: asEntityId("hero"), component: spriteComponent,
+  });
+  assert(componentAdded.ok && componentAdded.value !== undefined, "component command should succeed");
+  const beforeUpdate = componentAdded.value.project.scenes[0]?.entities[0]?.components[0];
+  assert(beforeUpdate !== undefined && beforeUpdate.type === "SPRITE" && beforeUpdate.visible === true, "fixture sprite should start visible");
+
+  const updated = await applyGame350EditorCommand(componentAdded.value, { ...caller, revisionId: asRevisionId("game350-rev-3b") }, {
+    type: "UPDATE_COMPONENT", commandId: "game350-update-sprite", baseRevisionId: asRevisionId("game350-rev-3b"), nextRevisionId: asRevisionId("game350-rev-4b"), sceneId: asSceneId("scene-main"), entityId: asEntityId("hero"),
+    component: { type: "SPRITE", componentId: asComponentId("hero-sprite"), asset: drawAsset, visible: false },
+  });
+  assert(updated.ok && updated.value !== undefined, "update command should succeed");
+  const afterUpdate = updated.value.project.scenes[0]?.entities[0]?.components[0];
+  assert(afterUpdate !== undefined && afterUpdate.type === "SPRITE" && afterUpdate.visible === false, "update should replace the Component fields");
+  assert(beforeUpdate.visible === true, "input snapshot must remain unchanged by update");
+
+  const typeMismatch = await applyGame350EditorCommand(updated.value, { ...caller, revisionId: asRevisionId("game350-rev-4b") }, {
+    type: "UPDATE_COMPONENT", commandId: "game350-update-sprite-bad-type", baseRevisionId: asRevisionId("game350-rev-4b"), nextRevisionId: asRevisionId("game350-rev-4c"), sceneId: asSceneId("scene-main"), entityId: asEntityId("hero"),
+    component: { type: "AUDIO_SOURCE", componentId: asComponentId("hero-sprite"), asset: audioAsset, loop: false, volume: 1 },
+  });
+  assert(!typeMismatch.ok, "update must reject a Component type change");
+
+  const removed = await applyGame350EditorCommand(updated.value, { ...caller, revisionId: asRevisionId("game350-rev-4b") }, {
+    type: "REMOVE_COMPONENT", commandId: "game350-remove-sprite", baseRevisionId: asRevisionId("game350-rev-4b"), nextRevisionId: asRevisionId("game350-rev-5b"), sceneId: asSceneId("scene-main"), entityId: asEntityId("hero"), componentId: asComponentId("hero-sprite"),
+  });
+  assert(removed.ok && removed.value !== undefined, "remove command should succeed");
+  assert(removed.value.project.scenes[0]?.entities[0]?.components.length === 0, "remove should drop the Component from the Entity");
+  assert(updated.value.project.scenes[0]?.entities[0]?.components.length === 1, "input snapshot must remain unchanged by remove");
+
+  const missing = await applyGame350EditorCommand(removed.value, { ...caller, revisionId: asRevisionId("game350-rev-5b") }, {
+    type: "REMOVE_COMPONENT", commandId: "game350-remove-again", baseRevisionId: asRevisionId("game350-rev-5b"), nextRevisionId: asRevisionId("game350-rev-6b"), sceneId: asSceneId("scene-main"), entityId: asEntityId("hero"), componentId: asComponentId("hero-sprite"),
+  });
+  assert(!missing.ok, "removing an already-removed Component should fail");
+});
+
 Deno.test("GAME350-EDITOR-003 rejects stale commands, foreign assets, and wrong component kinds", async () => {
   const initial = await snapshotFixture();
   const stale = await applyGame350EditorCommand(initial, caller, addEntityCommand("old-revision", "game350-rev-2"));

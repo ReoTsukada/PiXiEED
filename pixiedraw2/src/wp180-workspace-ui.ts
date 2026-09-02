@@ -3848,6 +3848,18 @@ export function bootstrapDraw2Workspace(
     documentRef,
     "#draw2GameNodeBox",
   );
+  const draw2GameNodeBoxSearch = query<HTMLInputElement>(
+    documentRef,
+    "#draw2GameNodeBoxSearch",
+  );
+  const draw2GameNodeBoxEmpty = query<HTMLElement>(
+    documentRef,
+    "#draw2GameNodeBoxEmpty",
+  );
+  const draw2GameNodeBoxHierarchyCta = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2GameNodeBoxHierarchyCta",
+  );
   const draw2GameComponentsStatus = query<HTMLElement>(
     documentRef,
     "#draw2GameComponentsStatus",
@@ -4523,10 +4535,11 @@ export function bootstrapDraw2Workspace(
   let gameBehaviorSources: GameBehaviorSourceSnapshot[] = [];
   let gameTemplateInstances: GameTemplateInstance[] = [];
   let gameTemplateCategory: GameTemplateCategory | "ALL" = "ALL";
-  let gameRailTab: GameAssetBrowserTab = "SCENE";
+  let gameRailTab: GameAssetBrowserTab = "ASSETS";
   let gameAssetBrowserQuery = "";
   let gameAssetBrowserSource: GameAssetBrowserSource | "ALL" = "ALL";
   let gameHierarchyBrowserQuery = "";
+  let gameNodeBoxQuery = "";
   let gameSceneViewMode: "SCENE" | "GAME" = "SCENE";
   const gameSceneSpriteDataCache = new Map<string, string>();
   let selectedGameAnimationClipId: string | undefined;
@@ -5035,7 +5048,7 @@ export function bootstrapDraw2Workspace(
     }
     return translateDraw2Text(value, locale);
   };
-  let modeDeckActiveTab = "game-scene";
+  let modeDeckActiveTab = "game-assets";
   let audioEditorActiveTab: AudioEditorTab = "ROLL";
   let audioEditorPinned = false;
   let audioRightActiveTab: AudioRightTab = "inspector";
@@ -17126,7 +17139,6 @@ export function bootstrapDraw2Workspace(
       const track = gameDeckTracks.find((candidate) =>
         candidate.id === selectedGameTrackId
       );
-      if (track !== undefined) focusGameAnimationForTrack(track);
       renderGameCustomPanels();
     }
     selectModeDeckCell(event, "game");
@@ -20032,6 +20044,49 @@ export function bootstrapDraw2Workspace(
       button.setAttribute("aria-selected", String(selected));
       button.tabIndex = selected ? 0 : -1;
     }
+    const gameDeckHeading: Record<
+      string,
+      { eyebrow: string; title: string; description: string }
+    > = {
+      "game-scene": {
+        eyebrow: "GAME SCENE",
+        title: "シーンビュー",
+        description: "シーンに配置したオブジェクトを編集",
+      },
+      "game-assets": {
+        eyebrow: "GAME INVENTORY",
+        title: "インベントリ",
+        description: "Gameで使うオブジェクトやエフェクトを配置",
+      },
+      "game-animation": {
+        eyebrow: "GAME ANIMATION",
+        title: "アニメーション",
+        description: "CharacterやSpriteの動きを管理",
+      },
+      "game-data": {
+        eyebrow: "GAME DATA",
+        title: "ゲームデータ",
+        description: "Gameオブジェクトの数値とテンプレート",
+      },
+      "game-events": {
+        eyebrow: "GAME EVENTS",
+        title: "イベント",
+        description: "ノードでゲームの処理を組み立て",
+      },
+    };
+    const selectedGameDeckHeading = gameDeckHeading[tab];
+    if (selectedGameDeckHeading !== undefined) {
+      if (modeTimelineDeckEyebrow !== undefined) {
+        modeTimelineDeckEyebrow.textContent = selectedGameDeckHeading.eyebrow;
+      }
+      if (modeTimelineDeckTitle !== undefined) {
+        modeTimelineDeckTitle.textContent = selectedGameDeckHeading.title;
+      }
+      if (modeTimelineDeckDescription !== undefined) {
+        modeTimelineDeckDescription.textContent =
+          selectedGameDeckHeading.description;
+      }
+    }
     const selectedGameRailTab = gameRailTabForModeDeck(tab);
     if (selectedGameRailTab !== undefined) {
       gameRailTab = selectedGameRailTab;
@@ -20578,11 +20633,42 @@ export function bootstrapDraw2Workspace(
     button.addEventListener("click", () => {
       const tab = button.dataset.modeDeckTab;
       if (tab !== undefined) selectModeDeckTab(tab);
-      if (tab === "game-assets" && root.dataset.creatorMode === "GAME") {
-        // Route the same tab to the Game Assets/Template panel after the
-        // current selection event has completed.
-        windowRef.setTimeout(() => setPanel("game-assets"), 0);
-      }
+    });
+  }
+  const visibleGameModeDeckTabs = (): HTMLButtonElement[] =>
+    modeTimelineDeckTabs.filter((button) =>
+      !button.hidden &&
+      gameRailTabForModeDeck(button.dataset.modeDeckTab ?? "") !== undefined
+    );
+  for (const button of modeTimelineDeckTabs.filter((candidate) =>
+    gameRailTabForModeDeck(candidate.dataset.modeDeckTab ?? "") !== undefined
+  )) {
+    button.addEventListener("keydown", (event) => {
+      if (button.hidden) return;
+      const key = event.key;
+      if (
+        key !== "ArrowLeft" && key !== "ArrowRight" &&
+        key !== "ArrowUp" && key !== "ArrowDown" && key !== "Home" &&
+        key !== "End"
+      ) return;
+      const tabs = visibleGameModeDeckTabs();
+      const currentIndex = tabs.indexOf(button);
+      if (currentIndex < 0 || tabs.length === 0) return;
+      const nextIndex = key === "Home"
+        ? 0
+        : key === "End"
+        ? tabs.length - 1
+        : (currentIndex +
+            (key === "ArrowLeft" || key === "ArrowUp" ? -1 : 1) +
+            tabs.length) % tabs.length;
+      const nextTab = tabs[nextIndex];
+      const nextTabId = nextTab?.dataset.modeDeckTab;
+      if (nextTab === undefined || nextTabId === undefined) return;
+      event.preventDefault();
+      // Keep keyboard activation on the same canonical path as a click so
+      // aria-selected, the Game tabpanel, and Game rail projection agree.
+      selectModeDeckTab(nextTabId);
+      nextTab.focus();
     });
   }
 
@@ -20734,7 +20820,7 @@ export function bootstrapDraw2Workspace(
       modeDeckAudio.hidden = !audioSurface;
       modeDeckAudio.inert = !audioSurface;
     }
-    const firstTab = gameSurface ? "game-scene" : "audio-timeline";
+    const firstTab = gameSurface ? "game-assets" : "audio-timeline";
     const audioBottomTabs = new Set([
       "audio-timeline",
       "audio-mixer",
@@ -21991,9 +22077,11 @@ export function bootstrapDraw2Workspace(
         setPanel("assets");
       } else if (projectedMode === "GAME") {
         // A new Game must land on the creation choice itself. Existing Games
-        // keep the normal Preview default once their state has been restored.
+        // use the profile default (the Game Inspector) once restored.
         setPanel(
-          gameCreationModePromptVisible ? "game-scene" : "preview",
+          gameCreationModePromptVisible
+            ? "game-scene"
+            : currentDesktopModeProfile().defaultPanel,
         );
       } else if (
         projectedMode === "AUDIO" &&
@@ -24923,6 +25011,9 @@ export function bootstrapDraw2Workspace(
     const components = track.components ??
       defaultGameObjectComponents(track.id, track.kind);
     const role = track.role ?? gameObjectRoleFor(track.id, track.kind);
+    // Mirror the Scene View marker color coding here so an object's role
+    // reads at a glance in every list, not only on the canvas.
+    button.dataset.gameTrackRole = role.toLocaleLowerCase();
     detail.textContent = `${gameRoleLabel(role)} · ${
       track.active === false ? "無効" : "Active"
     } · ${components.length}個の機能`;
@@ -24959,7 +25050,6 @@ export function bootstrapDraw2Workspace(
       );
       gameLogicMode = source?.mode ?? "SIMPLE";
       gameLogicModeBehaviorId = gameBehaviorIdForTrack(track.id);
-      focusGameAnimationForTrack(track);
       renderGameCustomPanels();
       // Choosing a Game object immediately exposes its Game-only Inspector.
       if (
@@ -25186,7 +25276,6 @@ export function bootstrapDraw2Workspace(
       );
       gameLogicMode = source?.mode ?? "SIMPLE";
       gameLogicModeBehaviorId = gameBehaviorIdForTrack(track.id);
-      focusGameAnimationForTrack(track);
       renderGameCustomPanels();
       setPanel("game-inspector");
     };
@@ -26442,6 +26531,51 @@ export function bootstrapDraw2Workspace(
     };
     return defaultGameObjectComponents(track.id, sources[type] ?? track.kind)
       .find((component) => component.type === type);
+  };
+  const normalizeGameNodeSearchText = (value: string): string =>
+    value.normalize("NFKC").toLocaleLowerCase();
+  const renderGameNodeBoxFilter = (): void => {
+    if (draw2GameNodeBox === undefined) return;
+    const query = normalizeGameNodeSearchText(gameNodeBoxQuery.trim());
+    let visibleTileCount = 0;
+    for (const category of draw2GameNodeBox.querySelectorAll<HTMLElement>(
+      ".draw2-game-node-category",
+    )) {
+      const categoryLabel = category.querySelector<HTMLElement>(
+        ".draw2-game-node-category-label",
+      )?.textContent ?? "";
+      const categoryMatches = query.length > 0 &&
+        normalizeGameNodeSearchText(categoryLabel).includes(query);
+      let categoryHasVisibleTile = false;
+      for (const tile of category.querySelectorAll<HTMLButtonElement>(
+        ".draw2-game-node-tile",
+      )) {
+        const tileSearchText = [
+          tile.textContent ?? "",
+          tile.title,
+          tile.dataset.gameComponentType ?? "",
+          tile.dataset.gameComponentPreset ?? "",
+        ].join(" ");
+        const visible = query.length === 0 || categoryMatches ||
+          normalizeGameNodeSearchText(tileSearchText).includes(query);
+        tile.hidden = !visible;
+        tile.setAttribute("aria-hidden", String(!visible));
+        if (visible) {
+          categoryHasVisibleTile = true;
+          visibleTileCount += 1;
+        }
+      }
+      category.hidden = !categoryHasVisibleTile;
+      category.setAttribute("aria-hidden", String(!categoryHasVisibleTile));
+    }
+    if (draw2GameNodeBoxEmpty !== undefined) {
+      const hasQuery = query.length > 0;
+      draw2GameNodeBoxEmpty.hidden = !hasQuery || visibleTileCount > 0;
+      draw2GameNodeBoxEmpty.textContent =
+        hasQuery && visibleTileCount === 0
+          ? "一致するノードがありません。検索語を変えてください。"
+          : "";
+    }
   };
   const appendComponentField = (
     card: HTMLElement,
@@ -27749,6 +27883,7 @@ export function bootstrapDraw2Workspace(
         tile.draggable = selected !== undefined;
       }
     }
+    renderGameNodeBoxFilter();
     renderGameComponentCards();
     setGameLogicMode(gameLogicMode);
   };
@@ -28494,12 +28629,6 @@ export function bootstrapDraw2Workspace(
         `${gameTemplateInstances.length}件のテンプレートをGame側で使用中です。`;
     }
   };
-  const gameTrackSupportsAnimation = (track: ModeDeckTrack): boolean => {
-    const role = track.role ?? gameObjectRoleFor(track.id, track.kind);
-    return role === "PLAYER" || role === "NPC" ||
-      (role === "CUSTOM" && track.kind === "SPRITE") ||
-      track.kind === "SPRITE";
-  };
   const activateGameRailTab = (tab: GameAssetBrowserTab): void => {
     gameRailTab = tab;
     modeDeckActiveTab = modeDeckTabForGameRail(tab);
@@ -28507,14 +28636,6 @@ export function bootstrapDraw2Workspace(
     syncGameModeDeckTabButtons(modeDeckActiveTab);
     syncGameRailTabSurface();
     renderGameAssetRail();
-  };
-  const focusGameAnimationForTrack = (track: ModeDeckTrack): void => {
-    if (!gameTrackSupportsAnimation(track)) return;
-    gameRailTab = "ANIMATION";
-    modeDeckActiveTab = modeDeckTabForGameRail("ANIMATION");
-    root.dataset.modeDeckTab = modeDeckActiveTab;
-    syncGameModeDeckTabButtons(modeDeckActiveTab);
-    syncGameRailTabSurface();
   };
   const selectedGameAnimationReference = ():
     | GameAnimationClipReference
@@ -28928,7 +29049,6 @@ export function bootstrapDraw2Workspace(
               );
               if (track !== undefined) {
                 selectedGameTrackId = track.id;
-                focusGameAnimationForTrack(track);
                 renderGameCustomPanels();
                 setPanel("game-inspector");
               }
@@ -30362,6 +30482,10 @@ export function bootstrapDraw2Workspace(
     gameHierarchyBrowserQuery = gameHierarchyQuery.value;
     renderGameHierarchyGroups();
   });
+  draw2GameNodeBoxSearch?.addEventListener("input", () => {
+    gameNodeBoxQuery = draw2GameNodeBoxSearch.value;
+    renderGameNodeBoxFilter();
+  });
   for (const button of draw2GameSceneViewButtons) {
     button.addEventListener("click", () => {
       const mode = button.dataset.gameViewMode;
@@ -30817,12 +30941,23 @@ export function bootstrapDraw2Workspace(
     const isNodeBox = tab === "node-box";
     if (draw2GameLeftDockHierarchyPanel !== undefined) {
       draw2GameLeftDockHierarchyPanel.hidden = isNodeBox;
+      draw2GameLeftDockHierarchyPanel.inert = isNodeBox;
+      draw2GameLeftDockHierarchyPanel.setAttribute(
+        "aria-hidden",
+        String(isNodeBox),
+      );
     }
     if (draw2GameLeftDockNodeBoxPanel !== undefined) {
       draw2GameLeftDockNodeBoxPanel.hidden = !isNodeBox;
+      draw2GameLeftDockNodeBoxPanel.inert = !isNodeBox;
+      draw2GameLeftDockNodeBoxPanel.setAttribute(
+        "aria-hidden",
+        String(!isNodeBox),
+      );
     }
     if (draw2GameLeftDockTabHierarchy !== undefined) {
       draw2GameLeftDockTabHierarchy.classList.toggle("is-active", !isNodeBox);
+      draw2GameLeftDockTabHierarchy.tabIndex = isNodeBox ? -1 : 0;
       draw2GameLeftDockTabHierarchy.setAttribute(
         "aria-selected",
         isNodeBox ? "false" : "true",
@@ -30830,6 +30965,7 @@ export function bootstrapDraw2Workspace(
     }
     if (draw2GameLeftDockTabNodeBox !== undefined) {
       draw2GameLeftDockTabNodeBox.classList.toggle("is-active", isNodeBox);
+      draw2GameLeftDockTabNodeBox.tabIndex = isNodeBox ? 0 : -1;
       draw2GameLeftDockTabNodeBox.setAttribute(
         "aria-selected",
         isNodeBox ? "true" : "false",
@@ -30841,6 +30977,59 @@ export function bootstrapDraw2Workspace(
   });
   draw2GameLeftDockTabNodeBox?.addEventListener("click", () => {
     setGameLeftDockTab("node-box");
+  });
+  const visibleGameLeftDockTabs = (): HTMLButtonElement[] =>
+    [draw2GameLeftDockTabHierarchy, draw2GameLeftDockTabNodeBox].filter(
+      (button): button is HTMLButtonElement =>
+        button !== undefined && !button.hidden,
+    );
+  for (const button of [
+    draw2GameLeftDockTabHierarchy,
+    draw2GameLeftDockTabNodeBox,
+  ]) {
+    button?.addEventListener("keydown", (event) => {
+      if (button.hidden || gameLeftDock?.hidden) return;
+      const key = event.key;
+      if (
+        key !== "ArrowLeft" && key !== "ArrowRight" &&
+        key !== "ArrowUp" && key !== "ArrowDown" && key !== "Home" &&
+        key !== "End"
+      ) return;
+      const tabs = visibleGameLeftDockTabs();
+      const currentIndex = tabs.indexOf(button);
+      if (currentIndex < 0 || tabs.length === 0) return;
+      const nextIndex = key === "Home"
+        ? 0
+        : key === "End"
+        ? tabs.length - 1
+        : (currentIndex +
+            (key === "ArrowLeft" || key === "ArrowUp" ? -1 : 1) +
+            tabs.length) % tabs.length;
+      const nextTab = tabs[nextIndex];
+      const nextTabId = nextTab?.dataset.gameLeftDockTab;
+      if (
+        nextTab === undefined ||
+        (nextTabId !== "hierarchy" && nextTabId !== "node-box")
+      ) return;
+      event.preventDefault();
+      // Keep keyboard activation on the same canonical path as a click so
+      // the selected tab and its tabpanel cannot drift apart.
+      setGameLeftDockTab(nextTabId);
+      nextTab.focus();
+    });
+  }
+  const focusGameHierarchyNextAction = (): void => {
+    if (gameDeckTracks.length === 0) {
+      // Empty Scene: adding the first object is the only useful next action.
+      gameHierarchyAdd?.focus();
+      return;
+    }
+    // Existing objects: search first so the user can select the intended one.
+    gameHierarchyQuery?.focus();
+  };
+  draw2GameNodeBoxHierarchyCta?.addEventListener("click", () => {
+    setGameLeftDockTab("hierarchy");
+    focusGameHierarchyNextAction();
   });
   draw2GameComponentsDropHint?.addEventListener("click", () => {
     setGameLeftDockTab("node-box");
@@ -33146,6 +33335,10 @@ export function bootstrapDraw2Workspace(
     if (!isEditableTarget(event.target)) event.preventDefault();
   });
   root.addEventListener("dragstart", (event) => {
+    if (
+      event.target instanceof Element &&
+      event.target.closest(".draw2-game-node-tile") !== null
+    ) return;
     event.preventDefault();
   });
   root.addEventListener("selectstart", (event) => {

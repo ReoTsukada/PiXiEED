@@ -205,11 +205,11 @@ Deno.test("WP-180 PC creator modes expose specialized panel families", () => {
   }
   if (
     game.showPalette || !game.showTimeline || game.timelineSurface !== "game" ||
-    game.showDrawingTools || game.defaultPanel !== "preview" ||
+    game.showDrawingTools || game.defaultPanel !== "game-inspector" ||
     !game.allowedPanels.includes("game-scene")
   ) {
     throw new Error(
-      "GAME must expose Play/Scene surfaces without Draw palette",
+      "GAME must expose Inspector/Scene surfaces without Draw palette",
     );
   }
   if (

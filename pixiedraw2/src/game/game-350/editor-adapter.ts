@@ -108,6 +108,21 @@ export interface AddComponentCommand extends Game350EditorCommandBase {
   readonly component: Component;
 }
 
+export interface UpdateComponentCommand extends Game350EditorCommandBase {
+  readonly type: "UPDATE_COMPONENT";
+  readonly sceneId: Scene["sceneId"];
+  readonly entityId: Entity["entityId"];
+  /** Replacement component; componentId and type must match the existing Component. */
+  readonly component: Component;
+}
+
+export interface RemoveComponentCommand extends Game350EditorCommandBase {
+  readonly type: "REMOVE_COMPONENT";
+  readonly sceneId: Scene["sceneId"];
+  readonly entityId: Entity["entityId"];
+  readonly componentId: Component["componentId"];
+}
+
 export interface BindAssetCommand extends Game350EditorCommandBase {
   readonly type: "BIND_ASSET";
   /** Binds a Draw/Audio reference; it never carries source bytes or edits. */
@@ -117,7 +132,7 @@ export interface BindAssetCommand extends Game350EditorCommandBase {
   readonly asset: AssetRevisionReference;
 }
 
-export type Game350EditorCommand = AddSceneCommand | AddEntityCommand | AddComponentCommand | BindAssetCommand;
+export type Game350EditorCommand = AddSceneCommand | AddEntityCommand | AddComponentCommand | UpdateComponentCommand | RemoveComponentCommand | BindAssetCommand;
 
 export type Game350BuildProjectionInput = Omit<BuildPlanRequest, "assetLocks">;
 
@@ -346,6 +361,25 @@ export async function applyGame350EditorCommand(
     }
     const nextScene = { ...scene, entities: scene.entities.map((item) => item.entityId === entity.entityId ? { ...item, components: [...item.components, command.component] } : item) };
     return commitProject(snapshot, caller, command, { ...project, scenes: project.scenes.map((item) => item.sceneId === scene.sceneId ? nextScene : item) }, { sceneId: scene.sceneId, entityId: entity.entityId, componentId: command.component.componentId });
+  }
+
+  if (command.type === "UPDATE_COMPONENT") {
+    const existing = entity.components.find((item) => item.componentId === command.component.componentId);
+    if (existing === undefined) return failure(diagnostic("MISSING_COMPONENT", "component.componentId", `Component ${String(command.component.componentId)} is not in Entity ${String(entity.entityId)}.`));
+    if (existing.type !== command.component.type) return failure(diagnostic("INVALID_COMPONENT", "component.type", "Component type cannot change; remove and re-add the component instead."));
+    if (command.component.type === "SPRITE" || command.component.type === "AUDIO_SOURCE") {
+      const assetIssues = assetReferenceDiagnostics(command.component.asset, project.ownerId, "component.asset");
+      if (assetIssues.length > 0) return failure(...assetIssues);
+    }
+    const nextScene = { ...scene, entities: scene.entities.map((item) => item.entityId === entity.entityId ? { ...item, components: item.components.map((itemComponent) => itemComponent.componentId === existing.componentId ? command.component : itemComponent) } : item) };
+    return commitProject(snapshot, caller, command, { ...project, scenes: project.scenes.map((item) => item.sceneId === scene.sceneId ? nextScene : item) }, { sceneId: scene.sceneId, entityId: entity.entityId, componentId: command.component.componentId });
+  }
+
+  if (command.type === "REMOVE_COMPONENT") {
+    const existing = entity.components.find((item) => item.componentId === command.componentId);
+    if (existing === undefined) return failure(diagnostic("MISSING_COMPONENT", "componentId", `Component ${String(command.componentId)} is not in Entity ${String(entity.entityId)}.`));
+    const nextScene = { ...scene, entities: scene.entities.map((item) => item.entityId === entity.entityId ? { ...item, components: item.components.filter((itemComponent) => itemComponent.componentId !== existing.componentId) } : item) };
+    return commitProject(snapshot, caller, command, { ...project, scenes: project.scenes.map((item) => item.sceneId === scene.sceneId ? nextScene : item) }, { sceneId: scene.sceneId, entityId: entity.entityId });
   }
 
   const component = entity.components.find((item) => item.componentId === command.componentId);

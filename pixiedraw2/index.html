@@ -10,7 +10,11 @@
     <title>PiXiEEDstudio — Studio</title>
     <link
       rel="stylesheet"
-      href="./assets/draw2-shell.min.css?v=20260901-icons-v21"
+      href="./assets/draw2-shell.min.css?v=20260901-icons-v22"
+    >
+    <link
+      rel="stylesheet"
+      href="./assets/draw2-game-ux.css?v=20260901-game-ux-v1"
     >
     <link
       rel="stylesheet"
@@ -1786,6 +1790,10 @@
               class="draw2-game-left-dock-panel"
               id="draw2GameLeftDockHierarchyPanel"
               data-game-left-dock-panel="hierarchy"
+              role="tabpanel"
+              aria-labelledby="draw2GameLeftDockTabHierarchy"
+              aria-hidden="true"
+              hidden
             >
             <header class="draw2-game-left-dock-header">
               <div>
@@ -1847,7 +1855,9 @@
               class="draw2-game-left-dock-panel"
               id="draw2GameLeftDockNodeBoxPanel"
               data-game-left-dock-panel="node-box"
-              hidden
+              role="tabpanel"
+              aria-labelledby="draw2GameLeftDockTabNodeBox"
+              aria-hidden="false"
             >
             <header class="draw2-game-left-dock-header">
               <div>
@@ -1855,9 +1865,44 @@
                 <strong>ノードボックス</strong>
               </div>
             </header>
-            <p class="draw2-panel-note">
-              シーン階層でオブジェクトを選ぶと、ここからドラッグ&ドロップ、またはクリックで機能を追加できます。
-            </p>
+            <div
+              class="draw2-game-node-box-intro"
+            >
+              <p
+                class="draw2-panel-note"
+                id="draw2GameNodeBoxDescription"
+              >
+                HierarchyまたはSceneで対象を選ぶと、ここからクリックまたはドラッグ&ドロップで機能を追加できます。
+              </p>
+              <button
+                class="draw2-button draw2-button-secondary draw2-game-node-box-hierarchy-cta"
+                id="draw2GameNodeBoxHierarchyCta"
+                type="button"
+                data-game-node-box-action="open-hierarchy"
+                aria-controls="draw2GameLeftDockHierarchyPanel"
+                aria-label="階層を開いてGameObjectを追加・選択"
+                title="Hierarchyタブを開き、GameObjectを追加または選択"
+              >階層を開いて追加・選択</button>
+            </div>
+            <label class="draw2-game-node-search">
+              <span>ノードを検索</span>
+              <input
+                id="draw2GameNodeBoxSearch"
+                type="search"
+                autocomplete="off"
+                placeholder="物理、Rigidbody、攻撃…"
+                aria-label="Node Boxのノードを検索"
+                aria-controls="draw2GameNodeBox"
+                aria-describedby="draw2GameNodeBoxDescription"
+              >
+            </label>
+            <p
+              class="draw2-panel-status draw2-game-node-box-empty"
+              id="draw2GameNodeBoxEmpty"
+              role="status"
+              aria-live="polite"
+              hidden
+            ></p>
             <div class="draw2-game-node-box" id="draw2GameNodeBox" role="group" aria-label="機能を追加">
                   <div class="draw2-game-node-category" data-node-category="display">
                     <span class="draw2-game-node-category-label">表示・配置</span>
@@ -1972,18 +2017,20 @@
               <button
                 type="button"
                 id="draw2GameLeftDockTabHierarchy"
-                class="draw2-button draw2-game-left-dock-tab is-active"
+                class="draw2-button draw2-game-left-dock-tab"
                 role="tab"
-                aria-selected="true"
+                aria-selected="false"
+                tabindex="-1"
                 aria-controls="draw2GameLeftDockHierarchyPanel"
                 data-game-left-dock-tab="hierarchy"
               ><svg class="draw2-ui-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-layers"></use></svg><span>階層</span></button>
               <button
                 type="button"
                 id="draw2GameLeftDockTabNodeBox"
-                class="draw2-button draw2-game-left-dock-tab"
+                class="draw2-button draw2-game-left-dock-tab is-active"
                 role="tab"
-                aria-selected="false"
+                aria-selected="true"
+                tabindex="0"
                 aria-controls="draw2GameLeftDockNodeBoxPanel"
                 data-game-left-dock-tab="node-box"
               ><svg class="draw2-ui-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-tools"></use></svg><span>ノードボックス</span></button>
@@ -6549,51 +6596,66 @@
               role="tablist"
             >
               <button
-                class="draw2-mode-timeline-deck-tab is-active"
+                id="draw2ModeTimelineDeckTabGameScene"
+                class="draw2-mode-timeline-deck-tab"
                 type="button"
                 role="tab"
                 aria-label="ゲームシーンの仕組み"
-                aria-selected="true"
+                aria-selected="false"
+                tabindex="-1"
+                aria-controls="draw2GameRailSurfaceScene"
                 data-mode-deck-tab="game-scene"
               >
                 シーン
               </button>
               <button
-                class="draw2-mode-timeline-deck-tab"
+                id="draw2ModeTimelineDeckTabGameAssets"
+                class="draw2-mode-timeline-deck-tab is-active"
                 type="button"
                 role="tab"
-                aria-label="ゲームアセットブラウザ"
-                aria-selected="false"
+                aria-label="ゲームインベントリ"
+                aria-selected="true"
+                tabindex="0"
+                aria-controls="draw2GameRailSurfaceAssets"
                 data-mode-deck-tab="game-assets"
               >
-                アセット
+                インベントリ
               </button>
               <button
+                id="draw2ModeTimelineDeckTabGameAnimation"
                 class="draw2-mode-timeline-deck-tab"
                 type="button"
                 role="tab"
                 aria-label="ゲームアニメーション"
                 aria-selected="false"
+                tabindex="-1"
+                aria-controls="draw2GameRailSurfaceAnimation"
                 data-mode-deck-tab="game-animation"
               >
                 アニメーション
               </button>
               <button
+                id="draw2ModeTimelineDeckTabGameData"
                 class="draw2-mode-timeline-deck-tab"
                 type="button"
                 role="tab"
                 aria-label="Gameデータ"
                 aria-selected="false"
+                tabindex="-1"
+                aria-controls="draw2GameRailSurfaceData"
                 data-mode-deck-tab="game-data"
               >
                 Gameデータ
               </button>
               <button
+                id="draw2ModeTimelineDeckTabGameEvents"
                 class="draw2-mode-timeline-deck-tab"
                 type="button"
                 role="tab"
                 aria-label="ゲームイベント"
                 aria-selected="false"
+                tabindex="-1"
+                aria-controls="draw2GameRailSurfaceEvents"
                 data-mode-deck-tab="game-events"
               >
                 イベント
@@ -6758,9 +6820,12 @@
                 >iAUDIOでSE</button>
               </div>
               <section
+                id="draw2GameRailSurfaceScene"
                 class="draw2-game-rail-surface"
                 data-game-rail-surface="SCENE"
                 aria-label="Game Scene objects"
+                role="tabpanel"
+                aria-labelledby="draw2ModeTimelineDeckTabGameScene"
               >
                 <div
                   class="draw2-game-systems-grid"
@@ -6771,9 +6836,12 @@
                 </div>
               </section>
               <section
+                id="draw2GameRailSurfaceAssets"
                 class="draw2-game-rail-surface"
                 data-game-rail-surface="ASSETS"
                 aria-label="Game asset browser"
+                role="tabpanel"
+                aria-labelledby="draw2ModeTimelineDeckTabGameAssets"
                 hidden
               >
                 <div class="draw2-game-rail-section-heading">
@@ -6820,9 +6888,12 @@
                 </p>
               </section>
               <section
+                id="draw2GameRailSurfaceAnimation"
                 class="draw2-game-rail-surface"
                 data-game-rail-surface="ANIMATION"
                 aria-label="Game animation browser"
+                role="tabpanel"
+                aria-labelledby="draw2ModeTimelineDeckTabGameAnimation"
                 hidden
               >
                 <div class="draw2-game-rail-section-heading">
@@ -6865,9 +6936,12 @@
                 </p>
               </section>
               <section
+                id="draw2GameRailSurfaceData"
                 class="draw2-game-rail-surface"
                 data-game-rail-surface="GAME_DATA"
                 aria-label="Game data browser"
+                role="tabpanel"
+                aria-labelledby="draw2ModeTimelineDeckTabGameData"
                 hidden
               >
                 <div class="draw2-game-rail-section-heading">
@@ -6880,9 +6954,12 @@
                 <div id="draw2GameRailData" class="draw2-game-rail-summary"></div>
               </section>
               <section
+                id="draw2GameRailSurfaceEvents"
                 class="draw2-game-rail-surface"
                 data-game-rail-surface="EVENTS"
                 aria-label="Game events browser"
+                role="tabpanel"
+                aria-labelledby="draw2ModeTimelineDeckTabGameEvents"
                 hidden
               >
                 <div class="draw2-game-rail-section-heading">
@@ -9935,7 +10012,7 @@
     <script src="../scripts/pixieed-account-supabase-client.js?v=20260828-staging-config-v1"></script>
     <script
       type="module"
-      src="./dist/draw2-entry.js?v=20260901-icons-v21"
+      src="./dist/draw2-entry.js?v=20260901-icons-v22"
     ></script>
     <script
       type="module"

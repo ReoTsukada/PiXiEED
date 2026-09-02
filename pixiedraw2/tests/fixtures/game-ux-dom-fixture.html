@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>iGAME beginner UX semantic fixture</title>
+  </head>
+  <body data-fixture="igame-beginner-ux" data-production="false">
+    <main id="game-editor" aria-labelledby="game-editor-title">
+      <h1 id="game-editor-title">iGAME beginner authoring flow</h1>
+
+      <section
+        id="context"
+        aria-label="Current editing context"
+        data-selected-scene="scene-village"
+        data-selected-node="node-player"
+        data-editor-state="editing"
+        data-preview-state="stopped"
+      >
+        <p>Scene: <strong data-context="scene">Village</strong></p>
+        <p>Selected node: <strong data-context="node">Player</strong></p>
+        <p data-context="mode">Editing</p>
+        <button
+          type="button"
+          id="preview-start"
+          data-action="preview-start"
+          aria-pressed="false"
+        >
+          Start Preview
+        </button>
+        <button
+          type="button"
+          id="preview-stop"
+          data-action="preview-stop"
+          aria-pressed="false"
+          disabled
+          data-disabled-reason="Preview is not running"
+        >
+          Stop Preview
+        </button>
+      </section>
+
+      <nav aria-label="Game editor steps" data-step-navigation>
+        <ol
+          role="tablist"
+          aria-label="Game editor steps"
+          aria-orientation="horizontal"
+        >
+          <li role="presentation">
+            <button
+              role="tab"
+              type="button"
+              id="step-template"
+              data-ux-step="template"
+              aria-selected="true"
+              aria-controls="template-panel"
+              tabindex="0"
+            >
+              1. New project
+            </button>
+          </li>
+          <li role="presentation">
+            <button
+              role="tab"
+              type="button"
+              id="step-scene"
+              data-ux-step="scene"
+              aria-selected="false"
+              aria-controls="scene-panel"
+              tabindex="-1"
+            >
+              2. Scene
+            </button>
+          </li>
+          <li role="presentation">
+            <button
+              role="tab"
+              type="button"
+              id="step-node"
+              data-ux-step="node"
+              aria-selected="false"
+              aria-controls="node-panel"
+              tabindex="-1"
+            >
+              3. Node
+            </button>
+          </li>
+          <li role="presentation">
+            <button
+              role="tab"
+              type="button"
+              id="step-inspector"
+              data-ux-step="inspector"
+              aria-selected="false"
+              aria-controls="inspector-panel"
+              tabindex="-1"
+            >
+              4. Inspector
+            </button>
+          </li>
+          <li role="presentation">
+            <button
+              role="tab"
+              type="button"
+              id="step-asset"
+              data-ux-step="asset"
+              aria-selected="false"
+              aria-controls="asset-panel"
+              tabindex="-1"
+            >
+              5. Asset
+            </button>
+          </li>
+          <li role="presentation">
+            <button
+              role="tab"
+              type="button"
+              id="step-logic"
+              data-ux-step="logic"
+              aria-selected="false"
+              aria-controls="logic-panel"
+              tabindex="-1"
+            >
+              6. Logic
+            </button>
+          </li>
+          <li role="presentation">
+            <button
+              role="tab"
+              type="button"
+              id="step-preview"
+              data-ux-step="preview"
+              aria-selected="false"
+              aria-controls="preview-panel"
+              tabindex="-1"
+            >
+              7. Preview
+            </button>
+          </li>
+          <li role="presentation">
+            <button
+              role="tab"
+              type="button"
+              id="step-build"
+              data-ux-step="build"
+              aria-selected="false"
+              aria-controls="build-panel"
+              tabindex="-1"
+            >
+              8. Build
+            </button>
+          </li>
+        </ol>
+      </nav>
+
+      <section
+        id="template-panel"
+        role="tabpanel"
+        aria-labelledby="step-template"
+        data-ux-step="template"
+        data-selected-scene="scene-village"
+        data-selected-node="node-player"
+        data-editor-state="editing"
+        data-preview-state="stopped"
+      >
+        <h2>Start with a recommended template</h2>
+        <button
+          type="button"
+          id="create-from-template"
+          data-action="create-project"
+        >
+          Create from recommended template
+        </button>
+      </section>
+
+      <section
+        id="scene-panel"
+        role="tabpanel"
+        aria-labelledby="step-scene"
+        data-ux-step="scene"
+        hidden
+        data-selected-scene="scene-village"
+        data-selected-node="node-player"
+        data-editor-state="editing"
+        data-preview-state="stopped"
+      >
+        <h2>Scene</h2>
+        <button
+          type="button"
+          id="select-scene-village"
+          data-action="select-scene"
+          aria-pressed="true"
+        >
+          Village
+        </button>
+      </section>
+
+      <section
+        id="node-panel"
+        role="tabpanel"
+        aria-labelledby="step-node"
+        data-ux-step="node"
+        hidden
+        data-selected-scene="scene-village"
+        data-selected-node="node-player"
+        data-editor-state="editing"
+        data-preview-state="stopped"
+      >
+        <h2>Scene nodes</h2>
+        <button type="button" id="add-node" data-action="add-node">
+          Add node
+        </button>
+        <button
+          type="button"
+          id="select-player"
+          data-action="select-node"
+          aria-pressed="true"
+        >
+          Player
+        </button>
+      </section>
+
+      <section
+        id="inspector-panel"
+        role="tabpanel"
+        aria-labelledby="step-inspector"
+        data-ux-step="inspector"
+        hidden
+        data-selected-scene="scene-village"
+        data-selected-node="node-player"
+        data-editor-state="editing"
+        data-preview-state="stopped"
+      >
+        <h2>Inspector</h2>
+        <form aria-label="Player settings">
+          <label for="node-name">Name</label>
+          <input id="node-name" name="name" value="Player">
+          <label for="node-x">X position</label>
+          <input id="node-x" name="x" value="4" inputmode="numeric">
+          <label for="node-y">Y position</label>
+          <input id="node-y" name="y" value="2" inputmode="numeric">
+          <button
+            type="button"
+            id="save-inspector"
+            data-action="save-inspector"
+          >
+            Apply node settings
+          </button>
+        </form>
+      </section>
+
+      <section
+        id="asset-panel"
+        role="tabpanel"
+        aria-labelledby="step-asset"
+        data-ux-step="asset"
+        hidden
+        data-selected-scene="scene-village"
+        data-selected-node="node-player"
+        data-editor-state="editing"
+        data-preview-state="stopped"
+      >
+        <h2>Asset</h2>
+        <button
+          type="button"
+          id="assign-player-asset"
+          data-action="assign-asset"
+        >
+          Assign Player sprite
+        </button>
+        <p id="asset-error" role="alert" hidden>
+          Choose an asset for Player. <a
+            href="#asset-panel"
+            aria-controls="asset-panel"
+          >Return to Asset settings</a>
+        </p>
+      </section>
+
+      <section
+        id="logic-panel"
+        role="tabpanel"
+        aria-labelledby="step-logic"
+        data-ux-step="logic"
+        hidden
+        data-selected-scene="scene-village"
+        data-selected-node="node-player"
+        data-editor-state="editing"
+        data-preview-state="stopped"
+      >
+        <h2>Logic</h2>
+        <button
+          type="button"
+          id="add-logic-event"
+          data-action="add-logic-event"
+        >
+          Add event
+        </button>
+        <button
+          type="button"
+          id="when-player-entered"
+          data-action="select-event"
+          aria-pressed="true"
+        >
+          When Player enters scene
+        </button>
+      </section>
+
+      <section
+        id="preview-panel"
+        role="tabpanel"
+        aria-labelledby="step-preview"
+        data-ux-step="preview"
+        hidden
+        data-selected-scene="scene-village"
+        data-selected-node="node-player"
+        data-editor-state="previewing"
+        data-preview-state="running"
+      >
+        <h2>Preview</h2>
+        <p>Previewing Village with Player selected.</p>
+        <button
+          type="button"
+          id="stop-preview"
+          data-action="preview-stop"
+          aria-pressed="true"
+        >
+          Stop Preview
+        </button>
+        <button type="button" id="resume-editing" data-action="resume-editing">
+          Return to editing
+        </button>
+      </section>
+
+      <section
+        id="build-panel"
+        role="tabpanel"
+        aria-labelledby="step-build"
+        data-ux-step="build"
+        hidden
+        data-selected-scene="scene-village"
+        data-selected-node="node-player"
+        data-editor-state="editing"
+        data-preview-state="stopped"
+      >
+        <h2>Build preflight</h2>
+        <button
+          type="button"
+          id="run-build-preflight"
+          data-action="build-preflight"
+        >
+          Run Build preflight
+        </button>
+        <p id="build-error" role="alert" hidden>
+          Build needs a sprite asset. <a
+            href="#asset-panel"
+            aria-controls="asset-panel"
+          >Open Asset settings</a>
+        </p>
+      </section>
+    </main>
+  </body>
+</html>

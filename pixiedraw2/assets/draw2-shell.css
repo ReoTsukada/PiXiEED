@@ -11988,6 +11988,57 @@ body:has(#draw2WorkspaceFrame) {
 .draw2-game-asset-entry.is-active {
   border-color: var(--draw2-accent-strong);
 }
+
+/* Role color coding: mirrors the Scene View marker palette
+   (.draw2-game-scene-object.is-player etc.) across every list row an
+   object appears in, so Player/NPC/Camera/Audio read at a glance in the
+   Hierarchy and Inventory too, not only on the canvas. */
+.draw2-game-hierarchy-entry[data-game-track-role],
+.draw2-game-scene-entry[data-game-track-role],
+.draw2-game-asset-entry[data-game-track-role] {
+  --draw2-track-role-color: #7dd3fc;
+  border-left: 3px solid var(--draw2-track-role-color);
+}
+.draw2-game-hierarchy-entry[data-game-track-role] strong,
+.draw2-game-scene-entry[data-game-track-role] strong,
+.draw2-game-asset-entry[data-game-track-role] strong {
+  position: relative;
+  padding-left: 11px;
+}
+.draw2-game-hierarchy-entry[data-game-track-role] strong::before,
+.draw2-game-scene-entry[data-game-track-role] strong::before,
+.draw2-game-asset-entry[data-game-track-role] strong::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--draw2-track-role-color);
+  transform: translateY(-50%);
+}
+.draw2-game-hierarchy-entry[data-game-track-role="player"],
+.draw2-game-scene-entry[data-game-track-role="player"],
+.draw2-game-asset-entry[data-game-track-role="player"] {
+  --draw2-track-role-color: #66e3b4;
+}
+.draw2-game-hierarchy-entry[data-game-track-role="npc"],
+.draw2-game-scene-entry[data-game-track-role="npc"],
+.draw2-game-asset-entry[data-game-track-role="npc"] {
+  --draw2-track-role-color: #f5b86a;
+}
+.draw2-game-hierarchy-entry[data-game-track-role="camera"],
+.draw2-game-scene-entry[data-game-track-role="camera"],
+.draw2-game-asset-entry[data-game-track-role="camera"] {
+  --draw2-track-role-color: #c4b5fd;
+}
+.draw2-game-hierarchy-entry[data-game-track-role="audio"],
+.draw2-game-scene-entry[data-game-track-role="audio"],
+.draw2-game-asset-entry[data-game-track-role="audio"] {
+  --draw2-track-role-color: #f0a7e8;
+}
+
 .draw2-game-creation-mode {
   display: grid;
   gap: 6px;

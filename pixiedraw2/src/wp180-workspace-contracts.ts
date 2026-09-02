@@ -74,7 +74,7 @@ export const DESKTOP_CREATOR_MODE_PROFILES: Readonly<
   GAME: {
     mode: "GAME",
     family: "game",
-    defaultPanel: "preview",
+    defaultPanel: "game-inspector",
     allowedPanels: [
       "preview",
       "game-scene",
