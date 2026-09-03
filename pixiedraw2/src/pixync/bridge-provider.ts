@@ -1,18 +1,31 @@
 /**
  * PixyncTransportProvider backed by the PiXiEED Bridge hub
- * (see `pixieed-bridge/docs/PROTOCOL_SPEC.md`), used in place of
- * `supabase-provider.ts`.
+ * (see `pixieed-bridge/docs/PROTOCOL_SPEC.md`).
  *
- * Context: the original PiXiSYNC Supabase migrations/RPCs were removed on
- * 2026-08-30 in favor of the app-agnostic PiXiEED Bridge (see
- * `docs/bridge-migration/pixisync-reuse-notes.md` in the parent repo,
- * and ADR-015 in the Bridge repo's DECISIONS.md). Reviving the old
- * Supabase schema was explicitly rejected as the Bridge's canonical
- * transport. This module instead speaks the Bridge's own
- * `pixieed.realtime/1` WebSocket envelope, so pixiedraw2's Draw/Audio/Game
- * aggregates become just another Bridge Connector — on the same hub, same
- * protocol, and eventually the same room as a connector for another
- * native creative application.
+ * Product boundary (owner decision, 2026-09): PiXiEED Bridge ships as a
+ * wholly separate, standalone app/product -- it is not a component of
+ * PiXiEEDraw2 and PiXiEEDraw2 does not depend on it. PiXiEEDraw2's own
+ * sync plan is PIXYNC, covering both local sharing across the Draw/Audio/
+ * Game modes (see `docs/mode-authority-contract.md`) and PIXYNC's own
+ * online sharing -- `supabase-provider.ts`, wired in `composition-root.ts`,
+ * remains the production transport for that online path. This is not a
+ * pending migration to Bridge; it is the plan.
+ *
+ * This module exists as an optional, off-by-default interoperability
+ * path only: it lets a PixyncTransportAdapter speak to a separately
+ * running Bridge hub over Bridge's own `pixieed.realtime/1` WebSocket
+ * envelope, for a user who *also* runs Bridge and wants PiXiEEDraw2's
+ * Draw/Audio/Game aggregates to show up there as one more Connector.
+ * Nothing in pixiedraw2 selects this provider by default, and adopting
+ * it for any product-facing path is a separate decision, not implied by
+ * this file's existence.
+ *
+ * (Historical context: the older PiXiSYNC Supabase migrations/RPCs this
+ * repo once carried were removed on 2026-08-30 -- see
+ * `docs/bridge-migration/pixisync-reuse-notes.md` in the parent repo, and
+ * ADR-015 in the Bridge repo's DECISIONS.md. That cleanup predates, and
+ * should not be read as evidence for, the "Bridge becomes pixiedraw2's
+ * transport" framing this comment used to carry.)
  *
  * Everything above this provider (PixyncOrderKeeper, PixyncDurableJournal,
  * PixyncLazyAggregateSync, PixyncDurableTransportCoordinator,
@@ -21,11 +34,11 @@
  *
  * Known v1 limitations (tracked in the Bridge repo's TASKS.md):
  *  - No authentication/authorization yet; every connected client is treated
- *    as an "editor". The Bridge hub does not yet enforce room membership,
- *    unlike the removed Supabase RLS layer.
+ *    as an "editor". The Bridge hub does not yet enforce room membership.
  *  - Reconnect uses a simple fixed-backoff retry; it has not been run
  *    against pixync's full existing DURABLE-TRANSPORT test battery
- *    (those tests exercise a mocked provider, not a live socket).
+ *    (those tests exercise a mocked provider, not a live socket) -- see
+ *    the manual-only `tests/pixync/bridge-provider-live-check.skip.ts`.
  */
 import {
   committedOperationFingerprint,
