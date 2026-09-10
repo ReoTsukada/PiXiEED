@@ -94,7 +94,7 @@ export function createMobileComparisonFlow(): readonly MobileComparisonStep[] {
 export function createAsepriteAudit(): readonly AsepriteAuditEntry[] {
   return [
     { capability: "Pencil", status: "IMPLEMENTED", evidence: "Draw2 stroke core and isolated Pen tool; physical pointer E2E remains untested." },
-    { capability: "Eraser", status: "IMPLEMENTED", evidence: "Tool bridge and raster erase path present." },
+    { capability: "Eraser", status: "IMPLEMENTED", evidence: "Tool adapter and raster erase path present." },
     { capability: "Fill", status: "IMPLEMENTED", evidence: "Bounded fill command path present." },
     { capability: "Line", status: "PARTIAL", evidence: "Line interpolation exists; dedicated Line tool discoverability is not final." },
     { capability: "Shapes", status: "PLANNED", evidence: "No dedicated shape tool contract in the current isolated surface." },
@@ -135,7 +135,7 @@ export function createGapInventory(): readonly GapInventoryEntry[] {
     { area: "Legacy compatibility", status: "UNTESTED", evidence: "Real Legacy PXD/user/device compatibility is not measured." },
     { area: "PiXYNC", status: "PARTIAL", evidence: "Workspace excludes Sync; existing transport is preserved and not replaced." },
     { area: "Asset integration", status: "PARTIAL", evidence: "Asset Graph/Revision references are contractual; production adapter is not connected." },
-    { area: "Game integration", status: "PARTIAL", evidence: "Runtime Preview boundary exists; Game authoring bridge remains later scope." },
+    { area: "Game integration", status: "PARTIAL", evidence: "Runtime Preview boundary exists; Game authoring adapter remains later scope." },
     { area: "Runtime", status: "COMPLETE", evidence: "Runtime bundle is separate and Workspace/Audio authoring does not enter it." },
     { area: "Advanced tools", status: "PARTIAL", evidence: "WP-170 lazy Core boundary preserved; full operational UX remains partial." },
     { area: "Desktop workspace", status: "COMPLETE", evidence: "Canvas-dominant Creator Workspace verified at reference viewport." },

@@ -348,3 +348,51 @@ Deno.test("integrated PXD v2 rejects a changed module payload", async () => {
     "hash does not match",
   );
 });
+
+Deno.test("integrated PXD v2 preserves captured local Asset frame snapshots", async () => {
+  const state = createProject({
+    projectId: "project-pxd-captured-sprite",
+    name: "Captured Sprite",
+    width: 2,
+    height: 1,
+    tileSize: 32,
+  });
+  const draft = createAssetDefinitionDraft({
+    sourceProjectId: state.projectId,
+    sourceCanvasId: state.activeAssetId,
+    sourceKind: "VISIBLE_COMPOSITE",
+    sourceLayerIds: [state.activeLayerId],
+    frameStart: 1,
+    frameEnd: 1,
+    frameSelection: { kind: "CURRENT_FRAME", frameId: state.activeFrameId },
+    region: { kind: "MANUAL", x: 0, y: 0, width: 2, height: 1 },
+    animationMapping: [{
+      name: "IDLE",
+      frameIds: [state.activeFrameId],
+      sourceFrames: [{
+        sourceFrameId: state.activeFrameId,
+        layerIds: [state.activeLayerId],
+        rect: { x: 0, y: 0, width: 2, height: 1 },
+        rasterSnapshot: {
+          width: 2,
+          height: 1,
+          data: [1, 2, 3, 255, 4, 5, 6, 128],
+        },
+      }],
+      loopMode: "LOOP",
+      fps: 12,
+    }],
+    assetKind: "CHARACTER",
+    pivot: "CENTER",
+    protection: { locked: false, sourceReadOnly: true, referencePolicy: "PINNED" },
+    metadata: { name: "Captured Hero" },
+  });
+  assert(draft.ok, "the captured Asset Definition should validate");
+  const exported = await exportPxdProject(state, {
+    assetDefinitions: [{ definitionId: "asset:captured-hero", definition: draft.value }],
+  });
+  const imported = await importPxdProject(exported.bytes);
+  const snapshot = imported.assetDefinitions[0]?.definition.animationMapping[0]
+    ?.sourceFrames?.[0]?.rasterSnapshot;
+  assert(snapshot?.data.join(",") === "1,2,3,255,4,5,6,128", "captured sprite bytes must survive PXD round-trip");
+});

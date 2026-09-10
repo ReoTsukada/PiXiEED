@@ -4,6 +4,15 @@ import {
   type PixelPoint,
 } from "./draw2-core.ts";
 import {
+  normalizeBrushDescriptor,
+  stampBrushPoints,
+} from "./draw2-brush.ts";
+import type {
+  BrushAlgorithm,
+  BrushPattern,
+  BrushShape,
+} from "./draw2-brush.ts";
+import {
   createShapeWriteSet as createCompactShapeWriteSet,
   shapePixelsInBounds as compactShapePixels,
   type ShapeTool,
@@ -12,6 +21,7 @@ import {
 export type BasicTool =
   | "pen"
   | "pixel-pen"
+  | "text"
   | "eraser"
   | "line"
   | "rect"
@@ -48,12 +58,14 @@ function isCompactShapeTool(tool: BasicTool): tool is ShapeTool {
 /** Selection behavior exposed by the unified color-selection tool. */
 export type ColorSelectionMode = "similar" | "exact" | "magic" | "opaque";
 
-export type BrushPattern = "solid" | "checker" | "dots" | "bayer-2x2";
-export type BrushShape = "square" | "circle";
+export { MAX_BRUSH_SIZE } from "./draw2-brush.ts";
+export type { BrushAlgorithm, BrushPattern, BrushShape } from "./draw2-brush.ts";
 
 export interface ToolOptions {
   readonly brushSize: number;
   readonly brushShape: BrushShape;
+  readonly brushAngle: number;
+  readonly brushAlgorithm: BrushAlgorithm;
   readonly pattern: BrushPattern;
   readonly similarity: number;
   readonly selectionMode?: ColorSelectionMode;
@@ -85,6 +97,8 @@ export interface SelectionPixels {
 export const DEFAULT_TOOL_OPTIONS: ToolOptions = {
   brushSize: 1,
   brushShape: "square",
+  brushAngle: 0,
+  brushAlgorithm: "regular",
   pattern: "solid",
   similarity: 0,
   selectionMode: "similar",
@@ -112,28 +126,19 @@ export function colorToleranceDistanceToPercent(distance: number): number {
 export function normalizeToolOptions(
   options: Partial<ToolOptions> = {},
 ): ToolOptions {
-  const requestedBrushSize = options.brushSize;
   const requestedSimilarity = options.similarity;
   const requestedSelectionMode = options.selectionMode;
-  const brushSize = Number.isSafeInteger(requestedBrushSize)
-    ? Math.max(1, Math.min(32, requestedBrushSize as number))
-    : DEFAULT_TOOL_OPTIONS.brushSize;
+  const brush = normalizeBrushDescriptor(options);
   const similarity = Number.isFinite(requestedSimilarity)
     ? Math.max(0, Math.min(255, requestedSimilarity as number))
     : DEFAULT_TOOL_OPTIONS.similarity;
-  const brushShape = options.brushShape === "circle" ? "circle" : "square";
-  const pattern: BrushPattern =
-    options.pattern === "checker" || options.pattern === "dots" ||
-      options.pattern === "bayer-2x2"
-      ? options.pattern
-      : "solid";
   const selectionMode: ColorSelectionMode =
     requestedSelectionMode === "exact" ||
         requestedSelectionMode === "magic" ||
         requestedSelectionMode === "opaque"
       ? requestedSelectionMode
       : "similar";
-  return { brushSize, brushShape, pattern, similarity, selectionMode };
+  return { ...brush, similarity, selectionMode };
 }
 
 function clampPoint(point: PixelPoint, bounds: RasterBounds): PixelPoint {
@@ -229,50 +234,13 @@ function patternVisible(x: number, y: number, pattern: BrushPattern): boolean {
   return true;
 }
 
-function stamp(
-  center: PixelPoint,
-  options: ToolOptions,
-  bounds: RasterBounds,
-): readonly PixelPoint[] {
-  const size = options.brushSize;
-  // Even brushes are centred on the half-pixel between the anchor pixel and
-  // its upper-left neighbour.  The previous `(size - 1) / 2` start placed a
-  // 6px brush at -2..+3, visibly biasing every stroke toward the lower-right.
-  const start = -Math.floor(size / 2);
-  const centerOffset = (size - 1) / 2;
-  const radius = Math.max(0.5, size / 2);
-  const points: PixelPoint[] = [];
-  for (let row = 0; row < size; row += 1) {
-    for (let column = 0; column < size; column += 1) {
-      const x = start + column;
-      const y = start + row;
-      if (
-        options.brushShape === "circle" &&
-        ((column - centerOffset) ** 2) + ((row - centerOffset) ** 2) >
-          radius ** 2
-      ) continue;
-      if (!patternVisible(center.x + x, center.y + y, options.pattern)) {
-        continue;
-      }
-      points.push({ x: center.x + x, y: center.y + y });
-    }
-  }
-  return points.filter((point) =>
-    point.x >= 0 && point.y >= 0 && point.x < bounds.width &&
-    point.y < bounds.height
-  );
-}
-
 export function stampBrush(
   points: readonly PixelPoint[],
   options: Partial<ToolOptions>,
   bounds: RasterBounds,
 ): readonly PixelPoint[] {
   const safe = normalizeToolOptions(options);
-  const stamped = points.flatMap((point) =>
-    stamp(clampPoint(point, bounds), safe, bounds)
-  );
-  return sortedUnique(stamped, bounds);
+  return stampBrushPoints(points, safe, bounds);
 }
 
 function rectanglePixels(
@@ -547,7 +515,11 @@ export function createWriteSet(
   const safe = normalizeToolOptions(options);
   const base = tool === "pen" || tool === "eraser"
     ? stampBrush(
-      interpolatePixelLine(clampPoint(from, bounds), clampPoint(to, bounds)),
+      interpolatePixelLine(
+        clampPoint(from, bounds),
+        clampPoint(to, bounds),
+        safe.brushAlgorithm,
+      ),
       safe,
       bounds,
     )
@@ -557,11 +529,13 @@ export function createWriteSet(
       from,
       to,
       colorIndex,
-      {
-        brushSize: safe.brushSize,
-        brushShape: safe.brushShape,
-        pattern: safe.pattern,
-      },
+        {
+          brushSize: safe.brushSize,
+          brushShape: safe.brushShape,
+          brushAngle: safe.brushAngle,
+          brushAlgorithm: safe.brushAlgorithm,
+          pattern: safe.pattern,
+        },
       bounds,
     )
     : stampBrush(shapePixels(tool, from, to, bounds), safe, bounds);
@@ -609,10 +583,12 @@ export function createPathWriteSet(
   bounds: RasterBounds,
 ): readonly ColoredPixel[] {
   if (points.length === 0) return [];
+  const safe = normalizeToolOptions(options);
   const path = interpolatePixelPath(
     points.map((point) => clampPoint(point, bounds)),
+    safe.brushAlgorithm,
   );
-  return stampBrush(path, normalizeToolOptions(options), bounds)
+  return stampBrush(path, safe, bounds)
     .map((point) => ({
       ...point,
       colorIndex: tool === "eraser" ? 0 : colorIndex,

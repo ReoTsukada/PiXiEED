@@ -15,6 +15,17 @@ export interface AudioScheduleEvent<T> {
   readonly payload: T;
 }
 
+/**
+ * A sorted event sequence whose members are materialized only when the
+ * transport lookahead reaches them. This keeps long arrangements independent
+ * of the number of timeline chunks.
+ */
+export interface AudioScheduleEventSource<T> {
+  readonly length: number;
+  readonly at: (index: number) => AudioScheduleEvent<T> | undefined;
+  readonly findFirstIndex: (startSeconds: number) => number;
+}
+
 export interface AudioSchedulerClock {
   readonly now: () => number;
 }
@@ -60,7 +71,19 @@ function normalizeEvents<T>(
     }))
     .sort((left, right) =>
       left.startSeconds - right.startSeconds || left.id.localeCompare(right.id)
-    );
+  );
+}
+
+function sourceFromArray<T>(
+  events: readonly AudioScheduleEvent<T>[],
+): AudioScheduleEventSource<T> {
+  return {
+    length: events.length,
+    at: (index) => events[index],
+    findFirstIndex: (startSeconds) => events.findIndex((event) =>
+      event.startSeconds >= startSeconds
+    ),
+  };
 }
 
 /**
@@ -69,7 +92,7 @@ function normalizeEvents<T>(
  * clock time plus the event's timeline offset.
  */
 export class SampleAccurateScheduler<T> {
-  private events: readonly AudioScheduleEvent<T>[] = [];
+  private events: AudioScheduleEventSource<T> = sourceFromArray([]);
   private durationSeconds = 0;
   private stateValue: AudioTransportState = "STOPPED";
   private loopValue = false;
@@ -123,19 +146,20 @@ export class SampleAccurateScheduler<T> {
   }
 
   load(
-    events: readonly AudioScheduleEvent<T>[],
+    events: readonly AudioScheduleEvent<T>[] | AudioScheduleEventSource<T>,
     durationSeconds: number,
   ): void {
     this.stop();
-    this.events = normalizeEvents(events);
-    const eventEnd = this.events.reduce(
-      (latest, event) =>
-        Math.max(
-          latest,
-          event.startSeconds + event.durationSeconds,
-        ),
+    const normalizedEvents: readonly AudioScheduleEvent<T>[] | undefined = Array.isArray(events)
+      ? normalizeEvents(events as readonly AudioScheduleEvent<T>[])
+      : undefined;
+    this.events = normalizedEvents === undefined
+      ? (events as AudioScheduleEventSource<T>)
+      : sourceFromArray(normalizedEvents);
+    const eventEnd = normalizedEvents?.reduce(
+      (latest, event) => Math.max(latest, event.startSeconds + event.durationSeconds),
       0,
-    );
+    ) ?? 0;
     this.durationSeconds = Math.max(
       EPSILON_SECONDS,
       finiteNonNegative(durationSeconds, 0),
@@ -215,7 +239,7 @@ export class SampleAccurateScheduler<T> {
 
     const targetElapsed = elapsed + this.lookaheadSeconds;
     while (this.events.length > 0) {
-      const event = this.events[this.nextEventIndex];
+      const event = this.events.at(this.nextEventIndex);
       if (event === undefined) break;
       const occurrenceElapsed = this.nextEventCycle * this.durationSeconds +
         event.startSeconds;
@@ -243,9 +267,7 @@ export class SampleAccurateScheduler<T> {
     const withinCycle = this.loopValue
       ? positionSeconds - cycle * this.durationSeconds
       : positionSeconds;
-    const first = this.events.findIndex((event) =>
-      event.startSeconds >= withinCycle - EPSILON_SECONDS
-    );
+    const first = this.events.findFirstIndex(withinCycle - EPSILON_SECONDS);
     if (first >= 0) {
       this.nextEventIndex = first;
       this.nextEventCycle = cycle;

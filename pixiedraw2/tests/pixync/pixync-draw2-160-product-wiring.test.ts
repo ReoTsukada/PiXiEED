@@ -26,7 +26,7 @@ function section(
 const lifecycleWiring = section(
   entry,
   "async function startPixyncProjectLifecycle",
-  "async function startPixyncProductionRoot",
+  "const PIXYNC_LOCAL_LIFECYCLE_WIRING_END",
 );
 const metadataWriter = section(
   entry,

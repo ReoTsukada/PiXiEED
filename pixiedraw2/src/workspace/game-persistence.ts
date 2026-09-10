@@ -7,16 +7,22 @@ import {
   type BehaviorIR,
   createGameProject,
   type GameAnimationBinding,
+  type GameBlockTypeDefinition,
   type GameComponentState,
   type GameEventCard,
+  type GameItemDefinition,
   type GameObjectRole,
   type GameProject,
+  type GameRecipeDefinition,
   type GameSceneRules,
   type GameTemplateInstance,
   type GameTilemapDocument,
   isValidGameAnimationBinding,
+  isValidGameBlockTypeDefinition,
   isValidGameCamera2DSettings,
   isValidGameEventCard,
+  isValidGameItemDefinition,
+  isValidGameRecipeDefinition,
   isValidGameSceneRules,
   isValidGameTemplateInstance,
   isValidGameTilemapDocument,
@@ -35,6 +41,12 @@ import {
   isValidGameVisualMakerConfig,
   type GameVisualMakerConfig,
 } from "../game/game-350/visual-maker-model.ts";
+import {
+  cloneGamePlaygroundConfig,
+  isValidGamePlaygroundConfig,
+  isValidGamePlaygroundPersistenceInput,
+  type GamePlaygroundConfig,
+} from "../game/game-350/playground.ts";
 
 export const GAME_EDITOR_PERSISTENCE_SCHEMA_VERSION =
   "GAME_EDITOR_PERSISTENCE_V1" as const;
@@ -81,6 +93,10 @@ export interface GameEditorBinding {
   readonly label: string;
   /** Named iDRAW Asset Definition; source bytes never cross this boundary. */
   readonly assetDefinitionId?: string;
+  /** Explicit license metadata for Market-backed references. */
+  readonly licenseId?: string;
+  readonly rights?: readonly string[];
+  readonly sourceKind?: "PROJECT" | "MARKET";
 }
 
 function referenceOnlyBinding(binding: GameEditorBinding): GameEditorBinding {
@@ -95,6 +111,9 @@ function referenceOnlyBinding(binding: GameEditorBinding): GameEditorBinding {
     ...(binding.assetDefinitionId === undefined
       ? {}
       : { assetDefinitionId: binding.assetDefinitionId }),
+    ...(binding.licenseId === undefined ? {} : { licenseId: binding.licenseId }),
+    ...(binding.rights === undefined ? {} : { rights: [...binding.rights] }),
+    ...(binding.sourceKind === undefined ? {} : { sourceKind: binding.sourceKind }),
   };
 }
 
@@ -223,6 +242,9 @@ const GAME_EDITOR_BINDING_KEYS = new Set([
   "mode",
   "label",
   "assetDefinitionId",
+  "licenseId",
+  "rights",
+  "sourceKind",
 ]);
 
 const GAME_EDITOR_TRACK_KEYS = new Set([
@@ -308,6 +330,92 @@ export interface GameBehaviorSourceSnapshot {
   readonly mode: GameBehaviorSourceMode;
   readonly graph?: VisualGameLogicSource;
   readonly sourceText?: string;
+}
+
+/** Author-defined Game-owned vocabulary kept beside the editor snapshot. */
+export interface GameEditorDataSnapshot {
+  readonly items: readonly GameItemDefinition[];
+  readonly recipes: readonly GameRecipeDefinition[];
+  readonly blockTypes: readonly GameBlockTypeDefinition[];
+}
+
+function validGameDataSnapshot(value: unknown): value is GameEditorDataSnapshot {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const candidate = value as Record<string, unknown>;
+  if (
+    !Object.keys(candidate).every((key) =>
+      ["items", "recipes", "blockTypes"].includes(key)
+    ) ||
+    !Array.isArray(candidate.items) ||
+    !Array.isArray(candidate.recipes) ||
+    !Array.isArray(candidate.blockTypes)
+  ) return false;
+  const items = candidate.items as unknown[];
+  const recipes = candidate.recipes as unknown[];
+  const blockTypes = candidate.blockTypes as unknown[];
+  if (
+    items.some((item) => !isValidGameItemDefinition(item)) ||
+    recipes.some((recipe) => !isValidGameRecipeDefinition(recipe)) ||
+    blockTypes.some((blockType) => !isValidGameBlockTypeDefinition(blockType))
+  ) return false;
+  const itemIds = new Set(items.map((item) => (item as GameItemDefinition).itemId));
+  if (itemIds.size !== items.length) return false;
+  const recipeIds = new Set(
+    recipes.map((recipe) => (recipe as GameRecipeDefinition).recipeId),
+  );
+  if (recipeIds.size !== recipes.length) return false;
+  const blockTypeIds = new Set(
+    blockTypes.map((blockType) =>
+      (blockType as GameBlockTypeDefinition).blockTypeId
+    ),
+  );
+  if (blockTypeIds.size !== blockTypes.length) return false;
+  for (const recipe of recipes as GameRecipeDefinition[]) {
+    if (
+      recipe.ingredients.some((ingredient) => !itemIds.has(ingredient.itemId)) ||
+      !itemIds.has(recipe.result.itemId)
+    ) return false;
+  }
+  for (const blockType of blockTypes as GameBlockTypeDefinition[]) {
+    if (
+      blockType.dropItemId !== undefined &&
+      !itemIds.has(blockType.dropItemId)
+    ) return false;
+  }
+  return true;
+}
+
+function gameEventCardReferencesExist(
+  card: GameEventCard,
+  data: GameEditorDataSnapshot | undefined,
+): boolean {
+  if (
+    (card.itemId !== undefined &&
+      !data?.items.some((item) => item.itemId === card.itemId)) ||
+    (card.recipeId !== undefined &&
+      !data?.recipes.some((recipe) => recipe.recipeId === card.recipeId)) ||
+    (card.blockTypeId !== undefined &&
+      !data?.blockTypes.some((blockType) =>
+        blockType.blockTypeId === card.blockTypeId
+      ))
+  ) return false;
+  return true;
+}
+
+function cloneGameDataSnapshot(
+  data: GameEditorDataSnapshot,
+): GameEditorDataSnapshot {
+  return {
+    items: data.items.map((item) => ({ ...item })),
+    recipes: data.recipes.map((recipe) => ({
+      ...recipe,
+      ingredients: recipe.ingredients.map((ingredient) => ({ ...ingredient })),
+      result: { ...recipe.result },
+    })),
+    blockTypes: data.blockTypes.map((blockType) => ({ ...blockType })),
+  };
 }
 
 function cloneVisualGameLogicSource(
@@ -422,6 +530,8 @@ export interface GameEditorPersistenceRecord {
   readonly sceneRules?: GameSceneRules;
   /** Beginner-facing event cards; canonical BehaviorIR remains authoritative. */
   readonly eventCards?: readonly GameEventCard[];
+  /** Author-defined items, recipes, and 2D block vocabulary. */
+  readonly gameData?: GameEditorDataSnapshot;
   readonly bindings?: readonly GameEditorBinding[];
   /** Canonical no-code Behavior IR; source is persisted separately below. */
   readonly behaviors?: readonly BehaviorIR[];
@@ -433,6 +543,8 @@ export interface GameEditorPersistenceRecord {
   readonly animationBindings?: readonly GameAnimationBinding[];
   /** Beginner-facing visual maker selections and UI slot layout. */
   readonly visualMaker?: GameVisualMakerConfig;
+  /** Simple iGAME playground: Draw references, Audio Tick ranges, and mode. */
+  readonly playground?: GamePlaygroundConfig;
   /** Exact PiXYNC canonical checkpoint; omitted by legacy/local-only records. */
   readonly canonicalProject?: GameProject;
   readonly appliedCommandIds?: readonly string[];
@@ -441,7 +553,36 @@ export interface GameEditorPersistenceRecord {
 export interface GameEditorPersistenceSaveResult {
   readonly ok: boolean;
   readonly stale: boolean;
+  /** Storage capability failures are distinct from ordinary write errors. */
+  readonly failure?: "offline" | "error";
+  /** Identifies the persistence stage that produced a failure or conflict. */
+  readonly stage?: GameEditorPersistenceFailureStage;
+  /** Non-sensitive diagnostic category for development tooling. */
+  readonly cause?: GameEditorPersistenceFailureCause;
+  /** Storage exception name when the browser supplied one. */
+  readonly errorName?: string;
 }
+
+export type GameEditorPersistenceFailureStage =
+  | "record-build"
+  | "canonical-build"
+  | "storage-save"
+  | "canonical-sync"
+  | "manifest-update";
+
+export type GameEditorPersistenceFailureCause =
+  | "indexeddb-unavailable"
+  | "database-open-failed"
+  | "database-blocked"
+  | "record-read-failed"
+  | "record-write-failed"
+  | "transaction-failed"
+  | "transaction-aborted"
+  | "record-build-failed"
+  | "canonical-build-failed"
+  | "canonical-sync-failed"
+  | "manifest-update-failed"
+  | "cas-conflict";
 
 /** Optional compare-and-swap guard for a Game editor snapshot. */
 export interface GameEditorPersistenceSaveOptions {
@@ -479,6 +620,8 @@ export async function createGameEditorPersistenceRecord(
   sceneRules?: GameSceneRules,
   eventCards: readonly GameEventCard[] = [],
   visualMaker?: GameVisualMakerConfig,
+  gameData?: GameEditorDataSnapshot,
+  playground?: GamePlaygroundConfig,
 ): Promise<GameEditorPersistenceRecord> {
   assertValidTrackHierarchy(tracks);
   if (
@@ -498,13 +641,16 @@ export async function createGameEditorPersistenceRecord(
     (sceneRules !== undefined && !isValidGameSceneRules(sceneRules)) ||
     eventCards.some((card) =>
       !isValidGameEventCard(card) ||
+      !gameEventCardReferencesExist(card, gameData) ||
       [card.sourceTrackId, card.targetTrackId, card.audioTrackId].some(
         (trackId) => trackId !== undefined &&
           !tracks.some((track) => track.id === trackId),
       )
     ) ||
     new Set(eventCards.map((card) => card.eventId)).size !== eventCards.length ||
-    (visualMaker !== undefined && !isValidGameVisualMakerConfig(visualMaker))
+    (visualMaker !== undefined && !isValidGameVisualMakerConfig(visualMaker)) ||
+    (gameData !== undefined && !validGameDataSnapshot(gameData)) ||
+    (playground !== undefined && !isValidGamePlaygroundConfig(playground))
   ) throw new Error("Invalid Game template instances.");
   const normalizedTracks = tracks.map((track) => ({
     id: track.id,
@@ -533,6 +679,12 @@ export async function createGameEditorPersistenceRecord(
     ...(sceneRules === undefined ? {} : { sceneRules: { ...sceneRules } }),
     ...(eventCards.length === 0 ? {} : {
       eventCards: eventCards.map((card) => ({ ...card })),
+    }),
+    ...(gameData === undefined ? {} : {
+      gameData: cloneGameDataSnapshot(gameData),
+    }),
+    ...(playground === undefined ? {} : {
+      playground: cloneGamePlaygroundConfig(playground),
     }),
     ...(visualMaker === undefined ? {} : {
       visualMaker: {
@@ -598,6 +750,10 @@ export async function validateGameEditorPersistenceRecord(
     ...(record.physics2D === undefined ? {} : { physics2D: record.physics2D }),
     ...(record.sceneRules === undefined ? {} : { sceneRules: record.sceneRules }),
     ...(record.eventCards === undefined ? {} : { eventCards: record.eventCards }),
+    ...(record.gameData === undefined ? {} : { gameData: record.gameData }),
+    ...(record.playground === undefined
+      ? {}
+      : { playground: record.playground }),
     ...(record.visualMaker === undefined
       ? {}
       : { visualMaker: record.visualMaker }),
@@ -643,13 +799,21 @@ export async function validateGameEditorPersistenceRecord(
     (!Array.isArray(record.eventCards) ||
       new Set(record.eventCards.map((card) => card.eventId)).size !==
         record.eventCards.length ||
-      record.eventCards.some((card) =>
+    record.eventCards.some((card) =>
         !isValidGameEventCard(card) ||
+        !gameEventCardReferencesExist(card, record.gameData) ||
         [card.sourceTrackId, card.targetTrackId, card.audioTrackId].some(
           (trackId) => trackId !== undefined &&
             !record.tracks.some((track) => track.id === trackId),
         )
       ))
+  ) return false;
+  if (
+    record.gameData !== undefined && !validGameDataSnapshot(record.gameData)
+  ) return false;
+  if (
+    record.playground !== undefined &&
+    !isValidGamePlaygroundPersistenceInput(record.playground)
   ) return false;
   if (
     record.visualMaker !== undefined &&
@@ -712,6 +876,14 @@ export async function validateGameEditorPersistenceRecord(
         await sha256Hex(candidate.editorTimeline?.eventCards ?? []) !==
           await sha256Hex(record.eventCards ?? [])
       ) return false;
+      if (
+        await sha256Hex(candidate.editorTimeline?.items ?? []) !==
+          await sha256Hex(record.gameData?.items ?? []) ||
+        await sha256Hex(candidate.editorTimeline?.recipes ?? []) !==
+          await sha256Hex(record.gameData?.recipes ?? []) ||
+        await sha256Hex(candidate.editorTimeline?.blockTypes ?? []) !==
+          await sha256Hex(record.gameData?.blockTypes ?? [])
+      ) return false;
       const scene = candidate.scenes.find((item) =>
         String(item.sceneId).startsWith("scene:pixieed-game:")
       ) as
@@ -768,6 +940,16 @@ export async function validateGameEditorPersistenceRecord(
           (binding.kind !== "DRAW" ||
             typeof binding.assetDefinitionId !== "string" ||
             !GAME_EDITOR_ID_PATTERN.test(binding.assetDefinitionId))) ||
+        (binding.licenseId !== undefined &&
+          (typeof binding.licenseId !== "string" ||
+            binding.licenseId.trim().length === 0)) ||
+        (binding.rights !== undefined &&
+          (!Array.isArray(binding.rights) || binding.rights.length === 0 ||
+            binding.rights.some((right: unknown) =>
+              typeof right !== "string" || right.trim().length === 0) ||
+            new Set(binding.rights).size !== binding.rights.length)) ||
+        (binding.sourceKind !== undefined &&
+          binding.sourceKind !== "PROJECT" && binding.sourceKind !== "MARKET") ||
         Object.keys(binding).some((key) => !GAME_EDITOR_BINDING_KEYS.has(key))
       ))
   ) return false;
@@ -901,6 +1083,42 @@ function matchesExpected(
   return true;
 }
 
+export function classifyGameEditorPersistenceError(
+  error: unknown,
+  fallbackCause: GameEditorPersistenceFailureCause,
+): {
+  readonly failure: "offline" | "error";
+  readonly cause: GameEditorPersistenceFailureCause;
+  readonly errorName?: string;
+} {
+  const value = error as { readonly name?: unknown; readonly message?: unknown };
+  const name = typeof value?.name === "string" ? value.name : "";
+  const message = typeof value?.message === "string" ? value.message : "";
+  if (name === "SecurityError" || name === "NotAllowedError" ||
+    name === "NotSupportedError" || name === "InvalidStateError") {
+    return {
+      failure: "offline",
+      cause: /IndexedDB(?: is)? (?:unavailable|not supported|not available)/iu
+          .test(message)
+        ? "indexeddb-unavailable"
+        : fallbackCause,
+      ...(name.length === 0 ? {} : { errorName: name }),
+    };
+  }
+  if (/IndexedDB(?: is)? (?:unavailable|not supported|not available)/iu.test(message)) {
+    return {
+      failure: "offline",
+      cause: "indexeddb-unavailable",
+      ...(name.length === 0 ? {} : { errorName: name }),
+    };
+  }
+  return {
+    failure: "error",
+    cause: fallbackCause,
+    ...(name.length === 0 ? {} : { errorName: name }),
+  };
+}
+
 function openGameDatabase(name: string): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     if (typeof indexedDB === "undefined") {
@@ -921,8 +1139,13 @@ function openGameDatabase(name: string): Promise<IDBDatabase> {
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () =>
-      reject(request.error ?? new Error("Game DB open failed."));
-    request.onblocked = () => reject(new Error("Game DB open was blocked."));
+      reject(request.error ?? Object.assign(new Error("Game DB open failed."), {
+        name: "DatabaseOpenError",
+      }));
+    request.onblocked = () =>
+      reject(Object.assign(new Error("Game DB open was blocked."), {
+        name: "DatabaseBlockedError",
+      }));
   });
 }
 
@@ -960,11 +1183,49 @@ export function createIndexedDbGameEditorPersistenceStore(
       }
     },
     async save(record, options) {
-      if (!available) return { ok: false, stale: false };
+      if (!available) {
+        return {
+          ok: false,
+          stale: false,
+          failure: "offline",
+          stage: "storage-save" as const,
+          cause: "indexeddb-unavailable",
+        };
+      }
       try {
-        const database = await openGameDatabase(databaseName);
+        let database: IDBDatabase;
+        try {
+          database = await openGameDatabase(databaseName);
+        } catch (error) {
+          const classified = classifyGameEditorPersistenceError(
+            error,
+            (error as { readonly name?: unknown })?.name ===
+                "DatabaseBlockedError"
+              ? "database-blocked"
+              : "database-open-failed",
+          );
+          return {
+            ok: false,
+            stale: false,
+            failure: classified.failure,
+            stage: "storage-save",
+            cause: classified.cause,
+            ...(classified.errorName === undefined
+              ? {}
+              : { errorName: classified.errorName }),
+          };
+        }
         return await new Promise<GameEditorPersistenceSaveResult>((resolve) => {
           let stale = false;
+          let settled = false;
+          let failure: {
+            readonly failure: "offline" | "error";
+            readonly cause: GameEditorPersistenceFailureCause;
+            readonly errorName?: string;
+          } = {
+            failure: "error",
+            cause: "transaction-failed",
+          };
           const transaction = database.transaction(
             GAME_EDITOR_PERSISTENCE_STORE_NAME,
             "readwrite",
@@ -973,30 +1234,104 @@ export function createIndexedDbGameEditorPersistenceStore(
             GAME_EDITOR_PERSISTENCE_STORE_NAME,
           );
           const read = store.get(record.projectId);
+          const putRecord = (): void => {
+            try {
+              const write = store.put(record);
+              write.onerror = () => {
+                failure = classifyGameEditorPersistenceError(
+                  write.error,
+                  "record-write-failed",
+                );
+                transaction.abort();
+              };
+            } catch (error) {
+              failure = classifyGameEditorPersistenceError(
+                error,
+                "record-write-failed",
+              );
+              transaction.abort();
+            }
+          };
+          const finish = (result: GameEditorPersistenceSaveResult): void => {
+            if (settled) return;
+            settled = true;
+            database.close();
+            resolve(result);
+          };
           read.onsuccess = () => {
             const current = read.result as
               | GameEditorPersistenceRecord
               | undefined;
             if (!matchesExpected(current, options)) stale = true;
-            else if (isNewer(record, current)) store.put(record);
+            else if (isNewer(record, current)) putRecord();
             else stale = true;
           };
-          read.onerror = () => transaction.abort();
+          read.onerror = () => {
+            failure = classifyGameEditorPersistenceError(
+              read.error,
+              "record-read-failed",
+            );
+            transaction.abort();
+          };
           transaction.oncomplete = () => {
-            database.close();
-            resolve({ ok: true, stale });
+            finish({
+              ok: true,
+              stale,
+              ...(stale
+                ? { stage: "storage-save" as const, cause: "cas-conflict" as const }
+                : {}),
+            });
           };
           transaction.onerror = () => {
-            database.close();
-            resolve({ ok: false, stale: false });
+            failure = classifyGameEditorPersistenceError(
+              transaction.error,
+              "transaction-failed",
+            );
+            finish({
+              ok: false,
+              stale: false,
+              failure: failure.failure,
+              stage: "storage-save",
+              cause: failure.cause,
+              ...(failure.errorName === undefined
+                ? {}
+                : { errorName: failure.errorName }),
+            });
           };
           transaction.onabort = () => {
-            database.close();
-            resolve({ ok: false, stale: false });
+            if (failure.cause === "transaction-failed") {
+              failure = classifyGameEditorPersistenceError(
+                transaction.error,
+                "transaction-aborted",
+              );
+            }
+            finish({
+              ok: false,
+              stale: false,
+              failure: failure.failure,
+              stage: "storage-save",
+              cause: failure.cause,
+              ...(failure.errorName === undefined
+                ? {}
+                : { errorName: failure.errorName }),
+            });
           };
         });
-      } catch {
-        return { ok: false, stale: false };
+      } catch (error) {
+        const classified = classifyGameEditorPersistenceError(
+          error,
+          "transaction-failed",
+        );
+        return {
+          ok: false,
+          stale: false,
+          failure: classified.failure,
+          stage: "storage-save",
+          cause: classified.cause,
+          ...(classified.errorName === undefined
+            ? {}
+            : { errorName: classified.errorName }),
+        };
       }
     },
     async clear(projectId) {
@@ -1041,7 +1376,12 @@ export function createMemoryGameEditorPersistenceStore(): GameEditorPersistenceS
     async save(record, options) {
       const current = records.get(record.projectId);
       if (!matchesExpected(current, options) || !isNewer(record, current)) {
-        return { ok: true, stale: true };
+        return {
+          ok: true,
+          stale: true,
+          stage: "storage-save" as const,
+          cause: "cas-conflict" as const,
+        };
       }
       records.set(record.projectId, record);
       return { ok: true, stale: false };

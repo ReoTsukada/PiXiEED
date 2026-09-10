@@ -30,6 +30,11 @@ import {
 } from "./draw2-creator-features.ts";
 import type { PxdAssetDefinitionEntry } from "./draw2-export.ts";
 import { cloneDraw2Tilemaps } from "./draw2-tilemap.ts";
+import {
+  cloneAssetPackageManifest,
+  verifyAssetPackageManifest,
+  type AssetPackageManifest,
+} from "./game/game-350/assetization.ts";
 
 export const DRAW2_PERSISTENCE_SCHEMA_VERSION =
   "DRAW2_PERSISTENCE_V1" as const;
@@ -110,6 +115,8 @@ export interface Draw2PersistenceRecord {
   readonly assetDefinitions?: readonly PxdAssetDefinitionEntry[];
   /** Lightweight Draw timeline annotations; old records may omit this field. */
   readonly timelineMetadata?: Draw2TimelineMetadata;
+  /** Strict, content-addressed Asset / Asset Pack manifests. */
+  readonly assetPackages?: readonly AssetPackageManifest[];
 }
 
 export interface Draw2PersistenceSaveResult {
@@ -185,18 +192,37 @@ function stateHashPayload(
   checkpoint: SerializedDraw2ProjectState,
   assetDefinitions: readonly PxdAssetDefinitionEntry[] | undefined,
   timelineMetadata: Draw2TimelineMetadata | undefined,
+  assetPackages: readonly AssetPackageManifest[] | undefined,
 ): unknown {
   // Records created before Asset Definitions were introduced hash only the
   // checkpoint. Keep those records readable while making new metadata changes
   // part of the Draw subdocument integrity boundary.
-  if (assetDefinitions === undefined && timelineMetadata === undefined) {
+  if (assetDefinitions === undefined && timelineMetadata === undefined && assetPackages === undefined) {
     return checkpoint;
   }
   return {
     checkpoint,
     ...(assetDefinitions === undefined ? {} : { assetDefinitions }),
     ...(timelineMetadata === undefined ? {} : { timelineMetadata }),
+    ...(assetPackages === undefined ? {} : { assetPackages }),
   };
+}
+
+async function normalizeAssetPackages(
+  entries: readonly AssetPackageManifest[] | undefined,
+): Promise<AssetPackageManifest[] | undefined> {
+  if (entries === undefined) return undefined;
+  const normalized: AssetPackageManifest[] = [];
+  const packageIds = new Set<string>();
+  for (const entry of entries) {
+    const verified = await verifyAssetPackageManifest(entry);
+    if (!verified.ok) throw new Error(`Draw2 Asset Package is invalid: ${verified.reasons.join("; ")}`);
+    if (packageIds.has(entry.packageId)) throw new Error("Draw2 Asset Package identity is duplicated.");
+    packageIds.add(entry.packageId);
+    normalized.push(cloneAssetPackageManifest(entry));
+  }
+  normalized.sort((left, right) => left.packageId.localeCompare(right.packageId));
+  return normalized;
 }
 
 function cloneBytes(bytes: Uint8Array): SerializedDraw2Tile["bytes"] {
@@ -388,12 +414,14 @@ export async function createDraw2PersistenceRecord(
   savedAt = new Date().toISOString(),
   assetDefinitions: readonly PxdAssetDefinitionEntry[] = [],
   timelineMetadata?: Draw2TimelineMetadata,
+  assetPackages?: readonly AssetPackageManifest[],
 ): Promise<Draw2PersistenceRecord> {
   const checkpoint = serializeDraw2ProjectState(state);
   const normalizedAssetDefinitions = normalizeAssetDefinitions(assetDefinitions);
   const normalizedTimelineMetadata = timelineMetadata === undefined
     ? undefined
     : normalizeDraw2TimelineMetadata(timelineMetadata, state.frames.length);
+  const normalizedAssetPackages = await normalizeAssetPackages(assetPackages);
   return {
     schemaVersion: DRAW2_PERSISTENCE_SCHEMA_VERSION,
     projectId: state.projectId,
@@ -404,6 +432,7 @@ export async function createDraw2PersistenceRecord(
         checkpoint,
         normalizedAssetDefinitions,
         normalizedTimelineMetadata,
+        normalizedAssetPackages,
       ),
     ),
     checkpoint,
@@ -413,6 +442,7 @@ export async function createDraw2PersistenceRecord(
     ...(normalizedTimelineMetadata === undefined
       ? {}
       : { timelineMetadata: normalizedTimelineMetadata }),
+    ...(normalizedAssetPackages === undefined ? {} : { assetPackages: normalizedAssetPackages }),
   };
 }
 
@@ -424,6 +454,7 @@ export async function restoreDraw2PersistenceRecord(
   readonly history: UndoRedoHistorySnapshot;
   readonly assetDefinitions: readonly PxdAssetDefinitionEntry[];
   readonly timelineMetadata: Draw2TimelineMetadata;
+  readonly assetPackages: readonly AssetPackageManifest[];
 }> {
   if (
     record.schemaVersion !== DRAW2_PERSISTENCE_SCHEMA_VERSION ||
@@ -442,11 +473,13 @@ export async function restoreDraw2PersistenceRecord(
       record.timelineMetadata,
       state.frames.length,
     );
+  const assetPackages = await normalizeAssetPackages(record.assetPackages);
   const expectedHash = await sha256Hex(
     stateHashPayload(
       record.checkpoint,
       record.assetDefinitions === undefined ? undefined : assetDefinitions,
       timelineMetadata,
+      assetPackages,
     ),
   );
   if (record.stateHash !== expectedHash) {
@@ -466,6 +499,7 @@ export async function restoreDraw2PersistenceRecord(
       undefined,
       state.frames.length,
     ),
+    assetPackages: assetPackages ?? [],
   };
 }
 

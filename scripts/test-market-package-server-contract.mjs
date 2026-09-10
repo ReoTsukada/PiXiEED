@@ -11,6 +11,7 @@ const capacityMigration = read('supabase/migrations/20260825090000_market_format
 const singlePriceMigration = read('supabase/migrations/20260721120000_market_single_price_listings.sql');
 const baseFormatRegistry = read('supabase/migrations/20260717110000_market_seller_and_asset_verification.sql');
 const audioFormatRegistry = read('supabase/migrations/20260824202450_market_audio_product_composition.sql');
+const vnextMarketMigration = read('supabase/migrations/20260906002539_pixieed_vnext_market_entitlements_and_pixync.sql');
 
 assert.match(sell, /market-verify-listing-package/);
 assert.ok(sell.indexOf('market-verify-listing-package') < sell.indexOf('market_attach_listing_package'), 'attach must follow server verification');
@@ -27,7 +28,8 @@ assert.match(migration, /server verified package required/);
 assert.match(migration, /name not like '%\/verified\/%'/);
 assert.match(download, /package_rights_snapshot/);
 assert.match(download, /pixieed-market-purchase-rights\/v1/);
-assert.match(download, /packageFiles\(asset, hasRightsSnapshot \? rightsSnapshot : null\)/);
+assert.match(download, /const packageManifest = Object\.keys\(revisionManifest\)\.length/);
+assert.match(download, /packageFiles\(asset, packageManifest\)/);
 
 const uiFormatSource = sell.match(/const FORMAT_ORDER = \[([\s\S]*?)\];/);
 const verifierFormatSource = sharedVerifier.match(/MARKET_PACKAGE_FORMATS = Object\.freeze\(\[([\s\S]*?)\]\)/);
@@ -39,7 +41,7 @@ assert.ok(uiFormats.length >= 18, 'the UI format registry must cover the current
 assert.deepEqual([...uiFormats].sort(), [...verifierFormats].sort(), 'UI and Edge verifier format registries must match');
 for (const format of uiFormats) {
   const escaped = format.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  assert.match(`${baseFormatRegistry}\n${audioFormatRegistry}`, new RegExp(`['"]${escaped}['"]`), `${format} must exist in the SQL format registry`);
+  assert.match(`${baseFormatRegistry}\n${audioFormatRegistry}\n${vnextMarketMigration}`, new RegExp(`['"]${escaped}['"]`), `${format} must exist in the SQL format registry`);
 }
 
 assert.match(capacityMigration, /create or replace function public\.market_create_root_asset_v3/);

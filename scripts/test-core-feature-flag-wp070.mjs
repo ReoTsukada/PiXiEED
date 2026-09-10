@@ -9,7 +9,7 @@ const load = new Function('window', `${source}\nreturn window.PiXiEEDrawModules.
 const api = load(appWindow);
 const flags = api.createCoreFeatureFlagRollback({
   flags: [
-    { flagId: 'draw2-path', domain: 'pxd', currentPath: '/pixiedraw/', actions: ['read', 'write'] },
+    { flagId: 'draw2-path', domain: 'pxd', currentPath: '/pixiedraw2/', actions: ['read', 'write'] },
     { flagId: 'market-path', domain: 'market', currentPath: '/market/', actions: ['read', 'write'] },
     { flagId: 'pixisync-path', domain: 'pixisync', currentPath: 'current-pixisync', actions: ['read', 'write'] },
     { flagId: 'commission-path', domain: 'commission', currentPath: 'current-commission', actions: ['read', 'write'] },

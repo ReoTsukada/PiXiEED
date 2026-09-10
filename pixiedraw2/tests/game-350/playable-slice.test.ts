@@ -6,6 +6,11 @@ import {
   createGame351RpgTemplateFromProject,
   createGame351Physics2DScene,
   createGame351Physics2DWorld,
+  createGame351Physics2DSession,
+  playGame351Physics2DSession,
+  stepGame351Physics2DSession,
+  stopGame351Physics2DSession,
+  restartGame351Physics2DSession,
   GAME351_INPUT_ACTIONS,
   stepGame351Physics2D,
   GAME351_INTERACT_ACTION,
@@ -488,4 +493,87 @@ Deno.test("GAME351-PHYSICS2D-003 distinguishes canonical NPC trigger events from
     !world.activeContactIds.some((id) => id.startsWith("COLLISION|") && id.includes(String(triggerTemplate.npcEntityId))),
     "NPC trigger must not become a blocking COLLISION contact",
   );
+});
+
+Deno.test("GAME351-PREVIEW-SESSION-001 isolates Physics2D Preview lifecycle and contacts", async () => {
+  const template = await createGame351RpgTemplate();
+  const beforeProject = JSON.stringify(template.project);
+  let session = playGame351Physics2DSession(createGame351Physics2DSession(template, { settings: { gravity: { x: 0, y: 0 } } }));
+  const beforeWorld = JSON.stringify(session.world);
+  session = stepGame351Physics2DSession(session, { action: GAME351_INPUT_ACTIONS.MOVE_DOWN });
+  const moved = session.world.bodies.find((body) => body.entityId === String(template.playerEntityId))!;
+  assert(moved.position.y > 1, "Preview session must move the Physics2D Player");
+  for (let index = 0; index < 15; index += 1) session = stepGame351Physics2DSession(session, { action: GAME351_INPUT_ACTIONS.MOVE_DOWN });
+  let collisionSeen = false;
+  for (let index = 0; index < 40; index += 1) {
+    session = stepGame351Physics2DSession(session, { action: GAME351_INPUT_ACTIONS.MOVE_RIGHT });
+    collisionSeen ||= session.events.some((event) => event.kind === "COLLISION");
+  }
+  const blocked = session.world.bodies.find((body) => body.entityId === String(template.playerEntityId))!;
+  assert(blocked.position.x < 3, `Physics2D Preview Player must stop at the solid cell (x=${blocked.position.x})`);
+  assert(collisionSeen, "solid contact must be exposed by the session");
+  assert(JSON.stringify(template.project) === beforeProject && JSON.stringify(session.snapshot) !== "", "session stepping must not mutate the canonical Project");
+  const stopped = stopGame351Physics2DSession(session);
+  assert(stopped.mode === "STOPPED" && stepGame351Physics2DSession(stopped).world === stopped.world, "Stop must freeze the Preview runtime");
+  const restarted = restartGame351Physics2DSession(stopped);
+  const resetPlayer = restarted.world.bodies.find((body) => body.entityId === String(template.playerEntityId))!;
+  assert(restarted.tick === 0 && resetPlayer.position.x === 1 && resetPlayer.position.y === 1, "Restart must clear runtime movement");
+  assert(JSON.stringify(createGame351Physics2DSession(template, { settings: { gravity: { x: 0, y: 0 } } }).world) === beforeWorld, "Restart must be deterministic");
+});
+
+Deno.test("GAME351-PREVIEW-SESSION-002 exposes trigger ENTER/STAY/EXIT", async () => {
+  const base = await createGame351RpgTemplate();
+  const template = { ...base, map: { ...base.map, triggerCells: [{ x: 2, y: 1, triggerId: "preview-trigger" }] } };
+  let session = playGame351Physics2DSession(createGame351Physics2DSession(template, { settings: { gravity: { x: 0, y: 0 } } }));
+  let phases: string[] = [];
+  for (let index = 0; index < 16; index += 1) {
+    session = stepGame351Physics2DSession(session, { action: GAME351_INPUT_ACTIONS.MOVE_RIGHT });
+    phases = [...phases, ...session.events.filter((event) => event.kind === "TRIGGER").map((event) => event.phase)];
+  }
+  assert(phases.includes("ENTER"), "enter must be emitted when Player enters a trigger");
+  session = stepGame351Physics2DSession(session, { action: null });
+  phases = [...phases, ...session.events.filter((event) => event.kind === "TRIGGER").map((event) => event.phase)];
+  assert(phases.includes("STAY"), "stay must be emitted while overlap continues");
+  for (let index = 0; index < 16; index += 1) {
+    session = stepGame351Physics2DSession(session, { action: GAME351_INPUT_ACTIONS.MOVE_LEFT });
+    phases = [...phases, ...session.events.filter((event) => event.kind === "TRIGGER").map((event) => event.phase)];
+  }
+  assert(phases.includes("EXIT"), "exit must be emitted when Player leaves a trigger");
+});
+
+Deno.test("GAME351-PREVIEW-SESSION-003 keeps large-map Physics2D bodies inside the runtime chunk window", async () => {
+  const base = await createGame351RpgTemplate();
+  const cases = [
+    { size: 256, center: { x: 128, y: 128 }, inside: { x: 128, y: 128 }, outside: { x: 0, y: 0 } },
+    { size: 1024, center: { x: 512, y: 512 }, inside: { x: 512, y: 512 }, outside: { x: 0, y: 0 } },
+  ] as const;
+
+  for (const testCase of cases) {
+    const map = {
+      ...base.map,
+      width: testCase.size,
+      height: testCase.size,
+      bounds: { minX: 0, minY: 0, maxX: testCase.size - 1, maxY: testCase.size - 1 },
+      solidCells: [testCase.inside, testCase.outside],
+      triggerCells: [{ ...testCase.inside, x: testCase.inside.x + 1, triggerId: `large-map-${testCase.size}` }, { ...testCase.outside, x: testCase.outside.x + 1, triggerId: `outside-${testCase.size}` }],
+    };
+    const template = { ...base, map };
+    const beforeProject = JSON.stringify(template.project);
+    const session = createGame351Physics2DSession(template, {
+      tilemapCenter: testCase.center,
+      tilemapChunkSize: 32,
+      tilemapChunkRadius: 1,
+    });
+    const generatedScene = session.scene.entities.filter((entity) => String(entity.entityId).startsWith("physics2d:"));
+    const generatedBodies = session.world.bodies.filter((body) => body.entityId.startsWith("physics2d:"));
+    const canonicalBodies = session.world.bodies.filter((body) => !body.entityId.startsWith("physics2d:"));
+    assert(generatedScene.length === 6, `only one in-window solid, one trigger, and four boundaries may be projected for ${testCase.size}x${testCase.size}`);
+    assert(generatedBodies.length === 6, `Preview Physics2D body count must stay bounded for ${testCase.size}x${testCase.size}`);
+    const canonicalEntityIds = new Set(session.scene.entities.filter((entity) => !String(entity.entityId).startsWith("physics2d:")).map((entity) => String(entity.entityId)));
+    assert(canonicalBodies.some((body) => body.entityId === String(template.playerEntityId)), "the canonical Player body must remain counted separately from generated tilemap bodies");
+    assert(canonicalBodies.every((body) => canonicalEntityIds.has(body.entityId)), "non-generated Physics2D bodies must come only from canonical entities; Camera2D has no body");
+    assert(session.world.bodies.length === canonicalBodies.length + 6, "total Preview bodies must be canonical Player/NPC plus the bounded tilemap projection");
+    assert(!generatedScene.some((entity) => entity.name.includes(`(${testCase.outside.x},${testCase.outside.y})`) || entity.name.includes(`outside-${testCase.size}`)), "out-of-window Solid/Trigger must not enter the Physics2D Scene");
+    assert(JSON.stringify(template.project) === beforeProject, "large-map runtime projection must not mutate the canonical Project");
+  }
 });

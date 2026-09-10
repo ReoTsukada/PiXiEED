@@ -39,7 +39,7 @@ export function pixelPerfectPath(
     const from = points[index - 1];
     const to = points[index];
     if (from === undefined || to === undefined) continue;
-    path.push(...interpolatePixelLine(from, to));
+    path.push(...interpolatePixelLine(from, to, "pixel-perfect"));
   }
   return uniquePoints(path);
 }

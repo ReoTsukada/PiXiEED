@@ -12,6 +12,7 @@ import { GameEditorCanonicalStore } from "../../src/pixync/game-editor-canonical
 import {
   buildGameAssetBrowserEntries,
   findGameAnimationClips,
+  gameAnimationClipMatchesRuntime,
   gameAnimationBindingIdFor,
   upsertGameAnimationBinding,
 } from "../../src/game/game-350/game-asset-browser.ts";
@@ -23,6 +24,14 @@ import {
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
+
+Deno.test("GAME350-ANIMATION-001 matches split and suffixed motion names", () => {
+  const clip = { id: "clip", definitionId: "def", definitionName: "hero", clipKey: "walk-down", clip: {} as AssetAnimationClip, motionName: "WALK_DOWN" };
+  assert(gameAnimationClipMatchesRuntime({ clip, motion: "WALK", direction: "DOWN" }), "suffixed motion should match");
+  assert(!gameAnimationClipMatchesRuntime({ clip, motion: "WALK", direction: "UP" }), "direction should remain strict");
+  const split = { ...clip, motionName: "WALK", direction: "DOWN" };
+  assert(gameAnimationClipMatchesRuntime({ clip: split, motion: "WALK", direction: "DOWN" }), "split direction should match");
+});
 
 function definition(
   definitionId: string,

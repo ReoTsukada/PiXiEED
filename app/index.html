@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Creator App | PiXiEED</title>
+  <link rel="stylesheet" href="assets/app-shell.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="app-header"><div class="app-header__inner">
+      <a class="app-logo" href="./">PiXi<span>EED</span></a>
+      <nav class="app-nav" aria-label="Creator App"><a href="./" aria-current="page">Project Home</a><a href="new/">新規Project</a><a href="../community/">SNS</a><a href="../market/">Market</a></nav>
+      <a class="app-header__account" href="account/">My Page ↗</a>
+    </div></header>
+    <main class="app-main">
+      <p class="app-kicker">CREATOR APP / PROJECT HOME</p>
+      <h1 class="app-title">つくる、組み合わせる、世界を広げる。</h1>
+      <p class="app-lead">Projectを中心に、iDRAW・iAUDIO・iGAMEを行き来するための新しい入口です。既存のStudio、Market、アカウント機能はそのまま利用します。</p>
+      <div class="app-actions"><a class="app-button app-button--primary" href="new/">新しいProjectを作る</a><a class="app-button" data-project-route href="project/">現在のProjectを開く</a><a class="app-button" data-studio-mode="DRAW" href="../pixiedraw2/">既存Studioを開く ↗</a></div>
+
+      <section class="app-section" aria-labelledby="project-status"><div class="app-section__heading"><div><h2 id="project-status">Project状態</h2><p>この入口で保持するローカル状態</p></div><span class="app-status app-status--pending">サーバー未接続</span></div>
+        <div class="app-split"><div class="app-card"><h3 data-project-name>無題のProject</h3><p>Project Homeの表示状態です。実データの保存・同期は既存Studio側が管理します。</p><div class="app-card__footer"><span class="app-status">保存: <span data-save-state>未保存</span></span><a class="app-button app-button--subtle" href="project/">詳細を見る</a></div></div><div class="app-card"><dl class="app-meta"><div><dt>ローカル</dt><dd data-local-state>LOCAL_ONLY</dd></div><div><dt>同期</dt><dd data-sync-state>未接続</dd></div><div><dt>権利</dt><dd data-rights-state>既存Marketを利用</dd></div></dl></div></div>
+      </section>
+
+      <section class="app-section" aria-labelledby="tools"><div class="app-section__heading"><div><h2 id="tools">制作ツール</h2><p>同じProjectから既存の実装へ進みます</p></div></div>
+        <div class="app-grid"><article class="app-card app-card--draw"><h3>iDRAW</h3><p>キャラクター、背景、アニメーションを描く。</p><div class="app-card__footer"><span class="app-status">既存Studio</span><a class="app-button" data-studio-mode="DRAW" href="../pixiedraw2/">開く ↗</a></div></article><article class="app-card app-card--audio"><h3>iAUDIO</h3><p>BGM、SE、音の範囲をProjectへ組み合わせる。</p><div class="app-card__footer"><span class="app-status">Studio内モード</span><a class="app-button" data-studio-mode="AUDIO" href="../pixiedraw2/">開く ↗</a></div></article><article class="app-card app-card--game"><h3>iGAME</h3><p>素材を配置し、遊べるSceneとして確かめる。</p><div class="app-card__footer"><span class="app-status">Studio内モード</span><a class="app-button" data-studio-mode="GAME" href="../pixiedraw2/">開く ↗</a></div></article><article class="app-card app-card--writing"><h3>文章・世界観</h3><p>物語、章、世界のノードと関係を組み立てる。</p><div class="app-card__footer"><span class="app-status">Creator App</span><a class="app-button" data-project-route href="writing/">開く</a></div></article><article class="app-card app-card--visual"><h3>画像・動画</h3><p>画像と動画を素材・レイヤーとして編集する。</p><div class="app-card__footer"><span class="app-status">Creator App</span><a class="app-button" data-project-route href="visual/">開く</a></div></article></div>
+      </section>
+
+      <section class="app-section" aria-labelledby="next"><div class="app-notice"><strong id="next">作品を届ける</strong><br>Marketの購入・Entitlement・License・安全なDownloadは既存Marketが管理します。この静的入口では決済や認証を実行しません。<div class="app-actions"><a class="app-button" href="../market/">Marketを見る</a><a class="app-button" data-project-route href="account/">購入済み・作品管理 ↗</a></div></div></section>
+    </main>
+    <footer class="app-footer"><p>PiXiEED Creator App · 静的ルート骨格 · 既存機能を保全</p></footer>
+  </div>
+  <script src="assets/creator-project-store.js"></script>
+  <script src="assets/app-shell.js"></script>
+</body>
+</html>

@@ -27,6 +27,19 @@ export const MARKET_PACKAGE_FORMATS = Object.freeze([
   "opus",
   "wav",
   "weba",
+  "novel-json",
+  "visual-project",
+  "text",
+  "markdown",
+  "html",
+  "csv",
+  "rtf",
+  "json",
+  "mp4",
+  "webm",
+  "mov",
+  "m4v",
+  "ogv",
 ]);
 
 const FORMAT_SET = new Set(MARKET_PACKAGE_FORMATS);
@@ -51,6 +64,17 @@ const AUDIO_FORMATS = new Set([
   "wav",
   "weba",
 ]);
+const TEXT_FORMATS = new Set([
+  "novel-json",
+  "visual-project",
+  "text",
+  "markdown",
+  "html",
+  "csv",
+  "rtf",
+  "json",
+]);
+const VIDEO_FORMATS = new Set(["mp4", "webm", "mov", "m4v", "ogv"]);
 
 export type MarketPackageFile = {
   original_path: string;
@@ -255,6 +279,45 @@ export function hasValidContainerSignature(format: string, bytes: Uint8Array): b
       return hasAscii(bytes.slice(0, 3), "ID3") || (bytes[0] === 0xff && (bytes[1] & 0xe0) === 0xe0);
     case "aac":
       return bytes[0] === 0xff && (bytes[1] & 0xf6) === 0xf0;
+    case "mp4":
+    case "mov":
+    case "m4v":
+      return hasAscii(bytes.slice(4, 8), "ftyp");
+    case "webm":
+      return hasBytes(bytes, [0x1a, 0x45, 0xdf, 0xa3]);
+    case "ogv":
+      return hasAscii(bytes.slice(0, 4), "OggS");
+    case "novel-json":
+    case "visual-project":
+    case "json":
+    case "text":
+    case "markdown":
+    case "html":
+    case "csv":
+    case "rtf": {
+      if (bytes.some((value) => value === 0)) return false;
+      let decoded = "";
+      try {
+        decoded = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+      } catch (_error) {
+        return false;
+      }
+      if (!decoded.trim()) return false;
+      if (format === "rtf" && !decoded.trimStart().startsWith("{\\rtf")) return false;
+      if (format === "novel-json" || format === "visual-project" || format === "json") {
+        try {
+          const parsed = JSON.parse(decoded);
+          if (format === "novel-json") {
+            return parsed?.contentKind === "NOVEL" || parsed?.contentAggregate?.novel?.contentKind === "NOVEL";
+          }
+          if (format === "visual-project") return parsed?.kind === "pixieed-visual-project";
+          return parsed !== null && typeof parsed === "object";
+        } catch (_error) {
+          return false;
+        }
+      }
+      return true;
+    }
     default:
       return false;
   }
@@ -263,11 +326,23 @@ export function hasValidContainerSignature(format: string, bytes: Uint8Array): b
 function mimeMatches(format: string, mimeType: string): boolean {
   const mime = mimeType.toLowerCase().split(";", 1)[0].trim();
   if (!mime || mime === "application/octet-stream") return true;
-  if (format === "pixiedraw-project") return ["application/zip", "application/x-zip-compressed"].includes(mime);
+  if (format === "pixiedraw-project") return ["application/vnd.pixieed.pxd", "application/zip", "application/x-zip-compressed"].includes(mime);
   if (format === "png" || format === "apng" || format === "sprite-sheet-png") return ["image/png", "image/apng"].includes(mime);
   if (format === "webp") return mime === "image/webp";
   if (format === "gif") return mime === "image/gif";
-  return mime.startsWith("audio/") || mime === "audio/midi" || mime === "application/ogg" || mime === "video/webm";
+  if (AUDIO_FORMATS.has(format)) return mime.startsWith("audio/") || mime === "audio/midi" || mime === "application/ogg";
+  if (format === "mp4") return ["video/mp4", "application/mp4"].includes(mime);
+  if (format === "mov") return ["video/quicktime", "video/mov"].includes(mime);
+  if (format === "m4v") return ["video/x-m4v", "video/mp4"].includes(mime);
+  if (format === "webm") return mime === "video/webm";
+  if (format === "ogv") return ["video/ogg", "application/ogg"].includes(mime);
+  if (format === "novel-json" || format === "visual-project" || format === "json") return ["application/json", "text/json", "text/plain"].includes(mime);
+  if (format === "markdown") return ["text/markdown", "text/x-markdown", "text/plain"].includes(mime);
+  if (format === "html") return ["text/html", "application/xhtml+xml"].includes(mime);
+  if (format === "csv") return ["text/csv", "text/plain"].includes(mime);
+  if (format === "rtf") return ["application/rtf", "text/rtf"].includes(mime);
+  if (format === "text") return mime.startsWith("text/");
+  return false;
 }
 
 function deriveComposition(formats: readonly string[]): string {
@@ -275,8 +350,14 @@ function deriveComposition(formats: readonly string[]): string {
   if (unique.length === 1 && unique[0] === "pixiedraw-project") return "pixiedraw-project";
   const hasImage = unique.some((format) => IMAGE_FORMATS.has(format));
   const hasAudio = unique.some((format) => AUDIO_FORMATS.has(format));
+  const hasText = unique.some((format) => TEXT_FORMATS.has(format));
+  const hasVideo = unique.some((format) => VIDEO_FORMATS.has(format));
   if (hasAudio && hasImage && unique.every((format) => IMAGE_FORMATS.has(format) || AUDIO_FORMATS.has(format))) return "image-audio";
+  if (hasText && hasImage && unique.every((format) => TEXT_FORMATS.has(format) || IMAGE_FORMATS.has(format))) return "text-image";
+  if (hasVideo && hasImage && unique.every((format) => VIDEO_FORMATS.has(format) || IMAGE_FORMATS.has(format))) return "image-video";
   if (hasAudio && unique.every((format) => AUDIO_FORMATS.has(format))) return "audio-only";
+  if (hasText && unique.every((format) => TEXT_FORMATS.has(format))) return "text-only";
+  if (hasVideo && unique.every((format) => VIDEO_FORMATS.has(format))) return "video-only";
   if (hasImage && unique.every((format) => IMAGE_FORMATS.has(format))) return "image-only";
   return "all-files";
 }

@@ -75,7 +75,7 @@ const CURRENT_ROUTE_DATA = Object.freeze([
   ['/pixfind/puzzles/pixfind-ho-a90bc7c5-e055-447c-b67f-d0b9fa61e3fa/', 'pixfind/puzzles/pixfind-ho-a90bc7c5-e055-447c-b67f-d0b9fa61e3fa/index.html', 'LEGACY_COMPAT'],
   ['/pixfind/puzzles/pixfind-ho-e52df997-0fc7-4de9-a0d6-2f9b57454bdb/', 'pixfind/puzzles/pixfind-ho-e52df997-0fc7-4de9-a0d6-2f9b57454bdb/index.html', 'LEGACY_COMPAT'],
   ['/pixfind/puzzles/pixfind-sd-0fb05bfd-47e6-47eb-95b7-a3021aa12d70/', 'pixfind/puzzles/pixfind-sd-0fb05bfd-47e6-47eb-95b7-a3021aa12d70/index.html', 'LEGACY_COMPAT'],
-  ['/pixiedraw/', 'pixiedraw/index.html', 'STATIC'],
+  ['/pixiedraw2/', 'pixiedraw2/index.html', 'STATIC'],
   ['/pixiee-lens/', 'pixiee-lens/index.html', 'STATIC'],
   ['/portfolio/', 'portfolio/index.html', 'STATIC'],
   ['/post/', 'post/index.html', 'STATIC'],
@@ -126,7 +126,8 @@ export const ROUTE_CATALOG = Object.freeze([
   freezeRoute({ routeId: 'pixfind-puzzle-legacy', path: '/pixfind/puzzles/:puzzleId/', source: 'pixfind/puzzles/:puzzleId/index.html', kind: 'LEGACY_COMPAT', resourceType: 'PIXFIND_PUZZLE', canonicalPath: '/pixfind/?puzzle=:puzzleId', legacy: true }),
   freezeRoute({ routeId: 'pixfind-puzzle-canonical-query', path: '/pixfind/', source: 'pixfind/index.html', kind: 'DYNAMIC_PUBLIC', resourceType: 'PIXFIND_PUZZLE', canonicalPath: '/pixfind/?puzzle=:puzzleId' }),
   freezeRoute({ routeId: 'pixfind-puzzle-index-query', path: '/pixfind/index.html', source: 'pixfind/index.html', kind: 'LEGACY_COMPAT', resourceType: 'PIXFIND_PUZZLE', canonicalPath: '/pixfind/?puzzle=:puzzleId', legacy: true }),
-  freezeRoute({ routeId: 'pixiedraw-project-query', path: '/pixiedraw/', source: 'pixiedraw/index.html', kind: 'DYNAMIC_PUBLIC', resourceType: 'PROJECT', canonicalPath: '/pixiedraw/?project=:projectId' }),
+  freezeRoute({ routeId: 'pixiedraw-legacy-route', path: '/pixiedraw/', source: 'pixiedraw/index.html', kind: 'LEGACY_COMPAT', resourceType: 'PROJECT', canonicalPath: '/pixiedraw2/', legacy: true }),
+  freezeRoute({ routeId: 'pixiedraw2-project-query', path: '/pixiedraw2/', source: 'pixiedraw2/index.html', kind: 'DYNAMIC_PUBLIC', resourceType: 'PROJECT', canonicalPath: '/pixiedraw2/' }),
   freezeRoute({ routeId: 'post-detail-query', path: '/post/', source: 'post/index.html', kind: 'DYNAMIC_PUBLIC', resourceType: 'SOCIAL_POST', canonicalPath: '/post/?id=:postId' }),
   freezeRoute({ routeId: 'post-detail-path', path: '/posts/:postId/', source: 'post/index.html', kind: 'LEGACY_COMPAT', resourceType: 'SOCIAL_POST', canonicalPath: '/post/?id=:postId', legacy: true }),
 ]);
@@ -186,7 +187,9 @@ function operationFailure(error, fallbackCode) {
 }
 
 function serverAllow(decision, code, expected, authorizationEvaluator) {
+  if (!decision) fail(code, 'Routing requires an AuthorizationProof decision.');
   if (typeof authorizationEvaluator !== 'function') fail(code, 'Routing requires a server-owned Authorization evaluator.');
+  if (decision && decision.source !== 'server' && decision.knownPrincipal !== true) fail(code, 'Routing AuthorizationProof must be server-owned.');
   const proof = resolveAuthorizationProofSync({
     expected: {
       ...expected,
@@ -195,7 +198,7 @@ function serverAllow(decision, code, expected, authorizationEvaluator) {
       correlationId: expected.correlationId ?? decision?.correlationId ?? null,
       policyVersion: AUTHORIZATION_PROOF_POLICY_VERSION,
     },
-    callerProof: decision,
+    callerProof: decision?.knownPrincipal === true ? null : decision,
     authorizationEvaluator: (input) => authorizationEvaluator({ ...input, source: 'server' }),
   });
   if (proof.decision !== 'allow') fail(code, 'Routing AuthorizationProof did not grant the requested operation.');
@@ -408,13 +411,28 @@ export function createPublicUrlRoutingCore({
         resource = resolved.resource; visibility = resolved.visibility.visibility; canonicalPath = withQuery('/pixfind/', { puzzle: pixfindQueryId }); legacy = request.pathname !== '/pixfind/'; state = legacy ? 'LEGACY_MATCH' : 'CANONICAL';
       }
 
-      const pixiedrawBasePath = request.pathname === '/pixiedraw/' || isIndexAlias(request.pathname, '/pixiedraw/');
+      const pixiedrawLegacyBasePath = request.pathname === '/pixiedraw/' || isIndexAlias(request.pathname, '/pixiedraw/');
+      const pixiedraw2BasePath = request.pathname === '/pixiedraw2/' || isIndexAlias(request.pathname, '/pixiedraw2/');
+      const pixiedrawBasePath = pixiedrawLegacyBasePath || pixiedraw2BasePath;
       const projectId = pixiedrawBasePath ? request.query.project : undefined;
-      if (!route && projectId !== undefined) {
+      if (!route && pixiedrawLegacyBasePath) {
+        if (projectId !== undefined) {
+          if (!projectId || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(projectId)) fail('ROUTING_TYPED_ID_INVALID', 'Legacy PiXiEEDraw project ID is invalid.', 'query.project');
+          params = { projectId };
+        }
+        route = routeById.get('pixiedraw-legacy-route');
+        const resolved = projectId === undefined ? null : resolveResource({ route, resourceId: projectId, permissionDecision });
+        resource = resolved?.resource || null;
+        visibility = resolved?.visibility.visibility || 'PUBLIC';
+        canonicalPath = projectId === undefined ? '/pixiedraw2/' : withQuery('/pixiedraw2/', { project: projectId });
+        legacy = true;
+        state = 'LEGACY_MATCH';
+      }
+      if (!route && pixiedraw2BasePath && projectId !== undefined) {
         if (!projectId || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(projectId)) fail('ROUTING_TYPED_ID_INVALID', 'PiXiEEDraw project ID is invalid.', 'query.project');
-        route = routeById.get('pixiedraw-project-query'); params = { projectId };
+        route = routeById.get('pixiedraw2-project-query'); params = { projectId };
         const resolved = resolveResource({ route, resourceId: projectId, permissionDecision });
-        resource = resolved.resource; visibility = resolved.visibility.visibility; canonicalPath = withQuery('/pixiedraw/', { project: projectId }); state = 'CANONICAL';
+        resource = resolved.resource; visibility = resolved.visibility.visibility; canonicalPath = withQuery('/pixiedraw2/', { project: projectId }); state = 'CANONICAL';
       }
 
       const postQueryPath = request.pathname === '/post/' || isIndexAlias(request.pathname, '/post/');

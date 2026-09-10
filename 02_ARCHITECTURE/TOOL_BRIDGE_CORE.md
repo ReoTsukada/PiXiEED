@@ -18,6 +18,12 @@ WP-093 freezes the common connection contract between PiXiEED Core and current/f
 is a pure, unloaded reference implementation. It does not implement an editor, renderer, player,
 converter, Storage client, package builder, Market, SNS, or transport.
 
+**Terminology boundary:** この文書のVersioned Tool Bridgeは、PiXiEED Core内部の参照・能力・
+アダプター契約であり、Aseprite／Unity等を接続する別製品のPiXiEED Bridgeネイティブアプリ
+ではない。また、この契約はDraw2の同期transportを選択しない。Draw2の標準同期はPiXYNC
+（ローカル3モードセッション＋オンラインprovider）が担い、外部PiXiEED Bridgeは任意の
+相互運用経路として別に扱う。
+
 ## Identity and registration
 
 `toolId` and `toolVersion` are Tool-owned identities. `bridgeApiVersion` is a separate Core-owned

@@ -17,6 +17,8 @@ export const WORKSPACE_ACTIVE_PROJECT_STORAGE_KEY =
   "pixiedraw2:active-project-id:v1" as const;
 export const WORKSPACE_PROJECT_CHANGED_EVENT =
   "pixiedraw2:project-changed" as const;
+export const WORKSPACE_MANIFEST_CHANGED_EVENT =
+  "pixiedraw2:workspace-manifest-changed" as const;
 export const DEFAULT_WORKSPACE_PROJECT_ID = "draw2-local-demo" as const;
 
 export type WorkspaceProjectId = string & {
@@ -484,6 +486,7 @@ export function createIndexedDbWorkspaceManifestStore(
         },
       };
       await this.save(next);
+      announceWorkspaceManifestChanged(next);
       return next;
     },
     async setActiveMode(projectId, activeMode) {
@@ -508,6 +511,7 @@ export function createIndexedDbWorkspaceManifestStore(
         migration: { audio: migration },
       };
       await this.save(next);
+      announceWorkspaceManifestChanged(next);
       return next;
     },
   };
@@ -549,6 +553,7 @@ export function createMemoryWorkspaceManifestStore(): WorkspaceManifestStore {
         },
       };
       await this.save(next);
+      announceWorkspaceManifestChanged(next);
       return next;
     },
     async setActiveMode(projectId, activeMode) {
@@ -573,6 +578,7 @@ export function createMemoryWorkspaceManifestStore(): WorkspaceManifestStore {
         migration: { audio: migration },
       };
       await this.save(next);
+      announceWorkspaceManifestChanged(next);
       return next;
     },
   };
@@ -615,6 +621,18 @@ export function announceWorkspaceProjectChanged(
     new CustomEvent<WorkspaceProjectChangedDetail>(
       WORKSPACE_PROJECT_CHANGED_EVENT,
       { detail },
+    ),
+  );
+}
+
+function announceWorkspaceManifestChanged(
+  manifest: WorkspaceProjectManifest,
+): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(
+    new CustomEvent<WorkspaceProjectManifest>(
+      WORKSPACE_MANIFEST_CHANGED_EVENT,
+      { detail: cloneManifest(manifest) },
     ),
   );
 }

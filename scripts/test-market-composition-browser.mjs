@@ -82,6 +82,14 @@ try {
   });
   await page.waitForTimeout(700);
 
+  assert.equal(await page.locator("#listingAcquisitionEnabled").isChecked(), true);
+  assert.equal(await page.locator("#listingPrice").inputValue(), "0");
+  await page.locator("#listingAcquisitionShowcase").check();
+  assert.equal(await page.locator("#listingAcquisitionFields").isHidden(), true);
+  assert.match(await page.locator("#listingPolicySummary").textContent(), /公開のみ/);
+  await page.locator("#listingAcquisitionEnabled").check();
+  assert.equal(await page.locator("#listingAcquisitionFields").isHidden(), false);
+
   const png = Buffer.from(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
     "base64",
@@ -107,11 +115,19 @@ try {
     /音声形式も購入後にZIP/,
   );
   for (const [id, expectedFormatCount] of compositions) {
-    await page.locator("#listingFiles").setInputFiles([
-      { name: "hero.png", mimeType: "image/png", buffer: png },
-      { name: "theme.mp3", mimeType: "audio/mpeg", buffer: audio },
-      { name: "project.pxd", mimeType: "application/zip", buffer: pxd },
-    ]);
+    const files = id === "image-audio"
+      ? [
+        { name: "hero.png", mimeType: "image/png", buffer: png },
+        { name: "theme.mp3", mimeType: "audio/mpeg", buffer: audio },
+      ]
+      : id === "pixiedraw-project"
+      ? [{ name: "project.pxd", mimeType: "application/zip", buffer: pxd }]
+      : [
+        { name: "hero.png", mimeType: "image/png", buffer: png },
+        { name: "theme.mp3", mimeType: "audio/mpeg", buffer: audio },
+        { name: "project.pxd", mimeType: "application/zip", buffer: pxd },
+      ];
+    await page.locator("#listingFiles").setInputFiles(files);
     await page.waitForTimeout(450);
     const radio = page.locator(`#listingPackageComposition input[value="${id}"]`);
     assert.equal(await radio.isDisabled(), false, `${id} must be available`);

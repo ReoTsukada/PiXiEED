@@ -42,6 +42,7 @@ export type TransformOperation =
   | "ROTATE_90_CW"
   | "ROTATE_90_CCW"
   | "ROTATE_180"
+  | "ROTATE_NEAREST"
   | "SCALE_INTEGER"
   | "SCALE_NEAREST";
 export type TransformInterpolationPolicy = "NEAREST_NEIGHBOR";
@@ -87,6 +88,8 @@ export interface TransformDescriptor {
   readonly dx: number;
   readonly dy: number;
   readonly factor: number;
+  /** Degrees clockwise in canvas coordinates for ROTATE_NEAREST. */
+  readonly angleDeg?: number;
   readonly interpolationPolicy: TransformInterpolationPolicy;
   readonly outOfBoundsPolicy: OutOfBoundsPolicy;
 }
@@ -172,6 +175,9 @@ export interface SelectionTransformWirePayload {
   readonly sourceCount: number;
   readonly destinationCount: number;
   readonly outOfBoundsClipped: boolean;
+  /** Transparent destination cells never erase existing artwork. */
+  /** Omitted by older v1 peers; the runtime still defaults to preservation. */
+  readonly transparentDestinationPolicy?: "PRESERVE_DESTINATION";
 }
 
 export interface SelectionTransformWireCommand
@@ -350,6 +356,7 @@ function validateTransform(transform: TransformDescriptor): Diagnostic[] {
   if (transform.outOfBoundsPolicy === "EXPAND_CANVAS_CANDIDATE") diagnostics.push(error("TRANSFORM_CANVAS_EXPANSION_UNSUPPORTED", "Canvas expansion is a future candidate and cannot mutate this Project.", "transform.outOfBoundsPolicy"));
   if (transform.operation === "SCALE_INTEGER" && (!isInteger(transform.factor) || transform.factor < 1 || transform.factor > 8)) diagnostics.push(error("TRANSFORM_SCALE_INVALID", "Integer scale factor must be between 1 and 8.", "transform.factor"));
   if (transform.operation === "SCALE_NEAREST" && (!Number.isFinite(transform.factor) || transform.factor < 0.125 || transform.factor > 8)) diagnostics.push(error("TRANSFORM_SCALE_INVALID", "Nearest-neighbor scale factor must be between 0.125 and 8.", "transform.factor"));
+  if (transform.operation === "ROTATE_NEAREST" && (!Number.isFinite(transform.angleDeg) || Math.abs(transform.angleDeg ?? 0) > 36000)) diagnostics.push(error("TRANSFORM_ANGLE_INVALID", "Nearest-neighbor rotation angle must be finite and within ±36000 degrees.", "transform.angleDeg"));
   return diagnostics;
 }
 
@@ -399,9 +406,69 @@ export function createRectangleSelectionSnapshot(
   };
 }
 
+function rotatedRegion(
+  bounds: SelectionRegion,
+  angleDeg: number,
+  dx = 0,
+  dy = 0,
+): SelectionRegion {
+  const normalizedAngle = ((angleDeg % 360) + 360) % 360;
+  const radians = normalizedAngle * Math.PI / 180;
+  const cos = Math.abs(Math.cos(radians)) < 1e-10 ? 0 : Math.cos(radians);
+  const sin = Math.abs(Math.sin(radians)) < 1e-10 ? 0 : Math.sin(radians);
+  const centerX = bounds.x + (bounds.width - 1) / 2;
+  const centerY = bounds.y + (bounds.height - 1) / 2;
+  const corners = [
+    { x: bounds.x, y: bounds.y },
+    { x: bounds.x + bounds.width - 1, y: bounds.y },
+    { x: bounds.x, y: bounds.y + bounds.height - 1 },
+    { x: bounds.x + bounds.width - 1, y: bounds.y + bounds.height - 1 },
+  ].map((point) => ({
+    x: centerX + (point.x - centerX) * cos - (point.y - centerY) * sin,
+    y: centerY + (point.x - centerX) * sin + (point.y - centerY) * cos,
+  }));
+  const minX = Math.floor(Math.min(...corners.map((point) => point.x)) + 1e-9);
+  const minY = Math.floor(Math.min(...corners.map((point) => point.y)) + 1e-9);
+  const maxX = Math.ceil(Math.max(...corners.map((point) => point.x)) - 1e-9);
+  const maxY = Math.ceil(Math.max(...corners.map((point) => point.y)) - 1e-9);
+  return {
+    x: minX + dx,
+    y: minY + dy,
+    width: Math.max(1, maxX - minX + 1),
+    height: Math.max(1, maxY - minY + 1),
+  };
+}
+
 function transformedPixels(snapshot: SelectionSnapshot, transform: TransformDescriptor): readonly TransformedPixel[] {
   const bounds = boundsFromRegions(snapshot.mask.regions);
   const pixels: TransformedPixel[] = [];
+  if (transform.operation === "ROTATE_NEAREST") {
+    const angleDeg = transform.angleDeg ?? 0;
+    const radians = ((angleDeg % 360) + 360) % 360 * Math.PI / 180;
+    const cos = Math.abs(Math.cos(radians)) < 1e-10 ? 0 : Math.cos(radians);
+    const sin = Math.abs(Math.sin(radians)) < 1e-10 ? 0 : Math.sin(radians);
+    const centerX = bounds.x + (bounds.width - 1) / 2;
+    const centerY = bounds.y + (bounds.height - 1) / 2;
+    const output = rotatedRegion(bounds, angleDeg);
+    const sourceByPoint = new Map<string, SelectionPixel>();
+    for (const pixel of snapshot.pixels) sourceByPoint.set(`${pixel.x}:${pixel.y}`, pixel);
+    for (let targetY = output.y; targetY < output.y + output.height; targetY += 1) {
+      for (let targetX = output.x; targetX < output.x + output.width; targetX += 1) {
+        const targetRelX = targetX - centerX;
+        const targetRelY = targetY - centerY;
+        const sourceX = Math.round(centerX + targetRelX * cos + targetRelY * sin);
+        const sourceY = Math.round(centerY - targetRelX * sin + targetRelY * cos);
+        const source = sourceByPoint.get(`${sourceX}:${sourceY}`);
+        if (source === undefined) continue;
+        pixels.push({
+          x: targetX + transform.dx,
+          y: targetY + transform.dy,
+          colorIndex: source.colorIndex,
+        });
+      }
+    }
+    return pixels;
+  }
   if (transform.operation === "SCALE_INTEGER" || transform.operation === "SCALE_NEAREST") {
     const factor = transform.factor;
     const outputWidth = Math.max(1, Math.round(bounds.width * factor));
@@ -437,6 +504,7 @@ function transformedPixels(snapshot: SelectionSnapshot, transform: TransformDesc
 function estimatedTransformBounds(snapshot: SelectionSnapshot, transform: TransformDescriptor): SelectionRegion {
   const bounds = boundsFromRegions(snapshot.mask.regions);
   if (transform.operation === "ROTATE_90_CW" || transform.operation === "ROTATE_90_CCW") return { ...bounds, width: bounds.height, height: bounds.width };
+  if (transform.operation === "ROTATE_NEAREST") return rotatedRegion(bounds, transform.angleDeg ?? 0, transform.dx, transform.dy);
   if (transform.operation === "SCALE_INTEGER" || transform.operation === "SCALE_NEAREST") {
     return { ...bounds, width: Math.max(1, Math.round(bounds.width * transform.factor)), height: Math.max(1, Math.round(bounds.height * transform.factor)) };
   }
@@ -444,6 +512,10 @@ function estimatedTransformBounds(snapshot: SelectionSnapshot, transform: Transf
 }
 
 function destinationBounds(snapshot: SelectionSnapshot, transform: TransformDescriptor): SelectionRegion {
+  if (transform.operation === "ROTATE_NEAREST") {
+    const bounds = boundsFromRegions(snapshot.mask.regions);
+    return rotatedRegion(bounds, transform.angleDeg ?? 0, transform.dx, transform.dy);
+  }
   const pixels = transformedPixels(snapshot, transform);
   return regionForPoints(pixels) ?? boundsFromRegions(snapshot.mask.regions);
 }
@@ -584,6 +656,7 @@ export function createSelectionTransformWirePayload(
     sourceCount: snapshot.pixels.length,
     destinationCount,
     outOfBoundsClipped,
+    transparentDestinationPolicy: "PRESERVE_DESTINATION",
   };
 }
 
@@ -664,7 +737,15 @@ function applyPixelMutations(
     if (mutation.cowSplit) cowSplitCount += 1;
   };
   if (clearSource) for (const pixel of sourcePixels) mutate(pixel, 0);
-  for (const pixel of destinationPixels) mutate(pixel, pixel.colorIndex);
+  // Selection and clipboard snapshots are dense, so transparent cells are
+  // present in the destination list as well. Index 0 represents a hole, not
+  // an erase instruction: writing it here would destroy artwork underneath a
+  // moved/ pasted transparent region. Clearing the source remains explicit
+  // through `clearSource` above.
+  for (const pixel of destinationPixels) {
+    if (pixel.colorIndex === 0) continue;
+    mutate(pixel, pixel.colorIndex);
+  }
   const uniqueDirtyPoints = new Map(
     dirtyPoints.map((point) => [`${point.x}:${point.y}`, point]),
   );
@@ -866,6 +947,12 @@ export async function applyCompactSelectionTransform(
   }
   if (typeof payload.outOfBoundsClipped !== "boolean") {
     diagnostics.push(error("TRANSFORM_METADATA_INVALID", "Transform clipping metadata must be boolean.", "outOfBoundsClipped"));
+  }
+  if (
+    payload.transparentDestinationPolicy !== undefined &&
+    payload.transparentDestinationPolicy !== "PRESERVE_DESTINATION"
+  ) {
+    diagnostics.push(error("TRANSFORM_TRANSPARENCY_POLICY_UNSUPPORTED", "Transform payload must preserve existing artwork under transparent destination cells.", "transparentDestinationPolicy"));
   }
 
   const scope = payload.scope;

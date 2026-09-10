@@ -150,3 +150,38 @@ Deno.test("AUDIO-240 scheduler resumes from a captured position after output int
   );
   scheduler.stop();
 });
+
+Deno.test("AUDIO-240 scheduler consumes a virtual event source without materializing its length", () => {
+  let now = 0;
+  const timer = new FakeTimer();
+  let accesses = 0;
+  const source = {
+    length: 10_000,
+    at: (index: number): AudioScheduleEvent<{ label: string }> => {
+      accesses += 1;
+      return event(`virtual-${index}`, index * 0.1);
+    },
+    findFirstIndex: (startSeconds: number): number =>
+      Math.max(0, Math.ceil(startSeconds / 0.1)),
+  };
+  const scheduled: string[] = [];
+  const scheduler = new SampleAccurateScheduler({
+    clock: { now: () => now },
+    timer: timer.adapter,
+    lookaheadSeconds: 0.25,
+    onSchedule: (item) => scheduled.push(item.id),
+  });
+  scheduler.load(source, 10_000);
+  assert(scheduler.start(0, false), "Virtual scheduler did not start.");
+  assert(
+    scheduled.length === 3 && accesses < 32,
+    "The scheduler should visit only the short lookahead window.",
+  );
+  now = 0.3;
+  scheduler.pump();
+  assert(
+    scheduled.includes("virtual-3") && accesses < 64,
+    "A virtual timeline should advance without allocating all events.",
+  );
+  scheduler.stop();
+});

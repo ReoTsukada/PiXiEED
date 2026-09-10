@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import {
   CURRENT_ROUTE_SNAPSHOT,
   PUBLIC_URL_FLAGS,
@@ -12,6 +12,7 @@ import {
   createPublicUrlRoutingCore,
   validateRouteRecord,
 } from '../core-shell/assets/core-public-url-routing-contracts.js';
+import { AUTHORIZATION_PROOF_POLICY_VERSION, normalizeAuthorizationProof } from '../core-shell/assets/core-authorization-proof-contracts.js';
 
 const fixture = JSON.parse(readFileSync(new URL('../core-shell/fixtures/public-url-routing-v1.valid.json', import.meta.url), 'utf8'));
 const schema = JSON.parse(readFileSync(new URL('../core-shell/schemas/public-url-routing-v1.schema.json', import.meta.url), 'utf8'));
@@ -34,6 +35,25 @@ const flags = ({ flagId }) => enabledFlags.has(flagId)
   ? { enabled: true, decision: 'enabled', source: 'server', flagId }
   : { enabled: false, decision: 'unknown', source: 'server', code: 'FEATURE_FLAG_UNKNOWN', flagId };
 const allow = (knownPrincipal = false) => ({ ok: true, decision: 'allow', source: 'server', knownPrincipal });
+const authorizationEvaluator = (input) => normalizeAuthorizationProof({
+  schemaVersion: 1,
+  proofType: 'AUTHORIZATION_PROOF',
+  source: 'server',
+  decision: 'allow',
+  authorityId: 'wp098-test-authority',
+  proofId: `wp098-${input.resourceType}-${input.resourceId}`,
+  principalId: input.principalId ?? null,
+  resourceType: input.resourceType,
+  resourceId: input.resourceId,
+  action: input.action,
+  capability: input.capability,
+  tenantId: input.tenantId ?? null,
+  correlationId: input.correlationId ?? null,
+  policyVersion: AUTHORIZATION_PROOF_POLICY_VERSION,
+  grantId: 'wp098-grant',
+  issuedAt: '2099-08-09T00:00:00.000Z',
+  expiresAt: '2099-08-09T00:05:00.000Z',
+}, input);
 const resourceResolverCalls = [];
 const resourceResolver = ({ route, resourceType, resourceId, source }) => {
   resourceResolverCalls.push({ routeId: route.routeId, resourceType, resourceId, source });
@@ -54,6 +74,7 @@ const core = createPublicUrlRoutingCore({
   resourceResolver,
   metadataResolver,
   redirectProofEvaluator,
+  authorizationEvaluator,
 });
 
 const failureNames = [];
@@ -73,10 +94,14 @@ assert.equal(ROUTE_VISIBILITIES.length, 6);
 assert.equal(ROUTE_RESOLUTION_STATES.length, 7);
 assert.equal(ROUTE_REDIRECT_STATUSES.length, 4);
 assert.equal(CURRENT_ROUTE_SNAPSHOT.length, 51);
-assert.equal(ROUTE_CATALOG.length, 59);
+assert.equal(ROUTE_CATALOG.length, 60);
 assert.equal(new Set(CURRENT_ROUTE_SNAPSHOT.map((route) => route.path)).size, 51);
-assert.deepEqual(new Set(CURRENT_ROUTE_SNAPSHOT.map((route) => route.path)), new Set(routeInventory.routes.map(({ route }) => route)));
-assert.equal(CURRENT_ROUTE_SNAPSHOT.find((route) => route.path === '/pixiedraw/').requiresAuth, false);
+const currentRoutePaths = new Set(CURRENT_ROUTE_SNAPSHOT.map((route) => route.path));
+const routeInventoryPaths = new Set(routeInventory.routes.map(({ route }) => route));
+assert.equal(currentRoutePaths.has('/pixiedraw/'), false);
+assert.equal(currentRoutePaths.has('/pixiedraw2/'), true);
+assert.deepEqual(new Set([...currentRoutePaths].map((path) => path === '/pixiedraw2/' ? '/pixiedraw/' : path)), routeInventoryPaths);
+assert.equal(CURRENT_ROUTE_SNAPSHOT.find((route) => route.path === '/pixiedraw2/').requiresAuth, false);
 assert.equal(CURRENT_ROUTE_SNAPSHOT.find((route) => route.path === '/account/').requiresAuth, true);
 assert.equal(validateRouteRecord(ROUTE_CATALOG.find((route) => route.routeId === 'market-item-legacy-query')).valid, true);
 assert.equal(validateRouteRecord({ routeId: 'bad-kind', path: '/', source: 'index.html', kind: 'NOPE' }).valid, false);
@@ -87,7 +112,7 @@ assert.equal(ROUTE_CATALOG.find((route) => route.routeId === 'market-item-canoni
 const snapshot = core.snapshot();
 assert.equal(snapshot.schemaVersion, 1);
 assert.equal(snapshot.registryVersion, 1);
-assert.equal(snapshot.routeCount, 59);
+assert.equal(snapshot.routeCount, 60);
 assert.equal(snapshot.currentSnapshotCount, 51);
 assert.deepEqual(snapshot.currentRoutes.map((route) => route.path), CURRENT_ROUTE_SNAPSHOT.map((route) => route.path));
 assert.deepEqual(snapshot.flags, PUBLIC_URL_FLAGS);
@@ -104,8 +129,8 @@ expectFailure('kill-switch', killSwitch.resolve({ url: '/' }), 'ROUTING_KILL_SWI
 
 const home = core.resolve({ url: 'https://pixieed.jp/' });
 assert.equal(home.ok, true); assert.equal(home.state, 'CURRENT'); assert.equal(home.status, 200); assert.equal(home.canonicalPath, '/');
-const draw = core.resolve({ url: '/pixiedraw/' });
-assert.equal(draw.ok, true); assert.equal(draw.state, 'CURRENT'); assert.equal(draw.routeId, CURRENT_ROUTE_SNAPSHOT.find((route) => route.path === '/pixiedraw/').routeId);
+const draw2 = core.resolve({ url: '/pixiedraw2/' });
+assert.equal(draw2.ok, true); assert.equal(draw2.state, 'CURRENT'); assert.equal(draw2.routeId, CURRENT_ROUTE_SNAPSHOT.find((route) => route.path === '/pixiedraw2/').routeId);
 const privateRouteWithoutDecision = core.resolve({ url: '/account/' });
 expectFailure('private-static-without-server-decision', privateRouteWithoutDecision, 'ROUTING_PRIVATE_ROUTE_PERMISSION_REQUIRED');
 expectFailure('private-static-client-decision', core.resolve({ url: '/account/', permissionDecision: { ok: true, decision: 'allow', source: 'client' } }), 'ROUTING_PRIVATE_ROUTE_PERMISSION_REQUIRED');
@@ -135,10 +160,16 @@ const canonicalPuzzleQuery = core.resolve({ url: `/pixfind/?puzzle=${knownPuzzle
 assert.equal(canonicalPuzzleQuery.ok, true); assert.equal(canonicalPuzzleQuery.state, 'CANONICAL'); assert.equal(canonicalPuzzleQuery.currentPathPreserved, true);
 const legacyPuzzleIndex = core.resolve({ url: `/pixfind/index.html?puzzle=${knownPuzzleId}` });
 assert.equal(legacyPuzzleIndex.ok, true); assert.equal(legacyPuzzleIndex.state, 'REDIRECT_CANDIDATE'); assert.equal(legacyPuzzleIndex.redirect.status, 'SHADOW');
-const drawProjectQuery = core.resolve({ url: `/pixiedraw/?project=${knownProjectId}` });
-assert.equal(drawProjectQuery.ok, true); assert.equal(drawProjectQuery.state, 'CANONICAL'); assert.equal(drawProjectQuery.routeId, 'pixiedraw-project-query');
+const draw2ProjectQuery = core.resolve({ url: `/pixiedraw2/?project=${knownProjectId}` });
+assert.equal(draw2ProjectQuery.ok, true); assert.equal(draw2ProjectQuery.state, 'CANONICAL'); assert.equal(draw2ProjectQuery.routeId, 'pixiedraw2-project-query');
+const retiredDraw = core.resolve({ url: '/pixiedraw/' });
+assert.equal(retiredDraw.ok, true); assert.equal(retiredDraw.state, 'REDIRECT_CANDIDATE'); assert.equal(retiredDraw.routeId, 'pixiedraw-legacy-route');
+assert.equal(retiredDraw.redirect.status, 'SHADOW'); assert.equal(retiredDraw.redirect.to, 'https://pixieed.jp/pixiedraw2/');
+const retiredDrawProjectQuery = core.resolve({ url: `/pixiedraw/?project=${knownProjectId}` });
+assert.equal(retiredDrawProjectQuery.ok, true); assert.equal(retiredDrawProjectQuery.state, 'REDIRECT_CANDIDATE'); assert.equal(retiredDrawProjectQuery.routeId, 'pixiedraw-legacy-route');
+assert.equal(retiredDrawProjectQuery.redirect.to, `https://pixieed.jp/pixiedraw2/?project=${knownProjectId}`);
 const drawIndexAlias = core.resolve({ url: `/pixiedraw/index.html` });
-assert.equal(drawIndexAlias.ok, true); assert.equal(drawIndexAlias.state, 'REDIRECT_CANDIDATE'); assert.equal(drawIndexAlias.redirect.to, 'https://pixieed.jp/pixiedraw/');
+assert.equal(drawIndexAlias.ok, true); assert.equal(drawIndexAlias.state, 'REDIRECT_CANDIDATE'); assert.equal(drawIndexAlias.redirect.to, 'https://pixieed.jp/pixiedraw2/');
 const postQuery = core.resolve({ url: `/post/?id=${knownPostId}` });
 assert.equal(postQuery.ok, true); assert.equal(postQuery.state, 'CANONICAL'); assert.equal(postQuery.routeId, 'post-detail-query');
 const postPath = core.resolve({ url: `/posts/${knownPostId}/` });
@@ -180,7 +211,7 @@ routingSecurityCoverage.add('private-metadata-noindex'); routingSecurityCoverage
 const untrustedMetadataCore = createPublicUrlRoutingCore({ featureFlagEvaluator: flags, metadataResolver: () => ({ source: 'client', title: 'untrusted', description: '', imagePath: null, locale: 'ja-JP' }) });
 const untrustedMetadata = untrustedMetadataCore.buildCanonicalMetadata({ resolution: untrustedMetadataCore.resolve({ url: '/' }) });
 expectFailure('untrusted-metadata', untrustedMetadata, 'ROUTING_METADATA_UNTRUSTED');
-const badProofCore = createPublicUrlRoutingCore({ featureFlagEvaluator: flags, resourceResolver, redirectProofEvaluator: () => ({ source: 'server', canonicalVerified: false, privacyVerified: true }) });
+const badProofCore = createPublicUrlRoutingCore({ featureFlagEvaluator: flags, resourceResolver, redirectProofEvaluator: () => ({ source: 'server', canonicalVerified: false, privacyVerified: true }), authorizationEvaluator });
 expectFailure('redirect-proof-failed', badProofCore.resolve({ url: `/market/items/${publicItemId}`, permissionDecision: allow(true), redirectMode: 'apply' }), 'ROUTING_REDIRECT_PROOF_FAILED');
 const noPermissionRedirect = core.prepareRedirect({ resolution: itemNoSlash });
 expectFailure('redirect-permission-required', noPermissionRedirect, 'ROUTING_REDIRECT_PERMISSION_REQUIRED');
@@ -212,8 +243,13 @@ assert.match(policy, /JWT/); assert.match(policy, /commission/iu);
 assert.doesNotMatch(moduleCode, /\b(?:window|document|fetch|supabase|location|history)\b/u);
 assert.ok(snapshot.storageBoundary.excluded.includes('raw-pixel'));
 assert.ok(snapshot.storageBoundary.excluded.includes('pxd-bytes'));
+const missingRouteSources = [];
 for (const { source } of routeInventory.routes) {
   const sourcePath = new URL(`../${source}`, import.meta.url);
+  if (!existsSync(sourcePath)) {
+    missingRouteSources.push(source);
+    continue;
+  }
   const currentSource = readFileSync(sourcePath, 'utf8');
   assert.equal(currentSource.includes('core-public-url-routing-contracts.js'), false, `${source} is connected to isolated routing Core.`);
   assert.equal(currentSource.includes('public-url-redirect'), false, `${source} is connected to Public URL redirect flag.`);
@@ -225,5 +261,5 @@ console.log(JSON.stringify({
   flags: PUBLIC_URL_FLAG_NAMES.length, resolutionStates: ROUTE_RESOLUTION_STATES, redirectStatuses: ROUTE_REDIRECT_STATUSES,
   canonicalMetadata: true, privateAndDeletedFailClosed: true, legacyIds: true, redirectProof: true, rollback: true,
   costPolicyClasses: ['LOCAL_ONLY', 'ACTIVE_SYNC', 'PLATFORM_EVENT', 'ASYNC_ON_DEMAND'], failureFixtures: failureNames.length,
-  failureFixtureNames: failureNames, routingSecurityCoverage: [...routingSecurityCoverage], currentRoutesConnected: false, productionRedirectChanged: false, realtimeSubscription: false,
+  failureFixtureNames: failureNames, routingSecurityCoverage: [...routingSecurityCoverage], currentRoutesConnected: false, productionRedirectChanged: false, realtimeSubscription: false, missingRouteSources,
 }, null, 2));

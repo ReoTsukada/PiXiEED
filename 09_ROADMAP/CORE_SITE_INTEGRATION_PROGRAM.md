@@ -44,6 +44,9 @@ commerce/direct-work flows, and all connected tools.
 After the Core integration line is ready, the existing Draw2 vertical slice is expanded and
 connected as follows. These are implementation scopes, not placeholders for future planning:
 
+The Bridge names in the work-package table below are internal Core/Tool adapter boundaries. They
+are not the external PiXiEED Bridge native product and they do not select Draw2's PiXYNC transport.
+
 | Work Package | Scope | Required compatibility |
 | --- | --- | --- |
 | WP-100 | PiXiEEDraw2 project open/create vertical slice | Approved isolated strict-TypeScript Core, sparse indexed raster, Tile/COW/dirty path, Reference Renderer, local autosave seam, and noindex Preview Entry. |

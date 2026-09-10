@@ -376,7 +376,7 @@ const EN_TO_JA: Readonly<Record<string, string>> = {
   "Select an Audio Clip to edit its waveform, fades and gain.":
     "オーディオクリップを選択して波形、フェード、ゲインを編集してください。",
   "Draw Preview: Audio-linked": "Drawプレビュー: Audio連携",
-  "Draw bridge": "Draw連携",
+  "Draw time sync": "Draw時間同期",
   "Draw sync ready": "Draw同期準備完了",
   "Draw preview follows the Audio playhead.":
     "DrawプレビューはAudioの再生ヘッドに追従します。",
@@ -706,7 +706,7 @@ const TRANSLATION_CACHE_LIMIT = 512;
 const translationCache = new Map<string, string>();
 
 export function normalizeDraw2Locale(value: unknown): Draw2Locale {
-  return value === "en" ? "en" : "ja";
+  return value === "ja" ? "ja" : "en";
 }
 
 export function translateDraw2Text(text: string, locale: Draw2Locale): string {

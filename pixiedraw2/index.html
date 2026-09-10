@@ -10,15 +10,15 @@
     <title>PiXiEEDstudio — Studio</title>
     <link
       rel="stylesheet"
-      href="./assets/draw2-shell.min.css?v=20260901-icons-v22"
+      href="./assets/draw2-shell.min.css?v=20260910-unity-asset-export-v2"
     >
     <link
       rel="stylesheet"
-      href="./assets/draw2-game-ux.css?v=20260901-game-ux-v1"
+      href="./assets/draw2-game-ux.css?v=20260910-unity-asset-export-v2"
     >
     <link
       rel="stylesheet"
-      href="./assets/draw2-mode-motion.css?v=20260831-mode-motion1"
+      href="./assets/draw2-mode-motion.css?v=20260910-unity-asset-export-v2"
     >
   </head>
   <body>
@@ -31,7 +31,7 @@
             iDRAW・iAUDIO・iGAMEをひとつのProjectで扱うProfessional Workspaceの隔離Entryです。既存のプロジェクトデータは変更しません。
           </p>
         </div>
-        <span class="draw2-badge">準備中</span>
+        <span class="draw2-badge">LOCAL</span>
       </header>
 
       <section
@@ -1416,6 +1416,35 @@
                       Local Sessionの確定Revisionを保存します。
                     </small>
                   </div>
+                  <div class="draw2-collaboration-scope-entry">
+                    <div>
+                      <strong>共同制作</strong>
+                      <small id="draw2CollaborationScopeStatus">参加前の確認が必要</small>
+                    </div>
+                    <button
+                      class="draw2-button draw2-button-secondary"
+                      id="draw2CollaborationScopeOpen"
+                      type="button"
+                    >
+                      同意・担当範囲
+                    </button>
+                  </div>
+                  <div
+                    id="draw2CollaborationEditGuard"
+                    class="draw2-collaboration-edit-guard"
+                    role="status"
+                    aria-live="polite"
+                    hidden
+                  >
+                    <span id="draw2CollaborationEditGuardMessage"></span>
+                    <button
+                      id="draw2CollaborationEditGuardOpen"
+                      class="draw2-button draw2-button-secondary"
+                      type="button"
+                    >
+                      確認・申請
+                    </button>
+                  </div>
                 </section>
               </details>
               <div
@@ -1560,6 +1589,78 @@
               >Saved · Local</output>
             </div>
           </div>
+          <div
+            id="draw2GameTopbarControls"
+            class="draw2-game-topbar-controls"
+            role="toolbar"
+            aria-label="Scene and Game controls"
+            hidden
+          >
+            <div class="draw2-igame-scene-header-tools">
+              <div
+                class="draw2-igame-view-toggle"
+                id="draw2GameViewToggle"
+                role="group"
+                aria-label="SceneとGameの表示切り替え"
+              >
+                <button
+                  id="draw2GameSceneView"
+                  class="is-active"
+                  type="button"
+                  data-game-view-mode="SCENE"
+                  aria-pressed="true"
+                  aria-label="Scene"
+                  title="Scene · edit layout"
+                ><svg class="draw2-ui-icon draw2-igame-view-toggle-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-edit"></use></svg></button>
+                <button
+                  id="draw2GameGameView"
+                  type="button"
+                  data-game-view-mode="GAME"
+                  aria-pressed="false"
+                  aria-label="Game"
+                  title="Game · live preview"
+                ><svg class="draw2-ui-icon draw2-igame-view-toggle-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-play"></use></svg></button>
+              </div>
+              <div
+                class="draw2-igame-scene-toolbar"
+                role="toolbar"
+                aria-label="Scene tools"
+              >
+                <div class="draw2-igame-scene-selection draw2-visually-hidden" id="draw2GameSceneSelection" aria-live="polite">
+                  <span class="draw2-eyebrow">選択中</span>
+                  <strong>オブジェクトを選択</strong>
+                </div>
+                <div class="draw2-igame-scene-actions">
+                  <button
+                    id="draw2GameSceneAddObject"
+                    class="draw2-button draw2-button-secondary draw2-button-icon"
+                    type="button"
+                    aria-label="Add object from Inventory"
+                    title="インベントリからオブジェクトを追加"
+                  ><svg class="draw2-ui-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-add"></use></svg><span class="draw2-visually-hidden">オブジェクトを追加</span></button>
+                  <button
+                    id="draw2GameSceneFocusSelected"
+                    class="draw2-button draw2-button-secondary draw2-button-icon"
+                    type="button"
+                    aria-label="Focus Selection"
+                    title="Focus Selection"
+                  ><svg class="draw2-ui-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-focus"></use></svg><span class="draw2-visually-hidden">選択を表示</span></button>
+                  <button
+                    id="draw2GameSceneFit"
+                    class="draw2-button draw2-button-secondary draw2-button-icon"
+                    type="button"
+                    aria-label="マップ全体を表示"
+                    title="マップ全体を表示"
+                  ><svg class="draw2-ui-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-fit-canvas"></use></svg><span class="draw2-visually-hidden">マップ全体を表示</span></button>
+                </div>
+              </div>
+            </div>
+            <output
+              id="draw2GameSceneViewportStatus"
+              class="draw2-visually-hidden"
+              aria-live="polite"
+            >Scene View · オブジェクトをクリックして選択</output>
+          </div>
           <nav
             class="draw2-creator-mode-bar"
             id="draw2CreatorModeBar"
@@ -1660,7 +1761,7 @@
                   id="draw2BrushSize"
                   type="number"
                   min="1"
-                  max="32"
+                  max="64"
                   step="1"
                   value="1"
                   inputmode="numeric"
@@ -1725,6 +1826,20 @@
               <label id="draw2BrushShapeControl">Shape<select id="draw2BrushShape">
                   <option value="square">Square</option>
                   <option value="circle">Circle</option>
+                </select></label>
+              <label id="draw2BrushAngleControl">Angle<input
+                  id="draw2BrushAngle"
+                  type="number"
+                  min="-180"
+                  max="180"
+                  step="1"
+                  value="0"
+                  inputmode="numeric"
+                  aria-label="Square brush angle"
+                ><span aria-hidden="true">°</span></label>
+              <label id="draw2BrushAlgorithmControl">Line<select id="draw2BrushAlgorithm">
+                  <option value="regular">Regular</option>
+                  <option value="pixel-perfect">Pixel perfect</option>
                 </select></label>
               <label id="draw2BrushPatternControl">Pattern<select id="draw2BrushPattern">
                   <option value="solid">Solid</option>
@@ -1792,8 +1907,7 @@
               data-game-left-dock-panel="hierarchy"
               role="tabpanel"
               aria-labelledby="draw2GameLeftDockTabHierarchy"
-              aria-hidden="true"
-              hidden
+              aria-hidden="false"
             >
             <header class="draw2-game-left-dock-header">
               <div>
@@ -1857,7 +1971,8 @@
               data-game-left-dock-panel="node-box"
               role="tabpanel"
               aria-labelledby="draw2GameLeftDockTabNodeBox"
-              aria-hidden="false"
+              aria-hidden="true"
+              hidden
             >
             <header class="draw2-game-left-dock-header">
               <div>
@@ -1865,24 +1980,27 @@
                 <strong>ノードボックス</strong>
               </div>
             </header>
-            <div
-              class="draw2-game-node-box-intro"
-            >
+            <div class="draw2-game-node-box-intro">
               <p
-                class="draw2-panel-note"
+                class="draw2-visually-hidden"
                 id="draw2GameNodeBoxDescription"
-              >
-                HierarchyまたはSceneで対象を選ぶと、ここからクリックまたはドラッグ&ドロップで機能を追加できます。
-              </p>
+              >Sceneまたはインベントリで対象を選び、NodeをクリックまたはInspectorへドラッグして追加します。</p>
+              <div
+                class="draw2-game-node-box-target"
+                id="draw2GameNodeBoxTarget"
+                role="status"
+                aria-live="polite"
+                data-state="empty"
+              >対象なし</div>
               <button
-                class="draw2-button draw2-button-secondary draw2-game-node-box-hierarchy-cta"
+                class="draw2-button draw2-button-secondary draw2-button-icon draw2-game-node-box-hierarchy-cta"
                 id="draw2GameNodeBoxHierarchyCta"
                 type="button"
-                data-game-node-box-action="open-hierarchy"
-                aria-controls="draw2GameLeftDockHierarchyPanel"
-                aria-label="階層を開いてGameObjectを追加・選択"
-                title="Hierarchyタブを開き、GameObjectを追加または選択"
-              >階層を開いて追加・選択</button>
+                data-game-node-box-action="open-assets"
+                aria-controls="draw2GameRailSurfaceAssets"
+                aria-label="インベントリを開いてGameObjectを追加・選択"
+                title="下部インベントリからGameObjectを追加または選択"
+              ><svg class="draw2-ui-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-add"></use></svg><span class="draw2-button-label">インベントリ</span></button>
             </div>
             <label class="draw2-game-node-search">
               <span>ノードを検索</span>
@@ -2007,32 +2125,85 @@
                   </div>
                 </div>
             </div>
-            </div>
-            <nav
-              class="draw2-game-left-dock-tabs"
+          </div>
+          <section
+            id="draw2GamePlaygroundSourceRail"
+            class="draw2-game-playground-source-rail"
+            aria-label="iGAME Playgroundの素材レール"
+          >
+            <header class="draw2-game-playground-rail-heading">
+              <div>
+                <span class="draw2-eyebrow">PLAYGROUND SOURCES</span>
+                <strong>素材を選ぶ</strong>
+              </div>
+              <span class="draw2-game-playground-step">01</span>
+            </header>
+            <article class="draw2-game-playground-source-card" data-source-kind="DRAW">
+              <div class="draw2-game-playground-source-card-heading">
+                <span class="draw2-game-playground-source-icon" aria-hidden="true">✦</span>
+                <div>
+                  <strong>iDRAW</strong>
+                  <small>世界・主人公・アニメーション</small>
+                </div>
+              </div>
+              <output id="draw2GamePlaygroundDrawStatus" class="draw2-game-playground-source-status" aria-live="polite">未選択</output>
+            </article>
+            <article class="draw2-game-playground-source-card" data-source-kind="AUDIO">
+              <div class="draw2-game-playground-source-card-heading">
+                <span class="draw2-game-playground-source-icon" aria-hidden="true">◒</span>
+                <div>
+                  <strong>iAUDIO</strong>
+                  <small>BGM・SE・ジャンプ音</small>
+                </div>
+              </div>
+              <output id="draw2GamePlaygroundAudioStatus" class="draw2-game-playground-source-status" aria-live="polite">未選択</output>
+            </article>
+            <section class="draw2-game-ui-library" aria-label="ゲームUIノード">
+              <header><strong>ゲームUI</strong><small>ドラッグして画面へ配置</small></header>
+              <div class="draw2-game-ui-library-grid">
+                <button type="button" draggable="true" data-game-ui-node-kind="MINIMAP">▣<span>マップ</span></button>
+                <button type="button" draggable="true" data-game-ui-node-kind="INVENTORY">▤<span>持ちもの</span></button>
+                <button type="button" draggable="true" data-game-ui-node-kind="BUTTON">＋<span>ボタン</span></button>
+              </div>
+            </section>
+            <section class="draw2-game-element-library" aria-label="ゲーム要素">
+              <header><strong>ゲーム要素</strong><small>使いたい要素を追加</small></header>
+              <div class="draw2-game-element-grid">
+                <button type="button" data-game-element-kind="ITEM">◆<span>アイテム</span></button>
+                <button type="button" data-game-element-kind="SKILL">✦<span>スキル</span></button>
+                <button type="button" data-game-element-kind="CURRENCY">●<span>通貨</span></button>
+                <button type="button" data-game-element-kind="STATUS">♥<span>ステータス</span></button>
+                <button type="button" data-game-element-kind="TIMER">◷<span>タイマー</span></button>
+              </div>
+            </section>
+            <p class="draw2-game-playground-rail-hint">素材はドラッグしてSceneへ配置できます。</p>
+          </section>
+          <nav
+            class="draw2-game-left-dock-tabs"
               id="draw2GameLeftDockTabs"
               role="tablist"
               aria-label="左パネルの切り替え"
             >
               <button
                 type="button"
-                id="draw2GameLeftDockTabHierarchy"
-                class="draw2-button draw2-game-left-dock-tab"
-                role="tab"
-                aria-selected="false"
-                tabindex="-1"
+              id="draw2GameLeftDockTabHierarchy"
+              class="draw2-button draw2-game-left-dock-tab"
+              role="tab"
+                aria-selected="true"
+                tabindex="0"
                 aria-controls="draw2GameLeftDockHierarchyPanel"
                 data-game-left-dock-tab="hierarchy"
               ><svg class="draw2-ui-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-layers"></use></svg><span>階層</span></button>
               <button
                 type="button"
-                id="draw2GameLeftDockTabNodeBox"
-                class="draw2-button draw2-game-left-dock-tab is-active"
+              id="draw2GameLeftDockTabNodeBox"
+                class="draw2-button draw2-game-left-dock-tab"
                 role="tab"
-                aria-selected="true"
-                tabindex="0"
+                aria-selected="false"
+                tabindex="-1"
                 aria-controls="draw2GameLeftDockNodeBoxPanel"
-                data-game-left-dock-tab="node-box"
+              data-game-left-dock-tab="node-box"
+                hidden
               ><svg class="draw2-ui-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-tools"></use></svg><span>ノードボックス</span></button>
             </nav>
           </section>
@@ -2095,15 +2266,13 @@
                 </button>
                 <button
                   class="draw2-tool-button"
-                  data-workspace-tool="pixel-pen"
-                  data-tool-icon="icon-line"
+                  data-workspace-tool="text"
+                  data-tool-icon="icon-pen"
                   type="button"
                   aria-pressed="false"
-                  title="Pixel Perfect Pen (Y)"
+                  title="Text (T)"
                 >
-                  <svg class="draw2-ui-icon draw2-tool-icon" aria-hidden="true" focusable="false">
-                    <use href="./assets/icons/draw2-icons.svg#icon-line"></use>
-                  </svg><span>Pixel 1px</span>
+                  <span class="draw2-tool-letter" aria-hidden="true">T</span><span>Text</span>
                 </button>
               </div>
             </details>
@@ -2379,16 +2548,6 @@
                 </button>
                 <button
                   class="draw2-tool-button"
-                  data-workspace-tool="select-polygon"
-                  data-tool-icon="icon-polygon"
-                  type="button"
-                  aria-pressed="false"
-                  title="Polygon selection (N)"
-                >
-                  <svg class="draw2-ui-icon draw2-tool-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-polygon"></use></svg><span>Polygon</span>
-                </button>
-                <button
-                  class="draw2-tool-button"
                   data-workspace-tool="select-color"
                   data-tool-icon="icon-select-similar"
                   type="button"
@@ -2415,16 +2574,6 @@
               <div class="draw2-tool-popover" role="menu">
                 <button class="draw2-tool-button" data-workspace-tool="move" data-tool-icon="icon-pan" type="button" aria-pressed="false" title="Move selection or active cel content; Alt-drag duplicates (V)">
                   <svg class="draw2-ui-icon draw2-tool-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-pan"></use></svg><span>Move Content</span>
-                </button>
-              </div>
-            </details>
-            <details class="draw2-tool-group" data-workspace-tool-group="tile">
-              <summary class="draw2-tool-group-summary" data-workspace-tool="tile-stamp" data-tool-icon="icon-sheet" aria-haspopup="menu" aria-label="Tile tools" title="Place the selected tileset cell">
-                <svg class="draw2-ui-icon draw2-tool-icon" data-tool-group-icon aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-sheet"></use></svg><span class="draw2-tool-group-label">Tile</span>
-              </summary>
-              <div class="draw2-tool-popover" role="menu">
-                <button class="draw2-tool-button" data-workspace-tool="tile-stamp" data-tool-icon="icon-sheet" type="button" aria-pressed="false" title="Tile placement (T)">
-                  <svg class="draw2-ui-icon draw2-tool-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-sheet"></use></svg><span>Place Tile</span>
                 </button>
               </div>
             </details>
@@ -2474,7 +2623,7 @@
         >
           <button
             id="draw2MiniPreviewRestore"
-            class="draw2-icon-button draw2-mini-preview-restore draw2-viewport-mini-preview-toggle"
+            class="draw2-icon-button draw2-mini-preview-restore"
             data-shared-control="mini-preview"
             type="button"
             aria-label="Open mini preview"
@@ -2483,7 +2632,7 @@
           >
             <svg class="draw2-ui-icon" aria-hidden="true" focusable="false">
               <use href="./assets/icons/draw2-icons.svg#icon-focus"></use>
-            </svg><span>Mini preview</span>
+            </svg><span class="draw2-visually-hidden">Mini preview</span>
           </button>
           <div id="draw2WorkspaceCanvasSlot"></div>
           <section
@@ -2492,70 +2641,29 @@
             aria-label="iGAME Scene View"
             hidden
           >
-            <header class="draw2-game-scene-viewport-header">
-              <div>
-                <span class="draw2-eyebrow">SCENE VIEW</span>
-                <strong>ゲーム配置</strong>
+            <section
+              id="draw2GamePlaygroundCenterBar"
+              class="draw2-game-playground-center-bar"
+              aria-label="iGAME Playgroundのモード選択"
+              hidden
+            >
+              <div class="draw2-game-playground-center-title">
+                <span class="draw2-eyebrow">iGAME PLAYGROUND</span>
+                <strong>選ぶ → 動かす → 音をつける</strong>
               </div>
-              <div class="draw2-igame-scene-header-tools">
-                <div
-                  class="draw2-igame-view-toggle"
-                  id="draw2GameViewToggle"
-                  role="group"
-                  aria-label="SceneとGameの表示切り替え"
-                >
-                  <button
-                    id="draw2GameSceneView"
-                    class="is-active"
-                    type="button"
-                    data-game-view-mode="SCENE"
-                    aria-pressed="true"
-                    aria-label="Scene"
-                    title="Scene · edit layout"
-                  ><svg class="draw2-ui-icon draw2-igame-view-toggle-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-edit"></use></svg></button>
-                  <button
-                    id="draw2GameGameView"
-                    type="button"
-                    data-game-view-mode="GAME"
-                    aria-pressed="false"
-                    aria-label="Game"
-                    title="Game · live preview"
-                  ><svg class="draw2-ui-icon draw2-igame-view-toggle-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-play"></use></svg></button>
-                </div>
-                <span class="draw2-igame-scene-name">Main Scene</span>
-              </div>
-              <div class="draw2-game-scene-legend" aria-label="表示凡例">
-                <span class="draw2-game-scene-legend-item draw2-game-scene-legend-collider">床・壁</span>
-                <span class="draw2-game-scene-legend-item draw2-game-scene-legend-trigger">反応範囲</span>
-              </div>
-            </header>
-            <div class="draw2-game-scene-viewport-stage">
               <div
-                class="draw2-igame-scene-toolbar"
-                role="toolbar"
-                aria-label="iGAME Scene操作"
+                id="draw2GamePlaygroundModes"
+                class="draw2-game-playground-mode-switch"
+                role="group"
+                aria-label="移動モード"
               >
-                <div class="draw2-igame-scene-selection" id="draw2GameSceneSelection" aria-live="polite">
-                  <span class="draw2-eyebrow">選択中</span>
-                  <strong>オブジェクトを選択</strong>
-                </div>
-                <div class="draw2-igame-scene-actions">
-                  <button
-                    id="draw2GameSceneFocusSelected"
-                    class="draw2-button draw2-button-secondary draw2-button-icon"
-                    type="button"
-                    aria-label="Focus Selection"
-                    title="Focus Selection"
-                  ><svg class="draw2-ui-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-focus"></use></svg><span class="draw2-visually-hidden">選択を表示</span></button>
-                  <button
-                    id="draw2GameSceneFit"
-                    class="draw2-button draw2-button-secondary draw2-button-icon"
-                    type="button"
-                    aria-label="Fit Scene"
-                    title="Fit Scene"
-                  ><svg class="draw2-ui-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-fit-canvas"></use></svg><span class="draw2-visually-hidden">全体表示</span></button>
-                </div>
+                <button type="button" class="is-active" data-game-playground-mode="SIDE_SCROLL" aria-pressed="true">横スクロール</button>
+                <button type="button" data-game-playground-mode="RPG_4" aria-pressed="false">RPG 4方向</button>
+                <button type="button" data-game-playground-mode="RPG_8" aria-pressed="false">RPG 8方向</button>
               </div>
+              <output id="draw2GamePlaygroundCenterStatus" class="draw2-game-playground-center-status" aria-live="polite">主人公を選ぶと、ここで動かせます</output>
+            </section>
+            <div class="draw2-game-scene-viewport-stage">
               <svg
                 id="draw2GameSceneSvg"
                 class="draw2-game-scene-svg"
@@ -2566,8 +2674,8 @@
               >
                 <title>ゲームオブジェクトの配置</title>
               </svg>
+              <div id="draw2GameUiOverlay" class="draw2-game-ui-overlay" aria-label="ゲームUI配置" aria-live="polite"></div>
               <div class="draw2-igame-scene-minimap" id="draw2GameSceneMinimap" aria-hidden="true">
-                <span class="draw2-igame-scene-minimap-label">マップ全体</span>
                 <svg
                   id="draw2GameSceneMinimapSvg"
                   class="draw2-igame-scene-minimap-svg"
@@ -2578,12 +2686,6 @@
                 ></svg>
               </div>
             </div>
-            <footer class="draw2-game-scene-viewport-footer">
-              <output id="draw2GameSceneViewportStatus" aria-live="polite">
-                Scene View · オブジェクトをクリックして選択
-              </output>
-              <span>クリックで選択 · ドラッグ配置 · Inspectorで編集</span>
-            </footer>
           </section>
           <section
             id="draw2AudioWorkspace"
@@ -2601,7 +2703,7 @@
                   <span class="draw2-eyebrow">ARRANGER TIMELINE</span>
                   <strong>Audio Composition</strong>
                 </div>
-                <output id="draw2AudioArrangerSummary">1 bar · 120 BPM · 4/4 · 0 audio / 0 MIDI</output>
+                <output id="draw2AudioArrangerSummary">4 bars · 120 BPM · 4/4 · 0 audio / 0 MIDI</output>
               </header>
               <div
                 class="draw2-audio-daw-toolbar"
@@ -2610,13 +2712,13 @@
                 aria-label="DAW arrangement editing"
               >
                 <div class="draw2-audio-daw-actions">
-                  <button
+                    <button
                     class="draw2-audio-daw-action is-primary"
                     id="draw2AudioDawBarPlus"
                     type="button"
-                    title="Add one musical bar"
+                    title="末尾に空のBarを追加"
                   >
-                    <span aria-hidden="true">＋</span> Bar
+                    <span aria-hidden="true">＋</span> 末尾にBar追加
                   </button>
                   <button
                     class="draw2-audio-daw-action"
@@ -2834,14 +2936,14 @@
                 aria-label="Artwork animation frame guide"
               >
                 <span id="draw2AudioAnimationGuide">Bar 1 · 1.1.1 · Draw sync ready</span>
-                <label>Draw bridge<input
+                <label>Draw time sync<input
                     id="draw2AudioFrameCursor"
                     type="range"
                     min="1"
                     max="16"
                     step="1"
                     value="1"
-                    aria-label="Draw frame bridge"
+                    aria-label="Draw frame time sync"
                   ></label>
                 <div
                   class="draw2-audio-midi-zoom"
@@ -3498,6 +3600,27 @@
                 Apply
               </button>
             </div>
+            <section class="draw2-color-history-section" aria-labelledby="draw2ColorHistoryHeading">
+              <div class="draw2-inline-section-heading">
+                <span class="draw2-eyebrow">RECENT COLORS</span>
+                <strong id="draw2ColorHistoryHeading">History</strong>
+              </div>
+              <div id="draw2ColorHistory" class="draw2-color-history" role="list" aria-label="Recent colors"></div>
+            </section>
+            <section class="draw2-color-ramp-section" aria-labelledby="draw2ColorRampHeading">
+              <div class="draw2-inline-section-heading">
+                <span class="draw2-eyebrow">COLOR RAMP</span>
+                <strong id="draw2ColorRampHeading">Palette ramp</strong>
+              </div>
+              <div class="draw2-color-ramp-controls">
+                <label>End <select id="draw2ColorRampEnd" aria-label="Ramp end color"></select></label>
+                <label>Steps <input id="draw2ColorRampSteps" type="number" min="2" max="32" value="5" inputmode="numeric"></label>
+                <label>Space <select id="draw2ColorRampSpace" aria-label="Ramp color space"><option value="HSV" selected>HSV</option><option value="RGB">RGB</option></select></label>
+                <label>Hue <select id="draw2ColorRampHue" aria-label="Ramp hue direction"><option value="SHORT" selected>Short</option><option value="LONG">Long</option></select></label>
+              </div>
+              <div id="draw2ColorRampPreview" class="draw2-color-ramp-preview" role="img" aria-label="Color ramp preview"></div>
+              <button id="draw2ColorRampCreate" class="draw2-button draw2-button-secondary" type="button">Create ramp</button>
+            </section>
             <p
               id="draw2ColorEditorStatus"
               class="draw2-color-editor-status"
@@ -3638,6 +3761,54 @@
           </section>
           <section
             class="draw2-workspace-panel"
+            data-workspace-panel-content="history"
+            id="draw2WorkspacePanelHistory"
+            role="tabpanel"
+            aria-labelledby="draw2WorkspaceTabHistory"
+            hidden
+          >
+            <div class="draw2-panel-shell">
+              <div class="draw2-panel-heading">
+                <div><span class="draw2-eyebrow">iDRAW</span><strong>History</strong></div>
+                <span class="draw2-panel-badge" id="draw2HistoryState">Waiting</span>
+              </div>
+              <p class="draw2-panel-note">描画の正規Undo／Redo履歴を表示します。ここでは別の履歴を作りません。</p>
+              <div class="draw2-panel-action-row">
+                <button id="draw2HistoryUndo" class="draw2-button draw2-button-secondary" type="button">Undo <output id="draw2HistoryUndoDepth">0</output></button>
+                <button id="draw2HistoryRedo" class="draw2-button draw2-button-secondary" type="button">Redo <output id="draw2HistoryRedoDepth">0</output></button>
+              </div>
+              <div id="draw2HistoryList" class="draw2-history-list" role="list" aria-label="Draw history"></div>
+              <p id="draw2HistoryEmpty" class="draw2-panel-status" role="status" aria-live="polite">履歴はまだありません。</p>
+            </div>
+          </section>
+          <section
+            class="draw2-workspace-panel"
+            data-workspace-panel-content="navigator"
+            id="draw2WorkspacePanelNavigator"
+            role="tabpanel"
+            aria-labelledby="draw2WorkspaceTabNavigator"
+            hidden
+          >
+            <div class="draw2-panel-shell">
+              <div class="draw2-panel-heading">
+                <div><span class="draw2-eyebrow">VIEW</span><strong>Navigator</strong></div>
+                <span class="draw2-panel-badge" id="draw2NavigatorZoomValue">100%</span>
+              </div>
+              <p class="draw2-panel-note">Canvasの表示位置と倍率だけを操作します。描画データは変更しません。</p>
+              <div class="draw2-navigator-preview">
+                <canvas id="draw2NavigatorCanvas" width="160" height="160" aria-label="Canvas overview"></canvas>
+              </div>
+              <div class="draw2-panel-action-row">
+                <button id="draw2NavigatorZoomOut" class="draw2-button draw2-button-secondary" type="button" aria-label="Zoom out">−</button>
+                <button id="draw2NavigatorFit" class="draw2-button draw2-button-secondary" type="button">Fit</button>
+                <button id="draw2NavigatorZoomIn" class="draw2-button draw2-button-secondary" type="button" aria-label="Zoom in">＋</button>
+              </div>
+              <label class="draw2-panel-range-label">倍率 <input id="draw2NavigatorZoom" type="range" min="25" max="800" step="1" value="100" aria-label="Canvas zoom"><output id="draw2NavigatorZoomRangeValue">100%</output></label>
+              <p id="draw2NavigatorStatus" class="draw2-panel-status" role="status" aria-live="polite">Canvas overviewを待機中です。</p>
+            </div>
+          </section>
+          <section
+            class="draw2-workspace-panel"
             data-workspace-panel-content="advanced"
             data-detail-level="detailed"
             id="draw2WorkspacePanelAdvanced"
@@ -3656,24 +3827,31 @@
               </header>
               <p class="draw2-tool-studio-note">選んだツールの設定だけを表示します。確定時にCanvasの正規操作へ送られ、Undoは1回にまとまります。</p>
               <div class="draw2-tool-studio-grid" role="list" aria-label="Specialized iDRAW tools">
-                <button class="draw2-tool-studio-card is-selected" type="button" data-draw2-studio-tool="pixel-pen" role="listitem">
-                  <span class="draw2-tool-studio-glyph">1px</span><span><strong>Pixel Perfect</strong><small>アンチエイリアスなし</small></span>
+                <button class="draw2-tool-studio-card" type="button" data-draw2-studio-tool="text" role="listitem">
+                  <span class="draw2-tool-studio-glyph">T</span><span><strong>Text</strong><small>文字をピクセル化して挿入</small></span>
                 </button>
                 <button class="draw2-tool-studio-card" type="button" data-draw2-studio-tool="move" role="listitem">
                   <span class="draw2-tool-studio-glyph">↗</span><span><strong>Move Content</strong><small>未選択なら現在セルを自動選択 · Altドラッグで複製</small></span>
                 </button>
-                <button class="draw2-tool-studio-card" type="button" data-draw2-studio-tool="select-polygon" role="listitem">
-                  <span class="draw2-tool-studio-glyph">◇</span><span><strong>Polygon Select</strong><small>多角形で範囲指定</small></span>
-                </button>
-                <button class="draw2-tool-studio-card" type="button" data-draw2-studio-tool="tile-stamp" role="listitem">
-                  <span class="draw2-tool-studio-glyph">▤</span><span><strong>Tile Placement</strong><small>選択セルを連続配置</small></span>
-                </button>
               </div>
+              <section class="draw2-tool-effect-controls" aria-labelledby="draw2OutlineHeading">
+                <div class="draw2-inline-section-heading">
+                  <span class="draw2-eyebrow">EFFECT</span>
+                  <strong id="draw2OutlineHeading">Outline</strong>
+                </div>
+                <div class="draw2-tool-studio-options">
+                  <label>Placement <select id="draw2OutlinePlacement"><option value="OUTSIDE" selected>Outside</option><option value="INSIDE">Inside</option></select></label>
+                  <label>Thickness <input id="draw2OutlineThickness" type="number" min="1" max="16" value="1" inputmode="numeric"></label>
+                  <label>Connectivity <select id="draw2OutlineConnectivity"><option value="8" selected>8-neighbor</option><option value="4">4-neighbor</option></select></label>
+                  <label>Color <select id="draw2OutlineColor" aria-label="Outline color"></select></label>
+                </div>
+                <button id="draw2OutlineApply" class="draw2-button draw2-button-secondary" type="button">Apply Outline</button>
+              </section>
               <div class="draw2-tool-studio-actions">
                 <button id="draw2SpecialDuplicateFrame" class="draw2-button draw2-button-secondary" type="button"><svg class="draw2-ui-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-duplicate"></use></svg><span>Duplicate Frame</span></button>
                 <button id="draw2SpecialOpenInspector" class="draw2-button draw2-button-secondary" type="button"><svg class="draw2-ui-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-inspector"></use></svg><span>Open Options</span></button>
               </div>
-              <p id="draw2ToolStudioStatus" class="draw2-tool-studio-status" role="status" aria-live="polite">Pixel Perfect Penは1pxのBresenham線を作ります。</p>
+              <p id="draw2ToolStudioStatus" class="draw2-tool-studio-status" role="status" aria-live="polite">Penでピクセルを描画できます。</p>
             </section>
           </section>
           <section
@@ -3704,17 +3882,183 @@
               aria-hidden="true"
             >
               <div class="draw2-creator-surface-heading">
-                <span class="draw2-eyebrow">ASSET</span><strong>Asset
-                  editor</strong><span
+                <span class="draw2-eyebrow">CHARACTER</span><strong>キャラクター設定</strong><span
                   class="draw2-creator-local-badge"
                 >PROJECT LOCAL</span>
               </div>
               <p class="draw2-creator-surface-note">
-                Drawで選択した範囲を追加し、同じ元データのままアニメーションを整理します。
+                絵を動き・向き・フレームに割り当て、保存したアニメーションをiGAMEへ配置します。
               </p>
+              <section
+                class="draw2-character-setup"
+                id="draw2CharacterSetupSurface"
+                aria-labelledby="draw2CharacterSetupTitle"
+              >
+                <header class="draw2-character-setup-header">
+                  <div>
+                    <span class="draw2-eyebrow">CHARACTER PROFILE</span>
+                    <strong id="draw2CharacterSetupTitle">ゲームで使うキャラクター</strong>
+                  </div>
+                  <output id="draw2CharacterSetupStatus" class="draw2-character-setup-status" role="status" aria-live="polite">まず動きと向きを登録します。</output>
+                </header>
+                <div class="draw2-character-setup-identity">
+                  <label class="draw2-character-setup-name">
+                    名前
+                    <input id="draw2CharacterSetupName" type="text" value="Hero" autocomplete="off" placeholder="例：ルミナ" />
+                  </label>
+                  <label class="draw2-character-setup-fps">
+                    速度
+                    <input id="draw2CharacterSetupFps" type="number" min="1" max="240" step="1" value="12" inputmode="numeric" />
+                    <span>FPS</span>
+                  </label>
+                  <button id="draw2CharacterSetupSave" class="draw2-button draw2-button-primary" type="button">保存</button>
+                  <button id="draw2CharacterSetupPlace" class="draw2-button draw2-button-secondary" type="button" disabled>iGAMEに配置</button>
+                </div>
+                <div class="draw2-character-setup-grid">
+                  <section class="draw2-character-setup-card draw2-character-action-card" aria-labelledby="draw2CharacterActionTitle">
+                    <div class="draw2-character-setup-card-heading">
+                      <div>
+                        <span class="draw2-eyebrow">1 · ACTION</span>
+                        <strong id="draw2CharacterActionTitle">動きを選ぶ</strong>
+                      </div>
+                      <small>登録したい動きだけ</small>
+                    </div>
+                    <div id="draw2CharacterActionList" class="draw2-character-action-list" role="tablist" aria-label="キャラクターの動き">
+                      <button class="draw2-character-action is-active" data-character-action="IDLE" type="button" role="tab" aria-selected="true"><span aria-hidden="true">●</span><strong>待機</strong><small>Idle</small></button>
+                      <button class="draw2-character-action" data-character-action="WALK" type="button" role="tab" aria-selected="false" tabindex="-1"><span aria-hidden="true">↔</span><strong>歩く</strong><small>Walk</small></button>
+                      <button class="draw2-character-action" data-character-action="RUN" type="button" role="tab" aria-selected="false" tabindex="-1"><span aria-hidden="true">≫</span><strong>走る</strong><small>Run</small></button>
+                      <button class="draw2-character-action" data-character-action="ATTACK" type="button" role="tab" aria-selected="false" tabindex="-1"><span aria-hidden="true">✦</span><strong>攻撃</strong><small>Attack</small></button>
+                      <button class="draw2-character-action" data-character-action="HIT" type="button" role="tab" aria-selected="false" tabindex="-1"><span aria-hidden="true">✕</span><strong>ダメージ</strong><small>Hit</small></button>
+                      <button class="draw2-character-action" data-character-action="DEATH" type="button" role="tab" aria-selected="false" tabindex="-1"><span aria-hidden="true">↓</span><strong>倒れる</strong><small>Death</small></button>
+                      <button class="draw2-character-action" data-character-action="TALK" type="button" role="tab" aria-selected="false" tabindex="-1"><span aria-hidden="true">◌</span><strong>話す</strong><small>Talk</small></button>
+                    </div>
+                    <p class="draw2-character-setup-help">動きを選び、方向の「画像を追加」からフレームを登録します。</p>
+                  </section>
+                  <section class="draw2-character-setup-card draw2-character-direction-card" aria-labelledby="draw2CharacterDirectionTitle">
+                    <div class="draw2-character-setup-card-heading">
+                      <div>
+                        <span class="draw2-eyebrow">2 · DIRECTION</span>
+                        <strong id="draw2CharacterDirectionTitle">方向ごとに絵を登録</strong>
+                      </div>
+                      <div class="draw2-character-direction-controls">
+                        <small id="draw2CharacterSelectedAction">待機</small>
+                        <label>方向数<select id="draw2CharacterDirectionMode" aria-label="キャラクターの方向数"><option value="2">2方向</option><option value="4" selected>4方向</option><option value="8">8方向</option></select></label>
+                      </div>
+                    </div>
+                    <div id="draw2CharacterDirectionGrid" class="draw2-character-direction-grid" role="grid" aria-label="キャラクターの方向">
+                      <button class="draw2-character-direction-slot" data-character-direction="UP" type="button" role="gridcell" aria-label="待機・上の画像を追加"><span class="draw2-character-direction-preview" aria-hidden="true"><canvas data-character-direction-preview-canvas width="48" height="48"></canvas><span class="draw2-character-direction-icon">↑</span><span class="draw2-character-direction-add">＋</span></span><strong>上</strong><small data-character-slot-state>画像を追加</small></button>
+                      <button class="draw2-character-direction-slot" data-character-direction="UP_RIGHT" type="button" role="gridcell" aria-label="待機・右上の画像を追加"><span class="draw2-character-direction-preview" aria-hidden="true"><canvas data-character-direction-preview-canvas width="48" height="48"></canvas><span class="draw2-character-direction-icon">↗</span><span class="draw2-character-direction-add">＋</span></span><strong>右上</strong><small data-character-slot-state>画像を追加</small></button>
+                      <button class="draw2-character-direction-slot" data-character-direction="RIGHT" type="button" role="gridcell" aria-label="待機・右の画像を追加"><span class="draw2-character-direction-preview" aria-hidden="true"><canvas data-character-direction-preview-canvas width="48" height="48"></canvas><span class="draw2-character-direction-icon">→</span><span class="draw2-character-direction-add">＋</span></span><strong>右</strong><small data-character-slot-state>画像を追加</small></button>
+                      <button class="draw2-character-direction-slot" data-character-direction="DOWN_RIGHT" type="button" role="gridcell" aria-label="待機・右下の画像を追加"><span class="draw2-character-direction-preview" aria-hidden="true"><canvas data-character-direction-preview-canvas width="48" height="48"></canvas><span class="draw2-character-direction-icon">↘</span><span class="draw2-character-direction-add">＋</span></span><strong>右下</strong><small data-character-slot-state>画像を追加</small></button>
+                      <button class="draw2-character-direction-slot" data-character-direction="DOWN" type="button" role="gridcell" aria-label="待機・下の画像を追加"><span class="draw2-character-direction-preview" aria-hidden="true"><canvas data-character-direction-preview-canvas width="48" height="48"></canvas><span class="draw2-character-direction-icon">↓</span><span class="draw2-character-direction-add">＋</span></span><strong>下</strong><small data-character-slot-state>画像を追加</small></button>
+                      <button class="draw2-character-direction-slot" data-character-direction="DOWN_LEFT" type="button" role="gridcell" aria-label="待機・左下の画像を追加"><span class="draw2-character-direction-preview" aria-hidden="true"><canvas data-character-direction-preview-canvas width="48" height="48"></canvas><span class="draw2-character-direction-icon">↙</span><span class="draw2-character-direction-add">＋</span></span><strong>左下</strong><small data-character-slot-state>画像を追加</small></button>
+                      <button class="draw2-character-direction-slot" data-character-direction="LEFT" type="button" role="gridcell" aria-label="待機・左の画像を追加"><span class="draw2-character-direction-preview" aria-hidden="true"><canvas data-character-direction-preview-canvas width="48" height="48"></canvas><span class="draw2-character-direction-icon">←</span><span class="draw2-character-direction-add">＋</span></span><strong>左</strong><small data-character-slot-state>画像を追加</small></button>
+                      <button class="draw2-character-direction-slot" data-character-direction="UP_LEFT" type="button" role="gridcell" aria-label="待機・左上の画像を追加"><span class="draw2-character-direction-preview" aria-hidden="true"><canvas data-character-direction-preview-canvas width="48" height="48"></canvas><span class="draw2-character-direction-icon">↖</span><span class="draw2-character-direction-add">＋</span></span><strong>左上</strong><small data-character-slot-state>画像を追加</small></button>
+                      <div class="draw2-character-direction-center" aria-hidden="true"><span class="draw2-character-direction-center-icon">＋</span><span>画像を追加</span><small>iDRAWで選ぶ</small></div>
+                    </div>
+                    <output id="draw2CharacterDirectionStatus" class="draw2-character-direction-status" role="status" aria-live="polite">「画像を追加」を押すと、iDRAWで範囲選択に切り替わります。</output>
+                  </section>
+                </div>
+                <section class="draw2-character-animation-card" aria-labelledby="draw2CharacterAnimationTitle">
+                  <div class="draw2-character-setup-card-heading">
+                    <div>
+                      <span class="draw2-eyebrow">3 · ANIMATION</span>
+                      <strong id="draw2CharacterAnimationTitle">選択中のアニメーション</strong>
+                    </div>
+                    <div class="draw2-character-animation-card-actions">
+                      <output id="draw2CharacterAnimationSlot" aria-live="polite">待機 · 下</output>
+                      <button
+                        id="draw2CharacterAnimationAddFrame"
+                        class="draw2-button draw2-button-secondary draw2-character-animation-add-frame"
+                        type="button"
+                        aria-label="1枚目を追加"
+                        title="現在の動き・方向に1枚目を追加"
+                      ><svg class="draw2-ui-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-add"></use></svg><span class="draw2-button-label" data-character-animation-add-label>1枚目を追加</span></button>
+                      <button
+                        id="draw2CharacterAnimationAllFrames"
+                        class="draw2-button draw2-button-secondary draw2-character-animation-all-frames"
+                        type="button"
+                        disabled
+                        aria-label="現在表示中のレイヤーで全フレームをアニメーション化"
+                        title="現在表示中のレイヤーと選択範囲を、全フレームのアニメーションとして登録"
+                      ><svg class="draw2-ui-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-timeline"></use></svg><span class="draw2-button-label">全フレーム</span></button>
+                      <button
+                        id="draw2CharacterAnimationDelete"
+                        class="draw2-button draw2-button-secondary draw2-button-icon"
+                        type="button"
+                        disabled
+                        aria-label="このアニメーションを削除"
+                        title="選択中の動き・方向を削除"
+                      ><svg class="draw2-ui-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-delete"></use></svg><span class="draw2-button-label">動きを削除</span></button>
+                    </div>
+                  </div>
+                  <div class="draw2-character-animation-preview-row">
+                    <canvas id="draw2CharacterAnimationPreviewCanvas" width="96" height="96" aria-label="選択中スプライトのプレビュー"></canvas>
+                    <div class="draw2-character-animation-frame-area">
+                      <div id="draw2CharacterAnimationFrameStrip" class="draw2-character-animation-frame-strip" role="list" aria-label="選択中アニメーションのフレーム"></div>
+                      <output id="draw2CharacterAnimationStatus" class="draw2-character-direction-status" role="status" aria-live="polite">方向を選ぶと登録済みフレームを表示します。</output>
+                    </div>
+                  </div>
+                  <div class="draw2-character-animation-edit-bar" aria-label="アニメーション編集">
+                    <button
+                      id="draw2CharacterAnimationFramePrevious"
+                      class="draw2-button draw2-button-secondary draw2-button-icon"
+                      type="button"
+                      disabled
+                      aria-label="選択フレームを前へ移動"
+                      title="選択フレームを前へ移動"
+                    ><svg class="draw2-ui-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-chevron-left"></use></svg></button>
+                    <button
+                      id="draw2CharacterAnimationFrameNext"
+                      class="draw2-button draw2-button-secondary draw2-button-icon"
+                      type="button"
+                      disabled
+                      aria-label="選択フレームを次へ移動"
+                      title="選択フレームを次へ移動"
+                    ><svg class="draw2-ui-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-chevron-right"></use></svg></button>
+                    <button
+                      id="draw2CharacterAnimationFrameReplace"
+                      class="draw2-button draw2-button-secondary draw2-button-icon"
+                      type="button"
+                      disabled
+                      aria-label="選択フレームを差し替え"
+                      title="選択フレームを差し替え"
+                    ><svg class="draw2-ui-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-edit"></use></svg></button>
+                    <button
+                      id="draw2CharacterAnimationFrameDelete"
+                      class="draw2-button draw2-button-secondary draw2-button-icon"
+                      type="button"
+                      disabled
+                      aria-label="選択フレームを削除"
+                      title="選択フレームを削除"
+                    ><svg class="draw2-ui-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-delete"></use></svg></button>
+                    <label class="draw2-character-animation-duration">表示<input id="draw2CharacterAnimationFrameDuration" type="number" min="1" max="60000" step="1" value="83" inputmode="numeric" aria-label="選択フレームの表示時間" disabled><span>ms</span></label>
+                    <label class="draw2-character-animation-loop">再生<select id="draw2CharacterAnimationLoop" aria-label="アニメーションの再生方法" disabled><option value="LOOP">ループ</option><option value="ONCE">1回</option><option value="PING_PONG">往復</option></select></label>
+                  </div>
+                </section>
+              </section>
+              <div class="draw2-asset-builder-actions draw2-creator-asset-export-actions" aria-label="Unityアセット出力">
+                <span>保存したAssetはUnityで使える形にまとめられます。</span>
+                <button
+                  class="draw2-button draw2-button-secondary draw2-asset-builder-unity-export"
+                  id="draw2AssetBuilderUnityExport"
+                  type="button"
+                  disabled
+                  title="選択中AssetをUnityへ取り込めるZIPとして保存"
+                >
+                  Unity用ZIP
+                </button>
+              </div>
+              <output
+                id="draw2AssetBuilderUnityStatus"
+                class="draw2-asset-builder-unity-status"
+                role="status"
+                aria-live="polite"
+              >Assetを選択するとUnity用に書き出せます。</output>
               <section
                 class="draw2-asset-builder"
                 id="draw2AssetBuilderVisual"
+                hidden
                 aria-labelledby="draw2AssetBuilderTitle"
               >
                 <header class="draw2-asset-builder-header">
@@ -4453,8 +4797,34 @@
                     このAssetを保存
                   </button>
                 </div>
+                <div class="draw2-asset-package-controls" aria-label="販売用Assetの確定">
+                  <label>
+                    <span>販売単位</span>
+                    <select id="draw2AssetBuilderOfferKind">
+                      <option value="ASSET">単品</option>
+                      <option value="ASSET_PACK">Pack</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>派生利用</span>
+                    <select id="draw2AssetBuilderDerivativePolicy">
+                      <option value="USE_ONLY">利用のみ</option>
+                      <option value="DERIVATIVE_ALLOWED">派生OK</option>
+                      <option value="REDISTRIBUTION_ALLOWED">再配布OK</option>
+                    </select>
+                  </label>
+                  <button
+                    class="draw2-button draw2-asset-builder-finalize"
+                    id="draw2AssetBuilderFinalize"
+                    type="button"
+                    disabled
+                  >
+                    販売用に確定
+                  </button>
+                  <output id="draw2AssetBuilderPackageStatus" data-state="idle">未確定</output>
+                </div>
               </section>
-              <details class="draw2-asset-detail-editor">
+              <details class="draw2-asset-detail-editor" hidden>
                 <summary>詳細編集（既存Asset一覧・Frame範囲）</summary>
                 <fieldset
                   class="draw2-creator-fieldset draw2-asset-quick-create"
@@ -4506,7 +4876,7 @@
                     class="draw2-asset-direction-grid"
                     id="draw2AssetSlotGrid"
                     role="grid"
-                    aria-label="4方向アセットスロット"
+                      aria-label="2・4・8方向アセットスロット"
                   >
                     <button
                       class="draw2-asset-slot"
@@ -4675,14 +5045,34 @@
                           <option value="IDLE_DOWN">Idle・下</option>
                           <option value="IDLE_LEFT">Idle・左</option>
                           <option value="IDLE_RIGHT">Idle・右</option>
+                          <option value="IDLE_UP_LEFT">Idle・左上</option>
+                          <option value="IDLE_UP_RIGHT">Idle・右上</option>
+                          <option value="IDLE_DOWN_LEFT">Idle・左下</option>
+                          <option value="IDLE_DOWN_RIGHT">Idle・右下</option>
                           <option value="WALK_UP">Walk・上</option>
                           <option value="WALK_DOWN">Walk・下</option>
                           <option value="WALK_LEFT">Walk・左</option>
                           <option value="WALK_RIGHT">Walk・右</option>
+                          <option value="WALK_UP_LEFT">Walk・左上</option>
+                          <option value="WALK_UP_RIGHT">Walk・右上</option>
+                          <option value="WALK_DOWN_LEFT">Walk・左下</option>
+                          <option value="WALK_DOWN_RIGHT">Walk・右下</option>
+                          <option value="JUMP_UP">Jump・上</option>
+                          <option value="JUMP_DOWN">Jump・下</option>
+                          <option value="JUMP_LEFT">Jump・左</option>
+                          <option value="JUMP_RIGHT">Jump・右</option>
+                          <option value="JUMP_UP_LEFT">Jump・左上</option>
+                          <option value="JUMP_UP_RIGHT">Jump・右上</option>
+                          <option value="JUMP_DOWN_LEFT">Jump・左下</option>
+                          <option value="JUMP_DOWN_RIGHT">Jump・右下</option>
                           <option value="ATTACK_UP">Attack・上</option>
                           <option value="ATTACK_DOWN">Attack・下</option>
                           <option value="ATTACK_LEFT">Attack・左</option>
                           <option value="ATTACK_RIGHT">Attack・右</option>
+                          <option value="ATTACK_UP_LEFT">Attack・左上</option>
+                          <option value="ATTACK_UP_RIGHT">Attack・右上</option>
+                          <option value="ATTACK_DOWN_LEFT">Attack・左下</option>
+                          <option value="ATTACK_DOWN_RIGHT">Attack・右下</option>
                         </select></label><label>From<input
                           id="draw2AssetAnimationFrom"
                           type="number"
@@ -4732,7 +5122,7 @@
                       id="draw2AssetAnimationSummary"
                       class="draw2-asset-selection-summary"
                     >
-                      Idleや4方向のIdle／Walk／Attackを個別に登録できます。
+                      Idleや必要な動きの2／4／8方向を個別に登録できます。
                     </p>
                   </fieldset>
                 </details>
@@ -4993,6 +5383,144 @@
             hidden
           >
             <div class="draw2-panel-shell">
+              <section
+                id="draw2GamePlaygroundInspector"
+                class="draw2-game-playground-inspector"
+                aria-labelledby="draw2GamePlaygroundInspectorHeading"
+              >
+                <header class="draw2-game-playground-inspector-heading">
+                  <div>
+                    <span class="draw2-eyebrow">GAME INSPECTOR</span>
+                    <strong id="draw2GamePlaygroundInspectorHeading">インスペクター</strong>
+                  </div>
+                  <span class="draw2-panel-badge">ASSET</span>
+                  <button
+                    id="draw2GameMobileInspectorClose"
+                    class="draw2-button draw2-button-quiet draw2-game-mobile-inspector-close"
+                    type="button"
+                    aria-label="Game Inspectorを閉じる"
+                  >閉じる</button>
+                </header>
+                <section
+                  id="draw2GamePlaygroundSelectedAsset"
+                  class="draw2-game-playground-selected-asset"
+                  aria-label="選択中アセット"
+                  aria-live="polite"
+                ></section>
+                <section class="draw2-game-playground-card" data-playground-card="world" aria-labelledby="draw2GamePlaygroundWorldHeading">
+                  <div class="draw2-game-playground-card-heading">
+                    <span class="draw2-game-playground-card-number">1</span>
+                    <div>
+                      <strong id="draw2GamePlaygroundWorldHeading">世界</strong>
+                      <small>iDRAWから選んだ絵をステージに使う</small>
+                    </div>
+                    <span id="draw2GamePlaygroundWorldState" class="draw2-game-playground-card-state">未設定</span>
+                  </div>
+                  <button id="draw2GamePlaygroundWorldSprite" class="draw2-game-playground-sprite-slot" type="button" aria-label="背景画像を追加">
+                    <span class="draw2-game-playground-sprite-slot-visual" aria-hidden="true"><span class="draw2-game-playground-sprite-slot-icon">＋</span></span>
+                    <span class="draw2-game-playground-sprite-slot-copy"><strong>背景画像を追加</strong><small>iDRAWで範囲を選択</small></span>
+                  </button>
+                  <output id="draw2GamePlaygroundWorldStatus" class="draw2-game-playground-card-status" aria-live="polite">iDRAWの選択範囲を待機中</output>
+                  <div class="draw2-game-playground-world-options" aria-label="ワールド範囲">
+                    <label>幅<input id="draw2GamePlaygroundWorldWidth" type="number" min="32" max="1048576" step="32" value="256" inputmode="numeric"></label>
+                    <label>高さ<input id="draw2GamePlaygroundWorldHeight" type="number" min="32" max="1048576" step="32" value="256" inputmode="numeric"></label>
+                    <label>境界<select id="draw2GamePlaygroundWorldBounds">
+                      <option value="FINITE">範囲内</option>
+                      <option value="INFINITE">無限</option>
+                    </select></label>
+                  </div>
+                  <div class="draw2-game-playground-card-actions">
+                    <button id="draw2GamePlaygroundWorldClear" class="draw2-button draw2-button-quiet" type="button">外す</button>
+                  </div>
+                </section>
+                <section class="draw2-game-playground-card" data-playground-card="player" aria-labelledby="draw2GamePlaygroundPlayerHeading">
+                  <div class="draw2-game-playground-card-heading">
+                    <span class="draw2-game-playground-card-number">2</span>
+                    <div>
+                      <strong id="draw2GamePlaygroundPlayerHeading">主人公</strong>
+                    </div>
+                    <span id="draw2GamePlaygroundPlayerState" class="draw2-game-playground-card-state">未設定</span>
+                  </div>
+                  <button id="draw2GamePlaygroundPlayerSprite" class="draw2-game-playground-sprite-slot is-character" type="button" aria-label="キャラクター画像を追加">
+                    <span class="draw2-game-playground-sprite-slot-visual" aria-hidden="true"><span class="draw2-game-playground-sprite-slot-icon">＋</span></span>
+                    <span class="draw2-game-playground-sprite-slot-copy"><strong>キャラクター画像を追加</strong><small>iDRAWで範囲を選択</small></span>
+                  </button>
+                  <div id="draw2GamePlaygroundPlayerFrames" class="draw2-game-playground-frame-strip" role="list" aria-label="主人公のフレーム確認"></div>
+                  <div class="draw2-game-playground-flags" role="group" aria-label="主人公の基本設定">
+                    <label><input id="draw2GamePlaygroundPlayerMovable" type="checkbox" checked>移動</label>
+                    <label><input id="draw2GamePlaygroundPlayerCollision" type="checkbox" checked>当たり判定</label>
+                    <label><input id="draw2GamePlaygroundPlayerGravity" type="checkbox">重力</label>
+                  </div>
+                  <output id="draw2GamePlaygroundPlayerStatus" class="draw2-game-playground-card-status" aria-live="polite">iDRAWのAsset Definitionまたは選択範囲を待機中</output>
+                  <div class="draw2-game-playground-card-actions">
+                    <button id="draw2GamePlaygroundPlayerClear" class="draw2-button draw2-button-quiet" type="button">外す</button>
+                  </div>
+                </section>
+                <section class="draw2-game-playground-card" data-playground-card="objects" aria-labelledby="draw2GamePlaygroundObjectsHeading">
+                  <div class="draw2-game-playground-card-heading">
+                    <span class="draw2-game-playground-card-number">＋</span>
+                    <div>
+                      <strong id="draw2GamePlaygroundObjectsHeading">配置オブジェクト</strong>
+                      <small>レイヤーと奥行きで自由に重ねる</small>
+                    </div>
+                    <span id="draw2GamePlaygroundObjectsState" class="draw2-game-playground-card-state">0件</span>
+                  </div>
+                  <div id="draw2GamePlaygroundObjects" class="draw2-game-playground-object-list" role="list" aria-label="自由配置オブジェクト"></div>
+                  <button id="draw2GamePlaygroundObjectAdd" class="draw2-game-playground-sprite-slot is-add" type="button" aria-label="オブジェクト画像を追加">
+                    <span class="draw2-game-playground-sprite-slot-visual" aria-hidden="true"><span class="draw2-game-playground-sprite-slot-icon">＋</span></span>
+                    <span class="draw2-game-playground-sprite-slot-copy"><strong>オブジェクト画像を追加</strong><small>iDRAWで範囲を選択</small></span>
+                  </button>
+                </section>
+                <section class="draw2-game-playground-card" data-playground-card="audio" aria-labelledby="draw2GamePlaygroundAudioHeading">
+                  <div class="draw2-game-playground-card-heading">
+                    <span class="draw2-game-playground-card-number">3</span>
+                    <div>
+                      <strong id="draw2GamePlaygroundAudioHeading">音をつける</strong>
+                      <small>iAUDIOで選択した範囲を役割にする</small>
+                    </div>
+                    <span id="draw2GamePlaygroundAudioState" class="draw2-game-playground-card-state">0件</span>
+                  </div>
+                  <div id="draw2GamePlaygroundAudioEvents" class="draw2-game-playground-audio-events" role="list" aria-label="音を入れるイベント">
+                    <button type="button" class="draw2-game-playground-audio-event" data-game-playground-audio-event="BACKGROUND_MUSIC"><span aria-hidden="true">♫</span><strong>BGM</strong><small>背景で流す</small></button>
+                    <button type="button" class="draw2-game-playground-audio-event" data-game-playground-audio-event="PLAYER_MOVE"><span aria-hidden="true">↔</span><strong>歩く</strong><small>移動・モーション</small></button>
+                    <button type="button" class="draw2-game-playground-audio-event" data-game-playground-audio-event="PLAYER_JUMP"><span aria-hidden="true">↟</span><strong>ジャンプ</strong><small>跳んだ瞬間</small></button>
+                    <button type="button" class="draw2-game-playground-audio-event" data-game-playground-audio-event="TILE_STEP"><span aria-hidden="true">▦</span><strong>踏む</strong><small>タイルに乗る</small></button>
+                    <button type="button" class="draw2-game-playground-audio-event" data-game-playground-audio-event="OBJECT_INTERACT"><span aria-hidden="true">◎</span><strong>触る</strong><small>オブジェクト操作</small></button>
+                  </div>
+                  <div class="draw2-game-playground-audio-controls">
+                    <label class="draw2-panel-field">イベント<select id="draw2GamePlaygroundAudioRole" hidden>
+                      <option value="BACKGROUND_MUSIC">BGM</option>
+                      <option value="PLAYER_MOVE">歩く</option>
+                      <option value="PLAYER_JUMP">ジャンプ</option>
+                      <option value="TILE_STEP">踏む</option>
+                      <option value="OBJECT_INTERACT">触る</option>
+                    </select></label>
+                    <label class="draw2-panel-field">参照<select id="draw2GamePlaygroundAudioReferenceMode">
+                      <option value="LIVE">LIVE（更新を反映）</option>
+                      <option value="PINNED">PINNED（版を固定）</option>
+                    </select></label>
+                  </div>
+                  <output id="draw2GamePlaygroundAudioRange" class="draw2-game-playground-card-status" aria-live="polite">iAUDIOで範囲を選択してください</output>
+                  <div class="draw2-game-playground-card-actions">
+                    <button id="draw2GamePlaygroundAudioApply" class="draw2-button" type="button" hidden>選択範囲を追加</button>
+                    <button id="draw2GamePlaygroundAudioClear" class="draw2-button draw2-button-quiet" type="button">全て外す</button>
+                  </div>
+                  <div id="draw2GamePlaygroundAudioAssignments" class="draw2-game-playground-audio-assignments" role="list" aria-label="iGAMEに割り当てた音"></div>
+                </section>
+                <section class="draw2-game-playground-card draw2-game-playground-controls-card" data-playground-card="controls" aria-labelledby="draw2GamePlaygroundControlsHeading">
+                  <div class="draw2-game-playground-card-heading">
+                    <span class="draw2-game-playground-card-number">▶</span>
+                    <div>
+                      <strong id="draw2GamePlaygroundControlsHeading">操作</strong>
+                      <small id="draw2GamePlaygroundControlsSummary">自由移動・連続座標</small>
+                    </div>
+                  </div>
+                  <div class="draw2-game-playground-keycaps" aria-label="現在の操作">
+                    <kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd><span>移動</span><kbd>WASD</kbd><span>キーボードでも操作</span>
+                  </div>
+                  <output id="draw2GamePlaygroundStatus" class="draw2-game-playground-card-status" aria-live="polite">配置を押して移動、Playで確認</output>
+                </section>
+              </section>
               <div class="draw2-panel-heading">
                 <div>
                   <span class="draw2-eyebrow">DRAW</span><strong
@@ -5059,47 +5587,6 @@
               <p class="draw2-panel-note">
                 テンプレートを選び、素材を置き、イベントを選ぶだけ。難しい内部設定はiGAMEが自動で準備します。
               </p>
-              <section
-                class="draw2-game-visual-maker"
-                id="draw2GameVisualMaker"
-                aria-labelledby="draw2GameVisualMakerHeading"
-              >
-                <div class="draw2-game-visual-maker-heading">
-                  <div>
-                    <span class="draw2-eyebrow">見ながら作る / VISUAL MAKER</span>
-                    <strong id="draw2GameVisualMakerHeading">ゲームを作る</strong>
-                  </div>
-                  <span class="draw2-panel-badge">かんたん</span>
-                </div>
-                <p class="draw2-game-visual-maker-intro">
-                  作りたいものを選び、画面の見本を押してください。最初は主人公を動かしてみましょう。
-                </p>
-                <div
-                  class="draw2-game-maker-category-tabs"
-                  role="tablist"
-                  aria-label="ゲーム制作の場所"
-                >
-                  <button class="draw2-game-maker-category" type="button" role="tab" data-game-maker-category="WORLD" aria-controls="draw2GameVisualMakerContext">
-                    <span aria-hidden="true">◇</span><strong>世界</strong><small>WORLD</small>
-                  </button>
-                  <button class="draw2-game-maker-category is-active" type="button" role="tab" data-game-maker-category="HERO" aria-controls="draw2GameVisualMakerContext" aria-selected="true">
-                    <span aria-hidden="true">●</span><strong>主人公</strong><small>HERO</small>
-                  </button>
-                  <button class="draw2-game-maker-category" type="button" role="tab" data-game-maker-category="ITEM" aria-controls="draw2GameVisualMakerContext">
-                    <span aria-hidden="true">◆</span><strong>もの</strong><small>ITEM</small>
-                  </button>
-                  <button class="draw2-game-maker-category" type="button" role="tab" data-game-maker-category="EVENT" aria-controls="draw2GameVisualMakerContext">
-                    <span aria-hidden="true">✦</span><strong>仕掛け</strong><small>EVENT</small>
-                  </button>
-                  <button class="draw2-game-maker-category" type="button" role="tab" data-game-maker-category="UI" aria-controls="draw2GameVisualMakerContext">
-                    <span aria-hidden="true">▣</span><strong>画面</strong><small>UI</small>
-                  </button>
-                </div>
-                <div id="draw2GameVisualMakerContext" class="draw2-game-visual-maker-context" role="tabpanel" tabindex="-1"></div>
-                <p class="draw2-panel-status" id="draw2GameVisualMakerStatus" aria-live="polite">
-                  主人公を選んで、向き・動き・操作を見ながら作れます。
-                </p>
-              </section>
               <section
                 class="draw2-game-creation-mode"
                 id="draw2GameCreationMode"
@@ -5299,20 +5786,31 @@
                   >オブジェクト設定</strong>
                 </div><span class="draw2-panel-badge">ゲーム専用</span>
               </div>
-              <p class="draw2-panel-status" id="draw2GameInspectorSelection">
-                左のシーン階層からMap・主人公・NPCを選択してください。
-              </p>
-              <p class="draw2-panel-note">
-                ここではGameオブジェクト名・役割・機能・イベントを設定します。iDRAWの画像やiAUDIOの音源は参照専用です。
-              </p>
-              <label class="draw2-panel-field">名前<input
-                  id="draw2GameInspectorName"
-                  type="text"
-                  maxlength="64"
-                ></label>
-              <label class="draw2-panel-field">役割<select
-                  id="draw2GameInspectorRole"
-                >
+              <section
+                class="draw2-game-object-card"
+                id="draw2GameObjectCard"
+                aria-labelledby="draw2GameObjectCardHeading"
+              >
+                <div class="draw2-game-object-card-heading">
+                  <div class="draw2-game-object-card-title">
+                    <svg class="draw2-ui-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-select"></use></svg>
+                    <div>
+                      <span class="draw2-eyebrow">GAME OBJECT</span>
+                      <strong id="draw2GameObjectCardHeading">オブジェクト</strong>
+                    </div>
+                  </div>
+                  <span class="draw2-game-object-state" id="draw2GameInspectorState" data-state="empty">未選択</span>
+                </div>
+                <p class="draw2-game-object-selection" id="draw2GameInspectorSelection" role="status" aria-live="polite">対象なし</p>
+                <div class="draw2-game-object-fields">
+                  <label class="draw2-panel-field">名前<input
+                      id="draw2GameInspectorName"
+                      type="text"
+                      maxlength="64"
+                    ></label>
+                  <label class="draw2-panel-field">役割<select
+                      id="draw2GameInspectorRole"
+                    >
                   <option value="PLAYER">主人公 (Player)</option>
                   <option value="NPC">登場人物 (NPC)</option>
                   <option value="PROP">宝箱・扉・環境</option>
@@ -5321,35 +5819,50 @@
                   <option value="CAMERA">カメラ (Camera)</option>
                   <option value="AUDIO">音の発生源</option>
                   <option value="CUSTOM">カスタム</option>
-                </select></label>
-              <label class="draw2-game-inspector-check">
-                <input id="draw2GameInspectorActive" type="checkbox" checked>
-                <span>Active（Play時に有効）</span>
-              </label>
-              <label class="draw2-panel-field">親<select
-                  id="draw2GameInspectorParent"
-                >
-                  <option value="">ルート（親なし）</option>
-                </select></label>
-              <div class="draw2-panel-action-row">
-                <button
-                  id="draw2GameInspectorApply"
-                  class="draw2-button"
-                  type="button"
-                >
-                  適用
-                </button>
-                <button
-                  id="draw2GameInspectorFocus"
-                  class="draw2-button draw2-button-secondary"
-                  type="button"
-                >
-                  シーンに表示
-                </button>
-              </div>
-              <p class="draw2-panel-status" id="draw2GameInspectorStatus">
-                名前・役割・有効/無効をProjectへ保存できます。
-              </p>
+                    </select></label>
+                  <label class="draw2-game-inspector-check draw2-game-object-active">
+                    <input id="draw2GameInspectorActive" type="checkbox" checked>
+                    <span>Active</span>
+                    <small>Play</small>
+                  </label>
+                  <label class="draw2-panel-field">親<select
+                      id="draw2GameInspectorParent"
+                    >
+                      <option value="">ルート（親なし）</option>
+                    </select></label>
+                </div>
+                <div class="draw2-panel-action-row">
+                  <button
+                    id="draw2GameInspectorApply"
+                    class="draw2-button"
+                    type="button"
+                  >
+                    適用
+                  </button>
+                  <button
+                    id="draw2GameInspectorFocus"
+                    class="draw2-button draw2-button-secondary"
+                    type="button"
+                  >
+                    シーンに表示
+                  </button>
+                </div>
+                <p class="draw2-panel-status" id="draw2GameInspectorStatus" role="status" aria-live="polite">未選択</p>
+              </section>
+              <section
+                class="draw2-game-quick-flags"
+                id="draw2GameQuickFlags"
+                aria-labelledby="draw2GameQuickFlagsHeading"
+              >
+                <div class="draw2-game-subheading">
+                  <div>
+                    <span class="draw2-eyebrow">QUICK FLAGS</span>
+                    <strong id="draw2GameQuickFlagsHeading">状態</strong>
+                  </div>
+                  <span class="draw2-panel-badge">ON / OFF</span>
+                </div>
+                <div id="draw2GameQuickFlagsGrid" class="draw2-game-quick-flags-grid" role="list"></div>
+              </section>
               <section
                 id="draw2GameCameraQuickSettings"
                 class="draw2-game-camera-quick"
@@ -5363,9 +5876,6 @@
                   </div>
                   <span class="draw2-panel-badge">かんたん</span>
                 </div>
-                <p class="draw2-panel-note">
-                  ドットをくっきり見せる、主人公を追いかける、ダメージで揺らすをここで変更できます。
-                </p>
                 <div class="draw2-game-camera-quick-grid">
                   <label class="draw2-game-inspector-check">
                     <input id="draw2GameCameraQuickPixelPerfect" type="checkbox">
@@ -5410,25 +5920,22 @@
                   </div>
                   <span class="draw2-panel-badge">ゲーム専用</span>
                 </div>
-                <p class="draw2-panel-note">
-                  追加した機能がオブジェクトの性質になります。当たり判定・重力・プレイヤー移動・カメラ・イベントをここで設定します。
-                </p>
                 <div
                   id="draw2GameComponents"
                   class="draw2-game-component-list"
                   role="list"
+                  data-drop-accept="application/x-draw2-game-component"
+                  data-drop-target="selected-game-object"
                 ></div>
                 <button
                   type="button"
                   class="draw2-game-components-drop-hint"
                   id="draw2GameComponentsDropHint"
                 >
-                  <svg class="draw2-ui-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-add"></use></svg><span>+ ここにドロップ、またはクリックしてノードボックスを開く</span>
+                  <svg class="draw2-ui-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-add"></use></svg><span>ここへドロップ</span>
                 </button>
                 
-                <p class="draw2-panel-status" id="draw2GameComponentsStatus">
-                  機能を追加すると、このオブジェクトの役割が明確になります。
-                </p>
+                <p class="draw2-panel-status" id="draw2GameComponentsStatus" role="status" aria-live="polite">機能なし</p>
                 </section>
               <details class="draw2-game-advanced-settings">
                 <summary>詳細設定（上級者向け）</summary>
@@ -5507,10 +6014,11 @@
                 role="tabpanel"
                 aria-label="Event Sheet"
               >
-                <p class="draw2-panel-note">
-                  ノードをつなぐ代わりに、「誰が」「条件」「起こすこと」を選びます。同じ条件の動作はイベントカードを複数追加できます。
+                <p class="draw2-visually-hidden" id="draw2GameEventDescription">
+                  誰が、条件、起こすこと、対象を選んでイベントカードを作成します。
                 </p>
-                <div class="draw2-game-event-card-fields">
+                <div class="draw2-game-event-form-grid" aria-describedby="draw2GameEventDescription">
+                  <div class="draw2-game-event-card-fields">
                   <label class="draw2-panel-field">誰が<select id="draw2GameEventWho">
                     <option value="PLAYER">主人公</option>
                     <option value="TOUCHED_OBJECT">触れたオブジェクト</option>
@@ -5534,7 +6042,7 @@
                   </select></label>
                   <label class="draw2-panel-field">対象<select id="draw2GameEventTarget"></select></label>
                 </div>
-                <label class="draw2-panel-field draw2-game-event-amount-field">ダメージ量<input
+                <label class="draw2-panel-field draw2-game-event-amount-field" id="draw2GameEventAmountField"><span id="draw2GameEventAmountLabel">ダメージ量</span><input
                     id="draw2GameEventAmount"
                     type="number"
                     min="0"
@@ -5542,11 +6050,15 @@
                     step="1"
                     value="1"
                   ></label>
-                <label class="draw2-panel-field">表示する内容<textarea
+                <label class="draw2-panel-field" id="draw2GameEventItemField" hidden>アイテム<select id="draw2GameEventItem"></select></label>
+                <label class="draw2-panel-field" id="draw2GameEventRecipeField" hidden>レシピ<select id="draw2GameEventRecipe"></select></label>
+                <label class="draw2-panel-field" id="draw2GameEventBlockField" hidden>ブロック<select id="draw2GameEventBlock"></select></label>
+                <label class="draw2-panel-field draw2-game-event-message-field">表示する内容<textarea
                     id="draw2GameEventMessage"
                     rows="3"
                     maxlength="240"
                   ></textarea></label>
+                </div>
                 <select id="draw2GameEventTrigger" hidden aria-hidden="true">
                   <option value="rpg.interact">Interact / Enter</option>
                   <option value="rpg.tap">Tap</option>
@@ -5568,7 +6080,7 @@
                   </button>
                 </div>
                 <div id="draw2GameEventList" class="draw2-game-event-list" role="list"></div>
-                <p class="draw2-panel-status" id="draw2GameEventStatus">
+                <p class="draw2-panel-status" id="draw2GameEventStatus" role="status" aria-live="polite">
                   Trackを選択するとイベントを編集できます。
                 </p>
               </div>
@@ -5660,7 +6172,7 @@
                 </div><span class="draw2-panel-badge">GAME OWNED</span>
               </div>
               <p class="draw2-panel-note">
-                iDRAW / iAUDIO素材は参照専用です。iDRAWは「範囲を選ぶ → キャラクターとして配置」、iAUDIOは「音を選ぶ → 効果音・BGMとして配置」で使います。
+                iDRAW / iAUDIO素材は参照専用です。登録済みiDRAW Assetは「表示中フレームの範囲を合成して固定保存」し、iGAMEではそのまま配置できます。
               </p>
               <section class="draw2-game-template-catalog" aria-labelledby="draw2GameTemplatesHeading">
                 <div class="draw2-game-template-heading">
@@ -5697,7 +6209,7 @@
               </div>
               <div class="draw2-game-binding-controls">
                 <p class="draw2-panel-note">
-                  iDRAW素材を選ぶと、選択中のフレームと範囲を参照として保存します。画像データはコピーせず、iDRAW側の変更は同じ範囲へ反映されます。
+                  iDRAW Assetは登録時に表示中フレームの選択範囲を合成して保存します。元のFrame／Layerを後から編集しても、登録済みAssetの画像は変わりません。
                 </p>
                 <label class="draw2-panel-field">参照<select
                     id="draw2GameBindingMode"
@@ -6197,6 +6709,62 @@
               >
                 Select a note, clip or track.
               </p>
+              <section
+                id="draw2AudioAssetPackage"
+                class="draw2-audio-asset-package"
+                aria-label="iAUDIO範囲をAsset化"
+              >
+                <div class="draw2-audio-asset-package-heading">
+                  <span class="draw2-eyebrow">ASSET DELIVERY</span>
+                  <strong>選択範囲をAsset化</strong>
+                </div>
+                <label class="draw2-audio-asset-package-name">
+                  名前
+                  <input
+                    id="draw2AudioAssetName"
+                    type="text"
+                    maxlength="128"
+                    autocomplete="off"
+                    placeholder="例: ジャンプ音"
+                  >
+                </label>
+                <div class="draw2-audio-asset-package-controls">
+                  <label>役割<select id="draw2AudioAssetRole">
+                    <option value="" selected>選択…</option>
+                    <option value="BGM">BGM</option>
+                    <option value="SE">SE</option>
+                    <option value="VOICE">VOICE</option>
+                  </select></label>
+                  <label>単位<select id="draw2AudioAssetOfferKind">
+                    <option value="ASSET" selected>単品</option>
+                    <option value="ASSET_PACK">Pack</option>
+                  </select></label>
+                  <label>派生<select id="draw2AudioAssetDerivativePolicy">
+                    <option value="USE_ONLY" selected>利用のみ</option>
+                    <option value="DERIVATIVE_ALLOWED">派生OK</option>
+                    <option value="REDISTRIBUTION_ALLOWED">再配布OK</option>
+                  </select></label>
+                </div>
+                <div class="draw2-audio-asset-package-action">
+                  <button
+                    id="draw2AudioAssetAddRange"
+                    class="draw2-button draw2-button-quiet"
+                    type="button"
+                    disabled
+                  >
+                    ＋Packへ追加
+                  </button>
+                  <button
+                    id="draw2AudioAssetFinalize"
+                    class="draw2-button draw2-button-primary"
+                    type="button"
+                    disabled
+                  >
+                    販売用に確定
+                  </button>
+                  <output id="draw2AudioAssetStatus" aria-live="polite">役割と範囲を指定</output>
+                </div>
+              </section>
               <details class="draw2-audio-inspector-details" data-detail-level="detailed">
                 <summary>Routing diagnostics <small>Playback / graph</small></summary>
                 <section
@@ -6661,6 +7229,19 @@
                 イベント
               </button>
               <button
+                id="draw2ModeTimelineDeckTabAssets"
+                class="draw2-mode-timeline-deck-tab"
+                type="button"
+                role="tab"
+                aria-label="保存済みアセット"
+                aria-selected="false"
+                tabindex="-1"
+                aria-controls="draw2ModeDeckAssets"
+                data-mode-deck-tab="assets"
+              >
+                アセット
+              </button>
+              <button
                 class="draw2-mode-timeline-deck-tab"
                 type="button"
                 role="tab"
@@ -6735,12 +7316,98 @@
               </button>
             </nav>
             <section
+              id="draw2ModeDeckAssets"
+              class="draw2-mode-deck-surface draw2-mode-deck-asset-surface"
+              data-mode-deck-surface="assets"
+              aria-label="保存済みアセット"
+              hidden
+            >
+              <div class="draw2-mode-deck-asset-heading">
+                <div>
+                  <span class="draw2-eyebrow">SAVED ASSETS</span>
+                  <strong>保存済みアセット</strong>
+                </div>
+                <button id="draw2ModeDeckAssetOpenPanel" class="draw2-button draw2-button-secondary draw2-button-icon" type="button" aria-label="アセットパネルを開く" title="アセットパネルを開く">
+                  <svg class="draw2-ui-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-layers"></use></svg><span class="draw2-button-label">編集</span>
+                </button>
+              </div>
+              <div id="draw2ModeDeckAssetShelf" class="draw2-mode-deck-asset-shelf" role="list" aria-label="保存済みアセット一覧"></div>
+              <output id="draw2ModeDeckAssetStatus" class="draw2-mode-deck-status" role="status" aria-live="polite">保存済みアセットを読み込んでいます。</output>
+            </section>
+            <section
               id="draw2ModeDeckGame"
               class="draw2-mode-deck-surface"
               data-mode-deck-surface="game"
               aria-label="Game systems and event sheet"
               hidden
             >
+              <section
+                id="draw2GamePlaygroundBottom"
+                class="draw2-game-playground-bottom"
+                aria-label="iGAMEアセット一覧"
+              >
+                <div class="draw2-game-playground-bottom-heading">
+                  <div>
+                    <span class="draw2-eyebrow">ASSET LIBRARY</span>
+                    <strong>アセット</strong>
+                  </div>
+                  <div class="draw2-game-playground-bottom-actions">
+                    <output id="draw2GamePlaygroundBottomStatus" aria-live="polite">0件</output>
+                    <button
+                      id="draw2GameMobileInspectorToggle"
+                      class="draw2-button draw2-button-quiet draw2-game-mobile-inspector-toggle"
+                      type="button"
+                      aria-label="Game Inspectorを表示"
+                      aria-controls="draw2WorkspaceRightDock"
+                      aria-expanded="false"
+                    >詳細</button>
+                    <button
+                      id="draw2GamePlaygroundAssetAdd"
+                      class="draw2-button draw2-button-primary draw2-button-icon"
+                      type="button"
+                      aria-label="アセットを追加"
+                      title="アセットを追加"
+                    >
+                      <svg class="draw2-ui-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-add"></use></svg>
+                      <span class="draw2-button-label">追加</span>
+                    </button>
+                  </div>
+                </div>
+                <div class="draw2-game-playground-library-toolbar">
+                  <div
+                    class="draw2-game-playground-library-tabs"
+                    role="tablist"
+                    aria-label="アセットの出所"
+                  >
+                    <button
+                      type="button"
+                      class="draw2-game-playground-library-tab is-active"
+                      role="tab"
+                      aria-selected="true"
+                      data-gameplayground-library-source="PROJECT"
+                    >Project</button>
+                    <button
+                      type="button"
+                      class="draw2-game-playground-library-tab"
+                      role="tab"
+                      aria-selected="false"
+                      data-gameplayground-library-source="MARKET"
+                    >Market</button>
+                  </div>
+                  <label class="draw2-game-playground-market-search">
+                    <span class="draw2-visually-hidden">Marketアセットを検索</span>
+                    <input
+                      id="draw2GamePlaygroundMarketSearch"
+                      type="search"
+                      autocomplete="off"
+                      placeholder="Marketを検索…"
+                      aria-label="Marketアセットを検索"
+                      hidden
+                    />
+                  </label>
+                </div>
+                <div id="draw2GamePlaygroundBottomCards" class="draw2-game-playground-bottom-cards" role="list" aria-label="iGAMEアセット"></div>
+              </section>
               <div
                 class="draw2-mode-deck-toolbar"
                 role="toolbar"
@@ -6901,7 +7568,7 @@
                     <span class="draw2-eyebrow">ANIMATION CLIPS</span>
                     <strong>アニメーション</strong>
                   </div>
-                  <small>原素材はiDRAW参照専用</small>
+                  <small>iDRAW参照</small>
                 </div>
                 <div id="draw2GameAnimationSelection" class="draw2-game-animation-selection">
                   キャラクターを選択すると、Animation Clipが表示されます。
@@ -7743,7 +8410,7 @@
                       type="checkbox"
                       checked
                       disabled
-                    > Draw Sync bridge (Audio stays on musical grid)</label>
+                    > Draw time sync (Audio stays on musical grid)</label>
                   <label class="draw2-audio-setting-check"><input
                       id="draw2AudioFollowFrame"
                       type="checkbox"
@@ -7802,9 +8469,16 @@
           ><i class="draw2-sync-dot" aria-hidden="true"></i><span
               data-draw2-sync-statusbar
             >Local</span></span>
-          <span class="draw2-statusbar-save" aria-label="Local save status"><i
-              aria-hidden="true"
-            ></i>Local</span>
+          <span
+            class="draw2-statusbar-save"
+            id="draw2GamePersistenceStatus"
+            data-game-persistence-state="ready"
+            role="status"
+            aria-live="polite"
+            aria-label="Game save status"
+          ><i aria-hidden="true"></i><span
+              data-game-persistence-label
+            >Local</span></span>
         </footer>
 
         <div
@@ -7883,7 +8557,7 @@
             </select></label>
             <label>Tool <select id="draw2Tool">
               <option value="pen">Pen</option>
-              <option value="pixel-pen">Pixel Perfect Pen</option>
+              <option value="text">Text</option>
               <option value="eraser">Eraser</option>
               <option value="fill">Fill / Indexed Gradient</option>
               <option value="line">Line</option>
@@ -7898,9 +8572,7 @@
               <option value="select-ellipse">Ellipse Select</option>
               <option value="select-lasso">Lasso Select</option>
               <option value="select-color">Color Selection</option>
-              <option value="select-polygon">Polygon Select</option>
               <option value="move">Move active cel content / Duplicate</option>
-              <option value="tile-stamp">Tile Placement</option>
               <option value="pan">Pan</option>
             </select></label>
           <button
@@ -8208,6 +8880,15 @@
               <option value="SUBTRACT">Subtract</option>
               <option value="INTERSECT">Intersect</option>
             </select></label>
+          <label>Mask edge px <input
+              id="draw2SelectionMorphologyRadius"
+              type="number"
+              min="1"
+              max="32"
+              step="1"
+              value="1"
+              inputmode="numeric"
+            ></label>
           <div
             class="draw2-selection-morphology"
             role="group"
@@ -8265,12 +8946,13 @@
               <option value="ROTATE_90_CW">Rotate 90° CW</option>
               <option value="ROTATE_90_CCW">Rotate 90° CCW</option>
               <option value="ROTATE_180">Rotate 180°</option>
+              <option value="ROTATE_NEAREST">Rotate arbitrary angle</option>
               <option value="SCALE_NEAREST">Scale nearest</option>
             </select></label>
           <label>ΔX <input
               id="draw2TransformDx"
               type="number"
-              value="16"
+              value="0"
             ></label>
           <label>ΔY <input
               id="draw2TransformDy"
@@ -8283,7 +8965,15 @@
               min="0.125"
               max="8"
               step="0.125"
-              value="2"
+              value="1"
+            ></label>
+          <label>Angle° <input
+              id="draw2TransformAngle"
+              type="number"
+              min="-36000"
+              max="36000"
+              step="0.1"
+              value="0"
             ></label>
         </div>
         <div
@@ -8323,63 +9013,99 @@
           >
             Cancel
           </button>
-          <button
-            id="draw2FlipHorizontal"
-            class="draw2-button draw2-button-secondary draw2-button-icon"
-            type="button"
-            aria-label="Flip selection horizontally"
-            title="Flip horizontal"
+          <div
+            class="draw2-selection-transform-actions"
+            role="group"
+            aria-label="選択中ピクセルの変形ショートカット"
           >
-            <svg class="draw2-ui-icon" aria-hidden="true" focusable="false">
-              <use href="./assets/icons/draw2-icons.svg#icon-flip-horizontal">
-              </use>
-            </svg>
-          </button>
-          <button
-            id="draw2FlipVertical"
-            class="draw2-button draw2-button-secondary draw2-button-icon"
-            type="button"
-            aria-label="Flip selection vertically"
-            title="Flip vertical"
-          >
-            <svg class="draw2-ui-icon" aria-hidden="true" focusable="false">
-              <use href="./assets/icons/draw2-icons.svg#icon-flip-vertical">
-              </use>
-            </svg>
-          </button>
-          <button
-            id="draw2RotateCCW"
-            class="draw2-button draw2-button-secondary draw2-button-icon"
-            type="button"
-            aria-label="Rotate selection counterclockwise"
-            title="Rotate 90° CCW"
-          >
-            <svg class="draw2-ui-icon" aria-hidden="true" focusable="false">
-              <use href="./assets/icons/draw2-icons.svg#icon-rotate-ccw"></use>
-            </svg>
-          </button>
-          <button
-            id="draw2RotateCW"
-            class="draw2-button draw2-button-secondary draw2-button-icon"
-            type="button"
-            aria-label="Rotate selection clockwise"
-            title="Rotate 90° CW"
-          >
-            <svg class="draw2-ui-icon" aria-hidden="true" focusable="false">
-              <use href="./assets/icons/draw2-icons.svg#icon-rotate-cw"></use>
-            </svg>
-          </button>
-          <button
-            id="draw2Rotate180"
-            class="draw2-button draw2-button-secondary draw2-button-icon"
-            type="button"
-            aria-label="Rotate selection 180 degrees"
-            title="Rotate 180°"
-          >
-            <svg class="draw2-ui-icon" aria-hidden="true" focusable="false">
-              <use href="./assets/icons/draw2-icons.svg#icon-rotate-180"></use>
-            </svg>
-          </button>
+            <span class="draw2-selection-transform-label">選択中のピクセル</span>
+            <button
+              id="draw2ScaleDown"
+              class="draw2-button draw2-button-secondary draw2-button-icon"
+              data-workspace-command="preview-transform"
+              type="button"
+              aria-label="選択中のピクセルを50%に縮小"
+              title="選択中を50%に縮小"
+            >
+              <svg class="draw2-ui-icon" aria-hidden="true" focusable="false">
+                <use href="./assets/icons/draw2-icons.svg#icon-shrink"></use>
+              </svg>
+            </button>
+            <button
+              id="draw2ScaleUp"
+              class="draw2-button draw2-button-secondary draw2-button-icon"
+              data-workspace-command="preview-transform"
+              type="button"
+              aria-label="選択中のピクセルを200%に拡大"
+              title="選択中を200%に拡大"
+            >
+              <svg class="draw2-ui-icon" aria-hidden="true" focusable="false">
+                <use href="./assets/icons/draw2-icons.svg#icon-expand"></use>
+              </svg>
+            </button>
+            <button
+              id="draw2FlipHorizontal"
+              class="draw2-button draw2-button-secondary draw2-button-icon"
+              data-workspace-command="preview-transform"
+              type="button"
+              aria-label="選択範囲を左右反転"
+              title="左右反転"
+            >
+              <svg class="draw2-ui-icon" aria-hidden="true" focusable="false">
+                <use href="./assets/icons/draw2-icons.svg#icon-flip-horizontal">
+                </use>
+              </svg>
+            </button>
+            <button
+              id="draw2FlipVertical"
+              class="draw2-button draw2-button-secondary draw2-button-icon"
+              data-workspace-command="preview-transform"
+              type="button"
+              aria-label="選択範囲を上下反転"
+              title="上下反転"
+            >
+              <svg class="draw2-ui-icon" aria-hidden="true" focusable="false">
+                <use href="./assets/icons/draw2-icons.svg#icon-flip-vertical">
+                </use>
+              </svg>
+            </button>
+            <button
+              id="draw2RotateCCW"
+              class="draw2-button draw2-button-secondary draw2-button-icon"
+              data-workspace-command="preview-transform"
+              type="button"
+              aria-label="選択範囲を左に90度回転"
+              title="左に90度回転"
+            >
+              <svg class="draw2-ui-icon" aria-hidden="true" focusable="false">
+                <use href="./assets/icons/draw2-icons.svg#icon-rotate-ccw"></use>
+              </svg>
+            </button>
+            <button
+              id="draw2RotateCW"
+              class="draw2-button draw2-button-secondary draw2-button-icon"
+              data-workspace-command="preview-transform"
+              type="button"
+              aria-label="選択範囲を右に90度回転"
+              title="右に90度回転"
+            >
+              <svg class="draw2-ui-icon" aria-hidden="true" focusable="false">
+                <use href="./assets/icons/draw2-icons.svg#icon-rotate-cw"></use>
+              </svg>
+            </button>
+            <button
+              id="draw2Rotate180"
+              class="draw2-button draw2-button-secondary draw2-button-icon"
+              data-workspace-command="preview-transform"
+              type="button"
+              aria-label="選択範囲を180度回転"
+              title="180度回転"
+            >
+              <svg class="draw2-ui-icon" aria-hidden="true" focusable="false">
+                <use href="./assets/icons/draw2-icons.svg#icon-rotate-180"></use>
+              </svg>
+            </button>
+          </div>
           <button
             id="draw2Copy"
             class="draw2-button draw2-button-secondary"
@@ -8494,6 +9220,18 @@
               data-draw2-timeline-tab="tags"
             >
               アニメ範囲
+            </button>
+            <button
+              id="draw2TimelineTabAssets"
+              class="draw2-timeline-tab"
+              type="button"
+              role="tab"
+              aria-controls="draw2TimelinePanelAssets"
+              aria-selected="false"
+              tabindex="-1"
+              data-draw2-timeline-tab="assets"
+            >
+              アセット
             </button>
             <button
               id="draw2TimelineTabMarkers"
@@ -8948,8 +9686,8 @@
             class="draw2-timeline-creator-tools draw2-timeline-single-panel"
             aria-label="Animation tags"
           >
-            <div class="draw2-timeline-creator-group">
-              <strong>アニメ範囲</strong><div class="draw2-timeline-creator-form">
+              <div class="draw2-timeline-creator-group">
+                <strong>アニメ範囲</strong><div class="draw2-timeline-creator-form">
                 <input
                   id="draw2TagName"
                   type="text"
@@ -8993,6 +9731,21 @@
                   </svg>
                 </button>
               </div>
+              <div class="draw2-animation-tag-free-panel" data-draw2-tag-free-panel>
+                <button
+                  id="draw2TagFromSelection"
+                  class="draw2-button draw2-button-secondary draw2-button-icon"
+                  type="button"
+                  disabled
+                  aria-label="選択範囲からアニメーションタグを作成"
+                  title="選択範囲をタグ化（⌥⇧T）"
+                >
+                  <svg class="draw2-ui-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-select"></use></svg>
+                  <span class="draw2-button-label">選択範囲をタグ化</span>
+                  <kbd>⌥⇧T</kbd>
+                </button>
+                <output id="draw2TagFromSelectionStatus" class="draw2-creator-meta-status" aria-live="polite">範囲選択待ち</output>
+              </div>
               <div
                 id="draw2AnimationTagList"
                 class="draw2-creator-meta-list"
@@ -9001,6 +9754,28 @@
               >
               </div>
             </div>
+          </section>
+        </section>
+        <section
+          id="draw2TimelinePanelAssets"
+          class="draw2-timeline-tab-panel"
+          role="tabpanel"
+          aria-labelledby="draw2TimelineTabAssets"
+          data-draw2-timeline-tab-panel="assets"
+          hidden
+        >
+          <section class="draw2-timeline-asset-shelf" aria-label="保存済みアセット">
+            <div class="draw2-timeline-asset-shelf-heading">
+              <div>
+                <span class="draw2-eyebrow">SAVED ASSETS</span>
+                <strong>保存済みアセット</strong>
+              </div>
+              <button id="draw2TimelineAssetOpenPanel" class="draw2-button draw2-button-secondary draw2-button-icon" type="button" aria-label="アセットパネルを開く" title="アセットパネルを開く">
+                <svg class="draw2-ui-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-layers"></use></svg><span class="draw2-button-label">編集</span>
+              </button>
+            </div>
+            <div id="draw2TimelineAssetShelf" class="draw2-timeline-asset-shelf-list" role="list" aria-label="Draw保存済みアセット"></div>
+            <output id="draw2TimelineAssetShelfStatus" class="draw2-creator-meta-empty" role="status" aria-live="polite">保存済みアセットを読み込んでいます。</output>
           </section>
         </section>
         <section
@@ -9106,7 +9881,7 @@
                 role="status"
                 aria-live="polite"
               >
-                Audio参照を準備中です。
+                Audio参照は未選択です。
               </output>
             </div>
           </section>
@@ -9209,11 +9984,6 @@
                   step="1"
                   aria-label="Color tolerance"
                 ><output id="draw2SimilarityValue">0%</output></label>
-              <label
-                class="draw2-viewport-context-control"
-                data-draw2-special-option="tile"
-                hidden
-              ><span>Scale</span><select id="draw2SpecialTileScale"><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option><option value="8">8×</option></select></label>
             </div>
             <div class="draw2-canvas-stack">
               <canvas
@@ -9813,6 +10583,128 @@
       </form>
     </dialog>
     <dialog
+      class="draw2-command-palette draw2-settings-dialog draw2-collaboration-dialog"
+      id="draw2CollaborationScopeDialog"
+      aria-labelledby="draw2CollaborationScopeTitle"
+    >
+      <form method="dialog" id="draw2CollaborationScopeForm">
+        <div class="draw2-command-palette-heading">
+          <div>
+            <p class="draw2-eyebrow">COLLABORATION</p>
+            <h2 id="draw2CollaborationScopeTitle">共同制作の設定</h2>
+          </div>
+          <button
+            class="draw2-panel-close"
+            value="cancel"
+            aria-label="共同制作の設定を閉じる"
+          >
+            <svg class="draw2-ui-icon" aria-hidden="true" focusable="false">
+              <use href="./assets/icons/draw2-icons.svg#icon-close"></use>
+            </svg>
+          </button>
+        </div>
+        <p
+          id="draw2CollaborationScopeMessage"
+          class="draw2-settings-note draw2-collaboration-message"
+          role="status"
+          aria-live="polite"
+        >
+          共同作業に参加する前に、以下の注意事項を確認してください。
+        </p>
+        <section class="draw2-collaboration-consent-section">
+          <div class="draw2-collaboration-consent-heading">
+            <span class="draw2-eyebrow">BEFORE YOU JOIN</span>
+            <strong>共同作業の注意事項</strong>
+          </div>
+          <article class="draw2-collaboration-consent-card">
+            <strong>気軽な共同お絵描き</strong>
+            <span>一緒に編集できますが、描いた量や編集履歴だけで著作権・クレジット・収益の権利が自動で発生するわけではありません。</span>
+          </article>
+          <article class="draw2-collaboration-consent-card">
+            <strong>公開・販売を伴う制作</strong>
+            <span>公開・販売・ゲーム利用などの担当範囲は、マスターの設定と本人の確認をもとに管理します。承認済みの担当範囲を外すときは本人の確認が必要です。</span>
+          </article>
+          <label class="draw2-collaboration-consent-check">
+            <input type="checkbox" id="draw2CollaborationConsentCheck">
+            <span>上記を確認し、共同作業に参加します。</span>
+          </label>
+          <button
+            class="draw2-button draw2-button-primary"
+            id="draw2CollaborationConsentAccept"
+            type="button"
+            disabled
+          >
+            確認して参加する
+          </button>
+        </section>
+        <section
+          id="draw2CollaborationEditPolicy"
+          class="draw2-collaboration-section draw2-collaboration-edit-policy"
+          hidden
+        >
+          <div class="draw2-collaboration-section-heading">
+            <div><span class="draw2-eyebrow">EDIT RULE</span><strong>編集ルール</strong></div>
+            <small>初期設定は自由編集です。必要なProjectだけ担当範囲を必須にできます。</small>
+          </div>
+          <p
+            id="draw2CollaborationEditPolicyMessage"
+            class="draw2-settings-note draw2-collaboration-policy-message"
+            role="status"
+            aria-live="polite"
+          ></p>
+          <fieldset class="draw2-collaboration-policy-options">
+            <legend class="sr-only">編集ルールを選択</legend>
+            <label class="draw2-collaboration-policy-option">
+              <input
+                id="draw2CollaborationEditPolicyOpen"
+                name="draw2CollaborationEditPolicy"
+                type="radio"
+                value="OPEN"
+              >
+              <span>
+                <strong>自由に編集</strong>
+                <small>編集参加者は、担当範囲の承認を待たずに作業できます。</small>
+              </span>
+            </label>
+            <label class="draw2-collaboration-policy-option">
+              <input
+                id="draw2CollaborationEditPolicyAssignedOnly"
+                name="draw2CollaborationEditPolicy"
+                type="radio"
+                value="ASSIGNED_ONLY"
+              >
+              <span>
+                <strong>担当範囲のみ</strong>
+                <small>本人が確認し、マスターが承認した範囲だけ編集できます。</small>
+              </span>
+            </label>
+          </fieldset>
+        </section>
+        <section id="draw2CollaborationMasterPanel" class="draw2-collaboration-section" hidden>
+          <div class="draw2-collaboration-section-heading">
+            <div><span class="draw2-eyebrow">MASTER</span><strong>参加者の担当範囲</strong></div>
+            <small>割り当ては本人の確認後に確定。承認済み範囲を外すと本人に確認を送ります。</small>
+          </div>
+          <div id="draw2CollaborationMasterList" class="draw2-collaboration-member-list"></div>
+        </section>
+        <section id="draw2CollaborationParticipantPanel" class="draw2-collaboration-section" hidden>
+          <div class="draw2-collaboration-section-heading">
+            <div><span class="draw2-eyebrow">PARTICIPANT</span><strong>担当範囲を申請</strong></div>
+            <small>必要なものだけ選んで申請できます。</small>
+          </div>
+          <div id="draw2CollaborationParticipantList" class="draw2-collaboration-scope-list"></div>
+        </section>
+        <div class="draw2-collaboration-help">
+          <strong>難しい権利設定は後回しにできます</strong>
+          <span>遊びで描く場合も、公開・販売する場合も、この注意事項を確認したうえで必要な担当範囲だけ設定できます。</span>
+        </div>
+        <div class="draw2-settings-actions">
+          <span id="draw2CollaborationScopeSaveStatus" class="draw2-settings-note" role="status" aria-live="polite"></span>
+          <button class="draw2-button" value="cancel" type="submit">閉じる</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog
       class="draw2-command-palette draw2-settings-dialog"
       id="draw2CanvasSettingsDialog"
       aria-labelledby="draw2CanvasSettingsTitle"
@@ -10009,10 +10901,64 @@
         </div>
       </form>
     </dialog>
+    <dialog id="draw2TextInsertDialog" class="draw2-dialog" aria-labelledby="draw2TextInsertHeading">
+      <form method="dialog" class="draw2-dialog-form">
+        <header class="draw2-dialog-heading">
+          <div>
+            <span class="draw2-eyebrow">TEXT TOOL</span>
+            <h2 id="draw2TextInsertHeading">Insert text</h2>
+          </div>
+          <span class="draw2-dialog-badge">PIXEL</span>
+        </header>
+        <label class="draw2-dialog-field">Text
+          <textarea id="draw2TextValue" rows="4" spellcheck="false">Text</textarea>
+        </label>
+        <div class="draw2-dialog-grid">
+          <label>Font <input id="draw2TextFont" value="monospace" autocomplete="off"></label>
+          <label>Size <input id="draw2TextSize" type="number" min="1" max="256" value="8" inputmode="numeric"></label>
+          <label>Weight <select id="draw2TextWeight"><option value="400" selected>Normal</option><option value="700">Bold</option></select></label>
+          <label>Align <select id="draw2TextAlign"><option value="left" selected>Left</option><option value="center">Center</option><option value="right">Right</option></select></label>
+        </div>
+        <div class="draw2-dialog-grid">
+          <label>Fill <select id="draw2TextFillColor" aria-label="Text fill color"></select></label>
+          <label class="draw2-dialog-checkbox"><input id="draw2TextStrokeEnabled" type="checkbox"> Outline</label>
+          <label>Stroke <select id="draw2TextStrokeColor" aria-label="Text outline color"></select></label>
+          <label>Stroke width <input id="draw2TextStrokeWidth" type="number" min="1" max="16" value="1" inputmode="numeric"></label>
+          <label>Pixel threshold <input id="draw2TextThreshold" type="number" min="1" max="255" value="160" inputmode="numeric"></label>
+        </div>
+        <section class="draw2-text-preview-panel" aria-label="Text preview">
+          <div class="draw2-text-preview-heading">
+            <strong>Preview</strong>
+            <small>Pixel edges are shown at the selected range.</small>
+          </div>
+          <canvas
+            id="draw2TextPreviewCanvas"
+            class="draw2-text-preview-canvas"
+            width="320"
+            height="144"
+            aria-label="Text insertion preview"
+          ></canvas>
+        </section>
+        <div class="draw2-dialog-grid draw2-text-range-grid">
+          <label>Range width <input id="draw2TextBoundsWidth" type="number" min="1" max="4096" value="128" inputmode="numeric"></label>
+          <label>Range height <input id="draw2TextBoundsHeight" type="number" min="1" max="4096" value="64" inputmode="numeric"></label>
+        </div>
+        <p id="draw2TextBoundsStatus" class="draw2-dialog-status" role="status" aria-live="polite">Drag on the canvas to choose bounds.</p>
+        <div class="draw2-dialog-actions">
+          <button id="draw2TextCancel" class="draw2-button draw2-button-secondary" type="button">Cancel</button>
+          <button id="draw2TextFitBounds" class="draw2-button draw2-button-secondary" type="button">Fit range</button>
+          <button id="draw2TextInsert" class="draw2-button" type="button">Insert</button>
+        </div>
+      </form>
+    </dialog>
+    <script src="../app/assets/creator-project-store.js?v=20260906-project-store1"></script>
+    <script src="../app/assets/creator-project-bridge.js?v=20260906-project-bridge1"></script>
+    <script src="../scripts/pixieed-market-access.js?v=20260906-igame-market-catalog-v1"></script>
     <script src="../scripts/pixieed-account-supabase-client.js?v=20260828-staging-config-v1"></script>
+    <script src="../scripts/market-purchase-delivery.js?v=20260906-direct-igame-market1"></script>
     <script
       type="module"
-      src="./dist/draw2-entry.js?v=20260901-icons-v22"
+      src="./dist/draw2-entry.js?v=20260910-unity-asset-export-v2"
     ></script>
     <script
       type="module"

@@ -92,7 +92,9 @@ import {
   type TimelineSessionState,
 } from "./draw2-timeline.ts";
 import {
+  MAX_BRUSH_SIZE,
   type BasicTool,
+  type BrushAlgorithm,
   type BrushPattern,
   type BrushShape,
   type ColorSelectionMode,
@@ -115,6 +117,19 @@ import {
   type ColoredPixel,
   type ToolOptions,
 } from "./draw2-basic-tools.ts";
+import {
+  createArgbColorRamp,
+  decodeArgbColor,
+  type ColorRampHueMode,
+  type ColorRampSpace,
+} from "./draw2-color-tools.ts";
+import {
+  createOutlineWriteSet,
+  type OutlineConnectivity,
+  type OutlinePlacement,
+} from "./draw2-outline-tools.ts";
+import { createTextMaskWriteSet } from "./draw2-text-tools.ts";
+import { createMarketAssetBindingCandidate } from "./game/game-350/market-asset-binding.ts";
 import {
   pixelPerfectPath,
   polygonSelectionPoints,
@@ -144,6 +159,7 @@ import {
   type AssetAnimationClip,
   assetAnimationClipKey,
   type AssetAnimationFrameReference,
+  type AssetAnimationFrameRasterSnapshot,
   type AssetAnimationName,
   type AssetDefinitionDraft,
   type AssetDirectionName,
@@ -154,8 +170,14 @@ import {
   validateAssetDefinitionDraft,
 } from "./draw2-creator-workspace.ts";
 import {
+  cloneAssetPackageManifest,
+  verifyAssetPackageManifest,
+  type AssetPackageManifest,
+} from "./game/game-350/assetization.ts";
+import {
   DRAW2_ASSET_STATE_CHANGED_EVENT,
   type Draw2AssetBridge,
+  type Draw2AssetPackageMutationResult,
   type Draw2AssetBridgeSnapshot,
   type Draw2AssetMutationResult,
   type Draw2AssetReferenceProjection,
@@ -327,6 +349,16 @@ import {
   type PixyncDurableSnapshot,
   type PixyncSnapshotPersistencePort,
 } from "./pixync/durability.ts";
+import {
+  COLLABORATION_EDIT_SCOPE_POLICIES,
+  COLLABORATION_SCOPE_KEYS,
+  editScopePolicyLabel,
+  isCollaborationEditScopePolicy,
+  isCollaborationScopeKey,
+  scopeLabel,
+  type CollaborationEditScopePolicy,
+  type CollaborationScopeKey,
+} from "./pixync/collaboration-scope.ts";
 import { createPixyncIndexedDbPersistence } from "./pixync/indexeddb-persistence.ts";
 import { publishPixyncCheckpoint } from "./pixync/checkpoint-publishing.ts";
 import {
@@ -431,6 +463,48 @@ interface WorkspacePxdArtifactSnapshot {
   readonly sourceReference: Draw2AssetReferenceRecord;
 }
 
+interface Draw2MarketDeliveryManifest {
+  readonly schemaVersion: 1;
+  readonly manifestId: string;
+  readonly selectionKind: "WHOLE_PROJECT";
+  readonly project: {
+    readonly projectId: string;
+    readonly revisionId?: string;
+    readonly name: string;
+  };
+  readonly entries: readonly [{
+    readonly entryId: string;
+    readonly sourceKind: "DRAW";
+    readonly source: {
+      readonly projectId: string;
+      readonly assetId: string;
+      readonly revisionId: string;
+      readonly contentHash: string;
+      readonly packageHash?: string;
+      readonly fileName: string;
+      readonly mimeType: string;
+      readonly byteLength: number;
+    };
+    readonly selection: { readonly kind: "PROJECT"; readonly label: string };
+    readonly provenance: {
+      readonly originKind: "LOCAL_PROJECT";
+      readonly rightsStatus: "CREATOR_DECLARATION_REQUIRED";
+    };
+    readonly capabilities: {
+      readonly editable: true;
+      readonly animation: true;
+      readonly targets: readonly ["iDRAW", "iAUDIO", "iGAME", "UNITY"];
+    };
+    readonly dependencyIds: readonly [];
+  }];
+  readonly summary: {
+    readonly entryCount: 1;
+    readonly sourceKinds: readonly ["DRAW"];
+    readonly labels: readonly [string];
+  };
+  readonly createdAt: string;
+}
+
 interface WorkspacePxdBridge {
   exportProjectPxdSnapshot: () => Promise<WorkspacePxdBridgeSnapshot>;
   exportProjectPxdArtifact?: () => Promise<WorkspacePxdArtifactSnapshot>;
@@ -519,7 +593,7 @@ function loadAdvancedModule(): Promise<AdvancedModule> {
 
 function loadWorkspaceModule(): Promise<WorkspaceModule> {
   const workspaceChunkUrl = new URL("wp180-workspace.js", import.meta.url);
-  workspaceChunkUrl.searchParams.set("v", "20260901-audio-midi-tools-v1");
+  workspaceChunkUrl.searchParams.set("v", "20260910-unity-asset-export-v2");
   workspaceModulePromise ??= import(
     workspaceChunkUrl.href
   ) as unknown as Promise<
@@ -558,7 +632,7 @@ function getWorkspacePxdBridge(): WorkspacePxdBridge {
     typeof candidate?.exportProjectPxdSnapshot !== "function" ||
     typeof candidate.restoreProjectPxdSnapshot !== "function"
   ) {
-    throw new Error("PXD workspace bridge is not ready.");
+    throw new Error("PXD workspace adapter is not ready.");
   }
   return candidate as WorkspacePxdBridge;
 }
@@ -659,6 +733,12 @@ const brushPatternElement = document.querySelector<HTMLSelectElement>(
 );
 const brushShapeElement = document.querySelector<HTMLSelectElement>(
   "#draw2BrushShape",
+);
+const brushAngleElement = document.querySelector<HTMLInputElement>(
+  "#draw2BrushAngle",
+);
+const brushAlgorithmElement = document.querySelector<HTMLSelectElement>(
+  "#draw2BrushAlgorithm",
 );
 const brushSizeControlElement = document.querySelector<HTMLElement>(
   "#draw2QuickBrushSizeControl",
@@ -836,6 +916,9 @@ const selectionHeightElement = document.querySelector<HTMLInputElement>(
 const selectionModeElement = document.querySelector<HTMLSelectElement>(
   "#draw2SelectionMode",
 );
+const selectionMorphologyRadiusElement = document.querySelector<HTMLInputElement>(
+  "#draw2SelectionMorphologyRadius",
+);
 const selectionExpandButton = document.querySelector<HTMLButtonElement>(
   "#draw2SelectionExpand",
 );
@@ -859,6 +942,9 @@ const transformDyElement = document.querySelector<HTMLInputElement>(
 );
 const transformFactorElement = document.querySelector<HTMLInputElement>(
   "#draw2TransformFactor",
+);
+const transformAngleElement = document.querySelector<HTMLInputElement>(
+  "#draw2TransformAngle",
 );
 const selectButton = document.querySelector<HTMLButtonElement>("#draw2Select");
 const commitSelectionButton = document.querySelector<HTMLButtonElement>(
@@ -890,6 +976,12 @@ const rotateCWButton = document.querySelector<HTMLButtonElement>(
 );
 const rotate180Button = document.querySelector<HTMLButtonElement>(
   "#draw2Rotate180",
+);
+const scaleDownButton = document.querySelector<HTMLButtonElement>(
+  "#draw2ScaleDown",
+);
+const scaleUpButton = document.querySelector<HTMLButtonElement>(
+  "#draw2ScaleUp",
 );
 const copyButton = document.querySelector<HTMLButtonElement>("#draw2Copy");
 const cutButton = document.querySelector<HTMLButtonElement>("#draw2Cut");
@@ -959,6 +1051,12 @@ const animationTagLoopElement = document.querySelector<HTMLInputElement>(
 );
 const animationTagAddElement = document.querySelector<HTMLButtonElement>(
   "#draw2TagAdd",
+);
+const animationTagFromSelectionElement = document.querySelector<HTMLButtonElement>(
+  "#draw2TagFromSelection",
+);
+const animationTagFromSelectionStatusElement = document.querySelector<HTMLElement>(
+  "#draw2TagFromSelectionStatus",
 );
 const animationTagListElement = document.querySelector<HTMLElement>(
   "#draw2AnimationTagList",
@@ -1108,6 +1206,96 @@ const colorApplyButton = document.querySelector<HTMLButtonElement>(
 const colorEditorStatusElement = document.querySelector<HTMLElement>(
   "#draw2ColorEditorStatus",
 );
+const colorHistoryElement = document.querySelector<HTMLElement>(
+  "#draw2ColorHistory",
+);
+const colorRampEndElement = document.querySelector<HTMLSelectElement>(
+  "#draw2ColorRampEnd",
+);
+const colorRampStepsElement = document.querySelector<HTMLInputElement>(
+  "#draw2ColorRampSteps",
+);
+const colorRampSpaceElement = document.querySelector<HTMLSelectElement>(
+  "#draw2ColorRampSpace",
+);
+const colorRampHueElement = document.querySelector<HTMLSelectElement>(
+  "#draw2ColorRampHue",
+);
+const colorRampPreviewElement = document.querySelector<HTMLElement>(
+  "#draw2ColorRampPreview",
+);
+const colorRampCreateButton = document.querySelector<HTMLButtonElement>(
+  "#draw2ColorRampCreate",
+);
+const outlinePlacementElement = document.querySelector<HTMLSelectElement>(
+  "#draw2OutlinePlacement",
+);
+const outlineThicknessElement = document.querySelector<HTMLInputElement>(
+  "#draw2OutlineThickness",
+);
+const outlineConnectivityElement = document.querySelector<HTMLSelectElement>(
+  "#draw2OutlineConnectivity",
+);
+const outlineColorElement = document.querySelector<HTMLSelectElement>(
+  "#draw2OutlineColor",
+);
+const outlineApplyButton = document.querySelector<HTMLButtonElement>(
+  "#draw2OutlineApply",
+);
+const textInsertDialogElement = document.querySelector<HTMLDialogElement>(
+  "#draw2TextInsertDialog",
+);
+const textValueElement = document.querySelector<HTMLTextAreaElement>(
+  "#draw2TextValue",
+);
+const textFontElement = document.querySelector<HTMLInputElement>(
+  "#draw2TextFont",
+);
+const textSizeElement = document.querySelector<HTMLInputElement>(
+  "#draw2TextSize",
+);
+const textWeightElement = document.querySelector<HTMLSelectElement>(
+  "#draw2TextWeight",
+);
+const textAlignElement = document.querySelector<HTMLSelectElement>(
+  "#draw2TextAlign",
+);
+const textFillColorElement = document.querySelector<HTMLSelectElement>(
+  "#draw2TextFillColor",
+);
+const textStrokeEnabledElement = document.querySelector<HTMLInputElement>(
+  "#draw2TextStrokeEnabled",
+);
+const textStrokeColorElement = document.querySelector<HTMLSelectElement>(
+  "#draw2TextStrokeColor",
+);
+const textStrokeWidthElement = document.querySelector<HTMLInputElement>(
+  "#draw2TextStrokeWidth",
+);
+const textThresholdElement = document.querySelector<HTMLInputElement>(
+  "#draw2TextThreshold",
+);
+const textPreviewCanvasElement = document.querySelector<HTMLCanvasElement>(
+  "#draw2TextPreviewCanvas",
+);
+const textBoundsWidthElement = document.querySelector<HTMLInputElement>(
+  "#draw2TextBoundsWidth",
+);
+const textBoundsHeightElement = document.querySelector<HTMLInputElement>(
+  "#draw2TextBoundsHeight",
+);
+const textBoundsStatusElement = document.querySelector<HTMLElement>(
+  "#draw2TextBoundsStatus",
+);
+const textInsertButton = document.querySelector<HTMLButtonElement>(
+  "#draw2TextInsert",
+);
+const textCancelButton = document.querySelector<HTMLButtonElement>(
+  "#draw2TextCancel",
+);
+const textFitBoundsButton = document.querySelector<HTMLButtonElement>(
+  "#draw2TextFitBounds",
+);
 const exportPanelStatusElement = document.querySelector<HTMLElement>(
   "#draw2ExportPanelStatus",
 );
@@ -1234,6 +1422,60 @@ const projectSessionCheckpointStatusElement = document.querySelector<
   HTMLElement
 >(
   "#draw2ProjectSessionCheckpointStatus",
+);
+const collaborationScopeOpenButton = document.querySelector<HTMLButtonElement>(
+  "#draw2CollaborationScopeOpen",
+);
+const collaborationScopeStatusElement = document.querySelector<HTMLElement>(
+  "#draw2CollaborationScopeStatus",
+);
+const collaborationScopeDialogElement = document.querySelector<HTMLDialogElement>(
+  "#draw2CollaborationScopeDialog",
+);
+const collaborationScopeMessageElement = document.querySelector<HTMLElement>(
+  "#draw2CollaborationScopeMessage",
+);
+const collaborationScopeConsentCheckElement = document.querySelector<HTMLInputElement>(
+  "#draw2CollaborationConsentCheck",
+);
+const collaborationScopeConsentAcceptButton = document.querySelector<HTMLButtonElement>(
+  "#draw2CollaborationConsentAccept",
+);
+const collaborationScopeSaveStatusElement = document.querySelector<HTMLElement>(
+  "#draw2CollaborationScopeSaveStatus",
+);
+const collaborationScopeMasterPanelElement = document.querySelector<HTMLElement>(
+  "#draw2CollaborationMasterPanel",
+);
+const collaborationScopeMasterListElement = document.querySelector<HTMLElement>(
+  "#draw2CollaborationMasterList",
+);
+const collaborationScopeParticipantPanelElement = document.querySelector<HTMLElement>(
+  "#draw2CollaborationParticipantPanel",
+);
+const collaborationScopeParticipantListElement = document.querySelector<HTMLElement>(
+  "#draw2CollaborationParticipantList",
+);
+const collaborationEditGuardElement = document.querySelector<HTMLElement>(
+  "#draw2CollaborationEditGuard",
+);
+const collaborationEditGuardMessageElement = document.querySelector<HTMLElement>(
+  "#draw2CollaborationEditGuardMessage",
+);
+const collaborationEditGuardOpenButton = document.querySelector<HTMLButtonElement>(
+  "#draw2CollaborationEditGuardOpen",
+);
+const collaborationEditPolicyPanelElement = document.querySelector<HTMLElement>(
+  "#draw2CollaborationEditPolicy",
+);
+const collaborationEditPolicyMessageElement = document.querySelector<HTMLElement>(
+  "#draw2CollaborationEditPolicyMessage",
+);
+const collaborationEditPolicyOpenElement = document.querySelector<HTMLInputElement>(
+  "#draw2CollaborationEditPolicyOpen",
+);
+const collaborationEditPolicyAssignedOnlyElement = document.querySelector<HTMLInputElement>(
+  "#draw2CollaborationEditPolicyAssignedOnly",
 );
 const gamePreviewCanvasElement = document.querySelector<HTMLCanvasElement>(
   "#draw2GamePreviewCanvas",
@@ -1369,6 +1611,7 @@ if (
   projectIdInputElement === null || tileSizeSelectElement === null ||
   toolSelectElement === null || brushSizeElement === null ||
   brushPatternElement === null || brushShapeElement === null ||
+  brushAngleElement === null || brushAlgorithmElement === null ||
   brushSizeControlElement === null || quickControlsElement === null ||
   brushOptionsButtonElement === null ||
   brushOptionsSummaryElement === null || brushOptionsFlyoutElement === null ||
@@ -1393,16 +1636,19 @@ if (
   miniPreviewResizeCornerElement === null ||
   selectionXElement === null || selectionYElement === null ||
   selectionWidthElement === null || selectionHeightElement === null ||
-  selectionModeElement === null || selectionExpandButton === null ||
+  selectionModeElement === null || selectionMorphologyRadiusElement === null ||
+  selectionExpandButton === null ||
   selectionShrinkButton === null || selectionInvertButton === null ||
   selectionBorderButton === null || transformOperationElement === null ||
   transformDxElement === null || transformDyElement === null ||
-  transformFactorElement === null || selectButton === null ||
+  transformFactorElement === null || transformAngleElement === null ||
+  selectButton === null ||
   commitSelectionButton === null || cancelSelectionButton === null ||
   previewButton === null || commitButton === null || cancelButton === null ||
   flipHorizontalButton === null || flipVerticalButton === null ||
   rotateCCWButton === null || rotateCWButton === null ||
-  rotate180Button === null || copyButton === null || cutButton === null ||
+  rotate180Button === null || scaleDownButton === null ||
+  scaleUpButton === null || copyButton === null || cutButton === null ||
   pasteButton === null || undoButton === null || redoButton === null ||
   timelineCardElement === null || timelineContextMenu === null ||
   createButton === null || importPxdInput === null ||
@@ -1437,7 +1683,23 @@ if (
   colorGValueElement === null || colorBValueElement === null ||
   colorAlphaValueElement === null || colorHexElement === null ||
   colorHexOutputElement === null || colorApplyButton === null ||
-  colorEditorStatusElement === null || gamePreviewStartButton === null ||
+  colorEditorStatusElement === null || colorHistoryElement === null ||
+  colorRampEndElement === null || colorRampStepsElement === null ||
+  colorRampSpaceElement === null || colorRampHueElement === null ||
+  colorRampPreviewElement === null || colorRampCreateButton === null ||
+  outlinePlacementElement === null ||
+  outlineThicknessElement === null || outlineConnectivityElement === null ||
+  outlineColorElement === null || outlineApplyButton === null ||
+  textInsertDialogElement === null || textValueElement === null ||
+  textFontElement === null || textSizeElement === null ||
+  textWeightElement === null || textAlignElement === null ||
+  textFillColorElement === null || textStrokeEnabledElement === null ||
+  textStrokeColorElement === null || textStrokeWidthElement === null ||
+  textThresholdElement === null || textPreviewCanvasElement === null ||
+  textBoundsWidthElement === null || textBoundsHeightElement === null ||
+  textBoundsStatusElement === null || textInsertButton === null ||
+  textCancelButton === null || textFitBoundsButton === null ||
+  gamePreviewStartButton === null ||
   gamePreviewStopButton === null || gamePreviewRestartButton === null ||
   gamePreviewPinButton === null || gamePreviewReloadButton === null ||
   gamePreviewStatusElement === null || goldenProjectStatusElement === null ||
@@ -1538,6 +1800,7 @@ interface DrawPersistenceSnapshotEnvelope {
   readonly journal: Draw2JournalSnapshot;
   readonly assetDefinitions: readonly PxdAssetDefinitionEntry[];
   readonly timelineMetadata: Draw2TimelineMetadata;
+  readonly assetPackages: readonly AssetPackageManifest[];
 }
 let drawPersistenceSavePending: DrawPersistenceSnapshotEnvelope | undefined;
 
@@ -1566,6 +1829,7 @@ function queueDrawPersistenceSave(reason: string): void {
     journal: drawJournalSnapshot(),
     assetDefinitions: assetDefinitions.map(cloneAssetDefinitionEntry),
     timelineMetadata: draw2TimelineMetadataSnapshot(),
+    assetPackages: assetPackages.map(cloneAssetPackageManifest),
   };
   if (drawPersistenceSaveTimer !== undefined) return;
   drawPersistenceSaveTimer = window.setTimeout(() => {
@@ -1592,6 +1856,7 @@ async function drainDrawPersistenceSave(): Promise<void> {
       new Date().toISOString(),
       envelope.assetDefinitions,
       envelope.timelineMetadata,
+      envelope.assetPackages,
     );
     const saved = await drawPersistenceStore.save(record, {
       expectedRevision,
@@ -1601,13 +1866,29 @@ async function drainDrawPersistenceSave(): Promise<void> {
       document.body.dataset.drawPersistenceState = "unavailable";
       return;
     }
-    if (!saved.stale) {
-      drawPersistenceExpectedRevision = revision;
-      drawPersistenceExpectedStateHash = record.stateHash;
+    if (saved.stale) {
+      // A rejected CAS write is not a persisted Draw revision. Do not move
+      // the Workspace Manifest or emit a successful-looking checkpoint for a
+      // snapshot that another tab already superseded.
+      document.body.dataset.drawPersistenceState = "stale-write-ignored";
+      // Refresh the CAS base without adopting the other tab's state. The
+      // current tab remains the visible source of truth until the user makes
+      // another edit; that next explicit save can then retry from the latest
+      // persisted revision instead of failing every time with the old base.
+      const latest = await drawPersistenceStore.load(projectId);
+      if (latest !== null) {
+        drawPersistenceRevision = Math.max(
+          drawPersistenceRevision,
+          latest.revision,
+        );
+        drawPersistenceExpectedRevision = latest.revision;
+        drawPersistenceExpectedStateHash = latest.stateHash;
+      }
+      return;
     }
-    document.body.dataset.drawPersistenceState = saved.stale
-      ? "stale-write-ignored"
-      : envelope.reason === "recovery"
+    drawPersistenceExpectedRevision = revision;
+    drawPersistenceExpectedStateHash = record.stateHash;
+    document.body.dataset.drawPersistenceState = envelope.reason === "recovery"
       ? "restored"
       : "saved";
     document.body.dataset.drawPersistenceRevision = String(revision);
@@ -1668,6 +1949,18 @@ document.addEventListener("visibilitychange", () => {
 function saveDrawProjectState(reason = "edit"): void {
   repository.save(state);
   queueDrawPersistenceSave(reason);
+}
+
+function isInteractiveKeyboardTarget(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest(
+      "button, a, summary, input, textarea, select, " +
+      "[contenteditable=true], [role=button], [role=tab], [role=menuitem], " +
+      "[role=option], [role=checkbox], [role=radio], [role=separator], " +
+      "[role=slider], [role=spinbutton], [role=combobox], [role=listbox], " +
+      "[role=grid], [role=gridcell], [role=tree], [role=treegrid], " +
+      "[role=treeitem], [role=row], [role=cell], [role=columnheader], " +
+      "[role=list], [role=tablist], [role=toolbar]",
+  ) !== null;
 }
 
 const canvas = canvasElement;
@@ -1748,6 +2041,8 @@ const toolSelect = toolSelectElement;
 const brushSize = brushSizeElement;
 const brushPattern = brushPatternElement;
 const brushShape = brushShapeElement;
+const brushAngle = brushAngleElement;
+const brushAlgorithm = brushAlgorithmElement;
 const brushSizeControl = brushSizeControlElement;
 const quickControls = quickControlsElement;
 const brushOptionsButton = brushOptionsButtonElement;
@@ -1773,10 +2068,12 @@ const selectionY = selectionYElement;
 const selectionWidth = selectionWidthElement;
 const selectionHeight = selectionHeightElement;
 const selectionModeControl = selectionModeElement;
+const selectionMorphologyRadius = selectionMorphologyRadiusElement;
 const transformOperation = transformOperationElement;
 const transformDx = transformDxElement;
 const transformDy = transformDyElement;
 const transformFactor = transformFactorElement;
+const transformAngle = transformAngleElement;
 const commitSelectionControl = commitSelectionButton;
 const cancelSelectionControl = cancelSelectionButton;
 const cancelTransformControl = cancelButton;
@@ -1887,12 +2184,20 @@ function persistMiniPreviewLayout(): void {
   }
 }
 
+function miniPreviewModeAvailable(): boolean {
+  const mode = workspaceFrameElement?.dataset.creatorMode;
+  return mode === undefined || mode === "DRAW" || mode === "ANIMATE";
+}
+
 function miniPreviewIsVisible(): boolean {
-  return miniPreviewEnabled && !miniPreviewLayout.collapsed;
+  return miniPreviewModeAvailable() && miniPreviewEnabled &&
+    !miniPreviewLayout.collapsed;
 }
 
 function syncMiniPreviewLayout(): void {
   const { width, height, collapsed } = miniPreviewLayout;
+  const modeAvailable = miniPreviewModeAvailable();
+  const previewVisible = modeAvailable && miniPreviewEnabled && !collapsed;
   miniPreviewContainerElement!.style.setProperty(
     "--draw2-mini-preview-width",
     `${width}px`,
@@ -1901,12 +2206,15 @@ function syncMiniPreviewLayout(): void {
     "--draw2-mini-preview-height",
     `${height}px`,
   );
-  miniPreviewContainerElement!.hidden = !miniPreviewIsVisible();
-  const previewVisible = miniPreviewEnabled && !collapsed;
+  miniPreviewContainerElement!.hidden = !previewVisible;
   // The restore control lives in the canvas viewport. Keep it visible only
   // while the preview surface is closed so it never sits on top of the
   // preview's own toolbar and collapse control.
-  miniPreviewRestoreButtonElement!.hidden = previewVisible;
+  miniPreviewRestoreButtonElement!.hidden = !modeAvailable || previewVisible;
+  miniPreviewRestoreButtonElement!.setAttribute(
+    "aria-hidden",
+    String(!modeAvailable),
+  );
   const previewToggleLabel = previewVisible
     ? "Hide mini preview"
     : "Open mini preview";
@@ -1917,7 +2225,7 @@ function syncMiniPreviewLayout(): void {
   miniPreviewRestoreButtonElement!.title = previewToggleLabel;
   miniPreviewRestoreButtonElement!.setAttribute(
     "aria-pressed",
-    String(miniPreviewEnabled && !collapsed),
+    String(previewVisible),
   );
   const previewToggleText = miniPreviewRestoreButtonElement!.querySelector(
     "span",
@@ -2241,7 +2549,7 @@ function drawMiniPreviewProjection(): void {
 }
 
 function syncMiniPreviewPlaybackControl(): void {
-  const playing = playbackRunning || audioLinkedPreviewPlaying;
+  const playing = playbackRunning;
   const use = miniPreviewPlayButton.querySelector("use");
   use?.setAttribute(
     "href",
@@ -2284,7 +2592,7 @@ function readStoredDraw2Locale(): Draw2Locale {
       window.localStorage.getItem("pixieed:draw2:locale:v1"),
     );
   } catch {
-    return "ja";
+    return "en";
   }
 }
 
@@ -3030,10 +3338,17 @@ viewportCenterButtonElement.addEventListener("click", () => {
 });
 
 function syncDisplayToggles(): void {
+  const miniPreviewAvailable = miniPreviewModeAvailable();
   for (const button of displayToggleButtons) {
-    const enabled = button.dataset.draw2DisplayToggle === "cursor"
-      ? virtualCursorEnabled
-      : miniPreviewEnabled;
+    const isMiniPreview = button.dataset.draw2DisplayToggle === "mini-preview";
+    const enabled = isMiniPreview
+      ? miniPreviewAvailable && miniPreviewEnabled
+      : virtualCursorEnabled;
+    if (isMiniPreview) {
+      button.hidden = !miniPreviewAvailable;
+      button.inert = !miniPreviewAvailable;
+      button.setAttribute("aria-hidden", String(!miniPreviewAvailable));
+    }
     button.setAttribute("aria-checked", String(enabled));
     button.classList.toggle("is-active", enabled);
   }
@@ -3044,16 +3359,38 @@ function syncDisplayToggles(): void {
 const drawingContext = canvas.getContext("2d", { alpha: true });
 const overlayContext = overlay.getContext("2d");
 const erasePreviewContext = erasePreview.getContext("2d");
+const textPreviewContext = textPreviewCanvasElement.getContext("2d");
 if (
   drawingContext === null || overlayContext === null ||
-  erasePreviewContext === null
+  erasePreviewContext === null || textPreviewContext === null
 ) {
   throw new Error("Draw2 reference viewport could not acquire Canvas2D.");
 }
 const canonicalContext = drawingContext;
 const selectionOverlayContext = overlayContext;
 const eraseProjectionContext = erasePreviewContext;
+const textPreviewProjectionContext = textPreviewContext;
 const tilesetSourceContext = tilesetSourceCanvas?.getContext("2d") ?? null;
+const TRANSFORM_PREVIEW_TILE_SIZE = 256;
+let transformPreviewScratch: {
+  readonly canvas: HTMLCanvasElement;
+  readonly context: CanvasRenderingContext2D;
+} | undefined;
+
+function getTransformPreviewScratch(): typeof transformPreviewScratch {
+  if (transformPreviewScratch !== undefined) return transformPreviewScratch;
+  const scratchCanvas = document.createElement("canvas");
+  scratchCanvas.width = TRANSFORM_PREVIEW_TILE_SIZE;
+  scratchCanvas.height = TRANSFORM_PREVIEW_TILE_SIZE;
+  const scratchContext = scratchCanvas.getContext("2d");
+  if (scratchContext === null) return undefined;
+  scratchContext.imageSmoothingEnabled = false;
+  transformPreviewScratch = {
+    canvas: scratchCanvas,
+    context: scratchContext,
+  };
+  return transformPreviewScratch;
+}
 
 function configurePixelRenderingContexts(): void {
   // Resizing a canvas resets all context flags. Re-apply nearest-neighbor
@@ -3061,6 +3398,7 @@ function configurePixelRenderingContexts(): void {
   canonicalContext.imageSmoothingEnabled = false;
   selectionOverlayContext.imageSmoothingEnabled = false;
   eraseProjectionContext.imageSmoothingEnabled = false;
+  textPreviewProjectionContext.imageSmoothingEnabled = false;
   if (tilesetSourceContext !== null) {
     tilesetSourceContext.imageSmoothingEnabled = false;
   }
@@ -3113,6 +3451,8 @@ const tagFromControl = animationTagFromElement;
 const tagToControl = animationTagToElement;
 const tagLoopControl = animationTagLoopElement;
 const tagAddControl = animationTagAddElement;
+const tagFromSelectionControl = animationTagFromSelectionElement;
+const tagFromSelectionStatus = animationTagFromSelectionStatusElement;
 const tagList = animationTagListElement;
 const markerKindControl = timelineMarkerKindElement;
 const markerLabelControl = timelineMarkerLabelElement;
@@ -3168,6 +3508,36 @@ const colorHex = colorHexElement;
 const colorHexOutput = colorHexOutputElement;
 const colorApply = colorApplyButton;
 const colorEditorStatus = colorEditorStatusElement;
+const colorHistoryControl = colorHistoryElement;
+const colorRampEndControl = colorRampEndElement;
+const colorRampStepsControl = colorRampStepsElement;
+const colorRampSpaceControl = colorRampSpaceElement;
+const colorRampHueControl = colorRampHueElement;
+const colorRampPreviewControl = colorRampPreviewElement;
+const colorRampCreateControl = colorRampCreateButton;
+const outlinePlacementControl = outlinePlacementElement;
+const outlineThicknessControl = outlineThicknessElement;
+const outlineConnectivityControl = outlineConnectivityElement;
+const outlineColorControl = outlineColorElement;
+const outlineApplyControl = outlineApplyButton;
+const textInsertDialogControl = textInsertDialogElement;
+const textValueControl = textValueElement;
+const textFontControl = textFontElement;
+const textSizeControl = textSizeElement;
+const textWeightControl = textWeightElement;
+const textAlignControl = textAlignElement;
+const textFillColorControl = textFillColorElement;
+const textStrokeEnabledControl = textStrokeEnabledElement;
+const textStrokeColorControl = textStrokeColorElement;
+const textStrokeWidthControl = textStrokeWidthElement;
+const textThresholdControl = textThresholdElement;
+const textPreviewCanvasControl = textPreviewCanvasElement;
+const textBoundsWidthControl = textBoundsWidthElement;
+const textBoundsHeightControl = textBoundsHeightElement;
+const textBoundsStatusControl = textBoundsStatusElement;
+const textInsertControl = textInsertButton;
+const textCancelControl = textCancelButton;
+const textFitBoundsControl = textFitBoundsButton;
 const exportPanelStatus = exportPanelStatusElement;
 const exportName = exportNameElement;
 const exportScale = exportScaleElement;
@@ -3459,7 +3829,8 @@ function createLocalProjectSessionAdapters(): readonly PixyncAggregateAdapter[] 
   return LOCAL_SESSION_AGGREGATES.map((aggregate) => ({
     aggregate,
     // The session proves ordering and presence independently from product
-    // state. Product bridges remain the only owners of Draw/Audio/Game data.
+    // state. Product adapters remain the only owners of Draw/Audio/Game data;
+    // this local session is not the external PiXiEED Bridge.
     apply: () => undefined,
   }));
 }
@@ -3532,7 +3903,7 @@ function publishLocalProjectSessionStatus(snapshot: ProjectSessionState): void {
         latencyMs: 0,
         message:
           `Project Session ${snapshot.status} · ${snapshot.activeMode} · ` +
-          `ローカル共同編集リハーサル（本番PiXYNC未接続）${error}`,
+          `ローカル3モードセッション（オンラインPiXYNC未接続）${error}`,
       },
     }),
   );
@@ -3705,6 +4076,7 @@ async function publishProductionCheckpoint(): Promise<void> {
 
 window.addEventListener("draw2:creator-mode", (event) => {
   const mode = (event as CustomEvent<{ readonly mode?: unknown }>).detail?.mode;
+  syncDisplayToggles();
   const session = localProjectSession;
   const sessionMode = projectSessionModeFromCreatorMode(mode);
   if (session !== undefined) {
@@ -3828,6 +4200,11 @@ window.addEventListener("pagehide", (event) => {
   pixyncProductionRoot = undefined;
 });
 
+// Keep the local lifecycle wiring boundary explicit. Product UI and the
+// authenticated production composition below must not be mistaken for local
+// lifecycle ownership by static contract checks.
+const PIXYNC_LOCAL_LIFECYCLE_WIRING_END = true;
+
 const PIXYNC_ROOM_ID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 let pixyncProductionRoot: PixyncProductionCompositionRoot | undefined;
@@ -3864,6 +4241,545 @@ async function availablePixyncSupabaseClient(
   );
 }
 
+type CollaborationScopeUiRow = {
+  readonly roomId: string;
+  readonly userId: string;
+  readonly memberRole: string;
+  readonly displayName: string;
+  readonly scopeKey: CollaborationScopeKey;
+  readonly assignmentState: string | null;
+  readonly canManage: boolean;
+  readonly isCurrentUser: boolean;
+  readonly currentUserConsented: boolean;
+  readonly editScopePolicy: CollaborationEditScopePolicy;
+};
+
+let collaborationScopeRows: readonly CollaborationScopeUiRow[] = [];
+let collaborationScopeConsentAccepted = false;
+let collaborationScopeConsentDraft = false;
+let collaborationScopeBusy = false;
+let collaborationEditScopePolicy: CollaborationEditScopePolicy = "OPEN";
+
+function collaborationScopeRecord(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function collaborationScopeRowsFromRpc(value: unknown): CollaborationScopeUiRow[] {
+  const values = Array.isArray(value) ? value : value === null ? [] : [value];
+  const rows: CollaborationScopeUiRow[] = [];
+  for (const value of values) {
+    const row = collaborationScopeRecord(value);
+    if (row === null) continue;
+    const roomId = typeof row.room_id === "string" ? row.room_id : "";
+    const userId = typeof row.user_id === "string" ? row.user_id : "";
+    const scopeKey = isCollaborationScopeKey(row.scope_key)
+      ? row.scope_key
+      : undefined;
+    if (roomId.length === 0 || userId.length === 0 || scopeKey === undefined) {
+      continue;
+    }
+    rows.push({
+      roomId,
+      userId,
+      memberRole: typeof row.member_role === "string" ? row.member_role : "viewer",
+      displayName: typeof row.display_name === "string" && row.display_name.trim() !== ""
+        ? row.display_name.trim()
+        : "参加者",
+      scopeKey,
+      assignmentState: typeof row.assignment_state === "string"
+        ? row.assignment_state
+        : null,
+      canManage: row.can_manage === true,
+      isCurrentUser: row.is_current_user === true,
+      currentUserConsented: row.current_user_consented === true,
+      editScopePolicy: isCollaborationEditScopePolicy(row.edit_scope_policy)
+        ? row.edit_scope_policy
+        : "OPEN",
+    });
+  }
+  return rows;
+}
+
+function collaborationCurrentScopeKey(): CollaborationScopeKey {
+  const mode = creatorStartModeFromValue(workspaceFrameElement?.dataset.creatorMode);
+  return mode === "AUDIO" ? "AUDIO" : mode === "GAME" ? "GAME" : "DRAW";
+}
+
+function collaborationCurrentScopeRow(): CollaborationScopeUiRow | undefined {
+  const scopeKey = collaborationCurrentScopeKey();
+  return collaborationScopeRows.find((row) =>
+    row.isCurrentUser && row.scopeKey === scopeKey
+  );
+}
+
+function collaborationEditBlockReason(): string | undefined {
+  if (collaborationScopeRows.length === 0) return undefined;
+  const row = collaborationCurrentScopeRow();
+  if (!collaborationScopeConsentAccepted) {
+    return "共同作業の注意事項を確認すると編集できます。";
+  }
+  if (row === undefined) {
+    return "このProjectの編集参加権限を確認できません。";
+  }
+  if (row.memberRole === "owner") return undefined;
+  if (row.memberRole !== "editor") {
+    return "閲覧参加者として接続中のため編集できません。マスターに編集参加者への変更を依頼してください。";
+  }
+  if (collaborationEditScopePolicy === "OPEN") return undefined;
+  if (row.assignmentState === "APPROVED") return undefined;
+  return `${scopeLabel(row.scopeKey)}は担当範囲のみ編集の対象です。承認済みの担当範囲ではありません。`;
+}
+
+function announceCollaborationEditBlock(): void {
+  const reason = collaborationEditBlockReason();
+  if (reason === undefined) return;
+  if (collaborationEditGuardMessageElement !== null) {
+    collaborationEditGuardMessageElement.textContent = reason;
+  }
+  setStatus(`${reason} 「同意・担当範囲」を確認してください。`, "error");
+}
+
+function collaborationCanvasToolIsNonMutating(tool: BasicTool): boolean {
+  return [
+    "pan",
+    "eyedropper",
+    "select-rect",
+    "select-ellipse",
+    "select-lasso",
+    "select-color",
+  ].includes(tool);
+}
+
+async function collaborationScopeRpc(
+  functionName: string,
+  args: Readonly<Record<string, unknown>>,
+): Promise<unknown> {
+  const client = await availablePixyncSupabaseClient();
+  if (client === undefined) throw new Error("ログインが必要です。");
+  let result;
+  try {
+    result = await client.rpc(functionName, args);
+  } catch (error) {
+    throw new Error(
+      error instanceof Error ? error.message : `${functionName}に接続できませんでした。`,
+    );
+  }
+  if (result.error !== null) {
+    const error = result.error;
+    throw new Error(
+      error instanceof Error ? error.message : `${functionName}が拒否されました。`,
+    );
+  }
+  return result.data;
+}
+
+function collaborationScopeStateLabel(state: string | null): string {
+  return state === "APPROVED"
+    ? "承認済み"
+    : state === "PENDING_MEMBER"
+    ? "本人の確認待ち"
+    : state === "PENDING_MASTER"
+    ? "マスター確認待ち"
+    : state === "REMOVAL_REQUESTED"
+    ? "解除の確認待ち"
+    : state === "REJECTED"
+    ? "未承認"
+    : "未設定";
+}
+
+function collaborationScopeActionButton(
+  label: string,
+  action: string,
+  scopeKey: CollaborationScopeKey,
+  userId?: string,
+  disabled = false,
+): HTMLButtonElement {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "draw2-collaboration-scope-button";
+  button.textContent = label;
+  button.disabled = disabled;
+  button.dataset.collaborationAction = action;
+  button.dataset.scopeKey = scopeKey;
+  if (userId !== undefined) button.dataset.userId = userId;
+  button.setAttribute("aria-label", `${scopeLabel(scopeKey)}: ${label}`);
+  return button;
+}
+
+function renderCollaborationScopeMasterList(): void {
+  if (collaborationScopeMasterListElement === null) return;
+  const members = new Map<string, {
+    readonly userId: string;
+    readonly displayName: string;
+    readonly memberRole: string;
+    readonly rows: Map<CollaborationScopeKey, CollaborationScopeUiRow>;
+  }>();
+  for (const row of collaborationScopeRows) {
+    if (row.memberRole === "owner") continue;
+    const member = members.get(row.userId) ?? {
+      userId: row.userId,
+      displayName: row.displayName,
+      memberRole: row.memberRole,
+      rows: new Map<CollaborationScopeKey, CollaborationScopeUiRow>(),
+    };
+    member.rows.set(row.scopeKey, row);
+    members.set(row.userId, member);
+  }
+  if (members.size === 0) {
+    const empty = document.createElement("p");
+    empty.className = "draw2-collaboration-empty";
+    empty.textContent = "参加者がいません。招待後に担当範囲を設定できます。";
+    collaborationScopeMasterListElement.replaceChildren(empty);
+    return;
+  }
+  const cards: HTMLElement[] = [];
+  for (const member of members.values()) {
+    const card = document.createElement("article");
+    card.className = "draw2-collaboration-member-card";
+    const heading = document.createElement("div");
+    heading.className = "draw2-collaboration-member-heading";
+    const name = document.createElement("strong");
+    name.textContent = member.displayName;
+    const role = document.createElement("small");
+    role.textContent = member.memberRole === "editor" ? "編集参加者" : "閲覧参加者";
+    heading.append(name, role);
+    const buttons = document.createElement("div");
+    buttons.className = "draw2-collaboration-scope-buttons";
+    for (const scopeKey of COLLABORATION_SCOPE_KEYS) {
+      const row = member.rows.get(scopeKey);
+      const state = row?.assignmentState ?? null;
+      let button: HTMLButtonElement;
+      if (state === "APPROVED") {
+        button = collaborationScopeActionButton("解除", "MASTER_REMOVE", scopeKey, member.userId);
+      } else if (state === "PENDING_MASTER") {
+        button = collaborationScopeActionButton("承認", "MASTER_APPROVE", scopeKey, member.userId);
+        const reject = collaborationScopeActionButton("却下", "MASTER_REJECT", scopeKey, member.userId);
+        reject.dataset.scopeState = state;
+        buttons.append(reject);
+      } else if (state === "PENDING_MEMBER") {
+        button = collaborationScopeActionButton("本人確認待ち", "NONE", scopeKey, member.userId, true);
+      } else if (state === "REMOVAL_REQUESTED") {
+        button = collaborationScopeActionButton("解除確認中", "NONE", scopeKey, member.userId, true);
+      } else {
+        button = collaborationScopeActionButton("割り当て", "MASTER_ASSIGN", scopeKey, member.userId);
+      }
+      button.dataset.state = state ?? "UNSET";
+      button.title = `${scopeLabel(scopeKey)} · ${collaborationScopeStateLabel(state)}`;
+      buttons.append(button);
+    }
+    card.append(heading, buttons);
+    cards.push(card);
+  }
+  collaborationScopeMasterListElement.replaceChildren(...cards);
+}
+
+function renderCollaborationScopeParticipantList(): void {
+  if (collaborationScopeParticipantListElement === null) return;
+  const rows = collaborationScopeRows.filter((row) => row.isCurrentUser);
+  if (rows.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "draw2-collaboration-empty";
+    empty.textContent = "参加者として接続すると、ここから担当範囲を申請できます。";
+    collaborationScopeParticipantListElement.replaceChildren(empty);
+    return;
+  }
+  const children: HTMLElement[] = [];
+  for (const row of rows) {
+    const item = document.createElement("div");
+    item.className = "draw2-collaboration-scope-row";
+    const heading = document.createElement("div");
+    const label = document.createElement("strong");
+    label.textContent = scopeLabel(row.scopeKey);
+    const state = document.createElement("small");
+    state.textContent = collaborationScopeStateLabel(row.assignmentState);
+    heading.append(label, state);
+    item.append(heading);
+    if (row.assignmentState === "PENDING_MEMBER") {
+      item.append(
+        collaborationScopeActionButton("この範囲を承認", "MEMBER_ACCEPT", row.scopeKey),
+        collaborationScopeActionButton("辞退", "MEMBER_DECLINE", row.scopeKey),
+      );
+    } else if (row.assignmentState === "REMOVAL_REQUESTED") {
+      item.append(
+        collaborationScopeActionButton("解除に同意", "MEMBER_ACCEPT_REMOVAL", row.scopeKey),
+        collaborationScopeActionButton("この範囲を残す", "MEMBER_REJECT_REMOVAL", row.scopeKey),
+      );
+    } else if (row.assignmentState === "PENDING_MASTER") {
+      const pending = document.createElement("small");
+      pending.textContent = "マスターの承認を待っています。";
+      item.append(pending);
+    } else if (row.assignmentState === "APPROVED") {
+      const request = collaborationScopeActionButton("追加申請済み", "NONE", row.scopeKey, undefined, true);
+      item.append(request);
+    } else {
+      item.append(collaborationScopeActionButton("この範囲を申請", "MEMBER_REQUEST", row.scopeKey));
+    }
+    children.push(item);
+  }
+  collaborationScopeParticipantListElement.replaceChildren(...children);
+}
+
+function renderCollaborationScopeUi(): void {
+  const online = collaborationScopeRows.length > 0;
+  const canManage = collaborationScopeRows.some((row) => row.canManage);
+  const isParticipant = collaborationScopeRows.some(
+    (row) => row.isCurrentUser && row.memberRole !== "owner",
+  );
+  collaborationScopeConsentAccepted = collaborationScopeRows.some(
+    (row) => row.isCurrentUser && row.currentUserConsented,
+  );
+  collaborationEditScopePolicy = collaborationScopeRows.find((row) =>
+    row.isCurrentUser
+  )?.editScopePolicy ?? collaborationScopeRows[0]?.editScopePolicy ?? "OPEN";
+  const editBlockReason = collaborationEditBlockReason();
+  document.body.dataset.pixyncEditScopePolicy = collaborationEditScopePolicy;
+  document.body.dataset.pixyncEditLocked = editBlockReason === undefined
+    ? "false"
+    : "true";
+  if (collaborationScopeStatusElement !== null) {
+    collaborationScopeStatusElement.textContent = !online
+      ? "ローカル編集"
+      : collaborationScopeConsentAccepted
+      ? editScopePolicyLabel(collaborationEditScopePolicy)
+      : "参加前の確認が必要";
+  }
+  if (collaborationScopeMessageElement !== null) {
+    collaborationScopeMessageElement.textContent = !online
+      ? "このProjectはローカル編集です。オンライン共同作業に参加するときに注意事項を確認します。"
+      : collaborationScopeConsentAccepted
+      ? `注意事項を確認済みです。編集ルールは「${editScopePolicyLabel(collaborationEditScopePolicy)}」です。`
+      : "共同作業に参加する前に、気軽な共同作業と公開・販売の注意事項を確認してください。";
+  }
+  if (collaborationEditGuardElement !== null) {
+    collaborationEditGuardElement.hidden = editBlockReason === undefined;
+  }
+  if (collaborationEditGuardMessageElement !== null) {
+    collaborationEditGuardMessageElement.textContent = editBlockReason ?? "";
+  }
+  if (collaborationEditGuardOpenButton !== null) {
+    collaborationEditGuardOpenButton.hidden = editBlockReason === undefined;
+    collaborationEditGuardOpenButton.textContent = !collaborationScopeConsentAccepted
+      ? "確認を開く"
+      : "確認・申請";
+  }
+  if (collaborationScopeConsentCheckElement !== null) {
+    collaborationScopeConsentCheckElement.checked = collaborationScopeConsentAccepted ||
+      collaborationScopeConsentDraft;
+    collaborationScopeConsentCheckElement.disabled = !online || collaborationScopeConsentAccepted;
+  }
+  if (collaborationScopeConsentAcceptButton !== null) {
+    collaborationScopeConsentAcceptButton.disabled = !online || collaborationScopeConsentAccepted ||
+      !collaborationScopeConsentDraft;
+    collaborationScopeConsentAcceptButton.textContent = collaborationScopeConsentAccepted
+      ? "確認済み"
+      : "確認して参加する";
+  }
+  if (collaborationScopeMasterPanelElement !== null) {
+    collaborationScopeMasterPanelElement.hidden = !online || !collaborationScopeConsentAccepted || !canManage;
+  }
+  if (collaborationScopeParticipantPanelElement !== null) {
+    collaborationScopeParticipantPanelElement.hidden = !online || !collaborationScopeConsentAccepted || !isParticipant;
+  }
+  if (collaborationEditPolicyPanelElement !== null) {
+    collaborationEditPolicyPanelElement.hidden = !online || !collaborationScopeConsentAccepted;
+  }
+  if (collaborationEditPolicyOpenElement !== null) {
+    collaborationEditPolicyOpenElement.checked = collaborationEditScopePolicy === "OPEN";
+    collaborationEditPolicyOpenElement.disabled = !canManage || collaborationScopeBusy;
+  }
+  if (collaborationEditPolicyAssignedOnlyElement !== null) {
+    collaborationEditPolicyAssignedOnlyElement.checked = collaborationEditScopePolicy === "ASSIGNED_ONLY";
+    collaborationEditPolicyAssignedOnlyElement.disabled = !canManage || collaborationScopeBusy;
+  }
+  if (collaborationEditPolicyMessageElement !== null) {
+    collaborationEditPolicyMessageElement.textContent = canManage
+      ? `現在は「${editScopePolicyLabel(collaborationEditScopePolicy)}」。初期設定のままなら、編集参加者は担当範囲を待たずに作業できます。`
+      : `マスターが決めた編集ルールは「${editScopePolicyLabel(collaborationEditScopePolicy)}」です。`;
+  }
+  renderCollaborationScopeMasterList();
+  renderCollaborationScopeParticipantList();
+}
+
+async function refreshCollaborationScopeUi(): Promise<void> {
+  collaborationScopeRows = [];
+  collaborationScopeConsentAccepted = false;
+  collaborationScopeConsentDraft = false;
+  collaborationEditScopePolicy = "OPEN";
+  renderCollaborationScopeUi();
+  if (!PIXYNC_ROOM_ID.test(state.projectId)) return;
+  try {
+    const data = await collaborationScopeRpc(
+      "pixisync_list_scope_assignments_v1",
+      { p_room_id: state.projectId },
+    );
+    collaborationScopeRows = collaborationScopeRowsFromRpc(data);
+    renderCollaborationScopeUi();
+  } catch (error) {
+    if (collaborationScopeMessageElement !== null) {
+      collaborationScopeMessageElement.textContent = error instanceof Error
+        ? `担当範囲を読み込めませんでした。${error.message}`
+        : "担当範囲を読み込めませんでした。";
+    }
+  }
+}
+
+async function setCollaborationEditScopePolicy(
+  policy: CollaborationEditScopePolicy,
+): Promise<void> {
+  if (!COLLABORATION_EDIT_SCOPE_POLICIES.includes(policy)) return;
+  if (!collaborationScopeRows.some((row) => row.canManage)) return;
+  if (collaborationScopeBusy || policy === collaborationEditScopePolicy) return;
+  collaborationScopeBusy = true;
+  renderCollaborationScopeUi();
+  if (collaborationScopeSaveStatusElement !== null) {
+    collaborationScopeSaveStatusElement.textContent = "保存中…";
+  }
+  try {
+    await collaborationScopeRpc("pixisync_set_edit_scope_policy_v1", {
+      p_room_id: state.projectId,
+      p_policy: policy,
+    });
+    await refreshCollaborationScopeUi();
+    if (collaborationScopeSaveStatusElement !== null) {
+      collaborationScopeSaveStatusElement.textContent =
+        `編集ルールを「${editScopePolicyLabel(policy)}」に変更しました。`;
+    }
+  } catch (error) {
+    renderCollaborationScopeUi();
+    if (collaborationScopeSaveStatusElement !== null) {
+      collaborationScopeSaveStatusElement.textContent = error instanceof Error
+        ? error.message
+        : "編集ルールを変更できませんでした。";
+    }
+  } finally {
+    collaborationScopeBusy = false;
+    renderCollaborationScopeUi();
+  }
+}
+
+async function promptCollaborationConsentIfNeeded(): Promise<void> {
+  if (collaborationScopeDialogElement === null) return;
+  await refreshCollaborationScopeUi();
+  if (
+    collaborationScopeRows.length > 0 &&
+    !collaborationScopeConsentAccepted &&
+    !collaborationScopeDialogElement.open
+  ) {
+    collaborationScopeDialogElement.showModal();
+  }
+}
+
+async function acceptCollaborationScopeConsent(): Promise<void> {
+  if (collaborationScopeConsentAccepted || collaborationScopeRows.length === 0) return;
+  if (collaborationScopeConsentCheckElement?.checked !== true) return;
+  collaborationScopeBusy = true;
+  if (collaborationScopeSaveStatusElement !== null) collaborationScopeSaveStatusElement.textContent = "保存中…";
+  try {
+    await collaborationScopeRpc("pixisync_accept_collaboration_consent_v1", {
+      p_room_id: state.projectId,
+      p_consent_version: "COLLABORATION_NOTICE_V1",
+    });
+    await refreshCollaborationScopeUi();
+    if (collaborationScopeSaveStatusElement !== null) collaborationScopeSaveStatusElement.textContent = "確認を保存しました。";
+  } catch (error) {
+    renderCollaborationScopeUi();
+    if (collaborationScopeSaveStatusElement !== null) collaborationScopeSaveStatusElement.textContent = error instanceof Error ? error.message : "保存できませんでした。";
+  } finally {
+    collaborationScopeBusy = false;
+  }
+}
+
+async function handleCollaborationScopeAction(button: HTMLButtonElement): Promise<void> {
+  const action = button.dataset.collaborationAction;
+  const scopeKey = button.dataset.scopeKey;
+  const userId = button.dataset.userId;
+  if (action === undefined || action === "NONE" || !isCollaborationScopeKey(scopeKey)) return;
+  if (action.startsWith("MASTER_") && (userId === undefined || userId.length === 0)) return;
+  if (collaborationScopeBusy) return;
+  collaborationScopeBusy = true;
+  if (collaborationScopeSaveStatusElement !== null) collaborationScopeSaveStatusElement.textContent = "保存中…";
+  try {
+    if (action === "MASTER_ASSIGN" || action === "MASTER_REMOVE") {
+      await collaborationScopeRpc("pixisync_set_scope_assignment_v1", {
+        p_room_id: state.projectId,
+        p_user_id: userId,
+        p_scope_key: scopeKey,
+        p_enabled: action === "MASTER_ASSIGN",
+      });
+    } else if (action === "MASTER_APPROVE" || action === "MASTER_REJECT") {
+      await collaborationScopeRpc("pixisync_review_scope_request_v1", {
+        p_room_id: state.projectId,
+        p_user_id: userId,
+        p_scope_key: scopeKey,
+        p_action: action === "MASTER_APPROVE" ? "APPROVE" : "REJECT",
+      });
+    } else if (action === "MEMBER_REQUEST") {
+      await collaborationScopeRpc("pixisync_request_scope_v1", {
+        p_room_id: state.projectId,
+        p_scope_key: scopeKey,
+      });
+    } else {
+      const responseAction = action === "MEMBER_ACCEPT"
+        ? "ACCEPT_ASSIGNMENT"
+        : action === "MEMBER_DECLINE"
+        ? "DECLINE_ASSIGNMENT"
+        : action === "MEMBER_ACCEPT_REMOVAL"
+        ? "ACCEPT_REMOVAL"
+        : "REJECT_REMOVAL";
+      await collaborationScopeRpc("pixisync_respond_scope_v1", {
+        p_room_id: state.projectId,
+        p_scope_key: scopeKey,
+        p_action: responseAction,
+      });
+    }
+    await refreshCollaborationScopeUi();
+    if (collaborationScopeSaveStatusElement !== null) collaborationScopeSaveStatusElement.textContent = "保存しました。";
+  } catch (error) {
+    if (collaborationScopeSaveStatusElement !== null) collaborationScopeSaveStatusElement.textContent = error instanceof Error ? error.message : "保存できませんでした。";
+  } finally {
+    collaborationScopeBusy = false;
+  }
+}
+
+function openCollaborationScopeDialog(): void {
+  if (collaborationScopeDialogElement === null) return;
+  void refreshCollaborationScopeUi();
+  if (!collaborationScopeDialogElement.open) collaborationScopeDialogElement.showModal();
+}
+
+collaborationScopeOpenButton?.addEventListener("click", openCollaborationScopeDialog);
+collaborationEditGuardOpenButton?.addEventListener("click", openCollaborationScopeDialog);
+collaborationScopeConsentCheckElement?.addEventListener("change", () => {
+  collaborationScopeConsentDraft = collaborationScopeConsentCheckElement.checked;
+  renderCollaborationScopeUi();
+});
+collaborationScopeConsentAcceptButton?.addEventListener("click", () => {
+  if (!collaborationScopeBusy) void acceptCollaborationScopeConsent();
+});
+collaborationScopeMasterListElement?.addEventListener("click", (event) => {
+  const target = (event.target as HTMLElement).closest<HTMLButtonElement>(
+    "button[data-collaboration-action]",
+  );
+  if (target !== null) void handleCollaborationScopeAction(target);
+});
+collaborationScopeParticipantListElement?.addEventListener("click", (event) => {
+  const target = (event.target as HTMLElement).closest<HTMLButtonElement>(
+    "button[data-collaboration-action]",
+  );
+  if (target !== null) void handleCollaborationScopeAction(target);
+});
+for (const input of [
+  collaborationEditPolicyOpenElement,
+  collaborationEditPolicyAssignedOnlyElement,
+]) {
+  input?.addEventListener("change", () => {
+    if (!input.checked || !isCollaborationEditScopePolicy(input.value)) return;
+    void setCollaborationEditScopePolicy(input.value);
+  });
+}
+
 function requireWorkspacePixyncBridge(): Required<
   Pick<
     WorkspacePxdBridge,
@@ -3889,7 +4805,7 @@ function requireWorkspacePixyncBridge(): Required<
     ] as const
   ) {
     if (typeof bridge[method] !== "function") {
-      throw new Error(`PiXYNC Workspace bridge is missing ${method}.`);
+      throw new Error(`PiXYNC Workspace adapter is missing ${method}.`);
     }
   }
   return bridge as Required<
@@ -4057,6 +4973,21 @@ async function startPixyncProductionRoot(
     },
     onStatus: (status) => publishPixyncProductionStatus(status, projectId),
     onError: (error) => {
+      const errorText = error instanceof Error
+        ? error.message
+        : typeof error === "string"
+        ? error
+        : JSON.stringify(error);
+      if (/scope_assignment_required/i.test(errorText ?? "")) {
+        document.body.dataset.pixyncState = "subscribed";
+        document.body.dataset.pixyncError = "COLLABORATION_SCOPE_REQUIRED";
+        setStatus(
+          "この編集ルールでは現在の担当範囲に保存できません。画面上部の「確認・申請」から担当範囲を申請してください。",
+          "error",
+        );
+        void refreshCollaborationScopeUi();
+        return;
+      }
       document.body.dataset.pixyncState = "error";
       document.body.dataset.pixyncError = error instanceof Error
         ? error.message
@@ -4085,6 +5016,7 @@ async function startPixyncProductionRoot(
   pixyncProductionRoot = root;
   document.body.dataset.pixyncComposition = "production";
   publishPixyncProductionStatus("SUBSCRIBED", projectId);
+  void promptCollaborationConsentIfNeeded();
   return true;
 }
 
@@ -4092,11 +5024,680 @@ interface PxdEntryImportOptions {
   readonly expectedPackageHash?: string;
   readonly expectedProjectId?: string;
   readonly announceProjectChange?: boolean;
-  readonly source?: "LOCAL_FILE" | "REMOTE_CHECKPOINT";
+  readonly mode?: "PROJECT" | "ASSET_ONLY";
+  readonly source?:
+    | "LOCAL_FILE"
+    | "REMOTE_CHECKPOINT"
+    | "MARKET_PURCHASE"
+    | "MARKET_ASSET";
+  readonly marketMetadata?: unknown;
+}
+
+const MARKET_IMPORT_DB_NAME = "pixieed-market-import-v1";
+const MARKET_IMPORT_STORE_NAME = "imports";
+const MARKET_IMPORT_TOKEN_PATTERN = /^[A-Za-z0-9_-]{16,128}$/u;
+const MARKET_IMPORT_FILENAME_PATTERN = /\.(?:pxd|pxdraw|pixiedraw)$/iu;
+const MARKET_IMPORT_PROJECT_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/u;
+
+interface MarketImportRecord {
+  readonly token: string;
+  readonly blob: Blob;
+  readonly filename: string;
+  readonly expiresAt: number;
+  readonly mode: "DRAW_OPEN" | "GAME_BIND";
+  readonly targetProjectId?: string;
+  readonly metadata?: unknown;
+}
+
+interface MarketImportRequest {
+  readonly token?: string;
+  readonly mode: "DRAW_OPEN" | "GAME_BIND";
+  readonly targetProjectId?: string;
+  readonly invalid: boolean;
+}
+
+function readMarketImportRequest(): MarketImportRequest {
+  const url = new URL(window.location.href);
+  const rawImportToken = url.searchParams.get("market_import");
+  const rawBindToken = url.searchParams.get("market_bind");
+  const rawProjectId = url.searchParams.get("projectId") ??
+    url.searchParams.get("project");
+  const targetProjectId = rawProjectId?.trim();
+  if (rawImportToken === null && rawBindToken === null) {
+    return { mode: "DRAW_OPEN", invalid: false };
+  }
+  try {
+    url.searchParams.delete("market_import");
+    url.searchParams.delete("market_bind");
+    window.history.replaceState(
+      window.history.state,
+      document.title,
+      `${url.pathname}${url.search}${url.hash}`,
+    );
+  } catch {
+    // The import remains fail-closed if the browser disallows history updates.
+  }
+  if (rawImportToken !== null && rawBindToken !== null) {
+    return { mode: "DRAW_OPEN", invalid: true };
+  }
+  const mode = rawBindToken === null ? "DRAW_OPEN" : "GAME_BIND";
+  const token = (rawBindToken ?? rawImportToken ?? "").trim();
+  if (!MARKET_IMPORT_TOKEN_PATTERN.test(token)) return { mode, invalid: true };
+  if (
+    mode === "GAME_BIND" &&
+    (targetProjectId === undefined ||
+      !MARKET_IMPORT_PROJECT_ID_PATTERN.test(targetProjectId))
+  ) {
+    return { mode, invalid: true };
+  }
+  return {
+    token,
+    mode,
+    ...(targetProjectId === undefined ? {} : { targetProjectId }),
+    invalid: false,
+  };
+}
+
+function consumeMarketImportRecord(
+  token: string,
+): Promise<MarketImportRecord> {
+  return new Promise((resolve, reject) => {
+    let database: IDBDatabase | undefined;
+    let consumed: MarketImportRecord | undefined;
+    const request = window.indexedDB.open(MARKET_IMPORT_DB_NAME, 1);
+    request.onupgradeneeded = () => {
+      const result = request.result;
+      if (!result.objectStoreNames.contains(MARKET_IMPORT_STORE_NAME)) {
+        result.createObjectStore(MARKET_IMPORT_STORE_NAME, { keyPath: "token" });
+      }
+    };
+    request.onerror = () => reject(new Error("Market import unavailable."));
+    request.onsuccess = () => {
+      database = request.result;
+      try {
+        const transaction = database.transaction(
+          MARKET_IMPORT_STORE_NAME,
+          "readwrite",
+        );
+        const store = transaction.objectStore(MARKET_IMPORT_STORE_NAME);
+        const read = store.get(token);
+        read.onerror = () => reject(new Error("Market import unavailable."));
+        read.onsuccess = () => {
+          const value = read.result as Partial<MarketImportRecord> | undefined;
+          const filename = typeof value?.filename === "string"
+            ? value.filename.trim()
+            : "";
+          const valid = value !== undefined &&
+            value.token === token &&
+            value.blob instanceof Blob &&
+            Number.isFinite(value.expiresAt) &&
+            Number(value.expiresAt) > Date.now() &&
+            filename.length > 0 && filename.length <= 255 &&
+            MARKET_IMPORT_FILENAME_PATTERN.test(filename) &&
+            !/[\\/\u0000-\u001f]/u.test(filename) &&
+            (value?.mode === undefined || value.mode === "DRAW_OPEN" ||
+              value.mode === "GAME_BIND") &&
+            (value?.targetProjectId === undefined ||
+              (typeof value.targetProjectId === "string" &&
+                MARKET_IMPORT_PROJECT_ID_PATTERN.test(value.targetProjectId)));
+          // Delete in the same readwrite transaction. A token can therefore
+          // never be successfully consumed twice, even across two tabs.
+          store.delete(token);
+          if (valid) {
+            consumed = {
+              token,
+              blob: new Blob([value.blob as Blob], {
+                type: value.blob.type || "application/vnd.pixieed.pxd",
+              }),
+            filename,
+            expiresAt: Number(value.expiresAt),
+            mode: value.mode === "GAME_BIND" ? "GAME_BIND" : "DRAW_OPEN",
+            ...(typeof value.targetProjectId === "string" &&
+                MARKET_IMPORT_PROJECT_ID_PATTERN.test(value.targetProjectId)
+              ? { targetProjectId: value.targetProjectId }
+              : {}),
+            ...(value.metadata === undefined ? {} : { metadata: value.metadata }),
+          };
+          }
+        };
+        transaction.oncomplete = () => {
+          database?.close();
+          if (consumed === undefined) {
+            reject(new Error("Market import record is invalid or expired."));
+            return;
+          }
+          resolve(consumed);
+        };
+        transaction.onerror = () => reject(new Error("Market import unavailable."));
+        transaction.onabort = () => reject(new Error("Market import unavailable."));
+      } catch {
+        database?.close();
+        reject(new Error("Market import unavailable."));
+      }
+    };
+  });
+}
+
+async function importMarketPurchaseFromUrl(): Promise<void> {
+  const request = readMarketImportRequest();
+  if (request.invalid) {
+    setStatus("購入PXDを読み込めません。", "error");
+    return;
+  }
+  if (request.token === undefined) return;
+  try {
+    const record = await consumeMarketImportRecord(request.token);
+    const file = new File(
+      [record.blob],
+      record.filename,
+      { type: record.blob.type || "application/vnd.pixieed.pxd" },
+    );
+    if (request.mode === "GAME_BIND" && record.mode !== "GAME_BIND") {
+      throw new Error("Market asset transfer mode is invalid.");
+    }
+    if (request.mode === "GAME_BIND") {
+      if (
+        record.targetProjectId !== undefined &&
+        record.targetProjectId !== request.targetProjectId
+      ) {
+        throw new Error("Market asset target Project is inconsistent.");
+      }
+      const targetProjectId = request.targetProjectId ?? record.targetProjectId;
+      if (
+        targetProjectId === undefined ||
+        !MARKET_IMPORT_PROJECT_ID_PATTERN.test(targetProjectId)
+      ) {
+        throw new Error("Market asset target Project is missing.");
+      }
+      await importPxdFile(file, {
+        mode: "ASSET_ONLY",
+        source: "MARKET_ASSET",
+        expectedProjectId: targetProjectId,
+        marketMetadata: record.metadata,
+      });
+      setStatus("購入Assetを現在のProjectのiGAME素材棚へ追加しました。");
+      return;
+    }
+    await importPxdFile(file, {
+      announceProjectChange: true,
+      source: "MARKET_PURCHASE",
+    });
+    setStatus("購入PXDを読み込みました。");
+  } catch {
+    // Do not expose the token, record, or storage details in the UI/status.
+    setStatus("購入PXDを読み込めません。", "error");
+  }
+}
+
+const MARKET_SOURCE_FRAME_PREFIX = "market-source-frame-v1:";
+const MARKET_SOURCE_RASTER_PREFIX = "market-source-raster-v1:";
+const MARKET_SOURCE_MAX_FRAMES = 512;
+const MARKET_SOURCE_HASH_PATTERN = /^[a-f0-9]{64}$/iu;
+const MARKET_SOURCE_LAYOUTS = [
+  "FULL_CANVAS",
+  "MANUAL",
+  "GRID_32",
+  "FRAME_SEQUENCE",
+  "GRID_FRAME_SEQUENCE",
+] as const;
+type MarketSourceLayout = typeof MARKET_SOURCE_LAYOUTS[number];
+
+interface MarketAssetBindingMetadata {
+  readonly source: {
+    readonly assetId: string;
+    readonly revisionId: string;
+    readonly contentHash: string;
+    readonly packageHash?: string;
+    readonly label: string;
+    readonly format: string;
+    readonly layout: MarketSourceLayout;
+    readonly projectId?: string;
+  };
+  readonly delivery: {
+    readonly deliveryId: string;
+    readonly status: "SECURE_DELIVERED";
+    readonly assetId: string;
+    readonly revisionId: string;
+    readonly contentHash: string;
+    readonly packageHash?: string;
+    readonly format: string;
+    readonly licenseId: string;
+  };
+  readonly license: {
+    readonly licenseId: string;
+    readonly status: "ACTIVE";
+    readonly rights: readonly string[];
+    readonly inGameUse: true;
+  };
+  readonly entitlement: {
+    readonly id: string;
+    readonly acquisitionKind: "paid" | "free" | "admin";
+  };
+}
+
+function marketRecord(value: unknown): Record<string, unknown> | undefined {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : undefined;
+}
+
+function marketRequiredText(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim().length > 0
+    ? value.trim()
+    : undefined;
+}
+
+function marketContentHash(value: unknown): string | undefined {
+  const text = marketRequiredText(value)?.toLowerCase();
+  return text !== undefined && MARKET_SOURCE_HASH_PATTERN.test(text)
+    ? text
+    : undefined;
+}
+
+function marketLayout(value: unknown): MarketSourceLayout | undefined {
+  return typeof value === "string" &&
+      (MARKET_SOURCE_LAYOUTS as readonly string[]).includes(value)
+    ? value as MarketSourceLayout
+    : undefined;
+}
+
+/** Accept only the explicit, server-provided rights and delivery envelope. */
+function marketAssetBindingMetadataFor(
+  value: unknown,
+  options: { readonly requireEntitlement?: boolean } = {},
+): MarketAssetBindingMetadata | undefined {
+  const candidate = marketRecord(value);
+  const source = marketRecord(candidate?.source);
+  const delivery = marketRecord(candidate?.delivery);
+  const license = marketRecord(candidate?.license);
+  const entitlement = marketRecord(candidate?.entitlement);
+  if (
+    source === undefined || delivery === undefined || license === undefined ||
+    (options.requireEntitlement === true && entitlement === undefined)
+  ) {
+    return undefined;
+  }
+  const assetId = marketRequiredText(source.assetId ?? source.asset_id);
+  const revisionId = marketRequiredText(source.revisionId ?? source.revision_id);
+  const contentHash = marketContentHash(source.contentHash ?? source.content_hash);
+  const packageHash = marketContentHash(source.packageHash ?? source.package_hash);
+  const label = marketRequiredText(source.label ?? source.title);
+  const format = marketRequiredText(source.format);
+  const layout = marketLayout(source.layout);
+  const deliveryId = marketRequiredText(delivery.deliveryId ?? delivery.delivery_id);
+  const deliveryStatus = marketRequiredText(delivery.status);
+  const deliveryAssetId = marketRequiredText(delivery.assetId ?? delivery.asset_id);
+  const deliveryRevisionId = marketRequiredText(delivery.revisionId ?? delivery.revision_id);
+  const deliveryHash = marketContentHash(delivery.contentHash ?? delivery.content_hash);
+  const deliveryPackageHash = marketContentHash(delivery.packageHash ?? delivery.package_hash);
+  const deliveryFormat = marketRequiredText(delivery.format);
+  const deliveryLicenseId = marketRequiredText(delivery.licenseId ?? delivery.license_id);
+  const licenseId = marketRequiredText(license.licenseId ?? license.license_id);
+  const licenseStatus = marketRequiredText(license.status);
+  const inGameUse = license.in_game_use === true || license.inGameUse === true;
+  const rights = Array.isArray(license.rights)
+    ? license.rights.flatMap((item) => {
+      const right = marketRequiredText(item);
+      return right === undefined ? [] : [right];
+    })
+    : [];
+  const entitlementId = marketRequiredText(entitlement?.id ?? entitlement?.entitlementId);
+  const acquisitionKind = marketRequiredText(
+    entitlement?.acquisitionKind ?? entitlement?.acquisition_kind,
+  );
+  const validAcquisitionKind = acquisitionKind === "paid" ||
+    acquisitionKind === "free" || acquisitionKind === "admin";
+  if (
+    assetId === undefined || revisionId === undefined ||
+    contentHash === undefined || label === undefined || format === undefined ||
+    layout === undefined || deliveryId === undefined ||
+    deliveryAssetId === undefined || deliveryRevisionId === undefined ||
+    deliveryHash === undefined || deliveryFormat === undefined ||
+    deliveryLicenseId === undefined || deliveryStatus !== "SECURE_DELIVERED" ||
+    licenseId === undefined || licenseStatus !== "ACTIVE" ||
+    rights.length === 0 || new Set(rights).size !== rights.length ||
+    !inGameUse || assetId !== deliveryAssetId ||
+    revisionId !== deliveryRevisionId || contentHash !== deliveryHash ||
+    format !== deliveryFormat || licenseId !== deliveryLicenseId
+    || (format === "pixiedraw-project" &&
+      (packageHash === undefined || deliveryPackageHash === undefined))
+    || packageHash !== deliveryPackageHash
+    || (options.requireEntitlement === true &&
+      (entitlementId === undefined || !validAcquisitionKind))
+  ) {
+    return undefined;
+  }
+  const projectId = marketRequiredText(source.projectId);
+  const normalized: MarketAssetBindingMetadata = {
+    source: {
+      assetId,
+      revisionId,
+      contentHash,
+      ...(packageHash === undefined ? {} : { packageHash }),
+      label,
+      format,
+      layout,
+      ...(projectId === undefined ? {} : { projectId }),
+    },
+    delivery: {
+      deliveryId,
+      status: "SECURE_DELIVERED",
+      assetId: deliveryAssetId,
+      revisionId: deliveryRevisionId,
+      contentHash: deliveryHash,
+      ...(deliveryPackageHash === undefined ? {} : { packageHash: deliveryPackageHash }),
+      format: deliveryFormat,
+      licenseId: deliveryLicenseId,
+    },
+    license: {
+      licenseId,
+      status: "ACTIVE",
+      rights,
+      inGameUse: true,
+    },
+    entitlement: {
+      id: entitlementId ?? "",
+      acquisitionKind: validAcquisitionKind ? acquisitionKind : "paid",
+    },
+  };
+  const marketAccess = normalized.entitlement.acquisitionKind === "free"
+    ? "FREE" as const
+    : "PURCHASED" as const;
+  const marketEntitlementStatus = normalized.entitlement.acquisitionKind === "admin"
+    ? "GRANTED" as const
+    : normalized.entitlement.acquisitionKind === "free"
+    ? "GRANTED" as const
+    : "PAID" as const;
+  const sharedValidation = createMarketAssetBindingCandidate({
+    catalog: {
+      id: normalized.source.assetId,
+      title: normalized.source.label,
+      kind: "DRAW",
+      formats: [normalized.source.format],
+      price: {
+        amountMinor: marketAccess === "FREE" ? 0 : 1,
+        currency: "JPY",
+      },
+      creator: { id: "MARKET", name: "Market" },
+      rights: [...normalized.license.rights],
+    },
+    access: marketAccess,
+    entitlementStatus: marketEntitlementStatus,
+    source: normalized.source,
+    license: normalized.license,
+    delivery: normalized.delivery,
+    supportedFormats: [normalized.source.format],
+  });
+  return sharedValidation.ok ? normalized : undefined;
+}
+
+function marketSourceRasterIdForFrame(sourceFrameId: string): string | undefined {
+  if (!sourceFrameId.startsWith(MARKET_SOURCE_FRAME_PREFIX)) return undefined;
+  try {
+    const value = decodeURIComponent(
+      sourceFrameId.slice(MARKET_SOURCE_FRAME_PREFIX.length),
+    );
+    return value.startsWith(MARKET_SOURCE_RASTER_PREFIX) ? value : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function compositeMarketSourceRaster(
+  importedState: ProjectState,
+  frameId: string,
+  rasterId: string,
+): RasterAsset {
+  const fallback = importedState.assets[importedState.activeAssetId];
+  if (fallback === undefined) {
+    throw new Error("Market PXDの基準ラスタが見つかりません。");
+  }
+  const width = fallback.width;
+  const height = fallback.height;
+  const rgba = new Uint8ClampedArray(width * height * 4);
+  const orderedLayers = importedState.timeline.layerTrackOrder
+    .map((layerTrackId) =>
+      importedState.layers.find((item) => item.layerTrackId === layerTrackId)
+    )
+    .filter((layer): layer is NonNullable<typeof layer> =>
+      layer !== undefined && layer.lifecycle === "ACTIVE" && layer.visible &&
+      layer.opacity > 0
+    );
+  const layers = orderedLayers.length > 0
+    ? orderedLayers
+    : importedState.layers
+      .filter((layer) => layer.lifecycle === "ACTIVE" && layer.visible && layer.opacity > 0)
+      .sort((left, right) => left.order - right.order ||
+        left.layerTrackId.localeCompare(right.layerTrackId));
+
+  for (const layer of layers) {
+    const cel = importedState.cels.find((candidate) =>
+      candidate.layerTrackId === layer.layerTrackId &&
+      candidate.frameId === frameId && candidate.lifecycle === "ACTIVE" &&
+      candidate.assetId !== undefined
+    );
+    const source = cel?.assetId === undefined
+      ? undefined
+      : importedState.assets[cel.assetId];
+    if (source === undefined) continue;
+    const sourcePixels = source.width >= width && source.height >= height
+      ? source.raster.readRegion(0, 0, width, height).pixels
+      : undefined;
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        if (x >= source.width || y >= source.height) continue;
+        const sourceIndex = sourcePixels === undefined
+          ? source.raster.getPixel(x, y)
+          : sourcePixels[y * width + x] ?? 0;
+        if (sourceIndex === 0) continue;
+        const sourceColor = decodeArgb(source.palette[sourceIndex] ?? 0);
+        const sourceAlpha = (sourceColor.alpha / 255) * layer.opacity;
+        if (sourceAlpha <= 0) continue;
+        const offset = (y * width + x) * 4;
+        const destinationAlpha = (rgba[offset + 3] ?? 0) / 255;
+        const destinationRed = (rgba[offset] ?? 0) / 255;
+        const destinationGreen = (rgba[offset + 1] ?? 0) / 255;
+        const destinationBlue = (rgba[offset + 2] ?? 0) / 255;
+        const sourceRed = sourceColor.red / 255;
+        const sourceGreen = sourceColor.green / 255;
+        const sourceBlue = sourceColor.blue / 255;
+        const blendRed = layer.blendMode === "MULTIPLY"
+          ? sourceRed * destinationRed
+          : sourceRed;
+        const blendGreen = layer.blendMode === "MULTIPLY"
+          ? sourceGreen * destinationGreen
+          : sourceGreen;
+        const blendBlue = layer.blendMode === "MULTIPLY"
+          ? sourceBlue * destinationBlue
+          : sourceBlue;
+        const outputAlpha = sourceAlpha + destinationAlpha * (1 - sourceAlpha);
+        if (outputAlpha <= 0) continue;
+        rgba[offset] = Math.round(
+          ((blendRed * sourceAlpha + destinationRed * destinationAlpha * (1 - sourceAlpha)) /
+            outputAlpha) * 255,
+        );
+        rgba[offset + 1] = Math.round(
+          ((blendGreen * sourceAlpha + destinationGreen * destinationAlpha * (1 - sourceAlpha)) /
+            outputAlpha) * 255,
+        );
+        rgba[offset + 2] = Math.round(
+          ((blendBlue * sourceAlpha + destinationBlue * destinationAlpha * (1 - sourceAlpha)) /
+            outputAlpha) * 255,
+        );
+        rgba[offset + 3] = Math.round(outputAlpha * 255);
+      }
+    }
+  }
+
+  // Keep the imported canonical representation indexed. A frame may contain
+  // blended/partially transparent colors that do not exist in any source
+  // palette, so select the 255 most frequent colors and deterministically
+  // map the remainder to the nearest color instead of dropping layers.
+  const frequencies = new Map<number, number>();
+  for (let index = 0; index < rgba.length; index += 4) {
+    const color = argbFromRgb(
+      { r: rgba[index] ?? 0, g: rgba[index + 1] ?? 0, b: rgba[index + 2] ?? 0 },
+      rgba[index + 3] ?? 0,
+    );
+    if ((rgba[index + 3] ?? 0) === 0) continue;
+    frequencies.set(color, (frequencies.get(color) ?? 0) + 1);
+  }
+  const palette = [0, ...Array.from(frequencies.keys()).sort((left, right) =>
+    (frequencies.get(right) ?? 0) - (frequencies.get(left) ?? 0) || left - right
+  ).slice(0, 255)];
+  const paletteIndexByColor = new Map(palette.map((color, index) => [color, index]));
+  const nearestIndex = (color: number): number => {
+    const exact = paletteIndexByColor.get(color);
+    if (exact !== undefined) return exact;
+    const target = decodeArgb(color);
+    let bestIndex = 1;
+    let bestDistance = Number.POSITIVE_INFINITY;
+    for (let index = 1; index < palette.length; index += 1) {
+      const candidate = decodeArgb(palette[index] ?? 0);
+      const distance = (target.red - candidate.red) ** 2 +
+        (target.green - candidate.green) ** 2 +
+        (target.blue - candidate.blue) ** 2 +
+        2 * (target.alpha - candidate.alpha) ** 2;
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestIndex = index;
+      }
+    }
+    return bestIndex;
+  };
+  const raster = IndexedTileRaster.empty(width, height, fallback.raster.tileSize);
+  for (let index = 0; index < rgba.length; index += 4) {
+    const alpha = rgba[index + 3] ?? 0;
+    if (alpha === 0) continue;
+    const color = argbFromRgb(
+      { r: rgba[index] ?? 0, g: rgba[index + 1] ?? 0, b: rgba[index + 2] ?? 0 },
+      alpha,
+    );
+    const pixel = index / 4;
+    raster.setPixel(
+      rasterId,
+      pixel % width,
+      Math.floor(pixel / width),
+      nearestIndex(color),
+    );
+  }
+  return { id: rasterId, width, height, palette, raster, revision: 0 };
+}
+
+function marketSourceRastersFor(
+  importedState: ProjectState,
+  metadata: MarketAssetBindingMetadata,
+): {
+  readonly assets: Readonly<Record<string, RasterAsset>>;
+  readonly sourceFrames: readonly {
+    readonly sourceFrameId: string;
+    readonly rect: { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
+    readonly durationMs: number;
+  }[];
+} {
+  if (importedState.frames.length === 0 || importedState.frames.length > MARKET_SOURCE_MAX_FRAMES) {
+    throw new Error("Market PXDのフレーム数がiGAMEの上限を超えています。");
+  }
+  const assets: Record<string, RasterAsset> = {};
+  const sourceFrames = importedState.frames.map((frame, index) => {
+    const rasterId = `${MARKET_SOURCE_RASTER_PREFIX}${encodeURIComponent(metadata.source.assetId)}:${encodeURIComponent(metadata.source.revisionId)}:${index}`;
+    if (assets[rasterId] === undefined) {
+      assets[rasterId] = compositeMarketSourceRaster(
+        importedState,
+        frame.frameId,
+        rasterId,
+      );
+    }
+    const raster = assets[rasterId];
+    if (raster === undefined) throw new Error("Market PXDのフレーム素材が見つかりません。");
+    const sourceFrameId = `${MARKET_SOURCE_FRAME_PREFIX}${encodeURIComponent(rasterId)}`;
+    return {
+      sourceFrameId,
+      layerIds: importedState.layers
+        .filter((layer) => layer.lifecycle === "ACTIVE" && layer.visible)
+        .map((layer) => layer.layerTrackId),
+      rect: { x: 0, y: 0, width: raster.width, height: raster.height },
+      durationMs: Math.max(1, Math.round(frame.durationMs)),
+    };
+  });
+  return { assets, sourceFrames };
+}
+
+function appendMarketAssetSource(
+  currentState: ProjectState,
+  importedState: ProjectState,
+  metadata: MarketAssetBindingMetadata,
+): {
+  readonly state: ProjectState;
+  readonly reference: {
+    readonly assetId: string;
+    readonly revisionId: string;
+    readonly contentHash: string;
+    readonly label: string;
+    readonly mode: "PINNED";
+    readonly licenseId: string;
+    readonly rights: readonly string[];
+    readonly sourceKind: "MARKET";
+    readonly layout: MarketSourceLayout;
+    readonly projectId?: string;
+    readonly sourceFrameId: string;
+    readonly region: { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
+    readonly sourceFrames: readonly {
+      readonly sourceFrameId: string;
+      readonly rect: { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
+      readonly durationMs: number;
+    }[];
+  };
+} {
+  const projected = marketSourceRastersFor(importedState, metadata);
+  const first = projected.sourceFrames[0];
+  if (first === undefined) throw new Error("Market PXDの参照フレームがありません。");
+  const firstRasterId = marketSourceRasterIdForFrame(first.sourceFrameId);
+  const firstRaster = firstRasterId === undefined
+    ? undefined
+    : projected.assets[firstRasterId];
+  if (firstRaster === undefined) throw new Error("Market PXDの参照ラスタがありません。");
+  const nextAssets = { ...currentState.assets };
+  let changed = false;
+  for (const [id, asset] of Object.entries(projected.assets)) {
+    const current = nextAssets[id];
+    if (current !== undefined && (current.width !== asset.width || current.height !== asset.height)) {
+      throw new Error("同一Market Asset IDに異なる内容が存在します。");
+    }
+    if (current === undefined) {
+      nextAssets[id] = asset;
+      changed = true;
+    }
+  }
+  const nextState: ProjectState = changed
+    ? {
+      ...currentState,
+      structureEpoch: currentState.structureEpoch + 1,
+      assets: nextAssets,
+    }
+    : currentState;
+  return {
+    state: nextState,
+    reference: {
+      assetId: metadata.source.assetId,
+      revisionId: metadata.source.revisionId,
+      contentHash: metadata.source.contentHash,
+      label: metadata.source.label,
+      mode: "PINNED",
+      ...(metadata.source.projectId === undefined ? {} : { projectId: metadata.source.projectId }),
+      licenseId: metadata.license.licenseId,
+      rights: [...metadata.license.rights],
+      sourceKind: "MARKET",
+      layout: metadata.source.layout,
+      sourceFrameId: first.sourceFrameId,
+      region: first.rect,
+      sourceFrames: projected.sourceFrames,
+    },
+  };
 }
 
 function currentDrawStateHasLocalWork(): boolean {
-  if (state.structureEpoch > 1 || assetDefinitions.length > 0) return true;
+  if (state.structureEpoch > 1 || assetDefinitions.length > 0 || assetPackages.length > 0) return true;
   if (history.undoDepth > 0 || history.redoDepth > 0) return true;
   if (journal.operations.length > 0 || journal.dirtyTileWrites.length > 0) {
     return true;
@@ -4329,6 +5930,10 @@ function persistDraw2EditorPreferencesNow(): void {
       tool: toolSelect.value,
       brushSize: Number.isFinite(brushSizeValue) ? brushSizeValue : 1,
       brushShape: brushShape.value,
+      brushAngle: Number(brushAngle.value) || 0,
+      brushAlgorithm: brushAlgorithm.value === "pixel-perfect"
+        ? "pixel-perfect"
+        : "regular",
       brushPattern: brushPattern.value,
       similarityPercent: Number.isFinite(similarityValue) ? similarityValue : 0,
       colorSelectionMode: colorSelectionModeControl.value,
@@ -4477,6 +6082,8 @@ function restoreDraw2GlobalEditorPreferences(): void {
     colorSelectionModeControl.value = preferences.colorSelectionMode;
   }
   brushSize.value = String(preferences.brushSize);
+  brushAngle.value = String(preferences.brushAngle);
+  brushAlgorithm.value = preferences.brushAlgorithm;
   similarity.value = String(preferences.similarityPercent);
   if (
     Array.from(playbackFpsControl.options).some((option) =>
@@ -4560,6 +6167,8 @@ function readStoredBrushPresets(): readonly BrushPreset[] {
       name: "Default",
       brushSize: 1,
       brushShape: "square",
+      brushAngle: 0,
+      brushAlgorithm: "regular",
       pattern: "solid",
       dither: "NONE",
       colorIndex: 1,
@@ -4642,6 +6251,7 @@ let selectionDraft: {
   readonly message: string;
 } | undefined;
 let assetDefinitions: PxdAssetDefinitionEntry[] = [];
+let assetPackages: AssetPackageManifest[] = [];
 let assetDefinitionSequence = 0;
 
 function cloneAssetDefinitionEntry(
@@ -4660,6 +6270,12 @@ function cloneAssetDefinitionEntry(
             ...frame,
             layerIds: [...frame.layerIds],
             rect: { ...frame.rect },
+            ...(frame.rasterSnapshot === undefined ? {} : {
+              rasterSnapshot: {
+                ...frame.rasterSnapshot,
+                data: [...frame.rasterSnapshot.data],
+              },
+            }),
           })),
         }),
         ...(clip.frameDurationsMs === undefined
@@ -4708,6 +6324,77 @@ function currentAssetSelectionSnapshot(): Draw2AssetSelectionSnapshot {
   };
 }
 
+function selectionProjectionFromImage(
+  image: ImageData,
+  region: { readonly x: number; readonly y: number; readonly width: number; readonly height: number },
+  selectedPixels = new Set(
+    selection?.pixels.map((point) => selectionPointKey(point)) ?? [],
+  ),
+): Draw2AssetReferenceProjection {
+  for (let index = 0; index < image.width * image.height; index += 1) {
+    const point = {
+      x: region.x + (index % image.width),
+      y: region.y + Math.floor(index / image.width),
+    };
+    if (selectedPixels.has(selectionPointKey(point))) continue;
+    const offset = index * 4;
+    image.data[offset] = 0;
+    image.data[offset + 1] = 0;
+    image.data[offset + 2] = 0;
+    image.data[offset + 3] = 0;
+  }
+  return { width: image.width, height: image.height, data: image.data };
+}
+
+function captureAssetSelectionForFrame(
+  frameId: string,
+): Draw2AssetReferenceProjection | undefined {
+  const current = currentAssetSelectionSnapshot();
+  if (
+    !current.hasSelection || current.region === null || current.pixelCount <= 0 ||
+    !state.frames.some((frame) => frame.frameId === frameId)
+  ) return undefined;
+  try {
+    return selectionProjectionFromImage(
+      compositeRegion(current.region, frameId),
+      current.region,
+    );
+  } catch {
+    return undefined;
+  }
+}
+
+function captureAssetSelectionForFrames(
+  frameIds: readonly string[],
+): readonly Draw2AssetReferenceProjection[] | undefined {
+  const current = currentAssetSelectionSnapshot();
+  const knownFrameIds = new Set(state.frames.map((frame) => frame.frameId));
+  if (
+    frameIds.length === 0 || !current.hasSelection || current.region === null ||
+    current.pixelCount <= 0 || frameIds.some((frameId) =>
+      !knownFrameIds.has(frameId)
+    )
+  ) return undefined;
+  const selectedPixels = new Set(
+    selection?.pixels.map((point) => selectionPointKey(point)) ?? [],
+  );
+  const projections: Draw2AssetReferenceProjection[] = [];
+  try {
+    for (const frameId of frameIds) {
+      projections.push(
+        selectionProjectionFromImage(
+          compositeRegion(current.region, frameId),
+          current.region,
+          selectedPixels,
+        ),
+      );
+    }
+    return projections;
+  } catch {
+    return undefined;
+  }
+}
+
 function notifyAssetStateChanged(): void {
   window.dispatchEvent(new Event(DRAW2_ASSET_STATE_CHANGED_EVENT));
 }
@@ -4728,6 +6415,9 @@ function nextAssetDefinitionId(): string {
 function assetDefinitionMutation(
   definitionId: string,
   candidate: PxdAssetDefinitionEntry["definition"],
+  options: {
+    readonly persistence?: "LOCAL_DRAFT" | "VALIDATED_DEFINITION";
+  } = {},
 ): Draw2AssetMutationResult {
   const current = assetDefinitions.find((entry) =>
     entry.definitionId === definitionId
@@ -4740,16 +6430,13 @@ function assetDefinitionMutation(
     persistence: "LOCAL_DRAFT",
   } as AssetDefinitionDraft);
   if (!validation.ok) return { ok: false, message: validation.message };
-  const normalized: AssetDefinitionDraft = {
+  const normalized: PxdAssetDefinitionEntry["definition"] = {
     ...validation.value,
-    persistence: "LOCAL_DRAFT",
+    persistence: options.persistence ?? "LOCAL_DRAFT",
   };
   const nextEntry: PxdAssetDefinitionEntry = {
     definitionId,
     definition: normalized,
-    ...(current.registryIdentity === undefined
-      ? {}
-      : { registryIdentity: { ...current.registryIdentity } }),
   };
   assetDefinitions = assetDefinitions.map((entry) =>
     entry.definitionId === definitionId ? nextEntry : entry
@@ -4788,9 +6475,11 @@ function createEmptyAssetDefinition(input: {
     },
   });
   if (!draft.ok) return { ok: false, message: draft.message };
+  const validated = validateAssetDefinitionDraft(draft.value);
+  if (!validated.ok) return { ok: false, message: validated.message };
   const entry: PxdAssetDefinitionEntry = {
     definitionId: nextAssetDefinitionId(),
-    definition: draft.value,
+    definition: validated.value,
   };
   assetDefinitions = [...assetDefinitions, entry];
   queueDrawPersistenceSave("asset-definition-create");
@@ -4837,6 +6526,12 @@ function createAssetAnimationClipFromInput(input: {
         ...frame,
         layerIds: [...frame.layerIds],
         rect: { ...frame.rect },
+        ...(frame.rasterSnapshot === undefined ? {} : {
+          rasterSnapshot: {
+            ...frame.rasterSnapshot,
+            data: [...frame.rasterSnapshot.data],
+          },
+        }),
       })),
     }),
     ...(input.frameDurationsMs === undefined
@@ -4856,6 +6551,7 @@ function addAssetDefinitionFromSelection(input: {
   readonly sourceReference?: string;
   readonly flipX?: boolean;
   readonly flipY?: boolean;
+  readonly fps?: number;
   readonly sourceFrames?: readonly AssetAnimationFrameReference[];
   readonly frameDurationsMs?: readonly number[];
 }): Draw2AssetMutationResult {
@@ -4870,16 +6566,78 @@ function addAssetDefinitionFromSelection(input: {
       message: "Drawモードで範囲を選択してから追加してください。",
     };
   }
+  const capturedProjection = captureCurrentAssetSelection();
+  const visibleLayerIds = state.timeline.layerTrackOrder.flatMap((layerTrackId) => {
+    const layer = state.layers.find((candidate) =>
+      candidate.layerTrackId === layerTrackId
+    );
+    return layer !== undefined && layer.visible && layer.opacity > 0
+      ? [layer.layerTrackId]
+      : [];
+  });
+  const capturedRasterSnapshot = capturedProjection === undefined
+    ? undefined
+    : {
+      width: capturedProjection.width,
+      height: capturedProjection.height,
+      data: Array.from(capturedProjection.data),
+    } satisfies AssetAnimationFrameRasterSnapshot;
+  const sourceFrames = input.sourceFrames ?? (capturedRasterSnapshot === undefined
+    ? undefined
+    : [{
+      sourceFrameId: source.frameId,
+      layerIds: visibleLayerIds.length > 0 ? visibleLayerIds : [source.layerId],
+      rect: { ...source.region },
+      rasterSnapshot: capturedRasterSnapshot,
+    }]);
+  const usesFixedComposite = sourceFrames?.some((frame) =>
+    frame.rasterSnapshot !== undefined
+  ) ?? false;
+  if (sourceFrames === undefined) {
+    return {
+      ok: false,
+      message: "表示中のフレームを画像として取得できません。範囲を選び直してください。",
+    };
+  }
+  const mappedFrameIds = sourceFrames.map((frame) => frame.sourceFrameId);
+  const frameNumberById = new Map(
+    state.frames.map((frame) => [frame.frameId, frame.index + 1]),
+  );
+  const mappedFrameNumbers = mappedFrameIds.map((frameId) =>
+    frameNumberById.get(frameId)
+  );
+  if (
+    mappedFrameIds.length === 0 ||
+    mappedFrameNumbers.length !== mappedFrameIds.length ||
+    mappedFrameNumbers.some((frameNumber) => frameNumber === undefined)
+  ) {
+    return {
+      ok: false,
+      message: "アニメーション化するFrameが見つかりません。",
+    };
+  }
+  const frameNumbers = mappedFrameNumbers.filter(
+    (frameNumber): frameNumber is number => frameNumber !== undefined,
+  );
+  const mappedFrameStart = Math.min(...frameNumbers);
+  const mappedFrameEnd = Math.max(...frameNumbers);
+  const sourceLayerIds = usesFixedComposite
+    ? (visibleLayerIds.length > 0 ? visibleLayerIds : [source.layerId])
+    : [source.layerId];
   const initialAnimationName = input.animationName ?? "IDLE";
   const draft = createAssetDefinitionDraft({
     sourceProjectId: state.projectId,
     sourceCanvasId: source.sourceCanvasId,
-    sourceKind: "SELECTED_LAYERS",
-    sourceLayerIds: [source.layerId],
-    layerSelection: { kind: "CURRENT_LAYER", layerId: source.layerId },
-    frameStart: source.frameNumber,
-    frameEnd: source.frameNumber,
-    frameSelection: { kind: "CURRENT_FRAME", frameId: source.frameId },
+    sourceKind: usesFixedComposite ? "VISIBLE_COMPOSITE" : "SELECTED_LAYERS",
+    sourceLayerIds,
+    layerSelection: usesFixedComposite
+      ? { kind: "VISIBLE_LAYERS" }
+      : { kind: "CURRENT_LAYER", layerId: source.layerId },
+    frameStart: mappedFrameStart,
+    frameEnd: mappedFrameEnd,
+    frameSelection: mappedFrameIds.length === 1
+      ? { kind: "CURRENT_FRAME", frameId: mappedFrameIds[0]! }
+      : { kind: "EXPLICIT", frameIds: mappedFrameIds },
     region: { kind: "MANUAL", ...source.region },
     animationMapping: [createAssetAnimationClipFromInput({
       animationName: initialAnimationName,
@@ -4890,29 +6648,24 @@ function addAssetDefinitionFromSelection(input: {
         ? {}
         : { motionName: input.motionName }),
       ...(input.direction === undefined ? {} : { direction: input.direction }),
-      frameIds: [source.frameId],
+      frameIds: mappedFrameIds,
       loopMode: "LOOP",
-      fps: 12,
+      fps: input.fps ?? 12,
       ...(input.sourceReference === undefined
         ? {}
         : { sourceReference: input.sourceReference }),
       ...(input.flipX === undefined ? {} : { flipX: input.flipX }),
       ...(input.flipY === undefined ? {} : { flipY: input.flipY }),
-      ...(input.sourceFrames === undefined
-        ? {
-          sourceFrames: [{
-            sourceFrameId: source.frameId,
-            layerIds: [source.layerId],
-            rect: { ...source.region },
-          }],
-        }
-        : { sourceFrames: input.sourceFrames }),
+      sourceFrames,
       ...(input.frameDurationsMs === undefined
         ? {}
         : { frameDurationsMs: input.frameDurationsMs }),
     })],
     assetKind: input.assetKind,
     pivot: input.pivot,
+    ...(usesFixedComposite
+      ? { protection: { locked: false, sourceReadOnly: true, referencePolicy: "PINNED" as const } }
+      : {}),
     metadata: {
       name: input.name.trim() || `Asset ${assetDefinitions.length + 1}`,
     },
@@ -4963,7 +6716,7 @@ function updateAssetDefinition(input: {
     metadata: input.name === undefined
       ? current.definition.metadata
       : { ...current.definition.metadata, name: input.name.trim() },
-  });
+  }, { persistence: "VALIDATED_DEFINITION" });
 }
 
 function frameIdsForRange(
@@ -5024,7 +6777,7 @@ function assignAssetAnimation(input: {
   const start = Math.min(input.frameStart, input.frameEnd);
   const end = Math.max(input.frameStart, input.frameEnd);
   if (
-    sourceClip === undefined && (
+    sourceClip === undefined && input.frameIds === undefined && (
       !Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 1 ||
       end > state.frames.length
     )
@@ -5142,23 +6895,143 @@ function getAssetBridgeSnapshot(): Draw2AssetBridgeSnapshot {
     frameNumbers: Object.fromEntries(
       state.frames.map((frame) => [frame.frameId, frame.index + 1]),
     ),
+    frameDurationsMs: Object.fromEntries(
+      state.frames.map((frame) => [frame.frameId, frame.durationMs]),
+    ),
+    layers: state.timeline.layerTrackOrder.flatMap((layerTrackId) => {
+      const layer = state.layers.find((candidate) => candidate.layerTrackId === layerTrackId);
+      return layer === undefined ? [] : [{ layerTrackId, name: layer.name, visible: layer.visible }];
+    }),
     assetDefinitions: assetDefinitions.map(cloneAssetDefinitionEntry),
+    assetPackages: assetPackages.map(cloneAssetPackageManifest),
   };
+}
+
+function rasterProjectionFromSnapshot(
+  snapshot: AssetAnimationFrameRasterSnapshot | undefined,
+): Draw2AssetReferenceProjection | undefined {
+  if (
+    snapshot === undefined ||
+    !Number.isSafeInteger(snapshot.width) || snapshot.width < 1 ||
+    !Number.isSafeInteger(snapshot.height) || snapshot.height < 1 ||
+    !Array.isArray(snapshot.data) ||
+    snapshot.data.length !== snapshot.width * snapshot.height * 4 ||
+    snapshot.data.some((value) =>
+      !Number.isSafeInteger(value) || value < 0 || value > 255
+    )
+  ) return undefined;
+  return {
+    width: snapshot.width,
+    height: snapshot.height,
+    data: new Uint8ClampedArray(snapshot.data),
+  };
+}
+
+function captureCurrentAssetSelection(): Draw2AssetReferenceProjection | undefined {
+  const current = currentAssetSelectionSnapshot();
+  if (
+    !current.hasSelection || current.region === null || current.frameId === null ||
+    current.pixelCount <= 0
+  ) return undefined;
+  return captureAssetSelectionForFrame(current.frameId);
+}
+
+function sameAssetReferenceRect(
+  left: { readonly x: number; readonly y: number; readonly width: number; readonly height: number },
+  right: { readonly x: number; readonly y: number; readonly width: number; readonly height: number },
+): boolean {
+  return left.x === right.x && left.y === right.y &&
+    left.width === right.width && left.height === right.height;
+}
+
+function sameAssetReferenceLayers(
+  left: readonly string[] | undefined,
+  right: readonly string[],
+): boolean {
+  if (left === undefined) return true;
+  const normalizedLeft = [...new Set(left)].sort();
+  const normalizedRight = [...new Set(right)].sort();
+  return normalizedLeft.length === normalizedRight.length &&
+    normalizedLeft.every((value, index) => value === normalizedRight[index]);
+}
+
+function storedRasterSnapshotForReference(input: {
+  readonly sourceFrameId: string;
+  readonly rect: { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
+  readonly layerIds?: readonly string[];
+  readonly assetDefinitionId?: string;
+}): AssetAnimationFrameRasterSnapshot | undefined {
+  const definitions = input.assetDefinitionId === undefined
+    ? []
+    : assetDefinitions.filter((entry) =>
+      entry.definitionId === input.assetDefinitionId
+    );
+  for (const entry of [...definitions].reverse()) {
+    for (const clip of [...entry.definition.animationMapping].reverse()) {
+      for (const frame of [...(clip.sourceFrames ?? [])].reverse()) {
+        if (
+          frame.sourceFrameId === input.sourceFrameId &&
+          frame.rasterSnapshot !== undefined &&
+          sameAssetReferenceRect(frame.rect, input.rect) &&
+          sameAssetReferenceLayers(input.layerIds, frame.layerIds)
+        ) return frame.rasterSnapshot;
+      }
+    }
+  }
+  return undefined;
 }
 
 function renderAssetReference(input: {
   readonly sourceFrameId: string;
+  readonly layerIds?: readonly string[];
+  readonly assetDefinitionId?: string;
   readonly rect: {
     readonly x: number;
     readonly y: number;
     readonly width: number;
     readonly height: number;
   };
+  readonly rasterSnapshot?: AssetAnimationFrameRasterSnapshot;
 }): Draw2AssetReferenceProjection | undefined {
+  const fixedSnapshot = input.rasterSnapshot ??
+    (input.assetDefinitionId === undefined
+      ? undefined
+      : storedRasterSnapshotForReference(input));
+  const fixedProjection = rasterProjectionFromSnapshot(fixedSnapshot);
+  if (fixedProjection !== undefined) return fixedProjection;
+  const marketRasterId = marketSourceRasterIdForFrame(input.sourceFrameId);
+  if (marketRasterId !== undefined) {
+    const asset = state.assets[marketRasterId];
+    if (asset === undefined) return undefined;
+    const { x, y, width, height } = input.rect;
+    if (
+      !Number.isSafeInteger(x) || !Number.isSafeInteger(y) ||
+      !Number.isSafeInteger(width) || !Number.isSafeInteger(height) ||
+      width < 1 || height < 1 || x < 0 || y < 0 ||
+      x + width > asset.width || y + height > asset.height
+    ) return undefined;
+    try {
+      const indexed = asset.raster.readRegion(x, y, width, height).pixels;
+      const image = canonicalContext.createImageData(width, height);
+      for (let index = 0; index < indexed.length; index += 1) {
+        const color = decodeArgb(
+          paletteColorForRender(asset, indexed[index] ?? 0),
+        );
+        const offset = index * 4;
+        image.data[offset] = color.red;
+        image.data[offset + 1] = color.green;
+        image.data[offset + 2] = color.blue;
+        image.data[offset + 3] = color.alpha;
+      }
+      return { width: image.width, height: image.height, data: image.data };
+    } catch {
+      return undefined;
+    }
+  }
   if (!state.frames.some((frame) => frame.frameId === input.sourceFrameId)) {
     return undefined;
   }
-  const image = compositeRegion(input.rect, input.sourceFrameId);
+  const image = compositeRegion(input.rect, input.sourceFrameId, undefined, input.layerIds);
   return {
     width: image.width,
     height: image.height,
@@ -5188,6 +7061,8 @@ async function resolveCurrentDrawReference(input: {
     contentHash,
     mode: input.mode,
     label: asset.id,
+    projectId: state.projectId,
+    referenceScope: "LOCAL_PROJECT",
   };
 }
 
@@ -5203,32 +7078,47 @@ async function resolveDrawDefinitionReference(input: {
   ) {
     return undefined;
   }
+  const hasFixedSnapshot = entry.definition.animationMapping.some((clip) =>
+    clip.sourceFrames?.some((frame) => frame.rasterSnapshot !== undefined) === true
+  );
   const sourceAsset = state.assets[entry.definition.sourceCanvasId];
-  if (sourceAsset === undefined) return undefined;
-  const assetId = entry.registryIdentity?.assetId ?? sourceAsset.id;
+  if (sourceAsset === undefined && !hasFixedSnapshot) return undefined;
+  const assetId = entry.registryIdentity?.assetId ?? sourceAsset?.id ??
+    `draw-definition-${entry.definitionId}`;
   const revisionId = entry.registryIdentity?.revisionId ??
-    `draw-revision-${sourceAsset.revision}`;
+    (hasFixedSnapshot
+      ? `draw-definition-${entry.definitionId}-snapshot`
+      : `draw-revision-${sourceAsset!.revision}`);
   const contentHash = String(
-    await hashCanonical({
-      definitionId: entry.definitionId,
-      definition: entry.definition,
-      source: {
-        id: sourceAsset.id,
-        width: sourceAsset.width,
-        height: sourceAsset.height,
-        palette: sourceAsset.palette,
-        pixels: sourceAsset.raster.toUint8Array(),
-      },
-    }),
+    await hashCanonical(hasFixedSnapshot
+      ? {
+        definitionId: entry.definitionId,
+        definition: entry.definition,
+      }
+      : {
+        definitionId: entry.definitionId,
+        definition: entry.definition,
+        source: {
+          id: sourceAsset!.id,
+          width: sourceAsset!.width,
+          height: sourceAsset!.height,
+          palette: sourceAsset!.palette,
+          pixels: sourceAsset!.raster.toUint8Array(),
+        },
+      }),
   );
   return {
     kind: "DRAW",
     assetId,
     revisionId,
     contentHash,
-    mode: input.mode,
+    mode: hasFixedSnapshot ? "PINNED" : input.mode,
     label: entry.definition.metadata.name || entry.definitionId,
     assetDefinitionId: entry.definitionId,
+    projectId: state.projectId,
+    referenceScope: entry.registryIdentity === undefined
+      ? "LOCAL_PROJECT"
+      : "REGISTERED",
   };
 }
 
@@ -5237,6 +7127,9 @@ const draw2AssetBridge: Draw2AssetBridge = {
   resolveCurrentReference: resolveCurrentDrawReference,
   resolveDefinitionReference: resolveDrawDefinitionReference,
   renderReference: renderAssetReference,
+  captureSelection: captureCurrentAssetSelection,
+  captureSelectionForFrame: captureAssetSelectionForFrame,
+  captureSelectionForFrames: captureAssetSelectionForFrames,
   prepareSelection: prepareAssetSelection,
   createDefinition: createEmptyAssetDefinition,
   addFromSelection: addAssetDefinitionFromSelection,
@@ -5254,6 +7147,30 @@ const draw2AssetBridge: Draw2AssetBridge = {
     queueDrawPersistenceSave("asset-definition-remove");
     notifyAssetStateChanged();
     return true;
+  },
+  saveAssetPackage: async (
+    manifest,
+  ): Promise<Draw2AssetPackageMutationResult> => {
+    const verified = await verifyAssetPackageManifest(manifest);
+    if (!verified.ok) {
+      return { ok: false, message: `Asset Packageを保存できません: ${verified.reasons.join("; ")}` };
+    }
+    const next = cloneAssetPackageManifest(manifest);
+    const replacedSourceKeys = new Set(
+      next.entries.map((entry) => `${entry.kind}:${entry.source.sourceId}`),
+    );
+    assetPackages = [
+      ...assetPackages.filter((candidate) =>
+        candidate.packageId !== next.packageId &&
+        !candidate.entries.some((entry) =>
+          replacedSourceKeys.has(`${entry.kind}:${entry.source.sourceId}`)
+        )
+      ),
+      next,
+    ];
+    queueDrawPersistenceSave("asset-package-save");
+    notifyAssetStateChanged();
+    return { ok: true, manifest: next };
   },
 };
 (window as Window & { __pixiedraw2AssetBridge?: Draw2AssetBridge })
@@ -5278,6 +7195,27 @@ let lastSelectionClick: {
 } | undefined;
 let transformSession: TransformSession | undefined;
 let transformPreview: TransformPreview | undefined;
+/** Prevents duplicate commits and competing edits during the async commit path. */
+let transformCommitInFlight = false;
+type SelectionFrameHandle =
+  | "nw"
+  | "n"
+  | "ne"
+  | "e"
+  | "se"
+  | "s"
+  | "sw"
+  | "w"
+  | "rotate";
+let selectionFrameDrag: {
+  pointerId: number;
+  handle: SelectionFrameHandle;
+  startCanvasPoint: { x: number; y: number };
+  sourceBounds: SelectionOverlayRegion;
+  lastPointerAngle: number;
+  accumulatedAngle: number;
+  lastTransformKey: string;
+} | undefined;
 let selectionDrag: {
   pointerId: number;
   start: { x: number; y: number };
@@ -5292,13 +7230,13 @@ let timelineStateGeneration = 0;
 let timelineActivationRequestSequence = 0;
 let latestTimelineActivationRequestId = 0;
 let timelineViewportInitialized = false;
-type TimelineTab = "timeline" | "tags" | "markers" | "audio";
+type TimelineTab = "timeline" | "tags" | "assets" | "markers" | "audio";
 let activeTimelineTab: TimelineTab = "timeline";
 let timelineFrameElapsedById = new Map<string, number>();
 const TIMELINE_PROPERTIES_STORAGE_KEY = "pixieed:draw2:timeline-properties:v1";
 const isTimelineTab = (value: unknown): value is TimelineTab =>
-  value === "timeline" || value === "tags" || value === "markers" ||
-  value === "audio";
+  value === "timeline" || value === "tags" || value === "assets" ||
+  value === "markers" || value === "audio";
 const readTimelinePropertiesPreference = (): {
   width: number;
   collapsed: boolean;
@@ -5332,6 +7270,36 @@ let timelinePropertiesWidth = initialTimelinePropertiesPreference.width;
 let timelinePropertiesCollapsed = initialTimelinePropertiesPreference.collapsed;
 activeTimelineTab = initialTimelinePropertiesPreference.activeTab;
 const timelineSelectedCells = new Set<string>();
+
+// Bind the small, high-frequency tag actions next to the timeline state. The
+// rest of the editor boot sequence also prepares export and preview surfaces;
+// those optional surfaces must never be able to leave the core tag action
+// without a click handler.
+tagAddControl.addEventListener("click", addAnimationTagFromControls);
+tagFromSelectionControl?.addEventListener("click", addAnimationTagFromSelection);
+document.addEventListener("keydown", (event) => {
+  if (
+    !event.altKey || !event.shiftKey || event.ctrlKey || event.metaKey ||
+    event.key.toLocaleLowerCase() !== "t" ||
+    tagFromSelectionControl?.disabled !== false
+  ) return;
+  const creatorMode = workspaceFrameElement?.dataset.creatorMode;
+  if (
+    creatorMode !== undefined && creatorMode !== "DRAW" &&
+    creatorMode !== "ANIMATE"
+  ) return;
+  if (
+    event.defaultPrevented || event.isComposing ||
+    isInteractiveKeyboardTarget(event.target)
+  ) return;
+  event.preventDefault();
+  event.stopPropagation();
+  addAnimationTagFromSelection();
+});
+window.addEventListener(DRAW2_ASSET_STATE_CHANGED_EVENT, () => {
+  renderCreatorTimelineMetadata();
+});
+
 let timelineSelectionAnchor:
   | { frameIndex: number; layerIndex: number }
   | undefined;
@@ -5371,6 +7339,8 @@ let runtimePreviewModule: RuntimeModule | undefined;
 let toolOptions: ToolOptions = {
   brushSize: 1,
   brushShape: "square",
+  brushAngle: 0,
+  brushAlgorithm: "regular",
   pattern: "solid",
   similarity: 0,
   selectionMode: "similar",
@@ -5384,17 +7354,32 @@ let playbackRate = 1;
 let playbackFrameId: string | undefined;
 let playbackStartFrameId: string | undefined;
 let playbackOriginSession: TimelineSessionState | undefined;
-let audioLinkedPreviewPlaying = false;
 let colorDraft: RgbColor | undefined;
 let colorDraftAlpha = 255;
 let colorDraftDirty = false;
 let colorCommitInFlight = false;
+let colorHistory: number[] = [];
 let pendingPaletteAppendDraft: PaletteAppendDraft | undefined;
 let palettePointerActive = false;
 let paletteAppendInFlight = false;
 let paletteClickSuppressed = false;
 let paletteDrag: PaletteDragState | undefined;
 let colorPreviewFrame: number | undefined;
+type TextPreviewWrite = {
+  readonly x: number;
+  readonly y: number;
+  readonly colorIndex: number;
+};
+type TextPreviewDraft = {
+  readonly writes: readonly TextPreviewWrite[];
+  readonly naturalWidth: number;
+  readonly naturalHeight: number;
+};
+let pendingTextBounds: RasterClipRect | undefined;
+let pendingTextDraft: TextPreviewDraft | undefined;
+let pendingTextTarget:
+  | { readonly assetId: string; readonly celId: string; readonly structureEpoch: number }
+  | undefined;
 type MirrorMode = "NONE" | "ON";
 let mirrorMode: MirrorMode = "NONE";
 let mirrorEnabled = false;
@@ -6122,14 +8107,18 @@ function game351ActionForKey(key: string):
 
 function handleGame351PreviewKey(event: KeyboardEvent): void {
   const current = game351PlayableState;
-  if (current === undefined) return;
+  if (
+    current === undefined || event.defaultPrevented || event.isComposing ||
+    event.repeat || workspaceFrameElement?.dataset.creatorMode !== "GAME" ||
+    event.target !== gamePreviewCanvas
+  ) return;
   if (event.key === "Escape") {
     event.preventDefault();
     game351PlayableState = clearGame351Dialogue(current);
     drawGame351Preview(game351PlayableState, game351PreviewMode);
     return;
   }
-  if (event.key === "Enter" || event.key === " ") {
+  if (event.key === "Enter") {
     event.preventDefault();
     game351PlayableState = triggerGame351Action(
       current,
@@ -6155,7 +8144,11 @@ function handleGame351PreviewKey(event: KeyboardEvent): void {
 
 function handleGameGenrePreviewKey(event: KeyboardEvent): void {
   const current = gameGenrePlayableState;
-  if (current === undefined) return;
+  if (
+    current === undefined || event.defaultPrevented || event.isComposing ||
+    event.repeat || workspaceFrameElement?.dataset.creatorMode !== "GAME" ||
+    event.target !== gamePreviewCanvas
+  ) return;
   if (event.key === "Escape") {
     event.preventDefault();
     gameGenrePlayableState = clearGameGenreDialogue(current);
@@ -6168,10 +8161,8 @@ function handleGameGenrePreviewKey(event: KeyboardEvent): void {
     input = { left: true };
   } else if (event.key === "ArrowRight" || lowerKey === "d") {
     input = { right: true };
-  } else if (
-    event.key === "ArrowUp" || lowerKey === "w" || event.key === " "
-  ) {
-    input = { jump: true, ...(event.key === " " ? { interact: true } : {}) };
+  } else if (event.key === "ArrowUp" || lowerKey === "w") {
+    input = { jump: true };
   } else if (event.key === "Enter") {
     input = { interact: true, tap: true };
   } else {
@@ -6229,7 +8220,7 @@ async function startGamePreview(
           `Refs: ${value.manifest.assetLocks.length}`;
       }
       // Retry after a cold Audio Project finishes hydrating. When playback
-      // already started, the bridge treats this as a no-op.
+      // already started, the workspace adapter treats this as a no-op.
       workspace.startGoldenAudioPreview?.();
     }
     const boundary = await buildLocalDraw2GameProject(mode);
@@ -6290,7 +8281,7 @@ async function startGamePreview(
     try {
       await startGame351Preview(mode);
     } catch (cause) {
-      // Keep the existing GAME-350 preview usable while the Studio bridge is
+      // Keep the existing GAME-350 preview usable while the Studio workspace adapter is
       // still hydrating or when this isolated entry is opened without it.
       game351PlayableState = undefined;
       game351Behaviors = [];
@@ -6859,6 +8850,107 @@ function setColorEditorRgb(
   if (markDraft) requestColorPreviewRender();
 }
 
+function rememberColor(color: number): void {
+  if (color === 0) return;
+  colorHistory = [color, ...colorHistory.filter((candidate) => candidate !== color)]
+    .slice(0, 12);
+  renderColorHistory();
+}
+
+function renderColorHistory(): void {
+  colorHistoryControl.replaceChildren();
+  for (const color of colorHistory) {
+    const channels = decodeArgbColor(color);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "draw2-color-history-swatch";
+    button.style.backgroundColor = `rgb(${channels.red} ${channels.green} ${channels.blue} / ${channels.alpha / 255})`;
+    button.title = `Recent color #${[channels.red, channels.green, channels.blue]
+      .map((channel) => channel.toString(16).padStart(2, "0"))
+      .join("")}`;
+    button.setAttribute("aria-label", button.title);
+    button.addEventListener("click", () => {
+      const asset = state.assets[state.activeAssetId];
+      const paletteIndex = asset?.palette.indexOf(color) ?? -1;
+      if (paletteIndex >= 0) {
+        selectedColor = paletteIndex;
+        renderPaletteButtons(asset?.palette ?? []);
+        syncColorEditorFromSelection();
+        scheduleDraw2EditorPreferencesSave();
+        return;
+      }
+      colorDraftAlpha = channels.alpha;
+      setColorEditorRgb({ r: channels.red, g: channels.green, b: channels.blue });
+      setColorEditorStatus("履歴色をプレビュー中。追加ボタンでパレットへ登録できます。");
+    });
+    colorHistoryControl.append(button);
+  }
+  if (colorHistory.length === 0) {
+    const empty = document.createElement("span");
+    empty.className = "draw2-color-history-empty";
+    empty.textContent = "Recent colors";
+    colorHistoryControl.append(empty);
+  }
+}
+
+function renderColorRampOptions(palette: readonly number[]): void {
+  const current = colorRampEndControl.value;
+  colorRampEndControl.replaceChildren();
+  palette.forEach((color, index) => {
+    const channels = decodeArgbColor(color);
+    const hex = [channels.red, channels.green, channels.blue]
+      .map((channel) => channel.toString(16).padStart(2, "0"))
+      .join("");
+    colorRampEndControl.append(new Option(`Index ${index} · #${hex}`, String(index)));
+  });
+  colorRampEndControl.value = palette.some((_, index) => String(index) === current)
+    ? current
+    : String(Math.min(Math.max(1, selectedColor + 1), Math.max(0, palette.length - 1)));
+  renderColorRampPreview(palette);
+}
+
+function renderColorRampPreview(palette: readonly number[]): void {
+  const start = palette[selectedColor] ?? palette[0] ?? 0;
+  const end = palette[Number(colorRampEndControl.value)] ?? start;
+  const ramp = createArgbColorRamp(
+    start,
+    end,
+    Number(colorRampStepsControl.value),
+    colorRampSpaceControl.value === "RGB" ? "RGB" : "HSV",
+    colorRampHueControl.value === "LONG" ? "LONG" : "SHORT",
+  );
+  colorRampPreviewControl.replaceChildren();
+  for (const [index, color] of ramp.entries()) {
+    const channels = decodeArgbColor(color);
+    const swatch = document.createElement("span");
+    swatch.className = "draw2-color-ramp-swatch";
+    swatch.style.backgroundColor = `rgb(${channels.red} ${channels.green} ${channels.blue} / ${channels.alpha / 255})`;
+    swatch.setAttribute("aria-label", `Ramp color ${index + 1}`);
+    colorRampPreviewControl.append(swatch);
+  }
+}
+
+function renderIndexedColorOptions(
+  element: HTMLSelectElement,
+  palette: readonly number[],
+  includeTransparent = false,
+): void {
+  const current = element.value;
+  element.replaceChildren();
+  palette.forEach((color, index) => {
+    if (!includeTransparent && index === 0) return;
+    const channels = decodeArgbColor(color);
+    const hex = [channels.red, channels.green, channels.blue]
+      .map((channel) => channel.toString(16).padStart(2, "0"))
+      .join("");
+    element.append(new Option(`Index ${index} · #${hex}`, String(index)));
+  });
+  const fallback = palette.length > 1 ? String(Math.max(1, selectedColor)) : "";
+  element.value = Array.from(element.options).some((option) => option.value === current)
+    ? current
+    : fallback;
+}
+
 function syncColorEditorFromSelection(): void {
   const asset = state.assets[state.activeAssetId];
   if (asset === undefined) return;
@@ -6871,6 +8963,7 @@ function syncColorEditorFromSelection(): void {
   colorDraft = { r: red, g: green, b: blue };
   colorDraftDirty = false;
   colorApply.disabled = selectedColor === 0;
+  rememberColor(selected);
   setColorEditorStatus(
     selectedColor === 0
       ? "Index 0 · transparent / eraser"
@@ -6943,6 +9036,10 @@ function renderPaletteButtons(palette: readonly number[]): void {
     });
   }
   refreshPaletteButtonPreview();
+  renderColorRampOptions(palette);
+  renderIndexedColorOptions(outlineColorControl, palette);
+  renderIndexedColorOptions(textFillColorControl, palette);
+  renderIndexedColorOptions(textStrokeColorControl, palette);
 }
 
 function beginPaletteAddPointer(event: PointerEvent): void {
@@ -7100,6 +9197,10 @@ function commitColorEdit(): Promise<void> {
 }
 
 async function commitColorEditNow(): Promise<void> {
+  if (collaborationEditBlockReason() !== undefined) {
+    announceCollaborationEditBlock();
+    return;
+  }
   if (
     palettePointerActive || pendingPaletteAppendDraft !== undefined ||
     paletteAppendInFlight
@@ -7232,6 +9333,10 @@ async function appendPaletteDraftsNow(
   drafts: readonly PaletteAppendDraft[],
   mode: "nearby" | "grid",
 ): Promise<void> {
+  if (collaborationEditBlockReason() !== undefined) {
+    announceCollaborationEditBlock();
+    return;
+  }
   const asset = state.assets[state.activeAssetId];
   if (asset === undefined) {
     setColorEditorStatus("パレットを読み込めませんでした", "error");
@@ -7343,6 +9448,20 @@ function integerInput(element: HTMLInputElement, fallback: number): number {
   return Number.isSafeInteger(value) ? value : fallback;
 }
 
+function decimalInput(
+  element: HTMLInputElement,
+  fallback: number,
+  minimum: number,
+  maximum: number,
+): number {
+  const value = Number(element.value);
+  if (!Number.isFinite(value)) return fallback;
+  return Math.max(
+    minimum,
+    Math.min(maximum, Math.round(value * 10) / 10),
+  );
+}
+
 function currentTransform(): TransformDescriptor {
   const rawFactor = Number(transformFactor.value);
   const factor = Number.isFinite(rawFactor)
@@ -7353,6 +9472,7 @@ function currentTransform(): TransformDescriptor {
     dx: integerInput(transformDx, 0),
     dy: integerInput(transformDy, 0),
     factor,
+    angleDeg: decimalInput(transformAngle, 0, -36000, 36000),
     interpolationPolicy: "NEAREST_NEIGHBOR",
     outOfBoundsPolicy: "CLIP",
   };
@@ -7372,9 +9492,16 @@ function currentSelectionBounds(): {
   };
 }
 
+function currentSelectionMorphologyRadius(): number {
+  return Math.max(
+    1,
+    Math.min(32, integerInput(selectionMorphologyRadius, 1)),
+  );
+}
+
 function updateHistoryButtons(): void {
-  undoControl.disabled = history.undoDepth === 0;
-  redoControl.disabled = history.redoDepth === 0;
+  undoControl.disabled = history.undoDepth === 0 || transformCommitInFlight;
+  redoControl.disabled = history.redoDepth === 0 || transformCommitInFlight;
   window.dispatchEvent(
     new CustomEvent("draw2:history-changed", {
       detail: draw2HistoryPanelSnapshot(),
@@ -7398,12 +9525,13 @@ function syncWorkspaceEditCommandState(): void {
     selectionScopeMatchesActiveCel();
   const hasPreview = transformSession !== undefined &&
     transformPreview !== undefined;
+  const transformBusy = transformCommitInFlight;
   const commandAvailability: Record<string, boolean> = {
-    copy: hasSelection,
-    cut: hasSelection,
-    paste: clipboard !== undefined,
-    "preview-transform": hasSelection,
-    "commit-transform": hasPreview,
+    copy: hasSelection && !transformBusy,
+    cut: hasSelection && !transformBusy,
+    paste: clipboard !== undefined && !transformBusy,
+    "preview-transform": hasSelection && !transformBusy,
+    "commit-transform": hasPreview && !transformBusy,
     "cancel-transform": hasPreview,
   };
   for (
@@ -7424,6 +9552,7 @@ function syncWorkspaceEditCommandState(): void {
       clipboard !== undefined,
     );
   }
+  updateHistoryButtons();
 }
 
 function selectionModeLabel(mode: SelectionEditMode): string {
@@ -7840,12 +9969,8 @@ window.addEventListener("draw2:linked-preview-state", (event) => {
   if (detail?.source !== "AUDIO") return;
   if (workspaceFrameElement?.dataset.creatorMode !== "AUDIO") return;
   const playing = detail.playing === true && detail.monitor !== false;
-  audioLinkedPreviewPlaying = playing;
-  if (playing) {
-    if (playbackRunning) stopTimelinePlayback("Audio monitor follows Audio.");
-    syncMiniPreviewPlaybackControl();
-  } else {
-    syncMiniPreviewPlaybackControl();
+  if (playing && playbackRunning) {
+    stopTimelinePlayback("Audio monitor follows Audio.");
   }
 });
 
@@ -7854,18 +9979,9 @@ window.addEventListener("draw2:audio-monitor-state", (event) => {
   if (workspaceFrameElement?.dataset.creatorMode !== "AUDIO") return;
   const visible = detail?.visible === true;
   if (visible) {
-    // Audio owns a dedicated lower-deck preview. Keep the legacy floating
-    // preview available to Draw, but never make it compete with the Audio
-    // arranger or depend on its hidden layout.
-    miniPreviewEnabled = false;
-    miniPreviewLayout = { ...miniPreviewLayout, collapsed: true };
-    syncMiniPreviewLayout();
+    // Audio owns the central artwork preview. Do not mutate the Draw-only
+    // floating preview preference while the user is in iAUDIO.
     drawAudioDrawPreviewProjection();
-  } else {
-    audioLinkedPreviewPlaying = false;
-    miniPreviewEnabled = false;
-    syncMiniPreviewLayout();
-    syncMiniPreviewPlaybackControl();
   }
 });
 
@@ -9068,6 +11184,20 @@ function renderTimeline(): void {
 }
 
 function renderCreatorTimelineMetadata(): void {
+  const selectionSnapshot = currentAssetSelectionSnapshot();
+  if (tagFromSelectionControl !== null) {
+    tagFromSelectionControl.disabled = !selectionSnapshot.hasSelection;
+    tagFromSelectionControl.dataset.selectionReady = String(
+      selectionSnapshot.hasSelection,
+    );
+  }
+  if (tagFromSelectionStatus !== null) {
+    const region = selectionSnapshot.region;
+    tagFromSelectionStatus.textContent = selectionSnapshot.hasSelection &&
+        region !== null
+      ? `F${selectionSnapshot.frameNumber ?? 1} · ${region.width}×${region.height}px`
+      : "範囲選択待ち";
+  }
   tagList.replaceChildren();
   for (const tag of animationTags.list()) {
     const row = document.createElement("div");
@@ -9294,6 +11424,48 @@ function addAnimationTagFromControls(): void {
   }
 }
 
+function animationTagFrameRangeFromSelection(): {
+  readonly fromFrameIndex: number;
+  readonly toFrameIndex: number;
+} {
+  const selectedFrameIndexes = [...timelineSelectedCells].map((key) => {
+    const frameId = key.split("::")[0] ?? "";
+    return state.timeline.frameOrder.indexOf(frameId);
+  }).filter((index) => index >= 0);
+  const selectionSnapshot = currentAssetSelectionSnapshot();
+  const fallbackFrameIndex = selectionSnapshot.frameNumber === null
+    ? state.frames.find((frame) => frame.frameId === timelineSession.activeFrameId)
+      ?.index ?? 0
+    : Math.max(0, selectionSnapshot.frameNumber - 1);
+  const fromFrameIndex = selectedFrameIndexes.length === 0
+    ? fallbackFrameIndex
+    : Math.min(...selectedFrameIndexes);
+  const toFrameIndex = selectedFrameIndexes.length === 0
+    ? fallbackFrameIndex
+    : Math.max(...selectedFrameIndexes);
+  return { fromFrameIndex, toFrameIndex };
+}
+
+function addAnimationTagFromSelection(): void {
+  const selectionSnapshot = currentAssetSelectionSnapshot();
+  if (!selectionSnapshot.hasSelection) {
+    setStatus("先にキャンバスで範囲を選択してください。", "error");
+    return;
+  }
+  const range = animationTagFrameRangeFromSelection();
+  tagFromControl.value = String(range.fromFrameIndex + 1);
+  tagToControl.value = String(range.toFrameIndex + 1);
+  if (tagNameControl.value.trim() === "") tagNameControl.value = "SPRITE";
+  addAnimationTagFromControls();
+  if (tagFromSelectionStatus !== null) {
+    tagFromSelectionStatus.textContent =
+      `作成済み · F${range.fromFrameIndex + 1}–F${range.toFrameIndex + 1}`;
+  }
+  setStatus(
+    `選択範囲をアニメーションタグにしました。F${range.fromFrameIndex + 1}–F${range.toFrameIndex + 1}`,
+  );
+}
+
 function addTimelineMarkerFromControls(): void {
   try {
     const frame = state.frames.find((item) =>
@@ -9394,11 +11566,24 @@ function runTimelineCommand(
   );
 }
 
+function collaborationTimelineCommandIsNavigation(
+  commandType: TimelineCommand["commandType"],
+): boolean {
+  return commandType === "timeline.activateCel";
+}
+
 async function runTimelineCommandNow(
   commandType: TimelineCommand["commandType"],
   payload: unknown,
   options: TimelineCommandRunOptions = {},
 ): Promise<boolean> {
+  if (
+    !collaborationTimelineCommandIsNavigation(commandType) &&
+    collaborationEditBlockReason() !== undefined
+  ) {
+    announceCollaborationEditBlock();
+    return false;
+  }
   timelineStateGeneration += 1;
   const commandSequence = nextClientSequence(TIMELINE_CLIENT_ID);
   const before = state;
@@ -9562,12 +11747,179 @@ type SelectionOverlayRegion = {
   height: number;
 };
 
+type SelectionFrameHandlePoint = {
+  handle: SelectionFrameHandle;
+  x: number;
+  y: number;
+};
+
+function selectionFrameBounds(): SelectionOverlayRegion | undefined {
+  if (selection === undefined || selection.mask.regions.length === 0) {
+    return undefined;
+  }
+  const minX = Math.min(...selection.mask.regions.map((region) => region.x));
+  const minY = Math.min(...selection.mask.regions.map((region) => region.y));
+  const maxX = Math.max(
+    ...selection.mask.regions.map((region) => region.x + region.width),
+  );
+  const maxY = Math.max(
+    ...selection.mask.regions.map((region) => region.y + region.height),
+  );
+  return {
+    x: minX,
+    y: minY,
+    width: Math.max(1, maxX - minX),
+    height: Math.max(1, maxY - minY),
+  };
+}
+
+function selectionFrameHandleMetrics(): {
+  size: number;
+  hit: number;
+  gap: number;
+} {
+  const bounds = canvas.getBoundingClientRect();
+  const canvasPerCssPixel = Math.max(
+    0.0001,
+    1 / Math.max(
+      0.0001,
+      Math.min(
+        bounds.width / Math.max(1, canvas.width),
+        bounds.height / Math.max(1, canvas.height),
+      ),
+    ),
+  );
+  return {
+    size: Math.max(0.75, Math.min(12, canvasPerCssPixel * 7)),
+    hit: Math.max(1.5, Math.min(18, canvasPerCssPixel * 12)),
+    gap: Math.max(10, canvasPerCssPixel * 18),
+  };
+}
+
+function selectionFrameHandlePoints(
+  region: SelectionOverlayRegion,
+): readonly SelectionFrameHandlePoint[] {
+  const metrics = selectionFrameHandleMetrics();
+  const left = region.x;
+  const top = region.y;
+  const right = region.x + region.width;
+  const bottom = region.y + region.height;
+  const centerX = region.x + region.width / 2;
+  const centerY = region.y + region.height / 2;
+  const rotateY = top - metrics.gap < 0
+    ? Math.min(
+      Math.max(metrics.hit, top + metrics.gap),
+      Math.max(metrics.hit, canvas.height - metrics.hit),
+    )
+    : top - metrics.gap;
+  return [
+    { handle: "rotate", x: centerX, y: rotateY },
+    { handle: "nw", x: left, y: top },
+    { handle: "n", x: centerX, y: top },
+    { handle: "ne", x: right, y: top },
+    { handle: "e", x: right, y: centerY },
+    { handle: "se", x: right, y: bottom },
+    { handle: "s", x: centerX, y: bottom },
+    { handle: "sw", x: left, y: bottom },
+    { handle: "w", x: left, y: centerY },
+  ];
+}
+
+function canvasPointForClient(
+  clientX: number,
+  clientY: number,
+): { x: number; y: number } {
+  const bounds = canvas.getBoundingClientRect();
+  if (bounds.width <= 0 || bounds.height <= 0) {
+    return { x: canvas.width / 2, y: canvas.height / 2 };
+  }
+  return {
+    x: ((clientX - bounds.left) / bounds.width) * canvas.width,
+    y: ((clientY - bounds.top) / bounds.height) * canvas.height,
+  };
+}
+
+function selectionFrameHandleAtClient(
+  clientX: number,
+  clientY: number,
+): SelectionFrameHandle | undefined {
+  if (
+    selection === undefined || !selectionToolCanMove() ||
+    selectionDraft !== undefined
+  ) return undefined;
+  const region = selectionFrameBounds();
+  if (region === undefined) return undefined;
+  const point = canvasPointForClient(clientX, clientY);
+  const metrics = selectionFrameHandleMetrics();
+  const hit = selectionFrameHandlePoints(region)
+    .map((candidate) => ({
+      ...candidate,
+      distance: Math.hypot(
+        (point.x - candidate.x) / metrics.hit,
+        (point.y - candidate.y) / metrics.hit,
+      ),
+    }))
+    .filter((candidate) => candidate.distance <= 1)
+    .sort((left, right) => left.distance - right.distance)[0];
+  return hit?.handle;
+}
+
+function syncSelectionFrameCursor(
+  clientX: number,
+  clientY: number,
+): void {
+  if (selectionFrameDrag !== undefined) return;
+  const handle = selectionFrameHandleAtClient(clientX, clientY);
+  if (handle === undefined) {
+    delete canvas.dataset.selectionFrameHandle;
+  } else {
+    canvas.dataset.selectionFrameHandle = handle;
+  }
+}
+
+function selectionFrameBorderAtClient(
+  clientX: number,
+  clientY: number,
+): boolean {
+  if (
+    selection === undefined || !selectionToolCanMove() ||
+    selectionDraft !== undefined
+  ) return false;
+  const region = selectionFrameBounds();
+  if (region === undefined) return false;
+  const point = canvasPointForClient(clientX, clientY);
+  const tolerance = Math.max(1, selectionFrameHandleMetrics().hit * 0.55);
+  const withinX = point.x >= region.x - tolerance &&
+    point.x <= region.x + region.width + tolerance;
+  const withinY = point.y >= region.y - tolerance &&
+    point.y <= region.y + region.height + tolerance;
+  if (!withinX || !withinY) return false;
+  return Math.abs(point.x - region.x) <= tolerance ||
+    Math.abs(point.x - (region.x + region.width)) <= tolerance ||
+    Math.abs(point.y - region.y) <= tolerance ||
+    Math.abs(point.y - (region.y + region.height)) <= tolerance;
+}
+
+function selectionFrameRegionForOverlay(): SelectionOverlayRegion | undefined {
+  if (
+    selection === undefined || selectionDraft !== undefined ||
+    !selectionToolCanMove()
+  ) return undefined;
+  if (selectionFrameDrag !== undefined) {
+    const destination = transformPreview?.overlayRegions.at(-1);
+    if (destination !== undefined) return destination;
+  }
+  return selectionFrameBounds();
+}
+
 function renderSelectionSvgOverlay(
   regions: readonly SelectionOverlayRegion[],
   previewRegions: readonly SelectionOverlayRegion[],
   draftRegions: readonly SelectionOverlayRegion[] = [],
   pendingPoints: readonly { x: number; y: number }[] = [],
   pendingEllipseRegion?: SelectionOverlayRegion,
+  textRegions: readonly SelectionOverlayRegion[] = [],
+  transformFrameRegion?: SelectionOverlayRegion,
 ): void {
   selectionOverlay.setAttribute(
     "viewBox",
@@ -9578,7 +11930,7 @@ function renderSelectionSvgOverlay(
   }
   const appendRegion = (
     region: { x: number; y: number; width: number; height: number },
-    kind: "selection" | "preview" | "draft" | "pending",
+    kind: "selection" | "preview" | "draft" | "pending" | "text",
   ): void => {
     if (region.width < 1 || region.height < 1) return;
     const path = selectionRegionPath(region);
@@ -9642,15 +11994,93 @@ function renderSelectionSvgOverlay(
       selectionOverlayRegions.appendChild(element);
     }
   };
+  const appendTransformControls = (
+    region: SelectionOverlayRegion,
+  ): void => {
+    if (region.width < 1 || region.height < 1) return;
+    const metrics = selectionFrameHandleMetrics();
+    const group = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "g",
+    );
+    group.setAttribute(
+      "class",
+      "draw2-selection-transform-controls",
+    );
+    group.setAttribute("aria-hidden", "true");
+    const frame = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "path",
+    );
+    frame.setAttribute("d", selectionRegionPath(region));
+    frame.setAttribute("class", "draw2-selection-transform-frame");
+    frame.setAttribute("vector-effect", "non-scaling-stroke");
+    group.appendChild(frame);
+    const points = selectionFrameHandlePoints(region);
+    const rotate = points.find((point) => point.handle === "rotate");
+    const top = points.find((point) => point.handle === "n");
+    if (rotate !== undefined && top !== undefined) {
+      const connector = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "line",
+      );
+      connector.setAttribute("x1", String(top.x));
+      connector.setAttribute("y1", String(top.y));
+      connector.setAttribute("x2", String(rotate.x));
+      connector.setAttribute("y2", String(rotate.y));
+      connector.setAttribute(
+        "class",
+        "draw2-selection-transform-connector",
+      );
+      connector.setAttribute("vector-effect", "non-scaling-stroke");
+      group.appendChild(connector);
+    }
+    for (const point of points) {
+      if (point.handle === "rotate") {
+        const circle = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "circle",
+        );
+        circle.setAttribute("cx", String(point.x));
+        circle.setAttribute("cy", String(point.y));
+        circle.setAttribute("r", String(metrics.size / 2));
+        circle.setAttribute(
+          "class",
+          "draw2-selection-transform-handle draw2-selection-transform-handle--rotate",
+        );
+        group.appendChild(circle);
+        continue;
+      }
+      const handle = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "rect",
+      );
+      handle.setAttribute("x", String(point.x - metrics.size / 2));
+      handle.setAttribute("y", String(point.y - metrics.size / 2));
+      handle.setAttribute("width", String(metrics.size));
+      handle.setAttribute("height", String(metrics.size));
+      handle.setAttribute(
+        "class",
+        `draw2-selection-transform-handle draw2-selection-transform-handle--${point.handle}`,
+      );
+      group.appendChild(handle);
+    }
+    selectionOverlayRegions.appendChild(group);
+  };
   for (const region of regions) appendRegion(region, "selection");
   for (const region of previewRegions) appendRegion(region, "preview");
   for (const region of draftRegions) appendRegion(region, "draft");
+  for (const region of textRegions) appendRegion(region, "text");
   if (pendingEllipseRegion !== undefined) appendEllipse(pendingEllipseRegion);
   if (pendingPoints.length > 1) appendPath(pendingPoints, "pending");
+  if (transformFrameRegion !== undefined) {
+    appendTransformControls(transformFrameRegion);
+  }
   if (
     regions.length === 0 && previewRegions.length === 0 &&
-    draftRegions.length === 0 && pendingPoints.length < 2 &&
-    pendingEllipseRegion === undefined
+    draftRegions.length === 0 && textRegions.length === 0 &&
+    pendingPoints.length < 2 &&
+    pendingEllipseRegion === undefined && transformFrameRegion === undefined
   ) selectionOverlay.setAttribute("hidden", "");
   else selectionOverlay.removeAttribute("hidden");
 }
@@ -10302,7 +12732,26 @@ function drawOverlay(): void {
     }
   }
   if (asset !== undefined && !tilemapMode && transformPreview !== undefined) {
+    if (!pasteMode && selection !== undefined) {
+      drawErasePreviewWrites(asset, selection.pixels);
+    }
     drawTransformPreviewPixels(asset, transformPreview.pixels);
+  }
+  const textTarget = pendingTextTarget;
+  const textTargetIsCurrent = asset !== undefined && textTarget !== undefined &&
+    textTarget.assetId === asset.id &&
+    textTarget.celId === state.activeCelId &&
+    textTarget.structureEpoch === state.structureEpoch;
+  if (
+    textTargetIsCurrent && pendingTextBounds !== undefined &&
+    pendingTextDraft !== undefined && !tilemapMode
+  ) {
+    drawTextPreviewPixels(
+      asset,
+      pendingTextBounds,
+      pendingTextDraft.writes,
+      0.72,
+    );
   }
   if (asset !== undefined && !tilemapMode) syncMirrorGuideOverlay(asset);
   const draftRegions = selectionDraft?.snapshot?.mask.regions ?? [];
@@ -10345,24 +12794,118 @@ function drawOverlay(): void {
     [...draftRegions, ...pendingRegions],
     pendingPoints,
     pendingEllipseRegion,
+    textTargetIsCurrent && pendingTextBounds !== undefined
+      ? [pendingTextBounds]
+      : [],
+    selectionFrameRegionForOverlay(),
   );
 }
 
 const MAX_TRANSFORM_PREVIEW_PIXELS = 32_768;
 
+function drawLargeTransformPreviewTiles(
+  asset: RasterAsset,
+  pixels: readonly { x: number; y: number; colorIndex: number }[],
+  opacity: number,
+): boolean {
+  const scratch = getTransformPreviewScratch();
+  if (scratch === undefined) return false;
+  const tiles = new Map<string, {
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+    readonly pixels: Array<{
+      x: number;
+      y: number;
+      colorIndex: number;
+    }>;
+  }>();
+  for (const pixel of pixels) {
+    if (
+      pixel.x < 0 || pixel.y < 0 || pixel.x >= asset.width ||
+      pixel.y >= asset.height
+    ) continue;
+    const tileX = Math.floor(pixel.x / TRANSFORM_PREVIEW_TILE_SIZE) *
+      TRANSFORM_PREVIEW_TILE_SIZE;
+    const tileY = Math.floor(pixel.y / TRANSFORM_PREVIEW_TILE_SIZE) *
+      TRANSFORM_PREVIEW_TILE_SIZE;
+    const key = `${tileX}:${tileY}`;
+    let tile = tiles.get(key);
+    if (tile === undefined) {
+      tile = {
+        x: tileX,
+        y: tileY,
+        width: Math.min(TRANSFORM_PREVIEW_TILE_SIZE, asset.width - tileX),
+        height: Math.min(TRANSFORM_PREVIEW_TILE_SIZE, asset.height - tileY),
+        pixels: [],
+      };
+      tiles.set(key, tile);
+    }
+    tile.pixels.push(pixel);
+  }
+  if (tiles.size === 0) return true;
+
+  const { canvas, context } = scratch;
+  selectionOverlayContext.save();
+  selectionOverlayContext.imageSmoothingEnabled = false;
+  selectionOverlayContext.globalAlpha = opacity;
+  try {
+    for (const tile of tiles.values()) {
+      context.clearRect(
+        0,
+        0,
+        TRANSFORM_PREVIEW_TILE_SIZE,
+        TRANSFORM_PREVIEW_TILE_SIZE,
+      );
+      const image = context.createImageData(tile.width, tile.height);
+      for (const pixel of tile.pixels) {
+        const localX = pixel.x - tile.x;
+        const localY = pixel.y - tile.y;
+        const color = decodeArgb(
+          paletteColorForRender(asset, pixel.colorIndex),
+        );
+        if (color.alpha <= 0) continue;
+        const offset = (localY * tile.width + localX) * 4;
+        image.data[offset] = color.red;
+        image.data[offset + 1] = color.green;
+        image.data[offset + 2] = color.blue;
+        image.data[offset + 3] = color.alpha;
+      }
+      context.putImageData(image, 0, 0);
+      selectionOverlayContext.drawImage(
+        canvas,
+        0,
+        0,
+        tile.width,
+        tile.height,
+        tile.x,
+        tile.y,
+        tile.width,
+        tile.height,
+      );
+    }
+  } finally {
+    selectionOverlayContext.restore();
+  }
+  return true;
+}
+
 function drawTransformPreviewPixels(
   asset: RasterAsset,
   pixels: readonly { x: number; y: number; colorIndex: number }[],
+  opacity = 0.86,
 ): void {
-  // Keep pointer-move previews cheap for very large selections. The SVG
-  // bounds still communicate the destination; small sprite selections get
-  // the useful floating-pixel projection users expect from a pixel editor.
-  if (pixels.length === 0 || pixels.length > MAX_TRANSFORM_PREVIEW_PIXELS) {
-    return;
-  }
+  if (pixels.length === 0) return;
+  // Keep pointer-move previews cheap for very large selections by rasterizing
+  // bounded floating tiles instead of dropping the pixel projection entirely.
+  if (
+    pixels.length > MAX_TRANSFORM_PREVIEW_PIXELS &&
+    drawLargeTransformPreviewTiles(asset, pixels, opacity)
+  ) return;
   selectionOverlayContext.save();
   selectionOverlayContext.imageSmoothingEnabled = false;
-  selectionOverlayContext.globalAlpha = 0.86;
+  selectionOverlayContext.globalAlpha = opacity;
   const firstColorIndex = pixels[0]?.colorIndex;
   if (
     firstColorIndex !== undefined && pixels.every((pixel) =>
@@ -10398,6 +12941,24 @@ function drawTransformPreviewPixels(
     selectionOverlayContext.fillRect(pixel.x, pixel.y, 1, 1);
   }
   selectionOverlayContext.restore();
+}
+
+function drawTextPreviewPixels(
+  asset: RasterAsset,
+  bounds: RasterClipRect,
+  writes: readonly TextPreviewWrite[],
+  opacity = 0.72,
+): void {
+  if (writes.length === 0) return;
+  drawTransformPreviewPixels(
+    asset,
+    writes.map((write) => ({
+      x: bounds.x + write.x,
+      y: bounds.y + write.y,
+      colorIndex: write.colorIndex,
+    })),
+    opacity,
+  );
 }
 
 function previewWriteSet(
@@ -10758,6 +13319,7 @@ function compositeRegion(
     readonly assetId: string;
     readonly transparentPixels: ReadonlySet<string>;
   },
+  layerIds?: readonly string[],
 ): ImageData {
   const image = canonicalContext.createImageData(region.width, region.height);
   const orderedLayers = state.timeline.layerTrackOrder
@@ -10765,7 +13327,8 @@ function compositeRegion(
       state.layers.find((item) => item.layerTrackId === layerTrackId)
     )
     .filter((item): item is NonNullable<typeof item> =>
-      item !== undefined && item.visible && item.opacity > 0
+      item !== undefined && item.visible && item.opacity > 0 &&
+        (layerIds === undefined || layerIds.includes(item.layerTrackId))
     );
   for (const layer of orderedLayers) {
     const tilemap = layer.kind === "TILEMAP"
@@ -10799,7 +13362,9 @@ function compositeRegion(
       if (sourceAsset === undefined || sourceColorIndex === undefined) continue;
       const previewColorIndex = previewOverrides !== undefined &&
           sourceAsset.id === previewOverrides.assetId &&
-          previewOverrides.transparentPixels.has(`${globalX},${globalY}`)
+          previewOverrides.transparentPixels.has(
+            selectionPointKey({ x: globalX, y: globalY }),
+          )
         ? 0
         : sourceColorIndex;
       const sourceColor = decodeArgb(
@@ -10981,7 +13546,11 @@ async function presentAudioLinkedPlaybackFrame(frameId: string): Promise<void> {
 }
 
 function currentBasicTool(): BasicTool {
-  return toolSelect.value as BasicTool;
+  const value = toolSelect.value as BasicTool;
+  if (value === "pixel-pen") return "pen";
+  if (value === "select-polygon") return "select-lasso";
+  if (value === "tile-stamp") return "pen";
+  return value;
 }
 
 function toolSupportsMirror(tool: BasicTool): boolean {
@@ -11270,7 +13839,8 @@ function timelineCommandInvalidatesSelection(
 }
 
 function hasUncommittedSelectionWork(): boolean {
-  return selectionDrag !== undefined || selectionDraft !== undefined ||
+  return selectionFrameDrag !== undefined || selectionDrag !== undefined ||
+    selectionDraft !== undefined ||
     pendingSelectionGesture !== undefined || transformSession !== undefined ||
     transformPreview !== undefined || pasteMode;
 }
@@ -11282,6 +13852,11 @@ function cancelUncommittedSelectionWork(message?: string): boolean {
     selectionDrag !== undefined &&
     canvas.hasPointerCapture(selectionDrag.pointerId)
   ) canvas.releasePointerCapture(selectionDrag.pointerId);
+  if (
+    selectionFrameDrag !== undefined &&
+    canvas.hasPointerCapture(selectionFrameDrag.pointerId)
+  ) canvas.releasePointerCapture(selectionFrameDrag.pointerId);
+  selectionFrameDrag = undefined;
   if (
     pendingSelectionGesture !== undefined &&
     canvas.hasPointerCapture(pendingSelectionGesture.pointerId)
@@ -11444,7 +14019,10 @@ function beginSelectionFromPoints(
 
 type SelectionMorphology = "EXPAND" | "SHRINK" | "INVERT" | "BORDER";
 
-function applySelectionMorphology(operation: SelectionMorphology): void {
+function applySelectionMorphology(
+  operation: SelectionMorphology,
+  radius = currentSelectionMorphologyRadius(),
+): void {
   if (selection === undefined) {
     setStatus(
       "Create a selection before applying selection morphology.",
@@ -11459,12 +14037,12 @@ function applySelectionMorphology(operation: SelectionMorphology): void {
   }
   const base = createSelectionMask(asset.width, asset.height, selection.pixels);
   const nextMask = operation === "EXPAND"
-    ? selectionExpand(base)
+    ? selectionExpand(base, radius)
     : operation === "SHRINK"
-    ? selectionShrink(base)
+    ? selectionShrink(base, radius)
     : operation === "INVERT"
     ? selectionInvert(base)
-    : selectionBorder(base);
+    : selectionBorder(base, radius);
   const points: { x: number; y: number }[] = [];
   for (let y = 0; y < nextMask.height; y += 1) {
     for (let x = 0; x < nextMask.width; x += 1) {
@@ -11497,7 +14075,7 @@ function applySelectionMorphology(operation: SelectionMorphology): void {
   drawOverlay();
   notifyAssetStateChanged();
   setStatus(
-    `Selection ${operation.toLowerCase()} applied locally; confirm a Transform to mutate pixels.`,
+    `Selection ${operation.toLowerCase()}${operation === "INVERT" ? "" : ` (${radius}px)`} applied locally; confirm a Transform to mutate pixels.`,
   );
 }
 
@@ -11505,8 +14083,11 @@ function commitWriteSet(
   writes: readonly { x: number; y: number; colorIndex: number }[],
   sourceOperationType: string,
   toolForMirroring: BasicTool = currentBasicTool(),
-  options: { readonly respectSelection?: boolean } = {},
-): Promise<void> {
+  options: {
+    readonly respectSelection?: boolean;
+    readonly respectMirror?: boolean;
+  } = {},
+): Promise<boolean> {
   return enqueueCanonicalOperation(() =>
     commitWriteSetNow(writes, sourceOperationType, toolForMirroring, options)
   );
@@ -11516,21 +14097,30 @@ async function commitWriteSetNow(
   writes: readonly { x: number; y: number; colorIndex: number }[],
   sourceOperationType: string,
   toolForMirroring: BasicTool = currentBasicTool(),
-  options: { readonly respectSelection?: boolean } = {},
-): Promise<void> {
+  options: {
+    readonly respectSelection?: boolean;
+    readonly respectMirror?: boolean;
+  } = {},
+): Promise<boolean> {
+  if (collaborationEditBlockReason() !== undefined) {
+    announceCollaborationEditBlock();
+    return false;
+  }
   if (timelineActivationPending) {
     setStatus("Timeline cell is changing; drawing was not committed.", "error");
-    return;
+    return false;
   }
   const asset = state.assets[state.activeAssetId];
-  if (asset === undefined || writes.length === 0) return;
+  if (asset === undefined || writes.length === 0) return false;
   if (selection !== undefined && !selectionScopeMatchesActiveCel()) {
     clearCommittedSelection(
       "Selection cleared because it belongs to another timeline cel.",
     );
-    return;
+    return false;
   }
-  const mirroredWrites = mirrorWritesForTool(writes, asset, toolForMirroring);
+  const mirroredWrites = options.respectMirror === false
+    ? writes
+    : mirrorWritesForTool(writes, asset, toolForMirroring);
   const selectionKeys =
     options.respectSelection === false || selection === undefined
       ? undefined
@@ -11540,7 +14130,7 @@ async function commitWriteSetNow(
     : mirroredWrites.filter((write) =>
       selectionKeys.has(selectionPointKey(write))
     );
-  if (committedWrites.length === 0) return;
+  if (committedWrites.length === 0) return false;
   if (
     pixyncProductionRoot !== undefined &&
     (committedWrites.length > PIXYNC_DRAW2_MAX_PAYLOAD_KEYS ||
@@ -11551,7 +14141,7 @@ async function commitWriteSetNow(
       "この操作はリアルタイム同期の上限を超えるため、変更を確定しません。範囲を小さくするか、ミラー／選択範囲を解除してください。",
       "error",
     );
-    return;
+    return false;
   }
   const drawClientId = activeDrawClientId();
   const commandSequence = nextClientSequence(drawClientId);
@@ -11583,12 +14173,12 @@ async function commitWriteSetNow(
       "Timeline cell changed while drawing; the old-cell write was discarded.",
       "error",
     );
-    return;
+    return false;
   }
   if (!result.ok) {
     syncClientSequencesFromState();
     setStatus(result.diagnostics.map((item) => item.code).join(", "), "error");
-    return;
+    return false;
   }
   if (!result.result.noOp) {
     adoptCanonicalState(result.state);
@@ -11612,9 +14202,423 @@ async function commitWriteSetNow(
     `${sourceOperationType} committed · ${committedWrites.length}px${
       mirrorEnabled && mirrorHasActiveAxis()
         ? ` · mirror=${mirrorAxisSummary()}`
-        : ""
-    } · one undo`,
+      : ""
+  } · one undo`,
   );
+  return true;
+}
+
+function applyOutline(): Promise<void> {
+  return enqueueCanonicalOperation(async () => {
+    const asset = state.assets[state.activeAssetId];
+    if (asset === undefined) return;
+    const colorIndex = Number(outlineColorControl.value);
+    const allowedPixels = selection === undefined
+      ? undefined
+      : new Set(selection.pixels.map(selectionPointKey));
+    const writes = createOutlineWriteSet(
+      {
+        width: asset.width,
+        height: asset.height,
+        palette: asset.palette,
+        getPixel: (x, y) => asset.raster.getPixel(x, y),
+      },
+      {
+        colorIndex,
+        placement: (outlinePlacementControl.value === "INSIDE"
+          ? "INSIDE"
+          : "OUTSIDE") as OutlinePlacement,
+        thickness: Number(outlineThicknessControl.value),
+        connectivity: (outlineConnectivityControl.value === "4" ? 4 : 8) as OutlineConnectivity,
+        ...(allowedPixels === undefined ? {} : { allowedPixels }),
+      },
+    );
+    if (writes.length === 0) {
+      setStatus("Outlineに適用できる輪郭がありません。", "error");
+      return;
+    }
+    await commitWriteSetNow(
+      writes,
+      "tool.outline",
+      currentBasicTool(),
+      { respectMirror: false },
+    );
+  });
+}
+
+function textBoundsFromPoints(
+  asset: RasterAsset,
+  from: { readonly x: number; readonly y: number },
+  to: { readonly x: number; readonly y: number },
+): RasterClipRect {
+  const bounds = normalizeBounds(from, to, asset);
+  if (bounds.width > 1 || bounds.height > 1) return bounds;
+  const width = Math.min(128, asset.width);
+  const height = Math.min(64, asset.height);
+  return {
+    x: Math.max(0, Math.min(asset.width - width, from.x)),
+    y: Math.max(0, Math.min(asset.height - height, from.y)),
+    width,
+    height,
+  };
+}
+
+function createTextAlphaMask(
+  width: number,
+  height: number,
+  value: string,
+  fontFamily: string,
+  fontSize: number,
+  fontWeight: string,
+  align: CanvasTextAlign,
+  stroke: boolean,
+  strokeWidth: number,
+): { readonly width: number; readonly height: number; readonly alpha: Uint8ClampedArray } {
+  const surface = document.createElement("canvas");
+  surface.width = Math.max(1, width);
+  surface.height = Math.max(1, height);
+  const context = surface.getContext("2d", { willReadFrequently: true });
+  if (context === null) {
+    return { width: surface.width, height: surface.height, alpha: new Uint8ClampedArray(surface.width * surface.height) };
+  }
+  context.clearRect(0, 0, surface.width, surface.height);
+  context.imageSmoothingEnabled = false;
+  context.fillStyle = "#ffffff";
+  context.strokeStyle = "#ffffff";
+  context.lineJoin = "miter";
+  context.lineCap = "square";
+  const safeStrokeWidth = stroke ? Math.max(1, Math.min(16, Math.round(strokeWidth))) : 0;
+  context.lineWidth = Math.max(1, safeStrokeWidth * 2);
+  const safeFamily = fontFamily.replace(/["';]/g, "").trim() || "monospace";
+  const safeSize = Math.max(1, Math.min(256, Math.round(fontSize)));
+  context.font = `${fontWeight} ${safeSize}px ${safeFamily}`;
+  context.textAlign = align;
+  context.textBaseline = "top";
+  const lines = value.split(/\r?\n/).slice(0, 64);
+  const lineHeight = Math.max(1, Math.round(safeSize * 1.2));
+  const x = align === "center" ? surface.width / 2 : align === "right" ? surface.width - 2 : 2;
+  const y = Math.max(0, Math.min(surface.height - lineHeight, safeStrokeWidth + 1));
+  lines.forEach((line, index) => {
+    const lineY = y + index * lineHeight;
+    if (lineY >= surface.height) return;
+    if (stroke) context.strokeText(line, x, lineY);
+    else context.fillText(line, x, lineY);
+  });
+  const rgba = context.getImageData(0, 0, surface.width, surface.height).data;
+  const alpha = new Uint8ClampedArray(surface.width * surface.height);
+  for (let index = 0; index < alpha.length; index += 1) alpha[index] = rgba[index * 4 + 3] ?? 0;
+  return { width: surface.width, height: surface.height, alpha };
+}
+
+function measureTextNaturalSize(
+  value: string,
+  fontFamily: string,
+  fontSize: number,
+  fontWeight: string,
+  stroke: boolean,
+  strokeWidth: number,
+): { readonly width: number; readonly height: number } {
+  const surface = document.createElement("canvas");
+  const context = surface.getContext("2d");
+  if (context === null) return { width: 1, height: 1 };
+  const safeStrokeWidth = stroke
+    ? Math.max(1, Math.min(16, Math.round(strokeWidth)))
+    : 0;
+  const safeFamily = fontFamily.replace(/["';]/g, "").trim() || "monospace";
+  const safeSize = Math.max(1, Math.min(256, Math.round(fontSize)));
+  context.font = `${fontWeight} ${safeSize}px ${safeFamily}`;
+  const lines = value.split(/\r?\n/).slice(0, 64);
+  const lineHeight = Math.max(1, Math.round(safeSize * 1.2));
+  const measuredWidth = Math.max(
+    1,
+    ...lines.map((line) => context.measureText(line).width),
+  );
+  return {
+    width: Math.max(1, Math.ceil(measuredWidth + 4 + safeStrokeWidth * 2)),
+    height: Math.max(
+      1,
+      lines.length * lineHeight + 4 + safeStrokeWidth * 2,
+    ),
+  };
+}
+
+function createTextPreviewDraft(
+  bounds: RasterClipRect,
+): TextPreviewDraft {
+  const value = textValueControl.value;
+  const fontSize = Number(textSizeControl.value);
+  const strokeWidth = Number(textStrokeWidthControl.value);
+  const strokeEnabled = textStrokeEnabledControl.checked;
+  const fillMask = createTextAlphaMask(
+    bounds.width,
+    bounds.height,
+    value,
+    textFontControl.value,
+    fontSize,
+    textWeightControl.value,
+    textAlignControl.value as CanvasTextAlign,
+    false,
+    strokeWidth,
+  );
+  const strokeMask = strokeEnabled
+    ? createTextAlphaMask(
+      bounds.width,
+      bounds.height,
+      value,
+      textFontControl.value,
+      fontSize,
+      textWeightControl.value,
+      textAlignControl.value as CanvasTextAlign,
+      true,
+      strokeWidth,
+    )
+    : undefined;
+  const writes = createTextMaskWriteSet(fillMask, strokeMask, {
+    fillColorIndex: Number(textFillColorControl.value),
+    ...(strokeEnabled
+      ? { strokeColorIndex: Number(textStrokeColorControl.value) }
+      : {}),
+    threshold: Number(textThresholdControl.value),
+  });
+  const natural = measureTextNaturalSize(
+    value,
+    textFontControl.value,
+    fontSize,
+    textWeightControl.value,
+    strokeEnabled,
+    strokeWidth,
+  );
+  return { writes, naturalWidth: natural.width, naturalHeight: natural.height };
+}
+
+function renderTextDialogPreview(
+  asset: RasterAsset,
+  bounds: RasterClipRect,
+  draft: TextPreviewDraft,
+): void {
+  const context = textPreviewProjectionContext;
+  const width = textPreviewCanvasControl.width;
+  const height = textPreviewCanvasControl.height;
+  context.clearRect(0, 0, width, height);
+  if (bounds.width < 1 || bounds.height < 1) return;
+  const padding = 12;
+  const scale = Math.min(
+    (width - padding * 2) / bounds.width,
+    (height - padding * 2) / bounds.height,
+  );
+  const displayScale = Math.max(0.01, Math.min(12, scale));
+  const displayWidth = bounds.width * displayScale;
+  const displayHeight = bounds.height * displayScale;
+  const offsetX = (width - displayWidth) / 2;
+  const offsetY = (height - displayHeight) / 2;
+  context.save();
+  context.imageSmoothingEnabled = false;
+  for (const write of draft.writes) {
+    const color = decodeArgb(paletteColorForRender(asset, write.colorIndex));
+    if (color.alpha <= 0) continue;
+    context.fillStyle =
+      `rgba(${color.red}, ${color.green}, ${color.blue}, ${color.alpha / 255})`;
+    context.fillRect(
+      offsetX + write.x * displayScale,
+      offsetY + write.y * displayScale,
+      Math.max(0.5, displayScale),
+      Math.max(0.5, displayScale),
+    );
+  }
+  context.strokeStyle = "rgba(138, 227, 210, 0.86)";
+  context.lineWidth = 1;
+  context.setLineDash([4, 3]);
+  context.strokeRect(offsetX + 0.5, offsetY + 0.5, displayWidth - 1, displayHeight - 1);
+  context.restore();
+}
+
+function clampTextBoundsDimension(
+  value: string,
+  maximum: number,
+  fallback: number,
+): number {
+  return Math.max(
+    1,
+    Math.min(maximum, Math.round(Number(value) || fallback)),
+  );
+}
+
+function updateTextBoundsControls(bounds: RasterClipRect): void {
+  textBoundsWidthControl.value = String(bounds.width);
+  textBoundsHeightControl.value = String(bounds.height);
+}
+
+function refreshTextPreview(): void {
+  const bounds = pendingTextBounds;
+  const target = pendingTextTarget;
+  const asset = state.assets[state.activeAssetId];
+  if (
+    bounds === undefined || target === undefined || asset === undefined ||
+    target.assetId !== asset.id || target.celId !== state.activeCelId ||
+    target.structureEpoch !== state.structureEpoch
+  ) return;
+  const draft = createTextPreviewDraft(bounds);
+  pendingTextDraft = draft;
+  textBoundsStatusControl.textContent =
+    `Range ${bounds.width}×${bounds.height} · origin ${bounds.x},${bounds.y} · recommended ${draft.naturalWidth}×${draft.naturalHeight} · ${draft.writes.length}px`;
+  textInsertControl.disabled = draft.writes.length === 0;
+  renderTextDialogPreview(asset, bounds, draft);
+  drawOverlay();
+}
+
+function updateTextBoundsFromControls(): void {
+  const asset = state.assets[state.activeAssetId];
+  const current = pendingTextBounds;
+  if (asset === undefined || current === undefined) return;
+  const width = clampTextBoundsDimension(
+    textBoundsWidthControl.value,
+    asset.width,
+    current.width,
+  );
+  const height = clampTextBoundsDimension(
+    textBoundsHeightControl.value,
+    asset.height,
+    current.height,
+  );
+  pendingTextBounds = {
+    x: Math.max(0, Math.min(asset.width - width, current.x)),
+    y: Math.max(0, Math.min(asset.height - height, current.y)),
+    width,
+    height,
+  };
+  updateTextBoundsControls(pendingTextBounds);
+  refreshTextPreview();
+}
+
+function fitTextBoundsToContent(): void {
+  const asset = state.assets[state.activeAssetId];
+  const current = pendingTextBounds;
+  const draft = pendingTextDraft;
+  if (asset === undefined || current === undefined || draft === undefined) return;
+  const width = Math.min(asset.width, draft.naturalWidth);
+  const height = Math.min(asset.height, draft.naturalHeight);
+  pendingTextBounds = {
+    x: Math.max(0, Math.min(asset.width - width, current.x)),
+    y: Math.max(0, Math.min(asset.height - height, current.y)),
+    width,
+    height,
+  };
+  updateTextBoundsControls(pendingTextBounds);
+  refreshTextPreview();
+  setStatus("Text range fitted to the current font and content.");
+}
+
+function openTextInsertDialog(
+  from: { readonly x: number; readonly y: number },
+  to: { readonly x: number; readonly y: number },
+): void {
+  const asset = state.assets[state.activeAssetId];
+  if (asset === undefined) return;
+  pendingTextBounds = textBoundsFromPoints(asset, from, to);
+  pendingTextTarget = {
+    assetId: asset.id,
+    celId: state.activeCelId,
+    structureEpoch: state.structureEpoch,
+  };
+  textValueControl.value = textValueControl.value.trim().length > 0
+    ? textValueControl.value
+    : "Text";
+  const selected = asset.palette.length > 1 ? Math.max(1, selectedColor) : 0;
+  textFillColorControl.value = String(selected);
+  textStrokeColorControl.value = String(selected);
+  textBoundsWidthControl.max = String(asset.width);
+  textBoundsHeightControl.max = String(asset.height);
+  updateTextBoundsControls(pendingTextBounds);
+  textInsertDialogControl.showModal();
+  refreshTextPreview();
+  textValueControl.focus();
+  textValueControl.select();
+}
+
+function activateTextSelectionForMove(
+  writes: readonly TextPreviewWrite[],
+): void {
+  const next = selectionSnapshotFromPoints(
+    writes.map((write) => ({ x: write.x, y: write.y })),
+    "alpha",
+  );
+  if (next === undefined) {
+    setStatus("Text inserted, but no visible pixels could be selected.", "error");
+    return;
+  }
+  selectionInteractionGeneration += 1;
+  selection = next;
+  selectionDraft = undefined;
+  transformSession = undefined;
+  transformPreview = undefined;
+  pasteMode = false;
+  const region = next.mask.regions[0];
+  if (region !== undefined) {
+    selectionX.value = String(region.x);
+    selectionY.value = String(region.y);
+    selectionWidth.value = String(region.width);
+    selectionHeight.value = String(region.height);
+  }
+  selectShortcutTool("move");
+  updateSelectionActionButtons();
+  updateSelectionStatus(
+    `scope=${next.scope.celId} · ${next.pixels.length}px · text inserted · drag to move`,
+  );
+  notifyAssetStateChanged();
+  drawOverlay();
+  setStatus("Text inserted and selected. Drag it to move; the move is previewed until release.");
+}
+
+function commitTextInsert(): Promise<void> {
+  return enqueueCanonicalOperation(async () => {
+    const bounds = pendingTextBounds;
+    const target = pendingTextTarget;
+    const asset = state.assets[state.activeAssetId];
+    const value = textValueControl.value;
+    if (
+      bounds === undefined || target === undefined || asset === undefined ||
+      target.assetId !== asset.id || target.celId !== state.activeCelId ||
+      target.structureEpoch !== state.structureEpoch
+    ) {
+      pendingTextBounds = undefined;
+      pendingTextDraft = undefined;
+      pendingTextTarget = undefined;
+      textInsertDialogControl.close();
+      drawOverlay();
+      setStatus("対象のCanvasが変わったため、テキスト挿入をキャンセルしました。", "error");
+      return;
+    }
+    if (value.trim().length === 0) {
+      setStatus("テキストを入力してください。", "error");
+      return;
+    }
+    const draft = createTextPreviewDraft(bounds);
+    pendingTextDraft = draft;
+    const writes = draft.writes.map((write) => ({
+      x: bounds.x + write.x,
+      y: bounds.y + write.y,
+      colorIndex: write.colorIndex,
+    }));
+    if (writes.length === 0) {
+      setStatus("テキストを描画できる範囲がありません。", "error");
+      return;
+    }
+    const selectionKeys = selection === undefined
+      ? undefined
+      : new Set(selection.pixels.map(selectionPointKey));
+    const insertedWrites = selectionKeys === undefined
+      ? writes
+      : writes.filter((write) => selectionKeys.has(selectionPointKey(write)));
+    const committed = await commitWriteSetNow(writes, "tool.text", currentBasicTool(), {
+      respectMirror: false,
+    });
+    if (!committed) return;
+    textInsertDialogControl.close();
+    pendingTextBounds = undefined;
+    pendingTextDraft = undefined;
+    pendingTextTarget = undefined;
+    activateTextSelectionForMove(insertedWrites);
+  });
 }
 
 interface CanvasProjectSettings {
@@ -11622,6 +14626,7 @@ interface CanvasProjectSettings {
   readonly mode?: "OPEN" | "NEW";
   readonly initialCreatorMode?: CreatorStartMode;
   readonly projectIdOverride?: string;
+  readonly projectNameOverride?: string;
   readonly anchor?: CanvasResizeAnchor;
   readonly width?: number;
   readonly height?: number;
@@ -11795,7 +14800,7 @@ async function resetProject(
   const tileSize: TileSize = parsedTileSize === 64 ? 64 : 32;
   const createOptions = {
     projectId,
-    name: `Draw2 ${projectId}`,
+    name: options.projectNameOverride?.trim() || `Draw2 ${projectId}`,
     width: options.width ?? 256,
     height: options.height ?? 256,
     tileSize,
@@ -11818,6 +14823,9 @@ async function resetProject(
   assetDefinitions = forceCreate
     ? []
     : (restored?.assetDefinitions ?? []).map(cloneAssetDefinitionEntry);
+  assetPackages = forceCreate
+    ? []
+    : (restored?.assetPackages ?? []).map(cloneAssetPackageManifest);
   assetDefinitionSequence = 0;
   repository.save(state);
   projectIdInput.value = projectId;
@@ -12719,6 +15727,7 @@ async function createPxdProjectArtifact(
   const snapshot = await workspace.exportProjectPxdSnapshot();
   const output = await exportModule.exportPxdProject(state, {
     assetDefinitions,
+    assetPackages,
     drawTimelineMetadata: draw2TimelineMetadataSnapshot(),
     ...(snapshot.audio === null ? {} : {
       audio: {
@@ -12763,7 +15772,13 @@ async function exportCurrentPxdArtifactForWorkspace(): Promise<
   };
 }
 
-async function storePxdMarketTransfer(file: File): Promise<string> {
+async function storePxdMarketTransfer(
+  file: File,
+  options?: {
+    readonly metadata?: Record<string, unknown>;
+    readonly deliveryManifest?: Draw2MarketDeliveryManifest;
+  },
+): Promise<string> {
   if (!window.indexedDB || typeof File !== "function") {
     throw new Error(
       "このブラウザではMarketへのPXD引き継ぎを利用できません。PXDを保存してからMarketで追加してください。",
@@ -12772,10 +15787,18 @@ async function storePxdMarketTransfer(file: File): Promise<string> {
   const transferId = typeof crypto.randomUUID === "function"
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const createdAt = Date.now();
+  const storedMetadata = options?.metadata === undefined
+    ? undefined
+    : options.deliveryManifest === undefined
+    ? options.metadata
+    : { ...options.metadata, deliveryManifest: options.deliveryManifest };
   await new Promise<void>((resolve, reject) => {
     const request = indexedDB.open("pixieed-market-project-transfers", 1);
     request.onupgradeneeded = () => {
-      request.result.createObjectStore("transfers", { keyPath: "id" });
+      if (!request.result.objectStoreNames.contains("transfers")) {
+        request.result.createObjectStore("transfers", { keyPath: "id" });
+      }
     };
     request.onerror = () => {
       reject(
@@ -12797,8 +15820,12 @@ async function storePxdMarketTransfer(file: File): Promise<string> {
         transaction.objectStore("transfers").put({
           id: transferId,
           file,
-          createdAt: Date.now(),
-          expiresAt: Date.now() + (15 * 60 * 1000),
+          ...(storedMetadata === undefined ? {} : { metadata: storedMetadata }),
+          ...(options?.deliveryManifest === undefined
+            ? {}
+            : { deliveryManifest: options.deliveryManifest }),
+          createdAt,
+          expiresAt: createdAt + (15 * 60 * 1000),
         });
         transaction.oncomplete = () => finish();
         transaction.onerror = () =>
@@ -12817,6 +15844,79 @@ async function storePxdMarketTransfer(file: File): Promise<string> {
     };
   });
   return transferId;
+}
+
+function safeMarketManifestDisplayName(value: string, fallback: string): string {
+  return (value || fallback)
+    .normalize("NFC")
+    .replace(/[\u0000-\u001f\u007f]/gu, " ")
+    .trim()
+    .slice(0, 160) || fallback;
+}
+
+function createDrawMarketDeliveryManifest(
+  file: File,
+  artifact: Draw2ExportArtifact,
+  sourceReference: Draw2AssetReferenceRecord,
+): Draw2MarketDeliveryManifest {
+  const projectName = safeMarketManifestDisplayName(
+    state.name.trim(),
+    `Draw2 ${state.projectId}`,
+  );
+  const label = safeMarketManifestDisplayName(
+    sourceReference.label,
+    projectName,
+  );
+  const projectRevisionId = drawPersistenceSavePending === undefined &&
+      drawPersistenceSaveTimer === undefined &&
+      Number.isSafeInteger(drawPersistenceRevision) &&
+      drawPersistenceRevision >= 0
+    ? `draw-project-revision-${drawPersistenceRevision}`
+    : undefined;
+  const source = {
+    projectId: state.projectId,
+    assetId: sourceReference.assetId,
+    revisionId: sourceReference.revisionId,
+    contentHash: sourceReference.contentHash,
+    ...(artifact.packageHash === undefined
+      ? {}
+      : { packageHash: artifact.packageHash }),
+    fileName: file.name,
+    mimeType: file.type || artifact.mimeType,
+    byteLength: file.size,
+  };
+  return {
+    schemaVersion: 1,
+    manifestId: `draw2-delivery-manifest:${state.projectId}:${sourceReference.contentHash}:${artifact.packageHash ?? "no-package-hash"}`,
+    selectionKind: "WHOLE_PROJECT",
+    project: {
+      projectId: state.projectId,
+      ...(projectRevisionId === undefined ? {} : { revisionId: projectRevisionId }),
+      name: projectName,
+    },
+    entries: [{
+      entryId: "draw-project",
+      sourceKind: "DRAW",
+      source,
+      selection: { kind: "PROJECT", label },
+      provenance: {
+        originKind: "LOCAL_PROJECT",
+        rightsStatus: "CREATOR_DECLARATION_REQUIRED",
+      },
+      capabilities: {
+        editable: true,
+        animation: true,
+        targets: ["iDRAW", "iAUDIO", "iGAME", "UNITY"],
+      },
+      dependencyIds: [],
+    }],
+    summary: {
+      entryCount: 1,
+      sourceKinds: ["DRAW"],
+      labels: [label],
+    },
+    createdAt: new Date().toISOString(),
+  };
 }
 
 async function handoffPxdProjectToMarket(): Promise<void> {
@@ -12843,7 +15943,19 @@ async function handoffPxdProjectToMarket(): Promise<void> {
       artifact.filename,
       { type: artifact.mimeType },
     );
-    const transferId = await storePxdMarketTransfer(file);
+    const sourceReference = await resolveCurrentDrawReference({ mode: "PINNED" });
+    if (sourceReference === undefined) {
+      throw new Error("PXDのMarket配信manifestに必要なDraw参照を取得できませんでした。");
+    }
+    const deliveryManifest = createDrawMarketDeliveryManifest(
+      file,
+      artifact,
+      sourceReference,
+    );
+    const transferId = await storePxdMarketTransfer(file, {
+      metadata: { projectId: state.projectId, kind: "draw" },
+      deliveryManifest,
+    });
     const url = new URL("../market/sell.html", window.location.href);
     url.searchParams.set("project_transfer", transferId);
     window.location.assign(url.href);
@@ -12901,7 +16013,7 @@ async function createAudioMediaArtifact(
   }
   const workspace = getWorkspacePxdBridge();
   if (typeof workspace.renderAudioWavForExport !== "function") {
-    throw new Error("Audio render bridge is unavailable for audio export.");
+    throw new Error("Audio render adapter is unavailable for audio export.");
   }
   const audioSnapshot = await withDrawAudioExportDemand(() =>
     workspace.renderAudioWavForExport!()
@@ -13045,7 +16157,7 @@ async function createWebmVideoArtifact(
   const durationSeconds = Math.max(0.1, authoredDurationMs / 1_000);
   const workspace = getWorkspacePxdBridge();
   if (typeof workspace.renderAudioWavForExport !== "function") {
-    throw new Error("Audio render bridge is unavailable for WebM export.");
+    throw new Error("Audio render adapter is unavailable for WebM export.");
   }
   const audioSnapshot = await withDrawAudioExportDemand(() =>
     workspace.renderAudioWavForExport!(durationSeconds)
@@ -13358,7 +16470,7 @@ async function createExportArtifacts(
     } else if (format === "wav") {
       const workspace = getWorkspacePxdBridge();
       if (typeof workspace.renderAudioWavForExport !== "function") {
-        throw new Error("Audio render bridge is unavailable for WAV export.");
+        throw new Error("Audio render adapter is unavailable for WAV export.");
       }
       const output = await withDrawAudioExportDemand(() =>
         workspace.renderAudioWavForExport!()
@@ -13562,6 +16674,7 @@ async function importPxdFile(
     state: cloneProjectStateShared(state),
     activeWorkspaceProjectId: readActiveWorkspaceProjectId(),
     assetDefinitions: assetDefinitions.map(cloneAssetDefinitionEntry),
+    assetPackages: assetPackages.map(cloneAssetPackageManifest),
     assetDefinitionSequence,
     history: history.snapshot(),
     drawPersistenceRevision,
@@ -13617,6 +16730,7 @@ async function importPxdFile(
     }
     let importedState: ProjectState;
     let importedAssetDefinitions: readonly PxdAssetDefinitionEntry[] = [];
+    let importedAssetPackages: readonly AssetPackageManifest[] = [];
     let importedTimelineMetadata: Draw2TimelineMetadata | undefined;
     let importedStatus = "schema=v1";
     let importedHash = "";
@@ -13653,6 +16767,7 @@ async function importPxdFile(
       );
       importedState = imported.state;
       importedAssetDefinitions = imported.assetDefinitions;
+      importedAssetPackages = imported.assetPackages;
       importedTimelineMetadata = imported.drawTimelineMetadata;
       importedHash = imported.packageHash;
       importedStatus = "schema=v2 · Draw/Audio/Game";
@@ -13667,7 +16782,11 @@ async function importPxdFile(
         diagnostic?.message ?? "PXD format could not be identified.",
       );
     }
+    // A full Project restore must target the requested Project.  ASSET_ONLY
+    // intentionally imports a Market source Project into the already-open
+    // target Project, so its source projectId is expected to differ.
     if (
+      options.mode !== "ASSET_ONLY" &&
       options.expectedProjectId !== undefined &&
       importedState.projectId !== options.expectedProjectId
     ) {
@@ -13681,6 +16800,65 @@ async function importPxdFile(
     }
     if (importedState.assets[importedState.activeAssetId] === undefined) {
       throw new Error("Imported PXD active asset is missing.");
+    }
+    if (options.mode === "ASSET_ONLY") {
+      const metadata = marketAssetBindingMetadataFor(options.marketMetadata, {
+        requireEntitlement: true,
+      });
+      if (metadata === undefined) {
+        throw new Error(
+          "iGAME利用に必要なAsset revision・hash・配信・ライセンス情報が不足しています。",
+        );
+      }
+      if (metadata.source.format !== "pixiedraw-project") {
+        throw new Error("現在のiGAME取込はPXD形式のMarket Assetに対応しています。");
+      }
+      if (
+        typeof importedHash !== "string" ||
+        importedHash.toLowerCase() !==
+          (metadata.source.packageHash ?? metadata.source.contentHash)
+      ) {
+        throw new Error("配信されたPXDの内容がMarketの宣言Hashと一致しません。");
+      }
+      await flushDrawPersistence();
+      if (
+        options.expectedProjectId !== undefined &&
+        state.projectId !== options.expectedProjectId
+      ) {
+        throw new Error("The Project changed before the Market asset binding.");
+      }
+      const before = state;
+      const projected = appendMarketAssetSource(state, importedState, metadata);
+      importCommitStarted = projected.state !== state;
+      if (importCommitStarted) {
+        state = projected.state;
+        repository.save(state);
+        adoptCanonicalState(state);
+        history.record(
+          before,
+          state,
+          `market-asset-${metadata.delivery.deliveryId}`,
+          "market.assetImport",
+        );
+        saveDrawProjectState("market-asset-import");
+        notifyAssetStateChanged();
+      }
+      window.dispatchEvent(
+        new CustomEvent("draw2:market-asset-ready", {
+          detail: {
+            reference: projected.reference,
+            source: metadata.source,
+            delivery: metadata.delivery,
+            license: metadata.license,
+          },
+        }),
+      );
+      setStatus(
+        importCommitStarted
+          ? `Market AssetをiGAME素材棚へ追加しました · ${metadata.source.label}`
+          : `Market AssetはiGAME素材棚へ追加済みです · ${metadata.source.label}`,
+      );
+      return;
     }
     if (importedWorkspace !== undefined) {
       previousWorkspacePxdSnapshot = await getWorkspacePxdBridge()
@@ -13704,6 +16882,7 @@ async function importPxdFile(
     draw2EditorPreferencesReady = false;
     state = importedState;
     assetDefinitions = importedAssetDefinitions.map(cloneAssetDefinitionEntry);
+    assetPackages = importedAssetPackages.map(cloneAssetPackageManifest);
     assetDefinitionSequence = 0;
     repository.save(state);
     adoptCanonicalState(state);
@@ -13772,6 +16951,8 @@ async function importPxdFile(
     }
     const sourceLabel = options.source === "REMOTE_CHECKPOINT"
       ? "PiXYNC checkpoint restored"
+      : options.source === "MARKET_PURCHASE"
+      ? "Purchased PXD imported"
       : "PXD imported locally";
     setStatus(
       `${sourceLabel} · ${importedStatus} · hash=${importedHash.slice(0, 12)}…`,
@@ -13782,6 +16963,7 @@ async function importPxdFile(
       assetDefinitions = previousImportState.assetDefinitions.map(
         cloneAssetDefinitionEntry,
       );
+      assetPackages = previousImportState.assetPackages.map(cloneAssetPackageManifest);
       assetDefinitionSequence = previousImportState.assetDefinitionSequence;
       drawPersistenceRevision = previousImportState.drawPersistenceRevision;
       drawPersistenceExpectedRevision =
@@ -13878,7 +17060,11 @@ async function importPxdFile(
         : message,
       "error",
     );
-    if (options.source === "REMOTE_CHECKPOINT") {
+    if (
+      options.source === "REMOTE_CHECKPOINT" ||
+      options.source === "MARKET_PURCHASE" ||
+      options.source === "MARKET_ASSET"
+    ) {
       throw cause instanceof Error ? cause : new Error(message);
     }
   } finally {
@@ -14097,6 +17283,10 @@ async function commitTileStampCommandNow(
   payload: TileStampPayload,
   label = "Tile placement",
 ): Promise<boolean> {
+  if (collaborationEditBlockReason() !== undefined) {
+    announceCollaborationEditBlock();
+    return false;
+  }
   const drawClientId = activeDrawClientId();
   const commandSequence = nextClientSequence(drawClientId);
   const before = state;
@@ -14171,6 +17361,10 @@ async function commitFillCommandNow(
   clip?: RasterClipRect,
   selectionMask?: RasterSelectionMask,
 ): Promise<void> {
+  if (collaborationEditBlockReason() !== undefined) {
+    announceCollaborationEditBlock();
+    return;
+  }
   const drawClientId = activeDrawClientId();
   const commandSequence = nextClientSequence(drawClientId);
   const before = state;
@@ -14265,6 +17459,13 @@ async function commitPointerPointsNow(
     return;
   }
   const tool = fixedContext?.tool ?? currentBasicTool();
+  if (
+    collaborationEditBlockReason() !== undefined &&
+    !collaborationCanvasToolIsNonMutating(tool)
+  ) {
+    announceCollaborationEditBlock();
+    return;
+  }
   const colorIndex = fixedContext?.colorIndex ?? selectedColor;
   const fixedToolOptions = fixedContext?.toolOptions ?? toolOptions;
   const selectionClip = activeRectangleSelectionClip();
@@ -14272,6 +17473,10 @@ async function commitPointerPointsNow(
   const first = points[0] ?? points[points.length - 1]!;
   const last = points[points.length - 1] ?? first;
   if (tool === "pan") return;
+  if (tool === "text") {
+    openTextInsertDialog(first, last);
+    return;
+  }
   if (tool === "eyedropper") {
     selectedColor = asset.raster.getPixel(first.x, first.y);
     renderPaletteButtons(asset.palette);
@@ -14448,7 +17653,11 @@ async function commitPointerPointsNow(
       );
       // Validate only the reduced path so input density does not reject an
       // otherwise drawable gesture.
-      interpolatePixelPath(strokePoints);
+      if (strokeOptions.brushAlgorithm === "regular") {
+        interpolatePixelPath(strokePoints);
+      } else {
+        interpolatePixelPath(strokePoints, strokeOptions.brushAlgorithm);
+      }
     } catch (cause) {
       syncClientSequencesFromState();
       setStatus(
@@ -14473,6 +17682,8 @@ async function commitPointerPointsNow(
         colorIndex: tool === "eraser" ? 0 : colorIndex,
         brushSize: strokeOptions.brushSize,
         brushShape: strokeOptions.brushShape,
+        brushAngle: strokeOptions.brushAngle,
+        brushAlgorithm: strokeOptions.brushAlgorithm,
         pattern: strokeOptions.pattern,
         ...(mirror === undefined ? {} : { mirror }),
         ...(selectionClip === undefined ? {} : { clip: selectionClip }),
@@ -14552,6 +17763,10 @@ async function commitShapePointsNow(
   colorIndex: number,
   toolOptions: Partial<ToolOptions>,
 ): Promise<void> {
+  if (collaborationEditBlockReason() !== undefined) {
+    announceCollaborationEditBlock();
+    return;
+  }
   const asset = state.assets[state.activeAssetId];
   if (asset === undefined) return;
   const options = normalizeToolOptions(toolOptions);
@@ -14579,6 +17794,8 @@ async function commitShapePointsNow(
       colorIndex,
       brushSize: options.brushSize,
       brushShape: options.brushShape,
+      brushAngle: options.brushAngle,
+      brushAlgorithm: options.brushAlgorithm,
       pattern: options.pattern,
       ...(mirror === undefined ? {} : { mirror }),
       ...(clip === undefined ? {} : { clip }),
@@ -14795,7 +18012,6 @@ document.querySelector<HTMLElement>("#draw2WorkspaceTabExport")
     "click",
     () => syncExportPanel(),
   );
-tagAddControl.addEventListener("click", addAnimationTagFromControls);
 markerAddControl.addEventListener("click", addTimelineMarkerFromControls);
 linkedCelToggleControl.addEventListener("click", toggleActiveLinkedCel);
 drawAudioAdd?.addEventListener("click", addDrawAudioReferenceFromControls);
@@ -15185,6 +18401,7 @@ selectionModeControl.addEventListener("change", () => {
 commitSelectionControl.addEventListener("click", commitSelectionDraft);
 cancelSelectionControl.addEventListener("click", () => cancelSelectionDraft());
 selectButton.addEventListener("click", () => {
+  if (transformCommitInFlight) return;
   try {
     const next = createRectangleSelectionSnapshot(
       state,
@@ -15207,6 +18424,7 @@ selectButton.addEventListener("click", () => {
 });
 
 previewButton.addEventListener("click", () => {
+  if (transformCommitInFlight) return;
   if (selectionDraft !== undefined || pendingSelectionGesture !== undefined) {
     setStatus(
       "Confirm or cancel the selection draft before Transform Preview.",
@@ -15246,15 +18464,29 @@ previewButton.addEventListener("click", () => {
 
 function previewSelectionOperation(
   operation: TransformDescriptor["operation"],
+  factor = 1,
 ): void {
+  if (transformCommitInFlight) return;
   if (selection === undefined) {
     setStatus("Create a selection before Transform Preview.", "error");
     return;
   }
   transformOperation.value = operation;
+  transformDx.value = "0";
+  transformDy.value = "0";
+  transformFactor.value = String(factor);
+  transformAngle.value = "0";
   previewButton?.click();
 }
 
+scaleDownButton.addEventListener(
+  "click",
+  () => previewSelectionOperation("SCALE_NEAREST", 0.5),
+);
+scaleUpButton.addEventListener(
+  "click",
+  () => previewSelectionOperation("SCALE_NEAREST", 2),
+);
 flipHorizontalButton.addEventListener(
   "click",
   () => previewSelectionOperation("FLIP_HORIZONTAL"),
@@ -15277,6 +18509,26 @@ rotate180Button.addEventListener(
 );
 
 async function commitActiveTransform(): Promise<boolean> {
+  if (transformCommitInFlight) return false;
+  if (transformSession === undefined) {
+    setStatus("Start a Transform or Paste Preview before Commit.", "error");
+    return false;
+  }
+  transformCommitInFlight = true;
+  syncWorkspaceEditCommandState();
+  try {
+    return await commitActiveTransformOnce();
+  } finally {
+    transformCommitInFlight = false;
+    syncWorkspaceEditCommandState();
+  }
+}
+
+async function commitActiveTransformOnce(): Promise<boolean> {
+  if (collaborationEditBlockReason() !== undefined) {
+    announceCollaborationEditBlock();
+    return false;
+  }
   if (transformSession === undefined) {
     setStatus("Start a Transform or Paste Preview before Commit.", "error");
     return false;
@@ -15426,6 +18678,7 @@ async function commitActiveTransform(): Promise<boolean> {
   }
   selectionDraft = undefined;
   pendingSelectionGesture = undefined;
+  selectionFrameDrag = undefined;
   transformSession = undefined;
   transformPreview = undefined;
   pasteMode = false;
@@ -15470,6 +18723,7 @@ cancelButton.addEventListener("click", () => {
 });
 
 copyButton.addEventListener("click", () => {
+  if (transformCommitInFlight) return;
   cancelUncommittedSelectionWork();
   if (selection === undefined) {
     setStatus("Create a selection before Copy.", "error");
@@ -15494,6 +18748,11 @@ copyButton.addEventListener("click", () => {
 });
 
 cutButton.addEventListener("click", () => {
+  if (transformCommitInFlight) return;
+  if (collaborationEditBlockReason() !== undefined) {
+    announceCollaborationEditBlock();
+    return;
+  }
   void (async () => {
     // Cut is mutually exclusive with every uncommitted transform/paste
     // projection. Otherwise the cut can commit while the old paste remains
@@ -15565,6 +18824,7 @@ cutButton.addEventListener("click", () => {
     selection = undefined;
     selectionDraft = undefined;
     pendingSelectionGesture = undefined;
+    selectionFrameDrag = undefined;
     selectionDrag = undefined;
     transformSession = undefined;
     transformPreview = undefined;
@@ -15580,6 +18840,7 @@ cutButton.addEventListener("click", () => {
 });
 
 pasteButton.addEventListener("click", () => {
+  if (transformCommitInFlight) return;
   // Starting a new paste cancels an older transform/paste projection first.
   // Clipboard contents stay intact so the user can place them again.
   cancelUncommittedSelectionWork();
@@ -15616,6 +18877,14 @@ pasteButton.addEventListener("click", () => {
 });
 
 undoControl.addEventListener("click", async () => {
+  if (collaborationEditBlockReason() !== undefined) {
+    announceCollaborationEditBlock();
+    return;
+  }
+  if (transformCommitInFlight) {
+    setStatus("Transform commit is still in progress; Undo is temporarily locked.", "error");
+    return;
+  }
   if (
     cancelUncommittedSelectionWork(
       "Active selection preview cancelled; press Undo again to undo history.",
@@ -15632,6 +18901,7 @@ undoControl.addEventListener("click", async () => {
   selection = undefined;
   selectionDraft = undefined;
   pendingSelectionGesture = undefined;
+  selectionFrameDrag = undefined;
   selectionDrag = undefined;
   transformSession = undefined;
   transformPreview = undefined;
@@ -15659,6 +18929,14 @@ undoControl.addEventListener("click", async () => {
 });
 
 redoControl.addEventListener("click", async () => {
+  if (collaborationEditBlockReason() !== undefined) {
+    announceCollaborationEditBlock();
+    return;
+  }
+  if (transformCommitInFlight) {
+    setStatus("Transform commit is still in progress; Redo is temporarily locked.", "error");
+    return;
+  }
   if (
     cancelUncommittedSelectionWork(
       "Active selection preview cancelled; press Redo again to redo history.",
@@ -15675,6 +18953,7 @@ redoControl.addEventListener("click", async () => {
   selection = undefined;
   selectionDraft = undefined;
   pendingSelectionGesture = undefined;
+  selectionFrameDrag = undefined;
   selectionDrag = undefined;
   transformSession = undefined;
   transformPreview = undefined;
@@ -15907,7 +19186,7 @@ function selectionToolCanMove(): boolean {
   const tool = currentBasicTool();
   return tool === "select-rect" || tool === "select-ellipse" ||
     tool === "select-lasso" || tool === "select-color" ||
-    tool === "select-polygon" || tool === "move";
+    tool === "move";
 }
 
 function pointIsSelectedPixel(
@@ -15922,12 +19201,16 @@ function pointIsSelectedPixel(
 
 function pointIsInsideSelection(point: { x: number; y: number }): boolean {
   if (selection === undefined) return false;
-  return pointInSelectionBounds(point, selection.mask.regions);
+  return selection.mask.kind === "rectangle"
+    ? pointInSelectionBounds(point, selection.mask.regions)
+    : pointIsSelectedPixel(selection, point);
 }
 
 function pointIsInsideSelectionDraft(point: { x: number; y: number }): boolean {
   if (selectionDraft?.snapshot === undefined) return false;
-  return pointInSelectionBounds(point, selectionDraft.snapshot.mask.regions);
+  return selectionDraft.snapshot.mask.kind === "rectangle"
+    ? pointInSelectionBounds(point, selectionDraft.snapshot.mask.regions)
+    : pointIsSelectedPixel(selectionDraft.snapshot, point);
 }
 
 function cancelSelectionDrag(): void {
@@ -15949,10 +19232,247 @@ function cancelSelectionDrag(): void {
   markCanonicalMetrics();
 }
 
+function selectionFrameHandleAxes(handle: SelectionFrameHandle): {
+  horizontal: -1 | 0 | 1;
+  vertical: -1 | 0 | 1;
+} {
+  return {
+    horizontal: handle === "nw" || handle === "w" || handle === "sw"
+      ? -1
+      : handle === "ne" || handle === "e" || handle === "se"
+      ? 1
+      : 0,
+    vertical: handle === "nw" || handle === "n" || handle === "ne"
+      ? -1
+      : handle === "sw" || handle === "s" || handle === "se"
+      ? 1
+      : 0,
+  };
+}
+
+function selectionFrameTransformForPoint(
+  drag: NonNullable<typeof selectionFrameDrag>,
+  point: { x: number; y: number },
+): { transform: TransformDescriptor; label: string } | undefined {
+  if (drag.handle === "rotate") {
+    const centerX = drag.sourceBounds.x + (drag.sourceBounds.width - 1) / 2;
+    const centerY = drag.sourceBounds.y + (drag.sourceBounds.height - 1) / 2;
+    const pointerAngle = Math.atan2(point.y - centerY, point.x - centerX);
+    let delta = pointerAngle - drag.lastPointerAngle;
+    while (delta > Math.PI) delta -= Math.PI * 2;
+    while (delta < -Math.PI) delta += Math.PI * 2;
+    drag.lastPointerAngle = pointerAngle;
+    drag.accumulatedAngle += delta;
+    const angleDeg = Math.round(drag.accumulatedAngle * 180 / Math.PI * 10) /
+      10;
+    if (Math.abs(angleDeg) < 0.1) return undefined;
+    return {
+      transform: {
+        ...currentTransform(),
+        operation: "ROTATE_NEAREST",
+        dx: 0,
+        dy: 0,
+        factor: 1,
+        angleDeg,
+      },
+      label: "回転 " + angleDeg + "°",
+    };
+  }
+  const axes = selectionFrameHandleAxes(drag.handle);
+  const bounds = drag.sourceBounds;
+  const right = bounds.x + bounds.width;
+  const bottom = bounds.y + bounds.height;
+  const requestedWidth = axes.horizontal === 1
+    ? Math.max(1, point.x - bounds.x)
+    : axes.horizontal === -1
+    ? Math.max(1, right - point.x)
+    : bounds.width;
+  const requestedHeight = axes.vertical === 1
+    ? Math.max(1, point.y - bounds.y)
+    : axes.vertical === -1
+    ? Math.max(1, bottom - point.y)
+    : bounds.height;
+  const widthRatio = requestedWidth / Math.max(1, bounds.width);
+  const heightRatio = requestedHeight / Math.max(1, bounds.height);
+  const rawFactor = axes.horizontal !== 0 && axes.vertical !== 0
+    ? Math.max(widthRatio, heightRatio)
+    : axes.horizontal !== 0
+    ? widthRatio
+    : heightRatio;
+  const factor = Math.max(
+    0.125,
+    Math.min(8, Math.round(rawFactor * 1000) / 1000),
+  );
+  const outputWidth = Math.max(1, Math.round(bounds.width * factor));
+  const outputHeight = Math.max(1, Math.round(bounds.height * factor));
+  const originX = Math.floor((bounds.width - outputWidth) / 2);
+  const originY = Math.floor((bounds.height - outputHeight) / 2);
+  const baseX = bounds.x + originX;
+  const baseY = bounds.y + originY;
+  const targetX = axes.horizontal === 1
+    ? bounds.x
+    : axes.horizontal === -1
+    ? right - outputWidth
+    : baseX;
+  const targetY = axes.vertical === 1
+    ? bounds.y
+    : axes.vertical === -1
+    ? bottom - outputHeight
+    : baseY;
+  const dx = Math.round(targetX - baseX);
+  const dy = Math.round(targetY - baseY);
+  return {
+    transform: {
+      ...currentTransform(),
+      operation: "SCALE_NEAREST",
+      dx,
+      dy,
+      factor,
+    },
+    label: "拡大縮小 " + Math.round(factor * 100) + "% · Δ" + dx + "," + dy,
+  };
+}
+
+function transformHasEffect(transform: TransformDescriptor): boolean {
+  if (transform.operation === "ROTATE_NEAREST") {
+    const angle = Number(transform.angleDeg ?? 0);
+    const normalizedAngle = ((angle + 180) % 360 + 360) % 360 - 180;
+    return transform.dx !== 0 || transform.dy !== 0 ||
+      Math.abs(normalizedAngle) > 0.0001;
+  }
+  return transform.operation !== "MOVE" || transform.dx !== 0 ||
+    transform.dy !== 0 || Math.abs(transform.factor - 1) > 0.0001;
+}
+
+function beginSelectionFrameDrag(
+  event: PointerEvent,
+  handle: SelectionFrameHandle,
+): boolean {
+  if (transformCommitInFlight) return false;
+  if (collaborationEditBlockReason() !== undefined) {
+    announceCollaborationEditBlock();
+    return false;
+  }
+  const currentSelection = selection;
+  const sourceBounds = selectionFrameBounds();
+  if (currentSelection === undefined || sourceBounds === undefined) {
+    return false;
+  }
+  if (event.cancelable) event.preventDefault();
+  // A manual Transform Preview is replaced by the frame gesture. The source
+  // selection remains canonical and is the stable base for the new preview.
+  transformSession = undefined;
+  transformPreview = undefined;
+  pasteMode = false;
+  const startCanvasPoint = canvasPointForClient(event.clientX, event.clientY);
+  const centerX = sourceBounds.x + (sourceBounds.width - 1) / 2;
+  const centerY = sourceBounds.y + (sourceBounds.height - 1) / 2;
+  selectionFrameDrag = {
+    pointerId: event.pointerId,
+    handle,
+    startCanvasPoint,
+    sourceBounds,
+    lastPointerAngle: Math.atan2(
+      startCanvasPoint.y - centerY,
+      startCanvasPoint.x - centerX,
+    ),
+    accumulatedAngle: 0,
+    lastTransformKey: "",
+  };
+  selectionInteractionGeneration += 1;
+  canvas.setPointerCapture(event.pointerId);
+  syncWorkspaceEditCommandState();
+  updateSelectionStatus(
+    "scope=" + currentSelection.scope.celId + " · " +
+      currentSelection.pixels.length + "px · 枠" +
+      (handle === "rotate" ? "回転" : "拡大縮小") + " · preview=only",
+  );
+  markPreviewMetrics();
+  drawOverlay();
+  return true;
+}
+
+function updateSelectionFrameDragPreview(
+  point: { x: number; y: number },
+): void {
+  const drag = selectionFrameDrag;
+  const currentSelection = selection;
+  if (drag === undefined || currentSelection === undefined) return;
+  const next = selectionFrameTransformForPoint(drag, point);
+  if (next === undefined) {
+    if (drag.lastTransformKey === "identity") return;
+    drag.lastTransformKey = "identity";
+    transformSession = undefined;
+    transformPreview = undefined;
+    transformAngle.value = "0";
+    syncWorkspaceEditCommandState();
+    updateSelectionStatus(
+      "scope=" + currentSelection.scope.celId + " · " +
+        currentSelection.pixels.length + "px · 枠回転 0° · preview=only",
+    );
+    markPreviewMetrics();
+    drawOverlay();
+    return;
+  }
+  const transform = next.transform;
+  const key = transform.operation + ":" + transform.dx + ":" +
+    transform.dy + ":" + transform.factor + ":" +
+    (transform.angleDeg ?? 0);
+  if (drag.lastTransformKey === key) return;
+  drag.lastTransformKey = key;
+  transformOperation.value = transform.operation;
+  transformDx.value = String(transform.dx);
+  transformDy.value = String(transform.dy);
+  transformFactor.value = String(transform.factor);
+  transformAngle.value = String(transform.angleDeg ?? 0);
+  transformSession = createTransformSession(
+    currentSelection,
+    transform,
+    "transform-frame-" + state.projectId + "-" +
+      currentSelection.mask.selectionVersion + "-" + key,
+  );
+  transformPreview = previewTransform(currentSelection, transformSession);
+  pasteMode = false;
+  syncWorkspaceEditCommandState();
+  updateSelectionStatus(
+    "scope=" + currentSelection.scope.celId + " · " +
+      currentSelection.pixels.length + "px · " + next.label +
+      " · preview=only",
+  );
+  markPreviewMetrics();
+  drawOverlay();
+}
+
+function cancelSelectionFrameDrag(): void {
+  if (
+    selectionFrameDrag !== undefined &&
+    canvas.hasPointerCapture(selectionFrameDrag.pointerId)
+  ) canvas.releasePointerCapture(selectionFrameDrag.pointerId);
+  selectionFrameDrag = undefined;
+  transformSession = undefined;
+  transformPreview = undefined;
+  pasteMode = false;
+  updateSelectionActionButtons();
+  updateSelectionStatus(
+    selection === undefined
+      ? "scope=" + state.activeCelId + " · selection=none"
+      : "scope=" + selection.scope.celId + " · " +
+        selection.pixels.length + "px · " + selection.mask.kind +
+        " · preview=cancelled",
+  );
+  drawOverlay();
+  markCanonicalMetrics();
+}
+
 function beginSelectionDrag(
   event: PointerEvent,
   point: { readonly x: number; readonly y: number },
 ): boolean {
+  if (transformCommitInFlight) return false;
+  if (collaborationEditBlockReason() !== undefined) {
+    announceCollaborationEditBlock();
+    return false;
+  }
   const currentSelection = selection;
   if (currentSelection === undefined) return false;
   if (event.cancelable) event.preventDefault();
@@ -15968,6 +19488,7 @@ function beginSelectionDrag(
   transformOperation.value = "MOVE";
   transformDx.value = "0";
   transformDy.value = "0";
+  transformAngle.value = "0";
   const transform = { ...currentTransform(), operation: "MOVE" as const };
   if (duplicate) {
     clipboard = createClipboardPayload(
@@ -16062,6 +19583,7 @@ function updateSelectionDragPreview(point: { x: number; y: number }): void {
   transformOperation.value = "MOVE";
   transformDx.value = String(dx);
   transformDy.value = String(dy);
+  transformAngle.value = "0";
   const transform = {
     ...currentTransform(),
     operation: "MOVE" as const,
@@ -16690,6 +20212,19 @@ async function finishTilemapPointerGesture(
 canvas.addEventListener("pointerdown", (event) => {
   if (event.button !== 0 && event.button !== 1 && event.button !== 2) return;
   if (event.button === 2 && !activeLayerIsTilemap()) return;
+  if (transformCommitInFlight) {
+    if (event.cancelable) event.preventDefault();
+    return;
+  }
+  if (
+    (event.button === 0 || event.button === 2) &&
+    collaborationEditBlockReason() !== undefined &&
+    !collaborationCanvasToolIsNonMutating(currentBasicTool())
+  ) {
+    if (event.cancelable) event.preventDefault();
+    announceCollaborationEditBlock();
+    return;
+  }
   cancelViewportCenterReturn();
   if (event.pointerType === "touch") {
     canvasPointers.set(event.pointerId, {
@@ -16717,6 +20252,22 @@ canvas.addEventListener("pointerdown", (event) => {
     return;
   }
   const point = pointFromPointer(event);
+  if (
+    event.button === 0 && point !== undefined && selection !== undefined &&
+    selectionToolCanMove() && !event.shiftKey
+  ) {
+    const frameHandle = selectionFrameHandleAtClient(
+      event.clientX,
+      event.clientY,
+    );
+    if (
+      frameHandle !== undefined &&
+      beginSelectionFrameDrag(event, frameHandle)
+    ) return;
+    if (selectionFrameBorderAtClient(event.clientX, event.clientY)) {
+      if (beginSelectionDrag(event, point)) return;
+    }
+  }
   if (
     point !== undefined && (event.button === 0 || event.button === 2) &&
     currentBasicTool() !== "pan" &&
@@ -16807,8 +20358,16 @@ canvas.addEventListener("pointermove", (event) => {
   }
   const point = pointFromPointer(event);
   if (point !== undefined) hoverPoint = point;
+  syncSelectionFrameCursor(event.clientX, event.clientY);
   if (tilemapPointerGesture?.pointerId === event.pointerId) {
     if (point !== undefined) updateTilemapPointerGesture(point);
+    if (event.cancelable) event.preventDefault();
+    return;
+  }
+  if (selectionFrameDrag?.pointerId === event.pointerId) {
+    updateSelectionFrameDragPreview(
+      canvasPointForClient(event.clientX, event.clientY),
+    );
     if (event.cancelable) event.preventDefault();
     return;
   }
@@ -16863,6 +20422,34 @@ canvas.addEventListener("pointerup", (event) => {
     viewportPanPointerId = undefined;
     if (canvas.hasPointerCapture(event.pointerId)) {
       canvas.releasePointerCapture(event.pointerId);
+    }
+    return;
+  }
+  if (selectionFrameDrag?.pointerId === event.pointerId) {
+    updateSelectionFrameDragPreview(
+      canvasPointForClient(event.clientX, event.clientY),
+    );
+    const activeTransform = transformSession?.transform;
+    selectionFrameDrag = undefined;
+    if (canvas.hasPointerCapture(event.pointerId)) {
+      canvas.releasePointerCapture(event.pointerId);
+    }
+    if (
+      activeTransform !== undefined && transformHasEffect(activeTransform)
+    ) {
+      void commitActiveTransform();
+    } else {
+      transformSession = undefined;
+      transformPreview = undefined;
+      updateSelectionStatus(
+        selection === undefined
+          ? "scope=" + state.activeCelId + " · selection=none"
+          : "scope=" + selection.scope.celId + " · " +
+            selection.pixels.length + "px · " + selection.mask.kind +
+            " · preview=none",
+      );
+      syncWorkspaceEditCommandState();
+      drawOverlay();
     }
     return;
   }
@@ -16933,6 +20520,11 @@ canvas.addEventListener("pointercancel", (event) => {
     finishMirrorGuideDrag(event);
     return;
   }
+  if (selectionFrameDrag?.pointerId === event.pointerId) {
+    cancelSelectionFrameDrag();
+    setStatus("選択枠の変形をキャンセルしました。Canonical Rasterは未変更です。", "error");
+    return;
+  }
   if (selectionDrag?.pointerId === event.pointerId) {
     cancelSelectionDrag();
     setStatus("Selection move cancelled; Canonical Raster unchanged.", "error");
@@ -16970,6 +20562,14 @@ canvas.addEventListener("lostpointercapture", (event) => {
   }
   if (mirrorGuideDrag?.pointerId === event.pointerId) {
     finishMirrorGuideDrag(event);
+    return;
+  }
+  if (selectionFrameDrag?.pointerId === event.pointerId) {
+    cancelSelectionFrameDrag();
+    setStatus(
+      "選択枠の変形をキャンセルしました（ポインター捕捉解除）。",
+      "error",
+    );
     return;
   }
   if (selectionDrag?.pointerId === event.pointerId) {
@@ -17032,8 +20632,10 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 canvas.addEventListener("pointerleave", () => {
+  delete canvas.dataset.selectionFrameHandle;
   if (
     drawInteraction?.activePointerId === undefined &&
+    selectionFrameDrag === undefined &&
     selectionDrag === undefined &&
     pendingSelectionGesture === undefined && mirrorGuideDrag === undefined
   ) hoverPoint = undefined;
@@ -17302,11 +20904,13 @@ window.addEventListener("resize", () => applyViewportTransform(), {
 });
 
 miniPreviewCollapseButtonElement.addEventListener("click", () => {
+  if (!miniPreviewModeAvailable()) return;
   miniPreviewLayout = { ...miniPreviewLayout, collapsed: true };
   persistMiniPreviewLayout();
   syncMiniPreviewLayout();
 });
 miniPreviewRestoreButtonElement.addEventListener("click", () => {
+  if (!miniPreviewModeAvailable()) return;
   if (!miniPreviewEnabled) miniPreviewEnabled = true;
   else {
     miniPreviewLayout = {
@@ -17319,18 +20923,12 @@ miniPreviewRestoreButtonElement.addEventListener("click", () => {
   if (!miniPreviewLayout.collapsed) drawMiniPreviewProjection();
 });
 miniPreviewPlayButton.addEventListener("click", () => {
-  if (workspaceFrameElement?.dataset.creatorMode === "AUDIO") {
-    window.dispatchEvent(
-      new CustomEvent("draw2:mini-preview-playback-request", {
-        detail: { source: "MINI_PREVIEW" },
-      }),
-    );
-    return;
-  }
+  if (!miniPreviewModeAvailable()) return;
   if (playbackRunning) stopTimelinePlayback();
   else startTimelinePlayback();
 });
 miniPreviewReferenceButton.addEventListener("click", () => {
+  if (!miniPreviewModeAvailable()) return;
   miniPreviewReferenceInput.click();
 });
 miniPreviewReferenceInput.addEventListener("change", () => {
@@ -17339,6 +20937,7 @@ miniPreviewReferenceInput.addEventListener("change", () => {
   miniPreviewReferenceInput.value = "";
 });
 miniPreviewReferenceClearButton.addEventListener("click", () => {
+  if (!miniPreviewModeAvailable()) return;
   closeMiniPreviewReferenceSource();
   miniPreviewReferenceClearButton.disabled = true;
   miniPreviewReferenceButton.setAttribute("aria-pressed", "false");
@@ -17355,6 +20954,7 @@ for (const button of displayToggleButtons) {
       virtualCursorEnabled = !virtualCursorEnabled;
     }
     if (button.dataset.draw2DisplayToggle === "mini-preview") {
+      if (!miniPreviewModeAvailable()) return;
       miniPreviewEnabled = !miniPreviewEnabled;
     }
     syncDisplayToggles();
@@ -17427,12 +21027,10 @@ function syncToolButtons(): void {
 
 const TOOL_STUDIO_LABELS: Readonly<Record<string, string>> = {
   pen: "Pen",
-  "pixel-pen": "Pixel Perfect Pen",
   eraser: "Eraser",
+  text: "Text",
   move: "Move / Duplicate",
   "select-color": "Color Selection",
-  "select-polygon": "Polygon Select",
-  "tile-stamp": "Tile Placement",
 };
 
 function syncToolStudio(): void {
@@ -17451,12 +21049,10 @@ function syncToolStudio(): void {
     card.setAttribute("aria-pressed", String(active));
   }
   if (toolStudioStatusElement !== null) {
-    const message = current === "pixel-pen"
-      ? "Pixel Perfect Penは1pxのBresenham線を作ります。"
-      : current === "move"
+    const message = current === "move"
       ? "選択範囲をドラッグ。Altを押すと複製して移動します。"
-      : current === "select-polygon"
-      ? "頂点をドラッグして多角形を描き、離すと選択範囲になります。"
+      : current === "text"
+      ? "Canvasをドラッグしてテキスト範囲を作り、確定前にフォントと枠線を調整します。"
       : current === "select-color"
       ? `${
         colorSelectionModeLabel(
@@ -17465,8 +21061,6 @@ function syncToolStudio(): void {
       } color selection. Mode and tolerance are shown near the viewport.`
       : current === "fill"
       ? "クリック地点と同じパレット色でつながる範囲だけを塗りつぶします。"
-      : current === "tile-stamp"
-      ? "Tilesetのセルを選び、Canvasへ配置します。"
       : "ツールを選ぶと、ここに使い方と設定が表示されます。";
     toolStudioStatusElement.textContent = message;
   }
@@ -17550,7 +21144,14 @@ function showShortcutsDialog(): void {
 }
 
 function selectShortcutTool(tool: BasicTool): void {
-  toolSelect.value = tool;
+  const normalized = tool === "pixel-pen"
+    ? "pen"
+    : tool === "select-polygon"
+    ? "select-lasso"
+    : tool === "tile-stamp"
+    ? "pen"
+    : tool;
+  toolSelect.value = normalized;
   toolSelect.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
@@ -17563,12 +21164,17 @@ function clearCommittedSelection(
     canvas.hasPointerCapture(selectionDrag.pointerId)
   ) canvas.releasePointerCapture(selectionDrag.pointerId);
   if (
+    selectionFrameDrag !== undefined &&
+    canvas.hasPointerCapture(selectionFrameDrag.pointerId)
+  ) canvas.releasePointerCapture(selectionFrameDrag.pointerId);
+  if (
     pendingSelectionGesture !== undefined &&
     canvas.hasPointerCapture(pendingSelectionGesture.pointerId)
   ) canvas.releasePointerCapture(pendingSelectionGesture.pointerId);
   selection = undefined;
   selectionDraft = undefined;
   pendingSelectionGesture = undefined;
+  selectionFrameDrag = undefined;
   selectionDrag = undefined;
   transformSession = undefined;
   transformPreview = undefined;
@@ -17599,10 +21205,18 @@ function selectAllPixels(): void {
 }
 
 function nudgeCommittedSelection(dx: number, dy: number): boolean {
-  if (selection === undefined || transformSession !== undefined) return false;
+  if (collaborationEditBlockReason() !== undefined) {
+    announceCollaborationEditBlock();
+    return false;
+  }
+  if (
+    transformCommitInFlight || selection === undefined ||
+    transformSession !== undefined
+  ) return false;
   transformOperation.value = "MOVE";
   transformDx.value = String(dx);
   transformDy.value = String(dy);
+  transformAngle.value = "0";
   transformSession = createTransformSession(
     selection,
     { ...currentTransform(), operation: "MOVE", dx, dy },
@@ -17644,6 +21258,24 @@ function selectRelativeTimelineFrame(delta: number): void {
   void activateTimelineCell(frameId, timelineSession.activeLayerTrackId);
 }
 
+function selectRelativeTimelineLayer(delta: number): void {
+  const layerOrder = state.timeline.layerTrackOrder;
+  if (layerOrder.length === 0) return;
+  const currentIndex = Math.max(
+    0,
+    layerOrder.indexOf(timelineSession.activeLayerTrackId),
+  );
+  const nextIndex = Math.max(
+    0,
+    Math.min(layerOrder.length - 1, currentIndex + delta),
+  );
+  const layerTrackId = layerOrder[nextIndex];
+  if (layerTrackId === undefined) return;
+  timelineSession = { ...timelineSession, activeLayerTrackId: layerTrackId };
+  renderTimeline();
+  void activateTimelineCell(timelineSession.activeFrameId, layerTrackId);
+}
+
 async function clearActiveTimelineCel(): Promise<void> {
   const cel = state.cels.find((item) =>
     item.frameId === timelineSession.activeFrameId &&
@@ -17656,10 +21288,24 @@ async function clearActiveTimelineCel(): Promise<void> {
   await runTimelineCommand("timeline.clearCel", { celId: cel.celId });
 }
 
+function draw2ShortcutMutatesContent(command: string): boolean {
+  if (command === "selection-confirm") return transformSession !== undefined;
+  if (command === "delete-selection") return true;
+  return [
+    "undo",
+    "redo",
+    "cut",
+    "paste",
+    "clear-cel",
+    "add-frame",
+    "duplicate-frame",
+  ].includes(command);
+}
+
 function runDraw2Shortcut(command: string, event?: KeyboardEvent): void {
   const toolMap: Readonly<Record<string, BasicTool>> = {
     "tool-pen": "pen",
-    "tool-pixel-pen": "pixel-pen",
+    "tool-text": "text",
     "tool-eraser": "eraser",
     "tool-fill": "fill",
     "tool-eyedropper": "eyedropper",
@@ -17670,14 +21316,16 @@ function runDraw2Shortcut(command: string, event?: KeyboardEvent): void {
     "tool-select": "select-rect",
     "tool-select-color": "select-color",
     "tool-select-lasso": "select-lasso",
-    "tool-select-polygon": "select-polygon",
     "tool-move": "move",
-    "tool-tile-stamp": "tile-stamp",
     "tool-pan": "pan",
   };
   const mappedTool = toolMap[command];
   if (mappedTool !== undefined) {
     selectShortcutTool(mappedTool);
+    return;
+  }
+  if (collaborationEditBlockReason() !== undefined && draw2ShortcutMutatesContent(command)) {
+    announceCollaborationEditBlock();
     return;
   }
   switch (command) {
@@ -17697,13 +21345,15 @@ function runDraw2Shortcut(command: string, event?: KeyboardEvent): void {
       pasteControl.click();
       break;
     case "selection-confirm":
-      commitSelectionDraft();
+      if (transformSession !== undefined) void commitActiveTransform();
+      else commitSelectionDraft();
       break;
     case "selection-cancel":
       if (
         selectionDraft !== undefined || pendingSelectionGesture !== undefined
       ) cancelSelectionDraft();
       else if (transformSession !== undefined) cancelTransformControl.click();
+      else if (selectionFrameDrag !== undefined) cancelSelectionFrameDrag();
       else if (selectionDrag !== undefined) cancelSelectionDrag();
       break;
     case "selection-deselect":
@@ -17745,6 +21395,12 @@ function runDraw2Shortcut(command: string, event?: KeyboardEvent): void {
       break;
     case "next-frame":
       selectRelativeTimelineFrame(1);
+      break;
+    case "previous-layer":
+      selectRelativeTimelineLayer(-1);
+      break;
+    case "next-layer":
+      selectRelativeTimelineLayer(1);
       break;
     case "toggle-loop":
       cyclePlaybackLoopMode();
@@ -17820,7 +21476,7 @@ for (
 }
 
 const BRUSH_SIZE_MIN = 1;
-const BRUSH_SIZE_MAX = 32;
+const BRUSH_SIZE_MAX = MAX_BRUSH_SIZE;
 
 function brushPatternLabel(pattern: string): string {
   switch (pattern) {
@@ -17839,18 +21495,28 @@ function syncBrushOptionsButton(): void {
   const isCircle = brushShape.value === "circle";
   const shapeLabel = isCircle ? "Circle" : "Square";
   const patternLabel = brushPatternLabel(brushPattern.value);
+  const angle = Number(brushAngle.value);
+  const angleLabel = !isCircle && Number.isFinite(angle) && angle !== 0
+    ? ` · ${Math.round(angle)}°`
+    : "";
+  const algorithmLabel = brushAlgorithm.value === "pixel-perfect"
+    ? " · Pixel perfect"
+    : "";
   brushOptionsSummary.textContent = `${isCircle ? "○" : "□"} ${
     localizeDraw2Text(patternLabel)
-  }`;
+  }${angleLabel}${algorithmLabel}`;
   const accessibleLabel = `${localizeDraw2Text("Shape")}: ${
     localizeDraw2Text(shapeLabel)
-  } · ${localizeDraw2Text("Pattern")}: ${localizeDraw2Text(patternLabel)}`;
+  } · ${localizeDraw2Text("Pattern")}: ${localizeDraw2Text(patternLabel)}${
+    angleLabel
+  }${algorithmLabel}`;
   brushOptionsButton.setAttribute("aria-label", accessibleLabel);
   brushOptionsButton.title = accessibleLabel;
 }
 
 function syncQuickToolControls(): void {
   syncBrushOptionsButton();
+  brushAngle.disabled = brushShape.value === "circle";
   syncMirrorModeToggle();
   const tool = currentBasicTool();
   const colorSelectionMode = normalizeColorSelectionMode(
@@ -17878,10 +21544,9 @@ function syncQuickToolControls(): void {
     "[data-draw2-special-option]",
   );
   for (const option of specialOptions) {
-    const kind = option.dataset.draw2SpecialOption;
-    option.hidden = !(kind === "tile" && tool === "tile-stamp");
+    option.hidden = true;
   }
-  const showContextRail = showColorSelectionMode || tool === "tile-stamp";
+  const showContextRail = showColorSelectionMode;
   viewportContextRail.hidden = !showContextRail;
 }
 
@@ -17891,6 +21556,14 @@ function normalizeBrushSizeInput(): void {
     ? Math.max(BRUSH_SIZE_MIN, Math.min(BRUSH_SIZE_MAX, Math.round(requested)))
     : BRUSH_SIZE_MIN;
   brushSize.value = String(next);
+}
+
+function normalizeBrushAngleInput(): void {
+  const requested = Number(brushAngle.value);
+  const next = Number.isFinite(requested)
+    ? Math.max(-180, Math.min(180, Math.round(requested)))
+    : 0;
+  brushAngle.value = String(next);
 }
 
 function adjustBrushSizeFromWheel(deltaY: number): void {
@@ -17938,6 +21611,7 @@ function setBrushOptionsFlyoutOpen(open: boolean, restoreFocus = false): void {
 }
 
 function updateToolOptions(): void {
+  normalizeBrushAngleInput();
   const similarityPercent = Number(similarity.value);
   const selectionMode = normalizeColorSelectionMode(
     colorSelectionModeControl.value as ColorSelectionMode,
@@ -17945,6 +21619,8 @@ function updateToolOptions(): void {
   toolOptions = {
     brushSize: Number(brushSize.value),
     brushShape: brushShape.value as BrushShape,
+    brushAngle: Number(brushAngle.value),
+    brushAlgorithm: brushAlgorithm.value as BrushAlgorithm,
     pattern: brushPattern.value as BrushPattern,
     similarity: colorTolerancePercentToDistance(similarityPercent),
     selectionMode,
@@ -17983,8 +21659,10 @@ function applyBrushPreset(id: string): void {
   if (!id) return;
   const preset = brushPresets.load(id);
   if (preset === undefined) return;
-  brushSize.value = String(Math.min(32, preset.brushSize));
+  brushSize.value = String(Math.min(MAX_BRUSH_SIZE, preset.brushSize));
   brushShape.value = preset.brushShape;
+  brushAngle.value = String(preset.brushAngle);
+  brushAlgorithm.value = preset.brushAlgorithm;
   brushPattern.value = preset.pattern;
   const asset = state.assets[state.activeAssetId];
   if (asset !== undefined && preset.colorIndex < asset.palette.length) {
@@ -18009,6 +21687,8 @@ function saveBrushPreset(): void {
     name,
     brushSize: Number(brushSize.value),
     brushShape: brushShape.value as BrushShape,
+    brushAngle: Number(brushAngle.value),
+    brushAlgorithm: brushAlgorithm.value as BrushAlgorithm,
     pattern: brushPattern.value as BrushPattern,
     dither: "NONE",
     colorIndex: selectedColor,
@@ -18089,6 +21769,9 @@ colorSelectionModeControl.addEventListener("change", updateToolOptions);
 for (const control of [brushPattern, brushShape]) {
   control.addEventListener("change", updateToolOptions);
 }
+brushAngle.addEventListener("input", updateToolOptions);
+brushAngle.addEventListener("change", updateToolOptions);
+brushAlgorithm.addEventListener("change", updateToolOptions);
 brushSize.addEventListener("input", () => {
   normalizeBrushSizeInput();
   updateToolOptions();
@@ -18191,7 +21874,8 @@ document.addEventListener("keydown", (event) => {
   // is active. Let its workspace handler receive Cmd/Ctrl+Z/Y instead of the
   // Draw shortcut listener consuming the event with stopImmediatePropagation.
   const workspaceAudioOwnsHistory = creatorMode === "AUDIO" &&
-    (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z" &&
+    (event.metaKey || event.ctrlKey) &&
+    (event.key.toLowerCase() === "z" || event.key.toLowerCase() === "y") &&
     !event.altKey;
   if (workspaceAudioOwnsHistory) return;
   const inputEditing = event.target instanceof HTMLInputElement ||
@@ -18207,20 +21891,40 @@ document.addEventListener("keydown", (event) => {
   // Space playback is owned by the mode-aware Workspace module. Returning
   // here prevents Draw's legacy Space shortcut from leaking into GAME/AUDIO.
   if (workspacePlaybackSpace) return;
-  const interactiveTarget = event.target instanceof HTMLElement &&
-    event.target.closest(
-        "button, a, summary, [role='button'], [role='tab'], [role='menuitem']",
-      ) !== null;
+  const drawWorkspaceMode = creatorMode === undefined ||
+    creatorMode === "DRAW" || creatorMode === "ANIMATE";
+  // GAME/AUDIO/ASSET/EXPORT have their own keyboard owners. Draw's legacy
+  // command registry must never change a hidden Draw tool or timeline there.
+  if (!drawWorkspaceMode) return;
+  const interactiveTarget = isInteractiveKeyboardTarget(event.target);
   const selectionNudgeKeys = new Set([
     "ArrowLeft",
     "ArrowRight",
     "ArrowUp",
     "ArrowDown",
   ]);
+  const activeDrawGesture = drawInteraction !== undefined ||
+    selectionDraft !== undefined || pendingSelectionGesture !== undefined ||
+    selectionFrameDrag !== undefined || selectionDrag !== undefined ||
+    transformSession !== undefined;
   if (
-    !inputEditing && selection !== undefined && selectionToolCanMove() &&
+    !inputEditing && !interactiveTarget && !event.defaultPrevented &&
+    !event.metaKey && !event.ctrlKey && !event.altKey &&
+    activeDrawGesture && selectionNudgeKeys.has(event.key)
+  ) {
+    // Never change the active frame/layer while a stroke, selection drag, or
+    // transform preview owns the editor. The gesture can finish or cancel
+    // explicitly; raw arrows are consumed until then.
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    return;
+  }
+  if (
+    !inputEditing && !interactiveTarget && !event.defaultPrevented &&
+    selection !== undefined && selectionToolCanMove() &&
     drawInteraction === undefined && selectionDraft === undefined &&
-    pendingSelectionGesture === undefined && selectionDrag === undefined &&
+    pendingSelectionGesture === undefined && selectionFrameDrag === undefined &&
+    selectionDrag === undefined &&
     transformSession === undefined &&
     selectionNudgeKeys.has(event.key) && !event.metaKey && !event.ctrlKey &&
     !event.altKey
@@ -18327,6 +22031,82 @@ colorHex.addEventListener("keydown", (event) => {
 colorApply.addEventListener("click", () => {
   void commitColorEdit();
 });
+for (
+  const control of [
+    colorRampEndControl,
+    colorRampStepsControl,
+    colorRampSpaceControl,
+    colorRampHueControl,
+  ]
+) {
+  control.addEventListener("input", () => {
+    renderColorRampPreview(state.assets[state.activeAssetId]?.palette ?? []);
+  });
+  control.addEventListener("change", () => {
+    renderColorRampPreview(state.assets[state.activeAssetId]?.palette ?? []);
+  });
+}
+colorRampCreateControl.addEventListener("click", () => {
+  const asset = state.assets[state.activeAssetId];
+  if (asset === undefined) return;
+  const start = asset.palette[selectedColor] ?? asset.palette[0] ?? 0;
+  const endIndex = Number(colorRampEndControl.value);
+  const end = asset.palette[endIndex] ?? start;
+  const space = colorRampSpaceControl.value === "RGB" ? "RGB" : "HSV";
+  const hueMode = colorRampHueControl.value === "LONG" ? "LONG" : "SHORT";
+  const ramp = createArgbColorRamp(
+    start,
+    end,
+    Number(colorRampStepsControl.value),
+    space as ColorRampSpace,
+    hueMode as ColorRampHueMode,
+  );
+  const drafts = ramp.map((color) => {
+    const channels = decodeArgbColor(color);
+    return {
+      color: { r: channels.red, g: channels.green, b: channels.blue },
+      alpha: channels.alpha,
+    };
+  });
+  void appendPaletteGridFromDrafts(drafts);
+});
+outlineApplyControl.addEventListener("click", () => {
+  void applyOutline();
+});
+textInsertControl.addEventListener("click", () => {
+  void commitTextInsert();
+});
+textCancelControl.addEventListener("click", () => {
+  pendingTextBounds = undefined;
+  pendingTextDraft = undefined;
+  pendingTextTarget = undefined;
+  textInsertDialogControl.close();
+  drawOverlay();
+});
+textInsertDialogControl.addEventListener("cancel", () => {
+  pendingTextBounds = undefined;
+  pendingTextDraft = undefined;
+  pendingTextTarget = undefined;
+  drawOverlay();
+});
+textFitBoundsControl.addEventListener("click", fitTextBoundsToContent);
+textBoundsWidthControl.addEventListener("input", updateTextBoundsFromControls);
+textBoundsHeightControl.addEventListener("input", updateTextBoundsFromControls);
+for (const control of [
+  textValueControl,
+  textFontControl,
+  textSizeControl,
+  textWeightControl,
+  textAlignControl,
+  textFillColorControl,
+  textStrokeEnabledControl,
+  textStrokeColorControl,
+  textStrokeWidthControl,
+  textThresholdControl,
+]) {
+  control.addEventListener("input", refreshTextPreview);
+  control.addEventListener("change", refreshTextPreview);
+}
 window.addEventListener("pointermove", updatePaletteAddPointer, {
   passive: false,
 });
@@ -18440,7 +22220,7 @@ goldenProjectApplyButton.addEventListener("click", () => {
     try {
       const result = await workspace.applyGoldenProject?.("LIVE");
       if (result === undefined) {
-        throw new Error("Golden Project bridge is unavailable.");
+        throw new Error("Golden Project workspace adapter is unavailable.");
       }
       if (!result.ok || result.value === undefined) {
         throw new Error(
@@ -19069,7 +22849,7 @@ async function resolveInitialProjectSettings(): Promise<CanvasProjectSettings> {
   try {
     const params = new URLSearchParams(window.location.search);
     const requestedMode = params.get("mode");
-    const projectId = params.get("project")?.trim();
+    const projectId = (params.get("projectId") ?? params.get("project"))?.trim();
     if (projectId !== undefined && projectId.length > 0) {
       const intent = createProjectStartIntent({
         projectId,
@@ -19080,6 +22860,9 @@ async function resolveInitialProjectSettings(): Promise<CanvasProjectSettings> {
         ...(intent.projectId === undefined
           ? {}
           : { projectIdOverride: intent.projectId }),
+        ...(params.get("projectName")?.trim() === undefined
+          ? {}
+          : { projectNameOverride: params.get("projectName")!.trim() }),
         mode: intent.kind,
         initialCreatorMode: intent.mode,
       };
@@ -19119,7 +22902,7 @@ void resolveInitialProjectSettings().then(async (settings) => {
     initialProjectMode: settings.mode,
     initialCreatorMode: settings.initialCreatorMode,
   };
-}).then(({ module, initialProjectMode, initialCreatorMode }) => {
+}).then(async ({ module, initialProjectMode, initialCreatorMode }) => {
   const result = module.bootstrapDraw2Workspace(document, {
     projectId: state.projectId,
     ...(initialProjectMode === undefined ? {} : { initialProjectMode }),
@@ -19143,6 +22926,10 @@ void resolveInitialProjectSettings().then(async (settings) => {
     "#draw2WorkspaceFrame",
   );
   if (workspaceFrame !== null) translateDraw2Subtree(workspaceFrame);
+  // Consume Market delivery only after the Workspace chunk has mounted. The
+  // normal project/new-project URL paths therefore keep their existing order,
+  // while integrated PXD imports can restore Audio/Game safely.
+  await importMarketPurchaseFromUrl();
   // Workspace bootstrap moves the Timeline into its final slot and applies
   // the desktop profile after the first project render.
   // Reproject once after layout settles so frame 1 uses the same label/cell

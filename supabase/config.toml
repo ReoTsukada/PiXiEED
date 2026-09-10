@@ -1,6 +1,3 @@
-[functions.plaza-cleanup-expired]
-verify_jwt = false
-
 [functions.market-stripe-connect]
 verify_jwt = true
 
@@ -16,6 +13,15 @@ verify_jwt = false
 [functions.market-download]
 verify_jwt = true
 
+[functions.market-reconcile-my-sales]
+verify_jwt = true
+
+[functions.market-request-payout]
+verify_jwt = true
+
+[functions.market-verify-listing-package]
+verify_jwt = true
+
 [functions.market-public-preview]
 verify_jwt = false
 
@@ -26,9 +32,7 @@ verify_jwt = false
 enabled = true
 verify_jwt = true
 import_map = "./functions/market-reconcile-purchase/deno.json"
-# Uncomment to specify a custom file path to the entrypoint.
-# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
 entrypoint = "./functions/market-reconcile-purchase/index.ts"
-# Specifies static files to be bundled with the function. Supports glob patterns.
-# For example, if you want to serve static HTML pages in your function:
-# static_files = [ "./functions/market-reconcile-purchase/*.html" ]
+
+[functions.pixisync-create-slot-checkout]
+verify_jwt = true

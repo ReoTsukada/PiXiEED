@@ -224,6 +224,9 @@
 
 ## WP-093 Versioned Tool Bridge API — 2026-08-07
 
+> この節のBridgeはCore内部のunloadedなTool／Legacy adapter契約を指す。Aseprite／Unity等を
+> 接続する別製品のPiXiEED Bridgeや、Draw2のPiXYNC同期transportを指さない。
+
 54. Separate `bridgeApiVersion` from `toolVersion`. Tool registration requires a trusted server
     decision, Current Draw and Draw2 remain distinct Tool IDs, and unknown/duplicate/unavailable/
     incompatible Tool registrations fail closed.
@@ -239,7 +242,7 @@
 58. Require Event ID, Origin/Target Tool, Correlation/Causation chain, visited Tool IDs, and bounded
     depth. Duplicate, cyclic, unknown-causation, and loop events fail closed. Host adapters own
     transport, timeout measurement, Tool rendering, playback, and Blob conversion.
-59. Keep the current PiXiEEDraw/PXD/PiXiSYNC path behind an unloaded thin Legacy Bridge. Future
+59. Keep the current PiXiEEDraw/PXD/PiXiSYNC path behind an unloaded thin Legacy Bridge adapter. Future
     WP-100+ performance specifications are a mandatory pre-WP-100 gate: High Performance Contract,
     Technology Selection Gate, Device/Workload Matrix, and Bundle/Memory/Worker Budgets, with
     external audit required before WP-100 starts.

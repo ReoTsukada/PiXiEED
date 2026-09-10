@@ -13,9 +13,50 @@ import type {
 } from "../../src/audio/audio-200/contracts.ts";
 import { LongAudioClipRuntime } from "../../src/audio/audio-240/long-audio-runtime.ts";
 import { MixerRuntimeAdapter } from "../../src/audio/audio-240/mixer-runtime.ts";
+import { createAudioPcmChunkReader } from "../../src/audio/audio-200/streaming.ts";
+import type { AudioAssetByteStore } from "../../src/audio/audio-200/audio-asset-store.ts";
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
+}
+
+class CountingDelayedStore implements AudioAssetByteStore {
+  rangeReads = 0;
+  delayed = false;
+  private readonly pending: (() => void)[] = [];
+
+  constructor(private readonly delegate: AudioAssetByteStore) {}
+
+  put(...args: Parameters<AudioAssetByteStore["put"]>): ReturnType<AudioAssetByteStore["put"]> {
+    return this.delegate.put(...args);
+  }
+  get(...args: Parameters<AudioAssetByteStore["get"]>): ReturnType<AudioAssetByteStore["get"]> {
+    return this.delegate.get(...args);
+  }
+  async getRange(...args: Parameters<AudioAssetByteStore["getRange"]>): Promise<Awaited<ReturnType<AudioAssetByteStore["getRange"]>>> {
+    this.rangeReads += 1;
+    if (!this.delayed) return this.delegate.getRange(...args);
+    const result = await new Promise<Awaited<ReturnType<AudioAssetByteStore["getRange"]>>>((resolve) => {
+      this.pending.push(() => {
+        void this.delegate.getRange(...args).then(resolve);
+      });
+    });
+    return result;
+  }
+  has(...args: Parameters<AudioAssetByteStore["has"]>): ReturnType<AudioAssetByteStore["has"]> {
+    return this.delegate.has(...args);
+  }
+  remove(...args: Parameters<AudioAssetByteStore["remove"]>): ReturnType<AudioAssetByteStore["remove"]> {
+    return this.delegate.remove(...args);
+  }
+
+  releaseOne(): void {
+    this.pending.shift()?.();
+  }
+
+  releaseAll(): void {
+    while (this.pending.length > 0) this.releaseOne();
+  }
 }
 
 class FakeParam {
@@ -110,10 +151,24 @@ class FakeAudioContext {
 
 class FakeWindow {
   private nextHandle = 1;
+  readonly timeouts = new Map<number, () => void>();
   setInterval(_callback: () => void, _delay: number): number {
     return this.nextHandle++;
   }
   clearInterval(_handle: number): void {}
+  setTimeout(callback: () => void, _delay: number): number {
+    const handle = this.nextHandle++;
+    this.timeouts.set(handle, callback);
+    return handle;
+  }
+  clearTimeout(handle: number): void {
+    this.timeouts.delete(handle);
+  }
+  fireTimeouts(): void {
+    const callbacks = [...this.timeouts.values()];
+    this.timeouts.clear();
+    for (const callback of callbacks) callback();
+  }
 }
 
 function wavFixture(): Uint8Array {
@@ -199,11 +254,12 @@ Deno.test("Phase 2-B2 runtime schedules one bounded chunk and releases it on res
     loop: false,
     playbackRate: 0.5,
   };
+  const fakeWindow = new FakeWindow();
   const created = await LongAudioClipRuntime.create({
     store,
     context: context as unknown as AudioContext,
     mixer,
-    windowRef: new FakeWindow() as unknown as Window,
+    windowRef: fakeWindow as unknown as Window,
     clip,
     revision: source.revision,
     tempoMilliBpm: 120_000,
@@ -241,6 +297,13 @@ Deno.test("Phase 2-B2 runtime schedules one bounded chunk and releases it on res
     "Seek did not re-anchor the Clip transport position.",
   );
   assert((await runtime.play(0, false)).ok, "Runtime could not restart.");
+  assert(
+    (await runtime.playForDuration(0, 0.25, false)).ok,
+    "Bounded range playback did not start.",
+  );
+  assert(fakeWindow.timeouts.size === 1, "Range stop timer was not scheduled.");
+  fakeWindow.fireTimeouts();
+  assert(!runtime.isPlaying, "Bounded range playback did not stop at its end.");
   runtime.stop();
   assert(
     runtime.snapshot().activeSourceCount === 0,
@@ -310,4 +373,153 @@ Deno.test("Phase 2-B2 separates Clip source looping from transport looping", asy
   );
   runtime.value.dispose();
   mixer.dispose();
+});
+
+Deno.test("AUDIO-240 accepts long seek with bounded chunk cache and stop/restart release", async () => {
+  const source = await revisionFixture();
+  const store = createMemoryAudioAssetByteStore();
+  assert((await store.put(source.revision, source.bytes)).ok, "Source put failed.");
+
+  const readerResult = await createAudioPcmChunkReader(store, source.revision, {
+      chunkSeconds: 0.005,
+      readAheadChunks: 0,
+      maxCachedChunks: 3,
+      shortAudioMaxBytes: 1,
+      shortAudioMaxSeconds: 0,
+    });
+  assert(readerResult.ok, JSON.stringify(readerResult.diagnostics));
+  const reader = readerResult.value;
+  for (let index = 0; index < 80; index += 1) {
+    assert((await reader.readChunk(index)).ok, `chunk ${index} was not readable`);
+    assert(
+      reader.snapshot().cachedChunkCount <= 3,
+      "Sequential long-form reads exceeded the cache upper bound.",
+    );
+  }
+  assert(
+    reader.snapshot().cachedSampleCount <= reader.plan.chunkFrames * 3,
+    "Cached PCM expanded beyond the configured chunk window.",
+  );
+  reader.clear();
+  assert(reader.snapshot().cachedChunkCount === 0, "Reader.clear() retained chunks.");
+
+  const context = new FakeAudioContext();
+  const mixer = new MixerRuntimeAdapter(context as unknown as AudioContext);
+  mixer.applyMixer({
+    mixerId: "mixer:long-acceptance" as never,
+    masterGainMilliDb: 0,
+    channels: [{
+      channelId: "channel:long-acceptance" as never,
+      trackId: asAudioTrackId("track:long-acceptance"),
+      gainMilliDb: 0,
+      panMilli: 0,
+      muted: false,
+      solo: false,
+    }],
+  });
+  const clip: AudioClip = {
+    clipId: asAudioClipId("clip:long-acceptance"),
+    trackId: asAudioTrackId("track:long-acceptance"),
+    revisionId: source.revision.revisionId,
+    timeline: { startTick: 0 as never, durationTick: 48_000 as never },
+    sourceOffsetUs: 0,
+    gainMilliDb: 0,
+    fadeInTick: 0 as never,
+    fadeOutTick: 0 as never,
+    loop: true,
+    playbackRate: 1,
+  };
+  const runtimeResult = await LongAudioClipRuntime.create({
+    store,
+    context: context as unknown as AudioContext,
+    mixer,
+    windowRef: new FakeWindow() as unknown as Window,
+    clip,
+    revision: source.revision,
+    tempoMilliBpm: 120_000,
+    ticksPerQuarter: 480,
+    chunkSeconds: 0.005,
+    readAheadChunks: 1,
+    maxCachedChunks: 3,
+    shortAudioMaxBytes: 1,
+    shortAudioMaxSeconds: 0,
+  });
+  assert(runtimeResult.ok, JSON.stringify(runtimeResult.diagnostics));
+  const runtime = runtimeResult.value;
+  assert((await runtime.play(0, true)).ok, "Long runtime did not start.");
+  await Promise.resolve();
+  assert((await runtime.seek(9.5)).ok, "Long seek was rejected.");
+  assert(runtime.isPlaying, "Long seek unexpectedly stopped transport.");
+  assert(runtime.snapshot().reader.cachedChunkCount <= 3, "Seek exceeded cache bound.");
+  runtime.stop();
+  assert(runtime.snapshot().reader.cachedChunkCount === 0, "Stop retained PCM chunks.");
+  assert(runtime.snapshot().activeSourceCount === 0, "Stop retained source references.");
+  assert((await runtime.play(0, true)).ok, "Runtime could not restart after stop.");
+  runtime.stop();
+  assert(runtime.snapshot().reader.cachedChunkCount === 0, "Restart/stop retained PCM chunks.");
+  assert(runtime.snapshot().activeSourceCount === 0, "Restart/stop retained source references.");
+  runtime.dispose();
+  mixer.dispose();
+});
+
+Deno.test("AUDIO-240 invalidates an in-flight chunk generation after a seek-like clear", async () => {
+  const source = await revisionFixture();
+  const base = createMemoryAudioAssetByteStore();
+  assert((await base.put(source.revision, source.bytes)).ok, "Source put failed.");
+  const store = new CountingDelayedStore(base);
+  const created = await createAudioPcmChunkReader(store, source.revision, {
+    chunkSeconds: 0.005,
+    readAheadChunks: 0,
+    maxCachedChunks: 2,
+    shortAudioMaxBytes: 1,
+    shortAudioMaxSeconds: 0,
+  });
+  assert(created.ok, JSON.stringify(created.diagnostics));
+  store.delayed = true;
+  const staleRead = created.value.readChunk(0);
+  await Promise.resolve();
+  assert(store.rangeReads > 0, "The delayed chunk read did not start.");
+  created.value.clear();
+  store.releaseAll();
+  await staleRead;
+  assert(
+    created.value.snapshot().cachedChunkCount === 0,
+    "A read completed before clear() was incorrectly cached in the new generation.",
+  );
+  assert(
+    created.value.snapshot().inFlightChunkIndices.length === 0,
+    "The invalidated read remained in-flight after completion.",
+  );
+});
+
+Deno.test("AUDIO-240 bounds long repeated chunk access to one data range read per chunk", async () => {
+  const source = await revisionFixture();
+  const base = createMemoryAudioAssetByteStore();
+  assert((await base.put(source.revision, source.bytes)).ok, "Source put failed.");
+  const store = new CountingDelayedStore(base);
+  const created = await createAudioPcmChunkReader(store, source.revision, {
+    chunkSeconds: 0.005,
+    readAheadChunks: 0,
+    maxCachedChunks: 4,
+    shortAudioMaxBytes: 1,
+    shortAudioMaxSeconds: 0,
+  });
+  assert(created.ok, JSON.stringify(created.diagnostics));
+  const headerReads = store.rangeReads;
+  const chunkCount = Math.ceil(
+    source.revision.source.metadata.sampleFrames / created.value.plan.chunkFrames,
+  );
+  for (let pass = 0; pass < 20; pass += 1) {
+    for (let index = 0; index < chunkCount; index += 1) {
+      assert((await created.value.readChunk(index)).ok, `chunk ${index} failed`);
+    }
+  }
+  assert(
+    store.rangeReads - headerReads <= chunkCount * 20,
+    "Long repeated access exceeded the one-range-per-request upper bound.",
+  );
+  assert(
+    created.value.snapshot().cachedChunkCount <= 4,
+    "Long repeated access exceeded the configured cache bound.",
+  );
 });

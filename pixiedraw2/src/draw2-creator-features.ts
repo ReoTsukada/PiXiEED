@@ -1,9 +1,11 @@
 import type {
+  BrushAlgorithm,
   BrushPattern,
   BrushShape,
   PixelReader,
   RasterBounds,
 } from "./draw2-basic-tools.ts";
+import { MAX_BRUSH_SIZE } from "./draw2-brush.ts";
 import type { PixelPoint } from "./draw2-core.ts";
 
 /**
@@ -22,6 +24,8 @@ export interface BrushPreset {
   readonly name: string;
   readonly brushSize: number;
   readonly brushShape: BrushShape;
+  readonly brushAngle: number;
+  readonly brushAlgorithm: BrushAlgorithm;
   readonly pattern: BrushPattern;
   readonly dither: "NONE" | "BAYER_2X2" | "BAYER_4X4";
   readonly colorIndex: number;
@@ -29,7 +33,11 @@ export interface BrushPreset {
   readonly schemaVersion: typeof CREATOR_FEATURE_SCHEMA_VERSION;
 }
 
-export interface BrushPresetInput extends Omit<BrushPreset, "schemaVersion"> {}
+export interface BrushPresetInput
+  extends Omit<BrushPreset, "schemaVersion" | "brushAngle" | "brushAlgorithm"> {
+  readonly brushAngle?: number;
+  readonly brushAlgorithm?: BrushAlgorithm;
+}
 
 function boundedInteger(
   value: number,
@@ -64,8 +72,12 @@ export function normalizeBrushPreset(input: BrushPresetInput): BrushPreset {
   return {
     id: stableId(input.id, "Brush preset ID"),
     name: input.name.trim().slice(0, 64) || "Preset",
-    brushSize: boundedInteger(input.brushSize, 1, 64, 1),
+    brushSize: boundedInteger(input.brushSize, 1, MAX_BRUSH_SIZE, 1),
     brushShape: input.brushShape === "circle" ? "circle" : "square",
+    brushAngle: boundedInteger(input.brushAngle ?? 0, -180, 180, 0),
+    brushAlgorithm: input.brushAlgorithm === "pixel-perfect"
+      ? "pixel-perfect"
+      : "regular",
     pattern: input.pattern === "checker" || input.pattern === "dots" ||
         input.pattern === "bayer-2x2"
       ? input.pattern

@@ -50,6 +50,20 @@ Deno.test("GAME350-TILEMAP-002 paints cells without mutating the previous docume
   assert(paintGameTilemapCell(initial, 1, 2, "ERASE") === initial, "empty erase must be a no-op");
 });
 
+Deno.test("GAME350-TILEMAP-002A keeps huge worlds sparse", () => {
+  const document = createGameTilemapDocument({
+    mapId: "map:huge",
+    width: 1_000_000,
+    height: 1_000_000,
+    cells: [
+      { x: 999_999, y: 999_999, collision: "SOLID" },
+    ],
+  });
+  assert(document.width === 1_000_000 && document.height === 1_000_000, "large dimensions must be accepted");
+  assert(document.cells.length === 1 && gameTilemapCellAt(document, 999_999, 999_999)?.collision === "SOLID", "only authored cells should be stored");
+  assert(validateGameTilemapDocument(document).valid, "sparse huge maps must remain canonical");
+});
+
 Deno.test("GAME350-TILEMAP-003 rejects invalid or conflicting map cells", () => {
   let duplicateRejected = false;
   try {

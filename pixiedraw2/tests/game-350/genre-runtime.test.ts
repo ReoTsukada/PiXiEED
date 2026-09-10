@@ -512,7 +512,11 @@ Deno.test("GAME350-GENRE-007 BREAK_BLOCK/PLACE_BLOCK dig and rebuild the tilemap
     placedCells.length === 1,
     "placing a block should add exactly one dirt cell back to the map",
   );
-  const [placedKey] = placedCells[0];
+  const placedEntry = placedCells[0];
+  if (placedEntry === undefined) {
+    throw new Error("the placed block entry should exist after placement");
+  }
+  const [placedKey] = placedEntry;
   const [placedX, placedY] = placedKey.split(",").map(Number);
   assert(
     state.world.solidCells.some((cell) =>
@@ -521,4 +525,3 @@ Deno.test("GAME350-GENRE-007 BREAK_BLOCK/PLACE_BLOCK dig and rebuild the tilemap
     "a newly placed block should also become a collision cell",
   );
 });
-

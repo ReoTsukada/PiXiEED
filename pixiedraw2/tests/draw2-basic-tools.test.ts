@@ -84,6 +84,47 @@ Deno.test("Draw2 even brush stamps use a stable half-pixel centre", () => {
   }
 });
 
+Deno.test("Draw2 large brushes share rotation and pixel-perfect line rules", () => {
+  const bounds = { width: 64, height: 64 };
+  const regular = createPathWriteSet(
+    "pen",
+    [{ x: 8, y: 8 }, { x: 11, y: 10 }],
+    2,
+    { brushSize: 1, brushShape: "square", pattern: "solid", brushAlgorithm: "regular" },
+    bounds,
+  );
+  const pixelPerfect = createPathWriteSet(
+    "pen",
+    [{ x: 8, y: 8 }, { x: 11, y: 10 }],
+    2,
+    { brushSize: 1, brushShape: "square", pattern: "solid", brushAlgorithm: "pixel-perfect" },
+    bounds,
+  );
+  assert(
+    JSON.stringify(regular.map(({ x, y }) => ({ x, y }))) !==
+      JSON.stringify(pixelPerfect.map(({ x, y }) => ({ x, y }))),
+    "line algorithm selection did not affect the raster path",
+  );
+
+  const axisAligned = stampBrush(
+    [{ x: 32, y: 32 }],
+    { brushSize: 8, brushShape: "square", pattern: "solid", brushAngle: 0 },
+    bounds,
+  );
+  const rotated = stampBrush(
+    [{ x: 32, y: 32 }],
+    { brushSize: 8, brushShape: "square", pattern: "solid", brushAngle: 45 },
+    bounds,
+  );
+  assert(axisAligned.length === 64, "large square brush lost its 8x8 footprint");
+  assert(
+    JSON.stringify(axisAligned) !== JSON.stringify(rotated) &&
+      rotated.every((point) => point.x >= 0 && point.x < bounds.width && point.y >= 0 && point.y < bounds.height),
+    "rotated large brush escaped the raster or kept the axis-aligned footprint",
+  );
+  assert(normalizeToolOptions({ brushSize: 64 }).brushSize === 64, "64px brush size was not accepted");
+});
+
 Deno.test("Draw2 cursor footprint follows brush size and shape", () => {
   const bounds = { width: 32, height: 32 };
   const square = nearestBrushCursor({ x: 16, y: 16 }, { brushSize: 4, brushShape: "square" }, bounds);

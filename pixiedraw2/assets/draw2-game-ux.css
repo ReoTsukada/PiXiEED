@@ -9,6 +9,48 @@
  * .is-preflight, and .is-selected may be added to the existing surfaces.
  */
 
+#draw2WorkspaceFrame[data-creator-mode="DRAW"] .draw2-game-capture-bar {
+  position: absolute;
+  z-index: 8;
+  top: 12px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(92%, 520px);
+  padding: 6px 8px;
+  border: 1px solid var(--draw2-mode-accent, var(--draw2-accent));
+  border-radius: var(--studio-card-radius, var(--draw2-radius-md));
+  background: color-mix(in srgb, var(--draw2-surface-raised) 94%, transparent);
+  box-shadow: 0 8px 22px rgb(0 0 0 / 24%);
+  transform: translateX(-50%);
+}
+
+#draw2WorkspaceFrame[data-creator-mode="DRAW"] .draw2-game-capture-bar[hidden] {
+  display: none;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="DRAW"] .draw2-game-capture-bar-label {
+  min-width: 0;
+  color: var(--draw2-text-strong, var(--draw2-text));
+  font-size: 0.68rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="DRAW"] .draw2-game-capture-bar .draw2-button {
+  flex: 0 0 auto;
+  min-height: 28px;
+  padding: 4px 8px;
+  font-size: 0.62rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #draw2WorkspaceFrame[data-creator-mode="DRAW"] .draw2-game-capture-bar {
+    transition: none;
+  }
+}
+
 /* Shared panels keep their shell-assigned dimensions; only their own
    content surfaces receive a bounded scroll area here. */
 #draw2WorkspaceFrame[data-creator-mode="GAME"]
@@ -19,6 +61,1154 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
+}
+
+/* -------------------------------------------------------------------------
+   Final Playground geometry guard
+
+   The shared scene viewport has a later, mode-agnostic grid declaration. Keep
+   the Playground's compact mode chooser above the stage without changing the
+   Draw/Audio surfaces or their rail sizing.
+   ------------------------------------------------------------------------- */
+#draw2WorkspaceFrame[data-creator-mode="GAME"] #draw2GameSceneViewport {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-template-rows: 48px minmax(0, 1fr) 20px !important;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  #draw2GamePlaygroundCenterBar {
+  display: none !important;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-scene-viewport-stage {
+  grid-column-start: 1 !important;
+  grid-column-end: auto !important;
+  grid-row-start: 2 !important;
+  grid-row-end: auto !important;
+  min-height: 0;
+  position: relative;
+  z-index: 1;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-scene-viewport-footer {
+  grid-column-start: 1 !important;
+  grid-column-end: auto !important;
+  grid-row-start: 3 !important;
+  grid-row-end: auto !important;
+}
+
+/* The desktop shell has an older GAME-specific !important rule. Match its
+   specificity so the Playground keeps a dedicated mode row and stage row. */
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+  #draw2GameSceneViewport:not([hidden]) {
+  grid-template-rows: 48px minmax(0, 1fr) 20px !important;
+  gap: 8px !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+  .draw2-game-scene-viewport-stage {
+  grid-row-start: 2 !important;
+  grid-row-end: auto !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+  .draw2-game-scene-viewport-footer {
+  grid-row-start: 3 !important;
+  grid-row-end: auto !important;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  :is(.draw2-igame-scene-name, .draw2-game-scene-legend) {
+  display: none !important;
+}
+
+/* The old selection toolbar and prose footer belong to the retired authoring
+   surface. The Playground communicates state through cards and controls. */
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-igame-scene-toolbar,
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-scene-viewport-footer > span {
+  display: none !important;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-scene-playground-world {
+  image-rendering: pixelated;
+  pointer-events: none;
+  opacity: 0.94;
+}
+
+/* The hierarchy menu is a popover, not part of the left-rail scroll flow.
+   Keep the tree itself scrollable while allowing all object templates to be
+   reached above the source cards below it. */
+@media (min-width: 1024px) {
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+    #draw2GameLeftDockPanels {
+    overflow: visible !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+    #draw2GameLeftDockHierarchyPanel:not([hidden]) {
+    overflow: visible !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+    #draw2GameHierarchyList {
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+    #draw2GameHierarchyAddMenu {
+    z-index: 100 !important;
+  }
+}
+
+/* -------------------------------------------------------------------------
+   iGAME Playground
+
+   The legacy Game editor remains in the DOM for compatibility and recovery,
+   but the desktop GAME surface exposes only the small, source-first
+   playground. This keeps the common shell/rail geometry and motion tokens
+   intact while reducing the number of decisions a new author sees.
+   ------------------------------------------------------------------------- */
+
+/* The Playground is a GAME-only projection.  It must not leak into Draw or
+   Audio when the shared panel registry reuses the same DOM nodes. */
+#draw2GamePlaygroundCenterBar,
+#draw2GamePlaygroundInspector,
+#draw2GamePlaygroundBottom {
+  display: none;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  #draw2GameLeftDockPanels {
+  display: flex !important;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] #draw2GameLeftDockTabs {
+  display: none !important;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  #draw2ModeTimelineDeck
+  > :is(.draw2-mode-timeline-deck-heading, #draw2ModeTimelineDeckTabs) {
+  display: none !important;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  #draw2WorkspaceTabs
+  > :is(
+    [data-workspace-panel="game-scene"],
+    [data-workspace-panel="game-assets"],
+    [data-workspace-panel="game-build"]
+  ) {
+  display: none !important;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  #draw2GamePlaygroundSourceRail {
+  display: grid !important;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  #draw2GamePlaygroundSourceRail {
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  :is(.draw2-game-ui-library, .draw2-game-element-library) {
+  min-width: 0;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  :is(.draw2-game-ui-library, .draw2-game-element-library) > header {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  :is(.draw2-game-ui-library, .draw2-game-element-library) > header strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  :is(.draw2-game-ui-library, .draw2-game-element-library) > header small {
+  display: none;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  :is(.draw2-game-ui-library-grid, .draw2-game-element-grid) {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 64px), 1fr));
+  gap: 5px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  :is(.draw2-game-ui-library-grid, .draw2-game-element-grid) > button {
+  display: grid;
+  grid-template-rows: 1.1em minmax(0, auto);
+  min-width: 0;
+  min-height: 44px;
+  place-items: center;
+  gap: 3px;
+  overflow: hidden;
+  padding: 5px 3px;
+  border: 1px solid var(--draw2-border-subtle, var(--draw2-border));
+  border-radius: var(--studio-control-radius, var(--draw2-radius-sm));
+  background: var(--draw2-surface-input, var(--draw2-surface-raised));
+  color: var(--draw2-text-strong, var(--draw2-text));
+  white-space: nowrap;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  :is(.draw2-game-ui-library-grid, .draw2-game-element-grid) > button > span {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] #draw2GameSceneViewport {
+  grid-template-rows: 48px auto minmax(0, 1fr) 20px;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  #draw2GamePlaygroundCenterBar {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-scene-viewport-stage {
+  grid-column: 1;
+  grid-row: 3;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-scene-viewport-footer {
+  grid-column: 1;
+  grid-row: 4;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-playground-rail-heading,
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-playground-bottom-heading,
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-playground-inspector-heading,
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-playground-card-heading,
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-playground-source-card-heading {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--draw2-space-2, 8px);
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-playground-rail-heading,
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-playground-inspector-heading,
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-playground-bottom-heading {
+  justify-content: space-between;
+  padding: 2px 2px 6px;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  :is(.draw2-game-playground-rail-heading, .draw2-game-playground-inspector-heading, .draw2-game-playground-bottom-heading)
+  > div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  :is(.draw2-game-playground-rail-heading, .draw2-game-playground-inspector-heading, .draw2-game-playground-bottom-heading)
+  strong {
+  color: var(--draw2-text-strong, var(--draw2-text));
+  font-size: 0.78rem;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-step,
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-card-number {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid color-mix(in srgb, var(--draw2-mode-accent, var(--draw2-accent)) 60%, var(--draw2-border));
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--draw2-mode-accent, var(--draw2-accent)) 12%, var(--draw2-surface-input, var(--draw2-surface-raised)));
+  color: var(--draw2-mode-accent, var(--draw2-accent));
+  font-size: 0.66rem;
+  font-weight: 800;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-source-card,
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-card {
+  display: grid;
+  min-width: 0;
+  gap: var(--draw2-space-2, 8px);
+  padding: 10px;
+  border: 1px solid var(--draw2-border-subtle, var(--draw2-border));
+  border-radius: var(--studio-control-radius, var(--draw2-radius-sm));
+  background: var(--draw2-surface, var(--draw2-bg));
+  box-shadow: 0 8px 20px rgb(0 0 0 / 12%);
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-source-card {
+  gap: 7px;
+  padding: 9px;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-playground-source-card[data-source-kind="DRAW"] {
+  border-left: 3px solid #55b9ff;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-playground-source-card[data-source-kind="AUDIO"] {
+  border-left: 3px solid #c98dff;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-source-card-heading > div,
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-card-heading > div {
+  display: grid;
+  min-width: 0;
+  flex: 1 1 auto;
+  gap: 2px;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  :is(.draw2-game-playground-source-card-heading, .draw2-game-playground-card-heading)
+  strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--draw2-text-strong, var(--draw2-text));
+  font-size: 0.74rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  :is(.draw2-game-playground-source-card-heading, .draw2-game-playground-card-heading)
+  small {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--draw2-text-muted, var(--draw2-muted));
+  font-size: 0.62rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-source-icon {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: var(--draw2-surface-input, var(--draw2-surface-raised));
+  color: var(--draw2-mode-accent, var(--draw2-accent));
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-source-status,
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-card-status,
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-center-status {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--draw2-text-muted, var(--draw2-muted));
+  font-size: 0.66rem;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: normal;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-source-actions,
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-card-actions,
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-player-controls,
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-audio-controls {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-source-actions,
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-card-actions {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-player-controls,
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-audio-controls {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-source-actions .draw2-button,
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-card-actions .draw2-button {
+  min-width: 0;
+  min-height: 30px;
+  padding-inline: 8px;
+  overflow: hidden;
+  font-size: 0.64rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-rail-hint {
+  margin: 0;
+  padding: 3px 2px;
+  color: var(--draw2-text-muted, var(--draw2-muted));
+  font-size: 0.62rem;
+  line-height: 1.4;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  #draw2GamePlaygroundCenterBar {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+  padding: 8px 10px;
+  border-block: 1px solid var(--draw2-border-subtle, var(--draw2-border));
+  background: color-mix(in srgb, var(--draw2-surface, var(--draw2-bg)) 88%, var(--draw2-mode-accent, var(--draw2-accent)) 12%);
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-center-title {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-center-title strong {
+  overflow: hidden;
+  color: var(--draw2-text-strong, var(--draw2-text));
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-mode-switch {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  min-width: 0;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-mode-switch button {
+  min-width: 0;
+  min-height: 30px;
+  padding: 5px 7px;
+  border: 1px solid var(--draw2-border-subtle, var(--draw2-border));
+  border-radius: var(--studio-control-radius, var(--draw2-radius-sm));
+  background: var(--draw2-surface-input, var(--draw2-surface-raised));
+  color: var(--draw2-text-muted, var(--draw2-muted));
+  font-size: 0.64rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-playground-mode-switch button:is(.is-active, [aria-pressed="true"]),
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-mode-switch button:focus-visible {
+  border-color: var(--draw2-mode-accent, var(--draw2-accent));
+  background: color-mix(in srgb, var(--draw2-mode-accent, var(--draw2-accent)) 18%, var(--draw2-surface-input, var(--draw2-surface-raised)));
+  color: var(--draw2-text-strong, var(--draw2-text));
+  outline: 2px solid var(--draw2-focus-ring, var(--draw2-focus));
+  outline-offset: 1px;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  #draw2WorkspacePanelGameInspector .draw2-panel-shell {
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  #draw2WorkspacePanelGameInspector .draw2-panel-shell
+  > :not(#draw2GamePlaygroundInspector) {
+  display: none !important;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] #draw2GamePlaygroundInspector {
+  display: grid;
+  min-width: 0;
+  gap: 10px;
+  padding: 10px;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-playground-inspector-heading {
+  min-height: 28px;
+  align-items: center;
+  padding-block: 2px 4px;
+  border-bottom: 1px solid var(--draw2-border-subtle, var(--draw2-border));
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-playground-inspector-heading
+  :is(.draw2-eyebrow, .draw2-panel-badge) {
+  display: none;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  #draw2GamePlaygroundInspector
+  > :is([data-playground-card], .draw2-game-playground-inspector-card) {
+  min-width: 0;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  #draw2GamePlaygroundInspector
+  > :is([data-playground-card], .draw2-game-playground-inspector-card)
+  :is(button, [role="button"], select, textarea, input:not([type="checkbox"]):not([type="radio"])) {
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 28px;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-card-state {
+  flex: 0 0 auto;
+  padding: 3px 6px;
+  border: 1px solid var(--draw2-border-subtle, var(--draw2-border));
+  border-radius: 999px;
+  background: var(--draw2-surface-input, var(--draw2-surface-raised));
+  color: var(--draw2-text-muted, var(--draw2-muted));
+  font-size: 0.58rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-playground-card[data-playground-card="player"] {
+  border-left: 3px solid #63c3ff;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-playground-card[data-playground-card="world"] {
+  border-left: 3px solid #7cd992;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-playground-card[data-playground-card="audio"] {
+  border-left: 3px solid #c98dff;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-playground-card[data-playground-card="controls"] {
+  border-left: 3px solid #ffbd56;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-world-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) minmax(0, 1.15fr);
+  min-width: 0;
+  gap: 6px;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-world-options label {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+  color: var(--draw2-text-muted, var(--draw2-muted));
+  font-size: 0.58rem;
+  font-weight: 700;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-world-options :is(input, select) {
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
+  min-height: 28px;
+  padding: 3px 6px;
+  font-size: 0.62rem;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-flags {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 0;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-flags label {
+  display: inline-flex;
+  min-height: 25px;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  border: 1px solid var(--draw2-border-subtle, var(--draw2-border));
+  border-radius: 6px;
+  background: var(--draw2-surface-input, var(--draw2-surface-raised));
+  color: var(--draw2-text-muted, var(--draw2-muted));
+  font-size: 0.58rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-flags label:has(input:checked) {
+  border-color: color-mix(in srgb, var(--draw2-mode-accent, var(--draw2-accent)) 72%, var(--draw2-border));
+  color: var(--draw2-text-strong, var(--draw2-text));
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-flags input {
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  accent-color: var(--draw2-mode-accent, var(--draw2-accent));
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-flags.is-compact {
+  gap: 3px;
+  padding: 0;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-flags.is-compact label {
+  min-height: 21px;
+  padding: 2px 4px;
+  font-size: 0.52rem;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-keycaps {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  color: var(--draw2-text-muted, var(--draw2-muted));
+  font-size: 0.6rem;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-keycaps kbd {
+  min-width: 22px;
+  padding: 3px 5px;
+  border: 1px solid var(--draw2-border-subtle, var(--draw2-border));
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--draw2-surface-input, var(--draw2-surface-raised));
+  color: var(--draw2-text-strong, var(--draw2-text));
+  font-size: 0.62rem;
+  text-align: center;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-audio-assignments {
+  display: grid;
+  min-width: 0;
+  max-height: 132px;
+  gap: 4px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-audio-assignment {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 6px;
+  border: 1px solid var(--draw2-border-subtle, var(--draw2-border));
+  border-radius: 6px;
+  background: var(--draw2-surface-input, var(--draw2-surface-raised));
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-audio-assignment > div {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-audio-assignment strong,
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-audio-assignment small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-audio-assignment strong {
+  color: var(--draw2-text-strong, var(--draw2-text));
+  font-size: 0.63rem;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-audio-assignment small {
+  color: var(--draw2-text-muted, var(--draw2-muted));
+  font-size: 0.56rem;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-audio-assignment button {
+  width: 24px;
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--draw2-text-muted, var(--draw2-muted));
+}
+
+/* Source slots are the interaction surface.  The image is the affordance,
+   so the author never has to find a separate "choose in Draw" action. */
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-sprite-slot {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  min-width: 0;
+  min-height: 58px;
+  align-items: center;
+  column-gap: 9px;
+  row-gap: 2px;
+  padding: 6px;
+  border: 1px dashed color-mix(in srgb, var(--draw2-mode-accent, var(--draw2-accent)) 66%, var(--draw2-border));
+  border-radius: var(--studio-control-radius, var(--draw2-radius-sm));
+  background: color-mix(in srgb, var(--draw2-mode-accent, var(--draw2-accent)) 6%, var(--draw2-surface-input, var(--draw2-surface-raised)));
+  color: var(--draw2-text-strong, var(--draw2-text));
+  text-align: left;
+  cursor: pointer;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-sprite-slot:hover,
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-sprite-slot:focus-visible {
+  border-style: solid;
+  border-color: var(--draw2-mode-accent, var(--draw2-accent));
+  background: color-mix(in srgb, var(--draw2-mode-accent, var(--draw2-accent)) 12%, var(--draw2-surface-input, var(--draw2-surface-raised)));
+  outline: 2px solid var(--draw2-focus-ring, var(--draw2-focus));
+  outline-offset: 1px;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-sprite-slot[data-state="ready"] {
+  border-style: solid;
+  border-color: var(--draw2-border-strong, var(--draw2-border));
+  background: var(--draw2-surface-input, var(--draw2-surface-raised));
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-sprite-slot:disabled {
+  cursor: default;
+  opacity: 0.62;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-sprite-slot-visual {
+  display: grid;
+  grid-row: 1 / span 2;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  overflow: hidden;
+  border: 1px solid var(--draw2-border-subtle, var(--draw2-border));
+  border-radius: 7px;
+  background-color: var(--draw2-surface-canvas, var(--draw2-bg));
+  background-image: linear-gradient(45deg, rgb(255 255 255 / 5%) 25%, transparent 25%), linear-gradient(-45deg, rgb(255 255 255 / 5%) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, rgb(255 255 255 / 5%) 75%), linear-gradient(-45deg, transparent 75%, rgb(255 255 255 / 5%) 75%);
+  background-position: 0 0, 0 6px, 6px -6px, -6px 0;
+  background-size: 12px 12px;
+  background-repeat: repeat;
+  background-position: center;
+  background-size: contain;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-sprite-slot[data-state="empty"] .draw2-game-playground-sprite-slot-visual {
+  background-size: 12px 12px;
+  background-repeat: repeat;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-sprite-slot-icon {
+  color: var(--draw2-mode-accent, var(--draw2-accent));
+  font-size: 1.45rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-sprite-slot-copy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-sprite-slot-copy strong,
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-sprite-slot-copy small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-sprite-slot-copy strong {
+  font-size: 0.68rem;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-sprite-slot-copy small {
+  color: var(--draw2-text-muted, var(--draw2-muted));
+  font-size: 0.57rem;
+}
+
+/* Character/world source slots keep a stable hit area.  The checkerboard
+   preview is the image affordance; the copy explains that the next step is
+   choosing a range in iDRAW.  Selection never scales the button. */
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-playground-sprite-slot {
+  box-sizing: border-box;
+  min-height: 66px;
+  transform: none !important;
+  transition: border-color 120ms ease, background-color 120ms ease,
+    outline-color 120ms ease;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-playground-sprite-slot:active {
+  transform: none !important;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-playground-sprite-slot-visual {
+  box-sizing: border-box;
+  border-style: dashed;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-playground-sprite-slot.is-character
+  .draw2-game-playground-sprite-slot-visual {
+  border-color: color-mix(
+    in srgb,
+    var(--draw2-mode-accent, var(--draw2-accent)) 74%,
+    var(--draw2-border-subtle, var(--draw2-border))
+  );
+  background-color: color-mix(
+    in srgb,
+    var(--draw2-mode-accent, var(--draw2-accent)) 8%,
+    var(--draw2-surface-canvas, var(--draw2-bg))
+  );
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-playground-sprite-slot-copy {
+  align-self: center;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-frame-strip {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-frame {
+  display: grid;
+  flex: 0 0 30px;
+  place-items: end center;
+  width: 30px;
+  height: 30px;
+  padding: 0 0 2px;
+  border: 1px solid var(--draw2-border-subtle, var(--draw2-border));
+  border-radius: 5px;
+  background-color: var(--draw2-surface-canvas, var(--draw2-bg));
+  background-position: center;
+  background-size: contain;
+  background-repeat: no-repeat;
+  color: var(--draw2-text-muted, var(--draw2-muted));
+  font-size: 0.5rem;
+  image-rendering: pixelated;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-frame:is(:hover, :focus-visible, .is-active) {
+  border-color: var(--draw2-mode-accent, var(--draw2-accent));
+  outline: 2px solid var(--draw2-focus-ring, var(--draw2-focus));
+  outline-offset: 1px;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-frame-more {
+  flex: 0 0 auto;
+  padding-inline: 2px;
+  color: var(--draw2-text-muted, var(--draw2-muted));
+  font-size: 0.58rem;
+  font-weight: 700;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-object-list {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-object-row {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) 24px;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  padding: 5px;
+  border: 1px solid var(--draw2-border-subtle, var(--draw2-border));
+  border-radius: 7px;
+  background: var(--draw2-surface-input, var(--draw2-surface-raised));
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-object-sprite {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid var(--draw2-border-subtle, var(--draw2-border));
+  border-radius: 6px;
+  background-color: var(--draw2-surface-canvas, var(--draw2-bg));
+  background-position: center;
+  background-size: contain;
+  background-repeat: no-repeat;
+  color: var(--draw2-mode-accent, var(--draw2-accent));
+  cursor: pointer;
+  image-rendering: pixelated;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-object-sprite:hover,
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-object-sprite:focus-visible {
+  border-color: var(--draw2-mode-accent, var(--draw2-accent));
+  outline: 2px solid var(--draw2-focus-ring, var(--draw2-focus));
+  outline-offset: 1px;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-object-body {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-object-body > strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--draw2-text-strong, var(--draw2-text));
+  font-size: 0.63rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-object-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 54px;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-object-controls select,
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-object-controls input {
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 26px;
+  width: 100%;
+  padding: 3px 5px;
+  font-size: 0.58rem;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-object-position {
+  grid-column: 1 / -1;
+  color: var(--draw2-text-muted, var(--draw2-muted));
+  font-size: 0.55rem;
+  line-height: 1.2;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-object-remove {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--draw2-text-muted, var(--draw2-muted));
+  font-size: 1rem;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-object-remove:hover,
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-object-remove:focus-visible {
+  background: color-mix(in srgb, #ff6c82 16%, transparent);
+  color: #ff9eaa;
+  outline: 2px solid var(--draw2-focus-ring, var(--draw2-focus));
+  outline-offset: 1px;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-audio-events {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-width: 0;
+  gap: 5px;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-audio-event {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  min-width: 0;
+  min-height: 42px;
+  align-items: center;
+  column-gap: 5px;
+  padding: 5px;
+  border: 1px solid var(--draw2-border-subtle, var(--draw2-border));
+  border-radius: 7px;
+  background: var(--draw2-surface-input, var(--draw2-surface-raised));
+  color: var(--draw2-text-strong, var(--draw2-text));
+  text-align: left;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-audio-event > span {
+  grid-row: 1 / span 2;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  background: color-mix(in srgb, #c98dff 18%, var(--draw2-surface-canvas, var(--draw2-bg)));
+  color: #d9b1ff;
+  font-size: 0.8rem;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-audio-event strong,
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-audio-event small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-audio-event strong {
+  font-size: 0.61rem;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-audio-event small {
+  color: var(--draw2-text-muted, var(--draw2-muted));
+  font-size: 0.53rem;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-audio-event:hover,
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-audio-event:focus-visible,
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-audio-event.is-assigned {
+  border-color: #c98dff;
+  background: color-mix(in srgb, #c98dff 15%, var(--draw2-surface-input, var(--draw2-surface-raised)));
+  outline: 2px solid var(--draw2-focus-ring, var(--draw2-focus));
+  outline-offset: 1px;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-audio-event:disabled {
+  cursor: default;
+  opacity: 0.62;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  #draw2ModeDeckGame {
+  min-width: 0;
+  min-height: 0;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] #draw2ModeDeckGame:has(> #draw2GamePlaygroundBottom:not([hidden])):not(:has(> :is(.draw2-mode-deck-toolbar, [role="tablist"]):not([hidden]))) {
+  gap: 0;
+  padding-block-start: 0;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  #draw2ModeDeckGame
+  > :not(#draw2GamePlaygroundBottom) {
+  display: none !important;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] #draw2GamePlaygroundBottom {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+  padding: 10px;
+  overflow: hidden;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] #draw2GamePlaygroundBottomStatus {
+  color: var(--draw2-text-muted, var(--draw2-muted));
+  font-size: 0.62rem;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  #draw2GamePersistenceStatus[data-game-persistence-state="offline"] {
+  color: var(--draw2-danger, #ff9e9e);
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  #draw2GamePersistenceStatus[data-game-persistence-state="offline"] i {
+  background: var(--draw2-danger, #ff9e9e);
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-bottom-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  min-width: 0;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-bottom-card {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+  padding: 7px 8px;
+  border: 1px solid var(--draw2-border-subtle, var(--draw2-border));
+  border-radius: 6px;
+  background: var(--draw2-surface, var(--draw2-bg));
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-bottom-card strong,
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-bottom-card small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-bottom-card strong {
+  color: var(--draw2-text-strong, var(--draw2-text));
+  font-size: 0.65rem;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-bottom-card small {
+  color: var(--draw2-text-muted, var(--draw2-muted));
+  font-size: 0.57rem;
+}
+
+@media (max-height: 760px) and (min-width: 900px) {
+  #draw2WorkspaceFrame[data-creator-mode="GAME"] #draw2GamePlaygroundInspector {
+    gap: 6px;
+    padding: 7px;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-card {
+    gap: 5px;
+    padding: 7px;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-card small {
+    display: none;
+  }
 }
 
 #draw2WorkspaceFrame[data-creator-mode="GAME"]
@@ -174,6 +1364,121 @@
   border-color: var(--draw2-border-subtle, var(--draw2-border));
   border-radius: var(--studio-control-radius, var(--draw2-radius-sm));
   background: var(--draw2-surface-canvas, var(--draw2-bg));
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-scene-free-space {
+  fill: color-mix(in srgb, var(--draw2-surface-canvas, var(--draw2-bg)) 82%, #236b9d 18%);
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  :is(.draw2-game-scene-world-cells, .draw2-game-scene-legacy-tilemap) {
+  pointer-events: none;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-scene-svg {
+  cursor: grab;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-scene-svg:active {
+  cursor: grabbing;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-scene-world-cell {
+  fill: transparent;
+  stroke: transparent;
+  stroke-width: 0.08;
+  vector-effect: non-scaling-stroke;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-scene-world-cell.has-tile {
+  fill: color-mix(in srgb, var(--draw2-accent-strong, var(--draw2-accent)) 28%, transparent);
+  stroke: color-mix(in srgb, var(--draw2-accent-strong, var(--draw2-accent)) 58%, transparent);
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-scene-world-cell.is-solid {
+  fill: color-mix(in srgb, #f0b45c 42%, transparent);
+  stroke: color-mix(in srgb, #f0b45c 78%, white 8%);
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-scene-world-cell.is-trigger {
+  fill: color-mix(in srgb, #b78cff 34%, transparent);
+  stroke: color-mix(in srgb, #b78cff 78%, white 8%);
+  stroke-dasharray: 0.18 0.12;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-scene-minimap-chunks {
+  fill: color-mix(in srgb, var(--draw2-accent-strong, var(--draw2-accent)) 22%, transparent);
+  stroke: color-mix(in srgb, var(--draw2-accent-strong, var(--draw2-accent)) 42%, transparent);
+  stroke-width: 0.35;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-scene-minimap-object {
+  fill: var(--draw2-text-strong, var(--draw2-text));
+  opacity: 0.78;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-scene-minimap-object.is-player {
+  fill: var(--draw2-mode-accent, var(--draw2-accent));
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-scene-minimap-camera {
+  fill: color-mix(in srgb, var(--draw2-focus-ring, var(--draw2-focus)) 13%, transparent);
+  stroke: var(--draw2-focus-ring, var(--draw2-focus));
+  stroke-width: 0.55;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-scene-playground-world {
+  opacity: 0.92;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-scene-free-object {
+  cursor: grab;
+  outline: none;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-scene-free-object:active {
+  cursor: grabbing;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-scene-free-object:focus-visible .draw2-game-scene-selection-box,
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-scene-free-object.is-selected .draw2-game-scene-selection-box {
+  stroke: var(--draw2-mode-accent, var(--draw2-accent));
+  stroke-width: 0.18;
+  stroke-dasharray: 0.5 0.25;
+  fill: none;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-scene-free-label {
+  fill: var(--draw2-text-strong, var(--draw2-text));
+  font-size: 2px;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: rgb(8 15 24 / 78%);
+  stroke-width: 0.45px;
+  pointer-events: none;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-scene-free-frame {
+  fill: none;
+  stroke: var(--draw2-border-strong, var(--draw2-border));
+  stroke-width: 0.16;
+  pointer-events: none;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-scene-sprite {
+  image-rendering: pixelated;
+  pointer-events: none;
 }
 
 #draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-igame-view-toggle {
@@ -642,6 +1947,1604 @@
   }
 }
 
+/* Keep the asset shelf focused on the grid; the title row is intentionally
+   compact because the rail itself already identifies the surface. */
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-bottom {
+  padding-top: 2px;
+}
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-bottom-heading {
+  min-height: 24px;
+  padding-top: 0;
+  padding-bottom: 2px;
+}
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-bottom-cards {
+  margin-top: 0;
+}
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-library-toolbar {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-library-tabs {
+  display: flex;
+  min-width: 0;
+  flex: 0 0 auto;
+  gap: 4px;
+}
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-library-tab {
+  min-width: 0;
+  min-height: 26px;
+  padding: 3px 8px;
+  border: 1px solid var(--draw2-border-subtle, var(--draw2-border));
+  border-radius: 999px;
+  background: var(--draw2-surface-input, var(--draw2-surface));
+  color: var(--draw2-text-muted, var(--draw2-muted));
+  font-size: 0.6rem;
+  font-weight: 700;
+}
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-library-tab:is(:hover, :focus-visible, .is-active) {
+  border-color: var(--draw2-mode-accent, var(--draw2-accent));
+  background: color-mix(in srgb, var(--draw2-mode-accent, var(--draw2-accent)) 14%, var(--draw2-surface-input, var(--draw2-surface)));
+  color: var(--draw2-text-strong, var(--draw2-text));
+  outline: none;
+}
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-market-search {
+  display: block;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+#draw2WorkspaceFrame[data-creator-mode="GAME"] #draw2GamePlaygroundMarketSearch {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 28px;
+  padding: 4px 8px;
+  border: 1px solid var(--draw2-border-subtle, var(--draw2-border));
+  border-radius: var(--draw2-radius-sm, 6px);
+  background: var(--draw2-surface-input, var(--draw2-surface));
+  color: var(--draw2-text-strong, var(--draw2-text));
+  font-size: 0.62rem;
+}
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-market-card {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-asset-button {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  min-width: 0;
+  width: 100%;
+  min-height: 58px;
+  align-items: center;
+  gap: 6px;
+  padding: 5px;
+  border: 1px solid var(--draw2-border-subtle, var(--draw2-border));
+  border-radius: var(--studio-control-radius, var(--draw2-radius-sm));
+  background: var(--draw2-surface, var(--draw2-bg));
+  color: var(--draw2-text-strong, var(--draw2-text));
+  text-align: left;
+  cursor: pointer;
+}
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-asset-button:hover,
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-asset-button:focus-visible {
+  border-color: var(--draw2-mode-accent, var(--draw2-accent));
+  outline: 2px solid var(--draw2-focus-ring, var(--draw2-focus));
+  outline-offset: 1px;
+}
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-asset-visual {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  overflow: hidden;
+  border: 1px solid var(--draw2-border-subtle, var(--draw2-border));
+  border-radius: 6px;
+  background-color: var(--draw2-surface-canvas, var(--draw2-bg));
+  color: var(--draw2-mode-accent, var(--draw2-accent));
+  font-size: 1.05rem;
+  image-rendering: pixelated;
+}
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-asset-copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-asset-copy :is(strong, small) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-asset-copy strong {
+  font-size: 0.63rem;
+}
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-asset-copy small {
+  color: var(--draw2-text-muted, var(--draw2-muted));
+  font-size: 0.53rem;
+}
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-market-card .draw2-game-playground-asset-button {
+  text-decoration: none;
+}
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-market-visual img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-market-access {
+  color: var(--draw2-mode-accent, var(--draw2-accent));
+  font-weight: 700;
+}
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-market-card .draw2-game-playground-asset-place {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 26px;
+  padding: 3px 6px;
+  text-decoration: none;
+}
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-asset-empty button {
+  justify-self: start;
+  min-width: 0;
+}
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-playground-inspector-flags label[data-layer-present="false"] {
+  opacity: .45;
+}
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-object-name-field {
+  display: grid;
+  grid-template-columns: 5em minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+  color: var(--draw2-text-muted, var(--draw2-muted));
+  font-size: .7rem;
+}
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-object-name-field input {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* GAME compact authoring: keep high-information panels dense and scannable. */
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-rail-section-heading {
+  min-height: 28px;
+  gap: 6px;
+}
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-rail-section-heading small,
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-animation-selection,
+#draw2WorkspaceFrame[data-creator-mode="GAME"] #draw2GameAnimationStatus {
+  font-size: 0.68rem;
+  line-height: 1.2;
+}
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-animation-clips {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+  gap: 4px;
+  max-height: 76px;
+  overflow: auto;
+}
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-animation-clip {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 5px 7px;
+  text-align: left;
+}
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-animation-clip small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-animation-detail {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 6px;
+  min-height: 74px;
+}
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-animation-preview {
+  min-height: 74px;
+}
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-frame-strip {
+  display: flex;
+  gap: 4px;
+  min-width: 0;
+  overflow-x: auto;
+}
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-frame-thumb {
+  flex: 0 0 48px;
+}
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-animation-overrides {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+}
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-animation-actions {
+  gap: 5px;
+  margin-top: 5px;
+}
+
+/* The desktop shell keeps the timeline matrix rule highly specific. When a
+   secondary tab is selected, that rule must still respect native [hidden],
+   otherwise the hidden matrix reserves the last grid row and the active tag
+   panel collapses to zero height underneath it. */
+@media (min-width: 1024px) {
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+    #draw2WorkspaceTimelineSlot
+    > #draw2TimelineCard
+    > .draw2-timeline-tab-panel[hidden] {
+    display: none !important;
+    min-height: 0 !important;
+    height: 0 !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+    #draw2WorkspaceTimelineSlot
+    > #draw2TimelineCard
+    > .draw2-timeline-tab-panel:not([hidden]) {
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+    #draw2TimelinePanelTags
+    > .draw2-timeline-single-panel {
+    box-sizing: border-box;
+    height: 100%;
+    min-height: 0;
+    overflow: auto;
+    position: relative;
+  }
+
+  /* Keep the quick action in the left column without pushing the tag list
+     below the compact desktop timeline rail. */
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+    #draw2TimelinePanelTags .draw2-animation-tag-free-panel {
+    position: absolute;
+    z-index: 2;
+    inset: auto auto 5px 8px;
+    width: min(360px, calc(100% - 16px));
+    box-sizing: border-box;
+    margin: 0;
+    padding-top: 4px;
+  }
+}
+
+/* iDRAW: one-click frame tagging after a canvas range is selected. */
+.draw2-animation-tag-free-panel {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  margin-top: 7px;
+  padding-top: 7px;
+  border-top: 1px solid var(--draw2-border-subtle, var(--draw2-border));
+}
+
+.draw2-animation-tag-free-panel > button {
+  min-width: 0;
+  min-height: 28px;
+  padding: 4px 7px;
+  font-size: 0.62rem;
+}
+
+.draw2-animation-tag-free-panel > button kbd {
+  padding: 1px 4px;
+  border: 1px solid var(--draw2-border-subtle, var(--draw2-border));
+  border-radius: 4px;
+  color: var(--draw2-text-muted, var(--draw2-muted));
+  font-size: 0.52rem;
+}
+
+.draw2-animation-tag-free-panel > button[data-selection-ready="true"] {
+  border-color: var(--draw2-accent-strong, var(--draw2-accent));
+}
+
+.draw2-animation-tag-free-panel > button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.draw2-animation-tag-free-panel > output {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--draw2-text-muted, var(--draw2-muted));
+  font-size: 0.58rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* -------------------------------------------------------------------------
+   GAME asset library + inspector projection
+
+   The bottom rail is an asset shelf, not a second scene editor. Selecting a
+   shelf card is the single path into the right inspector; the left rail stays
+   reserved for display order and hierarchy.
+   ------------------------------------------------------------------------- */
+@media (min-width: 1024px) {
+  #draw2WorkspaceFrame[data-creator-mode="GAME"] #draw2GameLeftDockPanels {
+    display: flex !important;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"] #draw2GameLeftDockHierarchyPanel {
+    display: flex !important;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    :is(#draw2GameLeftDockNodeBoxPanel, #draw2GameLeftDockTabs) {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    #draw2GamePlaygroundInspector
+    > :is([data-playground-card="player"], [data-playground-card="objects"], [data-playground-card="controls"]) {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-bottom {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-bottom-heading {
+    min-width: 0;
+    align-items: center;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-bottom-actions {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 8px;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    #draw2GamePlaygroundAssetAdd {
+    min-height: 28px;
+    padding: 3px 7px;
+    font-size: 0.58rem;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-bottom-cards {
+    grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+    grid-auto-rows: minmax(72px, auto);
+    align-content: start;
+    max-height: 116px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-asset-card {
+    min-width: 0;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-asset-button {
+    display: grid;
+    grid-template-columns: 38px minmax(0, 1fr);
+    min-width: 0;
+    width: 100%;
+    min-height: 72px;
+    align-items: center;
+    gap: 6px;
+    padding: 6px;
+    border: 1px solid var(--draw2-border-subtle, var(--draw2-border));
+    border-radius: var(--studio-control-radius, var(--draw2-radius-sm));
+    background: var(--draw2-surface, var(--draw2-bg));
+    color: var(--draw2-text-strong, var(--draw2-text));
+    text-align: left;
+    cursor: pointer;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-asset-button:hover,
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-asset-button:focus-visible,
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-asset-button.is-active {
+    border-color: var(--draw2-mode-accent, var(--draw2-accent));
+    background: color-mix(
+      in srgb,
+      var(--draw2-mode-accent, var(--draw2-accent)) 13%,
+      var(--draw2-surface-input, var(--draw2-surface-raised))
+    );
+    outline: 2px solid var(--draw2-focus-ring, var(--draw2-focus));
+    outline-offset: 1px;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-asset-button[data-state="empty"] {
+    border-style: dashed;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-asset-visual {
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    overflow: hidden;
+    border: 1px solid var(--draw2-border-subtle, var(--draw2-border));
+    border-radius: 6px;
+    background-color: var(--draw2-surface-canvas, var(--draw2-bg));
+    background-position: center;
+    background-size: contain;
+    background-repeat: no-repeat;
+    color: var(--draw2-mode-accent, var(--draw2-accent));
+    font-size: 1.1rem;
+    image-rendering: pixelated;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-asset-copy,
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-inspector-card-title {
+    display: grid;
+    min-width: 0;
+    gap: 3px;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    :is(.draw2-game-playground-asset-copy, .draw2-game-playground-inspector-card-title)
+    :is(strong, small) {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-asset-copy strong {
+    font-size: 0.63rem;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-asset-copy small {
+    color: var(--draw2-text-muted, var(--draw2-muted));
+    font-size: 0.53rem;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-asset-empty,
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-inspector-empty {
+    display: grid;
+    min-width: 0;
+    gap: 3px;
+    padding: 8px;
+    border: 1px dashed var(--draw2-border-strong, var(--draw2-border));
+    border-radius: var(--studio-control-radius, var(--draw2-radius-sm));
+    color: var(--draw2-text-muted, var(--draw2-muted));
+    font-size: 0.62rem;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-inspector-empty small {
+    font-size: 0.56rem;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-selected-asset {
+    min-width: 0;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-inspector-card {
+    display: grid;
+    min-width: 0;
+    gap: 8px;
+    padding: 8px;
+    border: 1px solid color-mix(
+      in srgb,
+      var(--draw2-mode-accent, var(--draw2-accent)) 58%,
+      var(--draw2-border-subtle, var(--draw2-border))
+    );
+    border-radius: var(--studio-card-radius, var(--draw2-radius-md));
+    background: linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--draw2-mode-accent, var(--draw2-accent)) 9%, var(--draw2-surface-raised)),
+      var(--draw2-surface, var(--draw2-bg))
+    );
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-inspector-card-heading {
+    display: grid;
+    grid-template-columns: 52px minmax(0, 1fr) auto;
+    min-width: 0;
+    align-items: center;
+    gap: 7px;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-inspector-sprite {
+    display: grid;
+    place-items: center;
+    width: 52px;
+    height: 52px;
+    padding: 0;
+    border: 1px solid var(--draw2-border-subtle, var(--draw2-border));
+    border-radius: 8px;
+    background-color: var(--draw2-surface-canvas, var(--draw2-bg));
+    background-position: center;
+    background-size: contain;
+    background-repeat: no-repeat;
+    color: var(--draw2-mode-accent, var(--draw2-accent));
+    font-size: 1.3rem;
+    image-rendering: pixelated;
+    cursor: pointer;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-inspector-sprite:hover,
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-inspector-sprite:focus-visible {
+    border-color: var(--draw2-mode-accent, var(--draw2-accent));
+    outline: 2px solid var(--draw2-focus-ring, var(--draw2-focus));
+    outline-offset: 1px;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-inspector-sprite:disabled {
+    cursor: default;
+    opacity: 0.62;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-inspector-card-title strong {
+    font-size: 0.76rem;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-inspector-card-title small {
+    color: var(--draw2-text-muted, var(--draw2-muted));
+    font-size: 0.56rem;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-inspector-role {
+    align-self: start;
+    padding: 3px 5px;
+    border: 1px solid var(--draw2-border-subtle, var(--draw2-border));
+    border-radius: 999px;
+    color: var(--draw2-text-muted, var(--draw2-muted));
+    font-size: 0.52rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-inspector-section-heading {
+    color: var(--draw2-text-strong, var(--draw2-text));
+    font-size: 0.63rem;
+    font-weight: 700;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-inspector-info {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    min-width: 0;
+    gap: 4px;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-inspector-info > div {
+    display: grid;
+    min-width: 0;
+    gap: 2px;
+    padding: 5px 6px;
+    border: 1px solid var(--draw2-border-subtle, var(--draw2-border));
+    border-radius: 5px;
+    background: var(--draw2-surface-input, var(--draw2-surface-raised));
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-inspector-info span {
+    color: var(--draw2-text-muted, var(--draw2-muted));
+    font-size: 0.52rem;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-inspector-info strong {
+    min-width: 0;
+    overflow: hidden;
+    font-size: 0.58rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-inspector-field {
+    display: grid;
+    min-width: 0;
+    gap: 3px;
+    color: var(--draw2-text-muted, var(--draw2-muted));
+    font-size: 0.56rem;
+    font-weight: 700;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-inspector-field :is(select, input) {
+    box-sizing: border-box;
+    min-width: 0;
+    width: 100%;
+    min-height: 27px;
+    padding: 3px 5px;
+    font-size: 0.58rem;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-inspector-flags {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    min-width: 0;
+    gap: 4px;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-inspector-flags label {
+    display: inline-flex;
+    min-width: 0;
+    min-height: 28px;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 3px 4px;
+    border: 1px solid var(--draw2-border-subtle, var(--draw2-border));
+    border-radius: 5px;
+    background: var(--draw2-surface-input, var(--draw2-surface-raised));
+    color: var(--draw2-text-muted, var(--draw2-muted));
+    font-size: 0.56rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-inspector-flags label:has(input:checked) {
+    border-color: var(--draw2-mode-accent, var(--draw2-accent));
+    color: var(--draw2-text-strong, var(--draw2-text));
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-inspector-flags input {
+    width: 13px;
+    height: 13px;
+    margin: 0;
+    accent-color: var(--draw2-mode-accent, var(--draw2-accent));
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-inspector-placement {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 74px;
+    min-width: 0;
+    gap: 5px;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-inspector-frame-strip {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 4px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-inspector-frame {
+    display: grid;
+    flex: 0 0 30px;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 1px solid var(--draw2-border-subtle, var(--draw2-border));
+    border-radius: 5px;
+    background-color: var(--draw2-surface-canvas, var(--draw2-bg));
+    background-position: center;
+    background-size: contain;
+    background-repeat: no-repeat;
+    color: var(--draw2-text-muted, var(--draw2-muted));
+    font-size: 0.5rem;
+    image-rendering: pixelated;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-inspector-frame:is(:hover, :focus-visible, .is-active) {
+    border-color: var(--draw2-mode-accent, var(--draw2-accent));
+    outline: 2px solid var(--draw2-focus-ring, var(--draw2-focus));
+    outline-offset: 1px;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-playground-inspector-frame-more {
+    color: var(--draw2-text-muted, var(--draw2-muted));
+    font-size: 0.56rem;
+  }
+}
+
+/* The three icon actions are part of the inspection loop. They share the
+   upper rail with Scene/Game and never cover or resize the scene stage. */
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-igame-scene-toolbar {
+  position: static !important;
+  inset: auto !important;
+  z-index: auto !important;
+  display: flex !important;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: none !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  pointer-events: auto;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-igame-scene-toolbar
+  .draw2-igame-scene-selection.draw2-visually-hidden {
+  display: block !important;
+  pointer-events: none;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-igame-scene-toolbar .draw2-igame-scene-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-igame-scene-toolbar .draw2-button-icon {
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  min-height: 30px;
+  padding: 5px;
+}
+
+/* -------------------------------------------------------------------------
+   Visual authoring pass
+
+   Game authoring surfaces use cards, chips and state boxes as the primary
+   language. Static helper prose is kept for assistive technology where it
+   is referenced, but it no longer competes with the controls on desktop.
+   ------------------------------------------------------------------------- */
+@media (min-width: 1024px) {
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-node-box-intro {
+    gap: 6px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-node-box-target {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    min-height: 30px;
+    padding: 5px 8px;
+    border: 1px solid
+      color-mix(in srgb, var(--draw2-mode-accent, var(--draw2-accent)) 46%, var(--draw2-border-subtle));
+    border-left-width: 3px;
+    border-radius: var(--studio-control-radius, var(--draw2-radius-sm));
+    background: color-mix(in srgb, var(--draw2-mode-accent, var(--draw2-accent)) 8%, var(--draw2-surface-raised));
+    color: var(--draw2-text-strong, var(--draw2-text));
+    font-size: 0.68rem;
+    font-weight: 800;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-node-box-target[data-state="empty"],
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-node-box-target[data-state="event"] {
+    border-color: var(--draw2-border-subtle, var(--draw2-border));
+    border-left-color: var(--draw2-border-strong, var(--draw2-border));
+    background: var(--draw2-surface-input, var(--draw2-surface-raised));
+    color: var(--draw2-text-muted, var(--draw2-muted));
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-node-box-hierarchy-cta {
+    min-height: 30px;
+    padding-inline: 8px;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-node-category[data-node-category="display"] {
+    --draw2-node-category-color: #38bdf8;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-node-category[data-node-category="physics"] {
+    --draw2-node-category-color: #60a5fa;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-node-category[data-node-category="movement"] {
+    --draw2-node-category-color: #34d399;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-node-category[data-node-category="audio-event"] {
+    --draw2-node-category-color: #fbbf24;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-node-category[data-node-category="status"] {
+    --draw2-node-category-color: #f87171;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-node-category[data-node-category="skill"] {
+    --draw2-node-category-color: #a78bfa;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-node-category[data-node-category="brain"] {
+    --draw2-node-category-color: #fb923c;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-node-category {
+    border-color: color-mix(
+      in srgb,
+      var(--draw2-node-category-color, var(--draw2-border-subtle)) 38%,
+      var(--draw2-border-subtle)
+    );
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-node-category-label {
+    color: var(--draw2-node-category-color, var(--draw2-text-muted));
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-node-category-label::before {
+    background: var(--draw2-node-category-color, var(--draw2-border-strong));
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-node-tile {
+    border-top: 2px solid
+      color-mix(in srgb, var(--draw2-node-category-color, var(--draw2-border-subtle)) 72%, transparent);
+    cursor: default;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-node-tile[draggable="true"] {
+    cursor: grab;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-node-tile[draggable="true"]:active,
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-node-tile.is-dragging {
+    cursor: grabbing;
+    opacity: 0.62;
+    transform: scale(0.98);
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    :is(#draw2GameComponents, #draw2GameComponentsDropHint)[data-game-drop-state="dragging"] {
+    border-color: var(--draw2-mode-accent, var(--draw2-accent));
+    background: color-mix(in srgb, var(--draw2-mode-accent, var(--draw2-accent)) 13%, var(--draw2-surface-raised));
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--draw2-mode-accent, var(--draw2-accent)) 20%, transparent);
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    #draw2GameComponents[data-game-drop-state="no-selection"] {
+    border-color: var(--draw2-border-subtle, var(--draw2-border));
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    #draw2GameComponentsDropHint[data-game-drop-state="no-selection"] {
+    cursor: pointer;
+  }
+
+  /* Notes repeat the meaning already carried by headings, labels and cards.
+     Keep live statuses and empty/error states visible. */
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    #draw2WorkspacePanelGameInspector .draw2-panel-note,
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    #draw2GameRailSurfaceEvents .draw2-game-rail-section-heading small {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-object-card {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+    padding: 9px;
+    border: 1px solid
+      color-mix(in srgb, var(--draw2-mode-accent, var(--draw2-accent)) 45%, var(--draw2-border-subtle));
+    border-radius: var(--studio-card-radius, var(--draw2-radius-md));
+    background: linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--draw2-mode-accent, var(--draw2-accent)) 10%, var(--draw2-surface-raised)),
+      var(--draw2-surface)
+    );
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-object-card-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-object-card-title {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-object-card-title > .draw2-ui-icon {
+    flex: 0 0 auto;
+    width: 24px;
+    height: 24px;
+    padding: 4px;
+    border-radius: var(--studio-control-radius, var(--draw2-radius-sm));
+    background: color-mix(in srgb, var(--draw2-mode-accent, var(--draw2-accent)) 19%, var(--draw2-surface-input));
+    color: var(--draw2-mode-accent, var(--draw2-accent));
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-object-card-title > div {
+    display: grid;
+    gap: 1px;
+    min-width: 0;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-object-card-title .draw2-eyebrow {
+    margin: 0;
+    font-size: 0.52rem;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-object-card-title strong {
+    color: var(--draw2-text-strong, var(--draw2-text));
+    font-size: 0.74rem;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-object-state,
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-component-state {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 34px;
+    min-height: 20px;
+    padding: 2px 6px;
+    border: 1px solid var(--draw2-border-subtle, var(--draw2-border));
+    border-radius: 999px;
+    background: var(--draw2-surface-input, var(--draw2-surface-raised));
+    color: var(--draw2-text-muted, var(--draw2-muted));
+    font: 800 0.5rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    white-space: nowrap;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-object-state[data-state="ready"],
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-component-state[data-state="on"] {
+    border-color: color-mix(in srgb, #34d399 68%, var(--draw2-border-subtle));
+    background: color-mix(in srgb, #34d399 14%, var(--draw2-surface-raised));
+    color: #9ff3c9;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-object-state[data-state="event"] {
+    border-color: color-mix(in srgb, #fbbf24 68%, var(--draw2-border-subtle));
+    color: #fbd38d;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-component-state[data-state="trigger"] {
+    border-color: color-mix(in srgb, #fbbf24 68%, var(--draw2-border-subtle));
+    background: color-mix(in srgb, #fbbf24 14%, var(--draw2-surface-raised));
+    color: #fbd38d;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-object-selection {
+    min-width: 0;
+    margin: 0;
+    padding: 6px 7px;
+    border-radius: var(--studio-control-radius, var(--draw2-radius-sm));
+    background: color-mix(in srgb, var(--draw2-surface-input) 82%, transparent);
+    color: var(--draw2-text-strong, var(--draw2-text));
+    font-size: 0.63rem;
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-object-fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    min-width: 0;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-object-fields > .draw2-panel-field:first-child {
+    grid-column: 1 / -1;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-object-active {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 5px;
+    min-height: 30px;
+    padding: 4px 6px;
+    border: 1px solid var(--draw2-border-subtle, var(--draw2-border));
+    border-radius: var(--studio-control-radius, var(--draw2-radius-sm));
+    background: var(--draw2-surface-input, var(--draw2-surface-raised));
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-object-active small {
+    color: var(--draw2-text-muted, var(--draw2-muted));
+    font-size: 0.5rem;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-quick-flags {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+    padding: 8px;
+    border: 1px solid var(--draw2-border-subtle, var(--draw2-border));
+    border-radius: var(--studio-card-radius, var(--draw2-radius-md));
+    background: color-mix(in srgb, var(--draw2-surface-raised) 78%, var(--draw2-surface));
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-quick-flags-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 5px;
+    min-width: 0;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-quick-flag {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    min-height: 44px;
+    padding: 5px;
+    border: 1px solid var(--draw2-border-subtle, var(--draw2-border));
+    border-radius: var(--studio-control-radius, var(--draw2-radius-sm));
+    background: var(--draw2-surface-input, var(--draw2-surface-raised));
+    cursor: pointer;
+    transition: border-color 120ms ease, background-color 120ms ease;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-quick-flag[data-state="on"] {
+    border-color: color-mix(in srgb, #34d399 56%, var(--draw2-border-subtle));
+    background: color-mix(in srgb, #34d399 9%, var(--draw2-surface-input));
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-quick-flag-icon {
+    width: 18px;
+    height: 18px;
+    padding: 3px;
+    border-radius: 5px;
+    background: color-mix(in srgb, var(--draw2-mode-accent) 18%, var(--draw2-surface-raised));
+    color: var(--draw2-mode-accent, var(--draw2-accent));
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-quick-flag-copy {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-quick-flag-copy strong {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--draw2-text-strong, var(--draw2-text));
+    font-size: 0.6rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-quick-flag-copy small {
+    color: var(--draw2-text-muted, var(--draw2-muted));
+    font: 800 0.49rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    :is(.draw2-game-quick-flag input, .draw2-game-object-active input) {
+    position: relative;
+    width: 30px;
+    height: 18px;
+    margin: 0;
+    appearance: none;
+    border: 1px solid var(--draw2-border-strong, var(--draw2-border));
+    border-radius: 999px;
+    background: var(--draw2-surface, var(--draw2-bg));
+    cursor: pointer;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    :is(.draw2-game-quick-flag input, .draw2-game-object-active input)::after {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--draw2-text-muted, var(--draw2-muted));
+    content: "";
+    transition: transform 120ms ease, background-color 120ms ease;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    :is(.draw2-game-quick-flag input, .draw2-game-object-active input):checked {
+    border-color: #34d399;
+    background: color-mix(in srgb, #34d399 32%, var(--draw2-surface));
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    :is(.draw2-game-quick-flag input, .draw2-game-object-active input):checked::after {
+    background: #d8ffeb;
+    transform: translateX(12px);
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    :is(.draw2-game-quick-flag input, .draw2-game-object-active input):disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    #draw2WorkspacePanelGameInspector .draw2-game-component-list {
+    gap: 6px;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    #draw2WorkspacePanelGameInspector .draw2-game-component-card {
+    transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    #draw2WorkspacePanelGameInspector .draw2-game-component-card[data-drop-result="success"] {
+    border-color: #34d399;
+    box-shadow: 0 0 0 2px color-mix(in srgb, #34d399 26%, transparent);
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    #draw2WorkspacePanelGameInspector .draw2-game-component-card-heading {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    gap: 5px;
+    align-items: center;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-component-card-icon {
+    width: 18px;
+    height: 18px;
+    padding: 3px;
+    border-radius: 5px;
+    background: color-mix(in srgb, var(--draw2-node-category-color, var(--draw2-accent)) 18%, var(--draw2-surface-input));
+    color: var(--draw2-node-category-color, var(--draw2-accent));
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-component-chip-toggle {
+    min-width: 0;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-component-chip-toggle strong {
+    font-size: 0.61rem;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-component-chip-toggle small {
+    font-size: 0.48rem;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-component-state {
+    max-width: 72px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    #draw2GameRailSurfaceEvents .draw2-game-rail-summary {
+    min-width: 0;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-rail-event-card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 6px;
+    min-width: 0;
+    overflow: auto;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-rail-event-card {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+    min-height: 62px;
+    padding: 7px 8px;
+    border: 1px solid var(--draw2-border-subtle, var(--draw2-border));
+    border-radius: var(--studio-card-radius, var(--draw2-radius-sm));
+    background: var(--draw2-surface-raised, var(--draw2-surface));
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 120ms ease, background-color 120ms ease, transform 120ms ease;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-rail-event-card:hover,
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-rail-event-card:focus-visible,
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-rail-event-card[aria-pressed="true"] {
+    border-color: var(--draw2-mode-accent, var(--draw2-accent));
+    background: color-mix(in srgb, var(--draw2-mode-accent, var(--draw2-accent)) 12%, var(--draw2-surface-raised));
+    outline: 2px solid var(--draw2-focus-ring, var(--draw2-focus));
+    outline-offset: 1px;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-rail-event-card-icon {
+    width: 22px;
+    height: 22px;
+    padding: 4px;
+    border-radius: 6px;
+    background: color-mix(in srgb, #fbbf24 18%, var(--draw2-surface-input));
+    color: #fbbf24;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-rail-event-card-content {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-rail-event-card-content > strong,
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-rail-event-card-content > small {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-rail-event-card-content > strong {
+    color: var(--draw2-text-strong, var(--draw2-text));
+    font-size: 0.64rem;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-rail-event-card-content > small {
+    color: var(--draw2-text-muted, var(--draw2-muted));
+    font-size: 0.51rem;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-rail-event-flow {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--draw2-text-muted, var(--draw2-muted));
+    font-size: 0.53rem;
+    white-space: nowrap;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-rail-event-flow > :is(b, i, span) {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-rail-event-flow b {
+    color: var(--draw2-text-strong, var(--draw2-text));
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-rail-event-flow i {
+    color: #fbbf24;
+    font-style: normal;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-rail-event-empty {
+    min-height: 58px;
+    padding: 10px;
+    border: 1px dashed var(--draw2-border-subtle, var(--draw2-border));
+    border-radius: var(--studio-card-radius, var(--draw2-radius-sm));
+    color: var(--draw2-text-muted, var(--draw2-muted));
+    font-size: 0.62rem;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-event-form-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+    min-width: 0;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-event-card-fields {
+    display: contents;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-event-form-grid
+    > :is(.draw2-game-event-message-field, #draw2GameEventAmountField, #draw2GameEventItemField, #draw2GameEventRecipeField, #draw2GameEventBlockField) {
+    min-width: 0;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-event-form-grid > .draw2-game-event-message-field {
+    grid-column: 1 / -1;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-event-form-grid > #draw2GameEventAmountField,
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-event-form-grid > #draw2GameEventItemField,
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-event-form-grid > #draw2GameEventRecipeField,
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-event-form-grid > #draw2GameEventBlockField {
+    grid-column: span 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) and (min-width: 1024px) {
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    :is(.draw2-game-node-tile.is-dragging, .draw2-game-component-card[data-drop-result="success"]) {
+    transform: none;
+    transition: none;
+  }
+}
+
+/* Game data is a compact, scrollable authoring surface. It uses the same
+   border/radius/field tokens as the existing Game rails so adding a rule does
+   not introduce a second visual language. */
+@media (min-width: 1024px) {
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    [data-game-rail-surface="GAME_DATA"] {
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    [data-game-rail-surface="GAME_DATA"]
+    #draw2GameRailData {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(220px, 1fr));
+    gap: 8px;
+    min-width: 0;
+    align-content: start;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    [data-game-rail-surface="GAME_DATA"]
+    #draw2GameRailData
+    > .draw2-game-rail-summary-card {
+    min-width: 0;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-data-note,
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-data-section {
+    grid-column: 1 / -1;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-data-note {
+    margin: 0;
+    padding: 8px 10px;
+    border: 1px solid var(--draw2-border-subtle, var(--draw2-border));
+    border-radius: var(--studio-control-radius, var(--draw2-radius-sm));
+    color: var(--draw2-text-muted, var(--draw2-muted));
+    background: var(--draw2-surface, var(--draw2-bg));
+    font-size: 0.72rem;
+    line-height: 1.45;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-data-section {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+    padding: 8px;
+    border: 1px solid var(--draw2-border-subtle, var(--draw2-border));
+    border-radius: var(--studio-control-radius, var(--draw2-radius-sm));
+    background: var(--draw2-surface, var(--draw2-bg));
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-data-section-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-data-section-heading > div {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-data-section-heading strong {
+    color: var(--draw2-text-strong, var(--draw2-text));
+    font-size: 0.78rem;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-data-section-heading small {
+    color: var(--draw2-text-muted, var(--draw2-muted));
+    font-size: 0.64rem;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-data-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 6px;
+    min-width: 0;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-data-card {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+    padding: 7px;
+    border: 1px solid var(--draw2-border-subtle, var(--draw2-border));
+    border-radius: var(--studio-control-radius, var(--draw2-radius-sm));
+    background: var(--draw2-surface-input, var(--draw2-surface-raised));
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-data-field {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    color: var(--draw2-text-muted, var(--draw2-muted));
+    font-size: 0.66rem;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-data-field input,
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-data-field select {
+    box-sizing: border-box;
+    min-width: 0;
+    width: 100%;
+    min-height: 26px;
+    padding: 3px 6px;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-data-field.is-number {
+    grid-template-columns: max-content minmax(56px, 88px);
+    justify-content: space-between;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-data-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    color: var(--draw2-text-muted, var(--draw2-muted));
+    font-size: 0.66rem;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-data-toggle input {
+    margin: 0;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-data-inline-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) max-content 28px;
+    align-items: end;
+    gap: 5px;
+    min-width: 0;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-data-inline-row
+    .draw2-game-data-field:first-child {
+    grid-template-columns: 1fr;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-data-inline-row
+    .draw2-game-data-field:first-child > span {
+    display: none;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-data-sublist {
+    display: grid;
+    gap: 5px;
+    min-width: 0;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-data-sublist > strong {
+    color: var(--draw2-text-muted, var(--draw2-muted));
+    font-size: 0.66rem;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-data-remove {
+    min-width: 28px;
+    min-height: 26px;
+    padding-inline: 6px;
+  }
+}
+
 @media (min-width: 1024px) {
   @container game-inspector (max-width: 239px) {
   #draw2WorkspacePanelGameInspector .draw2-panel-heading,
@@ -814,6 +3717,23 @@
     line-height: 1.4;
   }
 
+  #draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-node-box-target {
+    margin: 0;
+    padding: 5px 6px;
+    border-left: 2px solid var(--draw2-mode-accent, var(--draw2-accent));
+    color: var(--draw2-text-strong, var(--draw2-text));
+    font-size: 0.66rem;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-node-box-target[data-state="empty"],
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    .draw2-game-node-box-target[data-state="event"] {
+    color: var(--draw2-text-muted, var(--draw2-muted));
+  }
+
   #draw2WorkspaceFrame[data-creator-mode="GAME"]
     .draw2-game-node-box-hierarchy-cta {
     justify-self: start;
@@ -860,4 +3780,363 @@
     scrollbar-gutter: stable;
     align-content: start;
   }
+}
+.draw2-game-audio-capture-bar {
+  position: sticky;
+  top: 0;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 7px 10px;
+  border: 1px solid var(--draw2-border-strong, #40526b);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--draw2-panel, #17202d) 94%, transparent);
+  box-shadow: 0 8px 20px rgb(0 0 0 / 18%);
+}
+.draw2-game-audio-capture-label {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: var(--draw2-text, #f4f7fb);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.draw2-game-audio-capture-waveform {
+  flex: 0 0 76px;
+  height: 18px;
+  border: 1px solid var(--draw2-border-subtle, #304057);
+  border-radius: 4px;
+  background: repeating-linear-gradient(90deg, #63c5f2 0 3px, transparent 3px 6px), linear-gradient(180deg, transparent 45%, rgb(99 197 242 / 22%) 46% 54%, transparent 55%);
+  opacity: .82;
+}
+.draw2-game-audio-capture-waveform[data-state="empty"] { opacity: .28; }
+.draw2-game-playground-audio-slots { display: grid; gap: 6px; margin-top: 10px; }
+.draw2-game-playground-audio-slot-list { display: grid; gap: 5px; }
+.draw2-game-playground-audio-slot { display: grid; grid-template-columns: minmax(74px, .45fr) minmax(0, 1fr) auto; align-items: center; gap: 8px; }
+.draw2-game-playground-audio-slot > span { color: var(--draw2-text-muted, #9aa8bb); font-size: 12px; }
+.draw2-game-playground-audio-slot > button { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.draw2-game-playground-audio-slot > .draw2-gameplay-audio-slot-clear { width: 28px; min-width: 28px; padding-inline: 0; text-align: center; }
+.draw2-game-playground-dpcm-library { display: grid; gap: 4px; margin-top: 8px; }
+.draw2-game-playground-dpcm-library > small { color: var(--draw2-text-muted, #9aa8bb); font-size: 11px; }
+.draw2-game-playground-dpcm-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; overflow: hidden; padding: 4px 6px; border: 1px solid var(--draw2-border-subtle, var(--draw2-border)); border-radius: var(--draw2-radius-sm); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.draw2-game-playground-dpcm-row:not([draggable="false"]) { cursor: grab; }
+.draw2-game-playground-dpcm-row > button { flex: 0 0 24px; width: 24px; min-width: 24px; padding-inline: 0; text-align: center; }
+.draw2-game-playground-audio-slot > button[data-drop-active="true"] { outline: 2px solid var(--draw2-accent, #63c5f2); outline-offset: 1px; }
+.draw2-game-playground-audio-card .draw2-game-playground-asset-visual { color: #c88bff; font-size: 24px; }
+.draw2-game-playground-animation-quickset { display: grid; gap: 5px; margin-top: 8px; }
+.draw2-game-playground-animation-quickset-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+.draw2-game-playground-animation-quickset-grid > button {
+  min-width: 0;
+  min-height: 28px;
+  overflow: hidden;
+  padding: 3px 5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+}
+
+/* Audio central editor: keep the header inside the canvas grid cell. */
+#draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"] #draw2AudioWorkspace {
+  position: relative !important;
+  inset: 0 !important;
+  box-sizing: border-box !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
+}
+#draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"] #draw2AudioWorkspace > .draw2-audio-editor-header {
+  position: relative !important;
+  inset: auto !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+}
+#draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"] #draw2AudioWorkspace > .draw2-audio-editor-header > * {
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+#draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"] #draw2AudioWorkspace > .draw2-audio-editor-surface,
+#draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"] #draw2AudioWorkspace > .draw2-audio-panel {
+  min-width: 0 !important;
+  min-height: 0 !important;
+  overflow: auto !important;
+}
+@media (max-height: 640px) {
+  .draw2-game-audio-capture-bar { min-height: 36px; padding: 4px 8px; }
+  .draw2-game-audio-capture-bar .draw2-button { min-height: 28px; padding-inline: 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .draw2-game-audio-capture-bar { scroll-behavior: auto; transition: none; }
+}
+
+/* Keep persistent template prose out of the compact GAME workspace. */
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-game-template-catalog > .draw2-panel-note {
+  display: none;
+}
+
+.draw2-game-playground-inspector-frame-nav {
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
+  border: 1px solid var(--draw2-border, #40506a);
+  border-radius: 6px;
+  background: rgba(28, 39, 58, .9);
+  color: inherit;
+  cursor: pointer;
+}
+.draw2-game-playground-inspector-frame-nav:disabled {
+  opacity: .35;
+  cursor: default;
+}
+
+.draw2-asset-builder-frame-nav {
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
+  border: 1px solid var(--draw2-border, #40506a);
+  border-radius: 6px;
+  background: rgba(28, 39, 58, .9);
+  color: inherit;
+  cursor: pointer;
+}
+.draw2-asset-builder-frame-nav:disabled {
+  opacity: .35;
+  cursor: default;
+}
+.draw2-game-creation-guide > .draw2-panel-status,
+.draw2-game-left-dock-panel[data-game-left-dock-panel="hierarchy"] > .draw2-panel-status {
+  display: none;
+}
+
+/* Responsive GAME projection ---------------------------------------------
+ * On a narrow viewport the canvas and the asset shelf are the primary
+ * authoring surface. The desktop source rail and Inspector remain available
+ * through their existing state, but are projected into a temporary Inspector
+ * sheet so they never sit on top of the scene. */
+.draw2-game-mobile-inspector-toggle,
+.draw2-game-mobile-inspector-close {
+  display: none;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame
+  :is(.draw2-game-mobile-inspector-toggle, .draw2-game-mobile-inspector-close) {
+  display: none !important;
+}
+
+@media (max-width: 900px) {
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"] {
+    position: relative !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    overflow-x: hidden !important;
+    grid-template-columns: 0 minmax(0, 1fr) 0 !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+    #draw2WorkspaceLeftDock,
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+    #draw2WorkspaceRightDock {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+    #draw2WorkspaceCanvasRegion {
+    grid-column: 2 !important;
+    min-width: 0 !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+    #draw2GamePlaygroundBottom {
+    min-width: 0 !important;
+    padding-inline: 8px !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+    .draw2-game-playground-bottom-heading {
+    min-width: 0;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+    .draw2-game-playground-bottom-actions {
+    min-width: 0;
+    gap: 4px;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+    .draw2-game-mobile-inspector-toggle {
+    display: inline-flex !important;
+    min-width: 42px;
+    min-height: 28px;
+    padding-inline: 7px;
+    font-size: 0.6rem;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+    .draw2-game-playground-library-toolbar {
+    flex-wrap: wrap;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+    .draw2-game-playground-market-search {
+    flex-basis: min(100%, 240px);
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"][data-game-mobile-inspector="open"]
+    #draw2WorkspaceRightDock {
+    display: grid !important;
+    position: absolute !important;
+    z-index: 40 !important;
+    inset: auto 8px
+      calc(
+        var(
+          --draw2-responsive-bottom-height,
+          max(32px, min(220px, var(--draw2-timeline-height, 132px)))
+        ) + var(--draw2-statusbar-height, 24px) + 8px
+      ) 8px !important;
+    box-sizing: border-box !important;
+    width: auto !important;
+    grid-area: auto !important;
+    justify-self: stretch !important;
+    align-self: stretch !important;
+    height: min(42dvh, 300px) !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    max-height: min(42dvh, 300px) !important;
+    padding: 8px !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: 36px minmax(0, 1fr) !important;
+    gap: 6px !important;
+    overflow: hidden !important;
+    border: 1px solid var(--draw2-border-strong, var(--draw2-border)) !important;
+    border-radius: var(--draw2-radius-md, 8px) !important;
+    background: color-mix(
+      in srgb,
+      var(--draw2-surface, #111722) 96%,
+      transparent
+    ) !important;
+    box-shadow: 0 16px 40px rgb(0 0 0 / 34%) !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"][data-game-mobile-inspector="open"]
+    #draw2WorkspaceRightDock
+    > #draw2WorkspaceRightResize {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"][data-game-mobile-inspector="open"]
+    #draw2WorkspaceModeSummary {
+    display: flex !important;
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    min-width: 0 !important;
+    min-height: 36px !important;
+    height: 36px !important;
+    overflow: hidden !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"][data-game-mobile-inspector="open"]
+    #draw2WorkspaceRightCustomDock {
+    display: flex !important;
+    grid-column: 1 !important;
+    grid-row: 2 !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: hidden !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"][data-game-mobile-inspector="open"]
+    #draw2WorkspaceRightCustomDock
+    > .draw2-workspace-tabs {
+    flex: 0 0 28px !important;
+    min-height: 28px !important;
+    height: 28px !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"][data-game-mobile-inspector="open"]
+    #draw2WorkspaceRightCustomDock
+    > .draw2-workspace-panel:not([hidden]) {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+    overflow: auto !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"][data-game-mobile-inspector="open"]
+    .draw2-game-mobile-inspector-close {
+    display: inline-flex !important;
+    min-width: 42px;
+    min-height: 28px;
+    padding-inline: 7px;
+    font-size: 0.6rem;
+  }
+}
+
+/* Final panel border hierarchy contract (2026-09-08)
+ * Use accent edges and selected states to carry meaning without boxing every
+ * game card and hierarchy row. */
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-hierarchy-group-heading {
+  border-bottom: 0 !important;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-hierarchy-entry {
+  border-color: transparent !important;
+  border-radius: 4px !important;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-hierarchy-entry:is(:hover, :focus-visible, .is-active, [aria-selected="true"]) {
+  border-color: var(--draw2-mode-accent, var(--draw2-accent)) !important;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  :is(.draw2-game-playground-source-card, .draw2-game-playground-card) {
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-playground-source-card[data-source-kind="DRAW"] {
+  border-left-color: #55b9ff !important;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-playground-source-card[data-source-kind="AUDIO"] {
+  border-left-color: #c78cff !important;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-playground-card[data-playground-card="player"] {
+  border-left-color: #63c3ff !important;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-playground-card[data-playground-card="world"] {
+  border-left-color: #70d6a0 !important;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-playground-card[data-playground-card="audio"] {
+  border-left-color: #c78cff !important;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-playground-card[data-playground-card="controls"] {
+  border-left-color: #f2b36d !important;
 }

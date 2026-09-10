@@ -475,10 +475,10 @@ export interface CharacterControllerComponent {
 
 /**
  * Genre-agnostic RPG-style stat block (HP/Stamina/MP/Attack/Defense/Level).
- * Editor-authoring only for now: it is not yet part of the canonical
- * `Component` union consumed by the GAME-350 build pipeline, so adding it
- * here cannot affect Build/Publish. Runtime behavior (taking damage,
- * leveling up, etc.) is not implemented yet - this is authoring data only.
+ * The editor schema is intentionally kept separate from the canonical
+ * runtime component union. GAME-350 projects project the enabled fields into
+ * their bounded runtime status model, while this richer authoring record can
+ * continue to hold editor-only values without changing Build/Publish data.
  */
 export interface StatusComponent {
   readonly type: "STATUS";
@@ -740,6 +740,23 @@ export interface GameTimelineTrack {
   readonly tilemap?: GameTilemapDocument;
 }
 
+/**
+ * License-bearing metadata for an editor source binding.  The canonical Game
+ * Project keeps only identity and rights here; source bytes remain owned by
+ * iDRAW/iAUDIO and are never copied into the Game document.
+ */
+export interface GameTimelineAssetBinding {
+  readonly trackId: string;
+  readonly kind: AssetKind;
+  readonly assetId: AssetId;
+  readonly revisionId: AssetRevisionId;
+  readonly contentHash: Sha256;
+  readonly mode: AssetReferenceMode;
+  readonly licenseId?: string;
+  readonly rights?: readonly string[];
+  readonly sourceKind?: "PROJECT" | "MARKET";
+}
+
 export type GameAnimationLoopMode = "LOOP" | "ONCE" | "PING_PONG";
 
 /**
@@ -773,6 +790,8 @@ export interface GameRuntimeProfileReference {
 export interface GameEditorTimeline {
   readonly frameCount: number;
   readonly tracks: readonly GameTimelineTrack[];
+  /** Explicit license metadata survives canonical rebuilds and PiXYNC. */
+  readonly assetBindings?: readonly GameTimelineAssetBinding[];
   /** Selected beginner template family; absent in legacy projects. */
   readonly creationMode?:
     | "RPG_TEMPLATE"
@@ -946,9 +965,9 @@ export function isValidGameTilemapDocument(
     typeof value.mapId !== "string" ||
     !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(value.mapId) ||
     !Number.isSafeInteger(width) || typeof width !== "number" || width < 1 ||
-    width > 256 ||
+    width > Number.MAX_SAFE_INTEGER ||
     !Number.isSafeInteger(height) || typeof height !== "number" || height < 1 ||
-    height > 256 ||
+    height > Number.MAX_SAFE_INTEGER ||
     !Number.isSafeInteger(tileSize) || typeof tileSize !== "number" ||
     tileSize < 1 || tileSize > 4096 || !Array.isArray(cells) ||
     cells.length > width * height
@@ -1115,6 +1134,46 @@ function isValidAssetRevisionReference(
     typeof value.contentHash === "string" &&
     /^[a-f0-9]{64}$/u.test(value.contentHash) &&
     (value.mode === "PINNED" || value.mode === "LIVE");
+}
+
+const GAME_TIMELINE_ASSET_BINDING_KEYS = new Set([
+  "trackId",
+  "kind",
+  "assetId",
+  "revisionId",
+  "contentHash",
+  "mode",
+  "licenseId",
+  "rights",
+  "sourceKind",
+]);
+
+export function isValidGameTimelineAssetBinding(
+  value: unknown,
+): value is GameTimelineAssetBinding {
+  if (!isRecord(value)) return false;
+  const id = (candidate: unknown): candidate is string =>
+    typeof candidate === "string" && GAME_TEMPLATE_VALUE_KEY_PATTERN.test(candidate);
+  const rightsValid = value.rights === undefined || (
+    Array.isArray(value.rights) && value.rights.length > 0 &&
+    value.rights.every((right) => typeof right === "string" && right.trim().length > 0) &&
+    new Set(value.rights).size === value.rights.length
+  );
+  return Object.keys(value).every((key) =>
+    GAME_TIMELINE_ASSET_BINDING_KEYS.has(key)
+  ) &&
+    typeof value.trackId === "string" && GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.trackId) &&
+    (value.kind === "DRAW" || value.kind === "AUDIO") &&
+    id(value.assetId) && id(value.revisionId) &&
+    typeof value.contentHash === "string" && /^[a-f0-9]{64}$/u.test(value.contentHash) &&
+    (value.mode === "PINNED" || value.mode === "LIVE") &&
+    (value.licenseId === undefined || id(value.licenseId)) &&
+    rightsValid &&
+    (value.sourceKind === undefined || value.sourceKind === "PROJECT" || value.sourceKind === "MARKET") &&
+    (value.sourceKind !== "MARKET" || (
+      value.mode === "PINNED" && value.licenseId !== undefined &&
+      Array.isArray(value.rights) && value.rights.length > 0
+    ));
 }
 
 const GAME_ITEM_DEFINITION_KEYS = new Set([
@@ -2409,6 +2468,37 @@ export function validateGameProject(
         }
       }
     }
+    if (timeline.assetBindings !== undefined) {
+      const trackIds = new Set(
+        Array.isArray(timeline.tracks)
+          ? timeline.tracks.map((track) => track.trackId)
+          : [],
+      );
+      if (
+        !Array.isArray(timeline.assetBindings) ||
+        timeline.assetBindings.some((binding) =>
+          !isValidGameTimelineAssetBinding(binding) ||
+          !trackIds.has(binding.trackId)
+        )
+      ) {
+        diagnostics.push(
+          diagnostic(
+            "INVALID_PROJECT",
+            "editorTimeline.assetBindings",
+            "Editor asset binding metadata is invalid or targets a missing track.",
+          ),
+        );
+      } else {
+        diagnostics.push(
+          ...duplicateDiagnostics(
+            timeline.assetBindings.map((binding) =>
+              `${binding.trackId}:${binding.kind}`
+            ),
+            "editorTimeline.assetBindings",
+          ),
+        );
+      }
+    }
     if (
       timeline.sceneRules !== undefined &&
       !isValidGameSceneRules(timeline.sceneRules)
@@ -2576,7 +2666,9 @@ export function validateGameProject(
         );
         for (const [index, recipe] of timeline.recipes.entries()) {
           const referenced = [
-            ...recipe.ingredients.map((ingredient) => ingredient.itemId),
+            ...recipe.ingredients.map((ingredient: GameRecipeIngredient) =>
+              ingredient.itemId
+            ),
             recipe.result.itemId,
           ];
           for (const itemId of referenced) {
@@ -2806,6 +2898,17 @@ function canonicalProjectPayload(
             right,
           ) => left - right),
         })),
+        ...(project.editorTimeline.assetBindings === undefined ? {} : {
+          assetBindings: sortById(
+            project.editorTimeline.assetBindings as unknown as Record<string, unknown>[],
+            "trackId",
+          ).map((binding) => ({
+            ...binding,
+            ...(Array.isArray(binding.rights)
+              ? { rights: [...(binding.rights as string[])].sort() }
+              : {}),
+          })),
+        }),
         ...(project.editorTimeline.creationMode === undefined ? {} : {
           creationMode: project.editorTimeline.creationMode,
         }),

@@ -175,7 +175,7 @@ Deno.test("Draw and Audio clocks remain independently owned", async () => {
   }
 });
 
-Deno.test("Audio Piano Roll starts at one measure and zooms only its time axis", async () => {
+Deno.test("Audio Piano Roll starts with a multi-bar window and zooms only its time axis", async () => {
   const html = await Deno.readTextFile(
     new URL("../index.html", import.meta.url),
   );
@@ -916,7 +916,7 @@ Deno.test("Draw2 desktop primary commands stay touch-sized", async () => {
   }
 });
 
-Deno.test("Draw2 viewport utility stays left while mini preview is shared", async () => {
+Deno.test("Draw2 viewport utility stays left while mini preview stays in the Draw canvas", async () => {
   const html = await Deno.readTextFile(
     new URL("../index.html", import.meta.url),
   );
@@ -930,18 +930,25 @@ Deno.test("Draw2 viewport utility stays left while mini preview is shared", asyn
   const commandBarStart = html.indexOf('class="draw2-workspace-command-bar"');
   const canvasCenter = html.indexOf('id="draw2ViewportCenter"');
   const miniPreviewToggle = html.indexOf('id="draw2MiniPreviewRestore"');
+  const canvasRegionStart = html.indexOf('id="draw2WorkspaceCanvasRegion"');
+  const canvasSlotStart = html.indexOf('id="draw2WorkspaceCanvasSlot"');
   const viewportStart = html.indexOf('class="draw2-viewport-wrap"');
   if (
     toolbarStart < 0 || canvasCenter <= toolbarStart ||
-    commandBarStart < 0 || miniPreviewToggle <= commandBarStart ||
+    commandBarStart < 0 || canvasRegionStart < 0 ||
+    canvasSlotStart < 0 || miniPreviewToggle <= canvasRegionStart ||
+    miniPreviewToggle >= canvasSlotStart ||
     (viewportStart >= 0 && canvasCenter > viewportStart)
   ) {
     throw new Error(
-      "Center must stay in the left rail and mini preview must be in the shared top rail",
+      "Center must stay in the left rail and mini preview must be in the Draw canvas corner",
     );
   }
   if (html.includes('data-workspace-tool-action="mini-preview"')) {
     throw new Error("Mini preview must not remain a Draw-only rail tool");
+  }
+  if (html.includes('draw2-viewport-mini-preview-toggle')) {
+    throw new Error("Mini preview restore must not remain a viewport overlay");
   }
   if (html.includes('class="draw2-viewport-center-button')) {
     throw new Error("Canvas center must not remain a canvas overlay button");
@@ -963,6 +970,10 @@ Deno.test("Draw2 viewport utility stays left while mini preview is shared", asyn
       ".draw2-mirror-guide-line",
       ".draw2-mirror-line-toggle::after",
       ".draw2-global-mini-preview-toggle",
+      '#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-mini-preview',
+      '#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-mini-preview-restore',
+      '#draw2WorkspaceFrame[data-creator-mode="AUDIO"] .draw2-mini-preview',
+      '#draw2WorkspaceFrame[data-creator-mode="AUDIO"] .draw2-mini-preview-restore',
     ]
   ) {
     if (!shell.includes(required)) {
@@ -972,12 +983,19 @@ Deno.test("Draw2 viewport utility stays left while mini preview is shared", asyn
   for (
     const required of [
       "draw2:linked-preview-state",
-      "draw2:mini-preview-playback-request",
+      "miniPreviewModeAvailable",
+      "button.hidden = !miniPreviewAvailable",
     ]
   ) {
     if (!source.includes(required)) {
-      throw new Error(`Shared preview playback bridge missing: ${required}`);
+      throw new Error(`Mode-scoped preview contract missing: ${required}`);
     }
+  }
+  if (source.includes("draw2:mini-preview-playback-request")) {
+    throw new Error("Audio must not receive playback from the Draw mini preview");
+  }
+  if (!html.includes('id="draw2AudioDrawPreviewCanvas"')) {
+    throw new Error("Audio central artwork preview must remain mounted");
   }
 });
 

@@ -15,7 +15,7 @@ indexed palette handling.
 
 PiXiEED does not copy Aseprite source, UI assets, branding, product identity, file format,
 or license assumptions. Aseprite is not added as a runtime or build dependency. Draw2
-keeps PiXiEED Core, Asset Revision, Journal, PiXiSYNC, Game/Audio bridge, and package
+keeps PiXiEED Core, Asset Revision, Journal, PiXYNC, internal Game/Audio adapters, and package
 contracts authoritative.
 
 ## Product adaptation

@@ -15,6 +15,7 @@
 - The former corporate/portfolio surface (`portfolio/`) and its portfolio-only gallery builders/admin guide were removed; `/contact/` remains only as a PiXiEED Bridge support page.
 - The retired top-level `scripts.js` and tests that directly required removed tools or Capacitor pages were removed with the cutover.
 - The external PiXiEED Bridge MVP is intentionally outside this repository at `Documents/Codex/2026-08-30/referenced-chatgpt-conversation-this-is-an/outputs/pixieed-bridge/`; preserve it and treat its own `AGENTS.md` as authoritative for Bridge implementation.
+- `docs/decisions/ADR-20260908-PIXYNC-BRIDGE-BOUNDARY.md` is the current terminology and ownership boundary: Draw2 uses PiXYNC for its local three-mode and online sync paths; the external PiXiEED Bridge is a separate, optional native connector. Do not describe them as the same transport.
 - `docs/bridge-migration/pixisync-reuse-notes.md` is the handoff note for PiXYNC/PiXiSYNC concepts that may be reused by the Bridge protocol.
 - `pixiedraw/_backup/` and ignored `PiXiEEDrawDEV/` content are protected safety remnants; do not remove or commit them without a separate, exact approval.
 - Tracked Capacitor source under `app-shell/pixieed-capacitor/` was removed as part of the cutover. Any remaining ignored native/build/signing files are not Bridge source and require separate cleanup approval.

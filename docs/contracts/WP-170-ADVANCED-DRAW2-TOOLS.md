@@ -46,6 +46,6 @@ entitlement, or Market publish operation.
 
 ## Compatibility and release
 
-The Legacy PXD/Draw/PiXiSYNC bridge remains lazy and read-only. The current site, current Draw,
+The Legacy PXD/Draw/PiXiSYNC adapter remains lazy and read-only. The current site, current Draw,
 existing PXD, existing URLs, Market, database, Storage, and production data are outside this
 WP. Feature flags remain OFF and the isolated entry remains disconnected from public navigation.

@@ -82,14 +82,14 @@ try {
       assert.equal(await page.evaluate(() => document.activeElement?.textContent.trim()), 'Shellの境界を見る');
 
       await page.getByRole('button', { name: 'Themeを変更' }).click();
-      await page.getByRole('button', { name: 'Light', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Light', exact: true }).click();
       const lightPixel = await page.evaluate(() => {
         const canvas = document.createElement('canvas'); canvas.width = 1; canvas.height = 1;
         const context = canvas.getContext('2d'); context.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--color-pixel-canonical').trim(); context.fillRect(0, 0, 1, 1);
         return { theme: document.documentElement.dataset.theme, pixel: [...context.getImageData(0, 0, 1, 1).data], canonical: getComputedStyle(document.documentElement).getPropertyValue('--color-pixel-canonical').trim() };
       });
       await page.getByRole('button', { name: 'Themeを変更' }).click();
-      await page.getByRole('button', { name: 'Dark', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Dark', exact: true }).click();
       const darkPixel = await page.evaluate(() => ({ theme: document.documentElement.dataset.theme, canonical: getComputedStyle(document.documentElement).getPropertyValue('--color-pixel-canonical').trim() }));
       assert.equal(lightPixel.theme, 'light');
       assert.equal(darkPixel.theme, 'dark');

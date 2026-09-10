@@ -185,6 +185,67 @@ Deno.test("Asset Frames may reference one Editor Frame more than once when recta
   }
 });
 
+Deno.test("Captured Asset Frames preserve a fixed composite snapshot", () => {
+  const result = createAssetDefinitionDraft({
+    sourceProjectId: "project-character",
+    sourceCanvasId: "canvas-1",
+    sourceKind: "VISIBLE_COMPOSITE",
+    sourceLayerIds: ["body", "hair"],
+    frameStart: 1,
+    frameEnd: 1,
+    frameSelection: { kind: "CURRENT_FRAME", frameId: "frame-1" },
+    animationMapping: [{
+      name: "IDLE",
+      frameIds: ["frame-1"],
+      sourceFrames: [{
+        sourceFrameId: "frame-1",
+        layerIds: ["body", "hair"],
+        rect: { x: 2, y: 3, width: 2, height: 1 },
+        rasterSnapshot: {
+          width: 2,
+          height: 1,
+          data: [255, 0, 0, 255, 0, 0, 0, 0],
+        },
+      }],
+      loopMode: "LOOP",
+      fps: 12,
+    }],
+    assetKind: "CHARACTER",
+    pivot: "FEET",
+    metadata: { name: "Hero" },
+  });
+  if (!result.ok) throw new Error(result.message);
+  const frame = result.value.animationMapping[0]?.sourceFrames?.[0];
+  if (frame?.rasterSnapshot?.data.join(",") !== "255,0,0,255,0,0,0,0") {
+    throw new Error("Fixed composite snapshot was not retained in the Asset Definition.");
+  }
+  const invalid = createAssetDefinitionDraft({
+    sourceProjectId: "project-character",
+    sourceCanvasId: "canvas-1",
+    sourceKind: "VISIBLE_COMPOSITE",
+    sourceLayerIds: ["body"],
+    frameStart: 1,
+    frameEnd: 1,
+    frameSelection: { kind: "CURRENT_FRAME", frameId: "frame-1" },
+    animationMapping: [{
+      name: "IDLE",
+      frameIds: ["frame-1"],
+      sourceFrames: [{
+        sourceFrameId: "frame-1",
+        layerIds: ["body"],
+        rect: { x: 0, y: 0, width: 2, height: 1 },
+        rasterSnapshot: { width: 2, height: 1, data: [255, 0, 0, 255] },
+      }],
+      loopMode: "LOOP",
+      fps: 12,
+    }],
+    assetKind: "CHARACTER",
+    pivot: "CENTER",
+    metadata: { name: "Invalid" },
+  });
+  if (invalid.ok) throw new Error("An incomplete RGBA snapshot was accepted.");
+});
+
 Deno.test("Asset definition rejects duplicate Motion + Direction slots, not duplicate CUSTOM names alone", () => {
   const result = createAssetDefinitionDraft({
     sourceProjectId: "project-character",

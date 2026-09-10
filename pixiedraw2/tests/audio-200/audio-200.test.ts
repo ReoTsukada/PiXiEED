@@ -332,7 +332,10 @@ Deno.test("AUDIO-200 creates Project/Track/Clip/Note/Automation/Mixer/Effect sta
     ...current.project,
     notes: [{
       ...note,
-      timeline: { startTick: 9_000_000_000 as never, durationTick: 2 as never },
+      timeline: {
+        startTick: Number.MAX_SAFE_INTEGER as never,
+        durationTick: 2 as never,
+      },
     }],
   });
   assert(

@@ -94,8 +94,10 @@ Deno.test("Draw2 entry serializes every local canonical raster mutation", () => 
   assert(
     pointerImplementation.includes('if (tool === "tile-stamp")') &&
       pointerImplementation.includes("selectedTileSource") &&
-      !pointerImplementation.includes("selectionStampSourceForAsset"),
-    "Tile Placement must remain available independently from the retired selection-stamp feature.",
+      !pointerImplementation.includes("selectionStampSourceForAsset") &&
+      pointerImplementation.includes('if (tool === "text")') &&
+      source.includes("createTextMaskWriteSet"),
+    "Legacy tile placement must remain compatible while the new text raster path stays canonical.",
   );
 });
 
@@ -130,6 +132,92 @@ Deno.test("Draw2 live previews batch frames and keep empty coalesced samples", (
     pointerMove.includes("scheduleDrawOverlay()") &&
       !pointerMove.includes("(event.buttons & 1) === 0"),
     "The active pointer must reach the input state machine even when buttons briefly reports zero.",
+  );
+});
+
+Deno.test("Draw2 text insertion previews its range and hands off to Move", () => {
+  assert(
+    source.includes("function refreshTextPreview()") &&
+      source.includes("renderTextDialogPreview") &&
+      source.includes("drawTextPreviewPixels") &&
+      source.includes("textBoundsWidthControl") &&
+      source.includes("textBoundsHeightControl") &&
+      source.includes("fitTextBoundsToContent"),
+    "Text insertion must expose a live range/content preview and an explicit fit path.",
+  );
+  assert(
+    source.includes("function activateTextSelectionForMove(") &&
+      source.includes('selectShortcutTool("move")') &&
+      source.includes("drag to move") &&
+      source.includes("move is previewed until release"),
+    "Inserted text must become the active movable selection without a second tool choice.",
+  );
+});
+
+Deno.test("Draw2 selection transform shortcuts use one isolated preview path", () => {
+  assert(
+    source.includes("selectionMorphologyRadius") &&
+      source.includes("selectionExpand(base, radius)") &&
+      source.includes("selectionShrink(base, radius)") &&
+      source.includes("selectionBorder(base, radius)"),
+    "Selection edge operations must support an explicit pixel radius.",
+  );
+  assert(
+    source.includes('previewSelectionOperation("SCALE_NEAREST", 0.5)') &&
+      source.includes('previewSelectionOperation("SCALE_NEAREST", 2)') &&
+      source.includes('transformDx.value = "0"') &&
+      source.includes('transformDy.value = "0"'),
+    "Quick scale/rotate/flip actions must reset translation and reuse Transform Preview.",
+  );
+});
+
+Deno.test("Draw2 selection frame drives scale and arbitrary-angle rotation previews", () => {
+  assert(
+    source.includes("selectionFrameHandleAtClient") &&
+      source.includes("selectionFrameBorderAtClient") &&
+      source.includes("beginSelectionFrameDrag") &&
+      source.includes("updateSelectionFrameDragPreview") &&
+      source.includes("draw2-selection-transform-handle"),
+    "The active selection frame must expose direct pointer manipulation handles.",
+  );
+  assert(
+    source.includes('operation: "SCALE_NEAREST"') &&
+      source.includes("transformHasEffect") &&
+      source.includes("commitActiveTransform()") &&
+      source.includes("selectionFrameDrag = undefined"),
+    "Frame scale gestures must reuse the nearest-neighbor preview and one commit path.",
+  );
+  assert(
+    source.includes('operation: "ROTATE_NEAREST"') &&
+      source.includes("angleDeg") &&
+      source.includes("lastPointerAngle") &&
+      source.includes("accumulatedAngle") &&
+      source.includes('transformAngle.value = String(transform.angleDeg ?? 0)'),
+    "Frame rotation must preserve continuous angle input in the deterministic nearest-neighbor transform path.",
+  );
+});
+
+Deno.test("Draw2 transform preview hides its source and serializes one commit", () => {
+  assert(
+    source.includes("drawErasePreviewWrites(asset, selection.pixels)") &&
+      source.includes("selectionPointKey({ x: globalX, y: globalY })") &&
+      source.includes("let transformCommitInFlight = false") &&
+      source.includes("return await commitActiveTransformOnce()") &&
+      source.includes("transformCommitInFlight = false") &&
+      source.includes("history.record(") &&
+      source.includes("Transform commit is still in progress; Undo is temporarily locked."),
+    "Transform Preview must mask the canonical source, guard async double commits, and keep Undo outside the in-flight commit.",
+  );
+});
+
+Deno.test("Draw2 large transform previews use bounded raster tiles", () => {
+  assert(
+    source.includes("TRANSFORM_PREVIEW_TILE_SIZE") &&
+      source.includes("drawLargeTransformPreviewTiles") &&
+      source.includes("createImageData(tile.width, tile.height)") &&
+      source.includes("selectionOverlayContext.drawImage(") &&
+      source.includes("pixels.length > MAX_TRANSFORM_PREVIEW_PIXELS"),
+    "Large Transform Preview must keep the source cut-out visible while rasterizing the floating selection in bounded tiles.",
   );
 });
 

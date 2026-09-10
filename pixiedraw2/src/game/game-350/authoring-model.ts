@@ -79,6 +79,7 @@ export const GAME_EVENT_CONDITION_OPTIONS: readonly {
   { value: "TAP", label: "タップした" },
   { value: "INTERACT", label: "話しかけた" },
   { value: "REACH_GOAL", label: "ゴールに着いた" },
+  { value: "HAS_ITEM", label: "アイテムを持っている" },
 ] as const;
 
 export const GAME_EVENT_ACTION_OPTIONS: readonly {
@@ -91,6 +92,11 @@ export const GAME_EVENT_ACTION_OPTIONS: readonly {
   { value: "PLAY_AUDIO", label: "効果音を鳴らす" },
   { value: "COMPLETE_SCENE", label: "Sceneをクリアする" },
   { value: "SET_VARIABLE", label: "ゲーム状態を変える" },
+  { value: "GIVE_ITEM", label: "アイテムを渡す" },
+  { value: "TAKE_ITEM", label: "アイテムを減らす" },
+  { value: "CRAFT_ITEM", label: "レシピを作る" },
+  { value: "BREAK_BLOCK", label: "ブロックを壊す" },
+  { value: "PLACE_BLOCK", label: "ブロックを置く" },
 ] as const;
 
 const DEFAULT_RULE_FLAGS: Omit<GameSceneRules, "runtimeFamily" | "gravity"> = {
@@ -178,13 +184,34 @@ export function sceneRulesForCreationMode(
 export function normalizeGameSceneRules(
   value?: Partial<GameSceneRules>,
 ): GameSceneRules {
-  const fallback = sceneRulesForRuntimeFamily(value?.runtimeFamily ?? "FREE");
+  const runtimeFamily = value?.runtimeFamily;
+  const safeRuntimeFamily: GameRuntimeFamily = runtimeFamily === "RPG_GRID" ||
+      runtimeFamily === "ACTION_PLATFORM" ||
+      runtimeFamily === "SCROLL_SIDE" ||
+      runtimeFamily === "DODGE_ARENA" || runtimeFamily === "FREE"
+    ? runtimeFamily
+    : "FREE";
+  const fallback = sceneRulesForRuntimeFamily(safeRuntimeFamily);
+  const gravity = value?.gravity;
+  const safeGravity: GameSceneGravityPreset = gravity === "NONE" ||
+      gravity === "WEAK" || gravity === "STANDARD" || gravity === "STRONG"
+    ? gravity
+    : fallback.gravity;
+  const booleanRule = (key: keyof GameSceneRules): boolean =>
+    typeof value?.[key] === "boolean"
+      ? value[key] as boolean
+      : fallback[key] as boolean;
   return {
     ...fallback,
-    ...value,
     schemaVersion: 1,
-    runtimeFamily: value?.runtimeFamily ?? fallback.runtimeFamily,
-    gravity: value?.gravity ?? fallback.gravity,
+    runtimeFamily: safeRuntimeFamily,
+    gravity: safeGravity,
+    horizontalMove: booleanRule("horizontalMove"),
+    verticalMove: booleanRule("verticalMove"),
+    jump: booleanRule("jump"),
+    floorCollision: booleanRule("floorCollision"),
+    cameraFollow: booleanRule("cameraFollow"),
+    mobileControls: booleanRule("mobileControls"),
   };
 }
 
@@ -333,6 +360,15 @@ function triggerForCondition(card: GameEventCard): {
           ? {}
           : { value: card.targetTrackId }),
       };
+    case "HAS_ITEM":
+      // The beginner BehaviorIR predates inventory-specific trigger fields.
+      // Keep the event card authoritative and project the item reference into
+      // the bounded action trigger used by the existing editor/runtime adapter.
+      return {
+        type: "ACTION",
+        actionId: "inventory.has-item",
+        value: card.itemId ?? "item",
+      };
   }
 }
 
@@ -382,6 +418,41 @@ function actionForCard(card: GameEventCard): {
         targetId: card.targetTrackId ?? "game",
         property: "state",
         value: card.message ?? "true",
+      };
+    case "GIVE_ITEM":
+      return {
+        kind: "SET_VARIABLE",
+        targetId: "inventory",
+        property: "give:" + (card.itemId ?? "item"),
+        value: Math.max(1, card.amount ?? 1),
+      };
+    case "TAKE_ITEM":
+      return {
+        kind: "SET_VARIABLE",
+        targetId: "inventory",
+        property: "take:" + (card.itemId ?? "item"),
+        value: Math.max(1, card.amount ?? 1),
+      };
+    case "CRAFT_ITEM":
+      return {
+        kind: "SET_VARIABLE",
+        targetId: "inventory",
+        property: "craft:" + (card.recipeId ?? "recipe"),
+        value: true,
+      };
+    case "BREAK_BLOCK":
+      return {
+        kind: "SET_VARIABLE",
+        targetId: "world",
+        property: "break:" + (card.blockTypeId ?? "block"),
+        value: true,
+      };
+    case "PLACE_BLOCK":
+      return {
+        kind: "SET_VARIABLE",
+        targetId: "world",
+        property: "place:" + (card.blockTypeId ?? "block"),
+        value: card.blockTypeId ?? "block",
       };
   }
 }

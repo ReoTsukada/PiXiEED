@@ -1,5 +1,5 @@
 /**
- * AUDIO-200 workspace bridge.
+ * AUDIO-200 workspace adapter.
  *
  * The editor may still receive frame coordinates from the canvas, but this
  * adapter accepts canonical Tick coordinates first and persists only the

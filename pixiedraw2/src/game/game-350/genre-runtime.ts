@@ -43,8 +43,13 @@ export interface GameGenreRuntimePoint {
 export interface GameGenreRuntimeStatus {
   readonly hp: number;
   readonly maxHp: number;
+  readonly stamina: number;
+  readonly maxStamina: number;
+  readonly mp: number;
+  readonly maxMp: number;
   readonly attack: number;
   readonly defense: number;
+  readonly level: number;
 }
 
 export interface GameGenreRuntimeObject {
@@ -75,6 +80,7 @@ export interface GameGenreRuntimeInput {
   readonly jump?: boolean;
   readonly interact?: boolean;
   readonly tap?: boolean;
+  readonly attack?: boolean;
 }
 
 export interface GameGenreRuntimeState {
@@ -147,14 +153,24 @@ const DODGE_ENEMY_SPEED = 0.045;
 const DEFAULT_NPC_STATUS: GameGenreRuntimeStatus = {
   hp: 10,
   maxHp: 10,
+  stamina: 10,
+  maxStamina: 10,
+  mp: 0,
+  maxMp: 0,
   attack: 2,
   defense: 0,
+  level: 1,
 };
 const DEFAULT_PLAYER_STATUS: GameGenreRuntimeStatus = {
   hp: 10,
   maxHp: 10,
+  stamina: 10,
+  maxStamina: 10,
+  mp: 0,
+  maxMp: 0,
   attack: 2,
   defense: 1,
+  level: 1,
 };
 const COMBAT_TICK_INTERVAL = 30;
 // Block Building (decision: 2D, existing tilemap): how far from the
@@ -229,11 +245,19 @@ function trackStatus(
     component.type === "STATUS"
   );
   if (status?.type !== "STATUS" || !status.enabled) return fallback;
+  const maxHp = Math.max(1, status.maxHp);
+  const maxStamina = Math.max(0, status.maxStamina);
+  const maxMp = Math.max(0, status.maxMp);
   return {
-    hp: Math.max(0, status.hp),
-    maxHp: Math.max(1, status.maxHp),
+    hp: Math.max(0, Math.min(status.hp, maxHp)),
+    maxHp,
+    stamina: Math.max(0, Math.min(status.stamina, maxStamina)),
+    maxStamina,
+    mp: Math.max(0, Math.min(status.mp, maxMp)),
+    maxMp,
     attack: Math.max(0, status.attack),
     defense: Math.max(0, status.defense),
+    level: Math.max(1, Math.round(status.level)),
   };
 }
 

@@ -58,6 +58,7 @@ export function tracePolicyForTool(tool: BasicTool): TracePolicy {
   ) {
     return "IMMEDIATE";
   }
+  if (tool === "text") return "LAST";
   return tool === "select-lasso" ? "ACCUMULATE" : "LAST";
 }
 
@@ -368,7 +369,11 @@ export class ToolSession {
     if (remaining <= 0) return;
     let segment: readonly PixelPoint[];
     try {
-      segment = interpolatePixelLine(start, end);
+      segment = interpolatePixelLine(
+        start,
+        end,
+        this.#pathPreviewOptions.brushAlgorithm,
+      );
     } catch {
       // Preview input is disposable. A malformed or oversized segment must
       // never strand the active pointer session; canonical commit validation

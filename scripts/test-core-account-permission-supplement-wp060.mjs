@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = fileURLToPath(new URL('../', import.meta.url));
-const modulePath = join(repoRoot, 'pixiedraw/assets/js/modules/core-account-permission-utils.js');
+const modulePath = join(repoRoot, 'core-shell/assets/core-account-permission-utils.js');
 const source = await readFile(modulePath, 'utf8');
 const appWindow = {};
 const load = new Function('window', `${source}\nreturn window.PiXiEEDrawModules.coreAccountPermissionUtils;`);

@@ -13,6 +13,9 @@
     const format = String(value || 'pixiedraw-project');
     if (format === 'pixiedraw-project') return format;
     if (['gif', 'apng', 'sprite-sheet-png'].includes(format)) return 'animation';
+    if (['novel-json', 'text', 'markdown', 'html', 'csv', 'rtf', 'json'].includes(format)) return 'text';
+    if (['mp4', 'webm', 'mov', 'm4v', 'ogv'].includes(format)) return 'video';
+    if (['aac', 'aiff', 'flac', 'm4a', 'mid', 'midi', 'mp3', 'oga', 'ogg', 'opus', 'wav', 'weba'].includes(format)) return 'audio';
     return 'image';
   }
 

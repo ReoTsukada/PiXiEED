@@ -1,8 +1,8 @@
-# PiXiSYNCからPiXiEED Bridgeへ引き継ぐ要点
+# PiXiSYNC設計をPiXiEED Bridgeの外部コネクターへ再利用する要点
 
 作成日: 2026-08-30
 参照スナップショット: `d8cde9d1`
-位置づけ: 旧PiXiSYNC実装を削除した後に、Bridge設計へ再利用候補だけを戻すための短い引継ぎメモ。これは現時点の本番受入れ証明ではない。
+位置づけ: 旧PiXiSYNC設計から、外部PiXiEED Bridgeのprotocol／Connectorへ再利用できる候補だけを整理する短い引継ぎメモ。Draw2の正規同期はPiXYNC（ローカル3モード＋オンラインprovider）であり、このメモはDraw2のtransport変更やPiXiEED Bridgeへの一本化を決めない。これは現時点の本番受入れ証明でもない。
 
 ## 再利用候補
 

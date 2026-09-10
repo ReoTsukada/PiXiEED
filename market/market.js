@@ -34,6 +34,7 @@
   function formatPrice(value) {
     const amount = Number(value);
     if (!Number.isFinite(amount)) return '価格未設定';
+    if (amount === 0) return '無料';
     if (amount < 500) return '販売停止中';
     return `${new Intl.NumberFormat('ja-JP').format(amount)}円`;
   }
@@ -52,21 +53,39 @@
     return Number.isInteger(quantity) && quantity > 0 && Number(asset?.limited_sold_count || 0) >= quantity;
   }
 
+  function isAcquisitionEnabled(asset) {
+    // 既存の静的商品データには列がないため、未定義は従来どおり取得可能。
+    return asset?.acquisition_enabled !== false;
+  }
+
   function formatLabel(value) {
     const labels = {
       'pixiedraw-project': 'iDRAW', png: 'PNG', webp: 'WebP', gif: 'GIF', apng: 'APNG',
       'sprite-sheet-png': 'スプライトシート',
+      'novel-json': '小説・世界観', text: 'テキスト', markdown: 'Markdown', html: 'HTML', csv: 'CSV', rtf: 'RTF', json: 'JSON',
+      mp4: 'MP4動画', webm: 'WebM動画', mov: 'QuickTime動画', m4v: 'M4V動画', ogv: 'Ogg動画',
       aac: 'AAC', aiff: 'AIFF', flac: 'FLAC', m4a: 'M4A', mid: 'MIDI', midi: 'MIDI',
       mp3: 'MP3', oga: 'OGA', ogg: 'OGG', opus: 'Opus', wav: 'WAV', weba: 'WebM音声'
     };
     return labels[String(value || '')] || '画像素材';
   }
 
+  function productKind(asset) {
+    const groups = new Set(assetFormats(asset).map((format) => discovery.formatGroup(format)));
+    if (groups.has('pixiedraw-project')) return 'iDRAW作品';
+    const names = [];
+    if (groups.has('text')) names.push('文章・世界観');
+    if (groups.has('image') || groups.has('animation')) names.push('画像');
+    if (groups.has('video')) names.push('動画');
+    if (groups.has('audio')) names.push('音声');
+    return names.length ? names.join(' + ') : '一般素材';
+  }
+
   function createVerificationBadges(asset) {
     const badges = document.createElement('div'); badges.className = 'market-card__badges';
     const productType = document.createElement('span');
     productType.className = isPixieeDrawProduct(asset) ? 'is-pixiedraw-product' : 'is-general-product';
-    productType.textContent = isPixieeDrawProduct(asset) ? 'iDRAW作品' : '一般素材';
+    productType.textContent = productKind(asset);
     badges.appendChild(productType);
     if (asset.ai_usage_status === 'used' || asset.ai_usage_status === 'not-used') {
       const ai = document.createElement('span');
@@ -129,7 +148,7 @@
     const badges = createVerificationBadges(asset);
     const meta = document.createElement('div'); meta.className = 'market-card__meta';
     const format = document.createElement('span'); format.className = 'market-card__format'; format.textContent = assetFormats(asset).map(formatLabel).join(' / ');
-    const price = document.createElement('strong'); price.className = 'market-card__price'; price.textContent = `合計 ${formatPrice(asset.sale_price_yen)}`; meta.append(format, price);
+    const price = document.createElement('strong'); price.className = 'market-card__price'; price.textContent = isAcquisitionEnabled(asset) ? `合計 ${formatPrice(asset.sale_price_yen)}` : '公開のみ'; meta.append(format, price);
     const stats = document.createElement('div'); stats.className = 'market-card__stats';
     if (Number(asset.derivative_count) > 0) {
       const derivatives = document.createElement('span'); derivatives.textContent = `派生 ${Number(asset.derivative_count).toLocaleString('ja-JP')}`; stats.appendChild(derivatives);
@@ -137,7 +156,9 @@
     if (asset.series?.derivative_sales_allowed === true) {
       const allowed = document.createElement('span'); allowed.className = 'is-derivative-ok'; allowed.textContent = '改変・素材再販売OK'; stats.appendChild(allowed);
     }
-    if (asset.withdrawn_at) {
+    if (!isAcquisitionEnabled(asset)) {
+      const showcase = document.createElement('span'); showcase.className = 'is-showcase-only'; showcase.textContent = '閲覧のみ・取得不可'; stats.appendChild(showcase);
+    } else if (asset.withdrawn_at) {
       const withdrawn = document.createElement('span'); withdrawn.className = 'is-sold-out'; withdrawn.textContent = '出品取り下げ・売り切れ';
       stats.appendChild(withdrawn);
     } else if (Number.isInteger(Number(asset.limited_quantity)) && Number(asset.limited_quantity) > 0) {

@@ -173,8 +173,9 @@ function asAudioContentHash(value) {
   }
   return value;
 }
+var AUDIO200_MAX_TICK = Number.MAX_SAFE_INTEGER;
 function asAudioTick(value) {
-  if (!Number.isSafeInteger(value) || value < 0 || value > 9e9) {
+  if (!Number.isSafeInteger(value) || value < 0 || value > AUDIO200_MAX_TICK) {
     throw new Error("AudioTick must be a bounded non-negative safe integer.");
   }
   return value;
@@ -484,7 +485,7 @@ function sourcePlacementIsLocal(placement) {
 }
 
 // src/audio/audio-200/timebase.ts
-var MAX_TICK = 9e9;
+var MAX_TICK = Math.min(AUDIO200_MAX_TICK, 9e9);
 var SAFE_INSTRUMENT = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 function positiveFinite(value, fallback) {
   return Number.isFinite(value) && value > 0 ? value : fallback;
@@ -814,7 +815,6 @@ function buildAudioRoutingGraph(mixer, tracks) {
 }
 
 // src/audio/audio-200/state.ts
-var AUDIO200_MAX_TICK = 9e9;
 var AUDIO200_MAX_PROJECT_REVISION = 1e9;
 var AUDIO200_DEFAULT_PPQ = 480;
 var AUDIO200_DEFAULT_TEMPO_MILLIBPM = 12e4;
@@ -901,7 +901,7 @@ function validTimeRange(range, path) {
       recoverable: false
     };
   }
-  if (candidate.startTick + candidate.durationTick > AUDIO200_MAX_TICK) {
+  if (candidate.startTick > AUDIO200_MAX_TICK - candidate.durationTick) {
     return {
       code: "AUDIO_OVERFLOW",
       message: "Timeline end exceeds the safe AUDIO-200 tick range.",
@@ -2005,7 +2005,7 @@ async function applyAudioCommand(project, command) {
       const startTick = range?.startTick;
       const durationTick = range?.durationTick;
       const endTick = typeof startTick === "number" && typeof durationTick === "number" ? startTick + durationTick : NaN;
-      if (!boundedInteger(startTick, 0, AUDIO200_MAX_TICK) || !boundedInteger(durationTick, 1, AUDIO200_MAX_TICK) || !Number.isSafeInteger(endTick) || endTick > AUDIO200_MAX_TICK) {
+      if (!boundedInteger(startTick, 0, AUDIO200_MAX_TICK) || !boundedInteger(durationTick, 1, AUDIO200_MAX_TICK) || !Number.isSafeInteger(endTick) || startTick > AUDIO200_MAX_TICK - durationTick) {
         return fail2("AUDIO_INVALID_NUMBER", "Timeline bar range must be bounded non-negative ticks.", "command.payload.timelineBar");
       }
       const noteEdits = project.notes.flatMap((note) => {
@@ -5135,6 +5135,7 @@ export {
   AUDIO200_JOURNAL_SCHEMA_VERSION,
   AUDIO200_MAX_RANGE_BYTES,
   AUDIO200_MAX_SOURCE_BYTES,
+  AUDIO200_MAX_TICK,
   AUDIO200_METADATA_AUTHORITY,
   AUDIO200_PERSISTENCE_DB_NAME,
   AUDIO200_PERSISTENCE_DB_VERSION,

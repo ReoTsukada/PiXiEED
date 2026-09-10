@@ -10,6 +10,7 @@ import {
   getChipSynthVoice,
   midiToFrequency,
 } from "./chiptune.ts";
+import { decodeDpcmSample, type DpcmQuantizedSample } from "./dpcm.ts";
 import type {
   AudioAutomation,
   AudioChipMachineId,
@@ -476,6 +477,51 @@ export class ChipTuneSynth {
       0,
       voiceId,
     );
+  }
+
+  /** Play a bounded, already-quantized DPCM sample through a track input. */
+  playDpcmSample(sample: DpcmQuantizedSample, trackId?: string): boolean {
+    const decoded = decodeDpcmSample(sample);
+    if (decoded === undefined || decoded.length === 0) return false;
+
+    let source: AudioBufferSourceNode | undefined;
+    try {
+      const context = this.ensureContext();
+      const mixerRuntime = this.mixerRuntime;
+      if (context === undefined || mixerRuntime === undefined ||
+        String(context.state) !== "running") return false;
+      const buffer = context.createBuffer(1, decoded.length, sample.rateHz);
+      buffer.getChannelData(0).set(decoded);
+      source = context.createBufferSource();
+      source.buffer = buffer;
+      source.loop = sample.loop;
+      source.connect(mixerRuntime.getTrackInput(trackId));
+      const cleanup = (): void => {
+        if (source === undefined) return;
+        this.activeSources.delete(source);
+        try {
+          source.disconnect();
+        } catch {
+          // The browser may have disconnected an ended source already.
+        }
+      };
+      source.addEventListener("ended", cleanup, { once: true });
+      this.activeSources.add(source);
+      const start = context.currentTime + 0.005;
+      source.start(start);
+      if (!sample.loop) source.stop(start + decoded.length / sample.rateHz);
+      return true;
+    } catch {
+      if (source !== undefined) {
+        this.activeSources.delete(source);
+        try {
+          source.disconnect();
+        } catch {
+          // A partially-created source may already be disconnected.
+        }
+      }
+      return false;
+    }
   }
 
   /** Return the Web Audio clock without creating an AudioContext. */

@@ -31,6 +31,7 @@ export type DrawTool = "pen" | "eraser";
 export type InteractionTool =
   | DrawTool
   | "pixel-pen"
+  | "text"
   | "line"
   | "rect"
   | "rect-fill"

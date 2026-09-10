@@ -46,9 +46,25 @@ import {
 import {
   DRAW2_ASSET_STATE_CHANGED_EVENT,
   type Draw2AssetBridge,
+  type Draw2AssetReferenceRecord,
   type Draw2AssetBridgeSnapshot,
   type Draw2AssetSelectionSnapshot,
 } from "./draw2-asset-bridge-contract.ts";
+import {
+  detectAudioAssetization,
+  detectDrawAssetization,
+  finalizeAssetPackage,
+  type AssetPackageOfferKind,
+  type AssetPackageManifest,
+  type AssetDerivativePolicy,
+  type DrawAssetizationInput,
+  type AssetizationSourceFrame,
+} from "./game/game-350/assetization.ts";
+import {
+  createAudioAssetizationInput,
+  type AudioAssetPackageKind,
+  type AudioAssetPackageSelectionInput,
+} from "./game/game-350/audio-asset-package.ts";
 import {
   CHIP_SYNTH_PRESETS,
   type ChipSynthPresetId,
@@ -113,10 +129,15 @@ import {
 import {
   createGameEditorPersistenceRecord,
   createIndexedDbGameEditorPersistenceStore,
+  classifyGameEditorPersistenceError,
+  type GameEditorPersistenceFailureCause,
   type GameBehaviorSourceSnapshot,
+  type GameEditorDataSnapshot,
   type GameEditorBinding,
   type GameEditorCreationMode,
   type GameEditorPersistenceRecord,
+  type GameEditorPersistenceFailureStage,
+  type GameEditorPersistenceSaveResult,
   type GameEditorTrack,
   validateGameEditorPersistenceRecord,
 } from "./workspace/game-persistence.ts";
@@ -154,10 +175,15 @@ import {
   canonicalJson,
   type BehaviorIR,
   compileNoCodeBehavior,
+  type GameBlockTypeDefinition,
+  type GameEventAction,
   type GameEventCard,
+  type GameEventCondition,
   type GameAnimationBinding,
+  type GameItemDefinition,
   type GameObjectRole,
   type GameProject,
+  type GameRecipeDefinition,
   type GameSceneRules,
   type GameTemplateCategory,
   type GameTemplateInstance,
@@ -228,6 +254,16 @@ import {
   type Physics2DSettings,
 } from "./game/game-350/physics-2d.ts";
 import {
+  cleanupGame351Physics2DSession,
+  createGame351Physics2DSession,
+  createGame351RpgTemplateFromProject,
+  GAME351_INPUT_ACTIONS,
+  playGame351Physics2DSession,
+  stepGame351Physics2DSession,
+  stopGame351Physics2DSession,
+  type Game351Physics2DSession,
+} from "./game/game-350/playable-slice.ts";
+import {
   behaviorFromGameEventCard,
   defaultGameEventCardsForRuntimeFamily,
   GAME_EVENT_ACTION_OPTIONS,
@@ -253,6 +289,9 @@ import {
   GAME_VISUAL_MAKER_WORLD_THEMES,
   normalizeGameVisualMakerConfig,
   updateGameVisualMakerUiSlot,
+  createGameUiNode,
+  updateGameUiNode,
+  type GameUiNode,
   type GameVisualMakerCategory,
   type GameVisualMakerConfig,
   type GameVisualMakerDirection,
@@ -262,6 +301,116 @@ import {
   type GameVisualMakerUiSlotId,
   type GameVisualMakerWorldTheme,
 } from "./game/game-350/visual-maker-model.ts";
+
+type GameUiNodePlacement = Pick<GameUiNode["style"], "x" | "y" | "width" | "height">;
+
+type GameMarketRpcResult = {
+  readonly data?: unknown;
+  readonly error?: unknown;
+};
+
+type GameMarketQuery = {
+  select: (columns: string) => PromiseLike<GameMarketRpcResult>;
+};
+
+type GameMarketClient = {
+  readonly rpc: (
+    functionName: string,
+    parameters: Record<string, unknown>,
+  ) => PromiseLike<GameMarketRpcResult>;
+  readonly auth: {
+    readonly getSession: () => PromiseLike<{
+      readonly data?: {
+        readonly session?: {
+          readonly user?: { readonly id?: unknown } | null;
+        } | null;
+      };
+      readonly error?: unknown;
+    }>;
+  };
+  readonly functions?: {
+    readonly invoke: (
+      functionName: string,
+      options: { readonly body: Record<string, unknown> },
+    ) => PromiseLike<GameMarketRpcResult>;
+  };
+  readonly from: (table: string) => GameMarketQuery;
+};
+
+type GameMarketHost = Window & {
+  readonly PiXiEEDMarketAccess?: {
+    readonly getClient?: () => Promise<GameMarketClient>;
+  };
+  readonly __PIXIEED_ACCOUNT_SUPABASE_CLIENT__?: GameMarketClient;
+  readonly __PIXIEED_ACCOUNT_SUPABASE_CLIENT_PROMISE__?:
+    Promise<GameMarketClient>;
+  readonly PiXiEEDMarketDelivery?: {
+    readonly stagePiXiEEDrawFile?: (
+      blob: Blob,
+      metadata?: Record<string, unknown>,
+    ) => Promise<string>;
+  };
+};
+
+const gameUiNodePlacementOverlaps = (
+  left: GameUiNodePlacement,
+  right: GameUiNodePlacement,
+  gap: number,
+): boolean => left.x < right.x + right.width + gap &&
+  left.x + left.width + gap > right.x &&
+  left.y < right.y + right.height + gap &&
+  left.y + left.height + gap > right.y;
+
+const clampGameUiNodePlacement = (style: GameUiNode["style"]): GameUiNode["style"] => {
+  const width = Math.min(100, Math.max(1, Number.isFinite(style.width) ? style.width : 1));
+  const height = Math.min(100, Math.max(1, Number.isFinite(style.height) ? style.height : 1));
+  return {
+    ...style,
+    x: Math.min(100 - width, Math.max(0, Number.isFinite(style.x) ? style.x : 0)),
+    y: Math.min(100 - height, Math.max(0, Number.isFinite(style.y) ? style.y : 0)),
+    width,
+    height,
+  };
+};
+
+/** Resolves model placement into safe percentage coordinates for the DOM surface. */
+export function resolveGameUiNodeDomPlacements(
+  nodes: readonly GameUiNode[],
+): readonly GameUiNode[] {
+  const placed: GameUiNodePlacement[] = [];
+  return nodes.map((node) => {
+    const base = clampGameUiNodePlacement(node.style);
+    const layout = node.layout;
+    if (layout?.anchor === "FREE" || layout?.autoArrange === false) {
+      const result = { ...node, style: base };
+      placed.push(base);
+      return result;
+    }
+    const gap = Math.max(0, Math.min(20, layout?.gap ?? 2));
+    const maxX = 100 - base.width;
+    const maxY = 100 - base.height;
+    const anchor = layout?.anchor ?? "FREE";
+    const anchorPosition = (x: number, y: number): GameUiNodePlacement => ({ ...base, x, y });
+    const preferred = anchor === "TOP_RIGHT" ? [maxX, 0] :
+      anchor === "TOP_CENTER" ? [(100 - base.width) / 2, 0] :
+      anchor === "TOP_LEFT" ? [0, 0] :
+      anchor === "CENTER" ? [(100 - base.width) / 2, (100 - base.height) / 2] :
+      anchor === "BOTTOM_LEFT" ? [0, maxY] :
+      anchor === "BOTTOM_CENTER" ? [(100 - base.width) / 2, maxY] :
+      anchor === "BOTTOM_RIGHT" ? [maxX, maxY] : [base.x, base.y];
+    const preferredX = preferred[0] ?? base.x;
+    const preferredY = preferred[1] ?? base.y;
+    const candidates: GameUiNodePlacement[] = [anchorPosition(preferredX, preferredY)];
+    for (let y = 0; y <= maxY; y += Math.max(1, gap + 1)) {
+      for (let x = 0; x <= maxX; x += Math.max(1, gap + 1)) candidates.push(anchorPosition(x, y));
+    }
+    const placement = candidates.find((candidate) =>
+      placed.every((other) => !gameUiNodePlacementOverlaps(candidate, other, gap))
+    ) ?? anchorPosition(Math.min(maxX, base.x), Math.min(maxY, base.y));
+    placed.push(placement);
+    return { ...node, style: { ...base, x: placement.x, y: placement.y } };
+  });
+}
 import {
   createDefaultRpgTilemapDocument,
   createGameTilemapDocument,
@@ -281,6 +430,7 @@ import {
 import {
   buildGameAssetBrowserEntries,
   findGameAnimationClips,
+  gameAnimationClipMatchesRuntime,
   gameAnimationBindingIdFor,
   gameAnimationBindingKey,
   type GameAnimationClipReference,
@@ -289,9 +439,41 @@ import {
   upsertGameAnimationBinding,
 } from "./game/game-350/game-asset-browser.ts";
 import {
+  classifyGameMarketAccess,
+  normalizeGameMarketCatalogRecord,
+  type GameMarketAccessResult,
+  type GameMarketCatalogRecord,
+} from "./game/game-350/game-market-catalog.ts";
+import {
+  createGameWorkspaceContext,
+  gameWorkspaceReducer,
+  type GameWorkspaceAction,
+  type GameWorkspaceBottomPanel,
+  type GameWorkspaceContext,
+  type GameWorkspaceReturnContext,
+} from "./game/game-350/workspace-context.ts";
+import {
+  beginCaptureSession,
+  cancelCaptureSession,
+  captureDraftKey,
+  captureFrameCountAllowed,
+  commitCaptureSession,
+  gameAssetIdForCapture,
+  splitCaptureRectInto32Frames,
+  updateCaptureSessionDraft,
+  type CaptureDraft,
+  type CaptureReturnContext,
+  type CaptureSession,
+  type CaptureSessionTarget,
+} from "./game/game-350/capture-session.ts";
+import {
   createGame350EngineAdapterPackage,
   type EngineAdapterPackage,
 } from "./game/game-350/engine-adapters.ts";
+import {
+  createUnityAssetImportPackage,
+  encodeUnityAssetImportPackageZip,
+} from "./game/game-350/unity-asset-export.ts";
 import {
   createSite400IGameRoute,
   type Site400IGameFeatureFlag,
@@ -306,6 +488,139 @@ import {
   type GameGenreRuntimeInput,
   type GameGenreRuntimeState,
 } from "./game/game-350/genre-runtime.ts";
+import {
+  createDefaultGamePlaygroundConfig,
+  createDefaultGamePlaygroundWorldMap,
+  createGamePlaygroundRuntime,
+  gamePlaygroundAudioEventForRole,
+  cloneGamePlaygroundConfig,
+  normalizeGamePlaygroundConfig,
+  removeGamePlaygroundAudioRange,
+  stepGamePlaygroundRuntime,
+  gamePlaygroundAnimationFrameIndex,
+  upsertGamePlaygroundAudioRange,
+  removeGamePlaygroundDpcmSample,
+  type GamePlaygroundAudioRange,
+  type GamePlaygroundAudioEvent,
+  type GameAssetEntry,
+  type GamePlaygroundConfig,
+  type GamePlaygroundDrawReference,
+  type GamePlaygroundRect,
+  type GamePlaygroundSourceFrame,
+  type GamePlaygroundLayer,
+  type GamePlaygroundPlacement,
+  normalizeGamePlaygroundPlacement,
+  type GamePlaygroundMode,
+  type GamePlaygroundRuntimeInput,
+  inferGamePlaygroundAssetLayout,
+  type GamePlaygroundRuntimeState,
+  type GamePlaygroundElement,
+} from "./game/game-350/playground.ts";
+import { gameAudioTargetForMotion } from "./game/game-350/game-audio.ts";
+import { applyGameElementAction, applyGameElementEffect, createGameElementState, type GameElementState } from "./game/game-350/game-elements.ts";
+import {
+  beginAudioCaptureSession,
+  beginAudioCaptureCommit,
+  cancelAudioCaptureSession,
+  finishAudioCaptureCommit,
+  updateAudioCaptureDraft,
+  type AudioCaptureSession,
+  type AudioCaptureDraft,
+  type AudioCaptureTarget,
+} from "./game/game-350/audio-capture-session.ts";
+import {
+  attachDpcmReferenceToGameAudioAsset,
+  clearGameAudioTarget,
+  commitGameAudioTransaction,
+  gameAudioTargetEquals,
+  gameAudioAssetIdForSource,
+  type GameAudioAsset,
+  type GameAudioCommitInput,
+  type GameAudioTarget,
+} from "./game/game-350/game-audio.ts";
+import { normalizeGameAudioRangeSelection, scheduleGameAudioPlayback } from "./audio/audio-240/game-range-selection.ts";
+import { createGameAudioQueue } from "./audio/audio-240/game-audio-queue.ts";
+import { quantizeDpcmSample } from "./audio/audio-240/dpcm.ts";
+import { splitAudioTick, virtualViewport } from "./audio/audio-240/virtual-timeline.ts";
+import { AUDIO200_MAX_TICK } from "./audio/audio-200/contracts.ts";
+import { createAudioTrackIntervalIndex } from "./game/game-350/audio-track-interval-index.ts";
+import {
+  GAME_PLAYGROUND_MAX_WORLD_DIMENSION,
+  paintGamePlaygroundWorldCell,
+  gamePlaygroundWorldResidentChunkKeys,
+  createGamePlaygroundWorldIndex,
+  type GamePlaygroundWorldIndex,
+  type GamePlaygroundWorldMap,
+} from "./game/game-350/world.ts";
+
+export interface GamePlaygroundDrawReferenceProjectionInput {
+  readonly projectId?: string;
+  readonly layout: GamePlaygroundDrawReference["layout"];
+  readonly sourceFrameId?: string;
+  readonly region?: GamePlaygroundRect;
+  readonly sourceFrames?: readonly {
+    readonly sourceFrameId: string;
+    readonly layerIds?: readonly string[];
+    readonly rect: GamePlaygroundRect;
+    readonly durationMs?: number;
+  }[];
+  readonly hiddenLayerIds?: readonly string[];
+  readonly hiddenLayerIdsByFrame?: Readonly<Record<string, readonly string[]>>;
+}
+
+/**
+ * Projects the Draw asset bridge's reference into the strict Game-owned metadata
+ * boundary. Asset-bridge-only fields such as kind, layerIds, and flip flags never
+ * cross into the persisted Playground model.
+ */
+export function projectGamePlaygroundDrawReference(
+  reference: Pick<
+    Draw2AssetReferenceRecord,
+    "assetId" | "revisionId" | "contentHash" | "label" | "mode" |
+      "assetDefinitionId"
+  >,
+  input: GamePlaygroundDrawReferenceProjectionInput,
+): GamePlaygroundDrawReference {
+  const sourceFrames = input.sourceFrames?.map((frame): GamePlaygroundSourceFrame => ({
+    sourceFrameId: frame.sourceFrameId,
+    ...(frame.layerIds === undefined ? {} : { layerIds: [...frame.layerIds] }),
+    rect: {
+      x: frame.rect.x,
+      y: frame.rect.y,
+      width: frame.rect.width,
+      height: frame.rect.height,
+    },
+    ...(frame.durationMs === undefined ? {} : { durationMs: frame.durationMs }),
+  }));
+  return {
+    assetId: reference.assetId,
+    revisionId: reference.revisionId,
+    contentHash: reference.contentHash,
+    label: reference.label,
+    mode: reference.mode,
+    ...(input.projectId === undefined ? {} : { projectId: input.projectId }),
+    ...(reference.assetDefinitionId === undefined
+      ? {}
+      : { assetDefinitionId: reference.assetDefinitionId }),
+    layout: input.layout,
+    ...(input.sourceFrameId === undefined
+      ? {}
+      : { sourceFrameId: input.sourceFrameId }),
+    ...(input.region === undefined
+      ? {}
+      : {
+        region: {
+          x: input.region.x,
+          y: input.region.y,
+          width: input.region.width,
+          height: input.region.height,
+        },
+      }),
+    ...(sourceFrames === undefined ? {} : { sourceFrames }),
+    ...(input.hiddenLayerIds === undefined ? {} : { hiddenLayerIds: [...input.hiddenLayerIds] }),
+    ...(input.hiddenLayerIdsByFrame === undefined ? {} : { hiddenLayerIdsByFrame: Object.fromEntries(Object.entries(input.hiddenLayerIdsByFrame).map(([id, layers]) => [id, [...layers]])) }),
+  };
+}
 import type { Site400ResolveResult } from "./platform/site-400/server-authorized-registry-provider.ts";
 import { encodeStoredZip } from "./draw2-export.ts";
 import { createEventGraph, planPlayback } from "./audio/audio-210/core.ts";
@@ -512,6 +827,8 @@ const PANELS: PanelKind[] = [
   "color",
   "layers",
   "inspector",
+  "history",
+  "navigator",
   "assets",
   "tileset",
   "advanced",
@@ -555,6 +872,20 @@ const RIGHT_DOCK_PANEL_REGISTRY: readonly RightDockPanelDefinition[] = [
     label: "Inspector",
     category: "Information",
     aliases: ["properties", "props", "selection"],
+    singleton: true,
+  },
+  {
+    id: "history",
+    label: "History",
+    category: "Information",
+    aliases: ["undo", "redo", "operations"],
+    singleton: true,
+  },
+  {
+    id: "navigator",
+    label: "Navigator",
+    category: "Information",
+    aliases: ["zoom", "pan", "overview", "canvas"],
     singleton: true,
   },
   {
@@ -1095,6 +1426,13 @@ const WORKSPACE_COMMANDS: WorkspaceCommand[] = [
     regions: ["left_dock", "canvas"],
   },
   {
+    id: "tool-text",
+    version: 1,
+    label: "Text",
+    shortcut: "t",
+    regions: ["left_dock", "canvas"],
+  },
+  {
     id: "tool-eraser",
     version: 1,
     label: "Eraser",
@@ -1244,6 +1582,46 @@ function queryAll<T extends Element>(root: ParentNode, selector: string): T[] {
   return [...root.querySelectorAll<T>(selector)];
 }
 
+export const GAME_PERSISTENCE_OFFLINE_MESSAGE =
+  "この環境では保存できません。再読み込みで変更が失われます。";
+
+export type GamePersistenceFailureState = "offline" | "error" | "conflict";
+
+export function isGamePersistenceCapabilityAvailable(
+  storeAvailable: boolean,
+  indexedDb: unknown,
+): boolean {
+  return storeAvailable && indexedDb !== undefined && indexedDb !== null;
+}
+
+export function classifyGamePersistenceFailure(
+  error: unknown,
+  capabilityAvailable: boolean,
+): GamePersistenceFailureState {
+  if (!capabilityAvailable) return "offline";
+  const value = error as { readonly name?: unknown; readonly message?: unknown };
+  const name = typeof value?.name === "string" ? value.name : "";
+  const message = typeof value?.message === "string" ? value.message : "";
+  if (
+    name === "ConflictError" ||
+    /(?:CAS|stale|conflict|競合)/iu.test(`${name} ${message}`)
+  ) return "conflict";
+  if (
+    name === "SecurityError" || name === "NotAllowedError" ||
+    name === "NotSupportedError" || name === "InvalidStateError" ||
+    /IndexedDB(?: is)? (?:unavailable|not supported|not available)/iu.test(
+      message,
+    )
+  ) return "offline";
+  return "error";
+}
+
+function safeGamePersistenceErrorName(error: unknown): string | undefined {
+  const value = error as { readonly name?: unknown };
+  const name = typeof value?.name === "string" ? value.name : "";
+  return /^[A-Za-z][A-Za-z0-9]{0,47}Error$/u.test(name) ? name : undefined;
+}
+
 const DRAW2_ICON_SPRITE = "./assets/icons/draw2-icons.svg#";
 
 function createDraw2Icon(
@@ -1290,6 +1668,28 @@ function isEditableTarget(target: EventTarget | null): boolean {
     target.matches("input, textarea, select, [contenteditable=true]") ||
     target.closest("input, textarea, select, [contenteditable=true]") !== null
   );
+}
+
+function isWorkspaceInteractiveTarget(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest(
+    "button, a, summary, input, textarea, select, " +
+      "[contenteditable=true], [role='button'], [role='tab'], " +
+      "[role='menuitem'], [role='option'], [role='checkbox'], " +
+      "[role='radio'], [role='separator'], [role='slider'], " +
+      "[role='spinbutton'], [role='combobox'], [role='listbox'], " +
+      "[role='grid'], [role='gridcell'], [role='tree'], [role='treegrid'], " +
+      "[role='treeitem'], [role='row'], [role='cell'], " +
+      "[role='columnheader'], [role='list'], [role='tablist'], " +
+      "[role='toolbar']",
+  ) !== null;
+}
+
+export function isWorkspaceKeyboardActionAllowed(
+  event: Pick<KeyboardEvent, "defaultPrevented" | "isComposing" | "repeat">,
+  target: EventTarget | null,
+): boolean {
+  return !event.defaultPrevented && !event.isComposing && !event.repeat &&
+    !isEditableTarget(target) && !isWorkspaceInteractiveTarget(target);
 }
 
 function setPressed(
@@ -1407,10 +1807,19 @@ export function bootstrapDraw2Workspace(
   );
   const workspaceManifestStore = createIndexedDbWorkspaceManifestStore();
   const gamePersistenceStore = createIndexedDbGameEditorPersistenceStore();
+  let gamePersistenceOffline = false;
   let gamePersistenceRevision = 0;
   let gamePersistenceExpectedRevision = 0;
   let gamePersistenceExpectedStateHash: string | null = null;
   let gamePersistenceSaveQueue: Promise<void> = Promise.resolve();
+  type GamePersistenceUiState =
+    | "ready"
+    | "unsaved"
+    | "saving"
+    | "saved"
+    | "error"
+    | "conflict"
+    | "offline";
   let pixyncGameStore: GameEditorCanonicalStore | undefined;
   let workspaceProjectSwitchQueue: Promise<void> = Promise.resolve();
   const chipTuneSynth = new ChipTuneSynth(windowRef);
@@ -1514,6 +1923,90 @@ export function bootstrapDraw2Workspace(
   const statusbarMessage = query<HTMLElement>(
     documentRef,
     "#draw2WorkspaceStatusbarMessage",
+  );
+  const gamePersistenceStatus = query<HTMLElement>(
+    documentRef,
+    "#draw2GamePersistenceStatus",
+  );
+  const gamePersistenceStatusLabel = gamePersistenceStatus?.querySelector<HTMLElement>(
+    "[data-game-persistence-label]",
+  );
+  const setGamePersistenceState = (
+    state: GamePersistenceUiState,
+  ): void => {
+    root.dataset.gamePersistenceState = state;
+    if (gamePersistenceStatus === undefined) return;
+    gamePersistenceStatus.dataset.gamePersistenceState = state;
+    const label = state === "offline"
+      ? GAME_PERSISTENCE_OFFLINE_MESSAGE
+      : state === "unsaved"
+      ? "未保存"
+      : state === "saving"
+      ? "保存中…"
+      : state === "saved"
+      ? "保存済み"
+      : state === "conflict"
+      ? "競合・未保存"
+      : state === "error"
+      ? "保存エラー"
+      : "Local";
+    gamePersistenceStatusLabel?.replaceChildren(
+      documentRef.createTextNode(label),
+    );
+    gamePersistenceStatus.setAttribute("aria-label", label);
+  };
+  const clearGamePersistenceDiagnostic = (): void => {
+    delete root.dataset.gamePersistenceFailureStage;
+    delete root.dataset.gamePersistenceFailureCause;
+    delete root.dataset.gamePersistenceFailureName;
+    if (gamePersistenceStatus !== undefined) {
+      delete gamePersistenceStatus.dataset.gamePersistenceFailureStage;
+      delete gamePersistenceStatus.dataset.gamePersistenceFailureCause;
+      delete gamePersistenceStatus.dataset.gamePersistenceFailureName;
+    }
+  };
+  const setGamePersistenceDiagnostic = (
+    stage: GameEditorPersistenceFailureStage,
+    cause: GameEditorPersistenceFailureCause,
+    errorName?: string,
+  ): void => {
+    const safeErrorName = safeGamePersistenceErrorName({ name: errorName });
+    root.dataset.gamePersistenceFailureStage = stage;
+    root.dataset.gamePersistenceFailureCause = cause;
+    if (safeErrorName === undefined) {
+      delete root.dataset.gamePersistenceFailureName;
+    } else {
+      root.dataset.gamePersistenceFailureName = safeErrorName;
+    }
+    if (gamePersistenceStatus !== undefined) {
+      gamePersistenceStatus.dataset.gamePersistenceFailureStage = stage;
+      gamePersistenceStatus.dataset.gamePersistenceFailureCause = cause;
+      if (safeErrorName === undefined) {
+        delete gamePersistenceStatus.dataset.gamePersistenceFailureName;
+      } else {
+        gamePersistenceStatus.dataset.gamePersistenceFailureName = safeErrorName;
+      }
+    }
+    if (typeof console !== "undefined" && typeof console.warn === "function") {
+      console.warn("[iGAME persistence]", {
+        stage,
+        cause,
+        errorName: safeErrorName,
+      });
+    }
+  };
+  const gamePersistenceCapabilityAvailable = (): boolean =>
+    !gamePersistenceOffline &&
+    isGamePersistenceCapabilityAvailable(
+        gamePersistenceStore.available,
+        windowRef.indexedDB,
+      );
+  gamePersistenceOffline = !isGamePersistenceCapabilityAvailable(
+    gamePersistenceStore.available,
+    windowRef.indexedDB,
+  );
+  setGamePersistenceState(
+    gamePersistenceOffline ? "offline" : "ready",
   );
   const syncStatusSurface = query<HTMLElement>(
     documentRef,
@@ -1705,6 +2198,106 @@ export function bootstrapDraw2Workspace(
   const creatorAssetSurface = query<HTMLElement>(
     documentRef,
     "#draw2CreatorAssetSurface",
+  );
+  const characterSetupName = query<HTMLInputElement>(
+    documentRef,
+    "#draw2CharacterSetupName",
+  );
+  const characterSetupFps = query<HTMLInputElement>(
+    documentRef,
+    "#draw2CharacterSetupFps",
+  );
+  const characterSetupStatus = query<HTMLElement>(
+    documentRef,
+    "#draw2CharacterSetupStatus",
+  );
+  const characterSetupActionButtons = queryAll<HTMLButtonElement>(
+    documentRef,
+    "[data-character-action]",
+  );
+  const characterSetupDirectionButtons = queryAll<HTMLButtonElement>(
+    documentRef,
+    "[data-character-direction]",
+  );
+  const characterSetupDirectionGrid = query<HTMLElement>(
+    documentRef,
+    "#draw2CharacterDirectionGrid",
+  );
+  const characterSetupDirectionMode = query<HTMLSelectElement>(
+    documentRef,
+    "#draw2CharacterDirectionMode",
+  );
+  const characterSetupSelectedAction = query<HTMLElement>(
+    documentRef,
+    "#draw2CharacterSelectedAction",
+  );
+  const characterSetupDirectionStatus = query<HTMLElement>(
+    documentRef,
+    "#draw2CharacterDirectionStatus",
+  );
+  const characterSetupAnimationSlot = query<HTMLOutputElement>(
+    documentRef,
+    "#draw2CharacterAnimationSlot",
+  );
+  const characterSetupAnimationAddFrame = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2CharacterAnimationAddFrame",
+  );
+  const characterSetupAnimationAllFrames = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2CharacterAnimationAllFrames",
+  );
+  const characterSetupAnimationAddFrameLabel = query<HTMLElement>(
+    documentRef,
+    "[data-character-animation-add-label]",
+  );
+  const characterSetupAnimationDelete = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2CharacterAnimationDelete",
+  );
+  const characterSetupAnimationFramePrevious = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2CharacterAnimationFramePrevious",
+  );
+  const characterSetupAnimationFrameNext = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2CharacterAnimationFrameNext",
+  );
+  const characterSetupAnimationFrameReplace = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2CharacterAnimationFrameReplace",
+  );
+  const characterSetupAnimationFrameDelete = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2CharacterAnimationFrameDelete",
+  );
+  const characterSetupAnimationFrameDuration = query<HTMLInputElement>(
+    documentRef,
+    "#draw2CharacterAnimationFrameDuration",
+  );
+  const characterSetupAnimationLoop = query<HTMLSelectElement>(
+    documentRef,
+    "#draw2CharacterAnimationLoop",
+  );
+  const characterSetupAnimationPreview = query<HTMLCanvasElement>(
+    documentRef,
+    "#draw2CharacterAnimationPreviewCanvas",
+  );
+  const characterSetupAnimationFrameStrip = query<HTMLElement>(
+    documentRef,
+    "#draw2CharacterAnimationFrameStrip",
+  );
+  const characterSetupAnimationStatus = query<HTMLOutputElement>(
+    documentRef,
+    "#draw2CharacterAnimationStatus",
+  );
+  const characterSetupSave = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2CharacterSetupSave",
+  );
+  const characterSetupPlace = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2CharacterSetupPlace",
   );
   const creatorAssetUnavailable = query<HTMLElement>(
     documentRef,
@@ -1981,6 +2574,30 @@ export function bootstrapDraw2Workspace(
   const assetBuilderSave = query<HTMLButtonElement>(
     documentRef,
     "#draw2AssetBuilderSave",
+  );
+  const assetBuilderUnityExport = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2AssetBuilderUnityExport",
+  );
+  const assetBuilderUnityStatus = query<HTMLOutputElement>(
+    documentRef,
+    "#draw2AssetBuilderUnityStatus",
+  );
+  const assetBuilderOfferKind = query<HTMLSelectElement>(
+    documentRef,
+    "#draw2AssetBuilderOfferKind",
+  );
+  const assetBuilderDerivativePolicy = query<HTMLSelectElement>(
+    documentRef,
+    "#draw2AssetBuilderDerivativePolicy",
+  );
+  const assetBuilderFinalize = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2AssetBuilderFinalize",
+  );
+  const assetBuilderPackageStatus = query<HTMLOutputElement>(
+    documentRef,
+    "#draw2AssetBuilderPackageStatus",
   );
   const assetBuilderAssetSelect = query<HTMLSelectElement>(
     documentRef,
@@ -2297,7 +2914,7 @@ export function bootstrapDraw2Workspace(
       ? "Build／Publishは本番境界へ接続しない後続枠です。このEntryから公開処理は行いません。"
       : definition.category === "Audio"
       ? audioFeatureFlag === "on"
-        ? "Audio Bridgeはlazy load済みでも、編集UIは後続実装で接続します。"
+        ? "Audioモジュールはlazy load済みでも、編集UIは後続実装で接続します。"
         : "Audio feature flagがOFFのため編集UIは読み込みません。必要時にAudio flagを有効化します。"
       : "このパネルは追加済みの表示枠です。対応機能は後続の実装で接続します。";
     empty.append(title, stateLabel, message);
@@ -2458,14 +3075,23 @@ export function bootstrapDraw2Workspace(
     documentRef,
     "#draw2WorkspaceCanvasSlot",
   );
+  const workspaceCanvasRegion = query<HTMLElement>(
+    documentRef,
+    "#draw2WorkspaceCanvasRegion",
+  );
   const draw2GameSceneViewport = query<HTMLElement>(
     documentRef,
     "#draw2GameSceneViewport",
+  );
+  const draw2GameTopbarControls = query<HTMLElement>(
+    documentRef,
+    "#draw2GameTopbarControls",
   );
   const draw2GameSceneSvg = query<SVGSVGElement>(
     documentRef,
     "#draw2GameSceneSvg",
   );
+  const draw2GameUiOverlay = query<HTMLElement>(documentRef, "#draw2GameUiOverlay");
   const draw2GameSceneMinimapSvg = query<SVGSVGElement>(
     documentRef,
     "#draw2GameSceneMinimapSvg",
@@ -2474,6 +3100,339 @@ export function bootstrapDraw2Workspace(
     documentRef,
     "#draw2GameSceneViewportStatus",
   );
+  const draw2GamePlaygroundSourceRail = query<HTMLElement>(
+    documentRef,
+    "#draw2GamePlaygroundSourceRail",
+  );
+  const draw2GamePlaygroundDrawStatus = query<HTMLOutputElement>(
+    documentRef,
+    "#draw2GamePlaygroundDrawStatus",
+  );
+  const draw2GamePlaygroundDrawOpen = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2GamePlaygroundDrawOpen",
+  );
+  const draw2GamePlaygroundDrawRefresh = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2GamePlaygroundDrawRefresh",
+  );
+  const draw2GamePlaygroundAudioStatus = query<HTMLOutputElement>(
+    documentRef,
+    "#draw2GamePlaygroundAudioStatus",
+  );
+  const draw2GamePlaygroundAudioOpen = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2GamePlaygroundAudioOpen",
+  );
+  const draw2GamePlaygroundAudioRefresh = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2GamePlaygroundAudioRefresh",
+  );
+  const draw2GamePlaygroundCenterBar = query<HTMLElement>(
+    documentRef,
+    "#draw2GamePlaygroundCenterBar",
+  );
+  const draw2GamePlaygroundModes = queryAll<HTMLButtonElement>(
+    documentRef,
+    "[data-game-playground-mode]",
+  );
+  const draw2GamePlaygroundCenterStatus = query<HTMLOutputElement>(
+    documentRef,
+    "#draw2GamePlaygroundCenterStatus",
+  );
+  const draw2GamePlaygroundInspector = query<HTMLElement>(
+    documentRef,
+    "#draw2GamePlaygroundInspector",
+  );
+  const draw2GameMobileInspectorToggle = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2GameMobileInspectorToggle",
+  );
+  const draw2GameMobileInspectorClose = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2GameMobileInspectorClose",
+  );
+  const draw2GamePlaygroundSelectedAsset = query<HTMLElement>(
+    documentRef,
+    "#draw2GamePlaygroundSelectedAsset",
+  );
+  const draw2GamePlaygroundWorldState = query<HTMLElement>(
+    documentRef,
+    "#draw2GamePlaygroundWorldState",
+  );
+  const draw2GamePlaygroundWorldStatus = query<HTMLOutputElement>(
+    documentRef,
+    "#draw2GamePlaygroundWorldStatus",
+  );
+  const draw2GamePlaygroundWorldSprite = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2GamePlaygroundWorldSprite",
+  );
+  const draw2GamePlaygroundWorldApply = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2GamePlaygroundWorldApply",
+  );
+  const draw2GamePlaygroundWorldClear = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2GamePlaygroundWorldClear",
+  );
+  const draw2GamePlaygroundWorldWidth = query<HTMLInputElement>(
+    documentRef,
+    "#draw2GamePlaygroundWorldWidth",
+  );
+  const draw2GamePlaygroundWorldHeight = query<HTMLInputElement>(
+    documentRef,
+    "#draw2GamePlaygroundWorldHeight",
+  );
+  const draw2GamePlaygroundWorldBounds = query<HTMLSelectElement>(
+    documentRef,
+    "#draw2GamePlaygroundWorldBounds",
+  );
+  const draw2GamePlaygroundPlayerState = query<HTMLElement>(
+    documentRef,
+    "#draw2GamePlaygroundPlayerState",
+  );
+  const draw2GamePlaygroundPlayerStatus = query<HTMLOutputElement>(
+    documentRef,
+    "#draw2GamePlaygroundPlayerStatus",
+  );
+  const draw2GamePlaygroundPlayerSprite = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2GamePlaygroundPlayerSprite",
+  );
+  const draw2GamePlaygroundPlayerFrames = query<HTMLElement>(
+    documentRef,
+    "#draw2GamePlaygroundPlayerFrames",
+  );
+  const draw2GamePlaygroundPlayerApply = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2GamePlaygroundPlayerApply",
+  );
+  const draw2GamePlaygroundPlayerClear = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2GamePlaygroundPlayerClear",
+  );
+  const draw2GamePlaygroundPlayerMovable = query<HTMLInputElement>(
+    documentRef,
+    "#draw2GamePlaygroundPlayerMovable",
+  );
+  const draw2GamePlaygroundPlayerCollision = query<HTMLInputElement>(
+    documentRef,
+    "#draw2GamePlaygroundPlayerCollision",
+  );
+  const draw2GamePlaygroundPlayerGravity = query<HTMLInputElement>(
+    documentRef,
+    "#draw2GamePlaygroundPlayerGravity",
+  );
+  const draw2GamePlaygroundDrawLayout = query<HTMLSelectElement>(
+    documentRef,
+    "#draw2GamePlaygroundDrawLayout",
+  );
+  const draw2GamePlaygroundReferenceMode = query<HTMLSelectElement>(
+    documentRef,
+    "#draw2GamePlaygroundReferenceMode",
+  );
+  const draw2GamePlaygroundObjectAdd = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2GamePlaygroundObjectAdd",
+  );
+  const draw2GamePlaygroundAudioState = query<HTMLElement>(
+    documentRef,
+    "#draw2GamePlaygroundAudioState",
+  );
+  const draw2GamePlaygroundAudioRange = query<HTMLOutputElement>(
+    documentRef,
+    "#draw2GamePlaygroundAudioRange",
+  );
+  const draw2GamePlaygroundAudioRole = query<HTMLSelectElement>(
+    documentRef,
+    "#draw2GamePlaygroundAudioRole",
+  );
+  const draw2GamePlaygroundAudioEvents = queryAll<HTMLButtonElement>(
+    documentRef,
+    "[data-game-playground-audio-event]",
+  );
+  const draw2GamePlaygroundAudioReferenceMode = query<HTMLSelectElement>(
+    documentRef,
+    "#draw2GamePlaygroundAudioReferenceMode",
+  );
+  const draw2GamePlaygroundAudioApply = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2GamePlaygroundAudioApply",
+  );
+  const draw2GamePlaygroundAudioClear = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2GamePlaygroundAudioClear",
+  );
+  const draw2GamePlaygroundAudioAssignments = query<HTMLElement>(
+    documentRef,
+    "#draw2GamePlaygroundAudioAssignments",
+  );
+  const draw2GamePlaygroundStatus = query<HTMLOutputElement>(
+    documentRef,
+    "#draw2GamePlaygroundStatus",
+  );
+  const draw2GamePlaygroundControlsSummary = query<HTMLElement>(
+    documentRef,
+    "#draw2GamePlaygroundControlsSummary",
+  );
+  const draw2GamePlaygroundBottom = query<HTMLElement>(
+    documentRef,
+    "#draw2GamePlaygroundBottom",
+  );
+  const draw2GamePlaygroundBottomCards = query<HTMLElement>(
+    documentRef,
+    "#draw2GamePlaygroundBottomCards",
+  );
+  const draw2GamePlaygroundBottomStatus = query<HTMLOutputElement>(
+    documentRef,
+    "#draw2GamePlaygroundBottomStatus",
+  );
+  const draw2GamePlaygroundLibrarySourceTabs = queryAll<HTMLButtonElement>(
+    documentRef,
+    "[data-gameplayground-library-source]",
+  );
+  const draw2GamePlaygroundMarketSearch = query<HTMLInputElement>(
+    documentRef,
+    "#draw2GamePlaygroundMarketSearch",
+  );
+  const draw2GamePlaygroundAssetAdd = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2GamePlaygroundAssetAdd",
+  );
+  // The playground markup is declared once in index.html so the legacy panel
+  // registry keeps its stable shape. Move the user-facing surface into the
+  // existing Game Inspector rail before any mode projection runs.
+  const gameInspectorShell = query<HTMLElement>(
+    documentRef,
+    "#draw2WorkspacePanelGameInspector .draw2-panel-shell",
+  );
+  if (
+    draw2GamePlaygroundInspector !== undefined &&
+    gameInspectorShell !== undefined &&
+    !gameInspectorShell.contains(draw2GamePlaygroundInspector)
+  ) {
+    gameInspectorShell.prepend(draw2GamePlaygroundInspector);
+  }
+  const setGameMobileInspectorOpen = (open: boolean): void => {
+    const active = root.dataset.creatorMode === "GAME" && open;
+    root.dataset.gameMobileInspector = active ? "open" : "closed";
+    draw2GameMobileInspectorToggle?.setAttribute(
+      "aria-expanded",
+      String(active),
+    );
+  };
+  const legacyGameUiEnabled: boolean = false;
+  const legacyGameEventTypes = [
+    "click",
+    "change",
+    "input",
+    "beforeinput",
+    "keydown",
+    "keyup",
+    "pointerdown",
+    "pointermove",
+    "pointerup",
+    "pointercancel",
+    "mousedown",
+    "mousemove",
+    "mouseup",
+    "wheel",
+    "touchstart",
+    "touchmove",
+    "touchend",
+    "dragstart",
+    "dragenter",
+    "dragover",
+    "dragleave",
+    "dragend",
+    "drop",
+    "dblclick",
+    "contextmenu",
+    "submit",
+  ] as const;
+  type LegacyGameUiEvent = Event;
+  const bindLegacyGameUiEvent = <T extends LegacyGameUiEvent>(
+    target: EventTarget | undefined,
+    type: string,
+    listener: (event: T) => void,
+    capture = false,
+  ): void => {
+    if (!legacyGameUiEnabled || target === undefined) return;
+    target.addEventListener(type, listener as EventListener, capture);
+  };
+  const blockLegacyGameEvent = (event: Event): void => {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  };
+  const isolateLegacyGameSurface = (surface: HTMLElement): void => {
+    if (surface === draw2GamePlaygroundInspector) return;
+    const listenerBound = surface.dataset.gameLegacyIsolated === "true";
+    surface.dataset.gameLegacyIsolated = "true";
+    surface.dataset.gameLegacySurface = "true";
+    surface.hidden = true;
+    surface.inert = true;
+    surface.setAttribute("aria-hidden", "true");
+    for (const focusable of queryAll<HTMLElement>(
+      surface,
+      "a[href], button, input, select, textarea, [tabindex]",
+    )) {
+      focusable.tabIndex = -1;
+    }
+    if (!listenerBound) {
+      for (const type of legacyGameEventTypes) {
+        surface.addEventListener(type, blockLegacyGameEvent, {
+          capture: true,
+          passive: type !== "wheel" && !type.startsWith("touch"),
+        });
+      }
+    }
+  };
+  const isolateLegacyGameUi = (): void => {
+    for (const selector of [
+      "#draw2GameLeftDockNodeBoxPanel",
+      "#draw2WorkspacePanelGameScene",
+      "#draw2WorkspacePanelGameAssets",
+      "#draw2GameVisualMaker",
+      "#draw2GameCreationMode",
+      "#draw2GameSceneRules",
+      "#draw2GameCreationGuide",
+      "#draw2GameSceneList",
+      "#draw2GameSceneAdd",
+      "#draw2GameSceneStatus",
+      "#draw2GameAssetsList",
+      "#draw2GameBindings",
+      // The compact source rail is the live GAME entry point for adding
+      // sprites, audio references, UI nodes, and game elements. Keep the
+      // legacy editor surfaces isolated, but never hide this authoring rail.
+      "#draw2GameLeftDockTabs",
+    ]) {
+      const surface = query<HTMLElement>(documentRef, selector);
+      if (surface !== undefined) isolateLegacyGameSurface(surface);
+    }
+    if (gameInspectorShell !== undefined) {
+      for (const card of queryAll<HTMLElement>(
+        gameInspectorShell,
+        "#draw2GamePlaygroundInspector [data-playground-card]",
+      )) {
+        isolateLegacyGameSurface(card);
+      }
+      for (const child of [...gameInspectorShell.children]) {
+        if (child !== draw2GamePlaygroundInspector) {
+          isolateLegacyGameSurface(child as HTMLElement);
+        }
+      }
+    }
+    const gameDeckSurface = query<HTMLElement>(documentRef, "#draw2ModeDeckGame");
+    if (gameDeckSurface !== undefined) {
+      for (const child of [...gameDeckSurface.children]) {
+        if (child.id !== "draw2GamePlaygroundBottom") {
+          isolateLegacyGameSurface(child as HTMLElement);
+        }
+      }
+    }
+  };
+  isolateLegacyGameUi();
   const draw2GameSceneSelection = query<HTMLElement>(
     documentRef,
     "#draw2GameSceneSelection",
@@ -2490,7 +3449,23 @@ export function bootstrapDraw2Workspace(
     documentRef,
     "#draw2GameSceneFit",
   );
+  const draw2GameSceneAddObject = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2GameSceneAddObject",
+  );
   const timelineCard = query<HTMLElement>(documentRef, "#draw2TimelineCard");
+  const draw2TimelineAssetShelf = query<HTMLElement>(
+    documentRef,
+    "#draw2TimelineAssetShelf",
+  );
+  const draw2TimelineAssetShelfStatus = query<HTMLOutputElement>(
+    documentRef,
+    "#draw2TimelineAssetShelfStatus",
+  );
+  const draw2TimelineAssetOpenPanel = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2TimelineAssetOpenPanel",
+  );
   const timelineCollapseButton = query<HTMLButtonElement>(
     documentRef,
     "#draw2TimelineCollapse",
@@ -2675,6 +3650,34 @@ export function bootstrapDraw2Workspace(
     documentRef,
     "#draw2AudioDawRangeStatus",
   );
+  const audioAssetName = query<HTMLInputElement>(
+    documentRef,
+    "#draw2AudioAssetName",
+  );
+  const audioAssetRole = query<HTMLSelectElement>(
+    documentRef,
+    "#draw2AudioAssetRole",
+  );
+  const audioAssetOfferKind = query<HTMLSelectElement>(
+    documentRef,
+    "#draw2AudioAssetOfferKind",
+  );
+  const audioAssetDerivativePolicy = query<HTMLSelectElement>(
+    documentRef,
+    "#draw2AudioAssetDerivativePolicy",
+  );
+  const audioAssetAddRange = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2AudioAssetAddRange",
+  );
+  const audioAssetFinalize = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2AudioAssetFinalize",
+  );
+  const audioAssetStatus = query<HTMLOutputElement>(
+    documentRef,
+    "#draw2AudioAssetStatus",
+  );
   const audioClockStatus = query<HTMLElement>(
     documentRef,
     "#draw2AudioClockStatus",
@@ -2708,6 +3711,22 @@ export function bootstrapDraw2Workspace(
     "[data-mode-deck-tab]",
   );
   const modeDeckGame = query<HTMLElement>(documentRef, "#draw2ModeDeckGame");
+  const modeDeckAssets = query<HTMLElement>(
+    documentRef,
+    "#draw2ModeDeckAssets",
+  );
+  const modeDeckAssetShelf = query<HTMLElement>(
+    documentRef,
+    "#draw2ModeDeckAssetShelf",
+  );
+  const modeDeckAssetStatus = query<HTMLOutputElement>(
+    documentRef,
+    "#draw2ModeDeckAssetStatus",
+  );
+  const modeDeckAssetOpenPanel = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2ModeDeckAssetOpenPanel",
+  );
   const modeDeckAudio = query<HTMLElement>(
     documentRef,
     "#draw2ModeDeckAudio",
@@ -3195,6 +4214,8 @@ export function bootstrapDraw2Workspace(
     documentRef,
     "#draw2AudioChipMachineLoad",
   );
+  const audioDpcmSample = query<HTMLButtonElement>(documentRef, "#draw2AudioDpcmSample");
+  const audioDpcmSampleInput = query<HTMLInputElement>(documentRef, "#draw2AudioDpcmSampleInput");
   const audioMidiInstrument = query<HTMLSelectElement>(
     documentRef,
     "#draw2AudioMidiInstrument",
@@ -3391,6 +4412,8 @@ export function bootstrapDraw2Workspace(
     documentRef,
     "#draw2AudioRightInspectorStatus",
   );
+  let audioAssetPackageBusy = false;
+  let syncAudioAssetPackagePanel: () => void = () => {};
   const audioVoiceEditor = query<HTMLElement>(
     documentRef,
     "#draw2AudioVoiceEditor",
@@ -3743,6 +4766,10 @@ export function bootstrapDraw2Workspace(
     documentRef,
     "#draw2GameInspectorSelection",
   );
+  const draw2GameInspectorState = query<HTMLElement>(
+    documentRef,
+    "#draw2GameInspectorState",
+  );
   const draw2GameInspectorName = query<HTMLInputElement>(
     documentRef,
     "#draw2GameInspectorName",
@@ -3851,6 +4878,10 @@ export function bootstrapDraw2Workspace(
     documentRef,
     "#draw2GameComponents",
   );
+  const draw2GameQuickFlagsGrid = query<HTMLElement>(
+    documentRef,
+    "#draw2GameQuickFlagsGrid",
+  );
   const draw2GameNodeBox = query<HTMLElement>(
     documentRef,
     "#draw2GameNodeBox",
@@ -3862,6 +4893,10 @@ export function bootstrapDraw2Workspace(
   const draw2GameNodeBoxEmpty = query<HTMLElement>(
     documentRef,
     "#draw2GameNodeBoxEmpty",
+  );
+  const draw2GameNodeBoxTarget = query<HTMLElement>(
+    documentRef,
+    "#draw2GameNodeBoxTarget",
   );
   const draw2GameNodeBoxHierarchyCta = query<HTMLButtonElement>(
     documentRef,
@@ -3882,6 +4917,10 @@ export function bootstrapDraw2Workspace(
   const draw2GameLeftDockTabNodeBox = query<HTMLButtonElement>(
     documentRef,
     "#draw2GameLeftDockTabNodeBox",
+  );
+  const draw2GameLeftDockTabs = query<HTMLElement>(
+    documentRef,
+    "#draw2GameLeftDockTabs",
   );
   const draw2GameLeftDockHierarchyPanel = query<HTMLElement>(
     documentRef,
@@ -3914,6 +4953,38 @@ export function bootstrapDraw2Workspace(
   const draw2GameEventAmount = query<HTMLInputElement>(
     documentRef,
     "#draw2GameEventAmount",
+  );
+  const draw2GameEventAmountField = query<HTMLElement>(
+    documentRef,
+    "#draw2GameEventAmountField",
+  );
+  const draw2GameEventAmountLabel = query<HTMLElement>(
+    documentRef,
+    "#draw2GameEventAmountLabel",
+  );
+  const draw2GameEventItemField = query<HTMLElement>(
+    documentRef,
+    "#draw2GameEventItemField",
+  );
+  const draw2GameEventItem = query<HTMLSelectElement>(
+    documentRef,
+    "#draw2GameEventItem",
+  );
+  const draw2GameEventRecipeField = query<HTMLElement>(
+    documentRef,
+    "#draw2GameEventRecipeField",
+  );
+  const draw2GameEventRecipe = query<HTMLSelectElement>(
+    documentRef,
+    "#draw2GameEventRecipe",
+  );
+  const draw2GameEventBlockField = query<HTMLElement>(
+    documentRef,
+    "#draw2GameEventBlockField",
+  );
+  const draw2GameEventBlock = query<HTMLSelectElement>(
+    documentRef,
+    "#draw2GameEventBlock",
   );
   const draw2GameEventMessage = query<HTMLTextAreaElement>(
     documentRef,
@@ -4397,6 +5468,9 @@ export function bootstrapDraw2Workspace(
     "RPG_TEMPLATE",
   );
   let gameEventCards: GameEventCard[] = [];
+  let gameItems: GameItemDefinition[] = [];
+  let gameRecipes: GameRecipeDefinition[] = [];
+  let gameBlockTypes: GameBlockTypeDefinition[] = [];
   let gameVisualMaker: GameVisualMakerConfig =
     createDefaultGameVisualMakerConfig("hero");
   let gameMakerPendingHeroBinding: {
@@ -4410,6 +5484,15 @@ export function bootstrapDraw2Workspace(
   let gameCreationModePromptVisible = false;
   const gameCreationModeForPersistence = (): GameEditorCreationMode | undefined =>
     gameCreationMode === "UNSELECTED" ? undefined : gameCreationMode;
+  const gameDataForPersistence = (): GameEditorDataSnapshot => ({
+    items: gameItems.map((item) => ({ ...item })),
+    recipes: gameRecipes.map((recipe) => ({
+      ...recipe,
+      ingredients: recipe.ingredients.map((ingredient) => ({ ...ingredient })),
+      result: { ...recipe.result },
+    })),
+    blockTypes: gameBlockTypes.map((blockType) => ({ ...blockType })),
+  });
   const gameRoleLabel = (role: ModeDeckTrack["role"]): string => {
     switch (role) {
       case "PLAYER":
@@ -4545,10 +5628,366 @@ export function bootstrapDraw2Workspace(
   let gameRailTab: GameAssetBrowserTab = "ASSETS";
   let gameAssetBrowserQuery = "";
   let gameAssetBrowserSource: GameAssetBrowserSource | "ALL" = "ALL";
+  type GamePlaygroundLibrarySource = "PROJECT" | "MARKET";
+  let gamePlaygroundLibrarySource: GamePlaygroundLibrarySource = "PROJECT";
+  let gameMarketCatalog: readonly GameMarketCatalogRecord[] = [];
+  let gameMarketAccessByAssetId = new Map<string, GameMarketAccessResult>();
+  let gameMarketCatalogState: "idle" | "loading" | "ready" | "error" =
+    "idle";
+  let gameMarketCatalogError: string | undefined;
+  let gameMarketAuthenticated = false;
+  let gameMarketClient: GameMarketClient | undefined;
+  let gameMarketCatalogRequest = 0;
+  const gameMarketSupportedFormats = [
+    "pixiedraw-project",
+    "png",
+    "webp",
+    "gif",
+    "apng",
+    "sprite-sheet-png",
+    "wav",
+    "mp3",
+    "ogg",
+    "oga",
+    "m4a",
+    "aac",
+    "aiff",
+    "flac",
+    "mid",
+    "midi",
+  ] as const;
   let gameHierarchyBrowserQuery = "";
   let gameNodeBoxQuery = "";
   let gameSceneViewMode: "SCENE" | "GAME" = "SCENE";
   const gameSceneSpriteDataCache = new Map<string, string>();
+  // Scene View remembers a continuous camera; Game View is driven by the
+  // runtime camera.  Neither camera changes the authored world coordinates.
+  let gamePlaygroundCamera = { x: 0, y: 0, zoom: 1 };
+  let gamePlaygroundWorldIndex: GamePlaygroundWorldIndex | undefined;
+  let gameUiNodes: GameUiNode[] = [];
+  let selectedGameInventoryAssetId: string | undefined;
+  let selectedGameWorldTileAssetId: string | undefined;
+  let gameElements: GamePlaygroundElement[] = [];
+  let gameElementRuntimeState: GameElementState = createGameElementState();
+  let draggingGameUiNode: { id: string; offsetX: number; offsetY: number } | undefined;
+  let suppressGameUiNodeClick = false;
+  const openGameUiOverlayPanel = (kind: "MINIMAP" | "INVENTORY" | "PANEL", node?: GameUiNode): void => {
+    const returnFocus = documentRef.activeElement as HTMLElement | null;
+    const existing = documentRef.querySelector<HTMLElement>("[data-game-ui-modal]");
+    existing?.remove();
+    const modal = documentRef.createElement("div");
+    modal.dataset.gameUiModal = kind;
+    modal.className = "draw2-game-ui-modal";
+    modal.setAttribute("role", "dialog");
+    modal.setAttribute("aria-modal", "true");
+    const closeModal = (): void => { modal.remove(); returnFocus?.focus({ preventScroll: true }); };
+    modal.addEventListener("click", (event) => { if (event.target === modal) closeModal(); });
+    modal.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !event.defaultPrevented) {
+        event.preventDefault();
+        event.stopPropagation();
+        closeModal();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = [...modal.querySelectorAll<HTMLElement>("button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])")];
+      if (focusable.length === 0) { event.preventDefault(); modal.focus(); return; }
+      const current = focusable.indexOf(documentRef.activeElement as HTMLElement);
+      const next = event.shiftKey
+        ? (current <= 0 ? focusable.length - 1 : current - 1)
+        : (current < 0 || current === focusable.length - 1 ? 0 : current + 1);
+      event.preventDefault();
+      focusable[next]?.focus();
+    });
+    const panel = documentRef.createElement("section"); panel.className = "draw2-game-ui-modal-panel";
+    const title = documentRef.createElement("h2"); title.id = "draw2GameUiModalTitle"; title.textContent = kind === "PANEL" ? node?.panelTitle ?? "ゲームメニュー" : kind === "MINIMAP" ? "全体マップ" : "持ちもの";
+    modal.setAttribute("aria-labelledby", title.id);
+    const close = documentRef.createElement("button"); close.type = "button"; close.textContent = "閉じる"; close.setAttribute("aria-label", "閉じる"); close.addEventListener("click", closeModal);
+    const header = documentRef.createElement("header"); header.append(title, close); panel.append(header);
+    if (node !== undefined && node.panelTabs.length > 0) {
+      panel.setAttribute("role", "tabpanel");
+      const tablist = documentRef.createElement("div"); tablist.className = "draw2-game-ui-modal-tabs"; tablist.setAttribute("role", "tablist");
+      const tabPanel = documentRef.createElement("div");
+      tabPanel.className = "draw2-game-ui-modal-tabpanel";
+      tabPanel.id = "draw2GameUiTabPanel";
+      tabPanel.setAttribute("role", "region");
+      tabPanel.setAttribute("aria-live", "polite");
+      node.panelTabs.forEach((tabLabel, index) => {
+        const tab = documentRef.createElement("button"); tab.type = "button"; tab.id = `draw2GameUiTab-${index}`; tab.className = "draw2-game-ui-modal-tab"; tab.textContent = tabLabel; tab.setAttribute("role", "tab"); tab.setAttribute("aria-selected", String(index === 0)); tab.setAttribute("aria-controls", tabPanel.id);
+        tab.tabIndex = index === 0 ? 0 : -1;
+        if (index === 0) { panel.setAttribute("aria-labelledby", tab.id); tabPanel.textContent = `${tabLabel}を表示中`; }
+        tab.addEventListener("click", () => { tablist.querySelectorAll<HTMLButtonElement>("[role=tab]").forEach((candidate) => { const active = candidate === tab; candidate.setAttribute("aria-selected", String(active)); candidate.tabIndex = active ? 0 : -1; }); panel.setAttribute("aria-labelledby", tab.id); tabPanel.textContent = `${tabLabel}を表示中`; status.textContent = `${tabLabel}を表示`; });
+        tab.addEventListener("keydown", (event) => {
+          const tabs = [...tablist.querySelectorAll<HTMLButtonElement>("[role=tab]")];
+          const current = tabs.indexOf(tab);
+          if (current < 0) return;
+          const next = event.key === "ArrowRight" ? (current + 1) % tabs.length : event.key === "ArrowLeft" ? (current - 1 + tabs.length) % tabs.length : event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : -1;
+          if (next < 0) return;
+          event.preventDefault();
+          tabs[next]?.click();
+          tabs[next]?.focus();
+        });
+        tablist.append(tab);
+      });
+      panel.append(tablist, tabPanel);
+    }
+    const status = documentRef.createElement("output"); status.className = "draw2-game-ui-modal-status"; status.setAttribute("aria-live", "polite"); modal.addEventListener("draw2:game-inventory-action", (event) => { const detail = (event as CustomEvent<{ assetId?: string; name?: string; action?: string }>).detail; const element = detail.assetId === undefined ? undefined : gameElements.find((candidate) => candidate.id === detail.assetId) ?? gameElements.find((candidate) => candidate.kind === "ITEM" && candidate.label === detail.name); const runtimeId = element?.id ?? detail.assetId; if (runtimeId !== undefined && detail.action === "USE") { gameElementRuntimeState = applyGameElementAction(gameElementRuntimeState, { type: "USE", id: runtimeId, amount: 1 }); gameElementRuntimeState = applyGameElementEffect(gameElementRuntimeState, element?.effect, element?.effectTargetId); } if (runtimeId !== undefined && detail.action === "EQUIP") { gameElementRuntimeState = applyGameElementAction(gameElementRuntimeState, { type: "EQUIP", id: runtimeId }); modal.querySelectorAll<HTMLElement>("[data-game-inventory-item]").forEach((item) => { if (item.dataset.gameInventoryItem === detail.assetId || item.dataset.gameInventoryItem === runtimeId) { item.classList.add("is-equipped"); item.setAttribute("aria-label", `${detail.name ?? "アイテム"}（装備中）`); } }); } if (detail.action === "USE" && runtimeId !== undefined) { const remaining = gameElementRuntimeState.values[runtimeId] ?? 0; modal.querySelectorAll<HTMLElement>("[data-game-inventory-count]").forEach((count) => { if (count.dataset.gameInventoryCount === detail.assetId || count.dataset.gameInventoryCount === runtimeId) count.textContent = `× ${remaining}`; }); modal.querySelectorAll<HTMLButtonElement>("[data-game-inventory-action='USE']").forEach((button) => { if (button.closest("[data-game-inventory-item]")?.getAttribute("data-game-inventory-item") === detail.assetId || button.closest("[data-game-inventory-item]")?.getAttribute("data-game-inventory-item") === runtimeId) button.disabled = remaining <= 0; }); } renderGameUiNodes(); status.textContent = `${detail.name ?? "アイテム"}：${detail.action === "USE" ? "使用" : detail.action === "EQUIP" ? "装備" : "選択"}`; modal.dispatchEvent(new CustomEvent("draw2:game-element-state", { bubbles: true, detail: { state: gameElementRuntimeState, elementId: element?.id, effect: element?.effect, effectTargetId: element?.effectTargetId, action: detail.action } })); });
+    if (kind === "MINIMAP") {
+      const map = draw2GameSceneMinimapSvg?.cloneNode(true) as SVGSVGElement | undefined;
+      if (map !== undefined) { map.classList.add("draw2-game-ui-modal-map"); panel.append(map); }
+    } else if (kind === "INVENTORY") {
+      const inventory = documentRef.createElement("div"); inventory.className = "draw2-game-ui-inventory-grid";
+      const inventorySettings = node?.kind === "INVENTORY" ? node.inventory : undefined;
+      const inventoryColumns = Math.max(1, Math.min(8, inventorySettings?.columns ?? 4));
+      inventory.style.gridTemplateColumns = `repeat(${inventoryColumns}, minmax(0, 1fr))`;
+      const inventoryAssets = gamePlayground.assets.filter((asset) => {
+        const element = gameElements.find((candidate) => candidate.id === asset.assetId);
+        const filter = inventorySettings?.filter ?? "ALL";
+        if (filter === "ALL") return true;
+        if (filter === "EQUIPPABLE") return element?.kind === "ITEM";
+        return element?.kind === filter;
+      });
+      if (inventoryAssets.length === 0) {
+        const message = documentRef.createElement("p"); message.textContent = "持ちものはまだありません。"; inventory.append(message);
+      } else {
+        for (const asset of inventoryAssets) {
+          const item = documentRef.createElement("article"); item.className = "draw2-game-ui-inventory-item"; item.dataset.gameInventoryItem = asset.assetId; item.setAttribute("data-game-inventory-item", "");
+          if (inventorySettings?.showEquipped !== false && gameElementRuntimeState.equipped.includes(asset.assetId)) item.classList.add("is-equipped");
+          item.classList.toggle("is-selected", selectedGameInventoryAssetId === asset.assetId);
+          item.setAttribute("role", "group"); item.setAttribute("aria-label", `${asset.name}のアイテム`);
+          const inventoryAssetId = asset.assetId;
+          let detailPressTimer: ReturnType<typeof setTimeout> | undefined;
+          let detailShown = false;
+          const cancelDetailPress = (): void => { if (detailPressTimer !== undefined) globalThis.clearTimeout(detailPressTimer); detailPressTimer = undefined; };
+          item.addEventListener("pointerdown", () => { cancelDetailPress(); if (detailShown) return; detailPressTimer = globalThis.setTimeout(() => { if (detailShown) return; const detail = documentRef.createElement("p"); detail.className = "draw2-game-ui-inventory-detail"; const region = asset.source.region; const size = region === undefined ? "範囲未設定" : `${Math.round(region.width)}×${Math.round(region.height)}px`; const layout = gamePlaygroundLayoutLabels[asset.source.layout] ?? asset.source.layout; const placements = gamePlayground.placements.filter((placement) => placement.assetId === asset.assetId).length; detail.textContent = `${asset.name} · ${size} · ${layout} · 配置${placements}件`; item.append(detail); detailShown = true; detailPressTimer = undefined; }, 550); });
+          item.addEventListener("pointerup", cancelDetailPress);
+          item.addEventListener("pointercancel", cancelDetailPress);
+          item.addEventListener("pointerleave", cancelDetailPress);
+          const selectItem = (action = "SELECT"): void => { selectedGameInventoryAssetId = inventoryAssetId; item.dispatchEvent(new CustomEvent("draw2:game-inventory-action", { bubbles: true, detail: { assetId: inventoryAssetId, name: asset.name, action } })); item.parentElement?.querySelectorAll(".draw2-game-ui-inventory-item").forEach((candidate) => candidate.classList.toggle("is-selected", candidate === item)); };
+          item.addEventListener("click", (event) => { if (event.target === item) selectItem(); });
+          const visual = documentRef.createElement("span"); visual.className = "draw2-game-ui-inventory-visual";
+          const dataUrl = gamePlaygroundReferenceDataUrlFor(asset.source); if (dataUrl !== undefined) visual.style.backgroundImage = `url("${dataUrl}")`; else visual.textContent = "＋";
+          const name = documentRef.createElement("strong"); name.textContent = asset.name;
+          const count = documentRef.createElement("small"); count.dataset.gameInventoryCount = inventoryAssetId; count.setAttribute("data-game-inventory-count", ""); count.textContent = `× ${gameElementRuntimeState.values[inventoryAssetId] ?? 1}`;
+          const itemActions = documentRef.createElement("div"); itemActions.className = "draw2-game-ui-inventory-actions";
+          if (inventorySettings?.allowUse !== false) { const actionButton = documentRef.createElement("button"); actionButton.type = "button"; actionButton.textContent = "使う"; actionButton.dataset.gameInventoryAction = "USE"; actionButton.setAttribute("aria-label", `${asset.name}を使う`); actionButton.disabled = (gameElementRuntimeState.values[inventoryAssetId] ?? 1) <= 0; actionButton.addEventListener("click", (event) => { event.stopPropagation(); selectItem("USE"); }); itemActions.append(actionButton); }
+          if (inventorySettings?.allowEquip !== false) { const actionButton = documentRef.createElement("button"); actionButton.type = "button"; actionButton.textContent = "装備"; actionButton.dataset.gameInventoryAction = "EQUIP"; actionButton.setAttribute("aria-label", `${asset.name}を装備`); actionButton.addEventListener("click", (event) => { event.stopPropagation(); selectItem("EQUIP"); }); itemActions.append(actionButton); }
+          const itemChildren: HTMLElement[] = [visual, name];
+          if (inventorySettings?.showCounts !== false) itemChildren.push(count);
+          if (itemActions.childElementCount > 0) itemChildren.push(itemActions);
+          item.append(...itemChildren); inventory.append(item);
+        }
+      }
+      panel.append(inventory, status);
+    } else {
+      const message = documentRef.createElement("p"); message.textContent = node?.panelMessage ?? "ゲームメニュー用のパネルです。"; panel.append(message);
+    }
+    modal.append(panel); documentRef.body.append(modal); modal.tabIndex = -1; modal.focus(); close.focus();
+  };
+  const syncGameUiNodesToPlayground = (): void => {
+    gamePlayground = { ...gamePlayground, uiNodes: gameUiNodes.map((node) => ({ ...node, style: { ...node.style } })), gameElements: gameElements.map((element) => ({ ...element })) };
+    queueGameEditorPersistenceSave("game-ui-node");
+    renderGameHierarchyGroups();
+  };
+  const resetGameElementRuntimeState = (): void => {
+    gameElementRuntimeState = createGameElementState();
+    for (const element of gameElements) {
+      if (element.kind === "SKILL") gameElementRuntimeState = applyGameElementAction(gameElementRuntimeState, { type: "LEARN", id: element.id });
+      else if (element.kind === "TIMER") gameElementRuntimeState = applyGameElementAction(gameElementRuntimeState, { type: "SET_TIMER", id: element.id, seconds: element.value });
+      else gameElementRuntimeState = applyGameElementAction(gameElementRuntimeState, { type: "SET", id: element.id, value: element.value });
+    }
+  };
+  const renderGameElementHud = (): void => {
+    if (draw2GameUiOverlay === undefined) return;
+    draw2GameUiOverlay.querySelector(".draw2-game-element-hud")?.remove();
+    if (gameSceneViewMode !== "GAME" || gameElements.length === 0) return;
+    const hud = documentRef.createElement("aside"); hud.className = "draw2-game-element-hud"; hud.setAttribute("aria-label", "ゲーム状態"); hud.setAttribute("aria-live", "polite"); hud.setAttribute("aria-atomic", "true");
+    for (const element of gameElements) {
+      const row = documentRef.createElement("span"); row.className = "draw2-game-element-hud-item";
+      const label = documentRef.createElement("b"); label.textContent = element.label;
+      const value = documentRef.createElement("strong"); value.textContent = element.kind === "SKILL" ? (gameElementRuntimeState.skills.includes(element.id) ? "取得" : "未取得") : element.kind === "TIMER" ? `${(gameElementRuntimeState.timers[element.id] ?? element.value).toFixed(1)}s` : String(gameElementRuntimeState.values[element.id] ?? element.value);
+      row.append(label, value); hud.append(row);
+    }
+    draw2GameUiOverlay.append(hud);
+  };
+  const gameUiActionForNode = (node: GameUiNode): GameVisualMakerUiAction | GameUiNode["action"] => {
+    if (node.kind !== "BUTTON") return node.action;
+    if (node.buttonAction !== undefined) return node.buttonAction;
+    return node.action === "OPEN_INVENTORY"
+      ? "INVENTORY"
+      : node.action === "OPEN_PANEL"
+      ? "OPEN_PANEL"
+      : "NONE";
+  };
+  const activateGameUiNode = (node: GameUiNode): void => {
+    const action = gameUiActionForNode(node);
+    draw2GameUiOverlay?.dispatchEvent(new CustomEvent("draw2:game-ui-activate", {
+      bubbles: true,
+      detail: { nodeId: node.nodeId, kind: node.kind, action },
+    }));
+    if (action === "OPEN_MINIMAP") {
+      openGameUiOverlayPanel("MINIMAP", node);
+      return;
+    }
+    if (action === "OPEN_INVENTORY" || action === "INVENTORY") {
+      openGameUiOverlayPanel("INVENTORY", node);
+      return;
+    }
+    if (action === "OPEN_PANEL") {
+      openGameUiOverlayPanel("PANEL", node);
+      return;
+    }
+    const inputField = action === "JUMP"
+      ? "jump"
+      : action === "ATTACK"
+      ? "attack"
+      : action === "INTERACT"
+      ? "interact"
+      : undefined;
+    if (inputField === undefined) return;
+    if (
+      gameDeckPlaying &&
+      (gamePlaygroundRuntimeState !== undefined || gameScenePlayState !== undefined ||
+        gamePhysics2DSession !== undefined)
+    ) {
+      gameScenePlayHeldInput = { ...gameScenePlayHeldInput, [inputField]: true };
+      windowRef.setTimeout(() => {
+        gameScenePlayHeldInput = { ...gameScenePlayHeldInput, [inputField]: false };
+      }, 120);
+    }
+  };
+  const renderGameUiNodes = (): void => {
+    if (draw2GameUiOverlay === undefined) return;
+    // Anchors and auto-arrange are view policy. Resolve them only for the
+    // overlay so the authored percentage coordinates remain stable and can be
+    // reused by another scene or a different viewport.
+    const visibleGameUiNodes = resolveGameUiNodeDomPlacements(gameUiNodes)
+      .filter((node) => node.style.visible);
+    draw2GameUiOverlay.replaceChildren(...visibleGameUiNodes.map((node) => {
+      const button = documentRef.createElement("button");
+      button.type = "button";
+      button.className = "draw2-game-ui-node";
+      button.textContent = node.label;
+      button.dataset.gameUiNodeId = node.nodeId;
+      button.setAttribute("aria-label", `${node.label} UIボタン`);
+      button.setAttribute("aria-keyshortcuts", "ArrowLeft ArrowRight ArrowUp ArrowDown Alt+ArrowLeft Alt+ArrowRight Alt+ArrowUp Alt+ArrowDown");
+      button.setAttribute("aria-pressed", String(selectedGameUiNodeId() === node.nodeId));
+      button.style.left = `${node.style.x}%`;
+      button.style.top = `${node.style.y}%`;
+      button.style.width = `${node.style.width}%`;
+      button.style.height = `${node.style.height}%`;
+      button.style.opacity = String(node.style.opacity);
+      button.style.zIndex = String(node.style.zIndex);
+      const interaction = node.interaction;
+      let holdTimer: ReturnType<typeof setTimeout> | undefined;
+      let holdActivated = false;
+      const cancelHold = (): void => {
+        if (holdTimer !== undefined) globalThis.clearTimeout(holdTimer);
+        holdTimer = undefined;
+      };
+      button.addEventListener("pointerdown", () => {
+        if (gameSceneViewMode !== "GAME" || interaction?.enabled === false) return;
+        cancelHold();
+        holdActivated = false;
+        if (interaction?.pressMode === "TAP") return;
+        holdTimer = globalThis.setTimeout(() => {
+          holdTimer = undefined;
+          holdActivated = true;
+          activateGameUiNode(node);
+        }, interaction?.longPressMs ?? 500);
+      });
+      button.addEventListener("pointerup", () => cancelHold());
+      button.addEventListener("pointercancel", () => {
+        cancelHold();
+        holdActivated = false;
+      });
+      button.addEventListener("pointerdown", (event) => {
+        if (gameSceneViewMode === "GAME" || gameAuthoringLocked()) return;
+        const rect = draw2GameUiOverlay.getBoundingClientRect();
+        draggingGameUiNode = { id: node.nodeId, offsetX: event.clientX - rect.left - rect.width * node.style.x / 100, offsetY: event.clientY - rect.top - rect.height * node.style.y / 100 };
+        button.setPointerCapture(event.pointerId); event.preventDefault();
+      });
+      button.addEventListener("pointermove", (event) => {
+        if (draggingGameUiNode?.id !== node.nodeId) return;
+        suppressGameUiNodeClick = true;
+        const rect = draw2GameUiOverlay.getBoundingClientRect();
+        const x = Math.max(0, Math.min(100 - node.style.width, (event.clientX - rect.left - draggingGameUiNode.offsetX) / rect.width * 100));
+        const y = Math.max(0, Math.min(100 - node.style.height, (event.clientY - rect.top - draggingGameUiNode.offsetY) / rect.height * 100));
+        button.style.left = `${x}%`; button.style.top = `${y}%`;
+        // A deliberate drag is an explicit opt-out from automatic placement.
+        // This prevents the node from snapping back on the next render.
+        gameUiNodes = gameUiNodes.map((candidate) => candidate.nodeId === node.nodeId
+          ? updateGameUiNode(candidate, { style: { x, y }, layout: { anchor: "FREE", autoArrange: false } })
+          : candidate);
+      });
+      button.addEventListener("pointerup", () => {
+        if (draggingGameUiNode?.id !== node.nodeId) return;
+        draggingGameUiNode = undefined; syncGameUiNodesToPlayground();
+      });
+      button.addEventListener("pointercancel", () => {
+        if (draggingGameUiNode?.id !== node.nodeId) return;
+        draggingGameUiNode = undefined; syncGameUiNodesToPlayground(); renderGameUiNodes();
+      });
+      button.addEventListener("click", () => {
+        if (suppressGameUiNodeClick) { suppressGameUiNodeClick = false; return; }
+        projectGameWorkspaceAction({ type: "SELECT_UI_NODE", nodeId: node.nodeId }, { render: false });
+        if (gameSceneViewMode !== "GAME") {
+          renderGamePlaygroundSelectedAssetInspector(false);
+          setPanel("game-inspector");
+          return;
+        }
+        if (interaction?.enabled === false) return;
+        if (interaction?.pressMode === "HOLD") {
+          if (holdActivated) holdActivated = false;
+          return;
+        }
+        if (holdActivated) {
+          holdActivated = false;
+          return;
+        }
+        activateGameUiNode(node);
+      });
+      button.addEventListener("keydown", (event) => {
+        if (gameSceneViewMode === "GAME" || gameAuthoringLocked()) return;
+        const delta = event.shiftKey ? 5 : 1;
+        if (event.altKey) {
+          const size = event.shiftKey ? 5 : 1;
+          const sizeDelta = event.key === "ArrowLeft" || event.key === "ArrowRight" ? size : 0;
+          const heightDelta = event.key === "ArrowUp" || event.key === "ArrowDown" ? size : 0;
+          if (sizeDelta === 0 && heightDelta === 0) return;
+          event.preventDefault();
+          const width = Math.max(4, Math.min(100 - node.style.x, node.style.width + (event.key === "ArrowRight" ? sizeDelta : -sizeDelta)));
+          const height = Math.max(4, Math.min(100 - node.style.y, node.style.height + (event.key === "ArrowDown" ? heightDelta : -heightDelta)));
+          gameUiNodes = gameUiNodes.map((candidate) => candidate.nodeId === node.nodeId ? updateGameUiNode(candidate, { style: { width, height } }) : candidate);
+          renderGameUiNodes();
+          syncGameUiNodesToPlayground();
+          documentRef.querySelector<HTMLButtonElement>(`[data-game-ui-node-id="${CSS.escape(node.nodeId)}"]`)?.focus();
+          return;
+        }
+        const moves: Record<string, { x: number; y: number }> = { ArrowLeft: { x: -delta, y: 0 }, ArrowRight: { x: delta, y: 0 }, ArrowUp: { x: 0, y: -delta }, ArrowDown: { x: 0, y: delta } };
+        const move = moves[event.key];
+        if (move === undefined) return;
+        event.preventDefault();
+        const x = Math.max(0, Math.min(100 - node.style.width, node.style.x + move.x));
+        const y = Math.max(0, Math.min(100 - node.style.height, node.style.y + move.y));
+        gameUiNodes = gameUiNodes.map((candidate) => candidate.nodeId === node.nodeId ? updateGameUiNode(candidate, { style: { x, y } }) : candidate);
+        renderGameUiNodes();
+        syncGameUiNodesToPlayground();
+        documentRef.querySelector<HTMLButtonElement>(`[data-game-ui-node-id="${CSS.escape(node.nodeId)}"]`)?.focus();
+      });
+      return button;
+    }));
+    renderGameElementHud();
+  };
+  const gamePlaygroundDefaultWorldMap = createDefaultGamePlaygroundWorldMap();
+  const gamePlaygroundWorldMapForEditor = (): GamePlaygroundWorldMap =>
+    gamePlayground.worldMap ?? gamePlaygroundDefaultWorldMap;
+  const gamePlaygroundWorldIndexForEditor = (): GamePlaygroundWorldIndex => {
+    const map = gamePlaygroundWorldMapForEditor();
+    if (gamePlaygroundWorldIndex?.map === map) return gamePlaygroundWorldIndex;
+    gamePlaygroundWorldIndex = createGamePlaygroundWorldIndex(map);
+    return gamePlaygroundWorldIndex;
+  };
   let selectedGameAnimationClipId: string | undefined;
   let selectedGameAssetDefinitionId: string | undefined;
   let gameAnimationPreviewFrame = 0;
@@ -4568,6 +6007,36 @@ export function bootstrapDraw2Workspace(
     project: GameProject,
   ): GameEditorBinding[] => {
     const bindings: GameEditorBinding[] = [];
+    const timelineBindings = project.editorTimeline?.assetBindings ?? [];
+    const trackLabel = new Map(
+      (project.editorTimeline?.tracks ?? []).map((track) => [
+        track.trackId,
+        track.label,
+      ]),
+    );
+    for (const binding of timelineBindings) {
+      bindings.push({
+        trackId: String(binding.trackId),
+        kind: binding.kind,
+        assetId: String(binding.assetId),
+        revisionId: String(binding.revisionId),
+        contentHash: String(binding.contentHash),
+        mode: binding.mode,
+        label: trackLabel.get(String(binding.trackId)) ?? String(binding.assetId),
+        ...(binding.licenseId === undefined
+          ? {}
+          : { licenseId: binding.licenseId }),
+        ...(binding.rights === undefined
+          ? {}
+          : { rights: [...binding.rights] }),
+        ...(binding.sourceKind === undefined
+          ? {}
+          : { sourceKind: binding.sourceKind }),
+      });
+    }
+    const existingKeys = new Set(
+      bindings.map((binding) => `${binding.trackId}:${binding.kind}`),
+    );
     const scene = project.scenes.find((candidate) =>
       String(candidate.sceneId).startsWith("scene:pixieed-game:")
     );
@@ -4580,9 +6049,11 @@ export function bootstrapDraw2Workspace(
       );
       if (component === undefined) continue;
       const asset = component.asset;
+      const kind = component.type === "SPRITE" ? "DRAW" : "AUDIO";
+      if (existingKeys.has(`${trackId}:${kind}`)) continue;
       bindings.push({
         trackId,
-        kind: component.type === "SPRITE" ? "DRAW" : "AUDIO",
+        kind,
         assetId: String(asset.assetId),
         revisionId: String(asset.revisionId),
         contentHash: String(asset.contentHash),
@@ -4773,8 +6244,49 @@ export function bootstrapDraw2Workspace(
     site400RouteRefreshQueue = scheduled.then(() => undefined, () => undefined);
     return scheduled;
   };
-  let selectedGameTrackId: string | undefined = gameDeckTracks[0]?.id;
+  // iGAME keeps selection explicit. A populated Scene is not the same as a
+  // selected object; the first object is only selected after an intentional
+  // user action (or an explicit starter placement action).
+  let selectedGameTrackId: string | undefined;
   let selectedGameEventCardId: string | undefined;
+  let gamePlayground: GamePlaygroundConfig = createDefaultGamePlaygroundConfig();
+  type PendingGamePlaygroundDrawTarget =
+    | { readonly kind: "WORLD" }
+    | { readonly kind: "PLAYER" }
+    | { readonly kind: "ASSET"; readonly assetId?: string }
+    | { readonly kind: "OBJECT"; readonly trackId: string };
+  let gameCaptureSession: CaptureSession | undefined;
+  // Keeps the card that opened iDRAW so a returned selection is applied to
+  // the same slot without asking the user to press a second Apply button.
+  let gamePendingDrawTarget: PendingGamePlaygroundDrawTarget | undefined;
+  let gameCaptureBar: HTMLElement | undefined;
+  let gameAudioCaptureSession: AudioCaptureSession | undefined;
+  let gameAudioCaptureBar: HTMLElement | undefined;
+  let gameAudioCaptureRangeOverride: { readonly trackIds: readonly string[]; readonly startTick: number; readonly endTick: number; readonly snap: "BEAT" | "FREE" } | undefined;
+  let gameAudioCaptureIntervalIndex: ReturnType<typeof createAudioTrackIntervalIndex> | undefined;
+  let gameAudioCaptureSnap: "BEAT" | "FREE" = "BEAT";
+  let gameAudioCaptureHostRetry = 0;
+  let gameAudioCapturePointer: {
+    readonly pointerId: number;
+    readonly trackIds: readonly string[];
+    readonly startTick: number;
+    readonly clipId?: string;
+    moved: boolean;
+  } | undefined;
+  let gameAudioCaptureDebounce: number | undefined;
+  let gameWorkspaceContext: GameWorkspaceContext =
+    createGameWorkspaceContext();
+  const gameAuthoringLocked = (): boolean =>
+    gameWorkspaceContext.phase === "TEST" ||
+    gameWorkspaceContext.phase === "RELEASE";
+  const selectedGameUiNodeId = (): string | undefined =>
+    gameWorkspaceContext.selection.kind === "UI_NODE"
+      ? gameWorkspaceContext.selection.nodeId
+      : undefined;
+  const selectedGameElementId = (): string | undefined =>
+    gameWorkspaceContext.selection.kind === "ELEMENT"
+      ? gameWorkspaceContext.selection.elementId
+      : undefined;
   let renderGameVisualMaker: () => void = () => {};
   let renderGameCustomPanels: () => void = () => {};
   let renderAudioCustomPanels: () => void = () => {};
@@ -4874,7 +6386,10 @@ export function bootstrapDraw2Workspace(
     tick();
   };
   const syncGameDeckPlayhead = (): void => {
-    gameDeckFrame = ((gameDeckFrame % 16) + 16) % 16;
+    // The transport has a 16-step compatibility lane, but imported iDRAW
+    // animations may contain any number of frames. Keep the full selected
+    // frame index and only project it modulo 16 to the legacy lane.
+    gameDeckFrame = Math.max(0, Math.floor(gameDeckFrame));
     root.dataset.gameCurrentFrame = String(gameDeckFrame + 1);
     for (
       const cell of gameAssetTracks?.querySelectorAll<HTMLElement>(
@@ -4882,21 +6397,196 @@ export function bootstrapDraw2Workspace(
       ) ?? []
     ) {
       const active = Number(cell.dataset.modeDeckIndex ?? "-1") ===
-        gameDeckFrame;
+        gameDeckFrame % 16;
       cell.classList.toggle("is-playhead", active);
       cell.setAttribute("aria-current", active ? "step" : "false");
     }
+    for (
+      const frame of draw2GamePlaygroundPlayerFrames?.querySelectorAll<HTMLButtonElement>(
+        "[data-game-playground-frame-index]",
+      ) ?? []
+    ) {
+      const active = Number(frame.dataset.gamePlaygroundFrameIndex ?? "-1") ===
+        gameDeckFrame;
+      frame.classList.toggle("is-active", active);
+      frame.setAttribute("aria-current", active ? "step" : "false");
+    }
+  };
+  const gamePlaygroundWorldForRuntime = (): {
+    readonly width: number;
+    readonly height: number;
+    readonly solidCells: readonly { readonly x: number; readonly y: number }[];
+    readonly bounds?: "FINITE" | "INFINITE";
+    readonly chunkSize?: number;
+    readonly solidAt?: (x: number, y: number) => boolean;
+  } => {
+    const tilemapTrack = gameDeckTracks.find((track) =>
+      (track.role ?? gameObjectRoleFor(track.id, track.kind)) === "TILEMAP"
+    );
+    const tilemapDocument = tilemapTrack === undefined
+      ? undefined
+      : tilemapDocumentForTrack(tilemapTrack);
+    const map = gamePlaygroundWorldMapForEditor();
+    const index = gamePlaygroundWorldIndexForEditor();
+    const legacySolidCells = tilemapDocument === undefined
+      ? []
+      : solidGameTilemapCells(tilemapDocument).map((cell) => ({
+        x: cell.x,
+        y: cell.y,
+      }));
+    const legacySolid = new Set(legacySolidCells.map((cell) =>
+      `${Math.floor(cell.x)},${Math.floor(cell.y)}`
+    ));
+    return {
+      width: map.width,
+      height: map.height,
+      solidCells: legacySolidCells,
+      bounds: map.bounds,
+      chunkSize: map.chunkSize,
+      solidAt: (x, y) => index.solidAt(x, y) ||
+        legacySolid.has(`${Math.floor(x)},${Math.floor(y)}`),
+    };
+  };
+  const gamePlaygroundSceneViewportForEditor = (): {
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+    readonly zoom: number;
+  } => {
+    const runtimeWorld = gamePlaygroundWorldForRuntime();
+    const worldMap = gamePlaygroundWorldMapForEditor();
+    const worldWidth = Math.max(1, runtimeWorld.width);
+    const worldHeight = Math.max(1, runtimeWorld.height);
+    const zoom = Math.min(8, Math.max(0.1, gamePlaygroundCamera.zoom));
+    const width = gameSceneViewMode === "GAME"
+      ? Math.min(worldWidth, 10)
+      : Math.min(worldWidth, Math.max(1, 100 / zoom));
+    const height = gameSceneViewMode === "GAME"
+      ? Math.min(worldHeight, 6)
+      : Math.min(worldHeight, Math.max(1, 60 / zoom));
+    const requestedX = gameSceneViewMode === "GAME"
+      ? gamePlaygroundRuntimeState?.cameraX ?? gamePlaygroundCamera.x
+      : gamePlaygroundCamera.x;
+    const requestedY = gameSceneViewMode === "GAME"
+      ? gamePlaygroundRuntimeState?.cameraY ?? gamePlaygroundCamera.y
+      : gamePlaygroundCamera.y;
+    const clamp = (value: number, minimum: number, maximum: number): number =>
+      Math.min(maximum, Math.max(minimum, value));
+    return {
+      x: worldMap.bounds === "FINITE"
+        ? clamp(requestedX, 0, Math.max(0, worldWidth - width))
+        : requestedX,
+      y: worldMap.bounds === "FINITE"
+        ? clamp(requestedY, 0, Math.max(0, worldHeight - height))
+        : requestedY,
+      width,
+      height,
+      zoom,
+    };
+  };
+  const gamePlaygroundActorsForRuntime = (): {
+    readonly player: { readonly id: string; readonly x: number; readonly y: number; readonly movable?: boolean; readonly collision?: boolean; readonly gravity?: boolean };
+    readonly actors: readonly { readonly id: string; readonly x: number; readonly y: number }[];
+    readonly canonicalPlayerPlacement?: GamePlaygroundPlacement;
+  } | undefined => {
+    const runtimeWorld = gamePlaygroundWorldForRuntime();
+    const sourceWidth = runtimeWorld.width > 12 ? 12 : runtimeWorld.width;
+    const sourceHeight = runtimeWorld.height > 8 ? 8 : runtimeWorld.height;
+    const transformFor = (track: ModeDeckTrack): { x: number; y: number } => {
+      const transform = track.components?.find((component) =>
+        component.type === "TRANSFORM"
+      );
+      return transform?.type === "TRANSFORM"
+        ? {
+          x: sourceWidth === runtimeWorld.width
+            ? Number(transform.x) || 0
+            : (Number(transform.x) || 0) / sourceWidth * runtimeWorld.width,
+          y: sourceHeight === runtimeWorld.height
+            ? Number(transform.y) || 0
+            : (Number(transform.y) || 0) / sourceHeight * runtimeWorld.height,
+        }
+        : { x: 1, y: 1 };
+    };
+    const player = gameDeckTracks.find((track) =>
+      (track.role ?? gameObjectRoleFor(track.id, track.kind)) === "PLAYER"
+    ) ?? gameDeckTracks.find((track) => track.id === "hero");
+    if (player === undefined) return undefined;
+    const placementFor = (trackId: string): GamePlaygroundPlacement | undefined =>
+      (gamePlayground.placements ?? []).find((item) =>
+        (item.placementId ?? item.id) === trackId
+      );
+    const actors = gameDeckTracks
+      .filter((track) => track.id !== player.id)
+      .filter((track) => track.kind !== "EVENT")
+      .filter((track) =>
+        (track.role ?? gameObjectRoleFor(track.id, track.kind)) !== "TILEMAP"
+      )
+      .map((track) => {
+        const placement = placementFor(track.id);
+        const position = placement === undefined
+          ? transformFor(track)
+          : { x: placement.x, y: placement.y };
+        return { id: track.id, ...position };
+      });
+    const playerPlacement = placementFor(player.id) ?? placementFor("player");
+    return {
+      player: {
+        id: player.id,
+        ...(playerPlacement === undefined
+          ? transformFor(player)
+          : {
+            x: playerPlacement.x,
+            y: playerPlacement.y,
+            ...(playerPlacement.movable === undefined
+              ? {}
+              : { movable: playerPlacement.movable }),
+            ...(playerPlacement.collision === undefined
+              ? {}
+              : { collision: playerPlacement.collision }),
+            ...(playerPlacement.gravity === undefined
+              ? {}
+              : { gravity: playerPlacement.gravity }),
+          }),
+      },
+      actors,
+      ...(playerPlacement === undefined
+        ? {}
+        : { canonicalPlayerPlacement: playerPlacement }),
+    };
   };
   const stopGameScenePlayRuntime = (): void => {
-    if (gameScenePlayState === undefined) return;
+    gameAudioSequenceQueue.stop();
+    gameAudioEventQueue.stop();
+    const hadRuntime = gameScenePlayState !== undefined ||
+      gamePlaygroundRuntimeState !== undefined ||
+      gamePhysics2DSession !== undefined;
     gameScenePlayState = undefined;
+    gamePlaygroundRuntimeState = undefined;
     gameScenePlayHeldInput = {};
-    renderGameSceneViewport();
+    delete root.dataset.gameRuntimeType;
+    delete root.dataset.gamePlayerMotion;
+    delete root.dataset.gamePlayerDirection;
+    delete root.dataset.gamePlayerFrame;
+    delete root.dataset.gamePlayerX;
+    delete root.dataset.gamePlayerY;
+    if (gamePhysics2DSession !== undefined) {
+      gamePhysics2DSession = cleanupGame351Physics2DSession(
+        stopGame351Physics2DSession(gamePhysics2DSession),
+      );
+      root.dataset.gamePhysics2dSession = "stopped";
+    }
+    if (hadRuntime) renderGameSceneViewport();
   };
   const stopGameDeckPlayback = (): void => {
     if (gameDeckPlaybackTimer !== undefined) {
       windowRef.clearInterval(gameDeckPlaybackTimer);
       gameDeckPlaybackTimer = undefined;
+    }
+    if (gameWorkspaceContext.phase === "TEST") {
+      projectGameWorkspaceAction(
+        { type: "STOP_PLAY" },
+      );
     }
     gameDeckPlaying = false;
     gameDeckPlay?.setAttribute("aria-pressed", "false");
@@ -4904,19 +6594,195 @@ export function bootstrapDraw2Workspace(
     syncModePlaybackButton();
     stopGameScenePlayRuntime();
   };
+  const playGameRuntimeAudio = async (
+    placementId: string,
+    motion: "WALK" | "JUMP" | "LAND" | "ATTACK",
+  ): Promise<void> => {
+    const session = audioWorkspaceSession;
+    if (session === undefined) return;
+    const target = gameAudioTargetForMotion({ placementId, motion });
+    if (target === undefined) return;
+    const binding = gamePlayground.audioBindings.find((candidate) =>
+      gameAudioTargetEquals(candidate.target, target)
+    );
+    if (binding === undefined) return;
+    const asset = gamePlayground.audioAssets.find((candidate) =>
+      candidate.audioAssetId === binding.audioAssetId
+    );
+    if (asset === undefined) return;
+    const source = asset.source;
+    await ensureAudioStreamingRuntime();
+    const plan = scheduleGameAudioPlayback(session.project, {
+      trackIds: source.trackIds,
+      startTick: source.startTick as AudioTick,
+      durationTick: source.durationTick as AudioTick,
+      snap: "FREE",
+    });
+    gameAudioEventQueue.start(plan, (segment) => {
+      const runtime = audioStreamingRuntimes.get(segment.clipId);
+      if (runtime === undefined) return;
+      void runtime.playForDuration(
+        segment.startSeconds,
+        segment.durationSeconds,
+        false,
+      );
+    });
+  };
+  const playGameTileStepAudio = async (): Promise<void> => {
+    const session = audioWorkspaceSession;
+    const binding = gamePlayground.audioBindings.find((candidate) =>
+      candidate.target.kind === "TILE_STEP"
+    );
+    if (session === undefined || binding === undefined) return;
+    const asset = gamePlayground.audioAssets.find((candidate) =>
+      candidate.audioAssetId === binding.audioAssetId
+    );
+    if (asset === undefined) return;
+    const source = asset.source;
+    await ensureAudioStreamingRuntime();
+    const scheduled = scheduleGameAudioPlayback(session.project, {
+      trackIds: source.trackIds,
+      startTick: source.startTick as AudioTick,
+      durationTick: source.durationTick as AudioTick,
+      snap: "FREE",
+    });
+    gameAudioEventQueue.start(scheduled, (segment) => {
+      const runtime = audioStreamingRuntimes.get(segment.clipId);
+      if (runtime === undefined) return;
+      void runtime.playForDuration(
+        segment.startSeconds,
+        segment.durationSeconds,
+        false,
+      );
+    });
+  };
+  const playGameSceneBgm = async (): Promise<void> => {
+    const session = audioWorkspaceSession;
+    const binding = gamePlayground.audioBindings.find((candidate) =>
+      candidate.target.kind === "SCENE_BGM"
+    );
+    if (session === undefined || binding === undefined) return;
+    const asset = gamePlayground.audioAssets.find((candidate) =>
+      candidate.audioAssetId === binding.audioAssetId
+    );
+    if (asset === undefined) return;
+    const source = asset.source;
+    await ensureAudioStreamingRuntime();
+    const ticksPerQuarter = session.project.timebase.ticksPerQuarter;
+    const bpm = session.project.tempo.milliBpm / 1000;
+    const scheduled = scheduleGameAudioPlayback(session.project, {
+      trackIds: source.trackIds,
+      startTick: source.startTick as AudioTick,
+      durationTick: source.durationTick as AudioTick,
+      snap: "FREE",
+    });
+    if (scheduled.length === 0) return;
+    if (asset.defaults.loop) {
+      gameAudioSequenceQueue.start(scheduled, (segment) => {
+        const queuedRuntime = audioStreamingRuntimes.get(segment.clipId);
+        if (queuedRuntime === undefined) return;
+        void queuedRuntime.playForDuration(segment.startSeconds, segment.durationSeconds, false);
+      }, true, Number(source.durationTick) / ticksPerQuarter * 60 / bpm);
+    } else {
+      gameAudioSequenceQueue.start(scheduled, (segment) => {
+        const queuedRuntime = audioStreamingRuntimes.get(segment.clipId);
+        if (queuedRuntime === undefined) return;
+        void queuedRuntime.playForDuration(
+          segment.startSeconds,
+          segment.durationSeconds,
+          false,
+        );
+      });
+    }
+  };
   const startGameScenePlayRuntime = (): void => {
+    resetGameElementRuntimeState();
+    const actors = gamePlaygroundActorsForRuntime();
+    if (actors?.canonicalPlayerPlacement !== undefined) {
+      // A canonical player placement owns the playable runtime. Legacy
+      // Physics2D and genre adapters must not compete with it.
+      gamePhysics2DSession = undefined;
+      try {
+        const world = gamePlaygroundWorldForRuntime();
+        gamePlaygroundRuntimeState = createGamePlaygroundRuntime({
+          mode: gamePlayground.mode,
+          world,
+          player: actors.player,
+          actors: actors.actors,
+        });
+        gameScenePlayState = undefined;
+        gameScenePlayHeldInput = {};
+        gameSceneViewMode = "GAME";
+        root.dataset.gameRuntimeType = "PLAYGROUND";
+        syncGameSceneViewMode();
+        renderGameSceneViewport();
+        void ensureAudioWorkspaceSession().then(playGameSceneBgm);
+      } catch {
+        gamePlaygroundRuntimeState = undefined;
+        gameScenePlayState = undefined;
+        delete root.dataset.gameRuntimeType;
+      }
+      return;
+    }
     try {
-      const project = gameCurrentProject();
-      gameScenePlayState = playGameGenre(createGameGenreRuntime(project));
+      gamePhysics2DSession = playGame351Physics2DSession(
+        createGame351Physics2DSession(
+          createGame351RpgTemplateFromProject(gameCurrentProject()),
+          { settings: gamePhysics2D },
+        ),
+      );
+      root.dataset.gamePhysics2dSession = "playing";
+    } catch {
+      // Non-RPG projects keep the existing fixed-cell Preview boundary.
+      gamePhysics2DSession = undefined;
+      root.dataset.gamePhysics2dSession = "unavailable";
+    }
+    // Physics2D is the single runtime authority when its session can be
+    // created. Do not advance the legacy cell runtime in parallel: that
+    // would make the rendered position and collision result diverge.
+    if (actors !== undefined && gamePhysics2DSession === undefined) {
+      const world = gamePlaygroundWorldForRuntime();
+      gamePlaygroundRuntimeState = createGamePlaygroundRuntime({
+        mode: gamePlayground.mode,
+        world,
+        player: actors.player,
+        actors: actors.actors,
+      });
+      gameScenePlayState = undefined;
+      root.dataset.gameRuntimeType = "PLAYGROUND";
       gameScenePlayHeldInput = {};
       gameSceneViewMode = "GAME";
       syncGameSceneViewMode();
       renderGameSceneViewport();
+      void ensureAudioWorkspaceSession().then(playGameSceneBgm);
+      return;
+    }
+    if (gamePhysics2DSession !== undefined) {
+      gameScenePlayState = undefined;
+      gamePlaygroundRuntimeState = undefined;
+      root.dataset.gameRuntimeType = "PHYSICS2D";
+      gameScenePlayHeldInput = {};
+      gameSceneViewMode = "GAME";
+      syncGameSceneViewMode();
+      renderGameSceneViewport();
+      void ensureAudioWorkspaceSession().then(playGameSceneBgm);
+      return;
+    }
+    try {
+      const project = gameCurrentProject();
+      gameScenePlayState = playGameGenre(createGameGenreRuntime(project));
+      root.dataset.gameRuntimeType = "GENRE";
+      gameScenePlayHeldInput = {};
+      gameSceneViewMode = "GAME";
+      syncGameSceneViewMode();
+      renderGameSceneViewport();
+      void ensureAudioWorkspaceSession().then(playGameSceneBgm);
     } catch {
       // No Game Project is ready yet (e.g. Scene not saved once). Fall back
       // to the animation-frame playhead below; entities keep showing their
       // authored (static) Transform position instead of a live simulation.
       gameScenePlayState = undefined;
+      delete root.dataset.gameRuntimeType;
     }
   };
   const startGameDeckPlayback = (): void => {
@@ -4926,9 +6792,69 @@ export function bootstrapDraw2Workspace(
     startGameScenePlayRuntime();
     gameDeckPlaybackTimer = windowRef.setInterval(() => {
       if (!gameDeckPlaying) return;
-      gameDeckFrame = (gameDeckFrame + 1) % 16;
+      const playbackFrameCount = Math.max(
+        1,
+        gamePlayground.player?.sourceFrames?.length ?? 1,
+        ...(gamePlayground.placements ?? []).map((placement) =>
+          placement.reference.sourceFrames?.length ?? 1
+        ),
+      );
+      gameDeckFrame = (gameDeckFrame + 1) % playbackFrameCount;
       syncGameDeckPlayhead();
-      if (gameScenePlayState !== undefined) {
+      // Game preview advances at 12 fixed steps per second; keep timer values
+      // expressed in seconds instead of tying them to animation frame count.
+      gameElementRuntimeState = applyGameElementAction(gameElementRuntimeState, { type: "TICK", seconds: 1 / 12 });
+      renderGameElementHud();
+      root.dispatchEvent(new CustomEvent("draw2:game-element-state", { bubbles: true, detail: { state: gameElementRuntimeState, action: "TICK" } }));
+      if (gamePhysics2DSession?.mode === "PLAYING") {
+        const action = gameScenePlayHeldInput.left
+          ? GAME351_INPUT_ACTIONS.MOVE_LEFT
+          : gameScenePlayHeldInput.right
+          ? GAME351_INPUT_ACTIONS.MOVE_RIGHT
+          : gameScenePlayHeldInput.up
+          ? GAME351_INPUT_ACTIONS.MOVE_UP
+          : gameScenePlayHeldInput.down
+          ? GAME351_INPUT_ACTIONS.MOVE_DOWN
+          : null;
+        gamePhysics2DSession = stepGame351Physics2DSession(
+          gamePhysics2DSession,
+          { action },
+        );
+        const events = gamePhysics2DSession.events;
+        if (events.length > 0) {
+          const message = events.map((event) =>
+            `${event.kind} ${event.phase} ${event.entityA}/${event.entityB}`.trim()
+          ).join(" · ");
+          if (gameDeckStatus !== undefined) gameDeckStatus.textContent =
+            `Physics2D Preview · ${message} · canonical state unchanged`;
+          root.dispatchEvent(new CustomEvent("draw2:game-physics2d-events", {
+            bubbles: true,
+            detail: { events, tick: gamePhysics2DSession.tick },
+          }));
+        }
+        root.dataset.gamePhysics2dTick = String(gamePhysics2DSession.tick);
+      }
+      if (gamePlaygroundRuntimeState !== undefined) {
+        const previousMotion = gamePlaygroundRuntimeState.motion;
+        const previousPosition = gamePlaygroundRuntimeState.playerPosition;
+        gamePlaygroundRuntimeState = stepGamePlaygroundRuntime(
+          gamePlaygroundRuntimeState,
+          gameScenePlayHeldInput,
+          gamePlaygroundWorldForRuntime(),
+        );
+        if (gamePlaygroundRuntimeState.motion !== "IDLE" &&
+          gamePlaygroundRuntimeState.motion !== previousMotion) {
+          void playGameRuntimeAudio(
+            gamePlaygroundRuntimeState.playerId,
+            gamePlaygroundRuntimeState.motion,
+          );
+        }
+        if (gamePlaygroundRuntimeState.playerPosition.x !== previousPosition.x ||
+          gamePlaygroundRuntimeState.playerPosition.y !== previousPosition.y) {
+          void playGameTileStepAudio();
+        }
+        renderGameSceneViewport();
+      } else if (gameScenePlayState !== undefined) {
         gameScenePlayState = stepGameGenre(
           gameScenePlayState,
           gameScenePlayHeldInput,
@@ -4936,7 +6862,9 @@ export function bootstrapDraw2Workspace(
         renderGameSceneViewport();
       }
       if (gameDeckStatus !== undefined) {
-        gameDeckStatus.textContent = gameScenePlayState !== undefined
+        gameDeckStatus.textContent = gamePlaygroundRuntimeState !== undefined
+          ? "Play · Playground runtime · 編集内容は保護されています"
+          : gameScenePlayState !== undefined
           ? "Play · スプライト未設定のオブジェクトも既定アイコンで表示中"
           : "Play preview · fixed-step runtime active · edit state is protected";
       }
@@ -4945,130 +6873,333 @@ export function bootstrapDraw2Workspace(
   const defaultAudioDeckTracks: readonly ModeDeckTrack[] = audioDeckTracks.map(
     (track) => ({ ...track, filled: [...track.filled] }),
   );
-  const commitCanonicalGameRecord = async (
-    record: GameEditorPersistenceRecord,
-  ): Promise<JournalCommand | undefined> => {
-    if (pixyncGameStore === undefined) {
-      pixyncGameStore = await GameEditorCanonicalStore.create(record);
-      return undefined;
+  const queueGameEditorPersistenceSave = (
+    reason: string,
+  ): Promise<GameEditorPersistenceSaveResult> => {
+    if (!gamePersistenceCapabilityAvailable()) {
+      setGamePersistenceDiagnostic(
+        "storage-save",
+        "indexeddb-unavailable",
+      );
+      setGamePersistenceState("offline");
+      gamePersistenceOffline = true;
+      return Promise.resolve({
+        ok: false,
+        stale: false,
+        failure: "offline",
+        stage: "storage-save" as const,
+        cause: "indexeddb-unavailable",
+      });
     }
-    return pixyncGameStore.commitLocal(record);
-  };
-  const queueGameEditorPersistenceSave = (reason: string): void => {
     const projectId = workspaceProjectId;
-    const tracks = gameDeckTracks.map((track) => ({
-      ...track,
-      filled: [...track.filled],
-    }));
-    const behaviors = [...gameBehaviors];
-    const behaviorSources = [...gameBehaviorSources];
-    const templateInstances = gameTemplateInstances.map((instance) => ({
-      ...instance,
-      values: { ...instance.values },
-    }));
-    const animationBindings = gameAnimationBindings.map((binding) => ({
-      ...binding,
-      frameIds: [...binding.frameIds],
-    }));
+    const snapshot = {
+      projectId,
+      tracks: gameDeckTracks.map((track) => ({
+        ...track,
+        filled: [...track.filled],
+      })),
+      bindings: gameDeckBindings.map((binding) => ({ ...binding })),
+      behaviors: [...gameBehaviors],
+      behaviorSources: [...gameBehaviorSources],
+      physics2D: normalizePhysics2DSettings(gamePhysics2D),
+      templateInstances: gameTemplateInstances.map((instance) => ({
+        ...instance,
+        values: { ...instance.values },
+      })),
+      animationBindings: gameAnimationBindings.map((binding) => ({
+        ...binding,
+        frameIds: [...binding.frameIds],
+      })),
+      creationMode: gameCreationModeForPersistence(),
+      sceneRules: { ...gameSceneRules },
+      eventCards: gameEventCards.map((card) => ({ ...card })),
+      visualMaker: gameVisualMaker === undefined
+        ? undefined
+        : {
+          ...gameVisualMaker,
+          hero: { ...gameVisualMaker.hero },
+          uiSlots: gameVisualMaker.uiSlots.map((slot) => ({ ...slot })),
+        },
+      gameData: gameDataForPersistence(),
+      playground: cloneGamePlaygroundConfig(gamePlayground),
+    };
     const revision = gamePersistenceRevision + 1;
     gamePersistenceRevision = revision;
-    gamePersistenceSaveQueue = gamePersistenceSaveQueue.then(async () => {
+    setGamePersistenceState("unsaved");
+    let queueStage: GameEditorPersistenceFailureStage = "record-build";
+    const completion = gamePersistenceSaveQueue.then(async () => {
+      if (!gamePersistenceCapabilityAvailable()) {
+        queueStage = "storage-save";
+        gamePersistenceOffline = true;
+        setGamePersistenceDiagnostic(
+          "storage-save",
+          "indexeddb-unavailable",
+        );
+        setGamePersistenceState("offline");
+        return {
+          ok: false,
+          stale: false,
+          failure: "offline" as const,
+          stage: "storage-save" as const,
+          cause: "indexeddb-unavailable" as const,
+        };
+      }
+      setGamePersistenceState("saving");
       const expectedRevision = gamePersistenceExpectedRevision;
       const expectedStateHash = gamePersistenceExpectedStateHash;
-      const record = await createGameEditorPersistenceRecord(
-        projectId,
-        tracks,
-        revision,
-        new Date().toISOString(),
-        undefined,
-        gameDeckBindings,
-        behaviors,
-        behaviorSources,
-        gamePhysics2D,
-        templateInstances,
-        animationBindings,
-        gameCreationModeForPersistence(),
-        gameSceneRules,
-        gameEventCards,
-        gameVisualMaker,
-      );
-      const saved = await gamePersistenceStore.save(record, {
-        expectedRevision,
-        expectedStateHash,
-      });
-      if (!saved.ok) {
-        root.dataset.gamePersistenceState = "unavailable";
-        return;
-      }
-      root.dataset.gamePersistenceState = saved.stale
-        ? "stale-write-ignored"
-        : reason === "recovery"
-        ? "restored"
-        : "saved";
-      root.dataset.gamePersistenceRevision = String(revision);
-      if (!saved.stale) {
-        gamePersistenceExpectedRevision = revision;
-        gamePersistenceExpectedStateHash = record.stateHash;
-        const command = await commitCanonicalGameRecord(record);
-        let canonicalSaveConflict = false;
-        if (pixyncGameStore !== undefined) {
-          const canonicalRecord = await createGameEditorPersistenceRecord(
-            projectId,
-            tracks,
-            revision,
-            record.savedAt,
-            {
-              project: pixyncGameStore.project,
-              appliedCommandIds: pixyncGameStore.appliedCommandIds,
-            },
-            gameDeckBindings,
-            behaviors,
-            behaviorSources,
-            gamePhysics2D,
-            templateInstances,
-            animationBindings,
-            gameCreationModeForPersistence(),
-            gameSceneRules,
-            gameEventCards,
-            gameVisualMaker,
-          );
-          const canonicalSaved = await gamePersistenceStore.save(
-            canonicalRecord,
-            {
-              expectedRevision: gamePersistenceExpectedRevision,
-              expectedStateHash: gamePersistenceExpectedStateHash,
-            },
-          );
-          if (canonicalSaved.ok && !canonicalSaved.stale) {
-            gamePersistenceExpectedStateHash = canonicalRecord.stateHash;
-          } else if (canonicalSaved.ok && canonicalSaved.stale) {
-            canonicalSaveConflict = true;
-            root.dataset.gamePersistenceState = "stale-write-ignored";
-          }
-        }
-        if (canonicalSaveConflict) return;
-        windowRef.dispatchEvent(
-          new CustomEvent("draw2:game-editor-committed", {
-            detail: { reason, record, command },
-          }),
+      let baseRecord: GameEditorPersistenceRecord;
+      try {
+        queueStage = "record-build";
+        baseRecord = await createGameEditorPersistenceRecord(
+          snapshot.projectId,
+          snapshot.tracks,
+          revision,
+          new Date().toISOString(),
+          undefined,
+          snapshot.bindings,
+          snapshot.behaviors,
+          snapshot.behaviorSources,
+          snapshot.physics2D,
+          snapshot.templateInstances,
+          snapshot.animationBindings,
+          snapshot.creationMode,
+          snapshot.sceneRules,
+          snapshot.eventCards,
+          snapshot.visualMaker,
+          snapshot.gameData,
+          snapshot.playground,
         );
+      } catch (error) {
+        const errorName = safeGamePersistenceErrorName(error);
+        setGamePersistenceDiagnostic(
+          "record-build",
+          "record-build-failed",
+          errorName,
+        );
+        setGamePersistenceState("error");
+        return {
+          ok: false,
+          stale: false,
+          failure: "error" as const,
+          stage: "record-build" as const,
+          cause: "record-build-failed" as const,
+          ...(errorName === undefined ? {} : { errorName }),
+        };
+      }
+
+      let canonicalCandidate: GameEditorCanonicalStore;
+      try {
+        queueStage = "canonical-build";
+        canonicalCandidate = pixyncGameStore === undefined
+          ? await GameEditorCanonicalStore.create(baseRecord)
+          : GameEditorCanonicalStore.restore(
+            pixyncGameStore.project,
+            pixyncGameStore.appliedCommandIds,
+          );
+      } catch (error) {
+        const errorName = safeGamePersistenceErrorName(error);
+        setGamePersistenceDiagnostic(
+          "canonical-build",
+          "canonical-build-failed",
+          errorName,
+        );
+        setGamePersistenceState("error");
+        return {
+          ok: false,
+          stale: false,
+          failure: "error" as const,
+          stage: "canonical-build" as const,
+          cause: "canonical-build-failed" as const,
+          ...(errorName === undefined ? {} : { errorName }),
+        };
+      }
+
+      const record = baseRecord;
+      let saved: GameEditorPersistenceSaveResult;
+      try {
+        queueStage = "storage-save";
+        saved = await gamePersistenceStore.save(record, {
+          expectedRevision,
+          expectedStateHash,
+        });
+      } catch (error) {
+        const classified = classifyGameEditorPersistenceError(
+          error,
+          "transaction-failed",
+        );
+        if (classified.failure === "offline") gamePersistenceOffline = true;
+        setGamePersistenceDiagnostic(
+          "storage-save",
+          classified.cause,
+          classified.errorName,
+        );
+        setGamePersistenceState(classified.failure);
+        return {
+          ok: false,
+          stale: false,
+          failure: classified.failure,
+          stage: "storage-save" as const,
+          cause: classified.cause,
+          ...(classified.errorName === undefined
+            ? {}
+            : { errorName: classified.errorName }),
+        };
+      }
+      if (!saved.ok) {
+        const failureState = saved.failure === "offline"
+          ? "offline"
+          : classifyGamePersistenceFailure(
+            undefined,
+            gamePersistenceCapabilityAvailable(),
+          );
+        if (failureState === "offline") gamePersistenceOffline = true;
+        setGamePersistenceDiagnostic(
+          "storage-save",
+          saved.cause ?? "transaction-failed",
+          saved.errorName,
+        );
+        setGamePersistenceState(
+          failureState,
+        );
+        return { ...saved, stage: "storage-save" as const };
+      }
+      if (saved.stale) {
+        setGamePersistenceDiagnostic(
+          "storage-save",
+          "cas-conflict",
+        );
+        setGamePersistenceState("conflict");
+        return {
+          ...saved,
+          stage: "storage-save" as const,
+          cause: "cas-conflict" as const,
+        };
+      }
+      setGamePersistenceState("saved");
+      clearGamePersistenceDiagnostic();
+      root.dataset.gamePersistenceRevision = String(revision);
+      gamePersistenceExpectedRevision = revision;
+      gamePersistenceExpectedStateHash = record.stateHash;
+      let result: GameEditorPersistenceSaveResult = saved;
+      let command: JournalCommand | undefined;
+      queueStage = "canonical-sync";
+      try {
+        // Adopt only after the storage record is durable. Existing stores are
+        // projected exactly once here; the candidate itself was only built
+        // during canonical-build.
+        command = pixyncGameStore === undefined
+          ? undefined
+          : await canonicalCandidate.commitLocal(record);
+        pixyncGameStore = canonicalCandidate;
+      } catch (error) {
+        const errorName = safeGamePersistenceErrorName(error);
+        setGamePersistenceDiagnostic(
+          "canonical-sync",
+          "canonical-sync-failed",
+          errorName,
+        );
+        if (typeof console !== "undefined" && typeof console.warn === "function") {
+          console.warn("[iGAME persistence] canonical sync failed", {
+            stage: "canonical-sync",
+            cause: "canonical-sync-failed",
+            errorName,
+          });
+        }
+        result = {
+          ...saved,
+          stage: "canonical-sync" as const,
+          cause: "canonical-sync-failed",
+          ...(errorName === undefined ? {} : { errorName }),
+        };
+      }
+      windowRef.dispatchEvent(
+        new CustomEvent("draw2:game-editor-committed", {
+          detail: { reason, record: baseRecord, command },
+        }),
+      );
+      queueStage = "manifest-update";
+      try {
         await workspaceManifestStore.updateModule(
-          asWorkspaceProjectId(projectId),
+          asWorkspaceProjectId(snapshot.projectId),
           "game",
           {
             status: "READY",
             revision,
-            stateHash: record.stateHash,
-            savedAt: record.savedAt,
+            stateHash: baseRecord.stateHash,
+            savedAt: baseRecord.savedAt,
           },
         );
-        if (root.dataset.creatorMode === "GAME") {
-          void refreshSite400IGameRoute("open");
+      } catch (error) {
+        const errorName = safeGamePersistenceErrorName(error);
+        setGamePersistenceDiagnostic(
+          "manifest-update",
+          "manifest-update-failed",
+          errorName,
+        );
+        if (typeof console !== "undefined" && typeof console.warn === "function") {
+          console.warn("[iGAME persistence] manifest update failed", {
+            stage: "manifest-update",
+            cause: "manifest-update-failed",
+            errorName,
+          });
         }
+        result = {
+          ...result,
+          stage: "manifest-update" as const,
+          cause: "manifest-update-failed",
+          ...(errorName === undefined ? {} : { errorName }),
+        };
       }
-    }).catch(() => {
-      root.dataset.gamePersistenceState = "error";
+      if (root.dataset.creatorMode === "GAME") {
+        void refreshSite400IGameRoute("open");
+      }
+      return result;
+    }).catch((error) => {
+      const postSaveFailure = queueStage === "canonical-sync" ||
+        queueStage === "manifest-update";
+      const cause: GameEditorPersistenceFailureCause = queueStage ===
+          "record-build"
+        ? "record-build-failed"
+        : queueStage === "canonical-build"
+        ? "canonical-build-failed"
+        : queueStage === "canonical-sync"
+        ? "canonical-sync-failed"
+        : queueStage === "manifest-update"
+        ? "manifest-update-failed"
+        : "transaction-failed";
+      const errorName = safeGamePersistenceErrorName(error);
+      setGamePersistenceDiagnostic(queueStage, cause, errorName);
+      if (postSaveFailure) {
+        return {
+          ok: true,
+          stale: false,
+          stage: queueStage,
+          cause,
+          ...(errorName === undefined ? {} : { errorName }),
+        };
+      }
+      const failureState = classifyGamePersistenceFailure(
+        error,
+        gamePersistenceCapabilityAvailable(),
+      );
+      if (failureState === "offline") gamePersistenceOffline = true;
+      setGamePersistenceState(
+        failureState,
+      );
+      const failure: "offline" | "error" = failureState === "offline"
+        ? "offline"
+        : "error";
+      return {
+        ok: false,
+        stale: false,
+        failure,
+        stage: queueStage,
+        cause,
+        ...(errorName === undefined ? {} : { errorName }),
+      };
     });
+    gamePersistenceSaveQueue = completion.then(() => undefined, () => undefined);
+    return completion;
   };
   const flushGameEditorPersistence = async (): Promise<void> => {
     await gamePersistenceSaveQueue.catch(() => undefined);
@@ -5151,6 +7282,19 @@ export function bootstrapDraw2Workspace(
     const selectedGameRailTab = gameRailTabForModeDeck(tab);
     if (selectedGameRailTab !== undefined) {
       gameRailTab = selectedGameRailTab;
+      const bottomPanel = gameWorkspaceBottomPanelForRail(
+        selectedGameRailTab,
+      );
+      if (
+        bottomPanel !== undefined &&
+        gameWorkspaceContext.bottomPanel !== bottomPanel
+      ) {
+        gameWorkspaceContext = gameWorkspaceReducer(
+          gameWorkspaceContext,
+          { type: "SELECT_BOTTOM_PANEL", panel: bottomPanel },
+        );
+        syncGameWorkspaceContextDataset();
+      }
       syncGameRailTabSurface();
       renderGameAssetRail();
     }
@@ -5252,6 +7396,7 @@ export function bootstrapDraw2Workspace(
     syncAudioRightMixerUi();
     renderAudioFxChain();
     renderAudioVoiceEditor();
+    syncAudioAssetPackagePanel();
   };
   let audioBrowserKind = "audio";
   let audioBrowserSelectedAssetId: string | undefined;
@@ -5764,6 +7909,9 @@ export function bootstrapDraw2Workspace(
   // sprite keep rendering their pixel art.
   let gameScenePlayState: GameGenreRuntimeState | undefined;
   let gameScenePlayHeldInput: GameGenreRuntimeInput = {};
+  let gamePlaygroundRuntimeState: GamePlaygroundRuntimeState | undefined;
+  // Disposable Preview-only state; never written to Project, Journal, or Undo.
+  let gamePhysics2DSession: Game351Physics2DSession | undefined;
 
   let gameDeckFrame = 0;
   let gameDeckPlaybackTimer: number | undefined;
@@ -5799,6 +7947,17 @@ export function bootstrapDraw2Workspace(
   // bounded collection so MIDI and multiple Audio Clips can be mixed.
   let audioStreamingRuntime: LongAudioClipRuntime | undefined;
   let audioStreamingRuntimes = new Map<string, LongAudioClipRuntime>();
+  const gameAudioSequenceQueue = createGameAudioQueue({
+    setTimeout: (callback, delayMs) => windowRef.setTimeout(callback, delayMs),
+    clearTimeout: (handle) => windowRef.clearTimeout(handle),
+  });
+  // Short event sounds use their own bounded queue so a jump/step never
+  // interrupts the scene BGM queue. A new event replaces the previous event
+  // schedule instead of creating one timer per clip or retaining PCM data.
+  const gameAudioEventQueue = createGameAudioQueue({
+    setTimeout: (callback, delayMs) => windowRef.setTimeout(callback, delayMs),
+    clearTimeout: (handle) => windowRef.clearTimeout(handle),
+  });
   let audioStreamingRuntimeRevisionId: string | undefined;
   let audioStreamingRuntimeClipId: string | undefined;
   let audioStreamingRuntimeProjectRevision: number | undefined;
@@ -5917,23 +8076,37 @@ export function bootstrapDraw2Workspace(
   const AUDIO_DEFAULT_BPM = 120;
   const AUDIO_DEFAULT_PPQ = 480;
   const AUDIO_TIMELINE_RENDER_LIMIT = 256;
-  // A new Audio document opens on one bar, but the project timeline itself is
-  // not a one-measure document.  This is a projection guard for transport and
-  // hit testing only; the durable notes/clips remain Tick-based and the Piano
-  // Roll virtualizes its horizontal paint window.
+  // A new Audio document opens with a four-bar working window so the Piano
+  // Roll is immediately useful for musical phrases. This is a projection
+  // guard for transport and hit testing only; the durable notes/clips remain
+  // Tick-based and the Piano Roll virtualizes its horizontal paint window.
   const AUDIO_MIN_FRAME_COUNT = 48;
-  const AUDIO_MAX_FRAME_COUNT = 1_000_000;
+  const AUDIO_INITIAL_VISIBLE_BARS = 4;
+  // The Tick timeline is sparse and rendered through a bounded viewport. Keep
+  // only a safe-integer guard for malformed input; there is no product-level
+  // bar limit and extending the range does not allocate empty cells.
+  const AUDIO_MAX_FRAME_COUNT = Number.MAX_SAFE_INTEGER;
   const AUDIO_TIMELINE_APPEND_FRAMES = 48;
-  // The optional lower deck is an overview, not a second Piano Roll.  Group
-  // long timelines into bounded slots so hidden/off-screen cells do not
-  // become thousands of interactive DOM nodes.  The central Piano Roll
-  // remains frame-accurate and keeps its own viewport virtualization.
+  // The lower deck is an overview, not a second Piano Roll. One compact cell
+  // represents one bar (or a bounded group of bars for very long projects),
+  // while the central Piano Roll remains frame-accurate and virtualized.
   const AUDIO_DECK_OVERVIEW_SLOTS = 48;
+  const AUDIO_TIMELINE_OVERVIEW_CELL_WIDTH = 112;
   const AUDIO_BAR_STRIP_RENDER_LIMIT = 256;
   // The piano roll is a viewport, not a document-sized matrix. Keep the row
   // geometry stable while materializing only the horizontally visible Tick
   // window. Horizontal zoom changes time columns only.
   const AUDIO_MIDI_ROW_HEIGHT = 20;
+  // 1:1 cells (design: bring the piano roll closer to a pixel-art canvas'
+  // shape). Four 1/16 grid cells per beat, so at zoom 1 the default grid
+  // cell is exactly AUDIO_MIDI_ROW_HEIGHT wide -- a square "dot", the same
+  // way one Draw canvas pixel is one square screen cell. Only the default
+  // quantize (1/16 / "off") lands on an exact square; a coarser or finer
+  // quantize still reads as a grid, just not a square one -- this keeps the
+  // shared Draw<->Audio timeline pixel scale (see audioDrawFrameColumnWidth)
+  // untouched rather than making it depend on the Piano Roll's own quantize
+  // setting, which stays cheap and avoids touching cross-mode sync math.
+  const AUDIO_MIDI_PIXELS_PER_BEAT = AUDIO_MIDI_ROW_HEIGHT * 4;
   const AUDIO_MIDI_KEY_WIDTH = 44;
   // The Arranger track header is a compact channel strip. Keep its width in
   // one source of truth so the ruler, clips, Draw-frame lane and playhead all
@@ -7690,10 +9863,13 @@ export function bootstrapDraw2Workspace(
         ),
       );
     }
-    // Keep an empty/new document at least one complete musical bar after the
-    // shared Draw FPS changes. The transport projection must not expose only
-    // 48 frames of a bar when the current animation clock is 60 FPS.
-    audioFrameCount = Math.max(audioFrameCount, audioMeasureFrameCount());
+    // Keep an empty/new document at least the four-bar working window after
+    // the shared Draw FPS changes. The transport projection must not expose
+    // only one bar when the current animation clock changes resolution.
+    audioFrameCount = Math.max(
+      audioFrameCount,
+      audioMeasureFrameCount() * AUDIO_INITIAL_VISIBLE_BARS,
+    );
     if (audioTempoControl !== undefined) {
       audioTempoControl.value = String(audioBpm);
     }
@@ -7935,7 +10111,7 @@ export function bootstrapDraw2Workspace(
             tempoBpm: audioBpm,
             ppq: AUDIO_DEFAULT_PPQ,
             // Keep the timeline's clip lanes and the Piano Roll instruments in
-            // one canonical mixer graph.  The workspace bridge normalizes the
+            // one canonical mixer graph.  The workspace adapter normalizes the
             // short BGM/SFX/Voice keys to instrument:<key> Track IDs.
             // Do not allocate all instrument/mixer lanes for a new project.
             // PIANO is the lightweight starting point; other sounds are
@@ -8908,6 +11084,8 @@ export function bootstrapDraw2Workspace(
       gameSceneRules,
       gameEventCards,
       gameVisualMaker,
+      gameDataForPersistence(),
+      gamePlayground,
     );
     if (pixyncGameStore === undefined) {
       pixyncGameStore = await GameEditorCanonicalStore.create(record);
@@ -8989,6 +11167,15 @@ export function bootstrapDraw2Workspace(
       if (timeline.eventCards !== undefined) {
         gameEventCards = timeline.eventCards.map((card) => ({ ...card }));
       }
+      gameItems = [...(timeline.items ?? [])].map((item) => ({ ...item }));
+      gameRecipes = [...(timeline.recipes ?? [])].map((recipe) => ({
+        ...recipe,
+        ingredients: recipe.ingredients.map((ingredient) => ({ ...ingredient })),
+        result: { ...recipe.result },
+      }));
+      gameBlockTypes = [...(timeline.blockTypes ?? [])].map((blockType) => ({
+        ...blockType,
+      }));
       gameDeckTracks = timeline.tracks.map((track) => ({
         id: track.trackId,
         label: track.label,
@@ -9017,9 +11204,23 @@ export function bootstrapDraw2Workspace(
             candidate.assetId === binding.assetId &&
             candidate.revisionId === binding.revisionId
           );
-          return previous?.assetDefinitionId === undefined
+          return previous === undefined
             ? binding
-            : { ...binding, assetDefinitionId: previous.assetDefinitionId };
+            : {
+              ...binding,
+              ...(previous.assetDefinitionId === undefined
+                ? {}
+                : { assetDefinitionId: previous.assetDefinitionId }),
+              ...(previous.licenseId === undefined
+                ? {}
+                : { licenseId: previous.licenseId }),
+              ...(previous.rights === undefined
+                ? {}
+                : { rights: [...previous.rights] }),
+              ...(previous.sourceKind === undefined
+                ? {}
+                : { sourceKind: previous.sourceKind }),
+            };
         },
       );
       gamePersistenceRevision = Math.max(
@@ -9047,6 +11248,8 @@ export function bootstrapDraw2Workspace(
         gameSceneRules,
         gameEventCards,
         gameVisualMaker,
+        gameDataForPersistence(),
+        gamePlayground,
       );
       const saved = await gamePersistenceStore.save(record, {
         expectedRevision: gamePersistenceExpectedRevision,
@@ -9656,7 +11859,8 @@ export function bootstrapDraw2Workspace(
     audioFps = AUDIO_DEFAULT_FPS;
     audioFrameCount = Math.max(
       AUDIO_MIN_FRAME_COUNT,
-      framesPerMeasure(audioFps, AUDIO_DEFAULT_BPM, AUDIO_DEFAULT_PPQ, 4, 4),
+      framesPerMeasure(audioFps, AUDIO_DEFAULT_BPM, AUDIO_DEFAULT_PPQ, 4, 4) *
+        AUDIO_INITIAL_VISIBLE_BARS,
     );
     drawAnimationFps = undefined;
     audioDrawMonitorVisible = false;
@@ -9847,7 +12051,7 @@ export function bootstrapDraw2Workspace(
     }
     audioFrameCount = Math.max(
       AUDIO_MIN_FRAME_COUNT,
-      audioMeasureFrameCount(),
+      audioMeasureFrameCount() * AUDIO_INITIAL_VISIBLE_BARS,
       highestAudioNoteFrame(),
     );
     audioFrameWindowStart.value = 0;
@@ -9893,7 +12097,7 @@ export function bootstrapDraw2Workspace(
   // Keep one scrollable composition window even when Draw currently contains
   // only a few cels. Audio can therefore be placed ahead of the artwork and
   // later aligned to additional animation frames without shrinking the song.
-  let audioFrameCount = AUDIO_MIN_FRAME_COUNT;
+  let audioFrameCount = AUDIO_MIN_FRAME_COUNT * AUDIO_INITIAL_VISIBLE_BARS;
   let audioFps = AUDIO_DEFAULT_FPS;
   let drawTimelineFrameDurationsMs: number[] = [];
   let drawTimelineFrameRevision = "";
@@ -9925,7 +12129,7 @@ export function bootstrapDraw2Workspace(
         audioWorkspaceSession.project,
         audioWorkspaceSession.framesPerSecond,
       );
-  // The bridge is always live, but the Audio editor does not replace its
+  // The Draw/Audio time link is always available, but the Audio editor does not replace its
   // musical grid with Draw cells. Draw frames are mapped onto that clock only
   // for the dedicated artwork lane and monitor.
   const audioUsesDrawTimebase = (): boolean => false;
@@ -10299,6 +12503,10 @@ export function bootstrapDraw2Workspace(
       const cells = documentRef.createElement("div");
       cells.className = "draw2-mode-deck-cells";
       cells.setAttribute("role", "row");
+      if (prefix === "audio") {
+        cells.setAttribute("aria-label", `${track.label} 互換プレビュー（編集は仮想タイムライン）`);
+        cells.title = "互換プレビュー · 長尺編集は中央の仮想タイムラインで行います";
+      }
       for (let index = 0; index < 16; index += 1) {
         const cell = documentRef.createElement("button");
         cell.className = "draw2-mode-deck-cell";
@@ -10328,6 +12536,12 @@ export function bootstrapDraw2Workspace(
   ): Promise<void> => {
     pixyncGameStore = undefined;
     gameMakerPendingHeroBinding = undefined;
+    gamePlayground = createDefaultGamePlaygroundConfig();
+    gameUiNodes = [];
+    gameElements = [];
+    gameElementRuntimeState = createGameElementState();
+    gameWorkspaceContext = createGameWorkspaceContext();
+    projectGameWorkspaceSelectionToLegacy();
     if (options.blank === true) {
       gameCreationMode = "UNSELECTED";
       gameCreationModePromptVisible = true;
@@ -10339,16 +12553,19 @@ export function bootstrapDraw2Workspace(
       gameAnimationBindings = [];
       gameSceneRules = sceneRulesForCreationMode("RPG_TEMPLATE");
       gameEventCards = [];
+      gameItems = [];
+      gameRecipes = [];
+      gameBlockTypes = [];
       gameVisualMaker = createDefaultGameVisualMakerConfig("hero");
       gamePhysics2D = normalizePhysics2DSettings(DEFAULT_PHYSICS_2D_SETTINGS);
       gameBehaviors = [];
       gameBehaviorSources = [];
       gameTemplateInstances = [];
+      gamePlayground = createDefaultGamePlaygroundConfig();
       gameLogicModeBehaviorId = undefined;
-      selectedGameTrackId = undefined;
-      root.dataset.gamePersistenceState = gamePersistenceStore.available
-        ? "ready"
-        : "unavailable";
+      setGamePersistenceState(
+        gamePersistenceStore.available ? "ready" : "offline",
+      );
       root.dataset.gamePersistenceRevision = "0";
       renderModeDeckTracks(gameAssetTracks, gameDeckTracks, "game");
       renderGameCustomPanels();
@@ -10381,6 +12598,17 @@ export function bootstrapDraw2Workspace(
         (binding) => ({ ...binding, frameIds: [...binding.frameIds] }),
       );
       gamePhysics2D = normalizePhysics2DSettings(record.physics2D);
+      gameItems = [...(record.gameData?.items ?? [])].map((item) => ({
+        ...item,
+      }));
+      gameRecipes = [...(record.gameData?.recipes ?? [])].map((recipe) => ({
+        ...recipe,
+        ingredients: recipe.ingredients.map((ingredient) => ({ ...ingredient })),
+        result: { ...recipe.result },
+      }));
+      gameBlockTypes = [...(record.gameData?.blockTypes ?? [])].map((blockType) => ({
+        ...blockType,
+      }));
       gameBehaviors = [...(record.behaviors ?? [])];
       gameBehaviorSources = [...(record.behaviorSources ?? [])];
       gameTemplateInstances = [...(record.templateInstances ?? [])].map((
@@ -10395,6 +12623,10 @@ export function bootstrapDraw2Workspace(
           (track.role ?? gameObjectRoleFor(track.id, track.kind)) === "PLAYER"
         )?.id ?? "hero",
       );
+      gamePlayground = normalizeGamePlaygroundConfig(record.playground);
+      gameUiNodes = [...(gamePlayground.uiNodes ?? [])].map((node) => ({ ...node, style: { ...node.style } }));
+      gameElements = [...(gamePlayground.gameElements ?? [])].map((element) => ({ ...element }));
+      resetGameElementRuntimeState();
       restored = true;
     } else {
       gameDeckTracks = defaultGameDeckTracks.map((track) => ({
@@ -10407,9 +12639,13 @@ export function bootstrapDraw2Workspace(
       gameDeckBindings = [];
       gameAnimationBindings = [];
       gamePhysics2D = normalizePhysics2DSettings(DEFAULT_PHYSICS_2D_SETTINGS);
+      gameItems = [];
+      gameRecipes = [];
+      gameBlockTypes = [];
       gameBehaviors = defaultGameBehaviors();
       gameBehaviorSources = [];
       gameTemplateInstances = [];
+      gamePlayground = createDefaultGamePlaygroundConfig();
       gameVisualMaker = createDefaultGameVisualMakerConfig(
         gameDeckTracks.find((track) =>
           (track.role ?? gameObjectRoleFor(track.id, track.kind)) === "PLAYER"
@@ -10461,20 +12697,12 @@ export function bootstrapDraw2Workspace(
     }
     root.dataset.gameCreationMode = gameCreationMode;
     gameLogicModeBehaviorId = undefined;
-    root.dataset.gamePersistenceState = restored
-      ? "restored"
-      : gamePersistenceStore.available
-      ? "ready"
-      : "unavailable";
+    setGamePersistenceState(
+      restored ? "saved" : gamePersistenceStore.available ? "ready" : "offline",
+    );
     root.dataset.gamePersistenceRevision = String(gamePersistenceRevision);
     renderModeDeckTracks(gameAssetTracks, gameDeckTracks, "game");
-    if (!gameDeckTracks.some((track) => track.id === selectedGameTrackId)) {
-      selectedGameTrackId = gameDeckTracks[0]?.id;
-    }
-    selectedGameEventCardId = gameEventCards.find((card) =>
-      card.sourceTrackId === selectedGameTrackId ||
-      card.targetTrackId === selectedGameTrackId
-    )?.eventId;
+    projectGameWorkspaceSelectionToLegacy();
     renderGameCustomPanels();
     if (gameDeckStatus !== undefined) {
       gameDeckStatus.textContent = restored
@@ -10511,6 +12739,8 @@ export function bootstrapDraw2Workspace(
         gameSceneRules,
         gameEventCards,
         gameVisualMaker,
+        gameDataForPersistence(),
+        gamePlayground,
       );
     pixyncGameStore = canonicalRecord.canonicalProject === undefined
       ? await GameEditorCanonicalStore.create(canonicalRecord)
@@ -10567,7 +12797,7 @@ export function bootstrapDraw2Workspace(
     }
     const target = Math.max(0, Math.trunc(frameExclusive));
     // Audio's edit clock is uniform.  Avoid building a frame-sized prefix
-    // array for a long song; Draw's variable-duration bridge still uses the
+    // array for a long song; Draw's variable-duration timebase still uses the
     // cached path below.
     if (!audioUsesDrawTimebase()) {
       return target * (1_000 / Math.max(1, audioFps));
@@ -10614,7 +12844,7 @@ export function bootstrapDraw2Workspace(
     (audioPpq * 4) / audioMeterParts().denominator;
   const audioBarTick = (): number =>
     audioBeatTick() * audioMeterParts().numerator;
-  // Audio is edited in musical time. Draw FPS remains the canonical bridge,
+  // Audio is edited in musical time. Draw FPS remains the source-side time reference,
   // but never becomes the visual grid: one bar is divided into beat/sub-beat
   // columns just like a conventional DAW Arranger and Piano Roll.
   const audioGridTick = (): number => {
@@ -10683,44 +12913,6 @@ export function bootstrapDraw2Workspace(
     const subdivision = Math.floor((tick % beat) / grid) + 1;
     return `${barIndex + 1}.${beatInBar + 1}.${subdivision}`;
   };
-  const audioDeckOverviewSlots = (): AudioDeckOverviewSlot[] => {
-    const totalFrames = Math.max(1, audioFrameCount);
-    const totalTicks = Math.max(audioBarTick(), audioFrameTick(totalFrames));
-    const grid = Math.max(1, audioGridTick());
-    const divisions = Math.max(1, Math.ceil(totalTicks / grid));
-    // Keep the DOM bounded for long Projects while preserving musical
-    // boundaries. A slot may represent several subdivisions, never a random
-    // group of Draw frames.
-    const subdivisionSpan = grid * Math.max(
-      1,
-      Math.ceil(divisions / AUDIO_DECK_OVERVIEW_SLOTS),
-    );
-    const slots: AudioDeckOverviewSlot[] = [];
-    for (
-      let startTick = 0;
-      startTick < totalTicks;
-      startTick += subdivisionSpan
-    ) {
-      const startFrame = audioFrameForTick(startTick);
-      if (startFrame >= totalFrames) break;
-      const endFrame = Math.min(
-        totalFrames,
-        Math.max(
-          startFrame + 1,
-          audioFrameForTick(startTick + subdivisionSpan),
-        ),
-      );
-      slots.push({ startFrame, endFrame });
-      if (endFrame >= totalFrames) break;
-    }
-    return slots;
-  };
-  const audioDeckSlotForFrame = (
-    frame: number,
-  ): AudioDeckOverviewSlot | undefined =>
-    audioDeckOverviewSlots().find((slot) =>
-      frame >= slot.startFrame && frame < slot.endFrame
-    );
   const audioMeasureFrameCount = (): number => {
     const meter = audioMeterParts();
     if (audioUsesDrawTimebase() && drawTimelineFrameDurationsMs.length > 0) {
@@ -10741,8 +12933,38 @@ export function bootstrapDraw2Workspace(
       meter.denominator,
     );
   };
+  const audioDeckOverviewSlots = (): AudioDeckOverviewSlot[] => {
+    const totalFrames = Math.max(1, audioFrameCount);
+    const measureFrames = Math.max(1, audioMeasureFrameCount());
+    const totalBars = Math.max(1, Math.ceil(totalFrames / measureFrames));
+    const barsPerSlot = Math.max(
+      1,
+      Math.ceil(totalBars / AUDIO_DECK_OVERVIEW_SLOTS),
+    );
+    const slots: AudioDeckOverviewSlot[] = [];
+    for (let startBar = 0; startBar < totalBars; startBar += barsPerSlot) {
+      const endBar = Math.min(totalBars, startBar + barsPerSlot);
+      const startFrame = Math.min(totalFrames - 1, startBar * measureFrames);
+      const endFrame = Math.min(
+        totalFrames,
+        Math.max(startFrame + 1, endBar * measureFrames),
+      );
+      slots.push({ startFrame, endFrame });
+      if (endFrame >= totalFrames) break;
+    }
+    return slots;
+  };
+  const audioDeckSlotForFrame = (
+    frame: number,
+  ): AudioDeckOverviewSlot | undefined =>
+    audioDeckOverviewSlots().find((slot) =>
+      frame >= slot.startFrame && frame < slot.endFrame
+    );
   const ensureAudioTimelineMinimum = (): boolean => {
-    const minimum = Math.max(AUDIO_MIN_FRAME_COUNT, audioMeasureFrameCount());
+    const minimum = Math.max(
+      AUDIO_MIN_FRAME_COUNT,
+      audioMeasureFrameCount() * AUDIO_INITIAL_VISIBLE_BARS,
+    );
     if (audioFrameCount >= minimum) return false;
     audioFrameCount = minimum;
     audioFrameWindowStart.value = 0;
@@ -10824,7 +13046,12 @@ export function bootstrapDraw2Workspace(
       state.host.scrollLeft = state.left;
       state.host.scrollTop = state.top;
     }
-    if (targetHost !== undefined) {
+    const compactOverviewHost = targetHost !== undefined && [
+      audioTimelineRuler,
+      audioAnimationCells,
+      audioTracks,
+    ].includes(targetHost);
+    if (targetHost !== undefined && !compactOverviewHost) {
       targetHost.scrollLeft = Math.max(
         0,
         Math.round(
@@ -10833,9 +13060,10 @@ export function bootstrapDraw2Workspace(
             viewportX,
         ),
       );
-      if (
-        targetHost !== audioMidiGrid && targetHost !== audioArrangerViewport
-      ) syncAudioTimelineScroll(targetHost);
+    } else if (targetHost !== undefined) {
+      // The lower surface is a fixed-width bar overview. Piano Roll zoom must
+      // not stretch it or move the user's overview scroll position.
+      syncAudioTimelineScroll(targetHost);
     }
     if (audioMidiGrid !== undefined) {
       syncAudioMidiCanvasPlayhead();
@@ -10900,7 +13128,8 @@ export function bootstrapDraw2Workspace(
   // indices are only a transport/render projection, so scrolling and hit
   // testing never stop at the currently selected bar.
   const audioMidiPixelsPerTick = (): number =>
-    (120 / Math.max(1, audioPpq)) * audioMidiHorizontalZoom;
+    (AUDIO_MIDI_PIXELS_PER_BEAT / Math.max(1, audioPpq)) *
+      audioMidiHorizontalZoom;
   const audioMidiTickToX = (tick: number): number =>
     Math.max(0, Number.isFinite(tick) ? tick : 0) * audioMidiPixelsPerTick();
   const audioMidiTimelineEndTick = (): number =>
@@ -11000,6 +13229,268 @@ export function bootstrapDraw2Workspace(
       button.classList.toggle("is-anchor", index === bounds.startBar);
       button.setAttribute("aria-selected", String(selected));
     });
+    syncAudioAssetPackagePanel();
+  };
+  type AudioAssetPackageNotice = {
+    readonly text: string;
+    readonly state: "ready" | "error";
+  };
+  let audioAssetPackageNotice: AudioAssetPackageNotice | undefined;
+  let audioAssetPackageRanges: AudioAssetPackageSelectionInput[] = [];
+  const audioAssetPackageSelection = (): {
+    readonly selection: AudioAssetPackageSelectionInput;
+    readonly track: AudioTrack;
+    readonly role: AudioAssetPackageKind;
+    readonly label: string;
+    readonly bounds: ReturnType<typeof audioSelectedMeasureBounds>;
+  } | { readonly error: string } => {
+    const session = audioWorkspaceSession;
+    if (session === undefined) return { error: "iAUDIOを読み込んでいます。" };
+    const track = selectedAudioCanonicalTrack();
+    if (track === undefined) return { error: "Asset化するTrackを選択してください。" };
+    const roleValue = audioAssetRole?.value;
+    if (roleValue !== "BGM" && roleValue !== "SE" && roleValue !== "VOICE") {
+      return { error: "役割を選択してください。" };
+    }
+    const bounds = audioSelectedMeasureBounds();
+    const barLabel = bounds.endBar - bounds.startBar === 1
+      ? `Bar ${bounds.startBar + 1}`
+      : `Bars ${bounds.startBar + 1}–${bounds.endBar}`;
+    const defaultLabel = `${track.name} · ${roleValue} · ${barLabel}`;
+    const label = audioAssetName?.value.trim() || defaultLabel;
+    return {
+      selection: {
+        projectId: String(session.project.projectId),
+        projectRevision: `audio-revision:${String(session.project.projectRevision)}`,
+        projectStateHash: String(session.project.stateHash),
+        label,
+        kind: roleValue,
+        trackIds: [String(track.trackId)],
+        startTick: Number(bounds.startTick),
+        durationTick: Number(bounds.durationTick),
+      },
+      track,
+      role: roleValue,
+      label,
+      bounds,
+    };
+  };
+  syncAudioAssetPackagePanel = (): void => {
+    if (audioAssetStatus === undefined || audioAssetFinalize === undefined) return;
+    const selection = audioAssetPackageSelection();
+    if ("error" in selection) {
+      audioAssetAddRange && (audioAssetAddRange.disabled = true);
+      audioAssetFinalize.disabled = true;
+      audioAssetStatus.textContent = audioAssetPackageBusy
+        ? "検証中…"
+        : selection.error;
+      audioAssetStatus.dataset.state = "error";
+      return;
+    }
+    const built = createAudioAssetizationInput(selection.selection);
+    if (!built.ok) {
+      audioAssetAddRange && (audioAssetAddRange.disabled = true);
+      audioAssetFinalize.disabled = true;
+      audioAssetStatus.textContent = built.errors[0] ?? "範囲を確認してください。";
+      audioAssetStatus.dataset.state = "error";
+      return;
+    }
+    const range = built.value.ranges[0];
+    audioAssetPackageRanges = audioAssetPackageRanges.filter((candidate) =>
+      candidate.projectId === selection.selection.projectId &&
+      candidate.projectRevision === selection.selection.projectRevision &&
+      candidate.projectStateHash === selection.selection.projectStateHash
+    );
+    const queuedRangeIds = new Set<string>();
+    for (const candidate of audioAssetPackageRanges) {
+      const candidateResult = createAudioAssetizationInput(candidate);
+      if (candidateResult.ok) {
+        const candidateRange = candidateResult.value.ranges[0];
+        if (candidateRange !== undefined) queuedRangeIds.add(candidateRange.rangeId);
+      }
+    }
+    const uniqueRangeCount = queuedRangeIds.size +
+      (range !== undefined && !queuedRangeIds.has(range.rangeId) ? 1 : 0);
+    const offerKind = audioAssetOfferKind?.value === "ASSET_PACK"
+      ? "ASSET_PACK"
+      : "ASSET";
+    if (audioAssetAddRange !== undefined) {
+      audioAssetAddRange.disabled = audioAssetPackageBusy ||
+        range === undefined || queuedRangeIds.has(range.rangeId);
+    }
+    audioAssetFinalize.disabled = audioAssetPackageBusy || range === undefined ||
+      (offerKind === "ASSET_PACK" && uniqueRangeCount < 2);
+    if (audioAssetPackageBusy) {
+      if (audioAssetAddRange !== undefined) audioAssetAddRange.disabled = true;
+      audioAssetFinalize.textContent = "検証中…";
+      audioAssetStatus.textContent = "明示範囲を検証しています。";
+      audioAssetStatus.dataset.state = "ready";
+      return;
+    }
+    if (audioAssetAddRange !== undefined) audioAssetAddRange.textContent = "＋Packへ追加";
+    audioAssetFinalize.textContent = "販売用に確定";
+    audioAssetStatus.textContent = audioAssetPackageNotice?.text ??
+      (offerKind === "ASSET_PACK" && uniqueRangeCount < 2
+        ? `${selection.track.name} · Pack ${uniqueRangeCount}/2範囲`
+        : `${selection.track.name} · ${selection.role} · ${selection.bounds.startTick}–${selection.bounds.endTick} tick`);
+    audioAssetStatus.dataset.state = audioAssetPackageNotice?.state ?? "ready";
+  };
+  const addCurrentAudioAssetPackageRange = (): void => {
+    const selection = audioAssetPackageSelection();
+    if ("error" in selection) {
+      audioAssetPackageNotice = { text: selection.error, state: "error" };
+      syncAudioAssetPackagePanel();
+      return;
+    }
+    const built = createAudioAssetizationInput(selection.selection);
+    if (!built.ok) {
+      audioAssetPackageNotice = { text: built.errors.join(" · "), state: "error" };
+      syncAudioAssetPackagePanel();
+      return;
+    }
+    const range = built.value.ranges[0];
+    if (range === undefined) return;
+    const duplicate = audioAssetPackageRanges.some((candidate) => {
+      const candidateResult = createAudioAssetizationInput(candidate);
+      return candidateResult.ok && candidateResult.value.ranges[0]?.rangeId === range.rangeId;
+    });
+    if (duplicate) {
+      audioAssetPackageNotice = { text: "この範囲はすでにPackへ追加されています。", state: "error" };
+      syncAudioAssetPackagePanel();
+      return;
+    }
+    audioAssetPackageRanges = [...audioAssetPackageRanges, selection.selection];
+    audioAssetPackageNotice = {
+      text: `Packへ追加しました（${audioAssetPackageRanges.length}範囲）。次の範囲を選択できます。`,
+      state: "ready",
+    };
+    syncAudioAssetPackagePanel();
+  };
+  const finalizeSelectedAudioAssetPackage = async (): Promise<void> => {
+    if (audioAssetPackageBusy) return;
+    audioAssetPackageNotice = undefined;
+    const selection = audioAssetPackageSelection();
+    if ("error" in selection) {
+      audioAssetPackageNotice = { text: selection.error, state: "error" };
+      syncAudioAssetPackagePanel();
+      return;
+    }
+    const bridge = getAssetBridge();
+    if (bridge === undefined) {
+      audioAssetPackageNotice = { text: "Asset保存機能を読み込めません。", state: "error" };
+      syncAudioAssetPackagePanel();
+      return;
+    }
+    const built = createAudioAssetizationInput(selection.selection);
+    if (!built.ok) {
+      audioAssetPackageNotice = { text: built.errors.join(" · "), state: "error" };
+      syncAudioAssetPackagePanel();
+      return;
+    }
+    const range = built.value.ranges[0];
+    if (range === undefined) {
+      audioAssetPackageNotice = { text: "Asset化する範囲がありません。", state: "error" };
+      syncAudioAssetPackagePanel();
+      return;
+    }
+    audioAssetPackageBusy = true;
+    syncAudioAssetPackagePanel();
+    try {
+      const offerKind: AssetPackageOfferKind = audioAssetOfferKind?.value === "ASSET_PACK"
+        ? "ASSET_PACK"
+        : "ASSET";
+      const selectedInputs = offerKind === "ASSET_PACK"
+        ? [...audioAssetPackageRanges, selection.selection]
+        : [selection.selection];
+      const distinctInputs: AudioAssetPackageSelectionInput[] = [];
+      const seenRangeIds = new Set<string>();
+      for (const candidate of selectedInputs) {
+        const candidateResult = createAudioAssetizationInput(candidate);
+        if (!candidateResult.ok) continue;
+        const candidateRange = candidateResult.value.ranges[0];
+        if (candidateRange === undefined || seenRangeIds.has(candidateRange.rangeId)) continue;
+        seenRangeIds.add(candidateRange.rangeId);
+        distinctInputs.push(candidate);
+      }
+      if (offerKind === "ASSET_PACK" && distinctInputs.length < 2) {
+        audioAssetPackageNotice = {
+          text: "Packには2つ以上の範囲が必要です。範囲を選んで「Packへ追加」してください。",
+          state: "error",
+        };
+        return;
+      }
+      const firstInput = distinctInputs[0];
+      if (firstInput === undefined) {
+        audioAssetPackageNotice = { text: "Asset化する範囲がありません。", state: "error" };
+        return;
+      }
+      const firstBuilt = createAudioAssetizationInput(firstInput);
+      if (!firstBuilt.ok) {
+        audioAssetPackageNotice = { text: firstBuilt.errors.join(" · "), state: "error" };
+        return;
+      }
+      const detected = detectAudioAssetization({
+        ...firstBuilt.value,
+        ranges: distinctInputs.flatMap((candidate) => {
+          const candidateResult = createAudioAssetizationInput(candidate);
+          return candidateResult.ok ? [...candidateResult.value.ranges] : [];
+        }),
+      });
+      if (detected.status !== "DETERMINISTIC") {
+        audioAssetPackageNotice = {
+          text: `自動判定を停止しました: ${detected.reasons.join(" · ")}`,
+          state: "error",
+        };
+        return;
+      }
+      const derivativePolicy: AssetDerivativePolicy = audioAssetDerivativePolicy?.value ===
+          "DERIVATIVE_ALLOWED"
+        ? "DERIVATIVE_ALLOWED"
+        : audioAssetDerivativePolicy?.value === "REDISTRIBUTION_ALLOWED"
+        ? "REDISTRIBUTION_ALLOWED"
+        : "USE_ONLY";
+      const packageItems = distinctInputs.flatMap((candidate) => {
+        const candidateResult = createAudioAssetizationInput(candidate);
+        const candidateRange = candidateResult.ok ? candidateResult.value.ranges[0] : undefined;
+        if (!candidateResult.ok || candidateRange === undefined) return [];
+        return [{
+          kind: "AUDIO" as const,
+          source: {
+            kind: "AUDIO" as const,
+            sourceId: candidateRange.rangeId,
+            projectId: candidateResult.value.sourceProjectId,
+            revisionId: candidateResult.value.sourceRevisionId,
+            contentHash: candidateResult.value.contentHash,
+          },
+          result: detected,
+          label: candidate.label,
+        }];
+      });
+      const finalized = await finalizeAssetPackage({
+        title: selection.label,
+        description: `iAUDIOの明示範囲 · ${selection.track.name} · ${packageItems.length}単位`,
+        offerKind,
+        derivativePolicy,
+        confirmationRevision: `${firstBuilt.value.sourceRevisionId}:${detected.inputHash}`,
+        items: packageItems,
+      });
+      if (!finalized.ok) {
+        audioAssetPackageNotice = { text: finalized.reasons.join(" · "), state: "error" };
+        return;
+      }
+      const saved = await bridge.saveAssetPackage(finalized.manifest);
+      audioAssetPackageNotice = saved.ok
+        ? { text: "確定しました。Marketへ出品できます。", state: "ready" }
+        : { text: saved.message, state: "error" };
+    } catch (error) {
+      audioAssetPackageNotice = {
+        text: error instanceof Error ? error.message : "Asset確定に失敗しました。",
+        state: "error",
+      };
+    } finally {
+      audioAssetPackageBusy = false;
+      syncAudioAssetPackagePanel();
+    }
   };
   const ensureAudioWorkspaceMeasure = (frame: number): boolean => {
     const measureFrames = audioMeasureFrameCount();
@@ -11028,58 +13519,6 @@ export function bootstrapDraw2Workspace(
       (_, offset) => audioWorkspaceMeasureStart.value + offset,
     );
   };
-  const audioFrameColumnWidth = (frameIndex: number): number =>
-    Math.min(
-      288,
-      Math.max(
-        8,
-        Math.round(
-          (audioFrameDurationTick(frameIndex) / audioPpq) * 120 *
-            audioMidiHorizontalZoom,
-        ),
-      ),
-    );
-  const audioFrameColumns = (frames = audioFrameIndices()): number[] =>
-    frames.map(audioFrameColumnWidth);
-  const audioFrameWidthPrefixCache: { key: string; values: number[] } = {
-    key: "",
-    values: [0],
-  };
-  const audioFrameWidthPrefix = (frameExclusive: number): number => {
-    const key = `${
-      audioUsesDrawTimebase() ? drawTimelineFrameRevision : "audio"
-    }/${audioFps}/${audioBpm}/${audioPpq}/${audioMidiHorizontalZoom}`;
-    if (audioFrameWidthPrefixCache.key !== key) {
-      audioFrameWidthPrefixCache.key = key;
-      audioFrameWidthPrefixCache.values = [0];
-    }
-    const target = Math.max(0, Math.trunc(frameExclusive));
-    // Musical Audio surfaces use a continuous Tick axis.  This keeps the
-    // width calculation O(1) when the user extends a project to thousands of
-    // bars while preserving the frame-by-frame cache for Draw projections.
-    if (!audioUsesDrawTimebase()) {
-      return Math.max(
-        0,
-        (audioFrameTick(target) / Math.max(1, audioPpq)) * 120 *
-          audioMidiHorizontalZoom,
-      );
-    }
-    const values = audioFrameWidthPrefixCache.values;
-    for (let frame = values.length; frame <= target; frame += 1) {
-      values.push(
-        (values[frame - 1] ?? 0) + audioFrameColumnWidth(frame - 1),
-      );
-    }
-    return values[target] ?? values[values.length - 1] ?? 0;
-  };
-  const audioFrameColumnWidthTotal = (
-    startFrame: number,
-    endFrame: number,
-  ): number =>
-    Math.max(
-      0,
-      audioFrameWidthPrefix(endFrame) - audioFrameWidthPrefix(startFrame),
-    );
   const audioDrawFrameDurationMs = (drawFrameIndex: number): number =>
     Math.max(
       1,
@@ -11095,7 +13534,7 @@ export function bootstrapDraw2Workspace(
       8,
       Math.round(
         (audioDrawFrameDurationMs(drawFrameIndex) / 1_000) *
-          (audioBpm / 60) * 120 * audioMidiHorizontalZoom,
+          (audioBpm / 60) * AUDIO_MIDI_PIXELS_PER_BEAT * audioMidiHorizontalZoom,
       ),
     );
   const audioDrawFrameWidthPrefix = (frameExclusive: number): number => {
@@ -11117,13 +13556,13 @@ export function bootstrapDraw2Workspace(
   const audioOverviewSlotColumns = (
     slots: readonly AudioDeckOverviewSlot[],
   ): number[] =>
-    slots.map((slot) =>
-      Math.max(30, audioFrameColumnWidthTotal(slot.startFrame, slot.endFrame))
-    );
+    slots.map(() => AUDIO_TIMELINE_OVERVIEW_CELL_WIDTH);
   type AudioDrawFrameColumn = {
     readonly drawFrame: number;
     readonly startFrame: number;
     readonly endFrame: number;
+    readonly startMs: number;
+    readonly endMs: number;
     readonly width: number;
     readonly durationMs: number;
   };
@@ -11152,6 +13591,8 @@ export function bootstrapDraw2Workspace(
         drawFrame,
         startFrame,
         endFrame,
+        startMs: elapsedMs,
+        endMs: elapsedMs + durationMs,
         // Every Draw image owns one cell. Its width follows the image
         // duration at Draw FPS instead of being split at beat/subdivision
         // boundaries in the musical ruler.
@@ -11166,16 +13607,114 @@ export function bootstrapDraw2Workspace(
     }
     return columns;
   };
-  const applyAudioColumns = (
-    host: HTMLElement | undefined,
-    labelWidth = 0,
+  const audioDrawOverviewForSlot = (
+    slot: AudioDeckOverviewSlot,
+    drawFrameColumns: readonly AudioDrawFrameColumn[],
+  ): {
+    readonly first: AudioDrawFrameColumn | undefined;
+    readonly last: AudioDrawFrameColumn | undefined;
+    readonly durationMs: number;
+  } => {
+    let first: AudioDrawFrameColumn | undefined;
+    let last: AudioDrawFrameColumn | undefined;
+    let durationMs = 0;
+    const slotStartMs = audioFrameTimePrefix(slot.startFrame);
+    const slotEndMs = audioFrameTimePrefix(slot.endFrame);
+    for (const column of drawFrameColumns) {
+      if (
+        column.startMs >= slotEndMs ||
+        column.endMs <= slotStartMs
+      ) continue;
+      first ??= column;
+      last = column;
+      durationMs += Math.max(
+        0,
+        Math.min(slotEndMs, column.endMs) -
+          Math.max(slotStartMs, column.startMs),
+      );
+    }
+    return { first, last, durationMs: Math.round(durationMs) };
+  };
+  type AudioDrawFrameSegment = {
+    readonly column: AudioDrawFrameColumn;
+    readonly leftPercent: number;
+    readonly widthPercent: number;
+  };
+  const audioDrawFrameSegmentsForSlot = (
+    slot: AudioDeckOverviewSlot,
+    drawFrameColumns: readonly AudioDrawFrameColumn[],
+  ): AudioDrawFrameSegment[] => {
+    const slotStartMs = audioFrameTimePrefix(slot.startFrame);
+    const slotEndMs = audioFrameTimePrefix(slot.endFrame);
+    const slotDurationMs = Math.max(1, slotEndMs - slotStartMs);
+    const segments: AudioDrawFrameSegment[] = [];
+    for (const column of drawFrameColumns) {
+      const visibleStartMs = Math.max(slotStartMs, column.startMs);
+      const visibleEndMs = Math.min(slotEndMs, column.endMs);
+      if (!(visibleEndMs > visibleStartMs)) continue;
+      const leftPercent = Math.max(
+        0,
+        Math.min(100, ((visibleStartMs - slotStartMs) / slotDurationMs) * 100),
+      );
+      const rightPercent = Math.max(
+        leftPercent,
+        Math.min(100, ((visibleEndMs - slotStartMs) / slotDurationMs) * 100),
+      );
+      segments.push({
+        column,
+        leftPercent,
+        widthPercent: rightPercent - leftPercent,
+      });
+    }
+    return segments;
+  };
+  const appendAudioDrawFrameSegments = (
+    host: HTMLElement,
+    segments: readonly AudioDrawFrameSegment[],
+    variant: "animation" | "lane",
   ): void => {
-    if (host === undefined) return;
-    const columns = audioFrameColumns();
-    host.style.gridTemplateColumns = [
-      ...(labelWidth > 0 ? [labelWidth + "px"] : []),
-      ...columns.map((width) => width + "px"),
-    ].join(" ");
+    if (segments.length === 0) return;
+    const segmentLayer = documentRef.createElement("span");
+    segmentLayer.className = variant === "animation"
+      ? "draw2-audio-animation-segments"
+      : "draw2-audio-draw-frame-segments";
+    segmentLayer.setAttribute("aria-hidden", "true");
+    const activeDrawFrame = audioFrameToDrawFrame(audioAnimationFrame) - 1;
+    for (const segment of segments) {
+      const drawSegment = documentRef.createElement("span");
+      drawSegment.className = variant === "animation"
+        ? "draw2-audio-animation-segment"
+        : "draw2-audio-draw-frame-segment";
+      drawSegment.dataset.audioDrawSegment = "true";
+      drawSegment.dataset.audioDrawFrame = String(segment.column.drawFrame);
+      drawSegment.dataset.audioDrawStartFrame = String(
+        segment.column.startFrame,
+      );
+      drawSegment.dataset.audioDrawEndFrame = String(segment.column.endFrame);
+      drawSegment.dataset.drawFrameDurationMs = String(
+        segment.column.durationMs,
+      );
+      drawSegment.style.left = `${segment.leftPercent}%`;
+      drawSegment.style.width = `${segment.widthPercent}%`;
+      drawSegment.title = `F${segment.column.drawFrame + 1} · ${segment.column.durationMs}ms`;
+      drawSegment.classList.toggle(
+        "is-active",
+        segment.column.drawFrame === activeDrawFrame,
+      );
+      segmentLayer.append(drawSegment);
+    }
+    host.append(segmentLayer);
+  };
+  const audioOverviewSlotBarRange = (
+    slot: AudioDeckOverviewSlot,
+  ): { readonly startBar: number; readonly endBar: number } => {
+    const measureFrames = Math.max(1, audioMeasureFrameCount());
+    const startBar = Math.max(0, Math.floor(slot.startFrame / measureFrames));
+    const endBar = Math.max(
+      startBar + 1,
+      Math.ceil(slot.endFrame / measureFrames),
+    );
+    return { startBar, endBar };
   };
   const ensureAudioFrameWindow = (frame: number): boolean => {
     const previous = audioFrameWindowStart.value;
@@ -11199,28 +13738,57 @@ export function bootstrapDraw2Workspace(
   const syncAudioPlayhead = (): void => {
     if (audioPlayhead === undefined) return;
     const currentFrame = Math.max(0, audioAnimationFrame - 1);
-    const slot = audioDeckSlotForFrame(currentFrame);
+    const slots = audioDeckOverviewSlots();
+    const slotIndex = slots.findIndex((candidate) =>
+      currentFrame >= candidate.startFrame && currentFrame < candidate.endFrame
+    );
+    const slot = slots[slotIndex];
+    const columns = audioOverviewSlotColumns(slots);
     const panelRect = audioTimelinePanel?.getBoundingClientRect();
     const firstTrackCell = audioDeckTimelineCellLookup.values().next()
       .value ?? audioInstrumentTimelineCellLookup.values().next().value;
     let left = 92;
-    if (panelRect !== undefined && firstTrackCell !== undefined && slot) {
+    if (
+      panelRect !== undefined && firstTrackCell !== undefined &&
+      slot !== undefined && slotIndex >= 0
+    ) {
       const cellRect = firstTrackCell.getBoundingClientRect();
-      const precedingWidth = audioFrameColumnWidthTotal(0, currentFrame);
+      const precedingWidth = columns.slice(0, slotIndex).reduce(
+        (sum, width) => sum + width,
+        0,
+      );
+      const slotWidth = columns[slotIndex] ??
+        AUDIO_TIMELINE_OVERVIEW_CELL_WIDTH;
+      const withinSlot = Math.max(
+        0,
+        Math.min(
+          1,
+          (currentFrame - slot.startFrame) /
+            Math.max(1, slot.endFrame - slot.startFrame),
+        ),
+      );
       // Use the actual overview cell rect so borders, label padding and the
       // shared horizontal scroll position cannot introduce a second offset.
-      left = cellRect.left - panelRect.left + precedingWidth;
+      left = cellRect.left - panelRect.left + precedingWidth +
+        withinSlot * slotWidth;
     } else {
-      const frames = audioFrameIndices();
-      const currentIndex = frames.indexOf(currentFrame);
-      const columns = audioFrameColumns();
+      const currentIndex = slotIndex;
       const precedingWidth = currentIndex > 0
-        ? columns.slice(0, currentIndex).reduce(
-          (sum, width) => sum + width,
-          0,
-        )
+        ? columns.slice(0, currentIndex).reduce((sum, width) => sum + width, 0)
         : 0;
+      const withinSlot = slot === undefined || currentIndex < 0
+        ? 0
+        : Math.max(
+          0,
+          Math.min(
+            1,
+            (currentFrame - slot.startFrame) /
+              Math.max(1, slot.endFrame - slot.startFrame),
+          ),
+        );
       left = 92 + precedingWidth;
+      left += withinSlot *
+        (columns[currentIndex] ?? AUDIO_TIMELINE_OVERVIEW_CELL_WIDTH);
     }
     audioPlayhead.style.left = `${left}px`;
     audioPlayhead.dataset.audioFrame = String(audioAnimationFrame);
@@ -11309,7 +13877,7 @@ export function bootstrapDraw2Workspace(
         (audioQuantize === "off"
           ? "Quantize off"
           : "Quantize " + audioQuantize) +
-        " · Audio owns the musical clock · bounded 256-frame safety window · " +
+        " · Audio owns the musical clock · compact bar overview · " +
         "local workspace state";
     }
     if (audioDrawPreviewClock !== undefined) {
@@ -11322,56 +13890,55 @@ export function bootstrapDraw2Workspace(
   const renderAudioRuler = (): void => {
     if (audioTimelineRuler === undefined) return;
     audioTimelineRuler.replaceChildren();
-    applyAudioColumns(audioTimelineRuler, 92);
+    const slots = audioDeckOverviewSlots();
+    const columns = audioOverviewSlotColumns(slots);
+    audioTimelineRuler.style.gridTemplateColumns = [
+      "92px",
+      ...columns.map((width) => `${width}px`),
+    ].join(" ");
     const fragment = documentRef.createDocumentFragment();
     const label = documentRef.createElement("span");
     label.className = "draw2-audio-ruler-cell";
-    label.textContent = "BAR.BEAT";
+    label.textContent = "BARS";
     fragment.append(label);
-    for (const frameIndex of audioFrameIndices()) {
-      const isBar = audioFrameTick(frameIndex) % audioBarTick() === 0;
-      const isGrid = audioFrameStartsGrid(frameIndex);
-      const cell = documentRef.createElement(isBar ? "button" : "span");
+    for (const slot of slots) {
+      const cell = documentRef.createElement("button");
       cell.className = "draw2-audio-ruler-cell";
-      const tick = audioFrameTick(frameIndex);
-      if (isBar) {
-        cell.classList.add("is-bar");
-        cell.dataset.audioBarStartFrame = String(frameIndex);
-        const selectedRange = audioSelectedMeasureBounds();
-        cell.classList.toggle(
-          "is-selected",
-          frameIndex >= selectedRange.startFrame &&
-            frameIndex < selectedRange.endFrame,
+      cell.type = "button";
+      cell.classList.add("is-bar");
+      const range = audioOverviewSlotBarRange(slot);
+      const barLabel = range.endBar - range.startBar === 1
+        ? `Bar ${range.startBar + 1}`
+        : `Bars ${range.startBar + 1}–${range.endBar}`;
+      const selectedRange = audioSelectedMeasureBounds();
+      cell.dataset.audioBarStartFrame = String(slot.startFrame);
+      cell.dataset.audioBarEndFrame = String(slot.endFrame);
+      cell.classList.toggle(
+        "is-selected",
+        slot.startFrame < selectedRange.endFrame &&
+          slot.endFrame > selectedRange.startFrame,
+      );
+      cell.textContent = range.endBar - range.startBar === 1
+        ? String(range.startBar + 1)
+        : `${range.startBar + 1}–${range.endBar}`;
+      cell.setAttribute("aria-label", `${barLabel}を選択`);
+      cell.title = barLabel;
+      cell.addEventListener("click", () => {
+        setAudioMeasureSelectionByBars(range.startBar, range.endBar);
+        seekAudioCompositionAtFrame(slot.startFrame + 1);
+        renderAudioArrangerOverview();
+        renderAudioMidiGrid();
+        syncAudioDawRangeStatus();
+        setModeDeckStatus(
+          "audio",
+          `${barLabel} selected · F${slot.startFrame + 1}–F${slot.endFrame}`,
         );
-        (cell as HTMLButtonElement).type = "button";
-        cell.setAttribute(
-          "aria-label",
-          `Select bar ${Math.floor(tick / audioBarTick()) + 1}`,
-        );
-        cell.addEventListener("click", () => {
-          setAudioMeasureSelectionByFrame(frameIndex);
-          seekAudioCompositionAtFrame(frameIndex + 1);
-          renderAudioArrangerOverview();
-          renderAudioMidiGrid();
-          syncAudioDawRangeStatus();
-          setModeDeckStatus(
-            "audio",
-            `Bar ${Math.floor(tick / audioBarTick()) + 1} selected · ` +
-              `F${frameIndex + 1}–F${
-                Math.min(
-                  audioFrameCount,
-                  frameIndex + audioMeasureFrameCount(),
-                )
-              }`,
-          );
-        });
-      }
-      if (isGrid) {
-        cell.classList.add("is-grid");
-        cell.textContent = audioFramePositionLabel(frameIndex);
-      }
-      cell.title = (isGrid ? audioFramePositionLabel(frameIndex) + " · " : "") +
-        tick + " ticks";
+        if (gameAudioCaptureSession !== undefined) {
+          const draft = gameAudioCaptureDraftForCurrentSelection();
+          if (draft !== undefined) gameAudioCaptureSession = updateAudioCaptureDraft(gameAudioCaptureSession, draft);
+          syncGameAudioCaptureBar();
+        }
+      });
       fragment.append(cell);
     }
     audioTimelineRuler.append(fragment);
@@ -11381,12 +13948,13 @@ export function bootstrapDraw2Workspace(
     audioTimelineRuler?.querySelectorAll<HTMLElement>(
       "[data-audio-bar-start-frame]",
     ).forEach((cell) => {
+      const startFrame = Number(cell.dataset.audioBarStartFrame ?? "-1");
+      const endFrame = Number(
+        cell.dataset.audioBarEndFrame ?? startFrame + 1,
+      );
       cell.classList.toggle(
         "is-selected",
-        Number(cell.dataset.audioBarStartFrame ?? "-1") >=
-            selectedRange.startFrame &&
-          Number(cell.dataset.audioBarStartFrame ?? "-1") <
-            selectedRange.endFrame,
+        startFrame < selectedRange.endFrame && endFrame > selectedRange.startFrame,
       );
     });
     syncAudioDawRangeStatus();
@@ -11394,40 +13962,65 @@ export function bootstrapDraw2Workspace(
   const renderAudioAnimationCells = (): void => {
     if (audioAnimationCells === undefined) return;
     audioAnimationCells.replaceChildren();
+    const slots = audioDeckOverviewSlots();
+    const columns = audioOverviewSlotColumns(slots);
     const drawFrameColumns = audioDrawFrameColumns();
     audioAnimationCells.style.gridTemplateColumns = [
       "92px",
-      ...drawFrameColumns.map((column) => `${column.width}px`),
+      ...columns.map((width) => `${width}px`),
     ].join(" ");
     const fragment = documentRef.createDocumentFragment();
     const label = documentRef.createElement("span");
     label.className = "draw2-audio-ruler-cell";
-    label.textContent = `DRAW FRAMES · ${drawAnimationFps ?? audioFps} FPS`;
+    label.textContent = "DRAW";
     fragment.append(label);
-    for (const projection of drawFrameColumns) {
+    for (let index = 0; index < slots.length; index += 1) {
+      const slot = slots[index];
+      if (slot === undefined) continue;
+      const overview = audioDrawOverviewForSlot(slot, drawFrameColumns);
+      const range = audioOverviewSlotBarRange(slot);
       const cell = documentRef.createElement("button");
       cell.type = "button";
-      cell.className = "draw2-audio-animation-cell is-cel";
-      cell.dataset.audioAnimationFrame = String(projection.startFrame);
-      cell.dataset.audioAnimationEndFrame = String(projection.endFrame);
-      cell.dataset.audioDrawFrame = String(projection.drawFrame);
-      cell.dataset.drawFrameDurationMs = String(projection.durationMs);
+      cell.className = "draw2-audio-animation-cell";
+      if (overview.first !== undefined) cell.classList.add("is-cel");
+      cell.dataset.audioAnimationFrame = String(slot.startFrame);
+      cell.dataset.audioAnimationEndFrame = String(slot.endFrame);
+      if (overview.first !== undefined) {
+        cell.dataset.audioDrawFrame = String(overview.first.drawFrame);
+        cell.dataset.drawFrameDurationMs = String(overview.durationMs);
+      }
+      const drawLabel = overview.first === undefined
+        ? "empty"
+        : overview.first.drawFrame === overview.last?.drawFrame
+        ? `F${overview.first.drawFrame + 1}`
+        : `F${overview.first.drawFrame + 1}–F${(overview.last?.drawFrame ?? overview.first.drawFrame) + 1}`;
+      const barLabel = range.endBar - range.startBar === 1
+        ? `Bar ${range.startBar + 1}`
+        : `Bars ${range.startBar + 1}–${range.endBar}`;
       cell.setAttribute(
         "aria-label",
-        "Draw animation frame " + (projection.drawFrame + 1) + " · " +
-          projection.durationMs + "ms",
+        `${barLabel} · Draw ${drawLabel}`,
       );
-      cell.innerHTML = "F" + (projection.drawFrame + 1) + " <small>" +
-        projection.durationMs + "ms</small>";
+      const segments = audioDrawFrameSegmentsForSlot(slot, drawFrameColumns);
+      cell.dataset.audioDrawSegmentCount = String(segments.length);
+      appendAudioDrawFrameSegments(cell, segments, "animation");
+      const drawLabelElement = documentRef.createElement("span");
+      drawLabelElement.className = "draw2-audio-animation-label";
+      drawLabelElement.textContent = drawLabel;
+      cell.append(drawLabelElement);
+      if (overview.durationMs > 0) {
+        const durationLabel = documentRef.createElement("small");
+        durationLabel.className = "draw2-audio-animation-duration";
+        durationLabel.textContent = `${overview.durationMs}ms`;
+        cell.append(durationLabel);
+      }
       cell.addEventListener("click", () => {
         selectAudioEditor("DRAW");
-        seekAudioCompositionAtFrame(projection.startFrame + 1);
+        seekAudioCompositionAtFrame(slot.startFrame + 1);
         if (!audioDrawMonitorVisible) toggleAudioDrawMonitor();
         setModeDeckStatus(
           "audio",
-          "Artwork cell F" + (projection.drawFrame + 1) + " · " +
-            audioFramePositionLabel(projection.startFrame) +
-            " · Draw FPS cell aligned",
+          `${barLabel} · ${drawLabel} · Draw overview selected`,
         );
       });
       fragment.append(cell);
@@ -11924,6 +14517,7 @@ export function bootstrapDraw2Workspace(
   renderAudioDock();
 
   const createAudioDrawFrameLane = (
+    slots: readonly AudioDeckOverviewSlot[],
     columns: readonly number[],
     surface: "arranger" | "timeline",
   ): HTMLElement => {
@@ -11962,48 +14556,60 @@ export function bootstrapDraw2Workspace(
       ? "draw2-audio-arranger-track-content draw2-audio-arranger-draw-frame-content"
       : "draw2-audio-track-lane-cells draw2-audio-draw-frame-cells";
     const totalWidth = columns.reduce((sum, width) => sum + width, 0);
-    content.style.width = Math.max(
-      totalWidth,
-      audioFrameWidthPrefix(audioFrameCount),
-      audioDrawFrameWidthPrefix(drawTimelineFrameDurationsMs.length),
-    ) + "px";
+    content.style.width = Math.max(totalWidth, 1) + "px";
     content.style.minWidth = content.style.width;
     const drawFrameColumns = audioDrawFrameColumns();
-    for (const projection of drawFrameColumns) {
-      const frameIndex = projection.startFrame;
-      const durationMs = projection.durationMs;
-      const width = projection.width;
+    let left = 0;
+    for (let index = 0; index < slots.length; index += 1) {
+      const slot = slots[index];
+      const width = columns[index] ?? AUDIO_TIMELINE_OVERVIEW_CELL_WIDTH;
+      if (slot === undefined) continue;
+      const overview = audioDrawOverviewForSlot(slot, drawFrameColumns);
+      if (overview.first === undefined) {
+        left += width;
+        continue;
+      }
+      const frameIndex = slot.startFrame;
+      const durationMs = overview.durationMs;
       const cell = documentRef.createElement("button");
       cell.type = "button";
       cell.className = surface === "arranger"
         ? "draw2-audio-arranger-draw-frame"
         : "draw2-audio-track-lane-cell draw2-audio-draw-frame-cell";
-      cell.dataset.audioDrawFrame = String(projection.drawFrame);
-      cell.dataset.audioDrawStartFrame = String(projection.startFrame);
-      cell.dataset.audioDrawEndFrame = String(projection.endFrame);
+      cell.dataset.audioDrawFrame = String(overview.first.drawFrame);
+      cell.dataset.audioDrawStartFrame = String(slot.startFrame);
+      cell.dataset.audioDrawEndFrame = String(slot.endFrame);
       cell.dataset.audioTrackFrame = String(frameIndex);
       cell.dataset.drawFrameDurationMs = String(durationMs);
-      cell.style.left = audioDrawFrameWidthPrefix(projection.drawFrame) + "px";
+      cell.style.left = left + "px";
       cell.style.width = width + "px";
       cell.classList.toggle(
         "is-active",
-        audioAnimationFrame - 1 >= projection.startFrame &&
-          audioAnimationFrame - 1 < projection.endFrame,
+        audioAnimationFrame - 1 >= slot.startFrame &&
+          audioAnimationFrame - 1 < slot.endFrame,
       );
-      cell.classList.toggle(
-        "is-grid",
-        audioFrameStartsGrid(frameIndex),
-      );
-      cell.classList.toggle("is-chopped", width <= 10);
-      cell.textContent = "F" + (projection.drawFrame + 1);
-      cell.title = "Draw F" + (projection.drawFrame + 1) + " · " +
-        durationMs + "ms · " + audioFramePositionLabel(frameIndex);
+      cell.classList.toggle("is-grid", true);
+      const drawLabel = overview.first.drawFrame === overview.last?.drawFrame
+        ? `F${overview.first.drawFrame + 1}`
+        : `F${overview.first.drawFrame + 1}–F${(overview.last?.drawFrame ?? overview.first.drawFrame) + 1}`;
+      const barRange = audioOverviewSlotBarRange(slot);
+      const barLabel = barRange.endBar - barRange.startBar === 1
+        ? `Bar ${barRange.startBar + 1}`
+        : `Bars ${barRange.startBar + 1}–${barRange.endBar}`;
+      const segments = audioDrawFrameSegmentsForSlot(slot, drawFrameColumns);
+      cell.dataset.audioDrawSegmentCount = String(segments.length);
+      appendAudioDrawFrameSegments(cell, segments, "lane");
+      const drawLabelElement = documentRef.createElement("span");
+      drawLabelElement.className = "draw2-audio-draw-frame-label-text";
+      drawLabelElement.textContent = drawLabel;
+      cell.append(drawLabelElement);
+      cell.title = `${drawLabel} · ${durationMs}ms · ${barLabel}`;
       cell.setAttribute(
         "aria-label",
-        "Draw animation frame " + (projection.drawFrame + 1) + " · " +
-          durationMs + "ms · " + audioFramePositionLabel(frameIndex),
+        `${drawLabel} · ${durationMs}ms · ${barLabel}`,
       );
       content.append(cell);
+      left += width;
     }
     lane.append(label, content);
     return lane;
@@ -12149,21 +14755,17 @@ export function bootstrapDraw2Workspace(
     for (const slot of slots) {
       const cell = documentRef.createElement("span");
       cell.className = "draw2-audio-arranger-ruler-cell";
-      const slotTick = audioFrameTick(slot.startFrame);
-      const isBar = slotTick % audioBarTick() === 0;
-      const isBeat = slotTick % audioBeatTick() === 0;
-      cell.classList.toggle("is-bar", isBar);
-      cell.classList.toggle("is-beat", isBeat);
+      const range = audioOverviewSlotBarRange(slot);
+      cell.classList.add("is-bar");
       cell.classList.toggle(
         "is-selected",
-        slot.startFrame >= selectedRange.startFrame &&
-          slot.startFrame < selectedRange.endFrame,
+        slot.startFrame < selectedRange.endFrame &&
+          slot.endFrame > selectedRange.startFrame,
       );
-      cell.textContent = isBar || isBeat
-        ? audioFramePositionLabel(slot.startFrame)
-        : "";
-      cell.title = audioFramePositionLabel(slot.startFrame) + " · " +
-        slotTick + " ticks";
+      cell.textContent = range.endBar - range.startBar === 1
+        ? `B${range.startBar + 1}`
+        : `B${range.startBar + 1}–${range.endBar}`;
+      cell.title = `Bars ${range.startBar + 1}–${range.endBar}`;
       audioArrangerRuler.append(cell);
     }
     audioArrangerLanes.replaceChildren();
@@ -12545,7 +15147,7 @@ export function bootstrapDraw2Workspace(
       );
     }
     audioArrangerLanes.append(
-      createAudioDrawFrameLane(columns, "arranger"),
+      createAudioDrawFrameLane(slots, columns, "arranger"),
     );
     audioArrangerViewport?.setAttribute(
       "aria-label",
@@ -12881,8 +15483,8 @@ export function bootstrapDraw2Workspace(
     audioTimelineTracksLastRenderKey = trackProjectionKey;
     audioTracks.replaceChildren();
     const slots = audioDeckOverviewSlots();
-    // Keep the overview bounded to a small number of cells, while preserving
-    // the exact frame-time scale used by the ruler and animation row.
+    // The lower timeline is a compact bar overview. Detailed frame placement
+    // stays in the central Piano Roll and Draw editor.
     const columns = audioOverviewSlotColumns(slots);
     audioDeckTimelineCellLookup.clear();
     audioInstrumentTimelineCellLookup.clear();
@@ -13069,7 +15671,7 @@ export function bootstrapDraw2Workspace(
       lane.append(label, cells);
       fragment.append(lane);
     }
-    fragment.append(createAudioDrawFrameLane(columns, "timeline"));
+    fragment.append(createAudioDrawFrameLane(slots, columns, "timeline"));
     audioTracks.append(fragment);
     renderAudioArrangerOverview();
     renderAudioDock();
@@ -13730,6 +16332,7 @@ export function bootstrapDraw2Workspace(
   const syncAudioFrameActiveState = (frame: number, active: boolean): void => {
     if (frame < 0) return;
     const overviewFrame = audioDeckSlotForFrame(frame)?.startFrame ?? frame;
+    const activeDrawFrame = audioFrameToDrawFrame(frame + 1) - 1;
     for (const host of [audioArrangerLanes, audioTracks]) {
       const cell = [
         ...(host?.querySelectorAll<HTMLElement>(
@@ -13743,6 +16346,18 @@ export function bootstrapDraw2Workspace(
         return frame >= start && frame < end;
       });
       cell?.classList.toggle("is-active", active);
+      for (
+        const segment of host?.querySelectorAll<HTMLElement>(
+          "[data-audio-draw-segment]",
+        ) ?? []
+      ) {
+        segment.classList.toggle(
+          "is-active",
+          active &&
+            Number(segment.dataset.audioDrawFrame ?? "-1") ===
+              activeDrawFrame,
+        );
+      }
     }
     const animationCell = [
       ...(audioAnimationCells?.querySelectorAll<HTMLElement>(
@@ -13756,6 +16371,17 @@ export function bootstrapDraw2Workspace(
       return frame >= start && frame < end;
     });
     animationCell?.classList.toggle("is-active", active);
+    for (
+      const segment of audioAnimationCells?.querySelectorAll<HTMLElement>(
+        "[data-audio-draw-segment]",
+      ) ?? []
+    ) {
+      segment.classList.toggle(
+        "is-active",
+        active &&
+          Number(segment.dataset.audioDrawFrame ?? "-1") === activeDrawFrame,
+      );
+    }
     for (const track of audioDeckTracks) {
       audioDeckTimelineCellLookup.get(
         `${track.id}:${overviewFrame}`,
@@ -15178,6 +17804,11 @@ export function bootstrapDraw2Workspace(
     layer.className = "draw2-audio-midi-canvas-layer";
     layer.style.width = `${totalWidth}px`;
     layer.style.height = `${totalHeight}px`;
+    const tileViewport = virtualViewport(tileStartTick, tileEndTick);
+    layer.dataset.audioChunkStart = String(tileViewport.start.chunk);
+    layer.dataset.audioChunkEnd = String(tileViewport.end.chunk);
+    layer.dataset.audioChunkOffsetStart = String(tileViewport.start.offsetTick);
+    layer.dataset.audioChunkOffsetEnd = String(tileViewport.end.offsetTick);
     layer.setAttribute("role", "rowgroup");
     const canvas = documentRef.createElement("canvas");
     canvas.className = "draw2-audio-midi-canvas";
@@ -15573,6 +18204,10 @@ export function bootstrapDraw2Workspace(
     audioSurfacesReady = true;
     const renderGeneration = audioSurfaceRenderGeneration;
     void ensureAudioWorkspaceSession();
+    // Extend the empty projection before painting any shared ruler/track
+    // surface so the Piano Roll and the lower Audio timeline start on the
+    // same multi-bar musical window.
+    ensureAudioTimelineMinimum();
     syncAudioTimebaseSummary();
     renderAudioRuler();
     renderAudioAnimationCells();
@@ -15648,7 +18283,7 @@ export function bootstrapDraw2Workspace(
       );
     }
     // Draw frame durations are retained for the dedicated artwork lane and
-    // the monitor bridge. They must not replace Audio's musical columns or
+    // the preview monitor link. They must not replace Audio's musical columns or
     // shrink/expand the Audio document one Draw cel at a time.
     syncAudioTimebaseSummary();
     audioTimelineTracksLastRenderKey = undefined;
@@ -16762,7 +19397,10 @@ export function bootstrapDraw2Workspace(
     removeAudioMidiNote(note, "MIDI note deleted · right-click action");
   });
   audioMidiGrid?.addEventListener("keydown", (event) => {
-    if (audioEditorActiveTab !== "ROLL") return;
+    if (
+      audioEditorActiveTab !== "ROLL" || event.defaultPrevented ||
+      event.isComposing || event.repeat
+    ) return;
     const key = event.key.toLowerCase();
     const selected = audioSelectedNoteKey === undefined
       ? undefined
@@ -16914,9 +19552,9 @@ export function bootstrapDraw2Workspace(
       audioMidiHorizontalZoom + AUDIO_MIDI_HORIZONTAL_ZOOM_STEP,
     );
   });
-  // Keep the Piano Roll one-measure-first, but let an experienced editor
-  // expand the time axis in the Piano Roll, arranger ruler and Audio lanes
-  // without changing pitch-row geometry. Ctrl+wheel is intercepted only on
+  // Keep the Piano Roll multi-bar-first, while letting an experienced editor
+  // expand or contract the time axis in the Piano Roll, arranger ruler and
+  // Audio lanes without changing pitch-row geometry. Ctrl+wheel is intercepted only on
   // these time surfaces, so plain wheel/trackpad scrolling stays navigation.
   const handleAudioTimeAxisWheel =
     (host: HTMLElement) => (event: Event): void => {
@@ -17042,6 +19680,27 @@ export function bootstrapDraw2Workspace(
       profile.label + " channels loaded · " + profile.hint,
     );
   });
+  audioDpcmSample?.addEventListener("click", () => audioDpcmSampleInput?.click());
+  audioDpcmSampleInput?.addEventListener("change", async () => {
+    const file = audioDpcmSampleInput.files?.[0];
+    if (file === undefined) return;
+    const resumed = await chipTuneSynth.resume();
+    const context = chipTuneSynth.getAudioContext();
+    if (!resumed || context === undefined) {
+      setModeDeckStatus("audio", "DPCMサンプルを開始できませんでした");
+      return;
+    }
+    try {
+      const decoded = await context.decodeAudioData(await file.arrayBuffer());
+      const sample = quantizeDpcmSample(file.name, decoded.getChannelData(0), decoded.sampleRate);
+      const played = chipTuneSynth.playDpcmSample(sample);
+      setModeDeckStatus("audio", played ? `${file.name} · DPCMプレビュー` : "DPCMサンプルを再生できませんでした");
+    } catch {
+      setModeDeckStatus("audio", "DPCMサンプルの形式が無効です");
+    } finally {
+      audioDpcmSampleInput.value = "";
+    }
+  });
   audioNoteLength?.addEventListener("change", () => {
     const selected = audioSelectedNoteKey === undefined
       ? undefined
@@ -17134,9 +19793,14 @@ export function bootstrapDraw2Workspace(
     if (surface === "game" && Number.isFinite(startFrame)) {
       gameDeckFrame = startFrame;
       const trackId = target.dataset.modeDeckTrack;
-      if (trackId !== undefined) {
-        selectedGameTrackId = trackId;
-        renderGameCustomPanels();
+      if (
+        trackId !== undefined &&
+        gameDeckTracks.some((track) => track.id === trackId)
+      ) {
+        projectGameWorkspaceAction(
+          { type: "SELECT_OBJECT", trackId },
+          { render: false },
+        );
       }
       const track = gameDeckTracks.find((candidate) =>
         candidate.id === trackId
@@ -17183,11 +19847,9 @@ export function bootstrapDraw2Workspace(
       gameAssetTracks.contains(trackLabel) &&
       trackLabel.dataset.modeDeckTrackLabel !== undefined
     ) {
-      selectedGameTrackId = trackLabel.dataset.modeDeckTrackLabel;
-      const track = gameDeckTracks.find((candidate) =>
-        candidate.id === selectedGameTrackId
-      );
-      renderGameCustomPanels();
+      selectGameObject(trackLabel.dataset.modeDeckTrackLabel, {
+        openInspector: true,
+      });
     }
     selectModeDeckCell(event, "game");
   });
@@ -17332,6 +19994,141 @@ export function bootstrapDraw2Workspace(
     const frame = Number(cell?.dataset.audioTrackFrame ?? "NaN");
     if (Number.isFinite(frame)) seekAudioCompositionAtFrame(frame + 1);
   });
+  const gameAudioCaptureTickAtPointer = (
+    event: PointerEvent,
+    cells: HTMLElement,
+  ): number => {
+    const rect = cells.getBoundingClientRect();
+    return audioMidiTickFromX(
+      Math.max(0, event.clientX - rect.left + (audioTracks?.scrollLeft ?? 0)),
+    );
+  };
+  const applyGameAudioCapturePointerRange = (
+    trackIds: readonly string[],
+    startTick: number,
+    endTick: number,
+  ): void => {
+    if (gameAudioCaptureSession === undefined) return;
+    try {
+      const selection = normalizeGameAudioRangeSelection({
+        trackIds: [...new Set(trackIds)],
+        startTick,
+        endTick,
+        snap: gameAudioCaptureSnap,
+        ticksPerBeat: audioPpq,
+      });
+      gameAudioCaptureRangeOverride = {
+        trackIds: selection.trackIds,
+        startTick: Number(selection.startTick),
+        endTick: Number(selection.startTick) + Number(selection.durationTick),
+        snap: gameAudioCaptureSnap,
+      };
+      const draft = gameAudioCaptureDraftForCurrentSelection();
+      if (draft !== undefined) {
+        gameAudioCaptureSession = updateAudioCaptureDraft(
+          gameAudioCaptureSession,
+          draft,
+        );
+      }
+      syncGameAudioCaptureBar();
+    } catch {
+      // Pointer hit-testing can briefly produce an empty range at the edge.
+    }
+  };
+  const scheduleGameAudioCapturePointerRange = (
+    trackIds: readonly string[],
+    startTick: number,
+    endTick: number,
+    immediate = false,
+  ): void => {
+    if (gameAudioCaptureDebounce !== undefined) {
+      windowRef.clearTimeout(gameAudioCaptureDebounce);
+      gameAudioCaptureDebounce = undefined;
+    }
+    if (immediate) {
+      applyGameAudioCapturePointerRange(trackIds, startTick, endTick);
+      return;
+    }
+    gameAudioCaptureDebounce = windowRef.setTimeout(() => {
+      gameAudioCaptureDebounce = undefined;
+      applyGameAudioCapturePointerRange(trackIds, startTick, endTick);
+    }, 80);
+  };
+  audioTracks?.addEventListener("pointerdown", (event) => {
+    if (gameAudioCaptureSession === undefined || !(event instanceof PointerEvent)) return;
+    const target = event.target instanceof Element
+      ? event.target.closest<HTMLElement>(".draw2-audio-track-lane-cells")
+      : null;
+    const lane = target?.closest<HTMLElement>(".draw2-audio-track-lane");
+    const trackId = lane?.dataset.modeDeckTrack;
+    if (
+      target === null || lane == null || trackId === undefined ||
+      lane.dataset.audioTrackKind === "MIDI"
+    ) return;
+    const existingTrackIds = gameAudioCaptureRangeOverride?.trackIds ?? [];
+    const trackIds = event.shiftKey
+      ? [...new Set([...existingTrackIds, trackId])]
+      : [trackId];
+    const startTick = gameAudioCaptureTickAtPointer(event, target);
+    const clip = gameAudioCaptureIntervalIndex?.query(trackId, startTick, 1)[0];
+    gameAudioCapturePointer = {
+      pointerId: event.pointerId,
+      trackIds,
+      startTick,
+      ...(clip === undefined ? {} : { clipId: String(clip.clipId) }),
+      moved: false,
+    };
+    target.setPointerCapture?.(event.pointerId);
+    event.preventDefault();
+    event.stopPropagation();
+  });
+  audioTracks?.addEventListener("pointermove", (event) => {
+    const active = gameAudioCapturePointer;
+    if (active === undefined || event.pointerId !== active.pointerId || !(event instanceof PointerEvent)) return;
+    const target = event.target instanceof Element
+      ? event.target.closest<HTMLElement>(".draw2-audio-track-lane-cells")
+      : audioTracks?.querySelector<HTMLElement>(
+        `.draw2-audio-track-lane[data-mode-deck-track="${CSS.escape(active.trackIds[0] ?? "")}"] .draw2-audio-track-lane-cells`,
+      );
+    if (target === null || target === undefined) return;
+    const endTick = gameAudioCaptureTickAtPointer(event, target);
+    active.moved = true;
+    scheduleGameAudioCapturePointerRange(active.trackIds, active.startTick, endTick);
+    event.preventDefault();
+  });
+  const finishGameAudioCapturePointer = (event: PointerEvent): void => {
+    const active = gameAudioCapturePointer;
+    if (active === undefined || event.pointerId !== active.pointerId) return;
+    const target = event.target instanceof Element
+      ? event.target.closest<HTMLElement>(".draw2-audio-track-lane-cells")
+      : null;
+    const cells = target ?? audioTracks?.querySelector<HTMLElement>(
+      `.draw2-audio-track-lane[data-mode-deck-track="${CSS.escape(active.trackIds[0] ?? "")}"] .draw2-audio-track-lane-cells`,
+    );
+    const endTick = cells === undefined || cells === null
+      ? active.startTick + Math.max(1, audioPpq)
+      : gameAudioCaptureTickAtPointer(event, cells);
+    let start = active.startTick;
+    let end = endTick;
+    if (!active.moved && active.clipId !== undefined) {
+      const clip = gameAudioCaptureIntervalIndex?.query(active.trackIds[0] ?? "", active.startTick, 1)
+        .find((candidate) => String(candidate.clipId) === active.clipId);
+      if (clip !== undefined) {
+        start = Number(clip.timeline.startTick);
+        end = start + Number(clip.timeline.durationTick);
+      }
+    }
+    scheduleGameAudioCapturePointerRange(active.trackIds, start, end, true);
+    gameAudioCapturePointer = undefined;
+    event.preventDefault();
+    event.stopPropagation();
+  };
+  audioTracks?.addEventListener("pointerup", (event) => {
+    if (event instanceof PointerEvent) finishGameAudioCapturePointer(event);
+  });
+  audioTracks?.addEventListener("pointercancel", (event) => {
+    if (event instanceof PointerEvent) gameAudioCapturePointer = undefined;
+  });
   gameDeckAddAsset?.addEventListener("click", () => {
     const index = gameDeckTracks.length + 1;
     const placingDrawCharacter = selectedGameAssetDefinitionId !== undefined;
@@ -17372,8 +20169,12 @@ export function bootstrapDraw2Workspace(
       );
     }
     renderModeDeckTracks(gameAssetTracks, gameDeckTracks, "game");
-    selectedGameTrackId = gameDeckTracks.at(-1)?.id;
-    renderGameCustomPanels();
+    const addedTrackId = gameDeckTracks.at(-1)?.id;
+    if (addedTrackId !== undefined) {
+      selectGameObject(addedTrackId, { openInspector: true });
+    } else {
+      renderGameCustomPanels();
+    }
     queueGameEditorPersistenceSave("edit");
     setModeDeckStatus("game", `New Asset ${index} added · local scene draft`);
   });
@@ -17392,8 +20193,12 @@ export function bootstrapDraw2Workspace(
       },
     ];
     renderModeDeckTracks(gameAssetTracks, gameDeckTracks, "game");
-    selectedGameTrackId = gameDeckTracks.at(-1)?.id;
-    renderGameCustomPanels();
+    const addedTrackId = gameDeckTracks.at(-1)?.id;
+    if (addedTrackId !== undefined) {
+      selectGameObject(addedTrackId, { openInspector: true });
+    } else {
+      renderGameCustomPanels();
+    }
     queueGameEditorPersistenceSave("edit");
     setModeDeckStatus(
       "game",
@@ -17401,8 +20206,21 @@ export function bootstrapDraw2Workspace(
     );
   });
   gameDeckPlay?.addEventListener("click", () => {
-    if (gameDeckPlaying) stopGameDeckPlayback();
-    else startGameDeckPlayback();
+    if (gameDeckPlaying) {
+      stopGameDeckPlayback();
+    } else {
+      projectGameWorkspaceAction(
+        { type: "START_PLAY" },
+      );
+      if (gameWorkspaceContext.phase === "TEST") {
+        startGameDeckPlayback();
+      } else if (gameWorkspaceContext.phase === "RELEASE") {
+        setModeDeckStatus(
+          "game",
+          "Release中はPlayを開始できません。Buildを閉じてから実行してください。",
+        );
+      }
+    }
     gameDeckPlay.setAttribute("aria-pressed", String(gameDeckPlaying));
     setDraw2ButtonIcon(
       gameDeckPlay,
@@ -17438,7 +20256,10 @@ export function bootstrapDraw2Workspace(
   const gameScenePlayKeyMap: ReadonlyMap<
     string,
     keyof GameGenreRuntimeInput | readonly (keyof GameGenreRuntimeInput)[]
-  > = new Map([
+  > = new Map<
+    string,
+    keyof GameGenreRuntimeInput | readonly (keyof GameGenreRuntimeInput)[]
+  >([
     ["ArrowLeft", "left"],
     ["KeyA", "left"],
     ["ArrowRight", "right"],
@@ -17447,6 +20268,8 @@ export function bootstrapDraw2Workspace(
     ["KeyW", ["up", "jump"]],
     ["ArrowDown", "down"],
     ["KeyS", "down"],
+    ["KeyJ", "attack"],
+    ["KeyK", "attack"],
   ]);
   const setGameScenePlayInput = (code: string, held: boolean): void => {
     const fields = gameScenePlayKeyMap.get(code);
@@ -17459,14 +20282,21 @@ export function bootstrapDraw2Workspace(
   };
   documentRef.addEventListener("keydown", (event) => {
     if (
-      gameScenePlayState === undefined || currentCreatorMode() !== "GAME" ||
-      isEditableTarget(event.target) || event.isComposing
+      gameScenePlayState === undefined &&
+        gamePlaygroundRuntimeState === undefined ||
+        currentCreatorMode() !== "GAME" ||
+      !isWorkspaceKeyboardActionAllowed(event, event.target)
     ) return;
     if (!gameScenePlayKeyMap.has(event.code)) return;
     event.preventDefault();
     setGameScenePlayInput(event.code, true);
   });
   documentRef.addEventListener("keyup", (event) => {
+    if (
+      gameScenePlayState === undefined &&
+        gamePlaygroundRuntimeState === undefined ||
+      currentCreatorMode() !== "GAME"
+    ) return;
     if (!gameScenePlayKeyMap.has(event.code)) return;
     setGameScenePlayInput(event.code, false);
   });
@@ -18370,6 +21200,44 @@ export function bootstrapDraw2Workspace(
     );
   };
   audioDeckAddFrames?.addEventListener("click", addAudioTimelineBar);
+  // Extend the logical range only when the editor reaches its visible end.
+  // Rendering remains windowed, so long songs do not allocate one DOM node
+  // or frame object per bar.
+  const extendAudioTimelineOnDemand = (event: Event): void => {
+    const source = event.currentTarget as HTMLElement | null;
+    if (source === null || source.scrollWidth <= source.clientWidth) return;
+    if (source === audioMidiGrid) {
+      const virtualTick = audioMidiTickFromX(
+        Math.max(0, source.scrollLeft - AUDIO_MIDI_KEY_WIDTH),
+      );
+      const virtualPosition = splitAudioTick(
+        Math.min(AUDIO200_MAX_TICK, Math.floor(virtualTick)),
+      );
+      source.dataset.audioVirtualChunk = String(virtualPosition.chunk);
+      source.dataset.audioVirtualChunkOffset = String(
+        virtualPosition.offsetTick,
+      );
+    }
+    if (source.scrollWidth - source.clientWidth - source.scrollLeft > 96) return;
+    const before = audioFrameCount;
+    extendAudioTimelineTo(
+      before + Math.max(audioMeasureFrameCount(), AUDIO_TIMELINE_APPEND_FRAMES) * 4,
+    );
+    if (audioFrameCount === before) return;
+    invalidateAudioMidiGrid();
+    renderAudioRuler();
+    renderAudioTimelineTracks();
+    renderAudioMidiGrid();
+  };
+  audioArrangerViewport?.addEventListener("scroll", extendAudioTimelineOnDemand, { passive: true });
+  audioMidiGrid?.addEventListener("scroll", extendAudioTimelineOnDemand, { passive: true });
+  documentRef.addEventListener("scroll", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    if (target.id === "draw2AudioMidiGrid" || target.id === "draw2AudioArrangerViewport" || target.id === "draw2AudioTrackLanes") {
+      extendAudioTimelineOnDemand({ currentTarget: target } as unknown as Event);
+    }
+  }, { capture: true, passive: true });
   audioClearBar?.addEventListener("click", clearSelectedAudioBar);
   audioDeckAddClip?.addEventListener(
     "click",
@@ -19040,6 +21908,7 @@ export function bootstrapDraw2Workspace(
     applyAudioClipPreviewProjection();
   });
   windowRef.addEventListener("pagehide", () => {
+    void flushGameEditorPersistence();
     void flushAudioPersistenceSave();
     stopGameDeckPlayback();
     cancelAudioOfflineRender();
@@ -20047,7 +22916,7 @@ export function bootstrapDraw2Workspace(
   });
   // The Audio toolbar can move between the persistent arranger and the
   // responsive deck. Delegate these commands from the stable Workspace root
-  // so a remounted toolbar never loses its editing actions or monitor bridge.
+  // so a remounted toolbar never loses its editing actions or monitor link.
   root.addEventListener("click", (event) => {
     const target = event.target instanceof Element
       ? event.target.closest<HTMLButtonElement>(
@@ -20103,7 +22972,7 @@ export function bootstrapDraw2Workspace(
         }
       }
       if (audioSettingsStatus !== undefined) {
-        audioSettingsStatus.textContent = "Draw Sync bridge always on · " +
+        audioSettingsStatus.textContent = "Draw time sync always on · " +
           "Audio musical grid · " +
           (audioPerformanceMode?.checked
             ? "bounded rendering"
@@ -20128,11 +22997,25 @@ export function bootstrapDraw2Workspace(
   const selectModeDeckTab = (tab: string): void => {
     modeDeckActiveTab = tab;
     root.dataset.modeDeckTab = tab;
+    const sharedAssetTab = tab === "assets";
     for (const button of modeTimelineDeckTabs) {
       const selected = button.dataset.modeDeckTab === tab;
       button.classList.toggle("is-active", selected);
       button.setAttribute("aria-selected", String(selected));
       button.tabIndex = selected ? 0 : -1;
+    }
+    if (modeDeckAssets !== undefined) {
+      modeDeckAssets.hidden = !sharedAssetTab;
+      modeDeckAssets.inert = !sharedAssetTab;
+      modeDeckAssets.setAttribute("aria-hidden", String(!sharedAssetTab));
+    }
+    if (modeDeckGame !== undefined && root.dataset.creatorMode === "GAME") {
+      modeDeckGame.hidden = sharedAssetTab;
+      modeDeckGame.inert = sharedAssetTab;
+    }
+    if (modeDeckAudio !== undefined && root.dataset.creatorMode === "AUDIO") {
+      modeDeckAudio.hidden = sharedAssetTab;
+      modeDeckAudio.inert = sharedAssetTab;
     }
     const gameDeckHeading: Record<
       string,
@@ -20164,8 +23047,13 @@ export function bootstrapDraw2Workspace(
         description: "ノードでゲームの処理を組み立て",
       },
     };
+    if (sharedAssetTab) {
+      if (modeTimelineDeckEyebrow !== undefined) modeTimelineDeckEyebrow.textContent = "SAVED ASSETS";
+      if (modeTimelineDeckTitle !== undefined) modeTimelineDeckTitle.textContent = "アセット";
+      if (modeTimelineDeckDescription !== undefined) modeTimelineDeckDescription.textContent = "保存済みのSpriteを確認してアセットパネルで編集";
+    }
     const selectedGameDeckHeading = gameDeckHeading[tab];
-    if (selectedGameDeckHeading !== undefined) {
+    if (selectedGameDeckHeading !== undefined && !sharedAssetTab) {
       if (modeTimelineDeckEyebrow !== undefined) {
         modeTimelineDeckEyebrow.textContent = selectedGameDeckHeading.eyebrow;
       }
@@ -20180,6 +23068,19 @@ export function bootstrapDraw2Workspace(
     const selectedGameRailTab = gameRailTabForModeDeck(tab);
     if (selectedGameRailTab !== undefined) {
       gameRailTab = selectedGameRailTab;
+      const bottomPanel = gameWorkspaceBottomPanelForRail(
+        selectedGameRailTab,
+      );
+      if (
+        bottomPanel !== undefined &&
+        gameWorkspaceContext.bottomPanel !== bottomPanel
+      ) {
+        gameWorkspaceContext = gameWorkspaceReducer(
+          gameWorkspaceContext,
+          { type: "SELECT_BOTTOM_PANEL", panel: bottomPanel },
+        );
+        syncGameWorkspaceContextDataset();
+      }
       syncGameRailTabSurface();
       renderGameAssetRail();
     }
@@ -20196,8 +23097,7 @@ export function bootstrapDraw2Workspace(
     // The Main Editor is the persistent Audio work surface.  Changing the
     // lower deck must not make the Piano Roll disappear; only the selected
     // bottom panel is remounted below it.
-    const audioWorkspaceActive = modeDeckAudio !== undefined &&
-      !modeDeckAudio.hidden;
+    const audioWorkspaceActive = root.dataset.creatorMode === "AUDIO";
     if (audioWorkspace !== undefined) {
       audioWorkspace.hidden = !audioWorkspaceActive;
       audioWorkspace.inert = !audioWorkspaceActive;
@@ -20234,7 +23134,12 @@ export function bootstrapDraw2Workspace(
       else if (tab === "audio-markers") renderAudioMarkers();
       else if (tab === "audio-fx") renderAudioFxChain();
     }
-    if (tab === "game-scene") {
+    if (tab === "assets") {
+      setModeDeckStatus(
+        root.dataset.creatorMode === "AUDIO" ? "audio" : "game",
+        "保存済みアセット · 選択するとアセットパネルで編集できます",
+      );
+    } else if (tab === "game-scene") {
       setModeDeckStatus(
         "game",
         "シーン階層 · オブジェクトを選んで機能を設定",
@@ -20329,6 +23234,18 @@ export function bootstrapDraw2Workspace(
       }
     });
   }
+  const clearAudioAssetPackageNotice = (): void => {
+    audioAssetPackageNotice = undefined;
+    syncAudioAssetPackagePanel();
+  };
+  audioAssetName?.addEventListener("input", clearAudioAssetPackageNotice);
+  audioAssetRole?.addEventListener("change", clearAudioAssetPackageNotice);
+  audioAssetOfferKind?.addEventListener("change", clearAudioAssetPackageNotice);
+  audioAssetDerivativePolicy?.addEventListener("change", clearAudioAssetPackageNotice);
+  audioAssetAddRange?.addEventListener("click", addCurrentAudioAssetPackageRange);
+  audioAssetFinalize?.addEventListener("click", () => {
+    void finalizeSelectedAudioAssetPackage();
+  });
   audioBrowserSearch?.addEventListener("input", filterAudioBrowser);
   audioBrowserTree?.addEventListener("click", (event) => {
     const button = event.target instanceof Element
@@ -20725,13 +23642,17 @@ export function bootstrapDraw2Workspace(
       if (tab !== undefined) selectModeDeckTab(tab);
     });
   }
-  const visibleGameModeDeckTabs = (): HTMLButtonElement[] =>
+  const visibleModeDeckTabs = (): HTMLButtonElement[] =>
     modeTimelineDeckTabs.filter((button) =>
       !button.hidden &&
-      gameRailTabForModeDeck(button.dataset.modeDeckTab ?? "") !== undefined
+      (button.dataset.modeDeckTab === "assets" ||
+        gameRailTabForModeDeck(button.dataset.modeDeckTab ?? "") !== undefined ||
+        (button.dataset.modeDeckTab ?? "").startsWith("audio-"))
     );
   for (const button of modeTimelineDeckTabs.filter((candidate) =>
-    gameRailTabForModeDeck(candidate.dataset.modeDeckTab ?? "") !== undefined
+    candidate.dataset.modeDeckTab === "assets" ||
+      gameRailTabForModeDeck(candidate.dataset.modeDeckTab ?? "") !== undefined ||
+      (candidate.dataset.modeDeckTab ?? "").startsWith("audio-")
   )) {
     button.addEventListener("keydown", (event) => {
       if (button.hidden) return;
@@ -20741,7 +23662,7 @@ export function bootstrapDraw2Workspace(
         key !== "ArrowUp" && key !== "ArrowDown" && key !== "Home" &&
         key !== "End"
       ) return;
-      const tabs = visibleGameModeDeckTabs();
+      const tabs = visibleModeDeckTabs();
       const currentIndex = tabs.indexOf(button);
       if (currentIndex < 0 || tabs.length === 0) return;
       const nextIndex = key === "Home"
@@ -20788,7 +23709,7 @@ export function bootstrapDraw2Workspace(
     const showGameLeftDock = surface === "game";
     if (drawStatusbarMetrics !== undefined) {
       drawStatusbarMetrics.textContent = gameMode
-        ? `Game Scene · ${gameDeckTracks.length} objects · Fixed-step`
+        ? `Game Playground · ${gameDeckTracks.length} objects · Free placement`
         : defaultWorkspaceStatusbarMetrics;
     }
     root.dataset.modeDeck = surface;
@@ -20817,6 +23738,11 @@ export function bootstrapDraw2Workspace(
       draw2GameSceneViewport.hidden = !gameMode;
       draw2GameSceneViewport.inert = !gameMode;
       draw2GameSceneViewport.setAttribute("aria-hidden", String(!gameMode));
+    }
+    if (draw2GameTopbarControls !== undefined) {
+      draw2GameTopbarControls.hidden = !gameMode;
+      draw2GameTopbarControls.inert = !gameMode;
+      draw2GameTopbarControls.setAttribute("aria-hidden", String(!gameMode));
     }
     if (workspaceLeftDock !== undefined) {
       if (showAudioLeftDock || showGameLeftDock) {
@@ -20919,10 +23845,11 @@ export function bootstrapDraw2Workspace(
     ]);
     for (const button of modeTimelineDeckTabs) {
       const tab = button.dataset.modeDeckTab ?? "";
+      const sharedAssetTab = tab === "assets";
       const visible = gameSurface
-        ? tab.startsWith("game-")
+        ? tab.startsWith("game-") || sharedAssetTab
         : audioSurface
-        ? audioBottomTabs.has(tab)
+        ? audioBottomTabs.has(tab) || sharedAssetTab
         : false;
       button.hidden = !visible;
       button.setAttribute("aria-hidden", String(!visible));
@@ -20954,7 +23881,10 @@ export function bootstrapDraw2Workspace(
   const syncRightDockTabs = (): void => {
     for (const tab of tabs) {
       const panel = tab.dataset.workspacePanel;
-      const visible = panel !== undefined &&
+      const playgroundHiddenPanel = root.dataset.creatorMode === "GAME" &&
+        (panel === "game-scene" || panel === "game-assets" ||
+          panel === "game-build");
+      const visible = !playgroundHiddenPanel && panel !== undefined &&
         isPanelKind(panel) &&
         rightDockVisibleTabs.has(panel) &&
         isPanelAllowedForCurrentMode(panel);
@@ -21271,12 +24201,39 @@ export function bootstrapDraw2Workspace(
   const setPanel = (panel: PanelKind): void => {
     if (!PANELS.includes(panel)) return;
     const modeProfile = currentDesktopModeProfile();
-    const detailRestricted = detailMode === "guided" && panel === "advanced";
+    const playgroundPanel = root.dataset.creatorMode === "GAME" &&
+      (panel === "game-scene" || panel === "game-assets" ||
+        panel === "game-build")
+      ? "game-inspector"
+      : panel;
+    const detailRestricted = detailMode === "guided" &&
+      playgroundPanel === "advanced";
     const nextPanel = detailRestricted
       ? modeProfile.defaultPanel
-      : modeProfile !== undefined && !modeProfile.allowedPanels.includes(panel)
+      : modeProfile !== undefined &&
+          !modeProfile.allowedPanels.includes(playgroundPanel)
       ? modeProfile.defaultPanel
-      : panel;
+      : playgroundPanel;
+    setGameMobileInspectorOpen(nextPanel === "game-inspector");
+    if (root.dataset.creatorMode === "GAME") {
+      if (
+        nextPanel === "game-build" &&
+        gameWorkspaceContext.phase !== "RELEASE"
+      ) {
+        gameWorkspaceContext = gameWorkspaceReducer(gameWorkspaceContext, {
+          type: "OPEN_BUILD",
+        });
+        syncGameWorkspaceContextDataset();
+      } else if (
+        nextPanel !== "game-build" &&
+        gameWorkspaceContext.phase === "RELEASE"
+      ) {
+        gameWorkspaceContext = gameWorkspaceReducer(gameWorkspaceContext, {
+          type: "CLOSE_BUILD",
+        });
+        syncGameWorkspaceContextDataset();
+      }
+    }
     rightDockVisibleTabs.add(nextPanel);
     syncRightDockCollapsedState(false);
     // Re-measure the palette split after the workspace leaves the project
@@ -21374,6 +24331,170 @@ export function bootstrapDraw2Workspace(
     );
   };
 
+  draw2GameMobileInspectorToggle?.addEventListener("click", () => {
+    if (root.dataset.creatorMode !== "GAME") return;
+    const open = root.dataset.gameMobileInspector === "open";
+    if (open) {
+      setGameMobileInspectorOpen(false);
+      return;
+    }
+    setPanel("game-inspector");
+    setGameMobileInspectorOpen(true);
+  });
+  draw2GameMobileInspectorClose?.addEventListener("click", () => {
+    setGameMobileInspectorOpen(false);
+    draw2GameMobileInspectorToggle?.focus({ preventScroll: true });
+  });
+
+  const gameWorkspaceBottomPanelForRail = (
+    tab: GameAssetBrowserTab,
+  ): GameWorkspaceBottomPanel | undefined => {
+    switch (tab) {
+      case "ASSETS":
+        return "ASSETS";
+      case "ANIMATION":
+        return "ANIMATION";
+      case "GAME_DATA":
+        return "DATA";
+      case "EVENTS":
+        return "EVENTS";
+      case "SCENE":
+        return undefined;
+    }
+  };
+  const gameWorkspaceModeDeckTabFor = (
+    panel: GameWorkspaceBottomPanel,
+  ): string => {
+    switch (panel) {
+      case "ASSETS":
+        return "game-assets";
+      case "ANIMATION":
+        return "game-animation";
+      case "DATA":
+        return "game-data";
+      case "EVENTS":
+        return "game-events";
+    }
+  };
+  const syncGameWorkspaceContextDataset = (): void => {
+    root.dataset.gameWorkspacePhase = gameWorkspaceContext.phase;
+    root.dataset.gameWorkspaceSelection = gameWorkspaceContext.selection.kind;
+    root.dataset.gameWorkspaceCenter = gameWorkspaceContext.centerMode;
+    root.dataset.gameWorkspaceBottom = gameWorkspaceContext.bottomPanel;
+    root.dataset.gameWorkspaceInspector =
+      gameWorkspaceContext.inspectorContext;
+  };
+  const scrollGameInspectorTo = (target: HTMLElement | undefined): void => {
+    const panel = query<HTMLElement>(
+      documentRef,
+      "#draw2WorkspacePanelGameInspector",
+    );
+    if (panel === undefined || target === undefined) return;
+    const panelRect = panel.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+    panel.scrollTop = Math.max(
+      0,
+      panel.scrollTop + targetRect.top - panelRect.top - 8,
+    );
+  };
+  const showGameObjectInspector = (): void => {
+    const panel = query<HTMLElement>(
+      documentRef,
+      "#draw2WorkspacePanelGameInspector",
+    );
+    if (panel !== undefined) panel.scrollTop = 0;
+  };
+  const projectGameWorkspaceSelectionToLegacy = (): void => {
+    selectedGameTrackId = undefined;
+    selectedGameEventCardId = undefined;
+    switch (gameWorkspaceContext.selection.kind) {
+      case "OBJECT":
+      case "COMPONENT":
+        selectedGameTrackId = gameWorkspaceContext.selection.trackId;
+        break;
+      case "EVENT":
+        selectedGameEventCardId = gameWorkspaceContext.selection.eventId;
+        break;
+      default:
+        break;
+    }
+  };
+  const projectGameWorkspaceAction = (
+    action: GameWorkspaceAction,
+    options: {
+      readonly render?: boolean;
+      readonly panel?: PanelKind;
+    } = {},
+  ): GameWorkspaceContext => {
+    const previousBottomPanel = gameWorkspaceContext.bottomPanel;
+    gameWorkspaceContext = gameWorkspaceReducer(gameWorkspaceContext, action);
+    projectGameWorkspaceSelectionToLegacy();
+    syncGameWorkspaceContextDataset();
+    const selection = gameWorkspaceContext.selection;
+    if (selection.kind === "OBJECT" || selection.kind === "COMPONENT") {
+      const source = gameBehaviorSources.find((candidate) =>
+        candidate.behaviorId === gameBehaviorIdForTrack(selection.trackId)
+      );
+      gameLogicMode = source?.mode ?? "SIMPLE";
+      gameLogicModeBehaviorId = gameBehaviorIdForTrack(selection.trackId);
+    }
+    if (gameWorkspaceContext.bottomPanel !== previousBottomPanel) {
+      // selectModeDeckTab is initialized before user actions can reach this
+      // projection. It remains the single DOM projection for the deck.
+      selectModeDeckTab(
+        gameWorkspaceModeDeckTabFor(gameWorkspaceContext.bottomPanel),
+      );
+    }
+    if (options.panel !== undefined) setPanel(options.panel);
+    if (options.render !== false) renderGameCustomPanels();
+    return gameWorkspaceContext;
+  };
+  const selectGameObject = (
+    trackId: string,
+    options: { readonly openInspector?: boolean } = {},
+  ): void => {
+    if (
+      !gameDeckTracks.some((track) => track.id === trackId) &&
+      !gamePlayground.placements.some((placement) =>
+        (placement.placementId ?? placement.id) === trackId
+      )
+    ) return;
+    const nextContext = projectGameWorkspaceAction(
+      { type: "SELECT_OBJECT", trackId },
+      { render: false },
+    );
+    renderGameCustomPanels();
+    const selected = nextContext.selection.kind === "OBJECT" ||
+        nextContext.selection.kind === "COMPONENT"
+      ? nextContext.selection.trackId === trackId
+      : false;
+    if (!gameAuthoringLocked() && options.openInspector === true && selected) {
+      setPanel("game-inspector");
+      showGameObjectInspector();
+    }
+  };
+  const openGameEvent = (eventId: string): void => {
+    if (!gameEventCards.some((card) => card.eventId === eventId)) return;
+    const nextContext = projectGameWorkspaceAction(
+      { type: "OPEN_EVENT", eventId },
+      { render: false },
+    );
+    renderGameCustomPanels();
+    if (
+      !gameAuthoringLocked() &&
+      nextContext.selection.kind === "EVENT" &&
+      nextContext.selection.eventId === eventId
+    ) {
+      setPanel("game-inspector");
+      scrollGameInspectorTo(draw2GameLogicSimplePanel);
+    }
+  };
+  const gameWorkspaceSceneId = (): string => {
+    const sceneId = pixyncGameStore?.project.scenes[0]?.sceneId;
+    return sceneId === undefined
+      ? `scene:pixieed-game:${workspaceProjectId}`
+      : String(sceneId);
+  };
   const toggleDetailMode = (): void => {
     detailMode = detailMode === "guided" ? "detailed" : "guided";
     writeWorkspaceDetailMode(rightDockStorage, detailMode);
@@ -21766,6 +24887,22 @@ export function bootstrapDraw2Workspace(
   windowRef.addEventListener("draw2:playback-state", () => {
     syncModePlaybackButton();
   });
+  const toggleGameDeckPlayback = (): void => {
+    if (gameDeckPlay !== undefined) {
+      gameDeckPlay.click();
+      return;
+    }
+    // The legacy Game deck can be isolated from the current workspace DOM.
+    // Keep the header Space transport functional by using the same reducer
+    // and runtime path when that old button is unavailable.
+    if (gameDeckPlaying) {
+      stopGameDeckPlayback();
+      return;
+    }
+    projectGameWorkspaceAction({ type: "START_PLAY" });
+    if (gameWorkspaceContext.phase === "TEST") startGameDeckPlayback();
+    syncModePlaybackButton();
+  };
   windowRef.addEventListener("draw2:audio-catalog-request", () => {
     void ensureAudioWorkspaceSession().then(publishDrawAudioCatalog);
   });
@@ -21854,7 +24991,7 @@ export function bootstrapDraw2Workspace(
   const toggleCurrentModePlayback = (): void => {
     switch (currentCreatorMode()) {
       case "GAME":
-        gameDeckPlay?.click();
+        toggleGameDeckPlayback();
         break;
       case "AUDIO":
         toggleAudioCompositionPlayback();
@@ -21875,13 +25012,44 @@ export function bootstrapDraw2Workspace(
         );
     }
   };
-  windowRef.addEventListener("draw2:mini-preview-playback-request", () => {
-    // The mini preview keeps one visual play control across modes. In Audio
-    // it delegates to the same composition transport as the Global Bar,
-    // which in turn drives the one-way Draw preview bridge above.
-    if (currentCreatorMode() === "AUDIO") toggleAudioCompositionPlayback();
-  });
-
+  const handleWorkspacePlaybackKeydown = (event: KeyboardEvent): void => {
+    const spaceKey = event.code === "Space" || event.key === " ";
+    const mode = currentCreatorMode();
+    const dialogOpen = commandPalette?.open === true ||
+      documentRef.querySelector("dialog[open]") !== null;
+    const interactiveTarget = event.target instanceof Element
+      ? event.target.closest<HTMLElement>(
+        "button, a, summary, [role='button'], [role='tab'], [role='menuitem']",
+      )
+      : null;
+    if (
+      !spaceKey || event.defaultPrevented || event.repeat ||
+      event.metaKey || event.ctrlKey || event.shiftKey || event.altKey ||
+      event.isComposing || dialogOpen || isEditableTarget(event.target) ||
+      (mode !== "DRAW" && mode !== "ANIMATE" && mode !== "GAME" &&
+        mode !== "AUDIO")
+    ) return;
+    // Space is reserved for global playback. Capture it before a focused
+    // button can synthesize its native click.
+    // The mode transport is the only owner; the old control keeps no focus
+    // that could be activated again on keyup.
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const active = documentRef.activeElement;
+    if (interactiveTarget !== null && active === interactiveTarget) {
+      windowRef.setTimeout(() => {
+        if (documentRef.activeElement === interactiveTarget) {
+          interactiveTarget.blur();
+        }
+      }, 0);
+    }
+    toggleCurrentModePlayback();
+  };
+  documentRef.addEventListener(
+    "keydown",
+    handleWorkspacePlaybackKeydown,
+    { capture: true },
+  );
   const applyDesktopModeSurface = (): void => {
     syncModePlaybackButton();
     for (const button of creatorModeButtons) {
@@ -22037,6 +25205,7 @@ export function bootstrapDraw2Workspace(
   const setCreatorMode = (
     mode: CreatorWorkspaceMode,
     activateSurface = true,
+    afterApplied?: (mode: CreatorWorkspaceMode) => void,
   ): void => {
     // Every call site historically ran applyCreatorModeChange()
     // unconditionally -- including when the mode was already current, which
@@ -22065,10 +25234,12 @@ export function bootstrapDraw2Workspace(
       prefersReducedMotionForModeSwitch()
     ) {
       applyCreatorModeChange(mode, activateSurface);
+      afterApplied?.(currentCreatorMode());
       return;
     }
     const transition = vtDocument.startViewTransition(() => {
       applyCreatorModeChange(mode, activateSurface);
+      afterApplied?.(currentCreatorMode());
     });
     transition.finished.catch(() => {
       // A rapid re-switch can abort the in-flight transition; the DOM
@@ -22179,6 +25350,7 @@ export function bootstrapDraw2Workspace(
       ) {
         setPanel("audio");
       } else if (projectedMode === "EXPORT") setPanel("export");
+      if (projectedMode === "GAME") setGameMobileInspectorOpen(false);
     }
     updateStatus(creatorModeMessage(projectedMode));
   };
@@ -22192,10 +25364,28 @@ export function bootstrapDraw2Workspace(
   };
 
   for (const button of creatorModeButtons) {
-    button.addEventListener("click", () => {
+    let pointerActivated = false;
+    button.addEventListener("pointerdown", () => {
+      pointerActivated = true;
+    });
+    button.addEventListener("pointercancel", () => {
+      pointerActivated = false;
+    });
+    button.addEventListener("click", (event) => {
       const mode = button.dataset.creatorMode;
       if (mode !== undefined && isCreatorWorkspaceMode(mode)) {
         setCreatorMode(mode);
+      }
+      // Raw arrows belong to the active editor after a mode is chosen. Keep
+      // the tab's arrow navigation only when the user intentionally entered
+      // the tablist with Tab; a pointer/Enter activation must not leave focus
+      // on the mode tab and steal iDRAW frame/layer navigation.
+      const editorActivation = pointerActivated || event.detail === 0;
+      pointerActivated = false;
+      if (editorActivation) {
+        windowRef.setTimeout(() => {
+          if (documentRef.activeElement === button) button.blur();
+        }, 0);
       }
     });
     button.addEventListener("keydown", (event) => {
@@ -22214,6 +25404,9 @@ export function bootstrapDraw2Workspace(
       else if (event.key === "End") nextIndex = modeOrder.length - 1;
       else return;
       event.preventDefault();
+      // Arrow ownership stays with the focused mode tab. Do not let the
+      // document-level selection nudge handler interpret the same key.
+      event.stopPropagation();
       const nextMode = modeOrder[nextIndex];
       if (nextMode !== undefined) {
         setCreatorMode(nextMode);
@@ -22233,7 +25426,7 @@ export function bootstrapDraw2Workspace(
   ): Promise<GoldenProjectBuildResult> => {
     const bridge = getAssetBridge();
     if (bridge === undefined) {
-      throw new Error("iDRAW Asset bridge is unavailable.");
+      throw new Error("iDRAW Asset adapter is unavailable.");
     }
     const drawSnapshot = bridge.snapshot();
     if (drawSnapshot.projectId !== workspaceProjectId) {
@@ -22363,8 +25556,11 @@ export function bootstrapDraw2Workspace(
     "EFFECT",
   ] as const;
   const pivots = ["CENTER", "FEET", "CUSTOM"] as const;
-  const animationLabels: Readonly<Record<string, string>> = {
+  const animationLabels: Record<string, string> = {
     IDLE: "待機",
+    WALK: "歩く",
+    JUMP: "ジャンプ",
+    ATTACK: "攻撃",
     IDLE_UP: "待機・上",
     IDLE_DOWN: "待機・下",
     IDLE_LEFT: "待機・左",
@@ -22373,12 +25569,34 @@ export function bootstrapDraw2Workspace(
     WALK_DOWN: "歩く・下",
     WALK_LEFT: "歩く・左",
     WALK_RIGHT: "歩く・右",
+    JUMP_UP: "ジャンプ・上",
+    JUMP_DOWN: "ジャンプ・下",
+    JUMP_LEFT: "ジャンプ・左",
+    JUMP_RIGHT: "ジャンプ・右",
     ATTACK_UP: "攻撃・上",
     ATTACK_DOWN: "攻撃・下",
     ATTACK_LEFT: "攻撃・左",
     ATTACK_RIGHT: "攻撃・右",
   };
-  const assetAnimationFamilies = ["IDLE", "WALK", "ATTACK"] as const;
+  const diagonalAnimationLabels: Readonly<Record<string, string>> = {
+    UP_LEFT: "左上",
+    UP_RIGHT: "右上",
+    DOWN_LEFT: "左下",
+    DOWN_RIGHT: "右下",
+  };
+  for (const family of ["IDLE", "WALK", "JUMP", "ATTACK"] as const) {
+    const familyLabel = family === "IDLE"
+      ? "待機"
+      : family === "WALK"
+      ? "歩く"
+      : family === "JUMP"
+      ? "ジャンプ"
+      : "攻撃";
+    for (const [direction, label] of Object.entries(diagonalAnimationLabels)) {
+      animationLabels[`${family}_${direction}`] = `${familyLabel}・${label}`;
+    }
+  }
+  const assetAnimationFamilies = ["IDLE", "WALK", "JUMP", "ATTACK"] as const;
   type AssetAnimationFamily = typeof assetAnimationFamilies[number];
   const assetDirections = [
     ["UP", "上"],
@@ -22397,18 +25615,69 @@ export function bootstrapDraw2Workspace(
   let selectedAssetAnimationFamily: AssetAnimationFamily = "IDLE";
   let assetBuilderSelectedMotionName = "IDLE";
   let assetBuilderSelectedDirectionName: AssetDirection = "DOWN";
+  type CharacterSetupAction =
+    | "IDLE"
+    | "WALK"
+    | "RUN"
+    | "ATTACK"
+    | "HIT"
+    | "DEATH"
+    | "TALK";
+  const characterSetupActionLabels: Readonly<Record<CharacterSetupAction, string>> = {
+    IDLE: "待機",
+    WALK: "歩く",
+    RUN: "走る",
+    ATTACK: "攻撃",
+    HIT: "ダメージ",
+    DEATH: "倒れる",
+    TALK: "話す",
+  };
+  const characterSetupActionMotionNames: Readonly<Record<CharacterSetupAction, string>> = {
+    IDLE: "IDLE",
+    WALK: "WALK",
+    RUN: "RUN",
+    ATTACK: "ATTACK",
+    HIT: "HURT",
+    DEATH: "DEATH",
+    TALK: "INTERACT",
+  };
+  let selectedCharacterSetupAction: CharacterSetupAction = "IDLE";
+  let selectedCharacterSetupDirection: AssetDirection = "DOWN";
+  type CharacterSetupDirectionMode = "2" | "4" | "8";
+  const characterSetupDirectionsByMode: Readonly<
+    Record<CharacterSetupDirectionMode, readonly AssetDirection[]>
+  > = {
+    "2": ["LEFT", "RIGHT"],
+    "4": ["UP", "LEFT", "RIGHT", "DOWN"],
+    "8": [
+      "UP",
+      "UP_RIGHT",
+      "RIGHT",
+      "DOWN_RIGHT",
+      "DOWN",
+      "DOWN_LEFT",
+      "LEFT",
+      "UP_LEFT",
+    ],
+  };
+  let selectedCharacterSetupDirectionMode: CharacterSetupDirectionMode = "4";
+  let selectedCharacterSetupFrameIndex = 0;
   let pendingAssetSlotCapture: {
     readonly animationName: AssetAnimationName;
     readonly motionName: string;
     readonly direction: AssetDirection;
     readonly targetDefinitionId?: string;
     readonly appendFrame?: boolean;
+    readonly replaceFrameIndex?: number;
+    readonly allFrames?: boolean;
   } | undefined;
   let activeAssetCaptureTarget: {
     readonly animationName: AssetAnimationName;
     readonly motionName: string;
     readonly direction: AssetDirection;
     readonly targetDefinitionId?: string;
+    readonly replaceFrameIndex?: number;
+    readonly allFrames?: boolean;
   } | undefined;
 
   const setAssetStatus = (
@@ -22550,6 +25819,8 @@ export function bootstrapDraw2Workspace(
   let assetBuilderDirectionMode: AssetBuilderDirectionMode = "4";
   let assetBuilderCustomDirectionNames: string[] = [];
   let assetBuilderPreviewTimer: number | undefined;
+  let assetBuilderFinalizeBusy = false;
+  let assetBuilderUnityExportBusy = false;
 
   const assetBuilderDirectionColumnsForMode = (): readonly {
     readonly id: AssetDirection;
@@ -22644,6 +25915,23 @@ export function bootstrapDraw2Workspace(
     if (assetBuilderPivot !== undefined) assetBuilderPivot.value = pivot;
   };
 
+  const openAssetDefinitionForEditing = (
+    entry: Draw2AssetBridgeSnapshot["assetDefinitions"][number],
+  ): void => {
+    clearAssetCapture();
+    assetBuilderNewAssetMode = false;
+    selectedAssetDefinitionId = entry.definitionId;
+    assetBuilderSelectedFrameIndex = 0;
+    assetBuilderPreviewFrameIndex = 0;
+    syncAssetBuilderFields(entry);
+    setAssetStatus(
+      `「${entry.definition.metadata.name}」を編集中。アクションと方向を選べます。`,
+      "success",
+    );
+    setPanel("assets");
+    renderAssetEditor();
+  };
+
   const clearAssetCapture = (): void => {
     pendingAssetSlotCapture = undefined;
     activeAssetCaptureTarget = undefined;
@@ -22690,16 +25978,7 @@ export function bootstrapDraw2Workspace(
       meta.textContent = `${motions} Animations · ${directions} Directions`;
       card.append(title, type, meta);
       card.addEventListener("click", () => {
-        clearAssetCapture();
-        assetBuilderNewAssetMode = false;
-        selectedAssetDefinitionId = entry.definitionId;
-        assetBuilderSelectedFrameIndex = 0;
-        assetBuilderPreviewFrameIndex = 0;
-        syncAssetBuilderFields(entry);
-        setAssetStatus(
-          `「${definition.metadata.name}」を編集中。セルを選んでください。`,
-        );
-        renderAssetEditor();
+        openAssetDefinitionForEditing(entry);
       });
       assetBuilderAssetCards.append(card);
     }
@@ -22756,13 +26035,13 @@ export function bootstrapDraw2Workspace(
     direction: AssetDirection,
   ): AssetAnimationClip | undefined => {
     if (entry === undefined) return undefined;
-    return entry.definition.animationMapping.find((clip) =>
-      assetAnimationMotionName(clip) === motionName && (
-        assetAnimationDirectionName(clip) === direction ||
-        (direction === "DOWN" &&
-          assetAnimationDirectionName(clip) === undefined)
-      )
+    const clips = entry.definition.animationMapping.filter((clip) =>
+      assetAnimationMotionName(clip) === motionName
     );
+    return clips.find((clip) => assetAnimationDirectionName(clip) === direction) ??
+      (direction === "DOWN"
+        ? clips.find((clip) => assetAnimationDirectionName(clip) === undefined)
+        : undefined);
   };
 
   const drawAssetBuilderCanvas = (
@@ -22776,20 +26055,32 @@ export function bootstrapDraw2Workspace(
     const source = documentRef.querySelector<HTMLCanvasElement>("#draw2Canvas");
     context.clearRect(0, 0, target.width, target.height);
     context.imageSmoothingEnabled = false;
-    if (source === null || source.width <= 0 || source.height <= 0) return;
+    const bridge = getAssetBridge();
     const referenceImage = reference === undefined
-      ? undefined
-      : getAssetBridge()?.renderReference({
+      ? (snapshot.selection.hasSelection
+        ? bridge?.captureSelection()
+        : undefined)
+      : bridge?.renderReference({
         sourceFrameId: reference.sourceFrameId,
+        ...(reference.layerIds === undefined
+          ? {}
+          : { layerIds: reference.layerIds }),
         rect: reference.rect,
+        ...(reference.rasterSnapshot === undefined
+          ? {}
+          : { rasterSnapshot: reference.rasterSnapshot }),
       });
-    const region = referenceImage === undefined
+    if (
+      referenceImage === undefined &&
+      (source === null || source.width <= 0 || source.height <= 0)
+    ) return;
+    const region = reference === undefined
       ? snapshot.selection.region
-      : reference?.rect ?? null;
+      : reference.rect;
     const sx = region?.x ?? 0;
     const sy = region?.y ?? 0;
-    const sw = referenceImage?.width ?? region?.width ?? source.width;
-    const sh = referenceImage?.height ?? region?.height ?? source.height;
+    const sw = referenceImage?.width ?? region?.width ?? source?.width ?? 1;
+    const sh = referenceImage?.height ?? region?.height ?? source?.height ?? 1;
     const padding = 14;
     const scale = Math.min(
       (target.width - padding * 2) / Math.max(1, sw),
@@ -22828,12 +26119,101 @@ export function bootstrapDraw2Workspace(
           context.drawImage(referenceCanvas, 0, 0, sw, sh, dx, dy, dw, dh);
         }
         context.restore();
-      } else {
+      } else if (source !== null) {
         context.drawImage(source, sx, sy, sw, sh, dx, dy, dw, dh);
       }
     } catch {
       // A canvas can be between frame projections. The next state event will
       // repaint the lazy preview without affecting the canonical document.
+    }
+  };
+
+  const drawAssetReferenceCanvas = (
+    target: HTMLCanvasElement | undefined,
+    snapshot: Draw2AssetBridgeSnapshot,
+    reference: AssetAnimationFrameReference | undefined,
+  ): boolean => {
+    if (target === undefined) return false;
+    const context = target.getContext("2d");
+    if (context === null) return false;
+    context.clearRect(0, 0, target.width, target.height);
+    if (reference === undefined) return false;
+    drawAssetBuilderCanvas(target, snapshot, reference);
+    return true;
+  };
+
+  const firstAssetPreviewReference = (
+    definition: Draw2AssetBridgeSnapshot["assetDefinitions"][number]["definition"],
+  ): AssetAnimationFrameReference | undefined =>
+    definition.animationMapping
+      .flatMap((clip) => clip.sourceFrames ?? [])
+      .find((reference) => reference.rect.width > 0 && reference.rect.height > 0);
+
+  const renderSavedAssetShelf = (
+    shelf: HTMLElement | undefined,
+    status: HTMLOutputElement | undefined,
+    snapshot: Draw2AssetBridgeSnapshot,
+  ): void => {
+    if (shelf === undefined) return;
+    shelf.replaceChildren();
+    const entries = snapshot.assetDefinitions;
+    if (entries.length === 0) {
+      const empty = documentRef.createElement("p");
+      empty.className = "draw2-asset-shelf-empty";
+      empty.textContent = "保存済みアセットはありません。iDRAWで登録するとここに表示されます。";
+      shelf.append(empty);
+      if (status !== undefined) status.textContent = "0件 · iDRAWでアセットを登録してください。";
+      return;
+    }
+    for (const entry of entries) {
+      const definition = entry.definition;
+      const card = documentRef.createElement("article");
+      card.className = "draw2-saved-asset-card";
+      card.setAttribute("role", "listitem");
+      const button = documentRef.createElement("button");
+      button.type = "button";
+      button.className = "draw2-saved-asset-button";
+      button.dataset.assetDefinitionId = entry.definitionId;
+      button.setAttribute(
+        "aria-label",
+        `${definition.metadata.name}をアセットパネルで編集`,
+      );
+      const visual = documentRef.createElement("span");
+      visual.className = "draw2-saved-asset-visual";
+      const canvas = documentRef.createElement("canvas");
+      canvas.width = 64;
+      canvas.height = 64;
+      const previewReference = firstAssetPreviewReference(definition);
+      if (!drawAssetReferenceCanvas(canvas, snapshot, previewReference)) {
+        visual.classList.add("draw2-saved-asset-placeholder");
+        visual.textContent = "✦";
+      } else {
+        visual.append(canvas);
+      }
+      const copy = documentRef.createElement("span");
+      copy.className = "draw2-saved-asset-copy";
+      const title = documentRef.createElement("strong");
+      title.textContent = definition.metadata.name;
+      const motionCount = new Set(
+        definition.animationMapping.map((clip) => assetAnimationMotionName(clip)),
+      ).size;
+      const directionCount = new Set(
+        definition.animationMapping.map((clip) => assetAnimationDirectionName(clip) ?? "DOWN"),
+      ).size;
+      const frameCount = definition.animationMapping.reduce(
+        (total, clip) => total + clip.frameIds.length,
+        0,
+      );
+      const detail = documentRef.createElement("small");
+      detail.textContent = `${motionCount}動作 · ${directionCount}方向 · ${frameCount}コマ`;
+      copy.append(title, detail);
+      button.append(visual, copy);
+      button.addEventListener("click", () => openAssetDefinitionForEditing(entry));
+      card.append(button);
+      shelf.append(card);
+    }
+    if (status !== undefined) {
+      status.textContent = `${entries.length}件 · 選択するとアセットパネルで編集できます。`;
     }
   };
 
@@ -23012,15 +26392,44 @@ export function bootstrapDraw2Workspace(
           regionLabel(selection.region)
         } · ${selection.pixelCount}px · フレーム ${
           selection.frameNumber ?? "?"
-        }`
+        } · 表示中のレイヤーを合成して保存`
         : "キャンバスで使いたい部分を囲んでください。";
     }
     if (assetBuilderFrameStrip !== undefined) {
       assetBuilderFrameStrip.hidden = assetBuilderSourceTab !== "frames";
       assetBuilderFrameStrip.replaceChildren();
-      const frames = Object.entries(snapshot.frameNumbers)
+      const allFrames = Object.entries(snapshot.frameNumbers)
         .sort((left, right) => left[1] - right[1])
-        .slice(0, 32);
+      const activeFrameIndex = Math.max(
+        0,
+        allFrames.findIndex(([, frameNumber]) =>
+          frameNumber === selection.frameNumber
+        ),
+      );
+      const frameWindowStart = allFrames.length <= 32
+        ? 0
+        : Math.min(
+          Math.max(0, activeFrameIndex - 15),
+          allFrames.length - 32,
+        );
+      if (allFrames.length > 32) {
+        const previous = documentRef.createElement("button");
+        previous.type = "button";
+        previous.className = "draw2-asset-builder-frame-nav";
+        previous.textContent = "‹";
+        previous.setAttribute("aria-label", "前のフレーム範囲");
+        previous.disabled = frameWindowStart === 0;
+        previous.addEventListener("click", () => {
+          const target = allFrames[Math.max(0, frameWindowStart - 1)];
+          if (target === undefined) return;
+          const element = documentRef.querySelector<HTMLElement>(
+            `[data-frame-id="${CSS.escape(target[0])}"]`,
+          );
+          element?.click();
+        });
+        assetBuilderFrameStrip.append(previous);
+      }
+      const frames = allFrames.slice(frameWindowStart, frameWindowStart + 32);
       for (const [frameId, frameNumber] of frames) {
         const frameButton = documentRef.createElement("button");
         frameButton.type = "button";
@@ -23042,6 +26451,23 @@ export function bootstrapDraw2Workspace(
           setAssetStatus(`Frame ${frameNumber} をSourceとして表示しました。`);
         });
         assetBuilderFrameStrip.append(frameButton);
+      }
+      if (allFrames.length > 32) {
+        const next = documentRef.createElement("button");
+        next.type = "button";
+        next.className = "draw2-asset-builder-frame-nav";
+        next.textContent = "›";
+        next.setAttribute("aria-label", "次のフレーム範囲");
+        next.disabled = frameWindowStart + 32 >= allFrames.length;
+        next.addEventListener("click", () => {
+          const target = allFrames[Math.min(allFrames.length - 1, frameWindowStart + 32)];
+          if (target === undefined) return;
+          const element = documentRef.querySelector<HTMLElement>(
+            `[data-frame-id="${CSS.escape(target[0])}"]`,
+          );
+          element?.click();
+        });
+        assetBuilderFrameStrip.append(next);
       }
     }
 
@@ -23096,7 +26522,11 @@ export function bootstrapDraw2Workspace(
           const thumb = documentRef.createElement("canvas");
           thumb.width = 36;
           thumb.height = 36;
-          drawAssetBuilderCanvas(thumb, snapshot);
+          if (clip?.sourceFrames?.[0] !== undefined) {
+            drawAssetReferenceCanvas(thumb, snapshot, clip.sourceFrames[0]);
+          } else {
+            drawAssetBuilderCanvas(thumb, snapshot);
+          }
           const value = documentRef.createElement("strong");
           if (clip === undefined) {
             value.append(createDraw2Icon(documentRef, "icon-add"));
@@ -23620,6 +27050,17 @@ export function bootstrapDraw2Workspace(
         selectedAssetDefinitionId = entry.definitionId;
         renderAssetDefinitions(snapshot);
       });
+      const lifecycle = documentRef.createElement("span");
+      lifecycle.className = "draw2-asset-definition-state";
+      lifecycle.textContent = definition.persistence === "VALIDATED_DEFINITION"
+        ? "Project内検証済み"
+        : "編集中";
+      lifecycle.dataset.state = definition.persistence === "VALIDATED_DEFINITION"
+        ? "validated"
+        : "draft";
+      lifecycle.title = definition.persistence === "VALIDATED_DEFINITION"
+        ? "同じProject内のiGAME参照に利用できます。外部Registry登録とは別です。"
+        : "名前・種類・Pivotを保存するとProject内検証済みになります。";
       const remove = documentRef.createElement("button");
       remove.type = "button";
       remove.className = "draw2-asset-definition-remove";
@@ -23636,7 +27077,7 @@ export function bootstrapDraw2Workspace(
           );
         }
       });
-      header.append(select, remove);
+      header.append(select, lifecycle, remove);
 
       const fields = documentRef.createElement("div");
       fields.className = "draw2-asset-definition-card-fields";
@@ -23742,15 +27183,18 @@ export function bootstrapDraw2Workspace(
         }`;
     }
     const animationEnabled = selectedEntry !== undefined;
+    const selectedAnimationEnabled = selectedEntry?.definition.animationMapping.some((clip) =>
+      clip.name === selectedAnimationName
+    ) ?? false;
     if (creatorAssetAssignAnimation !== undefined) {
       creatorAssetAssignAnimation.disabled = !animationEnabled;
     }
     if (creatorAssetClearAnimation !== undefined) {
-      creatorAssetClearAnimation.disabled = !animationEnabled;
+      creatorAssetClearAnimation.disabled = !animationEnabled || !selectedAnimationEnabled;
     }
     if (creatorAssetAnimationSummary !== undefined) {
       creatorAssetAnimationSummary.textContent = selectedEntry === undefined
-        ? "Idleや4方向のIdle／Walk／Attackを個別に登録できます。"
+        ? "Idleや必要な動きの2／4／8方向を個別に登録できます。"
         : `${selectedEntry.definition.animationMapping.length} ポーズ登録済み · 選択中: ${
           animationLabels[selectedAnimationName] ?? selectedAnimationName
         }`;
@@ -23764,11 +27208,16 @@ export function bootstrapDraw2Workspace(
     snapshot: Draw2AssetBridgeSnapshot,
   ): void => {
     const capture = pendingAssetSlotCapture;
-    const frameNumber = snapshot.selection.frameNumber;
+    const currentFrameNumber = snapshot.selection.frameNumber ??
+      (snapshot.selection.frameId === null
+        ? null
+        : snapshot.frameNumbers[snapshot.selection.frameId] ?? null);
+    const allFramesCapture = capture?.allFrames === true;
     if (
       capture === undefined ||
       !snapshot.selection.hasSelection ||
-      frameNumber === null
+      snapshot.selection.region === null ||
+      (!allFramesCapture && currentFrameNumber === null)
     ) return;
     const bridge = getAssetBridge();
     if (bridge === undefined) return;
@@ -23778,46 +27227,129 @@ export function bootstrapDraw2Workspace(
     if (sourceFrameId === null || sourceLayerId === null || region === null) {
       setAssetStatus("元Frame・Layer・範囲を取得できません。", "error");
       pendingAssetSlotCapture = undefined;
+      activeAssetCaptureTarget = undefined;
       return;
     }
-    const durationMs = Math.max(
+    const visibleLayerIds = snapshot.layers
+      .filter((layer) => layer.visible)
+      .map((layer) => layer.layerTrackId);
+    const parsedCaptureFps = Number(assetBuilderFps?.value ?? 12);
+    const captureFps = Math.max(
       1,
-      Math.round(
-        1000 / Number(assetBuilderFps?.value ?? 12),
-      ),
+      Math.min(240, Number.isFinite(parsedCaptureFps) && parsedCaptureFps > 0 ? parsedCaptureFps : 12),
     );
-    const sourceFrame: AssetAnimationFrameReference = {
-      sourceFrameId,
-      layerIds: [sourceLayerId],
-      rect: { ...region },
-      durationMs,
-    };
+    const defaultDurationMs = Math.max(1, Math.round(1000 / captureFps));
+    const sourceFrameEntries = allFramesCapture
+      ? Object.entries(snapshot.frameNumbers).sort(([, left], [, right]) => left - right)
+      : [[sourceFrameId, currentFrameNumber!]] as [string, number][];
+    if (sourceFrameEntries.length === 0) {
+      setAssetStatus("アニメーション化するFrameがありません。", "error");
+      pendingAssetSlotCapture = undefined;
+      activeAssetCaptureTarget = undefined;
+      return;
+    }
+    const capturedFrameIds = sourceFrameEntries.map(([frameId]) => frameId);
+    const capturedFrameNumbers = sourceFrameEntries.map(([, frameNumber]) => frameNumber);
+    const capturedProjections = bridge.captureSelectionForFrames(capturedFrameIds);
+    if (
+      capturedProjections === undefined ||
+      capturedProjections.length !== capturedFrameIds.length ||
+      capturedProjections.some((projection) =>
+        projection.width !== region.width || projection.height !== region.height
+      )
+    ) {
+      setAssetStatus(
+        allFramesCapture
+          ? "全フレームの表示画像を取得できません。選択範囲を選び直してください。"
+          : "表示中のフレームを画像として取得できません。範囲を選び直してください。",
+        "error",
+      );
+      pendingAssetSlotCapture = undefined;
+      activeAssetCaptureTarget = undefined;
+      return;
+    }
+    const frameDurationsForCapture = capturedFrameIds.map((frameId) => {
+      const duration = snapshot.frameDurationsMs?.[frameId];
+      return Number.isFinite(duration) && duration !== undefined && duration > 0
+        ? Math.max(1, Math.round(duration))
+        : defaultDurationMs;
+    });
+    const capturedSourceFrames: AssetAnimationFrameReference[] = capturedProjections.map(
+      (projection, index) => ({
+        sourceFrameId: capturedFrameIds[index]!,
+        layerIds: visibleLayerIds.length > 0 ? visibleLayerIds : [sourceLayerId],
+        rect: { ...region },
+        rasterSnapshot: {
+          width: projection.width,
+          height: projection.height,
+          data: Array.from(projection.data),
+        },
+        durationMs: frameDurationsForCapture[index]!,
+      }),
+    );
     const target = capture.targetDefinitionId === undefined
       ? undefined
       : snapshot.assetDefinitions.find((entry) =>
         entry.definitionId === capture.targetDefinitionId
       );
-    const targetClip = target?.definition.animationMapping.find((clip) =>
-      assetAnimationMotionName(clip) === capture.motionName &&
-      (assetAnimationDirectionName(clip) === capture.direction ||
-        (capture.direction === "DOWN" &&
-          assetAnimationDirectionName(clip) === undefined))
-    );
-    const frameIds = capture.appendFrame && targetClip !== undefined
-      ? [...targetClip.frameIds, snapshot.selection.frameId!]
+    const targetClips = target?.definition.animationMapping.filter((clip) =>
+      assetAnimationMotionName(clip) === capture.motionName
+    ) ?? [];
+    const targetClip = targetClips.find((clip) =>
+      assetAnimationDirectionName(clip) === capture.direction
+    ) ?? (capture.direction === "DOWN"
+      ? targetClips.find((clip) => assetAnimationDirectionName(clip) === undefined)
+      : undefined);
+    const replacingFrame = capture.replaceFrameIndex !== undefined;
+    if (
+      replacingFrame &&
+      (targetClip === undefined ||
+        capture.replaceFrameIndex! < 0 ||
+        capture.replaceFrameIndex! >= targetClip.frameIds.length)
+    ) {
+      pendingAssetSlotCapture = undefined;
+      activeAssetCaptureTarget = undefined;
+      setAssetStatus("差し替えるアニメーションフレームが見つかりません。", "error");
+      return;
+    }
+    const frameIds = allFramesCapture
+      ? capturedFrameIds
+      : replacingFrame
+      ? targetClip!.frameIds.map((frameId, index) =>
+        index === capture.replaceFrameIndex ? capturedFrameIds[0]! : frameId
+      )
+      : capture.appendFrame && targetClip !== undefined
+      ? [...targetClip.frameIds, capturedFrameIds[0]!]
       : undefined;
     const frameDurationsMs = frameIds === undefined
-      ? [durationMs]
+      ? [frameDurationsForCapture[0]!]
       : frameIds.map((_, index) =>
-        targetClip?.frameDurationsMs?.[index] ??
-          durationMs
+        allFramesCapture
+          ? frameDurationsForCapture[index]!
+          : replacingFrame && index === capture.replaceFrameIndex
+          ? frameDurationsForCapture[0]!
+          : targetClip?.frameDurationsMs?.[index] ?? frameDurationsForCapture[0]!
       );
-    const sourceFrames =
-      capture.appendFrame && targetClip?.sourceFrames !== undefined
-        ? [...targetClip.sourceFrames, sourceFrame]
-        : targetClip === undefined
-        ? [sourceFrame]
-        : undefined;
+    const sourceFrames = allFramesCapture
+      ? capturedSourceFrames
+      : replacingFrame && targetClip?.sourceFrames !== undefined
+      ? targetClip.sourceFrames.map((source, index) =>
+        index === capture.replaceFrameIndex ? capturedSourceFrames[0]! : source
+      )
+      : capture.appendFrame && targetClip?.sourceFrames !== undefined
+      ? [...targetClip.sourceFrames, capturedSourceFrames[0]!]
+      : targetClip === undefined
+      ? [capturedSourceFrames[0]!]
+      : undefined;
+    const preserveDirectionlessDown = targetClip !== undefined &&
+      capture.direction === "DOWN" &&
+      assetAnimationDirectionName(targetClip) === undefined;
+    const assignmentAnimationName = targetClip !== undefined && preserveDirectionlessDown
+      ? targetClip.name
+      : capture.animationName;
+    const assignmentMotionName = targetClip !== undefined && preserveDirectionlessDown
+      ? assetAnimationMotionName(targetClip)
+      : capture.motionName;
     const kindValue = creatorAssetKind?.value ?? "CHARACTER";
     const pivotValue = creatorAssetPivot?.value ?? "CENTER";
     const assetKind =
@@ -23838,62 +27370,603 @@ export function bootstrapDraw2Workspace(
           : {}),
         motionName: capture.motionName,
         direction: capture.direction,
+        fps: captureFps,
         ...(sourceFrames === undefined ? {} : { sourceFrames }),
         frameDurationsMs,
       })
       : bridge.assignAnimation({
         definitionId: target.definitionId,
-        animationName: capture.animationName,
-        ...(capture.animationName === "CUSTOM"
+        animationName: assignmentAnimationName,
+        ...(targetClip !== undefined && preserveDirectionlessDown
+          ? targetClip.customName === undefined
+            ? {}
+            : { customName: targetClip.customName }
+          : capture.animationName === "CUSTOM"
           ? { customName: capture.motionName }
           : {}),
-        motionName: capture.motionName,
-        direction: capture.direction,
-        frameStart: frameNumber,
-        frameEnd: frameNumber,
+        motionName: assignmentMotionName,
+        ...(targetClip !== undefined && preserveDirectionlessDown
+          ? {}
+          : { direction: capture.direction }),
+        frameStart: Math.min(...capturedFrameNumbers),
+        frameEnd: Math.max(...capturedFrameNumbers),
         loopMode: "LOOP",
-        fps: Number(assetBuilderFps?.value ?? 12),
+        fps: captureFps,
         ...(frameIds === undefined ? {} : { frameIds }),
         frameDurationsMs,
         ...(sourceFrames === undefined ? {} : { sourceFrames }),
       });
     if (result.ok === false) {
       pendingAssetSlotCapture = undefined;
+      activeAssetCaptureTarget = undefined;
       setAssetStatus(result.message, "error");
       return;
     }
     selectedAssetDefinitionId = result.entry.definitionId;
     assetBuilderNewAssetMode = false;
-    selectedAnimationName = capture.animationName;
+    selectedAnimationName = assignmentAnimationName;
     assetBuilderSelectedMotionName = capture.motionName;
     assetBuilderSelectedDirectionName = capture.direction;
-    activeAssetCaptureTarget = {
-      animationName: capture.animationName,
-      motionName: capture.motionName,
-      direction: capture.direction,
-      targetDefinitionId: result.entry.definitionId,
-    };
-    pendingAssetSlotCapture = {
-      animationName: capture.animationName,
-      motionName: capture.motionName,
-      direction: capture.direction,
-      targetDefinitionId: result.entry.definitionId,
-      appendFrame: true,
-    };
+    const registeredClip = result.entry.definition.animationMapping.find((clip) =>
+      assetAnimationMotionName(clip) === capture.motionName &&
+      (assetAnimationDirectionName(clip) === capture.direction ||
+        (capture.direction === "DOWN" &&
+          assetAnimationDirectionName(clip) === undefined))
+    );
+    selectedCharacterSetupFrameIndex = registeredClip === undefined
+      ? 0
+      : allFramesCapture
+      ? 0
+      : replacingFrame
+      ? Math.min(capture.replaceFrameIndex!, registeredClip.frameIds.length - 1)
+      : Math.max(0, registeredClip.frameIds.length - 1);
+    if (replacingFrame || allFramesCapture) {
+      activeAssetCaptureTarget = undefined;
+      pendingAssetSlotCapture = undefined;
+    } else {
+      activeAssetCaptureTarget = {
+        animationName: capture.animationName,
+        motionName: capture.motionName,
+        direction: capture.direction,
+        targetDefinitionId: result.entry.definitionId,
+      };
+      pendingAssetSlotCapture = {
+        animationName: capture.animationName,
+        motionName: capture.motionName,
+        direction: capture.direction,
+        targetDefinitionId: result.entry.definitionId,
+        appendFrame: true,
+      };
+    }
     bridge.prepareSelection();
     const label = `${
       assetBuilderKnownMotionLabels[capture.motionName] ?? capture.motionName
     } · ${capture.direction}`;
     setAssetStatus(
-      `「${label}」を登録しました。続けて同じセルに追加できます。Escで終了。`,
+      allFramesCapture
+        ? `「${label}」に${capturedFrameIds.length}フレームを一括登録しました。`
+        : replacingFrame
+        ? `「${label}」のフレームを差し替えました。`
+        : `「${label}」を登録しました。続けて同じセルに追加できます。Escで終了。`,
       "success",
     );
     updateStatus(
-      `${capability.profile} · ${label} added · Project autosave ready`,
+      `${capability.profile} · ${label} ${allFramesCapture ? "all frames added" : replacingFrame ? "replaced" : "added"} · Project autosave ready`,
     );
+    // addFromSelection/assignAnimation notify synchronously.  Repaint once
+    // more after the selected definition and append target have been updated
+    // so the first captured sprite becomes visible immediately and the next
+    // capture starts from the newly registered frame sequence.
+    renderAssetEditor();
   };
 
   let pendingAssetCaptureApplyScheduled = false;
+  const assetBuilderStrictInputFor = (
+    entry: Draw2AssetBridgeSnapshot["assetDefinitions"][number],
+    snapshot: Draw2AssetBridgeSnapshot,
+    reference: { readonly revisionId: string; readonly contentHash: string },
+  ): { readonly input: DrawAssetizationInput } | { readonly error: string } => {
+    const definition = entry.definition;
+    const firstMappedSource = definition.animationMapping
+      .flatMap((clip) => clip.sourceFrames ?? [])
+      .find((frame) => frame.rect.width > 0 && frame.rect.height > 0);
+    const fallbackRegion = snapshot.selection.region ?? firstMappedSource?.rect ?? (
+      assetBuilderSourceCanvas !== undefined && assetBuilderSourceCanvas.width > 0 && assetBuilderSourceCanvas.height > 0
+        ? { x: 0, y: 0, width: assetBuilderSourceCanvas.width, height: assetBuilderSourceCanvas.height }
+        : undefined
+    );
+    const selectedRegion = definition.region;
+    let selection: DrawAssetizationInput["selection"] | undefined;
+    let grid: DrawAssetizationInput["grid"];
+    if (selectedRegion.kind === "FULL_CANVAS") {
+      selection = fallbackRegion === undefined ? undefined : { ...fallbackRegion };
+    } else if (selectedRegion.kind === "MANUAL") {
+      selection = { x: selectedRegion.x, y: selectedRegion.y, width: selectedRegion.width, height: selectedRegion.height };
+    } else if (selectedRegion.kind === "GRID") {
+      selection = {
+        x: selectedRegion.x,
+        y: selectedRegion.y,
+        width: selectedRegion.cellSize * selectedRegion.columns,
+        height: selectedRegion.cellSize * selectedRegion.rows,
+      };
+      grid = { cellWidth: selectedRegion.cellSize, cellHeight: selectedRegion.cellSize };
+    } else {
+      selection = {
+        x: selectedRegion.x,
+        y: selectedRegion.y,
+        width: selectedRegion.cellWidth * selectedRegion.columns,
+        height: selectedRegion.cellHeight * selectedRegion.rows,
+      };
+      grid = { cellWidth: selectedRegion.cellWidth, cellHeight: selectedRegion.cellHeight };
+    }
+    if (selection === undefined) {
+      return { error: "iDRAWの選択範囲が確定していません。範囲を選択してから確定してください。" };
+    }
+
+    const orderedFrameIds: string[] = [];
+    const frameSources = new Map<string, AssetAnimationFrameReference>();
+    const frameSourceSignatures = new Map<string, string>();
+    let conflictingFrameSource = false;
+    for (const clip of definition.animationMapping) {
+      for (const [index, frameId] of clip.frameIds.entries()) {
+        const normalizedFrameId = frameId.trim();
+        if (normalizedFrameId.length === 0) continue;
+        if (!orderedFrameIds.includes(normalizedFrameId)) orderedFrameIds.push(normalizedFrameId);
+        const source = clip.sourceFrames?.[index];
+        const sourceSignature = JSON.stringify(source === undefined
+          ? null
+          : {
+            sourceFrameId: source.sourceFrameId,
+            rect: source.rect,
+            layerIds: [...source.layerIds].sort(),
+            durationMs: source.durationMs ?? null,
+            flipX: source.flipX ?? false,
+            flipY: source.flipY ?? false,
+          });
+        const previousSignature = frameSourceSignatures.get(normalizedFrameId);
+        if (previousSignature !== undefined && previousSignature !== sourceSignature) {
+          conflictingFrameSource = true;
+        } else if (!frameSourceSignatures.has(normalizedFrameId)) {
+          frameSourceSignatures.set(normalizedFrameId, sourceSignature);
+        }
+        if (source !== undefined && !frameSources.has(normalizedFrameId)) frameSources.set(normalizedFrameId, source);
+      }
+    }
+    if (conflictingFrameSource) {
+      return {
+        error: "同じフレームに異なる範囲・レイヤー・反転設定があります。各範囲を別Assetとして登録してください。",
+      };
+    }
+    if (orderedFrameIds.length === 0) {
+      const frameSelection = definition.frameSelection;
+      if (frameSelection.kind === "CURRENT_FRAME") orderedFrameIds.push(frameSelection.frameId);
+      else if (frameSelection.kind === "EXPLICIT") orderedFrameIds.push(...frameSelection.frameIds);
+      else if (frameSelection.kind === "RANGE") {
+        const start = snapshot.frameNumbers[frameSelection.startFrameId];
+        const end = snapshot.frameNumbers[frameSelection.endFrameId];
+        if (start !== undefined && end !== undefined) {
+          for (const [frameId, number] of Object.entries(snapshot.frameNumbers).sort((left, right) => left[1] - right[1])) {
+            if (number >= Math.min(start, end) && number <= Math.max(start, end)) orderedFrameIds.push(frameId);
+          }
+        }
+      }
+    }
+    if (orderedFrameIds.length === 0 && snapshot.selection.frameId !== null) orderedFrameIds.push(snapshot.selection.frameId);
+    const sourceFrames: AssetizationSourceFrame[] = [];
+    const allLayerIds = new Set(definition.sourceLayerIds.map((id) => id.trim()).filter((id) => id.length > 0));
+    for (const frameId of orderedFrameIds) {
+      const index = snapshot.frameNumbers[frameId];
+      if (index === undefined) {
+        return { error: `iDRAWのフレーム ${frameId} が現在の保存状態にありません。` };
+      }
+      const source = frameSources.get(frameId);
+      const layerIds = source?.layerIds === undefined ? definition.sourceLayerIds : source.layerIds;
+      for (const layerId of layerIds) allLayerIds.add(layerId);
+      sourceFrames.push({
+        frameId,
+        index: index - 1,
+        ...(source?.durationMs === undefined ? {} : { durationMs: source.durationMs }),
+        ...(source === undefined ? {} : { region: { ...source.rect }, layerIds: [...source.layerIds] }),
+        ...(source?.flipX === undefined ? {} : { flipX: source.flipX }),
+        ...(source?.flipY === undefined ? {} : { flipY: source.flipY }),
+      });
+    }
+    if (sourceFrames.length === 0) {
+      return { error: "iDRAWのAssetに使うフレームがありません。" };
+    }
+    const animationRanges = definition.animationMapping.length === 0
+      ? undefined
+      : definition.animationMapping.map((clip) => ({
+        animationId: assetAnimationClipKey(clip),
+        label: `${assetAnimationMotionName(clip)} · ${assetAnimationDirectionName(clip) ?? "DEFAULT"}`,
+        frameIds: clip.frameIds.map((frameId) => frameId.trim()),
+        loop: clip.loopMode,
+        roles: [assetAnimationMotionName(clip), assetAnimationDirectionName(clip)].filter((value): value is string => value !== undefined),
+      }));
+    return { input: {
+      sourceProjectId: snapshot.projectId,
+      sourceRevisionId: reference.revisionId,
+      sourceCanvasId: definition.sourceCanvasId,
+      contentHash: reference.contentHash,
+      selection,
+      sourceFrames,
+      selectedLayerIds: [...allLayerIds],
+      ...(grid === undefined ? {} : { grid }),
+      ...(animationRanges === undefined ? {} : { animationRanges }),
+      layerMode: "COMPOSITE",
+      roles: [...definition.metadata.tags],
+    } };
+  };
+
+  const assetPackageForDefinition = (
+    snapshot: Draw2AssetBridgeSnapshot,
+    definitionId: string,
+  ): AssetPackageManifest | undefined => snapshot.assetPackages.find((manifest) =>
+    manifest.entries.some((entry) => entry.kind === "DRAW" && entry.source.sourceId === definitionId)
+  );
+
+  const characterSetupDirectionLabels: Readonly<Record<
+    "UP" | "UP_RIGHT" | "RIGHT" | "DOWN_RIGHT" | "DOWN" | "DOWN_LEFT" | "LEFT" | "UP_LEFT",
+    string
+  >> = {
+    UP: "上",
+    UP_RIGHT: "右上",
+    LEFT: "左",
+    RIGHT: "右",
+    DOWN_RIGHT: "右下",
+    DOWN: "下",
+    DOWN_LEFT: "左下",
+    UP_LEFT: "左上",
+  };
+  const characterSetupDirectionLabel = (direction: AssetDirection): string =>
+    direction === "UP" || direction === "UP_RIGHT" || direction === "LEFT" ||
+        direction === "RIGHT" || direction === "DOWN_RIGHT" ||
+        direction === "DOWN" || direction === "DOWN_LEFT" || direction === "UP_LEFT"
+      ? characterSetupDirectionLabels[
+        direction as keyof typeof characterSetupDirectionLabels
+      ]
+      : direction;
+  const characterSetupDirectionsForMode = (): readonly AssetDirection[] =>
+    characterSetupDirectionsByMode[selectedCharacterSetupDirectionMode];
+  const characterSetupDefaultDirectionForMode = (): AssetDirection =>
+    selectedCharacterSetupDirectionMode === "2" ? "RIGHT" : "DOWN";
+  const characterSetupAnimationDescriptor = (
+    action: CharacterSetupAction,
+    direction: AssetDirection,
+  ): {
+    readonly animationName: AssetAnimationName;
+    readonly motionName: string;
+  } => {
+    const motionName = characterSetupActionMotionNames[action];
+    const legacyFamily = action === "IDLE" || action === "WALK" ||
+      action === "ATTACK";
+    return {
+      animationName: legacyFamily
+        ? assetAnimationNameFor(
+          action as "IDLE" | "WALK" | "ATTACK",
+          direction as "UP" | "DOWN" | "LEFT" | "RIGHT",
+        )
+        : "CUSTOM",
+      motionName,
+    };
+  };
+  const characterSetupClipFor = (
+    entry: Draw2AssetBridgeSnapshot["assetDefinitions"][number] | undefined,
+    action: CharacterSetupAction,
+    direction: AssetDirection,
+  ): AssetAnimationClip | undefined => {
+    if (entry === undefined) return undefined;
+    const motionName = characterSetupActionMotionNames[action];
+    const clips = entry.definition.animationMapping.filter((clip) =>
+      assetAnimationMotionName(clip) === motionName
+    );
+    return clips.find((clip) => assetAnimationDirectionName(clip) === direction) ??
+      (direction === "DOWN"
+        ? clips.find((clip) => assetAnimationDirectionName(clip) === undefined)
+        : undefined);
+  };
+  const renderCharacterSetup = (
+    snapshot: Draw2AssetBridgeSnapshot,
+  ): void => {
+    const selectedEntry = assetBuilderSelectedEntry(snapshot);
+    const actionLabel = characterSetupActionLabels[selectedCharacterSetupAction];
+    const availableDirections = characterSetupDirectionsForMode();
+    if (!availableDirections.includes(selectedCharacterSetupDirection)) {
+      selectedCharacterSetupDirection = characterSetupDefaultDirectionForMode();
+      selectedCharacterSetupFrameIndex = 0;
+    }
+    if (characterSetupDirectionGrid !== undefined) {
+      characterSetupDirectionGrid.dataset.directionMode =
+        selectedCharacterSetupDirectionMode;
+    }
+    if (characterSetupDirectionMode !== undefined) {
+      characterSetupDirectionMode.value = selectedCharacterSetupDirectionMode;
+    }
+    if (
+      characterSetupName !== undefined &&
+      documentRef.activeElement !== characterSetupName
+    ) {
+      characterSetupName.value = selectedEntry?.definition.metadata.name ??
+        (characterSetupName.value.trim() || "Hero");
+    }
+    if (
+      characterSetupFps !== undefined &&
+      documentRef.activeElement !== characterSetupFps &&
+      assetBuilderFps !== undefined
+    ) {
+      characterSetupFps.value = assetBuilderFps.value || "12";
+    }
+    if (characterSetupSelectedAction !== undefined) {
+      characterSetupSelectedAction.textContent = actionLabel;
+    }
+    for (const button of characterSetupActionButtons) {
+      const action = button.dataset.characterAction as CharacterSetupAction | undefined;
+      if (action === undefined || !Object.prototype.hasOwnProperty.call(characterSetupActionLabels, action)) continue;
+      const active = action === selectedCharacterSetupAction;
+      button.classList.toggle("is-active", active);
+      button.setAttribute("aria-selected", String(active));
+      button.tabIndex = active ? 0 : -1;
+    }
+    for (const button of characterSetupDirectionButtons) {
+      const direction = button.dataset.characterDirection as AssetDirection | undefined;
+      if (direction === undefined) continue;
+      const directionAvailable = availableDirections.includes(direction);
+      button.hidden = !directionAvailable;
+      button.inert = !directionAvailable;
+      button.setAttribute("aria-hidden", String(!directionAvailable));
+      button.tabIndex = directionAvailable && direction === selectedCharacterSetupDirection
+        ? 0
+        : -1;
+      if (!directionAvailable) {
+        button.setAttribute("aria-selected", "false");
+        button.setAttribute("aria-pressed", "false");
+        continue;
+      }
+      const clip = characterSetupClipFor(
+        selectedEntry,
+        selectedCharacterSetupAction,
+        direction,
+      );
+      const motionName = characterSetupActionMotionNames[selectedCharacterSetupAction];
+      const pending = activeAssetCaptureTarget?.motionName === motionName &&
+        activeAssetCaptureTarget.direction === direction;
+      const state = button.querySelector<HTMLElement>("[data-character-slot-state]");
+      const previewCanvas = button.querySelector<HTMLCanvasElement>(
+        "[data-character-direction-preview-canvas]",
+      );
+      const previewReference = clip?.sourceFrames?.[0];
+      button.dataset.state = pending ? "pending" : clip === undefined ? "empty" : "ready";
+      button.dataset.hasPreview = String(
+        drawAssetReferenceCanvas(previewCanvas ?? undefined, snapshot, previewReference),
+      );
+      button.setAttribute("aria-pressed", String(pending));
+      button.setAttribute(
+        "aria-selected",
+        String(direction === selectedCharacterSetupDirection),
+      );
+      const slotStateLabel = pending
+        ? "iDRAWで画像を選択"
+        : clip === undefined
+        ? "画像を追加"
+        : `${clip.frameIds.length}コマ登録済み`;
+      button.setAttribute(
+        "aria-label",
+        `${actionLabel}・${characterSetupDirectionLabel(direction)}の${slotStateLabel}`,
+      );
+      if (state !== null) {
+        state.textContent = pending
+          ? "iDRAWで画像を選択"
+          : clip === undefined
+          ? "画像を追加"
+          : `${clip.frameIds.length}コマ登録済み`;
+      }
+    }
+    const selectedDirectionClip = characterSetupClipFor(
+      selectedEntry,
+      selectedCharacterSetupAction,
+      selectedCharacterSetupDirection,
+    );
+    const selectedDirectionLabel = characterSetupDirectionLabel(
+      selectedCharacterSetupDirection,
+    );
+    const selectedFrameCount = selectedDirectionClip?.frameIds.length ?? 0;
+    const selectedMotionName = characterSetupActionMotionNames[
+      selectedCharacterSetupAction
+    ];
+    const selectedAnimationCapturePending =
+      activeAssetCaptureTarget?.motionName === selectedMotionName &&
+      activeAssetCaptureTarget.direction === selectedCharacterSetupDirection;
+    const selectedAnimationCaptureReplacing = selectedAnimationCapturePending &&
+      activeAssetCaptureTarget?.replaceFrameIndex !== undefined;
+    const selectedAnimationCaptureAllFrames = selectedAnimationCapturePending &&
+      activeAssetCaptureTarget?.allFrames === true;
+    selectedCharacterSetupFrameIndex = selectedFrameCount === 0
+      ? 0
+      : Math.min(selectedCharacterSetupFrameIndex, selectedFrameCount - 1);
+    if (
+      characterSetupFps !== undefined &&
+      documentRef.activeElement !== characterSetupFps
+    ) {
+      characterSetupFps.value = String(
+        selectedDirectionClip?.fps ?? assetBuilderFps?.value ?? 12,
+      );
+    }
+    const characterAnimationEditingDisabled = selectedDirectionClip === undefined ||
+      activeAssetCaptureTarget !== undefined;
+    if (characterSetupAnimationDelete !== undefined) {
+      characterSetupAnimationDelete.disabled = characterAnimationEditingDisabled;
+    }
+    if (characterSetupAnimationAllFrames !== undefined) {
+      characterSetupAnimationAllFrames.disabled = activeAssetCaptureTarget !== undefined;
+      characterSetupAnimationAllFrames.dataset.state = selectedDirectionClip === undefined
+        ? "empty"
+        : "ready";
+    }
+    if (characterSetupAnimationFramePrevious !== undefined) {
+      characterSetupAnimationFramePrevious.disabled =
+        characterAnimationEditingDisabled || selectedCharacterSetupFrameIndex <= 0;
+    }
+    if (characterSetupAnimationFrameNext !== undefined) {
+      characterSetupAnimationFrameNext.disabled = characterAnimationEditingDisabled ||
+        selectedCharacterSetupFrameIndex >= selectedFrameCount - 1;
+    }
+    if (characterSetupAnimationFrameReplace !== undefined) {
+      characterSetupAnimationFrameReplace.disabled = characterAnimationEditingDisabled;
+    }
+    if (characterSetupAnimationFrameDelete !== undefined) {
+      characterSetupAnimationFrameDelete.disabled = characterAnimationEditingDisabled;
+    }
+    if (characterSetupAnimationFrameDuration !== undefined) {
+      const durationFps = Number(
+        selectedDirectionClip?.fps ?? characterSetupFps?.value ?? 12,
+      );
+      const safeDurationFps = Number.isFinite(durationFps) && durationFps > 0
+        ? durationFps
+        : 12;
+      const defaultDuration = Math.max(1, Math.round(1000 / safeDurationFps));
+      characterSetupAnimationFrameDuration.value = String(
+        selectedDirectionClip?.frameDurationsMs?.[selectedCharacterSetupFrameIndex] ??
+          selectedDirectionClip?.sourceFrames?.[selectedCharacterSetupFrameIndex]?.durationMs ??
+          defaultDuration,
+      );
+      characterSetupAnimationFrameDuration.disabled = characterAnimationEditingDisabled;
+    }
+    if (characterSetupAnimationLoop !== undefined) {
+      characterSetupAnimationLoop.value = selectedDirectionClip?.loopMode ?? "LOOP";
+      characterSetupAnimationLoop.disabled = characterAnimationEditingDisabled;
+    }
+    if (characterSetupAnimationAddFrame !== undefined) {
+      const hasFrames = selectedFrameCount > 0;
+      // Keep the action available while capture mode is waiting for the next
+      // source frame.  Disable it only during the short interval in which a
+      // selected range is being committed, so the animation place itself can
+      // drive every subsequent frame addition.
+      characterSetupAnimationAddFrame.disabled =
+        selectedAnimationCapturePending &&
+        pendingAssetSlotCapture !== undefined &&
+        snapshot.selection.hasSelection;
+      characterSetupAnimationAddFrame.setAttribute(
+        "aria-label",
+        hasFrames ? "次のフレームを追加" : "1枚目を追加",
+      );
+      characterSetupAnimationAddFrame.title = hasFrames
+        ? "現在の動き・方向に次のフレームを追加"
+        : "現在の動き・方向に1枚目を追加";
+      characterSetupAnimationAddFrame.dataset.state = selectedAnimationCapturePending
+        ? "pending"
+        : hasFrames
+        ? "ready"
+        : "empty";
+    }
+    if (characterSetupAnimationAddFrameLabel !== undefined) {
+      characterSetupAnimationAddFrameLabel.textContent = selectedFrameCount > 0
+        ? "次のフレーム"
+        : "1枚目を追加";
+    }
+    const selectedFrameReference = selectedDirectionClip?.sourceFrames?.[
+      selectedCharacterSetupFrameIndex
+    ];
+    drawAssetReferenceCanvas(
+      characterSetupAnimationPreview,
+      snapshot,
+      selectedFrameReference,
+    );
+    if (characterSetupAnimationSlot !== undefined) {
+      characterSetupAnimationSlot.textContent = `${actionLabel} · ${selectedDirectionLabel}`;
+    }
+    if (characterSetupAnimationFrameStrip !== undefined) {
+      characterSetupAnimationFrameStrip.replaceChildren();
+      if (selectedDirectionClip === undefined || selectedFrameCount === 0) {
+        const empty = documentRef.createElement("span");
+        empty.className = "draw2-character-animation-frame-empty";
+        empty.textContent = "まだフレームがありません";
+        characterSetupAnimationFrameStrip.append(empty);
+      } else {
+        for (const [index, frameId] of selectedDirectionClip.frameIds.entries()) {
+          const frameButton = documentRef.createElement("button");
+          frameButton.type = "button";
+          frameButton.className = "draw2-character-animation-frame";
+          frameButton.classList.toggle("is-active", index === selectedCharacterSetupFrameIndex);
+          frameButton.setAttribute("role", "listitem");
+          const sourceFrameNumber = snapshot.frameNumbers[frameId] ?? index + 1;
+          frameButton.setAttribute(
+            "aria-label",
+            `アニメーション ${index + 1}枚目（iDRAW F${sourceFrameNumber}）`,
+          );
+          frameButton.title = `アニメーション ${index + 1}枚目 · iDRAW F${sourceFrameNumber}`;
+          const frameCanvas = documentRef.createElement("canvas");
+          frameCanvas.width = 44;
+          frameCanvas.height = 44;
+          drawAssetReferenceCanvas(
+            frameCanvas,
+            snapshot,
+            selectedDirectionClip.sourceFrames?.[index],
+          );
+          const frameLabel = documentRef.createElement("small");
+          frameLabel.textContent = `${index + 1}枚目`;
+          frameButton.append(frameCanvas, frameLabel);
+          frameButton.addEventListener("click", () => {
+            if (activeAssetCaptureTarget !== undefined) {
+              clearAssetCapture();
+              getAssetBridge()?.prepareSelection();
+            }
+            selectedCharacterSetupFrameIndex = index;
+            renderAssetEditor();
+          });
+          characterSetupAnimationFrameStrip.append(frameButton);
+        }
+      }
+    }
+    if (characterSetupAnimationStatus !== undefined) {
+      characterSetupAnimationStatus.textContent = selectedAnimationCapturePending
+        ? selectedAnimationCaptureAllFrames
+          ? "iDRAWで範囲を選択すると、現在表示中のレイヤーで全フレームを登録します。"
+          : selectedAnimationCaptureReplacing
+          ? "iDRAWで範囲を選択すると、選択フレームを差し替えます。"
+          : "iDRAWで範囲を選択すると、このアニメーションへ追加します。"
+        : selectedDirectionClip === undefined
+        ? "「1枚目を追加」からiDRAWの範囲を選びます。"
+        : `${selectedFrameCount}枚 · ${selectedDirectionClip.fps ?? Number(characterSetupFps?.value ?? 12)} FPS · 「次のフレーム」で続けて追加できます`;
+    }
+    if (characterSetupDirectionStatus !== undefined) {
+      if (activeAssetCaptureTarget !== undefined) {
+        characterSetupDirectionStatus.textContent =
+          `${actionLabel}・${characterSetupDirectionLabel(activeAssetCaptureTarget.direction)}を${activeAssetCaptureTarget.allFrames ? "全フレーム登録中" : "登録中"}。iDRAWで範囲を囲みます。`;
+      } else if (selectedEntry === undefined) {
+        characterSetupDirectionStatus.textContent =
+          "「画像を追加」を押すと、iDRAWで範囲選択に切り替わります。";
+      } else {
+        const configuredDirections = new Set(
+          selectedEntry.definition.animationMapping
+            .filter((clip) =>
+              assetAnimationMotionName(clip) === characterSetupActionMotionNames[selectedCharacterSetupAction]
+            )
+            .map((clip) => assetAnimationDirectionName(clip) ?? "DOWN"),
+        );
+        const configured = availableDirections.filter((direction) =>
+          configuredDirections.has(direction)
+        ).length;
+        characterSetupDirectionStatus.textContent =
+          `${actionLabel}は${availableDirections.length}方向中${Math.min(availableDirections.length, configured)}方向を登録済み。空いている方向を押して追加します。`;
+      }
+    }
+    if (characterSetupPlace !== undefined) {
+      characterSetupPlace.disabled = selectedEntry === undefined;
+    }
+    if (characterSetupStatus !== undefined) {
+      characterSetupStatus.textContent = activeAssetCaptureTarget !== undefined
+        ? "iDRAWで範囲を選択してください。選択すると自動登録します。"
+        : selectedEntry === undefined
+        ? "まだ保存されていません。方向を登録すると自動作成されます。"
+        : `${selectedEntry.definition.animationMapping.length}つの動きを登録中。保存後にiGAMEへ配置できます。`;
+      characterSetupStatus.dataset.state = activeAssetCaptureTarget !== undefined
+        ? "idle"
+        : selectedEntry === undefined
+        ? "idle"
+        : "success";
+    }
+  };
+
   const renderAssetEditor = (): void => {
     const snapshot = getAssetBridge()?.snapshot();
     if (snapshot === undefined) return;
@@ -23910,6 +27983,38 @@ export function bootstrapDraw2Workspace(
       creatorAssetAddFromSelection.disabled = !selection.hasSelection;
     }
     renderAssetDefinitions(snapshot);
+    const selectedEntry = assetBuilderSelectedEntry(snapshot);
+    const finalizedPackage = selectedEntry === undefined
+      ? undefined
+      : assetPackageForDefinition(snapshot, selectedEntry.definitionId);
+    if (assetBuilderUnityExport !== undefined) {
+      assetBuilderUnityExport.disabled = selectedEntry === undefined ||
+        assetBuilderUnityExportBusy;
+      assetBuilderUnityExport.textContent = assetBuilderUnityExportBusy
+        ? "準備中…"
+        : "Unity用ZIP";
+    }
+    if (assetBuilderUnityStatus !== undefined && !assetBuilderUnityExportBusy) {
+      assetBuilderUnityStatus.textContent = selectedEntry === undefined
+        ? "Assetを選択するとUnity用に書き出せます。"
+        : "選択したAssetを画像・アニメーション・Prefab・Manifest付きのUnity用ZIPにまとめます。";
+      assetBuilderUnityStatus.dataset.state = selectedEntry === undefined
+        ? "idle"
+        : "ready";
+    }
+    if (assetBuilderFinalize !== undefined) {
+      assetBuilderFinalize.disabled = selectedEntry === undefined || assetBuilderFinalizeBusy;
+      assetBuilderFinalize.textContent = assetBuilderFinalizeBusy ? "検証中…" : "販売用に確定";
+    }
+    if (assetBuilderPackageStatus !== undefined) {
+      assetBuilderPackageStatus.textContent = finalizedPackage === undefined
+        ? "未確定"
+        : `${finalizedPackage.offerKind} · ${finalizedPackage.entries.length}単位 · ${finalizedPackage.saleReadiness === "READY" ? "販売準備済み" : "アカウント接続待ち"}`;
+      assetBuilderPackageStatus.dataset.state = finalizedPackage === undefined ? "idle" : "ready";
+    }
+    renderCharacterSetup(snapshot);
+    renderSavedAssetShelf(draw2TimelineAssetShelf, draw2TimelineAssetShelfStatus, snapshot);
+    renderSavedAssetShelf(modeDeckAssetShelf, modeDeckAssetStatus, snapshot);
     if (
       pendingAssetSlotCapture !== undefined &&
       selection.hasSelection &&
@@ -23931,6 +28036,8 @@ export function bootstrapDraw2Workspace(
       readonly motionName?: string;
       readonly direction?: AssetDirection;
       readonly appendFrame?: boolean;
+      readonly replaceFrameIndex?: number;
+      readonly allFrames?: boolean;
     },
   ): void => {
     const motionName = options?.motionName ??
@@ -23944,6 +28051,10 @@ export function bootstrapDraw2Workspace(
       animationName,
       motionName,
       direction,
+      ...(options?.replaceFrameIndex === undefined
+        ? {}
+        : { replaceFrameIndex: options.replaceFrameIndex }),
+      ...(options?.allFrames === true ? { allFrames: true } : {}),
       ...(selectedAssetDefinitionId === undefined
         ? {}
         : { targetDefinitionId: selectedAssetDefinitionId }),
@@ -23953,20 +28064,198 @@ export function bootstrapDraw2Workspace(
       motionName,
       direction,
       ...(options?.appendFrame === true ? { appendFrame: true } : {}),
+      ...(options?.replaceFrameIndex === undefined
+        ? {}
+        : { replaceFrameIndex: options.replaceFrameIndex }),
+      ...(options?.allFrames === true ? { allFrames: true } : {}),
       ...(selectedAssetDefinitionId === undefined
         ? {}
         : { targetDefinitionId: selectedAssetDefinitionId }),
     };
     getAssetBridge()?.prepareSelection();
     setPanel("assets");
+    const captureMode = options?.replaceFrameIndex !== undefined
+      ? "選択フレームを差し替え"
+      : options?.allFrames === true
+      ? "全フレームを登録"
+      : options?.appendFrame === true
+      ? "次のフレームを追加"
+      : "1枚目を追加";
     setAssetStatus(
       `● ${
         assetBuilderKnownMotionLabels[motionName] ?? motionName
-      } / ${direction} に登録中。Canvasで範囲を選択してください。`,
+      } / ${direction} · ${captureMode}。Canvasで範囲を選択してください。`,
       "idle",
     );
     renderAssetEditor();
   };
+
+  const beginAllFramesAssetCapture = (): void => {
+    if (activeAssetCaptureTarget !== undefined) return;
+    const descriptor = characterSetupAnimationDescriptor(
+      selectedCharacterSetupAction,
+      selectedCharacterSetupDirection,
+    );
+    const snapshot = getAssetBridge()?.snapshot();
+    const hasCurrentSelection = snapshot?.selection.hasSelection === true &&
+      snapshot.selection.region !== null && snapshot.selection.frameId !== null;
+    if (!hasCurrentSelection) {
+      beginAssetSlotCapture(descriptor.animationName, {
+        motionName: descriptor.motionName,
+        direction: selectedCharacterSetupDirection,
+        allFrames: true,
+      });
+      return;
+    }
+    selectedAnimationName = descriptor.animationName;
+    assetBuilderSelectedMotionName = descriptor.motionName;
+    assetBuilderSelectedDirectionName = selectedCharacterSetupDirection;
+    activeAssetCaptureTarget = {
+      animationName: descriptor.animationName,
+      motionName: descriptor.motionName,
+      direction: selectedCharacterSetupDirection,
+      allFrames: true,
+      ...(selectedAssetDefinitionId === undefined
+        ? {}
+        : { targetDefinitionId: selectedAssetDefinitionId }),
+    };
+    pendingAssetSlotCapture = {
+      animationName: descriptor.animationName,
+      motionName: descriptor.motionName,
+      direction: selectedCharacterSetupDirection,
+      allFrames: true,
+      ...(selectedAssetDefinitionId === undefined
+        ? {}
+        : { targetDefinitionId: selectedAssetDefinitionId }),
+    };
+    setPanel("assets");
+    setAssetStatus(
+      `● ${assetBuilderKnownMotionLabels[descriptor.motionName] ?? descriptor.motionName} / ${selectedCharacterSetupDirection} · 全フレームを登録。現在の範囲を使います。`,
+      "idle",
+    );
+    renderAssetEditor();
+  };
+
+  characterSetupName?.addEventListener("input", () => {
+    if (assetBuilderName !== undefined) assetBuilderName.value = characterSetupName.value;
+    if (creatorAssetName !== undefined) creatorAssetName.value = characterSetupName.value;
+  });
+  characterSetupFps?.addEventListener("input", () => {
+    const value = String(Math.min(240, Math.max(1, Number(characterSetupFps.value) || 12)));
+    if (assetBuilderFps !== undefined) assetBuilderFps.value = value;
+    if (creatorAssetAnimationFps !== undefined) creatorAssetAnimationFps.value = value;
+  });
+  characterSetupDirectionMode?.addEventListener("change", () => {
+    const next = characterSetupDirectionMode.value;
+    if (next !== "2" && next !== "4" && next !== "8") return;
+    if (activeAssetCaptureTarget !== undefined) {
+      clearAssetCapture();
+      getAssetBridge()?.prepareSelection();
+    }
+    selectedCharacterSetupDirectionMode = next;
+    assetBuilderDirectionMode = next;
+    if (assetBuilderDirectionModeControl !== undefined) {
+      assetBuilderDirectionModeControl.value = next;
+    }
+    if (!characterSetupDirectionsForMode().includes(selectedCharacterSetupDirection)) {
+      selectedCharacterSetupDirection = characterSetupDefaultDirectionForMode();
+    }
+    selectedCharacterSetupFrameIndex = 0;
+    renderAssetEditor();
+  });
+  for (const button of characterSetupActionButtons) {
+    button.addEventListener("click", () => {
+      const action = button.dataset.characterAction as CharacterSetupAction | undefined;
+      if (action === undefined || !Object.prototype.hasOwnProperty.call(characterSetupActionLabels, action)) return;
+      if (activeAssetCaptureTarget !== undefined) {
+        clearAssetCapture();
+        getAssetBridge()?.prepareSelection();
+      }
+      selectedCharacterSetupAction = action;
+      selectedCharacterSetupFrameIndex = 0;
+      renderAssetEditor();
+    });
+  }
+  for (const button of characterSetupDirectionButtons) {
+    button.addEventListener("click", () => {
+      const direction = button.dataset.characterDirection as AssetDirection | undefined;
+      if (
+        direction === undefined ||
+        !characterSetupDirectionsForMode().includes(direction)
+      ) return;
+      selectedCharacterSetupDirection = direction;
+      selectedCharacterSetupFrameIndex = 0;
+      const descriptor = characterSetupAnimationDescriptor(
+        selectedCharacterSetupAction,
+        direction,
+      );
+      const snapshot = getAssetBridge()?.snapshot();
+      const selectedEntry = snapshot === undefined
+        ? undefined
+        : assetBuilderSelectedEntry(snapshot);
+      const existingClip = characterSetupClipFor(
+        selectedEntry,
+        selectedCharacterSetupAction,
+        direction,
+      );
+      beginAssetSlotCapture(descriptor.animationName, {
+        motionName: descriptor.motionName,
+        direction,
+        appendFrame: existingClip !== undefined,
+      });
+    });
+  }
+  characterSetupAnimationAddFrame?.addEventListener("click", () => {
+    const descriptor = characterSetupAnimationDescriptor(
+      selectedCharacterSetupAction,
+      selectedCharacterSetupDirection,
+    );
+    const snapshot = getAssetBridge()?.snapshot();
+    const selectedEntry = snapshot === undefined
+      ? undefined
+      : assetBuilderSelectedEntry(snapshot);
+    const existingClip = characterSetupClipFor(
+      selectedEntry,
+      selectedCharacterSetupAction,
+      selectedCharacterSetupDirection,
+    );
+    // Keep the current animation selected while the next source frame is
+    // being picked.  The capture result moves this index to the new last
+    // frame after the bridge mutation completes.
+    selectedCharacterSetupFrameIndex = existingClip?.frameIds.length ?? 0;
+    beginAssetSlotCapture(descriptor.animationName, {
+      motionName: descriptor.motionName,
+      direction: selectedCharacterSetupDirection,
+      appendFrame: existingClip !== undefined,
+    });
+  });
+  characterSetupAnimationAllFrames?.addEventListener("click", () => {
+    beginAllFramesAssetCapture();
+  });
+  characterSetupSave?.addEventListener("click", () => {
+    const name = characterSetupName?.value.trim() ?? "";
+    if (name.length === 0) {
+      setAssetStatus("キャラクター名を入力してください。", "error");
+      characterSetupName?.focus({ preventScroll: true });
+      return;
+    }
+    if (assetBuilderName !== undefined) assetBuilderName.value = name;
+    if (creatorAssetName !== undefined) creatorAssetName.value = name;
+    if (selectedAssetDefinitionId === undefined) assetBuilderNewAssetMode = true;
+    assetBuilderSave?.click();
+  });
+  characterSetupPlace?.addEventListener("click", () => {
+    const definitionId = selectedAssetDefinitionId;
+    if (definitionId === undefined) {
+      setAssetStatus("先にキャラクターを保存してください。", "error");
+      return;
+    }
+    selectedGameAssetDefinitionId = definitionId;
+    setCreatorMode("GAME", true, (appliedMode) => {
+      if (appliedMode !== "GAME") return;
+      draw2GameAssetsAdd?.click();
+    });
+  });
 
   documentRef.addEventListener("keydown", (event) => {
     if (event.key !== "Escape" || activeAssetCaptureTarget === undefined) {
@@ -24213,10 +28502,11 @@ export function bootstrapDraw2Workspace(
     nextDurations?: readonly number[],
     nextLoopMode?: AssetLoopMode,
     nextSourceFrames?: readonly AssetAnimationFrameReference[],
-  ): void => {
+    nextFps?: number,
+  ): boolean => {
     const snapshot = getAssetBridge()?.snapshot();
     if (snapshot === undefined || selectedAssetDefinitionId === undefined) {
-      return;
+      return false;
     }
     const entry = assetBuilderSelectedEntry(snapshot);
     const currentClip = assetBuilderClip(
@@ -24227,15 +28517,18 @@ export function bootstrapDraw2Workspace(
     if (
       entry === undefined || currentClip === undefined ||
       nextFrameIds.length === 0
-    ) return;
+    ) return false;
     const descriptor = assetBuilderSlotDescriptor(
       assetBuilderSelectedMotionName,
       assetBuilderSelectedDirectionName,
     );
+    const currentDirection = assetAnimationDirectionName(currentClip);
+    const preserveDirectionlessDown = assetBuilderSelectedDirectionName === "DOWN" &&
+      currentDirection === undefined;
     const frameNumbers = nextFrameIds
       .map((frameId) => snapshot.frameNumbers[frameId])
       .filter((value): value is number => typeof value === "number");
-    if (frameNumbers.length !== nextFrameIds.length) return;
+    if (frameNumbers.length !== nextFrameIds.length) return false;
     const sourceFrames = currentClip.sourceFrames === undefined
       ? undefined
       : nextSourceFrames !== undefined
@@ -24273,20 +28566,32 @@ export function bootstrapDraw2Workspace(
           };
         });
       })();
-    if (sourceFrames?.some((frame) => frame === undefined)) return;
+    if (sourceFrames?.some((frame) => frame === undefined)) return false;
     const result = getAssetBridge()?.assignAnimation({
       definitionId: entry.definitionId,
-      animationName: descriptor.animationName,
-      ...(descriptor.customName === undefined
+      animationName: preserveDirectionlessDown
+        ? currentClip.name
+        : descriptor.animationName,
+      ...(preserveDirectionlessDown
+        ? currentClip.customName === undefined
+          ? {}
+          : { customName: currentClip.customName }
+        : descriptor.customName === undefined
         ? {}
         : { customName: descriptor.customName }),
-      motionName: descriptor.motionName,
-      direction: descriptor.direction,
+      motionName: preserveDirectionlessDown
+        ? assetAnimationMotionName(currentClip)
+        : descriptor.motionName,
+      ...(preserveDirectionlessDown
+        ? currentDirection === undefined
+          ? {}
+          : { direction: currentDirection }
+        : { direction: descriptor.direction }),
       frameStart: Math.min(...frameNumbers),
       frameEnd: Math.max(...frameNumbers),
       frameIds: nextFrameIds,
       loopMode: nextLoopMode ?? currentClip.loopMode,
-      fps: currentClip.fps ?? Number(assetBuilderFps?.value ?? 12),
+      fps: nextFps ?? currentClip.fps ?? Number(assetBuilderFps?.value ?? 12),
       ...(nextDurations === undefined
         ? {}
         : { frameDurationsMs: nextDurations }),
@@ -24294,13 +28599,14 @@ export function bootstrapDraw2Workspace(
         ? {}
         : { sourceReference: currentClip.sourceReference }),
       ...(currentClip.flipX === undefined ? {} : { flipX: currentClip.flipX }),
+      ...(currentClip.flipY === undefined ? {} : { flipY: currentClip.flipY }),
       ...(sourceFrames === undefined
         ? {}
         : { sourceFrames: sourceFrames as AssetAnimationFrameReference[] }),
     });
     if (result?.ok === false) {
       setAssetStatus(result.message, "error");
-      return;
+      return false;
     }
     assetBuilderSelectedFrameIndex = Math.min(
       assetBuilderSelectedFrameIndex,
@@ -24310,7 +28616,236 @@ export function bootstrapDraw2Workspace(
       "フレームを更新しました。Projectに自動保存されます。",
       "success",
     );
+    return true;
   };
+  type CharacterSetupAnimationEdit = {
+    readonly frameIds?: readonly string[];
+    readonly frameDurationsMs?: readonly number[];
+    readonly sourceFrames?: readonly AssetAnimationFrameReference[];
+    readonly loopMode?: AssetLoopMode;
+    readonly fps?: number;
+  };
+  const characterSetupAnimationContext = (): {
+    readonly snapshot: Draw2AssetBridgeSnapshot;
+    readonly entry: Draw2AssetBridgeSnapshot["assetDefinitions"][number];
+    readonly clip: AssetAnimationClip;
+    readonly descriptor: ReturnType<typeof characterSetupAnimationDescriptor>;
+  } | undefined => {
+    const snapshot = getAssetBridge()?.snapshot();
+    if (snapshot === undefined || selectedAssetDefinitionId === undefined) {
+      return undefined;
+    }
+    const entry = assetBuilderSelectedEntry(snapshot);
+    const clip = characterSetupClipFor(
+      entry,
+      selectedCharacterSetupAction,
+      selectedCharacterSetupDirection,
+    );
+    if (entry === undefined || clip === undefined) return undefined;
+    return {
+      snapshot,
+      entry,
+      clip,
+      descriptor: characterSetupAnimationDescriptor(
+        selectedCharacterSetupAction,
+        selectedCharacterSetupDirection,
+      ),
+    };
+  };
+  const commitCharacterSetupAnimation = (
+    edit: CharacterSetupAnimationEdit,
+  ): boolean => {
+    const context = characterSetupAnimationContext();
+    if (context === undefined) return false;
+    assetBuilderSelectedMotionName = context.descriptor.motionName;
+    assetBuilderSelectedDirectionName = selectedCharacterSetupDirection;
+    assetBuilderSelectedFrameIndex = selectedCharacterSetupFrameIndex;
+    selectedAnimationName = context.descriptor.animationName;
+    const fps = edit.fps ?? context.clip.fps ?? Number(
+      characterSetupFps?.value ?? assetBuilderFps?.value ?? 12,
+    );
+    return updateSelectedBuilderFrames(
+      edit.frameIds ?? context.clip.frameIds,
+      edit.frameDurationsMs ?? context.clip.frameDurationsMs,
+      edit.loopMode ?? context.clip.loopMode,
+      edit.sourceFrames,
+      fps,
+    );
+  };
+  const deleteCharacterSetupAnimation = (): void => {
+    if (activeAssetCaptureTarget !== undefined) return;
+    const context = characterSetupAnimationContext();
+    if (context === undefined) return;
+    const currentDirection = assetAnimationDirectionName(context.clip);
+    const result = getAssetBridge()?.clearAnimation({
+      definitionId: context.entry.definitionId,
+      animationName: context.clip.name,
+      ...(context.clip.customName === undefined
+        ? {}
+        : { customName: context.clip.customName }),
+      ...(context.clip.motionName === undefined
+        ? {}
+        : { motionName: context.clip.motionName }),
+      ...(currentDirection === undefined
+        ? {}
+        : { direction: currentDirection }),
+    });
+    if (result?.ok === false) {
+      setAssetStatus(result.message, "error");
+      return;
+    }
+    selectedCharacterSetupFrameIndex = 0;
+    setAssetStatus(
+      `${characterSetupActionLabels[selectedCharacterSetupAction]}・${characterSetupDirectionLabel(selectedCharacterSetupDirection)}のアニメーションを削除しました。`,
+      "success",
+    );
+    renderAssetEditor();
+  };
+  const deleteCharacterSetupFrame = (): void => {
+    if (activeAssetCaptureTarget !== undefined) return;
+    const context = characterSetupAnimationContext();
+    if (context === undefined) return;
+    const index = selectedCharacterSetupFrameIndex;
+    const nextFrameIds = context.clip.frameIds.filter((_, frameIndex) =>
+      frameIndex !== index
+    );
+    if (nextFrameIds.length === 0) {
+      deleteCharacterSetupAnimation();
+      return;
+    }
+    const updated = commitCharacterSetupAnimation({
+      frameIds: nextFrameIds,
+      ...(context.clip.frameDurationsMs === undefined
+        ? {}
+        : {
+          frameDurationsMs: context.clip.frameDurationsMs.filter((_, frameIndex) =>
+            frameIndex !== index
+          ),
+        }),
+      ...(context.clip.sourceFrames === undefined
+        ? {}
+        : {
+          sourceFrames: context.clip.sourceFrames.filter((_, frameIndex) =>
+            frameIndex !== index
+          ),
+        }),
+    });
+    if (!updated) return;
+    selectedCharacterSetupFrameIndex = Math.min(
+      index,
+      nextFrameIds.length - 1,
+    );
+    setAssetStatus("選択フレームを削除しました。", "success");
+    renderAssetEditor();
+  };
+  const moveCharacterSetupFrame = (delta: -1 | 1): void => {
+    if (activeAssetCaptureTarget !== undefined) return;
+    const context = characterSetupAnimationContext();
+    if (context === undefined) return;
+    const index = selectedCharacterSetupFrameIndex;
+    const targetIndex = index + delta;
+    if (targetIndex < 0 || targetIndex >= context.clip.frameIds.length) {
+      return;
+    }
+    const frameIds = [...context.clip.frameIds];
+    [frameIds[index], frameIds[targetIndex]] = [
+      frameIds[targetIndex]!,
+      frameIds[index]!,
+    ];
+    const frameDurationsMs = context.clip.frameDurationsMs === undefined
+      ? undefined
+      : [...context.clip.frameDurationsMs];
+    if (frameDurationsMs !== undefined) {
+      [frameDurationsMs[index], frameDurationsMs[targetIndex]] = [
+        frameDurationsMs[targetIndex]!,
+        frameDurationsMs[index]!,
+      ];
+    }
+    const sourceFrames = context.clip.sourceFrames === undefined
+      ? undefined
+      : [...context.clip.sourceFrames];
+    if (sourceFrames !== undefined) {
+      [sourceFrames[index], sourceFrames[targetIndex]] = [
+        sourceFrames[targetIndex]!,
+        sourceFrames[index]!,
+      ];
+    }
+    const updated = commitCharacterSetupAnimation({
+      frameIds,
+      ...(frameDurationsMs === undefined ? {} : { frameDurationsMs }),
+      ...(sourceFrames === undefined ? {} : { sourceFrames }),
+    });
+    if (!updated) return;
+    selectedCharacterSetupFrameIndex = targetIndex;
+    setAssetStatus(
+      `フレームを${delta < 0 ? "前" : "次"}へ移動しました。`,
+      "success",
+    );
+    renderAssetEditor();
+  };
+  characterSetupAnimationDelete?.addEventListener("click", () => {
+    deleteCharacterSetupAnimation();
+  });
+  characterSetupAnimationFrameDelete?.addEventListener("click", () => {
+    deleteCharacterSetupFrame();
+  });
+  characterSetupAnimationFramePrevious?.addEventListener("click", () => {
+    moveCharacterSetupFrame(-1);
+  });
+  characterSetupAnimationFrameNext?.addEventListener("click", () => {
+    moveCharacterSetupFrame(1);
+  });
+  characterSetupAnimationFrameReplace?.addEventListener("click", () => {
+    if (activeAssetCaptureTarget !== undefined) return;
+    const context = characterSetupAnimationContext();
+    if (context === undefined) return;
+    selectedCharacterSetupFrameIndex = Math.min(
+      selectedCharacterSetupFrameIndex,
+      context.clip.frameIds.length - 1,
+    );
+    beginAssetSlotCapture(context.descriptor.animationName, {
+      motionName: context.descriptor.motionName,
+      direction: selectedCharacterSetupDirection,
+      replaceFrameIndex: selectedCharacterSetupFrameIndex,
+    });
+  });
+  characterSetupAnimationFrameDuration?.addEventListener("change", () => {
+    const context = characterSetupAnimationContext();
+    if (context === undefined || activeAssetCaptureTarget !== undefined) return;
+    const defaultDuration = Math.max(
+      1,
+      Math.round(1000 / (context.clip.fps ?? Number(characterSetupFps?.value ?? 12))),
+    );
+    const durations = [
+      ...(context.clip.frameDurationsMs ?? context.clip.frameIds.map(() => defaultDuration)),
+    ];
+    durations[selectedCharacterSetupFrameIndex] = Math.min(
+      60000,
+      Math.max(1, Number(characterSetupAnimationFrameDuration.value) || defaultDuration),
+    );
+    if (commitCharacterSetupAnimation({ frameDurationsMs: durations })) {
+      setAssetStatus("選択フレームの表示時間を変更しました。", "success");
+      renderAssetEditor();
+    }
+  });
+  characterSetupAnimationLoop?.addEventListener("change", () => {
+    const next = characterSetupAnimationLoop.value;
+    if (next !== "LOOP" && next !== "ONCE" && next !== "PING_PONG") return;
+    if (activeAssetCaptureTarget !== undefined) return;
+    if (commitCharacterSetupAnimation({ loopMode: next })) {
+      setAssetStatus("アニメーションの再生方法を変更しました。", "success");
+      renderAssetEditor();
+    }
+  });
+  characterSetupFps?.addEventListener("change", () => {
+    if (activeAssetCaptureTarget !== undefined) return;
+    const fps = Math.min(240, Math.max(1, Number(characterSetupFps.value) || 12));
+    characterSetupFps.value = String(fps);
+    if (commitCharacterSetupAnimation({ fps })) {
+      setAssetStatus("アニメーションのFPSを変更しました。", "success");
+      renderAssetEditor();
+    }
+  });
   assetBuilderPreviewPrevious?.addEventListener("click", () => {
     stepAssetBuilderPreview(-1);
   });
@@ -24576,7 +29111,7 @@ export function bootstrapDraw2Workspace(
     if (result?.ok === false) setAssetStatus(result.message, "error");
     else {
       setAssetStatus(
-        "反転参照を登録しました。元の絵はコピーしていません。",
+        "反転アニメーションを登録しました。固定スプライトを参照します。",
         "success",
       );
       assetBuilderSelectedFrameIndex = 0;
@@ -24609,6 +29144,182 @@ export function bootstrapDraw2Workspace(
       );
     });
   }
+  const downloadUnityAssetImportPackage = async (): Promise<void> => {
+    if (assetBuilderUnityExportBusy) return;
+    const bridge = getAssetBridge();
+    const snapshot = bridge?.snapshot();
+    const selectedEntry = snapshot === undefined
+      ? undefined
+      : assetBuilderSelectedEntry(snapshot);
+    if (snapshot === undefined || selectedEntry === undefined) {
+      setAssetStatus("Unity用に書き出すAssetを一覧から選択してください。", "error");
+      if (assetBuilderUnityStatus !== undefined) {
+        assetBuilderUnityStatus.textContent = "Assetを選択してから実行してください。";
+        assetBuilderUnityStatus.dataset.state = "error";
+      }
+      return;
+    }
+    assetBuilderUnityExportBusy = true;
+    if (assetBuilderUnityStatus !== undefined) {
+      assetBuilderUnityStatus.textContent = "Unity用の画像とアニメーションを準備しています…";
+      assetBuilderUnityStatus.dataset.state = "busy";
+    }
+    renderAssetEditor();
+    try {
+      const result = await createUnityAssetImportPackage(selectedEntry);
+      if (!result.ok) {
+        const detail = result.diagnostics.map((diagnostic) => diagnostic.message).join(" ");
+        setAssetStatus("Unity用書き出しを停止しました: " + detail, "error");
+        if (assetBuilderUnityStatus !== undefined) {
+          assetBuilderUnityStatus.textContent = detail;
+          assetBuilderUnityStatus.dataset.state = "error";
+        }
+        return;
+      }
+      const bytes = encodeUnityAssetImportPackageZip(result.value);
+      const blob = new Blob([bytes.slice().buffer as ArrayBuffer], {
+        type: "application/zip",
+      });
+      const url = URL.createObjectURL(blob);
+      const anchor = documentRef.createElement("a");
+      anchor.href = url;
+      const safeName = selectedEntry.definition.metadata.name
+        .trim()
+        .replace(/[^A-Za-z0-9_-]+/gu, "_") || "asset";
+      anchor.download = "pixieed-" + safeName + "-unity-" +
+        result.value.packageHash.slice(0, 12) + ".zip";
+      anchor.click();
+      windowRef.setTimeout(() => URL.revokeObjectURL(url), 0);
+      const frameCount = result.value.entries.filter((entry) =>
+        entry.mimeType === "image/png"
+      ).length;
+      const status = selectedEntry.definition.metadata.name +
+        " をUnity用ZIPに書き出しました · " + frameCount + "コマ · " +
+        (bytes.byteLength / 1024).toFixed(1) +
+        "KB · Manifest／Prefab／Animator付き。Unity EditorのImport/Compileは別途確認が必要です。";
+      setAssetStatus(status, "success");
+      if (assetBuilderUnityStatus !== undefined) {
+        assetBuilderUnityStatus.textContent = status;
+        assetBuilderUnityStatus.dataset.state = "success";
+      }
+      updateStatus(
+        "Unity asset export · " + selectedEntry.definition.metadata.name +
+          " · " + result.value.packageHash.slice(0, 12),
+      );
+    } catch {
+      setAssetStatus("Unity用ZIPの作成に失敗しました。元のAssetは変更されていません。", "error");
+      if (assetBuilderUnityStatus !== undefined) {
+        assetBuilderUnityStatus.textContent = "ZIPの作成に失敗しました。";
+        assetBuilderUnityStatus.dataset.state = "error";
+      }
+    } finally {
+      assetBuilderUnityExportBusy = false;
+      if (assetBuilderUnityExport !== undefined) {
+        const currentSnapshot = getAssetBridge()?.snapshot();
+        const currentEntry = currentSnapshot === undefined
+          ? undefined
+          : assetBuilderSelectedEntry(currentSnapshot);
+        assetBuilderUnityExport.disabled = currentEntry === undefined;
+        assetBuilderUnityExport.textContent = "Unity用ZIP";
+      }
+    }
+  };
+  const finalizeSelectedAssetPackage = async (): Promise<void> => {
+    if (assetBuilderFinalizeBusy) return;
+    const bridge = getAssetBridge();
+    const snapshot = bridge?.snapshot();
+    const selectedEntry = snapshot === undefined
+      ? undefined
+      : assetBuilderSelectedEntry(snapshot);
+    if (bridge === undefined || snapshot === undefined || selectedEntry === undefined) {
+      setAssetStatus("先にAssetカードを選択してください。", "error");
+      return;
+    }
+    assetBuilderFinalizeBusy = true;
+    renderAssetEditor();
+    try {
+      const reference = await bridge.resolveDefinitionReference({
+        definitionId: selectedEntry.definitionId,
+        mode: "PINNED",
+      });
+      if (reference === undefined) {
+        setAssetStatus("iDRAWの確定元を取得できません。保存後にもう一度試してください。", "error");
+        return;
+      }
+      const strictInputResult = assetBuilderStrictInputFor(selectedEntry, snapshot, reference);
+      if ("error" in strictInputResult) {
+        setAssetStatus(strictInputResult.error, "error");
+        return;
+      }
+      const detected = detectDrawAssetization(strictInputResult.input);
+      if (detected.status === "REVIEW_REQUIRED") {
+        setAssetStatus(
+          `自動判定を停止しました: ${detected.reasons.join(" · ")}`,
+          "error",
+        );
+        return;
+      }
+      const offerKind: AssetPackageOfferKind = assetBuilderOfferKind?.value === "ASSET_PACK"
+        ? "ASSET_PACK"
+        : "ASSET";
+      const derivativePolicy: AssetDerivativePolicy = assetBuilderDerivativePolicy?.value ===
+          "DERIVATIVE_ALLOWED"
+        ? "DERIVATIVE_ALLOWED"
+        : assetBuilderDerivativePolicy?.value === "REDISTRIBUTION_ALLOWED"
+        ? "REDISTRIBUTION_ALLOWED"
+        : "USE_ONLY";
+      const finalized = await finalizeAssetPackage({
+        title: assetBuilderName?.value.trim() || selectedEntry.definition.metadata.name,
+        description: selectedEntry.definition.metadata.description,
+        offerKind,
+        derivativePolicy,
+        confirmationRevision: reference.revisionId,
+        items: [{
+          kind: "DRAW",
+          source: {
+            kind: "DRAW",
+            sourceId: selectedEntry.definitionId,
+            projectId: snapshot.projectId,
+            revisionId: reference.revisionId,
+            contentHash: reference.contentHash,
+            canvasId: selectedEntry.definition.sourceCanvasId,
+          },
+          result: detected,
+        }],
+      });
+      if (!finalized.ok) {
+        setAssetStatus(
+          `販売用確定を停止しました: ${finalized.reasons.join(" · ")}`,
+          "error",
+        );
+        return;
+      }
+      const latest = bridge.snapshot();
+      if (!latest.assetDefinitions.some((entry) => entry.definitionId === selectedEntry.definitionId)) {
+        setAssetStatus("Assetが更新されたため、もう一度確定してください。", "error");
+        return;
+      }
+      const saved = await bridge.saveAssetPackage(finalized.manifest);
+      if (!saved.ok) {
+        setAssetStatus(saved.message, "error");
+        return;
+      }
+      setAssetStatus(
+        saved.manifest.saleReadiness === "READY"
+          ? "販売用Assetを確定しました。Marketへ出品できます。"
+          : "販売用Assetを確定しました。アカウント接続後にMarketへ出品できます。",
+        "success",
+      );
+      updateStatus(
+        `${saved.manifest.offerKind} finalized · ${saved.manifest.entries.length} asset unit(s) · source pinned`,
+      );
+    } catch {
+      setAssetStatus("販売用Assetの確定中にエラーが発生しました。元データは変更されていません。", "error");
+    } finally {
+      assetBuilderFinalizeBusy = false;
+      renderAssetEditor();
+    }
+  };
   assetBuilderSave?.addEventListener("click", () => {
     const snapshot = getAssetBridge()?.snapshot();
     const selectedEntry = snapshot === undefined
@@ -24662,6 +29373,12 @@ export function bootstrapDraw2Workspace(
       "Asset一覧から＋を押して、新しいAssetを作成してください。",
       "error",
     );
+  });
+  assetBuilderFinalize?.addEventListener("click", () => {
+    void finalizeSelectedAssetPackage();
+  });
+  assetBuilderUnityExport?.addEventListener("click", () => {
+    void downloadUnityAssetImportPackage();
   });
 
   for (const tab of creatorAssetMotionTabs) {
@@ -24779,6 +29496,12 @@ export function bootstrapDraw2Workspace(
     DRAW2_ASSET_STATE_CHANGED_EVENT,
     renderAssetEditor,
   );
+  const openSavedAssetPanel = (): void => {
+    setPanel("assets");
+    renderAssetEditor();
+  };
+  draw2TimelineAssetOpenPanel?.addEventListener("click", openSavedAssetPanel);
+  modeDeckAssetOpenPanel?.addEventListener("click", openSavedAssetPanel);
   renderAssetEditor();
 
   /*
@@ -25131,26 +29854,67 @@ export function bootstrapDraw2Workspace(
       button.dataset.gameHierarchyGroup = gameHierarchyGroupFor(track);
     }
     button.addEventListener("click", () => {
-      selectedGameTrackId = track.id;
-      selectedGameEventCardId = gameEventCards.find((card) =>
-        card.sourceTrackId === track.id || card.targetTrackId === track.id
-      )?.eventId;
-      const source = gameBehaviorSources.find((candidate) =>
-        candidate.behaviorId === gameBehaviorIdForTrack(track.id)
-      );
-      gameLogicMode = source?.mode ?? "SIMPLE";
-      gameLogicModeBehaviorId = gameBehaviorIdForTrack(track.id);
-      renderGameCustomPanels();
-      // Choosing a Game object immediately exposes its Game-only Inspector.
-      if (
-        className === "draw2-game-hierarchy-entry" ||
-        className === "draw2-game-scene-entry"
-      ) setPanel("game-inspector");
+      selectGameObject(track.id, {
+        openInspector: className === "draw2-game-scene-entry" ||
+          className === "draw2-game-hierarchy-entry" ||
+          className === "draw2-game-asset-entry",
+      });
     });
     return button;
   };
   const renderGameHierarchyGroups = (): void => {
     if (gameHierarchyList === undefined) return;
+    const placementIdFor = (placement: GamePlaygroundPlacement): string =>
+      placement.placementId ?? placement.id;
+    const placementAssetIdFor = (placement: GamePlaygroundPlacement): string =>
+      placement.assetId ?? placement.reference.assetId;
+    const tracksById = new Map(gameDeckTracks.map((track) => [track.id, track]));
+    const hierarchyLayerOrder: Readonly<Record<GamePlaygroundLayer, number>> = {
+      BACKGROUND: 0,
+      WORLD: 10,
+      ACTOR: 20,
+      FOREGROUND: 30,
+      UI: 40,
+    };
+    const placementsById = new Map(
+      gamePlayground.placements.map((placement) => [
+        placementIdFor(placement),
+        placement,
+      ]),
+    );
+    const sceneTracks: ModeDeckTrack[] = [
+      ...gameDeckTracks,
+      ...gamePlayground.placements
+        .filter((placement) => !tracksById.has(placementIdFor(placement)))
+        .map((placement) => ({
+          id: placementIdFor(placement),
+          label: gamePlayground.assets.find((asset) =>
+            asset.assetId === placementAssetIdFor(placement)
+          )?.name ?? placementAssetIdFor(placement),
+          kind: "SPRITE",
+          role: "PROP" as const,
+          active: placement.visible,
+          components: defaultGameObjectComponents(
+            placementIdFor(placement),
+            "SPRITE",
+            "PROP",
+          ),
+          filled: [0],
+        })),
+    ].sort((left, right) => {
+      const leftPlacement = placementsById.get(left.id);
+      const rightPlacement = placementsById.get(right.id);
+      const leftLayer = leftPlacement === undefined
+        ? hierarchyLayerOrder.ACTOR
+        : hierarchyLayerOrder[leftPlacement.layer];
+      const rightLayer = rightPlacement === undefined
+        ? hierarchyLayerOrder.ACTOR
+        : hierarchyLayerOrder[rightPlacement.layer];
+      const leftDepth = leftPlacement?.depth ?? 0;
+      const rightDepth = rightPlacement?.depth ?? 0;
+      return leftLayer - rightLayer || leftDepth - rightDepth ||
+        left.id.localeCompare(right.id);
+    });
     const query = gameHierarchyBrowserQuery.trim().toLocaleLowerCase();
     const visibleTrackIds = new Set<string>();
     const trackMatches = (track: ModeDeckTrack): boolean => {
@@ -25161,12 +29925,12 @@ export function bootstrapDraw2Workspace(
         .toLocaleLowerCase()
         .includes(query);
     };
-    for (const track of gameDeckTracks) {
+    for (const track of sceneTracks) {
       if (!trackMatches(track)) continue;
       visibleTrackIds.add(track.id);
       let parentId = track.parentTrackId;
       while (parentId !== undefined) {
-        const parent = gameDeckTracks.find((candidate) =>
+        const parent = sceneTracks.find((candidate) =>
           candidate.id === parentId
         );
         if (parent === undefined || visibleTrackIds.has(parent.id)) break;
@@ -25175,10 +29939,10 @@ export function bootstrapDraw2Workspace(
       }
     }
     const childrenByParent = new Map<string | undefined, ModeDeckTrack[]>();
-    for (const track of gameDeckTracks) {
+    for (const track of sceneTracks) {
       if (!visibleTrackIds.has(track.id)) continue;
       const parent = track.parentTrackId !== undefined &&
-          gameDeckTracks.some((candidate) =>
+          sceneTracks.some((candidate) =>
             candidate.id === track.parentTrackId &&
               visibleTrackIds.has(candidate.id)
           )
@@ -25251,7 +30015,30 @@ export function bootstrapDraw2Workspace(
       return node;
     };
     const roots = childrenByParent.get(undefined) ?? [];
-    if (roots.length === 0) {
+    const uiEntries = gameUiNodes.map((node) => {
+      const entry = documentRef.createElement("button");
+      entry.type = "button"; entry.className = "draw2-game-hierarchy-entry draw2-game-ui-hierarchy-entry";
+      entry.textContent = `UI · ${node.label}`; entry.dataset.gameUiNodeId = node.nodeId;
+      entry.draggable = true;
+      entry.addEventListener("dragstart", (event) => event.dataTransfer?.setData("application/x-draw2-ui-reorder", node.nodeId));
+      entry.addEventListener("dragover", (event) => { if (event.dataTransfer?.types.includes("application/x-draw2-ui-reorder")) { event.preventDefault(); entry.classList.add("is-drag-target"); } });
+      entry.addEventListener("dragleave", () => entry.classList.remove("is-drag-target"));
+      entry.addEventListener("drop", (event) => {
+        event.preventDefault(); entry.classList.remove("is-drag-target");
+        const sourceId = event.dataTransfer?.getData("application/x-draw2-ui-reorder");
+        if (!sourceId || sourceId === node.nodeId) return;
+        const from = gameUiNodes.findIndex((candidate) => candidate.nodeId === sourceId);
+        const to = gameUiNodes.findIndex((candidate) => candidate.nodeId === node.nodeId);
+        if (from < 0 || to < 0) return;
+        const reordered = [...gameUiNodes]; const [moved] = reordered.splice(from, 1); if (moved === undefined) return;
+        reordered.splice(to, 0, moved);
+        gameUiNodes = reordered.map((candidate, index) => updateGameUiNode(candidate, { style: { zIndex: index + 1 } }));
+        syncGameUiNodesToPlayground(); renderGameUiNodes(); renderGameHierarchyGroups();
+      });
+      entry.addEventListener("click", () => { projectGameWorkspaceAction({ type: "SELECT_UI_NODE", nodeId: node.nodeId }, { render: false }); renderGamePlaygroundSelectedAssetInspector(gameAuthoringLocked()); setPanel("game-inspector"); });
+      return entry;
+    });
+    if (roots.length === 0 && uiEntries.length === 0) {
       const empty = documentRef.createElement("small");
       empty.className = "draw2-panel-status";
       empty.textContent = "一致するGameオブジェクトがありません。";
@@ -25260,9 +30047,10 @@ export function bootstrapDraw2Workspace(
     }
     gameHierarchyList.replaceChildren(
       ...roots.map((track) => renderNode(track, 0)),
+      ...uiEntries,
     );
   };
-  const renderGameSceneViewport = (): void => {
+  const renderGameSceneViewportLegacy = (): void => {
     if (draw2GameSceneSvg === undefined) return;
     const svg = draw2GameSceneSvg;
     svg.dataset.gameViewMode = gameSceneViewMode;
@@ -25277,36 +30065,82 @@ export function bootstrapDraw2Workspace(
         element.setAttribute(name, String(value));
       }
     };
-    const addText = (
-      parent: SVGElement,
-      text: string,
-      attributes: Record<string, string | number>,
-    ): void => {
-      const label = createSvgElement("text");
-      setAttributes(label, attributes);
-      label.textContent = text;
-      parent.append(label);
-    };
     const spriteDataUrlFor = (
       reference: GameAnimationClipReference,
       sourceFrame: AssetAnimationFrameReference,
       flipX: boolean,
       flipY: boolean,
     ): string | undefined => {
+      const definition = getAssetBridge()?.snapshot().assetDefinitions.find((entry) =>
+        entry.definitionId === reference.definitionId
+      );
       const cacheKey = [
+        "animation",
         reference.definitionId,
         sourceFrame.sourceFrameId,
         flipX ? "x" : "",
         flipY ? "y" : "",
-        getAssetBridge()?.snapshot().assetDefinitions.find((entry) =>
-          entry.definitionId === reference.definitionId
-        )?.registryIdentity?.revisionId ?? "",
+        definition?.registryIdentity?.revisionId ?? "",
       ].join(":");
       const cached = gameSceneSpriteDataCache.get(cacheKey);
       if (cached !== undefined) return cached;
       const projection = getAssetBridge()?.renderReference({
         sourceFrameId: sourceFrame.sourceFrameId,
+        assetDefinitionId: reference.definitionId,
         rect: sourceFrame.rect,
+        ...(sourceFrame.rasterSnapshot === undefined
+          ? {}
+          : { rasterSnapshot: sourceFrame.rasterSnapshot }),
+      });
+      if (projection === undefined || projection.width <= 0 || projection.height <= 0) {
+        return undefined;
+      }
+      const canvas = documentRef.createElement("canvas");
+      canvas.width = projection.width;
+      canvas.height = projection.height;
+      const context = canvas.getContext("2d");
+      if (context === null) return undefined;
+      const image = context.createImageData(projection.width, projection.height);
+      image.data.set(projection.data);
+      context.save();
+      context.imageSmoothingEnabled = false;
+      context.translate(flipX ? projection.width : 0, flipY ? projection.height : 0);
+      context.scale(flipX ? -1 : 1, flipY ? -1 : 1);
+      context.putImageData(image, 0, 0);
+      context.restore();
+      const dataUrl = canvas.toDataURL("image/png");
+      gameSceneSpriteDataCache.set(cacheKey, dataUrl);
+      return dataUrl;
+    };
+    const playgroundDataUrlFor = (
+      reference: GamePlaygroundDrawReference | undefined,
+    ): string | undefined => {
+      if (reference === undefined) return undefined;
+      const sourceFrame = reference.sourceFrames?.find((frame) =>
+        frame.sourceFrameId === reference.sourceFrameId
+      ) ?? reference.sourceFrames?.[0];
+      const sourceFrameId = reference.sourceFrameId ??
+        sourceFrame?.sourceFrameId;
+      const rect = sourceFrame?.rect ?? reference.region;
+      if (sourceFrameId === undefined || rect === undefined) return undefined;
+      const cacheKey = [
+        "playground",
+        reference.assetId,
+        reference.revisionId,
+        sourceFrameId,
+        rect.x,
+        rect.y,
+        rect.width,
+        rect.height,
+      ].join(":");
+      const cached = gameSceneSpriteDataCache.get(cacheKey);
+      if (cached !== undefined) return cached;
+      const projection = getAssetBridge()?.renderReference({
+        sourceFrameId,
+        ...(reference.assetDefinitionId === undefined
+          ? {}
+          : { assetDefinitionId: reference.assetDefinitionId }),
+        rect,
       });
       if (
         projection === undefined || projection.width <= 0 ||
@@ -25322,15 +30156,8 @@ export function bootstrapDraw2Workspace(
         projection.height,
       );
       image.data.set(projection.data);
-      context.save();
       context.imageSmoothingEnabled = false;
-      context.translate(
-        flipX ? projection.width : 0,
-        flipY ? projection.height : 0,
-      );
-      context.scale(flipX ? -1 : 1, flipY ? -1 : 1);
       context.putImageData(image, 0, 0);
-      context.restore();
       const dataUrl = canvas.toDataURL("image/png");
       gameSceneSpriteDataCache.set(cacheKey, dataUrl);
       return dataUrl;
@@ -25343,7 +30170,17 @@ export function bootstrapDraw2Workspace(
       : tilemapDocumentForTrack(tilemapTrack);
     const mapWidth = tilemapDocument?.width ?? 12;
     const mapHeight = tilemapDocument?.height ?? 8;
-    svg.setAttribute("viewBox", `0 0 ${mapWidth} ${mapHeight}`);
+    const playgroundCameraWidth = gamePlaygroundRuntimeState?.mode ===
+        "SIDE_SCROLL"
+      ? Math.min(mapWidth, 10)
+      : mapWidth;
+    const playgroundCameraX = gameSceneViewMode === "GAME"
+      ? gamePlaygroundRuntimeState?.cameraX ?? 0
+      : 0;
+    svg.setAttribute(
+      "viewBox",
+      `${playgroundCameraX} 0 ${playgroundCameraWidth} ${mapHeight}`,
+    );
     const grid = createSvgElement("g");
     grid.setAttribute("class", "draw2-game-scene-grid");
     for (let x = 0; x <= mapWidth; x += 1) {
@@ -25359,15 +30196,27 @@ export function bootstrapDraw2Workspace(
     const map = createSvgElement("rect");
     setAttributes(map, { x: 0, y: 0, width: mapWidth, height: mapHeight });
     map.setAttribute("class", "draw2-game-scene-map");
-    const selectGameTrack = (track: ModeDeckTrack): void => {
-      selectedGameTrackId = track.id;
-      const source = gameBehaviorSources.find((candidate) =>
-        candidate.behaviorId === gameBehaviorIdForTrack(track.id)
+    const worldDataUrl = playgroundDataUrlFor(gamePlayground.world);
+    const worldImage = worldDataUrl === undefined
+      ? undefined
+      : createSvgElement("image");
+    if (worldImage !== undefined && worldDataUrl !== undefined) {
+      setAttributes(worldImage, {
+        x: 0,
+        y: 0,
+        width: mapWidth,
+        height: mapHeight,
+      });
+      worldImage.setAttribute("href", worldDataUrl);
+      worldImage.setAttribute("preserveAspectRatio", "xMidYMid slice");
+      worldImage.setAttribute(
+        "class",
+        "draw2-game-scene-playground-world",
       );
-      gameLogicMode = source?.mode ?? "SIMPLE";
-      gameLogicModeBehaviorId = gameBehaviorIdForTrack(track.id);
-      renderGameCustomPanels();
-      setPanel("game-inspector");
+      worldImage.setAttribute("aria-hidden", "true");
+    }
+    const selectGameTrack = (track: ModeDeckTrack): void => {
+      selectGameObject(track.id, { openInspector: true });
     };
     const tilemapLayer = createSvgElement("g");
     tilemapLayer.setAttribute("class", "draw2-game-scene-tilemap");
@@ -25461,6 +30310,23 @@ export function bootstrapDraw2Workspace(
               : "消去"
           }として保存しました。`,
         );
+        const sparseCell = gameTilemapPaintMode === "ERASE"
+          ? undefined
+          : {
+            ...(gameTilemapPaintMode === "SOLID" ? { solid: true } : {}),
+            ...(gameTilemapPaintMode === "TRIGGER" ? { surfaceId: triggerId } : {}),
+          };
+        gamePlayground = {
+          ...gamePlayground,
+          worldMap: paintGamePlaygroundWorldCell(
+            gamePlaygroundWorldMapForEditor(),
+            x,
+            y,
+            sparseCell,
+          ),
+        };
+        gamePlaygroundWorldIndex = undefined;
+        queueGameEditorPersistenceSave("playground-world-cell");
         if (draw2GameSceneViewportStatus !== undefined) {
           draw2GameSceneViewportStatus.textContent =
             `${tilemapTrack.label} · (${x}, ${y}) · ` +
@@ -25498,10 +30364,45 @@ export function bootstrapDraw2Workspace(
           y: Math.floor(localY / scale),
         };
       };
-      tilemapHitArea.addEventListener("click", (event) => {
+      let paintPointerId: number | undefined;
+      let lastPaintCell = "";
+      const paintFromPointer = (event: Event): void => {
         const cell = cellAtPointer(event);
-        if (cell !== undefined) paintMapCell(cell.x, cell.y, event);
+        if (cell === undefined) return;
+        const key = `${cell.x}:${cell.y}`;
+        if (key === lastPaintCell) return;
+        lastPaintCell = key;
+        paintMapCell(cell.x, cell.y, event);
+      };
+      tilemapHitArea.addEventListener("click", (event) => {
+        // Pointer-up after a drag also produces click; the last cell was
+        // already painted by pointermove, so this remains idempotent.
+        paintFromPointer(event);
       });
+      tilemapHitArea.addEventListener("pointerdown", (event) => {
+        const pointer = event as PointerEvent;
+        if (pointer.button !== 0) return;
+        pointer.preventDefault();
+        paintPointerId = pointer.pointerId;
+        lastPaintCell = "";
+        tilemapHitArea.setPointerCapture(pointer.pointerId);
+        paintFromPointer(event);
+      });
+      tilemapHitArea.addEventListener("pointermove", (event) => {
+        const pointer = event as PointerEvent;
+        if (paintPointerId !== pointer.pointerId) return;
+        paintFromPointer(event);
+      });
+      const finishPaint = (event: Event): void => {
+        const pointer = event as PointerEvent;
+        if (paintPointerId !== pointer.pointerId) return;
+        if (tilemapHitArea.hasPointerCapture(pointer.pointerId)) {
+          tilemapHitArea.releasePointerCapture(pointer.pointerId);
+        }
+        paintPointerId = undefined;
+      };
+      tilemapHitArea.addEventListener("pointerup", finishPaint);
+      tilemapHitArea.addEventListener("pointercancel", finishPaint);
       if (tilemapDocument !== undefined) {
         const cellLayer = createSvgElement("g");
         cellLayer.setAttribute("class", "draw2-game-scene-map-cells");
@@ -25532,11 +30433,6 @@ export function bootstrapDraw2Workspace(
         }
         tilemapLayer.append(cellLayer);
       }
-      addText(tilemapLayer, tilemapTrack.label, {
-        x: 0.32,
-        y: Math.max(0.42, mapHeight - 0.32),
-        "text-anchor": "start",
-      });
     }
     const objects = createSvgElement("g");
     objects.setAttribute("class", "draw2-game-scene-objects");
@@ -25555,12 +30451,21 @@ export function bootstrapDraw2Workspace(
       // authored/static Transform. The existing sprite-or-marker rendering
       // below is untouched, so an object with no sprite bound still shows up
       // as its role-colored icon while playing.
-      const livePosition = gameScenePlayState === undefined
-        ? undefined
-        : track.id === gameScenePlayState.playerId
-        ? gameScenePlayState.playerPosition
-        : gameScenePlayState.objects.find((object) => object.id === track.id)
-          ?.position;
+      const playgroundPosition = gamePlaygroundRuntimeState?.positions[track.id];
+      const physicsPosition = gamePhysics2DSession?.world.bodies.find((body) =>
+        body.entityId === String(
+          gamePhysics2DSession?.snapshot.playerEntityId ?? ""
+        )
+      )?.position;
+      const livePosition = role === "PLAYER" && physicsPosition !== undefined
+        ? physicsPosition
+        : playgroundPosition ??
+        (gameScenePlayState === undefined
+          ? undefined
+          : track.id === gameScenePlayState.playerId
+          ? gameScenePlayState.playerPosition
+          : gameScenePlayState.objects.find((object) => object.id === track.id)
+            ?.position);
       const rawX = livePosition?.x ??
         (transform?.type === "TRANSFORM" ? transform.x : 0);
       const rawY = livePosition?.y ??
@@ -25622,7 +30527,10 @@ export function bootstrapDraw2Workspace(
           if (!moved) selectGameTrack(track);
           return;
         }
-        selectedGameTrackId = track.id;
+        projectGameWorkspaceAction(
+          { type: "SELECT_OBJECT", trackId: track.id },
+          { render: false },
+        );
         const requestedX = role === "PLAYER" || role === "NPC"
           ? Math.round(current.x + delta.x)
           : current.x + delta.x;
@@ -25751,14 +30659,36 @@ export function bootstrapDraw2Workspace(
           ? {}
           : { boundDrawDefinitionId: drawBinding.assetDefinitionId }),
       });
-      const animationReference = animationBinding === undefined
-        ? animationReferences[0]
-        : animationReferences.find((reference) =>
-          reference.definitionId === animationBinding.assetDefinitionId &&
-          reference.clipKey === animationBinding.clipKey
-        ) ?? animationReferences[0];
-      const sourceFrameId = animationBinding?.frameIds[0] ??
-        animationReference?.clip.frameIds[0];
+      const runtimeMotion = gamePlaygroundRuntimeState?.motion ?? "IDLE";
+      const runtimeDirection = gamePlaygroundRuntimeState?.facing;
+      const runtimeReference = animationReferences.find((candidate) =>
+        gameAnimationClipMatchesRuntime({ clip: candidate, motion: runtimeMotion, direction: runtimeDirection })
+      );
+      const boundReference = animationBinding === undefined
+        ? undefined
+        : animationReferences.find((candidate) =>
+          candidate.definitionId === animationBinding.assetDefinitionId &&
+          candidate.clipKey === animationBinding.clipKey
+        );
+      const animationReference = runtimeReference ?? boundReference ??
+        animationReferences[0];
+      const runtimeBinding = animationBinding !== undefined &&
+          boundReference?.id === animationReference?.id
+        ? animationBinding
+        : undefined;
+      const animationFrameIds = runtimeBinding?.frameIds ??
+        animationReference?.clip.frameIds ?? [];
+      const runtimeStateForAnimation = gamePlaygroundRuntimeState;
+      const animationFrameIndex = runtimeStateForAnimation === undefined
+        ? 0
+        : gamePlaygroundAnimationFrameIndex({
+          motion: runtimeStateForAnimation.motion,
+          frameCount: animationFrameIds.length,
+          tick: runtimeStateForAnimation.tick,
+          motionTicksRemaining: runtimeStateForAnimation.motionTicksRemaining,
+        });
+      const sourceFrameId = animationFrameIds[animationFrameIndex] ??
+        animationFrameIds[0];
       const sourceFrame = sourceFrameId === undefined
         ? undefined
         : animationReference?.clip.sourceFrames?.find((frame) =>
@@ -25770,17 +30700,34 @@ export function bootstrapDraw2Workspace(
         : spriteDataUrlFor(
           animationReference,
           sourceFrame,
-          animationBinding?.flipX ?? sourceFrame.flipX ??
+          runtimeBinding?.flipX ?? sourceFrame.flipX ??
             animationReference.clip.flipX ?? false,
-          animationBinding?.flipY ?? sourceFrame.flipY ??
+          runtimeBinding?.flipY ?? sourceFrame.flipY ??
             animationReference.clip.flipY ?? false,
         );
+      const playgroundPlayerFrame = role === "PLAYER"
+        ? gamePlayground.player?.sourceFrames?.find((frame) =>
+          frame.sourceFrameId === gamePlayground.player?.sourceFrameId
+        ) ?? gamePlayground.player?.sourceFrames?.[0]
+        : undefined;
+      const playgroundPlayerDataUrl = role === "PLAYER"
+        ? playgroundDataUrlFor(gamePlayground.player)
+        : undefined;
+      // A bound iDRAW animation is the runtime source.  The authored player
+      // frame remains the safe fallback when no matching clip exists.
+      const effectiveSpriteDataUrl = spriteDataUrl ?? playgroundPlayerDataUrl;
+      const effectiveSpriteRect = sourceFrame?.rect ??
+        playgroundPlayerFrame?.rect ??
+        gamePlayground.player?.region;
       let selectionHalfWidth = 0.21;
       let selectionHalfHeight = 0.21;
-      if (spriteDataUrl !== undefined && sourceFrame !== undefined) {
+      if (
+        effectiveSpriteDataUrl !== undefined &&
+        effectiveSpriteRect !== undefined
+      ) {
         const image = createSvgElement("image");
-        const sourceWidth = Math.max(1, sourceFrame.rect.width);
-        const sourceHeight = Math.max(1, sourceFrame.rect.height);
+        const sourceWidth = Math.max(1, effectiveSpriteRect.width);
+        const sourceHeight = Math.max(1, effectiveSpriteRect.height);
         const maxSize = role === "PLAYER" || role === "NPC" ? 0.92 : 0.78;
         const aspect = sourceWidth / sourceHeight;
         const spriteWidth = aspect >= 1
@@ -25795,7 +30742,7 @@ export function bootstrapDraw2Workspace(
           width: spriteWidth,
           height: spriteHeight,
         });
-        image.setAttribute("href", spriteDataUrl);
+        image.setAttribute("href", effectiveSpriteDataUrl);
         image.setAttribute("preserveAspectRatio", "xMidYMid meet");
         image.setAttribute("class", "draw2-game-scene-sprite");
         image.setAttribute("aria-hidden", "true");
@@ -25863,15 +30810,6 @@ export function bootstrapDraw2Workspace(
           group.append(handle);
         }
       }
-      const labelX = role === "CAMERA"
-        ? Math.min(Math.max(0.5, mapWidth - 0.5), x + 0.45)
-        : x;
-      const labelY = role === "CAMERA" ? Math.max(0.22, y - 0.25) : y + 0.56;
-      addText(group, track.label, {
-        x: labelX,
-        y: labelY,
-        "text-anchor": role === "CAMERA" ? "start" : "middle",
-      });
       objects.append(group);
     }
     const frame = createSvgElement("rect");
@@ -25883,14 +30821,17 @@ export function bootstrapDraw2Workspace(
       rx: 0.08,
     });
     frame.setAttribute("class", "draw2-game-scene-frame");
-    svg.replaceChildren(map, tilemapLayer, grid, frame, objects);
+    const sceneLayers: SVGElement[] = [map];
+    if (worldImage !== undefined) sceneLayers.push(worldImage);
+    sceneLayers.push(tilemapLayer, grid, frame, objects);
+    svg.replaceChildren(...sceneLayers);
     if (draw2GameSceneMinimapSvg !== undefined) {
       draw2GameSceneMinimapSvg.setAttribute(
         "viewBox",
         `0 0 ${mapWidth} ${mapHeight}`,
       );
       draw2GameSceneMinimapSvg.replaceChildren(
-        ...[map, tilemapLayer, grid, frame, objects].map((node) =>
+        ...sceneLayers.map((node) =>
           node.cloneNode(true)
         ),
       );
@@ -25913,6 +30854,890 @@ export function bootstrapDraw2Workspace(
         }`;
     }
   };
+  const addGameUiNodeAt = (kind: GameUiNode["kind"], x = 8, y = 8): void => {
+    if (gameAuthoringLocked()) return;
+    const node = createGameUiNode(`ui:${kind.toLowerCase()}:${Date.now()}`, kind);
+    gameUiNodes = [...gameUiNodes, {
+      ...node,
+      style: { ...node.style, x: Math.max(0, Math.min(88, x)), y: Math.max(0, Math.min(88, y)) },
+    }];
+    projectGameWorkspaceAction({ type: "SELECT_UI_NODE", nodeId: node.nodeId }, { render: false });
+    syncGameUiNodesToPlayground();
+    renderGameUiNodes();
+    renderGamePlaygroundSelectedAssetInspector(false);
+    setPanel("game-inspector");
+  };
+  for (const tile of queryAll<HTMLButtonElement>(documentRef, "[data-game-ui-node-kind]")) {
+    tile.addEventListener("dragstart", (event) => {
+      event.dataTransfer?.setData("application/x-draw2-game-ui-node", tile.dataset.gameUiNodeKind ?? "BUTTON");
+    });
+    tile.addEventListener("click", () => {
+      const kind = tile.dataset.gameUiNodeKind;
+      if (kind === "MINIMAP" || kind === "INVENTORY" || kind === "BUTTON") addGameUiNodeAt(kind);
+    });
+  }
+  for (const element of queryAll<HTMLButtonElement>(documentRef, "[data-game-element-kind]")) {
+    element.addEventListener("click", () => {
+      if (gameAuthoringLocked()) return;
+      const kind = element.dataset.gameElementKind ?? "ITEM";
+      const id = `element:${kind.toLowerCase()}:${Date.now()}`;
+      const elementKind = ["ITEM", "SKILL", "CURRENCY", "STATUS", "TIMER"].includes(kind) ? kind as GamePlaygroundElement["kind"] : "ITEM";
+      gameElements = [...gameElements, { id, kind: elementKind, label: elementKind === "ITEM" ? "アイテム" : elementKind === "SKILL" ? "スキル" : elementKind === "CURRENCY" ? "通貨" : elementKind === "STATUS" ? "ステータス" : "タイマー", value: 0 }];
+      projectGameWorkspaceAction({ type: "SELECT_ELEMENT", elementId: id }, { render: false });
+      syncGameUiNodesToPlayground();
+      draw2GamePlaygroundSourceRail?.dispatchEvent(new CustomEvent("draw2:game-element-add", { bubbles: true, detail: { kind } }));
+      if (draw2GamePlaygroundDrawStatus !== undefined) draw2GamePlaygroundDrawStatus.textContent = `${kind}要素を追加しました。Inspectorで詳細を設定できます。`;
+      renderGamePlaygroundSelectedAssetInspector(false); setPanel("game-inspector");
+    });
+  }
+  draw2GameUiOverlay?.addEventListener("dragover", (event) => event.preventDefault());
+  draw2GameUiOverlay?.addEventListener("drop", (event) => {
+    event.preventDefault();
+    const kind = event.dataTransfer?.getData("application/x-draw2-game-ui-node");
+    if (kind !== "MINIMAP" && kind !== "INVENTORY" && kind !== "BUTTON") return;
+    const rect = draw2GameUiOverlay.getBoundingClientRect();
+    addGameUiNodeAt(kind, (event.clientX - rect.left) / rect.width * 100, (event.clientY - rect.top) / rect.height * 100);
+  });
+  const renderGameSceneViewport = (): void => {
+    if (draw2GameSceneSvg === undefined) return;
+    const svg = draw2GameSceneSvg;
+    const svgNamespace = "http://www.w3.org/2000/svg";
+    const createSvgElement = (tagName: string): SVGElement =>
+      documentRef.createElementNS(svgNamespace, tagName) as SVGElement;
+    const setAttributes = (
+      element: SVGElement,
+      attributes: Record<string, string | number>,
+    ): void => {
+      for (const [name, value] of Object.entries(attributes)) {
+        element.setAttribute(name, String(value));
+      }
+    };
+    const spriteDataUrlFor = (
+      reference: GameAnimationClipReference,
+      sourceFrame: AssetAnimationFrameReference,
+      flipX: boolean,
+      flipY: boolean,
+    ): string | undefined => {
+      const definition = getAssetBridge()?.snapshot().assetDefinitions.find((entry) =>
+        entry.definitionId === reference.definitionId
+      );
+      const cacheKey = [
+        "animation",
+        reference.definitionId,
+        sourceFrame.sourceFrameId,
+        flipX ? "x" : "",
+        flipY ? "y" : "",
+        definition?.registryIdentity?.revisionId ?? "",
+      ].join(":");
+      const cached = gameSceneSpriteDataCache.get(cacheKey);
+      if (cached !== undefined) return cached;
+      const projection = getAssetBridge()?.renderReference({
+        sourceFrameId: sourceFrame.sourceFrameId,
+        assetDefinitionId: reference.definitionId,
+        rect: sourceFrame.rect,
+        ...(sourceFrame.rasterSnapshot === undefined
+          ? {}
+          : { rasterSnapshot: sourceFrame.rasterSnapshot }),
+      });
+      if (projection === undefined || projection.width <= 0 || projection.height <= 0) {
+        return undefined;
+      }
+      const canvas = documentRef.createElement("canvas");
+      canvas.width = projection.width;
+      canvas.height = projection.height;
+      const context = canvas.getContext("2d");
+      if (context === null) return undefined;
+      const image = context.createImageData(projection.width, projection.height);
+      image.data.set(projection.data);
+      context.save();
+      context.imageSmoothingEnabled = false;
+      context.translate(flipX ? projection.width : 0, flipY ? projection.height : 0);
+      context.scale(flipX ? -1 : 1, flipY ? -1 : 1);
+      context.putImageData(image, 0, 0);
+      context.restore();
+      const dataUrl = canvas.toDataURL("image/png");
+      gameSceneSpriteDataCache.set(cacheKey, dataUrl);
+      return dataUrl;
+    };
+    const clampPlaygroundCoordinate = (
+      value: number,
+      minimum: number,
+      maximum: number,
+    ): number => Math.min(maximum, Math.max(minimum, value));
+    const runtimeWorld = gamePlaygroundWorldForRuntime();
+    const worldMap = gamePlaygroundWorldMapForEditor();
+    const worldIndex = gamePlaygroundWorldIndexForEditor();
+    const worldWidth = Math.max(1, runtimeWorld.width);
+    const worldHeight = Math.max(1, runtimeWorld.height);
+    const finiteWorld = worldMap.bounds === "FINITE";
+    const sceneViewport = gamePlaygroundSceneViewportForEditor();
+    const sceneZoom = sceneViewport.zoom;
+    const cameraWidth = sceneViewport.width;
+    const cameraHeight = sceneViewport.height;
+    const physicsPlayerBody = gamePhysics2DSession?.mode === "PLAYING"
+      ? gamePhysics2DSession.world.bodies.find((body) =>
+        body.entityId === gamePhysics2DSession?.snapshot.playerEntityId
+      )
+      : undefined;
+    const cameraX = physicsPlayerBody === undefined
+      ? sceneViewport.x
+      : clampPlaygroundCoordinate(
+        physicsPlayerBody.position.x - cameraWidth / 2,
+        finiteWorld ? 0 : physicsPlayerBody.position.x - cameraWidth / 2,
+        finiteWorld ? Math.max(0, worldWidth - cameraWidth) : physicsPlayerBody.position.x - cameraWidth / 2,
+      );
+    const cameraY = physicsPlayerBody === undefined
+      ? sceneViewport.y
+      : clampPlaygroundCoordinate(
+        physicsPlayerBody.position.y - cameraHeight / 2,
+        finiteWorld ? 0 : physicsPlayerBody.position.y - cameraHeight / 2,
+        finiteWorld ? Math.max(0, worldHeight - cameraHeight) : physicsPlayerBody.position.y - cameraHeight / 2,
+      );
+    const viewport = sceneViewport;
+    svg.dataset.gameViewMode = gameSceneViewMode;
+    svg.setAttribute(
+      "viewBox",
+      `${cameraX} ${cameraY} ${cameraWidth} ${cameraHeight}`,
+    );
+    svg.tabIndex = 0;
+    draw2GameSceneViewport?.setAttribute("tabindex", "0");
+    let scenePointerMoved = false;
+    let sceneBlankSelectionSuppressed = false;
+
+    const map = createSvgElement("rect");
+    setAttributes(map, { x: 0, y: 0, width: worldWidth, height: worldHeight });
+    map.setAttribute("class", "draw2-game-scene-map draw2-game-scene-free-space");
+
+    const previewFrameIndex = gameDeckPlaying ? gameDeckFrame : undefined;
+    const activeRuntimeType = gamePlaygroundRuntimeState !== undefined
+      ? "PLAYGROUND"
+      : gamePhysics2DSession !== undefined
+      ? "PHYSICS2D"
+      : gameScenePlayState !== undefined
+      ? "GENRE"
+      : undefined;
+    if (activeRuntimeType === undefined) {
+      delete svg.dataset.gameRuntimeType;
+      delete root.dataset.gameRuntimeType;
+    } else {
+      svg.dataset.gameRuntimeType = activeRuntimeType;
+      root.dataset.gameRuntimeType = activeRuntimeType;
+    }
+    delete root.dataset.gamePlayerMotion;
+    delete root.dataset.gamePlayerDirection;
+    delete root.dataset.gamePlayerFrame;
+    delete root.dataset.gamePlayerX;
+    delete root.dataset.gamePlayerY;
+    const worldDataUrl = gamePlaygroundReferenceDataUrlFor(
+      gamePlayground.world,
+      previewFrameIndex,
+    );
+    const worldImage = worldDataUrl === undefined
+      ? undefined
+      : createSvgElement("image");
+    if (worldImage !== undefined && worldDataUrl !== undefined) {
+      setAttributes(worldImage, { x: 0, y: 0, width: worldWidth, height: worldHeight });
+      worldImage.setAttribute("href", worldDataUrl);
+      worldImage.setAttribute("preserveAspectRatio", "xMidYMid slice");
+      worldImage.setAttribute("class", "draw2-game-scene-playground-world");
+      worldImage.setAttribute("aria-hidden", "true");
+    }
+
+    // Only authored cells in the camera rectangle are projected. Empty space
+    // is never represented by a DOM node, so a 256×256 world and a much
+    // larger world cost the same while the camera is still.
+    const viewportArea = viewport.width * viewport.height;
+    const worldCells = viewportArea <= 20_000
+      ? worldIndex.cellsInViewport(viewport)
+      : [];
+    const worldCellLayer = createSvgElement("g");
+    worldCellLayer.setAttribute("class", "draw2-game-scene-world-cells");
+    for (const cell of worldCells) {
+      const cellElement = createSvgElement("rect");
+      setAttributes(cellElement, {
+        x: cell.worldX,
+        y: cell.worldY,
+        width: 1,
+        height: 1,
+      });
+      cellElement.setAttribute(
+        "class",
+        `draw2-game-scene-world-cell${cell.tileId === undefined ? "" : " has-tile"}${cell.solid === true ? " is-solid" : ""}`,
+      );
+      if (cell.tileId !== undefined) cellElement.dataset.gameWorldTileId = cell.tileId;
+      if (cell.surfaceId !== undefined) cellElement.dataset.gameWorldSurfaceId = cell.surfaceId;
+      cellElement.setAttribute("aria-hidden", "true");
+      worldCellLayer.append(cellElement);
+      if (cell.tileId !== undefined) {
+        const tileAsset = gamePlayground.assets.find((asset) =>
+          asset.assetId === cell.tileId
+        );
+        const tileDataUrl = tileAsset === undefined
+          ? undefined
+          : gamePlaygroundReferenceDataUrlFor(tileAsset.source, gameDeckFrame);
+        if (tileDataUrl !== undefined) {
+          const tileImage = createSvgElement("image");
+          setAttributes(tileImage, {
+            x: cell.worldX,
+            y: cell.worldY,
+            width: 1,
+            height: 1,
+          });
+          tileImage.setAttribute("href", tileDataUrl);
+          tileImage.setAttribute("preserveAspectRatio", "xMidYMid slice");
+          tileImage.setAttribute("class", "draw2-game-scene-world-tile");
+          tileImage.dataset.gameWorldTileId = cell.tileId;
+          tileImage.setAttribute("aria-hidden", "true");
+          worldCellLayer.append(tileImage);
+        }
+      }
+    }
+
+    // Keep the older tilemap authoring data visible during the migration. It
+    // remains an overlay source; new worlds use the sparse chunk index above.
+    const tilemapTrack = gameDeckTracks.find((track) =>
+      (track.role ?? gameObjectRoleFor(track.id, track.kind)) === "TILEMAP"
+    );
+    const tilemapDocument = tilemapTrack === undefined
+      ? undefined
+      : tilemapDocumentForTrack(tilemapTrack);
+    const legacyTileLayer = createSvgElement("g");
+    legacyTileLayer.setAttribute("class", "draw2-game-scene-legacy-tilemap");
+    const appendLegacyCells = (
+      cells: readonly { readonly x: number; readonly y: number }[],
+      className: string,
+    ): void => {
+      for (const cell of cells) {
+        if (
+          cell.x + 1 <= viewport.x || cell.x >= viewport.x + viewport.width ||
+          cell.y + 1 <= viewport.y || cell.y >= viewport.y + viewport.height
+        ) continue;
+        const cellElement = createSvgElement("rect");
+        setAttributes(cellElement, { x: cell.x, y: cell.y, width: 1, height: 1 });
+        cellElement.setAttribute("class", className);
+        cellElement.setAttribute("aria-hidden", "true");
+        legacyTileLayer.append(cellElement);
+      }
+    };
+    if (tilemapDocument !== undefined) {
+      appendLegacyCells(
+        solidGameTilemapCells(tilemapDocument),
+        "draw2-game-scene-world-cell is-legacy-solid",
+      );
+      appendLegacyCells(
+        triggerGameTilemapCells(tilemapDocument),
+        "draw2-game-scene-world-cell is-trigger",
+      );
+    }
+
+    const placements = (gamePlayground.placements ?? []).filter((placement) =>
+      placement.visible && placement.kind === "SPRITE"
+    );
+    const placementIdFor = (placement: GamePlaygroundPlacement): string =>
+      placement.placementId ?? placement.id;
+    const placementAssetIdFor = (placement: GamePlaygroundPlacement): string =>
+      placement.assetId ?? placement.reference.assetId;
+    const placementById = new Map(placements.map((placement) => [placementIdFor(placement), placement]));
+    const layerOrder: Readonly<Record<GamePlaygroundLayer, number>> = {
+      BACKGROUND: 0,
+      WORLD: 10,
+      ACTOR: 20,
+      FOREGROUND: 30,
+      UI: 40,
+    };
+    const trackById = new Map(gameDeckTracks.map((track) => [track.id, track]));
+    const entries = placements.map((placement) => ({
+      track: trackById.get(placementIdFor(placement)) ?? {
+        id: placementIdFor(placement),
+        label: gamePlayground.assets.find((asset) => asset.assetId === placementAssetIdFor(placement))?.name ??
+          placementIdFor(placement),
+        kind: "SPRITE",
+        filled: [],
+        role: "PROP" as const,
+      },
+      placement,
+    })).filter((entry) =>
+      (entry.track.role ?? gameObjectRoleFor(entry.track.id, entry.track.kind)) !== "TILEMAP"
+    );
+    entries.sort((left, right) => {
+      const leftLayer = layerOrder[left.placement?.layer ?? "ACTOR"];
+      const rightLayer = layerOrder[right.placement?.layer ?? "ACTOR"];
+      return leftLayer - rightLayer ||
+        (left.placement?.depth ?? 0) - (right.placement?.depth ?? 0);
+    });
+    const animationFrameCount = entries.reduce((maximum, entry) => {
+      const role = entry.track.role ?? gameObjectRoleFor(entry.track.id, entry.track.kind);
+      const reference = entry.placement?.reference ??
+        (role === "PLAYER" ? gamePlayground.player : undefined);
+      return Math.max(maximum, reference?.sourceFrames?.length ?? 0);
+    }, 0);
+    svg.dataset.gameAnimationFrame = animationFrameCount === 0
+      ? ""
+      : String((gameDeckFrame % animationFrameCount) + 1);
+    svg.dataset.gameAnimationFrameCount = String(animationFrameCount);
+    const scenePointForTrack = (track: ModeDeckTrack, placement?: GamePlaygroundPlacement): {
+      readonly x: number;
+      readonly y: number;
+    } => {
+      if (placement !== undefined) return { x: placement.x, y: placement.y };
+      const transform = componentsForGameTrack(track).find((component) =>
+        component.type === "TRANSFORM"
+      );
+      if (transform?.type !== "TRANSFORM") return { x: worldWidth / 2, y: worldHeight / 2 };
+      return {
+        x: clampPlaygroundCoordinate(
+          transform.x / Math.min(12, worldWidth) * worldWidth,
+          0.5,
+          worldWidth - 0.5,
+        ),
+        y: clampPlaygroundCoordinate(
+          transform.y / Math.min(8, worldHeight) * worldHeight,
+          0.5,
+          worldHeight - 0.5,
+        ),
+      };
+    };
+    const pointerWorldPoint = (event: PointerEvent): { x: number; y: number } | undefined => {
+      const bounds = svg.getBoundingClientRect();
+      if (bounds.width <= 0 || bounds.height <= 0) return undefined;
+      const scale = Math.min(bounds.width / cameraWidth, bounds.height / cameraHeight);
+      const renderedWidth = cameraWidth * scale;
+      const renderedHeight = cameraHeight * scale;
+      const localX = event.clientX - bounds.left - (bounds.width - renderedWidth) / 2;
+      const localY = event.clientY - bounds.top - (bounds.height - renderedHeight) / 2;
+      if (localX < 0 || localY < 0 || localX > renderedWidth || localY > renderedHeight) return undefined;
+      return { x: cameraX + localX / scale, y: cameraY + localY / scale };
+    };
+    const paintSparseWorldCellAt = (worldX: number, worldY: number): void => {
+      if (
+        tilemapTrack === undefined ||
+        selectedGameTrackId !== tilemapTrack.id ||
+        gameSceneViewMode !== "SCENE" ||
+        !Number.isSafeInteger(worldX) || !Number.isSafeInteger(worldY)
+      ) return;
+      const tileAsset = selectedGameWorldTileAssetId === undefined
+        ? undefined
+        : gamePlayground.assets.find((asset) =>
+          asset.assetId === selectedGameWorldTileAssetId
+        );
+      const triggerId = `world.${tilemapTrack.id}.${worldX}.${worldY}`;
+      const nextCell = gameTilemapPaintMode === "ERASE"
+        ? undefined
+        : {
+          ...(tileAsset === undefined ? {} : { tileId: tileAsset.assetId }),
+          ...(gameTilemapPaintMode === "SOLID" ? { solid: true } : {}),
+          ...(gameTilemapPaintMode === "TRIGGER" ? { surfaceId: triggerId } : {}),
+        };
+      gamePlayground = {
+        ...gamePlayground,
+        worldMap: paintGamePlaygroundWorldCell(
+          gamePlaygroundWorldMapForEditor(),
+          worldX,
+          worldY,
+          nextCell,
+        ),
+      };
+      gamePlaygroundWorldIndex = undefined;
+      queueGameEditorPersistenceSave("playground-world-cell");
+      renderGameSceneViewport();
+      if (draw2GameSceneViewportStatus !== undefined) {
+        const modeLabel = gameTilemapPaintMode === "SOLID"
+          ? "床"
+          : gameTilemapPaintMode === "TRIGGER"
+          ? "反応範囲"
+          : "消去";
+        draw2GameSceneViewportStatus.textContent =
+          `${tilemapTrack.label} · (${worldX}, ${worldY}) · ${modeLabel}`;
+      }
+    };
+    svg.onwheel = (event: WheelEvent): void => {
+      if (gameSceneViewMode === "GAME") return;
+      const anchor = pointerWorldPoint(event as unknown as PointerEvent);
+      if (anchor === undefined) return;
+      event.preventDefault();
+      const nextZoom = clampPlaygroundCoordinate(
+        sceneZoom * (event.deltaY > 0 ? 0.88 : 1.14),
+        0.1,
+        8,
+      );
+      const nextWidth = Math.min(worldWidth, Math.max(1, 100 / nextZoom));
+      const nextHeight = Math.min(worldHeight, Math.max(1, 60 / nextZoom));
+      const nextX = anchor.x - (anchor.x - cameraX) * nextWidth / cameraWidth;
+      const nextY = anchor.y - (anchor.y - cameraY) * nextHeight / cameraHeight;
+      gamePlaygroundCamera = {
+        x: finiteWorld
+          ? clampPlaygroundCoordinate(nextX, 0, Math.max(0, worldWidth - nextWidth))
+          : nextX,
+        y: finiteWorld
+          ? clampPlaygroundCoordinate(nextY, 0, Math.max(0, worldHeight - nextHeight))
+          : nextY,
+        zoom: nextZoom,
+      };
+      renderGameSceneViewport();
+    };
+    svg.onpointerdown = (event: PointerEvent): void => {
+      scenePointerMoved = false;
+      sceneBlankSelectionSuppressed = false;
+      if (gameSceneViewMode === "GAME" || event.button !== 0) return;
+      const target = event.target;
+      if (
+        target instanceof Element &&
+        target.closest("[data-game-scene-track-id]") !== null
+      ) return;
+      const paintingWorld = tilemapTrack !== undefined &&
+        selectedGameTrackId === tilemapTrack.id &&
+        gameSceneViewMode === "SCENE" &&
+        !gameDeckPlaying &&
+        !gameAuthoringLocked();
+      if (paintingWorld) {
+        const firstPoint = pointerWorldPoint(event);
+        if (firstPoint === undefined) return;
+        event.preventDefault();
+        event.stopPropagation();
+        let lastCellKey = "";
+        const paint = (paintEvent: Event): void => {
+          const point = pointerWorldPoint(paintEvent as PointerEvent);
+          if (point === undefined) return;
+          const worldX = Math.floor(point.x);
+          const worldY = Math.floor(point.y);
+          const key = `${worldX},${worldY}`;
+          if (key === lastCellKey) return;
+          lastCellKey = key;
+          paintSparseWorldCellAt(worldX, worldY);
+        };
+        const finishPainting = (finishEvent: Event): void => {
+          documentRef.removeEventListener("pointermove", paint);
+          documentRef.removeEventListener("pointerup", finishPainting);
+          documentRef.removeEventListener("pointercancel", finishPainting);
+          if (finishEvent instanceof PointerEvent && svg.hasPointerCapture(finishEvent.pointerId)) {
+            svg.releasePointerCapture(finishEvent.pointerId);
+          }
+        };
+        if (typeof svg.setPointerCapture === "function") svg.setPointerCapture(event.pointerId);
+        paint(event);
+        documentRef.addEventListener("pointermove", paint);
+        documentRef.addEventListener("pointerup", finishPainting);
+        documentRef.addEventListener("pointercancel", finishPainting);
+        return;
+      }
+      const bounds = svg.getBoundingClientRect();
+      const scale = Math.min(bounds.width / cameraWidth, bounds.height / cameraHeight);
+      if (scale <= 0) return;
+      event.preventDefault();
+      const start = {
+        clientX: event.clientX,
+        clientY: event.clientY,
+        x: gamePlaygroundCamera.x,
+        y: gamePlaygroundCamera.y,
+      };
+      const move = (moveEvent: Event): void => {
+        const pointer = moveEvent as PointerEvent;
+        if (
+          Math.abs(pointer.clientX - start.clientX) > 2 ||
+          Math.abs(pointer.clientY - start.clientY) > 2
+        ) {
+          scenePointerMoved = true;
+        }
+        gamePlaygroundCamera = {
+          ...gamePlaygroundCamera,
+          x: finiteWorld
+            ? clampPlaygroundCoordinate(
+              start.x - (pointer.clientX - start.clientX) / scale,
+              0,
+              Math.max(0, worldWidth - cameraWidth),
+            )
+            : start.x - (pointer.clientX - start.clientX) / scale,
+          y: finiteWorld
+            ? clampPlaygroundCoordinate(
+              start.y - (pointer.clientY - start.clientY) / scale,
+              0,
+              Math.max(0, worldHeight - cameraHeight),
+            )
+            : start.y - (pointer.clientY - start.clientY) / scale,
+        };
+        renderGameSceneViewport();
+      };
+      const end = (): void => {
+        documentRef.removeEventListener("pointermove", move);
+        documentRef.removeEventListener("pointerup", end);
+      };
+      documentRef.addEventListener("pointermove", move);
+      documentRef.addEventListener("pointerup", end);
+    };
+    const placeGameAssetAt = placeGamePlaygroundAssetAt;
+    svg.ondragover = (event: DragEvent): void => {
+      if (gameSceneViewMode === "GAME" || gameAuthoringLocked() || event.dataTransfer === null) return;
+      if (!event.dataTransfer.types.includes("application/x-draw2-game-asset")) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "copy";
+      svg.classList.add("is-game-asset-drop-target");
+    };
+    svg.ondragleave = (): void => {
+      svg.classList.remove("is-game-asset-drop-target");
+    };
+    svg.ondrop = (event: DragEvent): void => {
+      sceneBlankSelectionSuppressed = true;
+      svg.classList.remove("is-game-asset-drop-target");
+      if (gameSceneViewMode === "GAME" || gameAuthoringLocked() || event.dataTransfer === null) return;
+      const assetId = event.dataTransfer.getData("application/x-draw2-game-asset");
+      if (assetId === "") return;
+      const point = pointerWorldPoint(event as unknown as PointerEvent);
+      if (point === undefined) return;
+      event.preventDefault();
+      placeGameAssetAt(assetId, point);
+    };
+    svg.onclick = (event: MouseEvent): void => {
+      const target = event.target;
+      const isSceneObject = target instanceof Element &&
+        target.closest(
+          "[data-game-scene-track-id], .draw2-game-scene-object, .draw2-game-scene-tilemap, " +
+            ".draw2-game-scene-handle, [data-game-scene-handle], " +
+            ".draw2-game-scene-pan, [data-game-scene-drag], button, input, " +
+            "textarea, select, [contenteditable=true]",
+        ) !== null;
+      const shouldSelectScene = gameSceneViewMode !== "GAME" &&
+        !gameDeckPlaying && !gameAuthoringLocked() && !scenePointerMoved &&
+        !sceneBlankSelectionSuppressed && !isSceneObject;
+      scenePointerMoved = false;
+      sceneBlankSelectionSuppressed = false;
+      if (!shouldSelectScene) return;
+      projectGameWorkspaceAction({
+        type: "SELECT_SCENE",
+        sceneId: gameWorkspaceSceneId(),
+      });
+    };
+    const handleSceneEscape = (event: KeyboardEvent): void => {
+      const target = event.target;
+      const isControl = target instanceof Element && target.closest(
+        "button, input, textarea, select, [contenteditable=true]",
+      ) !== null;
+      const sceneFocused = target === svg || target === draw2GameSceneViewport ||
+        documentRef.activeElement === svg ||
+        documentRef.activeElement === draw2GameSceneViewport;
+      if (
+        event.key !== "Escape" ||
+        isEditableTarget(event.target) ||
+        isControl ||
+        gameSceneViewMode === "GAME" || gameDeckPlaying ||
+        gameAuthoringLocked() ||
+        !sceneFocused
+      ) return;
+      event.preventDefault();
+      projectGameWorkspaceAction({
+        type: "SELECT_SCENE",
+        sceneId: gameWorkspaceSceneId(),
+      });
+    };
+    svg.onkeydown = handleSceneEscape;
+    if (draw2GameSceneViewport !== undefined) {
+      draw2GameSceneViewport.onkeydown = handleSceneEscape;
+    }
+    const selectGameTrack = (track: ModeDeckTrack): void => {
+      selectGameObject(track.id, { openInspector: true });
+    };
+
+    const placementPointFor = (
+      track: ModeDeckTrack,
+      placement?: GamePlaygroundPlacement,
+    ): { readonly x: number; readonly y: number } => {
+      if (
+        physicsPlayerBody !== undefined &&
+        (track.role ?? gameObjectRoleFor(track.id, track.kind)) === "PLAYER"
+      ) return { x: physicsPlayerBody.position.x, y: physicsPlayerBody.position.y };
+      const runtimePosition = gamePlaygroundRuntimeState?.positions[track.id];
+      if (runtimePosition !== undefined) return runtimePosition;
+      return scenePointForTrack(track, placement);
+    };
+    const visibleMargin = gameSceneViewMode === "GAME" ? 2 : 0;
+    const isInCamera = (point: { readonly x: number; readonly y: number }): boolean =>
+      point.x >= cameraX - visibleMargin &&
+      point.x <= cameraX + cameraWidth + visibleMargin &&
+      point.y >= cameraY - visibleMargin &&
+      point.y <= cameraY + cameraHeight + visibleMargin;
+    const objects = createSvgElement("g");
+    objects.setAttribute("class", "draw2-game-scene-objects draw2-game-scene-free-objects");
+    const miniObjects = createSvgElement("g");
+    miniObjects.setAttribute("class", "draw2-game-scene-minimap-objects");
+    const minimapBuckets = new Set<string>();
+    const minimapBucketWidth = Math.max(1, worldWidth / 64);
+    const minimapBucketHeight = Math.max(1, worldHeight / 64);
+    const visualUnit = Math.min(1, 64 / Math.max(worldWidth, worldHeight));
+
+    for (const entry of entries) {
+      const { track, placement } = entry;
+      const role = track.role ?? gameObjectRoleFor(track.id, track.kind);
+      const rawPoint = placementPointFor(track, placement);
+      const point = finiteWorld
+        ? {
+          x: clampPlaygroundCoordinate(rawPoint.x, 0.5, worldWidth - 0.5),
+          y: clampPlaygroundCoordinate(rawPoint.y, 0.5, worldHeight - 0.5),
+        }
+        : rawPoint;
+      const bucketKey = `${Math.floor(point.x / minimapBucketWidth)},${Math.floor(point.y / minimapBucketHeight)}`;
+      if (!minimapBuckets.has(bucketKey) || track.id === selectedGameTrackId) {
+        minimapBuckets.add(bucketKey);
+        const miniMarker = createSvgElement("circle");
+        setAttributes(miniMarker, {
+          cx: point.x,
+          cy: point.y,
+          r: track.id === selectedGameTrackId ? 0.9 : 0.55,
+        });
+        miniMarker.setAttribute("class", "draw2-game-scene-minimap-object");
+        miniMarker.classList.add(`is-${role.toLocaleLowerCase()}`);
+        miniObjects.append(miniMarker);
+      }
+      if (!isInCamera(point)) continue;
+      const group = createSvgElement("g");
+      group.setAttribute("class", "draw2-game-scene-object draw2-game-scene-free-object");
+      group.setAttribute("data-game-scene-track-id", track.id);
+      group.setAttribute("role", "button");
+      group.setAttribute("tabindex", "0");
+      group.setAttribute("aria-label", `${track.label}を選択`);
+      if (track.id === selectedGameTrackId) group.classList.add("is-selected");
+      group.classList.add(`is-${role.toLocaleLowerCase()}`);
+      const reference = placement?.reference ??
+        (role === "PLAYER" ? gamePlayground.player : undefined);
+      const playerRuntime = role === "PLAYER"
+        ? gamePlaygroundRuntimeState
+        : undefined;
+      const runtimeMotion = playerRuntime?.motion ?? "IDLE";
+      const runtimeDirection = playerRuntime?.facing;
+      const drawSnapshot = getAssetBridge()?.snapshot();
+      const drawBinding = gameDeckBindings.find((binding) =>
+        binding.trackId === track.id && binding.kind === "DRAW"
+      );
+      const animationBinding = gameAnimationBindings.find((binding) =>
+        binding.trackId === track.id
+      );
+      const animationReferences = role === "PLAYER"
+        ? findGameAnimationClips({
+          track,
+          drawDefinitions: drawSnapshot?.assetDefinitions ?? [],
+          ...(drawBinding === undefined ? {} : { boundDrawAssetId: drawBinding.assetId }),
+          ...(drawBinding?.assetDefinitionId === undefined ? {} : { boundDrawDefinitionId: drawBinding.assetDefinitionId }),
+        })
+        : [];
+      const runtimeReference = playerRuntime === undefined
+        ? undefined
+        : animationReferences.find((candidate) =>
+          gameAnimationClipMatchesRuntime({
+            clip: candidate,
+            motion: runtimeMotion,
+            direction: runtimeDirection,
+          })
+        );
+      const boundReference = animationBinding === undefined
+        ? undefined
+        : animationReferences.find((candidate) =>
+          candidate.definitionId === animationBinding.assetDefinitionId &&
+          candidate.clipKey === animationBinding.clipKey
+        );
+      const animationReference = runtimeReference ?? boundReference;
+      const animationFrameIds = animationBinding !== undefined &&
+          boundReference?.id === animationReference?.id
+        ? animationBinding.frameIds
+        : animationReference?.clip.frameIds ?? [];
+      const playerAnimationFrameIndex = playerRuntime === undefined
+        ? undefined
+        : gamePlaygroundAnimationFrameIndex({
+          motion: playerRuntime.motion,
+          frameCount: animationFrameIds.length,
+          tick: playerRuntime.tick,
+          motionTicksRemaining: playerRuntime.motionTicksRemaining,
+        });
+      const referenceFrameIndex = role === "PLAYER"
+        ? playerAnimationFrameIndex
+        : previewFrameIndex;
+      const animationFrameId = playerAnimationFrameIndex === undefined
+        ? undefined
+        : animationFrameIds[playerAnimationFrameIndex] ?? animationFrameIds[0];
+      const animationSourceFrame = animationFrameId === undefined
+        ? undefined
+        : animationReference?.clip.sourceFrames?.find((frame) =>
+          frame.sourceFrameId === animationFrameId
+        ) ?? animationReference?.clip.sourceFrames?.[0];
+      const playgroundSourceFrame = reference?.sourceFrames === undefined ||
+          reference.sourceFrames.length === 0 || referenceFrameIndex === undefined
+        ? reference?.sourceFrames?.find((frame) =>
+          frame.sourceFrameId === reference?.sourceFrameId
+        ) ?? reference?.sourceFrames?.[0]
+        : reference.sourceFrames[((referenceFrameIndex % reference.sourceFrames.length) + reference.sourceFrames.length) % reference.sourceFrames.length];
+      const sourceFrame = animationSourceFrame ?? playgroundSourceFrame;
+      const dataUrl = animationReference !== undefined && animationSourceFrame !== undefined
+        ? spriteDataUrlFor(
+          animationReference,
+          animationSourceFrame,
+          animationBinding?.flipX ?? animationSourceFrame.flipX ?? animationReference.clip.flipX ?? false,
+          animationBinding?.flipY ?? animationSourceFrame.flipY ?? animationReference.clip.flipY ?? false,
+        )
+        : gamePlaygroundReferenceDataUrlFor(reference, referenceFrameIndex);
+      const sourceRect = sourceFrame?.rect ?? reference?.region ?? reference?.sourceFrames?.[0]?.rect;
+      if (activeRuntimeType !== undefined && role === "PLAYER") {
+        group.dataset.gameRuntimeType = activeRuntimeType;
+        group.dataset.gamePlayerX = String(point.x);
+        group.dataset.gamePlayerY = String(point.y);
+        if (playerRuntime !== undefined) {
+          group.dataset.gamePlayerMotion = playerRuntime.motion;
+          group.dataset.gamePlayerDirection = playerRuntime.facing;
+          group.dataset.gamePlayerFrame = String((playerAnimationFrameIndex ?? 0) + 1);
+          root.dataset.gamePlayerMotion = playerRuntime.motion;
+          root.dataset.gamePlayerDirection = playerRuntime.facing;
+          root.dataset.gamePlayerFrame = String((playerAnimationFrameIndex ?? 0) + 1);
+        }
+        root.dataset.gamePlayerX = String(point.x);
+        root.dataset.gamePlayerY = String(point.y);
+      }
+      if (referenceFrameIndex !== undefined && sourceFrame !== undefined) {
+        group.dataset.gameAnimationFrame = String(referenceFrameIndex + 1);
+        group.dataset.gameAnimationFrameId = sourceFrame.sourceFrameId;
+      }
+      const aspect = sourceRect === undefined ? 1 : sourceRect.width / Math.max(1, sourceRect.height);
+      const baseSize = placement?.scale ?? 1;
+      const spriteHeight = Math.max(1.5, 8 * baseSize * visualUnit);
+      const spriteWidth = Math.max(3, spriteHeight * aspect);
+      if (dataUrl !== undefined) {
+        const image = createSvgElement("image");
+        setAttributes(image, {
+          x: point.x - spriteWidth / 2,
+          y: point.y - spriteHeight / 2,
+          width: spriteWidth,
+          height: spriteHeight,
+        });
+        image.setAttribute("href", dataUrl);
+        image.setAttribute("preserveAspectRatio", "xMidYMid meet");
+        image.setAttribute("class", "draw2-game-scene-sprite");
+        image.setAttribute("aria-hidden", "true");
+        group.classList.add("has-sprite");
+        group.append(image);
+      }
+      const marker = createSvgElement("circle");
+      setAttributes(marker, { cx: point.x, cy: point.y, r: dataUrl === undefined ? 1.5 : 0.7 });
+      marker.setAttribute("class", "draw2-game-scene-marker");
+      group.append(marker);
+      if (track.id === selectedGameTrackId) {
+        const selection = createSvgElement("rect");
+        setAttributes(selection, {
+          x: point.x - spriteWidth / 2 - 1,
+          y: point.y - spriteHeight / 2 - 1,
+          width: spriteWidth + 2,
+          height: spriteHeight + 2,
+          rx: 0.6,
+        });
+        selection.setAttribute("class", "draw2-game-scene-selection-box");
+        group.append(selection);
+      }
+      group.addEventListener("click", () => selectGameTrack(track));
+      group.addEventListener("keydown", (event) => {
+        if ((event as KeyboardEvent).key !== "Enter" && (event as KeyboardEvent).key !== " ") return;
+        event.preventDefault();
+        selectGameTrack(track);
+      });
+      if (placement !== undefined && !gameAuthoringLocked()) {
+        let dragStart: { pointerId: number; x: number; y: number } | undefined;
+        group.addEventListener("pointerdown", (event) => {
+          const pointer = event as PointerEvent;
+          if (pointer.button !== 0) return;
+          const start = pointerWorldPoint(pointer);
+          if (start === undefined) return;
+          pointer.preventDefault();
+          dragStart = { pointerId: pointer.pointerId, x: start.x, y: start.y };
+          group.setPointerCapture?.(pointer.pointerId);
+          const move = (moveEvent: Event): void => {
+            if (dragStart === undefined) return;
+            const next = pointerWorldPoint(moveEvent as PointerEvent);
+            if (next === undefined) return;
+            const dx = next.x - dragStart.x;
+            const dy = next.y - dragStart.y;
+            group.setAttribute("transform", `translate(${dx} ${dy})`);
+          };
+          const end = (endEvent: Event): void => {
+            documentRef.removeEventListener("pointermove", move);
+            documentRef.removeEventListener("pointerup", end);
+            if (dragStart === undefined) return;
+            const next = pointerWorldPoint(endEvent as PointerEvent);
+            const current = dragStart;
+            dragStart = undefined;
+            group.removeAttribute("transform");
+            if (next === undefined) return;
+            const updated = {
+              ...placement,
+              x: clampPlaygroundCoordinate(placement.x + next.x - current.x, 0, worldWidth),
+              y: clampPlaygroundCoordinate(placement.y + next.y - current.y, 0, worldHeight),
+              snapToGrid: false as const,
+            };
+            upsertGamePlaygroundPlacement(updated);
+            queueGameEditorPersistenceSave("playground-placement-drag");
+            renderGameCustomPanels();
+          };
+          documentRef.addEventListener("pointermove", move);
+          documentRef.addEventListener("pointerup", end);
+        });
+      }
+      objects.append(group);
+    }
+    const frame = createSvgElement("rect");
+    setAttributes(frame, { x: 0, y: 0, width: worldWidth, height: worldHeight, rx: 0.8 });
+    frame.setAttribute("class", "draw2-game-scene-frame draw2-game-scene-free-frame");
+    svg.replaceChildren(
+      map,
+      ...(worldImage === undefined ? [] : [worldImage]),
+      worldCellLayer,
+      legacyTileLayer,
+      objects,
+      frame,
+    );
+    if (draw2GameSceneMinimapSvg !== undefined) {
+      draw2GameSceneMinimapSvg.setAttribute("viewBox", `0 0 ${worldWidth} ${worldHeight}`);
+      const miniChunks = createSvgElement("g");
+      miniChunks.setAttribute("class", "draw2-game-scene-minimap-chunks");
+      const chunkStride = Math.max(1, Math.ceil(worldMap.chunks.length / 1024));
+      for (let index = 0; index < worldMap.chunks.length; index += chunkStride) {
+        const chunk = worldMap.chunks[index];
+        if (chunk === undefined) continue;
+        const chunkElement = createSvgElement("rect");
+        setAttributes(chunkElement, {
+          x: chunk.x * worldMap.chunkSize,
+          y: chunk.y * worldMap.chunkSize,
+          width: worldMap.chunkSize,
+          height: worldMap.chunkSize,
+        });
+        chunkElement.setAttribute("class", "draw2-game-scene-minimap-chunk");
+        miniChunks.append(chunkElement);
+      }
+      const miniCamera = createSvgElement("rect");
+      setAttributes(miniCamera, {
+        x: cameraX,
+        y: cameraY,
+        width: cameraWidth,
+        height: cameraHeight,
+      });
+      miniCamera.setAttribute("class", "draw2-game-scene-minimap-camera");
+      draw2GameSceneMinimapSvg.replaceChildren(
+        map.cloneNode(true),
+        miniChunks,
+        miniObjects,
+        miniCamera,
+      );
+    }
+    renderGameUiNodes();
+    if (draw2GameSceneViewportStatus !== undefined) {
+      const residentGridWidth = Math.ceil(viewport.width / worldMap.chunkSize) + 2;
+      const residentGridHeight = Math.ceil(viewport.height / worldMap.chunkSize) + 2;
+      const residentChunkCount = residentGridWidth * residentGridHeight <= 4096
+        ? gamePlaygroundWorldResidentChunkKeys(worldMap, viewport, 1).length
+        : undefined;
+      const loadedCells = worldCells.length;
+      const frameStatus = animationFrameCount === 0
+        ? ""
+        : ` · F${(gameDeckFrame % animationFrameCount) + 1}/${animationFrameCount}`;
+      draw2GameSceneViewportStatus.textContent =
+        `${worldWidth}×${worldHeight} · ${worldMap.chunkSize}×${worldMap.chunkSize} Chunk · ` +
+        `${worldMap.chunks.length} loaded / ` +
+        `${residentChunkCount === undefined ? "wide" : residentChunkCount} resident · ` +
+        `${viewportArea > 20_000 ? "zoom for cells" : loadedCells + " cells"} · ` +
+        `${entries.length} objects${frameStatus}`;
+    }
+  };
   const syncGameSceneViewMode = (): void => {
     draw2GameSceneViewport?.setAttribute(
       "data-game-view-mode",
@@ -25930,11 +31755,18 @@ export function bootstrapDraw2Workspace(
     const selected = gameDeckTracks.find((track) =>
       track.id === selectedGameTrackId
     );
+    const workspaceSelection = gameWorkspaceContext.selection;
+    const selectedEvent = workspaceSelection.kind === "EVENT"
+      ? gameEventCards.find((card) => card.eventId === workspaceSelection.eventId)
+      : undefined;
     const eyebrow = documentRef.createElement("span");
     eyebrow.className = "draw2-eyebrow";
     eyebrow.textContent = "選択中";
     const title = documentRef.createElement("strong");
-    if (selected === undefined) {
+    if (selectedEvent !== undefined) {
+      title.textContent = "イベント: " +
+        (selectedEvent.label || selectedEvent.eventId);
+    } else if (selected === undefined) {
       title.textContent = "オブジェクトを選択";
     } else {
       const role = selected.role ?? gameObjectRoleFor(selected.id, selected.kind);
@@ -25982,12 +31814,7 @@ export function bootstrapDraw2Workspace(
       : gameEventCards.find((card) =>
         card.eventId === selectedGameEventCardId
       );
-    if (byId !== undefined) return byId;
-    if (selectedGameTrackId === undefined) return undefined;
-    return gameEventCards.find((card) =>
-      card.sourceTrackId === selectedGameTrackId ||
-      card.targetTrackId === selectedGameTrackId
-    );
+    return byId;
   };
   const syncGameEventCardTargets = (): void => {
     if (draw2GameEventTarget === undefined) return;
@@ -26005,21 +31832,14 @@ export function bootstrapDraw2Workspace(
     }
     draw2GameEventTarget.value = current;
   };
-  const syncGameEventCardEditor = (): void => {
+  const syncGameEventCardEditor = (draft?: {
+    readonly condition?: GameEventCondition;
+    readonly action?: GameEventAction;
+  }): void => {
     const selected = gameDeckTracks.find((track) =>
       track.id === selectedGameTrackId
     );
-    let card = gameEventCardForEditor();
-    if (
-      card !== undefined &&
-      selected !== undefined &&
-      card.sourceTrackId !== selected.id &&
-      card.targetTrackId !== selected.id
-    ) {
-      card = undefined;
-      selectedGameEventCardId = undefined;
-    }
-    if (card !== undefined) selectedGameEventCardId = card.eventId;
+    const card = gameEventCardForEditor();
     const selectedRole = selected === undefined
       ? undefined
       : selected.role ?? gameObjectRoleFor(selected.id, selected.kind);
@@ -26032,9 +31852,9 @@ export function bootstrapDraw2Workspace(
       ?.message ??
       "近くで話しかけると会話を表示します。";
     const who = card?.who ?? "PLAYER";
-    const condition = card?.condition ??
+    const condition = draft?.condition ?? card?.condition ??
       (selectedRole === "NPC" ? "INTERACT" : "TOUCH");
-    const action = card?.action ??
+    const action = draft?.action ?? card?.action ??
       (selectedRole === "NPC" ? "SHOW_DIALOGUE" : "DAMAGE");
     const setOptions = (
       select: HTMLSelectElement | undefined,
@@ -26059,6 +31879,62 @@ export function bootstrapDraw2Workspace(
       condition,
     );
     setOptions(draw2GameEventAction, GAME_EVENT_ACTION_OPTIONS, action);
+    const itemOptions: readonly {
+      readonly value: string;
+      readonly label: string;
+    }[] = [
+      { value: "", label: "選択してください" },
+      ...gameItems.map((item) => ({
+        value: item.itemId,
+        label: item.label,
+      })),
+    ];
+    const recipeOptions: readonly {
+      readonly value: string;
+      readonly label: string;
+    }[] = [
+      { value: "", label: "選択してください" },
+      ...gameRecipes.map((recipe) => ({
+        value: recipe.recipeId,
+        label: recipe.label,
+      })),
+    ];
+    const blockOptions: readonly {
+      readonly value: string;
+      readonly label: string;
+    }[] = [
+      { value: "", label: "選択してください" },
+      ...gameBlockTypes.map((blockType) => ({
+        value: blockType.blockTypeId,
+        label: blockType.label,
+      })),
+    ];
+    setOptions(draw2GameEventItem, itemOptions, card?.itemId ?? "");
+    setOptions(draw2GameEventRecipe, recipeOptions, card?.recipeId ?? "");
+    setOptions(draw2GameEventBlock, blockOptions, card?.blockTypeId ?? "");
+    const itemVisible = condition === "HAS_ITEM" ||
+      action === "GIVE_ITEM" || action === "TAKE_ITEM";
+    const recipeVisible = action === "CRAFT_ITEM";
+    const blockVisible = action === "BREAK_BLOCK" || action === "PLACE_BLOCK";
+    const amountVisible = action === "DAMAGE" || condition === "HAS_ITEM" ||
+      action === "GIVE_ITEM" || action === "TAKE_ITEM";
+    if (draw2GameEventItemField !== undefined) {
+      draw2GameEventItemField.hidden = !itemVisible;
+    }
+    if (draw2GameEventRecipeField !== undefined) {
+      draw2GameEventRecipeField.hidden = !recipeVisible;
+    }
+    if (draw2GameEventBlockField !== undefined) {
+      draw2GameEventBlockField.hidden = !blockVisible;
+    }
+    if (draw2GameEventAmountField !== undefined) {
+      draw2GameEventAmountField.hidden = !amountVisible;
+    }
+    if (draw2GameEventAmountLabel !== undefined) {
+      draw2GameEventAmountLabel.textContent = action === "DAMAGE"
+        ? "ダメージ量"
+        : "個数";
+    }
     syncGameEventCardTargets();
     if (draw2GameEventTarget !== undefined) {
       draw2GameEventTarget.value = card?.targetTrackId ??
@@ -26076,7 +31952,8 @@ export function bootstrapDraw2Workspace(
         ? "rpg.tap"
         : "rpg.interact";
     }
-    const disabled = selected === undefined;
+    const editorAvailable = selected !== undefined || card !== undefined;
+    const disabled = !editorAvailable || gameAuthoringLocked();
     for (
       const control of [
         draw2GameEventWho,
@@ -26084,6 +31961,9 @@ export function bootstrapDraw2Workspace(
         draw2GameEventAction,
         draw2GameEventTarget,
         draw2GameEventAmount,
+        draw2GameEventItem,
+        draw2GameEventRecipe,
+        draw2GameEventBlock,
         draw2GameEventMessage,
       ]
     ) {
@@ -26093,16 +31973,39 @@ export function bootstrapDraw2Workspace(
       draw2GameEventApply.disabled = disabled;
     }
     if (draw2GameEventClear !== undefined) {
-      draw2GameEventClear.disabled = card === undefined;
+      draw2GameEventClear.disabled = card === undefined ||
+        gameAuthoringLocked();
     }
     if (draw2GameEventStatus !== undefined) {
-      draw2GameEventStatus.textContent = selected === undefined
-        ? "Hierarchyで主人公・NPC・オブジェクトを選択してください。"
+      draw2GameEventStatus.textContent = !editorAvailable
+        ? "Sceneまたはインベントリで主人公・NPC・オブジェクトを選択してください。"
+        : gameAuthoringLocked()
+        ? "Play / Release中はイベントを編集できません。"
         : card === undefined
         ? "新しいイベントカードを作成できます。"
         : "選択中のイベントカードを編集中です。";
     }
   };
+  const syncGameEventCardEditorFromControls = (): void => {
+    const condition = GAME_EVENT_CONDITION_OPTIONS.find((item) =>
+      item.value === draw2GameEventCondition?.value
+    )?.value;
+    const action = GAME_EVENT_ACTION_OPTIONS.find((item) =>
+      item.value === draw2GameEventAction?.value
+    )?.value;
+    syncGameEventCardEditor({
+      ...(condition === undefined ? {} : { condition }),
+      ...(action === undefined ? {} : { action }),
+    });
+  };
+  draw2GameEventCondition?.addEventListener(
+    "change",
+    syncGameEventCardEditorFromControls,
+  );
+  draw2GameEventAction?.addEventListener(
+    "change",
+    syncGameEventCardEditorFromControls,
+  );
   const renderGameEvents = (): void => {
     if (draw2GameEventList === undefined) return;
     if (gameEventCards.length > 0) {
@@ -26128,9 +32031,7 @@ export function bootstrapDraw2Workspace(
             (card.enabled ? "" : " · 無効");
           row.append(title, detail);
           row.addEventListener("click", () => {
-            selectedGameEventCardId = card.eventId;
-            selectedGameTrackId = card.targetTrackId ?? card.sourceTrackId;
-            renderGameCustomPanels();
+            openGameEvent(card.eventId);
           });
           return row;
         }),
@@ -26279,7 +32180,7 @@ export function bootstrapDraw2Workspace(
         const empty = documentRef.createElement("small");
         empty.className = "draw2-panel-status";
         empty.textContent = selected === undefined
-          ? "HierarchyでGameObjectを選択してください。"
+          ? "SceneまたはインベントリでGameObjectを選択してください。"
           : "AB分岐テンプレートを追加すると、Node Graphを編集できます。";
         draw2GameGraphNodes.replaceChildren(empty);
       } else {
@@ -26554,6 +32455,7 @@ export function bootstrapDraw2Workspace(
     update: (components: GameEditorComponent[]) => GameEditorComponent[],
     status = "機能設定をProjectへ保存しました。",
   ): void => {
+    if (gameAuthoringLocked()) return;
     const selected = selectedGameTrack();
     if (selected === undefined) return;
     const components = update(componentsForGameTrack(selected));
@@ -26599,6 +32501,18 @@ export function bootstrapDraw2Workspace(
         : status;
     }
   };
+  const updateSelectedGameTrackLabel = (label: string): void => {
+    if (gameAuthoringLocked()) return;
+    const selected = selectedGameTrack();
+    const nextLabel = label.trim();
+    if (selected === undefined || nextLabel.length === 0 || nextLabel === selected.label) return;
+    gameDeckTracks = gameDeckTracks.map((track) =>
+      track.id === selected.id ? { ...track, label: nextLabel } : track
+    );
+    renderModeDeckTracks(gameAssetTracks, gameDeckTracks, "game");
+    renderGameCustomPanels();
+    queueGameEditorPersistenceSave("game-track-label");
+  };
   const componentForAdd = (
     track: ModeDeckTrack,
     type: GameEditorComponent["type"],
@@ -26638,6 +32552,7 @@ export function bootstrapDraw2Workspace(
   const normalizeGameNodeSearchText = (value: string): string =>
     value.normalize("NFKC").toLocaleLowerCase();
   const renderGameNodeBoxFilter = (): void => {
+    if (!legacyGameUiEnabled) return;
     if (draw2GameNodeBox === undefined) return;
     const query = normalizeGameNodeSearchText(gameNodeBoxQuery.trim());
     let visibleTileCount = 0;
@@ -26747,34 +32662,181 @@ export function bootstrapDraw2Workspace(
         return "#94a3b8";
     }
   };
+  const componentIconId = (
+    type: GameEditorComponent["type"],
+  ): string => {
+    switch (type) {
+      case "TRANSFORM":
+        return "icon-anchor";
+      case "SPRITE":
+        return "icon-image";
+      case "AUDIO_SOURCE":
+        return "icon-wave";
+      case "TILEMAP":
+        return "icon-sheet";
+      case "COLLIDER":
+        return "icon-border";
+      case "RIGIDBODY":
+        return "icon-bounce";
+      case "CHARACTER_CONTROLLER":
+        return "icon-pan";
+      case "CAMERA":
+        return "icon-view";
+      case "BEHAVIOR":
+        return "icon-commands";
+      case "STATUS":
+        return "icon-star";
+      case "SKILL":
+        return "icon-fx";
+      case "BRAIN":
+        return "icon-tools";
+    }
+  };
+  const componentCardLabel = (
+    type: GameEditorComponent["type"],
+  ): string => {
+    switch (type) {
+      case "TRANSFORM":
+        return "位置";
+      case "SPRITE":
+        return "見た目";
+      case "AUDIO_SOURCE":
+        return "音";
+      case "TILEMAP":
+        return "マップ";
+      case "COLLIDER":
+        return "当たり判定";
+      case "RIGIDBODY":
+        return "重力・物理";
+      case "CHARACTER_CONTROLLER":
+        return "移動";
+      case "CAMERA":
+        return "カメラ";
+      case "BEHAVIOR":
+        return "イベント";
+      case "STATUS":
+        return "ステータス";
+      case "SKILL":
+        return "スキル";
+      case "BRAIN":
+        return "AI";
+    }
+  };
+  const gameComponentIsEnabled = (
+    component: GameEditorComponent,
+  ): boolean => {
+    switch (component.type) {
+      case "SPRITE":
+        return component.visible;
+      case "CAMERA":
+        return component.active;
+      case "TILEMAP":
+      case "TRANSFORM":
+        return true;
+      case "AUDIO_SOURCE":
+        return component.volume > 0;
+      default:
+        return component.enabled;
+    }
+  };
+  const gameComponentStateLabel = (
+    component: GameEditorComponent,
+  ): string => {
+    switch (component.type) {
+      case "COLLIDER":
+        return !component.enabled
+          ? "OFF"
+          : component.isTrigger
+          ? "TRIGGER"
+          : "SOLID";
+      case "RIGIDBODY":
+        return !component.enabled
+          ? "OFF"
+          : component.gravityScale === 0
+          ? "重力 OFF"
+          : "重力 ON";
+      case "CHARACTER_CONTROLLER":
+        return component.enabled ? "移動 ON" : "移動 OFF";
+      case "SPRITE":
+        return component.visible ? "表示 ON" : "表示 OFF";
+      case "CAMERA":
+        return component.active ? "ON" : "OFF";
+      case "AUDIO_SOURCE":
+        return component.volume > 0 ? "ON" : "OFF";
+      default:
+        return gameComponentIsEnabled(component) ? "ON" : "OFF";
+    }
+  };
+  const gameComponentStateTone = (
+    component: GameEditorComponent,
+  ): "on" | "off" | "trigger" => {
+    if (
+      component.type === "RIGIDBODY" &&
+      (component.enabled === false || component.gravityScale === 0)
+    ) return "off";
+    if (!gameComponentIsEnabled(component)) return "off";
+    return component.type === "COLLIDER" && component.isTrigger
+      ? "trigger"
+      : "on";
+  };
   const renderGameComponentCards = (): void => {
     if (draw2GameComponents === undefined) return;
     const selected = selectedGameTrack();
     if (selected === undefined) {
       const empty = documentRef.createElement("small");
       empty.className = "draw2-panel-status";
-      empty.textContent = "HierarchyでGameObjectを選択してください。";
+      empty.textContent = "対象なし";
       draw2GameComponents.replaceChildren(empty);
+      if (draw2GameComponentsStatus !== undefined) {
+        draw2GameComponentsStatus.textContent = "対象なし";
+      }
       return;
     }
     const components = componentsForGameTrack(selected);
+    const locked = gameAuthoringLocked();
+    if (draw2GameComponentsStatus !== undefined) {
+      const enabledCount = components.filter((component) =>
+        gameComponentIsEnabled(component)
+      ).length;
+      draw2GameComponentsStatus.textContent = components.length === 0
+        ? "機能なし"
+        : `${components.length}機能 · ON ${enabledCount}`;
+    }
     draw2GameComponents.replaceChildren(
       ...components.map((component) => {
         const card = documentRef.createElement("article");
         card.className = "draw2-game-component-card";
         card.dataset.gameComponentType = component.type;
+        card.dataset.gameComponentId = component.componentId;
+        card.dataset.gameComponentEnabled = String(
+          gameComponentIsEnabled(component),
+        );
         card.setAttribute("role", "listitem");
         card.style.setProperty(
           "--draw2-node-category-color",
           componentCategoryColor(component.type),
         );
+        const isExpanded = expandedGameComponentIds.has(
+          component.componentId,
+        );
+        const bodyId = `draw2GameComponentBody-${component.componentId.replace(
+          /[^A-Za-z0-9_-]/gu,
+          "-",
+        )}`;
         const heading = documentRef.createElement("div");
         heading.className = "draw2-game-component-card-heading";
+        const icon = createDraw2Icon(
+          documentRef,
+          componentIconId(component.type),
+          "draw2-game-component-card-icon",
+        );
         const toggle = documentRef.createElement("button");
         toggle.type = "button";
         toggle.className = "draw2-game-component-chip-toggle";
+        toggle.setAttribute("aria-expanded", String(isExpanded));
+        toggle.setAttribute("aria-controls", bodyId);
         const title = documentRef.createElement("strong");
-        title.textContent = componentLabel(component.type);
+        title.textContent = componentCardLabel(component.type);
         const summary = documentRef.createElement("small");
         summary.textContent = componentSummary(component);
         const chevron = createDraw2Icon(
@@ -26791,27 +32853,36 @@ export function bootstrapDraw2Workspace(
           }
           renderGameComponentCards();
         });
+        const state = documentRef.createElement("span");
+        state.className = "draw2-game-component-state";
+        state.dataset.state = gameComponentStateTone(component);
+        state.textContent = gameComponentStateLabel(component);
+        state.title = componentSummary(component);
         const remove = documentRef.createElement("button");
         remove.type = "button";
         remove.className = "draw2-button draw2-button-secondary";
         remove.textContent = component.type === "TRANSFORM" ? "必須" : "削除";
-        remove.disabled = component.type === "TRANSFORM";
+        remove.setAttribute(
+          "aria-label",
+          component.type === "TRANSFORM"
+            ? `${componentCardLabel(component.type)}は必須`
+            : `${componentCardLabel(component.type)}を削除`,
+        );
+        remove.disabled = component.type === "TRANSFORM" || locked;
         remove.addEventListener("click", () => {
           updateSelectedGameComponents(
             (items) =>
               items.filter((item) =>
                 item.componentId !== component.componentId
               ),
-            `${componentLabel(component.type)}を削除しました。`,
+                `${componentLabel(component.type)}を削除しました。`,
           );
         });
-        heading.append(toggle, remove);
+        heading.append(icon, toggle, state, remove);
         card.append(heading);
         const body = documentRef.createElement("div");
         body.className = "draw2-game-component-card-body";
-        const isExpanded = expandedGameComponentIds.has(
-          component.componentId,
-        );
+        body.id = bodyId;
         card.classList.toggle("is-expanded", isExpanded);
         body.hidden = !isExpanded;
         switch (component.type) {
@@ -26820,8 +32891,7 @@ export function bootstrapDraw2Workspace(
             const y = numberControl(component.y);
             const selectedRole = selected.role ??
               gameObjectRoleFor(selected.id, selected.kind);
-            const snapToRpgGrid = selectedRole === "PLAYER" ||
-              selectedRole === "NPC";
+            const snapToRpgGrid = false;
             appendComponentField(body, "X", x);
             appendComponentField(body, "Y", y);
             x.addEventListener(
@@ -26965,8 +33035,8 @@ export function bootstrapDraw2Workspace(
                       : item
                   )
                 );
-              },
-            );
+          },
+        );
             tileSize.addEventListener(
               "change",
               () =>
@@ -27042,11 +33112,13 @@ export function bootstrapDraw2Workspace(
             const width = numberControl(component.width);
             const height = numberControl(component.height);
             const trigger = checkboxControl(component.isTrigger);
+            const enabled = checkboxControl(component.enabled);
             appendComponentField(body, "Shape", shape);
             appendComponentField(body, "Layer", layer);
             appendComponentField(body, "Width", width);
             appendComponentField(body, "Height", height);
             appendComponentField(body, "Is Trigger", trigger);
+            appendComponentField(body, "Enabled", enabled);
             const apply = () =>
               updateSelectedGameComponents(
                 (items) =>
@@ -27066,9 +33138,10 @@ export function bootstrapDraw2Workspace(
                           Number(height.value) || component.height,
                         ),
                         isTrigger: trigger.checked,
+                        enabled: enabled.checked,
                       }
                       : item
-                  ),
+                ),
                 trigger.checked
                   ? "Triggerを有効にしました。接触ではなくイベント起点になります。"
                   : "床・壁として設定しました。接触すると止まります。",
@@ -27078,6 +33151,7 @@ export function bootstrapDraw2Workspace(
             width.addEventListener("change", apply);
             height.addEventListener("change", apply);
             trigger.addEventListener("change", apply);
+            enabled.addEventListener("change", apply);
             break;
           }
           case "RIGIDBODY": {
@@ -27088,10 +33162,12 @@ export function bootstrapDraw2Workspace(
             const mass = numberControl(component.mass);
             const gravity = numberControl(component.gravityScale);
             const fixedRotation = checkboxControl(component.fixedRotation);
+            const enabled = checkboxControl(component.enabled);
             appendComponentField(body, "Body Type", bodyType);
             appendComponentField(body, "Mass", mass);
             appendComponentField(body, "Gravity Scale", gravity);
             appendComponentField(body, "Fixed Rotation", fixedRotation);
+            appendComponentField(body, "Enabled", enabled);
             const apply = () =>
               updateSelectedGameComponents((items) =>
                 items.map((item) =>
@@ -27103,27 +33179,31 @@ export function bootstrapDraw2Workspace(
                       mass: Math.max(
                         0.01,
                         Number(mass.value) || component.mass,
-                      ),
-                      gravityScale: Number(gravity.value) || 0,
-                      fixedRotation: fixedRotation.checked,
-                    }
-                    : item
+                        ),
+                        gravityScale: Number(gravity.value) || 0,
+                        fixedRotation: fixedRotation.checked,
+                        enabled: enabled.checked,
+                      }
+                      : item
                 )
               );
             bodyType.addEventListener("change", apply);
             mass.addEventListener("change", apply);
             gravity.addEventListener("change", apply);
             fixedRotation.addEventListener("change", apply);
+            enabled.addEventListener("change", apply);
             break;
           }
           case "CHARACTER_CONTROLLER": {
             const speed = numberControl(component.moveSpeed);
             const stepHeight = numberControl(component.stepHeight);
             const fixedStep = numberControl(component.fixedStep, "1");
+            const enabled = checkboxControl(component.enabled);
             fixedStep.min = "1";
             appendComponentField(body, "Move Speed", speed);
             appendComponentField(body, "Step Height", stepHeight);
             appendComponentField(body, "Fixed Step", fixedStep);
+            appendComponentField(body, "Enabled", enabled);
             const apply = () =>
               updateSelectedGameComponents((items) =>
                 items.map((item) =>
@@ -27136,17 +33216,19 @@ export function bootstrapDraw2Workspace(
                         Number(speed.value) || component.moveSpeed,
                       ),
                       stepHeight: Math.max(0, Number(stepHeight.value) || 0),
-                      fixedStep: Math.max(
-                        1,
-                        Math.round(Number(fixedStep.value) || 1),
-                      ),
-                    }
-                    : item
+                        fixedStep: Math.max(
+                          1,
+                          Math.round(Number(fixedStep.value) || 1),
+                        ),
+                        enabled: enabled.checked,
+                      }
+                      : item
                 )
               );
             speed.addEventListener("change", apply);
             stepHeight.addEventListener("change", apply);
             fixedStep.addEventListener("change", apply);
+            enabled.addEventListener("change", apply);
             break;
           }
           case "CAMERA": {
@@ -27493,12 +33575,173 @@ export function bootstrapDraw2Workspace(
             break;
           }
         }
+        if (locked) {
+          for (const control of body.querySelectorAll<
+            HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | HTMLButtonElement
+          >("input, select, textarea, button")) {
+            control.disabled = true;
+          }
+        }
         card.append(body);
         return card;
       }),
     );
   };
+  type GameQuickFlagType =
+    | "COLLIDER"
+    | "RIGIDBODY"
+    | "CHARACTER_CONTROLLER";
+  type GameQuickFlagDefinition = {
+    readonly type: GameQuickFlagType;
+    readonly label: string;
+    readonly icon: string;
+    readonly enabled: (component: GameEditorComponent | undefined) => boolean;
+  };
+  const gameQuickFlagDefinitions: readonly GameQuickFlagDefinition[] = [
+    {
+      type: "CHARACTER_CONTROLLER",
+      label: "移動",
+      icon: "icon-pan",
+      enabled: (component) => component?.type === "CHARACTER_CONTROLLER" &&
+        component.enabled,
+    },
+    {
+      type: "COLLIDER",
+      label: "当たり判定",
+      icon: "icon-border",
+      enabled: (component) => component?.type === "COLLIDER" &&
+        component.enabled,
+    },
+    {
+      type: "RIGIDBODY",
+      label: "重力",
+      icon: "icon-bounce",
+      enabled: (component) => component?.type === "RIGIDBODY" &&
+        component.enabled && component.gravityScale !== 0,
+    },
+  ];
+  const applyGameQuickFlag = (
+    type: GameQuickFlagType,
+    enabled: boolean,
+  ): void => {
+    if (gameAuthoringLocked()) {
+      if (draw2GameComponentsStatus !== undefined) {
+        draw2GameComponentsStatus.textContent =
+          "Play / Release中はオブジェクトを編集できません。";
+      }
+      return;
+    }
+    const selected = selectedGameTrack();
+    if (
+      selected === undefined ||
+      (gameWorkspaceContext.selection.kind !== "OBJECT" &&
+        gameWorkspaceContext.selection.kind !== "COMPONENT")
+    ) return;
+    const current = componentsForGameTrack(selected);
+    const existing = current.find((component) => component.type === type);
+    if (existing === undefined) {
+      if (!enabled) return;
+      const next = componentForAdd(selected, type);
+      if (next === undefined) return;
+      const adjusted = type === "RIGIDBODY" && next.type === "RIGIDBODY"
+        ? {
+          ...next,
+          bodyType: next.bodyType === "STATIC" ? "DYNAMIC" : next.bodyType,
+          gravityScale: Math.max(1, next.gravityScale),
+          enabled: true,
+        }
+        : next;
+      expandedGameComponentIds.add(adjusted.componentId);
+      projectGameWorkspaceAction(
+        {
+          type: "SELECT_COMPONENT",
+          trackId: selected.id,
+          componentId: adjusted.componentId,
+        },
+        { render: false },
+      );
+      updateSelectedGameComponents(
+        (items) => [...items, adjusted],
+        `${componentCardLabel(type)}をONにしました。`,
+      );
+      return;
+    }
+    expandedGameComponentIds.add(existing.componentId);
+    updateSelectedGameComponents(
+      (items) =>
+        items.map((item) => {
+          if (item.componentId !== existing.componentId) return item;
+          if (type === "COLLIDER" && item.type === "COLLIDER") {
+            return { ...item, enabled };
+          }
+          if (type === "CHARACTER_CONTROLLER" && item.type === "CHARACTER_CONTROLLER") {
+            return { ...item, enabled };
+          }
+          if (type === "RIGIDBODY" && item.type === "RIGIDBODY") {
+            return {
+              ...item,
+              enabled: enabled ? true : item.enabled,
+              gravityScale: enabled && item.gravityScale === 0
+                ? 1
+                : enabled
+                ? item.gravityScale
+                : 0,
+            };
+          }
+          return item;
+        }),
+      `${componentCardLabel(type)}を${enabled ? "ON" : "OFF"}にしました。`,
+    );
+  };
+  const renderGameQuickFlags = (): void => {
+    if (draw2GameQuickFlagsGrid === undefined) return;
+    const objectContext = gameWorkspaceContext.selection.kind === "OBJECT" ||
+      gameWorkspaceContext.selection.kind === "COMPONENT";
+    const selected = objectContext ? selectedGameTrack() : undefined;
+    const components = selected === undefined
+      ? []
+      : componentsForGameTrack(selected);
+    draw2GameQuickFlagsGrid.replaceChildren(
+      ...gameQuickFlagDefinitions.map((definition) => {
+        const component = components.find((candidate) =>
+          candidate.type === definition.type
+        );
+        const enabled = definition.enabled(component);
+        const card = documentRef.createElement("label");
+        card.className = "draw2-game-quick-flag";
+        card.setAttribute("role", "listitem");
+        card.dataset.gameComponentType = definition.type;
+        card.dataset.state = enabled ? "on" : "off";
+        const icon = createDraw2Icon(
+          documentRef,
+          definition.icon,
+          "draw2-game-quick-flag-icon",
+        );
+        const copy = documentRef.createElement("span");
+        copy.className = "draw2-game-quick-flag-copy";
+        const title = documentRef.createElement("strong");
+        title.textContent = definition.label;
+        const state = documentRef.createElement("small");
+        state.textContent = enabled ? "ON" : "OFF";
+        copy.append(title, state);
+        const input = documentRef.createElement("input");
+        input.type = "checkbox";
+        input.checked = enabled;
+        input.disabled = selected === undefined || gameAuthoringLocked();
+        input.setAttribute(
+          "aria-label",
+          `${definition.label}を${enabled ? "OFF" : "ON"}`,
+        );
+        input.addEventListener("change", () => {
+          applyGameQuickFlag(definition.type, input.checked);
+        });
+        card.append(icon, copy, input);
+        return card;
+      }),
+    );
+  };
   const renderGameSystemsDeck = (): void => {
+    if (!legacyGameUiEnabled) return;
     if (gameAssetTracks === undefined) return;
     const cards = documentRef.createElement("div");
     cards.className = "draw2-game-system-card-list";
@@ -27603,9 +33846,10 @@ export function bootstrapDraw2Workspace(
       draw2GameInspectorParent.append(option);
     }
     draw2GameInspectorParent.value = selected.parentTrackId ?? "";
-    draw2GameInspectorParent.disabled = false;
+    draw2GameInspectorParent.disabled = gameAuthoringLocked();
   };
   const syncGamePhysicsInspector = (): void => {
+    const locked = gameAuthoringLocked();
     const fields: readonly [HTMLInputElement | undefined, number][] = [
       [draw2GamePhysicsGravityX, gamePhysics2D.gravity.x],
       [draw2GamePhysicsGravityY, gamePhysics2D.gravity.y],
@@ -27615,10 +33859,23 @@ export function bootstrapDraw2Workspace(
       [draw2GamePhysicsBounciness, gamePhysics2D.defaultMaterial.bounciness],
     ];
     for (const [field, value] of fields) {
-      if (field !== undefined) field.value = String(value);
+      if (field !== undefined) {
+        field.value = String(value);
+        field.disabled = locked;
+      }
+    }
+    if (draw2GamePhysicsApply !== undefined) {
+      draw2GamePhysicsApply.disabled = locked;
     }
   };
   const applyGamePhysicsFromInspector = (): void => {
+    if (gameAuthoringLocked()) {
+      if (draw2GamePhysicsStatus !== undefined) {
+        draw2GamePhysicsStatus.textContent =
+          "Play / Release中はScene物理設定を編集できません。";
+      }
+      return;
+    }
     const candidate: Partial<Physics2DSettings> = {
       gravity: {
         x: Number(draw2GamePhysicsGravityX?.value),
@@ -27650,11 +33907,13 @@ export function bootstrapDraw2Workspace(
   };
   const syncGameSceneRulesPanel = (): void => {
     const rules = gameSceneRules;
+    const locked = gameAuthoringLocked();
     if (draw2GameSceneRulesSummary !== undefined) {
       draw2GameSceneRulesSummary.textContent = sceneRulesSummary(rules);
     }
     if (draw2GameSceneRulesRuntime !== undefined) {
       draw2GameSceneRulesRuntime.value = rules.runtimeFamily;
+      draw2GameSceneRulesRuntime.disabled = locked;
       for (const option of [...draw2GameSceneRulesRuntime.options]) {
         const family = option.value as GameSceneRules["runtimeFamily"];
         if (GAME_RUNTIME_FAMILY_LABELS[family] !== undefined) {
@@ -27664,6 +33923,7 @@ export function bootstrapDraw2Workspace(
     }
     if (draw2GameSceneRulesGravity !== undefined) {
       draw2GameSceneRulesGravity.value = rules.gravity;
+      draw2GameSceneRulesGravity.disabled = locked;
       for (const option of [...draw2GameSceneRulesGravity.options]) {
         const gravity = option.value as GameSceneRules["gravity"];
         const definition = GAME_SCENE_GRAVITY_OPTIONS.find((item) =>
@@ -27682,10 +33942,23 @@ export function bootstrapDraw2Workspace(
       [draw2GameSceneRulesCamera, rules.cameraFollow],
     ];
     for (const [checkbox, checked] of checkboxes) {
-      if (checkbox !== undefined) checkbox.checked = checked;
+      if (checkbox !== undefined) {
+        checkbox.checked = checked;
+        checkbox.disabled = locked;
+      }
+    }
+    if (draw2GameSceneRulesApply !== undefined) {
+      draw2GameSceneRulesApply.disabled = locked;
     }
   };
   const applyGameSceneRulesFromInspector = (): void => {
+    if (gameAuthoringLocked()) {
+      if (draw2GameSceneRulesStatus !== undefined) {
+        draw2GameSceneRulesStatus.textContent =
+          "Play / Release中はSceneルールを編集できません。";
+      }
+      return;
+    }
     const runtimeValues: readonly GameSceneRules["runtimeFamily"][] = [
       "RPG_GRID",
       "ACTION_PLATFORM",
@@ -27760,9 +34033,10 @@ export function bootstrapDraw2Workspace(
         "CAMERA";
     const camera = isCamera ? selectedGameCameraComponent() : undefined;
     const visible = camera !== undefined;
+    const locked = gameAuthoringLocked();
     if (draw2GameCameraQuickSettings !== undefined) {
       draw2GameCameraQuickSettings.hidden = !visible;
-      draw2GameCameraQuickSettings.inert = !visible;
+      draw2GameCameraQuickSettings.inert = !visible || locked;
       draw2GameCameraQuickSettings.setAttribute(
         "aria-hidden",
         String(!visible),
@@ -27810,6 +34084,18 @@ export function bootstrapDraw2Workspace(
         settings.shake.durationMs,
       );
     }
+    for (const control of [
+      draw2GameCameraQuickPixelPerfect,
+      draw2GameCameraQuickFollow,
+      draw2GameCameraQuickTarget,
+      draw2GameCameraQuickSmoothing,
+      draw2GameCameraQuickShake,
+      draw2GameCameraQuickShakeStrength,
+      draw2GameCameraQuickShakeDuration,
+      draw2GameCameraQuickTestShake,
+    ]) {
+      if (control !== undefined) control.disabled = locked;
+    }
     if (draw2GameCameraQuickStatus !== undefined) {
       draw2GameCameraQuickStatus.textContent =
         `${settings.pixelPerfect ? "ピクセルパーフェクト" : "通常表示"} · ` +
@@ -27818,6 +34104,13 @@ export function bootstrapDraw2Workspace(
     }
   };
   const applyGameCameraQuickSettings = (): void => {
+    if (gameAuthoringLocked()) {
+      if (draw2GameCameraQuickStatus !== undefined) {
+        draw2GameCameraQuickStatus.textContent =
+          "Play / Release中はカメラを編集できません。";
+      }
+      return;
+    }
     const selected = gameDeckTracks.find((track) =>
       track.id === selectedGameTrackId
     );
@@ -27893,6 +34186,11 @@ export function bootstrapDraw2Workspace(
     const selected = gameDeckTracks.find((track) =>
       track.id === selectedGameTrackId
     );
+    const workspaceSelection = gameWorkspaceContext.selection;
+    const selectedEvent = workspaceSelection.kind === "EVENT"
+      ? gameEventCards.find((card) => card.eventId === workspaceSelection.eventId)
+      : undefined;
+    const locked = gameAuthoringLocked();
     const currentBehaviorId = selected === undefined
       ? undefined
       : gameBehaviorIdForTrack(selected.id);
@@ -27907,14 +34205,33 @@ export function bootstrapDraw2Workspace(
     }
     const selectedBehavior = selectedGameBehavior();
     const dialogue = dialogueActionFromBehavior(selectedBehavior);
+    if (draw2GameInspectorState !== undefined) {
+      const state = selectedEvent !== undefined
+        ? "event"
+        : selected === undefined
+        ? "empty"
+        : selected.active === false
+        ? "off"
+        : "ready";
+      draw2GameInspectorState.dataset.state = state;
+      draw2GameInspectorState.textContent = state === "event"
+        ? "EVENT"
+        : state === "empty"
+        ? "未選択"
+        : state === "off"
+        ? "OFF"
+        : "選択中";
+    }
     if (draw2GameInspectorSelection !== undefined) {
-      draw2GameInspectorSelection.textContent = selected === undefined
-        ? "Trackを選択してください。"
-        : `選択中: ${selected.label} · ${selected.kind}`;
+      draw2GameInspectorSelection.textContent = selectedEvent !== undefined
+        ? `編集中 · ${selectedEvent.label || selectedEvent.eventId}`
+        : selected === undefined
+        ? "対象なし"
+        : `対象: ${selected.label}`;
     }
     if (draw2GameInspectorName !== undefined) {
       draw2GameInspectorName.value = selected?.label ?? "";
-      draw2GameInspectorName.disabled = selected === undefined;
+      draw2GameInspectorName.disabled = selected === undefined || locked;
     }
     if (draw2GameInspectorKind !== undefined) {
       draw2GameInspectorKind.value = selected !== undefined &&
@@ -27923,7 +34240,7 @@ export function bootstrapDraw2Workspace(
           )
         ? selected.kind
         : "EVENT";
-      draw2GameInspectorKind.disabled = selected === undefined;
+      draw2GameInspectorKind.disabled = selected === undefined || locked;
     }
     if (draw2GameInspectorRole !== undefined) {
       const role = selected?.role ??
@@ -27936,57 +34253,111 @@ export function bootstrapDraw2Workspace(
           )
           ? role
           : "CUSTOM";
-      draw2GameInspectorRole.disabled = selected === undefined;
+      draw2GameInspectorRole.disabled = selected === undefined || locked;
     }
     if (draw2GameInspectorActive !== undefined) {
       draw2GameInspectorActive.checked = selected?.active !== false;
-      draw2GameInspectorActive.disabled = selected === undefined;
+      draw2GameInspectorActive.disabled = selected === undefined || locked;
     }
     syncGameInspectorParentOptions(selected);
     syncGamePhysicsInspector();
     if (draw2GameInspectorApply !== undefined) {
-      draw2GameInspectorApply.disabled = selected === undefined;
+      draw2GameInspectorApply.disabled = selected === undefined || locked;
     }
     if (draw2GameInspectorFocus !== undefined) {
       draw2GameInspectorFocus.disabled = selected === undefined;
     }
     if (draw2GameEventTrigger !== undefined) {
       draw2GameEventTrigger.value = dialogue?.trigger ?? "rpg.interact";
-      draw2GameEventTrigger.disabled = selected === undefined;
+      draw2GameEventTrigger.disabled = selected === undefined || locked;
     }
     if (draw2GameEventMessage !== undefined) {
       draw2GameEventMessage.value = dialogue?.message ?? "";
-      draw2GameEventMessage.disabled = selected === undefined;
+      draw2GameEventMessage.disabled = selected === undefined || locked;
     }
     if (draw2GameEventApply !== undefined) {
-      draw2GameEventApply.disabled = selected === undefined;
+      draw2GameEventApply.disabled = selected === undefined || locked;
     }
     if (draw2GameEventClear !== undefined) {
-      draw2GameEventClear.disabled = selectedBehavior === undefined;
+      draw2GameEventClear.disabled = selectedBehavior === undefined || locked;
     }
     if (draw2GameEventStatus !== undefined) {
       draw2GameEventStatus.textContent = selectedBehavior === undefined
         ? "このTrackにはイベントがありません。"
         : "このTrackのイベントを編集中です。";
     }
-    if (draw2GameInspectorSelection !== undefined && selected !== undefined) {
+    if (
+      draw2GameInspectorSelection !== undefined && selected !== undefined &&
+      selectedEvent === undefined
+    ) {
       const role = selected.role ?? gameObjectRoleFor(selected.id, selected.kind);
       draw2GameInspectorSelection.textContent =
-        "選択中: " + selected.label + " · " + gameRoleLabel(role);
+        "対象: " + selected.label + " · " + gameRoleLabel(role);
     }
     syncGameCameraQuickSettings();
     syncGameEventCardEditor();
     if (draw2GameNodeBox !== undefined) {
+      const objectContext = gameWorkspaceContext.selection.kind === "OBJECT" ||
+        gameWorkspaceContext.selection.kind === "COMPONENT";
+      const nodeTarget = objectContext ? selected : undefined;
+      if (draw2GameNodeBoxTarget !== undefined) {
+        if (nodeTarget !== undefined) {
+          const role = nodeTarget.role ??
+            gameObjectRoleFor(nodeTarget.id, nodeTarget.kind);
+          draw2GameNodeBoxTarget.textContent = nodeTarget.label +
+            " · " + gameRoleLabel(role);
+          draw2GameNodeBoxTarget.dataset.state = "ready";
+        } else if (gameWorkspaceContext.selection.kind === "EVENT") {
+          draw2GameNodeBoxTarget.textContent = "イベント編集中";
+          draw2GameNodeBoxTarget.dataset.state = "event";
+        } else {
+          draw2GameNodeBoxTarget.textContent = "対象なし";
+          draw2GameNodeBoxTarget.dataset.state = "empty";
+        }
+      }
+      if (draw2GameNodeBoxHierarchyCta !== undefined) {
+        draw2GameNodeBoxHierarchyCta.hidden = nodeTarget !== undefined;
+      }
+      const dropLabel = nodeTarget === undefined
+        ? "対象を選択するとここへNodeをドロップできます"
+        : `${nodeTarget.label}へNodeをドロップ`;
+      if (draw2GameComponents !== undefined) {
+        draw2GameComponents.dataset.dropTargetId = nodeTarget?.id ?? "";
+        draw2GameComponents.dataset.gameDropState = nodeTarget === undefined
+          ? "no-selection"
+          : "ready";
+        draw2GameComponents.setAttribute("aria-label", dropLabel);
+      }
+      if (draw2GameComponentsDropHint !== undefined) {
+        draw2GameComponentsDropHint.dataset.dropTargetId = nodeTarget?.id ?? "";
+        draw2GameComponentsDropHint.dataset.gameDropState =
+          nodeTarget === undefined ? "no-selection" : "ready";
+        draw2GameComponentsDropHint.setAttribute("aria-label", dropLabel);
+        draw2GameComponentsDropHint.title = dropLabel;
+      }
       for (
         const tile of draw2GameNodeBox.querySelectorAll<HTMLButtonElement>(
           ".draw2-game-node-tile",
         )
       ) {
-        tile.disabled = selected === undefined;
-        tile.draggable = selected !== undefined;
+        tile.disabled = nodeTarget === undefined || locked;
+        tile.draggable = nodeTarget !== undefined && !locked;
+        const tileLabel = tile.querySelector("span")?.textContent?.trim() ??
+          tile.dataset.gameComponentType ??
+          "Node";
+        tile.setAttribute(
+          "aria-label",
+          nodeTarget === undefined
+            ? `${tileLabel}を追加（対象を選択）`
+            : `${nodeTarget.label}に${tileLabel}を追加`,
+        );
+        tile.title = nodeTarget === undefined
+          ? "SceneまたはインベントリでObjectを選択"
+          : `${nodeTarget.label}へ${tileLabel}をクリックまたはドラッグで追加`;
       }
     }
     renderGameNodeBoxFilter();
+    renderGameQuickFlags();
     renderGameComponentCards();
     setGameLogicMode(gameLogicMode);
   };
@@ -28057,13 +34428,11 @@ export function bootstrapDraw2Workspace(
     const template = rpgObjectTemplateFor(templateId);
     const existing = gameDeckTracks.find((track) =>
       (track.role ?? gameObjectRoleFor(track.id, track.kind)) ===
-        template.role &&
+      template.role &&
       ["PLAYER", "TILEMAP", "CAMERA"].includes(template.role)
     );
     if (existing !== undefined) {
-      selectedGameTrackId = existing.id;
-      renderGameCustomPanels();
-      setPanel("game-inspector");
+      selectGameObject(existing.id, { openInspector: true });
       setModeDeckStatus(
         "game",
         `${existing.label}を選択しました。右側で設定できます。`,
@@ -28076,25 +34445,37 @@ export function bootstrapDraw2Workspace(
       index += 1;
       id = `${template.prefix}-${index}`;
     }
+    const requestedName = windowRef.prompt(
+      "ヒエラルキーに表示する名前を入力してください",
+      templateId === "NPC" ? `${template.label} ${index}` : template.label,
+    );
+    if (requestedName === null) return;
+    const displayName = requestedName.trim() || template.label;
     const track: ModeDeckTrack = {
       id,
-      label: templateId === "NPC"
-        ? `${template.label} ${index}`
-        : template.label,
+      label: displayName,
       kind: template.kind,
       role: template.role,
       active: true,
       components: defaultGameObjectComponents(id, template.kind),
+      // New maps are authored by the sparse 256×256+ Playground world. Keep
+      // a tiny empty legacy document only as a compatibility shell so the
+      // retired finite 12×8 sample is not silently added to a fresh map.
       ...(template.role === "TILEMAP"
-        ? { tilemap: createDefaultRpgTilemapDocument(`map:${id}`) }
+        ? {
+          tilemap: createGameTilemapDocument({
+            mapId: `map:${id}`,
+            width: 1,
+            height: 1,
+            cells: [],
+          }),
+        }
         : {}),
       filled: template.kind === "EVENT" ? [] : [0],
     };
     gameDeckTracks = [...gameDeckTracks, track];
-    selectedGameTrackId = track.id;
-    renderGameCustomPanels();
+    selectGameObject(track.id, { openInspector: true });
     queueGameEditorPersistenceSave("rpg-object-add");
-    setPanel("game-inspector");
     setModeDeckStatus("game", `${track.label}をGame Sceneに追加しました。`);
   };
   const addGameStarterKit = (
@@ -28146,14 +34527,14 @@ export function bootstrapDraw2Workspace(
     } else if (gameBehaviors.length === 0) {
       gameBehaviors = defaultGameBehaviors();
     }
-    selectedGameTrackId = gameGuideTrack(["hero", "player"])?.id ??
-      gameDeckTracks[0]?.id;
-    selectedGameEventCardId = gameEventCards.find((card) =>
-      card.sourceTrackId === selectedGameTrackId ||
-      card.targetTrackId === selectedGameTrackId
-    )?.eventId;
     renderModeDeckTracks(gameAssetTracks, gameDeckTracks, "game");
-    renderGameCustomPanels();
+    const starterTrack = gameGuideTrack(["hero", "player"]) ??
+      gameDeckTracks.find((track) => track.kind !== "EVENT");
+    if (starterTrack !== undefined) {
+      selectGameObject(starterTrack.id, { openInspector: true });
+    } else {
+      projectGameWorkspaceAction({ type: "SELECT_NONE" });
+    }
     if (missing.length > 0 || eventCardsAdded) {
       queueGameEditorPersistenceSave("starter-kit");
     }
@@ -28268,38 +34649,46 @@ export function bootstrapDraw2Workspace(
     const track = gameGuideTrack(patterns) ??
       gameDeckTracks.find((candidate) => candidate.kind !== "EVENT");
     if (track === undefined) return undefined;
-    selectedGameTrackId = track.id;
-    renderGameCustomPanels();
+    selectGameObject(track.id);
     return track;
   };
   const runGameCreationGuideAction = (
     action: GameCreationGuideAction,
   ): void => {
+    const guidedStarterMode = (): Exclude<GameCreationMode, "UNSELECTED"> =>
+      gameCreationMode === "ACTION_2D" || gameCreationMode === "DODGE_2D" ||
+        gameCreationMode === "SCROLL_2D"
+        ? gameCreationMode
+        : "RPG_TEMPLATE";
     switch (action) {
       case "ADD_STARTER":
-        addGameStarterKit(
-          gameCreationMode === "UNSELECTED" ? "RPG_TEMPLATE" : gameCreationMode,
-        );
+        addGameStarterKit(guidedStarterMode());
         setPanel("game-scene");
         break;
       case "EDIT_EVENT": {
-        const track = selectGameGuideTrack(["enemy", "npc", "guide"]);
+        let track = selectGameGuideTrack(["enemy", "npc", "guide"]);
         if (track === undefined) {
-          addGameStarterKit(
-            gameCreationMode === "UNSELECTED" ? "RPG_TEMPLATE" : gameCreationMode,
-          );
-          selectGameGuideTrack(["enemy", "npc", "guide"]);
+          addGameStarterKit(guidedStarterMode());
+          track = selectGameGuideTrack(["enemy", "npc", "guide"]);
         }
-        setPanel("game-inspector");
+        const card = track === undefined
+          ? undefined
+          : gameEventCards.find((candidate) =>
+            candidate.sourceTrackId === track.id ||
+            candidate.targetTrackId === track.id
+          );
+        if (card !== undefined) {
+          openGameEvent(card.eventId);
+        } else {
+          setPanel("game-inspector");
+        }
         draw2GameEventMessage?.focus({ preventScroll: true });
         break;
       }
       case "OPEN_ASSETS": {
         const track = selectGameGuideTrack(["hero", "player"]);
         if (track === undefined) {
-          addGameStarterKit(
-            gameCreationMode === "UNSELECTED" ? "RPG_TEMPLATE" : gameCreationMode,
-          );
+          addGameStarterKit(guidedStarterMode());
         }
         setPanel("game-assets");
         draw2GameBindDraw?.focus({ preventScroll: true });
@@ -28314,6 +34703,7 @@ export function bootstrapDraw2Workspace(
     }
   };
   const renderGameCreationGuide = (): void => {
+    if (!legacyGameUiEnabled) return;
     const guide = createGameCreationGuide({
       tracks: gameDeckTracks,
       behaviorCount: gameBehaviors.length,
@@ -28370,9 +34760,13 @@ export function bootstrapDraw2Workspace(
       }),
     );
   };
-  windowRef.addEventListener("draw2:game-preview-state", () => {
-    renderGameCreationGuide();
-  });
+  bindLegacyGameUiEvent<CustomEvent>(
+    windowRef,
+    "draw2:game-preview-state",
+    () => {
+      renderGameCreationGuide();
+    },
+  );
   const renderGameAudioBindingOptions = (): void => {
     if (draw2GameAudioAsset === undefined) return;
     const session = audioWorkspaceSession;
@@ -28439,7 +34833,10 @@ export function bootstrapDraw2Workspace(
       track.kind === "MUSIC"
     );
     if (existing !== undefined) {
-      selectedGameTrackId = existing.id;
+      projectGameWorkspaceAction(
+        { type: "SELECT_OBJECT", trackId: existing.id },
+        { render: false },
+      );
       return existing;
     }
     let index = 1;
@@ -28459,7 +34856,10 @@ export function bootstrapDraw2Workspace(
       filled: [],
     };
     gameDeckTracks = [...gameDeckTracks, track];
-    selectedGameTrackId = track.id;
+    projectGameWorkspaceAction(
+      { type: "SELECT_OBJECT", trackId: track.id },
+      { render: false },
+    );
     renderGameCustomPanels();
     queueGameEditorPersistenceSave("audio-source-add");
     return track;
@@ -28482,6 +34882,251 @@ export function bootstrapDraw2Workspace(
     if (track === undefined || draw2GameAudioAsset === undefined) return;
     draw2GameAudioAsset.value = "revision|" + assetId + "|" + revisionId;
     draw2GameBindAudio?.click();
+  };
+  type GameAudioSlotSpec = {
+    readonly id: string;
+    readonly label: string;
+    readonly target: GameAudioTarget;
+  };
+  const gameAudioSlotSpecsForSelection = (): readonly GameAudioSlotSpec[] => {
+    const selection = gameWorkspaceContext.selection;
+    if (selection.kind === "SCENE") {
+      return [{
+        id: "scene-bgm",
+        label: "BGM",
+        target: { kind: "SCENE_BGM", sceneId: selection.sceneId },
+      }];
+    }
+    if (selection.kind === "OBJECT" || selection.kind === "COMPONENT") {
+      const track = gameDeckTracks.find((candidate) =>
+        candidate.id === selection.trackId
+      );
+      const role = track === undefined
+        ? undefined
+        : track.role ?? gameObjectRoleFor(track.id, track.kind);
+      if (role === "TILEMAP") {
+        return [{
+          id: "tile-step",
+          label: "Tile step",
+          target: { kind: "TILE_STEP", assetId: track?.id ?? selection.trackId },
+        }];
+      }
+      return ([
+        ["jump", "Jump", "JUMP"],
+        ["land", "Land", "LAND"],
+        ["footstep", "Footstep", "MOVE"],
+        ["attack", "Attack", "ATTACK"],
+        ["interact", "Interact", "INTERACT"],
+      ] as const).map(([id, label, trigger]) => ({
+        id,
+        label,
+        target: {
+          kind: "OBJECT_TRIGGER",
+          placementId: selection.trackId,
+          trigger,
+        },
+      }));
+    }
+    if (selection.kind === "ANIMATION") {
+      return [{
+        id: "animation-marker",
+        label: "Animation",
+        target: {
+          kind: "ANIMATION_MARKER",
+          clipId: selection.clipId,
+          phase: "FRAME",
+        },
+      }];
+    }
+    if (selection.kind === "EVENT") {
+      return [{
+        id: "event-audio",
+        label: "Event",
+        target: { kind: "EVENT", eventId: selection.eventId },
+      }];
+    }
+    if (selection.kind === "ASSET") {
+      return [{
+        id: "asset-tile-step",
+        label: "Tile step",
+        target: { kind: "TILE_STEP", assetId: selection.assetId },
+      }];
+    }
+    return [];
+  };
+  const assignGameAudioAssetToTarget = (
+    asset: GameAudioAsset,
+    target: GameAudioTarget,
+  ): void => {
+    if (gameAuthoringLocked()) return;
+    const result = commitGameAudioTransaction({
+      config: gamePlayground,
+      asset,
+      target,
+      expectedProjectRevision: asset.source.projectRevision,
+      expectedProjectStateHash: asset.source.projectStateHash,
+      currentProjectRevision: asset.source.projectRevision,
+      currentProjectStateHash: asset.source.projectStateHash,
+      commitId: `bind:${asset.audioAssetId}:${JSON.stringify(target)}`,
+    });
+    if (result.result === "SOURCE_CHANGED" || result.saveCount === 0) return;
+    gamePlayground = result.config;
+    void queueGameEditorPersistenceSave("playground-audio-binding");
+    renderGameCustomPanels();
+  };
+  const assignGameAudioAssetToActiveSlot = (assetId: string): void => {
+    const asset = gamePlayground.audioAssets.find((candidate) =>
+      candidate.audioAssetId === assetId
+    );
+    const slot = gameAudioSlotSpecsForSelection()[0];
+    if (asset !== undefined && slot !== undefined) {
+      assignGameAudioAssetToTarget(asset, slot.target);
+    }
+  };
+  const renderGameAudioSlots = (
+    host: HTMLElement,
+    locked: boolean,
+  ): void => {
+    const specs = gameAudioSlotSpecsForSelection();
+    if (specs.length === 0) return;
+    const section = documentRef.createElement("section");
+    section.className = "draw2-game-playground-audio-slots";
+    section.dataset.gameAudioSlotContext = gameWorkspaceContext.selection.kind;
+    const heading = documentRef.createElement("div");
+    heading.className = "draw2-game-playground-inspector-section-heading";
+    heading.textContent = "Audio";
+    section.append(heading);
+    const list = documentRef.createElement("div");
+    list.className = "draw2-game-playground-audio-slot-list";
+    for (const spec of specs) {
+      const binding = gamePlayground.audioBindings.find((candidate) =>
+        gameAudioTargetEquals(candidate.target, spec.target)
+      );
+      const bound = binding === undefined
+        ? undefined
+        : gamePlayground.audioAssets.find((asset) =>
+          asset.audioAssetId === binding.audioAssetId
+        );
+      const row = documentRef.createElement("div");
+      row.className = "draw2-game-playground-audio-slot";
+      row.dataset.gameAudioSlot = spec.id;
+      const label = documentRef.createElement("span");
+      label.textContent = spec.label;
+      const slot = documentRef.createElement("button");
+      slot.type = "button";
+      slot.className = "draw2-button draw2-button-secondary";
+      slot.disabled = locked;
+      slot.textContent = bound === undefined
+        ? "＋"
+        : bound.dpcm === undefined
+        ? bound.name
+        : `${bound.name} · DPCM`;
+      slot.setAttribute("aria-label", bound?.dpcm === undefined
+        ? `${spec.label}のAudioをiAUDIOで設定`
+        : `${spec.label}のDPCM音源（${bound.dpcm.frameCount}フレーム・${bound.dpcm.rateHz}Hz）をiAUDIOで設定`);
+      if (bound?.dpcm !== undefined) {
+        slot.title = `DPCM · ${bound.dpcm.frameCount}フレーム · ${bound.dpcm.rateHz}Hz${bound.dpcm.loop ? " · ループ" : ""}`;
+      } else {
+        slot.removeAttribute("title");
+      }
+      slot.addEventListener("click", () => openGamePlaygroundAudioTarget(spec.target));
+      slot.addEventListener("dragover", (event) => {
+        if (!locked) {
+          event.preventDefault();
+          slot.dataset.dropActive = "true";
+        }
+      });
+      slot.addEventListener("dragleave", () => { delete slot.dataset.dropActive; });
+      slot.addEventListener("drop", (event) => {
+        event.preventDefault();
+        delete slot.dataset.dropActive;
+        const assetId = event.dataTransfer?.getData("application/x-draw2-game-audio-asset");
+        const asset = gamePlayground.audioAssets.find((candidate) =>
+          candidate.audioAssetId === assetId
+        );
+        if (asset !== undefined) {
+          assignGameAudioAssetToTarget(asset, spec.target);
+          return;
+        }
+        const dpcmSampleId = event.dataTransfer?.getData("application/x-draw2-game-dpcm-sample");
+        const dpcmSample = gamePlayground.dpcmSamples?.find((sample) => sample.sampleId === dpcmSampleId);
+        const withDpcm = bound === undefined || dpcmSample === undefined
+          ? undefined
+          : attachDpcmReferenceToGameAudioAsset(bound, dpcmSample);
+        if (withDpcm !== undefined) assignGameAudioAssetToTarget(withDpcm, spec.target);
+      });
+      row.append(label, slot);
+      if (bound !== undefined) {
+        const clear = documentRef.createElement("button");
+        clear.type = "button";
+        clear.className = "draw2-button draw2-button-quiet draw2-gameplay-audio-slot-clear";
+        clear.textContent = "×";
+        clear.disabled = locked;
+        clear.setAttribute("aria-label", `${spec.label}の音声割り当てを解除`);
+        clear.title = "割り当てを解除";
+        clear.addEventListener("click", () => {
+          if (locked || gameAuthoringLocked() || binding === undefined) return;
+          gamePlayground = clearGameAudioTarget(gamePlayground, spec.target);
+          void queueGameEditorPersistenceSave("playground-audio-slot-clear");
+          renderGameCustomPanels();
+        });
+        row.append(clear);
+      }
+      list.append(row);
+    }
+    section.append(list);
+    const dpcmSamples = gamePlayground.dpcmSamples ?? [];
+    if (dpcmSamples.length > 0) {
+      const library = documentRef.createElement("div");
+      library.className = "draw2-game-playground-dpcm-library";
+      const libraryHeading = documentRef.createElement("small");
+      libraryHeading.textContent = "DPCMライブラリ";
+      library.append(libraryHeading);
+      for (const sample of dpcmSamples) {
+        const sampleRow = documentRef.createElement("div");
+        sampleRow.className = "draw2-game-playground-dpcm-row";
+        sampleRow.draggable = !locked;
+        sampleRow.textContent = `${sample.sampleId} · ${sample.frameCount}f · ${sample.rateHz}Hz`;
+        sampleRow.setAttribute("role", "button");
+        sampleRow.setAttribute("aria-label", `${sample.sampleId} DPCM、${sample.frameCount}フレーム、${sample.rateHz}Hz${sample.loop ? "、ループ" : ""}`);
+        sampleRow.title = "音イベントへドラッグして割り当て";
+        sampleRow.tabIndex = locked ? -1 : 0;
+        sampleRow.addEventListener("click", () => {
+          const activeSlot = specs[0];
+          const activeBinding = activeSlot === undefined ? undefined : gamePlayground.audioBindings.find((candidate) => gameAudioTargetEquals(candidate.target, activeSlot.target));
+          const activeAsset = activeBinding === undefined ? undefined : gamePlayground.audioAssets.find((asset) => asset.audioAssetId === activeBinding.audioAssetId);
+          if (locked || activeSlot === undefined || activeAsset === undefined) return;
+          const withDpcm = attachDpcmReferenceToGameAudioAsset(activeAsset, sample);
+          if (withDpcm !== undefined) assignGameAudioAssetToTarget(withDpcm, activeSlot.target);
+        });
+        sampleRow.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            sampleRow.click();
+          }
+        });
+        sampleRow.addEventListener("dragstart", (event) => {
+          event.dataTransfer?.setData("application/x-draw2-game-dpcm-sample", sample.sampleId);
+        });
+        const remove = documentRef.createElement("button");
+        remove.type = "button";
+        remove.className = "draw2-button draw2-button-quiet";
+        remove.textContent = "×";
+        remove.disabled = locked;
+        remove.setAttribute("aria-label", `${sample.sampleId}をDPCMライブラリから削除`);
+        remove.addEventListener("click", (event) => {
+          event.stopPropagation();
+          if (locked || gameAuthoringLocked()) return;
+          gamePlayground = removeGamePlaygroundDpcmSample(gamePlayground, sample.sampleId);
+          void queueGameEditorPersistenceSave("dpcm-library-remove");
+          renderGameCustomPanels();
+        });
+        sampleRow.append(remove);
+        library.append(sampleRow);
+      }
+      section.append(library);
+    }
+    host.append(section);
   };
   const renderGameBindings = (): void => {
     if (draw2GameBindings === undefined) return;
@@ -28649,7 +35294,10 @@ export function bootstrapDraw2Workspace(
           gameDeckTracks = [...applied.tracks];
           gameTemplateInstances = [...applied.instances];
           if (applied.selectedTrackId !== undefined) {
-            selectedGameTrackId = applied.selectedTrackId;
+            projectGameWorkspaceAction(
+              { type: "SELECT_OBJECT", trackId: applied.selectedTrackId },
+              { render: false },
+            );
           }
           renderGameCustomPanels();
           queueGameEditorPersistenceSave("template-apply");
@@ -28787,7 +35435,12 @@ export function bootstrapDraw2Workspace(
       ? undefined
       : bridge.renderReference({
         sourceFrameId: sourceFrame.sourceFrameId,
+        assetDefinitionId: reference.definitionId,
         rect: sourceFrame.rect,
+        ...(sourceFrame.layerIds === undefined ? {} : { layerIds: sourceFrame.layerIds }),
+        ...(sourceFrame.rasterSnapshot === undefined
+          ? {}
+          : { rasterSnapshot: sourceFrame.rasterSnapshot }),
       });
     if (
       projection !== undefined && projection.width > 0 && projection.height > 0
@@ -28814,8 +35467,11 @@ export function bootstrapDraw2Workspace(
       }
     }
     const caption = documentRef.createElement("small");
+    const layerCount = sourceFrame?.layerIds?.length ?? 0;
     caption.textContent = projection === undefined
       ? `F${frameIndex + 1} · ${frameId}`
+      : layerCount > 0
+      ? `F${frameIndex + 1} · ${layerCount}L`
       : `F${frameIndex + 1}`;
     const item = documentRef.createElement("div");
     item.className = "draw2-game-frame-thumb";
@@ -28888,16 +35544,16 @@ export function bootstrapDraw2Workspace(
     );
     if (draw2GameAnimationSelection !== undefined) {
       draw2GameAnimationSelection.textContent = track === undefined
-        ? "左のHierarchyまたはSceneでキャラクターを選択してください。"
-        : `${track.label} · ${references.length} Clip · Game設定のみ編集 / iDRAW原素材は参照専用`;
+        ? "キャラクターを選択"
+        : `${track.label} · ${references.length} Clip`;
     }
     if (draw2GameAnimationClips !== undefined) {
       if (references.length === 0) {
         const empty = documentRef.createElement("small");
         empty.className = "draw2-panel-status";
         empty.textContent = track === undefined
-          ? "キャラクターを選択すると、全方向・全フレームが表示されます。"
-          : "Animation Clipがありません。iDRAW側でClipを作成すると、ここに参照表示されます。";
+          ? "キャラクターを選択"
+          : "Clipなし · iDRAWで範囲を登録";
         draw2GameAnimationClips.replaceChildren(empty);
       } else {
         draw2GameAnimationClips.replaceChildren(
@@ -29023,8 +35679,8 @@ export function bootstrapDraw2Workspace(
       draw2GameAnimationStatus.textContent = currentBinding === undefined
         ? `${reference.motionName}${
           reference.direction === undefined ? "" : ` · ${reference.direction}`
-        } · ${reference.clip.frameIds.length}フレームを表示中。Gameに割り当てると設定を保存します。`
-        : `Gameに割り当て済み · ${currentBinding.mode} · ${reference.clip.frameIds.length}フレーム · 原素材は編集不可`;
+        } · ${reference.clip.frameIds.length}F · 未割当`
+        : `割当済み · ${currentBinding.mode} · ${reference.clip.frameIds.length}F`;
     }
   };
   const renderGameAssetCatalog = (): void => {
@@ -29151,9 +35807,7 @@ export function bootstrapDraw2Workspace(
                 candidate.id === entry.trackId
               );
               if (track !== undefined) {
-                selectedGameTrackId = track.id;
-                renderGameCustomPanels();
-                setPanel("game-inspector");
+                selectGameObject(track.id, { openInspector: true });
               }
               return;
             }
@@ -29225,6 +35879,405 @@ export function bootstrapDraw2Workspace(
   };
   const renderGameRailData = (): void => {
     if (draw2GameRailData === undefined) return;
+    const itemOptions = (): readonly { readonly value: string; readonly label: string }[] =>
+      gameItems.map((item) => ({ value: item.itemId, label: item.label }));
+    const blockOptions = (): readonly { readonly value: string; readonly label: string }[] =>
+      gameBlockTypes.map((blockType) => ({ value: blockType.blockTypeId, label: blockType.label }));
+    const nextId = (prefix: string, ids: readonly string[]): string => {
+      let sequence = ids.length + 1;
+      let id = `${prefix}:${sequence}`;
+      while (ids.includes(id)) {
+        sequence += 1;
+        id = `${prefix}:${sequence}`;
+      }
+      return id;
+    };
+    const rerenderData = (reason: string): void => {
+      queueGameEditorPersistenceSave(reason);
+      renderGameAssetRail();
+    };
+    const textField = (
+      labelText: string,
+      value: string,
+      onChange: (value: string) => void,
+    ): HTMLElement => {
+      const field = documentRef.createElement("label");
+      field.className = "draw2-game-data-field";
+      const label = documentRef.createElement("span");
+      label.textContent = labelText;
+      const input = documentRef.createElement("input");
+      input.type = "text";
+      input.value = value;
+      input.maxLength = 128;
+      input.addEventListener("change", () => onChange(input.value.trim()));
+      field.append(label, input);
+      return field;
+    };
+    const numberField = (
+      labelText: string,
+      value: number,
+      min: number,
+      max: number,
+      onChange: (value: number) => void,
+    ): HTMLElement => {
+      const field = documentRef.createElement("label");
+      field.className = "draw2-game-data-field is-number";
+      const label = documentRef.createElement("span");
+      label.textContent = labelText;
+      const input = documentRef.createElement("input");
+      input.type = "number";
+      input.min = String(min);
+      input.max = String(max);
+      input.step = "1";
+      input.value = String(value);
+      input.addEventListener("change", () => {
+        const next = Math.min(max, Math.max(min, Math.round(Number(input.value) || min)));
+        input.value = String(next);
+        onChange(next);
+      });
+      field.append(label, input);
+      return field;
+    };
+    const selectField = (
+      labelText: string,
+      options: readonly { readonly value: string; readonly label: string }[],
+      value: string,
+      onChange: (value: string) => void,
+    ): HTMLElement => {
+      const field = documentRef.createElement("label");
+      field.className = "draw2-game-data-field";
+      const label = documentRef.createElement("span");
+      label.textContent = labelText;
+      const select = documentRef.createElement("select");
+      for (const optionData of options) {
+        const option = documentRef.createElement("option");
+        option.value = optionData.value;
+        option.textContent = optionData.label;
+        select.append(option);
+      }
+      select.value = value;
+      select.addEventListener("change", () => onChange(select.value));
+      field.append(label, select);
+      return field;
+    };
+    const toggleField = (
+      labelText: string,
+      checked: boolean,
+      onChange: (checked: boolean) => void,
+    ): HTMLElement => {
+      const field = documentRef.createElement("label");
+      field.className = "draw2-game-data-toggle";
+      const input = documentRef.createElement("input");
+      input.type = "checkbox";
+      input.checked = checked;
+      input.addEventListener("change", () => onChange(input.checked));
+      const label = documentRef.createElement("span");
+      label.textContent = labelText;
+      field.append(input, label);
+      return field;
+    };
+    const removeButton = (
+      labelText: string,
+      disabled: boolean,
+      onClick: () => void,
+    ): HTMLButtonElement => {
+      const button = documentRef.createElement("button");
+      button.type = "button";
+      button.className = "draw2-button draw2-button-secondary draw2-game-data-remove";
+      button.textContent = labelText;
+      button.disabled = disabled;
+      button.addEventListener("click", onClick);
+      return button;
+    };
+    const addButton = (
+      labelText: string,
+      disabled: boolean,
+      onClick: () => void,
+    ): HTMLButtonElement => {
+      const button = documentRef.createElement("button");
+      button.type = "button";
+      button.className = "draw2-button draw2-button-secondary";
+      button.textContent = labelText;
+      button.disabled = disabled;
+      button.addEventListener("click", onClick);
+      return button;
+    };
+    const section = (
+      titleText: string,
+      detailText: string,
+      addLabel: string,
+      addDisabled: boolean,
+      onAdd: () => void,
+    ): { section: HTMLElement; body: HTMLElement } => {
+      const host = documentRef.createElement("section");
+      host.className = "draw2-game-data-section";
+      const heading = documentRef.createElement("header");
+      heading.className = "draw2-game-data-section-heading";
+      const copy = documentRef.createElement("div");
+      const title = documentRef.createElement("strong");
+      title.textContent = titleText;
+      const detail = documentRef.createElement("small");
+      detail.textContent = detailText;
+      copy.append(title, detail);
+      heading.append(copy, addButton(addLabel, addDisabled, onAdd));
+      const body = documentRef.createElement("div");
+      body.className = "draw2-game-data-list";
+      host.append(heading, body);
+      return { section: host, body };
+    };
+    const itemSection = section(
+      "Items",
+      `${gameItems.length}件 · イベントとレシピから参照できます`,
+      "＋ アイテム",
+      false,
+      () => {
+        gameItems = [
+          ...gameItems,
+          {
+            itemId: nextId("item", gameItems.map((item) => item.itemId)),
+            label: "新しいアイテム",
+            stackable: true,
+            maxStack: 99,
+          },
+        ];
+        rerenderData("game-data-item-add");
+      },
+    );
+    for (const item of gameItems) {
+      const card = documentRef.createElement("article");
+      card.className = "draw2-game-data-card";
+      card.append(
+        textField("名前", item.label, (label) => {
+          if (label.length === 0) return;
+          gameItems = gameItems.map((candidate) =>
+            candidate.itemId === item.itemId ? { ...candidate, label } : candidate
+          );
+          rerenderData("game-data-item-label");
+        }),
+        toggleField("スタックする", item.stackable, (stackable) => {
+          gameItems = gameItems.map((candidate) =>
+            candidate.itemId === item.itemId
+              ? { ...candidate, stackable, maxStack: stackable ? Math.max(1, candidate.maxStack) : 1 }
+              : candidate
+          );
+          rerenderData("game-data-item-stackable");
+        }),
+        numberField("最大数", item.maxStack, 1, 999999, (maxStack) => {
+          gameItems = gameItems.map((candidate) =>
+            candidate.itemId === item.itemId
+              ? { ...candidate, maxStack: candidate.stackable ? maxStack : 1 }
+              : candidate
+          );
+          rerenderData("game-data-item-max-stack");
+        }),
+      );
+      const used = gameRecipes.some((recipe) =>
+        recipe.ingredients.some((ingredient) => ingredient.itemId === item.itemId) ||
+        recipe.result.itemId === item.itemId
+      ) || gameBlockTypes.some((blockType) => blockType.dropItemId === item.itemId) ||
+        gameEventCards.some((card) => card.itemId === item.itemId);
+      card.append(removeButton("削除", used, () => {
+        gameItems = gameItems.filter((candidate) => candidate.itemId !== item.itemId);
+        rerenderData("game-data-item-remove");
+      }));
+      itemSection.body.append(card);
+    }
+    const recipeSection = section(
+      "Recipes",
+      `${gameRecipes.length}件 · 材料が揃ったらCraftします`,
+      "＋ レシピ",
+      gameItems.length === 0,
+      () => {
+        const firstItem = gameItems[0];
+        if (firstItem === undefined) return;
+        gameRecipes = [
+          ...gameRecipes,
+          {
+            recipeId: nextId("recipe", gameRecipes.map((recipe) => recipe.recipeId)),
+            label: "新しいレシピ",
+            ingredients: [{ itemId: firstItem.itemId, amount: 1 }],
+            result: { itemId: firstItem.itemId, amount: 1 },
+          },
+        ];
+        rerenderData("game-data-recipe-add");
+      },
+    );
+    for (const recipe of gameRecipes) {
+      const card = documentRef.createElement("article");
+      card.className = "draw2-game-data-card is-recipe";
+      card.append(
+        textField("名前", recipe.label, (label) => {
+          if (label.length === 0) return;
+          gameRecipes = gameRecipes.map((candidate) =>
+            candidate.recipeId === recipe.recipeId ? { ...candidate, label } : candidate
+          );
+          rerenderData("game-data-recipe-label");
+        }),
+      );
+      const ingredients = documentRef.createElement("div");
+      ingredients.className = "draw2-game-data-sublist";
+      const ingredientHeading = documentRef.createElement("strong");
+      ingredientHeading.textContent = "材料";
+      ingredients.append(ingredientHeading);
+      for (const [ingredientIndex, ingredient] of recipe.ingredients.entries()) {
+        const row = documentRef.createElement("div");
+        row.className = "draw2-game-data-inline-row";
+        row.append(
+          selectField("材料", itemOptions(), ingredient.itemId, (itemId) => {
+            gameRecipes = gameRecipes.map((candidate) =>
+              candidate.recipeId !== recipe.recipeId
+                ? candidate
+                : {
+                  ...candidate,
+                  ingredients: candidate.ingredients.map((current, index) =>
+                    index === ingredientIndex ? { ...current, itemId } : current
+                  ),
+                }
+            );
+            rerenderData("game-data-recipe-ingredient");
+          }),
+          numberField("個数", ingredient.amount, 1, 999999, (amount) => {
+            gameRecipes = gameRecipes.map((candidate) =>
+              candidate.recipeId !== recipe.recipeId
+                ? candidate
+                : {
+                  ...candidate,
+                  ingredients: candidate.ingredients.map((current, index) =>
+                    index === ingredientIndex ? { ...current, amount } : current
+                  ),
+                }
+            );
+            rerenderData("game-data-recipe-ingredient-amount");
+          }),
+          removeButton("×", recipe.ingredients.length <= 1, () => {
+            gameRecipes = gameRecipes.map((candidate) =>
+              candidate.recipeId !== recipe.recipeId
+                ? candidate
+                : {
+                  ...candidate,
+                  ingredients: candidate.ingredients.filter((_, index) => index !== ingredientIndex),
+                }
+            );
+            rerenderData("game-data-recipe-ingredient-remove");
+          }),
+        );
+        ingredients.append(row);
+      }
+      ingredients.append(addButton("＋ 材料", false, () => {
+        const firstItem = gameItems[0];
+        if (firstItem === undefined) return;
+        gameRecipes = gameRecipes.map((candidate) =>
+          candidate.recipeId === recipe.recipeId
+            ? { ...candidate, ingredients: [...candidate.ingredients, { itemId: firstItem.itemId, amount: 1 }] }
+            : candidate
+        );
+        rerenderData("game-data-recipe-ingredient-add");
+      }));
+      card.append(ingredients);
+      card.append(
+        selectField("結果", itemOptions(), recipe.result.itemId, (itemId) => {
+          gameRecipes = gameRecipes.map((candidate) =>
+            candidate.recipeId === recipe.recipeId
+              ? { ...candidate, result: { ...candidate.result, itemId } }
+              : candidate
+          );
+          rerenderData("game-data-recipe-result");
+        }),
+        numberField("結果数", recipe.result.amount, 1, 999999, (amount) => {
+          gameRecipes = gameRecipes.map((candidate) =>
+            candidate.recipeId === recipe.recipeId
+              ? { ...candidate, result: { ...candidate.result, amount } }
+              : candidate
+          );
+          rerenderData("game-data-recipe-result-amount");
+        }),
+        removeButton("レシピを削除", false, () => {
+          gameRecipes = gameRecipes.filter((candidate) => candidate.recipeId !== recipe.recipeId);
+          rerenderData("game-data-recipe-remove");
+        }),
+      );
+      recipeSection.body.append(card);
+    }
+    const blockSection = section(
+      "Blocks",
+      `${gameBlockTypes.length}件 · 既存の2D Tilemapへ置きます`,
+      "＋ ブロック",
+      false,
+      () => {
+        gameBlockTypes = [
+          ...gameBlockTypes,
+          {
+            blockTypeId: nextId("block", gameBlockTypes.map((blockType) => blockType.blockTypeId)),
+            label: "新しいブロック",
+            breakable: true,
+            ...(gameItems[0] === undefined ? {} : { dropItemId: gameItems[0].itemId }),
+            placeable: true,
+          },
+        ];
+        rerenderData("game-data-block-add");
+      },
+    );
+    for (const blockType of gameBlockTypes) {
+      const card = documentRef.createElement("article");
+      card.className = "draw2-game-data-card";
+      card.append(
+        textField("名前", blockType.label, (label) => {
+          if (label.length === 0) return;
+          gameBlockTypes = gameBlockTypes.map((candidate) =>
+            candidate.blockTypeId === blockType.blockTypeId ? { ...candidate, label } : candidate
+          );
+          rerenderData("game-data-block-label");
+        }),
+        toggleField("壊せる", blockType.breakable, (breakable) => {
+          gameBlockTypes = gameBlockTypes.map((candidate) =>
+            candidate.blockTypeId === blockType.blockTypeId ? { ...candidate, breakable } : candidate
+          );
+          rerenderData("game-data-block-breakable");
+        }),
+        toggleField("置ける", blockType.placeable, (placeable) => {
+          gameBlockTypes = gameBlockTypes.map((candidate) =>
+            candidate.blockTypeId === blockType.blockTypeId ? { ...candidate, placeable } : candidate
+          );
+          rerenderData("game-data-block-placeable");
+        }),
+        selectField(
+          "壊した時のItem",
+          [
+            { value: "", label: "なし" },
+            ...gameItems.map((item) => ({
+              value: item.itemId,
+              label: item.label,
+            })),
+          ],
+          blockType.dropItemId ?? "",
+          (dropItemId) => {
+            gameBlockTypes = gameBlockTypes.map((candidate) => {
+              if (candidate.blockTypeId !== blockType.blockTypeId) return candidate;
+              if (dropItemId.length === 0) {
+                const { dropItemId: _dropItemId, ...withoutDrop } = candidate;
+                return withoutDrop;
+              }
+              return { ...candidate, dropItemId };
+            });
+            rerenderData("game-data-block-drop-item");
+          },
+        ),
+      );
+      const mapUsesBlock = gameDeckTracks.some((track) =>
+        track.tilemap?.cells.some((cell) => cell.blockTypeId === blockType.blockTypeId)
+      );
+      const eventUsesBlock = gameEventCards.some((card) =>
+        card.blockTypeId === blockType.blockTypeId
+      );
+      card.append(removeButton("削除", mapUsesBlock || eventUsesBlock, () => {
+        gameBlockTypes = gameBlockTypes.filter((candidate) => candidate.blockTypeId !== blockType.blockTypeId);
+        rerenderData("game-data-block-remove");
+      }));
+      blockSection.body.append(card);
+    }
+    const intro = documentRef.createElement("p");
+    intro.className = "draw2-game-data-note";
+    intro.textContent = "Gameが所有するルールデータです。画像・音はiDRAW / iAUDIOを参照し、イベントカードから組み合わせます。";
     draw2GameRailData.replaceChildren(
       summaryCard(
         "テンプレート",
@@ -29244,40 +36297,86 @@ export function bootstrapDraw2Workspace(
         "Sceneを開く",
         () => activateGameRailTab("SCENE"),
       ),
+      intro,
+      itemSection.section,
+      recipeSection.section,
+      blockSection.section,
     );
   };
   const renderGameRailEvents = (): void => {
     if (draw2GameRailEvents === undefined) return;
-    const eventTracks = gameDeckTracks.filter((track) =>
-      track.kind === "EVENT"
-    );
-    draw2GameRailEvents.replaceChildren(
-      summaryCard(
-        "ノーコードイベント",
-        `${gameEventCards.length}件のイベントカード · ${eventTracks.length}件のイベント起点をGame側で管理中です。`,
-        "イベント編集を開く",
-        () => {
-          const card = gameEventCards[0];
-          if (card !== undefined) {
-            selectedGameEventCardId = card.eventId;
-            selectedGameTrackId = card.targetTrackId ?? card.sourceTrackId;
-            renderGameCustomPanels();
-          }
-          setPanel("game-inspector");
-          draw2GameEventWho?.focus({ preventScroll: true });
-        },
-      ),
-      summaryCard(
-        "作り方",
-        "イベント → 条件 → アクションの順に組み立てます。必要な人だけGraph / Codeへ拡張できます。",
-      ),
-      summaryCard(
-        "入力",
-        "移動・決定・キャンセルなどのInput ActionはSceneやイベントカードから参照します。",
-      ),
-    );
+    const list = documentRef.createElement("div");
+    list.className = "draw2-game-rail-event-card-grid";
+    list.setAttribute("role", "list");
+    list.setAttribute("aria-label", "イベントカード一覧");
+    if (gameEventCards.length === 0) {
+      const empty = documentRef.createElement("div");
+      empty.className = "draw2-game-rail-event-empty";
+      empty.textContent = "イベントなし";
+      list.append(empty);
+    }
+    for (const card of gameEventCards) {
+      const row = documentRef.createElement("button");
+      row.type = "button";
+      row.className = "draw2-game-rail-event-card";
+      row.dataset.gameRailEventId = card.eventId;
+      row.setAttribute("role", "listitem");
+      row.setAttribute(
+        "aria-pressed",
+        String(card.eventId === selectedGameEventCardId),
+      );
+      row.title = eventCardLabel(card);
+      const icon = createDraw2Icon(
+        documentRef,
+        "icon-commands",
+        "draw2-game-rail-event-card-icon",
+      );
+      const content = documentRef.createElement("span");
+      content.className = "draw2-game-rail-event-card-content";
+      const title = documentRef.createElement("strong");
+      title.textContent = card.label || "イベント";
+      const flow = documentRef.createElement("span");
+      flow.className = "draw2-game-rail-event-flow";
+      const who = documentRef.createElement("b");
+      who.textContent = GAME_EVENT_WHO_OPTIONS.find((item) =>
+        item.value === card.who
+      )?.label ?? card.who;
+      const condition = documentRef.createElement("i");
+      condition.textContent = GAME_EVENT_CONDITION_OPTIONS.find((item) =>
+        item.value === card.condition
+      )?.label ?? card.condition;
+      const action = documentRef.createElement("b");
+      action.textContent = GAME_EVENT_ACTION_OPTIONS.find((item) =>
+        item.value === card.action
+      )?.label ?? card.action;
+      const arrowA = documentRef.createElement("span");
+      arrowA.textContent = "→";
+      const arrowB = documentRef.createElement("span");
+      arrowB.textContent = "→";
+      flow.append(who, arrowA, condition, arrowB, action);
+      const target = documentRef.createElement("small");
+      const targetLabel = card.targetTrackId === undefined
+        ? "Scene"
+        : gameDeckTracks.find((track) => track.id === card.targetTrackId)
+            ?.label ?? card.targetTrackId;
+      target.textContent = card.enabled === false
+        ? `${targetLabel} · OFF`
+        : targetLabel;
+      content.append(title, flow, target);
+      row.append(icon, content, createDraw2Icon(documentRef, "icon-chevron-right"));
+      row.setAttribute(
+        "aria-label",
+        `${title.textContent} · ${who.textContent} · ${condition.textContent} · ${action.textContent}`,
+      );
+      row.addEventListener("click", () => {
+        openGameEvent(card.eventId);
+      });
+      list.append(row);
+    }
+    draw2GameRailEvents.replaceChildren(list);
   };
   renderGameAssetRail = (): void => {
+    if (!legacyGameUiEnabled) return;
     syncGameRailTabSurface();
     renderGameAssetCatalog();
     renderGameAnimationBrowser();
@@ -29496,7 +36595,10 @@ export function bootstrapDraw2Workspace(
   ): void => {
     const hero = gameMakerHeroTrack();
     if (hero !== undefined) {
-      selectedGameTrackId = hero.id;
+      projectGameWorkspaceAction(
+        { type: "SELECT_OBJECT", trackId: hero.id },
+        { render: false },
+      );
       const targetDirection = direction ?? gameVisualMaker.hero.direction;
       const targetMotion = motion ?? gameVisualMaker.hero.motion;
       gameVisualMaker = {
@@ -29876,7 +36978,7 @@ export function bootstrapDraw2Workspace(
         "▶ 試してみる",
         "draw2-game-maker-play-button",
         () => {
-          selectedGameTrackId = hero.id;
+          selectGameObject(hero.id);
           setPanel("preview");
           draw2GamePreviewStart?.click();
         },
@@ -29993,7 +37095,10 @@ export function bootstrapDraw2Workspace(
             button.textContent = "✦";
           }
           button.addEventListener("click", () => {
-            selectedGameTrackId = mapTrack.id;
+            projectGameWorkspaceAction(
+              { type: "SELECT_OBJECT", trackId: mapTrack.id },
+              { render: false },
+            );
             updateSelectedGameTilemap((current) =>
               paintGameTilemapCell(
                 current,
@@ -30123,7 +37228,10 @@ export function bootstrapDraw2Workspace(
         ),
         { behaviorId, mode: "SIMPLE" },
       ];
-      selectedGameEventCardId = card.eventId;
+      projectGameWorkspaceAction(
+        { type: "OPEN_EVENT", eventId: card.eventId },
+        { render: false },
+      );
       gameLogicMode = "SIMPLE";
       gameLogicModeBehaviorId = undefined;
       renderGameCustomPanels();
@@ -30140,9 +37248,10 @@ export function bootstrapDraw2Workspace(
       gameBehaviorSources = gameBehaviorSources.filter((source) =>
         source.behaviorId !== behaviorId
       );
-      selectedGameEventCardId = gameEventCards[0]?.eventId;
+      selectedGameEventCardId = undefined;
       gameLogicMode = "SIMPLE";
       gameLogicModeBehaviorId = undefined;
+      projectGameWorkspaceAction({ type: "SELECT_NONE" }, { render: false });
       renderGameCustomPanels();
       queueGameEditorPersistenceSave("visual-maker-event-clear");
     };
@@ -30216,19 +37325,14 @@ export function bootstrapDraw2Workspace(
       row.append(who, when, arrow, then);
       row.title = eventCardLabel(card);
       row.addEventListener("click", () => {
-        selectedGameEventCardId = card.eventId;
-        selectedGameTrackId = card.targetTrackId ?? card.sourceTrackId;
-        renderGameVisualMaker();
+        openGameEvent(card.eventId);
       });
       list.append(row);
     }
     host.append(list);
     const selectedCard = gameEventCards.find((card) =>
       card.eventId === selectedGameEventCardId
-    ) ?? gameEventCards[0];
-    if (selectedCard !== undefined && selectedGameEventCardId === undefined) {
-      selectedGameEventCardId = selectedCard.eventId;
-    }
+    );
     if (selectedCard !== undefined) {
       const editor = documentRef.createElement("section");
       editor.className = "draw2-game-maker-card draw2-game-maker-event-editor";
@@ -30259,10 +37363,25 @@ export function bootstrapDraw2Workspace(
           selectedCard.condition,
           (value) => {
             if (!GAME_EVENT_CONDITION_OPTIONS.some((item) => item.value === value)) return;
-            saveVisualEventCard(
-              { ...selectedCard, condition: value as GameEventCard["condition"] },
-              "visual-maker-event-condition",
-            );
+            const condition = value as GameEventCard["condition"];
+            let nextCard: GameEventCard = { ...selectedCard, condition };
+            const keepsItem = condition === "HAS_ITEM" ||
+              nextCard.action === "GIVE_ITEM" || nextCard.action === "TAKE_ITEM";
+            const keepsAmount = condition === "HAS_ITEM" ||
+              ["DAMAGE", "GIVE_ITEM", "TAKE_ITEM"].includes(nextCard.action);
+            if (keepsItem && nextCard.itemId === undefined && gameItems[0] !== undefined) {
+              nextCard = { ...nextCard, itemId: gameItems[0].itemId };
+            } else if (!keepsItem) {
+              const { itemId: _itemId, ...withoutItem } = nextCard;
+              nextCard = withoutItem;
+            }
+            if (!keepsAmount) {
+              const { amount: _amount, ...withoutAmount } = nextCard;
+              nextCard = withoutAmount;
+            } else if (nextCard.amount === undefined) {
+              nextCard = { ...nextCard, amount: 1 };
+            }
+            saveVisualEventCard(nextCard, "visual-maker-event-condition");
           },
         ),
         visualEventField(
@@ -30272,18 +37391,36 @@ export function bootstrapDraw2Workspace(
           (value) => {
             if (!GAME_EVENT_ACTION_OPTIONS.some((item) => item.value === value)) return;
             const action = value as GameEventCard["action"];
-            if (action === "DAMAGE") {
-              saveVisualEventCard(
-                { ...selectedCard, action, amount: selectedCard.amount ?? 1 },
-                "visual-maker-event-action",
-              );
-              return;
+            let nextCard: GameEventCard = { ...selectedCard, action };
+            const keepsItem = nextCard.condition === "HAS_ITEM" ||
+              action === "GIVE_ITEM" || action === "TAKE_ITEM";
+            const keepsAmount = nextCard.condition === "HAS_ITEM" ||
+              ["DAMAGE", "GIVE_ITEM", "TAKE_ITEM"].includes(action);
+            if (keepsItem && nextCard.itemId === undefined && gameItems[0] !== undefined) {
+              nextCard = { ...nextCard, itemId: gameItems[0].itemId };
+            } else if (!keepsItem) {
+              const { itemId: _itemId, ...withoutItem } = nextCard;
+              nextCard = withoutItem;
             }
-            const { amount: _amount, ...withoutAmount } = selectedCard;
-            saveVisualEventCard(
-              { ...withoutAmount, action },
-              "visual-maker-event-action",
-            );
+            if (action === "CRAFT_ITEM" && nextCard.recipeId === undefined && gameRecipes[0] !== undefined) {
+              nextCard = { ...nextCard, recipeId: gameRecipes[0].recipeId };
+            } else if (action !== "CRAFT_ITEM") {
+              const { recipeId: _recipeId, ...withoutRecipe } = nextCard;
+              nextCard = withoutRecipe;
+            }
+            if (["BREAK_BLOCK", "PLACE_BLOCK"].includes(action) && nextCard.blockTypeId === undefined && gameBlockTypes[0] !== undefined) {
+              nextCard = { ...nextCard, blockTypeId: gameBlockTypes[0].blockTypeId };
+            } else if (!["BREAK_BLOCK", "PLACE_BLOCK"].includes(action)) {
+              const { blockTypeId: _blockTypeId, ...withoutBlock } = nextCard;
+              nextCard = withoutBlock;
+            }
+            if (!keepsAmount) {
+              const { amount: _amount, ...withoutAmount } = nextCard;
+              nextCard = withoutAmount;
+            } else if (nextCard.amount === undefined) {
+              nextCard = { ...nextCard, amount: 1 };
+            }
+            saveVisualEventCard(nextCard, "visual-maker-event-action");
           },
         ),
       );
@@ -30316,6 +37453,110 @@ export function bootstrapDraw2Workspace(
           },
         ),
       );
+      const itemOptions: readonly {
+        readonly value: string;
+        readonly label: string;
+      }[] = [
+        { value: "", label: "選択してください" },
+        ...gameItems.map((item) => ({
+          value: item.itemId,
+          label: item.label,
+        })),
+      ];
+      const recipeOptions: readonly {
+        readonly value: string;
+        readonly label: string;
+      }[] = [
+        { value: "", label: "選択してください" },
+        ...gameRecipes.map((recipe) => ({
+          value: recipe.recipeId,
+          label: recipe.label,
+        })),
+      ];
+      const blockOptions: readonly {
+        readonly value: string;
+        readonly label: string;
+      }[] = [
+        { value: "", label: "選択してください" },
+        ...gameBlockTypes.map((blockType) => ({
+          value: blockType.blockTypeId,
+          label: blockType.label,
+        })),
+      ];
+      const saveOptionalReference = (
+        key: "itemId" | "recipeId" | "blockTypeId",
+        value: string,
+        reason: string,
+      ): void => {
+        if (key === "itemId") {
+          if (value.length === 0) {
+            const { itemId: _itemId, ...withoutItem } = selectedCard;
+            saveVisualEventCard(withoutItem, reason);
+          } else {
+            saveVisualEventCard({ ...selectedCard, itemId: value }, reason);
+          }
+          return;
+        }
+        if (key === "recipeId") {
+          if (value.length === 0) {
+            const { recipeId: _recipeId, ...withoutRecipe } = selectedCard;
+            saveVisualEventCard(withoutRecipe, reason);
+          } else {
+            saveVisualEventCard({ ...selectedCard, recipeId: value }, reason);
+          }
+          return;
+        }
+        if (value.length === 0) {
+          const { blockTypeId: _blockTypeId, ...withoutBlock } = selectedCard;
+          saveVisualEventCard(withoutBlock, reason);
+        } else {
+          saveVisualEventCard({ ...selectedCard, blockTypeId: value }, reason);
+        }
+      };
+      if (selectedCard.condition === "HAS_ITEM" ||
+        selectedCard.action === "GIVE_ITEM" || selectedCard.action === "TAKE_ITEM") {
+        fields.append(
+          visualEventField(
+            "アイテム",
+            itemOptions,
+            selectedCard.itemId ?? "",
+            (value) => saveOptionalReference(
+              "itemId",
+              value,
+              "visual-maker-event-item",
+            ),
+          ),
+        );
+      }
+      if (selectedCard.action === "CRAFT_ITEM") {
+        fields.append(
+          visualEventField(
+            "レシピ",
+            recipeOptions,
+            selectedCard.recipeId ?? "",
+            (value) => saveOptionalReference(
+              "recipeId",
+              value,
+              "visual-maker-event-recipe",
+            ),
+          ),
+        );
+      }
+      if (selectedCard.action === "BREAK_BLOCK" ||
+        selectedCard.action === "PLACE_BLOCK") {
+        fields.append(
+          visualEventField(
+            "ブロック",
+            blockOptions,
+            selectedCard.blockTypeId ?? "",
+            (value) => saveOptionalReference(
+              "blockTypeId",
+              value,
+              "visual-maker-event-block",
+            ),
+          ),
+        );
+      }
       if (selectedCard.action === "SHOW_DIALOGUE") {
         fields.append(
           visualEventTextField(
@@ -30331,15 +37572,18 @@ export function bootstrapDraw2Workspace(
           ),
         );
       }
-      if (selectedCard.action === "DAMAGE") {
+      if (selectedCard.condition === "HAS_ITEM" ||
+        ["DAMAGE", "GIVE_ITEM", "TAKE_ITEM"].includes(selectedCard.action)) {
         fields.append(
           visualEventField(
-            "ダメージ量",
+            selectedCard.action === "DAMAGE" ? "ダメージ量" : "個数",
             [
               { value: "1", label: "1" },
               { value: "2", label: "2" },
               { value: "3", label: "3" },
               { value: "5", label: "5" },
+              { value: "10", label: "10" },
+              { value: "99", label: "99" },
             ],
             String(selectedCard.amount ?? 1),
             (value) => {
@@ -30392,7 +37636,10 @@ export function bootstrapDraw2Workspace(
             ? { message: "近くで話しかけると会話を表示します。" }
             : { amount: 1 }),
         };
-        selectedGameTrackId = target?.id ?? hero?.id;
+        const selectedTrack = target ?? hero;
+        if (selectedTrack !== undefined) {
+          selectGameObject(selectedTrack.id);
+        }
         saveVisualEventCard(card, "visual-maker-event-add");
       },
     );
@@ -30494,6 +37741,7 @@ export function bootstrapDraw2Workspace(
     return host;
   };
   renderGameVisualMaker = (): void => {
+    if (!legacyGameUiEnabled) return;
     if (draw2GameVisualMakerContext === undefined) return;
     const category = gameVisualMaker.activeCategory;
     for (const button of queryAll<HTMLButtonElement>(
@@ -30530,57 +37778,3605 @@ export function bootstrapDraw2Workspace(
       renderGameVisualMaker();
     });
   }
-  renderGameCustomPanels = (): void => {
-    if (!gameDeckTracks.some((track) => track.id === selectedGameTrackId)) {
-      selectedGameTrackId = gameDeckTracks[0]?.id;
-    }
-    renderModeDeckTracks(gameAssetTracks, gameDeckTracks, "game");
-    renderGameSystemsDeck();
-    draw2GameSceneList?.replaceChildren(
-      ...gameDeckTracks.map((track) =>
-        renderGameTrackEntry(track, "draw2-game-scene-entry")
-      ),
+  const gamePlaygroundLayoutLabels: Readonly<Record<GamePlaygroundDrawReference["layout"], string>> = {
+    FULL_CANVAS: "キャンバス全体",
+    MANUAL: "選択範囲",
+    GRID_32: "32×32グリッド",
+    FRAME_SEQUENCE: "フレーム列",
+    GRID_FRAME_SEQUENCE: "32×32 × フレーム列",
+  };
+  const gamePlaygroundAudioRoleLabels: Readonly<Record<GamePlaygroundAudioRange["role"], string>> = {
+    BGM: "BGM",
+    SE: "SE",
+    JUMP: "ジャンプ音",
+  };
+  const gamePlaygroundAudioEventLabels: Readonly<Record<GamePlaygroundAudioEvent, string>> = {
+    BACKGROUND_MUSIC: "BGM",
+    PLAYER_MOVE: "歩く",
+    PLAYER_JUMP: "ジャンプ",
+    PLAYER_LAND: "着地",
+    PLAYER_ATTACK: "攻撃",
+    TILE_STEP: "タイルを踏む",
+    OBJECT_INTERACT: "オブジェクトに触る",
+  };
+  const gamePlaygroundLayerLabels: Readonly<Record<GamePlaygroundLayer, string>> = {
+    BACKGROUND: "背景",
+    WORLD: "世界",
+    ACTOR: "キャラクター",
+    FOREGROUND: "前景",
+    UI: "UI",
+  };
+  const gamePlaygroundLayoutValues: readonly GamePlaygroundDrawReference["layout"][] = [
+    "FULL_CANVAS",
+    "MANUAL",
+    "GRID_32",
+    "FRAME_SEQUENCE",
+    "GRID_FRAME_SEQUENCE",
+  ];
+  const gamePlaygroundModeValues: readonly GamePlaygroundMode[] = [
+    "SIDE_SCROLL",
+    "RPG_4",
+    "RPG_8",
+  ];
+  const gamePlaygroundReferenceModeFor = (
+    value: string | undefined,
+  ): GamePlaygroundDrawReference["mode"] => value === "PINNED"
+    ? "PINNED"
+    : "LIVE";
+  const gamePlaygroundLayoutFor = (
+    value: string | undefined,
+  ): GamePlaygroundDrawReference["layout"] =>
+    gamePlaygroundLayoutValues.includes(
+        value as GamePlaygroundDrawReference["layout"],
+      )
+      ? value as GamePlaygroundDrawReference["layout"]
+      : "FULL_CANVAS";
+  const gamePlaygroundAudioEventFor = (
+    value: string | undefined,
+  ): GamePlaygroundAudioEvent => {
+    const events: readonly GamePlaygroundAudioEvent[] = [
+      "BACKGROUND_MUSIC",
+      "PLAYER_MOVE",
+      "PLAYER_JUMP",
+      "PLAYER_LAND",
+      "PLAYER_ATTACK",
+      "TILE_STEP",
+      "OBJECT_INTERACT",
+    ];
+    return events.includes(value as GamePlaygroundAudioEvent)
+      ? value as GamePlaygroundAudioEvent
+      : "PLAYER_MOVE";
+  };
+  const gamePlaygroundPlacementFor = (
+    id: string,
+  ): GamePlaygroundPlacement | undefined =>
+    gamePlayground.placements?.find((placement) => placement.placementId === id);
+  const gamePlaygroundPlacementDefaults = (
+    kind: GamePlaygroundPlacement["kind"],
+    id: string,
+    label: string,
+    reference: GamePlaygroundDrawReference,
+  ): GamePlaygroundPlacement => ({
+    id,
+    label,
+    kind,
+    reference,
+    layer: kind === "WORLD" ? "WORLD" : "ACTOR",
+    depth: kind === "WORLD" ? 0 : 10,
+    x: kind === "WORLD" ? 0 : 50,
+    y: kind === "WORLD" ? 0 : 30,
+    scale: kind === "WORLD" ? 1 : 1,
+    rotation: 0,
+    visible: true,
+    snapToGrid: false,
+    movable: kind === "SPRITE",
+    collision: kind === "SPRITE",
+    gravity: false,
+  });
+  const ensureGamePlaygroundAsset = (
+    reference: GamePlaygroundDrawReference,
+    defaults: GameAssetEntry["defaults"] = {
+      movable: true,
+      collision: true,
+      gravity: false,
+    },
+  ): GameAssetEntry => {
+    const existing = gamePlayground.assets.find((asset) =>
+      asset.assetId === reference.assetId
     );
+    if (existing !== undefined) return existing;
+    const asset: GameAssetEntry = {
+      assetId: reference.assetId,
+      name: reference.label,
+      source: { ...reference },
+      defaults: { ...defaults },
+    };
+    gamePlayground = {
+      ...gamePlayground,
+      assets: [...gamePlayground.assets, asset],
+    };
+    return asset;
+  };
+  const upsertGamePlaygroundPlacement = (
+    placement: GamePlaygroundPlacement,
+  ): void => {
+    const reference = gamePlayground.assets.find((asset) =>
+      asset.assetId === placement.assetId
+    )?.source ?? placement.reference;
+    if (reference === undefined) return;
+    ensureGamePlaygroundAsset(reference, {
+      movable: placement.movable ?? true,
+      collision: placement.collision ?? true,
+      gravity: placement.gravity ?? false,
+    });
+    const normalized = normalizeGamePlaygroundPlacement(placement, reference);
+    const placements = gamePlayground.placements ?? [];
+    gamePlayground = {
+      ...gamePlayground,
+      placements: [
+        ...placements.filter((item) => item.placementId !== normalized.placementId),
+        normalized,
+      ],
+    };
+    const transform = normalized.transform ?? {
+      x: normalized.x,
+      y: normalized.y,
+      rotation: normalized.rotation,
+      scale: normalized.scale,
+    };
+    gameDeckTracks = gameDeckTracks.map((track) =>
+      track.id !== normalized.placementId || track.components === undefined
+        ? track
+        : {
+          ...track,
+          components: track.components.map((component) =>
+            component.type === "TRANSFORM"
+              ? {
+                ...component,
+                x: transform.x,
+                y: transform.y,
+                rotation: transform.rotation,
+                scaleX: transform.scale,
+                scaleY: transform.scale,
+              }
+              : component
+          ),
+        }
+    );
+  };
+  const removeGamePlaygroundPlacement = (id: string): void => {
+    gamePlayground = {
+      ...gamePlayground,
+      placements: (gamePlayground.placements ?? []).filter((item) =>
+        item.placementId !== id
+      ),
+    };
+  };
+  const gamePlaygroundReferenceDataUrlFor = (
+    reference: GamePlaygroundDrawReference | undefined,
+    frameIndex?: number,
+  ): string | undefined => {
+    if (reference === undefined) return undefined;
+    const sourceFrames = reference.sourceFrames ?? [];
+    const indexedFrame = frameIndex === undefined || sourceFrames.length === 0
+      ? undefined
+      : sourceFrames[((Math.floor(frameIndex) % sourceFrames.length) + sourceFrames.length) % sourceFrames.length];
+    const sourceFrame = indexedFrame ?? sourceFrames.find((frame) =>
+      frame.sourceFrameId === reference.sourceFrameId
+    ) ?? sourceFrames[0];
+    const sourceFrameId = indexedFrame?.sourceFrameId ?? reference.sourceFrameId ??
+      sourceFrame?.sourceFrameId;
+    const rect = sourceFrame?.rect ?? reference.region;
+    if (sourceFrameId === undefined || rect === undefined) return undefined;
+    const cacheKey = [
+      "playground-card",
+      reference.assetId,
+      reference.revisionId,
+      sourceFrameId,
+      frameIndex === undefined ? "selected" : String(frameIndex),
+      rect.x,
+      rect.y,
+      rect.width,
+      rect.height,
+    ].join(":");
+    const cached = gameSceneSpriteDataCache.get(cacheKey);
+    if (cached !== undefined) return cached;
+    const visibleLayerIds = sourceFrame?.layerIds?.filter((id) =>
+      !(reference.hiddenLayerIds ?? []).includes(id) &&
+        !(reference.hiddenLayerIdsByFrame?.[sourceFrame?.sourceFrameId ?? ""] ?? []).includes(id)
+    );
+    const projection = getAssetBridge()?.renderReference({
+      sourceFrameId,
+      ...(reference.assetDefinitionId === undefined
+        ? {}
+        : { assetDefinitionId: reference.assetDefinitionId }),
+      rect,
+      ...(visibleLayerIds === undefined ? {} : { layerIds: visibleLayerIds }),
+    });
+    if (projection === undefined || projection.width <= 0 || projection.height <= 0) return undefined;
+    const canvas = documentRef.createElement("canvas");
+    canvas.width = projection.width;
+    canvas.height = projection.height;
+    const context = canvas.getContext("2d");
+    if (context === null) return undefined;
+    const image = context.createImageData(projection.width, projection.height);
+    image.data.set(projection.data);
+    context.imageSmoothingEnabled = false;
+    context.putImageData(image, 0, 0);
+    const dataUrl = canvas.toDataURL("image/png");
+    gameSceneSpriteDataCache.set(cacheKey, dataUrl);
+    return dataUrl;
+  };
+  const gamePlaygroundReferenceForCurrentDraw = async (
+    fallback?: GamePlaygroundDrawReference,
+    layoutOverride?: GamePlaygroundDrawReference["layout"],
+    modeOverride?: GamePlaygroundDrawReference["mode"],
+  ): Promise<GamePlaygroundDrawReference | undefined> => {
+    let layout = layoutOverride ?? gamePlaygroundLayoutFor(
+      draw2GamePlaygroundDrawLayout?.value,
+    );
+    const layoutWasUserSelected = layoutOverride !== undefined ||
+      draw2GamePlaygroundDrawLayout !== undefined;
+    const bridge = getAssetBridge();
+    if (bridge === undefined) {
+      return fallback === undefined
+        ? undefined
+        : projectGamePlaygroundDrawReference(fallback, {
+          layout,
+          ...(fallback.projectId === undefined ? {} : { projectId: fallback.projectId }),
+          ...(fallback.sourceFrameId === undefined ? {} : { sourceFrameId: fallback.sourceFrameId }),
+          ...(fallback.region === undefined ? {} : { region: fallback.region }),
+          ...(fallback.sourceFrames === undefined ? {} : { sourceFrames: fallback.sourceFrames }),
+        });
+    }
+    const snapshot = bridge.snapshot();
+    const selection = snapshot.selection;
+    const explicitDefinition = selectedGameAssetDefinitionId === undefined
+      ? undefined
+      : snapshot.assetDefinitions.find((entry) =>
+        entry.definitionId === selectedGameAssetDefinitionId
+      );
+    const matchingDefinition = explicitDefinition ??
+      [...snapshot.assetDefinitions].reverse().find((entry) =>
+        entry.definition.sourceCanvasId === selection.sourceCanvasId &&
+        selection.frameNumber !== null &&
+        entry.definition.frameStart <= selection.frameNumber &&
+        entry.definition.frameEnd >= selection.frameNumber
+      );
+    if (!layoutWasUserSelected) {
+      const animationFrames = matchingDefinition?.definition.animationMapping
+        .flatMap((mapping) => mapping.sourceFrames ?? []).length ?? 0;
+      const selectionRegion = selection.region;
+      layout = inferGamePlaygroundAssetLayout({
+        animationFrameCount: animationFrames,
+        region: selectionRegion,
+      });
+    }
+    const mode = modeOverride ?? gamePlaygroundReferenceModeFor(
+      draw2GamePlaygroundReferenceMode?.value,
+    );
+    const resolvedReference = matchingDefinition === undefined
+      ? await bridge.resolveCurrentReference({ mode })
+      : await bridge.resolveDefinitionReference({
+        definitionId: matchingDefinition.definitionId,
+        mode,
+      });
+    if (resolvedReference === undefined && fallback === undefined) return undefined;
+    const reference = resolvedReference ?? fallback;
+    if (reference === undefined) return undefined;
+    const definitionRegion = matchingDefinition?.definition.region;
+    const selectedRegion = selection.region ?? fallback?.region;
+    const region = definitionRegion?.kind === "MANUAL"
+      ? {
+        x: definitionRegion.x,
+        y: definitionRegion.y,
+        width: definitionRegion.width,
+        height: definitionRegion.height,
+      }
+      : selectedRegion === undefined
+      ? undefined
+      : { ...selectedRegion };
+    const selectedClip = matchingDefinition?.definition.animationMapping.find((mapping) =>
+      selection.frameId !== null && mapping.sourceFrames?.some((frame) =>
+        frame.sourceFrameId === selection.frameId
+      )
+    ) ?? matchingDefinition?.definition.animationMapping[0];
+    const definedSourceFrames = selectedClip?.sourceFrames?.length === 0
+      ? undefined
+      : selectedClip?.sourceFrames;
+    const fallbackSourceFrames = selectedClip === undefined && fallback?.layout === layout
+      ? fallback.sourceFrames
+      : undefined;
+    const sequenceFrameIds = selectedClip?.frameIds.length !== undefined &&
+        selectedClip.frameIds.length > 0
+      ? selectedClip.frameIds
+      : [];
+    const gridRectsFor = (base: GamePlaygroundRect): readonly GamePlaygroundRect[] => {
+      const columns = Math.floor(base.width / 32);
+      const rows = Math.floor(base.height / 32);
+      if (columns < 1 || rows < 1) return [base];
+      return Array.from({ length: columns * rows }, (_, index) => ({
+        x: base.x + (index % columns) * 32,
+        y: base.y + Math.floor(index / columns) * 32,
+        width: 32,
+        height: 32,
+      }));
+    };
+    const generatedSourceFrames = definedSourceFrames === undefined &&
+        region !== undefined &&
+        (layout === "GRID_32" || layout === "FRAME_SEQUENCE" ||
+          layout === "GRID_FRAME_SEQUENCE")
+      ? (layout === "FRAME_SEQUENCE"
+        ? sequenceFrameIds.map((sourceFrameId) => ({ sourceFrameId, rect: region }))
+        : layout === "GRID_32"
+        ? gridRectsFor(region).map((rect) => ({
+          sourceFrameId: selection.frameId ?? fallback?.sourceFrameId ??
+            sequenceFrameIds[0] ?? "",
+          rect,
+        }))
+        : sequenceFrameIds.flatMap((sourceFrameId) =>
+          gridRectsFor(region).map((rect) => ({ sourceFrameId, rect }))
+        )).filter((frame) => frame.sourceFrameId.length > 0)
+      : undefined;
+    const sourceFrames = definedSourceFrames ?? generatedSourceFrames ??
+      fallbackSourceFrames;
+    const sourceFrameId = sourceFrames?.[0]?.sourceFrameId ??
+      selection.frameId ??
+      fallback?.sourceFrameId ??
+      selectedClip?.frameIds[0];
+    return projectGamePlaygroundDrawReference(reference, {
+      projectId: snapshot.projectId,
+      layout,
+      ...(sourceFrameId === undefined ? {} : { sourceFrameId }),
+      ...(region === undefined ? {} : { region }),
+      ...(sourceFrames === undefined ? {} : { sourceFrames }),
+    });
+  };
+  const gamePlaygroundCaptureDraftForCurrentDraw = async (): Promise<
+    CaptureDraft | undefined
+  > => {
+    const bridge = getAssetBridge();
+    if (bridge === undefined) return undefined;
+    const snapshot = bridge.snapshot();
+    const selection = snapshot.selection;
+    if (
+      selection.hasSelection !== true || selection.region === null ||
+      selection.frameId === null
+    ) return undefined;
+    const rect: GamePlaygroundRect = {
+      x: selection.region.x,
+      y: selection.region.y,
+      width: selection.region.width,
+      height: selection.region.height,
+    };
+    const matchingDefinition = [...snapshot.assetDefinitions].reverse().find(
+      (entry) => {
+        const definition = entry.definition;
+        if (
+          definition.sourceCanvasId !== selection.sourceCanvasId ||
+          selection.frameNumber === null ||
+          definition.frameStart > selection.frameNumber ||
+          definition.frameEnd < selection.frameNumber
+        ) return false;
+        if (definition.region.kind !== "MANUAL") return true;
+        return definition.region.x === rect.x &&
+          definition.region.y === rect.y &&
+          definition.region.width === rect.width &&
+          definition.region.height === rect.height;
+      },
+    );
+    const reference = matchingDefinition === undefined
+      ? await bridge.resolveCurrentReference({ mode: "LIVE" })
+      : await bridge.resolveDefinitionReference({
+        definitionId: matchingDefinition.definitionId,
+        mode: "LIVE",
+      });
+    if (reference === undefined) return undefined;
+    const selectedClip = matchingDefinition?.definition.animationMapping.find((mapping) =>
+      selection.frameId !== null && mapping.sourceFrames?.some((frame) =>
+        frame.sourceFrameId === selection.frameId
+      )
+    ) ?? matchingDefinition?.definition.animationMapping[0];
+    const definedSourceFrames = selectedClip?.sourceFrames?.map(
+      (frame): GamePlaygroundSourceFrame => ({
+        sourceFrameId: frame.sourceFrameId,
+        ...(frame.layerIds === undefined ? {} : { layerIds: [...frame.layerIds] }),
+        rect: {
+          x: frame.rect.x,
+          y: frame.rect.y,
+          width: frame.rect.width,
+          height: frame.rect.height,
+        },
+        ...(frame.durationMs === undefined
+          ? {}
+          : { durationMs: frame.durationMs }),
+      }),
+    );
+    const sourceFrames = definedSourceFrames ??
+      splitCaptureRectInto32Frames(rect, selection.frameId);
+    if (!captureFrameCountAllowed(sourceFrames)) return undefined;
+    const layout: GamePlaygroundDrawReference["layout"] = sourceFrames.length === 1
+      ? "MANUAL"
+      : inferGamePlaygroundAssetLayout({
+        animationFrameCount: sourceFrames.length,
+        region: rect,
+      });
+    const projected = projectGamePlaygroundDrawReference(reference, {
+      projectId: snapshot.projectId,
+      layout,
+      sourceFrameId: sourceFrames[0]?.sourceFrameId ?? selection.frameId,
+      region: rect,
+      sourceFrames,
+    });
+    return { reference: projected, rect, sourceFrames };
+  };
+  const captureReturnContextForCurrentGame = (): CaptureReturnContext => {
+    const activeElement = documentRef.activeElement;
+    const sceneCamera = gamePlaygroundSceneViewportForEditor();
+    const inspector = query<HTMLElement>(documentRef, "#draw2WorkspacePanelGameInspector .draw2-panel-shell");
+    return {
+      selection: gameWorkspaceContext.selection,
+      sceneCamera: { panX: sceneCamera.x, panY: sceneCamera.y, zoom: sceneCamera.zoom },
+      ...(draw2GamePlaygroundBottom === undefined ? {} : { bottomAssetScrollLeft: draw2GamePlaygroundBottom.scrollLeft }),
+      ...(gameLeftDock === undefined ? {} : { leftRailScrollTop: gameLeftDock.scrollTop, railScrollTop: gameLeftDock.scrollTop }),
+      ...(rightDock === undefined ? {} : { rightRailScrollTop: rightDock.scrollTop }),
+      ...(inspector === undefined ? {} : { inspectorScrollTop: inspector.scrollTop }),
+      selectionPanel: state.activePanel,
+      inspectorPanel: state.activePanel,
+      ...(activeElement instanceof HTMLElement && activeElement.id.length > 0
+        ? { focusTargetId: activeElement.id }
+        : {}),
+    };
+  };
+  const captureDraftForAsset = (
+    asset: GameAssetEntry,
+  ): CaptureDraft | undefined => {
+    const reference = asset.source;
+    const rect = reference.region ?? reference.sourceFrames?.[0]?.rect;
+    if (rect === undefined) return undefined;
+    const sourceFrames = reference.sourceFrames ?? (reference.sourceFrameId === undefined
+      ? []
+      : [{ sourceFrameId: reference.sourceFrameId, rect }]);
+    if (!captureFrameCountAllowed(sourceFrames)) return undefined;
+    return { reference, rect, sourceFrames };
+  };
+  const captureDrawSelectionKey = (
+    selection: Draw2AssetSelectionSnapshot,
+  ): string => JSON.stringify({
+    hasSelection: selection.hasSelection,
+    pixelCount: selection.pixelCount,
+    kind: selection.kind,
+    region: selection.region,
+    sourceCanvasId: selection.sourceCanvasId,
+    layerId: selection.layerId,
+    frameId: selection.frameId,
+    frameNumber: selection.frameNumber,
+  });
+  const syncGameCaptureBar = (): void => {
+    if (workspaceCanvasRegion === undefined) return;
+    if (gameCaptureSession === undefined || root.dataset.creatorMode !== "DRAW") {
+      if (gameCaptureBar !== undefined) gameCaptureBar.hidden = true;
+      return;
+    }
+    if (gameCaptureBar === undefined) {
+      const bar = documentRef.createElement("div");
+      bar.id = "draw2GameCaptureBar";
+      bar.className = "draw2-game-capture-bar";
+      bar.setAttribute("role", "status");
+      bar.setAttribute("aria-live", "polite");
+      const label = documentRef.createElement("span");
+      label.className = "draw2-game-capture-bar-label";
+      const commit = documentRef.createElement("button");
+      commit.type = "button";
+      commit.className = "draw2-button draw2-button-primary";
+      commit.dataset.captureAction = "commit";
+      commit.textContent = "この範囲を使う";
+      commit.addEventListener("click", () => void commitGameCapture());
+      const cancel = documentRef.createElement("button");
+      cancel.type = "button";
+      cancel.className = "draw2-button draw2-button-secondary";
+      cancel.dataset.captureAction = "cancel";
+      cancel.textContent = "キャンセル";
+      cancel.addEventListener("click", cancelGameCapture);
+      bar.append(label, commit, cancel);
+      workspaceCanvasRegion.prepend(bar);
+      gameCaptureBar = bar;
+    }
+    const label = query<HTMLElement>(gameCaptureBar, ".draw2-game-capture-bar-label");
+    const commit = query<HTMLButtonElement>(gameCaptureBar, '[data-capture-action="commit"]');
+    const draft = gameCaptureSession.draft;
+    if (label !== undefined) {
+      label.textContent = draft === undefined
+        ? "iDRAWでSprite範囲を選択"
+        : `iDRAW範囲 · ${draft.rect.width}×${draft.rect.height}px · ${draft.sourceFrames.length}F`;
+    }
+    if (commit !== undefined) commit.disabled = gameCaptureSession.state !== "READY";
+    gameCaptureBar.hidden = false;
+  };
+  let returnContextRestoreQueued = false;
+  const restoreCaptureReturnContext = (context: GameWorkspaceReturnContext & { readonly inspectorPanel?: string; readonly railScrollTop?: number }): void => {
+    if (returnContextRestoreQueued) return;
+    returnContextRestoreQueued = true;
+    windowRef.requestAnimationFrame(() => {
+      returnContextRestoreQueued = false;
+      if (context.sceneCamera !== undefined) {
+        gamePlaygroundCamera = { x: context.sceneCamera.panX, y: context.sceneCamera.panY, zoom: context.sceneCamera.zoom };
+        renderGameSceneViewport();
+      }
+    const selection = context.selection;
+    if (selection.kind === "ASSET") {
+      projectGameWorkspaceAction({ type: "OPEN_ASSET", assetId: selection.assetId }, { render: false });
+    } else if (selection.kind === "OBJECT" || selection.kind === "COMPONENT") {
+      projectGameWorkspaceAction({ type: "SELECT_OBJECT", trackId: selection.trackId }, { render: false });
+    } else if (selection.kind === "UI_NODE") {
+      projectGameWorkspaceAction({ type: "SELECT_UI_NODE", nodeId: selection.nodeId }, { render: false });
+    } else if (selection.kind === "ELEMENT") {
+      projectGameWorkspaceAction({ type: "SELECT_ELEMENT", elementId: selection.elementId }, { render: false });
+    } else if (selection.kind === "SCENE") {
+      projectGameWorkspaceAction({ type: "SELECT_SCENE", sceneId: selection.sceneId }, { render: false });
+    } else {
+      projectGameWorkspaceAction({ type: "SELECT_NONE" }, { render: false });
+    }
+    renderGameCustomPanels();
+    const panel = context.selectionPanel ?? context.inspectorPanel;
+    if (panel !== undefined) setPanel(panel as PanelKind);
+    if (draw2GamePlaygroundBottom !== undefined && context.bottomAssetScrollLeft !== undefined) draw2GamePlaygroundBottom.scrollLeft = context.bottomAssetScrollLeft;
+    if (gameLeftDock !== undefined && (context.leftRailScrollTop ?? context.railScrollTop) !== undefined) gameLeftDock.scrollTop = context.leftRailScrollTop ?? context.railScrollTop ?? 0;
+    if (rightDock !== undefined && context.rightRailScrollTop !== undefined) rightDock.scrollTop = context.rightRailScrollTop;
+    const inspector = query<HTMLElement>(documentRef, "#draw2WorkspacePanelGameInspector .draw2-panel-shell");
+    if (inspector !== undefined && context.inspectorScrollTop !== undefined) inspector.scrollTop = context.inspectorScrollTop;
+    if (context.focusTargetId !== undefined) {
+      documentRef.getElementById(context.focusTargetId)?.focus();
+    }
+    });
+  };
+  const commitGameCapture = async (): Promise<void> => {
+    if (gameAuthoringLocked()) return;
+    const session = gameCaptureSession;
+    const committed = session === undefined ? undefined : commitCaptureSession(session);
+    const draft = committed?.draft;
+    if (committed === undefined || draft === undefined) return;
+    const duplicate = gamePlayground.assets.find((asset) => {
+      const existingDraft = captureDraftForAsset(asset);
+      return existingDraft !== undefined && captureDraftKey(existingDraft) === captureDraftKey(draft);
+    });
+    let targetAssetId: string | undefined = duplicate?.assetId;
+    let changed = false;
+    const captureTarget = committed.target;
+    if (targetAssetId === undefined && captureTarget.kind === "EXISTING_ASSET") {
+      const existing = gamePlayground.assets.find((asset) => asset.assetId === captureTarget.assetId);
+      if (existing === undefined) return;
+      targetAssetId = existing.assetId;
+      const assets = gamePlayground.assets.map((asset) =>
+        asset.assetId === existing.assetId ? { ...asset, source: draft.reference } : asset
+      );
+      const placements = gamePlayground.placements.map((placement) =>
+        placement.assetId === existing.assetId
+          ? { ...placement, reference: draft.reference }
+          : placement
+      );
+      gamePlayground = { ...gamePlayground, assets, placements };
+      changed = true;
+    } else if (targetAssetId === undefined) {
+      const assetId = gameAssetIdForCapture(draft);
+      targetAssetId = assetId;
+      gamePlayground = {
+        ...gamePlayground,
+        assets: [
+          ...gamePlayground.assets,
+          {
+            assetId,
+            name: draft.reference.label,
+            source: draft.reference,
+            defaults: { movable: true, collision: true, gravity: false },
+          },
+        ],
+      };
+      changed = true;
+    }
+    gameCaptureSession = committed;
+    if (changed) await queueGameEditorPersistenceSave("playground-asset-capture");
+    const assetId = targetAssetId;
+    gameCaptureSession = undefined;
+    if (assetId === undefined) return;
+    projectGameWorkspaceAction({ type: "OPEN_ASSET", assetId }, { render: false });
+    setCreatorMode("GAME", true, (appliedMode) => {
+      if (appliedMode !== "GAME") return;
+      renderGameCustomPanels();
+      setPanel("game-inspector");
+    });
+  };
+  const cancelGameCapture = (): void => {
+    const session = gameCaptureSession;
+    gamePendingDrawTarget = undefined;
+    if (session === undefined) return;
+    const cancelled = cancelCaptureSession(session);
+    if (cancelled === undefined) return;
+    gameCaptureSession = cancelled;
+    if (gameCaptureBar !== undefined) gameCaptureBar.hidden = true;
+    setCreatorMode("GAME", true, (appliedMode) => {
+      if (appliedMode === "GAME") restoreCaptureReturnContext(cancelled.returnContext);
+    });
+    gameCaptureSession = undefined;
+  };
+  documentRef.addEventListener("keydown", (event) => {
+    const session = gameCaptureSession;
+    if (session === undefined || root.dataset.creatorMode !== "DRAW") return;
+    const target = event.target;
+    if (!isWorkspaceKeyboardActionAllowed(event, target)) return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      cancelGameCapture();
+      return;
+    }
+    if (event.key === "Enter" && session.state === "READY" && !(target instanceof HTMLElement && target.closest("#draw2GameCaptureBar") !== null)) {
+      event.preventDefault();
+      void commitGameCapture();
+    }
+  });
+  const renderGamePlaygroundAudioAssignments = (): void => {
+    if (draw2GamePlaygroundAudioAssignments === undefined) return;
+    draw2GamePlaygroundAudioAssignments.replaceChildren(
+      ...gamePlayground.audio.map((range) => {
+        const item = documentRef.createElement("div");
+        item.className = "draw2-game-playground-audio-assignment";
+        item.setAttribute("role", "listitem");
+        const role = documentRef.createElement("span");
+        role.className = "draw2-game-playground-card-state";
+        const audioEvent = range.event ?? gamePlaygroundAudioEventForRole(range.role);
+        role.textContent = gamePlaygroundAudioEventLabels[audioEvent];
+        const copy = documentRef.createElement("div");
+        const title = documentRef.createElement("strong");
+        title.textContent = range.label;
+        const detail = documentRef.createElement("small");
+        const asset = gamePlayground.audioAssets.find((candidate) =>
+          candidate.name === range.label && candidate.source.startTick === range.startTick &&
+          candidate.source.durationTick === range.durationTick
+        );
+        const dpcmDetail = asset?.dpcm === undefined
+          ? ""
+          : ` · DPCM ${asset.dpcm.frameCount}f/${asset.dpcm.rateHz}Hz${asset.dpcm.loop ? " loop" : ""}`;
+        detail.textContent = "Tick " + range.startTick + "–" +
+          (range.startTick + range.durationTick) + " · " + range.mode + dpcmDetail;
+        copy.append(title, detail);
+        item.addEventListener("click", () => {
+          openGamePlaygroundAudioEvent(audioEvent);
+        });
+        const remove = documentRef.createElement("button");
+        remove.type = "button";
+        remove.textContent = "×";
+        remove.setAttribute("aria-label", range.label + "を外す");
+        remove.disabled = gameAuthoringLocked();
+        remove.addEventListener("click", (event) => {
+          event.stopPropagation();
+          if (gameAuthoringLocked()) return;
+          gamePlayground = removeGamePlaygroundAudioRange(
+            gamePlayground,
+            range.assignmentId,
+          );
+          queueGameEditorPersistenceSave("playground-audio-remove");
+          renderGameCustomPanels();
+        });
+        item.append(role, copy, remove);
+        return item;
+      }),
+    );
+  };
+  const gamePlaygroundReferenceSummary = (
+    reference: GamePlaygroundDrawReference | undefined,
+  ): string => {
+    if (reference === undefined) return "未設定";
+    const region = reference.region === undefined
+      ? ""
+      : " · " + Math.round(reference.region.width) + "×" +
+        Math.round(reference.region.height) + "px";
+    const frameCount = reference.sourceFrames === undefined
+      ? ""
+      : " · " + reference.sourceFrames.length + "フレーム";
+    return reference.label + " · " +
+      (gamePlaygroundLayoutLabels[reference.layout] ?? reference.layout) +
+      region + frameCount;
+  };
+  const updateGamePlaygroundWorldMap = (patch: {
+    readonly width?: number;
+    readonly height?: number;
+    readonly bounds?: "FINITE" | "INFINITE";
+  }): void => {
+    if (gameAuthoringLocked()) return;
+    const current = gamePlaygroundWorldMapForEditor();
+    const chunkSize = current.chunkSize;
+    const normalizeDimension = (value: number | undefined, fallback: number): number => {
+      if (value === undefined || !Number.isFinite(value)) return fallback;
+      const rounded = Math.round(value / chunkSize) * chunkSize;
+      return Math.min(
+        GAME_PLAYGROUND_MAX_WORLD_DIMENSION,
+        Math.max(chunkSize, rounded),
+      );
+    };
+    const requestedWidth = normalizeDimension(patch.width, current.width);
+    const requestedHeight = normalizeDimension(patch.height, current.height);
+    const requestedBounds = patch.bounds ?? current.bounds;
+    const hasNegativeChunk = current.chunks.some((chunk) =>
+      chunk.x < 0 || chunk.y < 0
+    );
+    const largestChunkX = current.chunks.reduce(
+      (largest, chunk) => Math.max(largest, chunk.x),
+      -1,
+    );
+    const largestChunkY = current.chunks.reduce(
+      (largest, chunk) => Math.max(largest, chunk.y),
+      -1,
+    );
+    // A finite map cannot represent negative or out-of-range chunk
+    // coordinates. Keep the authored data intact when switching an infinite
+    // map back to finite bounds; the editor remains infinite in that case.
+    const finiteChunkLimit = Math.floor(
+      GAME_PLAYGROUND_MAX_WORLD_DIMENSION / chunkSize,
+    );
+    const canUseFiniteBounds = !hasNegativeChunk &&
+      largestChunkX < finiteChunkLimit && largestChunkY < finiteChunkLimit;
+    const bounds = requestedBounds === "FINITE" && canUseFiniteBounds
+      ? "FINITE"
+      : "INFINITE";
+    const width = bounds === "FINITE"
+      ? Math.max(requestedWidth, (largestChunkX + 1) * chunkSize)
+      : requestedWidth;
+    const height = bounds === "FINITE"
+      ? Math.max(requestedHeight, (largestChunkY + 1) * chunkSize)
+      : requestedHeight;
+    const nextMap: GamePlaygroundWorldMap = {
+      ...current,
+      bounds,
+      width: Math.min(GAME_PLAYGROUND_MAX_WORLD_DIMENSION, width),
+      height: Math.min(GAME_PLAYGROUND_MAX_WORLD_DIMENSION, height),
+    };
+    gamePlayground = { ...gamePlayground, worldMap: nextMap };
+    gamePlaygroundWorldIndex = undefined;
+    queueGameEditorPersistenceSave("playground-world-map");
+    renderGameCustomPanels();
+  };
+  const renderLegacyGamePlayground = (locked: boolean): void => {
+    const drawSnapshot = getAssetBridge()?.snapshot();
+    const selection = drawSnapshot?.selection;
+    const selectionRegion = selection?.region;
+    const drawSelectionStatus = selection?.hasSelection === true
+      ? "選択範囲 · " + (selectionRegion === null || selectionRegion === undefined
+        ? "範囲情報なし"
+        : Math.round(selectionRegion.width) + "×" +
+          Math.round(selectionRegion.height) + "px") +
+        (selection.frameNumber === null || selection.frameNumber === undefined
+          ? ""
+          : " · F" + (selection.frameNumber + 1))
+      : drawSnapshot === undefined
+      ? "iDRAW連携を読み込み中"
+      : drawSnapshot.assetDefinitions.length + "件のAsset Definition · 範囲選択も可能";
+    if (draw2GamePlaygroundDrawStatus !== undefined) {
+      draw2GamePlaygroundDrawStatus.textContent = drawSelectionStatus;
+    }
+    if (draw2GamePlaygroundSourceRail !== undefined) {
+      draw2GamePlaygroundSourceRail.dataset.selectionReady =
+        selection?.hasSelection === true ? "true" : "false";
+    }
+
+    const mode = gamePlayground.mode;
+    if (draw2GamePlaygroundCenterBar !== undefined) {
+      draw2GamePlaygroundCenterBar.dataset.playgroundMode = mode;
+    }
+    for (const button of draw2GamePlaygroundModes) {
+      const active = button.dataset.gamePlaygroundMode === mode;
+      button.classList.toggle("is-active", active);
+      button.setAttribute("aria-pressed", String(active));
+      button.disabled = locked;
+    }
+    const modeControlSummary = mode === "SIDE_SCROLL"
+      ? "左右移動＋ジャンプ"
+      : mode === "RPG_4"
+      ? "上下左右・4方向"
+      : "上下左右・斜めを含む8方向";
+    if (draw2GamePlaygroundControlsSummary !== undefined) {
+      draw2GamePlaygroundControlsSummary.textContent = modeControlSummary;
+    }
+
+    const world = gamePlayground.world;
+    const player = gamePlayground.player;
+    if (draw2GamePlaygroundWorldState !== undefined) {
+      draw2GamePlaygroundWorldState.textContent = world === undefined
+        ? "未設定"
+        : "設定済み";
+    }
+    if (draw2GamePlaygroundWorldStatus !== undefined) {
+      draw2GamePlaygroundWorldStatus.textContent = world === undefined
+        ? drawSelectionStatus
+        : gamePlaygroundReferenceSummary(world);
+    }
+    if (draw2GamePlaygroundPlayerState !== undefined) {
+      draw2GamePlaygroundPlayerState.textContent = player === undefined
+        ? "未設定"
+        : "設定済み";
+    }
+    if (draw2GamePlaygroundPlayerStatus !== undefined) {
+      draw2GamePlaygroundPlayerStatus.textContent = player === undefined
+        ? drawSelectionStatus
+        : gamePlaygroundReferenceSummary(player);
+    }
+    if (draw2GamePlaygroundDrawLayout !== undefined) {
+      draw2GamePlaygroundDrawLayout.value = player?.layout ??
+        gamePlaygroundLayoutFor(draw2GamePlaygroundDrawLayout.value);
+      draw2GamePlaygroundDrawLayout.disabled = locked;
+    }
+    if (draw2GamePlaygroundReferenceMode !== undefined) {
+      draw2GamePlaygroundReferenceMode.value = player?.mode ??
+        gamePlaygroundReferenceModeFor(
+          draw2GamePlaygroundReferenceMode.value,
+        );
+      draw2GamePlaygroundReferenceMode.disabled = locked;
+    }
+    for (const button of [
+      draw2GamePlaygroundWorldApply,
+      draw2GamePlaygroundWorldClear,
+      draw2GamePlaygroundPlayerApply,
+      draw2GamePlaygroundPlayerClear,
+      draw2GamePlaygroundAudioApply,
+      draw2GamePlaygroundAudioClear,
+    ]) {
+      if (button !== undefined) button.disabled = locked;
+    }
+
+    let audioSelectionStatus = "iAUDIO Projectを読み込んで範囲を選択";
+    if (audioWorkspaceSession !== undefined) {
+      try {
+        const bounds = audioSelectedMeasureBounds();
+        const track = selectedAudioCanonicalTrack();
+        const barLabel = bounds.endBar - bounds.startBar === 1
+          ? "Bar " + (bounds.startBar + 1)
+          : "Bars " + (bounds.startBar + 1) + "–" + bounds.endBar;
+        audioSelectionStatus = (track === undefined
+          ? "Track未選択"
+          : track.name) + " · " + barLabel + " · Tick " +
+          bounds.startTick + "–" + bounds.endTick;
+      } catch {
+        audioSelectionStatus = "iAUDIOの選択範囲を読み込み中";
+      }
+    }
+    if (draw2GamePlaygroundAudioStatus !== undefined) {
+      draw2GamePlaygroundAudioStatus.textContent = audioSelectionStatus;
+    }
+    if (draw2GamePlaygroundAudioRange !== undefined) {
+      draw2GamePlaygroundAudioRange.textContent = audioSelectionStatus;
+    }
+    if (draw2GamePlaygroundAudioState !== undefined) {
+      draw2GamePlaygroundAudioState.textContent =
+        gamePlayground.audio.length + "件";
+    }
+    if (draw2GamePlaygroundAudioRole !== undefined) {
+      draw2GamePlaygroundAudioRole.disabled = locked;
+    }
+    if (draw2GamePlaygroundAudioReferenceMode !== undefined) {
+      draw2GamePlaygroundAudioReferenceMode.disabled = locked;
+    }
+    renderGamePlaygroundAudioAssignments();
+
+    if (draw2GamePlaygroundCenterStatus !== undefined) {
+      const runtime = gamePlaygroundRuntimeState;
+      draw2GamePlaygroundCenterStatus.textContent = runtime === undefined
+        ? player === undefined
+          ? "iDRAWから主人公を選ぶと、ここで動かせます"
+          : "Playで" + player.label + "を操作 · " + modeControlSummary
+        : "実行中 · (" + runtime.playerPosition.x.toFixed(1) + ", " +
+          runtime.playerPosition.y.toFixed(1) + ")" +
+          (mode === "SIDE_SCROLL"
+            ? runtime.grounded ? " · 地上" : " · 空中"
+            : " · " + runtime.facing);
+    }
+    if (draw2GamePlaygroundStatus !== undefined) {
+      draw2GamePlaygroundStatus.textContent = locked
+        ? "テスト中は設定を保護しています。停止すると編集できます。"
+        : player === undefined
+        ? "主人公を割り当ててからPlayで確認できます。"
+        : "Playで" + modeControlSummary + "を確認できます。";
+    }
+    if (draw2GamePlaygroundBottomStatus !== undefined) {
+      draw2GamePlaygroundBottomStatus.textContent =
+        "世界 " + (world === undefined ? 0 : 1) + " · 主人公 " +
+        (player === undefined ? 0 : 1) + " · 音 " +
+        gamePlayground.audio.length;
+    }
+    if (draw2GamePlaygroundBottomCards !== undefined) {
+      const entries = [
+        { label: "世界", detail: gamePlaygroundReferenceSummary(world) },
+        { label: "主人公", detail: gamePlaygroundReferenceSummary(player) },
+        {
+          label: "音",
+          detail: gamePlayground.audio.length === 0
+            ? "未設定"
+            : gamePlayground.audio.map((item) =>
+              gamePlaygroundAudioRoleLabels[item.role]
+            ).join(" · "),
+        },
+      ];
+      draw2GamePlaygroundBottomCards.replaceChildren(
+        ...entries.map((entry) => {
+          const card = documentRef.createElement("div");
+          card.className = "draw2-game-playground-bottom-card";
+          card.setAttribute("role", "listitem");
+          const label = documentRef.createElement("strong");
+          label.textContent = entry.label;
+          const detail = documentRef.createElement("small");
+          detail.textContent = entry.detail;
+          card.append(label, detail);
+          return card;
+        }),
+      );
+    }
+  };
+  const openGamePlaygroundDrawSelection = (
+    target: PendingGamePlaygroundDrawTarget,
+  ): void => {
+    if (gameAuthoringLocked()) return;
+    const returnContext = captureReturnContextForCurrentGame();
+    const prepareDrawCapture = (): void => {
+      if (root.dataset.creatorMode !== "DRAW") return;
+      getAssetBridge()?.prepareSelection();
+      setPanel("color");
+      syncGameCaptureBar();
+    };
+    if (target.kind !== "ASSET") {
+      gamePendingDrawTarget = target;
+      setCreatorMode("DRAW", false, prepareDrawCapture);
+      return;
+    }
+    gamePendingDrawTarget = undefined;
+    gameCaptureSession = beginCaptureSession(
+      target.assetId === undefined
+        ? { kind: "NEW_ASSET" }
+        : { kind: "EXISTING_ASSET", assetId: target.assetId },
+      returnContext,
+      `capture:${workspaceProjectId}:${Date.now()}`,
+    );
+    setCreatorMode("DRAW", false, prepareDrawCapture);
+  };
+  const openGamePlaygroundAudioTarget = (
+    target: GameAudioTarget,
+  ): void => {
+    if (gameAuthoringLocked()) return;
+    const returnContext = captureReturnContextForCurrentGame();
+    const openAudioCapture = (appliedMode: CreatorWorkspaceMode): void => {
+      if (appliedMode !== "AUDIO") return;
+      selectModeDeckTab("audio-timeline");
+      void ensureAudioWorkspaceSession().then(() => {
+      const session = audioWorkspaceSession;
+      if (session !== undefined) {
+        gameAudioCaptureSession = beginAudioCaptureSession({
+          target,
+          returnContext,
+          projectRevision: session.project.projectRevision,
+          projectStateHash: String(session.project.stateHash),
+        });
+        gameAudioCaptureRangeOverride = undefined;
+        gameAudioCaptureSnap = "BEAT";
+        gameAudioCapturePointer = undefined;
+        gameAudioCaptureIntervalIndex = createAudioTrackIntervalIndex(session.project.clips);
+      }
+      renderAudioSurfaces();
+      renderGamePlayground();
+      // Audio surface rendering replaces the timeline host, so mount the
+      // temporary GAME capture bar after the surface has been rebuilt.
+      syncGameAudioCaptureBar();
+      windowRef.setTimeout(syncGameAudioCaptureBar, 0);
+      // A restored Audio project may publish its session one render pass
+      // after the ready promise resolves. Re-arm the target once so the
+      // return-to-GAME context is never lost on that path.
+      if (gameAudioCaptureSession === undefined) {
+        let attempts = 0;
+        const retry = (): void => {
+          if (gameAudioCaptureSession !== undefined || root.dataset.creatorMode !== "AUDIO" || attempts++ >= 20) return;
+          const ready = audioWorkspaceSession;
+          if (ready === undefined) {
+            windowRef.setTimeout(retry, 0);
+            return;
+          }
+          gameAudioCaptureSession = beginAudioCaptureSession({
+            target,
+            returnContext,
+            projectRevision: ready.project.projectRevision,
+            projectStateHash: String(ready.project.stateHash),
+          });
+          gameAudioCaptureIntervalIndex = createAudioTrackIntervalIndex(ready.project.clips);
+          syncGameAudioCaptureBar();
+        };
+        windowRef.setTimeout(retry, 0);
+      }
+      });
+    };
+    setCreatorMode("AUDIO", false, openAudioCapture);
+  };
+  const openGamePlaygroundAudioEvent = (
+    event: GamePlaygroundAudioEvent,
+  ): void => {
+    if (draw2GamePlaygroundAudioRole !== undefined) {
+      draw2GamePlaygroundAudioRole.value = event;
+    }
+    const target: GameAudioTarget = event === "BACKGROUND_MUSIC"
+      ? {
+        kind: "SCENE_BGM",
+        sceneId: gameWorkspaceContext.selection.kind === "SCENE"
+          ? gameWorkspaceContext.selection.sceneId
+          : "scene:main",
+      }
+      : {
+        kind: "OBJECT_TRIGGER",
+        placementId: gameWorkspaceContext.selection.kind === "OBJECT" ||
+            gameWorkspaceContext.selection.kind === "COMPONENT"
+          ? gameWorkspaceContext.selection.trackId
+          : "player",
+        trigger: event === "PLAYER_JUMP"
+          ? "JUMP"
+          : event === "PLAYER_LAND"
+          ? "LAND"
+          : event === "PLAYER_ATTACK"
+          ? "ATTACK"
+          : event === "PLAYER_MOVE"
+          ? "MOVE"
+          : "INTERACT",
+      };
+    const resolvedTarget: GameAudioTarget = event === "TILE_STEP"
+      ? { kind: "TILE_STEP", assetId: gameWorkspaceContext.selection.kind === "OBJECT" ? gameWorkspaceContext.selection.trackId : "world" }
+      : target;
+    openGamePlaygroundAudioTarget(resolvedTarget);
+  };
+  const gamePlaygroundAssetPlacementFor = (
+    track: ModeDeckTrack,
+  ): GamePlaygroundPlacement | undefined => {
+    const role = track.role ?? gameObjectRoleFor(track.id, track.kind);
+    return role === "TILEMAP"
+      ? gamePlaygroundPlacementFor("world")
+      : gamePlaygroundPlacementFor(track.id) ??
+        (role === "PLAYER" ? gamePlaygroundPlacementFor("player") : undefined);
+  };
+  const gamePlaygroundAssetReferenceFor = (
+    track: ModeDeckTrack,
+  ): GamePlaygroundDrawReference | undefined => {
+    const role = track.role ?? gameObjectRoleFor(track.id, track.kind);
+    const placement = gamePlaygroundAssetPlacementFor(track);
+    return role === "TILEMAP"
+      ? gamePlayground.world
+      : gamePlayground.assets.find((asset) => asset.assetId === placement?.assetId)?.source ??
+        placement?.reference ?? (role === "PLAYER" ? gamePlayground.player : undefined);
+  };
+  const placeGamePlaygroundAssetAt = (
+    assetId: string,
+    point: { readonly x: number; readonly y: number },
+  ): void => {
+    if (gameAuthoringLocked()) return;
+    const asset = gamePlayground.assets.find((candidate) => candidate.assetId === assetId);
+    if (asset === undefined) return;
+    const sceneViewport = gamePlaygroundSceneViewportForEditor();
+    const worldMap = gamePlaygroundWorldMapForEditor();
+    const world = gamePlaygroundWorldForRuntime();
+    const duplicateCount = gamePlayground.placements.filter((placement) =>
+      Math.abs(placement.x - point.x) < 0.0001 &&
+      Math.abs(placement.y - point.y) < 0.0001
+    ).length;
+    const offset = duplicateCount * 0.75;
+    const clamp = (value: number, minimum: number, maximum: number): number =>
+      Math.min(maximum, Math.max(minimum, value));
+    const placementPoint = worldMap.bounds === "FINITE"
+      ? {
+        x: clamp(point.x + offset, 0.5, Math.max(0.5, world.width - 0.5)),
+        y: clamp(point.y + offset, 0.5, Math.max(0.5, world.height - 0.5)),
+      }
+      : { x: point.x + offset, y: point.y + offset };
+    const fallbackPoint = {
+      x: sceneViewport.x + sceneViewport.width / 2,
+      y: sceneViewport.y + sceneViewport.height / 2,
+    };
+    const resolvedPoint = Number.isFinite(placementPoint.x) && Number.isFinite(placementPoint.y)
+      ? placementPoint
+      : fallbackPoint;
+    let index = 1;
+    let placementId = asset.assetId + ":placement:" + index;
+    const existingIds = new Set(gamePlayground.placements.map((placement) => placement.placementId));
+    while (existingIds.has(placementId)) {
+      index += 1;
+      placementId = asset.assetId + ":placement:" + index;
+    }
+    upsertGamePlaygroundPlacement({
+      id: placementId,
+      label: asset.name,
+      kind: "SPRITE",
+      reference: asset.source,
+      layer: "ACTOR",
+      depth: 10,
+      x: resolvedPoint.x,
+      y: resolvedPoint.y,
+      scale: 1,
+      rotation: 0,
+      visible: true,
+      snapToGrid: false,
+      ...asset.defaults,
+    });
+    if (!gameDeckTracks.some((track) => track.id === placementId)) {
+      gameDeckTracks = [...gameDeckTracks, {
+        id: placementId,
+        label: asset.name,
+        kind: "SPRITE",
+        role: "PROP",
+        active: true,
+        components: defaultGameObjectComponents(placementId, "SPRITE", "PROP").map((component) =>
+          component.type === "TRANSFORM"
+              ? { ...component, x: resolvedPoint.x, y: resolvedPoint.y }
+            : component
+        ),
+        filled: [0],
+      }];
+    }
+    projectGameWorkspaceAction({ type: "SELECT_OBJECT", trackId: placementId }, { render: false });
+    queueGameEditorPersistenceSave("playground-placement-add");
+    renderGameCustomPanels();
+    setPanel("game-inspector");
+  };
+  const gameMarketRecordObject = (
+    value: unknown,
+  ): Record<string, unknown> | undefined =>
+    typeof value === "object" && value !== null && !Array.isArray(value)
+      ? value as Record<string, unknown>
+      : undefined;
+  const gameMarketString = (value: unknown): string | undefined =>
+    typeof value === "string" && value.trim().length > 0
+      ? value.trim()
+      : undefined;
+  const gameMarketStringList = (value: unknown): string[] =>
+    Array.isArray(value)
+      ? [...new Set(value.map(gameMarketString).filter((item): item is string => item !== undefined))]
+      : [];
+  const gameMarketCatalogRecordFor = (
+    value: unknown,
+  ): GameMarketCatalogRecord | null => {
+    const candidate = gameMarketRecordObject(value);
+    if (candidate === undefined) return null;
+    const assetFormat = gameMarketString(candidate.asset_format);
+    const rawFormats = gameMarketStringList(
+      candidate.formats ?? candidate.included_formats,
+    );
+    const formats = [...new Set([
+      ...rawFormats,
+      ...(assetFormat === undefined ? [] : [assetFormat]),
+    ])];
+    const title = gameMarketString(candidate.title);
+    const id = gameMarketString(candidate.id);
+    const kind = gameMarketString(candidate.kind) ??
+      gameMarketString(candidate.source_kind) ?? assetFormat;
+    const amountMinor = gameMarketRecordObject(candidate.price)?.amountMinor ??
+      candidate.sale_price_yen;
+    const creatorObject = gameMarketRecordObject(candidate.creator);
+    const creatorName = gameMarketString(candidate.creator_display_name) ??
+      gameMarketString(creatorObject?.name) ??
+      gameMarketString(creatorObject?.displayName);
+    const creatorId = gameMarketString(candidate.creator_id) ??
+      gameMarketString(creatorObject?.id) ?? creatorName;
+    const rights = gameMarketStringList(candidate.rights);
+    const previewUrl = gameMarketString(candidate.previewUrl) ??
+      gameMarketString(candidate.preview_url) ??
+      gameMarketString(candidate.preview_object_path);
+    return normalizeGameMarketCatalogRecord({
+      id,
+      title,
+      kind,
+      formats,
+      price: {
+        amountMinor,
+        currency: "JPY",
+      },
+      creator: {
+        id: creatorId,
+        name: creatorName,
+      },
+      rights,
+      ...(previewUrl === undefined ? {} : { previewUrl }),
+    });
+  };
+  const gameMarketCatalogRowsFor = (value: unknown): readonly unknown[] => {
+    if (Array.isArray(value)) return value;
+    if (typeof value !== "string") return [];
+    try {
+      const parsed: unknown = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  };
+  const gameMarketCatalogForQuery = (): readonly GameMarketCatalogRecord[] => {
+    const query = draw2GamePlaygroundMarketSearch?.value.trim().toLocaleLowerCase() ??
+      "";
+    if (query.length === 0) return gameMarketCatalog;
+    return gameMarketCatalog.filter((record) =>
+      [
+        record.id,
+        record.title,
+        record.kind,
+        record.creator.name,
+        ...record.formats,
+        ...record.rights,
+      ].join(" ").toLocaleLowerCase().includes(query)
+    );
+  };
+  const loadGameMarketCatalog = async (refresh = false): Promise<void> => {
+    if (gameMarketCatalogState === "loading" && !refresh) return;
+    const request = ++gameMarketCatalogRequest;
+    gameMarketCatalogState = "loading";
+    gameMarketCatalogError = undefined;
+    if (root.dataset.creatorMode === "GAME") renderGameCustomPanels();
+    try {
+      const host = windowRef as GameMarketHost;
+      const client = host.PiXiEEDMarketAccess?.getClient !== undefined
+        ? await host.PiXiEEDMarketAccess.getClient()
+        : host.__PIXIEED_ACCOUNT_SUPABASE_CLIENT__ ??
+          await host.__PIXIEED_ACCOUNT_SUPABASE_CLIENT_PROMISE__;
+      if (client === undefined) throw new Error("MARKET_CLIENT_UNAVAILABLE");
+      gameMarketClient = client;
+      const catalogResponse = await client.rpc(
+        "market_public_catalog_v1",
+        { input_limit: 120 },
+      );
+      if (catalogResponse.error !== undefined && catalogResponse.error !== null) {
+        throw new Error("MARKET_CATALOG_UNAVAILABLE");
+      }
+      const catalog = gameMarketCatalogRowsFor(catalogResponse.data)
+        .map(gameMarketCatalogRecordFor)
+        .filter((record): record is GameMarketCatalogRecord => record !== null);
+      let authenticated = false;
+      try {
+        const sessionResponse = await client.auth.getSession();
+        const userId = sessionResponse.data?.session?.user?.id;
+        authenticated = typeof userId === "string" && userId.trim().length > 0;
+      } catch {
+        // The public catalog remains useful when the optional session read fails.
+      }
+      const entitlementByAssetId = new Map<string, string>();
+      if (authenticated) {
+        try {
+          const entitlementResponse = await client.from("market_asset_entitlements").select(
+            "asset_id, status, acquisition_kind",
+          );
+          if (entitlementResponse.error === undefined || entitlementResponse.error === null) {
+            for (const row of gameMarketCatalogRowsFor(entitlementResponse.data)) {
+              const entitlement = gameMarketRecordObject(row);
+              const assetId = gameMarketString(entitlement?.asset_id);
+              const status = gameMarketString(entitlement?.status)?.toUpperCase();
+              if (
+                assetId !== undefined &&
+                status === "ACTIVE"
+              ) entitlementByAssetId.set(assetId, status);
+            }
+          }
+        } catch {
+          // Do not turn an optional entitlement read into a catalog outage.
+        }
+      }
+      if (request !== gameMarketCatalogRequest) return;
+      gameMarketAuthenticated = authenticated;
+      gameMarketCatalog = catalog;
+      gameMarketAccessByAssetId = new Map(
+        catalog.map((record) => [
+          record.id,
+          (() => {
+            const entitlementStatus = entitlementByAssetId.get(record.id);
+            return classifyGameMarketAccess({
+              catalog: record,
+              isAuthenticated: authenticated,
+              ...(entitlementStatus === undefined ? {} : { entitlementStatus }),
+              supportedFormats: gameMarketSupportedFormats,
+            });
+          })(),
+        ]),
+      );
+      gameMarketCatalogState = "ready";
+    } catch {
+      if (request !== gameMarketCatalogRequest) return;
+      gameMarketCatalogState = "error";
+      gameMarketCatalogError =
+        "Marketの公開カタログを取得できませんでした。通信状態を確認してください。";
+    }
+    if (root.dataset.creatorMode === "GAME") renderGameCustomPanels();
+  };
+  const gameMarketHexDigest = async (blob: Blob): Promise<string> => {
+    if (!windowRef.crypto?.subtle) return "";
+    const digest = new Uint8Array(await windowRef.crypto.subtle.digest(
+      "SHA-256",
+      await blob.arrayBuffer(),
+    ));
+    return Array.from(digest, (value) => value.toString(16).padStart(2, "0")).join("");
+  };
+  const deliverGameMarketAsset = async (
+    record: GameMarketCatalogRecord,
+    button: HTMLButtonElement,
+    acquireFree: boolean,
+  ): Promise<void> => {
+    const client = gameMarketClient;
+    if (client === undefined || client.functions?.invoke === undefined) {
+      throw new Error("Market接続を確認できません。ページを再読み込みしてください。");
+    }
+    const host = windowRef as GameMarketHost;
+    const delivery = host.PiXiEEDMarketDelivery;
+    if (typeof delivery?.stagePiXiEEDrawFile !== "function") {
+      throw new Error("Market配信モジュールを読み込めませんでした。");
+    }
+    button.disabled = true;
+    button.textContent = acquireFree ? "無料取得中…" : "配信を確認中…";
+    if (acquireFree) {
+      const acquisition = await client.rpc("market_acquire_free_asset_v1", {
+        input_asset_id: record.id,
+      });
+      if (acquisition.error !== undefined && acquisition.error !== null) {
+        throw new Error("無料取得を完了できませんでした。Market詳細で状態を確認してください。");
+      }
+    }
+    const response = await client.functions.invoke("market-download", {
+      body: { action: "authorize", kind: "pixieedraw-open", asset_id: record.id },
+    });
+    if (response.error !== undefined && response.error !== null) {
+      throw new Error("安全なAsset配信を開始できませんでした。Market詳細で状態を確認してください。");
+    }
+    const payload = gameMarketRecordObject(response.data);
+    const source = gameMarketRecordObject(payload?.source);
+    const license = gameMarketRecordObject(payload?.license);
+    const entitlement = gameMarketRecordObject(payload?.entitlement);
+    const traceId = gameMarketString(payload?.trace_id);
+    const revisionId = gameMarketString(source?.revisionId);
+    const contentHash = gameMarketString(source?.contentHash)?.toLowerCase();
+    const licenseId = gameMarketString(license?.license_id);
+    const rights = gameMarketStringList(license?.rights);
+    const files = Array.isArray(payload?.files) ? payload.files : [];
+    const file = gameMarketRecordObject(files[0]);
+    const packageHash = gameMarketString(file?.sha256)?.toLowerCase();
+    const fileUrl = gameMarketString(file?.url);
+    if (
+      source === undefined || source.assetId !== record.id || revisionId === undefined ||
+      contentHash === undefined || !/^[a-f0-9]{64}$/iu.test(contentHash) ||
+      packageHash === undefined || !/^[a-f0-9]{64}$/iu.test(packageHash) ||
+      entitlement === undefined || !gameMarketString(entitlement.id) ||
+      !["paid", "free", "admin"].includes(gameMarketString(entitlement.acquisition_kind) ?? "") ||
+      license?.in_game_use !== true || licenseId === undefined || rights.length === 0 ||
+      traceId === undefined || file === undefined || file.format !== "pixiedraw-project" ||
+      fileUrl === undefined
+    ) {
+      throw new Error("Assetのrevision・利用権・配信情報を確認できませんでした。");
+    }
+    const download = await windowRef.fetch(fileUrl, { cache: "no-store", credentials: "omit" });
+    if (!download.ok) throw new Error("Asset本体を取得できませんでした。もう一度お試しください。");
+    const blob = await download.blob();
+    const actualHash = await gameMarketHexDigest(blob);
+    if (actualHash !== packageHash) throw new Error("Asset本体の整合性を確認できませんでした。");
+    const stagedToken = await delivery.stagePiXiEEDrawFile(blob, {
+      filename: gameMarketString(file.name) ?? "market-asset.pxd",
+      assetId: record.id,
+      traceId,
+      targetProjectId: workspaceProjectId,
+      mode: "GAME_BIND",
+      source: {
+        assetId: record.id,
+        revisionId,
+        contentHash,
+        packageHash,
+        label: gameMarketString(source.label) ?? record.title,
+        format: "pixiedraw-project",
+        layout: "FULL_CANVAS",
+      },
+      delivery: {
+        deliveryId: traceId,
+        status: "SECURE_DELIVERED",
+        assetId: record.id,
+        revisionId,
+        contentHash,
+        packageHash,
+        format: "pixiedraw-project",
+        licenseId,
+      },
+      license: {
+        licenseId,
+        status: "ACTIVE",
+        inGameUse: true,
+        rights,
+      },
+    });
+    const binding = await client.rpc("market_record_asset_binding_v1", {
+      input_asset_id: record.id,
+      input_project_id: workspaceProjectId,
+      input_revision_id: revisionId,
+      input_content_hash: contentHash,
+      input_license_id: licenseId,
+      input_delivery_id: traceId,
+    });
+    const bindingRecord = gameMarketRecordObject(binding.data);
+    if ((binding.error !== undefined && binding.error !== null) || bindingRecord?.ok !== true) {
+      throw new Error("iGAME素材Bindingをサーバーへ記録できませんでした。");
+    }
+    const url = new URL(windowRef.location.href);
+    url.searchParams.set("mode", "GAME");
+    url.searchParams.set("projectId", workspaceProjectId);
+    url.searchParams.set("market_bind", stagedToken);
+    windowRef.location.assign(url.toString());
+  };
+  const renderGameMarketAssetGrid = (): void => {
+    if (draw2GamePlaygroundBottomCards === undefined) return;
+    if (gameMarketCatalogState === "loading") {
+      const loading = documentRef.createElement("small");
+      loading.className = "draw2-game-playground-asset-empty";
+      loading.textContent = "Marketの公開アセットを読み込んでいます…";
+      draw2GamePlaygroundBottomCards.replaceChildren(loading);
+      return;
+    }
+    if (gameMarketCatalogState === "error") {
+      const error = documentRef.createElement("div");
+      error.className = "draw2-game-playground-asset-empty";
+      error.textContent = gameMarketCatalogError ?? "Marketを読み込めませんでした。";
+      const retry = documentRef.createElement("button");
+      retry.type = "button";
+      retry.className = "draw2-button draw2-button-secondary";
+      retry.textContent = "再読み込み";
+      retry.addEventListener("click", () => void loadGameMarketCatalog(true));
+      error.append(retry);
+      draw2GamePlaygroundBottomCards.replaceChildren(error);
+      return;
+    }
+    const catalog = gameMarketCatalogForQuery();
+    if (catalog.length === 0) {
+      const empty = documentRef.createElement("div");
+      empty.className = "draw2-game-playground-asset-empty";
+      empty.textContent = gameMarketCatalog.length === 0
+        ? "公開中のMarketアセットはまだありません。"
+        : "検索条件に一致するMarketアセットはありません。";
+      draw2GamePlaygroundBottomCards.replaceChildren(empty);
+      return;
+    }
+    draw2GamePlaygroundBottomCards.replaceChildren(
+      ...catalog.map((record) => {
+        const access = gameMarketAccessByAssetId.get(record.id) ??
+          classifyGameMarketAccess({
+            catalog: record,
+            isAuthenticated: gameMarketAuthenticated,
+            supportedFormats: gameMarketSupportedFormats,
+          });
+        const card = documentRef.createElement("article");
+        card.className =
+          "draw2-game-playground-asset-card draw2-game-playground-market-card";
+        card.setAttribute("role", "listitem");
+        card.dataset.gameMarketAssetId = record.id;
+        card.dataset.gameMarketAccess = access.access;
+        card.dataset.gameMarketAction = access.action;
+        const visual = documentRef.createElement("span");
+        visual.className = "draw2-game-playground-asset-visual draw2-game-playground-market-visual";
+        if (record.previewUrl !== undefined) {
+          const image = documentRef.createElement("img");
+          image.src = record.previewUrl;
+          image.alt = "";
+          image.loading = "lazy";
+          image.decoding = "async";
+          visual.append(image);
+        } else {
+          visual.textContent = record.kind === "AUDIO" ? "♫" : "✦";
+        }
+        const copy = documentRef.createElement("span");
+        copy.className = "draw2-game-playground-asset-copy";
+        const title = documentRef.createElement("strong");
+        title.textContent = record.title;
+        const detail = documentRef.createElement("small");
+        detail.textContent = `${record.kind} · ${record.creator.name}`;
+        const accessLabel = documentRef.createElement("small");
+        accessLabel.className = "draw2-game-playground-market-access";
+        accessLabel.textContent = access.access === "PURCHASED"
+          ? record.formats.includes("pixiedraw-project")
+            ? "購入済み・すぐに追加"
+            : "購入済み・詳細から利用"
+          : access.access === "FREE"
+          ? "無料公開"
+          : access.access === "AUTH_REQUIRED"
+          ? "ログイン後に購入"
+          : access.access === "UNAVAILABLE"
+          ? record.rights.length === 0
+            ? "権利情報未確認・追加不可"
+            : "対応形式を確認"
+          : "公開中・詳細から購入";
+        copy.append(title, detail, accessLabel);
+        const href = `../market/items/${encodeURIComponent(record.id)}/`;
+        const link = documentRef.createElement("a");
+        link.className = "draw2-game-playground-asset-button";
+        link.href = href;
+        link.setAttribute("aria-label", `${record.title}のMarket詳細を開く`);
+        link.append(visual, copy);
+        const directUse = record.formats.includes("pixiedraw-project") &&
+          (access.access === "PURCHASED" ||
+            (access.access === "FREE" && gameMarketAuthenticated));
+        const action = directUse
+          ? documentRef.createElement("button")
+          : documentRef.createElement("a");
+        action.className = "draw2-button draw2-button-secondary draw2-game-playground-asset-place";
+        action.textContent = access.access === "AUTH_REQUIRED"
+          ? "ログインして確認"
+          : access.access === "PURCHASED"
+          ? directUse ? "今すぐiGAMEへ追加" : "Market詳細を開く"
+          : access.access === "UNAVAILABLE"
+          ? record.rights.length === 0 ? "権利を確認" : "形式を確認"
+          : access.access === "FREE"
+          ? gameMarketAuthenticated ? "無料取得して追加" : "無料取得・詳細"
+          : "詳細・購入";
+        action.setAttribute("aria-label", directUse
+          ? `${record.title}をiGAMEへ追加`
+          : `${record.title}のMarket詳細を開く`);
+        if (action instanceof HTMLAnchorElement) {
+          action.href = href;
+        } else {
+          action.type = "button";
+          action.addEventListener("click", () => {
+            void deliverGameMarketAsset(record, action, access.access === "FREE")
+              .catch((error: unknown) => {
+                action.disabled = false;
+                action.textContent = access.access === "FREE"
+                  ? "無料取得して追加"
+                  : "今すぐiGAMEへ追加";
+                if (draw2GamePlaygroundStatus !== undefined) {
+                  draw2GamePlaygroundStatus.textContent = error instanceof Error
+                    ? error.message
+                    : "Market AssetをiGAMEへ追加できませんでした。";
+                }
+              });
+          });
+        }
+        card.append(link, action);
+        return card;
+      }),
+    );
+  };
+  const renderGamePlaygroundAssetGrid = (): void => {
+    if (draw2GamePlaygroundBottomCards === undefined) return;
+    if (gamePlaygroundLibrarySource === "MARKET") {
+      renderGameMarketAssetGrid();
+      return;
+    }
+    const assets = gamePlayground.assets;
+    const audioAssets = gamePlayground.audioAssets;
+    if (assets.length === 0 && audioAssets.length === 0) {
+      const empty = documentRef.createElement("div");
+      empty.className = "draw2-game-playground-asset-empty";
+      empty.textContent = "右上の追加からiDRAWの範囲を選択";
+      draw2GamePlaygroundBottomCards.replaceChildren(empty);
+      return;
+    }
+    const audioCards = audioAssets.map((asset) => {
+      const card = documentRef.createElement("article");
+      card.className = "draw2-game-playground-asset-card draw2-game-playground-audio-card";
+      card.setAttribute("role", "listitem");
+      card.dataset.gameAudioAssetId = asset.audioAssetId;
+      const button = documentRef.createElement("button");
+      button.type = "button";
+      button.className = "draw2-game-playground-asset-button";
+      button.draggable = true;
+      button.setAttribute("aria-label", `${asset.name}をAudio slotへ割り当て`);
+      const visual = documentRef.createElement("span");
+      visual.className = "draw2-game-playground-asset-visual draw2-game-playground-audio-visual";
+      visual.textContent = asset.kind === "BGM" ? "♫" : asset.kind === "VOICE" ? "◖" : "•";
+      const copy = documentRef.createElement("span");
+      copy.className = "draw2-game-playground-asset-copy";
+      const title = documentRef.createElement("strong");
+      title.textContent = asset.name;
+      const badge = documentRef.createElement("small");
+      badge.textContent = `Audio · ${asset.kind}`;
+      copy.append(title, badge);
+      button.append(visual, copy);
+      button.addEventListener("click", () => assignGameAudioAssetToActiveSlot(asset.audioAssetId));
+      button.addEventListener("dragstart", (event) => {
+        if (event.dataTransfer === null) return;
+        event.dataTransfer.effectAllowed = "copy";
+        event.dataTransfer.setData("application/x-draw2-game-audio-asset", asset.audioAssetId);
+        event.dataTransfer.setData("text/plain", asset.name);
+      });
+      const assign = documentRef.createElement("button");
+      assign.type = "button";
+      assign.className = "draw2-button draw2-button-secondary draw2-game-playground-asset-place";
+      assign.textContent = "slotへ";
+      assign.disabled = gameAuthoringLocked() || gameAudioSlotSpecsForSelection().length === 0;
+      assign.addEventListener("click", () => assignGameAudioAssetToActiveSlot(asset.audioAssetId));
+      card.append(button, assign);
+      return card;
+    });
+    draw2GamePlaygroundBottomCards.replaceChildren(
+      ...assets.map((asset) => {
+        const reference = asset.source;
+        const placementCount = gamePlayground.placements.filter((placement) =>
+          placement.assetId === asset.assetId
+        ).length;
+        const card = documentRef.createElement("article");
+        card.className = "draw2-game-playground-asset-card";
+        card.setAttribute("role", "listitem");
+        card.dataset.gamePlaygroundAssetId = asset.assetId;
+        card.dataset.gamePlaygroundAssetRole = "asset";
+        const button = documentRef.createElement("button");
+        button.type = "button";
+        button.className = "draw2-game-playground-asset-button";
+        button.classList.toggle(
+          "is-active",
+          gameWorkspaceContext.selection.kind === "ASSET" &&
+            gameWorkspaceContext.selection.assetId === asset.assetId,
+        );
+        button.dataset.state = "ready";
+        button.draggable = true;
+        button.setAttribute(
+          "aria-label",
+          `${asset.name}を選択。中央へドラッグして配置`,
+        );
+        const visual = documentRef.createElement("span");
+        visual.className = "draw2-game-playground-asset-visual";
+        const dataUrl = gamePlaygroundReferenceDataUrlFor(reference);
+        if (dataUrl !== undefined) {
+          visual.style.backgroundImage = `url("${dataUrl}")`;
+        } else {
+          visual.textContent = "＋";
+        }
+        const copy = documentRef.createElement("span");
+        copy.className = "draw2-game-playground-asset-copy";
+        const title = documentRef.createElement("strong");
+        title.textContent = asset.name;
+        const badge = documentRef.createElement("small");
+        badge.textContent = "Sprite · " +
+          (reference.sourceFrames?.length ?? 1) + "F · " + placementCount + "配置";
+        copy.append(title, badge);
+        button.append(visual, copy);
+        button.addEventListener("click", () => {
+          projectGameWorkspaceAction(
+            { type: "OPEN_ASSET", assetId: asset.assetId },
+            { render: false },
+          );
+          renderGameCustomPanels();
+          if (!gameAuthoringLocked()) {
+            setPanel("game-inspector");
+            showGameObjectInspector();
+          }
+        });
+        button.addEventListener("dragstart", (event) => {
+          if (gameAuthoringLocked() || event.dataTransfer === null) return;
+          event.dataTransfer.effectAllowed = "copy";
+          event.dataTransfer.setData("application/x-draw2-game-asset", asset.assetId);
+          event.dataTransfer.setData("text/plain", asset.name);
+          button.setAttribute("aria-grabbed", "true");
+        });
+        button.addEventListener("dragend", () => {
+          button.setAttribute("aria-grabbed", "false");
+        });
+        const place = documentRef.createElement("button");
+        place.type = "button";
+        place.className = "draw2-button draw2-button-secondary draw2-game-playground-asset-place";
+        place.textContent = "中央へ配置";
+        place.setAttribute("aria-label", `${asset.name}を中央へ配置`);
+        place.disabled = gameAuthoringLocked();
+        place.addEventListener("click", () => {
+          const viewport = gamePlaygroundSceneViewportForEditor();
+          placeGamePlaygroundAssetAt(asset.assetId, {
+            x: viewport.x + viewport.width / 2,
+            y: viewport.y + viewport.height / 2,
+          });
+        });
+        card.append(button, place);
+        return card;
+      }),
+      ...audioCards,
+    );
+  };
+  const updateSelectedGameUiNode = (patch: Parameters<typeof updateGameUiNode>[1]): void => {
+    if (gameAuthoringLocked()) return;
+    const index = gameUiNodes.findIndex((node) => node.nodeId === selectedGameUiNodeId());
+    if (index < 0) return;
+    const node = gameUiNodes[index];
+    if (node === undefined) return;
+    gameUiNodes = gameUiNodes.map((candidate, candidateIndex) => candidateIndex === index ? updateGameUiNode(candidate, patch) : candidate);
+    syncGameUiNodesToPlayground();
+    renderGameUiNodes();
+    renderGamePlaygroundSelectedAssetInspector(false);
+  };
+  documentRef.addEventListener("keydown", (event) => {
+    const selectedNodeId = selectedGameUiNodeId();
+    const selectedNodeTarget = event.target instanceof Element
+      ? event.target.closest<HTMLElement>("[data-game-ui-node-id]")
+      : null;
+    const isSelectedNodeTarget = selectedNodeId !== undefined &&
+      selectedNodeTarget?.dataset.gameUiNodeId === selectedNodeId;
+    if (
+      (event.key !== "Delete" && event.key !== "Backspace") ||
+      currentCreatorMode() !== "GAME" ||
+      selectedNodeId === undefined || gameAuthoringLocked() ||
+      event.defaultPrevented || event.isComposing || event.repeat ||
+      (!isSelectedNodeTarget && isWorkspaceInteractiveTarget(event.target))
+    ) return;
+    event.preventDefault();
+    event.stopPropagation();
+    gameUiNodes = gameUiNodes.filter((node) => node.nodeId !== selectedNodeId);
+    projectGameWorkspaceAction({ type: "SELECT_SCENE", sceneId: gameWorkspaceSceneId() }, { render: false });
+    syncGameUiNodesToPlayground(); renderGameUiNodes(); renderGamePlaygroundSelectedAssetInspector(gameAuthoringLocked());
+  });
+  const renderGamePlaygroundSelectedAssetInspector = (
+    locked: boolean,
+  ): void => {
+    if (draw2GamePlaygroundSelectedAsset === undefined) return;
+    const selectedGameElement = gameElements.find((element) => element.id === selectedGameElementId());
+    if (selectedGameElement !== undefined) {
+      const card = documentRef.createElement("section"); card.className = "draw2-game-playground-inspector-card draw2-game-element-inspector-card";
+      card.dataset.gamePlaygroundInspectorRole = "element";
+      card.setAttribute("aria-label", "ELEMENT — ゲーム要素");
+      const heading = documentRef.createElement("strong"); heading.textContent = "ELEMENT — ゲーム要素"; card.append(heading);
+      const name = documentRef.createElement("input"); name.type = "text"; name.value = selectedGameElement.label; name.setAttribute("aria-label", "要素名");
+      name.addEventListener("change", () => { if (locked || gameAuthoringLocked()) return; gameElements = gameElements.map((element) => element.id === selectedGameElement.id ? { ...element, label: name.value.trim() || element.label } : element); syncGameUiNodesToPlayground(); renderGamePlaygroundSelectedAssetInspector(gameAuthoringLocked()); });
+      const nameRow = documentRef.createElement("label"); nameRow.textContent = "名前"; nameRow.append(name); card.append(nameRow);
+      const value = documentRef.createElement("input"); value.type = "number"; value.min = "0"; value.value = String(selectedGameElement.value); value.setAttribute("aria-label", "初期値");
+      value.addEventListener("change", () => { if (locked || gameAuthoringLocked()) return; gameElements = gameElements.map((element) => element.id === selectedGameElement.id ? { ...element, value: Math.max(0, Number(value.value) || 0) } : element); syncGameUiNodesToPlayground(); renderGamePlaygroundSelectedAssetInspector(gameAuthoringLocked()); });
+      const valueRow = documentRef.createElement("label"); valueRow.textContent = "初期値"; valueRow.append(value); card.append(valueRow);
+      const effect = documentRef.createElement("input"); effect.type = "text"; effect.value = selectedGameElement.effect ?? ""; effect.placeholder = "例：HP +20 / 回復 / 開く"; effect.setAttribute("aria-label", "効果");
+      effect.addEventListener("change", () => { if (locked || gameAuthoringLocked()) return; gameElements = gameElements.map((element) => { if (element.id !== selectedGameElement.id) return element; const trimmed = effect.value.trim(); if (trimmed !== "") return { ...element, effect: trimmed }; const { effect: _effect, ...withoutEffect } = element; return withoutEffect; }); syncGameUiNodesToPlayground(); renderGamePlaygroundSelectedAssetInspector(gameAuthoringLocked()); });
+      const effectRow = documentRef.createElement("label"); effectRow.textContent = "効果"; effectRow.append(effect); card.append(effectRow);
+      const effectTarget = documentRef.createElement("select"); effectTarget.setAttribute("aria-label", "効果の対象");
+      const automaticTarget = documentRef.createElement("option"); automaticTarget.value = ""; automaticTarget.textContent = "効果欄の名前を使う"; effectTarget.append(automaticTarget);
+      for (const target of gameElements.filter((candidate) => candidate.id !== selectedGameElement.id)) {
+        const option = documentRef.createElement("option"); option.value = target.id; option.textContent = `${target.label} · ${target.kind}`; option.selected = target.id === selectedGameElement.effectTargetId; effectTarget.append(option);
+      }
+      if (selectedGameElement.effectTargetId === undefined) automaticTarget.selected = true;
+      effectTarget.addEventListener("change", () => { if (locked || gameAuthoringLocked()) return; gameElements = gameElements.map((element) => { if (element.id !== selectedGameElement.id) return element; if (effectTarget.value !== "") return { ...element, effectTargetId: effectTarget.value }; const { effectTargetId: _effectTargetId, ...withoutEffectTarget } = element; return withoutEffectTarget; }); syncGameUiNodesToPlayground(); renderGamePlaygroundSelectedAssetInspector(gameAuthoringLocked()); });
+      const effectTargetRow = documentRef.createElement("label"); effectTargetRow.textContent = "効果の対象"; effectTargetRow.append(effectTarget); card.append(effectTargetRow);
+      const remove = documentRef.createElement("button"); remove.type = "button"; remove.className = "draw2-game-inspector-danger"; remove.textContent = "この要素を削除"; remove.addEventListener("click", () => { if (locked || gameAuthoringLocked()) return; gameElements = gameElements.filter((element) => element.id !== selectedGameElement.id); projectGameWorkspaceAction({ type: "SELECT_SCENE", sceneId: gameWorkspaceSceneId() }, { render: false }); syncGameUiNodesToPlayground(); renderGamePlaygroundSelectedAssetInspector(gameAuthoringLocked()); }); card.append(remove);
+      for (const control of card.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | HTMLButtonElement>("input,textarea,select,button")) control.disabled = locked;
+      draw2GamePlaygroundSelectedAsset.replaceChildren(card); return;
+    }
+    const selectedUiNode = gameUiNodes.find((node) => node.nodeId === selectedGameUiNodeId());
+    if (selectedUiNode !== undefined) {
+      const card = documentRef.createElement("section");
+      card.className = "draw2-game-playground-inspector-card draw2-game-ui-inspector-card";
+      card.dataset.gamePlaygroundInspectorRole = "ui-node";
+      card.setAttribute("aria-label", "UI_NODE — UIノード");
+      const heading = documentRef.createElement("strong");
+      heading.textContent = "UI_NODE — UIノード設定";
+      card.append(heading);
+      const fields: Array<[string, string, (value: string) => void]> = [
+        ["表示名", selectedUiNode.label, (value) => updateSelectedGameUiNode({ label: value })],
+        ["X", String(Math.round(selectedUiNode.style.x)), (value) => updateSelectedGameUiNode({ style: { x: Number(value) } })],
+        ["Y", String(Math.round(selectedUiNode.style.y)), (value) => updateSelectedGameUiNode({ style: { y: Number(value) } })],
+        ["幅", String(Math.round(selectedUiNode.style.width)), (value) => updateSelectedGameUiNode({ style: { width: Number(value) } })],
+        ["高さ", String(Math.round(selectedUiNode.style.height)), (value) => updateSelectedGameUiNode({ style: { height: Number(value) } })],
+        ["透明度", String(selectedUiNode.style.opacity), (value) => updateSelectedGameUiNode({ style: { opacity: Number(value) } })],
+        ["前後", String(selectedUiNode.style.zIndex), (value) => updateSelectedGameUiNode({ style: { zIndex: Number(value) } })],
+      ];
+      for (const [label, value, apply] of fields) {
+        const input = documentRef.createElement("input"); input.value = value; input.type = label === "表示名" ? "text" : "number"; input.setAttribute("aria-label", label);
+        input.addEventListener("change", () => { try { apply(input.value); } catch { input.value = value; } });
+        const row = documentRef.createElement("label"); row.textContent = label; row.append(input); card.append(row);
+      }
+      for (const [label, key] of [["パネル見出し", "panelTitle"], ["パネル本文", "panelMessage"]] as const) {
+        const input = documentRef.createElement(key === "panelMessage" ? "textarea" : "input"); input.value = selectedUiNode[key]; input.setAttribute("aria-label", label); if (input instanceof HTMLTextAreaElement) input.rows = 4;
+        input.addEventListener("change", () => updateSelectedGameUiNode({ [key]: input.value }));
+        const row = documentRef.createElement("label"); row.textContent = label; row.append(input); card.append(row);
+      }
+      const tabs = documentRef.createElement("input"); tabs.type = "text"; tabs.value = selectedUiNode.panelTabs.join(", "); tabs.placeholder = "例：基本, 装備, 設定（空欄でタブなし）"; tabs.setAttribute("aria-label", "パネルタブ");
+      tabs.addEventListener("change", () => updateSelectedGameUiNode({ panelTabs: tabs.value.split(",").map((tab) => tab.trim()).filter(Boolean) }));
+      const tabsRow = documentRef.createElement("label"); tabsRow.textContent = "タブ"; tabsRow.append(tabs); card.append(tabsRow);
+      const appendUiSectionHeading = (label: string): void => {
+        const sectionHeading = documentRef.createElement("div");
+        sectionHeading.className = "draw2-game-playground-inspector-section-heading";
+        sectionHeading.textContent = label;
+        card.append(sectionHeading);
+      };
+      const appendUiSelect = (
+        label: string,
+        ariaLabel: string,
+        value: string,
+        options: readonly { readonly value: string; readonly label: string }[],
+        apply: (value: string) => void,
+      ): void => {
+        const select = documentRef.createElement("select");
+        select.setAttribute("aria-label", ariaLabel);
+        for (const optionValue of options) {
+          const option = documentRef.createElement("option");
+          option.value = optionValue.value;
+          option.textContent = optionValue.label;
+          option.selected = optionValue.value === value;
+          select.append(option);
+        }
+        select.addEventListener("change", () => apply(select.value));
+        const row = documentRef.createElement("label");
+        row.textContent = label;
+        row.append(select);
+        card.append(row);
+      };
+      const appendUiCheckbox = (
+        label: string,
+        ariaLabel: string,
+        checked: boolean,
+        apply: (checked: boolean) => void,
+      ): void => {
+        const input = documentRef.createElement("input");
+        input.type = "checkbox";
+        input.checked = checked;
+        input.setAttribute("aria-label", ariaLabel);
+        input.addEventListener("change", () => apply(input.checked));
+        const row = documentRef.createElement("label");
+        row.textContent = label;
+        row.append(input);
+        card.append(row);
+      };
+      if (selectedUiNode.kind === "BUTTON") {
+        appendUiSectionHeading("タップ時");
+        appendUiSelect(
+          "動作",
+          "ボタンの動作",
+          selectedUiNode.buttonAction ?? "NONE",
+          GAME_VISUAL_MAKER_UI_ACTIONS.map((item) => ({ value: item.id, label: item.label })),
+          (value) => updateSelectedGameUiNode({ buttonAction: value as GameVisualMakerUiAction }),
+        );
+      }
+      const interaction = selectedUiNode.interaction ?? {
+        enabled: true,
+        pressMode: "TAP" as const,
+        longPressMs: 500,
+        repeatWhileHeld: false,
+      };
+      appendUiSectionHeading("操作");
+      appendUiCheckbox("有効", "UIノードを有効化", interaction.enabled, (checked) => updateSelectedGameUiNode({ interaction: { enabled: checked } }));
+      appendUiSelect(
+        "押し方",
+        "UIノードの押し方",
+        interaction.pressMode,
+        [
+          { value: "TAP", label: "タップ" },
+          { value: "HOLD", label: "長押し" },
+          { value: "TAP_OR_HOLD", label: "タップ / 長押し" },
+        ],
+        (value) => updateSelectedGameUiNode({ interaction: { pressMode: value as NonNullable<GameUiNode["interaction"]>["pressMode"] } }),
+      );
+      const longPress = documentRef.createElement("input");
+      longPress.type = "number";
+      longPress.min = "100";
+      longPress.max = "2000";
+      longPress.step = "50";
+      longPress.value = String(interaction.longPressMs);
+      longPress.setAttribute("aria-label", "長押し判定時間（ミリ秒）");
+      longPress.addEventListener("change", () => updateSelectedGameUiNode({ interaction: { longPressMs: Math.max(100, Math.min(2000, Number(longPress.value) || 500)) } }));
+      const longPressRow = documentRef.createElement("label");
+      longPressRow.textContent = "長押し(ms)";
+      longPressRow.append(longPress);
+      card.append(longPressRow);
+      appendUiCheckbox("押し続ける", "押している間くり返す", interaction.repeatWhileHeld, (checked) => updateSelectedGameUiNode({ interaction: { repeatWhileHeld: checked } }));
+      appendUiSectionHeading("配置の基準");
+      const layout = selectedUiNode.layout ?? { anchor: "FREE" as const, autoArrange: false, gap: 2 };
+      appendUiSelect(
+        "基準位置",
+        "UIノードの基準位置",
+        layout.anchor,
+        [
+          { value: "FREE", label: "自由" },
+          { value: "TOP_LEFT", label: "左上" },
+          { value: "TOP_CENTER", label: "上中央" },
+          { value: "TOP_RIGHT", label: "右上" },
+          { value: "CENTER", label: "中央" },
+          { value: "BOTTOM_LEFT", label: "左下" },
+          { value: "BOTTOM_CENTER", label: "下中央" },
+          { value: "BOTTOM_RIGHT", label: "右下" },
+        ],
+        (value) => updateSelectedGameUiNode({ layout: { anchor: value as NonNullable<GameUiNode["layout"]>["anchor"] } }),
+      );
+      appendUiCheckbox("自動整列", "UIノードを重ならないよう自動整列", layout.autoArrange, (checked) => updateSelectedGameUiNode({ layout: { autoArrange: checked } }));
+      const gap = documentRef.createElement("input");
+      gap.type = "number";
+      gap.min = "0";
+      gap.max = "20";
+      gap.step = "1";
+      gap.value = String(layout.gap);
+      gap.setAttribute("aria-label", "自動整列の間隔");
+      gap.addEventListener("change", () => updateSelectedGameUiNode({ layout: { gap: Math.max(0, Math.min(20, Number(gap.value) || 0)) } }));
+      const gapRow = documentRef.createElement("label");
+      gapRow.textContent = "間隔";
+      gapRow.append(gap);
+      card.append(gapRow);
+      if (selectedUiNode.kind === "INVENTORY" && selectedUiNode.inventory !== undefined) {
+        appendUiSectionHeading("持ちもの");
+        const inventory = selectedUiNode.inventory;
+        const columns = documentRef.createElement("input");
+        columns.type = "number";
+        columns.min = "1";
+        columns.max = "8";
+        columns.value = String(inventory.columns);
+        columns.setAttribute("aria-label", "持ちものの列数");
+        columns.addEventListener("change", () => updateSelectedGameUiNode({ inventory: { columns: Math.max(1, Math.min(8, Number(columns.value) || 1)) } }));
+        const columnsRow = documentRef.createElement("label");
+        columnsRow.textContent = "列数";
+        columnsRow.append(columns);
+        card.append(columnsRow);
+        appendUiSelect("絞り込み", "持ちものの絞り込み", inventory.filter, [
+          { value: "ALL", label: "すべて" },
+          { value: "ITEM", label: "アイテム" },
+          { value: "SKILL", label: "スキル" },
+          { value: "EQUIPPABLE", label: "装備可能" },
+        ], (value) => updateSelectedGameUiNode({ inventory: { filter: value as NonNullable<GameUiNode["inventory"]>["filter"] } }));
+        appendUiCheckbox("個数を表示", "個数を表示", inventory.showCounts, (checked) => updateSelectedGameUiNode({ inventory: { showCounts: checked } }));
+        appendUiCheckbox("使用できる", "アイテムを使用できる", inventory.allowUse, (checked) => updateSelectedGameUiNode({ inventory: { allowUse: checked } }));
+        appendUiCheckbox("装備できる", "アイテムを装備できる", inventory.allowEquip, (checked) => updateSelectedGameUiNode({ inventory: { allowEquip: checked } }));
+      }
+      if (selectedUiNode.kind === "MINIMAP" && selectedUiNode.minimap !== undefined) {
+        appendUiSectionHeading("全体マップ");
+        const minimap = selectedUiNode.minimap;
+        const scale = documentRef.createElement("input");
+        scale.type = "number";
+        scale.min = "0.5";
+        scale.max = "4";
+        scale.step = "0.1";
+        scale.value = String(minimap.scale);
+        scale.setAttribute("aria-label", "全体マップの倍率");
+        scale.addEventListener("change", () => updateSelectedGameUiNode({ minimap: { scale: Math.max(0.5, Math.min(4, Number(scale.value) || 1)) } }));
+        const scaleRow = documentRef.createElement("label");
+        scaleRow.textContent = "倍率";
+        scaleRow.append(scale);
+        card.append(scaleRow);
+        appendUiCheckbox("主人公", "全体マップに主人公を表示", minimap.showPlayer, (checked) => updateSelectedGameUiNode({ minimap: { showPlayer: checked } }));
+        appendUiCheckbox("オブジェクト", "全体マップにオブジェクトを表示", minimap.showActors, (checked) => updateSelectedGameUiNode({ minimap: { showActors: checked } }));
+        appendUiCheckbox("目的地", "全体マップに目的地を表示", minimap.showObjectives, (checked) => updateSelectedGameUiNode({ minimap: { showObjectives: checked } }));
+        appendUiCheckbox("主人公に追従", "全体マップを主人公に追従", minimap.rotateWithPlayer, (checked) => updateSelectedGameUiNode({ minimap: { rotateWithPlayer: checked } }));
+      }
+      const visible = documentRef.createElement("input"); visible.type = "checkbox"; visible.checked = selectedUiNode.style.visible; visible.setAttribute("aria-label", "表示");
+      visible.addEventListener("change", () => updateSelectedGameUiNode({ style: { visible: visible.checked } }));
+      const visibleRow = documentRef.createElement("label"); visibleRow.textContent = "表示"; visibleRow.append(visible); card.append(visibleRow);
+      const actions = documentRef.createElement("div"); actions.className = "draw2-game-ui-inspector-actions";
+      const moveUiNode = (delta: number): void => {
+        if (gameAuthoringLocked()) return;
+        const from = gameUiNodes.findIndex((candidate) => candidate.nodeId === selectedUiNode.nodeId);
+        const to = from + delta;
+        if (from < 0 || to < 0 || to >= gameUiNodes.length) return;
+        const reordered = [...gameUiNodes]; const [moved] = reordered.splice(from, 1); if (moved === undefined) return;
+        reordered.splice(to, 0, moved);
+        gameUiNodes = reordered.map((candidate, index) => updateGameUiNode(candidate, { style: { zIndex: index + 1 } }));
+        syncGameUiNodesToPlayground(); renderGameUiNodes(); renderGameHierarchyGroups(); renderGamePlaygroundSelectedAssetInspector(false);
+      };
+      const up = documentRef.createElement("button"); up.type = "button"; up.textContent = "▲ 前へ"; up.addEventListener("click", () => moveUiNode(-1));
+      const down = documentRef.createElement("button"); down.type = "button"; down.textContent = "▼ 後へ"; down.addEventListener("click", () => moveUiNode(1));
+      const duplicate = documentRef.createElement("button"); duplicate.type = "button"; duplicate.textContent = "複製";
+      duplicate.addEventListener("click", () => {
+        if (gameAuthoringLocked()) return;
+        const copy = createGameUiNode(`ui:${selectedUiNode.kind.toLowerCase()}:${Date.now()}`, selectedUiNode.kind, selectedUiNode.label + " コピー");
+        gameUiNodes = [...gameUiNodes, {
+          ...copy,
+          action: selectedUiNode.action,
+          panelTitle: selectedUiNode.panelTitle,
+          panelMessage: selectedUiNode.panelMessage,
+          panelTabs: [...selectedUiNode.panelTabs],
+          ...(selectedUiNode.interaction === undefined ? {} : { interaction: { ...selectedUiNode.interaction } }),
+          ...(selectedUiNode.layout === undefined ? {} : { layout: { ...selectedUiNode.layout } }),
+          ...(selectedUiNode.buttonAction === undefined ? {} : { buttonAction: selectedUiNode.buttonAction }),
+          ...(selectedUiNode.inventory === undefined ? {} : { inventory: { ...selectedUiNode.inventory } }),
+          ...(selectedUiNode.minimap === undefined ? {} : { minimap: { ...selectedUiNode.minimap } }),
+          style: { ...selectedUiNode.style, x: Math.min(88, selectedUiNode.style.x + 3), y: Math.min(88, selectedUiNode.style.y + 3) },
+        }];
+        projectGameWorkspaceAction({ type: "SELECT_UI_NODE", nodeId: copy.nodeId }, { render: false }); syncGameUiNodesToPlayground(); renderGameUiNodes(); renderGamePlaygroundSelectedAssetInspector(gameAuthoringLocked());
+      });
+      const remove = documentRef.createElement("button"); remove.type = "button"; remove.textContent = "削除";
+      remove.addEventListener("click", () => { if (gameAuthoringLocked()) return; gameUiNodes = gameUiNodes.filter((node) => node.nodeId !== selectedUiNode.nodeId); projectGameWorkspaceAction({ type: "SELECT_SCENE", sceneId: gameWorkspaceSceneId() }, { render: false }); syncGameUiNodesToPlayground(); renderGameUiNodes(); renderGamePlaygroundSelectedAssetInspector(gameAuthoringLocked()); });
+      actions.append(up, down, duplicate, remove); card.append(actions);
+      for (const control of card.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | HTMLButtonElement>("input,textarea,select,button")) control.disabled = locked;
+      draw2GamePlaygroundSelectedAsset.replaceChildren(card); return;
+    }
+    const assetSelection = gameWorkspaceContext.selection.kind === "ASSET"
+      ? gameWorkspaceContext.selection
+      : undefined;
+    const selectedAsset = assetSelection === undefined
+      ? undefined
+      : gamePlayground.assets.find((asset) =>
+        asset.assetId === assetSelection.assetId
+      );
+    const objectSelection = gameWorkspaceContext.selection.kind === "OBJECT" ||
+        gameWorkspaceContext.selection.kind === "COMPONENT"
+      ? gameWorkspaceContext.selection
+      : undefined;
+    const uiNodeSelection = gameWorkspaceContext.selection.kind === "UI_NODE"
+      ? gameWorkspaceContext.selection
+      : undefined;
+    const elementSelection = gameWorkspaceContext.selection.kind === "ELEMENT"
+      ? gameWorkspaceContext.selection
+      : undefined;
+    const track = objectSelection === undefined
+      ? undefined
+      : gameDeckTracks.find((candidate) =>
+        candidate.id === objectSelection.trackId && candidate.kind !== "EVENT"
+      );
+    if (draw2GamePlaygroundInspector !== undefined) {
+      const context = assetSelection !== undefined
+        ? "asset"
+        : objectSelection !== undefined
+        ? "object"
+        : uiNodeSelection !== undefined
+        ? "ui-node"
+        : elementSelection !== undefined
+        ? "element"
+        : gameWorkspaceContext.selection.kind === "ANIMATION"
+        ? "animation"
+        : gameWorkspaceContext.selection.kind === "EVENT"
+        ? "event"
+        : "scene";
+      const contextLabel = context === "asset"
+        ? "ASSET — アセット"
+        : context === "object"
+        ? "OBJECT — オブジェクト"
+        : context === "ui-node"
+        ? "UI_NODE — UIノード"
+        : context === "element"
+        ? "ELEMENT — ゲーム要素"
+        : context === "animation"
+        ? "ANIMATION — アニメーション"
+        : context === "event"
+        ? "EVENT — イベント"
+        : "SCENE — シーン";
+      draw2GamePlaygroundInspector.dataset.inspectorContext = context;
+      draw2GamePlaygroundInspector.setAttribute("aria-label", contextLabel);
+      draw2GamePlaygroundSelectedAsset.setAttribute("aria-label", contextLabel);
+      draw2GamePlaygroundInspector.querySelector<HTMLElement>(
+        "#draw2GamePlaygroundInspectorHeading",
+      )?.replaceChildren(documentRef.createTextNode(contextLabel));
+      draw2GamePlaygroundInspector.querySelector<HTMLElement>(
+        ".draw2-panel-badge",
+      )?.replaceChildren(documentRef.createTextNode(contextLabel));
+    }
+    draw2GamePlaygroundSelectedAsset.replaceChildren();
+    if (assetSelection !== undefined && selectedAsset !== undefined) {
+      const reference = selectedAsset.source;
+      const card = documentRef.createElement("section");
+      card.className = "draw2-game-playground-inspector-card";
+      card.dataset.gamePlaygroundInspectorRole = "asset";
+      card.setAttribute("aria-label", "ASSET — アセット");
+      const heading = documentRef.createElement("header");
+      heading.className = "draw2-game-playground-inspector-card-heading";
+      const sprite = documentRef.createElement("button");
+      sprite.type = "button";
+      sprite.className = "draw2-game-playground-inspector-sprite";
+      sprite.disabled = locked;
+      sprite.setAttribute("aria-label", selectedAsset.name + "のSprite範囲をiDRAWで変更");
+      const dataUrl = gamePlaygroundReferenceDataUrlFor(reference);
+      if (dataUrl !== undefined) sprite.style.backgroundImage = `url("${dataUrl}")`;
+      else sprite.textContent = "＋";
+      sprite.addEventListener("click", () => {
+        openGamePlaygroundDrawSelection({ kind: "ASSET", assetId: selectedAsset.assetId });
+      });
+      const titleBlock = documentRef.createElement("div");
+      titleBlock.className = "draw2-game-playground-inspector-card-title";
+      const title = documentRef.createElement("strong");
+      title.textContent = selectedAsset.name;
+      const source = documentRef.createElement("small");
+      source.textContent = "再利用Asset · iDRAW";
+      titleBlock.append(title, source);
+      const badge = documentRef.createElement("span");
+      badge.className = "draw2-game-playground-inspector-role";
+      badge.textContent = "ASSET";
+      heading.append(sprite, titleBlock, badge);
+      card.append(heading);
+      const infoHeading = documentRef.createElement("div");
+      infoHeading.className = "draw2-game-playground-inspector-section-heading";
+      infoHeading.textContent = "Sprite情報";
+      card.append(infoHeading);
+      const info = documentRef.createElement("div");
+      info.className = "draw2-game-playground-inspector-info";
+      for (const [label, value] of [
+        ["範囲", reference.region === undefined ? "—" : `${Math.round(reference.region.width)}×${Math.round(reference.region.height)}px`],
+        ["読み取り", gamePlaygroundLayoutLabels[reference.layout] ?? reference.layout],
+        ["アニメーション", reference.sourceFrames === undefined ? "1フレーム" : `${reference.sourceFrames.length}フレーム`],
+        ["レイヤー", reference.sourceFrames?.reduce((total, frame) => total + (frame.layerIds?.length ?? 0), 0) === 0 ? "—" : `${new Set(reference.sourceFrames?.flatMap((frame) => frame.layerIds ?? [])).size}レイヤー`],
+        ["配置数", String(gamePlayground.placements.filter((placement) => placement.assetId === selectedAsset.assetId).length)],
+      ] as const) {
+        const row = documentRef.createElement("div");
+        const key = documentRef.createElement("span");
+        key.textContent = label;
+        const valueElement = documentRef.createElement("strong");
+        valueElement.textContent = value;
+        row.append(key, valueElement);
+        info.append(row);
+      }
+      card.append(info);
+      const defaultsHeading = documentRef.createElement("div");
+      defaultsHeading.className = "draw2-game-playground-inspector-section-heading";
+      defaultsHeading.textContent = "新しく置くときの初期値";
+      card.append(defaultsHeading);
+      const flags = documentRef.createElement("div");
+      flags.className = "draw2-game-playground-inspector-flags";
+      for (const [key, label] of [["movable", "移動"], ["collision", "当たり判定"], ["gravity", "重力"]] as const) {
+        const toggle = documentRef.createElement("label");
+        const input = documentRef.createElement("input");
+        input.type = "checkbox";
+        input.checked = selectedAsset.defaults[key];
+        input.disabled = locked;
+        input.addEventListener("change", () => {
+          if (gameAuthoringLocked()) return;
+          gamePlayground = {
+            ...gamePlayground,
+            assets: gamePlayground.assets.map((candidate) =>
+              candidate.assetId === selectedAsset.assetId
+                ? { ...candidate, defaults: { ...candidate.defaults, [key]: input.checked } }
+                : candidate
+            ),
+          };
+          queueGameEditorPersistenceSave("playground-asset-defaults");
+          renderGameCustomPanels();
+        });
+        toggle.append(input, documentRef.createTextNode(label));
+        flags.append(toggle);
+      }
+      card.append(flags);
+      renderGameAudioSlots(card, locked);
+      draw2GamePlaygroundSelectedAsset.append(card);
+      return;
+    }
+    if (track === undefined) {
+      if (gameWorkspaceContext.selection.kind === "SCENE") {
+        const card = documentRef.createElement("section");
+        card.className = "draw2-game-playground-inspector-card";
+        card.dataset.gamePlaygroundInspectorRole = "scene";
+        card.setAttribute("aria-label", "SCENE — シーン");
+        const heading = documentRef.createElement("header");
+        heading.className = "draw2-game-playground-inspector-card-heading";
+        const titleBlock = documentRef.createElement("div");
+        titleBlock.className = "draw2-game-playground-inspector-card-title";
+        const title = documentRef.createElement("strong");
+        title.textContent = gameWorkspaceContext.selection.sceneId;
+        const detail = documentRef.createElement("small");
+        detail.textContent = `${gamePlayground.placements.length} Placement`;
+        titleBlock.append(title, detail);
+        const badge = documentRef.createElement("span");
+        badge.className = "draw2-game-playground-inspector-role";
+        badge.textContent = "SCENE";
+        heading.append(titleBlock, badge);
+        card.append(heading);
+        const info = documentRef.createElement("div");
+        info.className = "draw2-game-playground-inspector-info";
+        const row = documentRef.createElement("div");
+        const key = documentRef.createElement("span");
+        key.textContent = "配置";
+        const value = documentRef.createElement("strong");
+        value.textContent = `${gamePlayground.placements.length}件`;
+        row.append(key, value);
+        info.append(row);
+        card.append(info);
+        renderGameAudioSlots(card, locked);
+        draw2GamePlaygroundSelectedAsset.append(card);
+        return;
+      }
+      if (gameWorkspaceContext.selection.kind === "ANIMATION" || gameWorkspaceContext.selection.kind === "EVENT") {
+        const card = documentRef.createElement("section");
+        card.className = "draw2-game-playground-inspector-card";
+        card.dataset.gamePlaygroundInspectorRole = gameWorkspaceContext.selection.kind.toLowerCase();
+        const heading = documentRef.createElement("header");
+        heading.className = "draw2-game-playground-inspector-card-heading";
+        const titleBlock = documentRef.createElement("div");
+        titleBlock.className = "draw2-game-playground-inspector-card-title";
+        const title = documentRef.createElement("strong");
+        title.textContent = gameWorkspaceContext.selection.kind === "ANIMATION"
+          ? gameWorkspaceContext.selection.clipId
+          : gameWorkspaceContext.selection.eventId;
+        titleBlock.append(title);
+        heading.append(titleBlock);
+        card.append(heading);
+        renderGameAudioSlots(card, locked);
+        draw2GamePlaygroundSelectedAsset.append(card);
+        return;
+      }
+      const empty = documentRef.createElement("div");
+      empty.className = "draw2-game-playground-inspector-empty";
+      empty.innerHTML = "<strong>アセットを選択</strong><small>下のグリッドから開く</small>";
+      draw2GamePlaygroundSelectedAsset.append(empty);
+      return;
+    }
+    const role = track.role ?? gameObjectRoleFor(track.id, track.kind);
+    const isTilemap = role === "TILEMAP";
+    const reference = gamePlaygroundAssetReferenceFor(track);
+    const currentPlacement = gamePlaygroundAssetPlacementFor(track);
+    const canSelectSprite = isTilemap || role === "PLAYER" ||
+      role === "NPC" || role === "PROP" || track.kind === "SPRITE";
+    const card = documentRef.createElement("section");
+    card.className = "draw2-game-playground-inspector-card";
+    card.dataset.gamePlaygroundInspectorRole = role.toLocaleLowerCase();
+    card.setAttribute("aria-label", "OBJECT — オブジェクト");
+
+    const heading = documentRef.createElement("header");
+    heading.className = "draw2-game-playground-inspector-card-heading";
+    const sprite = documentRef.createElement("button");
+    sprite.type = "button";
+    sprite.className = "draw2-game-playground-inspector-sprite";
+    sprite.disabled = locked || !canSelectSprite;
+    sprite.setAttribute(
+      "aria-label",
+      canSelectSprite
+        ? `${track.label}のSprite範囲をiDRAWで変更`
+        : `${track.label}はSprite対象外`,
+    );
+    const spriteDataUrl = gamePlaygroundReferenceDataUrlFor(reference);
+    if (spriteDataUrl !== undefined) {
+      sprite.style.backgroundImage = `url("${spriteDataUrl}")`;
+    } else {
+      sprite.textContent = canSelectSprite ? "＋" : "◇";
+    }
+    if (canSelectSprite) {
+      sprite.addEventListener("click", () => {
+        if (isTilemap) openGamePlaygroundDrawSelection({ kind: "WORLD" });
+        else if (role === "PLAYER") openGamePlaygroundDrawSelection({ kind: "PLAYER" });
+        else openGamePlaygroundDrawSelection({ kind: "OBJECT", trackId: track.id });
+      });
+    }
+    const titleBlock = documentRef.createElement("div");
+    titleBlock.className = "draw2-game-playground-inspector-card-title";
+    const title = documentRef.createElement("strong");
+    title.textContent = track.label;
+    const source = documentRef.createElement("small");
+    source.textContent = reference === undefined
+      ? "Sprite未設定"
+      : "iDRAW · " + reference.label;
+    titleBlock.append(title, source);
+    const badge = documentRef.createElement("span");
+    badge.className = "draw2-game-playground-inspector-role";
+    badge.textContent = gameRoleLabel(role);
+    heading.append(sprite, titleBlock, badge);
+    card.append(heading);
+    const nameRow = documentRef.createElement("label");
+    nameRow.className = "draw2-game-object-name-field";
+    nameRow.textContent = "ヒエラルキー名";
+    const nameInput = documentRef.createElement("input");
+    nameInput.type = "text";
+    nameInput.value = track.label;
+    nameInput.maxLength = 80;
+    nameInput.disabled = locked;
+    nameInput.setAttribute("aria-label", "ヒエラルキー名");
+    nameInput.addEventListener("change", () => updateSelectedGameTrackLabel(nameInput.value));
+    nameRow.append(nameInput);
+    card.append(nameRow);
+
+    const infoHeading = documentRef.createElement("div");
+    infoHeading.className = "draw2-game-playground-inspector-section-heading";
+    infoHeading.textContent = "Sprite情報";
+    card.append(infoHeading);
+    const info = documentRef.createElement("div");
+    info.className = "draw2-game-playground-inspector-info";
+    const infoRows: readonly [string, string][] = [
+      ["範囲", reference?.region === undefined
+        ? "—"
+        : `${Math.round(reference.region.width)}×${Math.round(reference.region.height)}px`],
+      ["読み取り", reference === undefined
+        ? "—"
+        : gamePlaygroundLayoutLabels[reference.layout] ?? reference.layout],
+      ["フレーム", reference === undefined
+        ? "—"
+        : String(reference.sourceFrames?.length ?? 1)],
+      ["配置", currentPlacement === undefined
+        ? "未配置"
+        : `${currentPlacement.x.toFixed(1)}, ${currentPlacement.y.toFixed(1)}`],
+    ];
+    for (const [label, value] of infoRows) {
+      const row = documentRef.createElement("div");
+      const key = documentRef.createElement("span");
+      key.textContent = label;
+      const valueElement = documentRef.createElement("strong");
+      valueElement.textContent = value;
+      row.append(key, valueElement);
+      info.append(row);
+    }
+    card.append(info);
+
+    const layerIds = [...new Set(
+      (reference?.sourceFrames ?? []).flatMap((frame) => frame.layerIds ?? []),
+    )].sort((left, right) => {
+      const order = new Map(
+        (getAssetBridge()?.snapshot().layers ?? []).map((layer, index) => [layer.layerTrackId, index]),
+      );
+      return (order.get(left) ?? Number.MAX_SAFE_INTEGER) -
+        (order.get(right) ?? Number.MAX_SAFE_INTEGER);
+    });
+    const currentSourceFrame = reference?.sourceFrames?.length === undefined
+      ? undefined
+      : reference.sourceFrames[gameDeckFrame % reference.sourceFrames.length];
+    const currentFrameHidden = currentSourceFrame === undefined
+      ? []
+      : reference?.hiddenLayerIdsByFrame?.[currentSourceFrame.sourceFrameId] ?? [];
+    if (layerIds.length > 0) {
+      const layerNames = new Map(
+        (getAssetBridge()?.snapshot().layers ?? []).map((layer) => [layer.layerTrackId, layer.name]),
+      );
+      const layersHeading = documentRef.createElement("div");
+      layersHeading.className = "draw2-game-playground-inspector-section-heading";
+      layersHeading.textContent = "iDRAWレイヤー · 奥 → 手前";
+      card.append(layersHeading);
+      const layers = documentRef.createElement("div");
+      layers.className = "draw2-game-playground-inspector-flags";
+      for (const [index, layerId] of layerIds.entries()) {
+        const toggle = documentRef.createElement("label");
+        const input = documentRef.createElement("input");
+        input.type = "checkbox";
+        const presentInFrame = currentSourceFrame?.layerIds?.includes(layerId) ?? false;
+        toggle.dataset.layerPresent = String(presentInFrame);
+        input.checked = !(reference?.hiddenLayerIds ?? []).includes(layerId) &&
+          !currentFrameHidden.includes(layerId);
+        input.disabled = locked || !presentInFrame;
+        input.setAttribute("aria-label", `レイヤー${index + 1}を表示`);
+        input.addEventListener("change", () => {
+          if (gameAuthoringLocked() || reference === undefined) return;
+          const hiddenLayerIds = new Set(reference.hiddenLayerIds ?? []);
+          const frameHidden = new Set(currentFrameHidden);
+          if (input.checked) {
+            hiddenLayerIds.delete(layerId);
+            frameHidden.delete(layerId);
+          } else {
+            frameHidden.add(layerId);
+          }
+          const hiddenLayerIdsByFrame = { ...(reference.hiddenLayerIdsByFrame ?? {}) };
+          if (currentSourceFrame !== undefined) {
+            if (frameHidden.size === 0) delete hiddenLayerIdsByFrame[currentSourceFrame.sourceFrameId];
+            else hiddenLayerIdsByFrame[currentSourceFrame.sourceFrameId] = [...frameHidden];
+          }
+          commitReference({
+            ...reference,
+            hiddenLayerIds: [...hiddenLayerIds],
+            hiddenLayerIdsByFrame,
+          });
+        });
+        const label = layerNames.get(layerId) ?? `レイヤー ${index + 1}`;
+        toggle.setAttribute("title", `${index + 1} · ${label}`);
+        toggle.append(input, documentRef.createTextNode(
+          presentInFrame ? label : `${label} · このフレームなし`,
+        ));
+        layers.append(toggle);
+      }
+      card.append(layers);
+    }
+
+    const commitReference = (nextReference: GamePlaygroundDrawReference): void => {
+      const roleForTrack = track.role ?? gameObjectRoleFor(track.id, track.kind);
+      const placement = gamePlaygroundAssetPlacementFor(track);
+      if (roleForTrack === "TILEMAP") {
+        gamePlayground = { ...gamePlayground, world: nextReference };
+        const worldPlacement = placement ?? gamePlaygroundPlacementDefaults(
+          "WORLD",
+          "world",
+          track.label,
+          nextReference,
+        );
+        upsertGamePlaygroundPlacement({
+          ...worldPlacement,
+          label: track.label,
+          reference: nextReference,
+          snapToGrid: false,
+        });
+      } else {
+        gamePlayground = roleForTrack === "PLAYER"
+          ? { ...gamePlayground, player: nextReference }
+          : gamePlayground;
+        const oldId = placement?.id;
+        const placementId = oldId === "player" && track.id !== "player"
+          ? track.id
+          : oldId ?? track.id;
+        if (oldId !== undefined && oldId !== placementId) {
+          removeGamePlaygroundPlacement(oldId);
+        }
+        const spritePlacement = placement === undefined
+          ? gamePlaygroundPlacementDefaults(
+            "SPRITE",
+            placementId,
+            track.label,
+            nextReference,
+          )
+          : { ...placement, id: placementId };
+        upsertGamePlaygroundPlacement({
+          ...spritePlacement,
+          label: track.label,
+          reference: nextReference,
+          snapToGrid: false,
+        });
+      }
+      queueGameEditorPersistenceSave("playground-asset-reference");
+      renderGameCustomPanels();
+    };
+    const layoutLabel = documentRef.createElement("label");
+    layoutLabel.className = "draw2-game-playground-inspector-field";
+    layoutLabel.textContent = "アニメーションの読み取り";
+    const layout = documentRef.createElement("select");
+    layout.setAttribute("aria-label", `${track.label}のアニメーションの読み取り`);
+    for (const value of gamePlaygroundLayoutValues) {
+      const option = documentRef.createElement("option");
+      option.value = value;
+      option.textContent = gamePlaygroundLayoutLabels[value];
+      option.selected = value === (reference?.layout ?? "FULL_CANVAS");
+      layout.append(option);
+    }
+    layout.disabled = locked || reference === undefined;
+    layout.addEventListener("change", () => {
+      if (locked || reference === undefined) return;
+      const nextLayout = gamePlaygroundLayoutFor(layout.value);
+      void gamePlaygroundReferenceForCurrentDraw(
+        reference,
+        nextLayout,
+        reference.mode,
+      ).then((nextReference) => {
+        if (gameAuthoringLocked()) return;
+        commitReference(nextReference ?? { ...reference, layout: nextLayout });
+      });
+    });
+    layoutLabel.append(layout);
+    card.append(layoutLabel);
+    if (reference !== undefined) {
+      const modeLabel = documentRef.createElement("label");
+      modeLabel.className = "draw2-game-playground-inspector-field";
+      modeLabel.textContent = "参照";
+      const mode = documentRef.createElement("select");
+      mode.setAttribute("aria-label", `${track.label}の参照モード`);
+      for (const value of ["LIVE", "PINNED"] as const) {
+        const option = documentRef.createElement("option");
+        option.value = value;
+        option.textContent = value === "LIVE" ? "LIVE" : "PINNED";
+        option.selected = reference.mode === value;
+        mode.append(option);
+      }
+      mode.disabled = locked;
+      mode.addEventListener("change", () => {
+        if (locked || reference === undefined) return;
+        commitReference({
+          ...reference,
+          mode: gamePlaygroundReferenceModeFor(mode.value),
+        });
+      });
+      modeLabel.append(mode);
+      card.append(modeLabel);
+    }
+    const frameStrip = documentRef.createElement("div");
+    frameStrip.className = "draw2-game-playground-inspector-frame-strip";
+    frameStrip.setAttribute("role", "list");
+    frameStrip.setAttribute("aria-label", `${track.label}のフレーム`);
+    const sourceFrames = reference?.sourceFrames ?? [];
+    const frameWindowStart = sourceFrames.length <= 32
+      ? 0
+      : Math.min(
+        Math.max(0, gameDeckFrame - 15),
+        sourceFrames.length - 32,
+      );
+    if (sourceFrames.length > 32) {
+      const previous = documentRef.createElement("button");
+      previous.type = "button";
+      previous.className = "draw2-game-playground-inspector-frame-nav";
+      previous.textContent = "‹";
+      previous.setAttribute("aria-label", "前のフレーム範囲");
+      previous.title = "前のフレームを表示";
+      previous.disabled = frameWindowStart === 0;
+      previous.addEventListener("click", () => {
+        gameDeckFrame = Math.max(0, frameWindowStart - 1);
+        syncGameDeckPlayhead();
+        renderGameSceneViewport();
+        renderGamePlaygroundSelectedAssetInspector(false);
+      });
+      frameStrip.append(previous);
+    }
+    for (const [windowIndex] of sourceFrames.slice(frameWindowStart, frameWindowStart + 32).entries()) {
+      const index = frameWindowStart + windowIndex;
+      const frame = documentRef.createElement("button");
+      frame.type = "button";
+      frame.className = "draw2-game-playground-inspector-frame";
+      frame.classList.toggle(
+        "is-active",
+        sourceFrames.length > 0 && index === gameDeckFrame % sourceFrames.length,
+      );
+      frame.setAttribute(
+        "aria-current",
+        sourceFrames.length > 0 && index === gameDeckFrame % sourceFrames.length
+          ? "true"
+          : "false",
+      );
+      frame.setAttribute("role", "listitem");
+      frame.setAttribute("aria-label", `${track.label} フレーム${index + 1}`);
+      const frameDataUrl = gamePlaygroundReferenceDataUrlFor(reference, index);
+      if (frameDataUrl !== undefined) frame.style.backgroundImage = `url("${frameDataUrl}")`;
+      else frame.textContent = String(index + 1);
+      frame.addEventListener("click", () => {
+        if (gameAuthoringLocked()) return;
+        gameDeckFrame = index;
+        syncGameDeckPlayhead();
+        renderGameSceneViewport();
+        renderGamePlaygroundSelectedAssetInspector(false);
+      });
+      frameStrip.append(frame);
+    }
+    if (sourceFrames.length > 32) {
+      const next = documentRef.createElement("button");
+      next.type = "button";
+      next.className = "draw2-game-playground-inspector-frame-nav";
+      next.textContent = "›";
+      next.setAttribute("aria-label", "次のフレーム範囲");
+      next.title = "次のフレームを表示";
+      next.disabled = frameWindowStart + 32 >= sourceFrames.length;
+      next.addEventListener("click", () => {
+        gameDeckFrame = Math.min(sourceFrames.length - 1, frameWindowStart + 32);
+        syncGameDeckPlayhead();
+        renderGameSceneViewport();
+        renderGamePlaygroundSelectedAssetInspector(false);
+      });
+      frameStrip.append(next);
+      const more = documentRef.createElement("small");
+      more.className = "draw2-game-playground-inspector-frame-more";
+      more.textContent = `${frameWindowStart + 1}–${Math.min(
+        sourceFrames.length,
+        frameWindowStart + 32,
+      )} / ${sourceFrames.length}`;
+      frameStrip.append(more);
+    }
+    if (sourceFrames.length > 0) card.append(frameStrip);
+
+    if (isTilemap) {
+      const mapSection = documentRef.createElement("section");
+      mapSection.className = "draw2-game-playground-map-edit-section";
+      const mapHeading = documentRef.createElement("div");
+      mapHeading.className = "draw2-game-playground-inspector-section-heading";
+      mapHeading.textContent = "マップ編集";
+      mapSection.append(mapHeading);
+      const mapTools = documentRef.createElement("div");
+      mapTools.className = "draw2-game-maker-map-tools";
+      for (const [mode, label] of [["SOLID", "床"], ["TRIGGER", "反応"], ["ERASE", "消去"]] as const) {
+        const tool = documentRef.createElement("button");
+        tool.type = "button";
+        tool.className = "draw2-button draw2-button-secondary";
+        tool.textContent = label;
+        tool.setAttribute("aria-pressed", String(gameTilemapPaintMode === mode));
+        tool.classList.toggle("is-selected", gameTilemapPaintMode === mode);
+        tool.disabled = locked;
+        tool.addEventListener("click", () => {
+          if (locked || gameAuthoringLocked()) return;
+          gameTilemapPaintMode = mode;
+          renderGameSceneViewport();
+          renderGamePlaygroundSelectedAssetInspector(false);
+        });
+        mapTools.append(tool);
+      }
+      mapSection.append(mapTools);
+      const tileSource = documentRef.createElement("select");
+      tileSource.setAttribute("aria-label", "配置するiDRAWタイル");
+      const emptyTile = documentRef.createElement("option");
+      emptyTile.value = "";
+      emptyTile.textContent = "タイルなし（属性だけ）";
+      tileSource.append(emptyTile);
+      for (const asset of gamePlayground.assets) {
+        const option = documentRef.createElement("option");
+        option.value = asset.assetId;
+        option.textContent = asset.name;
+        option.selected = asset.assetId === selectedGameWorldTileAssetId;
+        tileSource.append(option);
+      }
+      tileSource.value = selectedGameWorldTileAssetId ?? "";
+      tileSource.disabled = locked;
+      tileSource.addEventListener("change", () => {
+        if (locked || gameAuthoringLocked()) return;
+        selectedGameWorldTileAssetId = tileSource.value || undefined;
+      });
+      const tileSourceRow = documentRef.createElement("label");
+      tileSourceRow.className = "draw2-game-playground-inspector-field";
+      tileSourceRow.textContent = "タイル";
+      tileSourceRow.append(tileSource);
+      mapSection.append(tileSourceRow);
+      const mapHint = documentRef.createElement("small");
+      mapHint.textContent = "中央をクリック/ドラッグ · オブジェクトは自由配置";
+      mapSection.append(mapHint);
+      card.append(mapSection);
+    }
+
+    const commitPlacement = (patch: Partial<GamePlaygroundPlacement>): void => {
+      if (locked || reference === undefined || isTilemap) return;
+      const placement = gamePlaygroundAssetPlacementFor(track);
+      const oldId = placement?.id;
+      const placementId = oldId === "player" && track.id !== "player"
+        ? track.id
+        : oldId ?? track.id;
+      if (oldId !== undefined && oldId !== placementId) {
+        removeGamePlaygroundPlacement(oldId);
+      }
+      const base = placement === undefined
+        ? gamePlaygroundPlacementDefaults(
+          "SPRITE",
+          placementId,
+          track.label,
+          reference,
+        )
+        : { ...placement, id: placementId };
+      upsertGamePlaygroundPlacement({
+        ...base,
+        ...patch,
+        label: track.label,
+        reference,
+        snapToGrid: false,
+      });
+      queueGameEditorPersistenceSave("playground-asset-settings");
+      renderGameCustomPanels();
+    };
+    if (!isTilemap && (reference !== undefined || role === "PLAYER" || role === "NPC" || role === "PROP")) {
+      const flags = documentRef.createElement("div");
+      flags.className = "draw2-game-playground-inspector-flags";
+      for (const [key, label, fallback] of [
+        ["movable", "移動", true],
+        ["collision", "当たり判定", true],
+        ["gravity", "重力", false],
+      ] as const) {
+        const toggle = documentRef.createElement("label");
+        const input = documentRef.createElement("input");
+        input.type = "checkbox";
+        input.checked = currentPlacement?.[key] ?? fallback;
+        input.disabled = locked || reference === undefined;
+        input.addEventListener("change", () => {
+          if (key === "movable") commitPlacement({ movable: input.checked });
+          if (key === "collision") commitPlacement({ collision: input.checked });
+          if (key === "gravity") commitPlacement({ gravity: input.checked });
+        });
+        toggle.append(input, documentRef.createTextNode(label));
+        flags.append(toggle);
+      }
+      card.append(flags);
+    }
+    if (!isTilemap && reference !== undefined) {
+      const animationSection = documentRef.createElement("div");
+      animationSection.className = "draw2-game-playground-animation-quickset";
+      const animationHeading = documentRef.createElement("div");
+      animationHeading.className = "draw2-game-playground-inspector-section-heading";
+      animationHeading.textContent = "アニメーション";
+      animationSection.append(animationHeading);
+      const animationGrid = documentRef.createElement("div");
+      animationGrid.className = "draw2-game-playground-animation-quickset-grid";
+      const drawSnapshot = getAssetBridge()?.snapshot();
+      const drawBinding = gameDeckBindings.find((binding) =>
+        binding.trackId === track.id && binding.kind === "DRAW"
+      );
+      const quickClips = findGameAnimationClips({
+        track,
+        drawDefinitions: drawSnapshot?.assetDefinitions ?? [],
+        ...(drawBinding?.assetId === undefined ? {} : { boundDrawAssetId: drawBinding.assetId }),
+        ...(drawBinding?.assetDefinitionId === undefined ? {} : { boundDrawDefinitionId: drawBinding.assetDefinitionId }),
+      }).slice(0, 8);
+      for (const clip of quickClips) {
+        const button = documentRef.createElement("button");
+        button.type = "button";
+        button.className = "draw2-button draw2-button-secondary";
+        button.textContent = clip.direction === undefined
+          ? clip.motionName
+          : `${clip.motionName} · ${clip.direction}`;
+        button.title = `${clip.clip.frameIds.length}F · ${clip.clip.fps ?? 12} FPS`;
+        button.addEventListener("click", () => {
+          selectedGameAnimationClipId = clip.id;
+          gameAnimationPreviewFrame = 0;
+          activateGameRailTab("ANIMATION");
+          renderGameCustomPanels();
+        });
+        animationGrid.append(button);
+      }
+      const detail = documentRef.createElement("button");
+      detail.type = "button";
+      detail.className = "draw2-button draw2-button-quiet";
+      detail.textContent = "詳細";
+      detail.addEventListener("click", () => {
+        activateGameRailTab("ANIMATION");
+        renderGameCustomPanels();
+      });
+      animationGrid.append(detail);
+      animationSection.append(animationGrid);
+      card.append(animationSection);
+      const placement = currentPlacement ?? gamePlaygroundPlacementDefaults(
+        "SPRITE",
+        track.id,
+        track.label,
+        reference,
+      );
+      const placementGrid = documentRef.createElement("div");
+      placementGrid.className = "draw2-game-playground-inspector-placement";
+      const layerLabel = documentRef.createElement("label");
+      layerLabel.className = "draw2-game-playground-inspector-field";
+      layerLabel.textContent = "レイヤー";
+      const layer = documentRef.createElement("select");
+      layer.setAttribute("aria-label", `${track.label}のレイヤー`);
+      for (const value of ["BACKGROUND", "WORLD", "ACTOR", "FOREGROUND", "UI"] as const) {
+        const option = documentRef.createElement("option");
+        option.value = value;
+        option.textContent = gamePlaygroundLayerLabels[value];
+        option.selected = placement.layer === value;
+        layer.append(option);
+      }
+      layer.disabled = locked;
+      layer.addEventListener("change", () => {
+        commitPlacement({ layer: layer.value as GamePlaygroundLayer });
+      });
+      layerLabel.append(layer);
+      const depthLabel = documentRef.createElement("label");
+      depthLabel.className = "draw2-game-playground-inspector-field";
+      depthLabel.textContent = "奥行き";
+      const depth = documentRef.createElement("input");
+      depth.type = "number";
+      depth.step = "0.1";
+      depth.value = String(placement.depth);
+      depth.setAttribute("aria-label", `${track.label}の奥行き`);
+      depth.disabled = locked;
+      depth.addEventListener("change", () => {
+        const value = Number(depth.value);
+        if (Number.isFinite(value)) commitPlacement({ depth: value });
+      });
+      depthLabel.append(depth);
+      placementGrid.append(layerLabel, depthLabel);
+      card.append(placementGrid);
+    }
+    renderGameAudioSlots(card, locked);
+    draw2GamePlaygroundSelectedAsset.append(card);
+  };
+  const renderGamePlayground = (): void => {
+    const locked = gameAuthoringLocked();
+    // GAME always uses the hierarchy rail. The legacy Node Box remains
+    // available in the DOM for compatibility, but is not part of this
+    // simplified authoring surface.
+    setGameLeftDockTab("hierarchy");
+    renderGamePlaygroundSelectedAssetInspector(locked);
+    renderGamePlaygroundAssetGrid();
+    if (draw2GamePlaygroundBottomStatus !== undefined) {
+      draw2GamePlaygroundBottomStatus.textContent =
+        gamePlaygroundLibrarySource === "MARKET"
+          ? gameMarketCatalogState === "loading"
+            ? "Market読込中"
+            : `${gameMarketCatalogForQuery().length}件 · Market`
+          : `${gamePlayground.assets.length} Asset · ${gamePlayground.placements.length} Placement`;
+    }
+    if (legacyGameUiEnabled) renderLegacyGamePlayground(locked);
+  };
+  renderGameCustomPanels = (): void => {
+    isolateLegacyGameUi();
     renderGameHierarchyGroups();
     renderGameSceneViewport();
     syncGameSceneViewMode();
     syncGameSceneToolbar();
-    draw2GameAssetsList?.replaceChildren(
-      ...gameDeckTracks
-        .filter((track) => track.kind !== "EVENT")
-        .map((track) => renderGameTrackEntry(track, "draw2-game-asset-entry")),
-    );
-    if (draw2GameSceneStatus !== undefined) {
-      draw2GameSceneStatus.textContent =
-        `${gameDeckTracks.length} track · Project別自動保存`;
-    }
     if (
       drawStatusbarMetrics !== undefined &&
       root.dataset.creatorMode === "GAME"
     ) {
       drawStatusbarMetrics.textContent =
-        `Game Scene · ${gameDeckTracks.length} objects · Fixed-step`;
+        `Game Playground · ${gameDeckTracks.length} objects · Free placement`;
     }
-    if (draw2GameAssetsStatus !== undefined) {
-      draw2GameAssetsStatus.textContent = `${
-        gameDeckTracks.filter((track) => track.kind !== "EVENT").length
-      } Game配置 · iDRAW / iAUDIOは参照専用`;
-    }
-    renderGameAudioBindingOptions();
-    renderGameBindings();
-    renderGameTemplates();
-    renderGameAssetRail();
-    renderGameEvents();
-    renderGameCreationMode();
-    renderGameCreationGuide();
-    renderGameVisualMaker();
-    syncGameSceneRulesPanel();
+    renderGamePlayground();
     if (gameHierarchyStatus !== undefined) {
       gameHierarchyStatus.textContent =
-        `${gameDeckTracks.length}個のGameオブジェクト · Projectへ自動保存`;
+        `${gamePlayground.placements.length}個のPlacement · Projectへ自動保存`;
     }
-    syncGameInspectorPanel();
   };
+  windowRef.addEventListener("draw2:market-asset-ready", (event) => {
+    const detail = (event as CustomEvent<unknown>).detail;
+    if (detail === null || typeof detail !== "object" || Array.isArray(detail)) {
+      return;
+    }
+    const value = detail as Record<string, unknown>;
+    const source = value.source;
+    const delivery = value.delivery;
+    const license = value.license;
+    const rawReference = value.reference;
+    if (
+      source === null || typeof source !== "object" || Array.isArray(source) ||
+      delivery === null || typeof delivery !== "object" || Array.isArray(delivery) ||
+      license === null || typeof license !== "object" || Array.isArray(license) ||
+      rawReference === null || typeof rawReference !== "object" || Array.isArray(rawReference)
+    ) {
+      if (draw2GamePlaygroundStatus !== undefined) {
+        draw2GamePlaygroundStatus.textContent =
+          "Market Assetの接続情報が不足しているため追加できません。";
+      }
+      return;
+    }
+    const sourceRecord = source as Record<string, unknown>;
+    const deliveryRecord = delivery as Record<string, unknown>;
+    const licenseRecord = license as Record<string, unknown>;
+    const referenceRecord = rawReference as Record<string, unknown>;
+    const text = (candidate: unknown): string | undefined =>
+      typeof candidate === "string" && candidate.trim().length > 0
+        ? candidate.trim()
+        : undefined;
+    const sourceAssetId = text(sourceRecord.assetId);
+    const sourceRevisionId = text(sourceRecord.revisionId);
+    const sourceHash = text(sourceRecord.contentHash);
+    const sourceLabel = text(sourceRecord.label);
+    const sourceFormat = text(sourceRecord.format);
+    const deliveryAssetId = text(deliveryRecord.assetId);
+    const deliveryRevisionId = text(deliveryRecord.revisionId);
+    const deliveryHash = text(deliveryRecord.contentHash);
+    const deliveryFormat = text(deliveryRecord.format);
+    const deliveryId = text(deliveryRecord.deliveryId);
+    const licenseId = text(licenseRecord.licenseId);
+    const licenseStatus = text(licenseRecord.status);
+    const rights = Array.isArray(licenseRecord.rights)
+      ? licenseRecord.rights.filter((right): right is string =>
+        typeof right === "string" && right.trim().length > 0
+      )
+      : [];
+    const inGameUse = licenseRecord.inGameUse === true;
+    const referenceAssetId = text(referenceRecord.assetId);
+    const referenceRevisionId = text(referenceRecord.revisionId);
+    const referenceHash = text(referenceRecord.contentHash);
+    const referenceLabel = text(referenceRecord.label);
+    const sourceFrameId = text(referenceRecord.sourceFrameId);
+    const rectFrom = (candidate: unknown): GamePlaygroundRect | undefined => {
+      if (candidate === null || typeof candidate !== "object" || Array.isArray(candidate)) return undefined;
+      const value = candidate as Record<string, unknown>;
+      const x = value.x;
+      const y = value.y;
+      const width = value.width;
+      const height = value.height;
+      if (![x, y, width, height].every((item) => Number.isSafeInteger(item))) return undefined;
+      if ((x as number) < 0 || (y as number) < 0 || (width as number) < 1 || (height as number) < 1) return undefined;
+      return { x: x as number, y: y as number, width: width as number, height: height as number };
+    };
+    const referenceRegion = rectFrom(referenceRecord.region);
+    const referenceFrames = Array.isArray(referenceRecord.sourceFrames)
+      ? referenceRecord.sourceFrames.map((candidate): GamePlaygroundSourceFrame | undefined => {
+        if (candidate === null || typeof candidate !== "object" || Array.isArray(candidate)) return undefined;
+        const frame = candidate as Record<string, unknown>;
+        const frameId = text(frame.sourceFrameId);
+        const rect = rectFrom(frame.rect);
+        const layerIds = frame.layerIds === undefined
+          ? undefined
+          : Array.isArray(frame.layerIds) && frame.layerIds.every((item) => typeof item === "string")
+          ? frame.layerIds as string[]
+          : null;
+        const durationMs = frame.durationMs === undefined
+          ? undefined
+          : Number.isSafeInteger(frame.durationMs) && (frame.durationMs as number) > 0
+          ? frame.durationMs as number
+          : null;
+        if (frameId === undefined || rect === undefined || layerIds === null || durationMs === null) return undefined;
+        return {
+          sourceFrameId: frameId,
+          ...(layerIds === undefined ? {} : { layerIds: [...layerIds] }),
+          rect,
+          ...(durationMs === undefined ? {} : { durationMs }),
+        };
+      }).filter((candidate): candidate is GamePlaygroundSourceFrame => candidate !== undefined)
+      : undefined;
+    if (
+      sourceAssetId === undefined || sourceRevisionId === undefined ||
+      sourceHash === undefined || !/^[a-f0-9]{64}$/iu.test(sourceHash) ||
+      sourceLabel === undefined || sourceFormat !== "pixiedraw-project" ||
+      deliveryId === undefined || deliveryAssetId !== sourceAssetId ||
+      deliveryRevisionId !== sourceRevisionId || deliveryHash !== sourceHash ||
+      deliveryFormat !== sourceFormat || deliveryRecord.status !== "SECURE_DELIVERED" ||
+      licenseId === undefined || licenseStatus !== "ACTIVE" || !inGameUse || rights.length === 0 ||
+      new Set(rights).size !== rights.length ||
+      referenceAssetId !== sourceAssetId || referenceRevisionId !== sourceRevisionId ||
+      referenceHash !== sourceHash || referenceLabel !== sourceLabel ||
+      sourceFrameId === undefined || referenceRegion === undefined ||
+      referenceFrames === undefined || referenceFrames.length === 0 ||
+      referenceFrames.length !== (referenceRecord.sourceFrames as unknown[]).length
+    ) {
+      if (draw2GamePlaygroundStatus !== undefined) {
+        draw2GamePlaygroundStatus.textContent =
+          "このAssetのiGAME利用許可を確認できないため追加できません。";
+      }
+      return;
+    }
+    const reference: GamePlaygroundDrawReference = {
+      assetId: sourceAssetId,
+      revisionId: sourceRevisionId,
+      contentHash: sourceHash,
+      label: sourceLabel,
+      mode: "PINNED",
+      layout: referenceRecord.layout as GamePlaygroundDrawReference["layout"],
+      sourceFrameId,
+      region: referenceRegion,
+      sourceFrames: referenceFrames,
+      licenseId,
+      rights: [...rights],
+      sourceKind: "MARKET",
+      ...(typeof sourceRecord.projectId === "string" && sourceRecord.projectId.trim()
+        ? { projectId: sourceRecord.projectId.trim() }
+        : {}),
+    };
+    try {
+      const entry: GameAssetEntry = {
+        assetId: reference.assetId,
+        name: reference.label,
+        source: reference,
+        defaults: { movable: true, collision: true, gravity: false },
+      };
+      const existing = gamePlayground.assets.some((asset) =>
+        asset.assetId === entry.assetId
+      );
+      const assets = existing
+        ? gamePlayground.assets.map((asset) => asset.assetId === entry.assetId ? entry : asset)
+        : [...gamePlayground.assets, entry];
+      const normalized = normalizeGamePlaygroundConfig({
+        ...gamePlayground,
+        assets,
+      });
+      if (!normalized.assets.some((asset) => asset.assetId === entry.assetId)) {
+        throw new Error("Market Asset reference was rejected by the Playground schema.");
+      }
+      gamePlayground = normalized;
+      gamePlaygroundLibrarySource = "PROJECT";
+      for (const tab of draw2GamePlaygroundLibrarySourceTabs) {
+        const active = tab.dataset.gameplaygroundLibrarySource === "PROJECT";
+        tab.classList.toggle("is-active", active);
+        tab.setAttribute("aria-selected", String(active));
+      }
+      if (draw2GamePlaygroundMarketSearch !== undefined) {
+        draw2GamePlaygroundMarketSearch.hidden = true;
+      }
+      queueGameEditorPersistenceSave("market-asset-binding");
+      renderGameCustomPanels();
+      if (draw2GamePlaygroundStatus !== undefined) {
+        draw2GamePlaygroundStatus.textContent =
+          `Market Asset「${entry.name}」を素材棚へ追加しました。中央へ配置できます。`;
+      }
+    } catch {
+      if (draw2GamePlaygroundStatus !== undefined) {
+        draw2GamePlaygroundStatus.textContent =
+          "Market Assetの参照をProjectへ保存できませんでした。内容は変更していません。";
+      }
+    }
+  });
+  for (const tab of draw2GamePlaygroundLibrarySourceTabs) {
+    tab.addEventListener("click", () => {
+      const value = tab.dataset.gameplaygroundLibrarySource;
+      gamePlaygroundLibrarySource = value === "MARKET" ? "MARKET" : "PROJECT";
+      for (const candidate of draw2GamePlaygroundLibrarySourceTabs) {
+        const active = candidate === tab;
+        candidate.classList.toggle("is-active", active);
+        candidate.setAttribute("aria-selected", String(active));
+      }
+      if (draw2GamePlaygroundMarketSearch !== undefined) {
+        draw2GamePlaygroundMarketSearch.hidden =
+          gamePlaygroundLibrarySource !== "MARKET";
+      }
+      if (gamePlaygroundLibrarySource === "MARKET") {
+        void loadGameMarketCatalog();
+      }
+      renderGameCustomPanels();
+    });
+  }
+  draw2GamePlaygroundMarketSearch?.addEventListener("input", () => {
+    if (gamePlaygroundLibrarySource === "MARKET") renderGameCustomPanels();
+  });
+  windowRef.addEventListener("pixieed:account-auth-state", () => {
+    if (
+      root.dataset.creatorMode === "GAME" &&
+      gamePlaygroundLibrarySource === "MARKET"
+    ) void loadGameMarketCatalog(true);
+  });
+  const setGamePlaygroundMode = (mode: GamePlaygroundMode): void => {
+    if (!gamePlaygroundModeValues.includes(mode) || gameAuthoringLocked()) return;
+    gamePlayground = { ...gamePlayground, mode };
+    const runtimeFamily = mode === "SIDE_SCROLL" ? "SCROLL_SIDE" : "RPG_GRID";
+    gameSceneRules = normalizeGameSceneRules(
+      sceneRulesForRuntimeFamily(runtimeFamily),
+    );
+    gamePhysics2D = physics2DSettingsForSceneRules(
+      gameSceneRules,
+      gamePhysics2D,
+    );
+    queueGameEditorPersistenceSave("playground-mode");
+    renderGameCustomPanels();
+  };
+  const applyGamePlaygroundDrawReference = async (
+    slot: "world" | "player" | { readonly kind: "asset" } | { readonly kind: "object"; readonly trackId: string },
+  ): Promise<void> => {
+    if (gameAuthoringLocked()) return;
+    gamePendingDrawTarget = undefined;
+    const reference = await gamePlaygroundReferenceForCurrentDraw();
+    const slotName = typeof slot === "string" ? slot : slot.kind;
+    if (reference === undefined) {
+      const status = slotName === "world"
+        ? draw2GamePlaygroundWorldStatus
+        : draw2GamePlaygroundPlayerStatus;
+      if (status !== undefined) {
+        status.textContent =
+          "iDRAWでAsset Definitionまたは範囲選択を用意してください。";
+      }
+      return;
+    }
+    const role = slotName === "world"
+      ? "TILEMAP"
+      : slotName === "player"
+      ? "PLAYER"
+      : "PROP";
+    if (typeof slot !== "string" && slot.kind === "asset") {
+      const existing = gamePlayground.assets.find((asset) =>
+        asset.assetId === reference.assetId
+      );
+      if (existing === undefined) {
+        ensureGamePlaygroundAsset(reference);
+        queueGameEditorPersistenceSave("playground-asset-add");
+      }
+      gameCaptureSession = undefined;
+      renderGameCustomPanels();
+      if (root.dataset.creatorMode === "DRAW") setCreatorMode("GAME");
+      return;
+    }
+    if (!gameDeckTracks.some((track) =>
+      (track.role ?? gameObjectRoleFor(track.id, track.kind)) === role
+    )) {
+      addRpgObjectTemplate(role);
+    }
+    const track = typeof slot === "object"
+      ? gameDeckTracks.find((candidate) => candidate.id === slot.trackId)
+      : gameDeckTracks.find((candidate) =>
+        (candidate.role ?? gameObjectRoleFor(candidate.id, candidate.kind)) ===
+          role
+      );
+    const placementId = typeof slot === "object"
+      ? slot.trackId
+      : slotName === "player"
+      ? track?.id ?? "player"
+      : slot;
+    const placementKind: GamePlaygroundPlacement["kind"] = slotName === "world"
+      ? "WORLD"
+      : "SPRITE";
+    const previousPlacement = gamePlaygroundPlacementFor(placementId);
+    upsertGamePlaygroundPlacement(previousPlacement === undefined
+      ? gamePlaygroundPlacementDefaults(
+        placementKind,
+        placementId,
+        track?.label ?? reference.label,
+        reference,
+      )
+      : { ...previousPlacement, reference, label: track?.label ?? previousPlacement.label });
+    if ((slotName === "player" || slotName === "object") && track !== undefined) {
+      gameDeckBindings = [
+        ...gameDeckBindings.filter((binding) =>
+          binding.trackId !== track.id || binding.kind !== "DRAW"
+        ),
+        {
+          trackId: track.id,
+          kind: "DRAW",
+          assetId: reference.assetId,
+          revisionId: reference.revisionId,
+          contentHash: reference.contentHash,
+          mode: reference.mode,
+          label: reference.label,
+          ...(reference.assetDefinitionId === undefined
+            ? {}
+            : { assetDefinitionId: reference.assetDefinitionId }),
+          ...(reference.licenseId === undefined
+            ? {}
+            : { licenseId: reference.licenseId }),
+          ...(reference.rights === undefined
+            ? {}
+            : { rights: [...reference.rights] }),
+          ...(reference.sourceKind === undefined
+            ? {}
+            : { sourceKind: reference.sourceKind }),
+        },
+      ];
+      if (slotName === "player") {
+        gamePlayground = { ...gamePlayground, player: reference };
+      }
+    }
+    if (slotName === "world") {
+      gamePlayground = { ...gamePlayground, world: reference };
+    }
+    gameCaptureSession = undefined;
+    queueGameEditorPersistenceSave("playground-draw-" + slotName);
+    renderGameCustomPanels();
+  };
+  const applyGamePlaygroundAudioRange = async (): Promise<void> => {
+    if (gameAuthoringLocked()) return;
+    if (audioWorkspaceSession === undefined) {
+      if (draw2GamePlaygroundAudioRange !== undefined) {
+        draw2GamePlaygroundAudioRange.textContent =
+          "iAUDIO Projectを読み込んでいます。少し待ってから再実行してください。";
+      }
+      await ensureAudioWorkspaceSession();
+      if (audioWorkspaceSession === undefined) {
+        renderGameCustomPanels();
+        return;
+      }
+    }
+    const track = selectedAudioCanonicalTrack() ??
+      audioWorkspaceSession.project.tracks[0];
+    if (track === undefined) {
+      if (draw2GamePlaygroundAudioRange !== undefined) {
+        draw2GamePlaygroundAudioRange.textContent =
+          "iAUDIOでTrackを選択してください。";
+      }
+      return;
+    }
+    const bounds = audioSelectedMeasureBounds();
+    const event = gamePlaygroundAudioEventFor(draw2GamePlaygroundAudioRole?.value);
+    const role: GamePlaygroundAudioRange["role"] = event ===
+        "BACKGROUND_MUSIC"
+      ? "BGM"
+      : event === "PLAYER_JUMP"
+      ? "JUMP"
+      : "SE";
+    const mode = gamePlaygroundReferenceModeFor(
+      draw2GamePlaygroundAudioReferenceMode?.value,
+    );
+    const overlappingClip = audioWorkspaceSession.project.clips.find((clip) =>
+      String(clip.trackId) === String(track.trackId) &&
+      clip.timeline.startTick < bounds.endTick &&
+      clip.timeline.startTick + clip.timeline.durationTick > bounds.startTick
+    );
+    const revision = overlappingClip === undefined
+      ? undefined
+      : audioWorkspaceSession.project.revisions.find((candidate) =>
+        String(candidate.revisionId) === String(overlappingClip.revisionId)
+      );
+    const barLabel = bounds.endBar - bounds.startBar === 1
+      ? "Bar " + (bounds.startBar + 1)
+      : "Bars " + (bounds.startBar + 1) + "–" + bounds.endBar;
+    const range: GamePlaygroundAudioRange = {
+      assignmentId: "audio:" + event + ":" + String(track.trackId) + ":" +
+        bounds.startTick + ":" + bounds.durationTick,
+      role,
+      event,
+      projectId: String(audioWorkspaceSession.project.projectId),
+      label: gamePlaygroundAudioEventLabels[event] + " · " + track.name + " · " +
+        barLabel,
+      startTick: bounds.startTick,
+      durationTick: bounds.durationTick,
+      mode,
+      trackId: String(track.trackId),
+      ...(overlappingClip === undefined
+        ? {}
+        : { clipId: String(overlappingClip.clipId) }),
+      ...(revision === undefined
+        ? {}
+        : {
+          assetId: String(revision.assetId),
+          revisionId: String(revision.revisionId),
+          contentHash: String(revision.source.metadata.contentHash),
+        }),
+    };
+    gamePlayground = upsertGamePlaygroundAudioRange(gamePlayground, range);
+    queueGameEditorPersistenceSave("playground-audio-" + event.toLowerCase());
+    renderGameCustomPanels();
+  };
+  const clearGamePlaygroundReference = (
+    slot: "world" | "player",
+  ): void => {
+    if (gameAuthoringLocked()) return;
+    if (slot === "world") {
+      const { world: _world, ...withoutWorld } = gamePlayground;
+      gamePlayground = withoutWorld;
+      removeGamePlaygroundPlacement("world");
+    } else {
+      const { player: _player, ...withoutPlayer } = gamePlayground;
+      gamePlayground = withoutPlayer;
+      removeGamePlaygroundPlacement("player");
+      const playerTrackIds = new Set(
+        gameDeckTracks.filter((track) =>
+          (track.role ?? gameObjectRoleFor(track.id, track.kind)) === "PLAYER"
+        ).map((track) => track.id),
+      );
+      for (const playerTrackId of playerTrackIds) {
+        removeGamePlaygroundPlacement(playerTrackId);
+      }
+      gameDeckBindings = gameDeckBindings.filter((binding) =>
+        binding.kind !== "DRAW" || !playerTrackIds.has(binding.trackId)
+      );
+    }
+    queueGameEditorPersistenceSave("playground-draw-clear-" + slot);
+    renderGameCustomPanels();
+  };
+  const gameAudioCaptureDraftForCurrentSelection = (): AudioCaptureDraft | undefined => {
+    const capture = gameAudioCaptureSession;
+    const audioSession = audioWorkspaceSession;
+    const track = selectedAudioCanonicalTrack() ?? audioSession?.project.tracks[0];
+    if (capture === undefined || audioSession === undefined || track === undefined) return undefined;
+    const bounds = audioSelectedMeasureBounds();
+    const override = gameAudioCaptureRangeOverride;
+    const selection = normalizeGameAudioRangeSelection({
+      trackIds: override?.trackIds ?? [String(track.trackId)],
+      startTick: override?.startTick ?? bounds.startTick,
+      endTick: override?.endTick ?? bounds.endTick,
+      snap: override?.snap ?? "BEAT",
+      ticksPerBeat: audioPpq,
+    });
+    const clip = (gameAudioCaptureIntervalIndex ?? createAudioTrackIntervalIndex(audioSession.project.clips)).queryMany(selection.trackIds, Number(selection.startTick), Number(selection.durationTick))[0];
+    const revision = clip === undefined ? undefined : audioSession.project.revisions.find((candidate) => String(candidate.revisionId) === String(clip.revisionId));
+    return {
+      ...selection,
+      projectId: String(audioSession.project.projectId),
+      projectRevision: audioSession.project.projectRevision,
+      projectStateHash: String(audioSession.project.stateHash),
+      label: `${track.name} · Tick ${selection.startTick}–${Number(selection.startTick) + Number(selection.durationTick)}`,
+      kind: capture.target.kind === "SCENE_BGM" ? "BGM" : "SE",
+      mode: "LIVE",
+      ...(clip === undefined ? {} : { clipId: String(clip.clipId) }),
+      ...(revision === undefined ? {} : { revisionId: String(revision.revisionId) }),
+    } as AudioCaptureDraft;
+  };
+  const syncGameAudioCaptureBar = (): void => {
+    // Audio surfaces are rebuilt on every mode projection. Resolve the live
+    // host here instead of relying on the bootstrap-time node reference.
+    const host = query<HTMLElement>(documentRef, "#draw2AudioWorkspace") ??
+      query<HTMLElement>(documentRef, "#draw2AudioTrackLanes") ??
+      query<HTMLElement>(documentRef, "#draw2WorkspaceTimelineRegion");
+    const capture = gameAudioCaptureSession;
+    if (host === undefined) {
+      // Audio projection can finish one microtask after the mode switch. Keep
+      // the capture affordance alive until the real surface is mounted.
+      if (capture !== undefined && root.dataset.creatorMode === "AUDIO" && gameAudioCaptureHostRetry < 20) {
+        gameAudioCaptureHostRetry += 1;
+        windowRef.setTimeout(syncGameAudioCaptureBar, 0);
+      }
+      return;
+    }
+    gameAudioCaptureHostRetry = 0;
+    if (capture === undefined || root.dataset.creatorMode !== "AUDIO") {
+      if (gameAudioCaptureBar !== undefined) gameAudioCaptureBar.hidden = true;
+      return;
+    }
+    if (gameAudioCaptureBar === undefined) {
+      const bar = documentRef.createElement("div");
+      bar.id = "draw2GameAudioCaptureBar";
+      bar.className = "draw2-game-audio-capture-bar";
+      bar.setAttribute("role", "status");
+      bar.setAttribute("aria-live", "polite");
+      const label = documentRef.createElement("span");
+      label.className = "draw2-game-audio-capture-label";
+      const waveform = documentRef.createElement("span");
+      waveform.className = "draw2-game-audio-capture-waveform";
+      waveform.setAttribute("aria-hidden", "true");
+      const snap = documentRef.createElement("button");
+      snap.type = "button";
+      snap.className = "draw2-button draw2-button-quiet";
+      snap.dataset.gameAudioCapture = "snap";
+      snap.addEventListener("click", () => {
+        gameAudioCaptureSnap = gameAudioCaptureSnap === "BEAT" ? "FREE" : "BEAT";
+        if (gameAudioCaptureRangeOverride !== undefined) {
+          gameAudioCaptureRangeOverride = {
+            ...gameAudioCaptureRangeOverride,
+            snap: gameAudioCaptureSnap,
+          };
+        }
+        const active = gameAudioCaptureSession;
+        const draft = gameAudioCaptureDraftForCurrentSelection();
+        if (active !== undefined && draft !== undefined) {
+          gameAudioCaptureSession = updateAudioCaptureDraft(active, draft);
+        }
+      syncGameAudioCaptureBar();
+      windowRef.setTimeout(syncGameAudioCaptureBar, 0);
+      });
+      const preview = documentRef.createElement("button");
+      preview.type = "button";
+      preview.className = "draw2-button draw2-button-secondary";
+      preview.textContent = "▶ 試聴";
+      preview.addEventListener("click", () => {
+        const draft = gameAudioCaptureSession?.draft;
+        if (draft !== undefined) {
+          const frame = Math.max(
+            1,
+            Math.floor(
+              Number(draft.startTick) / Math.max(1, audioPpq) *
+                audioFps * 60 / Math.max(1, audioBpm),
+            ) + 1,
+          );
+          seekAudioCompositionAtFrame(frame);
+        }
+        audioDeckPlay?.click();
+      });
+      const commit = documentRef.createElement("button");
+      commit.type = "button";
+      commit.className = "draw2-button draw2-button-primary";
+      commit.textContent = "この音を使う";
+      commit.dataset.gameAudioCapture = "commit";
+      commit.addEventListener("click", () => void commitGameAudioCapture());
+      const cancel = documentRef.createElement("button");
+      cancel.type = "button";
+      cancel.className = "draw2-button draw2-button-quiet";
+      cancel.textContent = "キャンセル";
+      cancel.dataset.gameAudioCapture = "cancel";
+      cancel.addEventListener("click", cancelGameAudioCapture);
+      bar.append(label, waveform, snap, preview, commit, cancel);
+      gameAudioCaptureBar = bar;
+    }
+    // The Audio surface is rebuilt during tab/track projection. Reattach the
+    // single persistent bar whenever that happens instead of leaving it in a
+    // detached old workspace.
+    if (gameAudioCaptureBar.parentElement !== host) host.prepend(gameAudioCaptureBar);
+    const draft = capture.draft;
+    const label = query<HTMLElement>(gameAudioCaptureBar, ".draw2-game-audio-capture-label");
+    const waveform = query<HTMLElement>(gameAudioCaptureBar, ".draw2-game-audio-capture-waveform");
+    const snap = query<HTMLButtonElement>(gameAudioCaptureBar, '[data-game-audio-capture="snap"]');
+    const commit = query<HTMLButtonElement>(gameAudioCaptureBar, '[data-game-audio-capture="commit"]');
+    if (label !== undefined) label.textContent = draft === undefined ? "Trackを選択して範囲を指定" : draft.label;
+    if (waveform !== undefined) waveform.dataset.state = draft === undefined ? "empty" : "ready";
+    if (snap !== undefined) snap.textContent = gameAudioCaptureSnap;
+    if (commit !== undefined) commit.disabled = capture.state !== "READY";
+    gameAudioCaptureBar.hidden = false;
+  };
+  const commitGameAudioCapture = async (): Promise<void> => {
+    const session = gameAudioCaptureSession;
+    const draft = session?.draft;
+    const audioSession = audioWorkspaceSession;
+    if (session === undefined || draft === undefined || audioSession === undefined || gameAuthoringLocked()) return;
+    const audioAssetization = detectAudioAssetization({
+      sourceProjectId: draft.projectId,
+      sourceRevisionId: `audio-revision:${draft.projectId}:${draft.projectRevision}`,
+      contentHash: draft.projectStateHash,
+      ranges: [{
+        rangeId: `${session.sessionId}:range:${session.selectionGeneration}`,
+        label: draft.label,
+        trackIds: [...draft.trackIds],
+        startTick: draft.startTick,
+        durationTick: draft.durationTick,
+        role: draft.kind === "BGM" ? "BGM" : draft.kind === "VOICE" ? "VOICE" : "SE",
+        loop: draft.kind === "BGM",
+      }],
+    });
+    if (audioAssetization.status !== "DETERMINISTIC") {
+      if (draw2GamePlaygroundAudioRange !== undefined) {
+        draw2GamePlaygroundAudioRange.textContent =
+          `音の役割または範囲が確定していません: ${
+            audioAssetization.reasons.join(" · ")
+          }`;
+      }
+      return;
+    }
+    const committing = beginAudioCaptureCommit(session, `commit:${session.sessionId}:${session.selectionGeneration}`);
+    if (committing === undefined) return;
+    const target = session.target.kind === "ASSET_SHELF" ? undefined : session.target;
+    const source = { projectId: draft.projectId, projectRevision: draft.projectRevision, projectStateHash: draft.projectStateHash, trackIds: [...draft.trackIds], startTick: draft.startTick, durationTick: draft.durationTick, renderMode: "POST_MIX" as const, mode: draft.mode };
+    const asset: GameAudioAsset = { audioAssetId: gameAudioAssetIdForSource(source), name: draft.label, kind: draft.kind, source, defaults: { gainMilliDb: 0, loop: draft.kind === "BGM", retrigger: draft.kind === "BGM" ? "RESTART" : "OVERLAP" } };
+    const transactionInput: GameAudioCommitInput = { config: gamePlayground, asset, expectedProjectRevision: session.expectedProjectRevision, expectedProjectStateHash: session.expectedProjectStateHash, currentProjectRevision: audioSession.project.projectRevision, currentProjectStateHash: String(audioSession.project.stateHash), commitId: committing.commitId ?? "", ...(target === undefined ? {} : { target }) };
+    const result = commitGameAudioTransaction(transactionInput);
+    if (result.result === "SOURCE_CHANGED") {
+      gameAudioCaptureSession = undefined;
+      if (draw2GamePlaygroundAudioRange !== undefined) draw2GamePlaygroundAudioRange.textContent = "iAUDIOが更新されたため、もう一度範囲を選択してください。";
+      return;
+    }
+    if (result.saveCount === 1) {
+      gamePlayground = result.config;
+      await queueGameEditorPersistenceSave("playground-audio-capture");
+    }
+    gameAudioCaptureSession = finishAudioCaptureCommit(committing);
+    const returnContext = session.returnContext;
+    gameAudioCaptureSession = undefined;
+    setCreatorMode("GAME");
+    restoreCaptureReturnContext(returnContext);
+    renderGameCustomPanels();
+  };
+  const cancelGameAudioCapture = (): void => {
+    const session = gameAudioCaptureSession;
+    if (session === undefined) return;
+    const cancelled = cancelAudioCaptureSession(session);
+    if (cancelled === undefined) return;
+    gameAudioCaptureSession = undefined;
+    if (gameAudioCaptureBar !== undefined) gameAudioCaptureBar.hidden = true;
+    setCreatorMode("GAME");
+    restoreCaptureReturnContext(cancelled.returnContext);
+    renderGameCustomPanels();
+  };
+  documentRef.addEventListener("keydown", (event) => {
+    const capture = gameAudioCaptureSession;
+    if (capture === undefined || root.dataset.creatorMode !== "AUDIO") return;
+    const target = event.target;
+    if (!isWorkspaceKeyboardActionAllowed(event, target)) return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      cancelGameAudioCapture();
+    } else if (event.key === "Enter" && capture.state === "READY") {
+      event.preventDefault();
+      void commitGameAudioCapture();
+    }
+  });
+  const captureGamePlaygroundAudioSelection = (event: Event): void => {
+    const target = event.target as Element | null;
+    if (
+      gameAudioCaptureSession === undefined ||
+      target === null ||
+      typeof target.closest !== "function" ||
+      target.closest(
+        "[data-audio-bar-index], [data-audio-bar-start-frame]",
+      ) === null
+    ) return;
+    const draft = gameAudioCaptureDraftForCurrentSelection();
+    if (draft !== undefined) gameAudioCaptureSession = updateAudioCaptureDraft(gameAudioCaptureSession, draft);
+    syncGameAudioCaptureBar();
+  };
+  bindLegacyGameUiEvent(
+    audioBarStrip,
+    "click",
+    captureGamePlaygroundAudioSelection,
+    true,
+  );
+  bindLegacyGameUiEvent(
+    audioTimelineRuler,
+    "click",
+    captureGamePlaygroundAudioSelection,
+    true,
+  );
+  for (const button of draw2GamePlaygroundModes) {
+    button.addEventListener("click", () => {
+      const mode = button.dataset.gamePlaygroundMode;
+      if (
+        mode === "SIDE_SCROLL" || mode === "RPG_4" || mode === "RPG_8"
+      ) setGamePlaygroundMode(mode);
+    });
+  }
+  draw2GamePlaygroundWorldSprite?.addEventListener("click", () => {
+    openGamePlaygroundDrawSelection({ kind: "WORLD" });
+  });
+  draw2GamePlaygroundPlayerSprite?.addEventListener("click", () => {
+    openGamePlaygroundDrawSelection({ kind: "PLAYER" });
+  });
+  draw2GamePlaygroundObjectAdd?.addEventListener("click", () => {
+    if (gameAuthoringLocked()) return;
+    const previousIds = new Set(gameDeckTracks.map((track) => track.id));
+    addRpgObjectTemplate("PROP");
+    const added = [...gameDeckTracks].find((track) => !previousIds.has(track.id));
+    if (added === undefined) return;
+    openGamePlaygroundDrawSelection({ kind: "OBJECT", trackId: added.id });
+  });
+  for (const button of draw2GamePlaygroundAudioEvents) {
+    button.addEventListener("click", () => {
+      const event = gamePlaygroundAudioEventFor(
+        button.dataset.gamePlaygroundAudioEvent,
+      );
+      openGamePlaygroundAudioEvent(event);
+    });
+  }
+  // The compact Inspector also exposes the event as a select.  Treating a
+  // change as the same intent as pressing an event card keeps the short path
+  // usable even when the card rail is collapsed or clipped.
+  draw2GamePlaygroundAudioRole?.addEventListener("change", () => {
+    const event = gamePlaygroundAudioEventFor(
+      draw2GamePlaygroundAudioRole.value,
+    );
+    openGamePlaygroundAudioEvent(event);
+  });
+  // The Inspector is rebuilt when the selected placement changes, so the
+  // bootstrap reference above can become detached. Keep the same shortcut
+  // working for the live select element through delegated input handling.
+  documentRef.addEventListener("change", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLSelectElement) || target.id !== "draw2GamePlaygroundAudioRole") return;
+    openGamePlaygroundAudioEvent(gamePlaygroundAudioEventFor(target.value));
+  });
+  draw2GamePlaygroundAssetAdd?.addEventListener("click", () => {
+    if (gameAuthoringLocked()) return;
+    openGamePlaygroundDrawSelection({ kind: "ASSET" });
+    if (draw2GamePlaygroundDrawStatus !== undefined) {
+      draw2GamePlaygroundDrawStatus.textContent =
+        "iDRAWで範囲を選ぶと、再利用できるAssetとして追加されます。";
+    }
+  });
+  draw2GamePlaygroundDrawOpen?.addEventListener("click", () => {
+    getAssetBridge()?.prepareSelection();
+    setCreatorMode("DRAW");
+    if (draw2GamePlaygroundDrawStatus !== undefined) {
+      draw2GamePlaygroundDrawStatus.textContent =
+        "iDRAWでキャンバスをドラッグして範囲を選択してください。";
+    }
+  });
+  draw2GamePlaygroundDrawRefresh?.addEventListener("click", () => {
+    renderGameCustomPanels();
+  });
+  draw2GamePlaygroundAudioOpen?.addEventListener("click", () => {
+    setCreatorMode("AUDIO");
+    selectModeDeckTab("audio-timeline");
+    void ensureAudioWorkspaceSession().then(renderGameCustomPanels);
+  });
+  draw2GamePlaygroundAudioRefresh?.addEventListener("click", () => {
+    void ensureAudioWorkspaceSession().then(renderGameCustomPanels);
+  });
+  draw2GamePlaygroundWorldApply?.addEventListener("click", () => {
+    void applyGamePlaygroundDrawReference("world");
+  });
+  draw2GamePlaygroundWorldClear?.addEventListener("click", () => {
+    clearGamePlaygroundReference("world");
+  });
+  draw2GamePlaygroundWorldWidth?.addEventListener("change", () => {
+    updateGamePlaygroundWorldMap({
+      width: Number(draw2GamePlaygroundWorldWidth.value),
+    });
+  });
+  draw2GamePlaygroundWorldHeight?.addEventListener("change", () => {
+    updateGamePlaygroundWorldMap({
+      height: Number(draw2GamePlaygroundWorldHeight.value),
+    });
+  });
+  draw2GamePlaygroundWorldBounds?.addEventListener("change", () => {
+    const value = draw2GamePlaygroundWorldBounds.value;
+    updateGamePlaygroundWorldMap({
+      bounds: value === "INFINITE" ? "INFINITE" : "FINITE",
+    });
+  });
+  draw2GamePlaygroundPlayerApply?.addEventListener("click", () => {
+    void applyGamePlaygroundDrawReference("player");
+  });
+  draw2GamePlaygroundPlayerClear?.addEventListener("click", () => {
+    clearGamePlaygroundReference("player");
+  });
+  draw2GamePlaygroundDrawLayout?.addEventListener("change", () => {
+    if (gameAuthoringLocked() || gamePlayground.player === undefined) return;
+    const layout = gamePlaygroundLayoutFor(
+      draw2GamePlaygroundDrawLayout?.value,
+    );
+    const currentPlayer = gamePlayground.player;
+    void gamePlaygroundReferenceForCurrentDraw(currentPlayer).then((reference) => {
+      if (gameAuthoringLocked() || gamePlayground.player !== currentPlayer) return;
+      const nextPlayer = reference === undefined
+        ? { ...currentPlayer, layout }
+        : { ...currentPlayer, ...reference, layout };
+      gamePlayground = { ...gamePlayground, player: nextPlayer };
+      const playerTrackId = gameDeckTracks.find((track) =>
+        (track.role ?? gameObjectRoleFor(track.id, track.kind)) === "PLAYER"
+      )?.id ?? "player";
+      const placement = gamePlaygroundPlacementFor(playerTrackId) ??
+        gamePlaygroundPlacementFor("player");
+      if (placement !== undefined) {
+        upsertGamePlaygroundPlacement({
+          ...placement,
+          reference: nextPlayer,
+          snapToGrid: false,
+        });
+      }
+      queueGameEditorPersistenceSave("playground-player-layout");
+      renderGameCustomPanels();
+    }).catch(() => {
+      gamePlayground = {
+        ...gamePlayground,
+        player: { ...currentPlayer, layout },
+      };
+      queueGameEditorPersistenceSave("playground-player-layout");
+      renderGameCustomPanels();
+    });
+  });
+  draw2GamePlaygroundReferenceMode?.addEventListener("change", () => {
+    if (gameAuthoringLocked() || gamePlayground.player === undefined) return;
+    gamePlayground = {
+      ...gamePlayground,
+      player: {
+        ...gamePlayground.player,
+        mode: gamePlaygroundReferenceModeFor(
+          draw2GamePlaygroundReferenceMode?.value,
+        ),
+      },
+    };
+    queueGameEditorPersistenceSave("playground-player-reference-mode");
+    renderGameCustomPanels();
+  });
+  const commitGamePlaygroundPlayerFlag = (
+    patch: Partial<GamePlaygroundPlacement>,
+  ): void => {
+    if (gameAuthoringLocked()) return;
+    const playerTrackId = gameDeckTracks.find((track) =>
+      (track.role ?? gameObjectRoleFor(track.id, track.kind)) === "PLAYER"
+    )?.id ?? "player";
+    const placement = gamePlaygroundPlacementFor(playerTrackId) ??
+      gamePlaygroundPlacementFor("player");
+    if (placement === undefined) return;
+    upsertGamePlaygroundPlacement({ ...placement, ...patch, snapToGrid: false });
+    queueGameEditorPersistenceSave("playground-player-settings");
+    renderGameCustomPanels();
+  };
+  draw2GamePlaygroundPlayerMovable?.addEventListener("change", () => {
+    commitGamePlaygroundPlayerFlag({
+      movable: draw2GamePlaygroundPlayerMovable.checked,
+    });
+  });
+  draw2GamePlaygroundPlayerCollision?.addEventListener("change", () => {
+    commitGamePlaygroundPlayerFlag({
+      collision: draw2GamePlaygroundPlayerCollision.checked,
+    });
+  });
+  draw2GamePlaygroundPlayerGravity?.addEventListener("change", () => {
+    commitGamePlaygroundPlayerFlag({
+      gravity: draw2GamePlaygroundPlayerGravity.checked,
+    });
+  });
+  draw2GamePlaygroundAudioApply?.addEventListener("click", () => {
+    void commitGameAudioCapture();
+  });
+  draw2GamePlaygroundAudioClear?.addEventListener("click", () => {
+    if (gameAuthoringLocked()) return;
+    // Clear the canonical references as well as the legacy UI projection.
+    // Leaving audioBindings behind makes the editor appear empty while Play
+    // can still resolve and trigger the old sound.
+    gamePlayground = {
+      ...gamePlayground,
+      audioAssets: [],
+      audioBindings: [],
+      audio: [],
+    };
+    queueGameEditorPersistenceSave("playground-audio-clear");
+    renderGameCustomPanels();
+  });
   gameHierarchyQuery?.addEventListener("input", () => {
     gameHierarchyBrowserQuery = gameHierarchyQuery.value;
     renderGameHierarchyGroups();
@@ -30604,27 +41400,77 @@ export function bootstrapDraw2Workspace(
     });
   }
   draw2GameSceneFocusSelected?.addEventListener("click", () => {
-    const selected = [...(draw2GameSceneSvg?.querySelectorAll<SVGElement>(
-      "[data-game-scene-track-id]",
-    ) ?? [])].find((element) =>
-      element.dataset.gameSceneTrackId === selectedGameTrackId
+    const selectedTrack = gameDeckTracks.find((track) =>
+      track.id === selectedGameTrackId
     );
-    if (selected !== undefined) {
-      const focusable = selected as SVGElement & { focus?: () => void };
-      focusable.focus?.();
+    if (selectedTrack !== undefined) {
+      const world = gamePlaygroundWorldMapForEditor();
+      const placement = gamePlaygroundPlacementFor(selectedTrack.id);
+      const runtimePoint = gamePlaygroundRuntimeState?.positions[selectedTrack.id];
+      const transform = componentsForGameTrack(selectedTrack).find((component) =>
+        component.type === "TRANSFORM"
+      );
+      const point = runtimePoint ?? (placement !== undefined
+        ? { x: placement.x, y: placement.y }
+        : transform?.type === "TRANSFORM"
+        ? {
+          x: transform.x / Math.min(12, world.width) * world.width,
+          y: transform.y / Math.min(8, world.height) * world.height,
+        }
+        : { x: world.width / 2, y: world.height / 2 });
+      const zoom = Math.min(8, Math.max(0.1, gamePlaygroundCamera.zoom));
+      const width = Math.min(
+        world.width,
+        gameSceneViewMode === "GAME" ? 10 : Math.max(1, 100 / zoom),
+      );
+      const height = Math.min(
+        world.height,
+        gameSceneViewMode === "GAME" ? 6 : Math.max(1, 60 / zoom),
+      );
+      gamePlaygroundCamera = {
+        x: world.bounds === "FINITE"
+          ? Math.min(world.width - width, Math.max(0, point.x - width / 2))
+          : point.x - width / 2,
+        y: world.bounds === "FINITE"
+          ? Math.min(world.height - height, Math.max(0, point.y - height / 2))
+          : point.y - height / 2,
+        zoom,
+      };
+      renderGameSceneViewport();
+      const selected = [...(draw2GameSceneSvg?.querySelectorAll<SVGElement>(
+        "[data-game-scene-track-id]",
+      ) ?? [])].find((element) =>
+        element.dataset.gameSceneTrackId === selectedGameTrackId
+      );
+      (selected as (SVGElement & { focus?: () => void }) | undefined)?.focus?.();
       if (draw2GameSceneViewportStatus !== undefined) {
         draw2GameSceneViewportStatus.textContent =
-          "選択中のオブジェクトを表示しています。";
+          `${selectedTrack.label}を中央に表示 · ${point.x.toFixed(1)}, ${point.y.toFixed(1)}`;
       }
     } else if (draw2GameSceneViewportStatus !== undefined) {
       draw2GameSceneViewportStatus.textContent =
         "先にHierarchyまたはSceneでオブジェクトを選択してください。";
     }
   });
-  draw2GameSceneFit?.addEventListener("click", () => {
+  draw2GameSceneAddObject?.addEventListener("click", () => {
+    selectModeDeckTab("game-assets");
+    draw2GameAssetQuery?.focus({ preventScroll: true });
     if (draw2GameSceneViewportStatus !== undefined) {
       draw2GameSceneViewportStatus.textContent =
-        "Scene全体を表示しています。グリッドに合わせて配置できます。";
+        "下部のインベントリからオブジェクトを選ぶと、Sceneへ追加できます。";
+    }
+  });
+  draw2GameSceneFit?.addEventListener("click", () => {
+    const world = gamePlaygroundWorldMapForEditor();
+    gamePlaygroundCamera = {
+      x: 0,
+      y: 0,
+      zoom: Math.min(1, 100 / Math.max(1, world.width), 60 / Math.max(1, world.height)),
+    };
+    renderGameSceneViewport();
+    if (draw2GameSceneViewportStatus !== undefined) {
+      draw2GameSceneViewportStatus.textContent =
+        `${world.width}×${world.height}の全体を表示 · ${world.chunkSize}×${world.chunkSize} Chunk`;
     }
   });
   gameHierarchyAdd?.addEventListener("click", () => {
@@ -30860,6 +41706,13 @@ export function bootstrapDraw2Workspace(
     }
   });
   draw2GameInspectorApply?.addEventListener("click", () => {
+    if (gameAuthoringLocked()) {
+      if (draw2GameInspectorStatus !== undefined) {
+        draw2GameInspectorStatus.textContent =
+          "Play / Release中はオブジェクトを編集できません。";
+      }
+      return;
+    }
     const selected = gameDeckTracks.find((track) =>
       track.id === selectedGameTrackId
     );
@@ -30932,15 +41785,50 @@ export function bootstrapDraw2Workspace(
     }
   });
   const GAME_NODE_TILE_DRAG_MIME = "application/x-draw2-game-component";
+  const clearGameNodeDragState = (): void => {
+    draw2GameNodeBox?.querySelectorAll<HTMLElement>(
+      ".draw2-game-node-tile.is-dragging",
+    ).forEach((tile) => {
+      tile.classList.remove("is-dragging");
+      tile.setAttribute("aria-grabbed", "false");
+    });
+    draw2GameComponents?.classList.remove("is-drag-over");
+    draw2GameComponentsDropHint?.classList.remove("is-drag-over");
+    const objectContext = gameWorkspaceContext.selection.kind === "OBJECT" ||
+      gameWorkspaceContext.selection.kind === "COMPONENT";
+    if (draw2GameComponents !== undefined) {
+      draw2GameComponents.dataset.gameDropState =
+        !objectContext || selectedGameTrack() === undefined
+          ? "no-selection"
+          : "ready";
+    }
+    if (draw2GameComponentsDropHint !== undefined) {
+      draw2GameComponentsDropHint.dataset.gameDropState =
+        !objectContext || selectedGameTrack() === undefined
+          ? "no-selection"
+          : "ready";
+    }
+  };
   const addGameComponentFromNodeTile = (
     type: GameEditorComponent["type"] | undefined,
     preset: string | undefined,
   ): void => {
+    if (
+      draw2GameLeftDockNodeBoxPanel?.hidden === true ||
+      draw2GameLeftDockNodeBoxPanel?.inert === true
+    ) return;
+    if (gameAuthoringLocked()) {
+      if (draw2GameComponentsStatus !== undefined) {
+        draw2GameComponentsStatus.textContent =
+          "Play / Release中はオブジェクトを編集できません。";
+      }
+      return;
+    }
     const selected = selectedGameTrack();
     if (selected === undefined || type === undefined) {
       if (draw2GameComponentsStatus !== undefined) {
         draw2GameComponentsStatus.textContent =
-          "先にHierarchyでGameObjectを選択してください。";
+          "先にSceneまたはインベントリでGameObjectを選択してください。";
       }
       return;
     }
@@ -30962,10 +41850,34 @@ export function bootstrapDraw2Workspace(
       }
       return;
     }
+    expandedGameComponentIds.add(next.componentId);
+    projectGameWorkspaceAction(
+      {
+        type: "SELECT_COMPONENT",
+        trackId: selected.id,
+        componentId: next.componentId,
+      },
+      { render: false },
+    );
     updateSelectedGameComponents(
       (items) => [...items, next],
       `${componentLabel(type)}を追加しました。`,
     );
+    const addedCard = draw2GameComponents === undefined
+      ? undefined
+      : [...draw2GameComponents.querySelectorAll<HTMLElement>(
+        ".draw2-game-component-card",
+      )].find((card) => card.dataset.gameComponentId === next.componentId);
+    if (addedCard !== undefined) {
+      addedCard.dataset.dropResult = "success";
+      addedCard.scrollIntoView({ block: "nearest" });
+      addedCard.querySelector<HTMLButtonElement>(
+        ".draw2-game-component-chip-toggle",
+      )?.focus({ preventScroll: true });
+      windowRef.setTimeout(() => {
+        delete addedCard.dataset.dropResult;
+      }, 720);
+    }
   };
   draw2GameNodeBox?.addEventListener("click", (event) => {
     const tile = (event.target as HTMLElement | null)?.closest<
@@ -30982,10 +41894,11 @@ export function bootstrapDraw2Workspace(
     const tile = (event.target as HTMLElement | null)?.closest<
       HTMLButtonElement
     >(".draw2-game-node-tile");
-    if (
-      tile === null || tile === undefined || tile.disabled ||
-      event.dataTransfer === null
-    ) {
+    if (tile === null || tile === undefined || tile.disabled) return;
+    if (event.dataTransfer === null) return;
+    if (gameAuthoringLocked()) {
+      event.dataTransfer.effectAllowed = "none";
+      event.dataTransfer.dropEffect = "none";
       return;
     }
     const type = tile.dataset.gameComponentType ?? "";
@@ -30996,17 +41909,32 @@ export function bootstrapDraw2Workspace(
       JSON.stringify({ type, preset }),
     );
     event.dataTransfer.setData("text/plain", type);
+    tile.classList.add("is-dragging");
+    tile.setAttribute("aria-grabbed", "true");
   });
-  draw2GameComponents?.addEventListener("dragover", (event) => {
-    if (
-      event.dataTransfer === null ||
-      !event.dataTransfer.types.includes(GAME_NODE_TILE_DRAG_MIME)
-    ) {
+  draw2GameNodeBox?.addEventListener("dragend", clearGameNodeDragState);
+  draw2GameComponents?.addEventListener("dragenter", (event) => {
+    if (event.dataTransfer === null) return;
+    if (gameAuthoringLocked()) {
+      event.dataTransfer.dropEffect = "none";
       return;
     }
+    if (!event.dataTransfer.types.includes(GAME_NODE_TILE_DRAG_MIME)) return;
+    event.preventDefault();
+    draw2GameComponents.classList.add("is-drag-over");
+    draw2GameComponents.dataset.gameDropState = "dragging";
+  });
+  draw2GameComponents?.addEventListener("dragover", (event) => {
+    if (event.dataTransfer === null) return;
+    if (gameAuthoringLocked()) {
+      event.dataTransfer.dropEffect = "none";
+      return;
+    }
+    if (!event.dataTransfer.types.includes(GAME_NODE_TILE_DRAG_MIME)) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = "copy";
     draw2GameComponents.classList.add("is-drag-over");
+    draw2GameComponents.dataset.gameDropState = "dragging";
   });
   draw2GameComponents?.addEventListener("dragleave", (event) => {
     if (
@@ -31019,6 +41947,10 @@ export function bootstrapDraw2Workspace(
     }
   });
   draw2GameComponents?.addEventListener("drop", (event) => {
+    if (gameAuthoringLocked()) {
+      clearGameNodeDragState();
+      return;
+    }
     if (
       event.dataTransfer === null ||
       !event.dataTransfer.types.includes(GAME_NODE_TILE_DRAG_MIME)
@@ -31027,6 +41959,7 @@ export function bootstrapDraw2Workspace(
     }
     event.preventDefault();
     draw2GameComponents.classList.remove("is-drag-over");
+    draw2GameComponents.dataset.gameDropState = "dropped";
     const raw = event.dataTransfer.getData(GAME_NODE_TILE_DRAG_MIME);
     if (raw === "") return;
     try {
@@ -31039,9 +41972,24 @@ export function bootstrapDraw2Workspace(
     } catch {
       // 不正なドロップペイロードは無視する。
     }
+    clearGameNodeDragState();
   });
   const setGameLeftDockTab = (tab: "hierarchy" | "node-box"): void => {
-    const isNodeBox = tab === "node-box";
+    // Phase 1 keeps the old Node Box DOM for compatibility, but it is not an
+    // authoring route in the Asset/Placement surface.
+    if (draw2GameLeftDockTabNodeBox !== undefined) {
+      draw2GameLeftDockTabNodeBox.hidden = true;
+      draw2GameLeftDockTabNodeBox.inert = true;
+      draw2GameLeftDockTabNodeBox.tabIndex = -1;
+      draw2GameLeftDockTabNodeBox.setAttribute("aria-hidden", "true");
+    }
+    if (draw2GameLeftDockNodeBoxPanel !== undefined) {
+      draw2GameLeftDockNodeBoxPanel.hidden = true;
+      draw2GameLeftDockNodeBoxPanel.inert = true;
+      draw2GameLeftDockNodeBoxPanel.setAttribute("aria-hidden", "true");
+    }
+    void tab;
+    const isNodeBox = false;
     if (draw2GameLeftDockHierarchyPanel !== undefined) {
       draw2GameLeftDockHierarchyPanel.hidden = isNodeBox;
       draw2GameLeftDockHierarchyPanel.inert = isNodeBox;
@@ -31073,6 +42021,9 @@ export function bootstrapDraw2Workspace(
         "aria-selected",
         isNodeBox ? "true" : "false",
       );
+    }
+    if (!legacyGameUiEnabled && draw2GameLeftDockTabs !== undefined) {
+      isolateLegacyGameSurface(draw2GameLeftDockTabs);
     }
   };
   draw2GameLeftDockTabHierarchy?.addEventListener("click", () => {
@@ -31121,20 +42072,15 @@ export function bootstrapDraw2Workspace(
       nextTab.focus();
     });
   }
-  const focusGameHierarchyNextAction = (): void => {
-    if (gameDeckTracks.length === 0) {
-      // Empty Scene: adding the first object is the only useful next action.
-      gameHierarchyAdd?.focus();
-      return;
-    }
-    // Existing objects: search first so the user can select the intended one.
-    gameHierarchyQuery?.focus();
-  };
   draw2GameNodeBoxHierarchyCta?.addEventListener("click", () => {
-    setGameLeftDockTab("hierarchy");
-    focusGameHierarchyNextAction();
+    selectModeDeckTab("game-assets");
+    draw2GameAssetQuery?.focus({ preventScroll: true });
   });
   draw2GameComponentsDropHint?.addEventListener("click", () => {
+    if (
+      draw2GameLeftDockNodeBoxPanel?.hidden === true ||
+      draw2GameLeftDockNodeBoxPanel?.inert === true
+    ) return;
     setGameLeftDockTab("node-box");
     if (draw2GameComponentsStatus !== undefined) {
       draw2GameComponentsStatus.textContent =
@@ -31142,20 +42088,36 @@ export function bootstrapDraw2Workspace(
     }
   });
   draw2GameComponentsDropHint?.addEventListener("dragover", (event) => {
-    if (
-      event.dataTransfer === null ||
-      !event.dataTransfer.types.includes(GAME_NODE_TILE_DRAG_MIME)
-    ) {
+    if (event.dataTransfer === null) return;
+    if (gameAuthoringLocked()) {
+      event.dataTransfer.dropEffect = "none";
       return;
     }
+    if (!event.dataTransfer.types.includes(GAME_NODE_TILE_DRAG_MIME)) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = "copy";
     draw2GameComponentsDropHint.classList.add("is-drag-over");
+    draw2GameComponentsDropHint.dataset.gameDropState = "dragging";
+  });
+  draw2GameComponentsDropHint?.addEventListener("dragenter", (event) => {
+    if (event.dataTransfer === null) return;
+    if (gameAuthoringLocked()) {
+      event.dataTransfer.dropEffect = "none";
+      return;
+    }
+    if (!event.dataTransfer.types.includes(GAME_NODE_TILE_DRAG_MIME)) return;
+    event.preventDefault();
+    draw2GameComponentsDropHint.classList.add("is-drag-over");
+    draw2GameComponentsDropHint.dataset.gameDropState = "dragging";
   });
   draw2GameComponentsDropHint?.addEventListener("dragleave", () => {
     draw2GameComponentsDropHint.classList.remove("is-drag-over");
   });
   draw2GameComponentsDropHint?.addEventListener("drop", (event) => {
+    if (gameAuthoringLocked()) {
+      clearGameNodeDragState();
+      return;
+    }
     if (
       event.dataTransfer === null ||
       !event.dataTransfer.types.includes(GAME_NODE_TILE_DRAG_MIME)
@@ -31164,6 +42126,7 @@ export function bootstrapDraw2Workspace(
     }
     event.preventDefault();
     draw2GameComponentsDropHint.classList.remove("is-drag-over");
+    draw2GameComponentsDropHint.dataset.gameDropState = "dropped";
     const raw = event.dataTransfer.getData(GAME_NODE_TILE_DRAG_MIME);
     if (raw === "") return;
     try {
@@ -31176,6 +42139,7 @@ export function bootstrapDraw2Workspace(
     } catch {
       // 不正なドロップペイロードは無視する。
     }
+    clearGameNodeDragState();
   });
   draw2GameLogicSimpleButton?.addEventListener("click", () => {
     setGameLogicMode("SIMPLE");
@@ -31193,7 +42157,7 @@ export function bootstrapDraw2Workspace(
     if (selected === undefined) {
       if (draw2GameGraphStatus !== undefined) {
         draw2GameGraphStatus.textContent =
-          "先にHierarchyでGameObjectを選択してください。";
+          "先にSceneまたはインベントリでGameObjectを選択してください。";
       }
       return;
     }
@@ -31345,7 +42309,7 @@ export function bootstrapDraw2Workspace(
     if (selected === undefined || sourceText.length === 0) {
       if (draw2GameCodeStatus !== undefined) {
         draw2GameCodeStatus.textContent = selected === undefined
-          ? "先にHierarchyでGameObjectを選択してください。"
+          ? "先にSceneまたはインベントリでGameObjectを選択してください。"
           : "コードを入力してください。";
       }
       return;
@@ -31381,6 +42345,13 @@ export function bootstrapDraw2Workspace(
     }
   });
   draw2GameEventApply?.addEventListener("click", () => {
+    if (gameAuthoringLocked()) {
+      if (draw2GameEventStatus !== undefined) {
+        draw2GameEventStatus.textContent =
+          "Play / Release中はイベントを編集できません。";
+      }
+      return;
+    }
     if (draw2GameEventWho !== undefined) return;
     const selected = gameDeckTracks.find((track) =>
       track.id === selectedGameTrackId
@@ -31433,6 +42404,13 @@ export function bootstrapDraw2Workspace(
     }
   });
   draw2GameEventClear?.addEventListener("click", () => {
+    if (gameAuthoringLocked()) {
+      if (draw2GameEventStatus !== undefined) {
+        draw2GameEventStatus.textContent =
+          "Play / Release中はイベントを編集できません。";
+      }
+      return;
+    }
     if (draw2GameEventWho !== undefined) return;
     const selected = gameDeckTracks.find((track) =>
       track.id === selectedGameTrackId
@@ -31454,9 +42432,29 @@ export function bootstrapDraw2Workspace(
     }
   });
   draw2GameEventApply?.addEventListener("click", () => {
-    const selected = gameDeckTracks.find((track) =>
+    if (gameAuthoringLocked()) {
+      if (draw2GameEventStatus !== undefined) {
+        draw2GameEventStatus.textContent =
+          "Play / Release中はイベントを編集できません。";
+      }
+      return;
+    }
+    const selectedTrack = gameDeckTracks.find((track) =>
       track.id === selectedGameTrackId
     );
+    const existing = gameEventCardForEditor();
+    const existingSourceTrack = existing?.sourceTrackId === undefined
+      ? undefined
+      : gameDeckTracks.find((track) => track.id === existing.sourceTrackId);
+    const existingTargetTrack = existing?.targetTrackId === undefined
+      ? undefined
+      : gameDeckTracks.find((track) => track.id === existing.targetTrackId);
+    const selected = existingSourceTrack ??
+      existingTargetTrack ??
+      selectedTrack ??
+      gameDeckTracks.find((track) =>
+        (track.role ?? gameObjectRoleFor(track.id, track.kind)) === "PLAYER"
+      );
     if (selected === undefined) {
       if (draw2GameEventStatus !== undefined) {
         draw2GameEventStatus.textContent =
@@ -31466,11 +42464,13 @@ export function bootstrapDraw2Workspace(
     }
     const selectedRole = selected.role ??
       gameObjectRoleFor(selected.id, selected.kind);
-    const sourceTrackId = selectedRole === "PLAYER"
-      ? selected.id
-      : gameDeckTracks.find((track) =>
-        (track.role ?? gameObjectRoleFor(track.id, track.kind)) === "PLAYER"
-      )?.id ?? selected.id;
+    const sourceTrackId = existing === undefined
+      ? selectedRole === "PLAYER"
+        ? selected.id
+        : gameDeckTracks.find((track) =>
+          (track.role ?? gameObjectRoleFor(track.id, track.kind)) === "PLAYER"
+        )?.id ?? selected.id
+      : existing.sourceTrackId;
     const targetTrackId = draw2GameEventTarget?.value.trim() || undefined;
     const who = GAME_EVENT_WHO_OPTIONS.find((item) =>
       item.value === draw2GameEventWho?.value
@@ -31481,12 +42481,31 @@ export function bootstrapDraw2Workspace(
     const action = GAME_EVENT_ACTION_OPTIONS.find((item) =>
       item.value === draw2GameEventAction?.value
     )?.value ?? "SHOW_DIALOGUE";
-    const existing = gameEventCardForEditor();
     const rawMessage = draw2GameEventMessage?.value.trim() ?? "";
     const amount = Math.min(
       999999,
       Math.max(0, Math.round(Number(draw2GameEventAmount?.value ?? "1") || 1)),
     );
+    const itemId = draw2GameEventItem?.value.trim() || undefined;
+    const recipeId = draw2GameEventRecipe?.value.trim() || undefined;
+    const blockTypeId = draw2GameEventBlock?.value.trim() || undefined;
+    const missingReference = condition === "HAS_ITEM" ||
+        action === "GIVE_ITEM" || action === "TAKE_ITEM"
+      ? itemId === undefined
+        ? "アイテム"
+        : undefined
+      : action === "CRAFT_ITEM"
+      ? recipeId === undefined ? "レシピ" : undefined
+      : action === "BREAK_BLOCK" || action === "PLACE_BLOCK"
+      ? blockTypeId === undefined ? "ブロック" : undefined
+      : undefined;
+    if (missingReference !== undefined) {
+      if (draw2GameEventStatus !== undefined) {
+        draw2GameEventStatus.textContent =
+          `ゲームデータで${missingReference}を作成し、対象を選択してください。`;
+      }
+      return;
+    }
     const draft = {
       eventId: existing?.eventId ?? "event:card:" + (gameEventCards.length + 1),
       label: existing?.label ?? "イベントカード",
@@ -31501,7 +42520,13 @@ export function bootstrapDraw2Workspace(
           ? { message: "イベントが起こりました。" }
           : {}
         : { message: rawMessage }),
-      ...(action === "DAMAGE" ? { amount } : {}),
+      ...(action === "DAMAGE" || condition === "HAS_ITEM" ||
+          action === "GIVE_ITEM" || action === "TAKE_ITEM"
+        ? { amount }
+        : {}),
+      ...(itemId === undefined ? {} : { itemId }),
+      ...(recipeId === undefined ? {} : { recipeId }),
+      ...(blockTypeId === undefined ? {} : { blockTypeId }),
     };
     const card: GameEventCard = {
       ...draft,
@@ -31526,7 +42551,10 @@ export function bootstrapDraw2Workspace(
       ),
       { behaviorId, mode: "SIMPLE" },
     ];
-    selectedGameEventCardId = card.eventId;
+    projectGameWorkspaceAction(
+      { type: "OPEN_EVENT", eventId: card.eventId },
+      { render: false },
+    );
     gameLogicMode = "SIMPLE";
     gameLogicModeBehaviorId = undefined;
     renderGameCustomPanels();
@@ -31537,6 +42565,13 @@ export function bootstrapDraw2Workspace(
     }
   });
   draw2GameEventClear?.addEventListener("click", () => {
+    if (gameAuthoringLocked()) {
+      if (draw2GameEventStatus !== undefined) {
+        draw2GameEventStatus.textContent =
+          "Play / Release中はイベントを編集できません。";
+      }
+      return;
+    }
     if (draw2GameEventWho === undefined) return;
     const card = gameEventCardForEditor();
     if (card === undefined) return;
@@ -31553,6 +42588,10 @@ export function bootstrapDraw2Workspace(
     selectedGameEventCardId = undefined;
     gameLogicMode = "SIMPLE";
     gameLogicModeBehaviorId = undefined;
+    projectGameWorkspaceAction(
+      { type: "SELECT_NONE" },
+      { render: false },
+    );
     renderGameCustomPanels();
     queueGameEditorPersistenceSave("event-card-clear");
     if (draw2GameEventStatus !== undefined) {
@@ -31694,7 +42733,7 @@ export function bootstrapDraw2Workspace(
     const uniqueIds = new Set(ids).size === ids.length;
     const framesValid = gameDeckTracks.every((track) =>
       track.filled.every((frame) =>
-        Number.isSafeInteger(frame) && frame >= 0 && frame < 16
+        Number.isSafeInteger(frame) && frame >= 0
       )
     );
     const canonical = pixyncGameStore?.project;
@@ -31769,7 +42808,7 @@ export function bootstrapDraw2Workspace(
       },
       {
         label: "Frame references",
-        detail: framesValid ? "0–15の範囲内" : "範囲外のフレームがあります",
+        detail: framesValid ? "任意の安全なフレーム番号" : "範囲外のフレームがあります",
         state: framesValid ? "ok" : "error",
       },
       {
@@ -32307,8 +43346,48 @@ export function bootstrapDraw2Workspace(
   syncStudioReleaseControls();
   windowRef.addEventListener(DRAW2_ASSET_STATE_CHANGED_EVENT, () => {
     gameSceneSpriteDataCache.clear();
-    const pending = gameMakerPendingHeroBinding;
     const snapshot = getAssetBridge()?.snapshot();
+    const capture = gameCaptureSession;
+    if (capture !== undefined && root.dataset.creatorMode === "DRAW") {
+      const sessionId = capture.sessionId;
+      const draftGeneration = capture.draftGeneration;
+      const selectionKey = snapshot === undefined
+        ? undefined
+        : captureDrawSelectionKey(snapshot.selection);
+      void gamePlaygroundCaptureDraftForCurrentDraw().then((draft) => {
+        const currentSnapshot = getAssetBridge()?.snapshot();
+        const currentSession = gameCaptureSession;
+        if (
+          draft === undefined ||
+          currentSession?.sessionId !== sessionId ||
+          currentSession.draftGeneration !== draftGeneration ||
+          selectionKey === undefined ||
+          currentSnapshot === undefined ||
+          captureDrawSelectionKey(currentSnapshot.selection) !== selectionKey ||
+          root.dataset.creatorMode !== "DRAW"
+        ) return;
+        gameCaptureSession = updateCaptureSessionDraft(currentSession, draft);
+        syncGameCaptureBar();
+      });
+    }
+    const pendingTarget = gamePendingDrawTarget;
+    if (
+      pendingTarget !== undefined &&
+      root.dataset.creatorMode === "DRAW" &&
+      snapshot?.selection.hasSelection === true
+    ) {
+      gamePendingDrawTarget = undefined;
+      const slot = pendingTarget.kind === "WORLD"
+        ? "world"
+        : pendingTarget.kind === "PLAYER"
+        ? "player"
+        : pendingTarget.kind === "OBJECT"
+        ? { kind: "object" as const, trackId: pendingTarget.trackId }
+        : { kind: "asset" as const };
+      void applyGamePlaygroundDrawReference(slot);
+    }
+    if (!legacyGameUiEnabled) return;
+    const pending = gameMakerPendingHeroBinding;
     if (pending !== undefined && snapshot !== undefined) {
       const entry = [...snapshot.assetDefinitions].reverse().find((candidate) =>
         candidate.definition.animationMapping.some((clip) =>
@@ -32318,7 +43397,10 @@ export function bootstrapDraw2Workspace(
       );
       if (entry !== undefined) {
         gameMakerPendingHeroBinding = undefined;
-        selectedGameTrackId = pending.trackId;
+        projectGameWorkspaceAction(
+          { type: "SELECT_OBJECT", trackId: pending.trackId },
+          { render: false },
+        );
         bindDrawReferenceToSelectedTrack(entry.definitionId);
       }
     }
@@ -32652,20 +43734,30 @@ export function bootstrapDraw2Workspace(
   >();
 
   const setTool = (tool: WorkspaceState["localTool"]): void => {
-    state = { ...state, localTool: tool };
+    const normalizedTool = tool === "pixel-pen"
+      ? "pen"
+      : tool === "select-polygon"
+      ? "select-lasso"
+      : tool === "tile-stamp"
+      ? "pen"
+      : tool;
+    state = { ...state, localTool: normalizedTool };
     setPressed(
       toolButtons,
-      query<HTMLElement>(documentRef, `[data-workspace-tool="${tool}"]`),
+      query<HTMLElement>(
+        documentRef,
+        `[data-workspace-tool="${normalizedTool}"]`,
+      ),
       "aria-pressed",
     );
     for (const group of toolGroups) {
       const members = queryAll<HTMLElement>(group, "[data-workspace-tool]");
       const activeMember = members.find((member) =>
-        member.dataset.workspaceTool === tool
+        member.dataset.workspaceTool === normalizedTool
       );
       if (activeMember !== undefined) {
-        lastSelectedToolByGroup.set(group, tool);
-        group.dataset.lastWorkspaceTool = tool;
+        lastSelectedToolByGroup.set(group, normalizedTool);
+        group.dataset.lastWorkspaceTool = normalizedTool;
       }
       const summary = query<HTMLElement>(group, "[data-tool-group-summary]") ??
         query<HTMLElement>(group, "summary");
@@ -32679,7 +43771,9 @@ export function bootstrapDraw2Workspace(
       }
     }
     const selector = query<HTMLSelectElement>(documentRef, "#draw2Tool");
-    const selectorValue = tool === "select" ? "select-rect" : tool;
+    const selectorValue = normalizedTool === "select"
+      ? "select-rect"
+      : normalizedTool;
     if (
       selector !== undefined &&
       Array.from(selector.options).some((option) =>
@@ -32690,7 +43784,9 @@ export function bootstrapDraw2Workspace(
       selector.dispatchEvent(new Event("change", { bubbles: true }));
     }
     hotPath.workspaceUpdates += 1;
-    updateStatus(`${capability.profile} · ${tool} · Canvas owns pointer input`);
+    updateStatus(
+      `${capability.profile} · ${normalizedTool} · Canvas owns pointer input`,
+    );
   };
 
   const runCommand = (commandId: string): void => {
@@ -32983,6 +44079,9 @@ export function bootstrapDraw2Workspace(
         break;
       case "tool-pen":
         setTool("pen");
+        break;
+      case "tool-text":
+        setTool("text");
         break;
       case "tool-eraser":
         setTool("eraser");
@@ -33995,60 +45094,89 @@ export function bootstrapDraw2Workspace(
   });
 
   const shortcutRegistry = createWorkspaceCommandRegistry(WORKSPACE_COMMANDS);
+  const drawOnlyKeyboardCommands = new Set([
+    "undo",
+    "redo",
+    "copy",
+    "cut",
+    "paste",
+    "tool-pen",
+    "tool-text",
+    "tool-eraser",
+    "tool-fill",
+    "tool-select",
+    "tool-pan",
+    "tool-line",
+    "tool-rect",
+    "tool-ellipse",
+    "tool-circle",
+    "tool-eyedropper",
+    "tool-select-ellipse",
+    "tool-select-color",
+    "tool-select-lasso",
+  ]);
   documentRef.addEventListener("keydown", (event) => {
     const dialogOpen = commandPalette?.open === true;
+    if (event.defaultPrevented) return;
     if (event.key === "Escape" && dialogOpen) {
       event.preventDefault();
       commandPalette?.close();
       return;
     }
-    const interactiveTarget = event.target instanceof HTMLElement &&
-      event.target.closest(
-          "button, a, summary, [role='button'], [role='tab'], [role='menuitem']",
-        ) !== null;
+    const interactiveTarget = isWorkspaceInteractiveTarget(event.target);
     const mode = currentCreatorMode();
     const audioTimelineTarget = event.target instanceof Node &&
       audioTimelinePanel?.contains(event.target) === true;
+    const audioTimelineSelectionTarget = audioTimelineTarget &&
+      event.target instanceof Element &&
+      event.target.closest(
+        "[data-audio-bar-index], [data-audio-bar-start-frame], " +
+          "[data-audio-animation-frame], [data-audio-track-frame]",
+      ) !== null;
     if (
       mode === "AUDIO" &&
       (event.key === "Delete" || event.key === "Backspace") &&
       !dialogOpen &&
       !isEditableTarget(event.target) && !event.isComposing &&
-      (!interactiveTarget || audioTimelineTarget)
+      (!interactiveTarget || audioTimelineSelectionTarget)
     ) {
       event.preventDefault();
+      event.stopImmediatePropagation();
       clearSelectedAudioBar();
       return;
     }
+    const audioHistoryKey = event.key.toLowerCase();
+    const audioRedo = audioHistoryKey === "y" ||
+      audioHistoryKey === "z" && event.shiftKey;
     if (
       mode === "AUDIO" &&
       (event.metaKey || event.ctrlKey) &&
-      event.key.toLowerCase() === "z" &&
+      (audioHistoryKey === "z" || audioHistoryKey === "y") &&
       !event.altKey &&
       !dialogOpen &&
-      !isEditableTarget(event.target) &&
+      !isEditableTarget(event.target) && !interactiveTarget &&
       !event.isComposing
     ) {
       event.preventDefault();
+      event.stopImmediatePropagation();
       queueAudioWorkspaceTransition(
-        event.shiftKey
+        audioRedo
           ? (module, session) => module.redoWorkspaceAudio(session)
           : (module, session) => module.undoWorkspaceAudio(session),
-        event.shiftKey ? "redo" : "undo",
+        audioRedo ? "redo" : "undo",
       );
       return;
     }
     const spaceKey = event.code === "Space" || event.key === " ";
     if (
-      spaceKey && !event.repeat && !event.metaKey && !event.ctrlKey &&
+      spaceKey && !event.metaKey && !event.ctrlKey &&
       !event.shiftKey && !event.altKey && !dialogOpen &&
-      !event.isComposing &&
+      isWorkspaceKeyboardActionAllowed(event, event.target) &&
       (mode === "DRAW" || mode === "ANIMATE" || mode === "GAME" ||
         mode === "AUDIO")
     ) {
-      // Space is reserved for global playback, including while a select or
-      // single-line field still owns focus. preventDefault keeps native select
-      // option toggling and inserted spaces from competing with transport.
+      // This bubble-phase branch is the fallback for a non-editable workspace
+      // surface. Focused buttons are already handled in capture phase above.
       event.preventDefault();
       toggleCurrentModePlayback();
       return;
@@ -34061,27 +45189,37 @@ export function bootstrapDraw2Workspace(
     }, {
       modalOpen: dialogOpen,
       sheetOpen: false,
-      inputEditing: isEditableTarget(event.target),
+      inputEditing: isEditableTarget(event.target) || interactiveTarget,
       imeComposing: event.isComposing,
     }, shortcutRegistry);
     if (resolution !== undefined) {
+      const drawMode = mode === "DRAW" || mode === "ANIMATE";
+      if (!drawMode && drawOnlyKeyboardCommands.has(resolution.commandId)) {
+        return;
+      }
       event.preventDefault();
+      event.stopImmediatePropagation();
       runCommand(resolution.commandId);
       return;
     }
     if (
-      dialogOpen || isEditableTarget(event.target) ||
+      dialogOpen || isEditableTarget(event.target) || interactiveTarget ||
       event.isComposing
     ) return;
     const shortcutTool = new Map([
       ["p", "pen"],
+      ["t", "text"],
       ["e", "eraser"],
       ["g", "fill"],
       ["m", "select"],
       ["h", "pan"],
     ]).get(event.key.toLowerCase());
-    if (shortcutTool !== undefined) {
+    if (
+      shortcutTool !== undefined &&
+      (mode === "DRAW" || mode === "ANIMATE")
+    ) {
       event.preventDefault();
+      event.stopImmediatePropagation();
       setTool(shortcutTool as WorkspaceState["localTool"]);
     }
   });
@@ -34178,6 +45316,8 @@ export function bootstrapDraw2Workspace(
       gameSceneRules,
       gameEventCards,
       gameVisualMaker,
+      gameDataForPersistence(),
+      gamePlayground,
     );
     return {
       projectId: workspaceProjectId,
@@ -34413,8 +45553,15 @@ export function bootstrapDraw2Workspace(
 
   void restoreGameEditorState(workspaceProjectId, {
     blank: options.initialProjectMode === "NEW",
-  }).catch(() => {
-    root.dataset.gamePersistenceState = "error";
+  }).catch((error) => {
+    const failureState = classifyGamePersistenceFailure(
+      error,
+      gamePersistenceCapabilityAvailable(),
+    );
+    if (failureState === "offline") gamePersistenceOffline = true;
+    setGamePersistenceState(
+      failureState,
+    );
   });
 
   // Draw2 applies its persisted editor tool before the lazy Workspace module
@@ -34458,6 +45605,18 @@ export function bootstrapDraw2Workspace(
     requestedCreatorMode ?? creatorState.activeMode,
     requestedCreatorMode !== undefined,
   );
+  for (const tab of draw2GamePlaygroundLibrarySourceTabs) {
+    const active = tab.dataset.gameplaygroundLibrarySource ===
+      gamePlaygroundLibrarySource;
+    tab.classList.toggle("is-active", active);
+    tab.setAttribute("aria-selected", String(active));
+  }
+  if (draw2GamePlaygroundMarketSearch !== undefined) {
+    draw2GamePlaygroundMarketSearch.hidden = true;
+  }
+  if (requestedCreatorMode === "GAME" || creatorState.activeMode === "GAME") {
+    void loadGameMarketCatalog();
+  }
   if (unknownFlag) {
     updateStatus(
       "Unknown Workspace flag · fail-closed OFF · isolated Entry only",
@@ -34470,11 +45629,11 @@ export function bootstrapDraw2Workspace(
   if (audioFeatureFlag === "on") {
     void loadWp190AudioModule().then(() =>
       updateStatus(
-        `${capability.profile} · Audio Bridge lazy loaded · workspace ready`,
+        `${capability.profile} · Audio module lazy loaded · workspace ready`,
       )
     ).catch(() =>
       updateStatus(
-        `${capability.profile} · Audio Bridge unavailable · fail-closed`,
+        `${capability.profile} · Audio module unavailable · fail-closed`,
       )
     );
   }

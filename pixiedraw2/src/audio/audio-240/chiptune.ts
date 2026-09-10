@@ -624,8 +624,8 @@ export interface ChipSynthMachineProfile {
 
 /**
  * Channel layouts for the two compact consoles.  GB_WAVE is intentionally a
- * triangle-based 32-step-wave approximation; Famicom DPCM needs a user sample
- * and therefore stays outside this lightweight synth layout for now.
+ * triangle-based 32-step-wave approximation; Famicom DPCM samples use the
+ * separate bounded sample adapter.
  */
 export const CHIP_SYNTH_MACHINE_PROFILES: readonly ChipSynthMachineProfile[] =
   Object.freeze([
@@ -669,7 +669,7 @@ export const CHIP_SYNTH_MACHINE_PROFILES: readonly ChipSynthMachineProfile[] =
     Object.freeze({
       id: "FAMICOM" as const,
       label: "Famicom / NES",
-      hint: "2 pulse + triangle + long LFSR noise（DPCMは未対応）",
+      hint: "2 pulse + triangle + long LFSR noise · DPCMサンプル対応",
       channels: Object.freeze([
         Object.freeze({
           id: "NES_PULSE_1",

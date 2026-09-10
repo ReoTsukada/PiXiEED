@@ -51,6 +51,8 @@ const DRAW_DESKTOP_PANELS: readonly PanelKind[] = [
   "color",
   "layers",
   "inspector",
+  "history",
+  "navigator",
   "assets",
   "tileset",
   "advanced",
@@ -81,6 +83,7 @@ export const DESKTOP_CREATOR_MODE_PROFILES: Readonly<
       "game-inspector",
       "game-assets",
       "game-build",
+      "assets",
       "export",
     ],
     showPalette: false,
@@ -98,6 +101,7 @@ export const DESKTOP_CREATOR_MODE_PROFILES: Readonly<
       "audio-inspector",
       "audio-library",
       "audio-preview",
+      "assets",
       "export",
     ],
     showPalette: false,
@@ -135,6 +139,8 @@ export function resolveWorkspaceDetailMode(
 
 export type WorkspaceTool =
   | "pen"
+  | "pixel-pen"
+  | "text"
   | "eraser"
   | "fill"
   | "select"
@@ -149,7 +155,10 @@ export type WorkspaceTool =
   | "eyedropper"
   | "select-ellipse"
   | "select-color"
-  | "select-lasso";
+  | "select-lasso"
+  | "select-polygon"
+  | "move"
+  | "tile-stamp";
 
 export interface CoalescedNotifier {
   request(): void;

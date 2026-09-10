@@ -7,10 +7,12 @@
   const labels = {
     'pixiedraw-project': 'iDRAW', png: 'PNG', webp: 'WebP', gif: 'GIF', apng: 'APNG',
     'sprite-sheet-png': 'PNGスプライトシート',
+    'novel-json': '小説・世界観', text: 'テキスト', markdown: 'Markdown', html: 'HTML', csv: 'CSV', rtf: 'RTF', json: 'JSON',
+    mp4: 'MP4動画', webm: 'WebM動画', mov: 'QuickTime動画', m4v: 'M4V動画', ogv: 'Ogg動画',
     aac: 'AAC', aiff: 'AIFF', flac: 'FLAC', m4a: 'M4A', mid: 'MIDI', midi: 'MIDI',
     mp3: 'MP3', oga: 'OGA', ogg: 'OGG', opus: 'Opus', wav: 'WAV', weba: 'WebM音声'
   };
-  const yen = (value) => `${Number(value || 0).toLocaleString('ja-JP')}円`;
+  const yen = (value) => Number(value || 0) === 0 ? '無料' : `${Number(value || 0).toLocaleString('ja-JP')}円`;
   let currentAsset = null;
   let purchaseClient = null;
   let purchaseUser = null;
@@ -41,20 +43,28 @@
 
   async function loadPublicAsset(id) {
     const embedded = embeddedSeoAsset(id);
-    if (embedded) return embedded;
     const pending = window.__PIXIEED_MARKET_PUBLIC_ASSET_PROMISE__;
     if (pending) return pending;
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/market_public_asset_v1`, {
-      method: 'POST',
-      headers: {
-        apikey: SUPABASE_KEY,
-        Authorization: `Bearer ${SUPABASE_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ input_asset_id: id })
-    });
-    if (!response.ok) throw new Error(`market_public_asset_v1 failed: ${response.status}`);
-    return response.json();
+    // 新しい公開専用フラグが埋め込まれている静的ページはそのまま使う。
+    // 旧SEOページにはフラグがないため、現行RPCを確認して誤って購入導線を
+    // 表示しない。通信できない場合だけ、従来の静的商品情報へ戻す。
+    if (embedded && Object.prototype.hasOwnProperty.call(embedded, 'acquisition_enabled')) return embedded;
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/market_public_asset_v1`, {
+        method: 'POST',
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ input_asset_id: id })
+      });
+      if (!response.ok) throw new Error(`market_public_asset_v1 failed: ${response.status}`);
+      return await response.json();
+    } catch (error) {
+      if (embedded) return embedded;
+      throw error;
+    }
   }
 
   async function loadPublicPreview(assetId) {
@@ -85,6 +95,11 @@
     if (asset?.withdrawn_at) return true;
     const quantity = Number(asset?.limited_quantity);
     return Number.isInteger(quantity) && quantity > 0 && Number(asset?.limited_sold_count || 0) >= quantity;
+  }
+
+  function isAcquisitionEnabled(asset) {
+    // 古い静的商品データには列がないため、未定義は従来どおり取得可能として扱う。
+    return asset?.acquisition_enabled !== false;
   }
 
   function badge(text) {
@@ -168,24 +183,38 @@
     const formats = assetFormats(asset);
     const hasAudio = formats.some((format) => ['aac', 'aiff', 'flac', 'm4a', 'mid', 'midi', 'mp3', 'oga', 'ogg', 'opus', 'wav', 'weba'].includes(format));
     const hasDraw = formats.some((format) => ['pixiedraw-project', 'png', 'webp', 'gif', 'apng', 'sprite-sheet-png'].includes(format));
+    const hasText = formats.some((format) => ['novel-json', 'text', 'markdown', 'html', 'csv', 'rtf', 'json'].includes(format));
+    const hasVideo = formats.some((format) => ['mp4', 'webm', 'mov', 'm4v', 'ogv'].includes(format));
     const options = series.inherited_terms?.license_options || [];
     document.title = `${asset.title} | PiXiEEDマーケット`;
     const canonical = document.querySelector('link[rel="canonical"]');
     if (canonical) canonical.href = `https://pixieed.jp/market/items/${encodeURIComponent(asset.id)}/`;
     $('itemTitle').textContent = asset.title || '名称未設定の素材';
     $('itemDescription').textContent = asset.description || '説明はありません。';
-    $('itemPrice').textContent = yen(asset.sale_price_yen);
+    $('itemPrice').textContent = isAcquisitionEnabled(asset) ? yen(asset.sale_price_yen) : '公開のみ';
     $('itemFormats').textContent = formats.map((format) => labels[format] || format).join(' / ');
     $('itemProductType').textContent = isPixieeDrawProduct(asset)
       ? 'iDRAW作品（編集用プロジェクト入り）'
       : hasAudio && hasDraw
         ? 'iDRAW + iAUDIO素材（絵と音楽）'
+        : hasText && hasVideo
+          ? '文章・世界観 + 動画素材'
+          : hasText && hasDraw
+            ? '文章・世界観 + 画像素材'
+            : hasText
+              ? '文章・世界観素材'
+              : hasVideo && hasAudio
+                ? '動画 + iAUDIO素材'
+                : hasVideo
+                  ? '動画素材'
         : hasAudio
           ? 'iAUDIO素材（音楽・SE）'
           : '一般素材（画像・アニメーション）';
     const limitedQuantity = Number(asset.limited_quantity);
     const limitedSold = Math.max(0, Number(asset.limited_sold_count || 0));
-    $('itemAvailability').textContent = asset.withdrawn_at
+    $('itemAvailability').textContent = !isAcquisitionEnabled(asset)
+      ? '公開のみ・取得不可'
+      : asset.withdrawn_at
       ? '出品者による取り下げ・売り切れ'
       : Number.isInteger(limitedQuantity) && limitedQuantity > 0
       ? (isSoldOut(asset) ? `先着${limitedQuantity.toLocaleString('ja-JP')}名・売り切れ` : `先着${limitedQuantity.toLocaleString('ja-JP')}名・残り${Math.max(0, limitedQuantity - limitedSold).toLocaleString('ja-JP')}`)
@@ -348,6 +377,30 @@
     }
   }
 
+  async function acquireFreeAsset() {
+    if (!purchaseClient || !purchaseUser || !currentAsset) return;
+    setPurchaseState({ disabled: true, label: '無料取得を処理中', status: '無料Assetの取得記録と利用権をサーバーで発行しています。' });
+    try {
+      const { data, error } = await purchaseClient.rpc('market_acquire_free_asset_v1', {
+        input_asset_id: currentAsset.id
+      });
+      if (error || !data?.ok) throw new Error(error?.message || '無料取得を完了できませんでした');
+      setPurchaseState({
+        disabled: true,
+        label: '無料取得済み',
+        status: data.already_available
+          ? 'このAssetは取得済みです。マイページから確認できます。'
+          : '無料取得しました。マイページから出力し、iGAMEのAsset一覧から使用できます。'
+      });
+    } catch (error) {
+      setPurchaseState({
+        disabled: false,
+        label: '無料で取得',
+        status: `無料取得を完了できませんでした: ${error.message || '時間をおいて再試行してください'}`
+      });
+    }
+  }
+
   async function waitForPaidPurchase() {
     for (let attempt = 0; attempt < 12; attempt += 1) {
       const purchase = await findExistingPurchase();
@@ -399,6 +452,10 @@
 
   async function initPurchase() {
     if (!currentAsset) return;
+    if (!isAcquisitionEnabled(currentAsset)) {
+      setPurchaseState({ disabled: true, label: '公開のみ', status: 'この作品は閲覧専用です。購入・無料取得・iGAMEへの取得はできません。' });
+      return;
+    }
     if (window.location.protocol === 'file:') {
       setPurchaseState({ disabled: true, label: 'HTTPで購入確認できます', status: 'ローカルファイル表示ではログイン状態を確認できません。' });
       return;
@@ -424,7 +481,14 @@
         return;
       }
       if (existingPurchase?.status === 'granted') {
-        setPurchaseState({ disabled: true, label: '管理者取得済み', status: '管理者として無料取得済みです。マイページから確認できます。' });
+        const isFreeAcquisition = existingPurchase.payment_provider === 'free_acquisition';
+        setPurchaseState({
+          disabled: true,
+          label: isFreeAcquisition ? '無料取得済み' : '管理者取得済み',
+          status: isFreeAcquisition
+            ? '無料取得済みです。マイページから確認できます。'
+            : '管理者として無料取得済みです。マイページから確認できます。'
+        });
         return;
       }
       if (existingPurchase?.status === 'disputed') {
@@ -449,6 +513,11 @@
           status: 'Stripe決済を行わず取得できます。販売数・限定販売枠・売上には加算されません。'
         });
         $('itemPurchase').addEventListener('click', grantAdminAccess);
+        return;
+      }
+      if (Number(currentAsset.sale_price_yen || 0) === 0) {
+        setPurchaseState({ disabled: false, label: '無料で取得', status: '無料で取得すると、マイページとiGAMEのAsset一覧からすぐに使用できます。' });
+        $('itemPurchase').addEventListener('click', acquireFreeAsset);
         return;
       }
       if (Number(currentAsset.sale_price_yen || 0) < 500) {

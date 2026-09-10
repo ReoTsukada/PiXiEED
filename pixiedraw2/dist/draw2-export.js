@@ -439,6 +439,10 @@ function isValidRegionSelection(region) {
   if (region.kind === "GRID") return (region.cellSize === 16 || region.cellSize === 32) && isPositiveInteger(region.columns) && isPositiveInteger(region.rows);
   return isPositiveInteger(region.cellWidth) && isPositiveInteger(region.cellHeight) && isPositiveInteger(region.columns) && isPositiveInteger(region.rows);
 }
+function isValidRasterSnapshot(snapshot) {
+  if (!isPositiveInteger(snapshot.width) || !isPositiveInteger(snapshot.height) || !Array.isArray(snapshot.data) || snapshot.data.length !== snapshot.width * snapshot.height * 4) return false;
+  return snapshot.data.every((value) => Number.isSafeInteger(value) && value >= 0 && value <= 255);
+}
 function isValidAnimationMapping(mapping) {
   const seenKeys = /* @__PURE__ */ new Set();
   return mapping.every((clip) => {
@@ -455,7 +459,7 @@ function isValidAnimationMapping(mapping) {
     if (clip.sourceReference !== void 0 && clip.sourceReference.trim().length === 0) return false;
     if (clip.flipX !== void 0 && typeof clip.flipX !== "boolean") return false;
     if (clip.flipY !== void 0 && typeof clip.flipY !== "boolean") return false;
-    if (clip.sourceFrames !== void 0 && (clip.sourceFrames.length !== clip.frameIds.length || clip.sourceFrames.some((frame) => frame.sourceFrameId.trim().length === 0 || normalizeReferences(frame.layerIds).length === 0 || !Number.isSafeInteger(frame.rect.x) || !Number.isSafeInteger(frame.rect.y) || frame.rect.x < 0 || frame.rect.y < 0 || !isPositiveInteger(frame.rect.width) || !isPositiveInteger(frame.rect.height) || frame.durationMs !== void 0 && (!Number.isFinite(frame.durationMs) || frame.durationMs <= 0) || frame.flipX !== void 0 && typeof frame.flipX !== "boolean" || frame.flipY !== void 0 && typeof frame.flipY !== "boolean"))) return false;
+    if (clip.sourceFrames !== void 0 && (clip.sourceFrames.length !== clip.frameIds.length || clip.sourceFrames.some((frame) => frame.sourceFrameId.trim().length === 0 || normalizeReferences(frame.layerIds).length === 0 || !Number.isSafeInteger(frame.rect.x) || !Number.isSafeInteger(frame.rect.y) || frame.rect.x < 0 || frame.rect.y < 0 || !isPositiveInteger(frame.rect.width) || !isPositiveInteger(frame.rect.height) || frame.rasterSnapshot !== void 0 && !isValidRasterSnapshot(frame.rasterSnapshot) || frame.durationMs !== void 0 && (!Number.isFinite(frame.durationMs) || frame.durationMs <= 0) || frame.flipX !== void 0 && typeof frame.flipX !== "boolean" || frame.flipY !== void 0 && typeof frame.flipY !== "boolean"))) return false;
     if (clip.frameDurationsMs !== void 0 && (clip.frameDurationsMs.length !== clip.frameIds.length || clip.frameDurationsMs.some((duration) => !Number.isFinite(duration) || duration <= 0))) return false;
     return [
       "LOOP",
@@ -642,6 +646,67 @@ var DrawAudioReferenceStore = class {
     ].sort((left, right) => left.startFrame - right.startFrame || left.id.localeCompare(right.id));
   }
 };
+var MAX_SELECTION_STAMP_DIMENSION = 4096;
+var MAX_SELECTION_STAMP_AREA = 1048576;
+function normalizeDraw2SelectionStamp(input) {
+  if (typeof input.id !== "string" || typeof input.name !== "string" || !Array.isArray(input.pixels) || !Array.isArray(input.palette)) {
+    throw new Error("Draw2 selection stamp shape is invalid.");
+  }
+  if (!Number.isSafeInteger(input.width) || !Number.isSafeInteger(input.height) || input.width < 1 || input.height < 1 || input.width > MAX_SELECTION_STAMP_DIMENSION || input.height > MAX_SELECTION_STAMP_DIMENSION || input.width * input.height > MAX_SELECTION_STAMP_AREA) {
+    throw new Error("Draw2 selection stamp dimensions are invalid.");
+  }
+  if (input.palette.length < 1 || input.palette.length > 256) {
+    throw new Error("Draw2 selection stamp palette is invalid.");
+  }
+  const palette = input.palette.map((color) => {
+    if (!Number.isSafeInteger(color) || color < 0 || color > 4294967295) throw new Error("Draw2 selection stamp palette color is invalid.");
+    return color >>> 0;
+  });
+  const pixels = /* @__PURE__ */ new Map();
+  for (const candidate of input.pixels) {
+    if (candidate === null || typeof candidate !== "object" || !Number.isSafeInteger(candidate.x) || !Number.isSafeInteger(candidate.y) || !Number.isSafeInteger(candidate.colorIndex) || candidate.x < 0 || candidate.y < 0 || candidate.x >= input.width || candidate.y >= input.height || candidate.colorIndex < 0 || candidate.colorIndex >= palette.length) {
+      throw new Error("Draw2 selection stamp pixel is invalid.");
+    }
+    pixels.set(`${candidate.x}:${candidate.y}`, {
+      x: candidate.x,
+      y: candidate.y,
+      colorIndex: candidate.colorIndex
+    });
+  }
+  return {
+    id: stableId(input.id, "Draw2 selection stamp ID"),
+    name: input.name.trim().slice(0, 64) || "Selection stamp",
+    width: input.width,
+    height: input.height,
+    pixels: [
+      ...pixels.values()
+    ].sort((left, right) => left.y - right.y || left.x - right.x),
+    palette,
+    schemaVersion: CREATOR_FEATURE_SCHEMA_VERSION
+  };
+}
+var Draw2SelectionStampStore = class {
+  #stamps = /* @__PURE__ */ new Map();
+  constructor(initial = []) {
+    for (const stamp of initial) this.save(stamp);
+  }
+  save(input) {
+    const stamp = normalizeDraw2SelectionStamp(input);
+    this.#stamps.set(stamp.id, stamp);
+    return stamp;
+  }
+  load(id) {
+    return this.#stamps.get(id);
+  }
+  remove(id) {
+    return this.#stamps.delete(id);
+  }
+  list() {
+    return [
+      ...this.#stamps.values()
+    ].sort((left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id));
+  }
+};
 var DRAW2_TIMELINE_METADATA_SCHEMA_VERSION = 2;
 function isMetadataRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -673,6 +738,10 @@ function normalizeDraw2TimelineMetadata(value, frameCount) {
   }
   if (!Array.isArray(value.animationTags) || !Array.isArray(value.markers) || !Array.isArray(value.audioReferences)) {
     throw new Error("Draw2 timeline metadata collections are invalid.");
+  }
+  const selectionStampCandidates = value.selectionStamps;
+  if (selectionStampCandidates !== void 0 && !Array.isArray(selectionStampCandidates)) {
+    throw new Error("Draw2 selection stamp collection is invalid.");
   }
   const tags = new AnimationTagStore();
   const tagIds = /* @__PURE__ */ new Set();
@@ -713,6 +782,19 @@ function normalizeDraw2TimelineMetadata(value, frameCount) {
     audioReferenceIds.add(candidate.id);
     audioReferences.upsert(candidate, frameCount);
   }
+  const selectionStamps = new Draw2SelectionStampStore();
+  const selectionStampIds = /* @__PURE__ */ new Set();
+  for (const candidate of selectionStampCandidates ?? []) {
+    if (candidate === null || typeof candidate !== "object" || typeof candidate.id !== "string") {
+      throw new Error("Draw2 selection stamp is invalid.");
+    }
+    const normalized = normalizeDraw2SelectionStamp(candidate);
+    if (selectionStampIds.has(normalized.id)) {
+      throw new Error("Draw2 selection stamp identity is duplicated.");
+    }
+    selectionStampIds.add(normalized.id);
+    selectionStamps.save(normalized);
+  }
   return {
     schemaVersion: DRAW2_TIMELINE_METADATA_SCHEMA_VERSION,
     animationTags: tags.list().map((tag) => ({
@@ -721,8 +803,168 @@ function normalizeDraw2TimelineMetadata(value, frameCount) {
     markers: markers.list().map(cloneTimelineMarker),
     audioReferences: audioReferences.list().map((reference) => ({
       ...reference
-    }))
+    })),
+    ...selectionStampCandidates === void 0 ? {} : {
+      selectionStamps: selectionStamps.list().map((stamp) => ({
+        ...stamp,
+        pixels: stamp.pixels.map((pixel) => ({
+          ...pixel
+        })),
+        palette: [
+          ...stamp.palette
+        ]
+      }))
+    }
   };
+}
+
+// src/game/game-350/assetization.ts
+var ASSET_PACKAGE_SCHEMA_VERSION = 1;
+var ASSETIZATION_CONTRACT_VERSION = "PIXIEED_ASSETIZATION_V1";
+function isRecord(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+function packageText(value, maxLength) {
+  if (typeof value !== "string") return void 0;
+  const normalized = value.trim();
+  return normalized.length <= maxLength ? normalized : void 0;
+}
+function canonicalPackageValue(value) {
+  if (Array.isArray(value)) return value.map(canonicalPackageValue);
+  if (isRecord(value)) {
+    return Object.fromEntries(Object.keys(value).sort().map((key) => [
+      key,
+      canonicalPackageValue(value[key])
+    ]));
+  }
+  return value;
+}
+async function sha256PackageBody(value) {
+  const bytes = new TextEncoder().encode(JSON.stringify(canonicalPackageValue(packageBody(value))));
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return `sha256:${Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+}
+function packageBody(manifest) {
+  return {
+    schemaVersion: manifest.schemaVersion,
+    detectorVersion: manifest.detectorVersion,
+    confirmationRevision: manifest.confirmationRevision,
+    title: manifest.title,
+    description: manifest.description,
+    offerKind: manifest.offerKind,
+    derivativePolicy: manifest.derivativePolicy,
+    sellerId: manifest.sellerId ?? null,
+    entries: manifest.entries
+  };
+}
+function sourceReasons(source) {
+  const reasons = [];
+  if (!isRecord(source)) return [
+    "source is required"
+  ];
+  const kind = source.kind;
+  if (kind !== "DRAW" && kind !== "AUDIO") reasons.push("source kind is unsupported");
+  if (packageText(typeof source.sourceId === "string" ? source.sourceId : void 0, 256) === void 0) reasons.push("sourceId is required");
+  if (packageText(typeof source.projectId === "string" ? source.projectId : void 0, 256) === void 0) reasons.push("source projectId is required");
+  if (packageText(typeof source.revisionId === "string" ? source.revisionId : void 0, 256) === void 0) reasons.push("source revisionId is required");
+  if (packageText(typeof source.contentHash === "string" ? source.contentHash : void 0, 512) === void 0) reasons.push("source contentHash is required");
+  if (kind === "DRAW" && packageText(typeof source.canvasId === "string" ? source.canvasId : void 0, 256) === void 0) reasons.push("Draw source canvasId is required");
+  return reasons;
+}
+function proposalSourceMatches(source, proposal) {
+  if (!isRecord(source) || !isRecord(proposal)) return false;
+  if (source.kind === "DRAW" && (proposal.kind === "SPRITE" || proposal.kind === "ANIMATION")) {
+    return typeof source.projectId === "string" && typeof source.revisionId === "string" && typeof source.contentHash === "string" && typeof source.canvasId === "string" && proposal.sourceProjectId === source.projectId.trim() && proposal.sourceRevisionId === source.revisionId.trim() && proposal.contentHash === source.contentHash.trim() && proposal.sourceCanvasId === source.canvasId.trim();
+  }
+  if (source.kind === "AUDIO" && proposal.kind === "AUDIO") {
+    return typeof source.sourceId === "string" && typeof source.projectId === "string" && typeof source.revisionId === "string" && typeof source.contentHash === "string" && proposal.sourceProjectId === source.projectId.trim() && proposal.sourceRevisionId === source.revisionId.trim() && proposal.contentHash === source.contentHash.trim() && proposal.rangeId === source.sourceId.trim();
+  }
+  return false;
+}
+function packageStructureReasons(manifest) {
+  const reasons = [];
+  if (manifest.schemaVersion !== ASSET_PACKAGE_SCHEMA_VERSION) reasons.push("unsupported package schemaVersion");
+  if (manifest.status !== "FINALIZED") reasons.push("package status must be FINALIZED");
+  if (manifest.detectorVersion !== ASSETIZATION_CONTRACT_VERSION) reasons.push("unsupported detectorVersion");
+  if (packageText(manifest.confirmationRevision, 256) === void 0 || manifest.confirmationRevision.trim().length === 0) reasons.push("confirmationRevision is required");
+  if (packageText(manifest.packageId, 256) === void 0 || manifest.packageId.trim().length === 0) reasons.push("packageId is required");
+  if (!/^sha256:[0-9a-f]{64}$/u.test(manifest.packageHash)) reasons.push("packageHash must be a SHA-256 hash");
+  if (packageText(manifest.title, 128) === void 0 || manifest.title.trim().length === 0) reasons.push("title is required");
+  if (packageText(manifest.description, 4096) === void 0) reasons.push("description is invalid");
+  if (manifest.offerKind !== "ASSET" && manifest.offerKind !== "ASSET_PACK") reasons.push("offerKind is invalid");
+  if (![
+    "USE_ONLY",
+    "DERIVATIVE_ALLOWED",
+    "REDISTRIBUTION_ALLOWED"
+  ].includes(manifest.derivativePolicy)) reasons.push("derivativePolicy is invalid");
+  if (manifest.sellerId !== void 0 && (packageText(manifest.sellerId, 256) === void 0 || manifest.sellerId.trim().length === 0)) reasons.push("sellerId is invalid");
+  const expectedReadiness = manifest.sellerId === void 0 ? "ACCOUNT_REQUIRED" : "READY";
+  if (manifest.saleReadiness !== expectedReadiness) reasons.push("saleReadiness does not match sellerId");
+  const rawEntries = manifest.entries;
+  const entries = Array.isArray(rawEntries) ? rawEntries : [];
+  if (!Array.isArray(rawEntries) || entries.length === 0) reasons.push("at least one package entry is required");
+  if (manifest.offerKind === "ASSET" && entries.length !== 1) reasons.push("ASSET must contain exactly one entry");
+  if (manifest.offerKind === "ASSET_PACK" && entries.length < 2) reasons.push("ASSET_PACK must contain at least two entries");
+  const entryIds = /* @__PURE__ */ new Set();
+  for (const [index, entry] of entries.entries()) {
+    if (!isRecord(entry)) {
+      reasons.push(`entry ${index} is invalid`);
+      continue;
+    }
+    const entryId = typeof entry.entryId === "string" ? entry.entryId : "";
+    if (entryId.trim().length === 0 || entryIds.has(entryId)) reasons.push(`entry ${index} has a duplicate or empty entryId`);
+    entryIds.add(entryId);
+    if (entry.kind !== "DRAW" && entry.kind !== "AUDIO") reasons.push(`entry ${index} kind is invalid`);
+    if (typeof entry.label !== "string" || entry.label.trim().length === 0 || entry.label.length > 128) reasons.push(`entry ${index} label is invalid`);
+    reasons.push(...sourceReasons(entry.source).map((reason) => `entry ${index}: ${reason}`));
+    if (!isRecord(entry.proposal)) {
+      reasons.push(`entry ${index} proposal is invalid`);
+      continue;
+    }
+    if (entry.kind === "DRAW") {
+      if (entry.proposal.kind !== "SPRITE" && entry.proposal.kind !== "ANIMATION") reasons.push(`entry ${index} Draw proposal is invalid`);
+      else if (!proposalSourceMatches(entry.source, entry.proposal)) reasons.push(`entry ${index} Draw proposal source mismatch`);
+    } else if (entry.proposal.kind !== "AUDIO" || !proposalSourceMatches(entry.source, entry.proposal)) {
+      reasons.push(`entry ${index} Audio proposal source mismatch`);
+    }
+  }
+  return reasons;
+}
+function validateAssetPackageManifest(value) {
+  if (!isRecord(value)) return {
+    ok: false,
+    reasons: [
+      "package manifest must be an object"
+    ]
+  };
+  const manifest = value;
+  const reasons = packageStructureReasons(manifest);
+  return reasons.length === 0 ? {
+    ok: true,
+    value: manifest
+  } : {
+    ok: false,
+    reasons
+  };
+}
+async function verifyAssetPackageManifest(manifest) {
+  const structure = validateAssetPackageManifest(manifest);
+  if (!structure.ok) return structure;
+  const expectedHash = await sha256PackageBody(manifest);
+  if (expectedHash !== manifest.packageHash) return {
+    ok: false,
+    reasons: [
+      "packageHash does not match the finalized manifest"
+    ]
+  };
+  const expectedPackageId = `asset-package:${expectedHash.slice("sha256:".length, "sha256:".length + 24)}`;
+  if (expectedPackageId !== manifest.packageId) return {
+    ok: false,
+    reasons: [
+      "packageId does not match the packageHash"
+    ]
+  };
+  return structure;
 }
 
 // src/draw2-export-registry.ts
@@ -2019,16 +2261,19 @@ function manifestWithoutHash(value) {
 function packageFileName(projectId) {
   return `${projectId.replace(/[^A-Za-z0-9._-]+/gu, "-") || "pixieed-project"}.pxd`;
 }
-function isRecord(value) {
+function isRecord2(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
-function assertNoEmbeddedAssetPayload(value, path) {
+function assertNoEmbeddedAssetPayload(value, path, allowRasterSnapshots = false) {
   if (Array.isArray(value)) {
-    value.forEach((entry, index) => assertNoEmbeddedAssetPayload(entry, `${path}[${index}]`));
+    value.forEach((entry, index) => assertNoEmbeddedAssetPayload(entry, `${path}[${index}]`, allowRasterSnapshots));
     return;
   }
-  if (!isRecord(value)) return;
+  if (!isRecord2(value)) return;
   for (const [key, entry] of Object.entries(value)) {
+    if (allowRasterSnapshots && key === "rasterSnapshot") {
+      continue;
+    }
     assert(![
       "pixels",
       "pixelData",
@@ -2039,11 +2284,11 @@ function assertNoEmbeddedAssetPayload(value, path) {
       "indexedBytes",
       "payload"
     ].includes(key), "PXD_ASSET_DEFINITION_EMBEDDED_DATA", `${path}.${key} must not contain embedded asset data.`);
-    assertNoEmbeddedAssetPayload(entry, `${path}.${key}`);
+    assertNoEmbeddedAssetPayload(entry, `${path}.${key}`, allowRasterSnapshots);
   }
 }
 function assertAssetDefinitionShape(value, path) {
-  assert(isRecord(value), "PXD_ASSET_DEFINITION_INVALID", `${path} must be an object.`);
+  assert(isRecord2(value), "PXD_ASSET_DEFINITION_INVALID", `${path} must be an object.`);
   const definition = value;
   assert(definition.schemaVersion === 1, "PXD_ASSET_DEFINITION_VERSION_UNSUPPORTED", `${path}.schemaVersion is unsupported.`);
   assert(definition.persistence === "LOCAL_DRAFT" || definition.persistence === "VALIDATED_DEFINITION", "PXD_ASSET_DEFINITION_PERSISTENCE_INVALID", `${path}.persistence must be LOCAL_DRAFT or VALIDATED_DEFINITION.`);
@@ -2061,12 +2306,12 @@ function assertAssetDefinitionShape(value, path) {
 }
 function validateAssetDefinitionEntry(value, index) {
   const path = `assetDefinitions[${index}]`;
-  assert(isRecord(value), "PXD_ASSET_DEFINITION_INVALID", `${path} must be an object.`);
-  assertNoEmbeddedAssetPayload(value, path);
+  assert(isRecord2(value), "PXD_ASSET_DEFINITION_INVALID", `${path} must be an object.`);
+  assertNoEmbeddedAssetPayload(value, path, true);
   assert(typeof value.definitionId === "string" && value.definitionId.trim() === value.definitionId && value.definitionId.length > 0, "PXD_ASSET_DEFINITION_ID_INVALID", `${path}.definitionId is invalid.`);
   assertAssetDefinitionShape(value.definition, `${path}.definition`);
   if (value.registryIdentity !== void 0) {
-    assert(isRecord(value.registryIdentity), "PXD_REGISTRY_IDENTITY_INVALID", `${path}.registryIdentity is invalid.`);
+    assert(isRecord2(value.registryIdentity), "PXD_REGISTRY_IDENTITY_INVALID", `${path}.registryIdentity is invalid.`);
     assert(typeof value.registryIdentity.assetId === "string" && value.registryIdentity.assetId.trim() === value.registryIdentity.assetId && value.registryIdentity.assetId.length > 0, "PXD_REGISTRY_IDENTITY_INVALID", `${path}.registryIdentity.assetId is invalid.`);
     assert(typeof value.registryIdentity.revisionId === "string" && value.registryIdentity.revisionId.trim() === value.registryIdentity.revisionId && value.registryIdentity.revisionId.length > 0, "PXD_REGISTRY_IDENTITY_INVALID", `${path}.registryIdentity.revisionId is invalid.`);
   }
@@ -2113,7 +2358,7 @@ function normalizePxdProductReferences(value, path) {
 }
 function normalizePxdProductDefinition(value, index, assetDefinitionIds, audioRevisionIds, availableModules) {
   const path = `productDefinitions[${index}]`;
-  assert(isRecord(value), "PXD_PRODUCT_DEFINITION_INVALID", `${path} must be an object.`);
+  assert(isRecord2(value), "PXD_PRODUCT_DEFINITION_INVALID", `${path} must be an object.`);
   assertNoEmbeddedAssetPayload(value, path);
   const allowedKeys = /* @__PURE__ */ new Set([
     "schemaVersion",
@@ -2158,7 +2403,7 @@ function normalizePxdProductDefinition(value, index, assetDefinitionIds, audioRe
   const rights = normalizePxdProductReferences(value.rights, `${path}.rights`);
   assert(rights.every((right) => PXD_PRODUCT_RIGHTS.includes(right)), "PXD_PRODUCT_RIGHT_INVALID", `${path}.rights contains an unsupported right.`);
   assert(rights.length > 0, "PXD_PRODUCT_RIGHT_REQUIRED", `${path}.rights must not be empty.`);
-  assert(isRecord(value.edition), "PXD_PRODUCT_EDITION_INVALID", `${path}.edition is invalid.`);
+  assert(isRecord2(value.edition), "PXD_PRODUCT_EDITION_INVALID", `${path}.edition is invalid.`);
   const editionValue = value.edition;
   let edition;
   if (editionValue.kind === "UNLIMITED") {
@@ -2199,6 +2444,22 @@ function normalizePxdProductDefinitions(entries, assetDefinitions, audioRevision
   normalized.sort((left, right) => compareStrings(left.productId, right.productId));
   for (let index = 1; index < normalized.length; index += 1) {
     assert(normalized[index - 1]?.productId !== normalized[index]?.productId, "PXD_PRODUCT_DEFINITION_DUPLICATE", `Product Definition ${normalized[index]?.productId ?? ""} is duplicated.`);
+  }
+  return normalized;
+}
+function normalizePxdAssetPackages(entries) {
+  const normalized = [
+    ...entries ?? []
+  ].map((entry, index) => {
+    const checked = validateAssetPackageManifest(entry);
+    if (!checked.ok) {
+      assert(false, "PXD_ASSET_PACKAGE_INVALID", `assetPackages[${index}] is invalid: ${checked.reasons.join("; ")}`);
+    }
+    return entry;
+  });
+  normalized.sort((left, right) => compareStrings(left.packageId, right.packageId));
+  for (let index = 1; index < normalized.length; index += 1) {
+    assert(normalized[index - 1]?.packageId !== normalized[index]?.packageId, "PXD_ASSET_PACKAGE_DUPLICATE", `Asset Package ${normalized[index]?.packageId ?? ""} is duplicated.`);
   }
   return normalized;
 }
@@ -2476,6 +2737,13 @@ function emptyProjectModule() {
 }
 async function exportPxdProject(state, options = {}) {
   const assetDefinitions = normalizeAssetDefinitions(options.assetDefinitions);
+  const assetPackages = normalizePxdAssetPackages(options.assetPackages);
+  for (const [index, packageManifest] of assetPackages.entries()) {
+    const verified = await verifyAssetPackageManifest(packageManifest);
+    if (!verified.ok) {
+      assert(false, "PXD_ASSET_PACKAGE_HASH_INVALID", `assetPackages[${index}] could not be verified: ${verified.reasons.join("; ")}`);
+    }
+  }
   const drawTimelineMetadata = options.drawTimelineMetadata === void 0 ? void 0 : normalizeDraw2TimelineMetadata(options.drawTimelineMetadata, state.frames.length);
   const payloadSpecs = [];
   const drawAssetSpecs = [];
@@ -2621,6 +2889,9 @@ async function exportPxdProject(state, options = {}) {
       drawTimelineMetadata
     },
     productDefinitions,
+    ...assetPackages.length === 0 ? {} : {
+      assetPackages
+    },
     dependencies: []
   };
   const packageId = `pxd_${(await sha256BytesHex(new TextEncoder().encode(canonicalJson(content)))).slice(0, 32)}`;
@@ -2749,6 +3020,13 @@ function validateProjectManifest(value) {
   if (manifest.productDefinitions !== void 0) {
     assert(canonicalJson(productDefinitions) === canonicalJson(manifest.productDefinitions), "PXD_PRODUCT_DEFINITION_NOT_NORMALIZED", "PXD productDefinitions must be canonically normalized.");
   }
+  if (manifest.assetPackages !== void 0) {
+    assert(Array.isArray(manifest.assetPackages), "PXD_ASSET_PACKAGE_INVALID", "PXD assetPackages must be an array.");
+  }
+  const assetPackages = normalizePxdAssetPackages(manifest.assetPackages);
+  if (manifest.assetPackages !== void 0) {
+    assert(canonicalJson(assetPackages) === canonicalJson(manifest.assetPackages), "PXD_ASSET_PACKAGE_NOT_NORMALIZED", "PXD assetPackages must be canonically normalized.");
+  }
   const entryPaths = new Set(entries.map((entry) => entry.path));
   for (const asset of drawAssets) assert(entryPaths.has(asset.path), "PXD_ENTRY_MISSING", `PXD Draw entry ${asset.path} is missing.`);
   for (const module of [
@@ -2768,7 +3046,10 @@ function validateProjectManifest(value) {
       audio,
       game
     },
-    entries
+    entries,
+    ...manifest.assetPackages === void 0 ? {} : {
+      assetPackages
+    }
   };
 }
 function parseProjectJsonPayload(entry, payloads) {
@@ -2806,6 +3087,12 @@ async function importPxdProject(bytes, options = {}) {
   delete manifestBase.canonicalManifestHash;
   const actualManifestHash = await sha256BytesHex(new TextEncoder().encode(canonicalJson(manifestBase)));
   assert(actualManifestHash === manifest.canonicalManifestHash, "PXD_MANIFEST_HASH_MISMATCH", "PXD project manifest hash does not match its contents.");
+  for (const [index, packageManifest] of (manifest.assetPackages ?? []).entries()) {
+    const verified = await verifyAssetPackageManifest(packageManifest);
+    if (!verified.ok) {
+      assert(false, "PXD_ASSET_PACKAGE_HASH_INVALID", `assetPackages[${index}] could not be verified: ${verified.reasons.join("; ")}`);
+    }
+  }
   const packageHash = await sha256BytesHex(bytes);
   if (options.expectedPackageHash !== void 0) assert(packageHash === options.expectedPackageHash, "PXD_PACKAGE_HASH_MISMATCH", "PXD package hash does not match the expected hash.");
   const payloads = /* @__PURE__ */ new Map();
@@ -2893,6 +3180,7 @@ async function importPxdProject(bytes, options = {}) {
     assetDefinitions,
     drawTimelineMetadata: manifest.drawTimelineMetadata === void 0 ? normalizeDraw2TimelineMetadata(void 0, state.frames.length) : normalizeDraw2TimelineMetadata(manifest.drawTimelineMetadata, state.frames.length),
     productDefinitions: manifest.productDefinitions === void 0 ? [] : manifest.productDefinitions,
+    assetPackages: manifest.assetPackages === void 0 ? [] : manifest.assetPackages,
     audio,
     game
   };

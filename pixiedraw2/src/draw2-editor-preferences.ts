@@ -9,6 +9,11 @@
  * Playback mode and rate are safe editor preferences and are kept below.
  */
 
+import {
+  MAX_BRUSH_SIZE,
+  type BrushAlgorithm,
+} from "./draw2-brush.ts";
+
 export const DRAW2_EDITOR_PREFERENCES_STORAGE_KEY =
   "pixieed:draw2:editor-preferences:v1" as const;
 
@@ -50,6 +55,8 @@ export interface Draw2EditorPreferences {
   readonly tool: string;
   readonly brushSize: number;
   readonly brushShape: string;
+  readonly brushAngle: number;
+  readonly brushAlgorithm: BrushAlgorithm;
   readonly brushPattern: string;
   readonly similarityPercent: number;
   readonly colorSelectionMode: string;
@@ -95,6 +102,8 @@ export const DEFAULT_DRAW2_EDITOR_PREFERENCES: Draw2EditorPreferences = {
   tool: "pen",
   brushSize: 1,
   brushShape: "square",
+  brushAngle: 0,
+  brushAlgorithm: "regular",
   brushPattern: "solid",
   similarityPercent: 0,
   colorSelectionMode: "similar",
@@ -183,6 +192,18 @@ function normalizeProjectPreferences(
   };
 }
 
+/**
+ * The dedicated one-pixel pen, polygon selection, and tile stamp are no
+ * longer exposed as iDRAW tools.  Old preference records are normalized at
+ * the boundary so a removed UI item can never strand the editor on startup.
+ */
+function normalizeToolPreference(value: unknown): string {
+  if (value === "pixel-pen") return "pen";
+  if (value === "select-polygon") return "select-lasso";
+  if (value === "tile-stamp") return "pen";
+  return typeof value === "string" && value.trim().length > 0 ? value : "pen";
+}
+
 function normalizePreferences(value: unknown): Draw2EditorPreferences {
   const source = asRecord(value);
   const projectsSource = asRecord(source.projects);
@@ -203,11 +224,15 @@ function normalizePreferences(value: unknown): Draw2EditorPreferences {
     ? source.playbackFps
     : "24";
   return {
-    tool: typeof source.tool === "string" ? source.tool : "pen",
-    brushSize: boundedInteger(source.brushSize, 1, 32, 1),
+    tool: normalizeToolPreference(source.tool),
+    brushSize: boundedInteger(source.brushSize, 1, MAX_BRUSH_SIZE, 1),
     brushShape: typeof source.brushShape === "string"
       ? source.brushShape
       : "square",
+    brushAngle: boundedInteger(source.brushAngle, -180, 180, 0),
+    brushAlgorithm: source.brushAlgorithm === "pixel-perfect"
+      ? "pixel-perfect"
+      : "regular",
     brushPattern: typeof source.brushPattern === "string"
       ? source.brushPattern
       : "solid",

@@ -51,12 +51,28 @@ export interface GameAnimationClipReference {
   readonly clipKey: string;
   readonly clip: AssetAnimationClip;
   readonly motionName: string;
-  readonly direction?: string;
+  readonly direction?: string | undefined;
 }
 
 export interface UpsertGameAnimationBindingResult {
   readonly bindings: readonly GameAnimationBinding[];
   readonly changed: boolean;
+}
+
+/** Match runtime motion/direction against split or suffixed clip names. */
+export function gameAnimationClipMatchesRuntime(input: {
+  readonly clip: GameAnimationClipReference;
+  readonly motion: string;
+  readonly direction?: string | undefined;
+}): boolean {
+  const motion = input.motion.toUpperCase();
+  const candidateMotion = input.clip.motionName.toUpperCase();
+  const parts = candidateMotion.split("_");
+  const family = parts[0] ?? candidateMotion;
+  const candidateDirection = String(input.clip.direction ?? parts.slice(1).join("_")).toUpperCase();
+  const direction = input.direction?.toUpperCase();
+  return (candidateMotion === motion || family === motion) &&
+    (direction === undefined || candidateDirection === "" || candidateDirection === direction);
 }
 
 function searchable(values: readonly (string | undefined)[]): string {

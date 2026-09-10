@@ -26,6 +26,19 @@
     ['audio/mpeg', 'mp3'], ['audio/ogg', 'ogg'], ['audio/opus', 'opus'],
     ['audio/wav', 'wav'], ['audio/x-wav', 'wav'], ['audio/webm', 'weba']
   ]);
+  const TEXT_EXTENSIONS = new Set([
+    'txt', 'md', 'markdown', 'json', 'rtf', 'html', 'htm', 'csv'
+  ]);
+  const VIDEO_EXTENSIONS = new Set(['mp4', 'webm', 'mov', 'm4v', 'ogv']);
+  const TEXT_MIME_FORMATS = new Map([
+    ['text/plain', 'text'], ['text/markdown', 'markdown'], ['text/x-markdown', 'markdown'],
+    ['text/html', 'html'], ['text/csv', 'csv'], ['application/json', 'json'],
+    ['application/rtf', 'rtf'], ['text/rtf', 'rtf']
+  ]);
+  const VIDEO_MIME_FORMATS = new Map([
+    ['video/mp4', 'mp4'], ['video/webm', 'webm'], ['video/quicktime', 'mov'],
+    ['video/x-m4v', 'm4v'], ['video/ogg', 'ogv']
+  ]);
   let gifCodec = null;
 
   function readUint24LittleEndian(bytes, offset) {
@@ -74,6 +87,9 @@
     const isGif = hasSignature(bytes, [71, 73, 70, 56]);
     const isWebp = hasSignature(bytes, [82, 73, 70, 70])
       && bytes[8] === 87 && bytes[9] === 69 && bytes[10] === 66 && bytes[11] === 80;
+    const isFtyp = bytes.length >= 12 && hasSignature(bytes.slice(4, 8), [102, 116, 121, 112]);
+    const isWebm = hasSignature(bytes, [0x1a, 0x45, 0xdf, 0xa3]);
+    const isOgg = hasSignature(bytes, [79, 103, 103, 83]);
     const mimeType = String(file?.type || '').toLowerCase();
 
     // .pxd is the current PiXiEEDraw extension. Keep the prior extension as
@@ -88,6 +104,42 @@
     }
     if (AUDIO_EXTENSIONS.has(extension)) return extension;
     if (mimeType.startsWith('audio/')) return AUDIO_MIME_FORMATS.get(mimeType) || 'm4a';
+    if (VIDEO_EXTENSIONS.has(extension)) {
+      if ((extension === 'webm' && isWebm) || (extension === 'ogv' && isOgg)) return extension;
+      if (['mp4', 'mov', 'm4v'].includes(extension) && isFtyp) return extension;
+      return null;
+    }
+    if (mimeType.startsWith('video/')) {
+      const mapped = VIDEO_MIME_FORMATS.get(mimeType);
+      if (mapped === 'webm' && !isWebm) return null;
+      if (mapped === 'ogv' && !isOgg) return null;
+      if (['mp4', 'mov', 'm4v'].includes(mapped) && !isFtyp) return null;
+      return mapped || null;
+    }
+    if (TEXT_EXTENSIONS.has(extension) || TEXT_MIME_FORMATS.has(mimeType)) {
+      let decoded = '';
+      try {
+        if (bytes.some((value) => value === 0)) return null;
+        decoded = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+      } catch (_error) {
+        return null;
+      }
+      if (extension === 'md' || extension === 'markdown' || mimeType === 'text/markdown' || mimeType === 'text/x-markdown') return 'markdown';
+      if (extension === 'html' || extension === 'htm' || mimeType === 'text/html') return 'html';
+      if (extension === 'csv' || mimeType === 'text/csv') return 'csv';
+      if (extension === 'rtf' || mimeType === 'application/rtf' || mimeType === 'text/rtf') return 'rtf';
+      if (extension === 'json' || mimeType === 'application/json') {
+        try {
+          const parsed = JSON.parse(decoded);
+          if (parsed?.contentKind === 'NOVEL' || parsed?.contentAggregate?.novel?.contentKind === 'NOVEL') return 'novel-json';
+          if (parsed?.kind === 'pixieed-visual-project') return 'visual-project';
+        } catch (_error) {
+          return null;
+        }
+        return 'json';
+      }
+      return 'text';
+    }
     return null;
   }
 
@@ -96,6 +148,8 @@
     const extension = extensionOf(file);
     const mimeType = String(file?.type || '').toLowerCase();
     if (AUDIO_EXTENSIONS.has(detectedFormat) || mimeType.startsWith('audio/') || AUDIO_EXTENSIONS.has(extension)) return 'audio';
+    if (VIDEO_EXTENSIONS.has(detectedFormat) || mimeType.startsWith('video/') || VIDEO_EXTENSIONS.has(extension)) return 'video';
+    if (TEXT_EXTENSIONS.has(detectedFormat) || TEXT_MIME_FORMATS.has(mimeType) || TEXT_EXTENSIONS.has(extension)) return 'text';
     if (detectedFormat) return 'image';
     return 'other';
   }

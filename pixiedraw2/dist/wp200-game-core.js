@@ -2500,7 +2500,10 @@ var GAME_EVENT_CARD_KEYS = /* @__PURE__ */ new Set([
   "action",
   "message",
   "amount",
-  "audioTrackId"
+  "audioTrackId",
+  "itemId",
+  "recipeId",
+  "blockTypeId"
 ]);
 function isValidGameSceneRules(value) {
   if (!isRecord(value)) return false;
@@ -2508,6 +2511,7 @@ function isValidGameSceneRules(value) {
     "RPG_GRID",
     "ACTION_PLATFORM",
     "SCROLL_SIDE",
+    "DODGE_ARENA",
     "FREE"
   ].includes(String(value.runtimeFamily)) && [
     "NONE",
@@ -2537,15 +2541,21 @@ function isValidGameEventCard(value) {
     "TOUCH",
     "TAP",
     "INTERACT",
-    "REACH_GOAL"
+    "REACH_GOAL",
+    "HAS_ITEM"
   ].includes(String(value.condition)) && validReference(value.sourceTrackId) && validReference(value.targetTrackId) && [
     "SHOW_DIALOGUE",
     "DAMAGE",
     "SHAKE_CAMERA",
     "PLAY_AUDIO",
     "COMPLETE_SCENE",
-    "SET_VARIABLE"
-  ].includes(String(value.action)) && validText(value.message) && validReference(value.audioTrackId) && (value.amount === void 0 || typeof value.amount === "number" && Number.isFinite(value.amount) && value.amount >= 0 && value.amount <= 999999);
+    "SET_VARIABLE",
+    "GIVE_ITEM",
+    "TAKE_ITEM",
+    "CRAFT_ITEM",
+    "BREAK_BLOCK",
+    "PLACE_BLOCK"
+  ].includes(String(value.action)) && validText(value.message) && validReference(value.audioTrackId) && validReference(value.itemId) && validReference(value.recipeId) && validReference(value.blockTypeId) && (value.amount === void 0 || typeof value.amount === "number" && Number.isFinite(value.amount) && value.amount >= 0 && value.amount <= 999999);
 }
 var GAME_SCENE_RULES_SCHEMA_VERSION = 1;
 var GAME_TILEMAP_DOCUMENT_SCHEMA_VERSION = 1;
@@ -2591,7 +2601,8 @@ var GAME_TILEMAP_CELL_KEYS = /* @__PURE__ */ new Set([
   "x",
   "y",
   "collision",
-  "triggerId"
+  "triggerId",
+  "blockTypeId"
 ]);
 function isValidGameTilemapDocument(value) {
   if (!isRecord(value)) return false;
@@ -2599,7 +2610,7 @@ function isValidGameTilemapDocument(value) {
   const height = value.height;
   const tileSize = value.tileSize;
   const cells = value.cells;
-  if (Object.keys(value).some((key) => !GAME_TILEMAP_DOCUMENT_KEYS.has(key)) || value.schemaVersion !== GAME_TILEMAP_DOCUMENT_SCHEMA_VERSION || typeof value.mapId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(value.mapId) || !Number.isSafeInteger(width) || typeof width !== "number" || width < 1 || width > 256 || !Number.isSafeInteger(height) || typeof height !== "number" || height < 1 || height > 256 || !Number.isSafeInteger(tileSize) || typeof tileSize !== "number" || tileSize < 1 || tileSize > 4096 || !Array.isArray(cells) || cells.length > width * height) {
+  if (Object.keys(value).some((key) => !GAME_TILEMAP_DOCUMENT_KEYS.has(key)) || value.schemaVersion !== GAME_TILEMAP_DOCUMENT_SCHEMA_VERSION || typeof value.mapId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(value.mapId) || !Number.isSafeInteger(width) || typeof width !== "number" || width < 1 || width > Number.MAX_SAFE_INTEGER || !Number.isSafeInteger(height) || typeof height !== "number" || height < 1 || height > Number.MAX_SAFE_INTEGER || !Number.isSafeInteger(tileSize) || typeof tileSize !== "number" || tileSize < 1 || tileSize > 4096 || !Array.isArray(cells) || cells.length > width * height) {
     return false;
   }
   const seen = /* @__PURE__ */ new Set();
@@ -2609,7 +2620,10 @@ function isValidGameTilemapDocument(value) {
     const y = rawCell.y;
     const collision = rawCell.collision;
     const triggerId = rawCell.triggerId;
-    if (Object.keys(rawCell).some((key2) => !GAME_TILEMAP_CELL_KEYS.has(key2)) || !Number.isSafeInteger(x) || typeof x !== "number" || x < 0 || x >= width || !Number.isSafeInteger(y) || typeof y !== "number" || y < 0 || y >= height || collision !== "NONE" && collision !== "SOLID" || triggerId !== void 0 && (typeof triggerId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(triggerId)) || collision === "NONE" && triggerId === void 0) {
+    const blockTypeId = rawCell.blockTypeId;
+    if (Object.keys(rawCell).some((key2) => !GAME_TILEMAP_CELL_KEYS.has(key2)) || !Number.isSafeInteger(x) || typeof x !== "number" || x < 0 || x >= width || !Number.isSafeInteger(y) || typeof y !== "number" || y < 0 || y >= height || collision !== "NONE" && collision !== "SOLID" || triggerId !== void 0 && (typeof triggerId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(triggerId)) || blockTypeId !== void 0 && (typeof blockTypeId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(blockTypeId)) || // A cell with none of the three is indistinguishable from an absent
+    // (air) cell, so the sparse list rejects it to stay canonical.
+    collision === "NONE" && triggerId === void 0 && blockTypeId === void 0) {
       return false;
     }
     const key = `${x},${y}`;
@@ -2669,6 +2683,77 @@ function isValidGameAnimationBinding(value) {
     "ONCE",
     "PING_PONG"
   ].includes(String(value.loopMode)) && typeof value.flipX === "boolean" && typeof value.flipY === "boolean" && (value.mode === "LIVE" || value.mode === "PINNED") && (value.sourceAssetId === void 0 || id(value.sourceAssetId)) && (value.sourceRevisionId === void 0 || id(value.sourceRevisionId)) && (value.sourceContentHash === void 0 || typeof value.sourceContentHash === "string" && /^[a-f0-9]{64}$/u.test(value.sourceContentHash));
+}
+var GAME_ASSET_REVISION_REFERENCE_KEYS = /* @__PURE__ */ new Set([
+  "kind",
+  "assetId",
+  "revisionId",
+  "ownerId",
+  "contentHash",
+  "mode"
+]);
+function isValidAssetRevisionReference(value) {
+  if (!isRecord(value)) return false;
+  const id = (candidate) => typeof candidate === "string" && GAME_TEMPLATE_VALUE_KEY_PATTERN.test(candidate);
+  return Object.keys(value).every((key) => GAME_ASSET_REVISION_REFERENCE_KEYS.has(key)) && (value.kind === "DRAW" || value.kind === "AUDIO") && id(value.assetId) && id(value.revisionId) && id(value.ownerId) && typeof value.contentHash === "string" && /^[a-f0-9]{64}$/u.test(value.contentHash) && (value.mode === "PINNED" || value.mode === "LIVE");
+}
+var GAME_TIMELINE_ASSET_BINDING_KEYS = /* @__PURE__ */ new Set([
+  "trackId",
+  "kind",
+  "assetId",
+  "revisionId",
+  "contentHash",
+  "mode",
+  "licenseId",
+  "rights",
+  "sourceKind"
+]);
+function isValidGameTimelineAssetBinding(value) {
+  if (!isRecord(value)) return false;
+  const id = (candidate) => typeof candidate === "string" && GAME_TEMPLATE_VALUE_KEY_PATTERN.test(candidate);
+  const rightsValid = value.rights === void 0 || Array.isArray(value.rights) && value.rights.length > 0 && value.rights.every((right) => typeof right === "string" && right.trim().length > 0) && new Set(value.rights).size === value.rights.length;
+  return Object.keys(value).every((key) => GAME_TIMELINE_ASSET_BINDING_KEYS.has(key)) && typeof value.trackId === "string" && GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.trackId) && (value.kind === "DRAW" || value.kind === "AUDIO") && id(value.assetId) && id(value.revisionId) && typeof value.contentHash === "string" && /^[a-f0-9]{64}$/u.test(value.contentHash) && (value.mode === "PINNED" || value.mode === "LIVE") && (value.licenseId === void 0 || id(value.licenseId)) && rightsValid && (value.sourceKind === void 0 || value.sourceKind === "PROJECT" || value.sourceKind === "MARKET") && (value.sourceKind !== "MARKET" || value.mode === "PINNED" && value.licenseId !== void 0 && Array.isArray(value.rights) && value.rights.length > 0);
+}
+var GAME_ITEM_DEFINITION_KEYS = /* @__PURE__ */ new Set([
+  "itemId",
+  "label",
+  "icon",
+  "stackable",
+  "maxStack"
+]);
+function isValidGameItemDefinition(value) {
+  if (!isRecord(value)) return false;
+  return Object.keys(value).every((key) => GAME_ITEM_DEFINITION_KEYS.has(key)) && typeof value.itemId === "string" && GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.itemId) && typeof value.label === "string" && value.label.trim().length > 0 && value.label.length <= 128 && (value.icon === void 0 || isValidAssetRevisionReference(value.icon)) && typeof value.stackable === "boolean" && typeof value.maxStack === "number" && Number.isFinite(value.maxStack) && value.maxStack >= 1 && value.maxStack <= 999999 && (value.stackable || value.maxStack === 1);
+}
+var GAME_RECIPE_INGREDIENT_KEYS = /* @__PURE__ */ new Set([
+  "itemId",
+  "amount"
+]);
+function isValidGameRecipeIngredient(value) {
+  if (!isRecord(value)) return false;
+  return Object.keys(value).every((key) => GAME_RECIPE_INGREDIENT_KEYS.has(key)) && typeof value.itemId === "string" && GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.itemId) && typeof value.amount === "number" && Number.isFinite(value.amount) && value.amount >= 1 && value.amount <= 999999;
+}
+var GAME_RECIPE_DEFINITION_KEYS = /* @__PURE__ */ new Set([
+  "recipeId",
+  "label",
+  "ingredients",
+  "result"
+]);
+function isValidGameRecipeDefinition(value) {
+  if (!isRecord(value)) return false;
+  return Object.keys(value).every((key) => GAME_RECIPE_DEFINITION_KEYS.has(key)) && typeof value.recipeId === "string" && GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.recipeId) && typeof value.label === "string" && value.label.trim().length > 0 && value.label.length <= 128 && Array.isArray(value.ingredients) && value.ingredients.length > 0 && value.ingredients.length <= 32 && value.ingredients.every((ingredient) => isValidGameRecipeIngredient(ingredient)) && isValidGameRecipeIngredient(value.result);
+}
+var GAME_BLOCK_TYPE_DEFINITION_KEYS = /* @__PURE__ */ new Set([
+  "blockTypeId",
+  "label",
+  "icon",
+  "breakable",
+  "dropItemId",
+  "placeable"
+]);
+function isValidGameBlockTypeDefinition(value) {
+  if (!isRecord(value)) return false;
+  return Object.keys(value).every((key) => GAME_BLOCK_TYPE_DEFINITION_KEYS.has(key)) && typeof value.blockTypeId === "string" && GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.blockTypeId) && typeof value.label === "string" && value.label.trim().length > 0 && value.label.length <= 128 && (value.icon === void 0 || isValidAssetRevisionReference(value.icon)) && typeof value.breakable === "boolean" && (value.dropItemId === void 0 || typeof value.dropItemId === "string" && GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.dropItemId)) && typeof value.placeable === "boolean";
 }
 function diagnostic5(code, path, message) {
   return {
@@ -2875,7 +2960,10 @@ function validateGameComponentState(component, path, diagnostics) {
     "TILEMAP",
     "COLLIDER",
     "RIGIDBODY",
-    "CHARACTER_CONTROLLER"
+    "CHARACTER_CONTROLLER",
+    "STATUS",
+    "SKILL",
+    "BRAIN"
   ].includes(component.type)) {
     diagnostics.push(diagnostic5("INVALID_PROJECT", `${path}.type`, `Unknown Game editor component state: ${component.type}`));
     return;
@@ -2939,6 +3027,39 @@ function validateGameComponentState(component, path, diagnostics) {
   }
   if (component.type === "CHARACTER_CONTROLLER" && (typeof component.moveSpeed !== "number" || !Number.isFinite(component.moveSpeed) || component.moveSpeed <= 0 || typeof component.stepHeight !== "number" || !Number.isFinite(component.stepHeight) || component.stepHeight < 0 || typeof component.fixedStep !== "number" || !Number.isSafeInteger(component.fixedStep) || component.fixedStep < 1 || typeof component.enabled !== "boolean")) {
     diagnostics.push(diagnostic5("INVALID_PROJECT", path, "Game editor Character Controller state is invalid."));
+  }
+  if (component.type === "STATUS" && (![
+    "hp",
+    "maxHp",
+    "stamina",
+    "maxStamina",
+    "mp",
+    "maxMp",
+    "attack",
+    "defense",
+    "level"
+  ].every((key) => typeof component[key] === "number" && Number.isFinite(component[key])) || typeof component.enabled !== "boolean")) {
+    diagnostics.push(diagnostic5("INVALID_PROJECT", path, "Game editor Status state is invalid."));
+  }
+  if (component.type === "SKILL" && (![
+    "ATTACK",
+    "SHOOT",
+    "MAGIC",
+    "DASH_ATTACK",
+    "HEAL",
+    "SHIELD"
+  ].includes(component.kind) || typeof component.power !== "number" || !Number.isFinite(component.power) || typeof component.cooldown !== "number" || !Number.isFinite(component.cooldown) || component.cooldown < 0 || typeof component.enabled !== "boolean")) {
+    diagnostics.push(diagnostic5("INVALID_PROJECT", path, "Game editor Skill state is invalid."));
+  }
+  if (component.type === "BRAIN" && (![
+    "PLAYER_CONTROL",
+    "AI",
+    "PATROL",
+    "PURSUE",
+    "AVOID",
+    "WAIT"
+  ].includes(component.mode) || typeof component.speed !== "number" || !Number.isFinite(component.speed) || component.speed < 0 || typeof component.range !== "number" || !Number.isFinite(component.range) || component.range < 0 || typeof component.enabled !== "boolean")) {
+    diagnostics.push(diagnostic5("INVALID_PROJECT", path, "Game editor Brain state is invalid."));
   }
 }
 function validateDependencyCycles(dependencies, diagnostics) {
@@ -3126,12 +3247,21 @@ function validateGameProject2(value, caller) {
         }
       }
     }
+    if (timeline.assetBindings !== void 0) {
+      const trackIds = new Set(Array.isArray(timeline.tracks) ? timeline.tracks.map((track) => track.trackId) : []);
+      if (!Array.isArray(timeline.assetBindings) || timeline.assetBindings.some((binding) => !isValidGameTimelineAssetBinding(binding) || !trackIds.has(binding.trackId))) {
+        diagnostics.push(diagnostic5("INVALID_PROJECT", "editorTimeline.assetBindings", "Editor asset binding metadata is invalid or targets a missing track."));
+      } else {
+        diagnostics.push(...duplicateDiagnostics2(timeline.assetBindings.map((binding) => `${binding.trackId}:${binding.kind}`), "editorTimeline.assetBindings"));
+      }
+    }
     if (timeline.sceneRules !== void 0 && !isValidGameSceneRules(timeline.sceneRules)) {
       diagnostics.push(diagnostic5("INVALID_PROJECT", "editorTimeline.sceneRules", "Scene-wide Game rules are invalid."));
     }
     if (timeline.creationMode !== void 0 && ![
       "RPG_TEMPLATE",
       "ACTION_2D",
+      "DODGE_2D",
       "SCROLL_2D",
       "BLANK"
     ].includes(timeline.creationMode)) {
@@ -3143,6 +3273,9 @@ function validateGameProject2(value, caller) {
       } else {
         diagnostics.push(...duplicateDiagnostics2(timeline.eventCards.map((card) => card.eventId), "editorTimeline.eventCards.eventId"));
         const trackIds = new Set(Array.isArray(timeline.tracks) ? timeline.tracks.map((track) => track.trackId) : []);
+        const itemIds = new Set(Array.isArray(timeline.items) ? timeline.items.map((item) => item.itemId) : []);
+        const recipeIds = new Set(Array.isArray(timeline.recipes) ? timeline.recipes.map((recipe) => recipe.recipeId) : []);
+        const blockTypeIds = new Set(Array.isArray(timeline.blockTypes) ? timeline.blockTypes.map((blockType) => blockType.blockTypeId) : []);
         for (const [index, card] of timeline.eventCards.entries()) {
           for (const [key, trackId] of [
             [
@@ -3161,6 +3294,55 @@ function validateGameProject2(value, caller) {
             if (trackId !== void 0 && !trackIds.has(trackId)) {
               diagnostics.push(diagnostic5("MISSING_REFERENCE", `editorTimeline.eventCards[${index}].${key}`, "Game event card track reference is missing."));
             }
+          }
+          if (card.itemId !== void 0 && !itemIds.has(card.itemId)) {
+            diagnostics.push(diagnostic5("MISSING_REFERENCE", `editorTimeline.eventCards[${index}].itemId`, "Game event card item reference is missing."));
+          }
+          if (card.recipeId !== void 0 && !recipeIds.has(card.recipeId)) {
+            diagnostics.push(diagnostic5("MISSING_REFERENCE", `editorTimeline.eventCards[${index}].recipeId`, "Game event card recipe reference is missing."));
+          }
+          if (card.blockTypeId !== void 0 && !blockTypeIds.has(card.blockTypeId)) {
+            diagnostics.push(diagnostic5("MISSING_REFERENCE", `editorTimeline.eventCards[${index}].blockTypeId`, "Game event card block type reference is missing."));
+          }
+        }
+      }
+    }
+    if (timeline.items !== void 0) {
+      if (!Array.isArray(timeline.items) || timeline.items.some((item) => !isValidGameItemDefinition(item))) {
+        diagnostics.push(diagnostic5("INVALID_PROJECT", "editorTimeline.items", "Game item definitions are invalid."));
+      } else {
+        diagnostics.push(...duplicateDiagnostics2(timeline.items.map((item) => item.itemId), "editorTimeline.items.itemId"));
+      }
+    }
+    if (timeline.recipes !== void 0) {
+      if (!Array.isArray(timeline.recipes) || timeline.recipes.some((recipe) => !isValidGameRecipeDefinition(recipe))) {
+        diagnostics.push(diagnostic5("INVALID_PROJECT", "editorTimeline.recipes", "Game recipe definitions are invalid."));
+      } else {
+        diagnostics.push(...duplicateDiagnostics2(timeline.recipes.map((recipe) => recipe.recipeId), "editorTimeline.recipes.recipeId"));
+        const knownItemIds = new Set(Array.isArray(timeline.items) ? timeline.items.map((item) => item.itemId) : []);
+        for (const [index, recipe] of timeline.recipes.entries()) {
+          const referenced = [
+            ...recipe.ingredients.map((ingredient) => ingredient.itemId),
+            recipe.result.itemId
+          ];
+          for (const itemId of referenced) {
+            if (!knownItemIds.has(itemId)) {
+              diagnostics.push(diagnostic5("MISSING_REFERENCE", `editorTimeline.recipes[${index}]`, "Game recipe references an unknown item."));
+              break;
+            }
+          }
+        }
+      }
+    }
+    if (timeline.blockTypes !== void 0) {
+      if (!Array.isArray(timeline.blockTypes) || timeline.blockTypes.some((blockType) => !isValidGameBlockTypeDefinition(blockType))) {
+        diagnostics.push(diagnostic5("INVALID_PROJECT", "editorTimeline.blockTypes", "Game block type definitions are invalid."));
+      } else {
+        diagnostics.push(...duplicateDiagnostics2(timeline.blockTypes.map((blockType) => blockType.blockTypeId), "editorTimeline.blockTypes.blockTypeId"));
+        const knownItemIdsForBlocks = new Set(Array.isArray(timeline.items) ? timeline.items.map((item) => item.itemId) : []);
+        for (const [index, blockType] of timeline.blockTypes.entries()) {
+          if (blockType.dropItemId !== void 0 && !knownItemIdsForBlocks.has(blockType.dropItemId)) {
+            diagnostics.push(diagnostic5("MISSING_REFERENCE", `editorTimeline.blockTypes[${index}].dropItemId`, "Game block type drop item reference is missing."));
           }
         }
       }
@@ -3482,9 +3664,9 @@ var GAME_RUNTIME_PROFILES = createRegistry(BUILT_IN_PROFILES);
 var DEFAULT_GAME_RUNTIME_PROFILE_ID = GAME_RUNTIME_PROFILE_IDS.TOP_DOWN_RPG;
 
 // src/game/game-350/tilemap-authoring.ts
-var GAME350_TILEMAP_MAX_WIDTH = 256;
-var GAME350_TILEMAP_MAX_HEIGHT = 256;
-var GAME350_TILEMAP_MAX_CELLS = 65536;
+var GAME350_TILEMAP_MAX_WIDTH = Number.MAX_SAFE_INTEGER;
+var GAME350_TILEMAP_MAX_HEIGHT = Number.MAX_SAFE_INTEGER;
+var GAME350_TILEMAP_MAX_CELLS = Number.MAX_SAFE_INTEGER;
 function freezeDeep2(value) {
   if (value !== null && typeof value === "object" && !Object.isFrozen(value)) {
     Object.freeze(value);
@@ -3506,13 +3688,10 @@ function idIsValid(value) {
 function assertDimensions(mapId, width, height, tileSize) {
   if (!idIsValid(mapId)) throw new Error("Tilemap mapId is invalid.");
   if (!Number.isSafeInteger(width) || width < 1 || width > GAME350_TILEMAP_MAX_WIDTH) {
-    throw new Error("Tilemap width must be an integer between 1 and 256.");
+    throw new Error("Tilemap width must be a positive safe integer.");
   }
   if (!Number.isSafeInteger(height) || height < 1 || height > GAME350_TILEMAP_MAX_HEIGHT) {
-    throw new Error("Tilemap height must be an integer between 1 and 256.");
-  }
-  if (width * height > GAME350_TILEMAP_MAX_CELLS) {
-    throw new Error("Tilemap cell capacity is limited to 65536 cells.");
+    throw new Error("Tilemap height must be a positive safe integer.");
   }
   if (!Number.isSafeInteger(tileSize) || tileSize < 1 || tileSize > 4096) {
     throw new Error("Tilemap tileSize must be an integer between 1 and 4096.");
@@ -3530,7 +3709,10 @@ function normalizeCells(cells = [], width, height) {
     if (cell.triggerId !== void 0 && !idIsValid(cell.triggerId)) {
       throw new Error("Tilemap triggerId is invalid.");
     }
-    if (cell.collision === "NONE" && cell.triggerId === void 0) {
+    if (cell.blockTypeId !== void 0 && !idIsValid(cell.blockTypeId)) {
+      throw new Error("Tilemap blockTypeId is invalid.");
+    }
+    if (cell.collision === "NONE" && cell.triggerId === void 0 && cell.blockTypeId === void 0) {
       throw new Error("An empty tilemap cell must not be persisted.");
     }
     const key = cellKey(cell.x, cell.y);
@@ -3541,6 +3723,9 @@ function normalizeCells(cells = [], width, height) {
       collision: cell.collision,
       ...cell.triggerId === void 0 ? {} : {
         triggerId: cell.triggerId
+      },
+      ...cell.blockTypeId === void 0 ? {} : {
+        blockTypeId: cell.blockTypeId
       }
     });
   }
@@ -3552,9 +3737,6 @@ function documentFrom(options) {
   const tileSize = options.tileSize ?? 1;
   assertDimensions(options.mapId, options.width, options.height, tileSize);
   const cells = normalizeCells(options.cells, options.width, options.height);
-  if (cells.length > GAME350_TILEMAP_MAX_CELLS) {
-    throw new Error("Tilemap cell capacity is limited to 65536 cells.");
-  }
   return freezeDeep2({
     schemaVersion: GAME_TILEMAP_DOCUMENT_SCHEMA_VERSION,
     mapId: options.mapId,
@@ -3630,7 +3812,18 @@ function createDefaultRpgTilemapDocument(mapId = "map:tilemap") {
   });
 }
 function gameTilemapCellAt(document, x, y) {
-  return document.cells.find((cell) => cell.x === x && cell.y === y);
+  let low = 0;
+  let high = document.cells.length - 1;
+  while (low <= high) {
+    const middle = Math.floor((low + high) / 2);
+    const cell = document.cells[middle];
+    if (cell === void 0) return void 0;
+    const comparison = cell.y - y || cell.x - x;
+    if (comparison === 0) return cell;
+    if (comparison < 0) low = middle + 1;
+    else high = middle - 1;
+  }
+  return void 0;
 }
 function assertCellCoordinate(document, x, y) {
   if (!Number.isSafeInteger(x) || !Number.isSafeInteger(y) || x < 0 || x >= document.width || y < 0 || y >= document.height) {
@@ -3788,6 +3981,21 @@ var GAME351_INPUT_ACTIONS = Object.freeze({
 var GAME351_INTERACT_ACTION = asActionId("rpg.interact");
 var GAME351_TAP_ACTION = asActionId("rpg.tap");
 var GAME351_PHYSICS2D_MOVE_SPEED = 4;
+var GAME351_TILEMAP_RUNTIME_CHUNK_SIZE = 32;
+var GAME351_TILEMAP_RUNTIME_CHUNK_RADIUS = 1;
+function game351TilemapCellsInRuntimeWindow(map, center, chunkSize = GAME351_TILEMAP_RUNTIME_CHUNK_SIZE, chunkRadius = GAME351_TILEMAP_RUNTIME_CHUNK_RADIUS) {
+  if (!Number.isSafeInteger(chunkSize) || chunkSize < 1) {
+    throw new Error("GAME-351 tilemap chunkSize must be a positive integer.");
+  }
+  const radius = Math.max(0, Math.floor(chunkRadius));
+  const centerChunkX = Math.floor(center.x / chunkSize);
+  const centerChunkY = Math.floor(center.y / chunkSize);
+  const resident = (x, y) => Math.abs(Math.floor(x / chunkSize) - centerChunkX) <= radius && Math.abs(Math.floor(y / chunkSize) - centerChunkY) <= radius;
+  return {
+    solidCells: map.solidCells.filter((cell) => resident(cell.x, cell.y)),
+    triggerCells: map.triggerCells.filter((cell) => resident(cell.x, cell.y))
+  };
+}
 function freezeDeep3(value) {
   if (value !== null && typeof value === "object" && !Object.isFrozen(value)) {
     Object.freeze(value);
@@ -4018,7 +4226,7 @@ function createGame351Physics2DScene(template, options = {}) {
   if (player === void 0 || playerCollider?.type !== "COLLIDER" || playerRigidbody?.type !== "RIGIDBODY" || playerCollider.layer !== "PLAYER" || playerRigidbody.bodyType !== "DYNAMIC" || playerCollider.enabled === false || playerRigidbody.enabled === false) {
     throw new Error("GAME-351 Physics2D preview requires an enabled dynamic PLAYER Collider and Rigidbody.");
   }
-  const entities = sourceScene.entities.map((entity) => ({
+  const entities = sourceScene.entities.filter((entity) => entity.entityId === template.playerEntityId || entity.entityId === template.npcEntityId).map((entity) => ({
     ...entity,
     components: entity.components.map((component) => ({
       ...component
@@ -4039,8 +4247,9 @@ function createGame351Physics2DScene(template, options = {}) {
     generatedComponentIds.forEach((componentId) => componentIds2.add(componentId));
     entities.push(generated);
   };
+  const runtimeCells = game351TilemapCellsInRuntimeWindow(template.map, options.tilemapCenter ?? entityTransform(template.project, template.sceneId, template.playerEntityId), options.tilemapChunkSize, options.tilemapChunkRadius);
   const cells = [
-    ...template.map.solidCells
+    ...runtimeCells.solidCells
   ].sort((left, right) => left.y - right.y || left.x - right.x);
   for (const cell of cells) {
     const suffix = `${coordinateId(cell.x)}:${coordinateId(cell.y)}`;
@@ -4048,7 +4257,7 @@ function createGame351Physics2DScene(template, options = {}) {
     appendGenerated(staticWorldEntity(id, id, `RPG Solid Cell (${cell.x},${cell.y})`, cell.x, cell.y, 1, 1));
   }
   const triggers = [
-    ...template.map.triggerCells
+    ...runtimeCells.triggerCells
   ].sort((left, right) => left.y - right.y || left.x - right.x || left.triggerId.localeCompare(right.triggerId));
   for (const trigger of triggers) {
     const id = physics2DId(template.sceneId, "trigger", `${coordinateId(trigger.x)}:${coordinateId(trigger.y)}:${trigger.triggerId}`);
@@ -4096,7 +4305,7 @@ function createGame351Physics2DScene(template, options = {}) {
     ...sourceScene,
     rootEntityIds: [
       ...sourceScene.rootEntityIds,
-      ...entities.slice(sourceScene.entities.length).map((entity) => entity.entityId)
+      ...entities.filter((entity) => String(entity.entityId).startsWith("physics2d:")).map((entity) => entity.entityId)
     ],
     entities,
     physics2D: normalizePhysics2DSettings({
@@ -5336,6 +5545,7 @@ var GAME_RUNTIME_FAMILY_LABELS = Object.freeze({
   RPG_GRID: "RPG\u30FB\u30DE\u30B9\u79FB\u52D5",
   ACTION_PLATFORM: "2D\u30A2\u30AF\u30B7\u30E7\u30F3\u30FB\u7C21\u6613\u7269\u7406",
   SCROLL_SIDE: "2D\u30B9\u30AF\u30ED\u30FC\u30EB\u30FB\u6A2A\u79FB\u52D5",
+  DODGE_ARENA: "\u6575\u3088\u3051\u30FB\u30A2\u30EA\u30FC\u30CA",
   FREE: "\u81EA\u7531\u5236\u4F5C\u30FB\u6700\u5C0F\u30EB\u30FC\u30EB"
 });
 var GAME_SCENE_GRAVITY_OPTIONS = [
@@ -5398,6 +5608,10 @@ var GAME_EVENT_CONDITION_OPTIONS = [
   {
     value: "REACH_GOAL",
     label: "\u30B4\u30FC\u30EB\u306B\u7740\u3044\u305F"
+  },
+  {
+    value: "HAS_ITEM",
+    label: "\u30A2\u30A4\u30C6\u30E0\u3092\u6301\u3063\u3066\u3044\u308B"
   }
 ];
 var GAME_EVENT_ACTION_OPTIONS = [
@@ -5424,6 +5638,26 @@ var GAME_EVENT_ACTION_OPTIONS = [
   {
     value: "SET_VARIABLE",
     label: "\u30B2\u30FC\u30E0\u72B6\u614B\u3092\u5909\u3048\u308B"
+  },
+  {
+    value: "GIVE_ITEM",
+    label: "\u30A2\u30A4\u30C6\u30E0\u3092\u6E21\u3059"
+  },
+  {
+    value: "TAKE_ITEM",
+    label: "\u30A2\u30A4\u30C6\u30E0\u3092\u6E1B\u3089\u3059"
+  },
+  {
+    value: "CRAFT_ITEM",
+    label: "\u30EC\u30B7\u30D4\u3092\u4F5C\u308B"
+  },
+  {
+    value: "BREAK_BLOCK",
+    label: "\u30D6\u30ED\u30C3\u30AF\u3092\u58CA\u3059"
+  },
+  {
+    value: "PLACE_BLOCK",
+    label: "\u30D6\u30ED\u30C3\u30AF\u3092\u7F6E\u304F"
   }
 ];
 var DEFAULT_RULE_FLAGS = {
@@ -5465,6 +5699,16 @@ function sceneRulesForRuntimeFamily(runtimeFamily) {
         jump: true,
         floorCollision: true
       };
+    case "DODGE_ARENA":
+      return {
+        ...DEFAULT_RULE_FLAGS,
+        runtimeFamily,
+        gravity: "NONE",
+        horizontalMove: true,
+        verticalMove: true,
+        jump: false,
+        floorCollision: false
+      };
     case "FREE":
       return {
         ...DEFAULT_RULE_FLAGS,
@@ -5474,16 +5718,26 @@ function sceneRulesForRuntimeFamily(runtimeFamily) {
   }
 }
 function sceneRulesForCreationMode(mode) {
-  return sceneRulesForRuntimeFamily(mode === "RPG_TEMPLATE" ? "RPG_GRID" : mode === "ACTION_2D" ? "ACTION_PLATFORM" : mode === "SCROLL_2D" ? "SCROLL_SIDE" : "FREE");
+  return sceneRulesForRuntimeFamily(mode === "RPG_TEMPLATE" ? "RPG_GRID" : mode === "ACTION_2D" ? "ACTION_PLATFORM" : mode === "DODGE_2D" ? "DODGE_ARENA" : mode === "SCROLL_2D" ? "SCROLL_SIDE" : "FREE");
 }
 function normalizeGameSceneRules(value) {
-  const fallback = sceneRulesForRuntimeFamily(value?.runtimeFamily ?? "FREE");
+  const runtimeFamily = value?.runtimeFamily;
+  const safeRuntimeFamily = runtimeFamily === "RPG_GRID" || runtimeFamily === "ACTION_PLATFORM" || runtimeFamily === "SCROLL_SIDE" || runtimeFamily === "DODGE_ARENA" || runtimeFamily === "FREE" ? runtimeFamily : "FREE";
+  const fallback = sceneRulesForRuntimeFamily(safeRuntimeFamily);
+  const gravity = value?.gravity;
+  const safeGravity = gravity === "NONE" || gravity === "WEAK" || gravity === "STANDARD" || gravity === "STRONG" ? gravity : fallback.gravity;
+  const booleanRule = (key) => typeof value?.[key] === "boolean" ? value[key] : fallback[key];
   return {
     ...fallback,
-    ...value,
     schemaVersion: 1,
-    runtimeFamily: value?.runtimeFamily ?? fallback.runtimeFamily,
-    gravity: value?.gravity ?? fallback.gravity
+    runtimeFamily: safeRuntimeFamily,
+    gravity: safeGravity,
+    horizontalMove: booleanRule("horizontalMove"),
+    verticalMove: booleanRule("verticalMove"),
+    jump: booleanRule("jump"),
+    floorCollision: booleanRule("floorCollision"),
+    cameraFollow: booleanRule("cameraFollow"),
+    mobileControls: booleanRule("mobileControls")
   };
 }
 function physics2DSettingsForSceneRules(rules, current) {
@@ -5518,7 +5772,6 @@ function sceneRulesSummary(rules) {
   if (rules.jump) flags.push("\u30B8\u30E3\u30F3\u30D7");
   if (rules.floorCollision) flags.push("\u5E8A\u3068\u306E\u885D\u7A81");
   if (rules.cameraFollow) flags.push("\u30AB\u30E1\u30E9\u8FFD\u5F93");
-  if (rules.mobileControls) flags.push("\u30B9\u30DE\u30DB\u64CD\u4F5C");
   return GAME_RUNTIME_FAMILY_LABELS[rules.runtimeFamily] + " \xB7 \u91CD\u529B" + GAME_SCENE_RULE_LABELS[rules.gravity] + " \xB7 " + (flags.join("\u30FB") || "\u6700\u5C0F\u30EB\u30FC\u30EB");
 }
 function defaultGameEventCardsForRuntimeFamily(runtimeFamily, trackIds = []) {
@@ -5562,6 +5815,36 @@ function defaultGameEventCardsForRuntimeFamily(runtimeFamily, trackIds = []) {
       },
       {
         eventId: "event:enemy-camera-shake",
+        label: "\u30C0\u30E1\u30FC\u30B8\u3067\u30AB\u30E1\u30E9\u3092\u63FA\u3089\u3059",
+        enabled: true,
+        who: "PLAYER",
+        condition: "TOUCH",
+        ...source,
+        ...enemy === void 0 ? {} : {
+          targetTrackId: enemy
+        },
+        action: "SHAKE_CAMERA"
+      }
+    ];
+  }
+  if (runtimeFamily === "DODGE_ARENA") {
+    const enemy = trackIds.find((id) => id === "enemy" || id.includes("enemy"));
+    return [
+      {
+        eventId: "event:dodge-enemy-hit",
+        label: "\u6575\u306B\u89E6\u308C\u305F\u3089\u30E9\u30A4\u30D5\u304C\u6E1B\u308B",
+        enabled: true,
+        who: "PLAYER",
+        condition: "TOUCH",
+        ...source,
+        ...enemy === void 0 ? {} : {
+          targetTrackId: enemy
+        },
+        action: "DAMAGE",
+        amount: 1
+      },
+      {
+        eventId: "event:dodge-camera-shake",
         label: "\u30C0\u30E1\u30FC\u30B8\u3067\u30AB\u30E1\u30E9\u3092\u63FA\u3089\u3059",
         enabled: true,
         who: "PLAYER",
@@ -5630,6 +5913,12 @@ function triggerForCondition(card) {
           value: card.targetTrackId
         }
       };
+    case "HAS_ITEM":
+      return {
+        type: "ACTION",
+        actionId: "inventory.has-item",
+        value: card.itemId ?? "item"
+      };
   }
 }
 function actionForCard(card) {
@@ -5674,6 +5963,41 @@ function actionForCard(card) {
         property: "state",
         value: card.message ?? "true"
       };
+    case "GIVE_ITEM":
+      return {
+        kind: "SET_VARIABLE",
+        targetId: "inventory",
+        property: "give:" + (card.itemId ?? "item"),
+        value: Math.max(1, card.amount ?? 1)
+      };
+    case "TAKE_ITEM":
+      return {
+        kind: "SET_VARIABLE",
+        targetId: "inventory",
+        property: "take:" + (card.itemId ?? "item"),
+        value: Math.max(1, card.amount ?? 1)
+      };
+    case "CRAFT_ITEM":
+      return {
+        kind: "SET_VARIABLE",
+        targetId: "inventory",
+        property: "craft:" + (card.recipeId ?? "recipe"),
+        value: true
+      };
+    case "BREAK_BLOCK":
+      return {
+        kind: "SET_VARIABLE",
+        targetId: "world",
+        property: "break:" + (card.blockTypeId ?? "block"),
+        value: true
+      };
+    case "PLACE_BLOCK":
+      return {
+        kind: "SET_VARIABLE",
+        targetId: "world",
+        property: "place:" + (card.blockTypeId ?? "block"),
+        value: card.blockTypeId ?? "block"
+      };
   }
 }
 function behaviorFromGameEventCard(card) {
@@ -5709,17 +6033,145 @@ var PLAYER_HALF_HEIGHT = 0.35;
 var JUMP_SPEED = 6;
 var DEFAULT_MOVE_SPEED = 5;
 var TOUCH_DISTANCE = 0.9;
+var DODGE_SURVIVAL_SECONDS = 15;
+var DODGE_SURVIVAL_TICKS = DODGE_SURVIVAL_SECONDS * 60;
+var DODGE_MOVE_SPEED = 4.5;
+var DODGE_ENEMY_SPEED = 0.045;
+var DEFAULT_NPC_STATUS = {
+  hp: 10,
+  maxHp: 10,
+  stamina: 10,
+  maxStamina: 10,
+  mp: 0,
+  maxMp: 0,
+  attack: 2,
+  defense: 0,
+  level: 1
+};
+var DEFAULT_PLAYER_STATUS = {
+  hp: 10,
+  maxHp: 10,
+  stamina: 10,
+  maxStamina: 10,
+  mp: 0,
+  maxMp: 0,
+  attack: 2,
+  defense: 1,
+  level: 1
+};
+var COMBAT_TICK_INTERVAL = 30;
+var BLOCK_REACH_DISTANCE = 1.4;
 function point(x, y) {
   return {
     x,
     y
   };
 }
+function cellKey3(x, y) {
+  return `${x},${y}`;
+}
+function nearbyCellCandidates(playerPosition, world) {
+  const cx = Math.floor(playerPosition.x);
+  const cy = Math.floor(playerPosition.y);
+  const candidates = [
+    point(cx, cy),
+    point(cx - 1, cy),
+    point(cx + 1, cy),
+    point(cx, cy - 1),
+    point(cx, cy + 1)
+  ].filter((cell) => cell.x >= 0 && cell.x < world.width && cell.y >= 0 && cell.y < world.height);
+  return candidates.map((cell) => ({
+    cell,
+    // Compare against the cell's center, not its corner, for a fair
+    // "which cell is actually closest to me" ordering.
+    d: distance(playerPosition, point(cell.x + 0.5, cell.y + 0.5))
+  })).filter(({ d }) => d <= BLOCK_REACH_DISTANCE).sort((a, b) => a.d - b.d).map(({ cell }) => cell);
+}
 function distance(left, right) {
   return Math.hypot(left.x - right.x, left.y - right.y);
 }
+function isDodgeEnemy(object) {
+  const text = `${object.id} ${object.label}`.toLowerCase();
+  return object.role === "NPC" || text.includes("enemy") || text.includes("\u6575");
+}
 function trackRole(track) {
   return track.role;
+}
+function trackStatus(track, fallback) {
+  const status = track?.components?.find((component) => component.type === "STATUS");
+  if (status?.type !== "STATUS" || !status.enabled) return fallback;
+  const maxHp = Math.max(1, status.maxHp);
+  const maxStamina = Math.max(0, status.maxStamina);
+  const maxMp = Math.max(0, status.maxMp);
+  return {
+    hp: Math.max(0, Math.min(status.hp, maxHp)),
+    maxHp,
+    stamina: Math.max(0, Math.min(status.stamina, maxStamina)),
+    maxStamina,
+    mp: Math.max(0, Math.min(status.mp, maxMp)),
+    maxMp,
+    attack: Math.max(0, status.attack),
+    defense: Math.max(0, status.defense),
+    level: Math.max(1, Math.round(status.level))
+  };
+}
+function trackBrainMode(track) {
+  const brain = track?.components?.find((component) => component.type === "BRAIN");
+  if (brain?.type !== "BRAIN" || !brain.enabled) return void 0;
+  return {
+    mode: brain.mode,
+    speed: brain.speed,
+    range: brain.range
+  };
+}
+function stepBrain(object, playerPosition, world) {
+  const brain = object.brain;
+  if (brain === void 0) return object;
+  if (brain.mode !== "PURSUE" && brain.mode !== "AVOID") return object;
+  const dx = playerPosition.x - object.position.x;
+  const dy = playerPosition.y - object.position.y;
+  const length = Math.hypot(dx, dy);
+  if (length <= 1e-3 || length > brain.range) return object;
+  const speed = Math.max(0, brain.speed) * 0.01;
+  const move = Math.min(speed, length);
+  const direction = brain.mode === "PURSUE" ? 1 : -1;
+  return {
+    ...object,
+    position: point(Math.min(world.width - PLAYER_HALF_WIDTH, Math.max(PLAYER_HALF_WIDTH, object.position.x + dx / length * move * direction)), Math.min(world.height - PLAYER_HALF_HEIGHT, Math.max(PLAYER_HALF_HEIGHT, object.position.y + dy / length * move * direction)))
+  };
+}
+function applyContactCombat(playerStatus, playerPosition, objects) {
+  let nextPlayerStatus = playerStatus;
+  const nextObjects = [];
+  for (const object of objects) {
+    if (object.role !== "NPC" || object.status === void 0 || nextPlayerStatus.hp <= 0) {
+      nextObjects.push(object);
+      continue;
+    }
+    if (distance(playerPosition, object.position) > TOUCH_DISTANCE) {
+      nextObjects.push(object);
+      continue;
+    }
+    const damageToObject = Math.max(1, nextPlayerStatus.attack - object.status.defense);
+    const damageToPlayer = Math.max(1, object.status.attack - nextPlayerStatus.defense);
+    const objectHp = Math.max(0, object.status.hp - damageToObject);
+    nextPlayerStatus = {
+      ...nextPlayerStatus,
+      hp: Math.max(0, nextPlayerStatus.hp - damageToPlayer)
+    };
+    if (objectHp <= 0) continue;
+    nextObjects.push({
+      ...object,
+      status: {
+        ...object.status,
+        hp: objectHp
+      }
+    });
+  }
+  return {
+    objects: nextObjects,
+    playerStatus: nextPlayerStatus
+  };
 }
 function trackPosition(track) {
   const transform3 = track.components?.find((component) => component.type === "TRANSFORM");
@@ -5738,10 +6190,17 @@ function mapFromTracks(tracks) {
   const solidCells = document?.cells.filter((cell) => cell.collision === "SOLID").map((cell) => point(cell.x, cell.y)) ?? Array.from({
     length: width
   }, (_, x) => point(x, height - 1));
+  const blockTypeIds = {};
+  for (const cell of document?.cells ?? []) {
+    if (cell.blockTypeId !== void 0) {
+      blockTypeIds[`${cell.x},${cell.y}`] = cell.blockTypeId;
+    }
+  }
   return {
     width,
     height,
-    solidCells
+    solidCells,
+    blockTypeIds
   };
 }
 function objectById(state, id) {
@@ -5765,11 +6224,33 @@ function targetPosition(state, card) {
   return void 0;
 }
 function cardIsNearTarget(state, card) {
+  if (card.condition === "HAS_ITEM") {
+    const have = state.inventory[card.itemId ?? ""] ?? 0;
+    return have >= Math.max(1, card.amount ?? 1);
+  }
   const target = targetPosition(state, card);
   if (target !== void 0 && card.condition === "REACH_GOAL" && state.runtimeFamily === "SCROLL_SIDE") {
     return state.playerPosition.x >= target.x - TOUCH_DISTANCE;
   }
   return target === void 0 || distance(state.playerPosition, target) <= TOUCH_DISTANCE;
+}
+function addToInventory(inventory, itemId, amount) {
+  const next = Math.max(0, (inventory[itemId] ?? 0) + amount);
+  return {
+    ...inventory,
+    [itemId]: next
+  };
+}
+function craftRecipe(inventory, recipes, recipeId) {
+  const recipe = recipes.find((candidate) => candidate.recipeId === recipeId);
+  if (recipe === void 0) return inventory;
+  const canCraft = recipe.ingredients.every((ingredient) => (inventory[ingredient.itemId] ?? 0) >= ingredient.amount);
+  if (!canCraft) return inventory;
+  let next = inventory;
+  for (const ingredient of recipe.ingredients) {
+    next = addToInventory(next, ingredient.itemId, -ingredient.amount);
+  }
+  return addToInventory(next, recipe.result.itemId, recipe.result.amount);
 }
 function applyEventCard(state, card) {
   if (!card.enabled) return state;
@@ -5779,6 +6260,7 @@ function applyEventCard(state, card) {
       return {
         ...state,
         health: Math.max(0, damaged),
+        gameOver: damaged <= 0,
         cameraShakeFrames: Math.max(state.cameraShakeFrames, state.camera2D.shake.onDamage ? 8 : 0)
       };
     }
@@ -5810,6 +6292,78 @@ function applyEventCard(state, card) {
           state: card.message?.trim() || true
         }
       };
+    case "GIVE_ITEM":
+      if (card.itemId === void 0) return state;
+      return {
+        ...state,
+        inventory: addToInventory(state.inventory, card.itemId, Math.max(1, card.amount ?? 1))
+      };
+    case "TAKE_ITEM":
+      if (card.itemId === void 0) return state;
+      return {
+        ...state,
+        inventory: addToInventory(state.inventory, card.itemId, -Math.max(1, card.amount ?? 1))
+      };
+    case "CRAFT_ITEM":
+      return {
+        ...state,
+        inventory: craftRecipe(state.inventory, state.recipes, card.recipeId)
+      };
+    case "BREAK_BLOCK": {
+      for (const cell of nearbyCellCandidates(state.playerPosition, state.world)) {
+        const key = cellKey3(cell.x, cell.y);
+        const blockTypeId = state.world.blockTypeIds[key];
+        if (blockTypeId === void 0) continue;
+        const blockType = state.blockTypes.find((candidate) => candidate.blockTypeId === blockTypeId);
+        if (blockType === void 0 || !blockType.breakable) continue;
+        const nextBlockTypeIds = {
+          ...state.world.blockTypeIds
+        };
+        delete nextBlockTypeIds[key];
+        return {
+          ...state,
+          world: {
+            ...state.world,
+            blockTypeIds: nextBlockTypeIds,
+            solidCells: state.world.solidCells.filter((solid) => !(solid.x === cell.x && solid.y === cell.y))
+          },
+          inventory: blockType.dropItemId === void 0 ? state.inventory : addToInventory(state.inventory, blockType.dropItemId, 1)
+        };
+      }
+      return state;
+    }
+    case "PLACE_BLOCK": {
+      if (card.blockTypeId === void 0 || card.itemId === void 0) {
+        return state;
+      }
+      const blockType = state.blockTypes.find((candidate) => candidate.blockTypeId === card.blockTypeId);
+      if (blockType === void 0 || !blockType.placeable || (state.inventory[card.itemId] ?? 0) < 1) {
+        return state;
+      }
+      const playerCellX = Math.floor(state.playerPosition.x);
+      const playerCellY = Math.floor(state.playerPosition.y);
+      for (const cell of nearbyCellCandidates(state.playerPosition, state.world)) {
+        if (cell.x === playerCellX && cell.y === playerCellY) continue;
+        const key = cellKey3(cell.x, cell.y);
+        if (state.world.blockTypeIds[key] !== void 0) continue;
+        return {
+          ...state,
+          world: {
+            ...state.world,
+            blockTypeIds: {
+              ...state.world.blockTypeIds,
+              [key]: card.blockTypeId
+            },
+            solidCells: [
+              ...state.world.solidCells,
+              cell
+            ]
+          },
+          inventory: addToInventory(state.inventory, card.itemId, -1)
+        };
+      }
+      return state;
+    }
   }
 }
 function cameraOriginFor(playerPosition, camera2D, world) {
@@ -5847,7 +6401,7 @@ function processEventCards(state, input) {
     if (!card.enabled || card.condition === "START") continue;
     const near = cardIsNearTarget(next, card);
     const inputTriggered = card.condition === "TAP" ? input.tap === true : card.condition === "INTERACT" ? input.interact === true : false;
-    const rangeTriggered = card.condition === "TOUCH" || card.condition === "ENTER_RANGE" || card.condition === "REACH_GOAL";
+    const rangeTriggered = card.condition === "TOUCH" || card.condition === "ENTER_RANGE" || card.condition === "REACH_GOAL" || card.condition === "HAS_ITEM";
     const triggered = rangeTriggered ? near : inputTriggered && near;
     if (!triggered) continue;
     if (rangeTriggered) activeEventIds.push(card.eventId);
@@ -5876,6 +6430,18 @@ function landingY(state, x, previousY, nextY) {
   return best;
 }
 function stepMovement(state, input) {
+  if (state.runtimeFamily === "DODGE_ARENA") {
+    const directionX = (input.right === true ? 1 : 0) - (input.left === true ? 1 : 0);
+    const directionY = (input.down === true ? 1 : 0) - (input.up === true || input.jump === true ? 1 : 0);
+    const magnitude = Math.hypot(directionX, directionY) || 1;
+    const velocityX2 = directionX / magnitude * DODGE_MOVE_SPEED;
+    const velocityY2 = directionY / magnitude * DODGE_MOVE_SPEED;
+    return {
+      playerPosition: point(Math.min(state.world.width - PLAYER_HALF_WIDTH, Math.max(PLAYER_HALF_WIDTH, state.playerPosition.x + velocityX2 / 60)), Math.min(state.world.height - PLAYER_HALF_HEIGHT, Math.max(PLAYER_HALF_HEIGHT, state.playerPosition.y + velocityY2 / 60))),
+      velocity: point(velocityX2, velocityY2),
+      grounded: true
+    };
+  }
   const direction = (input.right === true ? 1 : 0) - (input.left === true ? 1 : 0);
   const speed = DEFAULT_MOVE_SPEED;
   const velocityX = state.rules.horizontalMove ? direction * speed : 0;
@@ -5898,7 +6464,10 @@ function stepMovement(state, input) {
 }
 function familyForProject(project) {
   const family = project.editorTimeline?.sceneRules?.runtimeFamily;
-  if (family === "ACTION_PLATFORM" || family === "SCROLL_SIDE") return family;
+  if (family === "ACTION_PLATFORM" || family === "DODGE_ARENA" || family === "SCROLL_SIDE") return family;
+  if (project.editorTimeline?.creationMode === "DODGE_2D") {
+    return "DODGE_ARENA";
+  }
   if (project.editorTimeline?.creationMode === "SCROLL_2D") {
     return "SCROLL_SIDE";
   }
@@ -5914,12 +6483,22 @@ function createGameGenreRuntime(project) {
   const world = mapFromTracks(tracks);
   const cameraTrack = tracks.find((track) => track.role === "CAMERA");
   const camera2D = trackCamera(cameraTrack);
-  const objects = tracks.filter((track) => track.trackId !== playerId).filter((track) => track.active !== false).map((track) => ({
-    id: track.trackId,
-    label: track.label,
-    role: trackRole(track),
-    position: trackPosition(track)
-  }));
+  const objects = tracks.filter((track) => track.trackId !== playerId).filter((track) => track.active !== false).map((track) => {
+    const role = trackRole(track);
+    const brain = trackBrainMode(track);
+    return {
+      id: track.trackId,
+      label: track.label,
+      role,
+      position: trackPosition(track),
+      ...role === "NPC" ? {
+        status: trackStatus(track, DEFAULT_NPC_STATUS)
+      } : {},
+      ...brain === void 0 ? {} : {
+        brain
+      }
+    };
+  });
   const state = {
     schemaVersion: GAME_GENRE_RUNTIME_SCHEMA_VERSION,
     projectId: project.projectId,
@@ -5937,6 +6516,9 @@ function createGameGenreRuntime(project) {
     velocity: POINT_ZERO,
     grounded: false,
     health: 3,
+    playerStatus: trackStatus(player, DEFAULT_PLAYER_STATUS),
+    survivalSeconds: 0,
+    gameOver: false,
     camera2D,
     cameraOrigin: cameraOriginFor(point(1, 1), camera2D, world),
     cameraShakeFrames: 0,
@@ -5948,7 +6530,10 @@ function createGameGenreRuntime(project) {
     dialogue: null,
     lastAudioTrackId: null,
     sceneComplete: false,
-    variables: {}
+    variables: {},
+    inventory: {},
+    recipes: project.editorTimeline?.recipes ?? [],
+    blockTypes: project.editorTimeline?.blockTypes ?? []
   };
   return initialEventState(state);
 }
@@ -5981,19 +6566,47 @@ function triggerGameGenreCameraShake(state) {
   };
 }
 function stepGameGenre(state, input = {}) {
-  if (state.mode !== "PLAYING") return state;
+  if (state.mode !== "PLAYING" || state.gameOver || state.sceneComplete) return state;
+  const chasedObjects = state.runtimeFamily === "DODGE_ARENA" ? state.objects.map((object) => {
+    if (object.brain !== void 0 || !isDodgeEnemy(object)) return object;
+    const dx = state.playerPosition.x - object.position.x;
+    const dy = state.playerPosition.y - object.position.y;
+    const length = Math.hypot(dx, dy);
+    if (length <= 1e-3) return object;
+    const move = Math.min(DODGE_ENEMY_SPEED, length);
+    return {
+      ...object,
+      position: point(Math.min(state.world.width - PLAYER_HALF_WIDTH, Math.max(PLAYER_HALF_WIDTH, object.position.x + dx / length * move)), Math.min(state.world.height - PLAYER_HALF_HEIGHT, Math.max(PLAYER_HALF_HEIGHT, object.position.y + dy / length * move)))
+    };
+  }) : state.objects;
+  const brainObjects = chasedObjects.map((object) => stepBrain(object, state.playerPosition, state.world));
   const movement2 = stepMovement(state, input);
+  const combat = (state.tick + 1) % COMBAT_TICK_INTERVAL === 0 ? applyContactCombat(state.playerStatus, movement2.playerPosition, brainObjects) : {
+    objects: brainObjects,
+    playerStatus: state.playerStatus
+  };
   const nextBase = {
     ...state,
     tick: state.tick + 1,
+    objects: combat.objects,
+    playerStatus: combat.playerStatus,
     playerPosition: movement2.playerPosition,
     velocity: movement2.velocity,
     grounded: movement2.grounded,
+    survivalSeconds: state.runtimeFamily === "DODGE_ARENA" ? Math.floor((state.tick + 1) / 60) : state.survivalSeconds,
     cameraOrigin: cameraOriginFor(movement2.playerPosition, state.camera2D, state.world),
     cameraShakeFrames: Math.max(0, state.cameraShakeFrames - 1),
-    dialogue: input.interact === true || input.tap === true ? null : state.dialogue
+    dialogue: input.interact === true || input.tap === true ? null : state.dialogue,
+    gameOver: state.gameOver || combat.playerStatus.hp <= 0
   };
-  return processEventCards(nextBase, input);
+  const eventState = processEventCards(nextBase, input);
+  if (eventState.runtimeFamily === "DODGE_ARENA" && eventState.tick >= DODGE_SURVIVAL_TICKS && !eventState.gameOver) {
+    return {
+      ...eventState,
+      sceneComplete: true
+    };
+  }
+  return eventState;
 }
 export {
   DEFAULT_PHYSICS_2D_SETTINGS,

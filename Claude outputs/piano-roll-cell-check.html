@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>Piano Roll Cell Check</title>
+<style>
+  body { margin: 0; padding: 24px; background: #0b0f19; color: #e8ecf4; font-family: ui-sans-serif, system-ui, sans-serif; }
+  h1 { font-size: 16px; margin: 0 0 4px; }
+  p { font-size: 12px; color: #a9b4c4; margin: 0 0 20px; line-height: 1.6; }
+  .row { display: flex; gap: 32px; flex-wrap: wrap; }
+  .col { display: flex; flex-direction: column; gap: 8px; }
+  .label { font-size: 11px; font-weight: 700; color: #cbd5e6; }
+  .dims { font-size: 10px; color: #8ae3d2; font-family: ui-monospace, monospace; }
+  canvas { border: 1px solid #374356; border-radius: 4px; image-rendering: pixelated; }
+  .note { font-size: 10px; color: #6b7688; margin-top: 4px; }
+</style>
+</head>
+<body>
+  <h1>iAUDIO ピアノロール セル形状チェック(実データ再現)</h1>
+  <p>
+    src/wp180-workspace-ui.ts の renderAudioMidiGrid と全く同じグリッド線描画ロジック・同じ定数値(AUDIO_MIDI_ROW_HEIGHT, ppq=480, 既定クオンタイズ=1/16, ズーム=100%)を、
+    実アプリと切り離した状態でこのページ単体で再現したものです。実アプリのビルド(dist/wp180-workspace.js)には触れていません。
+  </p>
+  <div class="row">
+    <div class="col">
+      <div class="label">修正前(PIXELS_PER_BEAT = 120)</div>
+      <canvas id="before" width="240" height="200"></canvas>
+      <div class="dims" id="beforeDims"></div>
+      <div class="note">1マス = 横30px × 縦20px(長方形)</div>
+    </div>
+    <div class="col">
+      <div class="label">修正後(PIXELS_PER_BEAT = ROW_HEIGHT × 4 = 80)</div>
+      <canvas id="after" width="240" height="200"></canvas>
+      <div class="dims" id="afterDims"></div>
+      <div class="note">1マス = 横20px × 縦20px(正方形)</div>
+    </div>
+  </div>
+
+<script>
+const ROW_HEIGHT = 20;
+const PPQ = 480;
+const ZOOM = 1;
+
+function gridTickFor16th() {
+  // audioBeatTick() at 4/4 = ppq*4/4 = ppq; audioGridTick() for "1/16"/"off" = beat/4
+  const beat = PPQ;
+  return Math.max(1, Math.round(beat / 4));
+}
+
+function draw(canvasId, dimsId, pixelsPerBeat) {
+  const canvas = document.getElementById(canvasId);
+  const ctx = canvas.getContext("2d");
+  const pixelsPerTick = (pixelsPerBeat / PPQ) * ZOOM;
+  const gridTick = gridTickFor16th();
+  const cellWidth = gridTick * pixelsPerTick;
+  const rowCount = Math.floor(canvas.height / ROW_HEIGHT);
+
+  ctx.fillStyle = "#0b0f19";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // alternate row shading, same idea as the black-key rows in the real grid
+  for (let row = 0; row < rowCount; row++) {
+    if (row % 2 === 1) {
+      ctx.fillStyle = "rgba(3,5,10,.32)";
+      ctx.fillRect(0, row * ROW_HEIGHT, canvas.width, ROW_HEIGHT);
+    }
+  }
+
+  // horizontal (row) lines
+  ctx.strokeStyle = "rgba(104,121,148,.35)";
+  ctx.lineWidth = 1;
+  for (let row = 0; row <= rowCount; row++) {
+    const y = row * ROW_HEIGHT + 0.5;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(canvas.width, y);
+    ctx.stroke();
+  }
+
+  // vertical (grid tick) lines, same as the real renderAudioMidiGrid loop
+  let col = 0;
+  for (let x = 0; x < canvas.width; x += cellWidth) {
+    const isBeat = col % 4 === 0; // every 4th 1/16 cell = 1 beat
+    ctx.strokeStyle = isBeat ? "rgba(149,190,231,.6)" : "rgba(149,162,190,.35)";
+    ctx.beginPath();
+    ctx.moveTo(x + 0.5, 0);
+    ctx.lineTo(x + 0.5, canvas.height);
+    ctx.stroke();
+    col++;
+  }
+
+  // draw one sample "note" square in the very first cell so the square-ness is obvious
+  ctx.fillStyle = "#66e3b4";
+  ctx.fillRect(2, ROW_HEIGHT * 2 + 2, cellWidth - 4, ROW_HEIGHT - 4);
+
+  document.getElementById(dimsId).textContent =
+    `pixelsPerTick=${pixelsPerTick.toFixed(4)}  gridTick=${gridTick}  cellWidth=${cellWidth.toFixed(1)}px  rowHeight=${ROW_HEIGHT}px`;
+}
+
+draw("before", "beforeDims", 120);
+draw("after", "afterDims", 80);
+</script>
+</body>
+</html>

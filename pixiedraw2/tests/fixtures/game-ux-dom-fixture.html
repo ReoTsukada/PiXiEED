@@ -217,6 +217,27 @@
         >
           Player
         </button>
+        <section id="game-ui-library" aria-label="Game UI nodes">
+          <h3>Game UI</h3>
+          <button
+            type="button"
+            draggable="true"
+            data-game-ui-node-kind="BUTTON"
+            aria-controls="inspector-panel"
+          >Button</button>
+          <button
+            type="button"
+            draggable="true"
+            data-game-ui-node-kind="MINIMAP"
+            aria-controls="inspector-panel"
+          >Minimap</button>
+          <button
+            type="button"
+            draggable="true"
+            data-game-ui-node-kind="INVENTORY"
+            aria-controls="inspector-panel"
+          >Inventory</button>
+        </section>
       </section>
 
       <section
@@ -314,6 +335,8 @@
         data-selected-node="node-player"
         data-editor-state="previewing"
         data-preview-state="running"
+        data-preview-runtime="physics2d-session"
+        data-preview-canonical="unchanged"
       >
         <h2>Preview</h2>
         <p>Previewing Village with Player selected.</p>

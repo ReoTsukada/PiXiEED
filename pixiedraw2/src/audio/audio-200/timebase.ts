@@ -4,12 +4,13 @@
  * The Project is authoritative in PPQ ticks. Frames are the Draw/UI
  * projection and seconds are the runtime/render projection. Keeping all three
  * conversions here prevents the editor, scheduler, renderer, and recording
- * bridge from accumulating slightly different rounding rules.
+ * shared timebase from accumulating slightly different rounding rules.
  */
 
 import {
   asAudioTick,
   asAudioTrackId,
+  AUDIO200_MAX_TICK,
   type AudioProject,
   type AudioTick,
   type AudioTrackId,
@@ -27,7 +28,10 @@ export interface AudioClockPosition {
   readonly seconds: number;
 }
 
-const MAX_TICK = 9_000_000_000;
+// Frame/seconds are floating-point projections. Keep their conversion bound
+// conservative even though the canonical Tick document can address the full
+// safe-integer range through Tick-native editing and virtual timelines.
+const MAX_TICK = Math.min(AUDIO200_MAX_TICK, 9_000_000_000);
 const SAFE_INSTRUMENT = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 
 function positiveFinite(value: number, fallback: number): number {

@@ -730,8 +730,11 @@ export function asAudioContentHash(value: string): AudioContentHash {
   return value as AudioContentHash;
 }
 
+/** Maximum representable PPQ tick for the canonical Audio-200 document. */
+export const AUDIO200_MAX_TICK = Number.MAX_SAFE_INTEGER;
+
 export function asAudioTick(value: number): AudioTick {
-  if (!Number.isSafeInteger(value) || value < 0 || value > 9_000_000_000) {
+  if (!Number.isSafeInteger(value) || value < 0 || value > AUDIO200_MAX_TICK) {
     throw new Error("AudioTick must be a bounded non-negative safe integer.");
   }
   return value as AudioTick;

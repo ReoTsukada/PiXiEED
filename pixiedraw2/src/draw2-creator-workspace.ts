@@ -52,7 +52,27 @@ export type AssetAnimationName =
   | "WALK_DOWN"
   | "WALK_LEFT"
   | "WALK_RIGHT"
+  | "JUMP_UP"
+  | "JUMP_DOWN"
+  | "JUMP_LEFT"
+  | "JUMP_RIGHT"
+  | "IDLE_UP_LEFT"
+  | "IDLE_UP_RIGHT"
+  | "IDLE_DOWN_LEFT"
+  | "IDLE_DOWN_RIGHT"
+  | "WALK_UP_LEFT"
+  | "WALK_UP_RIGHT"
+  | "WALK_DOWN_LEFT"
+  | "WALK_DOWN_RIGHT"
+  | "JUMP_UP_LEFT"
+  | "JUMP_UP_RIGHT"
+  | "JUMP_DOWN_LEFT"
+  | "JUMP_DOWN_RIGHT"
   | "ATTACK"
+  | "ATTACK_UP_LEFT"
+  | "ATTACK_UP_RIGHT"
+  | "ATTACK_DOWN_LEFT"
+  | "ATTACK_DOWN_RIGHT"
   | "ATTACK_UP"
   | "ATTACK_DOWN"
   | "ATTACK_LEFT"
@@ -73,8 +93,23 @@ export type AssetDirectionName =
 export type AssetLoopMode = "LOOP" | "ONCE" | "PING_PONG";
 
 /**
- * One animation frame keeps a live reference to the Draw document.
- * The raster itself is never copied into an Asset definition.
+ * A fixed, local image captured from the visible composite of one Draw frame.
+ *
+ * The byte array is intentionally JSON-safe so the local Asset Definition can
+ * be restored without requiring the source Frame or Layer to remain unchanged.
+ * It is not part of the Game persistence model and is not a realtime-sync
+ * payload.
+ */
+export interface AssetAnimationFrameRasterSnapshot {
+  readonly width: number;
+  readonly height: number;
+  readonly data: readonly number[];
+}
+
+/**
+ * One animation frame keeps its original editor identity for diagnostics and
+ * backwards compatibility, but newly captured frames also carry a fixed
+ * composite snapshot. The snapshot is the rendering authority when present.
  */
 export interface AssetAnimationFrameReference {
   readonly sourceFrameId: string;
@@ -85,6 +120,8 @@ export interface AssetAnimationFrameReference {
     readonly width: number;
     readonly height: number;
   };
+  /** Fixed RGBA image captured from the displayed frame selection. */
+  readonly rasterSnapshot?: AssetAnimationFrameRasterSnapshot;
   readonly durationMs?: number;
   readonly flipX?: boolean;
   readonly flipY?: boolean;
@@ -100,11 +137,11 @@ export interface AssetAnimationClip {
   readonly frameIds: readonly string[];
   readonly loopMode: AssetLoopMode;
   readonly fps?: number;
-  /** A live source reference used for mirrored directions; no bitmap is copied. */
+  /** Optional source slot used for mirrored directions and legacy definitions. */
   readonly sourceReference?: string;
   readonly flipX?: boolean;
   readonly flipY?: boolean;
-  /** Per-frame live references into the source Draw document. */
+  /** Per-frame source identity plus optional fixed local image snapshots. */
   readonly sourceFrames?: readonly AssetAnimationFrameReference[];
   /** Optional per-frame durations. When omitted, `fps` is used. */
   readonly frameDurationsMs?: readonly number[];
@@ -267,6 +304,17 @@ function normalizeAnimationFrameReferences(
       width: Math.round(frame.rect.width),
       height: Math.round(frame.rect.height),
     },
+    ...(frame.rasterSnapshot === undefined
+      ? {}
+      : {
+        rasterSnapshot: {
+          width: Math.round(frame.rasterSnapshot.width),
+          height: Math.round(frame.rasterSnapshot.height),
+          data: Array.isArray(frame.rasterSnapshot.data)
+            ? frame.rasterSnapshot.data.map((value) => Math.round(value))
+            : [],
+        },
+      }),
     ...(frame.durationMs === undefined
       ? {}
       : { durationMs: Math.round(frame.durationMs) }),
@@ -407,6 +455,20 @@ function isValidRegionSelection(region: AssetRegionSelection): boolean {
   return isPositiveInteger(region.cellWidth) && isPositiveInteger(region.cellHeight) && isPositiveInteger(region.columns) && isPositiveInteger(region.rows);
 }
 
+function isValidRasterSnapshot(
+  snapshot: AssetAnimationFrameRasterSnapshot,
+): boolean {
+  if (
+    !isPositiveInteger(snapshot.width) ||
+    !isPositiveInteger(snapshot.height) ||
+    !Array.isArray(snapshot.data) ||
+    snapshot.data.length !== snapshot.width * snapshot.height * 4
+  ) return false;
+  return snapshot.data.every((value) =>
+    Number.isSafeInteger(value) && value >= 0 && value <= 255
+  );
+}
+
 function isValidAnimationMapping(mapping: readonly AssetAnimationClip[]): boolean {
   const seenKeys = new Set<string>();
   return mapping.every((clip) => {
@@ -445,6 +507,8 @@ function isValidAnimationMapping(mapping: readonly AssetAnimationClip[]): boolea
         || frame.rect.y < 0
         || !isPositiveInteger(frame.rect.width)
         || !isPositiveInteger(frame.rect.height)
+        || (frame.rasterSnapshot !== undefined &&
+          !isValidRasterSnapshot(frame.rasterSnapshot))
         || (frame.durationMs !== undefined && (!Number.isFinite(frame.durationMs) || frame.durationMs <= 0))
         || (frame.flipX !== undefined && typeof frame.flipX !== "boolean")
         || (frame.flipY !== undefined && typeof frame.flipY !== "boolean")

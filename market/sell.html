@@ -17,7 +17,41 @@
         <strong id="listingDerivativeSourceTitle" data-i18n-key="sellDerivativeLoading">親作品を確認しています</strong>
         <p data-i18n-key="sellDerivativeCopy">親作品と派生出品権は固定されています。この出品を大元作品へ変更することはできません。</p>
       </section>
-      <fieldset class="market-form-section" id="listingFilesSection">
+      <fieldset class="market-form-section market-delivery-manifest-section" id="listingDeliveryManifestSection">
+        <legend>販売内容</legend>
+        <p class="helper">iDRAW・文章・Visualの制作画面から引き継いだ内容と、下のファイル追加を、今回販売する内容としてまとめます。</p>
+        <p id="listingDeliveryProjectNote" class="helper">制作画面の「Marketへ出品」から来た場合は、Project名・revision・由来を保持したまま表示されます。</p>
+        <p id="listingDeliverySummary" class="helper" aria-live="polite">まだ販売内容が選択されていません。</p>
+      </fieldset>
+      <fieldset class="market-form-section market-simple-policy-section" id="listingSimplePolicy">
+        <legend>公開設定</legend>
+        <p class="helper">販売形式を細かく分類する必要はありません。見せるだけか、取得できるかを選び、必要な範囲だけ設定します。編集履歴だけから権利者を自動で増やすことはありません。</p>
+        <div class="market-policy-choice-grid" role="radiogroup" aria-label="作品の公開方法">
+          <label class="market-policy-choice">
+            <input id="listingAcquisitionShowcase" type="radio" name="listingAcquisitionMode" value="showcase">
+            <span><strong>公開のみ</strong><small>作品を見せるだけ。価格を付けず、取得・購入はできません。</small></span>
+          </label>
+          <label class="market-policy-choice is-selected">
+            <input id="listingAcquisitionEnabled" type="radio" name="listingAcquisitionMode" value="acquire" checked>
+            <span><strong>取得できる</strong><small>無料または有料で、購入者が取得して使えるようにします。</small></span>
+          </label>
+        </div>
+        <div id="listingAcquisitionFields" class="market-simple-policy-fields">
+          <div class="market-policy-two-column">
+            <label class="market-field"><span>価格</span><input id="listingPrice" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="8" list="listingPricePresets" value="0"><small>0円なら無料。500円以上は100円単位です。</small></label>
+            <label class="market-field"><span>利用範囲</span><select id="listingUsePreset"><option value="view-only">見る・保存する</option><option value="use-in-work" selected>作品やゲームで使う</option><option value="modify-and-derive">加工して派生作品にも使う</option></select><small>詳細な利用規約ではなく、目的で選びます。</small></label>
+          </div>
+          <label class="market-policy-check"><input id="listingSimpleLimitedEnabled" type="checkbox"><span><strong>取得数を制限する</strong><small>有料作品だけ、先着人数を設定できます。</small></span></label>
+          <label class="market-limited-quantity market-simple-limited-quantity" id="listingSimpleLimitedQuantityField" hidden>先着人数<input id="listingSimpleLimitedQuantity" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" list="listingQuantityPresets" value="10"><small>1〜100,000名。0円・公開のみでは設定できません。</small></label>
+        </div>
+        <div class="market-participant-summary" id="listingParticipantSummary">
+          <strong>制作参加者</strong>
+          <p>1ピクセルや編集履歴だけで権利者を増やしません。明示的に登録・承認された参加者だけをクレジットと分配の対象にします。</p>
+          <ul id="listingParticipantList"><li>出品者のみ</li></ul>
+        </div>
+        <p id="listingPolicySummary" class="market-policy-summary" aria-live="polite">無料で取得できます。作品やゲームで使えます。</p>
+      </fieldset>
+      <fieldset class="market-form-section" id="listingFilesSection" data-legacy-config-panel="files">
         <legend><span class="market-heading-with-help"><span data-i18n-key="sellFiles">出品ファイル</span><span class="market-help-tip" data-market-help><button class="market-help-tip__button" type="button" aria-label="出品ファイルについて" aria-describedby="sellFilesHelp" aria-expanded="false">?</button><span class="market-help-tip__content" id="sellFilesHelp" role="tooltip">1商品に含めるファイルやフォルダをまとめて追加します。元ファイルは非公開領域へ保存され、購入前にはサムネイルと購入前プレビューだけを表示します。</span></span></span></legend>
         <div class="market-drop-zone" id="listingDropZone" role="button" tabindex="0" aria-label="ファイルまたはフォルダを追加">
           <strong data-i18n-key="sellDropTitle">ここへファイル・フォルダをドロップ</strong>
@@ -32,28 +66,28 @@
         <p id="listingFileSummary" class="helper" data-i18n-key="sellFilesEmpty">ファイルまたはフォルダを追加してください。</p>
         <div id="listingFileList" class="market-file-list" aria-live="polite"></div>
       </fieldset>
-      <fieldset class="market-form-section">
+      <fieldset class="market-form-section" data-legacy-config-panel="formats">
         <legend><span class="market-heading-with-help"><span data-i18n-key="sellFormats">含める形式</span><span class="market-help-tip" data-market-help><button class="market-help-tip__button" type="button" aria-label="形式の自動選択について" aria-describedby="sellFormatsHelp" aria-expanded="false">?</button><span class="market-help-tip__content" id="sellFormatsHelp" role="tooltip">拡張子とファイル内容から形式を自動判定します。販売パッケージに入れたくない形式だけOFFにします。ONの形式に該当するファイルは購入者へ提供されます。</span></span></span></legend>
         <p class="helper" data-i18n-key="sellFormatsHelper">ファイルから自動選択されます。PNG・WebP・GIF・APNG・スプライトシートは最大512×512pxです。</p>
         <p class="market-product-type-preview" id="listingProductType" data-i18n-key="sellProductPending">商品種類はファイル追加後に自動判定されます。</p>
         <div id="listingFormatSwitches" class="market-switch-list"></div>
       </fieldset>
-      <fieldset class="market-form-section" id="listingCompositionSection">
+      <fieldset class="market-form-section" id="listingCompositionSection" data-legacy-config-panel="composition">
         <legend>販売パッケージ構成</legend>
         <p class="helper">形式スイッチは複数選択できます。ここでは購入者へ渡す商品の構成を1つ選びます。音楽は購入後に音声ファイルとして受け取れます。</p>
         <div id="listingPackageComposition" class="market-composition-grid" role="radiogroup" aria-label="販売パッケージ構成"></div>
         <p id="listingCompositionStatus" class="market-composition-status" aria-live="polite"></p>
       </fieldset>
-      <fieldset class="market-form-section" id="listingPreviewSection" hidden>
+      <fieldset class="market-form-section" id="listingPreviewSection" data-legacy-config-panel="preview" hidden>
         <legend><span class="market-heading-with-help"><span data-i18n-key="sellPreview">サムネイル・購入前プレビュー</span><span class="market-help-tip" data-market-help><button class="market-help-tip__button" type="button" aria-label="公開プレビューについて" aria-describedby="sellPreviewHelp" aria-expanded="false">?</button><span class="market-help-tip__content" id="sellPreviewHelp" role="tooltip">サムネイルは一覧の代表画像、購入前プレビューは購入前に内容を確認する画像です。元データそのものは公開せず、透かし付き画像を生成します。PXDと旧iDRAWファイルは埋め込みPNGプレビューを使います。</span></span></span></legend>
         <p class="helper" data-i18n-key="sellPreviewHelper">サムネイルを1枚、購入前プレビューを最大6枚選択できます。公開用には元ファイルではなく透かし付き確認画像を生成します。</p>
         <div id="listingPreviewGrid" class="market-preview-grid"></div>
         <button id="listingOpenViewMode" class="market-file-button is-subtle" type="button" data-i18n-key="sellPreviewViewMode">購入者の視聴モードを確認</button>
       </fieldset>
-      <label id="listingChangeSummaryField" hidden><span data-i18n-key="sellChangeSummary">元作品から変更・追加した内容</span><textarea id="listingChangeSummary" maxlength="2000" placeholder="追加したパーツ、色、フレーム、動きなどを具体的に記載してください。" data-i18n-placeholder="sellChangeSummaryPlaceholder"></textarea></label>
-      <label><span data-i18n-key="sellAssetName">素材名</span><input id="listingTitle" required maxlength="120" autocomplete="off"></label>
-      <label><span data-i18n-key="sellDescription">説明</span><textarea id="listingDescription" maxlength="4000"></textarea></label>
-      <section class="market-tag-editor" aria-labelledby="listingTagsTitle">
+      <label id="listingChangeSummaryField" data-legacy-config-panel="change-summary" hidden><span data-i18n-key="sellChangeSummary">元作品から変更・追加した内容</span><textarea id="listingChangeSummary" maxlength="2000" placeholder="追加したパーツ、色、フレーム、動きなどを具体的に記載してください。" data-i18n-placeholder="sellChangeSummaryPlaceholder"></textarea></label>
+      <label data-legacy-config-panel="identity"><span data-i18n-key="sellAssetName">素材名</span><input id="listingTitle" required maxlength="120" autocomplete="off"></label>
+      <label data-legacy-config-panel="description"><span data-i18n-key="sellDescription">説明</span><textarea id="listingDescription" maxlength="4000"></textarea></label>
+      <section class="market-tag-editor" data-legacy-config-panel="tags" aria-labelledby="listingTagsTitle">
         <span class="market-heading-with-help" id="listingTagsTitle"><span data-i18n-key="sellTags">タグ</span><span class="market-help-tip" data-market-help><button class="market-help-tip__button" type="button" aria-label="タグについて" aria-describedby="sellTagsHelp" aria-expanded="false">?</button><span class="market-help-tip__content" id="sellTagsHelp" role="tooltip">検索に使う言葉を最大5個設定できます。入力後にEnterを押して確定し、不要なタグはボタンを押して削除します。</span></span></span>
         <div class="market-tag-editor__input"><input id="listingTagInput" maxlength="24" autocomplete="off" list="listingTagSuggestions" placeholder="既存タグを検索して選ぶ" data-i18n-placeholder="sellTagPlaceholder"><button id="listingTagAdd" class="market-file-button is-subtle" type="button" data-i18n-key="sellTagAdd">追加</button></div>
         <div id="listingTagChips" class="market-tag-chips" aria-live="polite"></div>
@@ -61,7 +95,7 @@
         <datalist id="listingTagSuggestions"></datalist>
         <small>既存タグから選ぶと表記ゆれを防げます。最大5個・1個24文字まで</small>
       </section>
-      <fieldset class="market-form-section" id="listingOptionsSection">
+      <fieldset class="market-form-section" id="listingOptionsSection" data-legacy-config-panel="options" hidden aria-hidden="true">
         <legend><span class="market-heading-with-help"><span id="listingOptionsTitle" data-i18n-key="sellOptions">追加オプション</span><span class="market-help-tip" data-market-help><button class="market-help-tip__button" type="button" aria-label="利用オプションの設定方法" aria-describedby="sellOptionsHelp" aria-expanded="false">?</button><span class="market-help-tip__content" id="sellOptionsHelp" role="tooltip">限定販売、派生許可、利用範囲をまとめて設定します。選んだ条件は販売価格に含まれます。</span></span></span></legend>
         <p class="helper" data-i18n-key="sellOptionsHelper">必要なものだけONにしてください。選んだオプションは販売価格に含まれます。</p>
         <div class="market-switch-list" aria-live="polite">
@@ -74,9 +108,7 @@
         </div>
         <p class="helper market-price-note">オプションの内容は自由に選べます。料金はすべて販売価格に含まれます。</p>
       </fieldset>
-      <div class="market-field"><span class="market-heading-with-help"><label for="listingPrice" data-i18n-key="sellPrice">販売価格</label><span class="market-help-tip" data-market-help><button class="market-help-tip__button" type="button" aria-label="販売価格について" aria-describedby="sellPriceHelp" aria-expanded="false">?</button><span class="market-help-tip__content" id="sellPriceHelp" role="tooltip">選択したオプションを含む購入者の支払額です。最低500円、100円単位で設定します。</span></span></span><input id="listingPrice" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="8" list="listingPricePresets" value="500" required></div>
-      <p class="helper market-price-note">オプション込みで500円以上・100円単位です。</p>
-      <fieldset class="market-form-section market-declaration-section">
+      <fieldset class="market-form-section market-declaration-section" data-legacy-config-panel="declaration">
         <legend data-i18n-key="sellAiDeclaration">AI使用の申告（必須）</legend>
         <p class="helper" data-i18n-key="sellAiHelper">AIの使用は禁止していません。作品の制作・加工に生成AIを使用したかを正しく選んでください。</p>
         <div class="market-declaration-options">
@@ -87,7 +119,7 @@
       <div class="market-legal-confirmations">
         <div class="market-check"><input id="listingTermsConfirmed" type="checkbox" required><label for="listingTermsConfirmed"><a href="../terms/index.html" target="_blank" rel="noopener">利用規約</a>を読み、内容に同意しました。</label></div>
         <div class="market-check"><input id="listingPrivacyConfirmed" type="checkbox" required><label for="listingPrivacyConfirmed"><a href="../privacy/index.html" target="_blank" rel="noopener">プライバシーポリシー</a>を読み、出品情報の取扱いを確認しました。</label></div>
-        <div class="market-check"><input id="listingRights" type="checkbox" required><span class="market-heading-with-help"><label id="listingRightsLabel" for="listingRights">PiXiEEDの購入素材を元にしていない大元作品で、出品・販売する権利があることを確認しました。</label><span class="market-help-tip" data-market-help><button class="market-help-tip__button" type="button" aria-label="出品権限の確認について" aria-describedby="sellRightsHelp" aria-expanded="false">?</button><span class="market-help-tip__content" id="sellRightsHelp" role="tooltip">自作物またはPiXiEED外で販売許可を得た大元作品だけを登録します。PiXiEEDで購入した素材の再編集作品は、マイページの商品カードにある「派生作品を出品」から登録してください。</span></span></span></div>
+        <div class="market-check"><input id="listingRights" type="checkbox" required><span class="market-heading-with-help"><label id="listingRightsLabel" for="listingRights">この作品を出品し、設定した範囲で利用許諾できる権限があります。</label><span class="market-help-tip" data-market-help><button class="market-help-tip__button" type="button" aria-label="出品権限の確認について" aria-describedby="sellRightsHelp" aria-expanded="false">?</button><span class="market-help-tip__content" id="sellRightsHelp" role="tooltip">編集履歴から権利者を自動判定しません。自作物、明示的に登録・承認された制作参加者、または利用許可を確認できる元素材だけを出品してください。購入素材を元にした作品は、商品カードの「派生作品を出品」から登録します。</span></span></span></div>
       </div>
       <button class="market-sell-button" id="listingSubmit" type="submit" data-i18n-key="sellSubmit">出品内容を送信</button><p id="listingStatus" class="helper"></p>
     </form>
@@ -106,5 +138,5 @@
   <datalist id="listingPricePresets"></datalist>
   <datalist id="listingOptionPricePresets"></datalist>
   <datalist id="listingQuantityPresets"><option value="1"><option value="5"><option value="10"><option value="20"><option value="50"><option value="100"><option value="500"><option value="1000"><option value="10000"><option value="100000"></datalist>
-<script src="../scripts/pixieed-market-access.js?v=20260721-auth-network-fallback2"></script><script src="access-gate.js?v=20260721-auth-network-fallback2"></script><script src="color-codec-utils.js?v=2026.07.19-gif-native-scale2"></script><script src="listing-package-utils.js?v=20260825-package-composition3"></script><script src="sell.js?v=20260825-package-composition3"></script><script src="help-tips.js?v=2026.07.17-context-help1"></script><script src="../scripts/shared-profile-header.js?v=20260825-common-shell15"></script><script src="../scripts/shared-bottom-nav.js?v=20260830-bridge-shell1"></script>
+<script src="../app/assets/creator-market-delivery-manifest.js?v=20260910-delivery-manifest2"></script><script src="../app/assets/creator-market-transfer.js?v=20260910-delivery-manifest2"></script><script src="../scripts/pixieed-market-access.js?v=20260721-auth-network-fallback2"></script><script src="access-gate.js?v=20260721-auth-network-fallback2"></script><script src="color-codec-utils.js?v=2026.07.19-gif-native-scale2"></script><script src="listing-package-utils.js?v=20260906-content-packages1"></script><script src="listing-contracts.js?v=20260910-simple-policy1"></script><script src="sell.js?v=20260910-delivery-manifest2"></script><script src="help-tips.js?v=2026.07.17-context-help1"></script><script src="../scripts/shared-profile-header.js?v=20260825-common-shell15"></script><script src="../scripts/shared-bottom-nav.js?v=20260830-bridge-shell1"></script>
 </body></html>

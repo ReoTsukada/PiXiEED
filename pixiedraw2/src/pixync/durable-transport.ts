@@ -45,6 +45,22 @@ export class PixyncDurableTransportError extends Error {
   }
 }
 
+function isPermanentScopePermissionError(error: unknown): boolean {
+  if (
+    error instanceof Error && /scope_assignment_required/i.test(error.message)
+  ) {
+    return true;
+  }
+  if (error !== null && typeof error === "object") {
+    const record = error as Record<string, unknown>;
+    return [record.code, record.message, record.details, record.hint]
+      .some((value) =>
+        typeof value === "string" && /scope_assignment_required/i.test(value)
+      );
+  }
+  return false;
+}
+
 export interface PixyncDurableTransportConnectInput {
   readonly projectId: string;
   readonly clientId: string;
@@ -266,7 +282,7 @@ export class PixyncDurableTransportCoordinator {
         await this.#journal.failOutbox(
           lease.record.operationId,
           lease.lease.token,
-          true,
+          !isPermanentScopePermissionError(error),
         );
       } catch {
         // The original transport error remains authoritative; restart

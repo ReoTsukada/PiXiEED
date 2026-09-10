@@ -194,3 +194,103 @@ Deno.test("all adjustable rails share a reachable collapse contract", async () =
   );
   assert(!finalRail.includes("&.is-"), "Final rail CSS must stay flat CSS.");
 });
+
+Deno.test("final border hierarchy keeps structural edges single", async () => {
+  const css = await readProjectFile("../assets/draw2-shell.css");
+  const gameCss = await readProjectFile("../assets/draw2-game-ux.css");
+  const motionCss = await readProjectFile("../assets/draw2-mode-motion.css");
+  const cleanupStart = css.lastIndexOf(
+    "Final border hierarchy contract (2026-09-08)",
+  );
+  assert(cleanupStart >= 0, "Final border hierarchy contract is missing.");
+  const cleanup = css.slice(cleanupStart);
+  for (const required of [
+    "#draw2WorkspaceFrame.draw2-workspace-frame:not([hidden])",
+    "#draw2WorkspaceLeftDock",
+    "border-right: 1px solid var(--draw2-border-subtle)",
+    "#draw2WorkspaceRightCustomDock",
+    "#draw2WorkspaceCanvasRegion",
+    "#draw2WorkspaceTimelineSlot",
+    ".draw2-timeline-cell",
+    "border-inline-end: 1px solid var(--draw2-border-subtle)",
+    "box-shadow: inset 0 0 0 1px var(--draw2-accent-strong)",
+  ]) {
+    assert(
+      cleanup.includes(required),
+      `Final border hierarchy contract missing: ${required}`,
+    );
+  }
+
+  const gameCleanupStart = gameCss.lastIndexOf(
+    "Final panel border hierarchy contract (2026-09-08)",
+  );
+  assert(
+    gameCleanupStart >= 0,
+    "Final game panel border hierarchy contract is missing.",
+  );
+  const gameCleanup = gameCss.slice(gameCleanupStart);
+  for (const required of [
+    ".draw2-game-hierarchy-entry",
+    ".draw2-game-playground-source-card",
+    ".draw2-game-playground-card[data-playground-card=\"player\"]",
+    "border-color: transparent !important",
+  ]) {
+    assert(
+      gameCleanup.includes(required),
+      `Final game panel border hierarchy contract missing: ${required}`,
+    );
+  }
+
+  const cascadeSealStart = motionCss.lastIndexOf(
+    "Final border cascade seal (2026-09-08)",
+  );
+  assert(cascadeSealStart >= 0, "Final border cascade seal is missing.");
+  const cascadeSeal = motionCss.slice(cascadeSealStart);
+  for (const required of [
+    "data-workspace-profile=\"desktop\"",
+    "#draw2WorkspaceLeftDock",
+    "#draw2WorkspaceRightDock",
+    "#draw2WorkspaceCanvasRegion",
+    "#draw2WorkspaceRightCustomDock",
+    "#draw2ModeTimelineDeck",
+    ".draw2-game-scene-viewport:not([hidden])",
+    "#draw2AudioCompactMaster",
+  ]) {
+    assert(
+      cascadeSeal.includes(required),
+      `Final border cascade seal missing: ${required}`,
+    );
+  }
+});
+
+Deno.test("final density contract removes redundant panel chrome", async () => {
+  const motionCss = await readProjectFile("../assets/draw2-mode-motion.css");
+  const densityStart = motionCss.lastIndexOf(
+    "Final density contract (2026-09-08)",
+  );
+  assert(densityStart >= 0, "Final density contract is missing.");
+  const density = motionCss.slice(densityStart);
+  for (const required of [
+    "#draw2WorkspaceModeSummary",
+    "#draw2GameSceneViewport",
+    "#draw2GameTopbarControls",
+    "#draw2ModeTimelineDeck",
+    ".draw2-mode-timeline-deck-heading",
+    "#draw2TimelineCard",
+    "#draw2TimelineCollapse",
+    "#draw2WorkspacePaletteStrip",
+    ".draw2-palette-active-color",
+    "#draw2WorkspacePaletteGrid",
+    "#draw2GameDeckStatus",
+    "#draw2AudioDeckStatus",
+    "#draw2GamePlaygroundBottom",
+    "display: none !important",
+    "grid-template-rows: 30px 24px minmax(0, 1fr)",
+    "position: absolute !important",
+  ]) {
+    assert(
+      density.includes(required),
+      `Final density contract missing: ${required}`,
+    );
+  }
+});

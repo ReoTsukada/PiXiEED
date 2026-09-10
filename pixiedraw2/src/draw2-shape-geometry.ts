@@ -1,3 +1,14 @@
+import {
+  interpolateBrushLine,
+  normalizeBrushDescriptor,
+  stampBrushPoints,
+} from "./draw2-brush.ts";
+import type {
+  BrushAlgorithm,
+  BrushPattern,
+  BrushShape,
+} from "./draw2-brush.ts";
+
 export type ShapeTool =
   | "line"
   | "rect"
@@ -7,12 +18,14 @@ export type ShapeTool =
   | "circle"
   | "circle-fill";
 
-export type ShapeBrushShape = "square" | "circle";
-export type ShapeBrushPattern = "solid" | "checker" | "dots" | "bayer-2x2";
+export type ShapeBrushShape = BrushShape;
+export type ShapeBrushPattern = BrushPattern;
 
 export interface ShapeToolOptions {
   readonly brushSize: number;
   readonly brushShape: ShapeBrushShape;
+  readonly brushAngle: number;
+  readonly brushAlgorithm: BrushAlgorithm;
   readonly pattern: ShapeBrushPattern;
 }
 
@@ -91,84 +104,16 @@ function patternVisible(
   return true;
 }
 
-function interpolatePixelLine(
-  from: ShapePoint,
-  to: ShapePoint,
-): ShapePoint[] {
-  const points: ShapePoint[] = [];
-  let x0 = Math.round(from.x);
-  let y0 = Math.round(from.y);
-  const x1 = Math.round(to.x);
-  const y1 = Math.round(to.y);
-  const dx = Math.abs(x1 - x0);
-  const sx = x0 < x1 ? 1 : -1;
-  const dy = -Math.abs(y1 - y0);
-  const sy = y0 < y1 ? 1 : -1;
-  let error = dx + dy;
-
-  while (true) {
-    points.push({ x: x0, y: y0 });
-    if (x0 === x1 && y0 === y1) break;
-    const doubleError = 2 * error;
-    if (doubleError >= dy) {
-      error += dy;
-      x0 += sx;
-    }
-    if (doubleError <= dx) {
-      error += dx;
-      y0 += sy;
-    }
-  }
-  return points;
-}
-
-function stamp(
-  center: ShapePoint,
-  options: ShapeToolOptions,
-  bounds: ShapeBounds,
-): ShapePoint[] {
-  const size = options.brushSize;
-  const start = -Math.floor(size / 2);
-  const centerOffset = (size - 1) / 2;
-  const radius = Math.max(0.5, size / 2);
-  const points: ShapePoint[] = [];
-  for (let row = 0; row < size; row += 1) {
-    for (let column = 0; column < size; column += 1) {
-      const x = start + column;
-      const y = start + row;
-      if (
-        options.brushShape === "circle" &&
-        ((column - centerOffset) ** 2) + ((row - centerOffset) ** 2) >
-          radius ** 2
-      ) continue;
-      if (!patternVisible(center.x + x, center.y + y, options.pattern)) {
-        continue;
-      }
-      points.push({ x: center.x + x, y: center.y + y });
-    }
-  }
-  return points.filter((point) =>
-    point.x >= 0 && point.y >= 0 && point.x < bounds.width &&
-    point.y < bounds.height
-  );
-}
-
 function stampBrush(
   points: readonly ShapePoint[],
   options: ShapeToolOptions,
   bounds: ShapeBounds,
 ): ShapePoint[] {
-  const stamped: ShapePoint[] = [];
-  for (const point of points) {
-    const next = stamp(clampPoint(point, bounds), options, bounds);
-    if (stamped.length + next.length > MAX_STAMPED_STROKE_PIXELS) {
-      throw new Error(
-        "Expanded Stroke exceeds the bounded pixel budget.",
-      );
-    }
-    stamped.push(...next);
+  const stamped = stampBrushPoints(points, options, bounds);
+  if (stamped.length > MAX_STAMPED_STROKE_PIXELS) {
+    throw new Error("Expanded Stroke exceeds the bounded pixel budget.");
   }
-  return sortedUnique(stamped, bounds);
+  return [...stamped];
 }
 
 function rectanglePixels(rect: DragRect, filled: boolean): ShapePoint[] {
@@ -310,11 +255,16 @@ function shapePixels(
   from: ShapePoint,
   to: ShapePoint,
   bounds: ShapeBounds,
+  algorithm: BrushAlgorithm = "regular",
 ): ShapePoint[] {
   const rect = normalizeBounds(from, to, bounds);
   if (tool === "line") {
     return sortedUnique(
-      interpolatePixelLine(clampPoint(from, bounds), clampPoint(to, bounds)),
+      interpolateBrushLine(
+        clampPoint(from, bounds),
+        clampPoint(to, bounds),
+        algorithm,
+      ),
       bounds,
     );
   }
@@ -371,15 +321,13 @@ function isOutlineShape(
 }
 
 function normalizeOptions(options: ShapeToolOptions): ShapeToolOptions {
+  const brush = normalizeBrushDescriptor(options);
   return {
-    brushSize: Number.isSafeInteger(options.brushSize)
-      ? Math.max(1, Math.min(32, options.brushSize))
-      : 1,
-    brushShape: options.brushShape === "circle" ? "circle" : "square",
-    pattern: options.pattern === "checker" || options.pattern === "dots" ||
-        options.pattern === "bayer-2x2"
-      ? options.pattern
-      : "solid",
+    brushSize: brush.brushSize,
+    brushShape: brush.brushShape,
+    brushAngle: brush.brushAngle,
+    brushAlgorithm: brush.brushAlgorithm,
+    pattern: brush.pattern,
   };
 }
 
@@ -424,7 +372,7 @@ export function createShapeWriteSet(
   let points: ShapePoint[];
   if (tool === "line") {
     points = stampBrush(
-      shapePixels(tool, from, to, safeBounds),
+      shapePixels(tool, from, to, safeBounds, safeOptions.brushAlgorithm),
       safeOptions,
       safeBounds,
     );

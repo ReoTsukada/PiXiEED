@@ -43,13 +43,16 @@ Deno.test("creator P0 brush presets normalize and round-trip all editing attribu
     name: "  Ink  ",
     brushSize: 99,
     brushShape: "circle",
+    brushAngle: 45,
+    brushAlgorithm: "pixel-perfect",
     pattern: "dots",
     dither: "BAYER_4X4",
     colorIndex: 4,
     opacity: 0.5,
   });
   assert(
-    saved.name === "Ink" && saved.brushSize === 64 && saved.opacity === 0.5,
+    saved.name === "Ink" && saved.brushSize === 64 && saved.brushAngle === 45 &&
+      saved.brushAlgorithm === "pixel-perfect" && saved.opacity === 0.5,
     "brush preset normalization lost a field",
   );
   assert(

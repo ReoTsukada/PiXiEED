@@ -10,6 +10,7 @@ import {
   createIndexedRasterStampSource,
   createRasterSelectionMask,
   createProject,
+  interpolatePixelLine,
   interpolatePixelPath,
   type PixelPoint,
   sha256Hex,
@@ -376,6 +377,30 @@ Deno.test("supports pen, eraser, bounded fill, and palette definition without pi
     payload: { color: 0xffabcdef },
   });
   if (!duplicate.ok || !duplicate.result.noOp || duplicate.state !== batched.state) throw new Error("duplicate palette append was not a no-op");
+});
+
+Deno.test("rejects invisible non-transparent palette colors", async () => {
+  const state = createProject({ projectId: "core-palette-alpha", width: 8, height: 8, tileSize: 32 });
+  const asset = state.assets[state.activeAssetId];
+  if (asset === undefined) throw new Error("palette alpha fixture asset missing");
+  const invalidSet = await new EditorCore(state).execute({
+    ...setPixel(state.projectId, asset.id, 1),
+    commandId: "palette-alpha-set-invalid",
+    commandType: "palette.setColor",
+    payload: { paletteIndex: 1, color: 0x00112233 },
+  } as EditorCommand);
+  const invalidAppend = await new EditorCore(state).execute({
+    ...setPixel(state.projectId, asset.id, 1),
+    commandId: "palette-alpha-append-invalid",
+    commandType: "palette.appendColor",
+    payload: { color: 0x00445566 },
+  } as EditorCommand);
+  if (
+    invalidSet.ok ||
+    !invalidSet.diagnostics.some((item) => item.code === "PALETTE_ALPHA_INVALID") ||
+    invalidAppend.ok ||
+    !invalidAppend.diagnostics.some((item) => item.code === "PALETTE_ALPHA_INVALID")
+  ) throw new Error("non-transparent alpha-zero palette colors were accepted");
 });
 
 Deno.test("keeps mirrored broad strokes and shapes in one bounded canonical command", async () => {
@@ -972,6 +997,48 @@ Deno.test("keeps fast Pointer Stroke paths continuous, local, and atomically und
   if (undoErase?.state.assets[state.activeAssetId]?.raster.getPixel(15, 2) !== 1 || undoDraw?.state.assets[state.activeAssetId]?.raster.getPixel(15, 2) !== 0) throw new Error("Stroke Undo was not atomic");
 });
 
+Deno.test("uses one deterministic line algorithm for preview-compatible canonical strokes", async () => {
+  const regular = interpolatePixelLine({ x: 0, y: 0 }, { x: 3, y: 2 });
+  const pixelPerfect = interpolatePixelLine(
+    { x: 0, y: 0 },
+    { x: 3, y: 2 },
+    "pixel-perfect",
+  );
+  if (
+    JSON.stringify(regular) !==
+      JSON.stringify([{ x: 0, y: 0 }, { x: 1, y: 1 }, { x: 2, y: 1 }, { x: 3, y: 2 }]) ||
+    JSON.stringify(pixelPerfect) !==
+      JSON.stringify([{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 1 }, { x: 3, y: 2 }])
+  ) throw new Error("Draw2 line tie rules changed unexpectedly");
+
+  const state = createProject({ projectId: "project-pixel-perfect-line", width: 8, height: 8, tileSize: 32 });
+  const result = await new EditorCore(state).execute({
+    commandId: "pixel-perfect-line-1",
+    commandType: "raster.strokeCommit",
+    schemaVersion: 1,
+    projectId: state.projectId,
+    assetId: state.activeAssetId,
+    actorId: "line-test",
+    clientId: "line-test",
+    clientSequence: 1,
+    baseStructureEpoch: state.structureEpoch,
+    createdAtMonotonicMs: 1,
+    payload: {
+      points: [{ x: 0, y: 0 }, { x: 3, y: 2 }],
+      colorIndex: 1,
+      brushSize: 1,
+      brushShape: "square",
+      brushAlgorithm: "pixel-perfect",
+      pattern: "solid",
+    },
+  });
+  if (!result.ok) throw new Error("pixel-perfect canonical stroke was rejected");
+  const painted = pixelPerfect.filter((point) =>
+    result.state.assets[state.activeAssetId]?.raster.getPixel(point.x, point.y) === 1
+  );
+  if (painted.length !== pixelPerfect.length) throw new Error("canonical stroke diverged from its selected line algorithm");
+});
+
 Deno.test("keeps Selection Preview outside Canonical Raster and separates invalidation domains", async () => {
   const initial = createProject({ projectId: "project-wp120-preview", width: 64, height: 64, tileSize: 32 });
   const painted = await new EditorCore(initial).execute(setPixel(initial.projectId, initial.activeAssetId, 1, { payload: { x: 2, y: 2, colorIndex: 1 } }));
@@ -1004,7 +1071,7 @@ Deno.test("commits deterministic transforms with affected-tile COW only", async 
   const initial = createProject({ projectId: "project-wp120-transform", width: 64, height: 64, tileSize: 32 });
   const first = await new EditorCore(initial).execute(setPixel(initial.projectId, initial.activeAssetId, 1, { payload: { x: 2, y: 2, colorIndex: 1 } }));
   if (!first.ok) throw new Error("transform source fixture failed");
-  const second = await new EditorCore(first.state).execute(setPixel(first.state.projectId, first.state.activeAssetId, 2, { payload: { x: 40, y: 2, colorIndex: 2 } }));
+  const second = await new EditorCore(first.state).execute(setPixel(first.state.projectId, first.state.activeAssetId, 2, { payload: { x: 35, y: 2, colorIndex: 2 } }));
   if (!second.ok) throw new Error("transform destination COW fixture failed");
   const selection = createRectangleSelectionSnapshot(second.state, { x: 2, y: 2, width: 2, height: 2 }, "selection-transform", 1);
   const session = createTransformSession(selection, { operation: "MOVE", dx: 32, dy: 0, factor: 1, interpolationPolicy: "NEAREST_NEIGHBOR", outOfBoundsPolicy: "CLIP" }, "transform-commit");
@@ -1028,7 +1095,7 @@ Deno.test("commits deterministic transforms with affected-tile COW only", async 
   if (a.result.operation.operationType !== "selection.transformCommit" || a.result.dirtyTiles.length !== 2 || a.result.cowSplitCount !== 2 || a.result.copiedBytes !== 2 * 32 * 32) throw new Error(`transform locality metrics are wrong: ${JSON.stringify({ dirtyTiles: a.result.dirtyTiles.length, cow: a.result.cowSplitCount, copied: a.result.copiedBytes })}`);
   if (await sha256Hex(a.state.assets[a.state.activeAssetId]?.raster.toUint8Array()) !== await sha256Hex(b.state.assets[b.state.activeAssetId]?.raster.toUint8Array())) throw new Error("same transform command diverged");
   if (await sha256Hex(second.state.assets[second.state.activeAssetId]?.raster.toUint8Array()) !== originalHash) throw new Error("transform mutated source state during commit preparation");
-  if (a.state.assets[a.state.activeAssetId]?.raster.getPixel(34, 2) !== 1 || a.state.assets[a.state.activeAssetId]?.raster.getPixel(2, 2) !== 0) throw new Error("move transform pixels are incorrect");
+  if (a.state.assets[a.state.activeAssetId]?.raster.getPixel(34, 2) !== 1 || a.state.assets[a.state.activeAssetId]?.raster.getPixel(35, 2) !== 2 || a.state.assets[a.state.activeAssetId]?.raster.getPixel(2, 2) !== 0) throw new Error("move transform erased artwork under a transparent destination cell or moved pixels incorrectly");
   const stale = await commitTransform(a.state, command);
   if (stale.ok || !stale.diagnostics.some((item) => item.code === "STALE_SELECTION_RASTER")) throw new Error("stale transform commit was accepted");
 });
@@ -1185,6 +1252,10 @@ Deno.test("supports PiXiEEDraw-style nearest scale and quarter-turn selection tr
   const doubleScale = createTransformSession(selection, { ...base, operation: "SCALE_NEAREST", factor: 2 }, "transform-double-scale");
   const doublePreview = previewTransform(selection, doubleScale);
   if (doubleScale.destinationBounds.width !== 8 || doubleScale.destinationBounds.height !== 4 || doublePreview.pixels.length !== 32) throw new Error("Nearest-neighbor enlargement did not produce a dense 8x4 output.");
+
+  const rotate45 = createTransformSession(selection, { ...base, operation: "ROTATE_NEAREST", angleDeg: 45 }, "transform-rotate-45");
+  const rotate45Preview = previewTransform(selection, rotate45);
+  if (rotate45.destinationBounds.width < 4 || rotate45.destinationBounds.height < 4 || rotate45Preview.pixels.length === 0) throw new Error("Arbitrary-angle nearest-neighbor rotation did not produce a bounded preview.");
 
   const ccw = createTransformSession(selection, { ...base, operation: "ROTATE_90_CCW" }, "transform-ccw");
   if (ccw.destinationBounds.width !== 2 || ccw.destinationBounds.height !== 4) throw new Error("Counter-clockwise quarter-turn bounds are incorrect.");

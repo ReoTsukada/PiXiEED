@@ -2,13 +2,11 @@
  * iDRAW / iAUDIO / iGAME mode-switch motion.
  *
  * Deliberately kept separate from draw2-shell.css (which is large and under
- * active development elsewhere): this file only tunes the timing of the
+ * active development elsewhere): most of this file tunes the timing of the
  * native View Transition that wraps setCreatorMode() in
- * src/wp180-workspace-ui.ts. It does not define, override, or depend on any
- * mode-scoped [data-creator-mode="..."] selector -- the browser screenshots
- * the whole workspace before/after the mode switch and cross-fades between
- * the two images, so this file works regardless of how any given rule in
- * draw2-shell.css implements its mode-specific colors/panels.
+ * src/wp180-workspace-ui.ts. The final border and density presentation seals
+ * at EOF are the structural overrides kept here because this stylesheet loads
+ * last; they close the outer-panel cascade without changing domain state.
  *
  * Duration/easing are not arbitrary -- see the "Motion Research Notes"
  * reference for the full evidence trail:
@@ -89,8 +87,539 @@
      ever, run. It stays here so a browser/environment where the JS check
      somehow doesn't fire still gets a correct, motion-free result. */
   ::view-transition-group(*),
-  ::view-transition-old(*),
-  ::view-transition-new(*) {
+::view-transition-old(*),
+::view-transition-new(*) {
     animation: none !important;
   }
+}
+
+/* Final border cascade seal (2026-09-08)
+ * This file is loaded after the shared shell and game UX layers. The desktop
+ * workspace therefore gets the final say on structural edges while the
+ * responsive inspector overlay keeps its own modal frame. */
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode]
+  #draw2WorkspaceLeftDock,
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode]
+  #draw2WorkspaceRightDock,
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode]
+  #draw2WorkspaceCanvasRegion,
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode]
+  #draw2WorkspaceRightCustomDock,
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode]
+  #draw2ModeTimelineDeck {
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode]
+  #draw2WorkspaceLeftDock {
+  border-right: 1px solid var(--draw2-border-subtle) !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode]
+  #draw2WorkspaceRightDock {
+  border-left: 1px solid var(--draw2-border-subtle) !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+  #draw2WorkspaceCanvasRegion
+  .draw2-game-scene-viewport:not([hidden]) {
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+  .draw2-game-hierarchy-entry {
+  border-color: transparent !important;
+  border-radius: 4px !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+  .draw2-game-hierarchy-entry:is(:hover, :focus-visible, .is-active, [aria-selected="true"]) {
+  border-color: var(--draw2-mode-accent, var(--draw2-accent)) !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+  :is(.draw2-game-playground-source-card, .draw2-game-playground-card) {
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+  #draw2AudioCompactMaster {
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Final density contract (2026-09-08)
+ * Repeated labels are presentation chrome, not workspace state. Keep their
+ * DOM nodes, IDs, event wiring, and accessible control names intact while
+ * removing the title rows that consumed editor space. This file is loaded
+ * last so the contract also wins over the legacy desktop projections in the
+ * large shell stylesheet. */
+
+/* A mode summary is already communicated by the selected iDRAW/iGAME/iAUDIO
+ * tab. It must not reserve a second right-rail header row. */
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode]
+  #draw2WorkspaceModeSummary:not([hidden]) {
+  display: none !important;
+}
+
+/* iGAME: keep Scene/Game and scene actions in the shared upper rail. The
+ * central workspace is reserved for the scene stage and never loses a row
+ * to navigation controls. */
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+  #draw2GameSceneViewport:not([hidden]) {
+  display: grid !important;
+  grid-template-rows: minmax(0, 1fr) !important;
+  gap: 0 !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+  #draw2GameTopbarControls:not([hidden]) {
+  position: absolute !important;
+  top: 12px !important;
+  left: 50% !important;
+  z-index: 8 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: min(280px, calc(100% - 460px)) !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  max-height: 40px !important;
+  padding: 3px !important;
+  gap: 6px !important;
+  overflow: visible !important;
+  transform: translateX(-50%) !important;
+  pointer-events: auto !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+  .draw2-igame-scene-header-tools {
+  display: flex !important;
+  flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  align-items: center !important;
+  gap: 6px !important;
+  justify-content: center !important;
+  pointer-events: auto !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+  #draw2GameTopbarControls[hidden] {
+  display: none !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+  #draw2GameSceneViewport
+  > .draw2-game-scene-viewport-stage {
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+  min-height: 0 !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+  #draw2GameSceneViewport
+  > .draw2-game-scene-viewport-footer {
+  display: none !important;
+}
+
+/* Lower mode deck: tabs are the actionable navigation. The descriptive
+ * heading and redundant status sentence no longer consume a row. */
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode]
+  #draw2ModeTimelineDeck:not([hidden]) {
+  display: grid !important;
+  grid-template-rows: 30px minmax(0, 1fr) !important;
+  gap: 0 !important;
+  padding: 0 !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode]
+  #draw2ModeTimelineDeck
+  > .draw2-mode-timeline-deck-heading {
+  display: none !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode]
+  #draw2ModeTimelineDeck
+  > .draw2-mode-timeline-deck-tabs {
+  display: flex !important;
+  grid-row: 1 !important;
+  height: 30px !important;
+  min-height: 30px !important;
+  flex: 0 0 30px !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode]
+  #draw2ModeTimelineDeck
+  > .draw2-mode-timeline-deck-tabs
+  > .draw2-mode-timeline-deck-tab {
+  height: 28px !important;
+  min-height: 28px !important;
+  line-height: 28px !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+  #draw2ModeTimelineDeck:not([hidden]) {
+  grid-template-rows: minmax(0, 1fr) !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+  #draw2ModeTimelineDeck
+  > .draw2-mode-deck-surface:not([hidden]) {
+  grid-row: 1 !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+  #draw2ModeTimelineDeck
+  > .draw2-mode-deck-surface:not([hidden]) {
+  grid-row: 2 !important;
+}
+
+/* The deck status nodes are still live regions for assistive technology, but
+ * their initial explanatory sentences duplicate the visible tabs/toolbars.
+ * Removing them from layout gives the actual timeline surface the row. */
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode]
+  :is(#draw2GameDeckStatus, #draw2AudioDeckStatus) {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  margin: -1px !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0) !important;
+  clip-path: inset(50%) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+/* The asset shelf already has Project/Market tabs and an add action. Hide
+ * only its repeated title pair and keep the live count and action controls. */
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+  #draw2GamePlaygroundBottom
+  > .draw2-game-playground-bottom-heading
+  > div:first-child {
+  display: none !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+  #draw2GamePlaygroundBottom
+  > .draw2-game-playground-bottom-heading {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  height: 32px !important;
+  min-height: 30px !important;
+  padding: 0 2px !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+  #draw2GamePlaygroundBottom
+  > .draw2-game-playground-bottom-heading
+  > .draw2-game-playground-bottom-actions {
+  display: flex !important;
+  flex: 0 0 auto !important;
+  align-items: center !important;
+  gap: 4px !important;
+  min-width: 0 !important;
+  width: auto !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+  #draw2GamePlaygroundBottom {
+  grid-template-rows: 32px 28px minmax(0, 1fr) !important;
+  gap: 0 !important;
+  padding-top: 0 !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+  #draw2GamePlaygroundBottom
+  > .draw2-game-playground-library-toolbar {
+  display: flex !important;
+  align-items: center !important;
+  height: 28px !important;
+  min-height: 28px !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+  #draw2GamePlaygroundBottom
+  > .draw2-game-playground-bottom-cards {
+  min-height: 0 !important;
+  overflow: auto !important;
+}
+
+/* Main Draw timeline: the collapse button stays available, but its
+ * decorative title is removed and the tabs/readout move up by one row. */
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+  #draw2WorkspaceTimelineSlot
+  > #draw2TimelineCard {
+  grid-template-rows: 30px 24px minmax(0, 1fr) !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+  #draw2WorkspaceTimelineSlot
+  > #draw2TimelineCard
+  > .draw2-timeline-heading {
+  position: absolute !important;
+  inset: 0 2px auto auto !important;
+  z-index: 18 !important;
+  display: flex !important;
+  grid-row: auto !important;
+  flex: 0 0 auto !important;
+  width: 30px !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  pointer-events: none !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+  #draw2WorkspaceTimelineSlot
+  > #draw2TimelineCard
+  > .draw2-timeline-heading::before {
+  content: none !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+  #draw2WorkspaceTimelineSlot
+  > #draw2TimelineCard
+  > .draw2-timeline-heading
+  #draw2TimelineCollapse {
+  position: absolute !important;
+  top: 1px !important;
+  right: 0 !important;
+  display: grid !important;
+  width: 26px !important;
+  min-width: 26px !important;
+  height: 26px !important;
+  min-height: 26px !important;
+  padding: 0 !important;
+  pointer-events: auto !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+  #draw2WorkspaceTimelineSlot
+  > #draw2TimelineCard
+  > .draw2-timeline-tabs-shell {
+  grid-row: 1 !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+  #draw2WorkspaceTimelineSlot
+  > #draw2TimelineCard
+  > #draw2TimelineReadout {
+  grid-row: 2 !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+  #draw2WorkspaceTimelineSlot
+  > #draw2TimelineCard
+  > .draw2-timeline-tab-panel {
+  grid-row: 3 !important;
+}
+
+/* iDRAW palette: the active hex value and the decorative label repeat the
+ * Color editor. Preserve the live output for assistive technology while the
+ * swatches reflow to the panel width and scroll vertically as the palette
+ * grows. */
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+  #draw2WorkspaceRightDock
+  > #draw2WorkspacePaletteStrip.draw2-palette-strip {
+  container-type: inline-size;
+  display: grid !important;
+  grid-template-rows: auto minmax(0, 1fr) !important;
+  flex: 1 1 auto !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  padding: 6px !important;
+  overflow: hidden !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+  #draw2WorkspacePaletteStrip::before {
+  display: none !important;
+  content: none !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+  #draw2WorkspacePaletteStrip
+  > .draw2-palette-active-color {
+  position: relative !important;
+  display: block !important;
+  grid-row: 1 !important;
+  width: 100% !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+  #draw2WorkspaceRightDock
+  > #draw2WorkspacePaletteStrip.draw2-palette-strip
+  > #draw2WorkspacePaletteGrid.draw2-palette-grid {
+  --draw2-palette-swatch-size: clamp(28px, 14cqw, 36px);
+  display: grid !important;
+  grid-row: 2 !important;
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(var(--draw2-palette-swatch-size), 1fr)
+  ) !important;
+  grid-template-rows: none !important;
+  grid-auto-flow: row !important;
+  grid-auto-rows: var(--draw2-palette-swatch-size) !important;
+  grid-auto-columns: auto !important;
+  gap: 4px !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  padding: 2px !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  align-content: start !important;
+  justify-content: stretch !important;
+  scrollbar-gutter: stable !important;
+  scrollbar-width: thin !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+  #draw2WorkspaceRightDock
+  > #draw2WorkspacePaletteStrip.draw2-palette-strip
+  > #draw2WorkspacePaletteGrid.draw2-palette-grid
+  :is(.draw2-color, .draw2-color-add) {
+  box-sizing: border-box !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  aspect-ratio: 1 / 1;
+  transform: none !important;
+  transition: border-color 120ms ease, box-shadow 120ms ease,
+    background-color 120ms ease;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+  #draw2WorkspaceRightDock
+  > #draw2WorkspacePaletteStrip.draw2-palette-strip
+  > #draw2WorkspacePaletteGrid.draw2-palette-grid
+  :is(.draw2-color, .draw2-color-add):active {
+  transform: none !important;
+}
+
+/* The mini-preview affordance belongs to iDRAW's canvas corner, where it was
+ * originally available without consuming command-bar space. Keep it compact,
+ * icon-only, and out of the iAUDIO/iGAME workspaces. */
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+  #draw2WorkspaceCanvasRegion
+  > #draw2MiniPreviewRestore:not([hidden]) {
+  position: absolute !important;
+  top: 8px !important;
+  right: 8px !important;
+  bottom: auto !important;
+  left: auto !important;
+  z-index: 6 !important;
+  display: grid !important;
+  width: 36px !important;
+  min-width: 36px !important;
+  max-width: 36px !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  max-height: 36px !important;
+  padding: 0 !important;
+  place-items: center !important;
+  border-color: var(--draw2-border-strong) !important;
+  border-radius: 6px !important;
+  background: color-mix(in srgb, var(--draw2-surface-raised) 92%, transparent) !important;
+  opacity: 0.72 !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+  #draw2WorkspaceCanvasRegion
+  > #draw2MiniPreviewRestore[hidden] {
+  display: none !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+  #draw2WorkspaceCanvasRegion
+  > #draw2MiniPreviewRestore::after {
+  content: none !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+  #draw2WorkspaceCanvasRegion
+  > #draw2MiniPreviewRestore:hover,
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+  #draw2WorkspaceCanvasRegion
+  > #draw2MiniPreviewRestore:focus-visible,
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+  #draw2WorkspaceCanvasRegion
+  > #draw2MiniPreviewRestore:active {
+  opacity: 1 !important;
+}
+
+/* The scene minimap is orientation context, not a second toolbar. Keep it
+ * compact and textless in Scene view; the upper-rail Fit control remains the
+ * single explicit action for showing the whole map. Live Game view is kept
+ * clean because a passive map overlay is redundant there. */
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+  .draw2-igame-scene-minimap {
+  top: 8px !important;
+  right: 8px !important;
+  width: clamp(88px, 18%, 112px) !important;
+  max-width: 112px !important;
+  max-height: 78px !important;
+  gap: 0 !important;
+  padding: 4px !important;
+  border: 1px solid var(--draw2-border-subtle, var(--draw2-border)) !important;
+  border-radius: 6px !important;
+  background: color-mix(
+    in srgb,
+    var(--draw2-surface-raised, var(--draw2-surface)) 86%,
+    transparent
+  ) !important;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 22%) !important;
+  opacity: 0.92;
+  contain: layout paint;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+  .draw2-igame-scene-minimap-label {
+  display: none !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+  .draw2-igame-scene-minimap-svg {
+  width: 100% !important;
+  height: auto !important;
+  aspect-ratio: 12 / 8 !important;
+  border-radius: 4px !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+  #draw2GameSceneSvg[data-game-view-mode="GAME"]
+  ~ .draw2-igame-scene-minimap {
+  display: none !important;
 }

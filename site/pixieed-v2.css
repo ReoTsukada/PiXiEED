@@ -468,3 +468,86 @@ body.pxv2 .pxv2-topnav a{
   transition:transform .2s ease, background .2s ease, color .15s ease, border-color .15s ease;
 }
 body.pxv2 .social-home__empty-action:hover{ transform:translateY(-1px); }
+
+/* ---------------------------------------------------------------------
+ * Public home responsive override
+ * index.html keeps its hero/card grids inline for the desktop composition.
+ * These scoped overrides let the same content reflow before those inline
+ * columns become too narrow; the shared shell/nav and page scroll remain
+ * owned by their existing styles.
+ * --------------------------------------------------------------------- */
+@media (max-width:900px){
+  .pxv2 > section > .pxv2-shell,
+  .pxv2 > section > .pxv2-shell > *{
+    min-width:0;
+  }
+
+  .pxv2 > section:first-of-type > .pxv2-shell,
+  .pxv2 > section[aria-labelledby="pxv2MarketTitle"] > .pxv2-shell,
+  .pxv2 > section[aria-labelledby="pxv2BridgeTitle"] > .pxv2-shell{
+    grid-template-columns:minmax(0, 1fr) !important;
+  }
+
+  .pxv2 .pxv2-stagger{
+    grid-template-columns:minmax(0, 1fr) !important;
+  }
+
+  .pxv2 .pxv2-mode-card,
+  .pxv2 .pxv2-pixel-field,
+  .pxv2 .pxv2-card{
+    width:100%;
+    min-width:0;
+  }
+
+  .pxv2 .pxv2-pixel-field > div,
+  .pxv2 .pxv2-pixel-field > div > div{
+    min-width:0;
+  }
+
+  .pxv2 .pxv2-pixel-field > div > div{
+    align-items:flex-start !important;
+  }
+
+  .pxv2 .pxv2-pixel-field > div > div > span:last-child{
+    flex:1 1 0;
+    min-width:0;
+    overflow-wrap:anywhere;
+  }
+
+  .pxv2 > section img,
+  .pxv2 .pxv2-pixel-field img{
+    width:100%;
+    max-width:100%;
+    height:auto;
+  }
+
+  .pxv2 .pxv2-btn{
+    max-width:100%;
+    white-space:normal;
+    text-align:center;
+  }
+}
+
+@media (max-width:480px){
+  .pxv2-shell{ padding-inline:16px; }
+  .pxv2-section{ padding-block:44px; }
+  .pxv2 > section:first-of-type{ padding-top:44px !important; }
+
+  .pxv2 .pxv2-pixel-field{
+    padding:20px !important;
+  }
+
+  .pxv2 .pxv2-pixel-field > div:first-child{
+    gap:8px;
+    align-items:flex-start !important;
+    flex-wrap:wrap;
+  }
+
+  .pxv2 .pxv2-pixel-field > div:first-child > span:last-child{
+    margin-left:auto;
+  }
+
+  .pxv2 .pxv2-hero-seq + *{
+    margin-top:4px;
+  }
+}

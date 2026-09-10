@@ -42,16 +42,16 @@ supersedes: なし(既存CANONICAL文書を置き換えない。参照・現状�
   未追跡ディレクトリ**であり、現行の公開サイトには含まれていません。SITE-400〜SITE-460・PLATFORM-450という
   一連のWork Packageが「COMPLETE_CANDIDATE(実装済みだが本番未検証)」まで進んでいますが、これは
   ローカル/隔離スコープでの話で、本番切替(CUT-001)には別途Owner承認が必要です。
-- **リアルタイム同期は「1つ」ではなく「3層」ある。** (詳細は4章)
-  1. **PiXiSYNC** — 現行 `pixiedraw` を支える本番同期。Preservation Gateで明示的に保護されており、
-     互換性が証明されるまで置き換え禁止。
-  2. **Cross-Tool Live Edit**(`02_ARCHITECTURE/CROSS_TOOL_LIVE_EDIT.md`, CANONICAL) — Draw2/Audio/Game
-     を「同じProjectを別ウィンドウで開く」体験として繋ぐための設計。まだ実装/検証は進行中。
+- **Draw2の同期はPiXYNCの2経路で構成され、外部Bridgeは別製品である。** (詳細は4章)
+  1. **PiXYNCローカル3モードセッション** — Draw／Audio／Gameを同一Projectで扱うローカル経路。
+     セッションの順序・presence・checkpointを扱うが、各モードの実データの正本はProduct Adapterが持つ。
+  2. **PiXYNCオンラインprovider** — Draw2のオンライン共有に使うPiXYNCのprovider経路。標準のcomposition rootは
+     `PixyncSupabaseProvider`を選択する。認証、Realtime、Storage、2ユーザー再接続などの本番受入れ状況は別途確認する。
   3. **PiXiEED Bridge**(別リポジトリ `pixieed-bridge`) — Tauri製ネイティブランタイムの **loopback限定**
      WebSocketハブ(`pixieed.realtime/1`)。これは複数ユーザーのクラウド同期ではなく、**同一マシン上の
-     別アプリ(Aseprite/Unity等)とPiXiEEDを繋ぐ**ための仕組みです。`pixiedraw2/src/pixync/bridge-provider.ts`
-     はすでにこのBridgeに接続するクライアントとして実装済みです。
-  「サイトのリアルタイム同期」という言葉が上記のどれを指すかで実装方針が大きく変わるため、2章末で選択肢を提示します。
+     別アプリ(Aseprite/Unity等)とPiXiEEDを繋ぐ**ための任意連携です。`pixiedraw2/src/pixync/bridge-provider.ts`
+     は既定OFFの相互運用アダプターであり、Draw2標準同期のproviderではありません。
+  「サイトの同期」という言葉を使う場合は、PiXYNCのローカル／オンライン経路か、外部PiXiEED Bridgeかを明記します。
 - **現在Gitの作業ツリーには、サイト共通シェル(ナビ・多言語・プロフィールヘッダー・ページ遷移アニメーション)への
   未コミットの変更が既にあります**(約16ファイル・250行規模)。これは今回の依頼と直接関係する領域なので、
   重複作業を避けるため、まずこの差分の内容を確認・整理することを推奨します。
@@ -156,18 +156,18 @@ Desktop 1100–1439px / Wide ≥1440px、横スクロール禁止、`dvh`+`safe-
 
 ## 4. 現状評価: リアルタイム同期の実装方針
 
-> **[2026-08-31 追記] この節はOwnerの決定により更新されました。**
-> 本節はClaudeによる現状分析(`BRIEFING_ANALYSIS`)であり、Owner自身の決定ではありません。
-> Ownerは2026-08-31付で「PiXiSYNCは今後廃止・触らない」「Cross-Tool Live Editおよびオンライン複数人同期はPiXiEED Bridgeに一本化する(PiXYNC＝Bridge)」と明示的に決定しました。
-> 詳細・用語整理・ギャップ一覧は `ADR-20260831-REALTIME-SYNC-PIXYNC-BRIDGE-UNIFICATION.md` を正とします。以下は決定前時点の分析として履歴保存のみを目的に残します。
+> **[2026-09-08 訂正] この節の2026-08-31追記は旧案としてSUPERSEDEDです。**
+> 本節はClaudeによる現状分析(`BRIEFING_ANALYSIS`)と当時の判断経緯を保存する履歴であり、現行の実装指示ではありません。
+> 現行は、Draw2のローカル3モード同期・オンライン同期をPiXYNCが担い、PiXiEED BridgeはAseprite／Unity等を接続する別製品の任意連携とします。
+> 現行の用語・責務・配線は `ADR-20260908-PIXYNC-BRIDGE-BOUNDARY.md` を正とします。
 
 「リアルタイム同期をどう実装するか」への回答は、**どのレイヤーの同期を指すか**で全く別の答えになります。
 
 | レイヤー | 目的 | 現状 | 保護レベル |
 | --- | --- | --- | --- |
-| **PiXiSYNC** | 現行`pixiedraw`の保存・共同編集同期(Realtime、RPC、Table、Policy、Migration契約) | 本番稼働中 | Preservation Gateで明示保護。互換性証明なしに置換禁止。チェックポイント取得・再接続・オフラインキュー・2クライアント収束を壊してはならない |
-| **Cross-Tool Live Edit** | 同一Projectを開くDraw2/Audio/Game **別ウィンドウ間**の状態共有(Asset Revision, Frame ID, FPS, Marker等の「作品出力に関係する正式データ」のみ共有。Zoom/Tool/Selection等のUI状態は共有しない) | CANONICAL仕様確定、実装は進行中 | 実ブラウザでの完了条件(1ドット修正が新Revisionとして検知される等)が明記済み。競合はLast-write-winsで黙って上書きしない設計 |
-| **PiXiEED Bridge** | **同一マシン上の別ネイティブアプリ**(Aseprite/Unity等)とPiXiEEDを繋ぐloopback WebSocketハブ(`pixieed.realtime/1`)。アカウント・クラウドリレー・TLS・複数ユーザールームは対象外(MVP境界) | 別リポジトリで契約(schema/protocol)は確定。`pixiedraw2/src/pixync/bridge-provider.ts` が接続クライアントとして実装済み | LAN/WANへの公開は明示的に禁止。外部公開・複数ユーザー化は別のsecurity/service/legal gateで設計する方針 |
+| **PiXiSYNC** | 旧来のPiXiEEDraw側に属する互換・履歴上の同期名 | Draw2の標準同期ではない | 既存データ・互換性の扱いは別の保存／移行判断で保護する。PiXYNCや外部Bridgeと同一視しない |
+| **PiXYNC（ローカル3モード／オンライン）** | 同一Projectを開くDraw2のDraw／Audio／Game間で、作品出力に関係する正式データを共有する同期抽象層。ローカルセッションとオンラインproviderを含む | Draw2の現行同期方針 | Draw・Audio・Game各モードの所有権を保ち、Zoom／Tool／SelectionなどのUI状態を同期正本にしない。オンラインの本番受入れ状況は別途確認する |
+| **PiXiEED Bridge** | **同一マシン上の別ネイティブアプリ**(Aseprite/Unity等)とPiXiEEDを繋ぐloopback WebSocketハブ(`pixieed.realtime/1`)。アカウント・クラウドリレー・TLS・複数ユーザールームは対象外(MVP境界) | 別リポジトリで契約(schema/protocol)は確定。`pixiedraw2/src/pixync/bridge-provider.ts` は任意・既定OFFの接続アダプターであり、Draw2の標準composition rootでは選択しない | LAN/WANへの公開は明示的に禁止。外部公開・複数ユーザー化は別のsecurity/service/legal gateで設計する方針 |
 
 ### 提案する切り分け
 

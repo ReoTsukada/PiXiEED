@@ -1,145 +1,101 @@
-# Repository Cleanup Report — Bridge cutover addendum (2026-08-30)
+# Repository Cleanup Report
 
-> この追補が今回のBridge切替の現行記録です。以下の旧記録は、過去のWP-005監査証跡として削除せず保持しています。
+> The original snapshot below records the earlier audit. The 2026-09-05 legacy-runtime retirement and its current counts are recorded in the addendum at the end of this file.
 
-## Current cleanup run
+repository_commit: "working tree (no commit created)"
+branch_or_worktree: "shared working tree"
+scan_scope: "PiXiEED repository, with focus on pixiedraw2 iGAME/iAUDIO changes and untracked files"
+candidate_count: 1
+deleted_count: 0
+kept_active_count: 25
+kept_compatibility_count: 0
+unknown_count: 1
+bytes_removed: 0
+files_deleted: []
+duplicates_consolidated: []
+generated_files_untracked: []
 
-- Baseline commit: `d8cde9d143ca7227b8164f82d99074e44dd1872f`.
-- Branch/worktree: `main`; cleanup changes are staged but uncommitted.
-- Rollback reference: `cleanup/bridge-cutover-20260830` points to the baseline commit.
-- The user explicitly authorized removal of the former tool groups and current correction work, while requiring the linked Bridge work and reusable PiXYNC/PiXiSYNC points to be preserved.
-- The external Bridge MVP at `/Users/tsukadareine/Documents/Codex/2026-08-30/referenced-chatgpt-conversation-this-is-an/outputs/pixieed-bridge/` was excluded and not modified.
-- Current approved deletion batches contain **1,501 staged direct deletions; with two required source relocations, 1,503 former tracked paths are gone from their old locations**. No commit, push, deploy, database, Storage, Realtime, Stripe, or publication action was performed.
+## Classification
 
-Deleted groups:
+- `KEEP_ACTIVE`: current iGAME/iAUDIO source, tests, bundled workspace output, and entry/style changes.
+- `UNKNOWN`: `Claude outputs/piano-roll-cell-check.html`; purpose and ownership could not be disproven from repository references.
+- No file met the safe deletion conditions.
 
-- Former applications: `pixiedraw/`, `pixiedraw2/`, `pixfind/`, `pixiee-lens/`, `qr/`, `qr-maker/`, `maoitu/`, and `studio/`.
-- Former corporate/portfolio surface: `portfolio/`, its portfolio-only gallery builders, and the old downloadable gallery administration note.
-- Former tool project pages: `projects/index.html` and old `projects/` tool subdirectories.
-- Retired top-level legacy site script and tests that directly required removed tools, removed Capacitor pages, or obsolete old-tool UI contracts.
-- Tracked Capacitor source under `app-shell/pixieed-capacitor/`.
-- Retired PiXiSYNC room/slot/payment Supabase functions and migrations.
-- Old tool measurement, browser-smoke, release-integrity, PiXiSYNC audit, and PiXiSYNC test scripts.
-- Retired PiXiSYNC v1 deployment, purchase, browser-smoke, concurrency, final-design, and lifecycle reports.
-- Unreferenced former-tool/home/portfolio screenshots, former-tool icons/hero images, and obsolete old-tool test guards.
+## Commands run
 
-Preserved boundaries:
-
-- `docs/bridge-migration/pixisync-reuse-notes.md` records revision authority, idempotent operation IDs, canonical deltas, checkpoint/journal recovery, conflicts, lifecycle, transport/provider/connector separation, and capability negotiation.
-- Detailed PiXiSYNC contracts/inventories and the journal-recovery reference test remain as migration evidence.
-- `core-shell/`, `16_IMPLEMENTATION_STARTER/`, Market `pixiedraw-project` compatibility and purchased-file handling, public PiXFiND/OGP production paths, `pixiedraw/_backup/`, and legal/terms pages were not removed or rewritten.
-- `/contact/` was retained only as a Bridge support endpoint; its corporate commission, portfolio, press, and production-request copy was replaced with Bridge setup/Protocol/Connector support copy.
-- The Market color codec was moved to `market/color-codec-utils.js` so purchased GIF/file compatibility remains without restoring the editor tree.
-- The generic feature-flag rollback utility was moved into `core-shell/assets/` so the protected Core Shell remains self-contained without restoring the editor tree.
-- Physical ignored/generated remnants (`PiXiEEDrawDEV/` and native/build/signing material under `app-shell/pixieed-capacitor/`) remain pending separate exact path approval.
-
-Current verification boundary:
-
-- `git diff --cached --check` and `git diff --check` pass; changed JavaScript syntax checks pass.
-- Active HTML route/script scans contain no links to the removed tool, project, portfolio, or studio routes; the old cache-buster labels were also removed.
-- Core Shell WP-070/WP-080/WP-090 contract tests and Market listing/GIF compatibility tests pass after the two generic utility relocations.
-- The external Bridge MVP path exists with its own harness; it was inspected only for existence and not modified.
-- Former-tool builds/tests, Capacitor builds, and Bridge end-to-end acceptance are `UNTESTED` in this repository because the former sources were intentionally removed and Bridge lives in the protected external output.
-- PiXiSYNC PASS results retained from the old repository are migration evidence only, not Bridge production qualification.
-
-Remaining separate decisions:
-
-- Whether to remove the PiXiSYNC payment/return wording in `legal/index.html` and `terms/index.html` (exact legal-text approval required).
-- Whether to physically remove ignored/generated native remnants after path-level review.
-
-# Historical Repository Cleanup Report
-
-## Baseline
-
-- Repository commit: `76e01b24c7f4f4ae3b75c0727f1e3612a133d970`
-- Branch/worktree: `main`; existing dirty worktree preserved. No deletion branch was created because Phase B had zero authorized deletion candidates.
-- Scan scope: Git-tracked repository assets plus non-ignored working-tree files; reference scans excluded `.git`, `node_modules`, build/dist/cache output, and `pixiedraw/_backup`.
-- Commands used:
-  - `python3 scripts/inventory_repository_assets.py --root .`
-  - generated repository file/reference inventory and duplicate classification
-  - `rg`/static basename reference checks across HTML, CSS, JS, JSON, manifests, workflows, tests, and docs
-  - `node --check` for PiXiEEDraw, Market, PiXFiND, and shared scripts
-  - `(cd app-shell/pixieed-capacitor && npm run doctor)`
-  - 77-script pure baseline suite
-  - selected Market SEO and PiXiSYNC compatibility tests
-  - localhost route smoke checks and case-sensitive path collision check
-  - `git diff --check`
-- Evidence limitations: no-reference is not proof of unused; dynamic URLs, database-stored paths, external public links, old clients/projects, and native resource conventions cannot be fully disproven by repository text alone.
-
-## Summary
-
-Candidate unit is an exact duplicate group from `repository-asset-inventory.json`, not an individual asset. The scan found 384 binary asset records and 37 exact duplicate groups. All duplicate groups remain preserved because no canonical replacement path was proven.
-
-| Classification | Count | Bytes |
-|---|---:|---:|
-| KEEP_ACTIVE | 0 candidate groups | 0 |
-| KEEP_COMPATIBILITY | 0 candidate groups | 0 |
-| KEEP_GENERATED_SOURCE | 0 candidate groups | 0 |
-| REGENERATE_NOT_COMMIT | 0 candidate groups | 0 |
-| DUPLICATE_REPLACE | 0 candidate groups | 0 |
-| UNUSED_SAFE_DELETE | 0 candidate groups | 0 |
-| UNKNOWN | 37 candidate groups | 0 removed |
-
-Static basename reference status for individual assets is recorded in [`repository-cleanup-classification.json`](repository-cleanup-classification.json). It is evidence for retention, not deletion authorization.
-
-## Deleted files
-
-None. No file satisfied all policy conditions for `UNUSED_SAFE_DELETE` or `REGENERATE_NOT_COMMIT`.
-
-## Duplicate consolidation
-
-None. Exact hashes identify byte identity only. The groups include public OGP images, editor/tool icons, dynamically selected character sprites, PiXFiND/sample assets, screenshots, and native splash resources. Removing one path could break a public URL, runtime ID, generated/native convention, or old compatibility path.
-
-The complete 37-group list, SHA-256 values, sizes, and static reference evidence is in [`repository-cleanup-classification.json`](repository-cleanup-classification.json).
-
-## Generated files and ignored output
-
-Observed but not removed:
-
-- `app-shell/pixieed-capacitor/android/app/build/`
-- `app-shell/pixieed-capacitor/android/build/`
-- `app-shell/pixieed-capacitor/dist/`
-- `app-shell/pixieed-capacitor/ios/build/`
-- `pixiedraw/_backup/`
-
-These are build/backup areas with ownership or regeneration implications. No clean-checkout regeneration proof was established, so they remain untouched.
-
-## Kept for compatibility and safety
-
-- `PiXiEEDogp.png` and `assets/og/*` remain because OGP/public URL usage is present or cannot be ruled out.
-- `character-dots/*`, `maoitu/assets/sprites/*`, `pixfind/assets/puzzles/*`, and `pixiee-lens/stamps/*` remain because runtime IDs, manifests, or public/sample paths can select them dynamically.
-- `pixiedraw/assets/icons/*` remains because editor controls, shared navigation, service-worker precache, and runtime module paths use icon names.
-- Native `splash.png` and app icon resources remain because Capacitor resource naming and scale conventions are part of the native build boundary.
-- `pixiee-lens/index.html.20240605.bak` remains because backups are explicitly outside automatic cleanup authorization.
-
-## Unknown candidates
-
-All 37 exact duplicate groups are `UNKNOWN`. Required evidence before any deletion would be: canonical path approval, static/dynamic/reference graph closure, public URL compatibility check, old-project/client check, native/build generation check where applicable, and post-change build/route/Market/PiXiSYNC verification in a dedicated cleanup branch.
+- `git status --short`
+- `git ls-files --others --exclude-standard`
+- `rg` reference scan over `pixiedraw2/src`, `pixiedraw2/tests`, and `pixiedraw2/assets`
+- `deno check src/wp180-workspace-ui.ts src/game/game-350/playground.ts`
+- `deno test --no-remote --allow-read=src,tests,index.html --check tests/game-350`
+- `deno task build:workspace`
+- `git diff --check`
 
 ## Verification
 
-- Build: Capacitor staging doctor passed: `OK: 34 entries are available for staging.`
-- Type check: no repository-wide TypeScript project is configured; JavaScript syntax checks passed for the affected baseline entry points.
-- Lint: no root lint command is configured; no lint failure was invented.
-- Unit tests: pure baseline `63/77` passed; the same 14 pre-existing failures from WP-000 remain.
-- Integration tests: selected Market SEO and PiXiSYNC codec/document/project/checkpoint/raster tests passed.
-- Browser smoke tests: `/`, `/market/`, `/pixiedraw/`, `/pixfind/`, `/pixiee-lens/`, and `/account/` loaded locally with visible main content and no captured console error. Empty preview `<img>` elements on initial forms were hidden/placeholder state, not missing asset files.
-- Market baseline: Market syntax, SEO test, and existing 77-script baseline unchanged.
-- PiXiSYNC baseline: codec, document operation, project delete/switch, checkpoint reference, raster asset/region asset tests passed.
-- Case-sensitive path check: 0 case-fold collisions among tracked paths.
-- Production data/deploy: no database, Storage, Stripe, Realtime, deploy, publish, commit, or push action performed.
+- GAME-350 tests: 144 passed / 0 failed.
+- Workspace bundle: generated successfully.
+- Diff check: passed; existing unrelated CRLF warnings remain under `tools/screenshots/node_modules`.
+- Browser: iAUDIO central workspace and lower timeline rendered as separate surfaces; no deletion smoke test was applicable.
+
+## Compatibility notes
+
+- User changes and active untracked implementation files were preserved.
+- No backup, project data, PiXiSYNC data, compatibility route, or external file was touched.
 
 ## Rollback
 
-- Git commit: none created.
-- Revert command: no deletion rollback is required because `deleted_count = 0`. If a later approved batch deletes files, restore only its recorded paths with `git restore -- <path>` from the pre-deletion commit/worktree snapshot.
+- No files were deleted. The report itself can be removed or reverted independently.
 
 ## Remaining candidates
 
-Keep all 37 duplicate groups as `UNKNOWN`; do not delete them in WP-005. Future cleanup requires owner-approved canonical mapping or stronger runtime/public compatibility evidence.
+- `Claude outputs/piano-roll-cell-check.html` remains UNKNOWN and requires owner confirmation before deletion.
 
-Machine-readable supporting files:
+## Addendum: 旧PiXiEEDraw退役（2026-09-05）
 
-- [`repository-asset-inventory.json`](repository-asset-inventory.json)
-- [`repository-file-inventory.json`](repository-file-inventory.json)
-- [`repository-cleanup-classification.json`](repository-cleanup-classification.json)
+repository_commit: "working tree (no commit created)"
+branch_or_worktree: "shared working tree"
+scan_scope: "tracked pixiedraw/ runtime, active URL/import references, Core test module placement, and current pixiedraw2 migration boundary"
+retired_runtime_entries: 255
+deleted_runtime_entries: 251
+moved_compatibility_entries: 4
+compatibility_stub_entries: 1
+bytes_removed_from_old_runtime_blobs: 6037987
+files_deleted: "旧 pixiedraw/ 本体のうち、現行へ移設した4つのCore共通モジュールを除く251エントリ"
+files_moved: [
+  "core-account-permission-utils.js",
+  "core-asset-graph-utils.js",
+  "core-command-engine-utils.js",
+  "core-journal-recovery-utils.js"
+]
+files_added_for_compatibility: ["pixiedraw/index.html"]
+unknown_candidates_kept: ["Claude outputs/piano-roll-cell-check.html"]
+
+### 判断
+
+- 旧エディタの実行コード、旧アセット、旧Worker、旧Service Worker、旧Manifest、旧Vendorを退役。
+- `/pixiedraw/` は旧アプリ本体ではなく、`/pixiedraw2/` へ安全に渡す最小の互換入口だけを残した。`project` と `market_import` は許可した形式の値だけを引き継ぐ。
+- 購入済みPXDは現行Draw2の `market_import` 受け渡しへ接続し、IndexedDBの一度きり消費・期限・Blob・ファイル名を検証する。画像・音声のみの商品はZIP出力に限定する。
+- PiXYNC、PXD互換処理、Market契約、履歴資料、保護対象のバックアップ領域は削除していない。
+
+### 検証
+
+- `node scripts/test-market-verification.mjs`: PASS
+- `node scripts/test-core-public-url-routing-wp098.mjs`: PASS（失敗系27件を含む）
+- Core移設テスト: Account / Asset Graph / Command Engine / Journal Recovery は PASS
+- `deno task check`: PASS
+- iGAME/PXD関連: 25 passed / 0 failed
+- iGAMEロジック・永続化関連: 55 passed / 0 failed
+- Draw2 core suite: 65 passed / 0 failed
+- iGAME/iAUDIO asset bridge・capture・runtime追加群: 124 passed / 0 failed
+- iAUDIO-200: 32 passed / 0 failed
+- iAUDIO-240: 21 passed / 0 failed
+- `deno task build`, `deno task build:workspace`, `deno task build:game`: PASS
+- `git diff --check` と staged diff check: PASS（既存node_modulesのCRLF警告のみ）
+- ローカルブラウザ: `http://localhost:8000/pixiedraw/index.html?...` から現行 `pixiedraw2` へ遷移し、Draw2ワークスペースを表示。
+
+### 未検証・残存境界
+
+- `scripts/test-core-account-permission-supplement-wp060.mjs` は、今回の旧Draw退役とは無関係に、既に存在しない `pixfind/` を読むため未完了。削除済みページを復元する変更は行わない。
+- ルート契約上の旧URLは `LEGACY_COMPAT` / `SHADOW` redirect candidate。静的サーバーにはサーバー側恒久リダイレクト機能がないため、公開配信側の恒久設定は別作業。
+- 変更は未コミット・未プッシュ。ロールバックはコミット前なら作業ツリーの変更を個別確認して戻し、コミット後は旧ランタイムを復元せず互換入口の差し替えで行う。

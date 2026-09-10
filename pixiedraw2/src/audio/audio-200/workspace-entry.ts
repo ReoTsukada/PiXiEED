@@ -1,4 +1,4 @@
-/** Lazy browser entry for the AUDIO-200 Workspace Project/Journal bridge. */
+/** Lazy browser entry for the AUDIO-200 Workspace Project/Journal adapter. */
 export * from "./contracts.ts";
 export * from "./metadata-authority.ts";
 export * from "./workspace-session.ts";

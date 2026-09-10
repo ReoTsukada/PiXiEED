@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Writing Studio — PiXiEED</title>
+  <link rel="stylesheet" href="./writing.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" data-project-route href="../project/">PiXiEED <span>Writing Studio</span></a>
+    <div class="top-actions"><span id="saveState" class="state">ローカル保存</span><button id="saveButton" class="button button-primary">保存</button><button id="marketButton" class="button">Marketへ出品</button><a data-project-route href="../project/" class="button">Project Homeへ</a></div>
+  </header>
+  <div class="missing-project" data-project-not-found hidden role="alert" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:16px 22px 0;padding:12px 14px;border:1px solid #825f46;border-radius:10px;background:#2b211b"><strong style="color:#f1c58f">Projectが見つかりません</strong><span style="color:var(--muted);font-size:12px">指定したProject IDはこの端末にありません。</span><a class="button" href="../new/" style="margin-left:auto">新規Projectを作成</a><a class="button" href="../account/">My Pageへ</a></div>
+  <main class="studio">
+    <aside class="sidebar">
+      <div class="sidebar-heading"><div><small>作品</small><h1 id="workTitle">星渡りの記録</h1></div><button id="newWorkButton" class="icon-button" title="新しい作品">＋</button></div>
+      <nav class="tabs" aria-label="制作対象"><button class="tab is-active" data-panel="manuscript">原稿</button><button class="tab" data-panel="world">世界観</button><button class="tab" data-panel="rights">権利</button></nav>
+      <section id="chapterPanel" class="chapter-list" aria-label="章一覧"></section>
+      <section id="nodePanel" class="node-list is-hidden" aria-label="世界観一覧"></section>
+      <section id="rightsPanel" class="rights-panel is-hidden"><p class="muted">ローカル制作中</p><strong>作品の利用条件</strong><p>作品データに含める希望条件を選べます。サーバー上のLicenseや販売許可は、接続後に別途確認されます。</p><fieldset class="rights-form"><legend>許可する範囲</legend><label><input id="rightCommercial" type="checkbox"> 商用利用</label><label><input id="rightDerivative" type="checkbox"> 二次創作・改変</label><label><input id="rightResale" type="checkbox"> 派生作品の販売</label><label><input id="rightAttribution" type="checkbox"> クレジット表記を必須にする</label></fieldset><p class="muted">License ID: <code>local-unconnected</code></p></section>
+      <button id="addChapterButton" class="button add-button">＋ 章を追加</button>
+      <button id="addNodeButton" class="button add-button is-hidden">＋ ノードを追加</button>
+    </aside>
+    <section class="workspace">
+      <div class="workspace-head"><div><span class="eyebrow">LOCAL DRAFT</span><h2 id="chapterTitle">第一章　海辺の灯台</h2></div><div class="head-actions"><button id="importButton" class="button">読み込み</button><button id="exportButton" class="button button-primary">書き出し</button><input id="fileInput" type="file" accept=".json,.txt,.md,.markdown" hidden></div></div>
+      <div id="manuscriptPanel" class="editor-panel">
+        <label class="field-label" for="titleInput">章タイトル</label><input id="titleInput" class="title-input" type="text" maxlength="160">
+        <label class="field-label" for="bodyInput">本文 <span id="wordCount">0文字</span></label><textarea id="bodyInput" class="body-input" spellcheck="false" placeholder="物語を書き始める…"></textarea>
+        <div class="editor-footer"><span>Markdown対応 · 自動保存はこの端末のみ</span><span id="chapterUpdated"></span></div>
+      </div>
+      <div id="worldPanel" class="world-panel is-hidden">
+        <div class="world-toolbar"><div><h3>世界観グラフ</h3><p class="muted">人物・場所・出来事を文章に関連付けます。関係は作品データに保存されます。</p></div><button id="addEdgeButton" class="button">＋ 関係を追加</button></div>
+        <div class="world-grid"><div id="nodeEditor" class="card"></div><div id="edgeEditor" class="card"></div></div>
+      </div>
+    </section>
+    <aside class="inspector"><div class="inspector-section"><span class="eyebrow">PROJECT</span><h3>作品情報</h3><label class="field-label" for="workTitleInput">作品タイトル</label><input id="workTitleInput" class="text-input" type="text" maxlength="160"><label class="field-label" for="synopsisInput">あらすじ</label><textarea id="synopsisInput" class="small-textarea" maxlength="1000"></textarea></div><div class="inspector-section"><span class="eyebrow">REFERENCES</span><h3>素材参照</h3><p class="muted">同じProjectの画像・動画・ゲーム素材を、現在の章や世界観ノードへ参照として追加します。</p><div id="referenceList" class="reference-list"></div></div><div class="inspector-section"><span class="eyebrow">CONNECTIONS</span><h3>接続状態</h3><div class="connection"><span class="dot dot-local"></span><span>ローカル下書き</span><strong>有効</strong></div><div class="connection"><span class="dot dot-off"></span><span>PiXiSYNC</span><strong>未接続</strong></div><div class="connection"><span class="dot dot-local"></span><span>Market引き渡し</span><strong>ローカル準備済み</strong></div><p class="muted">Marketの認証、権利確定、販売・購入配信は既存サーバー接続後に有効になります。</p></div><div class="inspector-section"><span class="eyebrow">EXPORT</span><p class="muted">原稿はJSON、TXT、Markdownで端末に書き出せます。</p><select id="exportFormat" class="text-input"><option value="json">JSON（作品データ）</option><option value="md">Markdown</option><option value="txt">TXT</option></select></div></aside>
+  </main>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="../assets/creator-project-store.js"></script>
+  <script src="../assets/app-shell.js"></script>
+  <script src="../assets/creator-market-delivery-manifest.js?v=20260910-delivery-manifest2"></script>
+  <script src="../assets/creator-market-transfer.js?v=20260910-delivery-manifest2"></script>
+  <script src="./writing.js?v=20260910-delivery-manifest2"></script>
+</body>
+</html>

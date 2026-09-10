@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Visual Studio | PiXiEED</title>
+  <link rel="stylesheet" href="./visual-studio.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" data-project-route href="../project/">PiXiEED <span>Visual Studio</span></a>
+    <div class="project-name"><span class="status-dot"></span><input id="projectTitle" value="Untitled Visual Project" aria-label="プロジェクト名"></div>
+    <div class="top-actions"><button id="saveLocal" class="button button-quiet">ローカル保存</button><button id="exportJson" class="button button-quiet">JSON書き出し</button><label class="button button-quiet file-button">JSON読み込み<input id="importJson" type="file" accept="application/json"></label><button id="marketButton" class="button">Marketへ出品</button><a class="button button-primary" data-project-route href="../project/">Project Homeへ</a></div>
+  </header>
+  <div class="missing-project" data-project-not-found hidden role="alert" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:12px 18px 0;padding:10px 12px;border:1px solid #825f46;border-radius:8px;background:#2b211b"><strong style="color:#f1c58f">Projectが見つかりません</strong><span style="color:var(--muted);font-size:11px">指定したProject IDはこの端末にありません。</span><a class="button" href="../new/" style="margin-left:auto">新規Projectを作成</a><a class="button" href="../account/">My Pageへ</a></div>
+  <main class="studio">
+    <nav class="mode-tabs" aria-label="制作モード"><button class="mode-tab is-active" data-mode="image">画像クリエイティブ</button><button class="mode-tab" data-mode="video">動画クリエイティブ</button><span class="connection-note">ローカル編集 · 外部接続なし</span></nav>
+    <section class="workspace">
+      <aside class="panel panel-left">
+        <div class="panel-heading"><h2 id="libraryTitle">画像素材</h2><label class="icon-button" title="素材を追加">＋<input id="assetInput" type="file" accept="image/*,video/*" multiple></label></div>
+        <p class="panel-help">素材はこのブラウザ内だけで保持されます。</p>
+        <div id="assetList" class="asset-list"></div>
+        <div class="panel-heading section-heading"><h2>レイヤー</h2><button id="addLayer" class="text-button">＋追加</button></div>
+        <div id="layerList" class="layer-list"></div>
+      </aside>
+      <section class="canvas-column">
+        <div class="canvas-toolbar"><span id="canvasLabel">Canvas · 1280 × 720</span><div><button id="fitCanvas" class="text-button">全体表示</button><button id="resetTransform" class="text-button">変形リセット</button></div></div>
+        <div class="canvas-stage"><canvas id="creativeCanvas" width="1280" height="720"></canvas><video id="videoPreview" class="video-preview" controls playsinline hidden></video><div id="emptyCanvas" class="empty-canvas"><strong>素材を追加して制作を開始</strong><span>画像・動画を左の素材一覧へドラッグするか、＋から選択</span></div></div>
+        <div class="timeline" id="videoTimeline" hidden><div class="timeline-head"><strong>タイムライン</strong><button id="addClip" class="text-button">＋Clip</button></div><div id="clipList" class="clip-list"></div><div class="time-ruler"><span>00:00</span><span>00:05</span><span>00:10</span><span>00:15</span><span>00:20</span></div></div>
+      </section>
+      <aside class="panel panel-right">
+        <div class="inspector-group"><h2>プロパティ</h2><div id="selectionLabel" class="selection-label">選択なし</div></div>
+        <div class="inspector-group"><h3>非破壊調整</h3><p class="panel-help">元素材を変更せず、表示時に適用します。</p><label class="range-row">明るさ <output id="brightnessValue">0</output><input id="brightness" type="range" min="-100" max="100" value="0"></label><label class="range-row">コントラスト <output id="contrastValue">0</output><input id="contrast" type="range" min="-100" max="100" value="0"></label><label class="range-row">彩度 <output id="saturationValue">0</output><input id="saturation" type="range" min="-100" max="100" value="0"></label></div>
+        <div class="inspector-group"><h3>切り抜き / 変形</h3><div class="field-grid"><label>X <input id="transformX" type="number" value="0"></label><label>Y <input id="transformY" type="number" value="0"></label><label>拡大率 <input id="transformScale" type="number" min="0.1" max="8" step="0.1" value="1"></label><label>回転 <input id="transformRotation" type="number" value="0">°</label></div><div class="crop-state"><span class="state-icon">⌗</span><span>切り抜き範囲: <b id="cropState">Canvas全体</b></span></div></div>
+        <div class="inspector-group video-only" hidden><h3>Preview設定</h3><label class="select-row">品質<select id="previewQuality"><option>Draft · 軽量</option><option>Standard · 標準</option><option>High · 高品質</option></select></label><label class="check-row"><input id="loopPreview" type="checkbox" checked> ループ再生</label><label class="check-row"><input id="includeAudio" type="checkbox" checked> 音声を含める</label></div>
+        <div class="inspector-group video-only" hidden><h3>Clip範囲 / 音声</h3><label class="range-row">開始 <output id="audioStartValue">0.0s</output><input id="audioStart" type="range" min="0" max="60" step="0.1" value="0"></label><label class="range-row">終了 <output id="audioEndValue">20.0s</output><input id="audioEnd" type="range" min="0.1" max="60" step="0.1" value="20"></label><div class="audio-track"><span>音声トラック · 未接続</span></div></div>
+        <div class="inspector-group export-group"><h3>出力</h3><button id="exportPng" class="button button-primary full-width">PNGを書き出し</button><button id="exportVideo" class="button button-primary full-width video-only" hidden>WebMを書き出し</button><button id="previewButton" class="button button-quiet full-width">Preview</button><p class="not-connected">PNG／WebM出力とMarket引き渡しはローカルで利用できます。外部エンコード・認証・販売・同期は未接続です。</p></div>
+      </aside>
+    </section>
+  </main>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="../assets/creator-project-store.js"></script>
+  <script src="../assets/app-shell.js"></script>
+  <script src="../assets/creator-market-delivery-manifest.js?v=20260910-delivery-manifest2"></script>
+  <script src="../assets/creator-market-transfer.js?v=20260910-delivery-manifest2"></script>
+  <script src="./visual-blob-store.js?v=20260906-visual-blob1"></script>
+  <script src="./visual-studio.js?v=20260910-delivery-manifest2"></script>
+</body>
+</html>

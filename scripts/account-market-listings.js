@@ -34,6 +34,10 @@
     return `${Math.max(0, Number(value) || 0).toLocaleString('ja-JP')}円`;
   }
 
+  function listingPrice(entry) {
+    return entry?.acquisition_enabled === false ? '公開のみ' : formatPrice(entry?.sale_price_yen);
+  }
+
   function formatDate(value) {
     const date = new Date(value || '');
     if (!Number.isFinite(date.getTime())) return '更新日不明';
@@ -371,7 +375,7 @@
     const meta = document.createElement('div');
     meta.className = 'account-listing-card__meta';
     const price = document.createElement('span');
-    price.textContent = formatPrice(entry?.sale_price_yen);
+    price.textContent = listingPrice(entry);
     const date = document.createElement('span');
     date.textContent = formatDate(entry?.published_at || entry?.updated_at || entry?.created_at);
     meta.append(price, date);

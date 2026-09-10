@@ -16,6 +16,10 @@ Deno.test("Draw2 shortcut registry covers selection, tools, mirror and viewport"
       "mirror-cycle",
       "zoom-in",
       "zoom-reset",
+      "previous-frame-arrow",
+      "next-frame-arrow",
+      "previous-layer-arrow",
+      "next-layer-arrow",
       "shortcuts",
     ]
   ) {
@@ -43,22 +47,34 @@ Deno.test("Draw2 shortcut registry covers selection, tools, mirror and viewport"
     "Ctrl+A should select all",
   );
   assert(
+    resolveDraw2Shortcut({ key: "ArrowLeft" })?.command === "previous-frame",
+    "ArrowLeft should select the previous frame in Draw mode",
+  );
+  assert(
+    resolveDraw2Shortcut({ key: "ArrowDown" })?.command === "next-layer",
+    "ArrowDown should select the next layer in Draw mode",
+  );
+  assert(
     resolveDraw2Shortcut({ key: "p" }, { inputEditing: true }) === undefined,
     "input editing must suppress shortcuts",
   );
 });
 
-Deno.test("Draw2 specialized tools have stable keyboard entry points", () => {
+Deno.test("Draw2 user-facing tool shortcuts keep text and move entry points", () => {
   const expected = new Map([
-    ["y", "tool-pixel-pen"],
-    ["n", "tool-select-polygon"],
+    ["t", "tool-text"],
     ["v", "tool-move"],
-    ["t", "tool-tile-stamp"],
   ]);
   for (const [key, command] of expected) {
     assert(
       resolveDraw2Shortcut({ key })?.command === command,
       `${key} should resolve to ${command}`,
+    );
+  }
+  for (const removed of ["tool-pixel-pen", "tool-select-polygon", "tool-tile-stamp"]) {
+    assert(
+      !DRAW2_SHORTCUTS.some((shortcut) => shortcut.command === removed),
+      `${removed} should not be user-facing anymore`,
     );
   }
 });

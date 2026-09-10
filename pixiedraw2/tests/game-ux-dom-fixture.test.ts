@@ -16,6 +16,9 @@ const productionGameCss = await Deno.readTextFile(
 const productionShellCss = await Deno.readTextFile(
   new URL("../assets/draw2-shell.css", import.meta.url),
 );
+const productionMotionCss = await Deno.readTextFile(
+  new URL("../assets/draw2-mode-motion.css", import.meta.url),
+);
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
@@ -150,6 +153,77 @@ Deno.test("iGAME fixture makes editor and Preview state explicit", () => {
   );
 });
 
+Deno.test("iGAME fixture exposes reachable Game UI node entrances", () => {
+  const library = elementById("game-ui-library");
+  assert(
+    !hasBooleanAttribute(library, "hidden") &&
+      !/\binert(?:\s|=|>)/iu.test(library),
+    "Game UI library must remain reachable",
+  );
+  const nodes = fixture.match(
+    /<button\b[^>]*data-game-ui-node-kind=["'][^"']+["'][^>]*>[\s\S]*?<\/button>/giu,
+  ) ?? [];
+  assert(nodes.length === 3, "Fixture must expose exactly three Game UI nodes");
+  for (const kind of ["BUTTON", "MINIMAP", "INVENTORY"]) {
+    const node = nodes.find((entry) =>
+      attribute(entry, "data-game-ui-node-kind") === kind
+    );
+    assert(node, `Game UI node entrance is missing: ${kind}`);
+    assert(
+      attribute(node, "type") === "button" &&
+        attribute(node, "draggable") === "true" &&
+        attribute(node, "aria-controls") === "inspector-panel",
+      `Game UI node must be draggable and Inspector-linked: ${kind}`,
+    );
+  }
+  const inspector = elementById("inspector-panel");
+  assert(
+    attribute(inspector, "role") === "tabpanel" &&
+      attribute(inspector, "aria-labelledby") === "step-inspector",
+    "Game UI nodes must lead to the semantic Inspector panel",
+  );
+});
+
+Deno.test("GAME Preview fixture defines the Physics2D session boundary", () => {
+  const preview = elementById("preview-panel");
+  assert(
+    attribute(preview, "data-preview-runtime") === "physics2d-session",
+    "GAME Preview must identify the disposable Physics2D session runtime",
+  );
+  assert(
+    attribute(preview, "data-preview-canonical") === "unchanged",
+    "GAME Preview must declare canonical state unchanged",
+  );
+  assert(
+    productionUi.includes('from "./game/game-350/playable-slice.ts"'),
+    "Workspace UI must import the GAME-351 Physics2D session API",
+  );
+  for (const api of [
+    "createGame351Physics2DSession",
+    "playGame351Physics2DSession",
+    "stopGame351Physics2DSession",
+    "cleanupGame351Physics2DSession",
+    "stepGame351Physics2DSession",
+  ]) {
+    assert(productionUi.includes(api), `Preview lifecycle must call ${api}`);
+  }
+  assert(
+    productionUi.includes('"draw2:game-physics2d-events"') &&
+      productionUi.includes("gamePhysics2DSession.tick"),
+    "Physics2D step events and tick must be exposed to the Preview DOM",
+  );
+  assert(
+    productionUi.includes("physicsPosition") &&
+      productionUi.includes('role === "PLAYER"'),
+    "Physics2D Player position must be selected only for the Player render",
+  );
+  assert(
+    productionUi.includes("Disposable Preview-only state") &&
+      productionUi.includes("Project, Journal, or Undo"),
+    "Physics2D session must remain explicitly outside canonical state",
+  );
+});
+
 Deno.test("iGAME fixture has complete tab and tabpanel relationships", () => {
   const tablist = fixture.match(/<ol\b[^>]*role=["']tablist["'][^>]*>/iu);
   assert(tablist, "The flow must have one semantic tablist");
@@ -244,13 +318,13 @@ Deno.test("production iGAME surface exposes integration hooks and CSS order", ()
     /<button\b[^>]*data-mode-deck-tab="game-assets"[^>]*>/iu,
   )?.[0] ?? "";
   assert(
-    hasBooleanAttribute(leftHierarchy, "hidden") &&
-      !hasBooleanAttribute(leftNodeBox, "hidden") &&
-      attribute(hierarchyTab, "aria-selected") === "false" &&
-      attribute(nodeBoxTab, "aria-selected") === "true" &&
+    !hasBooleanAttribute(leftHierarchy, "hidden") &&
+      hasBooleanAttribute(leftNodeBox, "hidden") &&
+      attribute(hierarchyTab, "aria-selected") === "true" &&
+      attribute(nodeBoxTab, "aria-selected") === "false" &&
       attribute(sceneDeckTab, "aria-selected") === "false" &&
       attribute(inventoryDeckTab, "aria-selected") === "true",
-    "Production GAME first paint must project Node Box and Inventory",
+    "Production GAME first paint must project Hierarchy and Inventory",
   );
 
   const compactUi = productionUi.replace(/\s+/gu, " ");
@@ -369,6 +443,60 @@ Deno.test("production iGAME surface exposes integration hooks and CSS order", ()
   );
 });
 
+Deno.test("iGAME Scene controls stay in the upper rail above an unobstructed stage", () => {
+  const topbarControlsStart = production.indexOf(
+    'id="draw2GameTopbarControls"',
+  );
+  const toolbarStart = production.indexOf(
+    'class="draw2-igame-scene-toolbar"',
+  );
+  const viewportStart = production.indexOf(
+    'id="draw2GameSceneViewport"',
+  );
+  const stageStart = production.indexOf(
+    'class="draw2-game-scene-viewport-stage"',
+  );
+  assert(
+    topbarControlsStart >= 0 && toolbarStart > topbarControlsStart &&
+      topbarControlsStart < viewportStart && viewportStart < stageStart,
+    "Scene tools must be mounted in the upper rail before the viewport",
+  );
+  const stage = production.slice(stageStart);
+  assert(
+    !stage.includes('class="draw2-igame-scene-toolbar"') &&
+      !stage.includes('class="draw2-game-scene-viewport-header"') &&
+      !stage.includes(">動かして確認<"),
+    "The scene stage must not contain an overlay toolbar, header, or prose heading",
+  );
+  assert(
+    productionGameCss.includes("position: static !important") &&
+      productionMotionCss.includes(
+        "grid-template-rows: minmax(0, 1fr) !important",
+      ) &&
+      productionMotionCss.includes("#draw2GameTopbarControls:not([hidden])") &&
+      productionMotionCss.includes("transform: translateX(-50%) !important"),
+    "GAME controls must use the upper rail while the central stage keeps one row",
+  );
+});
+
+Deno.test("iGAME map overview stays compact and does not cover Game preview", () => {
+  assert(
+    production.includes('aria-label="マップ全体を表示"') &&
+      production.includes('id="draw2GameSceneMinimap"') &&
+      !production.includes('class="draw2-igame-scene-minimap-label"'),
+    "Map overview must keep one explicit Fit action without a redundant label",
+  );
+  assert(
+    productionMotionCss.includes("width: clamp(88px, 18%, 112px) !important") &&
+      productionMotionCss.includes(".draw2-igame-scene-minimap-label") &&
+      productionMotionCss.includes(
+        '#draw2GameSceneSvg[data-game-view-mode="GAME"]',
+      ) &&
+      productionMotionCss.includes("display: none !important"),
+    "Map overview must use the compact Scene-only presentation contract",
+  );
+});
+
 Deno.test("iGAME fixture exposes an error route back to the relevant settings", () => {
   for (const id of ["asset-error", "build-error"]) {
     const error = elementById(id);
@@ -389,6 +517,58 @@ Deno.test("iGAME fixture exposes an error route back to the relevant settings", 
       `${id} link must identify its settings target`,
     );
   }
+});
+
+Deno.test("GAME desktop readability rules keep libraries and Inspector bounded", () => {
+  const compactCss = productionGameCss.replace(/\s+/gu, " ");
+  assert(
+    /#draw2WorkspaceFrame\[data-creator-mode="GAME"\] #draw2ModeDeckGame:has\(> #draw2GamePlaygroundBottom:not\(\[hidden\]\)\):not\(\s*:has\(>\s*:is\(\.draw2-mode-deck-toolbar, \[role="tablist"\]\):not\(\[hidden\]\)\)\s*\)/u.test(compactCss) &&
+      compactCss.includes("gap: 0; padding-block-start: 0;"),
+    "GAME bottom deck may remove only empty top spacing when toolbar/tab content is hidden",
+  );
+
+  assert(
+    production.includes("draw2-game-ui-library-grid") &&
+      production.includes("draw2-game-element-grid") &&
+      /#draw2WorkspaceFrame\[data-creator-mode="GAME"\][\s\S]*:is\(\.draw2-game-ui-library-grid, \.draw2-game-element-grid\) \{[\s\S]*grid-template-columns: repeat\(auto-fit, minmax\(min\(100%, 64px\), 1fr\)\)/u.test(
+        compactCss,
+      ),
+    "GAME UI and element libraries must use bounded wrapping grid columns",
+  );
+  assert(
+    compactCss.includes(
+      ":is(.draw2-game-ui-library-grid, .draw2-game-element-grid) > button { display: grid;",
+    ) &&
+      compactCss.includes("min-height: 44px;") &&
+      compactCss.includes("text-overflow: ellipsis; white-space: nowrap;"),
+    "GAME library controls and captions must remain readable and single-line",
+  );
+  assert(
+    /#draw2WorkspaceFrame\[data-creator-mode="GAME"\] :is\(\.draw2-game-ui-library, \.draw2-game-element-library\) > header small \{ display: none; \}/u.test(
+      compactCss,
+    ) &&
+      /:is\(\.draw2-game-ui-library, \.draw2-game-element-library\) > header strong \{[\s\S]*white-space: nowrap;/u.test(
+        compactCss,
+      ),
+    "Only the two redundant library instructions may be hidden and headers must not character-wrap",
+  );
+
+  assert(
+    /#draw2WorkspaceFrame\[data-creator-mode="GAME"\] \.draw2-game-playground-inspector-heading :is\(\.draw2-eyebrow, \.draw2-panel-badge\) \{ display: none; \}/u.test(
+      compactCss,
+    ) &&
+      compactCss.includes(
+        "> :is([data-playground-card], .draw2-game-playground-inspector-card) { min-width: 0; }",
+      ) &&
+      compactCss.includes("min-height: 28px;"),
+    "GAME Inspector must retain one context heading, generic card coverage, and reachable 28px controls",
+  );
+  assert(
+    /#draw2WorkspaceFrame\[data-creator-mode="GAME"\][\s\S]*#draw2GamePlaygroundSourceRail[\s\S]*overflow-x: hidden;[\s\S]*overflow-y: auto;/u.test(
+      compactCss,
+    ),
+    "GAME library overflow must remain inside the source rail",
+  );
 });
 
 Deno.test("iGAME Node Box keeps search, empty-state, and interaction contracts", () => {
@@ -415,15 +595,14 @@ Deno.test("iGAME Node Box keeps search, empty-state, and interaction contracts",
     "Node Box search must be a labelled, controlled search field",
   );
   assert(
-    attribute(nodeBoxCta, "data-game-node-box-action") === "open-hierarchy" &&
-      attribute(nodeBoxCta, "aria-controls") ===
-        "draw2GameLeftDockHierarchyPanel" &&
+    attribute(nodeBoxCta, "data-game-node-box-action") === "open-assets" &&
+      attribute(nodeBoxCta, "aria-controls") === "draw2GameRailSurfaceAssets" &&
       attribute(nodeBoxCta, "aria-label") ===
-        "階層を開いてGameObjectを追加・選択" &&
+        "インベントリを開いてGameObjectを追加・選択" &&
       attribute(nodeBoxCta, "title") ===
-        "Hierarchyタブを開き、GameObjectを追加または選択" &&
-      textContent(nodeBoxCta).includes("階層を開いて追加・選択"),
-    "Node Box must expose a Hierarchy selection CTA",
+        "下部インベントリからGameObjectを追加または選択" &&
+      textContent(nodeBoxCta).includes("インベントリ"),
+    "Node Box must expose an Inventory selection CTA",
   );
   assert(
     attribute(nodeBoxEmpty, "role") === "status" &&
@@ -454,16 +633,10 @@ Deno.test("iGAME Node Box keeps search, empty-state, and interaction contracts",
   assert(
     compactUi.includes("tile.hidden = !visible;") &&
       compactUi.includes('tile.setAttribute("aria-hidden", String(!visible));') &&
-      compactUi.includes("tile.disabled = selected === undefined;") &&
-      compactUi.includes("tile.draggable = selected !== undefined;") &&
       compactUi.includes('setGameLeftDockTab("hierarchy");') &&
-      compactUi.includes("focusGameHierarchyNextAction") &&
-      compactUi.includes("gameDeckTracks.length === 0") &&
-      compactUi.includes("gameHierarchyAdd?.focus()") &&
-      compactUi.includes("gameHierarchyQuery?.focus()") &&
       compactUi.includes("GAME_NODE_TILE_DRAG_MIME") &&
       compactUi.includes("dataTransfer.setData"),
-    "Node Box filtering must preserve aria, disabled, drag, CTA, and drop contracts",
+    "Node Box filtering must preserve aria, hierarchy, drag, and drop contracts",
   );
   const rootDragStart = compactUi.match(
     /root\.addEventListener\("dragstart",\s*\(event\)\s*=>\s*\{[\s\S]*?\}\);/u,

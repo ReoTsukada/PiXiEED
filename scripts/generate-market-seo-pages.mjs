@@ -26,17 +26,70 @@ const escapeJson = (value) => JSON.stringify(value).replaceAll('<', '\\u003c').r
 const text = (value, fallback = '') => String(value ?? '').trim() || fallback;
 const attributeText = (value) => text(value).replace(/\s+/g, ' ');
 const itemUrl = (id) => `${siteUrl}/market/items/${encodeURIComponent(id)}/`;
-const yen = (value) => `${Number(value || 0).toLocaleString('ja-JP')}円`;
+const yen = (value) => Number(value || 0) === 0
+  ? '無料'
+  : `${Number(value || 0).toLocaleString('ja-JP')}円`;
 const fallbackShareImageUrl = `${siteUrl}/PiXiEEDogp.png`;
 const publicPreviewEndpoint = `${supabaseUrl}/functions/v1/market-public-preview`;
 const previewMaxIds = 120;
 const shareRibbonPolygon = [[0.146, 0.059], [0.333, 0.059], [0.031, 0.372], [0.031, 0.21]];
 
+const FORMAT_LABELS = Object.freeze({
+  'pixiedraw-project': 'PiXiEEDraw',
+  'novel-json': '小説・世界観（JSON）',
+  'visual-project': '画像・動画Project（JSON）',
+  text: 'テキスト',
+  markdown: 'Markdown',
+  html: 'HTML',
+  csv: 'CSV',
+  rtf: 'RTF',
+  json: 'JSON',
+  png: 'PNG',
+  webp: 'WebP',
+  gif: 'GIF',
+  apng: 'APNG',
+  'sprite-sheet-png': 'PNGスプライトシート',
+  mp4: 'MP4動画',
+  webm: 'WebM動画',
+  mov: 'QuickTime動画',
+  m4v: 'M4V動画',
+  ogv: 'Ogg動画',
+  aac: 'AAC音声',
+  aiff: 'AIFF音声',
+  flac: 'FLAC音声',
+  m4a: 'M4A音声',
+  mid: 'MIDI音声',
+  midi: 'MIDI音声',
+  mp3: 'MP3音声',
+  oga: 'OGA音声',
+  ogg: 'Ogg音声',
+  opus: 'Opus音声',
+  wav: 'WAV音声',
+  weba: 'WebA音声'
+});
+const TEXT_FORMATS = new Set(['novel-json', 'visual-project', 'text', 'markdown', 'html', 'csv', 'rtf', 'json']);
+const IMAGE_FORMATS = new Set(['pixiedraw-project', 'png', 'webp', 'gif', 'apng', 'sprite-sheet-png']);
+const VIDEO_FORMATS = new Set(['mp4', 'webm', 'mov', 'm4v', 'ogv']);
+const AUDIO_FORMATS = new Set(['aac', 'aiff', 'flac', 'm4a', 'mid', 'midi', 'mp3', 'oga', 'ogg', 'opus', 'wav', 'weba']);
+
+function formatValues(asset) {
+  return Array.isArray(asset.included_formats) && asset.included_formats.length
+    ? asset.included_formats.filter(Boolean)
+    : [asset.asset_format].filter(Boolean);
+}
+
 function formats(asset) {
-  const values = Array.isArray(asset.included_formats) && asset.included_formats.length
-    ? asset.included_formats : [asset.asset_format];
-  const labels = { 'pixiedraw-project': 'PiXiEEDraw', png: 'PNG', webp: 'WebP', gif: 'GIF', apng: 'APNG', 'sprite-sheet-png': 'PNGスプライトシート' };
-  return values.filter(Boolean).map((value) => labels[value] || value).join(' / ') || '画像素材';
+  return formatValues(asset).map((value) => FORMAT_LABELS[value] || value).join(' / ') || '創作素材';
+}
+
+function productType(asset) {
+  const values = formatValues(asset);
+  const kinds = [];
+  if (values.some((value) => TEXT_FORMATS.has(value))) kinds.push('文章・世界観');
+  if (values.some((value) => IMAGE_FORMATS.has(value))) kinds.push('画像');
+  if (values.some((value) => VIDEO_FORMATS.has(value))) kinds.push('動画');
+  if (values.some((value) => AUDIO_FORMATS.has(value))) kinds.push('音声');
+  return kinds.join(' + ') || '一般素材';
 }
 
 function isSoldOut(asset) {
@@ -52,7 +105,7 @@ function replaceElement(html, id, content) {
 
 function staticPage(template, asset, { ogImageUrl }) {
   const title = text(asset.title, 'PiXiEEDマーケット素材');
-  const description = text(asset.description, `${title}のドット絵素材。形式と利用条件をPiXiEEDマーケットで確認できます。`);
+  const description = text(asset.description, `${title}の創作素材。形式と利用条件をPiXiEEDマーケットで確認できます。`);
   const metaTitle = attributeText(title);
   const metaDescription = attributeText(description);
   const format = formats(asset);
@@ -65,7 +118,7 @@ function staticPage(template, asset, { ogImageUrl }) {
     name: title,
     description,
     url,
-    category: `ドット絵素材 / ${format}`,
+    category: `${productType(asset)} / ${format}`,
     brand: { '@type': 'Brand', name: 'PiXiEED' },
     offers: {
       '@type': 'Offer',
@@ -93,7 +146,7 @@ function staticPage(template, asset, { ogImageUrl }) {
   html = replaceElement(html, 'itemDescription', escapeHtml(description));
   html = replaceElement(html, 'itemPrice', escapeHtml(yen(asset.sale_price_yen)));
   html = replaceElement(html, 'itemFormats', escapeHtml(format));
-  html = replaceElement(html, 'itemProductType', escapeHtml(format.includes('PiXiEEDraw') ? 'PiXiEEDraw作品（編集用プロジェクト入り）' : '一般素材（画像・アニメーション）'));
+  html = replaceElement(html, 'itemProductType', escapeHtml(productType(asset)));
   html = replaceElement(html, 'itemAuthor', `作者: ${escapeHtml(text(asset.creator_display_name, 'PiXiEEDクリエイター'))}`);
   html = replaceElement(html, 'itemDerivative', series.derivative_sales_allowed
     ? 'OK（改変した素材を独立商品として再販売可能・系列ロイヤリティーあり）'

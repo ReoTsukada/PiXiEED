@@ -4,7 +4,7 @@
  * This contract is deliberately independent from DOM, Canvas, AudioContext,
  * Network, Supabase, IndexedDB, OPFS, Object Storage, Market, and Runtime.
  * Audio bytes remain outside the Core; only immutable Revision metadata and
- * authorized storage locators cross the bridge.
+ * authorized storage locators cross the adapter boundary.
  */
 
 import { asSha256, type ContentHash } from "./wp160-contracts.ts";

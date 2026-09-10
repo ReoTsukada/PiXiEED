@@ -150,3 +150,94 @@ Deno.test("GAME350-CANONICAL-004 projects Behavior IR into a stable Scene compon
     "Behavior-bearing records must validate their state hash",
   );
 });
+
+Deno.test("GAME350-CANONICAL-005 keeps author-defined game data and event references lossless", async () => {
+  const record = await createGameEditorPersistenceRecord(
+    "game-data-project",
+    [{ id: "hero", label: "Hero", kind: "SPRITE", filled: [] }],
+    1,
+    undefined,
+    undefined,
+    [],
+    [],
+    [],
+    undefined,
+    [],
+    [],
+    undefined,
+    undefined,
+    [
+      {
+        eventId: "event:inventory",
+        label: "鍵を渡す",
+        enabled: true,
+        who: "PLAYER",
+        condition: "HAS_ITEM",
+        sourceTrackId: "hero",
+        action: "GIVE_ITEM",
+        amount: 1,
+        itemId: "item:key",
+      },
+      {
+        eventId: "event:craft",
+        label: "薬を作る",
+        enabled: true,
+        who: "PLAYER",
+        condition: "INTERACT",
+        sourceTrackId: "hero",
+        action: "CRAFT_ITEM",
+        recipeId: "recipe:potion",
+      },
+      {
+        eventId: "event:block",
+        label: "石を置く",
+        enabled: true,
+        who: "PLAYER",
+        condition: "TOUCH",
+        sourceTrackId: "hero",
+        action: "PLACE_BLOCK",
+        blockTypeId: "block:stone",
+      },
+    ],
+    undefined,
+    {
+      items: [
+        {
+          itemId: "item:key",
+          label: "古い鍵",
+          stackable: false,
+          maxStack: 1,
+        },
+        {
+          itemId: "item:potion",
+          label: "回復薬",
+          stackable: true,
+          maxStack: 10,
+        },
+      ],
+      recipes: [{
+        recipeId: "recipe:potion",
+        label: "回復薬を作る",
+        ingredients: [{ itemId: "item:key", amount: 1 }],
+        result: { itemId: "item:potion", amount: 1 },
+      }],
+      blockTypes: [{
+        blockTypeId: "block:stone",
+        label: "石ブロック",
+        breakable: true,
+        dropItemId: "item:key",
+        placeable: true,
+      }],
+    },
+  );
+  const store = await GameEditorCanonicalStore.create(record);
+  const timeline = store.project.editorTimeline;
+  assert(timeline?.items?.[1]?.label === "回復薬", "items must remain canonical");
+  assert(timeline?.recipes?.[0]?.result.itemId === "item:potion", "recipes must remain canonical");
+  assert(timeline?.blockTypes?.[0]?.blockTypeId === "block:stone", "block types must remain canonical");
+  assert(timeline?.eventCards?.[2]?.blockTypeId === "block:stone", "event references must remain canonical");
+  assert(
+    await validateGameEditorPersistenceRecord(record),
+    "game data and event references must validate their state hash",
+  );
+});

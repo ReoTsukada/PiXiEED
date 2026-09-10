@@ -146,13 +146,6 @@
     visibility: hidden !important;
     pointer-events: none !important;
   }
-  .draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
-    .draw2-mini-preview:not([hidden]) {
-    top: var(--draw2-space-2) !important;
-    right: var(--draw2-space-2) !important;
-    left: auto !important;
-    transform: none !important;
-  }
 }
 
 /* iGAME right rail: the Game preview/build surface is a two-level rail.
@@ -1004,6 +997,370 @@
   width: 13px;
   height: 13px;
   flex: 0 0 13px;
+}
+
+/* -------------------------------------------------------------------------
+   Character Setup surface
+   The visible authoring path is intentionally a small profile: choose an
+   action, choose a direction, select the source rectangle, save, and place.
+   The former Asset Builder remains mounted only as a compatibility surface
+   for existing state and is not part of the product UI.
+   ------------------------------------------------------------------------- */
+#draw2AssetBuilderVisual[hidden],
+#draw2CreatorAssetSurface > .draw2-asset-detail-editor[hidden] {
+  display: none !important;
+}
+
+.draw2-character-setup {
+  display: grid;
+  gap: 10px;
+  margin: 8px 0 14px;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--draw2-accent-strong) 38%, var(--draw2-border-subtle));
+  border-radius: var(--draw2-radius-md);
+  background: color-mix(in srgb, var(--draw2-accent-strong) 4%, var(--draw2-surface-raised));
+}
+.draw2-character-setup-header,
+.draw2-character-setup-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.draw2-character-setup-header > div,
+.draw2-character-setup-card-heading > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.draw2-character-setup-header strong,
+.draw2-character-setup-card-heading strong {
+  color: var(--draw2-text-strong);
+  font-size: 0.82rem;
+  line-height: 1.2;
+}
+.draw2-character-setup-header small,
+.draw2-character-setup-card-heading small {
+  flex: 0 0 auto;
+  color: var(--draw2-text-muted);
+  font-size: 0.62rem;
+}
+.draw2-character-setup-card-heading > .draw2-character-animation-card-actions {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.draw2-character-direction-controls {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  min-width: 0;
+}
+.draw2-character-direction-controls > label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--draw2-text-muted);
+  font-size: 0.58rem;
+  white-space: nowrap;
+}
+.draw2-character-direction-controls select {
+  box-sizing: border-box;
+  min-height: 27px;
+  padding: 3px 17px 3px 5px;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: 5px;
+  background: var(--draw2-surface-input);
+  color: var(--draw2-text-strong);
+  font-size: 0.62rem;
+}
+.draw2-character-animation-card > .draw2-character-setup-card-heading {
+  flex-wrap: wrap;
+}
+.draw2-character-animation-card-actions > output {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--draw2-text-muted);
+  font-size: 0.62rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.draw2-character-animation-add-frame {
+  min-height: 28px;
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+.draw2-character-animation-add-frame[data-state="pending"] {
+  cursor: wait;
+}
+.draw2-character-animation-all-frames {
+  min-height: 28px;
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+.draw2-character-animation-card-actions > .draw2-button-icon {
+  flex: 0 0 auto;
+  min-height: 28px;
+  padding-inline: 7px;
+}
+.draw2-character-animation-card-actions
+  > #draw2CharacterAnimationDelete:not(:disabled) {
+  color: var(--draw2-danger);
+}
+.draw2-character-animation-edit-bar {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  padding-top: 2px;
+  border-top: 1px solid color-mix(in srgb, var(--draw2-border-subtle) 70%, transparent);
+}
+.draw2-character-animation-edit-bar .draw2-button-icon {
+  flex: 0 0 28px;
+  width: 28px;
+  min-height: 28px;
+  padding: 0;
+}
+.draw2-character-animation-edit-bar label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  color: var(--draw2-text-muted);
+  font-size: 0.58rem;
+  white-space: nowrap;
+}
+.draw2-character-animation-edit-bar input,
+.draw2-character-animation-edit-bar select {
+  box-sizing: border-box;
+  min-height: 28px;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: 5px;
+  background: var(--draw2-surface-input);
+  color: var(--draw2-text-strong);
+  font-size: 0.62rem;
+}
+.draw2-character-animation-edit-bar input {
+  width: 58px;
+  padding: 4px 5px;
+  text-align: right;
+}
+.draw2-character-animation-edit-bar select {
+  max-width: 84px;
+  padding: 4px 18px 4px 5px;
+}
+.draw2-character-animation-edit-bar input:disabled,
+.draw2-character-animation-edit-bar select:disabled,
+.draw2-character-animation-edit-bar .draw2-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+.draw2-character-setup-status,
+.draw2-character-direction-status {
+  min-width: 0;
+  color: var(--draw2-text-muted);
+  font-size: 0.65rem;
+  line-height: 1.35;
+  text-align: right;
+}
+.draw2-character-setup-status[data-state="success"] { color: var(--draw2-accent-strong); }
+.draw2-character-setup-status[data-state="error"] { color: var(--draw2-danger); }
+.draw2-character-setup-identity {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 92px auto auto;
+  align-items: end;
+  gap: 7px;
+}
+.draw2-character-setup-identity label {
+  display: grid;
+  gap: 3px;
+  color: var(--draw2-text-muted);
+  font-size: 0.64rem;
+}
+.draw2-character-setup-identity input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 34px;
+  padding: 7px 8px;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: var(--draw2-radius-sm);
+  background: var(--draw2-surface-input);
+  color: var(--draw2-text-strong);
+  font-size: 0.76rem;
+}
+.draw2-character-setup-fps { position: relative; }
+.draw2-character-setup-fps input { padding-right: 30px; }
+.draw2-character-setup-fps span {
+  position: absolute;
+  right: 7px;
+  bottom: 9px;
+  color: var(--draw2-text-muted);
+  font-size: 0.58rem;
+  pointer-events: none;
+}
+.draw2-character-setup-identity .draw2-button {
+  min-height: 34px;
+  white-space: nowrap;
+}
+.draw2-character-setup-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+  gap: 8px;
+  min-width: 0;
+}
+.draw2-character-setup-card {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: var(--draw2-radius-sm);
+  background: color-mix(in srgb, var(--draw2-surface-input) 68%, transparent);
+}
+.draw2-character-action-list {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+}
+.draw2-character-action {
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: 53px;
+  padding: 6px 4px;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--draw2-surface-raised) 82%, transparent);
+  color: var(--draw2-text-muted);
+  cursor: pointer;
+  text-align: center;
+  touch-action: manipulation;
+}
+.draw2-character-action:hover,
+.draw2-character-action:focus-visible,
+.draw2-character-action.is-active {
+  border-color: var(--draw2-accent-strong);
+  background: color-mix(in srgb, var(--draw2-accent-strong) 14%, var(--draw2-surface-raised));
+  color: var(--draw2-text-strong);
+  outline: none;
+}
+.draw2-character-action > span {
+  color: var(--draw2-accent-strong);
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1;
+}
+.draw2-character-action strong {
+  overflow: hidden;
+  max-width: 100%;
+  font-size: 0.65rem;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.draw2-character-action small {
+  color: var(--draw2-text-muted);
+  font-size: 0.56rem;
+  line-height: 1;
+}
+.draw2-character-direction-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(3, minmax(54px, auto));
+  gap: 5px;
+  max-width: 300px;
+  margin-inline: auto;
+}
+.draw2-character-direction-slot,
+.draw2-character-direction-center {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: 54px;
+  padding: 5px;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: 7px;
+}
+.draw2-character-direction-slot {
+  background: color-mix(in srgb, var(--draw2-surface-raised) 82%, transparent);
+  color: var(--draw2-text-muted);
+  cursor: pointer;
+  text-align: center;
+}
+.draw2-character-direction-slot:hover,
+.draw2-character-direction-slot:focus-visible,
+.draw2-character-direction-slot[data-state="pending"] {
+  border-color: var(--draw2-focus);
+  background: color-mix(in srgb, var(--draw2-focus) 12%, var(--draw2-surface-raised));
+  color: var(--draw2-text-strong);
+  outline: none;
+}
+.draw2-character-direction-slot[data-state="ready"] {
+  border-color: color-mix(in srgb, var(--draw2-accent-strong) 76%, var(--draw2-border-subtle));
+  background: color-mix(in srgb, var(--draw2-accent-strong) 12%, var(--draw2-surface-raised));
+}
+.draw2-character-direction-slot[data-state="ready"] [data-character-slot-state] { color: var(--draw2-accent-strong); }
+.draw2-character-direction-icon {
+  color: var(--draw2-accent-strong);
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1;
+}
+.draw2-character-direction-slot strong { font-size: 0.66rem; line-height: 1; }
+.draw2-character-direction-slot small,
+.draw2-character-direction-center small {
+  color: var(--draw2-text-muted);
+  font-size: 0.56rem;
+  line-height: 1;
+}
+.draw2-character-direction-slot:nth-child(1) { grid-column: 2; grid-row: 1; }
+.draw2-character-direction-slot:nth-child(2) { grid-column: 1; grid-row: 2; }
+.draw2-character-direction-center { grid-column: 2; grid-row: 2; border-style: dashed; background: transparent; color: var(--draw2-text-muted); font-size: 0.62rem; }
+.draw2-character-direction-slot:nth-child(4) { grid-column: 3; grid-row: 2; }
+.draw2-character-direction-slot:nth-child(5) { grid-column: 2; grid-row: 3; }
+.draw2-character-direction-center span { font-weight: 700; line-height: 1; }
+.draw2-character-direction-status {
+  display: block;
+  min-height: 1.25em;
+  text-align: left;
+}
+.draw2-character-setup-help {
+  margin: 0;
+  color: var(--draw2-text-muted);
+  font-size: 0.62rem;
+  line-height: 1.35;
+}
+
+@media (max-width: 760px) {
+  .draw2-creator-surface-heading {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: baseline;
+  }
+  .draw2-creator-surface-heading strong {
+    white-space: nowrap;
+  }
+  .draw2-creator-local-badge {
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: start;
+  }
+  .draw2-character-setup { padding: 8px; }
+  .draw2-character-setup-header { display: grid; }
+  .draw2-character-setup-status { text-align: left; }
+  .draw2-character-setup-identity { grid-template-columns: minmax(0, 1fr) 82px; }
+  .draw2-character-setup-identity .draw2-button { width: 100%; }
+  .draw2-character-setup-identity .draw2-button-primary { grid-column: 1; }
+  .draw2-character-setup-identity .draw2-button-secondary { grid-column: 2; }
+  .draw2-character-setup-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* -------------------------------------------------------------------------
@@ -2857,18 +3214,66 @@ button.draw2-audio-ruler-cell {
   content-visibility: auto;
   contain-intrinsic-size: 30px 30px;
 }
+.draw2-audio-animation-segments,
+.draw2-audio-draw-frame-segments {
+  position: absolute;
+  inset: 2px 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+.draw2-audio-animation-segment,
+.draw2-audio-draw-frame-segment {
+  position: absolute;
+  inset-block: 0;
+  min-width: 1px;
+  border-inline-end: 1px solid rgb(238 206 255 / 56%);
+  opacity: 0.92;
+  transition: background-color 90ms ease, opacity 90ms ease;
+}
+.draw2-audio-animation-segment {
+  background: linear-gradient(
+    180deg,
+    rgb(116 215 163 / 82%),
+    rgb(47 121 91 / 76%)
+  );
+}
+.draw2-audio-draw-frame-segment {
+  background: linear-gradient(
+    180deg,
+    rgb(215 168 255 / 88%),
+    rgb(117 70 165 / 84%)
+  );
+}
+.draw2-audio-animation-segment.is-active,
+.draw2-audio-draw-frame-segment.is-active {
+  background: linear-gradient(
+    180deg,
+    rgb(255 239 255 / 92%),
+    rgb(199 121 255 / 74%)
+  );
+  border-inline-end-color: #fff5ff;
+  opacity: 1;
+}
+.draw2-audio-animation-label,
+.draw2-audio-animation-duration,
+.draw2-audio-draw-frame-label-text {
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+}
 .draw2-audio-animation-cell small {
   color: color-mix(in srgb, var(--draw2-text-muted) 75%, transparent);
   font-size: 0.45rem;
   font-weight: 500;
 }
 .draw2-audio-animation-cell.is-cel {
-  background: color-mix(in srgb, #74d7a3 19%, var(--draw2-surface-raised));
+  background: color-mix(in srgb, #74d7a3 7%, var(--draw2-surface-raised));
 }
 .draw2-audio-animation-cell.is-active,
 .draw2-audio-animation-cell:focus-visible {
   border-color: #f0c5ff;
-  background: color-mix(in srgb, #c88bff 35%, var(--draw2-surface-raised));
+  background: color-mix(in srgb, #c88bff 13%, var(--draw2-surface-raised));
   color: var(--draw2-text-strong);
   outline: none;
 }
@@ -4474,10 +4879,6 @@ body:has(#draw2WorkspaceFrame) {
     #draw2AudioWorkspace[hidden] {
     display: none !important;
   }
-  .draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
-    .draw2-mini-preview {
-    display: none !important;
-  }
   .draw2-audio-editor-header {
     display: flex;
     flex: 0 0 42px;
@@ -5586,6 +5987,39 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 }
 .draw2-selection-path--pending.draw2-selection-path--light {
   stroke: rgba(218, 160, 255, 0.98);
+}
+.draw2-selection-path--text.draw2-selection-path--dark {
+  stroke: rgba(20, 46, 52, 0.96);
+}
+.draw2-selection-path--text.draw2-selection-path--light {
+  stroke: rgba(138, 227, 210, 0.98);
+}
+.draw2-selection-transform-controls {
+  pointer-events: none;
+}
+.draw2-selection-transform-frame {
+  fill: rgba(138, 227, 210, 0.04);
+  stroke: rgba(138, 227, 210, 0.98);
+  stroke-width: 1px;
+  stroke-dasharray: 2 3;
+  shape-rendering: crispEdges;
+}
+.draw2-selection-transform-connector {
+  stroke: rgba(138, 227, 210, 0.86);
+  stroke-width: 1px;
+  stroke-dasharray: 2 2;
+  shape-rendering: crispEdges;
+}
+.draw2-selection-transform-handle {
+  fill: rgba(13, 31, 37, 0.94);
+  stroke: rgba(226, 255, 249, 0.98);
+  stroke-width: 1px;
+  shape-rendering: crispEdges;
+}
+.draw2-selection-transform-handle--rotate {
+  fill: rgba(71, 191, 171, 0.98);
+  stroke: rgba(226, 255, 249, 0.98);
+  shape-rendering: geometricPrecision;
 }
 @keyframes draw2-selection-ants {
   to {
@@ -7069,6 +7503,25 @@ html, body {
 #draw2WorkspaceCanvasSlot #draw2Canvas[data-tool="pan"]:active {
   cursor: grabbing;
 }
+#draw2Canvas[data-selection-frame-handle="nw"],
+#draw2Canvas[data-selection-frame-handle="se"] {
+  cursor: nwse-resize;
+}
+#draw2Canvas[data-selection-frame-handle="ne"],
+#draw2Canvas[data-selection-frame-handle="sw"] {
+  cursor: nesw-resize;
+}
+#draw2Canvas[data-selection-frame-handle="n"],
+#draw2Canvas[data-selection-frame-handle="s"] {
+  cursor: ns-resize;
+}
+#draw2Canvas[data-selection-frame-handle="e"],
+#draw2Canvas[data-selection-frame-handle="w"] {
+  cursor: ew-resize;
+}
+#draw2Canvas[data-selection-frame-handle="rotate"] {
+  cursor: crosshair;
+}
 @media (min-width: 701px) {
   /* The Draw rail is on the left. Keep the pre-measurement fallback beside
      the rail so a flyout is still reachable before its viewport position is
@@ -7193,6 +7646,27 @@ html, body {
 .draw2-selection-morphology {
   grid-column: 1 / -1;
   justify-content: flex-start;
+}
+.draw2-selection-transform-actions {
+  display: flex;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--draw2-space-1);
+  min-width: 0;
+}
+.draw2-selection-transform-label {
+  flex: 0 0 auto;
+  margin-right: var(--draw2-space-1);
+  color: var(--draw2-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.draw2-selection-transform-actions .draw2-button {
+  flex: 0 0 32px;
+  min-height: 32px;
+  padding: 0;
 }
 .draw2-mini-preview {
   position: absolute;
@@ -15043,6 +15517,20 @@ body:has(#draw2WorkspaceFrame) {
   color: #c4b5fd;
   text-decoration: underline;
 }
+.draw2-asset-definition-state {
+  flex: 0 0 auto;
+  padding: 2px 5px;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: 999px;
+  color: var(--draw2-text-muted);
+  font-size: 0.54rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.draw2-asset-definition-state[data-state="validated"] {
+  border-color: color-mix(in srgb, var(--draw2-accent-strong) 60%, var(--draw2-border-subtle));
+  color: var(--draw2-accent-strong);
+}
 .draw2-asset-definition-remove {
   flex: 0 0 auto;
   padding: 2px 5px;
@@ -15903,6 +16391,66 @@ body:has(#draw2WorkspaceFrame) {
 .draw2-asset-builder-save:focus-visible {
   background: color-mix(in srgb, #4db7ff 32%, var(--draw2-surface-raised));
 }
+.draw2-asset-package-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto minmax(82px, auto);
+  align-items: end;
+  gap: 6px;
+  min-width: 0;
+  padding: 6px;
+  border: 1px solid color-mix(in srgb, #f1c77b 34%, var(--draw2-border-subtle));
+  border-radius: var(--draw2-radius-sm);
+  background: color-mix(in srgb, var(--draw2-surface-input) 72%, transparent);
+}
+.draw2-asset-package-controls > label {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  color: var(--draw2-text-muted);
+  font-size: 0.5rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+.draw2-asset-package-controls select {
+  min-width: 0;
+  min-height: 28px;
+  padding: 3px 6px;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: 4px;
+  background: var(--draw2-surface-raised);
+  color: var(--draw2-text-strong);
+  font: inherit;
+}
+.draw2-asset-builder-finalize {
+  min-height: 28px;
+  padding-inline: 9px;
+  border-color: #f1c77b;
+  background: color-mix(in srgb, #f1c77b 22%, var(--draw2-surface-raised));
+  color: var(--draw2-text-strong);
+  white-space: nowrap;
+}
+.draw2-asset-builder-finalize:hover:not(:disabled),
+.draw2-asset-builder-finalize:focus-visible:not(:disabled) {
+  background: color-mix(in srgb, #f1c77b 34%, var(--draw2-surface-raised));
+}
+.draw2-asset-builder-finalize:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.draw2-asset-package-controls > output {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  padding: 6px 4px;
+  color: var(--draw2-text-muted);
+  font-size: 0.52rem;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.draw2-asset-package-controls > output[data-state="ready"] {
+  color: #8ee8bd;
+}
 .draw2-asset-builder-help {
   white-space: normal;
 }
@@ -16147,6 +16695,48 @@ body:has(#draw2WorkspaceFrame) {
   flex: 0 0 auto;
   border-color: #9b7dff;
   background: color-mix(in srgb, #9b7dff 24%, var(--draw2-surface-raised));
+}
+.draw2-asset-builder-actions {
+  flex-wrap: wrap;
+}
+.draw2-asset-builder-actions > span {
+  flex: 1 1 180px;
+}
+.draw2-asset-builder-unity-export {
+  min-width: 112px;
+  min-height: 32px;
+  flex: 0 0 auto;
+  border-color: #79c7ff;
+  background: color-mix(in srgb, #79c7ff 16%, var(--draw2-surface-raised));
+}
+.draw2-asset-builder-unity-export:hover:not(:disabled),
+.draw2-asset-builder-unity-export:focus-visible:not(:disabled) {
+  border-color: #a4dcff;
+  background: color-mix(in srgb, #79c7ff 28%, var(--draw2-surface-raised));
+}
+.draw2-asset-builder-unity-export:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.draw2-asset-builder-unity-status {
+  display: block;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--draw2-text-muted);
+  font-size: 0.54rem;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+}
+.draw2-asset-builder-unity-status[data-state="ready"],
+.draw2-asset-builder-unity-status[data-state="success"] {
+  color: #8ee8bd;
+}
+.draw2-asset-builder-unity-status[data-state="busy"] {
+  color: #f1c77b;
+}
+.draw2-asset-builder-unity-status[data-state="error"] {
+  color: #ff9e9e;
 }
 .draw2-asset-detail-editor {
   display: grid;
@@ -16634,6 +17224,9 @@ body:has(#draw2WorkspaceFrame) {
   position: relative;
   isolation: isolate;
   contain: strict;
+  overflow-anchor: none;
+  overflow: auto;
+  contain-intrinsic-size: 480px 520px;
   width: 100%;
   overscroll-behavior: contain;
   scrollbar-gutter: stable both-edges;
@@ -18246,9 +18839,16 @@ body:has(#draw2WorkspaceFrame) {
   color: var(--draw2-text-muted);
   font-size: 0.66rem;
 }
-.draw2-brush-options-flyout select {
+.draw2-brush-options-flyout select,
+.draw2-brush-options-flyout input {
   width: 100%;
   min-height: 30px;
+}
+.draw2-brush-options-flyout #draw2BrushAngleControl {
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+}
+.draw2-brush-options-flyout #draw2BrushAngle {
+  width: 100%;
 }
 .draw2-brush-options-help {
   margin: 0;
@@ -18646,21 +19246,11 @@ body:has(#draw2WorkspaceFrame) {
   color: var(--draw2-text-strong);
 }
 /* Desktop keeps the legacy command bar children collapsed because the
- * quick-control strip owns the other commands. The shared preview is the
- * deliberate exception and must remain reachable from the top rail. */
+ * quick-control strip owns the other commands. */
 #draw2WorkspaceFrame
   .draw2-workspace-command-bar
   > .draw2-global-mini-preview-toggle:not([hidden]) {
   display: grid !important;
-}
-@media (min-width: 1120px) {
-  /* Audio hides the full canvas projection on desktop, but the shared mini
-     preview is the intentional visual companion and stays mounted. */
-  .draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
-    .draw2-mini-preview:not([hidden]) {
-    display: grid !important;
-    visibility: visible !important;
-  }
 }
 
 /* -------------------------------------------------------------------------
@@ -20106,6 +20696,343 @@ body:has(#draw2WorkspaceFrame) {
   line-height: 1.4;
 }
 
+#draw2WorkspaceFrame .draw2-collaboration-scope-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 9px;
+  border-top: 1px solid var(--draw2-border-subtle, var(--draw2-border));
+}
+
+#draw2WorkspaceFrame .draw2-collaboration-scope-entry > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+#draw2WorkspaceFrame .draw2-collaboration-scope-entry strong {
+  color: var(--draw2-text-strong, #f4f7fb);
+  font-size: 0.68rem;
+}
+
+#draw2WorkspaceFrame .draw2-collaboration-scope-entry small {
+  overflow: hidden;
+  color: var(--draw2-text-muted, #aeb8c8);
+  font-size: 0.58rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#draw2WorkspaceFrame .draw2-collaboration-scope-entry .draw2-button {
+  flex: 0 0 auto;
+  min-height: 30px;
+  padding-inline: 9px;
+  font-size: 0.62rem;
+}
+
+#draw2WorkspaceFrame .draw2-collaboration-edit-guard {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 7px;
+  padding: 7px 8px;
+  border: 1px solid color-mix(in srgb, #e4ad4a 58%, var(--draw2-border-subtle));
+  border-radius: 7px;
+  background: color-mix(in srgb, #e4ad4a 10%, var(--draw2-surface));
+}
+
+#draw2WorkspaceFrame .draw2-collaboration-edit-guard span {
+  min-width: 0;
+  color: #f3d184;
+  font-size: 0.58rem;
+  line-height: 1.4;
+}
+
+#draw2WorkspaceFrame .draw2-collaboration-edit-guard .draw2-button {
+  flex: 0 0 auto;
+  min-height: 26px;
+  padding-inline: 8px;
+  font-size: 0.58rem;
+}
+
+.draw2-collaboration-dialog {
+  width: min(620px, calc(100vw - 24px));
+}
+
+.draw2-collaboration-dialog::backdrop {
+  background: rgb(4 8 15 / 72%);
+  backdrop-filter: blur(3px);
+}
+
+.draw2-collaboration-consent-section,
+.draw2-collaboration-section,
+.draw2-collaboration-help {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--draw2-surface-raised) 82%, transparent);
+}
+
+.draw2-collaboration-consent-heading,
+.draw2-collaboration-section-heading > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.draw2-collaboration-consent-heading strong,
+.draw2-collaboration-section-heading strong,
+.draw2-collaboration-help strong {
+  color: var(--draw2-text-strong);
+  font-size: 0.7rem;
+}
+
+.draw2-collaboration-section-heading small,
+.draw2-collaboration-help span,
+.draw2-collaboration-message {
+  color: var(--draw2-text-muted);
+  font-size: 0.62rem;
+  line-height: 1.45;
+}
+
+.draw2-collaboration-consent-card {
+  display: grid;
+  gap: 4px;
+  padding: 9px;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: 8px;
+  background: var(--draw2-surface);
+}
+
+.draw2-collaboration-consent-card strong {
+  color: var(--draw2-text-strong);
+  font-size: 0.68rem;
+}
+
+.draw2-collaboration-consent-card span {
+  color: var(--draw2-text-muted);
+  font-size: 0.62rem;
+  line-height: 1.45;
+}
+
+.draw2-collaboration-consent-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--draw2-text-strong);
+  cursor: pointer;
+  font-size: 0.64rem;
+  line-height: 1.4;
+}
+
+.draw2-collaboration-consent-check input {
+  flex: 0 0 auto;
+  margin: 2px 0 0;
+  accent-color: var(--draw2-accent-strong);
+}
+
+.draw2-collaboration-consent-section > .draw2-button {
+  justify-self: start;
+  min-height: 32px;
+  padding-inline: 12px;
+  font-size: 0.64rem;
+}
+
+.draw2-collaboration-section-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.draw2-collaboration-section-heading > small {
+  max-width: 52%;
+  text-align: right;
+}
+
+.draw2-collaboration-policy-message {
+  margin: 0;
+}
+
+.draw2-collaboration-policy-options {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.draw2-collaboration-policy-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: 8px;
+  background: var(--draw2-surface);
+  cursor: pointer;
+}
+
+.draw2-collaboration-policy-option:has(input:checked) {
+  border-color: color-mix(in srgb, var(--draw2-accent-strong) 72%, var(--draw2-border-subtle));
+  background: color-mix(in srgb, var(--draw2-accent-strong) 8%, var(--draw2-surface));
+}
+
+.draw2-collaboration-policy-option input {
+  flex: 0 0 auto;
+  margin: 2px 0 0;
+  accent-color: var(--draw2-accent-strong);
+}
+
+.draw2-collaboration-policy-option > span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.draw2-collaboration-policy-option strong {
+  color: var(--draw2-text-strong);
+  font-size: 0.64rem;
+}
+
+.draw2-collaboration-policy-option small {
+  color: var(--draw2-text-muted);
+  font-size: 0.58rem;
+  line-height: 1.4;
+}
+
+.draw2-collaboration-policy-option input:disabled,
+.draw2-collaboration-policy-option input:disabled + span {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.draw2-collaboration-member-list,
+.draw2-collaboration-scope-list {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.draw2-collaboration-member-card,
+.draw2-collaboration-scope-row {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: 8px;
+  background: var(--draw2-surface);
+}
+
+.draw2-collaboration-member-heading,
+.draw2-collaboration-scope-row > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.draw2-collaboration-member-heading strong,
+.draw2-collaboration-scope-row strong {
+  overflow: hidden;
+  color: var(--draw2-text-strong);
+  font-size: 0.66rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.draw2-collaboration-member-heading small,
+.draw2-collaboration-scope-row small {
+  color: var(--draw2-text-muted);
+  font-size: 0.58rem;
+}
+
+.draw2-collaboration-scope-buttons {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.draw2-collaboration-scope-button {
+  min-width: 0;
+  min-height: 32px;
+  padding: 4px;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: 6px;
+  background: var(--draw2-surface-raised);
+  color: var(--draw2-text-muted);
+  cursor: pointer;
+  font-size: 0.54rem;
+  line-height: 1.15;
+}
+
+.draw2-collaboration-scope-button[data-state="APPROVED"] {
+  border-color: color-mix(in srgb, #54c58a 65%, var(--draw2-border-subtle));
+  color: #9be6bd;
+}
+
+.draw2-collaboration-scope-button[data-state="PENDING_MEMBER"],
+.draw2-collaboration-scope-button[data-state="PENDING_MASTER"],
+.draw2-collaboration-scope-button[data-state="REMOVAL_REQUESTED"] {
+  border-color: color-mix(in srgb, #e4ad4a 68%, var(--draw2-border-subtle));
+  color: #f3d184;
+}
+
+.draw2-collaboration-scope-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.draw2-collaboration-scope-row button {
+  flex: 0 0 auto;
+  min-height: 28px;
+  padding: 4px 8px;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: 6px;
+  background: var(--draw2-surface-raised);
+  color: var(--draw2-text-strong);
+  cursor: pointer;
+  font-size: 0.58rem;
+}
+
+.draw2-collaboration-scope-row button:hover,
+.draw2-collaboration-scope-row button:focus-visible,
+.draw2-collaboration-scope-button:hover,
+.draw2-collaboration-scope-button:focus-visible {
+  border-color: var(--draw2-accent-strong);
+  outline: none;
+}
+
+.draw2-collaboration-empty {
+  margin: 0;
+  color: var(--draw2-text-muted);
+  font-size: 0.62rem;
+}
+
+@media (max-width: 560px) {
+  .draw2-collaboration-section-heading {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .draw2-collaboration-section-heading > small {
+    max-width: none;
+    text-align: left;
+  }
+
+  .draw2-collaboration-scope-buttons {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 #draw2WorkspaceFrame .draw2-statusbar-sync {
   display: inline-flex;
   align-items: center;
@@ -20578,32 +21505,6 @@ body:has(#draw2WorkspaceFrame) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/* The mini preview is opened from a quiet, fixed viewport affordance. */
-#draw2WorkspaceFrame .draw2-viewport-mini-preview-toggle {
-  position: absolute !important;
-  z-index: 6 !important;
-  top: 8px !important;
-  right: 8px !important;
-  display: grid !important;
-  width: 34px !important;
-  min-width: 34px !important;
-  height: 34px !important;
-  min-height: 34px !important;
-  padding: 0 !important;
-  place-items: center;
-  border-color: var(--draw2-border-strong);
-  background: color-mix(in srgb, var(--draw2-surface) 94%, transparent);
-  opacity: 0.86;
-}
-#draw2WorkspaceFrame .draw2-viewport-mini-preview-toggle > span {
-  display: none !important;
-}
-#draw2WorkspaceFrame .draw2-viewport-mini-preview-toggle:hover,
-#draw2WorkspaceFrame .draw2-viewport-mini-preview-toggle:focus-visible,
-#draw2WorkspaceFrame .draw2-viewport-mini-preview-toggle:active {
-  opacity: 1;
 }
 
 /* Keep the numeric brush-size value inside its own field at every viewport
@@ -22343,12 +23244,7 @@ body:has(#draw2WorkspaceFrame) {
   padding: 0;
   border: 1px solid rgba(200, 139, 255, 0.5);
   border-radius: 2px;
-  background:
-    linear-gradient(
-      180deg,
-      rgba(208, 151, 255, 0.86),
-      rgba(112, 66, 157, 0.9)
-    );
+  background: color-mix(in srgb, #c88bff 8%, var(--draw2-surface-raised));
   color: #fff5ff;
   cursor: pointer;
   font: 800 0.46rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -22368,12 +23264,7 @@ body:has(#draw2WorkspaceFrame) {
 .draw2-audio-arranger-draw-frame.is-active,
 .draw2-audio-draw-frame-cell.is-active {
   border-color: #f6d6ff;
-  background:
-    linear-gradient(
-      180deg,
-      #f0c6ff,
-      #9c5cc6
-    );
+  background: color-mix(in srgb, #c88bff 16%, var(--draw2-surface-raised));
   box-shadow: 0 0 0 1px rgba(249, 223, 255, 0.7);
 }
 .draw2-audio-arranger-draw-frame.is-chopped,
@@ -22467,27 +23358,6 @@ body:has(#draw2WorkspaceFrame) {
   text-align: center;
   white-space: nowrap;
 }
-#draw2WorkspaceFrame[data-creator-mode="AUDIO"][data-audio-draw-monitor="true"]
-  .draw2-mini-preview {
-  display: block !important;
-  z-index: 30;
-  top: 16px !important;
-  right: 16px !important;
-  width: 188px !important;
-  height: 188px !important;
-  padding: 4px !important;
-  border-color: rgba(135, 230, 255, 0.72);
-  background: rgba(10, 17, 29, 0.94);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.36),
-    0 0 0 1px rgba(135, 230, 255, 0.12);
-  pointer-events: none;
-}
-#draw2WorkspaceFrame[data-creator-mode="AUDIO"][data-audio-draw-monitor="true"]
-  .draw2-mini-preview canvas {
-  width: 180px !important;
-  height: 180px !important;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .draw2-audio-arranger-playhead,
   .draw2-audio-midi-playhead {
@@ -23534,15 +24404,22 @@ body:has(#draw2WorkspaceFrame) {
   }
 }
 
-/* Audio has a dedicated lower-deck artwork preview. The legacy floating
- * surface remains a Draw-only affordance and must stay out of the Audio
- * composition view even when older profile attributes are absent. */
+/* The floating preview belongs to iDRAW/animation only. iAUDIO keeps its
+ * dedicated central Artwork Preview, while iGAME uses its own scene/runtime
+ * surface. Hide both the surface and every restore/menu entry in those modes
+ * so stale preferences and mode transitions cannot leave a dead overlay. */
 .draw2-mini-preview[hidden],
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-mini-preview,
+#draw2WorkspaceFrame[data-creator-mode="GAME"] .draw2-mini-preview-restore,
 #draw2WorkspaceFrame[data-creator-mode="AUDIO"] .draw2-mini-preview,
-#draw2WorkspaceFrame[data-creator-mode="AUDIO"][data-audio-draw-monitor="true"]
-  .draw2-mini-preview {
+#draw2WorkspaceFrame[data-creator-mode="AUDIO"] .draw2-mini-preview-restore,
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  [data-workspace-command="display-mini-preview"],
+#draw2WorkspaceFrame[data-creator-mode="AUDIO"]
+  [data-workspace-command="display-mini-preview"] {
   display: none !important;
   visibility: hidden !important;
+  pointer-events: none !important;
 }
 
 /* Audio central Arranger authority --------------------------------------
@@ -26564,30 +27441,20 @@ body:has(#draw2WorkspaceFrame) {
   #draw2WorkspaceFrame.draw2-workspace-frame[data-creator-mode="DRAW"]
     #draw2MiniPreviewRestore {
     position: absolute !important;
-    z-index: 4 !important;
-    top: 16px !important;
-    right: 16px !important;
+    z-index: 6 !important;
+    top: 8px !important;
+    right: 8px !important;
     display: grid !important;
-    width: 82px !important;
-    min-width: 82px !important;
-    height: 32px !important;
-    min-height: 32px !important;
+    width: 36px !important;
+    min-width: 36px !important;
+    height: 36px !important;
+    min-height: 36px !important;
     padding: 0 !important;
-    border: 1px solid var(--draw2-border-subtle) !important;
-    border-radius: 4px !important;
-    background: var(--draw2-surface-raised) !important;
-    font-size: 0.58rem !important;
-  }
-
-  #draw2WorkspaceFrame.draw2-workspace-frame[data-creator-mode="DRAW"]
-    #draw2MiniPreviewRestore::after {
-    content: "Focus" !important;
-    color: var(--draw2-text-strong) !important;
-  }
-
-  #draw2WorkspaceFrame.draw2-workspace-frame[data-creator-mode="DRAW"]
-    #draw2MiniPreviewRestore .draw2-button-label {
-    display: none !important;
+    place-items: center !important;
+    border: 1px solid var(--draw2-border-strong) !important;
+    border-radius: 6px !important;
+    background: color-mix(in srgb, var(--draw2-surface-raised) 92%, transparent) !important;
+    opacity: 0.72 !important;
   }
 
   #draw2WorkspaceFrame.draw2-workspace-frame[data-creator-mode="DRAW"]
@@ -30874,5 +31741,1215 @@ body:has(#draw2WorkspaceFrame) {
       64px minmax(0, 1fr)
       max(32px, min(132px, var(--draw2-timeline-height, 132px)))
       var(--draw2-statusbar-height, 28px) !important;
+  }
+}
+
+/* Desktop GAME/AUDIO workspace guard.
+ * Keep the central authoring surface usable when either adjustable rail is
+ * widened. DRAW intentionally stays outside this rule so its fixed tool
+ * lane remains the 52px parent-only rail. On narrow desktop widths the grid
+ * may overflow horizontally instead of shrinking the editor below its
+ * practical minimum; the workspace itself remains the scroll container. */
+@media (min-width: 701px) {
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"],
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"] {
+    --draw2-center-workspace-min-width: 420px;
+    --draw2-workspace-rail-content-gap: 6px;
+    --draw2-workspace-rail-block-padding: 8px;
+    min-width: calc(
+      var(--draw2-left-rail-min-width, 220px) +
+      var(--draw2-center-workspace-min-width) +
+      var(--draw2-right-dock-min-width, 200px)
+    );
+    overflow-x: auto;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"] {
+    grid-template-columns:
+      minmax(220px, min(320px, max(220px, var(--draw2-left-rail-width, 244px))))
+      minmax(var(--draw2-center-workspace-min-width), 1fr)
+      minmax(200px, min(320px, max(200px, var(--draw2-right-dock-width, 280px)))) !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"] {
+    grid-template-columns:
+      minmax(220px, min(320px, max(220px, var(--draw2-left-rail-width, 244px))))
+      minmax(var(--draw2-center-workspace-min-width), 1fr)
+      minmax(200px, min(320px, max(200px, var(--draw2-right-dock-width, 280px)))) !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+    #draw2WorkspaceLeftDock,
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    #draw2WorkspaceLeftDock,
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+    #draw2WorkspaceRightDock,
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    #draw2WorkspaceRightDock {
+    gap: var(--draw2-workspace-rail-content-gap);
+    padding-block: var(--draw2-workspace-rail-block-padding);
+  }
+}
+
+@media (min-width: 1120px) {
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="GAME"],
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"] {
+    --draw2-center-workspace-min-width: 560px;
+  }
+}
+.draw2-game-ui-overlay{position:absolute;inset:0;pointer-events:none;z-index:4}
+.draw2-game-ui-node{position:absolute;pointer-events:auto;min-width:72px;border:1px solid #78d7ff;border-radius:8px;background:#172536e6;color:#fff;font:600 12px/1.2 system-ui;cursor:pointer;box-shadow:0 4px 14px #0006}
+.draw2-game-ui-node:hover{background:#21425c}
+.draw2-game-ui-node:focus-visible{outline:2px solid #ffd36b;outline-offset:2px}.draw2-game-ui-node[aria-pressed="true"]{border-color:#ffd36b;box-shadow:0 0 0 2px #ffd36b55,0 4px 14px #0006}
+.draw2-game-ui-library{margin-top:8px;padding:8px;border:1px solid #31445b;border-radius:8px;background:#121b28}
+.draw2-game-ui-library header{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.draw2-game-ui-library small{color:#91a5bb}
+.draw2-game-ui-library-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:6px}
+.draw2-game-ui-library-grid button{display:grid;place-items:center;gap:2px;padding:7px 4px;border:1px solid #3b5870;border-radius:7px;background:#1c3043;color:#dcecff;cursor:grab}
+.draw2-game-ui-library-grid button span{font-size:11px}
+.draw2-game-ui-inspector-card label{display:grid;grid-template-columns:5em 1fr;gap:8px;align-items:center;margin-top:7px}
+.draw2-game-ui-inspector-card input,.draw2-game-ui-inspector-card select{min-width:0;width:100%;box-sizing:border-box}
+.draw2-game-ui-inspector-actions{display:flex;gap:8px;margin-top:12px}
+.draw2-game-ui-inspector-actions button{flex:1;padding:7px;border:1px solid #48647d;border-radius:6px;background:#1b3042;color:#fff;cursor:pointer}
+.draw2-game-ui-inspector-actions button:last-child{border-color:#a55b64;color:#ffdfe2}
+.draw2-game-ui-modal{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:#07101dcc;backdrop-filter:blur(4px)}
+.draw2-game-ui-modal-panel{width:min(680px,80vw);max-height:80vh;padding:18px;border:1px solid #5d7893;border-radius:12px;background:#172536;color:#edf6ff;box-shadow:0 20px 60px #000b}
+.draw2-game-ui-inventory-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin-top:14px}.draw2-game-ui-inventory-item{display:flex;flex-direction:column;gap:5px;padding:12px;border:1px solid #405d75;border-radius:8px;background:#1c3043}.draw2-game-ui-inventory-item small{color:#a8c2d9}
+.draw2-game-ui-inventory-visual{display:grid;place-items:center;width:48px;height:48px;border-radius:6px;background:#0d1a27 center/contain no-repeat;color:#8fdcff;font-size:22px}
+.draw2-game-ui-inventory-item:focus-visible{outline:2px solid #ffd36b;outline-offset:2px}
+.draw2-game-ui-inventory-item.is-selected{border-color:#ffd36b;background:#29445a;box-shadow:0 0 0 1px #ffd36b55}
+.draw2-game-ui-inventory-item.is-equipped{border-color:#9ee493;box-shadow:inset 0 0 0 1px #9ee493;position:relative}.draw2-game-ui-inventory-item.is-equipped:before{content:"装備中";position:absolute;top:6px;right:6px;padding:2px 5px;border-radius:999px;background:#9ee493;color:#102017;font-size:10px;font-weight:700}
+.draw2-game-inspector-danger{margin-top:12px;border:1px solid #d36b76;background:#4a222b;color:#ffdfe2;border-radius:7px;padding:7px 10px;cursor:pointer}.draw2-game-inspector-danger:hover{background:#63303a}
+.draw2-game-element-hud{position:absolute;top:10px;right:10px;z-index:90;display:flex;flex-wrap:wrap;gap:6px;max-width:48%;pointer-events:none}.draw2-game-element-hud-item{display:flex;gap:6px;align-items:center;padding:5px 8px;border:1px solid #46637a;border-radius:7px;background:#142333dd;color:#e7f3ff;font-size:11px}.draw2-game-element-hud-item strong{color:#ffd36b}
+.draw2-game-ui-modal-status{display:block;min-height:1.3em;margin-top:10px;color:#ffd36b;font-size:12px}
+.draw2-game-ui-inventory-actions{display:flex;gap:5px}.draw2-game-ui-inventory-actions button{flex:1;padding:4px 6px;border:1px solid #56758e;border-radius:5px;background:#203b50;color:#fff;font-size:11px}.draw2-game-ui-inventory-actions button:hover{background:#2c5872}
+.draw2-game-ui-inventory-detail{grid-column:1/-1;margin:4px 0 0;color:#c5d8e9;font-size:12px;overflow-wrap:anywhere}
+.draw2-game-ui-hierarchy-entry.is-drag-target{outline:2px solid #72d7ff;background:#21425c}
+.draw2-game-element-library{margin-top:8px;padding:8px;border:1px solid #31445b;border-radius:8px;background:#121b28}.draw2-game-element-library header{display:flex;justify-content:space-between;gap:8px}.draw2-game-element-library small{color:#91a5bb}.draw2-game-element-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin-top:6px}.draw2-game-element-grid button{display:grid;place-items:center;gap:2px;padding:6px 2px;border:1px solid #3b5870;border-radius:6px;background:#1c3043;color:#dcecff;cursor:pointer}.draw2-game-element-grid span{font-size:10px}
+.draw2-game-element-inspector-card label{display:grid;grid-template-columns:5em 1fr;gap:8px;align-items:center;margin-top:8px}.draw2-game-element-inspector-card input{min-width:0;width:100%;box-sizing:border-box}
+.draw2-game-ui-modal-panel header{display:flex;align-items:center;justify-content:space-between;gap:12px}.draw2-game-ui-modal-panel h2{margin:0;font-size:18px}.draw2-game-ui-modal-panel header button{padding:6px 12px;border:1px solid #5d7893;border-radius:6px;background:#223c52;color:#fff}.draw2-game-ui-modal-map{display:block;width:100%;height:auto;margin-top:14px;background:#0e1925;border-radius:8px}
+.draw2-game-ui-modal-tabs{display:flex;gap:6px;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid var(--draw2-border,#334155)}
+.draw2-game-ui-modal-tab{appearance:none;border:1px solid var(--draw2-border,#475569);border-radius:7px;background:var(--draw2-surface,#1e293b);color:inherit;padding:6px 12px;cursor:pointer}
+.draw2-game-ui-modal-tab[aria-selected="true"]{border-color:var(--draw2-accent,#60a5fa);background:color-mix(in srgb,var(--draw2-accent,#60a5fa) 18%,var(--draw2-surface,#1e293b));box-shadow:0 0 0 1px var(--draw2-accent,#60a5fa) inset}
+.draw2-game-ui-modal-tabpanel{min-height:1.4em;margin-top:8px;padding:6px 8px;border-left:2px solid var(--draw2-accent,#60a5fa);color:#bcd0e2;font-size:11px}
+
+/* iAUDIO -> Market uses the same explicit-range contract as iDRAW. Keep the
+ * delivery card compact so it does not compete with the selected Track. */
+.draw2-audio-asset-package {
+  display: grid;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 8px;
+  border: 1px solid rgb(200 139 255 / 38%);
+  border-radius: 6px;
+  background: linear-gradient(145deg, rgb(51 38 76 / 62%), rgb(16 25 40 / 76%));
+}
+.draw2-audio-asset-package-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.draw2-audio-asset-package-heading strong {
+  color: #f1e6ff;
+  font-size: 0.68rem;
+}
+.draw2-audio-asset-package-name,
+.draw2-audio-asset-package-controls label {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  color: var(--draw2-text-muted);
+  font-size: 0.57rem;
+  font-weight: 700;
+}
+.draw2-audio-asset-package-name input,
+.draw2-audio-asset-package-controls select {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 26px;
+  padding: 3px 6px;
+  border: 1px solid #40516e;
+  border-radius: 4px;
+  background: #111b2c;
+  color: var(--draw2-text-strong);
+  font: inherit;
+}
+.draw2-audio-asset-package-controls {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+}
+.draw2-audio-asset-package-action {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: center;
+  gap: 7px;
+}
+.draw2-audio-asset-package-action button {
+  min-height: 28px;
+  padding: 4px 8px;
+  font-size: 0.59rem;
+  white-space: nowrap;
+}
+.draw2-audio-asset-package-action output {
+  grid-column: 1 / -1;
+  min-width: 0;
+  overflow: hidden;
+  color: #bcd0e2;
+  font-size: 0.56rem;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.draw2-audio-asset-package-action output[data-state="ready"] {
+  color: #8de4b2;
+}
+.draw2-audio-asset-package-action output[data-state="error"] {
+  color: #ffb9c3;
+  white-space: normal;
+}
+@media (max-width: 420px) {
+  .draw2-audio-asset-package-controls {
+    grid-template-columns: 1fr 1fr;
+  }
+  .draw2-audio-asset-package-controls label:first-child {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Project Start responsive projection. Keep the launch surface readable on
+ * narrow portrait and landscape viewports without changing its DOM contract. */
+@media (max-width: 700px), (max-width: 900px) and (max-height: 520px) {
+  .draw2-shell:has(#draw2ProjectStart:not([hidden])) {
+    padding: 16px !important;
+    overflow-x: hidden !important;
+  }
+
+  .draw2-project-start {
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    padding: 20px;
+  }
+
+  .draw2-project-start-header {
+    flex-wrap: wrap;
+  }
+
+  .draw2-project-start-brand {
+    flex: 1 1 100%;
+  }
+
+  .draw2-project-start-brand > div,
+  .draw2-project-start-card > span:last-child {
+    min-width: 0;
+  }
+
+  .draw2-project-start-grid,
+  .draw2-project-start-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .draw2-project-start-open > div {
+    flex-direction: column;
+  }
+
+  .draw2-project-start-open input,
+  .draw2-project-start-open .draw2-button {
+    width: 100% !important;
+  }
+
+  .draw2-project-start-section-heading {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+}
+
+/* Color history and ramps keep the high-frequency palette workflow close to
+ * the canvas. The controls are intentionally compact so the editor can stay
+ * useful on narrow rails as well as desktop docks. */
+.draw2-inline-section-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--draw2-space-2);
+}
+.draw2-inline-section-heading strong {
+  color: var(--draw2-text-strong);
+  font-size: .68rem;
+  font-weight: 700;
+}
+.draw2-color-history-section,
+.draw2-color-ramp-section,
+.draw2-tool-effect-controls {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding-top: 4px;
+}
+.draw2-color-history {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 5px;
+  min-height: 26px;
+}
+.draw2-color-history-swatch {
+  width: 100%;
+  min-width: 0;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 14%);
+  cursor: pointer;
+}
+.draw2-color-history-swatch:hover,
+.draw2-color-history-swatch:focus-visible {
+  border-color: var(--draw2-focus-ring);
+  outline: 2px solid var(--draw2-focus-ring);
+  outline-offset: 1px;
+}
+.draw2-color-history-empty {
+  grid-column: 1 / -1;
+  color: var(--draw2-text-muted);
+  font-size: .62rem;
+}
+.draw2-color-ramp-controls,
+.draw2-tool-studio-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+.draw2-color-ramp-controls label,
+.draw2-tool-effect-controls label,
+.draw2-dialog-grid label,
+.draw2-dialog-field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  color: var(--draw2-text-muted);
+  font-size: .64rem;
+}
+.draw2-color-ramp-controls select,
+.draw2-color-ramp-controls input,
+.draw2-tool-effect-controls select,
+.draw2-tool-effect-controls input {
+  width: 100%;
+  min-width: 0;
+}
+.draw2-color-ramp-section > .draw2-button,
+.draw2-tool-effect-controls > .draw2-button {
+  justify-self: start;
+  min-height: 30px;
+  padding-inline: 10px;
+  font-size: .65rem;
+}
+.draw2-color-ramp-preview {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  min-height: 24px;
+  overflow: hidden;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: 6px;
+  background: repeating-conic-gradient(#d9dce2 0 25%, #aab2bf 0 50%) 50% / 8px 8px;
+}
+.draw2-color-ramp-swatch {
+  min-width: 0;
+  min-height: 24px;
+  box-shadow: inset 1px 0 rgb(0 0 0 / 18%);
+}
+.draw2-tool-effect-controls {
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--draw2-accent, #74d7ff) 22%, transparent);
+  border-radius: 11px;
+  background: color-mix(in srgb, #0b1423 76%, transparent);
+}
+.draw2-tool-letter {
+  display: grid;
+  place-items: center;
+  width: var(--draw2-icon-size);
+  height: var(--draw2-icon-size);
+  color: currentColor;
+  font: 800 .9rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.draw2-tool-popover .draw2-tool-button .draw2-tool-letter {
+  display: grid !important;
+}
+
+/* Text insertion is a native dialog so keyboard focus, Escape, and mobile
+ * viewport behavior remain predictable without another custom overlay. */
+.draw2-dialog {
+  width: min(520px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  max-height: calc(100dvh - 24px);
+  overflow: auto;
+  padding: 0;
+  border: 1px solid var(--draw2-border-strong);
+  border-radius: 16px;
+  background: var(--draw2-surface);
+  color: var(--draw2-text);
+  box-shadow: var(--draw2-shadow-panel);
+}
+.draw2-dialog::backdrop {
+  background: rgb(4 8 15 / 66%);
+  backdrop-filter: blur(3px);
+}
+.draw2-dialog-form {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+.draw2-dialog-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.draw2-dialog-heading h2 {
+  margin: 3px 0 0;
+  color: var(--draw2-text-strong);
+  font-size: 1rem;
+}
+.draw2-dialog-badge {
+  padding: 4px 7px;
+  border: 1px solid color-mix(in srgb, var(--draw2-accent, #74d7ff) 36%, transparent);
+  border-radius: 999px;
+  color: var(--draw2-accent, #74d7ff);
+  font: 700 .58rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.draw2-dialog-field textarea,
+.draw2-dialog-grid input,
+.draw2-dialog-grid select,
+.draw2-dialog-field input,
+.draw2-dialog-field select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.draw2-dialog-field textarea {
+  min-height: 92px;
+  resize: vertical;
+}
+.draw2-dialog-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+.draw2-dialog-checkbox {
+  display: flex !important;
+  align-items: center;
+  align-self: end;
+  min-height: 32px;
+}
+.draw2-dialog-checkbox input {
+  width: auto;
+  margin: 0;
+  accent-color: var(--draw2-accent-strong);
+}
+.draw2-dialog-status {
+  min-height: 1.2em;
+  margin: 0;
+  color: var(--draw2-text-muted);
+  font-size: .66rem;
+  line-height: 1.4;
+}
+.draw2-text-preview-panel {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--draw2-accent, #74d7ff) 24%, var(--draw2-border-subtle));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--draw2-surface-raised) 86%, transparent);
+}
+.draw2-text-preview-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.draw2-text-preview-heading strong {
+  color: var(--draw2-text-strong);
+  font-size: .68rem;
+}
+.draw2-text-preview-heading small {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--draw2-text-muted);
+  font-size: .58rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.draw2-text-preview-canvas {
+  display: block;
+  width: 100%;
+  height: 144px;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: 7px;
+  background: repeating-conic-gradient(#d9dce2 0 25%, #aab2bf 0 50%) 50% / 12px 12px;
+  image-rendering: crisp-edges;
+  image-rendering: pixelated;
+}
+.draw2-text-range-grid {
+  margin-top: -4px;
+}
+.draw2-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+@media (max-width: 420px) {
+  .draw2-color-ramp-controls,
+  .draw2-tool-studio-options,
+  .draw2-dialog-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Final border hierarchy contract (2026-09-08)
+ * Keep one structural edge per rail. Inner borders remain only where they
+ * communicate selection, focus, editing, or a meaningful content group. */
+#draw2WorkspaceFrame.draw2-workspace-frame:not([hidden]) {
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame #draw2WorkspaceLeftDock {
+  border: 0 !important;
+  border-right: 1px solid var(--draw2-border-subtle) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame #draw2WorkspaceRightDock {
+  border: 0 !important;
+  border-left: 1px solid var(--draw2-border-subtle) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame.is-right-dock-collapsed
+  #draw2WorkspaceRightDock {
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame #draw2WorkspaceCanvasRegion {
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame #draw2WorkspaceRightCustomDock,
+#draw2WorkspaceFrame.draw2-workspace-frame
+  #draw2WorkspaceRightCustomDock
+  > .draw2-workspace-panel:not([hidden]),
+#draw2WorkspaceFrame.draw2-workspace-frame
+  #draw2WorkspaceRightCustomDock
+  .draw2-panel-shell {
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame
+  #draw2WorkspaceRightCustomDock
+  .draw2-panel-shell {
+  background: transparent !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame
+  #draw2WorkspaceRightCustomDock
+  .draw2-panel-shell
+  > .draw2-panel-heading {
+  border-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame #draw2WorkspaceTabs,
+#draw2WorkspaceFrame.draw2-workspace-frame #draw2AudioRightTabs {
+  border-right: 0 !important;
+  border-bottom: 1px solid var(--draw2-border-subtle) !important;
+  border-left: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame
+  #draw2WorkspaceRightDock
+  > #draw2WorkspacePaletteStrip,
+#draw2WorkspaceFrame.draw2-workspace-frame
+  #draw2WorkspaceRightDock
+  > #draw2WorkspaceModeSummary {
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-creator-mode="DRAW"]
+  #draw2WorkspaceRightDock::before {
+  border: 0 !important;
+  border-bottom: 1px solid var(--draw2-border-subtle) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-creator-mode="DRAW"]
+  #draw2WorkspaceRightDock
+  > #draw2WorkspacePaletteStrip {
+  border: 0 !important;
+  border-bottom: 1px solid var(--draw2-border-subtle) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-creator-mode="DRAW"]
+  #draw2WorkspaceCanvasSlot
+  > .draw2-canvas-card,
+#draw2WorkspaceFrame.draw2-workspace-frame[data-creator-mode="DRAW"]
+  #draw2WorkspaceCanvasSlot
+  .draw2-viewport-wrap {
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-creator-mode="GAME"]
+  .draw2-game-scene-viewport:not([hidden]) {
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame[data-creator-mode="AUDIO"]
+  #draw2AudioWorkspace:not([hidden]),
+#draw2WorkspaceFrame.draw2-workspace-frame[data-creator-mode="AUDIO"]
+  #draw2AudioRightDock
+  .draw2-audio-right-surface:not([hidden]),
+#draw2WorkspaceFrame.draw2-workspace-frame[data-creator-mode="AUDIO"]
+  #draw2AudioCompactMaster {
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame #draw2ModeTimelineDeck:not([hidden]) {
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame #draw2WorkspaceTimelineRegion {
+  border-top: 1px solid var(--draw2-border-subtle) !important;
+  border-right: 0 !important;
+  border-bottom: 0 !important;
+  border-left: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame
+  #draw2WorkspaceTimelineSlot
+  .draw2-timeline-viewport {
+  border: 1px solid var(--draw2-border-subtle) !important;
+  border-radius: 3px !important;
+  box-shadow: none !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame
+  #draw2WorkspaceTimelineSlot
+  .draw2-timeline-cell {
+  border: 0 !important;
+  border-inline-end: 1px solid var(--draw2-border-subtle) !important;
+  border-block-end: 1px solid var(--draw2-border-subtle) !important;
+  border-radius: 0 !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame
+  #draw2WorkspaceTimelineSlot
+  .draw2-timeline-frame-header,
+#draw2WorkspaceFrame.draw2-workspace-frame
+  #draw2WorkspaceTimelineSlot
+  .draw2-timeline-corner,
+#draw2WorkspaceFrame.draw2-workspace-frame
+  #draw2WorkspaceTimelineSlot
+  .draw2-timeline-row-label {
+  border: 0 !important;
+  border-inline-end: 1px solid var(--draw2-border-subtle) !important;
+  border-block-end: 1px solid var(--draw2-border-subtle) !important;
+  border-radius: 0 !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame
+  #draw2WorkspaceTimelineSlot
+  .draw2-timeline-frame-header:is([data-selected="true"], [aria-selected="true"]),
+#draw2WorkspaceFrame.draw2-workspace-frame
+  #draw2WorkspaceTimelineSlot
+  .draw2-timeline-cell:is([data-selected="true"], [aria-selected="true"]),
+#draw2WorkspaceFrame.draw2-workspace-frame
+  #draw2WorkspaceTimelineSlot
+  .draw2-timeline-row-label:is([data-selected="true"], [aria-selected="true"]) {
+  box-shadow: inset 0 0 0 1px var(--draw2-accent-strong) !important;
+}
+
+/* Final palette interaction contract (2026-09-09)
+ * The palette is a responsive grid inside the rail.  Its columns follow the
+ * actual panel width, while the grid itself owns vertical scrolling so a
+ * large palette never widens the workspace or pushes the editor away. */
+#draw2WorkspaceFrame.draw2-workspace-frame
+  #draw2WorkspaceRightDock
+  > #draw2WorkspacePaletteStrip {
+  container-type: inline-size;
+  display: grid !important;
+  grid-template-rows: auto minmax(0, 1fr) !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  padding: 6px !important;
+  overflow: hidden !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame
+  #draw2WorkspaceRightDock
+  > #draw2WorkspacePaletteStrip
+  > .draw2-palette-active-color {
+  display: none !important;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame
+  #draw2WorkspaceRightDock
+  > #draw2WorkspacePaletteStrip
+  > #draw2WorkspacePaletteGrid {
+  --draw2-palette-swatch-size: clamp(28px, 14cqw, 36px);
+  display: grid !important;
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(var(--draw2-palette-swatch-size), 1fr)
+  ) !important;
+  grid-auto-rows: var(--draw2-palette-swatch-size) !important;
+  align-content: start !important;
+  justify-content: stretch !important;
+  gap: 4px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  padding: 2px !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame
+  #draw2WorkspaceRightDock
+  > #draw2WorkspacePaletteStrip
+  > #draw2WorkspacePaletteGrid
+  > :is(.draw2-color, .draw2-color-add) {
+  box-sizing: border-box !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  aspect-ratio: 1 / 1;
+  transform: none !important;
+  transition: border-color 120ms ease, box-shadow 120ms ease,
+    background-color 120ms ease;
+}
+
+#draw2WorkspaceFrame.draw2-workspace-frame
+  #draw2WorkspaceRightDock
+  > #draw2WorkspacePaletteStrip
+  > #draw2WorkspacePaletteGrid
+  > :is(.draw2-color, .draw2-color-add):active {
+  transform: none !important;
+}
+
+/* Character setup controls keep their hit area and position when selected.
+ * Selection is communicated with color, outline, and check state; it never
+ * changes the button's box size. */
+.draw2-character-action,
+.draw2-character-direction-slot {
+  box-sizing: border-box;
+  min-height: 56px;
+  transform: none !important;
+  transition: border-color 120ms ease, background-color 120ms ease,
+    color 120ms ease, box-shadow 120ms ease;
+}
+
+.draw2-character-action:active,
+.draw2-character-direction-slot:active {
+  transform: none !important;
+}
+
+.draw2-character-action-list {
+  grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
+}
+
+.draw2-character-direction-grid {
+  grid-template-rows: repeat(3, minmax(78px, auto));
+}
+
+.draw2-character-direction-slot,
+.draw2-character-direction-center {
+  min-height: 78px;
+}
+
+.draw2-character-direction-slot {
+  grid-template-rows: 36px auto auto;
+  align-content: center;
+  padding: 6px 4px;
+}
+
+.draw2-character-direction-preview {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  overflow: hidden;
+  border: 1px dashed color-mix(
+    in srgb,
+    var(--draw2-accent-strong) 58%,
+    var(--draw2-border-subtle)
+  );
+  border-radius: 6px;
+  background-color: var(--draw2-surface-canvas);
+  background-image: linear-gradient(
+      45deg,
+      rgb(255 255 255 / 7%) 25%,
+      transparent 25%,
+      transparent 75%,
+      rgb(255 255 255 / 7%) 75%
+    ),
+    linear-gradient(
+      45deg,
+      rgb(255 255 255 / 7%) 25%,
+      transparent 25%,
+      transparent 75%,
+      rgb(255 255 255 / 7%) 75%
+    );
+  background-position: 0 0, 6px 6px;
+  background-size: 12px 12px;
+  color: var(--draw2-accent-strong);
+}
+
+.draw2-character-direction-icon {
+  font-size: 1.1rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.draw2-character-direction-add {
+  position: absolute;
+  right: 2px;
+  bottom: 1px;
+  color: var(--draw2-text-strong);
+  font-size: 0.7rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.draw2-character-direction-slot[data-state="pending"]
+  .draw2-character-direction-preview {
+  border-style: solid;
+  border-color: var(--draw2-focus);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--draw2-focus) 18%, transparent);
+}
+
+.draw2-character-direction-slot[data-state="ready"]
+  .draw2-character-direction-preview {
+  border-style: solid;
+  border-color: var(--draw2-accent-strong);
+  background-color: color-mix(
+    in srgb,
+    var(--draw2-accent-strong) 14%,
+    var(--draw2-surface-canvas)
+  );
+}
+
+.draw2-character-direction-slot[data-state="ready"]
+  .draw2-character-direction-add {
+  display: none;
+}
+
+.draw2-character-direction-slot[data-state="ready"]
+  .draw2-character-direction-preview::after {
+  content: "✓";
+  position: absolute;
+  right: 2px;
+  bottom: 1px;
+  color: var(--draw2-accent-strong);
+  font-size: 0.68rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.draw2-character-direction-center {
+  min-height: 78px;
+  gap: 3px;
+}
+
+.draw2-character-direction-center-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px dashed var(--draw2-border-subtle);
+  border-radius: 6px;
+  color: var(--draw2-accent-strong);
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+/* The compact character setup uses the same direction vocabulary as the
+ * detailed Asset Builder.  Two directions mean left/right, four directions
+ * use the cardinal points, and eight directions add the diagonal points. */
+.draw2-character-direction-grid[data-direction-mode="2"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: minmax(78px, auto);
+}
+.draw2-character-direction-grid[data-direction-mode="2"]
+  [data-character-direction="LEFT"] { grid-column: 1; grid-row: 1; }
+.draw2-character-direction-grid[data-direction-mode="2"]
+  [data-character-direction="RIGHT"] { grid-column: 2; grid-row: 1; }
+.draw2-character-direction-grid[data-direction-mode="2"]
+  .draw2-character-direction-center { display: none; }
+
+.draw2-character-direction-grid[data-direction-mode="4"] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(3, minmax(78px, auto));
+}
+.draw2-character-direction-grid[data-direction-mode="4"]
+  [data-character-direction="UP"] { grid-column: 2; grid-row: 1; }
+.draw2-character-direction-grid[data-direction-mode="4"]
+  [data-character-direction="LEFT"] { grid-column: 1; grid-row: 2; }
+.draw2-character-direction-grid[data-direction-mode="4"]
+  [data-character-direction="RIGHT"] { grid-column: 3; grid-row: 2; }
+.draw2-character-direction-grid[data-direction-mode="4"]
+  [data-character-direction="DOWN"] { grid-column: 2; grid-row: 3; }
+.draw2-character-direction-grid[data-direction-mode="4"]
+  .draw2-character-direction-center { grid-column: 2; grid-row: 2; }
+
+.draw2-character-direction-grid[data-direction-mode="8"] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(3, minmax(72px, auto));
+}
+.draw2-character-direction-grid[data-direction-mode="8"]
+  [data-character-direction="UP"] { grid-column: 2; grid-row: 1; }
+.draw2-character-direction-grid[data-direction-mode="8"]
+  [data-character-direction="UP_RIGHT"] { grid-column: 3; grid-row: 1; }
+.draw2-character-direction-grid[data-direction-mode="8"]
+  [data-character-direction="RIGHT"] { grid-column: 3; grid-row: 2; }
+.draw2-character-direction-grid[data-direction-mode="8"]
+  [data-character-direction="DOWN_RIGHT"] { grid-column: 3; grid-row: 3; }
+.draw2-character-direction-grid[data-direction-mode="8"]
+  [data-character-direction="DOWN"] { grid-column: 2; grid-row: 3; }
+.draw2-character-direction-grid[data-direction-mode="8"]
+  [data-character-direction="DOWN_LEFT"] { grid-column: 1; grid-row: 3; }
+.draw2-character-direction-grid[data-direction-mode="8"]
+  [data-character-direction="LEFT"] { grid-column: 1; grid-row: 2; }
+.draw2-character-direction-grid[data-direction-mode="8"]
+  [data-character-direction="UP_LEFT"] { grid-column: 1; grid-row: 1; }
+.draw2-character-direction-grid[data-direction-mode="8"]
+  .draw2-character-direction-center { grid-column: 2; grid-row: 2; }
+
+@media (max-width: 760px) {
+  .draw2-character-direction-grid {
+    grid-template-rows: repeat(3, minmax(72px, auto));
+  }
+
+  .draw2-character-direction-slot,
+  .draw2-character-direction-center {
+    min-height: 72px;
+  }
+}
+
+/* -------------------------------------------------------------------------
+   Character animation previews and saved-asset shelves
+   The preview is always derived from the registered source frame.  Empty
+   slots keep their direction affordance; configured slots show the sprite.
+   ------------------------------------------------------------------------- */
+.draw2-character-direction-preview canvas {
+  display: none;
+  width: 30px;
+  height: 30px;
+  image-rendering: pixelated;
+  object-fit: contain;
+}
+.draw2-character-direction-slot[data-has-preview="true"]
+  .draw2-character-direction-preview canvas {
+  display: block;
+}
+.draw2-character-direction-slot[data-has-preview="true"]
+  .draw2-character-direction-icon {
+  display: none;
+}
+.draw2-character-direction-slot[data-has-preview="true"]
+  .draw2-character-direction-preview::after {
+  display: none;
+}
+
+.draw2-character-animation-card {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: var(--draw2-radius-sm);
+  background: color-mix(in srgb, var(--draw2-surface-input) 68%, transparent);
+}
+.draw2-character-animation-preview-row {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+#draw2CharacterAnimationPreviewCanvas {
+  width: 96px;
+  height: 96px;
+  max-width: 100%;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: 6px;
+  background-color: var(--draw2-surface-canvas);
+  background-image: linear-gradient(
+      45deg,
+      rgb(255 255 255 / 7%) 25%,
+      transparent 25%,
+      transparent 75%,
+      rgb(255 255 255 / 7%) 75%
+    ),
+    linear-gradient(
+      45deg,
+      rgb(255 255 255 / 7%) 25%,
+      transparent 25%,
+      transparent 75%,
+      rgb(255 255 255 / 7%) 75%
+    );
+  background-position: 0 0, 8px 8px;
+  background-size: 16px 16px;
+  image-rendering: pixelated;
+  object-fit: contain;
+}
+.draw2-character-animation-frame-area {
+  display: grid;
+  align-content: center;
+  gap: 6px;
+  min-width: 0;
+}
+.draw2-character-animation-frame-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+  gap: 5px;
+  min-width: 0;
+  max-height: 76px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.draw2-character-animation-frame {
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: 58px;
+  padding: 3px;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--draw2-surface-raised) 82%, transparent);
+  color: var(--draw2-text-muted);
+  cursor: pointer;
+  font-size: 0.56rem;
+}
+.draw2-character-animation-frame:hover,
+.draw2-character-animation-frame:focus-visible,
+.draw2-character-animation-frame.is-active {
+  border-color: var(--draw2-accent-strong);
+  background: color-mix(in srgb, var(--draw2-accent-strong) 14%, var(--draw2-surface-raised));
+  color: var(--draw2-text-strong);
+  outline: none;
+}
+.draw2-character-animation-frame canvas {
+  width: 44px;
+  height: 44px;
+  image-rendering: pixelated;
+  object-fit: contain;
+}
+
+.draw2-timeline-tab-panel[data-draw2-timeline-tab-panel="assets"] {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.draw2-timeline-asset-shelf,
+.draw2-mode-deck-asset-surface {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  min-width: 0;
+  min-height: 0;
+}
+.draw2-timeline-asset-shelf {
+  flex: 1 1 auto;
+  padding: 7px 8px;
+  overflow: hidden;
+}
+.draw2-timeline-asset-shelf-heading,
+.draw2-mode-deck-asset-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.draw2-timeline-asset-shelf-heading > div,
+.draw2-mode-deck-asset-heading > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.draw2-timeline-asset-shelf-heading strong,
+.draw2-mode-deck-asset-heading strong {
+  overflow: hidden;
+  color: var(--draw2-text-strong);
+  font-size: 0.7rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.draw2-timeline-asset-shelf-heading .draw2-button,
+.draw2-mode-deck-asset-heading .draw2-button {
+  flex: 0 0 auto;
+  min-height: 28px;
+}
+.draw2-timeline-asset-shelf-list,
+.draw2-mode-deck-asset-shelf {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(164px, 1fr));
+  gap: 6px;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.draw2-mode-deck-asset-surface {
+  padding: 7px 8px;
+  overflow: hidden;
+}
+.draw2-saved-asset-card {
+  min-width: 0;
+}
+.draw2-saved-asset-button {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 68px;
+  padding: 5px;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--draw2-surface-raised) 88%, transparent);
+  color: var(--draw2-text-muted);
+  cursor: pointer;
+  text-align: left;
+}
+.draw2-saved-asset-button:hover,
+.draw2-saved-asset-button:focus-visible {
+  border-color: var(--draw2-accent-strong);
+  background: color-mix(in srgb, var(--draw2-accent-strong) 12%, var(--draw2-surface-raised));
+  color: var(--draw2-text-strong);
+  outline: none;
+}
+.draw2-saved-asset-visual {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  overflow: hidden;
+  border: 1px solid var(--draw2-border-subtle);
+  border-radius: 5px;
+  background-color: var(--draw2-surface-canvas);
+  background-image: linear-gradient(
+      45deg,
+      rgb(255 255 255 / 7%) 25%,
+      transparent 25%,
+      transparent 75%,
+      rgb(255 255 255 / 7%) 75%
+    ),
+    linear-gradient(
+      45deg,
+      rgb(255 255 255 / 7%) 25%,
+      transparent 25%,
+      transparent 75%,
+      rgb(255 255 255 / 7%) 75%
+    );
+  background-position: 0 0, 6px 6px;
+  background-size: 12px 12px;
+}
+.draw2-saved-asset-visual canvas {
+  width: 48px;
+  height: 48px;
+  image-rendering: pixelated;
+  object-fit: contain;
+}
+.draw2-saved-asset-visual.draw2-saved-asset-placeholder {
+  color: var(--draw2-text-muted);
+  font-size: 1rem;
+  font-weight: 800;
+}
+.draw2-saved-asset-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.draw2-saved-asset-copy strong,
+.draw2-saved-asset-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.draw2-saved-asset-copy strong {
+  color: var(--draw2-text-strong);
+  font-size: 0.66rem;
+}
+.draw2-saved-asset-copy small {
+  color: var(--draw2-text-muted);
+  font-size: 0.58rem;
+}
+.draw2-asset-shelf-empty {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 10px;
+  border: 1px dashed var(--draw2-border-subtle);
+  border-radius: 6px;
+  color: var(--draw2-text-muted);
+  font-size: 0.64rem;
+  text-align: center;
+}
+
+@media (max-width: 760px) {
+  .draw2-character-animation-preview-row {
+    grid-template-columns: 72px minmax(0, 1fr);
+  }
+  #draw2CharacterAnimationPreviewCanvas {
+    width: 72px;
+    height: 72px;
+  }
+  .draw2-character-animation-frame-strip {
+    max-height: 66px;
+  }
+  .draw2-timeline-asset-shelf-list,
+  .draw2-mode-deck-asset-shelf {
+    grid-template-columns: repeat(auto-fill, minmax(144px, 1fr));
   }
 }

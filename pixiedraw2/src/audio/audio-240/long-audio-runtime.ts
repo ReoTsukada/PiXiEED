@@ -33,6 +33,7 @@ import {
 import { mixerGainToLinear, MixerRuntimeAdapter } from "./mixer-runtime.ts";
 import {
   type AudioScheduleEvent,
+  type AudioScheduleEventSource,
   type AudioSchedulerTimer,
   SampleAccurateScheduler,
 } from "./transport.ts";
@@ -184,6 +185,7 @@ export class LongAudioClipRuntime {
   private generation = 0;
   private scheduleDelaySeconds = 0;
   private loopValue: boolean;
+  private rangeStopTimer: number | undefined;
   private disposed = false;
 
   private constructor(
@@ -416,6 +418,26 @@ export class LongAudioClipRuntime {
     return audioOk(true);
   }
 
+  /** Play only a bounded range without changing the canonical Clip state. */
+  async playForDuration(
+    globalPositionSeconds: number,
+    durationSeconds: number,
+    loop = false,
+  ): Promise<Audio200Result<true>> {
+    const result = await this.play(globalPositionSeconds, loop);
+    if (!result.ok) return result;
+    const duration = finiteNonNegative(durationSeconds);
+    if (duration === 0) {
+      this.stop();
+      return result;
+    }
+    this.rangeStopTimer = this.options.windowRef.setTimeout(() => {
+      this.rangeStopTimer = undefined;
+      this.stop();
+    }, duration * 1000);
+    return result;
+  }
+
   pause(): number {
     const position = this.scheduler.pause();
     this.generation += 1;
@@ -463,49 +485,114 @@ export class LongAudioClipRuntime {
     };
   }
 
-  private buildEvents(): readonly AudioScheduleEvent<LongAudioChunkEvent>[] {
-    const events: AudioScheduleEvent<LongAudioChunkEvent>[] = [];
+  private buildEvents(): AudioScheduleEventSource<LongAudioChunkEvent> {
     const sampleRate = this.readerValue.plan.sampleRateHz;
     const chunkFrames = this.readerValue.plan.chunkFrames;
     const totalOutputFrames = Math.max(
       1,
       Math.ceil(this.clipDurationSeconds * sampleRate),
     );
-    let outputFrame = 0;
-    let sourceRelative = 0;
-    while (outputFrame < totalOutputFrames) {
+    // One source segment is one reader chunk (the first segment can begin in
+    // the middle of a chunk). Keep only the arithmetic needed to address a
+    // segment; never allocate one event object per chunk of a long clip.
+    const firstChunkOffset = this.sourceOffsetFrame % chunkFrames;
+    const firstSegmentFrames = Math.min(
+      chunkFrames - firstChunkOffset,
+      this.sourceAvailableFrames,
+    );
+    const segmentCount = firstSegmentFrames >= this.sourceAvailableFrames
+      ? 1
+      : 1 + Math.ceil(
+        (this.sourceAvailableFrames - firstSegmentFrames) / chunkFrames,
+      );
+    const sourceRelativeAt = (segment: number): number => segment === 0
+      ? 0
+      : firstSegmentFrames + (segment - 1) * chunkFrames;
+    const segmentFramesAt = (segment: number): number => Math.min(
+      segment === 0 ? firstSegmentFrames : chunkFrames,
+      this.sourceAvailableFrames - sourceRelativeAt(segment),
+    );
+    const outputFramesFor = (sourceFrames: number): number => Math.max(
+      1,
+      Math.ceil(sourceFrames / this.playbackRate),
+    );
+    const firstOutputFrames = outputFramesFor(firstSegmentFrames);
+    const fullOutputFrames = outputFramesFor(chunkFrames);
+    const lastOutputFrames = outputFramesFor(segmentFramesAt(segmentCount - 1));
+    const cycleOutputFrames = segmentCount === 1
+      ? firstOutputFrames
+      : firstOutputFrames +
+        Math.max(0, segmentCount - 2) * fullOutputFrames +
+        lastOutputFrames;
+    const segmentsForOutputFrames = (outputFrames: number): number => {
+      if (outputFrames <= firstOutputFrames) return 1;
+      return Math.min(
+        segmentCount,
+        1 + Math.ceil((outputFrames - firstOutputFrames) / fullOutputFrames),
+      );
+    };
+    const eventCount = this.loopValue
+      ? Math.floor(totalOutputFrames / cycleOutputFrames) * segmentCount +
+        (totalOutputFrames % cycleOutputFrames === 0
+          ? 0
+          : segmentsForOutputFrames(totalOutputFrames % cycleOutputFrames))
+      : segmentsForOutputFrames(totalOutputFrames);
+    if (!Number.isSafeInteger(eventCount) || eventCount < 1) {
+      throw new RangeError("Long audio event sequence exceeds the safe timeline range.");
+    }
+    const outputFrameAt = (segment: number): number => segment === 0
+      ? 0
+      : firstOutputFrames + (segment - 1) * fullOutputFrames;
+    const eventAt = (
+      index: number,
+    ): AudioScheduleEvent<LongAudioChunkEvent> | undefined => {
+      if (!Number.isSafeInteger(index) || index < 0 || index >= eventCount) {
+        return undefined;
+      }
+      const cycle = this.loopValue ? Math.floor(index / segmentCount) : 0;
+      const segment = this.loopValue ? index % segmentCount : index;
+      const outputFrame = (this.loopValue ? cycle * cycleOutputFrames : 0) +
+        outputFrameAt(segment);
+      const sourceRelative = sourceRelativeAt(segment);
       const sourceFrame = this.sourceOffsetFrame + sourceRelative;
-      const chunkIndex = Math.floor(sourceFrame / chunkFrames);
-      const chunkOffsetFrames = sourceFrame % chunkFrames;
-      const remainingOutput = totalOutputFrames - outputFrame;
-      const remainingSource = this.sourceAvailableFrames - sourceRelative;
       const frameCount = Math.max(
         1,
         Math.min(
-          chunkFrames - chunkOffsetFrames,
-          Math.ceil(remainingOutput * this.playbackRate),
-          remainingSource,
+          segmentFramesAt(segment),
+          Math.ceil((totalOutputFrames - outputFrame) * this.playbackRate),
+          this.sourceAvailableFrames - sourceRelative,
         ),
       );
-      events.push({
-        id: `clip:${String(this.options.clip.clipId)}:${events.length}`,
+      return {
+        id: `clip:${String(this.options.clip.clipId)}:${index}`,
         startSeconds: outputFrame / sampleRate,
         durationSeconds: frameCount / sampleRate / this.playbackRate,
         payload: {
-          chunkIndex,
-          chunkOffsetFrames,
+          chunkIndex: Math.floor(sourceFrame / chunkFrames),
+          chunkOffsetFrames: sourceFrame % chunkFrames,
           frameCount,
           sourceStartFrame: sourceFrame,
         },
-      });
-      sourceRelative += frameCount;
-      outputFrame += Math.max(1, Math.ceil(frameCount / this.playbackRate));
-      if (sourceRelative >= this.sourceAvailableFrames) {
-        if (!this.loopValue) break;
-        sourceRelative = 0;
-      }
-    }
-    return events;
+      };
+    };
+    return {
+      length: eventCount,
+      at: eventAt,
+      findFirstIndex: (startSeconds) => {
+        let low = 0;
+        let high = eventCount;
+        while (low < high) {
+          const middle = Math.floor((low + high) / 2);
+          const event = eventAt(middle);
+          if (event === undefined || event.startSeconds >= startSeconds) {
+            high = middle;
+          } else {
+            low = middle + 1;
+          }
+        }
+        return low < eventCount ? low : -1;
+      },
+    };
   }
 
   private localPosition(globalPositionSeconds: number): number | null {
@@ -674,6 +761,10 @@ export class LongAudioClipRuntime {
   }
 
   private stopRuntimeResources(clearReader: boolean): void {
+    if (this.rangeStopTimer !== undefined) {
+      this.options.windowRef.clearTimeout(this.rangeStopTimer);
+      this.rangeStopTimer = undefined;
+    }
     this.scheduler.stop();
     this.generation += 1;
     this.scheduledKeys.clear();

@@ -19,6 +19,11 @@ import {
   stampShapeBrushInBounds,
 } from "./draw2-shape-geometry.ts";
 import {
+  interpolateBrushLine,
+  MAX_BRUSH_SIZE,
+  type BrushAlgorithm,
+} from "./draw2-brush.ts";
+import {
   decodeRasterSelectionMask,
   rasterSelectionMaskIncludes,
   type DecodedRasterSelectionMask,
@@ -114,36 +119,18 @@ export const MAX_INTERPOLATED_STROKE_PIXELS = 65_536;
 export function interpolatePixelLine(
   from: PixelPoint,
   to: PixelPoint,
+  algorithm: BrushAlgorithm = "regular",
 ): readonly PixelPoint[] {
-  const points: PixelPoint[] = [];
-  let x = from.x;
-  let y = from.y;
-  const dx = Math.abs(to.x - from.x);
-  const dy = Math.abs(to.y - from.y);
-  const stepX = from.x < to.x ? 1 : -1;
-  const stepY = from.y < to.y ? 1 : -1;
-  let error = dx - dy;
-  while (true) {
-    points.push({ x, y });
-    if (x === to.x && y === to.y) break;
-    const twiceError = error * 2;
-    if (twiceError > -dy) {
-      error -= dy;
-      x += stepX;
-    }
-    if (twiceError < dx) {
-      error += dx;
-      y += stepY;
-    }
-    if (points.length > MAX_INTERPOLATED_STROKE_PIXELS) {
-      throw new Error("Interpolated Stroke exceeds the bounded pixel budget.");
-    }
+  const points = interpolateBrushLine(from, to, algorithm);
+  if (points.length > MAX_INTERPOLATED_STROKE_PIXELS) {
+    throw new Error("Interpolated Stroke exceeds the bounded pixel budget.");
   }
   return points;
 }
 
 export function interpolatePixelPath(
   points: readonly PixelPoint[],
+  algorithm: BrushAlgorithm = "regular",
 ): readonly PixelPoint[] {
   if (points.length === 0) return [];
   const interpolated: PixelPoint[] = [{
@@ -154,7 +141,7 @@ export function interpolatePixelPath(
     const from = points[index - 1];
     const to = points[index];
     if (from === undefined || to === undefined) continue;
-    for (const point of interpolatePixelLine(from, to).slice(1)) {
+    for (const point of interpolatePixelLine(from, to, algorithm).slice(1)) {
       if (interpolated.length >= MAX_INTERPOLATED_STROKE_PIXELS) {
         throw new Error(
           "Interpolated Stroke exceeds the bounded pixel budget.",
@@ -851,6 +838,8 @@ export interface StrokeCommitPayload {
   /** Optional brush parameters; omitted means a 1px solid square stroke. */
   readonly brushSize?: number;
   readonly brushShape?: ShapeBrushShape;
+  readonly brushAngle?: number;
+  readonly brushAlgorithm?: BrushAlgorithm;
   readonly pattern?: ShapeBrushPattern;
   readonly mirror?: MirrorCommitSpec;
   readonly clip?: RasterClipRect;
@@ -863,6 +852,8 @@ export interface ShapeCommitPayload {
   readonly colorIndex: number;
   readonly brushSize: number;
   readonly brushShape: ShapeBrushShape;
+  readonly brushAngle?: number;
+  readonly brushAlgorithm?: BrushAlgorithm;
   readonly pattern: ShapeBrushPattern;
   readonly mirror?: MirrorCommitSpec;
   readonly clip?: RasterClipRect;
@@ -1586,6 +1577,14 @@ function validatePayload(
             colorPath,
           ),
         );
+      } else if (color !== 0 && ((color >>> 24) & 0xff) === 0) {
+        diagnostics.push(
+          diagnostic(
+            "PALETTE_ALPHA_INVALID",
+            "Non-transparent palette colors must have alpha greater than zero.",
+            colorPath,
+          ),
+        );
       }
     }
     const colorsToAppend = paletteColorsToAppend(asset.palette, colors);
@@ -1622,6 +1621,17 @@ function validatePayload(
         diagnostic(
           "PALETTE_COLOR_INVALID",
           "Palette color must be a uint32 value.",
+          "payload.color",
+        ),
+      );
+    } else if (
+      command.payload.color !== 0 &&
+      ((command.payload.color >>> 24) & 0xff) === 0
+    ) {
+      diagnostics.push(
+        diagnostic(
+          "PALETTE_ALPHA_INVALID",
+          "Non-transparent palette colors must have alpha greater than zero.",
           "payload.color",
         ),
       );
@@ -2034,12 +2044,12 @@ function validatePayload(
     }
     if (
       !Number.isSafeInteger(payload.brushSize) || payload.brushSize < 1 ||
-      payload.brushSize > 32
+      payload.brushSize > MAX_BRUSH_SIZE
     ) {
       diagnostics.push(
         diagnostic(
           "SHAPE_BRUSH_SIZE_INVALID",
-          "Shape brushSize must be between 1 and 32.",
+          `Shape brushSize must be between 1 and ${MAX_BRUSH_SIZE}.`,
           "payload.brushSize",
         ),
       );
@@ -2050,6 +2060,32 @@ function validatePayload(
           "SHAPE_BRUSH_SHAPE_INVALID",
           "Shape brushShape must be square or circle.",
           "payload.brushShape",
+        ),
+      );
+    }
+    if (
+      payload.brushAngle !== undefined &&
+      (!Number.isSafeInteger(payload.brushAngle) ||
+        payload.brushAngle < -180 || payload.brushAngle > 180)
+    ) {
+      diagnostics.push(
+        diagnostic(
+          "SHAPE_BRUSH_ANGLE_INVALID",
+          "Shape brushAngle must be an integer between -180 and 180.",
+          "payload.brushAngle",
+        ),
+      );
+    }
+    if (
+      payload.brushAlgorithm !== undefined &&
+      payload.brushAlgorithm !== "regular" &&
+      payload.brushAlgorithm !== "pixel-perfect"
+    ) {
+      diagnostics.push(
+        diagnostic(
+          "SHAPE_BRUSH_ALGORITHM_INVALID",
+          "Shape brushAlgorithm must be regular or pixel-perfect.",
+          "payload.brushAlgorithm",
         ),
       );
     }
@@ -2094,12 +2130,13 @@ function validatePayload(
     );
     if (
       brushSize !== undefined &&
-      (!Number.isSafeInteger(brushSize) || brushSize < 1 || brushSize > 32)
+      (!Number.isSafeInteger(brushSize) || brushSize < 1 ||
+        brushSize > MAX_BRUSH_SIZE)
     ) {
       diagnostics.push(
         diagnostic(
           "STROKE_BRUSH_SIZE_INVALID",
-          "Stroke brushSize must be between 1 and 32.",
+          `Stroke brushSize must be between 1 and ${MAX_BRUSH_SIZE}.`,
           "payload.brushSize",
         ),
       );
@@ -2113,6 +2150,33 @@ function validatePayload(
           "STROKE_BRUSH_SHAPE_INVALID",
           "Stroke brushShape must be square or circle.",
           "payload.brushShape",
+        ),
+      );
+    }
+    if (
+      command.payload.brushAngle !== undefined &&
+      (!Number.isSafeInteger(command.payload.brushAngle) ||
+        command.payload.brushAngle < -180 ||
+        command.payload.brushAngle > 180)
+    ) {
+      diagnostics.push(
+        diagnostic(
+          "STROKE_BRUSH_ANGLE_INVALID",
+          "Stroke brushAngle must be an integer between -180 and 180.",
+          "payload.brushAngle",
+        ),
+      );
+    }
+    if (
+      command.payload.brushAlgorithm !== undefined &&
+      command.payload.brushAlgorithm !== "regular" &&
+      command.payload.brushAlgorithm !== "pixel-perfect"
+    ) {
+      diagnostics.push(
+        diagnostic(
+          "STROKE_BRUSH_ALGORITHM_INVALID",
+          "Stroke brushAlgorithm must be regular or pixel-perfect.",
+          "payload.brushAlgorithm",
         ),
       );
     }
@@ -2152,13 +2216,18 @@ function validatePayload(
     command.commandType === "raster.strokeCommit" && diagnostics.length === 0
   ) {
     try {
-      const interpolated = interpolatePixelPath(command.payload.points);
+      const interpolated = interpolatePixelPath(
+        command.payload.points,
+        command.payload.brushAlgorithm ?? "regular",
+      );
       try {
         stampShapeBrushInBounds(
           interpolated,
           {
             brushSize: command.payload.brushSize ?? 1,
             brushShape: command.payload.brushShape ?? "square",
+            brushAngle: command.payload.brushAngle ?? 0,
+            brushAlgorithm: command.payload.brushAlgorithm ?? "regular",
             pattern: command.payload.pattern ?? "solid",
           },
           asset,
@@ -2605,13 +2674,18 @@ export class EditorCore {
     }
     if (command.commandType === "raster.setPixel") points = [command.payload];
     else if (command.commandType === "raster.strokeCommit") {
-      const interpolated = interpolatePixelPath(command.payload.points);
+      const interpolated = interpolatePixelPath(
+        command.payload.points,
+        command.payload.brushAlgorithm ?? "regular",
+      );
       interpolatedStrokePixelCount = interpolated.length;
       const strokedPoints = stampShapeBrushInBounds(
         interpolated,
         {
           brushSize: command.payload.brushSize ?? 1,
           brushShape: command.payload.brushShape ?? "square",
+          brushAngle: command.payload.brushAngle ?? 0,
+          brushAlgorithm: command.payload.brushAlgorithm ?? "regular",
           pattern: command.payload.pattern ?? "solid",
         },
         sourceAsset,
@@ -2636,6 +2710,8 @@ export class EditorCore {
         {
           brushSize: command.payload.brushSize,
           brushShape: command.payload.brushShape,
+          brushAngle: command.payload.brushAngle ?? 0,
+          brushAlgorithm: command.payload.brushAlgorithm ?? "regular",
           pattern: command.payload.pattern,
         },
         sourceAsset,

@@ -5,6 +5,9 @@
 - Scope: Tool registration, capability negotiation, versioned envelopes, compatibility, events,
   cancellation, transport boundary, and legacy Draw adapter
 
+> **Terminology boundary:** このADRのTool Bridge／Legacy BridgeはCore内部の参照・互換アダプター
+> 契約である。外部のPiXiEED Bridgeネイティブアプリでも、Draw2のPiXYNC同期transportでもない。
+
 ## Decision
 
 Add an unloaded pure Tool Bridge contract at

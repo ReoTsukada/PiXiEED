@@ -539,14 +539,30 @@
     const token = crypto.randomUUID ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
     const db = await openTransferDb();
     try {
+      const metadataRecord = metadata && typeof metadata === 'object' ? metadata : {};
+      const safeMetadata = {
+        assetId: typeof metadataRecord.assetId === 'string' ? metadataRecord.assetId.slice(0, 256) : '',
+        traceId: typeof metadataRecord.traceId === 'string' ? metadataRecord.traceId.slice(0, 256) : '',
+        targetProjectId: typeof metadataRecord.targetProjectId === 'string'
+          ? metadataRecord.targetProjectId.slice(0, 256)
+          : '',
+        mode: metadataRecord.mode === 'GAME_BIND' ? 'GAME_BIND' : 'DRAW_OPEN',
+        source: metadataRecord.source && typeof metadataRecord.source === 'object' ? metadataRecord.source : undefined,
+        delivery: metadataRecord.delivery && typeof metadataRecord.delivery === 'object' ? metadataRecord.delivery : undefined,
+        license: metadataRecord.license && typeof metadataRecord.license === 'object' ? metadataRecord.license : undefined,
+        entitlement: metadataRecord.entitlement && typeof metadataRecord.entitlement === 'object' ? metadataRecord.entitlement : undefined
+      };
       await new Promise((resolve, reject) => {
         const transaction = db.transaction(TRANSFER_STORE, 'readwrite');
         transaction.objectStore(TRANSFER_STORE).put({
           token,
           blob,
-          filename: normalizePath(metadata.filename, 'purchased.pxd').split('/').pop(),
-          assetId: String(metadata.assetId || ''),
-          traceId: String(metadata.traceId || ''),
+          filename: normalizePath(metadataRecord.filename, 'purchased.pxd').split('/').pop(),
+          assetId: safeMetadata.assetId,
+          traceId: safeMetadata.traceId,
+          targetProjectId: safeMetadata.targetProjectId,
+          mode: safeMetadata.mode,
+          metadata: safeMetadata,
           createdAt: Date.now(),
           expiresAt: Date.now() + 5 * 60 * 1000
         });

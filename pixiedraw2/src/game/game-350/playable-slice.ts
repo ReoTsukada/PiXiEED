@@ -179,6 +179,51 @@ export const GAME351_PHYSICS2D_MOVE_SPEED = 4;
 
 export interface Game351Physics2DSceneOptions {
   readonly settings?: Partial<Physics2DSettings>;
+  /** Runtime-only tilemap residency; the authored document remains unchanged. */
+  readonly tilemapChunkSize?: number;
+  readonly tilemapChunkRadius?: number;
+  readonly tilemapCenter?: Game351GridPosition;
+}
+
+export const GAME351_TILEMAP_RUNTIME_CHUNK_SIZE = 32 as const;
+export const GAME351_TILEMAP_RUNTIME_CHUNK_RADIUS = 1 as const;
+
+export function game351TilemapCellsInRuntimeWindow(
+  map: Game351RpgMap,
+  center: Game351GridPosition,
+  chunkSize: number = GAME351_TILEMAP_RUNTIME_CHUNK_SIZE,
+  chunkRadius: number = GAME351_TILEMAP_RUNTIME_CHUNK_RADIUS,
+): { readonly solidCells: readonly Game351GridPosition[]; readonly triggerCells: readonly Game351TriggerCell[] } {
+  if (!Number.isSafeInteger(chunkSize) || chunkSize < 1) {
+    throw new Error("GAME-351 tilemap chunkSize must be a positive integer.");
+  }
+  const radius = Math.max(0, Math.floor(chunkRadius));
+  const centerChunkX = Math.floor(center.x / chunkSize);
+  const centerChunkY = Math.floor(center.y / chunkSize);
+  const resident = (x: number, y: number): boolean =>
+    Math.abs(Math.floor(x / chunkSize) - centerChunkX) <= radius &&
+    Math.abs(Math.floor(y / chunkSize) - centerChunkY) <= radius;
+  return {
+    solidCells: map.solidCells.filter((cell) => resident(cell.x, cell.y)),
+    triggerCells: map.triggerCells.filter((cell) => resident(cell.x, cell.y)),
+  };
+}
+
+/**
+ * Isolated Physics2D state for the GAME Preview only.
+ *
+ * This is deliberately not part of Game351PlayableState: the existing fixed
+ * cell preview remains the legacy boundary, while this session is an
+ * opt-in, world-unit Physics2D projection. The canonical Project/Journal is
+ * never written by any session transition.
+ */
+export interface Game351Physics2DSession {
+  readonly snapshot: Game351PlayableSnapshot;
+  readonly scene: Physics2DScene;
+  readonly world: Physics2DWorld;
+  readonly mode: "STOPPED" | "PLAYING";
+  readonly tick: number;
+  readonly events: readonly Physics2DStepResult["events"][number][];
 }
 
 function freezeDeep<T>(value: T): T {
@@ -419,7 +464,7 @@ export async function createGame351RpgTemplate(
 }
 
 /**
- * Project-bound preview template for the Studio bridge.
+ * Project-bound preview template for the Studio workspace adapter.
  *
  * The editor Project remains the canonical source; this only supplies the
  * fixed RPG collision map and identifies the existing Player/NPC entities.
@@ -743,10 +788,21 @@ export function createGame351Physics2DScene(
     );
   }
 
-  const entities: Physics2DEntity[] = sourceScene.entities.map((entity) => ({
+  // Keep canonical runtime entities (Player/NPC) separate from the bounded
+  // tilemap projection below. Camera2D is snapshot state, not a Physics2D
+  // entity, so it must never contribute a body here.
+  // GAME-351 Physics2D owns only the playable actors. Authoring-only Map and
+  // Camera entities remain canonical data but are not runtime Physics2D
+  // bodies; tilemap collision is supplied exclusively by the bounded window.
+  const entities: Physics2DEntity[] = sourceScene.entities
+    .filter((entity) =>
+      entity.entityId === template.playerEntityId ||
+      entity.entityId === template.npcEntityId
+    )
+    .map((entity) => ({
     ...entity,
     components: entity.components.map((component) => ({ ...component })),
-  }));
+    }));
   const entityIds = new Set(entities.map((entity) => String(entity.entityId)));
   const componentIds = new Set(
     entities.flatMap((entity) =>
@@ -774,7 +830,15 @@ export function createGame351Physics2DScene(
     entities.push(generated);
   };
 
-  const cells = [...template.map.solidCells].sort((left, right) =>
+  const runtimeCells = game351TilemapCellsInRuntimeWindow(
+    template.map,
+    options.tilemapCenter ?? entityTransform(template.project, template.sceneId, template.playerEntityId),
+    options.tilemapChunkSize,
+    options.tilemapChunkRadius,
+  );
+  // Only cells in the residency window become generated Physics2D entities;
+  // the canonical map remains the source of truth and is never expanded here.
+  const cells = [...runtimeCells.solidCells].sort((left, right) =>
     left.y - right.y || left.x - right.x
   );
   for (const cell of cells) {
@@ -793,7 +857,7 @@ export function createGame351Physics2DScene(
     );
   }
 
-  const triggers = [...template.map.triggerCells].sort((left, right) =>
+  const triggers = [...runtimeCells.triggerCells].sort((left, right) =>
     left.y - right.y || left.x - right.x ||
     left.triggerId.localeCompare(right.triggerId)
   );
@@ -814,6 +878,8 @@ export function createGame351Physics2DScene(
     );
   }
 
+  // Map boundaries are four stable generated entities, independent of the
+  // number of authored cells and therefore independent of map dimensions.
   const { minX, minY, maxX, maxY } = template.map.bounds;
   const spanX = maxX - minX + 1;
   const spanY = maxY - minY + 1;
@@ -867,7 +933,8 @@ export function createGame351Physics2DScene(
     ...sourceScene,
     rootEntityIds: [
       ...sourceScene.rootEntityIds,
-      ...entities.slice(sourceScene.entities.length).map((entity) => entity.entityId),
+      ...entities.filter((entity) => String(entity.entityId).startsWith("physics2d:"))
+        .map((entity) => entity.entityId),
     ],
     entities,
     physics2D: normalizePhysics2DSettings({
@@ -926,6 +993,77 @@ export function stepGame351Physics2D(
     },
   });
 }
+
+/** Create a stopped, Preview-only Physics2D session from an immutable snapshot. */
+export function createGame351Physics2DSession(
+  template: Game351RpgTemplate,
+  options: Game351Physics2DSceneOptions = {},
+): Game351Physics2DSession {
+  const snapshot = createGame351PlayableSnapshot(template);
+  const scene = createGame351Physics2DScene(template, options);
+  return freezeDeep({
+    snapshot,
+    scene,
+    world: createPhysics2DWorld(scene),
+    mode: "STOPPED" as const,
+    tick: 0,
+    events: [],
+  });
+}
+
+export function playGame351Physics2DSession(
+  session: Game351Physics2DSession,
+): Game351Physics2DSession {
+  return freezeDeep({ ...session, mode: "PLAYING" as const, events: [] });
+}
+
+/** Advance one fixed Physics2D step without mutating the session or Project. */
+export function stepGame351Physics2DSession(
+  session: Game351Physics2DSession,
+  input: Game351Physics2DInput = {},
+): Game351Physics2DSession {
+  if (session.mode !== "PLAYING") return session;
+  const result = stepGame351Physics2D(session.world, input);
+  return freezeDeep({
+    ...session,
+    world: result.world,
+    tick: session.tick + 1,
+    events: [...result.events],
+  });
+}
+
+export function stopGame351Physics2DSession(
+  session: Game351Physics2DSession,
+): Game351Physics2DSession {
+  return freezeDeep({ ...session, mode: "STOPPED" as const, events: [] });
+}
+
+/** Restart from the same immutable snapshot; runtime contact state is cleared. */
+export function restartGame351Physics2DSession(
+  session: Game351Physics2DSession,
+  options: Game351Physics2DSceneOptions = {},
+): Game351Physics2DSession {
+  const scene = options.settings === undefined
+    ? session.scene
+    : { ...session.scene, physics2D: normalizePhysics2DSettings({ ...session.scene.physics2D, ...options.settings }) };
+  const world = createPhysics2DWorld(scene);
+  return freezeDeep({
+    ...session,
+    scene,
+    world,
+    mode: session.mode,
+    tick: 0,
+    events: [],
+  });
+}
+
+/** Cleanup is an explicit terminal transition for host integrations. */
+export function cleanupGame351Physics2DSession(
+  session: Game351Physics2DSession,
+): Game351Physics2DSession {
+  return stopGame351Physics2DSession(session);
+}
+
 
 /** Create the Playable state while reusing GAME-300's canonical Journal. */
 export function createGame351PlayableState(

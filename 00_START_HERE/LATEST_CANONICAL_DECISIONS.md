@@ -44,6 +44,10 @@ verified_at: 2026-08-10
 6. コード、テスト、DB定義、Migration、現行画面は現状の証拠。未決定の製品方針を推測する根拠にはしない。
 7. `docs/inventory/`、`docs/manual/`、`docs/worklogs/`、`CODEX_TASK_PROMPTS`、旧プロンプト、生成コンテキスト、状態スナップショットは、それぞれ EVIDENCE / HISTORY / GENERATED として参照するだけで、CANONICALではない。
 
+### Draw2同期とBridgeの用語境界
+
+Draw2の現行同期境界は [ADR-20260908-PIXYNC-BRIDGE-BOUNDARY.md](../docs/decisions/ADR-20260908-PIXYNC-BRIDGE-BOUNDARY.md) を参照する。PiXYNCがローカル3モードセッションとオンラインproviderを担い、外部PiXiEED BridgeはAseprite／Unity等を接続する別製品の任意アダプターである。Core内部のAsset／Registry／Workspace／Tool Bridgeは別の内部契約であり、これらを同一transportとして記述しない。
+
 解消不能な矛盾は、勝手に統合せず停止して確認する。正本の版が古い場合も、実装が存在することだけを理由に仕様を変更しない。
 
 ## 3. 現行システム保存・実行境界

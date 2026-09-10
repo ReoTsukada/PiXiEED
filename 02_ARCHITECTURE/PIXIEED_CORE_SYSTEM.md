@@ -133,6 +133,12 @@ PiXiGame Bridge         PiXiRuntime Bridge      PixFind/Camera Bridge
 Market Bridge           SNS Card Bridge         Account/Admin Bridge
 ```
 
+ここでいうCore／Tool Bridgeは、Project・Asset・Capabilityの参照とアダプターを定義する
+内部契約であり、Aseprite／Unity等を接続する別製品の**PiXiEED Bridge**とは別物である。
+Draw2の標準同期はPiXYNC（ローカル3モードセッションとオンラインprovider）であり、
+外部PiXiEED Bridgeは標準同期やProject正本ではない。内部契約の型名に含まれる
+`Bridge` は、この区別を明記した上で使用する。
+
 Examples of canonical bridge operations:
 
 - Draw2 `use in game` adds an Asset Revision reference to the Game Asset Browser.

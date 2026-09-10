@@ -1,4 +1,4 @@
-/** Lazy EditorCore bridge for WP-170 write sets. This is not part of the initial advanced tool chunk. */
+/** Lazy EditorCore adapter for WP-170 write sets. This is not part of the initial advanced tool chunk. */
 
 import {
   type EditorCommand,

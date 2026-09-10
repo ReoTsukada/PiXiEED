@@ -26,6 +26,11 @@ import {
   packAtlas,
   type Draw2TimelineMetadata,
 } from "./draw2-creator-features.ts";
+import {
+  validateAssetPackageManifest,
+  verifyAssetPackageManifest,
+  type AssetPackageManifest,
+} from "./game/game-350/assetization.ts";
 import { maxPngExportScale } from "./draw2-export-registry.ts";
 export {
   EXPORT_FORMATS,
@@ -109,9 +114,10 @@ export interface PxdManifestAsset {
 }
 
 /**
- * PXD-owned Asset Definition metadata. This is a source reference, not a
- * flattened raster or a registry record. Registry identity is deliberately
- * kept in the optional external mapping below.
+ * PXD-owned local Asset Definition. Source identity is retained for
+ * diagnostics, while captured animation frames may also carry a bounded,
+ * fixed RGBA snapshot. Registry identity is deliberately kept in the optional
+ * external mapping below.
  */
 export type PxdAssetDefinition = AssetDefinitionDraft | ValidatedAssetDefinition;
 
@@ -194,7 +200,7 @@ export interface PxdImportOptions {
 }
 
 export interface PxdExportOptions {
-  /** PXD-owned reference definitions; source pixels are never copied here. */
+  /** PXD-owned definitions; captured local animation snapshots are preserved. */
   readonly assetDefinitions?: readonly PxdAssetDefinitionEntry[];
   readonly drawTimelineMetadata?: Draw2TimelineMetadata;
 }
@@ -233,7 +239,7 @@ export interface PxdProjectGameInput {
 }
 
 export interface PxdProjectExportOptions {
-  /** PXD-owned reference definitions; source pixels are never copied here. */
+  /** PXD-owned definitions; captured local animation snapshots are preserved. */
   readonly assetDefinitions?: readonly PxdAssetDefinitionEntry[];
   readonly drawTimelineMetadata?: Draw2TimelineMetadata;
   /**
@@ -241,6 +247,8 @@ export interface PxdProjectExportOptions {
    * they do not duplicate bytes or become Marketplace Product records.
    */
   readonly productDefinitions?: readonly PxdProductDefinition[];
+  /** Strict, content-addressed Asset / Asset Pack delivery manifests. */
+  readonly assetPackages?: readonly AssetPackageManifest[];
   readonly audio?: PxdProjectAudioInput;
   readonly game?: PxdProjectGameInput;
 }
@@ -288,6 +296,8 @@ export interface PxdManifestV2 {
   readonly assetDefinitions: readonly PxdAssetDefinitionEntry[];
   readonly drawTimelineMetadata?: Draw2TimelineMetadata;
   readonly productDefinitions?: readonly PxdProductDefinition[];
+  /** Optional strict Asset / Asset Pack manifests from the Draw workspace. */
+  readonly assetPackages?: readonly AssetPackageManifest[];
   readonly dependencies: readonly [];
   readonly canonicalManifestHash: string;
 }
@@ -315,6 +325,7 @@ export interface PxdProjectImport {
   readonly assetDefinitions: readonly PxdAssetDefinitionEntry[];
   readonly drawTimelineMetadata: Draw2TimelineMetadata;
   readonly productDefinitions: readonly PxdProductDefinition[];
+  readonly assetPackages: readonly AssetPackageManifest[];
   readonly audio: {
     readonly schemaVersion: string;
     readonly record: unknown;
@@ -1578,19 +1589,30 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-function assertNoEmbeddedAssetPayload(value: unknown, path: string): void {
+function assertNoEmbeddedAssetPayload(
+  value: unknown,
+  path: string,
+  allowRasterSnapshots = false,
+): void {
   if (Array.isArray(value)) {
-    value.forEach((entry, index) => assertNoEmbeddedAssetPayload(entry, `${path}[${index}]`));
+    value.forEach((entry, index) =>
+      assertNoEmbeddedAssetPayload(entry, `${path}[${index}]`, allowRasterSnapshots)
+    );
     return;
   }
   if (!isRecord(value)) return;
   for (const [key, entry] of Object.entries(value)) {
+    if (allowRasterSnapshots && key === "rasterSnapshot") {
+      // AssetAnimationFrameReference validates this fixed image's dimensions,
+      // channel count, and byte range before the definition reaches export.
+      continue;
+    }
     assert(
       !["pixels", "pixelData", "raster", "blob", "dataUrl", "rgba", "indexedBytes", "payload"].includes(key),
       "PXD_ASSET_DEFINITION_EMBEDDED_DATA",
       `${path}.${key} must not contain embedded asset data.`,
     );
-    assertNoEmbeddedAssetPayload(entry, `${path}.${key}`);
+    assertNoEmbeddedAssetPayload(entry, `${path}.${key}`, allowRasterSnapshots);
   }
 }
 
@@ -1609,7 +1631,7 @@ function assertAssetDefinitionShape(value: unknown, path: string): asserts value
 function validateAssetDefinitionEntry(value: unknown, index: number): PxdAssetDefinitionEntry {
   const path = `assetDefinitions[${index}]`;
   assert(isRecord(value), "PXD_ASSET_DEFINITION_INVALID", `${path} must be an object.`);
-  assertNoEmbeddedAssetPayload(value, path);
+  assertNoEmbeddedAssetPayload(value, path, true);
   assert(typeof value.definitionId === "string" && value.definitionId.trim() === value.definitionId && value.definitionId.length > 0, "PXD_ASSET_DEFINITION_ID_INVALID", `${path}.definitionId is invalid.`);
   assertAssetDefinitionShape(value.definition, `${path}.definition`);
   if (value.registryIdentity !== undefined) {
@@ -1745,6 +1767,23 @@ function normalizePxdProductDefinitions(
   normalized.sort((left, right) => compareStrings(left.productId, right.productId));
   for (let index = 1; index < normalized.length; index += 1) {
     assert(normalized[index - 1]?.productId !== normalized[index]?.productId, "PXD_PRODUCT_DEFINITION_DUPLICATE", `Product Definition ${normalized[index]?.productId ?? ""} is duplicated.`);
+  }
+  return normalized;
+}
+
+function normalizePxdAssetPackages(
+  entries: readonly AssetPackageManifest[] | undefined,
+): AssetPackageManifest[] {
+  const normalized = [...(entries ?? [])].map((entry, index) => {
+    const checked = validateAssetPackageManifest(entry);
+    if (!checked.ok) {
+      assert(false, "PXD_ASSET_PACKAGE_INVALID", `assetPackages[${index}] is invalid: ${checked.reasons.join("; ")}`);
+    }
+    return entry;
+  });
+  normalized.sort((left, right) => compareStrings(left.packageId, right.packageId));
+  for (let index = 1; index < normalized.length; index += 1) {
+    assert(normalized[index - 1]?.packageId !== normalized[index]?.packageId, "PXD_ASSET_PACKAGE_DUPLICATE", `Asset Package ${normalized[index]?.packageId ?? ""} is duplicated.`);
   }
   return normalized;
 }
@@ -2033,6 +2072,13 @@ export async function exportPxdProject(
   options: PxdProjectExportOptions = {},
 ): Promise<PxdProjectExport> {
   const assetDefinitions = normalizeAssetDefinitions(options.assetDefinitions);
+  const assetPackages = normalizePxdAssetPackages(options.assetPackages);
+  for (const [index, packageManifest] of assetPackages.entries()) {
+    const verified = await verifyAssetPackageManifest(packageManifest);
+    if (!verified.ok) {
+      assert(false, "PXD_ASSET_PACKAGE_HASH_INVALID", `assetPackages[${index}] could not be verified: ${verified.reasons.join("; ")}`);
+    }
+  }
   const drawTimelineMetadata = options.drawTimelineMetadata === undefined
     ? undefined
     : normalizeDraw2TimelineMetadata(
@@ -2192,6 +2238,7 @@ export async function exportPxdProject(
     assetDefinitions,
     ...(drawTimelineMetadata === undefined ? {} : { drawTimelineMetadata }),
     productDefinitions,
+    ...(assetPackages.length === 0 ? {} : { assetPackages }),
     dependencies: [] as const,
   };
   const packageId = `pxd_${(await sha256BytesHex(new TextEncoder().encode(canonicalJson(content)))).slice(0, 32)}`;
@@ -2336,6 +2383,13 @@ function validateProjectManifest(value: unknown): PxdManifestV2 {
   if (manifest.productDefinitions !== undefined) {
     assert(canonicalJson(productDefinitions) === canonicalJson(manifest.productDefinitions), "PXD_PRODUCT_DEFINITION_NOT_NORMALIZED", "PXD productDefinitions must be canonically normalized.");
   }
+  if (manifest.assetPackages !== undefined) {
+    assert(Array.isArray(manifest.assetPackages), "PXD_ASSET_PACKAGE_INVALID", "PXD assetPackages must be an array.");
+  }
+  const assetPackages = normalizePxdAssetPackages(manifest.assetPackages);
+  if (manifest.assetPackages !== undefined) {
+    assert(canonicalJson(assetPackages) === canonicalJson(manifest.assetPackages), "PXD_ASSET_PACKAGE_NOT_NORMALIZED", "PXD assetPackages must be canonically normalized.");
+  }
   const entryPaths = new Set(entries.map((entry) => entry.path));
   for (const asset of drawAssets) assert(entryPaths.has(asset.path), "PXD_ENTRY_MISSING", `PXD Draw entry ${asset.path} is missing.`);
   for (const module of [audio, game]) {
@@ -2346,6 +2400,7 @@ function validateProjectManifest(value: unknown): PxdManifestV2 {
     ...manifest,
     modules: { draw: { ...draw, assets: drawAssets }, audio, game },
     entries,
+    ...(manifest.assetPackages === undefined ? {} : { assetPackages }),
   };
 }
 
@@ -2386,6 +2441,12 @@ export async function importPxdProject(
   delete manifestBase.canonicalManifestHash;
   const actualManifestHash = await sha256BytesHex(new TextEncoder().encode(canonicalJson(manifestBase)));
   assert(actualManifestHash === manifest.canonicalManifestHash, "PXD_MANIFEST_HASH_MISMATCH", "PXD project manifest hash does not match its contents.");
+  for (const [index, packageManifest] of (manifest.assetPackages ?? []).entries()) {
+    const verified = await verifyAssetPackageManifest(packageManifest);
+    if (!verified.ok) {
+      assert(false, "PXD_ASSET_PACKAGE_HASH_INVALID", `assetPackages[${index}] could not be verified: ${verified.reasons.join("; ")}`);
+    }
+  }
   const packageHash = await sha256BytesHex(bytes);
   if (options.expectedPackageHash !== undefined) assert(packageHash === options.expectedPackageHash, "PXD_PACKAGE_HASH_MISMATCH", "PXD package hash does not match the expected hash.");
   const payloads = new Map<string, Uint8Array>();
@@ -2464,6 +2525,7 @@ export async function importPxdProject(
         state.frames.length,
       ),
     productDefinitions: manifest.productDefinitions === undefined ? [] : manifest.productDefinitions,
+    assetPackages: manifest.assetPackages === undefined ? [] : manifest.assetPackages,
     audio,
     game,
   };

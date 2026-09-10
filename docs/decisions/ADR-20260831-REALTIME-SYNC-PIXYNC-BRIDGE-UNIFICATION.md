@@ -1,10 +1,17 @@
-# ADR-20260831: リアルタイム同期 — PiXYNC＝Bridge統合方針
+# ADR-20260831: リアルタイム同期 — PiXYNC＝Bridge統合方針（旧案・現行仕様ではない）
+
+> **Status: SUPERSEDED / current boundary correction (2026-09-08).**
+>
+> このファイルは2026-08-31時点の旧案を監査証跡として保持する。現行の正本は
+> [ADR-20260908-PIXYNC-BRIDGE-BOUNDARY.md](ADR-20260908-PIXYNC-BRIDGE-BOUNDARY.md) である。
+> 本文にある「PiXYNC＝Bridge」「BridgeをDraw2のオンライン同期正本とする」という記述は、
+> 現行仕様・実装方針ではない。本文を新しい実装の指示として使用してはならない。
 
 ## 位置づけ
 
-これはOwner（アルタ様）本人による直接指示を記録したものであり、`00_START_HERE/LATEST_CANONICAL_DECISIONS.md` の優先順位で最上位（現在のユーザー指示）に属する。`docs/decisions/2026-08-31-site-direction-briefing.md`（Claude作成、`BRIEFING_ANALYSIS`＝Claude自身の分析にすぎない）第4節「リアルタイム同期」の内容は、本ADRの内容で更新・上書きされる。実装の詳細（プロトコル拡張、認証方式、リレー構築など）はCodexが担当する対象であり、本ADRは方向性と境界を確定するための文書である。
+これは当時のOwner指示と、その指示を前提に作成された実装検討を保存するための履歴である。現在のOwner指示・実装境界・用語規則は、上記の2026-09-08 ADRを優先する。以下の「決定」「現状」「次のステップ」は、現行の実装指示ではなく、当時案の保存内容である。
 
-## 決定
+## 当時の旧案（実行不可）
 
 1. **PiXiSYNC**（現行 `/pixiedraw/` の本番同期。`collab_v1` RPC・Supabase Realtime・`pixisync-checkpoints`）は今後廃止する。**触らない**。延命・拡張・新機能追加の対象にしない。廃止に伴う実際のコード削除・移行は別途明示的な承認を得てから行う。
 2. **Cross-Tool Live Edit**（Draw2/Audio/Game間でProjectを同期する仕組み）の同期手段は、**PiXiEED Bridge を正本とする**。より良い方法が今後現れれば採用を検討するが、現時点でBridgeに一本化する。

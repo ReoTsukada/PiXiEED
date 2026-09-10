@@ -184,9 +184,9 @@
 
   function resolvePageKind(path, basePath) {
     const normalizedPath = path.replace(/\/+$/, '') || '/';
-    if (/(?:^|\/)projects\/pixiedraw(?:\/|\/index\.html)?$/.test(path)) return 'project-draw';
+    if (/(?:^|\/)projects\/pixiedraw2(?:\/|\/index\.html)?$/.test(path)) return 'project-draw';
     if (/(?:^|\/)projects\/pixiee-lens(?:\/|\/index\.html)?$/.test(path)) return 'project-camera';
-    if (/(?:^|\/)(?:pixiedraw|pixieedrawdev)(?:\/|\/index\.html)?$/.test(path)) return 'draw';
+    if (/(?:^|\/)pixiedraw2(?:\/|\/index\.html)?$/.test(path)) return 'draw';
     if (/(?:^|\/)market(?:\/|\/index\.html)?$/.test(path)) return 'market';
     if (/(?:^|\/)account(?:\/|\/index\.html)?$/.test(path)) return 'account';
     if (/(?:^|\/)pixiee-lens(?:\/|\/index\.html)?$/.test(path)) return 'camera';
@@ -220,7 +220,7 @@
     }
     items.push(
       { label: '用語集', path: 'glossary/index.html', icon: 'assets/icons/Word.png?v=2026.07.19-icons2' },
-      { label: 'お問い合わせ', path: 'contact/index.html', icon: 'pixiedraw/assets/icons/talk.png' },
+      { label: 'お問い合わせ', path: 'contact/index.html', icon: 'assets/icons/help.png?v=2026.07.17-icons1' },
       { label: '利用規約', path: 'terms/index.html', icon: 'assets/icons/Terms.png?v=2026.07.19-icons1' },
       { label: 'プライバシー', path: 'privacy/index.html', icon: 'assets/icons/Privacy-Policy.png?v=2026.07.19-icons2' },
     );
@@ -243,7 +243,7 @@
     if (kind === 'project-draw') {
       return {
         actions: [
-          { id: 'open-draw', label: 'Drawを開く', path: 'studio/index.html', icon: 'assets/icons/Draw.png?v=2026.07.19-ui-icons1' },
+          { id: 'open-draw', label: 'iDRAWを開く', path: 'pixiedraw2/', icon: 'assets/icons/Draw.png?v=2026.07.19-ui-icons1' },
         ],
         details: buildSupportDetails(),
       };
@@ -264,19 +264,19 @@
           { id: 'pixisync', label: 'PiXiSYNC', selector: '#pixisyncQuickOpen', cloneIcon: true, iconSourceSelector: '#mobileTabMulti', mirrorState: true, mirrorVisibility: true },
           { id: 'camera', label: 'カメラ', selector: '[data-ui-action="openLensCamera"]', icon: 'assets/icons/Camera.png', gapBefore: true },
           { id: 'qr', label: 'QR編集', selector: '[data-ui-action="openQrEditor"]', icon: 'assets/icons/QR.png' },
-          { id: 'copy', label: 'コピー', selector: '#canvasClipboardCopy', icon: 'pixiedraw/assets/icons/action-copy.png?v=20260726-clipboard-actions1', mirrorState: true, mirrorVisibility: true, placement: 'trailing' },
-          { id: 'cut', label: 'カット', selector: '#canvasClipboardCut', icon: 'pixiedraw/assets/icons/action-cut.png?v=20260726-clipboard-actions1', mirrorState: true, mirrorVisibility: true, placement: 'trailing' },
-          { id: 'paste', label: 'ペースト', selector: '#canvasClipboardPaste', icon: 'pixiedraw/assets/icons/action-paste.png?v=20260726-clipboard-actions1', mirrorState: true, mirrorVisibility: true, placement: 'trailing' },
+          { id: 'copy', label: 'コピー', selector: '#canvasClipboardCopy', icon: 'assets/icons/File.png?v=20260726-clipboard-actions1', mirrorState: true, mirrorVisibility: true, placement: 'trailing' },
+          { id: 'cut', label: 'カット', selector: '#canvasClipboardCut', icon: 'assets/icons/File.png?v=20260726-clipboard-actions1', mirrorState: true, mirrorVisibility: true, placement: 'trailing' },
+          { id: 'paste', label: 'ペースト', selector: '#canvasClipboardPaste', icon: 'assets/icons/File.png?v=20260726-clipboard-actions1', mirrorState: true, mirrorVisibility: true, placement: 'trailing' },
           { id: 'undo', label: '元に戻す', selector: '#undoAction', icon: 'assets/icons/Undo.png?v=2026.07.19-ui-icons1', mirrorDisabled: true, placement: 'trailing' },
           { id: 'redo', label: 'やり直す', selector: '#redoAction', icon: 'assets/icons/Redo.png?v=2026.07.19-ui-icons1', mirrorDisabled: true, placement: 'trailing' },
           { id: 'fullscreen', label: '拡大', selector: '#fullscreenButton', icon: '拡大.png', iconWhenPressed: '縮小.png', mirrorState: true, mode: 'fullscreen', fullscreenController: 'tool', placement: 'leading' },
         ],
         details: [
-          { label: 'ショートカット一覧', selector: '#openShortcutHelp', icon: 'pixiedraw/assets/icons/short_cut.png?v=20260721-icons1' },
+          { label: 'ショートカット一覧', selector: '#openShortcutHelp', icon: 'assets/icons/Word.png?v=20260721-icons1' },
           { label: '使い方ヘルプ', selector: '#openOperationHelpPanel', icon: 'assets/icons/help.png?v=2026.07.17-icons1' },
-          { label: '更新情報', selector: '#openUpdateHistory', icon: 'pixiedraw/assets/icons/ecticon_frame_04.png' },
+          { label: '更新情報', selector: '#openUpdateHistory', icon: 'assets/icons/Development-Notes.png' },
           { label: 'アプリとして使う', selector: '#pixieedPwaInstallButton', icon: 'assets/icons/Draw.png?v=2026.07.19-ui-icons1', mirrorDisabled: true },
-          { label: '言語', selector: '#toggleLanguageMode', icon: 'pixiedraw/assets/icons/ecticon_frame_05.png', keepOpen: true },
+          { label: '言語', selector: '#toggleLanguageMode', icon: 'assets/icons/icon-e1_frame_05.png', keepOpen: true },
           ...buildSupportDetails(),
         ],
       };
@@ -291,7 +291,7 @@
           { label: 'マーケットとは', path: 'market/about.html', icon: 'assets/icons/Market.png?v=2026.07.19-ui-icons1' },
           { label: 'ヘルプ', path: 'help/index.html', icon: 'assets/icons/help.png?v=2026.07.17-icons1' },
           { label: 'マーケットヘルプ', path: 'market/help.html', icon: 'assets/icons/help.png?v=2026.07.17-icons1' },
-          { label: 'お問い合わせ', path: 'contact/index.html', icon: 'pixiedraw/assets/icons/talk.png' },
+          { label: 'お問い合わせ', path: 'contact/index.html', icon: 'assets/icons/help.png?v=2026.07.17-icons1' },
           { label: '利用規約', path: 'terms/index.html', icon: 'assets/icons/Terms.png?v=2026.07.19-icons1' },
           { label: 'プライバシーポリシー', path: 'privacy/index.html', icon: 'assets/icons/Privacy-Policy.png?v=2026.07.19-icons2' },
         ],
@@ -305,7 +305,7 @@
         details: [
           { label: 'ヘルプ', path: 'help/index.html', icon: 'assets/icons/help.png?v=2026.07.17-icons1' },
           { label: 'アカウント削除', path: 'account-deletion/index.html', icon: 'assets/icons/delete.png?v=2026.07.19-ui-icons1' },
-          { label: 'お問い合わせ', path: 'contact/index.html', icon: 'pixiedraw/assets/icons/talk.png' },
+          { label: 'お問い合わせ', path: 'contact/index.html', icon: 'assets/icons/help.png?v=2026.07.17-icons1' },
           { label: '利用規約', path: 'terms/index.html', icon: 'assets/icons/Terms.png?v=2026.07.19-icons1' },
           { label: 'プライバシー', path: 'privacy/index.html', icon: 'assets/icons/Privacy-Policy.png?v=2026.07.19-icons2' },
         ],
@@ -353,7 +353,7 @@
         actions: [],
         details: buildSupportDetails({
           guideLabel: 'はじめての使い方',
-          guidePath: 'projects/pixiedraw/',
+          guidePath: 'pixiedraw2/',
           guideIcon: 'assets/icons/Beginner.png?v=2026.07.19-icons1',
           includeMarketHelp: false,
           includeUpdates: true,
@@ -423,7 +423,7 @@
     detailButton.setAttribute('aria-label', copy.details);
     detailButton.setAttribute('aria-expanded', 'false');
     detailButton.setAttribute('aria-controls', 'pixieedCommonDetailsPanel');
-    detailButton.append(createIcon('pixiedraw/assets/icons/action-more-menu.svg'), createSrOnlyLabel(copy.details));
+    detailButton.append(createIcon('assets/icons/Settings.png?v=2026.07.19-icons2'), createSrOnlyLabel(copy.details));
 
     const layer = document.createElement('div');
     layer.className = 'pixieed-common-details-layer';
@@ -650,9 +650,9 @@
   }
 
   function renderDetails(container) {
-    const myPage = { label: 'マイページ', path: 'account/index.html', icon: 'pixiedraw/assets/icons/ecticon_frame_01.png' };
+    const myPage = { label: 'マイページ', path: 'account/index.html', icon: 'assets/icons/icon-e1_frame_01.png' };
     const notifications = { id: 'notifications', label: '通知', mode: 'notifications', icon: 'bell.png?v=20260724-icon-paths1' };
-    const fallbackIcon = 'pixiedraw/assets/icons/action-more-menu.svg';
+    const fallbackIcon = 'assets/icons/Settings.png?v=2026.07.19-icons2';
     const currentPathname = new URL(window.location.href).pathname.replace(/\/+$/, '') || '/';
     const items = [myPage, notifications, state.reloadAction, ...state.details.filter((item) => {
       if (!item || item.path === 'account/index.html') return false;
@@ -1013,10 +1013,10 @@
       body.has-pixieed-common-tabbar > header.site-header{
         top:calc(var(--pixieed-top-ad-offset, 0px) + var(--pixieed-common-tabbar-height))!important;
       }
-      body.has-pixieed-common-tabbar:not([data-pixieed-page='pixiedraw']):not([data-pixieed-page='pixiee-lens']):not([data-pixieed-page='maoitu']):not([data-pixieed-page='pixfind']){
+      body.has-pixieed-common-tabbar:not([data-pixieed-page='pixiedraw2']):not([data-pixieed-page='pixiee-lens']):not([data-pixieed-page='maoitu']):not([data-pixieed-page='pixfind']){
         padding-top:var(--pixieed-common-content-top)!important;
       }
-      body[data-pixieed-page='pixiedraw'] .app,
+      body[data-pixieed-page='pixiedraw2'] .app,
       body[data-pixieed-page='maoitu'] .game-shell{
         padding-top:var(--pixieed-common-content-top)!important;
       }
@@ -1034,17 +1034,17 @@
         top:var(--pixieed-common-content-top)!important;
         bottom:var(--pixieed-shared-bottom-nav-offset, 68px)!important;
       }
-      body[data-pixieed-page='pixiedraw'] #mobileTopBar{display:none!important}
-      body[data-pixieed-page='pixiedraw'] .editor-command-lane{display:none!important}
-      body[data-pixieed-page='pixiedraw'] .layout{--editor-command-lane-height:0px!important}
+      body[data-pixieed-page='pixiedraw2'] #mobileTopBar{display:none!important}
+      body[data-pixieed-page='pixiedraw2'] .editor-command-lane{display:none!important}
+      body[data-pixieed-page='pixiedraw2'] .layout{--editor-command-lane-height:0px!important}
       /* The portrait drawer owns these actions; the common bar owns them in landscape/desktop. */
-      body[data-pixieed-page='pixiedraw'].is-mobile-layout
+      body[data-pixieed-page='pixiedraw2'].is-mobile-layout
         .pixieed-common-tabbar__button[data-common-action='settings'],
-      body[data-pixieed-page='pixiedraw'].is-mobile-layout
+      body[data-pixieed-page='pixiedraw2'].is-mobile-layout
         .pixieed-common-tabbar__button[data-common-action='file'],
-      body[data-pixieed-page='pixiedraw'].is-mobile-layout
+      body[data-pixieed-page='pixiedraw2'].is-mobile-layout
         .pixieed-common-tabbar__button[data-common-action='camera'],
-      body[data-pixieed-page='pixiedraw'].is-mobile-layout
+      body[data-pixieed-page='pixiedraw2'].is-mobile-layout
         .pixieed-common-tabbar__button[data-common-action='qr']{
         display:none!important;
       }
@@ -1073,10 +1073,10 @@
           right:var(--pixieed-shared-side-nav-width, 72px);
           width:auto;
         }
-        body.has-pixieed-common-tabbar:not([data-pixieed-page='pixiedraw']):not([data-pixieed-page='pixiee-lens']):not([data-pixieed-page='maoitu']):not([data-pixieed-page='pixfind']){
+        body.has-pixieed-common-tabbar:not([data-pixieed-page='pixiedraw2']):not([data-pixieed-page='pixiee-lens']):not([data-pixieed-page='maoitu']):not([data-pixieed-page='pixfind']){
           padding-top:var(--pixieed-common-tabbar-height)!important;
         }
-        body[data-pixieed-page='pixiedraw'] .app,
+        body[data-pixieed-page='pixiedraw2'] .app,
         body[data-pixieed-page='maoitu'] .game-shell{
           padding-top:var(--pixieed-common-tabbar-height)!important;
         }

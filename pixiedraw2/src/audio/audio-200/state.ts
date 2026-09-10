@@ -3,6 +3,7 @@
 import { hashCanonical } from "../../wp160-contracts.ts";
 import {
   asAudioContentHash,
+  AUDIO200_MAX_TICK,
   AUDIO200_SCHEMA_VERSION,
   type Audio200Diagnostic,
   type Audio200Result,
@@ -37,7 +38,6 @@ import {
 } from "./contracts.ts";
 import { buildAudioRoutingGraph } from "../audio-310/routing.ts";
 
-export const AUDIO200_MAX_TICK = 9_000_000_000;
 export const AUDIO200_MAX_PROJECT_REVISION = 1_000_000_000;
 export const AUDIO200_DEFAULT_PPQ = 480;
 export const AUDIO200_DEFAULT_TEMPO_MILLIBPM = 120_000;
@@ -172,7 +172,7 @@ function validTimeRange(
       recoverable: false,
     };
   }
-  if (candidate.startTick + candidate.durationTick > AUDIO200_MAX_TICK) {
+  if (candidate.startTick > AUDIO200_MAX_TICK - candidate.durationTick) {
     return {
       code: "AUDIO_OVERFLOW",
       message: "Timeline end exceeds the safe AUDIO-200 tick range.",
@@ -1775,7 +1775,8 @@ export async function applyAudioCommand(
       if (
         !boundedInteger(startTick, 0, AUDIO200_MAX_TICK) ||
         !boundedInteger(durationTick, 1, AUDIO200_MAX_TICK) ||
-        !Number.isSafeInteger(endTick) || endTick > AUDIO200_MAX_TICK
+        !Number.isSafeInteger(endTick) ||
+        startTick > AUDIO200_MAX_TICK - durationTick
       ) {
         return fail(
           "AUDIO_INVALID_NUMBER",

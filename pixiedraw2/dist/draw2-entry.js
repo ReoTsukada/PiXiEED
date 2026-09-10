@@ -102,22 +102,31 @@ function buildTilemapGridSvgPath(width, height, layoutWidth, layoutHeight, cellS
   };
 }
 
-// src/draw2-shape-geometry.ts
-var MAX_STAMPED_STROKE_PIXELS = 1048576;
+// src/draw2-brush.ts
+var MIN_BRUSH_SIZE = 1;
+var MAX_BRUSH_SIZE = 64;
+var DEFAULT_BRUSH_DESCRIPTOR = {
+  brushSize: 1,
+  brushShape: "square",
+  brushAngle: 0,
+  brushAlgorithm: "regular",
+  pattern: "solid"
+};
+function normalizeBrushDescriptor(options = {}) {
+  const requestedSize = options.brushSize;
+  const requestedAngle = options.brushAngle;
+  return {
+    brushSize: Number.isSafeInteger(requestedSize) ? Math.max(MIN_BRUSH_SIZE, Math.min(MAX_BRUSH_SIZE, requestedSize)) : DEFAULT_BRUSH_DESCRIPTOR.brushSize,
+    brushShape: options.brushShape === "circle" ? "circle" : "square",
+    brushAngle: Number.isFinite(requestedAngle) ? Math.max(-180, Math.min(180, Math.round(requestedAngle))) : DEFAULT_BRUSH_DESCRIPTOR.brushAngle,
+    brushAlgorithm: options.brushAlgorithm === "pixel-perfect" ? "pixel-perfect" : DEFAULT_BRUSH_DESCRIPTOR.brushAlgorithm,
+    pattern: options.pattern === "checker" || options.pattern === "dots" || options.pattern === "bayer-2x2" ? options.pattern : DEFAULT_BRUSH_DESCRIPTOR.pattern
+  };
+}
 function clampPoint(point2, bounds) {
   return {
     x: Math.max(0, Math.min(bounds.width - 1, Math.round(point2.x))),
     y: Math.max(0, Math.min(bounds.height - 1, Math.round(point2.y)))
-  };
-}
-function normalizeBounds(from, to, bounds) {
-  const a = clampPoint(from, bounds);
-  const b = clampPoint(to, bounds);
-  return {
-    x: Math.min(a.x, b.x),
-    y: Math.min(a.y, b.y),
-    width: Math.max(1, Math.abs(a.x - b.x) + 1),
-    height: Math.max(1, Math.abs(a.y - b.y) + 1)
   };
 }
 function pointKey(point2) {
@@ -126,8 +135,8 @@ function pointKey(point2) {
 function sortedUnique(points, bounds) {
   const unique = /* @__PURE__ */ new Map();
   for (const point2 of points) {
-    const clamped = clampPoint(point2, bounds);
-    unique.set(pointKey(clamped), clamped);
+    if (point2.x < 0 || point2.y < 0 || point2.x >= bounds.width || point2.y >= bounds.height) continue;
+    unique.set(pointKey(point2), point2);
   }
   return [
     ...unique.values()
@@ -139,67 +148,182 @@ function patternVisible(x, y, pattern) {
   if (pattern === "bayer-2x2") return (x & 1) + (y & 1) * 2 !== 3;
   return true;
 }
-function interpolatePixelLine(from, to) {
+function interpolateBrushLine(from, to, algorithm = "regular") {
+  if (algorithm === "pixel-perfect") {
+    return interpolatePixelPerfectLine(from, to);
+  }
   const points = [];
-  let x0 = Math.round(from.x);
-  let y0 = Math.round(from.y);
-  const x1 = Math.round(to.x);
-  const y1 = Math.round(to.y);
-  const dx = Math.abs(x1 - x0);
-  const sx = x0 < x1 ? 1 : -1;
-  const dy = -Math.abs(y1 - y0);
-  const sy = y0 < y1 ? 1 : -1;
-  let error2 = dx + dy;
+  let x = from.x;
+  let y = from.y;
+  const dx = Math.abs(to.x - from.x);
+  const dy = Math.abs(to.y - from.y);
+  const stepX = from.x < to.x ? 1 : -1;
+  const stepY = from.y < to.y ? 1 : -1;
+  let error2 = dx - dy;
   while (true) {
     points.push({
-      x: x0,
-      y: y0
+      x,
+      y
     });
-    if (x0 === x1 && y0 === y1) break;
-    const doubleError = 2 * error2;
-    if (doubleError >= dy) {
-      error2 += dy;
-      x0 += sx;
+    if (x === to.x && y === to.y) break;
+    const twiceError = error2 * 2;
+    if (twiceError > -dy) {
+      error2 -= dy;
+      x += stepX;
     }
-    if (doubleError <= dx) {
+    if (twiceError < dx) {
       error2 += dx;
-      y0 += sy;
+      y += stepY;
     }
   }
   return points;
 }
-function stamp(center, options, bounds) {
-  const size = options.brushSize;
+function interpolatePixelPerfectLine(from, to) {
+  if (from.x === to.x && from.y === to.y) return [
+    {
+      ...from
+    }
+  ];
+  let x1 = from.x;
+  let y1 = from.y;
+  let x2 = to.x;
+  let y2 = to.y;
+  let yAxis = false;
+  if (Math.abs(y2 - y1) > Math.abs(x2 - x1)) {
+    [x1, y1] = [
+      y1,
+      x1
+    ];
+    [x2, y2] = [
+      y2,
+      x2
+    ];
+    yAxis = true;
+  }
+  const width = Math.abs(x2 - x1) + 1;
+  const height = Math.abs(y2 - y1) + 1;
+  const stepX = x1 < x2 ? 1 : -1;
+  const stepY = y1 < y2 ? 1 : y1 > y2 ? -1 : 0;
+  const endX = x2 + stepX;
+  const points = [];
+  let error2 = 0;
+  let y = y1;
+  for (let x = x1; x !== endX; x += stepX) {
+    points.push(yAxis ? {
+      x: y,
+      y: x
+    } : {
+      x,
+      y
+    });
+    error2 += height;
+    if (error2 >= width) {
+      y += stepY;
+      error2 -= width;
+    }
+  }
+  return points;
+}
+function pushIfVisible(output, x, y, descriptor) {
+  const point2 = {
+    x,
+    y
+  };
+  if (patternVisible(x, y, descriptor.pattern)) output.push(point2);
+}
+function stampAxisAligned(center, descriptor, bounds) {
+  const size = descriptor.brushSize;
   const start = -Math.floor(size / 2);
   const centerOffset = (size - 1) / 2;
   const radius = Math.max(0.5, size / 2);
   const points = [];
   for (let row = 0; row < size; row += 1) {
     for (let column = 0; column < size; column += 1) {
-      const x = start + column;
-      const y = start + row;
-      if (options.brushShape === "circle" && (column - centerOffset) ** 2 + (row - centerOffset) ** 2 > radius ** 2) continue;
-      if (!patternVisible(center.x + x, center.y + y, options.pattern)) {
-        continue;
-      }
-      points.push({
-        x: center.x + x,
-        y: center.y + y
-      });
+      const x = center.x + start + column;
+      const y = center.y + start + row;
+      if (descriptor.brushShape === "circle" && (column - centerOffset) ** 2 + (row - centerOffset) ** 2 > radius ** 2) continue;
+      pushIfVisible(points, x, y, descriptor);
     }
   }
-  return points.filter((point2) => point2.x >= 0 && point2.y >= 0 && point2.x < bounds.width && point2.y < bounds.height);
+  return sortedUnique(points, bounds);
+}
+function stampRotatedSquare(center, descriptor, bounds) {
+  if (descriptor.brushShape !== "square" || descriptor.brushAngle === 0) {
+    return stampAxisAligned(center, descriptor, bounds);
+  }
+  const size = descriptor.brushSize;
+  const half = size / 2;
+  const radians = descriptor.brushAngle * Math.PI / 180;
+  const cosine = Math.cos(radians);
+  const sine = Math.sin(radians);
+  const extent = Math.ceil(half * (Math.abs(cosine) + Math.abs(sine))) + 1;
+  const parityOffset = size % 2 === 0 ? 0.5 : 0;
+  const points = [];
+  for (let offsetY = -extent; offsetY <= extent; offsetY += 1) {
+    for (let offsetX = -extent; offsetX <= extent; offsetX += 1) {
+      const relativeX = offsetX + parityOffset;
+      const relativeY = offsetY + parityOffset;
+      const localX = relativeX * cosine + relativeY * sine;
+      const localY = -relativeX * sine + relativeY * cosine;
+      if (Math.abs(localX) > half || Math.abs(localY) > half) continue;
+      const x = center.x + offsetX;
+      const y = center.y + offsetY;
+      pushIfVisible(points, x, y, descriptor);
+    }
+  }
+  return sortedUnique(points, bounds);
+}
+function stampBrushPoints(points, options, bounds) {
+  const descriptor = normalizeBrushDescriptor(options);
+  const stamped = points.flatMap((point2) => stampRotatedSquare(clampPoint(point2, bounds), descriptor, bounds));
+  return sortedUnique(stamped, bounds);
+}
+
+// src/draw2-shape-geometry.ts
+var MAX_STAMPED_STROKE_PIXELS = 1048576;
+function clampPoint2(point2, bounds) {
+  return {
+    x: Math.max(0, Math.min(bounds.width - 1, Math.round(point2.x))),
+    y: Math.max(0, Math.min(bounds.height - 1, Math.round(point2.y)))
+  };
+}
+function normalizeBounds(from, to, bounds) {
+  const a = clampPoint2(from, bounds);
+  const b = clampPoint2(to, bounds);
+  return {
+    x: Math.min(a.x, b.x),
+    y: Math.min(a.y, b.y),
+    width: Math.max(1, Math.abs(a.x - b.x) + 1),
+    height: Math.max(1, Math.abs(a.y - b.y) + 1)
+  };
+}
+function pointKey2(point2) {
+  return `${point2.x}:${point2.y}`;
+}
+function sortedUnique2(points, bounds) {
+  const unique = /* @__PURE__ */ new Map();
+  for (const point2 of points) {
+    const clamped = clampPoint2(point2, bounds);
+    unique.set(pointKey2(clamped), clamped);
+  }
+  return [
+    ...unique.values()
+  ].sort((left, right) => left.y - right.y || left.x - right.x);
+}
+function patternVisible2(x, y, pattern) {
+  if (pattern === "checker") return (x + y) % 2 === 0;
+  if (pattern === "dots") return x % 2 === 0 && y % 2 === 0;
+  if (pattern === "bayer-2x2") return (x & 1) + (y & 1) * 2 !== 3;
+  return true;
 }
 function stampBrush(points, options, bounds) {
-  const stamped = [];
-  for (const point2 of points) {
-    const next = stamp(clampPoint(point2, bounds), options, bounds);
-    if (stamped.length + next.length > MAX_STAMPED_STROKE_PIXELS) {
-      throw new Error("Expanded Stroke exceeds the bounded pixel budget.");
-    }
-    stamped.push(...next);
+  const stamped = stampBrushPoints(points, options, bounds);
+  if (stamped.length > MAX_STAMPED_STROKE_PIXELS) {
+    throw new Error("Expanded Stroke exceeds the bounded pixel budget.");
   }
-  return sortedUnique(stamped, bounds);
+  return [
+    ...stamped
+  ];
 }
 function rectanglePixels(rect, filled) {
   const points = [];
@@ -237,8 +361,8 @@ function shapeGeometryBounds(tool, rect) {
   return tool === "circle" || tool === "circle-fill" ? circleRectForBounds(rect) : rect;
 }
 function subtractPixels(outer, inner, bounds) {
-  const innerKeys = new Set(inner.map(pointKey));
-  return sortedUnique(outer.filter((point2) => !innerKeys.has(pointKey(point2))), bounds);
+  const innerKeys = new Set(inner.map(pointKey2));
+  return sortedUnique2(outer.filter((point2) => !innerKeys.has(pointKey2(point2))), bounds);
 }
 function ellipsePixels(rect, filled) {
   const points = [];
@@ -269,7 +393,7 @@ function ellipsePixels(rect, filled) {
     return points;
   }
   const fillRanges = filled ? /* @__PURE__ */ new Map() : void 0;
-  const record3 = (x, y) => {
+  const record4 = (x, y) => {
     if (x < minX || x > maxX || y < minY || y > maxY) return;
     if (fillRanges !== void 0) {
       const existing = fillRanges.get(y);
@@ -303,10 +427,10 @@ function ellipsePixels(rect, filled) {
   a *= 8 * a;
   const b8 = 8 * b * b;
   do {
-    record3(x1, y0);
-    record3(x0, y0);
-    record3(x0, y1);
-    record3(x1, y1);
+    record4(x1, y0);
+    record4(x0, y0);
+    record4(x0, y1);
+    record4(x1, y1);
     const e2 = 2 * err;
     if (e2 <= dy) {
       y0 += 1;
@@ -322,10 +446,10 @@ function ellipsePixels(rect, filled) {
     }
   } while (x0 <= x1);
   while (y0 - y1 < b) {
-    record3(x0 - 1, y0);
-    record3(x1 + 1, y0);
-    record3(x0 - 1, y1);
-    record3(x1 + 1, y1);
+    record4(x0 - 1, y0);
+    record4(x1 + 1, y0);
+    record4(x0 - 1, y1);
+    record4(x1 + 1, y1);
     y0 += 1;
     y1 -= 1;
   }
@@ -339,25 +463,25 @@ function ellipsePixels(rect, filled) {
   }
   return points;
 }
-function shapePixels(tool, from, to, bounds) {
+function shapePixels(tool, from, to, bounds, algorithm = "regular") {
   const rect = normalizeBounds(from, to, bounds);
   if (tool === "line") {
-    return sortedUnique(interpolatePixelLine(clampPoint(from, bounds), clampPoint(to, bounds)), bounds);
+    return sortedUnique2(interpolateBrushLine(clampPoint2(from, bounds), clampPoint2(to, bounds), algorithm), bounds);
   }
   if (tool === "rect") {
-    return sortedUnique(rectanglePixels(rect, false), bounds);
+    return sortedUnique2(rectanglePixels(rect, false), bounds);
   }
   if (tool === "rect-fill") {
-    return sortedUnique(rectanglePixels(rect, true), bounds);
+    return sortedUnique2(rectanglePixels(rect, true), bounds);
   }
   if (tool === "ellipse") {
-    return sortedUnique(ellipsePixels(rect, false), bounds);
+    return sortedUnique2(ellipsePixels(rect, false), bounds);
   }
   if (tool === "ellipse-fill") {
-    return sortedUnique(ellipsePixels(rect, true), bounds);
+    return sortedUnique2(ellipsePixels(rect, true), bounds);
   }
   const circleRect = circleRectForBounds(rect);
-  return sortedUnique(ellipsePixels(circleRect, tool === "circle-fill"), bounds);
+  return sortedUnique2(ellipsePixels(circleRect, tool === "circle-fill"), bounds);
 }
 function shapeStrokePixels(tool, from, to, brushSize2, bounds) {
   const dragRect = normalizeBounds(from, to, bounds);
@@ -365,7 +489,7 @@ function shapeStrokePixels(tool, from, to, brushSize2, bounds) {
   if (brushSize2 <= 1) return shapePixels(tool, from, to, bounds);
   const outer = tool === "rect" ? rectanglePixels(geometryRect, true) : ellipsePixels(geometryRect, true);
   const innerRect = insetBounds(geometryRect, brushSize2);
-  if (innerRect === void 0) return sortedUnique(outer, bounds);
+  if (innerRect === void 0) return sortedUnique2(outer, bounds);
   const inner = tool === "rect" ? rectanglePixels(innerRect, true) : ellipsePixels(innerRect, true);
   return subtractPixels(outer, inner, bounds);
 }
@@ -376,10 +500,13 @@ function isOutlineShape(tool) {
   return tool === "rect" || tool === "ellipse" || tool === "circle";
 }
 function normalizeOptions(options) {
+  const brush = normalizeBrushDescriptor(options);
   return {
-    brushSize: Number.isSafeInteger(options.brushSize) ? Math.max(1, Math.min(32, options.brushSize)) : 1,
-    brushShape: options.brushShape === "circle" ? "circle" : "square",
-    pattern: options.pattern === "checker" || options.pattern === "dots" || options.pattern === "bayer-2x2" ? options.pattern : "solid"
+    brushSize: brush.brushSize,
+    brushShape: brush.brushShape,
+    brushAngle: brush.brushAngle,
+    brushAlgorithm: brush.brushAlgorithm,
+    pattern: brush.pattern
   };
 }
 function shapePixelsInBounds(tool, from, to, bounds) {
@@ -404,19 +531,19 @@ function createShapeWriteSet(tool, from, to, colorIndex, options, bounds) {
   const rect = normalizeBounds(from, to, safeBounds);
   let points;
   if (tool === "line") {
-    points = stampBrush(shapePixels(tool, from, to, safeBounds), safeOptions, safeBounds);
+    points = stampBrush(shapePixels(tool, from, to, safeBounds, safeOptions.brushAlgorithm), safeOptions, safeBounds);
   } else if (rect.width === 1 && rect.height === 1) {
     points = stampBrush([
-      clampPoint(from, safeBounds)
+      clampPoint2(from, safeBounds)
     ], safeOptions, safeBounds);
   } else if (isFilledShape(tool)) {
-    points = shapePixels(tool, from, to, safeBounds).filter((point2) => patternVisible(point2.x, point2.y, safeOptions.pattern));
+    points = shapePixels(tool, from, to, safeBounds).filter((point2) => patternVisible2(point2.x, point2.y, safeOptions.pattern));
   } else if (isOutlineShape(tool)) {
-    points = shapeStrokePixels(tool, from, to, safeOptions.brushSize, safeBounds).filter((point2) => patternVisible(point2.x, point2.y, safeOptions.pattern));
+    points = shapeStrokePixels(tool, from, to, safeOptions.brushSize, safeBounds).filter((point2) => patternVisible2(point2.x, point2.y, safeOptions.pattern));
   } else {
     points = [];
   }
-  return sortedUnique(points, safeBounds).map((point2) => ({
+  return sortedUnique2(points, safeBounds).map((point2) => ({
     ...point2,
     colorIndex: Math.max(0, Math.floor(colorIndex))
   }));
@@ -833,37 +960,14 @@ function rasterStampColorAt(source, x, y) {
 
 // src/draw2-core.ts
 var MAX_INTERPOLATED_STROKE_PIXELS = 65536;
-function interpolatePixelLine2(from, to) {
-  const points = [];
-  let x = from.x;
-  let y = from.y;
-  const dx = Math.abs(to.x - from.x);
-  const dy = Math.abs(to.y - from.y);
-  const stepX = from.x < to.x ? 1 : -1;
-  const stepY = from.y < to.y ? 1 : -1;
-  let error2 = dx - dy;
-  while (true) {
-    points.push({
-      x,
-      y
-    });
-    if (x === to.x && y === to.y) break;
-    const twiceError = error2 * 2;
-    if (twiceError > -dy) {
-      error2 -= dy;
-      x += stepX;
-    }
-    if (twiceError < dx) {
-      error2 += dx;
-      y += stepY;
-    }
-    if (points.length > MAX_INTERPOLATED_STROKE_PIXELS) {
-      throw new Error("Interpolated Stroke exceeds the bounded pixel budget.");
-    }
+function interpolatePixelLine(from, to, algorithm = "regular") {
+  const points = interpolateBrushLine(from, to, algorithm);
+  if (points.length > MAX_INTERPOLATED_STROKE_PIXELS) {
+    throw new Error("Interpolated Stroke exceeds the bounded pixel budget.");
   }
   return points;
 }
-function interpolatePixelPath(points) {
+function interpolatePixelPath(points, algorithm = "regular") {
   if (points.length === 0) return [];
   const interpolated = [
     {
@@ -875,7 +979,7 @@ function interpolatePixelPath(points) {
     const from = points[index - 1];
     const to = points[index];
     if (from === void 0 || to === void 0) continue;
-    for (const point2 of interpolatePixelLine2(from, to).slice(1)) {
+    for (const point2 of interpolatePixelLine(from, to, algorithm).slice(1)) {
       if (interpolated.length >= MAX_INTERPOLATED_STROKE_PIXELS) {
         throw new Error("Interpolated Stroke exceeds the bounded pixel budget.");
       }
@@ -1617,6 +1721,8 @@ function validatePayload(state2, command) {
     for (const color of colors) {
       if (!Number.isSafeInteger(color) || color < 0 || color > 4294967295) {
         diagnostics.push(diagnostic("PALETTE_COLOR_INVALID", "Palette color must be a uint32 value.", colorPath));
+      } else if (color !== 0 && (color >>> 24 & 255) === 0) {
+        diagnostics.push(diagnostic("PALETTE_ALPHA_INVALID", "Non-transparent palette colors must have alpha greater than zero.", colorPath));
       }
     }
     const colorsToAppend = paletteColorsToAppend(asset.palette, colors);
@@ -1631,6 +1737,8 @@ function validatePayload(state2, command) {
     }
     if (!Number.isSafeInteger(command.payload.color) || command.payload.color < 0 || command.payload.color > 4294967295) {
       diagnostics.push(diagnostic("PALETTE_COLOR_INVALID", "Palette color must be a uint32 value.", "payload.color"));
+    } else if (command.payload.color !== 0 && (command.payload.color >>> 24 & 255) === 0) {
+      diagnostics.push(diagnostic("PALETTE_ALPHA_INVALID", "Non-transparent palette colors must have alpha greater than zero.", "payload.color"));
     }
     return diagnostics;
   }
@@ -1776,11 +1884,17 @@ function validatePayload(state2, command) {
         diagnostics.push(diagnostic("SHAPE_POINT_OUT_OF_BOUNDS", "Shape point is outside the raster.", path));
       }
     }
-    if (!Number.isSafeInteger(payload.brushSize) || payload.brushSize < 1 || payload.brushSize > 32) {
-      diagnostics.push(diagnostic("SHAPE_BRUSH_SIZE_INVALID", "Shape brushSize must be between 1 and 32.", "payload.brushSize"));
+    if (!Number.isSafeInteger(payload.brushSize) || payload.brushSize < 1 || payload.brushSize > MAX_BRUSH_SIZE) {
+      diagnostics.push(diagnostic("SHAPE_BRUSH_SIZE_INVALID", `Shape brushSize must be between 1 and ${MAX_BRUSH_SIZE}.`, "payload.brushSize"));
     }
     if (payload.brushShape !== "square" && payload.brushShape !== "circle") {
       diagnostics.push(diagnostic("SHAPE_BRUSH_SHAPE_INVALID", "Shape brushShape must be square or circle.", "payload.brushShape"));
+    }
+    if (payload.brushAngle !== void 0 && (!Number.isSafeInteger(payload.brushAngle) || payload.brushAngle < -180 || payload.brushAngle > 180)) {
+      diagnostics.push(diagnostic("SHAPE_BRUSH_ANGLE_INVALID", "Shape brushAngle must be an integer between -180 and 180.", "payload.brushAngle"));
+    }
+    if (payload.brushAlgorithm !== void 0 && payload.brushAlgorithm !== "regular" && payload.brushAlgorithm !== "pixel-perfect") {
+      diagnostics.push(diagnostic("SHAPE_BRUSH_ALGORITHM_INVALID", "Shape brushAlgorithm must be regular or pixel-perfect.", "payload.brushAlgorithm"));
     }
     if (payload.pattern !== "solid" && payload.pattern !== "checker" && payload.pattern !== "dots" && payload.pattern !== "bayer-2x2") {
       diagnostics.push(diagnostic("SHAPE_PATTERN_INVALID", "Shape pattern is not supported.", "payload.pattern"));
@@ -1794,11 +1908,17 @@ function validatePayload(state2, command) {
     const { brushSize: brushSize2, brushShape: brushShape2, pattern } = command.payload;
     diagnostics.push(...validateRasterClip(command.payload.clip, asset), ...validateRasterSelectionMask(command.payload.selectionMask, asset), ...validateSelectionConstraintCombination(command.payload.clip, command.payload.selectionMask));
     diagnostics.push(...validateMirrorCommitSpec(command.payload.mirror, asset));
-    if (brushSize2 !== void 0 && (!Number.isSafeInteger(brushSize2) || brushSize2 < 1 || brushSize2 > 32)) {
-      diagnostics.push(diagnostic("STROKE_BRUSH_SIZE_INVALID", "Stroke brushSize must be between 1 and 32.", "payload.brushSize"));
+    if (brushSize2 !== void 0 && (!Number.isSafeInteger(brushSize2) || brushSize2 < 1 || brushSize2 > MAX_BRUSH_SIZE)) {
+      diagnostics.push(diagnostic("STROKE_BRUSH_SIZE_INVALID", `Stroke brushSize must be between 1 and ${MAX_BRUSH_SIZE}.`, "payload.brushSize"));
     }
     if (brushShape2 !== void 0 && brushShape2 !== "square" && brushShape2 !== "circle") {
       diagnostics.push(diagnostic("STROKE_BRUSH_SHAPE_INVALID", "Stroke brushShape must be square or circle.", "payload.brushShape"));
+    }
+    if (command.payload.brushAngle !== void 0 && (!Number.isSafeInteger(command.payload.brushAngle) || command.payload.brushAngle < -180 || command.payload.brushAngle > 180)) {
+      diagnostics.push(diagnostic("STROKE_BRUSH_ANGLE_INVALID", "Stroke brushAngle must be an integer between -180 and 180.", "payload.brushAngle"));
+    }
+    if (command.payload.brushAlgorithm !== void 0 && command.payload.brushAlgorithm !== "regular" && command.payload.brushAlgorithm !== "pixel-perfect") {
+      diagnostics.push(diagnostic("STROKE_BRUSH_ALGORITHM_INVALID", "Stroke brushAlgorithm must be regular or pixel-perfect.", "payload.brushAlgorithm"));
     }
     if (pattern !== void 0 && pattern !== "solid" && pattern !== "checker" && pattern !== "dots" && pattern !== "bayer-2x2") {
       diagnostics.push(diagnostic("STROKE_PATTERN_INVALID", "Stroke pattern is not supported.", "payload.pattern"));
@@ -1812,11 +1932,13 @@ function validatePayload(state2, command) {
   }
   if (command.commandType === "raster.strokeCommit" && diagnostics.length === 0) {
     try {
-      const interpolated = interpolatePixelPath(command.payload.points);
+      const interpolated = interpolatePixelPath(command.payload.points, command.payload.brushAlgorithm ?? "regular");
       try {
         stampShapeBrushInBounds(interpolated, {
           brushSize: command.payload.brushSize ?? 1,
           brushShape: command.payload.brushShape ?? "square",
+          brushAngle: command.payload.brushAngle ?? 0,
+          brushAlgorithm: command.payload.brushAlgorithm ?? "regular",
           pattern: command.payload.pattern ?? "solid"
         }, asset);
       } catch (cause) {
@@ -2129,11 +2251,13 @@ var EditorCore = class {
       command.payload
     ];
     else if (command.commandType === "raster.strokeCommit") {
-      const interpolated = interpolatePixelPath(command.payload.points);
+      const interpolated = interpolatePixelPath(command.payload.points, command.payload.brushAlgorithm ?? "regular");
       interpolatedStrokePixelCount = interpolated.length;
       const strokedPoints = stampShapeBrushInBounds(interpolated, {
         brushSize: command.payload.brushSize ?? 1,
         brushShape: command.payload.brushShape ?? "square",
+        brushAngle: command.payload.brushAngle ?? 0,
+        brushAlgorithm: command.payload.brushAlgorithm ?? "regular",
         pattern: command.payload.pattern ?? "solid"
       }, sourceAsset);
       const mirroredPoints = command.payload.mirror === void 0 ? strokedPoints : mirrorPixelPointsInBounds(strokedPoints, command.payload.mirror, sourceAsset);
@@ -2143,6 +2267,8 @@ var EditorCore = class {
       const shapePoints = createShapeWriteSet(command.payload.tool, command.payload.from, command.payload.to, command.payload.colorIndex, {
         brushSize: command.payload.brushSize,
         brushShape: command.payload.brushShape,
+        brushAngle: command.payload.brushAngle ?? 0,
+        brushAlgorithm: command.payload.brushAlgorithm ?? "regular",
         pattern: command.payload.pattern
       }, sourceAsset);
       const mirroredPoints = command.payload.mirror === void 0 ? shapePoints : mirrorPixelPointsInBounds(shapePoints, command.payload.mirror, sourceAsset);
@@ -3578,8 +3704,8 @@ function nowIso(now) {
 function leaseLive(lease, now) {
   return Date.parse(lease.expiresAt) > now.getTime();
 }
-function withoutLease(record3) {
-  const { lease: _lease, ...rest } = record3;
+function withoutLease(record4) {
+  const { lease: _lease, ...rest } = record4;
   return rest;
 }
 function emptySnapshot(projectId) {
@@ -3711,16 +3837,16 @@ function mergeAppliedReceipts(snapshot, incoming) {
 }
 function compactCompletedRecords(snapshot, receipts) {
   const receiptIds = new Set(receipts.map((receipt) => receipt.operationId));
-  const activeReceiptIds = new Set(snapshot.inbox.filter((record3) => record3.receipt !== void 0 && record3.state !== "COMPLETED").map((record3) => record3.operationId));
-  const completedCommitted = snapshot.vault.committed.filter((record3) => receiptIds.has(record3.envelope.operationId)).sort((left, right) => left.envelope.projectRevision - right.envelope.projectRevision);
-  const retainedCommittedIds = new Set(completedCommitted.slice(-RETAINED_COMPLETED_COMMITTED).map((record3) => record3.envelope.operationId));
-  const committed = snapshot.vault.committed.filter((record3) => {
-    const operationId = record3.envelope.operationId;
+  const activeReceiptIds = new Set(snapshot.inbox.filter((record4) => record4.receipt !== void 0 && record4.state !== "COMPLETED").map((record4) => record4.operationId));
+  const completedCommitted = snapshot.vault.committed.filter((record4) => receiptIds.has(record4.envelope.operationId)).sort((left, right) => left.envelope.projectRevision - right.envelope.projectRevision);
+  const retainedCommittedIds = new Set(completedCommitted.slice(-RETAINED_COMPLETED_COMMITTED).map((record4) => record4.envelope.operationId));
+  const committed = snapshot.vault.committed.filter((record4) => {
+    const operationId = record4.envelope.operationId;
     return !receiptIds.has(operationId) || activeReceiptIds.has(operationId) || retainedCommittedIds.has(operationId);
   });
-  const completedOutbox = snapshot.outbox.filter((record3) => record3.state === "DISPATCHED" && receiptIds.has(record3.operationId)).sort((left, right) => (left.confirmedRevision ?? 0) - (right.confirmedRevision ?? 0));
-  const retainedOutboxIds = new Set(completedOutbox.slice(-RETAINED_COMPLETED_OUTBOX).map((record3) => record3.operationId));
-  const outbox = snapshot.outbox.filter((record3) => record3.state !== "DISPATCHED" || !receiptIds.has(record3.operationId) || retainedOutboxIds.has(record3.operationId));
+  const completedOutbox = snapshot.outbox.filter((record4) => record4.state === "DISPATCHED" && receiptIds.has(record4.operationId)).sort((left, right) => (left.confirmedRevision ?? 0) - (right.confirmedRevision ?? 0));
+  const retainedOutboxIds = new Set(completedOutbox.slice(-RETAINED_COMPLETED_OUTBOX).map((record4) => record4.operationId));
+  const outbox = snapshot.outbox.filter((record4) => record4.state !== "DISPATCHED" || !receiptIds.has(record4.operationId) || retainedOutboxIds.has(record4.operationId));
   return {
     ...snapshot,
     vault: {
@@ -3728,7 +3854,7 @@ function compactCompletedRecords(snapshot, receipts) {
       committed
     },
     outbox,
-    inbox: snapshot.inbox.filter((record3) => record3.receipt === void 0 || record3.state !== "COMPLETED"),
+    inbox: snapshot.inbox.filter((record4) => record4.receipt === void 0 || record4.state !== "COMPLETED"),
     appliedOperationFingerprints: receipts
   };
 }
@@ -3892,10 +4018,10 @@ var PixyncDurableJournal = class _PixyncDurableJournal {
       if (existing.fingerprint !== fingerprint) {
         throw new PixyncDurabilityError("IDEMPOTENCY_CONFLICT", "Operation ID is bound to a different fingerprint.");
       }
-      const record4 = this.#state.outbox.find((item) => item.operationId === draft.operationId);
-      if (record4 !== void 0) {
+      const record5 = this.#state.outbox.find((item) => item.operationId === draft.operationId);
+      if (record5 !== void 0) {
         return {
-          record: clone(record4),
+          record: clone(record5),
           duplicate: true
         };
       }
@@ -3918,7 +4044,7 @@ var PixyncDurableJournal = class _PixyncDurableJournal {
       }
     }
     const now = nowIso(this.#now());
-    const record3 = {
+    const record4 = {
       operationId: draft.operationId,
       projectId: this.#projectId,
       envelope: clone(draft),
@@ -3943,12 +4069,12 @@ var PixyncDurableJournal = class _PixyncDurableJournal {
       },
       outbox: [
         ...this.#state.outbox,
-        record3
+        record4
       ]
     };
     await this.#commit(next);
     return {
-      record: clone(record3),
+      record: clone(record4),
       duplicate: false
     };
   }
@@ -3958,22 +4084,22 @@ var PixyncDurableJournal = class _PixyncDurableJournal {
     }
     let next = clone(this.#state);
     let changed = false;
-    const reclaimed = next.outbox.map((record3) => {
-      if (record3.state === "LEASED" && record3.lease !== void 0 && !leaseLive(record3.lease, now)) {
+    const reclaimed = next.outbox.map((record4) => {
+      if (record4.state === "LEASED" && record4.lease !== void 0 && !leaseLive(record4.lease, now)) {
         changed = true;
-        if (record3.attempt >= this.#maxAttempts) {
+        if (record4.attempt >= this.#maxAttempts) {
           return {
-            ...withoutLease(record3),
+            ...withoutLease(record4),
             state: "DLQ"
           };
         }
         return {
-          ...withoutLease(record3),
+          ...withoutLease(record4),
           state: "PENDING",
           nextAttemptAt: nowIso(now)
         };
       }
-      return record3;
+      return record4;
     });
     next = {
       ...next,
@@ -3981,7 +4107,7 @@ var PixyncDurableJournal = class _PixyncDurableJournal {
     };
     const candidate = [
       ...reclaimed
-    ].filter((record3) => record3.state === "PENDING" && Date.parse(record3.nextAttemptAt) <= now.getTime()).sort((left, right) => left.nextAttemptAt.localeCompare(right.nextAttemptAt))[0];
+    ].filter((record4) => record4.state === "PENDING" && Date.parse(record4.nextAttemptAt) <= now.getTime()).sort((left, right) => left.nextAttemptAt.localeCompare(right.nextAttemptAt))[0];
     if (candidate === void 0) {
       if (changed) await this.#commit(next);
       return void 0;
@@ -4027,23 +4153,23 @@ var PixyncDurableJournal = class _PixyncDurableJournal {
     if (!validPositive(confirmedRevision)) {
       throw new Error("Confirmed project revision must be positive.");
     }
-    const record3 = this.#state.outbox.find((item) => item.operationId === operationId);
-    if (record3 === void 0) throw new Error("Outbox record was not found.");
-    if (record3.state === "DISPATCHED") {
-      if (record3.lease?.token === fencingToken && record3.confirmedRevision === confirmedRevision) {
+    const record4 = this.#state.outbox.find((item) => item.operationId === operationId);
+    if (record4 === void 0) throw new Error("Outbox record was not found.");
+    if (record4.state === "DISPATCHED") {
+      if (record4.lease?.token === fencingToken && record4.confirmedRevision === confirmedRevision) {
         return {
-          record: clone(record3),
+          record: clone(record4),
           duplicate: true
         };
       }
       throw new PixyncDurabilityError("LEASE_STALE", "ACK token is stale.");
     }
-    if (record3.state !== "LEASED" || !sameLease(record3.lease, fencingToken) || !leaseLive(record3.lease, this.#now())) {
+    if (record4.state !== "LEASED" || !sameLease(record4.lease, fencingToken) || !leaseLive(record4.lease, this.#now())) {
       throw new PixyncDurabilityError("LEASE_STALE", "Only the current live Outbox lease may acknowledge.");
     }
-    const legacyAggregateRevision = record3.envelope.aggregateRevision || Math.max(...this.#state.vault.committed.filter((item) => item.envelope.aggregate === record3.envelope.aggregate).map((item) => item.envelope.aggregateRevision), ...this.#state.appliedOperationFingerprints.filter((item) => item.aggregate === record3.envelope.aggregate).map((item) => item.aggregateRevision ?? 0), 0) + 1;
+    const legacyAggregateRevision = record4.envelope.aggregateRevision || Math.max(...this.#state.vault.committed.filter((item) => item.envelope.aggregate === record4.envelope.aggregate).map((item) => item.envelope.aggregateRevision), ...this.#state.appliedOperationFingerprints.filter((item) => item.aggregate === record4.envelope.aggregate).map((item) => item.aggregateRevision ?? 0), 0) + 1;
     const committed = {
-      ...clone(record3.envelope),
+      ...clone(record4.envelope),
       projectRevision: confirmedRevision,
       aggregateRevision: legacyAggregateRevision,
       committedAt: nowIso(this.#now())
@@ -4054,7 +4180,7 @@ var PixyncDurableJournal = class _PixyncDurableJournal {
       projectId: committed.projectId,
       projectRevision: committed.projectRevision,
       aggregateRevision: committed.aggregateRevision,
-      submissionFingerprint: await operationFingerprint(record3.envelope),
+      submissionFingerprint: await operationFingerprint(record4.envelope),
       committedFingerprint: await committedOperationFingerprint(committed),
       operation: committed
     });
@@ -4066,17 +4192,17 @@ var PixyncDurableJournal = class _PixyncDurableJournal {
    * path and deliberately constructs its legacy envelope before delegating.
    */
   async acknowledgeOutboxAuthoritative(operationId, fencingToken, ack) {
-    const record3 = this.#state.outbox.find((item) => item.operationId === operationId);
-    if (record3 === void 0) throw new Error("Outbox record was not found.");
-    if (record3.state === "DISPATCHED") {
+    const record4 = this.#state.outbox.find((item) => item.operationId === operationId);
+    if (record4 === void 0) throw new Error("Outbox record was not found.");
+    if (record4.state === "DISPATCHED") {
       const committed = this.#state.vault.committed.find((item) => item.envelope.operationId === operationId);
-      if (record3.lease?.token === fencingToken && record3.confirmedRevision === ack.projectRevision && committed !== void 0 && committed.fingerprint === ack.committedFingerprint && JSON.stringify(committed.envelope) === JSON.stringify(ack.operation)) return {
-        record: clone(record3),
+      if (record4.lease?.token === fencingToken && record4.confirmedRevision === ack.projectRevision && committed !== void 0 && committed.fingerprint === ack.committedFingerprint && JSON.stringify(committed.envelope) === JSON.stringify(ack.operation)) return {
+        record: clone(record4),
         duplicate: true
       };
       throw new PixyncDurabilityError("LEASE_STALE", "ACK token is stale.");
     }
-    if (record3.state !== "LEASED" || !sameLease(record3.lease, fencingToken) || !leaseLive(record3.lease, this.#now())) {
+    if (record4.state !== "LEASED" || !sameLease(record4.lease, fencingToken) || !leaseLive(record4.lease, this.#now())) {
       throw new PixyncDurabilityError("LEASE_STALE", "Only the current live Outbox lease may acknowledge.");
     }
     if (ack.kind !== "COMMITTED" && ack.kind !== "DUPLICATE") {
@@ -4086,8 +4212,8 @@ var PixyncDurableJournal = class _PixyncDurableJournal {
       throw new PixyncDurabilityError("INBOX_CONFLICT", "Provider ACK identity is not bound to its committed envelope.");
     }
     await validatePixyncCommitted(ack.operation);
-    const expectedSubmissionFingerprint = record3.fingerprint;
-    if (ack.submissionFingerprint !== expectedSubmissionFingerprint || await operationFingerprint(ack.operation) !== expectedSubmissionFingerprint || record3.envelope.aggregateRevision !== 0 && ack.operation.aggregateRevision !== record3.envelope.aggregateRevision) {
+    const expectedSubmissionFingerprint = record4.fingerprint;
+    if (ack.submissionFingerprint !== expectedSubmissionFingerprint || await operationFingerprint(ack.operation) !== expectedSubmissionFingerprint || record4.envelope.aggregateRevision !== 0 && ack.operation.aggregateRevision !== record4.envelope.aggregateRevision) {
       throw new PixyncDurabilityError("INBOX_CONFLICT", "Provider ACK does not match the durable draft fingerprint or revision.");
     }
     const expectedCommittedFingerprint = await committedOperationFingerprint(ack.operation);
@@ -4101,7 +4227,7 @@ var PixyncDurableJournal = class _PixyncDurableJournal {
       throw new PixyncDurabilityError("REVISION_CONFLICT", "Confirmed revision is bound to another operation.");
     }
     const nextRecord = {
-      ...record3,
+      ...record4,
       state: "DISPATCHED",
       confirmedRevision: ack.operation.projectRevision
     };
@@ -4131,19 +4257,19 @@ var PixyncDurableJournal = class _PixyncDurableJournal {
     };
   }
   async failOutbox(operationId, fencingToken, retryable) {
-    const record3 = this.#state.outbox.find((item) => item.operationId === operationId);
-    if (record3 === void 0) throw new Error("Outbox record was not found.");
-    if (record3.state !== "LEASED" || !sameLease(record3.lease, fencingToken) || !leaseLive(record3.lease, this.#now())) {
+    const record4 = this.#state.outbox.find((item) => item.operationId === operationId);
+    if (record4 === void 0) throw new Error("Outbox record was not found.");
+    if (record4.state !== "LEASED" || !sameLease(record4.lease, fencingToken) || !leaseLive(record4.lease, this.#now())) {
       throw new PixyncDurabilityError("LEASE_STALE", "Stale Outbox lease cannot fail.");
     }
-    const terminal = !retryable || record3.attempt >= this.#maxAttempts;
+    const terminal = !retryable || record4.attempt >= this.#maxAttempts;
     const nextRecord = terminal ? {
-      ...withoutLease(record3),
+      ...withoutLease(record4),
       state: "DLQ"
     } : {
-      ...withoutLease(record3),
+      ...withoutLease(record4),
       state: "PENDING",
-      nextAttemptAt: new Date(this.#now().getTime() + this.#retryDelayMs * 2 ** Math.min(record3.attempt, 8)).toISOString()
+      nextAttemptAt: new Date(this.#now().getTime() + this.#retryDelayMs * 2 ** Math.min(record4.attempt, 8)).toISOString()
     };
     const next = {
       ...this.#state,
@@ -4156,12 +4282,12 @@ var PixyncDurableJournal = class _PixyncDurableJournal {
     };
   }
   async pruneConfirmed() {
-    const removable = this.#state.outbox.filter((record3) => record3.state === "DISPATCHED" && record3.confirmedRevision !== void 0 && record3.confirmedRevision <= this.#state.confirmedProjectRevision);
+    const removable = this.#state.outbox.filter((record4) => record4.state === "DISPATCHED" && record4.confirmedRevision !== void 0 && record4.confirmedRevision <= this.#state.confirmedProjectRevision);
     if (removable.length === 0) return 0;
-    const operationIds = new Set(removable.map((record3) => record3.operationId));
+    const operationIds = new Set(removable.map((record4) => record4.operationId));
     await this.#commit({
       ...this.#state,
-      outbox: this.#state.outbox.filter((record3) => !operationIds.has(record3.operationId))
+      outbox: this.#state.outbox.filter((record4) => !operationIds.has(record4.operationId))
     });
     return removable.length;
   }
@@ -4218,7 +4344,7 @@ var PixyncDurableJournal = class _PixyncDurableJournal {
       };
     }
     const sameRevision = this.#state.appliedOperationFingerprints.find((item) => item.projectRevision === committed.projectRevision && item.operationId !== committed.operationId) ?? this.#state.inbox.find((item) => item.envelope.projectRevision === committed.projectRevision && item.operationId !== committed.operationId) ?? this.#state.vault.committed.find((item) => item.envelope.projectRevision === committed.projectRevision && item.envelope.operationId !== committed.operationId);
-    const record3 = {
+    const record4 = {
       operationId: committed.operationId,
       projectId: this.#projectId,
       envelope: clone(committed),
@@ -4241,12 +4367,12 @@ var PixyncDurableJournal = class _PixyncDurableJournal {
       },
       inbox: [
         ...this.#state.inbox,
-        record3
+        record4
       ]
     };
     await this.#commit(next);
     return {
-      record: clone(record3),
+      record: clone(record4),
       conflict: sameRevision !== void 0,
       duplicate: false
     };
@@ -4257,22 +4383,22 @@ var PixyncDurableJournal = class _PixyncDurableJournal {
     }
     let next = clone(this.#state);
     let changed = false;
-    const reclaimed = next.inbox.map((record3) => {
-      if (record3.state === "LEASED" && record3.lease !== void 0 && !leaseLive(record3.lease, now)) {
+    const reclaimed = next.inbox.map((record4) => {
+      if (record4.state === "LEASED" && record4.lease !== void 0 && !leaseLive(record4.lease, now)) {
         changed = true;
-        if (record3.attempt >= this.#maxAttempts) {
+        if (record4.attempt >= this.#maxAttempts) {
           return {
-            ...withoutLease(record3),
+            ...withoutLease(record4),
             state: "DLQ"
           };
         }
         return {
-          ...withoutLease(record3),
+          ...withoutLease(record4),
           state: "RETRYABLE",
           nextAttemptAt: nowIso(now)
         };
       }
-      return record3;
+      return record4;
     });
     next = {
       ...next,
@@ -4280,7 +4406,7 @@ var PixyncDurableJournal = class _PixyncDurableJournal {
     };
     const candidate = [
       ...reclaimed
-    ].filter((record3) => (record3.state === "ACCEPTED" || record3.state === "RETRYABLE") && Date.parse(record3.nextAttemptAt) <= now.getTime()).sort((left, right) => left.envelope.projectRevision - right.envelope.projectRevision)[0];
+    ].filter((record4) => (record4.state === "ACCEPTED" || record4.state === "RETRYABLE") && Date.parse(record4.nextAttemptAt) <= now.getTime()).sort((left, right) => left.envelope.projectRevision - right.envelope.projectRevision)[0];
     if (candidate === void 0) {
       if (changed) await this.#commit(next);
       return void 0;
@@ -4322,14 +4448,14 @@ var PixyncDurableJournal = class _PixyncDurableJournal {
     };
   }
   async applyInbox(operationId, fencingToken, orderKeeper) {
-    const record3 = this.#state.inbox.find((item) => item.operationId === operationId);
-    if (record3 === void 0) throw new Error("Inbox record was not found.");
-    if (record3.state !== "LEASED" || !sameLease(record3.lease, fencingToken) || !leaseLive(record3.lease, this.#now())) {
+    const record4 = this.#state.inbox.find((item) => item.operationId === operationId);
+    if (record4 === void 0) throw new Error("Inbox record was not found.");
+    if (record4.state !== "LEASED" || !sameLease(record4.lease, fencingToken) || !leaseLive(record4.lease, this.#now())) {
       throw new PixyncDurabilityError("LEASE_STALE", "Only the current live Inbox lease may apply.");
     }
-    if (record3.receipt !== void 0) {
+    if (record4.receipt !== void 0) {
       const completed2 = {
-        ...withoutLease(record3),
+        ...withoutLease(record4),
         state: "COMPLETED"
       };
       await this.#commit({
@@ -4340,16 +4466,16 @@ var PixyncDurableJournal = class _PixyncDurableJournal {
     }
     let outcome;
     try {
-      outcome = await orderKeeper.receive(record3.envelope);
+      outcome = await orderKeeper.receive(record4.envelope);
     } catch (error2) {
-      const terminal = record3.attempt >= this.#maxAttempts;
+      const terminal = record4.attempt >= this.#maxAttempts;
       const failed = terminal ? {
-        ...withoutLease(record3),
+        ...withoutLease(record4),
         state: "DLQ"
       } : {
-        ...withoutLease(record3),
+        ...withoutLease(record4),
         state: "RETRYABLE",
-        nextAttemptAt: new Date(this.#now().getTime() + this.#retryDelayMs * 2 ** Math.min(record3.attempt, 8)).toISOString()
+        nextAttemptAt: new Date(this.#now().getTime() + this.#retryDelayMs * 2 ** Math.min(record4.attempt, 8)).toISOString()
       };
       await this.#commit({
         ...this.#state,
@@ -4359,7 +4485,7 @@ var PixyncDurableJournal = class _PixyncDurableJournal {
     }
     if (outcome === "gap-held") {
       const held = {
-        ...withoutLease(record3),
+        ...withoutLease(record4),
         state: "RETRYABLE",
         nextAttemptAt: nowIso(this.#now())
       };
@@ -4371,18 +4497,18 @@ var PixyncDurableJournal = class _PixyncDurableJournal {
     }
     const receipt = {
       operationId,
-      fingerprint: record3.fingerprint,
-      projectRevision: record3.envelope.projectRevision,
-      aggregate: record3.envelope.aggregate,
-      aggregateRevision: record3.envelope.aggregateRevision
+      fingerprint: record4.fingerprint,
+      projectRevision: record4.envelope.projectRevision,
+      aggregate: record4.envelope.aggregate,
+      aggregateRevision: record4.envelope.aggregateRevision
     };
     const withReceipt = {
-      ...record3,
+      ...record4,
       receipt
     };
     await this.#commit({
       ...withReceiptState(this.#state, withReceipt),
-      revision: Math.max(this.#state.revision, record3.envelope.projectRevision)
+      revision: Math.max(this.#state.revision, record4.envelope.projectRevision)
     }, false);
     this.#inject("AFTER_APPLY_BEFORE_ACK");
     const completed = {
@@ -4448,8 +4574,8 @@ var PixyncDurableJournal = class _PixyncDurableJournal {
     for (const injector of this.#faultInjectors) injector(point2);
   }
   async #commit(next, injectResponseCrash = true) {
-    const appliedOperationFingerprints = mergeAppliedReceipts(next, next.inbox.flatMap((record3) => record3.receipt === void 0 ? [] : [
-      clone(record3.receipt)
+    const appliedOperationFingerprints = mergeAppliedReceipts(next, next.inbox.flatMap((record4) => record4.receipt === void 0 ? [] : [
+      clone(record4.receipt)
     ]));
     const compacted = compactCompletedRecords({
       ...clone(next),
@@ -4459,17 +4585,17 @@ var PixyncDurableJournal = class _PixyncDurableJournal {
       ...compacted,
       confirmedProjectRevision: compacted.revision,
       retrySchedule: [
-        ...compacted.outbox.filter((record3) => record3.state === "PENDING").map((record3) => ({
-          recordId: record3.operationId,
+        ...compacted.outbox.filter((record4) => record4.state === "PENDING").map((record4) => ({
+          recordId: record4.operationId,
           kind: "outbox",
-          attempt: record3.attempt,
-          nextAttemptAt: record3.nextAttemptAt
+          attempt: record4.attempt,
+          nextAttemptAt: record4.nextAttemptAt
         })),
-        ...compacted.inbox.filter((record3) => record3.state === "RETRYABLE").map((record3) => ({
-          recordId: record3.operationId,
+        ...compacted.inbox.filter((record4) => record4.state === "RETRYABLE").map((record4) => ({
+          recordId: record4.operationId,
           kind: "inbox",
-          attempt: record3.attempt,
-          nextAttemptAt: record3.nextAttemptAt
+          attempt: record4.attempt,
+          nextAttemptAt: record4.nextAttemptAt
         }))
       ]
     });
@@ -4485,10 +4611,10 @@ var PixyncDurableJournal = class _PixyncDurableJournal {
     this.#state = clone(staged);
   }
 };
-function withReceiptState(snapshot, record3) {
+function withReceiptState(snapshot, record4) {
   return {
     ...snapshot,
-    inbox: snapshot.inbox.map((item) => item.operationId === record3.operationId ? record3 : item)
+    inbox: snapshot.inbox.map((item) => item.operationId === record4.operationId ? record4 : item)
   };
 }
 
@@ -4501,6 +4627,21 @@ var PixyncDurableTransportError = class extends Error {
     this.code = code;
   }
 };
+function isPermanentScopePermissionError(error2) {
+  if (error2 instanceof Error && /scope_assignment_required/i.test(error2.message)) {
+    return true;
+  }
+  if (error2 !== null && typeof error2 === "object") {
+    const record4 = error2;
+    return [
+      record4.code,
+      record4.message,
+      record4.details,
+      record4.hint
+    ].some((value) => typeof value === "string" && /scope_assignment_required/i.test(value));
+  }
+  return false;
+}
 var PixyncDurableTransportCoordinator = class {
   #journal;
   #transport;
@@ -4641,7 +4782,7 @@ var PixyncDurableTransportCoordinator = class {
       ack = await this.#transport.submit(lease.record.envelope);
     } catch (error2) {
       try {
-        await this.#journal.failOutbox(lease.record.operationId, lease.lease.token, true);
+        await this.#journal.failOutbox(lease.record.operationId, lease.lease.token, !isPermanentScopePermissionError(error2));
       } catch {
       }
       throw error2;
@@ -6489,7 +6630,10 @@ var GAME_EVENT_CARD_KEYS = /* @__PURE__ */ new Set([
   "action",
   "message",
   "amount",
-  "audioTrackId"
+  "audioTrackId",
+  "itemId",
+  "recipeId",
+  "blockTypeId"
 ]);
 function isValidGameSceneRules(value) {
   if (!isRecord5(value)) return false;
@@ -6527,15 +6671,21 @@ function isValidGameEventCard(value) {
     "TOUCH",
     "TAP",
     "INTERACT",
-    "REACH_GOAL"
+    "REACH_GOAL",
+    "HAS_ITEM"
   ].includes(String(value.condition)) && validReference(value.sourceTrackId) && validReference(value.targetTrackId) && [
     "SHOW_DIALOGUE",
     "DAMAGE",
     "SHAKE_CAMERA",
     "PLAY_AUDIO",
     "COMPLETE_SCENE",
-    "SET_VARIABLE"
-  ].includes(String(value.action)) && validText(value.message) && validReference(value.audioTrackId) && (value.amount === void 0 || typeof value.amount === "number" && Number.isFinite(value.amount) && value.amount >= 0 && value.amount <= 999999);
+    "SET_VARIABLE",
+    "GIVE_ITEM",
+    "TAKE_ITEM",
+    "CRAFT_ITEM",
+    "BREAK_BLOCK",
+    "PLACE_BLOCK"
+  ].includes(String(value.action)) && validText(value.message) && validReference(value.audioTrackId) && validReference(value.itemId) && validReference(value.recipeId) && validReference(value.blockTypeId) && (value.amount === void 0 || typeof value.amount === "number" && Number.isFinite(value.amount) && value.amount >= 0 && value.amount <= 999999);
 }
 var GAME_SCENE_RULES_SCHEMA_VERSION = 1;
 var GAME_TILEMAP_DOCUMENT_SCHEMA_VERSION = 1;
@@ -6590,7 +6740,8 @@ var GAME_TILEMAP_CELL_KEYS = /* @__PURE__ */ new Set([
   "x",
   "y",
   "collision",
-  "triggerId"
+  "triggerId",
+  "blockTypeId"
 ]);
 function isValidGameTilemapDocument(value) {
   if (!isRecord5(value)) return false;
@@ -6598,7 +6749,7 @@ function isValidGameTilemapDocument(value) {
   const height = value.height;
   const tileSize = value.tileSize;
   const cells = value.cells;
-  if (Object.keys(value).some((key) => !GAME_TILEMAP_DOCUMENT_KEYS.has(key)) || value.schemaVersion !== GAME_TILEMAP_DOCUMENT_SCHEMA_VERSION || typeof value.mapId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(value.mapId) || !Number.isSafeInteger(width) || typeof width !== "number" || width < 1 || width > 256 || !Number.isSafeInteger(height) || typeof height !== "number" || height < 1 || height > 256 || !Number.isSafeInteger(tileSize) || typeof tileSize !== "number" || tileSize < 1 || tileSize > 4096 || !Array.isArray(cells) || cells.length > width * height) {
+  if (Object.keys(value).some((key) => !GAME_TILEMAP_DOCUMENT_KEYS.has(key)) || value.schemaVersion !== GAME_TILEMAP_DOCUMENT_SCHEMA_VERSION || typeof value.mapId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(value.mapId) || !Number.isSafeInteger(width) || typeof width !== "number" || width < 1 || width > Number.MAX_SAFE_INTEGER || !Number.isSafeInteger(height) || typeof height !== "number" || height < 1 || height > Number.MAX_SAFE_INTEGER || !Number.isSafeInteger(tileSize) || typeof tileSize !== "number" || tileSize < 1 || tileSize > 4096 || !Array.isArray(cells) || cells.length > width * height) {
     return false;
   }
   const seen = /* @__PURE__ */ new Set();
@@ -6608,7 +6759,10 @@ function isValidGameTilemapDocument(value) {
     const y = rawCell.y;
     const collision = rawCell.collision;
     const triggerId = rawCell.triggerId;
-    if (Object.keys(rawCell).some((key2) => !GAME_TILEMAP_CELL_KEYS.has(key2)) || !Number.isSafeInteger(x) || typeof x !== "number" || x < 0 || x >= width || !Number.isSafeInteger(y) || typeof y !== "number" || y < 0 || y >= height || collision !== "NONE" && collision !== "SOLID" || triggerId !== void 0 && (typeof triggerId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(triggerId)) || collision === "NONE" && triggerId === void 0) {
+    const blockTypeId = rawCell.blockTypeId;
+    if (Object.keys(rawCell).some((key2) => !GAME_TILEMAP_CELL_KEYS.has(key2)) || !Number.isSafeInteger(x) || typeof x !== "number" || x < 0 || x >= width || !Number.isSafeInteger(y) || typeof y !== "number" || y < 0 || y >= height || collision !== "NONE" && collision !== "SOLID" || triggerId !== void 0 && (typeof triggerId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(triggerId)) || blockTypeId !== void 0 && (typeof blockTypeId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(blockTypeId)) || // A cell with none of the three is indistinguishable from an absent
+    // (air) cell, so the sparse list rejects it to stay canonical.
+    collision === "NONE" && triggerId === void 0 && blockTypeId === void 0) {
       return false;
     }
     const key = `${x},${y}`;
@@ -6668,6 +6822,77 @@ function isValidGameAnimationBinding(value) {
     "ONCE",
     "PING_PONG"
   ].includes(String(value.loopMode)) && typeof value.flipX === "boolean" && typeof value.flipY === "boolean" && (value.mode === "LIVE" || value.mode === "PINNED") && (value.sourceAssetId === void 0 || id(value.sourceAssetId)) && (value.sourceRevisionId === void 0 || id(value.sourceRevisionId)) && (value.sourceContentHash === void 0 || typeof value.sourceContentHash === "string" && /^[a-f0-9]{64}$/u.test(value.sourceContentHash));
+}
+var GAME_ASSET_REVISION_REFERENCE_KEYS = /* @__PURE__ */ new Set([
+  "kind",
+  "assetId",
+  "revisionId",
+  "ownerId",
+  "contentHash",
+  "mode"
+]);
+function isValidAssetRevisionReference(value) {
+  if (!isRecord5(value)) return false;
+  const id = (candidate) => typeof candidate === "string" && GAME_TEMPLATE_VALUE_KEY_PATTERN.test(candidate);
+  return Object.keys(value).every((key) => GAME_ASSET_REVISION_REFERENCE_KEYS.has(key)) && (value.kind === "DRAW" || value.kind === "AUDIO") && id(value.assetId) && id(value.revisionId) && id(value.ownerId) && typeof value.contentHash === "string" && /^[a-f0-9]{64}$/u.test(value.contentHash) && (value.mode === "PINNED" || value.mode === "LIVE");
+}
+var GAME_TIMELINE_ASSET_BINDING_KEYS = /* @__PURE__ */ new Set([
+  "trackId",
+  "kind",
+  "assetId",
+  "revisionId",
+  "contentHash",
+  "mode",
+  "licenseId",
+  "rights",
+  "sourceKind"
+]);
+function isValidGameTimelineAssetBinding(value) {
+  if (!isRecord5(value)) return false;
+  const id = (candidate) => typeof candidate === "string" && GAME_TEMPLATE_VALUE_KEY_PATTERN.test(candidate);
+  const rightsValid = value.rights === void 0 || Array.isArray(value.rights) && value.rights.length > 0 && value.rights.every((right) => typeof right === "string" && right.trim().length > 0) && new Set(value.rights).size === value.rights.length;
+  return Object.keys(value).every((key) => GAME_TIMELINE_ASSET_BINDING_KEYS.has(key)) && typeof value.trackId === "string" && GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.trackId) && (value.kind === "DRAW" || value.kind === "AUDIO") && id(value.assetId) && id(value.revisionId) && typeof value.contentHash === "string" && /^[a-f0-9]{64}$/u.test(value.contentHash) && (value.mode === "PINNED" || value.mode === "LIVE") && (value.licenseId === void 0 || id(value.licenseId)) && rightsValid && (value.sourceKind === void 0 || value.sourceKind === "PROJECT" || value.sourceKind === "MARKET") && (value.sourceKind !== "MARKET" || value.mode === "PINNED" && value.licenseId !== void 0 && Array.isArray(value.rights) && value.rights.length > 0);
+}
+var GAME_ITEM_DEFINITION_KEYS = /* @__PURE__ */ new Set([
+  "itemId",
+  "label",
+  "icon",
+  "stackable",
+  "maxStack"
+]);
+function isValidGameItemDefinition(value) {
+  if (!isRecord5(value)) return false;
+  return Object.keys(value).every((key) => GAME_ITEM_DEFINITION_KEYS.has(key)) && typeof value.itemId === "string" && GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.itemId) && typeof value.label === "string" && value.label.trim().length > 0 && value.label.length <= 128 && (value.icon === void 0 || isValidAssetRevisionReference(value.icon)) && typeof value.stackable === "boolean" && typeof value.maxStack === "number" && Number.isFinite(value.maxStack) && value.maxStack >= 1 && value.maxStack <= 999999 && (value.stackable || value.maxStack === 1);
+}
+var GAME_RECIPE_INGREDIENT_KEYS = /* @__PURE__ */ new Set([
+  "itemId",
+  "amount"
+]);
+function isValidGameRecipeIngredient(value) {
+  if (!isRecord5(value)) return false;
+  return Object.keys(value).every((key) => GAME_RECIPE_INGREDIENT_KEYS.has(key)) && typeof value.itemId === "string" && GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.itemId) && typeof value.amount === "number" && Number.isFinite(value.amount) && value.amount >= 1 && value.amount <= 999999;
+}
+var GAME_RECIPE_DEFINITION_KEYS = /* @__PURE__ */ new Set([
+  "recipeId",
+  "label",
+  "ingredients",
+  "result"
+]);
+function isValidGameRecipeDefinition(value) {
+  if (!isRecord5(value)) return false;
+  return Object.keys(value).every((key) => GAME_RECIPE_DEFINITION_KEYS.has(key)) && typeof value.recipeId === "string" && GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.recipeId) && typeof value.label === "string" && value.label.trim().length > 0 && value.label.length <= 128 && Array.isArray(value.ingredients) && value.ingredients.length > 0 && value.ingredients.length <= 32 && value.ingredients.every((ingredient) => isValidGameRecipeIngredient(ingredient)) && isValidGameRecipeIngredient(value.result);
+}
+var GAME_BLOCK_TYPE_DEFINITION_KEYS = /* @__PURE__ */ new Set([
+  "blockTypeId",
+  "label",
+  "icon",
+  "breakable",
+  "dropItemId",
+  "placeable"
+]);
+function isValidGameBlockTypeDefinition(value) {
+  if (!isRecord5(value)) return false;
+  return Object.keys(value).every((key) => GAME_BLOCK_TYPE_DEFINITION_KEYS.has(key)) && typeof value.blockTypeId === "string" && GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.blockTypeId) && typeof value.label === "string" && value.label.trim().length > 0 && value.label.length <= 128 && (value.icon === void 0 || isValidAssetRevisionReference(value.icon)) && typeof value.breakable === "boolean" && (value.dropItemId === void 0 || typeof value.dropItemId === "string" && GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.dropItemId)) && typeof value.placeable === "boolean";
 }
 function diagnostic2(code, path, message) {
   return {
@@ -6874,7 +7099,10 @@ function validateGameComponentState(component, path, diagnostics) {
     "TILEMAP",
     "COLLIDER",
     "RIGIDBODY",
-    "CHARACTER_CONTROLLER"
+    "CHARACTER_CONTROLLER",
+    "STATUS",
+    "SKILL",
+    "BRAIN"
   ].includes(component.type)) {
     diagnostics.push(diagnostic2("INVALID_PROJECT", `${path}.type`, `Unknown Game editor component state: ${component.type}`));
     return;
@@ -6938,6 +7166,39 @@ function validateGameComponentState(component, path, diagnostics) {
   }
   if (component.type === "CHARACTER_CONTROLLER" && (typeof component.moveSpeed !== "number" || !Number.isFinite(component.moveSpeed) || component.moveSpeed <= 0 || typeof component.stepHeight !== "number" || !Number.isFinite(component.stepHeight) || component.stepHeight < 0 || typeof component.fixedStep !== "number" || !Number.isSafeInteger(component.fixedStep) || component.fixedStep < 1 || typeof component.enabled !== "boolean")) {
     diagnostics.push(diagnostic2("INVALID_PROJECT", path, "Game editor Character Controller state is invalid."));
+  }
+  if (component.type === "STATUS" && (![
+    "hp",
+    "maxHp",
+    "stamina",
+    "maxStamina",
+    "mp",
+    "maxMp",
+    "attack",
+    "defense",
+    "level"
+  ].every((key) => typeof component[key] === "number" && Number.isFinite(component[key])) || typeof component.enabled !== "boolean")) {
+    diagnostics.push(diagnostic2("INVALID_PROJECT", path, "Game editor Status state is invalid."));
+  }
+  if (component.type === "SKILL" && (![
+    "ATTACK",
+    "SHOOT",
+    "MAGIC",
+    "DASH_ATTACK",
+    "HEAL",
+    "SHIELD"
+  ].includes(component.kind) || typeof component.power !== "number" || !Number.isFinite(component.power) || typeof component.cooldown !== "number" || !Number.isFinite(component.cooldown) || component.cooldown < 0 || typeof component.enabled !== "boolean")) {
+    diagnostics.push(diagnostic2("INVALID_PROJECT", path, "Game editor Skill state is invalid."));
+  }
+  if (component.type === "BRAIN" && (![
+    "PLAYER_CONTROL",
+    "AI",
+    "PATROL",
+    "PURSUE",
+    "AVOID",
+    "WAIT"
+  ].includes(component.mode) || typeof component.speed !== "number" || !Number.isFinite(component.speed) || component.speed < 0 || typeof component.range !== "number" || !Number.isFinite(component.range) || component.range < 0 || typeof component.enabled !== "boolean")) {
+    diagnostics.push(diagnostic2("INVALID_PROJECT", path, "Game editor Brain state is invalid."));
   }
 }
 function validateDependencyCycles(dependencies, diagnostics) {
@@ -7125,6 +7386,14 @@ function validateGameProject(value, caller) {
         }
       }
     }
+    if (timeline.assetBindings !== void 0) {
+      const trackIds = new Set(Array.isArray(timeline.tracks) ? timeline.tracks.map((track) => track.trackId) : []);
+      if (!Array.isArray(timeline.assetBindings) || timeline.assetBindings.some((binding) => !isValidGameTimelineAssetBinding(binding) || !trackIds.has(binding.trackId))) {
+        diagnostics.push(diagnostic2("INVALID_PROJECT", "editorTimeline.assetBindings", "Editor asset binding metadata is invalid or targets a missing track."));
+      } else {
+        diagnostics.push(...duplicateDiagnostics(timeline.assetBindings.map((binding) => `${binding.trackId}:${binding.kind}`), "editorTimeline.assetBindings"));
+      }
+    }
     if (timeline.sceneRules !== void 0 && !isValidGameSceneRules(timeline.sceneRules)) {
       diagnostics.push(diagnostic2("INVALID_PROJECT", "editorTimeline.sceneRules", "Scene-wide Game rules are invalid."));
     }
@@ -7143,6 +7412,9 @@ function validateGameProject(value, caller) {
       } else {
         diagnostics.push(...duplicateDiagnostics(timeline.eventCards.map((card) => card.eventId), "editorTimeline.eventCards.eventId"));
         const trackIds = new Set(Array.isArray(timeline.tracks) ? timeline.tracks.map((track) => track.trackId) : []);
+        const itemIds = new Set(Array.isArray(timeline.items) ? timeline.items.map((item) => item.itemId) : []);
+        const recipeIds = new Set(Array.isArray(timeline.recipes) ? timeline.recipes.map((recipe) => recipe.recipeId) : []);
+        const blockTypeIds = new Set(Array.isArray(timeline.blockTypes) ? timeline.blockTypes.map((blockType) => blockType.blockTypeId) : []);
         for (const [index, card] of timeline.eventCards.entries()) {
           for (const [key, trackId] of [
             [
@@ -7161,6 +7433,55 @@ function validateGameProject(value, caller) {
             if (trackId !== void 0 && !trackIds.has(trackId)) {
               diagnostics.push(diagnostic2("MISSING_REFERENCE", `editorTimeline.eventCards[${index}].${key}`, "Game event card track reference is missing."));
             }
+          }
+          if (card.itemId !== void 0 && !itemIds.has(card.itemId)) {
+            diagnostics.push(diagnostic2("MISSING_REFERENCE", `editorTimeline.eventCards[${index}].itemId`, "Game event card item reference is missing."));
+          }
+          if (card.recipeId !== void 0 && !recipeIds.has(card.recipeId)) {
+            diagnostics.push(diagnostic2("MISSING_REFERENCE", `editorTimeline.eventCards[${index}].recipeId`, "Game event card recipe reference is missing."));
+          }
+          if (card.blockTypeId !== void 0 && !blockTypeIds.has(card.blockTypeId)) {
+            diagnostics.push(diagnostic2("MISSING_REFERENCE", `editorTimeline.eventCards[${index}].blockTypeId`, "Game event card block type reference is missing."));
+          }
+        }
+      }
+    }
+    if (timeline.items !== void 0) {
+      if (!Array.isArray(timeline.items) || timeline.items.some((item) => !isValidGameItemDefinition(item))) {
+        diagnostics.push(diagnostic2("INVALID_PROJECT", "editorTimeline.items", "Game item definitions are invalid."));
+      } else {
+        diagnostics.push(...duplicateDiagnostics(timeline.items.map((item) => item.itemId), "editorTimeline.items.itemId"));
+      }
+    }
+    if (timeline.recipes !== void 0) {
+      if (!Array.isArray(timeline.recipes) || timeline.recipes.some((recipe) => !isValidGameRecipeDefinition(recipe))) {
+        diagnostics.push(diagnostic2("INVALID_PROJECT", "editorTimeline.recipes", "Game recipe definitions are invalid."));
+      } else {
+        diagnostics.push(...duplicateDiagnostics(timeline.recipes.map((recipe) => recipe.recipeId), "editorTimeline.recipes.recipeId"));
+        const knownItemIds = new Set(Array.isArray(timeline.items) ? timeline.items.map((item) => item.itemId) : []);
+        for (const [index, recipe] of timeline.recipes.entries()) {
+          const referenced = [
+            ...recipe.ingredients.map((ingredient) => ingredient.itemId),
+            recipe.result.itemId
+          ];
+          for (const itemId of referenced) {
+            if (!knownItemIds.has(itemId)) {
+              diagnostics.push(diagnostic2("MISSING_REFERENCE", `editorTimeline.recipes[${index}]`, "Game recipe references an unknown item."));
+              break;
+            }
+          }
+        }
+      }
+    }
+    if (timeline.blockTypes !== void 0) {
+      if (!Array.isArray(timeline.blockTypes) || timeline.blockTypes.some((blockType) => !isValidGameBlockTypeDefinition(blockType))) {
+        diagnostics.push(diagnostic2("INVALID_PROJECT", "editorTimeline.blockTypes", "Game block type definitions are invalid."));
+      } else {
+        diagnostics.push(...duplicateDiagnostics(timeline.blockTypes.map((blockType) => blockType.blockTypeId), "editorTimeline.blockTypes.blockTypeId"));
+        const knownItemIdsForBlocks = new Set(Array.isArray(timeline.items) ? timeline.items.map((item) => item.itemId) : []);
+        for (const [index, blockType] of timeline.blockTypes.entries()) {
+          if (blockType.dropItemId !== void 0 && !knownItemIdsForBlocks.has(blockType.dropItemId)) {
+            diagnostics.push(diagnostic2("MISSING_REFERENCE", `editorTimeline.blockTypes[${index}].dropItemId`, "Game block type drop item reference is missing."));
           }
         }
       }
@@ -7251,6 +7572,16 @@ function canonicalProjectPayload(project) {
             ...track.activeFrames
           ].sort((left, right) => left - right)
         })),
+        ...project.editorTimeline.assetBindings === void 0 ? {} : {
+          assetBindings: sortById(project.editorTimeline.assetBindings, "trackId").map((binding) => ({
+            ...binding,
+            ...Array.isArray(binding.rights) ? {
+              rights: [
+                ...binding.rights
+              ].sort()
+            } : {}
+          }))
+        },
         ...project.editorTimeline.creationMode === void 0 ? {} : {
           creationMode: project.editorTimeline.creationMode
         },
@@ -7270,6 +7601,20 @@ function canonicalProjectPayload(project) {
               ...binding.frameIds
             ]
           }))
+        },
+        ...project.editorTimeline.items === void 0 ? {} : {
+          items: sortById(project.editorTimeline.items, "itemId")
+        },
+        ...project.editorTimeline.recipes === void 0 ? {} : {
+          recipes: sortById(project.editorTimeline.recipes, "recipeId").map((recipe) => ({
+            ...recipe,
+            ingredients: [
+              ...recipe.ingredients
+            ]
+          }))
+        },
+        ...project.editorTimeline.blockTypes === void 0 ? {} : {
+          blockTypes: sortById(project.editorTimeline.blockTypes, "blockTypeId")
         }
       }
     }
@@ -7475,6 +7820,7 @@ function validateTransform(transform2) {
   if (transform2.outOfBoundsPolicy === "EXPAND_CANVAS_CANDIDATE") diagnostics.push(error("TRANSFORM_CANVAS_EXPANSION_UNSUPPORTED", "Canvas expansion is a future candidate and cannot mutate this Project.", "transform.outOfBoundsPolicy"));
   if (transform2.operation === "SCALE_INTEGER" && (!isInteger(transform2.factor) || transform2.factor < 1 || transform2.factor > 8)) diagnostics.push(error("TRANSFORM_SCALE_INVALID", "Integer scale factor must be between 1 and 8.", "transform.factor"));
   if (transform2.operation === "SCALE_NEAREST" && (!Number.isFinite(transform2.factor) || transform2.factor < 0.125 || transform2.factor > 8)) diagnostics.push(error("TRANSFORM_SCALE_INVALID", "Nearest-neighbor scale factor must be between 0.125 and 8.", "transform.factor"));
+  if (transform2.operation === "ROTATE_NEAREST" && (!Number.isFinite(transform2.angleDeg) || Math.abs(transform2.angleDeg ?? 0) > 36e3)) diagnostics.push(error("TRANSFORM_ANGLE_INVALID", "Nearest-neighbor rotation angle must be finite and within \xB136000 degrees.", "transform.angleDeg"));
   return diagnostics;
 }
 function validateClipboard(clipboard2, asset) {
@@ -7531,9 +7877,75 @@ function createRectangleSelectionSnapshot(state2, bounds, selectionId = `selecti
     pixels
   };
 }
+function rotatedRegion(bounds, angleDeg, dx = 0, dy = 0) {
+  const normalizedAngle = (angleDeg % 360 + 360) % 360;
+  const radians = normalizedAngle * Math.PI / 180;
+  const cos = Math.abs(Math.cos(radians)) < 1e-10 ? 0 : Math.cos(radians);
+  const sin = Math.abs(Math.sin(radians)) < 1e-10 ? 0 : Math.sin(radians);
+  const centerX = bounds.x + (bounds.width - 1) / 2;
+  const centerY = bounds.y + (bounds.height - 1) / 2;
+  const corners = [
+    {
+      x: bounds.x,
+      y: bounds.y
+    },
+    {
+      x: bounds.x + bounds.width - 1,
+      y: bounds.y
+    },
+    {
+      x: bounds.x,
+      y: bounds.y + bounds.height - 1
+    },
+    {
+      x: bounds.x + bounds.width - 1,
+      y: bounds.y + bounds.height - 1
+    }
+  ].map((point2) => ({
+    x: centerX + (point2.x - centerX) * cos - (point2.y - centerY) * sin,
+    y: centerY + (point2.x - centerX) * sin + (point2.y - centerY) * cos
+  }));
+  const minX = Math.floor(Math.min(...corners.map((point2) => point2.x)) + 1e-9);
+  const minY = Math.floor(Math.min(...corners.map((point2) => point2.y)) + 1e-9);
+  const maxX = Math.ceil(Math.max(...corners.map((point2) => point2.x)) - 1e-9);
+  const maxY = Math.ceil(Math.max(...corners.map((point2) => point2.y)) - 1e-9);
+  return {
+    x: minX + dx,
+    y: minY + dy,
+    width: Math.max(1, maxX - minX + 1),
+    height: Math.max(1, maxY - minY + 1)
+  };
+}
 function transformedPixels(snapshot, transform2) {
   const bounds = boundsFromRegions(snapshot.mask.regions);
   const pixels = [];
+  if (transform2.operation === "ROTATE_NEAREST") {
+    const angleDeg = transform2.angleDeg ?? 0;
+    const radians = (angleDeg % 360 + 360) % 360 * Math.PI / 180;
+    const cos = Math.abs(Math.cos(radians)) < 1e-10 ? 0 : Math.cos(radians);
+    const sin = Math.abs(Math.sin(radians)) < 1e-10 ? 0 : Math.sin(radians);
+    const centerX = bounds.x + (bounds.width - 1) / 2;
+    const centerY = bounds.y + (bounds.height - 1) / 2;
+    const output = rotatedRegion(bounds, angleDeg);
+    const sourceByPoint = /* @__PURE__ */ new Map();
+    for (const pixel of snapshot.pixels) sourceByPoint.set(`${pixel.x}:${pixel.y}`, pixel);
+    for (let targetY = output.y; targetY < output.y + output.height; targetY += 1) {
+      for (let targetX = output.x; targetX < output.x + output.width; targetX += 1) {
+        const targetRelX = targetX - centerX;
+        const targetRelY = targetY - centerY;
+        const sourceX = Math.round(centerX + targetRelX * cos + targetRelY * sin);
+        const sourceY = Math.round(centerY - targetRelX * sin + targetRelY * cos);
+        const source = sourceByPoint.get(`${sourceX}:${sourceY}`);
+        if (source === void 0) continue;
+        pixels.push({
+          x: targetX + transform2.dx,
+          y: targetY + transform2.dy,
+          colorIndex: source.colorIndex
+        });
+      }
+    }
+    return pixels;
+  }
   if (transform2.operation === "SCALE_INTEGER" || transform2.operation === "SCALE_NEAREST") {
     const factor = transform2.factor;
     const outputWidth = Math.max(1, Math.round(bounds.width * factor));
@@ -7600,6 +8012,7 @@ function estimatedTransformBounds(snapshot, transform2) {
     width: bounds.height,
     height: bounds.width
   };
+  if (transform2.operation === "ROTATE_NEAREST") return rotatedRegion(bounds, transform2.angleDeg ?? 0, transform2.dx, transform2.dy);
   if (transform2.operation === "SCALE_INTEGER" || transform2.operation === "SCALE_NEAREST") {
     return {
       ...bounds,
@@ -7610,6 +8023,10 @@ function estimatedTransformBounds(snapshot, transform2) {
   return bounds;
 }
 function destinationBounds(snapshot, transform2) {
+  if (transform2.operation === "ROTATE_NEAREST") {
+    const bounds = boundsFromRegions(snapshot.mask.regions);
+    return rotatedRegion(bounds, transform2.angleDeg ?? 0, transform2.dx, transform2.dy);
+  }
   const pixels = transformedPixels(snapshot, transform2);
   return regionForPoints(pixels) ?? boundsFromRegions(snapshot.mask.regions);
 }
@@ -7782,7 +8199,8 @@ function createSelectionTransformWirePayload(snapshot, transform2, destinationCo
     transform: transform2,
     sourceCount: snapshot.pixels.length,
     destinationCount,
-    outOfBoundsClipped
+    outOfBoundsClipped,
+    transparentDestinationPolicy: "PRESERVE_DESTINATION"
   };
 }
 async function buildResult(state2, commandId, operationType, operationPayload2, asset, dirtyTiles, dirtyRegions, copiedBytes, cowSplitCount, noOp = false, identity = DEFAULT_SELECTION_OPERATION_IDENTITY) {
@@ -7871,7 +8289,10 @@ function applyPixelMutations(state2, assetId, sourcePixels, destinationPixels, c
     if (mutation.cowSplit) cowSplitCount += 1;
   };
   if (clearSource) for (const pixel of sourcePixels) mutate(pixel, 0);
-  for (const pixel of destinationPixels) mutate(pixel, pixel.colorIndex);
+  for (const pixel of destinationPixels) {
+    if (pixel.colorIndex === 0) continue;
+    mutate(pixel, pixel.colorIndex);
+  }
   const uniqueDirtyPoints = new Map(dirtyPoints.map((point2) => [
     `${point2.x}:${point2.y}`,
     point2
@@ -8057,6 +8478,9 @@ async function applyCompactSelectionTransform(state2, command) {
   }
   if (typeof payload.outOfBoundsClipped !== "boolean") {
     diagnostics.push(error("TRANSFORM_METADATA_INVALID", "Transform clipping metadata must be boolean.", "outOfBoundsClipped"));
+  }
+  if (payload.transparentDestinationPolicy !== void 0 && payload.transparentDestinationPolicy !== "PRESERVE_DESTINATION") {
+    diagnostics.push(error("TRANSFORM_TRANSPARENCY_POLICY_UNSUPPORTED", "Transform payload must preserve existing artwork under transparent destination cells.", "transparentDestinationPolicy"));
   }
   const scope = payload.scope;
   const validScope = scope !== null && typeof scope === "object" && !Array.isArray(scope);
@@ -9244,6 +9668,8 @@ function isCompactShapeTool(tool) {
 var DEFAULT_TOOL_OPTIONS = {
   brushSize: 1,
   brushShape: "square",
+  brushAngle: 0,
+  brushAlgorithm: "regular",
   pattern: "solid",
   similarity: 0,
   selectionMode: "similar"
@@ -9254,31 +9680,26 @@ function colorTolerancePercentToDistance(percent) {
   return Math.round(safePercent / 100 * RGB_COLOR_DISTANCE_MAX);
 }
 function normalizeToolOptions(options = {}) {
-  const requestedBrushSize = options.brushSize;
   const requestedSimilarity = options.similarity;
   const requestedSelectionMode = options.selectionMode;
-  const brushSize2 = Number.isSafeInteger(requestedBrushSize) ? Math.max(1, Math.min(32, requestedBrushSize)) : DEFAULT_TOOL_OPTIONS.brushSize;
+  const brush = normalizeBrushDescriptor(options);
   const similarity2 = Number.isFinite(requestedSimilarity) ? Math.max(0, Math.min(255, requestedSimilarity)) : DEFAULT_TOOL_OPTIONS.similarity;
-  const brushShape2 = options.brushShape === "circle" ? "circle" : "square";
-  const pattern = options.pattern === "checker" || options.pattern === "dots" || options.pattern === "bayer-2x2" ? options.pattern : "solid";
   const selectionMode = requestedSelectionMode === "exact" || requestedSelectionMode === "magic" || requestedSelectionMode === "opaque" ? requestedSelectionMode : "similar";
   return {
-    brushSize: brushSize2,
-    brushShape: brushShape2,
-    pattern,
+    ...brush,
     similarity: similarity2,
     selectionMode
   };
 }
-function clampPoint2(point2, bounds) {
+function clampPoint3(point2, bounds) {
   return {
     x: Math.max(0, Math.min(bounds.width - 1, Math.round(point2.x))),
     y: Math.max(0, Math.min(bounds.height - 1, Math.round(point2.y)))
   };
 }
 function normalizeBounds2(from, to, bounds) {
-  const a = clampPoint2(from, bounds);
-  const b = clampPoint2(to, bounds);
+  const a = clampPoint3(from, bounds);
+  const b = clampPoint3(to, bounds);
   const x = Math.min(a.x, b.x);
   const y = Math.min(a.y, b.y);
   return {
@@ -9290,8 +9711,8 @@ function normalizeBounds2(from, to, bounds) {
 }
 function snapSelectionBoundsToGrid(from, to, bounds, gridSize = 16) {
   const safeGridSize = Number.isSafeInteger(gridSize) ? Math.max(1, gridSize) : 16;
-  const a = clampPoint2(from, bounds);
-  const b = clampPoint2(to, bounds);
+  const a = clampPoint3(from, bounds);
+  const b = clampPoint3(to, bounds);
   const cellX = Math.min(Math.floor(a.x / safeGridSize), Math.floor(b.x / safeGridSize));
   const cellY = Math.min(Math.floor(a.y / safeGridSize), Math.floor(b.y / safeGridSize));
   const endCellX = Math.max(Math.floor(a.x / safeGridSize), Math.floor(b.x / safeGridSize));
@@ -9307,60 +9728,20 @@ function snapSelectionBoundsToGrid(from, to, bounds, gridSize = 16) {
     height: Math.max(1, maxY - y)
   };
 }
-function pointKey2(point2) {
-  return `${point2.x}:${point2.y}`;
-}
-function sortedUnique2(points, bounds) {
-  const unique = /* @__PURE__ */ new Map();
-  for (const point2 of points) {
-    const clamped = clampPoint2(point2, bounds);
-    unique.set(pointKey2(clamped), clamped);
-  }
-  return [
-    ...unique.values()
-  ].sort((left, right) => left.y - right.y || left.x - right.x);
-}
-function patternVisible2(x, y, pattern) {
-  if (pattern === "checker") return (x + y) % 2 === 0;
-  if (pattern === "dots") return x % 2 === 0 && y % 2 === 0;
-  if (pattern === "bayer-2x2") return (x & 1) + (y & 1) * 2 !== 3;
-  return true;
-}
-function stamp2(center, options, bounds) {
-  const size = options.brushSize;
-  const start = -Math.floor(size / 2);
-  const centerOffset = (size - 1) / 2;
-  const radius = Math.max(0.5, size / 2);
-  const points = [];
-  for (let row = 0; row < size; row += 1) {
-    for (let column = 0; column < size; column += 1) {
-      const x = start + column;
-      const y = start + row;
-      if (options.brushShape === "circle" && (column - centerOffset) ** 2 + (row - centerOffset) ** 2 > radius ** 2) continue;
-      if (!patternVisible2(center.x + x, center.y + y, options.pattern)) {
-        continue;
-      }
-      points.push({
-        x: center.x + x,
-        y: center.y + y
-      });
-    }
-  }
-  return points.filter((point2) => point2.x >= 0 && point2.y >= 0 && point2.x < bounds.width && point2.y < bounds.height);
-}
 function stampBrush2(points, options, bounds) {
   const safe = normalizeToolOptions(options);
-  const stamped = points.flatMap((point2) => stamp2(clampPoint2(point2, bounds), safe, bounds));
-  return sortedUnique2(stamped, bounds);
+  return stampBrushPoints(points, safe, bounds);
 }
 function shapePixels2(tool, from, to, bounds) {
   return isCompactShapeTool(tool) ? shapePixelsInBounds(tool, from, to, bounds) : [];
 }
 function createWriteSet(tool, from, to, colorIndex, options, bounds) {
   const safe = normalizeToolOptions(options);
-  const base = tool === "pen" || tool === "eraser" ? stampBrush2(interpolatePixelLine2(clampPoint2(from, bounds), clampPoint2(to, bounds)), safe, bounds) : isCompactShapeTool(tool) ? createShapeWriteSet(tool, from, to, colorIndex, {
+  const base = tool === "pen" || tool === "eraser" ? stampBrush2(interpolatePixelLine(clampPoint3(from, bounds), clampPoint3(to, bounds), safe.brushAlgorithm), safe, bounds) : isCompactShapeTool(tool) ? createShapeWriteSet(tool, from, to, colorIndex, {
     brushSize: safe.brushSize,
     brushShape: safe.brushShape,
+    brushAngle: safe.brushAngle,
+    brushAlgorithm: safe.brushAlgorithm,
     pattern: safe.pattern
   }, bounds) : stampBrush2(shapePixels2(tool, from, to, bounds), safe, bounds);
   return base.map((point2) => ({
@@ -9389,14 +9770,15 @@ function createToolPreviewWriteSet(tool, point2, colorIndex, options, bounds) {
 }
 function createPathWriteSet(tool, points, colorIndex, options, bounds) {
   if (points.length === 0) return [];
-  const path = interpolatePixelPath(points.map((point2) => clampPoint2(point2, bounds)));
-  return stampBrush2(path, normalizeToolOptions(options), bounds).map((point2) => ({
+  const safe = normalizeToolOptions(options);
+  const path = interpolatePixelPath(points.map((point2) => clampPoint3(point2, bounds)), safe.brushAlgorithm);
+  return stampBrush2(path, safe, bounds).map((point2) => ({
     ...point2,
     colorIndex: tool === "eraser" ? 0 : colorIndex
   }));
 }
 function createFillPreviewWriteSet(reader, seed, colorIndex, maxPixels = Math.min(1048576, reader.width * reader.height), isAllowed) {
-  const start = clampPoint2(seed, reader);
+  const start = clampPoint3(seed, reader);
   const targetColor = reader.getPixel(start.x, start.y);
   if (targetColor === colorIndex) return [];
   const queue = [
@@ -9550,7 +9932,7 @@ function selectByOpaque(reader, palette) {
   };
 }
 function selectByContiguousColor(reader, seed, mode, palette, threshold = 0, maxPixels = Math.min(1048576, reader.width * reader.height)) {
-  const start = clampPoint2(seed, reader);
+  const start = clampPoint3(seed, reader);
   const targetIndex = reader.getPixel(start.x, start.y);
   const target = palette[targetIndex] ?? 0;
   const queue = [
@@ -9684,6 +10066,361 @@ function boundsForPixels(pixels) {
     width: maxX - minX + 1,
     height: maxY - minY + 1
   };
+}
+
+// src/draw2-color-tools.ts
+function decodeArgbColor(value) {
+  const safe = Number.isSafeInteger(value) ? value >>> 0 : 0;
+  return {
+    alpha: safe >>> 24 & 255,
+    red: safe >>> 16 & 255,
+    green: safe >>> 8 & 255,
+    blue: safe & 255
+  };
+}
+function encodeArgbColor(channels) {
+  const clamp = (value) => Math.max(0, Math.min(255, Math.round(Number.isFinite(value) ? value : 0)));
+  return (clamp(channels.alpha) << 24 | clamp(channels.red) << 16 | clamp(channels.green) << 8 | clamp(channels.blue)) >>> 0;
+}
+function rgbToHsv(color) {
+  const red = color.red / 255;
+  const green = color.green / 255;
+  const blue = color.blue / 255;
+  const maximum = Math.max(red, green, blue);
+  const minimum = Math.min(red, green, blue);
+  const delta = maximum - minimum;
+  let hue = 0;
+  if (delta > 0) {
+    if (maximum === red) hue = 60 * ((green - blue) / delta % 6);
+    else if (maximum === green) hue = 60 * ((blue - red) / delta + 2);
+    else hue = 60 * ((red - green) / delta + 4);
+  }
+  if (hue < 0) hue += 360;
+  return {
+    h: hue,
+    s: maximum === 0 ? 0 : delta / maximum,
+    v: maximum
+  };
+}
+function hsvToRgb(color) {
+  const hue = (color.h % 360 + 360) % 360;
+  const saturation = Math.max(0, Math.min(1, color.s));
+  const value = Math.max(0, Math.min(1, color.v));
+  const chroma = value * saturation;
+  const sector = hue / 60;
+  const second = chroma * (1 - Math.abs(sector % 2 - 1));
+  const match = value - chroma;
+  let red = 0;
+  let green = 0;
+  let blue = 0;
+  if (sector < 1) [red, green, blue] = [
+    chroma,
+    second,
+    0
+  ];
+  else if (sector < 2) [red, green, blue] = [
+    second,
+    chroma,
+    0
+  ];
+  else if (sector < 3) [red, green, blue] = [
+    0,
+    chroma,
+    second
+  ];
+  else if (sector < 4) [red, green, blue] = [
+    0,
+    second,
+    chroma
+  ];
+  else if (sector < 5) [red, green, blue] = [
+    second,
+    0,
+    chroma
+  ];
+  else [red, green, blue] = [
+    chroma,
+    0,
+    second
+  ];
+  return {
+    red: (red + match) * 255,
+    green: (green + match) * 255,
+    blue: (blue + match) * 255
+  };
+}
+function interpolateHue(start, end, progress, mode) {
+  let delta = ((end - start) % 360 + 360) % 360;
+  if (mode === "SHORT" && delta > 180) delta -= 360;
+  if (mode === "LONG" && delta < 180) delta -= 360;
+  if (mode === "LONG" && Math.abs(delta) === 180) delta = 180;
+  return start + delta * progress;
+}
+function createArgbColorRamp(start, end, steps, space = "HSV", hueMode = "SHORT") {
+  const safeSteps = Math.max(2, Math.min(32, Math.round(Number.isFinite(steps) ? steps : 2)));
+  const from = decodeArgbColor(start);
+  const to = decodeArgbColor(end);
+  const fromHsv = rgbToHsv(from);
+  const toHsv = rgbToHsv(to);
+  const ramp = [];
+  for (let index = 0; index < safeSteps; index += 1) {
+    const progress = index / (safeSteps - 1);
+    if (space === "RGB") {
+      ramp.push(encodeArgbColor({
+        alpha: from.alpha + (to.alpha - from.alpha) * progress,
+        red: from.red + (to.red - from.red) * progress,
+        green: from.green + (to.green - from.green) * progress,
+        blue: from.blue + (to.blue - from.blue) * progress
+      }));
+      continue;
+    }
+    const rgb = hsvToRgb({
+      h: interpolateHue(fromHsv.h, toHsv.h, progress, hueMode),
+      s: fromHsv.s + (toHsv.s - fromHsv.s) * progress,
+      v: fromHsv.v + (toHsv.v - fromHsv.v) * progress
+    });
+    ramp.push(encodeArgbColor({
+      alpha: from.alpha + (to.alpha - from.alpha) * progress,
+      ...rgb
+    }));
+  }
+  return ramp;
+}
+
+// src/draw2-outline-tools.ts
+function isOpaque(color) {
+  return (color >>> 24 & 255) > 0;
+}
+function pointKey3(x, y) {
+  return `${x}:${y}`;
+}
+function withinRadius(dx, dy, thickness, connectivity) {
+  return connectivity === 4 ? Math.abs(dx) + Math.abs(dy) <= thickness : Math.max(Math.abs(dx), Math.abs(dy)) <= thickness;
+}
+function createOutlineWriteSet(reader, options) {
+  const thickness = Math.max(1, Math.min(16, Math.round(options.thickness)));
+  if (!Number.isSafeInteger(options.colorIndex) || options.colorIndex <= 0 || options.colorIndex >= reader.palette.length || reader.width < 1 || reader.height < 1) return [];
+  const writes = [];
+  for (let y = 0; y < reader.height; y += 1) {
+    for (let x = 0; x < reader.width; x += 1) {
+      if (options.allowedPixels !== void 0 && !options.allowedPixels.has(pointKey3(x, y))) continue;
+      const opaque = isOpaque(reader.palette[reader.getPixel(x, y)] ?? 0);
+      const shouldWrite = options.placement === "OUTSIDE" ? !opaque : opaque;
+      if (!shouldWrite) continue;
+      let boundary = false;
+      for (let dy = -thickness; dy <= thickness && !boundary; dy += 1) {
+        for (let dx = -thickness; dx <= thickness; dx += 1) {
+          if (dx === 0 && dy === 0 || !withinRadius(dx, dy, thickness, options.connectivity)) continue;
+          const neighborX = x + dx;
+          const neighborY = y + dy;
+          const neighborOpaque = neighborX >= 0 && neighborY >= 0 && neighborX < reader.width && neighborY < reader.height ? isOpaque(reader.palette[reader.getPixel(neighborX, neighborY)] ?? 0) : false;
+          if (options.placement === "OUTSIDE" ? neighborOpaque : !neighborOpaque) {
+            boundary = true;
+            break;
+          }
+        }
+      }
+      if (boundary && reader.getPixel(x, y) !== options.colorIndex) {
+        writes.push({
+          x,
+          y,
+          colorIndex: options.colorIndex
+        });
+      }
+    }
+  }
+  return writes;
+}
+
+// src/draw2-text-tools.ts
+function alphaAt(mask, x, y) {
+  return mask.alpha[y * mask.width + x] ?? 0;
+}
+function createTextMaskWriteSet(fillMask, strokeMask, options) {
+  if (fillMask.width < 1 || fillMask.height < 1) return [];
+  const threshold = Math.max(1, Math.min(255, Math.round(options.threshold ?? 160)));
+  if (!Number.isSafeInteger(options.fillColorIndex) || options.fillColorIndex <= 0) return [];
+  const writes = /* @__PURE__ */ new Map();
+  if (strokeMask !== void 0 && Number.isSafeInteger(options.strokeColorIndex) && options.strokeColorIndex > 0) {
+    for (let y = 0; y < strokeMask.height; y += 1) {
+      for (let x = 0; x < strokeMask.width; x += 1) {
+        if (alphaAt(strokeMask, x, y) < threshold) continue;
+        writes.set(`${x}:${y}`, {
+          x,
+          y,
+          colorIndex: options.strokeColorIndex
+        });
+      }
+    }
+  }
+  for (let y = 0; y < fillMask.height; y += 1) {
+    for (let x = 0; x < fillMask.width; x += 1) {
+      if (alphaAt(fillMask, x, y) < threshold) continue;
+      writes.set(`${x}:${y}`, {
+        x,
+        y,
+        colorIndex: options.fillColorIndex
+      });
+    }
+  }
+  return [
+    ...writes.values()
+  ].sort((left, right) => left.y - right.y || left.x - right.x);
+}
+
+// src/game/game-350/market-asset-binding.ts
+var HASH = /^[a-f0-9]{64}$/u;
+var NON_EMPTY = /\S/u;
+function diagnostic4(code, path, message) {
+  return {
+    code,
+    path,
+    message
+  };
+}
+function success(value) {
+  return {
+    ok: true,
+    value,
+    diagnostics: []
+  };
+}
+function failure(...diagnostics) {
+  return {
+    ok: false,
+    diagnostics
+  };
+}
+function text(value) {
+  return typeof value === "string" && NON_EMPTY.test(value.trim());
+}
+function record2(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function hasForbiddenPayload(value) {
+  if (!record2(value)) return false;
+  return [
+    "bytes",
+    "blob",
+    "url",
+    "downloadUrl",
+    "payload",
+    "content"
+  ].some((key) => key in value);
+}
+function validUniqueStrings(value) {
+  return Array.isArray(value) && value.length > 0 && value.every((item) => text(item)) && new Set(value).size === value.length;
+}
+function validCatalog(value) {
+  return text(value.id) && text(value.title) && text(value.kind) && validUniqueStrings(value.formats) && validUniqueStrings(value.rights) && record2(value.price) && Number.isSafeInteger(value.price.amountMinor) && value.price.amountMinor >= 0;
+}
+function validAccess(value) {
+  return value === "FREE" || value === "PURCHASED" || value === "AVAILABLE" || value === "AUTH_REQUIRED" || value === "UNAVAILABLE";
+}
+function entitled(status2) {
+  return status2 === "PAID" || status2 === "GRANTED";
+}
+function validateInput(input) {
+  const errors = [];
+  if (!record2(input)) return [
+    diagnostic4("INVALID_METADATA", "input", "Binding input must be an object.")
+  ];
+  const item = input;
+  if (!record2(item.catalog) || !record2(item.source) || !record2(item.license) || !record2(item.delivery)) {
+    return [
+      diagnostic4("INVALID_METADATA", "input", "Catalog, source, license, and delivery metadata are required.")
+    ];
+  }
+  if (hasForbiddenPayload(item.source) || hasForbiddenPayload(item.delivery)) {
+    errors.push(diagnostic4("INVALID_METADATA", "source", "Raw bytes and URLs cannot be promoted to a Game source."));
+  }
+  if (!validCatalog(item.catalog)) errors.push(diagnostic4("INVALID_CATALOG", "catalog", "Catalog metadata is invalid."));
+  if (!validAccess(item.access)) errors.push(diagnostic4("INVALID_ACCESS", "access", "Market access is invalid."));
+  if (!validUniqueStrings(item.supportedFormats)) errors.push(diagnostic4("UNSUPPORTED_FORMAT", "supportedFormats", "Supported formats are required."));
+  if (!text(item.source.assetId) || !text(item.source.revisionId) || !HASH.test(item.source.contentHash) || !text(item.source.label) || !text(item.source.format)) {
+    errors.push(diagnostic4("INVALID_METADATA", "source", "Only complete, hashed source metadata is accepted."));
+  }
+  if (!text(item.license.licenseId) || !validUniqueStrings(item.license.rights) || item.license.status !== "ACTIVE" || item.license.inGameUse !== true) {
+    errors.push(diagnostic4("INVALID_LICENSE", "license", "An active in-game license and rights are required."));
+  }
+  if (item.source.packageHash !== void 0 && !HASH.test(item.source.packageHash)) {
+    errors.push(diagnostic4("INVALID_METADATA", "source.packageHash", "Source package bytes hash is invalid."));
+  }
+  if (item.delivery.packageHash !== void 0 && !HASH.test(item.delivery.packageHash)) {
+    errors.push(diagnostic4("INVALID_DELIVERY", "delivery.packageHash", "Delivered package bytes hash is invalid."));
+  }
+  if ((item.source.packageHash ?? void 0) !== (item.delivery.packageHash ?? void 0)) {
+    errors.push(diagnostic4("HASH_MISMATCH", "packageHash", "Source and delivery package bytes hashes must match."));
+  }
+  if (!text(item.delivery.deliveryId) || item.delivery.status !== "SECURE_DELIVERED" || !text(item.delivery.assetId) || !text(item.delivery.revisionId) || !HASH.test(item.delivery.contentHash) || !text(item.delivery.format) || !text(item.delivery.licenseId)) {
+    errors.push(diagnostic4("INVALID_DELIVERY", "delivery", "Secure delivery metadata is incomplete."));
+  }
+  if (!item.catalog.formats.includes(item.source.format) || !item.supportedFormats.includes(item.source.format)) {
+    errors.push(diagnostic4("UNSUPPORTED_FORMAT", "source.format", "The source format is not supported by the catalog and iGAME."));
+  }
+  if (item.access === "AVAILABLE" || item.access === "AUTH_REQUIRED" || item.access === "UNAVAILABLE") {
+    errors.push(diagnostic4("ENTITLEMENT_REQUIRED", "access", "Unpurchased or unavailable assets cannot become binding candidates."));
+  }
+  if (item.access === "PURCHASED" && !entitled(item.entitlementStatus)) {
+    errors.push(diagnostic4("ENTITLEMENT_REQUIRED", "entitlementStatus", "Purchased access requires a paid or granted entitlement."));
+  }
+  if (item.access === "FREE" && item.catalog.price.amountMinor !== 0) {
+    errors.push(diagnostic4("INVALID_ACCESS", "catalog.price.amountMinor", "FREE access requires a zero-priced catalog record."));
+  }
+  if (item.access === "PURCHASED" && item.catalog.price.amountMinor === 0) {
+    errors.push(diagnostic4("INVALID_ACCESS", "access", "A zero-priced asset must use FREE access."));
+  }
+  if (item.source.assetId !== item.catalog.id || item.delivery.assetId !== item.source.assetId) {
+    errors.push(diagnostic4("INVALID_METADATA", "assetId", "Catalog, source, and delivery asset IDs must match."));
+  }
+  if (item.delivery.revisionId !== item.source.revisionId) errors.push(diagnostic4("REVISION_MISMATCH", "delivery.revisionId", "Delivery revision does not match source metadata."));
+  if (item.delivery.contentHash !== item.source.contentHash) errors.push(diagnostic4("HASH_MISMATCH", "delivery.contentHash", "Delivery hash does not match source metadata."));
+  if (item.delivery.format !== item.source.format) errors.push(diagnostic4("UNSUPPORTED_FORMAT", "delivery.format", "Delivery format does not match source metadata."));
+  if (item.delivery.licenseId !== item.license.licenseId) errors.push(diagnostic4("LICENSE_MISMATCH", "delivery.licenseId", "Delivery license does not match the active license."));
+  return errors;
+}
+function createMarketAssetBindingCandidate(input) {
+  const errors = validateInput(input);
+  if (errors.length > 0) return failure(...errors);
+  const source = {
+    assetId: input.source.assetId,
+    revisionId: input.source.revisionId,
+    contentHash: input.source.contentHash,
+    label: input.source.label,
+    mode: "PINNED",
+    ...input.source.projectId === void 0 ? {} : {
+      projectId: input.source.projectId
+    },
+    ...input.source.assetDefinitionId === void 0 ? {} : {
+      assetDefinitionId: input.source.assetDefinitionId
+    },
+    licenseId: input.license.licenseId,
+    rights: [
+      ...input.license.rights
+    ],
+    sourceKind: "MARKET",
+    layout: input.source.layout
+  };
+  const defaults = input.defaults ?? {
+    movable: true,
+    collision: false,
+    gravity: false
+  };
+  return success({
+    assetId: input.source.assetId,
+    format: input.source.format,
+    licenseId: input.license.licenseId,
+    rights: [
+      ...input.license.rights
+    ],
+    deliveryId: input.delivery.deliveryId,
+    entry: {
+      assetId: input.source.assetId,
+      name: input.source.label,
+      source,
+      defaults
+    }
+  });
 }
 
 // src/draw2-special-tools.ts
@@ -10043,6 +10780,7 @@ function tracePolicyForTool(tool) {
   if (tool === "eyedropper" || tool === "fill" || tool === "pan" || tool === "tile-stamp") {
     return "IMMEDIATE";
   }
+  if (tool === "text") return "LAST";
   return tool === "select-lasso" ? "ACCUMULATE" : "LAST";
 }
 var SerializedCommitIngress = class {
@@ -10077,7 +10815,7 @@ function pointFromSample(sample) {
 function samePoint(left, right) {
   return left?.x === right.x && left.y === right.y;
 }
-function clampPoint3(point2, bounds) {
+function clampPoint4(point2, bounds) {
   return {
     x: Math.max(0, Math.min(bounds.width - 1, Math.round(point2.x))),
     y: Math.max(0, Math.min(bounds.height - 1, Math.round(point2.y)))
@@ -10243,13 +10981,13 @@ var ToolSession = class {
     return createWriteSet(this.#options.tool, first, last, this.#options.colorIndex, this.#options.toolOptions ?? {}, this.#options.bounds);
   }
   #appendPathPreview(from, to) {
-    const start = clampPoint3(from ?? to, this.#options.bounds);
-    const end = clampPoint3(to, this.#options.bounds);
+    const start = clampPoint4(from ?? to, this.#options.bounds);
+    const end = clampPoint4(to, this.#options.bounds);
     const remaining = MAX_INTERPOLATED_STROKE_PIXELS - this.#previewInterpolatedPixelCount;
     if (remaining <= 0) return;
     let segment;
     try {
-      segment = interpolatePixelLine2(start, end);
+      segment = interpolatePixelLine(start, end, this.#pathPreviewOptions.brushAlgorithm);
     } catch {
       return;
     }
@@ -10426,6 +11164,13 @@ function normalizeAnimationFrameReferences(values) {
       width: Math.round(frame2.rect.width),
       height: Math.round(frame2.rect.height)
     },
+    ...frame2.rasterSnapshot === void 0 ? {} : {
+      rasterSnapshot: {
+        width: Math.round(frame2.rasterSnapshot.width),
+        height: Math.round(frame2.rasterSnapshot.height),
+        data: Array.isArray(frame2.rasterSnapshot.data) ? frame2.rasterSnapshot.data.map((value) => Math.round(value)) : []
+      }
+    },
     ...frame2.durationMs === void 0 ? {} : {
       durationMs: Math.round(frame2.durationMs)
     },
@@ -10601,6 +11346,10 @@ function isValidRegionSelection(region) {
   if (region.kind === "GRID") return (region.cellSize === 16 || region.cellSize === 32) && isPositiveInteger(region.columns) && isPositiveInteger(region.rows);
   return isPositiveInteger(region.cellWidth) && isPositiveInteger(region.cellHeight) && isPositiveInteger(region.columns) && isPositiveInteger(region.rows);
 }
+function isValidRasterSnapshot(snapshot) {
+  if (!isPositiveInteger(snapshot.width) || !isPositiveInteger(snapshot.height) || !Array.isArray(snapshot.data) || snapshot.data.length !== snapshot.width * snapshot.height * 4) return false;
+  return snapshot.data.every((value) => Number.isSafeInteger(value) && value >= 0 && value <= 255);
+}
 function isValidAnimationMapping(mapping) {
   const seenKeys = /* @__PURE__ */ new Set();
   return mapping.every((clip) => {
@@ -10617,7 +11366,7 @@ function isValidAnimationMapping(mapping) {
     if (clip.sourceReference !== void 0 && clip.sourceReference.trim().length === 0) return false;
     if (clip.flipX !== void 0 && typeof clip.flipX !== "boolean") return false;
     if (clip.flipY !== void 0 && typeof clip.flipY !== "boolean") return false;
-    if (clip.sourceFrames !== void 0 && (clip.sourceFrames.length !== clip.frameIds.length || clip.sourceFrames.some((frame2) => frame2.sourceFrameId.trim().length === 0 || normalizeReferences(frame2.layerIds).length === 0 || !Number.isSafeInteger(frame2.rect.x) || !Number.isSafeInteger(frame2.rect.y) || frame2.rect.x < 0 || frame2.rect.y < 0 || !isPositiveInteger(frame2.rect.width) || !isPositiveInteger(frame2.rect.height) || frame2.durationMs !== void 0 && (!Number.isFinite(frame2.durationMs) || frame2.durationMs <= 0) || frame2.flipX !== void 0 && typeof frame2.flipX !== "boolean" || frame2.flipY !== void 0 && typeof frame2.flipY !== "boolean"))) return false;
+    if (clip.sourceFrames !== void 0 && (clip.sourceFrames.length !== clip.frameIds.length || clip.sourceFrames.some((frame2) => frame2.sourceFrameId.trim().length === 0 || normalizeReferences(frame2.layerIds).length === 0 || !Number.isSafeInteger(frame2.rect.x) || !Number.isSafeInteger(frame2.rect.y) || frame2.rect.x < 0 || frame2.rect.y < 0 || !isPositiveInteger(frame2.rect.width) || !isPositiveInteger(frame2.rect.height) || frame2.rasterSnapshot !== void 0 && !isValidRasterSnapshot(frame2.rasterSnapshot) || frame2.durationMs !== void 0 && (!Number.isFinite(frame2.durationMs) || frame2.durationMs <= 0) || frame2.flipX !== void 0 && typeof frame2.flipX !== "boolean" || frame2.flipY !== void 0 && typeof frame2.flipY !== "boolean"))) return false;
     if (clip.frameDurationsMs !== void 0 && (clip.frameDurationsMs.length !== clip.frameIds.length || clip.frameDurationsMs.some((duration) => !Number.isFinite(duration) || duration <= 0))) return false;
     return [
       "LOOP",
@@ -10729,8 +11478,10 @@ function normalizeBrushPreset(input) {
   return {
     id: stableId(input.id, "Brush preset ID"),
     name: input.name.trim().slice(0, 64) || "Preset",
-    brushSize: boundedInteger(input.brushSize, 1, 64, 1),
+    brushSize: boundedInteger(input.brushSize, 1, MAX_BRUSH_SIZE, 1),
     brushShape: input.brushShape === "circle" ? "circle" : "square",
+    brushAngle: boundedInteger(input.brushAngle ?? 0, -180, 180, 0),
+    brushAlgorithm: input.brushAlgorithm === "pixel-perfect" ? "pixel-perfect" : "regular",
     pattern: input.pattern === "checker" || input.pattern === "dots" || input.pattern === "bayer-2x2" ? input.pattern : "solid",
     dither: input.dither === "BAYER_2X2" || input.dither === "BAYER_4X4" ? input.dither : "NONE",
     colorIndex: boundedInteger(input.colorIndex, 0, 255, 0),
@@ -11005,12 +11756,12 @@ function normalizeDraw2SelectionStamp(input) {
 var Draw2SelectionStampStore = class {
   #stamps = /* @__PURE__ */ new Map();
   constructor(initial = []) {
-    for (const stamp3 of initial) this.save(stamp3);
+    for (const stamp of initial) this.save(stamp);
   }
   save(input) {
-    const stamp3 = normalizeDraw2SelectionStamp(input);
-    this.#stamps.set(stamp3.id, stamp3);
-    return stamp3;
+    const stamp = normalizeDraw2SelectionStamp(input);
+    this.#stamps.set(stamp.id, stamp);
+    return stamp;
   }
   load(id) {
     return this.#stamps.get(id);
@@ -11122,17 +11873,212 @@ function normalizeDraw2TimelineMetadata(value, frameCount) {
       ...reference
     })),
     ...selectionStampCandidates === void 0 ? {} : {
-      selectionStamps: selectionStamps.list().map((stamp3) => ({
-        ...stamp3,
-        pixels: stamp3.pixels.map((pixel) => ({
+      selectionStamps: selectionStamps.list().map((stamp) => ({
+        ...stamp,
+        pixels: stamp.pixels.map((pixel) => ({
           ...pixel
         })),
         palette: [
-          ...stamp3.palette
+          ...stamp.palette
         ]
       }))
     }
   };
+}
+
+// src/game/game-350/assetization.ts
+var ASSET_PACKAGE_SCHEMA_VERSION = 1;
+var ASSETIZATION_CONTRACT_VERSION = "PIXIEED_ASSETIZATION_V1";
+function isRecord6(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+function packageText(value, maxLength) {
+  if (typeof value !== "string") return void 0;
+  const normalized = value.trim();
+  return normalized.length <= maxLength ? normalized : void 0;
+}
+function canonicalPackageValue(value) {
+  if (Array.isArray(value)) return value.map(canonicalPackageValue);
+  if (isRecord6(value)) {
+    return Object.fromEntries(Object.keys(value).sort().map((key) => [
+      key,
+      canonicalPackageValue(value[key])
+    ]));
+  }
+  return value;
+}
+async function sha256PackageBody(value) {
+  const bytes = new TextEncoder().encode(JSON.stringify(canonicalPackageValue(packageBody(value))));
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return `sha256:${Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+}
+function cloneAssetPackageManifest(manifest) {
+  return {
+    ...manifest,
+    ...manifest.sellerId === void 0 ? {} : {
+      sellerId: manifest.sellerId
+    },
+    entries: manifest.entries.map((entry) => entry.kind === "DRAW" ? {
+      ...entry,
+      source: {
+        ...entry.source
+      },
+      proposal: {
+        ...entry.proposal,
+        roles: [
+          ...entry.proposal.roles
+        ],
+        frames: entry.proposal.frames.map((frame2) => ({
+          ...frame2,
+          layerIds: [
+            ...frame2.layerIds
+          ],
+          region: {
+            ...frame2.region
+          }
+        })),
+        evidence: [
+          ...entry.proposal.evidence
+        ]
+      }
+    } : {
+      ...entry,
+      source: {
+        ...entry.source
+      },
+      proposal: {
+        ...entry.proposal,
+        trackIds: [
+          ...entry.proposal.trackIds
+        ],
+        evidence: [
+          ...entry.proposal.evidence
+        ]
+      }
+    })
+  };
+}
+function packageBody(manifest) {
+  return {
+    schemaVersion: manifest.schemaVersion,
+    detectorVersion: manifest.detectorVersion,
+    confirmationRevision: manifest.confirmationRevision,
+    title: manifest.title,
+    description: manifest.description,
+    offerKind: manifest.offerKind,
+    derivativePolicy: manifest.derivativePolicy,
+    sellerId: manifest.sellerId ?? null,
+    entries: manifest.entries
+  };
+}
+function sourceReasons(source) {
+  const reasons = [];
+  if (!isRecord6(source)) return [
+    "source is required"
+  ];
+  const kind = source.kind;
+  if (kind !== "DRAW" && kind !== "AUDIO") reasons.push("source kind is unsupported");
+  if (packageText(typeof source.sourceId === "string" ? source.sourceId : void 0, 256) === void 0) reasons.push("sourceId is required");
+  if (packageText(typeof source.projectId === "string" ? source.projectId : void 0, 256) === void 0) reasons.push("source projectId is required");
+  if (packageText(typeof source.revisionId === "string" ? source.revisionId : void 0, 256) === void 0) reasons.push("source revisionId is required");
+  if (packageText(typeof source.contentHash === "string" ? source.contentHash : void 0, 512) === void 0) reasons.push("source contentHash is required");
+  if (kind === "DRAW" && packageText(typeof source.canvasId === "string" ? source.canvasId : void 0, 256) === void 0) reasons.push("Draw source canvasId is required");
+  return reasons;
+}
+function proposalSourceMatches(source, proposal) {
+  if (!isRecord6(source) || !isRecord6(proposal)) return false;
+  if (source.kind === "DRAW" && (proposal.kind === "SPRITE" || proposal.kind === "ANIMATION")) {
+    return typeof source.projectId === "string" && typeof source.revisionId === "string" && typeof source.contentHash === "string" && typeof source.canvasId === "string" && proposal.sourceProjectId === source.projectId.trim() && proposal.sourceRevisionId === source.revisionId.trim() && proposal.contentHash === source.contentHash.trim() && proposal.sourceCanvasId === source.canvasId.trim();
+  }
+  if (source.kind === "AUDIO" && proposal.kind === "AUDIO") {
+    return typeof source.sourceId === "string" && typeof source.projectId === "string" && typeof source.revisionId === "string" && typeof source.contentHash === "string" && proposal.sourceProjectId === source.projectId.trim() && proposal.sourceRevisionId === source.revisionId.trim() && proposal.contentHash === source.contentHash.trim() && proposal.rangeId === source.sourceId.trim();
+  }
+  return false;
+}
+function packageStructureReasons(manifest) {
+  const reasons = [];
+  if (manifest.schemaVersion !== ASSET_PACKAGE_SCHEMA_VERSION) reasons.push("unsupported package schemaVersion");
+  if (manifest.status !== "FINALIZED") reasons.push("package status must be FINALIZED");
+  if (manifest.detectorVersion !== ASSETIZATION_CONTRACT_VERSION) reasons.push("unsupported detectorVersion");
+  if (packageText(manifest.confirmationRevision, 256) === void 0 || manifest.confirmationRevision.trim().length === 0) reasons.push("confirmationRevision is required");
+  if (packageText(manifest.packageId, 256) === void 0 || manifest.packageId.trim().length === 0) reasons.push("packageId is required");
+  if (!/^sha256:[0-9a-f]{64}$/u.test(manifest.packageHash)) reasons.push("packageHash must be a SHA-256 hash");
+  if (packageText(manifest.title, 128) === void 0 || manifest.title.trim().length === 0) reasons.push("title is required");
+  if (packageText(manifest.description, 4096) === void 0) reasons.push("description is invalid");
+  if (manifest.offerKind !== "ASSET" && manifest.offerKind !== "ASSET_PACK") reasons.push("offerKind is invalid");
+  if (![
+    "USE_ONLY",
+    "DERIVATIVE_ALLOWED",
+    "REDISTRIBUTION_ALLOWED"
+  ].includes(manifest.derivativePolicy)) reasons.push("derivativePolicy is invalid");
+  if (manifest.sellerId !== void 0 && (packageText(manifest.sellerId, 256) === void 0 || manifest.sellerId.trim().length === 0)) reasons.push("sellerId is invalid");
+  const expectedReadiness = manifest.sellerId === void 0 ? "ACCOUNT_REQUIRED" : "READY";
+  if (manifest.saleReadiness !== expectedReadiness) reasons.push("saleReadiness does not match sellerId");
+  const rawEntries = manifest.entries;
+  const entries = Array.isArray(rawEntries) ? rawEntries : [];
+  if (!Array.isArray(rawEntries) || entries.length === 0) reasons.push("at least one package entry is required");
+  if (manifest.offerKind === "ASSET" && entries.length !== 1) reasons.push("ASSET must contain exactly one entry");
+  if (manifest.offerKind === "ASSET_PACK" && entries.length < 2) reasons.push("ASSET_PACK must contain at least two entries");
+  const entryIds = /* @__PURE__ */ new Set();
+  for (const [index, entry] of entries.entries()) {
+    if (!isRecord6(entry)) {
+      reasons.push(`entry ${index} is invalid`);
+      continue;
+    }
+    const entryId = typeof entry.entryId === "string" ? entry.entryId : "";
+    if (entryId.trim().length === 0 || entryIds.has(entryId)) reasons.push(`entry ${index} has a duplicate or empty entryId`);
+    entryIds.add(entryId);
+    if (entry.kind !== "DRAW" && entry.kind !== "AUDIO") reasons.push(`entry ${index} kind is invalid`);
+    if (typeof entry.label !== "string" || entry.label.trim().length === 0 || entry.label.length > 128) reasons.push(`entry ${index} label is invalid`);
+    reasons.push(...sourceReasons(entry.source).map((reason) => `entry ${index}: ${reason}`));
+    if (!isRecord6(entry.proposal)) {
+      reasons.push(`entry ${index} proposal is invalid`);
+      continue;
+    }
+    if (entry.kind === "DRAW") {
+      if (entry.proposal.kind !== "SPRITE" && entry.proposal.kind !== "ANIMATION") reasons.push(`entry ${index} Draw proposal is invalid`);
+      else if (!proposalSourceMatches(entry.source, entry.proposal)) reasons.push(`entry ${index} Draw proposal source mismatch`);
+    } else if (entry.proposal.kind !== "AUDIO" || !proposalSourceMatches(entry.source, entry.proposal)) {
+      reasons.push(`entry ${index} Audio proposal source mismatch`);
+    }
+  }
+  return reasons;
+}
+function validateAssetPackageManifest(value) {
+  if (!isRecord6(value)) return {
+    ok: false,
+    reasons: [
+      "package manifest must be an object"
+    ]
+  };
+  const manifest = value;
+  const reasons = packageStructureReasons(manifest);
+  return reasons.length === 0 ? {
+    ok: true,
+    value: manifest
+  } : {
+    ok: false,
+    reasons
+  };
+}
+async function verifyAssetPackageManifest(manifest) {
+  const structure = validateAssetPackageManifest(manifest);
+  if (!structure.ok) return structure;
+  const expectedHash = await sha256PackageBody(manifest);
+  if (expectedHash !== manifest.packageHash) return {
+    ok: false,
+    reasons: [
+      "packageHash does not match the finalized manifest"
+    ]
+  };
+  const expectedPackageId = `asset-package:${expectedHash.slice("sha256:".length, "sha256:".length + 24)}`;
+  if (expectedPackageId !== manifest.packageId) return {
+    ok: false,
+    reasons: [
+      "packageId does not match the packageHash"
+    ]
+  };
+  return structure;
 }
 
 // src/draw2-persistence.ts
@@ -11183,8 +12129,8 @@ function normalizeAssetDefinitions(entries) {
   }
   return normalized.sort((left, right) => left.definitionId.localeCompare(right.definitionId));
 }
-function stateHashPayload(checkpoint, assetDefinitions2, timelineMetadata) {
-  if (assetDefinitions2 === void 0 && timelineMetadata === void 0) {
+function stateHashPayload(checkpoint, assetDefinitions2, timelineMetadata, assetPackages2) {
+  if (assetDefinitions2 === void 0 && timelineMetadata === void 0 && assetPackages2 === void 0) {
     return checkpoint;
   }
   return {
@@ -11194,8 +12140,25 @@ function stateHashPayload(checkpoint, assetDefinitions2, timelineMetadata) {
     },
     ...timelineMetadata === void 0 ? {} : {
       timelineMetadata
+    },
+    ...assetPackages2 === void 0 ? {} : {
+      assetPackages: assetPackages2
     }
   };
+}
+async function normalizeAssetPackages(entries) {
+  if (entries === void 0) return void 0;
+  const normalized = [];
+  const packageIds = /* @__PURE__ */ new Set();
+  for (const entry of entries) {
+    const verified = await verifyAssetPackageManifest(entry);
+    if (!verified.ok) throw new Error(`Draw2 Asset Package is invalid: ${verified.reasons.join("; ")}`);
+    if (packageIds.has(entry.packageId)) throw new Error("Draw2 Asset Package identity is duplicated.");
+    packageIds.add(entry.packageId);
+    normalized.push(cloneAssetPackageManifest(entry));
+  }
+  normalized.sort((left, right) => left.packageId.localeCompare(right.packageId));
+  return normalized;
 }
 function cloneBytes(bytes) {
   return Array.from(bytes);
@@ -11372,45 +12335,50 @@ function serializeDraw2Journal(journal2) {
     }))
   };
 }
-async function createDraw2PersistenceRecord(state2, history2, journal2, revision, savedAt = (/* @__PURE__ */ new Date()).toISOString(), assetDefinitions2 = [], timelineMetadata) {
+async function createDraw2PersistenceRecord(state2, history2, journal2, revision, savedAt = (/* @__PURE__ */ new Date()).toISOString(), assetDefinitions2 = [], timelineMetadata, assetPackages2) {
   const checkpoint = serializeDraw2ProjectState(state2);
   const normalizedAssetDefinitions = normalizeAssetDefinitions(assetDefinitions2);
   const normalizedTimelineMetadata = timelineMetadata === void 0 ? void 0 : normalizeDraw2TimelineMetadata(timelineMetadata, state2.frames.length);
+  const normalizedAssetPackages = await normalizeAssetPackages(assetPackages2);
   return {
     schemaVersion: DRAW2_PERSISTENCE_SCHEMA_VERSION,
     projectId: state2.projectId,
     revision,
     savedAt,
-    stateHash: await sha256Hex(stateHashPayload(checkpoint, normalizedAssetDefinitions, normalizedTimelineMetadata)),
+    stateHash: await sha256Hex(stateHashPayload(checkpoint, normalizedAssetDefinitions, normalizedTimelineMetadata, normalizedAssetPackages)),
     checkpoint,
     journal: serializeDraw2Journal(journal2),
     history: serializeDraw2History(history2),
     assetDefinitions: normalizedAssetDefinitions,
     ...normalizedTimelineMetadata === void 0 ? {} : {
       timelineMetadata: normalizedTimelineMetadata
+    },
+    ...normalizedAssetPackages === void 0 ? {} : {
+      assetPackages: normalizedAssetPackages
     }
   };
 }
-async function restoreDraw2PersistenceRecord(record3, expectedProjectId) {
-  if (record3.schemaVersion !== DRAW2_PERSISTENCE_SCHEMA_VERSION || expectedProjectId !== void 0 && record3.projectId !== expectedProjectId) {
+async function restoreDraw2PersistenceRecord(record4, expectedProjectId) {
+  if (record4.schemaVersion !== DRAW2_PERSISTENCE_SCHEMA_VERSION || expectedProjectId !== void 0 && record4.projectId !== expectedProjectId) {
     throw new Error("Draw2 persistence record identity is invalid.");
   }
-  const state2 = deserializeDraw2ProjectState(record3.checkpoint);
-  if (state2.projectId !== record3.projectId) {
+  const state2 = deserializeDraw2ProjectState(record4.checkpoint);
+  if (state2.projectId !== record4.projectId) {
     throw new Error("Draw2 checkpoint Project ID does not match the record.");
   }
-  const assetDefinitions2 = normalizeAssetDefinitions(record3.assetDefinitions);
-  const timelineMetadata = record3.timelineMetadata === void 0 ? void 0 : normalizeDraw2TimelineMetadata(record3.timelineMetadata, state2.frames.length);
-  const expectedHash = await sha256Hex(stateHashPayload(record3.checkpoint, record3.assetDefinitions === void 0 ? void 0 : assetDefinitions2, timelineMetadata));
-  if (record3.stateHash !== expectedHash) {
+  const assetDefinitions2 = normalizeAssetDefinitions(record4.assetDefinitions);
+  const timelineMetadata = record4.timelineMetadata === void 0 ? void 0 : normalizeDraw2TimelineMetadata(record4.timelineMetadata, state2.frames.length);
+  const assetPackages2 = await normalizeAssetPackages(record4.assetPackages);
+  const expectedHash = await sha256Hex(stateHashPayload(record4.checkpoint, record4.assetDefinitions === void 0 ? void 0 : assetDefinitions2, timelineMetadata, assetPackages2));
+  if (record4.stateHash !== expectedHash) {
     throw new Error("Draw2 checkpoint hash does not match the record.");
   }
-  const history2 = deserializeDraw2History(record3.history);
+  const history2 = deserializeDraw2History(record4.history);
   for (const entry of [
     ...history2.undo,
     ...history2.redo
   ]) {
-    if (entry.before.projectId !== record3.projectId || entry.after.projectId !== record3.projectId) {
+    if (entry.before.projectId !== record4.projectId || entry.after.projectId !== record4.projectId) {
       throw new Error("Draw2 history Project ID does not match the record.");
     }
   }
@@ -11418,7 +12386,8 @@ async function restoreDraw2PersistenceRecord(record3, expectedProjectId) {
     state: state2,
     history: history2,
     assetDefinitions: assetDefinitions2,
-    timelineMetadata: timelineMetadata ?? normalizeDraw2TimelineMetadata(void 0, state2.frames.length)
+    timelineMetadata: timelineMetadata ?? normalizeDraw2TimelineMetadata(void 0, state2.frames.length),
+    assetPackages: assetPackages2 ?? []
   };
 }
 function isNewer(incoming, current) {
@@ -11481,7 +12450,7 @@ function createIndexedDbDraw2PersistenceStore(databaseName = DRAW2_PERSISTENCE_D
         return null;
       }
     },
-    async save(record3, options) {
+    async save(record4, options) {
       if (!available) return {
         ok: false,
         stale: false
@@ -11492,11 +12461,11 @@ function createIndexedDbDraw2PersistenceStore(databaseName = DRAW2_PERSISTENCE_D
           let stale = false;
           const transaction = database.transaction(DRAW2_PERSISTENCE_STORE_NAME, "readwrite");
           const store = transaction.objectStore(DRAW2_PERSISTENCE_STORE_NAME);
-          const read = store.get(record3.projectId);
+          const read = store.get(record4.projectId);
           read.onsuccess = () => {
             const current = read.result;
             if (!matchesExpected(current, options)) stale = true;
-            else if (isNewer(record3, current)) store.put(record3);
+            else if (isNewer(record4, current)) store.put(record4);
             else stale = true;
           };
           read.onerror = () => transaction.abort();
@@ -11640,12 +12609,12 @@ var DRAW2_SHORTCUTS = [
     command: "tool-pen"
   },
   {
-    id: "tool-pixel-pen",
+    id: "tool-text",
     version: 1,
     category: "Tools",
-    label: "Pixel Perfect Pen",
-    keys: "Y",
-    command: "tool-pixel-pen"
+    label: "Text",
+    keys: "T",
+    command: "tool-text"
   },
   {
     id: "tool-eraser",
@@ -11720,28 +12689,12 @@ var DRAW2_SHORTCUTS = [
     command: "tool-select-lasso"
   },
   {
-    id: "tool-select-polygon",
-    version: 1,
-    category: "Tools",
-    label: "Polygon selection",
-    keys: "N",
-    command: "tool-select-polygon"
-  },
-  {
     id: "tool-move",
     version: 1,
     category: "Tools",
     label: "Move active cel content / duplicate",
     keys: "V",
     command: "tool-move"
-  },
-  {
-    id: "tool-tile-stamp",
-    version: 1,
-    category: "Tools",
-    label: "Tile placement",
-    keys: "T",
-    command: "tool-tile-stamp"
   },
   {
     id: "tool-pan",
@@ -11870,6 +12823,38 @@ var DRAW2_SHORTCUTS = [
     label: "Next frame",
     keys: "]",
     command: "next-frame"
+  },
+  {
+    id: "previous-frame-arrow",
+    version: 1,
+    category: "Timeline",
+    label: "Previous frame (canvas arrows)",
+    keys: "ArrowLeft",
+    command: "previous-frame"
+  },
+  {
+    id: "next-frame-arrow",
+    version: 1,
+    category: "Timeline",
+    label: "Next frame (canvas arrows)",
+    keys: "ArrowRight",
+    command: "next-frame"
+  },
+  {
+    id: "previous-layer-arrow",
+    version: 1,
+    category: "Timeline",
+    label: "Previous layer (canvas arrows)",
+    keys: "ArrowUp",
+    command: "previous-layer"
+  },
+  {
+    id: "next-layer-arrow",
+    version: 1,
+    category: "Timeline",
+    label: "Next layer (canvas arrows)",
+    keys: "ArrowDown",
+    command: "next-layer"
   },
   {
     id: "toggle-loop",
@@ -12145,6 +13130,8 @@ var DEFAULT_DRAW2_EDITOR_PREFERENCES = {
   tool: "pen",
   brushSize: 1,
   brushShape: "square",
+  brushAngle: 0,
+  brushAlgorithm: "regular",
   brushPattern: "solid",
   similarityPercent: 0,
   colorSelectionMode: "similar",
@@ -12209,6 +13196,12 @@ function normalizeProjectPreferences(value) {
     }
   };
 }
+function normalizeToolPreference(value) {
+  if (value === "pixel-pen") return "pen";
+  if (value === "select-polygon") return "select-lasso";
+  if (value === "tile-stamp") return "pen";
+  return typeof value === "string" && value.trim().length > 0 ? value : "pen";
+}
 function normalizePreferences(value) {
   const source = asRecord(value);
   const projectsSource = asRecord(source.projects);
@@ -12227,9 +13220,11 @@ function normalizePreferences(value) {
     "custom"
   ].includes(source.playbackFps) ? source.playbackFps : "24";
   return {
-    tool: typeof source.tool === "string" ? source.tool : "pen",
-    brushSize: boundedInteger2(source.brushSize, 1, 32, 1),
+    tool: normalizeToolPreference(source.tool),
+    brushSize: boundedInteger2(source.brushSize, 1, MAX_BRUSH_SIZE, 1),
     brushShape: typeof source.brushShape === "string" ? source.brushShape : "square",
+    brushAngle: boundedInteger2(source.brushAngle, -180, 180, 0),
+    brushAlgorithm: source.brushAlgorithm === "pixel-perfect" ? "pixel-perfect" : "regular",
     brushPattern: typeof source.brushPattern === "string" ? source.brushPattern : "solid",
     similarityPercent: boundedInteger2(source.similarityPercent, 0, 100, 0),
     colorSelectionMode: typeof source.colorSelectionMode === "string" ? source.colorSelectionMode : "similar",
@@ -12626,7 +13621,7 @@ var EN_TO_JA = {
   "Open Clips to edit this waveform": "\u30AF\u30EA\u30C3\u30D7\u3092\u958B\u3044\u3066\u3053\u306E\u6CE2\u5F62\u3092\u7DE8\u96C6",
   "Select an Audio Clip to edit its waveform, fades and gain.": "\u30AA\u30FC\u30C7\u30A3\u30AA\u30AF\u30EA\u30C3\u30D7\u3092\u9078\u629E\u3057\u3066\u6CE2\u5F62\u3001\u30D5\u30A7\u30FC\u30C9\u3001\u30B2\u30A4\u30F3\u3092\u7DE8\u96C6\u3057\u3066\u304F\u3060\u3055\u3044\u3002",
   "Draw Preview: Audio-linked": "Draw\u30D7\u30EC\u30D3\u30E5\u30FC: Audio\u9023\u643A",
-  "Draw bridge": "Draw\u9023\u643A",
+  "Draw time sync": "Draw\u6642\u9593\u540C\u671F",
   "Draw sync ready": "Draw\u540C\u671F\u6E96\u5099\u5B8C\u4E86",
   "Draw preview follows the Audio playhead.": "Draw\u30D7\u30EC\u30D3\u30E5\u30FC\u306FAudio\u306E\u518D\u751F\u30D8\u30C3\u30C9\u306B\u8FFD\u5F93\u3057\u307E\u3059\u3002",
   "Press Monitor or select a Draw frame to follow the Audio playhead.": "Monitor\u3092\u62BC\u3059\u304BDraw\u30D5\u30EC\u30FC\u30E0\u3092\u9078\u629E\u3059\u308B\u3068\u3001Audio\u306E\u518D\u751F\u30D8\u30C3\u30C9\u306B\u8FFD\u5F93\u3057\u307E\u3059\u3002",
@@ -12930,13 +13925,13 @@ var SORTED_JA_TO_EN = Object.entries(JA_TO_EN).sort(([left], [right]) => right.l
 var TRANSLATION_CACHE_LIMIT = 512;
 var translationCache = /* @__PURE__ */ new Map();
 function normalizeDraw2Locale(value) {
-  return value === "en" ? "en" : "ja";
+  return value === "ja" ? "ja" : "en";
 }
-function translateDraw2Text(text, locale) {
-  const leading = text.match(/^\s*/)?.[0] ?? "";
-  const trailing = text.match(/\s*$/)?.[0] ?? "";
-  const core2 = text.slice(leading.length, text.length - trailing.length || void 0);
-  if (core2.length === 0) return text;
+function translateDraw2Text(text2, locale) {
+  const leading = text2.match(/^\s*/)?.[0] ?? "";
+  const trailing = text2.match(/\s*$/)?.[0] ?? "";
+  const core2 = text2.slice(leading.length, text2.length - trailing.length || void 0);
+  if (core2.length === 0) return text2;
   const cacheKey = `${locale}\0${core2}`;
   const cached = translationCache.get(cacheKey);
   if (cached !== void 0) return `${leading}${cached}${trailing}`;
@@ -13348,7 +14343,7 @@ function describeCanvasResizePlan(plan) {
 }
 
 // src/wp160-game-runtime-core.ts
-function diagnostic4(code, message, recoverable, severity = "ERROR") {
+function diagnostic5(code, message, recoverable, severity = "ERROR") {
   return {
     code,
     severity,
@@ -13409,15 +14404,15 @@ function sampleAnimation(clip, elapsedMs) {
 async function createRuntimePreview(options) {
   const runtime = options.runtime;
   const diagnostics = [];
-  if (runtime.runtimeVersion !== options.supportedRuntimeVersion) diagnostics.push(diagnostic4("UNSUPPORTED_RUNTIME_VERSION", `Runtime ${runtime.runtimeVersion} is not supported by this preview.`, false));
-  if (runtime.runtimeId.length === 0 || options.dependencies.entries.length === 0) diagnostics.push(diagnostic4("PACKAGE_INVALID", "Package manifest or dependency lock is invalid.", false));
+  if (runtime.runtimeVersion !== options.supportedRuntimeVersion) diagnostics.push(diagnostic5("UNSUPPORTED_RUNTIME_VERSION", `Runtime ${runtime.runtimeVersion} is not supported by this preview.`, false));
+  if (runtime.runtimeId.length === 0 || options.dependencies.entries.length === 0) diagnostics.push(diagnostic5("PACKAGE_INVALID", "Package manifest or dependency lock is invalid.", false));
   const calculatedHash = await calculateDependencySnapshotHash(options.dependencies.packageId, options.dependencies.packageVersion, options.dependencies.entries);
-  if (calculatedHash !== options.dependencies.snapshotHash) diagnostics.push(diagnostic4("DEPENDENCY_LOCK_MISMATCH", "Dependency Snapshot hash does not match its canonical entries.", false));
-  if (options.capabilities.graphics === "NONE") diagnostics.push(diagnostic4("RENDERER_UNAVAILABLE", "No supported renderer capability is available.", true, "WARNING"));
-  if (!options.capabilities.audio) diagnostics.push(diagnostic4("AUDIO_UNAVAILABLE", "Audio capability is unavailable; audio presentation is disabled.", true, "WARNING"));
+  if (calculatedHash !== options.dependencies.snapshotHash) diagnostics.push(diagnostic5("DEPENDENCY_LOCK_MISMATCH", "Dependency Snapshot hash does not match its canonical entries.", false));
+  if (options.capabilities.graphics === "NONE") diagnostics.push(diagnostic5("RENDERER_UNAVAILABLE", "No supported renderer capability is available.", true, "WARNING"));
+  if (!options.capabilities.audio) diagnostics.push(diagnostic5("AUDIO_UNAVAILABLE", "Audio capability is unavailable; audio presentation is disabled.", true, "WARNING"));
   const requestedRenderer = options.renderer ?? options.capabilities.graphics;
   const renderer2 = requestedRenderer === "WEBGPU" && (options.capabilities.graphics !== "WEBGPU" || !options.capabilities.webGpuBenefitMeasured) ? options.capabilities.graphics === "CANVAS2D" ? "CANVAS2D" : "NONE" : requestedRenderer === "CANVAS2D" && options.capabilities.graphics === "NONE" ? "NONE" : requestedRenderer;
-  if (requestedRenderer === "WEBGPU" && renderer2 !== "WEBGPU") diagnostics.push(diagnostic4("RENDERER_UNAVAILABLE", "WebGPU was not selected without capability detection and measured benefit; fallback renderer retained.", true, "WARNING"));
+  if (requestedRenderer === "WEBGPU" && renderer2 !== "WEBGPU") diagnostics.push(diagnostic5("RENDERER_UNAVAILABLE", "WebGPU was not selected without capability detection and measured benefit; fallback renderer retained.", true, "WARNING"));
   return {
     previewId: asGamePreviewId(options.previewId),
     projectId: asGameProjectId(options.projectId),
@@ -13465,22 +14460,22 @@ async function loadRuntimeAssets(session, requests, resolver) {
   for (const request of uniqueRequests.values()) {
     const entry = dependencyEntry(session, request.assetId);
     if (entry === void 0) {
-      diagnostics.push(diagnostic4(request.required ? "MISSING_REQUIRED_ASSET" : "OPTIONAL_ASSET_MISSING", `Asset ${request.assetId} is not declared by the locked dependency snapshot.`, !request.required));
+      diagnostics.push(diagnostic5(request.required ? "MISSING_REQUIRED_ASSET" : "OPTIONAL_ASSET_MISSING", `Asset ${request.assetId} is not declared by the locked dependency snapshot.`, !request.required));
       continue;
     }
     const existing = loaded[request.assetId];
     if (existing !== void 0 && existing.revisionId === entry.revisionId && existing.contentHash === entry.contentHash) continue;
     const payload = await resolver.resolve(request);
     if (payload === void 0) {
-      diagnostics.push(diagnostic4(request.required ? "MISSING_REQUIRED_ASSET" : "OPTIONAL_ASSET_MISSING", `Asset ${request.assetId} could not be resolved.`, !request.required));
+      diagnostics.push(diagnostic5(request.required ? "MISSING_REQUIRED_ASSET" : "OPTIONAL_ASSET_MISSING", `Asset ${request.assetId} could not be resolved.`, !request.required));
       continue;
     }
     if (payload.quarantined === true) {
-      diagnostics.push(diagnostic4("ASSET_QUARANTINED", `Asset ${request.assetId} is quarantined and cannot be loaded.`, false));
+      diagnostics.push(diagnostic5("ASSET_QUARANTINED", `Asset ${request.assetId} is quarantined and cannot be loaded.`, false));
       continue;
     }
     if (payload.revisionId !== entry.revisionId || payload.contentHash !== entry.contentHash) {
-      diagnostics.push(diagnostic4("HASH_MISMATCH", `Asset ${request.assetId} does not match the locked Revision or Hash.`, false));
+      diagnostics.push(diagnostic5("HASH_MISMATCH", `Asset ${request.assetId} does not match the locked Revision or Hash.`, false));
       continue;
     }
     loaded[request.assetId] = payload;
@@ -13567,7 +14562,7 @@ function resolveGameRuntimePerformanceProfile(options) {
 }
 
 // src/wp200-game-runtime-core.ts
-function diagnostic5(code, message, recoverable, severity = "ERROR") {
+function diagnostic6(code, message, recoverable, severity = "ERROR") {
   return {
     code,
     severity,
@@ -13602,25 +14597,25 @@ function validateReference(reference, diagnostics) {
   if (![
     "DRAW",
     "AUDIO"
-  ].includes(reference.kind)) diagnostics.push(diagnostic5("PACKAGE_INVALID", "Game Asset reference kind is unsupported.", false));
-  if (reference.provenance !== (reference.kind === "DRAW" ? "DRAW2" : "PIXIAUDIO")) diagnostics.push(diagnostic5("PACKAGE_INVALID", "Game Asset reference provenance does not match its kind.", false));
-  if (!Number.isSafeInteger(reference.byteLength) || reference.byteLength < 0) diagnostics.push(diagnostic5("PACKAGE_INVALID", "Game Asset reference byteLength is invalid.", false));
-  if (!reference.mimeType || reference.mimeType.includes("/") === false) diagnostics.push(diagnostic5("PACKAGE_INVALID", "Game Asset reference MIME type is invalid.", false));
-  if (reference.mode === "LIVE" && reference.kind === "AUDIO") diagnostics.push(diagnostic5("PACKAGE_INVALID", "Audio LIVE references are preview-only and must not enter a locked Build.", true, "WARNING"));
+  ].includes(reference.kind)) diagnostics.push(diagnostic6("PACKAGE_INVALID", "Game Asset reference kind is unsupported.", false));
+  if (reference.provenance !== (reference.kind === "DRAW" ? "DRAW2" : "PIXIAUDIO")) diagnostics.push(diagnostic6("PACKAGE_INVALID", "Game Asset reference provenance does not match its kind.", false));
+  if (!Number.isSafeInteger(reference.byteLength) || reference.byteLength < 0) diagnostics.push(diagnostic6("PACKAGE_INVALID", "Game Asset reference byteLength is invalid.", false));
+  if (!reference.mimeType || reference.mimeType.includes("/") === false) diagnostics.push(diagnostic6("PACKAGE_INVALID", "Game Asset reference MIME type is invalid.", false));
+  if (reference.mode === "LIVE" && reference.kind === "AUDIO") diagnostics.push(diagnostic6("PACKAGE_INVALID", "Audio LIVE references are preview-only and must not enter a locked Build.", true, "WARNING"));
 }
 function validateGameProject2(project) {
   const diagnostics = [];
-  if (project.schemaVersion !== 1) diagnostics.push(diagnostic5("PACKAGE_INVALID", "Unknown Game Project schema version.", false));
+  if (project.schemaVersion !== 1) diagnostics.push(diagnostic6("PACKAGE_INVALID", "Unknown Game Project schema version.", false));
   try {
     asGameProjectId(project.projectId);
     safeText(project.revisionId, "GameProjectRevisionId");
     safeText(project.packageVersion, "PackageVersion");
   } catch (error2) {
-    diagnostics.push(diagnostic5("BUILD_INVALID_REQUEST", error2 instanceof Error ? error2.message : "Game Project identity is invalid.", false));
+    diagnostics.push(diagnostic6("BUILD_INVALID_REQUEST", error2 instanceof Error ? error2.message : "Game Project identity is invalid.", false));
   }
-  if (!project.name.trim()) diagnostics.push(diagnostic5("BUILD_INVALID_REQUEST", "Game Project name is required.", false));
-  if (project.scenes.length === 0) diagnostics.push(diagnostic5("PACKAGE_INVALID", "Game Project requires at least one Scene.", false));
-  if (!project.dependencies.locked) diagnostics.push(diagnostic5("DEPENDENCY_LOCK_MISMATCH", "Game Project requires a locked Dependency Snapshot for Runtime/Build use.", false));
+  if (!project.name.trim()) diagnostics.push(diagnostic6("BUILD_INVALID_REQUEST", "Game Project name is required.", false));
+  if (project.scenes.length === 0) diagnostics.push(diagnostic6("PACKAGE_INVALID", "Game Project requires at least one Scene.", false));
+  if (!project.dependencies.locked) diagnostics.push(diagnostic6("DEPENDENCY_LOCK_MISMATCH", "Game Project requires a locked Dependency Snapshot for Runtime/Build use.", false));
   const sceneIds = /* @__PURE__ */ new Set();
   const entityIds = /* @__PURE__ */ new Set();
   const componentIds = /* @__PURE__ */ new Set();
@@ -13629,45 +14624,45 @@ function validateGameProject2(project) {
     try {
       safeText(action.actionId, "GameActionId");
     } catch (error2) {
-      diagnostics.push(diagnostic5("BUILD_INVALID_REQUEST", error2 instanceof Error ? error2.message : "Action ID is invalid.", false));
+      diagnostics.push(diagnostic6("BUILD_INVALID_REQUEST", error2 instanceof Error ? error2.message : "Action ID is invalid.", false));
     }
-    if (actionIds.has(action.actionId)) diagnostics.push(diagnostic5("PACKAGE_INVALID", `Duplicate Game Action ${action.actionId}.`, false));
+    if (actionIds.has(action.actionId)) diagnostics.push(diagnostic6("PACKAGE_INVALID", `Duplicate Game Action ${action.actionId}.`, false));
     actionIds.add(action.actionId);
-    if (!action.bindings.length) diagnostics.push(diagnostic5("BUILD_INVALID_REQUEST", `Game Action ${action.actionId} has no binding.`, true, "WARNING"));
+    if (!action.bindings.length) diagnostics.push(diagnostic6("BUILD_INVALID_REQUEST", `Game Action ${action.actionId} has no binding.`, true, "WARNING"));
   }
   for (const scene of project.scenes) {
     try {
       safeText(scene.sceneId, "GameSceneId");
     } catch (error2) {
-      diagnostics.push(diagnostic5("PACKAGE_INVALID", error2 instanceof Error ? error2.message : "Scene ID is invalid.", false));
+      diagnostics.push(diagnostic6("PACKAGE_INVALID", error2 instanceof Error ? error2.message : "Scene ID is invalid.", false));
     }
-    if (sceneIds.has(scene.sceneId)) diagnostics.push(diagnostic5("PACKAGE_INVALID", `Duplicate Game Scene ${scene.sceneId}.`, false));
+    if (sceneIds.has(scene.sceneId)) diagnostics.push(diagnostic6("PACKAGE_INVALID", `Duplicate Game Scene ${scene.sceneId}.`, false));
     sceneIds.add(scene.sceneId);
     const sceneEntityIds = new Set(scene.entities.map((entity2) => entity2.entityId));
-    for (const rootId of scene.rootEntityIds) if (!sceneEntityIds.has(rootId)) diagnostics.push(diagnostic5("MISSING_REQUIRED_ASSET", `Scene root Entity ${rootId} is missing.`, false));
+    for (const rootId of scene.rootEntityIds) if (!sceneEntityIds.has(rootId)) diagnostics.push(diagnostic6("MISSING_REQUIRED_ASSET", `Scene root Entity ${rootId} is missing.`, false));
     for (const entity2 of scene.entities) {
       try {
         safeText(entity2.entityId, "GameEntityId");
       } catch (error2) {
-        diagnostics.push(diagnostic5("PACKAGE_INVALID", error2 instanceof Error ? error2.message : "Entity ID is invalid.", false));
+        diagnostics.push(diagnostic6("PACKAGE_INVALID", error2 instanceof Error ? error2.message : "Entity ID is invalid.", false));
       }
-      if (entityIds.has(entity2.entityId)) diagnostics.push(diagnostic5("PACKAGE_INVALID", `Duplicate Game Entity ${entity2.entityId}.`, false));
+      if (entityIds.has(entity2.entityId)) diagnostics.push(diagnostic6("PACKAGE_INVALID", `Duplicate Game Entity ${entity2.entityId}.`, false));
       entityIds.add(entity2.entityId);
-      if (entity2.parentEntityId !== void 0 && !sceneEntityIds.has(entity2.parentEntityId)) diagnostics.push(diagnostic5("PACKAGE_INVALID", `Entity parent ${entity2.parentEntityId} is missing.`, false));
+      if (entity2.parentEntityId !== void 0 && !sceneEntityIds.has(entity2.parentEntityId)) diagnostics.push(diagnostic6("PACKAGE_INVALID", `Entity parent ${entity2.parentEntityId} is missing.`, false));
       for (const component of entity2.components) {
         try {
           safeText(component.componentId, "GameComponentId");
         } catch (error2) {
-          diagnostics.push(diagnostic5("PACKAGE_INVALID", error2 instanceof Error ? error2.message : "Component ID is invalid.", false));
+          diagnostics.push(diagnostic6("PACKAGE_INVALID", error2 instanceof Error ? error2.message : "Component ID is invalid.", false));
         }
-        if (componentIds.has(component.componentId)) diagnostics.push(diagnostic5("PACKAGE_INVALID", `Duplicate Game Component ${component.componentId}.`, false));
+        if (componentIds.has(component.componentId)) diagnostics.push(diagnostic6("PACKAGE_INVALID", `Duplicate Game Component ${component.componentId}.`, false));
         componentIds.add(component.componentId);
         if (component.type === "SPRITE" || component.type === "ANIMATION" || component.type === "AUDIO_SOURCE") {
           validateReference(component.asset, diagnostics);
-          if (!dependencyMatchesReference(component.asset, project.dependencies)) diagnostics.push(diagnostic5("DEPENDENCY_LOCK_MISMATCH", `Game Asset ${component.asset.assetId} is not present in the locked Dependency Snapshot.`, false));
+          if (!dependencyMatchesReference(component.asset, project.dependencies)) diagnostics.push(diagnostic6("DEPENDENCY_LOCK_MISMATCH", `Game Asset ${component.asset.assetId} is not present in the locked Dependency Snapshot.`, false));
         }
-        if (component.type === "CONTROL" && !actionIds.has(component.actionId)) diagnostics.push(diagnostic5("BUILD_INVALID_REQUEST", `Control references unknown Action ${component.actionId}.`, false));
-        if (component.type === "AUDIO_SOURCE" && (component.volume < 0 || component.volume > 1)) diagnostics.push(diagnostic5("BUILD_INVALID_REQUEST", `Audio volume for ${component.componentId} must be between 0 and 1.`, false));
+        if (component.type === "CONTROL" && !actionIds.has(component.actionId)) diagnostics.push(diagnostic6("BUILD_INVALID_REQUEST", `Control references unknown Action ${component.actionId}.`, false));
+        if (component.type === "AUDIO_SOURCE" && (component.volume < 0 || component.volume > 1)) diagnostics.push(diagnostic6("BUILD_INVALID_REQUEST", `Audio volume for ${component.componentId} must be between 0 and 1.`, false));
       }
     }
     for (const entity2 of scene.entities) {
@@ -13675,7 +14670,7 @@ function validateGameProject2(project) {
       let parentId = entity2.parentEntityId;
       while (parentId !== void 0) {
         if (seenParents.has(parentId) || parentId === entity2.entityId) {
-          diagnostics.push(diagnostic5("PACKAGE_INVALID", `Entity parent cycle includes ${entity2.entityId}.`, false));
+          diagnostics.push(diagnostic6("PACKAGE_INVALID", `Entity parent cycle includes ${entity2.entityId}.`, false));
           break;
         }
         seenParents.add(parentId);
@@ -13687,15 +14682,15 @@ function validateGameProject2(project) {
     try {
       safeText(behavior.behaviorId, "GameBehaviorId");
     } catch (error2) {
-      diagnostics.push(diagnostic5("PACKAGE_INVALID", error2 instanceof Error ? error2.message : "Behavior ID is invalid.", false));
+      diagnostics.push(diagnostic6("PACKAGE_INVALID", error2 instanceof Error ? error2.message : "Behavior ID is invalid.", false));
     }
     for (const rule of behavior.rules) {
-      if (!actionIds.has(rule.actionId)) diagnostics.push(diagnostic5("BUILD_INVALID_REQUEST", `Behavior references unknown Action ${rule.actionId}.`, false));
-      for (const operation of rule.operations) if (!operation.key.trim()) diagnostics.push(diagnostic5("BUILD_INVALID_REQUEST", "Behavior operation key is required.", false));
+      if (!actionIds.has(rule.actionId)) diagnostics.push(diagnostic6("BUILD_INVALID_REQUEST", `Behavior references unknown Action ${rule.actionId}.`, false));
+      for (const operation of rule.operations) if (!operation.key.trim()) diagnostics.push(diagnostic6("BUILD_INVALID_REQUEST", "Behavior operation key is required.", false));
     }
   }
   for (const reference of collectReferences(project)) {
-    if (reference.mode === "PINNED" && !dependencyMatchesReference(reference, project.dependencies)) diagnostics.push(diagnostic5("DEPENDENCY_LOCK_MISMATCH", `Pinned Asset ${reference.assetId} is not locked.`, false));
+    if (reference.mode === "PINNED" && !dependencyMatchesReference(reference, project.dependencies)) diagnostics.push(diagnostic6("DEPENDENCY_LOCK_MISMATCH", `Pinned Asset ${reference.assetId} is not locked.`, false));
   }
   return {
     valid: diagnostics.every((item) => item.severity !== "ERROR"),
@@ -13744,7 +14739,7 @@ function featureEnabled(flags, feature, killSwitch) {
   return killSwitch !== true && flags[feature] === true;
 }
 function appendFlagDiagnostic(diagnostics, feature) {
-  diagnostics.push(diagnostic5("UNSUPPORTED_CAPABILITY", `Feature flag ${feature} is OFF; isolated Game/Runtime operation is unavailable.`, true, "WARNING"));
+  diagnostics.push(diagnostic6("UNSUPPORTED_CAPABILITY", `Feature flag ${feature} is OFF; isolated Game/Runtime operation is unavailable.`, true, "WARNING"));
 }
 async function createGameRuntimePreview(options) {
   const validation = validateGameProject2(options.project);
@@ -13868,7 +14863,7 @@ async function createGameDependencySnapshot(packageId, packageVersion, entries) 
 }
 
 // src/game/game-340/core.ts
-function diagnostic6(code, path, message, recoverable = true) {
+function diagnostic7(code, path, message, recoverable = true) {
   return {
     code,
     path,
@@ -13876,50 +14871,6 @@ function diagnostic6(code, path, message, recoverable = true) {
     recoverable
   };
 }
-function success(value) {
-  return {
-    ok: true,
-    value,
-    diagnostics: []
-  };
-}
-function failure(...diagnostics) {
-  return {
-    ok: false,
-    diagnostics
-  };
-}
-function stable(value) {
-  return /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(value);
-}
-function resolveAssetBinding(binding, authority, caller) {
-  const claim = [
-    binding.projectId === String(caller.projectId) ? void 0 : diagnostic6("WRONG_PROJECT", "binding.projectId", "Asset binding belongs to another project."),
-    binding.ownerId === String(caller.ownerId) ? void 0 : diagnostic6("WRONG_OWNER", "binding.ownerId", "Asset binding belongs to another owner."),
-    binding.permission === "PREVIEW" || binding.permission === "READ" ? void 0 : diagnostic6("PERMISSION_DENIED", "binding.permission", "Preview permission is required.")
-  ].filter((item) => item !== void 0);
-  if (claim.length) return failure(...claim);
-  if (!stable(binding.assetId) || !stable(binding.licenseId)) return failure(diagnostic6("INVALID_CLAIM", "binding", "Binding identifiers are invalid."));
-  const matches = authority.filter((item) => item.projectId === binding.projectId && item.ownerId === binding.ownerId && item.kind === binding.kind && item.assetId === binding.assetId);
-  if (matches.length === 0) return failure(diagnostic6("MISSING_ASSET", "binding.assetId", "Canonical asset revision is missing."));
-  const current = matches.slice().sort((a, b) => a.revisionId.localeCompare(b.revisionId)).at(-1);
-  const selected = binding.mode === "LIVE" ? current : matches.find((item) => item.revisionId === binding.revisionId);
-  if (!selected) return failure(diagnostic6("STALE_REVISION", "binding.revisionId", "Requested asset revision is not canonical."));
-  if (binding.mode === "LIVE" && (binding.revisionId !== void 0 || binding.contentHash !== void 0)) return failure(diagnostic6("INVALID_CLAIM", "binding", "LIVE cannot carry a caller revision or hash override."));
-  if (binding.mode !== "LIVE" && binding.revisionId !== selected.revisionId) return failure(diagnostic6("REVISION_MISMATCH", "binding.revisionId", "Revision claim does not match canonical authority."));
-  if (binding.contentHash !== void 0 && binding.contentHash !== selected.contentHash) return failure(diagnostic6("HASH_MISMATCH", "binding.contentHash", "Caller hash is not authoritative."));
-  if (binding.licenseId !== selected.licenseId) return failure(diagnostic6("LICENSE_MISSING", "binding.licenseId", "License claim does not match canonical authority."));
-  if (binding.mode === "REVIEW" && selected.reviewStatus !== "APPROVED") return failure(diagnostic6("REVIEW_REQUIRED", "binding.mode", "Review mode requires APPROVED authority."));
-  if (binding.mode === "FORKED" && selected.forkId !== binding.forkId) return failure(diagnostic6("FORK_MISMATCH", "binding.forkId", "Fork binding does not match canonical authority."));
-  return success({
-    ...binding,
-    revisionId: selected.revisionId,
-    contentHash: selected.contentHash,
-    licenseId: selected.licenseId
-  });
-}
-
-// src/game/game-350/runtime-qualification.ts
 function success2(value) {
   return {
     ok: true,
@@ -13933,7 +14884,51 @@ function failure2(...diagnostics) {
     diagnostics
   };
 }
-function diagnostic7(code, path, message) {
+function stable(value) {
+  return /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(value);
+}
+function resolveAssetBinding(binding, authority, caller) {
+  const claim = [
+    binding.projectId === String(caller.projectId) ? void 0 : diagnostic7("WRONG_PROJECT", "binding.projectId", "Asset binding belongs to another project."),
+    binding.ownerId === String(caller.ownerId) ? void 0 : diagnostic7("WRONG_OWNER", "binding.ownerId", "Asset binding belongs to another owner."),
+    binding.permission === "PREVIEW" || binding.permission === "READ" ? void 0 : diagnostic7("PERMISSION_DENIED", "binding.permission", "Preview permission is required.")
+  ].filter((item) => item !== void 0);
+  if (claim.length) return failure2(...claim);
+  if (!stable(binding.assetId) || !stable(binding.licenseId)) return failure2(diagnostic7("INVALID_CLAIM", "binding", "Binding identifiers are invalid."));
+  const matches = authority.filter((item) => item.projectId === binding.projectId && item.ownerId === binding.ownerId && item.kind === binding.kind && item.assetId === binding.assetId);
+  if (matches.length === 0) return failure2(diagnostic7("MISSING_ASSET", "binding.assetId", "Canonical asset revision is missing."));
+  const current = matches.slice().sort((a, b) => a.revisionId.localeCompare(b.revisionId)).at(-1);
+  const selected = binding.mode === "LIVE" ? current : matches.find((item) => item.revisionId === binding.revisionId);
+  if (!selected) return failure2(diagnostic7("STALE_REVISION", "binding.revisionId", "Requested asset revision is not canonical."));
+  if (binding.mode === "LIVE" && (binding.revisionId !== void 0 || binding.contentHash !== void 0)) return failure2(diagnostic7("INVALID_CLAIM", "binding", "LIVE cannot carry a caller revision or hash override."));
+  if (binding.mode !== "LIVE" && binding.revisionId !== selected.revisionId) return failure2(diagnostic7("REVISION_MISMATCH", "binding.revisionId", "Revision claim does not match canonical authority."));
+  if (binding.contentHash !== void 0 && binding.contentHash !== selected.contentHash) return failure2(diagnostic7("HASH_MISMATCH", "binding.contentHash", "Caller hash is not authoritative."));
+  if (binding.licenseId !== selected.licenseId) return failure2(diagnostic7("LICENSE_MISSING", "binding.licenseId", "License claim does not match canonical authority."));
+  if (binding.mode === "REVIEW" && selected.reviewStatus !== "APPROVED") return failure2(diagnostic7("REVIEW_REQUIRED", "binding.mode", "Review mode requires APPROVED authority."));
+  if (binding.mode === "FORKED" && selected.forkId !== binding.forkId) return failure2(diagnostic7("FORK_MISMATCH", "binding.forkId", "Fork binding does not match canonical authority."));
+  return success2({
+    ...binding,
+    revisionId: selected.revisionId,
+    contentHash: selected.contentHash,
+    licenseId: selected.licenseId
+  });
+}
+
+// src/game/game-350/runtime-qualification.ts
+function success3(value) {
+  return {
+    ok: true,
+    value,
+    diagnostics: []
+  };
+}
+function failure3(...diagnostics) {
+  return {
+    ok: false,
+    diagnostics
+  };
+}
+function diagnostic8(code, path, message) {
   return {
     code,
     path,
@@ -13949,7 +14944,7 @@ function integrationDiagnosticCode(code) {
   return "INVALID_MANIFEST";
 }
 function resultFromIntegration(result) {
-  return result.ok && result.value !== void 0 ? success2(result.value) : failure2(...result.diagnostics.map((item) => diagnostic7(integrationDiagnosticCode(item.code), item.path, item.message)));
+  return result.ok && result.value !== void 0 ? success3(result.value) : failure3(...result.diagnostics.map((item) => diagnostic8(integrationDiagnosticCode(item.code), item.path, item.message)));
 }
 function runtimeValidationCode(item) {
   if (item.code === "HASH_MISMATCH") return "HASH_MISMATCH";
@@ -13961,27 +14956,27 @@ function runtimeValidationCode(item) {
 function validateRuntimeManifest(project) {
   try {
     const validation = validateGameProject2(project);
-    if (validation.valid) return success2(project);
+    if (validation.valid) return success3(project);
     const first = validation.diagnostics.find((item) => item.severity === "ERROR") ?? validation.diagnostics[0];
-    if (first === void 0) return failure2(diagnostic7("INVALID_MANIFEST", "project", "Runtime Project manifest is invalid."));
-    return failure2(diagnostic7(runtimeValidationCode(first), "project", validation.diagnostics.map((item) => item.message).join(" ")));
+    if (first === void 0) return failure3(diagnostic8("INVALID_MANIFEST", "project", "Runtime Project manifest is invalid."));
+    return failure3(diagnostic8(runtimeValidationCode(first), "project", validation.diagnostics.map((item) => item.message).join(" ")));
   } catch (error2) {
-    return failure2(diagnostic7("INVALID_MANIFEST", "project", error2 instanceof Error ? error2.message : "Runtime Project manifest is malformed."));
+    return failure3(diagnostic8("INVALID_MANIFEST", "project", error2 instanceof Error ? error2.message : "Runtime Project manifest is malformed."));
   }
 }
 function resolveRuntimeIdentity(request) {
-  if (request.project === void 0 || request.project === null) return failure2(diagnostic7("MISSING_PROJECT", "project", "Runtime Project is required."));
-  if (typeof request.project !== "object" || Array.isArray(request.project)) return failure2(diagnostic7("INVALID_MANIFEST", "project", "Runtime Project manifest must be an object."));
+  if (request.project === void 0 || request.project === null) return failure3(diagnostic8("MISSING_PROJECT", "project", "Runtime Project is required."));
+  if (typeof request.project !== "object" || Array.isArray(request.project)) return failure3(diagnostic8("INVALID_MANIFEST", "project", "Runtime Project manifest must be an object."));
   const project = request.project;
-  if (project.projectId !== request.projectId) return failure2(diagnostic7("WRONG_PROJECT", "projectId", "Runtime Project identity does not match the requested Project."));
+  if (project.projectId !== request.projectId) return failure3(diagnostic8("WRONG_PROJECT", "projectId", "Runtime Project identity does not match the requested Project."));
   const manifest = validateRuntimeManifest(project);
-  if (!manifest.ok || manifest.value === void 0) return failure2(...manifest.diagnostics);
+  if (!manifest.ok || manifest.value === void 0) return failure3(...manifest.diagnostics);
   const scene = project.scenes.find((candidate) => candidate.sceneId === request.sceneId);
-  if (!scene) return failure2(diagnostic7("MISSING_SCENE", "sceneId", "Requested Scene is not part of the canonical Project."));
+  if (!scene) return failure3(diagnostic8("MISSING_SCENE", "sceneId", "Requested Scene is not part of the canonical Project."));
   if (request.entityId !== void 0 && !scene.entities.some((entity2) => entity2.entityId === request.entityId)) {
-    return failure2(diagnostic7("WRONG_ENTITY", "entityId", "Requested Entity is not a member of the requested canonical Scene."));
+    return failure3(diagnostic8("WRONG_ENTITY", "entityId", "Requested Entity is not a member of the requested canonical Scene."));
   }
-  return success2({
+  return success3({
     project,
     sceneId: scene.sceneId,
     ...request.entityId === void 0 ? {} : {
@@ -14046,13 +15041,13 @@ function createGame350AssetRegistryAdapter(authority, options = {}) {
   };
   return {
     resolve(reference, context) {
-      if (reference.mode !== "LIVE" && reference.mode !== "PINNED") return failure2(diagnostic7("MODE_MISMATCH", "reference.mode", "Runtime accepts only LIVE or PINNED asset references."));
+      if (reference.mode !== "LIVE" && reference.mode !== "PINNED") return failure3(diagnostic8("MODE_MISMATCH", "reference.mode", "Runtime accepts only LIVE or PINNED asset references."));
       const sameAsset = byAssetAnyOwner.get(assetKey(reference.kind, String(reference.assetId))) ?? [];
       if (sameAsset.length > 0 && !sameAsset.some((item) => item.projectId === context.projectId && item.ownerId === context.ownerId)) {
-        return failure2(diagnostic7("PROJECT_ASSET_MISMATCH", "context.projectId", "Runtime Asset authority belongs to another Project or owner."));
+        return failure3(diagnostic8("PROJECT_ASSET_MISMATCH", "context.projectId", "Runtime Asset authority belongs to another Project or owner."));
       }
       const candidates = byAsset.get(`${context.projectId}:${context.ownerId}:${assetKey(reference.kind, String(reference.assetId))}`) ?? [];
-      if (candidates.length === 0) return failure2(diagnostic7("MISSING_ASSET", "reference.assetId", "Canonical asset revision is missing."));
+      if (candidates.length === 0) return failure3(diagnostic8("MISSING_ASSET", "reference.assetId", "Canonical asset revision is missing."));
       const caller = {
         projectId: asProjectId(context.projectId),
         ownerId: asOwnerId(context.ownerId),
@@ -14063,7 +15058,7 @@ function createGame350AssetRegistryAdapter(authority, options = {}) {
         try {
           pinnedContentHash = asSha2562(String(reference.contentHash));
         } catch {
-          return failure2(diagnostic7("HASH_MISMATCH", "reference.contentHash", "Pinned Runtime Asset hash is not a valid SHA-256 value."));
+          return failure3(diagnostic8("HASH_MISMATCH", "reference.contentHash", "Pinned Runtime Asset hash is not a valid SHA-256 value."));
         }
       }
       const binding = {
@@ -14082,7 +15077,7 @@ function createGame350AssetRegistryAdapter(authority, options = {}) {
       };
       const current = candidates.slice().sort((a, b) => a.revisionId.localeCompare(b.revisionId)).at(-1);
       if (context.licenseByAsset[String(reference.assetId)] !== current.licenseId) {
-        return failure2(diagnostic7("INVALID_MANIFEST", "context.licenseByAsset", "Runtime Asset license claim does not match canonical authority."));
+        return failure3(diagnostic8("INVALID_MANIFEST", "context.licenseByAsset", "Runtime Asset license claim does not match canonical authority."));
       }
       const cacheIdentity = {
         projectId: context.projectId,
@@ -14098,7 +15093,7 @@ function createGame350AssetRegistryAdapter(authority, options = {}) {
       }
       const cacheKey = liveKey;
       const cached = cacheGet(cacheKey);
-      if (cached !== void 0) return success2(cached);
+      if (cached !== void 0) return success3(cached);
       const resolved = resultFromIntegration(resolveAssetBinding(binding, candidates, caller));
       if (!resolved.ok || resolved.value === void 0) return resolved;
       const value = {
@@ -14110,7 +15105,7 @@ function createGame350AssetRegistryAdapter(authority, options = {}) {
         mode: reference.mode
       };
       cacheSet(cacheKey, value);
-      return success2(value);
+      return success3(value);
     },
     replaceAuthority: (nextAuthority) => {
       indexAuthority(nextAuthority);
@@ -14153,7 +15148,7 @@ function prepareGame350Composition(request) {
       entityId: request.entityId
     }
   });
-  if (!identity.ok || identity.value === void 0) return failure2(...identity.diagnostics);
+  if (!identity.ok || identity.value === void 0) return failure3(...identity.diagnostics);
   const project = identity.value.project;
   const scene = project.scenes.find((item) => item.sceneId === identity.value.sceneId);
   const entity2 = identity.value.entityId === void 0 ? void 0 : scene.entities.find((item) => item.entityId === identity.value.entityId);
@@ -14177,14 +15172,14 @@ function prepareGame350Composition(request) {
   };
   for (const item of references) {
     const resolved = request.adapter.resolve(item.reference, context);
-    if (!resolved.ok || resolved.value === void 0) return failure2(...resolved.diagnostics);
+    if (!resolved.ok || resolved.value === void 0) return failure3(...resolved.diagnostics);
     assets.push({
       componentId: item.componentId,
       reference: item.reference,
       resolved: resolved.value
     });
   }
-  return success2({
+  return success3({
     identity: {
       projectId: String(project.projectId),
       ownerId: request.ownerId,
@@ -14222,11 +15217,11 @@ function createRuntimeLifecycleController() {
   });
   return {
     start(session) {
-      if (active) return failure2(diagnostic7("RUNTIME_ALREADY_RUNNING", "runtime", "Runtime start is idempotent and refuses a duplicate active instance."));
+      if (active) return failure3(diagnostic8("RUNTIME_ALREADY_RUNNING", "runtime", "Runtime start is idempotent and refuses a duplicate active instance."));
       activeSession = session;
       active = true;
       instanceCount += 1;
-      return success2(snapshot());
+      return success3(snapshot());
     },
     stop() {
       if (activeSession !== void 0) activeSession = {
@@ -14247,7 +15242,7 @@ function createRuntimeLifecycleController() {
 }
 
 // src/game/game-350/product-path.ts
-function failure3(...diagnostics) {
+function failure4(...diagnostics) {
   return {
     ok: false,
     diagnostics
@@ -14281,7 +15276,7 @@ async function startGame350ProductPreview(options) {
     adapter,
     licenseByAsset: options.licenseByAsset
   });
-  if (!prepared.ok || prepared.value === void 0) return failure3(...prepared.diagnostics);
+  if (!prepared.ok || prepared.value === void 0) return failure4(...prepared.diagnostics);
   try {
     let session = await createGameRuntimePreview({
       project: options.project,
@@ -14313,7 +15308,7 @@ async function startGame350ProductPreview(options) {
     session = await loadGameRuntimeAssets(session, resolver);
     const lifecycle = createRuntimeLifecycleController();
     const started = lifecycle.start(session);
-    if (!started.ok || started.value === void 0) return failure3(...started.diagnostics);
+    if (!started.ok || started.value === void 0) return failure4(...started.diagnostics);
     const loadedSession = session;
     let current = session;
     let steps = 0;
@@ -14359,7 +15354,7 @@ async function startGame350ProductPreview(options) {
       diagnostics: []
     };
   } catch (error2) {
-    return failure3(errorDiagnostic(error2 instanceof Error ? error2.message : "GAME-350 Runtime preview could not start."));
+    return failure4(errorDiagnostic(error2 instanceof Error ? error2.message : "GAME-350 Runtime preview could not start."));
   }
 }
 
@@ -14536,7 +15531,7 @@ var BUILT_IN_PROFILES = Object.freeze([
 function stable2(value) {
   return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(value);
 }
-function diagnostic8(code, path, message) {
+function diagnostic9(code, path, message) {
   return {
     code,
     path,
@@ -14546,27 +15541,27 @@ function diagnostic8(code, path, message) {
 function validateGameRuntimeProfile(profile) {
   const diagnostics = [];
   if (profile.schemaVersion !== GAME_RUNTIME_PROFILE_SCHEMA_VERSION2) {
-    diagnostics.push(diagnostic8("INVALID_PROFILE", "schemaVersion", "Runtime profile schema is unsupported."));
+    diagnostics.push(diagnostic9("INVALID_PROFILE", "schemaVersion", "Runtime profile schema is unsupported."));
   }
   if (!stable2(profile.profileId)) {
-    diagnostics.push(diagnostic8("INVALID_PROFILE", "profileId", "Runtime profile id is not stable."));
+    diagnostics.push(diagnostic9("INVALID_PROFILE", "profileId", "Runtime profile id is not stable."));
   }
   if (!profile.label.trim()) {
-    diagnostics.push(diagnostic8("INVALID_PROFILE", "label", "Runtime profile label is required."));
+    diagnostics.push(diagnostic9("INVALID_PROFILE", "label", "Runtime profile label is required."));
   }
   if (profile.genre === "CUSTOM" && profile.profileId.length === 0) {
-    diagnostics.push(diagnostic8("INVALID_PROFILE", "profileId", "Custom runtime profile id is required."));
+    diagnostics.push(diagnostic9("INVALID_PROFILE", "profileId", "Custom runtime profile id is required."));
   }
   if (profile.dimension !== "2D" && profile.dimension !== "3D") {
-    diagnostics.push(diagnostic8("INVALID_PROFILE", "dimension", "Runtime profile dimension is unsupported."));
+    diagnostics.push(diagnostic9("INVALID_PROFILE", "dimension", "Runtime profile dimension is unsupported."));
   }
   if (!Array.isArray(profile.capabilities) || profile.capabilities.length === 0) {
-    diagnostics.push(diagnostic8("INVALID_PROFILE", "capabilities", "Runtime profile must declare capabilities."));
+    diagnostics.push(diagnostic9("INVALID_PROFILE", "capabilities", "Runtime profile must declare capabilities."));
   } else if (new Set(profile.capabilities).size !== profile.capabilities.length) {
-    diagnostics.push(diagnostic8("INVALID_PROFILE", "capabilities", "Runtime profile capabilities must be unique."));
+    diagnostics.push(diagnostic9("INVALID_PROFILE", "capabilities", "Runtime profile capabilities must be unique."));
   }
   if (profile.status !== "AVAILABLE" && profile.status !== "FOUNDATION" && profile.status !== "PLANNED") {
-    diagnostics.push(diagnostic8("INVALID_PROFILE", "status", "Runtime profile status is unsupported."));
+    diagnostics.push(diagnostic9("INVALID_PROFILE", "status", "Runtime profile status is unsupported."));
   }
   return {
     valid: diagnostics.length === 0,
@@ -14724,9 +15719,9 @@ var DEFAULT_PHYSICS_2D_SETTINGS = Object.freeze({
 });
 
 // src/game/game-350/tilemap-authoring.ts
-var GAME350_TILEMAP_MAX_WIDTH = 256;
-var GAME350_TILEMAP_MAX_HEIGHT = 256;
-var GAME350_TILEMAP_MAX_CELLS = 65536;
+var GAME350_TILEMAP_MAX_WIDTH = Number.MAX_SAFE_INTEGER;
+var GAME350_TILEMAP_MAX_HEIGHT = Number.MAX_SAFE_INTEGER;
+var GAME350_TILEMAP_MAX_CELLS = Number.MAX_SAFE_INTEGER;
 function freezeDeep(value) {
   if (value !== null && typeof value === "object" && !Object.isFrozen(value)) {
     Object.freeze(value);
@@ -14748,13 +15743,10 @@ function idIsValid(value) {
 function assertDimensions(mapId, width, height, tileSize) {
   if (!idIsValid(mapId)) throw new Error("Tilemap mapId is invalid.");
   if (!Number.isSafeInteger(width) || width < 1 || width > GAME350_TILEMAP_MAX_WIDTH) {
-    throw new Error("Tilemap width must be an integer between 1 and 256.");
+    throw new Error("Tilemap width must be a positive safe integer.");
   }
   if (!Number.isSafeInteger(height) || height < 1 || height > GAME350_TILEMAP_MAX_HEIGHT) {
-    throw new Error("Tilemap height must be an integer between 1 and 256.");
-  }
-  if (width * height > GAME350_TILEMAP_MAX_CELLS) {
-    throw new Error("Tilemap cell capacity is limited to 65536 cells.");
+    throw new Error("Tilemap height must be a positive safe integer.");
   }
   if (!Number.isSafeInteger(tileSize) || tileSize < 1 || tileSize > 4096) {
     throw new Error("Tilemap tileSize must be an integer between 1 and 4096.");
@@ -14772,7 +15764,10 @@ function normalizeCells(cells = [], width, height) {
     if (cell.triggerId !== void 0 && !idIsValid(cell.triggerId)) {
       throw new Error("Tilemap triggerId is invalid.");
     }
-    if (cell.collision === "NONE" && cell.triggerId === void 0) {
+    if (cell.blockTypeId !== void 0 && !idIsValid(cell.blockTypeId)) {
+      throw new Error("Tilemap blockTypeId is invalid.");
+    }
+    if (cell.collision === "NONE" && cell.triggerId === void 0 && cell.blockTypeId === void 0) {
       throw new Error("An empty tilemap cell must not be persisted.");
     }
     const key = cellKey(cell.x, cell.y);
@@ -14783,6 +15778,9 @@ function normalizeCells(cells = [], width, height) {
       collision: cell.collision,
       ...cell.triggerId === void 0 ? {} : {
         triggerId: cell.triggerId
+      },
+      ...cell.blockTypeId === void 0 ? {} : {
+        blockTypeId: cell.blockTypeId
       }
     });
   }
@@ -14794,9 +15792,6 @@ function documentFrom(options) {
   const tileSize = options.tileSize ?? 1;
   assertDimensions(options.mapId, options.width, options.height, tileSize);
   const cells = normalizeCells(options.cells, options.width, options.height);
-  if (cells.length > GAME350_TILEMAP_MAX_CELLS) {
-    throw new Error("Tilemap cell capacity is limited to 65536 cells.");
-  }
   return freezeDeep({
     schemaVersion: GAME_TILEMAP_DOCUMENT_SCHEMA_VERSION,
     mapId: options.mapId,
@@ -14848,7 +15843,7 @@ function bounded(value, minimum, maximum, fallback) {
 function integerBounded(value, minimum, maximum, fallback) {
   return Number.isSafeInteger(value) && Number(value) >= minimum && Number(value) <= maximum ? Number(value) : fallback;
 }
-function record2(value) {
+function record3(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value) ? value : void 0;
 }
 function stableId2(value) {
@@ -14866,9 +15861,9 @@ function normalizeCamera2DSettings(value, fallback = DEFAULT_CAMERA_2D_SETTINGS)
       }
     };
   }
-  const source = record2(value);
-  const sourceFollow = record2(source?.follow);
-  const sourceShake = record2(source?.shake);
+  const source = record3(value);
+  const sourceFollow = record3(source?.follow);
+  const sourceShake = record3(source?.shake);
   const fallbackFollow = fallback.follow;
   const fallbackShake = fallback.shake;
   return {
@@ -15522,21 +16517,141 @@ var DODGE_SURVIVAL_SECONDS = 15;
 var DODGE_SURVIVAL_TICKS = DODGE_SURVIVAL_SECONDS * 60;
 var DODGE_MOVE_SPEED = 4.5;
 var DODGE_ENEMY_SPEED = 0.045;
+var DEFAULT_NPC_STATUS = {
+  hp: 10,
+  maxHp: 10,
+  stamina: 10,
+  maxStamina: 10,
+  mp: 0,
+  maxMp: 0,
+  attack: 2,
+  defense: 0,
+  level: 1
+};
+var DEFAULT_PLAYER_STATUS = {
+  hp: 10,
+  maxHp: 10,
+  stamina: 10,
+  maxStamina: 10,
+  mp: 0,
+  maxMp: 0,
+  attack: 2,
+  defense: 1,
+  level: 1
+};
+var COMBAT_TICK_INTERVAL = 30;
+var BLOCK_REACH_DISTANCE = 1.4;
 function point(x, y) {
   return {
     x,
     y
   };
 }
+function cellKey3(x, y) {
+  return `${x},${y}`;
+}
+function nearbyCellCandidates(playerPosition, world) {
+  const cx = Math.floor(playerPosition.x);
+  const cy = Math.floor(playerPosition.y);
+  const candidates = [
+    point(cx, cy),
+    point(cx - 1, cy),
+    point(cx + 1, cy),
+    point(cx, cy - 1),
+    point(cx, cy + 1)
+  ].filter((cell) => cell.x >= 0 && cell.x < world.width && cell.y >= 0 && cell.y < world.height);
+  return candidates.map((cell) => ({
+    cell,
+    // Compare against the cell's center, not its corner, for a fair
+    // "which cell is actually closest to me" ordering.
+    d: distance(playerPosition, point(cell.x + 0.5, cell.y + 0.5))
+  })).filter(({ d }) => d <= BLOCK_REACH_DISTANCE).sort((a, b) => a.d - b.d).map(({ cell }) => cell);
+}
 function distance(left, right) {
   return Math.hypot(left.x - right.x, left.y - right.y);
 }
 function isDodgeEnemy(object) {
-  const text = `${object.id} ${object.label}`.toLowerCase();
-  return object.role === "NPC" || text.includes("enemy") || text.includes("\u6575");
+  const text2 = `${object.id} ${object.label}`.toLowerCase();
+  return object.role === "NPC" || text2.includes("enemy") || text2.includes("\u6575");
 }
 function trackRole(track) {
   return track.role;
+}
+function trackStatus(track, fallback) {
+  const status2 = track?.components?.find((component) => component.type === "STATUS");
+  if (status2?.type !== "STATUS" || !status2.enabled) return fallback;
+  const maxHp = Math.max(1, status2.maxHp);
+  const maxStamina = Math.max(0, status2.maxStamina);
+  const maxMp = Math.max(0, status2.maxMp);
+  return {
+    hp: Math.max(0, Math.min(status2.hp, maxHp)),
+    maxHp,
+    stamina: Math.max(0, Math.min(status2.stamina, maxStamina)),
+    maxStamina,
+    mp: Math.max(0, Math.min(status2.mp, maxMp)),
+    maxMp,
+    attack: Math.max(0, status2.attack),
+    defense: Math.max(0, status2.defense),
+    level: Math.max(1, Math.round(status2.level))
+  };
+}
+function trackBrainMode(track) {
+  const brain = track?.components?.find((component) => component.type === "BRAIN");
+  if (brain?.type !== "BRAIN" || !brain.enabled) return void 0;
+  return {
+    mode: brain.mode,
+    speed: brain.speed,
+    range: brain.range
+  };
+}
+function stepBrain(object, playerPosition, world) {
+  const brain = object.brain;
+  if (brain === void 0) return object;
+  if (brain.mode !== "PURSUE" && brain.mode !== "AVOID") return object;
+  const dx = playerPosition.x - object.position.x;
+  const dy = playerPosition.y - object.position.y;
+  const length = Math.hypot(dx, dy);
+  if (length <= 1e-3 || length > brain.range) return object;
+  const speed = Math.max(0, brain.speed) * 0.01;
+  const move = Math.min(speed, length);
+  const direction = brain.mode === "PURSUE" ? 1 : -1;
+  return {
+    ...object,
+    position: point(Math.min(world.width - PLAYER_HALF_WIDTH, Math.max(PLAYER_HALF_WIDTH, object.position.x + dx / length * move * direction)), Math.min(world.height - PLAYER_HALF_HEIGHT, Math.max(PLAYER_HALF_HEIGHT, object.position.y + dy / length * move * direction)))
+  };
+}
+function applyContactCombat(playerStatus, playerPosition, objects) {
+  let nextPlayerStatus = playerStatus;
+  const nextObjects = [];
+  for (const object of objects) {
+    if (object.role !== "NPC" || object.status === void 0 || nextPlayerStatus.hp <= 0) {
+      nextObjects.push(object);
+      continue;
+    }
+    if (distance(playerPosition, object.position) > TOUCH_DISTANCE) {
+      nextObjects.push(object);
+      continue;
+    }
+    const damageToObject = Math.max(1, nextPlayerStatus.attack - object.status.defense);
+    const damageToPlayer = Math.max(1, object.status.attack - nextPlayerStatus.defense);
+    const objectHp = Math.max(0, object.status.hp - damageToObject);
+    nextPlayerStatus = {
+      ...nextPlayerStatus,
+      hp: Math.max(0, nextPlayerStatus.hp - damageToPlayer)
+    };
+    if (objectHp <= 0) continue;
+    nextObjects.push({
+      ...object,
+      status: {
+        ...object.status,
+        hp: objectHp
+      }
+    });
+  }
+  return {
+    objects: nextObjects,
+    playerStatus: nextPlayerStatus
+  };
 }
 function trackPosition(track) {
   const transform2 = track.components?.find((component) => component.type === "TRANSFORM");
@@ -15555,10 +16670,17 @@ function mapFromTracks(tracks) {
   const solidCells = document2?.cells.filter((cell) => cell.collision === "SOLID").map((cell) => point(cell.x, cell.y)) ?? Array.from({
     length: width
   }, (_, x) => point(x, height - 1));
+  const blockTypeIds = {};
+  for (const cell of document2?.cells ?? []) {
+    if (cell.blockTypeId !== void 0) {
+      blockTypeIds[`${cell.x},${cell.y}`] = cell.blockTypeId;
+    }
+  }
   return {
     width,
     height,
-    solidCells
+    solidCells,
+    blockTypeIds
   };
 }
 function objectById(state2, id) {
@@ -15582,11 +16704,33 @@ function targetPosition(state2, card) {
   return void 0;
 }
 function cardIsNearTarget(state2, card) {
+  if (card.condition === "HAS_ITEM") {
+    const have = state2.inventory[card.itemId ?? ""] ?? 0;
+    return have >= Math.max(1, card.amount ?? 1);
+  }
   const target = targetPosition(state2, card);
   if (target !== void 0 && card.condition === "REACH_GOAL" && state2.runtimeFamily === "SCROLL_SIDE") {
     return state2.playerPosition.x >= target.x - TOUCH_DISTANCE;
   }
   return target === void 0 || distance(state2.playerPosition, target) <= TOUCH_DISTANCE;
+}
+function addToInventory(inventory, itemId, amount) {
+  const next = Math.max(0, (inventory[itemId] ?? 0) + amount);
+  return {
+    ...inventory,
+    [itemId]: next
+  };
+}
+function craftRecipe(inventory, recipes, recipeId) {
+  const recipe = recipes.find((candidate) => candidate.recipeId === recipeId);
+  if (recipe === void 0) return inventory;
+  const canCraft = recipe.ingredients.every((ingredient) => (inventory[ingredient.itemId] ?? 0) >= ingredient.amount);
+  if (!canCraft) return inventory;
+  let next = inventory;
+  for (const ingredient of recipe.ingredients) {
+    next = addToInventory(next, ingredient.itemId, -ingredient.amount);
+  }
+  return addToInventory(next, recipe.result.itemId, recipe.result.amount);
 }
 function applyEventCard(state2, card) {
   if (!card.enabled) return state2;
@@ -15628,6 +16772,78 @@ function applyEventCard(state2, card) {
           state: card.message?.trim() || true
         }
       };
+    case "GIVE_ITEM":
+      if (card.itemId === void 0) return state2;
+      return {
+        ...state2,
+        inventory: addToInventory(state2.inventory, card.itemId, Math.max(1, card.amount ?? 1))
+      };
+    case "TAKE_ITEM":
+      if (card.itemId === void 0) return state2;
+      return {
+        ...state2,
+        inventory: addToInventory(state2.inventory, card.itemId, -Math.max(1, card.amount ?? 1))
+      };
+    case "CRAFT_ITEM":
+      return {
+        ...state2,
+        inventory: craftRecipe(state2.inventory, state2.recipes, card.recipeId)
+      };
+    case "BREAK_BLOCK": {
+      for (const cell of nearbyCellCandidates(state2.playerPosition, state2.world)) {
+        const key = cellKey3(cell.x, cell.y);
+        const blockTypeId = state2.world.blockTypeIds[key];
+        if (blockTypeId === void 0) continue;
+        const blockType = state2.blockTypes.find((candidate) => candidate.blockTypeId === blockTypeId);
+        if (blockType === void 0 || !blockType.breakable) continue;
+        const nextBlockTypeIds = {
+          ...state2.world.blockTypeIds
+        };
+        delete nextBlockTypeIds[key];
+        return {
+          ...state2,
+          world: {
+            ...state2.world,
+            blockTypeIds: nextBlockTypeIds,
+            solidCells: state2.world.solidCells.filter((solid) => !(solid.x === cell.x && solid.y === cell.y))
+          },
+          inventory: blockType.dropItemId === void 0 ? state2.inventory : addToInventory(state2.inventory, blockType.dropItemId, 1)
+        };
+      }
+      return state2;
+    }
+    case "PLACE_BLOCK": {
+      if (card.blockTypeId === void 0 || card.itemId === void 0) {
+        return state2;
+      }
+      const blockType = state2.blockTypes.find((candidate) => candidate.blockTypeId === card.blockTypeId);
+      if (blockType === void 0 || !blockType.placeable || (state2.inventory[card.itemId] ?? 0) < 1) {
+        return state2;
+      }
+      const playerCellX = Math.floor(state2.playerPosition.x);
+      const playerCellY = Math.floor(state2.playerPosition.y);
+      for (const cell of nearbyCellCandidates(state2.playerPosition, state2.world)) {
+        if (cell.x === playerCellX && cell.y === playerCellY) continue;
+        const key = cellKey3(cell.x, cell.y);
+        if (state2.world.blockTypeIds[key] !== void 0) continue;
+        return {
+          ...state2,
+          world: {
+            ...state2.world,
+            blockTypeIds: {
+              ...state2.world.blockTypeIds,
+              [key]: card.blockTypeId
+            },
+            solidCells: [
+              ...state2.world.solidCells,
+              cell
+            ]
+          },
+          inventory: addToInventory(state2.inventory, card.itemId, -1)
+        };
+      }
+      return state2;
+    }
   }
 }
 function cameraOriginFor(playerPosition, camera2D, world) {
@@ -15665,7 +16881,7 @@ function processEventCards(state2, input) {
     if (!card.enabled || card.condition === "START") continue;
     const near = cardIsNearTarget(next, card);
     const inputTriggered = card.condition === "TAP" ? input.tap === true : card.condition === "INTERACT" ? input.interact === true : false;
-    const rangeTriggered = card.condition === "TOUCH" || card.condition === "ENTER_RANGE" || card.condition === "REACH_GOAL";
+    const rangeTriggered = card.condition === "TOUCH" || card.condition === "ENTER_RANGE" || card.condition === "REACH_GOAL" || card.condition === "HAS_ITEM";
     const triggered = rangeTriggered ? near : inputTriggered && near;
     if (!triggered) continue;
     if (rangeTriggered) activeEventIds.push(card.eventId);
@@ -15747,12 +16963,22 @@ function createGameGenreRuntime(project) {
   const world = mapFromTracks(tracks);
   const cameraTrack = tracks.find((track) => track.role === "CAMERA");
   const camera2D = trackCamera(cameraTrack);
-  const objects = tracks.filter((track) => track.trackId !== playerId).filter((track) => track.active !== false).map((track) => ({
-    id: track.trackId,
-    label: track.label,
-    role: trackRole(track),
-    position: trackPosition(track)
-  }));
+  const objects = tracks.filter((track) => track.trackId !== playerId).filter((track) => track.active !== false).map((track) => {
+    const role = trackRole(track);
+    const brain = trackBrainMode(track);
+    return {
+      id: track.trackId,
+      label: track.label,
+      role,
+      position: trackPosition(track),
+      ...role === "NPC" ? {
+        status: trackStatus(track, DEFAULT_NPC_STATUS)
+      } : {},
+      ...brain === void 0 ? {} : {
+        brain
+      }
+    };
+  });
   const state2 = {
     schemaVersion: GAME_GENRE_RUNTIME_SCHEMA_VERSION,
     projectId: project.projectId,
@@ -15770,6 +16996,7 @@ function createGameGenreRuntime(project) {
     velocity: POINT_ZERO,
     grounded: false,
     health: 3,
+    playerStatus: trackStatus(player, DEFAULT_PLAYER_STATUS),
     survivalSeconds: 0,
     gameOver: false,
     camera2D,
@@ -15783,7 +17010,10 @@ function createGameGenreRuntime(project) {
     dialogue: null,
     lastAudioTrackId: null,
     sceneComplete: false,
-    variables: {}
+    variables: {},
+    inventory: {},
+    recipes: project.editorTimeline?.recipes ?? [],
+    blockTypes: project.editorTimeline?.blockTypes ?? []
   };
   return initialEventState(state2);
 }
@@ -15817,8 +17047,8 @@ function triggerGameGenreCameraShake(state2) {
 }
 function stepGameGenre(state2, input = {}) {
   if (state2.mode !== "PLAYING" || state2.gameOver || state2.sceneComplete) return state2;
-  const nextObjects = state2.runtimeFamily === "DODGE_ARENA" ? state2.objects.map((object) => {
-    if (!isDodgeEnemy(object)) return object;
+  const chasedObjects = state2.runtimeFamily === "DODGE_ARENA" ? state2.objects.map((object) => {
+    if (object.brain !== void 0 || !isDodgeEnemy(object)) return object;
     const dx = state2.playerPosition.x - object.position.x;
     const dy = state2.playerPosition.y - object.position.y;
     const length = Math.hypot(dx, dy);
@@ -15829,18 +17059,25 @@ function stepGameGenre(state2, input = {}) {
       position: point(Math.min(state2.world.width - PLAYER_HALF_WIDTH, Math.max(PLAYER_HALF_WIDTH, object.position.x + dx / length * move)), Math.min(state2.world.height - PLAYER_HALF_HEIGHT, Math.max(PLAYER_HALF_HEIGHT, object.position.y + dy / length * move)))
     };
   }) : state2.objects;
+  const brainObjects = chasedObjects.map((object) => stepBrain(object, state2.playerPosition, state2.world));
   const movement2 = stepMovement(state2, input);
+  const combat = (state2.tick + 1) % COMBAT_TICK_INTERVAL === 0 ? applyContactCombat(state2.playerStatus, movement2.playerPosition, brainObjects) : {
+    objects: brainObjects,
+    playerStatus: state2.playerStatus
+  };
   const nextBase = {
     ...state2,
     tick: state2.tick + 1,
-    objects: nextObjects,
+    objects: combat.objects,
+    playerStatus: combat.playerStatus,
     playerPosition: movement2.playerPosition,
     velocity: movement2.velocity,
     grounded: movement2.grounded,
     survivalSeconds: state2.runtimeFamily === "DODGE_ARENA" ? Math.floor((state2.tick + 1) / 60) : state2.survivalSeconds,
     cameraOrigin: cameraOriginFor(movement2.playerPosition, state2.camera2D, state2.world),
     cameraShakeFrames: Math.max(0, state2.cameraShakeFrames - 1),
-    dialogue: input.interact === true || input.tap === true ? null : state2.dialogue
+    dialogue: input.interact === true || input.tap === true ? null : state2.dialogue,
+    gameOver: state2.gameOver || combat.playerStatus.hp <= 0
   };
   const eventState = processEventCards(nextBase, input);
   if (eventState.runtimeFamily === "DODGE_ARENA" && eventState.tick >= DODGE_SURVIVAL_TICKS && !eventState.gameOver) {
@@ -15859,6 +17096,7 @@ var WORKSPACE_MANIFEST_DB_VERSION = 1;
 var WORKSPACE_MANIFEST_STORE_NAME = "manifests";
 var WORKSPACE_ACTIVE_PROJECT_STORAGE_KEY = "pixiedraw2:active-project-id:v1";
 var WORKSPACE_PROJECT_CHANGED_EVENT = "pixiedraw2:project-changed";
+var WORKSPACE_MANIFEST_CHANGED_EVENT = "pixiedraw2:workspace-manifest-changed";
 var DEFAULT_WORKSPACE_PROJECT_ID = "draw2-local-demo";
 var SAFE_ID5 = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$/u;
 var MANIFEST_KEYS = /* @__PURE__ */ new Set([
@@ -15979,21 +17217,21 @@ function normalizedManifest(value) {
       if (audioMigration === null || typeof audioMigration !== "object") {
         return null;
       }
-      const record3 = audioMigration;
-      if (Object.keys(record3).some((key) => ![
+      const record4 = audioMigration;
+      if (Object.keys(record4).some((key) => ![
         "status",
         "legacyProjectId",
         "migratedAt",
         "verifiedAt"
       ].includes(key))) return null;
-      if (!isWorkspaceMigrationStatus(record3.status) || !safeReference(record3.legacyProjectId) || typeof record3.migratedAt !== "string" || record3.verifiedAt !== void 0 && typeof record3.verifiedAt !== "string") return null;
+      if (!isWorkspaceMigrationStatus(record4.status) || !safeReference(record4.legacyProjectId) || typeof record4.migratedAt !== "string" || record4.verifiedAt !== void 0 && typeof record4.verifiedAt !== "string") return null;
       migration = {
         audio: {
-          status: record3.status,
-          legacyProjectId: record3.legacyProjectId,
-          migratedAt: record3.migratedAt,
-          ...record3.verifiedAt === void 0 ? {} : {
-            verifiedAt: record3.verifiedAt
+          status: record4.status,
+          legacyProjectId: record4.legacyProjectId,
+          migratedAt: record4.migratedAt,
+          ...record4.verifiedAt === void 0 ? {} : {
+            verifiedAt: record4.verifiedAt
           }
         }
       };
@@ -16144,6 +17382,7 @@ function createIndexedDbWorkspaceManifestStore(databaseName = WORKSPACE_MANIFEST
         }
       };
       await this.save(next);
+      announceWorkspaceManifestChanged(next);
       return next;
     },
     async setActiveMode(projectId, activeMode) {
@@ -16168,6 +17407,7 @@ function createIndexedDbWorkspaceManifestStore(databaseName = WORKSPACE_MANIFEST
         }
       };
       await this.save(next);
+      announceWorkspaceManifestChanged(next);
       return next;
     }
   };
@@ -16188,6 +17428,12 @@ function writeActiveWorkspaceProjectId(projectId, storage = typeof window === "u
 function announceWorkspaceProjectChanged(windowRef, detail) {
   windowRef.dispatchEvent(new CustomEvent(WORKSPACE_PROJECT_CHANGED_EVENT, {
     detail
+  }));
+}
+function announceWorkspaceManifestChanged(manifest) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(WORKSPACE_MANIFEST_CHANGED_EVENT, {
+    detail: cloneManifest(manifest)
   }));
 }
 
@@ -16226,6 +17472,42 @@ async function deleteWorkspaceProjectLocalData(projectId, ports) {
     cleared,
     failed
   };
+}
+
+// src/pixync/collaboration-scope.ts
+var COLLABORATION_SCOPE_KEYS = [
+  "DRAW",
+  "AUDIO",
+  "GAME",
+  "WRITING",
+  "PUBLISH"
+];
+var COLLABORATION_EDIT_SCOPE_POLICIES = [
+  "OPEN",
+  "ASSIGNED_ONLY"
+];
+var COLLABORATION_EDIT_SCOPE_POLICY_LABELS = Object.freeze({
+  OPEN: "\u81EA\u7531\u306B\u7DE8\u96C6",
+  ASSIGNED_ONLY: "\u62C5\u5F53\u7BC4\u56F2\u306E\u307F"
+});
+var COLLABORATION_SCOPE_LABELS = Object.freeze({
+  DRAW: "iDRAW\u30FB\u7D75\u3068\u30A2\u30CB\u30E1\u30FC\u30B7\u30E7\u30F3",
+  AUDIO: "iAUDIO\u30FB\u97F3\u697D\u3068SE",
+  GAME: "iGAME\u30FB\u30B2\u30FC\u30E0\u914D\u7F6E\u3068\u8A2D\u5B9A",
+  WRITING: "\u6587\u7AE0\u30FB\u4E16\u754C\u89B3",
+  PUBLISH: "\u516C\u958B\u30FB\u8CA9\u58F2"
+});
+function isCollaborationScopeKey(value) {
+  return typeof value === "string" && COLLABORATION_SCOPE_KEYS.includes(value);
+}
+function isCollaborationEditScopePolicy(value) {
+  return typeof value === "string" && COLLABORATION_EDIT_SCOPE_POLICIES.includes(value);
+}
+function editScopePolicyLabel(value) {
+  return isCollaborationEditScopePolicy(value) ? COLLABORATION_EDIT_SCOPE_POLICY_LABELS[value] : COLLABORATION_EDIT_SCOPE_POLICY_LABELS.OPEN;
+}
+function scopeLabel(value) {
+  return isCollaborationScopeKey(value) ? COLLABORATION_SCOPE_LABELS[value] : "\u62C5\u5F53\u7BC4\u56F2";
 }
 
 // src/pixync/indexeddb-persistence.ts
@@ -16353,7 +17635,7 @@ function readRecord(db, projectId) {
       ], "readonly");
       const request = transaction.objectStore(STORE_NAME).get(projectId);
       const deletedRequest = transaction.objectStore(DELETED_STORE_NAME).get(projectId);
-      let record3;
+      let record4;
       let requestFinished = false;
       let deleted = false;
       let deletedRequestFinished = false;
@@ -16366,7 +17648,7 @@ function readRecord(db, projectId) {
       request.onerror = () => rejectOnce(request.error);
       request.onsuccess = () => {
         requestFinished = true;
-        record3 = request.result;
+        record4 = request.result;
       };
       deletedRequest.onerror = () => rejectOnce(deletedRequest.error);
       deletedRequest.onsuccess = () => {
@@ -16383,7 +17665,7 @@ function readRecord(db, projectId) {
         }
         settled = true;
         resolve({
-          record: record3,
+          record: record4,
           deleted
         });
       };
@@ -16420,7 +17702,7 @@ function readDeletionMarker(db, projectId) {
     }
   });
 }
-function writeRecord(db, record3) {
+function writeRecord(db, record4) {
   return new Promise((resolve, reject2) => {
     let transaction;
     let deletedProject;
@@ -16438,7 +17720,7 @@ function writeRecord(db, record3) {
       ], "readwrite");
       const snapshots = transaction.objectStore(STORE_NAME);
       const deletedProjects = transaction.objectStore(DELETED_STORE_NAME);
-      const deletionRead = deletedProjects.get(record3.projectId);
+      const deletionRead = deletedProjects.get(record4.projectId);
       deletionRead.onerror = () => rejectOnce(deletionRead.error);
       deletionRead.onsuccess = () => {
         deletedProject = deletionRead.result;
@@ -16448,7 +17730,7 @@ function writeRecord(db, record3) {
           return;
         }
         try {
-          const request = snapshots.put(clone2(record3));
+          const request = snapshots.put(clone2(record4));
           request.onerror = () => rejectOnce(request.error);
         } catch (error2) {
           rejectOnce(error2);
@@ -16598,12 +17880,12 @@ function compareAndSwapRecord(db, projectId, snapshot, expectedSnapshotHash) {
     }
   });
 }
-function normalizeRecord(record3, projectId) {
-  if (record3 === void 0) return void 0;
-  if (record3 === null || typeof record3 !== "object" || record3.projectId !== projectId || !("snapshot" in record3)) {
+function normalizeRecord(record4, projectId) {
+  if (record4 === void 0) return void 0;
+  if (record4 === null || typeof record4 !== "object" || record4.projectId !== projectId || !("snapshot" in record4)) {
     throw new PixyncIndexedDbPersistenceError("RECORD_MALFORMED", "IndexedDB snapshot record is malformed or belongs to another project.");
   }
-  return clone2(record3.snapshot);
+  return clone2(record4.snapshot);
 }
 var PixyncIndexedDbSnapshotPersistence = class {
   projectId;
@@ -16649,11 +17931,11 @@ var PixyncIndexedDbSnapshotPersistence = class {
       if (snapshot.projectId !== this.projectId) {
         throw new PixyncIndexedDbPersistenceError("PROJECT_MISMATCH", "IndexedDB snapshot belongs to another project.");
       }
-      const record3 = {
+      const record4 = {
         projectId: this.projectId,
         snapshot: clone2(snapshot)
       };
-      await withDatabase(this.#factory, this.dbName, (db) => writeRecord(db, record3));
+      await withDatabase(this.#factory, this.dbName, (db) => writeRecord(db, record4));
     });
   }
   compareAndSwap(snapshot, expectedSnapshotHash) {
@@ -16711,12 +17993,12 @@ var PixyncCheckpointPublishError = class extends Error {
     this.name = "PixyncCheckpointPublishError";
   }
 };
-function isRecord6(value) {
+function isRecord7(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 function exactlyOneRow(value, label) {
   const row = Array.isArray(value) ? value.length === 1 ? value[0] : void 0 : value;
-  if (!isRecord6(row)) {
+  if (!isRecord7(row)) {
     throw new PixyncCheckpointPublishError("SERVER_RESPONSE_INVALID", `${label} did not return exactly one object row.`);
   }
   return row;
@@ -16787,7 +18069,7 @@ function uploadBody(bytes) {
     type: PIXYNC_INITIAL_CHECKPOINT_MEDIA_TYPE
   });
 }
-function validateInput(input) {
+function validateInput2(input) {
   const roomId = typeof input.projectId === "string" ? input.projectId.trim().toLowerCase() : "";
   const bytes = input.checkpointBytes instanceof Uint8Array ? new Uint8Array(input.checkpointBytes) : void 0;
   if (!UUID2.test(roomId) || bytes === void 0 || bytes.byteLength < 1 || bytes.byteLength > PIXYNC_INITIAL_CHECKPOINT_MAX_BYTES || !UUID2.test(input.attestationClientId)) {
@@ -16799,7 +18081,7 @@ function validateInput(input) {
   };
 }
 async function publishPixyncCheckpoint(client, input) {
-  const { roomId, bytes } = validateInput(input);
+  const { roomId, bytes } = validateInput2(input);
   await authenticatedClientUser(client);
   const storage = client.storage?.from(PIXYNC_INITIAL_CHECKPOINT_BUCKET);
   if (storage === void 0) {
@@ -16941,7 +18223,7 @@ var PixyncProjectDeletionError = class extends Error {
     this.name = "PixyncProjectDeletionError";
   }
 };
-function isRecord7(value) {
+function isRecord8(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 function fail3(code, message, cause) {
@@ -16967,13 +18249,13 @@ async function requireAuthenticatedUser(client) {
     fail3("AUTHENTICATION_FAILED", "PiXYNC authentication could not be checked.", result.error);
   }
   const user = result.data?.user;
-  if (!isRecord7(user) || typeof user.id !== "string" || !UUID3.test(user.id)) {
+  if (!isRecord8(user) || typeof user.id !== "string" || !UUID3.test(user.id)) {
     fail3("AUTHENTICATION_REQUIRED", "Sign in is required before detaching a shared PiXYNC Project.");
   }
 }
 function exactlyOneRow2(value) {
   const row = Array.isArray(value) ? value.length === 1 ? value[0] : void 0 : value;
-  if (!isRecord7(row)) {
+  if (!isRecord8(row)) {
     fail3("SERVER_RESPONSE_INVALID", "PiXYNC detach returned an unexpected response shape.");
   }
   return row;
@@ -17031,7 +18313,7 @@ async function detachPixyncProject(client, projectId) {
     fail3("RPC_FAILED", "PiXYNC remote detach could not be completed.", cause);
   }
   if (result.error !== null) {
-    const message = isRecord7(result.error) && typeof result.error.message === "string" ? result.error.message : "";
+    const message = isRecord8(result.error) && typeof result.error.message === "string" ? result.error.message : "";
     if (/locali[sz]ation_required/iu.test(message)) {
       fail3("LOCALIZATION_REQUIRED", "Owner localization is required before this shared Project can be detached.", result.error);
     }
@@ -17068,12 +18350,12 @@ var PixyncRemoteCheckpointError = class extends Error {
     this.name = "PixyncRemoteCheckpointError";
   }
 };
-function isRecord8(value) {
+function isRecord9(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 function exactlyOneRow3(value) {
   const row = Array.isArray(value) ? value.length === 1 ? value[0] : void 0 : value;
-  if (!isRecord8(row)) {
+  if (!isRecord9(row)) {
     throw new PixyncRemoteCheckpointError("SERVER_RESPONSE_INVALID", "pixisync_open_session did not return exactly one checkpoint row.");
   }
   const keys = Object.keys(row);
@@ -17435,7 +18717,7 @@ function loadAdvancedModule() {
 }
 function loadWorkspaceModule() {
   const workspaceChunkUrl = new URL("wp180-workspace.js", import.meta.url);
-  workspaceChunkUrl.searchParams.set("v", "20260901-audio-midi-tools-v1");
+  workspaceChunkUrl.searchParams.set("v", "20260910-unity-asset-export-v2");
   workspaceModulePromise ??= import(workspaceChunkUrl.href);
   return workspaceModulePromise;
 }
@@ -17452,7 +18734,7 @@ function loadProjectDataStorageModule() {
 function getWorkspacePxdBridge() {
   const candidate = window.__pixiedraw2WorkspaceDebug;
   if (typeof candidate?.exportProjectPxdSnapshot !== "function" || typeof candidate.restoreProjectPxdSnapshot !== "function") {
-    throw new Error("PXD workspace bridge is not ready.");
+    throw new Error("PXD workspace adapter is not ready.");
   }
   return candidate;
 }
@@ -17491,6 +18773,8 @@ var toolSelectElement = document.querySelector("#draw2Tool");
 var brushSizeElement = document.querySelector("#draw2BrushSize");
 var brushPatternElement = document.querySelector("#draw2BrushPattern");
 var brushShapeElement = document.querySelector("#draw2BrushShape");
+var brushAngleElement = document.querySelector("#draw2BrushAngle");
+var brushAlgorithmElement = document.querySelector("#draw2BrushAlgorithm");
 var brushSizeControlElement = document.querySelector("#draw2QuickBrushSizeControl");
 var quickControlsElement = document.querySelector("#draw2WorkspaceQuickControls");
 var workspaceContextRowElement = document.querySelector(".draw2-workspace-context-row");
@@ -17545,6 +18829,7 @@ var selectionYElement = document.querySelector("#draw2SelectionY");
 var selectionWidthElement = document.querySelector("#draw2SelectionWidth");
 var selectionHeightElement = document.querySelector("#draw2SelectionHeight");
 var selectionModeElement = document.querySelector("#draw2SelectionMode");
+var selectionMorphologyRadiusElement = document.querySelector("#draw2SelectionMorphologyRadius");
 var selectionExpandButton = document.querySelector("#draw2SelectionExpand");
 var selectionShrinkButton = document.querySelector("#draw2SelectionShrink");
 var selectionInvertButton = document.querySelector("#draw2SelectionInvert");
@@ -17553,6 +18838,7 @@ var transformOperationElement = document.querySelector("#draw2TransformOperation
 var transformDxElement = document.querySelector("#draw2TransformDx");
 var transformDyElement = document.querySelector("#draw2TransformDy");
 var transformFactorElement = document.querySelector("#draw2TransformFactor");
+var transformAngleElement = document.querySelector("#draw2TransformAngle");
 var selectButton = document.querySelector("#draw2Select");
 var commitSelectionButton = document.querySelector("#draw2CommitSelection");
 var cancelSelectionButton = document.querySelector("#draw2CancelSelection");
@@ -17564,6 +18850,8 @@ var flipVerticalButton = document.querySelector("#draw2FlipVertical");
 var rotateCCWButton = document.querySelector("#draw2RotateCCW");
 var rotateCWButton = document.querySelector("#draw2RotateCW");
 var rotate180Button = document.querySelector("#draw2Rotate180");
+var scaleDownButton = document.querySelector("#draw2ScaleDown");
+var scaleUpButton = document.querySelector("#draw2ScaleUp");
 var copyButton = document.querySelector("#draw2Copy");
 var cutButton = document.querySelector("#draw2Cut");
 var pasteButton = document.querySelector("#draw2Paste");
@@ -17589,6 +18877,8 @@ var animationTagFromElement = document.querySelector("#draw2TagFrom");
 var animationTagToElement = document.querySelector("#draw2TagTo");
 var animationTagLoopElement = document.querySelector("#draw2TagLoop");
 var animationTagAddElement = document.querySelector("#draw2TagAdd");
+var animationTagFromSelectionElement = document.querySelector("#draw2TagFromSelection");
+var animationTagFromSelectionStatusElement = document.querySelector("#draw2TagFromSelectionStatus");
 var animationTagListElement = document.querySelector("#draw2AnimationTagList");
 var timelineMarkerKindElement = document.querySelector("#draw2MarkerKind");
 var timelineMarkerLabelElement = document.querySelector("#draw2MarkerLabel");
@@ -17643,6 +18933,36 @@ var colorHexElement = document.querySelector("#draw2ColorHex");
 var colorHexOutputElement = document.querySelector("#draw2ColorHexOutput");
 var colorApplyButton = document.querySelector("#draw2ColorApply");
 var colorEditorStatusElement = document.querySelector("#draw2ColorEditorStatus");
+var colorHistoryElement = document.querySelector("#draw2ColorHistory");
+var colorRampEndElement = document.querySelector("#draw2ColorRampEnd");
+var colorRampStepsElement = document.querySelector("#draw2ColorRampSteps");
+var colorRampSpaceElement = document.querySelector("#draw2ColorRampSpace");
+var colorRampHueElement = document.querySelector("#draw2ColorRampHue");
+var colorRampPreviewElement = document.querySelector("#draw2ColorRampPreview");
+var colorRampCreateButton = document.querySelector("#draw2ColorRampCreate");
+var outlinePlacementElement = document.querySelector("#draw2OutlinePlacement");
+var outlineThicknessElement = document.querySelector("#draw2OutlineThickness");
+var outlineConnectivityElement = document.querySelector("#draw2OutlineConnectivity");
+var outlineColorElement = document.querySelector("#draw2OutlineColor");
+var outlineApplyButton = document.querySelector("#draw2OutlineApply");
+var textInsertDialogElement = document.querySelector("#draw2TextInsertDialog");
+var textValueElement = document.querySelector("#draw2TextValue");
+var textFontElement = document.querySelector("#draw2TextFont");
+var textSizeElement = document.querySelector("#draw2TextSize");
+var textWeightElement = document.querySelector("#draw2TextWeight");
+var textAlignElement = document.querySelector("#draw2TextAlign");
+var textFillColorElement = document.querySelector("#draw2TextFillColor");
+var textStrokeEnabledElement = document.querySelector("#draw2TextStrokeEnabled");
+var textStrokeColorElement = document.querySelector("#draw2TextStrokeColor");
+var textStrokeWidthElement = document.querySelector("#draw2TextStrokeWidth");
+var textThresholdElement = document.querySelector("#draw2TextThreshold");
+var textPreviewCanvasElement = document.querySelector("#draw2TextPreviewCanvas");
+var textBoundsWidthElement = document.querySelector("#draw2TextBoundsWidth");
+var textBoundsHeightElement = document.querySelector("#draw2TextBoundsHeight");
+var textBoundsStatusElement = document.querySelector("#draw2TextBoundsStatus");
+var textInsertButton = document.querySelector("#draw2TextInsert");
+var textCancelButton = document.querySelector("#draw2TextCancel");
+var textFitBoundsButton = document.querySelector("#draw2TextFitBounds");
 var exportPanelStatusElement = document.querySelector("#draw2ExportPanelStatus");
 var exportNameElement = document.querySelector("#draw2ExportName");
 var exportScaleElement = document.querySelector("#draw2ExportScale");
@@ -17684,6 +19004,24 @@ var goldenProjectRefsElement = document.querySelector("#draw2GoldenProjectRefs")
 var goldenProjectApplyButton = document.querySelector("#draw2GoldenProjectApply");
 var projectSessionCheckpointButton = document.querySelector("#draw2ProjectSessionCheckpoint");
 var projectSessionCheckpointStatusElement = document.querySelector("#draw2ProjectSessionCheckpointStatus");
+var collaborationScopeOpenButton = document.querySelector("#draw2CollaborationScopeOpen");
+var collaborationScopeStatusElement = document.querySelector("#draw2CollaborationScopeStatus");
+var collaborationScopeDialogElement = document.querySelector("#draw2CollaborationScopeDialog");
+var collaborationScopeMessageElement = document.querySelector("#draw2CollaborationScopeMessage");
+var collaborationScopeConsentCheckElement = document.querySelector("#draw2CollaborationConsentCheck");
+var collaborationScopeConsentAcceptButton = document.querySelector("#draw2CollaborationConsentAccept");
+var collaborationScopeSaveStatusElement = document.querySelector("#draw2CollaborationScopeSaveStatus");
+var collaborationScopeMasterPanelElement = document.querySelector("#draw2CollaborationMasterPanel");
+var collaborationScopeMasterListElement = document.querySelector("#draw2CollaborationMasterList");
+var collaborationScopeParticipantPanelElement = document.querySelector("#draw2CollaborationParticipantPanel");
+var collaborationScopeParticipantListElement = document.querySelector("#draw2CollaborationParticipantList");
+var collaborationEditGuardElement = document.querySelector("#draw2CollaborationEditGuard");
+var collaborationEditGuardMessageElement = document.querySelector("#draw2CollaborationEditGuardMessage");
+var collaborationEditGuardOpenButton = document.querySelector("#draw2CollaborationEditGuardOpen");
+var collaborationEditPolicyPanelElement = document.querySelector("#draw2CollaborationEditPolicy");
+var collaborationEditPolicyMessageElement = document.querySelector("#draw2CollaborationEditPolicyMessage");
+var collaborationEditPolicyOpenElement = document.querySelector("#draw2CollaborationEditPolicyOpen");
+var collaborationEditPolicyAssignedOnlyElement = document.querySelector("#draw2CollaborationEditPolicyAssignedOnly");
 var gamePreviewCanvasElement = document.querySelector("#draw2GamePreviewCanvas");
 var advancedLoadButton = document.querySelector("#draw2AdvancedLoad");
 var advancedPatternButton = document.querySelector("#draw2AdvancedPattern");
@@ -17722,7 +19060,7 @@ var languageElement = document.querySelector("#draw2Language");
 var shortcutsDialogElement = document.querySelector("#draw2ShortcutsDialog");
 var shortcutSearchElement = document.querySelector("#draw2ShortcutSearch");
 var shortcutListElement = document.querySelector("#draw2ShortcutList");
-if (canvasElement === null || overlayElement === null || erasePreviewElement === null || viewportCenterButtonElement === null || pixelGridElement === null || pixelGridMinorPathElement === null || pixelGridMajorPathElement === null || selectionOverlayElement === null || mirrorGuideOverlayElement === null || mirrorGuideVerticalElement === null || mirrorGuideHorizontalElement === null || mirrorGuideDiagonalDownElement === null || mirrorGuideDiagonalUpElement === null || mirrorToggleXElement === null || mirrorToggleYElement === null || mirrorToggleDiagonalDownElement === null || mirrorToggleDiagonalUpElement === null || selectionOverlayRegionsElement === null || statusElement === null || metricsElement === null || selectionStatusElement === null || projectIdInputElement === null || tileSizeSelectElement === null || toolSelectElement === null || brushSizeElement === null || brushPatternElement === null || brushShapeElement === null || brushSizeControlElement === null || quickControlsElement === null || brushOptionsButtonElement === null || brushOptionsSummaryElement === null || brushOptionsFlyoutElement === null || brushOptionsCloseButtonElement === null || brushPresetElement === null || brushPresetNameElement === null || brushPresetSaveButton === null || brushPresetDeleteButton === null || mirrorModeToggleElement === null || viewportContextRailElement === null || similarityControlElement === null || similarityElement === null || similarityValueElement === null || colorSelectionModeElement === null || miniPreviewCanvasElement === null || miniPreviewContainerElement === null || miniPreviewPlayButtonElement === null || miniPreviewReferenceButtonElement === null || miniPreviewReferenceClearButtonElement === null || miniPreviewReferenceInputElement === null || miniPreviewReferenceStatusElement === null || miniPreviewCollapseButtonElement === null || miniPreviewRestoreButtonElement === null || miniPreviewResizeLeftElement === null || miniPreviewResizeBottomElement === null || miniPreviewResizeCornerElement === null || selectionXElement === null || selectionYElement === null || selectionWidthElement === null || selectionHeightElement === null || selectionModeElement === null || selectionExpandButton === null || selectionShrinkButton === null || selectionInvertButton === null || selectionBorderButton === null || transformOperationElement === null || transformDxElement === null || transformDyElement === null || transformFactorElement === null || selectButton === null || commitSelectionButton === null || cancelSelectionButton === null || previewButton === null || commitButton === null || cancelButton === null || flipHorizontalButton === null || flipVerticalButton === null || rotateCCWButton === null || rotateCWButton === null || rotate180Button === null || copyButton === null || cutButton === null || pasteButton === null || undoButton === null || redoButton === null || timelineCardElement === null || timelineContextMenu === null || createButton === null || importPxdInput === null || timelineStatusElement === null || timelineViewportElement === null || timelineSpacerElement === null || timelineWindowElement === null || timelinePropertiesResizeElement === null || timelinePropertiesElement === null || timelinePropertiesBodyElement === null || timelinePropertiesCollapseElement === null || timelineSecondaryControlsElement === null || animationTagNameElement === null || animationTagFromElement === null || animationTagToElement === null || animationTagLoopElement === null || animationTagAddElement === null || animationTagListElement === null || timelineMarkerKindElement === null || timelineMarkerLabelElement === null || timelineMarkerAddElement === null || timelineMarkerListElement === null || linkedCelToggleElement === null || linkedCelStatusElement === null || addFrameButton === null || duplicateFrameButton === null || removeFrameButton === null || addLayerButton === null || reorderLayerButton === null || toggleLayerButton === null || toggleOnionButton === null || togglePlaybackButton === null || onionOptionsElement === null || onionPreviousElement === null || onionPreviousValueElement === null || onionNextElement === null || onionNextValueElement === null || onionOpacityElement === null || onionOpacityValueElement === null || onionColorModeElement === null || playbackFpsElement === null || playbackLoopElement === null || playbackFpsCustomElement === null || colorMapElement === null || paletteWheelElement === null || hueCursorElement === null || svCursorElement === null || colorRElement === null || colorGElement === null || colorBElement === null || colorAlphaElement === null || colorRValueElement === null || colorGValueElement === null || colorBValueElement === null || colorAlphaValueElement === null || colorHexElement === null || colorHexOutputElement === null || colorApplyButton === null || colorEditorStatusElement === null || gamePreviewStartButton === null || gamePreviewStopButton === null || gamePreviewRestartButton === null || gamePreviewPinButton === null || gamePreviewReloadButton === null || gamePreviewStatusElement === null || goldenProjectStatusElement === null || goldenProjectRefsElement === null || goldenProjectApplyButton === null || projectSessionCheckpointButton === null || projectSessionCheckpointStatusElement === null || gamePreviewCanvasElement === null || advancedLoadButton === null || advancedPatternButton === null || advancedMirrorButton === null || advancedGridButton === null || advancedGuideButton === null || advancedStatusElement === null || languageElement === null || exportPanelStatusElement === null || exportNameElement === null || exportScaleElement === null || exportFormatCardsElement === null || exportSelectionSummaryElement === null || exportFormatOptionsElement === null || exportPackageSectionElement === null || exportPackageSingleElement === null || exportPackageZipElement === null || exportPreviewCanvasElement === null || exportPreviewSummaryElement === null || exportOutputFilesElement === null || exportProgressElement === null || exportProgressBarElement === null || exportProgressPercentElement === null || exportProgressTitleElement === null || exportProgressDetailElement === null || exportProgressCurrentElement === null || exportProgressCountElement === null || exportProgressTrackElement === null || exportExecuteButton === null || exportToMarketButton === null) {
+if (canvasElement === null || overlayElement === null || erasePreviewElement === null || viewportCenterButtonElement === null || pixelGridElement === null || pixelGridMinorPathElement === null || pixelGridMajorPathElement === null || selectionOverlayElement === null || mirrorGuideOverlayElement === null || mirrorGuideVerticalElement === null || mirrorGuideHorizontalElement === null || mirrorGuideDiagonalDownElement === null || mirrorGuideDiagonalUpElement === null || mirrorToggleXElement === null || mirrorToggleYElement === null || mirrorToggleDiagonalDownElement === null || mirrorToggleDiagonalUpElement === null || selectionOverlayRegionsElement === null || statusElement === null || metricsElement === null || selectionStatusElement === null || projectIdInputElement === null || tileSizeSelectElement === null || toolSelectElement === null || brushSizeElement === null || brushPatternElement === null || brushShapeElement === null || brushAngleElement === null || brushAlgorithmElement === null || brushSizeControlElement === null || quickControlsElement === null || brushOptionsButtonElement === null || brushOptionsSummaryElement === null || brushOptionsFlyoutElement === null || brushOptionsCloseButtonElement === null || brushPresetElement === null || brushPresetNameElement === null || brushPresetSaveButton === null || brushPresetDeleteButton === null || mirrorModeToggleElement === null || viewportContextRailElement === null || similarityControlElement === null || similarityElement === null || similarityValueElement === null || colorSelectionModeElement === null || miniPreviewCanvasElement === null || miniPreviewContainerElement === null || miniPreviewPlayButtonElement === null || miniPreviewReferenceButtonElement === null || miniPreviewReferenceClearButtonElement === null || miniPreviewReferenceInputElement === null || miniPreviewReferenceStatusElement === null || miniPreviewCollapseButtonElement === null || miniPreviewRestoreButtonElement === null || miniPreviewResizeLeftElement === null || miniPreviewResizeBottomElement === null || miniPreviewResizeCornerElement === null || selectionXElement === null || selectionYElement === null || selectionWidthElement === null || selectionHeightElement === null || selectionModeElement === null || selectionMorphologyRadiusElement === null || selectionExpandButton === null || selectionShrinkButton === null || selectionInvertButton === null || selectionBorderButton === null || transformOperationElement === null || transformDxElement === null || transformDyElement === null || transformFactorElement === null || transformAngleElement === null || selectButton === null || commitSelectionButton === null || cancelSelectionButton === null || previewButton === null || commitButton === null || cancelButton === null || flipHorizontalButton === null || flipVerticalButton === null || rotateCCWButton === null || rotateCWButton === null || rotate180Button === null || scaleDownButton === null || scaleUpButton === null || copyButton === null || cutButton === null || pasteButton === null || undoButton === null || redoButton === null || timelineCardElement === null || timelineContextMenu === null || createButton === null || importPxdInput === null || timelineStatusElement === null || timelineViewportElement === null || timelineSpacerElement === null || timelineWindowElement === null || timelinePropertiesResizeElement === null || timelinePropertiesElement === null || timelinePropertiesBodyElement === null || timelinePropertiesCollapseElement === null || timelineSecondaryControlsElement === null || animationTagNameElement === null || animationTagFromElement === null || animationTagToElement === null || animationTagLoopElement === null || animationTagAddElement === null || animationTagListElement === null || timelineMarkerKindElement === null || timelineMarkerLabelElement === null || timelineMarkerAddElement === null || timelineMarkerListElement === null || linkedCelToggleElement === null || linkedCelStatusElement === null || addFrameButton === null || duplicateFrameButton === null || removeFrameButton === null || addLayerButton === null || reorderLayerButton === null || toggleLayerButton === null || toggleOnionButton === null || togglePlaybackButton === null || onionOptionsElement === null || onionPreviousElement === null || onionPreviousValueElement === null || onionNextElement === null || onionNextValueElement === null || onionOpacityElement === null || onionOpacityValueElement === null || onionColorModeElement === null || playbackFpsElement === null || playbackLoopElement === null || playbackFpsCustomElement === null || colorMapElement === null || paletteWheelElement === null || hueCursorElement === null || svCursorElement === null || colorRElement === null || colorGElement === null || colorBElement === null || colorAlphaElement === null || colorRValueElement === null || colorGValueElement === null || colorBValueElement === null || colorAlphaValueElement === null || colorHexElement === null || colorHexOutputElement === null || colorApplyButton === null || colorEditorStatusElement === null || colorHistoryElement === null || colorRampEndElement === null || colorRampStepsElement === null || colorRampSpaceElement === null || colorRampHueElement === null || colorRampPreviewElement === null || colorRampCreateButton === null || outlinePlacementElement === null || outlineThicknessElement === null || outlineConnectivityElement === null || outlineColorElement === null || outlineApplyButton === null || textInsertDialogElement === null || textValueElement === null || textFontElement === null || textSizeElement === null || textWeightElement === null || textAlignElement === null || textFillColorElement === null || textStrokeEnabledElement === null || textStrokeColorElement === null || textStrokeWidthElement === null || textThresholdElement === null || textPreviewCanvasElement === null || textBoundsWidthElement === null || textBoundsHeightElement === null || textBoundsStatusElement === null || textInsertButton === null || textCancelButton === null || textFitBoundsButton === null || gamePreviewStartButton === null || gamePreviewStopButton === null || gamePreviewRestartButton === null || gamePreviewPinButton === null || gamePreviewReloadButton === null || gamePreviewStatusElement === null || goldenProjectStatusElement === null || goldenProjectRefsElement === null || goldenProjectApplyButton === null || projectSessionCheckpointButton === null || projectSessionCheckpointStatusElement === null || gamePreviewCanvasElement === null || advancedLoadButton === null || advancedPatternButton === null || advancedMirrorButton === null || advancedGridButton === null || advancedGuideButton === null || advancedStatusElement === null || languageElement === null || exportPanelStatusElement === null || exportNameElement === null || exportScaleElement === null || exportFormatCardsElement === null || exportSelectionSummaryElement === null || exportFormatOptionsElement === null || exportPackageSectionElement === null || exportPackageSingleElement === null || exportPackageZipElement === null || exportPreviewCanvasElement === null || exportPreviewSummaryElement === null || exportOutputFilesElement === null || exportProgressElement === null || exportProgressBarElement === null || exportProgressPercentElement === null || exportProgressTitleElement === null || exportProgressDetailElement === null || exportProgressCurrentElement === null || exportProgressCountElement === null || exportProgressTrackElement === null || exportExecuteButton === null || exportToMarketButton === null) {
   throw new Error("Draw2 isolated entry is missing a required element.");
 }
 if (canvasSettingsDialogElement === null || canvasSettingsProjectIdElement === null || canvasSettingsWidthElement === null || canvasSettingsHeightElement === null || canvasSettingsTileSizeElement === null || canvasSettingsApplyButton === null || openCanvasSettingsButton === null || openProjectDialogButton === null || projectDialogElement === null || projectDialogIdElement === null || projectDialogOpenButton === null || projectDialogNewButton === null || projectDialogStatusElement === null) {
@@ -17792,7 +19130,8 @@ function queueDrawPersistenceSave(reason) {
     history: history.snapshot(DRAW2_PERSISTED_HISTORY_LIMIT),
     journal: drawJournalSnapshot(),
     assetDefinitions: assetDefinitions.map(cloneAssetDefinitionEntry),
-    timelineMetadata: draw2TimelineMetadataSnapshot()
+    timelineMetadata: draw2TimelineMetadataSnapshot(),
+    assetPackages: assetPackages.map(cloneAssetPackageManifest)
   };
   if (drawPersistenceSaveTimer !== void 0) return;
   drawPersistenceSaveTimer = window.setTimeout(() => {
@@ -17810,8 +19149,8 @@ async function drainDrawPersistenceSave() {
   drawPersistenceSaveQueue = drawPersistenceSaveQueue.then(async () => {
     const expectedRevision = drawPersistenceExpectedRevision;
     const expectedStateHash = drawPersistenceExpectedStateHash;
-    const record3 = await createDraw2PersistenceRecord(envelope.state, envelope.history, envelope.journal, revision, (/* @__PURE__ */ new Date()).toISOString(), envelope.assetDefinitions, envelope.timelineMetadata);
-    const saved = await drawPersistenceStore.save(record3, {
+    const record4 = await createDraw2PersistenceRecord(envelope.state, envelope.history, envelope.journal, revision, (/* @__PURE__ */ new Date()).toISOString(), envelope.assetDefinitions, envelope.timelineMetadata, envelope.assetPackages);
+    const saved = await drawPersistenceStore.save(record4, {
       expectedRevision,
       expectedStateHash
     });
@@ -17819,17 +19158,25 @@ async function drainDrawPersistenceSave() {
       document.body.dataset.drawPersistenceState = "unavailable";
       return;
     }
-    if (!saved.stale) {
-      drawPersistenceExpectedRevision = revision;
-      drawPersistenceExpectedStateHash = record3.stateHash;
+    if (saved.stale) {
+      document.body.dataset.drawPersistenceState = "stale-write-ignored";
+      const latest = await drawPersistenceStore.load(projectId);
+      if (latest !== null) {
+        drawPersistenceRevision = Math.max(drawPersistenceRevision, latest.revision);
+        drawPersistenceExpectedRevision = latest.revision;
+        drawPersistenceExpectedStateHash = latest.stateHash;
+      }
+      return;
     }
-    document.body.dataset.drawPersistenceState = saved.stale ? "stale-write-ignored" : envelope.reason === "recovery" ? "restored" : "saved";
+    drawPersistenceExpectedRevision = revision;
+    drawPersistenceExpectedStateHash = record4.stateHash;
+    document.body.dataset.drawPersistenceState = envelope.reason === "recovery" ? "restored" : "saved";
     document.body.dataset.drawPersistenceRevision = String(revision);
     await workspaceManifestStore.updateModule(asWorkspaceProjectId(projectId), "draw", {
       status: "READY",
       revision,
-      stateHash: record3.stateHash,
-      savedAt: record3.savedAt
+      stateHash: record4.stateHash,
+      savedAt: record4.savedAt
     }, envelope.state.name);
   }).catch(() => {
     document.body.dataset.drawPersistenceState = "error";
@@ -17866,6 +19213,9 @@ document.addEventListener("visibilitychange", () => {
 function saveDrawProjectState(reason = "edit") {
   repository.save(state);
   queueDrawPersistenceSave(reason);
+}
+function isInteractiveKeyboardTarget(target) {
+  return target instanceof Element && target.closest("button, a, summary, input, textarea, select, [contenteditable=true], [role=button], [role=tab], [role=menuitem], [role=option], [role=checkbox], [role=radio], [role=separator], [role=slider], [role=spinbutton], [role=combobox], [role=listbox], [role=grid], [role=gridcell], [role=tree], [role=treegrid], [role=treeitem], [role=row], [role=cell], [role=columnheader], [role=list], [role=tablist], [role=toolbar]") !== null;
 }
 var canvas = canvasElement;
 var overlay = overlayElement;
@@ -17924,6 +19274,8 @@ var toolSelect = toolSelectElement;
 var brushSize = brushSizeElement;
 var brushPattern = brushPatternElement;
 var brushShape = brushShapeElement;
+var brushAngle = brushAngleElement;
+var brushAlgorithm = brushAlgorithmElement;
 var brushSizeControl = brushSizeControlElement;
 var quickControls = quickControlsElement;
 var brushOptionsButton = brushOptionsButtonElement;
@@ -17949,10 +19301,12 @@ var selectionY = selectionYElement;
 var selectionWidth = selectionWidthElement;
 var selectionHeight = selectionHeightElement;
 var selectionModeControl = selectionModeElement;
+var selectionMorphologyRadius = selectionMorphologyRadiusElement;
 var transformOperation = transformOperationElement;
 var transformDx = transformDxElement;
 var transformDy = transformDyElement;
 var transformFactor = transformFactorElement;
+var transformAngle = transformAngleElement;
 var commitSelectionControl = commitSelectionButton;
 var cancelSelectionControl = cancelSelectionButton;
 var cancelTransformControl = cancelButton;
@@ -18009,11 +19363,11 @@ function readMiniPreviewLayout() {
         collapsed: false
       };
     }
-    const record3 = parsed;
+    const record4 = parsed;
     return {
-      width: clampMiniPreview(typeof record3.width === "number" ? record3.width : 148, MINI_PREVIEW_MIN_SIZE, MINI_PREVIEW_MAX_WIDTH),
-      height: clampMiniPreview(typeof record3.height === "number" ? record3.height : 148, MINI_PREVIEW_MIN_SIZE, MINI_PREVIEW_MAX_HEIGHT),
-      collapsed: record3.collapsed === true
+      width: clampMiniPreview(typeof record4.width === "number" ? record4.width : 148, MINI_PREVIEW_MIN_SIZE, MINI_PREVIEW_MAX_WIDTH),
+      height: clampMiniPreview(typeof record4.height === "number" ? record4.height : 148, MINI_PREVIEW_MIN_SIZE, MINI_PREVIEW_MAX_HEIGHT),
+      collapsed: record4.collapsed === true
     };
   } catch {
     return {
@@ -18031,20 +19385,26 @@ function persistMiniPreviewLayout() {
   } catch {
   }
 }
+function miniPreviewModeAvailable() {
+  const mode = workspaceFrameElement?.dataset.creatorMode;
+  return mode === void 0 || mode === "DRAW" || mode === "ANIMATE";
+}
 function miniPreviewIsVisible() {
-  return miniPreviewEnabled && !miniPreviewLayout.collapsed;
+  return miniPreviewModeAvailable() && miniPreviewEnabled && !miniPreviewLayout.collapsed;
 }
 function syncMiniPreviewLayout() {
   const { width, height, collapsed } = miniPreviewLayout;
+  const modeAvailable = miniPreviewModeAvailable();
+  const previewVisible = modeAvailable && miniPreviewEnabled && !collapsed;
   miniPreviewContainerElement.style.setProperty("--draw2-mini-preview-width", `${width}px`);
   miniPreviewContainerElement.style.setProperty("--draw2-mini-preview-height", `${height}px`);
-  miniPreviewContainerElement.hidden = !miniPreviewIsVisible();
-  const previewVisible = miniPreviewEnabled && !collapsed;
-  miniPreviewRestoreButtonElement.hidden = previewVisible;
+  miniPreviewContainerElement.hidden = !previewVisible;
+  miniPreviewRestoreButtonElement.hidden = !modeAvailable || previewVisible;
+  miniPreviewRestoreButtonElement.setAttribute("aria-hidden", String(!modeAvailable));
   const previewToggleLabel = previewVisible ? "Hide mini preview" : "Open mini preview";
   miniPreviewRestoreButtonElement.setAttribute("aria-label", previewToggleLabel);
   miniPreviewRestoreButtonElement.title = previewToggleLabel;
-  miniPreviewRestoreButtonElement.setAttribute("aria-pressed", String(miniPreviewEnabled && !collapsed));
+  miniPreviewRestoreButtonElement.setAttribute("aria-pressed", String(previewVisible));
   const previewToggleText = miniPreviewRestoreButtonElement.querySelector("span");
   if (previewToggleText !== null) {
     previewToggleText.textContent = previewVisible ? "Hide preview" : "Mini preview";
@@ -18247,7 +19607,7 @@ function drawMiniPreviewProjection() {
   drawMiniPreviewSource(canvas, 1, false);
 }
 function syncMiniPreviewPlaybackControl() {
-  const playing = playbackRunning || audioLinkedPreviewPlaying;
+  const playing = playbackRunning;
   const use = miniPreviewPlayButton.querySelector("use");
   use?.setAttribute("href", `./assets/icons/draw2-icons.svg#icon-${playing ? "pause" : "play"}`);
   miniPreviewPlayButton.setAttribute("aria-pressed", String(playing));
@@ -18275,7 +19635,7 @@ function readStoredDraw2Locale() {
   try {
     return normalizeDraw2Locale(window.localStorage.getItem("pixieed:draw2:locale:v1"));
   } catch {
-    return "ja";
+    return "en";
   }
 }
 var draw2Locale = readStoredDraw2Locale();
@@ -18792,8 +20152,15 @@ viewportCenterButtonElement.addEventListener("click", () => {
   setStatus("Canvas\u3092\u4E2D\u592E\u306B\u914D\u7F6E\u3057\u3066\u3044\u307E\u3059\u3002");
 });
 function syncDisplayToggles() {
+  const miniPreviewAvailable = miniPreviewModeAvailable();
   for (const button of displayToggleButtons) {
-    const enabled = button.dataset.draw2DisplayToggle === "cursor" ? virtualCursorEnabled : miniPreviewEnabled;
+    const isMiniPreview = button.dataset.draw2DisplayToggle === "mini-preview";
+    const enabled = isMiniPreview ? miniPreviewAvailable && miniPreviewEnabled : virtualCursorEnabled;
+    if (isMiniPreview) {
+      button.hidden = !miniPreviewAvailable;
+      button.inert = !miniPreviewAvailable;
+      button.setAttribute("aria-hidden", String(!miniPreviewAvailable));
+    }
     button.setAttribute("aria-checked", String(enabled));
     button.classList.toggle("is-active", enabled);
   }
@@ -18805,17 +20172,36 @@ var drawingContext = canvas.getContext("2d", {
 });
 var overlayContext = overlay.getContext("2d");
 var erasePreviewContext = erasePreview.getContext("2d");
-if (drawingContext === null || overlayContext === null || erasePreviewContext === null) {
+var textPreviewContext = textPreviewCanvasElement.getContext("2d");
+if (drawingContext === null || overlayContext === null || erasePreviewContext === null || textPreviewContext === null) {
   throw new Error("Draw2 reference viewport could not acquire Canvas2D.");
 }
 var canonicalContext = drawingContext;
 var selectionOverlayContext = overlayContext;
 var eraseProjectionContext = erasePreviewContext;
+var textPreviewProjectionContext = textPreviewContext;
 var tilesetSourceContext = tilesetSourceCanvas?.getContext("2d") ?? null;
+var TRANSFORM_PREVIEW_TILE_SIZE = 256;
+var transformPreviewScratch;
+function getTransformPreviewScratch() {
+  if (transformPreviewScratch !== void 0) return transformPreviewScratch;
+  const scratchCanvas = document.createElement("canvas");
+  scratchCanvas.width = TRANSFORM_PREVIEW_TILE_SIZE;
+  scratchCanvas.height = TRANSFORM_PREVIEW_TILE_SIZE;
+  const scratchContext = scratchCanvas.getContext("2d");
+  if (scratchContext === null) return void 0;
+  scratchContext.imageSmoothingEnabled = false;
+  transformPreviewScratch = {
+    canvas: scratchCanvas,
+    context: scratchContext
+  };
+  return transformPreviewScratch;
+}
 function configurePixelRenderingContexts() {
   canonicalContext.imageSmoothingEnabled = false;
   selectionOverlayContext.imageSmoothingEnabled = false;
   eraseProjectionContext.imageSmoothingEnabled = false;
+  textPreviewProjectionContext.imageSmoothingEnabled = false;
   if (tilesetSourceContext !== null) {
     tilesetSourceContext.imageSmoothingEnabled = false;
   }
@@ -18869,6 +20255,8 @@ var tagFromControl = animationTagFromElement;
 var tagToControl = animationTagToElement;
 var tagLoopControl = animationTagLoopElement;
 var tagAddControl = animationTagAddElement;
+var tagFromSelectionControl = animationTagFromSelectionElement;
+var tagFromSelectionStatus = animationTagFromSelectionStatusElement;
 var tagList = animationTagListElement;
 var markerKindControl = timelineMarkerKindElement;
 var markerLabelControl = timelineMarkerLabelElement;
@@ -18919,6 +20307,36 @@ var colorHex = colorHexElement;
 var colorHexOutput = colorHexOutputElement;
 var colorApply = colorApplyButton;
 var colorEditorStatus = colorEditorStatusElement;
+var colorHistoryControl = colorHistoryElement;
+var colorRampEndControl = colorRampEndElement;
+var colorRampStepsControl = colorRampStepsElement;
+var colorRampSpaceControl = colorRampSpaceElement;
+var colorRampHueControl = colorRampHueElement;
+var colorRampPreviewControl = colorRampPreviewElement;
+var colorRampCreateControl = colorRampCreateButton;
+var outlinePlacementControl = outlinePlacementElement;
+var outlineThicknessControl = outlineThicknessElement;
+var outlineConnectivityControl = outlineConnectivityElement;
+var outlineColorControl = outlineColorElement;
+var outlineApplyControl = outlineApplyButton;
+var textInsertDialogControl = textInsertDialogElement;
+var textValueControl = textValueElement;
+var textFontControl = textFontElement;
+var textSizeControl = textSizeElement;
+var textWeightControl = textWeightElement;
+var textAlignControl = textAlignElement;
+var textFillColorControl = textFillColorElement;
+var textStrokeEnabledControl = textStrokeEnabledElement;
+var textStrokeColorControl = textStrokeColorElement;
+var textStrokeWidthControl = textStrokeWidthElement;
+var textThresholdControl = textThresholdElement;
+var textPreviewCanvasControl = textPreviewCanvasElement;
+var textBoundsWidthControl = textBoundsWidthElement;
+var textBoundsHeightControl = textBoundsHeightElement;
+var textBoundsStatusControl = textBoundsStatusElement;
+var textInsertControl = textInsertButton;
+var textCancelControl = textCancelButton;
+var textFitBoundsControl = textFitBoundsButton;
 var exportPanelStatus = exportPanelStatusElement;
 var exportName = exportNameElement;
 var exportScale = exportScaleElement;
@@ -19155,7 +20573,8 @@ function createLocalProjectSessionAdapters() {
   return LOCAL_SESSION_AGGREGATES.map((aggregate) => ({
     aggregate,
     // The session proves ordering and presence independently from product
-    // state. Product bridges remain the only owners of Draw/Audio/Game data.
+    // state. Product adapters remain the only owners of Draw/Audio/Game data;
+    // this local session is not the external PiXiEED Bridge.
     apply: () => void 0
   }));
 }
@@ -19199,7 +20618,7 @@ function publishLocalProjectSessionStatus(snapshot) {
       revision: `r${snapshot.projectRevision}`,
       members: String(Math.max(1, snapshot.presence.length)),
       latencyMs: 0,
-      message: `Project Session ${snapshot.status} \xB7 ${snapshot.activeMode} \xB7 \u30ED\u30FC\u30AB\u30EB\u5171\u540C\u7DE8\u96C6\u30EA\u30CF\u30FC\u30B5\u30EB\uFF08\u672C\u756APiXYNC\u672A\u63A5\u7D9A\uFF09${error2}`
+      message: `Project Session ${snapshot.status} \xB7 ${snapshot.activeMode} \xB7 \u30ED\u30FC\u30AB\u30EB3\u30E2\u30FC\u30C9\u30BB\u30C3\u30B7\u30E7\u30F3\uFF08\u30AA\u30F3\u30E9\u30A4\u30F3PiXYNC\u672A\u63A5\u7D9A\uFF09${error2}`
     }
   }));
 }
@@ -19315,6 +20734,7 @@ async function publishProductionCheckpoint() {
 }
 window.addEventListener("draw2:creator-mode", (event) => {
   const mode = event.detail?.mode;
+  syncDisplayToggles();
   const session = localProjectSession;
   const sessionMode = projectSessionModeFromCreatorMode(mode);
   if (session !== void 0) {
@@ -19423,6 +20843,421 @@ async function availablePixyncSupabaseClient(supplied) {
   }
   return host.__PIXIEED_ACCOUNT_SUPABASE_CLIENT_PROMISE__?.catch(() => void 0);
 }
+var collaborationScopeRows = [];
+var collaborationScopeConsentAccepted = false;
+var collaborationScopeConsentDraft = false;
+var collaborationScopeBusy = false;
+var collaborationEditScopePolicy = "OPEN";
+function collaborationScopeRecord(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value) ? value : null;
+}
+function collaborationScopeRowsFromRpc(value) {
+  const values = Array.isArray(value) ? value : value === null ? [] : [
+    value
+  ];
+  const rows = [];
+  for (const value2 of values) {
+    const row = collaborationScopeRecord(value2);
+    if (row === null) continue;
+    const roomId = typeof row.room_id === "string" ? row.room_id : "";
+    const userId = typeof row.user_id === "string" ? row.user_id : "";
+    const scopeKey = isCollaborationScopeKey(row.scope_key) ? row.scope_key : void 0;
+    if (roomId.length === 0 || userId.length === 0 || scopeKey === void 0) {
+      continue;
+    }
+    rows.push({
+      roomId,
+      userId,
+      memberRole: typeof row.member_role === "string" ? row.member_role : "viewer",
+      displayName: typeof row.display_name === "string" && row.display_name.trim() !== "" ? row.display_name.trim() : "\u53C2\u52A0\u8005",
+      scopeKey,
+      assignmentState: typeof row.assignment_state === "string" ? row.assignment_state : null,
+      canManage: row.can_manage === true,
+      isCurrentUser: row.is_current_user === true,
+      currentUserConsented: row.current_user_consented === true,
+      editScopePolicy: isCollaborationEditScopePolicy(row.edit_scope_policy) ? row.edit_scope_policy : "OPEN"
+    });
+  }
+  return rows;
+}
+function collaborationCurrentScopeKey() {
+  const mode = creatorStartModeFromValue(workspaceFrameElement?.dataset.creatorMode);
+  return mode === "AUDIO" ? "AUDIO" : mode === "GAME" ? "GAME" : "DRAW";
+}
+function collaborationCurrentScopeRow() {
+  const scopeKey = collaborationCurrentScopeKey();
+  return collaborationScopeRows.find((row) => row.isCurrentUser && row.scopeKey === scopeKey);
+}
+function collaborationEditBlockReason() {
+  if (collaborationScopeRows.length === 0) return void 0;
+  const row = collaborationCurrentScopeRow();
+  if (!collaborationScopeConsentAccepted) {
+    return "\u5171\u540C\u4F5C\u696D\u306E\u6CE8\u610F\u4E8B\u9805\u3092\u78BA\u8A8D\u3059\u308B\u3068\u7DE8\u96C6\u3067\u304D\u307E\u3059\u3002";
+  }
+  if (row === void 0) {
+    return "\u3053\u306EProject\u306E\u7DE8\u96C6\u53C2\u52A0\u6A29\u9650\u3092\u78BA\u8A8D\u3067\u304D\u307E\u305B\u3093\u3002";
+  }
+  if (row.memberRole === "owner") return void 0;
+  if (row.memberRole !== "editor") {
+    return "\u95B2\u89A7\u53C2\u52A0\u8005\u3068\u3057\u3066\u63A5\u7D9A\u4E2D\u306E\u305F\u3081\u7DE8\u96C6\u3067\u304D\u307E\u305B\u3093\u3002\u30DE\u30B9\u30BF\u30FC\u306B\u7DE8\u96C6\u53C2\u52A0\u8005\u3078\u306E\u5909\u66F4\u3092\u4F9D\u983C\u3057\u3066\u304F\u3060\u3055\u3044\u3002";
+  }
+  if (collaborationEditScopePolicy === "OPEN") return void 0;
+  if (row.assignmentState === "APPROVED") return void 0;
+  return `${scopeLabel(row.scopeKey)}\u306F\u62C5\u5F53\u7BC4\u56F2\u306E\u307F\u7DE8\u96C6\u306E\u5BFE\u8C61\u3067\u3059\u3002\u627F\u8A8D\u6E08\u307F\u306E\u62C5\u5F53\u7BC4\u56F2\u3067\u306F\u3042\u308A\u307E\u305B\u3093\u3002`;
+}
+function announceCollaborationEditBlock() {
+  const reason = collaborationEditBlockReason();
+  if (reason === void 0) return;
+  if (collaborationEditGuardMessageElement !== null) {
+    collaborationEditGuardMessageElement.textContent = reason;
+  }
+  setStatus(`${reason} \u300C\u540C\u610F\u30FB\u62C5\u5F53\u7BC4\u56F2\u300D\u3092\u78BA\u8A8D\u3057\u3066\u304F\u3060\u3055\u3044\u3002`, "error");
+}
+function collaborationCanvasToolIsNonMutating(tool) {
+  return [
+    "pan",
+    "eyedropper",
+    "select-rect",
+    "select-ellipse",
+    "select-lasso",
+    "select-color"
+  ].includes(tool);
+}
+async function collaborationScopeRpc(functionName, args) {
+  const client = await availablePixyncSupabaseClient();
+  if (client === void 0) throw new Error("\u30ED\u30B0\u30A4\u30F3\u304C\u5FC5\u8981\u3067\u3059\u3002");
+  let result;
+  try {
+    result = await client.rpc(functionName, args);
+  } catch (error2) {
+    throw new Error(error2 instanceof Error ? error2.message : `${functionName}\u306B\u63A5\u7D9A\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002`);
+  }
+  if (result.error !== null) {
+    const error2 = result.error;
+    throw new Error(error2 instanceof Error ? error2.message : `${functionName}\u304C\u62D2\u5426\u3055\u308C\u307E\u3057\u305F\u3002`);
+  }
+  return result.data;
+}
+function collaborationScopeStateLabel(state2) {
+  return state2 === "APPROVED" ? "\u627F\u8A8D\u6E08\u307F" : state2 === "PENDING_MEMBER" ? "\u672C\u4EBA\u306E\u78BA\u8A8D\u5F85\u3061" : state2 === "PENDING_MASTER" ? "\u30DE\u30B9\u30BF\u30FC\u78BA\u8A8D\u5F85\u3061" : state2 === "REMOVAL_REQUESTED" ? "\u89E3\u9664\u306E\u78BA\u8A8D\u5F85\u3061" : state2 === "REJECTED" ? "\u672A\u627F\u8A8D" : "\u672A\u8A2D\u5B9A";
+}
+function collaborationScopeActionButton(label, action, scopeKey, userId, disabled = false) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "draw2-collaboration-scope-button";
+  button.textContent = label;
+  button.disabled = disabled;
+  button.dataset.collaborationAction = action;
+  button.dataset.scopeKey = scopeKey;
+  if (userId !== void 0) button.dataset.userId = userId;
+  button.setAttribute("aria-label", `${scopeLabel(scopeKey)}: ${label}`);
+  return button;
+}
+function renderCollaborationScopeMasterList() {
+  if (collaborationScopeMasterListElement === null) return;
+  const members = /* @__PURE__ */ new Map();
+  for (const row of collaborationScopeRows) {
+    if (row.memberRole === "owner") continue;
+    const member = members.get(row.userId) ?? {
+      userId: row.userId,
+      displayName: row.displayName,
+      memberRole: row.memberRole,
+      rows: /* @__PURE__ */ new Map()
+    };
+    member.rows.set(row.scopeKey, row);
+    members.set(row.userId, member);
+  }
+  if (members.size === 0) {
+    const empty = document.createElement("p");
+    empty.className = "draw2-collaboration-empty";
+    empty.textContent = "\u53C2\u52A0\u8005\u304C\u3044\u307E\u305B\u3093\u3002\u62DB\u5F85\u5F8C\u306B\u62C5\u5F53\u7BC4\u56F2\u3092\u8A2D\u5B9A\u3067\u304D\u307E\u3059\u3002";
+    collaborationScopeMasterListElement.replaceChildren(empty);
+    return;
+  }
+  const cards = [];
+  for (const member of members.values()) {
+    const card = document.createElement("article");
+    card.className = "draw2-collaboration-member-card";
+    const heading = document.createElement("div");
+    heading.className = "draw2-collaboration-member-heading";
+    const name = document.createElement("strong");
+    name.textContent = member.displayName;
+    const role = document.createElement("small");
+    role.textContent = member.memberRole === "editor" ? "\u7DE8\u96C6\u53C2\u52A0\u8005" : "\u95B2\u89A7\u53C2\u52A0\u8005";
+    heading.append(name, role);
+    const buttons = document.createElement("div");
+    buttons.className = "draw2-collaboration-scope-buttons";
+    for (const scopeKey of COLLABORATION_SCOPE_KEYS) {
+      const row = member.rows.get(scopeKey);
+      const state2 = row?.assignmentState ?? null;
+      let button;
+      if (state2 === "APPROVED") {
+        button = collaborationScopeActionButton("\u89E3\u9664", "MASTER_REMOVE", scopeKey, member.userId);
+      } else if (state2 === "PENDING_MASTER") {
+        button = collaborationScopeActionButton("\u627F\u8A8D", "MASTER_APPROVE", scopeKey, member.userId);
+        const reject2 = collaborationScopeActionButton("\u5374\u4E0B", "MASTER_REJECT", scopeKey, member.userId);
+        reject2.dataset.scopeState = state2;
+        buttons.append(reject2);
+      } else if (state2 === "PENDING_MEMBER") {
+        button = collaborationScopeActionButton("\u672C\u4EBA\u78BA\u8A8D\u5F85\u3061", "NONE", scopeKey, member.userId, true);
+      } else if (state2 === "REMOVAL_REQUESTED") {
+        button = collaborationScopeActionButton("\u89E3\u9664\u78BA\u8A8D\u4E2D", "NONE", scopeKey, member.userId, true);
+      } else {
+        button = collaborationScopeActionButton("\u5272\u308A\u5F53\u3066", "MASTER_ASSIGN", scopeKey, member.userId);
+      }
+      button.dataset.state = state2 ?? "UNSET";
+      button.title = `${scopeLabel(scopeKey)} \xB7 ${collaborationScopeStateLabel(state2)}`;
+      buttons.append(button);
+    }
+    card.append(heading, buttons);
+    cards.push(card);
+  }
+  collaborationScopeMasterListElement.replaceChildren(...cards);
+}
+function renderCollaborationScopeParticipantList() {
+  if (collaborationScopeParticipantListElement === null) return;
+  const rows = collaborationScopeRows.filter((row) => row.isCurrentUser);
+  if (rows.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "draw2-collaboration-empty";
+    empty.textContent = "\u53C2\u52A0\u8005\u3068\u3057\u3066\u63A5\u7D9A\u3059\u308B\u3068\u3001\u3053\u3053\u304B\u3089\u62C5\u5F53\u7BC4\u56F2\u3092\u7533\u8ACB\u3067\u304D\u307E\u3059\u3002";
+    collaborationScopeParticipantListElement.replaceChildren(empty);
+    return;
+  }
+  const children = [];
+  for (const row of rows) {
+    const item = document.createElement("div");
+    item.className = "draw2-collaboration-scope-row";
+    const heading = document.createElement("div");
+    const label = document.createElement("strong");
+    label.textContent = scopeLabel(row.scopeKey);
+    const state2 = document.createElement("small");
+    state2.textContent = collaborationScopeStateLabel(row.assignmentState);
+    heading.append(label, state2);
+    item.append(heading);
+    if (row.assignmentState === "PENDING_MEMBER") {
+      item.append(collaborationScopeActionButton("\u3053\u306E\u7BC4\u56F2\u3092\u627F\u8A8D", "MEMBER_ACCEPT", row.scopeKey), collaborationScopeActionButton("\u8F9E\u9000", "MEMBER_DECLINE", row.scopeKey));
+    } else if (row.assignmentState === "REMOVAL_REQUESTED") {
+      item.append(collaborationScopeActionButton("\u89E3\u9664\u306B\u540C\u610F", "MEMBER_ACCEPT_REMOVAL", row.scopeKey), collaborationScopeActionButton("\u3053\u306E\u7BC4\u56F2\u3092\u6B8B\u3059", "MEMBER_REJECT_REMOVAL", row.scopeKey));
+    } else if (row.assignmentState === "PENDING_MASTER") {
+      const pending = document.createElement("small");
+      pending.textContent = "\u30DE\u30B9\u30BF\u30FC\u306E\u627F\u8A8D\u3092\u5F85\u3063\u3066\u3044\u307E\u3059\u3002";
+      item.append(pending);
+    } else if (row.assignmentState === "APPROVED") {
+      const request = collaborationScopeActionButton("\u8FFD\u52A0\u7533\u8ACB\u6E08\u307F", "NONE", row.scopeKey, void 0, true);
+      item.append(request);
+    } else {
+      item.append(collaborationScopeActionButton("\u3053\u306E\u7BC4\u56F2\u3092\u7533\u8ACB", "MEMBER_REQUEST", row.scopeKey));
+    }
+    children.push(item);
+  }
+  collaborationScopeParticipantListElement.replaceChildren(...children);
+}
+function renderCollaborationScopeUi() {
+  const online = collaborationScopeRows.length > 0;
+  const canManage = collaborationScopeRows.some((row) => row.canManage);
+  const isParticipant = collaborationScopeRows.some((row) => row.isCurrentUser && row.memberRole !== "owner");
+  collaborationScopeConsentAccepted = collaborationScopeRows.some((row) => row.isCurrentUser && row.currentUserConsented);
+  collaborationEditScopePolicy = collaborationScopeRows.find((row) => row.isCurrentUser)?.editScopePolicy ?? collaborationScopeRows[0]?.editScopePolicy ?? "OPEN";
+  const editBlockReason = collaborationEditBlockReason();
+  document.body.dataset.pixyncEditScopePolicy = collaborationEditScopePolicy;
+  document.body.dataset.pixyncEditLocked = editBlockReason === void 0 ? "false" : "true";
+  if (collaborationScopeStatusElement !== null) {
+    collaborationScopeStatusElement.textContent = !online ? "\u30ED\u30FC\u30AB\u30EB\u7DE8\u96C6" : collaborationScopeConsentAccepted ? editScopePolicyLabel(collaborationEditScopePolicy) : "\u53C2\u52A0\u524D\u306E\u78BA\u8A8D\u304C\u5FC5\u8981";
+  }
+  if (collaborationScopeMessageElement !== null) {
+    collaborationScopeMessageElement.textContent = !online ? "\u3053\u306EProject\u306F\u30ED\u30FC\u30AB\u30EB\u7DE8\u96C6\u3067\u3059\u3002\u30AA\u30F3\u30E9\u30A4\u30F3\u5171\u540C\u4F5C\u696D\u306B\u53C2\u52A0\u3059\u308B\u3068\u304D\u306B\u6CE8\u610F\u4E8B\u9805\u3092\u78BA\u8A8D\u3057\u307E\u3059\u3002" : collaborationScopeConsentAccepted ? `\u6CE8\u610F\u4E8B\u9805\u3092\u78BA\u8A8D\u6E08\u307F\u3067\u3059\u3002\u7DE8\u96C6\u30EB\u30FC\u30EB\u306F\u300C${editScopePolicyLabel(collaborationEditScopePolicy)}\u300D\u3067\u3059\u3002` : "\u5171\u540C\u4F5C\u696D\u306B\u53C2\u52A0\u3059\u308B\u524D\u306B\u3001\u6C17\u8EFD\u306A\u5171\u540C\u4F5C\u696D\u3068\u516C\u958B\u30FB\u8CA9\u58F2\u306E\u6CE8\u610F\u4E8B\u9805\u3092\u78BA\u8A8D\u3057\u3066\u304F\u3060\u3055\u3044\u3002";
+  }
+  if (collaborationEditGuardElement !== null) {
+    collaborationEditGuardElement.hidden = editBlockReason === void 0;
+  }
+  if (collaborationEditGuardMessageElement !== null) {
+    collaborationEditGuardMessageElement.textContent = editBlockReason ?? "";
+  }
+  if (collaborationEditGuardOpenButton !== null) {
+    collaborationEditGuardOpenButton.hidden = editBlockReason === void 0;
+    collaborationEditGuardOpenButton.textContent = !collaborationScopeConsentAccepted ? "\u78BA\u8A8D\u3092\u958B\u304F" : "\u78BA\u8A8D\u30FB\u7533\u8ACB";
+  }
+  if (collaborationScopeConsentCheckElement !== null) {
+    collaborationScopeConsentCheckElement.checked = collaborationScopeConsentAccepted || collaborationScopeConsentDraft;
+    collaborationScopeConsentCheckElement.disabled = !online || collaborationScopeConsentAccepted;
+  }
+  if (collaborationScopeConsentAcceptButton !== null) {
+    collaborationScopeConsentAcceptButton.disabled = !online || collaborationScopeConsentAccepted || !collaborationScopeConsentDraft;
+    collaborationScopeConsentAcceptButton.textContent = collaborationScopeConsentAccepted ? "\u78BA\u8A8D\u6E08\u307F" : "\u78BA\u8A8D\u3057\u3066\u53C2\u52A0\u3059\u308B";
+  }
+  if (collaborationScopeMasterPanelElement !== null) {
+    collaborationScopeMasterPanelElement.hidden = !online || !collaborationScopeConsentAccepted || !canManage;
+  }
+  if (collaborationScopeParticipantPanelElement !== null) {
+    collaborationScopeParticipantPanelElement.hidden = !online || !collaborationScopeConsentAccepted || !isParticipant;
+  }
+  if (collaborationEditPolicyPanelElement !== null) {
+    collaborationEditPolicyPanelElement.hidden = !online || !collaborationScopeConsentAccepted;
+  }
+  if (collaborationEditPolicyOpenElement !== null) {
+    collaborationEditPolicyOpenElement.checked = collaborationEditScopePolicy === "OPEN";
+    collaborationEditPolicyOpenElement.disabled = !canManage || collaborationScopeBusy;
+  }
+  if (collaborationEditPolicyAssignedOnlyElement !== null) {
+    collaborationEditPolicyAssignedOnlyElement.checked = collaborationEditScopePolicy === "ASSIGNED_ONLY";
+    collaborationEditPolicyAssignedOnlyElement.disabled = !canManage || collaborationScopeBusy;
+  }
+  if (collaborationEditPolicyMessageElement !== null) {
+    collaborationEditPolicyMessageElement.textContent = canManage ? `\u73FE\u5728\u306F\u300C${editScopePolicyLabel(collaborationEditScopePolicy)}\u300D\u3002\u521D\u671F\u8A2D\u5B9A\u306E\u307E\u307E\u306A\u3089\u3001\u7DE8\u96C6\u53C2\u52A0\u8005\u306F\u62C5\u5F53\u7BC4\u56F2\u3092\u5F85\u305F\u305A\u306B\u4F5C\u696D\u3067\u304D\u307E\u3059\u3002` : `\u30DE\u30B9\u30BF\u30FC\u304C\u6C7A\u3081\u305F\u7DE8\u96C6\u30EB\u30FC\u30EB\u306F\u300C${editScopePolicyLabel(collaborationEditScopePolicy)}\u300D\u3067\u3059\u3002`;
+  }
+  renderCollaborationScopeMasterList();
+  renderCollaborationScopeParticipantList();
+}
+async function refreshCollaborationScopeUi() {
+  collaborationScopeRows = [];
+  collaborationScopeConsentAccepted = false;
+  collaborationScopeConsentDraft = false;
+  collaborationEditScopePolicy = "OPEN";
+  renderCollaborationScopeUi();
+  if (!PIXYNC_ROOM_ID.test(state.projectId)) return;
+  try {
+    const data = await collaborationScopeRpc("pixisync_list_scope_assignments_v1", {
+      p_room_id: state.projectId
+    });
+    collaborationScopeRows = collaborationScopeRowsFromRpc(data);
+    renderCollaborationScopeUi();
+  } catch (error2) {
+    if (collaborationScopeMessageElement !== null) {
+      collaborationScopeMessageElement.textContent = error2 instanceof Error ? `\u62C5\u5F53\u7BC4\u56F2\u3092\u8AAD\u307F\u8FBC\u3081\u307E\u305B\u3093\u3067\u3057\u305F\u3002${error2.message}` : "\u62C5\u5F53\u7BC4\u56F2\u3092\u8AAD\u307F\u8FBC\u3081\u307E\u305B\u3093\u3067\u3057\u305F\u3002";
+    }
+  }
+}
+async function setCollaborationEditScopePolicy(policy) {
+  if (!COLLABORATION_EDIT_SCOPE_POLICIES.includes(policy)) return;
+  if (!collaborationScopeRows.some((row) => row.canManage)) return;
+  if (collaborationScopeBusy || policy === collaborationEditScopePolicy) return;
+  collaborationScopeBusy = true;
+  renderCollaborationScopeUi();
+  if (collaborationScopeSaveStatusElement !== null) {
+    collaborationScopeSaveStatusElement.textContent = "\u4FDD\u5B58\u4E2D\u2026";
+  }
+  try {
+    await collaborationScopeRpc("pixisync_set_edit_scope_policy_v1", {
+      p_room_id: state.projectId,
+      p_policy: policy
+    });
+    await refreshCollaborationScopeUi();
+    if (collaborationScopeSaveStatusElement !== null) {
+      collaborationScopeSaveStatusElement.textContent = `\u7DE8\u96C6\u30EB\u30FC\u30EB\u3092\u300C${editScopePolicyLabel(policy)}\u300D\u306B\u5909\u66F4\u3057\u307E\u3057\u305F\u3002`;
+    }
+  } catch (error2) {
+    renderCollaborationScopeUi();
+    if (collaborationScopeSaveStatusElement !== null) {
+      collaborationScopeSaveStatusElement.textContent = error2 instanceof Error ? error2.message : "\u7DE8\u96C6\u30EB\u30FC\u30EB\u3092\u5909\u66F4\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002";
+    }
+  } finally {
+    collaborationScopeBusy = false;
+    renderCollaborationScopeUi();
+  }
+}
+async function promptCollaborationConsentIfNeeded() {
+  if (collaborationScopeDialogElement === null) return;
+  await refreshCollaborationScopeUi();
+  if (collaborationScopeRows.length > 0 && !collaborationScopeConsentAccepted && !collaborationScopeDialogElement.open) {
+    collaborationScopeDialogElement.showModal();
+  }
+}
+async function acceptCollaborationScopeConsent() {
+  if (collaborationScopeConsentAccepted || collaborationScopeRows.length === 0) return;
+  if (collaborationScopeConsentCheckElement?.checked !== true) return;
+  collaborationScopeBusy = true;
+  if (collaborationScopeSaveStatusElement !== null) collaborationScopeSaveStatusElement.textContent = "\u4FDD\u5B58\u4E2D\u2026";
+  try {
+    await collaborationScopeRpc("pixisync_accept_collaboration_consent_v1", {
+      p_room_id: state.projectId,
+      p_consent_version: "COLLABORATION_NOTICE_V1"
+    });
+    await refreshCollaborationScopeUi();
+    if (collaborationScopeSaveStatusElement !== null) collaborationScopeSaveStatusElement.textContent = "\u78BA\u8A8D\u3092\u4FDD\u5B58\u3057\u307E\u3057\u305F\u3002";
+  } catch (error2) {
+    renderCollaborationScopeUi();
+    if (collaborationScopeSaveStatusElement !== null) collaborationScopeSaveStatusElement.textContent = error2 instanceof Error ? error2.message : "\u4FDD\u5B58\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002";
+  } finally {
+    collaborationScopeBusy = false;
+  }
+}
+async function handleCollaborationScopeAction(button) {
+  const action = button.dataset.collaborationAction;
+  const scopeKey = button.dataset.scopeKey;
+  const userId = button.dataset.userId;
+  if (action === void 0 || action === "NONE" || !isCollaborationScopeKey(scopeKey)) return;
+  if (action.startsWith("MASTER_") && (userId === void 0 || userId.length === 0)) return;
+  if (collaborationScopeBusy) return;
+  collaborationScopeBusy = true;
+  if (collaborationScopeSaveStatusElement !== null) collaborationScopeSaveStatusElement.textContent = "\u4FDD\u5B58\u4E2D\u2026";
+  try {
+    if (action === "MASTER_ASSIGN" || action === "MASTER_REMOVE") {
+      await collaborationScopeRpc("pixisync_set_scope_assignment_v1", {
+        p_room_id: state.projectId,
+        p_user_id: userId,
+        p_scope_key: scopeKey,
+        p_enabled: action === "MASTER_ASSIGN"
+      });
+    } else if (action === "MASTER_APPROVE" || action === "MASTER_REJECT") {
+      await collaborationScopeRpc("pixisync_review_scope_request_v1", {
+        p_room_id: state.projectId,
+        p_user_id: userId,
+        p_scope_key: scopeKey,
+        p_action: action === "MASTER_APPROVE" ? "APPROVE" : "REJECT"
+      });
+    } else if (action === "MEMBER_REQUEST") {
+      await collaborationScopeRpc("pixisync_request_scope_v1", {
+        p_room_id: state.projectId,
+        p_scope_key: scopeKey
+      });
+    } else {
+      const responseAction = action === "MEMBER_ACCEPT" ? "ACCEPT_ASSIGNMENT" : action === "MEMBER_DECLINE" ? "DECLINE_ASSIGNMENT" : action === "MEMBER_ACCEPT_REMOVAL" ? "ACCEPT_REMOVAL" : "REJECT_REMOVAL";
+      await collaborationScopeRpc("pixisync_respond_scope_v1", {
+        p_room_id: state.projectId,
+        p_scope_key: scopeKey,
+        p_action: responseAction
+      });
+    }
+    await refreshCollaborationScopeUi();
+    if (collaborationScopeSaveStatusElement !== null) collaborationScopeSaveStatusElement.textContent = "\u4FDD\u5B58\u3057\u307E\u3057\u305F\u3002";
+  } catch (error2) {
+    if (collaborationScopeSaveStatusElement !== null) collaborationScopeSaveStatusElement.textContent = error2 instanceof Error ? error2.message : "\u4FDD\u5B58\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002";
+  } finally {
+    collaborationScopeBusy = false;
+  }
+}
+function openCollaborationScopeDialog() {
+  if (collaborationScopeDialogElement === null) return;
+  void refreshCollaborationScopeUi();
+  if (!collaborationScopeDialogElement.open) collaborationScopeDialogElement.showModal();
+}
+collaborationScopeOpenButton?.addEventListener("click", openCollaborationScopeDialog);
+collaborationEditGuardOpenButton?.addEventListener("click", openCollaborationScopeDialog);
+collaborationScopeConsentCheckElement?.addEventListener("change", () => {
+  collaborationScopeConsentDraft = collaborationScopeConsentCheckElement.checked;
+  renderCollaborationScopeUi();
+});
+collaborationScopeConsentAcceptButton?.addEventListener("click", () => {
+  if (!collaborationScopeBusy) void acceptCollaborationScopeConsent();
+});
+collaborationScopeMasterListElement?.addEventListener("click", (event) => {
+  const target = event.target.closest("button[data-collaboration-action]");
+  if (target !== null) void handleCollaborationScopeAction(target);
+});
+collaborationScopeParticipantListElement?.addEventListener("click", (event) => {
+  const target = event.target.closest("button[data-collaboration-action]");
+  if (target !== null) void handleCollaborationScopeAction(target);
+});
+for (const input of [
+  collaborationEditPolicyOpenElement,
+  collaborationEditPolicyAssignedOnlyElement
+]) {
+  input?.addEventListener("change", () => {
+    if (!input.checked || !isCollaborationEditScopePolicy(input.value)) return;
+    void setCollaborationEditScopePolicy(input.value);
+  });
+}
 function requireWorkspacePixyncBridge() {
   const bridge = getWorkspacePxdBridge();
   for (const method of [
@@ -19435,7 +21270,7 @@ function requireWorkspacePixyncBridge() {
     "applyPixyncGameRemote"
   ]) {
     if (typeof bridge[method] !== "function") {
-      throw new Error(`PiXYNC Workspace bridge is missing ${method}.`);
+      throw new Error(`PiXYNC Workspace adapter is missing ${method}.`);
     }
   }
   return bridge;
@@ -19558,6 +21393,14 @@ async function startPixyncProductionRoot(suppliedClient) {
     },
     onStatus: (status2) => publishPixyncProductionStatus(status2, projectId),
     onError: (error2) => {
+      const errorText = error2 instanceof Error ? error2.message : typeof error2 === "string" ? error2 : JSON.stringify(error2);
+      if (/scope_assignment_required/i.test(errorText ?? "")) {
+        document.body.dataset.pixyncState = "subscribed";
+        document.body.dataset.pixyncError = "COLLABORATION_SCOPE_REQUIRED";
+        setStatus("\u3053\u306E\u7DE8\u96C6\u30EB\u30FC\u30EB\u3067\u306F\u73FE\u5728\u306E\u62C5\u5F53\u7BC4\u56F2\u306B\u4FDD\u5B58\u3067\u304D\u307E\u305B\u3093\u3002\u753B\u9762\u4E0A\u90E8\u306E\u300C\u78BA\u8A8D\u30FB\u7533\u8ACB\u300D\u304B\u3089\u62C5\u5F53\u7BC4\u56F2\u3092\u7533\u8ACB\u3057\u3066\u304F\u3060\u3055\u3044\u3002", "error");
+        void refreshCollaborationScopeUi();
+        return;
+      }
       document.body.dataset.pixyncState = "error";
       document.body.dataset.pixyncError = error2 instanceof Error ? error2.message : "PIXYNC_RUNTIME_ERROR";
       publishPixyncProductionStatus("OFFLINE", projectId, "PiXYNC\u3067\u30A8\u30E9\u30FC\u304C\u767A\u751F\u3057\u307E\u3057\u305F\u3002\u30ED\u30FC\u30AB\u30EB\u5909\u66F4\u3092\u4FDD\u6301\u3057\u3066\u3044\u307E\u3059\u3002");
@@ -19580,10 +21423,488 @@ async function startPixyncProductionRoot(suppliedClient) {
   pixyncProductionRoot = root;
   document.body.dataset.pixyncComposition = "production";
   publishPixyncProductionStatus("SUBSCRIBED", projectId);
+  void promptCollaborationConsentIfNeeded();
   return true;
 }
+var MARKET_IMPORT_DB_NAME = "pixieed-market-import-v1";
+var MARKET_IMPORT_STORE_NAME = "imports";
+var MARKET_IMPORT_TOKEN_PATTERN = /^[A-Za-z0-9_-]{16,128}$/u;
+var MARKET_IMPORT_FILENAME_PATTERN = /\.(?:pxd|pxdraw|pixiedraw)$/iu;
+var MARKET_IMPORT_PROJECT_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/u;
+function readMarketImportRequest() {
+  const url = new URL(window.location.href);
+  const rawImportToken = url.searchParams.get("market_import");
+  const rawBindToken = url.searchParams.get("market_bind");
+  const rawProjectId = url.searchParams.get("projectId") ?? url.searchParams.get("project");
+  const targetProjectId = rawProjectId?.trim();
+  if (rawImportToken === null && rawBindToken === null) {
+    return {
+      mode: "DRAW_OPEN",
+      invalid: false
+    };
+  }
+  try {
+    url.searchParams.delete("market_import");
+    url.searchParams.delete("market_bind");
+    window.history.replaceState(window.history.state, document.title, `${url.pathname}${url.search}${url.hash}`);
+  } catch {
+  }
+  if (rawImportToken !== null && rawBindToken !== null) {
+    return {
+      mode: "DRAW_OPEN",
+      invalid: true
+    };
+  }
+  const mode = rawBindToken === null ? "DRAW_OPEN" : "GAME_BIND";
+  const token = (rawBindToken ?? rawImportToken ?? "").trim();
+  if (!MARKET_IMPORT_TOKEN_PATTERN.test(token)) return {
+    mode,
+    invalid: true
+  };
+  if (mode === "GAME_BIND" && (targetProjectId === void 0 || !MARKET_IMPORT_PROJECT_ID_PATTERN.test(targetProjectId))) {
+    return {
+      mode,
+      invalid: true
+    };
+  }
+  return {
+    token,
+    mode,
+    ...targetProjectId === void 0 ? {} : {
+      targetProjectId
+    },
+    invalid: false
+  };
+}
+function consumeMarketImportRecord(token) {
+  return new Promise((resolve, reject2) => {
+    let database;
+    let consumed;
+    const request = window.indexedDB.open(MARKET_IMPORT_DB_NAME, 1);
+    request.onupgradeneeded = () => {
+      const result = request.result;
+      if (!result.objectStoreNames.contains(MARKET_IMPORT_STORE_NAME)) {
+        result.createObjectStore(MARKET_IMPORT_STORE_NAME, {
+          keyPath: "token"
+        });
+      }
+    };
+    request.onerror = () => reject2(new Error("Market import unavailable."));
+    request.onsuccess = () => {
+      database = request.result;
+      try {
+        const transaction = database.transaction(MARKET_IMPORT_STORE_NAME, "readwrite");
+        const store = transaction.objectStore(MARKET_IMPORT_STORE_NAME);
+        const read = store.get(token);
+        read.onerror = () => reject2(new Error("Market import unavailable."));
+        read.onsuccess = () => {
+          const value = read.result;
+          const filename = typeof value?.filename === "string" ? value.filename.trim() : "";
+          const valid = value !== void 0 && value.token === token && value.blob instanceof Blob && Number.isFinite(value.expiresAt) && Number(value.expiresAt) > Date.now() && filename.length > 0 && filename.length <= 255 && MARKET_IMPORT_FILENAME_PATTERN.test(filename) && !/[\\/\u0000-\u001f]/u.test(filename) && (value?.mode === void 0 || value.mode === "DRAW_OPEN" || value.mode === "GAME_BIND") && (value?.targetProjectId === void 0 || typeof value.targetProjectId === "string" && MARKET_IMPORT_PROJECT_ID_PATTERN.test(value.targetProjectId));
+          store.delete(token);
+          if (valid) {
+            consumed = {
+              token,
+              blob: new Blob([
+                value.blob
+              ], {
+                type: value.blob.type || "application/vnd.pixieed.pxd"
+              }),
+              filename,
+              expiresAt: Number(value.expiresAt),
+              mode: value.mode === "GAME_BIND" ? "GAME_BIND" : "DRAW_OPEN",
+              ...typeof value.targetProjectId === "string" && MARKET_IMPORT_PROJECT_ID_PATTERN.test(value.targetProjectId) ? {
+                targetProjectId: value.targetProjectId
+              } : {},
+              ...value.metadata === void 0 ? {} : {
+                metadata: value.metadata
+              }
+            };
+          }
+        };
+        transaction.oncomplete = () => {
+          database?.close();
+          if (consumed === void 0) {
+            reject2(new Error("Market import record is invalid or expired."));
+            return;
+          }
+          resolve(consumed);
+        };
+        transaction.onerror = () => reject2(new Error("Market import unavailable."));
+        transaction.onabort = () => reject2(new Error("Market import unavailable."));
+      } catch {
+        database?.close();
+        reject2(new Error("Market import unavailable."));
+      }
+    };
+  });
+}
+async function importMarketPurchaseFromUrl() {
+  const request = readMarketImportRequest();
+  if (request.invalid) {
+    setStatus("\u8CFC\u5165PXD\u3092\u8AAD\u307F\u8FBC\u3081\u307E\u305B\u3093\u3002", "error");
+    return;
+  }
+  if (request.token === void 0) return;
+  try {
+    const record4 = await consumeMarketImportRecord(request.token);
+    const file = new File([
+      record4.blob
+    ], record4.filename, {
+      type: record4.blob.type || "application/vnd.pixieed.pxd"
+    });
+    if (request.mode === "GAME_BIND" && record4.mode !== "GAME_BIND") {
+      throw new Error("Market asset transfer mode is invalid.");
+    }
+    if (request.mode === "GAME_BIND") {
+      if (record4.targetProjectId !== void 0 && record4.targetProjectId !== request.targetProjectId) {
+        throw new Error("Market asset target Project is inconsistent.");
+      }
+      const targetProjectId = request.targetProjectId ?? record4.targetProjectId;
+      if (targetProjectId === void 0 || !MARKET_IMPORT_PROJECT_ID_PATTERN.test(targetProjectId)) {
+        throw new Error("Market asset target Project is missing.");
+      }
+      await importPxdFile(file, {
+        mode: "ASSET_ONLY",
+        source: "MARKET_ASSET",
+        expectedProjectId: targetProjectId,
+        marketMetadata: record4.metadata
+      });
+      setStatus("\u8CFC\u5165Asset\u3092\u73FE\u5728\u306EProject\u306EiGAME\u7D20\u6750\u68DA\u3078\u8FFD\u52A0\u3057\u307E\u3057\u305F\u3002");
+      return;
+    }
+    await importPxdFile(file, {
+      announceProjectChange: true,
+      source: "MARKET_PURCHASE"
+    });
+    setStatus("\u8CFC\u5165PXD\u3092\u8AAD\u307F\u8FBC\u307F\u307E\u3057\u305F\u3002");
+  } catch {
+    setStatus("\u8CFC\u5165PXD\u3092\u8AAD\u307F\u8FBC\u3081\u307E\u305B\u3093\u3002", "error");
+  }
+}
+var MARKET_SOURCE_FRAME_PREFIX = "market-source-frame-v1:";
+var MARKET_SOURCE_RASTER_PREFIX = "market-source-raster-v1:";
+var MARKET_SOURCE_MAX_FRAMES = 512;
+var MARKET_SOURCE_HASH_PATTERN = /^[a-f0-9]{64}$/iu;
+var MARKET_SOURCE_LAYOUTS = [
+  "FULL_CANVAS",
+  "MANUAL",
+  "GRID_32",
+  "FRAME_SEQUENCE",
+  "GRID_FRAME_SEQUENCE"
+];
+function marketRecord(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value) ? value : void 0;
+}
+function marketRequiredText(value) {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : void 0;
+}
+function marketContentHash(value) {
+  const text2 = marketRequiredText(value)?.toLowerCase();
+  return text2 !== void 0 && MARKET_SOURCE_HASH_PATTERN.test(text2) ? text2 : void 0;
+}
+function marketLayout(value) {
+  return typeof value === "string" && MARKET_SOURCE_LAYOUTS.includes(value) ? value : void 0;
+}
+function marketAssetBindingMetadataFor(value, options = {}) {
+  const candidate = marketRecord(value);
+  const source = marketRecord(candidate?.source);
+  const delivery = marketRecord(candidate?.delivery);
+  const license = marketRecord(candidate?.license);
+  const entitlement = marketRecord(candidate?.entitlement);
+  if (source === void 0 || delivery === void 0 || license === void 0 || options.requireEntitlement === true && entitlement === void 0) {
+    return void 0;
+  }
+  const assetId = marketRequiredText(source.assetId ?? source.asset_id);
+  const revisionId = marketRequiredText(source.revisionId ?? source.revision_id);
+  const contentHash = marketContentHash(source.contentHash ?? source.content_hash);
+  const packageHash = marketContentHash(source.packageHash ?? source.package_hash);
+  const label = marketRequiredText(source.label ?? source.title);
+  const format = marketRequiredText(source.format);
+  const layout = marketLayout(source.layout);
+  const deliveryId = marketRequiredText(delivery.deliveryId ?? delivery.delivery_id);
+  const deliveryStatus = marketRequiredText(delivery.status);
+  const deliveryAssetId = marketRequiredText(delivery.assetId ?? delivery.asset_id);
+  const deliveryRevisionId = marketRequiredText(delivery.revisionId ?? delivery.revision_id);
+  const deliveryHash = marketContentHash(delivery.contentHash ?? delivery.content_hash);
+  const deliveryPackageHash = marketContentHash(delivery.packageHash ?? delivery.package_hash);
+  const deliveryFormat = marketRequiredText(delivery.format);
+  const deliveryLicenseId = marketRequiredText(delivery.licenseId ?? delivery.license_id);
+  const licenseId = marketRequiredText(license.licenseId ?? license.license_id);
+  const licenseStatus = marketRequiredText(license.status);
+  const inGameUse = license.in_game_use === true || license.inGameUse === true;
+  const rights = Array.isArray(license.rights) ? license.rights.flatMap((item) => {
+    const right = marketRequiredText(item);
+    return right === void 0 ? [] : [
+      right
+    ];
+  }) : [];
+  const entitlementId = marketRequiredText(entitlement?.id ?? entitlement?.entitlementId);
+  const acquisitionKind = marketRequiredText(entitlement?.acquisitionKind ?? entitlement?.acquisition_kind);
+  const validAcquisitionKind = acquisitionKind === "paid" || acquisitionKind === "free" || acquisitionKind === "admin";
+  if (assetId === void 0 || revisionId === void 0 || contentHash === void 0 || label === void 0 || format === void 0 || layout === void 0 || deliveryId === void 0 || deliveryAssetId === void 0 || deliveryRevisionId === void 0 || deliveryHash === void 0 || deliveryFormat === void 0 || deliveryLicenseId === void 0 || deliveryStatus !== "SECURE_DELIVERED" || licenseId === void 0 || licenseStatus !== "ACTIVE" || rights.length === 0 || new Set(rights).size !== rights.length || !inGameUse || assetId !== deliveryAssetId || revisionId !== deliveryRevisionId || contentHash !== deliveryHash || format !== deliveryFormat || licenseId !== deliveryLicenseId || format === "pixiedraw-project" && (packageHash === void 0 || deliveryPackageHash === void 0) || packageHash !== deliveryPackageHash || options.requireEntitlement === true && (entitlementId === void 0 || !validAcquisitionKind)) {
+    return void 0;
+  }
+  const projectId = marketRequiredText(source.projectId);
+  const normalized = {
+    source: {
+      assetId,
+      revisionId,
+      contentHash,
+      ...packageHash === void 0 ? {} : {
+        packageHash
+      },
+      label,
+      format,
+      layout,
+      ...projectId === void 0 ? {} : {
+        projectId
+      }
+    },
+    delivery: {
+      deliveryId,
+      status: "SECURE_DELIVERED",
+      assetId: deliveryAssetId,
+      revisionId: deliveryRevisionId,
+      contentHash: deliveryHash,
+      ...deliveryPackageHash === void 0 ? {} : {
+        packageHash: deliveryPackageHash
+      },
+      format: deliveryFormat,
+      licenseId: deliveryLicenseId
+    },
+    license: {
+      licenseId,
+      status: "ACTIVE",
+      rights,
+      inGameUse: true
+    },
+    entitlement: {
+      id: entitlementId ?? "",
+      acquisitionKind: validAcquisitionKind ? acquisitionKind : "paid"
+    }
+  };
+  const marketAccess = normalized.entitlement.acquisitionKind === "free" ? "FREE" : "PURCHASED";
+  const marketEntitlementStatus = normalized.entitlement.acquisitionKind === "admin" ? "GRANTED" : normalized.entitlement.acquisitionKind === "free" ? "GRANTED" : "PAID";
+  const sharedValidation = createMarketAssetBindingCandidate({
+    catalog: {
+      id: normalized.source.assetId,
+      title: normalized.source.label,
+      kind: "DRAW",
+      formats: [
+        normalized.source.format
+      ],
+      price: {
+        amountMinor: marketAccess === "FREE" ? 0 : 1,
+        currency: "JPY"
+      },
+      creator: {
+        id: "MARKET",
+        name: "Market"
+      },
+      rights: [
+        ...normalized.license.rights
+      ]
+    },
+    access: marketAccess,
+    entitlementStatus: marketEntitlementStatus,
+    source: normalized.source,
+    license: normalized.license,
+    delivery: normalized.delivery,
+    supportedFormats: [
+      normalized.source.format
+    ]
+  });
+  return sharedValidation.ok ? normalized : void 0;
+}
+function marketSourceRasterIdForFrame(sourceFrameId) {
+  if (!sourceFrameId.startsWith(MARKET_SOURCE_FRAME_PREFIX)) return void 0;
+  try {
+    const value = decodeURIComponent(sourceFrameId.slice(MARKET_SOURCE_FRAME_PREFIX.length));
+    return value.startsWith(MARKET_SOURCE_RASTER_PREFIX) ? value : void 0;
+  } catch {
+    return void 0;
+  }
+}
+function compositeMarketSourceRaster(importedState, frameId, rasterId) {
+  const fallback = importedState.assets[importedState.activeAssetId];
+  if (fallback === void 0) {
+    throw new Error("Market PXD\u306E\u57FA\u6E96\u30E9\u30B9\u30BF\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3002");
+  }
+  const width = fallback.width;
+  const height = fallback.height;
+  const rgba = new Uint8ClampedArray(width * height * 4);
+  const orderedLayers = importedState.timeline.layerTrackOrder.map((layerTrackId) => importedState.layers.find((item) => item.layerTrackId === layerTrackId)).filter((layer2) => layer2 !== void 0 && layer2.lifecycle === "ACTIVE" && layer2.visible && layer2.opacity > 0);
+  const layers = orderedLayers.length > 0 ? orderedLayers : importedState.layers.filter((layer2) => layer2.lifecycle === "ACTIVE" && layer2.visible && layer2.opacity > 0).sort((left, right) => left.order - right.order || left.layerTrackId.localeCompare(right.layerTrackId));
+  for (const layer2 of layers) {
+    const cel2 = importedState.cels.find((candidate) => candidate.layerTrackId === layer2.layerTrackId && candidate.frameId === frameId && candidate.lifecycle === "ACTIVE" && candidate.assetId !== void 0);
+    const source = cel2?.assetId === void 0 ? void 0 : importedState.assets[cel2.assetId];
+    if (source === void 0) continue;
+    const sourcePixels = source.width >= width && source.height >= height ? source.raster.readRegion(0, 0, width, height).pixels : void 0;
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        if (x >= source.width || y >= source.height) continue;
+        const sourceIndex = sourcePixels === void 0 ? source.raster.getPixel(x, y) : sourcePixels[y * width + x] ?? 0;
+        if (sourceIndex === 0) continue;
+        const sourceColor = decodeArgb(source.palette[sourceIndex] ?? 0);
+        const sourceAlpha = sourceColor.alpha / 255 * layer2.opacity;
+        if (sourceAlpha <= 0) continue;
+        const offset = (y * width + x) * 4;
+        const destinationAlpha = (rgba[offset + 3] ?? 0) / 255;
+        const destinationRed = (rgba[offset] ?? 0) / 255;
+        const destinationGreen = (rgba[offset + 1] ?? 0) / 255;
+        const destinationBlue = (rgba[offset + 2] ?? 0) / 255;
+        const sourceRed = sourceColor.red / 255;
+        const sourceGreen = sourceColor.green / 255;
+        const sourceBlue = sourceColor.blue / 255;
+        const blendRed = layer2.blendMode === "MULTIPLY" ? sourceRed * destinationRed : sourceRed;
+        const blendGreen = layer2.blendMode === "MULTIPLY" ? sourceGreen * destinationGreen : sourceGreen;
+        const blendBlue = layer2.blendMode === "MULTIPLY" ? sourceBlue * destinationBlue : sourceBlue;
+        const outputAlpha = sourceAlpha + destinationAlpha * (1 - sourceAlpha);
+        if (outputAlpha <= 0) continue;
+        rgba[offset] = Math.round((blendRed * sourceAlpha + destinationRed * destinationAlpha * (1 - sourceAlpha)) / outputAlpha * 255);
+        rgba[offset + 1] = Math.round((blendGreen * sourceAlpha + destinationGreen * destinationAlpha * (1 - sourceAlpha)) / outputAlpha * 255);
+        rgba[offset + 2] = Math.round((blendBlue * sourceAlpha + destinationBlue * destinationAlpha * (1 - sourceAlpha)) / outputAlpha * 255);
+        rgba[offset + 3] = Math.round(outputAlpha * 255);
+      }
+    }
+  }
+  const frequencies = /* @__PURE__ */ new Map();
+  for (let index = 0; index < rgba.length; index += 4) {
+    const color = argbFromRgb({
+      r: rgba[index] ?? 0,
+      g: rgba[index + 1] ?? 0,
+      b: rgba[index + 2] ?? 0
+    }, rgba[index + 3] ?? 0);
+    if ((rgba[index + 3] ?? 0) === 0) continue;
+    frequencies.set(color, (frequencies.get(color) ?? 0) + 1);
+  }
+  const palette = [
+    0,
+    ...Array.from(frequencies.keys()).sort((left, right) => (frequencies.get(right) ?? 0) - (frequencies.get(left) ?? 0) || left - right).slice(0, 255)
+  ];
+  const paletteIndexByColor = new Map(palette.map((color, index) => [
+    color,
+    index
+  ]));
+  const nearestIndex = (color) => {
+    const exact = paletteIndexByColor.get(color);
+    if (exact !== void 0) return exact;
+    const target = decodeArgb(color);
+    let bestIndex = 1;
+    let bestDistance = Number.POSITIVE_INFINITY;
+    for (let index = 1; index < palette.length; index += 1) {
+      const candidate = decodeArgb(palette[index] ?? 0);
+      const distance2 = (target.red - candidate.red) ** 2 + (target.green - candidate.green) ** 2 + (target.blue - candidate.blue) ** 2 + 2 * (target.alpha - candidate.alpha) ** 2;
+      if (distance2 < bestDistance) {
+        bestDistance = distance2;
+        bestIndex = index;
+      }
+    }
+    return bestIndex;
+  };
+  const raster = IndexedTileRaster.empty(width, height, fallback.raster.tileSize);
+  for (let index = 0; index < rgba.length; index += 4) {
+    const alpha = rgba[index + 3] ?? 0;
+    if (alpha === 0) continue;
+    const color = argbFromRgb({
+      r: rgba[index] ?? 0,
+      g: rgba[index + 1] ?? 0,
+      b: rgba[index + 2] ?? 0
+    }, alpha);
+    const pixel = index / 4;
+    raster.setPixel(rasterId, pixel % width, Math.floor(pixel / width), nearestIndex(color));
+  }
+  return {
+    id: rasterId,
+    width,
+    height,
+    palette,
+    raster,
+    revision: 0
+  };
+}
+function marketSourceRastersFor(importedState, metadata) {
+  if (importedState.frames.length === 0 || importedState.frames.length > MARKET_SOURCE_MAX_FRAMES) {
+    throw new Error("Market PXD\u306E\u30D5\u30EC\u30FC\u30E0\u6570\u304CiGAME\u306E\u4E0A\u9650\u3092\u8D85\u3048\u3066\u3044\u307E\u3059\u3002");
+  }
+  const assets = {};
+  const sourceFrames = importedState.frames.map((frame2, index) => {
+    const rasterId = `${MARKET_SOURCE_RASTER_PREFIX}${encodeURIComponent(metadata.source.assetId)}:${encodeURIComponent(metadata.source.revisionId)}:${index}`;
+    if (assets[rasterId] === void 0) {
+      assets[rasterId] = compositeMarketSourceRaster(importedState, frame2.frameId, rasterId);
+    }
+    const raster = assets[rasterId];
+    if (raster === void 0) throw new Error("Market PXD\u306E\u30D5\u30EC\u30FC\u30E0\u7D20\u6750\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3002");
+    const sourceFrameId = `${MARKET_SOURCE_FRAME_PREFIX}${encodeURIComponent(rasterId)}`;
+    return {
+      sourceFrameId,
+      layerIds: importedState.layers.filter((layer2) => layer2.lifecycle === "ACTIVE" && layer2.visible).map((layer2) => layer2.layerTrackId),
+      rect: {
+        x: 0,
+        y: 0,
+        width: raster.width,
+        height: raster.height
+      },
+      durationMs: Math.max(1, Math.round(frame2.durationMs))
+    };
+  });
+  return {
+    assets,
+    sourceFrames
+  };
+}
+function appendMarketAssetSource(currentState, importedState, metadata) {
+  const projected = marketSourceRastersFor(importedState, metadata);
+  const first = projected.sourceFrames[0];
+  if (first === void 0) throw new Error("Market PXD\u306E\u53C2\u7167\u30D5\u30EC\u30FC\u30E0\u304C\u3042\u308A\u307E\u305B\u3093\u3002");
+  const firstRasterId = marketSourceRasterIdForFrame(first.sourceFrameId);
+  const firstRaster = firstRasterId === void 0 ? void 0 : projected.assets[firstRasterId];
+  if (firstRaster === void 0) throw new Error("Market PXD\u306E\u53C2\u7167\u30E9\u30B9\u30BF\u304C\u3042\u308A\u307E\u305B\u3093\u3002");
+  const nextAssets = {
+    ...currentState.assets
+  };
+  let changed = false;
+  for (const [id, asset] of Object.entries(projected.assets)) {
+    const current = nextAssets[id];
+    if (current !== void 0 && (current.width !== asset.width || current.height !== asset.height)) {
+      throw new Error("\u540C\u4E00Market Asset ID\u306B\u7570\u306A\u308B\u5185\u5BB9\u304C\u5B58\u5728\u3057\u307E\u3059\u3002");
+    }
+    if (current === void 0) {
+      nextAssets[id] = asset;
+      changed = true;
+    }
+  }
+  const nextState = changed ? {
+    ...currentState,
+    structureEpoch: currentState.structureEpoch + 1,
+    assets: nextAssets
+  } : currentState;
+  return {
+    state: nextState,
+    reference: {
+      assetId: metadata.source.assetId,
+      revisionId: metadata.source.revisionId,
+      contentHash: metadata.source.contentHash,
+      label: metadata.source.label,
+      mode: "PINNED",
+      ...metadata.source.projectId === void 0 ? {} : {
+        projectId: metadata.source.projectId
+      },
+      licenseId: metadata.license.licenseId,
+      rights: [
+        ...metadata.license.rights
+      ],
+      sourceKind: "MARKET",
+      layout: metadata.source.layout,
+      sourceFrameId: first.sourceFrameId,
+      region: first.rect,
+      sourceFrames: projected.sourceFrames
+    }
+  };
+}
 function currentDrawStateHasLocalWork() {
-  if (state.structureEpoch > 1 || assetDefinitions.length > 0) return true;
+  if (state.structureEpoch > 1 || assetDefinitions.length > 0 || assetPackages.length > 0) return true;
   if (history.undoDepth > 0 || history.redoDepth > 0) return true;
   if (journal.operations.length > 0 || journal.dirtyTileWrites.length > 0) {
     return true;
@@ -19765,6 +22086,8 @@ function persistDraw2EditorPreferencesNow() {
     tool: toolSelect.value,
     brushSize: Number.isFinite(brushSizeValue) ? brushSizeValue : 1,
     brushShape: brushShape.value,
+    brushAngle: Number(brushAngle.value) || 0,
+    brushAlgorithm: brushAlgorithm.value === "pixel-perfect" ? "pixel-perfect" : "regular",
     brushPattern: brushPattern.value,
     similarityPercent: Number.isFinite(similarityValue2) ? similarityValue2 : 0,
     colorSelectionMode: colorSelectionModeControl.value,
@@ -19865,6 +22188,8 @@ function restoreDraw2GlobalEditorPreferences() {
     colorSelectionModeControl.value = preferences.colorSelectionMode;
   }
   brushSize.value = String(preferences.brushSize);
+  brushAngle.value = String(preferences.brushAngle);
+  brushAlgorithm.value = preferences.brushAlgorithm;
   similarity.value = String(preferences.similarityPercent);
   if (Array.from(playbackFpsControl.options).some((option) => option.value === preferences.playbackFps)) playbackFpsControl.value = preferences.playbackFps;
   playbackFpsCustomControl.value = String(preferences.playbackFpsCustom);
@@ -19917,6 +22242,8 @@ function readStoredBrushPresets() {
       name: "Default",
       brushSize: 1,
       brushShape: "square",
+      brushAngle: 0,
+      brushAlgorithm: "regular",
       pattern: "solid",
       dither: "NONE",
       colorIndex: 1,
@@ -19957,11 +22284,11 @@ function restoreDraw2TimelineMetadata(value) {
   for (const reference of metadata.audioReferences) {
     drawAudioReferences.upsert(reference, state.frames.length);
   }
-  for (const stamp3 of selectionStampStore.list()) {
-    selectionStampStore.remove(stamp3.id);
+  for (const stamp of selectionStampStore.list()) {
+    selectionStampStore.remove(stamp.id);
   }
-  for (const stamp3 of metadata.selectionStamps ?? []) {
-    selectionStampStore.save(stamp3);
+  for (const stamp of metadata.selectionStamps ?? []) {
+    selectionStampStore.save(stamp);
   }
 }
 var linkedCelBindings = [];
@@ -19973,6 +22300,7 @@ var selectionInteractionGeneration = 0;
 var selectionEditMode = "REPLACE";
 var selectionDraft;
 var assetDefinitions = [];
+var assetPackages = [];
 var assetDefinitionSequence = 0;
 function cloneAssetDefinitionEntry(entry) {
   return {
@@ -19995,6 +22323,14 @@ function cloneAssetDefinitionEntry(entry) {
             ],
             rect: {
               ...frame2.rect
+            },
+            ...frame2.rasterSnapshot === void 0 ? {} : {
+              rasterSnapshot: {
+                ...frame2.rasterSnapshot,
+                data: [
+                  ...frame2.rasterSnapshot.data
+                ]
+              }
             }
           }))
         },
@@ -20050,6 +22386,49 @@ function currentAssetSelectionSnapshot() {
     frameNumber: frame2 === void 0 ? null : frame2.index + 1
   };
 }
+function selectionProjectionFromImage(image, region, selectedPixels = new Set(selection?.pixels.map((point2) => selectionPointKey(point2)) ?? [])) {
+  for (let index = 0; index < image.width * image.height; index += 1) {
+    const point2 = {
+      x: region.x + index % image.width,
+      y: region.y + Math.floor(index / image.width)
+    };
+    if (selectedPixels.has(selectionPointKey(point2))) continue;
+    const offset = index * 4;
+    image.data[offset] = 0;
+    image.data[offset + 1] = 0;
+    image.data[offset + 2] = 0;
+    image.data[offset + 3] = 0;
+  }
+  return {
+    width: image.width,
+    height: image.height,
+    data: image.data
+  };
+}
+function captureAssetSelectionForFrame(frameId) {
+  const current = currentAssetSelectionSnapshot();
+  if (!current.hasSelection || current.region === null || current.pixelCount <= 0 || !state.frames.some((frame2) => frame2.frameId === frameId)) return void 0;
+  try {
+    return selectionProjectionFromImage(compositeRegion(current.region, frameId), current.region);
+  } catch {
+    return void 0;
+  }
+}
+function captureAssetSelectionForFrames(frameIds) {
+  const current = currentAssetSelectionSnapshot();
+  const knownFrameIds = new Set(state.frames.map((frame2) => frame2.frameId));
+  if (frameIds.length === 0 || !current.hasSelection || current.region === null || current.pixelCount <= 0 || frameIds.some((frameId) => !knownFrameIds.has(frameId))) return void 0;
+  const selectedPixels = new Set(selection?.pixels.map((point2) => selectionPointKey(point2)) ?? []);
+  const projections = [];
+  try {
+    for (const frameId of frameIds) {
+      projections.push(selectionProjectionFromImage(compositeRegion(current.region, frameId), current.region, selectedPixels));
+    }
+    return projections;
+  } catch {
+    return void 0;
+  }
+}
 function notifyAssetStateChanged() {
   window.dispatchEvent(new Event(DRAW2_ASSET_STATE_CHANGED_EVENT));
 }
@@ -20062,7 +22441,7 @@ function nextAssetDefinitionId() {
   } while (assetDefinitions.some((entry) => entry.definitionId === candidate));
   return candidate;
 }
-function assetDefinitionMutation(definitionId, candidate) {
+function assetDefinitionMutation(definitionId, candidate, options = {}) {
   const current = assetDefinitions.find((entry) => entry.definitionId === definitionId);
   if (current === void 0) {
     return {
@@ -20080,16 +22459,11 @@ function assetDefinitionMutation(definitionId, candidate) {
   };
   const normalized = {
     ...validation.value,
-    persistence: "LOCAL_DRAFT"
+    persistence: options.persistence ?? "LOCAL_DRAFT"
   };
   const nextEntry = {
     definitionId,
-    definition: normalized,
-    ...current.registryIdentity === void 0 ? {} : {
-      registryIdentity: {
-        ...current.registryIdentity
-      }
-    }
+    definition: normalized
   };
   assetDefinitions = assetDefinitions.map((entry) => entry.definitionId === definitionId ? nextEntry : entry);
   queueDrawPersistenceSave("asset-definition");
@@ -20138,9 +22512,14 @@ function createEmptyAssetDefinition(input) {
     ok: false,
     message: draft.message
   };
+  const validated = validateAssetDefinitionDraft(draft.value);
+  if (!validated.ok) return {
+    ok: false,
+    message: validated.message
+  };
   const entry = {
     definitionId: nextAssetDefinitionId(),
-    definition: draft.value
+    definition: validated.value
   };
   assetDefinitions = [
     ...assetDefinitions,
@@ -20191,6 +22570,14 @@ function createAssetAnimationClipFromInput(input) {
         ],
         rect: {
           ...frame2.rect
+        },
+        ...frame2.rasterSnapshot === void 0 ? {} : {
+          rasterSnapshot: {
+            ...frame2.rasterSnapshot,
+            data: [
+              ...frame2.rasterSnapshot.data
+            ]
+          }
         }
       }))
     },
@@ -20209,23 +22596,77 @@ function addAssetDefinitionFromSelection(input) {
       message: "Draw\u30E2\u30FC\u30C9\u3067\u7BC4\u56F2\u3092\u9078\u629E\u3057\u3066\u304B\u3089\u8FFD\u52A0\u3057\u3066\u304F\u3060\u3055\u3044\u3002"
     };
   }
+  const capturedProjection = captureCurrentAssetSelection();
+  const visibleLayerIds = state.timeline.layerTrackOrder.flatMap((layerTrackId) => {
+    const layer2 = state.layers.find((candidate) => candidate.layerTrackId === layerTrackId);
+    return layer2 !== void 0 && layer2.visible && layer2.opacity > 0 ? [
+      layer2.layerTrackId
+    ] : [];
+  });
+  const capturedRasterSnapshot = capturedProjection === void 0 ? void 0 : {
+    width: capturedProjection.width,
+    height: capturedProjection.height,
+    data: Array.from(capturedProjection.data)
+  };
+  const sourceFrames = input.sourceFrames ?? (capturedRasterSnapshot === void 0 ? void 0 : [
+    {
+      sourceFrameId: source.frameId,
+      layerIds: visibleLayerIds.length > 0 ? visibleLayerIds : [
+        source.layerId
+      ],
+      rect: {
+        ...source.region
+      },
+      rasterSnapshot: capturedRasterSnapshot
+    }
+  ]);
+  const usesFixedComposite = sourceFrames?.some((frame2) => frame2.rasterSnapshot !== void 0) ?? false;
+  if (sourceFrames === void 0) {
+    return {
+      ok: false,
+      message: "\u8868\u793A\u4E2D\u306E\u30D5\u30EC\u30FC\u30E0\u3092\u753B\u50CF\u3068\u3057\u3066\u53D6\u5F97\u3067\u304D\u307E\u305B\u3093\u3002\u7BC4\u56F2\u3092\u9078\u3073\u76F4\u3057\u3066\u304F\u3060\u3055\u3044\u3002"
+    };
+  }
+  const mappedFrameIds = sourceFrames.map((frame2) => frame2.sourceFrameId);
+  const frameNumberById = new Map(state.frames.map((frame2) => [
+    frame2.frameId,
+    frame2.index + 1
+  ]));
+  const mappedFrameNumbers = mappedFrameIds.map((frameId) => frameNumberById.get(frameId));
+  if (mappedFrameIds.length === 0 || mappedFrameNumbers.length !== mappedFrameIds.length || mappedFrameNumbers.some((frameNumber) => frameNumber === void 0)) {
+    return {
+      ok: false,
+      message: "\u30A2\u30CB\u30E1\u30FC\u30B7\u30E7\u30F3\u5316\u3059\u308BFrame\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3002"
+    };
+  }
+  const frameNumbers = mappedFrameNumbers.filter((frameNumber) => frameNumber !== void 0);
+  const mappedFrameStart = Math.min(...frameNumbers);
+  const mappedFrameEnd = Math.max(...frameNumbers);
+  const sourceLayerIds = usesFixedComposite ? visibleLayerIds.length > 0 ? visibleLayerIds : [
+    source.layerId
+  ] : [
+    source.layerId
+  ];
   const initialAnimationName = input.animationName ?? "IDLE";
   const draft = createAssetDefinitionDraft({
     sourceProjectId: state.projectId,
     sourceCanvasId: source.sourceCanvasId,
-    sourceKind: "SELECTED_LAYERS",
-    sourceLayerIds: [
-      source.layerId
-    ],
-    layerSelection: {
+    sourceKind: usesFixedComposite ? "VISIBLE_COMPOSITE" : "SELECTED_LAYERS",
+    sourceLayerIds,
+    layerSelection: usesFixedComposite ? {
+      kind: "VISIBLE_LAYERS"
+    } : {
       kind: "CURRENT_LAYER",
       layerId: source.layerId
     },
-    frameStart: source.frameNumber,
-    frameEnd: source.frameNumber,
-    frameSelection: {
+    frameStart: mappedFrameStart,
+    frameEnd: mappedFrameEnd,
+    frameSelection: mappedFrameIds.length === 1 ? {
       kind: "CURRENT_FRAME",
-      frameId: source.frameId
+      frameId: mappedFrameIds[0]
+    } : {
+      kind: "EXPLICIT",
+      frameIds: mappedFrameIds
     },
     region: {
       kind: "MANUAL",
@@ -20243,11 +22684,9 @@ function addAssetDefinitionFromSelection(input) {
         ...input.direction === void 0 ? {} : {
           direction: input.direction
         },
-        frameIds: [
-          source.frameId
-        ],
+        frameIds: mappedFrameIds,
         loopMode: "LOOP",
-        fps: 12,
+        fps: input.fps ?? 12,
         ...input.sourceReference === void 0 ? {} : {
           sourceReference: input.sourceReference
         },
@@ -20257,21 +22696,7 @@ function addAssetDefinitionFromSelection(input) {
         ...input.flipY === void 0 ? {} : {
           flipY: input.flipY
         },
-        ...input.sourceFrames === void 0 ? {
-          sourceFrames: [
-            {
-              sourceFrameId: source.frameId,
-              layerIds: [
-                source.layerId
-              ],
-              rect: {
-                ...source.region
-              }
-            }
-          ]
-        } : {
-          sourceFrames: input.sourceFrames
-        },
+        sourceFrames,
         ...input.frameDurationsMs === void 0 ? {} : {
           frameDurationsMs: input.frameDurationsMs
         }
@@ -20279,6 +22704,13 @@ function addAssetDefinitionFromSelection(input) {
     ],
     assetKind: input.assetKind,
     pivot: input.pivot,
+    ...usesFixedComposite ? {
+      protection: {
+        locked: false,
+        sourceReadOnly: true,
+        referencePolicy: "PINNED"
+      }
+    } : {},
     metadata: {
       name: input.name.trim() || `Asset ${assetDefinitions.length + 1}`
     }
@@ -20337,6 +22769,8 @@ function updateAssetDefinition(input) {
       ...current.definition.metadata,
       name: input.name.trim()
     }
+  }, {
+    persistence: "VALIDATED_DEFINITION"
   });
 }
 function frameIdsForRange(start, end) {
@@ -20369,7 +22803,7 @@ function assignAssetAnimation(input) {
   }
   const start = Math.min(input.frameStart, input.frameEnd);
   const end = Math.max(input.frameStart, input.frameEnd);
-  if (sourceClip === void 0 && (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 1 || end > state.frames.length)) {
+  if (sourceClip === void 0 && input.frameIds === void 0 && (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 1 || end > state.frames.length)) {
     return {
       ok: false,
       message: "\u30D5\u30EC\u30FC\u30E0\u7BC4\u56F2\u3092\u78BA\u8A8D\u3057\u3066\u304F\u3060\u3055\u3044\u3002"
@@ -20487,14 +22921,101 @@ function getAssetBridgeSnapshot() {
       frame2.frameId,
       frame2.index + 1
     ])),
-    assetDefinitions: assetDefinitions.map(cloneAssetDefinitionEntry)
+    frameDurationsMs: Object.fromEntries(state.frames.map((frame2) => [
+      frame2.frameId,
+      frame2.durationMs
+    ])),
+    layers: state.timeline.layerTrackOrder.flatMap((layerTrackId) => {
+      const layer2 = state.layers.find((candidate) => candidate.layerTrackId === layerTrackId);
+      return layer2 === void 0 ? [] : [
+        {
+          layerTrackId,
+          name: layer2.name,
+          visible: layer2.visible
+        }
+      ];
+    }),
+    assetDefinitions: assetDefinitions.map(cloneAssetDefinitionEntry),
+    assetPackages: assetPackages.map(cloneAssetPackageManifest)
   };
 }
+function rasterProjectionFromSnapshot(snapshot) {
+  if (snapshot === void 0 || !Number.isSafeInteger(snapshot.width) || snapshot.width < 1 || !Number.isSafeInteger(snapshot.height) || snapshot.height < 1 || !Array.isArray(snapshot.data) || snapshot.data.length !== snapshot.width * snapshot.height * 4 || snapshot.data.some((value) => !Number.isSafeInteger(value) || value < 0 || value > 255)) return void 0;
+  return {
+    width: snapshot.width,
+    height: snapshot.height,
+    data: new Uint8ClampedArray(snapshot.data)
+  };
+}
+function captureCurrentAssetSelection() {
+  const current = currentAssetSelectionSnapshot();
+  if (!current.hasSelection || current.region === null || current.frameId === null || current.pixelCount <= 0) return void 0;
+  return captureAssetSelectionForFrame(current.frameId);
+}
+function sameAssetReferenceRect(left, right) {
+  return left.x === right.x && left.y === right.y && left.width === right.width && left.height === right.height;
+}
+function sameAssetReferenceLayers(left, right) {
+  if (left === void 0) return true;
+  const normalizedLeft = [
+    ...new Set(left)
+  ].sort();
+  const normalizedRight = [
+    ...new Set(right)
+  ].sort();
+  return normalizedLeft.length === normalizedRight.length && normalizedLeft.every((value, index) => value === normalizedRight[index]);
+}
+function storedRasterSnapshotForReference(input) {
+  const definitions = input.assetDefinitionId === void 0 ? [] : assetDefinitions.filter((entry) => entry.definitionId === input.assetDefinitionId);
+  for (const entry of [
+    ...definitions
+  ].reverse()) {
+    for (const clip of [
+      ...entry.definition.animationMapping
+    ].reverse()) {
+      for (const frame2 of [
+        ...clip.sourceFrames ?? []
+      ].reverse()) {
+        if (frame2.sourceFrameId === input.sourceFrameId && frame2.rasterSnapshot !== void 0 && sameAssetReferenceRect(frame2.rect, input.rect) && sameAssetReferenceLayers(input.layerIds, frame2.layerIds)) return frame2.rasterSnapshot;
+      }
+    }
+  }
+  return void 0;
+}
 function renderAssetReference(input) {
+  const fixedSnapshot = input.rasterSnapshot ?? (input.assetDefinitionId === void 0 ? void 0 : storedRasterSnapshotForReference(input));
+  const fixedProjection = rasterProjectionFromSnapshot(fixedSnapshot);
+  if (fixedProjection !== void 0) return fixedProjection;
+  const marketRasterId = marketSourceRasterIdForFrame(input.sourceFrameId);
+  if (marketRasterId !== void 0) {
+    const asset = state.assets[marketRasterId];
+    if (asset === void 0) return void 0;
+    const { x, y, width, height } = input.rect;
+    if (!Number.isSafeInteger(x) || !Number.isSafeInteger(y) || !Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width < 1 || height < 1 || x < 0 || y < 0 || x + width > asset.width || y + height > asset.height) return void 0;
+    try {
+      const indexed = asset.raster.readRegion(x, y, width, height).pixels;
+      const image2 = canonicalContext.createImageData(width, height);
+      for (let index = 0; index < indexed.length; index += 1) {
+        const color = decodeArgb(paletteColorForRender(asset, indexed[index] ?? 0));
+        const offset = index * 4;
+        image2.data[offset] = color.red;
+        image2.data[offset + 1] = color.green;
+        image2.data[offset + 2] = color.blue;
+        image2.data[offset + 3] = color.alpha;
+      }
+      return {
+        width: image2.width,
+        height: image2.height,
+        data: image2.data
+      };
+    } catch {
+      return void 0;
+    }
+  }
   if (!state.frames.some((frame2) => frame2.frameId === input.sourceFrameId)) {
     return void 0;
   }
-  const image = compositeRegion(input.rect, input.sourceFrameId);
+  const image = compositeRegion(input.rect, input.sourceFrameId, void 0, input.layerIds);
   return {
     width: image.width,
     height: image.height,
@@ -20518,7 +23039,9 @@ async function resolveCurrentDrawReference(input) {
     revisionId,
     contentHash,
     mode: input.mode,
-    label: asset.id
+    label: asset.id,
+    projectId: state.projectId,
+    referenceScope: "LOCAL_PROJECT"
   };
 }
 async function resolveDrawDefinitionReference(input) {
@@ -20526,11 +23049,15 @@ async function resolveDrawDefinitionReference(input) {
   if (entry === void 0 || entry.definition.sourceProjectId !== state.projectId) {
     return void 0;
   }
+  const hasFixedSnapshot = entry.definition.animationMapping.some((clip) => clip.sourceFrames?.some((frame2) => frame2.rasterSnapshot !== void 0) === true);
   const sourceAsset = state.assets[entry.definition.sourceCanvasId];
-  if (sourceAsset === void 0) return void 0;
-  const assetId = entry.registryIdentity?.assetId ?? sourceAsset.id;
-  const revisionId = entry.registryIdentity?.revisionId ?? `draw-revision-${sourceAsset.revision}`;
-  const contentHash = String(await hashCanonical({
+  if (sourceAsset === void 0 && !hasFixedSnapshot) return void 0;
+  const assetId = entry.registryIdentity?.assetId ?? sourceAsset?.id ?? `draw-definition-${entry.definitionId}`;
+  const revisionId = entry.registryIdentity?.revisionId ?? (hasFixedSnapshot ? `draw-definition-${entry.definitionId}-snapshot` : `draw-revision-${sourceAsset.revision}`);
+  const contentHash = String(await hashCanonical(hasFixedSnapshot ? {
+    definitionId: entry.definitionId,
+    definition: entry.definition
+  } : {
     definitionId: entry.definitionId,
     definition: entry.definition,
     source: {
@@ -20546,9 +23073,11 @@ async function resolveDrawDefinitionReference(input) {
     assetId,
     revisionId,
     contentHash,
-    mode: input.mode,
+    mode: hasFixedSnapshot ? "PINNED" : input.mode,
     label: entry.definition.metadata.name || entry.definitionId,
-    assetDefinitionId: entry.definitionId
+    assetDefinitionId: entry.definitionId,
+    projectId: state.projectId,
+    referenceScope: entry.registryIdentity === void 0 ? "LOCAL_PROJECT" : "REGISTERED"
   };
 }
 var draw2AssetBridge = {
@@ -20556,6 +23085,9 @@ var draw2AssetBridge = {
   resolveCurrentReference: resolveCurrentDrawReference,
   resolveDefinitionReference: resolveDrawDefinitionReference,
   renderReference: renderAssetReference,
+  captureSelection: captureCurrentAssetSelection,
+  captureSelectionForFrame: captureAssetSelectionForFrame,
+  captureSelectionForFrames: captureAssetSelectionForFrames,
   prepareSelection: prepareAssetSelection,
   createDefinition: createEmptyAssetDefinition,
   addFromSelection: addAssetDefinitionFromSelection,
@@ -20569,6 +23101,27 @@ var draw2AssetBridge = {
     queueDrawPersistenceSave("asset-definition-remove");
     notifyAssetStateChanged();
     return true;
+  },
+  saveAssetPackage: async (manifest) => {
+    const verified = await verifyAssetPackageManifest(manifest);
+    if (!verified.ok) {
+      return {
+        ok: false,
+        message: `Asset Package\u3092\u4FDD\u5B58\u3067\u304D\u307E\u305B\u3093: ${verified.reasons.join("; ")}`
+      };
+    }
+    const next = cloneAssetPackageManifest(manifest);
+    const replacedSourceKeys = new Set(next.entries.map((entry) => `${entry.kind}:${entry.source.sourceId}`));
+    assetPackages = [
+      ...assetPackages.filter((candidate) => candidate.packageId !== next.packageId && !candidate.entries.some((entry) => replacedSourceKeys.has(`${entry.kind}:${entry.source.sourceId}`))),
+      next
+    ];
+    queueDrawPersistenceSave("asset-package-save");
+    notifyAssetStateChanged();
+    return {
+      ok: true,
+      manifest: next
+    };
   }
 };
 window.__pixiedraw2AssetBridge = draw2AssetBridge;
@@ -20578,6 +23131,8 @@ var SELECTION_DOUBLE_CLICK_WINDOW_MS = 420;
 var lastSelectionClick;
 var transformSession;
 var transformPreview;
+var transformCommitInFlight = false;
+var selectionFrameDrag;
 var selectionDrag;
 var pasteMode = false;
 var clipboard;
@@ -20590,7 +23145,7 @@ var timelineViewportInitialized = false;
 var activeTimelineTab = "timeline";
 var timelineFrameElapsedById = /* @__PURE__ */ new Map();
 var TIMELINE_PROPERTIES_STORAGE_KEY = "pixieed:draw2:timeline-properties:v1";
-var isTimelineTab = (value) => value === "timeline" || value === "tags" || value === "markers" || value === "audio";
+var isTimelineTab = (value) => value === "timeline" || value === "tags" || value === "assets" || value === "markers" || value === "audio";
 var readTimelinePropertiesPreference = () => {
   try {
     const raw = window.localStorage.getItem(TIMELINE_PROPERTIES_STORAGE_KEY);
@@ -20620,6 +23175,20 @@ var timelinePropertiesWidth = initialTimelinePropertiesPreference.width;
 var timelinePropertiesCollapsed = initialTimelinePropertiesPreference.collapsed;
 activeTimelineTab = initialTimelinePropertiesPreference.activeTab;
 var timelineSelectedCells = /* @__PURE__ */ new Set();
+tagAddControl.addEventListener("click", addAnimationTagFromControls);
+tagFromSelectionControl?.addEventListener("click", addAnimationTagFromSelection);
+document.addEventListener("keydown", (event) => {
+  if (!event.altKey || !event.shiftKey || event.ctrlKey || event.metaKey || event.key.toLocaleLowerCase() !== "t" || tagFromSelectionControl?.disabled !== false) return;
+  const creatorMode = workspaceFrameElement?.dataset.creatorMode;
+  if (creatorMode !== void 0 && creatorMode !== "DRAW" && creatorMode !== "ANIMATE") return;
+  if (event.defaultPrevented || event.isComposing || isInteractiveKeyboardTarget(event.target)) return;
+  event.preventDefault();
+  event.stopPropagation();
+  addAnimationTagFromSelection();
+});
+window.addEventListener(DRAW2_ASSET_STATE_CHANGED_EVENT, () => {
+  renderCreatorTimelineMetadata();
+});
 var timelineSelectionAnchor;
 var timelineScrollRenderFrame;
 var lastRenderedTimelineScrollTop = Number.NaN;
@@ -20646,6 +23215,8 @@ var game351CameraShakeSeed = 0;
 var toolOptions = {
   brushSize: 1,
   brushShape: "square",
+  brushAngle: 0,
+  brushAlgorithm: "regular",
   pattern: "solid",
   similarity: 0,
   selectionMode: "similar"
@@ -20659,17 +23230,20 @@ var playbackRate = 1;
 var playbackFrameId;
 var playbackStartFrameId;
 var playbackOriginSession;
-var audioLinkedPreviewPlaying = false;
 var colorDraft;
 var colorDraftAlpha = 255;
 var colorDraftDirty = false;
 var colorCommitInFlight = false;
+var colorHistory = [];
 var pendingPaletteAppendDraft;
 var palettePointerActive = false;
 var paletteAppendInFlight = false;
 var paletteClickSuppressed = false;
 var paletteDrag;
 var colorPreviewFrame;
+var pendingTextBounds;
+var pendingTextDraft;
+var pendingTextTarget;
 var mirrorMode = "NONE";
 var mirrorEnabled = false;
 var mirrorAxes = {
@@ -21108,14 +23682,14 @@ function game351ActionForKey(key) {
 }
 function handleGame351PreviewKey(event) {
   const current = game351PlayableState;
-  if (current === void 0) return;
+  if (current === void 0 || event.defaultPrevented || event.isComposing || event.repeat || workspaceFrameElement?.dataset.creatorMode !== "GAME" || event.target !== gamePreviewCanvas) return;
   if (event.key === "Escape") {
     event.preventDefault();
     game351PlayableState = clearGame351Dialogue(current);
     drawGame351Preview(game351PlayableState, game351PreviewMode);
     return;
   }
-  if (event.key === "Enter" || event.key === " ") {
+  if (event.key === "Enter") {
     event.preventDefault();
     game351PlayableState = triggerGame351Action(current, String(GAME351_INTERACT_ACTION), game351Behaviors);
     drawGame351Preview(game351PlayableState, game351PreviewMode);
@@ -21133,7 +23707,7 @@ function handleGame351PreviewKey(event) {
 }
 function handleGameGenrePreviewKey(event) {
   const current = gameGenrePlayableState;
-  if (current === void 0) return;
+  if (current === void 0 || event.defaultPrevented || event.isComposing || event.repeat || workspaceFrameElement?.dataset.creatorMode !== "GAME" || event.target !== gamePreviewCanvas) return;
   if (event.key === "Escape") {
     event.preventDefault();
     gameGenrePlayableState = clearGameGenreDialogue(current);
@@ -21150,12 +23724,9 @@ function handleGameGenrePreviewKey(event) {
     input = {
       right: true
     };
-  } else if (event.key === "ArrowUp" || lowerKey === "w" || event.key === " ") {
+  } else if (event.key === "ArrowUp" || lowerKey === "w") {
     input = {
-      jump: true,
-      ...event.key === " " ? {
-        interact: true
-      } : {}
+      jump: true
     };
   } else if (event.key === "Enter") {
     input = {
@@ -21403,7 +23974,7 @@ function renderPaletteDragPreview(drafts, targetCellIndex) {
     group.dataset.paletteDropCell = String(targetCellIndex);
   }
 }
-function rgbToHsv(color) {
+function rgbToHsv2(color) {
   const r = clampColorChannel(color.r) / 255;
   const g = clampColorChannel(color.g) / 255;
   const b = clampColorChannel(color.b) / 255;
@@ -21423,7 +23994,7 @@ function rgbToHsv(color) {
     v: max
   };
 }
-function hsvToRgb(color) {
+function hsvToRgb2(color) {
   const h = (color.h % 360 + 360) % 360;
   const s = Math.max(0, Math.min(1, color.s));
   const v = Math.max(0, Math.min(1, color.v));
@@ -21544,7 +24115,7 @@ function drawPaletteWheel(hue) {
       let rgb;
       if (distance2 >= metrics2.innerRadius) {
         const ringHue = (Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360;
-        rgb = hsvToRgb({
+        rgb = hsvToRgb2({
           h: ringHue,
           s: 1,
           v: 1
@@ -21552,7 +24123,7 @@ function drawPaletteWheel(hue) {
       } else if (isPointInsidePaletteSv(x + 0.5, y + 0.5, metrics2)) {
         const saturation = Math.max(0, Math.min(1, (x + 0.5 - metrics2.svLeft) / metrics2.svSpan));
         const value = 1 - Math.max(0, Math.min(1, (y + 0.5 - metrics2.svTop) / metrics2.svSpan));
-        rgb = hsvToRgb({
+        rgb = hsvToRgb2({
           h: hue,
           s: saturation,
           v: value
@@ -21588,7 +24159,7 @@ function updatePaletteWheelCursor(hsv) {
   svCursor.style.top = `${offsetY + metrics2.svTop + (1 - hsv.v) * metrics2.svSpan}px`;
 }
 function redrawPaletteWheelFromDraft() {
-  const hsv = rgbToHsv({
+  const hsv = rgbToHsv2({
     r: Number(colorR.value),
     g: Number(colorG.value),
     b: Number(colorB.value)
@@ -21678,11 +24249,105 @@ function setColorEditorRgb(color, writeHex = true, markDraft = true) {
   const hex = rgbToHex(rgb);
   if (writeHex) colorHex.value = hex;
   colorHexOutput.value = hex;
-  const hsv = rgbToHsv(rgb);
+  const hsv = rgbToHsv2(rgb);
   colorMap.setAttribute("aria-valuetext", `Hue ${Math.round(hsv.h)}, saturation ${Math.round(hsv.s * 100)}%, value ${Math.round(hsv.v * 100)}%`);
   drawPaletteWheel(hsv.h);
   updatePaletteWheelCursor(hsv);
   if (markDraft) requestColorPreviewRender();
+}
+function rememberColor(color) {
+  if (color === 0) return;
+  colorHistory = [
+    color,
+    ...colorHistory.filter((candidate) => candidate !== color)
+  ].slice(0, 12);
+  renderColorHistory();
+}
+function renderColorHistory() {
+  colorHistoryControl.replaceChildren();
+  for (const color of colorHistory) {
+    const channels = decodeArgbColor(color);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "draw2-color-history-swatch";
+    button.style.backgroundColor = `rgb(${channels.red} ${channels.green} ${channels.blue} / ${channels.alpha / 255})`;
+    button.title = `Recent color #${[
+      channels.red,
+      channels.green,
+      channels.blue
+    ].map((channel) => channel.toString(16).padStart(2, "0")).join("")}`;
+    button.setAttribute("aria-label", button.title);
+    button.addEventListener("click", () => {
+      const asset = state.assets[state.activeAssetId];
+      const paletteIndex = asset?.palette.indexOf(color) ?? -1;
+      if (paletteIndex >= 0) {
+        selectedColor = paletteIndex;
+        renderPaletteButtons(asset?.palette ?? []);
+        syncColorEditorFromSelection();
+        scheduleDraw2EditorPreferencesSave();
+        return;
+      }
+      colorDraftAlpha = channels.alpha;
+      setColorEditorRgb({
+        r: channels.red,
+        g: channels.green,
+        b: channels.blue
+      });
+      setColorEditorStatus("\u5C65\u6B74\u8272\u3092\u30D7\u30EC\u30D3\u30E5\u30FC\u4E2D\u3002\u8FFD\u52A0\u30DC\u30BF\u30F3\u3067\u30D1\u30EC\u30C3\u30C8\u3078\u767B\u9332\u3067\u304D\u307E\u3059\u3002");
+    });
+    colorHistoryControl.append(button);
+  }
+  if (colorHistory.length === 0) {
+    const empty = document.createElement("span");
+    empty.className = "draw2-color-history-empty";
+    empty.textContent = "Recent colors";
+    colorHistoryControl.append(empty);
+  }
+}
+function renderColorRampOptions(palette) {
+  const current = colorRampEndControl.value;
+  colorRampEndControl.replaceChildren();
+  palette.forEach((color, index) => {
+    const channels = decodeArgbColor(color);
+    const hex = [
+      channels.red,
+      channels.green,
+      channels.blue
+    ].map((channel) => channel.toString(16).padStart(2, "0")).join("");
+    colorRampEndControl.append(new Option(`Index ${index} \xB7 #${hex}`, String(index)));
+  });
+  colorRampEndControl.value = palette.some((_, index) => String(index) === current) ? current : String(Math.min(Math.max(1, selectedColor + 1), Math.max(0, palette.length - 1)));
+  renderColorRampPreview(palette);
+}
+function renderColorRampPreview(palette) {
+  const start = palette[selectedColor] ?? palette[0] ?? 0;
+  const end = palette[Number(colorRampEndControl.value)] ?? start;
+  const ramp = createArgbColorRamp(start, end, Number(colorRampStepsControl.value), colorRampSpaceControl.value === "RGB" ? "RGB" : "HSV", colorRampHueControl.value === "LONG" ? "LONG" : "SHORT");
+  colorRampPreviewControl.replaceChildren();
+  for (const [index, color] of ramp.entries()) {
+    const channels = decodeArgbColor(color);
+    const swatch = document.createElement("span");
+    swatch.className = "draw2-color-ramp-swatch";
+    swatch.style.backgroundColor = `rgb(${channels.red} ${channels.green} ${channels.blue} / ${channels.alpha / 255})`;
+    swatch.setAttribute("aria-label", `Ramp color ${index + 1}`);
+    colorRampPreviewControl.append(swatch);
+  }
+}
+function renderIndexedColorOptions(element, palette, includeTransparent = false) {
+  const current = element.value;
+  element.replaceChildren();
+  palette.forEach((color, index) => {
+    if (!includeTransparent && index === 0) return;
+    const channels = decodeArgbColor(color);
+    const hex = [
+      channels.red,
+      channels.green,
+      channels.blue
+    ].map((channel) => channel.toString(16).padStart(2, "0")).join("");
+    element.append(new Option(`Index ${index} \xB7 #${hex}`, String(index)));
+  });
+  const fallback = palette.length > 1 ? String(Math.max(1, selectedColor)) : "";
+  element.value = Array.from(element.options).some((option) => option.value === current) ? current : fallback;
 }
 function syncColorEditorFromSelection() {
   const asset = state.assets[state.activeAssetId];
@@ -21704,6 +24369,7 @@ function syncColorEditorFromSelection() {
   };
   colorDraftDirty = false;
   colorApply.disabled = selectedColor === 0;
+  rememberColor(selected);
   setColorEditorStatus(selectedColor === 0 ? "Index 0 \xB7 transparent / eraser" : `Index ${selectedColor} \xB7 local edit`);
 }
 function renderPaletteButtons(palette) {
@@ -21756,6 +24422,10 @@ function renderPaletteButtons(palette) {
     });
   }
   refreshPaletteButtonPreview();
+  renderColorRampOptions(palette);
+  renderIndexedColorOptions(outlineColorControl, palette);
+  renderIndexedColorOptions(textFillColorControl, palette);
+  renderIndexedColorOptions(textStrokeColorControl, palette);
 }
 function beginPaletteAddPointer(event) {
   if (event.button !== 0 || paletteAppendInFlight) return;
@@ -21848,14 +24518,14 @@ function setColorEditorFromWheel(clientX, clientY, mode) {
   if (point2 === void 0) return;
   const { x, y, size } = point2;
   const metrics2 = getPaletteWheelMetrics(size);
-  const current = rgbToHsv({
+  const current = rgbToHsv2({
     r: Number(colorR.value),
     g: Number(colorG.value),
     b: Number(colorB.value)
   });
   if (mode === "hue") {
     const hue = (Math.atan2(y - metrics2.center, x - metrics2.center) * 180 / Math.PI + 360) % 360;
-    setColorEditorRgb(hsvToRgb({
+    setColorEditorRgb(hsvToRgb2({
       h: hue,
       s: current.s,
       v: current.v
@@ -21863,7 +24533,7 @@ function setColorEditorFromWheel(clientX, clientY, mode) {
   } else {
     const saturation = Math.max(0, Math.min(1, (x - metrics2.svLeft) / metrics2.svSpan));
     const value = 1 - Math.max(0, Math.min(1, (y - metrics2.svTop) / metrics2.svSpan));
-    setColorEditorRgb(hsvToRgb({
+    setColorEditorRgb(hsvToRgb2({
       h: current.h,
       s: saturation,
       v: value
@@ -21876,6 +24546,10 @@ function commitColorEdit() {
   return enqueueCanonicalOperation(() => commitColorEditNow());
 }
 async function commitColorEditNow() {
+  if (collaborationEditBlockReason() !== void 0) {
+    announceCollaborationEditBlock();
+    return;
+  }
   if (palettePointerActive || pendingPaletteAppendDraft !== void 0 || paletteAppendInFlight) return;
   if (selectedColor === 0) {
     setColorEditorStatus("Index 0\u306F\u900F\u660E\u8272\u306E\u305F\u3081\u5909\u66F4\u3067\u304D\u307E\u305B\u3093", "error");
@@ -21981,6 +24655,10 @@ function appendPaletteGridFromDrafts(drafts) {
   });
 }
 async function appendPaletteDraftsNow(drafts, mode) {
+  if (collaborationEditBlockReason() !== void 0) {
+    announceCollaborationEditBlock();
+    return;
+  }
   const asset = state.assets[state.activeAssetId];
   if (asset === void 0) {
     setColorEditorStatus("\u30D1\u30EC\u30C3\u30C8\u3092\u8AAD\u307F\u8FBC\u3081\u307E\u305B\u3093\u3067\u3057\u305F", "error");
@@ -22053,6 +24731,11 @@ function integerInput(element, fallback) {
   const value = Number(element.value);
   return Number.isSafeInteger(value) ? value : fallback;
 }
+function decimalInput(element, fallback, minimum, maximum) {
+  const value = Number(element.value);
+  if (!Number.isFinite(value)) return fallback;
+  return Math.max(minimum, Math.min(maximum, Math.round(value * 10) / 10));
+}
 function currentTransform() {
   const rawFactor = Number(transformFactor.value);
   const factor = Number.isFinite(rawFactor) ? Math.max(0.125, Math.min(8, Math.round(rawFactor * 1e3) / 1e3)) : 1;
@@ -22061,6 +24744,7 @@ function currentTransform() {
     dx: integerInput(transformDx, 0),
     dy: integerInput(transformDy, 0),
     factor,
+    angleDeg: decimalInput(transformAngle, 0, -36e3, 36e3),
     interpolationPolicy: "NEAREST_NEIGHBOR",
     outOfBoundsPolicy: "CLIP"
   };
@@ -22073,9 +24757,12 @@ function currentSelectionBounds() {
     height: integerInput(selectionHeight, 1)
   };
 }
+function currentSelectionMorphologyRadius() {
+  return Math.max(1, Math.min(32, integerInput(selectionMorphologyRadius, 1)));
+}
 function updateHistoryButtons() {
-  undoControl.disabled = history.undoDepth === 0;
-  redoControl.disabled = history.redoDepth === 0;
+  undoControl.disabled = history.undoDepth === 0 || transformCommitInFlight;
+  redoControl.disabled = history.redoDepth === 0 || transformCommitInFlight;
   window.dispatchEvent(new CustomEvent("draw2:history-changed", {
     detail: draw2HistoryPanelSnapshot()
   }));
@@ -22091,12 +24778,13 @@ function updateSelectionActionButtons() {
 function syncWorkspaceEditCommandState() {
   const hasSelection = selection !== void 0 && selectionScopeMatchesActiveCel();
   const hasPreview = transformSession !== void 0 && transformPreview !== void 0;
+  const transformBusy = transformCommitInFlight;
   const commandAvailability = {
-    copy: hasSelection,
-    cut: hasSelection,
-    paste: clipboard !== void 0,
-    "preview-transform": hasSelection,
-    "commit-transform": hasPreview,
+    copy: hasSelection && !transformBusy,
+    cut: hasSelection && !transformBusy,
+    paste: clipboard !== void 0 && !transformBusy,
+    "preview-transform": hasSelection && !transformBusy,
+    "commit-transform": hasPreview && !transformBusy,
     "cancel-transform": hasPreview
   };
   for (const button of document.querySelectorAll("[data-workspace-command]")) {
@@ -22111,6 +24799,7 @@ function syncWorkspaceEditCommandState() {
     workspaceFrameElement.dataset.draw2TransformPreview = String(hasPreview);
     workspaceFrameElement.dataset.draw2ClipboardReady = String(clipboard !== void 0);
   }
+  updateHistoryButtons();
 }
 function selectionModeLabel(mode) {
   return mode.toLowerCase();
@@ -22402,12 +25091,8 @@ window.addEventListener("draw2:linked-preview-state", (event) => {
   if (detail?.source !== "AUDIO") return;
   if (workspaceFrameElement?.dataset.creatorMode !== "AUDIO") return;
   const playing = detail.playing === true && detail.monitor !== false;
-  audioLinkedPreviewPlaying = playing;
-  if (playing) {
-    if (playbackRunning) stopTimelinePlayback("Audio monitor follows Audio.");
-    syncMiniPreviewPlaybackControl();
-  } else {
-    syncMiniPreviewPlaybackControl();
+  if (playing && playbackRunning) {
+    stopTimelinePlayback("Audio monitor follows Audio.");
   }
 });
 window.addEventListener("draw2:audio-monitor-state", (event) => {
@@ -22415,18 +25100,7 @@ window.addEventListener("draw2:audio-monitor-state", (event) => {
   if (workspaceFrameElement?.dataset.creatorMode !== "AUDIO") return;
   const visible = detail?.visible === true;
   if (visible) {
-    miniPreviewEnabled = false;
-    miniPreviewLayout = {
-      ...miniPreviewLayout,
-      collapsed: true
-    };
-    syncMiniPreviewLayout();
     drawAudioDrawPreviewProjection();
-  } else {
-    audioLinkedPreviewPlaying = false;
-    miniPreviewEnabled = false;
-    syncMiniPreviewLayout();
-    syncMiniPreviewPlaybackControl();
   }
 });
 window.addEventListener("draw2:audio-editor-state", (event) => {
@@ -23275,14 +25949,23 @@ function renderTimeline() {
   renderTimelineLayerProperties();
 }
 function renderCreatorTimelineMetadata() {
+  const selectionSnapshot = currentAssetSelectionSnapshot();
+  if (tagFromSelectionControl !== null) {
+    tagFromSelectionControl.disabled = !selectionSnapshot.hasSelection;
+    tagFromSelectionControl.dataset.selectionReady = String(selectionSnapshot.hasSelection);
+  }
+  if (tagFromSelectionStatus !== null) {
+    const region = selectionSnapshot.region;
+    tagFromSelectionStatus.textContent = selectionSnapshot.hasSelection && region !== null ? `F${selectionSnapshot.frameNumber ?? 1} \xB7 ${region.width}\xD7${region.height}px` : "\u7BC4\u56F2\u9078\u629E\u5F85\u3061";
+  }
   tagList.replaceChildren();
   for (const tag of animationTags.list()) {
     const row = document.createElement("div");
     row.className = "draw2-creator-meta-row";
-    const text = document.createElement("span");
-    text.append(document.createTextNode(`${tag.name} \xB7 ${tag.fromFrameIndex + 1}\u2013${tag.toFrameIndex + 1}`));
-    if (tag.loop) text.append(createDraw2Icon("icon-loop"));
-    text.title = `${tag.name}: frames ${tag.fromFrameIndex + 1}-${tag.toFrameIndex + 1}`;
+    const text2 = document.createElement("span");
+    text2.append(document.createTextNode(`${tag.name} \xB7 ${tag.fromFrameIndex + 1}\u2013${tag.toFrameIndex + 1}`));
+    if (tag.loop) text2.append(createDraw2Icon("icon-loop"));
+    text2.title = `${tag.name}: frames ${tag.fromFrameIndex + 1}-${tag.toFrameIndex + 1}`;
     const remove = document.createElement("button");
     remove.type = "button";
     remove.className = "draw2-button draw2-button-secondary draw2-button-icon";
@@ -23294,7 +25977,7 @@ function renderCreatorTimelineMetadata() {
       renderCreatorTimelineMetadata();
       setStatus(`Animation tag ${tag.name} removed.`);
     });
-    row.append(text, remove);
+    row.append(text2, remove);
     tagList.append(row);
   }
   if (tagList.childElementCount === 0) {
@@ -23309,8 +25992,8 @@ function renderCreatorTimelineMetadata() {
   for (const marker of activeMarkers) {
     const row = document.createElement("div");
     row.className = "draw2-creator-meta-row";
-    const text = document.createElement("span");
-    text.textContent = `${marker.kind} \xB7 ${marker.label}`;
+    const text2 = document.createElement("span");
+    text2.textContent = `${marker.kind} \xB7 ${marker.label}`;
     const remove = document.createElement("button");
     remove.type = "button";
     remove.className = "draw2-button draw2-button-secondary draw2-button-icon";
@@ -23322,7 +26005,7 @@ function renderCreatorTimelineMetadata() {
       renderCreatorTimelineMetadata();
       setStatus(`Timeline marker ${marker.label} removed.`);
     });
-    row.append(text, remove);
+    row.append(text2, remove);
     markerList.append(row);
   }
   if (markerList.childElementCount === 0) {
@@ -23364,8 +26047,8 @@ function renderDrawAudioReferences() {
     const row = document.createElement("div");
     row.className = "draw2-creator-meta-row";
     row.setAttribute("role", "listitem");
-    const text = document.createElement("span");
-    text.textContent = `${reference.kind} \xB7 ${reference.label} \xB7 F${reference.startFrame + 1}`;
+    const text2 = document.createElement("span");
+    text2.textContent = `${reference.kind} \xB7 ${reference.label} \xB7 F${reference.startFrame + 1}`;
     const remove = document.createElement("button");
     remove.type = "button";
     remove.className = "draw2-button draw2-button-secondary draw2-button-icon";
@@ -23378,7 +26061,7 @@ function renderDrawAudioReferences() {
       renderTimeline();
       setStatus(`Audio\u53C2\u7167 ${reference.label} \u3092\u524A\u9664\u3057\u307E\u3057\u305F\u3002`);
     });
-    row.append(text, remove);
+    row.append(text2, remove);
     drawAudioLane.append(row);
   }
   drawAudioEmpty.hidden = references.length > 0;
@@ -23432,6 +26115,38 @@ function addAnimationTagFromControls() {
   } catch (cause) {
     setStatus(cause instanceof Error ? cause.message : "Animation tag is invalid.", "error");
   }
+}
+function animationTagFrameRangeFromSelection() {
+  const selectedFrameIndexes = [
+    ...timelineSelectedCells
+  ].map((key) => {
+    const frameId = key.split("::")[0] ?? "";
+    return state.timeline.frameOrder.indexOf(frameId);
+  }).filter((index) => index >= 0);
+  const selectionSnapshot = currentAssetSelectionSnapshot();
+  const fallbackFrameIndex = selectionSnapshot.frameNumber === null ? state.frames.find((frame2) => frame2.frameId === timelineSession.activeFrameId)?.index ?? 0 : Math.max(0, selectionSnapshot.frameNumber - 1);
+  const fromFrameIndex = selectedFrameIndexes.length === 0 ? fallbackFrameIndex : Math.min(...selectedFrameIndexes);
+  const toFrameIndex = selectedFrameIndexes.length === 0 ? fallbackFrameIndex : Math.max(...selectedFrameIndexes);
+  return {
+    fromFrameIndex,
+    toFrameIndex
+  };
+}
+function addAnimationTagFromSelection() {
+  const selectionSnapshot = currentAssetSelectionSnapshot();
+  if (!selectionSnapshot.hasSelection) {
+    setStatus("\u5148\u306B\u30AD\u30E3\u30F3\u30D0\u30B9\u3067\u7BC4\u56F2\u3092\u9078\u629E\u3057\u3066\u304F\u3060\u3055\u3044\u3002", "error");
+    return;
+  }
+  const range = animationTagFrameRangeFromSelection();
+  tagFromControl.value = String(range.fromFrameIndex + 1);
+  tagToControl.value = String(range.toFrameIndex + 1);
+  if (tagNameControl.value.trim() === "") tagNameControl.value = "SPRITE";
+  addAnimationTagFromControls();
+  if (tagFromSelectionStatus !== null) {
+    tagFromSelectionStatus.textContent = `\u4F5C\u6210\u6E08\u307F \xB7 F${range.fromFrameIndex + 1}\u2013F${range.toFrameIndex + 1}`;
+  }
+  setStatus(`\u9078\u629E\u7BC4\u56F2\u3092\u30A2\u30CB\u30E1\u30FC\u30B7\u30E7\u30F3\u30BF\u30B0\u306B\u3057\u307E\u3057\u305F\u3002F${range.fromFrameIndex + 1}\u2013F${range.toFrameIndex + 1}`);
 }
 function addTimelineMarkerFromControls() {
   try {
@@ -23495,7 +26210,14 @@ function toggleActiveLinkedCel() {
 function runTimelineCommand(commandType, payload, options = {}) {
   return enqueueCanonicalOperation(() => runTimelineCommandNow(commandType, payload, options));
 }
+function collaborationTimelineCommandIsNavigation(commandType) {
+  return commandType === "timeline.activateCel";
+}
 async function runTimelineCommandNow(commandType, payload, options = {}) {
+  if (!collaborationTimelineCommandIsNavigation(commandType) && collaborationEditBlockReason() !== void 0) {
+    announceCollaborationEditBlock();
+    return false;
+  }
   timelineStateGeneration += 1;
   const commandSequence = nextClientSequence(TIMELINE_CLIENT_ID);
   const before = state;
@@ -23600,7 +26322,141 @@ function selectionRegionPath(region) {
   const bottom = region.y + region.height;
   return `M ${region.x} ${region.y} H ${right} V ${bottom} H ${region.x} Z`;
 }
-function renderSelectionSvgOverlay(regions, previewRegions, draftRegions = [], pendingPoints = [], pendingEllipseRegion) {
+function selectionFrameBounds() {
+  if (selection === void 0 || selection.mask.regions.length === 0) {
+    return void 0;
+  }
+  const minX = Math.min(...selection.mask.regions.map((region) => region.x));
+  const minY = Math.min(...selection.mask.regions.map((region) => region.y));
+  const maxX = Math.max(...selection.mask.regions.map((region) => region.x + region.width));
+  const maxY = Math.max(...selection.mask.regions.map((region) => region.y + region.height));
+  return {
+    x: minX,
+    y: minY,
+    width: Math.max(1, maxX - minX),
+    height: Math.max(1, maxY - minY)
+  };
+}
+function selectionFrameHandleMetrics() {
+  const bounds = canvas.getBoundingClientRect();
+  const canvasPerCssPixel = Math.max(1e-4, 1 / Math.max(1e-4, Math.min(bounds.width / Math.max(1, canvas.width), bounds.height / Math.max(1, canvas.height))));
+  return {
+    size: Math.max(0.75, Math.min(12, canvasPerCssPixel * 7)),
+    hit: Math.max(1.5, Math.min(18, canvasPerCssPixel * 12)),
+    gap: Math.max(10, canvasPerCssPixel * 18)
+  };
+}
+function selectionFrameHandlePoints(region) {
+  const metrics2 = selectionFrameHandleMetrics();
+  const left = region.x;
+  const top = region.y;
+  const right = region.x + region.width;
+  const bottom = region.y + region.height;
+  const centerX = region.x + region.width / 2;
+  const centerY = region.y + region.height / 2;
+  const rotateY = top - metrics2.gap < 0 ? Math.min(Math.max(metrics2.hit, top + metrics2.gap), Math.max(metrics2.hit, canvas.height - metrics2.hit)) : top - metrics2.gap;
+  return [
+    {
+      handle: "rotate",
+      x: centerX,
+      y: rotateY
+    },
+    {
+      handle: "nw",
+      x: left,
+      y: top
+    },
+    {
+      handle: "n",
+      x: centerX,
+      y: top
+    },
+    {
+      handle: "ne",
+      x: right,
+      y: top
+    },
+    {
+      handle: "e",
+      x: right,
+      y: centerY
+    },
+    {
+      handle: "se",
+      x: right,
+      y: bottom
+    },
+    {
+      handle: "s",
+      x: centerX,
+      y: bottom
+    },
+    {
+      handle: "sw",
+      x: left,
+      y: bottom
+    },
+    {
+      handle: "w",
+      x: left,
+      y: centerY
+    }
+  ];
+}
+function canvasPointForClient(clientX, clientY) {
+  const bounds = canvas.getBoundingClientRect();
+  if (bounds.width <= 0 || bounds.height <= 0) {
+    return {
+      x: canvas.width / 2,
+      y: canvas.height / 2
+    };
+  }
+  return {
+    x: (clientX - bounds.left) / bounds.width * canvas.width,
+    y: (clientY - bounds.top) / bounds.height * canvas.height
+  };
+}
+function selectionFrameHandleAtClient(clientX, clientY) {
+  if (selection === void 0 || !selectionToolCanMove() || selectionDraft !== void 0) return void 0;
+  const region = selectionFrameBounds();
+  if (region === void 0) return void 0;
+  const point2 = canvasPointForClient(clientX, clientY);
+  const metrics2 = selectionFrameHandleMetrics();
+  const hit = selectionFrameHandlePoints(region).map((candidate) => ({
+    ...candidate,
+    distance: Math.hypot((point2.x - candidate.x) / metrics2.hit, (point2.y - candidate.y) / metrics2.hit)
+  })).filter((candidate) => candidate.distance <= 1).sort((left, right) => left.distance - right.distance)[0];
+  return hit?.handle;
+}
+function syncSelectionFrameCursor(clientX, clientY) {
+  if (selectionFrameDrag !== void 0) return;
+  const handle = selectionFrameHandleAtClient(clientX, clientY);
+  if (handle === void 0) {
+    delete canvas.dataset.selectionFrameHandle;
+  } else {
+    canvas.dataset.selectionFrameHandle = handle;
+  }
+}
+function selectionFrameBorderAtClient(clientX, clientY) {
+  if (selection === void 0 || !selectionToolCanMove() || selectionDraft !== void 0) return false;
+  const region = selectionFrameBounds();
+  if (region === void 0) return false;
+  const point2 = canvasPointForClient(clientX, clientY);
+  const tolerance = Math.max(1, selectionFrameHandleMetrics().hit * 0.55);
+  const withinX = point2.x >= region.x - tolerance && point2.x <= region.x + region.width + tolerance;
+  const withinY = point2.y >= region.y - tolerance && point2.y <= region.y + region.height + tolerance;
+  if (!withinX || !withinY) return false;
+  return Math.abs(point2.x - region.x) <= tolerance || Math.abs(point2.x - (region.x + region.width)) <= tolerance || Math.abs(point2.y - region.y) <= tolerance || Math.abs(point2.y - (region.y + region.height)) <= tolerance;
+}
+function selectionFrameRegionForOverlay() {
+  if (selection === void 0 || selectionDraft !== void 0 || !selectionToolCanMove()) return void 0;
+  if (selectionFrameDrag !== void 0) {
+    const destination = transformPreview?.overlayRegions.at(-1);
+    if (destination !== void 0) return destination;
+  }
+  return selectionFrameBounds();
+}
+function renderSelectionSvgOverlay(regions, previewRegions, draftRegions = [], pendingPoints = [], pendingEllipseRegion, textRegions = [], transformFrameRegion) {
   selectionOverlay.setAttribute("viewBox", `0 0 ${canvas.width} ${canvas.height}`);
   while (selectionOverlayRegions.firstChild !== null) {
     selectionOverlayRegions.removeChild(selectionOverlayRegions.firstChild);
@@ -23654,12 +26510,60 @@ function renderSelectionSvgOverlay(regions, previewRegions, draftRegions = [], p
       selectionOverlayRegions.appendChild(element);
     }
   };
+  const appendTransformControls = (region) => {
+    if (region.width < 1 || region.height < 1) return;
+    const metrics2 = selectionFrameHandleMetrics();
+    const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    group.setAttribute("class", "draw2-selection-transform-controls");
+    group.setAttribute("aria-hidden", "true");
+    const frame2 = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    frame2.setAttribute("d", selectionRegionPath(region));
+    frame2.setAttribute("class", "draw2-selection-transform-frame");
+    frame2.setAttribute("vector-effect", "non-scaling-stroke");
+    group.appendChild(frame2);
+    const points = selectionFrameHandlePoints(region);
+    const rotate = points.find((point2) => point2.handle === "rotate");
+    const top = points.find((point2) => point2.handle === "n");
+    if (rotate !== void 0 && top !== void 0) {
+      const connector = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      connector.setAttribute("x1", String(top.x));
+      connector.setAttribute("y1", String(top.y));
+      connector.setAttribute("x2", String(rotate.x));
+      connector.setAttribute("y2", String(rotate.y));
+      connector.setAttribute("class", "draw2-selection-transform-connector");
+      connector.setAttribute("vector-effect", "non-scaling-stroke");
+      group.appendChild(connector);
+    }
+    for (const point2 of points) {
+      if (point2.handle === "rotate") {
+        const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        circle.setAttribute("cx", String(point2.x));
+        circle.setAttribute("cy", String(point2.y));
+        circle.setAttribute("r", String(metrics2.size / 2));
+        circle.setAttribute("class", "draw2-selection-transform-handle draw2-selection-transform-handle--rotate");
+        group.appendChild(circle);
+        continue;
+      }
+      const handle = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      handle.setAttribute("x", String(point2.x - metrics2.size / 2));
+      handle.setAttribute("y", String(point2.y - metrics2.size / 2));
+      handle.setAttribute("width", String(metrics2.size));
+      handle.setAttribute("height", String(metrics2.size));
+      handle.setAttribute("class", `draw2-selection-transform-handle draw2-selection-transform-handle--${point2.handle}`);
+      group.appendChild(handle);
+    }
+    selectionOverlayRegions.appendChild(group);
+  };
   for (const region of regions) appendRegion(region, "selection");
   for (const region of previewRegions) appendRegion(region, "preview");
   for (const region of draftRegions) appendRegion(region, "draft");
+  for (const region of textRegions) appendRegion(region, "text");
   if (pendingEllipseRegion !== void 0) appendEllipse(pendingEllipseRegion);
   if (pendingPoints.length > 1) appendPath(pendingPoints, "pending");
-  if (regions.length === 0 && previewRegions.length === 0 && draftRegions.length === 0 && pendingPoints.length < 2 && pendingEllipseRegion === void 0) selectionOverlay.setAttribute("hidden", "");
+  if (transformFrameRegion !== void 0) {
+    appendTransformControls(transformFrameRegion);
+  }
+  if (regions.length === 0 && previewRegions.length === 0 && draftRegions.length === 0 && textRegions.length === 0 && pendingPoints.length < 2 && pendingEllipseRegion === void 0 && transformFrameRegion === void 0) selectionOverlay.setAttribute("hidden", "");
   else selectionOverlay.removeAttribute("hidden");
 }
 function normalizeMirrorGuide(asset) {
@@ -24076,7 +26980,15 @@ function drawOverlay() {
     }
   }
   if (asset !== void 0 && !tilemapMode && transformPreview !== void 0) {
+    if (!pasteMode && selection !== void 0) {
+      drawErasePreviewWrites(asset, selection.pixels);
+    }
     drawTransformPreviewPixels(asset, transformPreview.pixels);
+  }
+  const textTarget = pendingTextTarget;
+  const textTargetIsCurrent = asset !== void 0 && textTarget !== void 0 && textTarget.assetId === asset.id && textTarget.celId === state.activeCelId && textTarget.structureEpoch === state.structureEpoch;
+  if (textTargetIsCurrent && pendingTextBounds !== void 0 && pendingTextDraft !== void 0 && !tilemapMode) {
+    drawTextPreviewPixels(asset, pendingTextBounds, pendingTextDraft.writes, 0.72);
   }
   if (asset !== void 0 && !tilemapMode) syncMirrorGuideOverlay(asset);
   const draftRegions = selectionDraft?.snapshot?.mask.regions ?? [];
@@ -24094,16 +27006,67 @@ function drawOverlay() {
   renderSelectionSvgOverlay(selection?.mask.regions ?? [], transformPreview?.overlayRegions ?? [], [
     ...draftRegions,
     ...pendingRegions
-  ], pendingPoints, pendingEllipseRegion);
+  ], pendingPoints, pendingEllipseRegion, textTargetIsCurrent && pendingTextBounds !== void 0 ? [
+    pendingTextBounds
+  ] : [], selectionFrameRegionForOverlay());
 }
 var MAX_TRANSFORM_PREVIEW_PIXELS = 32768;
-function drawTransformPreviewPixels(asset, pixels) {
-  if (pixels.length === 0 || pixels.length > MAX_TRANSFORM_PREVIEW_PIXELS) {
-    return;
+function drawLargeTransformPreviewTiles(asset, pixels, opacity) {
+  const scratch = getTransformPreviewScratch();
+  if (scratch === void 0) return false;
+  const tiles = /* @__PURE__ */ new Map();
+  for (const pixel of pixels) {
+    if (pixel.x < 0 || pixel.y < 0 || pixel.x >= asset.width || pixel.y >= asset.height) continue;
+    const tileX = Math.floor(pixel.x / TRANSFORM_PREVIEW_TILE_SIZE) * TRANSFORM_PREVIEW_TILE_SIZE;
+    const tileY = Math.floor(pixel.y / TRANSFORM_PREVIEW_TILE_SIZE) * TRANSFORM_PREVIEW_TILE_SIZE;
+    const key = `${tileX}:${tileY}`;
+    let tile = tiles.get(key);
+    if (tile === void 0) {
+      tile = {
+        x: tileX,
+        y: tileY,
+        width: Math.min(TRANSFORM_PREVIEW_TILE_SIZE, asset.width - tileX),
+        height: Math.min(TRANSFORM_PREVIEW_TILE_SIZE, asset.height - tileY),
+        pixels: []
+      };
+      tiles.set(key, tile);
+    }
+    tile.pixels.push(pixel);
   }
+  if (tiles.size === 0) return true;
+  const { canvas: canvas2, context } = scratch;
   selectionOverlayContext.save();
   selectionOverlayContext.imageSmoothingEnabled = false;
-  selectionOverlayContext.globalAlpha = 0.86;
+  selectionOverlayContext.globalAlpha = opacity;
+  try {
+    for (const tile of tiles.values()) {
+      context.clearRect(0, 0, TRANSFORM_PREVIEW_TILE_SIZE, TRANSFORM_PREVIEW_TILE_SIZE);
+      const image = context.createImageData(tile.width, tile.height);
+      for (const pixel of tile.pixels) {
+        const localX = pixel.x - tile.x;
+        const localY = pixel.y - tile.y;
+        const color = decodeArgb(paletteColorForRender(asset, pixel.colorIndex));
+        if (color.alpha <= 0) continue;
+        const offset = (localY * tile.width + localX) * 4;
+        image.data[offset] = color.red;
+        image.data[offset + 1] = color.green;
+        image.data[offset + 2] = color.blue;
+        image.data[offset + 3] = color.alpha;
+      }
+      context.putImageData(image, 0, 0);
+      selectionOverlayContext.drawImage(canvas2, 0, 0, tile.width, tile.height, tile.x, tile.y, tile.width, tile.height);
+    }
+  } finally {
+    selectionOverlayContext.restore();
+  }
+  return true;
+}
+function drawTransformPreviewPixels(asset, pixels, opacity = 0.86) {
+  if (pixels.length === 0) return;
+  if (pixels.length > MAX_TRANSFORM_PREVIEW_PIXELS && drawLargeTransformPreviewTiles(asset, pixels, opacity)) return;
+  selectionOverlayContext.save();
+  selectionOverlayContext.imageSmoothingEnabled = false;
+  selectionOverlayContext.globalAlpha = opacity;
   const firstColorIndex = pixels[0]?.colorIndex;
   if (firstColorIndex !== void 0 && pixels.every((pixel) => pixel.colorIndex === firstColorIndex)) {
     const color = decodeArgb(paletteColorForRender(asset, firstColorIndex));
@@ -24125,6 +27088,14 @@ function drawTransformPreviewPixels(asset, pixels) {
     selectionOverlayContext.fillRect(pixel.x, pixel.y, 1, 1);
   }
   selectionOverlayContext.restore();
+}
+function drawTextPreviewPixels(asset, bounds, writes, opacity = 0.72) {
+  if (writes.length === 0) return;
+  drawTransformPreviewPixels(asset, writes.map((write) => ({
+    x: bounds.x + write.x,
+    y: bounds.y + write.y,
+    colorIndex: write.colorIndex
+  })), opacity);
 }
 function previewWriteSet(asset, tool, points, cachedWrites) {
   if (selection !== void 0 && !selectionScopeMatchesActiveCel()) return [];
@@ -24328,9 +27299,9 @@ function paletteColorForRender(asset, paletteIndex) {
   if (asset.id === state.activeAssetId && paletteIndex === selectedColor && colorDraftDirty && colorDraft !== void 0) return argbFromRgb(colorDraft, colorDraftAlpha);
   return asset.palette[paletteIndex] ?? 0;
 }
-function compositeRegion(region, frameId = timelineSession.activeFrameId, previewOverrides) {
+function compositeRegion(region, frameId = timelineSession.activeFrameId, previewOverrides, layerIds) {
   const image = canonicalContext.createImageData(region.width, region.height);
-  const orderedLayers = state.timeline.layerTrackOrder.map((layerTrackId) => state.layers.find((item) => item.layerTrackId === layerTrackId)).filter((item) => item !== void 0 && item.visible && item.opacity > 0);
+  const orderedLayers = state.timeline.layerTrackOrder.map((layerTrackId) => state.layers.find((item) => item.layerTrackId === layerTrackId)).filter((item) => item !== void 0 && item.visible && item.opacity > 0 && (layerIds === void 0 || layerIds.includes(item.layerTrackId)));
   for (const layer2 of orderedLayers) {
     const tilemap2 = layer2.kind === "TILEMAP" ? state.tilemaps?.[tilemapIdFor(layer2.layerTrackId, frameId)] : void 0;
     const cel2 = state.cels.find((item) => item.layerTrackId === layer2.layerTrackId && item.frameId === frameId && item.lifecycle === "ACTIVE" && (item.assetId !== void 0 || tilemap2 !== void 0));
@@ -24345,7 +27316,10 @@ function compositeRegion(region, frameId = timelineSession.activeFrameId, previe
       const sourceAsset = tilePixel?.asset ?? source;
       const sourceColorIndex = tilePixel?.colorIndex ?? pixels?.[index];
       if (sourceAsset === void 0 || sourceColorIndex === void 0) continue;
-      const previewColorIndex = previewOverrides !== void 0 && sourceAsset.id === previewOverrides.assetId && previewOverrides.transparentPixels.has(`${globalX},${globalY}`) ? 0 : sourceColorIndex;
+      const previewColorIndex = previewOverrides !== void 0 && sourceAsset.id === previewOverrides.assetId && previewOverrides.transparentPixels.has(selectionPointKey({
+        x: globalX,
+        y: globalY
+      })) ? 0 : sourceColorIndex;
       const sourceColor = decodeArgb(paletteColorForRender(sourceAsset, previewColorIndex));
       const sourceAlpha = sourceColor.alpha / 255 * layer2.opacity;
       if (sourceAlpha <= 0) continue;
@@ -24477,7 +27451,11 @@ async function presentAudioLinkedPlaybackFrame(frameId) {
   drawOverlay();
 }
 function currentBasicTool() {
-  return toolSelect.value;
+  const value = toolSelect.value;
+  if (value === "pixel-pen") return "pen";
+  if (value === "select-polygon") return "select-lasso";
+  if (value === "tile-stamp") return "pen";
+  return value;
 }
 function mirrorAppliesToTool(tool) {
   return mirrorEnabled && mirrorHasActiveAxis() && [
@@ -24728,12 +27706,14 @@ function timelineCommandInvalidatesSelection(before, after) {
   return before.activeAssetId !== after.activeAssetId || before.activeLayerId !== after.activeLayerId || before.activeFrameId !== after.activeFrameId || before.activeCelId !== after.activeCelId || before.structureEpoch !== after.structureEpoch || activeRasterRevision(before) !== activeRasterRevision(after);
 }
 function hasUncommittedSelectionWork() {
-  return selectionDrag !== void 0 || selectionDraft !== void 0 || pendingSelectionGesture !== void 0 || transformSession !== void 0 || transformPreview !== void 0 || pasteMode;
+  return selectionFrameDrag !== void 0 || selectionDrag !== void 0 || selectionDraft !== void 0 || pendingSelectionGesture !== void 0 || transformSession !== void 0 || transformPreview !== void 0 || pasteMode;
 }
 function cancelUncommittedSelectionWork(message) {
   if (!hasUncommittedSelectionWork()) return false;
   selectionInteractionGeneration += 1;
   if (selectionDrag !== void 0 && canvas.hasPointerCapture(selectionDrag.pointerId)) canvas.releasePointerCapture(selectionDrag.pointerId);
+  if (selectionFrameDrag !== void 0 && canvas.hasPointerCapture(selectionFrameDrag.pointerId)) canvas.releasePointerCapture(selectionFrameDrag.pointerId);
+  selectionFrameDrag = void 0;
   if (pendingSelectionGesture !== void 0 && canvas.hasPointerCapture(pendingSelectionGesture.pointerId)) canvas.releasePointerCapture(pendingSelectionGesture.pointerId);
   selectionDrag = void 0;
   selectionDraft = void 0;
@@ -24840,7 +27820,7 @@ function selectionSnapshotForPoints(points, kind, mode) {
 function beginSelectionFromPoints(points, kind, mode, message) {
   beginSelectionDraft(selectionSnapshotForPoints(points, kind, mode), mode, message);
 }
-function applySelectionMorphology(operation) {
+function applySelectionMorphology(operation, radius = currentSelectionMorphologyRadius()) {
   if (selection === void 0) {
     setStatus("Create a selection before applying selection morphology.", "error");
     return;
@@ -24851,7 +27831,7 @@ function applySelectionMorphology(operation) {
     return;
   }
   const base = createSelectionMask(asset.width, asset.height, selection.pixels);
-  const nextMask = operation === "EXPAND" ? selectionExpand(base) : operation === "SHRINK" ? selectionShrink(base) : operation === "INVERT" ? selectionInvert(base) : selectionBorder(base);
+  const nextMask = operation === "EXPAND" ? selectionExpand(base, radius) : operation === "SHRINK" ? selectionShrink(base, radius) : operation === "INVERT" ? selectionInvert(base) : selectionBorder(base, radius);
   const points = [];
   for (let y = 0; y < nextMask.height; y += 1) {
     for (let x = 0; x < nextMask.width; x += 1) {
@@ -24884,28 +27864,32 @@ function applySelectionMorphology(operation) {
   transformPreview = void 0;
   drawOverlay();
   notifyAssetStateChanged();
-  setStatus(`Selection ${operation.toLowerCase()} applied locally; confirm a Transform to mutate pixels.`);
+  setStatus(`Selection ${operation.toLowerCase()}${operation === "INVERT" ? "" : ` (${radius}px)`} applied locally; confirm a Transform to mutate pixels.`);
 }
 async function commitWriteSetNow(writes, sourceOperationType, toolForMirroring = currentBasicTool(), options = {}) {
+  if (collaborationEditBlockReason() !== void 0) {
+    announceCollaborationEditBlock();
+    return false;
+  }
   if (timelineActivationPending) {
     setStatus("Timeline cell is changing; drawing was not committed.", "error");
-    return;
+    return false;
   }
   const asset = state.assets[state.activeAssetId];
-  if (asset === void 0 || writes.length === 0) return;
+  if (asset === void 0 || writes.length === 0) return false;
   if (selection !== void 0 && !selectionScopeMatchesActiveCel()) {
     clearCommittedSelection("Selection cleared because it belongs to another timeline cel.");
-    return;
+    return false;
   }
-  const mirroredWrites = mirrorWritesForTool(writes, asset, toolForMirroring);
+  const mirroredWrites = options.respectMirror === false ? writes : mirrorWritesForTool(writes, asset, toolForMirroring);
   const selectionKeys = options.respectSelection === false || selection === void 0 ? void 0 : new Set(selection.pixels.map(selectionPointKey));
   const committedWrites = selectionKeys === void 0 ? mirroredWrites : mirroredWrites.filter((write) => selectionKeys.has(selectionPointKey(write)));
-  if (committedWrites.length === 0) return;
+  if (committedWrites.length === 0) return false;
   if (pixyncProductionRoot !== void 0 && (committedWrites.length > PIXYNC_DRAW2_MAX_PAYLOAD_KEYS || new TextEncoder().encode(JSON.stringify({
     writes: committedWrites
   })).byteLength > PIXYNC_DRAW2_MAX_PAYLOAD_BYTES)) {
     setStatus("\u3053\u306E\u64CD\u4F5C\u306F\u30EA\u30A2\u30EB\u30BF\u30A4\u30E0\u540C\u671F\u306E\u4E0A\u9650\u3092\u8D85\u3048\u308B\u305F\u3081\u3001\u5909\u66F4\u3092\u78BA\u5B9A\u3057\u307E\u305B\u3093\u3002\u7BC4\u56F2\u3092\u5C0F\u3055\u304F\u3059\u308B\u304B\u3001\u30DF\u30E9\u30FC\uFF0F\u9078\u629E\u7BC4\u56F2\u3092\u89E3\u9664\u3057\u3066\u304F\u3060\u3055\u3044\u3002", "error");
-    return;
+    return false;
   }
   const drawClientId = activeDrawClientId();
   const commandSequence = nextClientSequence(drawClientId);
@@ -24931,12 +27915,12 @@ async function commitWriteSetNow(writes, sourceOperationType, toolForMirroring =
   if (writeTimelineGeneration !== timelineStateGeneration || writeCanonicalGeneration !== canonicalStateGeneration) {
     syncClientSequencesFromState();
     setStatus("Timeline cell changed while drawing; the old-cell write was discarded.", "error");
-    return;
+    return false;
   }
   if (!result.ok) {
     syncClientSequencesFromState();
     setStatus(result.diagnostics.map((item) => item.code).join(", "), "error");
-    return;
+    return false;
   }
   if (!result.result.noOp) {
     adoptCanonicalState(result.state);
@@ -24952,6 +27936,308 @@ async function commitWriteSetNow(writes, sourceOperationType, toolForMirroring =
   await present(result.result.dirtyRegions, result.result.dirtyTiles);
   updateHistoryButtons();
   setStatus(`${sourceOperationType} committed \xB7 ${committedWrites.length}px${mirrorEnabled && mirrorHasActiveAxis() ? ` \xB7 mirror=${mirrorAxisSummary()}` : ""} \xB7 one undo`);
+  return true;
+}
+function applyOutline() {
+  return enqueueCanonicalOperation(async () => {
+    const asset = state.assets[state.activeAssetId];
+    if (asset === void 0) return;
+    const colorIndex = Number(outlineColorControl.value);
+    const allowedPixels = selection === void 0 ? void 0 : new Set(selection.pixels.map(selectionPointKey));
+    const writes = createOutlineWriteSet({
+      width: asset.width,
+      height: asset.height,
+      palette: asset.palette,
+      getPixel: (x, y) => asset.raster.getPixel(x, y)
+    }, {
+      colorIndex,
+      placement: outlinePlacementControl.value === "INSIDE" ? "INSIDE" : "OUTSIDE",
+      thickness: Number(outlineThicknessControl.value),
+      connectivity: outlineConnectivityControl.value === "4" ? 4 : 8,
+      ...allowedPixels === void 0 ? {} : {
+        allowedPixels
+      }
+    });
+    if (writes.length === 0) {
+      setStatus("Outline\u306B\u9069\u7528\u3067\u304D\u308B\u8F2A\u90ED\u304C\u3042\u308A\u307E\u305B\u3093\u3002", "error");
+      return;
+    }
+    await commitWriteSetNow(writes, "tool.outline", currentBasicTool(), {
+      respectMirror: false
+    });
+  });
+}
+function textBoundsFromPoints(asset, from, to) {
+  const bounds = normalizeBounds2(from, to, asset);
+  if (bounds.width > 1 || bounds.height > 1) return bounds;
+  const width = Math.min(128, asset.width);
+  const height = Math.min(64, asset.height);
+  return {
+    x: Math.max(0, Math.min(asset.width - width, from.x)),
+    y: Math.max(0, Math.min(asset.height - height, from.y)),
+    width,
+    height
+  };
+}
+function createTextAlphaMask(width, height, value, fontFamily, fontSize, fontWeight, align, stroke, strokeWidth) {
+  const surface = document.createElement("canvas");
+  surface.width = Math.max(1, width);
+  surface.height = Math.max(1, height);
+  const context = surface.getContext("2d", {
+    willReadFrequently: true
+  });
+  if (context === null) {
+    return {
+      width: surface.width,
+      height: surface.height,
+      alpha: new Uint8ClampedArray(surface.width * surface.height)
+    };
+  }
+  context.clearRect(0, 0, surface.width, surface.height);
+  context.imageSmoothingEnabled = false;
+  context.fillStyle = "#ffffff";
+  context.strokeStyle = "#ffffff";
+  context.lineJoin = "miter";
+  context.lineCap = "square";
+  const safeStrokeWidth = stroke ? Math.max(1, Math.min(16, Math.round(strokeWidth))) : 0;
+  context.lineWidth = Math.max(1, safeStrokeWidth * 2);
+  const safeFamily = fontFamily.replace(/["';]/g, "").trim() || "monospace";
+  const safeSize = Math.max(1, Math.min(256, Math.round(fontSize)));
+  context.font = `${fontWeight} ${safeSize}px ${safeFamily}`;
+  context.textAlign = align;
+  context.textBaseline = "top";
+  const lines = value.split(/\r?\n/).slice(0, 64);
+  const lineHeight = Math.max(1, Math.round(safeSize * 1.2));
+  const x = align === "center" ? surface.width / 2 : align === "right" ? surface.width - 2 : 2;
+  const y = Math.max(0, Math.min(surface.height - lineHeight, safeStrokeWidth + 1));
+  lines.forEach((line, index) => {
+    const lineY = y + index * lineHeight;
+    if (lineY >= surface.height) return;
+    if (stroke) context.strokeText(line, x, lineY);
+    else context.fillText(line, x, lineY);
+  });
+  const rgba = context.getImageData(0, 0, surface.width, surface.height).data;
+  const alpha = new Uint8ClampedArray(surface.width * surface.height);
+  for (let index = 0; index < alpha.length; index += 1) alpha[index] = rgba[index * 4 + 3] ?? 0;
+  return {
+    width: surface.width,
+    height: surface.height,
+    alpha
+  };
+}
+function measureTextNaturalSize(value, fontFamily, fontSize, fontWeight, stroke, strokeWidth) {
+  const surface = document.createElement("canvas");
+  const context = surface.getContext("2d");
+  if (context === null) return {
+    width: 1,
+    height: 1
+  };
+  const safeStrokeWidth = stroke ? Math.max(1, Math.min(16, Math.round(strokeWidth))) : 0;
+  const safeFamily = fontFamily.replace(/["';]/g, "").trim() || "monospace";
+  const safeSize = Math.max(1, Math.min(256, Math.round(fontSize)));
+  context.font = `${fontWeight} ${safeSize}px ${safeFamily}`;
+  const lines = value.split(/\r?\n/).slice(0, 64);
+  const lineHeight = Math.max(1, Math.round(safeSize * 1.2));
+  const measuredWidth = Math.max(1, ...lines.map((line) => context.measureText(line).width));
+  return {
+    width: Math.max(1, Math.ceil(measuredWidth + 4 + safeStrokeWidth * 2)),
+    height: Math.max(1, lines.length * lineHeight + 4 + safeStrokeWidth * 2)
+  };
+}
+function createTextPreviewDraft(bounds) {
+  const value = textValueControl.value;
+  const fontSize = Number(textSizeControl.value);
+  const strokeWidth = Number(textStrokeWidthControl.value);
+  const strokeEnabled = textStrokeEnabledControl.checked;
+  const fillMask = createTextAlphaMask(bounds.width, bounds.height, value, textFontControl.value, fontSize, textWeightControl.value, textAlignControl.value, false, strokeWidth);
+  const strokeMask = strokeEnabled ? createTextAlphaMask(bounds.width, bounds.height, value, textFontControl.value, fontSize, textWeightControl.value, textAlignControl.value, true, strokeWidth) : void 0;
+  const writes = createTextMaskWriteSet(fillMask, strokeMask, {
+    fillColorIndex: Number(textFillColorControl.value),
+    ...strokeEnabled ? {
+      strokeColorIndex: Number(textStrokeColorControl.value)
+    } : {},
+    threshold: Number(textThresholdControl.value)
+  });
+  const natural = measureTextNaturalSize(value, textFontControl.value, fontSize, textWeightControl.value, strokeEnabled, strokeWidth);
+  return {
+    writes,
+    naturalWidth: natural.width,
+    naturalHeight: natural.height
+  };
+}
+function renderTextDialogPreview(asset, bounds, draft) {
+  const context = textPreviewProjectionContext;
+  const width = textPreviewCanvasControl.width;
+  const height = textPreviewCanvasControl.height;
+  context.clearRect(0, 0, width, height);
+  if (bounds.width < 1 || bounds.height < 1) return;
+  const padding = 12;
+  const scale = Math.min((width - padding * 2) / bounds.width, (height - padding * 2) / bounds.height);
+  const displayScale = Math.max(0.01, Math.min(12, scale));
+  const displayWidth = bounds.width * displayScale;
+  const displayHeight = bounds.height * displayScale;
+  const offsetX = (width - displayWidth) / 2;
+  const offsetY = (height - displayHeight) / 2;
+  context.save();
+  context.imageSmoothingEnabled = false;
+  for (const write of draft.writes) {
+    const color = decodeArgb(paletteColorForRender(asset, write.colorIndex));
+    if (color.alpha <= 0) continue;
+    context.fillStyle = `rgba(${color.red}, ${color.green}, ${color.blue}, ${color.alpha / 255})`;
+    context.fillRect(offsetX + write.x * displayScale, offsetY + write.y * displayScale, Math.max(0.5, displayScale), Math.max(0.5, displayScale));
+  }
+  context.strokeStyle = "rgba(138, 227, 210, 0.86)";
+  context.lineWidth = 1;
+  context.setLineDash([
+    4,
+    3
+  ]);
+  context.strokeRect(offsetX + 0.5, offsetY + 0.5, displayWidth - 1, displayHeight - 1);
+  context.restore();
+}
+function clampTextBoundsDimension(value, maximum, fallback) {
+  return Math.max(1, Math.min(maximum, Math.round(Number(value) || fallback)));
+}
+function updateTextBoundsControls(bounds) {
+  textBoundsWidthControl.value = String(bounds.width);
+  textBoundsHeightControl.value = String(bounds.height);
+}
+function refreshTextPreview() {
+  const bounds = pendingTextBounds;
+  const target = pendingTextTarget;
+  const asset = state.assets[state.activeAssetId];
+  if (bounds === void 0 || target === void 0 || asset === void 0 || target.assetId !== asset.id || target.celId !== state.activeCelId || target.structureEpoch !== state.structureEpoch) return;
+  const draft = createTextPreviewDraft(bounds);
+  pendingTextDraft = draft;
+  textBoundsStatusControl.textContent = `Range ${bounds.width}\xD7${bounds.height} \xB7 origin ${bounds.x},${bounds.y} \xB7 recommended ${draft.naturalWidth}\xD7${draft.naturalHeight} \xB7 ${draft.writes.length}px`;
+  textInsertControl.disabled = draft.writes.length === 0;
+  renderTextDialogPreview(asset, bounds, draft);
+  drawOverlay();
+}
+function updateTextBoundsFromControls() {
+  const asset = state.assets[state.activeAssetId];
+  const current = pendingTextBounds;
+  if (asset === void 0 || current === void 0) return;
+  const width = clampTextBoundsDimension(textBoundsWidthControl.value, asset.width, current.width);
+  const height = clampTextBoundsDimension(textBoundsHeightControl.value, asset.height, current.height);
+  pendingTextBounds = {
+    x: Math.max(0, Math.min(asset.width - width, current.x)),
+    y: Math.max(0, Math.min(asset.height - height, current.y)),
+    width,
+    height
+  };
+  updateTextBoundsControls(pendingTextBounds);
+  refreshTextPreview();
+}
+function fitTextBoundsToContent() {
+  const asset = state.assets[state.activeAssetId];
+  const current = pendingTextBounds;
+  const draft = pendingTextDraft;
+  if (asset === void 0 || current === void 0 || draft === void 0) return;
+  const width = Math.min(asset.width, draft.naturalWidth);
+  const height = Math.min(asset.height, draft.naturalHeight);
+  pendingTextBounds = {
+    x: Math.max(0, Math.min(asset.width - width, current.x)),
+    y: Math.max(0, Math.min(asset.height - height, current.y)),
+    width,
+    height
+  };
+  updateTextBoundsControls(pendingTextBounds);
+  refreshTextPreview();
+  setStatus("Text range fitted to the current font and content.");
+}
+function openTextInsertDialog(from, to) {
+  const asset = state.assets[state.activeAssetId];
+  if (asset === void 0) return;
+  pendingTextBounds = textBoundsFromPoints(asset, from, to);
+  pendingTextTarget = {
+    assetId: asset.id,
+    celId: state.activeCelId,
+    structureEpoch: state.structureEpoch
+  };
+  textValueControl.value = textValueControl.value.trim().length > 0 ? textValueControl.value : "Text";
+  const selected = asset.palette.length > 1 ? Math.max(1, selectedColor) : 0;
+  textFillColorControl.value = String(selected);
+  textStrokeColorControl.value = String(selected);
+  textBoundsWidthControl.max = String(asset.width);
+  textBoundsHeightControl.max = String(asset.height);
+  updateTextBoundsControls(pendingTextBounds);
+  textInsertDialogControl.showModal();
+  refreshTextPreview();
+  textValueControl.focus();
+  textValueControl.select();
+}
+function activateTextSelectionForMove(writes) {
+  const next = selectionSnapshotFromPoints(writes.map((write) => ({
+    x: write.x,
+    y: write.y
+  })), "alpha");
+  if (next === void 0) {
+    setStatus("Text inserted, but no visible pixels could be selected.", "error");
+    return;
+  }
+  selectionInteractionGeneration += 1;
+  selection = next;
+  selectionDraft = void 0;
+  transformSession = void 0;
+  transformPreview = void 0;
+  pasteMode = false;
+  const region = next.mask.regions[0];
+  if (region !== void 0) {
+    selectionX.value = String(region.x);
+    selectionY.value = String(region.y);
+    selectionWidth.value = String(region.width);
+    selectionHeight.value = String(region.height);
+  }
+  selectShortcutTool("move");
+  updateSelectionActionButtons();
+  updateSelectionStatus(`scope=${next.scope.celId} \xB7 ${next.pixels.length}px \xB7 text inserted \xB7 drag to move`);
+  notifyAssetStateChanged();
+  drawOverlay();
+  setStatus("Text inserted and selected. Drag it to move; the move is previewed until release.");
+}
+function commitTextInsert() {
+  return enqueueCanonicalOperation(async () => {
+    const bounds = pendingTextBounds;
+    const target = pendingTextTarget;
+    const asset = state.assets[state.activeAssetId];
+    const value = textValueControl.value;
+    if (bounds === void 0 || target === void 0 || asset === void 0 || target.assetId !== asset.id || target.celId !== state.activeCelId || target.structureEpoch !== state.structureEpoch) {
+      pendingTextBounds = void 0;
+      pendingTextDraft = void 0;
+      pendingTextTarget = void 0;
+      textInsertDialogControl.close();
+      drawOverlay();
+      setStatus("\u5BFE\u8C61\u306ECanvas\u304C\u5909\u308F\u3063\u305F\u305F\u3081\u3001\u30C6\u30AD\u30B9\u30C8\u633F\u5165\u3092\u30AD\u30E3\u30F3\u30BB\u30EB\u3057\u307E\u3057\u305F\u3002", "error");
+      return;
+    }
+    if (value.trim().length === 0) {
+      setStatus("\u30C6\u30AD\u30B9\u30C8\u3092\u5165\u529B\u3057\u3066\u304F\u3060\u3055\u3044\u3002", "error");
+      return;
+    }
+    const draft = createTextPreviewDraft(bounds);
+    pendingTextDraft = draft;
+    const writes = draft.writes.map((write) => ({
+      x: bounds.x + write.x,
+      y: bounds.y + write.y,
+      colorIndex: write.colorIndex
+    }));
+    if (writes.length === 0) {
+      setStatus("\u30C6\u30AD\u30B9\u30C8\u3092\u63CF\u753B\u3067\u304D\u308B\u7BC4\u56F2\u304C\u3042\u308A\u307E\u305B\u3093\u3002", "error");
+      return;
+    }
+    const selectionKeys = selection === void 0 ? void 0 : new Set(selection.pixels.map(selectionPointKey));
+    const insertedWrites = selectionKeys === void 0 ? writes : writes.filter((write) => selectionKeys.has(selectionPointKey(write)));
+    const committed = await commitWriteSetNow(writes, "tool.text", currentBasicTool(), {
+      respectMirror: false
+    });
+    if (!committed) return;
+    textInsertDialogControl.close();
+    pendingTextBounds = void 0;
+    pendingTextDraft = void 0;
+    pendingTextTarget = void 0;
+    activateTextSelectionForMove(insertedWrites);
+  });
 }
 function resizeRasterForCanvas(asset, plan) {
   const resized = IndexedTileRaster.empty(plan.newWidth, plan.newHeight, asset.raster.tileSize);
@@ -25053,7 +28339,7 @@ async function resetProject(options = {}) {
   const tileSize = parsedTileSize === 64 ? 64 : 32;
   const createOptions = {
     projectId,
-    name: `Draw2 ${projectId}`,
+    name: options.projectNameOverride?.trim() || `Draw2 ${projectId}`,
     width: options.width ?? 256,
     height: options.height ?? 256,
     tileSize
@@ -25067,6 +28353,7 @@ async function resetProject(options = {}) {
     anchor
   }) : forceCreate ? repository.create(createOptions) : restored?.state ?? repository.open(projectId) ?? repository.create(createOptions);
   assetDefinitions = forceCreate ? [] : (restored?.assetDefinitions ?? []).map(cloneAssetDefinitionEntry);
+  assetPackages = forceCreate ? [] : (restored?.assetPackages ?? []).map(cloneAssetPackageManifest);
   assetDefinitionSequence = 0;
   repository.save(state);
   projectIdInput.value = projectId;
@@ -25711,6 +28998,7 @@ async function createPxdProjectArtifact(exportModule, baseName) {
   const snapshot = await workspace.exportProjectPxdSnapshot();
   const output = await exportModule.exportPxdProject(state, {
     assetDefinitions,
+    assetPackages,
     drawTimelineMetadata: draw2TimelineMetadataSnapshot(),
     ...snapshot.audio === null ? {} : {
       audio: {
@@ -25750,17 +29038,24 @@ async function exportCurrentPxdArtifactForWorkspace() {
     sourceReference
   };
 }
-async function storePxdMarketTransfer(file) {
+async function storePxdMarketTransfer(file, options) {
   if (!window.indexedDB || typeof File !== "function") {
     throw new Error("\u3053\u306E\u30D6\u30E9\u30A6\u30B6\u3067\u306FMarket\u3078\u306EPXD\u5F15\u304D\u7D99\u304E\u3092\u5229\u7528\u3067\u304D\u307E\u305B\u3093\u3002PXD\u3092\u4FDD\u5B58\u3057\u3066\u304B\u3089Market\u3067\u8FFD\u52A0\u3057\u3066\u304F\u3060\u3055\u3044\u3002");
   }
   const transferId = typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const createdAt = Date.now();
+  const storedMetadata = options?.metadata === void 0 ? void 0 : options.deliveryManifest === void 0 ? options.metadata : {
+    ...options.metadata,
+    deliveryManifest: options.deliveryManifest
+  };
   await new Promise((resolve, reject2) => {
     const request = indexedDB.open("pixieed-market-project-transfers", 1);
     request.onupgradeneeded = () => {
-      request.result.createObjectStore("transfers", {
-        keyPath: "id"
-      });
+      if (!request.result.objectStoreNames.contains("transfers")) {
+        request.result.createObjectStore("transfers", {
+          keyPath: "id"
+        });
+      }
     };
     request.onerror = () => {
       reject2(request.error ?? new Error("Market transfer storage unavailable."));
@@ -25780,8 +29075,14 @@ async function storePxdMarketTransfer(file) {
         transaction.objectStore("transfers").put({
           id: transferId,
           file,
-          createdAt: Date.now(),
-          expiresAt: Date.now() + 15 * 60 * 1e3
+          ...storedMetadata === void 0 ? {} : {
+            metadata: storedMetadata
+          },
+          ...options?.deliveryManifest === void 0 ? {} : {
+            deliveryManifest: options.deliveryManifest
+          },
+          createdAt,
+          expiresAt: createdAt + 15 * 60 * 1e3
         });
         transaction.oncomplete = () => finish();
         transaction.onerror = () => finish(transaction.error ?? new Error("Market transfer storage write failed."));
@@ -25792,6 +29093,74 @@ async function storePxdMarketTransfer(file) {
     };
   });
   return transferId;
+}
+function safeMarketManifestDisplayName(value, fallback) {
+  return (value || fallback).normalize("NFC").replace(/[\u0000-\u001f\u007f]/gu, " ").trim().slice(0, 160) || fallback;
+}
+function createDrawMarketDeliveryManifest(file, artifact, sourceReference) {
+  const projectName = safeMarketManifestDisplayName(state.name.trim(), `Draw2 ${state.projectId}`);
+  const label = safeMarketManifestDisplayName(sourceReference.label, projectName);
+  const projectRevisionId = drawPersistenceSavePending === void 0 && drawPersistenceSaveTimer === void 0 && Number.isSafeInteger(drawPersistenceRevision) && drawPersistenceRevision >= 0 ? `draw-project-revision-${drawPersistenceRevision}` : void 0;
+  const source = {
+    projectId: state.projectId,
+    assetId: sourceReference.assetId,
+    revisionId: sourceReference.revisionId,
+    contentHash: sourceReference.contentHash,
+    ...artifact.packageHash === void 0 ? {} : {
+      packageHash: artifact.packageHash
+    },
+    fileName: file.name,
+    mimeType: file.type || artifact.mimeType,
+    byteLength: file.size
+  };
+  return {
+    schemaVersion: 1,
+    manifestId: `draw2-delivery-manifest:${state.projectId}:${sourceReference.contentHash}:${artifact.packageHash ?? "no-package-hash"}`,
+    selectionKind: "WHOLE_PROJECT",
+    project: {
+      projectId: state.projectId,
+      ...projectRevisionId === void 0 ? {} : {
+        revisionId: projectRevisionId
+      },
+      name: projectName
+    },
+    entries: [
+      {
+        entryId: "draw-project",
+        sourceKind: "DRAW",
+        source,
+        selection: {
+          kind: "PROJECT",
+          label
+        },
+        provenance: {
+          originKind: "LOCAL_PROJECT",
+          rightsStatus: "CREATOR_DECLARATION_REQUIRED"
+        },
+        capabilities: {
+          editable: true,
+          animation: true,
+          targets: [
+            "iDRAW",
+            "iAUDIO",
+            "iGAME",
+            "UNITY"
+          ]
+        },
+        dependencyIds: []
+      }
+    ],
+    summary: {
+      entryCount: 1,
+      sourceKinds: [
+        "DRAW"
+      ],
+      labels: [
+        label
+      ]
+    },
+    createdAt: (/* @__PURE__ */ new Date()).toISOString()
+  };
 }
 async function handoffPxdProjectToMarket() {
   if (colorDraftDirty) {
@@ -25811,7 +29180,20 @@ async function handoffPxdProjectToMarket() {
     ], artifact.filename, {
       type: artifact.mimeType
     });
-    const transferId = await storePxdMarketTransfer(file);
+    const sourceReference = await resolveCurrentDrawReference({
+      mode: "PINNED"
+    });
+    if (sourceReference === void 0) {
+      throw new Error("PXD\u306EMarket\u914D\u4FE1manifest\u306B\u5FC5\u8981\u306ADraw\u53C2\u7167\u3092\u53D6\u5F97\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002");
+    }
+    const deliveryManifest = createDrawMarketDeliveryManifest(file, artifact, sourceReference);
+    const transferId = await storePxdMarketTransfer(file, {
+      metadata: {
+        projectId: state.projectId,
+        kind: "draw"
+      },
+      deliveryManifest
+    });
     const url = new URL("../market/sell.html", window.location.href);
     url.searchParams.set("project_transfer", transferId);
     window.location.assign(url.href);
@@ -25852,7 +29234,7 @@ async function createAudioMediaArtifact(format, baseName, report, start, span, i
   }
   const workspace = getWorkspacePxdBridge();
   if (typeof workspace.renderAudioWavForExport !== "function") {
-    throw new Error("Audio render bridge is unavailable for audio export.");
+    throw new Error("Audio render adapter is unavailable for audio export.");
   }
   const audioSnapshot = await withDrawAudioExportDemand(() => workspace.renderAudioWavForExport());
   if (audioSnapshot === null) {
@@ -25976,7 +29358,7 @@ async function createWebmVideoArtifact(baseName, report, start, span, index, tot
   const durationSeconds = Math.max(0.1, authoredDurationMs / 1e3);
   const workspace = getWorkspacePxdBridge();
   if (typeof workspace.renderAudioWavForExport !== "function") {
-    throw new Error("Audio render bridge is unavailable for WebM export.");
+    throw new Error("Audio render adapter is unavailable for WebM export.");
   }
   const audioSnapshot = await withDrawAudioExportDemand(() => workspace.renderAudioWavForExport(durationSeconds));
   const audioContext = new AudioContext();
@@ -26228,7 +29610,7 @@ async function createExportArtifacts(exportModule, exportState, report) {
     } else if (format === "wav") {
       const workspace = getWorkspacePxdBridge();
       if (typeof workspace.renderAudioWavForExport !== "function") {
-        throw new Error("Audio render bridge is unavailable for WAV export.");
+        throw new Error("Audio render adapter is unavailable for WAV export.");
       }
       const output = await withDrawAudioExportDemand(() => workspace.renderAudioWavForExport());
       if (output === null) {
@@ -26402,6 +29784,7 @@ async function importPxdFile(file, options = {}) {
     state: cloneProjectStateShared(state),
     activeWorkspaceProjectId: readActiveWorkspaceProjectId(),
     assetDefinitions: assetDefinitions.map(cloneAssetDefinitionEntry),
+    assetPackages: assetPackages.map(cloneAssetPackageManifest),
     assetDefinitionSequence,
     history: history.snapshot(),
     drawPersistenceRevision,
@@ -26447,6 +29830,7 @@ async function importPxdFile(file, options = {}) {
     }
     let importedState;
     let importedAssetDefinitions = [];
+    let importedAssetPackages = [];
     let importedTimelineMetadata;
     let importedStatus = "schema=v1";
     let importedHash = "";
@@ -26478,6 +29862,7 @@ async function importPxdFile(file, options = {}) {
       });
       importedState = imported.state;
       importedAssetDefinitions = imported.assetDefinitions;
+      importedAssetPackages = imported.assetPackages;
       importedTimelineMetadata = imported.drawTimelineMetadata;
       importedHash = imported.packageHash;
       importedStatus = "schema=v2 \xB7 Draw/Audio/Game";
@@ -26487,10 +29872,10 @@ async function importPxdFile(file, options = {}) {
         game: imported.game
       };
     } else {
-      const diagnostic9 = inspection.diagnostics[0];
-      throw new Error(diagnostic9?.message ?? "PXD format could not be identified.");
+      const diagnostic10 = inspection.diagnostics[0];
+      throw new Error(diagnostic10?.message ?? "PXD format could not be identified.");
     }
-    if (options.expectedProjectId !== void 0 && importedState.projectId !== options.expectedProjectId) {
+    if (options.mode !== "ASSET_ONLY" && options.expectedProjectId !== void 0 && importedState.projectId !== options.expectedProjectId) {
       throw new Error("The PXD Project ID does not match the active Room.");
     }
     if (options.expectedProjectId !== void 0 && state.projectId !== options.expectedProjectId) {
@@ -26498,6 +29883,45 @@ async function importPxdFile(file, options = {}) {
     }
     if (importedState.assets[importedState.activeAssetId] === void 0) {
       throw new Error("Imported PXD active asset is missing.");
+    }
+    if (options.mode === "ASSET_ONLY") {
+      const metadata = marketAssetBindingMetadataFor(options.marketMetadata, {
+        requireEntitlement: true
+      });
+      if (metadata === void 0) {
+        throw new Error("iGAME\u5229\u7528\u306B\u5FC5\u8981\u306AAsset revision\u30FBhash\u30FB\u914D\u4FE1\u30FB\u30E9\u30A4\u30BB\u30F3\u30B9\u60C5\u5831\u304C\u4E0D\u8DB3\u3057\u3066\u3044\u307E\u3059\u3002");
+      }
+      if (metadata.source.format !== "pixiedraw-project") {
+        throw new Error("\u73FE\u5728\u306EiGAME\u53D6\u8FBC\u306FPXD\u5F62\u5F0F\u306EMarket Asset\u306B\u5BFE\u5FDC\u3057\u3066\u3044\u307E\u3059\u3002");
+      }
+      if (typeof importedHash !== "string" || importedHash.toLowerCase() !== (metadata.source.packageHash ?? metadata.source.contentHash)) {
+        throw new Error("\u914D\u4FE1\u3055\u308C\u305FPXD\u306E\u5185\u5BB9\u304CMarket\u306E\u5BA3\u8A00Hash\u3068\u4E00\u81F4\u3057\u307E\u305B\u3093\u3002");
+      }
+      await flushDrawPersistence();
+      if (options.expectedProjectId !== void 0 && state.projectId !== options.expectedProjectId) {
+        throw new Error("The Project changed before the Market asset binding.");
+      }
+      const before = state;
+      const projected = appendMarketAssetSource(state, importedState, metadata);
+      importCommitStarted = projected.state !== state;
+      if (importCommitStarted) {
+        state = projected.state;
+        repository.save(state);
+        adoptCanonicalState(state);
+        history.record(before, state, `market-asset-${metadata.delivery.deliveryId}`, "market.assetImport");
+        saveDrawProjectState("market-asset-import");
+        notifyAssetStateChanged();
+      }
+      window.dispatchEvent(new CustomEvent("draw2:market-asset-ready", {
+        detail: {
+          reference: projected.reference,
+          source: metadata.source,
+          delivery: metadata.delivery,
+          license: metadata.license
+        }
+      }));
+      setStatus(importCommitStarted ? `Market Asset\u3092iGAME\u7D20\u6750\u68DA\u3078\u8FFD\u52A0\u3057\u307E\u3057\u305F \xB7 ${metadata.source.label}` : `Market Asset\u306FiGAME\u7D20\u6750\u68DA\u3078\u8FFD\u52A0\u6E08\u307F\u3067\u3059 \xB7 ${metadata.source.label}`);
+      return;
     }
     if (importedWorkspace !== void 0) {
       previousWorkspacePxdSnapshot = await getWorkspacePxdBridge().exportProjectPxdSnapshot();
@@ -26514,6 +29938,7 @@ async function importPxdFile(file, options = {}) {
     draw2EditorPreferencesReady = false;
     state = importedState;
     assetDefinitions = importedAssetDefinitions.map(cloneAssetDefinitionEntry);
+    assetPackages = importedAssetPackages.map(cloneAssetPackageManifest);
     assetDefinitionSequence = 0;
     repository.save(state);
     adoptCanonicalState(state);
@@ -26576,12 +30001,13 @@ async function importPxdFile(file, options = {}) {
         name: state.name
       });
     }
-    const sourceLabel = options.source === "REMOTE_CHECKPOINT" ? "PiXYNC checkpoint restored" : "PXD imported locally";
+    const sourceLabel = options.source === "REMOTE_CHECKPOINT" ? "PiXYNC checkpoint restored" : options.source === "MARKET_PURCHASE" ? "Purchased PXD imported" : "PXD imported locally";
     setStatus(`${sourceLabel} \xB7 ${importedStatus} \xB7 hash=${importedHash.slice(0, 12)}\u2026`);
   } catch (cause) {
     if (importCommitStarted) {
       state = previousImportState.state;
       assetDefinitions = previousImportState.assetDefinitions.map(cloneAssetDefinitionEntry);
+      assetPackages = previousImportState.assetPackages.map(cloneAssetPackageManifest);
       assetDefinitionSequence = previousImportState.assetDefinitionSequence;
       drawPersistenceRevision = previousImportState.drawPersistenceRevision;
       drawPersistenceExpectedRevision = previousImportState.drawPersistenceExpectedRevision;
@@ -26649,7 +30075,7 @@ async function importPxdFile(file, options = {}) {
     }
     const message = cause instanceof Error ? `PXD import rejected: ${cause.message}` : "PXD import rejected.";
     setStatus(workspaceRollbackFailed ? `${message} Draw was restored, but the shared Audio/Game snapshot could not be restored.` : message, "error");
-    if (options.source === "REMOTE_CHECKPOINT") {
+    if (options.source === "REMOTE_CHECKPOINT" || options.source === "MARKET_PURCHASE" || options.source === "MARKET_ASSET") {
       throw cause instanceof Error ? cause : new Error(message);
     }
   } finally {
@@ -26764,6 +30190,10 @@ function commitPointerPoints(points, fixedContext) {
   return enqueueCanonicalOperation(() => commitPointerPointsNow(points, fixedContext));
 }
 async function commitTileStampCommandNow(asset, payload, label = "Tile placement") {
+  if (collaborationEditBlockReason() !== void 0) {
+    announceCollaborationEditBlock();
+    return false;
+  }
   const drawClientId = activeDrawClientId();
   const commandSequence = nextClientSequence(drawClientId);
   const before = state;
@@ -26814,6 +30244,10 @@ async function commitTileStampCommandNow(asset, payload, label = "Tile placement
   return !result.result.noOp;
 }
 async function commitFillCommandNow(asset, seed, colorIndex, gradientTo, clip, selectionMask) {
+  if (collaborationEditBlockReason() !== void 0) {
+    announceCollaborationEditBlock();
+    return;
+  }
   const drawClientId = activeDrawClientId();
   const commandSequence = nextClientSequence(drawClientId);
   const before = state;
@@ -26889,6 +30323,10 @@ async function commitPointerPointsNow(points, fixedContext) {
     return;
   }
   const tool = fixedContext?.tool ?? currentBasicTool();
+  if (collaborationEditBlockReason() !== void 0 && !collaborationCanvasToolIsNonMutating(tool)) {
+    announceCollaborationEditBlock();
+    return;
+  }
   const colorIndex = fixedContext?.colorIndex ?? selectedColor;
   const fixedToolOptions = fixedContext?.toolOptions ?? toolOptions;
   const selectionClip = activeRectangleSelectionClip();
@@ -26896,6 +30334,10 @@ async function commitPointerPointsNow(points, fixedContext) {
   const first = points[0] ?? points[points.length - 1];
   const last = points[points.length - 1] ?? first;
   if (tool === "pan") return;
+  if (tool === "text") {
+    openTextInsertDialog(first, last);
+    return;
+  }
   if (tool === "eyedropper") {
     selectedColor = asset.raster.getPixel(first.x, first.y);
     renderPaletteButtons(asset.palette);
@@ -27008,7 +30450,11 @@ async function commitPointerPointsNow(points, fixedContext) {
         y: point2.y
       }));
       strokePoints = compactPixelPath(rawStrokePoints, PIXYNC_DRAW2_MAX_PAYLOAD_KEYS);
-      interpolatePixelPath(strokePoints);
+      if (strokeOptions.brushAlgorithm === "regular") {
+        interpolatePixelPath(strokePoints);
+      } else {
+        interpolatePixelPath(strokePoints, strokeOptions.brushAlgorithm);
+      }
     } catch (cause) {
       syncClientSequencesFromState();
       setStatus(cause instanceof Error ? cause.message : "Stroke interpolation failed.", "error");
@@ -27030,6 +30476,8 @@ async function commitPointerPointsNow(points, fixedContext) {
         colorIndex: tool === "eraser" ? 0 : colorIndex,
         brushSize: strokeOptions.brushSize,
         brushShape: strokeOptions.brushShape,
+        brushAngle: strokeOptions.brushAngle,
+        brushAlgorithm: strokeOptions.brushAlgorithm,
         pattern: strokeOptions.pattern,
         ...mirror === void 0 ? {} : {
           mirror
@@ -27079,6 +30527,10 @@ async function commitPointerPointsNow(points, fixedContext) {
   await commitWriteSetNow(writes, `tool.${tool}`);
 }
 async function commitShapePointsNow(tool, from, to, colorIndex, toolOptions2) {
+  if (collaborationEditBlockReason() !== void 0) {
+    announceCollaborationEditBlock();
+    return;
+  }
   const asset = state.assets[state.activeAssetId];
   if (asset === void 0) return;
   const options = normalizeToolOptions(toolOptions2);
@@ -27112,6 +30564,8 @@ async function commitShapePointsNow(tool, from, to, colorIndex, toolOptions2) {
       colorIndex,
       brushSize: options.brushSize,
       brushShape: options.brushShape,
+      brushAngle: options.brushAngle,
+      brushAlgorithm: options.brushAlgorithm,
       pattern: options.pattern,
       ...mirror === void 0 ? {} : {
         mirror
@@ -27288,7 +30742,6 @@ exportToMarket.addEventListener("click", () => {
   void handoffPxdProjectToMarket();
 });
 document.querySelector("#draw2WorkspaceTabExport")?.addEventListener("click", () => syncExportPanel());
-tagAddControl.addEventListener("click", addAnimationTagFromControls);
 markerAddControl.addEventListener("click", addTimelineMarkerFromControls);
 linkedCelToggleControl.addEventListener("click", toggleActiveLinkedCel);
 drawAudioAdd?.addEventListener("click", addDrawAudioReferenceFromControls);
@@ -27591,6 +31044,7 @@ selectionModeControl.addEventListener("change", () => {
 commitSelectionControl.addEventListener("click", commitSelectionDraft);
 cancelSelectionControl.addEventListener("click", () => cancelSelectionDraft());
 selectButton.addEventListener("click", () => {
+  if (transformCommitInFlight) return;
   try {
     const next = createRectangleSelectionSnapshot(state, currentSelectionBounds(), `selection-${state.projectId}-${Date.now()}`, (selection?.mask.selectionVersion ?? 0) + 1);
     beginSelectionFromPoints(next.pixels, "rectangle", selectionEditMode, "Rectangle selection created.");
@@ -27599,6 +31053,7 @@ selectButton.addEventListener("click", () => {
   }
 });
 previewButton.addEventListener("click", () => {
+  if (transformCommitInFlight) return;
   if (selectionDraft !== void 0 || pendingSelectionGesture !== void 0) {
     setStatus("Confirm or cancel the selection draft before Transform Preview.", "error");
     return;
@@ -27621,20 +31076,46 @@ previewButton.addEventListener("click", () => {
     setStatus(cause instanceof Error ? cause.message : "Transform Preview failed.", "error");
   }
 });
-function previewSelectionOperation(operation) {
+function previewSelectionOperation(operation, factor = 1) {
+  if (transformCommitInFlight) return;
   if (selection === void 0) {
     setStatus("Create a selection before Transform Preview.", "error");
     return;
   }
   transformOperation.value = operation;
+  transformDx.value = "0";
+  transformDy.value = "0";
+  transformFactor.value = String(factor);
+  transformAngle.value = "0";
   previewButton?.click();
 }
+scaleDownButton.addEventListener("click", () => previewSelectionOperation("SCALE_NEAREST", 0.5));
+scaleUpButton.addEventListener("click", () => previewSelectionOperation("SCALE_NEAREST", 2));
 flipHorizontalButton.addEventListener("click", () => previewSelectionOperation("FLIP_HORIZONTAL"));
 flipVerticalButton.addEventListener("click", () => previewSelectionOperation("FLIP_VERTICAL"));
 rotateCCWButton.addEventListener("click", () => previewSelectionOperation("ROTATE_90_CCW"));
 rotateCWButton.addEventListener("click", () => previewSelectionOperation("ROTATE_90_CW"));
 rotate180Button.addEventListener("click", () => previewSelectionOperation("ROTATE_180"));
 async function commitActiveTransform() {
+  if (transformCommitInFlight) return false;
+  if (transformSession === void 0) {
+    setStatus("Start a Transform or Paste Preview before Commit.", "error");
+    return false;
+  }
+  transformCommitInFlight = true;
+  syncWorkspaceEditCommandState();
+  try {
+    return await commitActiveTransformOnce();
+  } finally {
+    transformCommitInFlight = false;
+    syncWorkspaceEditCommandState();
+  }
+}
+async function commitActiveTransformOnce() {
+  if (collaborationEditBlockReason() !== void 0) {
+    announceCollaborationEditBlock();
+    return false;
+  }
   if (transformSession === void 0) {
     setStatus("Start a Transform or Paste Preview before Commit.", "error");
     return false;
@@ -27738,6 +31219,7 @@ async function commitActiveTransform() {
   }
   selectionDraft = void 0;
   pendingSelectionGesture = void 0;
+  selectionFrameDrag = void 0;
   transformSession = void 0;
   transformPreview = void 0;
   pasteMode = false;
@@ -27763,6 +31245,7 @@ cancelButton.addEventListener("click", () => {
   setStatus("Transform Preview cancelled; Canonical Raster unchanged.");
 });
 copyButton.addEventListener("click", () => {
+  if (transformCommitInFlight) return;
   cancelUncommittedSelectionWork();
   if (selection === void 0) {
     setStatus("Create a selection before Copy.", "error");
@@ -27778,6 +31261,11 @@ copyButton.addEventListener("click", () => {
   setStatus("Internal Clipboard copied locally; Canonical Raster unchanged.");
 });
 cutButton.addEventListener("click", () => {
+  if (transformCommitInFlight) return;
+  if (collaborationEditBlockReason() !== void 0) {
+    announceCollaborationEditBlock();
+    return;
+  }
   void (async () => {
     cancelUncommittedSelectionWork();
     if (selection === void 0) {
@@ -27828,6 +31316,7 @@ cutButton.addEventListener("click", () => {
     selection = void 0;
     selectionDraft = void 0;
     pendingSelectionGesture = void 0;
+    selectionFrameDrag = void 0;
     selectionDrag = void 0;
     transformSession = void 0;
     transformPreview = void 0;
@@ -27842,6 +31331,7 @@ cutButton.addEventListener("click", () => {
   })();
 });
 pasteButton.addEventListener("click", () => {
+  if (transformCommitInFlight) return;
   cancelUncommittedSelectionWork();
   if (clipboard === void 0) {
     setStatus("Copy or Cut a selection before Paste.", "error");
@@ -27870,6 +31360,14 @@ pasteButton.addEventListener("click", () => {
   drawOverlay();
 });
 undoControl.addEventListener("click", async () => {
+  if (collaborationEditBlockReason() !== void 0) {
+    announceCollaborationEditBlock();
+    return;
+  }
+  if (transformCommitInFlight) {
+    setStatus("Transform commit is still in progress; Undo is temporarily locked.", "error");
+    return;
+  }
   if (cancelUncommittedSelectionWork("Active selection preview cancelled; press Undo again to undo history.")) return;
   const result = history.undo();
   if (result === void 0) {
@@ -27882,6 +31380,7 @@ undoControl.addEventListener("click", async () => {
   selection = void 0;
   selectionDraft = void 0;
   pendingSelectionGesture = void 0;
+  selectionFrameDrag = void 0;
   selectionDrag = void 0;
   transformSession = void 0;
   transformPreview = void 0;
@@ -27903,6 +31402,14 @@ undoControl.addEventListener("click", async () => {
   setStatus(`Undo restored ${result.operationId} locally; no Realtime operation sent.`);
 });
 redoControl.addEventListener("click", async () => {
+  if (collaborationEditBlockReason() !== void 0) {
+    announceCollaborationEditBlock();
+    return;
+  }
+  if (transformCommitInFlight) {
+    setStatus("Transform commit is still in progress; Redo is temporarily locked.", "error");
+    return;
+  }
   if (cancelUncommittedSelectionWork("Active selection preview cancelled; press Redo again to redo history.")) return;
   const result = history.redo();
   if (result === void 0) {
@@ -27915,6 +31422,7 @@ redoControl.addEventListener("click", async () => {
   selection = void 0;
   selectionDraft = void 0;
   pendingSelectionGesture = void 0;
+  selectionFrameDrag = void 0;
   selectionDrag = void 0;
   transformSession = void 0;
   transformPreview = void 0;
@@ -28046,7 +31554,7 @@ function cancelActiveStroke() {
 }
 function selectionToolCanMove() {
   const tool = currentBasicTool();
-  return tool === "select-rect" || tool === "select-ellipse" || tool === "select-lasso" || tool === "select-color" || tool === "select-polygon" || tool === "move";
+  return tool === "select-rect" || tool === "select-ellipse" || tool === "select-lasso" || tool === "select-color" || tool === "move";
 }
 function pointIsSelectedPixel(snapshot, point2) {
   if (snapshot === void 0) return false;
@@ -28054,11 +31562,11 @@ function pointIsSelectedPixel(snapshot, point2) {
 }
 function pointIsInsideSelection(point2) {
   if (selection === void 0) return false;
-  return pointInSelectionBounds(point2, selection.mask.regions);
+  return selection.mask.kind === "rectangle" ? pointInSelectionBounds(point2, selection.mask.regions) : pointIsSelectedPixel(selection, point2);
 }
 function pointIsInsideSelectionDraft(point2) {
   if (selectionDraft?.snapshot === void 0) return false;
-  return pointInSelectionBounds(point2, selectionDraft.snapshot.mask.regions);
+  return selectionDraft.snapshot.mask.kind === "rectangle" ? pointInSelectionBounds(point2, selectionDraft.snapshot.mask.regions) : pointIsSelectedPixel(selectionDraft.snapshot, point2);
 }
 function cancelSelectionDrag() {
   if (selectionDrag !== void 0 && canvas.hasPointerCapture(selectionDrag.pointerId)) canvas.releasePointerCapture(selectionDrag.pointerId);
@@ -28071,7 +31579,161 @@ function cancelSelectionDrag() {
   drawOverlay();
   markCanonicalMetrics();
 }
+function selectionFrameHandleAxes(handle) {
+  return {
+    horizontal: handle === "nw" || handle === "w" || handle === "sw" ? -1 : handle === "ne" || handle === "e" || handle === "se" ? 1 : 0,
+    vertical: handle === "nw" || handle === "n" || handle === "ne" ? -1 : handle === "sw" || handle === "s" || handle === "se" ? 1 : 0
+  };
+}
+function selectionFrameTransformForPoint(drag, point2) {
+  if (drag.handle === "rotate") {
+    const centerX = drag.sourceBounds.x + (drag.sourceBounds.width - 1) / 2;
+    const centerY = drag.sourceBounds.y + (drag.sourceBounds.height - 1) / 2;
+    const pointerAngle = Math.atan2(point2.y - centerY, point2.x - centerX);
+    let delta = pointerAngle - drag.lastPointerAngle;
+    while (delta > Math.PI) delta -= Math.PI * 2;
+    while (delta < -Math.PI) delta += Math.PI * 2;
+    drag.lastPointerAngle = pointerAngle;
+    drag.accumulatedAngle += delta;
+    const angleDeg = Math.round(drag.accumulatedAngle * 180 / Math.PI * 10) / 10;
+    if (Math.abs(angleDeg) < 0.1) return void 0;
+    return {
+      transform: {
+        ...currentTransform(),
+        operation: "ROTATE_NEAREST",
+        dx: 0,
+        dy: 0,
+        factor: 1,
+        angleDeg
+      },
+      label: "\u56DE\u8EE2 " + angleDeg + "\xB0"
+    };
+  }
+  const axes = selectionFrameHandleAxes(drag.handle);
+  const bounds = drag.sourceBounds;
+  const right = bounds.x + bounds.width;
+  const bottom = bounds.y + bounds.height;
+  const requestedWidth = axes.horizontal === 1 ? Math.max(1, point2.x - bounds.x) : axes.horizontal === -1 ? Math.max(1, right - point2.x) : bounds.width;
+  const requestedHeight = axes.vertical === 1 ? Math.max(1, point2.y - bounds.y) : axes.vertical === -1 ? Math.max(1, bottom - point2.y) : bounds.height;
+  const widthRatio = requestedWidth / Math.max(1, bounds.width);
+  const heightRatio = requestedHeight / Math.max(1, bounds.height);
+  const rawFactor = axes.horizontal !== 0 && axes.vertical !== 0 ? Math.max(widthRatio, heightRatio) : axes.horizontal !== 0 ? widthRatio : heightRatio;
+  const factor = Math.max(0.125, Math.min(8, Math.round(rawFactor * 1e3) / 1e3));
+  const outputWidth = Math.max(1, Math.round(bounds.width * factor));
+  const outputHeight = Math.max(1, Math.round(bounds.height * factor));
+  const originX = Math.floor((bounds.width - outputWidth) / 2);
+  const originY = Math.floor((bounds.height - outputHeight) / 2);
+  const baseX = bounds.x + originX;
+  const baseY = bounds.y + originY;
+  const targetX = axes.horizontal === 1 ? bounds.x : axes.horizontal === -1 ? right - outputWidth : baseX;
+  const targetY = axes.vertical === 1 ? bounds.y : axes.vertical === -1 ? bottom - outputHeight : baseY;
+  const dx = Math.round(targetX - baseX);
+  const dy = Math.round(targetY - baseY);
+  return {
+    transform: {
+      ...currentTransform(),
+      operation: "SCALE_NEAREST",
+      dx,
+      dy,
+      factor
+    },
+    label: "\u62E1\u5927\u7E2E\u5C0F " + Math.round(factor * 100) + "% \xB7 \u0394" + dx + "," + dy
+  };
+}
+function transformHasEffect(transform2) {
+  if (transform2.operation === "ROTATE_NEAREST") {
+    const angle = Number(transform2.angleDeg ?? 0);
+    const normalizedAngle = ((angle + 180) % 360 + 360) % 360 - 180;
+    return transform2.dx !== 0 || transform2.dy !== 0 || Math.abs(normalizedAngle) > 1e-4;
+  }
+  return transform2.operation !== "MOVE" || transform2.dx !== 0 || transform2.dy !== 0 || Math.abs(transform2.factor - 1) > 1e-4;
+}
+function beginSelectionFrameDrag(event, handle) {
+  if (transformCommitInFlight) return false;
+  if (collaborationEditBlockReason() !== void 0) {
+    announceCollaborationEditBlock();
+    return false;
+  }
+  const currentSelection = selection;
+  const sourceBounds = selectionFrameBounds();
+  if (currentSelection === void 0 || sourceBounds === void 0) {
+    return false;
+  }
+  if (event.cancelable) event.preventDefault();
+  transformSession = void 0;
+  transformPreview = void 0;
+  pasteMode = false;
+  const startCanvasPoint = canvasPointForClient(event.clientX, event.clientY);
+  const centerX = sourceBounds.x + (sourceBounds.width - 1) / 2;
+  const centerY = sourceBounds.y + (sourceBounds.height - 1) / 2;
+  selectionFrameDrag = {
+    pointerId: event.pointerId,
+    handle,
+    startCanvasPoint,
+    sourceBounds,
+    lastPointerAngle: Math.atan2(startCanvasPoint.y - centerY, startCanvasPoint.x - centerX),
+    accumulatedAngle: 0,
+    lastTransformKey: ""
+  };
+  selectionInteractionGeneration += 1;
+  canvas.setPointerCapture(event.pointerId);
+  syncWorkspaceEditCommandState();
+  updateSelectionStatus("scope=" + currentSelection.scope.celId + " \xB7 " + currentSelection.pixels.length + "px \xB7 \u67A0" + (handle === "rotate" ? "\u56DE\u8EE2" : "\u62E1\u5927\u7E2E\u5C0F") + " \xB7 preview=only");
+  markPreviewMetrics();
+  drawOverlay();
+  return true;
+}
+function updateSelectionFrameDragPreview(point2) {
+  const drag = selectionFrameDrag;
+  const currentSelection = selection;
+  if (drag === void 0 || currentSelection === void 0) return;
+  const next = selectionFrameTransformForPoint(drag, point2);
+  if (next === void 0) {
+    if (drag.lastTransformKey === "identity") return;
+    drag.lastTransformKey = "identity";
+    transformSession = void 0;
+    transformPreview = void 0;
+    transformAngle.value = "0";
+    syncWorkspaceEditCommandState();
+    updateSelectionStatus("scope=" + currentSelection.scope.celId + " \xB7 " + currentSelection.pixels.length + "px \xB7 \u67A0\u56DE\u8EE2 0\xB0 \xB7 preview=only");
+    markPreviewMetrics();
+    drawOverlay();
+    return;
+  }
+  const transform2 = next.transform;
+  const key = transform2.operation + ":" + transform2.dx + ":" + transform2.dy + ":" + transform2.factor + ":" + (transform2.angleDeg ?? 0);
+  if (drag.lastTransformKey === key) return;
+  drag.lastTransformKey = key;
+  transformOperation.value = transform2.operation;
+  transformDx.value = String(transform2.dx);
+  transformDy.value = String(transform2.dy);
+  transformFactor.value = String(transform2.factor);
+  transformAngle.value = String(transform2.angleDeg ?? 0);
+  transformSession = createTransformSession(currentSelection, transform2, "transform-frame-" + state.projectId + "-" + currentSelection.mask.selectionVersion + "-" + key);
+  transformPreview = previewTransform(currentSelection, transformSession);
+  pasteMode = false;
+  syncWorkspaceEditCommandState();
+  updateSelectionStatus("scope=" + currentSelection.scope.celId + " \xB7 " + currentSelection.pixels.length + "px \xB7 " + next.label + " \xB7 preview=only");
+  markPreviewMetrics();
+  drawOverlay();
+}
+function cancelSelectionFrameDrag() {
+  if (selectionFrameDrag !== void 0 && canvas.hasPointerCapture(selectionFrameDrag.pointerId)) canvas.releasePointerCapture(selectionFrameDrag.pointerId);
+  selectionFrameDrag = void 0;
+  transformSession = void 0;
+  transformPreview = void 0;
+  pasteMode = false;
+  updateSelectionActionButtons();
+  updateSelectionStatus(selection === void 0 ? "scope=" + state.activeCelId + " \xB7 selection=none" : "scope=" + selection.scope.celId + " \xB7 " + selection.pixels.length + "px \xB7 " + selection.mask.kind + " \xB7 preview=cancelled");
+  drawOverlay();
+  markCanonicalMetrics();
+}
 function beginSelectionDrag(event, point2) {
+  if (transformCommitInFlight) return false;
+  if (collaborationEditBlockReason() !== void 0) {
+    announceCollaborationEditBlock();
+    return false;
+  }
   const currentSelection = selection;
   if (currentSelection === void 0) return false;
   if (event.cancelable) event.preventDefault();
@@ -28090,6 +31752,7 @@ function beginSelectionDrag(event, point2) {
   transformOperation.value = "MOVE";
   transformDx.value = "0";
   transformDy.value = "0";
+  transformAngle.value = "0";
   const transform2 = {
     ...currentTransform(),
     operation: "MOVE"
@@ -28159,6 +31822,7 @@ function updateSelectionDragPreview(point2) {
   transformOperation.value = "MOVE";
   transformDx.value = String(dx);
   transformDy.value = String(dy);
+  transformAngle.value = "0";
   const transform2 = {
     ...currentTransform(),
     operation: "MOVE",
@@ -28612,6 +32276,15 @@ async function finishTilemapPointerGesture(cancelled = false) {
 canvas.addEventListener("pointerdown", (event) => {
   if (event.button !== 0 && event.button !== 1 && event.button !== 2) return;
   if (event.button === 2 && !activeLayerIsTilemap()) return;
+  if (transformCommitInFlight) {
+    if (event.cancelable) event.preventDefault();
+    return;
+  }
+  if ((event.button === 0 || event.button === 2) && collaborationEditBlockReason() !== void 0 && !collaborationCanvasToolIsNonMutating(currentBasicTool())) {
+    if (event.cancelable) event.preventDefault();
+    announceCollaborationEditBlock();
+    return;
+  }
   cancelViewportCenterReturn();
   if (event.pointerType === "touch") {
     canvasPointers.set(event.pointerId, {
@@ -28636,6 +32309,13 @@ canvas.addEventListener("pointerdown", (event) => {
     return;
   }
   const point2 = pointFromPointer(event);
+  if (event.button === 0 && point2 !== void 0 && selection !== void 0 && selectionToolCanMove() && !event.shiftKey) {
+    const frameHandle = selectionFrameHandleAtClient(event.clientX, event.clientY);
+    if (frameHandle !== void 0 && beginSelectionFrameDrag(event, frameHandle)) return;
+    if (selectionFrameBorderAtClient(event.clientX, event.clientY)) {
+      if (beginSelectionDrag(event, point2)) return;
+    }
+  }
   if (point2 !== void 0 && (event.button === 0 || event.button === 2) && currentBasicTool() !== "pan" && !(event.altKey && !selectionToolCanMove()) && beginTilemapPointerGesture(event, point2)) return;
   if (event.button === 0 && point2 !== void 0 && currentBasicTool() === "select-rect") {
     const plainSelectionClick = !event.shiftKey && !event.altKey && !event.metaKey && !event.ctrlKey;
@@ -28715,8 +32395,14 @@ canvas.addEventListener("pointermove", (event) => {
   }
   const point2 = pointFromPointer(event);
   if (point2 !== void 0) hoverPoint = point2;
+  syncSelectionFrameCursor(event.clientX, event.clientY);
   if (tilemapPointerGesture?.pointerId === event.pointerId) {
     if (point2 !== void 0) updateTilemapPointerGesture(point2);
+    if (event.cancelable) event.preventDefault();
+    return;
+  }
+  if (selectionFrameDrag?.pointerId === event.pointerId) {
+    updateSelectionFrameDragPreview(canvasPointForClient(event.clientX, event.clientY));
     if (event.cancelable) event.preventDefault();
     return;
   }
@@ -28767,6 +32453,24 @@ canvas.addEventListener("pointerup", (event) => {
     viewportPanPointerId = void 0;
     if (canvas.hasPointerCapture(event.pointerId)) {
       canvas.releasePointerCapture(event.pointerId);
+    }
+    return;
+  }
+  if (selectionFrameDrag?.pointerId === event.pointerId) {
+    updateSelectionFrameDragPreview(canvasPointForClient(event.clientX, event.clientY));
+    const activeTransform = transformSession?.transform;
+    selectionFrameDrag = void 0;
+    if (canvas.hasPointerCapture(event.pointerId)) {
+      canvas.releasePointerCapture(event.pointerId);
+    }
+    if (activeTransform !== void 0 && transformHasEffect(activeTransform)) {
+      void commitActiveTransform();
+    } else {
+      transformSession = void 0;
+      transformPreview = void 0;
+      updateSelectionStatus(selection === void 0 ? "scope=" + state.activeCelId + " \xB7 selection=none" : "scope=" + selection.scope.celId + " \xB7 " + selection.pixels.length + "px \xB7 " + selection.mask.kind + " \xB7 preview=none");
+      syncWorkspaceEditCommandState();
+      drawOverlay();
     }
     return;
   }
@@ -28829,6 +32533,11 @@ canvas.addEventListener("pointercancel", (event) => {
     finishMirrorGuideDrag(event);
     return;
   }
+  if (selectionFrameDrag?.pointerId === event.pointerId) {
+    cancelSelectionFrameDrag();
+    setStatus("\u9078\u629E\u67A0\u306E\u5909\u5F62\u3092\u30AD\u30E3\u30F3\u30BB\u30EB\u3057\u307E\u3057\u305F\u3002Canonical Raster\u306F\u672A\u5909\u66F4\u3067\u3059\u3002", "error");
+    return;
+  }
   if (selectionDrag?.pointerId === event.pointerId) {
     cancelSelectionDrag();
     setStatus("Selection move cancelled; Canonical Raster unchanged.", "error");
@@ -28863,6 +32572,11 @@ canvas.addEventListener("lostpointercapture", (event) => {
   }
   if (mirrorGuideDrag?.pointerId === event.pointerId) {
     finishMirrorGuideDrag(event);
+    return;
+  }
+  if (selectionFrameDrag?.pointerId === event.pointerId) {
+    cancelSelectionFrameDrag();
+    setStatus("\u9078\u629E\u67A0\u306E\u5909\u5F62\u3092\u30AD\u30E3\u30F3\u30BB\u30EB\u3057\u307E\u3057\u305F\uFF08\u30DD\u30A4\u30F3\u30BF\u30FC\u6355\u6349\u89E3\u9664\uFF09\u3002", "error");
     return;
   }
   if (selectionDrag?.pointerId === event.pointerId) {
@@ -28911,7 +32625,8 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 canvas.addEventListener("pointerleave", () => {
-  if (drawInteraction?.activePointerId === void 0 && selectionDrag === void 0 && pendingSelectionGesture === void 0 && mirrorGuideDrag === void 0) hoverPoint = void 0;
+  delete canvas.dataset.selectionFrameHandle;
+  if (drawInteraction?.activePointerId === void 0 && selectionFrameDrag === void 0 && selectionDrag === void 0 && pendingSelectionGesture === void 0 && mirrorGuideDrag === void 0) hoverPoint = void 0;
   drawOverlay();
 });
 canvas.addEventListener("contextmenu", (event) => {
@@ -29141,6 +32856,7 @@ window.addEventListener("resize", () => applyViewportTransform(), {
   passive: true
 });
 miniPreviewCollapseButtonElement.addEventListener("click", () => {
+  if (!miniPreviewModeAvailable()) return;
   miniPreviewLayout = {
     ...miniPreviewLayout,
     collapsed: true
@@ -29149,6 +32865,7 @@ miniPreviewCollapseButtonElement.addEventListener("click", () => {
   syncMiniPreviewLayout();
 });
 miniPreviewRestoreButtonElement.addEventListener("click", () => {
+  if (!miniPreviewModeAvailable()) return;
   if (!miniPreviewEnabled) miniPreviewEnabled = true;
   else {
     miniPreviewLayout = {
@@ -29161,18 +32878,12 @@ miniPreviewRestoreButtonElement.addEventListener("click", () => {
   if (!miniPreviewLayout.collapsed) drawMiniPreviewProjection();
 });
 miniPreviewPlayButton.addEventListener("click", () => {
-  if (workspaceFrameElement?.dataset.creatorMode === "AUDIO") {
-    window.dispatchEvent(new CustomEvent("draw2:mini-preview-playback-request", {
-      detail: {
-        source: "MINI_PREVIEW"
-      }
-    }));
-    return;
-  }
+  if (!miniPreviewModeAvailable()) return;
   if (playbackRunning) stopTimelinePlayback();
   else startTimelinePlayback();
 });
 miniPreviewReferenceButton.addEventListener("click", () => {
+  if (!miniPreviewModeAvailable()) return;
   miniPreviewReferenceInput.click();
 });
 miniPreviewReferenceInput.addEventListener("change", () => {
@@ -29181,6 +32892,7 @@ miniPreviewReferenceInput.addEventListener("change", () => {
   miniPreviewReferenceInput.value = "";
 });
 miniPreviewReferenceClearButton.addEventListener("click", () => {
+  if (!miniPreviewModeAvailable()) return;
   closeMiniPreviewReferenceSource();
   miniPreviewReferenceClearButton.disabled = true;
   miniPreviewReferenceButton.setAttribute("aria-pressed", "false");
@@ -29196,6 +32908,7 @@ for (const button of displayToggleButtons) {
       virtualCursorEnabled = !virtualCursorEnabled;
     }
     if (button.dataset.draw2DisplayToggle === "mini-preview") {
+      if (!miniPreviewModeAvailable()) return;
       miniPreviewEnabled = !miniPreviewEnabled;
     }
     syncDisplayToggles();
@@ -29248,12 +32961,10 @@ function syncToolButtons() {
 }
 var TOOL_STUDIO_LABELS = {
   pen: "Pen",
-  "pixel-pen": "Pixel Perfect Pen",
   eraser: "Eraser",
+  text: "Text",
   move: "Move / Duplicate",
-  "select-color": "Color Selection",
-  "select-polygon": "Polygon Select",
-  "tile-stamp": "Tile Placement"
+  "select-color": "Color Selection"
 };
 function syncToolStudio() {
   const current = currentBasicTool();
@@ -29267,7 +32978,7 @@ function syncToolStudio() {
     card.setAttribute("aria-pressed", String(active));
   }
   if (toolStudioStatusElement !== null) {
-    const message = current === "pixel-pen" ? "Pixel Perfect Pen\u306F1px\u306EBresenham\u7DDA\u3092\u4F5C\u308A\u307E\u3059\u3002" : current === "move" ? "\u9078\u629E\u7BC4\u56F2\u3092\u30C9\u30E9\u30C3\u30B0\u3002Alt\u3092\u62BC\u3059\u3068\u8907\u88FD\u3057\u3066\u79FB\u52D5\u3057\u307E\u3059\u3002" : current === "select-polygon" ? "\u9802\u70B9\u3092\u30C9\u30E9\u30C3\u30B0\u3057\u3066\u591A\u89D2\u5F62\u3092\u63CF\u304D\u3001\u96E2\u3059\u3068\u9078\u629E\u7BC4\u56F2\u306B\u306A\u308A\u307E\u3059\u3002" : current === "select-color" ? `${colorSelectionModeLabel(normalizeColorSelectionMode(toolOptions.selectionMode))} color selection. Mode and tolerance are shown near the viewport.` : current === "fill" ? "\u30AF\u30EA\u30C3\u30AF\u5730\u70B9\u3068\u540C\u3058\u30D1\u30EC\u30C3\u30C8\u8272\u3067\u3064\u306A\u304C\u308B\u7BC4\u56F2\u3060\u3051\u3092\u5857\u308A\u3064\u3076\u3057\u307E\u3059\u3002" : current === "tile-stamp" ? "Tileset\u306E\u30BB\u30EB\u3092\u9078\u3073\u3001Canvas\u3078\u914D\u7F6E\u3057\u307E\u3059\u3002" : "\u30C4\u30FC\u30EB\u3092\u9078\u3076\u3068\u3001\u3053\u3053\u306B\u4F7F\u3044\u65B9\u3068\u8A2D\u5B9A\u304C\u8868\u793A\u3055\u308C\u307E\u3059\u3002";
+    const message = current === "move" ? "\u9078\u629E\u7BC4\u56F2\u3092\u30C9\u30E9\u30C3\u30B0\u3002Alt\u3092\u62BC\u3059\u3068\u8907\u88FD\u3057\u3066\u79FB\u52D5\u3057\u307E\u3059\u3002" : current === "text" ? "Canvas\u3092\u30C9\u30E9\u30C3\u30B0\u3057\u3066\u30C6\u30AD\u30B9\u30C8\u7BC4\u56F2\u3092\u4F5C\u308A\u3001\u78BA\u5B9A\u524D\u306B\u30D5\u30A9\u30F3\u30C8\u3068\u67A0\u7DDA\u3092\u8ABF\u6574\u3057\u307E\u3059\u3002" : current === "select-color" ? `${colorSelectionModeLabel(normalizeColorSelectionMode(toolOptions.selectionMode))} color selection. Mode and tolerance are shown near the viewport.` : current === "fill" ? "\u30AF\u30EA\u30C3\u30AF\u5730\u70B9\u3068\u540C\u3058\u30D1\u30EC\u30C3\u30C8\u8272\u3067\u3064\u306A\u304C\u308B\u7BC4\u56F2\u3060\u3051\u3092\u5857\u308A\u3064\u3076\u3057\u307E\u3059\u3002" : "\u30C4\u30FC\u30EB\u3092\u9078\u3076\u3068\u3001\u3053\u3053\u306B\u4F7F\u3044\u65B9\u3068\u8A2D\u5B9A\u304C\u8868\u793A\u3055\u308C\u307E\u3059\u3002";
     toolStudioStatusElement.textContent = message;
   }
   if (toolStudioElement !== null) {
@@ -29336,7 +33047,8 @@ function showShortcutsDialog() {
   shortcutSearchElement?.focus();
 }
 function selectShortcutTool(tool) {
-  toolSelect.value = tool;
+  const normalized = tool === "pixel-pen" ? "pen" : tool === "select-polygon" ? "select-lasso" : tool === "tile-stamp" ? "pen" : tool;
+  toolSelect.value = normalized;
   toolSelect.dispatchEvent(new Event("change", {
     bubbles: true
   }));
@@ -29344,10 +33056,12 @@ function selectShortcutTool(tool) {
 function clearCommittedSelection(message = "Selection cleared; Canonical Raster unchanged.") {
   selectionInteractionGeneration += 1;
   if (selectionDrag !== void 0 && canvas.hasPointerCapture(selectionDrag.pointerId)) canvas.releasePointerCapture(selectionDrag.pointerId);
+  if (selectionFrameDrag !== void 0 && canvas.hasPointerCapture(selectionFrameDrag.pointerId)) canvas.releasePointerCapture(selectionFrameDrag.pointerId);
   if (pendingSelectionGesture !== void 0 && canvas.hasPointerCapture(pendingSelectionGesture.pointerId)) canvas.releasePointerCapture(pendingSelectionGesture.pointerId);
   selection = void 0;
   selectionDraft = void 0;
   pendingSelectionGesture = void 0;
+  selectionFrameDrag = void 0;
   selectionDrag = void 0;
   transformSession = void 0;
   transformPreview = void 0;
@@ -29371,10 +33085,15 @@ function selectAllPixels() {
   commitSelectionDraft();
 }
 function nudgeCommittedSelection(dx, dy) {
-  if (selection === void 0 || transformSession !== void 0) return false;
+  if (collaborationEditBlockReason() !== void 0) {
+    announceCollaborationEditBlock();
+    return false;
+  }
+  if (transformCommitInFlight || selection === void 0 || transformSession !== void 0) return false;
   transformOperation.value = "MOVE";
   transformDx.value = String(dx);
   transformDy.value = String(dy);
+  transformAngle.value = "0";
   transformSession = createTransformSession(selection, {
     ...currentTransform(),
     operation: "MOVE",
@@ -29407,6 +33126,20 @@ function selectRelativeTimelineFrame(delta) {
   renderTimeline();
   void activateTimelineCell(frameId, timelineSession.activeLayerTrackId);
 }
+function selectRelativeTimelineLayer(delta) {
+  const layerOrder = state.timeline.layerTrackOrder;
+  if (layerOrder.length === 0) return;
+  const currentIndex = Math.max(0, layerOrder.indexOf(timelineSession.activeLayerTrackId));
+  const nextIndex = Math.max(0, Math.min(layerOrder.length - 1, currentIndex + delta));
+  const layerTrackId = layerOrder[nextIndex];
+  if (layerTrackId === void 0) return;
+  timelineSession = {
+    ...timelineSession,
+    activeLayerTrackId: layerTrackId
+  };
+  renderTimeline();
+  void activateTimelineCell(timelineSession.activeFrameId, layerTrackId);
+}
 async function clearActiveTimelineCel() {
   const cel2 = state.cels.find((item) => item.frameId === timelineSession.activeFrameId && item.layerTrackId === timelineSession.activeLayerTrackId);
   if (cel2?.assetId === void 0) {
@@ -29417,10 +33150,23 @@ async function clearActiveTimelineCel() {
     celId: cel2.celId
   });
 }
+function draw2ShortcutMutatesContent(command) {
+  if (command === "selection-confirm") return transformSession !== void 0;
+  if (command === "delete-selection") return true;
+  return [
+    "undo",
+    "redo",
+    "cut",
+    "paste",
+    "clear-cel",
+    "add-frame",
+    "duplicate-frame"
+  ].includes(command);
+}
 function runDraw2Shortcut(command, event) {
   const toolMap = {
     "tool-pen": "pen",
-    "tool-pixel-pen": "pixel-pen",
+    "tool-text": "text",
     "tool-eraser": "eraser",
     "tool-fill": "fill",
     "tool-eyedropper": "eyedropper",
@@ -29431,14 +33177,16 @@ function runDraw2Shortcut(command, event) {
     "tool-select": "select-rect",
     "tool-select-color": "select-color",
     "tool-select-lasso": "select-lasso",
-    "tool-select-polygon": "select-polygon",
     "tool-move": "move",
-    "tool-tile-stamp": "tile-stamp",
     "tool-pan": "pan"
   };
   const mappedTool = toolMap[command];
   if (mappedTool !== void 0) {
     selectShortcutTool(mappedTool);
+    return;
+  }
+  if (collaborationEditBlockReason() !== void 0 && draw2ShortcutMutatesContent(command)) {
+    announceCollaborationEditBlock();
     return;
   }
   switch (command) {
@@ -29458,11 +33206,13 @@ function runDraw2Shortcut(command, event) {
       pasteControl.click();
       break;
     case "selection-confirm":
-      commitSelectionDraft();
+      if (transformSession !== void 0) void commitActiveTransform();
+      else commitSelectionDraft();
       break;
     case "selection-cancel":
       if (selectionDraft !== void 0 || pendingSelectionGesture !== void 0) cancelSelectionDraft();
       else if (transformSession !== void 0) cancelTransformControl.click();
+      else if (selectionFrameDrag !== void 0) cancelSelectionFrameDrag();
       else if (selectionDrag !== void 0) cancelSelectionDrag();
       break;
     case "selection-deselect":
@@ -29504,6 +33254,12 @@ function runDraw2Shortcut(command, event) {
       break;
     case "next-frame":
       selectRelativeTimelineFrame(1);
+      break;
+    case "previous-layer":
+      selectRelativeTimelineLayer(-1);
+      break;
+    case "next-layer":
+      selectRelativeTimelineLayer(1);
       break;
     case "toggle-loop":
       cyclePlaybackLoopMode();
@@ -29552,7 +33308,7 @@ for (const button of document.querySelectorAll("[data-workspace-tool]")) {
   });
 }
 var BRUSH_SIZE_MIN = 1;
-var BRUSH_SIZE_MAX = 32;
+var BRUSH_SIZE_MAX = MAX_BRUSH_SIZE;
 function brushPatternLabel(pattern) {
   switch (pattern) {
     case "checker":
@@ -29569,13 +33325,17 @@ function syncBrushOptionsButton() {
   const isCircle = brushShape.value === "circle";
   const shapeLabel = isCircle ? "Circle" : "Square";
   const patternLabel = brushPatternLabel(brushPattern.value);
-  brushOptionsSummary.textContent = `${isCircle ? "\u25CB" : "\u25A1"} ${localizeDraw2Text(patternLabel)}`;
-  const accessibleLabel = `${localizeDraw2Text("Shape")}: ${localizeDraw2Text(shapeLabel)} \xB7 ${localizeDraw2Text("Pattern")}: ${localizeDraw2Text(patternLabel)}`;
+  const angle = Number(brushAngle.value);
+  const angleLabel = !isCircle && Number.isFinite(angle) && angle !== 0 ? ` \xB7 ${Math.round(angle)}\xB0` : "";
+  const algorithmLabel = brushAlgorithm.value === "pixel-perfect" ? " \xB7 Pixel perfect" : "";
+  brushOptionsSummary.textContent = `${isCircle ? "\u25CB" : "\u25A1"} ${localizeDraw2Text(patternLabel)}${angleLabel}${algorithmLabel}`;
+  const accessibleLabel = `${localizeDraw2Text("Shape")}: ${localizeDraw2Text(shapeLabel)} \xB7 ${localizeDraw2Text("Pattern")}: ${localizeDraw2Text(patternLabel)}${angleLabel}${algorithmLabel}`;
   brushOptionsButton.setAttribute("aria-label", accessibleLabel);
   brushOptionsButton.title = accessibleLabel;
 }
 function syncQuickToolControls() {
   syncBrushOptionsButton();
+  brushAngle.disabled = brushShape.value === "circle";
   syncMirrorModeToggle();
   const tool = currentBasicTool();
   const colorSelectionMode = normalizeColorSelectionMode(colorSelectionModeControl.value);
@@ -29591,16 +33351,20 @@ function syncQuickToolControls() {
   }
   const specialOptions = document.querySelectorAll("[data-draw2-special-option]");
   for (const option of specialOptions) {
-    const kind = option.dataset.draw2SpecialOption;
-    option.hidden = !(kind === "tile" && tool === "tile-stamp");
+    option.hidden = true;
   }
-  const showContextRail = showColorSelectionMode || tool === "tile-stamp";
+  const showContextRail = showColorSelectionMode;
   viewportContextRail.hidden = !showContextRail;
 }
 function normalizeBrushSizeInput() {
   const requested = Number(brushSize.value);
   const next = Number.isFinite(requested) ? Math.max(BRUSH_SIZE_MIN, Math.min(BRUSH_SIZE_MAX, Math.round(requested))) : BRUSH_SIZE_MIN;
   brushSize.value = String(next);
+}
+function normalizeBrushAngleInput() {
+  const requested = Number(brushAngle.value);
+  const next = Number.isFinite(requested) ? Math.max(-180, Math.min(180, Math.round(requested))) : 0;
+  brushAngle.value = String(next);
 }
 function adjustBrushSizeFromWheel(deltaY) {
   if (deltaY === 0) return;
@@ -29638,11 +33402,14 @@ function setBrushOptionsFlyoutOpen(open, restoreFocus = false) {
   }
 }
 function updateToolOptions() {
+  normalizeBrushAngleInput();
   const similarityPercent = Number(similarity.value);
   const selectionMode = normalizeColorSelectionMode(colorSelectionModeControl.value);
   toolOptions = {
     brushSize: Number(brushSize.value),
     brushShape: brushShape.value,
+    brushAngle: Number(brushAngle.value),
+    brushAlgorithm: brushAlgorithm.value,
     pattern: brushPattern.value,
     similarity: colorTolerancePercentToDistance(similarityPercent),
     selectionMode
@@ -29674,8 +33441,10 @@ function applyBrushPreset(id) {
   if (!id) return;
   const preset = brushPresets.load(id);
   if (preset === void 0) return;
-  brushSize.value = String(Math.min(32, preset.brushSize));
+  brushSize.value = String(Math.min(MAX_BRUSH_SIZE, preset.brushSize));
   brushShape.value = preset.brushShape;
+  brushAngle.value = String(preset.brushAngle);
+  brushAlgorithm.value = preset.brushAlgorithm;
   brushPattern.value = preset.pattern;
   const asset = state.assets[state.activeAssetId];
   if (asset !== void 0 && preset.colorIndex < asset.palette.length) {
@@ -29696,6 +33465,8 @@ function saveBrushPreset() {
     name,
     brushSize: Number(brushSize.value),
     brushShape: brushShape.value,
+    brushAngle: Number(brushAngle.value),
+    brushAlgorithm: brushAlgorithm.value,
     pattern: brushPattern.value,
     dither: "NONE",
     colorIndex: selectedColor,
@@ -29765,6 +33536,9 @@ for (const control of [
 ]) {
   control.addEventListener("change", updateToolOptions);
 }
+brushAngle.addEventListener("input", updateToolOptions);
+brushAngle.addEventListener("change", updateToolOptions);
+brushAlgorithm.addEventListener("change", updateToolOptions);
 brushSize.addEventListener("input", () => {
   normalizeBrushSizeInput();
   updateToolOptions();
@@ -29833,21 +33607,29 @@ document.addEventListener("keydown", (event) => {
     return;
   }
   const creatorMode = document.querySelector("#draw2WorkspaceFrame")?.dataset.creatorMode;
-  const workspaceAudioOwnsHistory = creatorMode === "AUDIO" && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z" && !event.altKey;
+  const workspaceAudioOwnsHistory = creatorMode === "AUDIO" && (event.metaKey || event.ctrlKey) && (event.key.toLowerCase() === "z" || event.key.toLowerCase() === "y") && !event.altKey;
   if (workspaceAudioOwnsHistory) return;
   const inputEditing = event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLSelectElement || event.target instanceof HTMLElement && event.target.isContentEditable;
   const workspaceMode = creatorMode === "DRAW" || creatorMode === "ANIMATE" || creatorMode === "GAME" || creatorMode === "AUDIO";
   const spaceKey = event.code === "Space" || event.key === " ";
   const workspacePlaybackSpace = spaceKey && !event.repeat && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && workspaceMode && !dialogOpen && !event.isComposing;
   if (workspacePlaybackSpace) return;
-  const interactiveTarget = event.target instanceof HTMLElement && event.target.closest("button, a, summary, [role='button'], [role='tab'], [role='menuitem']") !== null;
+  const drawWorkspaceMode = creatorMode === void 0 || creatorMode === "DRAW" || creatorMode === "ANIMATE";
+  if (!drawWorkspaceMode) return;
+  const interactiveTarget = isInteractiveKeyboardTarget(event.target);
   const selectionNudgeKeys = /* @__PURE__ */ new Set([
     "ArrowLeft",
     "ArrowRight",
     "ArrowUp",
     "ArrowDown"
   ]);
-  if (!inputEditing && selection !== void 0 && selectionToolCanMove() && drawInteraction === void 0 && selectionDraft === void 0 && pendingSelectionGesture === void 0 && selectionDrag === void 0 && transformSession === void 0 && selectionNudgeKeys.has(event.key) && !event.metaKey && !event.ctrlKey && !event.altKey) {
+  const activeDrawGesture = drawInteraction !== void 0 || selectionDraft !== void 0 || pendingSelectionGesture !== void 0 || selectionFrameDrag !== void 0 || selectionDrag !== void 0 || transformSession !== void 0;
+  if (!inputEditing && !interactiveTarget && !event.defaultPrevented && !event.metaKey && !event.ctrlKey && !event.altKey && activeDrawGesture && selectionNudgeKeys.has(event.key)) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    return;
+  }
+  if (!inputEditing && !interactiveTarget && !event.defaultPrevented && selection !== void 0 && selectionToolCanMove() && drawInteraction === void 0 && selectionDraft === void 0 && pendingSelectionGesture === void 0 && selectionFrameDrag === void 0 && selectionDrag === void 0 && transformSession === void 0 && selectionNudgeKeys.has(event.key) && !event.metaKey && !event.ctrlKey && !event.altKey) {
     const step = event.shiftKey ? 8 : 1;
     const dx = event.key === "ArrowLeft" ? -step : event.key === "ArrowRight" ? step : 0;
     const dy = event.key === "ArrowUp" ? -step : event.key === "ArrowDown" ? step : 0;
@@ -29928,6 +33710,78 @@ colorHex.addEventListener("keydown", (event) => {
 colorApply.addEventListener("click", () => {
   void commitColorEdit();
 });
+for (const control of [
+  colorRampEndControl,
+  colorRampStepsControl,
+  colorRampSpaceControl,
+  colorRampHueControl
+]) {
+  control.addEventListener("input", () => {
+    renderColorRampPreview(state.assets[state.activeAssetId]?.palette ?? []);
+  });
+  control.addEventListener("change", () => {
+    renderColorRampPreview(state.assets[state.activeAssetId]?.palette ?? []);
+  });
+}
+colorRampCreateControl.addEventListener("click", () => {
+  const asset = state.assets[state.activeAssetId];
+  if (asset === void 0) return;
+  const start = asset.palette[selectedColor] ?? asset.palette[0] ?? 0;
+  const endIndex = Number(colorRampEndControl.value);
+  const end = asset.palette[endIndex] ?? start;
+  const space = colorRampSpaceControl.value === "RGB" ? "RGB" : "HSV";
+  const hueMode = colorRampHueControl.value === "LONG" ? "LONG" : "SHORT";
+  const ramp = createArgbColorRamp(start, end, Number(colorRampStepsControl.value), space, hueMode);
+  const drafts = ramp.map((color) => {
+    const channels = decodeArgbColor(color);
+    return {
+      color: {
+        r: channels.red,
+        g: channels.green,
+        b: channels.blue
+      },
+      alpha: channels.alpha
+    };
+  });
+  void appendPaletteGridFromDrafts(drafts);
+});
+outlineApplyControl.addEventListener("click", () => {
+  void applyOutline();
+});
+textInsertControl.addEventListener("click", () => {
+  void commitTextInsert();
+});
+textCancelControl.addEventListener("click", () => {
+  pendingTextBounds = void 0;
+  pendingTextDraft = void 0;
+  pendingTextTarget = void 0;
+  textInsertDialogControl.close();
+  drawOverlay();
+});
+textInsertDialogControl.addEventListener("cancel", () => {
+  pendingTextBounds = void 0;
+  pendingTextDraft = void 0;
+  pendingTextTarget = void 0;
+  drawOverlay();
+});
+textFitBoundsControl.addEventListener("click", fitTextBoundsToContent);
+textBoundsWidthControl.addEventListener("input", updateTextBoundsFromControls);
+textBoundsHeightControl.addEventListener("input", updateTextBoundsFromControls);
+for (const control of [
+  textValueControl,
+  textFontControl,
+  textSizeControl,
+  textWeightControl,
+  textAlignControl,
+  textFillColorControl,
+  textStrokeEnabledControl,
+  textStrokeColorControl,
+  textStrokeWidthControl,
+  textThresholdControl
+]) {
+  control.addEventListener("input", refreshTextPreview);
+  control.addEventListener("change", refreshTextPreview);
+}
 window.addEventListener("pointermove", updatePaletteAddPointer, {
   passive: false
 });
@@ -29974,14 +33828,14 @@ colorMap.addEventListener("lostpointercapture", () => {
 colorMap.addEventListener("keydown", (event) => {
   if (!(event.key === "ArrowLeft" || event.key === "ArrowRight" || event.key === "ArrowUp" || event.key === "ArrowDown")) return;
   event.preventDefault();
-  const current = rgbToHsv({
+  const current = rgbToHsv2({
     r: Number(colorR.value),
     g: Number(colorG.value),
     b: Number(colorB.value)
   });
   const hueDelta = event.key === "ArrowLeft" ? -5 : event.key === "ArrowRight" ? 5 : 0;
   const valueDelta = event.key === "ArrowUp" ? 0.05 : event.key === "ArrowDown" ? -0.05 : 0;
-  setColorEditorRgb(hsvToRgb({
+  setColorEditorRgb(hsvToRgb2({
     h: current.h + hueDelta,
     s: current.s,
     v: Math.max(0, Math.min(1, current.v + valueDelta))
@@ -30003,7 +33857,7 @@ goldenProjectApplyButton.addEventListener("click", () => {
     try {
       const result = await workspace.applyGoldenProject?.("LIVE");
       if (result === void 0) {
-        throw new Error("Golden Project bridge is unavailable.");
+        throw new Error("Golden Project workspace adapter is unavailable.");
       }
       if (!result.ok || result.value === void 0) {
         throw new Error(result.diagnostics.map((item) => item.message).join(" ") || "Golden Project could not be applied.");
@@ -30489,7 +34343,7 @@ async function resolveInitialProjectSettings() {
   try {
     const params = new URLSearchParams(window.location.search);
     const requestedMode = params.get("mode");
-    const projectId = params.get("project")?.trim();
+    const projectId = (params.get("projectId") ?? params.get("project"))?.trim();
     if (projectId !== void 0 && projectId.length > 0) {
       const intent = createProjectStartIntent({
         projectId,
@@ -30499,6 +34353,9 @@ async function resolveInitialProjectSettings() {
       return {
         ...intent.projectId === void 0 ? {} : {
           projectIdOverride: intent.projectId
+        },
+        ...params.get("projectName")?.trim() === void 0 ? {} : {
+          projectNameOverride: params.get("projectName").trim()
         },
         mode: intent.kind,
         initialCreatorMode: intent.mode
@@ -30536,7 +34393,7 @@ void resolveInitialProjectSettings().then(async (settings) => {
     initialProjectMode: settings.mode,
     initialCreatorMode: settings.initialCreatorMode
   };
-}).then(({ module, initialProjectMode, initialCreatorMode }) => {
+}).then(async ({ module, initialProjectMode, initialCreatorMode }) => {
   const result = module.bootstrapDraw2Workspace(document, {
     projectId: state.projectId,
     ...initialProjectMode === void 0 ? {} : {
@@ -30556,6 +34413,7 @@ void resolveInitialProjectSettings().then(async (settings) => {
   }
   const workspaceFrame = document.querySelector("#draw2WorkspaceFrame");
   if (workspaceFrame !== null) translateDraw2Subtree(workspaceFrame);
+  await importMarketPurchaseFromUrl();
   window.requestAnimationFrame(() => {
     renderTimeline();
     window.requestAnimationFrame(() => renderTimeline());

@@ -7,9 +7,12 @@ import {
   type GameTilemapDocument,
 } from "../game-300/core.ts";
 
-export const GAME350_TILEMAP_MAX_WIDTH = 256;
-export const GAME350_TILEMAP_MAX_HEIGHT = 256;
-export const GAME350_TILEMAP_MAX_CELLS = 65_536;
+// Dimensions are coordinate bounds, not allocated canvas size. The cell list
+// remains sparse, so a huge world does not allocate a huge grid in memory.
+export const GAME350_TILEMAP_MAX_WIDTH = Number.MAX_SAFE_INTEGER;
+export const GAME350_TILEMAP_MAX_HEIGHT = Number.MAX_SAFE_INTEGER;
+/** Compatibility export for callers that treated the sparse world as one bound. */
+export const GAME350_TILEMAP_MAX_CELLS = Number.MAX_SAFE_INTEGER;
 
 export type GameTilemapPaintMode = "SOLID" | "TRIGGER" | "ERASE";
 
@@ -62,14 +65,11 @@ function assertDimensions(
   if (!idIsValid(mapId)) throw new Error("Tilemap mapId is invalid.");
   if (!Number.isSafeInteger(width) || width < 1 ||
     width > GAME350_TILEMAP_MAX_WIDTH) {
-    throw new Error("Tilemap width must be an integer between 1 and 256.");
+    throw new Error("Tilemap width must be a positive safe integer.");
   }
   if (!Number.isSafeInteger(height) || height < 1 ||
     height > GAME350_TILEMAP_MAX_HEIGHT) {
-    throw new Error("Tilemap height must be an integer between 1 and 256.");
-  }
-  if (width * height > GAME350_TILEMAP_MAX_CELLS) {
-    throw new Error("Tilemap cell capacity is limited to 65536 cells.");
+    throw new Error("Tilemap height must be a positive safe integer.");
   }
   if (!Number.isSafeInteger(tileSize) || tileSize < 1 || tileSize > 4096) {
     throw new Error("Tilemap tileSize must be an integer between 1 and 4096.");
@@ -125,9 +125,6 @@ function documentFrom(
   const tileSize = options.tileSize ?? 1;
   assertDimensions(options.mapId, options.width, options.height, tileSize);
   const cells = normalizeCells(options.cells, options.width, options.height);
-  if (cells.length > GAME350_TILEMAP_MAX_CELLS) {
-    throw new Error("Tilemap cell capacity is limited to 65536 cells.");
-  }
   return freezeDeep({
     schemaVersion: GAME_TILEMAP_DOCUMENT_SCHEMA_VERSION,
     mapId: options.mapId,
@@ -191,7 +188,20 @@ export function gameTilemapCellAt(
   x: number,
   y: number,
 ): GameTilemapCell | undefined {
-  return document.cells.find((cell) => cell.x === x && cell.y === y);
+  // Cells are canonicalized by (y, x), so lookup stays logarithmic even when
+  // a large world contains many authored cells.
+  let low = 0;
+  let high = document.cells.length - 1;
+  while (low <= high) {
+    const middle = Math.floor((low + high) / 2);
+    const cell = document.cells[middle];
+    if (cell === undefined) return undefined;
+    const comparison = cell.y - y || cell.x - x;
+    if (comparison === 0) return cell;
+    if (comparison < 0) low = middle + 1;
+    else high = middle - 1;
+  }
+  return undefined;
 }
 
 function assertCellCoordinate(

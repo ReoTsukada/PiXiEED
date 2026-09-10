@@ -17,28 +17,49 @@
   const PRICE_STEP_YEN = 100;
   const MAX_LISTING_PRICE_YEN = 99999900;
   const MAX_OPTION_PRICE_YEN = 10000000;
+  // The currently deployed public RPC still accepts at most six distinct
+  // format IDs. Keep the local picker broader, but stop before a guaranteed
+  // server rejection until that RPC contract is migrated.
+  const MAX_SERVER_FORMATS = 6;
   const LISTING_DRAFT_DB = 'pixieed-market-listing-drafts';
   const LISTING_DRAFT_STORE = 'drafts';
   const MARKET_TERMS_VERSION = '2026-07-19';
   const MARKET_PRIVACY_VERSION = '2026-07-19';
   const packageUtils = window.PiXiEEDMarketPackage;
-  const FORMAT_ORDER = ['pixiedraw-project', 'png', 'sprite-sheet-png', 'webp', 'gif', 'apng', 'aac', 'aiff', 'flac', 'm4a', 'mid', 'midi', 'mp3', 'oga', 'ogg', 'opus', 'wav', 'weba'];
+  const listingContracts = window.PiXiEEDMarketListingContracts;
+  const LISTING_MODES = listingContracts?.MODES || Object.freeze({ SHOWCASE: 'showcase', ACQUIRE: 'acquire' });
+  const LISTING_USE_PRESETS = listingContracts?.USE_PRESETS || Object.freeze({ VIEW_ONLY: 'view-only', USE_IN_WORK: 'use-in-work', MODIFY_AND_DERIVE: 'modify-and-derive' });
+  const FORMAT_ORDER = ['pixiedraw-project', 'novel-json', 'visual-project', 'text', 'markdown', 'html', 'csv', 'rtf', 'png', 'sprite-sheet-png', 'webp', 'gif', 'apng', 'mp4', 'webm', 'mov', 'm4v', 'ogv', 'aac', 'aiff', 'flac', 'm4a', 'mid', 'midi', 'mp3', 'oga', 'ogg', 'opus', 'wav', 'weba', 'json'];
   const FORMAT_LABELS = {
     'pixiedraw-project': 'iDRAW（PXD）',
+    'novel-json': '小説・世界観（JSON）',
+    'visual-project': '画像・動画Project（JSON）',
+    text: 'テキスト', markdown: 'Markdown', html: 'HTML', csv: 'CSV', rtf: 'RTF',
     png: 'PNG',
     'sprite-sheet-png': 'PNGスプライトシート',
     webp: 'WebP',
     gif: 'GIF',
     apng: 'APNG',
+    mp4: 'MP4動画', webm: 'WebM動画', mov: 'QuickTime動画', m4v: 'M4V動画', ogv: 'Ogg動画',
     aac: 'AAC', aiff: 'AIFF', flac: 'FLAC', m4a: 'M4A', mid: 'MIDI', midi: 'MIDI',
-    mp3: 'MP3', oga: 'OGA', ogg: 'OGG', opus: 'Opus', wav: 'WAV', weba: 'WebM Audio'
+    mp3: 'MP3', oga: 'OGA', ogg: 'OGG', opus: 'Opus', wav: 'WAV', weba: 'WebM Audio', json: 'JSON'
   };
   const RASTER_FORMATS = new Set(['png', 'sprite-sheet-png', 'webp', 'gif', 'apng']);
   const AUDIO_FORMATS = new Set(['aac', 'aiff', 'flac', 'm4a', 'mid', 'midi', 'mp3', 'oga', 'ogg', 'opus', 'wav', 'weba']);
+  const TEXT_FORMATS = new Set(['novel-json', 'visual-project', 'text', 'markdown', 'html', 'csv', 'rtf', 'json']);
+  const VIDEO_FORMATS = new Set(['mp4', 'webm', 'mov', 'm4v', 'ogv']);
+  const IMAGE_FORMATS = new Set([...RASTER_FORMATS, 'pixiedraw-project']);
+  // The server verifier and the format registry share the complete creator
+  // surface: native projects, images, audio, text/world packages, and video.
+  const SERVER_SUPPORTED_FORMATS = new Set(FORMAT_ORDER);
   const PACKAGE_COMPOSITIONS = [
     { id: 'image-only', label: '絵のみ', description: '画像・アニメーション形式だけを収録します。' },
     { id: 'audio-only', label: '音楽のみ', description: '音声ファイルだけを収録します。' },
     { id: 'image-audio', label: '絵＋音楽', description: '画像・アニメーションと音声をまとめます。' },
+    { id: 'text-only', label: '文章・世界観', description: '小説、世界観、Markdownなどの文章形式だけを収録します。' },
+    { id: 'video-only', label: '動画のみ', description: '動画形式だけを収録します。' },
+    { id: 'image-video', label: '絵＋動画', description: '画像・アニメーションと動画をまとめます。' },
+    { id: 'text-image', label: '文章＋絵', description: '文章・世界観と画像をまとめます。' },
     { id: 'pixiedraw-project', label: 'PXDプロジェクト', description: 'iDRAWで編集できるPXDを収録します。' },
     { id: 'all-files', label: '全ファイル', description: '検出できた対応形式をすべて収録します。' }
   ];
@@ -51,7 +72,7 @@
   const sourceAssetId = pageParams.get('source_asset_id') || '';
   const derivativeLicenseId = pageParams.get('derivative_license_id') || '';
   const derivativeModeRequested = pageParams.has('source_asset_id') || pageParams.has('derivative_license_id');
-  const projectTransferId = pageParams.get('project_transfer') || '';
+  const projectTransferId = pageParams.get('project_transfer') || pageParams.get('creator_transfer') || '';
   const validUuid = (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 
   const form = document.getElementById('listingForm');
@@ -86,8 +107,145 @@
   let listingDraftLoaded = false;
   let listingDraftSaveTimer = 0;
   let productComposition = 'auto';
+  let deliveryManifest = null;
+  let deliveryManifestBaseline = null;
+  let deliveryManifestError = '';
+  let acquisitionMode = LISTING_MODES.ACQUIRE;
+  let usePreset = LISTING_USE_PRESETS.USE_IN_WORK;
 
   const setStatus = (value) => { status.textContent = value || ''; };
+  const deliveryManifestRuntime = window.PiXiEEDCreatorMarketDeliveryManifest;
+  const normalizeDeliveryManifest = (value) => (
+    deliveryManifestRuntime && typeof deliveryManifestRuntime.normalize === 'function'
+      ? deliveryManifestRuntime.normalize(value)
+      : null
+  );
+
+  const manifestPath = (entry) => String(entry?.source?.path || entry?.source?.fileName || '').slice(0, 180);
+  function syncDeliveryManifestWithEntries(entries = activeEntries()) {
+    deliveryManifestError = '';
+    if (!entries.length) {
+      deliveryManifest = null;
+      return true;
+    }
+    if (!deliveryManifestRuntime || typeof deliveryManifestRuntime.createManifest !== 'function') {
+      deliveryManifest = null;
+      deliveryManifestError = '販売内容manifestの共通契約を読み込めませんでした。';
+      return false;
+    }
+    const current = deliveryManifest ? normalizeDeliveryManifest(deliveryManifest) : null;
+    const baseline = deliveryManifestBaseline ? normalizeDeliveryManifest(deliveryManifestBaseline) : null;
+    const base = current || baseline;
+    const existingByPath = new Map((current?.entries || []).map((entry) => [manifestPath(entry), entry]));
+    (baseline?.entries || []).forEach((entry) => existingByPath.set(manifestPath(entry), entry));
+    const usedEntryIds = new Set();
+    const manifestEntries = entries.map((entry, index) => {
+      const path = String(entry.path || entry.file.name || `file-${index + 1}`).slice(0, 180);
+      const existing = existingByPath.get(path);
+      let entryId = existing?.entryId || `market-file-${index + 1}`;
+      while (usedEntryIds.has(entryId)) entryId = `${entryId}-${index + 1}`;
+      usedEntryIds.add(entryId);
+      return existing ? {
+        ...existing,
+        entryId,
+        source: {
+          ...existing.source,
+          path,
+          fileName: entry.file.name,
+          mimeType: entry.file.type || 'application/octet-stream',
+          byteLength: entry.file.size
+        }
+      } : {
+        entryId,
+        sourceKind: entry.format === 'pixiedraw-project' ? 'DRAW' : 'EXTERNAL',
+        source: { path, fileName: entry.file.name, mimeType: entry.file.type || 'application/octet-stream', byteLength: entry.file.size },
+        selection: { kind: entry.format === 'pixiedraw-project' ? 'PROJECT' : 'FILE', label: path, locator: path },
+        provenance: { originKind: 'EXTERNAL_FILE', rightsStatus: 'CREATOR_DECLARATION_REQUIRED' },
+        capabilities: {},
+        dependencyIds: []
+      };
+    });
+    const retainedEntryIds = new Set(manifestEntries.map((entry) => entry.entryId));
+    const dependencyCandidates = new Map([
+      ...(current?.dependencies || []).map((dependency) => [dependency.dependencyId, dependency]),
+      ...(baseline?.dependencies || []).map((dependency) => [dependency.dependencyId, dependency])
+    ]);
+    const dependencies = [...dependencyCandidates.values()].filter((dependency) => retainedEntryIds.has(dependency.entryId));
+    const retainedDependencyIds = new Set(dependencies.map((dependency) => dependency.dependencyId));
+    manifestEntries.forEach((entry) => {
+      entry.dependencyIds = (entry.dependencyIds || []).filter((dependencyId) => retainedDependencyIds.has(dependencyId));
+    });
+    const hasExternal = manifestEntries.some((entry) => entry.sourceKind === 'EXTERNAL');
+    const hasProjectContent = manifestEntries.some((entry) => entry.sourceKind !== 'EXTERNAL');
+    const selectionKind = manifestEntries.length === 1 && manifestEntries[0].selection.kind === 'PROJECT'
+      ? 'WHOLE_PROJECT'
+      : hasExternal && hasProjectContent
+      ? 'MIXED_BUNDLE'
+      : hasExternal
+        ? 'EXTERNAL_BUNDLE'
+        : ['WHOLE_PROJECT', 'TOOL_SET', 'SELECTED_SET'].includes(base?.selectionKind)
+          ? base.selectionKind
+          : 'TOOL_SET';
+    try {
+      deliveryManifest = deliveryManifestRuntime.createManifest({
+        manifestId: baseline?.manifestId || current?.manifestId,
+        selectionKind,
+        project: hasProjectContent ? baseline?.project || current?.project || null : null,
+        entries: manifestEntries,
+        dependencies,
+        summary: { labels: baseline?.summary?.labels || current?.summary?.labels || [] },
+        createdAt: baseline?.createdAt || current?.createdAt
+      });
+      return true;
+    } catch (error) {
+      deliveryManifest = null;
+      deliveryManifestError = error instanceof Error ? error.message : '販売内容manifestを作成できませんでした。';
+      return false;
+    }
+  }
+
+  function removeFromDeliveryManifestBaseline(path) {
+    const baseline = deliveryManifestBaseline ? normalizeDeliveryManifest(deliveryManifestBaseline) : null;
+    if (!baseline) return;
+    const removedEntryIds = new Set(baseline.entries.filter((entry) => manifestPath(entry) === String(path).slice(0, 180)).map((entry) => entry.entryId));
+    if (!removedEntryIds.size) return;
+    const entries = baseline.entries.filter((entry) => !removedEntryIds.has(entry.entryId));
+    if (!entries.length) {
+      deliveryManifestBaseline = null;
+      return;
+    }
+    const dependencies = baseline.dependencies.filter((dependency) => !removedEntryIds.has(dependency.entryId));
+    const dependencyIds = new Set(dependencies.map((dependency) => dependency.dependencyId));
+    entries.forEach((entry) => {
+      entry.dependencyIds = entry.dependencyIds.filter((dependencyId) => dependencyIds.has(dependencyId));
+    });
+    try {
+      deliveryManifestBaseline = deliveryManifestRuntime.createManifest({ ...baseline, entries, dependencies });
+    } catch (_error) {
+      deliveryManifestBaseline = null;
+    }
+  }
+
+  function renderDeliveryManifestSummary() {
+    const summaryNode = $('listingDeliverySummary') || document.querySelector('[data-market-delivery-manifest-summary]');
+    if (!summaryNode) return;
+    if (deliveryManifestError) {
+      summaryNode.textContent = `販売内容を確認できません：${deliveryManifestError}`;
+      summaryNode.hidden = false;
+      return;
+    }
+    if (!deliveryManifest) {
+      summaryNode.textContent = 'まだ販売内容が選択されていません。';
+      summaryNode.hidden = false;
+      return;
+    }
+    const projectName = deliveryManifest.project?.name || deliveryManifest.project?.projectId || '外部ファイル';
+    const selections = deliveryManifest.entries.map((entry) => entry.selection.label || entry.selection.kind).slice(0, 3).join('、') || '選択内容なし';
+    const sourceLabels = { DRAW: 'iDRAW', AUDIO: 'iAUDIO', GAME: 'iGAME', WRITING: '文章・世界観', VISUAL: '画像・動画', EXTERNAL: '外部' };
+    const sources = deliveryManifest.summary.sourceKinds.map((kind) => sourceLabels[kind] || kind).join('＋');
+    summaryNode.textContent = `販売内容：${projectName}／${selections}${deliveryManifest.entries.length > 3 ? ' ほか' : ''}／${deliveryManifest.entries.length}件${sources ? `／由来：${sources}` : ''}`;
+    summaryNode.hidden = false;
+  }
   const yen = (value) => `${Number(value || 0).toLocaleString('ja-JP')}円`;
   const fileSize = (bytes) => {
     if (bytes < 1024) return `${bytes} B`;
@@ -112,8 +270,15 @@
     if (!Number.isInteger(parsed) || parsed < floor) return floor;
     return Math.min(ceiling, Math.ceil(parsed / PRICE_STEP_YEN) * PRICE_STEP_YEN);
   };
+  const normalizedListingPrice = (value, minimum = 0, maximum = MAX_LISTING_PRICE_YEN) => {
+    const parsed = integerValue(value);
+    if (parsed === 0) return 0;
+    return normalizedPaidPrice(value, Math.max(MIN_LISTING_PRICE_YEN, minimum), maximum);
+  };
   const isPreviewable = (entry) => entry && Boolean(entry.format) && (
-    entry.mediaKind === 'image' || (entry.mediaKind === 'project' && entry.previewBlob instanceof Blob)
+    entry.mediaKind === 'image'
+    || (entry.mediaKind === 'project' && entry.previewBlob instanceof Blob)
+    || ((entry.mediaKind === 'text' || entry.mediaKind === 'video') && entry.previewBlob instanceof Blob)
   );
   const isRasterEntry = (entry) => RASTER_FORMATS.has(entry?.format);
   const rasterDimensionError = (entry) => {
@@ -156,8 +321,11 @@
       key: listingDraftKey,
       savedAt: Date.now(),
       values,
-      checks: Object.fromEntries(['listingLimitedEnabled', 'listingDerivativeAllowed', 'listingTermsConfirmed', 'listingPrivacyConfirmed', 'listingRights']
+      checks: Object.fromEntries(['listingLimitedEnabled', 'listingSimpleLimitedEnabled', 'listingDerivativeAllowed', 'listingTermsConfirmed', 'listingPrivacyConfirmed', 'listingRights']
         .map((id) => [id, Boolean($(id)?.checked)])),
+      acquisitionMode,
+      usePreset,
+      simpleLimitedQuantity: $('listingSimpleLimitedQuantity')?.value || '',
       aiUsage: form.querySelector('input[name="listingAiUsage"]:checked')?.value || '',
       files: Array.from(sourceFiles.entries()).map(([path, file]) => ({ path, file })),
       fileOptimizations: Array.from(sourceOptimizations.entries()),
@@ -171,7 +339,9 @@
       customOptions: customOptions.map((option) => ({ ...option })),
       thumbnailPath,
       samplePreviewPaths: Array.from(samplePreviewPaths),
-      previewSelectionTouched
+      previewSelectionTouched,
+      ...(deliveryManifest ? { deliveryManifest } : {}),
+      ...(deliveryManifestBaseline ? { deliveryManifestBaseline } : {})
     };
   }
 
@@ -215,6 +385,15 @@
     const values = draft.values || {};
     Object.entries(values).forEach(([id, value]) => { if ($(id)) $(id).value = String(value ?? ''); });
     Object.entries(draft.checks || {}).forEach(([id, checked]) => { if ($(id)) $(id).checked = Boolean(checked); });
+    acquisitionMode = draft.acquisitionMode === LISTING_MODES.SHOWCASE ? LISTING_MODES.SHOWCASE : LISTING_MODES.ACQUIRE;
+    usePreset = Object.values(LISTING_USE_PRESETS).includes(draft.usePreset) ? draft.usePreset : LISTING_USE_PRESETS.USE_IN_WORK;
+    const acquisitionRadio = $(acquisitionMode === LISTING_MODES.SHOWCASE ? 'listingAcquisitionShowcase' : 'listingAcquisitionEnabled');
+    if (acquisitionRadio) acquisitionRadio.checked = true;
+    if ($('listingUsePreset')) $('listingUsePreset').value = usePreset;
+    if ($('listingSimpleLimitedEnabled') && draft.simpleLimitedQuantity == null && draft.checks?.listingLimitedEnabled === true) {
+      $('listingSimpleLimitedEnabled').checked = true;
+    }
+    if ($('listingSimpleLimitedQuantity') && draft.simpleLimitedQuantity != null) $('listingSimpleLimitedQuantity').value = String(draft.simpleLimitedQuantity);
     const aiUsage = form.querySelector(`input[name="listingAiUsage"][value="${draft.aiUsage}"]`);
     if (aiUsage) aiUsage.checked = true;
     sourceFiles.clear();
@@ -243,6 +422,14 @@
     thumbnailPath = String(draft.thumbnailPath || '');
     samplePreviewPaths.clear(); (draft.samplePreviewPaths || []).forEach((value) => samplePreviewPaths.add(value));
     previewSelectionTouched = Boolean(draft.previewSelectionTouched);
+    deliveryManifestError = '';
+    const savedManifest = draft.deliveryManifest ?? null;
+    const savedBaseline = draft.deliveryManifestBaseline ?? savedManifest;
+    deliveryManifest = savedManifest ? normalizeDeliveryManifest(savedManifest) : null;
+    deliveryManifestBaseline = savedBaseline ? normalizeDeliveryManifest(savedBaseline) : null;
+    if (savedManifest && !deliveryManifest) {
+      deliveryManifestError = '保存された販売内容manifestを確認できません。ファイルを選び直してください。';
+    }
     customOptions = []; renderTags(); updateLimitedState(); renderOptions(); updatePrice();
     await refreshDetectedFiles();
     listingDraftLoaded = true;
@@ -256,13 +443,114 @@
     button.textContent = label || (enabled ? '出品内容を送信' : 'ログイン後に出品できます');
   }
 
+  function currentListingPolicy() {
+    const mode = acquisitionMode === LISTING_MODES.SHOWCASE ? LISTING_MODES.SHOWCASE : LISTING_MODES.ACQUIRE;
+    const simpleLimited = Boolean($('listingSimpleLimitedEnabled')?.checked);
+    const participants = Array.isArray(deliveryManifest?.participants)
+      ? deliveryManifest.participants
+      : Array.isArray(deliveryManifest?.contributors)
+        ? deliveryManifest.contributors
+        : [];
+    if (listingContracts?.buildListingPolicy) {
+      return listingContracts.buildListingPolicy({
+        mode,
+        priceYen: mode === LISTING_MODES.ACQUIRE ? $('listingPrice')?.value : 0,
+        usePreset,
+        derivativeSalesAllowed: usePreset === LISTING_USE_PRESETS.MODIFY_AND_DERIVE,
+        limited: simpleLimited,
+        limitedQuantity: $('listingSimpleLimitedQuantity')?.value,
+        ownerAccountId: signedInUser?.id || 'seller',
+        participants
+      });
+    }
+    return {
+      schema: 'pixieed-listing-policy/v1',
+      mode,
+      acquisitionEnabled: mode === LISTING_MODES.ACQUIRE,
+      priceYen: mode === LISTING_MODES.ACQUIRE ? normalizedListingPrice($('listingPrice')?.value, 0, MAX_LISTING_PRICE_YEN) : 0,
+      usePreset,
+      derivativeSalesAllowed: usePreset === LISTING_USE_PRESETS.MODIFY_AND_DERIVE,
+      participants: [{ accountId: signedInUser?.id || 'seller', role: 'owner', explicit: true, accepted: true, revenueShareBps: 10000 }],
+      limited: { enabled: simpleLimited && mode === LISTING_MODES.ACQUIRE, quantity: integerValue($('listingSimpleLimitedQuantity')?.value) || null }
+    };
+  }
+
+  function renderParticipantSummary(policy = currentListingPolicy()) {
+    const list = $('listingParticipantList');
+    if (!list) return;
+    const participants = Array.isArray(policy?.participants) ? policy.participants : [];
+    list.replaceChildren(...(participants.length ? participants : [{ role: 'owner', displayName: '出品者' }]).map((participant) => {
+      const item = document.createElement('li');
+      item.textContent = participant.role === 'owner' ? '出品者' : (participant.displayName || participant.accountId || '明示された参加者');
+      return item;
+    }));
+  }
+
+  function applyUsePreset() {
+    if (derivativeContext) {
+      usePreset = LISTING_USE_PRESETS.MODIFY_AND_DERIVE;
+      $('listingUsePreset').value = usePreset;
+      $('listingDerivativeAllowed').checked = true;
+      renderOptions();
+      return;
+    }
+    usePreset = Object.values(LISTING_USE_PRESETS).includes($('listingUsePreset')?.value)
+      ? $('listingUsePreset').value
+      : LISTING_USE_PRESETS.USE_IN_WORK;
+    selectedOptionIds.clear();
+    if (usePreset !== LISTING_USE_PRESETS.VIEW_ONLY && acquisitionMode === LISTING_MODES.ACQUIRE) {
+      const commercial = optionCatalog.find((option) => option.id === 'commercial-use');
+      const game = optionCatalog.find((option) => option.id === 'game-app-use');
+      if (commercial) selectedOptionIds.add(commercial.id);
+      else if (game) selectedOptionIds.add(game.id);
+    }
+    $('listingDerivativeAllowed').checked = usePreset === LISTING_USE_PRESETS.MODIFY_AND_DERIVE;
+    renderOptions();
+  }
+
+  function syncSimplePolicyUi({ applyPreset: shouldApplyPreset = false } = {}) {
+    acquisitionMode = $('listingAcquisitionShowcase')?.checked ? LISTING_MODES.SHOWCASE : LISTING_MODES.ACQUIRE;
+    if (shouldApplyPreset) applyUsePreset();
+    const enabled = acquisitionMode === LISTING_MODES.ACQUIRE;
+    const fields = $('listingAcquisitionFields');
+    const price = $('listingPrice');
+    const preset = $('listingUsePreset');
+    if (fields) fields.hidden = !enabled;
+    if (price) {
+      price.disabled = !enabled;
+      price.required = false;
+      if (!enabled) price.value = '0';
+    }
+    if (preset) preset.disabled = !enabled || Boolean(derivativeContext);
+    const simpleLimited = $('listingSimpleLimitedEnabled');
+    if (simpleLimited && (!enabled || Number(integerValue(price?.value) || 0) <= 0)) simpleLimited.checked = false;
+    const limitedEnabled = enabled && Number(integerValue(price?.value) || 0) > 0 && Boolean(simpleLimited?.checked);
+    if ($('listingLimitedEnabled')) $('listingLimitedEnabled').checked = limitedEnabled;
+    if ($('listingLimitedQuantity') && $('listingSimpleLimitedQuantity')) $('listingLimitedQuantity').value = $('listingSimpleLimitedQuantity').value;
+    if ($('listingSimpleLimitedQuantityField')) $('listingSimpleLimitedQuantityField').hidden = !limitedEnabled;
+    if ($('listingSimpleLimitedQuantity')) $('listingSimpleLimitedQuantity').required = limitedEnabled;
+    if ($('listingLimitedQuantityField')) $('listingLimitedQuantityField').hidden = true;
+    const policy = currentListingPolicy();
+    const summary = $('listingPolicySummary');
+    if (summary) {
+      if (!policy.acquisitionEnabled) summary.textContent = '公開のみです。購入・無料取得・iGAMEでの取得はできません。';
+      else if (policy.usePreset === LISTING_USE_PRESETS.MODIFY_AND_DERIVE) summary.textContent = `${yen(policy.priceYen)}で取得できます。加工と派生作品への利用が可能です。`;
+      else if (policy.usePreset === LISTING_USE_PRESETS.VIEW_ONLY) summary.textContent = `${yen(policy.priceYen)}で閲覧・保存できます。作品への利用や再販売は許可しません。`;
+      else summary.textContent = `${yen(policy.priceYen)}で取得できます。作品やゲームで使えます。`;
+    }
+    renderParticipantSummary(policy);
+    updatePrice();
+  }
+
   function updatePrice() {
     const salePrice = Math.max(0, integerValue($('listingPrice').value) || 0);
     $('listingLimitedPriceLabel').textContent = '価格に含む';
   }
 
   function normalizePriceInput(input, minimum = 0, maximum = MAX_OPTION_PRICE_YEN) {
-    const value = normalizedPaidPrice(input.value, minimum, maximum);
+    const value = maximum === MAX_LISTING_PRICE_YEN
+      ? normalizedListingPrice(input.value, minimum, maximum)
+      : normalizedPaidPrice(input.value, minimum, maximum);
     input.value = String(value);
     input.setCustomValidity('');
     return value;
@@ -270,7 +558,7 @@
 
   function populatePricePresets() {
     const appendValues = (list, maximum) => {
-      const values = [];
+      const values = maximum === MAX_LISTING_PRICE_YEN ? [0] : [];
       for (let value = MIN_LISTING_PRICE_YEN; value <= 10000; value += PRICE_STEP_YEN) values.push(value);
       [20000, 30000, 50000, 100000, 300000, 500000, 1000000, maximum].forEach((value) => {
         if (value <= maximum && !values.includes(value)) values.push(value);
@@ -341,9 +629,15 @@
   }
 
   function updateLimitedState() {
-    const enabled = $('listingLimitedEnabled').checked;
-    $('listingLimitedQuantityField').hidden = !enabled;
-    $('listingLimitedQuantity').required = enabled;
+    const enabled = Boolean($('listingSimpleLimitedEnabled')?.checked)
+      && acquisitionMode === LISTING_MODES.ACQUIRE
+      && Number(integerValue($('listingPrice')?.value) || 0) > 0;
+    if ($('listingLimitedEnabled')) $('listingLimitedEnabled').checked = enabled;
+    if ($('listingLimitedQuantity') && $('listingSimpleLimitedQuantity')) $('listingLimitedQuantity').value = $('listingSimpleLimitedQuantity').value;
+    if ($('listingLimitedQuantityField')) $('listingLimitedQuantityField').hidden = true;
+    if ($('listingSimpleLimitedQuantityField')) $('listingSimpleLimitedQuantityField').hidden = !enabled;
+    if ($('listingLimitedQuantity')) $('listingLimitedQuantity').required = false;
+    if ($('listingSimpleLimitedQuantity')) $('listingSimpleLimitedQuantity').required = enabled;
     renderOptionPriceFields();
     updatePrice();
   }
@@ -387,11 +681,15 @@
     $('listingRightsLabel').textContent = '表示中の親作品を元にした派生作品であり、変更・追加内容を正しく申告しました。';
     $('listingDerivativeAllowed').checked = true;
     $('listingDerivativeAllowed').disabled = true;
+    $('listingAcquisitionEnabled').checked = true;
+    $('listingAcquisitionShowcase').disabled = true;
+    $('listingUsePreset').value = LISTING_USE_PRESETS.MODIFY_AND_DERIVE;
+    usePreset = LISTING_USE_PRESETS.MODIFY_AND_DERIVE;
     $('listingPrice').min = String(Math.max(MIN_LISTING_PRICE_YEN, minimumPrice(context.minimum_seller_price_yen)));
     if (Number($('listingPrice').value) < Number($('listingPrice').min)) $('listingPrice').value = $('listingPrice').min;
     $('listingOptionsTitle').textContent = '継承される利用オプション';
     document.querySelector('.market-titlebar h1').textContent = '派生作品を出品';
-    renderOptions(); renderOptionPriceFields(); updatePrice();
+    renderOptions(); renderOptionPriceFields(); updatePrice(); syncSimplePolicyUi({ applyPreset: true });
     return derivativeContext;
   }
 
@@ -448,11 +746,18 @@
     const entries = activeEntries();
     if (!entries.length) return 'image-only';
     if (entries.every((entry) => entry.format === 'pixiedraw-project')) return 'pixiedraw-project';
-    const hasImage = entries.some((entry) => entry.mediaKind === 'image');
-    const hasAudio = entries.some((entry) => entry.mediaKind === 'audio');
-    if (hasAudio && hasImage && entries.every((entry) => entry.mediaKind === 'image' || entry.mediaKind === 'audio')) return 'image-audio';
-    if (hasAudio && entries.every((entry) => entry.mediaKind === 'audio')) return 'audio-only';
-    if (hasImage && entries.every((entry) => entry.mediaKind === 'image')) return 'image-only';
+    const kinds = new Set(entries.map((entry) => entry.mediaKind));
+    const hasImage = kinds.has('image');
+    const hasAudio = kinds.has('audio');
+    const hasText = kinds.has('text');
+    const hasVideo = kinds.has('video');
+    if (hasAudio && hasImage && kinds.size === 2) return 'image-audio';
+    if (hasText && hasImage && kinds.size === 2) return 'text-image';
+    if (hasVideo && hasImage && kinds.size === 2) return 'image-video';
+    if (hasAudio && kinds.size === 1) return 'audio-only';
+    if (hasText && kinds.size === 1) return 'text-only';
+    if (hasVideo && kinds.size === 1) return 'video-only';
+    if (hasImage && kinds.size === 1) return 'image-only';
     return 'all-files';
   }
 
@@ -470,7 +775,10 @@
     const hasImage = detectedEntries.some((entry) => entry.mediaKind === 'image' && entry.format);
     const hasProject = detectedEntries.some((entry) => entry.mediaKind === 'project' && entry.format);
     const hasAudio = detectedEntries.some((entry) => entry.mediaKind === 'audio');
+    const hasText = detectedEntries.some((entry) => entry.mediaKind === 'text');
+    const hasVideo = detectedEntries.some((entry) => entry.mediaKind === 'video');
     const allFilesSupported = detectedEntries.length > 0 && detectedEntries.every((entry) => Boolean(entry.format));
+    const mediaKinds = new Set(detectedEntries.filter((entry) => entry.format).map((entry) => entry.mediaKind));
     const current = effectiveComposition();
     container.replaceChildren(...PACKAGE_COMPOSITIONS.map((option) => {
       const wrapper = document.createElement('label');
@@ -479,9 +787,13 @@
       input.type = 'radio'; input.name = 'listingProductComposition'; input.value = option.id;
       const available = option.id === 'image-only' ? hasImage
         : option.id === 'audio-only' ? hasAudio
-          : option.id === 'image-audio' ? hasImage && hasAudio
-            : option.id === 'pixiedraw-project' ? hasProject
-              : option.id === 'all-files' ? allFilesSupported
+          : option.id === 'image-audio' ? hasImage && hasAudio && mediaKinds.size === 2
+            : option.id === 'text-only' ? hasText
+              : option.id === 'video-only' ? hasVideo
+                : option.id === 'image-video' ? hasImage && hasVideo && mediaKinds.size === 2
+                  : option.id === 'text-image' ? hasText && hasImage && mediaKinds.size === 2
+                    : option.id === 'pixiedraw-project' ? hasProject && detectedEntries.filter((entry) => entry.format).every((entry) => entry.format === 'pixiedraw-project')
+                      : option.id === 'all-files' ? allFilesSupported
           : false;
       input.disabled = !available;
       input.checked = current === option.id && available;
@@ -506,6 +818,18 @@
         } else if (option.id === 'image-audio') {
           selectedFormats.clear();
           detectedEntries.filter((entry) => entry.format && (entry.mediaKind === 'image' || entry.mediaKind === 'audio')).forEach((entry) => selectedFormats.add(entry.format));
+        } else if (option.id === 'text-only') {
+          selectedFormats.clear();
+          detectedEntries.filter((entry) => entry.format && entry.mediaKind === 'text').forEach((entry) => selectedFormats.add(entry.format));
+        } else if (option.id === 'video-only') {
+          selectedFormats.clear();
+          detectedEntries.filter((entry) => entry.format && entry.mediaKind === 'video').forEach((entry) => selectedFormats.add(entry.format));
+        } else if (option.id === 'image-video') {
+          selectedFormats.clear();
+          detectedEntries.filter((entry) => entry.format && (entry.mediaKind === 'image' || entry.mediaKind === 'video')).forEach((entry) => selectedFormats.add(entry.format));
+        } else if (option.id === 'text-image') {
+          selectedFormats.clear();
+          detectedEntries.filter((entry) => entry.format && (entry.mediaKind === 'text' || entry.mediaKind === 'image')).forEach((entry) => selectedFormats.add(entry.format));
         } else if (option.id === 'pixiedraw-project') {
           selectedFormats.clear(); selectedFormats.add('pixiedraw-project');
         } else if (option.id === 'all-files') {
@@ -533,6 +857,8 @@
 
   function renderFiles() {
     const entries = activeEntries();
+    syncDeliveryManifestWithEntries(entries);
+    renderDeliveryManifestSummary();
     const activeBytes = entries.reduce((total, entry) => total + entry.file.size, 0);
     const suffix = ignoredFileCount ? `／未対応 ${ignoredFileCount}件は現在出品対象外` : '';
     $('listingFileSummary').textContent = detectedEntries.length
@@ -544,7 +870,7 @@
       const name = document.createElement('span'); name.textContent = entry.path;
       const format = document.createElement('b'); format.textContent = entry.format
         ? FORMAT_LABELS[entry.format]
-        : entry.mediaKind === 'audio' ? '音声（受け取り未対応）' : (entry.rejectionReason || '未対応');
+        : (entry.rejectionReason || '未対応');
       const size = document.createElement('small');
       size.textContent = entry.optimization
         ? `${fileSize(entry.file.size)}・${entry.optimization.integer_scale_factor}倍縮小済み`
@@ -554,6 +880,7 @@
       remove.textContent = '外す';
       remove.setAttribute('aria-label', `${entry.path} を出品ファイルから外す`);
       remove.addEventListener('click', async () => {
+        removeFromDeliveryManifestBaseline(entry.path);
         sourceFiles.delete(entry.path);
         sourceOptimizations.delete(entry.path);
         await refreshDetectedFiles();
@@ -664,7 +991,7 @@
     const composition = compositionOption(effectiveComposition());
     $('listingProductType').textContent = pixieeDraw
       ? `${composition.label}：編集用プロジェクトを含み、購入後にiDRAWで開けます。`
-      : `${composition.label}：画像・アニメーション形式をZIPで受け取る商品です。`;
+      : `${composition.label}：購入後に選択した形式をZIPで受け取る商品です。`;
     $('listingProductType').className = `market-product-type-preview ${pixieeDraw ? 'is-pixiedraw-product' : 'is-general-product'}`;
   }
 
@@ -730,10 +1057,16 @@
         ? rasterDimensionError({ format, dimensions })
         : '';
       const acceptedFormat = rejectionReason ? null : format;
-      const previewBlob = acceptedFormat === 'pixiedraw-project'
+      const mediaKind = packageUtils.detectMediaKind(file, acceptedFormat);
+      let previewBlob = acceptedFormat === 'pixiedraw-project'
         ? await packageUtils.extractPixieeDrawPreviewPng(file)
         : null;
-      detected.push({ path, file, format: acceptedFormat, mediaKind: packageUtils.detectMediaKind(file, acceptedFormat), previewBlob, optimization, dimensions, rejectionReason });
+      if (acceptedFormat && mediaKind === 'text') {
+        try { previewBlob = await createTextPreviewBlob(file); } catch (_error) { previewBlob = null; }
+      } else if (acceptedFormat && mediaKind === 'video') {
+        try { previewBlob = await createVideoPreviewBlob(file); } catch (_error) { previewBlob = null; }
+      }
+      detected.push({ path, file, format: acceptedFormat, mediaKind, previewBlob, optimization, dimensions, rejectionReason });
       if (index > 0 && index % 20 === 0) setStatus(`ファイル形式を判定しています（${index + 1}/${files.length}）...`);
     }
     if (run !== detectionRun) return;
@@ -759,7 +1092,15 @@
   }
 
   async function addFiles(additions) {
-    const normalized = Array.from(additions || []).map((item) => item?.file ? item : { file: item, path: filePath(item) }).filter((item) => item.file instanceof File);
+    const normalized = Array.from(additions || []).map((item) => item?.file ? item : { file: item, path: filePath(item) })
+      .map((item) => {
+        if (!(item.file instanceof Blob)) return null;
+        const file = item.file instanceof File
+          ? item.file
+          : new File([item.file], item.path || 'asset.bin', { type: item.file.type || 'application/octet-stream' });
+        return { file, path: item.path || filePath(file) };
+      })
+      .filter(Boolean);
     if (!normalized.length) return;
     normalized.forEach(({ file, path }) => {
       const normalizedPath = path || filePath(file);
@@ -822,6 +1163,10 @@
     sourceOptimizations.clear();
     selectedFormats.clear(); dismissedFormats.clear(); samplePreviewPaths.clear(); previewSelectionTouched = false;
     productComposition = 'auto';
+    deliveryManifest = null;
+    deliveryManifestBaseline = null;
+    deliveryManifestError = '';
+    renderDeliveryManifestSummary();
     detectionRun += 1;
     previewUrls.forEach((url) => URL.revokeObjectURL(url)); previewUrls.clear();
     renderFormats(); setStatus(''); scheduleListingDraftSave();
@@ -896,6 +1241,86 @@
     context.restore();
   }
 
+  function canvasBlob(canvas, mimeType = 'image/webp') {
+    return new Promise((resolve, reject) => {
+      canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('preview conversion failed')), mimeType, .88);
+    });
+  }
+
+  async function createTextPreviewBlob(file, { watermark = false } = {}) {
+    const source = await file.text();
+    const canvas = document.createElement('canvas');
+    canvas.width = 960;
+    canvas.height = 540;
+    const context = canvas.getContext('2d', { alpha: false });
+    context.fillStyle = '#10182c';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = '#e5f2ff';
+    context.font = '600 24px sans-serif';
+    context.fillText(String(file.name || 'Text Work').slice(0, 48), 42, 54);
+    context.font = '18px sans-serif';
+    context.fillStyle = '#aabbd0';
+    const lines = String(source || '').replace(/\r\n?/g, '\n').split('\n');
+    const visible = [];
+    for (const line of lines) {
+      let remaining = line || ' ';
+      while (remaining.length > 78) {
+        visible.push(remaining.slice(0, 78));
+        remaining = remaining.slice(78);
+      }
+      visible.push(remaining);
+      if (visible.length >= 18) break;
+    }
+    visible.slice(0, 18).forEach((line, index) => context.fillText(line, 42, 96 + index * 24));
+    if (watermark) drawPreviewWatermark(context, canvas.width, canvas.height);
+    return canvasBlob(canvas);
+  }
+
+  async function createVideoPreviewBlob(file, { watermark = false } = {}) {
+    const url = URL.createObjectURL(file);
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    video.muted = true;
+    video.playsInline = true;
+    video.src = url;
+    try {
+      await new Promise((resolve, reject) => {
+        video.onloadedmetadata = resolve;
+        video.onerror = () => reject(new Error('video preview unavailable'));
+      });
+      const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0;
+      await new Promise((resolve) => {
+        if (!duration) { resolve(); return; }
+        let timer = 0;
+        const finish = () => {
+          video.removeEventListener('seeked', finish);
+          if (timer) window.clearTimeout(timer);
+          resolve();
+        };
+        video.addEventListener('seeked', finish, { once: true });
+        timer = window.setTimeout(finish, 1800);
+        try { video.currentTime = Math.min(duration / 2, 0.25); } catch (_error) { finish(); }
+      });
+      const sourceWidth = Math.max(1, video.videoWidth || 960);
+      const sourceHeight = Math.max(1, video.videoHeight || 540);
+      const scale = 960 / Math.max(sourceWidth, sourceHeight);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(sourceWidth * scale));
+      canvas.height = Math.max(1, Math.round(sourceHeight * scale));
+      const context = canvas.getContext('2d', { alpha: false });
+      context.fillStyle = '#10182c';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.imageSmoothingEnabled = true;
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      if (watermark) drawPreviewWatermark(context, canvas.width, canvas.height);
+      return canvasBlob(canvas);
+    } finally {
+      video.pause();
+      video.removeAttribute('src');
+      URL.revokeObjectURL(url);
+    }
+  }
+
   async function createPreviewBlob(file, { thumbnail = false, watermark = thumbnail, mimeType = 'image/webp' } = {}) {
     const source = await loadImageSource(file);
     try {
@@ -930,8 +1355,8 @@
   function bindLocalUi() {
     form.hidden = false;
     populatePricePresets();
-    renderOptions(); renderFormats(); updateLimitedState(); setSubmissionEnabled(false);
-    renderTags();
+    renderOptions(); renderFormats(); syncSimplePolicyUi({ applyPreset: true }); updateLimitedState(); setSubmissionEnabled(false);
+    renderTags(); renderDeliveryManifestSummary();
     const sourceDialog = $('listingSourceDialog');
     const openSourceDialog = () => {
       if (typeof sourceDialog.showModal === 'function') sourceDialog.showModal(); else sourceDialog.setAttribute('open', '');
@@ -946,11 +1371,18 @@
     $('listingChooseFiles').addEventListener('click', () => { closeSourceDialog(); $('listingFiles').click(); });
     $('listingChooseFolder').addEventListener('click', () => { closeSourceDialog(); $('listingFolder').click(); });
     $('listingFilesClear').addEventListener('click', clearFiles);
-    $('listingPrice').addEventListener('input', () => { updatePrice(); scheduleListingDraftSave(); });
+    $('listingPrice').addEventListener('input', () => { syncSimplePolicyUi(); updateLimitedState(); scheduleListingDraftSave(); });
     $('listingPrice').addEventListener('change', () => {
-      normalizePriceInput($('listingPrice'), Number($('listingPrice').min) || MIN_LISTING_PRICE_YEN, MAX_LISTING_PRICE_YEN);
-      updatePrice(); scheduleListingDraftSave();
+      const minimum = Number.isFinite(Number($('listingPrice').min)) ? Number($('listingPrice').min) : 0;
+      normalizePriceInput($('listingPrice'), minimum, MAX_LISTING_PRICE_YEN);
+      syncSimplePolicyUi(); updateLimitedState(); scheduleListingDraftSave();
     });
+    ['listingAcquisitionShowcase', 'listingAcquisitionEnabled'].forEach((id) => $(id).addEventListener('change', () => {
+      syncSimplePolicyUi({ applyPreset: true }); updateLimitedState(); scheduleListingDraftSave();
+    }));
+    $('listingUsePreset').addEventListener('change', () => { usePreset = $('listingUsePreset').value; applyUsePreset(); syncSimplePolicyUi(); scheduleListingDraftSave(); });
+    $('listingSimpleLimitedEnabled').addEventListener('change', () => { updateLimitedState(); syncSimplePolicyUi(); scheduleListingDraftSave(); });
+    $('listingSimpleLimitedQuantity').addEventListener('input', () => { updateLimitedState(); scheduleListingDraftSave(); });
     $('listingLimitedEnabled').addEventListener('change', () => { updateLimitedState(); scheduleListingDraftSave(); });
     $('listingLimitedQuantity').addEventListener('input', () => { updatePrice(); scheduleListingDraftSave(); });
     $('listingTagAdd').addEventListener('click', addTag);
@@ -992,36 +1424,91 @@
     if (!projectTransferId || !window.indexedDB) return false;
     const transfer = await new Promise((resolve, reject) => {
       const request = indexedDB.open('pixieed-market-project-transfers', 1);
-      request.onupgradeneeded = () => request.result.createObjectStore('transfers', { keyPath: 'id' });
+      request.onupgradeneeded = () => {
+        if (!request.result.objectStoreNames.contains('transfers')) {
+          request.result.createObjectStore('transfers', { keyPath: 'id' });
+        }
+      };
       request.onerror = () => reject(request.error || new Error('販売用PXDを読み出せませんでした'));
       request.onsuccess = () => {
         const database = request.result;
-        const transaction = database.transaction('transfers', 'readwrite');
+        const transaction = database.transaction('transfers', 'readonly');
         const store = transaction.objectStore('transfers');
         const getRequest = store.get(projectTransferId);
         getRequest.onsuccess = () => {
           const value = getRequest.result || null;
-          store.delete(projectTransferId);
-          transaction.oncomplete = () => { database.close(); resolve(value); };
+          database.close();
+          resolve(value);
         };
         getRequest.onerror = () => { database.close(); reject(getRequest.error || new Error('販売用PXDを読み出せませんでした')); };
         transaction.onerror = () => { database.close(); reject(transaction.error || new Error('販売用PXDを削除できませんでした')); };
       };
     });
-    if (!(transfer?.file instanceof File) || Number(transfer.expiresAt) < Date.now()) {
-      setStatus('販売用PXDの引き継ぎ期限が切れました。iDRAWからもう一度「販売する」を押してください。');
+    const transferFiles = Array.isArray(transfer?.files) && transfer.files.length
+      ? transfer.files
+      : transfer?.file ? [{ file: transfer.file, path: transfer.file.name }] : [];
+    const expiresAt = Number(transfer?.expiresAt);
+    if (!transferFiles.length || transferFiles.some((entry) => !(entry?.file instanceof Blob)) || (Number.isFinite(expiresAt) && expiresAt < Date.now())) {
+      setStatus('Creator Appからの引き継ぎ期限が切れました。制作画面からもう一度「Marketへ出品」を押してください。');
       return false;
     }
-    await addFiles([{ file: transfer.file, path: transfer.file.name }]);
-    if (!$('listingTitle').value.trim()) $('listingTitle').value = transfer.file.name.replace(/\.(?:pxd|pixieedraw|pxdraw)$/i, '');
-    setStatus('iDRAWからPXDを受け取りました。埋め込みPNGからサムネイルと購入前プレビューを選べます。');
+    const transferredManifest = transfer?.deliveryManifest || transfer?.delivery_manifest || transfer?.metadata?.deliveryManifest || transfer?.metadata?.delivery_manifest;
+    if (transferredManifest !== undefined && transferredManifest !== null) {
+      deliveryManifest = normalizeDeliveryManifest(transferredManifest);
+      if (!deliveryManifest) {
+        deliveryManifestError = 'Creator Appから受け取った販売内容manifestの由来・依存関係を確認できません。';
+        renderDeliveryManifestSummary();
+        setStatus('販売内容manifestを安全に確認できなかったため、引き継ぎを停止しました。制作画面からもう一度やり直してください。');
+        return false;
+      }
+      deliveryManifestBaseline = deliveryManifest;
+    }
+    await addFiles(transferFiles);
+    // 取込に成功してから削除する。後片付けに失敗しても、取込済みの画面を
+    // エラー扱いにせず、短いTTL後に自然失効させる。
+    await deleteProjectTransfer(projectTransferId).catch(() => {});
+    const firstFile = transferFiles[0].file;
+    if (!$('listingTitle').value.trim()) $('listingTitle').value = String(firstFile.name || 'creator-work').replace(/\.(?:pxd|pixieedraw|pxdraw|json|md|markdown|txt)$/i, '');
+    const transferKind = String(transfer?.metadata?.kind || 'draw').toLowerCase();
+    const handoffLabel = transferKind === 'writing' ? '文章・世界観'
+      : transferKind === 'visual' ? '画像・動画'
+        : 'iDRAW';
+    setStatus(`${handoffLabel}の制作結果を受け取りました。販売する形式と購入前プレビューを確認できます。`);
     window.history.replaceState({}, '', `${location.pathname}${location.hash}`);
     return true;
   }
 
+  async function deleteProjectTransfer(transferId) {
+    if (!transferId || !window.indexedDB) return;
+    await new Promise((resolve, reject) => {
+      const request = indexedDB.open('pixieed-market-project-transfers', 1);
+      request.onupgradeneeded = () => {
+        if (!request.result.objectStoreNames.contains('transfers')) {
+          request.result.createObjectStore('transfers', { keyPath: 'id' });
+        }
+      };
+      request.onerror = () => reject(request.error || new Error('販売用引き渡しの後片付けに失敗しました'));
+      request.onsuccess = () => {
+        const database = request.result;
+        let transaction;
+        try {
+          transaction = database.transaction('transfers', 'readwrite');
+          transaction.objectStore('transfers').delete(transferId);
+          transaction.oncomplete = () => { database.close(); resolve(); };
+          transaction.onerror = () => { database.close(); reject(transaction.error || new Error('販売用引き渡しの後片付けに失敗しました')); };
+          transaction.onabort = () => { database.close(); reject(transaction.error || new Error('販売用引き渡しの後片付けが中断されました')); };
+        } catch (error) {
+          database.close();
+          reject(error);
+        }
+      };
+    });
+  }
+
   async function submitListing(event) {
     event.preventDefault();
-    const salePriceMinimum = Number($('listingPrice').min) || MIN_LISTING_PRICE_YEN;
+    syncSimplePolicyUi({ applyPreset: true });
+    const salePriceMinimum = Number.isFinite(Number($('listingPrice').min)) ? Number($('listingPrice').min) : 0;
     normalizePriceInput($('listingPrice'), salePriceMinimum, MAX_LISTING_PRICE_YEN);
     optionCatalog.forEach((option) => {
       if (selectedOptionIds.has(option.id)) optionPrices.set(option.id, 0);
@@ -1031,31 +1518,70 @@
     if (!form.reportValidity()) {
       setStatus('必須項目と確認欄をすべて入力してください。'); return;
     }
+    const listingPolicy = currentListingPolicy();
+    const policyErrors = listingContracts?.validateListingPolicy ? listingContracts.validateListingPolicy(listingPolicy) : [];
+    if (policyErrors.length) {
+      setStatus(policyErrors[0]); return;
+    }
     if (!submissionEnabled || !client || !signedInUser) {
       setStatus('出品送信にはHTTPで開き、ログインと販売者確認を完了してください。'); return;
     }
     const entries = activeEntries();
     if (!entries.length) { setStatus('出品する形式を1つ以上ONにしてください。'); return; }
+    if (!syncDeliveryManifestWithEntries(entries)) {
+      renderDeliveryManifestSummary();
+      setStatus(`販売内容manifestを確定できません: ${deliveryManifestError || '販売内容を選び直してください。'}`);
+      return;
+    }
+    const verificationRequiredEntries = deliveryManifest.entries.filter((entry) => entry.provenance.rightsStatus === 'SERVER_VERIFICATION_REQUIRED');
+    const derivativeSourceVerified = derivativeContext && verificationRequiredEntries.length > 0
+      && verificationRequiredEntries.every((entry) => entry.source.assetId === sourceAssetId);
+    if (verificationRequiredEntries.length && !derivativeSourceVerified) {
+      setStatus('購入Assetなどサーバー確認が必要な内容を含むため、この出品経路では送信できません。対象商品の「派生作品を出品」から開き直してください。');
+      return;
+    }
     const invalidRaster = entries.find((entry) => rasterDimensionError(entry));
     if (invalidRaster) { setStatus(`${invalidRaster.path}: ${rasterDimensionError(invalidRaster)}`); return; }
     if (entries.length > MAX_FILE_COUNT) { setStatus(`ファイルは${MAX_FILE_COUNT}件までです。`); return; }
     const totalBytes = entries.reduce((total, entry) => total + entry.file.size, 0);
     if (totalBytes > MAX_TOTAL_BYTES) { setStatus('1商品の合計ファイルサイズは50MBまでです。'); return; }
     const formats = FORMAT_ORDER.filter((format) => selectedFormats.has(format) && entries.some((entry) => entry.format === format));
+    const serverUnsupportedFormats = formats.filter((format) => !SERVER_SUPPORTED_FORMATS.has(format));
+    if (serverUnsupportedFormats.length) {
+      setStatus(`この制作結果はローカルPackageとして準備済みですが、現在のMarketサーバーは${serverUnsupportedFormats.map((format) => FORMAT_LABELS[format] || format).join('、')}の出品に未対応です。サーバー対応後に再送信できます。`);
+      return;
+    }
+    if (formats.length > MAX_SERVER_FORMATS) {
+      setStatus(`現在のMarketサーバーは1商品につき形式を${MAX_SERVER_FORMATS}種類まで受け付けます。形式スイッチを${MAX_SERVER_FORMATS}種類以内にしてください。`);
+      return;
+    }
     const composition = effectiveComposition();
+    const activeKinds = new Set(entries.map((entry) => entry.mediaKind));
+    const onlyKinds = (...kinds) => entries.length > 0 && entries.every((entry) => kinds.includes(entry.mediaKind));
+    const hasKind = (kind) => entries.some((entry) => entry.mediaKind === kind);
     if (!['image-only', 'audio-only', 'image-audio', 'pixiedraw-project', 'all-files'].includes(composition)) {
-      setStatus('販売パッケージ構成を選び直してください。'); return;
+      if (!PACKAGE_COMPOSITIONS.some((option) => option.id === composition)) {
+        setStatus('販売パッケージ構成を選び直してください。'); return;
+      }
     }
     const detectedSupportedFormats = new Set(detectedEntries.map((entry) => entry.format).filter(Boolean));
     const compositionMismatch = composition === 'image-only'
-      ? formats.includes('pixiedraw-project') || formats.some((format) => AUDIO_FORMATS.has(format)) || !formats.some((format) => !AUDIO_FORMATS.has(format) && format !== 'pixiedraw-project')
+      ? !onlyKinds('image')
       : composition === 'audio-only'
-        ? formats.some((format) => !AUDIO_FORMATS.has(format)) || !formats.some((format) => AUDIO_FORMATS.has(format))
+        ? !onlyKinds('audio')
         : composition === 'image-audio'
-          ? formats.includes('pixiedraw-project') || !formats.some((format) => AUDIO_FORMATS.has(format)) || !formats.some((format) => !AUDIO_FORMATS.has(format) && format !== 'pixiedraw-project')
-          : composition === 'pixiedraw-project'
-            ? formats.length !== 1 || formats[0] !== 'pixiedraw-project'
-            : detectedEntries.some((entry) => !entry.format) || formats.length !== detectedSupportedFormats.size;
+          ? !(activeKinds.size === 2 && hasKind('image') && hasKind('audio') && onlyKinds('image', 'audio'))
+          : composition === 'text-only'
+            ? !onlyKinds('text')
+            : composition === 'video-only'
+              ? !onlyKinds('video')
+              : composition === 'image-video'
+                ? !(activeKinds.size === 2 && hasKind('image') && hasKind('video') && onlyKinds('image', 'video'))
+                : composition === 'text-image'
+                  ? !(activeKinds.size === 2 && hasKind('text') && hasKind('image') && onlyKinds('text', 'image'))
+                  : composition === 'pixiedraw-project'
+                    ? formats.length !== 1 || formats[0] !== 'pixiedraw-project'
+                    : detectedEntries.some((entry) => !entry.format) || formats.length !== detectedSupportedFormats.size;
     if (compositionMismatch) {
       setStatus('販売パッケージ構成と含める形式が一致していません。構成を選び直してください。'); return;
     }
@@ -1064,19 +1590,22 @@
     if (tags.length > MAX_TAGS || tags.some((tag) => Array.from(tag).length > 24)) {
       setStatus('タグは最大5個、1個24文字以内で設定してください。'); return;
     }
-    const salePrice = integerValue($('listingPrice').value);
+    const salePrice = listingPolicy.priceYen;
     if (!Number.isInteger(salePrice) || salePrice < salePriceMinimum || salePrice > MAX_LISTING_PRICE_YEN || salePrice % PRICE_STEP_YEN !== 0) {
-      setStatus(`販売価格は${yen(salePriceMinimum)}以上、100円単位で設定してください。`); return;
+      setStatus(`${yen(Math.max(0, salePriceMinimum))}以上を100円単位で設定してください。`); return;
     }
     const purchasePrice = salePrice;
-    if (purchasePrice < MIN_LISTING_PRICE_YEN || purchasePrice % PRICE_STEP_YEN !== 0) {
-      setStatus('販売価格は500円以上、100円単位で設定してください。'); return;
+    if ((purchasePrice !== 0 && purchasePrice < 500) || purchasePrice % PRICE_STEP_YEN !== 0) {
+      setStatus('販売価格は500円以上を100円単位で設定してください。'); return;
     }
     if (purchasePrice > 99999999) {
       setStatus('購入者の支払額は99,999,999円以下にしてください。'); return;
     }
-    const limitedEnabled = $('listingLimitedEnabled').checked;
-    const limitedQuantity = integerValue($('listingLimitedQuantity').value);
+    const limitedEnabled = listingPolicy.limited.enabled;
+    const limitedQuantity = listingPolicy.limited.quantity;
+    if (limitedEnabled && purchasePrice === 0) {
+      setStatus('無料Assetでは限定販売を設定できません。限定販売を解除してください。'); return;
+    }
     if (limitedEnabled && (!Number.isInteger(limitedQuantity) || limitedQuantity < 1 || limitedQuantity > 100000)) {
       setStatus('限定販売の先着人数は1〜100,000名で設定してください。'); return;
     }
@@ -1111,6 +1640,7 @@
         excluded_media: detectedEntries.filter((entry) => !entry.format).map((entry) => ({ path: entry.path, media_kind: entry.mediaKind })),
         ai_usage_status: aiUsageStatus,
         legal_confirmation: { terms_version: MARKET_TERMS_VERSION, privacy_version: MARKET_PRIVACY_VERSION },
+        listing_policy: listingPolicy,
         listing_tags: tags,
         files: packageData.files,
         preview_selection: {
@@ -1119,7 +1649,8 @@
           public_preview_kind: 'baked-fixed-size-watermark',
           watermark_version: 'baked-v5'
         },
-        limited_sale: limitedEnabled ? { enabled: true, quantity: limitedQuantity, option_price_yen: 0, minimum_price_yen: 0 } : { enabled: false }
+        limited_sale: limitedEnabled ? { enabled: true, quantity: limitedQuantity, option_price_yen: 0, minimum_price_yen: 0 } : { enabled: false },
+        ...(deliveryManifest ? { delivery_manifest: deliveryManifest } : {})
       };
       setStatus('出品下書きを作成しています...');
       const rpcName = derivativeContext ? 'market_create_derivative_draft_v5' : 'market_create_root_asset_v8';
@@ -1144,7 +1675,7 @@
         input_title: $('listingTitle').value.trim(),
         input_description: $('listingDescription').value.trim(),
         input_sale_price_yen: sellerPriceForRpc,
-        input_derivative_sales_allowed: $('listingDerivativeAllowed').checked,
+        input_derivative_sales_allowed: listingPolicy.derivativeSalesAllowed,
         input_source_kind: 'external',
         input_source_sha256: packageData.sourceHash,
         input_asset_formats: formats,
@@ -1244,8 +1775,8 @@
       }
       if (attachError) throw attachError;
 
-      form.reset(); $('listingPrice').value = String(MIN_LISTING_PRICE_YEN); clearFiles(); selectedOptionIds.clear(); optionPrices.clear(); listingTagValues.length = 0; customOptions = []; limitedOptionPrice = 0;
-      renderTags(); renderOptions(); updateLimitedState(); uploadedPaths = [];
+      form.reset(); $('listingPrice').value = '0'; $('listingAcquisitionEnabled').checked = true; acquisitionMode = LISTING_MODES.ACQUIRE; usePreset = LISTING_USE_PRESETS.USE_IN_WORK; $('listingUsePreset').value = usePreset; clearFiles(); selectedOptionIds.clear(); optionPrices.clear(); listingTagValues.length = 0; customOptions = []; limitedOptionPrice = 0;
+      renderTags(); renderOptions(); syncSimplePolicyUi({ applyPreset: true }); updateLimitedState(); uploadedPaths = [];
       await deleteListingDraft();
       setStatus(aiUsageStatus === 'used' || derivativeContext
         ? '出品を審査へ送りました。確認後に公開されます。'
@@ -1275,8 +1806,9 @@
       optionCatalog = options || FALLBACK_OPTIONS; signedInUser = user;
       if (derivativeModeRequested) await loadDerivativeContext();
       listingDraftKey = `v1:${signedInUser.id}:${derivativeModeRequested ? `${sourceAssetId}:${derivativeLicenseId}` : 'root'}`;
-      await restoreListingDraft();
-      renderOptions(); renderOptionPriceFields(); updatePrice(); gate.textContent = '商品を作成して審査へ送れます。入力内容とファイルはこの端末に自動保存されます。'; setSubmissionEnabled(true);
+      if (projectTransferId) listingDraftLoaded = true;
+      else await restoreListingDraft();
+      renderOptions(); renderOptionPriceFields(); syncSimplePolicyUi({ applyPreset: !derivativeContext }); updatePrice(); gate.textContent = '商品を作成して審査へ送れます。入力内容とファイルはこの端末に自動保存されます。'; setSubmissionEnabled(true);
     } catch (error) {
       gate.textContent = `ファイルと価格の画面内確認は利用できますが、出品接続を開始できませんでした: ${error.message || '時間をおいて再試行してください'}`;
     }

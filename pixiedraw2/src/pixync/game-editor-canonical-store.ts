@@ -23,6 +23,7 @@ import {
   type Entity,
   type GameComponentState,
   type GameProject,
+  type GameTimelineAssetBinding,
   type GameTilemapDocument,
   type JournalCommand,
   type JournalState,
@@ -296,6 +297,19 @@ async function revisionId(
         left.eventId.localeCompare(right.eventId)
       ),
     }),
+    ...(record.gameData === undefined ? {} : {
+      gameData: {
+        items: [...record.gameData.items].sort((left, right) =>
+          left.itemId.localeCompare(right.itemId)
+        ),
+        recipes: [...record.gameData.recipes].sort((left, right) =>
+          left.recipeId.localeCompare(right.recipeId)
+        ),
+        blockTypes: [...record.gameData.blockTypes].sort((left, right) =>
+          left.blockTypeId.localeCompare(right.blockTypeId)
+        ),
+      },
+    }),
     ...(record.templateInstances === undefined ? {} : {
       templateInstances: [...record.templateInstances].sort((left, right) =>
         left.instanceId.localeCompare(right.instanceId)
@@ -387,9 +401,41 @@ async function projectFromRecord(
         }),
         ...(track.tilemap === undefined ? {} : { tilemap: track.tilemap }),
       })) as readonly CanonicalTimelineTrack[],
+      ...(record.bindings === undefined || record.bindings.length === 0
+        ? {}
+        : {
+          assetBindings: record.bindings.map((binding) => ({
+            trackId: binding.trackId,
+            kind: binding.kind,
+            assetId: asAssetId(binding.assetId),
+            revisionId: asAssetRevisionId(binding.revisionId),
+            contentHash: asSha256(binding.contentHash),
+            mode: binding.mode,
+            ...(binding.licenseId === undefined
+              ? {}
+              : { licenseId: binding.licenseId }),
+            ...(binding.rights === undefined
+              ? {}
+              : { rights: [...binding.rights] }),
+            ...(binding.sourceKind === undefined
+              ? {}
+              : { sourceKind: binding.sourceKind }),
+          })) satisfies readonly GameTimelineAssetBinding[],
+        }),
       ...(record.sceneRules === undefined ? {} : { sceneRules: record.sceneRules }),
       ...(record.eventCards === undefined ? {} : {
         eventCards: record.eventCards.map((card) => ({ ...card })),
+      }),
+      ...(record.gameData === undefined ? {} : {
+        items: record.gameData.items.map((item) => ({ ...item })),
+        recipes: record.gameData.recipes.map((recipe) => ({
+          ...recipe,
+          ingredients: recipe.ingredients.map((ingredient) => ({ ...ingredient })),
+          result: { ...recipe.result },
+        })),
+        blockTypes: record.gameData.blockTypes.map((blockType) => ({
+          ...blockType,
+        })),
       }),
       ...(record.templateInstances === undefined ? {} : {
         templateInstances: record.templateInstances.map((instance) => ({

@@ -19,5 +19,5 @@ the external UX reference; it is not a dependency or source to copy.
 For every row, audits report `PASS`, `FAIL`, or `UNTESTED`, with the exact Test name,
 target file, user operation, and performance measurement where applicable. `UNTESTED`
 must not be presented as parity. Additional PiXiEED behavior—Core identity, Asset
-Revision, offline Journal, realtime-safe events, Game/Audio bridges, and package
+Revision, offline Journal, realtime-safe events, internal Game/Audio adapters, and package
 provenance—is assessed separately and must not be reduced to Aseprite parity.

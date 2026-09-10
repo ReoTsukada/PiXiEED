@@ -558,3 +558,16 @@ Deno.test("PIXYNC-DRAW2-190-PUBLIC-API keeps transport internal and enables the 
     /readonly provider: PixyncTransportProvider/u,
   );
 });
+
+Deno.test("PIXYNC-DRAW2-190 keeps the native PiXiEED Bridge optional", async () => {
+  const compositionRoot = await Deno.readTextFile(
+    new URL("../../src/pixync/composition-root.ts", import.meta.url),
+  );
+  const bridgeProvider = await Deno.readTextFile(
+    new URL("../../src/pixync/bridge-provider.ts", import.meta.url),
+  );
+  assert.match(compositionRoot, /new PixyncSupabaseProvider/u);
+  assert.doesNotMatch(compositionRoot, /PixyncBridgeProvider/u);
+  assert.match(bridgeProvider, /wholly separate, standalone app\/product/u);
+  assert.match(bridgeProvider, /optional, off-by-default interoperability/u);
+});
