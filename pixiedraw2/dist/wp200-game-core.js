@@ -188,10 +188,10 @@ function validTransition(from, to) {
   };
   return transitions[from].includes(to);
 }
-function transitionBuild(record3, next) {
-  if (!validTransition(record3.lifecycle, next)) throw new Error(`Invalid Build lifecycle transition ${record3.lifecycle} -> ${next}.`);
+function transitionBuild(record5, next) {
+  if (!validTransition(record5.lifecycle, next)) throw new Error(`Invalid Build lifecycle transition ${record5.lifecycle} -> ${next}.`);
   return {
-    ...record3,
+    ...record5,
     lifecycle: next
   };
 }
@@ -280,13 +280,13 @@ async function createBuildRecord(request) {
 function canPromoteReady(evidence) {
   return Object.values(evidence).every((value) => value === true);
 }
-function attachVerifiedArtifact(record3, artifact, evidence) {
-  if (record3.lifecycle !== "VERIFYING") throw new Error("Only VERIFYING builds may produce a READY artifact.");
+function attachVerifiedArtifact(record5, artifact, evidence) {
+  if (record5.lifecycle !== "VERIFYING") throw new Error("Only VERIFYING builds may produce a READY artifact.");
   if (!canPromoteReady(evidence)) throw new Error("All Build verification evidence is required before READY.");
   if (artifact.verificationState !== "VERIFIED") throw new Error("Artifact verificationState must be VERIFIED.");
   if (!Number.isSafeInteger(artifact.byteLength) || artifact.byteLength < 0) throw new Error("Artifact byteLength must be a non-negative safe integer.");
   return {
-    ...record3,
+    ...record5,
     lifecycle: "READY",
     artifact
   };
@@ -1196,61 +1196,61 @@ async function createGameBuildRecord(request) {
     requestFingerprint
   };
 }
-function transitionGameBuild(record3, next) {
-  const base = transitionBuild(record3.base, next);
+function transitionGameBuild(record5, next) {
+  const base = transitionBuild(record5.base, next);
   return {
-    ...record3,
+    ...record5,
     base,
     lifecycle: base.lifecycle
   };
 }
-function createGameRuntimeArtifactManifest(record3, artifact, verificationState = "UNVERIFIED") {
-  if (record3.plan === void 0) throw new Error("Game Build Plan is required for an artifact manifest.");
+function createGameRuntimeArtifactManifest(record5, artifact, verificationState = "UNVERIFIED") {
+  if (record5.plan === void 0) throw new Error("Game Build Plan is required for an artifact manifest.");
   return {
     schemaVersion: 1,
     buildArtifactId: artifact.buildArtifactId,
-    projectId: record3.plan.projectId,
-    projectRevisionId: record3.plan.projectRevisionId,
-    packageId: record3.base.request.packageId,
-    packageVersion: record3.base.request.packageVersion,
-    dependencySnapshotHash: record3.base.request.dependencies.snapshotHash,
-    runtimeId: record3.base.request.runtime.runtimeId,
-    runtimeVersion: record3.base.request.runtime.runtimeVersion,
-    target: record3.base.request.target,
-    configurationVersion: record3.base.request.configuration.version,
-    projectSnapshotHash: record3.plan.projectSnapshotHash,
-    provenanceHash: record3.plan.provenanceHash,
+    projectId: record5.plan.projectId,
+    projectRevisionId: record5.plan.projectRevisionId,
+    packageId: record5.base.request.packageId,
+    packageVersion: record5.base.request.packageVersion,
+    dependencySnapshotHash: record5.base.request.dependencies.snapshotHash,
+    runtimeId: record5.base.request.runtime.runtimeId,
+    runtimeVersion: record5.base.request.runtime.runtimeVersion,
+    target: record5.base.request.target,
+    configurationVersion: record5.base.request.configuration.version,
+    projectSnapshotHash: record5.plan.projectSnapshotHash,
+    provenanceHash: record5.plan.provenanceHash,
     artifactHash: artifact.artifactHash,
     verificationState
   };
 }
-function attachVerifiedGameArtifact(record3, artifact, evidence) {
-  const base = attachVerifiedArtifact(record3.base, artifact, evidence);
-  const manifest = createGameRuntimeArtifactManifest(record3, artifact, "VERIFIED");
+function attachVerifiedGameArtifact(record5, artifact, evidence) {
+  const base = attachVerifiedArtifact(record5.base, artifact, evidence);
+  const manifest = createGameRuntimeArtifactManifest(record5, artifact, "VERIFIED");
   return {
-    ...record3,
+    ...record5,
     base,
     lifecycle: "READY",
     artifact: manifest,
-    diagnostics: record3.diagnostics
+    diagnostics: record5.diagnostics
   };
 }
-function recoverGameBuild(record3) {
-  if (record3.lifecycle === "READY") return {
+function recoverGameBuild(record5) {
+  if (record5.lifecycle === "READY") return {
     recovered: false,
-    record: record3,
+    record: record5,
     diagnostics: [
       diagnostic3("BUILD_INVALID_REQUEST", "A READY artifact is immutable and does not need recovery.", true)
     ],
     retryAllowed: false
   };
-  if (record3.lifecycle === "FAILED" || record3.lifecycle === "CANCELLED" || record3.lifecycle === "QUARANTINED") {
+  if (record5.lifecycle === "FAILED" || record5.lifecycle === "CANCELLED" || record5.lifecycle === "QUARANTINED") {
     return {
       recovered: true,
       record: {
-        ...record3,
+        ...record5,
         diagnostics: [
-          ...record3.diagnostics,
+          ...record5.diagnostics,
           diagnostic3("BUILD_CANCELLED", "Build remains recoverable as a failed record; retry requires a new idempotent request.", true)
         ]
       },
@@ -1260,7 +1260,7 @@ function recoverGameBuild(record3) {
   }
   return {
     recovered: false,
-    record: record3,
+    record: record5,
     diagnostics: [
       diagnostic3("BUILD_INVALID_REQUEST", "Only failed, cancelled, or quarantined Builds can enter recovery.", true)
     ],
@@ -1458,17 +1458,3906 @@ function admitIGameExternalBuild(request) {
   }
 }
 
+// src/game/game-350/igame-public-bootstrap.ts
+var IGAME_PUBLIC_BOOTSTRAP_SCHEMA = "pixieed-igame-player-bootstrap/v1";
+var SHA2562 = /^[a-f0-9]{64}$/u;
+var STABLE_ID2 = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$/u;
+function record(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+function safeId(value) {
+  return typeof value === "string" && STABLE_ID2.test(value);
+}
+function safeUrl(value) {
+  if (typeof value !== "string" || value.length > 2048) return false;
+  try {
+    const url = new URL(value);
+    const localHttp = url.protocol === "http:" && (url.hostname === "localhost" || url.hostname === "127.0.0.1");
+    return url.protocol === "https:" || localHttp;
+  } catch {
+    return false;
+  }
+}
+function parseIGamePublicBootstrap(value, principalId) {
+  const candidate = record(value);
+  if (candidate.schema !== IGAME_PUBLIC_BOOTSTRAP_SCHEMA) {
+    throw new Error("iGAME\u516C\u958BBootstrap\u306E\u30B9\u30AD\u30FC\u30DE\u304C\u5BFE\u5FDC\u3057\u3066\u3044\u307E\u305B\u3093\u3002");
+  }
+  if (!safeId(principalId)) throw new Error("iGAME\u516C\u958BBootstrap\u306E\u5229\u7528\u8005ID\u304C\u4E0D\u6B63\u3067\u3059\u3002");
+  const product = record(candidate.product);
+  const revision = record(candidate.revision);
+  const packageInfo = record(candidate.package);
+  const productId = product.id;
+  const revisionId = revision.id;
+  const packageHash = revision.package_hash;
+  const packageBytesHash = packageInfo.sha256;
+  const revisionNumber = typeof revision.number === "number" ? revision.number : NaN;
+  const expiresIn = typeof packageInfo.expires_in === "number" ? packageInfo.expires_in : NaN;
+  if (!safeId(productId) || typeof product.title !== "string" || product.title.trim().length === 0 || !safeId(revisionId) || !Number.isSafeInteger(revisionNumber) || revisionNumber < 1 || !SHA2562.test(String(packageHash)) || !SHA2562.test(String(packageBytesHash)) || !safeUrl(packageInfo.url) || typeof packageInfo.mime_type !== "string" || packageInfo.mime_type.length > 256 || !Number.isSafeInteger(expiresIn) || expiresIn < 1 || expiresIn > 300) {
+    throw new Error("iGAME\u516C\u958BBootstrap\u306ERevision\u307E\u305F\u306FPackage\u60C5\u5831\u304C\u4E0D\u6B63\u3067\u3059\u3002");
+  }
+  const manifest = createIGamePlayerManifest(record(candidate.manifest));
+  if (manifest.productId !== productId || manifest.revisionId !== revisionId) {
+    throw new Error("iGAME\u516C\u958BBootstrap\u306E\u5546\u54C1\u3068Revision\u304C\u4E00\u81F4\u3057\u307E\u305B\u3093\u3002");
+  }
+  const proof = requireAuthorizationProofV1(candidate.proof, {
+    principalId,
+    resourceType: "igame-product",
+    resourceId: manifest.productId,
+    action: "play",
+    capability: "game.play",
+    tenantId: manifest.tenantId
+  });
+  if (proof.expiresAt !== void 0 && Date.parse(proof.expiresAt) <= Date.now()) {
+    throw new Error("iGAME\u516C\u958BBootstrap\u306E\u30D7\u30EC\u30A4\u6A29\u9650\u304C\u671F\u9650\u5207\u308C\u3067\u3059\u3002");
+  }
+  return Object.freeze({
+    schema: IGAME_PUBLIC_BOOTSTRAP_SCHEMA,
+    product: {
+      id: productId,
+      title: product.title.trim()
+    },
+    revision: {
+      id: revisionId,
+      number: revisionNumber,
+      content_hash: typeof revision.content_hash === "string" ? revision.content_hash : null,
+      package_hash: String(packageHash)
+    },
+    manifest,
+    package: {
+      url: packageInfo.url,
+      sha256: String(packageBytesHash),
+      mime_type: packageInfo.mime_type,
+      expires_in: expiresIn
+    },
+    proof
+  });
+}
+async function sha256BytesHex(bytes) {
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new Uint8Array(bytes).buffer));
+  return Array.from(digest, (value) => value.toString(16).padStart(2, "0")).join("");
+}
+async function fetchIGamePublicPackage(bootstrap, fetcher = fetch) {
+  const response = await fetcher(bootstrap.package.url, {
+    method: "GET",
+    credentials: "omit",
+    cache: "no-store"
+  });
+  if (!response.ok) throw new Error(`iGAME Package\u306E\u53D6\u5F97\u306B\u5931\u6557\u3057\u307E\u3057\u305F (${response.status})\u3002`);
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  if (await sha256BytesHex(bytes) !== bootstrap.package.sha256) {
+    throw new Error("iGAME Package\u306EHash\u304C\u4E00\u81F4\u3057\u307E\u305B\u3093\u3002");
+  }
+  return bytes;
+}
+
+// src/draw2-core.ts
+var NullInstrumentation = class {
+  record(_point) {
+  }
+};
+var NOOP_INSTRUMENTATION = new NullInstrumentation();
+function stableValue(value) {
+  if (value instanceof Uint8Array) {
+    return {
+      __type: "Uint8Array",
+      values: Array.from(value)
+    };
+  }
+  if (value instanceof Map) {
+    return Array.from(value.entries()).sort(([left], [right]) => String(left).localeCompare(String(right))).map(([key, entry]) => [
+      key,
+      stableValue(entry)
+    ]);
+  }
+  if (Array.isArray(value)) return value.map((entry) => stableValue(entry));
+  if (value !== null && typeof value === "object") {
+    const object = value;
+    return Object.fromEntries(Object.keys(object).filter((key) => object[key] !== void 0).sort().map((key) => [
+      key,
+      stableValue(object[key])
+    ]));
+  }
+  return value;
+}
+function canonicalJson2(value) {
+  return JSON.stringify(stableValue(value)) ?? "null";
+}
+var IndexedTileRaster = class _IndexedTileRaster {
+  width;
+  height;
+  tileSize;
+  #tiles;
+  #nonTransparentPixelCount;
+  #cowSplitCount = 0;
+  #copiedBytes = 0;
+  constructor(width, height, tileSize, tiles, nonTransparentPixelCount = 0) {
+    this.width = width;
+    this.height = height;
+    this.tileSize = tileSize;
+    this.#tiles = tiles;
+    this.#nonTransparentPixelCount = nonTransparentPixelCount;
+  }
+  static empty(width, height, tileSize) {
+    if (!Number.isSafeInteger(width) || width < 1 || !Number.isSafeInteger(height) || height < 1) {
+      throw new Error("Raster dimensions must be positive safe integers.");
+    }
+    return new _IndexedTileRaster(width, height, tileSize, /* @__PURE__ */ new Map());
+  }
+  /** Rehydrates a sparse raster from its canonical tile snapshots. */
+  static fromTileSnapshots(width, height, tileSize, snapshots) {
+    const raster = _IndexedTileRaster.empty(width, height, tileSize);
+    const tiles = /* @__PURE__ */ new Map();
+    const expectedByteLength = tileSize * tileSize;
+    const tileColumns = Math.ceil(width / tileSize);
+    const tileRows = Math.ceil(height / tileSize);
+    let nonTransparentPixelCount = 0;
+    for (const snapshot of snapshots) {
+      if (!/^\d+:\d+$/.test(snapshot.tileKey)) {
+        throw new Error("Raster tile key is invalid.");
+      }
+      const [tileXText, tileYText] = snapshot.tileKey.split(":");
+      const tileX = Number(tileXText);
+      const tileY = Number(tileYText);
+      if (!Number.isSafeInteger(tileX) || !Number.isSafeInteger(tileY) || tileX < 0 || tileY < 0 || tileX >= tileColumns || tileY >= tileRows) {
+        throw new Error("Raster tile key is outside the raster.");
+      }
+      if (!(snapshot.bytes instanceof Uint8Array) || snapshot.bytes.byteLength !== expectedByteLength) {
+        throw new Error("Raster tile byte length is invalid.");
+      }
+      for (const value of snapshot.bytes) {
+        if (value !== 0) nonTransparentPixelCount += 1;
+      }
+      if (tiles.has(snapshot.tileKey)) {
+        throw new Error("Raster tile key is duplicated.");
+      }
+      tiles.set(snapshot.tileKey, {
+        bytes: new Uint8Array(snapshot.bytes),
+        references: 1
+      });
+    }
+    return new _IndexedTileRaster(raster.width, raster.height, raster.tileSize, tiles, nonTransparentPixelCount);
+  }
+  /** Shares immutable Tile buffers; the next mutation splits only its affected Tile. */
+  sharedClone() {
+    const tiles = /* @__PURE__ */ new Map();
+    for (const [key, cell] of this.#tiles) {
+      cell.references += 1;
+      tiles.set(key, cell);
+    }
+    return new _IndexedTileRaster(this.width, this.height, this.tileSize, tiles, this.#nonTransparentPixelCount);
+  }
+  #tileCoordinates(x, y) {
+    const tileX = Math.floor(x / this.tileSize);
+    const tileY = Math.floor(y / this.tileSize);
+    const localX = x % this.tileSize;
+    const localY = y % this.tileSize;
+    return {
+      tileX,
+      tileY,
+      localIndex: localY * this.tileSize + localX,
+      tileKey: `${tileX}:${tileY}`
+    };
+  }
+  getPixel(x, y) {
+    if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0 || x >= this.width || y >= this.height) {
+      throw new Error("Pixel coordinate is outside the raster.");
+    }
+    const coordinates = this.#tileCoordinates(x, y);
+    return this.#tiles.get(coordinates.tileKey)?.bytes[coordinates.localIndex] ?? 0;
+  }
+  /** Returns whether the raster contains any non-transparent indexed pixel. */
+  hasNonTransparentPixel() {
+    return this.#nonTransparentPixelCount > 0;
+  }
+  setPixel(assetId, x, y, colorIndex) {
+    if (!Number.isInteger(colorIndex) || colorIndex < 0 || colorIndex > 255) {
+      throw new Error("Canonical palette index must be an integer from 0 through 255.");
+    }
+    if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0 || x >= this.width || y >= this.height) {
+      throw new Error("Pixel coordinate is outside the raster.");
+    }
+    const coordinates = this.#tileCoordinates(x, y);
+    let cell = this.#tiles.get(coordinates.tileKey);
+    const previous = cell?.bytes[coordinates.localIndex] ?? 0;
+    const tile = {
+      assetId,
+      tileX: coordinates.tileX,
+      tileY: coordinates.tileY,
+      tileKey: coordinates.tileKey
+    };
+    if (previous === colorIndex) {
+      return {
+        changed: false,
+        tile,
+        copiedBytes: 0,
+        cowSplit: false
+      };
+    }
+    let copiedBytes = 0;
+    let cowSplit = false;
+    if (cell === void 0) {
+      cell = {
+        bytes: new Uint8Array(this.tileSize * this.tileSize),
+        references: 1
+      };
+      this.#tiles.set(coordinates.tileKey, cell);
+    } else if (cell.references > 1) {
+      cell.references -= 1;
+      cell = {
+        bytes: new Uint8Array(cell.bytes),
+        references: 1
+      };
+      this.#tiles.set(coordinates.tileKey, cell);
+      copiedBytes = cell.bytes.byteLength;
+      cowSplit = true;
+      this.#cowSplitCount += 1;
+      this.#copiedBytes += copiedBytes;
+    }
+    cell.bytes[coordinates.localIndex] = colorIndex;
+    if (previous === 0 && colorIndex !== 0) {
+      this.#nonTransparentPixelCount += 1;
+    } else if (previous !== 0 && colorIndex === 0) {
+      this.#nonTransparentPixelCount -= 1;
+    }
+    return {
+      changed: true,
+      tile,
+      copiedBytes,
+      cowSplit
+    };
+  }
+  snapshotTiles() {
+    return Array.from(this.#tiles.entries()).sort(([left], [right]) => left.localeCompare(right)).map(([tileKey, cell]) => ({
+      tileKey,
+      bytes: new Uint8Array(cell.bytes)
+    }));
+  }
+  /** Full canonical read is reserved for Golden Fixture equivalence, not active dirty rendering. */
+  toUint8Array() {
+    const pixels = new Uint8Array(this.width * this.height);
+    for (let y = 0; y < this.height; y += 1) {
+      for (let x = 0; x < this.width; x += 1) {
+        pixels[y * this.width + x] = this.getPixel(x, y);
+      }
+    }
+    return pixels;
+  }
+  /** Reads only the requested presentation region; active editing must not call toUint8Array(). */
+  readRegion(x, y, width, height) {
+    if (!Number.isSafeInteger(x) || !Number.isSafeInteger(y) || !Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width < 1 || height < 1 || x < 0 || y < 0 || x + width > this.width || y + height > this.height) {
+      throw new Error("Raster region is outside the raster.");
+    }
+    const pixels = new Uint8Array(width * height);
+    let implicitTransparentPixelCount = 0;
+    for (let regionY = 0; regionY < height; regionY += 1) {
+      for (let regionX = 0; regionX < width; regionX += 1) {
+        const sourceX = x + regionX;
+        const sourceY = y + regionY;
+        const coordinates = this.#tileCoordinates(sourceX, sourceY);
+        const cell = this.#tiles.get(coordinates.tileKey);
+        if (cell === void 0) implicitTransparentPixelCount += 1;
+        pixels[regionY * width + regionX] = cell?.bytes[coordinates.localIndex] ?? 0;
+      }
+    }
+    return {
+      x,
+      y,
+      width,
+      height,
+      pixels,
+      implicitTransparentPixelCount
+    };
+  }
+  memoryMetrics() {
+    let sharedTileBytes = 0;
+    for (const cell of this.#tiles.values()) {
+      if (cell.references > 1) sharedTileBytes += cell.bytes.byteLength;
+    }
+    const tileColumns = Math.ceil(this.width / this.tileSize);
+    const tileRows = Math.ceil(this.height / this.tileSize);
+    return {
+      logicalRasterBytes: this.width * this.height,
+      allocatedTileBytes: this.#tiles.size * this.tileSize * this.tileSize,
+      sharedTileBytes,
+      tileCount: this.#tiles.size,
+      implicitTransparentTileCount: tileColumns * tileRows - this.#tiles.size,
+      cowSplitCount: this.#cowSplitCount,
+      copiedBytes: this.#copiedBytes
+    };
+  }
+};
+function validatePalette(palette) {
+  if (palette.length < 1 || palette.length > 256) {
+    throw new Error("Palette must contain 1 through 256 entries.");
+  }
+  if (palette[0] !== 0) throw new Error("Palette index 0 must be transparent.");
+  for (const color of palette) {
+    if (!Number.isSafeInteger(color) || color < 0 || color > 4294967295) {
+      throw new Error("Palette colors must be uint32 values.");
+    }
+  }
+  return [
+    ...palette
+  ];
+}
+function createProject(options) {
+  if (!options.projectId) throw new Error("Project ID is required.");
+  const width = options.width ?? 256;
+  const height = options.height ?? 256;
+  const palette = validatePalette(options.palette ?? [
+    0,
+    4294967295,
+    4278190335,
+    65535
+  ]);
+  const assetId = `${options.projectId}:draw:main`;
+  const asset = {
+    id: assetId,
+    width,
+    height,
+    palette,
+    raster: IndexedTileRaster.empty(width, height, options.tileSize ?? 32),
+    revision: 0
+  };
+  const layerId = `${options.projectId}:layer:0`;
+  const frameId = `${options.projectId}:frame:0`;
+  const celId = `${options.projectId}:cel:0:0`;
+  return {
+    schemaVersion: 1,
+    projectId: options.projectId,
+    name: options.name ?? "Untitled Draw2 Project",
+    structureEpoch: 1,
+    activeAssetId: assetId,
+    layers: [
+      {
+        id: layerId,
+        layerTrackId: layerId,
+        name: "Layer 1",
+        order: 0,
+        orderingKey: "00000000",
+        visible: true,
+        opacity: 1,
+        blendMode: "NORMAL",
+        locked: false,
+        lifecycle: "ACTIVE",
+        kind: "RASTER"
+      }
+    ],
+    frames: [
+      {
+        id: frameId,
+        frameId,
+        index: 0,
+        orderKey: "00000000",
+        durationMs: 100,
+        timingUnit: "MILLISECONDS",
+        metadataVersion: 1
+      }
+    ],
+    cels: [
+      {
+        id: celId,
+        celId,
+        layerId,
+        layerTrackId: layerId,
+        frameId,
+        assetId,
+        bindingMode: "RASTER",
+        recordVersion: 1,
+        lifecycle: "ACTIVE"
+      }
+    ],
+    timeline: {
+      id: `${options.projectId}:timeline:0`,
+      timelineId: `${options.projectId}:timeline:0`,
+      frameOrder: [
+        frameId
+      ],
+      layerTrackOrder: [
+        layerId
+      ],
+      metadataVersion: 1
+    },
+    activeLayerId: layerId,
+    activeFrameId: frameId,
+    activeCelId: celId,
+    assets: {
+      [assetId]: asset
+    },
+    tilemaps: {},
+    appliedCommandIds: [],
+    lastClientSequenceByClient: {}
+  };
+}
+
+// src/draw2-creator-workspace.ts
+function isAssetSourceKind(value) {
+  return [
+    "LAYER_GROUP",
+    "SELECTED_LAYERS",
+    "VISIBLE_COMPOSITE",
+    "ANIMATION_RANGE"
+  ].includes(value);
+}
+function isCreatorAssetKind(value) {
+  return [
+    "CHARACTER",
+    "OBJECT",
+    "TILE",
+    "BACKGROUND",
+    "EFFECT"
+  ].includes(value);
+}
+function isAssetAnimationName(value) {
+  return value.trim().length > 0 && value.length <= 128;
+}
+function isAssetPivot(value) {
+  return [
+    "CENTER",
+    "FEET",
+    "CUSTOM"
+  ].includes(value);
+}
+function normalizeReferences(values) {
+  return [
+    ...new Set((values ?? []).map((value) => value.trim()).filter((value) => value.length > 0))
+  ].sort();
+}
+function normalizeOrderedReferences(values) {
+  const seen = /* @__PURE__ */ new Set();
+  const normalized = [];
+  for (const value of values) {
+    const trimmed = value.trim();
+    if (trimmed.length === 0 || seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    normalized.push(trimmed);
+  }
+  return normalized;
+}
+var LEGACY_DIRECTION_SUFFIXES = [
+  "UP",
+  "DOWN",
+  "LEFT",
+  "RIGHT",
+  "UP_LEFT",
+  "UP_RIGHT",
+  "DOWN_LEFT",
+  "DOWN_RIGHT"
+];
+function assetAnimationMotionName(clip) {
+  const explicit = clip.motionName?.trim();
+  if (explicit !== void 0 && explicit.length > 0) return explicit;
+  const custom = clip.customName?.trim();
+  if (clip.name === "CUSTOM" && custom !== void 0 && custom.length > 0) return custom;
+  const separator = clip.name.lastIndexOf("_");
+  const suffix = separator > 0 ? clip.name.slice(separator + 1) : "";
+  return LEGACY_DIRECTION_SUFFIXES.includes(suffix) ? clip.name.slice(0, separator) : clip.name;
+}
+function assetAnimationDirectionName(clip) {
+  const explicit = clip.direction?.trim();
+  if (explicit !== void 0 && explicit.length > 0) return explicit;
+  const separator = clip.name.lastIndexOf("_");
+  const suffix = separator > 0 ? clip.name.slice(separator + 1) : "";
+  return LEGACY_DIRECTION_SUFFIXES.includes(suffix) ? suffix : void 0;
+}
+function assetAnimationClipKey(clip) {
+  return `${assetAnimationMotionName(clip)}::${assetAnimationDirectionName(clip) ?? "DEFAULT"}`;
+}
+function isPositiveInteger(value) {
+  return Number.isSafeInteger(value) && value > 0;
+}
+function isFiniteInteger(value) {
+  return Number.isSafeInteger(value);
+}
+function isValidLayerSelection(selection) {
+  if (selection.kind === "CURRENT_LAYER") return selection.layerId.trim().length > 0;
+  if (selection.kind === "LAYER_GROUP") return selection.groupId.trim().length > 0;
+  if (selection.kind === "SELECTED_LAYERS") return normalizeReferences(selection.layerIds).length > 0;
+  return selection.kind === "VISIBLE_LAYERS";
+}
+function isValidFrameSelection(selection) {
+  if (selection.kind === "CURRENT_FRAME") return selection.frameId.trim().length > 0;
+  if (selection.kind === "RANGE") return selection.startFrameId.trim().length > 0 && selection.endFrameId.trim().length > 0;
+  if (selection.kind === "TAG") return selection.tagId.trim().length > 0;
+  return selection.frameIds.length > 0 && normalizeReferences(selection.frameIds).length === selection.frameIds.length;
+}
+function isValidRegionSelection(region) {
+  if (region.kind === "FULL_CANVAS") return true;
+  if (![
+    region.x,
+    region.y
+  ].every(isFiniteInteger) || region.x < 0 || region.y < 0) return false;
+  if (region.kind === "MANUAL") return isPositiveInteger(region.width) && isPositiveInteger(region.height);
+  if (region.kind === "GRID") return (region.cellSize === 16 || region.cellSize === 32) && isPositiveInteger(region.columns) && isPositiveInteger(region.rows);
+  return isPositiveInteger(region.cellWidth) && isPositiveInteger(region.cellHeight) && isPositiveInteger(region.columns) && isPositiveInteger(region.rows);
+}
+function isValidRasterSnapshot(snapshot) {
+  if (!isPositiveInteger(snapshot.width) || !isPositiveInteger(snapshot.height) || !Array.isArray(snapshot.data) || snapshot.data.length !== snapshot.width * snapshot.height * 4) return false;
+  return snapshot.data.every((value) => Number.isSafeInteger(value) && value >= 0 && value <= 255);
+}
+function isValidAnimationMapping(mapping) {
+  const seenKeys = /* @__PURE__ */ new Set();
+  return mapping.every((clip) => {
+    const motionName = assetAnimationMotionName(clip).trim();
+    const direction = assetAnimationDirectionName(clip);
+    const key = assetAnimationClipKey(clip);
+    const hasSourceFrames = clip.sourceFrames !== void 0;
+    const normalizedFrameIds = clip.frameIds.map((frameId) => frameId.trim()).filter((frameId) => frameId.length > 0);
+    if (!isAssetAnimationName(clip.name) || motionName.length === 0 || seenKeys.has(key) || clip.frameIds.length === 0 || normalizedFrameIds.length !== clip.frameIds.length || !hasSourceFrames && normalizeOrderedReferences(clip.frameIds).length !== clip.frameIds.length) return false;
+    seenKeys.add(key);
+    if (clip.name === "CUSTOM" && (clip.customName ?? "").trim().length === 0) return false;
+    if (clip.motionName !== void 0 && clip.motionName.trim().length === 0) return false;
+    if (direction !== void 0 && direction.trim().length === 0) return false;
+    if (clip.sourceReference !== void 0 && clip.sourceReference.trim().length === 0) return false;
+    if (clip.flipX !== void 0 && typeof clip.flipX !== "boolean") return false;
+    if (clip.flipY !== void 0 && typeof clip.flipY !== "boolean") return false;
+    if (clip.sourceFrames !== void 0 && (clip.sourceFrames.length !== clip.frameIds.length || clip.sourceFrames.some((frame) => frame.sourceFrameId.trim().length === 0 || normalizeReferences(frame.layerIds).length === 0 || !Number.isSafeInteger(frame.rect.x) || !Number.isSafeInteger(frame.rect.y) || frame.rect.x < 0 || frame.rect.y < 0 || !isPositiveInteger(frame.rect.width) || !isPositiveInteger(frame.rect.height) || frame.rasterSnapshot !== void 0 && !isValidRasterSnapshot(frame.rasterSnapshot) || frame.durationMs !== void 0 && (!Number.isFinite(frame.durationMs) || frame.durationMs <= 0) || frame.flipX !== void 0 && typeof frame.flipX !== "boolean" || frame.flipY !== void 0 && typeof frame.flipY !== "boolean"))) return false;
+    if (clip.frameDurationsMs !== void 0 && (clip.frameDurationsMs.length !== clip.frameIds.length || clip.frameDurationsMs.some((duration) => !Number.isFinite(duration) || duration <= 0))) return false;
+    return [
+      "LOOP",
+      "ONCE",
+      "PING_PONG"
+    ].includes(clip.loopMode) && (clip.fps === void 0 || Number.isFinite(clip.fps) && clip.fps > 0);
+  });
+}
+function isValidPivotDefinition(pivot) {
+  return pivot.kind !== "CUSTOM" || [
+    pivot.x,
+    pivot.y
+  ].every(Number.isFinite);
+}
+function isValidProtection(protection) {
+  return typeof protection.locked === "boolean" && protection.sourceReadOnly === true && [
+    "LIVE",
+    "PINNED",
+    "REVIEW",
+    "FORKED"
+  ].includes(protection.referencePolicy);
+}
+function isValidDefinition(definition) {
+  const validFrames = isPositiveInteger(definition.frameStart) && isPositiveInteger(definition.frameEnd) && definition.frameEnd >= definition.frameStart;
+  return definition.sourceProjectId.length > 0 && definition.sourceProjectId === definition.sourceProjectId.trim() && definition.sourceCanvasId.length > 0 && definition.sourceCanvasId === definition.sourceCanvasId.trim() && validFrames && isAssetSourceKind(definition.sourceKind) && isCreatorAssetKind(definition.assetKind) && isAssetPivot(definition.pivot) && isValidLayerSelection(definition.layerSelection) && isValidFrameSelection(definition.frameSelection) && isValidRegionSelection(definition.region) && isValidAnimationMapping(definition.animationMapping) && isValidPivotDefinition(definition.pivotDefinition) && isValidProtection(definition.protection) && definition.metadata.name.length > 0;
+}
+function validateAssetDefinitionDraft(draft) {
+  if (draft.persistence !== "LOCAL_DRAFT" || !isValidDefinition(draft)) {
+    return {
+      ok: false,
+      code: "INVALID_ASSET_DEFINITION",
+      message: "Asset\u5B9A\u7FA9\u306E\u53C2\u7167\u3001\u7BC4\u56F2\u3001\u30E1\u30BF\u30C7\u30FC\u30BF\u3001\u4FDD\u8B77\u8A2D\u5B9A\u3092\u78BA\u8A8D\u3057\u3066\u304F\u3060\u3055\u3044\u3002"
+    };
+  }
+  return {
+    ok: true,
+    value: {
+      ...draft,
+      persistence: "VALIDATED_DEFINITION"
+    }
+  };
+}
+
+// src/draw2-creator-features.ts
+var CREATOR_FEATURE_SCHEMA_VERSION = 1;
+function boundedInteger(value, min, max, fallback) {
+  return Number.isSafeInteger(value) ? Math.max(min, Math.min(max, value)) : fallback;
+}
+function boundedNumber(value, min, max, fallback) {
+  return Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback;
+}
+function stableId2(value, kind) {
+  if (!/^[A-Za-z0-9:_./-]{1,128}$/.test(value)) {
+    throw new Error(`${kind} must be a bounded stable identifier.`);
+  }
+  return value;
+}
+var AnimationTagStore = class {
+  #tags = /* @__PURE__ */ new Map();
+  upsert(tag, frameCount) {
+    const errors = validateAnimationTag(tag, frameCount);
+    if (errors.length > 0) throw new Error(errors.join(","));
+    const normalized = {
+      ...tag,
+      id: stableId2(tag.id, "Animation tag ID"),
+      name: tag.name.trim().slice(0, 64)
+    };
+    this.#tags.set(normalized.id, normalized);
+    return normalized;
+  }
+  remove(id) {
+    return this.#tags.delete(id);
+  }
+  get(id) {
+    return this.#tags.get(id);
+  }
+  list() {
+    return [
+      ...this.#tags.values()
+    ].sort((a, b) => a.fromFrameIndex - b.fromFrameIndex || a.id.localeCompare(b.id));
+  }
+};
+function validateAnimationTag(tag, frameCount) {
+  const errors = [];
+  if (!tag.id.trim() || !tag.name.trim()) {
+    errors.push("TAG_ID_OR_NAME_REQUIRED");
+  }
+  if (!Number.isSafeInteger(tag.fromFrameIndex) || !Number.isSafeInteger(tag.toFrameIndex) || tag.fromFrameIndex < 0 || tag.toFrameIndex < tag.fromFrameIndex || tag.toFrameIndex >= frameCount) errors.push("TAG_FRAME_RANGE_INVALID");
+  if (tag.color !== void 0 && (!Number.isSafeInteger(tag.color) || tag.color < 0 || tag.color > 4294967295)) errors.push("TAG_COLOR_INVALID");
+  return errors;
+}
+var TimelineMarkerStore = class {
+  #markers = /* @__PURE__ */ new Map();
+  upsert(marker) {
+    if (!marker.id.trim() || !marker.label.trim() || !Number.isSafeInteger(marker.frameIndex) || marker.frameIndex < 0 || ![
+      "AUDIO",
+      "GAME_EVENT",
+      "NOTE"
+    ].includes(marker.kind)) throw new Error("Timeline marker is invalid.");
+    const normalized = {
+      ...marker,
+      id: stableId2(marker.id, "Timeline marker ID"),
+      label: marker.label.trim().slice(0, 128),
+      payload: marker.payload === void 0 ? void 0 : {
+        ...marker.payload
+      }
+    };
+    this.#markers.set(normalized.id, normalized);
+    return normalized;
+  }
+  remove(id) {
+    return this.#markers.delete(id);
+  }
+  list(frameIndex) {
+    return [
+      ...this.#markers.values()
+    ].filter((marker) => frameIndex === void 0 || marker.frameIndex === frameIndex).sort((a, b) => a.frameIndex - b.frameIndex || a.id.localeCompare(b.id));
+  }
+};
+var DrawAudioReferenceStore = class {
+  #references = /* @__PURE__ */ new Map();
+  upsert(reference, frameCount) {
+    if (!Number.isSafeInteger(frameCount) || frameCount < 1) {
+      throw new Error("Draw Audio reference requires a valid frame count.");
+    }
+    const normalized = {
+      id: stableId2(reference.id, "Draw Audio reference ID"),
+      audioAssetId: stableId2(reference.audioAssetId, "Audio Asset ID"),
+      audioRevisionId: stableId2(reference.audioRevisionId, "Audio Revision ID"),
+      kind: reference.kind === "SE" ? "SE" : "BGM",
+      label: reference.label.trim().slice(0, 128) || reference.kind,
+      startFrame: boundedInteger(reference.startFrame, 0, frameCount - 1, 0),
+      durationFrames: boundedInteger(reference.durationFrames, 1, frameCount, reference.kind === "SE" ? 1 : frameCount),
+      loop: reference.kind === "BGM" && reference.loop === true,
+      gain: boundedNumber(reference.gain, 0, 2, 1)
+    };
+    this.#references.set(normalized.id, normalized);
+    return normalized;
+  }
+  remove(id) {
+    return this.#references.delete(id);
+  }
+  list() {
+    return [
+      ...this.#references.values()
+    ].sort((left, right) => left.startFrame - right.startFrame || left.id.localeCompare(right.id));
+  }
+};
+var MAX_SELECTION_STAMP_DIMENSION = 4096;
+var MAX_SELECTION_STAMP_AREA = 1048576;
+function normalizeDraw2SelectionStamp(input) {
+  if (typeof input.id !== "string" || typeof input.name !== "string" || !Array.isArray(input.pixels) || !Array.isArray(input.palette)) {
+    throw new Error("Draw2 selection stamp shape is invalid.");
+  }
+  if (!Number.isSafeInteger(input.width) || !Number.isSafeInteger(input.height) || input.width < 1 || input.height < 1 || input.width > MAX_SELECTION_STAMP_DIMENSION || input.height > MAX_SELECTION_STAMP_DIMENSION || input.width * input.height > MAX_SELECTION_STAMP_AREA) {
+    throw new Error("Draw2 selection stamp dimensions are invalid.");
+  }
+  if (input.palette.length < 1 || input.palette.length > 256) {
+    throw new Error("Draw2 selection stamp palette is invalid.");
+  }
+  const palette = input.palette.map((color) => {
+    if (!Number.isSafeInteger(color) || color < 0 || color > 4294967295) throw new Error("Draw2 selection stamp palette color is invalid.");
+    return color >>> 0;
+  });
+  const pixels = /* @__PURE__ */ new Map();
+  for (const candidate of input.pixels) {
+    if (candidate === null || typeof candidate !== "object" || !Number.isSafeInteger(candidate.x) || !Number.isSafeInteger(candidate.y) || !Number.isSafeInteger(candidate.colorIndex) || candidate.x < 0 || candidate.y < 0 || candidate.x >= input.width || candidate.y >= input.height || candidate.colorIndex < 0 || candidate.colorIndex >= palette.length) {
+      throw new Error("Draw2 selection stamp pixel is invalid.");
+    }
+    pixels.set(`${candidate.x}:${candidate.y}`, {
+      x: candidate.x,
+      y: candidate.y,
+      colorIndex: candidate.colorIndex
+    });
+  }
+  return {
+    id: stableId2(input.id, "Draw2 selection stamp ID"),
+    name: input.name.trim().slice(0, 64) || "Selection stamp",
+    width: input.width,
+    height: input.height,
+    pixels: [
+      ...pixels.values()
+    ].sort((left, right) => left.y - right.y || left.x - right.x),
+    palette,
+    schemaVersion: CREATOR_FEATURE_SCHEMA_VERSION
+  };
+}
+var Draw2SelectionStampStore = class {
+  #stamps = /* @__PURE__ */ new Map();
+  constructor(initial = []) {
+    for (const stamp of initial) this.save(stamp);
+  }
+  save(input) {
+    const stamp = normalizeDraw2SelectionStamp(input);
+    this.#stamps.set(stamp.id, stamp);
+    return stamp;
+  }
+  load(id) {
+    return this.#stamps.get(id);
+  }
+  remove(id) {
+    return this.#stamps.delete(id);
+  }
+  list() {
+    return [
+      ...this.#stamps.values()
+    ].sort((left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id));
+  }
+};
+var DRAW2_TIMELINE_METADATA_SCHEMA_VERSION = 2;
+function isMetadataRecord(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+function cloneTimelineMarker(marker) {
+  return marker.payload === void 0 ? {
+    ...marker
+  } : {
+    ...marker,
+    payload: {
+      ...marker.payload
+    }
+  };
+}
+function normalizeDraw2TimelineMetadata(value, frameCount) {
+  if (!Number.isSafeInteger(frameCount) || frameCount < 1) {
+    throw new Error("Draw2 timeline metadata requires a valid frame count.");
+  }
+  if (value === void 0) {
+    return {
+      schemaVersion: DRAW2_TIMELINE_METADATA_SCHEMA_VERSION,
+      animationTags: [],
+      markers: [],
+      audioReferences: []
+    };
+  }
+  if (!isMetadataRecord(value) || value.schemaVersion !== DRAW2_TIMELINE_METADATA_SCHEMA_VERSION) {
+    throw new Error("Draw2 timeline metadata schema is unsupported.");
+  }
+  if (!Array.isArray(value.animationTags) || !Array.isArray(value.markers) || !Array.isArray(value.audioReferences)) {
+    throw new Error("Draw2 timeline metadata collections are invalid.");
+  }
+  const selectionStampCandidates = value.selectionStamps;
+  if (selectionStampCandidates !== void 0 && !Array.isArray(selectionStampCandidates)) {
+    throw new Error("Draw2 selection stamp collection is invalid.");
+  }
+  const tags = new AnimationTagStore();
+  const tagIds = /* @__PURE__ */ new Set();
+  for (const candidate of value.animationTags) {
+    if (!isMetadataRecord(candidate) || typeof candidate.id !== "string") {
+      throw new Error("Draw2 animation tag is invalid.");
+    }
+    if (tagIds.has(candidate.id)) {
+      throw new Error("Draw2 animation tag identity is duplicated.");
+    }
+    tagIds.add(candidate.id);
+    tags.upsert(candidate, frameCount);
+  }
+  const markers = new TimelineMarkerStore();
+  const markerIds = /* @__PURE__ */ new Set();
+  for (const candidate of value.markers) {
+    if (!isMetadataRecord(candidate) || typeof candidate.id !== "string") {
+      throw new Error("Draw2 timeline marker is invalid.");
+    }
+    if (!Number.isSafeInteger(candidate.frameIndex) || candidate.frameIndex < 0 || candidate.frameIndex >= frameCount) {
+      throw new Error("Draw2 timeline marker frame is invalid.");
+    }
+    if (markerIds.has(candidate.id)) {
+      throw new Error("Draw2 timeline marker identity is duplicated.");
+    }
+    markerIds.add(candidate.id);
+    markers.upsert(candidate);
+  }
+  const audioReferences = new DrawAudioReferenceStore();
+  const audioReferenceIds = /* @__PURE__ */ new Set();
+  for (const candidate of value.audioReferences) {
+    if (!isMetadataRecord(candidate) || typeof candidate.id !== "string") {
+      throw new Error("Draw Audio reference is invalid.");
+    }
+    if (audioReferenceIds.has(candidate.id)) {
+      throw new Error("Draw Audio reference identity is duplicated.");
+    }
+    audioReferenceIds.add(candidate.id);
+    audioReferences.upsert(candidate, frameCount);
+  }
+  const selectionStamps = new Draw2SelectionStampStore();
+  const selectionStampIds = /* @__PURE__ */ new Set();
+  for (const candidate of selectionStampCandidates ?? []) {
+    if (candidate === null || typeof candidate !== "object" || typeof candidate.id !== "string") {
+      throw new Error("Draw2 selection stamp is invalid.");
+    }
+    const normalized = normalizeDraw2SelectionStamp(candidate);
+    if (selectionStampIds.has(normalized.id)) {
+      throw new Error("Draw2 selection stamp identity is duplicated.");
+    }
+    selectionStampIds.add(normalized.id);
+    selectionStamps.save(normalized);
+  }
+  return {
+    schemaVersion: DRAW2_TIMELINE_METADATA_SCHEMA_VERSION,
+    animationTags: tags.list().map((tag) => ({
+      ...tag
+    })),
+    markers: markers.list().map(cloneTimelineMarker),
+    audioReferences: audioReferences.list().map((reference) => ({
+      ...reference
+    })),
+    ...selectionStampCandidates === void 0 ? {} : {
+      selectionStamps: selectionStamps.list().map((stamp) => ({
+        ...stamp,
+        pixels: stamp.pixels.map((pixel) => ({
+          ...pixel
+        })),
+        palette: [
+          ...stamp.palette
+        ]
+      }))
+    }
+  };
+}
+
+// src/game/game-350/assetization.ts
+var ASSET_PACKAGE_SCHEMA_VERSION = 1;
+var ASSETIZATION_CONTRACT_VERSION = "PIXIEED_ASSETIZATION_V1";
+function isRecord(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+function packageText(value, maxLength) {
+  if (typeof value !== "string") return void 0;
+  const normalized = value.trim();
+  return normalized.length <= maxLength ? normalized : void 0;
+}
+function canonicalPackageValue(value) {
+  if (Array.isArray(value)) return value.map(canonicalPackageValue);
+  if (isRecord(value)) {
+    return Object.fromEntries(Object.keys(value).sort().map((key) => [
+      key,
+      canonicalPackageValue(value[key])
+    ]));
+  }
+  return value;
+}
+async function sha256PackageBody(value) {
+  const bytes = new TextEncoder().encode(JSON.stringify(canonicalPackageValue(packageBody(value))));
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return `sha256:${Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+}
+function packageBody(manifest) {
+  return {
+    schemaVersion: manifest.schemaVersion,
+    detectorVersion: manifest.detectorVersion,
+    confirmationRevision: manifest.confirmationRevision,
+    title: manifest.title,
+    description: manifest.description,
+    offerKind: manifest.offerKind,
+    derivativePolicy: manifest.derivativePolicy,
+    sellerId: manifest.sellerId ?? null,
+    entries: manifest.entries
+  };
+}
+function sourceReasons(source) {
+  const reasons = [];
+  if (!isRecord(source)) return [
+    "source is required"
+  ];
+  const kind = source.kind;
+  if (kind !== "DRAW" && kind !== "AUDIO") reasons.push("source kind is unsupported");
+  if (packageText(typeof source.sourceId === "string" ? source.sourceId : void 0, 256) === void 0) reasons.push("sourceId is required");
+  if (packageText(typeof source.projectId === "string" ? source.projectId : void 0, 256) === void 0) reasons.push("source projectId is required");
+  if (packageText(typeof source.revisionId === "string" ? source.revisionId : void 0, 256) === void 0) reasons.push("source revisionId is required");
+  if (packageText(typeof source.contentHash === "string" ? source.contentHash : void 0, 512) === void 0) reasons.push("source contentHash is required");
+  if (kind === "DRAW" && packageText(typeof source.canvasId === "string" ? source.canvasId : void 0, 256) === void 0) reasons.push("Draw source canvasId is required");
+  return reasons;
+}
+function proposalSourceMatches(source, proposal) {
+  if (!isRecord(source) || !isRecord(proposal)) return false;
+  if (source.kind === "DRAW" && (proposal.kind === "SPRITE" || proposal.kind === "ANIMATION")) {
+    return typeof source.projectId === "string" && typeof source.revisionId === "string" && typeof source.contentHash === "string" && typeof source.canvasId === "string" && proposal.sourceProjectId === source.projectId.trim() && proposal.sourceRevisionId === source.revisionId.trim() && proposal.contentHash === source.contentHash.trim() && proposal.sourceCanvasId === source.canvasId.trim();
+  }
+  if (source.kind === "AUDIO" && proposal.kind === "AUDIO") {
+    return typeof source.sourceId === "string" && typeof source.projectId === "string" && typeof source.revisionId === "string" && typeof source.contentHash === "string" && proposal.sourceProjectId === source.projectId.trim() && proposal.sourceRevisionId === source.revisionId.trim() && proposal.contentHash === source.contentHash.trim() && proposal.rangeId === source.sourceId.trim();
+  }
+  return false;
+}
+function packageStructureReasons(manifest) {
+  const reasons = [];
+  if (manifest.schemaVersion !== ASSET_PACKAGE_SCHEMA_VERSION) reasons.push("unsupported package schemaVersion");
+  if (manifest.status !== "FINALIZED") reasons.push("package status must be FINALIZED");
+  if (manifest.detectorVersion !== ASSETIZATION_CONTRACT_VERSION) reasons.push("unsupported detectorVersion");
+  if (packageText(manifest.confirmationRevision, 256) === void 0 || manifest.confirmationRevision.trim().length === 0) reasons.push("confirmationRevision is required");
+  if (packageText(manifest.packageId, 256) === void 0 || manifest.packageId.trim().length === 0) reasons.push("packageId is required");
+  if (!/^sha256:[0-9a-f]{64}$/u.test(manifest.packageHash)) reasons.push("packageHash must be a SHA-256 hash");
+  if (packageText(manifest.title, 128) === void 0 || manifest.title.trim().length === 0) reasons.push("title is required");
+  if (packageText(manifest.description, 4096) === void 0) reasons.push("description is invalid");
+  if (manifest.offerKind !== "ASSET" && manifest.offerKind !== "ASSET_PACK") reasons.push("offerKind is invalid");
+  if (![
+    "USE_ONLY",
+    "DERIVATIVE_ALLOWED",
+    "REDISTRIBUTION_ALLOWED"
+  ].includes(manifest.derivativePolicy)) reasons.push("derivativePolicy is invalid");
+  if (manifest.sellerId !== void 0 && (packageText(manifest.sellerId, 256) === void 0 || manifest.sellerId.trim().length === 0)) reasons.push("sellerId is invalid");
+  const expectedReadiness = manifest.sellerId === void 0 ? "ACCOUNT_REQUIRED" : "READY";
+  if (manifest.saleReadiness !== expectedReadiness) reasons.push("saleReadiness does not match sellerId");
+  const rawEntries = manifest.entries;
+  const entries = Array.isArray(rawEntries) ? rawEntries : [];
+  if (!Array.isArray(rawEntries) || entries.length === 0) reasons.push("at least one package entry is required");
+  if (manifest.offerKind === "ASSET" && entries.length !== 1) reasons.push("ASSET must contain exactly one entry");
+  if (manifest.offerKind === "ASSET_PACK" && entries.length < 2) reasons.push("ASSET_PACK must contain at least two entries");
+  const entryIds = /* @__PURE__ */ new Set();
+  for (const [index, entry] of entries.entries()) {
+    if (!isRecord(entry)) {
+      reasons.push(`entry ${index} is invalid`);
+      continue;
+    }
+    const entryId = typeof entry.entryId === "string" ? entry.entryId : "";
+    if (entryId.trim().length === 0 || entryIds.has(entryId)) reasons.push(`entry ${index} has a duplicate or empty entryId`);
+    entryIds.add(entryId);
+    if (entry.kind !== "DRAW" && entry.kind !== "AUDIO") reasons.push(`entry ${index} kind is invalid`);
+    if (typeof entry.label !== "string" || entry.label.trim().length === 0 || entry.label.length > 128) reasons.push(`entry ${index} label is invalid`);
+    reasons.push(...sourceReasons(entry.source).map((reason) => `entry ${index}: ${reason}`));
+    if (!isRecord(entry.proposal)) {
+      reasons.push(`entry ${index} proposal is invalid`);
+      continue;
+    }
+    if (entry.kind === "DRAW") {
+      if (entry.proposal.kind !== "SPRITE" && entry.proposal.kind !== "ANIMATION") reasons.push(`entry ${index} Draw proposal is invalid`);
+      else if (!proposalSourceMatches(entry.source, entry.proposal)) reasons.push(`entry ${index} Draw proposal source mismatch`);
+    } else if (entry.proposal.kind !== "AUDIO" || !proposalSourceMatches(entry.source, entry.proposal)) {
+      reasons.push(`entry ${index} Audio proposal source mismatch`);
+    }
+  }
+  return reasons;
+}
+function validateAssetPackageManifest(value) {
+  if (!isRecord(value)) return {
+    ok: false,
+    reasons: [
+      "package manifest must be an object"
+    ]
+  };
+  const manifest = value;
+  const reasons = packageStructureReasons(manifest);
+  return reasons.length === 0 ? {
+    ok: true,
+    value: manifest
+  } : {
+    ok: false,
+    reasons
+  };
+}
+async function verifyAssetPackageManifest(manifest) {
+  const structure = validateAssetPackageManifest(manifest);
+  if (!structure.ok) return structure;
+  const expectedHash = await sha256PackageBody(manifest);
+  if (expectedHash !== manifest.packageHash) return {
+    ok: false,
+    reasons: [
+      "packageHash does not match the finalized manifest"
+    ]
+  };
+  const expectedPackageId = `asset-package:${expectedHash.slice("sha256:".length, "sha256:".length + 24)}`;
+  if (expectedPackageId !== manifest.packageId) return {
+    ok: false,
+    reasons: [
+      "packageId does not match the packageHash"
+    ]
+  };
+  return structure;
+}
+
+// src/draw2-export-registry.ts
+var PNG_EXPORT_MAX_PIXELS = 4096 * 4096;
+var PNG_EXPORT_SCALE_PRESETS = Object.freeze([
+  1,
+  2,
+  3,
+  4,
+  6,
+  8,
+  12,
+  16,
+  24,
+  32,
+  48,
+  64,
+  96,
+  128,
+  192,
+  256
+]);
+var EXPORT_FORMATS = Object.freeze([
+  {
+    id: "png",
+    category: "image",
+    label: "PNG",
+    description: "\u900F\u904E\u3092\u4FDD\u3063\u305F\u753B\u50CF",
+    extension: "png",
+    mimeType: "image/png",
+    visible: true,
+    supported: true,
+    supportsScale: true
+  },
+  {
+    id: "jpeg",
+    category: "image",
+    label: "JPEG",
+    description: "\u8EFD\u91CF\u306A\u753B\u50CF",
+    extension: "jpg",
+    mimeType: "image/jpeg",
+    visible: true,
+    supported: true,
+    supportsScale: true
+  },
+  {
+    id: "webp",
+    category: "image",
+    label: "WebP",
+    description: "\u8EFD\u91CF\u30FB\u900F\u904E\u5BFE\u5FDC\u306E\u753B\u50CF",
+    extension: "webp",
+    mimeType: "image/webp",
+    visible: true,
+    supported: true,
+    supportsScale: true
+  },
+  {
+    id: "avif",
+    category: "image",
+    label: "AVIF",
+    description: "\u30D6\u30E9\u30A6\u30B6\u5BFE\u5FDC\u6642\u306E\u9AD8\u5727\u7E2E\u753B\u50CF",
+    extension: "avif",
+    mimeType: "image/avif",
+    visible: true,
+    supported: true,
+    supportsScale: true
+  },
+  {
+    id: "bmp",
+    category: "image",
+    label: "BMP",
+    description: "\u4E92\u63DB\u6027\u91CD\u8996\u306E\u30D3\u30C3\u30C8\u30DE\u30C3\u30D7",
+    extension: "bmp",
+    mimeType: "image/bmp",
+    visible: true,
+    supported: true,
+    supportsScale: true
+  },
+  {
+    id: "tiff",
+    category: "image",
+    label: "TIFF",
+    description: "\u5370\u5237\u30FB\u4FDD\u5B58\u5411\u3051\u306E\u9AD8\u54C1\u8CEA\u753B\u50CF",
+    extension: "tiff",
+    mimeType: "image/tiff",
+    visible: true,
+    supported: true,
+    supportsScale: true
+  },
+  {
+    id: "gif",
+    category: "animation",
+    label: "GIF",
+    description: "\u30A2\u30CB\u30E1\u30FC\u30B7\u30E7\u30F3\u753B\u50CF",
+    extension: "gif",
+    mimeType: "image/gif",
+    visible: true,
+    supported: true,
+    supportsScale: true
+  },
+  {
+    id: "apng",
+    category: "animation",
+    label: "APNG",
+    description: "\u900F\u904E\u5BFE\u5FDC\u30A2\u30CB\u30E1\u30FC\u30B7\u30E7\u30F3",
+    extension: "apng",
+    mimeType: "image/apng",
+    visible: true,
+    supported: true,
+    supportsScale: true
+  },
+  {
+    id: "webm",
+    category: "animation",
+    label: "WebM Draw + Audio",
+    description: "Draw\u30A2\u30CB\u30E1\u30FC\u30B7\u30E7\u30F3\u3068\u9078\u629E\u3057\u305FAudio\u3092\u4E00\u4F53\u5316\u3057\u305F\u52D5\u753B",
+    extension: "webm",
+    mimeType: "video/webm",
+    visible: true,
+    supported: true,
+    supportsScale: false
+  },
+  {
+    id: "wav",
+    category: "audio",
+    label: "WAV Mix",
+    description: "\u9078\u629E\u3057\u305FBGM\u30FBSE\u30FB\u697D\u5668\u3092\u542B\u3080\u975E\u5727\u7E2E\u30DF\u30C3\u30AF\u30B9",
+    extension: "wav",
+    mimeType: "audio/wav",
+    visible: true,
+    supported: true,
+    supportsScale: false
+  },
+  {
+    id: "audio-webm",
+    category: "audio",
+    label: "WebM Audio (Opus)",
+    description: "\u9078\u629E\u3057\u305FBGM\u30FBSE\u30FB\u697D\u5668\u3092\u8EFD\u91CF\u306AOpus\u97F3\u58F0\u3067\u4FDD\u5B58",
+    extension: "webm",
+    mimeType: "audio/webm",
+    visible: true,
+    supported: true,
+    supportsScale: false
+  },
+  {
+    id: "audio-ogg",
+    category: "audio",
+    label: "Ogg Audio (Opus)",
+    description: "\u5BFE\u5FDC\u30D6\u30E9\u30A6\u30B6\u3067\u9078\u629E\u3057\u305FAudio\u3092Ogg/Opus\u3067\u4FDD\u5B58",
+    extension: "ogg",
+    mimeType: "audio/ogg",
+    visible: true,
+    supported: true,
+    supportsScale: false
+  },
+  {
+    id: "svg",
+    category: "image",
+    label: "SVG",
+    description: "\u30D9\u30AF\u30BF\u30FC\u753B\u50CF",
+    extension: "svg",
+    mimeType: "image/svg+xml",
+    visible: true,
+    supported: true,
+    supportsScale: true
+  },
+  {
+    id: "sprite-sheet",
+    category: "animation",
+    label: "Sprite Sheet",
+    description: "\u5168\u30D5\u30EC\u30FC\u30E0\u3092\u4E26\u3079\u305F\u753B\u50CF",
+    extension: "png",
+    mimeType: "image/png",
+    visible: true,
+    supported: true,
+    supportsScale: true
+  },
+  {
+    id: "atlas-json",
+    category: "animation",
+    label: "Atlas metadata",
+    description: "Sprite Sheet\u306E\u5EA7\u6A19\u30E1\u30BF\u30C7\u30FC\u30BF",
+    extension: "json",
+    mimeType: "application/json",
+    visible: true,
+    supported: true,
+    supportsScale: false
+  },
+  {
+    id: "tileset",
+    category: "tiles",
+    label: "Tileset",
+    description: "\u30BF\u30A4\u30EB\u7D20\u6750\u3068\u914D\u7F6E\u60C5\u5831",
+    extension: "png",
+    mimeType: "image/png",
+    visible: true,
+    supported: true,
+    supportsScale: true
+  },
+  {
+    id: "pxd",
+    category: "project",
+    label: "PXD Project",
+    description: "Draw / Audio / Game\u3092\u542B\u3080\u30D7\u30ED\u30B8\u30A7\u30AF\u30C8",
+    extension: "pxd",
+    mimeType: "application/vnd.pixieed.pxd",
+    visible: true,
+    supported: true,
+    supportsScale: false
+  },
+  {
+    id: "glb",
+    category: "game",
+    label: "GLB",
+    description: "3D\u30B2\u30FC\u30E0\u7D20\u6750\uFF08\u5C06\u6765\u5BFE\u5FDC\uFF09",
+    extension: "glb",
+    mimeType: "model/gltf-binary",
+    visible: false,
+    supported: false,
+    supportsScale: false
+  }
+]);
+var EXPORT_FORMAT_BY_ID = new Map(EXPORT_FORMATS.map((definition) => [
+  definition.id,
+  definition
+]));
+
+// src/draw2-export.ts
+var PXD_FORMAT = "pxd";
+var PXD_MAGIC = new Uint8Array([
+  80,
+  88,
+  68,
+  0
+]);
+var PXD_HEADER_BYTES = 9;
+var PXD_CREATED_BY = Object.freeze({
+  application: "PiXiEED",
+  version: "2.0.0-reference"
+});
+var PXD_PROJECT_SCHEMA_VERSION = 2;
+var PXD_PROJECT_ARCHIVE_VERSION = 2;
+function assert(condition, code, message) {
+  if (!condition) throw Object.assign(new Error(message), {
+    code
+  });
+}
+function readUint32(bytes, offset, label) {
+  assert(offset >= 0 && offset + 4 <= bytes.length, "PXD_TRUNCATED", `${label} is truncated.`);
+  return (bytes[offset] ?? 0) * 16777216 + ((bytes[offset + 1] ?? 0) << 16) + ((bytes[offset + 2] ?? 0) << 8) + (bytes[offset + 3] ?? 0);
+}
+async function sha256BytesHex2(bytes) {
+  const digest = await crypto.subtle.digest("SHA-256", new Uint8Array(bytes).buffer);
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+function isRecord2(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+function assertNoEmbeddedAssetPayload(value, path, allowRasterSnapshots = false) {
+  if (Array.isArray(value)) {
+    value.forEach((entry, index) => assertNoEmbeddedAssetPayload(entry, `${path}[${index}]`, allowRasterSnapshots));
+    return;
+  }
+  if (!isRecord2(value)) return;
+  for (const [key, entry] of Object.entries(value)) {
+    if (allowRasterSnapshots && key === "rasterSnapshot") {
+      continue;
+    }
+    assert(![
+      "pixels",
+      "pixelData",
+      "raster",
+      "blob",
+      "dataUrl",
+      "rgba",
+      "indexedBytes",
+      "payload"
+    ].includes(key), "PXD_ASSET_DEFINITION_EMBEDDED_DATA", `${path}.${key} must not contain embedded asset data.`);
+    assertNoEmbeddedAssetPayload(entry, `${path}.${key}`, allowRasterSnapshots);
+  }
+}
+function assertAssetDefinitionShape(value, path) {
+  assert(isRecord2(value), "PXD_ASSET_DEFINITION_INVALID", `${path} must be an object.`);
+  const definition = value;
+  assert(definition.schemaVersion === 1, "PXD_ASSET_DEFINITION_VERSION_UNSUPPORTED", `${path}.schemaVersion is unsupported.`);
+  assert(definition.persistence === "LOCAL_DRAFT" || definition.persistence === "VALIDATED_DEFINITION", "PXD_ASSET_DEFINITION_PERSISTENCE_INVALID", `${path}.persistence must be LOCAL_DRAFT or VALIDATED_DEFINITION.`);
+  const candidate = {
+    ...definition,
+    persistence: "LOCAL_DRAFT"
+  };
+  const validation = validateAssetDefinitionDraft(candidate);
+  assert(validation.ok, "PXD_ASSET_DEFINITION_INVALID", `${path} failed Asset Definition validation.`);
+  const normalized = {
+    ...validation.value,
+    persistence: definition.persistence
+  };
+  assert(canonicalJson2(normalized) === canonicalJson2(definition), "PXD_ASSET_DEFINITION_NOT_NORMALIZED", `${path} is not normalized.`);
+}
+function validateAssetDefinitionEntry(value, index) {
+  const path = `assetDefinitions[${index}]`;
+  assert(isRecord2(value), "PXD_ASSET_DEFINITION_INVALID", `${path} must be an object.`);
+  assertNoEmbeddedAssetPayload(value, path, true);
+  assert(typeof value.definitionId === "string" && value.definitionId.trim() === value.definitionId && value.definitionId.length > 0, "PXD_ASSET_DEFINITION_ID_INVALID", `${path}.definitionId is invalid.`);
+  assertAssetDefinitionShape(value.definition, `${path}.definition`);
+  if (value.registryIdentity !== void 0) {
+    assert(isRecord2(value.registryIdentity), "PXD_REGISTRY_IDENTITY_INVALID", `${path}.registryIdentity is invalid.`);
+    assert(typeof value.registryIdentity.assetId === "string" && value.registryIdentity.assetId.trim() === value.registryIdentity.assetId && value.registryIdentity.assetId.length > 0, "PXD_REGISTRY_IDENTITY_INVALID", `${path}.registryIdentity.assetId is invalid.`);
+    assert(typeof value.registryIdentity.revisionId === "string" && value.registryIdentity.revisionId.trim() === value.registryIdentity.revisionId && value.registryIdentity.revisionId.length > 0, "PXD_REGISTRY_IDENTITY_INVALID", `${path}.registryIdentity.revisionId is invalid.`);
+  }
+  return value;
+}
+var PXD_PRODUCT_MODULES = [
+  "DRAW",
+  "AUDIO",
+  "GAME"
+];
+var PXD_PRODUCT_KINDS = [
+  "GAME_PROJECT",
+  "DRAW_IMAGE",
+  "DRAW_ANIMATION",
+  "DRAW_CHARACTER_ANIMATION",
+  "AUDIO_ASSET",
+  "PROJECT"
+];
+var PXD_PRODUCT_RIGHTS = [
+  "PERSONAL_USE",
+  "COMMERCIAL_USE",
+  "DERIVATIVE",
+  "EMBEDDING",
+  "RESALE"
+];
+function normalizePxdProductReferences(value, path) {
+  assert(Array.isArray(value), "PXD_PRODUCT_REFERENCE_INVALID", `${path} must be an array.`);
+  const normalized = value.map((entry, index) => {
+    assert(typeof entry === "string" && entry.trim() === entry && entry.length > 0, "PXD_PRODUCT_REFERENCE_INVALID", `${path}[${index}] is invalid.`);
+    return entry;
+  });
+  assert(new Set(normalized).size === normalized.length, "PXD_PRODUCT_REFERENCE_DUPLICATE", `${path} contains a duplicate reference.`);
+  return normalized.sort(compareStrings);
+}
+function normalizePxdProductDefinition(value, index, assetDefinitionIds, audioRevisionIds, availableModules) {
+  const path = `productDefinitions[${index}]`;
+  assert(isRecord2(value), "PXD_PRODUCT_DEFINITION_INVALID", `${path} must be an object.`);
+  assertNoEmbeddedAssetPayload(value, path);
+  const allowedKeys = /* @__PURE__ */ new Set([
+    "schemaVersion",
+    "persistence",
+    "productId",
+    "kind",
+    "name",
+    "description",
+    "includedModules",
+    "assetDefinitionIds",
+    "audioRevisionIds",
+    "rights",
+    "edition"
+  ]);
+  assert(Object.keys(value).every((key) => allowedKeys.has(key)), "PXD_PRODUCT_DEFINITION_FIELD_INVALID", `${path} contains an unsupported field.`);
+  assert(value.schemaVersion === 1, "PXD_PRODUCT_DEFINITION_VERSION_UNSUPPORTED", `${path}.schemaVersion is unsupported.`);
+  assert(value.persistence === "LOCAL_DRAFT", "PXD_PRODUCT_DEFINITION_PERSISTENCE_INVALID", `${path}.persistence must be LOCAL_DRAFT.`);
+  assert(typeof value.productId === "string" && /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(value.productId), "PXD_PRODUCT_ID_INVALID", `${path}.productId is invalid.`);
+  assert(typeof value.kind === "string" && PXD_PRODUCT_KINDS.includes(value.kind), "PXD_PRODUCT_KIND_INVALID", `${path}.kind is invalid.`);
+  assert(typeof value.name === "string" && value.name.trim() === value.name && value.name.length > 0 && value.name.length <= 128, "PXD_PRODUCT_NAME_INVALID", `${path}.name is invalid.`);
+  assert(typeof value.description === "string" && value.description.trim() === value.description && value.description.length <= 4096, "PXD_PRODUCT_DESCRIPTION_INVALID", `${path}.description is invalid.`);
+  const includedModules = normalizePxdProductReferences(value.includedModules, `${path}.includedModules`);
+  assert(includedModules.every((module) => PXD_PRODUCT_MODULES.includes(module)), "PXD_PRODUCT_MODULE_INVALID", `${path}.includedModules contains an unsupported module.`);
+  assert(includedModules.length > 0, "PXD_PRODUCT_MODULE_REQUIRED", `${path}.includedModules must not be empty.`);
+  const assetIds = normalizePxdProductReferences(value.assetDefinitionIds, `${path}.assetDefinitionIds`);
+  const audioIds = normalizePxdProductReferences(value.audioRevisionIds, `${path}.audioRevisionIds`);
+  for (const assetId of assetIds) assert(assetDefinitionIds.has(assetId), "PXD_PRODUCT_ASSET_REFERENCE_MISSING", `${path} references missing Asset Definition ${assetId}.`);
+  for (const audioId of audioIds) assert(audioRevisionIds.has(audioId), "PXD_PRODUCT_AUDIO_REFERENCE_MISSING", `${path} references missing Audio revision ${audioId}.`);
+  assert(assetIds.length === 0 || includedModules.includes("DRAW"), "PXD_PRODUCT_DRAW_MODULE_REQUIRED", `${path} uses Draw Asset Definitions without including DRAW.`);
+  assert(audioIds.length === 0 || includedModules.includes("AUDIO"), "PXD_PRODUCT_AUDIO_MODULE_REQUIRED", `${path} uses Audio revisions without including AUDIO.`);
+  if (value.kind === "GAME_PROJECT") assert(includedModules.includes("GAME"), "PXD_PRODUCT_GAME_MODULE_REQUIRED", `${path} GAME_PROJECT must include GAME.`);
+  if ([
+    "DRAW_IMAGE",
+    "DRAW_ANIMATION",
+    "DRAW_CHARACTER_ANIMATION"
+  ].includes(value.kind)) {
+    assert(includedModules.includes("DRAW") && assetIds.length > 0, "PXD_PRODUCT_DRAW_SOURCE_REQUIRED", `${path} Draw products require DRAW and at least one Asset Definition.`);
+  }
+  if (value.kind === "AUDIO_ASSET") {
+    assert(includedModules.includes("AUDIO") && audioIds.length > 0, "PXD_PRODUCT_AUDIO_SOURCE_REQUIRED", `${path} AUDIO_ASSET products require AUDIO and at least one Audio revision.`);
+  }
+  const rights = normalizePxdProductReferences(value.rights, `${path}.rights`);
+  assert(rights.every((right) => PXD_PRODUCT_RIGHTS.includes(right)), "PXD_PRODUCT_RIGHT_INVALID", `${path}.rights contains an unsupported right.`);
+  assert(rights.length > 0, "PXD_PRODUCT_RIGHT_REQUIRED", `${path}.rights must not be empty.`);
+  assert(isRecord2(value.edition), "PXD_PRODUCT_EDITION_INVALID", `${path}.edition is invalid.`);
+  const editionValue = value.edition;
+  let edition;
+  if (editionValue.kind === "UNLIMITED") {
+    assert(Object.keys(editionValue).length === 1, "PXD_PRODUCT_EDITION_INVALID", `${path}.edition contains an unsupported field.`);
+    edition = {
+      kind: "UNLIMITED"
+    };
+  } else {
+    assert(editionValue.kind === "LIMITED" && Object.keys(editionValue).length === 2, "PXD_PRODUCT_EDITION_INVALID", `${path}.edition kind is invalid.`);
+    const maxUnits = editionValue.maxUnits;
+    assert(typeof maxUnits === "number" && Number.isSafeInteger(maxUnits) && maxUnits > 0, "PXD_PRODUCT_EDITION_LIMIT_INVALID", `${path}.edition.maxUnits must be a positive safe integer.`);
+    edition = {
+      kind: "LIMITED",
+      maxUnits
+    };
+  }
+  for (const module of includedModules) assert(availableModules.has(module), "PXD_PRODUCT_MODULE_MISSING", `${path} requires unavailable module ${module}.`);
+  return {
+    schemaVersion: 1,
+    persistence: "LOCAL_DRAFT",
+    productId: value.productId,
+    kind: value.kind,
+    name: value.name,
+    description: value.description,
+    includedModules,
+    assetDefinitionIds: assetIds,
+    audioRevisionIds: audioIds,
+    rights,
+    edition
+  };
+}
+function normalizePxdProductDefinitions(entries, assetDefinitions, audioRevisionIds, availableModules) {
+  const assetDefinitionIds = new Set(assetDefinitions.map((entry) => entry.definitionId));
+  const audioIds = new Set(audioRevisionIds);
+  const normalized = [
+    ...entries ?? []
+  ].map((entry, index) => normalizePxdProductDefinition(entry, index, assetDefinitionIds, audioIds, availableModules));
+  normalized.sort((left, right) => compareStrings(left.productId, right.productId));
+  for (let index = 1; index < normalized.length; index += 1) {
+    assert(normalized[index - 1]?.productId !== normalized[index]?.productId, "PXD_PRODUCT_DEFINITION_DUPLICATE", `Product Definition ${normalized[index]?.productId ?? ""} is duplicated.`);
+  }
+  return normalized;
+}
+function normalizePxdAssetPackages(entries) {
+  const normalized = [
+    ...entries ?? []
+  ].map((entry, index) => {
+    const checked = validateAssetPackageManifest(entry);
+    if (!checked.ok) {
+      assert(false, "PXD_ASSET_PACKAGE_INVALID", `assetPackages[${index}] is invalid: ${checked.reasons.join("; ")}`);
+    }
+    return entry;
+  });
+  normalized.sort((left, right) => compareStrings(left.packageId, right.packageId));
+  for (let index = 1; index < normalized.length; index += 1) {
+    assert(normalized[index - 1]?.packageId !== normalized[index]?.packageId, "PXD_ASSET_PACKAGE_DUPLICATE", `Asset Package ${normalized[index]?.packageId ?? ""} is duplicated.`);
+  }
+  return normalized;
+}
+function validateProjectMetadata(value) {
+  assert(value !== null && typeof value === "object", "PXD_PROJECT_INVALID", "PXD project metadata is invalid.");
+  const project = value;
+  assert(typeof project.name === "string", "PXD_PROJECT_INVALID", "PXD project name is invalid.");
+  assert(Number.isSafeInteger(project.structureEpoch) && project.structureEpoch >= 1, "PXD_PROJECT_INVALID", "PXD structure epoch is invalid.");
+  assert(Array.isArray(project.layers) && Array.isArray(project.frames) && Array.isArray(project.cels), "PXD_PROJECT_INVALID", "PXD timeline collections are invalid.");
+  assert(project.timeline !== null && typeof project.timeline === "object", "PXD_PROJECT_INVALID", "PXD timeline metadata is invalid.");
+  return project;
+}
+function buildImportedAsset(entry, bytes) {
+  assert(bytes.byteLength === entry.bytes && bytes.byteLength === entry.width * entry.height, "PXD_ASSET_SIZE_MISMATCH", `PXD asset ${entry.assetId} byte size does not match its dimensions.`);
+  const raster = IndexedTileRaster.empty(entry.width, entry.height, entry.tileSize);
+  for (let index = 0; index < bytes.length; index += 1) {
+    const colorIndex = bytes[index] ?? 0;
+    assert(colorIndex < entry.palette.length, "PXD_PIXEL_INDEX_INVALID", `PXD asset ${entry.assetId} contains an out-of-range palette index.`);
+    if (colorIndex === 0) continue;
+    const x = index % entry.width;
+    const y = Math.floor(index / entry.width);
+    raster.setPixel(entry.assetId, x, y, colorIndex);
+  }
+  return {
+    id: entry.assetId,
+    width: entry.width,
+    height: entry.height,
+    palette: [
+      ...entry.palette
+    ],
+    raster,
+    revision: entry.revision
+  };
+}
+function compareStrings(left, right) {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+function projectPayloadPathIsSafe(path) {
+  return path.length > 0 && path.length <= 512 && !path.startsWith("/") && !path.includes("\\") && !path.split("/").some((segment) => segment.length === 0 || segment === "." || segment === "..") && !/[\u0000\u0009\u000a\u000d]/u.test(path);
+}
+function validateProjectPayloadEntry(value, path) {
+  assert(value !== null && typeof value === "object" && !Array.isArray(value), "PXD_ENTRY_INVALID", `${path} is invalid.`);
+  const entry = value;
+  assert(projectPayloadPathIsSafe(entry.path), "PXD_PATH_UNSAFE", `${path}.path is unsafe.`);
+  assert(typeof entry.mediaType === "string" && entry.mediaType.length > 0, "PXD_MEDIA_TYPE_INVALID", `${path}.mediaType is invalid.`);
+  assert(/^[a-f0-9]{64}$/u.test(entry.sha256), "PXD_ENTRY_HASH_INVALID", `${path}.sha256 is invalid.`);
+  assert(Number.isSafeInteger(entry.bytes) && entry.bytes > 0, "PXD_ENTRY_SIZE_INVALID", `${path}.bytes is invalid.`);
+  assert(Number.isSafeInteger(entry.offset) && entry.offset >= 0, "PXD_OFFSET_INVALID", `${path}.offset is invalid.`);
+  return entry;
+}
+function validateProjectModuleManifest(value, path) {
+  assert(value !== null && typeof value === "object" && !Array.isArray(value), "PXD_MODULE_INVALID", `${path} is invalid.`);
+  const module = value;
+  assert(module.schemaVersion === null || typeof module.schemaVersion === "string" && module.schemaVersion.length > 0, "PXD_MODULE_SCHEMA_INVALID", `${path}.schemaVersion is invalid.`);
+  assert(module.status === "EMPTY" || module.status === "EMBEDDED", "PXD_MODULE_STATUS_INVALID", `${path}.status is invalid.`);
+  assert(module.state === null || typeof module.state === "object", "PXD_MODULE_STATE_INVALID", `${path}.state is invalid.`);
+  const state = module.state === null ? null : validateProjectPayloadEntry(module.state, `${path}.state`);
+  assert(Array.isArray(module.assets), "PXD_MODULE_ASSETS_INVALID", `${path}.assets is invalid.`);
+  const assets = module.assets.map((asset, index) => {
+    const entry = validateProjectPayloadEntry(asset, `${path}.assets[${index}]`);
+    const candidate = asset;
+    assert(typeof candidate.revisionId === "string" && candidate.revisionId.length > 0, "PXD_AUDIO_REVISION_INVALID", `${path}.assets[${index}].revisionId is invalid.`);
+    return {
+      ...entry,
+      revisionId: candidate.revisionId
+    };
+  });
+  if (module.status === "EMPTY") {
+    assert(module.schemaVersion === null && state === null && assets.length === 0, "PXD_MODULE_EMPTY_INVALID", `${path} empty module must not contain state or assets.`);
+  } else {
+    assert(module.schemaVersion !== null && state !== null, "PXD_MODULE_STATE_MISSING", `${path} embedded module state is missing.`);
+  }
+  return {
+    schemaVersion: module.schemaVersion,
+    status: module.status,
+    state,
+    assets
+  };
+}
+function validateProjectManifestAsset(value, index) {
+  assert(value !== null && typeof value === "object" && !Array.isArray(value), "PXD_ASSET_INVALID", `modules.draw.assets[${index}] is invalid.`);
+  const asset = value;
+  assert(typeof asset.assetId === "string" && typeof asset.revisionId === "string", "PXD_ASSET_INVALID", `modules.draw.assets[${index}] identity is invalid.`);
+  assert(asset.mediaType === "application/vnd.pixieed.indexed-raster", "PXD_ASSET_TYPE_UNSUPPORTED", `modules.draw.assets[${index}] media type is unsupported.`);
+  assert(/^objects\/asset-\d{4}\.raster$/u.test(asset.path), "PXD_PATH_UNSAFE", `modules.draw.assets[${index}].path is invalid.`);
+  assert(/^[a-f0-9]{64}$/u.test(asset.sha256), "PXD_ASSET_HASH_INVALID", `modules.draw.assets[${index}].sha256 is invalid.`);
+  assert(Number.isSafeInteger(asset.bytes) && asset.bytes > 0, "PXD_ASSET_SIZE_INVALID", `modules.draw.assets[${index}].bytes is invalid.`);
+  assert(Number.isSafeInteger(asset.width) && asset.width > 0 && Number.isSafeInteger(asset.height) && asset.height > 0, "PXD_ASSET_DIMENSIONS_INVALID", `modules.draw.assets[${index}] dimensions are invalid.`);
+  assert(asset.tileSize === 32 || asset.tileSize === 64, "PXD_TILE_SIZE_INVALID", `modules.draw.assets[${index}].tileSize is invalid.`);
+  assert(Array.isArray(asset.palette) && asset.palette.length >= 1 && asset.palette.length <= 256 && asset.palette[0] === 0, "PXD_PALETTE_INVALID", `modules.draw.assets[${index}].palette is invalid.`);
+  assert(Number.isSafeInteger(asset.revision) && asset.revision >= 0, "PXD_REVISION_INVALID", `modules.draw.assets[${index}].revision is invalid.`);
+  assert(Number.isSafeInteger(asset.offset) && asset.offset >= 0, "PXD_OFFSET_INVALID", `modules.draw.assets[${index}].offset is invalid.`);
+  return asset;
+}
+function validateProjectManifest(value) {
+  assert(value !== null && typeof value === "object" && !Array.isArray(value), "PXD_MANIFEST_INVALID", "PXD v2 manifest must be an object.");
+  const manifest = value;
+  assert(manifest.format === PXD_FORMAT, "PXD_FORMAT_UNSUPPORTED", "Unsupported PXD format.");
+  assert(manifest.schemaVersion === PXD_PROJECT_SCHEMA_VERSION && manifest.archiveVersion === PXD_PROJECT_ARCHIVE_VERSION, "PXD_VERSION_UNSUPPORTED", "Unsupported PXD project schema or archive version.");
+  assert(manifest.packageKind === "PROJECT_PACKAGE", "PXD_PACKAGE_KIND_UNSUPPORTED", "Unsupported PXD package kind.");
+  assert(typeof manifest.packageId === "string" && manifest.packageId.length > 0 && typeof manifest.projectId === "string" && manifest.projectId.length > 0, "PXD_MANIFEST_INVALID", "PXD project identity is invalid.");
+  assert(Array.isArray(manifest.entries), "PXD_ENTRIES_INVALID", "PXD entries are invalid.");
+  const entries = manifest.entries.map((entry, index) => validateProjectPayloadEntry(entry, `entries[${index}]`));
+  for (let index = 1; index < entries.length; index += 1) {
+    assert(entries[index - 1].path < entries[index].path, "PXD_ENTRY_ORDER_INVALID", "PXD entries must be in canonical path order.");
+  }
+  assert(typeof manifest.canonicalManifestHash === "string" && /^[a-f0-9]{64}$/u.test(manifest.canonicalManifestHash), "PXD_MANIFEST_HASH_INVALID", "PXD manifest hash is invalid.");
+  assert(Array.isArray(manifest.dependencies) && manifest.dependencies.length === 0, "PXD_DEPENDENCIES_UNSUPPORTED", "PXD project dependencies must be empty.");
+  validateProjectMetadata(manifest.project);
+  if (manifest.drawTimelineMetadata !== void 0) {
+    const normalized = normalizeDraw2TimelineMetadata(manifest.drawTimelineMetadata, manifest.project.frames.length);
+    assert(canonicalJson2(normalized) === canonicalJson2(manifest.drawTimelineMetadata), "PXD_TIMELINE_METADATA_NOT_NORMALIZED", "PXD Draw timeline metadata must be canonically normalized.");
+  }
+  assert(manifest.modules !== null && typeof manifest.modules === "object", "PXD_MODULES_INVALID", "PXD modules are missing.");
+  const draw = manifest.modules.draw;
+  assert(draw !== null && typeof draw === "object" && draw.schemaVersion === "DRAW2_PROJECT_V1" && draw.status === "EMBEDDED" && draw.state === null && Array.isArray(draw.assets) && draw.assets.length > 0, "PXD_DRAW_MODULE_INVALID", "PXD Draw module is invalid.");
+  const drawAssets = draw.assets.map((asset, index) => validateProjectManifestAsset(asset, index));
+  const audio = validateProjectModuleManifest(manifest.modules.audio, "modules.audio");
+  const game = validateProjectModuleManifest(manifest.modules.game, "modules.game");
+  if (manifest.assetDefinitions !== void 0) {
+    assert(Array.isArray(manifest.assetDefinitions), "PXD_ASSET_DEFINITION_INVALID", "PXD assetDefinitions must be an array.");
+  }
+  const assetDefinitions = manifest.assetDefinitions === void 0 ? [] : manifest.assetDefinitions.map((entry, index) => validateAssetDefinitionEntry(entry, index));
+  for (let index = 1; index < assetDefinitions.length; index += 1) {
+    assert(assetDefinitions[index - 1].definitionId < assetDefinitions[index].definitionId, "PXD_ASSET_DEFINITION_ORDER_INVALID", "PXD assetDefinitions must be in canonical definitionId order.");
+  }
+  const availableModules = /* @__PURE__ */ new Set([
+    "DRAW"
+  ]);
+  if (audio.status === "EMBEDDED") availableModules.add("AUDIO");
+  if (game.status === "EMBEDDED") availableModules.add("GAME");
+  if (manifest.productDefinitions !== void 0) {
+    assert(Array.isArray(manifest.productDefinitions), "PXD_PRODUCT_DEFINITION_INVALID", "PXD productDefinitions must be an array.");
+  }
+  const productDefinitions = normalizePxdProductDefinitions(manifest.productDefinitions, assetDefinitions, audio.assets.map((asset) => asset.revisionId), availableModules);
+  if (manifest.productDefinitions !== void 0) {
+    assert(canonicalJson2(productDefinitions) === canonicalJson2(manifest.productDefinitions), "PXD_PRODUCT_DEFINITION_NOT_NORMALIZED", "PXD productDefinitions must be canonically normalized.");
+  }
+  if (manifest.assetPackages !== void 0) {
+    assert(Array.isArray(manifest.assetPackages), "PXD_ASSET_PACKAGE_INVALID", "PXD assetPackages must be an array.");
+  }
+  const assetPackages = normalizePxdAssetPackages(manifest.assetPackages);
+  if (manifest.assetPackages !== void 0) {
+    assert(canonicalJson2(assetPackages) === canonicalJson2(manifest.assetPackages), "PXD_ASSET_PACKAGE_NOT_NORMALIZED", "PXD assetPackages must be canonically normalized.");
+  }
+  const entryPaths = new Set(entries.map((entry) => entry.path));
+  for (const asset of drawAssets) assert(entryPaths.has(asset.path), "PXD_ENTRY_MISSING", `PXD Draw entry ${asset.path} is missing.`);
+  for (const module of [
+    audio,
+    game
+  ]) {
+    if (module.state !== null) assert(entryPaths.has(module.state.path), "PXD_ENTRY_MISSING", `PXD module entry ${module.state.path} is missing.`);
+    for (const asset of module.assets) assert(entryPaths.has(asset.path), "PXD_ENTRY_MISSING", `PXD module entry ${asset.path} is missing.`);
+  }
+  return {
+    ...manifest,
+    modules: {
+      draw: {
+        ...draw,
+        assets: drawAssets
+      },
+      audio,
+      game
+    },
+    entries,
+    ...manifest.assetPackages === void 0 ? {} : {
+      assetPackages
+    }
+  };
+}
+function parseProjectJsonPayload(entry, payloads) {
+  const bytes = payloads.get(entry.path);
+  assert(bytes !== void 0, "PXD_ENTRY_MISSING", `PXD entry ${entry.path} is missing.`);
+  try {
+    return JSON.parse(new TextDecoder().decode(bytes));
+  } catch (cause) {
+    if (cause instanceof SyntaxError) throw Object.assign(new Error(`PXD module JSON ${entry.path} is invalid.`), {
+      code: "PXD_MODULE_JSON_INVALID"
+    });
+    throw cause;
+  }
+}
+async function importPxdProject(bytes, options = {}) {
+  assert(bytes.byteLength >= PXD_HEADER_BYTES, "PXD_TRUNCATED", "PXD project header is truncated.");
+  for (let index = 0; index < PXD_MAGIC.length; index += 1) assert(bytes[index] === PXD_MAGIC[index], "PXD_MAGIC_INVALID", "PXD magic header is invalid.");
+  assert(bytes[4] === PXD_PROJECT_ARCHIVE_VERSION, "PXD_VERSION_UNSUPPORTED", "Unsupported PXD project archive version.");
+  const manifestLength = readUint32(bytes, 5, "PXD project manifest");
+  const manifestStart = PXD_HEADER_BYTES;
+  const payloadStart = manifestStart + manifestLength;
+  assert(payloadStart <= bytes.byteLength, "PXD_TRUNCATED", "PXD project manifest is truncated.");
+  let manifest;
+  try {
+    manifest = validateProjectManifest(JSON.parse(new TextDecoder().decode(bytes.subarray(manifestStart, payloadStart))));
+  } catch (cause) {
+    if (cause instanceof SyntaxError) throw Object.assign(new Error("PXD project manifest JSON is invalid."), {
+      code: "PXD_MANIFEST_JSON_INVALID"
+    });
+    throw cause;
+  }
+  const manifestBase = {
+    ...manifest
+  };
+  delete manifestBase.canonicalManifestHash;
+  const actualManifestHash = await sha256BytesHex2(new TextEncoder().encode(canonicalJson2(manifestBase)));
+  assert(actualManifestHash === manifest.canonicalManifestHash, "PXD_MANIFEST_HASH_MISMATCH", "PXD project manifest hash does not match its contents.");
+  for (const [index, packageManifest] of (manifest.assetPackages ?? []).entries()) {
+    const verified = await verifyAssetPackageManifest(packageManifest);
+    if (!verified.ok) {
+      assert(false, "PXD_ASSET_PACKAGE_HASH_INVALID", `assetPackages[${index}] could not be verified: ${verified.reasons.join("; ")}`);
+    }
+  }
+  const packageHash = await sha256BytesHex2(bytes);
+  if (options.expectedPackageHash !== void 0) assert(packageHash === options.expectedPackageHash, "PXD_PACKAGE_HASH_MISMATCH", "PXD package hash does not match the expected hash.");
+  const payloads = /* @__PURE__ */ new Map();
+  let expectedOffset = 0;
+  for (const entry of manifest.entries) {
+    assert(entry.offset === expectedOffset, "PXD_ENTRY_OFFSET_INVALID", `PXD entry ${entry.path} is not in canonical payload order.`);
+    const start = payloadStart + entry.offset;
+    const end = start + entry.bytes;
+    assert(end <= bytes.byteLength, "PXD_TRUNCATED", `PXD entry ${entry.path} is truncated.`);
+    const entryBytes = bytes.slice(start, end);
+    assert(await sha256BytesHex2(entryBytes) === entry.sha256, "PXD_ENTRY_HASH_MISMATCH", `PXD entry ${entry.path} hash does not match its contents.`);
+    payloads.set(entry.path, entryBytes);
+    expectedOffset += entry.bytes;
+  }
+  assert(payloadStart + expectedOffset === bytes.byteLength, "PXD_TRAILING_BYTES", "PXD project contains unexpected trailing bytes.");
+  const assets = {};
+  for (const entry of manifest.modules.draw.assets) {
+    const rasterBytes = payloads.get(entry.path);
+    assert(rasterBytes !== void 0, "PXD_ENTRY_MISSING", `PXD Draw entry ${entry.path} is missing.`);
+    assert(await sha256BytesHex2(rasterBytes) === entry.sha256, "PXD_ASSET_HASH_MISMATCH", `PXD asset ${entry.assetId} hash does not match its contents.`);
+    assert(assets[entry.assetId] === void 0, "PXD_ASSET_DUPLICATE", `PXD asset ${entry.assetId} is duplicated.`);
+    assets[entry.assetId] = buildImportedAsset(entry, rasterBytes);
+  }
+  const primary = manifest.modules.draw.assets[0];
+  assert(primary !== void 0, "PXD_ASSETS_EMPTY", "PXD project has no Draw asset.");
+  const project = manifest.project;
+  const created = createProject({
+    projectId: manifest.projectId,
+    name: project.name,
+    width: primary.width,
+    height: primary.height,
+    tileSize: primary.tileSize,
+    palette: primary.palette
+  });
+  const state = {
+    ...created,
+    structureEpoch: project.structureEpoch,
+    activeAssetId: project.activeAssetId,
+    activeLayerId: project.activeLayerId,
+    activeFrameId: project.activeFrameId,
+    activeCelId: project.activeCelId,
+    layers: project.layers.map((layer) => ({
+      ...layer
+    })),
+    frames: project.frames.map((frame) => ({
+      ...frame
+    })),
+    cels: project.cels.map((cel) => ({
+      ...cel
+    })),
+    timeline: {
+      ...project.timeline,
+      frameOrder: [
+        ...project.timeline.frameOrder
+      ],
+      layerTrackOrder: [
+        ...project.timeline.layerTrackOrder
+      ]
+    },
+    tilemaps: project.tilemaps ?? {},
+    assets,
+    appliedCommandIds: [],
+    lastClientSequenceByClient: {}
+  };
+  assert(state.assets[state.activeAssetId] !== void 0, "PXD_ACTIVE_ASSET_MISSING", "PXD active Draw asset is missing.");
+  const audio = manifest.modules.audio.status === "EMPTY" || manifest.modules.audio.state === null ? null : {
+    schemaVersion: manifest.modules.audio.schemaVersion,
+    record: parseProjectJsonPayload(manifest.modules.audio.state, payloads),
+    assets: manifest.modules.audio.assets.map((asset) => ({
+      revisionId: asset.revisionId,
+      mediaType: asset.mediaType,
+      bytes: payloads.get(asset.path)
+    }))
+  };
+  const game = manifest.modules.game.status === "EMPTY" || manifest.modules.game.state === null ? null : {
+    schemaVersion: manifest.modules.game.schemaVersion,
+    record: parseProjectJsonPayload(manifest.modules.game.state, payloads)
+  };
+  const assetDefinitions = manifest.assetDefinitions === void 0 ? [] : manifest.assetDefinitions;
+  return {
+    state,
+    packageHash,
+    manifestHash: manifest.canonicalManifestHash,
+    manifest,
+    assetDefinitions,
+    drawTimelineMetadata: manifest.drawTimelineMetadata === void 0 ? normalizeDraw2TimelineMetadata(void 0, state.frames.length) : normalizeDraw2TimelineMetadata(manifest.drawTimelineMetadata, state.frames.length),
+    productDefinitions: manifest.productDefinitions === void 0 ? [] : manifest.productDefinitions,
+    assetPackages: manifest.assetPackages === void 0 ? [] : manifest.assetPackages,
+    audio,
+    game
+  };
+}
+
+// src/game/game-300/core.ts
+var GAME_PROJECT_SCHEMA_VERSION = 1;
+var BEHAVIOR_IR_VERSION = 1;
+var GAME_RUNTIME_PROFILE_SCHEMA_VERSION = 1;
+var GAME_CAMERA_2D_SETTINGS_SCHEMA_VERSION = 1;
+function stableCameraReference(value) {
+  return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(value);
+}
+function isValidGameCamera2DSettings(value) {
+  if (!isRecord3(value)) return false;
+  const follow = value.follow;
+  const shake = value.shake;
+  if (!isRecord3(follow) || !isRecord3(shake)) return false;
+  return value.schemaVersion === GAME_CAMERA_2D_SETTINGS_SCHEMA_VERSION && typeof value.pixelPerfect === "boolean" && Number.isSafeInteger(value.referenceWidth) && Number(value.referenceWidth) >= 1 && Number(value.referenceWidth) <= 8192 && Number.isSafeInteger(value.referenceHeight) && Number(value.referenceHeight) >= 1 && Number(value.referenceHeight) <= 8192 && Number.isSafeInteger(value.pixelsPerUnit) && Number(value.pixelsPerUnit) >= 1 && Number(value.pixelsPerUnit) <= 1024 && typeof follow.enabled === "boolean" && (follow.targetId === void 0 || stableCameraReference(follow.targetId)) && typeof follow.smoothing === "number" && Number.isFinite(follow.smoothing) && follow.smoothing >= 0 && follow.smoothing <= 2 && [
+    "deadZoneX",
+    "deadZoneY"
+  ].every((key) => typeof follow[key] === "number" && Number.isFinite(follow[key]) && follow[key] >= 0 && follow[key] <= 64) && [
+    "lookAheadX",
+    "lookAheadY"
+  ].every((key) => typeof follow[key] === "number" && Number.isFinite(follow[key]) && follow[key] >= -64 && follow[key] <= 64) && typeof shake.onDamage === "boolean" && typeof shake.strength === "number" && Number.isFinite(shake.strength) && shake.strength >= 0 && shake.strength <= 64 && typeof shake.durationMs === "number" && Number.isSafeInteger(shake.durationMs) && shake.durationMs >= 0 && shake.durationMs <= 1e4 && typeof shake.frequency === "number" && Number.isFinite(shake.frequency) && shake.frequency >= 1 && shake.frequency <= 120;
+}
+var GAME_SCENE_RULES_KEYS = /* @__PURE__ */ new Set([
+  "schemaVersion",
+  "runtimeFamily",
+  "gravity",
+  "horizontalMove",
+  "verticalMove",
+  "jump",
+  "floorCollision",
+  "cameraFollow",
+  "mobileControls"
+]);
+var GAME_EVENT_CARD_KEYS = /* @__PURE__ */ new Set([
+  "eventId",
+  "label",
+  "enabled",
+  "who",
+  "condition",
+  "sourceTrackId",
+  "targetTrackId",
+  "action",
+  "message",
+  "amount",
+  "audioTrackId",
+  "itemId",
+  "recipeId",
+  "blockTypeId"
+]);
+function isValidGameSceneRules(value) {
+  if (!isRecord3(value)) return false;
+  return Object.keys(value).every((key) => GAME_SCENE_RULES_KEYS.has(key)) && value.schemaVersion === GAME_SCENE_RULES_SCHEMA_VERSION && [
+    "RPG_GRID",
+    "ACTION_PLATFORM",
+    "SCROLL_SIDE",
+    "DODGE_ARENA",
+    "FREE"
+  ].includes(String(value.runtimeFamily)) && [
+    "NONE",
+    "WEAK",
+    "STANDARD",
+    "STRONG"
+  ].includes(String(value.gravity)) && [
+    "horizontalMove",
+    "verticalMove",
+    "jump",
+    "floorCollision",
+    "cameraFollow",
+    "mobileControls"
+  ].every((key) => typeof value[key] === "boolean");
+}
+function isValidGameEventCard(value) {
+  if (!isRecord3(value)) return false;
+  const validReference = (candidate) => candidate === void 0 || typeof candidate === "string" && GAME_TEMPLATE_VALUE_KEY_PATTERN.test(candidate);
+  const validText = (candidate, max = 240) => candidate === void 0 || typeof candidate === "string" && candidate.length <= max;
+  return Object.keys(value).every((key) => GAME_EVENT_CARD_KEYS.has(key)) && typeof value.eventId === "string" && GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.eventId) && typeof value.label === "string" && value.label.trim().length > 0 && value.label.length <= 128 && typeof value.enabled === "boolean" && [
+    "PLAYER",
+    "TOUCHED_OBJECT",
+    "ANYONE"
+  ].includes(String(value.who)) && [
+    "START",
+    "ENTER_RANGE",
+    "TOUCH",
+    "TAP",
+    "INTERACT",
+    "REACH_GOAL",
+    "HAS_ITEM"
+  ].includes(String(value.condition)) && validReference(value.sourceTrackId) && validReference(value.targetTrackId) && [
+    "SHOW_DIALOGUE",
+    "DAMAGE",
+    "SHAKE_CAMERA",
+    "PLAY_AUDIO",
+    "COMPLETE_SCENE",
+    "SET_VARIABLE",
+    "GIVE_ITEM",
+    "TAKE_ITEM",
+    "CRAFT_ITEM",
+    "BREAK_BLOCK",
+    "PLACE_BLOCK"
+  ].includes(String(value.action)) && validText(value.message) && validReference(value.audioTrackId) && validReference(value.itemId) && validReference(value.recipeId) && validReference(value.blockTypeId) && (value.amount === void 0 || typeof value.amount === "number" && Number.isFinite(value.amount) && value.amount >= 0 && value.amount <= 999999);
+}
+var GAME_SCENE_RULES_SCHEMA_VERSION = 1;
+var GAME_TILEMAP_DOCUMENT_SCHEMA_VERSION = 1;
+var GAME_TEMPLATE_CATEGORIES = [
+  "CORE",
+  "RPG",
+  "ACTION",
+  "SHOOTING",
+  "RACING",
+  "RHYTHM"
+];
+var GAME_TEMPLATE_KINDS = [
+  "CHARACTER",
+  "WEAPON",
+  "ARMOR",
+  "SKILL",
+  "STATUS",
+  "TILE",
+  "DAMAGE",
+  "UI"
+];
+function asId(value, label) {
+  if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(value)) {
+    throw new Error(`${label} must be a stable identifier.`);
+  }
+  return value;
+}
+var asEntityId = (value) => asId(value, "EntityId");
+var asComponentId = (value) => asId(value, "ComponentId");
+var asBehaviorId = (value) => asId(value, "BehaviorId");
+function isRecord3(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+var GAME_TILEMAP_DOCUMENT_KEYS = /* @__PURE__ */ new Set([
+  "schemaVersion",
+  "mapId",
+  "width",
+  "height",
+  "tileSize",
+  "cells"
+]);
+var GAME_TILEMAP_CELL_KEYS = /* @__PURE__ */ new Set([
+  "x",
+  "y",
+  "collision",
+  "triggerId",
+  "blockTypeId"
+]);
+function isValidGameTilemapDocument(value) {
+  if (!isRecord3(value)) return false;
+  const width = value.width;
+  const height = value.height;
+  const tileSize = value.tileSize;
+  const cells = value.cells;
+  if (Object.keys(value).some((key) => !GAME_TILEMAP_DOCUMENT_KEYS.has(key)) || value.schemaVersion !== GAME_TILEMAP_DOCUMENT_SCHEMA_VERSION || typeof value.mapId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(value.mapId) || !Number.isSafeInteger(width) || typeof width !== "number" || width < 1 || width > Number.MAX_SAFE_INTEGER || !Number.isSafeInteger(height) || typeof height !== "number" || height < 1 || height > Number.MAX_SAFE_INTEGER || !Number.isSafeInteger(tileSize) || typeof tileSize !== "number" || tileSize < 1 || tileSize > 4096 || !Array.isArray(cells) || cells.length > width * height) {
+    return false;
+  }
+  const seen = /* @__PURE__ */ new Set();
+  for (const rawCell of cells) {
+    if (!isRecord3(rawCell)) return false;
+    const x = rawCell.x;
+    const y = rawCell.y;
+    const collision = rawCell.collision;
+    const triggerId = rawCell.triggerId;
+    const blockTypeId = rawCell.blockTypeId;
+    if (Object.keys(rawCell).some((key2) => !GAME_TILEMAP_CELL_KEYS.has(key2)) || !Number.isSafeInteger(x) || typeof x !== "number" || x < 0 || x >= width || !Number.isSafeInteger(y) || typeof y !== "number" || y < 0 || y >= height || collision !== "NONE" && collision !== "SOLID" || triggerId !== void 0 && (typeof triggerId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(triggerId)) || blockTypeId !== void 0 && (typeof blockTypeId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(blockTypeId)) || // A cell with none of the three is indistinguishable from an absent
+    // (air) cell, so the sparse list rejects it to stay canonical.
+    collision === "NONE" && triggerId === void 0 && blockTypeId === void 0) {
+      return false;
+    }
+    const key = `${x},${y}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+  }
+  return true;
+}
+var GAME_TEMPLATE_INSTANCE_KEYS = /* @__PURE__ */ new Set([
+  "instanceId",
+  "templateId",
+  "category",
+  "kind",
+  "target",
+  "label",
+  "values",
+  "targetTrackId"
+]);
+var GAME_TEMPLATE_VALUE_KEY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u;
+function isValidGameTemplateInstance(value) {
+  if (!isRecord3(value)) return false;
+  if (Object.keys(value).some((key) => !GAME_TEMPLATE_INSTANCE_KEYS.has(key)) || typeof value.instanceId !== "string" || !GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.instanceId) || typeof value.templateId !== "string" || !GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.templateId) || !GAME_TEMPLATE_CATEGORIES.includes(value.category) || !GAME_TEMPLATE_KINDS.includes(value.kind) || value.target !== "SCENE_OBJECT" && value.target !== "GAME_DATA" || typeof value.label !== "string" || value.label.trim().length === 0 || !isRecord3(value.values) || value.targetTrackId !== void 0 && (typeof value.targetTrackId !== "string" || !GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.targetTrackId))) return false;
+  if (value.target === "SCENE_OBJECT" && value.targetTrackId === void 0) {
+    return false;
+  }
+  const templateValues = value.values;
+  if (!isRecord3(templateValues)) return false;
+  return Object.keys(templateValues).every((key) => {
+    if (!GAME_TEMPLATE_VALUE_KEY_PATTERN.test(key)) return false;
+    const templateValue = templateValues[key];
+    return typeof templateValue === "string" || typeof templateValue === "boolean" || typeof templateValue === "number" && Number.isFinite(templateValue);
+  });
+}
+var GAME_ANIMATION_BINDING_KEYS = /* @__PURE__ */ new Set([
+  "bindingId",
+  "trackId",
+  "assetDefinitionId",
+  "clipKey",
+  "motionName",
+  "direction",
+  "frameIds",
+  "fps",
+  "loopMode",
+  "flipX",
+  "flipY",
+  "mode",
+  "sourceAssetId",
+  "sourceRevisionId",
+  "sourceContentHash"
+]);
+function isValidGameAnimationBinding(value) {
+  if (!isRecord3(value)) return false;
+  const id = (candidate) => typeof candidate === "string" && GAME_TEMPLATE_VALUE_KEY_PATTERN.test(candidate);
+  const label = (candidate) => typeof candidate === "string" && candidate.trim().length > 0 && candidate.length <= 128;
+  return Object.keys(value).every((key) => GAME_ANIMATION_BINDING_KEYS.has(key)) && id(value.bindingId) && id(value.trackId) && id(value.assetDefinitionId) && label(value.clipKey) && label(value.motionName) && (value.direction === void 0 || label(value.direction)) && Array.isArray(value.frameIds) && value.frameIds.length > 0 && value.frameIds.length <= 512 && value.frameIds.every((frameId) => id(frameId)) && typeof value.fps === "number" && Number.isFinite(value.fps) && value.fps > 0 && value.fps <= 240 && [
+    "LOOP",
+    "ONCE",
+    "PING_PONG"
+  ].includes(String(value.loopMode)) && typeof value.flipX === "boolean" && typeof value.flipY === "boolean" && (value.mode === "LIVE" || value.mode === "PINNED") && (value.sourceAssetId === void 0 || id(value.sourceAssetId)) && (value.sourceRevisionId === void 0 || id(value.sourceRevisionId)) && (value.sourceContentHash === void 0 || typeof value.sourceContentHash === "string" && /^[a-f0-9]{64}$/u.test(value.sourceContentHash));
+}
+var GAME_ASSET_REVISION_REFERENCE_KEYS = /* @__PURE__ */ new Set([
+  "kind",
+  "assetId",
+  "revisionId",
+  "ownerId",
+  "contentHash",
+  "mode"
+]);
+function isValidAssetRevisionReference(value) {
+  if (!isRecord3(value)) return false;
+  const id = (candidate) => typeof candidate === "string" && GAME_TEMPLATE_VALUE_KEY_PATTERN.test(candidate);
+  return Object.keys(value).every((key) => GAME_ASSET_REVISION_REFERENCE_KEYS.has(key)) && (value.kind === "DRAW" || value.kind === "AUDIO") && id(value.assetId) && id(value.revisionId) && id(value.ownerId) && typeof value.contentHash === "string" && /^[a-f0-9]{64}$/u.test(value.contentHash) && (value.mode === "PINNED" || value.mode === "LIVE");
+}
+var GAME_TIMELINE_ASSET_BINDING_KEYS = /* @__PURE__ */ new Set([
+  "trackId",
+  "kind",
+  "assetId",
+  "revisionId",
+  "contentHash",
+  "mode",
+  "licenseId",
+  "rights",
+  "sourceKind"
+]);
+function isValidGameTimelineAssetBinding(value) {
+  if (!isRecord3(value)) return false;
+  const id = (candidate) => typeof candidate === "string" && GAME_TEMPLATE_VALUE_KEY_PATTERN.test(candidate);
+  const rightsValid = value.rights === void 0 || Array.isArray(value.rights) && value.rights.length > 0 && value.rights.every((right) => typeof right === "string" && right.trim().length > 0) && new Set(value.rights).size === value.rights.length;
+  return Object.keys(value).every((key) => GAME_TIMELINE_ASSET_BINDING_KEYS.has(key)) && typeof value.trackId === "string" && GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.trackId) && (value.kind === "DRAW" || value.kind === "AUDIO") && id(value.assetId) && id(value.revisionId) && typeof value.contentHash === "string" && /^[a-f0-9]{64}$/u.test(value.contentHash) && (value.mode === "PINNED" || value.mode === "LIVE") && (value.licenseId === void 0 || id(value.licenseId)) && rightsValid && (value.sourceKind === void 0 || value.sourceKind === "PROJECT" || value.sourceKind === "MARKET") && (value.sourceKind !== "MARKET" || value.mode === "PINNED" && value.licenseId !== void 0 && Array.isArray(value.rights) && value.rights.length > 0);
+}
+var GAME_ITEM_DEFINITION_KEYS = /* @__PURE__ */ new Set([
+  "itemId",
+  "label",
+  "icon",
+  "stackable",
+  "maxStack"
+]);
+function isValidGameItemDefinition(value) {
+  if (!isRecord3(value)) return false;
+  return Object.keys(value).every((key) => GAME_ITEM_DEFINITION_KEYS.has(key)) && typeof value.itemId === "string" && GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.itemId) && typeof value.label === "string" && value.label.trim().length > 0 && value.label.length <= 128 && (value.icon === void 0 || isValidAssetRevisionReference(value.icon)) && typeof value.stackable === "boolean" && typeof value.maxStack === "number" && Number.isFinite(value.maxStack) && value.maxStack >= 1 && value.maxStack <= 999999 && (value.stackable || value.maxStack === 1);
+}
+var GAME_RECIPE_INGREDIENT_KEYS = /* @__PURE__ */ new Set([
+  "itemId",
+  "amount"
+]);
+function isValidGameRecipeIngredient(value) {
+  if (!isRecord3(value)) return false;
+  return Object.keys(value).every((key) => GAME_RECIPE_INGREDIENT_KEYS.has(key)) && typeof value.itemId === "string" && GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.itemId) && typeof value.amount === "number" && Number.isFinite(value.amount) && value.amount >= 1 && value.amount <= 999999;
+}
+var GAME_RECIPE_DEFINITION_KEYS = /* @__PURE__ */ new Set([
+  "recipeId",
+  "label",
+  "ingredients",
+  "result"
+]);
+function isValidGameRecipeDefinition(value) {
+  if (!isRecord3(value)) return false;
+  return Object.keys(value).every((key) => GAME_RECIPE_DEFINITION_KEYS.has(key)) && typeof value.recipeId === "string" && GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.recipeId) && typeof value.label === "string" && value.label.trim().length > 0 && value.label.length <= 128 && Array.isArray(value.ingredients) && value.ingredients.length > 0 && value.ingredients.length <= 32 && value.ingredients.every((ingredient) => isValidGameRecipeIngredient(ingredient)) && isValidGameRecipeIngredient(value.result);
+}
+var GAME_BLOCK_TYPE_DEFINITION_KEYS = /* @__PURE__ */ new Set([
+  "blockTypeId",
+  "label",
+  "icon",
+  "breakable",
+  "dropItemId",
+  "placeable"
+]);
+function isValidGameBlockTypeDefinition(value) {
+  if (!isRecord3(value)) return false;
+  return Object.keys(value).every((key) => GAME_BLOCK_TYPE_DEFINITION_KEYS.has(key)) && typeof value.blockTypeId === "string" && GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.blockTypeId) && typeof value.label === "string" && value.label.trim().length > 0 && value.label.length <= 128 && (value.icon === void 0 || isValidAssetRevisionReference(value.icon)) && typeof value.breakable === "boolean" && (value.dropItemId === void 0 || typeof value.dropItemId === "string" && GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.dropItemId)) && typeof value.placeable === "boolean";
+}
+function diagnostic4(code, path, message) {
+  return {
+    code,
+    path,
+    message,
+    recoverable: true
+  };
+}
+function duplicateDiagnostics(values, path) {
+  const seen = /* @__PURE__ */ new Set();
+  const diagnostics = [];
+  for (const value of values) {
+    if (seen.has(value)) {
+      diagnostics.push(diagnostic4("DUPLICATE_ID", path, `Duplicate id: ${value}`));
+    }
+    seen.add(value);
+  }
+  return diagnostics;
+}
+function validateCaller(project, caller) {
+  const diagnostics = [];
+  if (project.projectId !== caller.projectId || project.revision.projectId !== caller.projectId) {
+    diagnostics.push(diagnostic4("PROJECT_ID_MISMATCH", "projectId", "Caller project identity does not match the project revision."));
+  }
+  if (project.ownerId !== caller.ownerId || project.revision.ownerId !== caller.ownerId) {
+    diagnostics.push(diagnostic4("CALLER_OWNER_MISMATCH", "ownerId", "Caller owner is not the project/revision owner."));
+  }
+  if (project.revision.revisionId !== caller.revisionId) {
+    diagnostics.push(diagnostic4("CALLER_REVISION_MISMATCH", "revision.revisionId", "Caller revision is not the current project revision."));
+  }
+  return diagnostics;
+}
+function validateAssetReference(reference, path, ownerId, diagnostics) {
+  if (!isRecord3(reference) || ![
+    "DRAW",
+    "AUDIO"
+  ].includes(String(reference.kind))) {
+    diagnostics.push(diagnostic4("INVALID_REFERENCE", path, "Asset reference must declare DRAW or AUDIO."));
+    return;
+  }
+  if (reference.ownerId !== ownerId) {
+    diagnostics.push(diagnostic4("INVALID_REFERENCE", `${path}.ownerId`, "Asset owner must match the Game Project owner."));
+  }
+  for (const key of [
+    "assetId",
+    "revisionId",
+    "ownerId",
+    "contentHash",
+    "mode"
+  ]) {
+    if (typeof reference[key] !== "string") {
+      diagnostics.push(diagnostic4("INVALID_REFERENCE", `${path}.${key}`, "Asset revision reference field is invalid."));
+    }
+  }
+  if (typeof reference.contentHash === "string" && !/^[a-f0-9]{64}$/u.test(reference.contentHash)) {
+    diagnostics.push(diagnostic4("INVALID_REFERENCE", `${path}.contentHash`, "Asset content hash must be lowercase SHA-256."));
+  }
+}
+function validateComponent(component, path, ownerId, knownBehaviorIds, diagnostics) {
+  if (!isRecord3(component) || typeof component.type !== "string" || typeof component.componentId !== "string") {
+    diagnostics.push(diagnostic4("INVALID_COMPONENT", path, "Component shape or type is unsupported."));
+    return;
+  }
+  if (![
+    "TRANSFORM",
+    "SPRITE",
+    "AUDIO_SOURCE",
+    "BEHAVIOR",
+    "CAMERA",
+    "TILEMAP",
+    "COLLIDER",
+    "RIGIDBODY",
+    "CHARACTER_CONTROLLER"
+  ].includes(component.type)) {
+    diagnostics.push(diagnostic4("INVALID_COMPONENT", path, `Unknown component type: ${component.type}`));
+    return;
+  }
+  if (typeof component.componentId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(component.componentId)) {
+    diagnostics.push(diagnostic4("INVALID_COMPONENT", `${path}.componentId`, "Component id is invalid."));
+  }
+  if (component.type === "TRANSFORM" && ![
+    "x",
+    "y",
+    "rotation",
+    "scaleX",
+    "scaleY"
+  ].every((key) => typeof component[key] === "number" && Number.isFinite(component[key]))) {
+    diagnostics.push(diagnostic4("INVALID_COMPONENT", path, "Transform component contains a non-finite value."));
+  }
+  if (component.type === "SPRITE") {
+    validateAssetReference(component.asset, `${path}.asset`, ownerId, diagnostics);
+  }
+  if (component.type === "AUDIO_SOURCE") {
+    validateAssetReference(component.asset, `${path}.asset`, ownerId, diagnostics);
+    if (!isRecord3(component.asset) || component.asset.kind !== "AUDIO") {
+      diagnostics.push(diagnostic4("INVALID_COMPONENT", `${path}.asset`, "Audio Source requires an AUDIO asset revision."));
+    }
+    if (typeof component.volume !== "number" || !Number.isFinite(component.volume) || component.volume < 0 || component.volume > 1) {
+      diagnostics.push(diagnostic4("INVALID_COMPONENT", `${path}.volume`, "Audio volume must be between 0 and 1."));
+    }
+  }
+  if (component.type === "BEHAVIOR" && (typeof component.behaviorId !== "string" || !knownBehaviorIds.has(component.behaviorId))) {
+    diagnostics.push(diagnostic4("MISSING_REFERENCE", `${path}.behaviorId`, "Behavior component references an unknown behavior."));
+  }
+  if (component.type === "CAMERA" && (typeof component.zoom !== "number" || !Number.isFinite(component.zoom) || component.zoom <= 0)) {
+    diagnostics.push(diagnostic4("INVALID_COMPONENT", `${path}.zoom`, "Camera zoom must be a positive finite number."));
+  }
+  if (component.type === "CAMERA" && component.camera2D !== void 0 && !isValidGameCamera2DSettings(component.camera2D)) {
+    diagnostics.push(diagnostic4("INVALID_COMPONENT", `${path}.camera2D`, "Camera 2D settings are invalid."));
+  }
+  if (component.type === "TILEMAP") {
+    if (typeof component.mapId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(component.mapId)) {
+      diagnostics.push(diagnostic4("INVALID_COMPONENT", `${path}.mapId`, "Tilemap map id is invalid."));
+    }
+    if (typeof component.tileSize !== "number" || !Number.isSafeInteger(component.tileSize) || component.tileSize < 1) {
+      diagnostics.push(diagnostic4("INVALID_COMPONENT", `${path}.tileSize`, "Tilemap tile size must be a positive integer."));
+    }
+    if (typeof component.collisionEnabled !== "boolean") {
+      diagnostics.push(diagnostic4("INVALID_COMPONENT", `${path}.collisionEnabled`, "Tilemap collisionEnabled must be boolean."));
+    }
+    if (component.document !== void 0 && !isValidGameTilemapDocument(component.document)) {
+      diagnostics.push(diagnostic4("INVALID_COMPONENT", `${path}.document`, "Tilemap document is invalid."));
+    }
+  }
+  if (component.type === "COLLIDER") {
+    if (![
+      "BOX",
+      "CIRCLE",
+      "CAPSULE"
+    ].includes(component.shape)) {
+      diagnostics.push(diagnostic4("INVALID_COMPONENT", `${path}.shape`, "Collider shape is unsupported."));
+    }
+    for (const key of [
+      "width",
+      "height",
+      "radius"
+    ]) {
+      if (typeof component[key] !== "number" || !Number.isFinite(component[key]) || component[key] <= 0) {
+        diagnostics.push(diagnostic4("INVALID_COMPONENT", `${path}.${key}`, "Collider dimensions must be positive finite numbers."));
+      }
+    }
+    if (typeof component.isTrigger !== "boolean") {
+      diagnostics.push(diagnostic4("INVALID_COMPONENT", `${path}.isTrigger`, "Collider isTrigger must be boolean."));
+    }
+    if (![
+      "DEFAULT",
+      "WORLD",
+      "PLAYER",
+      "NPC",
+      "SENSOR",
+      "PROJECTILE"
+    ].includes(component.layer)) {
+      diagnostics.push(diagnostic4("INVALID_COMPONENT", `${path}.layer`, "Collider layer is unsupported."));
+    }
+    if (typeof component.enabled !== "boolean") {
+      diagnostics.push(diagnostic4("INVALID_COMPONENT", `${path}.enabled`, "Collider enabled must be boolean."));
+    }
+  }
+  if (component.type === "RIGIDBODY") {
+    if (![
+      "STATIC",
+      "DYNAMIC",
+      "KINEMATIC"
+    ].includes(component.bodyType)) {
+      diagnostics.push(diagnostic4("INVALID_COMPONENT", `${path}.bodyType`, "Rigidbody body type is unsupported."));
+    }
+    if (typeof component.mass !== "number" || !Number.isFinite(component.mass) || component.mass <= 0) {
+      diagnostics.push(diagnostic4("INVALID_COMPONENT", `${path}.mass`, "Rigidbody mass must be positive."));
+    }
+    if (typeof component.gravityScale !== "number" || !Number.isFinite(component.gravityScale)) {
+      diagnostics.push(diagnostic4("INVALID_COMPONENT", `${path}.gravityScale`, "Rigidbody gravity scale must be finite."));
+    }
+    if (typeof component.fixedRotation !== "boolean" || typeof component.enabled !== "boolean") {
+      diagnostics.push(diagnostic4("INVALID_COMPONENT", path, "Rigidbody flags are invalid."));
+    }
+  }
+  if (component.type === "CHARACTER_CONTROLLER") {
+    if (typeof component.moveSpeed !== "number" || !Number.isFinite(component.moveSpeed) || component.moveSpeed <= 0) {
+      diagnostics.push(diagnostic4("INVALID_COMPONENT", `${path}.moveSpeed`, "Character Controller move speed must be positive."));
+    }
+    if (typeof component.stepHeight !== "number" || !Number.isFinite(component.stepHeight) || component.stepHeight < 0) {
+      diagnostics.push(diagnostic4("INVALID_COMPONENT", `${path}.stepHeight`, "Character Controller step height must be non-negative."));
+    }
+    if (typeof component.fixedStep !== "number" || !Number.isSafeInteger(component.fixedStep) || component.fixedStep < 1) {
+      diagnostics.push(diagnostic4("INVALID_COMPONENT", `${path}.fixedStep`, "Character Controller fixed step must be a positive integer."));
+    }
+    if (typeof component.enabled !== "boolean") {
+      diagnostics.push(diagnostic4("INVALID_COMPONENT", `${path}.enabled`, "Character Controller enabled must be boolean."));
+    }
+  }
+}
+function validateGameComponentState(component, path, diagnostics) {
+  if (!isRecord3(component) || typeof component.type !== "string" || typeof component.componentId !== "string") {
+    diagnostics.push(diagnostic4("INVALID_PROJECT", path, "Game editor component state is invalid."));
+    return;
+  }
+  if (![
+    "TRANSFORM",
+    "SPRITE",
+    "AUDIO_SOURCE",
+    "BEHAVIOR",
+    "CAMERA",
+    "TILEMAP",
+    "COLLIDER",
+    "RIGIDBODY",
+    "CHARACTER_CONTROLLER",
+    "STATUS",
+    "SKILL",
+    "BRAIN"
+  ].includes(component.type)) {
+    diagnostics.push(diagnostic4("INVALID_PROJECT", `${path}.type`, `Unknown Game editor component state: ${component.type}`));
+    return;
+  }
+  if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(component.componentId)) {
+    diagnostics.push(diagnostic4("INVALID_PROJECT", `${path}.componentId`, "Game editor component id is invalid."));
+  }
+  if (component.type === "TRANSFORM" && ![
+    "x",
+    "y",
+    "rotation",
+    "scaleX",
+    "scaleY"
+  ].every((key) => typeof component[key] === "number" && Number.isFinite(component[key]))) {
+    diagnostics.push(diagnostic4("INVALID_PROJECT", path, "Game editor Transform state contains a non-finite value."));
+  }
+  if (component.type === "SPRITE" && typeof component.visible !== "boolean") {
+    diagnostics.push(diagnostic4("INVALID_PROJECT", path, "Game editor Sprite state requires visible."));
+  }
+  if (component.type === "BEHAVIOR" && typeof component.enabled !== "boolean") {
+    diagnostics.push(diagnostic4("INVALID_PROJECT", path, "Game editor Behavior state requires enabled."));
+  }
+  if (component.type === "AUDIO_SOURCE" && (typeof component.loop !== "boolean" || typeof component.volume !== "number" || !Number.isFinite(component.volume) || component.volume < 0 || component.volume > 1)) {
+    diagnostics.push(diagnostic4("INVALID_PROJECT", path, "Game editor Audio Source state is invalid."));
+  }
+  if (component.type === "CAMERA" && (typeof component.active !== "boolean" || typeof component.zoom !== "number" || !Number.isFinite(component.zoom) || component.zoom <= 0)) {
+    diagnostics.push(diagnostic4("INVALID_PROJECT", path, "Game editor Camera state is invalid."));
+  }
+  if (component.type === "CAMERA" && component.camera2D !== void 0 && !isValidGameCamera2DSettings(component.camera2D)) {
+    diagnostics.push(diagnostic4("INVALID_PROJECT", `${path}.camera2D`, "Game editor Camera 2D settings are invalid."));
+  }
+  if (component.type === "TILEMAP" && (typeof component.mapId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(component.mapId) || typeof component.tileSize !== "number" || !Number.isSafeInteger(component.tileSize) || component.tileSize < 1 || typeof component.collisionEnabled !== "boolean" || component.document !== void 0 && !isValidGameTilemapDocument(component.document))) {
+    diagnostics.push(diagnostic4("INVALID_PROJECT", path, "Game editor Tilemap state is invalid."));
+  }
+  if (component.type === "COLLIDER") {
+    if (![
+      "BOX",
+      "CIRCLE",
+      "CAPSULE"
+    ].includes(component.shape) || [
+      "width",
+      "height",
+      "radius"
+    ].some((key) => typeof component[key] !== "number" || !Number.isFinite(component[key]) || component[key] <= 0) || typeof component.isTrigger !== "boolean" || ![
+      "DEFAULT",
+      "WORLD",
+      "PLAYER",
+      "NPC",
+      "SENSOR",
+      "PROJECTILE"
+    ].includes(component.layer) || typeof component.enabled !== "boolean") {
+      diagnostics.push(diagnostic4("INVALID_PROJECT", path, "Game editor Collider state is invalid."));
+    }
+  }
+  if (component.type === "RIGIDBODY" && (![
+    "STATIC",
+    "DYNAMIC",
+    "KINEMATIC"
+  ].includes(component.bodyType) || typeof component.mass !== "number" || !Number.isFinite(component.mass) || component.mass <= 0 || typeof component.gravityScale !== "number" || !Number.isFinite(component.gravityScale) || typeof component.fixedRotation !== "boolean" || typeof component.enabled !== "boolean")) {
+    diagnostics.push(diagnostic4("INVALID_PROJECT", path, "Game editor Rigidbody state is invalid."));
+  }
+  if (component.type === "CHARACTER_CONTROLLER" && (typeof component.moveSpeed !== "number" || !Number.isFinite(component.moveSpeed) || component.moveSpeed <= 0 || typeof component.stepHeight !== "number" || !Number.isFinite(component.stepHeight) || component.stepHeight < 0 || typeof component.fixedStep !== "number" || !Number.isSafeInteger(component.fixedStep) || component.fixedStep < 1 || typeof component.enabled !== "boolean")) {
+    diagnostics.push(diagnostic4("INVALID_PROJECT", path, "Game editor Character Controller state is invalid."));
+  }
+  if (component.type === "STATUS" && (![
+    "hp",
+    "maxHp",
+    "stamina",
+    "maxStamina",
+    "mp",
+    "maxMp",
+    "attack",
+    "defense",
+    "level"
+  ].every((key) => typeof component[key] === "number" && Number.isFinite(component[key])) || typeof component.enabled !== "boolean")) {
+    diagnostics.push(diagnostic4("INVALID_PROJECT", path, "Game editor Status state is invalid."));
+  }
+  if (component.type === "SKILL" && (![
+    "ATTACK",
+    "SHOOT",
+    "MAGIC",
+    "DASH_ATTACK",
+    "HEAL",
+    "SHIELD"
+  ].includes(component.kind) || typeof component.power !== "number" || !Number.isFinite(component.power) || typeof component.cooldown !== "number" || !Number.isFinite(component.cooldown) || component.cooldown < 0 || typeof component.enabled !== "boolean")) {
+    diagnostics.push(diagnostic4("INVALID_PROJECT", path, "Game editor Skill state is invalid."));
+  }
+  if (component.type === "BRAIN" && (![
+    "PLAYER_CONTROL",
+    "AI",
+    "PATROL",
+    "PURSUE",
+    "AVOID",
+    "WAIT"
+  ].includes(component.mode) || typeof component.speed !== "number" || !Number.isFinite(component.speed) || component.speed < 0 || typeof component.range !== "number" || !Number.isFinite(component.range) || component.range < 0 || typeof component.enabled !== "boolean")) {
+    diagnostics.push(diagnostic4("INVALID_PROJECT", path, "Game editor Brain state is invalid."));
+  }
+}
+function validateDependencyCycles(dependencies, diagnostics) {
+  const byId = new Map(dependencies.map((dependency) => [
+    String(dependency.dependencyId),
+    dependency
+  ]));
+  const visiting = /* @__PURE__ */ new Set();
+  const visited = /* @__PURE__ */ new Set();
+  const visit = (id, path) => {
+    if (visiting.has(id)) {
+      diagnostics.push(diagnostic4("DEPENDENCY_CYCLE", path, `Dependency cycle includes ${id}.`));
+      return;
+    }
+    if (visited.has(id)) return;
+    const dependency = byId.get(id);
+    if (!dependency) {
+      diagnostics.push(diagnostic4("MISSING_REFERENCE", path, `Dependency ${id} is missing.`));
+      return;
+    }
+    visiting.add(id);
+    for (const target of dependency.dependsOn) {
+      visit(target, `${path}.dependsOn`);
+    }
+    visiting.delete(id);
+    visited.add(id);
+  };
+  for (const dependency of dependencies) {
+    visit(dependency.dependencyId, "dependencies");
+  }
+}
+function validateGameProject2(value, caller) {
+  const diagnostics = [];
+  if (!isRecord3(value)) {
+    return {
+      valid: false,
+      diagnostics: [
+        diagnostic4("INVALID_PROJECT", "project", "Game Project must be an object.")
+      ]
+    };
+  }
+  if (value.schemaVersion !== GAME_PROJECT_SCHEMA_VERSION) {
+    diagnostics.push(diagnostic4("UNKNOWN_SCHEMA", "schemaVersion", "Unsupported Game Project schema version."));
+  }
+  if (typeof value.projectId !== "string" || typeof value.ownerId !== "string" || typeof value.name !== "string" || !isRecord3(value.revision)) {
+    return {
+      valid: false,
+      diagnostics: [
+        ...diagnostics,
+        diagnostic4("INVALID_PROJECT", "project", "Required Game Project identity is missing.")
+      ]
+    };
+  }
+  const project = value;
+  if (caller) diagnostics.push(...validateCaller(project, caller));
+  if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(project.projectId) || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(project.ownerId)) {
+    diagnostics.push(diagnostic4("INVALID_PROJECT", "projectId/ownerId", "Project and owner ids must be stable identifiers."));
+  }
+  if (!project.name.trim()) {
+    diagnostics.push(diagnostic4("INVALID_PROJECT", "name", "Project name is required."));
+  }
+  if (project.revision.projectId !== project.projectId || project.revision.ownerId !== project.ownerId || !Number.isSafeInteger(project.revision.sequence) || project.revision.sequence < 1) {
+    diagnostics.push(diagnostic4("INVALID_REVISION", "revision", "Revision is not bound to the project owner or sequence."));
+  }
+  if (!Array.isArray(project.scenes) || !Array.isArray(project.prefabs) || !Array.isArray(project.dependencies) || !Array.isArray(project.behaviors)) {
+    return {
+      valid: false,
+      diagnostics: [
+        ...diagnostics,
+        diagnostic4("INVALID_PROJECT", "project", "Project collections are invalid.")
+      ]
+    };
+  }
+  if (project.runtimeProfile !== void 0) {
+    if (!isRecord3(project.runtimeProfile) || project.runtimeProfile.schemaVersion !== GAME_RUNTIME_PROFILE_SCHEMA_VERSION || typeof project.runtimeProfile.profileId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(project.runtimeProfile.profileId)) {
+      diagnostics.push(diagnostic4("INVALID_RUNTIME_PROFILE", "runtimeProfile", "Runtime profile reference is invalid."));
+    }
+  }
+  diagnostics.push(...duplicateDiagnostics(project.scenes.map((scene) => String(scene.sceneId)), "scenes.sceneId"));
+  diagnostics.push(...duplicateDiagnostics(project.prefabs.map((prefab) => String(prefab.prefabId)), "prefabs.prefabId"));
+  diagnostics.push(...duplicateDiagnostics(project.dependencies.map((dependency) => String(dependency.dependencyId)), "dependencies.dependencyId"));
+  diagnostics.push(...duplicateDiagnostics(project.behaviors.map((behavior2) => String(behavior2.behaviorId)), "behaviors.behaviorId"));
+  const behaviorIds = new Set(project.behaviors.map((behavior2) => String(behavior2.behaviorId)));
+  const allEntityIds = [];
+  const allComponentIds = [];
+  for (const [sceneIndex, scene] of project.scenes.entries()) {
+    if (!isRecord3(scene) || typeof scene.sceneId !== "string" || !Array.isArray(scene.entities) || !Array.isArray(scene.rootEntityIds)) {
+      diagnostics.push(diagnostic4("INVALID_PROJECT", `scenes[${sceneIndex}]`, "Scene shape is invalid."));
+      continue;
+    }
+    const sceneEntityIds = new Set(scene.entities.map((entity) => String(entity.entityId)));
+    for (const rootId of scene.rootEntityIds) {
+      if (!sceneEntityIds.has(String(rootId))) {
+        diagnostics.push(diagnostic4("MISSING_REFERENCE", `scenes[${sceneIndex}].rootEntityIds`, `Root Entity ${String(rootId)} is missing.`));
+      }
+    }
+    diagnostics.push(...duplicateDiagnostics(scene.entities.map((entity) => String(entity.entityId)), `scenes[${sceneIndex}].entities.entityId`));
+    for (const [entityIndex, entity] of scene.entities.entries()) {
+      if (!isRecord3(entity) || typeof entity.entityId !== "string" || !Array.isArray(entity.components)) {
+        diagnostics.push(diagnostic4("INVALID_PROJECT", `scenes[${sceneIndex}].entities[${entityIndex}]`, "Entity shape is invalid."));
+        continue;
+      }
+      allEntityIds.push(entity.entityId);
+      if (entity.parentEntityId !== void 0 && !sceneEntityIds.has(String(entity.parentEntityId))) {
+        diagnostics.push(diagnostic4("MISSING_REFERENCE", `scenes[${sceneIndex}].entities[${entityIndex}].parentEntityId`, "Parent Entity is missing."));
+      }
+      diagnostics.push(...duplicateDiagnostics(entity.components.map((component) => String(isRecord3(component) ? component.componentId : "<invalid>")), `scenes[${sceneIndex}].entities[${entityIndex}].components.componentId`));
+      for (const [componentIndex, component] of entity.components.entries()) {
+        if (isRecord3(component) && typeof component.componentId === "string") {
+          allComponentIds.push(component.componentId);
+        }
+        validateComponent(component, `scenes[${sceneIndex}].entities[${entityIndex}].components[${componentIndex}]`, project.ownerId, behaviorIds, diagnostics);
+      }
+    }
+    for (const entity of scene.entities) {
+      const seen = /* @__PURE__ */ new Set();
+      let parentId = entity.parentEntityId;
+      while (parentId !== void 0) {
+        if (seen.has(String(parentId)) || parentId === entity.entityId) {
+          diagnostics.push(diagnostic4("DEPENDENCY_CYCLE", `scenes[${sceneIndex}].entities`, `Entity parent cycle includes ${String(entity.entityId)}.`));
+          break;
+        }
+        seen.add(String(parentId));
+        parentId = scene.entities.find((candidate) => candidate.entityId === parentId)?.parentEntityId;
+      }
+    }
+  }
+  diagnostics.push(...duplicateDiagnostics(allEntityIds, "project.entities.entityId"));
+  diagnostics.push(...duplicateDiagnostics(allComponentIds, "project.components.componentId"));
+  for (const dependency of project.dependencies) {
+    if (!isRecord3(dependency) || typeof dependency.dependencyId !== "string" || !Array.isArray(dependency.dependsOn)) {
+      diagnostics.push(diagnostic4("INVALID_PROJECT", "dependencies", "Dependency shape is invalid."));
+    } else if (dependency.ownerId !== project.ownerId || dependency.ownerRevisionId !== project.revision.revisionId) {
+      diagnostics.push(diagnostic4("INVALID_REFERENCE", `dependencies.${dependency.dependencyId}`, "Dependency owner/revision is not the current project revision."));
+    }
+  }
+  validateDependencyCycles(project.dependencies, diagnostics);
+  for (const behavior2 of project.behaviors) {
+    if (behavior2.version !== BEHAVIOR_IR_VERSION || behavior2.ownership !== "CANONICAL_IR" || !Array.isArray(behavior2.rules)) {
+      diagnostics.push(diagnostic4("UNKNOWN_SCHEMA", `behaviors.${String(behavior2.behaviorId)}`, "Behavior IR schema is unsupported."));
+    }
+  }
+  if (project.editorTimeline !== void 0) {
+    const timeline = project.editorTimeline;
+    if (!Number.isSafeInteger(timeline.frameCount) || timeline.frameCount < 1) {
+      diagnostics.push(diagnostic4("INVALID_PROJECT", "editorTimeline.frameCount", "Editor timeline frame count must be a positive integer."));
+    }
+    if (!Array.isArray(timeline.tracks)) {
+      diagnostics.push(diagnostic4("INVALID_PROJECT", "editorTimeline.tracks", "Editor timeline tracks must be an array."));
+    } else {
+      diagnostics.push(...duplicateDiagnostics(timeline.tracks.map((track) => track.trackId), "editorTimeline.tracks.trackId"));
+      for (const [index, track] of timeline.tracks.entries()) {
+        if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(track.trackId) || track.label.trim().length === 0 || track.kind.trim().length === 0) {
+          diagnostics.push(diagnostic4("INVALID_PROJECT", `editorTimeline.tracks[${index}]`, "Editor timeline track identity is invalid."));
+        }
+        if (!Array.isArray(track.activeFrames) || track.activeFrames.some((frame) => !Number.isSafeInteger(frame) || frame < 0 || frame >= timeline.frameCount)) {
+          diagnostics.push(diagnostic4("INVALID_PROJECT", `editorTimeline.tracks[${index}].activeFrames`, "Editor timeline frames must be in range."));
+        } else if (new Set(track.activeFrames).size !== track.activeFrames.length) {
+          diagnostics.push(diagnostic4("DUPLICATE_ID", `editorTimeline.tracks[${index}].activeFrames`, "Editor timeline frames must be unique."));
+        }
+        if (track.role !== void 0 && ![
+          "PLAYER",
+          "NPC",
+          "PROP",
+          "TRIGGER",
+          "TILEMAP",
+          "CAMERA",
+          "AUDIO",
+          "CUSTOM"
+        ].includes(track.role)) {
+          diagnostics.push(diagnostic4("INVALID_PROJECT", `editorTimeline.tracks[${index}].role`, "Game object role is unsupported."));
+        }
+        if (track.components !== void 0) {
+          if (!Array.isArray(track.components)) {
+            diagnostics.push(diagnostic4("INVALID_PROJECT", `editorTimeline.tracks[${index}].components`, "Game editor components must be an array."));
+          } else {
+            diagnostics.push(...duplicateDiagnostics(track.components.map((component) => String(component.componentId)), `editorTimeline.tracks[${index}].components.componentId`));
+            for (const [componentIndex, component] of track.components.entries()) {
+              validateGameComponentState(component, `editorTimeline.tracks[${index}].components[${componentIndex}]`, diagnostics);
+            }
+          }
+        }
+        if (track.tilemap !== void 0 && !isValidGameTilemapDocument(track.tilemap)) {
+          diagnostics.push(diagnostic4("INVALID_PROJECT", `editorTimeline.tracks[${index}].tilemap`, "Editor tilemap document is invalid."));
+        }
+      }
+    }
+    if (timeline.assetBindings !== void 0) {
+      const trackIds = new Set(Array.isArray(timeline.tracks) ? timeline.tracks.map((track) => track.trackId) : []);
+      if (!Array.isArray(timeline.assetBindings) || timeline.assetBindings.some((binding) => !isValidGameTimelineAssetBinding(binding) || !trackIds.has(binding.trackId))) {
+        diagnostics.push(diagnostic4("INVALID_PROJECT", "editorTimeline.assetBindings", "Editor asset binding metadata is invalid or targets a missing track."));
+      } else {
+        diagnostics.push(...duplicateDiagnostics(timeline.assetBindings.map((binding) => `${binding.trackId}:${binding.kind}`), "editorTimeline.assetBindings"));
+      }
+    }
+    if (timeline.sceneRules !== void 0 && !isValidGameSceneRules(timeline.sceneRules)) {
+      diagnostics.push(diagnostic4("INVALID_PROJECT", "editorTimeline.sceneRules", "Scene-wide Game rules are invalid."));
+    }
+    if (timeline.creationMode !== void 0 && ![
+      "RPG_TEMPLATE",
+      "ACTION_2D",
+      "DODGE_2D",
+      "SCROLL_2D",
+      "BLANK"
+    ].includes(timeline.creationMode)) {
+      diagnostics.push(diagnostic4("INVALID_PROJECT", "editorTimeline.creationMode", "Game creation mode is unsupported."));
+    }
+    if (timeline.eventCards !== void 0) {
+      if (!Array.isArray(timeline.eventCards) || timeline.eventCards.some((card) => !isValidGameEventCard(card))) {
+        diagnostics.push(diagnostic4("INVALID_PROJECT", "editorTimeline.eventCards", "Game event cards are invalid."));
+      } else {
+        diagnostics.push(...duplicateDiagnostics(timeline.eventCards.map((card) => card.eventId), "editorTimeline.eventCards.eventId"));
+        const trackIds = new Set(Array.isArray(timeline.tracks) ? timeline.tracks.map((track) => track.trackId) : []);
+        const itemIds = new Set(Array.isArray(timeline.items) ? timeline.items.map((item) => item.itemId) : []);
+        const recipeIds = new Set(Array.isArray(timeline.recipes) ? timeline.recipes.map((recipe) => recipe.recipeId) : []);
+        const blockTypeIds = new Set(Array.isArray(timeline.blockTypes) ? timeline.blockTypes.map((blockType) => blockType.blockTypeId) : []);
+        for (const [index, card] of timeline.eventCards.entries()) {
+          for (const [key, trackId] of [
+            [
+              "sourceTrackId",
+              card.sourceTrackId
+            ],
+            [
+              "targetTrackId",
+              card.targetTrackId
+            ],
+            [
+              "audioTrackId",
+              card.audioTrackId
+            ]
+          ]) {
+            if (trackId !== void 0 && !trackIds.has(trackId)) {
+              diagnostics.push(diagnostic4("MISSING_REFERENCE", `editorTimeline.eventCards[${index}].${key}`, "Game event card track reference is missing."));
+            }
+          }
+          if (card.itemId !== void 0 && !itemIds.has(card.itemId)) {
+            diagnostics.push(diagnostic4("MISSING_REFERENCE", `editorTimeline.eventCards[${index}].itemId`, "Game event card item reference is missing."));
+          }
+          if (card.recipeId !== void 0 && !recipeIds.has(card.recipeId)) {
+            diagnostics.push(diagnostic4("MISSING_REFERENCE", `editorTimeline.eventCards[${index}].recipeId`, "Game event card recipe reference is missing."));
+          }
+          if (card.blockTypeId !== void 0 && !blockTypeIds.has(card.blockTypeId)) {
+            diagnostics.push(diagnostic4("MISSING_REFERENCE", `editorTimeline.eventCards[${index}].blockTypeId`, "Game event card block type reference is missing."));
+          }
+        }
+      }
+    }
+    if (timeline.items !== void 0) {
+      if (!Array.isArray(timeline.items) || timeline.items.some((item) => !isValidGameItemDefinition(item))) {
+        diagnostics.push(diagnostic4("INVALID_PROJECT", "editorTimeline.items", "Game item definitions are invalid."));
+      } else {
+        diagnostics.push(...duplicateDiagnostics(timeline.items.map((item) => item.itemId), "editorTimeline.items.itemId"));
+      }
+    }
+    if (timeline.recipes !== void 0) {
+      if (!Array.isArray(timeline.recipes) || timeline.recipes.some((recipe) => !isValidGameRecipeDefinition(recipe))) {
+        diagnostics.push(diagnostic4("INVALID_PROJECT", "editorTimeline.recipes", "Game recipe definitions are invalid."));
+      } else {
+        diagnostics.push(...duplicateDiagnostics(timeline.recipes.map((recipe) => recipe.recipeId), "editorTimeline.recipes.recipeId"));
+        const knownItemIds = new Set(Array.isArray(timeline.items) ? timeline.items.map((item) => item.itemId) : []);
+        for (const [index, recipe] of timeline.recipes.entries()) {
+          const referenced = [
+            ...recipe.ingredients.map((ingredient) => ingredient.itemId),
+            recipe.result.itemId
+          ];
+          for (const itemId of referenced) {
+            if (!knownItemIds.has(itemId)) {
+              diagnostics.push(diagnostic4("MISSING_REFERENCE", `editorTimeline.recipes[${index}]`, "Game recipe references an unknown item."));
+              break;
+            }
+          }
+        }
+      }
+    }
+    if (timeline.blockTypes !== void 0) {
+      if (!Array.isArray(timeline.blockTypes) || timeline.blockTypes.some((blockType) => !isValidGameBlockTypeDefinition(blockType))) {
+        diagnostics.push(diagnostic4("INVALID_PROJECT", "editorTimeline.blockTypes", "Game block type definitions are invalid."));
+      } else {
+        diagnostics.push(...duplicateDiagnostics(timeline.blockTypes.map((blockType) => blockType.blockTypeId), "editorTimeline.blockTypes.blockTypeId"));
+        const knownItemIdsForBlocks = new Set(Array.isArray(timeline.items) ? timeline.items.map((item) => item.itemId) : []);
+        for (const [index, blockType] of timeline.blockTypes.entries()) {
+          if (blockType.dropItemId !== void 0 && !knownItemIdsForBlocks.has(blockType.dropItemId)) {
+            diagnostics.push(diagnostic4("MISSING_REFERENCE", `editorTimeline.blockTypes[${index}].dropItemId`, "Game block type drop item reference is missing."));
+          }
+        }
+      }
+    }
+    if (timeline.templateInstances !== void 0) {
+      if (!Array.isArray(timeline.templateInstances) || timeline.templateInstances.some((instance) => !isValidGameTemplateInstance(instance))) {
+        diagnostics.push(diagnostic4("INVALID_PROJECT", "editorTimeline.templateInstances", "Game template instances are invalid."));
+      } else {
+        diagnostics.push(...duplicateDiagnostics(timeline.templateInstances.map((instance) => instance.instanceId), "editorTimeline.templateInstances.instanceId"));
+        const trackIds = new Set(Array.isArray(timeline.tracks) ? timeline.tracks.map((track) => track.trackId) : []);
+        for (const [index, instance] of timeline.templateInstances.entries()) {
+          if (instance.targetTrackId !== void 0 && !trackIds.has(instance.targetTrackId)) {
+            diagnostics.push(diagnostic4("MISSING_REFERENCE", `editorTimeline.templateInstances[${index}].targetTrackId`, "Game template target track is missing."));
+          }
+        }
+      }
+    }
+    if (timeline.animationBindings !== void 0) {
+      if (!Array.isArray(timeline.animationBindings) || timeline.animationBindings.some((binding) => !isValidGameAnimationBinding(binding))) {
+        diagnostics.push(diagnostic4("INVALID_PROJECT", "editorTimeline.animationBindings", "Game animation bindings are invalid."));
+      } else {
+        diagnostics.push(...duplicateDiagnostics(timeline.animationBindings.map((binding) => binding.bindingId), "editorTimeline.animationBindings.bindingId"));
+        const trackIds = new Set(Array.isArray(timeline.tracks) ? timeline.tracks.map((track) => track.trackId) : []);
+        const keys = /* @__PURE__ */ new Set();
+        for (const [index, binding] of timeline.animationBindings.entries()) {
+          if (!trackIds.has(binding.trackId)) {
+            diagnostics.push(diagnostic4("MISSING_REFERENCE", `editorTimeline.animationBindings[${index}].trackId`, "Game animation target track is missing."));
+          }
+          const key = `${binding.trackId}\0${binding.assetDefinitionId}\0${binding.clipKey}`;
+          if (keys.has(key)) {
+            diagnostics.push(diagnostic4("DUPLICATE_ID", `editorTimeline.animationBindings[${index}]`, "A Game animation clip can only be assigned once per object."));
+          }
+          keys.add(key);
+        }
+      }
+    }
+  }
+  return {
+    valid: diagnostics.length === 0,
+    diagnostics
+  };
+}
+function sortById(items, key) {
+  return [
+    ...items
+  ].sort((left, right) => String(left[key]).localeCompare(String(right[key]), "en", {
+    numeric: false
+  }));
+}
+function normalizeBehavior(behaviorId, rules) {
+  return {
+    behaviorId,
+    version: BEHAVIOR_IR_VERSION,
+    ownership: "CANONICAL_IR",
+    rules: sortById(rules.map((rule) => ({
+      ...rule,
+      conditions: [
+        ...rule.conditions
+      ],
+      actions: [
+        ...rule.actions
+      ]
+    })), "ruleId")
+  };
+}
+function compileNoCodeBehavior(source) {
+  return normalizeBehavior(source.behaviorId, source.rules);
+}
+
+// src/game/game-350/camera-2d.ts
+var DEFAULT_CAMERA_2D_SETTINGS = Object.freeze({
+  schemaVersion: GAME_CAMERA_2D_SETTINGS_SCHEMA_VERSION,
+  pixelPerfect: true,
+  referenceWidth: 160,
+  referenceHeight: 96,
+  pixelsPerUnit: 16,
+  follow: Object.freeze({
+    enabled: true,
+    targetId: "hero",
+    smoothing: 0.12,
+    deadZoneX: 1,
+    deadZoneY: 0.75,
+    lookAheadX: 0.5,
+    lookAheadY: 0
+  }),
+  shake: Object.freeze({
+    onDamage: true,
+    strength: 0.5,
+    durationMs: 160,
+    frequency: 18
+  })
+});
+function finite(value) {
+  return typeof value === "number" && Number.isFinite(value);
+}
+function bounded(value, minimum, maximum, fallback) {
+  return finite(value) ? Math.min(maximum, Math.max(minimum, value)) : fallback;
+}
+function integerBounded(value, minimum, maximum, fallback) {
+  return Number.isSafeInteger(value) && Number(value) >= minimum && Number(value) <= maximum ? Number(value) : fallback;
+}
+function record2(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value) ? value : void 0;
+}
+function stableId3(value) {
+  return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(value);
+}
+function normalizeCamera2DSettings(value, fallback = DEFAULT_CAMERA_2D_SETTINGS) {
+  if (isValidGameCamera2DSettings(value)) {
+    return {
+      ...value,
+      follow: {
+        ...value.follow
+      },
+      shake: {
+        ...value.shake
+      }
+    };
+  }
+  const source = record2(value);
+  const sourceFollow = record2(source?.follow);
+  const sourceShake = record2(source?.shake);
+  const fallbackFollow = fallback.follow;
+  const fallbackShake = fallback.shake;
+  return {
+    schemaVersion: GAME_CAMERA_2D_SETTINGS_SCHEMA_VERSION,
+    pixelPerfect: typeof source?.pixelPerfect === "boolean" ? source.pixelPerfect : fallback.pixelPerfect,
+    referenceWidth: integerBounded(source?.referenceWidth, 1, 8192, fallback.referenceWidth),
+    referenceHeight: integerBounded(source?.referenceHeight, 1, 8192, fallback.referenceHeight),
+    pixelsPerUnit: integerBounded(source?.pixelsPerUnit, 1, 1024, fallback.pixelsPerUnit),
+    follow: {
+      enabled: typeof sourceFollow?.enabled === "boolean" ? sourceFollow.enabled : fallbackFollow.enabled,
+      ...stableId3(sourceFollow?.targetId) ? {
+        targetId: sourceFollow.targetId
+      } : fallbackFollow.targetId === void 0 ? {} : {
+        targetId: fallbackFollow.targetId
+      },
+      smoothing: bounded(sourceFollow?.smoothing, 0, 2, fallbackFollow.smoothing),
+      deadZoneX: bounded(sourceFollow?.deadZoneX, 0, 64, fallbackFollow.deadZoneX),
+      deadZoneY: bounded(sourceFollow?.deadZoneY, 0, 64, fallbackFollow.deadZoneY),
+      lookAheadX: bounded(sourceFollow?.lookAheadX, -64, 64, fallbackFollow.lookAheadX),
+      lookAheadY: bounded(sourceFollow?.lookAheadY, -64, 64, fallbackFollow.lookAheadY)
+    },
+    shake: {
+      onDamage: typeof sourceShake?.onDamage === "boolean" ? sourceShake.onDamage : fallbackShake.onDamage,
+      strength: bounded(sourceShake?.strength, 0, 64, fallbackShake.strength),
+      durationMs: integerBounded(sourceShake?.durationMs, 0, 1e4, fallbackShake.durationMs),
+      frequency: bounded(sourceShake?.frequency, 1, 120, fallbackShake.frequency)
+    }
+  };
+}
+
+// src/game/game-350/authoring-model.ts
+var GAME_SCENE_RULE_PRESETS = Object.freeze({
+  NONE: 0,
+  WEAK: 4.9,
+  STANDARD: 9.8,
+  STRONG: 19.6
+});
+var GAME_SCENE_RULE_LABELS = Object.freeze({
+  NONE: "\u306A\u3057",
+  WEAK: "\u5F31\u3044",
+  STANDARD: "\u6A19\u6E96",
+  STRONG: "\u5F37\u3044"
+});
+var GAME_RUNTIME_FAMILY_LABELS = Object.freeze({
+  RPG_GRID: "RPG\u30FB\u30DE\u30B9\u79FB\u52D5",
+  ACTION_PLATFORM: "2D\u30A2\u30AF\u30B7\u30E7\u30F3\u30FB\u7C21\u6613\u7269\u7406",
+  SCROLL_SIDE: "2D\u30B9\u30AF\u30ED\u30FC\u30EB\u30FB\u6A2A\u79FB\u52D5",
+  DODGE_ARENA: "\u6575\u3088\u3051\u30FB\u30A2\u30EA\u30FC\u30CA",
+  FREE: "\u81EA\u7531\u5236\u4F5C\u30FB\u6700\u5C0F\u30EB\u30FC\u30EB"
+});
+var GAME_SCENE_GRAVITY_OPTIONS = [
+  {
+    gravity: "NONE",
+    label: "\u306A\u3057",
+    detail: "\u4E0A\u4E0B\u5DE6\u53F3\u306B\u81EA\u7531\u306B\u79FB\u52D5"
+  },
+  {
+    gravity: "WEAK",
+    label: "\u5F31\u3044",
+    detail: "\u3086\u3063\u304F\u308A\u843D\u4E0B\u3059\u308B"
+  },
+  {
+    gravity: "STANDARD",
+    label: "\u6A19\u6E96",
+    detail: "2D\u30A2\u30AF\u30B7\u30E7\u30F3\u306E\u57FA\u672C"
+  },
+  {
+    gravity: "STRONG",
+    label: "\u5F37\u3044",
+    detail: "\u7D20\u65E9\u304F\u843D\u4E0B\u3059\u308B"
+  }
+];
+var GAME_EVENT_WHO_OPTIONS = [
+  {
+    value: "PLAYER",
+    label: "\u4E3B\u4EBA\u516C"
+  },
+  {
+    value: "TOUCHED_OBJECT",
+    label: "\u89E6\u308C\u305F\u30AA\u30D6\u30B8\u30A7\u30AF\u30C8"
+  },
+  {
+    value: "ANYONE",
+    label: "\u8AB0\u3067\u3082"
+  }
+];
+var GAME_EVENT_CONDITION_OPTIONS = [
+  {
+    value: "START",
+    label: "\u30B2\u30FC\u30E0\u304C\u59CB\u307E\u3063\u305F"
+  },
+  {
+    value: "ENTER_RANGE",
+    label: "\u7BC4\u56F2\u306B\u5165\u3063\u305F"
+  },
+  {
+    value: "TOUCH",
+    label: "\u89E6\u308C\u305F"
+  },
+  {
+    value: "TAP",
+    label: "\u30BF\u30C3\u30D7\u3057\u305F"
+  },
+  {
+    value: "INTERACT",
+    label: "\u8A71\u3057\u304B\u3051\u305F"
+  },
+  {
+    value: "REACH_GOAL",
+    label: "\u30B4\u30FC\u30EB\u306B\u7740\u3044\u305F"
+  },
+  {
+    value: "HAS_ITEM",
+    label: "\u30A2\u30A4\u30C6\u30E0\u3092\u6301\u3063\u3066\u3044\u308B"
+  }
+];
+var GAME_EVENT_ACTION_OPTIONS = [
+  {
+    value: "SHOW_DIALOGUE",
+    label: "\u4F1A\u8A71\u3092\u8868\u793A"
+  },
+  {
+    value: "DAMAGE",
+    label: "\u30C0\u30E1\u30FC\u30B8\u3092\u4E0E\u3048\u308B"
+  },
+  {
+    value: "SHAKE_CAMERA",
+    label: "\u30AB\u30E1\u30E9\u3092\u63FA\u3089\u3059"
+  },
+  {
+    value: "PLAY_AUDIO",
+    label: "\u52B9\u679C\u97F3\u3092\u9CF4\u3089\u3059"
+  },
+  {
+    value: "COMPLETE_SCENE",
+    label: "Scene\u3092\u30AF\u30EA\u30A2\u3059\u308B"
+  },
+  {
+    value: "SET_VARIABLE",
+    label: "\u30B2\u30FC\u30E0\u72B6\u614B\u3092\u5909\u3048\u308B"
+  },
+  {
+    value: "GIVE_ITEM",
+    label: "\u30A2\u30A4\u30C6\u30E0\u3092\u6E21\u3059"
+  },
+  {
+    value: "TAKE_ITEM",
+    label: "\u30A2\u30A4\u30C6\u30E0\u3092\u6E1B\u3089\u3059"
+  },
+  {
+    value: "CRAFT_ITEM",
+    label: "\u30EC\u30B7\u30D4\u3092\u4F5C\u308B"
+  },
+  {
+    value: "BREAK_BLOCK",
+    label: "\u30D6\u30ED\u30C3\u30AF\u3092\u58CA\u3059"
+  },
+  {
+    value: "PLACE_BLOCK",
+    label: "\u30D6\u30ED\u30C3\u30AF\u3092\u7F6E\u304F"
+  }
+];
+var DEFAULT_RULE_FLAGS = {
+  schemaVersion: 1,
+  horizontalMove: true,
+  verticalMove: true,
+  jump: false,
+  floorCollision: false,
+  cameraFollow: true,
+  mobileControls: true
+};
+function sceneRulesForRuntimeFamily(runtimeFamily) {
+  switch (runtimeFamily) {
+    case "RPG_GRID":
+      return {
+        ...DEFAULT_RULE_FLAGS,
+        runtimeFamily,
+        gravity: "NONE",
+        horizontalMove: true,
+        verticalMove: true
+      };
+    case "ACTION_PLATFORM":
+      return {
+        ...DEFAULT_RULE_FLAGS,
+        runtimeFamily,
+        gravity: "STANDARD",
+        horizontalMove: true,
+        verticalMove: false,
+        jump: true,
+        floorCollision: true
+      };
+    case "SCROLL_SIDE":
+      return {
+        ...DEFAULT_RULE_FLAGS,
+        runtimeFamily,
+        gravity: "STANDARD",
+        horizontalMove: true,
+        verticalMove: false,
+        jump: true,
+        floorCollision: true
+      };
+    case "DODGE_ARENA":
+      return {
+        ...DEFAULT_RULE_FLAGS,
+        runtimeFamily,
+        gravity: "NONE",
+        horizontalMove: true,
+        verticalMove: true,
+        jump: false,
+        floorCollision: false
+      };
+    case "FREE":
+      return {
+        ...DEFAULT_RULE_FLAGS,
+        runtimeFamily,
+        gravity: "NONE"
+      };
+  }
+}
+function sceneRulesForCreationMode(mode) {
+  return sceneRulesForRuntimeFamily(mode === "RPG_TEMPLATE" ? "RPG_GRID" : mode === "ACTION_2D" ? "ACTION_PLATFORM" : mode === "DODGE_2D" ? "DODGE_ARENA" : mode === "SCROLL_2D" ? "SCROLL_SIDE" : "FREE");
+}
+function normalizeGameSceneRules(value) {
+  const runtimeFamily = value?.runtimeFamily;
+  const safeRuntimeFamily = runtimeFamily === "RPG_GRID" || runtimeFamily === "ACTION_PLATFORM" || runtimeFamily === "SCROLL_SIDE" || runtimeFamily === "DODGE_ARENA" || runtimeFamily === "FREE" ? runtimeFamily : "FREE";
+  const fallback = sceneRulesForRuntimeFamily(safeRuntimeFamily);
+  const gravity = value?.gravity;
+  const safeGravity = gravity === "NONE" || gravity === "WEAK" || gravity === "STANDARD" || gravity === "STRONG" ? gravity : fallback.gravity;
+  const booleanRule = (key) => typeof value?.[key] === "boolean" ? value[key] : fallback[key];
+  return {
+    ...fallback,
+    schemaVersion: 1,
+    runtimeFamily: safeRuntimeFamily,
+    gravity: safeGravity,
+    horizontalMove: booleanRule("horizontalMove"),
+    verticalMove: booleanRule("verticalMove"),
+    jump: booleanRule("jump"),
+    floorCollision: booleanRule("floorCollision"),
+    cameraFollow: booleanRule("cameraFollow"),
+    mobileControls: booleanRule("mobileControls")
+  };
+}
+function physics2DSettingsForSceneRules(rules, current) {
+  const gravity = GAME_SCENE_RULE_PRESETS[rules.gravity];
+  const base = current ?? {
+    gravity: {
+      x: 0,
+      y: gravity
+    },
+    fixedDeltaTime: 1 / 60,
+    maxSubSteps: 4,
+    defaultMaterial: {
+      friction: 0.4,
+      bounciness: 0
+    }
+  };
+  return {
+    ...base,
+    gravity: {
+      x: 0,
+      y: gravity
+    },
+    defaultMaterial: {
+      ...base.defaultMaterial
+    }
+  };
+}
+function sceneRulesSummary(rules) {
+  const flags = [];
+  if (rules.horizontalMove) flags.push("\u5DE6\u53F3\u79FB\u52D5");
+  if (rules.verticalMove) flags.push("\u4E0A\u4E0B\u79FB\u52D5");
+  if (rules.jump) flags.push("\u30B8\u30E3\u30F3\u30D7");
+  if (rules.floorCollision) flags.push("\u5E8A\u3068\u306E\u885D\u7A81");
+  if (rules.cameraFollow) flags.push("\u30AB\u30E1\u30E9\u8FFD\u5F93");
+  return GAME_RUNTIME_FAMILY_LABELS[rules.runtimeFamily] + " \xB7 \u91CD\u529B" + GAME_SCENE_RULE_LABELS[rules.gravity] + " \xB7 " + (flags.join("\u30FB") || "\u6700\u5C0F\u30EB\u30FC\u30EB");
+}
+function defaultGameEventCardsForRuntimeFamily(runtimeFamily, trackIds = []) {
+  const player = trackIds.find((id) => id === "hero" || id.includes("hero"));
+  const source = player === void 0 ? {} : {
+    sourceTrackId: player
+  };
+  const npc = trackIds.find((id) => id === "enemy" || id.includes("npc"));
+  if (runtimeFamily === "RPG_GRID") {
+    return [
+      {
+        eventId: "event:npc-dialogue",
+        label: "NPC\u306B\u8A71\u3057\u304B\u3051\u308B",
+        enabled: true,
+        who: "PLAYER",
+        condition: "INTERACT",
+        ...source,
+        ...npc === void 0 ? {} : {
+          targetTrackId: npc
+        },
+        action: "SHOW_DIALOGUE",
+        message: "\u3053\u3093\u306B\u3061\u306F\u3002\u77E2\u5370\u30AD\u30FC\u3067\u6B69\u3044\u3066\u3001\u8FD1\u304F\u3067Enter\u3092\u62BC\u3057\u3066\u307F\u3066\u304F\u3060\u3055\u3044\u3002"
+      }
+    ];
+  }
+  if (runtimeFamily === "ACTION_PLATFORM") {
+    const enemy = trackIds.find((id) => id === "enemy" || id.includes("enemy"));
+    return [
+      {
+        eventId: "event:enemy-hit",
+        label: "\u6575\u306B\u89E6\u308C\u305F\u3089\u30C0\u30E1\u30FC\u30B8",
+        enabled: true,
+        who: "PLAYER",
+        condition: "TOUCH",
+        ...source,
+        ...enemy === void 0 ? {} : {
+          targetTrackId: enemy
+        },
+        action: "DAMAGE",
+        amount: 1
+      },
+      {
+        eventId: "event:enemy-camera-shake",
+        label: "\u30C0\u30E1\u30FC\u30B8\u3067\u30AB\u30E1\u30E9\u3092\u63FA\u3089\u3059",
+        enabled: true,
+        who: "PLAYER",
+        condition: "TOUCH",
+        ...source,
+        ...enemy === void 0 ? {} : {
+          targetTrackId: enemy
+        },
+        action: "SHAKE_CAMERA"
+      }
+    ];
+  }
+  if (runtimeFamily === "DODGE_ARENA") {
+    const enemy = trackIds.find((id) => id === "enemy" || id.includes("enemy"));
+    return [
+      {
+        eventId: "event:dodge-enemy-hit",
+        label: "\u6575\u306B\u89E6\u308C\u305F\u3089\u30E9\u30A4\u30D5\u304C\u6E1B\u308B",
+        enabled: true,
+        who: "PLAYER",
+        condition: "TOUCH",
+        ...source,
+        ...enemy === void 0 ? {} : {
+          targetTrackId: enemy
+        },
+        action: "DAMAGE",
+        amount: 1
+      },
+      {
+        eventId: "event:dodge-camera-shake",
+        label: "\u30C0\u30E1\u30FC\u30B8\u3067\u30AB\u30E1\u30E9\u3092\u63FA\u3089\u3059",
+        enabled: true,
+        who: "PLAYER",
+        condition: "TOUCH",
+        ...source,
+        ...enemy === void 0 ? {} : {
+          targetTrackId: enemy
+        },
+        action: "SHAKE_CAMERA"
+      }
+    ];
+  }
+  if (runtimeFamily === "SCROLL_SIDE") {
+    const goal = trackIds.find((id) => id === "goal" || id.includes("goal"));
+    return [
+      {
+        eventId: "event:reach-goal",
+        label: "\u30B4\u30FC\u30EB\u306B\u7740\u3044\u305F\u3089\u30AF\u30EA\u30A2",
+        enabled: true,
+        who: "PLAYER",
+        condition: "REACH_GOAL",
+        ...source,
+        ...goal === void 0 ? {} : {
+          targetTrackId: goal
+        },
+        action: "COMPLETE_SCENE"
+      }
+    ];
+  }
+  return [];
+}
+function triggerForCondition(card) {
+  switch (card.condition) {
+    case "TAP": {
+      const value = card.targetTrackId ?? card.sourceTrackId;
+      return {
+        type: "TAP",
+        ...value === void 0 ? {} : {
+          value
+        }
+      };
+    }
+    case "TOUCH":
+    case "REACH_GOAL":
+      return {
+        type: "COLLISION",
+        ...card.targetTrackId === void 0 ? {} : {
+          value: card.targetTrackId
+        }
+      };
+    case "START":
+      return {
+        type: "TIMER",
+        value: "start"
+      };
+    case "ENTER_RANGE":
+      return {
+        type: "COLLISION",
+        value: "range:" + (card.targetTrackId ?? "scene")
+      };
+    case "INTERACT":
+      return {
+        type: "ACTION",
+        actionId: "rpg.interact",
+        ...card.targetTrackId === void 0 ? {} : {
+          value: card.targetTrackId
+        }
+      };
+    case "HAS_ITEM":
+      return {
+        type: "ACTION",
+        actionId: "inventory.has-item",
+        value: card.itemId ?? "item"
+      };
+  }
+}
+function actionForCard(card) {
+  switch (card.action) {
+    case "SHOW_DIALOGUE":
+      return {
+        kind: "SET_VARIABLE",
+        targetId: card.targetTrackId ?? card.sourceTrackId ?? "game",
+        property: "dialogue",
+        value: card.message?.trim() || "\u4F1A\u8A71\u3092\u8868\u793A\u3057\u307E\u3057\u305F\u3002"
+      };
+    case "DAMAGE":
+      return {
+        kind: "SET_COMPONENT_PROPERTY",
+        targetId: card.targetTrackId ?? "target",
+        property: "damage",
+        value: card.amount ?? 1
+      };
+    case "SHAKE_CAMERA":
+      return {
+        kind: "SET_VARIABLE",
+        targetId: "camera",
+        property: "shake",
+        value: true
+      };
+    case "PLAY_AUDIO":
+      return {
+        kind: "PLAY_AUDIO",
+        targetId: card.audioTrackId ?? "audio"
+      };
+    case "COMPLETE_SCENE":
+      return {
+        kind: "SET_VARIABLE",
+        targetId: "scene",
+        property: "complete",
+        value: true
+      };
+    case "SET_VARIABLE":
+      return {
+        kind: "SET_VARIABLE",
+        targetId: card.targetTrackId ?? "game",
+        property: "state",
+        value: card.message ?? "true"
+      };
+    case "GIVE_ITEM":
+      return {
+        kind: "SET_VARIABLE",
+        targetId: "inventory",
+        property: "give:" + (card.itemId ?? "item"),
+        value: Math.max(1, card.amount ?? 1)
+      };
+    case "TAKE_ITEM":
+      return {
+        kind: "SET_VARIABLE",
+        targetId: "inventory",
+        property: "take:" + (card.itemId ?? "item"),
+        value: Math.max(1, card.amount ?? 1)
+      };
+    case "CRAFT_ITEM":
+      return {
+        kind: "SET_VARIABLE",
+        targetId: "inventory",
+        property: "craft:" + (card.recipeId ?? "recipe"),
+        value: true
+      };
+    case "BREAK_BLOCK":
+      return {
+        kind: "SET_VARIABLE",
+        targetId: "world",
+        property: "break:" + (card.blockTypeId ?? "block"),
+        value: true
+      };
+    case "PLACE_BLOCK":
+      return {
+        kind: "SET_VARIABLE",
+        targetId: "world",
+        property: "place:" + (card.blockTypeId ?? "block"),
+        value: card.blockTypeId ?? "block"
+      };
+  }
+}
+function behaviorFromGameEventCard(card) {
+  const behaviorId = asBehaviorId("behavior:pixiedraw-game:" + card.eventId);
+  return compileNoCodeBehavior({
+    behaviorId,
+    rules: [
+      {
+        ruleId: card.eventId + ":rule",
+        enabled: card.enabled,
+        trigger: triggerForCondition(card),
+        conditions: [
+          {
+            kind: "ALWAYS"
+          }
+        ],
+        actions: [
+          actionForCard(card)
+        ]
+      }
+    ]
+  });
+}
+
+// src/game/game-350/genre-runtime.ts
+var GAME_GENRE_RUNTIME_SCHEMA_VERSION = 1;
+var POINT_ZERO = {
+  x: 0,
+  y: 0
+};
+var PLAYER_HALF_WIDTH = 0.35;
+var PLAYER_HALF_HEIGHT = 0.35;
+var JUMP_SPEED = 6;
+var DEFAULT_MOVE_SPEED = 5;
+var TOUCH_DISTANCE = 0.9;
+var DODGE_SURVIVAL_SECONDS = 15;
+var DODGE_SURVIVAL_TICKS = DODGE_SURVIVAL_SECONDS * 60;
+var DODGE_MOVE_SPEED = 4.5;
+var DODGE_ENEMY_SPEED = 0.045;
+var DEFAULT_NPC_STATUS = {
+  hp: 10,
+  maxHp: 10,
+  stamina: 10,
+  maxStamina: 10,
+  mp: 0,
+  maxMp: 0,
+  attack: 2,
+  defense: 0,
+  level: 1
+};
+var DEFAULT_PLAYER_STATUS = {
+  hp: 10,
+  maxHp: 10,
+  stamina: 10,
+  maxStamina: 10,
+  mp: 0,
+  maxMp: 0,
+  attack: 2,
+  defense: 1,
+  level: 1
+};
+var COMBAT_TICK_INTERVAL = 30;
+var BLOCK_REACH_DISTANCE = 1.4;
+function point(x, y) {
+  return {
+    x,
+    y
+  };
+}
+function cellKey(x, y) {
+  return `${x},${y}`;
+}
+function nearbyCellCandidates(playerPosition, world) {
+  const cx = Math.floor(playerPosition.x);
+  const cy = Math.floor(playerPosition.y);
+  const candidates = [
+    point(cx, cy),
+    point(cx - 1, cy),
+    point(cx + 1, cy),
+    point(cx, cy - 1),
+    point(cx, cy + 1)
+  ].filter((cell) => cell.x >= 0 && cell.x < world.width && cell.y >= 0 && cell.y < world.height);
+  return candidates.map((cell) => ({
+    cell,
+    // Compare against the cell's center, not its corner, for a fair
+    // "which cell is actually closest to me" ordering.
+    d: distance(playerPosition, point(cell.x + 0.5, cell.y + 0.5))
+  })).filter(({ d }) => d <= BLOCK_REACH_DISTANCE).sort((a, b) => a.d - b.d).map(({ cell }) => cell);
+}
+function distance(left, right) {
+  return Math.hypot(left.x - right.x, left.y - right.y);
+}
+function isDodgeEnemy(object) {
+  const text = `${object.id} ${object.label}`.toLowerCase();
+  return object.role === "NPC" || text.includes("enemy") || text.includes("\u6575");
+}
+function trackRole(track) {
+  return track.role;
+}
+function trackStatus(track, fallback) {
+  const status = track?.components?.find((component) => component.type === "STATUS");
+  if (status?.type !== "STATUS" || !status.enabled) return fallback;
+  const maxHp = Math.max(1, status.maxHp);
+  const maxStamina = Math.max(0, status.maxStamina);
+  const maxMp = Math.max(0, status.maxMp);
+  return {
+    hp: Math.max(0, Math.min(status.hp, maxHp)),
+    maxHp,
+    stamina: Math.max(0, Math.min(status.stamina, maxStamina)),
+    maxStamina,
+    mp: Math.max(0, Math.min(status.mp, maxMp)),
+    maxMp,
+    attack: Math.max(0, status.attack),
+    defense: Math.max(0, status.defense),
+    level: Math.max(1, Math.round(status.level))
+  };
+}
+function trackBrainMode(track) {
+  const brain = track?.components?.find((component) => component.type === "BRAIN");
+  if (brain?.type !== "BRAIN" || !brain.enabled) return void 0;
+  return {
+    mode: brain.mode,
+    speed: brain.speed,
+    range: brain.range
+  };
+}
+function stepBrain(object, playerPosition, world) {
+  const brain = object.brain;
+  if (brain === void 0) return object;
+  if (brain.mode !== "PURSUE" && brain.mode !== "AVOID") return object;
+  const dx = playerPosition.x - object.position.x;
+  const dy = playerPosition.y - object.position.y;
+  const length = Math.hypot(dx, dy);
+  if (length <= 1e-3 || length > brain.range) return object;
+  const speed = Math.max(0, brain.speed) * 0.01;
+  const move = Math.min(speed, length);
+  const direction = brain.mode === "PURSUE" ? 1 : -1;
+  return {
+    ...object,
+    position: point(Math.min(world.width - PLAYER_HALF_WIDTH, Math.max(PLAYER_HALF_WIDTH, object.position.x + dx / length * move * direction)), Math.min(world.height - PLAYER_HALF_HEIGHT, Math.max(PLAYER_HALF_HEIGHT, object.position.y + dy / length * move * direction)))
+  };
+}
+function applyContactCombat(playerStatus, playerPosition, objects) {
+  let nextPlayerStatus = playerStatus;
+  const nextObjects = [];
+  for (const object of objects) {
+    if (object.role !== "NPC" || object.status === void 0 || nextPlayerStatus.hp <= 0) {
+      nextObjects.push(object);
+      continue;
+    }
+    if (distance(playerPosition, object.position) > TOUCH_DISTANCE) {
+      nextObjects.push(object);
+      continue;
+    }
+    const damageToObject = Math.max(1, nextPlayerStatus.attack - object.status.defense);
+    const damageToPlayer = Math.max(1, object.status.attack - nextPlayerStatus.defense);
+    const objectHp = Math.max(0, object.status.hp - damageToObject);
+    nextPlayerStatus = {
+      ...nextPlayerStatus,
+      hp: Math.max(0, nextPlayerStatus.hp - damageToPlayer)
+    };
+    if (objectHp <= 0) continue;
+    nextObjects.push({
+      ...object,
+      status: {
+        ...object.status,
+        hp: objectHp
+      }
+    });
+  }
+  return {
+    objects: nextObjects,
+    playerStatus: nextPlayerStatus
+  };
+}
+function trackPosition(track) {
+  const transform3 = track.components?.find((component) => component.type === "TRANSFORM");
+  return transform3?.type === "TRANSFORM" ? point(transform3.x, transform3.y) : point(0, 0);
+}
+function trackCamera(track) {
+  const camera = track?.components?.find((component) => component.type === "CAMERA");
+  return camera?.type === "CAMERA" ? normalizeCamera2DSettings(camera.camera2D) : DEFAULT_CAMERA_2D_SETTINGS;
+}
+function mapFromTracks(tracks) {
+  const mapTrack = tracks.find((track) => track.role === "TILEMAP" || track.kind === "TILEMAP");
+  const tilemapComponent = mapTrack?.components?.find((component) => component.type === "TILEMAP");
+  const document2 = mapTrack?.tilemap ?? (tilemapComponent?.type === "TILEMAP" ? tilemapComponent.document : void 0);
+  const width = Math.max(8, document2?.width ?? 24);
+  const height = Math.max(6, document2?.height ?? 10);
+  const solidCells = document2?.cells.filter((cell) => cell.collision === "SOLID").map((cell) => point(cell.x, cell.y)) ?? Array.from({
+    length: width
+  }, (_, x) => point(x, height - 1));
+  const blockTypeIds = {};
+  for (const cell of document2?.cells ?? []) {
+    if (cell.blockTypeId !== void 0) {
+      blockTypeIds[`${cell.x},${cell.y}`] = cell.blockTypeId;
+    }
+  }
+  return {
+    width,
+    height,
+    solidCells,
+    blockTypeIds
+  };
+}
+function objectById(state, id) {
+  if (id === void 0 || id === state.playerId) {
+    return id === state.playerId ? {
+      id: state.playerId,
+      label: "\u4E3B\u4EBA\u516C",
+      role: "PLAYER",
+      position: state.playerPosition
+    } : void 0;
+  }
+  return state.objects.find((object) => object.id === id);
+}
+function targetPosition(state, card) {
+  if (card.targetTrackId !== void 0) {
+    return objectById(state, card.targetTrackId)?.position;
+  }
+  if (card.condition === "REACH_GOAL") {
+    return state.objects.find((object) => object.role === "TRIGGER" && object.id.toLowerCase().includes("goal"))?.position;
+  }
+  return void 0;
+}
+function cardIsNearTarget(state, card) {
+  if (card.condition === "HAS_ITEM") {
+    const have = state.inventory[card.itemId ?? ""] ?? 0;
+    return have >= Math.max(1, card.amount ?? 1);
+  }
+  const target = targetPosition(state, card);
+  if (target !== void 0 && card.condition === "REACH_GOAL" && state.runtimeFamily === "SCROLL_SIDE") {
+    return state.playerPosition.x >= target.x - TOUCH_DISTANCE;
+  }
+  return target === void 0 || distance(state.playerPosition, target) <= TOUCH_DISTANCE;
+}
+function addToInventory(inventory, itemId, amount) {
+  const next = Math.max(0, (inventory[itemId] ?? 0) + amount);
+  return {
+    ...inventory,
+    [itemId]: next
+  };
+}
+function craftRecipe(inventory, recipes, recipeId) {
+  const recipe = recipes.find((candidate) => candidate.recipeId === recipeId);
+  if (recipe === void 0) return inventory;
+  const canCraft = recipe.ingredients.every((ingredient) => (inventory[ingredient.itemId] ?? 0) >= ingredient.amount);
+  if (!canCraft) return inventory;
+  let next = inventory;
+  for (const ingredient of recipe.ingredients) {
+    next = addToInventory(next, ingredient.itemId, -ingredient.amount);
+  }
+  return addToInventory(next, recipe.result.itemId, recipe.result.amount);
+}
+function applyEventCard(state, card) {
+  if (!card.enabled) return state;
+  switch (card.action) {
+    case "DAMAGE": {
+      const damaged = state.health - Math.max(0, card.amount ?? 1);
+      return {
+        ...state,
+        health: Math.max(0, damaged),
+        gameOver: damaged <= 0,
+        cameraShakeFrames: Math.max(state.cameraShakeFrames, state.camera2D.shake.onDamage ? 8 : 0)
+      };
+    }
+    case "SHAKE_CAMERA":
+      return {
+        ...state,
+        cameraShakeFrames: Math.max(state.cameraShakeFrames, 8)
+      };
+    case "SHOW_DIALOGUE":
+      return {
+        ...state,
+        dialogue: card.message?.trim() || "\u30A4\u30D9\u30F3\u30C8\u304C\u8D77\u3053\u308A\u307E\u3057\u305F\u3002"
+      };
+    case "PLAY_AUDIO":
+      return {
+        ...state,
+        lastAudioTrackId: card.audioTrackId ?? card.targetTrackId ?? null
+      };
+    case "COMPLETE_SCENE":
+      return {
+        ...state,
+        sceneComplete: true
+      };
+    case "SET_VARIABLE":
+      return {
+        ...state,
+        variables: {
+          ...state.variables,
+          state: card.message?.trim() || true
+        }
+      };
+    case "GIVE_ITEM":
+      if (card.itemId === void 0) return state;
+      return {
+        ...state,
+        inventory: addToInventory(state.inventory, card.itemId, Math.max(1, card.amount ?? 1))
+      };
+    case "TAKE_ITEM":
+      if (card.itemId === void 0) return state;
+      return {
+        ...state,
+        inventory: addToInventory(state.inventory, card.itemId, -Math.max(1, card.amount ?? 1))
+      };
+    case "CRAFT_ITEM":
+      return {
+        ...state,
+        inventory: craftRecipe(state.inventory, state.recipes, card.recipeId)
+      };
+    case "BREAK_BLOCK": {
+      for (const cell of nearbyCellCandidates(state.playerPosition, state.world)) {
+        const key = cellKey(cell.x, cell.y);
+        const blockTypeId = state.world.blockTypeIds[key];
+        if (blockTypeId === void 0) continue;
+        const blockType = state.blockTypes.find((candidate) => candidate.blockTypeId === blockTypeId);
+        if (blockType === void 0 || !blockType.breakable) continue;
+        const nextBlockTypeIds = {
+          ...state.world.blockTypeIds
+        };
+        delete nextBlockTypeIds[key];
+        return {
+          ...state,
+          world: {
+            ...state.world,
+            blockTypeIds: nextBlockTypeIds,
+            solidCells: state.world.solidCells.filter((solid) => !(solid.x === cell.x && solid.y === cell.y))
+          },
+          inventory: blockType.dropItemId === void 0 ? state.inventory : addToInventory(state.inventory, blockType.dropItemId, 1)
+        };
+      }
+      return state;
+    }
+    case "PLACE_BLOCK": {
+      if (card.blockTypeId === void 0 || card.itemId === void 0) {
+        return state;
+      }
+      const blockType = state.blockTypes.find((candidate) => candidate.blockTypeId === card.blockTypeId);
+      if (blockType === void 0 || !blockType.placeable || (state.inventory[card.itemId] ?? 0) < 1) {
+        return state;
+      }
+      const playerCellX = Math.floor(state.playerPosition.x);
+      const playerCellY = Math.floor(state.playerPosition.y);
+      for (const cell of nearbyCellCandidates(state.playerPosition, state.world)) {
+        if (cell.x === playerCellX && cell.y === playerCellY) continue;
+        const key = cellKey(cell.x, cell.y);
+        if (state.world.blockTypeIds[key] !== void 0) continue;
+        return {
+          ...state,
+          world: {
+            ...state.world,
+            blockTypeIds: {
+              ...state.world.blockTypeIds,
+              [key]: card.blockTypeId
+            },
+            solidCells: [
+              ...state.world.solidCells,
+              cell
+            ]
+          },
+          inventory: addToInventory(state.inventory, card.itemId, -1)
+        };
+      }
+      return state;
+    }
+  }
+}
+function cameraOriginFor(playerPosition, camera2D, world) {
+  const pixelsPerUnit = Math.max(1, camera2D.pixelsPerUnit);
+  const viewportWidth = Math.max(1, camera2D.referenceWidth / pixelsPerUnit);
+  const viewportHeight = Math.max(1, camera2D.referenceHeight / pixelsPerUnit);
+  const x = camera2D.follow.enabled ? playerPosition.x - viewportWidth / 2 + camera2D.follow.lookAheadX : 0;
+  const y = camera2D.follow.enabled ? playerPosition.y - viewportHeight / 2 + camera2D.follow.lookAheadY : 0;
+  const clampedX = Math.min(Math.max(0, world.width - viewportWidth), Math.max(0, x));
+  const clampedY = Math.min(Math.max(0, world.height - viewportHeight), Math.max(0, y));
+  const quantum = 1 / pixelsPerUnit;
+  return point(camera2D.pixelPerfect ? Math.round(clampedX / quantum) * quantum : clampedX, camera2D.pixelPerfect ? Math.round(clampedY / quantum) * quantum : clampedY);
+}
+function initialEventState(state) {
+  let next = state;
+  const firedEventIds = [];
+  for (const card of state.eventCards) {
+    if (card.enabled && card.condition === "START") {
+      next = applyEventCard(next, card);
+      firedEventIds.push(card.eventId);
+    }
+  }
+  return {
+    ...next,
+    firedEventIds
+  };
+}
+function processEventCards(state, input) {
+  let next = state;
+  const activeEventIds = [];
+  const firedEventIds = [
+    ...state.firedEventIds
+  ];
+  for (const card of state.eventCards) {
+    if (!card.enabled || card.condition === "START") continue;
+    const near = cardIsNearTarget(next, card);
+    const inputTriggered = card.condition === "TAP" ? input.tap === true : card.condition === "INTERACT" ? input.interact === true : false;
+    const rangeTriggered = card.condition === "TOUCH" || card.condition === "ENTER_RANGE" || card.condition === "REACH_GOAL" || card.condition === "HAS_ITEM";
+    const triggered = rangeTriggered ? near : inputTriggered && near;
+    if (!triggered) continue;
+    if (rangeTriggered) activeEventIds.push(card.eventId);
+    const edgeTriggered = rangeTriggered ? !state.activeEventIds.includes(card.eventId) : true;
+    const oneShot = card.condition === "REACH_GOAL";
+    if (edgeTriggered && (!oneShot || !firedEventIds.includes(card.eventId))) {
+      next = applyEventCard(next, card);
+      if (oneShot) firedEventIds.push(card.eventId);
+    }
+  }
+  return {
+    ...next,
+    activeEventIds,
+    firedEventIds
+  };
+}
+function landingY(state, x, previousY, nextY) {
+  if (!state.rules.floorCollision || nextY < previousY) return void 0;
+  let best;
+  for (const cell of state.world.solidCells) {
+    if (Math.abs(cell.x - x) > 0.8) continue;
+    const surface = cell.y - PLAYER_HALF_HEIGHT;
+    if (surface < previousY - 0.05 || nextY < surface) continue;
+    if (best === void 0 || surface < best) best = surface;
+  }
+  return best;
+}
+function stepMovement(state, input) {
+  if (state.runtimeFamily === "DODGE_ARENA") {
+    const directionX = (input.right === true ? 1 : 0) - (input.left === true ? 1 : 0);
+    const directionY = (input.down === true ? 1 : 0) - (input.up === true || input.jump === true ? 1 : 0);
+    const magnitude = Math.hypot(directionX, directionY) || 1;
+    const velocityX2 = directionX / magnitude * DODGE_MOVE_SPEED;
+    const velocityY2 = directionY / magnitude * DODGE_MOVE_SPEED;
+    return {
+      playerPosition: point(Math.min(state.world.width - PLAYER_HALF_WIDTH, Math.max(PLAYER_HALF_WIDTH, state.playerPosition.x + velocityX2 / 60)), Math.min(state.world.height - PLAYER_HALF_HEIGHT, Math.max(PLAYER_HALF_HEIGHT, state.playerPosition.y + velocityY2 / 60))),
+      velocity: point(velocityX2, velocityY2),
+      grounded: true
+    };
+  }
+  const direction = (input.right === true ? 1 : 0) - (input.left === true ? 1 : 0);
+  const speed = DEFAULT_MOVE_SPEED;
+  const velocityX = state.rules.horizontalMove ? direction * speed : 0;
+  const jump = input.jump === true && state.grounded && state.rules.jump;
+  const gravity = GAME_SCENE_RULE_PRESETS[state.rules.gravity];
+  const velocityY = state.rules.gravity === "NONE" ? 0 : jump ? -JUMP_SPEED : state.velocity.y + gravity / 60;
+  const previous = state.playerPosition;
+  let x = previous.x + velocityX / 60;
+  let y = previous.y + velocityY / 60;
+  x = Math.min(state.world.width - PLAYER_HALF_WIDTH, Math.max(PLAYER_HALF_WIDTH, x));
+  const floor = landingY(state, x, previous.y, y);
+  const grounded = floor !== void 0;
+  if (floor !== void 0) y = floor;
+  y = Math.min(state.world.height + 2, Math.max(-2, y));
+  return {
+    playerPosition: point(x, y),
+    velocity: point(velocityX, floor === void 0 ? velocityY : 0),
+    grounded
+  };
+}
+function familyForProject(project) {
+  const family = project.editorTimeline?.sceneRules?.runtimeFamily;
+  if (family === "ACTION_PLATFORM" || family === "DODGE_ARENA" || family === "SCROLL_SIDE") return family;
+  if (project.editorTimeline?.creationMode === "DODGE_2D") {
+    return "DODGE_ARENA";
+  }
+  if (project.editorTimeline?.creationMode === "SCROLL_2D") {
+    return "SCROLL_SIDE";
+  }
+  return "ACTION_PLATFORM";
+}
+function createGameGenreRuntime(project) {
+  const family = familyForProject(project);
+  const fallbackRules = sceneRulesForRuntimeFamily(family);
+  const rules = project.editorTimeline?.sceneRules ?? fallbackRules;
+  const tracks = project.editorTimeline?.tracks ?? [];
+  const player = tracks.find((track) => track.role === "PLAYER") ?? tracks.find((track) => track.trackId === "hero");
+  const playerId = player?.trackId ?? "hero";
+  const world = mapFromTracks(tracks);
+  const cameraTrack = tracks.find((track) => track.role === "CAMERA");
+  const camera2D = trackCamera(cameraTrack);
+  const objects = tracks.filter((track) => track.trackId !== playerId).filter((track) => track.active !== false).map((track) => {
+    const role = trackRole(track);
+    const brain = trackBrainMode(track);
+    return {
+      id: track.trackId,
+      label: track.label,
+      role,
+      position: trackPosition(track),
+      ...role === "NPC" ? {
+        status: trackStatus(track, DEFAULT_NPC_STATUS)
+      } : {},
+      ...brain === void 0 ? {} : {
+        brain
+      }
+    };
+  });
+  const state = {
+    schemaVersion: GAME_GENRE_RUNTIME_SCHEMA_VERSION,
+    projectId: project.projectId,
+    runtimeFamily: family,
+    rules,
+    mode: "STOPPED",
+    tick: 0,
+    playerId,
+    playerPosition: trackPosition(player ?? {
+      trackId: playerId,
+      label: "\u4E3B\u4EBA\u516C",
+      kind: "SPRITE",
+      activeFrames: []
+    }),
+    velocity: POINT_ZERO,
+    grounded: false,
+    health: 3,
+    playerStatus: trackStatus(player, DEFAULT_PLAYER_STATUS),
+    survivalSeconds: 0,
+    gameOver: false,
+    camera2D,
+    cameraOrigin: cameraOriginFor(point(1, 1), camera2D, world),
+    cameraShakeFrames: 0,
+    world,
+    objects,
+    eventCards: project.editorTimeline?.eventCards ?? [],
+    activeEventIds: [],
+    firedEventIds: [],
+    dialogue: null,
+    lastAudioTrackId: null,
+    sceneComplete: false,
+    variables: {},
+    inventory: {},
+    recipes: project.editorTimeline?.recipes ?? [],
+    blockTypes: project.editorTimeline?.blockTypes ?? []
+  };
+  return initialEventState(state);
+}
+function playGameGenre(state) {
+  return {
+    ...state,
+    mode: "PLAYING",
+    dialogue: null
+  };
+}
+function stopGameGenre(state) {
+  return {
+    ...state,
+    mode: "STOPPED"
+  };
+}
+function restartGameGenre(project) {
+  return playGameGenre(createGameGenreRuntime(project));
+}
+function clearGameGenreDialogue(state) {
+  return {
+    ...state,
+    dialogue: null
+  };
+}
+function triggerGameGenreCameraShake(state) {
+  return {
+    ...state,
+    cameraShakeFrames: Math.max(state.cameraShakeFrames, 8)
+  };
+}
+function stepGameGenre(state, input = {}) {
+  if (state.mode !== "PLAYING" || state.gameOver || state.sceneComplete) return state;
+  const chasedObjects = state.runtimeFamily === "DODGE_ARENA" ? state.objects.map((object) => {
+    if (object.brain !== void 0 || !isDodgeEnemy(object)) return object;
+    const dx = state.playerPosition.x - object.position.x;
+    const dy = state.playerPosition.y - object.position.y;
+    const length = Math.hypot(dx, dy);
+    if (length <= 1e-3) return object;
+    const move = Math.min(DODGE_ENEMY_SPEED, length);
+    return {
+      ...object,
+      position: point(Math.min(state.world.width - PLAYER_HALF_WIDTH, Math.max(PLAYER_HALF_WIDTH, object.position.x + dx / length * move)), Math.min(state.world.height - PLAYER_HALF_HEIGHT, Math.max(PLAYER_HALF_HEIGHT, object.position.y + dy / length * move)))
+    };
+  }) : state.objects;
+  const brainObjects = chasedObjects.map((object) => stepBrain(object, state.playerPosition, state.world));
+  const movement2 = stepMovement(state, input);
+  const combat = (state.tick + 1) % COMBAT_TICK_INTERVAL === 0 ? applyContactCombat(state.playerStatus, movement2.playerPosition, brainObjects) : {
+    objects: brainObjects,
+    playerStatus: state.playerStatus
+  };
+  const nextBase = {
+    ...state,
+    tick: state.tick + 1,
+    objects: combat.objects,
+    playerStatus: combat.playerStatus,
+    playerPosition: movement2.playerPosition,
+    velocity: movement2.velocity,
+    grounded: movement2.grounded,
+    survivalSeconds: state.runtimeFamily === "DODGE_ARENA" ? Math.floor((state.tick + 1) / 60) : state.survivalSeconds,
+    cameraOrigin: cameraOriginFor(movement2.playerPosition, state.camera2D, state.world),
+    cameraShakeFrames: Math.max(0, state.cameraShakeFrames - 1),
+    dialogue: input.interact === true || input.tap === true ? null : state.dialogue,
+    gameOver: state.gameOver || combat.playerStatus.hp <= 0
+  };
+  const eventState = processEventCards(nextBase, input);
+  if (eventState.runtimeFamily === "DODGE_ARENA" && eventState.tick >= DODGE_SURVIVAL_TICKS && !eventState.gameOver) {
+    return {
+      ...eventState,
+      sceneComplete: true
+    };
+  }
+  return eventState;
+}
+
 // src/game/game-350/runtime-launch.ts
 var IGAME_RUNTIME_LAUNCH_SCHEMA_VERSION = 1;
 var PIXIEED_BRAND_SPLASH_DURATION_MS = 1200;
 function nonEmptyText2(value, maxLength = 256) {
   return typeof value === "string" && value.trim().length > 0 && value.length <= maxLength;
 }
-function stableId2(value) {
+function stableId4(value) {
   return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$/u.test(value);
 }
 function createIGameRuntimeLaunchConfig(input) {
-  if (!nonEmptyText2(input.title) || !stableId2(input.startSceneId)) {
+  if (!nonEmptyText2(input.title) || !stableId4(input.startSceneId)) {
     throw new Error("iGAME Runtime launch config contains an unstable identity.");
   }
   const subtitle = input.subtitle ?? "\u3053\u306EGame\u306E\u30B9\u30BF\u30FC\u30C8\u753B\u9762";
@@ -1523,9 +5412,262 @@ function isIGamePlayerRuntimeSource(value) {
   return source.manifest !== null && typeof source.manifest === "object" && source.launch !== null && typeof source.launch === "object" && typeof source.mount === "function";
 }
 
+// src/game/game-350/igame-browser-runtime.ts
+function record3(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+function gameProjectFrom(imported) {
+  const candidate = record3(record3(imported.game?.record).canonicalProject);
+  const timeline = record3(candidate.editorTimeline);
+  if (candidate.schemaVersion !== 1 || typeof candidate.projectId !== "string" || !Array.isArray(candidate.scenes) || !Array.isArray(candidate.prefabs) || !Array.isArray(candidate.dependencies) || !Array.isArray(candidate.behaviors) || !Array.isArray(timeline.tracks)) {
+    throw new Error("PXD\u306B\u518D\u751F\u53EF\u80FD\u306AGame Project\u304C\u542B\u307E\u308C\u3066\u3044\u307E\u305B\u3093\u3002");
+  }
+  return candidate;
+}
+function assetIdByDefinition(imported, definitionId) {
+  if (!definitionId) return void 0;
+  const definition = imported.assetDefinitions.find((entry) => entry.definitionId === definitionId);
+  const identity = record3(definition?.registryIdentity);
+  return typeof identity.assetId === "string" ? identity.assetId : definitionId;
+}
+function assetIdForTrack(project, imported, trackId) {
+  const animation = project.editorTimeline?.animationBindings?.find((binding2) => binding2.trackId === trackId);
+  const animationAsset = assetIdByDefinition(imported, animation?.assetDefinitionId);
+  if (animationAsset) return animationAsset;
+  const binding = project.editorTimeline?.assetBindings?.find((candidate) => candidate.trackId === trackId && candidate.kind === "DRAW");
+  return binding?.assetId;
+}
+function resizeCanvas(canvas) {
+  const rect = canvas.getBoundingClientRect();
+  const ratio = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  const width = Math.max(320, Math.floor(rect.width * ratio));
+  const height = Math.max(180, Math.floor(rect.height * ratio));
+  if (canvas.width !== width || canvas.height !== height) {
+    canvas.width = width;
+    canvas.height = height;
+  }
+  return {
+    width,
+    height
+  };
+}
+function drawRaster(context, asset, x, y, width, height) {
+  const pixels = asset.raster.toUint8Array();
+  const image = new ImageData(asset.width, asset.height);
+  for (let index = 0; index < pixels.length; index += 1) {
+    const paletteIndex = pixels[index] ?? 0;
+    const color = asset.palette[paletteIndex] ?? 0;
+    const offset = index * 4;
+    image.data[offset] = color >>> 16 & 255;
+    image.data[offset + 1] = color >>> 8 & 255;
+    image.data[offset + 2] = color & 255;
+    image.data[offset + 3] = paletteIndex === 0 ? 0 : color >>> 24 & 255;
+  }
+  const offscreen = document.createElement("canvas");
+  offscreen.width = asset.width;
+  offscreen.height = asset.height;
+  offscreen.getContext("2d")?.putImageData(image, 0, 0);
+  context.imageSmoothingEnabled = false;
+  context.drawImage(offscreen, x, y, width, height);
+}
+function renderBrowserGame(canvas, state, source, assetByTrack) {
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Canvas 2D Runtime\u3092\u521D\u671F\u5316\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002");
+  const { width, height } = resizeCanvas(canvas);
+  const game = state.game;
+  const worldWidth = Math.max(8, game.world.width);
+  const worldHeight = Math.max(6, game.world.height);
+  const viewWidth = Math.max(8, Math.min(worldWidth, game.camera2D.referenceWidth / Math.max(1, game.camera2D.pixelsPerUnit)));
+  const viewHeight = Math.max(6, Math.min(worldHeight, game.camera2D.referenceHeight / Math.max(1, game.camera2D.pixelsPerUnit)));
+  const left = Math.max(0, Math.min(worldWidth - viewWidth, game.playerPosition.x - viewWidth / 2));
+  const top = Math.max(0, Math.min(worldHeight - viewHeight, game.playerPosition.y - viewHeight / 2));
+  const sx = width / viewWidth;
+  const sy = height / viewHeight;
+  const toCanvasX = (value) => (value - left) * sx;
+  const toCanvasY = (value) => (value - top) * sy;
+  const gradient = context.createLinearGradient(0, 0, 0, height);
+  gradient.addColorStop(0, "#142642");
+  gradient.addColorStop(1, "#07101c");
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, width, height);
+  context.strokeStyle = "rgba(142, 190, 229, 0.12)";
+  context.lineWidth = 1;
+  for (let x = Math.floor(left); x <= left + viewWidth; x += 1) {
+    context.beginPath();
+    context.moveTo(toCanvasX(x), 0);
+    context.lineTo(toCanvasX(x), height);
+    context.stroke();
+  }
+  for (let y = Math.floor(top); y <= top + viewHeight; y += 1) {
+    context.beginPath();
+    context.moveTo(0, toCanvasY(y));
+    context.lineTo(width, toCanvasY(y));
+    context.stroke();
+  }
+  const drawEntity = (trackId, x, y, isPlayer) => {
+    const assetId = assetByTrack.get(trackId);
+    const asset = assetId ? source.draw.assets[assetId] : void 0;
+    const entitySize = Math.max(0.6, Math.min(1.8, isPlayer ? 1 : 0.9));
+    const canvasX = toCanvasX(x - entitySize / 2);
+    const canvasY = toCanvasY(y - entitySize / 2);
+    const canvasSize = Math.max(8, entitySize * Math.min(sx, sy));
+    if (asset) {
+      const ratio = asset.width / Math.max(1, asset.height);
+      const drawHeight = canvasSize;
+      const drawWidth = drawHeight * ratio;
+      drawRaster(context, asset, canvasX - (drawWidth - canvasSize) / 2, canvasY, drawWidth, drawHeight);
+      return;
+    }
+    context.fillStyle = isPlayer ? "#7fe6d4" : "#ff7997";
+    context.fillRect(canvasX, canvasY, canvasSize, canvasSize);
+    context.fillStyle = "rgba(255,255,255,0.7)";
+    context.fillRect(canvasX + canvasSize * 0.25, canvasY + canvasSize * 0.2, canvasSize * 0.16, canvasSize * 0.16);
+    context.fillRect(canvasX + canvasSize * 0.6, canvasY + canvasSize * 0.2, canvasSize * 0.16, canvasSize * 0.16);
+  };
+  for (const cell of game.world.solidCells) {
+    const canvasX = toCanvasX(cell.x);
+    const canvasY = toCanvasY(cell.y);
+    const cellWidth = Math.max(1, sx);
+    const cellHeight = Math.max(1, sy);
+    context.fillStyle = "rgba(102, 149, 193, 0.42)";
+    context.fillRect(canvasX, canvasY, cellWidth, cellHeight);
+  }
+  for (const object of game.objects) drawEntity(object.id, object.position.x, object.position.y, false);
+  drawEntity(game.playerId, game.playerPosition.x, game.playerPosition.y, true);
+  context.fillStyle = "rgba(4, 9, 17, 0.72)";
+  context.fillRect(12, 12, Math.min(330, width - 24), 52);
+  context.fillStyle = "#eef4ff";
+  context.font = `${Math.max(12, Math.floor(Math.min(width, height) / 48))}px system-ui, sans-serif`;
+  context.fillText(source.project.name, 24, 34);
+  context.fillStyle = "#a8b6ca";
+  context.fillText(`HP ${game.health}  \u2022  ${game.runtimeFamily}  \u2022  ${Math.floor(state.animationTick / 60)}s`, 24, 52);
+}
+function inputFromKeys(keys) {
+  return {
+    left: keys.has("ArrowLeft") || keys.has("a") || keys.has("A"),
+    right: keys.has("ArrowRight") || keys.has("d") || keys.has("D"),
+    up: keys.has("ArrowUp") || keys.has("w") || keys.has("W"),
+    down: keys.has("ArrowDown") || keys.has("s") || keys.has("S"),
+    jump: keys.has(" ") || keys.has("z") || keys.has("Z"),
+    attack: keys.has("x") || keys.has("X")
+  };
+}
+function sourceAssetMap(project, imported) {
+  const map = /* @__PURE__ */ new Map();
+  for (const track of project.editorTimeline?.tracks ?? []) {
+    const assetId = assetIdForTrack(project, imported, track.trackId);
+    if (assetId) map.set(track.trackId, assetId);
+  }
+  return map;
+}
+function mountBrowserGame(context, source) {
+  const shell = document.createElement("div");
+  shell.className = "igame-browser-runtime";
+  const canvas = document.createElement("canvas");
+  canvas.className = "igame-browser-runtime__canvas";
+  canvas.tabIndex = 0;
+  canvas.setAttribute("aria-label", "iGAME\u30D7\u30EC\u30A4\u753B\u9762");
+  const hint = document.createElement("p");
+  hint.className = "igame-browser-runtime__hint";
+  hint.textContent = "\u77E2\u5370\u30AD\u30FC / WASD\u3067\u79FB\u52D5\u3000Z\u3067\u30B8\u30E3\u30F3\u30D7\u3000X\u3067\u653B\u6483\u3000Esc\u3067\u505C\u6B62";
+  shell.append(canvas, hint);
+  context.root.replaceChildren(shell);
+  const keys = /* @__PURE__ */ new Set();
+  const assetMap = sourceAssetMap(source.project, source.imported);
+  let state = {
+    game: playGameGenre(createGameGenreRuntime(source.project)),
+    animationTick: 0
+  };
+  let frameHandle = 0;
+  let stopped = false;
+  const onKeyDown = (event) => {
+    if ([
+      "ArrowLeft",
+      "ArrowRight",
+      "ArrowUp",
+      "ArrowDown",
+      " ",
+      "z",
+      "Z",
+      "x",
+      "X",
+      "Escape"
+    ].includes(event.key)) {
+      event.preventDefault();
+    }
+    if (event.key === "Escape") {
+      void context.requestStop();
+      return;
+    }
+    keys.add(event.key);
+  };
+  const onKeyUp = (event) => {
+    keys.delete(event.key);
+  };
+  const onResize = () => renderBrowserGame(canvas, state, source, assetMap);
+  const tick = () => {
+    if (stopped) return;
+    state = {
+      game: stepGameGenre(state.game, inputFromKeys(keys)),
+      animationTick: state.animationTick + 1
+    };
+    renderBrowserGame(canvas, state, source, assetMap);
+    frameHandle = window.requestAnimationFrame(tick);
+  };
+  window.addEventListener("keydown", onKeyDown, {
+    passive: false
+  });
+  window.addEventListener("keyup", onKeyUp);
+  window.addEventListener("resize", onResize);
+  canvas.focus({
+    preventScroll: true
+  });
+  tick();
+  return {
+    dispose: () => {
+      stopped = true;
+      window.cancelAnimationFrame(frameHandle);
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("resize", onResize);
+      context.root.replaceChildren();
+    }
+  };
+}
+async function createIGameBrowserRuntimeSource(bootstrap, packageBytes) {
+  const imported = await importPxdProject(packageBytes, {
+    expectedPackageHash: bootstrap.package.sha256
+  });
+  const project = gameProjectFrom(imported);
+  if (project.projectId !== bootstrap.manifest.projectId) {
+    throw new Error("\u516C\u958BGame\u306EProject ID\u304CManifest\u3068\u4E00\u81F4\u3057\u307E\u305B\u3093\u3002");
+  }
+  const data = {
+    project,
+    draw: imported.state,
+    imported
+  };
+  const launch = createIGameRuntimeLaunchConfig({
+    title: bootstrap.manifest.title,
+    subtitle: "\u516C\u958BRevision\u3092\u78BA\u8A8D\u3057\u307E\u3057\u305F\u3002START\u3067Game\u3092\u958B\u59CB\u3057\u307E\u3059\u3002",
+    startSceneId: project.editorTimeline?.tracks[0]?.trackId || "scene-start",
+    startLabel: "START"
+  });
+  return {
+    manifest: bootstrap.manifest,
+    proof: bootstrap.proof,
+    launch,
+    mount: async (context) => mountBrowserGame(context, data)
+  };
+}
+async function createIGameBrowserRuntimeSourceFromBootstrap(bootstrap) {
+  const packageBytes = await fetchIGamePublicPackage(bootstrap);
+  return createIGameBrowserRuntimeSource(bootstrap, packageBytes);
+}
+
 // src/game/game-350/scene-graph.ts
 var GAME350_PREFAB_DESIGN_GATE = "PREFAB_DESIGN_GATE";
-function diagnostic4(code, path, message) {
+function diagnostic5(code, path, message) {
   return {
     code,
     path,
@@ -1544,11 +5686,11 @@ function entityMap(scene) {
 function componentIds(scene) {
   return scene.entities.flatMap((entity) => entity.components.map((component) => String(component.componentId)));
 }
-function duplicateDiagnostics(values, code, path) {
+function duplicateDiagnostics2(values, code, path) {
   const seen = /* @__PURE__ */ new Set();
   const diagnostics = [];
   for (const value of values) {
-    if (seen.has(value)) diagnostics.push(diagnostic4(code, path, `Duplicate id: ${value}`));
+    if (seen.has(value)) diagnostics.push(diagnostic5(code, path, `Duplicate id: ${value}`));
     seen.add(value);
   }
   return diagnostics;
@@ -1558,27 +5700,27 @@ function validateSceneHierarchy(scene) {
   const diagnostics = [];
   const ids = candidate.entities.map((entity) => String(entity.entityId));
   const byId = entityMap(candidate);
-  diagnostics.push(...duplicateDiagnostics(ids, "DUPLICATE_ID", "entities.entityId"));
-  diagnostics.push(...duplicateDiagnostics(componentIds(candidate), "DUPLICATE_COMPONENT_ID", "entities.components.componentId"));
+  diagnostics.push(...duplicateDiagnostics2(ids, "DUPLICATE_ID", "entities.entityId"));
+  diagnostics.push(...duplicateDiagnostics2(componentIds(candidate), "DUPLICATE_COMPONENT_ID", "entities.components.componentId"));
   const roots = candidate.rootEntityIds.map(String);
-  diagnostics.push(...duplicateDiagnostics(roots, "INVALID_ROOT", "rootEntityIds"));
+  diagnostics.push(...duplicateDiagnostics2(roots, "INVALID_ROOT", "rootEntityIds"));
   for (const rootId of roots) {
     const root = byId.get(rootId);
     if (root === void 0) {
-      diagnostics.push(diagnostic4("MISSING_ROOT", "rootEntityIds", `Root Entity ${rootId} is missing.`));
+      diagnostics.push(diagnostic5("MISSING_ROOT", "rootEntityIds", `Root Entity ${rootId} is missing.`));
     } else if (root.parentEntityId !== void 0) {
-      diagnostics.push(diagnostic4("INVALID_ROOT", `rootEntityIds.${rootId}`, "A root Entity cannot have a parent."));
+      diagnostics.push(diagnostic5("INVALID_ROOT", `rootEntityIds.${rootId}`, "A root Entity cannot have a parent."));
     }
   }
   for (const entity of candidate.entities) {
     if (entity.active !== void 0 && typeof entity.active !== "boolean") {
-      diagnostics.push(diagnostic4("INVALID_ROOT", `entities.${String(entity.entityId)}.active`, "Entity active must be boolean."));
+      diagnostics.push(diagnostic5("INVALID_ROOT", `entities.${String(entity.entityId)}.active`, "Entity active must be boolean."));
     }
     if (entity.prefabId !== void 0) {
-      diagnostics.push(diagnostic4("PREFAB_DESIGN_GATE", `entities.${String(entity.entityId)}.prefabId`, "Prefab operations are unavailable until the ownership design gate is closed."));
+      diagnostics.push(diagnostic5("PREFAB_DESIGN_GATE", `entities.${String(entity.entityId)}.prefabId`, "Prefab operations are unavailable until the ownership design gate is closed."));
     }
     if (entity.parentEntityId !== void 0 && !byId.has(String(entity.parentEntityId))) {
-      diagnostics.push(diagnostic4("MISSING_PARENT", `entities.${String(entity.entityId)}.parentEntityId`, "Parent Entity must belong to this Scene."));
+      diagnostics.push(diagnostic5("MISSING_PARENT", `entities.${String(entity.entityId)}.parentEntityId`, "Parent Entity must belong to this Scene."));
     }
     const seen = /* @__PURE__ */ new Set([
       String(entity.entityId)
@@ -1587,7 +5729,7 @@ function validateSceneHierarchy(scene) {
     while (parentId !== void 0) {
       const key = String(parentId);
       if (seen.has(key)) {
-        diagnostics.push(diagnostic4("CYCLE", "entities", `Entity parent cycle includes ${String(entity.entityId)}.`));
+        diagnostics.push(diagnostic5("CYCLE", "entities", `Entity parent cycle includes ${String(entity.entityId)}.`));
         break;
       }
       seen.add(key);
@@ -1598,10 +5740,10 @@ function validateSceneHierarchy(scene) {
   for (const entity of candidate.entities) {
     const id = String(entity.entityId);
     if (entity.parentEntityId === void 0 && !rootSet.has(id)) {
-      diagnostics.push(diagnostic4("MISSING_ROOT", `entities.${id}`, "A parentless Entity must occur in rootEntityIds."));
+      diagnostics.push(diagnostic5("MISSING_ROOT", `entities.${id}`, "A parentless Entity must occur in rootEntityIds."));
     }
     if (entity.parentEntityId !== void 0 && rootSet.has(id)) {
-      diagnostics.push(diagnostic4("INVALID_ROOT", `entities.${id}`, "A child Entity cannot occur in rootEntityIds."));
+      diagnostics.push(diagnostic5("INVALID_ROOT", `entities.${id}`, "A child Entity cannot occur in rootEntityIds."));
     }
   }
   return {
@@ -1662,12 +5804,12 @@ function targetId(value) {
 function targetDiagnostics(scene, value, path) {
   if (typeof value === "object" && String(value.sceneId) !== String(scene.sceneId)) {
     return [
-      diagnostic4("FOREIGN_TARGET", path, "Target Entity belongs to another Scene.")
+      diagnostic5("FOREIGN_TARGET", path, "Target Entity belongs to another Scene.")
     ];
   }
   if (!entityMap(scene).has(targetId(value))) {
     return [
-      diagnostic4("MISSING_PARENT", path, "Target Entity is not in this Scene.")
+      diagnostic5("MISSING_PARENT", path, "Target Entity is not in this Scene.")
     ];
   }
   return [];
@@ -1676,9 +5818,9 @@ function renameEntity(scene, entityId, name) {
   const candidate = asGame350Scene(scene);
   requireValid(candidate);
   const entity = entityMap(candidate).get(String(entityId));
-  if (entity === void 0) return failure(diagnostic4("MISSING_PARENT", "entityId", "Entity is not in this Scene."));
+  if (entity === void 0) return failure(diagnostic5("MISSING_PARENT", "entityId", "Entity is not in this Scene."));
   const trimmed = name.trim();
-  if (trimmed.length === 0) return failure(diagnostic4("INVALID_ROOT", "name", "Entity name is required."));
+  if (trimmed.length === 0) return failure(diagnostic5("INVALID_ROOT", "name", "Entity name is required."));
   if (trimmed === entity.name) return result(candidate, false);
   const next = {
     ...candidate,
@@ -1694,14 +5836,14 @@ function reparentEntity(scene, entityId, parentEntityId) {
   requireValid(candidate);
   const byId = entityMap(candidate);
   const entity = byId.get(String(entityId));
-  if (entity === void 0) return failure(diagnostic4("MISSING_PARENT", "entityId", "Entity is not in this Scene."));
+  if (entity === void 0) return failure(diagnostic5("MISSING_PARENT", "entityId", "Entity is not in this Scene."));
   if (parentEntityId !== void 0) {
     const targetIssues = targetDiagnostics(candidate, parentEntityId, "parentEntityId");
     if (targetIssues.length > 0) return failure(...targetIssues);
     const nextParent2 = targetId(parentEntityId);
     let current = nextParent2;
     while (current !== void 0) {
-      if (current === String(entityId)) return failure(diagnostic4("CYCLE", "parentEntityId", "Reparenting would create a cycle."));
+      if (current === String(entityId)) return failure(diagnostic5("CYCLE", "parentEntityId", "Reparenting would create a cycle."));
       current = byId.get(current)?.parentEntityId === void 0 ? void 0 : String(byId.get(current)?.parentEntityId);
     }
   }
@@ -1732,8 +5874,8 @@ function setEntityActive(scene, entityId, active) {
   const candidate = asGame350Scene(scene);
   requireValid(candidate);
   const entity = entityMap(candidate).get(String(entityId));
-  if (entity === void 0) return failure(diagnostic4("MISSING_PARENT", "entityId", "Entity is not in this Scene."));
-  if (typeof active !== "boolean") return failure(diagnostic4("INVALID_ROOT", "active", "Entity active must be boolean."));
+  if (entity === void 0) return failure(diagnostic5("MISSING_PARENT", "entityId", "Entity is not in this Scene."));
+  if (typeof active !== "boolean") return failure(diagnostic5("INVALID_ROOT", "active", "Entity active must be boolean."));
   if ((entity.active ?? true) === active && (active || entity.active !== void 0)) return result(candidate, false);
   return result({
     ...candidate,
@@ -1762,7 +5904,7 @@ function descendantsOf(scene, entityId) {
 function deleteEntity(scene, entityId) {
   const candidate = asGame350Scene(scene);
   requireValid(candidate);
-  if (!entityMap(candidate).has(String(entityId))) return failure(diagnostic4("MISSING_PARENT", "entityId", "Entity is not in this Scene."));
+  if (!entityMap(candidate).has(String(entityId))) return failure(diagnostic5("MISSING_PARENT", "entityId", "Entity is not in this Scene."));
   const deleted = descendantsOf(candidate, entityId);
   return result({
     ...candidate,
@@ -1787,7 +5929,7 @@ function duplicateEntity(scene, entityId, options = {}) {
   const candidate = asGame350Scene(scene);
   requireValid(candidate);
   const source = entityMap(candidate).get(String(entityId));
-  if (source === void 0) return failure(diagnostic4("MISSING_PARENT", "entityId", "Entity is not in this Scene."));
+  if (source === void 0) return failure(diagnostic5("MISSING_PARENT", "entityId", "Entity is not in this Scene."));
   const ids = descendantsOf(candidate, entityId);
   const ordered = candidate.entities.filter((entity) => ids.has(String(entity.entityId)));
   const includeDescendants = options.includeDescendants ?? true;
@@ -1809,7 +5951,7 @@ function duplicateEntity(scene, entityId, options = {}) {
     const hasCollision = projectedIds.some((id) => existingEntityIds.has(id));
     if (!hasDuplicate && !hasCollision) break;
     if (requestedRootId !== void 0) {
-      return failure(diagnostic4("DUPLICATE_ID", "entityId", `Entity ${String(newRootId)} already exists.`));
+      return failure(diagnostic5("DUPLICATE_ID", "entityId", `Entity ${String(newRootId)} already exists.`));
     }
     generatedRootAttempt += 1;
     newRootId = `${String(entityId)}:copy${generatedRootAttempt}`;
@@ -1877,7 +6019,7 @@ function validateScenePrefabReferences(scene, prefabs) {
   ];
   for (const entity of scene.entities) {
     if (entity.prefabId !== void 0 && !known.has(String(entity.prefabId))) {
-      diagnostics.push(diagnostic4("PREFAB_DESIGN_GATE", `entities.${String(entity.entityId)}.prefabId`, "Prefab reference is not closed by the current Scene contract."));
+      diagnostics.push(diagnostic5("PREFAB_DESIGN_GATE", `entities.${String(entity.entityId)}.prefabId`, "Prefab reference is not closed by the current Scene contract."));
     }
   }
   return {
@@ -1923,7 +6065,7 @@ function vector(x, y) {
 function finiteVector(value) {
   return value !== null && typeof value === "object" && typeof value.x === "number" && Number.isFinite(value.x) && typeof value.y === "number" && Number.isFinite(value.y);
 }
-function record(component) {
+function record4(component) {
   return component;
 }
 function componentOf(entity, type) {
@@ -2012,7 +6154,7 @@ function validatePhysicsBody(entity, diagnostics) {
       collider3.radius
     ].every((item) => typeof item === "number" && Number.isFinite(item) && item > 0)) diagnostics.push(`${String(entity.entityId)}.collider.shape`);
     if (!Object.hasOwn(GAME350_PHYSICS_LAYER_BITS, collider3.layer) || typeof collider3.isTrigger !== "boolean" || typeof collider3.enabled !== "boolean") diagnostics.push(`${String(entity.entityId)}.collider`);
-    const value = record(collider3);
+    const value = record4(collider3);
     if (value.offset !== void 0 && !finiteVector(value.offset)) diagnostics.push(`${String(entity.entityId)}.collider.offset`);
     try {
       layerMask(value.mask);
@@ -2027,7 +6169,7 @@ function validatePhysicsBody(entity, diagnostics) {
   }
   const rigidbody3 = rigidbodyOf(entity);
   if (rigidbody3 !== void 0) {
-    const value = record(rigidbody3);
+    const value = record4(rigidbody3);
     if (![
       "STATIC",
       "DYNAMIC",
@@ -2094,7 +6236,7 @@ function transformOf(entity) {
 function colliderOf(entity, settings) {
   const candidate = componentOf(entity, "COLLIDER");
   if (candidate === void 0) return void 0;
-  const value = record(candidate);
+  const value = record4(candidate);
   const offset = finiteVector(value.offset) ? value.offset : vector(0, 0);
   return {
     ...candidate,
@@ -2113,7 +6255,7 @@ function bodyFromEntity(entity, settings) {
   if (collider3 === void 0 || collider3.enabled === false) return void 0;
   const transform3 = transformOf(entity);
   const rb = rigidbodyOf(entity);
-  const value = rb === void 0 ? {} : record(rb);
+  const value = rb === void 0 ? {} : record4(rb);
   const freezePositionValue = value.freezePosition;
   const freezePosition = freezePositionValue !== null && typeof freezePositionValue === "object" ? {
     x: Boolean(freezePositionValue.x),
@@ -2457,961 +6599,6 @@ function advancePhysics2D(world, elapsedSeconds, input = {}) {
   };
 }
 
-// src/game/game-300/core.ts
-var GAME_PROJECT_SCHEMA_VERSION = 1;
-var BEHAVIOR_IR_VERSION = 1;
-var GAME_RUNTIME_PROFILE_SCHEMA_VERSION = 1;
-var GAME_CAMERA_2D_SETTINGS_SCHEMA_VERSION = 1;
-function stableCameraReference(value) {
-  return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(value);
-}
-function isValidGameCamera2DSettings(value) {
-  if (!isRecord(value)) return false;
-  const follow = value.follow;
-  const shake = value.shake;
-  if (!isRecord(follow) || !isRecord(shake)) return false;
-  return value.schemaVersion === GAME_CAMERA_2D_SETTINGS_SCHEMA_VERSION && typeof value.pixelPerfect === "boolean" && Number.isSafeInteger(value.referenceWidth) && Number(value.referenceWidth) >= 1 && Number(value.referenceWidth) <= 8192 && Number.isSafeInteger(value.referenceHeight) && Number(value.referenceHeight) >= 1 && Number(value.referenceHeight) <= 8192 && Number.isSafeInteger(value.pixelsPerUnit) && Number(value.pixelsPerUnit) >= 1 && Number(value.pixelsPerUnit) <= 1024 && typeof follow.enabled === "boolean" && (follow.targetId === void 0 || stableCameraReference(follow.targetId)) && typeof follow.smoothing === "number" && Number.isFinite(follow.smoothing) && follow.smoothing >= 0 && follow.smoothing <= 2 && [
-    "deadZoneX",
-    "deadZoneY"
-  ].every((key) => typeof follow[key] === "number" && Number.isFinite(follow[key]) && follow[key] >= 0 && follow[key] <= 64) && [
-    "lookAheadX",
-    "lookAheadY"
-  ].every((key) => typeof follow[key] === "number" && Number.isFinite(follow[key]) && follow[key] >= -64 && follow[key] <= 64) && typeof shake.onDamage === "boolean" && typeof shake.strength === "number" && Number.isFinite(shake.strength) && shake.strength >= 0 && shake.strength <= 64 && typeof shake.durationMs === "number" && Number.isSafeInteger(shake.durationMs) && shake.durationMs >= 0 && shake.durationMs <= 1e4 && typeof shake.frequency === "number" && Number.isFinite(shake.frequency) && shake.frequency >= 1 && shake.frequency <= 120;
-}
-var GAME_SCENE_RULES_KEYS = /* @__PURE__ */ new Set([
-  "schemaVersion",
-  "runtimeFamily",
-  "gravity",
-  "horizontalMove",
-  "verticalMove",
-  "jump",
-  "floorCollision",
-  "cameraFollow",
-  "mobileControls"
-]);
-var GAME_EVENT_CARD_KEYS = /* @__PURE__ */ new Set([
-  "eventId",
-  "label",
-  "enabled",
-  "who",
-  "condition",
-  "sourceTrackId",
-  "targetTrackId",
-  "action",
-  "message",
-  "amount",
-  "audioTrackId",
-  "itemId",
-  "recipeId",
-  "blockTypeId"
-]);
-function isValidGameSceneRules(value) {
-  if (!isRecord(value)) return false;
-  return Object.keys(value).every((key) => GAME_SCENE_RULES_KEYS.has(key)) && value.schemaVersion === GAME_SCENE_RULES_SCHEMA_VERSION && [
-    "RPG_GRID",
-    "ACTION_PLATFORM",
-    "SCROLL_SIDE",
-    "DODGE_ARENA",
-    "FREE"
-  ].includes(String(value.runtimeFamily)) && [
-    "NONE",
-    "WEAK",
-    "STANDARD",
-    "STRONG"
-  ].includes(String(value.gravity)) && [
-    "horizontalMove",
-    "verticalMove",
-    "jump",
-    "floorCollision",
-    "cameraFollow",
-    "mobileControls"
-  ].every((key) => typeof value[key] === "boolean");
-}
-function isValidGameEventCard(value) {
-  if (!isRecord(value)) return false;
-  const validReference = (candidate) => candidate === void 0 || typeof candidate === "string" && GAME_TEMPLATE_VALUE_KEY_PATTERN.test(candidate);
-  const validText = (candidate, max = 240) => candidate === void 0 || typeof candidate === "string" && candidate.length <= max;
-  return Object.keys(value).every((key) => GAME_EVENT_CARD_KEYS.has(key)) && typeof value.eventId === "string" && GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.eventId) && typeof value.label === "string" && value.label.trim().length > 0 && value.label.length <= 128 && typeof value.enabled === "boolean" && [
-    "PLAYER",
-    "TOUCHED_OBJECT",
-    "ANYONE"
-  ].includes(String(value.who)) && [
-    "START",
-    "ENTER_RANGE",
-    "TOUCH",
-    "TAP",
-    "INTERACT",
-    "REACH_GOAL",
-    "HAS_ITEM"
-  ].includes(String(value.condition)) && validReference(value.sourceTrackId) && validReference(value.targetTrackId) && [
-    "SHOW_DIALOGUE",
-    "DAMAGE",
-    "SHAKE_CAMERA",
-    "PLAY_AUDIO",
-    "COMPLETE_SCENE",
-    "SET_VARIABLE",
-    "GIVE_ITEM",
-    "TAKE_ITEM",
-    "CRAFT_ITEM",
-    "BREAK_BLOCK",
-    "PLACE_BLOCK"
-  ].includes(String(value.action)) && validText(value.message) && validReference(value.audioTrackId) && validReference(value.itemId) && validReference(value.recipeId) && validReference(value.blockTypeId) && (value.amount === void 0 || typeof value.amount === "number" && Number.isFinite(value.amount) && value.amount >= 0 && value.amount <= 999999);
-}
-var GAME_SCENE_RULES_SCHEMA_VERSION = 1;
-var GAME_TILEMAP_DOCUMENT_SCHEMA_VERSION = 1;
-var GAME_TEMPLATE_CATEGORIES = [
-  "CORE",
-  "RPG",
-  "ACTION",
-  "SHOOTING",
-  "RACING",
-  "RHYTHM"
-];
-var GAME_TEMPLATE_KINDS = [
-  "CHARACTER",
-  "WEAPON",
-  "ARMOR",
-  "SKILL",
-  "STATUS",
-  "TILE",
-  "DAMAGE",
-  "UI"
-];
-function asId(value, label) {
-  if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(value)) {
-    throw new Error(`${label} must be a stable identifier.`);
-  }
-  return value;
-}
-var asEntityId = (value) => asId(value, "EntityId");
-var asComponentId = (value) => asId(value, "ComponentId");
-var asBehaviorId = (value) => asId(value, "BehaviorId");
-function isRecord(value) {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-var GAME_TILEMAP_DOCUMENT_KEYS = /* @__PURE__ */ new Set([
-  "schemaVersion",
-  "mapId",
-  "width",
-  "height",
-  "tileSize",
-  "cells"
-]);
-var GAME_TILEMAP_CELL_KEYS = /* @__PURE__ */ new Set([
-  "x",
-  "y",
-  "collision",
-  "triggerId",
-  "blockTypeId"
-]);
-function isValidGameTilemapDocument(value) {
-  if (!isRecord(value)) return false;
-  const width = value.width;
-  const height = value.height;
-  const tileSize = value.tileSize;
-  const cells = value.cells;
-  if (Object.keys(value).some((key) => !GAME_TILEMAP_DOCUMENT_KEYS.has(key)) || value.schemaVersion !== GAME_TILEMAP_DOCUMENT_SCHEMA_VERSION || typeof value.mapId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(value.mapId) || !Number.isSafeInteger(width) || typeof width !== "number" || width < 1 || width > Number.MAX_SAFE_INTEGER || !Number.isSafeInteger(height) || typeof height !== "number" || height < 1 || height > Number.MAX_SAFE_INTEGER || !Number.isSafeInteger(tileSize) || typeof tileSize !== "number" || tileSize < 1 || tileSize > 4096 || !Array.isArray(cells) || cells.length > width * height) {
-    return false;
-  }
-  const seen = /* @__PURE__ */ new Set();
-  for (const rawCell of cells) {
-    if (!isRecord(rawCell)) return false;
-    const x = rawCell.x;
-    const y = rawCell.y;
-    const collision = rawCell.collision;
-    const triggerId = rawCell.triggerId;
-    const blockTypeId = rawCell.blockTypeId;
-    if (Object.keys(rawCell).some((key2) => !GAME_TILEMAP_CELL_KEYS.has(key2)) || !Number.isSafeInteger(x) || typeof x !== "number" || x < 0 || x >= width || !Number.isSafeInteger(y) || typeof y !== "number" || y < 0 || y >= height || collision !== "NONE" && collision !== "SOLID" || triggerId !== void 0 && (typeof triggerId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(triggerId)) || blockTypeId !== void 0 && (typeof blockTypeId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(blockTypeId)) || // A cell with none of the three is indistinguishable from an absent
-    // (air) cell, so the sparse list rejects it to stay canonical.
-    collision === "NONE" && triggerId === void 0 && blockTypeId === void 0) {
-      return false;
-    }
-    const key = `${x},${y}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-  }
-  return true;
-}
-var GAME_TEMPLATE_INSTANCE_KEYS = /* @__PURE__ */ new Set([
-  "instanceId",
-  "templateId",
-  "category",
-  "kind",
-  "target",
-  "label",
-  "values",
-  "targetTrackId"
-]);
-var GAME_TEMPLATE_VALUE_KEY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u;
-function isValidGameTemplateInstance(value) {
-  if (!isRecord(value)) return false;
-  if (Object.keys(value).some((key) => !GAME_TEMPLATE_INSTANCE_KEYS.has(key)) || typeof value.instanceId !== "string" || !GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.instanceId) || typeof value.templateId !== "string" || !GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.templateId) || !GAME_TEMPLATE_CATEGORIES.includes(value.category) || !GAME_TEMPLATE_KINDS.includes(value.kind) || value.target !== "SCENE_OBJECT" && value.target !== "GAME_DATA" || typeof value.label !== "string" || value.label.trim().length === 0 || !isRecord(value.values) || value.targetTrackId !== void 0 && (typeof value.targetTrackId !== "string" || !GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.targetTrackId))) return false;
-  if (value.target === "SCENE_OBJECT" && value.targetTrackId === void 0) {
-    return false;
-  }
-  const templateValues = value.values;
-  if (!isRecord(templateValues)) return false;
-  return Object.keys(templateValues).every((key) => {
-    if (!GAME_TEMPLATE_VALUE_KEY_PATTERN.test(key)) return false;
-    const templateValue = templateValues[key];
-    return typeof templateValue === "string" || typeof templateValue === "boolean" || typeof templateValue === "number" && Number.isFinite(templateValue);
-  });
-}
-var GAME_ANIMATION_BINDING_KEYS = /* @__PURE__ */ new Set([
-  "bindingId",
-  "trackId",
-  "assetDefinitionId",
-  "clipKey",
-  "motionName",
-  "direction",
-  "frameIds",
-  "fps",
-  "loopMode",
-  "flipX",
-  "flipY",
-  "mode",
-  "sourceAssetId",
-  "sourceRevisionId",
-  "sourceContentHash"
-]);
-function isValidGameAnimationBinding(value) {
-  if (!isRecord(value)) return false;
-  const id = (candidate) => typeof candidate === "string" && GAME_TEMPLATE_VALUE_KEY_PATTERN.test(candidate);
-  const label = (candidate) => typeof candidate === "string" && candidate.trim().length > 0 && candidate.length <= 128;
-  return Object.keys(value).every((key) => GAME_ANIMATION_BINDING_KEYS.has(key)) && id(value.bindingId) && id(value.trackId) && id(value.assetDefinitionId) && label(value.clipKey) && label(value.motionName) && (value.direction === void 0 || label(value.direction)) && Array.isArray(value.frameIds) && value.frameIds.length > 0 && value.frameIds.length <= 512 && value.frameIds.every((frameId) => id(frameId)) && typeof value.fps === "number" && Number.isFinite(value.fps) && value.fps > 0 && value.fps <= 240 && [
-    "LOOP",
-    "ONCE",
-    "PING_PONG"
-  ].includes(String(value.loopMode)) && typeof value.flipX === "boolean" && typeof value.flipY === "boolean" && (value.mode === "LIVE" || value.mode === "PINNED") && (value.sourceAssetId === void 0 || id(value.sourceAssetId)) && (value.sourceRevisionId === void 0 || id(value.sourceRevisionId)) && (value.sourceContentHash === void 0 || typeof value.sourceContentHash === "string" && /^[a-f0-9]{64}$/u.test(value.sourceContentHash));
-}
-var GAME_ASSET_REVISION_REFERENCE_KEYS = /* @__PURE__ */ new Set([
-  "kind",
-  "assetId",
-  "revisionId",
-  "ownerId",
-  "contentHash",
-  "mode"
-]);
-function isValidAssetRevisionReference(value) {
-  if (!isRecord(value)) return false;
-  const id = (candidate) => typeof candidate === "string" && GAME_TEMPLATE_VALUE_KEY_PATTERN.test(candidate);
-  return Object.keys(value).every((key) => GAME_ASSET_REVISION_REFERENCE_KEYS.has(key)) && (value.kind === "DRAW" || value.kind === "AUDIO") && id(value.assetId) && id(value.revisionId) && id(value.ownerId) && typeof value.contentHash === "string" && /^[a-f0-9]{64}$/u.test(value.contentHash) && (value.mode === "PINNED" || value.mode === "LIVE");
-}
-var GAME_TIMELINE_ASSET_BINDING_KEYS = /* @__PURE__ */ new Set([
-  "trackId",
-  "kind",
-  "assetId",
-  "revisionId",
-  "contentHash",
-  "mode",
-  "licenseId",
-  "rights",
-  "sourceKind"
-]);
-function isValidGameTimelineAssetBinding(value) {
-  if (!isRecord(value)) return false;
-  const id = (candidate) => typeof candidate === "string" && GAME_TEMPLATE_VALUE_KEY_PATTERN.test(candidate);
-  const rightsValid = value.rights === void 0 || Array.isArray(value.rights) && value.rights.length > 0 && value.rights.every((right) => typeof right === "string" && right.trim().length > 0) && new Set(value.rights).size === value.rights.length;
-  return Object.keys(value).every((key) => GAME_TIMELINE_ASSET_BINDING_KEYS.has(key)) && typeof value.trackId === "string" && GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.trackId) && (value.kind === "DRAW" || value.kind === "AUDIO") && id(value.assetId) && id(value.revisionId) && typeof value.contentHash === "string" && /^[a-f0-9]{64}$/u.test(value.contentHash) && (value.mode === "PINNED" || value.mode === "LIVE") && (value.licenseId === void 0 || id(value.licenseId)) && rightsValid && (value.sourceKind === void 0 || value.sourceKind === "PROJECT" || value.sourceKind === "MARKET") && (value.sourceKind !== "MARKET" || value.mode === "PINNED" && value.licenseId !== void 0 && Array.isArray(value.rights) && value.rights.length > 0);
-}
-var GAME_ITEM_DEFINITION_KEYS = /* @__PURE__ */ new Set([
-  "itemId",
-  "label",
-  "icon",
-  "stackable",
-  "maxStack"
-]);
-function isValidGameItemDefinition(value) {
-  if (!isRecord(value)) return false;
-  return Object.keys(value).every((key) => GAME_ITEM_DEFINITION_KEYS.has(key)) && typeof value.itemId === "string" && GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.itemId) && typeof value.label === "string" && value.label.trim().length > 0 && value.label.length <= 128 && (value.icon === void 0 || isValidAssetRevisionReference(value.icon)) && typeof value.stackable === "boolean" && typeof value.maxStack === "number" && Number.isFinite(value.maxStack) && value.maxStack >= 1 && value.maxStack <= 999999 && (value.stackable || value.maxStack === 1);
-}
-var GAME_RECIPE_INGREDIENT_KEYS = /* @__PURE__ */ new Set([
-  "itemId",
-  "amount"
-]);
-function isValidGameRecipeIngredient(value) {
-  if (!isRecord(value)) return false;
-  return Object.keys(value).every((key) => GAME_RECIPE_INGREDIENT_KEYS.has(key)) && typeof value.itemId === "string" && GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.itemId) && typeof value.amount === "number" && Number.isFinite(value.amount) && value.amount >= 1 && value.amount <= 999999;
-}
-var GAME_RECIPE_DEFINITION_KEYS = /* @__PURE__ */ new Set([
-  "recipeId",
-  "label",
-  "ingredients",
-  "result"
-]);
-function isValidGameRecipeDefinition(value) {
-  if (!isRecord(value)) return false;
-  return Object.keys(value).every((key) => GAME_RECIPE_DEFINITION_KEYS.has(key)) && typeof value.recipeId === "string" && GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.recipeId) && typeof value.label === "string" && value.label.trim().length > 0 && value.label.length <= 128 && Array.isArray(value.ingredients) && value.ingredients.length > 0 && value.ingredients.length <= 32 && value.ingredients.every((ingredient) => isValidGameRecipeIngredient(ingredient)) && isValidGameRecipeIngredient(value.result);
-}
-var GAME_BLOCK_TYPE_DEFINITION_KEYS = /* @__PURE__ */ new Set([
-  "blockTypeId",
-  "label",
-  "icon",
-  "breakable",
-  "dropItemId",
-  "placeable"
-]);
-function isValidGameBlockTypeDefinition(value) {
-  if (!isRecord(value)) return false;
-  return Object.keys(value).every((key) => GAME_BLOCK_TYPE_DEFINITION_KEYS.has(key)) && typeof value.blockTypeId === "string" && GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.blockTypeId) && typeof value.label === "string" && value.label.trim().length > 0 && value.label.length <= 128 && (value.icon === void 0 || isValidAssetRevisionReference(value.icon)) && typeof value.breakable === "boolean" && (value.dropItemId === void 0 || typeof value.dropItemId === "string" && GAME_TEMPLATE_VALUE_KEY_PATTERN.test(value.dropItemId)) && typeof value.placeable === "boolean";
-}
-function diagnostic5(code, path, message) {
-  return {
-    code,
-    path,
-    message,
-    recoverable: true
-  };
-}
-function duplicateDiagnostics2(values, path) {
-  const seen = /* @__PURE__ */ new Set();
-  const diagnostics = [];
-  for (const value of values) {
-    if (seen.has(value)) {
-      diagnostics.push(diagnostic5("DUPLICATE_ID", path, `Duplicate id: ${value}`));
-    }
-    seen.add(value);
-  }
-  return diagnostics;
-}
-function validateCaller(project, caller) {
-  const diagnostics = [];
-  if (project.projectId !== caller.projectId || project.revision.projectId !== caller.projectId) {
-    diagnostics.push(diagnostic5("PROJECT_ID_MISMATCH", "projectId", "Caller project identity does not match the project revision."));
-  }
-  if (project.ownerId !== caller.ownerId || project.revision.ownerId !== caller.ownerId) {
-    diagnostics.push(diagnostic5("CALLER_OWNER_MISMATCH", "ownerId", "Caller owner is not the project/revision owner."));
-  }
-  if (project.revision.revisionId !== caller.revisionId) {
-    diagnostics.push(diagnostic5("CALLER_REVISION_MISMATCH", "revision.revisionId", "Caller revision is not the current project revision."));
-  }
-  return diagnostics;
-}
-function validateAssetReference(reference, path, ownerId, diagnostics) {
-  if (!isRecord(reference) || ![
-    "DRAW",
-    "AUDIO"
-  ].includes(String(reference.kind))) {
-    diagnostics.push(diagnostic5("INVALID_REFERENCE", path, "Asset reference must declare DRAW or AUDIO."));
-    return;
-  }
-  if (reference.ownerId !== ownerId) {
-    diagnostics.push(diagnostic5("INVALID_REFERENCE", `${path}.ownerId`, "Asset owner must match the Game Project owner."));
-  }
-  for (const key of [
-    "assetId",
-    "revisionId",
-    "ownerId",
-    "contentHash",
-    "mode"
-  ]) {
-    if (typeof reference[key] !== "string") {
-      diagnostics.push(diagnostic5("INVALID_REFERENCE", `${path}.${key}`, "Asset revision reference field is invalid."));
-    }
-  }
-  if (typeof reference.contentHash === "string" && !/^[a-f0-9]{64}$/u.test(reference.contentHash)) {
-    diagnostics.push(diagnostic5("INVALID_REFERENCE", `${path}.contentHash`, "Asset content hash must be lowercase SHA-256."));
-  }
-}
-function validateComponent(component, path, ownerId, knownBehaviorIds, diagnostics) {
-  if (!isRecord(component) || typeof component.type !== "string" || typeof component.componentId !== "string") {
-    diagnostics.push(diagnostic5("INVALID_COMPONENT", path, "Component shape or type is unsupported."));
-    return;
-  }
-  if (![
-    "TRANSFORM",
-    "SPRITE",
-    "AUDIO_SOURCE",
-    "BEHAVIOR",
-    "CAMERA",
-    "TILEMAP",
-    "COLLIDER",
-    "RIGIDBODY",
-    "CHARACTER_CONTROLLER"
-  ].includes(component.type)) {
-    diagnostics.push(diagnostic5("INVALID_COMPONENT", path, `Unknown component type: ${component.type}`));
-    return;
-  }
-  if (typeof component.componentId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(component.componentId)) {
-    diagnostics.push(diagnostic5("INVALID_COMPONENT", `${path}.componentId`, "Component id is invalid."));
-  }
-  if (component.type === "TRANSFORM" && ![
-    "x",
-    "y",
-    "rotation",
-    "scaleX",
-    "scaleY"
-  ].every((key) => typeof component[key] === "number" && Number.isFinite(component[key]))) {
-    diagnostics.push(diagnostic5("INVALID_COMPONENT", path, "Transform component contains a non-finite value."));
-  }
-  if (component.type === "SPRITE") {
-    validateAssetReference(component.asset, `${path}.asset`, ownerId, diagnostics);
-  }
-  if (component.type === "AUDIO_SOURCE") {
-    validateAssetReference(component.asset, `${path}.asset`, ownerId, diagnostics);
-    if (!isRecord(component.asset) || component.asset.kind !== "AUDIO") {
-      diagnostics.push(diagnostic5("INVALID_COMPONENT", `${path}.asset`, "Audio Source requires an AUDIO asset revision."));
-    }
-    if (typeof component.volume !== "number" || !Number.isFinite(component.volume) || component.volume < 0 || component.volume > 1) {
-      diagnostics.push(diagnostic5("INVALID_COMPONENT", `${path}.volume`, "Audio volume must be between 0 and 1."));
-    }
-  }
-  if (component.type === "BEHAVIOR" && (typeof component.behaviorId !== "string" || !knownBehaviorIds.has(component.behaviorId))) {
-    diagnostics.push(diagnostic5("MISSING_REFERENCE", `${path}.behaviorId`, "Behavior component references an unknown behavior."));
-  }
-  if (component.type === "CAMERA" && (typeof component.zoom !== "number" || !Number.isFinite(component.zoom) || component.zoom <= 0)) {
-    diagnostics.push(diagnostic5("INVALID_COMPONENT", `${path}.zoom`, "Camera zoom must be a positive finite number."));
-  }
-  if (component.type === "CAMERA" && component.camera2D !== void 0 && !isValidGameCamera2DSettings(component.camera2D)) {
-    diagnostics.push(diagnostic5("INVALID_COMPONENT", `${path}.camera2D`, "Camera 2D settings are invalid."));
-  }
-  if (component.type === "TILEMAP") {
-    if (typeof component.mapId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(component.mapId)) {
-      diagnostics.push(diagnostic5("INVALID_COMPONENT", `${path}.mapId`, "Tilemap map id is invalid."));
-    }
-    if (typeof component.tileSize !== "number" || !Number.isSafeInteger(component.tileSize) || component.tileSize < 1) {
-      diagnostics.push(diagnostic5("INVALID_COMPONENT", `${path}.tileSize`, "Tilemap tile size must be a positive integer."));
-    }
-    if (typeof component.collisionEnabled !== "boolean") {
-      diagnostics.push(diagnostic5("INVALID_COMPONENT", `${path}.collisionEnabled`, "Tilemap collisionEnabled must be boolean."));
-    }
-    if (component.document !== void 0 && !isValidGameTilemapDocument(component.document)) {
-      diagnostics.push(diagnostic5("INVALID_COMPONENT", `${path}.document`, "Tilemap document is invalid."));
-    }
-  }
-  if (component.type === "COLLIDER") {
-    if (![
-      "BOX",
-      "CIRCLE",
-      "CAPSULE"
-    ].includes(component.shape)) {
-      diagnostics.push(diagnostic5("INVALID_COMPONENT", `${path}.shape`, "Collider shape is unsupported."));
-    }
-    for (const key of [
-      "width",
-      "height",
-      "radius"
-    ]) {
-      if (typeof component[key] !== "number" || !Number.isFinite(component[key]) || component[key] <= 0) {
-        diagnostics.push(diagnostic5("INVALID_COMPONENT", `${path}.${key}`, "Collider dimensions must be positive finite numbers."));
-      }
-    }
-    if (typeof component.isTrigger !== "boolean") {
-      diagnostics.push(diagnostic5("INVALID_COMPONENT", `${path}.isTrigger`, "Collider isTrigger must be boolean."));
-    }
-    if (![
-      "DEFAULT",
-      "WORLD",
-      "PLAYER",
-      "NPC",
-      "SENSOR",
-      "PROJECTILE"
-    ].includes(component.layer)) {
-      diagnostics.push(diagnostic5("INVALID_COMPONENT", `${path}.layer`, "Collider layer is unsupported."));
-    }
-    if (typeof component.enabled !== "boolean") {
-      diagnostics.push(diagnostic5("INVALID_COMPONENT", `${path}.enabled`, "Collider enabled must be boolean."));
-    }
-  }
-  if (component.type === "RIGIDBODY") {
-    if (![
-      "STATIC",
-      "DYNAMIC",
-      "KINEMATIC"
-    ].includes(component.bodyType)) {
-      diagnostics.push(diagnostic5("INVALID_COMPONENT", `${path}.bodyType`, "Rigidbody body type is unsupported."));
-    }
-    if (typeof component.mass !== "number" || !Number.isFinite(component.mass) || component.mass <= 0) {
-      diagnostics.push(diagnostic5("INVALID_COMPONENT", `${path}.mass`, "Rigidbody mass must be positive."));
-    }
-    if (typeof component.gravityScale !== "number" || !Number.isFinite(component.gravityScale)) {
-      diagnostics.push(diagnostic5("INVALID_COMPONENT", `${path}.gravityScale`, "Rigidbody gravity scale must be finite."));
-    }
-    if (typeof component.fixedRotation !== "boolean" || typeof component.enabled !== "boolean") {
-      diagnostics.push(diagnostic5("INVALID_COMPONENT", path, "Rigidbody flags are invalid."));
-    }
-  }
-  if (component.type === "CHARACTER_CONTROLLER") {
-    if (typeof component.moveSpeed !== "number" || !Number.isFinite(component.moveSpeed) || component.moveSpeed <= 0) {
-      diagnostics.push(diagnostic5("INVALID_COMPONENT", `${path}.moveSpeed`, "Character Controller move speed must be positive."));
-    }
-    if (typeof component.stepHeight !== "number" || !Number.isFinite(component.stepHeight) || component.stepHeight < 0) {
-      diagnostics.push(diagnostic5("INVALID_COMPONENT", `${path}.stepHeight`, "Character Controller step height must be non-negative."));
-    }
-    if (typeof component.fixedStep !== "number" || !Number.isSafeInteger(component.fixedStep) || component.fixedStep < 1) {
-      diagnostics.push(diagnostic5("INVALID_COMPONENT", `${path}.fixedStep`, "Character Controller fixed step must be a positive integer."));
-    }
-    if (typeof component.enabled !== "boolean") {
-      diagnostics.push(diagnostic5("INVALID_COMPONENT", `${path}.enabled`, "Character Controller enabled must be boolean."));
-    }
-  }
-}
-function validateGameComponentState(component, path, diagnostics) {
-  if (!isRecord(component) || typeof component.type !== "string" || typeof component.componentId !== "string") {
-    diagnostics.push(diagnostic5("INVALID_PROJECT", path, "Game editor component state is invalid."));
-    return;
-  }
-  if (![
-    "TRANSFORM",
-    "SPRITE",
-    "AUDIO_SOURCE",
-    "BEHAVIOR",
-    "CAMERA",
-    "TILEMAP",
-    "COLLIDER",
-    "RIGIDBODY",
-    "CHARACTER_CONTROLLER",
-    "STATUS",
-    "SKILL",
-    "BRAIN"
-  ].includes(component.type)) {
-    diagnostics.push(diagnostic5("INVALID_PROJECT", `${path}.type`, `Unknown Game editor component state: ${component.type}`));
-    return;
-  }
-  if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(component.componentId)) {
-    diagnostics.push(diagnostic5("INVALID_PROJECT", `${path}.componentId`, "Game editor component id is invalid."));
-  }
-  if (component.type === "TRANSFORM" && ![
-    "x",
-    "y",
-    "rotation",
-    "scaleX",
-    "scaleY"
-  ].every((key) => typeof component[key] === "number" && Number.isFinite(component[key]))) {
-    diagnostics.push(diagnostic5("INVALID_PROJECT", path, "Game editor Transform state contains a non-finite value."));
-  }
-  if (component.type === "SPRITE" && typeof component.visible !== "boolean") {
-    diagnostics.push(diagnostic5("INVALID_PROJECT", path, "Game editor Sprite state requires visible."));
-  }
-  if (component.type === "BEHAVIOR" && typeof component.enabled !== "boolean") {
-    diagnostics.push(diagnostic5("INVALID_PROJECT", path, "Game editor Behavior state requires enabled."));
-  }
-  if (component.type === "AUDIO_SOURCE" && (typeof component.loop !== "boolean" || typeof component.volume !== "number" || !Number.isFinite(component.volume) || component.volume < 0 || component.volume > 1)) {
-    diagnostics.push(diagnostic5("INVALID_PROJECT", path, "Game editor Audio Source state is invalid."));
-  }
-  if (component.type === "CAMERA" && (typeof component.active !== "boolean" || typeof component.zoom !== "number" || !Number.isFinite(component.zoom) || component.zoom <= 0)) {
-    diagnostics.push(diagnostic5("INVALID_PROJECT", path, "Game editor Camera state is invalid."));
-  }
-  if (component.type === "CAMERA" && component.camera2D !== void 0 && !isValidGameCamera2DSettings(component.camera2D)) {
-    diagnostics.push(diagnostic5("INVALID_PROJECT", `${path}.camera2D`, "Game editor Camera 2D settings are invalid."));
-  }
-  if (component.type === "TILEMAP" && (typeof component.mapId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(component.mapId) || typeof component.tileSize !== "number" || !Number.isSafeInteger(component.tileSize) || component.tileSize < 1 || typeof component.collisionEnabled !== "boolean" || component.document !== void 0 && !isValidGameTilemapDocument(component.document))) {
-    diagnostics.push(diagnostic5("INVALID_PROJECT", path, "Game editor Tilemap state is invalid."));
-  }
-  if (component.type === "COLLIDER") {
-    if (![
-      "BOX",
-      "CIRCLE",
-      "CAPSULE"
-    ].includes(component.shape) || [
-      "width",
-      "height",
-      "radius"
-    ].some((key) => typeof component[key] !== "number" || !Number.isFinite(component[key]) || component[key] <= 0) || typeof component.isTrigger !== "boolean" || ![
-      "DEFAULT",
-      "WORLD",
-      "PLAYER",
-      "NPC",
-      "SENSOR",
-      "PROJECTILE"
-    ].includes(component.layer) || typeof component.enabled !== "boolean") {
-      diagnostics.push(diagnostic5("INVALID_PROJECT", path, "Game editor Collider state is invalid."));
-    }
-  }
-  if (component.type === "RIGIDBODY" && (![
-    "STATIC",
-    "DYNAMIC",
-    "KINEMATIC"
-  ].includes(component.bodyType) || typeof component.mass !== "number" || !Number.isFinite(component.mass) || component.mass <= 0 || typeof component.gravityScale !== "number" || !Number.isFinite(component.gravityScale) || typeof component.fixedRotation !== "boolean" || typeof component.enabled !== "boolean")) {
-    diagnostics.push(diagnostic5("INVALID_PROJECT", path, "Game editor Rigidbody state is invalid."));
-  }
-  if (component.type === "CHARACTER_CONTROLLER" && (typeof component.moveSpeed !== "number" || !Number.isFinite(component.moveSpeed) || component.moveSpeed <= 0 || typeof component.stepHeight !== "number" || !Number.isFinite(component.stepHeight) || component.stepHeight < 0 || typeof component.fixedStep !== "number" || !Number.isSafeInteger(component.fixedStep) || component.fixedStep < 1 || typeof component.enabled !== "boolean")) {
-    diagnostics.push(diagnostic5("INVALID_PROJECT", path, "Game editor Character Controller state is invalid."));
-  }
-  if (component.type === "STATUS" && (![
-    "hp",
-    "maxHp",
-    "stamina",
-    "maxStamina",
-    "mp",
-    "maxMp",
-    "attack",
-    "defense",
-    "level"
-  ].every((key) => typeof component[key] === "number" && Number.isFinite(component[key])) || typeof component.enabled !== "boolean")) {
-    diagnostics.push(diagnostic5("INVALID_PROJECT", path, "Game editor Status state is invalid."));
-  }
-  if (component.type === "SKILL" && (![
-    "ATTACK",
-    "SHOOT",
-    "MAGIC",
-    "DASH_ATTACK",
-    "HEAL",
-    "SHIELD"
-  ].includes(component.kind) || typeof component.power !== "number" || !Number.isFinite(component.power) || typeof component.cooldown !== "number" || !Number.isFinite(component.cooldown) || component.cooldown < 0 || typeof component.enabled !== "boolean")) {
-    diagnostics.push(diagnostic5("INVALID_PROJECT", path, "Game editor Skill state is invalid."));
-  }
-  if (component.type === "BRAIN" && (![
-    "PLAYER_CONTROL",
-    "AI",
-    "PATROL",
-    "PURSUE",
-    "AVOID",
-    "WAIT"
-  ].includes(component.mode) || typeof component.speed !== "number" || !Number.isFinite(component.speed) || component.speed < 0 || typeof component.range !== "number" || !Number.isFinite(component.range) || component.range < 0 || typeof component.enabled !== "boolean")) {
-    diagnostics.push(diagnostic5("INVALID_PROJECT", path, "Game editor Brain state is invalid."));
-  }
-}
-function validateDependencyCycles(dependencies, diagnostics) {
-  const byId = new Map(dependencies.map((dependency) => [
-    String(dependency.dependencyId),
-    dependency
-  ]));
-  const visiting = /* @__PURE__ */ new Set();
-  const visited = /* @__PURE__ */ new Set();
-  const visit = (id, path) => {
-    if (visiting.has(id)) {
-      diagnostics.push(diagnostic5("DEPENDENCY_CYCLE", path, `Dependency cycle includes ${id}.`));
-      return;
-    }
-    if (visited.has(id)) return;
-    const dependency = byId.get(id);
-    if (!dependency) {
-      diagnostics.push(diagnostic5("MISSING_REFERENCE", path, `Dependency ${id} is missing.`));
-      return;
-    }
-    visiting.add(id);
-    for (const target of dependency.dependsOn) {
-      visit(target, `${path}.dependsOn`);
-    }
-    visiting.delete(id);
-    visited.add(id);
-  };
-  for (const dependency of dependencies) {
-    visit(dependency.dependencyId, "dependencies");
-  }
-}
-function validateGameProject2(value, caller) {
-  const diagnostics = [];
-  if (!isRecord(value)) {
-    return {
-      valid: false,
-      diagnostics: [
-        diagnostic5("INVALID_PROJECT", "project", "Game Project must be an object.")
-      ]
-    };
-  }
-  if (value.schemaVersion !== GAME_PROJECT_SCHEMA_VERSION) {
-    diagnostics.push(diagnostic5("UNKNOWN_SCHEMA", "schemaVersion", "Unsupported Game Project schema version."));
-  }
-  if (typeof value.projectId !== "string" || typeof value.ownerId !== "string" || typeof value.name !== "string" || !isRecord(value.revision)) {
-    return {
-      valid: false,
-      diagnostics: [
-        ...diagnostics,
-        diagnostic5("INVALID_PROJECT", "project", "Required Game Project identity is missing.")
-      ]
-    };
-  }
-  const project = value;
-  if (caller) diagnostics.push(...validateCaller(project, caller));
-  if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(project.projectId) || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(project.ownerId)) {
-    diagnostics.push(diagnostic5("INVALID_PROJECT", "projectId/ownerId", "Project and owner ids must be stable identifiers."));
-  }
-  if (!project.name.trim()) {
-    diagnostics.push(diagnostic5("INVALID_PROJECT", "name", "Project name is required."));
-  }
-  if (project.revision.projectId !== project.projectId || project.revision.ownerId !== project.ownerId || !Number.isSafeInteger(project.revision.sequence) || project.revision.sequence < 1) {
-    diagnostics.push(diagnostic5("INVALID_REVISION", "revision", "Revision is not bound to the project owner or sequence."));
-  }
-  if (!Array.isArray(project.scenes) || !Array.isArray(project.prefabs) || !Array.isArray(project.dependencies) || !Array.isArray(project.behaviors)) {
-    return {
-      valid: false,
-      diagnostics: [
-        ...diagnostics,
-        diagnostic5("INVALID_PROJECT", "project", "Project collections are invalid.")
-      ]
-    };
-  }
-  if (project.runtimeProfile !== void 0) {
-    if (!isRecord(project.runtimeProfile) || project.runtimeProfile.schemaVersion !== GAME_RUNTIME_PROFILE_SCHEMA_VERSION || typeof project.runtimeProfile.profileId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(project.runtimeProfile.profileId)) {
-      diagnostics.push(diagnostic5("INVALID_RUNTIME_PROFILE", "runtimeProfile", "Runtime profile reference is invalid."));
-    }
-  }
-  diagnostics.push(...duplicateDiagnostics2(project.scenes.map((scene) => String(scene.sceneId)), "scenes.sceneId"));
-  diagnostics.push(...duplicateDiagnostics2(project.prefabs.map((prefab) => String(prefab.prefabId)), "prefabs.prefabId"));
-  diagnostics.push(...duplicateDiagnostics2(project.dependencies.map((dependency) => String(dependency.dependencyId)), "dependencies.dependencyId"));
-  diagnostics.push(...duplicateDiagnostics2(project.behaviors.map((behavior2) => String(behavior2.behaviorId)), "behaviors.behaviorId"));
-  const behaviorIds = new Set(project.behaviors.map((behavior2) => String(behavior2.behaviorId)));
-  const allEntityIds = [];
-  const allComponentIds = [];
-  for (const [sceneIndex, scene] of project.scenes.entries()) {
-    if (!isRecord(scene) || typeof scene.sceneId !== "string" || !Array.isArray(scene.entities) || !Array.isArray(scene.rootEntityIds)) {
-      diagnostics.push(diagnostic5("INVALID_PROJECT", `scenes[${sceneIndex}]`, "Scene shape is invalid."));
-      continue;
-    }
-    const sceneEntityIds = new Set(scene.entities.map((entity) => String(entity.entityId)));
-    for (const rootId of scene.rootEntityIds) {
-      if (!sceneEntityIds.has(String(rootId))) {
-        diagnostics.push(diagnostic5("MISSING_REFERENCE", `scenes[${sceneIndex}].rootEntityIds`, `Root Entity ${String(rootId)} is missing.`));
-      }
-    }
-    diagnostics.push(...duplicateDiagnostics2(scene.entities.map((entity) => String(entity.entityId)), `scenes[${sceneIndex}].entities.entityId`));
-    for (const [entityIndex, entity] of scene.entities.entries()) {
-      if (!isRecord(entity) || typeof entity.entityId !== "string" || !Array.isArray(entity.components)) {
-        diagnostics.push(diagnostic5("INVALID_PROJECT", `scenes[${sceneIndex}].entities[${entityIndex}]`, "Entity shape is invalid."));
-        continue;
-      }
-      allEntityIds.push(entity.entityId);
-      if (entity.parentEntityId !== void 0 && !sceneEntityIds.has(String(entity.parentEntityId))) {
-        diagnostics.push(diagnostic5("MISSING_REFERENCE", `scenes[${sceneIndex}].entities[${entityIndex}].parentEntityId`, "Parent Entity is missing."));
-      }
-      diagnostics.push(...duplicateDiagnostics2(entity.components.map((component) => String(isRecord(component) ? component.componentId : "<invalid>")), `scenes[${sceneIndex}].entities[${entityIndex}].components.componentId`));
-      for (const [componentIndex, component] of entity.components.entries()) {
-        if (isRecord(component) && typeof component.componentId === "string") {
-          allComponentIds.push(component.componentId);
-        }
-        validateComponent(component, `scenes[${sceneIndex}].entities[${entityIndex}].components[${componentIndex}]`, project.ownerId, behaviorIds, diagnostics);
-      }
-    }
-    for (const entity of scene.entities) {
-      const seen = /* @__PURE__ */ new Set();
-      let parentId = entity.parentEntityId;
-      while (parentId !== void 0) {
-        if (seen.has(String(parentId)) || parentId === entity.entityId) {
-          diagnostics.push(diagnostic5("DEPENDENCY_CYCLE", `scenes[${sceneIndex}].entities`, `Entity parent cycle includes ${String(entity.entityId)}.`));
-          break;
-        }
-        seen.add(String(parentId));
-        parentId = scene.entities.find((candidate) => candidate.entityId === parentId)?.parentEntityId;
-      }
-    }
-  }
-  diagnostics.push(...duplicateDiagnostics2(allEntityIds, "project.entities.entityId"));
-  diagnostics.push(...duplicateDiagnostics2(allComponentIds, "project.components.componentId"));
-  for (const dependency of project.dependencies) {
-    if (!isRecord(dependency) || typeof dependency.dependencyId !== "string" || !Array.isArray(dependency.dependsOn)) {
-      diagnostics.push(diagnostic5("INVALID_PROJECT", "dependencies", "Dependency shape is invalid."));
-    } else if (dependency.ownerId !== project.ownerId || dependency.ownerRevisionId !== project.revision.revisionId) {
-      diagnostics.push(diagnostic5("INVALID_REFERENCE", `dependencies.${dependency.dependencyId}`, "Dependency owner/revision is not the current project revision."));
-    }
-  }
-  validateDependencyCycles(project.dependencies, diagnostics);
-  for (const behavior2 of project.behaviors) {
-    if (behavior2.version !== BEHAVIOR_IR_VERSION || behavior2.ownership !== "CANONICAL_IR" || !Array.isArray(behavior2.rules)) {
-      diagnostics.push(diagnostic5("UNKNOWN_SCHEMA", `behaviors.${String(behavior2.behaviorId)}`, "Behavior IR schema is unsupported."));
-    }
-  }
-  if (project.editorTimeline !== void 0) {
-    const timeline = project.editorTimeline;
-    if (!Number.isSafeInteger(timeline.frameCount) || timeline.frameCount < 1) {
-      diagnostics.push(diagnostic5("INVALID_PROJECT", "editorTimeline.frameCount", "Editor timeline frame count must be a positive integer."));
-    }
-    if (!Array.isArray(timeline.tracks)) {
-      diagnostics.push(diagnostic5("INVALID_PROJECT", "editorTimeline.tracks", "Editor timeline tracks must be an array."));
-    } else {
-      diagnostics.push(...duplicateDiagnostics2(timeline.tracks.map((track) => track.trackId), "editorTimeline.tracks.trackId"));
-      for (const [index, track] of timeline.tracks.entries()) {
-        if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(track.trackId) || track.label.trim().length === 0 || track.kind.trim().length === 0) {
-          diagnostics.push(diagnostic5("INVALID_PROJECT", `editorTimeline.tracks[${index}]`, "Editor timeline track identity is invalid."));
-        }
-        if (!Array.isArray(track.activeFrames) || track.activeFrames.some((frame) => !Number.isSafeInteger(frame) || frame < 0 || frame >= timeline.frameCount)) {
-          diagnostics.push(diagnostic5("INVALID_PROJECT", `editorTimeline.tracks[${index}].activeFrames`, "Editor timeline frames must be in range."));
-        } else if (new Set(track.activeFrames).size !== track.activeFrames.length) {
-          diagnostics.push(diagnostic5("DUPLICATE_ID", `editorTimeline.tracks[${index}].activeFrames`, "Editor timeline frames must be unique."));
-        }
-        if (track.role !== void 0 && ![
-          "PLAYER",
-          "NPC",
-          "PROP",
-          "TRIGGER",
-          "TILEMAP",
-          "CAMERA",
-          "AUDIO",
-          "CUSTOM"
-        ].includes(track.role)) {
-          diagnostics.push(diagnostic5("INVALID_PROJECT", `editorTimeline.tracks[${index}].role`, "Game object role is unsupported."));
-        }
-        if (track.components !== void 0) {
-          if (!Array.isArray(track.components)) {
-            diagnostics.push(diagnostic5("INVALID_PROJECT", `editorTimeline.tracks[${index}].components`, "Game editor components must be an array."));
-          } else {
-            diagnostics.push(...duplicateDiagnostics2(track.components.map((component) => String(component.componentId)), `editorTimeline.tracks[${index}].components.componentId`));
-            for (const [componentIndex, component] of track.components.entries()) {
-              validateGameComponentState(component, `editorTimeline.tracks[${index}].components[${componentIndex}]`, diagnostics);
-            }
-          }
-        }
-        if (track.tilemap !== void 0 && !isValidGameTilemapDocument(track.tilemap)) {
-          diagnostics.push(diagnostic5("INVALID_PROJECT", `editorTimeline.tracks[${index}].tilemap`, "Editor tilemap document is invalid."));
-        }
-      }
-    }
-    if (timeline.assetBindings !== void 0) {
-      const trackIds = new Set(Array.isArray(timeline.tracks) ? timeline.tracks.map((track) => track.trackId) : []);
-      if (!Array.isArray(timeline.assetBindings) || timeline.assetBindings.some((binding) => !isValidGameTimelineAssetBinding(binding) || !trackIds.has(binding.trackId))) {
-        diagnostics.push(diagnostic5("INVALID_PROJECT", "editorTimeline.assetBindings", "Editor asset binding metadata is invalid or targets a missing track."));
-      } else {
-        diagnostics.push(...duplicateDiagnostics2(timeline.assetBindings.map((binding) => `${binding.trackId}:${binding.kind}`), "editorTimeline.assetBindings"));
-      }
-    }
-    if (timeline.sceneRules !== void 0 && !isValidGameSceneRules(timeline.sceneRules)) {
-      diagnostics.push(diagnostic5("INVALID_PROJECT", "editorTimeline.sceneRules", "Scene-wide Game rules are invalid."));
-    }
-    if (timeline.creationMode !== void 0 && ![
-      "RPG_TEMPLATE",
-      "ACTION_2D",
-      "DODGE_2D",
-      "SCROLL_2D",
-      "BLANK"
-    ].includes(timeline.creationMode)) {
-      diagnostics.push(diagnostic5("INVALID_PROJECT", "editorTimeline.creationMode", "Game creation mode is unsupported."));
-    }
-    if (timeline.eventCards !== void 0) {
-      if (!Array.isArray(timeline.eventCards) || timeline.eventCards.some((card) => !isValidGameEventCard(card))) {
-        diagnostics.push(diagnostic5("INVALID_PROJECT", "editorTimeline.eventCards", "Game event cards are invalid."));
-      } else {
-        diagnostics.push(...duplicateDiagnostics2(timeline.eventCards.map((card) => card.eventId), "editorTimeline.eventCards.eventId"));
-        const trackIds = new Set(Array.isArray(timeline.tracks) ? timeline.tracks.map((track) => track.trackId) : []);
-        const itemIds = new Set(Array.isArray(timeline.items) ? timeline.items.map((item) => item.itemId) : []);
-        const recipeIds = new Set(Array.isArray(timeline.recipes) ? timeline.recipes.map((recipe) => recipe.recipeId) : []);
-        const blockTypeIds = new Set(Array.isArray(timeline.blockTypes) ? timeline.blockTypes.map((blockType) => blockType.blockTypeId) : []);
-        for (const [index, card] of timeline.eventCards.entries()) {
-          for (const [key, trackId] of [
-            [
-              "sourceTrackId",
-              card.sourceTrackId
-            ],
-            [
-              "targetTrackId",
-              card.targetTrackId
-            ],
-            [
-              "audioTrackId",
-              card.audioTrackId
-            ]
-          ]) {
-            if (trackId !== void 0 && !trackIds.has(trackId)) {
-              diagnostics.push(diagnostic5("MISSING_REFERENCE", `editorTimeline.eventCards[${index}].${key}`, "Game event card track reference is missing."));
-            }
-          }
-          if (card.itemId !== void 0 && !itemIds.has(card.itemId)) {
-            diagnostics.push(diagnostic5("MISSING_REFERENCE", `editorTimeline.eventCards[${index}].itemId`, "Game event card item reference is missing."));
-          }
-          if (card.recipeId !== void 0 && !recipeIds.has(card.recipeId)) {
-            diagnostics.push(diagnostic5("MISSING_REFERENCE", `editorTimeline.eventCards[${index}].recipeId`, "Game event card recipe reference is missing."));
-          }
-          if (card.blockTypeId !== void 0 && !blockTypeIds.has(card.blockTypeId)) {
-            diagnostics.push(diagnostic5("MISSING_REFERENCE", `editorTimeline.eventCards[${index}].blockTypeId`, "Game event card block type reference is missing."));
-          }
-        }
-      }
-    }
-    if (timeline.items !== void 0) {
-      if (!Array.isArray(timeline.items) || timeline.items.some((item) => !isValidGameItemDefinition(item))) {
-        diagnostics.push(diagnostic5("INVALID_PROJECT", "editorTimeline.items", "Game item definitions are invalid."));
-      } else {
-        diagnostics.push(...duplicateDiagnostics2(timeline.items.map((item) => item.itemId), "editorTimeline.items.itemId"));
-      }
-    }
-    if (timeline.recipes !== void 0) {
-      if (!Array.isArray(timeline.recipes) || timeline.recipes.some((recipe) => !isValidGameRecipeDefinition(recipe))) {
-        diagnostics.push(diagnostic5("INVALID_PROJECT", "editorTimeline.recipes", "Game recipe definitions are invalid."));
-      } else {
-        diagnostics.push(...duplicateDiagnostics2(timeline.recipes.map((recipe) => recipe.recipeId), "editorTimeline.recipes.recipeId"));
-        const knownItemIds = new Set(Array.isArray(timeline.items) ? timeline.items.map((item) => item.itemId) : []);
-        for (const [index, recipe] of timeline.recipes.entries()) {
-          const referenced = [
-            ...recipe.ingredients.map((ingredient) => ingredient.itemId),
-            recipe.result.itemId
-          ];
-          for (const itemId of referenced) {
-            if (!knownItemIds.has(itemId)) {
-              diagnostics.push(diagnostic5("MISSING_REFERENCE", `editorTimeline.recipes[${index}]`, "Game recipe references an unknown item."));
-              break;
-            }
-          }
-        }
-      }
-    }
-    if (timeline.blockTypes !== void 0) {
-      if (!Array.isArray(timeline.blockTypes) || timeline.blockTypes.some((blockType) => !isValidGameBlockTypeDefinition(blockType))) {
-        diagnostics.push(diagnostic5("INVALID_PROJECT", "editorTimeline.blockTypes", "Game block type definitions are invalid."));
-      } else {
-        diagnostics.push(...duplicateDiagnostics2(timeline.blockTypes.map((blockType) => blockType.blockTypeId), "editorTimeline.blockTypes.blockTypeId"));
-        const knownItemIdsForBlocks = new Set(Array.isArray(timeline.items) ? timeline.items.map((item) => item.itemId) : []);
-        for (const [index, blockType] of timeline.blockTypes.entries()) {
-          if (blockType.dropItemId !== void 0 && !knownItemIdsForBlocks.has(blockType.dropItemId)) {
-            diagnostics.push(diagnostic5("MISSING_REFERENCE", `editorTimeline.blockTypes[${index}].dropItemId`, "Game block type drop item reference is missing."));
-          }
-        }
-      }
-    }
-    if (timeline.templateInstances !== void 0) {
-      if (!Array.isArray(timeline.templateInstances) || timeline.templateInstances.some((instance) => !isValidGameTemplateInstance(instance))) {
-        diagnostics.push(diagnostic5("INVALID_PROJECT", "editorTimeline.templateInstances", "Game template instances are invalid."));
-      } else {
-        diagnostics.push(...duplicateDiagnostics2(timeline.templateInstances.map((instance) => instance.instanceId), "editorTimeline.templateInstances.instanceId"));
-        const trackIds = new Set(Array.isArray(timeline.tracks) ? timeline.tracks.map((track) => track.trackId) : []);
-        for (const [index, instance] of timeline.templateInstances.entries()) {
-          if (instance.targetTrackId !== void 0 && !trackIds.has(instance.targetTrackId)) {
-            diagnostics.push(diagnostic5("MISSING_REFERENCE", `editorTimeline.templateInstances[${index}].targetTrackId`, "Game template target track is missing."));
-          }
-        }
-      }
-    }
-    if (timeline.animationBindings !== void 0) {
-      if (!Array.isArray(timeline.animationBindings) || timeline.animationBindings.some((binding) => !isValidGameAnimationBinding(binding))) {
-        diagnostics.push(diagnostic5("INVALID_PROJECT", "editorTimeline.animationBindings", "Game animation bindings are invalid."));
-      } else {
-        diagnostics.push(...duplicateDiagnostics2(timeline.animationBindings.map((binding) => binding.bindingId), "editorTimeline.animationBindings.bindingId"));
-        const trackIds = new Set(Array.isArray(timeline.tracks) ? timeline.tracks.map((track) => track.trackId) : []);
-        const keys = /* @__PURE__ */ new Set();
-        for (const [index, binding] of timeline.animationBindings.entries()) {
-          if (!trackIds.has(binding.trackId)) {
-            diagnostics.push(diagnostic5("MISSING_REFERENCE", `editorTimeline.animationBindings[${index}].trackId`, "Game animation target track is missing."));
-          }
-          const key = `${binding.trackId}\0${binding.assetDefinitionId}\0${binding.clipKey}`;
-          if (keys.has(key)) {
-            diagnostics.push(diagnostic5("DUPLICATE_ID", `editorTimeline.animationBindings[${index}]`, "A Game animation clip can only be assigned once per object."));
-          }
-          keys.add(key);
-        }
-      }
-    }
-  }
-  return {
-    valid: diagnostics.length === 0,
-    diagnostics
-  };
-}
-function sortById(items, key) {
-  return [
-    ...items
-  ].sort((left, right) => String(left[key]).localeCompare(String(right[key]), "en", {
-    numeric: false
-  }));
-}
-function normalizeBehavior(behaviorId, rules) {
-  return {
-    behaviorId,
-    version: BEHAVIOR_IR_VERSION,
-    ownership: "CANONICAL_IR",
-    rules: sortById(rules.map((rule) => ({
-      ...rule,
-      conditions: [
-        ...rule.conditions
-      ],
-      actions: [
-        ...rule.actions
-      ]
-    })), "ruleId")
-  };
-}
-function compileNoCodeBehavior(source) {
-  return normalizeBehavior(source.behaviorId, source.rules);
-}
-
 // src/game/game-310/core.ts
 var asActionId = (value) => asIdentifier(value, "actionId");
 function asIdentifier(value, label) {
@@ -3676,7 +6863,7 @@ function freezeDeep2(value) {
   }
   return value;
 }
-function cellKey(x, y) {
+function cellKey2(x, y) {
   return `${x},${y}`;
 }
 function cellSort(left, right) {
@@ -3715,7 +6902,7 @@ function normalizeCells(cells = [], width, height) {
     if (cell.collision === "NONE" && cell.triggerId === void 0 && cell.blockTypeId === void 0) {
       throw new Error("An empty tilemap cell must not be persisted.");
     }
-    const key = cellKey(cell.x, cell.y);
+    const key = cellKey2(cell.x, cell.y);
     if (byKey.has(key)) throw new Error(`Duplicate tilemap cell: ${key}`);
     byKey.set(key, {
       x: cell.x,
@@ -3811,12 +6998,12 @@ function createDefaultRpgTilemapDocument(mapId = "map:tilemap") {
     cells
   });
 }
-function gameTilemapCellAt(document, x, y) {
+function gameTilemapCellAt(document2, x, y) {
   let low = 0;
-  let high = document.cells.length - 1;
+  let high = document2.cells.length - 1;
   while (low <= high) {
     const middle = Math.floor((low + high) / 2);
-    const cell = document.cells[middle];
+    const cell = document2.cells[middle];
     if (cell === void 0) return void 0;
     const comparison = cell.y - y || cell.x - x;
     if (comparison === 0) return cell;
@@ -3825,14 +7012,14 @@ function gameTilemapCellAt(document, x, y) {
   }
   return void 0;
 }
-function assertCellCoordinate(document, x, y) {
-  if (!Number.isSafeInteger(x) || !Number.isSafeInteger(y) || x < 0 || x >= document.width || y < 0 || y >= document.height) {
+function assertCellCoordinate(document2, x, y) {
+  if (!Number.isSafeInteger(x) || !Number.isSafeInteger(y) || x < 0 || x >= document2.width || y < 0 || y >= document2.height) {
     throw new Error("Tilemap cell is outside the document bounds.");
   }
 }
-function withCell(document, x, y, patch) {
-  assertCellCoordinate(document, x, y);
-  const existing = gameTilemapCellAt(document, x, y);
+function withCell(document2, x, y, patch) {
+  assertCellCoordinate(document2, x, y);
+  const existing = gameTilemapCellAt(document2, x, y);
   const nextCell = patch === null ? void 0 : {
     x,
     y,
@@ -3843,130 +7030,47 @@ function withCell(document, x, y, patch) {
       triggerId: existing.triggerId
     }
   };
-  if (existing !== void 0 && nextCell !== void 0 && JSON.stringify(existing) === JSON.stringify(nextCell)) return document;
-  if (existing === void 0 && nextCell === void 0) return document;
-  const cells = document.cells.filter((cell) => !(cell.x === x && cell.y === y));
+  if (existing !== void 0 && nextCell !== void 0 && JSON.stringify(existing) === JSON.stringify(nextCell)) return document2;
+  if (existing === void 0 && nextCell === void 0) return document2;
+  const cells = document2.cells.filter((cell) => !(cell.x === x && cell.y === y));
   if (nextCell !== void 0 && !(nextCell.collision === "NONE" && nextCell.triggerId === void 0)) {
     cells.push(nextCell);
   }
   return documentFrom({
-    mapId: document.mapId,
-    width: document.width,
-    height: document.height,
-    tileSize: document.tileSize,
+    mapId: document2.mapId,
+    width: document2.width,
+    height: document2.height,
+    tileSize: document2.tileSize,
     cells
   });
 }
-function setGameTilemapCell(document, x, y, patch) {
-  return withCell(document, x, y, patch);
+function setGameTilemapCell(document2, x, y, patch) {
+  return withCell(document2, x, y, patch);
 }
-function clearGameTilemapCell(document, x, y) {
-  return withCell(document, x, y, null);
+function clearGameTilemapCell(document2, x, y) {
+  return withCell(document2, x, y, null);
 }
-function paintGameTilemapCell(document, x, y, mode, triggerId = "rpg.cell-trigger") {
+function paintGameTilemapCell(document2, x, y, mode, triggerId = "rpg.cell-trigger") {
   switch (mode) {
     case "SOLID":
-      return setGameTilemapCell(document, x, y, {
+      return setGameTilemapCell(document2, x, y, {
         collision: "SOLID",
         triggerId: null
       });
     case "TRIGGER":
-      return setGameTilemapCell(document, x, y, {
+      return setGameTilemapCell(document2, x, y, {
         collision: "NONE",
         triggerId
       });
     case "ERASE":
-      return clearGameTilemapCell(document, x, y);
+      return clearGameTilemapCell(document2, x, y);
   }
 }
-function solidGameTilemapCells(document) {
-  return document.cells.filter((cell) => cell.collision === "SOLID");
+function solidGameTilemapCells(document2) {
+  return document2.cells.filter((cell) => cell.collision === "SOLID");
 }
-function triggerGameTilemapCells(document) {
-  return document.cells.filter((cell) => cell.triggerId !== void 0);
-}
-
-// src/game/game-350/camera-2d.ts
-var DEFAULT_CAMERA_2D_SETTINGS = Object.freeze({
-  schemaVersion: GAME_CAMERA_2D_SETTINGS_SCHEMA_VERSION,
-  pixelPerfect: true,
-  referenceWidth: 160,
-  referenceHeight: 96,
-  pixelsPerUnit: 16,
-  follow: Object.freeze({
-    enabled: true,
-    targetId: "hero",
-    smoothing: 0.12,
-    deadZoneX: 1,
-    deadZoneY: 0.75,
-    lookAheadX: 0.5,
-    lookAheadY: 0
-  }),
-  shake: Object.freeze({
-    onDamage: true,
-    strength: 0.5,
-    durationMs: 160,
-    frequency: 18
-  })
-});
-function finite(value) {
-  return typeof value === "number" && Number.isFinite(value);
-}
-function bounded(value, minimum, maximum, fallback) {
-  return finite(value) ? Math.min(maximum, Math.max(minimum, value)) : fallback;
-}
-function integerBounded(value, minimum, maximum, fallback) {
-  return Number.isSafeInteger(value) && Number(value) >= minimum && Number(value) <= maximum ? Number(value) : fallback;
-}
-function record2(value) {
-  return value !== null && typeof value === "object" && !Array.isArray(value) ? value : void 0;
-}
-function stableId3(value) {
-  return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(value);
-}
-function normalizeCamera2DSettings(value, fallback = DEFAULT_CAMERA_2D_SETTINGS) {
-  if (isValidGameCamera2DSettings(value)) {
-    return {
-      ...value,
-      follow: {
-        ...value.follow
-      },
-      shake: {
-        ...value.shake
-      }
-    };
-  }
-  const source = record2(value);
-  const sourceFollow = record2(source?.follow);
-  const sourceShake = record2(source?.shake);
-  const fallbackFollow = fallback.follow;
-  const fallbackShake = fallback.shake;
-  return {
-    schemaVersion: GAME_CAMERA_2D_SETTINGS_SCHEMA_VERSION,
-    pixelPerfect: typeof source?.pixelPerfect === "boolean" ? source.pixelPerfect : fallback.pixelPerfect,
-    referenceWidth: integerBounded(source?.referenceWidth, 1, 8192, fallback.referenceWidth),
-    referenceHeight: integerBounded(source?.referenceHeight, 1, 8192, fallback.referenceHeight),
-    pixelsPerUnit: integerBounded(source?.pixelsPerUnit, 1, 1024, fallback.pixelsPerUnit),
-    follow: {
-      enabled: typeof sourceFollow?.enabled === "boolean" ? sourceFollow.enabled : fallbackFollow.enabled,
-      ...stableId3(sourceFollow?.targetId) ? {
-        targetId: sourceFollow.targetId
-      } : fallbackFollow.targetId === void 0 ? {} : {
-        targetId: fallbackFollow.targetId
-      },
-      smoothing: bounded(sourceFollow?.smoothing, 0, 2, fallbackFollow.smoothing),
-      deadZoneX: bounded(sourceFollow?.deadZoneX, 0, 64, fallbackFollow.deadZoneX),
-      deadZoneY: bounded(sourceFollow?.deadZoneY, 0, 64, fallbackFollow.deadZoneY),
-      lookAheadX: bounded(sourceFollow?.lookAheadX, -64, 64, fallbackFollow.lookAheadX),
-      lookAheadY: bounded(sourceFollow?.lookAheadY, -64, 64, fallbackFollow.lookAheadY)
-    },
-    shake: {
-      onDamage: typeof sourceShake?.onDamage === "boolean" ? sourceShake.onDamage : fallbackShake.onDamage,
-      strength: bounded(sourceShake?.strength, 0, 64, fallbackShake.strength),
-      durationMs: integerBounded(sourceShake?.durationMs, 0, 1e4, fallbackShake.durationMs),
-      frequency: bounded(sourceShake?.frequency, 1, 120, fallbackShake.frequency)
-    }
-  };
+function triggerGameTilemapCells(document2) {
+  return document2.cells.filter((cell) => cell.triggerId !== void 0);
 }
 
 // src/game/game-350/playable-slice.ts
@@ -4014,7 +7118,7 @@ function position(x, y) {
 function clonePosition(value) {
   return position(value.x, value.y);
 }
-function cellKey2(value) {
+function cellKey3(value) {
   return `${value.x},${value.y}`;
 }
 function camera2DSettingsForProject(project, scene) {
@@ -4079,17 +7183,17 @@ function validateMap(map) {
     if (!Number.isSafeInteger(cell.x) || !Number.isSafeInteger(cell.y) || !inBounds(map.bounds, cell)) {
       throw new Error("RPG solid cells must be integer cells inside collision bounds.");
     }
-    if (seen.has(cellKey2(cell))) {
-      throw new Error(`RPG solid cell is duplicated: ${cellKey2(cell)}`);
+    if (seen.has(cellKey3(cell))) {
+      throw new Error(`RPG solid cell is duplicated: ${cellKey3(cell)}`);
     }
-    seen.add(cellKey2(cell));
+    seen.add(cellKey3(cell));
   }
   const triggerIds = /* @__PURE__ */ new Set();
   for (const cell of map.triggerCells) {
     if (!Number.isSafeInteger(cell.x) || !Number.isSafeInteger(cell.y) || !inBounds(map.bounds, cell) || typeof cell.triggerId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(cell.triggerId)) {
       throw new Error("RPG trigger cells must be valid integer cells with stable IDs.");
     }
-    const key = cellKey2(cell);
+    const key = cellKey3(cell);
     if (seen.has(key)) {
       throw new Error(`RPG map cell cannot be both solid and trigger: ${key}`);
     }
@@ -4187,8 +7291,8 @@ function createGame351PlayableSnapshot(template) {
   const playerPosition = entityTransform(template.project, template.sceneId, template.playerEntityId);
   const npcPosition = entityTransform(template.project, template.sceneId, template.npcEntityId);
   if (!inBounds(template.map.bounds, playerPosition) || !inBounds(template.map.bounds, npcPosition)) throw new Error("RPG actors must start inside collision bounds.");
-  const solid = new Set(template.map.solidCells.map(cellKey2));
-  if (solid.has(cellKey2(playerPosition)) || solid.has(cellKey2(npcPosition))) {
+  const solid = new Set(template.map.solidCells.map(cellKey3));
+  if (solid.has(cellKey3(playerPosition)) || solid.has(cellKey3(npcPosition))) {
     throw new Error("RPG actors may not start on solid cells.");
   }
   const camera2D = camera2DSettingsForProject(template.project, scene);
@@ -4394,7 +7498,7 @@ var GAME351_RPG_RUNTIME_MODULE = {
   }
 };
 function canEnterGame351Cell(snapshot, value) {
-  return inBounds(snapshot.collisionBounds, value) && !new Set(snapshot.solidCells.map(cellKey2)).has(cellKey2(value)) && cellKey2(value) !== cellKey2(snapshot.npcPosition);
+  return inBounds(snapshot.collisionBounds, value) && !new Set(snapshot.solidCells.map(cellKey3)).has(cellKey3(value)) && cellKey3(value) !== cellKey3(snapshot.npcPosition);
 }
 
 // src/game/game-350/game-studio-systems.ts
@@ -4509,7 +7613,7 @@ function componentIdFor(trackId, type) {
 }
 
 // src/game/game-350/template-registry.ts
-var STABLE_ID2 = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u;
+var STABLE_ID3 = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u;
 var TEMPLATE_MAX_INSTANCES = 512;
 function isScalar(value) {
   return typeof value === "string" || typeof value === "boolean" || typeof value === "number" && Number.isFinite(value);
@@ -4528,7 +7632,7 @@ function valueMatchesField(field2, value) {
   }
 }
 function validateGameTemplateDefinition(definition) {
-  if (!STABLE_ID2.test(definition.id) || definition.title.trim().length === 0 || definition.description.trim().length === 0 || ![
+  if (!STABLE_ID3.test(definition.id) || definition.title.trim().length === 0 || definition.description.trim().length === 0 || ![
     "CORE",
     "RPG",
     "ACTION",
@@ -4567,7 +7671,7 @@ function validateGameTemplateDefinition(definition) {
   }
   const fieldIds = /* @__PURE__ */ new Set();
   for (const field2 of definition.fields) {
-    if (!STABLE_ID2.test(field2.id) || field2.label.trim().length === 0 || fieldIds.has(field2.id) || !valueMatchesField(field2, field2.defaultValue)) return {
+    if (!STABLE_ID3.test(field2.id) || field2.label.trim().length === 0 || fieldIds.has(field2.id) || !valueMatchesField(field2, field2.defaultValue)) return {
       valid: false,
       reason: `Template field is invalid: ${field2.id}`
     };
@@ -5527,1087 +8631,6 @@ function removeGameTemplateInstance(instances, instanceId) {
     })
   })));
 }
-
-// src/game/game-350/authoring-model.ts
-var GAME_SCENE_RULE_PRESETS = Object.freeze({
-  NONE: 0,
-  WEAK: 4.9,
-  STANDARD: 9.8,
-  STRONG: 19.6
-});
-var GAME_SCENE_RULE_LABELS = Object.freeze({
-  NONE: "\u306A\u3057",
-  WEAK: "\u5F31\u3044",
-  STANDARD: "\u6A19\u6E96",
-  STRONG: "\u5F37\u3044"
-});
-var GAME_RUNTIME_FAMILY_LABELS = Object.freeze({
-  RPG_GRID: "RPG\u30FB\u30DE\u30B9\u79FB\u52D5",
-  ACTION_PLATFORM: "2D\u30A2\u30AF\u30B7\u30E7\u30F3\u30FB\u7C21\u6613\u7269\u7406",
-  SCROLL_SIDE: "2D\u30B9\u30AF\u30ED\u30FC\u30EB\u30FB\u6A2A\u79FB\u52D5",
-  DODGE_ARENA: "\u6575\u3088\u3051\u30FB\u30A2\u30EA\u30FC\u30CA",
-  FREE: "\u81EA\u7531\u5236\u4F5C\u30FB\u6700\u5C0F\u30EB\u30FC\u30EB"
-});
-var GAME_SCENE_GRAVITY_OPTIONS = [
-  {
-    gravity: "NONE",
-    label: "\u306A\u3057",
-    detail: "\u4E0A\u4E0B\u5DE6\u53F3\u306B\u81EA\u7531\u306B\u79FB\u52D5"
-  },
-  {
-    gravity: "WEAK",
-    label: "\u5F31\u3044",
-    detail: "\u3086\u3063\u304F\u308A\u843D\u4E0B\u3059\u308B"
-  },
-  {
-    gravity: "STANDARD",
-    label: "\u6A19\u6E96",
-    detail: "2D\u30A2\u30AF\u30B7\u30E7\u30F3\u306E\u57FA\u672C"
-  },
-  {
-    gravity: "STRONG",
-    label: "\u5F37\u3044",
-    detail: "\u7D20\u65E9\u304F\u843D\u4E0B\u3059\u308B"
-  }
-];
-var GAME_EVENT_WHO_OPTIONS = [
-  {
-    value: "PLAYER",
-    label: "\u4E3B\u4EBA\u516C"
-  },
-  {
-    value: "TOUCHED_OBJECT",
-    label: "\u89E6\u308C\u305F\u30AA\u30D6\u30B8\u30A7\u30AF\u30C8"
-  },
-  {
-    value: "ANYONE",
-    label: "\u8AB0\u3067\u3082"
-  }
-];
-var GAME_EVENT_CONDITION_OPTIONS = [
-  {
-    value: "START",
-    label: "\u30B2\u30FC\u30E0\u304C\u59CB\u307E\u3063\u305F"
-  },
-  {
-    value: "ENTER_RANGE",
-    label: "\u7BC4\u56F2\u306B\u5165\u3063\u305F"
-  },
-  {
-    value: "TOUCH",
-    label: "\u89E6\u308C\u305F"
-  },
-  {
-    value: "TAP",
-    label: "\u30BF\u30C3\u30D7\u3057\u305F"
-  },
-  {
-    value: "INTERACT",
-    label: "\u8A71\u3057\u304B\u3051\u305F"
-  },
-  {
-    value: "REACH_GOAL",
-    label: "\u30B4\u30FC\u30EB\u306B\u7740\u3044\u305F"
-  },
-  {
-    value: "HAS_ITEM",
-    label: "\u30A2\u30A4\u30C6\u30E0\u3092\u6301\u3063\u3066\u3044\u308B"
-  }
-];
-var GAME_EVENT_ACTION_OPTIONS = [
-  {
-    value: "SHOW_DIALOGUE",
-    label: "\u4F1A\u8A71\u3092\u8868\u793A"
-  },
-  {
-    value: "DAMAGE",
-    label: "\u30C0\u30E1\u30FC\u30B8\u3092\u4E0E\u3048\u308B"
-  },
-  {
-    value: "SHAKE_CAMERA",
-    label: "\u30AB\u30E1\u30E9\u3092\u63FA\u3089\u3059"
-  },
-  {
-    value: "PLAY_AUDIO",
-    label: "\u52B9\u679C\u97F3\u3092\u9CF4\u3089\u3059"
-  },
-  {
-    value: "COMPLETE_SCENE",
-    label: "Scene\u3092\u30AF\u30EA\u30A2\u3059\u308B"
-  },
-  {
-    value: "SET_VARIABLE",
-    label: "\u30B2\u30FC\u30E0\u72B6\u614B\u3092\u5909\u3048\u308B"
-  },
-  {
-    value: "GIVE_ITEM",
-    label: "\u30A2\u30A4\u30C6\u30E0\u3092\u6E21\u3059"
-  },
-  {
-    value: "TAKE_ITEM",
-    label: "\u30A2\u30A4\u30C6\u30E0\u3092\u6E1B\u3089\u3059"
-  },
-  {
-    value: "CRAFT_ITEM",
-    label: "\u30EC\u30B7\u30D4\u3092\u4F5C\u308B"
-  },
-  {
-    value: "BREAK_BLOCK",
-    label: "\u30D6\u30ED\u30C3\u30AF\u3092\u58CA\u3059"
-  },
-  {
-    value: "PLACE_BLOCK",
-    label: "\u30D6\u30ED\u30C3\u30AF\u3092\u7F6E\u304F"
-  }
-];
-var DEFAULT_RULE_FLAGS = {
-  schemaVersion: 1,
-  horizontalMove: true,
-  verticalMove: true,
-  jump: false,
-  floorCollision: false,
-  cameraFollow: true,
-  mobileControls: true
-};
-function sceneRulesForRuntimeFamily(runtimeFamily) {
-  switch (runtimeFamily) {
-    case "RPG_GRID":
-      return {
-        ...DEFAULT_RULE_FLAGS,
-        runtimeFamily,
-        gravity: "NONE",
-        horizontalMove: true,
-        verticalMove: true
-      };
-    case "ACTION_PLATFORM":
-      return {
-        ...DEFAULT_RULE_FLAGS,
-        runtimeFamily,
-        gravity: "STANDARD",
-        horizontalMove: true,
-        verticalMove: false,
-        jump: true,
-        floorCollision: true
-      };
-    case "SCROLL_SIDE":
-      return {
-        ...DEFAULT_RULE_FLAGS,
-        runtimeFamily,
-        gravity: "STANDARD",
-        horizontalMove: true,
-        verticalMove: false,
-        jump: true,
-        floorCollision: true
-      };
-    case "DODGE_ARENA":
-      return {
-        ...DEFAULT_RULE_FLAGS,
-        runtimeFamily,
-        gravity: "NONE",
-        horizontalMove: true,
-        verticalMove: true,
-        jump: false,
-        floorCollision: false
-      };
-    case "FREE":
-      return {
-        ...DEFAULT_RULE_FLAGS,
-        runtimeFamily,
-        gravity: "NONE"
-      };
-  }
-}
-function sceneRulesForCreationMode(mode) {
-  return sceneRulesForRuntimeFamily(mode === "RPG_TEMPLATE" ? "RPG_GRID" : mode === "ACTION_2D" ? "ACTION_PLATFORM" : mode === "DODGE_2D" ? "DODGE_ARENA" : mode === "SCROLL_2D" ? "SCROLL_SIDE" : "FREE");
-}
-function normalizeGameSceneRules(value) {
-  const runtimeFamily = value?.runtimeFamily;
-  const safeRuntimeFamily = runtimeFamily === "RPG_GRID" || runtimeFamily === "ACTION_PLATFORM" || runtimeFamily === "SCROLL_SIDE" || runtimeFamily === "DODGE_ARENA" || runtimeFamily === "FREE" ? runtimeFamily : "FREE";
-  const fallback = sceneRulesForRuntimeFamily(safeRuntimeFamily);
-  const gravity = value?.gravity;
-  const safeGravity = gravity === "NONE" || gravity === "WEAK" || gravity === "STANDARD" || gravity === "STRONG" ? gravity : fallback.gravity;
-  const booleanRule = (key) => typeof value?.[key] === "boolean" ? value[key] : fallback[key];
-  return {
-    ...fallback,
-    schemaVersion: 1,
-    runtimeFamily: safeRuntimeFamily,
-    gravity: safeGravity,
-    horizontalMove: booleanRule("horizontalMove"),
-    verticalMove: booleanRule("verticalMove"),
-    jump: booleanRule("jump"),
-    floorCollision: booleanRule("floorCollision"),
-    cameraFollow: booleanRule("cameraFollow"),
-    mobileControls: booleanRule("mobileControls")
-  };
-}
-function physics2DSettingsForSceneRules(rules, current) {
-  const gravity = GAME_SCENE_RULE_PRESETS[rules.gravity];
-  const base = current ?? {
-    gravity: {
-      x: 0,
-      y: gravity
-    },
-    fixedDeltaTime: 1 / 60,
-    maxSubSteps: 4,
-    defaultMaterial: {
-      friction: 0.4,
-      bounciness: 0
-    }
-  };
-  return {
-    ...base,
-    gravity: {
-      x: 0,
-      y: gravity
-    },
-    defaultMaterial: {
-      ...base.defaultMaterial
-    }
-  };
-}
-function sceneRulesSummary(rules) {
-  const flags = [];
-  if (rules.horizontalMove) flags.push("\u5DE6\u53F3\u79FB\u52D5");
-  if (rules.verticalMove) flags.push("\u4E0A\u4E0B\u79FB\u52D5");
-  if (rules.jump) flags.push("\u30B8\u30E3\u30F3\u30D7");
-  if (rules.floorCollision) flags.push("\u5E8A\u3068\u306E\u885D\u7A81");
-  if (rules.cameraFollow) flags.push("\u30AB\u30E1\u30E9\u8FFD\u5F93");
-  return GAME_RUNTIME_FAMILY_LABELS[rules.runtimeFamily] + " \xB7 \u91CD\u529B" + GAME_SCENE_RULE_LABELS[rules.gravity] + " \xB7 " + (flags.join("\u30FB") || "\u6700\u5C0F\u30EB\u30FC\u30EB");
-}
-function defaultGameEventCardsForRuntimeFamily(runtimeFamily, trackIds = []) {
-  const player = trackIds.find((id) => id === "hero" || id.includes("hero"));
-  const source = player === void 0 ? {} : {
-    sourceTrackId: player
-  };
-  const npc = trackIds.find((id) => id === "enemy" || id.includes("npc"));
-  if (runtimeFamily === "RPG_GRID") {
-    return [
-      {
-        eventId: "event:npc-dialogue",
-        label: "NPC\u306B\u8A71\u3057\u304B\u3051\u308B",
-        enabled: true,
-        who: "PLAYER",
-        condition: "INTERACT",
-        ...source,
-        ...npc === void 0 ? {} : {
-          targetTrackId: npc
-        },
-        action: "SHOW_DIALOGUE",
-        message: "\u3053\u3093\u306B\u3061\u306F\u3002\u77E2\u5370\u30AD\u30FC\u3067\u6B69\u3044\u3066\u3001\u8FD1\u304F\u3067Enter\u3092\u62BC\u3057\u3066\u307F\u3066\u304F\u3060\u3055\u3044\u3002"
-      }
-    ];
-  }
-  if (runtimeFamily === "ACTION_PLATFORM") {
-    const enemy = trackIds.find((id) => id === "enemy" || id.includes("enemy"));
-    return [
-      {
-        eventId: "event:enemy-hit",
-        label: "\u6575\u306B\u89E6\u308C\u305F\u3089\u30C0\u30E1\u30FC\u30B8",
-        enabled: true,
-        who: "PLAYER",
-        condition: "TOUCH",
-        ...source,
-        ...enemy === void 0 ? {} : {
-          targetTrackId: enemy
-        },
-        action: "DAMAGE",
-        amount: 1
-      },
-      {
-        eventId: "event:enemy-camera-shake",
-        label: "\u30C0\u30E1\u30FC\u30B8\u3067\u30AB\u30E1\u30E9\u3092\u63FA\u3089\u3059",
-        enabled: true,
-        who: "PLAYER",
-        condition: "TOUCH",
-        ...source,
-        ...enemy === void 0 ? {} : {
-          targetTrackId: enemy
-        },
-        action: "SHAKE_CAMERA"
-      }
-    ];
-  }
-  if (runtimeFamily === "DODGE_ARENA") {
-    const enemy = trackIds.find((id) => id === "enemy" || id.includes("enemy"));
-    return [
-      {
-        eventId: "event:dodge-enemy-hit",
-        label: "\u6575\u306B\u89E6\u308C\u305F\u3089\u30E9\u30A4\u30D5\u304C\u6E1B\u308B",
-        enabled: true,
-        who: "PLAYER",
-        condition: "TOUCH",
-        ...source,
-        ...enemy === void 0 ? {} : {
-          targetTrackId: enemy
-        },
-        action: "DAMAGE",
-        amount: 1
-      },
-      {
-        eventId: "event:dodge-camera-shake",
-        label: "\u30C0\u30E1\u30FC\u30B8\u3067\u30AB\u30E1\u30E9\u3092\u63FA\u3089\u3059",
-        enabled: true,
-        who: "PLAYER",
-        condition: "TOUCH",
-        ...source,
-        ...enemy === void 0 ? {} : {
-          targetTrackId: enemy
-        },
-        action: "SHAKE_CAMERA"
-      }
-    ];
-  }
-  if (runtimeFamily === "SCROLL_SIDE") {
-    const goal = trackIds.find((id) => id === "goal" || id.includes("goal"));
-    return [
-      {
-        eventId: "event:reach-goal",
-        label: "\u30B4\u30FC\u30EB\u306B\u7740\u3044\u305F\u3089\u30AF\u30EA\u30A2",
-        enabled: true,
-        who: "PLAYER",
-        condition: "REACH_GOAL",
-        ...source,
-        ...goal === void 0 ? {} : {
-          targetTrackId: goal
-        },
-        action: "COMPLETE_SCENE"
-      }
-    ];
-  }
-  return [];
-}
-function triggerForCondition(card) {
-  switch (card.condition) {
-    case "TAP": {
-      const value = card.targetTrackId ?? card.sourceTrackId;
-      return {
-        type: "TAP",
-        ...value === void 0 ? {} : {
-          value
-        }
-      };
-    }
-    case "TOUCH":
-    case "REACH_GOAL":
-      return {
-        type: "COLLISION",
-        ...card.targetTrackId === void 0 ? {} : {
-          value: card.targetTrackId
-        }
-      };
-    case "START":
-      return {
-        type: "TIMER",
-        value: "start"
-      };
-    case "ENTER_RANGE":
-      return {
-        type: "COLLISION",
-        value: "range:" + (card.targetTrackId ?? "scene")
-      };
-    case "INTERACT":
-      return {
-        type: "ACTION",
-        actionId: "rpg.interact",
-        ...card.targetTrackId === void 0 ? {} : {
-          value: card.targetTrackId
-        }
-      };
-    case "HAS_ITEM":
-      return {
-        type: "ACTION",
-        actionId: "inventory.has-item",
-        value: card.itemId ?? "item"
-      };
-  }
-}
-function actionForCard(card) {
-  switch (card.action) {
-    case "SHOW_DIALOGUE":
-      return {
-        kind: "SET_VARIABLE",
-        targetId: card.targetTrackId ?? card.sourceTrackId ?? "game",
-        property: "dialogue",
-        value: card.message?.trim() || "\u4F1A\u8A71\u3092\u8868\u793A\u3057\u307E\u3057\u305F\u3002"
-      };
-    case "DAMAGE":
-      return {
-        kind: "SET_COMPONENT_PROPERTY",
-        targetId: card.targetTrackId ?? "target",
-        property: "damage",
-        value: card.amount ?? 1
-      };
-    case "SHAKE_CAMERA":
-      return {
-        kind: "SET_VARIABLE",
-        targetId: "camera",
-        property: "shake",
-        value: true
-      };
-    case "PLAY_AUDIO":
-      return {
-        kind: "PLAY_AUDIO",
-        targetId: card.audioTrackId ?? "audio"
-      };
-    case "COMPLETE_SCENE":
-      return {
-        kind: "SET_VARIABLE",
-        targetId: "scene",
-        property: "complete",
-        value: true
-      };
-    case "SET_VARIABLE":
-      return {
-        kind: "SET_VARIABLE",
-        targetId: card.targetTrackId ?? "game",
-        property: "state",
-        value: card.message ?? "true"
-      };
-    case "GIVE_ITEM":
-      return {
-        kind: "SET_VARIABLE",
-        targetId: "inventory",
-        property: "give:" + (card.itemId ?? "item"),
-        value: Math.max(1, card.amount ?? 1)
-      };
-    case "TAKE_ITEM":
-      return {
-        kind: "SET_VARIABLE",
-        targetId: "inventory",
-        property: "take:" + (card.itemId ?? "item"),
-        value: Math.max(1, card.amount ?? 1)
-      };
-    case "CRAFT_ITEM":
-      return {
-        kind: "SET_VARIABLE",
-        targetId: "inventory",
-        property: "craft:" + (card.recipeId ?? "recipe"),
-        value: true
-      };
-    case "BREAK_BLOCK":
-      return {
-        kind: "SET_VARIABLE",
-        targetId: "world",
-        property: "break:" + (card.blockTypeId ?? "block"),
-        value: true
-      };
-    case "PLACE_BLOCK":
-      return {
-        kind: "SET_VARIABLE",
-        targetId: "world",
-        property: "place:" + (card.blockTypeId ?? "block"),
-        value: card.blockTypeId ?? "block"
-      };
-  }
-}
-function behaviorFromGameEventCard(card) {
-  const behaviorId = asBehaviorId("behavior:pixiedraw-game:" + card.eventId);
-  return compileNoCodeBehavior({
-    behaviorId,
-    rules: [
-      {
-        ruleId: card.eventId + ":rule",
-        enabled: card.enabled,
-        trigger: triggerForCondition(card),
-        conditions: [
-          {
-            kind: "ALWAYS"
-          }
-        ],
-        actions: [
-          actionForCard(card)
-        ]
-      }
-    ]
-  });
-}
-
-// src/game/game-350/genre-runtime.ts
-var GAME_GENRE_RUNTIME_SCHEMA_VERSION = 1;
-var POINT_ZERO = {
-  x: 0,
-  y: 0
-};
-var PLAYER_HALF_WIDTH = 0.35;
-var PLAYER_HALF_HEIGHT = 0.35;
-var JUMP_SPEED = 6;
-var DEFAULT_MOVE_SPEED = 5;
-var TOUCH_DISTANCE = 0.9;
-var DODGE_SURVIVAL_SECONDS = 15;
-var DODGE_SURVIVAL_TICKS = DODGE_SURVIVAL_SECONDS * 60;
-var DODGE_MOVE_SPEED = 4.5;
-var DODGE_ENEMY_SPEED = 0.045;
-var DEFAULT_NPC_STATUS = {
-  hp: 10,
-  maxHp: 10,
-  stamina: 10,
-  maxStamina: 10,
-  mp: 0,
-  maxMp: 0,
-  attack: 2,
-  defense: 0,
-  level: 1
-};
-var DEFAULT_PLAYER_STATUS = {
-  hp: 10,
-  maxHp: 10,
-  stamina: 10,
-  maxStamina: 10,
-  mp: 0,
-  maxMp: 0,
-  attack: 2,
-  defense: 1,
-  level: 1
-};
-var COMBAT_TICK_INTERVAL = 30;
-var BLOCK_REACH_DISTANCE = 1.4;
-function point(x, y) {
-  return {
-    x,
-    y
-  };
-}
-function cellKey3(x, y) {
-  return `${x},${y}`;
-}
-function nearbyCellCandidates(playerPosition, world) {
-  const cx = Math.floor(playerPosition.x);
-  const cy = Math.floor(playerPosition.y);
-  const candidates = [
-    point(cx, cy),
-    point(cx - 1, cy),
-    point(cx + 1, cy),
-    point(cx, cy - 1),
-    point(cx, cy + 1)
-  ].filter((cell) => cell.x >= 0 && cell.x < world.width && cell.y >= 0 && cell.y < world.height);
-  return candidates.map((cell) => ({
-    cell,
-    // Compare against the cell's center, not its corner, for a fair
-    // "which cell is actually closest to me" ordering.
-    d: distance(playerPosition, point(cell.x + 0.5, cell.y + 0.5))
-  })).filter(({ d }) => d <= BLOCK_REACH_DISTANCE).sort((a, b) => a.d - b.d).map(({ cell }) => cell);
-}
-function distance(left, right) {
-  return Math.hypot(left.x - right.x, left.y - right.y);
-}
-function isDodgeEnemy(object) {
-  const text = `${object.id} ${object.label}`.toLowerCase();
-  return object.role === "NPC" || text.includes("enemy") || text.includes("\u6575");
-}
-function trackRole(track) {
-  return track.role;
-}
-function trackStatus(track, fallback) {
-  const status = track?.components?.find((component) => component.type === "STATUS");
-  if (status?.type !== "STATUS" || !status.enabled) return fallback;
-  const maxHp = Math.max(1, status.maxHp);
-  const maxStamina = Math.max(0, status.maxStamina);
-  const maxMp = Math.max(0, status.maxMp);
-  return {
-    hp: Math.max(0, Math.min(status.hp, maxHp)),
-    maxHp,
-    stamina: Math.max(0, Math.min(status.stamina, maxStamina)),
-    maxStamina,
-    mp: Math.max(0, Math.min(status.mp, maxMp)),
-    maxMp,
-    attack: Math.max(0, status.attack),
-    defense: Math.max(0, status.defense),
-    level: Math.max(1, Math.round(status.level))
-  };
-}
-function trackBrainMode(track) {
-  const brain = track?.components?.find((component) => component.type === "BRAIN");
-  if (brain?.type !== "BRAIN" || !brain.enabled) return void 0;
-  return {
-    mode: brain.mode,
-    speed: brain.speed,
-    range: brain.range
-  };
-}
-function stepBrain(object, playerPosition, world) {
-  const brain = object.brain;
-  if (brain === void 0) return object;
-  if (brain.mode !== "PURSUE" && brain.mode !== "AVOID") return object;
-  const dx = playerPosition.x - object.position.x;
-  const dy = playerPosition.y - object.position.y;
-  const length = Math.hypot(dx, dy);
-  if (length <= 1e-3 || length > brain.range) return object;
-  const speed = Math.max(0, brain.speed) * 0.01;
-  const move = Math.min(speed, length);
-  const direction = brain.mode === "PURSUE" ? 1 : -1;
-  return {
-    ...object,
-    position: point(Math.min(world.width - PLAYER_HALF_WIDTH, Math.max(PLAYER_HALF_WIDTH, object.position.x + dx / length * move * direction)), Math.min(world.height - PLAYER_HALF_HEIGHT, Math.max(PLAYER_HALF_HEIGHT, object.position.y + dy / length * move * direction)))
-  };
-}
-function applyContactCombat(playerStatus, playerPosition, objects) {
-  let nextPlayerStatus = playerStatus;
-  const nextObjects = [];
-  for (const object of objects) {
-    if (object.role !== "NPC" || object.status === void 0 || nextPlayerStatus.hp <= 0) {
-      nextObjects.push(object);
-      continue;
-    }
-    if (distance(playerPosition, object.position) > TOUCH_DISTANCE) {
-      nextObjects.push(object);
-      continue;
-    }
-    const damageToObject = Math.max(1, nextPlayerStatus.attack - object.status.defense);
-    const damageToPlayer = Math.max(1, object.status.attack - nextPlayerStatus.defense);
-    const objectHp = Math.max(0, object.status.hp - damageToObject);
-    nextPlayerStatus = {
-      ...nextPlayerStatus,
-      hp: Math.max(0, nextPlayerStatus.hp - damageToPlayer)
-    };
-    if (objectHp <= 0) continue;
-    nextObjects.push({
-      ...object,
-      status: {
-        ...object.status,
-        hp: objectHp
-      }
-    });
-  }
-  return {
-    objects: nextObjects,
-    playerStatus: nextPlayerStatus
-  };
-}
-function trackPosition(track) {
-  const transform3 = track.components?.find((component) => component.type === "TRANSFORM");
-  return transform3?.type === "TRANSFORM" ? point(transform3.x, transform3.y) : point(0, 0);
-}
-function trackCamera(track) {
-  const camera = track?.components?.find((component) => component.type === "CAMERA");
-  return camera?.type === "CAMERA" ? normalizeCamera2DSettings(camera.camera2D) : DEFAULT_CAMERA_2D_SETTINGS;
-}
-function mapFromTracks(tracks) {
-  const mapTrack = tracks.find((track) => track.role === "TILEMAP" || track.kind === "TILEMAP");
-  const tilemapComponent = mapTrack?.components?.find((component) => component.type === "TILEMAP");
-  const document = mapTrack?.tilemap ?? (tilemapComponent?.type === "TILEMAP" ? tilemapComponent.document : void 0);
-  const width = Math.max(8, document?.width ?? 24);
-  const height = Math.max(6, document?.height ?? 10);
-  const solidCells = document?.cells.filter((cell) => cell.collision === "SOLID").map((cell) => point(cell.x, cell.y)) ?? Array.from({
-    length: width
-  }, (_, x) => point(x, height - 1));
-  const blockTypeIds = {};
-  for (const cell of document?.cells ?? []) {
-    if (cell.blockTypeId !== void 0) {
-      blockTypeIds[`${cell.x},${cell.y}`] = cell.blockTypeId;
-    }
-  }
-  return {
-    width,
-    height,
-    solidCells,
-    blockTypeIds
-  };
-}
-function objectById(state, id) {
-  if (id === void 0 || id === state.playerId) {
-    return id === state.playerId ? {
-      id: state.playerId,
-      label: "\u4E3B\u4EBA\u516C",
-      role: "PLAYER",
-      position: state.playerPosition
-    } : void 0;
-  }
-  return state.objects.find((object) => object.id === id);
-}
-function targetPosition(state, card) {
-  if (card.targetTrackId !== void 0) {
-    return objectById(state, card.targetTrackId)?.position;
-  }
-  if (card.condition === "REACH_GOAL") {
-    return state.objects.find((object) => object.role === "TRIGGER" && object.id.toLowerCase().includes("goal"))?.position;
-  }
-  return void 0;
-}
-function cardIsNearTarget(state, card) {
-  if (card.condition === "HAS_ITEM") {
-    const have = state.inventory[card.itemId ?? ""] ?? 0;
-    return have >= Math.max(1, card.amount ?? 1);
-  }
-  const target = targetPosition(state, card);
-  if (target !== void 0 && card.condition === "REACH_GOAL" && state.runtimeFamily === "SCROLL_SIDE") {
-    return state.playerPosition.x >= target.x - TOUCH_DISTANCE;
-  }
-  return target === void 0 || distance(state.playerPosition, target) <= TOUCH_DISTANCE;
-}
-function addToInventory(inventory, itemId, amount) {
-  const next = Math.max(0, (inventory[itemId] ?? 0) + amount);
-  return {
-    ...inventory,
-    [itemId]: next
-  };
-}
-function craftRecipe(inventory, recipes, recipeId) {
-  const recipe = recipes.find((candidate) => candidate.recipeId === recipeId);
-  if (recipe === void 0) return inventory;
-  const canCraft = recipe.ingredients.every((ingredient) => (inventory[ingredient.itemId] ?? 0) >= ingredient.amount);
-  if (!canCraft) return inventory;
-  let next = inventory;
-  for (const ingredient of recipe.ingredients) {
-    next = addToInventory(next, ingredient.itemId, -ingredient.amount);
-  }
-  return addToInventory(next, recipe.result.itemId, recipe.result.amount);
-}
-function applyEventCard(state, card) {
-  if (!card.enabled) return state;
-  switch (card.action) {
-    case "DAMAGE": {
-      const damaged = state.health - Math.max(0, card.amount ?? 1);
-      return {
-        ...state,
-        health: Math.max(0, damaged),
-        gameOver: damaged <= 0,
-        cameraShakeFrames: Math.max(state.cameraShakeFrames, state.camera2D.shake.onDamage ? 8 : 0)
-      };
-    }
-    case "SHAKE_CAMERA":
-      return {
-        ...state,
-        cameraShakeFrames: Math.max(state.cameraShakeFrames, 8)
-      };
-    case "SHOW_DIALOGUE":
-      return {
-        ...state,
-        dialogue: card.message?.trim() || "\u30A4\u30D9\u30F3\u30C8\u304C\u8D77\u3053\u308A\u307E\u3057\u305F\u3002"
-      };
-    case "PLAY_AUDIO":
-      return {
-        ...state,
-        lastAudioTrackId: card.audioTrackId ?? card.targetTrackId ?? null
-      };
-    case "COMPLETE_SCENE":
-      return {
-        ...state,
-        sceneComplete: true
-      };
-    case "SET_VARIABLE":
-      return {
-        ...state,
-        variables: {
-          ...state.variables,
-          state: card.message?.trim() || true
-        }
-      };
-    case "GIVE_ITEM":
-      if (card.itemId === void 0) return state;
-      return {
-        ...state,
-        inventory: addToInventory(state.inventory, card.itemId, Math.max(1, card.amount ?? 1))
-      };
-    case "TAKE_ITEM":
-      if (card.itemId === void 0) return state;
-      return {
-        ...state,
-        inventory: addToInventory(state.inventory, card.itemId, -Math.max(1, card.amount ?? 1))
-      };
-    case "CRAFT_ITEM":
-      return {
-        ...state,
-        inventory: craftRecipe(state.inventory, state.recipes, card.recipeId)
-      };
-    case "BREAK_BLOCK": {
-      for (const cell of nearbyCellCandidates(state.playerPosition, state.world)) {
-        const key = cellKey3(cell.x, cell.y);
-        const blockTypeId = state.world.blockTypeIds[key];
-        if (blockTypeId === void 0) continue;
-        const blockType = state.blockTypes.find((candidate) => candidate.blockTypeId === blockTypeId);
-        if (blockType === void 0 || !blockType.breakable) continue;
-        const nextBlockTypeIds = {
-          ...state.world.blockTypeIds
-        };
-        delete nextBlockTypeIds[key];
-        return {
-          ...state,
-          world: {
-            ...state.world,
-            blockTypeIds: nextBlockTypeIds,
-            solidCells: state.world.solidCells.filter((solid) => !(solid.x === cell.x && solid.y === cell.y))
-          },
-          inventory: blockType.dropItemId === void 0 ? state.inventory : addToInventory(state.inventory, blockType.dropItemId, 1)
-        };
-      }
-      return state;
-    }
-    case "PLACE_BLOCK": {
-      if (card.blockTypeId === void 0 || card.itemId === void 0) {
-        return state;
-      }
-      const blockType = state.blockTypes.find((candidate) => candidate.blockTypeId === card.blockTypeId);
-      if (blockType === void 0 || !blockType.placeable || (state.inventory[card.itemId] ?? 0) < 1) {
-        return state;
-      }
-      const playerCellX = Math.floor(state.playerPosition.x);
-      const playerCellY = Math.floor(state.playerPosition.y);
-      for (const cell of nearbyCellCandidates(state.playerPosition, state.world)) {
-        if (cell.x === playerCellX && cell.y === playerCellY) continue;
-        const key = cellKey3(cell.x, cell.y);
-        if (state.world.blockTypeIds[key] !== void 0) continue;
-        return {
-          ...state,
-          world: {
-            ...state.world,
-            blockTypeIds: {
-              ...state.world.blockTypeIds,
-              [key]: card.blockTypeId
-            },
-            solidCells: [
-              ...state.world.solidCells,
-              cell
-            ]
-          },
-          inventory: addToInventory(state.inventory, card.itemId, -1)
-        };
-      }
-      return state;
-    }
-  }
-}
-function cameraOriginFor(playerPosition, camera2D, world) {
-  const pixelsPerUnit = Math.max(1, camera2D.pixelsPerUnit);
-  const viewportWidth = Math.max(1, camera2D.referenceWidth / pixelsPerUnit);
-  const viewportHeight = Math.max(1, camera2D.referenceHeight / pixelsPerUnit);
-  const x = camera2D.follow.enabled ? playerPosition.x - viewportWidth / 2 + camera2D.follow.lookAheadX : 0;
-  const y = camera2D.follow.enabled ? playerPosition.y - viewportHeight / 2 + camera2D.follow.lookAheadY : 0;
-  const clampedX = Math.min(Math.max(0, world.width - viewportWidth), Math.max(0, x));
-  const clampedY = Math.min(Math.max(0, world.height - viewportHeight), Math.max(0, y));
-  const quantum = 1 / pixelsPerUnit;
-  return point(camera2D.pixelPerfect ? Math.round(clampedX / quantum) * quantum : clampedX, camera2D.pixelPerfect ? Math.round(clampedY / quantum) * quantum : clampedY);
-}
-function initialEventState(state) {
-  let next = state;
-  const firedEventIds = [];
-  for (const card of state.eventCards) {
-    if (card.enabled && card.condition === "START") {
-      next = applyEventCard(next, card);
-      firedEventIds.push(card.eventId);
-    }
-  }
-  return {
-    ...next,
-    firedEventIds
-  };
-}
-function processEventCards(state, input) {
-  let next = state;
-  const activeEventIds = [];
-  const firedEventIds = [
-    ...state.firedEventIds
-  ];
-  for (const card of state.eventCards) {
-    if (!card.enabled || card.condition === "START") continue;
-    const near = cardIsNearTarget(next, card);
-    const inputTriggered = card.condition === "TAP" ? input.tap === true : card.condition === "INTERACT" ? input.interact === true : false;
-    const rangeTriggered = card.condition === "TOUCH" || card.condition === "ENTER_RANGE" || card.condition === "REACH_GOAL" || card.condition === "HAS_ITEM";
-    const triggered = rangeTriggered ? near : inputTriggered && near;
-    if (!triggered) continue;
-    if (rangeTriggered) activeEventIds.push(card.eventId);
-    const edgeTriggered = rangeTriggered ? !state.activeEventIds.includes(card.eventId) : true;
-    const oneShot = card.condition === "REACH_GOAL";
-    if (edgeTriggered && (!oneShot || !firedEventIds.includes(card.eventId))) {
-      next = applyEventCard(next, card);
-      if (oneShot) firedEventIds.push(card.eventId);
-    }
-  }
-  return {
-    ...next,
-    activeEventIds,
-    firedEventIds
-  };
-}
-function landingY(state, x, previousY, nextY) {
-  if (!state.rules.floorCollision || nextY < previousY) return void 0;
-  let best;
-  for (const cell of state.world.solidCells) {
-    if (Math.abs(cell.x - x) > 0.8) continue;
-    const surface = cell.y - PLAYER_HALF_HEIGHT;
-    if (surface < previousY - 0.05 || nextY < surface) continue;
-    if (best === void 0 || surface < best) best = surface;
-  }
-  return best;
-}
-function stepMovement(state, input) {
-  if (state.runtimeFamily === "DODGE_ARENA") {
-    const directionX = (input.right === true ? 1 : 0) - (input.left === true ? 1 : 0);
-    const directionY = (input.down === true ? 1 : 0) - (input.up === true || input.jump === true ? 1 : 0);
-    const magnitude = Math.hypot(directionX, directionY) || 1;
-    const velocityX2 = directionX / magnitude * DODGE_MOVE_SPEED;
-    const velocityY2 = directionY / magnitude * DODGE_MOVE_SPEED;
-    return {
-      playerPosition: point(Math.min(state.world.width - PLAYER_HALF_WIDTH, Math.max(PLAYER_HALF_WIDTH, state.playerPosition.x + velocityX2 / 60)), Math.min(state.world.height - PLAYER_HALF_HEIGHT, Math.max(PLAYER_HALF_HEIGHT, state.playerPosition.y + velocityY2 / 60))),
-      velocity: point(velocityX2, velocityY2),
-      grounded: true
-    };
-  }
-  const direction = (input.right === true ? 1 : 0) - (input.left === true ? 1 : 0);
-  const speed = DEFAULT_MOVE_SPEED;
-  const velocityX = state.rules.horizontalMove ? direction * speed : 0;
-  const jump = input.jump === true && state.grounded && state.rules.jump;
-  const gravity = GAME_SCENE_RULE_PRESETS[state.rules.gravity];
-  const velocityY = state.rules.gravity === "NONE" ? 0 : jump ? -JUMP_SPEED : state.velocity.y + gravity / 60;
-  const previous = state.playerPosition;
-  let x = previous.x + velocityX / 60;
-  let y = previous.y + velocityY / 60;
-  x = Math.min(state.world.width - PLAYER_HALF_WIDTH, Math.max(PLAYER_HALF_WIDTH, x));
-  const floor = landingY(state, x, previous.y, y);
-  const grounded = floor !== void 0;
-  if (floor !== void 0) y = floor;
-  y = Math.min(state.world.height + 2, Math.max(-2, y));
-  return {
-    playerPosition: point(x, y),
-    velocity: point(velocityX, floor === void 0 ? velocityY : 0),
-    grounded
-  };
-}
-function familyForProject(project) {
-  const family = project.editorTimeline?.sceneRules?.runtimeFamily;
-  if (family === "ACTION_PLATFORM" || family === "DODGE_ARENA" || family === "SCROLL_SIDE") return family;
-  if (project.editorTimeline?.creationMode === "DODGE_2D") {
-    return "DODGE_ARENA";
-  }
-  if (project.editorTimeline?.creationMode === "SCROLL_2D") {
-    return "SCROLL_SIDE";
-  }
-  return "ACTION_PLATFORM";
-}
-function createGameGenreRuntime(project) {
-  const family = familyForProject(project);
-  const fallbackRules = sceneRulesForRuntimeFamily(family);
-  const rules = project.editorTimeline?.sceneRules ?? fallbackRules;
-  const tracks = project.editorTimeline?.tracks ?? [];
-  const player = tracks.find((track) => track.role === "PLAYER") ?? tracks.find((track) => track.trackId === "hero");
-  const playerId = player?.trackId ?? "hero";
-  const world = mapFromTracks(tracks);
-  const cameraTrack = tracks.find((track) => track.role === "CAMERA");
-  const camera2D = trackCamera(cameraTrack);
-  const objects = tracks.filter((track) => track.trackId !== playerId).filter((track) => track.active !== false).map((track) => {
-    const role = trackRole(track);
-    const brain = trackBrainMode(track);
-    return {
-      id: track.trackId,
-      label: track.label,
-      role,
-      position: trackPosition(track),
-      ...role === "NPC" ? {
-        status: trackStatus(track, DEFAULT_NPC_STATUS)
-      } : {},
-      ...brain === void 0 ? {} : {
-        brain
-      }
-    };
-  });
-  const state = {
-    schemaVersion: GAME_GENRE_RUNTIME_SCHEMA_VERSION,
-    projectId: project.projectId,
-    runtimeFamily: family,
-    rules,
-    mode: "STOPPED",
-    tick: 0,
-    playerId,
-    playerPosition: trackPosition(player ?? {
-      trackId: playerId,
-      label: "\u4E3B\u4EBA\u516C",
-      kind: "SPRITE",
-      activeFrames: []
-    }),
-    velocity: POINT_ZERO,
-    grounded: false,
-    health: 3,
-    playerStatus: trackStatus(player, DEFAULT_PLAYER_STATUS),
-    survivalSeconds: 0,
-    gameOver: false,
-    camera2D,
-    cameraOrigin: cameraOriginFor(point(1, 1), camera2D, world),
-    cameraShakeFrames: 0,
-    world,
-    objects,
-    eventCards: project.editorTimeline?.eventCards ?? [],
-    activeEventIds: [],
-    firedEventIds: [],
-    dialogue: null,
-    lastAudioTrackId: null,
-    sceneComplete: false,
-    variables: {},
-    inventory: {},
-    recipes: project.editorTimeline?.recipes ?? [],
-    blockTypes: project.editorTimeline?.blockTypes ?? []
-  };
-  return initialEventState(state);
-}
-function playGameGenre(state) {
-  return {
-    ...state,
-    mode: "PLAYING",
-    dialogue: null
-  };
-}
-function stopGameGenre(state) {
-  return {
-    ...state,
-    mode: "STOPPED"
-  };
-}
-function restartGameGenre(project) {
-  return playGameGenre(createGameGenreRuntime(project));
-}
-function clearGameGenreDialogue(state) {
-  return {
-    ...state,
-    dialogue: null
-  };
-}
-function triggerGameGenreCameraShake(state) {
-  return {
-    ...state,
-    cameraShakeFrames: Math.max(state.cameraShakeFrames, 8)
-  };
-}
-function stepGameGenre(state, input = {}) {
-  if (state.mode !== "PLAYING" || state.gameOver || state.sceneComplete) return state;
-  const chasedObjects = state.runtimeFamily === "DODGE_ARENA" ? state.objects.map((object) => {
-    if (object.brain !== void 0 || !isDodgeEnemy(object)) return object;
-    const dx = state.playerPosition.x - object.position.x;
-    const dy = state.playerPosition.y - object.position.y;
-    const length = Math.hypot(dx, dy);
-    if (length <= 1e-3) return object;
-    const move = Math.min(DODGE_ENEMY_SPEED, length);
-    return {
-      ...object,
-      position: point(Math.min(state.world.width - PLAYER_HALF_WIDTH, Math.max(PLAYER_HALF_WIDTH, object.position.x + dx / length * move)), Math.min(state.world.height - PLAYER_HALF_HEIGHT, Math.max(PLAYER_HALF_HEIGHT, object.position.y + dy / length * move)))
-    };
-  }) : state.objects;
-  const brainObjects = chasedObjects.map((object) => stepBrain(object, state.playerPosition, state.world));
-  const movement2 = stepMovement(state, input);
-  const combat = (state.tick + 1) % COMBAT_TICK_INTERVAL === 0 ? applyContactCombat(state.playerStatus, movement2.playerPosition, brainObjects) : {
-    objects: brainObjects,
-    playerStatus: state.playerStatus
-  };
-  const nextBase = {
-    ...state,
-    tick: state.tick + 1,
-    objects: combat.objects,
-    playerStatus: combat.playerStatus,
-    playerPosition: movement2.playerPosition,
-    velocity: movement2.velocity,
-    grounded: movement2.grounded,
-    survivalSeconds: state.runtimeFamily === "DODGE_ARENA" ? Math.floor((state.tick + 1) / 60) : state.survivalSeconds,
-    cameraOrigin: cameraOriginFor(movement2.playerPosition, state.camera2D, state.world),
-    cameraShakeFrames: Math.max(0, state.cameraShakeFrames - 1),
-    dialogue: input.interact === true || input.tap === true ? null : state.dialogue,
-    gameOver: state.gameOver || combat.playerStatus.hp <= 0
-  };
-  const eventState = processEventCards(nextBase, input);
-  if (eventState.runtimeFamily === "DODGE_ARENA" && eventState.tick >= DODGE_SURVIVAL_TICKS && !eventState.gameOver) {
-    return {
-      ...eventState,
-      sceneComplete: true
-    };
-  }
-  return eventState;
-}
 export {
   DEFAULT_PHYSICS_2D_SETTINGS,
   GAME350_PHYSICS_LAYER_BITS,
@@ -6649,6 +8672,8 @@ export {
   createGameRuntimeArtifactManifest,
   createGameRuntimePreview,
   createGameTilemapDocument,
+  createIGameBrowserRuntimeSource,
+  createIGameBrowserRuntimeSourceFromBootstrap,
   createIGamePlayerManifest,
   createIGamePlayerSession,
   createIGameRuntimeLaunchConfig,
@@ -6658,6 +8683,7 @@ export {
   deleteEntity,
   duplicateEntity,
   evaluateGameRuntimePerformance,
+  fetchIGamePublicPackage,
   flattenSceneHierarchy,
   gameAssetRequests,
   gameAssetRequestsForScene,
@@ -6677,6 +8703,7 @@ export {
   normalizeGameSceneRules,
   normalizePhysics2DSettings,
   paintGameTilemapCell,
+  parseIGamePublicBootstrap,
   physics2DSettingsForSceneRules,
   playGameGenre,
   recoverGameBuild,
@@ -6695,6 +8722,7 @@ export {
   serializeGameRuntimeSaveState,
   setEntityActive,
   setGameTilemapCell,
+  sha256BytesHex,
   solidGameTilemapCells,
   startIGameRuntime,
   stepGame351Physics2D,

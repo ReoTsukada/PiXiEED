@@ -174,10 +174,12 @@ import {
   verifyAssetPackageManifest,
   type AssetPackageManifest,
 } from "./game/game-350/assetization.ts";
+import { exportAssetDefinitionPxd } from "./game/game-350/asset-market-export.ts";
 import {
   DRAW2_ASSET_STATE_CHANGED_EVENT,
   type Draw2AssetBridge,
   type Draw2AssetPackageMutationResult,
+  type Draw2AssetMarketHandoffResult,
   type Draw2AssetBridgeSnapshot,
   type Draw2AssetMutationResult,
   type Draw2AssetReferenceProjection,
@@ -463,10 +465,18 @@ interface WorkspacePxdArtifactSnapshot {
   readonly sourceReference: Draw2AssetReferenceRecord;
 }
 
+interface Draw2IGameProductMetadata {
+  readonly schema: "pixieed-igame-product/v1";
+  readonly project_id: string;
+  readonly runtime_profile_id: string;
+  readonly runtime_version: string;
+  readonly visibility: "PUBLIC";
+}
+
 interface Draw2MarketDeliveryManifest {
   readonly schemaVersion: 1;
   readonly manifestId: string;
-  readonly selectionKind: "WHOLE_PROJECT";
+  readonly selectionKind: "WHOLE_PROJECT" | "SELECTED_SET";
   readonly project: {
     readonly projectId: string;
     readonly revisionId?: string;
@@ -485,7 +495,11 @@ interface Draw2MarketDeliveryManifest {
       readonly mimeType: string;
       readonly byteLength: number;
     };
-    readonly selection: { readonly kind: "PROJECT"; readonly label: string };
+    readonly selection: {
+      readonly kind: "PROJECT" | "ANIMATION" | "FRAME_RANGE";
+      readonly label: string;
+      readonly locator?: string;
+    };
     readonly provenance: {
       readonly originKind: "LOCAL_PROJECT";
       readonly rightsStatus: "CREATOR_DECLARATION_REQUIRED";
@@ -493,7 +507,7 @@ interface Draw2MarketDeliveryManifest {
     readonly capabilities: {
       readonly editable: true;
       readonly animation: true;
-      readonly targets: readonly ["iDRAW", "iAUDIO", "iGAME", "UNITY"];
+      readonly targets: readonly ("iDRAW" | "iAUDIO" | "iGAME" | "UNITY")[];
     };
     readonly dependencyIds: readonly [];
   }];
@@ -593,7 +607,7 @@ function loadAdvancedModule(): Promise<AdvancedModule> {
 
 function loadWorkspaceModule(): Promise<WorkspaceModule> {
   const workspaceChunkUrl = new URL("wp180-workspace.js", import.meta.url);
-  workspaceChunkUrl.searchParams.set("v", "20260910-unity-asset-export-v2");
+  workspaceChunkUrl.searchParams.set("v", "20260911-unity-audio-export-v1");
   workspaceModulePromise ??= import(
     workspaceChunkUrl.href
   ) as unknown as Promise<
@@ -7172,6 +7186,7 @@ const draw2AssetBridge: Draw2AssetBridge = {
     notifyAssetStateChanged();
     return { ok: true, manifest: next };
   },
+  handoffDefinitionToMarket: handoffAssetDefinitionToMarket,
 };
 (window as Window & { __pixiedraw2AssetBridge?: Draw2AssetBridge })
   .__pixiedraw2AssetBridge = draw2AssetBridge;
@@ -15024,6 +15039,7 @@ interface Draw2ExportArtifact {
   readonly bytes: Uint8Array;
   readonly mimeType: string;
   readonly packageHash?: string;
+  readonly igameProduct?: Draw2IGameProductMetadata;
 }
 
 interface Draw2ExportProgressUpdate {
@@ -15719,12 +15735,51 @@ async function createBrowserRasterArtifact(
   };
 }
 
+function draw2IGameProductMetadata(
+  snapshot: WorkspacePxdBridgeSnapshot,
+): Draw2IGameProductMetadata | undefined {
+  const gameRecord = snapshot.game?.record;
+  if (gameRecord === null || typeof gameRecord !== "object" ||
+    Array.isArray(gameRecord)) return undefined;
+  const canonicalProject = (gameRecord as Record<string, unknown>)
+    .canonicalProject;
+  if (canonicalProject === null || typeof canonicalProject !== "object" ||
+    Array.isArray(canonicalProject)) return undefined;
+  const project = canonicalProject as Record<string, unknown>;
+  const timeline = project.editorTimeline;
+  if (
+    project.schemaVersion !== 1 || typeof project.projectId !== "string" ||
+    project.projectId.trim().length === 0 || !Array.isArray(project.scenes) ||
+    project.scenes.length === 0 || !Array.isArray(project.prefabs) ||
+    !Array.isArray(project.dependencies) || !Array.isArray(project.behaviors) ||
+    timeline === null || typeof timeline !== "object" ||
+    Array.isArray(timeline) ||
+    !Array.isArray((timeline as Record<string, unknown>).tracks)
+  ) return undefined;
+  const runtimeProfile = project.runtimeProfile;
+  const runtimeProfileId = runtimeProfile !== null &&
+      typeof runtimeProfile === "object" && !Array.isArray(runtimeProfile) &&
+      typeof (runtimeProfile as Record<string, unknown>).profileId === "string" &&
+      (runtimeProfile as Record<string, unknown>).profileId
+        ?.toString().trim().length
+    ? String((runtimeProfile as Record<string, unknown>).profileId).trim()
+    : "top-down-rpg";
+  return {
+    schema: "pixieed-igame-product/v1",
+    project_id: snapshot.projectId,
+    runtime_profile_id: runtimeProfileId,
+    runtime_version: "game-350-browser-v1",
+    visibility: "PUBLIC",
+  };
+}
+
 async function createPxdProjectArtifact(
   exportModule: ExportModule,
   baseName: string,
 ): Promise<Draw2ExportArtifact> {
   const workspace = getWorkspacePxdBridge();
   const snapshot = await workspace.exportProjectPxdSnapshot();
+  const gameProduct = draw2IGameProductMetadata(snapshot);
   const output = await exportModule.exportPxdProject(state, {
     assetDefinitions,
     assetPackages,
@@ -15749,6 +15804,7 @@ async function createPxdProjectArtifact(
     bytes: output.bytes,
     mimeType: output.mimeType,
     packageHash: output.packageHash,
+    ...(gameProduct === undefined ? {} : { igameProduct: gameProduct }),
   };
 }
 
@@ -15919,6 +15975,134 @@ function createDrawMarketDeliveryManifest(
   };
 }
 
+function createAssetMarketDeliveryManifest(
+  file: File,
+  artifact: { readonly packageHash: string },
+  sourceReference: Draw2AssetReferenceRecord,
+  entry: PxdAssetDefinitionEntry,
+): Draw2MarketDeliveryManifest {
+  const projectName = safeMarketManifestDisplayName(
+    state.name.trim(),
+    `Draw2 ${state.projectId}`,
+  );
+  const label = safeMarketManifestDisplayName(
+    entry.definition.metadata.name,
+    entry.definitionId,
+  );
+  const frameCount = new Set(
+    entry.definition.animationMapping.flatMap((clip) => clip.frameIds),
+  ).size;
+  return {
+    schemaVersion: 1,
+    manifestId: `draw2-asset-delivery-manifest:${state.projectId}:${entry.definitionId}:${sourceReference.contentHash}:${artifact.packageHash}`,
+    selectionKind: "SELECTED_SET",
+    project: {
+      projectId: state.projectId,
+      name: projectName,
+    },
+    entries: [{
+      entryId: `draw-asset:${entry.definitionId}`,
+      sourceKind: "DRAW",
+      source: {
+        projectId: state.projectId,
+        assetId: sourceReference.assetId,
+        revisionId: sourceReference.revisionId,
+        contentHash: sourceReference.contentHash,
+        packageHash: artifact.packageHash,
+        fileName: file.name,
+        mimeType: file.type || "application/vnd.pixieed.pxd",
+        byteLength: file.size,
+      },
+      selection: {
+        kind: frameCount > 1 ? "ANIMATION" : "FRAME_RANGE",
+        label: `${label} · ${frameCount || 1}フレーム`,
+        locator: entry.definitionId,
+      },
+      provenance: {
+        originKind: "LOCAL_PROJECT",
+        rightsStatus: "CREATOR_DECLARATION_REQUIRED",
+      },
+      capabilities: {
+        editable: true,
+        animation: true,
+        targets: ["iDRAW", "iAUDIO", "iGAME", "UNITY"],
+      },
+      dependencyIds: [],
+    }],
+    summary: {
+      entryCount: 1,
+      sourceKinds: ["DRAW"],
+      labels: [label],
+    },
+    createdAt: new Date().toISOString(),
+  };
+}
+
+async function handoffAssetDefinitionToMarket(
+  definitionId: string,
+): Promise<Draw2AssetMarketHandoffResult> {
+  const entry = assetDefinitions.find((candidate) =>
+    candidate.definitionId === definitionId
+  );
+  if (entry === undefined) {
+    return { ok: false, message: "Marketへ渡すAssetを選択してください。" };
+  }
+  const assetPackage = assetPackages.find((candidate) =>
+    candidate.entries.some((packageEntry) =>
+      packageEntry.kind === "DRAW" && packageEntry.source.sourceId === definitionId
+    )
+  );
+  if (assetPackage === undefined) {
+    return {
+      ok: false,
+      message: "先にこのAssetを「販売用に確定」してからMarketへ渡してください。",
+    };
+  }
+  try {
+    const sourceReference = await resolveDrawDefinitionReference({
+      definitionId,
+      mode: "PINNED",
+    });
+    if (sourceReference === undefined) {
+      return { ok: false, message: "Assetの固定revisionを取得できませんでした。" };
+    }
+    const output = await exportAssetDefinitionPxd({
+      entry,
+      assetPackage,
+    });
+    const file = new File(
+      [output.bytes.slice().buffer as ArrayBuffer],
+      output.filename,
+      { type: output.mimeType },
+    );
+    const deliveryManifest = createAssetMarketDeliveryManifest(
+      file,
+      output,
+      sourceReference,
+      entry,
+    );
+    const transferId = await storePxdMarketTransfer(file, {
+      metadata: {
+        projectId: state.projectId,
+        kind: "draw-asset",
+        definitionId,
+      },
+      deliveryManifest,
+    });
+    const url = new URL("../market/sell.html", window.location.href);
+    url.searchParams.set("project_transfer", transferId);
+    window.location.assign(url.href);
+    return { ok: true };
+  } catch (cause) {
+    return {
+      ok: false,
+      message: cause instanceof Error
+        ? cause.message
+        : "AssetのMarket引き継ぎに失敗しました。",
+    };
+  }
+}
+
 async function handoffPxdProjectToMarket(): Promise<void> {
   if (colorDraftDirty) {
     await commitColorEdit();
@@ -15953,7 +16137,13 @@ async function handoffPxdProjectToMarket(): Promise<void> {
       sourceReference,
     );
     const transferId = await storePxdMarketTransfer(file, {
-      metadata: { projectId: state.projectId, kind: "draw" },
+      metadata: {
+        projectId: state.projectId,
+        kind: "draw",
+        ...(artifact.igameProduct === undefined
+          ? {}
+          : { igameProduct: artifact.igameProduct }),
+      },
       deliveryManifest,
     });
     const url = new URL("../market/sell.html", window.location.href);

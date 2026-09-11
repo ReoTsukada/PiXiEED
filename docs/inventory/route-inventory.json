@@ -47,6 +47,12 @@
       "title": "ドット絵とは？ピクセルアートとの違い・英語・基本用語集 | PiXiEED"
     },
     {
+      "route": "/igame/",
+      "source": "igame/index.html",
+      "kind": "source-html",
+      "title": "iGAME | PiXiEED"
+    },
+    {
       "route": "/google10107469bdcc60fa.html",
       "source": "google10107469bdcc60fa.html",
       "kind": "public-verification-file",

@@ -49,6 +49,16 @@ export {
 } from "./game/game-350/igame-player-contract.ts";
 export type * from "./game/game-350/igame-player-contract.ts";
 export {
+  fetchIGamePublicPackage,
+  parseIGamePublicBootstrap,
+  sha256BytesHex,
+} from "./game/game-350/igame-public-bootstrap.ts";
+export type * from "./game/game-350/igame-public-bootstrap.ts";
+export {
+  createIGameBrowserRuntimeSource,
+  createIGameBrowserRuntimeSourceFromBootstrap,
+} from "./game/game-350/igame-browser-runtime.ts";
+export {
   completeIGameBrandSplash,
   createIGameRuntimeLaunchConfig,
   createIGameRuntimeLaunchState,

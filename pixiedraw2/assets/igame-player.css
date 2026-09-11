@@ -113,6 +113,53 @@ h1 { max-width: 100%; margin: 0; font-size: clamp(2rem, 6vw, 4.4rem); line-heigh
 .igame-player__runtime-mount > :first-child { max-width: 100%; }
 .igame-player__runtime-status { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
+.igame-browser-runtime {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  background: #07101c;
+}
+
+.igame-browser-runtime__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  outline: none;
+  image-rendering: pixelated;
+  touch-action: none;
+}
+
+.igame-browser-runtime__canvas:focus-visible {
+  box-shadow: inset 0 0 0 3px #7fe6d4;
+}
+
+.igame-browser-runtime__hint {
+  position: absolute;
+  right: 14px;
+  bottom: 12px;
+  max-width: calc(100% - 28px);
+  margin: 0;
+  padding: 7px 10px;
+  border: 1px solid rgba(159, 190, 224, 0.25);
+  border-radius: 8px;
+  color: #c4d2e5;
+  background: rgba(4, 9, 17, 0.68);
+  font-size: 0.72rem;
+  line-height: 1.35;
+  pointer-events: none;
+}
+
+@media (max-width: 540px) {
+  .igame-browser-runtime__hint {
+    right: 8px;
+    bottom: 8px;
+    max-width: calc(100% - 16px);
+    font-size: 0.66rem;
+  }
+}
+
 .igame-player__error {
   position: absolute;
   z-index: 3;

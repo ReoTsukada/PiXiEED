@@ -2,9 +2,9 @@
   "registry": {
     "schemaVersion": 1,
     "registryVersion": 1,
-    "routeCount": 60,
-    "currentSnapshotCount": 51,
-    "representativeCurrentRoutes": ["/", "/pixiedraw2/", "/market/", "/market/item.html", "/account/", "/pixfind/"],
+    "routeCount": 61,
+    "currentSnapshotCount": 52,
+    "representativeCurrentRoutes": ["/", "/pixiedraw2/", "/igame/", "/market/", "/market/item.html", "/account/", "/pixfind/"],
     "representativeCompatibilityRoutes": ["/market/items/:itemId/", "/market/item.html?id=:itemId", "/pixfind/puzzles/:puzzleId/", "/pixiedraw/", "/pixiedraw/?project=:projectId"],
     "flags": ["public-url-read", "public-url-resolve", "public-url-redirect", "public-url-metadata", "public-url-legacy-adapter"],
     "redirectDefault": "shadow",

@@ -49,6 +49,8 @@
   const TEXT_FORMATS = new Set(['novel-json', 'visual-project', 'text', 'markdown', 'html', 'csv', 'rtf', 'json']);
   const VIDEO_FORMATS = new Set(['mp4', 'webm', 'mov', 'm4v', 'ogv']);
   const IMAGE_FORMATS = new Set([...RASTER_FORMATS, 'pixiedraw-project']);
+  const IGAME_PRODUCT_SCHEMA = 'pixieed-igame-product/v1';
+  const STABLE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$/u;
   // The server verifier and the format registry share the complete creator
   // surface: native projects, images, audio, text/world packages, and video.
   const SERVER_SUPPORTED_FORMATS = new Set(FORMAT_ORDER);
@@ -110,6 +112,7 @@
   let deliveryManifest = null;
   let deliveryManifestBaseline = null;
   let deliveryManifestError = '';
+  let igameProductFromTransfer = null;
   let acquisitionMode = LISTING_MODES.ACQUIRE;
   let usePreset = LISTING_USE_PRESETS.USE_IN_WORK;
 
@@ -120,6 +123,24 @@
       ? deliveryManifestRuntime.normalize(value)
       : null
   );
+
+  function normalizeIGameProduct(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const schema = String(value.schema || '');
+    const projectId = String(value.project_id || '').trim();
+    const runtimeProfileId = String(value.runtime_profile_id || '').trim();
+    const runtimeVersion = String(value.runtime_version || '').trim();
+    if (schema !== IGAME_PRODUCT_SCHEMA || !STABLE_ID_PATTERN.test(projectId) ||
+      !STABLE_ID_PATTERN.test(runtimeProfileId) || !STABLE_ID_PATTERN.test(runtimeVersion) ||
+      value.visibility !== 'PUBLIC') return null;
+    return Object.freeze({
+      schema: IGAME_PRODUCT_SCHEMA,
+      project_id: projectId,
+      runtime_profile_id: runtimeProfileId,
+      runtime_version: runtimeVersion,
+      visibility: 'PUBLIC',
+    });
+  }
 
   const manifestPath = (entry) => String(entry?.source?.path || entry?.source?.fileName || '').slice(0, 180);
   function syncDeliveryManifestWithEntries(entries = activeEntries()) {
@@ -341,7 +362,8 @@
       samplePreviewPaths: Array.from(samplePreviewPaths),
       previewSelectionTouched,
       ...(deliveryManifest ? { deliveryManifest } : {}),
-      ...(deliveryManifestBaseline ? { deliveryManifestBaseline } : {})
+      ...(deliveryManifestBaseline ? { deliveryManifestBaseline } : {}),
+      ...(igameProductFromTransfer ? { igameProduct: igameProductFromTransfer } : {})
     };
   }
 
@@ -427,6 +449,7 @@
     const savedBaseline = draft.deliveryManifestBaseline ?? savedManifest;
     deliveryManifest = savedManifest ? normalizeDeliveryManifest(savedManifest) : null;
     deliveryManifestBaseline = savedBaseline ? normalizeDeliveryManifest(savedBaseline) : null;
+    igameProductFromTransfer = normalizeIGameProduct(draft.igameProduct);
     if (savedManifest && !deliveryManifest) {
       deliveryManifestError = '保存された販売内容manifestを確認できません。ファイルを選び直してください。';
     }
@@ -1463,6 +1486,20 @@
       }
       deliveryManifestBaseline = deliveryManifest;
     }
+    const transferredIGameProduct = transfer?.metadata?.igameProduct;
+    if (transferredIGameProduct !== undefined) {
+      igameProductFromTransfer = normalizeIGameProduct(transferredIGameProduct);
+      if (!igameProductFromTransfer) {
+        setStatus('公開iGAME商品の由来情報を確認できないため、引き継ぎを停止しました。制作画面からもう一度Marketへ渡してください。');
+        return false;
+      }
+      const manifestProjectId = deliveryManifest?.project?.projectId;
+      if (manifestProjectId && manifestProjectId !== igameProductFromTransfer.project_id) {
+        igameProductFromTransfer = null;
+        setStatus('公開iGAME商品のProject IDが販売内容と一致しないため、引き継ぎを停止しました。');
+        return false;
+      }
+    }
     await addFiles(transferFiles);
     // 取込に成功してから削除する。後片付けに失敗しても、取込済みの画面を
     // エラー扱いにせず、短いTTL後に自然失効させる。
@@ -1585,6 +1622,13 @@
     if (compositionMismatch) {
       setStatus('販売パッケージ構成と含める形式が一致していません。構成を選び直してください。'); return;
     }
+    if (igameProductFromTransfer && (
+      formats.length !== 1 || formats[0] !== 'pixiedraw-project' ||
+      deliveryManifest?.selectionKind !== 'WHOLE_PROJECT' ||
+      deliveryManifest.project?.projectId !== igameProductFromTransfer.project_id
+    )) {
+      setStatus('公開iGAME商品は、同じProjectのPXDプロジェクト全体を含めて出品してください。'); return;
+    }
     const optionIds = optionCatalog.filter((option) => selectedOptionIds.has(option.id)).map((option) => option.id);
     const tags = listingTags();
     if (tags.length > MAX_TAGS || tags.some((tag) => Array.from(tag).length > 24)) {
@@ -1640,6 +1684,7 @@
         excluded_media: detectedEntries.filter((entry) => !entry.format).map((entry) => ({ path: entry.path, media_kind: entry.mediaKind })),
         ai_usage_status: aiUsageStatus,
         legal_confirmation: { terms_version: MARKET_TERMS_VERSION, privacy_version: MARKET_PRIVACY_VERSION },
+        ...(igameProductFromTransfer === null ? {} : { igame_product: igameProductFromTransfer }),
         listing_policy: listingPolicy,
         listing_tags: tags,
         files: packageData.files,

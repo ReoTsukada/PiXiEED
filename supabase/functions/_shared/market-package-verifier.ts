@@ -7,6 +7,8 @@
 export const MARKET_PACKAGE_SCHEMA = "pixieed-market-package/v1" as const;
 export const MARKET_PACKAGE_MAX_FILES = 128;
 export const MARKET_PACKAGE_MAX_BYTES = 50 * 1024 * 1024;
+/** Draw2 PXD manifests are metadata only; keep JSON parsing bounded. */
+export const MARKET_PXD_MAX_MANIFEST_BYTES = 4 * 1024 * 1024;
 
 export const MARKET_PACKAGE_FORMATS = Object.freeze([
   "pixiedraw-project",
@@ -109,6 +111,8 @@ export type MarketPackageValidationResult =
     composition: string;
     fileCount: number;
     totalBytes: number;
+    /** PXD v2 Projects whose embedded Game module is structurally present. */
+    gameProjectIds: readonly string[];
   }
   | {
     ok: false;
@@ -180,6 +184,271 @@ function readZip32(bytes: Uint8Array, offset: number): number {
 function isSafeZipPath(path: string): boolean {
   if (!path || path.includes("\0") || path.includes("\\") || path.startsWith("/")) return false;
   return path.split("/").every((part) => part.length > 0 && part !== "." && part !== "..");
+}
+
+const DRAW2_PXD_MAGIC = [0x50, 0x58, 0x44, 0x00] as const;
+const DRAW2_PXD_HEADER_BYTES = 9;
+const DRAW2_PXD_MAX_METADATA_ITEMS = 4096;
+const DRAW2_PXD_MAX_STRING_BYTES = 4096;
+type Draw2PxdVersion = 1 | 2;
+
+type Draw2PxdPayloadEntry = {
+  path: string;
+  mediaType: string;
+  sha256: string;
+  bytes: number;
+  offset: number;
+};
+
+type Draw2PxdRasterAsset = Draw2PxdPayloadEntry & {
+  assetId: string;
+  revisionId: string;
+  width: number;
+  height: number;
+  tileSize: number;
+  palette: readonly unknown[];
+  revision: number;
+};
+
+type ParsedDraw2Pxd = {
+  version: Draw2PxdVersion;
+  manifest: Record<string, unknown>;
+  payloadStart: number;
+  entries: readonly Draw2PxdPayloadEntry[];
+};
+
+type Draw2PxdValidationResult =
+  | { ok: true; projectId: string; hasGameModule: boolean }
+  | { ok: false; code: string; message: string };
+
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function isSafePxdString(value: unknown, maximum = DRAW2_PXD_MAX_STRING_BYTES): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= maximum &&
+    !/[\u0000-\u001f\u007f]/u.test(value);
+}
+
+function isSafePxdInteger(value: unknown, minimum = 0, maximum = Number.MAX_SAFE_INTEGER): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= minimum && value <= maximum;
+}
+
+function isSha256(value: unknown): value is string {
+  return typeof value === "string" && /^[a-f0-9]{64}$/u.test(value);
+}
+
+function hasDraw2PxdMagic(bytes: Uint8Array): boolean {
+  return bytes.length >= DRAW2_PXD_MAGIC.length && DRAW2_PXD_MAGIC.every((value, index) => bytes[index] === value);
+}
+
+function readPxdUint32(bytes: Uint8Array, offset: number): number {
+  if (offset < 0 || offset + 4 > bytes.length) return -1;
+  return (bytes[offset] * 0x1000000) + (bytes[offset + 1] << 16) + (bytes[offset + 2] << 8) + bytes[offset + 3];
+}
+
+function isSafePxdPath(path: string): boolean {
+  return isSafeZipPath(path) && !/^[A-Za-z]:/u.test(path) && !/[\u0000-\u001f\u007f]/u.test(path);
+}
+
+function knownDraw2PxdV2Path(path: string): boolean {
+  return /^objects\/(?:asset-\d{4}\.raster|audio-\d{4}\.bin)$/u.test(path) ||
+    path === "modules/audio/state.json" || path === "modules/game/state.json";
+}
+
+function validatePxdProjectMetadata(value: unknown): boolean {
+  if (!isObjectRecord(value) || !isSafePxdString(value.name) || !isSafePxdInteger(value.structureEpoch, 1)) return false;
+  for (const key of ["layers", "frames", "cels"]) {
+    const collection = value[key];
+    if (!Array.isArray(collection) || collection.length > DRAW2_PXD_MAX_METADATA_ITEMS) return false;
+  }
+  return isObjectRecord(value.timeline);
+}
+
+function validatePxdPayloadEntry(value: unknown): value is Draw2PxdPayloadEntry {
+  if (!isObjectRecord(value)) return false;
+  return isSafePxdPath(stringValue(value.path)) &&
+    isSafePxdString(value.mediaType, 256) &&
+    isSha256(value.sha256) &&
+    isSafePxdInteger(value.bytes, 1, MARKET_PACKAGE_MAX_BYTES) &&
+    isSafePxdInteger(value.offset, 0, MARKET_PACKAGE_MAX_BYTES);
+}
+
+function samePxdPayloadEntry(left: Draw2PxdPayloadEntry, right: Draw2PxdPayloadEntry): boolean {
+  return left.path === right.path && left.mediaType === right.mediaType && left.sha256 === right.sha256 &&
+    left.bytes === right.bytes && left.offset === right.offset;
+}
+
+function validatePxdRasterAsset(value: unknown, expectedPathPattern: RegExp): value is Draw2PxdRasterAsset {
+  if (!isObjectRecord(value) || !validatePxdPayloadEntry(value)) return false;
+  const raster = value as unknown as Draw2PxdRasterAsset;
+  if (!isSafePxdString(raster.assetId) || !isSafePxdString(raster.revisionId) ||
+    raster.mediaType !== "application/vnd.pixieed.indexed-raster" || !expectedPathPattern.test(raster.path) ||
+    !isSafePxdInteger(raster.width, 1, 1_000_000) || !isSafePxdInteger(raster.height, 1, 1_000_000) ||
+    (raster.tileSize !== 32 && raster.tileSize !== 64) || !Array.isArray(raster.palette) ||
+    raster.palette.length < 1 || raster.palette.length > 256 || raster.palette[0] !== 0 ||
+    !isSafePxdInteger(raster.revision, 0)) return false;
+  const pixelBytes = raster.width * raster.height;
+  if (!Number.isSafeInteger(pixelBytes) || pixelBytes !== raster.bytes || pixelBytes > MARKET_PACKAGE_MAX_BYTES) return false;
+  return raster.palette.every((color) => isSafePxdInteger(color, 0, 0xffffffff));
+}
+
+function validatePxdModule(
+  value: unknown,
+  moduleName: "audio" | "game",
+): { state: Draw2PxdPayloadEntry | null; assets: readonly Draw2PxdPayloadEntry[] } | null {
+  if (!isObjectRecord(value)) return null;
+  const status = value.status;
+  const schemaVersion = value.schemaVersion;
+  const stateValue = value.state;
+  const assetsValue = value.assets;
+  if ((status !== "EMPTY" && status !== "EMBEDDED") || !Array.isArray(assetsValue) || assetsValue.length > MARKET_PACKAGE_MAX_FILES) return null;
+  if (status === "EMPTY") {
+    return schemaVersion === null && stateValue === null && assetsValue.length === 0 ? { state: null, assets: [] } : null;
+  }
+  if (!isSafePxdString(schemaVersion, 256) || !validatePxdPayloadEntry(stateValue) ||
+    stateValue.path !== `modules/${moduleName}/state.json` || stateValue.mediaType !== "application/json") return null;
+  if (moduleName === "game" && assetsValue.length !== 0) return null;
+  const assets: Draw2PxdPayloadEntry[] = [];
+  const revisionIds = new Set<string>();
+  for (const assetValue of assetsValue) {
+    if (!isObjectRecord(assetValue) || !validatePxdPayloadEntry(assetValue)) return null;
+    const asset = assetValue as Draw2PxdPayloadEntry & { revisionId?: unknown };
+    if (!/^objects\/audio-\d{4}\.bin$/u.test(asset.path) || !isSafePxdString(asset.revisionId) || revisionIds.has(asset.revisionId)) return null;
+    revisionIds.add(asset.revisionId);
+    assets.push(asset);
+  }
+  return { state: stateValue, assets };
+}
+
+function validateDraw2PxdManifest(
+  manifest: Record<string, unknown>,
+  version: Draw2PxdVersion,
+): readonly Draw2PxdPayloadEntry[] | null {
+  if (manifest.format !== "pxd" || manifest.schemaVersion !== version || manifest.archiveVersion !== version ||
+    manifest.packageKind !== "PROJECT_PACKAGE" || !isSafePxdString(manifest.packageId) ||
+    !isSafePxdString(manifest.projectId) || !isObjectRecord(manifest.createdBy) ||
+    !isSafePxdString(manifest.createdBy.application) || !validatePxdProjectMetadata(manifest.project) ||
+    !Array.isArray(manifest.dependencies) || manifest.dependencies.length !== 0 || !isSha256(manifest.canonicalManifestHash)) return null;
+
+  if (version === 1) {
+    if (!Array.isArray(manifest.assets) || manifest.assets.length === 0 || manifest.assets.length > MARKET_PACKAGE_MAX_FILES) return null;
+    const paths = new Set<string>();
+    const assetIds = new Set<string>();
+    const entries: Draw2PxdPayloadEntry[] = [];
+    for (const assetValue of manifest.assets) {
+      if (!validatePxdRasterAsset(assetValue, /^objects\/asset-\d{4}\.raster$/u)) return null;
+      if (paths.has(assetValue.path) || assetIds.has(assetValue.assetId)) return null;
+      paths.add(assetValue.path);
+      assetIds.add(assetValue.assetId);
+      entries.push(assetValue);
+    }
+    return entries;
+  }
+
+  if (!Array.isArray(manifest.entries) || manifest.entries.length === 0 || manifest.entries.length > MARKET_PACKAGE_MAX_FILES) return null;
+  const entries: Draw2PxdPayloadEntry[] = [];
+  let previousPath = "";
+  for (const entryValue of manifest.entries) {
+    if (!validatePxdPayloadEntry(entryValue) || !knownDraw2PxdV2Path(entryValue.path) || entryValue.path <= previousPath) return null;
+    previousPath = entryValue.path;
+    entries.push(entryValue);
+  }
+
+  const modules = manifest.modules;
+  if (!isObjectRecord(modules)) return null;
+  const draw = modules.draw;
+  if (!isObjectRecord(draw) || draw.schemaVersion !== "DRAW2_PROJECT_V1" || draw.status !== "EMBEDDED" ||
+    draw.state !== null || !Array.isArray(draw.assets) || draw.assets.length === 0 || draw.assets.length > MARKET_PACKAGE_MAX_FILES) return null;
+  const entryByPath = new Map(entries.map((entry) => [entry.path, entry]));
+  const references = new Set<string>();
+  const drawAssetIds = new Set<string>();
+  for (const assetValue of draw.assets) {
+    if (!validatePxdRasterAsset(assetValue, /^objects\/asset-\d{4}\.raster$/u)) return null;
+    if (drawAssetIds.has(assetValue.assetId)) return null;
+    const entry = entryByPath.get(assetValue.path);
+    if (!entry || !samePxdPayloadEntry(assetValue, entry)) return null;
+    drawAssetIds.add(assetValue.assetId);
+    references.add(assetValue.path);
+  }
+  for (const moduleName of ["audio", "game"] as const) {
+    const module = validatePxdModule(modules[moduleName], moduleName);
+    if (module === null) return null;
+    if (module.state !== null) {
+      const entry = entryByPath.get(module.state.path);
+      if (!entry || !samePxdPayloadEntry(module.state, entry)) return null;
+      references.add(module.state.path);
+    }
+    for (const asset of module.assets) {
+      const entry = entryByPath.get(asset.path);
+      if (!entry || !samePxdPayloadEntry(asset, entry)) return null;
+      references.add(asset.path);
+    }
+  }
+  return references.size === entries.length && entries.every((entry) => references.has(entry.path)) ? entries : null;
+}
+
+function canonicalJson(value: unknown, depth = 0): string {
+  if (depth > 64) throw new Error("PXD manifest nesting is too deep.");
+  if (Array.isArray(value)) return `[${value.map((entry) => canonicalJson(entry, depth + 1)).join(",")}]`;
+  if (isObjectRecord(value)) {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key], depth + 1)}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function parseDraw2PxdContainer(bytes: Uint8Array): ParsedDraw2Pxd | null {
+  if (!hasDraw2PxdMagic(bytes) || bytes.length < DRAW2_PXD_HEADER_BYTES || bytes.length > MARKET_PACKAGE_MAX_BYTES) return null;
+  const version = bytes[4];
+  if (version !== 1 && version !== 2) return null;
+  const manifestLength = readPxdUint32(bytes, 5);
+  if (manifestLength < 2 || manifestLength > MARKET_PXD_MAX_MANIFEST_BYTES) return null;
+  const payloadStart = DRAW2_PXD_HEADER_BYTES + manifestLength;
+  if (payloadStart > bytes.length) return null;
+  let manifest: unknown;
+  try {
+    manifest = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes.slice(DRAW2_PXD_HEADER_BYTES, payloadStart)));
+  } catch (_error) {
+    return null;
+  }
+  if (!isObjectRecord(manifest)) return null;
+  const entries = validateDraw2PxdManifest(manifest, version);
+  return entries === null ? null : { version, manifest, payloadStart, entries };
+}
+
+async function validateDraw2PxdPayload(bytes: Uint8Array): Promise<Draw2PxdValidationResult> {
+  const parsed = parseDraw2PxdContainer(bytes);
+  if (parsed === null) return { ok: false, code: "PXD_CONTAINER_INVALID", message: "Draw2 PXD header or manifest is invalid" };
+  let manifestBase: Record<string, unknown>;
+  try {
+    manifestBase = { ...parsed.manifest };
+    delete manifestBase.canonicalManifestHash;
+    if (await sha256Hex(new TextEncoder().encode(canonicalJson(manifestBase))) !== parsed.manifest.canonicalManifestHash) {
+      return { ok: false, code: "PXD_MANIFEST_HASH_MISMATCH", message: "Draw2 PXD manifest hash does not match its contents" };
+    }
+  } catch (_error) {
+    return { ok: false, code: "PXD_MANIFEST_CANONICALIZATION_FAILED", message: "Draw2 PXD manifest cannot be canonically verified" };
+  }
+
+  let expectedOffset = 0;
+  for (const entry of parsed.entries) {
+    if (entry.offset !== expectedOffset) return { ok: false, code: "PXD_PAYLOAD_OFFSET_INVALID", message: "Draw2 PXD payload offsets are not contiguous" };
+    const start = parsed.payloadStart + entry.offset;
+    const end = start + entry.bytes;
+    if (start < parsed.payloadStart || end < start || end > bytes.length) return { ok: false, code: "PXD_PAYLOAD_BOUNDARY_INVALID", message: "Draw2 PXD payload boundary is invalid" };
+    if (await sha256Hex(bytes.slice(start, end)) !== entry.sha256) return { ok: false, code: "PXD_PAYLOAD_HASH_MISMATCH", message: "Draw2 PXD payload hash does not match its manifest" };
+    expectedOffset += entry.bytes;
+  }
+  if (parsed.payloadStart + expectedOffset !== bytes.length) return { ok: false, code: "PXD_TRAILING_BYTES", message: "Draw2 PXD contains bytes outside its declared payload" };
+  const modules = parsed.manifest.modules;
+  const game = isObjectRecord(modules) && isObjectRecord(modules.game)
+    ? modules.game
+    : null;
+  return {
+    ok: true,
+    projectId: stringValue(parsed.manifest.projectId),
+    hasGameModule: parsed.version === 2 && game?.status === "EMBEDDED" && game.state !== null,
+  };
 }
 
 function isSafePxdZip(bytes: Uint8Array): boolean {
@@ -257,7 +526,7 @@ export function hasValidContainerSignature(format: string, bytes: Uint8Array): b
     case "gif":
       return textAt(bytes, 0, 6) === "GIF87a" || textAt(bytes, 0, 6) === "GIF89a";
     case "pixiedraw-project":
-      return isSafePxdZip(bytes);
+      return hasDraw2PxdMagic(bytes) ? parseDraw2PxdContainer(bytes) !== null : isSafePxdZip(bytes);
     case "wav":
       return hasAscii(bytes.slice(0, 4), "RIFF") && hasAscii(bytes.slice(8, 12), "WAVE");
     case "aiff":
@@ -403,6 +672,7 @@ export async function validateMarketPackage(input: MarketPackageValidationInput)
   if (expectedPaths.size !== input.fileObjectPaths.length || downloadedByPath.size !== input.downloadedFiles.length) return failure("DUPLICATE_PATH", "package contains duplicate storage paths");
 
   let totalBytes = 0;
+  const gameProjectIds = new Set<string>();
   for (const file of files) {
     const path = stringValue(file.storage_path);
     const format = stringValue(file.format);
@@ -415,6 +685,11 @@ export async function validateMarketPackage(input: MarketPackageValidationInput)
     if (downloaded.bytes.byteLength !== size) return failure("SIZE_MISMATCH", "Storage size differs from the signed manifest", path);
     if (!mimeMatches(format, downloaded.mimeType)) return failure("MIME_MISMATCH", "Storage MIME differs from the declared format", path);
     if (!hasValidContainerSignature(format, downloaded.bytes)) return failure("MAGIC_MISMATCH", "file container signature does not match its format", path);
+    if (format === "pixiedraw-project" && hasDraw2PxdMagic(downloaded.bytes)) {
+      const pxdValidation = await validateDraw2PxdPayload(downloaded.bytes);
+      if (!pxdValidation.ok) return failure(pxdValidation.code, pxdValidation.message, path);
+      if (pxdValidation.hasGameModule) gameProjectIds.add(pxdValidation.projectId);
+    }
     const actualHash = await sha256Hex(downloaded.bytes);
     if (actualHash !== hash) return failure("HASH_MISMATCH", "Storage bytes differ from the signed manifest", path);
     totalBytes += size;
@@ -424,5 +699,12 @@ export async function validateMarketPackage(input: MarketPackageValidationInput)
 
   const sourceHash = await computeMarketPackageSourceHash(files);
   if (sourceHash !== String(input.sourceSha256 || "").toLowerCase()) return failure("SOURCE_HASH_MISMATCH", "package fingerprint differs from the listing draft");
-  return { ok: true, sourceHash, composition, fileCount: files.length, totalBytes };
+  return {
+    ok: true,
+    sourceHash,
+    composition,
+    fileCount: files.length,
+    totalBytes,
+    gameProjectIds: [...gameProjectIds].sort(),
+  };
 }

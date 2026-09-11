@@ -38,9 +38,10 @@ Playerは実行状態を更新するだけで、Gameの編集履歴・Draw素材
 
 ## 現在の実装範囲
 
-- `pixiedraw2/igame-player.html` は編集UIを持たないローカルPlayerである
-- `?source=registry` はProof未接続のため安全停止する
+- `pixiedraw2/igame-player.html` は編集UIを持たないPlayer Hostである。`?product=<Market Asset ID>` では、Server Bootstrapから取得した公開PXDをCanvas Runtimeへ渡す
+- `/igame/?product=<Market Asset ID>` は公開Playerの正規入口で、Market Entitlement、immutable Revision、署名URL、Package Hashを同一経路で検証する
+- `?source=registry` による外部注入は従来どおりProofがない場合に安全停止し、公開Playerは外部注入ではなくServer Bootstrapを使う
 - PXD保存・PiXiEED内Playはこの外部ビルドゲートでブロックしない
-- 本番Registry/Auth/課金プロバイダ、Android/iOS Build worker、署名鍵、実機インストール、正式配布は未接続（UNTESTED）
+- SupabaseへのMigration／Edge Function適用、Market実データ、Android/iOS Build worker、署名鍵、実機インストール、正式配布は未接続（UNTESTED）
 
-したがって、現在確認できるのは「課金済みサーバーProofがない外部ビルドを拒否する契約」と「PiXiEED内の編集不可Player」のローカル動作までである。実際にAndroidビルドを販売・配布可能にするには、別途サーバー側のCheckout → Entitlement → Build → Artifact Deliveryを接続する。
+したがって、ローカルで確認できるのは「公開PlayerのBootstrap契約、PXD Hash検証、Canvas Runtime、課金済みサーバーProofがない外部ビルドの拒否」である。実際の公開Gameを本番で再生するには、対象Supabaseへの適用と実データ縦断確認が必要で、Android等の販売・配布には別途Checkout → Entitlement → Build → Artifact Deliveryを接続する。

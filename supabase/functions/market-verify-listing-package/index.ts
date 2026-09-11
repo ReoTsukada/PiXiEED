@@ -80,6 +80,7 @@ function serverVerification(result: Extract<Awaited<ReturnType<typeof validateMa
     file_count: result.fileCount,
     total_bytes: result.totalBytes,
     composition: result.composition,
+    game_project_ids: result.gameProjectIds,
     structural_verification_only: true,
   };
 }
@@ -147,6 +148,19 @@ Deno.serve(async (request) => {
     const currentManifest = asset.provenance_manifest && typeof asset.provenance_manifest === "object"
       ? asset.provenance_manifest as JsonRecord
       : {};
+    const declaredIGameProduct = currentManifest.igame_product &&
+        typeof currentManifest.igame_product === "object" &&
+        !Array.isArray(currentManifest.igame_product)
+      ? currentManifest.igame_product as JsonRecord
+      : null;
+    if (declaredIGameProduct !== null &&
+      !result.gameProjectIds.includes(stringValue(declaredIGameProduct.project_id))) {
+      return jsonResponse(request, {
+        error: "igame_product.project_id does not match an embedded Game module",
+        code: "IGAME_PRODUCT_MISMATCH",
+        path: null,
+      }, 422);
+    }
     const verification = serverVerification(result);
     const rawManifest = manifest && typeof manifest === "object" ? manifest as JsonRecord : {};
     const rawFiles = Array.isArray(rawManifest.files) ? rawManifest.files : [];

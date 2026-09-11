@@ -504,7 +504,7 @@ function success(value, diagnostics = []) {
   };
 }
 function failure(code, message, path) {
-  const diagnostic11 = path === void 0 ? {
+  const diagnostic12 = path === void 0 ? {
     code,
     message
   } : {
@@ -515,7 +515,7 @@ function failure(code, message, path) {
   return {
     ok: false,
     diagnostics: [
-      diagnostic11
+      diagnostic12
     ]
   };
 }
@@ -2898,7 +2898,7 @@ function audioOk(value, diagnostics = []) {
   };
 }
 function audioFail(code, message, path, recoverable = false) {
-  const diagnostic11 = {
+  const diagnostic12 = {
     code,
     message,
     ...path === void 0 ? {} : {
@@ -2909,7 +2909,7 @@ function audioFail(code, message, path, recoverable = false) {
   return {
     ok: false,
     diagnostics: [
-      diagnostic11
+      diagnostic12
     ]
   };
 }
@@ -11023,7 +11023,7 @@ function createIndexedDbGameEditorPersistenceStore(databaseName = GAME_EDITOR_PE
         return await new Promise((resolve) => {
           let stale = false;
           let settled = false;
-          let failure11 = {
+          let failure12 = {
             failure: "error",
             cause: "transaction-failed"
           };
@@ -11034,11 +11034,11 @@ function createIndexedDbGameEditorPersistenceStore(databaseName = GAME_EDITOR_PE
             try {
               const write = store.put(record3);
               write.onerror = () => {
-                failure11 = classifyGameEditorPersistenceError(write.error, "record-write-failed");
+                failure12 = classifyGameEditorPersistenceError(write.error, "record-write-failed");
                 transaction.abort();
               };
             } catch (error) {
-              failure11 = classifyGameEditorPersistenceError(error, "record-write-failed");
+              failure12 = classifyGameEditorPersistenceError(error, "record-write-failed");
               transaction.abort();
             }
           };
@@ -11055,7 +11055,7 @@ function createIndexedDbGameEditorPersistenceStore(databaseName = GAME_EDITOR_PE
             else stale = true;
           };
           read.onerror = () => {
-            failure11 = classifyGameEditorPersistenceError(read.error, "record-read-failed");
+            failure12 = classifyGameEditorPersistenceError(read.error, "record-read-failed");
             transaction.abort();
           };
           transaction.oncomplete = () => {
@@ -11069,30 +11069,30 @@ function createIndexedDbGameEditorPersistenceStore(databaseName = GAME_EDITOR_PE
             });
           };
           transaction.onerror = () => {
-            failure11 = classifyGameEditorPersistenceError(transaction.error, "transaction-failed");
+            failure12 = classifyGameEditorPersistenceError(transaction.error, "transaction-failed");
             finish({
               ok: false,
               stale: false,
-              failure: failure11.failure,
+              failure: failure12.failure,
               stage: "storage-save",
-              cause: failure11.cause,
-              ...failure11.errorName === void 0 ? {} : {
-                errorName: failure11.errorName
+              cause: failure12.cause,
+              ...failure12.errorName === void 0 ? {} : {
+                errorName: failure12.errorName
               }
             });
           };
           transaction.onabort = () => {
-            if (failure11.cause === "transaction-failed") {
-              failure11 = classifyGameEditorPersistenceError(transaction.error, "transaction-aborted");
+            if (failure12.cause === "transaction-failed") {
+              failure12 = classifyGameEditorPersistenceError(transaction.error, "transaction-aborted");
             }
             finish({
               ok: false,
               stale: false,
-              failure: failure11.failure,
+              failure: failure12.failure,
               stage: "storage-save",
-              cause: failure11.cause,
-              ...failure11.errorName === void 0 ? {} : {
-                errorName: failure11.errorName
+              cause: failure12.cause,
+              ...failure12.errorName === void 0 ? {} : {
+                errorName: failure12.errorName
               }
             });
           };
@@ -11680,11 +11680,11 @@ function validateProjectShape(project) {
     return fail("AUDIO_INVALID_PROJECT", "Synth preset identifiers are invalid or duplicated.", "project.synthPresets");
   }
   for (const [index, preset] of synthPresets.entries()) {
-    const diagnostic11 = validateSynthPreset(preset, `project.synthPresets[${index}]`);
-    if (diagnostic11 !== null) return {
+    const diagnostic12 = validateSynthPreset(preset, `project.synthPresets[${index}]`);
+    if (diagnostic12 !== null) return {
       ok: false,
       diagnostics: [
-        diagnostic11
+        diagnostic12
       ]
     };
   }
@@ -11790,50 +11790,50 @@ function validateProjectShape(project) {
     };
   }
   for (const [index, revision] of revisions.entries()) {
-    const diagnostic11 = validateRevision(revision, `project.revisions[${index}]`);
-    if (diagnostic11 !== null) return {
+    const diagnostic12 = validateRevision(revision, `project.revisions[${index}]`);
+    if (diagnostic12 !== null) return {
       ok: false,
       diagnostics: [
-        diagnostic11
+        diagnostic12
       ]
     };
   }
   for (const [index, track] of tracks.entries()) {
-    const diagnostic11 = validateTrack(track, `project.tracks[${index}]`);
-    if (diagnostic11 !== null) return {
+    const diagnostic12 = validateTrack(track, `project.tracks[${index}]`);
+    if (diagnostic12 !== null) return {
       ok: false,
       diagnostics: [
-        diagnostic11
+        diagnostic12
       ]
     };
   }
   for (const [index, clip] of clips.entries()) {
     const valueClip = clip;
-    const diagnostic11 = valueClip === null || typeof valueClip !== "object" || !validId3(valueClip.clipId) || !validId3(valueClip.trackId) || !validId3(valueClip.revisionId) || validTimeRange(valueClip.timeline, `project.clips[${index}].timeline`) !== null || !boundedInteger2(valueClip.sourceOffsetUs, 0, Number.MAX_SAFE_INTEGER) || !boundedInteger2(valueClip.gainMilliDb, -12e4, 24e3) || !boundedInteger2(valueClip.fadeInTick, 0, AUDIO200_MAX_TICK) || !boundedInteger2(valueClip.fadeOutTick, 0, AUDIO200_MAX_TICK) || typeof valueClip.loop !== "boolean" || valueClip.playbackRate !== void 0 && !boundedNumber(valueClip.playbackRate, 0.25, 4) ? {
+    const diagnostic12 = valueClip === null || typeof valueClip !== "object" || !validId3(valueClip.clipId) || !validId3(valueClip.trackId) || !validId3(valueClip.revisionId) || validTimeRange(valueClip.timeline, `project.clips[${index}].timeline`) !== null || !boundedInteger2(valueClip.sourceOffsetUs, 0, Number.MAX_SAFE_INTEGER) || !boundedInteger2(valueClip.gainMilliDb, -12e4, 24e3) || !boundedInteger2(valueClip.fadeInTick, 0, AUDIO200_MAX_TICK) || !boundedInteger2(valueClip.fadeOutTick, 0, AUDIO200_MAX_TICK) || typeof valueClip.loop !== "boolean" || valueClip.playbackRate !== void 0 && !boundedNumber(valueClip.playbackRate, 0.25, 4) ? {
       code: "AUDIO_INVALID_CLIP",
       message: "Clip fields or timeline are invalid.",
       path: `project.clips[${index}]`,
       recoverable: false
     } : null;
-    if (diagnostic11 !== null) return {
+    if (diagnostic12 !== null) return {
       ok: false,
       diagnostics: [
-        diagnostic11
+        diagnostic12
       ]
     };
   }
   for (const [index, note] of notes.entries()) {
     const valueNote = note;
-    const diagnostic11 = valueNote === null || typeof valueNote !== "object" || !validId3(valueNote.noteId) || !validId3(valueNote.trackId) || !boundedInteger2(valueNote.pitchMidi, 0, 127) || validTimeRange(valueNote.timeline, `project.notes[${index}].timeline`) !== null || !boundedInteger2(valueNote.velocityMilli, 0, 1e3) ? {
+    const diagnostic12 = valueNote === null || typeof valueNote !== "object" || !validId3(valueNote.noteId) || !validId3(valueNote.trackId) || !boundedInteger2(valueNote.pitchMidi, 0, 127) || validTimeRange(valueNote.timeline, `project.notes[${index}].timeline`) !== null || !boundedInteger2(valueNote.velocityMilli, 0, 1e3) ? {
       code: "AUDIO_INVALID_NOTE",
       message: "Note fields or timeline are invalid.",
       path: `project.notes[${index}]`,
       recoverable: false
     } : null;
-    if (diagnostic11 !== null) return {
+    if (diagnostic12 !== null) return {
       ok: false,
       diagnostics: [
-        diagnostic11
+        diagnostic12
       ]
     };
   }
@@ -11841,7 +11841,7 @@ function validateProjectShape(project) {
     const valueAutomation = automation;
     const target = valueAutomation?.target;
     const points = valueAutomation?.points;
-    const diagnostic11 = valueAutomation === null || typeof valueAutomation !== "object" || !validId3(valueAutomation.automationId) || target === null || ![
+    const diagnostic12 = valueAutomation === null || typeof valueAutomation !== "object" || !validId3(valueAutomation.automationId) || target === null || ![
       "TRACK_GAIN",
       "TRACK_PAN",
       "MIXER_CHANNEL_GAIN",
@@ -11859,10 +11859,10 @@ function validateProjectShape(project) {
       path: `project.automations[${index}]`,
       recoverable: false
     } : null;
-    if (diagnostic11 !== null) return {
+    if (diagnostic12 !== null) return {
       ok: false,
       diagnostics: [
-        diagnostic11
+        diagnostic12
       ]
     };
   }
@@ -12624,16 +12624,16 @@ async function applyAudioCommand(project, command) {
     }
     case "SYNTH_PRESET_REPLACE": {
       const synthPreset = entityFromPayload(payload, "synthPreset");
-      const diagnostic11 = synthPreset === null ? {
+      const diagnostic12 = synthPreset === null ? {
         code: "AUDIO_INVALID_PROJECT",
         message: "Synth preset payload is invalid.",
         path: "command.payload.synthPreset",
         recoverable: false
       } : validateSynthPreset(synthPreset, "command.payload.synthPreset");
-      if (diagnostic11 !== null) return {
+      if (diagnostic12 !== null) return {
         ok: false,
         diagnostics: [
-          diagnostic11
+          diagnostic12
         ]
       };
       next = {
@@ -15530,10 +15530,10 @@ function candidateReference(candidate, kind) {
 }
 function validWav(bytes) {
   if (bytes.byteLength < 44) return false;
-  const ascii = (offset, value) => [
+  const ascii2 = (offset, value) => [
     ...value
   ].every((character, index) => bytes[offset + index] === character.charCodeAt(0));
-  return ascii(0, "RIFF") && ascii(8, "WAVE") && ascii(12, "fmt ") && ascii(36, "data");
+  return ascii2(0, "RIFF") && ascii2(8, "WAVE") && ascii2(12, "fmt ") && ascii2(36, "data");
 }
 function jsonBytes(value) {
   return new TextEncoder().encode(canonicalJson3(value));
@@ -21121,6 +21121,327 @@ Prefab\u3092Scene\u3078\u914D\u7F6E\u3057\u3001PiXiEEDAssetAnimator\u306Emotion\
 `;
 }
 
+// src/game/game-350/unity-audio-export.ts
+var UNITY_AUDIO_IMPORT_SCHEMA_VERSION = "UNITY_AUDIO_IMPORT_V1";
+var UNITY_AUDIO_IMPORT_PACKAGE_KIND = "PIXIEED_UNITY_AUDIO";
+function success9(value) {
+  return {
+    ok: true,
+    value,
+    diagnostics: []
+  };
+}
+function failure10(...diagnostics) {
+  return {
+    ok: false,
+    diagnostics
+  };
+}
+function diagnostic11(code, path, message) {
+  return {
+    code,
+    path,
+    message
+  };
+}
+function safeFilePart3(value, fallback = "audio") {
+  const normalized2 = value.trim().replace(/[^A-Za-z0-9_-]+/gu, "_").replace(/^_+|_+$/gu, "");
+  return normalized2 || fallback;
+}
+function jsonBytes3(value) {
+  return new TextEncoder().encode(`${canonicalJson3(value)}
+`);
+}
+async function sha256Bytes3(bytes) {
+  const digest = await crypto.subtle.digest("SHA-256", new Uint8Array(bytes).buffer);
+  return asSha2562([
+    ...new Uint8Array(digest)
+  ].map((byte) => byte.toString(16).padStart(2, "0")).join(""));
+}
+function ascii(bytes, offset, length) {
+  return String.fromCharCode(...bytes.subarray(offset, offset + length));
+}
+function readUint16(bytes, offset) {
+  return (bytes[offset] ?? 0) | (bytes[offset + 1] ?? 0) << 8;
+}
+function readUint322(bytes, offset) {
+  return (bytes[offset] ?? 0) | (bytes[offset + 1] ?? 0) << 8 | (bytes[offset + 2] ?? 0) << 16 | (bytes[offset + 3] ?? 0) * 16777216;
+}
+function validateWav(input) {
+  if (input.bytes.byteLength < 44 || ascii(input.bytes, 0, 4) !== "RIFF" || ascii(input.bytes, 8, 4) !== "WAVE") {
+    return diagnostic11("INVALID_WAV", "bytes", "Unity\u51FA\u529B\u306B\u306FRIFF/WAVE\u5F62\u5F0F\u304C\u5FC5\u8981\u3067\u3059\u3002");
+  }
+  if (readUint16(input.bytes, 20) !== 1 || readUint16(input.bytes, 22) !== input.channels || readUint322(input.bytes, 24) !== input.sampleRateHz || readUint16(input.bytes, 34) !== input.bitDepth) {
+    return diagnostic11("INVALID_WAV_METADATA", "bytes", "WAV\u30D8\u30C3\u30C0\u30FC\u3068\u51FA\u529B\u8A2D\u5B9A\u304C\u4E00\u81F4\u3057\u307E\u305B\u3093\u3002");
+  }
+  if (readUint322(input.bytes, 40) > input.bytes.byteLength - 44) {
+    return diagnostic11("INVALID_WAV", "bytes", "WAV\u306EPCM\u30C7\u30FC\u30BF\u9577\u304C\u4E0D\u6B63\u3067\u3059\u3002");
+  }
+  return void 0;
+}
+function validateInput(input, options) {
+  if (input.assetId.trim().length === 0 || input.assetId.length > 255) {
+    return diagnostic11("INVALID_INPUT", "assetId", "Audio Asset ID\u3092\u6307\u5B9A\u3057\u3066\u304F\u3060\u3055\u3044\u3002");
+  }
+  if (input.revisionId !== void 0 && input.revisionId.trim().length === 0) {
+    return diagnostic11("INVALID_INPUT", "revisionId", "revisionId\u306F\u7A7A\u306B\u3067\u304D\u307E\u305B\u3093\u3002");
+  }
+  if (input.assetName.trim().length === 0) {
+    return diagnostic11("INVALID_INPUT", "assetName", "Audio Asset\u540D\u3092\u6307\u5B9A\u3057\u3066\u304F\u3060\u3055\u3044\u3002");
+  }
+  if (![
+    "BGM",
+    "SE",
+    "VOICE",
+    "MIX"
+  ].includes(input.role)) {
+    return diagnostic11("INVALID_INPUT", "role", "role\u306FBGM\u30FBSE\u30FBVOICE\u30FBMIX\u306E\u3044\u305A\u308C\u304B\u3067\u3059\u3002");
+  }
+  if (typeof input.loop !== "boolean") {
+    return diagnostic11("INVALID_INPUT", "loop", "Loop\u8A2D\u5B9A\u3092\u660E\u793A\u3057\u3066\u304F\u3060\u3055\u3044\u3002");
+  }
+  if (!Number.isSafeInteger(input.sampleRateHz) || input.sampleRateHz < 8e3 || input.sampleRateHz > 192e3) {
+    return diagnostic11("INVALID_INPUT", "sampleRateHz", "\u30B5\u30F3\u30D7\u30EB\u30EC\u30FC\u30C8\u304C\u7BC4\u56F2\u5916\u3067\u3059\u3002");
+  }
+  if (!Number.isFinite(input.durationSeconds) || input.durationSeconds <= 0) {
+    return diagnostic11("INVALID_INPUT", "durationSeconds", "\u518D\u751F\u6642\u9593\u306F\u6B63\u306E\u6570\u5024\u3067\u6307\u5B9A\u3057\u3066\u304F\u3060\u3055\u3044\u3002");
+  }
+  if (input.source.projectId.trim().length === 0 || input.source.stateHash.trim().length === 0 || !Number.isSafeInteger(input.source.projectRevision) || input.source.projectRevision < 0) {
+    return diagnostic11("INVALID_INPUT", "source", "Audio Project\u306E\u51FA\u5178\u60C5\u5831\u304C\u4E0D\u6B63\u3067\u3059\u3002");
+  }
+  if (options.creator !== void 0 && options.creator.creatorId.trim().length === 0) {
+    return diagnostic11("INVALID_OPTIONS", "creator.creatorId", "\u5236\u4F5C\u8005ID\u3092\u6307\u5B9A\u3057\u3066\u304F\u3060\u3055\u3044\u3002");
+  }
+  if (options.collaborators?.some((item) => item.creatorId.trim().length === 0)) {
+    return diagnostic11("INVALID_OPTIONS", "collaborators", "\u5171\u540C\u5236\u4F5C\u8005ID\u3092\u7A7A\u306B\u3067\u304D\u307E\u305B\u3093\u3002");
+  }
+  if (options.license !== void 0 && options.license.licenseId.trim().length === 0) {
+    return diagnostic11("INVALID_OPTIONS", "license.licenseId", "License ID\u3092\u6307\u5B9A\u3057\u3066\u304F\u3060\u3055\u3044\u3002");
+  }
+  return validateWav(input);
+}
+function unityAudioRuntimeSource() {
+  return `using System;
+using UnityEngine;
+
+namespace PiXiEED {
+    public enum PiXiEEDAudioRole { BGM, SE, VOICE, MIX }
+
+    [CreateAssetMenu(menuName = "PiXiEED/Audio Asset")]
+    public sealed class PiXiEEDAudio : ScriptableObject {
+        [SerializeField] private AudioClip clip;
+        [SerializeField] private string assetId;
+        [SerializeField] private string revisionId;
+        [SerializeField] private string displayName;
+        [SerializeField] private PiXiEEDAudioRole role;
+        [SerializeField] private bool loop;
+        [SerializeField] private string licenseId;
+        public AudioClip Clip => clip;
+        public string AssetId => assetId;
+        public string RevisionId => revisionId;
+        public string DisplayName => displayName;
+        public PiXiEEDAudioRole Role => role;
+        public bool Loop => loop;
+        public string LicenseId => licenseId;
+        public void Configure(AudioClip sourceClip, string sourceAssetId, string sourceRevisionId,
+            string sourceDisplayName, PiXiEEDAudioRole sourceRole, bool sourceLoop, string sourceLicenseId) {
+            clip = sourceClip;
+            assetId = sourceAssetId;
+            revisionId = sourceRevisionId;
+            displayName = sourceDisplayName;
+            role = sourceRole;
+            loop = sourceLoop;
+            licenseId = sourceLicenseId;
+        }
+    }
+}
+`;
+}
+function unityAudioImporterSource() {
+  return `using System;
+using System.IO;
+using UnityEditor;
+using UnityEngine;
+
+namespace PiXiEED.Editor {
+    [Serializable]
+    internal sealed class PiXiEEDAudioManifest {
+        public string assetId;
+        public string revisionId;
+        public string displayName;
+        public string role;
+        public bool loop;
+        public string audioPath;
+        public string licenseId;
+    }
+
+    public sealed class PiXiEEDAudioManifestImporter : AssetPostprocessor {
+        static void OnPostprocessAllAssets(string[] importedAssets, string[] deletedAssets,
+            string[] movedAssets, string[] movedFromAssetPaths) {
+            foreach (var path in importedAssets) {
+                if (!path.EndsWith("PiXiEEDAudio.json", StringComparison.Ordinal)) continue;
+                var manifestPath = path;
+                EditorApplication.delayCall += () => ImportManifest(manifestPath);
+            }
+        }
+
+        private static void ImportManifest(string manifestPath) {
+            var text = AssetDatabase.LoadAssetAtPath<TextAsset>(manifestPath);
+            if (text == null) return;
+            var manifest = JsonUtility.FromJson<PiXiEEDAudioManifest>(text.text);
+            if (manifest == null || string.IsNullOrEmpty(manifest.audioPath)) return;
+            var clip = AssetDatabase.LoadAssetAtPath<AudioClip>(manifest.audioPath);
+            if (clip == null) return;
+            var assetPath = Path.ChangeExtension(manifestPath, ".asset");
+            var asset = AssetDatabase.LoadAssetAtPath<PiXiEEDAudio>(assetPath);
+            if (asset == null) {
+                asset = ScriptableObject.CreateInstance<PiXiEEDAudio>();
+                AssetDatabase.CreateAsset(asset, assetPath);
+            }
+            var role = PiXiEEDAudioRole.MIX;
+            Enum.TryParse(manifest.role, true, out role);
+            asset.Configure(clip, manifest.assetId, manifest.revisionId, manifest.displayName,
+                role, manifest.loop, manifest.licenseId);
+            EditorUtility.SetDirty(asset);
+            AssetDatabase.SaveAssets();
+        }
+    }
+}
+`;
+}
+function unityAudioReadmeSource() {
+  return `# PiXiEED Unity Audio Import
+
+\u3053\u306EZIP\u306EAssets\u30D5\u30A9\u30EB\u30C0\u30FC\u3092Unity\u30D7\u30ED\u30B8\u30A7\u30AF\u30C8\u306E\u30EB\u30FC\u30C8\u3078\u30B3\u30D4\u30FC\u3057\u3066\u304F\u3060\u3055\u3044\u3002
+
+- WAV\u306FUnity\u306EAudioClip\u3068\u3057\u3066\u901A\u5E38\u3069\u304A\u308A\u8AAD\u307F\u8FBC\u307E\u308C\u307E\u3059\u3002
+- PiXiEEDAudio.json\u3092\u691C\u51FA\u3059\u308B\u3068PiXiEEDAudio.asset\u3092\u81EA\u52D5\u751F\u6210\u3057\u307E\u3059\u3002
+- \u5F79\u5272\u306FBGM / SE / VOICE / MIX\u3067\u3059\u3002Loop\u8A2D\u5B9A\u306FManifest\u3068PiXiEEDAudio.asset\u3078\u660E\u793A\u7684\u306B\u4FDD\u6301\u3057\u307E\u3059\u3002
+- PiXiEED\u5074\u3067WAV\u30D8\u30C3\u30C0\u30FC\u3068\u51FA\u5178\u30CF\u30C3\u30B7\u30E5\u3092\u691C\u8A3C\u6E08\u307F\u3067\u3059\u3002
+- Unity Editor\u306EImport\uFF0FCompile\uFF0F\u5B9F\u6A5F\u518D\u751F\u306F\u5229\u7528\u3059\u308BUnity\u30D7\u30ED\u30B8\u30A7\u30AF\u30C8\u3067\u5225\u9014\u78BA\u8A8D\u3057\u3066\u304F\u3060\u3055\u3044\u3002
+- \u30ED\u30FC\u30AB\u30EB\u30EC\u30F3\u30C0\u30FC\u306F\u6A29\u5229\u8A31\u8AFE\u6E08\u307F\u3068\u306F\u6271\u3044\u307E\u305B\u3093\u3002
+`;
+}
+async function createUnityAudioImportPackage(input, options = {}) {
+  const invalid3 = validateInput(input, options);
+  if (invalid3 !== void 0) return failure10(invalid3);
+  const assetId = input.assetId.trim();
+  const revisionId2 = input.revisionId?.trim();
+  const root = `Assets/PiXiEED/Generated/Audio/${safeFilePart3(assetId)}/${safeFilePart3(revisionId2 ?? "local")}`;
+  const audioPath = `${root}/${safeFilePart3(input.assetName, "audio")}.wav`;
+  const manifestPath = `${root}/PiXiEEDAudio.json`;
+  const packageManifestPath = `${root}/PiXiEEDPackage.json`;
+  const contentHash = await sha256Bytes3(input.bytes);
+  const entries = [];
+  const addEntry = async (path, bytes, mimeType) => {
+    entries.push({
+      path,
+      bytes,
+      mimeType,
+      contentHash: await sha256Bytes3(bytes)
+    });
+  };
+  await addEntry(audioPath, new Uint8Array(input.bytes), "audio/wav");
+  const manifestBase = {
+    schemaVersion: UNITY_AUDIO_IMPORT_SCHEMA_VERSION,
+    packageKind: UNITY_AUDIO_IMPORT_PACKAGE_KIND,
+    assetId,
+    ...revisionId2 === void 0 ? {} : {
+      revisionId: revisionId2
+    },
+    identityScope: revisionId2 === void 0 ? "LOCAL_RENDER" : "REGISTERED_REVISION",
+    displayName: input.assetName.trim(),
+    role: input.role,
+    loop: input.loop,
+    audioPath,
+    format: {
+      mimeType: "audio/wav",
+      sampleRateHz: input.sampleRateHz,
+      channels: input.channels,
+      bitDepth: input.bitDepth
+    },
+    durationSeconds: input.durationSeconds,
+    source: input.source,
+    ...input.sourceRange === void 0 ? {} : {
+      sourceRange: input.sourceRange
+    },
+    contentHash,
+    ...options.creator === void 0 ? {} : {
+      creator: options.creator
+    },
+    ...options.collaborators === void 0 ? {} : {
+      collaborators: options.collaborators
+    },
+    ...options.license === void 0 ? {} : {
+      license: options.license
+    }
+  };
+  const manifestHash = await sha256Bytes3(jsonBytes3(manifestBase));
+  await addEntry(manifestPath, jsonBytes3({
+    ...manifestBase,
+    manifestHash
+  }), "application/json");
+  await addEntry("Assets/PiXiEED/Runtime/PiXiEEDAudio.cs", new TextEncoder().encode(unityAudioRuntimeSource()), "text/plain");
+  await addEntry("Assets/Editor/PiXiEED/PiXiEEDAudioImporter.cs", new TextEncoder().encode(unityAudioImporterSource()), "text/plain");
+  await addEntry("Assets/PiXiEED/Generated/Audio/README.md", new TextEncoder().encode(unityAudioReadmeSource()), "text/plain");
+  entries.sort((left, right) => left.path.localeCompare(right.path));
+  const packageHash = await sha256Bytes3(jsonBytes3({
+    schemaVersion: UNITY_AUDIO_IMPORT_SCHEMA_VERSION,
+    packageKind: UNITY_AUDIO_IMPORT_PACKAGE_KIND,
+    assetId,
+    revisionId: revisionId2 ?? null,
+    contentHash,
+    manifestHash,
+    entries: entries.map((entry) => ({
+      path: entry.path,
+      contentHash: entry.contentHash
+    }))
+  }));
+  await addEntry(packageManifestPath, jsonBytes3({
+    schemaVersion: UNITY_AUDIO_IMPORT_SCHEMA_VERSION,
+    packageKind: UNITY_AUDIO_IMPORT_PACKAGE_KIND,
+    assetId,
+    revisionId: revisionId2 ?? null,
+    manifestPath,
+    audioPath,
+    contentHash,
+    manifestHash,
+    packageHash,
+    packageHashScope: "ENTRIES_EXCLUDING_PACKAGE_MANIFEST",
+    entries: entries.map((entry) => ({
+      path: entry.path,
+      contentHash: entry.contentHash
+    }))
+  }), "application/json");
+  entries.sort((left, right) => left.path.localeCompare(right.path));
+  return success9({
+    schemaVersion: UNITY_AUDIO_IMPORT_SCHEMA_VERSION,
+    packageKind: UNITY_AUDIO_IMPORT_PACKAGE_KIND,
+    assetId,
+    ...revisionId2 === void 0 ? {} : {
+      revisionId: revisionId2
+    },
+    assetName: input.assetName.trim(),
+    role: input.role,
+    loop: input.loop,
+    audioPath,
+    manifestPath,
+    packageManifestPath,
+    contentHash,
+    manifestHash,
+    packageHash,
+    entries,
+    nativeQualification: "UNTESTED"
+  });
+}
+function encodeUnityAudioImportPackageZip(packageValue) {
+  const entries = packageValue.entries.map((entry) => ({
+    filename: entry.path,
+    bytes: entry.bytes
+  }));
+  return encodeStoredZip(entries);
+}
+
 // src/platform/site-400/igame-route.ts
 var SAFE_ID5 = /^[A-Za-z0-9][A-Za-z0-9._:@/-]{0,255}$/u;
 var OPERATION_TYPES = [
@@ -21256,7 +21577,7 @@ function unavailable(operation, flag) {
     status: flag === "off" ? "OFF" : "UNKNOWN_FLAG"
   };
 }
-function failure10(operation, status2, reason, sequence) {
+function failure11(operation, status2, reason, sequence) {
   return sequence === void 0 ? {
     operationId: operation.operationId,
     type: operation.type,
@@ -21404,7 +21725,7 @@ function createSite400IGameRoute(options) {
       try {
         options.host.projectResolvedMetadata(metadata);
       } catch {
-        return failure10(operation, "ERROR", "HOST_PROJECTION_FAILED", operationSequence);
+        return failure11(operation, "ERROR", "HOST_PROJECTION_FAILED", operationSequence);
       }
     }
     const accepted = freezeProjectRecord(record3);
@@ -21422,17 +21743,17 @@ function createSite400IGameRoute(options) {
     try {
       if (featureFlag !== "on") return unavailable(operation, featureFlag);
       if (!isStableId(operation.operationId)) {
-        return failure10(operation, "ERROR", "INVALID_OPERATION_ID");
+        return failure11(operation, "ERROR", "INVALID_OPERATION_ID");
       }
       const operationSequence = ++sequence;
       if (operation.type === "create") {
         const created = await options.creator.create(operation.createInput);
         if (!isProjectRecord(created)) {
-          return failure10(operation, "ERROR", "PROJECT_CREATOR_RESPONSE_INVALID", operationSequence);
+          return failure11(operation, "ERROR", "PROJECT_CREATOR_RESPONSE_INVALID", operationSequence);
         }
         const accepted2 = freezeProjectRecord(created);
         if (current !== void 0 && current.identity.projectId === accepted2.identity.projectId) {
-          return failure10(operation, "ERROR", "CREATE_REUSES_ACTIVE_PROJECT", operationSequence);
+          return failure11(operation, "ERROR", "CREATE_REUSES_ACTIVE_PROJECT", operationSequence);
         }
         const resolved2 = await resolveMetadata({
           record: accepted2,
@@ -21440,7 +21761,7 @@ function createSite400IGameRoute(options) {
           resolveRegisteredAsset: options.resolveRegisteredAsset
         });
         if (!resolved2.ok) {
-          return failure10(operation, resolved2.status, resolved2.reason, operationSequence);
+          return failure11(operation, resolved2.status, resolved2.reason, operationSequence);
         }
         if (featureFlag !== "on") return unavailable(operation, featureFlag);
         const entry2 = await loadEntry();
@@ -21451,14 +21772,14 @@ function createSite400IGameRoute(options) {
           projectId: operation.projectId
         });
         if (loaded === null) {
-          return failure10(operation, "DENIED", "PROJECT_NOT_FOUND", operationSequence);
+          return failure11(operation, "DENIED", "PROJECT_NOT_FOUND", operationSequence);
         }
         if (!isProjectRecord(loaded)) {
-          return failure10(operation, "ERROR", "PROJECT_LOADER_RESPONSE_INVALID", operationSequence);
+          return failure11(operation, "ERROR", "PROJECT_LOADER_RESPONSE_INVALID", operationSequence);
         }
         const accepted2 = freezeProjectRecord(loaded);
         if (accepted2.identity.projectId !== operation.projectId) {
-          return failure10(operation, "DENIED", "PROJECT_MISMATCH", operationSequence);
+          return failure11(operation, "DENIED", "PROJECT_MISMATCH", operationSequence);
         }
         const resolved2 = await resolveMetadata({
           record: accepted2,
@@ -21466,14 +21787,14 @@ function createSite400IGameRoute(options) {
           resolveRegisteredAsset: options.resolveRegisteredAsset
         });
         if (!resolved2.ok) {
-          return failure10(operation, resolved2.status, resolved2.reason, operationSequence);
+          return failure11(operation, resolved2.status, resolved2.reason, operationSequence);
         }
         if (featureFlag !== "on") return unavailable(operation, featureFlag);
         const entry2 = await loadEntry();
         return await commit(operation, entry2, accepted2, operation.registryRequest, resolved2.metadata, operationSequence);
       }
       if (current === void 0 || activeRegistryRequest === void 0) {
-        return failure10(operation, "DENIED", "NO_ACTIVE_PROJECT", operationSequence);
+        return failure11(operation, "DENIED", "NO_ACTIVE_PROJECT", operationSequence);
       }
       const accepted = current;
       const reloaded = await options.loader.load({
@@ -21481,14 +21802,14 @@ function createSite400IGameRoute(options) {
         acceptedRevisionId: accepted.identity.revisionId
       });
       if (reloaded === null) {
-        return failure10(operation, "DENIED", "PROJECT_NOT_FOUND", operationSequence);
+        return failure11(operation, "DENIED", "PROJECT_NOT_FOUND", operationSequence);
       }
       if (!isProjectRecord(reloaded)) {
-        return failure10(operation, "ERROR", "PROJECT_LOADER_RESPONSE_INVALID", operationSequence);
+        return failure11(operation, "ERROR", "PROJECT_LOADER_RESPONSE_INVALID", operationSequence);
       }
       const acceptedRecord = freezeProjectRecord(reloaded);
       if (acceptedRecord.identity.projectId !== accepted.identity.projectId || acceptedRecord.identity.ownerId !== accepted.identity.ownerId || acceptedRecord.identity.tenantId !== accepted.identity.tenantId || acceptedRecord.identity.revisionId !== accepted.identity.revisionId) {
-        return failure10(operation, "DENIED", "STALE_ACCEPTED_REVISION", operationSequence);
+        return failure11(operation, "DENIED", "STALE_ACCEPTED_REVISION", operationSequence);
       }
       const resolved = await resolveMetadata({
         record: acceptedRecord,
@@ -21496,13 +21817,13 @@ function createSite400IGameRoute(options) {
         resolveRegisteredAsset: options.resolveRegisteredAsset
       });
       if (!resolved.ok) {
-        return failure10(operation, resolved.status, resolved.reason, operationSequence);
+        return failure11(operation, resolved.status, resolved.reason, operationSequence);
       }
       if (featureFlag !== "on") return unavailable(operation, featureFlag);
       const entry = await loadEntry();
       return await commit(operation, entry, acceptedRecord, activeRegistryRequest, resolved.metadata, operationSequence);
     } catch {
-      return failure10(operation, "ERROR", "IGAME_ROUTE_EXCEPTION");
+      return failure11(operation, "ERROR", "IGAME_ROUTE_EXCEPTION");
     }
   };
   return {
@@ -21514,12 +21835,12 @@ function createSite400IGameRoute(options) {
         return Promise.resolve(unavailable(operation, featureFlag));
       }
       if (!isStableId(operation.operationId)) {
-        return Promise.resolve(failure10(operation, "ERROR", "INVALID_OPERATION_ID"));
+        return Promise.resolve(failure11(operation, "ERROR", "INVALID_OPERATION_ID"));
       }
       const acceptedOperation = copyOperation(operation);
       const duplicate = operations.get(acceptedOperation.operationId);
       if (duplicate !== void 0) {
-        return sameOperation(duplicate.operation, acceptedOperation) ? duplicate.promise : Promise.resolve(failure10(acceptedOperation, "ERROR", "DUPLICATE_OPERATION_ID"));
+        return sameOperation(duplicate.operation, acceptedOperation) ? duplicate.promise : Promise.resolve(failure11(acceptedOperation, "ERROR", "DUPLICATE_OPERATION_ID"));
       }
       const scheduled = queue.then(() => execute(acceptedOperation));
       operations.set(acceptedOperation.operationId, {
@@ -24769,6 +25090,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
   const assetBuilderOfferKind = query(documentRef, "#draw2AssetBuilderOfferKind");
   const assetBuilderDerivativePolicy = query(documentRef, "#draw2AssetBuilderDerivativePolicy");
   const assetBuilderFinalize = query(documentRef, "#draw2AssetBuilderFinalize");
+  const assetBuilderMarket = query(documentRef, "#draw2AssetBuilderMarket");
   const assetBuilderPackageStatus = query(documentRef, "#draw2AssetBuilderPackageStatus");
   const assetBuilderAssetSelect = query(documentRef, "#draw2AssetBuilderAssetSelect");
   const assetBuilderAssetCards = query(documentRef, "#draw2AssetBuilderAssetCards");
@@ -25384,6 +25706,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
   const audioRecordingOffset = query(documentRef, "#draw2AudioRecordingOffset");
   const audioDeckSave = query(documentRef, "#draw2AudioDeckSave");
   const audioRender = query(documentRef, "#draw2AudioRender");
+  const audioUnityExport = query(documentRef, "#draw2AudioUnityExport");
   const audioRenderTarget = query(documentRef, "#draw2AudioRenderTarget");
   const audioRenderSampleRate = query(documentRef, "#draw2AudioRenderSampleRate");
   const audioRenderBitDepth = query(documentRef, "#draw2AudioRenderBitDepth");
@@ -27621,11 +27944,11 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       const failureState = classifyGamePersistenceFailure(error, gamePersistenceCapabilityAvailable());
       if (failureState === "offline") gamePersistenceOffline = true;
       setGamePersistenceState(failureState);
-      const failure11 = failureState === "offline" ? "offline" : "error";
+      const failure12 = failureState === "offline" ? "offline" : "error";
       return {
         ok: false,
         stale: false,
-        failure: failure11,
+        failure: failure12,
         stage: queueStage,
         cause,
         ...errorName === void 0 ? {} : {
@@ -29098,6 +29421,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
   let audioExportExcludedClipIds = /* @__PURE__ */ new Set();
   let audioExportSelectionTouched = false;
   let audioExportSelectionProjectId;
+  let audioUnityExportBusy = false;
   const pixyncRemoteAudioEntryIds = /* @__PURE__ */ new Set();
   let audioWorkspaceSessionReady;
   let audioProjectInitialization = "DEFAULT";
@@ -29382,7 +29706,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       setAudioPersistenceState("error", `Save failed \xB7 ${saved.diagnostics[0]?.code ?? "AUDIO_HOST_BOUNDARY_INVALID"}`);
       return;
     }
-    const stale = saved.diagnostics.some((diagnostic11) => diagnostic11.code === "AUDIO_STALE_PROJECT_REVISION");
+    const stale = saved.diagnostics.some((diagnostic12) => diagnostic12.code === "AUDIO_STALE_PROJECT_REVISION");
     if (stale) {
       setAudioPersistenceState("stale-write-ignored", "Save skipped \xB7 another tab changed Audio. Reload before continuing.");
       return;
@@ -37281,8 +37605,80 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       sourceProjectRevision: renderProject.projectRevision
     };
   };
+  const downloadUnityAudioImportPackage = async () => {
+    if (audioUnityExportBusy) return;
+    audioUnityExportBusy = true;
+    if (audioUnityExport !== void 0) {
+      audioUnityExport.disabled = true;
+      audioUnityExport.textContent = "Unity ZIP\u2026";
+    }
+    try {
+      if (audioRenderStatus !== void 0) {
+        audioRenderStatus.textContent = "Unity\u7528WAV\u3092\u30EC\u30F3\u30C0\u30FC\u3057\u3066\u3044\u307E\u3059\u2026";
+        audioRenderStatus.setAttribute("aria-busy", "true");
+      }
+      const snapshot = await renderAudioWavForExport(void 0, "CURRENT");
+      const session = audioWorkspaceSession;
+      if (snapshot === null || session === void 0) {
+        throw new Error("AUDIO_RENDER_SOURCE_EMPTY");
+      }
+      const target = audioRenderTarget?.value ?? "MASTER";
+      const projectId = String(session.project.projectId);
+      const projectName = String(session.project.name || "PiXiEED Audio");
+      const packaged = await createUnityAudioImportPackage({
+        assetId: `audio-render:${projectId}:${target}`,
+        assetName: `${projectName} ${target === "MASTER" ? "Master" : "Selection"}`,
+        role: "MIX",
+        loop: false,
+        bytes: snapshot.bytes,
+        sampleRateHz: snapshot.sampleRateHz,
+        channels: snapshot.channels,
+        bitDepth: snapshot.bitDepth,
+        durationSeconds: snapshot.durationSeconds,
+        source: {
+          projectId: snapshot.sourceProjectId,
+          stateHash: snapshot.sourceStateHash,
+          projectRevision: snapshot.sourceProjectRevision
+        }
+      });
+      if (!packaged.ok) {
+        throw new Error(packaged.diagnostics[0]?.code ?? "UNITY_AUDIO_EXPORT_INVALID");
+      }
+      const bytes = encodeUnityAudioImportPackageZip(packaged.value);
+      const objectUrl = URL.createObjectURL(new Blob([
+        bytes.buffer
+      ], {
+        type: "application/zip"
+      }));
+      const link = documentRef.createElement("a");
+      link.href = objectUrl;
+      link.download = `${projectName.replace(/[^A-Za-z0-9._-]+/gu, "-") || "pixieed-audio"}.unity-audio.zip`;
+      link.click();
+      windowRef.setTimeout(() => URL.revokeObjectURL(objectUrl), 3e4);
+      if (audioRenderStatus !== void 0) {
+        audioRenderStatus.textContent = `Unity Audio ZIP ready \xB7 ${snapshot.durationSeconds.toFixed(2)}s \xB7 ${bytes.byteLength} bytes`;
+      }
+      setModeDeckStatus("audio", "Unity Audio ZIP ready \xB7 WAV\uFF0FManifest\uFF0FAudioClip importer included");
+    } catch (error) {
+      const code = error instanceof Error ? error.message : "UNITY_AUDIO_EXPORT_INVALID";
+      if (audioRenderStatus !== void 0) {
+        audioRenderStatus.textContent = `Unity Audio export failed \xB7 ${code}`;
+      }
+      setModeDeckStatus("audio", "Unity Audio ZIP\u306E\u4F5C\u6210\u306B\u5931\u6557\u3057\u307E\u3057\u305F\u3002\u5143\u306EAudio Project\u306F\u5909\u66F4\u3055\u308C\u3066\u3044\u307E\u305B\u3093\u3002");
+    } finally {
+      audioUnityExportBusy = false;
+      audioRenderStatus?.removeAttribute("aria-busy");
+      if (audioUnityExport !== void 0) {
+        audioUnityExport.disabled = false;
+        audioUnityExport.textContent = "Unity ZIP";
+      }
+    }
+  };
   audioRender?.addEventListener("click", () => {
     void renderAudioOfflineToWav();
+  });
+  audioUnityExport?.addEventListener("click", () => {
+    void downloadUnityAudioImportPackage();
   });
   audioRenderSelectAll?.addEventListener("click", () => {
     audioExportSelectionTouched = true;
@@ -41095,6 +41491,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
   let assetBuilderPreviewTimer;
   let assetBuilderFinalizeBusy = false;
   let assetBuilderUnityExportBusy = false;
+  let assetBuilderMarketBusy = false;
   const assetBuilderDirectionColumnsForMode = () => {
     switch (assetBuilderDirectionMode) {
       case "1":
@@ -42595,6 +42992,11 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       assetBuilderFinalize.disabled = selectedEntry === void 0 || assetBuilderFinalizeBusy;
       assetBuilderFinalize.textContent = assetBuilderFinalizeBusy ? "\u691C\u8A3C\u4E2D\u2026" : "\u8CA9\u58F2\u7528\u306B\u78BA\u5B9A";
     }
+    if (assetBuilderMarket !== void 0) {
+      assetBuilderMarket.disabled = selectedEntry === void 0 || finalizedPackage === void 0 || assetBuilderMarketBusy;
+      assetBuilderMarket.textContent = assetBuilderMarketBusy ? "Market\u6E96\u5099\u4E2D\u2026" : "Market\u3078\u51FA\u54C1";
+      assetBuilderMarket.title = finalizedPackage === void 0 ? "\u5148\u306B\u8CA9\u58F2\u7528\u306B\u78BA\u5B9A\u3057\u3066\u304F\u3060\u3055\u3044" : "\u9078\u629E\u3057\u305FAsset\u3060\u3051\u3092Market\u306E\u51FA\u54C1\u753B\u9762\u3078\u6E21\u3057\u307E\u3059";
+    }
     if (assetBuilderPackageStatus !== void 0) {
       assetBuilderPackageStatus.textContent = finalizedPackage === void 0 ? "\u672A\u78BA\u5B9A" : `${finalizedPackage.offerKind} \xB7 ${finalizedPackage.entries.length}\u5358\u4F4D \xB7 ${finalizedPackage.saleReadiness === "READY" ? "\u8CA9\u58F2\u6E96\u5099\u6E08\u307F" : "\u30A2\u30AB\u30A6\u30F3\u30C8\u63A5\u7D9A\u5F85\u3061"}`;
       assetBuilderPackageStatus.dataset.state = finalizedPackage === void 0 ? "idle" : "ready";
@@ -43515,7 +43917,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     try {
       const result = await createUnityAssetImportPackage(selectedEntry);
       if (!result.ok) {
-        const detail = result.diagnostics.map((diagnostic11) => diagnostic11.message).join(" ");
+        const detail = result.diagnostics.map((diagnostic12) => diagnostic12.message).join(" ");
         setAssetStatus("Unity\u7528\u66F8\u304D\u51FA\u3057\u3092\u505C\u6B62\u3057\u307E\u3057\u305F: " + detail, "error");
         if (assetBuilderUnityStatus !== void 0) {
           assetBuilderUnityStatus.textContent = detail;
@@ -43636,6 +44038,38 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       renderAssetEditor();
     }
   };
+  const handoffSelectedAssetToMarket = async () => {
+    if (assetBuilderMarketBusy) return;
+    const bridge = getAssetBridge();
+    const snapshot = bridge?.snapshot();
+    const selectedEntry = snapshot === void 0 ? void 0 : assetBuilderSelectedEntry(snapshot);
+    if (bridge === void 0 || snapshot === void 0 || selectedEntry === void 0) {
+      setAssetStatus("Market\u3078\u6E21\u3059Asset\u3092\u4E00\u89A7\u304B\u3089\u9078\u629E\u3057\u3066\u304F\u3060\u3055\u3044\u3002", "error");
+      return;
+    }
+    const finalizedPackage = assetPackageForDefinition(snapshot, selectedEntry.definitionId);
+    if (finalizedPackage === void 0) {
+      setAssetStatus("\u5148\u306B\u3053\u306EAsset\u3092\u300C\u8CA9\u58F2\u7528\u306B\u78BA\u5B9A\u300D\u3057\u3066\u304F\u3060\u3055\u3044\u3002", "error");
+      return;
+    }
+    assetBuilderMarketBusy = true;
+    renderAssetEditor();
+    try {
+      const result = await bridge.handoffDefinitionToMarket(selectedEntry.definitionId);
+      if (result.ok === false) {
+        setAssetStatus(result.message, "error");
+        if (assetBuilderPackageStatus !== void 0) {
+          assetBuilderPackageStatus.textContent = result.message;
+          assetBuilderPackageStatus.dataset.state = "error";
+        }
+        return;
+      }
+      setAssetStatus(`\u300C${selectedEntry.definition.metadata.name}\u300D\u3060\u3051\u3092Market\u51FA\u54C1\u753B\u9762\u3078\u6E21\u3057\u307E\u3057\u305F\u3002`, "success");
+    } finally {
+      assetBuilderMarketBusy = false;
+      renderAssetEditor();
+    }
+  };
   assetBuilderSave?.addEventListener("click", () => {
     const snapshot = getAssetBridge()?.snapshot();
     const selectedEntry = snapshot === void 0 ? void 0 : assetBuilderSelectedEntry(snapshot);
@@ -43676,6 +44110,9 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
   });
   assetBuilderFinalize?.addEventListener("click", () => {
     void finalizeSelectedAssetPackage();
+  });
+  assetBuilderMarket?.addEventListener("click", () => {
+    void handoffSelectedAssetToMarket();
   });
   assetBuilderUnityExport?.addEventListener("click", () => {
     void downloadUnityAssetImportPackage();
@@ -55241,8 +55678,8 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       }
       const result = await createStudioReleaseCandidate(studioReleaseInputFromGolden(golden.value));
       if (!result.ok || result.value === void 0) {
-        const diagnostic11 = result.diagnostics[0];
-        setStudioReleaseStatus(diagnostic11 === void 0 ? "Release Candidate\u3092\u691C\u8A3C\u3067\u304D\u307E\u305B\u3093\u3002" : `${diagnostic11.code}: ${diagnostic11.message}`, "error");
+        const diagnostic12 = result.diagnostics[0];
+        setStudioReleaseStatus(diagnostic12 === void 0 ? "Release Candidate\u3092\u691C\u8A3C\u3067\u304D\u307E\u305B\u3093\u3002" : `${diagnostic12.code}: ${diagnostic12.message}`, "error");
         return;
       }
       lastStudioReleaseCandidate = result.value;
@@ -57013,12 +57450,17 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     await flushGameEditorPersistence();
     const loadedGame = await gamePersistenceStore.load(workspaceProjectId);
     const gameRecord = loadedGame ?? await createGameEditorPersistenceRecord(workspaceProjectId, gameDeckTracks, gamePersistenceRevision, (/* @__PURE__ */ new Date()).toISOString(), void 0, gameDeckBindings, gameBehaviors, gameBehaviorSources, gamePhysics2D, gameTemplateInstances, gameAnimationBindings, gameCreationModeForPersistence(), gameSceneRules, gameEventCards, gameVisualMaker, gameDataForPersistence(), gamePlayground);
+    const canonicalStore = pixyncGameStore ?? await GameEditorCanonicalStore.create(gameRecord);
+    const gameRecordForExport = await createGameEditorPersistenceRecord(gameRecord.projectId, gameRecord.tracks, gameRecord.revision, gameRecord.savedAt, {
+      project: canonicalStore.project,
+      appliedCommandIds: canonicalStore.appliedCommandIds
+    }, gameRecord.bindings ?? [], gameRecord.behaviors ?? [], gameRecord.behaviorSources ?? [], gameRecord.physics2D, gameRecord.templateInstances ?? [], gameRecord.animationBindings ?? [], gameRecord.creationMode, gameRecord.sceneRules, gameRecord.eventCards ?? [], gameRecord.visualMaker, gameRecord.gameData, gameRecord.playground);
     return {
       projectId: workspaceProjectId,
       audio,
       game: {
-        schemaVersion: gameRecord.schemaVersion,
-        record: gameRecord
+        schemaVersion: gameRecordForExport.schemaVersion,
+        record: gameRecordForExport
       }
     };
   };
@@ -57070,7 +57512,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
         expectedStateHash: currentAudioRecord.value?.checkpoint.stateHash ?? null
       });
       if (!saved.ok) throw new Error("PXD_AUDIO_RESTORE_FAILED");
-      if (saved.diagnostics.some((diagnostic11) => diagnostic11.code === "AUDIO_STALE_PROJECT_REVISION")) throw new Error("PXD_AUDIO_RESTORE_CONFLICT");
+      if (saved.diagnostics.some((diagnostic12) => diagnostic12.code === "AUDIO_STALE_PROJECT_REVISION")) throw new Error("PXD_AUDIO_RESTORE_CONFLICT");
       if (sameProject) {
         audioPersistenceExpectedRevision = record3.checkpoint.projectRevision;
         audioPersistenceExpectedStateHash = record3.checkpoint.stateHash;

@@ -1018,9 +1018,10 @@ html[data-pixieed-ad-free-account="true"] .market-ad {
 .market-item__body > .market-item__facts { order: 4; }
 .market-item__body > .market-purchase-button { order: 5; }
 .market-item__body > #itemPurchaseStatus { order: 6; }
-.market-item__body > .market-item__description { order: 7; }
-.market-item__body > .market-item__terms { order: 8; }
-.market-item__body > .market-payment-guide { order: 9; }
+.market-item__body > .market-item__game-use { order: 7; }
+.market-item__body > .market-item__description { order: 8; }
+.market-item__body > .market-item__terms { order: 9; }
+.market-item__body > .market-payment-guide { order: 10; }
 .market-item__social { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: #aebbd0; font-size: 11px; }
 .market-item__social a { color: inherit; text-decoration: none; }
 .market-item__social a[href]:not([href="#"]) { color: #9ae6c8; text-decoration: underline; text-underline-offset: 3px; }
@@ -1038,6 +1039,13 @@ html[data-pixieed-ad-free-account="true"] .market-ad {
 .market-item__option-list > div, .market-item__option-list > p { display: grid; gap: 3px; padding: 8px; border: 1px solid rgba(94,226,181,.14); border-radius: 6px; background: rgba(23,107,85,.08); }
 .market-item__option-list strong { color: #dffcf2; font-size: 10px; }
 .market-item__option-list span, .market-item__option-list small, .market-item__option-list p { color: #94a3b8; font-size: 9px; }
+.market-item__game-use { display: grid; gap: 8px; padding: 10px; border: 1px solid rgba(94,226,181,.32); border-radius: 8px; background: rgba(23,107,85,.12); }
+.market-item__game-use h3 { margin: 0; color: #dffcf2; font-size: 12px; }
+.market-item__game-use p { margin: 3px 0 0; color: #b7c7d9; font-size: 10px; line-height: 1.5; }
+.market-item__project-choice { display: grid; gap: 4px; color: #b7c7d9; font-size: 10px; font-weight: 800; }
+.market-item__project-choice select { min-height: 34px; box-sizing: border-box; padding: 6px 8px; border: 1px solid rgba(121,192,255,.32); border-radius: 6px; background: #0b1224; color: #e5f2ff; font: inherit; font-size: 11px; }
+.market-item__game-use-button { width: 100%; min-height: 38px; border-color: rgba(94,226,181,.45); background: #176b55; }
+.market-item__game-use-button:disabled { cursor: wait; opacity: .58; }
 .market-purchase-button { min-height: 42px; border: 1px solid rgba(255,255,255,.12); border-radius: 7px; background: #273249; color: #94a3b8; font: inherit; font-size: 12px; font-weight: 800; }
 
 .market-info-links {

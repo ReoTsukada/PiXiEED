@@ -10,15 +10,15 @@
     <title>PiXiEEDstudio — Studio</title>
     <link
       rel="stylesheet"
-      href="./assets/draw2-shell.min.css?v=20260910-unity-asset-export-v2"
+      href="./assets/draw2-shell.min.css?v=20260911-unity-audio-export-v1"
     >
     <link
       rel="stylesheet"
-      href="./assets/draw2-game-ux.css?v=20260910-unity-asset-export-v2"
+      href="./assets/draw2-game-ux.css?v=20260911-unity-audio-export-v1"
     >
     <link
       rel="stylesheet"
-      href="./assets/draw2-mode-motion.css?v=20260910-unity-asset-export-v2"
+      href="./assets/draw2-mode-motion.css?v=20260911-unity-audio-export-v1"
     >
   </head>
   <body>
@@ -2159,7 +2159,7 @@
               <output id="draw2GamePlaygroundAudioStatus" class="draw2-game-playground-source-status" aria-live="polite">未選択</output>
             </article>
             <section class="draw2-game-ui-library" aria-label="ゲームUIノード">
-              <header><strong>ゲームUI</strong><small>ドラッグして画面へ配置</small></header>
+              <header><strong>ゲームUI</strong><small>ドラッグ配置</small></header>
               <div class="draw2-game-ui-library-grid">
                 <button type="button" draggable="true" data-game-ui-node-kind="MINIMAP">▣<span>マップ</span></button>
                 <button type="button" draggable="true" data-game-ui-node-kind="INVENTORY">▤<span>持ちもの</span></button>
@@ -4820,6 +4820,14 @@
                     disabled
                   >
                     販売用に確定
+                  </button>
+                  <button
+                    class="draw2-button draw2-button-quiet"
+                    id="draw2AssetBuilderMarket"
+                    type="button"
+                    disabled
+                  >
+                    Marketへ出品
                   </button>
                   <output id="draw2AssetBuilderPackageStatus" data-state="idle">未確定</output>
                 </div>
@@ -7892,6 +7900,15 @@
                   Export WAV
                 </button>
                 <button
+                  id="draw2AudioUnityExport"
+                  class="draw2-button draw2-button-secondary draw2-audio-advanced-control"
+                  type="button"
+                  aria-label="Export audio as a Unity package"
+                  title="選択中のAudioをWAV・Manifest・Unity AudioClip importer付きZIPとして保存"
+                >
+                  Unity ZIP
+                </button>
+                <button
                   id="draw2AudioOpenExport"
                   class="draw2-button draw2-button-secondary draw2-audio-advanced-control"
                   data-workspace-command="panel-export"
@@ -10958,7 +10975,7 @@
     <script src="../scripts/market-purchase-delivery.js?v=20260906-direct-igame-market1"></script>
     <script
       type="module"
-      src="./dist/draw2-entry.js?v=20260910-unity-asset-export-v2"
+      src="./dist/draw2-entry.js?v=20260911-unity-audio-export-v1"
     ></script>
     <script
       type="module"

@@ -86,16 +86,16 @@ const expectFailure = (name, result, code = null) => {
 };
 
 assert.equal(schema.properties.schemaVersion.const, 1);
-assert.equal(schema.properties.currentSnapshotCount.const, 51);
-assert.equal(fixture.registry.currentSnapshotCount, 51);
+assert.equal(schema.properties.currentSnapshotCount.const, 52);
+assert.equal(fixture.registry.currentSnapshotCount, 52);
 assert.equal(fixture.registry.currentPathFallback, true);
 assert.deepEqual(ROUTE_KINDS, ['STATIC', 'DYNAMIC_PUBLIC', 'LEGACY_COMPAT', 'VERIFICATION_FILE', 'PRIVATE_STATIC', 'FUTURE']);
 assert.equal(ROUTE_VISIBILITIES.length, 6);
 assert.equal(ROUTE_RESOLUTION_STATES.length, 7);
 assert.equal(ROUTE_REDIRECT_STATUSES.length, 4);
-assert.equal(CURRENT_ROUTE_SNAPSHOT.length, 51);
-assert.equal(ROUTE_CATALOG.length, 60);
-assert.equal(new Set(CURRENT_ROUTE_SNAPSHOT.map((route) => route.path)).size, 51);
+assert.equal(CURRENT_ROUTE_SNAPSHOT.length, 52);
+assert.equal(ROUTE_CATALOG.length, 61);
+assert.equal(new Set(CURRENT_ROUTE_SNAPSHOT.map((route) => route.path)).size, 52);
 const currentRoutePaths = new Set(CURRENT_ROUTE_SNAPSHOT.map((route) => route.path));
 const routeInventoryPaths = new Set(routeInventory.routes.map(({ route }) => route));
 assert.equal(currentRoutePaths.has('/pixiedraw/'), false);
@@ -112,8 +112,8 @@ assert.equal(ROUTE_CATALOG.find((route) => route.routeId === 'market-item-canoni
 const snapshot = core.snapshot();
 assert.equal(snapshot.schemaVersion, 1);
 assert.equal(snapshot.registryVersion, 1);
-assert.equal(snapshot.routeCount, 60);
-assert.equal(snapshot.currentSnapshotCount, 51);
+assert.equal(snapshot.routeCount, 61);
+assert.equal(snapshot.currentSnapshotCount, 52);
 assert.deepEqual(snapshot.currentRoutes.map((route) => route.path), CURRENT_ROUTE_SNAPSHOT.map((route) => route.path));
 assert.deepEqual(snapshot.flags, PUBLIC_URL_FLAGS);
 assert.ok(snapshot.storageBoundary.excluded.includes('purchase-data'));

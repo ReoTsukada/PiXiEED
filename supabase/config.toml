@@ -13,6 +13,9 @@ verify_jwt = false
 [functions.market-download]
 verify_jwt = true
 
+[functions.igame-player-bootstrap]
+verify_jwt = true
+
 [functions.market-reconcile-my-sales]
 verify_jwt = true
 

@@ -50,7 +50,7 @@
 | --- | --- | --- | --- | --- |
 | DRAW | `/pixiedraw/` | `pixiedraw2/index.html`, Draw2 Core、Workspace | replace only after acceptance; current Project/PXD/PiXiSYNC compatibility | `PARTIAL` |
 | AUDIO | no confirmed current production route | `audio-200`〜`240`、Draw2 Audio markup／projection | current Audio entry、AudioContext/native、package/Market/Game connection | `PARTIAL` |
-| GAME | Core Shell says Coming Later | `game-300`〜`350`、Runtime browser reference | Studio route、Registry/Storage、native/runtime/build qualification | `PARTIAL` |
+| GAME | Core ShellのGame StudioはComing Later。公開Playerは`/igame/?product=...` | `game-300`〜`350`、Market Bootstrap、PXD Hash検証、Canvas browser runtime | Studio route、Supabase本番適用、native/runtime/build qualification | `PARTIAL` |
 
 ## 5. Design implication
 

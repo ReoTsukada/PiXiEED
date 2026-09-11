@@ -1,6 +1,6 @@
 # PiXiEED vNext 実装状態
 
-更新日: 2026-09-06
+更新日: 2026-09-11
 
 この文書は、Creator App／iDRAW／iAUDIO／iGAME／Market／文章・世界観／画像・動画を、既存のProject・PXD・PiXiSYNC・Marketの契約を壊さずに接続する作業の実装境界を記録する。ここで「実装済み」はコードが存在する状態であり、最終検証を通過したことを意味しない。
 
@@ -18,21 +18,29 @@
 | Market本番境界（コード） | 形式Registry、immutable revision、active Entitlement、License snapshot、無料取得RPC、有料／管理者取得materializer、private Storage配信、購入済み／無料取得済みのiGAME binding RPC、文章・動画の検証形式 | `supabase/migrations/20260906002539_pixieed_vnext_market_entitlements_and_pixync.sql`, `supabase/functions/market-download/`, `supabase/functions/market-verify-listing-package/`, `supabase/functions/_shared/market-package-verifier.ts` |
 | PiXYNC本番境界（コード） | 既存PiXYNC Foundation／checkpoint契約とDraw2 aggregate RPC（open、commit、since、Game revision、RLS／Presence）を現行クライアントが期待するMigration群として復元 | `supabase/migrations/20260730001656_pixisync_collab_v1_foundation.sql` ～ `supabase/migrations/20260828120000_pixisync_detach_require_localized_owner_record.sql` |
 | iGAME Market直追加 | Catalogの権利表示、無料取得、secure delivery、PXD本体SHA-256検証、現在のProjectへのAsset-only追加、server-side Binding記録 | `pixiedraw2/src/wp180-workspace-ui.ts`, `scripts/account-market-purchases.js`, `pixiedraw2/src/draw2-entry.ts`, `supabase/functions/market-download/index.ts` |
+| iGAME公開Player | `/igame/?product=...` の入口、Market Entitlement／immutable Revision／署名PXD URLのBootstrap、Manifest／Proof／Package Hash検証、Game ProjectのCanvas Runtime再生 | `igame/index.html`, `pixiedraw2/src/game/game-350/igame-player-entry.ts`, `pixiedraw2/src/game/game-350/igame-public-bootstrap.ts`, `pixiedraw2/src/game/game-350/igame-browser-runtime.ts`, `supabase/functions/igame-player-bootstrap/` |
 
-## ローカル最終検証結果（2026-09-06）
+## ローカル最終検証結果（2026-09-11）
 
-- `deno task check`、全対象bundle再生成、`git diff --check`、対象JavaScript全件の`node --check`がPASS。
-- Draw2基礎／Creator／PXD／iAUDIO／iGAME／Market／PiXYNC／StudioのDenoテストがPASS（代表値: 65、214、247、55）。
-- Market公開・SEO・Package契約・検証ガード、5構成のブラウザ出品検証、Core Shell WP-080／WP-090がPASS。
-- 公開Shell、Creator App、Writing、Visual、Market、Account、Help、Notes、Draw2、iGAME Playerを3 viewport・30ケースで確認し、HTTP 200、横スクロールなし、実行時エラーなし。
-- `scripts/test-verify-canonical-package-alignment.mjs` は、作業ツリーに存在しないローカル状態ファイル `.codex/PIXIEED_IMPLEMENTATION_STATE.yaml` を前提とするため未実施扱い。製品コードの失敗ではない。
+- `deno task check`、Draw2／Workspace bundle再生成、`git diff --check`、変更対象JavaScriptの`node --check`がPASS。
+- Draw2基礎テストは72件、Workspace／iAUDIO契約テストは43件、公開iGAME Player契約テストは10件、Unity画像・Audio出力は7件、Asset-only Market出力は2件がPASS。
+- Market PXD verifierは3件、iGAME公開Player静的契約、Market検証、Market SEO、Market公開入口、Core URL契約がPASS。
+- ローカルブラウザで`/igame/`、Draw2 GAME、Draw2 AUDIOを確認し、HTTP 200、横スクロールなし、ページ／Consoleエラーなし。未ログインの公開Playerはログイン要求で安全停止。
+- `supabase db lint --local` は、この環境でPostgres（127.0.0.1:54322）が起動していないため未実施。SQL／Edge Functionの本番適用確認とは別の環境制約であり、製品コードのテスト失敗ではない。
+
+## 本番事前確認（2026-09-11）
+
+- CLIの接続先はSupabase Project `kyyiuakrqomzlikfaire`（東京）で、Auth healthはHTTP 200、既存`market-download`は未認証時HTTP 401を返した。
+- `igame-player-bootstrap`と`market-verify-listing-package`は本番Edge Function未DeployのためHTTP 404だった。今回のコードはまだ本番経路へ到達していない。
+- `supabase db push --dry-run`は、リモートにのみ存在する過去Migration履歴を検出して安全停止した。履歴修復や`--include-all`は、既存本番スキーマを確認せずに実行してはいけない。
+- この環境にはUnity Editor／Unity Project本体がないため、Unity Import／Compile／再生は未実施。生成Packageの決定的テストまでを確認済みとする。
 
 ## 未実装・本番適用／外部境界で停止中
 
 | 優先度 | 未実装部分 | 残る変更 |
 | --- | --- | --- |
 | P0 | Supabase／Edge Functionへの適用と本番受入れ | このMigrationを対象Projectへ適用し、Stripe webhook、Storage、RLS、Realtime、2ユーザーの購入・無料取得・配信・再接続を本番相当環境で検証する。コードは実装済みだが、適用・受入れは未実施 |
-| P1 | 公開iGAME PlayerのRegistry商品materialize | `igame-player.html` の実行専用Hostと認証契約は実装済み。Project revisionからRegistryのGame Runtime package／manifest／asset deliveryを作成し、`AuthorizationProofV1` と一緒に公開URLへ渡すServer Providerが未接続 |
+| P1 | 公開iGAME Playerの本番受入れ | コード経路は実装済み。対象SupabaseへMigration／Edge Functionを適用し、検証済みPXDを持つ公開Market Assetでログイン、権利確認、Revision固定、再生、失敗時停止を本番相当環境で受入れる |
 | P1 | 外部Build worker | APK／AAB／IPA／Desktopの受付契約とidentity／Entitlementゲートは実装済み。署名鍵を含むBuild worker、Artifact Storage、配布・返金連携は未接続 |
 | P1 | 本番Registry／Project／Asset Provider | Creator App／iGAMEのローカルProject保存と既存Market委譲は実装済み。Project Registry、Asset Registry、PiXYNC Realtimeの本番接続と権限Proof発行は未接続 |
 
@@ -40,7 +48,7 @@
 
 - 現行Marketサーバーが受け付けない文章・Visual JSON・動画形式を、ローカルUIから送信しない処理は実装済みの fail-closed 境界である。形式検出とPackage準備は実装済みだが、本番受理は未実装のままである。
 - 無料商品を「購入済み」と表示せず「無料取得準備中」と停止する処理は、Entitlementを端末表示から推測しないための実装済み境界である。
-- `core-shell/assets/routes/*-route.js` のUnavailable表示、iGAME PlayerのRuntime package未接続停止、Bridgeの外部リポジトリ境界は、欠落を隠すための仮成功ではなく、未接続を明示するための仕様である。
+- `core-shell/assets/routes/*-route.js` の隔離Preview用Unavailable表示、公開PlayerのBootstrap／Package取得失敗時の安全停止、Bridgeの外部リポジトリ境界は、欠落を隠すための仮成功ではなく、未適用・未接続を明示するための仕様である。
 
 ## このリポジトリの対象外
 
@@ -52,5 +60,5 @@
 
 1. 対象Supabase ProjectへMigrationを適用し、Edge FunctionをDeployする。
 2. Stripe webhook、private Storage、RLS、Realtime、2ユーザーの購入／無料取得／配信／再接続を本番相当環境で受け入れる。
-3. Registry／Project／Asset Providerを接続し、公開iGAME PlayerのRuntime package／manifestをmaterializeする。
+3. 公開iGAME PlayerのMigration／Edge Functionをstagingへ適用し、公開Market AssetのRuntime package／manifestを受入れる。
 4. 外部Build worker、Artifact Storage、署名・配布・返金連携を接続する。

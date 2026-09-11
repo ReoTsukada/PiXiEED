@@ -36,7 +36,7 @@ export const ROUTE_LIMITS = Object.freeze({
   metadataDescription: 512,
   queryParams: 16,
   redirectChain: 4,
-  currentSnapshotRoutes: 51,
+  currentSnapshotRoutes: 52,
 });
 
 const CURRENT_ROUTE_DATA = Object.freeze([
@@ -47,6 +47,7 @@ const CURRENT_ROUTE_DATA = Object.freeze([
   ['/contact/', 'contact/index.html', 'STATIC'],
   ['/events/', 'events/index.html', 'STATIC'],
   ['/glossary/', 'glossary/index.html', 'STATIC'],
+  ['/igame/', 'igame/index.html', 'DYNAMIC_PUBLIC'],
   ['/google10107469bdcc60fa.html', 'google10107469bdcc60fa.html', 'VERIFICATION_FILE'],
   ['/google92ae386aca6917c9.html', 'google92ae386aca6917c9.html', 'VERIFICATION_FILE'],
   ['/googlee776c49d223e1a38.html', 'googlee776c49d223e1a38.html', 'VERIFICATION_FILE'],

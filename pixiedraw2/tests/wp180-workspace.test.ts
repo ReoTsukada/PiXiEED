@@ -266,6 +266,34 @@ Deno.test("iAUDIO Draw segments preserve iDRAW frame timing inside fixed bar cel
   }
 });
 
+Deno.test("PXD Game exports include the canonical Project for public iGAME", async () => {
+  const source = await Deno.readTextFile(
+    new URL("../src/wp180-workspace-ui.ts", import.meta.url),
+  );
+  const exportStart = source.indexOf(
+    "const exportProjectPxdSnapshot = async",
+  );
+  const exportEnd = source.indexOf(
+    "const restoreProjectPxdSnapshot = async",
+    exportStart,
+  );
+  if (exportStart < 0 || exportEnd < 0) {
+    throw new Error("PXD export boundary is missing");
+  }
+  const exportSource = source.slice(exportStart, exportEnd);
+  for (const required of [
+    "const canonicalStore = pixyncGameStore ??",
+    "GameEditorCanonicalStore.create(gameRecord)",
+    "const gameRecordForExport = await createGameEditorPersistenceRecord(",
+    "project: canonicalStore.project",
+    "record: gameRecordForExport",
+  ]) {
+    if (!exportSource.includes(required)) {
+      throw new Error(`Public iGAME export contract missing: ${required}`);
+    }
+  }
+});
+
 Deno.test("PC keyboard ownership separates mode arrows, selection nudge, and Space", async () => {
   const workspace = await Deno.readTextFile(
     new URL("../src/wp180-workspace-ui.ts", import.meta.url),
@@ -745,8 +773,32 @@ Deno.test("PC GAME/AUDIO rails preserve a practical central workspace", async ()
       throw new Error(`Central workspace protection contract missing: ${required}`);
     }
   }
+  const guardCommentStart = css.lastIndexOf(
+    '/* Desktop GAME/AUDIO workspace guard.',
+  );
+  const guardMediaStart = css.indexOf(
+    '@media (min-width: 701px)',
+    guardCommentStart,
+  );
+  if (guardCommentStart < 0 || guardMediaStart < 0) {
+    throw new Error("Desktop GAME/AUDIO workspace guard is missing");
+  }
+  let guardDepth = 0;
+  let guardEnd = -1;
+  for (let index = guardMediaStart; index < css.length; index += 1) {
+    const character = css[index];
+    if (character === "{") guardDepth += 1;
+    if (character === "}") {
+      guardDepth -= 1;
+      if (guardDepth === 0) {
+        guardEnd = index + 1;
+        break;
+      }
+    }
+  }
   const drawModeGuard = css.slice(
-    css.lastIndexOf('/* Desktop GAME/AUDIO workspace guard.'),
+    guardCommentStart,
+    guardEnd > guardCommentStart ? guardEnd : undefined,
   );
   if (drawModeGuard.includes('data-creator-mode="DRAW"')) {
     throw new Error("Central workspace protection must not change DRAW tool rail");

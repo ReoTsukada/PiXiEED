@@ -22,6 +22,10 @@
   let relatedSets = {};
   let relatedKind = 'derivative';
   let relatedLimit = RELATED_PAGE_SIZE;
+  const MARKET_PROJECT_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/;
+  const MARKET_GAME_TARGET_KEY = 'pixieed:market-igame-target:v1';
+  let gameUseAvailable = false;
+  let gameUseBusy = false;
 
   function currentAssetId() {
     const queryId = new URLSearchParams(location.search).get('id');
@@ -179,6 +183,8 @@
 
   function render(asset) {
     currentAsset = asset;
+    gameUseAvailable = false;
+    renderGameUseAction();
     const series = asset.series || {};
     const formats = assetFormats(asset);
     const hasAudio = formats.some((format) => ['aac', 'aiff', 'flac', 'm4a', 'mid', 'midi', 'mp3', 'oga', 'ogg', 'opus', 'wav', 'weba'].includes(format));
@@ -325,6 +331,256 @@
     $('itemPurchaseStatus').textContent = status;
   }
 
+  function safeGameProjectId(value) {
+    const candidate = String(value || '').trim();
+    return MARKET_PROJECT_ID_PATTERN.test(candidate) ? candidate : '';
+  }
+
+  function safeGameProjectName(value) {
+    const candidate = String(value || '').replace(/[\u0000-\u001f\u007f]/g, '').trim();
+    return candidate ? candidate.slice(0, 80) : '無題のProject';
+  }
+
+  function localStorageValue(key) {
+    try { return localStorage.getItem(key) || ''; } catch (_error) { return ''; }
+  }
+
+  function readGameProjects() {
+    const params = new URLSearchParams(window.location.search);
+    const projects = [];
+    const seen = new Set();
+    const add = (id, name) => {
+      const projectId = safeGameProjectId(id);
+      if (!projectId || seen.has(projectId)) return;
+      seen.add(projectId);
+      projects.push({ projectId, name: safeGameProjectName(name) });
+    };
+    let creatorStore = null;
+    let shellState = null;
+    let handoffTarget = null;
+    try {
+      const rawStore = localStorageValue('pixieed:creator-projects:v1');
+      const parsedStore = rawStore ? JSON.parse(rawStore) : null;
+      creatorStore = parsedStore && typeof parsedStore === 'object' ? parsedStore : null;
+      const rawShell = localStorageValue('pixieed:creator-app-shell:v1');
+      const parsedShell = rawShell ? JSON.parse(rawShell) : null;
+      shellState = parsedShell && typeof parsedShell === 'object' ? parsedShell : null;
+      const rawHandoff = localStorageValue(MARKET_GAME_TARGET_KEY);
+      const parsedHandoff = rawHandoff ? JSON.parse(rawHandoff) : null;
+      handoffTarget = parsedHandoff && typeof parsedHandoff === 'object' ? parsedHandoff : null;
+    } catch (_error) {
+      creatorStore = null;
+      shellState = null;
+    }
+    const handoffAssetMatches = !currentAsset || handoffTarget?.assetId === currentAsset.id;
+    const requestedId = safeGameProjectId(
+      params.get('projectId') || params.get('project') ||
+        (handoffAssetMatches ? handoffTarget?.projectId : ''),
+    );
+    const requestedProject = requestedId && creatorStore?.projects?.[requestedId];
+    add(requestedId, params.get('projectName') || requestedProject?.name || (handoffAssetMatches ? handoffTarget?.projectName : ''));
+    const activeId = safeGameProjectId(
+      localStorageValue('pixiedraw2:active-project-id:v1') ||
+        localStorageValue('pixieed:creator-project-active:v1') ||
+        creatorStore?.activeProjectId ||
+        shellState?.projectId,
+    );
+    const activeProject = activeId && creatorStore?.projects?.[activeId];
+    add(activeId, activeProject?.name || shellState?.projectName);
+    if (creatorStore?.projects && typeof creatorStore.projects === 'object') {
+      Object.values(creatorStore.projects).forEach((project) => {
+        if (!project || typeof project !== 'object') return;
+        add(project.projectId, project.name);
+      });
+    }
+    if (projects.length === 0) add('local-project', '無題のProject');
+    return projects;
+  }
+
+  function selectedGameProject() {
+    const select = $('itemGameProject');
+    const projects = readGameProjects();
+    const selectedId = safeGameProjectId(select?.value);
+    return projects.find((project) => project.projectId === selectedId) || projects[0];
+  }
+
+  function rememberGameProjectTarget() {
+    if (!currentAsset) return;
+    const project = selectedGameProject();
+    if (!project) return;
+    try {
+      localStorage.setItem(MARKET_GAME_TARGET_KEY, JSON.stringify({
+        assetId: currentAsset.id,
+        projectId: project.projectId,
+        projectName: project.name,
+        savedAt: Date.now(),
+      }));
+    } catch (_error) {
+      // The active Project is still recovered from the normal local workspace state.
+    }
+  }
+
+  function renderGameProjectOptions() {
+    const select = $('itemGameProject');
+    if (!select) return;
+    const previousId = safeGameProjectId(select.value);
+    const projects = readGameProjects();
+    select.replaceChildren(...projects.map((project) => {
+      const option = document.createElement('option');
+      option.value = project.projectId;
+      option.textContent = project.name;
+      option.title = project.projectId;
+      return option;
+    }));
+    const nextId = projects.some((project) => project.projectId === previousId)
+      ? previousId
+      : projects[0]?.projectId;
+    if (nextId) select.value = nextId;
+  }
+
+  function renderGameUseAction(status = '') {
+    const section = $('itemGameUse');
+    if (!section) return;
+    const available = gameUseAvailable && currentAsset !== null && isPixieeDrawProduct(currentAsset);
+    section.hidden = !available;
+    if (!available) return;
+    renderGameProjectOptions();
+    const button = $('itemUseInGame');
+    if (button) button.disabled = gameUseBusy;
+    const statusNode = $('itemGameUseStatus');
+    if (statusNode && status) statusNode.textContent = status;
+  }
+
+  function unlockGameUse(status) {
+    gameUseAvailable = true;
+    renderGameUseAction(status);
+  }
+
+  function marketRecordObject(value) {
+    return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
+  }
+
+  function marketString(value) {
+    return typeof value === 'string' && value.trim() ? value.trim() : '';
+  }
+
+  function marketStringList(value) {
+    return Array.isArray(value)
+      ? [...new Set(value.map(marketString).filter(Boolean))]
+      : [];
+  }
+
+  async function marketSha256(blob) {
+    if (!window.crypto?.subtle) return '';
+    const digest = new Uint8Array(await window.crypto.subtle.digest('SHA-256', await blob.arrayBuffer()));
+    return Array.from(digest, (value) => value.toString(16).padStart(2, '0')).join('');
+  }
+
+  async function useCurrentAssetInGame() {
+    if (gameUseBusy || !purchaseClient || !purchaseUser || !currentAsset) return;
+    if (!isPixieeDrawProduct(currentAsset)) return;
+    const button = $('itemUseInGame');
+    const status = $('itemGameUseStatus');
+    const delivery = window.PiXiEEDMarketDelivery;
+    const project = selectedGameProject();
+    if (!button || !status || !delivery?.stagePiXiEEDrawFile || !project) return;
+    gameUseBusy = true;
+    renderGameUseAction('EntitlementとAsset本体を確認しています…');
+    try {
+      const response = await purchaseClient.functions.invoke('market-download', {
+        body: { action: 'authorize', kind: 'pixieedraw-open', asset_id: currentAsset.id },
+      });
+      if (response.error) throw new Error(await functionErrorMessage(response.error, '購入済みAssetを準備できませんでした。'));
+      const payload = marketRecordObject(response.data) || {};
+      const source = marketRecordObject(payload.source) || marketRecordObject(payload.asset);
+      const license = marketRecordObject(payload.license);
+      const entitlement = marketRecordObject(payload.entitlement);
+      const files = Array.isArray(payload.files) ? payload.files : [];
+      const file = files.find((candidate) => marketRecordObject(candidate)?.format === 'pixiedraw-project');
+      const sourceAssetId = marketString(source?.assetId) || marketString(source?.asset_id) || marketString(source?.id);
+      const revisionId = marketString(source?.revisionId) || marketString(source?.revision_id);
+      const contentHash = (marketString(source?.contentHash) || marketString(source?.content_hash)).toLowerCase();
+      const licenseId = marketString(license?.license_id);
+      const rights = marketStringList(license?.rights);
+      const traceId = marketString(payload.trace_id);
+      const packageHash = marketString(file?.sha256).toLowerCase();
+      const fileUrl = marketString(file?.url);
+      const acquisitionKind = marketString(entitlement?.acquisition_kind);
+      if (
+        source === null || sourceAssetId !== currentAsset.id || !revisionId ||
+        !/^[a-f0-9]{64}$/i.test(contentHash) || !/^[a-f0-9]{64}$/i.test(packageHash) ||
+        !entitlement || !marketString(entitlement.id) || !['paid', 'free', 'admin'].includes(acquisitionKind) ||
+        license?.in_game_use !== true || !licenseId || rights.length === 0 || !traceId ||
+        !file || fileUrl.length === 0
+      ) {
+        throw new Error('Assetのrevision・利用権・配信情報を確認できませんでした。');
+      }
+      const download = await fetch(fileUrl, { cache: 'no-store', credentials: 'omit' });
+      if (!download.ok) throw new Error('Asset本体を取得できませんでした。もう一度お試しください。');
+      const blob = await download.blob();
+      if (await marketSha256(blob) !== packageHash) throw new Error('Asset本体の整合性を確認できませんでした。');
+      const token = await delivery.stagePiXiEEDrawFile(blob, {
+        filename: marketString(file.name) || 'market-asset.pxd',
+        assetId: currentAsset.id,
+        traceId,
+        targetProjectId: project.projectId,
+        mode: 'GAME_BIND',
+        source: {
+          assetId: currentAsset.id,
+          revisionId,
+          contentHash,
+          packageHash,
+          label: marketString(source.label) || marketString(source.title) || currentAsset.title || 'Market Asset',
+          format: 'pixiedraw-project',
+          layout: marketString(source.layout) || 'FULL_CANVAS',
+          ...(marketString(source.project_id) ? { projectId: marketString(source.project_id) } : {}),
+        },
+        delivery: {
+          deliveryId: traceId,
+          status: 'SECURE_DELIVERED',
+          assetId: currentAsset.id,
+          revisionId,
+          contentHash,
+          packageHash,
+          format: 'pixiedraw-project',
+          licenseId,
+        },
+        entitlement: {
+          id: marketString(entitlement.id),
+          acquisitionKind,
+        },
+        license: {
+          licenseId,
+          status: 'ACTIVE',
+          inGameUse: true,
+          rights,
+        },
+      });
+      const binding = await purchaseClient.rpc('market_record_asset_binding_v1', {
+        input_asset_id: currentAsset.id,
+        input_project_id: project.projectId,
+        input_revision_id: revisionId,
+        input_content_hash: contentHash,
+        input_license_id: licenseId,
+        input_delivery_id: traceId,
+      });
+      const bindingRecord = marketRecordObject(binding.data);
+      if (binding.error || bindingRecord?.ok !== true) throw new Error('iGAME素材Bindingをサーバーへ記録できませんでした。');
+      status.textContent = 'iGAMEを開き、選択したProjectの素材棚へ追加します…';
+      const destination = new URL('/pixiedraw2/', window.location.origin);
+      destination.searchParams.set('mode', 'GAME');
+      destination.searchParams.set('projectId', project.projectId);
+      destination.searchParams.set('projectName', project.name);
+      destination.searchParams.set('market_bind', token);
+      window.location.assign(destination.toString());
+    } catch (error) {
+      status.textContent = error?.message || 'iGAMEへ追加できませんでした。';
+    } finally {
+      gameUseBusy = false;
+      renderGameUseAction();
+    }
+  }
+
   function accountLoginUrl() {
     const account = new URL('/account/', window.location.origin);
     account.searchParams.set('returnTo', window.location.href);
@@ -368,6 +624,7 @@
           ? 'この商品は購入済みです。マイページから確認できます。'
           : '無料取得しました。販売数・限定販売枠・売上には加算されません。マイページから出力できます。'
       });
+      if (isPixieeDrawProduct(currentAsset)) unlockGameUse('取得済みです。iGAMEへ追加できます。');
     } catch (error) {
       setPurchaseState({
         disabled: false,
@@ -392,6 +649,7 @@
           ? 'このAssetは取得済みです。マイページから確認できます。'
           : '無料取得しました。マイページから出力し、iGAMEのAsset一覧から使用できます。'
       });
+      if (isPixieeDrawProduct(currentAsset)) unlockGameUse('無料取得済みです。iGAMEへ追加できます。');
     } catch (error) {
       setPurchaseState({
         disabled: false,
@@ -406,6 +664,7 @@
       const purchase = await findExistingPurchase();
       if (purchase?.status === 'paid') {
         setPurchaseState({ disabled: true, label: '購入済み', status: '購入済み商品へ追加しました。マイページから確認できます。' });
+        if (isPixieeDrawProduct(currentAsset)) unlockGameUse('購入済みです。iGAMEへ追加できます。');
         return;
       }
       await new Promise((resolve) => window.setTimeout(resolve, 1000));
@@ -424,6 +683,7 @@
 
   async function createPurchaseIntent() {
     if (!purchaseClient || !purchaseUser || !currentAsset) return;
+    rememberGameProjectTarget();
     setPurchaseState({ disabled: true, label: 'Stripeを開いています', status: '商品と販売料金をサーバーで確認しています。' });
     try {
       const { data, error } = await purchaseClient.functions.invoke('market-create-checkout', {
@@ -478,6 +738,7 @@
         // its royalty ledger was created.
         try { await reconcilePaidPurchase(); } catch (_ignored) {}
         setPurchaseState({ disabled: true, label: '購入済み', status: 'この商品は購入済みです。マイページから確認できます。' });
+        if (isPixieeDrawProduct(currentAsset)) unlockGameUse('購入済みです。iGAMEへ追加できます。');
         return;
       }
       if (existingPurchase?.status === 'granted') {
@@ -489,6 +750,7 @@
             ? '無料取得済みです。マイページから確認できます。'
             : '管理者として無料取得済みです。マイページから確認できます。'
         });
+        if (isPixieeDrawProduct(currentAsset)) unlockGameUse('無料取得済みです。iGAMEへ追加できます。');
         return;
       }
       if (existingPurchase?.status === 'disputed') {
@@ -539,6 +801,7 @@
           const reconciledPurchase = await findExistingPurchase();
           if (reconciledPurchase?.status === 'paid') {
             setPurchaseState({ disabled: true, label: '購入済み', status: '決済を確認し、購入済み商品へ追加しました。マイページから確認できます。' });
+            if (isPixieeDrawProduct(currentAsset)) unlockGameUse('購入済みです。iGAMEへ追加できます。');
             return;
           }
         }
@@ -615,5 +878,6 @@
     relatedKind = button.dataset.relatedKind || 'popular'; relatedLimit = RELATED_PAGE_SIZE; renderRelated();
   }));
   $('itemRelatedMore')?.addEventListener('click', () => { relatedLimit = Math.min(RELATED_MAX, relatedLimit + RELATED_PAGE_SIZE); renderRelated(); });
+  $('itemUseInGame')?.addEventListener('click', () => { void useCurrentAssetInGame(); });
   load();
 })();

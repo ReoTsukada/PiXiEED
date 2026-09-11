@@ -75,6 +75,10 @@ export type Draw2AssetPackageMutationResult =
   | { readonly ok: true; readonly manifest: AssetPackageManifest }
   | { readonly ok: false; readonly message: string };
 
+export type Draw2AssetMarketHandoffResult =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly message: string };
+
 export interface Draw2AssetBridge {
   readonly snapshot: () => Draw2AssetBridgeSnapshot;
   /** Resolve the active Draw revision for an iGAME binding. */
@@ -170,4 +174,8 @@ export interface Draw2AssetBridge {
   readonly saveAssetPackage: (
     manifest: AssetPackageManifest,
   ) => Promise<Draw2AssetPackageMutationResult>;
+  /** Prepare only the selected Asset Definition for the existing Market flow. */
+  readonly handoffDefinitionToMarket: (
+    definitionId: string,
+  ) => Promise<Draw2AssetMarketHandoffResult>;
 }

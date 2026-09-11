@@ -12555,6 +12555,971 @@ function selectionEditModeFromModifiers(shiftKey, altKey, fallback) {
   return fallback;
 }
 
+// src/draw2-export-registry.ts
+var PNG_EXPORT_MAX_PIXELS = 4096 * 4096;
+var PNG_EXPORT_MAX_DIMENSION = 8192;
+var PNG_EXPORT_MAX_SCALE = 256;
+var PNG_EXPORT_SCALE_PRESETS = Object.freeze([
+  1,
+  2,
+  3,
+  4,
+  6,
+  8,
+  12,
+  16,
+  24,
+  32,
+  48,
+  64,
+  96,
+  128,
+  192,
+  256
+]);
+function maxPngExportScale(width, height) {
+  const safeWidth = Math.max(1, Math.floor(Number.isFinite(width) ? width : 1));
+  const safeHeight = Math.max(1, Math.floor(Number.isFinite(height) ? height : 1));
+  const sourcePixels = safeWidth * safeHeight;
+  const byPixels = Math.floor(Math.sqrt(PNG_EXPORT_MAX_PIXELS / sourcePixels));
+  const byDimension = Math.floor(PNG_EXPORT_MAX_DIMENSION / Math.max(safeWidth, safeHeight));
+  return Math.max(1, Math.min(PNG_EXPORT_MAX_SCALE, byPixels, byDimension));
+}
+function pngExportScaleOptions(width, height) {
+  const maxScale = maxPngExportScale(width, height);
+  return PNG_EXPORT_SCALE_PRESETS.filter((scale) => scale <= maxScale);
+}
+var EXPORT_FORMATS = Object.freeze([
+  {
+    id: "png",
+    category: "image",
+    label: "PNG",
+    description: "\u900F\u904E\u3092\u4FDD\u3063\u305F\u753B\u50CF",
+    extension: "png",
+    mimeType: "image/png",
+    visible: true,
+    supported: true,
+    supportsScale: true
+  },
+  {
+    id: "jpeg",
+    category: "image",
+    label: "JPEG",
+    description: "\u8EFD\u91CF\u306A\u753B\u50CF",
+    extension: "jpg",
+    mimeType: "image/jpeg",
+    visible: true,
+    supported: true,
+    supportsScale: true
+  },
+  {
+    id: "webp",
+    category: "image",
+    label: "WebP",
+    description: "\u8EFD\u91CF\u30FB\u900F\u904E\u5BFE\u5FDC\u306E\u753B\u50CF",
+    extension: "webp",
+    mimeType: "image/webp",
+    visible: true,
+    supported: true,
+    supportsScale: true
+  },
+  {
+    id: "avif",
+    category: "image",
+    label: "AVIF",
+    description: "\u30D6\u30E9\u30A6\u30B6\u5BFE\u5FDC\u6642\u306E\u9AD8\u5727\u7E2E\u753B\u50CF",
+    extension: "avif",
+    mimeType: "image/avif",
+    visible: true,
+    supported: true,
+    supportsScale: true
+  },
+  {
+    id: "bmp",
+    category: "image",
+    label: "BMP",
+    description: "\u4E92\u63DB\u6027\u91CD\u8996\u306E\u30D3\u30C3\u30C8\u30DE\u30C3\u30D7",
+    extension: "bmp",
+    mimeType: "image/bmp",
+    visible: true,
+    supported: true,
+    supportsScale: true
+  },
+  {
+    id: "tiff",
+    category: "image",
+    label: "TIFF",
+    description: "\u5370\u5237\u30FB\u4FDD\u5B58\u5411\u3051\u306E\u9AD8\u54C1\u8CEA\u753B\u50CF",
+    extension: "tiff",
+    mimeType: "image/tiff",
+    visible: true,
+    supported: true,
+    supportsScale: true
+  },
+  {
+    id: "gif",
+    category: "animation",
+    label: "GIF",
+    description: "\u30A2\u30CB\u30E1\u30FC\u30B7\u30E7\u30F3\u753B\u50CF",
+    extension: "gif",
+    mimeType: "image/gif",
+    visible: true,
+    supported: true,
+    supportsScale: true
+  },
+  {
+    id: "apng",
+    category: "animation",
+    label: "APNG",
+    description: "\u900F\u904E\u5BFE\u5FDC\u30A2\u30CB\u30E1\u30FC\u30B7\u30E7\u30F3",
+    extension: "apng",
+    mimeType: "image/apng",
+    visible: true,
+    supported: true,
+    supportsScale: true
+  },
+  {
+    id: "webm",
+    category: "animation",
+    label: "WebM Draw + Audio",
+    description: "Draw\u30A2\u30CB\u30E1\u30FC\u30B7\u30E7\u30F3\u3068\u9078\u629E\u3057\u305FAudio\u3092\u4E00\u4F53\u5316\u3057\u305F\u52D5\u753B",
+    extension: "webm",
+    mimeType: "video/webm",
+    visible: true,
+    supported: true,
+    supportsScale: false
+  },
+  {
+    id: "wav",
+    category: "audio",
+    label: "WAV Mix",
+    description: "\u9078\u629E\u3057\u305FBGM\u30FBSE\u30FB\u697D\u5668\u3092\u542B\u3080\u975E\u5727\u7E2E\u30DF\u30C3\u30AF\u30B9",
+    extension: "wav",
+    mimeType: "audio/wav",
+    visible: true,
+    supported: true,
+    supportsScale: false
+  },
+  {
+    id: "audio-webm",
+    category: "audio",
+    label: "WebM Audio (Opus)",
+    description: "\u9078\u629E\u3057\u305FBGM\u30FBSE\u30FB\u697D\u5668\u3092\u8EFD\u91CF\u306AOpus\u97F3\u58F0\u3067\u4FDD\u5B58",
+    extension: "webm",
+    mimeType: "audio/webm",
+    visible: true,
+    supported: true,
+    supportsScale: false
+  },
+  {
+    id: "audio-ogg",
+    category: "audio",
+    label: "Ogg Audio (Opus)",
+    description: "\u5BFE\u5FDC\u30D6\u30E9\u30A6\u30B6\u3067\u9078\u629E\u3057\u305FAudio\u3092Ogg/Opus\u3067\u4FDD\u5B58",
+    extension: "ogg",
+    mimeType: "audio/ogg",
+    visible: true,
+    supported: true,
+    supportsScale: false
+  },
+  {
+    id: "svg",
+    category: "image",
+    label: "SVG",
+    description: "\u30D9\u30AF\u30BF\u30FC\u753B\u50CF",
+    extension: "svg",
+    mimeType: "image/svg+xml",
+    visible: true,
+    supported: true,
+    supportsScale: true
+  },
+  {
+    id: "sprite-sheet",
+    category: "animation",
+    label: "Sprite Sheet",
+    description: "\u5168\u30D5\u30EC\u30FC\u30E0\u3092\u4E26\u3079\u305F\u753B\u50CF",
+    extension: "png",
+    mimeType: "image/png",
+    visible: true,
+    supported: true,
+    supportsScale: true
+  },
+  {
+    id: "atlas-json",
+    category: "animation",
+    label: "Atlas metadata",
+    description: "Sprite Sheet\u306E\u5EA7\u6A19\u30E1\u30BF\u30C7\u30FC\u30BF",
+    extension: "json",
+    mimeType: "application/json",
+    visible: true,
+    supported: true,
+    supportsScale: false
+  },
+  {
+    id: "tileset",
+    category: "tiles",
+    label: "Tileset",
+    description: "\u30BF\u30A4\u30EB\u7D20\u6750\u3068\u914D\u7F6E\u60C5\u5831",
+    extension: "png",
+    mimeType: "image/png",
+    visible: true,
+    supported: true,
+    supportsScale: true
+  },
+  {
+    id: "pxd",
+    category: "project",
+    label: "PXD Project",
+    description: "Draw / Audio / Game\u3092\u542B\u3080\u30D7\u30ED\u30B8\u30A7\u30AF\u30C8",
+    extension: "pxd",
+    mimeType: "application/vnd.pixieed.pxd",
+    visible: true,
+    supported: true,
+    supportsScale: false
+  },
+  {
+    id: "glb",
+    category: "game",
+    label: "GLB",
+    description: "3D\u30B2\u30FC\u30E0\u7D20\u6750\uFF08\u5C06\u6765\u5BFE\u5FDC\uFF09",
+    extension: "glb",
+    mimeType: "model/gltf-binary",
+    visible: false,
+    supported: false,
+    supportsScale: false
+  }
+]);
+var EXPORT_FORMAT_BY_ID = new Map(EXPORT_FORMATS.map((definition) => [
+  definition.id,
+  definition
+]));
+function exportFormatDefinition(id) {
+  const definition = EXPORT_FORMAT_BY_ID.get(id);
+  if (definition === void 0) {
+    throw new Error(`Unknown Draw2 export format: ${id}`);
+  }
+  return definition;
+}
+function visibleExportFormats() {
+  return EXPORT_FORMATS.filter((definition) => definition.visible);
+}
+
+// src/draw2-export.ts
+var PXD_FORMAT = "pxd";
+var PXD_MIME_TYPE = "application/vnd.pixieed.pxd";
+var PXD_MAGIC = new Uint8Array([
+  80,
+  88,
+  68,
+  0
+]);
+var PXD_CREATED_BY = Object.freeze({
+  application: "PiXiEED",
+  version: "2.0.0-reference"
+});
+var PXD_PROJECT_SCHEMA_VERSION = 2;
+var PXD_PROJECT_ARCHIVE_VERSION = 2;
+function assert(condition, code, message) {
+  if (!condition) throw Object.assign(new Error(message), {
+    code
+  });
+}
+function writeUint32(value) {
+  const output = new Uint8Array(4);
+  output[0] = value >>> 24 & 255;
+  output[1] = value >>> 16 & 255;
+  output[2] = value >>> 8 & 255;
+  output[3] = value & 255;
+  return output;
+}
+async function sha256BytesHex(bytes) {
+  const digest = await crypto.subtle.digest("SHA-256", new Uint8Array(bytes).buffer);
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+function concatBytes(...parts) {
+  const total = parts.reduce((sum, part) => sum + part.byteLength, 0);
+  const output = new Uint8Array(total);
+  let offset = 0;
+  for (const part of parts) {
+    output.set(part, offset);
+    offset += part.byteLength;
+  }
+  return output;
+}
+function projectMetadata(state2) {
+  return {
+    name: state2.name,
+    structureEpoch: state2.structureEpoch,
+    activeAssetId: state2.activeAssetId,
+    activeLayerId: state2.activeLayerId,
+    activeFrameId: state2.activeFrameId,
+    activeCelId: state2.activeCelId,
+    layers: state2.layers,
+    frames: state2.frames,
+    cels: state2.cels,
+    timeline: state2.timeline,
+    tilemaps: state2.tilemaps ?? {}
+  };
+}
+function packageFileName(projectId) {
+  return `${projectId.replace(/[^A-Za-z0-9._-]+/gu, "-") || "pixieed-project"}.pxd`;
+}
+function isRecord7(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+function assertNoEmbeddedAssetPayload(value, path, allowRasterSnapshots = false) {
+  if (Array.isArray(value)) {
+    value.forEach((entry, index) => assertNoEmbeddedAssetPayload(entry, `${path}[${index}]`, allowRasterSnapshots));
+    return;
+  }
+  if (!isRecord7(value)) return;
+  for (const [key, entry] of Object.entries(value)) {
+    if (allowRasterSnapshots && key === "rasterSnapshot") {
+      continue;
+    }
+    assert(![
+      "pixels",
+      "pixelData",
+      "raster",
+      "blob",
+      "dataUrl",
+      "rgba",
+      "indexedBytes",
+      "payload"
+    ].includes(key), "PXD_ASSET_DEFINITION_EMBEDDED_DATA", `${path}.${key} must not contain embedded asset data.`);
+    assertNoEmbeddedAssetPayload(entry, `${path}.${key}`, allowRasterSnapshots);
+  }
+}
+function assertAssetDefinitionShape(value, path) {
+  assert(isRecord7(value), "PXD_ASSET_DEFINITION_INVALID", `${path} must be an object.`);
+  const definition = value;
+  assert(definition.schemaVersion === 1, "PXD_ASSET_DEFINITION_VERSION_UNSUPPORTED", `${path}.schemaVersion is unsupported.`);
+  assert(definition.persistence === "LOCAL_DRAFT" || definition.persistence === "VALIDATED_DEFINITION", "PXD_ASSET_DEFINITION_PERSISTENCE_INVALID", `${path}.persistence must be LOCAL_DRAFT or VALIDATED_DEFINITION.`);
+  const candidate = {
+    ...definition,
+    persistence: "LOCAL_DRAFT"
+  };
+  const validation = validateAssetDefinitionDraft(candidate);
+  assert(validation.ok, "PXD_ASSET_DEFINITION_INVALID", `${path} failed Asset Definition validation.`);
+  const normalized = {
+    ...validation.value,
+    persistence: definition.persistence
+  };
+  assert(canonicalJson(normalized) === canonicalJson(definition), "PXD_ASSET_DEFINITION_NOT_NORMALIZED", `${path} is not normalized.`);
+}
+function validateAssetDefinitionEntry(value, index) {
+  const path = `assetDefinitions[${index}]`;
+  assert(isRecord7(value), "PXD_ASSET_DEFINITION_INVALID", `${path} must be an object.`);
+  assertNoEmbeddedAssetPayload(value, path, true);
+  assert(typeof value.definitionId === "string" && value.definitionId.trim() === value.definitionId && value.definitionId.length > 0, "PXD_ASSET_DEFINITION_ID_INVALID", `${path}.definitionId is invalid.`);
+  assertAssetDefinitionShape(value.definition, `${path}.definition`);
+  if (value.registryIdentity !== void 0) {
+    assert(isRecord7(value.registryIdentity), "PXD_REGISTRY_IDENTITY_INVALID", `${path}.registryIdentity is invalid.`);
+    assert(typeof value.registryIdentity.assetId === "string" && value.registryIdentity.assetId.trim() === value.registryIdentity.assetId && value.registryIdentity.assetId.length > 0, "PXD_REGISTRY_IDENTITY_INVALID", `${path}.registryIdentity.assetId is invalid.`);
+    assert(typeof value.registryIdentity.revisionId === "string" && value.registryIdentity.revisionId.trim() === value.registryIdentity.revisionId && value.registryIdentity.revisionId.length > 0, "PXD_REGISTRY_IDENTITY_INVALID", `${path}.registryIdentity.revisionId is invalid.`);
+  }
+  return value;
+}
+function normalizeAssetDefinitions2(entries) {
+  const normalized = [
+    ...entries ?? []
+  ].map((entry, index) => validateAssetDefinitionEntry(entry, index));
+  normalized.sort((left, right) => left.definitionId < right.definitionId ? -1 : left.definitionId > right.definitionId ? 1 : 0);
+  for (let index = 1; index < normalized.length; index += 1) {
+    assert(normalized[index - 1]?.definitionId !== normalized[index]?.definitionId, "PXD_ASSET_DEFINITION_DUPLICATE", `Asset Definition ${normalized[index]?.definitionId ?? ""} is duplicated.`);
+  }
+  return normalized;
+}
+var PXD_PRODUCT_MODULES = [
+  "DRAW",
+  "AUDIO",
+  "GAME"
+];
+var PXD_PRODUCT_KINDS = [
+  "GAME_PROJECT",
+  "DRAW_IMAGE",
+  "DRAW_ANIMATION",
+  "DRAW_CHARACTER_ANIMATION",
+  "AUDIO_ASSET",
+  "PROJECT"
+];
+var PXD_PRODUCT_RIGHTS = [
+  "PERSONAL_USE",
+  "COMMERCIAL_USE",
+  "DERIVATIVE",
+  "EMBEDDING",
+  "RESALE"
+];
+function normalizePxdProductReferences(value, path) {
+  assert(Array.isArray(value), "PXD_PRODUCT_REFERENCE_INVALID", `${path} must be an array.`);
+  const normalized = value.map((entry, index) => {
+    assert(typeof entry === "string" && entry.trim() === entry && entry.length > 0, "PXD_PRODUCT_REFERENCE_INVALID", `${path}[${index}] is invalid.`);
+    return entry;
+  });
+  assert(new Set(normalized).size === normalized.length, "PXD_PRODUCT_REFERENCE_DUPLICATE", `${path} contains a duplicate reference.`);
+  return normalized.sort(compareStrings);
+}
+function normalizePxdProductDefinition(value, index, assetDefinitionIds, audioRevisionIds, availableModules) {
+  const path = `productDefinitions[${index}]`;
+  assert(isRecord7(value), "PXD_PRODUCT_DEFINITION_INVALID", `${path} must be an object.`);
+  assertNoEmbeddedAssetPayload(value, path);
+  const allowedKeys = /* @__PURE__ */ new Set([
+    "schemaVersion",
+    "persistence",
+    "productId",
+    "kind",
+    "name",
+    "description",
+    "includedModules",
+    "assetDefinitionIds",
+    "audioRevisionIds",
+    "rights",
+    "edition"
+  ]);
+  assert(Object.keys(value).every((key) => allowedKeys.has(key)), "PXD_PRODUCT_DEFINITION_FIELD_INVALID", `${path} contains an unsupported field.`);
+  assert(value.schemaVersion === 1, "PXD_PRODUCT_DEFINITION_VERSION_UNSUPPORTED", `${path}.schemaVersion is unsupported.`);
+  assert(value.persistence === "LOCAL_DRAFT", "PXD_PRODUCT_DEFINITION_PERSISTENCE_INVALID", `${path}.persistence must be LOCAL_DRAFT.`);
+  assert(typeof value.productId === "string" && /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(value.productId), "PXD_PRODUCT_ID_INVALID", `${path}.productId is invalid.`);
+  assert(typeof value.kind === "string" && PXD_PRODUCT_KINDS.includes(value.kind), "PXD_PRODUCT_KIND_INVALID", `${path}.kind is invalid.`);
+  assert(typeof value.name === "string" && value.name.trim() === value.name && value.name.length > 0 && value.name.length <= 128, "PXD_PRODUCT_NAME_INVALID", `${path}.name is invalid.`);
+  assert(typeof value.description === "string" && value.description.trim() === value.description && value.description.length <= 4096, "PXD_PRODUCT_DESCRIPTION_INVALID", `${path}.description is invalid.`);
+  const includedModules = normalizePxdProductReferences(value.includedModules, `${path}.includedModules`);
+  assert(includedModules.every((module) => PXD_PRODUCT_MODULES.includes(module)), "PXD_PRODUCT_MODULE_INVALID", `${path}.includedModules contains an unsupported module.`);
+  assert(includedModules.length > 0, "PXD_PRODUCT_MODULE_REQUIRED", `${path}.includedModules must not be empty.`);
+  const assetIds = normalizePxdProductReferences(value.assetDefinitionIds, `${path}.assetDefinitionIds`);
+  const audioIds = normalizePxdProductReferences(value.audioRevisionIds, `${path}.audioRevisionIds`);
+  for (const assetId of assetIds) assert(assetDefinitionIds.has(assetId), "PXD_PRODUCT_ASSET_REFERENCE_MISSING", `${path} references missing Asset Definition ${assetId}.`);
+  for (const audioId of audioIds) assert(audioRevisionIds.has(audioId), "PXD_PRODUCT_AUDIO_REFERENCE_MISSING", `${path} references missing Audio revision ${audioId}.`);
+  assert(assetIds.length === 0 || includedModules.includes("DRAW"), "PXD_PRODUCT_DRAW_MODULE_REQUIRED", `${path} uses Draw Asset Definitions without including DRAW.`);
+  assert(audioIds.length === 0 || includedModules.includes("AUDIO"), "PXD_PRODUCT_AUDIO_MODULE_REQUIRED", `${path} uses Audio revisions without including AUDIO.`);
+  if (value.kind === "GAME_PROJECT") assert(includedModules.includes("GAME"), "PXD_PRODUCT_GAME_MODULE_REQUIRED", `${path} GAME_PROJECT must include GAME.`);
+  if ([
+    "DRAW_IMAGE",
+    "DRAW_ANIMATION",
+    "DRAW_CHARACTER_ANIMATION"
+  ].includes(value.kind)) {
+    assert(includedModules.includes("DRAW") && assetIds.length > 0, "PXD_PRODUCT_DRAW_SOURCE_REQUIRED", `${path} Draw products require DRAW and at least one Asset Definition.`);
+  }
+  if (value.kind === "AUDIO_ASSET") {
+    assert(includedModules.includes("AUDIO") && audioIds.length > 0, "PXD_PRODUCT_AUDIO_SOURCE_REQUIRED", `${path} AUDIO_ASSET products require AUDIO and at least one Audio revision.`);
+  }
+  const rights = normalizePxdProductReferences(value.rights, `${path}.rights`);
+  assert(rights.every((right) => PXD_PRODUCT_RIGHTS.includes(right)), "PXD_PRODUCT_RIGHT_INVALID", `${path}.rights contains an unsupported right.`);
+  assert(rights.length > 0, "PXD_PRODUCT_RIGHT_REQUIRED", `${path}.rights must not be empty.`);
+  assert(isRecord7(value.edition), "PXD_PRODUCT_EDITION_INVALID", `${path}.edition is invalid.`);
+  const editionValue = value.edition;
+  let edition;
+  if (editionValue.kind === "UNLIMITED") {
+    assert(Object.keys(editionValue).length === 1, "PXD_PRODUCT_EDITION_INVALID", `${path}.edition contains an unsupported field.`);
+    edition = {
+      kind: "UNLIMITED"
+    };
+  } else {
+    assert(editionValue.kind === "LIMITED" && Object.keys(editionValue).length === 2, "PXD_PRODUCT_EDITION_INVALID", `${path}.edition kind is invalid.`);
+    const maxUnits = editionValue.maxUnits;
+    assert(typeof maxUnits === "number" && Number.isSafeInteger(maxUnits) && maxUnits > 0, "PXD_PRODUCT_EDITION_LIMIT_INVALID", `${path}.edition.maxUnits must be a positive safe integer.`);
+    edition = {
+      kind: "LIMITED",
+      maxUnits
+    };
+  }
+  for (const module of includedModules) assert(availableModules.has(module), "PXD_PRODUCT_MODULE_MISSING", `${path} requires unavailable module ${module}.`);
+  return {
+    schemaVersion: 1,
+    persistence: "LOCAL_DRAFT",
+    productId: value.productId,
+    kind: value.kind,
+    name: value.name,
+    description: value.description,
+    includedModules,
+    assetDefinitionIds: assetIds,
+    audioRevisionIds: audioIds,
+    rights,
+    edition
+  };
+}
+function normalizePxdProductDefinitions(entries, assetDefinitions2, audioRevisionIds, availableModules) {
+  const assetDefinitionIds = new Set(assetDefinitions2.map((entry) => entry.definitionId));
+  const audioIds = new Set(audioRevisionIds);
+  const normalized = [
+    ...entries ?? []
+  ].map((entry, index) => normalizePxdProductDefinition(entry, index, assetDefinitionIds, audioIds, availableModules));
+  normalized.sort((left, right) => compareStrings(left.productId, right.productId));
+  for (let index = 1; index < normalized.length; index += 1) {
+    assert(normalized[index - 1]?.productId !== normalized[index]?.productId, "PXD_PRODUCT_DEFINITION_DUPLICATE", `Product Definition ${normalized[index]?.productId ?? ""} is duplicated.`);
+  }
+  return normalized;
+}
+function normalizePxdAssetPackages(entries) {
+  const normalized = [
+    ...entries ?? []
+  ].map((entry, index) => {
+    const checked = validateAssetPackageManifest(entry);
+    if (!checked.ok) {
+      assert(false, "PXD_ASSET_PACKAGE_INVALID", `assetPackages[${index}] is invalid: ${checked.reasons.join("; ")}`);
+    }
+    return entry;
+  });
+  normalized.sort((left, right) => compareStrings(left.packageId, right.packageId));
+  for (let index = 1; index < normalized.length; index += 1) {
+    assert(normalized[index - 1]?.packageId !== normalized[index]?.packageId, "PXD_ASSET_PACKAGE_DUPLICATE", `Asset Package ${normalized[index]?.packageId ?? ""} is duplicated.`);
+  }
+  return normalized;
+}
+function compareStrings(left, right) {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+function projectPayloadPathIsSafe(path) {
+  return path.length > 0 && path.length <= 512 && !path.startsWith("/") && !path.includes("\\") && !path.split("/").some((segment) => segment.length === 0 || segment === "." || segment === "..") && !/[\u0000\u0009\u000a\u000d]/u.test(path);
+}
+function projectJsonPayload(value, path) {
+  assert(value !== void 0, "PXD_MODULE_STATE_MISSING", `${path} is missing.`);
+  const json = canonicalJson(value);
+  assert(json.length > 0, "PXD_MODULE_STATE_EMPTY", `${path} is empty.`);
+  return new TextEncoder().encode(json);
+}
+function projectMediaType(value, path) {
+  assert(typeof value === "string" && value.trim() === value && value.length > 0 && value.length <= 128 && !/[\u0000-\u0020]/u.test(value), "PXD_MEDIA_TYPE_INVALID", `${path} media type is invalid.`);
+  return value;
+}
+function projectPayloadEntry(spec, offset) {
+  assert(projectPayloadPathIsSafe(spec.path), "PXD_PATH_UNSAFE", `PXD path ${spec.path} is unsafe.`);
+  assert(Number.isSafeInteger(offset) && offset >= 0, "PXD_OFFSET_INVALID", `PXD offset for ${spec.path} is invalid.`);
+  return {
+    path: spec.path,
+    mediaType: projectMediaType(spec.mediaType, spec.path),
+    sha256: "",
+    bytes: spec.bytes.byteLength,
+    offset
+  };
+}
+function projectModuleManifest(schemaVersion, state2, assets = []) {
+  return {
+    schemaVersion,
+    status: "EMBEDDED",
+    state: state2,
+    assets
+  };
+}
+function emptyProjectModule() {
+  return {
+    schemaVersion: null,
+    status: "EMPTY",
+    state: null,
+    assets: []
+  };
+}
+async function exportPxdProject(state2, options = {}) {
+  const assetDefinitions2 = normalizeAssetDefinitions2(options.assetDefinitions);
+  const assetPackages2 = normalizePxdAssetPackages(options.assetPackages);
+  for (const [index, packageManifest] of assetPackages2.entries()) {
+    const verified = await verifyAssetPackageManifest(packageManifest);
+    if (!verified.ok) {
+      assert(false, "PXD_ASSET_PACKAGE_HASH_INVALID", `assetPackages[${index}] could not be verified: ${verified.reasons.join("; ")}`);
+    }
+  }
+  const drawTimelineMetadata = options.drawTimelineMetadata === void 0 ? void 0 : normalizeDraw2TimelineMetadata(options.drawTimelineMetadata, state2.frames.length);
+  const payloadSpecs = [];
+  const drawAssetSpecs = [];
+  const assetIds = Object.keys(state2.assets).sort(compareStrings);
+  for (const [assetIndex, assetId] of assetIds.entries()) {
+    const asset = state2.assets[assetId];
+    assert(asset !== void 0, "PXD_ASSET_NOT_FOUND", `PXD export asset ${assetId} was not found.`);
+    const pixels = asset.raster.toUint8Array();
+    const path = `objects/asset-${String(assetIndex).padStart(4, "0")}.raster`;
+    const sha2562 = await sha256BytesHex(pixels);
+    drawAssetSpecs.push({
+      asset: {
+        assetId: asset.id,
+        revisionId: `${asset.id}:revision:${asset.revision}`,
+        mediaType: "application/vnd.pixieed.indexed-raster",
+        width: asset.width,
+        height: asset.height,
+        tileSize: asset.raster.tileSize,
+        palette: [
+          ...asset.palette
+        ],
+        revision: asset.revision
+      },
+      path,
+      pixels,
+      sha256: sha2562
+    });
+    payloadSpecs.push({
+      path,
+      mediaType: "application/vnd.pixieed.indexed-raster",
+      bytes: pixels
+    });
+  }
+  let audioStateSpec;
+  const audioAssetSpecs = [];
+  if (options.audio !== void 0) {
+    assert(options.audio.schemaVersion.trim().length > 0, "PXD_MODULE_SCHEMA_INVALID", "Audio schemaVersion is invalid.");
+    audioStateSpec = {
+      path: "modules/audio/state.json",
+      mediaType: "application/json",
+      bytes: projectJsonPayload(options.audio.record, "modules.audio.state")
+    };
+    payloadSpecs.push(audioStateSpec);
+    const sourceAssets = [
+      ...options.audio.assets ?? []
+    ].sort((left, right) => compareStrings(left.revisionId, right.revisionId));
+    const seenRevisionIds = /* @__PURE__ */ new Set();
+    for (const [index, source] of sourceAssets.entries()) {
+      assert(typeof source.revisionId === "string" && source.revisionId.trim() === source.revisionId && source.revisionId.length > 0, "PXD_AUDIO_REVISION_INVALID", `Audio asset ${index} revisionId is invalid.`);
+      assert(!seenRevisionIds.has(source.revisionId), "PXD_AUDIO_REVISION_DUPLICATE", `Audio revision ${source.revisionId} is duplicated.`);
+      seenRevisionIds.add(source.revisionId);
+      assert(source.bytes.byteLength > 0, "PXD_AUDIO_ASSET_EMPTY", `Audio asset ${source.revisionId} is empty.`);
+      const path = `objects/audio-${String(index).padStart(4, "0")}.bin`;
+      const mediaType = projectMediaType(source.mediaType, `audio.assets.${source.revisionId}`);
+      const sha2562 = await sha256BytesHex(source.bytes);
+      audioAssetSpecs.push({
+        revisionId: source.revisionId,
+        path,
+        mediaType,
+        bytes: source.bytes,
+        sha256: sha2562
+      });
+      payloadSpecs.push({
+        path,
+        mediaType,
+        bytes: source.bytes
+      });
+    }
+  }
+  let gameStateSpec;
+  if (options.game !== void 0) {
+    assert(options.game.schemaVersion.trim().length > 0, "PXD_MODULE_SCHEMA_INVALID", "Game schemaVersion is invalid.");
+    gameStateSpec = {
+      path: "modules/game/state.json",
+      mediaType: "application/json",
+      bytes: projectJsonPayload(options.game.record, "modules.game.state")
+    };
+    payloadSpecs.push(gameStateSpec);
+  }
+  const availableModules = /* @__PURE__ */ new Set([
+    "DRAW"
+  ]);
+  if (options.audio !== void 0) availableModules.add("AUDIO");
+  if (options.game !== void 0) availableModules.add("GAME");
+  const productDefinitions = normalizePxdProductDefinitions(options.productDefinitions, assetDefinitions2, audioAssetSpecs.map((asset) => asset.revisionId), availableModules);
+  payloadSpecs.sort((left, right) => compareStrings(left.path, right.path));
+  const payloadEntries = /* @__PURE__ */ new Map();
+  const payloadByPath = /* @__PURE__ */ new Map();
+  let offset = 0;
+  for (const spec of payloadSpecs) {
+    assert(!payloadEntries.has(spec.path), "PXD_ENTRY_DUPLICATE", `PXD entry ${spec.path} is duplicated.`);
+    const entry = projectPayloadEntry(spec, offset);
+    payloadEntries.set(spec.path, {
+      ...entry,
+      sha256: await sha256BytesHex(spec.bytes)
+    });
+    payloadByPath.set(spec.path, spec.bytes);
+    offset += spec.bytes.byteLength;
+  }
+  const drawAssets = drawAssetSpecs.map((spec) => {
+    const entry = payloadEntries.get(spec.path);
+    assert(entry !== void 0, "PXD_ENTRY_MISSING", `PXD Draw entry ${spec.path} is missing.`);
+    return {
+      ...spec.asset,
+      path: spec.path,
+      sha256: spec.sha256,
+      bytes: spec.pixels.byteLength,
+      offset: entry.offset
+    };
+  });
+  const audioAssets = audioAssetSpecs.map((spec) => {
+    const entry = payloadEntries.get(spec.path);
+    assert(entry !== void 0, "PXD_ENTRY_MISSING", `PXD Audio entry ${spec.path} is missing.`);
+    return {
+      ...entry,
+      revisionId: spec.revisionId
+    };
+  });
+  const audioModule = options.audio === void 0 ? emptyProjectModule() : projectModuleManifest(options.audio.schemaVersion, payloadEntries.get(audioStateSpec.path), audioAssets);
+  const gameModule = options.game === void 0 ? emptyProjectModule() : projectModuleManifest(options.game.schemaVersion, payloadEntries.get(gameStateSpec.path));
+  const content = {
+    format: PXD_FORMAT,
+    schemaVersion: PXD_PROJECT_SCHEMA_VERSION,
+    archiveVersion: PXD_PROJECT_ARCHIVE_VERSION,
+    packageKind: "PROJECT_PACKAGE",
+    projectId: state2.projectId,
+    project: projectMetadata(state2),
+    modules: {
+      draw: {
+        schemaVersion: "DRAW2_PROJECT_V1",
+        status: "EMBEDDED",
+        state: null,
+        assets: drawAssets
+      },
+      audio: audioModule,
+      game: gameModule
+    },
+    entries: [
+      ...payloadEntries.values()
+    ],
+    assetDefinitions: assetDefinitions2,
+    ...drawTimelineMetadata === void 0 ? {} : {
+      drawTimelineMetadata
+    },
+    productDefinitions,
+    ...assetPackages2.length === 0 ? {} : {
+      assetPackages: assetPackages2
+    },
+    dependencies: []
+  };
+  const packageId = `pxd_${(await sha256BytesHex(new TextEncoder().encode(canonicalJson(content)))).slice(0, 32)}`;
+  const manifestBase = {
+    ...content,
+    packageId,
+    createdBy: PXD_CREATED_BY
+  };
+  const manifestHash = await sha256BytesHex(new TextEncoder().encode(canonicalJson(manifestBase)));
+  const manifest = {
+    ...manifestBase,
+    canonicalManifestHash: manifestHash
+  };
+  const manifestBytes = new TextEncoder().encode(canonicalJson(manifest));
+  assert(manifestBytes.byteLength <= 4294967295, "PXD_MANIFEST_TOO_LARGE", "PXD manifest exceeds the container limit.");
+  const payloads = [
+    ...payloadEntries.keys()
+  ].map((path) => payloadByPath.get(path));
+  const bytes = concatBytes(PXD_MAGIC, new Uint8Array([
+    PXD_PROJECT_ARCHIVE_VERSION
+  ]), writeUint32(manifestBytes.byteLength), manifestBytes, ...payloads);
+  return {
+    bytes,
+    filename: packageFileName(state2.projectId),
+    mimeType: PXD_MIME_TYPE,
+    packageHash: await sha256BytesHex(bytes),
+    manifestHash,
+    manifest
+  };
+}
+
+// src/game/game-350/asset-market-export.ts
+var MAX_FRAMES = 512;
+var MAX_DIMENSION = 4096;
+var MAX_PIXELS = 16 * 1024 * 1024;
+function safeProjectId(value) {
+  const normalized = value.normalize("NFC").replace(/[^A-Za-z0-9._-]+/gu, "-").replace(/^-+|-+$/gu, "").slice(0, 96);
+  return `pixieed-asset-${normalized || "unnamed"}`;
+}
+function safeDuration(value, fallback) {
+  return Number.isFinite(value) && value !== void 0 && value > 0 ? Math.max(1, Math.round(value)) : fallback;
+}
+function sourceFramesFor(entry) {
+  const frames = [];
+  const seen = /* @__PURE__ */ new Set();
+  const clips = entry.definition.animationMapping;
+  for (const clip of clips) {
+    const sourceFrames = clip.sourceFrames ?? [];
+    for (const [index, source] of sourceFrames.entries()) {
+      const snapshot = source.rasterSnapshot;
+      if (snapshot === void 0) {
+        throw new Error(`Asset\u300C${entry.definition.metadata.name || entry.definitionId}\u300D\u306E${index + 1}\u30D5\u30EC\u30FC\u30E0\u306B\u78BA\u5B9A\u753B\u50CF\u304C\u3042\u308A\u307E\u305B\u3093\u3002iDRAW\u3067\u8868\u793A\u4E2D\u306E\u7BC4\u56F2\u3092\u518D\u767B\u9332\u3057\u3066\u304F\u3060\u3055\u3044\u3002`);
+      }
+      if (!Number.isSafeInteger(snapshot.width) || snapshot.width < 1 || snapshot.width > MAX_DIMENSION || !Number.isSafeInteger(snapshot.height) || snapshot.height < 1 || snapshot.height > MAX_DIMENSION || snapshot.width * snapshot.height > MAX_PIXELS || !Array.isArray(snapshot.data) || snapshot.data.length !== snapshot.width * snapshot.height * 4 || snapshot.data.some((value) => !Number.isSafeInteger(value) || value < 0 || value > 255)) {
+        throw new Error(`Asset\u300C${entry.definition.metadata.name || entry.definitionId}\u300D\u306B\u4E0D\u6B63\u306A\u753B\u50CF\u30D5\u30EC\u30FC\u30E0\u304C\u3042\u308A\u307E\u3059\u3002`);
+      }
+      const pixels = new Uint8ClampedArray(snapshot.data);
+      const signature = `${source.sourceFrameId}:${snapshot.width}x${snapshot.height}:${Array.from(pixels).join(",")}`;
+      if (seen.has(signature)) continue;
+      seen.add(signature);
+      const duration = clip.frameDurationsMs?.[index] ?? source.durationMs;
+      frames.push({
+        sourceFrameId: source.sourceFrameId,
+        width: snapshot.width,
+        height: snapshot.height,
+        pixels,
+        durationMs: safeDuration(duration, Math.round(1e3 / (clip.fps ?? 12)))
+      });
+      if (frames.length > MAX_FRAMES) {
+        throw new Error("1 Asset\u306E\u30D5\u30EC\u30FC\u30E0\u6570\u304CMarket\u4E0A\u9650\u3092\u8D85\u3048\u3066\u3044\u307E\u3059\u3002\u30A2\u30CB\u30E1\u30FC\u30B7\u30E7\u30F3\u3092\u5206\u5272\u3057\u3066\u304F\u3060\u3055\u3044\u3002");
+      }
+    }
+  }
+  if (frames.length === 0) {
+    throw new Error(`Asset\u300C${entry.definition.metadata.name || entry.definitionId}\u300D\u306B\u78BA\u5B9A\u6E08\u307F\u306E\u30A2\u30CB\u30E1\u30FC\u30B7\u30E7\u30F3\u30D5\u30EC\u30FC\u30E0\u304C\u3042\u308A\u307E\u305B\u3093\u3002`);
+  }
+  return frames;
+}
+function argbFromRgba(pixels, offset) {
+  return ((pixels[offset + 3] ?? 0) << 24 | (pixels[offset] ?? 0) << 16 | (pixels[offset + 1] ?? 0) << 8 | (pixels[offset + 2] ?? 0)) >>> 0;
+}
+function rgbaFromArgb(value) {
+  return [
+    value >>> 16 & 255,
+    value >>> 8 & 255,
+    value & 255,
+    value >>> 24 & 255
+  ];
+}
+function indexedFramesFor(frames) {
+  const width = Math.max(...frames.map((frame2) => frame2.width));
+  const height = Math.max(...frames.map((frame2) => frame2.height));
+  const frequencies = /* @__PURE__ */ new Map();
+  for (const frame2 of frames) {
+    for (let offset = 0; offset < frame2.pixels.length; offset += 4) {
+      const color = argbFromRgba(frame2.pixels, offset);
+      if (color >>> 24 === 0) continue;
+      frequencies.set(color, (frequencies.get(color) ?? 0) + 1);
+    }
+  }
+  const palette = [
+    0,
+    ...Array.from(frequencies.keys()).sort((left, right) => (frequencies.get(right) ?? 0) - (frequencies.get(left) ?? 0) || left - right).slice(0, 255)
+  ];
+  const exact = new Map(palette.map((color, index) => [
+    color,
+    index
+  ]));
+  const nearest = (color) => {
+    const exactIndex = exact.get(color);
+    if (exactIndex !== void 0) return exactIndex;
+    if (palette.length === 1) return 0;
+    const target = rgbaFromArgb(color);
+    let bestIndex = 1;
+    let bestDistance = Number.POSITIVE_INFINITY;
+    for (let index = 1; index < palette.length; index += 1) {
+      const candidate = rgbaFromArgb(palette[index] ?? 0);
+      const distance2 = (target[0] - candidate[0]) ** 2 + (target[1] - candidate[1]) ** 2 + (target[2] - candidate[2]) ** 2 + 2 * (target[3] - candidate[3]) ** 2;
+      if (distance2 < bestDistance) {
+        bestDistance = distance2;
+        bestIndex = index;
+      }
+    }
+    return bestIndex;
+  };
+  const indexed = frames.map((frame2) => {
+    const output = new Uint8Array(width * height);
+    for (let y = 0; y < frame2.height; y += 1) {
+      for (let x = 0; x < frame2.width; x += 1) {
+        const sourceOffset = (y * frame2.width + x) * 4;
+        output[y * width + x] = nearest(argbFromRgba(frame2.pixels, sourceOffset));
+      }
+    }
+    return output;
+  });
+  return {
+    palette,
+    pixels: indexed,
+    width,
+    height
+  };
+}
+function syntheticProject(entry, frames) {
+  const indexed = indexedFramesFor(frames);
+  const projectId = safeProjectId(entry.definitionId);
+  const created = createProject({
+    projectId,
+    name: entry.definition.metadata.name || entry.definitionId,
+    width: indexed.width,
+    height: indexed.height,
+    tileSize: 32,
+    palette: indexed.palette
+  });
+  const layerId = `${projectId}:asset-layer`;
+  const assets = {};
+  const projectFrames = [];
+  const cels = [];
+  for (const [index, frame2] of frames.entries()) {
+    const assetId = `${projectId}:frame:${String(index).padStart(4, "0")}`;
+    const raster = IndexedTileRaster.empty(indexed.width, indexed.height, 32);
+    const pixels = indexed.pixels[index];
+    for (let y = 0; y < indexed.height; y += 1) {
+      for (let x = 0; x < indexed.width; x += 1) {
+        const colorIndex = pixels[y * indexed.width + x] ?? 0;
+        if (colorIndex !== 0) raster.setPixel(assetId, x, y, colorIndex);
+      }
+    }
+    assets[assetId] = {
+      id: assetId,
+      width: indexed.width,
+      height: indexed.height,
+      palette: indexed.palette,
+      raster,
+      revision: 0
+    };
+    const frameId = `${projectId}:frame:${String(index).padStart(4, "0")}`;
+    const celId = `${projectId}:cel:${String(index).padStart(4, "0")}`;
+    projectFrames.push({
+      id: frameId,
+      frameId,
+      index,
+      orderKey: String(index).padStart(8, "0"),
+      durationMs: frame2.durationMs,
+      timingUnit: "MILLISECONDS",
+      metadataVersion: 1
+    });
+    cels.push({
+      id: celId,
+      celId,
+      layerId,
+      layerTrackId: layerId,
+      frameId,
+      assetId,
+      bindingMode: "RASTER",
+      recordVersion: 1,
+      lifecycle: "ACTIVE"
+    });
+  }
+  const layer2 = {
+    id: layerId,
+    layerTrackId: layerId,
+    name: "Asset",
+    order: 0,
+    orderingKey: "00000000",
+    visible: true,
+    opacity: 1,
+    blendMode: "NORMAL",
+    locked: false,
+    lifecycle: "ACTIVE",
+    kind: "RASTER"
+  };
+  const firstFrame = projectFrames[0];
+  const firstAsset = assets[Object.keys(assets)[0]];
+  return {
+    ...created,
+    name: entry.definition.metadata.name || entry.definitionId,
+    activeAssetId: firstAsset.id,
+    layers: [
+      layer2
+    ],
+    frames: projectFrames,
+    cels,
+    timeline: {
+      id: `${projectId}:timeline`,
+      timelineId: `${projectId}:timeline`,
+      frameOrder: projectFrames.map((frame2) => frame2.frameId),
+      layerTrackOrder: [
+        layerId
+      ],
+      metadataVersion: 1
+    },
+    activeLayerId: layerId,
+    activeFrameId: firstFrame.frameId,
+    activeCelId: cels[0].celId,
+    assets,
+    tilemaps: {},
+    appliedCommandIds: [],
+    lastClientSequenceByClient: {}
+  };
+}
+async function exportAssetDefinitionPxd(options) {
+  const frames = sourceFramesFor(options.entry);
+  return await exportPxdProject(syntheticProject(options.entry, frames), {
+    assetDefinitions: [
+      options.entry
+    ],
+    ...options.assetPackage === void 0 ? {} : {
+      assetPackages: [
+        options.assetPackage
+      ]
+    }
+  });
+}
+
 // src/draw2-asset-bridge-contract.ts
 var DRAW2_ASSET_STATE_CHANGED_EVENT = "draw2:asset-state-changed";
 
@@ -13945,255 +14910,6 @@ function translateDraw2Text(text2, locale) {
   }
   translationCache.set(cacheKey, translated);
   return `${leading}${translated}${trailing}`;
-}
-
-// src/draw2-export-registry.ts
-var PNG_EXPORT_MAX_PIXELS = 4096 * 4096;
-var PNG_EXPORT_MAX_DIMENSION = 8192;
-var PNG_EXPORT_MAX_SCALE = 256;
-var PNG_EXPORT_SCALE_PRESETS = Object.freeze([
-  1,
-  2,
-  3,
-  4,
-  6,
-  8,
-  12,
-  16,
-  24,
-  32,
-  48,
-  64,
-  96,
-  128,
-  192,
-  256
-]);
-function maxPngExportScale(width, height) {
-  const safeWidth = Math.max(1, Math.floor(Number.isFinite(width) ? width : 1));
-  const safeHeight = Math.max(1, Math.floor(Number.isFinite(height) ? height : 1));
-  const sourcePixels = safeWidth * safeHeight;
-  const byPixels = Math.floor(Math.sqrt(PNG_EXPORT_MAX_PIXELS / sourcePixels));
-  const byDimension = Math.floor(PNG_EXPORT_MAX_DIMENSION / Math.max(safeWidth, safeHeight));
-  return Math.max(1, Math.min(PNG_EXPORT_MAX_SCALE, byPixels, byDimension));
-}
-function pngExportScaleOptions(width, height) {
-  const maxScale = maxPngExportScale(width, height);
-  return PNG_EXPORT_SCALE_PRESETS.filter((scale) => scale <= maxScale);
-}
-var EXPORT_FORMATS = Object.freeze([
-  {
-    id: "png",
-    category: "image",
-    label: "PNG",
-    description: "\u900F\u904E\u3092\u4FDD\u3063\u305F\u753B\u50CF",
-    extension: "png",
-    mimeType: "image/png",
-    visible: true,
-    supported: true,
-    supportsScale: true
-  },
-  {
-    id: "jpeg",
-    category: "image",
-    label: "JPEG",
-    description: "\u8EFD\u91CF\u306A\u753B\u50CF",
-    extension: "jpg",
-    mimeType: "image/jpeg",
-    visible: true,
-    supported: true,
-    supportsScale: true
-  },
-  {
-    id: "webp",
-    category: "image",
-    label: "WebP",
-    description: "\u8EFD\u91CF\u30FB\u900F\u904E\u5BFE\u5FDC\u306E\u753B\u50CF",
-    extension: "webp",
-    mimeType: "image/webp",
-    visible: true,
-    supported: true,
-    supportsScale: true
-  },
-  {
-    id: "avif",
-    category: "image",
-    label: "AVIF",
-    description: "\u30D6\u30E9\u30A6\u30B6\u5BFE\u5FDC\u6642\u306E\u9AD8\u5727\u7E2E\u753B\u50CF",
-    extension: "avif",
-    mimeType: "image/avif",
-    visible: true,
-    supported: true,
-    supportsScale: true
-  },
-  {
-    id: "bmp",
-    category: "image",
-    label: "BMP",
-    description: "\u4E92\u63DB\u6027\u91CD\u8996\u306E\u30D3\u30C3\u30C8\u30DE\u30C3\u30D7",
-    extension: "bmp",
-    mimeType: "image/bmp",
-    visible: true,
-    supported: true,
-    supportsScale: true
-  },
-  {
-    id: "tiff",
-    category: "image",
-    label: "TIFF",
-    description: "\u5370\u5237\u30FB\u4FDD\u5B58\u5411\u3051\u306E\u9AD8\u54C1\u8CEA\u753B\u50CF",
-    extension: "tiff",
-    mimeType: "image/tiff",
-    visible: true,
-    supported: true,
-    supportsScale: true
-  },
-  {
-    id: "gif",
-    category: "animation",
-    label: "GIF",
-    description: "\u30A2\u30CB\u30E1\u30FC\u30B7\u30E7\u30F3\u753B\u50CF",
-    extension: "gif",
-    mimeType: "image/gif",
-    visible: true,
-    supported: true,
-    supportsScale: true
-  },
-  {
-    id: "apng",
-    category: "animation",
-    label: "APNG",
-    description: "\u900F\u904E\u5BFE\u5FDC\u30A2\u30CB\u30E1\u30FC\u30B7\u30E7\u30F3",
-    extension: "apng",
-    mimeType: "image/apng",
-    visible: true,
-    supported: true,
-    supportsScale: true
-  },
-  {
-    id: "webm",
-    category: "animation",
-    label: "WebM Draw + Audio",
-    description: "Draw\u30A2\u30CB\u30E1\u30FC\u30B7\u30E7\u30F3\u3068\u9078\u629E\u3057\u305FAudio\u3092\u4E00\u4F53\u5316\u3057\u305F\u52D5\u753B",
-    extension: "webm",
-    mimeType: "video/webm",
-    visible: true,
-    supported: true,
-    supportsScale: false
-  },
-  {
-    id: "wav",
-    category: "audio",
-    label: "WAV Mix",
-    description: "\u9078\u629E\u3057\u305FBGM\u30FBSE\u30FB\u697D\u5668\u3092\u542B\u3080\u975E\u5727\u7E2E\u30DF\u30C3\u30AF\u30B9",
-    extension: "wav",
-    mimeType: "audio/wav",
-    visible: true,
-    supported: true,
-    supportsScale: false
-  },
-  {
-    id: "audio-webm",
-    category: "audio",
-    label: "WebM Audio (Opus)",
-    description: "\u9078\u629E\u3057\u305FBGM\u30FBSE\u30FB\u697D\u5668\u3092\u8EFD\u91CF\u306AOpus\u97F3\u58F0\u3067\u4FDD\u5B58",
-    extension: "webm",
-    mimeType: "audio/webm",
-    visible: true,
-    supported: true,
-    supportsScale: false
-  },
-  {
-    id: "audio-ogg",
-    category: "audio",
-    label: "Ogg Audio (Opus)",
-    description: "\u5BFE\u5FDC\u30D6\u30E9\u30A6\u30B6\u3067\u9078\u629E\u3057\u305FAudio\u3092Ogg/Opus\u3067\u4FDD\u5B58",
-    extension: "ogg",
-    mimeType: "audio/ogg",
-    visible: true,
-    supported: true,
-    supportsScale: false
-  },
-  {
-    id: "svg",
-    category: "image",
-    label: "SVG",
-    description: "\u30D9\u30AF\u30BF\u30FC\u753B\u50CF",
-    extension: "svg",
-    mimeType: "image/svg+xml",
-    visible: true,
-    supported: true,
-    supportsScale: true
-  },
-  {
-    id: "sprite-sheet",
-    category: "animation",
-    label: "Sprite Sheet",
-    description: "\u5168\u30D5\u30EC\u30FC\u30E0\u3092\u4E26\u3079\u305F\u753B\u50CF",
-    extension: "png",
-    mimeType: "image/png",
-    visible: true,
-    supported: true,
-    supportsScale: true
-  },
-  {
-    id: "atlas-json",
-    category: "animation",
-    label: "Atlas metadata",
-    description: "Sprite Sheet\u306E\u5EA7\u6A19\u30E1\u30BF\u30C7\u30FC\u30BF",
-    extension: "json",
-    mimeType: "application/json",
-    visible: true,
-    supported: true,
-    supportsScale: false
-  },
-  {
-    id: "tileset",
-    category: "tiles",
-    label: "Tileset",
-    description: "\u30BF\u30A4\u30EB\u7D20\u6750\u3068\u914D\u7F6E\u60C5\u5831",
-    extension: "png",
-    mimeType: "image/png",
-    visible: true,
-    supported: true,
-    supportsScale: true
-  },
-  {
-    id: "pxd",
-    category: "project",
-    label: "PXD Project",
-    description: "Draw / Audio / Game\u3092\u542B\u3080\u30D7\u30ED\u30B8\u30A7\u30AF\u30C8",
-    extension: "pxd",
-    mimeType: "application/vnd.pixieed.pxd",
-    visible: true,
-    supported: true,
-    supportsScale: false
-  },
-  {
-    id: "glb",
-    category: "game",
-    label: "GLB",
-    description: "3D\u30B2\u30FC\u30E0\u7D20\u6750\uFF08\u5C06\u6765\u5BFE\u5FDC\uFF09",
-    extension: "glb",
-    mimeType: "model/gltf-binary",
-    visible: false,
-    supported: false,
-    supportsScale: false
-  }
-]);
-var EXPORT_FORMAT_BY_ID = new Map(EXPORT_FORMATS.map((definition) => [
-  definition.id,
-  definition
-]));
-function exportFormatDefinition(id) {
-  const definition = EXPORT_FORMAT_BY_ID.get(id);
-  if (definition === void 0) {
-    throw new Error(`Unknown Draw2 export format: ${id}`);
-  }
-  return definition;
-}
-function visibleExportFormats() {
-  return EXPORT_FORMATS.filter((definition) => definition.visible);
 }
 
 // src/draw2-pixel-grid.ts
@@ -17993,12 +18709,12 @@ var PixyncCheckpointPublishError = class extends Error {
     this.name = "PixyncCheckpointPublishError";
   }
 };
-function isRecord7(value) {
+function isRecord8(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 function exactlyOneRow(value, label) {
   const row = Array.isArray(value) ? value.length === 1 ? value[0] : void 0 : value;
-  if (!isRecord7(row)) {
+  if (!isRecord8(row)) {
     throw new PixyncCheckpointPublishError("SERVER_RESPONSE_INVALID", `${label} did not return exactly one object row.`);
   }
   return row;
@@ -18223,7 +18939,7 @@ var PixyncProjectDeletionError = class extends Error {
     this.name = "PixyncProjectDeletionError";
   }
 };
-function isRecord8(value) {
+function isRecord9(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 function fail3(code, message, cause) {
@@ -18249,13 +18965,13 @@ async function requireAuthenticatedUser(client) {
     fail3("AUTHENTICATION_FAILED", "PiXYNC authentication could not be checked.", result.error);
   }
   const user = result.data?.user;
-  if (!isRecord8(user) || typeof user.id !== "string" || !UUID3.test(user.id)) {
+  if (!isRecord9(user) || typeof user.id !== "string" || !UUID3.test(user.id)) {
     fail3("AUTHENTICATION_REQUIRED", "Sign in is required before detaching a shared PiXYNC Project.");
   }
 }
 function exactlyOneRow2(value) {
   const row = Array.isArray(value) ? value.length === 1 ? value[0] : void 0 : value;
-  if (!isRecord8(row)) {
+  if (!isRecord9(row)) {
     fail3("SERVER_RESPONSE_INVALID", "PiXYNC detach returned an unexpected response shape.");
   }
   return row;
@@ -18313,7 +19029,7 @@ async function detachPixyncProject(client, projectId) {
     fail3("RPC_FAILED", "PiXYNC remote detach could not be completed.", cause);
   }
   if (result.error !== null) {
-    const message = isRecord8(result.error) && typeof result.error.message === "string" ? result.error.message : "";
+    const message = isRecord9(result.error) && typeof result.error.message === "string" ? result.error.message : "";
     if (/locali[sz]ation_required/iu.test(message)) {
       fail3("LOCALIZATION_REQUIRED", "Owner localization is required before this shared Project can be detached.", result.error);
     }
@@ -18350,12 +19066,12 @@ var PixyncRemoteCheckpointError = class extends Error {
     this.name = "PixyncRemoteCheckpointError";
   }
 };
-function isRecord9(value) {
+function isRecord10(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 function exactlyOneRow3(value) {
   const row = Array.isArray(value) ? value.length === 1 ? value[0] : void 0 : value;
-  if (!isRecord9(row)) {
+  if (!isRecord10(row)) {
     throw new PixyncRemoteCheckpointError("SERVER_RESPONSE_INVALID", "pixisync_open_session did not return exactly one checkpoint row.");
   }
   const keys = Object.keys(row);
@@ -18717,7 +19433,7 @@ function loadAdvancedModule() {
 }
 function loadWorkspaceModule() {
   const workspaceChunkUrl = new URL("wp180-workspace.js", import.meta.url);
-  workspaceChunkUrl.searchParams.set("v", "20260910-unity-asset-export-v2");
+  workspaceChunkUrl.searchParams.set("v", "20260911-unity-audio-export-v1");
   workspaceModulePromise ??= import(workspaceChunkUrl.href);
   return workspaceModulePromise;
 }
@@ -22433,11 +23149,11 @@ function notifyAssetStateChanged() {
   window.dispatchEvent(new Event(DRAW2_ASSET_STATE_CHANGED_EVENT));
 }
 function nextAssetDefinitionId() {
-  const safeProjectId = state.projectId.replace(/[^A-Za-z0-9._-]+/gu, "-").slice(0, 72);
+  const safeProjectId2 = state.projectId.replace(/[^A-Za-z0-9._-]+/gu, "-").slice(0, 72);
   let candidate = "";
   do {
     assetDefinitionSequence += 1;
-    candidate = `asset-${safeProjectId || "project"}-${assetDefinitionSequence}`;
+    candidate = `asset-${safeProjectId2 || "project"}-${assetDefinitionSequence}`;
   } while (assetDefinitions.some((entry) => entry.definitionId === candidate));
   return candidate;
 }
@@ -23122,7 +23838,8 @@ var draw2AssetBridge = {
       ok: true,
       manifest: next
     };
-  }
+  },
+  handoffDefinitionToMarket: handoffAssetDefinitionToMarket
 };
 window.__pixiedraw2AssetBridge = draw2AssetBridge;
 var pendingSelectionGesture;
@@ -28993,9 +29710,28 @@ async function createBrowserRasterArtifact(exportModule, format, baseName, scale
     mimeType: definition.mimeType
   };
 }
+function draw2IGameProductMetadata(snapshot) {
+  const gameRecord = snapshot.game?.record;
+  if (gameRecord === null || typeof gameRecord !== "object" || Array.isArray(gameRecord)) return void 0;
+  const canonicalProject = gameRecord.canonicalProject;
+  if (canonicalProject === null || typeof canonicalProject !== "object" || Array.isArray(canonicalProject)) return void 0;
+  const project = canonicalProject;
+  const timeline = project.editorTimeline;
+  if (project.schemaVersion !== 1 || typeof project.projectId !== "string" || project.projectId.trim().length === 0 || !Array.isArray(project.scenes) || project.scenes.length === 0 || !Array.isArray(project.prefabs) || !Array.isArray(project.dependencies) || !Array.isArray(project.behaviors) || timeline === null || typeof timeline !== "object" || Array.isArray(timeline) || !Array.isArray(timeline.tracks)) return void 0;
+  const runtimeProfile = project.runtimeProfile;
+  const runtimeProfileId = runtimeProfile !== null && typeof runtimeProfile === "object" && !Array.isArray(runtimeProfile) && typeof runtimeProfile.profileId === "string" && runtimeProfile.profileId?.toString().trim().length ? String(runtimeProfile.profileId).trim() : "top-down-rpg";
+  return {
+    schema: "pixieed-igame-product/v1",
+    project_id: snapshot.projectId,
+    runtime_profile_id: runtimeProfileId,
+    runtime_version: "game-350-browser-v1",
+    visibility: "PUBLIC"
+  };
+}
 async function createPxdProjectArtifact(exportModule, baseName) {
   const workspace = getWorkspacePxdBridge();
   const snapshot = await workspace.exportProjectPxdSnapshot();
+  const gameProduct = draw2IGameProductMetadata(snapshot);
   const output = await exportModule.exportPxdProject(state, {
     assetDefinitions,
     assetPackages,
@@ -29019,7 +29755,10 @@ async function createPxdProjectArtifact(exportModule, baseName) {
     filename: `${baseName}.pxd`,
     bytes: output.bytes,
     mimeType: output.mimeType,
-    packageHash: output.packageHash
+    packageHash: output.packageHash,
+    ...gameProduct === void 0 ? {} : {
+      igameProduct: gameProduct
+    }
   };
 }
 async function exportCurrentPxdArtifactForWorkspace() {
@@ -29162,6 +29901,123 @@ function createDrawMarketDeliveryManifest(file, artifact, sourceReference) {
     createdAt: (/* @__PURE__ */ new Date()).toISOString()
   };
 }
+function createAssetMarketDeliveryManifest(file, artifact, sourceReference, entry) {
+  const projectName = safeMarketManifestDisplayName(state.name.trim(), `Draw2 ${state.projectId}`);
+  const label = safeMarketManifestDisplayName(entry.definition.metadata.name, entry.definitionId);
+  const frameCount = new Set(entry.definition.animationMapping.flatMap((clip) => clip.frameIds)).size;
+  return {
+    schemaVersion: 1,
+    manifestId: `draw2-asset-delivery-manifest:${state.projectId}:${entry.definitionId}:${sourceReference.contentHash}:${artifact.packageHash}`,
+    selectionKind: "SELECTED_SET",
+    project: {
+      projectId: state.projectId,
+      name: projectName
+    },
+    entries: [
+      {
+        entryId: `draw-asset:${entry.definitionId}`,
+        sourceKind: "DRAW",
+        source: {
+          projectId: state.projectId,
+          assetId: sourceReference.assetId,
+          revisionId: sourceReference.revisionId,
+          contentHash: sourceReference.contentHash,
+          packageHash: artifact.packageHash,
+          fileName: file.name,
+          mimeType: file.type || "application/vnd.pixieed.pxd",
+          byteLength: file.size
+        },
+        selection: {
+          kind: frameCount > 1 ? "ANIMATION" : "FRAME_RANGE",
+          label: `${label} \xB7 ${frameCount || 1}\u30D5\u30EC\u30FC\u30E0`,
+          locator: entry.definitionId
+        },
+        provenance: {
+          originKind: "LOCAL_PROJECT",
+          rightsStatus: "CREATOR_DECLARATION_REQUIRED"
+        },
+        capabilities: {
+          editable: true,
+          animation: true,
+          targets: [
+            "iDRAW",
+            "iAUDIO",
+            "iGAME",
+            "UNITY"
+          ]
+        },
+        dependencyIds: []
+      }
+    ],
+    summary: {
+      entryCount: 1,
+      sourceKinds: [
+        "DRAW"
+      ],
+      labels: [
+        label
+      ]
+    },
+    createdAt: (/* @__PURE__ */ new Date()).toISOString()
+  };
+}
+async function handoffAssetDefinitionToMarket(definitionId) {
+  const entry = assetDefinitions.find((candidate) => candidate.definitionId === definitionId);
+  if (entry === void 0) {
+    return {
+      ok: false,
+      message: "Market\u3078\u6E21\u3059Asset\u3092\u9078\u629E\u3057\u3066\u304F\u3060\u3055\u3044\u3002"
+    };
+  }
+  const assetPackage = assetPackages.find((candidate) => candidate.entries.some((packageEntry) => packageEntry.kind === "DRAW" && packageEntry.source.sourceId === definitionId));
+  if (assetPackage === void 0) {
+    return {
+      ok: false,
+      message: "\u5148\u306B\u3053\u306EAsset\u3092\u300C\u8CA9\u58F2\u7528\u306B\u78BA\u5B9A\u300D\u3057\u3066\u304B\u3089Market\u3078\u6E21\u3057\u3066\u304F\u3060\u3055\u3044\u3002"
+    };
+  }
+  try {
+    const sourceReference = await resolveDrawDefinitionReference({
+      definitionId,
+      mode: "PINNED"
+    });
+    if (sourceReference === void 0) {
+      return {
+        ok: false,
+        message: "Asset\u306E\u56FA\u5B9Arevision\u3092\u53D6\u5F97\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F\u3002"
+      };
+    }
+    const output = await exportAssetDefinitionPxd({
+      entry,
+      assetPackage
+    });
+    const file = new File([
+      output.bytes.slice().buffer
+    ], output.filename, {
+      type: output.mimeType
+    });
+    const deliveryManifest = createAssetMarketDeliveryManifest(file, output, sourceReference, entry);
+    const transferId = await storePxdMarketTransfer(file, {
+      metadata: {
+        projectId: state.projectId,
+        kind: "draw-asset",
+        definitionId
+      },
+      deliveryManifest
+    });
+    const url = new URL("../market/sell.html", window.location.href);
+    url.searchParams.set("project_transfer", transferId);
+    window.location.assign(url.href);
+    return {
+      ok: true
+    };
+  } catch (cause) {
+    return {
+      ok: false,
+      message: cause instanceof Error ? cause.message : "Asset\u306EMarket\u5F15\u304D\u7D99\u304E\u306B\u5931\u6557\u3057\u307E\u3057\u305F\u3002"
+    };
+  }
+}
 async function handoffPxdProjectToMarket() {
   if (colorDraftDirty) {
     await commitColorEdit();
@@ -29190,7 +30046,10 @@ async function handoffPxdProjectToMarket() {
     const transferId = await storePxdMarketTransfer(file, {
       metadata: {
         projectId: state.projectId,
-        kind: "draw"
+        kind: "draw",
+        ...artifact.igameProduct === void 0 ? {} : {
+          igameProduct: artifact.igameProduct
+        }
       },
       deliveryManifest
     });

@@ -475,6 +475,10 @@ import {
   encodeUnityAssetImportPackageZip,
 } from "./game/game-350/unity-asset-export.ts";
 import {
+  createUnityAudioImportPackage,
+  encodeUnityAudioImportPackageZip,
+} from "./game/game-350/unity-audio-export.ts";
+import {
   createSite400IGameRoute,
   type Site400IGameFeatureFlag,
   type Site400IGameProjectRecord,
@@ -2595,6 +2599,10 @@ export function bootstrapDraw2Workspace(
     documentRef,
     "#draw2AssetBuilderFinalize",
   );
+  const assetBuilderMarket = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2AssetBuilderMarket",
+  );
   const assetBuilderPackageStatus = query<HTMLOutputElement>(
     documentRef,
     "#draw2AssetBuilderPackageStatus",
@@ -4137,6 +4145,10 @@ export function bootstrapDraw2Workspace(
   const audioRender = query<HTMLButtonElement>(
     documentRef,
     "#draw2AudioRender",
+  );
+  const audioUnityExport = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2AudioUnityExport",
   );
   const audioRenderTarget = query<HTMLSelectElement>(
     documentRef,
@@ -8994,6 +9006,7 @@ export function bootstrapDraw2Workspace(
   let audioExportExcludedClipIds = new Set<string>();
   let audioExportSelectionTouched = false;
   let audioExportSelectionProjectId: string | undefined;
+  let audioUnityExportBusy = false;
   const pixyncRemoteAudioEntryIds = new Set<string>();
   let audioWorkspaceSessionReady: Promise<void> | undefined;
   let audioProjectInitialization: "DEFAULT" | "BLANK" = "DEFAULT";
@@ -20705,8 +20718,82 @@ export function bootstrapDraw2Workspace(
       sourceProjectRevision: renderProject.projectRevision,
     };
   };
+  const downloadUnityAudioImportPackage = async (): Promise<void> => {
+    if (audioUnityExportBusy) return;
+    audioUnityExportBusy = true;
+    if (audioUnityExport !== undefined) {
+      audioUnityExport.disabled = true;
+      audioUnityExport.textContent = "Unity ZIP…";
+    }
+    try {
+      if (audioRenderStatus !== undefined) {
+        audioRenderStatus.textContent = "Unity用WAVをレンダーしています…";
+        audioRenderStatus.setAttribute("aria-busy", "true");
+      }
+      const snapshot = await renderAudioWavForExport(undefined, "CURRENT");
+      const session = audioWorkspaceSession;
+      if (snapshot === null || session === undefined) {
+        throw new Error("AUDIO_RENDER_SOURCE_EMPTY");
+      }
+      const target = audioRenderTarget?.value ?? "MASTER";
+      const projectId = String(session.project.projectId);
+      const projectName = String(session.project.name || "PiXiEED Audio");
+      const packaged = await createUnityAudioImportPackage({
+        assetId: `audio-render:${projectId}:${target}`,
+        assetName: `${projectName} ${target === "MASTER" ? "Master" : "Selection"}`,
+        role: "MIX",
+        loop: false,
+        bytes: snapshot.bytes,
+        sampleRateHz: snapshot.sampleRateHz,
+        channels: snapshot.channels,
+        bitDepth: snapshot.bitDepth,
+        durationSeconds: snapshot.durationSeconds,
+        source: {
+          projectId: snapshot.sourceProjectId,
+          stateHash: snapshot.sourceStateHash,
+          projectRevision: snapshot.sourceProjectRevision,
+        },
+      });
+      if (!packaged.ok) {
+        throw new Error(packaged.diagnostics[0]?.code ?? "UNITY_AUDIO_EXPORT_INVALID");
+      }
+      const bytes = encodeUnityAudioImportPackageZip(packaged.value);
+      const objectUrl = URL.createObjectURL(
+        new Blob([bytes.buffer as ArrayBuffer], { type: "application/zip" }),
+      );
+      const link = documentRef.createElement("a");
+      link.href = objectUrl;
+      link.download = `${projectName.replace(/[^A-Za-z0-9._-]+/gu, "-") || "pixieed-audio"}.unity-audio.zip`;
+      link.click();
+      windowRef.setTimeout(() => URL.revokeObjectURL(objectUrl), 30_000);
+      if (audioRenderStatus !== undefined) {
+        audioRenderStatus.textContent =
+          `Unity Audio ZIP ready · ${snapshot.durationSeconds.toFixed(2)}s · ${bytes.byteLength} bytes`;
+      }
+      setModeDeckStatus(
+        "audio",
+        "Unity Audio ZIP ready · WAV／Manifest／AudioClip importer included",
+      );
+    } catch (error) {
+      const code = error instanceof Error ? error.message : "UNITY_AUDIO_EXPORT_INVALID";
+      if (audioRenderStatus !== undefined) {
+        audioRenderStatus.textContent = `Unity Audio export failed · ${code}`;
+      }
+      setModeDeckStatus("audio", "Unity Audio ZIPの作成に失敗しました。元のAudio Projectは変更されていません。");
+    } finally {
+      audioUnityExportBusy = false;
+      audioRenderStatus?.removeAttribute("aria-busy");
+      if (audioUnityExport !== undefined) {
+        audioUnityExport.disabled = false;
+        audioUnityExport.textContent = "Unity ZIP";
+      }
+    }
+  };
   audioRender?.addEventListener("click", () => {
     void renderAudioOfflineToWav();
+  });
+  audioUnityExport?.addEventListener("click", () => {
+    void downloadUnityAudioImportPackage();
   });
   audioRenderSelectAll?.addEventListener("click", () => {
     audioExportSelectionTouched = true;
@@ -25821,6 +25908,7 @@ export function bootstrapDraw2Workspace(
   let assetBuilderPreviewTimer: number | undefined;
   let assetBuilderFinalizeBusy = false;
   let assetBuilderUnityExportBusy = false;
+  let assetBuilderMarketBusy = false;
 
   const assetBuilderDirectionColumnsForMode = (): readonly {
     readonly id: AssetDirection;
@@ -28006,6 +28094,16 @@ export function bootstrapDraw2Workspace(
       assetBuilderFinalize.disabled = selectedEntry === undefined || assetBuilderFinalizeBusy;
       assetBuilderFinalize.textContent = assetBuilderFinalizeBusy ? "検証中…" : "販売用に確定";
     }
+    if (assetBuilderMarket !== undefined) {
+      assetBuilderMarket.disabled = selectedEntry === undefined ||
+        finalizedPackage === undefined || assetBuilderMarketBusy;
+      assetBuilderMarket.textContent = assetBuilderMarketBusy
+        ? "Market準備中…"
+        : "Marketへ出品";
+      assetBuilderMarket.title = finalizedPackage === undefined
+        ? "先に販売用に確定してください"
+        : "選択したAssetだけをMarketの出品画面へ渡します";
+    }
     if (assetBuilderPackageStatus !== undefined) {
       assetBuilderPackageStatus.textContent = finalizedPackage === undefined
         ? "未確定"
@@ -29320,6 +29418,48 @@ export function bootstrapDraw2Workspace(
       renderAssetEditor();
     }
   };
+  const handoffSelectedAssetToMarket = async (): Promise<void> => {
+    if (assetBuilderMarketBusy) return;
+    const bridge = getAssetBridge();
+    const snapshot = bridge?.snapshot();
+    const selectedEntry = snapshot === undefined
+      ? undefined
+      : assetBuilderSelectedEntry(snapshot);
+    if (bridge === undefined || snapshot === undefined || selectedEntry === undefined) {
+      setAssetStatus("Marketへ渡すAssetを一覧から選択してください。", "error");
+      return;
+    }
+    const finalizedPackage = assetPackageForDefinition(
+      snapshot,
+      selectedEntry.definitionId,
+    );
+    if (finalizedPackage === undefined) {
+      setAssetStatus("先にこのAssetを「販売用に確定」してください。", "error");
+      return;
+    }
+    assetBuilderMarketBusy = true;
+    renderAssetEditor();
+    try {
+      const result = await bridge.handoffDefinitionToMarket(
+        selectedEntry.definitionId,
+      );
+      if (result.ok === false) {
+        setAssetStatus(result.message, "error");
+        if (assetBuilderPackageStatus !== undefined) {
+          assetBuilderPackageStatus.textContent = result.message;
+          assetBuilderPackageStatus.dataset.state = "error";
+        }
+        return;
+      }
+      setAssetStatus(
+        `「${selectedEntry.definition.metadata.name}」だけをMarket出品画面へ渡しました。`,
+        "success",
+      );
+    } finally {
+      assetBuilderMarketBusy = false;
+      renderAssetEditor();
+    }
+  };
   assetBuilderSave?.addEventListener("click", () => {
     const snapshot = getAssetBridge()?.snapshot();
     const selectedEntry = snapshot === undefined
@@ -29376,6 +29516,9 @@ export function bootstrapDraw2Workspace(
   });
   assetBuilderFinalize?.addEventListener("click", () => {
     void finalizeSelectedAssetPackage();
+  });
+  assetBuilderMarket?.addEventListener("click", () => {
+    void handoffSelectedAssetToMarket();
   });
   assetBuilderUnityExport?.addEventListener("click", () => {
     void downloadUnityAssetImportPackage();
@@ -45319,12 +45462,41 @@ export function bootstrapDraw2Workspace(
       gameDataForPersistence(),
       gamePlayground,
     );
+    // The IndexedDB record is intentionally allowed to be a legacy/local
+    // record without the canonical PiXYNC Project. A Market iGAME export is
+    // different: it must carry the exact Game Project that the public Player
+    // will execute. Rebuild the record with the current canonical store so a
+    // fresh Project cannot silently export without its Game module.
+    const canonicalStore = pixyncGameStore ??
+      await GameEditorCanonicalStore.create(gameRecord);
+    const gameRecordForExport = await createGameEditorPersistenceRecord(
+      gameRecord.projectId,
+      gameRecord.tracks,
+      gameRecord.revision,
+      gameRecord.savedAt,
+      {
+        project: canonicalStore.project,
+        appliedCommandIds: canonicalStore.appliedCommandIds,
+      },
+      gameRecord.bindings ?? [],
+      gameRecord.behaviors ?? [],
+      gameRecord.behaviorSources ?? [],
+      gameRecord.physics2D,
+      gameRecord.templateInstances ?? [],
+      gameRecord.animationBindings ?? [],
+      gameRecord.creationMode,
+      gameRecord.sceneRules,
+      gameRecord.eventCards ?? [],
+      gameRecord.visualMaker,
+      gameRecord.gameData,
+      gameRecord.playground,
+    );
     return {
       projectId: workspaceProjectId,
       audio,
       game: {
-        schemaVersion: gameRecord.schemaVersion,
-        record: gameRecord,
+        schemaVersion: gameRecordForExport.schemaVersion,
+        record: gameRecordForExport,
       },
     };
   };

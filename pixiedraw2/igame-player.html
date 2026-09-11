@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="ja" data-igame-entry="player" data-feature-flag="off">
+<html lang="ja" data-igame-entry="player" data-feature-flag="on">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="robots" content="noindex,nofollow">
     <title>iGAME Player Runtime | PiXiEED</title>
-    <link rel="stylesheet" href="./assets/igame-player.css?v=20260825-igame-runtime-shell-v2">
+    <link rel="stylesheet" href="./assets/igame-player.css?v=20260911-igame-public-player-v1">
   </head>
   <body>
     <main
@@ -67,7 +67,7 @@
           START
         </button>
         <p class="igame-player__note">
-          この画面の次に表示されるゲーム画面・操作・HUDは、ユーザーのGame設定とRuntimeが定義します。
+          この画面の次に表示されるゲーム画面は、公開されたGame設定とRuntimeから復元されます。
         </p>
       </section>
 
@@ -92,6 +92,7 @@
 
       <p id="igamePlayerError" class="igame-player__error" role="alert" hidden></p>
     </main>
-    <script type="module" src="./dist/igame-player.js?v=20260825-igame-runtime-shell-v2"></script>
+    <script src="../scripts/pixieed-account-supabase-client.js"></script>
+    <script type="module" src="./dist/igame-player.js?v=20260911-igame-public-player-v1"></script>
   </body>
 </html>

@@ -46,6 +46,17 @@
           </section>
           <button class="market-purchase-button" id="itemPurchase" type="button" disabled>購入状態を確認しています</button>
           <p class="helper" id="itemPurchaseStatus" aria-live="polite">購入状態を確認しています。</p>
+          <section class="market-item__game-use" id="itemGameUse" hidden aria-labelledby="itemGameUseTitle">
+            <div>
+              <h3 id="itemGameUseTitle">iGAMEで使う</h3>
+              <p>取得済みのiDRAW Assetを、選んだProjectの素材棚へ追加します。</p>
+            </div>
+            <label class="market-item__project-choice" for="itemGameProject">使用先Project
+              <select id="itemGameProject" aria-label="iGAMEで使うProject"></select>
+            </label>
+            <button class="market-file-button market-item__game-use-button" id="itemUseInGame" type="button">iGAMEへ追加</button>
+            <p class="helper" id="itemGameUseStatus" aria-live="polite"></p>
+          </section>
           <p id="itemDescription" class="market-item__description">個性豊かなPiXiEED公式キャラクター詰め合わせセットです
 それぞれの個性は企業ページからご覧いただけます。
 また、本サイト魔王様!!いつまでよければいいですか!?に収録された
@@ -68,7 +79,7 @@
           </section>
           <section class="market-payment-guide" aria-label="購入の流れ">
             <div class="market-payment-guide__head"><strong>購入の流れ</strong><span class="market-help-tip" data-market-help><button class="market-help-tip__button" type="button" aria-label="Stripe決済について" aria-describedby="itemStripeHelp" aria-expanded="false">?</button><span class="market-help-tip__content" id="itemStripeHelp" role="tooltip">購入時はStripeの画面へ移動します。表示された商品名と金額を確認して支払います。カード番号などの決済情報をPiXiEEDが直接保存することはありません。</span></span></div>
-            <ol class="market-payment-steps"><li>内容と金額を確認</li><li>Stripeで支払う</li><li>マイページで受取</li></ol>
+            <ol class="market-payment-steps"><li>内容と金額を確認</li><li>Stripeで支払う</li><li>iGAMEで使うか、マイページで受取</li></ol>
             <small>表示された販売価格を、すべてStripeで決済します。</small>
           </section>
         </section>
@@ -125,6 +136,7 @@
     })();
   </script>
   <script src="../../../scripts/pixieed-market-access.js?v=20260721-auth-network-fallback2"></script>
+  <script src="../../../scripts/market-purchase-delivery.js?v=20260911-igame-handoff1"></script>
   <script src="../../favorites.js?v=20260721-auth-network-fallback1"></script>
   <script src="../../market-ads.js?v=2026.07.19-no-ad-fallback1"></script>
   <script src="../../pageview-rewards.js?v=2026.07.19-lineage-rewards1"></script>

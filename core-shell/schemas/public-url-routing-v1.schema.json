@@ -9,7 +9,7 @@
     "schemaVersion": { "const": 1 },
     "registryVersion": { "const": 1 },
     "routeCount": { "type": "integer", "minimum": 1, "maximum": 256 },
-    "currentSnapshotCount": { "const": 51 },
+    "currentSnapshotCount": { "const": 52 },
     "currentRoutes": { "type": "array", "minItems": 50, "maxItems": 50, "items": { "$ref": "#/$defs/route" } },
     "catalog": { "type": "array", "minItems": 50, "maxItems": 256, "items": { "$ref": "#/$defs/route" } },
     "flags": { "type": "object", "minProperties": 5, "additionalProperties": { "type": "string", "minLength": 1, "maxLength": 64 } },
