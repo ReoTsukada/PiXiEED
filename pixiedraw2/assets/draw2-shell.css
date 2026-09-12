@@ -7610,6 +7610,149 @@ html, body {
 .draw2-tool-studio-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .draw2-tool-studio-actions .draw2-button { min-height: 36px; }
 .draw2-tool-studio-status { margin: 0; padding: 8px 10px; border-radius: 9px; background: color-mix(in srgb, #000 20%, transparent); }
+
+/* iDRAW live-effect controls: the quick rail exposes state, while the
+ * contextual studio exposes the visual choices without duplicating the
+ * manual outline controls below it. */
+.draw2-workspace-quick-controls .draw2-quick-control-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 54px;
+  cursor: pointer;
+}
+.draw2-workspace-quick-controls .draw2-quick-control-toggle .draw2-ui-icon {
+  width: 15px;
+  height: 15px;
+}
+.draw2-workspace-quick-controls .draw2-quick-control-toggle strong {
+  color: var(--draw2-text-muted);
+  font: 700 .58rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: .04em;
+}
+.draw2-workspace-quick-controls .draw2-quick-control-toggle[data-draw2-state="active"] {
+  color: var(--draw2-text-strong);
+  background: color-mix(in srgb, var(--draw2-accent, #74d7ff) 14%, var(--draw2-surface));
+}
+.draw2-workspace-quick-controls .draw2-quick-control-toggle[data-draw2-state="active"] strong {
+  color: var(--draw2-accent, #74d7ff);
+}
+.draw2-quick-control-toggle:focus-visible,
+.draw2-auto-outline-choice:focus-visible,
+#draw2AutoOutlineReset:focus-visible {
+  outline: 2px solid var(--draw2-focus-ring);
+  outline-offset: 2px;
+}
+.draw2-auto-outline-controls {
+  gap: 10px;
+}
+.draw2-auto-outline-controls[hidden] {
+  display: none !important;
+}
+.draw2-auto-outline-visual-options,
+.draw2-auto-outline-settings {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+.draw2-auto-outline-option-group,
+.draw2-auto-outline-settings label {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  color: var(--draw2-text-muted);
+  font-size: .64rem;
+}
+.draw2-auto-outline-option-label {
+  color: var(--draw2-text-muted);
+  font-size: .62rem;
+}
+.draw2-auto-outline-choice-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+}
+.draw2-auto-outline-choice {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: 32px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: var(--draw2-radius-sm);
+  background: color-mix(in srgb, var(--draw2-surface-input) 86%, transparent);
+  color: var(--draw2-text-muted);
+  cursor: pointer;
+  font-size: .62rem;
+}
+.draw2-auto-outline-choice:hover,
+.draw2-auto-outline-choice.is-selected,
+.draw2-auto-outline-choice[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--draw2-accent, #74d7ff) 16%, var(--draw2-surface-input));
+  color: var(--draw2-text-strong);
+}
+.draw2-auto-outline-choice .draw2-ui-icon {
+  width: 14px;
+  height: 14px;
+}
+.draw2-pixel-pattern {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  background: currentColor;
+  clip-path: polygon(35% 0, 65% 0, 65% 35%, 100% 35%, 100% 65%, 65% 65%, 65% 100%, 35% 100%, 35% 65%, 0 65%, 0 35%, 35% 35%);
+}
+.draw2-pixel-pattern-8 {
+  clip-path: none;
+  background:
+    linear-gradient(currentColor 0 0) 0 0 / 4px 4px,
+    linear-gradient(currentColor 0 0) 5px 0 / 4px 4px,
+    linear-gradient(currentColor 0 0) 10px 0 / 4px 4px,
+    linear-gradient(currentColor 0 0) 0 5px / 4px 4px,
+    linear-gradient(currentColor 0 0) 10px 5px / 4px 4px,
+    linear-gradient(currentColor 0 0) 0 10px / 4px 4px,
+    linear-gradient(currentColor 0 0) 5px 10px / 4px 4px,
+    linear-gradient(currentColor 0 0) 10px 10px / 4px 4px;
+  background-repeat: no-repeat;
+}
+.draw2-range-with-output {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+}
+.draw2-range-with-output input[type="range"] {
+  min-width: 0;
+  accent-color: var(--draw2-accent, #74d7ff);
+}
+.draw2-range-with-output output {
+  min-width: 34px;
+  color: var(--draw2-text-strong);
+  font: 700 .62rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  text-align: right;
+}
+.draw2-auto-outline-settings select {
+  width: 100%;
+  min-width: 0;
+}
+.draw2-auto-outline-controls > #draw2AutoOutlineReset {
+  justify-self: start;
+  min-height: 30px;
+  padding-inline: 9px;
+  font-size: .64rem;
+}
+.draw2-auto-outline-controls :disabled,
+.draw2-auto-outline-controls[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: .42;
+}
+.draw2-auto-outline-controls [hidden] {
+  display: none !important;
+}
 @media (min-width: 701px) {
   /* Keep the contextual tool surface immediately available in the advanced
    * dock. The heavier legacy advanced card remains below it and can scroll
@@ -32951,5 +33094,273 @@ body:has(#draw2WorkspaceFrame) {
   .draw2-timeline-asset-shelf-list,
   .draw2-mode-deck-asset-shelf {
     grid-template-columns: repeat(auto-fill, minmax(144px, 1fr));
+  }
+}
+
+/* The detail-density switch is the deliberate doorway to contextual tool
+ * settings. Several older desktop rail projections hide every non-essential
+ * command, which also hid the only route to the Advanced Tools panel. Keep
+ * the switch compact and icon-like, but make it reachable on PC. */
+@media (min-width: 701px) {
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"]
+    .draw2-workspace-command-bar
+    > #draw2WorkspaceDetailToggle {
+    display: grid !important;
+    flex: 0 0 44px !important;
+    box-sizing: border-box !important;
+    width: 44px !important;
+    min-width: 44px !important;
+    max-width: 44px !important;
+    height: 32px !important;
+    min-height: 32px !important;
+    max-height: 32px !important;
+    padding: 3px 4px !important;
+    place-items: center !important;
+    overflow: hidden !important;
+    text-align: center !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"]
+    .draw2-workspace-command-bar
+    > #draw2WorkspaceDetailToggle
+    .draw2-workspace-detail-toggle-description {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"]
+    .draw2-workspace-command-bar
+    > #draw2WorkspaceDetailToggle
+    .draw2-workspace-detail-toggle-label {
+    max-width: 100%;
+    overflow: hidden;
+    font-size: 0.58rem;
+    line-height: 1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* -------------------------------------------------------------------------
+   UI density projection v1 — authoritative presentation layer
+
+   This is intentionally the only density projection block. Existing IDs,
+   event targets, canvas state and persistence remain authoritative. Visual
+   surfaces are primary; selection-only controls are contextual; precision
+   controls stay advanced and remain reachable through detail mode.
+   ------------------------------------------------------------------------- */
+
+/* Supporting copy must not reserve a second row in compact panels. Error,
+   save and busy messages keep their own semantic state and remain visible. */
+#draw2WorkspaceFrame
+  [data-ui-copy="supporting"]:not([data-state="error"]):not([data-state="saving"]):not([data-state="processing"]),
+#draw2WorkspaceFrame
+  [data-ui-copy="description"]:not([data-state="error"]):not([data-state="saving"]):not([data-state="processing"]) {
+  max-block-size: 0 !important;
+  margin-block: 0 !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Empty contextual groups disappear only when their owner reports an empty
+   context; a contextual control is never globally disabled. */
+#draw2WorkspaceFrame [data-ui-tier="contextual"][data-context-state="empty"] {
+  display: none !important;
+}
+
+/* Guided mode is the compact default. Detail mode is the escape hatch for
+   precision-only controls and remains reachable from the existing toggle. */
+#draw2WorkspaceFrame[data-detail-mode="guided"] [data-ui-tier="advanced"] {
+  display: none !important;
+}
+
+/* Inspector is a secondary precision surface: selected values remain clear,
+   while empty/advanced child cards do not create nested visual containers. */
+#draw2WorkspaceFrame
+  :is(
+    #draw2WorkspacePanelInspector,
+    #draw2AudioRightInspector,
+    #draw2WorkspacePanelGameInspector
+  )
+  :is([data-ui-tier="primary"], [data-ui-tier="contextual"])
+  > :is(.draw2-panel-note, .draw2-panel-badge)[data-ui-copy="redundant"] {
+  display: none !important;
+}
+
+#draw2WorkspaceFrame
+  :is(
+    #draw2WorkspacePanelInspector,
+    #draw2AudioRightInspector,
+    #draw2WorkspacePanelGameInspector
+  )
+  :is(.draw2-panel-card, .draw2-panel-section, .draw2-audio-right-section)
+  :is([data-ui-tier="advanced"], [data-context-state="empty"]) {
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+/* iDRAW: Canvas, Palette, Layers and Timeline are the normal interaction
+   surfaces. Inspector keeps only precision controls and selected context. */
+#draw2WorkspaceFrame[data-creator-mode="DRAW"]
+  #draw2WorkspacePanelInspector .draw2-tool-presets {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 4px;
+  align-items: center;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="DRAW"]
+  #draw2WorkspacePanelInspector
+  .draw2-tool-presets
+  #draw2BrushPresetName[data-ui-tier="advanced"] {
+  display: none;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="DRAW"]
+  :is(.draw2-selection-transform-controls, #draw2TimelineLayerPropertiesBody)
+  [data-ui-tier="contextual"][data-context-state="empty"] {
+  display: none !important;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="DRAW"]
+  :is(#draw2WorkspacePanelColor, #draw2WorkspacePanelLayers, #draw2WorkspacePanelTimeline)
+  > .draw2-panel-shell {
+  gap: clamp(6px, 0.7vw, 10px);
+}
+
+/* iAUDIO: the central Piano Roll and lower timeline stay dominant. */
+#draw2WorkspaceFrame[data-creator-mode="AUDIO"]
+  :is(
+    #draw2AudioAssetPackage[data-ui-tier="contextual"][data-context-state="empty"],
+    #draw2AudioRoutingDiagnostics[data-ui-tier="advanced"],
+    #draw2AudioVoiceEditor[data-ui-tier="advanced"]
+  ) {
+  display: none !important;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="AUDIO"] .draw2-audio-compact-master {
+  flex-basis: 38px !important;
+  min-height: 38px !important;
+  grid-template-columns: minmax(44px, 1fr) 30px !important;
+  padding-block: 3px !important;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="AUDIO"]
+  .draw2-audio-compact-master-readouts {
+  display: none !important;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="AUDIO"]
+  :is(.draw2-audio-compact-master-meter, .draw2-audio-meter-channel) {
+  min-height: 28px;
+}
+
+@media (min-width: 1120px) {
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"] {
+    --draw2-timeline-height: clamp(140px, 18dvh, 190px);
+    grid-template: "top top top" 64px "left canvas right" minmax(0, 1fr)
+      "timeline timeline timeline" var(--draw2-timeline-height)
+      "status status status" 28px /
+      minmax(220px, var(--draw2-audio-left-width)) minmax(0, 1fr)
+      minmax(300px, var(--draw2-audio-right-width)) !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    #draw2AudioMidiExpression[data-ui-tier="contextual"][data-context-state="empty"] {
+    display: none !important;
+  }
+}
+
+/* iGAME: keep the inventory contract and make the catalog tiles denser. */
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  :is(.draw2-game-ui-inventory, [data-game-rail-surface="ASSETS"])
+  .draw2-game-ui-inventory-grid,
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  [data-game-rail-surface="ASSETS"] .draw2-game-asset-catalog {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)) !important;
+  gap: 6px !important;
+  min-width: 0;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  .draw2-game-ui-inventory-item {
+  min-width: 0;
+  padding: 9px;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  :is(.draw2-game-ui-inventory-detail, .draw2-game-ui-inventory-item small)[data-ui-copy="supporting"] {
+  max-block-size: 0;
+  margin-block: 0;
+  overflow: hidden;
+  opacity: 0;
+}
+
+/* PC iAUDIO: the lower Mixer is the single editing surface for gain, pan,
+ * mute, solo and FX. Keep the legacy controls intact for the unchanged
+ * tablet/mobile projection, but replace their desktop copy with a compact
+ * selected-track summary and one clear entry point. */
+#draw2AudioInspectorMixerSummary {
+  display: none;
+}
+
+@media (min-width: 901px) and (hover: hover) and (pointer: fine) {
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    #draw2AudioInspectorMixerSummary {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+    min-width: 0;
+    margin: 0 0 8px;
+    padding: 4px 0 8px;
+    border-bottom: 1px solid var(--draw2-border-subtle);
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    #draw2AudioInspectorMixerState {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--draw2-text-muted);
+    font-size: 0.56rem;
+    line-height: 1.3;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    #draw2AudioInspectorOpenMixer {
+    min-height: 26px;
+    padding-inline: 8px;
+    font-size: 0.58rem;
+    white-space: nowrap;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    #draw2AudioRightInspector
+    :is(.draw2-audio-inspector-controls, .draw2-audio-right-chip-row) {
+    display: none !important;
+  }
+
+  /* iDRAW: the selection frame and its handles are the primary transform
+   * surface in guided PC mode. Numeric bounds remain available in detail
+   * mode, where precision editing is intentional. */
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+    #draw2SelectionCard[data-context-state]:not([data-context-state="empty"])
+    .draw2-selection-precision-grid,
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="ANIMATE"]
+    #draw2SelectionCard[data-context-state]:not([data-context-state="empty"])
+    .draw2-selection-precision-grid {
+    display: none;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-detail-mode="detailed"][data-creator-mode="DRAW"]
+    #draw2SelectionCard
+    .draw2-selection-precision-grid,
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-detail-mode="detailed"][data-creator-mode="ANIMATE"]
+    #draw2SelectionCard
+    .draw2-selection-precision-grid {
+    display: grid !important;
   }
 }

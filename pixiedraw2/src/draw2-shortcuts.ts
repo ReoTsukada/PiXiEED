@@ -335,7 +335,7 @@ export const DRAW2_SHORTCUTS: readonly Draw2Shortcut[] = [
     version: 1,
     category: "Timeline",
     label: "Clear active cel",
-    keys: "Delete",
+    keys: "Delete / Backspace",
     command: "clear-cel",
   },
   {
@@ -343,7 +343,7 @@ export const DRAW2_SHORTCUTS: readonly Draw2Shortcut[] = [
     version: 1,
     category: "Selection",
     label: "Delete selected pixels",
-    keys: "Mod+Delete",
+    keys: "Mod+Delete / Mod+Backspace",
     command: "delete-selection",
   },
   {
@@ -396,8 +396,10 @@ function normalizedEventKey(event: Draw2ShortcutEvent): string {
   return `${modifier}${shift}${alt}${normalizeKey(event.key)}`;
 }
 
-function normalizedRegistryKey(keys: string): string {
-  return keys.toLowerCase().replace("escape", "esc").replace("space", "space");
+function normalizedRegistryKeys(keys: string): readonly string[] {
+  return keys.split(/\s*\/\s*/).map((entry) =>
+    entry.toLowerCase().replace("escape", "esc").replace("space", "space")
+  );
 }
 
 /** Returns the first active command, or undefined in protected editing contexts. */
@@ -411,6 +413,6 @@ export function resolveDraw2Shortcut(
   ) return undefined;
   const key = normalizedEventKey(event);
   return DRAW2_SHORTCUTS.find((shortcut) =>
-    normalizedRegistryKey(shortcut.keys) === key
+    normalizedRegistryKeys(shortcut.keys).includes(key)
   );
 }

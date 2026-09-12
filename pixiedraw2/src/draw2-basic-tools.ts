@@ -17,6 +17,7 @@ import {
   shapePixelsInBounds as compactShapePixels,
   type ShapeTool,
 } from "./draw2-shape-geometry.ts";
+import type { StrokeAutoOutlineOptions } from "./draw2-outline-tools.ts";
 
 export type BasicTool =
   | "pen"
@@ -69,6 +70,9 @@ export interface ToolOptions {
   readonly pattern: BrushPattern;
   readonly similarity: number;
   readonly selectionMode?: ColorSelectionMode;
+  /** Optional atomic stroke effects; UI can attach them without changing the core. */
+  readonly autoOutline?: StrokeAutoOutlineOptions;
+  readonly alphaLock?: boolean;
 }
 
 export interface RasterBounds {
@@ -138,7 +142,15 @@ export function normalizeToolOptions(
         requestedSelectionMode === "opaque"
       ? requestedSelectionMode
       : "similar";
-  return { ...brush, similarity, selectionMode };
+  return {
+    ...brush,
+    similarity,
+    selectionMode,
+    ...(options.autoOutline === undefined
+      ? {}
+      : { autoOutline: options.autoOutline }),
+    ...(options.alphaLock === true ? { alphaLock: true } : {}),
+  };
 }
 
 function clampPoint(point: PixelPoint, bounds: RasterBounds): PixelPoint {

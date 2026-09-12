@@ -125,9 +125,12 @@ import {
 } from "./draw2-color-tools.ts";
 import {
   createOutlineWriteSet,
+  createStrokeAutoOutlineWriteSet,
   type OutlineConnectivity,
   type OutlinePlacement,
+  type StrokeAutoOutlineOptions,
 } from "./draw2-outline-tools.ts";
+import { createAlphaLockedWriteSet } from "./draw2-pixel-effects.ts";
 import { createTextMaskWriteSet } from "./draw2-text-tools.ts";
 import { createMarketAssetBindingCandidate } from "./game/game-350/market-asset-binding.ts";
 import {
@@ -607,7 +610,7 @@ function loadAdvancedModule(): Promise<AdvancedModule> {
 
 function loadWorkspaceModule(): Promise<WorkspaceModule> {
   const workspaceChunkUrl = new URL("wp180-workspace.js", import.meta.url);
-  workspaceChunkUrl.searchParams.set("v", "20260911-unity-audio-export-v1");
+  workspaceChunkUrl.searchParams.set("v", "20260911-ui-density-v1");
   workspaceModulePromise ??= import(
     workspaceChunkUrl.href
   ) as unknown as Promise<
@@ -729,6 +732,9 @@ const statusElement = document.querySelector<HTMLElement>("#draw2Status");
 const metricsElement = document.querySelector<HTMLElement>("#draw2Metrics");
 const selectionStatusElement = document.querySelector<HTMLElement>(
   "#draw2SelectionStatus",
+);
+const selectionCardElement = document.querySelector<HTMLElement>(
+  "#draw2SelectionCard",
 );
 const projectIdInputElement = document.querySelector<HTMLInputElement>(
   "#draw2ProjectId",
@@ -1255,6 +1261,27 @@ const outlineColorElement = document.querySelector<HTMLSelectElement>(
 );
 const outlineApplyButton = document.querySelector<HTMLButtonElement>(
   "#draw2OutlineApply",
+);
+const autoOutlineToggleElement = document.querySelector<HTMLButtonElement>(
+  "#draw2AutoOutlineToggle[data-draw2-auto-outline-toggle]",
+);
+const alphaLockToggleElement = document.querySelector<HTMLButtonElement>(
+  "#draw2AlphaLockToggle[data-draw2-alpha-lock-toggle]",
+);
+const autoOutlineOptionsElement = document.querySelector<HTMLElement>(
+  "#draw2AutoOutlineOptions[data-draw2-auto-outline-options]",
+);
+const autoOutlineThicknessElement = document.querySelector<HTMLInputElement>(
+  "#draw2AutoOutlineThickness",
+);
+const autoOutlineThicknessValueElement = document.querySelector<HTMLOutputElement>(
+  "#draw2AutoOutlineThicknessValue",
+);
+const autoOutlineColorElement = document.querySelector<HTMLSelectElement>(
+  "#draw2AutoOutlineColor",
+);
+const autoOutlineResetElement = document.querySelector<HTMLButtonElement>(
+  "#draw2AutoOutlineReset",
 );
 const textInsertDialogElement = document.querySelector<HTMLDialogElement>(
   "#draw2TextInsertDialog",
@@ -3534,6 +3561,13 @@ const outlineThicknessControl = outlineThicknessElement;
 const outlineConnectivityControl = outlineConnectivityElement;
 const outlineColorControl = outlineColorElement;
 const outlineApplyControl = outlineApplyButton;
+const autoOutlineToggleControl = autoOutlineToggleElement;
+const alphaLockToggleControl = alphaLockToggleElement;
+const autoOutlineOptionsControl = autoOutlineOptionsElement;
+const autoOutlineThicknessControl = autoOutlineThicknessElement;
+const autoOutlineThicknessValueControl = autoOutlineThicknessValueElement;
+const autoOutlineColorControl = autoOutlineColorElement;
+const autoOutlineResetControl = autoOutlineResetElement;
 const textInsertDialogControl = textInsertDialogElement;
 const textValueControl = textValueElement;
 const textFontControl = textFontElement;
@@ -9053,6 +9087,7 @@ function renderPaletteButtons(palette: readonly number[]): void {
   refreshPaletteButtonPreview();
   renderColorRampOptions(palette);
   renderIndexedColorOptions(outlineColorControl, palette);
+  syncAutoOutlinePaletteSelection(palette);
   renderIndexedColorOptions(textFillColorControl, palette);
   renderIndexedColorOptions(textStrokeColorControl, palette);
 }
@@ -9566,6 +9601,13 @@ function syncWorkspaceEditCommandState(): void {
     workspaceFrameElement.dataset.draw2ClipboardReady = String(
       clipboard !== undefined,
     );
+  }
+  if (selectionCardElement !== null) {
+    selectionCardElement.dataset.contextState = hasPreview
+      ? "editing"
+      : hasSelection
+      ? "selected"
+      : "empty";
   }
   updateHistoryButtons();
 }
@@ -13041,8 +13083,55 @@ function previewWriteSet(
       write.x < selectionClip.x + selectionClip.width &&
       write.y < selectionClip.y + selectionClip.height
     );
-  return selectedWrites
+  return applyTransientStrokeEffects(
+    asset,
+    tool,
+    selectedWrites,
+    toolOptions,
+  )
     .map(({ x, y }) => ({ x, y }));
+}
+
+/**
+ * Applies optional stroke effects to a transient projection only. Canonical
+ * execution repeats the same deterministic work inside EditorCore, so a
+ * pointer preview can never mutate the raster or become the source of truth.
+ */
+function applyTransientStrokeEffects(
+  asset: RasterAsset,
+  tool: BasicTool,
+  writes: readonly ColoredPixel[],
+  options: Partial<ToolOptions>,
+): readonly ColoredPixel[] {
+  const normalized = normalizeToolOptions(options);
+  const reader = {
+    width: asset.width,
+    height: asset.height,
+    palette: asset.palette,
+    getPixel: (x: number, y: number): number => asset.raster.getPixel(x, y),
+  };
+  const alphaLocked = normalized.alphaLock === true
+    ? createAlphaLockedWriteSet(reader, writes)
+    : writes;
+  if (
+    normalized.autoOutline === undefined ||
+    (tool !== "pen" && tool !== "line") || alphaLocked.length === 0
+  ) return alphaLocked;
+  const outline = createStrokeAutoOutlineWriteSet(
+    reader,
+    alphaLocked,
+    normalized.autoOutline,
+  );
+  const ordered = new Map<string, ColoredPixel>();
+  for (const write of outline) ordered.set(
+    selectionPointKey(write),
+    write,
+  );
+  for (const write of alphaLocked) ordered.set(
+    selectionPointKey(write),
+    write,
+  );
+  return [...ordered.values()];
 }
 
 function guideColor(
@@ -17822,6 +17911,13 @@ async function commitPointerPointsNow(
     const commandSequence = nextClientSequence(drawClientId);
     const before = state;
     const strokeOptions = normalizeToolOptions(fixedToolOptions);
+    const strokeUsesAutoOptions = tool === "pen" || tool === "line";
+    const strokeAutoOutline = strokeUsesAutoOptions
+      ? strokeOptions.autoOutline
+      : undefined;
+    const strokeAlphaLock = strokeUsesAutoOptions
+      ? strokeOptions.alphaLock
+      : undefined;
     const mirror = mirrorCommitSpecForTool(asset, tool);
     let strokePoints: readonly { x: number; y: number }[];
     try {
@@ -17875,6 +17971,10 @@ async function commitPointerPointsNow(
         brushAngle: strokeOptions.brushAngle,
         brushAlgorithm: strokeOptions.brushAlgorithm,
         pattern: strokeOptions.pattern,
+        ...(strokeAutoOutline === undefined
+          ? {}
+          : { autoOutline: strokeAutoOutline }),
+        ...(strokeAlphaLock === true ? { alphaLock: true } : {}),
         ...(mirror === undefined ? {} : { mirror }),
         ...(selectionClip === undefined ? {} : { clip: selectionClip }),
         ...(selectionMask === undefined ? {} : { selectionMask }),
@@ -19229,7 +19329,12 @@ function queuePendingDrawPreview(
   const first = snapshot.points[0]!;
   const last = snapshot.points.at(-1) ?? first;
   const writes = snapshot.previewWrites.length > 0
-    ? projectPendingPreviewWrites(asset, commit.tool, snapshot.previewWrites)
+    ? applyTransientStrokeEffects(
+      asset,
+      commit.tool,
+      projectPendingPreviewWrites(asset, commit.tool, snapshot.previewWrites),
+      commit.toolOptions,
+    )
     : commit.tool === "fill"
     ? fillPreviewWrites(asset, first, last, commit.colorIndex)
     : [];
@@ -21257,6 +21362,7 @@ function syncToolStudio(): void {
   if (toolStudioElement !== null) {
     toolStudioElement.dataset.activeTool = current;
   }
+  syncAutoOutlineControls();
 }
 
 for (
@@ -21704,10 +21810,190 @@ function syncBrushOptionsButton(): void {
   brushOptionsButton.title = accessibleLabel;
 }
 
+function autoOutlineToolIsActive(): boolean {
+  const tool = currentBasicTool();
+  return tool === "pen" || tool === "line";
+}
+
+function readPressedControl(control: HTMLButtonElement | null): boolean {
+  if (control === null) return false;
+  return control.getAttribute("aria-pressed") === "true" ||
+    control.classList.contains("is-active");
+}
+
+function setPressedControl(
+  control: HTMLButtonElement | null,
+  pressed: boolean,
+  enabled: boolean,
+  activeLabel: string,
+  inactiveLabel: string,
+): void {
+  if (control === null) return;
+  control.classList.toggle("is-active", pressed && enabled);
+  control.setAttribute("aria-pressed", String(pressed));
+  control.setAttribute("aria-disabled", String(!enabled));
+  control.disabled = !enabled;
+  control.dataset.draw2State = !enabled
+    ? "unavailable"
+    : pressed
+    ? "active"
+    : "inactive";
+  const stateLabel = !enabled
+    ? "使用不可"
+    : pressed
+    ? activeLabel
+    : inactiveLabel;
+  control.setAttribute("aria-label", stateLabel);
+  const stateOutput = control.querySelector<HTMLElement>("strong");
+  if (stateOutput !== null) stateOutput.textContent = pressed && enabled
+    ? "ON"
+    : "OFF";
+  control.title = !enabled
+    ? "このツールでは使用できません"
+    : pressed
+    ? activeLabel
+    : inactiveLabel;
+}
+
+function selectedAutoOutlinePlacement(): OutlinePlacement {
+  const selected = document.querySelector<HTMLElement>(
+    '[data-draw2-auto-outline-placement][aria-pressed="true"], ' +
+      '[data-draw2-auto-outline-placement].is-active',
+  )?.dataset.placement;
+  return selected === "INSIDE" ? "INSIDE" : "OUTSIDE";
+}
+
+function selectedAutoOutlineConnectivity(): OutlineConnectivity {
+  const selected = document.querySelector<HTMLElement>(
+    '[data-draw2-auto-outline-connectivity][aria-pressed="true"], ' +
+      '[data-draw2-auto-outline-connectivity].is-active',
+  )?.dataset.connectivity;
+  return selected === "4" ? 4 : 8;
+}
+
+function autoOutlineColorIndex(
+  palette: readonly number[],
+  requested: number,
+): number {
+  if (palette.length < 2) return 0;
+  const safe = Number.isFinite(requested) ? Math.round(requested) : 1;
+  return Math.max(1, Math.min(palette.length - 1, safe));
+}
+
+function readAutoOutlineOptions(): StrokeAutoOutlineOptions | undefined {
+  if (autoOutlineToggleControl === null) return toolOptions.autoOutline;
+  if (!readPressedControl(autoOutlineToggleControl)) return undefined;
+  const asset = state.assets[state.activeAssetId];
+  const palette = asset?.palette ?? [];
+  if (palette.length < 2) return undefined;
+  const currentColor = toolOptions.autoOutline?.colorIndex ?? selectedColor;
+  const requestedColor = autoOutlineColorControl === null
+    ? currentColor
+    : Number(autoOutlineColorControl.value);
+  const requestedThickness = autoOutlineThicknessControl === null
+    ? toolOptions.autoOutline?.thickness ?? 1
+    : Number(autoOutlineThicknessControl.value);
+  const thickness = Number.isFinite(requestedThickness)
+    ? Math.max(1, Math.min(16, Math.round(requestedThickness)))
+    : 1;
+  return {
+    colorIndex: autoOutlineColorIndex(palette, requestedColor),
+    placement: selectedAutoOutlinePlacement(),
+    thickness,
+    connectivity: selectedAutoOutlineConnectivity(),
+  };
+}
+
+function syncAutoOutlinePaletteSelection(palette: readonly number[]): void {
+  if (autoOutlineColorControl === null) return;
+  renderIndexedColorOptions(autoOutlineColorControl, palette);
+  const requested = toolOptions.autoOutline?.colorIndex ?? selectedColor;
+  const safe = autoOutlineColorIndex(palette, requested);
+  if (safe > 0 && Array.from(autoOutlineColorControl.options).some((option) =>
+    option.value === String(safe)
+  )) autoOutlineColorControl.value = String(safe);
+}
+
+function syncAutoOutlineControls(): void {
+  const supported = autoOutlineToolIsActive();
+  const outlineEnabled = toolOptions.autoOutline !== undefined;
+  const alphaLocked = toolOptions.alphaLock === true;
+  setPressedControl(
+    autoOutlineToggleControl,
+    outlineEnabled,
+    supported,
+    "自動アウトライン: 有効",
+    "自動アウトライン: 無効",
+  );
+  setPressedControl(
+    alphaLockToggleControl,
+    alphaLocked,
+    supported,
+    "アルファロック: 有効",
+    "アルファロック: 無効",
+  );
+  if (autoOutlineOptionsControl !== null) {
+    autoOutlineOptionsControl.hidden = !supported || !outlineEnabled;
+    autoOutlineOptionsControl.dataset.draw2State = !supported
+      ? "unavailable"
+      : outlineEnabled
+      ? "active"
+      : "inactive";
+    autoOutlineOptionsControl.setAttribute(
+      "aria-disabled",
+      String(!supported || !outlineEnabled),
+    );
+  }
+  const placementButtons = document.querySelectorAll<HTMLButtonElement>(
+    "[data-draw2-auto-outline-placement]",
+  );
+  for (const button of placementButtons) {
+    const selected = button.dataset.placement ===
+      (toolOptions.autoOutline?.placement ?? "OUTSIDE");
+    button.classList.toggle("is-active", selected && supported && outlineEnabled);
+    button.setAttribute("aria-pressed", String(selected));
+    button.setAttribute("aria-disabled", String(!supported || !outlineEnabled));
+    button.disabled = !supported || !outlineEnabled;
+  }
+  const connectivityButtons = document.querySelectorAll<HTMLButtonElement>(
+    "[data-draw2-auto-outline-connectivity]",
+  );
+  for (const button of connectivityButtons) {
+    const selected = button.dataset.connectivity === String(
+      toolOptions.autoOutline?.connectivity ?? 8,
+    );
+    button.classList.toggle("is-active", selected && supported && outlineEnabled);
+    button.setAttribute("aria-pressed", String(selected));
+    button.setAttribute("aria-disabled", String(!supported || !outlineEnabled));
+    button.disabled = !supported || !outlineEnabled;
+  }
+  if (autoOutlineThicknessControl !== null) {
+    const thickness = toolOptions.autoOutline?.thickness ?? 1;
+    autoOutlineThicknessControl.value = String(thickness);
+    autoOutlineThicknessControl.disabled = !supported || !outlineEnabled;
+    autoOutlineThicknessControl.setAttribute(
+      "aria-disabled",
+      String(!supported || !outlineEnabled),
+    );
+    if (autoOutlineThicknessValueControl !== null) {
+      autoOutlineThicknessValueControl.value = `${thickness}px`;
+      autoOutlineThicknessValueControl.textContent = `${thickness}px`;
+    }
+  }
+  if (autoOutlineColorControl !== null) {
+    autoOutlineColorControl.disabled = !supported || !outlineEnabled;
+    autoOutlineColorControl.setAttribute(
+      "aria-disabled",
+      String(!supported || !outlineEnabled),
+    );
+  }
+}
+
 function syncQuickToolControls(): void {
   syncBrushOptionsButton();
   brushAngle.disabled = brushShape.value === "circle";
   syncMirrorModeToggle();
+  syncAutoOutlineControls();
   const tool = currentBasicTool();
   const colorSelectionMode = normalizeColorSelectionMode(
     colorSelectionModeControl.value as ColorSelectionMode,
@@ -21806,6 +22092,10 @@ function updateToolOptions(): void {
   const selectionMode = normalizeColorSelectionMode(
     colorSelectionModeControl.value as ColorSelectionMode,
   );
+  const autoOutline = readAutoOutlineOptions();
+  const alphaLock = alphaLockToggleControl === null
+    ? toolOptions.alphaLock === true
+    : readPressedControl(alphaLockToggleControl);
   toolOptions = {
     brushSize: Number(brushSize.value),
     brushShape: brushShape.value as BrushShape,
@@ -21814,6 +22104,8 @@ function updateToolOptions(): void {
     pattern: brushPattern.value as BrushPattern,
     similarity: colorTolerancePercentToDistance(similarityPercent),
     selectionMode,
+    ...(autoOutline === undefined ? {} : { autoOutline }),
+    ...(alphaLock ? { alphaLock: true } : {}),
   };
   const safePercent = Number.isFinite(similarityPercent)
     ? Math.max(0, Math.min(100, Math.round(similarityPercent)))
@@ -21904,6 +22196,102 @@ function deleteBrushPreset(): void {
   renderBrushPresetOptions();
   setStatus("Brush preset deleted locally.");
 }
+
+function setAutoOutlineChoice(
+  selector: string,
+  dataKey: "placement" | "connectivity",
+  value: string,
+): void {
+  for (const button of document.querySelectorAll<HTMLButtonElement>(selector)) {
+    const selected = button.dataset[dataKey] === value;
+    button.classList.toggle("is-active", selected);
+    button.setAttribute("aria-pressed", String(selected));
+  }
+}
+
+autoOutlineToggleControl?.addEventListener("click", () => {
+  const next = !readPressedControl(autoOutlineToggleControl);
+  autoOutlineToggleControl.setAttribute("aria-pressed", String(next));
+  autoOutlineToggleControl.classList.toggle("is-active", next);
+  updateToolOptions();
+});
+
+alphaLockToggleControl?.addEventListener("click", () => {
+  const next = !readPressedControl(alphaLockToggleControl);
+  alphaLockToggleControl.setAttribute("aria-pressed", String(next));
+  alphaLockToggleControl.classList.toggle("is-active", next);
+  updateToolOptions();
+});
+
+for (
+  const button of document.querySelectorAll<HTMLButtonElement>(
+    "[data-draw2-auto-outline-placement]",
+  )
+) {
+  button.addEventListener("click", () => {
+    const placement = button.dataset.placement;
+    if (placement !== "INSIDE" && placement !== "OUTSIDE") return;
+    setAutoOutlineChoice(
+      "[data-draw2-auto-outline-placement]",
+      "placement",
+      placement,
+    );
+    updateToolOptions();
+  });
+}
+
+for (
+  const button of document.querySelectorAll<HTMLButtonElement>(
+    "[data-draw2-auto-outline-connectivity]",
+  )
+) {
+  button.addEventListener("click", () => {
+    const connectivity = button.dataset.connectivity;
+    if (connectivity !== "4" && connectivity !== "8") return;
+    setAutoOutlineChoice(
+      "[data-draw2-auto-outline-connectivity]",
+      "connectivity",
+      connectivity,
+    );
+    updateToolOptions();
+  });
+}
+
+autoOutlineThicknessControl?.addEventListener("input", updateToolOptions);
+autoOutlineThicknessControl?.addEventListener("change", updateToolOptions);
+autoOutlineColorControl?.addEventListener("change", updateToolOptions);
+autoOutlineResetControl?.addEventListener("click", () => {
+  autoOutlineToggleControl?.classList.remove("is-active");
+  autoOutlineToggleControl?.setAttribute("aria-pressed", "false");
+  alphaLockToggleControl?.classList.remove("is-active");
+  alphaLockToggleControl?.setAttribute("aria-pressed", "false");
+  setAutoOutlineChoice(
+    "[data-draw2-auto-outline-placement]",
+    "placement",
+    "OUTSIDE",
+  );
+  setAutoOutlineChoice(
+    "[data-draw2-auto-outline-connectivity]",
+    "connectivity",
+    "8",
+  );
+  if (autoOutlineThicknessControl !== null) {
+    autoOutlineThicknessControl.value = "1";
+  }
+  if (autoOutlineColorControl !== null) {
+    const asset = state.assets[state.activeAssetId];
+    const fallback = autoOutlineColorIndex(asset?.palette ?? [], selectedColor);
+    autoOutlineColorControl.value = String(fallback);
+  }
+  const {
+    autoOutline: _resetAutoOutline,
+    alphaLock: _resetAlphaLock,
+    ...resetToolOptions
+  } = toolOptions;
+  toolOptions = resetToolOptions;
+  updateToolOptions();
+  setStatus("自動アウトラインとアルファロックを初期化しました。");
+});
 
 toolSelect.addEventListener("change", () => {
   cancelUncommittedSelectionWork(

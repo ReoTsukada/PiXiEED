@@ -25552,6 +25552,7 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
   const audioAssetAddRange = query(documentRef, "#draw2AudioAssetAddRange");
   const audioAssetFinalize = query(documentRef, "#draw2AudioAssetFinalize");
   const audioAssetStatus = query(documentRef, "#draw2AudioAssetStatus");
+  const audioAssetPackage = query(documentRef, "#draw2AudioAssetPackage");
   const audioClockStatus = query(documentRef, "#draw2AudioClockStatus");
   const audioDrawMonitor = query(documentRef, "#draw2AudioDrawMonitor");
   const audioMusicalPosition = query(documentRef, "#draw2AudioMusicalPosition");
@@ -25786,6 +25787,8 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
   const audioRightSurfaces = queryAll(documentRef, "[data-audio-right-surface]");
   const audioRightInspectorTrack = query(documentRef, "#draw2AudioRightInspectorTrack");
   const audioRightInspectorStatus = query(documentRef, "#draw2AudioRightInspectorStatus");
+  const audioRightInspectorMixerState = query(documentRef, "#draw2AudioInspectorMixerState");
+  const audioRightInspectorOpenMixer = query(documentRef, "#draw2AudioInspectorOpenMixer");
   let audioAssetPackageBusy = false;
   let syncAudioAssetPackagePanel = () => {
   };
@@ -25877,6 +25880,11 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
   const draw2GamePreviewStart = query(documentRef, "#draw2GamePreviewStart");
   const draw2GameCreationGuide = query(documentRef, "#draw2GameCreationGuide");
   const draw2GameInspectorSelection = query(documentRef, "#draw2GameInspectorSelection");
+  const draw2GameInspectorPanel = query(documentRef, "#draw2WorkspacePanelGameInspector");
+  const draw2GameObjectCard = query(documentRef, "#draw2GameObjectCard");
+  const draw2GameQuickFlags = query(documentRef, "#draw2GameQuickFlags");
+  const draw2GameComponentsPanel = query(documentRef, "#draw2GameComponentsPanel");
+  const draw2GameLogicMode = query(documentRef, "#draw2GameLogicMode");
   const draw2GameInspectorState = query(documentRef, "#draw2GameInspectorState");
   const draw2GameInspectorName = query(documentRef, "#draw2GameInspectorName");
   const draw2GameInspectorKind = query(documentRef, "#draw2GameInspectorKind");
@@ -31743,6 +31751,18 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
       button.setAttribute("aria-pressed", String(active));
       button.classList.toggle("is-active", active);
     }
+    if (audioRightInspectorMixerState !== void 0) {
+      const panLabel = Math.abs(mixer.pan) < 0.01 ? "Pan C" : mixer.pan < 0 ? `Pan L ${Math.round(Math.abs(mixer.pan) * 100)}` : `Pan R ${Math.round(mixer.pan * 100)}`;
+      const flags = [
+        mixer.muted ? "Mute" : "",
+        mixer.solo ? "Solo" : ""
+      ].filter(Boolean);
+      audioRightInspectorMixerState.textContent = [
+        `Gain ${mixer.gain.toFixed(1)} dB`,
+        panLabel,
+        flags.length > 0 ? flags.join(" \xB7 ") : "M/S off"
+      ].join(" \xB7 ");
+    }
   }
   const renderModeDeckTracks = (host, tracks, prefix) => {
     if (host === void 0) return;
@@ -32343,17 +32363,32 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
   let audioAssetPackageRanges = [];
   const audioAssetPackageSelection = () => {
     const session = audioWorkspaceSession;
-    if (session === void 0) return {
-      error: "iAUDIO\u3092\u8AAD\u307F\u8FBC\u3093\u3067\u3044\u307E\u3059\u3002"
-    };
+    if (session === void 0) {
+      return {
+        error: "iAUDIO\u3092\u8AAD\u307F\u8FBC\u3093\u3067\u3044\u307E\u3059\u3002",
+        contextState: "empty"
+      };
+    }
     const track = selectedAudioCanonicalTrack();
-    if (track === void 0) return {
-      error: "Asset\u5316\u3059\u308BTrack\u3092\u9078\u629E\u3057\u3066\u304F\u3060\u3055\u3044\u3002"
-    };
+    if (track === void 0) {
+      return {
+        error: "Asset\u5316\u3059\u308BTrack\u3092\u9078\u629E\u3057\u3066\u304F\u3060\u3055\u3044\u3002",
+        contextState: "empty"
+      };
+    }
     const roleValue = audioAssetRole?.value;
     if (roleValue !== "BGM" && roleValue !== "SE" && roleValue !== "VOICE") {
       return {
-        error: "\u5F79\u5272\u3092\u9078\u629E\u3057\u3066\u304F\u3060\u3055\u3044\u3002"
+        error: "\u5F79\u5272\u3092\u9078\u629E\u3057\u3066\u304F\u3060\u3055\u3044\u3002",
+        contextState: "error"
+      };
+    }
+    const rawStartFrame = Number(audioWorkspaceMeasureStart.value);
+    const rawEndFrame = Number(audioWorkspaceMeasureEnd.value);
+    if (!Number.isFinite(rawStartFrame) || !Number.isFinite(rawEndFrame) || rawStartFrame < 0 || rawEndFrame <= rawStartFrame || rawEndFrame > audioFrameCount || audioFrameCount <= 0) {
+      return {
+        error: "\u9078\u629E\u7BC4\u56F2\u3092\u78BA\u8A8D\u3057\u3066\u304F\u3060\u3055\u3044\u3002",
+        contextState: "error"
       };
     }
     const bounds = audioSelectedMeasureBounds();
@@ -32380,23 +32415,35 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     };
   };
   syncAudioAssetPackagePanel = () => {
-    if (audioAssetStatus === void 0 || audioAssetFinalize === void 0) return;
+    const setContextState = (state2) => {
+      if (audioAssetPackage !== void 0) {
+        audioAssetPackage.dataset.contextState = state2;
+      }
+    };
+    if (audioAssetStatus === void 0 || audioAssetFinalize === void 0) {
+      setContextState("empty");
+      return;
+    }
     const selection = audioAssetPackageSelection();
     if ("error" in selection) {
+      setContextState(selection.contextState);
       audioAssetAddRange && (audioAssetAddRange.disabled = true);
       audioAssetFinalize.disabled = true;
       audioAssetStatus.textContent = audioAssetPackageBusy ? "\u691C\u8A3C\u4E2D\u2026" : selection.error;
       audioAssetStatus.dataset.state = "error";
       return;
     }
+    setContextState("selected");
     const built = createAudioAssetizationInput(selection.selection);
     if (!built.ok) {
+      setContextState("error");
       audioAssetAddRange && (audioAssetAddRange.disabled = true);
       audioAssetFinalize.disabled = true;
       audioAssetStatus.textContent = built.errors[0] ?? "\u7BC4\u56F2\u3092\u78BA\u8A8D\u3057\u3066\u304F\u3060\u3055\u3044\u3002";
       audioAssetStatus.dataset.state = "error";
       return;
     }
+    setContextState("ready");
     const range = built.value.ranges[0];
     audioAssetPackageRanges = audioAssetPackageRanges.filter((candidate) => candidate.projectId === selection.selection.projectId && candidate.projectRevision === selection.selection.projectRevision && candidate.projectStateHash === selection.selection.projectStateHash);
     const queuedRangeIds = /* @__PURE__ */ new Set();
@@ -39780,12 +39827,13 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     });
   }
   const visibleModeDeckTabs = () => modeTimelineDeckTabs.filter((button) => !button.hidden && (button.dataset.modeDeckTab === "assets" || gameRailTabForModeDeck(button.dataset.modeDeckTab ?? "") !== void 0 || (button.dataset.modeDeckTab ?? "").startsWith("audio-")));
+  const visibleGameModeDeckTabs = visibleModeDeckTabs;
   for (const button of modeTimelineDeckTabs.filter((candidate) => candidate.dataset.modeDeckTab === "assets" || gameRailTabForModeDeck(candidate.dataset.modeDeckTab ?? "") !== void 0 || (candidate.dataset.modeDeckTab ?? "").startsWith("audio-"))) {
     button.addEventListener("keydown", (event) => {
       if (button.hidden) return;
       const key2 = event.key;
       if (key2 !== "ArrowLeft" && key2 !== "ArrowRight" && key2 !== "ArrowUp" && key2 !== "ArrowDown" && key2 !== "Home" && key2 !== "End") return;
-      const tabs2 = visibleModeDeckTabs();
+      const tabs2 = visibleGameModeDeckTabs();
       const currentIndex = tabs2.indexOf(button);
       if (currentIndex < 0 || tabs2.length === 0) return;
       const nextIndex = key2 === "Home" ? 0 : key2 === "End" ? tabs2.length - 1 : (currentIndex + (key2 === "ArrowLeft" || key2 === "ArrowUp" ? -1 : 1) + tabs2.length) % tabs2.length;
@@ -40676,10 +40724,6 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     syncModePlaybackButton();
   });
   const toggleGameDeckPlayback = () => {
-    if (gameDeckPlay !== void 0) {
-      gameDeckPlay.click();
-      return;
-    }
     if (gameDeckPlaying) {
       stopGameDeckPlayback();
       return;
@@ -47783,6 +47827,26 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     const selected = gameDeckTracks.find((track) => track.id === selectedGameTrackId);
     const workspaceSelection = gameWorkspaceContext.selection;
     const selectedEvent = workspaceSelection.kind === "EVENT" ? gameEventCards.find((card) => card.eventId === workspaceSelection.eventId) : void 0;
+    const inspectorContextState = selectedEvent !== void 0 ? "event" : selected === void 0 ? "empty" : "selected";
+    if (draw2GameInspectorPanel !== void 0) {
+      draw2GameInspectorPanel.dataset.contextState = inspectorContextState;
+    }
+    if (draw2GameObjectCard !== void 0) {
+      draw2GameObjectCard.dataset.contextState = inspectorContextState;
+    }
+    if (draw2GameQuickFlags !== void 0) {
+      draw2GameQuickFlags.dataset.contextState = selected === void 0 ? "empty" : "selected";
+    }
+    if (draw2GameComponentsPanel !== void 0) {
+      draw2GameComponentsPanel.dataset.contextState = selected === void 0 ? "empty" : "selected";
+    }
+    if (draw2GameLogicMode !== void 0) {
+      draw2GameLogicMode.dataset.contextState = selectedEvent !== void 0 ? "event" : selected === void 0 ? "empty" : "selected";
+    }
+    if (draw2GameLeftDockNodeBoxPanel !== void 0) {
+      const objectContext = gameWorkspaceContext.selection.kind === "OBJECT" || gameWorkspaceContext.selection.kind === "COMPONENT";
+      draw2GameLeftDockNodeBoxPanel.dataset.contextState = objectContext && selected !== void 0 ? "selected" : "empty";
+    }
     const locked = gameAuthoringLocked();
     const currentBehaviorId = selected === void 0 ? void 0 : gameBehaviorIdForTrack(selected.id);
     if (currentBehaviorId !== gameLogicModeBehaviorId) {
@@ -51532,6 +51596,9 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
     }
     const world = gamePlayground.world;
     const player = gamePlayground.player;
+    if (draw2GamePlaygroundCenterBar !== void 0) {
+      draw2GamePlaygroundCenterBar.dataset.contextState = gamePlaygroundRuntimeState !== void 0 ? "running" : player === void 0 ? "empty" : "ready";
+    }
     if (draw2GamePlaygroundWorldState !== void 0) {
       draw2GamePlaygroundWorldState.textContent = world === void 0 ? "\u672A\u8A2D\u5B9A" : "\u8A2D\u5B9A\u6E08\u307F";
     }
@@ -55993,6 +56060,11 @@ function bootstrapDraw2Workspace(documentRef = document, options = {}) {
   draw2AudioPanelOpenMixer?.addEventListener("click", () => {
     selectModeDeckTab("audio-mixer");
     void ensureAudioWorkspaceSession().then(renderAudioCustomPanels);
+  });
+  audioRightInspectorOpenMixer?.addEventListener("click", () => {
+    selectModeDeckTab("audio-mixer");
+    void ensureAudioWorkspaceSession().then(renderAudioCustomPanels);
+    setModeDeckStatus("audio", `${currentAudioDeckTrackId()} mixer opened`);
   });
   draw2AudioPanelOpenClips?.addEventListener("click", () => {
     selectModeDeckTab("audio-library");

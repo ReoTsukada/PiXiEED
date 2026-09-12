@@ -55,6 +55,15 @@ Deno.test("Draw2 shortcut registry covers selection, tools, mirror and viewport"
     "ArrowDown should select the next layer in Draw mode",
   );
   assert(
+    resolveDraw2Shortcut({ key: "Backspace" })?.command === "clear-cel",
+    "Backspace should clear the active cel like Delete",
+  );
+  assert(
+    resolveDraw2Shortcut({ key: "Backspace", ctrlKey: true })?.command ===
+      "delete-selection",
+    "Ctrl+Backspace should delete the selection like Ctrl+Delete",
+  );
+  assert(
     resolveDraw2Shortcut({ key: "p" }, { inputEditing: true }) === undefined,
     "input editing must suppress shortcuts",
   );

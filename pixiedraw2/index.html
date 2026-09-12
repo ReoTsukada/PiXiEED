@@ -10,15 +10,15 @@
     <title>PiXiEEDstudio — Studio</title>
     <link
       rel="stylesheet"
-      href="./assets/draw2-shell.min.css?v=20260911-unity-audio-export-v1"
+      href="./assets/draw2-shell.min.css?v=20260911-ui-density-v1"
     >
     <link
       rel="stylesheet"
-      href="./assets/draw2-game-ux.css?v=20260911-unity-audio-export-v1"
+      href="./assets/draw2-game-ux.css?v=20260911-ui-density-v1"
     >
     <link
       rel="stylesheet"
-      href="./assets/draw2-mode-motion.css?v=20260911-unity-audio-export-v1"
+      href="./assets/draw2-mode-motion.css?v=20260911-ui-density-v1"
     >
   </head>
   <body>
@@ -1801,6 +1801,32 @@
                   <use href="./assets/icons/draw2-icons.svg#icon-flip-horizontal"></use>
                 </svg><span class="draw2-visually-hidden">Mirror</span><strong data-draw2-mirror-state>OFF</strong>
               </button>
+              <button
+                class="draw2-quick-control draw2-quick-control-toggle draw2-auto-outline-toggle"
+                id="draw2AutoOutlineToggle"
+                type="button"
+                aria-pressed="false"
+                data-draw2-auto-outline-toggle
+                aria-label="Automatic outline: Off"
+                title="Toggle automatic outline"
+              >
+                <svg class="draw2-ui-icon" aria-hidden="true" focusable="false">
+                  <use href="./assets/icons/draw2-icons.svg#icon-border"></use>
+                </svg><span class="draw2-visually-hidden">Automatic outline</span><strong data-draw2-auto-outline-state>OFF</strong>
+              </button>
+              <button
+                class="draw2-quick-control draw2-quick-control-toggle draw2-alpha-lock-toggle"
+                id="draw2AlphaLockToggle"
+                type="button"
+                aria-pressed="false"
+                data-draw2-alpha-lock-toggle
+                aria-label="Alpha lock: Off"
+                title="Toggle alpha lock"
+              >
+                <svg class="draw2-ui-icon" aria-hidden="true" focusable="false">
+                  <use href="./assets/icons/draw2-icons.svg#icon-lock"></use>
+                </svg><span class="draw2-visually-hidden">Alpha lock</span><strong data-draw2-alpha-lock-state>OFF</strong>
+              </button>
             </div>
             <div
               class="draw2-brush-options-flyout"
@@ -1897,6 +1923,8 @@
           <section
             class="draw2-game-left-dock"
             id="draw2GameLeftDock"
+            data-ui-tier="primary"
+            data-ui-surface="hierarchy"
             aria-label="Game scene hierarchy"
             hidden
           >
@@ -1904,6 +1932,8 @@
             <div
               class="draw2-game-left-dock-panel"
               id="draw2GameLeftDockHierarchyPanel"
+              data-ui-tier="primary"
+              data-ui-surface="hierarchy"
               data-game-left-dock-panel="hierarchy"
               role="tabpanel"
               aria-labelledby="draw2GameLeftDockTabHierarchy"
@@ -1961,13 +1991,15 @@
               role="tree"
               aria-label="Gameシーンのオブジェクト"
             ></div>
-            <p class="draw2-panel-status" id="draw2GameHierarchyStatus">
+            <p class="draw2-panel-status" id="draw2GameHierarchyStatus" data-ui-copy="supporting">
               Gameのマップ・登場人物・オブジェクト・システムをここで管理します。
             </p>
             </div>
             <div
               class="draw2-game-left-dock-panel"
               id="draw2GameLeftDockNodeBoxPanel"
+              data-ui-tier="contextual"
+              data-ui-surface="node-box"
               data-game-left-dock-panel="node-box"
               role="tabpanel"
               aria-labelledby="draw2GameLeftDockTabNodeBox"
@@ -2638,22 +2670,28 @@
           <section
             id="draw2GameSceneViewport"
             class="draw2-game-scene-viewport"
+            data-ui-tier="primary"
+            data-ui-surface="viewport"
             aria-label="iGAME Scene View"
             hidden
           >
             <section
               id="draw2GamePlaygroundCenterBar"
               class="draw2-game-playground-center-bar"
+              data-ui-tier="contextual"
+              data-ui-surface="viewport-context"
+              data-context-state="empty"
               aria-label="iGAME Playgroundのモード選択"
               hidden
             >
-              <div class="draw2-game-playground-center-title">
+              <div class="draw2-game-playground-center-title" data-ui-copy="supporting">
                 <span class="draw2-eyebrow">iGAME PLAYGROUND</span>
                 <strong>選ぶ → 動かす → 音をつける</strong>
               </div>
               <div
                 id="draw2GamePlaygroundModes"
                 class="draw2-game-playground-mode-switch"
+                data-ui-tier="primary"
                 role="group"
                 aria-label="移動モード"
               >
@@ -2661,7 +2699,7 @@
                 <button type="button" data-game-playground-mode="RPG_4" aria-pressed="false">RPG 4方向</button>
                 <button type="button" data-game-playground-mode="RPG_8" aria-pressed="false">RPG 8方向</button>
               </div>
-              <output id="draw2GamePlaygroundCenterStatus" class="draw2-game-playground-center-status" aria-live="polite">主人公を選ぶと、ここで動かせます</output>
+              <output id="draw2GamePlaygroundCenterStatus" class="draw2-game-playground-center-status" data-ui-copy="supporting" aria-live="polite">主人公を選ぶと、ここで動かせます</output>
             </section>
             <div class="draw2-game-scene-viewport-stage">
               <svg
@@ -2690,12 +2728,16 @@
           <section
             id="draw2AudioWorkspace"
             class="draw2-audio-workspace"
+            data-ui-tier="primary"
+            data-ui-surface="audio-workspace"
             aria-label="Audio arranger and piano roll workspace"
             hidden
           >
             <section
               class="draw2-audio-arranger-overview"
               id="draw2AudioArrangerOverview"
+              data-ui-tier="primary"
+              data-ui-surface="audio-arranger"
               aria-label="Audio arranger overview"
             >
               <header class="draw2-audio-arranger-header">
@@ -2838,6 +2880,8 @@
               <div
                 class="draw2-audio-arranger-viewport"
                 id="draw2AudioArrangerViewport"
+                data-ui-tier="primary"
+                data-ui-surface="audio-arranger-viewport"
               >
                 <div
                   class="draw2-audio-arranger-ruler"
@@ -2925,6 +2969,8 @@
             <section
               class="draw2-audio-panel"
               id="draw2AudioPanelPianoRoll"
+              data-ui-tier="primary"
+              data-ui-surface="piano-roll"
               data-audio-panel-surface="piano-roll"
               data-audio-editor-surface="ROLL"
               role="tabpanel"
@@ -3634,6 +3680,8 @@
             class="draw2-workspace-panel"
             data-workspace-panel-content="layers"
             id="draw2WorkspacePanelLayers"
+            data-ui-tier="primary"
+            data-ui-surface="layer-stack"
             role="tabpanel"
             aria-labelledby="draw2WorkspaceTabLayers"
             hidden
@@ -3695,6 +3743,8 @@
             class="draw2-workspace-panel is-active"
             data-workspace-panel-content="color"
             id="draw2WorkspacePanelColor"
+            data-ui-tier="primary"
+            data-ui-surface="palette"
             role="tabpanel"
             aria-labelledby="draw2WorkspaceTabColor"
           >
@@ -3704,6 +3754,8 @@
             class="draw2-workspace-panel"
             data-workspace-panel-content="inspector"
             id="draw2WorkspacePanelInspector"
+            data-ui-tier="contextual"
+            data-ui-surface="inspector"
             role="tabpanel"
             aria-labelledby="draw2WorkspaceTabInspector"
             hidden
@@ -3711,9 +3763,10 @@
             <div
               class="draw2-tool-options"
               id="draw2ToolOptions"
+              data-ui-tier="contextual"
               aria-label="Tool options"
             >
-              <div class="draw2-tool-presets" aria-label="Brush presets">
+              <div class="draw2-tool-presets" data-ui-tier="contextual" aria-label="Brush presets">
                 <select id="draw2BrushPreset" aria-label="Brush preset">
                   <option value="">Preset</option>
                 </select>
@@ -3763,6 +3816,8 @@
             class="draw2-workspace-panel"
             data-workspace-panel-content="history"
             id="draw2WorkspacePanelHistory"
+            data-ui-tier="contextual"
+            data-ui-surface="history"
             role="tabpanel"
             aria-labelledby="draw2WorkspaceTabHistory"
             hidden
@@ -3772,7 +3827,7 @@
                 <div><span class="draw2-eyebrow">iDRAW</span><strong>History</strong></div>
                 <span class="draw2-panel-badge" id="draw2HistoryState">Waiting</span>
               </div>
-              <p class="draw2-panel-note">描画の正規Undo／Redo履歴を表示します。ここでは別の履歴を作りません。</p>
+              <p class="draw2-panel-note" data-ui-copy="supporting">描画の正規Undo／Redo履歴を表示します。ここでは別の履歴を作りません。</p>
               <div class="draw2-panel-action-row">
                 <button id="draw2HistoryUndo" class="draw2-button draw2-button-secondary" type="button">Undo <output id="draw2HistoryUndoDepth">0</output></button>
                 <button id="draw2HistoryRedo" class="draw2-button draw2-button-secondary" type="button">Redo <output id="draw2HistoryRedoDepth">0</output></button>
@@ -3785,6 +3840,8 @@
             class="draw2-workspace-panel"
             data-workspace-panel-content="navigator"
             id="draw2WorkspacePanelNavigator"
+            data-ui-tier="contextual"
+            data-ui-surface="navigator"
             role="tabpanel"
             aria-labelledby="draw2WorkspaceTabNavigator"
             hidden
@@ -3794,7 +3851,7 @@
                 <div><span class="draw2-eyebrow">VIEW</span><strong>Navigator</strong></div>
                 <span class="draw2-panel-badge" id="draw2NavigatorZoomValue">100%</span>
               </div>
-              <p class="draw2-panel-note">Canvasの表示位置と倍率だけを操作します。描画データは変更しません。</p>
+              <p class="draw2-panel-note" data-ui-copy="supporting">Canvasの表示位置と倍率だけを操作します。描画データは変更しません。</p>
               <div class="draw2-navigator-preview">
                 <canvas id="draw2NavigatorCanvas" width="160" height="160" aria-label="Canvas overview"></canvas>
               </div>
@@ -3812,6 +3869,8 @@
             data-workspace-panel-content="advanced"
             data-detail-level="detailed"
             id="draw2WorkspacePanelAdvanced"
+            data-ui-tier="advanced"
+            data-ui-surface="tool-studio"
             role="tabpanel"
             aria-labelledby="draw2WorkspaceTabAdvanced"
             hidden
@@ -3834,10 +3893,88 @@
                   <span class="draw2-tool-studio-glyph">↗</span><span><strong>Move Content</strong><small>未選択なら現在セルを自動選択 · Altドラッグで複製</small></span>
                 </button>
               </div>
+              <section
+                class="draw2-tool-effect-controls draw2-auto-outline-controls"
+                id="draw2AutoOutlineOptions"
+                data-draw2-auto-outline-options
+                aria-labelledby="draw2AutoOutlineHeading"
+              >
+                <div class="draw2-inline-section-heading">
+                  <span class="draw2-eyebrow">LIVE EFFECT</span>
+                  <strong id="draw2AutoOutlineHeading">Automatic outline</strong>
+                </div>
+                <div class="draw2-auto-outline-visual-options">
+                  <div class="draw2-auto-outline-option-group" role="group" aria-label="Automatic outline placement">
+                    <span class="draw2-auto-outline-option-label">Placement</span>
+                    <div class="draw2-auto-outline-choice-row">
+                      <button
+                        class="draw2-auto-outline-choice is-selected"
+                        id="draw2AutoOutlinePlacementOutside"
+                        type="button"
+                        data-draw2-auto-outline-placement
+                        data-placement="OUTSIDE"
+                        aria-pressed="true"
+                        aria-label="Automatic outline outside"
+                        title="Outline outside the stroke"
+                      ><svg class="draw2-ui-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-border"></use></svg><span>Outside</span></button>
+                      <button
+                        class="draw2-auto-outline-choice"
+                        id="draw2AutoOutlinePlacementInside"
+                        type="button"
+                        data-draw2-auto-outline-placement
+                        data-placement="INSIDE"
+                        aria-pressed="false"
+                        aria-label="Automatic outline inside"
+                        title="Outline inside the stroke"
+                      ><svg class="draw2-ui-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-border"></use></svg><span>Inside</span></button>
+                    </div>
+                  </div>
+                  <div class="draw2-auto-outline-option-group" role="group" aria-label="Automatic outline connectivity">
+                    <span class="draw2-auto-outline-option-label">Connectivity</span>
+                    <div class="draw2-auto-outline-choice-row">
+                      <button
+                        class="draw2-auto-outline-choice"
+                        id="draw2AutoOutlineConnectivity4"
+                        type="button"
+                        data-draw2-auto-outline-connectivity
+                        data-connectivity="4"
+                        aria-pressed="false"
+                        aria-label="Four-neighbor connectivity"
+                        title="Use four-neighbor connectivity"
+                      ><span class="draw2-pixel-pattern draw2-pixel-pattern-4" aria-hidden="true"></span><span>4</span></button>
+                      <button
+                        class="draw2-auto-outline-choice is-selected"
+                        id="draw2AutoOutlineConnectivity8"
+                        type="button"
+                        data-draw2-auto-outline-connectivity
+                        data-connectivity="8"
+                        aria-pressed="true"
+                        aria-label="Eight-neighbor connectivity"
+                        title="Use eight-neighbor connectivity"
+                      ><span class="draw2-pixel-pattern draw2-pixel-pattern-8" aria-hidden="true"></span><span>8</span></button>
+                    </div>
+                  </div>
+                </div>
+                <div class="draw2-auto-outline-settings">
+                  <label class="draw2-auto-outline-thickness">Thickness
+                    <span class="draw2-range-with-output"><input id="draw2AutoOutlineThickness" type="range" min="1" max="16" value="1" aria-label="Automatic outline thickness"><output id="draw2AutoOutlineThicknessValue" for="draw2AutoOutlineThickness">1 px</output></span>
+                  </label>
+                  <label>Outline color
+                    <select id="draw2AutoOutlineColor" aria-label="Automatic outline color"></select>
+                  </label>
+                </div>
+                <button
+                  id="draw2AutoOutlineReset"
+                  class="draw2-button draw2-button-secondary draw2-button-icon"
+                  type="button"
+                  aria-label="Reset automatic outline settings"
+                  title="Reset automatic outline settings"
+                ><svg class="draw2-ui-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-undo"></use></svg><span class="draw2-button-label">Reset</span></button>
+              </section>
               <section class="draw2-tool-effect-controls" aria-labelledby="draw2OutlineHeading">
                 <div class="draw2-inline-section-heading">
-                  <span class="draw2-eyebrow">EFFECT</span>
-                  <strong id="draw2OutlineHeading">Outline</strong>
+                  <span class="draw2-eyebrow">MANUAL EFFECT</span>
+                  <strong id="draw2OutlineHeading">Manual outline</strong>
                 </div>
                 <div class="draw2-tool-studio-options">
                   <label>Placement <select id="draw2OutlinePlacement"><option value="OUTSIDE" selected>Outside</option><option value="INSIDE">Inside</option></select></label>
@@ -3858,6 +3995,8 @@
             class="draw2-workspace-panel"
             data-workspace-panel-content="preview"
             id="draw2WorkspacePanelPreview"
+            data-ui-tier="contextual"
+            data-ui-surface="preview"
             role="tabpanel"
             aria-labelledby="draw2WorkspaceTabPreview"
             hidden
@@ -3868,6 +4007,8 @@
             class="draw2-workspace-panel"
             data-workspace-panel-content="assets"
             id="draw2WorkspacePanelAssets"
+            data-ui-tier="contextual"
+            data-ui-surface="asset-builder"
             role="tabpanel"
             aria-labelledby="draw2WorkspaceTabAssets"
             hidden
@@ -5161,6 +5302,8 @@
             class="draw2-workspace-panel"
             data-workspace-panel-content="export"
             id="draw2WorkspacePanelExport"
+            data-ui-tier="contextual"
+            data-ui-surface="export"
             role="tabpanel"
             aria-labelledby="draw2WorkspaceTabExport"
             hidden
@@ -5386,6 +5529,8 @@
             class="draw2-workspace-panel"
             data-workspace-panel-content="tileset"
             id="draw2WorkspacePanelTileset"
+            data-ui-tier="contextual"
+            data-ui-surface="tileset"
             role="tabpanel"
             aria-labelledby="draw2WorkspaceTabTileset"
             hidden
@@ -5582,6 +5727,8 @@
             class="draw2-workspace-panel"
             data-workspace-panel-content="game-scene"
             id="draw2WorkspacePanelGameScene"
+            data-ui-tier="primary"
+            data-ui-surface="game-scene"
             role="tabpanel"
             aria-labelledby="draw2WorkspaceTabGameScene"
             hidden
@@ -5783,6 +5930,8 @@
             class="draw2-workspace-panel"
             data-workspace-panel-content="game-inspector"
             id="draw2WorkspacePanelGameInspector"
+            data-ui-tier="contextual"
+            data-ui-surface="game-inspector"
             role="tabpanel"
             aria-labelledby="draw2WorkspaceTabGameInspector"
             hidden
@@ -5797,6 +5946,9 @@
               <section
                 class="draw2-game-object-card"
                 id="draw2GameObjectCard"
+                data-ui-tier="contextual"
+                data-ui-surface="object"
+                data-context-state="empty"
                 aria-labelledby="draw2GameObjectCardHeading"
               >
                 <div class="draw2-game-object-card-heading">
@@ -5860,6 +6012,9 @@
               <section
                 class="draw2-game-quick-flags"
                 id="draw2GameQuickFlags"
+                data-ui-tier="contextual"
+                data-ui-surface="object-state"
+                data-context-state="empty"
                 aria-labelledby="draw2GameQuickFlagsHeading"
               >
                 <div class="draw2-game-subheading">
@@ -5874,6 +6029,8 @@
               <section
                 id="draw2GameCameraQuickSettings"
                 class="draw2-game-camera-quick"
+                data-ui-tier="contextual"
+                data-ui-surface="camera"
                 aria-labelledby="draw2GameCameraQuickHeading"
                 hidden
               >
@@ -5918,7 +6075,11 @@
                 </p>
               </section>
               <section
+                id="draw2GameComponentsPanel"
                 class="draw2-game-components"
+                data-ui-tier="contextual"
+                data-ui-surface="components"
+                data-context-state="empty"
                 aria-labelledby="draw2GameComponentsHeading"
               >
                 <div class="draw2-game-subheading">
@@ -5931,6 +6092,8 @@
                 <div
                   id="draw2GameComponents"
                   class="draw2-game-component-list"
+                  data-ui-tier="contextual"
+                  data-ui-surface="components"
                   role="list"
                   data-drop-accept="application/x-draw2-game-component"
                   data-drop-target="selected-game-object"
@@ -5945,7 +6108,7 @@
                 
                 <p class="draw2-panel-status" id="draw2GameComponentsStatus" role="status" aria-live="polite">機能なし</p>
                 </section>
-              <details class="draw2-game-advanced-settings">
+              <details id="draw2GameAdvancedSettings" class="draw2-game-advanced-settings" data-ui-tier="advanced" data-ui-surface="advanced-settings">
                 <summary>詳細設定（上級者向け）</summary>
                 <p class="draw2-panel-note">
                   普段の制作では変更不要です。内部の種類・物理値・高度な機能を確認できます。
@@ -5989,7 +6152,7 @@
                 </section>
                 
               </details>
-              <div class="draw2-game-logic-mode" role="tablist" aria-label="Game logic authoring mode">
+              <div id="draw2GameLogicMode" class="draw2-game-logic-mode" data-ui-tier="contextual" data-context-state="empty" role="tablist" aria-label="Game logic authoring mode">
                 <button
                   id="draw2GameLogicSimple"
                   class="draw2-button draw2-game-logic-tab is-active"
@@ -6095,6 +6258,8 @@
               <section
                 id="draw2GameGraphPanel"
                 class="draw2-game-logic-panel"
+                data-ui-tier="advanced"
+                data-ui-surface="logic-graph"
                 data-game-logic-panel="GRAPH"
                 role="tabpanel"
                 aria-label="Node Graph"
@@ -6139,6 +6304,8 @@
               <section
                 id="draw2GameCodePanel"
                 class="draw2-game-logic-panel"
+                data-ui-tier="advanced"
+                data-ui-surface="logic-code"
                 data-game-logic-panel="CODE"
                 role="tabpanel"
                 aria-label="Bounded Game Code"
@@ -6169,6 +6336,8 @@
             class="draw2-workspace-panel"
             data-workspace-panel-content="game-assets"
             id="draw2WorkspacePanelGameAssets"
+            data-ui-tier="primary"
+            data-ui-surface="asset-inventory"
             role="tabpanel"
             aria-labelledby="draw2WorkspaceTabGameAssets"
             hidden
@@ -6266,6 +6435,8 @@
             class="draw2-workspace-panel"
             data-workspace-panel-content="game-build"
             id="draw2WorkspacePanelGameBuild"
+            data-ui-tier="advanced"
+            data-ui-surface="build"
             role="tabpanel"
             aria-labelledby="draw2WorkspaceTabGameBuild"
             hidden
@@ -6398,6 +6569,8 @@
             class="draw2-workspace-panel"
             data-workspace-panel-content="audio"
             id="draw2WorkspacePanelAudio"
+            data-ui-tier="contextual"
+            data-ui-surface="audio-overview"
             role="tabpanel"
             aria-labelledby="draw2WorkspaceTabAudio"
             hidden
@@ -6443,6 +6616,8 @@
             class="draw2-workspace-panel"
             data-workspace-panel-content="audio-inspector"
             id="draw2WorkspacePanelAudioInspector"
+            data-ui-tier="contextual"
+            data-ui-surface="audio-mixer"
             role="tabpanel"
             aria-labelledby="draw2WorkspaceTabAudioInspector"
             hidden
@@ -6472,6 +6647,8 @@
             class="draw2-workspace-panel"
             data-workspace-panel-content="audio-library"
             id="draw2WorkspacePanelAudioLibrary"
+            data-ui-tier="contextual"
+            data-ui-surface="audio-library"
             role="tabpanel"
             aria-labelledby="draw2WorkspaceTabAudioLibrary"
             hidden
@@ -6509,6 +6686,8 @@
             class="draw2-workspace-panel"
             data-workspace-panel-content="audio-preview"
             id="draw2WorkspacePanelAudioPreview"
+            data-ui-tier="contextual"
+            data-ui-surface="audio-preview"
             role="tabpanel"
             aria-labelledby="draw2WorkspaceTabAudioPreview"
             hidden
@@ -6632,6 +6811,8 @@
             <section
               class="draw2-audio-right-surface is-active"
               id="draw2AudioRightInspector"
+              data-ui-tier="contextual"
+              data-ui-surface="audio-inspector"
               data-audio-right-surface="inspector"
               role="tabpanel"
               aria-label="Audio Inspector"
@@ -6640,6 +6821,26 @@
                 <span class="draw2-eyebrow">INSPECTOR</span>
                 <strong id="draw2AudioRightInspectorTrack">Track: Piano</strong>
               </div>
+              <section
+                id="draw2AudioInspectorMixerSummary"
+                class="draw2-audio-inspector-mixer-summary"
+                data-ui-tier="contextual"
+                data-ui-surface="audio-mixer-summary"
+                aria-label="Selected track mixer"
+              >
+                <output
+                  id="draw2AudioInspectorMixerState"
+                  class="draw2-audio-inspector-mixer-state"
+                  aria-live="polite"
+                >Mixer</output>
+                <button
+                  id="draw2AudioInspectorOpenMixer"
+                  class="draw2-button draw2-button-quiet"
+                  type="button"
+                >
+                  Mixerを開く
+                </button>
+              </section>
               <div class="draw2-audio-inspector-controls">
                 <label class="draw2-audio-knob-field">
                   <span class="draw2-audio-control-heading"><span
@@ -6720,6 +6921,9 @@
               <section
                 id="draw2AudioAssetPackage"
                 class="draw2-audio-asset-package"
+                data-ui-tier="contextual"
+                data-ui-surface="asset-delivery"
+                data-context-state="empty"
                 aria-label="iAUDIO範囲をAsset化"
               >
                 <div class="draw2-audio-asset-package-heading">
@@ -6776,9 +6980,11 @@
               <details class="draw2-audio-inspector-details" data-detail-level="detailed">
                 <summary>Routing diagnostics <small>Playback / graph</small></summary>
                 <section
-                  id="draw2AudioRoutingDiagnostics"
-                  class="draw2-audio-right-section"
-                  aria-label="Mixer and routing diagnostics"
+                id="draw2AudioRoutingDiagnostics"
+                class="draw2-audio-right-section"
+                data-ui-tier="advanced"
+                data-ui-surface="audio-routing"
+                aria-label="Mixer and routing diagnostics"
                 >
                   <div class="draw2-audio-right-heading">
                     <span class="draw2-eyebrow">MIXER / ROUTING</span>
@@ -6805,6 +7011,8 @@
               <section
                 id="draw2AudioVoiceEditor"
                 class="draw2-audio-right-section draw2-audio-voice-editor"
+                data-ui-tier="advanced"
+                data-ui-surface="audio-voice"
                 aria-label="Instrument voice preset editor"
                 hidden
               >
@@ -6926,6 +7134,8 @@
             <section
               class="draw2-audio-right-surface"
               id="draw2AudioRightBrowser"
+              data-ui-tier="contextual"
+              data-ui-surface="audio-browser"
               data-audio-right-surface="browser"
               role="tabpanel"
               aria-label="Audio Library"
@@ -7028,6 +7238,8 @@
             <section
               class="draw2-audio-right-surface"
               id="draw2AudioRightMaster"
+              data-ui-tier="contextual"
+              data-ui-surface="audio-master"
               data-audio-right-surface="master"
               role="tabpanel"
               aria-label="Audio Master"
@@ -7141,6 +7353,8 @@
         <footer
           class="draw2-workspace-timeline-region"
           id="draw2WorkspaceTimelineRegion"
+          data-ui-tier="primary"
+          data-ui-surface="timeline"
           aria-label="Timeline Region"
         >
           <button
@@ -7153,6 +7367,8 @@
           <section
             class="draw2-mode-timeline-deck"
             id="draw2ModeTimelineDeck"
+            data-ui-tier="primary"
+            data-ui-surface="mode-deck"
             aria-label="Mode lower deck"
             hidden
           >
@@ -7326,6 +7542,8 @@
             <section
               id="draw2ModeDeckAssets"
               class="draw2-mode-deck-surface draw2-mode-deck-asset-surface"
+              data-ui-tier="primary"
+              data-ui-surface="saved-assets"
               data-mode-deck-surface="assets"
               aria-label="保存済みアセット"
               hidden
@@ -7345,6 +7563,8 @@
             <section
               id="draw2ModeDeckGame"
               class="draw2-mode-deck-surface"
+              data-ui-tier="primary"
+              data-ui-surface="game-deck"
               data-mode-deck-surface="game"
               aria-label="Game systems and event sheet"
               hidden
@@ -7352,6 +7572,8 @@
               <section
                 id="draw2GamePlaygroundBottom"
                 class="draw2-game-playground-bottom"
+                data-ui-tier="primary"
+                data-ui-surface="game-asset-library"
                 aria-label="iGAMEアセット一覧"
               >
                 <div class="draw2-game-playground-bottom-heading">
@@ -7497,6 +7719,8 @@
               <section
                 id="draw2GameRailSurfaceScene"
                 class="draw2-game-rail-surface"
+                data-ui-tier="primary"
+                data-ui-surface="game-scene-rail"
                 data-game-rail-surface="SCENE"
                 aria-label="Game Scene objects"
                 role="tabpanel"
@@ -7513,6 +7737,8 @@
               <section
                 id="draw2GameRailSurfaceAssets"
                 class="draw2-game-rail-surface"
+                data-ui-tier="primary"
+                data-ui-surface="game-assets-rail"
                 data-game-rail-surface="ASSETS"
                 aria-label="Game asset browser"
                 role="tabpanel"
@@ -7565,6 +7791,8 @@
               <section
                 id="draw2GameRailSurfaceAnimation"
                 class="draw2-game-rail-surface"
+                data-ui-tier="primary"
+                data-ui-surface="game-animation-rail"
                 data-game-rail-surface="ANIMATION"
                 aria-label="Game animation browser"
                 role="tabpanel"
@@ -7613,6 +7841,8 @@
               <section
                 id="draw2GameRailSurfaceData"
                 class="draw2-game-rail-surface"
+                data-ui-tier="advanced"
+                data-ui-surface="game-data-rail"
                 data-game-rail-surface="GAME_DATA"
                 aria-label="Game data browser"
                 role="tabpanel"
@@ -7631,6 +7861,8 @@
               <section
                 id="draw2GameRailSurfaceEvents"
                 class="draw2-game-rail-surface"
+                data-ui-tier="contextual"
+                data-ui-surface="game-events-rail"
                 data-game-rail-surface="EVENTS"
                 aria-label="Game events browser"
                 role="tabpanel"
@@ -8195,6 +8427,8 @@
               <section
                 class="draw2-audio-panel"
                 id="draw2AudioPanelTimeline"
+                data-ui-tier="primary"
+                data-ui-surface="audio-timeline"
                 data-audio-panel-surface="timeline"
                 role="tabpanel"
                 aria-label="Unified animation and audio timeline"
@@ -8230,6 +8464,8 @@
               <section
                 class="draw2-audio-panel"
                 id="draw2AudioPanelClips"
+                data-ui-tier="contextual"
+                data-ui-surface="audio-clips"
                 data-audio-panel-surface="clips"
                 role="tabpanel"
                 aria-label="Audio clip library"
@@ -8246,6 +8482,8 @@
               <section
                 class="draw2-audio-panel"
                 id="draw2AudioPanelMixer"
+                data-ui-tier="contextual"
+                data-ui-surface="audio-mixer"
                 data-audio-panel-surface="mixer"
                 role="tabpanel"
                 aria-label="Audio mixer"
@@ -8262,6 +8500,8 @@
               <section
                 class="draw2-audio-panel"
                 id="draw2AudioPanelAutomation"
+                data-ui-tier="contextual"
+                data-ui-surface="audio-automation"
                 data-audio-panel-surface="automation"
                 role="tabpanel"
                 aria-label="Audio automation"
@@ -8305,6 +8545,8 @@
               <section
                 class="draw2-audio-panel"
                 id="draw2AudioPanelFx"
+                data-ui-tier="advanced"
+                data-ui-surface="audio-fx"
                 data-audio-panel-surface="fx"
                 role="tabpanel"
                 aria-label="Selected Track FX chain"
@@ -8366,6 +8608,8 @@
               <section
                 class="draw2-audio-panel"
                 id="draw2AudioPanelMarkers"
+                data-ui-tier="contextual"
+                data-ui-surface="audio-markers"
                 data-audio-panel-surface="markers"
                 role="tabpanel"
                 aria-label="Animation sync markers"
@@ -8416,6 +8660,8 @@
               <section
                 class="draw2-audio-panel"
                 id="draw2AudioPanelSettings"
+                data-ui-tier="advanced"
+                data-ui-surface="audio-settings"
                 data-audio-panel-surface="settings"
                 role="tabpanel"
                 aria-label="Audio timing settings"
@@ -8852,6 +9098,9 @@
       <section
         class="draw2-card draw2-selection-card"
         id="draw2SelectionCard"
+        data-ui-tier="contextual"
+        data-ui-surface="selection-transform"
+        data-context-state="empty"
         aria-labelledby="draw2SelectionHeading"
       >
         <div class="draw2-card-heading">
@@ -8866,7 +9115,7 @@
         <p class="draw2-help">
           Canvasでは離すと選択が確定します。選択範囲の内側をドラッグすると移動、Alt+ドラッグで複製移動、Shiftで追加、Altで範囲外からの減算になります。矢印キーで1px、Shift+矢印キーで8px移動できます。矩形選択をダブルクリックしてそのままドラッグすると、16px単位で選択できます。
         </p>
-        <div class="draw2-transform-grid">
+        <div class="draw2-transform-grid draw2-selection-precision-grid">
           <label>X <input
               id="draw2SelectionX"
               type="number"
@@ -9170,6 +9419,8 @@
       <section
         class="draw2-card draw2-timeline-card"
         id="draw2TimelineCard"
+        data-ui-tier="primary"
+        data-ui-surface="timeline"
         aria-labelledby="draw2TimelineHeading"
       >
         <div class="draw2-card-heading draw2-timeline-heading">
@@ -9958,7 +10209,12 @@
         aria-label="Drawing canvas"
         hidden
       >
-        <div class="draw2-canvas-card" id="draw2CanvasCard">
+        <div
+          class="draw2-canvas-card"
+          id="draw2CanvasCard"
+          data-ui-tier="primary"
+          data-ui-surface="canvas"
+        >
           <output
             id="draw2Metrics"
             class="draw2-metrics"
@@ -10007,6 +10263,7 @@
                 id="draw2Canvas"
                 width="256"
                 height="256"
+                tabindex="0"
               aria-label="PiXiEEDstudio iDRAW pixel canvas. Pointer input commits one deterministic raster.strokeCommit per Stroke Session."
               ></canvas><svg
                 id="draw2TilemapGrid"
@@ -10975,7 +11232,7 @@
     <script src="../scripts/market-purchase-delivery.js?v=20260906-direct-igame-market1"></script>
     <script
       type="module"
-      src="./dist/draw2-entry.js?v=20260911-unity-audio-export-v1"
+      src="./dist/draw2-entry.js?v=20260911-ui-density-v1"
     ></script>
     <script
       type="module"

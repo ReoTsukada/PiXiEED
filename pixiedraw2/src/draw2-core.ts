@@ -35,6 +35,12 @@ import {
   type DecodedIndexedRasterStamp,
   type IndexedRasterStampSource,
 } from "./draw2-raster-stamp.ts";
+import {
+  createStrokeAutoOutlineWriteSet,
+  type StrokeAutoOutlineOptions,
+} from "./draw2-outline-tools.ts";
+
+export type { StrokeAutoOutlineOptions } from "./draw2-outline-tools.ts";
 
 export {
   createRasterSelectionMask,
@@ -844,6 +850,10 @@ export interface StrokeCommitPayload {
   readonly mirror?: MirrorCommitSpec;
   readonly clip?: RasterClipRect;
   readonly selectionMask?: RasterSelectionMask;
+  /** Optional stroke-local outline, applied atomically with the stroke. */
+  readonly autoOutline?: StrokeAutoOutlineOptions;
+  /** Only paint pixels that were already opaque when the stroke began. */
+  readonly alphaLock?: boolean;
 }
 export interface ShapeCommitPayload {
   readonly tool: ShapeTool;
@@ -1456,6 +1466,70 @@ function validateMirrorCommitSpec(
         ),
       );
     }
+  }
+  return diagnostics;
+}
+
+function validateStrokeAutoOutline(
+  value: unknown,
+  asset: Pick<RasterAsset, "palette">,
+  path = "payload.autoOutline",
+): Diagnostic[] {
+  if (value === undefined) return [];
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return [
+      diagnostic(
+        "STROKE_OUTLINE_INVALID",
+        "Stroke auto outline must be an object.",
+        path,
+      ),
+    ];
+  }
+  const outline = value as Record<string, unknown>;
+  const diagnostics: Diagnostic[] = [];
+  if (outline.placement !== "INSIDE" && outline.placement !== "OUTSIDE") {
+    diagnostics.push(
+      diagnostic(
+        "STROKE_OUTLINE_PLACEMENT_INVALID",
+        "Stroke auto outline placement is not supported.",
+        `${path}.placement`,
+      ),
+    );
+  }
+  if (
+    !Number.isSafeInteger(outline.thickness) ||
+    (outline.thickness as number) < 1 ||
+    (outline.thickness as number) > 16
+  ) {
+    diagnostics.push(
+      diagnostic(
+        "STROKE_OUTLINE_THICKNESS_INVALID",
+        "Stroke auto outline thickness must be between 1 and 16.",
+        `${path}.thickness`,
+      ),
+    );
+  }
+  if (outline.connectivity !== 4 && outline.connectivity !== 8) {
+    diagnostics.push(
+      diagnostic(
+        "STROKE_OUTLINE_CONNECTIVITY_INVALID",
+        "Stroke auto outline connectivity must be 4 or 8.",
+        `${path}.connectivity`,
+      ),
+    );
+  }
+  if (
+    !Number.isSafeInteger(outline.colorIndex) ||
+    (outline.colorIndex as number) <= 0 ||
+    (outline.colorIndex as number) >= asset.palette.length
+  ) {
+    diagnostics.push(
+      diagnostic(
+        "STROKE_OUTLINE_COLOR_INVALID",
+        "Stroke auto outline color must reference a non-transparent palette entry.",
+        `${path}.colorIndex`,
+      ),
+    );
   }
   return diagnostics;
 }
@@ -2127,7 +2201,20 @@ function validatePayload(
     );
     diagnostics.push(
       ...validateMirrorCommitSpec(command.payload.mirror, asset),
+      ...validateStrokeAutoOutline(command.payload.autoOutline, asset),
     );
+    if (
+      command.payload.alphaLock !== undefined &&
+      typeof command.payload.alphaLock !== "boolean"
+    ) {
+      diagnostics.push(
+        diagnostic(
+          "STROKE_ALPHA_LOCK_INVALID",
+          "Stroke alphaLock must be a boolean.",
+          "payload.alphaLock",
+        ),
+      );
+    }
     if (
       brushSize !== undefined &&
       (!Number.isSafeInteger(brushSize) || brushSize < 1 ||
@@ -2661,6 +2748,7 @@ export class EditorCore {
     let fillVisitedCount = 0;
     let fillWriteColors: ReadonlyMap<string, number> | undefined;
     let tileWriteColors: ReadonlyMap<string, number> | undefined;
+    let strokeWriteColors: ReadonlyMap<string, number> | undefined;
     let tileSourceCellCount = 0;
     let interpolatedStrokePixelCount = 0;
     let commandSelectionMask: DecodedRasterSelectionMask | undefined;
@@ -2698,9 +2786,44 @@ export class EditorCore {
           sourceAsset,
         );
       const clipped = clipPixelPoints(mirroredPoints, command.payload.clip);
-      points = clipped.filter((point) =>
+      const constrainedPoints = clipped.filter((point) =>
         pointInsideSelectionMask(point, commandSelectionMask)
       );
+      const paintedPoints = command.payload.alphaLock === true
+        ? constrainedPoints.filter((point) =>
+          ((sourceAsset.palette[sourceAsset.raster.getPixel(point.x, point.y)] ?? 0) >>> 24 &
+            0xff) > 0
+        )
+        : constrainedPoints;
+      points = paintedPoints;
+      if (command.payload.autoOutline !== undefined && paintedPoints.length > 0) {
+        const outline = createStrokeAutoOutlineWriteSet(
+          {
+            width: sourceAsset.width,
+            height: sourceAsset.height,
+            palette: sourceAsset.palette,
+            getPixel: (x, y) => sourceAsset.raster.getPixel(x, y),
+          },
+          paintedPoints,
+          command.payload.autoOutline,
+        ).filter((point) =>
+          pointInsideSelectionMask(point, commandSelectionMask) &&
+          (command.payload.clip === undefined ||
+            pointInsideRasterClip(point, command.payload.clip))
+        );
+        const ordered = new Map<string, number>();
+        for (const point of outline) {
+          ordered.set(`${point.x}:${point.y}`, point.colorIndex);
+        }
+        for (const point of paintedPoints) {
+          ordered.set(`${point.x}:${point.y}`, command.payload.colorIndex);
+        }
+        points = [...ordered.keys()].map((key) => {
+          const [xText, yText] = key.split(":");
+          return { x: Number(xText), y: Number(yText) };
+        });
+        strokeWriteColors = ordered;
+      }
     } else if (command.commandType === "raster.shapeCommit") {
       const shapePoints = createShapeWriteSet(
         command.payload.tool,
@@ -2808,6 +2931,8 @@ export class EditorCore {
         ? tileWriteColors
         : command.commandType === "raster.fill"
         ? fillWriteColors
+        : command.commandType === "raster.strokeCommit"
+        ? strokeWriteColors
         : undefined;
       const fallbackColorIndex = command.commandType === "raster.setPixel" ||
           command.commandType === "raster.strokeCommit" ||

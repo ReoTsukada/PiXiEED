@@ -3,6 +3,11 @@
 export type OutlinePlacement = "INSIDE" | "OUTSIDE";
 export type OutlineConnectivity = 4 | 8;
 
+export interface OutlinePoint {
+  readonly x: number;
+  readonly y: number;
+}
+
 export interface OutlinePixelReader {
   readonly width: number;
   readonly height: number;
@@ -22,6 +27,18 @@ export interface OutlineWrite {
   readonly x: number;
   readonly y: number;
   readonly colorIndex: number;
+}
+
+/**
+ * The bounded descriptor carried by a canonical stroke command.  Keeping this
+ * as metadata instead of expanding the outline into a write-set preserves the
+ * one-stroke/one-undo contract and keeps PiXYNC payloads small.
+ */
+export interface StrokeAutoOutlineOptions {
+  readonly colorIndex: number;
+  readonly placement: OutlinePlacement;
+  readonly thickness: number;
+  readonly connectivity: OutlineConnectivity;
 }
 
 function isOpaque(color: number): boolean {
@@ -86,4 +103,103 @@ export function createOutlineWriteSet(
     }
   }
   return writes;
+}
+
+/**
+ * Plans an outline around only the pixels produced by one stroke.  Unlike
+ * createOutlineWriteSet(), this never scans the whole canvas and never treats
+ * unrelated artwork as part of the outline source.  Existing opaque pixels
+ * are preserved for OUTSIDE outlines so a new stroke cannot erase artwork
+ * underneath it.
+ */
+export function createStrokeAutoOutlineWriteSet(
+  reader: OutlinePixelReader,
+  strokePoints: readonly OutlinePoint[],
+  options: StrokeAutoOutlineOptions & {
+    readonly allowedPixels?: ReadonlySet<string>;
+  },
+): readonly OutlineWrite[] {
+  const thickness = Math.max(1, Math.min(16, Math.round(options.thickness)));
+  if (
+    !Number.isSafeInteger(options.colorIndex) || options.colorIndex <= 0 ||
+    options.colorIndex >= reader.palette.length || reader.width < 1 ||
+    reader.height < 1
+  ) return [];
+  const source = new Set<string>();
+  for (const point of strokePoints) {
+    if (
+      point.x >= 0 && point.y >= 0 && point.x < reader.width &&
+      point.y < reader.height
+    ) source.add(pointKey(point.x, point.y));
+  }
+  if (source.size === 0) return [];
+  const writes = new Map<string, OutlineWrite>();
+  const add = (x: number, y: number): void => {
+    const key = pointKey(x, y);
+    if (
+      options.allowedPixels !== undefined &&
+      !options.allowedPixels.has(key)
+    ) return;
+    if (source.has(key)) return;
+    if (options.placement === "OUTSIDE") {
+      const original = reader.palette[reader.getPixel(x, y)] ?? 0;
+      if (isOpaque(original)) return;
+    }
+    if (reader.getPixel(x, y) === options.colorIndex) return;
+    writes.set(key, { x, y, colorIndex: options.colorIndex });
+  };
+  for (const sourceKey of source) {
+    const [sourceXText, sourceYText] = sourceKey.split(":");
+    const sourceX = Number(sourceXText);
+    const sourceY = Number(sourceYText);
+    if (options.placement === "INSIDE") {
+      let hasTransparentNeighbor = false;
+      for (let neighborY = -thickness; neighborY <= thickness; neighborY += 1) {
+        for (let neighborX = -thickness; neighborX <= thickness; neighborX += 1) {
+          if (
+            (neighborX === 0 && neighborY === 0) ||
+            !withinRadius(neighborX, neighborY, thickness, options.connectivity)
+          ) continue;
+          const candidateX = sourceX + neighborX;
+          const candidateY = sourceY + neighborY;
+          if (
+            candidateX < 0 || candidateY < 0 ||
+            candidateX >= reader.width || candidateY >= reader.height ||
+            !source.has(pointKey(candidateX, candidateY))
+          ) {
+            hasTransparentNeighbor = true;
+            break;
+          }
+        }
+        if (hasTransparentNeighbor) break;
+      }
+      if (
+        hasTransparentNeighbor &&
+        options.allowedPixels?.has(sourceKey) !== false &&
+        reader.getPixel(sourceX, sourceY) !== options.colorIndex
+      ) {
+        writes.set(sourceKey, {
+          x: sourceX,
+          y: sourceY,
+          colorIndex: options.colorIndex,
+        });
+      }
+      continue;
+    }
+    for (let dy = -thickness; dy <= thickness; dy += 1) {
+      for (let dx = -thickness; dx <= thickness; dx += 1) {
+        if (
+          (dx === 0 && dy === 0) ||
+          !withinRadius(dx, dy, thickness, options.connectivity)
+        ) continue;
+        const x = sourceX + dx;
+        const y = sourceY + dy;
+        if (
+          x < 0 || y < 0 || x >= reader.width || y >= reader.height
+        ) continue;
+        add(x, y);
+      }
+    }
+  }
+  return [...writes.values()];
 }

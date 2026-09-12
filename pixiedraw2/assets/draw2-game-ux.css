@@ -165,6 +165,32 @@
     #draw2GameHierarchyAddMenu {
     z-index: 100 !important;
   }
+
+  /* Keep Inventory's semantic title / controls / catalog contract in the
+     first desktop GAME projection as well as the final density projection. */
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    #draw2ModeDeckGame
+    > .draw2-game-rail-surface[data-game-rail-surface="ASSETS"]:not([hidden]) {
+    display: grid;
+    grid-template-areas:
+      "title controls"
+      "catalog catalog";
+    grid-template-columns: max-content minmax(0, 1fr);
+    grid-template-rows: 28px minmax(0, 1fr);
+    gap: 4px 8px;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    #draw2ModeDeckGame
+    > .draw2-game-rail-surface[data-game-rail-surface="ASSETS"]:not([hidden])
+    .draw2-game-asset-catalog {
+    grid-area: catalog;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    min-height: 0;
+    overflow: auto;
+  }
 }
 
 /* -------------------------------------------------------------------------
@@ -4139,4 +4165,96 @@
 #draw2WorkspaceFrame[data-creator-mode="GAME"]
   .draw2-game-playground-card[data-playground-card="controls"] {
   border-left-color: #f2b36d !important;
+}
+
+/* -------------------------------------------------------------------------
+   UI density projection v1: GAME-only final overrides
+
+   Viewport is the primary manipulation surface.  The inspector shows the
+   selected object's precision controls, while empty/contextual/advanced
+   groups do not consume the first visible viewport of the right rail.
+   ------------------------------------------------------------------------- */
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  #draw2WorkspacePanelGameInspector
+  :is([data-ui-tier="contextual"], [data-ui-tier="advanced"])
+  [data-context-state="empty"] {
+  display: none !important;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  #draw2WorkspacePanelGameInspector
+  :is(.draw2-panel-note, .draw2-game-playground-card-status)[data-ui-copy="supporting"] {
+  max-block-size: 0;
+  margin-block: 0;
+  overflow: hidden;
+  opacity: 0;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  #draw2WorkspacePanelGameInspector
+  :is(.draw2-game-playground-inspector-card, .draw2-game-component-card)
+  [data-ui-tier="advanced"] {
+  display: none !important;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  #draw2WorkspacePanelGameInspector
+  :is(.draw2-game-playground-inspector-card, .draw2-game-component-card) {
+  min-width: 0;
+  padding: 7px;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  #draw2WorkspacePanelGameInspector
+  :is(input, select, textarea, button, [role="button"]) {
+  min-height: 30px;
+}
+
+/* The viewport carries the result and the selection handles.  Keep the mode
+   switch in the upper rail and prevent helper prose from reclaiming stage
+   height when explicitly marked as supporting copy. */
+#draw2WorkspaceFrame[data-creator-mode="GAME"]
+  #draw2GameSceneViewport
+  [data-ui-copy="supporting"]:not([data-state="error"]):not([data-state="saving"]):not([data-state="processing"]) {
+  max-block-size: 0;
+  margin-block: 0;
+  overflow: hidden;
+  opacity: 0;
+}
+
+/* Keep the existing contract-visible named grid explicit: title, controls and
+   catalog remain separate regions so the inventory surface is discoverable
+   by the contract test and stable at narrow desktop widths. */
+@media (min-width: 1024px) {
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+    #draw2ModeDeckGame
+    > .draw2-game-rail-surface[data-game-rail-surface="ASSETS"]:not([hidden]) {
+    display: grid !important;
+    grid-template-areas:
+      "title controls"
+      "catalog catalog";
+    grid-template-columns: max-content minmax(0, 1fr);
+    grid-template-rows: 28px minmax(0, 1fr);
+    gap: 4px 8px;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+    #draw2ModeDeckGame
+    > .draw2-game-rail-surface[data-game-rail-surface="ASSETS"]:not([hidden])
+    > :is(.draw2-game-rail-section-heading, [data-game-rail-controls]) {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 700px) {
+  #draw2WorkspaceFrame[data-creator-mode="GAME"]
+    #draw2WorkspacePanelGameInspector
+    :is(.draw2-game-playground-inspector-card, .draw2-game-component-card) {
+    padding: 8px;
+  }
 }

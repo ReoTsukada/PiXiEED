@@ -3686,6 +3686,10 @@ export function bootstrapDraw2Workspace(
     documentRef,
     "#draw2AudioAssetStatus",
   );
+  const audioAssetPackage = query<HTMLElement>(
+    documentRef,
+    "#draw2AudioAssetPackage",
+  );
   const audioClockStatus = query<HTMLElement>(
     documentRef,
     "#draw2AudioClockStatus",
@@ -4424,6 +4428,14 @@ export function bootstrapDraw2Workspace(
     documentRef,
     "#draw2AudioRightInspectorStatus",
   );
+  const audioRightInspectorMixerState = query<HTMLOutputElement>(
+    documentRef,
+    "#draw2AudioInspectorMixerState",
+  );
+  const audioRightInspectorOpenMixer = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2AudioInspectorOpenMixer",
+  );
   let audioAssetPackageBusy = false;
   let syncAudioAssetPackagePanel: () => void = () => {};
   const audioVoiceEditor = query<HTMLElement>(
@@ -4777,6 +4789,26 @@ export function bootstrapDraw2Workspace(
   const draw2GameInspectorSelection = query<HTMLElement>(
     documentRef,
     "#draw2GameInspectorSelection",
+  );
+  const draw2GameInspectorPanel = query<HTMLElement>(
+    documentRef,
+    "#draw2WorkspacePanelGameInspector",
+  );
+  const draw2GameObjectCard = query<HTMLElement>(
+    documentRef,
+    "#draw2GameObjectCard",
+  );
+  const draw2GameQuickFlags = query<HTMLElement>(
+    documentRef,
+    "#draw2GameQuickFlags",
+  );
+  const draw2GameComponentsPanel = query<HTMLElement>(
+    documentRef,
+    "#draw2GameComponentsPanel",
+  );
+  const draw2GameLogicMode = query<HTMLElement>(
+    documentRef,
+    "#draw2GameLogicMode",
   );
   const draw2GameInspectorState = query<HTMLElement>(
     documentRef,
@@ -12435,6 +12467,22 @@ export function bootstrapDraw2Workspace(
       button.setAttribute("aria-pressed", String(active));
       button.classList.toggle("is-active", active);
     }
+    if (audioRightInspectorMixerState !== undefined) {
+      const panLabel = Math.abs(mixer.pan) < 0.01
+        ? "Pan C"
+        : mixer.pan < 0
+        ? `Pan L ${Math.round(Math.abs(mixer.pan) * 100)}`
+        : `Pan R ${Math.round(mixer.pan * 100)}`;
+      const flags = [
+        mixer.muted ? "Mute" : "",
+        mixer.solo ? "Solo" : "",
+      ].filter(Boolean);
+      audioRightInspectorMixerState.textContent = [
+        `Gain ${mixer.gain.toFixed(1)} dB`,
+        panLabel,
+        flags.length > 0 ? flags.join(" · ") : "M/S off",
+      ].join(" · ");
+    }
   }
 
   const renderModeDeckTracks = (
@@ -13250,20 +13298,40 @@ export function bootstrapDraw2Workspace(
   };
   let audioAssetPackageNotice: AudioAssetPackageNotice | undefined;
   let audioAssetPackageRanges: AudioAssetPackageSelectionInput[] = [];
+  type AudioAssetPackageSelectionError = {
+    readonly error: string;
+    readonly contextState: "empty" | "error";
+  };
   const audioAssetPackageSelection = (): {
     readonly selection: AudioAssetPackageSelectionInput;
     readonly track: AudioTrack;
     readonly role: AudioAssetPackageKind;
     readonly label: string;
     readonly bounds: ReturnType<typeof audioSelectedMeasureBounds>;
-  } | { readonly error: string } => {
+  } | AudioAssetPackageSelectionError => {
     const session = audioWorkspaceSession;
-    if (session === undefined) return { error: "iAUDIOを読み込んでいます。" };
+    if (session === undefined) {
+      return { error: "iAUDIOを読み込んでいます。", contextState: "empty" };
+    }
     const track = selectedAudioCanonicalTrack();
-    if (track === undefined) return { error: "Asset化するTrackを選択してください。" };
+    if (track === undefined) {
+      return {
+        error: "Asset化するTrackを選択してください。",
+        contextState: "empty",
+      };
+    }
     const roleValue = audioAssetRole?.value;
     if (roleValue !== "BGM" && roleValue !== "SE" && roleValue !== "VOICE") {
-      return { error: "役割を選択してください。" };
+      return { error: "役割を選択してください。", contextState: "error" };
+    }
+    const rawStartFrame = Number(audioWorkspaceMeasureStart.value);
+    const rawEndFrame = Number(audioWorkspaceMeasureEnd.value);
+    if (
+      !Number.isFinite(rawStartFrame) || !Number.isFinite(rawEndFrame) ||
+      rawStartFrame < 0 || rawEndFrame <= rawStartFrame ||
+      rawEndFrame > audioFrameCount || audioFrameCount <= 0
+    ) {
+      return { error: "選択範囲を確認してください。", contextState: "error" };
     }
     const bounds = audioSelectedMeasureBounds();
     const barLabel = bounds.endBar - bounds.startBar === 1
@@ -13289,9 +13357,20 @@ export function bootstrapDraw2Workspace(
     };
   };
   syncAudioAssetPackagePanel = (): void => {
-    if (audioAssetStatus === undefined || audioAssetFinalize === undefined) return;
+    const setContextState = (
+      state: "empty" | "error" | "selected" | "ready",
+    ): void => {
+      if (audioAssetPackage !== undefined) {
+        audioAssetPackage.dataset.contextState = state;
+      }
+    };
+    if (audioAssetStatus === undefined || audioAssetFinalize === undefined) {
+      setContextState("empty");
+      return;
+    }
     const selection = audioAssetPackageSelection();
     if ("error" in selection) {
+      setContextState(selection.contextState);
       audioAssetAddRange && (audioAssetAddRange.disabled = true);
       audioAssetFinalize.disabled = true;
       audioAssetStatus.textContent = audioAssetPackageBusy
@@ -13300,14 +13379,17 @@ export function bootstrapDraw2Workspace(
       audioAssetStatus.dataset.state = "error";
       return;
     }
+    setContextState("selected");
     const built = createAudioAssetizationInput(selection.selection);
     if (!built.ok) {
+      setContextState("error");
       audioAssetAddRange && (audioAssetAddRange.disabled = true);
       audioAssetFinalize.disabled = true;
       audioAssetStatus.textContent = built.errors[0] ?? "範囲を確認してください。";
       audioAssetStatus.dataset.state = "error";
       return;
     }
+    setContextState("ready");
     const range = built.value.ranges[0];
     audioAssetPackageRanges = audioAssetPackageRanges.filter((candidate) =>
       candidate.projectId === selection.selection.projectId &&
@@ -23736,6 +23818,9 @@ export function bootstrapDraw2Workspace(
         gameRailTabForModeDeck(button.dataset.modeDeckTab ?? "") !== undefined ||
         (button.dataset.modeDeckTab ?? "").startsWith("audio-"))
     );
+  // Compatibility alias for the Game tab contract; both names use the same
+  // visibility projection and therefore do not create a second behavior.
+  const visibleGameModeDeckTabs = visibleModeDeckTabs;
   for (const button of modeTimelineDeckTabs.filter((candidate) =>
     candidate.dataset.modeDeckTab === "assets" ||
       gameRailTabForModeDeck(candidate.dataset.modeDeckTab ?? "") !== undefined ||
@@ -23749,7 +23834,7 @@ export function bootstrapDraw2Workspace(
         key !== "ArrowUp" && key !== "ArrowDown" && key !== "Home" &&
         key !== "End"
       ) return;
-      const tabs = visibleModeDeckTabs();
+      const tabs = visibleGameModeDeckTabs();
       const currentIndex = tabs.indexOf(button);
       if (currentIndex < 0 || tabs.length === 0) return;
       const nextIndex = key === "Home"
@@ -24975,13 +25060,11 @@ export function bootstrapDraw2Workspace(
     syncModePlaybackButton();
   });
   const toggleGameDeckPlayback = (): void => {
-    if (gameDeckPlay !== undefined) {
-      gameDeckPlay.click();
-      return;
-    }
     // The legacy Game deck can be isolated from the current workspace DOM.
-    // Keep the header Space transport functional by using the same reducer
-    // and runtime path when that old button is unavailable.
+    // Keep both the header transport and the hidden compatibility control on
+    // the same reducer/runtime path. Do not delegate to the legacy button:
+    // that node may be isolated or have been replaced during panel projection,
+    // which would make a visible header click appear to do nothing.
     if (gameDeckPlaying) {
       stopGameDeckPlayback();
       return;
@@ -34333,6 +34416,42 @@ export function bootstrapDraw2Workspace(
     const selectedEvent = workspaceSelection.kind === "EVENT"
       ? gameEventCards.find((card) => card.eventId === workspaceSelection.eventId)
       : undefined;
+    const inspectorContextState = selectedEvent !== undefined
+      ? "event"
+      : selected === undefined
+      ? "empty"
+      : "selected";
+    if (draw2GameInspectorPanel !== undefined) {
+      draw2GameInspectorPanel.dataset.contextState = inspectorContextState;
+    }
+    if (draw2GameObjectCard !== undefined) {
+      draw2GameObjectCard.dataset.contextState = inspectorContextState;
+    }
+    if (draw2GameQuickFlags !== undefined) {
+      draw2GameQuickFlags.dataset.contextState = selected === undefined
+        ? "empty"
+        : "selected";
+    }
+    if (draw2GameComponentsPanel !== undefined) {
+      draw2GameComponentsPanel.dataset.contextState = selected === undefined
+        ? "empty"
+        : "selected";
+    }
+    if (draw2GameLogicMode !== undefined) {
+      draw2GameLogicMode.dataset.contextState = selectedEvent !== undefined
+        ? "event"
+        : selected === undefined
+        ? "empty"
+        : "selected";
+    }
+    if (draw2GameLeftDockNodeBoxPanel !== undefined) {
+      const objectContext = gameWorkspaceContext.selection.kind === "OBJECT" ||
+        gameWorkspaceContext.selection.kind === "COMPONENT";
+      draw2GameLeftDockNodeBoxPanel.dataset.contextState = objectContext &&
+          selected !== undefined
+        ? "selected"
+        : "empty";
+    }
     const locked = gameAuthoringLocked();
     const currentBehaviorId = selected === undefined
       ? undefined
@@ -38723,6 +38842,14 @@ export function bootstrapDraw2Workspace(
 
     const world = gamePlayground.world;
     const player = gamePlayground.player;
+    if (draw2GamePlaygroundCenterBar !== undefined) {
+      draw2GamePlaygroundCenterBar.dataset.contextState =
+        gamePlaygroundRuntimeState !== undefined
+          ? "running"
+          : player === undefined
+          ? "empty"
+          : "ready";
+    }
     if (draw2GamePlaygroundWorldState !== undefined) {
       draw2GamePlaygroundWorldState.textContent = world === undefined
         ? "未設定"
@@ -43607,6 +43734,14 @@ export function bootstrapDraw2Workspace(
   draw2AudioPanelOpenMixer?.addEventListener("click", () => {
     selectModeDeckTab("audio-mixer");
     void ensureAudioWorkspaceSession().then(renderAudioCustomPanels);
+  });
+  audioRightInspectorOpenMixer?.addEventListener("click", () => {
+    selectModeDeckTab("audio-mixer");
+    void ensureAudioWorkspaceSession().then(renderAudioCustomPanels);
+    setModeDeckStatus(
+      "audio",
+      `${currentAudioDeckTrackId()} mixer opened`,
+    );
   });
   draw2AudioPanelOpenClips?.addEventListener("click", () => {
     selectModeDeckTab("audio-library");

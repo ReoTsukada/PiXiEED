@@ -958,6 +958,116 @@ function rasterStampColorAt(source, x, y) {
   return 0;
 }
 
+// src/draw2-outline-tools.ts
+function isOpaque(color) {
+  return (color >>> 24 & 255) > 0;
+}
+function pointKey3(x, y) {
+  return `${x}:${y}`;
+}
+function withinRadius(dx, dy, thickness, connectivity) {
+  return connectivity === 4 ? Math.abs(dx) + Math.abs(dy) <= thickness : Math.max(Math.abs(dx), Math.abs(dy)) <= thickness;
+}
+function createOutlineWriteSet(reader, options) {
+  const thickness = Math.max(1, Math.min(16, Math.round(options.thickness)));
+  if (!Number.isSafeInteger(options.colorIndex) || options.colorIndex <= 0 || options.colorIndex >= reader.palette.length || reader.width < 1 || reader.height < 1) return [];
+  const writes = [];
+  for (let y = 0; y < reader.height; y += 1) {
+    for (let x = 0; x < reader.width; x += 1) {
+      if (options.allowedPixels !== void 0 && !options.allowedPixels.has(pointKey3(x, y))) continue;
+      const opaque = isOpaque(reader.palette[reader.getPixel(x, y)] ?? 0);
+      const shouldWrite = options.placement === "OUTSIDE" ? !opaque : opaque;
+      if (!shouldWrite) continue;
+      let boundary = false;
+      for (let dy = -thickness; dy <= thickness && !boundary; dy += 1) {
+        for (let dx = -thickness; dx <= thickness; dx += 1) {
+          if (dx === 0 && dy === 0 || !withinRadius(dx, dy, thickness, options.connectivity)) continue;
+          const neighborX = x + dx;
+          const neighborY = y + dy;
+          const neighborOpaque = neighborX >= 0 && neighborY >= 0 && neighborX < reader.width && neighborY < reader.height ? isOpaque(reader.palette[reader.getPixel(neighborX, neighborY)] ?? 0) : false;
+          if (options.placement === "OUTSIDE" ? neighborOpaque : !neighborOpaque) {
+            boundary = true;
+            break;
+          }
+        }
+      }
+      if (boundary && reader.getPixel(x, y) !== options.colorIndex) {
+        writes.push({
+          x,
+          y,
+          colorIndex: options.colorIndex
+        });
+      }
+    }
+  }
+  return writes;
+}
+function createStrokeAutoOutlineWriteSet(reader, strokePoints, options) {
+  const thickness = Math.max(1, Math.min(16, Math.round(options.thickness)));
+  if (!Number.isSafeInteger(options.colorIndex) || options.colorIndex <= 0 || options.colorIndex >= reader.palette.length || reader.width < 1 || reader.height < 1) return [];
+  const source = /* @__PURE__ */ new Set();
+  for (const point2 of strokePoints) {
+    if (point2.x >= 0 && point2.y >= 0 && point2.x < reader.width && point2.y < reader.height) source.add(pointKey3(point2.x, point2.y));
+  }
+  if (source.size === 0) return [];
+  const writes = /* @__PURE__ */ new Map();
+  const add = (x, y) => {
+    const key = pointKey3(x, y);
+    if (options.allowedPixels !== void 0 && !options.allowedPixels.has(key)) return;
+    if (source.has(key)) return;
+    if (options.placement === "OUTSIDE") {
+      const original = reader.palette[reader.getPixel(x, y)] ?? 0;
+      if (isOpaque(original)) return;
+    }
+    if (reader.getPixel(x, y) === options.colorIndex) return;
+    writes.set(key, {
+      x,
+      y,
+      colorIndex: options.colorIndex
+    });
+  };
+  for (const sourceKey of source) {
+    const [sourceXText, sourceYText] = sourceKey.split(":");
+    const sourceX = Number(sourceXText);
+    const sourceY = Number(sourceYText);
+    if (options.placement === "INSIDE") {
+      let hasTransparentNeighbor = false;
+      for (let neighborY = -thickness; neighborY <= thickness; neighborY += 1) {
+        for (let neighborX = -thickness; neighborX <= thickness; neighborX += 1) {
+          if (neighborX === 0 && neighborY === 0 || !withinRadius(neighborX, neighborY, thickness, options.connectivity)) continue;
+          const candidateX = sourceX + neighborX;
+          const candidateY = sourceY + neighborY;
+          if (candidateX < 0 || candidateY < 0 || candidateX >= reader.width || candidateY >= reader.height || !source.has(pointKey3(candidateX, candidateY))) {
+            hasTransparentNeighbor = true;
+            break;
+          }
+        }
+        if (hasTransparentNeighbor) break;
+      }
+      if (hasTransparentNeighbor && options.allowedPixels?.has(sourceKey) !== false && reader.getPixel(sourceX, sourceY) !== options.colorIndex) {
+        writes.set(sourceKey, {
+          x: sourceX,
+          y: sourceY,
+          colorIndex: options.colorIndex
+        });
+      }
+      continue;
+    }
+    for (let dy = -thickness; dy <= thickness; dy += 1) {
+      for (let dx = -thickness; dx <= thickness; dx += 1) {
+        if (dx === 0 && dy === 0 || !withinRadius(dx, dy, thickness, options.connectivity)) continue;
+        const x = sourceX + dx;
+        const y = sourceY + dy;
+        if (x < 0 || y < 0 || x >= reader.width || y >= reader.height) continue;
+        add(x, y);
+      }
+    }
+  }
+  return [
+    ...writes.values()
+  ];
+}
+
 // src/draw2-core.ts
 var MAX_INTERPOLATED_STROKE_PIXELS = 65536;
 function interpolatePixelLine(from, to, algorithm = "regular") {
@@ -1634,6 +1744,29 @@ function validateMirrorCommitSpec(value, asset, path = "payload.mirror") {
   }
   return diagnostics;
 }
+function validateStrokeAutoOutline(value, asset, path = "payload.autoOutline") {
+  if (value === void 0) return [];
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return [
+      diagnostic("STROKE_OUTLINE_INVALID", "Stroke auto outline must be an object.", path)
+    ];
+  }
+  const outline = value;
+  const diagnostics = [];
+  if (outline.placement !== "INSIDE" && outline.placement !== "OUTSIDE") {
+    diagnostics.push(diagnostic("STROKE_OUTLINE_PLACEMENT_INVALID", "Stroke auto outline placement is not supported.", `${path}.placement`));
+  }
+  if (!Number.isSafeInteger(outline.thickness) || outline.thickness < 1 || outline.thickness > 16) {
+    diagnostics.push(diagnostic("STROKE_OUTLINE_THICKNESS_INVALID", "Stroke auto outline thickness must be between 1 and 16.", `${path}.thickness`));
+  }
+  if (outline.connectivity !== 4 && outline.connectivity !== 8) {
+    diagnostics.push(diagnostic("STROKE_OUTLINE_CONNECTIVITY_INVALID", "Stroke auto outline connectivity must be 4 or 8.", `${path}.connectivity`));
+  }
+  if (!Number.isSafeInteger(outline.colorIndex) || outline.colorIndex <= 0 || outline.colorIndex >= asset.palette.length) {
+    diagnostics.push(diagnostic("STROKE_OUTLINE_COLOR_INVALID", "Stroke auto outline color must reference a non-transparent palette entry.", `${path}.colorIndex`));
+  }
+  return diagnostics;
+}
 function mirrorPixelPointsInBounds(points, spec, bounds) {
   const maxX = Math.max(1, bounds.width - 1);
   const maxY = Math.max(1, bounds.height - 1);
@@ -1907,7 +2040,10 @@ function validatePayload(state2, command) {
   if (command.commandType === "raster.strokeCommit") {
     const { brushSize: brushSize2, brushShape: brushShape2, pattern } = command.payload;
     diagnostics.push(...validateRasterClip(command.payload.clip, asset), ...validateRasterSelectionMask(command.payload.selectionMask, asset), ...validateSelectionConstraintCombination(command.payload.clip, command.payload.selectionMask));
-    diagnostics.push(...validateMirrorCommitSpec(command.payload.mirror, asset));
+    diagnostics.push(...validateMirrorCommitSpec(command.payload.mirror, asset), ...validateStrokeAutoOutline(command.payload.autoOutline, asset));
+    if (command.payload.alphaLock !== void 0 && typeof command.payload.alphaLock !== "boolean") {
+      diagnostics.push(diagnostic("STROKE_ALPHA_LOCK_INVALID", "Stroke alphaLock must be a boolean.", "payload.alphaLock"));
+    }
     if (brushSize2 !== void 0 && (!Number.isSafeInteger(brushSize2) || brushSize2 < 1 || brushSize2 > MAX_BRUSH_SIZE)) {
       diagnostics.push(diagnostic("STROKE_BRUSH_SIZE_INVALID", `Stroke brushSize must be between 1 and ${MAX_BRUSH_SIZE}.`, "payload.brushSize"));
     }
@@ -2241,6 +2377,7 @@ var EditorCore = class {
     let fillVisitedCount = 0;
     let fillWriteColors;
     let tileWriteColors;
+    let strokeWriteColors;
     let tileSourceCellCount = 0;
     let interpolatedStrokePixelCount = 0;
     let commandSelectionMask;
@@ -2262,7 +2399,34 @@ var EditorCore = class {
       }, sourceAsset);
       const mirroredPoints = command.payload.mirror === void 0 ? strokedPoints : mirrorPixelPointsInBounds(strokedPoints, command.payload.mirror, sourceAsset);
       const clipped = clipPixelPoints(mirroredPoints, command.payload.clip);
-      points = clipped.filter((point2) => pointInsideSelectionMask(point2, commandSelectionMask));
+      const constrainedPoints = clipped.filter((point2) => pointInsideSelectionMask(point2, commandSelectionMask));
+      const paintedPoints = command.payload.alphaLock === true ? constrainedPoints.filter((point2) => ((sourceAsset.palette[sourceAsset.raster.getPixel(point2.x, point2.y)] ?? 0) >>> 24 & 255) > 0) : constrainedPoints;
+      points = paintedPoints;
+      if (command.payload.autoOutline !== void 0 && paintedPoints.length > 0) {
+        const outline = createStrokeAutoOutlineWriteSet({
+          width: sourceAsset.width,
+          height: sourceAsset.height,
+          palette: sourceAsset.palette,
+          getPixel: (x, y) => sourceAsset.raster.getPixel(x, y)
+        }, paintedPoints, command.payload.autoOutline).filter((point2) => pointInsideSelectionMask(point2, commandSelectionMask) && (command.payload.clip === void 0 || pointInsideRasterClip(point2, command.payload.clip)));
+        const ordered = /* @__PURE__ */ new Map();
+        for (const point2 of outline) {
+          ordered.set(`${point2.x}:${point2.y}`, point2.colorIndex);
+        }
+        for (const point2 of paintedPoints) {
+          ordered.set(`${point2.x}:${point2.y}`, command.payload.colorIndex);
+        }
+        points = [
+          ...ordered.keys()
+        ].map((key) => {
+          const [xText, yText] = key.split(":");
+          return {
+            x: Number(xText),
+            y: Number(yText)
+          };
+        });
+        strokeWriteColors = ordered;
+      }
     } else if (command.commandType === "raster.shapeCommit") {
       const shapePoints = createShapeWriteSet(command.payload.tool, command.payload.from, command.payload.to, command.payload.colorIndex, {
         brushSize: command.payload.brushSize,
@@ -2335,7 +2499,7 @@ var EditorCore = class {
       const writeColors = command.commandType === "raster.writeSet" ? new Map(command.payload.writes.map((write) => [
         `${write.x}:${write.y}`,
         write.colorIndex
-      ])) : command.commandType === "raster.tileStamp" ? tileWriteColors : command.commandType === "raster.fill" ? fillWriteColors : void 0;
+      ])) : command.commandType === "raster.tileStamp" ? tileWriteColors : command.commandType === "raster.fill" ? fillWriteColors : command.commandType === "raster.strokeCommit" ? strokeWriteColors : void 0;
       const fallbackColorIndex = command.commandType === "raster.setPixel" || command.commandType === "raster.strokeCommit" || command.commandType === "raster.shapeCommit" || command.commandType === "raster.fill" ? command.payload.colorIndex : 0;
       for (const point2 of points) {
         const tileX = Math.floor(point2.x / asset.raster.tileSize);
@@ -9688,7 +9852,13 @@ function normalizeToolOptions(options = {}) {
   return {
     ...brush,
     similarity: similarity2,
-    selectionMode
+    selectionMode,
+    ...options.autoOutline === void 0 ? {} : {
+      autoOutline: options.autoOutline
+    },
+    ...options.alphaLock === true ? {
+      alphaLock: true
+    } : {}
   };
 }
 function clampPoint3(point2, bounds) {
@@ -10187,49 +10357,15 @@ function createArgbColorRamp(start, end, steps, space = "HSV", hueMode = "SHORT"
   return ramp;
 }
 
-// src/draw2-outline-tools.ts
-function isOpaque(color) {
+// src/draw2-pixel-effects.ts
+function isOpaque2(color) {
   return (color >>> 24 & 255) > 0;
 }
-function pointKey3(x, y) {
-  return `${x}:${y}`;
-}
-function withinRadius(dx, dy, thickness, connectivity) {
-  return connectivity === 4 ? Math.abs(dx) + Math.abs(dy) <= thickness : Math.max(Math.abs(dx), Math.abs(dy)) <= thickness;
-}
-function createOutlineWriteSet(reader, options) {
-  const thickness = Math.max(1, Math.min(16, Math.round(options.thickness)));
-  if (!Number.isSafeInteger(options.colorIndex) || options.colorIndex <= 0 || options.colorIndex >= reader.palette.length || reader.width < 1 || reader.height < 1) return [];
-  const writes = [];
-  for (let y = 0; y < reader.height; y += 1) {
-    for (let x = 0; x < reader.width; x += 1) {
-      if (options.allowedPixels !== void 0 && !options.allowedPixels.has(pointKey3(x, y))) continue;
-      const opaque = isOpaque(reader.palette[reader.getPixel(x, y)] ?? 0);
-      const shouldWrite = options.placement === "OUTSIDE" ? !opaque : opaque;
-      if (!shouldWrite) continue;
-      let boundary = false;
-      for (let dy = -thickness; dy <= thickness && !boundary; dy += 1) {
-        for (let dx = -thickness; dx <= thickness; dx += 1) {
-          if (dx === 0 && dy === 0 || !withinRadius(dx, dy, thickness, options.connectivity)) continue;
-          const neighborX = x + dx;
-          const neighborY = y + dy;
-          const neighborOpaque = neighborX >= 0 && neighborY >= 0 && neighborX < reader.width && neighborY < reader.height ? isOpaque(reader.palette[reader.getPixel(neighborX, neighborY)] ?? 0) : false;
-          if (options.placement === "OUTSIDE" ? neighborOpaque : !neighborOpaque) {
-            boundary = true;
-            break;
-          }
-        }
-      }
-      if (boundary && reader.getPixel(x, y) !== options.colorIndex) {
-        writes.push({
-          x,
-          y,
-          colorIndex: options.colorIndex
-        });
-      }
-    }
-  }
-  return writes;
+function createAlphaLockedWriteSet(reader, writes) {
+  return writes.filter((write) => {
+    if (write.x < 0 || write.y < 0 || write.x >= reader.width || write.y >= reader.height) return false;
+    return isOpaque2(reader.palette[reader.getPixel(write.x, write.y)] ?? 0);
+  });
 }
 
 // src/draw2-text-tools.ts
@@ -13842,7 +13978,7 @@ var DRAW2_SHORTCUTS = [
     version: 1,
     category: "Timeline",
     label: "Clear active cel",
-    keys: "Delete",
+    keys: "Delete / Backspace",
     command: "clear-cel"
   },
   {
@@ -13850,7 +13986,7 @@ var DRAW2_SHORTCUTS = [
     version: 1,
     category: "Selection",
     label: "Delete selected pixels",
-    keys: "Mod+Delete",
+    keys: "Mod+Delete / Mod+Backspace",
     command: "delete-selection"
   },
   {
@@ -13882,13 +14018,13 @@ function normalizedEventKey(event) {
   const alt = event.altKey ? "alt+" : "";
   return `${modifier}${shift}${alt}${normalizeKey(event.key)}`;
 }
-function normalizedRegistryKey(keys) {
-  return keys.toLowerCase().replace("escape", "esc").replace("space", "space");
+function normalizedRegistryKeys(keys) {
+  return keys.split(/\s*\/\s*/).map((entry) => entry.toLowerCase().replace("escape", "esc").replace("space", "space"));
 }
 function resolveDraw2Shortcut(event, context = {}) {
   if (context.modalOpen || context.sheetOpen || context.inputEditing || context.imeComposing) return void 0;
   const key = normalizedEventKey(event);
-  return DRAW2_SHORTCUTS.find((shortcut) => normalizedRegistryKey(shortcut.keys) === key);
+  return DRAW2_SHORTCUTS.find((shortcut) => normalizedRegistryKeys(shortcut.keys).includes(key));
 }
 
 // src/draw2-viewport.ts
@@ -19433,7 +19569,7 @@ function loadAdvancedModule() {
 }
 function loadWorkspaceModule() {
   const workspaceChunkUrl = new URL("wp180-workspace.js", import.meta.url);
-  workspaceChunkUrl.searchParams.set("v", "20260911-unity-audio-export-v1");
+  workspaceChunkUrl.searchParams.set("v", "20260911-ui-density-v1");
   workspaceModulePromise ??= import(workspaceChunkUrl.href);
   return workspaceModulePromise;
 }
@@ -19483,6 +19619,7 @@ var selectionOverlayRegionsElement = document.querySelector("#draw2SelectionOver
 var statusElement = document.querySelector("#draw2Status");
 var metricsElement = document.querySelector("#draw2Metrics");
 var selectionStatusElement = document.querySelector("#draw2SelectionStatus");
+var selectionCardElement = document.querySelector("#draw2SelectionCard");
 var projectIdInputElement = document.querySelector("#draw2ProjectId");
 var tileSizeSelectElement = document.querySelector("#draw2TileSize");
 var toolSelectElement = document.querySelector("#draw2Tool");
@@ -19661,6 +19798,13 @@ var outlineThicknessElement = document.querySelector("#draw2OutlineThickness");
 var outlineConnectivityElement = document.querySelector("#draw2OutlineConnectivity");
 var outlineColorElement = document.querySelector("#draw2OutlineColor");
 var outlineApplyButton = document.querySelector("#draw2OutlineApply");
+var autoOutlineToggleElement = document.querySelector("#draw2AutoOutlineToggle[data-draw2-auto-outline-toggle]");
+var alphaLockToggleElement = document.querySelector("#draw2AlphaLockToggle[data-draw2-alpha-lock-toggle]");
+var autoOutlineOptionsElement = document.querySelector("#draw2AutoOutlineOptions[data-draw2-auto-outline-options]");
+var autoOutlineThicknessElement = document.querySelector("#draw2AutoOutlineThickness");
+var autoOutlineThicknessValueElement = document.querySelector("#draw2AutoOutlineThicknessValue");
+var autoOutlineColorElement = document.querySelector("#draw2AutoOutlineColor");
+var autoOutlineResetElement = document.querySelector("#draw2AutoOutlineReset");
 var textInsertDialogElement = document.querySelector("#draw2TextInsertDialog");
 var textValueElement = document.querySelector("#draw2TextValue");
 var textFontElement = document.querySelector("#draw2TextFont");
@@ -21035,6 +21179,13 @@ var outlineThicknessControl = outlineThicknessElement;
 var outlineConnectivityControl = outlineConnectivityElement;
 var outlineColorControl = outlineColorElement;
 var outlineApplyControl = outlineApplyButton;
+var autoOutlineToggleControl = autoOutlineToggleElement;
+var alphaLockToggleControl = alphaLockToggleElement;
+var autoOutlineOptionsControl = autoOutlineOptionsElement;
+var autoOutlineThicknessControl = autoOutlineThicknessElement;
+var autoOutlineThicknessValueControl = autoOutlineThicknessValueElement;
+var autoOutlineColorControl = autoOutlineColorElement;
+var autoOutlineResetControl = autoOutlineResetElement;
 var textInsertDialogControl = textInsertDialogElement;
 var textValueControl = textValueElement;
 var textFontControl = textFontElement;
@@ -25141,6 +25292,7 @@ function renderPaletteButtons(palette) {
   refreshPaletteButtonPreview();
   renderColorRampOptions(palette);
   renderIndexedColorOptions(outlineColorControl, palette);
+  syncAutoOutlinePaletteSelection(palette);
   renderIndexedColorOptions(textFillColorControl, palette);
   renderIndexedColorOptions(textStrokeColorControl, palette);
 }
@@ -25515,6 +25667,9 @@ function syncWorkspaceEditCommandState() {
     workspaceFrameElement.dataset.draw2SelectionReady = String(hasSelection);
     workspaceFrameElement.dataset.draw2TransformPreview = String(hasPreview);
     workspaceFrameElement.dataset.draw2ClipboardReady = String(clipboard !== void 0);
+  }
+  if (selectionCardElement !== null) {
+    selectionCardElement.dataset.contextState = hasPreview ? "editing" : hasSelection ? "selected" : "empty";
   }
   updateHistoryButtons();
 }
@@ -27823,10 +27978,28 @@ function previewWriteSet(asset, tool, points, cachedWrites) {
   const selectionClip = activeRectangleSelectionClip();
   const selectionKeys = selectionClip === void 0 && selection !== void 0 ? new Set(selection.pixels.map(selectionPointKey)) : void 0;
   const selectedWrites = selectionClip === void 0 ? selectionKeys === void 0 ? writes : writes.filter((write) => selectionKeys.has(selectionPointKey(write))) : writes.filter((write) => write.x >= selectionClip.x && write.y >= selectionClip.y && write.x < selectionClip.x + selectionClip.width && write.y < selectionClip.y + selectionClip.height);
-  return selectedWrites.map(({ x, y }) => ({
+  return applyTransientStrokeEffects(asset, tool, selectedWrites, toolOptions).map(({ x, y }) => ({
     x,
     y
   }));
+}
+function applyTransientStrokeEffects(asset, tool, writes, options) {
+  const normalized = normalizeToolOptions(options);
+  const reader = {
+    width: asset.width,
+    height: asset.height,
+    palette: asset.palette,
+    getPixel: (x, y) => asset.raster.getPixel(x, y)
+  };
+  const alphaLocked = normalized.alphaLock === true ? createAlphaLockedWriteSet(reader, writes) : writes;
+  if (normalized.autoOutline === void 0 || tool !== "pen" && tool !== "line" || alphaLocked.length === 0) return alphaLocked;
+  const outline = createStrokeAutoOutlineWriteSet(reader, alphaLocked, normalized.autoOutline);
+  const ordered = /* @__PURE__ */ new Map();
+  for (const write of outline) ordered.set(selectionPointKey(write), write);
+  for (const write of alphaLocked) ordered.set(selectionPointKey(write), write);
+  return [
+    ...ordered.values()
+  ];
 }
 function guideColor(asset, tool) {
   return tool === "eraser" ? {
@@ -31297,6 +31470,9 @@ async function commitPointerPointsNow(points, fixedContext) {
     const commandSequence = nextClientSequence(drawClientId);
     const before = state;
     const strokeOptions = normalizeToolOptions(fixedToolOptions);
+    const strokeUsesAutoOptions = tool === "pen" || tool === "line";
+    const strokeAutoOutline = strokeUsesAutoOptions ? strokeOptions.autoOutline : void 0;
+    const strokeAlphaLock = strokeUsesAutoOptions ? strokeOptions.alphaLock : void 0;
     const mirror = mirrorCommitSpecForTool(asset, tool);
     let strokePoints;
     try {
@@ -31338,6 +31514,12 @@ async function commitPointerPointsNow(points, fixedContext) {
         brushAngle: strokeOptions.brushAngle,
         brushAlgorithm: strokeOptions.brushAlgorithm,
         pattern: strokeOptions.pattern,
+        ...strokeAutoOutline === void 0 ? {} : {
+          autoOutline: strokeAutoOutline
+        },
+        ...strokeAlphaLock === true ? {
+          alphaLock: true
+        } : {},
         ...mirror === void 0 ? {} : {
           mirror
         },
@@ -32324,7 +32506,7 @@ function queuePendingDrawPreview(commit, snapshot) {
   if (asset === void 0 || snapshot.points.length === 0) return;
   const first = snapshot.points[0];
   const last = snapshot.points.at(-1) ?? first;
-  const writes = snapshot.previewWrites.length > 0 ? projectPendingPreviewWrites(asset, commit.tool, snapshot.previewWrites) : commit.tool === "fill" ? fillPreviewWrites(asset, first, last, commit.colorIndex) : [];
+  const writes = snapshot.previewWrites.length > 0 ? applyTransientStrokeEffects(asset, commit.tool, projectPendingPreviewWrites(asset, commit.tool, snapshot.previewWrites), commit.toolOptions) : commit.tool === "fill" ? fillPreviewWrites(asset, first, last, commit.colorIndex) : [];
   pendingDrawPreviews.push({
     sessionId: snapshot.sessionId,
     projectId: state.projectId,
@@ -33843,6 +34025,7 @@ function syncToolStudio() {
   if (toolStudioElement !== null) {
     toolStudioElement.dataset.activeTool = current;
   }
+  syncAutoOutlineControls();
 }
 for (const card of document.querySelectorAll("[data-draw2-studio-tool]")) {
   card.addEventListener("click", () => {
@@ -34192,10 +34375,111 @@ function syncBrushOptionsButton() {
   brushOptionsButton.setAttribute("aria-label", accessibleLabel);
   brushOptionsButton.title = accessibleLabel;
 }
+function autoOutlineToolIsActive() {
+  const tool = currentBasicTool();
+  return tool === "pen" || tool === "line";
+}
+function readPressedControl(control) {
+  if (control === null) return false;
+  return control.getAttribute("aria-pressed") === "true" || control.classList.contains("is-active");
+}
+function setPressedControl(control, pressed, enabled, activeLabel, inactiveLabel) {
+  if (control === null) return;
+  control.classList.toggle("is-active", pressed && enabled);
+  control.setAttribute("aria-pressed", String(pressed));
+  control.setAttribute("aria-disabled", String(!enabled));
+  control.disabled = !enabled;
+  control.dataset.draw2State = !enabled ? "unavailable" : pressed ? "active" : "inactive";
+  const stateLabel = !enabled ? "\u4F7F\u7528\u4E0D\u53EF" : pressed ? activeLabel : inactiveLabel;
+  control.setAttribute("aria-label", stateLabel);
+  const stateOutput = control.querySelector("strong");
+  if (stateOutput !== null) stateOutput.textContent = pressed && enabled ? "ON" : "OFF";
+  control.title = !enabled ? "\u3053\u306E\u30C4\u30FC\u30EB\u3067\u306F\u4F7F\u7528\u3067\u304D\u307E\u305B\u3093" : pressed ? activeLabel : inactiveLabel;
+}
+function selectedAutoOutlinePlacement() {
+  const selected = document.querySelector('[data-draw2-auto-outline-placement][aria-pressed="true"], [data-draw2-auto-outline-placement].is-active')?.dataset.placement;
+  return selected === "INSIDE" ? "INSIDE" : "OUTSIDE";
+}
+function selectedAutoOutlineConnectivity() {
+  const selected = document.querySelector('[data-draw2-auto-outline-connectivity][aria-pressed="true"], [data-draw2-auto-outline-connectivity].is-active')?.dataset.connectivity;
+  return selected === "4" ? 4 : 8;
+}
+function autoOutlineColorIndex(palette, requested) {
+  if (palette.length < 2) return 0;
+  const safe = Number.isFinite(requested) ? Math.round(requested) : 1;
+  return Math.max(1, Math.min(palette.length - 1, safe));
+}
+function readAutoOutlineOptions() {
+  if (autoOutlineToggleControl === null) return toolOptions.autoOutline;
+  if (!readPressedControl(autoOutlineToggleControl)) return void 0;
+  const asset = state.assets[state.activeAssetId];
+  const palette = asset?.palette ?? [];
+  if (palette.length < 2) return void 0;
+  const currentColor = toolOptions.autoOutline?.colorIndex ?? selectedColor;
+  const requestedColor = autoOutlineColorControl === null ? currentColor : Number(autoOutlineColorControl.value);
+  const requestedThickness = autoOutlineThicknessControl === null ? toolOptions.autoOutline?.thickness ?? 1 : Number(autoOutlineThicknessControl.value);
+  const thickness = Number.isFinite(requestedThickness) ? Math.max(1, Math.min(16, Math.round(requestedThickness))) : 1;
+  return {
+    colorIndex: autoOutlineColorIndex(palette, requestedColor),
+    placement: selectedAutoOutlinePlacement(),
+    thickness,
+    connectivity: selectedAutoOutlineConnectivity()
+  };
+}
+function syncAutoOutlinePaletteSelection(palette) {
+  if (autoOutlineColorControl === null) return;
+  renderIndexedColorOptions(autoOutlineColorControl, palette);
+  const requested = toolOptions.autoOutline?.colorIndex ?? selectedColor;
+  const safe = autoOutlineColorIndex(palette, requested);
+  if (safe > 0 && Array.from(autoOutlineColorControl.options).some((option) => option.value === String(safe))) autoOutlineColorControl.value = String(safe);
+}
+function syncAutoOutlineControls() {
+  const supported = autoOutlineToolIsActive();
+  const outlineEnabled = toolOptions.autoOutline !== void 0;
+  const alphaLocked = toolOptions.alphaLock === true;
+  setPressedControl(autoOutlineToggleControl, outlineEnabled, supported, "\u81EA\u52D5\u30A2\u30A6\u30C8\u30E9\u30A4\u30F3: \u6709\u52B9", "\u81EA\u52D5\u30A2\u30A6\u30C8\u30E9\u30A4\u30F3: \u7121\u52B9");
+  setPressedControl(alphaLockToggleControl, alphaLocked, supported, "\u30A2\u30EB\u30D5\u30A1\u30ED\u30C3\u30AF: \u6709\u52B9", "\u30A2\u30EB\u30D5\u30A1\u30ED\u30C3\u30AF: \u7121\u52B9");
+  if (autoOutlineOptionsControl !== null) {
+    autoOutlineOptionsControl.hidden = !supported || !outlineEnabled;
+    autoOutlineOptionsControl.dataset.draw2State = !supported ? "unavailable" : outlineEnabled ? "active" : "inactive";
+    autoOutlineOptionsControl.setAttribute("aria-disabled", String(!supported || !outlineEnabled));
+  }
+  const placementButtons = document.querySelectorAll("[data-draw2-auto-outline-placement]");
+  for (const button of placementButtons) {
+    const selected = button.dataset.placement === (toolOptions.autoOutline?.placement ?? "OUTSIDE");
+    button.classList.toggle("is-active", selected && supported && outlineEnabled);
+    button.setAttribute("aria-pressed", String(selected));
+    button.setAttribute("aria-disabled", String(!supported || !outlineEnabled));
+    button.disabled = !supported || !outlineEnabled;
+  }
+  const connectivityButtons = document.querySelectorAll("[data-draw2-auto-outline-connectivity]");
+  for (const button of connectivityButtons) {
+    const selected = button.dataset.connectivity === String(toolOptions.autoOutline?.connectivity ?? 8);
+    button.classList.toggle("is-active", selected && supported && outlineEnabled);
+    button.setAttribute("aria-pressed", String(selected));
+    button.setAttribute("aria-disabled", String(!supported || !outlineEnabled));
+    button.disabled = !supported || !outlineEnabled;
+  }
+  if (autoOutlineThicknessControl !== null) {
+    const thickness = toolOptions.autoOutline?.thickness ?? 1;
+    autoOutlineThicknessControl.value = String(thickness);
+    autoOutlineThicknessControl.disabled = !supported || !outlineEnabled;
+    autoOutlineThicknessControl.setAttribute("aria-disabled", String(!supported || !outlineEnabled));
+    if (autoOutlineThicknessValueControl !== null) {
+      autoOutlineThicknessValueControl.value = `${thickness}px`;
+      autoOutlineThicknessValueControl.textContent = `${thickness}px`;
+    }
+  }
+  if (autoOutlineColorControl !== null) {
+    autoOutlineColorControl.disabled = !supported || !outlineEnabled;
+    autoOutlineColorControl.setAttribute("aria-disabled", String(!supported || !outlineEnabled));
+  }
+}
 function syncQuickToolControls() {
   syncBrushOptionsButton();
   brushAngle.disabled = brushShape.value === "circle";
   syncMirrorModeToggle();
+  syncAutoOutlineControls();
   const tool = currentBasicTool();
   const colorSelectionMode = normalizeColorSelectionMode(colorSelectionModeControl.value);
   const showColorSelectionMode = tool === "select-color";
@@ -34264,6 +34548,8 @@ function updateToolOptions() {
   normalizeBrushAngleInput();
   const similarityPercent = Number(similarity.value);
   const selectionMode = normalizeColorSelectionMode(colorSelectionModeControl.value);
+  const autoOutline = readAutoOutlineOptions();
+  const alphaLock = alphaLockToggleControl === null ? toolOptions.alphaLock === true : readPressedControl(alphaLockToggleControl);
   toolOptions = {
     brushSize: Number(brushSize.value),
     brushShape: brushShape.value,
@@ -34271,7 +34557,13 @@ function updateToolOptions() {
     brushAlgorithm: brushAlgorithm.value,
     pattern: brushPattern.value,
     similarity: colorTolerancePercentToDistance(similarityPercent),
-    selectionMode
+    selectionMode,
+    ...autoOutline === void 0 ? {} : {
+      autoOutline
+    },
+    ...alphaLock ? {
+      alphaLock: true
+    } : {}
   };
   const safePercent = Number.isFinite(similarityPercent) ? Math.max(0, Math.min(100, Math.round(similarityPercent))) : 0;
   similarity.value = String(safePercent);
@@ -34350,6 +34642,64 @@ function deleteBrushPreset() {
   renderBrushPresetOptions();
   setStatus("Brush preset deleted locally.");
 }
+function setAutoOutlineChoice(selector, dataKey, value) {
+  for (const button of document.querySelectorAll(selector)) {
+    const selected = button.dataset[dataKey] === value;
+    button.classList.toggle("is-active", selected);
+    button.setAttribute("aria-pressed", String(selected));
+  }
+}
+autoOutlineToggleControl?.addEventListener("click", () => {
+  const next = !readPressedControl(autoOutlineToggleControl);
+  autoOutlineToggleControl.setAttribute("aria-pressed", String(next));
+  autoOutlineToggleControl.classList.toggle("is-active", next);
+  updateToolOptions();
+});
+alphaLockToggleControl?.addEventListener("click", () => {
+  const next = !readPressedControl(alphaLockToggleControl);
+  alphaLockToggleControl.setAttribute("aria-pressed", String(next));
+  alphaLockToggleControl.classList.toggle("is-active", next);
+  updateToolOptions();
+});
+for (const button of document.querySelectorAll("[data-draw2-auto-outline-placement]")) {
+  button.addEventListener("click", () => {
+    const placement = button.dataset.placement;
+    if (placement !== "INSIDE" && placement !== "OUTSIDE") return;
+    setAutoOutlineChoice("[data-draw2-auto-outline-placement]", "placement", placement);
+    updateToolOptions();
+  });
+}
+for (const button of document.querySelectorAll("[data-draw2-auto-outline-connectivity]")) {
+  button.addEventListener("click", () => {
+    const connectivity = button.dataset.connectivity;
+    if (connectivity !== "4" && connectivity !== "8") return;
+    setAutoOutlineChoice("[data-draw2-auto-outline-connectivity]", "connectivity", connectivity);
+    updateToolOptions();
+  });
+}
+autoOutlineThicknessControl?.addEventListener("input", updateToolOptions);
+autoOutlineThicknessControl?.addEventListener("change", updateToolOptions);
+autoOutlineColorControl?.addEventListener("change", updateToolOptions);
+autoOutlineResetControl?.addEventListener("click", () => {
+  autoOutlineToggleControl?.classList.remove("is-active");
+  autoOutlineToggleControl?.setAttribute("aria-pressed", "false");
+  alphaLockToggleControl?.classList.remove("is-active");
+  alphaLockToggleControl?.setAttribute("aria-pressed", "false");
+  setAutoOutlineChoice("[data-draw2-auto-outline-placement]", "placement", "OUTSIDE");
+  setAutoOutlineChoice("[data-draw2-auto-outline-connectivity]", "connectivity", "8");
+  if (autoOutlineThicknessControl !== null) {
+    autoOutlineThicknessControl.value = "1";
+  }
+  if (autoOutlineColorControl !== null) {
+    const asset = state.assets[state.activeAssetId];
+    const fallback = autoOutlineColorIndex(asset?.palette ?? [], selectedColor);
+    autoOutlineColorControl.value = String(fallback);
+  }
+  const { autoOutline: _resetAutoOutline, alphaLock: _resetAlphaLock, ...resetToolOptions } = toolOptions;
+  toolOptions = resetToolOptions;
+  updateToolOptions();
+  setStatus("\u81EA\u52D5\u30A2\u30A6\u30C8\u30E9\u30A4\u30F3\u3068\u30A2\u30EB\u30D5\u30A1\u30ED\u30C3\u30AF\u3092\u521D\u671F\u5316\u3057\u307E\u3057\u305F\u3002");
+});
 toolSelect.addEventListener("change", () => {
   cancelUncommittedSelectionWork("Selection/transform preview cancelled because the tool changed.");
   syncToolButtons();
