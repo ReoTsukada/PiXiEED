@@ -63,6 +63,8 @@ export interface LongAudioClipRuntimeOptions {
   readonly timer?: AudioSchedulerTimer;
   /** Optional canonical Clip Gain curve; runtime scheduling stays ephemeral. */
   readonly automations?: readonly AudioAutomation[];
+  /** Notify the host when a non-looping Clip reaches its timeline end. */
+  readonly onEnded?: () => void;
 }
 
 export interface LongAudioClipRuntimeSnapshot {
@@ -258,6 +260,7 @@ export class LongAudioClipRuntime {
       onSchedule: (event, audioTimeSeconds) => {
         void this.scheduleChunk(event, audioTimeSeconds);
       },
+      onEnded: () => options.onEnded?.(),
     });
     this.scheduler.load(events, this.clipDurationSeconds);
   }

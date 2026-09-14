@@ -99,3 +99,34 @@ unknown_candidates_kept: ["Claude outputs/piano-roll-cell-check.html"]
 - `scripts/test-core-account-permission-supplement-wp060.mjs` は、今回の旧Draw退役とは無関係に、既に存在しない `pixfind/` を読むため未完了。削除済みページを復元する変更は行わない。
 - ルート契約上の旧URLは `LEGACY_COMPAT` / `SHADOW` redirect candidate。静的サーバーにはサーバー側恒久リダイレクト機能がないため、公開配信側の恒久設定は別作業。
 - 変更は未コミット・未プッシュ。ロールバックはコミット前なら作業ツリーの変更を個別確認して戻し、コミット後は旧ランタイムを復元せず互換入口の差し替えで行う。
+
+## Addendum: 安全な生成キャッシュ整理（2026-09-14）
+
+repository_commit: "working tree (既存変更を保持)"
+branch_or_worktree: "shared working tree"
+scan_scope: "tracked Python cache files, repository ignore rules, and exact local metadata file"
+candidate_count: 3
+deleted_count: 3
+kept_active_count: 0
+kept_compatibility_count: 0
+unknown_count: 0
+bytes_removed: 63880
+files_deleted:
+  - "scripts/__pycache__/build_work_package_prompt.cpython-314.pyc (12342 bytes)"
+  - "scripts/__pycache__/validate_pixieed_program.cpython-314.pyc (27018 bytes)"
+  - ".DS_Store (24580 bytes; ignored local metadata)"
+duplicates_consolidated: []
+generated_files_untracked:
+  - "scripts/__pycache__/ を .gitignore に追加"
+commands_run:
+  - "git status --short"
+  - "git ls-files / reference scan"
+  - "python3 -B scripts/validate_pixieed_program.py --root ."
+tests_passed: []
+tests_failed:
+  - "repository validator: existing stale registry references .codex/prompts/AI_DEVELOPMENT_HARNESS_OPTIMIZATION.md and app-shell/pixieed-capacitor/package.json"
+browser_smoke_tests: "not applicable to Python cache removal"
+compatibility_notes: "既存のpixiedraw2 source/dist、Supabase、PiXYNC、Market、互換入口、バックアップ、未確定候補は変更していない"
+rollback: "Git管理分は親コミットから復元可能。ローカル .DS_Store は必要ならOSが再生成する"
+remaining_candidates:
+  - "stale registry/document references remain UNKNOWN and were not removed"

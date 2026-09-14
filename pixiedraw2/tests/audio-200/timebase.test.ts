@@ -6,6 +6,7 @@ import {
   audioClockForProject,
   audioFrameToTick,
   audioInstrumentTrackId,
+  resolveAudioTrackId,
   audioSecondsToFrame,
   audioSecondsToTick,
   audioTickToFrame,
@@ -50,6 +51,24 @@ Deno.test("AUDIO-200 timebase keeps Frame, Tick, and seconds on one clock", asyn
   assert(
     audioInstrumentTrackId(" instrument:PIANO ") === "instrument:piano",
     "Instrument Track ID normalization is not canonical.",
+  );
+  assert(
+    resolveAudioTrackId(created.value.project, "PIANO") ===
+      "instrument:piano",
+    "Display instrument IDs must resolve to the canonical Mixer Track.",
+  );
+  const bgm = await createAudioWorkspaceSession({
+    projectId: asAudioProjectId("audio-timebase-bgm-resolution"),
+    name: "BGM resolution",
+    createdAt: "2026-08-19T00:00:00.000Z",
+    framesPerSecond: 24,
+    tempoBpm: 120,
+    instrumentIds: ["bgm"],
+  });
+  assert(bgm.ok, JSON.stringify(bgm.diagnostics));
+  assert(
+    resolveAudioTrackId(bgm.value.project, "bgm") === "instrument:bgm",
+    "The visible BGM lane must resolve to instrument:bgm.",
   );
 });
 

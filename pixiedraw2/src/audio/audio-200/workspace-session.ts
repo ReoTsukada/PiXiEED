@@ -36,6 +36,7 @@ import {
   type AudioFreezeState,
   type AudioJournalEntry,
   type AudioMarker,
+  type AudioMusicalContext,
   type AudioMasterState,
   type AudioMixer,
   type AudioMixerSend,
@@ -50,6 +51,8 @@ import {
   type AudioTrackKind,
   isAudioChipMachineId,
   isAudioDrumKitId,
+  isAudioMusicalKey,
+  isAudioMusicalScaleId,
 } from "./contracts.ts";
 import {
   audioClockForProject,
@@ -98,6 +101,12 @@ export interface AudioWorkspaceNoteInput {
   readonly durationTick?: AudioTick;
   readonly velocity: number;
   readonly instrument: string;
+}
+
+/** One atomic replacement used by Piano Roll move/split gestures. */
+export interface AudioWorkspaceNoteBatchReplaceInput {
+  readonly removeNoteIds: readonly string[];
+  readonly notes: readonly AudioWorkspaceNoteInput[];
 }
 
 /** UI marker shape with a Tick-native path and a frame compatibility path. */
@@ -1153,6 +1162,54 @@ export async function journalWorkspaceNoteUpsert(
   });
 }
 
+export async function journalWorkspaceNoteBatchReplace(
+  session: AudioWorkspaceSession,
+  input: AudioWorkspaceNoteBatchReplaceInput,
+  mutation: AudioWorkspaceMutation,
+): Promise<Audio200Result<AudioWorkspaceSession>> {
+  let removeNoteIds: ReturnType<typeof asAudioNoteId>[];
+  try {
+    removeNoteIds = input.removeNoteIds.map((id) => asAudioNoteId(id));
+  } catch {
+    return fail(
+      "AUDIO_COMMAND_INVALID",
+      "Workspace note batch removal ID is invalid.",
+      "noteBatch.removeNoteIds",
+    );
+  }
+  const notes: import("./contracts.ts").AudioNote[] = [];
+  for (const [index, inputNote] of input.notes.entries()) {
+    const canonical = workspaceNoteToCanonical(
+      inputNote,
+      session.framesPerSecond,
+      session.project.tempo.milliBpm / 1_000,
+      session.ppq,
+    );
+    if (!canonical.ok) {
+      return fail(
+        "AUDIO_INVALID_NOTE",
+        canonical.diagnostics[0]?.message ?? "Workspace note is invalid.",
+        `noteBatch.notes[${index}]`,
+      );
+    }
+    if (
+      !session.project.tracks.some((track) =>
+        track.trackId === canonical.value.trackId
+      )
+    ) {
+      return fail(
+        "AUDIO_INVALID_NOTE",
+        "Workspace note instrument has no canonical Track.",
+        `noteBatch.notes[${index}].instrument`,
+      );
+    }
+    notes.push(canonical.value);
+  }
+  return dispatchWorkspaceCommand(session, mutation, "NOTE_BATCH_REPLACE", {
+    noteBatch: { removeNoteIds, notes },
+  });
+}
+
 export async function journalWorkspaceNoteRemove(
   session: AudioWorkspaceSession,
   noteId: string,
@@ -1809,6 +1866,27 @@ export async function journalWorkspaceTempo(
   }
   const tempo: AudioTempo = { milliBpm: bpm * 1_000 };
   return dispatchWorkspaceCommand(session, mutation, "TEMPO_SET", { tempo });
+}
+
+/** Persist the song-level key and scale without changing any existing notes. */
+export async function journalWorkspaceMusicalContext(
+  session: AudioWorkspaceSession,
+  musicalContext: AudioMusicalContext,
+  mutation: AudioWorkspaceMutation,
+): Promise<Audio200Result<AudioWorkspaceSession>> {
+  if (
+    !isAudioMusicalKey(musicalContext.key) ||
+    !isAudioMusicalScaleId(musicalContext.scale)
+  ) {
+    return fail(
+      "AUDIO_INVALID_PROJECT",
+      "Workspace musical key and scale are not supported.",
+      "musicalContext",
+    );
+  }
+  return dispatchWorkspaceCommand(session, mutation, "MUSICAL_CONTEXT_SET", {
+    musicalContext,
+  });
 }
 
 /** Persist the Drum Roll sound profile without touching note geometry. */

@@ -20,6 +20,7 @@ import {
   type AudioJournalEntryId,
   audioOk,
   type AudioProjectId,
+  type AudioScaleGuideMode,
   hasRawAudioPayload,
 } from "./contracts.ts";
 import {
@@ -86,6 +87,7 @@ export interface AudioWorkspacePersistenceSettings {
   readonly meter?: AudioPersistedMeter;
   readonly quantize?: AudioPersistedQuantize;
   readonly snap?: AudioPersistedSnap;
+  readonly scaleGuideMode?: AudioScaleGuideMode;
 }
 
 export interface AudioWorkspacePersistenceRecord {
@@ -158,7 +160,11 @@ function validPersistenceSettings(
         settings.quantize as string,
       )) &&
     (settings.snap === undefined ||
-      ["1/4", "1/8", "1/16"].includes(settings.snap as string));
+      ["1/4", "1/8", "1/16"].includes(settings.snap as string)) &&
+    (settings.scaleGuideMode === undefined ||
+      ["DISPLAY", "SNAP", "RESTRICT"].includes(
+        settings.scaleGuideMode as string,
+      ));
 }
 
 function projectRevisionOf(

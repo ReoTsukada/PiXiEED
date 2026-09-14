@@ -8,6 +8,8 @@ export type Draw2ShortcutCategory =
   | "Timeline"
   | "Workspace";
 
+export type Draw2ShortcutMode = "COMMON" | "DRAW" | "AUDIO" | "GAME";
+
 export interface Draw2Shortcut {
   readonly id: string;
   readonly version: 1;
@@ -15,12 +17,15 @@ export interface Draw2Shortcut {
   readonly label: string;
   readonly keys: string;
   readonly command: string;
+  /** Undefined keeps the historical iDRAW registry behavior. */
+  readonly mode?: Draw2ShortcutMode;
 }
 
 export const DRAW2_SHORTCUTS: readonly Draw2Shortcut[] = [
   {
     id: "undo",
     version: 1,
+    mode: "COMMON",
     category: "Edit",
     label: "Undo",
     keys: "Mod+Z",
@@ -29,6 +34,7 @@ export const DRAW2_SHORTCUTS: readonly Draw2Shortcut[] = [
   {
     id: "redo",
     version: 1,
+    mode: "COMMON",
     category: "Edit",
     label: "Redo",
     keys: "Mod+Shift+Z",
@@ -261,6 +267,7 @@ export const DRAW2_SHORTCUTS: readonly Draw2Shortcut[] = [
   {
     id: "toggle-playback",
     version: 1,
+    mode: "COMMON",
     category: "Timeline",
     label: "Play / stop timeline",
     keys: "Space",
@@ -349,6 +356,7 @@ export const DRAW2_SHORTCUTS: readonly Draw2Shortcut[] = [
   {
     id: "command-palette",
     version: 1,
+    mode: "COMMON",
     category: "Workspace",
     label: "Command Palette",
     keys: "Mod+K",
@@ -357,10 +365,236 @@ export const DRAW2_SHORTCUTS: readonly Draw2Shortcut[] = [
   {
     id: "shortcuts",
     version: 1,
+    mode: "COMMON",
     category: "Workspace",
     label: "Keyboard shortcuts",
     keys: "?",
     command: "shortcuts",
+  },
+  {
+    id: "audio-save",
+    version: 1,
+    mode: "AUDIO",
+    category: "Edit",
+    label: "Save Audio Project",
+    keys: "Mod+S",
+    command: "audio-save",
+  },
+  {
+    id: "audio-copy",
+    version: 1,
+    mode: "AUDIO",
+    category: "Edit",
+    label: "Copy selected notes or clips",
+    keys: "Mod+C",
+    command: "audio-copy",
+  },
+  {
+    id: "audio-cut",
+    version: 1,
+    mode: "AUDIO",
+    category: "Edit",
+    label: "Cut selected notes or clips",
+    keys: "Mod+X",
+    command: "audio-cut",
+  },
+  {
+    id: "audio-paste",
+    version: 1,
+    mode: "AUDIO",
+    category: "Edit",
+    label: "Paste notes or clips",
+    keys: "Mod+V",
+    command: "audio-paste",
+  },
+  {
+    id: "audio-duplicate",
+    version: 1,
+    mode: "AUDIO",
+    category: "Edit",
+    label: "Duplicate selected notes or clips",
+    keys: "Mod+D",
+    command: "audio-duplicate",
+  },
+  {
+    id: "audio-delete",
+    version: 1,
+    mode: "AUDIO",
+    category: "Edit",
+    label: "Delete selected notes or clips",
+    keys: "Delete / Backspace",
+    command: "audio-delete",
+  },
+  {
+    id: "audio-split",
+    version: 1,
+    mode: "AUDIO",
+    category: "Edit",
+    label: "Split at playhead",
+    keys: "S",
+    command: "audio-split",
+  },
+  {
+    id: "audio-nudge",
+    version: 1,
+    mode: "AUDIO",
+    category: "Timeline",
+    label: "Nudge selected notes",
+    keys: "ArrowLeft / ArrowRight / ArrowUp / ArrowDown",
+    command: "audio-nudge",
+  },
+  {
+    id: "audio-nudge-bar",
+    version: 1,
+    mode: "AUDIO",
+    category: "Timeline",
+    label: "Nudge by one bar",
+    keys: "Shift+ArrowLeft / Shift+ArrowRight",
+    command: "audio-nudge-bar",
+  },
+  {
+    id: "audio-selection-preview",
+    version: 1,
+    mode: "AUDIO",
+    category: "Timeline",
+    label: "Preview selection",
+    keys: "Shift+Space",
+    command: "audio-selection-preview",
+  },
+  {
+    id: "audio-quantize",
+    version: 1,
+    mode: "AUDIO",
+    category: "Timeline",
+    label: "Preview quantize",
+    keys: "Q",
+    command: "audio-quantize",
+  },
+  {
+    id: "audio-apply-quantize",
+    version: 1,
+    mode: "AUDIO",
+    category: "Timeline",
+    label: "Apply pending quantize",
+    keys: "Enter",
+    command: "audio-apply-quantize",
+  },
+  {
+    id: "audio-step-input",
+    version: 1,
+    mode: "AUDIO",
+    category: "Tools",
+    label: "Toggle step input",
+    keys: "I",
+    command: "audio-step-input",
+  },
+  {
+    id: "audio-swing",
+    version: 1,
+    mode: "AUDIO",
+    category: "Timeline",
+    label: "Apply swing",
+    keys: "G",
+    command: "audio-swing",
+  },
+  {
+    id: "audio-humanize",
+    version: 1,
+    mode: "AUDIO",
+    category: "Timeline",
+    label: "Humanize selected notes",
+    keys: "H",
+    command: "audio-humanize",
+  },
+  {
+    id: "audio-zoom-out",
+    version: 1,
+    mode: "AUDIO",
+    category: "View",
+    label: "Zoom Piano Roll out",
+    keys: "- / [",
+    command: "audio-zoom-out",
+  },
+  {
+    id: "audio-zoom-in",
+    version: 1,
+    mode: "AUDIO",
+    category: "View",
+    label: "Zoom Piano Roll in",
+    keys: "= / ]",
+    command: "audio-zoom-in",
+  },
+  {
+    id: "audio-loop",
+    version: 1,
+    mode: "AUDIO",
+    category: "Workspace",
+    label: "Toggle audio loop",
+    keys: "L",
+    command: "audio-loop",
+  },
+  {
+    id: "audio-record",
+    version: 1,
+    mode: "AUDIO",
+    category: "Workspace",
+    label: "Toggle audio recording",
+    keys: "R",
+    command: "audio-record",
+  },
+  {
+    id: "audio-test-tone",
+    version: 1,
+    mode: "AUDIO",
+    category: "Workspace",
+    label: "Play test tone",
+    keys: "T",
+    command: "audio-test-tone",
+  },
+  {
+    id: "audio-timeline-add-bar",
+    version: 1,
+    mode: "AUDIO",
+    category: "Timeline",
+    label: "Add timeline bar",
+    keys: "B",
+    command: "audio-timeline-add-bar",
+  },
+  {
+    id: "audio-timeline-move",
+    version: 1,
+    mode: "AUDIO",
+    category: "Timeline",
+    label: "Move selected timeline item",
+    keys: "M",
+    command: "audio-timeline-move",
+  },
+  {
+    id: "game-move",
+    version: 1,
+    mode: "GAME",
+    category: "Tools",
+    label: "Move player in preview",
+    keys: "ArrowLeft / ArrowRight / ArrowUp / ArrowDown / W / A / S / D",
+    command: "game-move",
+  },
+  {
+    id: "game-attack",
+    version: 1,
+    mode: "GAME",
+    category: "Tools",
+    label: "Attack in preview",
+    keys: "J / K",
+    command: "game-attack",
+  },
+  {
+    id: "game-cancel-preview",
+    version: 1,
+    mode: "GAME",
+    category: "Workspace",
+    label: "Stop game preview",
+    keys: "Esc",
+    command: "game-cancel-preview",
   },
 ];
 
@@ -377,6 +611,8 @@ export interface Draw2ShortcutContext {
   readonly sheetOpen?: boolean;
   readonly inputEditing?: boolean;
   readonly imeComposing?: boolean;
+  /** The active workspace owner; omitted for the historical iDRAW path. */
+  readonly mode?: Exclude<Draw2ShortcutMode, "COMMON">;
 }
 
 function normalizeKey(key: string): string {
@@ -412,7 +648,10 @@ export function resolveDraw2Shortcut(
     context.imeComposing
   ) return undefined;
   const key = normalizedEventKey(event);
+  const mode = context.mode ?? "DRAW";
   return DRAW2_SHORTCUTS.find((shortcut) =>
+    (shortcut.mode === "COMMON" || shortcut.mode === mode ||
+      (shortcut.mode === undefined && mode === "DRAW")) &&
     normalizedRegistryKeys(shortcut.keys).includes(key)
   );
 }

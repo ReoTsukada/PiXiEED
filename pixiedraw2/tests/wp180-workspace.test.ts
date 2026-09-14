@@ -16,6 +16,133 @@ import {
   resolveWorkspaceDetailMode,
   transitionPanelMount,
 } from "../src/wp180-workspace-contracts.ts";
+import { resolveAudioFeatureFlag } from "../src/wp180-audio-flag.ts";
+
+Deno.test("Audio feature flags default on and fail closed on invalid values", () => {
+  if (resolveAudioFeatureFlag(null).flag !== "on") {
+    throw new Error("Normal iAUDIO entry must enable Audio by default.");
+  }
+  if (resolveAudioFeatureFlag(null).reason !== "default-on") {
+    throw new Error("Default Audio state must be observable as default-on.");
+  }
+  if (resolveAudioFeatureFlag("on", "off").flag !== "on") {
+    throw new Error("Explicit audio=on must override the host fallback.");
+  }
+  if (resolveAudioFeatureFlag("off").flag !== "off") {
+    throw new Error("Explicit audio=off must remain an opt-out.");
+  }
+  for (const invalid of ["", "maybe", "ONCE"]) {
+    const resolution = resolveAudioFeatureFlag(invalid);
+    if (resolution.flag !== "off" || resolution.reason !== "unknown") {
+      throw new Error(`Invalid Audio flag must fail closed: ${invalid}`);
+    }
+  }
+  if (resolveAudioFeatureFlag(null, "off").flag !== "off") {
+    throw new Error("A host explicitly configured off must remain off.");
+  }
+});
+
+Deno.test("iAUDIO new and reset projects do not inject demo notes", async () => {
+  const source = await Deno.readTextFile(
+    new URL("../src/wp180-workspace-ui.ts", import.meta.url),
+  );
+  if (source.includes("initialAudioNotes")) {
+    throw new Error("New iAUDIO projects must not carry a demo-note seed.");
+  }
+  const resetStart = source.indexOf(
+    "const resetAudioSubdocumentForProjectSwitch =",
+  );
+  const resetEnd = source.indexOf(
+    "const audioNoteCellLookup =",
+    resetStart,
+  );
+  if (resetStart < 0 || resetEnd < 0) {
+    throw new Error("iAUDIO reset boundaries are missing.");
+  }
+  if (source.slice(resetStart, resetEnd).includes("audioMidiNotes.set(")) {
+    throw new Error("Project reset must not inject an iAUDIO demo note.");
+  }
+  const emptyMap = "const audioMidiNotes = new Map<string, PianoRollNote>();";
+  if (!source.includes(emptyMap)) {
+    throw new Error("iAUDIO new-project notes must start empty.");
+  }
+});
+
+Deno.test("iAUDIO opens the Piano Roll around C4 and keeps later scroll positions", async () => {
+  const source = await Deno.readTextFile(
+    new URL("../src/wp180-workspace-ui.ts", import.meta.url),
+  );
+  for (const required of [
+    'const audioMidiInitialScrollTop =',
+    'pitch.label === "C4"',
+    "const applyAudioMidiInitialViewport =",
+    "audioMidiInitialViewportApplied = true;",
+    "audioMidiGrid.scrollTop = scrollTop;",
+    "if (!applyAudioMidiInitialViewport())",
+    "audioMidiInitialViewportApplied = false;",
+  ]) {
+    if (!source.includes(required)) {
+      throw new Error(`Piano Roll initial viewport contract missing: ${required}`);
+    }
+  }
+  const initialTop = source.indexOf("const audioMidiInitialScrollTop =");
+  const renderTop = source.indexOf("const renderAudioMidiGrid =");
+  if (initialTop < 0 || renderTop < 0 || initialTop > renderTop) {
+    throw new Error("Initial Piano Roll viewport must be defined before rendering.");
+  }
+});
+
+Deno.test("iAUDIO Asset creation stays contextual and is independent from Market options", async () => {
+  const source = await Deno.readTextFile(
+    new URL("../src/wp180-workspace-ui.ts", import.meta.url),
+  );
+  const html = await Deno.readTextFile(
+    new URL("../index.html", import.meta.url),
+  );
+  for (const required of [
+    "let audioAssetScopeIntent = false;",
+    "const revealAudioAssetPackageForUserSelection =",
+    "audioAssetScopeIntent = true;",
+    "const visible = audioAssetScopeIntent && state !== \"empty\";",
+    "audioAssetPackage.hidden = !visible;",
+    "audioAssetPackage.setAttribute(\"aria-hidden\", String(!visible));",
+    "const inferredAudioAssetRole =",
+    "const saveSelectedAudioAsset = async (): Promise<void> =>",
+    'offerKind: "ASSET",',
+    'derivativePolicy: "USE_ONLY",',
+    "audioAssetScopeIntent = false;",
+  ]) {
+    if (!source.includes(required)) {
+      throw new Error(`Contextual iAUDIO Asset contract missing: ${required}`);
+    }
+  }
+  const packageStart = html.indexOf('id="draw2AudioAssetPackage"');
+  const packageEnd = html.indexOf(">", packageStart);
+  if (packageStart < 0 || packageEnd < 0 || !html.slice(packageStart, packageEnd).includes("hidden")) {
+    throw new Error("iAUDIO Asset panel must start hidden before an explicit scope is selected.");
+  }
+  const assetPanel = html.slice(packageStart);
+  for (const required of [
+    'data-audio-asset-workflow="asset-only"',
+    "Assetとして保存",
+  ]) {
+    if (!assetPanel.includes(required)) {
+      throw new Error(`iAUDIO Asset panel is missing: ${required}`);
+    }
+  }
+  for (const removed of [
+    "draw2AudioAssetRole",
+    "draw2AudioAssetOfferKind",
+    "draw2AudioAssetDerivativePolicy",
+    "draw2AudioAssetAddRange",
+    "販売用に確定",
+    "＋Packへ追加",
+  ]) {
+    if (assetPanel.includes(removed)) {
+      throw new Error(`iAUDIO Asset creation must not expose Market option: ${removed}`);
+    }
+  }
+});
 
 Deno.test("Luna keyboard actions share safe event guards", async () => {
   const source = await Deno.readTextFile(
@@ -144,6 +271,432 @@ Deno.test("iAUDIO Piano Roll starts with a multi-bar working window", async () =
     if (!source.includes(required)) {
       throw new Error(`Initial Audio multi-bar contract missing: ${required}`);
     }
+  }
+});
+
+Deno.test("iAUDIO Piano Roll exposes unified tools and safe range editing", async () => {
+  const html = await Deno.readTextFile(
+    new URL("../index.html", import.meta.url),
+  );
+  const source = await Deno.readTextFile(
+    new URL("../src/wp180-workspace-ui.ts", import.meta.url),
+  );
+  const css = await Deno.readTextFile(
+    new URL("../assets/draw2-shell.css", import.meta.url),
+  );
+  for (const required of [
+    'id="draw2AudioMidiToolStrip"',
+    'id="draw2AudioMidiSplit"',
+    'data-audio-midi-tool="pen"',
+    'data-audio-midi-tool="eraser"',
+    'data-audio-midi-tool="select"',
+    'data-audio-ui-group="tools"',
+    'data-audio-ui-group="actions"',
+  ]) {
+    if (!html.includes(required)) {
+      throw new Error(`Piano Roll tool markup missing: ${required}`);
+    }
+  }
+  for (const required of [
+    '"button[data-audio-midi-tool]"',
+    "journalWorkspaceNoteBatchReplace",
+    "const audioMidiSelectionBoundsFromDrag =",
+    "const beginAudioMidiMove =",
+    "const commitAudioMidiMove =",
+    "const splitSelectedAudioMidiNotes =",
+    "const audioMidiDirectManipulationEnabled =",
+    "const audioMidiNoteAtTarget =",
+    "const createAudioMidiNoteAtTarget =",
+    "const beginAudioMidiDrawAtTarget =",
+    "const splitAudioMidiNoteAtPointer =",
+    "audioMidiLastEmptyClick",
+    "audioMidiSkipNextDoubleClickAt",
+    "drag empty space to select a range",
+    "audioMidiMovePreview?.sourceNoteIds.has(note.id)",
+    "drag selected notes to move them",
+    "double-click a note to split",
+    "Empty lane · double-click to add a note",
+    "const stationary =",
+    "beginAudioMidiMarquee(event);",
+    "key === \"s\"",
+  ]) {
+    if (!source.includes(required)) {
+      throw new Error(`Piano Roll range editing contract missing: ${required}`);
+    }
+  }
+  for (const required of [
+    ".draw2-audio-midi-tool-strip",
+    ".draw2-audio-midi-grid.is-midi-moving",
+    ".draw2-audio-midi-grid.is-midi-drawing",
+    "#draw2AudioMidiToolStrip",
+    "grid-column: 1 / -1 !important;",
+    "#draw2AudioMidiSplit",
+    'data-audio-ui-group="tools-secondary"]',
+    "display: none !important;",
+  ]) {
+    if (!css.includes(required)) {
+      throw new Error(`Piano Roll range editing style missing: ${required}`);
+    }
+  }
+});
+
+Deno.test("PC mode timeline caps preserve the primary workspace", async () => {
+  const source = await Deno.readTextFile(
+    new URL("../src/wp180-workspace-ui.ts", import.meta.url),
+  );
+  const css = await Deno.readTextFile(
+    new URL("../assets/draw2-pc-workspace-overrides.css", import.meta.url),
+  );
+  for (const required of [
+    '[data-creator-mode="DRAW"]',
+    '[data-creator-mode="AUDIO"]',
+    '[data-creator-mode="GAME"]',
+    "--draw2-pc-audio-timeline-height: clamp(",
+    "min(24dvh, var(--draw2-timeline-height, 220px))",
+    "min(26dvh, var(--draw2-timeline-height, 240px))",
+    "min(32dvh, var(--draw2-timeline-height, 260px))",
+  ]) {
+    if (!css.includes(required)) {
+      throw new Error(`PC mode timeline sizing contract missing: ${required}`);
+    }
+  }
+  for (const required of [
+    "const timelineMinimumForViewport = (",
+    "const timelineMaximumForViewport = (",
+    "timelineMaximumForViewport(mode)",
+    "const effectiveHeight = clampRailLayoutValue(",
+    "timelineMinimumForViewport(),\n        timelineMaximumForViewport(),",
+  ]) {
+    if (!source.includes(required)) {
+      throw new Error(`Timeline runtime sizing contract missing: ${required}`);
+    }
+  }
+});
+
+Deno.test("iAUDIO desktop editing moves commands onto the timeline and shortcuts", async () => {
+  const source = await Deno.readTextFile(
+    new URL("../src/wp180-workspace-ui.ts", import.meta.url),
+  );
+  const css = await Deno.readTextFile(
+    new URL("../assets/draw2-shell.css", import.meta.url),
+  );
+  for (const required of [
+    "const selectAudioTimelineBar =",
+    "const selectAudioTimelineBarRange =",
+    "const audioTimelineRangeFromEvent =",
+    "const bindAudioTimelineDirectManipulation =",
+    "const handleAudioWorkspaceShortcuts =",
+    "Shift+Space",
+    "double-click the lane to add",
+    "audioMidiQuantizePreviewButton?.click()",
+    "audioMidiStepInput?.click()",
+    "audioSwingApply?.click()",
+    "audioHumanize?.click()",
+    "audioShortcutButton(\"draw2AudioDawDelete\")?.click()",
+  ]) {
+    if (!source.includes(required)) {
+      throw new Error(`Desktop Audio direct-edit contract missing: ${required}`);
+    }
+  }
+  for (const required of [
+    "iAUDIO desktop command minimization v0.1",
+    "#draw2AudioDawBarPlus",
+    "#draw2AudioDawCopy",
+    "#draw2AudioDawMove",
+    "#draw2AudioMidiQuantizePreview",
+    "#draw2AudioMidiPlaySelection",
+    "#draw2AudioMidiExpressionAdd",
+    "#draw2AudioDeckSave",
+    "#draw2AudioBarStrip",
+    "@media (min-width: 1120px)",
+    "display: none !important;",
+  ]) {
+    if (!css.includes(required)) {
+      throw new Error(`Desktop Audio command visibility contract missing: ${required}`);
+    }
+  }
+});
+
+Deno.test("iAUDIO direct gestures expose live previews and cancel safely", async () => {
+  const source = await Deno.readTextFile(
+    new URL("../src/wp180-workspace-ui.ts", import.meta.url),
+  );
+  const css = await Deno.readTextFile(
+    new URL("../assets/draw2-shell.css", import.meta.url),
+  );
+  for (const required of [
+    "readonly initialStartBar: number;",
+    "currentStartBar: number;",
+    "syncAudioTimelinePointerPreview",
+    "release to select · Esc to cancel",
+    "cancelAudioTimelinePointerGesture",
+    "audioMidiErase?.erasedIds.has(note.id)",
+    "release to delete · Esc to cancel",
+    "const cancelAudioMidiPointerGesture =",
+    "Erase preview cancelled · notes restored",
+    "audioMidiExpressionCancel",
+    "Selection preview cancelled",
+  ]) {
+    if (!source.includes(required)) {
+      throw new Error(`Audio live-preview contract missing: ${required}`);
+    }
+  }
+  for (const required of [
+    "is-direct-preview",
+    "is-direct-preview-anchor",
+    ".draw2-audio-midi-grid.is-midi-erasing",
+    ".draw2-audio-midi-expression-graph.is-expression-dragging",
+  ]) {
+    if (!css.includes(required)) {
+      throw new Error(`Audio live-preview style missing: ${required}`);
+    }
+  }
+  const html = await Deno.readTextFile(
+    new URL("../index.html", import.meta.url),
+  );
+  for (const required of [
+    "data-audio-midi-toolbar",
+    "syncAudioMidiToolVisibility",
+    "toolbar.hidden = direct",
+    "toolbar.inert = direct",
+  ]) {
+    if (!source.includes(required) && !html.includes(required)) {
+      throw new Error(`PC Piano Roll tool visibility contract missing: ${required}`);
+    }
+  }
+});
+
+Deno.test("iAUDIO keeps note editing direct and exposes contextual precision only on selection", async () => {
+  const html = await Deno.readTextFile(
+    new URL("../index.html", import.meta.url),
+  );
+  const source = await Deno.readTextFile(
+    new URL("../src/wp180-workspace-ui.ts", import.meta.url),
+  );
+  const css = await Deno.readTextFile(
+    new URL("../assets/draw2-shell.css", import.meta.url),
+  );
+  for (const required of [
+    'id="draw2AudioMidiNoteContext"',
+    'id="draw2AudioMidiNotePitch"',
+    'id="draw2AudioMidiNoteStart"',
+    'id="draw2AudioMidiNoteLength"',
+    'id="draw2AudioMidiNoteVelocity"',
+    "data-ui-tier=\"contextual\"",
+  ]) {
+    if (!html.includes(required)) {
+      throw new Error(`Contextual MIDI note UI is missing: ${required}`);
+    }
+  }
+  for (const required of [
+    "const audioMidiContextSelectedNotes =",
+    "const syncAudioMidiNoteContext =",
+    "const applyAudioMidiContextEdit =",
+    "audioMidiResizeAtPointer(event)",
+    "projectionFrameCount",
+    "if (nextFrameCount > audioFrameCount) extendAudioTimelineTo(nextFrameCount)",
+    "Drag note to move · drag edge to resize",
+  ]) {
+    if (!source.includes(required)) {
+      throw new Error(`Direct MIDI editing contract is missing: ${required}`);
+    }
+  }
+  for (const required of [
+    ".draw2-audio-midi-note-context",
+    "#draw2AudioMidiGrid[data-audio-midi-cursor=\"note\"]",
+    "#draw2AudioMidiGrid[data-audio-midi-cursor=\"start-resize\"]",
+    "#draw2AudioMidiGrid.is-midi-moving",
+    "#draw2AudioMidiNoteContext",
+    "@media (max-width: 1119px)",
+  ]) {
+    if (!css.includes(required)) {
+      throw new Error(`Direct MIDI presentation contract is missing: ${required}`);
+    }
+  }
+});
+
+Deno.test("iAUDIO workspace builds refresh the lazy mutation module", async () => {
+  const config = await Deno.readTextFile(
+    new URL("../deno.json", import.meta.url),
+  );
+  const workspace = await Deno.readTextFile(
+    new URL("../src/wp180-workspace-ui.ts", import.meta.url),
+  );
+  if (!config.includes('"build:audio-200-workspace"')) {
+    throw new Error("The Audio workspace chunk must have an explicit build task.");
+  }
+  if (!config.includes('"build:workspace": "deno task build:audio-200-workspace')) {
+    throw new Error(
+      "The workspace build must refresh the lazy Audio mutation module first.",
+    );
+  }
+  if (!config.includes('"build:workspace:min": "deno task build:audio-200-workspace')) {
+    throw new Error(
+      "The minified workspace build must refresh the lazy Audio mutation module first.",
+    );
+  }
+  if (!workspace.includes('"audio-200-workspace.js?v=')) {
+    throw new Error("The lazy Audio workspace module must use a cache-busting version.");
+  }
+  if (!workspace.includes("journalWorkspaceNoteBatchReplace(")) {
+    throw new Error(
+      "Piano Roll move and resize must use the atomic note batch mutation.",
+    );
+  }
+});
+
+Deno.test("iAUDIO P1 quantize and selection preview stay separate from full playback", async () => {
+  const html = await Deno.readTextFile(
+    new URL("../index.html", import.meta.url),
+  );
+  const source = await Deno.readTextFile(
+    new URL("../src/wp180-workspace-ui.ts", import.meta.url),
+  );
+  for (const required of [
+    'id="draw2AudioMidiQuantize"',
+    'id="draw2AudioMidiQuantizeAmount"',
+    'id="draw2AudioMidiQuantizeSwing"',
+    'id="draw2AudioMidiQuantizePreview"',
+    'id="draw2AudioMidiQuantizeApply"',
+    'id="draw2AudioMidiQuantizeCancel"',
+    'id="draw2AudioMidiPlaySelection"',
+    'id="draw2AudioMidiScaleGuide"',
+    'id="draw2AudioMidiScaleGuideMode"',
+    'id="draw2AudioMidiStepInput"',
+  ]) {
+    if (!html.includes(required)) {
+      throw new Error(`P1 Audio control markup missing: ${required}`);
+    }
+  }
+  for (const required of [
+    "quantizePianoRollNotes(",
+    "audioMidiQuantizePreview",
+    "note-quantize-batch",
+    "source notes were restored",
+    "audioSelectionScheduler",
+    "selection-preview",
+    "Stop the full composition before playing a selection",
+    "guide only",
+    "The scale guide is a visual aid only",
+    "journalWorkspaceMusicalContext",
+    "audioPitchForMusicalGuide",
+    "SNAP",
+    "RESTRICT",
+    "audioMidiStepInputEnabled",
+    "midi-step-input",
+    "note-velocity-batch",
+    "draw2-audio-midi-expression-graph",
+  ]) {
+    if (!source.includes(required)) {
+      throw new Error(`P1 Audio control contract missing: ${required}`);
+    }
+  }
+});
+
+Deno.test("Audio Clip end events clear the host playback state", async () => {
+  const html = await Deno.readTextFile(
+    new URL("../index.html", import.meta.url),
+  );
+  const workspace = await Deno.readTextFile(
+    new URL("../src/wp180-workspace-ui.ts", import.meta.url),
+  );
+  const runtime = await Deno.readTextFile(
+    new URL("../src/audio/audio-240/long-audio-runtime.ts", import.meta.url),
+  );
+  for (const required of [
+    "const audioStreamingRuntimeHasPendingSource",
+    "runtime.snapshot()",
+    "snapshot.activeSourceCount > 0",
+    "snapshot.positionSeconds < timelineEnd - 0.05",
+    "const finishAudioStreamingPreview",
+    "onEnded: () => onAudioStreamingRuntimeEnded?.(),",
+    "if (!audioDeckPlaying) stopAudioFrameTransport();",
+    "const audioFlagResolution = resolveAudioFeatureFlag(",
+    'queryAudioFlag, "on"',
+  ]) {
+    if (!workspace.includes(required)) {
+      throw new Error(`Audio host completion contract missing: ${required}`);
+    }
+  }
+  for (const required of [
+    'data-audio-feature-flag="off"',
+    "dist/draw2-entry.js?v=20260913-workspace-input-v1",
+  ]) {
+    if (!html.includes(required)) {
+      throw new Error(`Audio entry cache contract missing: ${required}`);
+    }
+  }
+  if (!runtime.includes("readonly onEnded?: () => void;")) {
+    throw new Error("Long Audio runtime must expose its natural end callback.");
+  }
+  if (!runtime.includes("onEnded: () => options.onEnded?.(),")) {
+    throw new Error("Long Audio runtime must forward scheduler end events.");
+  }
+});
+
+Deno.test("iAUDIO playback keeps an audible test path and the trusted gesture", async () => {
+  const html = await Deno.readTextFile(
+    new URL("../index.html", import.meta.url),
+  );
+  const source = await Deno.readTextFile(
+    new URL("../src/wp180-workspace-ui.ts", import.meta.url),
+  );
+  const entry = await Deno.readTextFile(
+    new URL("../src/draw2-entry.ts", import.meta.url),
+  );
+  const synth = await Deno.readTextFile(
+    new URL("../src/audio/audio-240/chiptune-synth.ts", import.meta.url),
+  );
+  for (const required of [
+    'value="0.6"',
+    "60%</output>",
+    "CHIP_SYNTH_DEFAULT_VOLUME",
+    'Test tone scheduled · Master output signal is active',
+    "audioChipPlay?.click();",
+  ]) {
+    if (!html.includes(required) && !source.includes(required)) {
+      throw new Error(`Audible Audio recovery contract missing: ${required}`);
+    }
+  }
+  if (!synth.includes("export const CHIP_SYNTH_DEFAULT_VOLUME = 0.6;")) {
+    throw new Error("Synth and Audio UI must share one audible default.");
+  }
+  if (!entry.includes('workspaceChunkUrl.searchParams.set("v", "20260913-workspace-input-v1")')) {
+    throw new Error("The lazy Audio workspace bundle must share the current cache version.");
+  }
+  if (!source.includes("\n      900,\n      \"triangle\",\n      1,")) {
+    throw new Error("The Audio output test must remain long and audible enough to verify.");
+  }
+  for (const required of [
+    "let audioCompositionStartGeneration = 0;",
+    "const startGeneration = ++audioCompositionStartGeneration;",
+    "startGeneration !== audioCompositionStartGeneration",
+    "Notes Preview start cancelled · notes remain in the Piano Roll",
+    "const readyPromise = ensureAudioPlaybackReady(\n      \"notes-preview\",",
+    "requestAudioCompositionPlayback();\n    if (!await readyPromise) return;",
+  ]) {
+    if (!source.includes(required)) {
+      throw new Error(`Audio start cancellation contract missing: ${required}`);
+    }
+  }
+  const notesHandlerStart = source.indexOf(
+    'audioChipPlay?.addEventListener("click", async () => {',
+  );
+  const notesHandler = notesHandlerStart >= 0
+    ? source.slice(notesHandlerStart, notesHandlerStart + 10_000)
+    : "";
+  const preflightStart = notesHandler.indexOf(
+    'const readyPromise = ensureAudioPlaybackReady(\n      "notes-preview",',
+  );
+  const intentStart = notesHandler.indexOf(
+    "requestAudioCompositionPlayback();\n    if (!await readyPromise) return;",
+  );
+  if (
+    preflightStart < 0 || intentStart < 0 || preflightStart > intentStart
+  ) {
+    throw new Error(
+      "Audio start must install the pending preflight before setting PLAY.",
+    );
   }
 });
 
@@ -312,7 +865,9 @@ Deno.test("PC keyboard ownership separates mode arrows, selection nudge, and Spa
   const modeBlock = workspace.slice(modeStart, modeEnd);
   if (
     !entry.includes("const activeDrawGesture =") ||
-    !entry.includes("activeDrawGesture && selectionNudgeKeys.has(event.key)")
+    !entry.includes(
+      'activeDrawGesture && drawArrowOwner === "DRAW_SELECTION"',
+    )
   ) {
     throw new Error(
       "Draw arrows must not change frame/layer during an active gesture",
@@ -354,6 +909,15 @@ Deno.test("PC keyboard ownership separates mode arrows, selection nudge, and Spa
   ]) {
     if (!playbackBlock.includes(required)) {
       throw new Error(`Space playback ownership missing: ${required}`);
+    }
+  }
+  for (const required of [
+    "const gameInputSurface = resolveDraw2ActiveSurface(",
+    'gameInputSurface !== "GAME_STAGE"',
+    'gameInputSurface !== "GAME_RUNTIME"',
+  ]) {
+    if (!workspace.includes(required)) {
+      throw new Error(`GAME input ownership guard missing: ${required}`);
     }
   }
 });

@@ -64,6 +64,34 @@ Deno.test("AUDIO-240 scheduler uses audio time and lookahead without duplicates"
   assert(timer.callbacks.size === 1, "The transport timer was not installed.");
 });
 
+Deno.test("AUDIO-240 scheduler notifies the host once at a natural end", () => {
+  let now = 0;
+  const timer = new FakeTimer();
+  let ended: number = 0;
+  const scheduler = new SampleAccurateScheduler({
+    clock: { now: () => now },
+    timer: timer.adapter,
+    onSchedule: () => {},
+    onEnded: () => ended += 1,
+  });
+  scheduler.load([event("end", 0.1)], 0.5);
+  assert(scheduler.start(0, false), "Natural-end scheduler did not start.");
+  now = 0.49;
+  scheduler.pump();
+  assert(ended === 0 && scheduler.isPlaying, "Scheduler ended too early.");
+  now = 0.5;
+  scheduler.pump();
+  assert(
+    Number(ended) === 1 && !scheduler.isPlaying && timer.callbacks.size === 0,
+    "Natural end did not stop the timer and notify the host exactly once.",
+  );
+  scheduler.pump(1);
+  assert(
+    Number(ended) === 1,
+    "Natural-end notification was emitted more than once.",
+  );
+});
+
 Deno.test("AUDIO-240 scheduler pause and seek reset the event cursor", () => {
   let now = 0;
   const timer = new FakeTimer();

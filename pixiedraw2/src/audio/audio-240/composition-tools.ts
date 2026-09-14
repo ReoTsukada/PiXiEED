@@ -19,6 +19,14 @@ export interface SwingPianoRollOptions {
   readonly amountPercent: number;
 }
 
+export interface QuantizePianoRollOptions {
+  readonly quantumTicks: number;
+  /** 0 keeps the original position; 100 moves fully to the grid. */
+  readonly amountPercent?: number;
+  /** Optional offbeat delay, expressed as a percentage of one subdivision. */
+  readonly swingPercent?: number;
+}
+
 function finite(value: number, fallback: number): number {
   return Number.isFinite(value) ? value : fallback;
 }
@@ -90,6 +98,40 @@ export function swingPianoRollNotes(
         options.subdivisionTicks,
         options.amountPercent,
       ),
+      durationTick: ticks.durationTick,
+      velocity: note.velocity,
+    };
+  });
+}
+
+/**
+ * Return a quantized projection without mutating the source notes.
+ * Callers can keep the source array as the reset target until the result is
+ * explicitly committed to the Audio journal.
+ */
+export function quantizePianoRollNotes(
+  notes: readonly PianoRollNote[],
+  clock: AudioClockSpec,
+  options: QuantizePianoRollOptions,
+): readonly PianoRollNote[] {
+  const quantum = Math.max(
+    1,
+    Math.round(finite(options.quantumTicks, 1)),
+  );
+  const amount = clamp(options.amountPercent ?? 100, 0, 100) / 100;
+  const swing = clamp(options.swingPercent ?? 0, 0, 100) / 100;
+  return projectNotes(notes, clock, (note) => {
+    const ticks = pianoRollNoteTicks(note, clock);
+    const original = Number(ticks.startTick);
+    const grid = Math.round(original / quantum) * quantum;
+    const index = Math.max(0, Math.round(original / quantum));
+    const swingOffset = index % 2 === 1 ? Math.round(quantum * swing / 3) : 0;
+    const target = grid + swingOffset;
+    return {
+      startTick: Math.max(
+        0,
+        Math.round(original + (target - original) * amount),
+      ) as AudioTick,
       durationTick: ticks.durationTick,
       velocity: note.velocity,
     };

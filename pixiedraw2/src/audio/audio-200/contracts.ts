@@ -62,6 +62,82 @@ export type AudioSourcePlacement =
 
 export type AudioAssetKind = "CLIP" | "SONG";
 export type AudioTrackKind = "AUDIO" | "INSTRUMENT" | "BUS" | "RETURN";
+export type AudioMusicalKey =
+  | "C"
+  | "C♯"
+  | "D"
+  | "D♯"
+  | "E"
+  | "F"
+  | "F♯"
+  | "G"
+  | "G♯"
+  | "A"
+  | "A♯"
+  | "B";
+export const AUDIO_MUSICAL_KEYS: readonly AudioMusicalKey[] = [
+  "C",
+  "C♯",
+  "D",
+  "D♯",
+  "E",
+  "F",
+  "F♯",
+  "G",
+  "G♯",
+  "A",
+  "A♯",
+  "B",
+] as const;
+export function isAudioMusicalKey(value: unknown): value is AudioMusicalKey {
+  return typeof value === "string" &&
+    (AUDIO_MUSICAL_KEYS as readonly string[]).includes(value);
+}
+export type AudioMusicalScaleId =
+  | "major"
+  | "minor"
+  | "harmonic-minor"
+  | "melodic-minor"
+  | "dorian"
+  | "phrygian"
+  | "lydian"
+  | "mixolydian"
+  | "locrian"
+  | "pentatonic"
+  | "minor-pentatonic"
+  | "blues"
+  | "chromatic";
+export const AUDIO_MUSICAL_SCALE_IDS: readonly AudioMusicalScaleId[] = [
+  "major",
+  "minor",
+  "harmonic-minor",
+  "melodic-minor",
+  "dorian",
+  "phrygian",
+  "lydian",
+  "mixolydian",
+  "locrian",
+  "pentatonic",
+  "minor-pentatonic",
+  "blues",
+  "chromatic",
+] as const;
+export function isAudioMusicalScaleId(
+  value: unknown,
+): value is AudioMusicalScaleId {
+  return typeof value === "string" &&
+    (AUDIO_MUSICAL_SCALE_IDS as readonly string[]).includes(value);
+}
+export interface AudioMusicalContext {
+  readonly key: AudioMusicalKey;
+  readonly scale: AudioMusicalScaleId;
+}
+export const AUDIO_DEFAULT_MUSICAL_CONTEXT: AudioMusicalContext = Object.freeze({
+  key: "C",
+  scale: "major",
+});
+/** Editor preference; it is persisted separately from canonical song data. */
+export type AudioScaleGuideMode = "DISPLAY" | "SNAP" | "RESTRICT";
 /** Lightweight drum-kit profiles used by the frame-oriented Drum Roll. */
 export type AudioDrumKitId = "BASIC" | "ARCADE" | "SOFT";
 export const AUDIO_DRUM_KIT_IDS: readonly AudioDrumKitId[] = [
@@ -152,6 +228,7 @@ export type AudioCommandType =
   | "CLIP_REMOVE"
   | "NOTE_REMOVE"
   | "NOTE_UPSERT"
+  | "NOTE_BATCH_REPLACE"
   | "AUTOMATION_UPSERT"
   | "AUTOMATION_REMOVE"
   | "MIXER_REPLACE"
@@ -163,6 +240,7 @@ export type AudioCommandType =
   | "SYNTH_PRESET_REPLACE"
   | "SYNTH_PRESET_REMOVE"
   | "TEMPO_SET"
+  | "MUSICAL_CONTEXT_SET"
   | "MARKER_UPSERT"
   | "MARKER_REMOVE"
   | "RECORDING_COMMIT"
@@ -417,6 +495,12 @@ export interface AudioTimelineBarClearPayload {
   readonly durationTick: AudioTick;
 }
 
+/** Atomically replace a set of notes as one undoable edit. */
+export interface AudioNoteBatchReplacePayload {
+  readonly removeNoteIds: readonly AudioNoteId[];
+  readonly notes: readonly AudioNote[];
+}
+
 export interface AudioNote {
   readonly noteId: AudioNoteId;
   readonly trackId: AudioTrackId;
@@ -456,6 +540,8 @@ export interface AudioProject {
   readonly stateHash: AudioContentHash;
   readonly tempo: AudioTempo;
   readonly timebase: AudioTimebase;
+  /** Optional for backwards-compatible AUDIO-200 projects before musical context support. */
+  readonly musicalContext?: AudioMusicalContext;
   /** Optional for projects created before the Drum Roll kit selector. */
   readonly drumKitId?: AudioDrumKitId;
   /** Optional for projects created before the hardware chip machine selector. */
@@ -486,6 +572,7 @@ export type AudioCommandPayload =
   | { readonly clipId: AudioClipId }
   | { readonly noteId: AudioNoteId }
   | { readonly note: AudioNote }
+  | { readonly noteBatch: AudioNoteBatchReplacePayload }
   | { readonly automation: AudioAutomation }
   | { readonly automationId: AudioAutomationId }
   | { readonly mixer: AudioMixer }
@@ -497,6 +584,7 @@ export type AudioCommandPayload =
   | { readonly synthPreset: AudioSynthPreset }
   | { readonly synthPresetId: string }
   | { readonly tempo: AudioTempo }
+  | { readonly musicalContext: AudioMusicalContext }
   | { readonly marker: AudioMarker }
   | { readonly markerId: string }
   | { readonly recording: AudioRecordingCommitPayload }

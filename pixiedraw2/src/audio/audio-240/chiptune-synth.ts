@@ -42,6 +42,21 @@ export type ChipTuneAudioContextState =
   | "uninitialized"
   | "unavailable";
 
+/**
+ * Audible but conservative default for the browser preview bus.  The former
+ * 0.22 value made a short audition sound absent on some laptop speakers even
+ * though the Web Audio graph was producing a signal.
+ */
+export const CHIP_SYNTH_DEFAULT_VOLUME = 0.6;
+
+/**
+ * Browser preview safety ceiling for simultaneously scheduled logical notes.
+ * A voice can fan out to several oscillator/noise sources, so bounding notes
+ * is more predictable than trying to bound individual Web Audio nodes. The
+ * score itself is never changed; only an overloaded live preview is limited.
+ */
+export const CHIP_SYNTH_MAX_POLYPHONY = 64;
+
 /** Read-only lifecycle information used by the host before scheduling. */
 export interface ChipTunePlaybackDiagnostics {
   readonly contextState: ChipTuneAudioContextState;
@@ -54,7 +69,22 @@ export interface ChipTunePlaybackDiagnostics {
   readonly effectiveGain: number;
   readonly masterGain: number;
   readonly outputGain: number;
+  readonly safetyLimiterEnabled: boolean;
   readonly activeSourceCount: number;
+  readonly activeVoiceCount: number;
+  readonly maxPolyphony: number;
+  readonly droppedVoiceCount: number;
+}
+
+interface ActiveVoiceSlot {
+  readonly id: number;
+  readonly priority: number;
+  readonly startTime: number;
+  readonly endTime: number;
+  readonly sequence: number;
+  sources: AudioScheduledSourceNode[];
+  cleanup: (() => void) | undefined;
+  released: boolean;
 }
 
 /**
@@ -68,6 +98,9 @@ export class ChipTuneSynth {
   private mixer: AudioMixer | undefined;
   private readonly activeSources = new Set<AudioScheduledSourceNode>();
   private readonly activeNoteGains = new Set<GainNode>();
+  private readonly activeVoices = new Map<number, ActiveVoiceSlot>();
+  private voiceSequence = 0;
+  private droppedVoiceCount = 0;
   private readonly mediaSources = new Map<
     HTMLMediaElement,
     MediaElementAudioSourceNode
@@ -80,7 +113,7 @@ export class ChipTuneSynth {
   private chipMachineId: AudioChipMachineId = "NONE";
   private automationTempoMilliBpm = 120_000;
   private automationPpq = 480;
-  private volume = 0.22;
+  private volume = CHIP_SYNTH_DEFAULT_VOLUME;
   private resumePromise: Promise<boolean> | undefined;
   private suspendPromise: Promise<void> | undefined;
   private readonly contextStateListeners = new Set<
@@ -90,7 +123,11 @@ export class ChipTuneSynth {
   constructor(private readonly windowRef: Window) {}
 
   setVolume(value: number): void {
-    this.volume = clamp(Number.isFinite(value) ? value : 0.22, 0, 1);
+    this.volume = clamp(
+      Number.isFinite(value) ? value : CHIP_SYNTH_DEFAULT_VOLUME,
+      0,
+      1,
+    );
     this.mixerRuntime?.setOutputVolume(this.volume);
   }
 
@@ -171,7 +208,11 @@ export class ChipTuneSynth {
       effectiveGain,
       masterGain,
       outputGain,
+      safetyLimiterEnabled: snapshot?.safetyLimiterEnabled === true,
       activeSourceCount: this.activeSources.size,
+      activeVoiceCount: this.activeVoices.size,
+      maxPolyphony: CHIP_SYNTH_MAX_POLYPHONY,
+      droppedVoiceCount: this.droppedVoiceCount,
     };
   }
 
@@ -435,6 +476,7 @@ export class ChipTuneSynth {
     velocity = 0.8,
     trackId?: string,
     voiceId?: string,
+    priority = velocity,
   ): boolean {
     const context = this.ensureContext();
     return this.scheduleNoteAt(
@@ -446,6 +488,7 @@ export class ChipTuneSynth {
       trackId,
       undefined,
       voiceId,
+      priority,
     );
   }
 
@@ -460,6 +503,7 @@ export class ChipTuneSynth {
     presetId: ChipSynthPresetId,
     velocity = 0.8,
     voiceId?: string,
+    priority = velocity,
   ): boolean {
     const context = this.ensureContext();
     if (
@@ -476,6 +520,7 @@ export class ChipTuneSynth {
       this.mixerRuntime.getPreviewInput(),
       0,
       voiceId,
+      priority,
     );
   }
 
@@ -485,19 +530,41 @@ export class ChipTuneSynth {
     if (decoded === undefined || decoded.length === 0) return false;
 
     let source: AudioBufferSourceNode | undefined;
+    let slot: ActiveVoiceSlot | undefined;
     try {
       const context = this.ensureContext();
       const mixerRuntime = this.mixerRuntime;
-      if (context === undefined || mixerRuntime === undefined ||
-        String(context.state) !== "running") return false;
+      if (
+        context === undefined || mixerRuntime === undefined ||
+        String(context.state) !== "running"
+      ) return false;
       const buffer = context.createBuffer(1, decoded.length, sample.rateHz);
       buffer.getChannelData(0).set(decoded);
       source = context.createBufferSource();
       source.buffer = buffer;
       source.loop = sample.loop;
       source.connect(mixerRuntime.getTrackInput(trackId));
+      const start = context.currentTime + 0.005;
+      const durationSeconds = decoded.length / sample.rateHz;
+      slot = this.reserveVoice(
+        start,
+        sample.loop ? Number.POSITIVE_INFINITY : start + durationSeconds,
+        1,
+      );
+      const reservedSlot = slot;
+      if (reservedSlot === undefined) {
+        try {
+          source.disconnect();
+        } catch {
+          // A source that was not scheduled can be discarded safely.
+        }
+        return false;
+      }
       const cleanup = (): void => {
         if (source === undefined) return;
+        if (reservedSlot.released && reservedSlot.cleanup !== cleanup) return;
+        reservedSlot.released = true;
+        this.activeVoices.delete(reservedSlot.id);
         this.activeSources.delete(source);
         try {
           source.disconnect();
@@ -505,13 +572,20 @@ export class ChipTuneSynth {
           // The browser may have disconnected an ended source already.
         }
       };
+      reservedSlot.sources = [source];
+      reservedSlot.cleanup = cleanup;
       source.addEventListener("ended", cleanup, { once: true });
       this.activeSources.add(source);
-      const start = context.currentTime + 0.005;
-      source.start(start);
-      if (!sample.loop) source.stop(start + decoded.length / sample.rateHz);
+      try {
+        source.start(start);
+        if (!sample.loop) source.stop(start + durationSeconds);
+      } catch {
+        this.releaseVoice(reservedSlot);
+        return false;
+      }
       return true;
     } catch {
+      if (slot !== undefined) this.releaseVoice(slot);
       if (source !== undefined) {
         this.activeSources.delete(source);
         try {
@@ -539,6 +613,7 @@ export class ChipTuneSynth {
     trackId?: string,
     startTick?: number,
     voiceId?: string,
+    priority = velocity,
   ): boolean {
     const context = this.ensureContext();
     const frequency = midiToFrequency(pitchMidi);
@@ -569,6 +644,7 @@ export class ChipTuneSynth {
       this.mixerRuntime.getTrackInput(trackId),
       pitchBend,
       voiceId ?? trackId?.replace(/^instrument:/u, ""),
+      priority,
     );
   }
 
@@ -582,6 +658,7 @@ export class ChipTuneSynth {
     destination: AudioNode,
     pitchBend = 0,
     voiceId?: string,
+    priority = velocity,
   ): boolean {
     const frequency = midiToFrequency(pitchMidi) *
       2 ** (clamp(pitchBend, -1, 1) * 2 / 12);
@@ -609,158 +686,206 @@ export class ChipTuneSynth {
       start + attack,
       Math.min(start + duration - release, start + attack + decay),
     );
+    const slot = this.reserveVoice(
+      start,
+      start + duration + 0.025,
+      priority,
+    );
+    if (slot === undefined) return false;
     const peak = clamp(
       (Number.isFinite(velocity) ? velocity : 0.8) * 0.72,
       0.02,
       0.8,
     );
     const sustain = Math.max(0.02, peak * clamp(voice.sustain, 0.02, 1));
-    const gain = context.createGain();
-    gain.gain.setValueAtTime(0.0001, start);
-    gain.gain.linearRampToValueAtTime(peak, start + attack);
-    gain.gain.exponentialRampToValueAtTime(sustain, releaseStart);
-    gain.gain.setValueAtTime(sustain, releaseStart);
-    gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
-
-    const voiceBus: AudioNode = voice.filter === undefined
-      ? gain
-      : context.createBiquadFilter();
-    const filterNode = voice.filter === undefined
-      ? undefined
-      : voiceBus as BiquadFilterNode;
-    if (filterNode !== undefined && voice.filter !== undefined) {
-      filterNode.type = voice.filter.type;
-      filterNode.frequency.setValueAtTime(
-        clamp(voice.filter.frequencyHz, 40, 20_000),
-        start,
-      );
-      filterNode.Q.setValueAtTime(clamp(voice.filter.q, 0.1, 18), start);
-      filterNode.connect(gain);
-    }
-    gain.connect(destination);
-    this.activeNoteGains.add(gain);
-
-    const scheduledSources: readonly {
+    let gain: GainNode | undefined;
+    let voiceBus: AudioNode | undefined;
+    let scheduledSources: readonly {
       readonly source: AudioScheduledSourceNode;
       readonly stopTime: number;
-    }[] = (() => {
-      const entries: {
-        source: AudioScheduledSourceNode;
-        stopTime: number;
-      }[] = [];
-      const mainSource = voice.waveform === "noise"
-        ? this.createNoiseSource(
-          context,
-          duration,
-          voice.noiseColor,
-          voice.noiseMode,
-        )
-        : this.createOscillatorSource(
-          context,
-          voice.waveform,
-          voice.dutyCycle,
-        );
-      const mainOscillator = voice.waveform === "noise"
+    }[] = [];
+    try {
+      gain = context.createGain();
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.linearRampToValueAtTime(peak, start + attack);
+      gain.gain.exponentialRampToValueAtTime(sustain, releaseStart);
+      gain.gain.setValueAtTime(sustain, releaseStart);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+
+      voiceBus = voice.filter === undefined
+        ? gain
+        : context.createBiquadFilter();
+      const filterNode = voice.filter === undefined
         ? undefined
-        : mainSource as OscillatorNode;
-      if (mainOscillator !== undefined) {
-        this.scheduleOscillatorPitch(
-          mainOscillator,
-          frequency,
-          voice,
+        : voiceBus as BiquadFilterNode;
+      if (filterNode !== undefined && voice.filter !== undefined) {
+        filterNode.type = voice.filter.type;
+        filterNode.frequency.setValueAtTime(
+          clamp(voice.filter.frequencyHz, 40, 20_000),
           start,
         );
-        mainSource.connect(voiceBus);
-      } else {
-        mainSource.connect(voiceBus);
+        filterNode.Q.setValueAtTime(clamp(voice.filter.q, 0.1, 18), start);
+        filterNode.connect(gain);
       }
-      entries.push({
-        source: mainSource,
-        stopTime: start + duration + 0.025,
-      });
-
-      for (const partial of voice.secondary) {
-        const oscillator = this.createOscillatorSource(
-          context,
-          partial.waveform,
-          partial.dutyCycle,
-        );
-        oscillator.detune.setValueAtTime(partial.detuneCents, start);
-        oscillator.frequency.setValueAtTime(
-          clamp(frequency * partial.ratio, 20, 20_000),
-          start,
-        );
-        const partialGain = context.createGain();
-        partialGain.gain.setValueAtTime(clamp(partial.gain, 0, 1), start);
-        oscillator.connect(partialGain);
-        partialGain.connect(voiceBus);
+      gain.connect(destination);
+      this.activeNoteGains.add(gain);
+      scheduledSources = (() => {
+        const entries: {
+          source: AudioScheduledSourceNode;
+          stopTime: number;
+        }[] = [];
+        const mainSource = voice.waveform === "noise"
+          ? this.createNoiseSource(
+            context,
+            duration,
+            voice.noiseColor,
+            voice.noiseMode,
+          )
+          : this.createOscillatorSource(
+            context,
+            voice.waveform,
+            voice.dutyCycle,
+          );
+        const mainOscillator = voice.waveform === "noise"
+          ? undefined
+          : mainSource as OscillatorNode;
+        if (mainOscillator !== undefined) {
+          this.scheduleOscillatorPitch(
+            mainOscillator,
+            frequency,
+            voice,
+            start,
+          );
+          mainSource.connect(voiceBus);
+        } else {
+          mainSource.connect(voiceBus);
+        }
         entries.push({
-          source: oscillator,
+          source: mainSource,
           stopTime: start + duration + 0.025,
         });
-      }
 
-      if (voice.transientLevel > 0) {
-        const transientDuration = Math.min(
-          duration,
-          Math.max(0.004, voice.transientMs / 1_000),
-        );
-        const transient = this.createNoiseSource(
-          context,
-          transientDuration,
-          voice.noiseColor,
-          voice.noiseMode,
-        );
-        const transientGain = context.createGain();
-        const transientPeak = clamp(
-          peak * voice.transientLevel,
-          0.0001,
-          0.7,
-        );
-        transientGain.gain.setValueAtTime(0.0001, start);
-        transientGain.gain.linearRampToValueAtTime(
-          transientPeak,
-          start + Math.min(0.003, transientDuration * 0.25),
-        );
-        transientGain.gain.exponentialRampToValueAtTime(
-          0.0001,
-          start + transientDuration,
-        );
-        transient.connect(transientGain);
-        transientGain.connect(voiceBus);
-        entries.push({
-          source: transient,
-          stopTime: start + transientDuration + 0.012,
-        });
-      }
+        for (const partial of voice.secondary) {
+          const oscillator = this.createOscillatorSource(
+            context,
+            partial.waveform,
+            partial.dutyCycle,
+          );
+          oscillator.detune.setValueAtTime(partial.detuneCents, start);
+          oscillator.frequency.setValueAtTime(
+            clamp(frequency * partial.ratio, 20, 20_000),
+            start,
+          );
+          const partialGain = context.createGain();
+          partialGain.gain.setValueAtTime(clamp(partial.gain, 0, 1), start);
+          oscillator.connect(partialGain);
+          partialGain.connect(voiceBus);
+          entries.push({
+            source: oscillator,
+            stopTime: start + duration + 0.025,
+          });
+        }
 
-      if (voice.vibratoDepthCents > 0 && mainOscillator !== undefined) {
-        const lfo = context.createOscillator();
-        const lfoGain = context.createGain();
-        lfo.type = "sine";
-        lfo.frequency.setValueAtTime(
-          clamp(voice.vibratoRateHz, 0.5, 16),
-          start,
-        );
-        lfoGain.gain.setValueAtTime(
-          clamp(voice.vibratoDepthCents, 0, 40),
-          start,
-        );
-        lfo.connect(lfoGain);
-        lfoGain.connect(mainOscillator.detune);
-        entries.push({
-          source: lfo,
-          stopTime: start + duration + 0.025,
-        });
+        if (voice.transientLevel > 0) {
+          const transientDuration = Math.min(
+            duration,
+            Math.max(0.004, voice.transientMs / 1_000),
+          );
+          const transient = this.createNoiseSource(
+            context,
+            transientDuration,
+            voice.noiseColor,
+            voice.noiseMode,
+          );
+          const transientGain = context.createGain();
+          const transientPeak = clamp(
+            peak * voice.transientLevel,
+            0.0001,
+            0.7,
+          );
+          transientGain.gain.setValueAtTime(0.0001, start);
+          transientGain.gain.linearRampToValueAtTime(
+            transientPeak,
+            start + Math.min(0.003, transientDuration * 0.25),
+          );
+          transientGain.gain.exponentialRampToValueAtTime(
+            0.0001,
+            start + transientDuration,
+          );
+          transient.connect(transientGain);
+          transientGain.connect(voiceBus);
+          entries.push({
+            source: transient,
+            stopTime: start + transientDuration + 0.012,
+          });
+        }
+
+        if (voice.vibratoDepthCents > 0 && mainOscillator !== undefined) {
+          const lfo = context.createOscillator();
+          const lfoGain = context.createGain();
+          lfo.type = "sine";
+          lfo.frequency.setValueAtTime(
+            clamp(voice.vibratoRateHz, 0.5, 16),
+            start,
+          );
+          lfoGain.gain.setValueAtTime(
+            clamp(voice.vibratoDepthCents, 0, 40),
+            start,
+          );
+          lfo.connect(lfoGain);
+          lfoGain.connect(mainOscillator.detune);
+          entries.push({
+            source: lfo,
+            stopTime: start + duration + 0.025,
+          });
+        }
+        return entries;
+      })();
+    } catch {
+      this.releaseVoice(slot);
+      if (voiceBus !== undefined) {
+        try {
+          voiceBus.disconnect();
+        } catch {
+          // A partially-created voice can be discarded safely.
+        }
       }
-      return entries;
-    })();
+      if (gain !== undefined) {
+        this.activeNoteGains.delete(gain);
+        try {
+          gain.disconnect();
+        } catch {
+          // A partially-created voice can be discarded safely.
+        }
+      }
+      for (const entry of scheduledSources) {
+        this.activeSources.delete(entry.source);
+        try {
+          entry.source.stop();
+        } catch {
+          // A source that was not scheduled can be discarded safely.
+        }
+        try {
+          entry.source.disconnect();
+        } catch {
+          // A partially-created voice can be discarded safely.
+        }
+      }
+      return false;
+    }
+    if (gain === undefined || voiceBus === undefined) {
+      this.releaseVoice(slot);
+      return false;
+    }
     let endedSources = 0;
     let cleanedUp = false;
     const cleanup = (): void => {
       if (cleanedUp) return;
       cleanedUp = true;
+      slot.released = true;
+      this.activeVoices.delete(slot.id);
       for (const entry of scheduledSources) {
+        this.activeSources.delete(entry.source);
         try {
           entry.source.disconnect();
         } catch {
@@ -779,6 +904,8 @@ export class ChipTuneSynth {
       }
       this.activeNoteGains.delete(gain);
     };
+    slot.sources = scheduledSources.map((entry) => entry.source);
+    slot.cleanup = cleanup;
     for (const entry of scheduledSources) {
       const { source, stopTime } = entry;
       this.activeSources.add(source);
@@ -787,13 +914,90 @@ export class ChipTuneSynth {
         endedSources += 1;
         if (endedSources >= scheduledSources.length) cleanup();
       }, { once: true });
-      source.start(start);
-      source.stop(stopTime);
+      try {
+        source.start(start);
+        source.stop(stopTime);
+      } catch {
+        this.releaseVoice(slot);
+        return false;
+      }
     }
     return true;
   }
 
+  private reserveVoice(
+    startTime: number,
+    endTime: number,
+    priority: number,
+  ): ActiveVoiceSlot | undefined {
+    const now = this.context?.currentTime ?? 0;
+    for (const slot of [...this.activeVoices.values()]) {
+      if (slot.endTime <= now) {
+        if (slot.cleanup !== undefined) {
+          slot.cleanup();
+        } else {
+          slot.released = true;
+          this.activeVoices.delete(slot.id);
+        }
+      }
+    }
+    if (this.activeVoices.size >= CHIP_SYNTH_MAX_POLYPHONY) {
+      const boundedPriority = clamp(
+        Number.isFinite(priority) ? priority : 0.5,
+        0,
+        1,
+      );
+      const candidate = [...this.activeVoices.values()].sort((left, right) =>
+        left.priority - right.priority ||
+        right.startTime - left.startTime ||
+        left.sequence - right.sequence
+      )[0];
+      // Keep already-playing voices when the new note is not more important.
+      // This avoids audible churn during dense scheduler pumps while still
+      // allowing a loud/accented note to replace a quiet background note.
+      if (candidate === undefined || boundedPriority <= candidate.priority) {
+        this.droppedVoiceCount += 1;
+        return undefined;
+      }
+      this.releaseVoice(candidate);
+    }
+    const slot: ActiveVoiceSlot = {
+      id: ++this.voiceSequence,
+      priority: clamp(
+        Number.isFinite(priority) ? priority : 0.5,
+        0,
+        1,
+      ),
+      startTime,
+      endTime,
+      sequence: this.voiceSequence,
+      sources: [],
+      cleanup: undefined,
+      released: false,
+    };
+    this.activeVoices.set(slot.id, slot);
+    return slot;
+  }
+
+  private releaseVoice(slot: ActiveVoiceSlot): void {
+    if (slot.released) return;
+    slot.released = true;
+    this.activeVoices.delete(slot.id);
+    for (const source of slot.sources) {
+      this.activeSources.delete(source);
+      try {
+        source.stop();
+      } catch {
+        // A source may have already ended or never reached start().
+      }
+    }
+    slot.cleanup?.();
+  }
+
   stopAll(): void {
+    for (const slot of [...this.activeVoices.values()]) {
+      this.releaseVoice(slot);
+    }
     for (const source of this.activeSources) {
       try {
         source.stop();
@@ -810,6 +1014,8 @@ export class ChipTuneSynth {
       }
     }
     this.activeNoteGains.clear();
+    this.activeVoices.clear();
+    this.droppedVoiceCount = 0;
   }
 
   suspend(): void {
@@ -840,6 +1046,7 @@ export class ChipTuneSynth {
     // runtime below.
     if (this.context?.state === "closed") {
       this.suspendPromise = undefined;
+      this.stopAll();
       this.mixerRuntime?.dispose();
       this.mixerRuntime = undefined;
       for (const source of this.mediaSources.values()) {

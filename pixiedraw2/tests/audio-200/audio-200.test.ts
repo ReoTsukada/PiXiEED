@@ -444,3 +444,94 @@ Deno.test("AUDIO-200 journal checkpoint, undo/redo, and recovery preserve canoni
     "Tampered checkpoint was accepted.",
   );
 });
+
+Deno.test("AUDIO-200 replaces Piano Roll note batches atomically", async () => {
+  const fixture = await projectFixture();
+  const created = await createAudioJournal(fixture.project);
+  assert(created.ok, JSON.stringify(created.diagnostics));
+  const track = {
+    trackId: asAudioTrackId("track-batch"),
+    kind: "INSTRUMENT" as const,
+    name: "Piano",
+    clipIds: [],
+    noteIds: [],
+    automationIds: [],
+    effectIds: [],
+    mixerChannelId: asAudioMixerChannelId("channel-batch"),
+    muted: false,
+    solo: false,
+  };
+  const withTrack = await dispatchAudioCommand(
+    created.value,
+    command(created.value.project, "cmd-batch-track", "TRACK_ADD", { track }),
+  );
+  assert(withTrack.ok, JSON.stringify(withTrack.diagnostics));
+  const firstNote = {
+    noteId: asAudioNoteId("note-batch-a"),
+    trackId: track.trackId,
+    pitchMidi: 60,
+    timeline: { startTick: 0 as never, durationTick: 120 as never },
+    velocityMilli: 900,
+  };
+  const secondNote = {
+    noteId: asAudioNoteId("note-batch-b"),
+    trackId: track.trackId,
+    pitchMidi: 64,
+    timeline: { startTick: 240 as never, durationTick: 120 as never },
+    velocityMilli: 700,
+  };
+  let current = await dispatchAudioCommand(
+    withTrack.value,
+    command(withTrack.value.project, "cmd-batch-note-a", "NOTE_UPSERT", {
+      note: firstNote,
+    }),
+  );
+  assert(current.ok, JSON.stringify(current.diagnostics));
+  current = await dispatchAudioCommand(
+    current.value,
+    command(current.value.project, "cmd-batch-note-b", "NOTE_UPSERT", {
+      note: secondNote,
+    }),
+  );
+  assert(current.ok, JSON.stringify(current.diagnostics));
+  const movedFirst = {
+    ...firstNote,
+    timeline: { startTick: 480 as never, durationTick: 120 as never },
+  };
+  const movedSecond = {
+    ...secondNote,
+    pitchMidi: 67,
+    timeline: { startTick: 720 as never, durationTick: 120 as never },
+  };
+  const replaced = await dispatchAudioCommand(
+    current.value,
+    command(current.value.project, "cmd-batch-replace", "NOTE_BATCH_REPLACE", {
+      noteBatch: {
+        removeNoteIds: [firstNote.noteId, secondNote.noteId],
+        notes: [movedFirst, movedSecond],
+      },
+    }),
+  );
+  assert(
+    replaced.ok && replaced.value.entries.length === current.value.entries.length + 1,
+    replaced.ok ? "Note batch did not create one journal entry." : JSON.stringify(replaced.diagnostics),
+  );
+  assert(
+    replaced.ok && replaced.value.project.notes.some((note) =>
+      note.noteId === firstNote.noteId && note.timeline.startTick === 480
+    ) && replaced.value.project.notes.some((note) =>
+      note.noteId === secondNote.noteId && note.pitchMidi === 67
+    ),
+    "Note batch did not replace the canonical notes.",
+  );
+  if (!replaced.ok) return;
+  const undone = await undoAudio(replaced.value);
+  assert(
+    undone.ok && undone.value.project.notes.some((note) =>
+      note.noteId === firstNote.noteId && note.timeline.startTick === 0
+    ) && undone.value.project.notes.some((note) =>
+      note.noteId === secondNote.noteId && note.pitchMidi === 64
+    ),
+    "Undo did not restore the complete pre-batch note state.",
+  );
+});

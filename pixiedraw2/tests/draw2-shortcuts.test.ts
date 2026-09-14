@@ -2,6 +2,14 @@ import {
   DRAW2_SHORTCUTS,
   resolveDraw2Shortcut,
 } from "../src/draw2-shortcuts.ts";
+import {
+  advanceSpacePointer,
+  armSpacePointer,
+  beginSpaceIntent,
+  createSpaceIntentState,
+  resolveDraw2ArrowOwner,
+  resolveSpaceKeyUp,
+} from "../src/draw2-input-ownership.ts";
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
@@ -67,6 +75,20 @@ Deno.test("Draw2 shortcut registry covers selection, tools, mirror and viewport"
     resolveDraw2Shortcut({ key: "p" }, { inputEditing: true }) === undefined,
     "input editing must suppress shortcuts",
   );
+  assert(
+    resolveDraw2Shortcut({ key: "ArrowLeft" }, { mode: "AUDIO" })
+      ?.command === "audio-nudge",
+    "AUDIO must own arrow-key note nudging",
+  );
+  assert(
+    resolveDraw2Shortcut({ key: "ArrowLeft" }, { mode: "GAME" })
+      ?.command === "game-move",
+    "GAME must own arrow-key preview movement",
+  );
+  assert(
+    resolveDraw2Shortcut({ key: "p" }, { mode: "AUDIO" }) === undefined,
+    "AUDIO must not expose an iDRAW pen shortcut",
+  );
 });
 
 Deno.test("Draw2 user-facing tool shortcuts keep text and move entry points", () => {
@@ -86,4 +108,124 @@ Deno.test("Draw2 user-facing tool shortcuts keep text and move entry points", ()
       `${removed} should not be user-facing anymore`,
     );
   }
+});
+
+Deno.test("Mode shortcut registry keeps direct-edit commands scoped", () => {
+  const audioCommands = [
+    "audio-save",
+    "audio-copy",
+    "audio-cut",
+    "audio-paste",
+    "audio-duplicate",
+    "audio-delete",
+    "audio-split",
+    "audio-nudge",
+    "audio-quantize",
+    "audio-step-input",
+    "audio-swing",
+    "audio-humanize",
+    "audio-zoom-out",
+    "audio-zoom-in",
+    "audio-loop",
+    "audio-record",
+    "audio-test-tone",
+    "audio-timeline-add-bar",
+    "audio-timeline-move",
+  ];
+  for (const command of audioCommands) {
+    assert(
+      DRAW2_SHORTCUTS.some((shortcut) =>
+        shortcut.mode === "AUDIO" && shortcut.command === command
+      ),
+      `missing AUDIO shortcut ${command}`,
+    );
+  }
+  for (const command of ["game-move", "game-attack", "game-cancel-preview"]) {
+    assert(
+      DRAW2_SHORTCUTS.some((shortcut) =>
+        shortcut.mode === "GAME" && shortcut.command === command
+      ),
+      `missing GAME shortcut ${command}`,
+    );
+  }
+  assert(
+    DRAW2_SHORTCUTS.some((shortcut) =>
+      shortcut.mode === "COMMON" && shortcut.command === "toggle-playback"
+    ),
+    "playback must remain visible as a shared workspace command",
+  );
+});
+
+Deno.test("Input ownership keeps arrows on the active authoring surface", () => {
+  assert(
+    resolveDraw2ArrowOwner({
+      mode: "DRAW",
+      surface: "DRAW_CANVAS",
+      hasSelection: true,
+      drawGestureActive: false,
+    }) === "DRAW_SELECTION",
+    "DRAW canvas selection should own arrow nudges",
+  );
+  assert(
+    resolveDraw2ArrowOwner({
+      mode: "DRAW",
+      surface: "DRAW_TIMELINE",
+      hasSelection: true,
+      drawGestureActive: false,
+    }) === "DRAW_TIMELINE",
+    "DRAW timeline should not nudge the canvas selection",
+  );
+  assert(
+    resolveDraw2ArrowOwner({
+      mode: "AUDIO",
+      surface: "AUDIO_ROLL",
+      hasSelection: false,
+      drawGestureActive: false,
+    }) === "AUDIO_ROLL",
+    "AUDIO roll should own note arrows",
+  );
+  assert(
+    resolveDraw2ArrowOwner({
+      mode: "AUDIO",
+      surface: "DRAW_CANVAS",
+      hasSelection: false,
+      drawGestureActive: false,
+    }) === "NONE",
+    "AUDIO must not leak into the hidden Draw canvas",
+  );
+  assert(
+    resolveDraw2ArrowOwner({
+      mode: "GAME",
+      surface: "GAME_STAGE",
+      hasSelection: false,
+      drawGestureActive: false,
+    }) === "GAME_RUNTIME",
+    "GAME stage should own runtime arrows",
+  );
+  assert(
+    resolveDraw2ArrowOwner({
+      mode: "GAME",
+      surface: "WORKSPACE",
+      hasSelection: false,
+      drawGestureActive: false,
+    }) === "NONE",
+    "GAME panels must not receive runtime arrows",
+  );
+});
+
+Deno.test("Space intent distinguishes playback from canvas pan", () => {
+  let state = beginSpaceIntent(createSpaceIntentState(), true);
+  state = armSpacePointer(state, 7, 10, 10, true);
+  state = advanceSpacePointer(state, 7, 11, 11);
+  assert(
+    resolveSpaceKeyUp(state).action === "toggle-playback",
+    "a short Space press should toggle playback",
+  );
+  state = beginSpaceIntent(createSpaceIntentState(), true);
+  state = armSpacePointer(state, 8, 10, 10, true);
+  state = advanceSpacePointer(state, 8, 20, 10);
+  assert(
+    resolveSpaceKeyUp(state).action === "none",
+    "a Space drag should pan without toggling playback",
+  );
 });

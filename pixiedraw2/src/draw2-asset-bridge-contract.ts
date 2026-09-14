@@ -127,6 +127,8 @@ export interface Draw2AssetBridge {
     readonly name: string;
     readonly assetKind: CreatorAssetKind;
     readonly pivot: AssetPivot;
+    /** Explicit layer tracks to composite for a quick Asset capture. */
+    readonly sourceLayerIds?: readonly string[];
     readonly animationName?: AssetAnimationName;
     readonly customName?: string;
     readonly motionName?: string;

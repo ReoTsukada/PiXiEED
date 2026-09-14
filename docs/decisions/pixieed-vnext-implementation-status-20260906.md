@@ -1,8 +1,12 @@
 # PiXiEED vNext 実装状態
 
-更新日: 2026-09-11
+更新日: 2026-09-14
+
+現在の進行方向の正本: [`pixieed-current-progress-and-next-direction-20260914.md`](./pixieed-current-progress-and-next-direction-20260914.md)
 
 この文書は、Creator App／iDRAW／iAUDIO／iGAME／Market／文章・世界観／画像・動画を、既存のProject・PXD・PiXiSYNC・Marketの契約を壊さずに接続する作業の実装境界を記録する。ここで「実装済み」はコードが存在する状態であり、最終検証を通過したことを意味しない。
+
+2026-09-14時点では、PC版の入力競合とモード間レイアウト記憶を安定化し、対象Supabase ProjectへMigration／Edge Functionを反映した段階である。次は、実商品を用いたMarket成功系・失敗系、iDRAWからiGAMEの実体縦断、Unity実環境の受入れを進める。タブレット／モバイルは今回の進行対象に含めず、PC受入れ後に扱う。
 
 ## 実装済み（ローカル最終検証済み）
 
@@ -19,30 +23,43 @@
 | PiXYNC本番境界（コード） | 既存PiXYNC Foundation／checkpoint契約とDraw2 aggregate RPC（open、commit、since、Game revision、RLS／Presence）を現行クライアントが期待するMigration群として復元 | `supabase/migrations/20260730001656_pixisync_collab_v1_foundation.sql` ～ `supabase/migrations/20260828120000_pixisync_detach_require_localized_owner_record.sql` |
 | iGAME Market直追加 | Catalogの権利表示、無料取得、secure delivery、PXD本体SHA-256検証、現在のProjectへのAsset-only追加、server-side Binding記録 | `pixiedraw2/src/wp180-workspace-ui.ts`, `scripts/account-market-purchases.js`, `pixiedraw2/src/draw2-entry.ts`, `supabase/functions/market-download/index.ts` |
 | iGAME公開Player | `/igame/?product=...` の入口、Market Entitlement／immutable Revision／署名PXD URLのBootstrap、Manifest／Proof／Package Hash検証、Game ProjectのCanvas Runtime再生 | `igame/index.html`, `pixiedraw2/src/game/game-350/igame-player-entry.ts`, `pixiedraw2/src/game/game-350/igame-public-bootstrap.ts`, `pixiedraw2/src/game/game-350/igame-browser-runtime.ts`, `supabase/functions/igame-player-bootstrap/` |
+| PC入力・表示基盤 | iDRAW／iAUDIO／iGAMEの入力面ごとの矢印キー所有、Spaceの再生／パン分離、GAME操作の面外漏れ防止、モード別Timeline高さの保持、PC iAUDIOの重複ツールバー非表示 | `pixiedraw2/src/draw2-input-ownership.ts`, `pixiedraw2/src/draw2-entry.ts`, `pixiedraw2/src/wp180-workspace-ui.ts`, `pixiedraw2/index.html`, `pixiedraw2/tests/draw2-shortcuts.test.ts`, `pixiedraw2/tests/wp180-workspace.test.ts` |
 
-## ローカル最終検証結果（2026-09-11）
+## ローカル検証結果（2026-09-14）
 
-- `deno task check`、Draw2／Workspace bundle再生成、`git diff --check`、変更対象JavaScriptの`node --check`がPASS。
-- Draw2基礎テストは72件、Workspace／iAUDIO契約テストは43件、公開iGAME Player契約テストは10件、Unity画像・Audio出力は7件、Asset-only Market出力は2件がPASS。
+- `deno task check`、`deno task build`、`deno task build:workspace:min`、変更対象TypeScriptの`deno check --no-remote`、`git diff --check`がPASS。
+- `deno task test`は97件PASS。入力所有権・Workspace UIの対象テストは、許可範囲を明示した実行で48件PASS（`draw2-shortcuts` 5件を含む）。
 - Market PXD verifierは3件、iGAME公開Player静的契約、Market検証、Market SEO、Market公開入口、Core URL契約がPASS。
-- ローカルブラウザで`/igame/`、Draw2 GAME、Draw2 AUDIOを確認し、HTTP 200、横スクロールなし、ページ／Consoleエラーなし。未ログインの公開Playerはログイン要求で安全停止。
+- 現在のブラウザでDraw2のGAME／DRAW／AUDIO切替とモード別Timeline保持、Consoleエラーなしを確認。表示中ブラウザは幅504pxのため、1120px以上のPCレイアウト受入れは未完了。Spaceの再生／パンとキー所有権は契約テストで確認済み。
 - `supabase db lint --local` は、この環境でPostgres（127.0.0.1:54322）が起動していないため未実施。SQL／Edge Functionの本番適用確認とは別の環境制約であり、製品コードのテスト失敗ではない。
 
-## 本番事前確認（2026-09-11）
+## 本番反映・受入れ状況（2026-09-14）
 
 - CLIの接続先はSupabase Project `kyyiuakrqomzlikfaire`（東京）で、Auth healthはHTTP 200、既存`market-download`は未認証時HTTP 401を返した。
-- `igame-player-bootstrap`と`market-verify-listing-package`は本番Edge Function未DeployのためHTTP 404だった。今回のコードはまだ本番経路へ到達していない。
-- `supabase db push --dry-run`は、リモートにのみ存在する過去Migration履歴を検出して安全停止した。履歴修復や`--include-all`は、既存本番スキーマを確認せずに実行してはいけない。
+- `igame-player-bootstrap`、`market-verify-listing-package`、`market-download`の更新版を含むローカル管理下の13 Functionを本番へ配備し、全てACTIVEを確認した。リモート専用の既存Function 3件は保持した。
+- リモートだけに存在した過去Migration 35件を履歴上のみ`reverted`として整理し、dry-runで対象を確認後、ローカルに存在する2026-08-24以降の11 migrationを適用した。必要な新規テーブルの存在をSQLで確認した。
+- 未認証HTTPスモークは認証必須Functionで401、公開Previewで200を確認した。実ユーザーを使う成功系はまだ未受入れである。
 - この環境にはUnity Editor／Unity Project本体がないため、Unity Import／Compile／再生は未実施。生成Packageの決定的テストまでを確認済みとする。
 
-## 未実装・本番適用／外部境界で停止中
+### 2026-09-14 反映前の読み取り再確認
 
-| 優先度 | 未実装部分 | 残る変更 |
-| --- | --- | --- |
-| P0 | Supabase／Edge Functionへの適用と本番受入れ | このMigrationを対象Projectへ適用し、Stripe webhook、Storage、RLS、Realtime、2ユーザーの購入・無料取得・配信・再接続を本番相当環境で検証する。コードは実装済みだが、適用・受入れは未実施 |
-| P1 | 公開iGAME Playerの本番受入れ | コード経路は実装済み。対象SupabaseへMigration／Edge Functionを適用し、検証済みPXDを持つ公開Market Assetでログイン、権利確認、Revision固定、再生、失敗時停止を本番相当環境で受入れる |
-| P1 | 外部Build worker | APK／AAB／IPA／Desktopの受付契約とidentity／Entitlementゲートは実装済み。署名鍵を含むBuild worker、Artifact Storage、配布・返金連携は未接続 |
-| P1 | 本番Registry／Project／Asset Provider | Creator App／iGAMEのローカルProject保存と既存Market委譲は実装済み。Project Registry、Asset Registry、PiXYNC Realtimeの本番接続と権限Proof発行は未接続 |
+- 対象Project `kyyiuakrqomzlikfaire`の反映前リモートDBには、`market_asset_revisions`、`market_asset_entitlements`、`market_asset_bindings`、共同制作のscope／consentテーブル、および無料取得・同意・編集範囲RPCが存在しなかった。これは反映前の記録である。
+- 反映前のリモートEdge Functionは14件がACTIVE。`igame-player-bootstrap`と`market-verify-listing-package`は未配備で、`market-download`はリモートの`verify_jwt=false`とローカル設定の`verify_jwt=true`が不一致だった。
+- Security AdvisorはRLSポリシーなし27件、mutable search_path 12件、Security Definer実行権限、匿名サインイン関連、漏洩パスワード保護無効などを報告している。既存の意図を確認するまで本番公開判定をPASSにしない。
+- `supabase db push --dry-run`は、リモートだけに存在する過去Migrationとローカルだけに存在する新しいMigrationの混在で停止した。履歴修復、`--include-all`、本番DBへの直接適用はまだ行っていない。
+
+## 未完了・本番適用／外部境界で停止中
+
+| 優先度 | 状態 | 未完了部分 | 残る変更 |
+| --- | --- | --- | --- |
+| P0 | 反映済み・未受入れ | Supabase／Edge Functionへの適用と本番受入れ | Migration履歴を整理し、11 migrationとローカル管理下の13 Functionを対象Projectへ反映した。Stripe webhook、Storage、RLS、Realtime、2ユーザーの購入・無料取得・配信・再接続の成功系・失敗系は実ユーザーで受入れが必要 |
+| P1 | 部分実装 | iDRAW → iGAMEの実体化縦断 | 表示中の合成画像を1枚目としてMaterializeし、複数Frame／方向／duration／PivotをManifestへ確定。iGAMEライブラリで実画像表示、ドラッグ配置、保存・再読込、既定Animationを受入れる |
+| P1 | 部分実装 | Unity向け画像・音声出力の実環境受入れ | PNG／Sheet／Manifest／Prefab／Animatorの生成契約を、対象UnityプロジェクトでImport、Compile、Playまで確認する。現環境にはUnity Editor／Projectがないため未実施 |
+| P1 | 反映済み・未受入れ | 公開iGAME Player | Bootstrap FunctionとDB契約は反映済み。検証済みPXDを持つ公開Market Assetでログイン、権利確認、Revision固定、再生、失敗時停止を受入れる |
+| P1 | 未接続 | 外部Build worker | APK／AAB／IPA／Desktopの受付契約とidentity／Entitlementゲートは実装済み。署名鍵を含むBuild worker、Artifact Storage、配布・返金連携は未接続 |
+| P1 | 未接続 | 本番Registry／Project／Asset Provider | Creator App／iGAMEのローカルProject保存と既存Market委譲は実装済み。Project Registry、Asset Registry、PiXYNC Realtimeの本番接続と権限Proof発行は未接続 |
+| P2 | 段階対応 | Inspector／パネルの役割整理 | 直接操作、Timeline、Layer、Palette、Assetへ移せる項目を移し、選択中だけContext表示する。挙動の受入れ後に、既存操作性を壊さない範囲でUIを更新する |
+| P3 | 保留 | タブレット／モバイル | PC版の受入れ完了後に別スコープで評価する。今回の入力・レイアウト変更の受入れ対象にはしない |
 
 ### 未実装と判定しない安全境界
 
@@ -58,7 +75,6 @@
 
 ## 外部受入れ工程
 
-1. 対象Supabase ProjectへMigrationを適用し、Edge FunctionをDeployする。
-2. Stripe webhook、private Storage、RLS、Realtime、2ユーザーの購入／無料取得／配信／再接続を本番相当環境で受け入れる。
-3. 公開iGAME PlayerのMigration／Edge Functionをstagingへ適用し、公開Market AssetのRuntime package／manifestを受入れる。
+1. 実商品を用いてStripe webhook、private Storage、RLS、Realtime、2ユーザーの購入／無料取得／配信／再接続を本番相当環境で受け入れる。
+2. 公開iGAME Playerで公開Market AssetのRuntime package／manifest、権利確認、Revision固定、再生を受け入れる。
 4. 外部Build worker、Artifact Storage、署名・配布・返金連携を接続する。

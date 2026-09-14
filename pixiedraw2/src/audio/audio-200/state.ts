@@ -3,6 +3,7 @@
 import { hashCanonical } from "../../wp160-contracts.ts";
 import {
   asAudioContentHash,
+  AUDIO_DEFAULT_MUSICAL_CONTEXT,
   AUDIO200_MAX_TICK,
   AUDIO200_SCHEMA_VERSION,
   type Audio200Diagnostic,
@@ -18,10 +19,12 @@ import {
   type AudioFreezeCommitPayload,
   type AudioFreezeState,
   type AudioMarker,
+  type AudioMusicalContext,
   type AudioMasterPayload,
   type AudioMasterState,
   type AudioMixer,
   type AudioNote,
+  type AudioNoteBatchReplacePayload,
   audioOk,
   type AudioProject,
   type AudioRevision,
@@ -32,6 +35,8 @@ import {
   type AudioTrack,
   canonicalAudioMaterial,
   hasRawAudioPayload,
+  isAudioMusicalKey,
+  isAudioMusicalScaleId,
   isAudioChipMachineId,
   isAudioDrumKitId,
   isSafeInteger,
@@ -54,6 +59,7 @@ const COMMAND_TYPES: readonly AudioCommandType[] = [
   "CLIP_REMOVE",
   "NOTE_REMOVE",
   "NOTE_UPSERT",
+  "NOTE_BATCH_REPLACE",
   "AUTOMATION_UPSERT",
   "AUTOMATION_REMOVE",
   "MIXER_REPLACE",
@@ -65,6 +71,7 @@ const COMMAND_TYPES: readonly AudioCommandType[] = [
   "SYNTH_PRESET_REPLACE",
   "SYNTH_PRESET_REMOVE",
   "TEMPO_SET",
+  "MUSICAL_CONTEXT_SET",
   "MARKER_UPSERT",
   "MARKER_REMOVE",
   "RECORDING_COMMIT",
@@ -532,6 +539,21 @@ function validateProjectShape(project: unknown): Audio200Result<true> {
       "Timebase must use a bounded PPQ value.",
       "project.timebase",
     );
+  }
+  if (value.musicalContext !== undefined) {
+    const musicalContext = value.musicalContext as Record<string, unknown> | null;
+    if (
+      musicalContext === null || typeof musicalContext !== "object" ||
+      Array.isArray(musicalContext) ||
+      !isAudioMusicalKey(musicalContext.key) ||
+      !isAudioMusicalScaleId(musicalContext.scale)
+    ) {
+      return fail(
+        "AUDIO_INVALID_PROJECT",
+        "Musical key and scale are not supported.",
+        "project.musicalContext",
+      );
+    }
   }
   if (value.drumKitId !== undefined && !isAudioDrumKitId(value.drumKitId)) {
     return fail(
@@ -1154,6 +1176,7 @@ export async function createAudioProject(
     tempo: input.tempo ?? { milliBpm: AUDIO200_DEFAULT_TEMPO_MILLIBPM },
     timebase: input.timebase ??
       { kind: "PPQ" as const, ticksPerQuarter: AUDIO200_DEFAULT_PPQ },
+    musicalContext: AUDIO_DEFAULT_MUSICAL_CONTEXT,
     drumKitId: "BASIC" as const,
     chipMachineId: "NONE" as const,
     synthPresets: [],
@@ -1959,6 +1982,87 @@ export async function applyAudioCommand(
       };
       break;
     }
+    case "NOTE_BATCH_REPLACE": {
+      const batch = entityFromPayload<AudioNoteBatchReplacePayload>(
+        payload,
+        "noteBatch",
+      );
+      if (
+        batch === null || !Array.isArray(batch.removeNoteIds) ||
+        !Array.isArray(batch.notes)
+      ) {
+        return fail(
+          "AUDIO_COMMAND_INVALID",
+          "Note batch payload is invalid.",
+          "command.payload.noteBatch",
+        );
+      }
+      const removeIds = batch.removeNoteIds.map((id) => String(id));
+      const removeSet = new Set(removeIds);
+      if (
+        removeIds.length !== removeSet.size ||
+        removeIds.some((id) => !validId(id))
+      ) {
+        return fail(
+          "AUDIO_COMMAND_INVALID",
+          "Note batch removal IDs are invalid or duplicated.",
+          "command.payload.noteBatch.removeNoteIds",
+        );
+      }
+      const existingIds = new Set(
+        project.notes.map((note) => String(note.noteId)),
+      );
+      if (removeIds.some((id) => !existingIds.has(id))) {
+        return fail(
+          "AUDIO_COMMAND_INVALID",
+          "Note batch removal ID does not exist in the current Project.",
+          "command.payload.noteBatch.removeNoteIds",
+        );
+      }
+      const replacementIds = new Set<string>();
+      for (const [index, note] of batch.notes.entries()) {
+        const noteId = String(note?.noteId ?? "");
+        if (
+          note === null || typeof note !== "object" ||
+          !validId(noteId) || replacementIds.has(noteId) ||
+          (existingIds.has(noteId) && !removeSet.has(noteId)) ||
+          !project.tracks.some((track) => track.trackId === note.trackId)
+        ) {
+          return fail(
+            "AUDIO_COMMAND_INVALID",
+            "Note batch contains an invalid, duplicated, or unbound note.",
+            `command.payload.noteBatch.notes[${index}]`,
+          );
+        }
+        replacementIds.add(noteId);
+      }
+      const replacementByTrack = new Map<string, AudioNote[]>();
+      for (const note of batch.notes) {
+        const trackId = String(note.trackId);
+        const notes = replacementByTrack.get(trackId) ?? [];
+        notes.push(note);
+        replacementByTrack.set(trackId, notes);
+      }
+      next = {
+        ...next,
+        notes: project.notes.filter((note) =>
+          !removeSet.has(String(note.noteId))
+        ).concat(batch.notes),
+        tracks: project.tracks.map((track) => {
+          const trackId = String(track.trackId);
+          const replacements = replacementByTrack.get(trackId) ?? [];
+          return replacements.length === 0 && removeSet.size === 0
+            ? track
+            : {
+              ...track,
+              noteIds: track.noteIds
+                .filter((id) => !removeSet.has(String(id)))
+                .concat(replacements.map((note) => note.noteId)),
+            };
+        }),
+      };
+      break;
+    }
     case "NOTE_REMOVE": {
       const noteId = entityFromPayload<AudioNote["noteId"]>(payload, "noteId");
       if (noteId === null || !validId(noteId)) {
@@ -2241,6 +2345,25 @@ export async function applyAudioCommand(
         );
       }
       next = { ...next, tempo };
+      break;
+    }
+    case "MUSICAL_CONTEXT_SET": {
+      const musicalContext = entityFromPayload<AudioMusicalContext>(
+        payload,
+        "musicalContext",
+      );
+      if (
+        musicalContext === null ||
+        !isAudioMusicalKey(musicalContext.key) ||
+        !isAudioMusicalScaleId(musicalContext.scale)
+      ) {
+        return fail(
+          "AUDIO_INVALID_PROJECT",
+          "Musical key and scale are not supported.",
+          "command.payload.musicalContext",
+        );
+      }
+      next = { ...next, musicalContext };
       break;
     }
     case "MARKER_UPSERT": {

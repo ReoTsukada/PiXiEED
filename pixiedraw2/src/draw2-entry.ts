@@ -130,6 +130,10 @@ import {
   type OutlinePlacement,
   type StrokeAutoOutlineOptions,
 } from "./draw2-outline-tools.ts";
+import {
+  resolveDraw2ActiveSurface,
+  resolveDraw2ArrowOwner,
+} from "./draw2-input-ownership.ts";
 import { createAlphaLockedWriteSet } from "./draw2-pixel-effects.ts";
 import { createTextMaskWriteSet } from "./draw2-text-tools.ts";
 import { createMarketAssetBindingCandidate } from "./game/game-350/market-asset-binding.ts";
@@ -189,7 +193,12 @@ import {
   type Draw2AssetReferenceRecord,
   type Draw2AssetSelectionSnapshot,
 } from "./draw2-asset-bridge-contract.ts";
-import { DRAW2_SHORTCUTS, resolveDraw2Shortcut } from "./draw2-shortcuts.ts";
+import {
+  DRAW2_SHORTCUTS,
+  resolveDraw2Shortcut,
+  type Draw2Shortcut,
+  type Draw2ShortcutMode,
+} from "./draw2-shortcuts.ts";
 import {
   MAX_VIEWPORT_ZOOM,
   MIN_VIEWPORT_ZOOM,
@@ -610,7 +619,7 @@ function loadAdvancedModule(): Promise<AdvancedModule> {
 
 function loadWorkspaceModule(): Promise<WorkspaceModule> {
   const workspaceChunkUrl = new URL("wp180-workspace.js", import.meta.url);
-  workspaceChunkUrl.searchParams.set("v", "20260911-ui-density-v1");
+  workspaceChunkUrl.searchParams.set("v", "20260913-workspace-input-v1");
   workspaceModulePromise ??= import(
     workspaceChunkUrl.href
   ) as unknown as Promise<
@@ -4142,6 +4151,13 @@ window.addEventListener("draw2:creator-mode", (event) => {
       selectionLabel: projectSessionSelectionLabel(sessionMode),
     }).catch(() => undefined);
   }
+  // The shortcut dialog is shared by every workspace, but its direct-edit
+  // commands are mode-owned. Keep an already-open dialog truthful when the
+  // user switches between iDRAW, iAUDIO, and iGAME.
+  renderShortcutList(shortcutSearchElement?.value ?? "");
+  if (shortcutListElement !== null) {
+    translateDraw2Subtree(shortcutListElement);
+  }
 });
 
 projectSessionCheckpointButton.addEventListener("click", async () => {
@@ -6396,6 +6412,7 @@ function selectionProjectionFromImage(
 
 function captureAssetSelectionForFrame(
   frameId: string,
+  layerIds?: readonly string[],
 ): Draw2AssetReferenceProjection | undefined {
   const current = currentAssetSelectionSnapshot();
   if (
@@ -6404,7 +6421,7 @@ function captureAssetSelectionForFrame(
   ) return undefined;
   try {
     return selectionProjectionFromImage(
-      compositeRegion(current.region, frameId),
+      compositeRegion(current.region, frameId, undefined, layerIds),
       current.region,
     );
   } catch {
@@ -6592,6 +6609,7 @@ function addAssetDefinitionFromSelection(input: {
   readonly name: string;
   readonly assetKind: CreatorAssetKind;
   readonly pivot: AssetPivot;
+  readonly sourceLayerIds?: readonly string[];
   readonly animationName?: AssetAnimationName;
   readonly customName?: string;
   readonly motionName?: string;
@@ -6614,7 +6632,6 @@ function addAssetDefinitionFromSelection(input: {
       message: "Drawモードで範囲を選択してから追加してください。",
     };
   }
-  const capturedProjection = captureCurrentAssetSelection();
   const visibleLayerIds = state.timeline.layerTrackOrder.flatMap((layerTrackId) => {
     const layer = state.layers.find((candidate) =>
       candidate.layerTrackId === layerTrackId
@@ -6623,6 +6640,21 @@ function addAssetDefinitionFromSelection(input: {
       ? [layer.layerTrackId]
       : [];
   });
+  const knownLayerIds = new Set(state.timeline.layerTrackOrder);
+  const requestedLayerIds = [...new Set(
+    (input.sourceLayerIds ?? [])
+      .map((layerId) => layerId.trim())
+      .filter((layerId) => layerId.length > 0 && knownLayerIds.has(layerId)),
+  )];
+  const sourceLayerIds = requestedLayerIds.length > 0
+    ? requestedLayerIds
+    : visibleLayerIds.length > 0
+    ? visibleLayerIds
+    : [source.layerId];
+  const capturedProjection = captureAssetSelectionForFrame(
+    source.frameId,
+    sourceLayerIds,
+  );
   const capturedRasterSnapshot = capturedProjection === undefined
     ? undefined
     : {
@@ -6634,7 +6666,7 @@ function addAssetDefinitionFromSelection(input: {
     ? undefined
     : [{
       sourceFrameId: source.frameId,
-      layerIds: visibleLayerIds.length > 0 ? visibleLayerIds : [source.layerId],
+      layerIds: sourceLayerIds,
       rect: { ...source.region },
       rasterSnapshot: capturedRasterSnapshot,
     }]);
@@ -6669,17 +6701,20 @@ function addAssetDefinitionFromSelection(input: {
   );
   const mappedFrameStart = Math.min(...frameNumbers);
   const mappedFrameEnd = Math.max(...frameNumbers);
-  const sourceLayerIds = usesFixedComposite
-    ? (visibleLayerIds.length > 0 ? visibleLayerIds : [source.layerId])
+  const definitionSourceLayerIds = usesFixedComposite
+    ? sourceLayerIds
     : [source.layerId];
+  const explicitLayerSelection = input.sourceLayerIds !== undefined;
   const initialAnimationName = input.animationName ?? "IDLE";
   const draft = createAssetDefinitionDraft({
     sourceProjectId: state.projectId,
     sourceCanvasId: source.sourceCanvasId,
     sourceKind: usesFixedComposite ? "VISIBLE_COMPOSITE" : "SELECTED_LAYERS",
-    sourceLayerIds,
+    sourceLayerIds: definitionSourceLayerIds,
     layerSelection: usesFixedComposite
-      ? { kind: "VISIBLE_LAYERS" }
+      ? explicitLayerSelection
+        ? { kind: "SELECTED_LAYERS", layerIds: definitionSourceLayerIds }
+        : { kind: "VISIBLE_LAYERS" }
       : { kind: "CURRENT_LAYER", layerId: source.layerId },
     frameStart: mappedFrameStart,
     frameEnd: mappedFrameEnd,
@@ -11061,36 +11096,53 @@ function renderTimeline(): void {
     });
     timelineWindow.append(row);
   });
+  const desktopTimelineUi = window.matchMedia?.("(min-width: 1120px)").matches ??
+    window.innerWidth >= 1120;
+  let audioRowForTimeline: HTMLDivElement | undefined;
   if (
     virtualWindow.lastLayerIndex === state.timeline.layerTrackOrder.length - 1
   ) {
     const audioRow = document.createElement("div");
     audioRow.className = "draw2-timeline-row draw2-timeline-audio-row";
     audioRow.style.top = `${
-      headerHeight + state.timeline.layerTrackOrder.length * layerRowHeight
+      headerHeight +
+      (state.timeline.layerTrackOrder.length + (desktopTimelineUi ? 1 : 0)) *
+        layerRowHeight
     }px`;
+    audioRow.dataset.timelineRole = "audio-reference";
+    audioRow.dataset.audioSource = "iAUDIO";
     audioRow.setAttribute("role", "row");
-    audioRow.setAttribute("aria-label", "Audio track");
+    audioRow.setAttribute(
+      "aria-label",
+      desktopTimelineUi ? "iAUDIO reference track" : "Audio track",
+    );
     const audioLabel = document.createElement("div");
     audioLabel.className =
       "draw2-timeline-row-label draw2-timeline-audio-label";
+    audioLabel.dataset.audioSource = "iAUDIO";
     audioLabel.setAttribute("role", "rowheader");
     const audioTitle = document.createElement("span");
     audioTitle.className = "draw2-timeline-audio-title";
     audioTitle.append(
       createDraw2Icon("icon-note"),
-      document.createTextNode("Audio"),
+      document.createTextNode(desktopTimelineUi ? "iAUDIO" : "Audio"),
     );
     audioLabel.append(audioTitle);
     if (drawAudioAssetPicker !== null && drawAudioAdd !== null) {
       drawAudioAssetPicker.classList.add("draw2-timeline-audio-picker");
+      if (desktopTimelineUi) {
+        drawAudioAssetPicker.title = "iAUDIO素材を選択";
+        drawAudioAssetPicker.setAttribute("aria-label", "iAUDIO素材を選択");
+      }
       drawAudioAdd.classList.add("draw2-timeline-audio-add");
       drawAudioAdd.textContent = "+";
-      drawAudioAdd.title = "選択中のフレームからAudioを追加";
-      drawAudioAdd.setAttribute(
-        "aria-label",
-        "選択中のフレームからAudioを追加",
-      );
+      if (desktopTimelineUi) {
+        drawAudioAdd.title = "iAUDIO素材を選択中のフレームへ追加";
+        drawAudioAdd.setAttribute(
+          "aria-label",
+          "iAUDIO素材を選択中のフレームへ追加",
+        );
+      }
       audioLabel.append(drawAudioAssetPicker, drawAudioAdd);
     }
     audioRow.append(audioLabel);
@@ -11140,7 +11192,8 @@ function renderTimeline(): void {
       });
       audioRow.append(block);
     }
-    timelineWindow.append(audioRow);
+    if (desktopTimelineUi) audioRowForTimeline = audioRow;
+    else timelineWindow.append(audioRow);
   }
   if (
     virtualWindow.lastLayerIndex === state.timeline.layerTrackOrder.length - 1
@@ -11149,8 +11202,10 @@ function renderTimeline(): void {
     addLayerRow.className = "draw2-timeline-row draw2-timeline-layer-add-row";
     addLayerRow.style.top = `${
       headerHeight +
-      (state.timeline.layerTrackOrder.length + 1) * layerRowHeight
+      (state.timeline.layerTrackOrder.length + (desktopTimelineUi ? 0 : 1)) *
+        layerRowHeight
     }px`;
+    addLayerRow.dataset.timelineRole = "layer-add";
     addLayerRow.setAttribute("role", "row");
     addLayerRow.setAttribute("aria-label", localizeDraw2Text("Add layer"));
     const addLayerHeader = document.createElement("button");
@@ -11159,6 +11214,13 @@ function renderTimeline(): void {
       "draw2-timeline-row-label draw2-timeline-layer-add-header draw2-timeline-command-cell";
     addLayerHeader.classList.add("draw2-button-icon");
     addLayerHeader.append(createDraw2Icon("icon-add"));
+    if (desktopTimelineUi) {
+      const addLayerLabel = document.createElement("span");
+      addLayerLabel.className = "draw2-timeline-layer-add-label";
+      addLayerLabel.textContent = localizeDraw2Text("Add layer");
+      addLayerLabel.setAttribute("aria-hidden", "true");
+      addLayerHeader.append(addLayerLabel);
+    }
     addLayerHeader.setAttribute(
       "aria-label",
       localizeDraw2Text("Add layer"),
@@ -11167,6 +11229,12 @@ function renderTimeline(): void {
     addLayerHeader.addEventListener("click", () => addLayerControl.click());
     addLayerRow.append(addLayerHeader);
     timelineWindow.append(addLayerRow);
+  }
+  if (audioRowForTimeline !== undefined) {
+    // Keep the layer action immediately after the image layers in both the
+    // visual order and the keyboard/screen-reader order. Audio references are
+    // a separate track below it, even though they share the same frame axis.
+    timelineWindow.append(audioRowForTimeline);
   }
   const onionCount = onionSkinEnabled
     ? resolveOnionSkinNeighborhood(state, timelineSession.activeFrameId, {
@@ -13431,8 +13499,10 @@ function compositeRegion(
       state.layers.find((item) => item.layerTrackId === layerTrackId)
     )
     .filter((item): item is NonNullable<typeof item> =>
-      item !== undefined && item.visible && item.opacity > 0 &&
-        (layerIds === undefined || layerIds.includes(item.layerTrackId))
+      item !== undefined && item.opacity > 0 &&
+        (layerIds === undefined
+          ? item.visible
+          : layerIds.includes(item.layerTrackId))
     );
   for (const layer of orderedLayers) {
     const tilemap = layer.kind === "TILEMAP"
@@ -20507,6 +20577,8 @@ async function finishTilemapPointerGesture(
 canvas.addEventListener("pointerdown", (event) => {
   if (event.button !== 0 && event.button !== 1 && event.button !== 2) return;
   if (event.button === 2 && !activeLayerIsTilemap()) return;
+  const spacePanRequested = event.button === 0 &&
+    workspaceFrameElement?.dataset.draw2SpaceHeld === "true";
   if (transformCommitInFlight) {
     if (event.cancelable) event.preventDefault();
     return;
@@ -20514,6 +20586,7 @@ canvas.addEventListener("pointerdown", (event) => {
   if (
     (event.button === 0 || event.button === 2) &&
     collaborationEditBlockReason() !== undefined &&
+    !spacePanRequested &&
     !collaborationCanvasToolIsNonMutating(currentBasicTool())
   ) {
     if (event.cancelable) event.preventDefault();
@@ -20539,7 +20612,7 @@ canvas.addEventListener("pointerdown", (event) => {
     return;
   }
   if (
-    event.button === 1 || currentBasicTool() === "pan" ||
+    event.button === 1 || spacePanRequested || currentBasicTool() === "pan" ||
     (event.altKey && !selectionToolCanMove())
   ) {
     if (event.cancelable) event.preventDefault();
@@ -21387,38 +21460,85 @@ specialOpenInspectorElement?.addEventListener("click", () => {
   )?.click();
 });
 
+function currentShortcutMode(): Exclude<Draw2ShortcutMode, "COMMON"> {
+  const mode = workspaceFrameElement?.dataset.creatorMode;
+  return mode === "AUDIO" || mode === "GAME" ? mode : "DRAW";
+}
+
+function shortcutModeName(
+  mode: Exclude<Draw2ShortcutMode, "COMMON">,
+): string {
+  return mode === "AUDIO" ? "iAUDIO" : mode === "GAME" ? "iGAME" : "iDRAW";
+}
+
+function shortcutsForCurrentMode(): readonly Draw2Shortcut[] {
+  const mode = currentShortcutMode();
+  return DRAW2_SHORTCUTS.filter((shortcut) =>
+    shortcut.mode === "COMMON" || shortcut.mode === mode ||
+    (shortcut.mode === undefined && mode === "DRAW")
+  );
+}
+
+function syncShortcutListLabel(): void {
+  shortcutListElement?.setAttribute(
+    "aria-label",
+    `${shortcutModeName(currentShortcutMode())} keyboard shortcuts`,
+  );
+}
+
 function renderShortcutList(filter = ""): void {
   if (shortcutListElement === null) return;
+  syncShortcutListLabel();
   const queryText = filter.trim().toLowerCase();
   shortcutListElement.replaceChildren();
-  let category: string | undefined;
-  for (const shortcut of DRAW2_SHORTCUTS) {
+  const groupedShortcuts = new Map<string, Draw2Shortcut[]>();
+  for (const shortcut of shortcutsForCurrentMode()) {
     const haystack = `${shortcut.category} ${shortcut.label} ${shortcut.keys}`
       .toLowerCase();
     if (queryText.length > 0 && !haystack.includes(queryText)) continue;
-    if (category !== shortcut.category) {
-      category = shortcut.category;
-      const heading = document.createElement("div");
-      heading.className = "draw2-shortcut-category";
-      heading.textContent = shortcut.category;
-      heading.setAttribute("role", "presentation");
-      shortcutListElement.append(heading);
+    const categoryShortcuts = groupedShortcuts.get(shortcut.category);
+    if (categoryShortcuts === undefined) {
+      groupedShortcuts.set(shortcut.category, [shortcut]);
+    } else {
+      categoryShortcuts.push(shortcut);
     }
-    const row = document.createElement("div");
-    row.className = "draw2-shortcut-row";
-    row.setAttribute("role", "listitem");
-    const label = document.createElement("span");
-    label.className = "draw2-shortcut-label";
-    label.textContent = shortcut.label;
-    const keys = document.createElement("span");
-    keys.className = "draw2-shortcut-keys";
-    for (const key of shortcut.keys.split("+")) {
-      const keycap = document.createElement("kbd");
-      keycap.textContent = key;
-      keys.append(keycap);
+  }
+  for (const [category, shortcuts] of groupedShortcuts) {
+    const heading = document.createElement("div");
+    heading.className = "draw2-shortcut-category";
+    heading.textContent = category;
+    heading.setAttribute("role", "presentation");
+    shortcutListElement.append(heading);
+    for (const shortcut of shortcuts) {
+      const row = document.createElement("div");
+      row.className = "draw2-shortcut-row";
+      row.setAttribute("role", "listitem");
+      const label = document.createElement("span");
+      label.className = "draw2-shortcut-label";
+      label.textContent = shortcut.label;
+      const keys = document.createElement("span");
+      keys.className = "draw2-shortcut-keys";
+      row.setAttribute("aria-label", `${shortcut.label}: ${shortcut.keys}`);
+      const alternatives = shortcut.keys.split(/\s*\/\s*/).filter((value) =>
+        value.length > 0
+      );
+      for (const [alternativeIndex, alternative] of alternatives.entries()) {
+        if (alternativeIndex > 0) {
+          const separator = document.createElement("span");
+          separator.className = "draw2-shortcut-separator";
+          separator.textContent = "/";
+          separator.setAttribute("aria-hidden", "true");
+          keys.append(separator);
+        }
+        for (const key of alternative.split("+")) {
+          const keycap = document.createElement("kbd");
+          keycap.textContent = key;
+          keys.append(keycap);
+        }
+      }
+      row.append(label, keys);
+      shortcutListElement.append(row);
     }
-    row.append(label, keys);
-    shortcutListElement.append(row);
   }
   if (shortcutListElement.childElementCount === 0) {
     const empty = document.createElement("div");
@@ -22475,6 +22595,10 @@ document.addEventListener("keydown", (event) => {
   // command registry must never change a hidden Draw tool or timeline there.
   if (!drawWorkspaceMode) return;
   const interactiveTarget = isInteractiveKeyboardTarget(event.target);
+  const drawActiveSurface = resolveDraw2ActiveSurface(
+    event.target,
+    document.activeElement instanceof Element ? document.activeElement : null,
+  );
   const selectionNudgeKeys = new Set([
     "ArrowLeft",
     "ArrowRight",
@@ -22485,10 +22609,17 @@ document.addEventListener("keydown", (event) => {
     selectionDraft !== undefined || pendingSelectionGesture !== undefined ||
     selectionFrameDrag !== undefined || selectionDrag !== undefined ||
     transformSession !== undefined;
+  const drawArrowOwner = resolveDraw2ArrowOwner({
+    mode: creatorMode === "ANIMATE" ? "ANIMATE" : "DRAW",
+    surface: drawActiveSurface,
+    hasSelection: selection !== undefined,
+    drawGestureActive: activeDrawGesture,
+  });
   if (
     !inputEditing && !interactiveTarget && !event.defaultPrevented &&
     !event.metaKey && !event.ctrlKey && !event.altKey &&
-    activeDrawGesture && selectionNudgeKeys.has(event.key)
+    activeDrawGesture && drawArrowOwner === "DRAW_SELECTION" &&
+    selectionNudgeKeys.has(event.key)
   ) {
     // Never change the active frame/layer while a stroke, selection drag, or
     // transform preview owns the editor. The gesture can finish or cancel
@@ -22504,6 +22635,7 @@ document.addEventListener("keydown", (event) => {
     pendingSelectionGesture === undefined && selectionFrameDrag === undefined &&
     selectionDrag === undefined &&
     transformSession === undefined &&
+    drawArrowOwner === "DRAW_SELECTION" &&
     selectionNudgeKeys.has(event.key) && !event.metaKey && !event.ctrlKey &&
     !event.altKey
   ) {
@@ -22528,6 +22660,7 @@ document.addEventListener("keydown", (event) => {
     sheetOpen: false,
     inputEditing: inputEditing || interactiveTarget,
     imeComposing: event.isComposing,
+    mode: currentShortcutMode(),
   });
   if (shortcut === undefined) return;
   event.preventDefault();

@@ -16,6 +16,7 @@ import {
   gameAnimationBindingIdFor,
   upsertGameAnimationBinding,
 } from "../../src/game/game-350/game-asset-browser.ts";
+import type { GameAudioAsset } from "../../src/game/game-350/game-audio.ts";
 import {
   createGameEditorPersistenceRecord,
   validateGameEditorPersistenceRecord,
@@ -143,6 +144,35 @@ Deno.test("GAME350-ASSET-BROWSER-001 builds one searchable catalog with read-onl
     }).length === 1,
     "catalog search must narrow to the matching external asset",
   );
+});
+
+Deno.test("GAME350-ASSET-BROWSER-006 exposes saved iAUDIO Assets as addable Game entries", () => {
+  const packageAsset: GameAudioAsset = {
+    audioAssetId: "game-audio-package:asset-package:theme:entry:theme",
+    name: "Theme Slice",
+    kind: "BGM",
+    source: {
+      projectId: "audio-project",
+      projectRevision: 7,
+      projectStateHash: "hash:audio:7",
+      trackIds: ["track:music"],
+      startTick: 960,
+      durationTick: 480,
+      renderMode: "POST_MIX",
+      mode: "PINNED",
+    },
+    defaults: { gainMilliDb: 0, loop: true, retrigger: "RESTART" },
+  };
+  const entries = buildGameAssetBrowserEntries({
+    tracks: [],
+    drawDefinitions: [],
+    audioAssets: [],
+    audioPackageAssets: [packageAsset],
+  });
+  const entry = entries.find((candidate) => candidate.audioPackage === true);
+  assert(entry !== undefined, "a saved package must appear in the Game catalog");
+  assert(entry.audioAssetId === packageAsset.audioAssetId, "the Game entry must retain the canonical package asset ID");
+  assert(entry.detail.includes("Tick 960–1440"), "the catalog must show the saved Tick range");
 });
 
 Deno.test("GAME350-ASSET-BROWSER-002 resolves all Character clips, directions and source frames", () => {

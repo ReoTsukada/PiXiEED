@@ -28,6 +28,10 @@ import {
   gameAudioAssetFromCaptureDraft,
   type GameAudioAsset,
 } from "./game-audio.ts";
+import type {
+  AssetPackageManifest,
+  AudioAssetPackageEntry,
+} from "./assetization.ts";
 
 export type GameAssetBridgeFailureCode =
   | "DRAW_SELECTION_REQUIRED"
@@ -274,4 +278,87 @@ export function gameAudioAssetForCaptureDraft(
     return failure("AUDIO_REFERENCE_INVALID", "iAUDIOの選択範囲をGame Audio参照に変換できません。");
   }
   return { ok: true, value: gameAudioAssetFromCaptureDraft(draft) };
+}
+
+function audioProjectRevisionFromPackageSource(
+  revisionId: string,
+): number | undefined {
+  const match = /(?:^|:)(\d+)$/u.exec(revisionId.trim());
+  if (match === null) return undefined;
+  const revision = Number(match[1]);
+  return Number.isSafeInteger(revision) && revision >= 0 ? revision : undefined;
+}
+
+function gameAudioKindForDeliveryRole(
+  role: AudioAssetPackageEntry["proposal"]["role"],
+): GameAudioAsset["kind"] {
+  if (role === "BGM") return "BGM";
+  if (role === "VOICE") return "VOICE";
+  return "SE";
+}
+
+/**
+ * Project one finalized iAUDIO Asset into the Game-owned audio library.
+ *
+ * The package remains the source of truth for identity and provenance. Game
+ * receives only the validated project/revision/Track/Tick pointer, so this
+ * adapter never copies audio bytes and can reuse the existing playback and
+ * slot-binding path.
+ */
+export function gameAudioAssetsForAssetPackage(
+  manifest: AssetPackageManifest,
+): readonly GameAudioAsset[] {
+  if (
+    manifest.status !== "FINALIZED" ||
+    manifest.packageId.trim().length === 0 ||
+    manifest.entries.length === 0
+  ) return [];
+  return manifest.entries.flatMap((entry) => {
+    if (entry.kind !== "AUDIO") return [];
+    const projectId = entry.source.projectId.trim();
+    const projectRevision = audioProjectRevisionFromPackageSource(
+      entry.source.revisionId,
+    );
+    const projectStateHash = entry.source.contentHash.trim();
+    const trackIds = [
+      ...new Set(entry.proposal.trackIds.map((trackId) => trackId.trim()).filter(
+        (trackId) => trackId.length > 0,
+      )),
+    ];
+    const startTick = entry.proposal.startTick;
+    const durationTick = entry.proposal.durationTick;
+    const name = entry.label.trim() || manifest.title.trim();
+    if (
+      projectId.length === 0 || projectRevision === undefined ||
+      projectStateHash.length === 0 || trackIds.length === 0 ||
+      !Number.isSafeInteger(startTick) || startTick < 0 ||
+      !Number.isSafeInteger(durationTick) || durationTick <= 0 ||
+      name.length === 0
+    ) return [];
+    const kind = gameAudioKindForDeliveryRole(entry.proposal.role);
+    const source = {
+      projectId,
+      projectRevision,
+      projectStateHash,
+      trackIds,
+      startTick,
+      durationTick,
+      renderMode: "POST_MIX" as const,
+      // A finalized Asset points at the confirmed source revision. Keeping
+      // it pinned prevents a later Audio edit from silently changing a Game.
+      mode: "PINNED" as const,
+    };
+    return [{
+      audioAssetId:
+        `game-audio-package:${manifest.packageId}:${entry.entryId}`,
+      name,
+      kind,
+      source,
+      defaults: {
+        gainMilliDb: 0,
+        loop: entry.proposal.loop === true || kind === "BGM",
+        retrigger: kind === "BGM" ? "RESTART" as const : "OVERLAP" as const,
+      },
+    } satisfies GameAudioAsset];
+  });
 }

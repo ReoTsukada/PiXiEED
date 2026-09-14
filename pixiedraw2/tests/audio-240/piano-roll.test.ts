@@ -6,6 +6,9 @@ import {
   pianoRollNoteFromTicks,
   pianoRollNoteTicks,
   resizePianoRollNote,
+  resizePianoRollNoteEndInTicks,
+  resizePianoRollNoteStartInTicks,
+  movePianoRollNoteInTicks,
   resizePianoRollNoteInTicks,
   snapPianoRollFrame,
   snapPianoRollTick,
@@ -143,4 +146,40 @@ Deno.test("Audio-240 persists Piano Roll edits as exact PPQ Ticks", () => {
   ) {
     throw new Error("1/64 and free-Tick placement must remain precise");
   }
+});
+
+Deno.test("Audio-240 resizes and moves notes on exact Tick boundaries", () => {
+  const clock = {
+    framesPerSecond: 24,
+    tempoMilliBpm: 120_000,
+    ticksPerQuarter: 480,
+  } as const;
+  const note = createPianoRollNote({
+    id: "piano:edge-resize",
+    pitchMidi: 60,
+    startFrame: 0,
+    durationFrames: 8,
+    startTick: 240 as never,
+    durationTick: 960 as never,
+    velocity: 0.8,
+    instrument: "PIANO",
+    frameCount: 128,
+  });
+  if (note === undefined) throw new Error("note should be created");
+  const left = resizePianoRollNoteStartInTicks(note, 480, clock, 128);
+  const leftTicks = pianoRollNoteTicks(left, clock);
+  if (leftTicks.startTick !== 480 || leftTicks.durationTick !== 720) {
+    throw new Error("left edge resize must keep the right Tick fixed");
+  }
+  const right = resizePianoRollNoteEndInTicks(note, 1_440, clock, 128);
+  const rightTicks = pianoRollNoteTicks(right, clock);
+  if (rightTicks.startTick !== 240 || rightTicks.durationTick !== 1_200) {
+    throw new Error("right edge resize must keep the left Tick fixed");
+  }
+  const moved = movePianoRollNoteInTicks(note, 120, 2, clock, 128);
+  const movedTicks = pianoRollNoteTicks(moved, clock);
+  if (
+    movedTicks.startTick !== 360 || movedTicks.durationTick !== 960 ||
+    moved.pitchMidi !== 62
+  ) throw new Error("move must preserve duration and apply Tick/pitch deltas");
 });

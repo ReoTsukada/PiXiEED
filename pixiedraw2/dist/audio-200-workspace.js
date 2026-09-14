@@ -56,6 +56,45 @@ var AUDIO200_SUPPORTED_CODECS = [
   "WAV_PCM",
   "WAV_IEEE_FLOAT"
 ];
+var AUDIO_MUSICAL_KEYS = [
+  "C",
+  "C\u266F",
+  "D",
+  "D\u266F",
+  "E",
+  "F",
+  "F\u266F",
+  "G",
+  "G\u266F",
+  "A",
+  "A\u266F",
+  "B"
+];
+function isAudioMusicalKey(value) {
+  return typeof value === "string" && AUDIO_MUSICAL_KEYS.includes(value);
+}
+var AUDIO_MUSICAL_SCALE_IDS = [
+  "major",
+  "minor",
+  "harmonic-minor",
+  "melodic-minor",
+  "dorian",
+  "phrygian",
+  "lydian",
+  "mixolydian",
+  "locrian",
+  "pentatonic",
+  "minor-pentatonic",
+  "blues",
+  "chromatic"
+];
+function isAudioMusicalScaleId(value) {
+  return typeof value === "string" && AUDIO_MUSICAL_SCALE_IDS.includes(value);
+}
+var AUDIO_DEFAULT_MUSICAL_CONTEXT = Object.freeze({
+  key: "C",
+  scale: "major"
+});
 var AUDIO_DRUM_KIT_IDS = [
   "BASIC",
   "ARCADE",
@@ -830,6 +869,7 @@ var COMMAND_TYPES = [
   "CLIP_REMOVE",
   "NOTE_REMOVE",
   "NOTE_UPSERT",
+  "NOTE_BATCH_REPLACE",
   "AUTOMATION_UPSERT",
   "AUTOMATION_REMOVE",
   "MIXER_REPLACE",
@@ -841,6 +881,7 @@ var COMMAND_TYPES = [
   "SYNTH_PRESET_REPLACE",
   "SYNTH_PRESET_REMOVE",
   "TEMPO_SET",
+  "MUSICAL_CONTEXT_SET",
   "MARKER_UPSERT",
   "MARKER_REMOVE",
   "RECORDING_COMMIT",
@@ -1248,6 +1289,12 @@ function validateProjectShape(project) {
   if (value.timebase === null || typeof value.timebase !== "object" || value.timebase.kind !== "PPQ" || !boundedInteger(value.timebase.ticksPerQuarter, 24, 3840)) {
     return fail2("AUDIO_INVALID_NUMBER", "Timebase must use a bounded PPQ value.", "project.timebase");
   }
+  if (value.musicalContext !== void 0) {
+    const musicalContext = value.musicalContext;
+    if (musicalContext === null || typeof musicalContext !== "object" || Array.isArray(musicalContext) || !isAudioMusicalKey(musicalContext.key) || !isAudioMusicalScaleId(musicalContext.scale)) {
+      return fail2("AUDIO_INVALID_PROJECT", "Musical key and scale are not supported.", "project.musicalContext");
+    }
+  }
   if (value.drumKitId !== void 0 && !isAudioDrumKitId(value.drumKitId)) {
     return fail2("AUDIO_INVALID_PROJECT", "Drum kit identifier is not supported.", "project.drumKitId");
   }
@@ -1631,6 +1678,7 @@ async function createAudioProject(input) {
       kind: "PPQ",
       ticksPerQuarter: AUDIO200_DEFAULT_PPQ
     },
+    musicalContext: AUDIO_DEFAULT_MUSICAL_CONTEXT,
     drumKitId: "BASIC",
     chipMachineId: "NONE",
     synthPresets: [],
@@ -2136,6 +2184,49 @@ async function applyAudioCommand(project, command) {
       };
       break;
     }
+    case "NOTE_BATCH_REPLACE": {
+      const batch = entityFromPayload(payload, "noteBatch");
+      if (batch === null || !Array.isArray(batch.removeNoteIds) || !Array.isArray(batch.notes)) {
+        return fail2("AUDIO_COMMAND_INVALID", "Note batch payload is invalid.", "command.payload.noteBatch");
+      }
+      const removeIds = batch.removeNoteIds.map((id) => String(id));
+      const removeSet = new Set(removeIds);
+      if (removeIds.length !== removeSet.size || removeIds.some((id) => !validId2(id))) {
+        return fail2("AUDIO_COMMAND_INVALID", "Note batch removal IDs are invalid or duplicated.", "command.payload.noteBatch.removeNoteIds");
+      }
+      const existingIds = new Set(project.notes.map((note) => String(note.noteId)));
+      if (removeIds.some((id) => !existingIds.has(id))) {
+        return fail2("AUDIO_COMMAND_INVALID", "Note batch removal ID does not exist in the current Project.", "command.payload.noteBatch.removeNoteIds");
+      }
+      const replacementIds = /* @__PURE__ */ new Set();
+      for (const [index, note] of batch.notes.entries()) {
+        const noteId = String(note?.noteId ?? "");
+        if (note === null || typeof note !== "object" || !validId2(noteId) || replacementIds.has(noteId) || existingIds.has(noteId) && !removeSet.has(noteId) || !project.tracks.some((track) => track.trackId === note.trackId)) {
+          return fail2("AUDIO_COMMAND_INVALID", "Note batch contains an invalid, duplicated, or unbound note.", `command.payload.noteBatch.notes[${index}]`);
+        }
+        replacementIds.add(noteId);
+      }
+      const replacementByTrack = /* @__PURE__ */ new Map();
+      for (const note of batch.notes) {
+        const trackId = String(note.trackId);
+        const notes = replacementByTrack.get(trackId) ?? [];
+        notes.push(note);
+        replacementByTrack.set(trackId, notes);
+      }
+      next = {
+        ...next,
+        notes: project.notes.filter((note) => !removeSet.has(String(note.noteId))).concat(batch.notes),
+        tracks: project.tracks.map((track) => {
+          const trackId = String(track.trackId);
+          const replacements = replacementByTrack.get(trackId) ?? [];
+          return replacements.length === 0 && removeSet.size === 0 ? track : {
+            ...track,
+            noteIds: track.noteIds.filter((id) => !removeSet.has(String(id))).concat(replacements.map((note) => note.noteId))
+          };
+        })
+      };
+      break;
+    }
     case "NOTE_REMOVE": {
       const noteId = entityFromPayload(payload, "noteId");
       if (noteId === null || !validId2(noteId)) {
@@ -2300,6 +2391,17 @@ async function applyAudioCommand(project, command) {
       next = {
         ...next,
         tempo
+      };
+      break;
+    }
+    case "MUSICAL_CONTEXT_SET": {
+      const musicalContext = entityFromPayload(payload, "musicalContext");
+      if (musicalContext === null || !isAudioMusicalKey(musicalContext.key) || !isAudioMusicalScaleId(musicalContext.scale)) {
+        return fail2("AUDIO_INVALID_PROJECT", "Musical key and scale are not supported.", "command.payload.musicalContext");
+      }
+      next = {
+        ...next,
+        musicalContext
       };
       break;
     }
@@ -3184,6 +3286,31 @@ async function journalWorkspaceNoteUpsert(session, note, mutation) {
     note: canonical.value
   });
 }
+async function journalWorkspaceNoteBatchReplace(session, input, mutation) {
+  let removeNoteIds;
+  try {
+    removeNoteIds = input.removeNoteIds.map((id) => asAudioNoteId(id));
+  } catch {
+    return fail4("AUDIO_COMMAND_INVALID", "Workspace note batch removal ID is invalid.", "noteBatch.removeNoteIds");
+  }
+  const notes = [];
+  for (const [index, inputNote] of input.notes.entries()) {
+    const canonical = workspaceNoteToCanonical(inputNote, session.framesPerSecond, session.project.tempo.milliBpm / 1e3, session.ppq);
+    if (!canonical.ok) {
+      return fail4("AUDIO_INVALID_NOTE", canonical.diagnostics[0]?.message ?? "Workspace note is invalid.", `noteBatch.notes[${index}]`);
+    }
+    if (!session.project.tracks.some((track) => track.trackId === canonical.value.trackId)) {
+      return fail4("AUDIO_INVALID_NOTE", "Workspace note instrument has no canonical Track.", `noteBatch.notes[${index}].instrument`);
+    }
+    notes.push(canonical.value);
+  }
+  return dispatchWorkspaceCommand(session, mutation, "NOTE_BATCH_REPLACE", {
+    noteBatch: {
+      removeNoteIds,
+      notes
+    }
+  });
+}
 async function journalWorkspaceNoteRemove(session, noteId, mutation) {
   try {
     return dispatchWorkspaceCommand(session, mutation, "NOTE_REMOVE", {
@@ -3566,6 +3693,14 @@ async function journalWorkspaceTempo(session, tempoBpm, mutation) {
     tempo
   });
 }
+async function journalWorkspaceMusicalContext(session, musicalContext, mutation) {
+  if (!isAudioMusicalKey(musicalContext.key) || !isAudioMusicalScaleId(musicalContext.scale)) {
+    return fail4("AUDIO_INVALID_PROJECT", "Workspace musical key and scale are not supported.", "musicalContext");
+  }
+  return dispatchWorkspaceCommand(session, mutation, "MUSICAL_CONTEXT_SET", {
+    musicalContext
+  });
+}
 async function journalWorkspaceDrumKitSet(session, drumKitId, mutation) {
   if (!isAudioDrumKitId(drumKitId)) {
     return fail4("AUDIO_INVALID_PROJECT", "Workspace drum kit is not supported.", "drumKitId");
@@ -3807,7 +3942,11 @@ function validPersistenceSettings(value) {
     "1/4",
     "1/8",
     "1/16"
-  ].includes(settings.snap));
+  ].includes(settings.snap)) && (settings.scaleGuideMode === void 0 || [
+    "DISPLAY",
+    "SNAP",
+    "RESTRICT"
+  ].includes(settings.scaleGuideMode));
 }
 function projectRevisionOf(record) {
   return record?.projectRevision ?? record?.checkpoint.projectRevision ?? 0;
@@ -5147,7 +5286,10 @@ export {
   AUDIO200_UI_SCHEMA_VERSION,
   AUDIO200_WAVEFORM_SCHEMA_VERSION,
   AUDIO_CHIP_MACHINE_IDS,
+  AUDIO_DEFAULT_MUSICAL_CONTEXT,
   AUDIO_DRUM_KIT_IDS,
+  AUDIO_MUSICAL_KEYS,
+  AUDIO_MUSICAL_SCALE_IDS,
   appendAudioAssetRevision,
   asAudioAssetId,
   asAudioAutomationId,
@@ -5195,6 +5337,8 @@ export {
   inspectSourceBlob,
   isAudioChipMachineId,
   isAudioDrumKitId,
+  isAudioMusicalKey,
+  isAudioMusicalScaleId,
   isFiniteNumber,
   isFiniteSafeNumber,
   isSafeInteger,
@@ -5220,6 +5364,8 @@ export {
   journalWorkspaceMasterReplace,
   journalWorkspaceMixerChannel,
   journalWorkspaceMixerRouting,
+  journalWorkspaceMusicalContext,
+  journalWorkspaceNoteBatchReplace,
   journalWorkspaceNoteRemove,
   journalWorkspaceNoteUpsert,
   journalWorkspaceRecordingCommit,

@@ -84,6 +84,113 @@ export interface PianoRollTickProjection {
   readonly durationTick: AudioTick;
 }
 
+/** Apply a canonical Tick range to the current frame projection. */
+export function pianoRollNoteWithTickRange(
+  note: PianoRollNote,
+  startTick: number,
+  durationTick: number,
+  clock: AudioClockSpec,
+  frameCount = Number.POSITIVE_INFINITY,
+): PianoRollNote {
+  const safeStartTick = Math.max(
+    0,
+    Number.isFinite(startTick) ? Math.round(startTick) : 0,
+  ) as AudioTick;
+  const safeDurationTick = Math.max(
+    1,
+    Number.isFinite(durationTick) ? Math.round(durationTick) : 1,
+  ) as AudioTick;
+  return pianoRollNoteFromTicks(
+    {
+      id: note.id,
+      pitchMidi: note.pitchMidi,
+      startTick: safeStartTick,
+      durationTick: safeDurationTick,
+      velocity: note.velocity,
+      instrument: note.instrument,
+    },
+    clock,
+    frameCount,
+  ) ?? {
+    ...note,
+    startTick: safeStartTick,
+    durationTick: safeDurationTick,
+  };
+}
+
+/** Move a note without converting its musical position through frames. */
+export function movePianoRollNoteInTicks(
+  note: PianoRollNote,
+  deltaTick: number,
+  deltaPitchMidi: number,
+  clock: AudioClockSpec,
+  frameCount = Number.POSITIVE_INFINITY,
+): PianoRollNote {
+  const ticks = pianoRollNoteTicks(note, clock);
+  return pianoRollNoteWithTickRange(
+    {
+      ...note,
+      pitchMidi: Math.max(
+        0,
+        Math.min(127, Math.trunc(note.pitchMidi + deltaPitchMidi)),
+      ),
+    },
+    Number(ticks.startTick) + (Number.isFinite(deltaTick) ? Math.round(deltaTick) : 0),
+    ticks.durationTick,
+    clock,
+    frameCount,
+  );
+}
+
+/** Resize the left edge while keeping the right edge fixed. */
+export function resizePianoRollNoteStartInTicks(
+  note: PianoRollNote,
+  startTick: number,
+  clock: AudioClockSpec,
+  frameCount = Number.POSITIVE_INFINITY,
+): PianoRollNote {
+  const ticks = pianoRollNoteTicks(note, clock);
+  const endTick = Number(ticks.startTick) + Number(ticks.durationTick);
+  const nextStartTick = Math.max(
+    0,
+    Math.min(
+      endTick - 1,
+      Number.isFinite(startTick) ? Math.round(startTick) : Number(ticks.startTick),
+    ),
+  );
+  return pianoRollNoteWithTickRange(
+    note,
+    nextStartTick,
+    Math.max(1, endTick - nextStartTick),
+    clock,
+    frameCount,
+  );
+}
+
+/** Resize the right edge while keeping the start edge fixed. */
+export function resizePianoRollNoteEndInTicks(
+  note: PianoRollNote,
+  endTick: number,
+  clock: AudioClockSpec,
+  frameCount = Number.POSITIVE_INFINITY,
+): PianoRollNote {
+  const ticks = pianoRollNoteTicks(note, clock);
+  const startTick = Number(ticks.startTick);
+  const nextEndTick = Math.max(
+    startTick + 1,
+    Number.isFinite(endTick)
+      ? Math.round(endTick)
+      : startTick + Number(ticks.durationTick),
+  );
+  return pianoRollNoteWithTickRange(
+    note,
+    startTick,
+    Math.max(1, nextEndTick - startTick),
+    clock,
+    frameCount,
+  );
+}
+
 /** Resolve a note's canonical Tick range, projecting legacy frame notes once. */
 export function pianoRollNoteTicks(
   note: PianoRollNote,

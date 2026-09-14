@@ -1,12 +1,14 @@
 import {
   createGameAudioCaptureDraft,
   createGameDrawCaptureDraft,
+  gameAudioAssetsForAssetPackage,
   gameAudioAssetForCaptureDraft,
 } from "../../src/game/game-350/asset-bridge.ts";
 import { commitGameAudioTransaction } from "../../src/game/game-350/game-audio.ts";
 import { createDefaultGamePlaygroundConfig } from "../../src/game/game-350/playground.ts";
 import type { Draw2AssetBridgeSnapshot } from "../../src/draw2-asset-bridge-contract.ts";
 import type { PxdAssetDefinitionEntry } from "../../src/draw2-export.ts";
+import type { AssetPackageManifest } from "../../src/game/game-350/assetization.ts";
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
@@ -183,4 +185,71 @@ Deno.test("GAME350-BRIDGE-AUDIO-002 rejects mismatched roles and makes duplicate
   assert(reused.result === "REUSED" && reused.saveCount === 0, "duplicate shelf capture must not save again");
   const mismatch = commitGameAudioTransaction({ config, asset: { ...asset.value, kind: "BGM" }, target: { kind: "OBJECT_TRIGGER", placementId: "hero", trigger: "JUMP" }, expectedProjectRevision: 1, expectedProjectStateHash: "hash:1", currentProjectRevision: 1, currentProjectStateHash: "hash:1", commitId: "capture:3" });
   assert(mismatch.result === "REJECTED" && mismatch.saveCount === 0, "BGM must not bind to an SE trigger");
+});
+
+const finalizedAudioPackage: AssetPackageManifest = {
+  schemaVersion: 1,
+  status: "FINALIZED",
+  detectorVersion: "PIXIEED_ASSETIZATION_V1",
+  confirmationRevision: "audio-revision:7:hash:range",
+  packageId: "asset-package:theme",
+  packageHash: "sha256:package-theme",
+  title: "Theme Slice",
+  description: "A saved iAUDIO range",
+  offerKind: "ASSET",
+  derivativePolicy: "USE_ONLY",
+  saleReadiness: "ACCOUNT_REQUIRED",
+  entries: [{
+    entryId: "entry:theme",
+    kind: "AUDIO",
+    label: "Theme Slice",
+    source: {
+      kind: "AUDIO",
+      sourceId: "audio-range:theme",
+      projectId: "audio-project",
+      revisionId: "audio-revision:7",
+      contentHash: "hash:audio:7",
+    },
+    proposal: {
+      proposalId: "audio-proposal:theme",
+      kind: "AUDIO",
+      sourceProjectId: "audio-project",
+      sourceRevisionId: "audio-revision:7",
+      contentHash: "hash:audio:7",
+      rangeId: "audio-range:theme",
+      label: "Theme Slice",
+      trackIds: ["track:music", "track:music"],
+      startTick: 960,
+      durationTick: 480,
+      role: "BGM",
+      loop: true,
+      evidence: [],
+    },
+  }],
+};
+
+Deno.test("GAME350-BRIDGE-AUDIO-003 projects a finalized iAUDIO Asset into a pinned Game library asset", () => {
+  const assets = gameAudioAssetsForAssetPackage(finalizedAudioPackage);
+  assert(assets.length === 1, "one finalized audio entry must produce one Game asset");
+  const asset = assets[0];
+  assert(asset !== undefined, "the projected Game asset must exist");
+  assert(asset.audioAssetId === "game-audio-package:asset-package:theme:entry:theme", "package and entry identity must be stable");
+  assert(asset.kind === "BGM" && asset.defaults.loop, "the saved BGM role must become a looping Game asset");
+  assert(asset.source.mode === "PINNED" && asset.source.projectRevision === 7, "a finalized package must pin its source revision");
+  assert(asset.source.trackIds.length === 1 && asset.source.trackIds[0] === "track:music", "duplicate tracks must be normalized");
+  assert(asset.source.startTick === 960 && asset.source.durationTick === 480, "the saved Tick range must remain exact");
+});
+
+Deno.test("GAME350-BRIDGE-AUDIO-004 fails closed when a package revision cannot be resolved", () => {
+  const assets = gameAudioAssetsForAssetPackage({
+    ...finalizedAudioPackage,
+    entries: [{
+      ...finalizedAudioPackage.entries[0]!,
+      source: {
+        ...finalizedAudioPackage.entries[0]!.source,
+        revisionId: "audio-revision:unknown",
+      },
+    }],
+  });
+  assert(assets.length === 0, "an unresolved source revision must not enter the Game library");
 });

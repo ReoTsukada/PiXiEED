@@ -1,4 +1,8 @@
-import { ChipTuneSynth } from "../../src/audio/audio-240/chiptune-synth.ts";
+import {
+  CHIP_SYNTH_DEFAULT_VOLUME,
+  CHIP_SYNTH_MAX_POLYPHONY,
+  ChipTuneSynth,
+} from "../../src/audio/audio-240/chiptune-synth.ts";
 import type { AudioMixer } from "../../src/audio/audio-200/contracts.ts";
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -141,6 +145,11 @@ Deno.test("AUDIO-240 blocks suspended scheduling and exposes recovery state", as
     },
   } as unknown as Window;
   const synth = new ChipTuneSynth(windowRef);
+  assert(
+    synth.getVolume() === CHIP_SYNTH_DEFAULT_VOLUME &&
+      CHIP_SYNTH_DEFAULT_VOLUME >= 0.5,
+    "The default preview volume must remain clearly audible.",
+  );
   assert(synth.prepare(), "AudioContext was not created.");
   assert(
     synth.scheduleNoteAt(60, 100, "triangle", 0.8, 0, "instrument:piano") ===
@@ -249,5 +258,59 @@ Deno.test("AUDIO-240 rebuilds a closed Context from canonical Mixer state", () =
     "Canonical Mixer was not re-projected.",
   );
   assert(latest !== undefined, "Rebuilt Context was not retained.");
+  synth.dispose();
+});
+
+Deno.test("AUDIO-240 bounds dense preview polyphony without changing the score", async () => {
+  let context: FakeContext | undefined;
+  const windowRef = {
+    AudioContext: class {
+      constructor() {
+        context = new FakeContext();
+        return context;
+      }
+    },
+  } as unknown as Window;
+  const synth = new ChipTuneSynth(windowRef);
+  synth.setMixer(mixerFixture());
+  assert(synth.prepare(), "Dense preview AudioContext was not created.");
+  assert(await synth.resume(), "Dense preview Context did not resume.");
+
+  let accepted = 0;
+  for (let index = 0; index < CHIP_SYNTH_MAX_POLYPHONY * 3; index += 1) {
+    const priority = index < CHIP_SYNTH_MAX_POLYPHONY * 2 ? 0.2 : 1;
+    if (
+      synth.scheduleNoteAt(
+        48 + (index % 24),
+        500,
+        "triangle",
+        priority,
+        0,
+        "instrument:piano",
+        undefined,
+        undefined,
+        priority,
+      )
+    ) accepted += 1;
+  }
+  const diagnostics = synth.getPlaybackDiagnostics(["instrument:piano"]);
+  assert(
+    diagnostics.activeVoiceCount <= CHIP_SYNTH_MAX_POLYPHONY &&
+      diagnostics.maxPolyphony === CHIP_SYNTH_MAX_POLYPHONY,
+    "Dense scheduling exceeded the live polyphony ceiling.",
+  );
+  assert(
+    accepted === CHIP_SYNTH_MAX_POLYPHONY * 2 &&
+      diagnostics.droppedVoiceCount >= CHIP_SYNTH_MAX_POLYPHONY,
+    "Overloaded preview did not reject low-priority voices deterministically.",
+  );
+  synth.stopAll();
+  const stopped = synth.getPlaybackDiagnostics();
+  assert(
+    stopped.activeVoiceCount === 0 && stopped.activeSourceCount === 0 &&
+      stopped.droppedVoiceCount === 0,
+    "Stopping dense preview retained voice state.",
+  );
+  assert(context !== undefined, "Dense preview context was not retained.");
   synth.dispose();
 });

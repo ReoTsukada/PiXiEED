@@ -26,6 +26,25 @@ Deno.test("Draw2 entry canonical state is adopted through one synchronisation he
   );
 });
 
+Deno.test("Draw2 shortcut rows keep alternative keys readable", () => {
+  assert(
+    source.includes("shortcut.keys.split(/\\s*\\/\\s*/)") &&
+      source.includes('className = "draw2-shortcut-separator"') &&
+      source.includes('row.setAttribute("aria-label"'),
+    "Shortcut alternatives must remain separate keycaps with an accessible summary.",
+  );
+});
+
+Deno.test("Shortcut dialog follows the active creator mode", () => {
+  assert(
+    source.includes("function shortcutsForCurrentMode()") &&
+      source.includes('shortcut.mode === "COMMON"') &&
+      source.includes("renderShortcutList(shortcutSearchElement?.value ?? \"\")") &&
+      source.includes('window.addEventListener("draw2:creator-mode"'),
+    "Shortcut dialog must update its direct-edit commands with the active mode.",
+  );
+});
+
 Deno.test("Draw2 entry rejects stale timeline activation completions", () => {
   assert(
     source.includes("latestTimelineActivationRequestId") &&

@@ -1,8 +1,12 @@
 # PiXiEED vNext 本番バックエンド一括実装計画
 
-更新日: 2026-09-06
+更新日: 2026-09-06（計画作成日）
 
-この文書は、ローカル制作画面と既存Marketの間に残っている本番境界を、機能ごとに細切れにせず一つの契約で実装するための作業単位を固定する。Migration、Edge Function、クライアント接続コードはこのリポジトリへ実装済みであり、Supabaseへの適用・Stripe／Storage／Realtimeを使う本番受入れ・Deployは別工程として扱う。
+現行の進行方向: [`pixieed-current-progress-and-next-direction-20260914.md`](./pixieed-current-progress-and-next-direction-20260914.md)
+
+この文書は、ローカル制作画面と既存Marketの間に残っている本番境界を、機能ごとに細切れにせず一つの契約で実装するための作業単位を固定する。Migration、Edge Function、クライアント接続コードはこのリポジトリへ実装済みであり、Supabaseへの適用・Deploy後も、Stripe／Storage／Realtimeを使う本番受入れは別工程として扱う。
+
+この文書はバックエンド契約の専門資料であり、作業の現在順序や完了判定は2026-09-14更新の進行方向資料を優先する。ここで「実装済み」と書かれている項目も、Supabase・Stripe・Storage・Realtimeの外部受入れ済みを意味しない。
 
 ## 目的
 
@@ -101,8 +105,8 @@ Migrationを一つのまとまりとして作成し、次を同時に揃える�
 - Stream A: `20260906002539_pixieed_vnext_market_entitlements_and_pixync.sql` に実装済み。形式、revision、Entitlement、License snapshot、無料取得、Asset Binding、public catalogを含む。
 - Stream B: `market-download` と `market-verify-listing-package` に実装済み。PXD・文章・Visual JSON・動画のサーバー検証とprivate Storage signed URL配信を含む。
 - Stream C: Account／iGAME／Draw2に実装済み。revision hashとPXD本体bytes hashを分離し、現在のProjectへAsset-onlyで追加する。
-- Stream D: 既存PiXYNC Foundation／checkpoint／Draw2 aggregate Migration群を復元済み。Supabase適用、Realtime、2クライアント受入れは未実施。
-- Stream E: source変更をdistへ再生成し、ローカル最終検証（型検査、テスト、Market／Core Shell／主要ルートのブラウザ検証）まで完了。外部適用・本番相当受入れは未実施。
+- Stream D: 既存PiXYNC Foundation／checkpoint／Draw2 aggregate Migration群を復元済み。対象Supabaseへ適用済み。Realtime、2クライアント受入れは未実施。
+- Stream E: source変更をdistへ再生成し、ローカル最終検証（型検査、テスト、Market／Core Shell／主要ルートのブラウザ検証）まで完了。対象SupabaseのMigration 11件とローカル管理下のEdge Function 13件を反映済み。
 
 ## Must-not-change
 
@@ -125,4 +129,4 @@ Migrationを一つのまとまりとして作成し、次を同時に揃える�
 
 ## 適用境界
 
-Supabase公式Changelog／RLS／Realtime／Storageの契約確認、`supabase migration new` によるMigration作成、Migration／Function／UIのコード実装、ローカル型検査・テスト・ブラウザ検証は完了している。Deploy、Migration適用、本番決済・Storage・Realtimeの受入れ、外部Build worker接続は、このリポジトリのローカル検証とは分離して実施する。
+Supabase公式Changelog／RLS／Realtime／Storageの契約確認、`supabase migration new` によるMigration作成、Migration／Function／UIのコード実装、ローカル型検査・テスト・ブラウザ検証、対象ProjectへのMigration適用・Edge Function配備は完了している。本番決済・Storage・Realtimeの成功系／失敗系受入れ、Unity実環境、外部Build worker接続は、このリポジトリのローカル検証および反映作業とは分離して実施する。

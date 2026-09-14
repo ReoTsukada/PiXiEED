@@ -188,6 +188,10 @@ Deno.test("AUDIO-330 Realtime Master FX/limiter nodes are disposable and bypassa
   const runtime = new MixerRuntimeAdapter(
     new Context() as unknown as AudioContext,
   );
+  assert(
+    runtime.snapshot().safetyLimiterEnabled === true,
+    "Runtime did not install transparent clip protection by default.",
+  );
   runtime.applyMixer(session.project.mixer);
   const masterEffect = {
     effectId: "effect:master-eq" as never,
@@ -206,6 +210,10 @@ Deno.test("AUDIO-330 Realtime Master FX/limiter nodes are disposable and bypassa
     runtime.snapshot().masterEffectNodeCount === 2,
     "Master FX/limiter were not projected.",
   );
+  assert(
+    runtime.snapshot().safetyLimiterEnabled === false,
+    "Canonical Master limiter was layered with an unnecessary safety limiter.",
+  );
   runtime.applyMasterState({
     gainMilliDb: 0,
     limiterEnabled: true,
@@ -216,6 +224,10 @@ Deno.test("AUDIO-330 Realtime Master FX/limiter nodes are disposable and bypassa
   assert(
     runtime.snapshot().masterEffectNodeCount === 0,
     "Master bypass did not release nodes.",
+  );
+  assert(
+    runtime.snapshot().safetyLimiterEnabled === true,
+    "Bypass removed runtime clip protection.",
   );
   runtime.dispose();
   assert(

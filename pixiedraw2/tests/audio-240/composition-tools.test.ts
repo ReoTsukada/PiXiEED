@@ -1,6 +1,7 @@
 import { asAudioTick } from "../../src/audio/audio-200/index.ts";
 import {
   humanizePianoRollNotes,
+  quantizePianoRollNotes,
   swingPianoRollNotes,
   swingTick,
 } from "../../src/audio/audio-240/composition-tools.ts";
@@ -73,4 +74,24 @@ Deno.test("composition humanize is bounded and deterministic", () => {
       "Humanize exceeded velocity bounds.",
     );
   }
+});
+
+Deno.test("composition quantize supports preview amount and swing without mutation", () => {
+  const source = notes[1];
+  if (source === undefined) throw new Error("source note missing");
+  const preview = quantizePianoRollNotes(notes, clock, {
+    quantumTicks: 240,
+    amountPercent: 50,
+    swingPercent: 66,
+  });
+  assert(source.startTick === asAudioTick(120), "quantize mutated its source");
+  assert(
+    preview[1]?.startTick === asAudioTick(207),
+    "quantize amount/swing projection is incorrect",
+  );
+  const full = quantizePianoRollNotes(notes, clock, {
+    quantumTicks: 240,
+    amountPercent: 100,
+  });
+  assert(full[1]?.startTick === asAudioTick(240), "full quantize missed the grid");
 });

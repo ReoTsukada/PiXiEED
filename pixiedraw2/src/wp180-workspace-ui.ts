@@ -21,6 +21,18 @@ import {
   type WorkspaceState,
 } from "./wp180-workspace-contracts.ts";
 import {
+  advanceSpacePointer,
+  armSpacePointer,
+  beginSpaceIntent,
+  cancelSpaceIntent,
+  createSpaceIntentState,
+  isDraw2SpacePanSurface,
+  releaseSpacePointer,
+  resolveDraw2ActiveSurface,
+  resolveSpaceKeyUp,
+  type SpaceIntentState,
+} from "./draw2-input-ownership.ts";
+import {
   type AssetAnimationClip,
   assetAnimationClipKey,
   assetAnimationDirectionName,
@@ -43,6 +55,10 @@ import {
   createBillingOverview,
   createExternalBuildBillingSnapshot,
 } from "./wp260-billing-framework.ts";
+import {
+  resolveAudioFeatureFlag,
+  type AudioFeatureFlag,
+} from "./wp180-audio-flag.ts";
 import {
   DRAW2_ASSET_STATE_CHANGED_EVENT,
   type Draw2AssetBridge,
@@ -95,12 +111,21 @@ import {
   pianoRollNoteTicks,
   type PianoRollQuantize,
   pitchLabel,
+  resizePianoRollNoteEndInTicks,
+  resizePianoRollNoteStartInTicks,
   resizePianoRollNoteInTicks,
   snapPianoRollFrame,
   snapPianoRollTick,
 } from "./audio/audio-240/piano-roll.ts";
 import {
+  audioMusicalKeyPitchClass,
+  audioMusicalPitchForInput,
+  audioMusicalScaleDefinition,
+  audioMusicalScalePitchClasses,
+} from "./audio/audio-240/musical-context.ts";
+import {
   humanizePianoRollNotes,
+  quantizePianoRollNotes,
   swingPianoRollNotes,
 } from "./audio/audio-240/composition-tools.ts";
 import {
@@ -110,7 +135,10 @@ import {
   pasteAudioProjectRange,
 } from "./audio/audio-240/arrangement-editing.ts";
 import { createAudioCrossfadePair } from "./audio/audio-240/clip-editing.ts";
-import { ChipTuneSynth } from "./audio/audio-240/chiptune-synth.ts";
+import {
+  ChipTuneSynth,
+  CHIP_SYNTH_DEFAULT_VOLUME,
+} from "./audio/audio-240/chiptune-synth.ts";
 import { AUDIO_EQ_BANDS } from "./audio/audio-320/index.ts";
 import type { LongAudioClipRuntime } from "./audio/audio-240/long-audio-runtime.ts";
 import type { BrowserAudioRecordingRuntime } from "./audio/audio-250/browser-recording.ts";
@@ -142,7 +170,10 @@ import {
   validateGameEditorPersistenceRecord,
 } from "./workspace/game-persistence.ts";
 import {
+  AUDIO_DEFAULT_MUSICAL_CONTEXT,
   isAudioChipMachineId,
+  isAudioMusicalKey,
+  isAudioMusicalScaleId,
   type AudioChipMachineId,
   type AudioAutomation,
   type AudioAutomationTargetKind,
@@ -150,9 +181,12 @@ import {
   type AudioDrumKitId,
   type AudioEffect,
   type AudioMasterState,
+  type AudioMusicalContext,
+  type AudioMusicalScaleId,
   type AudioMixer,
   type AudioProject,
   type AudioRevision,
+  type AudioScaleGuideMode,
   type AudioSynthPreset,
   type AudioTick,
   type AudioTrack,
@@ -532,6 +566,7 @@ import {
   type AudioCaptureDraft,
   type AudioCaptureTarget,
 } from "./game/game-350/audio-capture-session.ts";
+import { gameAudioAssetsForAssetPackage } from "./game/game-350/asset-bridge.ts";
 import {
   attachDpcmReferenceToGameAudioAsset,
   clearGameAudioTarget,
@@ -643,7 +678,9 @@ import {
   audioClockForProject,
   audioFrameToTick,
   audioInstrumentTrackId,
+  resolveAudioTrackId,
   audioSecondsToTick,
+  audioTickToSeconds,
   audioTickToFrame,
 } from "./audio/audio-200/timebase.ts";
 
@@ -655,7 +692,7 @@ type Audio270FreezeModule = typeof import("./audio/audio-270/index.ts");
 
 function loadAudio200WorkspaceModule(): Promise<Audio200WorkspaceModule> {
   const chunkUrl = new URL(
-    "audio-200-workspace.js?v=20260829-chip-machine-v1",
+    "audio-200-workspace.js?v=20260913-musical-context-v2",
     import.meta.url,
   ).href;
   return import(chunkUrl) as unknown as Promise<Audio200WorkspaceModule>;
@@ -1133,9 +1170,19 @@ interface RailLayoutPreference {
   readonly sharedLeftWidth: number;
   readonly audioLeftWidth: number;
   readonly rightWidth: number;
+  /** The lower deck remembers its size independently for each mode. */
+  readonly timelineByMode: Readonly<
+    Record<DesktopCreatorMode, TimelineRailPreference>
+  >;
+  /** Legacy DRAW projection kept for older stored preferences. */
   readonly timelineHeight: number;
   readonly gameLeftCollapsed: boolean;
   readonly audioLeftCollapsed: boolean;
+  readonly timelineCollapsed: boolean;
+}
+
+interface TimelineRailPreference {
+  readonly timelineHeight: number;
   readonly timelineCollapsed: boolean;
 }
 
@@ -1146,14 +1193,22 @@ const clampRailLayoutValue = (
 ): number => Math.max(minimum, Math.min(maximum, Math.round(value)));
 
 function defaultRailLayoutPreference(): RailLayoutPreference {
+  const timelineByMode: Readonly<
+    Record<DesktopCreatorMode, TimelineRailPreference>
+  > = {
+    DRAW: { timelineHeight: 260, timelineCollapsed: false },
+    GAME: { timelineHeight: 208, timelineCollapsed: false },
+    AUDIO: { timelineHeight: 176, timelineCollapsed: false },
+  };
   return {
     sharedLeftWidth: 52,
     audioLeftWidth: 244,
     rightWidth: 320,
-    timelineHeight: 260,
+    timelineByMode,
+    timelineHeight: timelineByMode.DRAW.timelineHeight,
     gameLeftCollapsed: false,
     audioLeftCollapsed: false,
-    timelineCollapsed: false,
+    timelineCollapsed: timelineByMode.DRAW.timelineCollapsed,
   };
 }
 
@@ -1169,6 +1224,7 @@ function readRailLayoutPreference(
       sharedLeftWidth?: unknown;
       audioLeftWidth?: unknown;
       rightWidth?: unknown;
+      timelineByMode?: unknown;
       timelineHeight?: unknown;
       gameLeftCollapsed?: unknown;
       audioLeftCollapsed?: unknown;
@@ -1178,6 +1234,54 @@ function readRailLayoutPreference(
       typeof value === "number" && Number.isFinite(value)
         ? value
         : defaultValue;
+    const legacyTimelineHeight = clampRailLayoutValue(
+      numberOr(parsed.timelineHeight, fallback.timelineHeight),
+      WORKSPACE_TIMELINE_MIN_PX,
+      WORKSPACE_TIMELINE_MAX_PX,
+    );
+    const legacyTimelineCollapsed = typeof parsed.timelineCollapsed ===
+        "boolean"
+      ? parsed.timelineCollapsed
+      : fallback.timelineCollapsed;
+    const storedTimelineByMode = parsed.timelineByMode !== null &&
+        typeof parsed.timelineByMode === "object"
+      ? parsed.timelineByMode as Record<string, unknown>
+      : undefined;
+    const readTimelineForMode = (
+      mode: DesktopCreatorMode,
+      defaultValue: TimelineRailPreference,
+    ): TimelineRailPreference => {
+      const storedValue = storedTimelineByMode?.[mode];
+      const stored = storedValue !== null && typeof storedValue === "object"
+        ? storedValue as Record<string, unknown>
+        : undefined;
+      return {
+        timelineHeight: clampRailLayoutValue(
+          numberOr(stored?.timelineHeight, defaultValue.timelineHeight),
+          WORKSPACE_TIMELINE_MIN_PX,
+          WORKSPACE_TIMELINE_MAX_PX,
+        ),
+        timelineCollapsed: typeof stored?.timelineCollapsed === "boolean"
+          ? stored.timelineCollapsed
+          : defaultValue.timelineCollapsed,
+      };
+    };
+    const timelineByMode: Readonly<
+      Record<DesktopCreatorMode, TimelineRailPreference>
+    > = {
+      // A pre-v2 preference only had one timeline value. Treat it as the
+      // user's DRAW layout and keep the other mode defaults independent.
+      DRAW: readTimelineForMode("DRAW", {
+        timelineHeight: storedTimelineByMode === undefined
+          ? legacyTimelineHeight
+          : fallback.timelineByMode.DRAW.timelineHeight,
+        timelineCollapsed: storedTimelineByMode === undefined
+          ? legacyTimelineCollapsed
+          : fallback.timelineByMode.DRAW.timelineCollapsed,
+      }),
+      GAME: readTimelineForMode("GAME", fallback.timelineByMode.GAME),
+      AUDIO: readTimelineForMode("AUDIO", fallback.timelineByMode.AUDIO),
+    };
     return {
       sharedLeftWidth: clampRailLayoutValue(
         numberOr(parsed.sharedLeftWidth, fallback.sharedLeftWidth),
@@ -1194,20 +1298,15 @@ function readRailLayoutPreference(
         WORKSPACE_RIGHT_RAIL_RESPONSIVE_MIN_PX,
         WORKSPACE_RIGHT_RAIL_MAX_PX,
       ),
-      timelineHeight: clampRailLayoutValue(
-        numberOr(parsed.timelineHeight, fallback.timelineHeight),
-        WORKSPACE_TIMELINE_MIN_PX,
-        WORKSPACE_TIMELINE_MAX_PX,
-      ),
+      timelineByMode,
+      timelineHeight: timelineByMode.DRAW.timelineHeight,
       gameLeftCollapsed: typeof parsed.gameLeftCollapsed === "boolean"
         ? parsed.gameLeftCollapsed
         : fallback.gameLeftCollapsed,
       audioLeftCollapsed: typeof parsed.audioLeftCollapsed === "boolean"
         ? parsed.audioLeftCollapsed
         : fallback.audioLeftCollapsed,
-      timelineCollapsed: typeof parsed.timelineCollapsed === "boolean"
-        ? parsed.timelineCollapsed
-        : fallback.timelineCollapsed,
+      timelineCollapsed: timelineByMode.DRAW.timelineCollapsed,
     };
   } catch {
     return fallback;
@@ -1833,17 +1932,18 @@ export function bootstrapDraw2Workspace(
       "off";
   const params = new URLSearchParams(windowRef.location.search);
   const queryFlag = params.get("workspace")?.trim().toLowerCase();
-  const queryAudioFlag = params.get("audio")?.trim().toLowerCase();
+  const queryAudioFlag = params.get("audio");
   const unknownFlag = queryFlag !== undefined && queryFlag !== null &&
     queryFlag !== "on" && queryFlag !== "off";
-  const unknownAudioFlag = queryAudioFlag !== undefined &&
-    queryAudioFlag !== null && queryAudioFlag !== "on" &&
-    queryAudioFlag !== "off";
   const featureFlag: "on" | "off" = queryFlag === "on" && !unknownFlag
     ? "on"
     : "off";
-  const audioFeatureFlag: "on" | "off" =
-    queryAudioFlag === "on" && !unknownAudioFlag ? "on" : "off";
+  // WP-180 is the desktop workspace host. Keep the shared HTML fallback
+  // unchanged for the separate mobile projection; desktop enables Audio by
+  // default and still allows an explicit `audio=off` opt-out.
+  const audioFlagResolution = resolveAudioFeatureFlag(queryAudioFlag, "on");
+  const audioFeatureFlag: AudioFeatureFlag = audioFlagResolution.flag;
+  const unknownAudioFlag = audioFlagResolution.reason === "unknown";
   root.dataset.featureFlag = featureFlag;
   root.dataset.featureFlagReason = unknownFlag
     ? "unknown"
@@ -1851,11 +1951,7 @@ export function bootstrapDraw2Workspace(
     ? "default-off"
     : "isolated-local";
   root.dataset.audioFeatureFlag = audioFeatureFlag;
-  root.dataset.audioFeatureFlagReason = unknownAudioFlag
-    ? "unknown"
-    : audioFeatureFlag === "off"
-    ? "default-off"
-    : "isolated-local";
+  root.dataset.audioFeatureFlagReason = audioFlagResolution.reason;
 
   // PiXiEEDstudio currently ships one desktop presentation. Alternate
   // projections will be introduced separately when their rebuild is ready.
@@ -2202,6 +2298,54 @@ export function bootstrapDraw2Workspace(
   const creatorAssetSurface = query<HTMLElement>(
     documentRef,
     "#draw2CreatorAssetSurface",
+  );
+  const quickAssetCapture = query<HTMLElement>(
+    documentRef,
+    "#draw2QuickAssetCapture",
+  );
+  const quickAssetPreview = query<HTMLCanvasElement>(
+    documentRef,
+    "#draw2QuickAssetPreview",
+  );
+  const quickAssetSelection = query<HTMLOutputElement>(
+    documentRef,
+    "#draw2QuickAssetSelection",
+  );
+  const quickAssetCaptureState = query<HTMLOutputElement>(
+    documentRef,
+    "#draw2QuickAssetCaptureState",
+  );
+  const quickAssetName = query<HTMLInputElement>(
+    documentRef,
+    "#draw2QuickAssetName",
+  );
+  const quickAssetSelectVisible = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2QuickAssetSelectVisible",
+  );
+  const quickAssetTracks = query<HTMLElement>(
+    documentRef,
+    "#draw2QuickAssetTracks",
+  );
+  const quickAssetFrameModeGroup = query<HTMLElement>(
+    documentRef,
+    "#draw2QuickAssetFrameMode",
+  );
+  const quickAssetFrameSummary = query<HTMLElement>(
+    documentRef,
+    "#draw2QuickAssetFrameSummary",
+  );
+  const quickAssetCreate = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2QuickAssetCreate",
+  );
+  const quickAssetStatus = query<HTMLOutputElement>(
+    documentRef,
+    "#draw2QuickAssetStatus",
+  );
+  const assetAdvancedDetails = query<HTMLDetailsElement>(
+    documentRef,
+    "#draw2AssetAdvancedDetails",
   );
   const characterSetupName = query<HTMLInputElement>(
     documentRef,
@@ -2671,16 +2815,50 @@ export function bootstrapDraw2Workspace(
     if (width < 1120) return 320;
     return WORKSPACE_RIGHT_RAIL_MAX_PX;
   };
-  const timelineMaximumForViewport = (): number => {
+  const timelineModeForViewport = (
+    mode?: DesktopCreatorMode,
+  ): DesktopCreatorMode => {
+    const modeValue = mode ?? root.dataset.creatorMode;
+    return modeValue !== undefined && isDesktopCreatorMode(modeValue)
+      ? modeValue
+      : "DRAW";
+  };
+  const timelineMinimumForViewport = (
+    mode?: DesktopCreatorMode,
+  ): number => {
+    if (workspaceViewportWidth() < 1120) return WORKSPACE_TIMELINE_MIN_PX;
+    switch (timelineModeForViewport(mode)) {
+      case "AUDIO":
+        return 132;
+      case "GAME":
+        return 148;
+      default:
+        return 180;
+    }
+  };
+  const timelineMaximumForViewport = (
+    mode?: DesktopCreatorMode,
+  ): number => {
     const width = workspaceViewportWidth();
     const height = workspaceViewportHeight();
-    const breakpointMaximum = width < 1120
-      ? height <= 520 ? 132 : 220
-      : 420;
-    return Math.min(
-      WORKSPACE_TIMELINE_MAX_PX,
-      breakpointMaximum,
-      Math.max(180, height * 0.72),
+    if (width < 1120) {
+      const breakpointMaximum = height <= 520 ? 132 : 220;
+      return Math.min(
+        WORKSPACE_TIMELINE_MAX_PX,
+        breakpointMaximum,
+        Math.max(180, height * 0.72),
+      );
+    }
+    const resolvedMode = timelineModeForViewport(mode);
+    const minimum = timelineMinimumForViewport(resolvedMode);
+    const maximum = resolvedMode === "AUDIO"
+      ? 220
+      : resolvedMode === "GAME"
+      ? 240
+      : 260;
+    const viewportRatio = resolvedMode === "GAME" ? 0.26 : 0.24;
+    return Math.round(
+      Math.min(maximum, Math.max(minimum, height * viewportRatio)),
     );
   };
   const syncRightDockCollapsedState = (collapsed: boolean): void => {
@@ -2714,6 +2892,30 @@ export function bootstrapDraw2Workspace(
   let detailMode = readWorkspaceDetailMode(rightDockStorage);
   const rightDockPreference = readRightDockPreference(rightDockStorage);
   let railLayoutPreference = readRailLayoutPreference(rightDockStorage);
+  const timelineLayoutForMode = (
+    mode: DesktopCreatorMode,
+  ): TimelineRailPreference => railLayoutPreference.timelineByMode[mode];
+  const setTimelineLayoutForMode = (
+    mode: DesktopCreatorMode,
+    update: Partial<TimelineRailPreference>,
+  ): void => {
+    const current = timelineLayoutForMode(mode);
+    const next: TimelineRailPreference = { ...current, ...update };
+    railLayoutPreference = {
+      ...railLayoutPreference,
+      timelineByMode: {
+        ...railLayoutPreference.timelineByMode,
+        [mode]: next,
+      },
+      // Keep the old flat fields as a DRAW-only compatibility projection.
+      ...(mode === "DRAW"
+        ? {
+          timelineHeight: next.timelineHeight,
+          timelineCollapsed: next.timelineCollapsed,
+        }
+        : {}),
+    };
+  };
   const applyRailCollapsePreference = (mode: DesktopCreatorMode): void => {
     const leftCollapsed = mode === "GAME"
       ? railLayoutPreference.gameLeftCollapsed
@@ -2740,8 +2942,11 @@ export function bootstrapDraw2Workspace(
       WORKSPACE_LEFT_RAIL_MAX_PX,
     );
 
-    const timelineCollapsed = railLayoutPreference.timelineCollapsed;
+    const timelineLayout = timelineLayoutForMode(mode);
+    const timelineCollapsed = timelineLayout.timelineCollapsed;
     root.classList.toggle("is-timeline-collapsed", timelineCollapsed);
+    const timelineMinimum = timelineMinimumForViewport(mode);
+    const timelineMaximum = timelineMaximumForViewport(mode);
     if (timelineRegion !== undefined) {
       const state = timelineCollapsed ? "collapsed" : "expanded";
       timelineRegion.dataset.timelineCollapse = state;
@@ -2751,9 +2956,14 @@ export function bootstrapDraw2Workspace(
         timelineRegion.style.setProperty("height", "32px", "important");
         timelineRegion.style.setProperty("min-height", "32px", "important");
       } else {
+        const effectiveHeight = clampRailLayoutValue(
+          timelineLayout.timelineHeight,
+          timelineMinimum,
+          timelineMaximum,
+        );
         root.style.setProperty(
           "--draw2-timeline-height",
-          `${railLayoutPreference.timelineHeight}px`,
+          `${effectiveHeight}px`,
         );
         timelineRegion.style.removeProperty("height");
         timelineRegion.style.removeProperty("min-height");
@@ -2795,15 +3005,21 @@ export function bootstrapDraw2Workspace(
       timelineResizeHandle,
       timelineCollapsed
         ? 0
-        : Math.min(
-          railLayoutPreference.timelineHeight,
-          timelineMaximumForViewport(),
+        : clampRailLayoutValue(
+          timelineLayout.timelineHeight,
+          timelineMinimum,
+          timelineMaximum,
         ),
       0,
-      timelineMaximumForViewport(),
+      timelineMaximum,
     );
   };
   const applyRailLayoutPreference = (): void => {
+    const modeValue = root.dataset.creatorMode;
+    const mode = modeValue !== undefined && isDesktopCreatorMode(modeValue)
+      ? modeValue
+      : "DRAW";
+    const timelineLayout = timelineLayoutForMode(mode);
     root.style.setProperty(
       "--draw2-left-rail-width",
       `${railLayoutPreference.sharedLeftWidth}px`,
@@ -2834,13 +3050,10 @@ export function bootstrapDraw2Workspace(
     );
     root.style.setProperty(
       "--draw2-timeline-height",
-      `${railLayoutPreference.timelineHeight}px`,
+      `${timelineLayout.timelineHeight}px`,
     );
-    const modeValue = root.dataset.creatorMode;
     applyRailCollapsePreference(
-      modeValue !== undefined && isDesktopCreatorMode(modeValue)
-        ? modeValue
-        : "DRAW",
+      mode,
     );
   };
   const saveRailLayoutPreference = (): void => {
@@ -3143,6 +3356,22 @@ export function bootstrapDraw2Workspace(
   const draw2GamePlaygroundModes = queryAll<HTMLButtonElement>(
     documentRef,
     "[data-game-playground-mode]",
+  );
+  const draw2GameQuickStart = query<HTMLElement>(
+    documentRef,
+    "#draw2GameQuickStart",
+  );
+  const draw2GameQuickStartHeading = query<HTMLElement>(
+    documentRef,
+    "#draw2GameQuickStartHeading",
+  );
+  const draw2GameQuickStartStatus = query<HTMLOutputElement>(
+    documentRef,
+    "#draw2GameQuickStartStatus",
+  );
+  const draw2GameQuickStartActions = queryAll<HTMLButtonElement>(
+    documentRef,
+    "[data-game-quick-action]",
   );
   const draw2GamePlaygroundCenterStatus = query<HTMLOutputElement>(
     documentRef,
@@ -3662,22 +3891,6 @@ export function bootstrapDraw2Workspace(
     documentRef,
     "#draw2AudioAssetName",
   );
-  const audioAssetRole = query<HTMLSelectElement>(
-    documentRef,
-    "#draw2AudioAssetRole",
-  );
-  const audioAssetOfferKind = query<HTMLSelectElement>(
-    documentRef,
-    "#draw2AudioAssetOfferKind",
-  );
-  const audioAssetDerivativePolicy = query<HTMLSelectElement>(
-    documentRef,
-    "#draw2AudioAssetDerivativePolicy",
-  );
-  const audioAssetAddRange = query<HTMLButtonElement>(
-    documentRef,
-    "#draw2AudioAssetAddRange",
-  );
   const audioAssetFinalize = query<HTMLButtonElement>(
     documentRef,
     "#draw2AudioAssetFinalize",
@@ -3848,6 +4061,17 @@ export function bootstrapDraw2Workspace(
     documentRef,
     "#draw2AudioMidiExpressionLane",
   );
+  const audioMidiActions = query<HTMLElement>(
+    documentRef,
+    ".draw2-audio-midi-actions",
+  );
+  const audioMidiQuantizeGroup = query<HTMLDetailsElement>(
+    documentRef,
+    ".draw2-audio-midi-quantize",
+  );
+  if (audioMidiQuantizeGroup !== undefined && windowRef.innerWidth < 1120) {
+    audioMidiQuantizeGroup.open = true;
+  }
   const audioMidiZoomOut = query<HTMLButtonElement>(
     documentRef,
     "#draw2AudioMidiZoomOut",
@@ -4256,6 +4480,34 @@ export function bootstrapDraw2Workspace(
     documentRef,
     "#draw2AudioMidiStatus",
   );
+  const audioMidiNoteContext = query<HTMLElement>(
+    documentRef,
+    "#draw2AudioMidiNoteContext",
+  );
+  const audioMidiNoteContextSummary = query<HTMLOutputElement>(
+    documentRef,
+    "#draw2AudioMidiNoteContextSummary",
+  );
+  const audioMidiNoteContextHint = query<HTMLElement>(
+    documentRef,
+    "#draw2AudioMidiNoteContextHint",
+  );
+  const audioMidiNotePitch = query<HTMLInputElement>(
+    documentRef,
+    "#draw2AudioMidiNotePitch",
+  );
+  const audioMidiNoteStart = query<HTMLInputElement>(
+    documentRef,
+    "#draw2AudioMidiNoteStart",
+  );
+  const audioMidiNoteLength = query<HTMLInputElement>(
+    documentRef,
+    "#draw2AudioMidiNoteLength",
+  );
+  const audioMidiNoteVelocity = query<HTMLInputElement>(
+    documentRef,
+    "#draw2AudioMidiNoteVelocity",
+  );
   const audioMidiRange = query<HTMLOutputElement>(
     documentRef,
     "#draw2AudioMidiRange",
@@ -4268,9 +4520,65 @@ export function bootstrapDraw2Workspace(
     documentRef,
     "#draw2AudioMidiVelocityValue",
   );
+  const audioMidiQuantize = query<HTMLSelectElement>(
+    documentRef,
+    "#draw2AudioMidiQuantize",
+  );
+  const audioMidiQuantizeAmount = query<HTMLInputElement>(
+    documentRef,
+    "#draw2AudioMidiQuantizeAmount",
+  );
+  const audioMidiQuantizeAmountValue = query<HTMLOutputElement>(
+    documentRef,
+    "#draw2AudioMidiQuantizeAmountValue",
+  );
+  const audioMidiQuantizeSwing = query<HTMLInputElement>(
+    documentRef,
+    "#draw2AudioMidiQuantizeSwing",
+  );
+  const audioMidiQuantizeSwingValue = query<HTMLOutputElement>(
+    documentRef,
+    "#draw2AudioMidiQuantizeSwingValue",
+  );
+  const audioMidiQuantizePreviewButton = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2AudioMidiQuantizePreview",
+  );
+  const audioMidiQuantizeApplyButton = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2AudioMidiQuantizeApply",
+  );
+  const audioMidiQuantizeCancelButton = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2AudioMidiQuantizeCancel",
+  );
+  const audioMidiPlaySelection = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2AudioMidiPlaySelection",
+  );
+  const audioMidiScaleKey = query<HTMLSelectElement>(
+    documentRef,
+    "#draw2AudioMidiScaleKey",
+  );
+  const audioMidiScaleMode = query<HTMLSelectElement>(
+    documentRef,
+    "#draw2AudioMidiScaleMode",
+  );
+  const audioMidiScaleGuideMode = query<HTMLSelectElement>(
+    documentRef,
+    "#draw2AudioMidiScaleGuideMode",
+  );
+  const audioMidiScaleGuide = query<HTMLOutputElement>(
+    documentRef,
+    "#draw2AudioMidiScaleGuide",
+  );
   const audioMidiImport = query<HTMLButtonElement>(
     documentRef,
     "#draw2AudioMidiImport",
+  );
+  const audioMidiSplit = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2AudioMidiSplit",
   );
   const audioMidiExport = query<HTMLButtonElement>(
     documentRef,
@@ -4280,9 +4588,17 @@ export function bootstrapDraw2Workspace(
     documentRef,
     "#draw2AudioMidiConnect",
   );
+  const audioMidiStepInput = query<HTMLButtonElement>(
+    documentRef,
+    "#draw2AudioMidiStepInput",
+  );
   const audioMidiToolButtons = queryAll<HTMLButtonElement>(
     documentRef,
-    "[data-audio-midi-tool]",
+    "button[data-audio-midi-tool]",
+  );
+  const audioMidiToolBars = queryAll<HTMLElement>(
+    documentRef,
+    "[data-audio-midi-toolbar]",
   );
   const audioMidiFileInput = query<HTMLInputElement>(
     documentRef,
@@ -4438,6 +4754,10 @@ export function bootstrapDraw2Workspace(
   );
   let audioAssetPackageBusy = false;
   let syncAudioAssetPackagePanel: () => void = () => {};
+  const revealAudioAssetPackageForUserSelection = (): void => {
+    audioAssetScopeIntent = true;
+    syncAudioAssetPackagePanel();
+  };
   const audioVoiceEditor = query<HTMLElement>(
     documentRef,
     "#draw2AudioVoiceEditor",
@@ -6333,12 +6653,19 @@ export function bootstrapDraw2Workspace(
       : undefined;
   let renderGameVisualMaker: () => void = () => {};
   let renderGameCustomPanels: () => void = () => {};
+  let renderGameQuickStart: (locked: boolean) => void = () => {};
+  let gameAudioPackageRefreshPending = false;
   let renderAudioCustomPanels: () => void = () => {};
   let renderAudioVoiceEditor: () => void = () => {};
   let renderAudioDock: () => void = () => {};
   let renderAudioArrangerOverview: () => void = () => {};
   let renderAudioExportTrackOptions: () => void = () => {};
   let audioDockPickerOpen = false;
+  // Asset Delivery is contextual. A default Track and the full project range
+  // are not an explicit asset scope, so do not surface role validation until
+  // the user deliberately chooses a Track or a timeline range.
+  let audioAssetScopeIntent = false;
+  let audioMidiInitialViewportFrame: number | undefined;
   // Keep a new Audio project intentionally small. Additional BGM/SFX/Voice
   // lanes are not materialized until the user chooses the actual lane type.
   // This mirrors Draw's "add a layer when needed" behavior and keeps the
@@ -6638,6 +6965,34 @@ export function bootstrapDraw2Workspace(
     syncModePlaybackButton();
     stopGameScenePlayRuntime();
   };
+  const gameAudioAssetMatchesCurrentProject = (
+    asset: GameAudioAsset,
+    session: {
+      readonly project: {
+        readonly projectId: unknown;
+        readonly projectRevision: number;
+        readonly stateHash: unknown;
+      };
+    } | undefined,
+  ): boolean => {
+    if (session === undefined) return false;
+    if (asset.source.projectId !== String(session.project.projectId)) return false;
+    return asset.source.mode !== "PINNED" || (
+      asset.source.projectRevision === session.project.projectRevision &&
+      asset.source.projectStateHash === String(session.project.stateHash)
+    );
+  };
+  const rejectStaleGameAudioAsset = (): void => {
+    root.dataset.gameAudioAssetState = "stale";
+    const message =
+      "保存時のiAUDIO Revisionと現在のProjectが異なります。iAUDIOでAssetを保存し直してください。";
+    if (draw2GamePlaygroundStatus !== undefined) {
+      draw2GamePlaygroundStatus.textContent = message;
+    }
+    if (draw2GameAssetCatalogStatus !== undefined) {
+      draw2GameAssetCatalogStatus.textContent = message;
+    }
+  };
   const playGameRuntimeAudio = async (
     placementId: string,
     motion: "WALK" | "JUMP" | "LAND" | "ATTACK",
@@ -6654,6 +7009,10 @@ export function bootstrapDraw2Workspace(
       candidate.audioAssetId === binding.audioAssetId
     );
     if (asset === undefined) return;
+    if (!gameAudioAssetMatchesCurrentProject(asset, session)) {
+      rejectStaleGameAudioAsset();
+      return;
+    }
     const source = asset.source;
     await ensureAudioStreamingRuntime();
     const plan = scheduleGameAudioPlayback(session.project, {
@@ -6682,6 +7041,10 @@ export function bootstrapDraw2Workspace(
       candidate.audioAssetId === binding.audioAssetId
     );
     if (asset === undefined) return;
+    if (!gameAudioAssetMatchesCurrentProject(asset, session)) {
+      rejectStaleGameAudioAsset();
+      return;
+    }
     const source = asset.source;
     await ensureAudioStreamingRuntime();
     const scheduled = scheduleGameAudioPlayback(session.project, {
@@ -6710,6 +7073,10 @@ export function bootstrapDraw2Workspace(
       candidate.audioAssetId === binding.audioAssetId
     );
     if (asset === undefined) return;
+    if (!gameAudioAssetMatchesCurrentProject(asset, session)) {
+      rejectStaleGameAudioAsset();
+      return;
+    }
     const source = asset.source;
     await ensureAudioStreamingRuntime();
     const ticksPerQuarter = session.project.timebase.ticksPerQuarter;
@@ -7651,10 +8018,10 @@ export function bootstrapDraw2Workspace(
     const session = audioWorkspaceSession;
     if (session === undefined) return undefined;
     const displayId = currentAudioDeckTrackId();
-    return session.project.tracks.find((track) =>
-      String(track.trackId) === displayId ||
-      String(track.trackId) === `instrument:${displayId.toLowerCase()}`
-    );
+    const canonicalId = resolveAudioTrackId(session.project, displayId);
+    return canonicalId === undefined
+      ? undefined
+      : session.project.tracks.find((track) => track.trackId === canonicalId);
   };
   const updateAudioEqCurvePreview = (item: HTMLElement): void => {
     const curve = item.querySelector<SVGPathElement>(
@@ -7968,6 +8335,7 @@ export function bootstrapDraw2Workspace(
   let audioMasterMeterTimer: number | undefined;
   let audioMasterMeterData: Uint8Array<ArrayBuffer> | undefined;
   let audioChipScheduler: SampleAccurateScheduler<PianoRollNote> | undefined;
+  let audioSelectionScheduler: SampleAccurateScheduler<PianoRollNote> | undefined;
   let audioLoopEnabled = false;
   let audioMetronomeEnabled = false;
   let audioLastMetronomeBeat = -1;
@@ -8010,6 +8378,7 @@ export function bootstrapDraw2Workspace(
     | Promise<readonly LongAudioClipRuntime[]>
     | undefined;
   let audioStreamingRuntimeGeneration = 0;
+  let onAudioStreamingRuntimeEnded: (() => void) | undefined;
   let audioPlaybackReadyPromise: Promise<boolean> | undefined;
   let audioPlaybackLifecycleUnsubscribe: (() => void) | undefined;
   type AudioCompositionTransportState =
@@ -8020,6 +8389,14 @@ export function bootstrapDraw2Workspace(
   let audioCompositionTransportState: AudioCompositionTransportState =
     "STOPPED";
   let audioCompositionTransportIntent: AudioCompositionTransportIntent = "IDLE";
+  // Follow is a view concern only. It never changes the canonical Tick
+  // position; manual scrolling during playback opts out until the next play.
+  let audioMidiFollowPlayhead = true;
+  let audioMidiAutoScrolling = false;
+  // A start can await Project restoration and AudioContext resume.  Increment
+  // this generation whenever that pending start is cancelled or completes so
+  // a stale promise cannot resurrect playback after the user pressed Stop.
+  let audioCompositionStartGeneration = 0;
   const audioCompositionHasPlayingSource = (): boolean =>
     audioDeckPlaying || chipDeckPlaying ||
     [...audioStreamingRuntimes.values()].some((runtime) => runtime.isPlaying);
@@ -8045,11 +8422,13 @@ export function bootstrapDraw2Workspace(
     audioPlaybackRecoveryPending = false;
     audioPlaybackRecoverySources = undefined;
     audioPlaybackRecoveryGeneration += 1;
+    audioMidiFollowPlayhead = true;
     audioCompositionTransportIntent = "PLAY";
     delete root.dataset.audioPlaybackRecovery;
     syncAudioCompositionTransportState();
   };
   const cancelAudioCompositionPlayback = (): void => {
+    audioCompositionStartGeneration += 1;
     audioPlaybackRecoveryPending = false;
     audioPlaybackRecoverySources = undefined;
     audioPlaybackRecoveryGeneration += 1;
@@ -8167,6 +8546,53 @@ export function bootstrapDraw2Workspace(
   const AUDIO_MIDI_HORIZONTAL_ZOOM_STEP = 0.25;
   const AUDIO_MIDI_HORIZONTAL_ZOOM_WHEEL_FACTOR = 1.12;
   const AUDIO_MIDI_PITCHES = [...createPianoRollPitchRange()].reverse();
+  const audioMidiInitialScrollTop = (
+    viewportHeight: number,
+    contentHeight: number,
+  ): number => {
+    const middleCIndex = AUDIO_MIDI_PITCHES.findIndex((pitch) =>
+      pitch.label === "C4"
+    );
+    if (middleCIndex < 0) return 0;
+    const middleCRowCenter = AUDIO_MIDI_ROW_HEIGHT +
+      middleCIndex * AUDIO_MIDI_ROW_HEIGHT + AUDIO_MIDI_ROW_HEIGHT / 2;
+    const centered = middleCRowCenter - viewportHeight / 2;
+    return Math.max(
+      0,
+      Math.min(
+        Math.max(0, contentHeight - viewportHeight),
+        Math.round(centered),
+      ),
+    );
+  };
+  const applyAudioMidiInitialViewport = (): boolean => {
+    if (audioMidiInitialViewportApplied || audioMidiGrid === undefined) {
+      return audioMidiInitialViewportApplied;
+    }
+    const viewportHeight = audioMidiGrid.clientHeight;
+    const contentHeight = audioMidiGrid.scrollHeight;
+    if (viewportHeight <= 0 || contentHeight <= viewportHeight) return false;
+    audioMidiGrid.scrollTop = audioMidiInitialScrollTop(
+      viewportHeight,
+      contentHeight,
+    );
+    audioMidiInitialViewportApplied = true;
+    return true;
+  };
+  const scheduleAudioMidiInitialViewport = (): void => {
+    if (
+      audioMidiInitialViewportApplied ||
+      audioMidiInitialViewportFrame !== undefined ||
+      audioMidiGrid === undefined
+    ) return;
+    audioMidiInitialViewportFrame = windowRef.requestAnimationFrame(() => {
+      audioMidiInitialViewportFrame = undefined;
+      if (applyAudioMidiInitialViewport()) {
+        syncAudioMidiViewportState();
+        syncAudioMidiCanvasPlayhead();
+      }
+    });
+  };
   type AudioInstrumentCategory =
     | "Keys"
     | "Strings"
@@ -8756,6 +9182,9 @@ export function bootstrapDraw2Workspace(
   let audioChipMachineId: AudioChipMachineId = "NONE";
   let audioChipPresetId: ChipSynthPresetId = "pulse-25";
   let audioInstrumentId: PianoRollInstrumentId = "PIANO";
+  let audioMusicalContext: AudioMusicalContext =
+    AUDIO_DEFAULT_MUSICAL_CONTEXT;
+  let audioScaleGuideMode: AudioScaleGuideMode = "DISPLAY";
   let audioVoiceDraft: AudioSynthPreset | undefined;
   let audioVoiceDraftInstrumentId: string | undefined;
   let audioVoiceDraftDirty = false;
@@ -8966,6 +9395,7 @@ export function bootstrapDraw2Workspace(
   // independent from Draw FPS: zoom changes only the horizontal time axis,
   // while the 88-key vertical geometry stays readable and stable.
   let audioMidiHorizontalZoom = 1;
+  let audioMidiInitialViewportApplied = false;
   // The catalog contains every available instrument, while this set is the
   // projection of lanes the user actually chose.  PIANO is the only default
   // lane; a new lane is added on demand or when its first note is committed.
@@ -8978,6 +9408,11 @@ export function bootstrapDraw2Workspace(
   let audioDefaultNoteLengthTicks: AudioTick = 120 as AudioTick;
   let audioNoteVelocity = 0.82;
   let audioMidiConnection: WebMidiInputConnection | undefined;
+  // Step Input is an explicit MIDI-only mode. In normal recording, note-off
+  // closes the held note; in Step Input, each note-on commits one fixed-length
+  // note at the current Tick and advances the insertion cursor. Keeping this
+  // separate prevents shortcuts or playback from changing the editing mode.
+  let audioMidiStepInputEnabled = false;
   const audioMidiHeldNotes = new Map<
     string,
     {
@@ -8989,33 +9424,70 @@ export function bootstrapDraw2Workspace(
   >();
   let audioSelectedNoteKey: string | undefined;
   // Pixel-art-style tool switching for the Piano Roll, mirroring iDRAW's
-  // Pen/Eraser/Select tools so MIDI notes can be painted the same way DRAW
-  // pixels are: pen places/lengthens notes (the pre-existing click+drag
-  // behavior below), eraser removes whatever the pointer passes over, and
-  // select rubber-bands a rectangle of notes for bulk delete.
+  // Pen/Eraser/Select tools. On the desktop, the note itself is the primary
+  // editing surface: a double-click on an empty cell creates a note, while a
+  // single click/drag on an existing note selects or edits it. Compact/touch
+  // layouts retain the explicit click+drag placement fallback.
   type AudioMidiToolId = "pen" | "eraser" | "select";
   let audioMidiTool: AudioMidiToolId = "pen";
+  // Desktop Piano Roll uses the note itself as the primary control surface.
+  // Keep the explicit tools for the compact/touch layout, where a direct
+  // gesture needs a less ambiguous fallback.
+  const audioMidiDirectManipulationEnabled = (): boolean =>
+    root.dataset.workspaceProfile === "desktop" && windowRef.innerWidth >= 1120;
+  const syncAudioMidiToolVisibility = (): void => {
+    const direct = audioMidiDirectManipulationEnabled();
+    for (const toolbar of audioMidiToolBars) {
+      toolbar.hidden = direct;
+      toolbar.inert = direct;
+      toolbar.setAttribute("aria-hidden", String(direct));
+    }
+  };
+  type AudioTimelinePointerState = {
+    readonly pointerId: number;
+    readonly anchorStartBar: number;
+    readonly anchorEndBar: number;
+    readonly initialStartBar: number;
+    readonly initialEndBar: number;
+    currentStartBar: number;
+    currentEndBar: number;
+  };
+  let audioTimelinePointerState: AudioTimelinePointerState | undefined;
+  let cancelAudioTimelinePointerGesture: (() => boolean) | undefined;
+  // Expression points and Piano Roll gestures are previews until pointerup.
+  // Escape/pointercancel must restore the pre-gesture value without creating
+  // a journal entry.
+  let audioMidiExpressionCancel: (() => boolean) | undefined;
+  let audioAutomationCancel: (() => boolean) | undefined;
   let audioMultiSelectedNoteKeys = new Set<string>();
   let audioMidiEditSequence = 0;
+  type AudioMidiSelectionBounds = {
+    readonly startTick: AudioTick;
+    readonly endTick: AudioTick;
+    readonly startPitchIndex: number;
+    readonly endPitchIndex: number;
+  };
+  let audioMidiSelectionBounds: AudioMidiSelectionBounds | undefined;
+  let audioMidiExistingQuantize: PianoRollQuantize = "1/16";
+  type AudioMidiQuantizePreview = {
+    readonly sourceNotes: readonly PianoRollNote[];
+    readonly previewNotes: readonly PianoRollNote[];
+    readonly quantumTicks: number;
+    readonly valid: boolean;
+  };
+  let audioMidiQuantizePreview: AudioMidiQuantizePreview | undefined;
+  let audioSelectionPlaybackPlaying = false;
+  let audioSelectionPlaybackStartTick: AudioTick = 0 as AudioTick;
+  let audioSelectionPlaybackEndTick: AudioTick = 0 as AudioTick;
   let audioAnimationFrame = 1;
   const audioNoteKey = (
     instrument: PianoRollInstrumentId,
     pitchMidi: number,
     startFrame: number,
   ): string => `${instrument}:${pitchMidi}:${startFrame}`;
-  const initialAudioNotes: readonly PianoRollNote[] = [
-    {
-      id: audioNoteKey("PIANO", 72, 0),
-      pitchMidi: 72,
-      startFrame: 0,
-      durationFrames: 4,
-      velocity: 0.82,
-      instrument: "PIANO",
-    },
-  ];
-  const audioMidiNotes = new Map<string, PianoRollNote>(
-    initialAudioNotes.map((note) => [note.id, note]),
-  );
+  // New Audio Projects start with an empty Piano Roll.  Existing notes are
+  // restored from the canonical workspace below; no demo note is injected.
+  const audioMidiNotes = new Map<string, PianoRollNote>();
   // The Audio UI can receive several canonical-session updates in one task
   // (journal commit, persistence recovery, mixer projection).  Keep DOM
   // projection invalidation separate from the canonical state so one
@@ -9072,6 +9544,18 @@ export function bootstrapDraw2Workspace(
   const audioWaveformCacheUnavailable = new Set<string>();
   /** Range edits stay here while the pointer is moving; Journal on commit. */
   const audioClipPreviewInputs = new Map<string, AudioWorkspaceClipInput>();
+  const audioClipPrecisionOpen = new Set<string>();
+  type AudioClipFadeField = "fadeInFrames" | "fadeOutFrames";
+  type AudioClipWaveformGesture = {
+    readonly pointerId: number;
+    readonly clipId: string;
+    readonly canvas: HTMLCanvasElement;
+    readonly clip: AudioClip;
+    readonly initial: AudioWorkspaceClipInput;
+    readonly field: AudioClipFadeField;
+    moved: boolean;
+  };
+  let audioClipWaveformGesture: AudioClipWaveformGesture | undefined;
   let audioPersistenceStore:
     | import("./audio/audio-200/persistence.ts").AudioPersistenceStore
     | undefined;
@@ -9485,6 +9969,7 @@ export function bootstrapDraw2Workspace(
             ["1/4", "1/8", "1/16"].includes(audioDeckSnap.value)
           ? { snap: audioDeckSnap.value as "1/4" | "1/8" | "1/16" }
           : {}),
+        scaleGuideMode: audioScaleGuideMode,
       },
     );
     if (!record.ok) {
@@ -9826,6 +10311,9 @@ export function bootstrapDraw2Workspace(
     audioFps = session.framesPerSecond;
     audioPpq = session.ppq;
     audioBpm = session.project.tempo.milliBpm / 1_000;
+    audioMusicalContext = session.project.musicalContext ??
+      AUDIO_DEFAULT_MUSICAL_CONTEXT;
+    syncAudioMusicalContextControls(audioMusicalContext);
     audioDrumKitId = session.project.drumKitId ?? "BASIC";
     audioChipMachineId = isAudioChipMachineId(session.project.chipMachineId)
       ? session.project.chipMachineId
@@ -9987,6 +10475,86 @@ export function bootstrapDraw2Workspace(
       Number.isSafeInteger(highest) ? highest : entries.length,
     );
   };
+  // Keep the optimistic editor value visible while a Project Journal command
+  // is queued. A failed command calls syncAudioWorkspaceUiFromSession(), which
+  // restores this value from the canonical Project.
+  const audioMusicalContextForUi = (): AudioMusicalContext =>
+    audioMusicalContext;
+  const audioScaleGuideModeLabel = (
+    mode: AudioScaleGuideMode,
+  ): string => mode === "SNAP"
+    ? "snap input"
+    : mode === "RESTRICT"
+    ? "scale lock"
+    : "guide only";
+  const audioMusicalScaleLabel = (scale: AudioMusicalScaleId): string =>
+    audioMusicalScaleDefinition(scale).label;
+  const syncAudioMusicalGuideOutput = (): void => {
+    if (audioMidiScaleGuide === undefined) return;
+    const context = audioMusicalContextForUi();
+    audioMidiScaleGuide.textContent = audioInstrumentId === "DRUMS"
+      ? `${context.key} ${audioMusicalScaleLabel(context.scale)} · kit mapping`
+      : `${context.key} ${audioMusicalScaleLabel(context.scale)} · ${
+        audioScaleGuideModeLabel(audioScaleGuideMode)
+      }`;
+    audioMidiScaleGuide.dataset.audioScaleGuideMode = audioScaleGuideMode;
+  };
+  const syncAudioMusicalContextControls = (
+    context: AudioMusicalContext = audioMusicalContext,
+  ): void => {
+    audioMusicalContext = context;
+    if (audioMidiScaleKey !== undefined) {
+      audioMidiScaleKey.value = context.key;
+    }
+    if (audioMidiScaleMode !== undefined) {
+      audioMidiScaleMode.value = context.scale;
+    }
+    if (audioMidiScaleGuideMode !== undefined) {
+      audioMidiScaleGuideMode.value = audioScaleGuideMode;
+    }
+    const isDrumLane = audioInstrumentId === "DRUMS";
+    for (const control of [
+      audioMidiScaleKey,
+      audioMidiScaleMode,
+      audioMidiScaleGuideMode,
+    ]) {
+      if (control === undefined) continue;
+      control.disabled = isDrumLane;
+      control.setAttribute("aria-disabled", String(isDrumLane));
+    }
+    const scaleSurface = documentRef.querySelector<HTMLElement>(
+      ".draw2-audio-midi-scale",
+    );
+    if (scaleSurface !== null) {
+      scaleSurface.dataset.audioScaleApplicable = String(!isDrumLane);
+      scaleSurface.dataset.audioMusicalKey = context.key;
+      scaleSurface.dataset.audioMusicalScale = context.scale;
+      scaleSurface.dataset.audioScaleGuideMode = audioScaleGuideMode;
+    }
+    syncAudioMusicalGuideOutput();
+  };
+  const audioPitchForMusicalGuide = (
+    pitchMidi: number,
+  ): number | undefined => {
+    if (audioInstrumentId === "DRUMS") {
+      if (!Number.isFinite(pitchMidi)) return undefined;
+      return Math.max(21, Math.min(108, Math.trunc(pitchMidi)));
+    }
+    const context = audioMusicalContextForUi();
+    return audioMusicalPitchForInput(
+      pitchMidi,
+      context,
+      audioScaleGuideMode,
+      21,
+      108,
+    );
+  };
+  const audioMusicalGuideRejection = (pitchMidi: number): string => {
+    const context = audioMusicalContextForUi();
+    return `${pitchLabel(pitchMidi)} is outside ${context.key} ${
+      audioMusicalScaleLabel(context.scale)
+    } · choose a scale row or switch Input to Guide`;
+  };
   const LEGACY_AUDIO_PROJECT_ID = "audio:draw2:workspace";
   const audioWorkspaceInstrumentTrackId = (
     instrument: PianoRollInstrumentId,
@@ -9995,17 +10563,42 @@ export function bootstrapDraw2Workspace(
     const module = audio200WorkspaceModule;
     let session = audioWorkspaceSession;
     if (module === undefined || session === undefined) return false;
-    if (
-      session.project.notes.length === 0 && session.project.clips.length === 0
-    ) {
-      return false;
-    }
     let changed = false;
+    // BGM is always visible in the Audio deck, including an empty/new Project.
+    // Older local records may have kept that UI placeholder without creating
+    // its canonical Mixer Track, which made the Test button report no lane
+    // and routed imported media to a muted transient node. Reconcile the
+    // visible default lane during restore so the UI and Mixer share one ID.
+    if (
+      audioDeckTracks.some((track) => track.id === "bgm") &&
+      !session.project.tracks.some((track) =>
+        String(track.trackId) === "instrument:bgm"
+      )
+    ) {
+      const added = await module.journalWorkspaceTrackAdd(
+        session,
+        {
+          id: "instrument:bgm",
+          kind: "AUDIO",
+          name: "BGM",
+        },
+        nextAudioWorkspaceMutation("bgm-track-bootstrap"),
+      );
+      if (!added.ok) {
+        root.dataset.audioProjectError = added.diagnostics[0]?.code ??
+          "AUDIO_BGM_TRACK_BOOTSTRAP_FAILED";
+        return changed;
+      }
+      session = added.value;
+      changed = true;
+    }
     // Only the default Piano lane is created during bootstrap.  Empty legacy
     // tracks remain valid in the canonical project, but are not projected
     // into the timeline until they contain a note or are explicitly selected.
     const piano = AUDIO_INSTRUMENTS.find((item) => item.id === "PIANO");
-    if (piano !== undefined) {
+    const shouldRestorePiano = session.project.notes.length > 0 ||
+      session.project.clips.length > 0;
+    if (piano !== undefined && shouldRestorePiano) {
       const trackId = audioWorkspaceInstrumentTrackId(piano.id);
       if (
         !session.project.tracks.some((track) =>
@@ -10217,8 +10810,20 @@ export function bootstrapDraw2Workspace(
     root.dataset.audioPlaybackEffectiveGain = String(
       diagnostics.effectiveGain,
     );
+    root.dataset.audioPlaybackSafetyLimiter = String(
+      diagnostics.safetyLimiterEnabled,
+    );
     root.dataset.audioPlaybackActiveSources = String(
       diagnostics.activeSourceCount,
+    );
+    root.dataset.audioPlaybackActiveVoices = String(
+      diagnostics.activeVoiceCount,
+    );
+    root.dataset.audioPlaybackMaxPolyphony = String(
+      diagnostics.maxPolyphony,
+    );
+    root.dataset.audioPlaybackDroppedVoices = String(
+      diagnostics.droppedVoiceCount,
     );
     const project = audioWorkspaceSession?.project;
     const playbackClips = audioWorkspaceSession === undefined
@@ -10268,7 +10873,11 @@ export function bootstrapDraw2Workspace(
         }` +
         ` · ${diagnostics.activeSourceCount} source${
           diagnostics.activeSourceCount === 1 ? "" : "s"
-        }`;
+        }` +
+        ` · ${diagnostics.activeVoiceCount}/${diagnostics.maxPolyphony} voices` +
+        (diagnostics.droppedVoiceCount > 0
+          ? ` · ${diagnostics.droppedVoiceCount} limited`
+          : "");
     }
     if (audioRoutingDiagnosticState !== undefined) {
       audioRoutingDiagnosticState.textContent = diagnostics.routingReady
@@ -10641,6 +11250,9 @@ export function bootstrapDraw2Workspace(
     audioDeckPlaying = false;
     audioChipScheduler?.stop();
     chipDeckPlaying = false;
+    audioSelectionScheduler?.stop();
+    audioSelectionPlaybackPlaying = false;
+    audioMidiPlaySelection?.setAttribute("aria-pressed", "false");
     chipTuneSynth.stopAll();
     audioDeckPlay?.setAttribute("aria-pressed", "false");
     audioChipPlay?.setAttribute("aria-pressed", "false");
@@ -10882,6 +11494,7 @@ export function bootstrapDraw2Workspace(
         readAheadChunks: 2,
         maxCachedChunks: 4,
         timer: ensureAudioStreamingTimerHub(),
+        onEnded: () => onAudioStreamingRuntimeEnded?.(),
       });
       if (!created.ok) {
         for (const runtime of createdRuntimes) runtime.dispose();
@@ -11032,8 +11645,14 @@ export function bootstrapDraw2Workspace(
         audioWorkspaceSession,
       );
       if (!result.ok) {
-        root.dataset.audioProjectError = result.diagnostics[0]?.code ??
+        const diagnostic = result.diagnostics[0];
+        root.dataset.audioProjectError = diagnostic?.code ??
           "AUDIO_PROJECT_MUTATION_FAILED";
+        if (diagnostic?.message !== undefined) {
+          root.dataset.audioProjectDiagnostic = diagnostic.message;
+        } else {
+          delete root.dataset.audioProjectDiagnostic;
+        }
         return false;
       }
       const previousSession = audioWorkspaceSession;
@@ -11048,9 +11667,12 @@ export function bootstrapDraw2Workspace(
       ) await pruneAudioGeneratedArtifacts(previousSession, result.value);
       queueAudioPersistenceSave("mutation");
       return true;
-    }).catch(() => {
+    }).catch((error) => {
       root.dataset.audioProjectState = "error";
       root.dataset.audioProjectError = "AUDIO_PROJECT_MUTATION_FAILED";
+      root.dataset.audioProjectDiagnostic = error instanceof Error
+        ? error.message
+        : String(error);
       return false;
     });
     audioWorkspaceMutationQueue = operation.then(() => undefined);
@@ -11782,6 +12404,217 @@ export function bootstrapDraw2Workspace(
       label + " · Humanize applied",
     );
   };
+  const audioExistingQuantizeTicks = (
+    quantize: PianoRollQuantize,
+  ): number => {
+    const beat = Math.max(1, audioBeatTick());
+    switch (quantize) {
+      case "1/4":
+        return beat;
+      case "1/8":
+        return Math.max(1, Math.round(beat / 2));
+      case "1/32":
+        return Math.max(1, Math.round(beat / 8));
+      case "1/64":
+        return Math.max(1, Math.round(beat / 16));
+      case "1/16":
+        return Math.max(1, Math.round(beat / 4));
+      case "off":
+      default:
+        return 0;
+    }
+  };
+  const selectedAudioMidiNotesForEdit = (): readonly PianoRollNote[] => {
+    const ids = audioMultiSelectedNoteKeys.size > 0
+      ? [...audioMultiSelectedNoteKeys]
+      : audioSelectedNoteKey === undefined ? [] : [audioSelectedNoteKey];
+    return ids.map((id) => audioMidiNotes.get(id)).filter(
+      (note): note is PianoRollNote => note !== undefined,
+    );
+  };
+  const previewAudioMidiQuantize = (): void => {
+    const notes = selectedAudioMidiNotesForEdit();
+    if (notes.length === 0) {
+      setModeDeckStatus("audio", "Quantize preview requires selected MIDI notes");
+      return;
+    }
+    const quantize = audioMidiQuantize?.value as PianoRollQuantize ??
+      audioMidiExistingQuantize;
+    audioMidiExistingQuantize = quantize;
+    const quantumTicks = audioExistingQuantizeTicks(quantize);
+    if (quantumTicks <= 0) {
+      audioMidiQuantizePreview = undefined;
+      invalidateAudioMidiGrid();
+      if (audioSurfacesReady) renderAudioMidiGrid();
+      syncAudioMidiStatus();
+      setModeDeckStatus("audio", "Existing-note Quantize is Off · source notes remain unchanged");
+      return;
+    }
+    const amountPercent = Math.min(
+      100,
+      Math.max(0, Number(audioMidiQuantizeAmount?.value ?? "100")),
+    );
+    const swingPercent = Math.min(
+      100,
+      Math.max(0, Number(audioMidiQuantizeSwing?.value ?? "0")),
+    );
+    const previewNotes = quantizePianoRollNotes(
+      notes,
+      audioPianoRollClock(),
+      { quantumTicks, amountPercent, swingPercent },
+    );
+    const clock = audioPianoRollClock();
+    const sourceIds = new Set(notes.map((note) => note.id));
+    const overlaps = (left: PianoRollNote, right: PianoRollNote): boolean => {
+      if (left.instrument !== right.instrument || left.pitchMidi !== right.pitchMidi) return false;
+      const a = pianoRollNoteTicks(left, clock);
+      const b = pianoRollNoteTicks(right, clock);
+      return Number(a.startTick) < Number(b.startTick + b.durationTick) &&
+        Number(b.startTick) < Number(a.startTick + a.durationTick);
+    };
+    const valid = !previewNotes.some((note, index) =>
+      [...audioMidiNotes.values()].some((other) =>
+        !sourceIds.has(other.id) && overlaps(note, other)
+      ) || previewNotes.slice(index + 1).some((other) => overlaps(note, other))
+    );
+    audioMidiQuantizePreview = {
+      sourceNotes: notes.map((note) => ({ ...note })),
+      previewNotes,
+      quantumTicks,
+      valid,
+    };
+    invalidateAudioMidiGrid();
+    if (audioSurfacesReady) renderAudioMidiGrid();
+    syncAudioMidiStatus();
+    setModeDeckStatus(
+      "audio",
+      valid
+        ? `Quantize preview · ${notes.length} note${notes.length === 1 ? "" : "s"} · Apply or Cancel`
+        : "Quantize preview is blocked · destination overlaps another note",
+    );
+  };
+  const cancelAudioMidiQuantize = (): void => {
+    if (audioMidiQuantizePreview === undefined) return;
+    audioMidiQuantizePreview = undefined;
+    invalidateAudioMidiGrid();
+    if (audioSurfacesReady) renderAudioMidiGrid();
+    syncAudioMidiStatus();
+    setModeDeckStatus("audio", "Quantize preview cancelled · source notes restored");
+  };
+  const applyAudioMidiQuantize = (): void => {
+    const preview = audioMidiQuantizePreview;
+    if (preview === undefined) {
+      setModeDeckStatus("audio", "Preview the selected notes before applying Quantize");
+      return;
+    }
+    if (!preview.valid || preview.previewNotes.length !== preview.sourceNotes.length) {
+      setModeDeckStatus("audio", "Quantize cancelled · the destination overlaps another note");
+      return;
+    }
+    for (const note of preview.sourceNotes) {
+      audioMidiNotes.delete(note.id);
+      unindexAudioNote(note);
+    }
+    for (const note of preview.previewNotes) {
+      audioMidiNotes.set(note.id, note);
+      indexAudioNote(note);
+    }
+    audioMidiQuantizePreview = undefined;
+    audioMultiSelectedNoteKeys = new Set(preview.previewNotes.map((note) => note.id));
+    audioSelectedNoteKey = preview.previewNotes.length === 1
+      ? preview.previewNotes[0]?.id
+      : undefined;
+    renderAudioMidiGrid();
+    renderAudioTimelineTracks();
+    syncAudioMidiStatus();
+    void queueAudioWorkspaceMutation((module, session) =>
+      module.journalWorkspaceNoteBatchReplace(
+        session,
+        {
+          removeNoteIds: preview.sourceNotes.map((note) => note.id),
+          notes: preview.previewNotes.map(audioWorkspaceNoteInput),
+        },
+        nextAudioWorkspaceMutation("note-quantize-batch"),
+      )
+    ).then((committed) => {
+      if (!committed) {
+        syncAudioWorkspaceUiFromSession();
+        setModeDeckStatus("audio", "Quantize could not be saved · source notes were restored");
+        return;
+      }
+      setModeDeckStatus("audio", "Quantize applied · one Undo restores the original Tick positions");
+    });
+  };
+  audioMidiQuantize?.addEventListener("change", () => {
+    audioMidiExistingQuantize = audioMidiQuantize.value as PianoRollQuantize;
+    cancelAudioMidiQuantize();
+  });
+  audioMidiQuantizeAmount?.addEventListener("input", () => syncAudioMidiStatus());
+  audioMidiQuantizeSwing?.addEventListener("input", () => syncAudioMidiStatus());
+  audioMidiQuantizePreviewButton?.addEventListener("click", previewAudioMidiQuantize);
+  audioMidiQuantizeApplyButton?.addEventListener("click", applyAudioMidiQuantize);
+  audioMidiQuantizeCancelButton?.addEventListener("click", cancelAudioMidiQuantize);
+  const refreshAudioMidiScaleGuide = (): void => {
+    syncAudioMusicalContextControls(audioMusicalContext);
+    invalidateAudioMidiGrid();
+    if (audioSurfacesReady) renderAudioMidiGrid();
+    syncAudioMidiStatus();
+  };
+  const saveAudioMusicalContext = (): void => {
+    const key = audioMidiScaleKey?.value;
+    const scale = audioMidiScaleMode?.value;
+    if (!isAudioMusicalKey(key) || !isAudioMusicalScaleId(scale)) {
+      syncAudioMusicalContextControls(audioMusicalContext);
+      return;
+    }
+    const nextContext: AudioMusicalContext = { key, scale };
+    if (
+      nextContext.key === audioMusicalContext.key &&
+      nextContext.scale === audioMusicalContext.scale
+    ) {
+      refreshAudioMidiScaleGuide();
+      return;
+    }
+    audioMusicalContext = nextContext;
+    refreshAudioMidiScaleGuide();
+    void queueAudioWorkspaceMutation((module, session) =>
+      module.journalWorkspaceMusicalContext(
+        session,
+        nextContext,
+        nextAudioWorkspaceMutation("musical-context"),
+      )
+    ).then((committed) => {
+      if (!committed) {
+        syncAudioWorkspaceUiFromSession();
+        setModeDeckStatus(
+          "audio",
+          "Key / Scale could not be saved · the previous context was restored",
+        );
+        return;
+      }
+      setModeDeckStatus(
+        "audio",
+        `${nextContext.key} ${audioMusicalScaleLabel(nextContext.scale)} · existing notes unchanged`,
+      );
+    });
+  };
+  const saveAudioScaleGuideMode = (): void => {
+    const value = audioMidiScaleGuideMode?.value;
+    if (value !== "DISPLAY" && value !== "SNAP" && value !== "RESTRICT") {
+      syncAudioMusicalContextControls(audioMusicalContext);
+      return;
+    }
+    audioScaleGuideMode = value;
+    refreshAudioMidiScaleGuide();
+    queueAudioPersistenceSave("scale-guide-mode");
+    setModeDeckStatus(
+      "audio",
+      `Scale input · ${audioScaleGuideModeLabel(audioScaleGuideMode)}`,
+    );
+  };
+  audioMidiScaleKey?.addEventListener("change", saveAudioMusicalContext);
+  audioMidiScaleMode?.addEventListener("change", saveAudioMusicalContext);
+  audioMidiScaleGuideMode?.addEventListener("change", saveAudioScaleGuideMode);
   const queueAudioWorkspaceTransition = (
     transition: (
       module: Audio200WorkspaceModule,
@@ -11827,9 +12660,18 @@ export function bootstrapDraw2Workspace(
   const resetAudioSubdocumentForProjectSwitch = async (
     blankProject = false,
   ): Promise<void> => {
+    if (audioMidiInitialViewportFrame !== undefined) {
+      windowRef.cancelAnimationFrame(audioMidiInitialViewportFrame);
+      audioMidiInitialViewportFrame = undefined;
+    }
+    audioMidiInitialViewportApplied = false;
+    audioAssetScopeIntent = false;
     audioMidiConnection?.close();
     audioMidiConnection = undefined;
     audioMidiHeldNotes.clear();
+    audioMidiStepInputEnabled = false;
+    audioMidiStepInput?.setAttribute("aria-pressed", "false");
+    audioMidiStepInput?.classList.remove("is-active");
     audioMidiConnect?.setAttribute("aria-pressed", "false");
     audioMidiConnect?.classList.remove("is-active");
     if (audioMidiConnect !== undefined) {
@@ -11878,6 +12720,9 @@ export function bootstrapDraw2Workspace(
     if (audioChipMachine !== undefined) audioChipMachine.value = "NONE";
     chipTuneSynth.setChipMachineId(audioChipMachineId);
     chipTuneSynth.setVoiceOverrides(new Map());
+    audioMusicalContext = AUDIO_DEFAULT_MUSICAL_CONTEXT;
+    audioScaleGuideMode = "DISPLAY";
+    syncAudioMusicalContextControls(audioMusicalContext);
     audioWorkspaceMutationQueue = Promise.resolve();
     audioPersistenceSaveQueue = Promise.resolve();
     audioWorkspaceMutationSequence = 0;
@@ -11886,9 +12731,6 @@ export function bootstrapDraw2Workspace(
     delete root.dataset.audioEventGraphState;
     delete root.dataset.audioPlaybackState;
     audioMidiNotes.clear();
-    if (!blankProject) {
-      for (const note of initialAudioNotes) audioMidiNotes.set(note.id, note);
-    }
     audioActiveInstrumentIds = new Set<PianoRollInstrumentId>(
       blankProject ? [] : ["PIANO"],
     );
@@ -11916,6 +12758,10 @@ export function bootstrapDraw2Workspace(
     audioPpq = AUDIO_DEFAULT_PPQ;
     audioMeter = "4/4";
     audioQuantize = "1/16";
+    audioMidiExistingQuantize = "1/16";
+    if (audioMidiQuantize !== undefined) audioMidiQuantize.value = "1/16";
+    if (audioMidiQuantizeAmount !== undefined) audioMidiQuantizeAmount.value = "100";
+    if (audioMidiQuantizeSwing !== undefined) audioMidiQuantizeSwing.value = "0";
     if (audioMeterControl !== undefined) audioMeterControl.value = audioMeter;
     if (audioQuantizeControl !== undefined) {
       audioQuantizeControl.value = audioQuantize;
@@ -11923,10 +12769,15 @@ export function bootstrapDraw2Workspace(
     if (audioDeckSnap !== undefined) audioDeckSnap.value = "1/8";
     audioWorkspaceMeasureStart.value = 0;
     audioWorkspaceMeasureEnd.value = audioFrameCount;
+    audioAssetPackageNotice = undefined;
     audioRangeClipboard = undefined;
     audioDrumKitId = "BASIC";
     audioAnimationFrame = 1;
     audioSelectedNoteKey = undefined;
+    audioMidiQuantizePreview = undefined;
+    audioSelectionPlaybackPlaying = false;
+    audioSelectionPlaybackStartTick = 0 as AudioTick;
+    audioSelectionPlaybackEndTick = 0 as AudioTick;
     audioNoteVelocity = 0.82;
     audioDefaultNoteLengthTicks = 120 as AudioTick;
     audioNoteLengthTicks = audioDefaultNoteLengthTicks;
@@ -12040,7 +12891,6 @@ export function bootstrapDraw2Workspace(
       }
     }
   };
-  for (const note of initialAudioNotes) indexAudioNote(note);
   function hydrateAudioNotesFromWorkspace(): void {
     const session = audioWorkspaceSession;
     if (session === undefined) return;
@@ -12048,6 +12898,8 @@ export function bootstrapDraw2Workspace(
       session.project,
       session.framesPerSecond,
     );
+    const previousSelectedNoteKey = audioSelectedNoteKey;
+    const previousMultiSelectedNoteKeys = audioMultiSelectedNoteKeys;
     audioMidiNotes.clear();
     audioNoteCellLookup.clear();
     audioInstrumentFrameLookup.clear();
@@ -12093,6 +12945,16 @@ export function bootstrapDraw2Workspace(
       audioMidiNotes.set(note.id, note);
       audioActiveInstrumentIds.add(note.instrument);
       indexAudioNote(note);
+    }
+    audioSelectedNoteKey = previousSelectedNoteKey !== undefined &&
+        audioMidiNotes.has(previousSelectedNoteKey)
+      ? previousSelectedNoteKey
+      : undefined;
+    audioMultiSelectedNoteKeys = new Set(
+      [...previousMultiSelectedNoteKeys].filter((id) => audioMidiNotes.has(id)),
+    );
+    if (audioMultiSelectedNoteKeys.size === 0) {
+      audioMidiSelectionBounds = undefined;
     }
     audioFrameCount = Math.max(
       AUDIO_MIN_FRAME_COUNT,
@@ -12208,12 +13070,18 @@ export function bootstrapDraw2Workspace(
   ): void => {
     if (settings?.meter !== undefined) audioMeter = settings.meter;
     if (settings?.quantize !== undefined) audioQuantize = settings.quantize;
+    if (settings?.scaleGuideMode !== undefined) {
+      audioScaleGuideMode = settings.scaleGuideMode;
+    }
     if (audioMeterControl !== undefined) audioMeterControl.value = audioMeter;
     if (audioQuantizeControl !== undefined) {
       audioQuantizeControl.value = audioQuantize;
     }
     if (audioDeckSnap !== undefined) {
       audioDeckSnap.value = settings?.snap ?? "1/8";
+    }
+    if (audioMidiScaleGuideMode !== undefined) {
+      audioMidiScaleGuideMode.value = audioScaleGuideMode;
     }
   };
   let lastAudioDrawBridgeState = "";
@@ -13269,6 +14137,59 @@ export function bootstrapDraw2Workspace(
     const bar = Math.floor(Math.max(0, Math.trunc(frame)) / measureFrames);
     setAudioMeasureSelectionByBars(bar);
   };
+  // On desktop the ruler itself is the timeline range control. Keep the
+  // selection commit in one place so the arranger, compact overview, Piano
+  // Roll, Draw row, and game-audio capture all receive the same range.
+  const refreshAudioTimelineSelection = (): void => {
+    const selected = audioSelectedMeasureBounds();
+    seekAudioCompositionAtFrame(selected.startFrame + 1);
+    setAudioMeasureSelectionByBars(selected.startBar, selected.endBar);
+    renderAudioArrangerOverview();
+    renderAudioRuler();
+    renderAudioAnimationCells();
+    renderAudioMidiGrid();
+    syncAudioDawRangeStatus();
+    const next = audioSelectedMeasureBounds();
+    setModeDeckStatus(
+      "audio",
+      `${next.endBar - next.startBar} bar selection · ` +
+        "Piano Roll and commands follow the selected range",
+    );
+    if (gameAudioCaptureSession !== undefined) {
+      const draft = gameAudioCaptureDraftForCurrentSelection();
+      if (draft !== undefined) {
+        gameAudioCaptureSession = updateAudioCaptureDraft(
+          gameAudioCaptureSession,
+          draft,
+        );
+      }
+      syncGameAudioCaptureBar();
+    }
+  };
+  const selectAudioTimelineBar = (
+    bar: number,
+    extend = false,
+  ): void => {
+    revealAudioAssetPackageForUserSelection();
+    const current = audioSelectedMeasureBounds();
+    if (extend) {
+      setAudioMeasureSelectionByBars(
+        Math.min(current.startBar, Math.trunc(bar)),
+        Math.max(current.startBar, Math.trunc(bar)) + 1,
+      );
+    } else {
+      setAudioMeasureSelectionByBars(Math.trunc(bar));
+    }
+    refreshAudioTimelineSelection();
+  };
+  const selectAudioTimelineBarRange = (
+    startBar: number,
+    endBar: number,
+  ): void => {
+    revealAudioAssetPackageForUserSelection();
+    setAudioMeasureSelectionByBars(startBar, Math.max(startBar + 1, endBar));
+    refreshAudioTimelineSelection();
+  };
   const syncAudioDawRangeStatus = (prefix?: string): void => {
     const bounds = audioSelectedMeasureBounds();
     const count = bounds.endBar - bounds.startBar;
@@ -13297,10 +14218,21 @@ export function bootstrapDraw2Workspace(
     readonly state: "ready" | "error";
   };
   let audioAssetPackageNotice: AudioAssetPackageNotice | undefined;
-  let audioAssetPackageRanges: AudioAssetPackageSelectionInput[] = [];
   type AudioAssetPackageSelectionError = {
     readonly error: string;
     readonly contextState: "empty" | "error";
+  };
+  // iAUDIO creates one neutral Asset at a time. The delivery envelope still
+  // needs an internal role for the existing iGAME/Market contract, so infer it
+  // from the selected lane instead of asking the creator to classify it here.
+  const inferredAudioAssetRole = (track: AudioTrack): AudioAssetPackageKind => {
+    const displayTrack = audioDeckTracks.find((candidate) =>
+      candidate.id === audioSelectedTrackId
+    );
+    const kind = String(displayTrack?.kind ?? track.kind).toUpperCase();
+    if (kind.includes("VOICE")) return "VOICE";
+    if (kind.includes("EFFECT") || kind.includes("SFX")) return "SE";
+    return "BGM";
   };
   const audioAssetPackageSelection = (): {
     readonly selection: AudioAssetPackageSelectionInput;
@@ -13320,10 +14252,7 @@ export function bootstrapDraw2Workspace(
         contextState: "empty",
       };
     }
-    const roleValue = audioAssetRole?.value;
-    if (roleValue !== "BGM" && roleValue !== "SE" && roleValue !== "VOICE") {
-      return { error: "役割を選択してください。", contextState: "error" };
-    }
+    const roleValue = inferredAudioAssetRole(track);
     const rawStartFrame = Number(audioWorkspaceMeasureStart.value);
     const rawEndFrame = Number(audioWorkspaceMeasureEnd.value);
     if (
@@ -13337,7 +14266,7 @@ export function bootstrapDraw2Workspace(
     const barLabel = bounds.endBar - bounds.startBar === 1
       ? `Bar ${bounds.startBar + 1}`
       : `Bars ${bounds.startBar + 1}–${bounds.endBar}`;
-    const defaultLabel = `${track.name} · ${roleValue} · ${barLabel}`;
+    const defaultLabel = `${track.name} · ${barLabel}`;
     const label = audioAssetName?.value.trim() || defaultLabel;
     return {
       selection: {
@@ -13362,6 +14291,9 @@ export function bootstrapDraw2Workspace(
     ): void => {
       if (audioAssetPackage !== undefined) {
         audioAssetPackage.dataset.contextState = state;
+        const visible = audioAssetScopeIntent && state !== "empty";
+        audioAssetPackage.hidden = !visible;
+        audioAssetPackage.setAttribute("aria-hidden", String(!visible));
       }
     };
     if (audioAssetStatus === undefined || audioAssetFinalize === undefined) {
@@ -13371,7 +14303,6 @@ export function bootstrapDraw2Workspace(
     const selection = audioAssetPackageSelection();
     if ("error" in selection) {
       setContextState(selection.contextState);
-      audioAssetAddRange && (audioAssetAddRange.disabled = true);
       audioAssetFinalize.disabled = true;
       audioAssetStatus.textContent = audioAssetPackageBusy
         ? "検証中…"
@@ -13383,7 +14314,6 @@ export function bootstrapDraw2Workspace(
     const built = createAudioAssetizationInput(selection.selection);
     if (!built.ok) {
       setContextState("error");
-      audioAssetAddRange && (audioAssetAddRange.disabled = true);
       audioAssetFinalize.disabled = true;
       audioAssetStatus.textContent = built.errors[0] ?? "範囲を確認してください。";
       audioAssetStatus.dataset.state = "error";
@@ -13391,77 +14321,19 @@ export function bootstrapDraw2Workspace(
     }
     setContextState("ready");
     const range = built.value.ranges[0];
-    audioAssetPackageRanges = audioAssetPackageRanges.filter((candidate) =>
-      candidate.projectId === selection.selection.projectId &&
-      candidate.projectRevision === selection.selection.projectRevision &&
-      candidate.projectStateHash === selection.selection.projectStateHash
-    );
-    const queuedRangeIds = new Set<string>();
-    for (const candidate of audioAssetPackageRanges) {
-      const candidateResult = createAudioAssetizationInput(candidate);
-      if (candidateResult.ok) {
-        const candidateRange = candidateResult.value.ranges[0];
-        if (candidateRange !== undefined) queuedRangeIds.add(candidateRange.rangeId);
-      }
-    }
-    const uniqueRangeCount = queuedRangeIds.size +
-      (range !== undefined && !queuedRangeIds.has(range.rangeId) ? 1 : 0);
-    const offerKind = audioAssetOfferKind?.value === "ASSET_PACK"
-      ? "ASSET_PACK"
-      : "ASSET";
-    if (audioAssetAddRange !== undefined) {
-      audioAssetAddRange.disabled = audioAssetPackageBusy ||
-        range === undefined || queuedRangeIds.has(range.rangeId);
-    }
-    audioAssetFinalize.disabled = audioAssetPackageBusy || range === undefined ||
-      (offerKind === "ASSET_PACK" && uniqueRangeCount < 2);
+    audioAssetFinalize.disabled = audioAssetPackageBusy || range === undefined;
     if (audioAssetPackageBusy) {
-      if (audioAssetAddRange !== undefined) audioAssetAddRange.disabled = true;
       audioAssetFinalize.textContent = "検証中…";
-      audioAssetStatus.textContent = "明示範囲を検証しています。";
+      audioAssetStatus.textContent = "選択範囲をAssetとして保存しています。";
       audioAssetStatus.dataset.state = "ready";
       return;
     }
-    if (audioAssetAddRange !== undefined) audioAssetAddRange.textContent = "＋Packへ追加";
-    audioAssetFinalize.textContent = "販売用に確定";
+    audioAssetFinalize.textContent = "Assetとして保存";
     audioAssetStatus.textContent = audioAssetPackageNotice?.text ??
-      (offerKind === "ASSET_PACK" && uniqueRangeCount < 2
-        ? `${selection.track.name} · Pack ${uniqueRangeCount}/2範囲`
-        : `${selection.track.name} · ${selection.role} · ${selection.bounds.startTick}–${selection.bounds.endTick} tick`);
+      `${selection.track.name} · ${selection.bounds.startTick}–${selection.bounds.endTick} tick`;
     audioAssetStatus.dataset.state = audioAssetPackageNotice?.state ?? "ready";
   };
-  const addCurrentAudioAssetPackageRange = (): void => {
-    const selection = audioAssetPackageSelection();
-    if ("error" in selection) {
-      audioAssetPackageNotice = { text: selection.error, state: "error" };
-      syncAudioAssetPackagePanel();
-      return;
-    }
-    const built = createAudioAssetizationInput(selection.selection);
-    if (!built.ok) {
-      audioAssetPackageNotice = { text: built.errors.join(" · "), state: "error" };
-      syncAudioAssetPackagePanel();
-      return;
-    }
-    const range = built.value.ranges[0];
-    if (range === undefined) return;
-    const duplicate = audioAssetPackageRanges.some((candidate) => {
-      const candidateResult = createAudioAssetizationInput(candidate);
-      return candidateResult.ok && candidateResult.value.ranges[0]?.rangeId === range.rangeId;
-    });
-    if (duplicate) {
-      audioAssetPackageNotice = { text: "この範囲はすでにPackへ追加されています。", state: "error" };
-      syncAudioAssetPackagePanel();
-      return;
-    }
-    audioAssetPackageRanges = [...audioAssetPackageRanges, selection.selection];
-    audioAssetPackageNotice = {
-      text: `Packへ追加しました（${audioAssetPackageRanges.length}範囲）。次の範囲を選択できます。`,
-      state: "ready",
-    };
-    syncAudioAssetPackagePanel();
-  };
-  const finalizeSelectedAudioAssetPackage = async (): Promise<void> => {
+  const saveSelectedAudioAsset = async (): Promise<void> => {
     if (audioAssetPackageBusy) return;
     audioAssetPackageNotice = undefined;
     const selection = audioAssetPackageSelection();
@@ -13491,45 +14363,11 @@ export function bootstrapDraw2Workspace(
     audioAssetPackageBusy = true;
     syncAudioAssetPackagePanel();
     try {
-      const offerKind: AssetPackageOfferKind = audioAssetOfferKind?.value === "ASSET_PACK"
-        ? "ASSET_PACK"
-        : "ASSET";
-      const selectedInputs = offerKind === "ASSET_PACK"
-        ? [...audioAssetPackageRanges, selection.selection]
-        : [selection.selection];
-      const distinctInputs: AudioAssetPackageSelectionInput[] = [];
-      const seenRangeIds = new Set<string>();
-      for (const candidate of selectedInputs) {
-        const candidateResult = createAudioAssetizationInput(candidate);
-        if (!candidateResult.ok) continue;
-        const candidateRange = candidateResult.value.ranges[0];
-        if (candidateRange === undefined || seenRangeIds.has(candidateRange.rangeId)) continue;
-        seenRangeIds.add(candidateRange.rangeId);
-        distinctInputs.push(candidate);
-      }
-      if (offerKind === "ASSET_PACK" && distinctInputs.length < 2) {
-        audioAssetPackageNotice = {
-          text: "Packには2つ以上の範囲が必要です。範囲を選んで「Packへ追加」してください。",
-          state: "error",
-        };
-        return;
-      }
-      const firstInput = distinctInputs[0];
-      if (firstInput === undefined) {
-        audioAssetPackageNotice = { text: "Asset化する範囲がありません。", state: "error" };
-        return;
-      }
-      const firstBuilt = createAudioAssetizationInput(firstInput);
-      if (!firstBuilt.ok) {
-        audioAssetPackageNotice = { text: firstBuilt.errors.join(" · "), state: "error" };
-        return;
-      }
+      // The existing manifest is only the local persistence envelope shared
+      // with iGAME and Market. It is always one Asset here; Pack/sale options
+      // are intentionally not part of iAUDIO creation.
       const detected = detectAudioAssetization({
-        ...firstBuilt.value,
-        ranges: distinctInputs.flatMap((candidate) => {
-          const candidateResult = createAudioAssetizationInput(candidate);
-          return candidateResult.ok ? [...candidateResult.value.ranges] : [];
-        }),
+        ...built.value,
       });
       if (detected.status !== "DETERMINISTIC") {
         audioAssetPackageNotice = {
@@ -13538,35 +14376,24 @@ export function bootstrapDraw2Workspace(
         };
         return;
       }
-      const derivativePolicy: AssetDerivativePolicy = audioAssetDerivativePolicy?.value ===
-          "DERIVATIVE_ALLOWED"
-        ? "DERIVATIVE_ALLOWED"
-        : audioAssetDerivativePolicy?.value === "REDISTRIBUTION_ALLOWED"
-        ? "REDISTRIBUTION_ALLOWED"
-        : "USE_ONLY";
-      const packageItems = distinctInputs.flatMap((candidate) => {
-        const candidateResult = createAudioAssetizationInput(candidate);
-        const candidateRange = candidateResult.ok ? candidateResult.value.ranges[0] : undefined;
-        if (!candidateResult.ok || candidateRange === undefined) return [];
-        return [{
+      const packageItems = [{
+        kind: "AUDIO" as const,
+        source: {
           kind: "AUDIO" as const,
-          source: {
-            kind: "AUDIO" as const,
-            sourceId: candidateRange.rangeId,
-            projectId: candidateResult.value.sourceProjectId,
-            revisionId: candidateResult.value.sourceRevisionId,
-            contentHash: candidateResult.value.contentHash,
-          },
-          result: detected,
-          label: candidate.label,
-        }];
-      });
+          sourceId: range.rangeId,
+          projectId: built.value.sourceProjectId,
+          revisionId: built.value.sourceRevisionId,
+          contentHash: built.value.contentHash,
+        },
+        result: detected,
+        label: selection.label,
+      }];
       const finalized = await finalizeAssetPackage({
         title: selection.label,
-        description: `iAUDIOの明示範囲 · ${selection.track.name} · ${packageItems.length}単位`,
-        offerKind,
-        derivativePolicy,
-        confirmationRevision: `${firstBuilt.value.sourceRevisionId}:${detected.inputHash}`,
+        description: `iAUDIOの選択範囲 · ${selection.track.name}`,
+        offerKind: "ASSET",
+        derivativePolicy: "USE_ONLY",
+        confirmationRevision: `${built.value.sourceRevisionId}:${detected.inputHash}`,
         items: packageItems,
       });
       if (!finalized.ok) {
@@ -13575,11 +14402,11 @@ export function bootstrapDraw2Workspace(
       }
       const saved = await bridge.saveAssetPackage(finalized.manifest);
       audioAssetPackageNotice = saved.ok
-        ? { text: "確定しました。Marketへ出品できます。", state: "ready" }
+        ? { text: "Assetを保存しました。販売や共有は後から設定できます。", state: "ready" }
         : { text: saved.message, state: "error" };
     } catch (error) {
       audioAssetPackageNotice = {
-        text: error instanceof Error ? error.message : "Asset確定に失敗しました。",
+        text: error instanceof Error ? error.message : "Assetの保存に失敗しました。",
         state: "error",
       };
     } finally {
@@ -14019,6 +14846,8 @@ export function bootstrapDraw2Workspace(
       cell.setAttribute("aria-label", `${barLabel}を選択`);
       cell.title = barLabel;
       cell.addEventListener("click", () => {
+        if (audioMidiDirectManipulationEnabled()) return;
+        revealAudioAssetPackageForUserSelection();
         setAudioMeasureSelectionByBars(range.startBar, range.endBar);
         seekAudioCompositionAtFrame(slot.startFrame + 1);
         renderAudioArrangerOverview();
@@ -14038,6 +14867,197 @@ export function bootstrapDraw2Workspace(
     }
     audioTimelineRuler.append(fragment);
   };
+  const audioTimelineRangeFromEvent = (
+    event: Event,
+  ): { readonly startBar: number; readonly endBar: number } | undefined => {
+    const pointer = event as PointerEvent;
+    let target = event.target instanceof Element
+      ? event.target.closest<HTMLElement>("[data-audio-bar-start-frame]")
+      : null;
+    if (target === null && Number.isFinite(pointer.clientX) &&
+      Number.isFinite(pointer.clientY)) {
+      const point = documentRef.elementFromPoint(
+        pointer.clientX,
+        pointer.clientY,
+      );
+      target = point?.closest<HTMLElement>("[data-audio-bar-start-frame]") ??
+        null;
+    }
+    if (target === null) return undefined;
+    const measureFrames = Math.max(1, audioMeasureFrameCount());
+    const startFrame = Number(target.dataset.audioBarStartFrame ?? "NaN");
+    const endFrame = Number(target.dataset.audioBarEndFrame ?? "NaN");
+    if (!Number.isFinite(startFrame) || !Number.isFinite(endFrame)) {
+      return undefined;
+    }
+    const startBar = Math.max(0, Math.floor(startFrame / measureFrames));
+    return {
+      startBar,
+      endBar: Math.max(startBar + 1, Math.ceil(endFrame / measureFrames)),
+    };
+  };
+  const syncAudioTimelinePointerPreview = (): void => {
+    const state = audioTimelinePointerState;
+    const preview = state === undefined
+      ? undefined
+      : {
+        startBar: Math.min(state.currentStartBar, state.currentEndBar),
+        endBar: Math.max(state.currentStartBar, state.currentEndBar),
+      };
+    const hosts = [audioArrangerRuler, audioTimelineRuler, audioBarStrip];
+    for (const host of hosts) {
+      if (host === undefined) continue;
+      const active = preview !== undefined;
+      host.classList.toggle("is-audio-direct-preview", active);
+      if (!active || preview === undefined) {
+        delete host.dataset.audioPreviewStartBar;
+        delete host.dataset.audioPreviewEndBar;
+      } else {
+        host.dataset.audioPreviewStartBar = String(preview.startBar);
+        host.dataset.audioPreviewEndBar = String(preview.endBar);
+      }
+      const cells = host.querySelectorAll<HTMLElement>(
+        "[data-audio-bar-start-frame], [data-audio-bar-index]",
+      );
+      for (const cell of cells) {
+        const startBar = Number(cell.dataset.audioBarIndex ?? "NaN");
+        const startFrame = Number(
+          cell.dataset.audioBarStartFrame ?? "NaN",
+        );
+        const endFrame = Number(cell.dataset.audioBarEndFrame ?? "NaN");
+        const measureFrames = Math.max(1, audioMeasureFrameCount());
+        const cellStart = Number.isFinite(startBar)
+          ? startBar
+          : Number.isFinite(startFrame)
+          ? Math.floor(startFrame / measureFrames)
+          : NaN;
+        const cellEnd = Number.isFinite(endFrame)
+          ? Math.max(cellStart + 1, Math.ceil(endFrame / measureFrames))
+          : cellStart + 1;
+        const inPreview = preview !== undefined && Number.isFinite(cellStart) &&
+          cellStart < preview.endBar && cellEnd > preview.startBar;
+        cell.classList.toggle("is-direct-preview", inPreview);
+        cell.classList.toggle(
+          "is-direct-preview-anchor",
+          inPreview && cellStart === preview?.startBar,
+        );
+      }
+      if (preview === undefined) {
+        host.querySelectorAll<HTMLElement>(".is-direct-preview").forEach(
+          (cell) => {
+            cell.classList.remove(
+              "is-direct-preview",
+              "is-direct-preview-anchor",
+            );
+          },
+        );
+      }
+    }
+    if (audioDawRangeStatus !== undefined && preview !== undefined) {
+      const count = Math.max(1, preview.endBar - preview.startBar);
+      const label = count === 1
+        ? `Bar ${preview.startBar + 1}`
+        : `Bars ${preview.startBar + 1}–${preview.endBar}`;
+      audioDawRangeStatus.textContent =
+        `${label} preview · release to select · Esc to cancel`;
+    }
+  };
+  const bindAudioTimelineDirectManipulation = (
+    host: HTMLElement | undefined,
+  ): void => {
+    if (host === undefined) return;
+    host.tabIndex = 0;
+    host.dataset.audioTimelineDirect = "true";
+    host.setAttribute(
+      "aria-keyshortcuts",
+      "Shift+Click Delete Backspace Control+C Control+V Control+D M B",
+    );
+    host.addEventListener("pointerdown", (event) => {
+      if (!audioMidiDirectManipulationEnabled() || event.button !== 0) return;
+      const range = audioTimelineRangeFromEvent(event);
+      if (range === undefined) return;
+      event.preventDefault();
+      event.stopPropagation();
+      host.focus({ preventScroll: true });
+      const current = audioSelectedMeasureBounds();
+      const anchorStartBar = event.shiftKey
+        ? Math.min(current.startBar, range.startBar)
+        : range.startBar;
+      const anchorEndBar = event.shiftKey
+        ? Math.max(current.endBar, range.endBar)
+        : range.endBar;
+      audioTimelinePointerState = {
+        pointerId: event.pointerId,
+        anchorStartBar,
+        anchorEndBar,
+        initialStartBar: current.startBar,
+        initialEndBar: current.endBar,
+        currentStartBar: anchorStartBar,
+        currentEndBar: anchorEndBar,
+      };
+      cancelAudioTimelinePointerGesture = (): boolean => {
+        const state = audioTimelinePointerState;
+        if (state === undefined) return false;
+        audioTimelinePointerState = undefined;
+        cancelAudioTimelinePointerGesture = undefined;
+        try {
+          host.releasePointerCapture?.(state.pointerId);
+        } catch {
+          // Pointer capture may already have been released by the browser.
+        }
+        setAudioMeasureSelectionByBars(
+          state.initialStartBar,
+          state.initialEndBar,
+        );
+        refreshAudioTimelineSelection();
+        syncAudioTimelinePointerPreview();
+        setModeDeckStatus("audio", "Timeline selection preview cancelled");
+        return true;
+      };
+      host.setPointerCapture?.(event.pointerId);
+      selectAudioTimelineBarRange(anchorStartBar, anchorEndBar);
+      syncAudioTimelinePointerPreview();
+    });
+    host.addEventListener("pointermove", (event) => {
+      const state = audioTimelinePointerState;
+      if (
+        !audioMidiDirectManipulationEnabled() || state === undefined ||
+        state.pointerId !== event.pointerId
+      ) return;
+      const range = audioTimelineRangeFromEvent(event);
+      if (range === undefined) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const nextStartBar = Math.min(state.anchorStartBar, range.startBar);
+      const nextEndBar = Math.max(state.anchorEndBar, range.endBar);
+      if (
+        state.currentStartBar === nextStartBar &&
+        state.currentEndBar === nextEndBar
+      ) return;
+      state.currentStartBar = nextStartBar;
+      state.currentEndBar = nextEndBar;
+      selectAudioTimelineBarRange(
+        nextStartBar,
+        nextEndBar,
+      );
+      syncAudioTimelinePointerPreview();
+    });
+    const finish = (event: PointerEvent): void => {
+      const state = audioTimelinePointerState;
+      if (state === undefined || state.pointerId !== event.pointerId) return;
+      audioTimelinePointerState = undefined;
+      cancelAudioTimelinePointerGesture = undefined;
+      host.releasePointerCapture?.(event.pointerId);
+      syncAudioTimelinePointerPreview();
+      syncAudioDawRangeStatus();
+    };
+    host.addEventListener("pointerup", finish);
+    host.addEventListener("pointercancel", () => {
+      cancelAudioTimelinePointerGesture?.();
+    });
+  };
+  bindAudioTimelineDirectManipulation(audioArrangerRuler);
+  bindAudioTimelineDirectManipulation(audioTimelineRuler);
   const syncAudioBarSelection = (): void => {
     const selectedRange = audioSelectedMeasureBounds();
     audioTimelineRuler?.querySelectorAll<HTMLElement>(
@@ -14180,6 +15200,7 @@ export function bootstrapDraw2Workspace(
   const selectAudioDockTrack = (trackId: string): void => {
     const track = audioDeckTracks.find((candidate) => candidate.id === trackId);
     if (track === undefined) return;
+    revealAudioAssetPackageForUserSelection();
     audioInspectorTargetKind = "deck";
     audioSelectedTrackId = track.id;
     selectAudioEditor("ROLL", true);
@@ -14282,6 +15303,7 @@ export function bootstrapDraw2Workspace(
   const selectAudioDockInstrument = (value: string): void => {
     const instrument = AUDIO_INSTRUMENTS.find((item) => item.id === value);
     if (instrument === undefined) return;
+    revealAudioAssetPackageForUserSelection();
     audioInspectorTargetKind = "instrument";
     audioActiveInstrumentIds.add(instrument.id);
     audioInstrumentId = instrument.id;
@@ -14730,6 +15752,8 @@ export function bootstrapDraw2Workspace(
       button.setAttribute("aria-selected", String(selected));
       button.setAttribute("aria-label", `Bar ${bar + 1}`);
       button.addEventListener("click", (event) => {
+        if (audioMidiDirectManipulationEnabled()) return;
+        revealAudioAssetPackageForUserSelection();
         event.stopPropagation();
         const current = audioSelectedMeasureBounds();
         if (event instanceof MouseEvent && event.shiftKey) {
@@ -14755,6 +15779,8 @@ export function bootstrapDraw2Workspace(
         );
       });
       button.addEventListener("pointerdown", (event) => {
+        if (audioMidiDirectManipulationEnabled()) return;
+        revealAudioAssetPackageForUserSelection();
         event.preventDefault();
         event.stopPropagation();
         const current = audioSelectedMeasureBounds();
@@ -14852,6 +15878,9 @@ export function bootstrapDraw2Workspace(
       cell.className = "draw2-audio-arranger-ruler-cell";
       const range = audioOverviewSlotBarRange(slot);
       cell.classList.add("is-bar");
+      cell.dataset.audioBarIndex = String(range.startBar);
+      cell.dataset.audioBarStartFrame = String(slot.startFrame);
+      cell.dataset.audioBarEndFrame = String(slot.endFrame);
       cell.classList.toggle(
         "is-selected",
         slot.startFrame < selectedRange.endFrame &&
@@ -15516,12 +16545,14 @@ export function bootstrapDraw2Workspace(
     );
   });
   audioBarStrip?.addEventListener("click", (event) => {
+    if (audioMidiDirectManipulationEnabled()) return;
     const target = event.target instanceof Element
       ? event.target.closest<HTMLButtonElement>("[data-audio-bar-index]")
       : null;
     if (target === null || !audioBarStrip.contains(target)) return;
     const bar = Number(target.dataset.audioBarIndex ?? "NaN");
     if (!Number.isFinite(bar)) return;
+    revealAudioAssetPackageForUserSelection();
     const current = audioSelectedMeasureBounds();
     if (event instanceof MouseEvent && event.shiftKey) {
       const start = Math.min(current.startBar, Math.trunc(bar));
@@ -15910,6 +16941,39 @@ export function bootstrapDraw2Workspace(
     context.fillRect(0, 0, fadeInWidth, cssHeight);
     context.fillStyle = "rgba(255, 169, 112, .17)";
     context.fillRect(cssWidth - fadeOutWidth, 0, fadeOutWidth, cssHeight);
+    // Fade boundaries are visible handles, not hidden slider state. The
+    // library gesture layer uses the outer edge hit areas to move them.
+    const drawFadeHandle = (
+      x: number,
+      color: string,
+      direction: "left" | "right",
+    ): void => {
+      context.strokeStyle = color;
+      context.lineWidth = 1.5;
+      context.beginPath();
+      context.moveTo(x + 0.5, 0);
+      context.lineTo(x + 0.5, cssHeight);
+      context.stroke();
+      context.fillStyle = color;
+      context.beginPath();
+      if (direction === "left") {
+        context.moveTo(x + 1, 0);
+        context.lineTo(x + 7, 0);
+        context.lineTo(x + 1, 7);
+      } else {
+        context.moveTo(x, 0);
+        context.lineTo(x - 6, 0);
+        context.lineTo(x, 6);
+      }
+      context.closePath();
+      context.fill();
+    };
+    drawFadeHandle(fadeInWidth, "rgba(95, 216, 171, .9)", "left");
+    drawFadeHandle(
+      cssWidth - fadeOutWidth,
+      "rgba(255, 169, 112, .9)",
+      "right",
+    );
     if (!compact) {
       context.fillStyle = "rgba(240, 233, 255, .72)";
       context.font = "600 10px ui-monospace, SFMono-Regular, Menlo, monospace";
@@ -15975,7 +17039,7 @@ export function bootstrapDraw2Workspace(
           canvas.dataset.audioClipCanvas = String(clip.clipId);
           canvas.setAttribute(
             "aria-label",
-            `Waveform for ${String(clip.clipId)}`,
+            `Waveform for ${String(clip.clipId)} · double-click to split · drag either edge to adjust fade`,
           );
           const controls = documentRef.createElement("div");
           controls.className = "draw2-audio-clip-controls";
@@ -16054,7 +17118,28 @@ export function bootstrapDraw2Workspace(
             `Crossfade ${String(clip.clipId)} with the next clip`,
           );
           controls.append(crossfade);
-          row.append(header, canvas, controls);
+          const precision = documentRef.createElement("details");
+          precision.className = "draw2-audio-clip-precision";
+          // Touch layouts keep the existing inspector-like controls visible;
+          // desktop puts the waveform first and reveals precision controls on
+          // demand so the library does not become a wall of sliders.
+          precision.open = windowRef.innerWidth < 1120 ||
+            audioClipPrecisionOpen.has(String(clip.clipId));
+          precision.addEventListener("toggle", () => {
+            if (precision.open) {
+              audioClipPrecisionOpen.add(String(clip.clipId));
+            } else {
+              audioClipPrecisionOpen.delete(String(clip.clipId));
+            }
+          });
+          const precisionSummary = documentRef.createElement("summary");
+          precisionSummary.textContent = "Adjust";
+          precisionSummary.setAttribute(
+            "aria-label",
+            `Adjust ${String(clip.clipId)} gain, speed and fades`,
+          );
+          precision.append(precisionSummary, controls);
+          row.append(header, canvas, precision);
           audioClipLibrary.append(row);
           void paintAudioClipWaveform(canvas, clip, input);
         }
@@ -16291,16 +17376,205 @@ export function bootstrapDraw2Workspace(
     const trackId = currentAudioDeckTrackId();
     const key = trackId + ":" + target;
     const points = audioAutomationPoints.get(key) ?? [];
+    const graphEndTick = Math.max(
+      audioBarTick(),
+      audioTotalBars() * audioBarTick(),
+    );
+    const graph = documentRef.createElement("div");
+    graph.className = "draw2-audio-automation-graph";
+    graph.dataset.audioAutomationTarget = target;
+    graph.dataset.audioAutomationTrack = trackId;
+    graph.setAttribute(
+      "aria-label",
+      `${target} automation lane · double-click to add a point`,
+    );
+    const curveSvg = documentRef.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "svg",
+    ) as SVGSVGElement;
+    curveSvg.setAttribute("viewBox", "0 0 100 100");
+    curveSvg.setAttribute("preserveAspectRatio", "none");
+    curveSvg.setAttribute("aria-hidden", "true");
+    const curveLine = documentRef.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "polyline",
+    ) as SVGPolylineElement;
+    curveLine.setAttribute("fill", "none");
+    curveLine.setAttribute("stroke", "rgba(200, 139, 255, .76)");
+    curveLine.setAttribute("stroke-width", "1.5");
+    curveLine.setAttribute("vector-effect", "non-scaling-stroke");
+    const updateAutomationCurve = (): void => {
+      curveLine.setAttribute(
+        "points",
+        points.map((point) =>
+          `${Math.min(100, Math.max(0, point.tick / graphEndTick * 100))},${
+            100 - Math.min(100, Math.max(0, point.value))
+          }`
+        ).join(" "),
+      );
+    };
+    curveSvg.append(curveLine);
+    graph.append(curveSvg);
+    const positionGraphPoint = (
+      point: AudioAutomationPoint,
+      button: HTMLButtonElement,
+    ): void => {
+      button.style.left = `${Math.min(
+        100,
+        Math.max(0, point.tick / graphEndTick * 100),
+      )}%`;
+      button.style.bottom = `${Math.min(100, Math.max(0, point.value))}%`;
+      updateAutomationCurve();
+      button.title = `${target} · T${point.tick} · ${
+        Math.round(point.value)
+      }%`;
+      button.setAttribute(
+        "aria-label",
+        `${target} automation point at Tick ${point.tick}, value ${Math.round(point.value)}%`,
+      );
+    };
+    const commit = (message?: string): void => {
+      points.sort((left, right) => left.tick - right.tick || left.id - right.id);
+      if (points.length === 0) audioAutomationPoints.delete(key);
+      else audioAutomationPoints.set(key, points);
+      queueAudioAutomationLaneMutation(trackId, target);
+      renderAudioAutomation();
+      if (message !== undefined) setModeDeckStatus("audio", message);
+    };
+    const removePoint = (pointId: number, reason: string): void => {
+      const index = points.findIndex((point) => point.id === pointId);
+      if (index < 0) return;
+      points.splice(index, 1);
+      commit(`${target} automation point removed · ${reason}`);
+    };
     if (points.length === 0) {
-      const empty = documentRef.createElement("p");
+      const empty = documentRef.createElement("span");
       empty.className = "draw2-mode-deck-status";
-      empty.textContent = "No automation points · choose a Tick and add one";
-      audioAutomationLane.append(empty);
-      return;
+      empty.textContent = "Double-click the lane to add a point";
+      graph.append(empty);
     }
+    for (const point of points) {
+      const graphPoint = documentRef.createElement("button");
+      graphPoint.type = "button";
+      graphPoint.className = "draw2-audio-automation-graph-point";
+      graphPoint.dataset.audioAutomationPoint = String(point.id);
+      positionGraphPoint(point, graphPoint);
+      graphPoint.addEventListener("dblclick", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        removePoint(point.id, "double-click");
+      });
+      graphPoint.addEventListener("keydown", (event) => {
+        if (event.key !== "Delete" && event.key !== "Backspace") return;
+        event.preventDefault();
+        event.stopPropagation();
+        removePoint(point.id, event.key);
+      });
+      graphPoint.addEventListener("pointerdown", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        graphPoint.focus();
+        graphPoint.setPointerCapture?.(event.pointerId);
+        const initialPoint = {
+          tick: point.tick,
+          frame: point.frame,
+          value: point.value,
+        };
+        let finished = false;
+        const update = (moveEvent: PointerEvent): void => {
+          if (finished) return;
+          const rect = graph.getBoundingClientRect();
+          if (rect.width <= 0 || rect.height <= 0) return;
+          const xRatio = Math.min(
+            1,
+            Math.max(0, (moveEvent.clientX - rect.left) / rect.width),
+          );
+          const yRatio = Math.min(
+            1,
+            Math.max(0, (rect.bottom - moveEvent.clientY) / rect.height),
+          );
+          point.tick = Math.round(xRatio * graphEndTick);
+          point.frame = Math.max(
+            1,
+            audioTickToFrame(point.tick, audioPianoRollClock()) + 1,
+          );
+          point.value = Math.round(yRatio * 100);
+          positionGraphPoint(point, graphPoint);
+        };
+        const cleanup = (): void => {
+          graphPoint.removeEventListener("pointermove", update);
+          graphPoint.removeEventListener("pointerup", finish);
+          graphPoint.removeEventListener("pointercancel", cancel);
+          graph.classList.remove("is-automation-dragging");
+          if (audioAutomationCancel === cancel) {
+            audioAutomationCancel = undefined;
+          }
+          try {
+            graphPoint.releasePointerCapture?.(event.pointerId);
+          } catch {
+            // The pointer may already have been released by the browser.
+          }
+        };
+        const finish = (): void => {
+          if (finished) return;
+          finished = true;
+          cleanup();
+          commit();
+        };
+        const cancel = (): boolean => {
+          if (finished) return false;
+          finished = true;
+          point.tick = initialPoint.tick;
+          point.frame = initialPoint.frame;
+          point.value = initialPoint.value;
+          cleanup();
+          renderAudioAutomation();
+          setModeDeckStatus(
+            "audio",
+            `${target} automation point preview cancelled`,
+          );
+          return true;
+        };
+        audioAutomationCancel = cancel;
+        graph.classList.add("is-automation-dragging");
+        graphPoint.addEventListener("pointermove", update);
+        graphPoint.addEventListener("pointerup", finish);
+        graphPoint.addEventListener("pointercancel", cancel);
+      });
+      graph.append(graphPoint);
+    }
+    graph.addEventListener("dblclick", (event) => {
+      if (
+        event.target instanceof Element &&
+        event.target.closest("[data-audio-automation-point]") !== null
+      ) return;
+      const rect = graph.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const xRatio = Math.min(
+        1,
+        Math.max(0, (event.clientX - rect.left) / rect.width),
+      );
+      const yRatio = Math.min(
+        1,
+        Math.max(0, (rect.bottom - event.clientY) / rect.height),
+      );
+      const tick = Math.round(xRatio * graphEndTick);
+      const point: AudioAutomationPoint = {
+        id: ++audioAutomationSequence,
+        tick,
+        frame: Math.max(1, audioTickToFrame(tick, audioPianoRollClock()) + 1),
+        value: Math.round(yRatio * 100),
+      };
+      points.push(point);
+      commit(`${target} automation point added at T${tick}`);
+    });
+    audioAutomationLane.append(graph);
     for (const point of points) {
       const row = documentRef.createElement("div");
       row.className = "draw2-audio-automation-point";
+      row.dataset.audioAutomationRow = String(point.id);
       const label = documentRef.createElement("span");
       label.textContent = "T" + point.tick + " · F" + point.frame;
       const tickInput = documentRef.createElement("input");
@@ -16325,6 +17599,10 @@ export function bootstrapDraw2Workspace(
           ) + 1,
         );
         label.textContent = "T" + point.tick + " · F" + point.frame;
+        const graphPoint = graph.querySelector<HTMLButtonElement>(
+          `[data-audio-automation-point="${String(point.id)}"]`,
+        );
+        if (graphPoint !== null) positionGraphPoint(point, graphPoint);
       });
       tickInput.addEventListener("change", () => {
         points.sort((left, right) =>
@@ -16345,6 +17623,10 @@ export function bootstrapDraw2Workspace(
       input.addEventListener("input", () => {
         point.value = Number(input.value);
         value.textContent = input.value;
+        const graphPoint = graph.querySelector<HTMLButtonElement>(
+          `[data-audio-automation-point="${String(point.id)}"]`,
+        );
+        if (graphPoint !== null) positionGraphPoint(point, graphPoint);
       });
       input.addEventListener("change", () => {
         queueAudioAutomationLaneMutation(trackId, target);
@@ -16360,16 +17642,7 @@ export function bootstrapDraw2Workspace(
       remove.dataset.audioAutomationRemove = String(point.id);
       remove.setAttribute("aria-label", "Remove automation point");
       remove.addEventListener("click", () => {
-        const remaining = points.filter((candidate) =>
-          candidate.id !== point.id
-        );
-        if (remaining.length === 0) {
-          audioAutomationPoints.delete(key);
-        } else {
-          audioAutomationPoints.set(key, remaining);
-        }
-        renderAudioAutomation();
-        queueAudioAutomationLaneMutation(trackId, target);
+        removePoint(point.id, "button");
       });
       row.append(label, tickInput, input, value, remove);
       audioAutomationLane.append(row);
@@ -16423,6 +17696,23 @@ export function bootstrapDraw2Workspace(
       "aria-label",
       `Current piano roll frame ${audioAnimationFrame}`,
     );
+    const viewport = audioMidiGrid;
+    if (
+      viewport !== undefined &&
+      audioCompositionTransportState === "PLAYING" &&
+      audioMidiFollowPlayhead
+    ) {
+      const lowerBound = viewport.scrollLeft + viewport.clientWidth * 0.2;
+      const upperBound = viewport.scrollLeft + viewport.clientWidth * 0.8;
+      if (left < lowerBound || left > upperBound) {
+        audioMidiAutoScrolling = true;
+        viewport.scrollLeft = Math.max(
+          0,
+          left - Math.max(1, viewport.clientWidth * 0.5),
+        );
+        audioMidiAutoScrolling = false;
+      }
+    }
   };
   const syncAudioFrameActiveState = (frame: number, active: boolean): void => {
     if (frame < 0) return;
@@ -16830,17 +18120,21 @@ export function bootstrapDraw2Workspace(
       !drawAudioReferencePlaybackActive ||
       drawAudioReferenceTrackIds.size === 0 ||
       drawAudioReferenceTrackIds.has(audioRuntimeTrackId(note.instrument))
-    ).map((note) => ({
-      id: note.id,
-      startSeconds: audioFrameToTransportSeconds(note.startFrame + 1),
-      durationSeconds: Math.max(
-        0.001,
-        audioFrameToTransportSeconds(
-          note.startFrame + note.durationFrames + 1,
-        ) - audioFrameToTransportSeconds(note.startFrame + 1),
-      ),
-      payload: note,
-    }));
+    ).map((note) => {
+      const clock = audioPianoRollClock();
+      const ticks = pianoRollNoteTicks(note, clock);
+      const startSeconds = audioTickToSeconds(Number(ticks.startTick), clock);
+      const endSeconds = audioTickToSeconds(
+        Number(ticks.startTick) + Number(ticks.durationTick),
+        clock,
+      );
+      return {
+        id: note.id,
+        startSeconds,
+        durationSeconds: Math.max(0.001, endSeconds - startSeconds),
+        payload: note,
+      };
+    });
   audioChipScheduler = new SampleAccurateScheduler<PianoRollNote>({
     clock: { now: () => chipTuneSynth.getCurrentTime() },
     timer: {
@@ -16863,6 +18157,39 @@ export function bootstrapDraw2Workspace(
         pianoRollNoteTicks(note, audioPianoRollClock()).startTick,
         note.instrument,
       );
+    },
+  });
+  audioSelectionScheduler = new SampleAccurateScheduler<PianoRollNote>({
+    clock: { now: () => chipTuneSynth.getCurrentTime() },
+    timer: {
+      setInterval: (callback, delayMs) =>
+        windowRef.setInterval(callback, delayMs),
+      clearInterval: (handle) => windowRef.clearInterval(handle),
+    },
+    lookaheadSeconds: 0.12,
+    intervalMs: 25,
+    onSchedule: (event, audioTimeSeconds) => {
+      const note = audioMidiNotes.get(event.payload.id) ?? event.payload;
+      chipTuneSynth.scheduleNoteAt(
+        note.pitchMidi,
+        Math.max(28, Math.round(event.durationSeconds * 1_000)),
+        audioInstrumentPreset(note.instrument, note.pitchMidi),
+        note.velocity,
+        audioTimeSeconds,
+        audioRuntimeTrackId(note.instrument),
+        pianoRollNoteTicks(note, audioPianoRollClock()).startTick,
+        note.instrument,
+      );
+      // The selection scheduler owns only its own queue; normal playback state
+      // is intentionally not changed here.
+    },
+    onEnded: () => {
+      audioSelectionPlaybackPlaying = false;
+      audioSelectionScheduler?.stop();
+      audioMidiPlaySelection?.setAttribute("aria-pressed", "false");
+      if (!audioDeckPlaying && !chipDeckPlaying) stopAudioFrameTransport();
+      setModeDeckStatus("audio", "Selection preview ended");
+      syncAudioMidiStatus();
     },
   });
   const syncAudioMidiViewportState = (): void => {
@@ -16906,14 +18233,119 @@ export function bootstrapDraw2Workspace(
       `MIDI piano roll · full range A0–C8 · visible ${visibleRange}`,
     );
   };
+  const audioMidiContextSelectedNotes = (): PianoRollNote[] => {
+    const ids = audioMultiSelectedNoteKeys.size > 0
+      ? [...audioMultiSelectedNoteKeys]
+      : audioSelectedNoteKey === undefined ? [] : [audioSelectedNoteKey];
+    return ids.map((id) => audioMidiNotes.get(id)).filter(
+      (note): note is PianoRollNote =>
+        note !== undefined && note.instrument === audioInstrumentId,
+    );
+  };
+  const syncAudioMidiContextInput = (
+    input: HTMLInputElement | undefined,
+    value: number | undefined,
+    mixed: boolean,
+  ): void => {
+    if (input === undefined) return;
+    input.dataset.mixed = String(mixed);
+    input.placeholder = mixed ? "Mixed" : "";
+    // Do not overwrite a value while the user is typing. A selection/render
+    // projection may be requested by the same gesture before change fires.
+    if (documentRef.activeElement === input) return;
+    input.value = mixed || value === undefined ? "" : String(value);
+    input.setAttribute("aria-invalid", "false");
+  };
+  const syncAudioMidiNoteContext = (): void => {
+    const notes = audioMidiContextSelectedNotes();
+    const desktop = audioMidiDirectManipulationEnabled();
+    const visible = desktop && notes.length > 0;
+    if (audioMidiNoteContext !== undefined) {
+      audioMidiNoteContext.hidden = !visible;
+      audioMidiNoteContext.dataset.contextState = notes.length === 0
+        ? "empty"
+        : notes.length === 1 ? "single" : "multi";
+    }
+    if (audioMidiGrid !== undefined) {
+      audioMidiGrid.dataset.audioMidiSelectionState = notes.length === 0
+        ? "empty"
+        : notes.length === 1 ? "single" : "multi";
+      audioMidiGrid.dataset.audioMidiSelectionCount = String(notes.length);
+    }
+    if (notes.length === 0) {
+      if (audioMidiNoteContextSummary !== undefined) {
+        audioMidiNoteContextSummary.textContent = "No note selected";
+      }
+      syncAudioMidiContextInput(audioMidiNotePitch, undefined, false);
+      syncAudioMidiContextInput(audioMidiNoteStart, undefined, false);
+      syncAudioMidiContextInput(audioMidiNoteLength, undefined, false);
+      syncAudioMidiContextInput(audioMidiNoteVelocity, undefined, false);
+      return;
+    }
+    const clock = audioPianoRollClock();
+    const ranges = notes.map((note) => pianoRollNoteTicks(note, clock));
+    const starts = ranges.map((range) => Number(range.startTick));
+    const lengths = ranges.map((range) => Number(range.durationTick));
+    const pitches = notes.map((note) => note.pitchMidi);
+    const velocities = notes.map((note) => Math.round(note.velocity * 100));
+    const minStart = Math.min(...starts);
+    const maxEnd = Math.max(
+      ...ranges.map((range) => Number(range.startTick + range.durationTick)),
+    );
+    const mixed = (values: readonly number[]): boolean =>
+      new Set(values).size > 1;
+    if (audioMidiNoteContextSummary !== undefined) {
+      audioMidiNoteContextSummary.textContent = notes.length === 1
+        ? `${pitchLabel(pitches[0] ?? 0)} · ${minStart}t · ${lengths[0] ?? 1}t`
+        : `${notes.length} notes · ${minStart}–${maxEnd}t`;
+    }
+    if (audioMidiNoteContextHint !== undefined) {
+      audioMidiNoteContextHint.textContent = notes.length === 1
+        ? "Drag note to move · drag edge to resize · double-click to split"
+        : "Drag any selected note to move together · Shift-click adds notes";
+    }
+    // For a multi-selection, Pitch and Start represent the selection's base.
+    // Editing either keeps the relative chord/timing intact rather than
+    // collapsing every note onto one value.
+    syncAudioMidiContextInput(
+      audioMidiNotePitch,
+      Math.min(...pitches),
+      false,
+    );
+    syncAudioMidiContextInput(audioMidiNoteStart, minStart, false);
+    syncAudioMidiContextInput(
+      audioMidiNoteLength,
+      lengths[0],
+      mixed(lengths),
+    );
+    syncAudioMidiContextInput(
+      audioMidiNoteVelocity,
+      velocities[0],
+      mixed(velocities),
+    );
+  };
   const syncAudioMidiStatus = (): void => {
     syncAudioMidiViewportState();
+    syncAudioMidiNoteContext();
     const instrument = AUDIO_INSTRUMENTS.find((item) =>
       item.id === audioInstrumentId
     );
     const selected = audioSelectedNoteKey === undefined
       ? undefined
       : audioMidiNotes.get(audioSelectedNoteKey);
+    const hasNoteSelection = selected !== undefined ||
+      audioMultiSelectedNoteKeys.size > 0;
+    if (audioMidiActions !== undefined) {
+      audioMidiActions.dataset.audioMidiSelection = hasNoteSelection
+        ? "selected"
+        : "empty";
+    }
+    if (
+      !hasNoteSelection && audioMidiQuantizeGroup !== undefined &&
+      windowRef.innerWidth >= 1120
+    ) {
+      audioMidiQuantizeGroup.open = false;
+    }
     if (selected !== undefined) audioNoteVelocity = selected.velocity;
     if (selected === undefined) {
       audioNoteLengthTicks = audioDefaultNoteLengthTicks;
@@ -16951,6 +18383,45 @@ export function bootstrapDraw2Workspace(
       audioMidiGrid.dataset.audioRollVisual = audioRollVisualKind(
         audioInstrumentId,
       );
+    }
+    syncAudioMusicalContextControls(audioMusicalContext);
+    if (audioMidiSplit !== undefined) {
+      const canSplit = audioMultiSelectedNoteKeys.size > 0 &&
+        audioMidiSelectionBounds !== undefined;
+      audioMidiSplit.disabled = !canSplit;
+      audioMidiSplit.setAttribute("aria-disabled", String(!canSplit));
+    }
+    if (audioMidiQuantize !== undefined) {
+      audioMidiQuantize.value = audioMidiExistingQuantize;
+    }
+    if (audioMidiQuantizeAmountValue !== undefined) {
+      audioMidiQuantizeAmountValue.textContent = `${Math.round(
+        Number(audioMidiQuantizeAmount?.value ?? "100"),
+      )}%`;
+    }
+    if (audioMidiQuantizeSwingValue !== undefined) {
+      audioMidiQuantizeSwingValue.textContent = `${Math.round(
+        Number(audioMidiQuantizeSwing?.value ?? "0"),
+      )}%`;
+    }
+    const hasQuantizePreview = audioMidiQuantizePreview !== undefined;
+    if (audioMidiQuantizeApplyButton !== undefined) {
+      audioMidiQuantizeApplyButton.disabled = !hasQuantizePreview;
+    }
+    if (audioMidiQuantizeCancelButton !== undefined) {
+      audioMidiQuantizeCancelButton.disabled = !hasQuantizePreview;
+    }
+    if (audioMidiPlaySelection !== undefined) {
+      audioMidiPlaySelection.disabled = audioSelectionPlaybackPlaying
+        ? false
+        : selected === undefined && audioMultiSelectedNoteKeys.size === 0;
+      audioMidiPlaySelection.setAttribute(
+        "aria-pressed",
+        String(audioSelectionPlaybackPlaying),
+      );
+      audioMidiPlaySelection.textContent = audioSelectionPlaybackPlaying
+        ? "Stop selection"
+        : "Play selection";
     }
     if (audioMidiStatus === undefined) return;
     const lengthLabel = selected === undefined
@@ -17070,14 +18541,14 @@ export function bootstrapDraw2Workspace(
       tick: point.tick,
       value: point.value,
     }));
-    if (points.length === 0) {
-      const empty = documentRef.createElement("span");
+    const empty = points.length === 0
+      ? documentRef.createElement("span")
+      : undefined;
+    if (empty !== undefined) {
       empty.className = "draw2-mode-deck-status";
       empty.textContent = `${
         audioMidiExpressionLabel(targetValue)
-      } · no points · ＋ Pointで追加`;
-      audioMidiExpressionLane.append(empty);
-      return;
+      } · no points · double-click the lane to add`;
     }
     const commit = (): void => {
       points.sort((left, right) => left.tick - right.tick);
@@ -17085,6 +18556,208 @@ export function bootstrapDraw2Workspace(
         renderAudioMidiExpression();
       });
     };
+    const graph = documentRef.createElement("div");
+    graph.className = "draw2-audio-midi-expression-graph";
+    graph.dataset.audioMidiExpressionTarget = targetValue;
+    graph.setAttribute(
+      "aria-label",
+      `${audioMidiExpressionLabel(targetValue)} visual Tick lane`,
+    );
+    const graphEndTick = Math.max(
+      audioBarTick(),
+      audioMidiTimelineEndTick(),
+    );
+    const graphValueRatio = (value: number): number =>
+      targetValue === "pitch-bend"
+        ? (Math.min(1, Math.max(-1, value)) + 1) / 2
+        : Math.min(1, Math.max(0, value));
+    const curveSvg = documentRef.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "svg",
+    ) as SVGSVGElement;
+    curveSvg.setAttribute("viewBox", "0 0 100 100");
+    curveSvg.setAttribute("preserveAspectRatio", "none");
+    curveSvg.setAttribute("aria-hidden", "true");
+    const curveLine = documentRef.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "polyline",
+    ) as SVGPolylineElement;
+    curveLine.setAttribute("fill", "none");
+    curveLine.setAttribute("stroke", "rgba(200, 139, 255, .76)");
+    curveLine.setAttribute("stroke-width", "1.5");
+    curveLine.setAttribute("vector-effect", "non-scaling-stroke");
+    const updateExpressionCurve = (): void => {
+      curveLine.setAttribute(
+        "points",
+        points.map((point) =>
+          `${Math.min(100, Math.max(0, Number(point.tick) / graphEndTick * 100))},${
+            100 - graphValueRatio(point.value) * 100
+          }`
+        ).join(" "),
+      );
+    };
+    curveSvg.append(curveLine);
+    graph.append(curveSvg);
+    graph.addEventListener("dblclick", (event) => {
+      if (
+        event.target instanceof Element &&
+        event.target.closest("[data-audio-midi-expression-point]") !== null
+      ) return;
+      const rect = graph.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const xRatio = Math.min(
+        1,
+        Math.max(0, (event.clientX - rect.left) / rect.width),
+      );
+      const yRatio = Math.min(
+        1,
+        Math.max(0, (rect.bottom - event.clientY) / rect.height),
+      );
+      const tick = Math.max(0, Math.round(xRatio * graphEndTick)) as AudioTick;
+      points.push({
+        tick,
+        value: targetValue === "pitch-bend" ? yRatio * 2 - 1 : yRatio,
+      });
+      commit();
+      setModeDeckStatus(
+        "audio",
+        `${audioMidiExpressionLabel(targetValue)} point added at T${tick}`,
+      );
+    });
+    const positionGraphPoint = (
+      point: { tick: AudioTick; value: number },
+      button: HTMLButtonElement,
+    ): void => {
+      button.style.left = `${Math.min(
+        100,
+        Math.max(0, Number(point.tick) / graphEndTick * 100),
+      )}%`;
+      button.style.bottom = `${graphValueRatio(point.value) * 100}%`;
+      updateExpressionCurve();
+      button.title = `${audioMidiExpressionLabel(targetValue)} · T${point.tick} · ${
+        Math.round(point.value * 100)
+      }%`;
+    };
+    const graphPoints = points.map((point, index) => {
+      const button = documentRef.createElement("button");
+      button.type = "button";
+      button.className = "draw2-audio-midi-expression-graph-point";
+      button.dataset.audioMidiExpressionPoint = String(index);
+      button.setAttribute(
+        "aria-label",
+        `${audioMidiExpressionLabel(targetValue)} point ${index + 1} at Tick ${point.tick}`,
+      );
+      positionGraphPoint(point, button);
+      const removePoint = (reason: string): void => {
+        points.splice(index, 1);
+        commit();
+        setModeDeckStatus(
+          "audio",
+          `${audioMidiExpressionLabel(targetValue)} point removed · ${reason}`,
+        );
+      };
+      // The point is the editing object. Double-click removes it, while the
+      // keyboard equivalent keeps the same direct-manipulation model usable
+      // without adding a permanent row of delete buttons.
+      button.addEventListener("dblclick", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        removePoint("double-click");
+      });
+      button.addEventListener("keydown", (event) => {
+        if (event.key !== "Delete" && event.key !== "Backspace") return;
+        event.preventDefault();
+        event.stopPropagation();
+        removePoint(event.key);
+      });
+      button.addEventListener("pointerdown", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        button.setPointerCapture?.(event.pointerId);
+        const initialPoint = {
+          tick: point.tick,
+          value: point.value,
+        };
+        let finished = false;
+        const update = (moveEvent: PointerEvent): void => {
+          if (finished) return;
+          const rect = graph.getBoundingClientRect();
+          if (rect.width <= 0 || rect.height <= 0) return;
+          const xRatio = Math.min(
+            1,
+            Math.max(0, (moveEvent.clientX - rect.left) / rect.width),
+          );
+          const yRatio = Math.min(
+            1,
+            Math.max(0, (rect.bottom - moveEvent.clientY) / rect.height),
+          );
+          point.tick = Math.max(
+            0,
+            Math.round(xRatio * graphEndTick),
+          ) as AudioTick;
+          point.value = targetValue === "pitch-bend"
+            ? yRatio * 2 - 1
+            : yRatio;
+          positionGraphPoint(point, button);
+          button.setAttribute(
+            "aria-label",
+            `${audioMidiExpressionLabel(targetValue)} point ${index + 1} at Tick ${point.tick}`,
+          );
+          const row = audioMidiExpressionLane.querySelectorAll<HTMLElement>(
+            ".draw2-audio-midi-expression-point",
+          )[index];
+          const rowLabel = row?.querySelector("span");
+          if (rowLabel !== null && rowLabel !== undefined) {
+            rowLabel.textContent = `T${point.tick}`;
+          }
+          const rowOutput = row?.querySelector("output");
+          if (rowOutput !== null && rowOutput !== undefined) {
+            rowOutput.textContent = `${Math.round(point.value * 100)}%`;
+          }
+        };
+        const cleanup = (): void => {
+          button.removeEventListener("pointermove", update);
+          button.removeEventListener("pointerup", finish);
+          button.removeEventListener("pointercancel", cancel);
+          graph.classList.remove("is-expression-dragging");
+          if (audioMidiExpressionCancel === cancel) {
+            audioMidiExpressionCancel = undefined;
+          }
+        };
+        const finish = (): void => {
+          if (finished) return;
+          finished = true;
+          cleanup();
+          commit();
+        };
+        const cancel = (): boolean => {
+          if (finished) return false;
+          finished = true;
+          point.tick = initialPoint.tick;
+          point.value = initialPoint.value;
+          cleanup();
+          positionGraphPoint(point, button);
+          renderAudioMidiExpression();
+          setModeDeckStatus(
+            "audio",
+            `${audioMidiExpressionLabel(targetValue)} point preview cancelled`,
+          );
+          return true;
+        };
+        audioMidiExpressionCancel = cancel;
+        graph.classList.add("is-expression-dragging");
+        button.addEventListener("pointermove", update);
+        button.addEventListener("pointerup", finish);
+        button.addEventListener("pointercancel", cancel);
+      });
+      graph.append(button);
+      return button;
+    });
+    void graphPoints;
+    audioMidiExpressionLane.append(graph);
+    if (empty !== undefined) graph.append(empty);
     for (const [index, point] of points.entries()) {
       const row = documentRef.createElement("div");
       row.className = "draw2-audio-midi-expression-point";
@@ -17588,11 +19261,16 @@ export function bootstrapDraw2Workspace(
       if (audioMidiHeldNotes.has(key)) return;
       const startTick = audioMidiCurrentTick();
       const instrument = audioInstrumentId;
+      const guidedPitchMidi = audioPitchForMusicalGuide(message.pitchMidi);
+      if (guidedPitchMidi === undefined) {
+        setModeDeckStatus("audio", audioMusicalGuideRejection(message.pitchMidi));
+        return;
+      }
       const note = pianoRollNoteFromTicks(
         {
           id:
-            `note:midi-live:${Date.now()}:${message.channel}:${message.pitchMidi}`,
-          pitchMidi: message.pitchMidi,
+            `note:midi-live:${Date.now()}:${audioMidiEditSequence++}:${message.channel}:${message.pitchMidi}`,
+          pitchMidi: guidedPitchMidi,
           startTick,
           durationTick: audioDefaultNoteLengthTicks,
           velocity: Math.min(1, Math.max(0.05, message.velocity / 127)),
@@ -17606,6 +19284,29 @@ export function bootstrapDraw2Workspace(
       audioMidiNotes.set(note.id, note);
       indexAudioNote(note);
       audioSelectedNoteKey = note.id;
+      if (audioMidiStepInputEnabled) {
+        // A step is a committed note, not a held recording note. Advance the
+        // insertion cursor in Tick space and ignore the matching note-off so
+        // key release cannot resize the just-created step.
+        const nextTick = Number(startTick) +
+          Number(audioDefaultNoteLengthTicks);
+        extendAudioTimelineTo(
+          audioTickToFrame(nextTick, audioPianoRollClock()) + 1,
+        );
+        audioAnimationFrame = Math.min(
+          Math.max(1, audioFrameCount),
+          audioTickToFrame(nextTick, audioPianoRollClock()) + 1,
+        );
+        void queueAudioNoteUpsert(note, "midi-step-input");
+        void playAudioNotePreview(note);
+        renderAudioMidiGrid();
+        syncAudioMidiStatus();
+        setModeDeckStatus(
+          "audio",
+          `${pitchLabel(note.pitchMidi)} added at T${startTick} · Step Input advanced`,
+        );
+        return;
+      }
       audioMidiHeldNotes.set(key, {
         id: note.id,
         startTick,
@@ -17683,6 +19384,23 @@ export function bootstrapDraw2Workspace(
       if (audioMidiConnect !== undefined) audioMidiConnect.disabled = false;
     }
   };
+  audioMidiStepInput?.addEventListener("click", () => {
+    audioMidiStepInputEnabled = !audioMidiStepInputEnabled;
+    audioMidiStepInput.setAttribute(
+      "aria-pressed",
+      String(audioMidiStepInputEnabled),
+    );
+    audioMidiStepInput.classList.toggle(
+      "is-active",
+      audioMidiStepInputEnabled,
+    );
+    setModeDeckStatus(
+      "audio",
+      audioMidiStepInputEnabled
+        ? "Step Input on · each MIDI note uses the selected length and advances the Tick"
+        : "Step Input off · MIDI note-off controls note length",
+    );
+  });
   const audioInstrumentLaneKey = (
     instrument: PianoRollInstrumentId,
     frame: number,
@@ -17870,17 +19588,29 @@ export function bootstrapDraw2Workspace(
       audioQuantize,
       gridTick,
       audioMidiHorizontalZoom,
+      audioMusicalContext.key,
+      audioMusicalContext.scale,
+      audioScaleGuideMode,
       timelineEndTick,
       totalWidth,
       totalHeight,
       tileStartTick,
       tileEndTick,
       tileWidth,
+      audioMidiQuantizePreview === undefined
+        ? ""
+        : audioMidiQuantizePreview.previewNotes.map((note) => {
+          const ticks = pianoRollNoteTicks(note, audioPianoRollClock());
+          return `${note.id}@${ticks.startTick}:${ticks.durationTick}`;
+        }).join(","),
     ].join(":");
     if (
       audioMidiGridLastRenderKey === renderKey &&
       audioMidiGrid.firstElementChild !== null
     ) {
+      if (!applyAudioMidiInitialViewport()) {
+        scheduleAudioMidiInitialViewport();
+      }
       syncAudioMidiCanvasPlayhead();
       return;
     }
@@ -17917,7 +19647,7 @@ export function bootstrapDraw2Workspace(
     canvas.tabIndex = 0;
     canvas.setAttribute(
       "aria-label",
-      "Piano Roll canvas. Click to select or add, drag to set length, Delete to remove, right-click to delete.",
+      "Piano Roll canvas. Double-click empty space to add a note, click a note to select it, drag a note to move it, drag either edge to resize it, drag empty space to select a range, double-click a note to split it, Control or Command C/X/V copies, cuts and pastes selected notes, and Delete removes selected notes.",
     );
     canvas.dataset.audioMidiCanvas = "true";
     const playhead = documentRef.createElement("div");
@@ -17934,10 +19664,33 @@ export function bootstrapDraw2Workspace(
       context.fillRect(0, 0, tileWidth, totalHeight);
       context.fillStyle = "#151b2a";
       context.fillRect(0, 0, tileWidth, headerHeight);
+      const musicalContext = audioMusicalContextForUi();
+      const selectedScaleKey = audioMusicalKeyPitchClass(musicalContext.key);
+      const scalePitchClasses = audioInstrumentId === "DRUMS"
+        ? new Set<number>()
+        : audioMusicalScalePitchClasses(musicalContext);
       for (let pitchIndex = 0; pitchIndex < rowCount; pitchIndex += 1) {
         const pitch = AUDIO_MIDI_PITCHES[pitchIndex];
         if (pitch?.black !== true) continue;
         context.fillStyle = "rgba(3,5,10,.32)";
+        context.fillRect(
+          0,
+          headerHeight + pitchIndex * AUDIO_MIDI_ROW_HEIGHT,
+          tileWidth,
+          AUDIO_MIDI_ROW_HEIGHT,
+        );
+      }
+      // The scale guide is a visual aid only. It changes row tint, never the
+      // canonical notes or their Tick positions.
+      for (let pitchIndex = 0; pitchIndex < rowCount; pitchIndex += 1) {
+        const pitch = AUDIO_MIDI_PITCHES[pitchIndex];
+        if (pitch === undefined || !scalePitchClasses.has(pitch.midi % 12)) {
+          continue;
+        }
+        const isRoot = pitch.midi % 12 === selectedScaleKey;
+        context.fillStyle = isRoot
+          ? "rgba(116,224,207,.10)"
+          : "rgba(116,224,207,.035)";
         context.fillRect(
           0,
           headerHeight + pitchIndex * AUDIO_MIDI_ROW_HEIGHT,
@@ -17997,6 +19750,12 @@ export function bootstrapDraw2Workspace(
       const clock = audioPianoRollClock();
       for (const note of audioMidiNotes.values()) {
         if (note.instrument !== audioInstrumentId) continue;
+        if (
+          audioMidiErase?.erasedIds.has(note.id) ||
+          audioMidiMovePreview?.sourceNoteIds.has(note.id) ||
+          audioMidiResizePreview?.sourceNoteIds.has(note.id) ||
+          audioMidiQuantizePreview?.sourceNotes.some((source) => source.id === note.id)
+        ) continue;
         const rowIndex = AUDIO_MIDI_PITCHES.findIndex((pitch) =>
           pitch.midi === note.pitchMidi
         );
@@ -18086,6 +19845,28 @@ export function bootstrapDraw2Workspace(
           Math.max(1, noteRight - noteLeft - 1),
           height - 1,
         );
+        if (noteIsSelected && audioMidiDirectManipulationEnabled()) {
+          // A selected note exposes its two resize grips visually. The hit
+          // area remains forgiving in audioMidiResizeAtPointer, while these
+          // small handles tell the user where length editing begins.
+          const gripHeight = Math.max(6, height - 8);
+          const gripWidth = Math.min(4, Math.max(2, (noteRight - noteLeft) * 0.12));
+          context.fillStyle = "#fff3ff";
+          context.globalAlpha = 0.94;
+          context.fillRect(
+            noteLeft + 2,
+            top + 4,
+            gripWidth,
+            gripHeight,
+          );
+          context.fillRect(
+            Math.max(noteLeft + 2, noteRight - gripWidth - 2),
+            top + 4,
+            gripWidth,
+            gripHeight,
+          );
+          context.globalAlpha = 1;
+        }
         if (noteRight - noteLeft > 34) {
           context.fillStyle = "rgba(18,13,28,.8)";
           context.font =
@@ -18097,6 +19878,163 @@ export function bootstrapDraw2Workspace(
             top + height / 2,
           );
           context.textAlign = "center";
+        }
+      }
+      if (audioMidiErase !== undefined && audioMidiErase.notes.length > 0) {
+        for (const note of audioMidiErase.notes) {
+          if (note.instrument !== audioInstrumentId) continue;
+          const rowIndex = AUDIO_MIDI_PITCHES.findIndex((pitch) =>
+            pitch.midi === note.pitchMidi
+          );
+          if (rowIndex < 0) continue;
+          const noteTicks = pianoRollNoteTicks(note, clock);
+          const noteStartX = audioMidiTickToX(noteTicks.startTick);
+          const noteEndX = audioMidiTickToX(
+            noteTicks.startTick + noteTicks.durationTick,
+          );
+          if (noteEndX <= tileStartTimeX || noteStartX >= tileEndTimeX) {
+            continue;
+          }
+          const noteLeft = Math.max(0, noteStartX - tileStartTimeX);
+          const noteRight = Math.min(
+            tileWidth,
+            Math.max(noteLeft + 8, noteEndX - tileStartTimeX),
+          );
+          const top = headerHeight + rowIndex * AUDIO_MIDI_ROW_HEIGHT + 3;
+          const height = AUDIO_MIDI_ROW_HEIGHT - 6;
+          context.fillStyle = "rgba(255,139,139,.16)";
+          context.fillRect(noteLeft, top, noteRight - noteLeft, height);
+          context.strokeStyle = "#ff8b8b";
+          context.lineWidth = 2;
+          context.setLineDash([5, 3]);
+          context.strokeRect(
+            noteLeft + 0.5,
+            top + 0.5,
+            Math.max(1, noteRight - noteLeft - 1),
+            height - 1,
+          );
+          context.beginPath();
+          context.moveTo(noteLeft + 2, top + 2);
+          context.lineTo(noteRight - 2, top + height - 2);
+          context.moveTo(noteRight - 2, top + 2);
+          context.lineTo(noteLeft + 2, top + height - 2);
+          context.stroke();
+          context.setLineDash([]);
+        }
+      }
+      if (audioMidiMovePreview !== undefined) {
+        for (const note of audioMidiMovePreview.notes) {
+          if (note.instrument !== audioInstrumentId) continue;
+          const rowIndex = AUDIO_MIDI_PITCHES.findIndex((pitch) =>
+            pitch.midi === note.pitchMidi
+          );
+          if (rowIndex < 0) continue;
+          const noteTicks = pianoRollNoteTicks(note, clock);
+          const noteStartX = audioMidiTickToX(noteTicks.startTick);
+          const noteEndX = audioMidiTickToX(
+            noteTicks.startTick + noteTicks.durationTick,
+          );
+          if (noteEndX <= tileStartTimeX || noteStartX >= tileEndTimeX) {
+            continue;
+          }
+          const noteLeft = Math.max(0, noteStartX - tileStartTimeX);
+          const noteRight = Math.min(
+            tileWidth,
+            Math.max(noteLeft + 8, noteEndX - tileStartTimeX),
+          );
+          const top = headerHeight + rowIndex * AUDIO_MIDI_ROW_HEIGHT + 3;
+          const height = AUDIO_MIDI_ROW_HEIGHT - 6;
+          const accent = audioMidiMovePreview.valid
+            ? colors[note.instrument] ?? "#74e0cf"
+            : "#ff8b8b";
+          context.fillStyle = accent;
+          context.globalAlpha = audioMidiMovePreview.valid ? 0.48 : 0.22;
+          context.fillRect(noteLeft, top, noteRight - noteLeft, height);
+          context.globalAlpha = 1;
+          context.strokeStyle = accent;
+          context.lineWidth = 2;
+          context.setLineDash([5, 3]);
+          context.strokeRect(
+            noteLeft + 0.5,
+            top + 0.5,
+            Math.max(1, noteRight - noteLeft - 1),
+            height - 1,
+          );
+          context.setLineDash([]);
+        }
+      }
+      if (audioMidiResizePreview !== undefined) {
+        for (const note of audioMidiResizePreview.notes) {
+          if (note.instrument !== audioInstrumentId) continue;
+          const rowIndex = AUDIO_MIDI_PITCHES.findIndex((pitch) =>
+            pitch.midi === note.pitchMidi
+          );
+          if (rowIndex < 0) continue;
+          const noteTicks = pianoRollNoteTicks(note, clock);
+          const noteStartX = audioMidiTickToX(noteTicks.startTick);
+          const noteEndX = audioMidiTickToX(
+            noteTicks.startTick + noteTicks.durationTick,
+          );
+          if (noteEndX <= tileStartTimeX || noteStartX >= tileEndTimeX) continue;
+          const noteLeft = Math.max(0, noteStartX - tileStartTimeX);
+          const noteRight = Math.min(
+            tileWidth,
+            Math.max(noteLeft + 8, noteEndX - tileStartTimeX),
+          );
+          const top = headerHeight + rowIndex * AUDIO_MIDI_ROW_HEIGHT + 3;
+          const height = AUDIO_MIDI_ROW_HEIGHT - 6;
+          const accent = audioMidiResizePreview.valid ? "#ffd166" : "#ff8b8b";
+          context.fillStyle = accent;
+          context.globalAlpha = audioMidiResizePreview.valid ? 0.5 : 0.22;
+          context.fillRect(noteLeft, top, noteRight - noteLeft, height);
+          context.globalAlpha = 1;
+          context.strokeStyle = accent;
+          context.lineWidth = 2;
+          context.setLineDash([5, 3]);
+          context.strokeRect(
+            noteLeft + 0.5,
+            top + 0.5,
+            Math.max(1, noteRight - noteLeft - 1),
+            height - 1,
+          );
+          context.setLineDash([]);
+        }
+      }
+      if (audioMidiQuantizePreview !== undefined) {
+        for (const note of audioMidiQuantizePreview.previewNotes) {
+          if (note.instrument !== audioInstrumentId) continue;
+          const rowIndex = AUDIO_MIDI_PITCHES.findIndex((pitch) =>
+            pitch.midi === note.pitchMidi
+          );
+          if (rowIndex < 0) continue;
+          const noteTicks = pianoRollNoteTicks(note, clock);
+          const noteStartX = audioMidiTickToX(noteTicks.startTick);
+          const noteEndX = audioMidiTickToX(
+            noteTicks.startTick + noteTicks.durationTick,
+          );
+          if (noteEndX <= tileStartTimeX || noteStartX >= tileEndTimeX) continue;
+          const noteLeft = Math.max(0, noteStartX - tileStartTimeX);
+          const noteRight = Math.min(
+            tileWidth,
+            Math.max(noteLeft + 8, noteEndX - tileStartTimeX),
+          );
+          const top = headerHeight + rowIndex * AUDIO_MIDI_ROW_HEIGHT + 3;
+          const height = AUDIO_MIDI_ROW_HEIGHT - 6;
+          const accent = audioMidiQuantizePreview.valid ? "#74e0cf" : "#ff8b8b";
+          context.fillStyle = accent;
+          context.globalAlpha = audioMidiQuantizePreview.valid ? 0.5 : 0.22;
+          context.fillRect(noteLeft, top, noteRight - noteLeft, height);
+          context.globalAlpha = 1;
+          context.strokeStyle = accent;
+          context.lineWidth = 2;
+          context.setLineDash([5, 3]);
+          context.strokeRect(
+            noteLeft + 0.5,
+            top + 0.5,
+            Math.max(1, noteRight - noteLeft - 1),
+            height - 1,
+          );
+          context.setLineDash([]);
         }
       }
       if (
@@ -18177,6 +20115,43 @@ export function bootstrapDraw2Workspace(
           );
           context.strokeStyle = "#74e0cf";
           context.setLineDash([4, 3]);
+          context.strokeRect(
+            rectLeft + 0.5,
+            rectTop + 0.5,
+            Math.max(1, rectRight - rectLeft - 1),
+            Math.max(1, rectBottom - rectTop - 1),
+          );
+          context.setLineDash([]);
+        }
+      }
+      if (
+        audioMidiSelectionBounds !== undefined &&
+        audioMultiSelectedNoteKeys.size > 0 &&
+        audioMidiMove === undefined
+      ) {
+        const bounds = audioMidiSelectionBounds;
+        const rectLeft = Math.max(
+          0,
+          audioMidiTickToX(bounds.startTick) - tileStartTimeX,
+        );
+        const rectRight = Math.min(
+          tileWidth,
+          audioMidiTickToX(bounds.endTick) - tileStartTimeX,
+        );
+        const rectTop = headerHeight +
+          bounds.startPitchIndex * AUDIO_MIDI_ROW_HEIGHT;
+        const rectBottom = headerHeight +
+          (bounds.endPitchIndex + 1) * AUDIO_MIDI_ROW_HEIGHT;
+        if (rectRight > rectLeft) {
+          context.fillStyle = "rgba(116,224,207,.07)";
+          context.fillRect(
+            rectLeft,
+            rectTop,
+            rectRight - rectLeft,
+            rectBottom - rectTop,
+          );
+          context.strokeStyle = "rgba(116,224,207,.84)";
+          context.setLineDash([3, 3]);
           context.strokeRect(
             rectLeft + 0.5,
             rectTop + 0.5,
@@ -18275,6 +20250,9 @@ export function bootstrapDraw2Workspace(
     audioMidiGrid.append(layer);
     audioMidiGrid.scrollLeft = scrollLeft;
     audioMidiGrid.scrollTop = scrollTop;
+    if (!applyAudioMidiInitialViewport()) {
+      scheduleAudioMidiInitialViewport();
+    }
     audioMidiGrid.setAttribute("aria-busy", "false");
     syncAudioMidiViewportState();
     syncAudioMidiCanvasPlayhead();
@@ -18298,7 +20276,17 @@ export function bootstrapDraw2Workspace(
     audioSurfaceRenderScheduled = false;
     audioSurfacesReady = true;
     const renderGeneration = audioSurfaceRenderGeneration;
-    void ensureAudioWorkspaceSession();
+    // Session restore may finish after the first empty projection. Re-run the
+    // lightweight Audio projection at that boundary so contextual surfaces
+    // such as Expression do not stay blank until the next user action.
+    void ensureAudioWorkspaceSession().then(() => {
+      if (
+        renderGeneration !== audioSurfaceRenderGeneration ||
+        !audioSurfacesReady ||
+        root.dataset.creatorMode !== "AUDIO"
+      ) return;
+      scheduleAudioWorkspaceUiProjection();
+    });
     // Extend the empty projection before painting any shared ruler/track
     // surface so the Piano Roll and the lower Audio timeline start on the
     // same multi-bar musical window.
@@ -18399,6 +20387,7 @@ export function bootstrapDraw2Workspace(
       ) return;
       renderAudioTimelineTracks();
       renderAudioMidiGrid();
+      renderAudioMidiExpression();
       renderAudioCustomPanels();
       // Keep hidden Audio panels lazy.  A session update while the Timeline
       // is open must not hydrate clip waveforms, mixer rows or automation
@@ -18441,6 +20430,13 @@ export function bootstrapDraw2Workspace(
     audioInstrumentTimelineCellLookup.clear();
     audioMidiGridLastRenderKey = undefined;
     audioTimelineTracksLastRenderKey = undefined;
+    if (audioClipWaveformGesture !== undefined) {
+      audioClipPreviewInputs.set(
+        audioClipWaveformGesture.clipId,
+        audioClipWaveformGesture.initial,
+      );
+      audioClipWaveformGesture = undefined;
+    }
     // Keep the canonical Project/session in memory, but release the DOM-heavy
     // projections while Draw/Game is active. This prevents an Audio visit from
     // leaving thousands of hidden buttons and canvases in the main document.
@@ -18553,6 +20549,14 @@ export function bootstrapDraw2Workspace(
       `Artwork F${audioAnimationFrame} selected · edit any bar in Piano Roll`,
     );
   });
+  type AudioMidiPanState = {
+    readonly pointerId: number;
+    readonly startX: number;
+    readonly startY: number;
+    readonly scrollLeft: number;
+    readonly scrollTop: number;
+  };
+  let audioMidiPan: AudioMidiPanState | undefined;
   type AudioMidiDragState = {
     readonly pointerId: number;
     readonly instrument: PianoRollInstrumentId;
@@ -18565,9 +20569,19 @@ export function bootstrapDraw2Workspace(
   let audioMidiDragPreviewFrames = new Set<number>();
   let audioMidiIgnoreClick = false;
   let audioMidiSkipNextClick = false;
+  // The second press of a native double-click arrives before the browser's
+  // dblclick event. Remember the first empty click so a double-click-drag can
+  // become a note-length gesture without exposing a Pen mode.
+  let audioMidiSkipNextDoubleClickAt = 0;
+  let audioMidiLastEmptyClick: {
+    readonly at: number;
+    readonly clientX: number;
+    readonly clientY: number;
+  } | undefined;
   type AudioMidiEraseState = {
     readonly pointerId: number;
     readonly erasedIds: Set<string>;
+    readonly notes: PianoRollNote[];
   };
   let audioMidiErase: AudioMidiEraseState | undefined;
   type AudioMidiMarqueeState = {
@@ -18578,6 +20592,43 @@ export function bootstrapDraw2Workspace(
     currentPitchIndex: number;
   };
   let audioMidiMarquee: AudioMidiMarqueeState | undefined;
+  type AudioMidiMoveState = {
+    readonly pointerId: number;
+    readonly anchorTick: AudioTick;
+    readonly anchorPitchIndex: number;
+    readonly notes: readonly PianoRollNote[];
+    readonly minStartTick: AudioTick;
+    readonly minPitchIndex: number;
+    readonly maxPitchIndex: number;
+    deltaTick: AudioTick;
+    deltaPitchIndex: number;
+    moved: boolean;
+    valid: boolean;
+  };
+  type AudioMidiMovePreview = {
+    readonly notes: readonly PianoRollNote[];
+    readonly sourceNoteIds: ReadonlySet<string>;
+    readonly valid: boolean;
+  };
+  let audioMidiMove: AudioMidiMoveState | undefined;
+  let audioMidiMovePreview: AudioMidiMovePreview | undefined;
+  type AudioMidiResizeEdge = "start" | "end";
+  type AudioMidiResizeState = {
+    readonly pointerId: number;
+    readonly note: PianoRollNote;
+    readonly edge: AudioMidiResizeEdge;
+    readonly anchorTick: AudioTick;
+    currentTick: AudioTick;
+    moved: boolean;
+    valid: boolean;
+  };
+  let audioMidiResize: AudioMidiResizeState | undefined;
+  let audioMidiResizePreview: AudioMidiMovePreview | undefined;
+  type AudioMidiClipboard = {
+    readonly notes: readonly PianoRollNote[];
+    readonly originTick: AudioTick;
+  };
+  let audioMidiClipboard: AudioMidiClipboard | undefined;
   const audioMidiPitchIndexFromMidi = (midi: number): number =>
     AUDIO_MIDI_PITCHES.findIndex((pitch) => pitch.midi === midi);
   type AudioMidiPointerTarget = {
@@ -18630,6 +20681,668 @@ export function bootstrapDraw2Workspace(
       pitchMidi: pitch.midi,
       pitch: pitch.label,
     };
+  };
+  const audioMidiNoteAtTarget = (
+    target: AudioMidiPointerTarget,
+  ): PianoRollNote | undefined => {
+    const clock = audioPianoRollClock();
+    for (const note of audioMidiNotes.values()) {
+      if (
+        note.instrument !== audioInstrumentId ||
+        note.pitchMidi !== target.pitchMidi ||
+        audioMidiErase?.erasedIds.has(note.id) === true
+      ) continue;
+      const ticks = pianoRollNoteTicks(note, clock);
+      const startTick = Number(ticks.startTick);
+      const endTick = startTick + Number(ticks.durationTick);
+      if (Number(target.tick) >= startTick && Number(target.tick) < endTick) {
+        return note;
+      }
+    }
+    return undefined;
+  };
+  const audioMidiSelectionBoundsFromDrag = (
+    startTick: AudioTick,
+    currentTick: AudioTick,
+    startPitchIndex: number,
+    currentPitchIndex: number,
+  ): AudioMidiSelectionBounds => {
+    const tickLo = Math.min(Number(startTick), Number(currentTick));
+    const tickHi = Math.max(Number(startTick), Number(currentTick));
+    const minimumEndTick = tickLo + Math.max(1, audioGridTick());
+    return {
+      startTick: Math.max(0, tickLo) as AudioTick,
+      endTick: Math.max(minimumEndTick, tickHi) as AudioTick,
+      startPitchIndex: Math.max(
+        0,
+        Math.min(startPitchIndex, currentPitchIndex),
+      ),
+      endPitchIndex: Math.min(
+        AUDIO_MIDI_PITCHES.length - 1,
+        Math.max(startPitchIndex, currentPitchIndex),
+      ),
+    };
+  };
+  const audioMidiSelectionContainsTarget = (
+    target: AudioMidiPointerTarget,
+  ): boolean => {
+    const pitchIndex = audioMidiPitchIndexFromMidi(target.pitchMidi);
+    const bounds = audioMidiSelectionBounds;
+    if (
+      bounds !== undefined &&
+      Number(target.tick) >= Number(bounds.startTick) &&
+      Number(target.tick) < Number(bounds.endTick) &&
+      pitchIndex >= bounds.startPitchIndex &&
+      pitchIndex <= bounds.endPitchIndex
+    ) return true;
+    const clock = audioPianoRollClock();
+    for (const id of audioMultiSelectedNoteKeys) {
+      const note = audioMidiNotes.get(id);
+      if (note === undefined || note.instrument !== audioInstrumentId) continue;
+      const ticks = pianoRollNoteTicks(note, clock);
+      const noteEnd = Number(ticks.startTick + ticks.durationTick);
+      if (
+        note.pitchMidi === target.pitchMidi &&
+        Number(target.tick) >= Number(ticks.startTick) &&
+        Number(target.tick) < noteEnd
+      ) return true;
+    }
+    return false;
+  };
+  const selectAudioMidiNoteForDirectGesture = (
+    note: PianoRollNote,
+    additive: boolean,
+  ): void => {
+    const previousSelected = audioSelectedNoteKey === undefined
+      ? undefined
+      : audioMidiNotes.get(audioSelectedNoteKey);
+    const nextSelection = additive
+      ? new Set([...audioMultiSelectedNoteKeys, note.id])
+      : new Set([note.id]);
+    audioMultiSelectedNoteKeys = nextSelection;
+    audioSelectedNoteKey = nextSelection.size === 1 ? note.id : undefined;
+    audioMidiSelectionBounds = undefined;
+    audioInstrumentId = note.instrument;
+    audioNoteVelocity = note.velocity;
+    audioNoteLengthFrames = note.durationFrames;
+    audioNoteLengthTicks = pianoRollNoteTicks(
+      note,
+      audioPianoRollClock(),
+    ).durationTick;
+    if (audioMidiInstrument !== undefined) {
+      audioMidiInstrument.value = note.instrument;
+    }
+    if (audioNoteLength !== undefined) {
+      audioNoteLength.value = audioNoteDurationControlValue(note);
+    }
+    audioMidiGrid?.focus();
+    selectAudioEditor("ROLL", true);
+    selectAudioRightPanel("inspector");
+    refreshAudioNoteVisuals(note, previousSelected);
+    syncAudioRightInspector(
+      `${pitchLabel(note.pitchMidi)} · F${note.startFrame + 1}–F${
+        note.startFrame + note.durationFrames
+      }`,
+      nextSelection.size === 1
+        ? "MIDI note selected · drag the note or either edge to edit"
+        : `${nextSelection.size} MIDI notes selected · drag to move together`,
+    );
+    setModeDeckStatus(
+      "audio",
+      nextSelection.size === 1
+        ? `${pitchLabel(note.pitchMidi)} selected · drag to move, edge to resize`
+        : `${nextSelection.size} notes selected · drag any selected note to move`,
+    );
+  };
+  const audioMidiMoveProjection = (
+    state: AudioMidiMoveState,
+  ): AudioMidiMovePreview => {
+    const clock = audioPianoRollClock();
+    let maximumEndTick = 0;
+    for (const note of state.notes) {
+      const ticks = pianoRollNoteTicks(note, clock);
+      maximumEndTick = Math.max(
+        maximumEndTick,
+        Number(ticks.startTick) + Number(ticks.durationTick) +
+          Number(state.deltaTick),
+      );
+    }
+    // A move is only a preview until pointerup. Calculate the frame capacity
+    // locally so hovering or dragging never changes the project's timeline.
+    const projectionFrameCount = Math.min(
+      AUDIO_MAX_FRAME_COUNT,
+      Math.max(
+        audioFrameCount,
+        audioTickToFrame(Math.max(0, maximumEndTick), clock) + 1,
+      ),
+    );
+    const projected: PianoRollNote[] = [];
+    const sourceIds = new Set(state.notes.map((note) => note.id));
+    let valid = true;
+    for (const note of state.notes) {
+      const ticks = pianoRollNoteTicks(note, clock);
+      const sourcePitchIndex = audioMidiPitchIndexFromMidi(note.pitchMidi);
+      const targetPitch = AUDIO_MIDI_PITCHES[
+        sourcePitchIndex + state.deltaPitchIndex
+      ];
+      // A time-only move keeps an existing note exactly as authored. Once
+      // the user changes its row, apply the selected scale input policy to
+      // the destination pitch (SNAP / RESTRICT).
+      const guidedPitchMidi = state.deltaPitchIndex === 0
+        ? note.pitchMidi
+        : targetPitch === undefined
+        ? undefined
+        : audioPitchForMusicalGuide(targetPitch.midi);
+      const startTick = Math.max(
+        0,
+        Number(ticks.startTick) + Number(state.deltaTick),
+      ) as AudioTick;
+      const candidate = guidedPitchMidi === undefined
+        ? undefined
+        : pianoRollNoteFromTicks(
+          {
+            id: note.id,
+            pitchMidi: guidedPitchMidi,
+            startTick,
+            durationTick: ticks.durationTick,
+            velocity: note.velocity,
+            instrument: note.instrument,
+          },
+          clock,
+          projectionFrameCount,
+        );
+      if (candidate === undefined) {
+        valid = false;
+        continue;
+      }
+      projected.push(candidate);
+    }
+    const overlaps = (
+      left: PianoRollNote,
+      right: PianoRollNote,
+    ): boolean => {
+      if (
+        left.instrument !== right.instrument ||
+        left.pitchMidi !== right.pitchMidi
+      ) return false;
+      const leftTicks = pianoRollNoteTicks(left, clock);
+      const rightTicks = pianoRollNoteTicks(right, clock);
+      const leftStart = Number(leftTicks.startTick);
+      const leftEnd = leftStart + Number(leftTicks.durationTick);
+      const rightStart = Number(rightTicks.startTick);
+      const rightEnd = rightStart + Number(rightTicks.durationTick);
+      return leftStart < rightEnd && rightStart < leftEnd;
+    };
+    for (const candidate of projected) {
+      for (const note of audioMidiNotes.values()) {
+        if (sourceIds.has(note.id)) continue;
+        if (overlaps(candidate, note)) valid = false;
+      }
+    }
+    for (let index = 0; index < projected.length; index += 1) {
+      const candidate = projected[index];
+      if (candidate === undefined) continue;
+      for (let otherIndex = index + 1; otherIndex < projected.length; otherIndex += 1) {
+        const other = projected[otherIndex];
+        if (other !== undefined && overlaps(candidate, other)) {
+          valid = false;
+        }
+      }
+    }
+    return { notes: projected, sourceNoteIds: sourceIds, valid };
+  };
+  const audioMidiResizeProjection = (
+    state: AudioMidiResizeState,
+  ): AudioMidiMovePreview => {
+    const clock = audioPianoRollClock();
+    const candidate = state.edge === "start"
+      ? resizePianoRollNoteStartInTicks(
+        state.note,
+        state.currentTick,
+        clock,
+        audioFrameCount,
+      )
+      : resizePianoRollNoteEndInTicks(
+        state.note,
+        state.currentTick,
+        clock,
+        audioFrameCount,
+      );
+    const sourceIds = new Set([state.note.id]);
+    const candidateTicks = pianoRollNoteTicks(candidate, clock);
+    const candidateStart = Number(candidateTicks.startTick);
+    const candidateEnd = candidateStart + Number(candidateTicks.durationTick);
+    const overlaps = [...audioMidiNotes.values()].some((note) => {
+      if (sourceIds.has(note.id) || note.instrument !== candidate.instrument ||
+        note.pitchMidi !== candidate.pitchMidi) return false;
+      const ticks = pianoRollNoteTicks(note, clock);
+      const start = Number(ticks.startTick);
+      const end = start + Number(ticks.durationTick);
+      return start < candidateEnd && candidateStart < end;
+    });
+    return {
+      notes: [candidate],
+      sourceNoteIds: sourceIds,
+      valid: !overlaps,
+    };
+  };
+  const audioMidiResizeAtPointer = (
+    event: Event,
+  ): { readonly note: PianoRollNote; readonly edge: AudioMidiResizeEdge } | null => {
+    const target = audioMidiCellFromPointer(event);
+    if (target === null) return null;
+    const pointer = event as PointerEvent;
+    const rect = audioMidiGrid?.getBoundingClientRect();
+    if (rect === undefined) return null;
+    const contentX = pointer.clientX - rect.left + (audioMidiGrid?.scrollLeft ?? 0) -
+      AUDIO_MIDI_KEY_WIDTH;
+    const clock = audioPianoRollClock();
+    // Keep the edge target forgiving without making short notes impossible
+    // to grab in their body. A proportional slop is easier to hit than one
+    // fixed value across zoom levels and does not swallow the whole note.
+    const thresholdForWidth = (width: number): number =>
+      Math.min(10, Math.max(3, width * 0.22));
+    let best: { note: PianoRollNote; edge: AudioMidiResizeEdge; distance: number } | undefined;
+    for (const note of audioMidiNotes.values()) {
+      if (note.instrument !== audioInstrumentId || note.pitchMidi !== target.pitchMidi) continue;
+      const ticks = pianoRollNoteTicks(note, clock);
+      const startX = audioMidiTickToX(ticks.startTick);
+      const endX = audioMidiTickToX(
+        Number(ticks.startTick) + Number(ticks.durationTick),
+      );
+      const threshold = thresholdForWidth(Math.max(1, endX - startX));
+      const candidates: readonly [AudioMidiResizeEdge, number][] = [
+        ["start", Math.abs(contentX - startX)],
+        ["end", Math.abs(contentX - endX)],
+      ];
+      for (const [edge, distance] of candidates) {
+        if (distance > threshold) continue;
+        if (best === undefined || distance < best.distance) {
+          best = { note, edge, distance };
+        }
+      }
+    }
+    return best === undefined ? null : { note: best.note, edge: best.edge };
+  };
+  const beginAudioMidiResize = (
+    event: Event,
+    target: { readonly note: PianoRollNote; readonly edge: AudioMidiResizeEdge },
+  ): void => {
+    const pointer = event as PointerEvent;
+    const pointerId = Number.isFinite(pointer.pointerId) ? pointer.pointerId : -1;
+    const cell = audioMidiCellFromPointer(event);
+    if (cell === null) return;
+    audioMidiResize = {
+      pointerId,
+      note: target.note,
+      edge: target.edge,
+      anchorTick: cell.tick,
+      currentTick: cell.tick,
+      moved: false,
+      valid: true,
+    };
+    audioMidiResizePreview = audioMidiResizeProjection(audioMidiResize);
+    audioMidiGrid?.classList.add("is-midi-resizing");
+    if (pointerId >= 0) audioMidiGrid?.setPointerCapture?.(pointerId);
+    audioMidiGridLastRenderKey = undefined;
+    if (audioSurfacesReady) renderAudioMidiGrid();
+    pointer.preventDefault();
+  };
+  const updateAudioMidiResize = (event: Event): void => {
+    const pointer = event as PointerEvent;
+    const state = audioMidiResize;
+    const pointerId = Number.isFinite(pointer.pointerId) ? pointer.pointerId : -1;
+    if (state === undefined || state.pointerId !== pointerId) return;
+    const cell = audioMidiCellFromPointer(event);
+    if (cell === null) return;
+    state.currentTick = cell.tick;
+    state.moved = state.currentTick !== state.anchorTick;
+    audioMidiResizePreview = audioMidiResizeProjection(state);
+    state.valid = audioMidiResizePreview.valid;
+    audioMidiGridLastRenderKey = undefined;
+    if (audioSurfacesReady) renderAudioMidiGrid();
+    setModeDeckStatus(
+      "audio",
+      state.valid
+        ? `${pitchLabel(state.note.pitchMidi)} · ${state.edge === "start" ? "start" : "end"} edge preview`
+        : "Resize preview is blocked · destination overlaps another note",
+    );
+    pointer.preventDefault();
+  };
+  const finishAudioMidiResize = (event: Event, cancelled: boolean): void => {
+    const pointer = event as PointerEvent;
+    const state = audioMidiResize;
+    const pointerId = Number.isFinite(pointer.pointerId) ? pointer.pointerId : -1;
+    if (state === undefined || state.pointerId !== pointerId) return;
+    audioMidiResize = undefined;
+    audioMidiGrid?.classList.remove("is-midi-resizing");
+    try {
+      if (pointerId >= 0) audioMidiGrid?.releasePointerCapture?.(pointerId);
+    } catch {
+      // Pointer capture may have already ended.
+    }
+    const preview = audioMidiResizePreview;
+    audioMidiResizePreview = undefined;
+    audioMidiGridLastRenderKey = undefined;
+    if (cancelled || !state.moved || preview === undefined) {
+      audioMidiSkipNextClick = !cancelled;
+      if (audioSurfacesReady) renderAudioMidiGrid();
+      return;
+    }
+    audioMidiIgnoreClick = true;
+    if (!state.valid || preview.notes.length !== 1) {
+      if (audioSurfacesReady) renderAudioMidiGrid();
+      setModeDeckStatus("audio", "Resize cancelled · the destination overlaps another note");
+      return;
+    }
+    const updated = preview.notes[0];
+    if (updated === undefined) return;
+    audioMidiNotes.delete(state.note.id);
+    unindexAudioNote(state.note);
+    audioMidiNotes.set(updated.id, updated);
+    indexAudioNote(updated);
+    audioSelectedNoteKey = updated.id;
+    audioMultiSelectedNoteKeys = new Set([updated.id]);
+    requestAudioNotePreviewOnGesture(updated);
+    renderAudioMidiGrid();
+    syncAudioMidiStatus();
+    void queueAudioWorkspaceMutation((module, session) =>
+      module.journalWorkspaceNoteBatchReplace(
+        session,
+        {
+          removeNoteIds: [state.note.id],
+          notes: [audioWorkspaceNoteInput(updated)],
+        },
+        nextAudioWorkspaceMutation("note-resize-edge"),
+      )
+    ).then((committed) => {
+      if (!committed) {
+        syncAudioWorkspaceUiFromSession();
+        setModeDeckStatus("audio", "Resize could not be saved · the original note was restored");
+        return;
+      }
+      setModeDeckStatus("audio", `${pitchLabel(updated.pitchMidi)} · note length saved · Undo restores the previous size`);
+    });
+  };
+  const commitAudioMidiMove = (state: AudioMidiMoveState): void => {
+    const preview = audioMidiMoveProjection(state);
+    if (!preview.valid || preview.notes.length !== state.notes.length) {
+      setModeDeckStatus(
+        "audio",
+        "Move cancelled · the destination overlaps another note",
+      );
+      return;
+    }
+    for (const note of state.notes) {
+      audioMidiNotes.delete(note.id);
+      unindexAudioNote(note);
+    }
+    const clock = audioPianoRollClock();
+    const requiredEndTick = Math.max(
+      0,
+      ...preview.notes.map((note) => {
+        const ticks = pianoRollNoteTicks(note, clock);
+        return Number(ticks.startTick) + Number(ticks.durationTick);
+      }),
+    );
+    extendAudioTimelineTo(audioTickToFrame(requiredEndTick, clock) + 1);
+    for (const note of preview.notes) {
+      audioMidiNotes.set(note.id, note);
+      indexAudioNote(note);
+      audioActiveInstrumentIds.add(note.instrument);
+    }
+    audioMultiSelectedNoteKeys = new Set(preview.notes.map((note) => note.id));
+    audioSelectedNoteKey = preview.notes.length === 1
+      ? preview.notes[0]?.id
+      : undefined;
+    renderAudioMidiGrid();
+    renderAudioTimelineTracks();
+    syncAudioMidiStatus();
+    const previewNote = preview.notes[0];
+    if (previewNote !== undefined) requestAudioNotePreviewOnGesture(previewNote);
+    void queueAudioWorkspaceMutation((module, session) =>
+      module.journalWorkspaceNoteBatchReplace(
+        session,
+        {
+          removeNoteIds: state.notes.map((note) => note.id),
+          notes: preview.notes.map(audioWorkspaceNoteInput),
+        },
+        nextAudioWorkspaceMutation("note-move"),
+      )
+    ).then((committed) => {
+      if (!committed) {
+        syncAudioWorkspaceUiFromSession();
+        setModeDeckStatus(
+          "audio",
+          "Move could not be saved · the original notes were restored",
+        );
+        return;
+      }
+      syncAudioRightInspector(
+        `${preview.notes.length} MIDI notes`,
+        "MIDI selection moved · one Undo restores the original positions",
+      );
+      setModeDeckStatus(
+        "audio",
+        `${preview.notes.length} note${preview.notes.length === 1 ? "" : "s"} moved · Tick position saved`,
+      );
+    });
+  };
+  const splitTickForAudioMidiNote = (
+    note: PianoRollNote,
+    bounds: AudioMidiSelectionBounds | undefined,
+    clock: ReturnType<typeof audioPianoRollClock>,
+    explicitTick?: AudioTick,
+  ): AudioTick | undefined => {
+    const ticks = pianoRollNoteTicks(note, clock);
+    const startTick = Number(ticks.startTick);
+    const endTick = startTick + Number(ticks.durationTick);
+    if (explicitTick !== undefined) {
+      const candidate = Number(explicitTick);
+      return candidate > startTick && candidate < endTick
+        ? candidate as AudioTick
+        : undefined;
+    }
+    if (bounds === undefined) return undefined;
+    const candidates = [
+      Number(bounds.endTick),
+      Number(bounds.startTick),
+    ];
+    for (const candidate of candidates) {
+      if (candidate > startTick && candidate < endTick) {
+        return candidate as AudioTick;
+      }
+    }
+    if (
+      startTick >= Number(bounds.startTick) &&
+      endTick <= Number(bounds.endTick)
+    ) {
+      const midpoint = Math.floor((startTick + endTick) / 2);
+      if (midpoint > startTick && midpoint < endTick) {
+        return midpoint as AudioTick;
+      }
+    }
+    return undefined;
+  };
+  const splitSelectedAudioMidiNotes = (splitAtTick?: AudioTick): void => {
+    const bounds = audioMidiSelectionBounds;
+    if (
+      (bounds === undefined && splitAtTick === undefined) ||
+      audioMultiSelectedNoteKeys.size === 0
+    ) {
+      setModeDeckStatus("audio", "Select MIDI notes before splitting");
+      return;
+    }
+    const clock = audioPianoRollClock();
+    const selectedNotes = [...audioMultiSelectedNoteKeys]
+      .map((id) => audioMidiNotes.get(id))
+      .filter((note): note is PianoRollNote =>
+        note !== undefined && note.instrument === audioInstrumentId
+      );
+    const entries: Array<{
+      readonly source: PianoRollNote;
+      readonly left: PianoRollNote;
+      readonly right: PianoRollNote;
+    }> = [];
+    for (const [index, note] of selectedNotes.entries()) {
+      const splitTick = splitTickForAudioMidiNote(
+        note,
+        bounds,
+        clock,
+        splitAtTick,
+      );
+      if (splitTick === undefined) continue;
+      const ticks = pianoRollNoteTicks(note, clock);
+      const startTick = Number(ticks.startTick);
+      const endTick = startTick + Number(ticks.durationTick);
+      const leftDuration = Number(splitTick) - startTick;
+      const rightDuration = endTick - Number(splitTick);
+      if (leftDuration < 1 || rightDuration < 1) continue;
+      const left = pianoRollNoteFromTicks(
+        {
+          id: note.id,
+          pitchMidi: note.pitchMidi,
+          startTick: ticks.startTick,
+          durationTick: leftDuration as AudioTick,
+          velocity: note.velocity,
+          instrument: note.instrument,
+        },
+        clock,
+        audioFrameCount,
+      );
+      const right = pianoRollNoteFromTicks(
+        {
+          id: `note:split:${Date.now()}:${audioMidiEditSequence++}:${index}`,
+          pitchMidi: note.pitchMidi,
+          startTick: splitTick,
+          durationTick: rightDuration as AudioTick,
+          velocity: note.velocity,
+          instrument: note.instrument,
+        },
+        clock,
+        audioFrameCount,
+      );
+      if (left !== undefined && right !== undefined) {
+        entries.push({ source: note, left, right });
+      }
+    }
+    if (entries.length === 0) {
+      setModeDeckStatus(
+        "audio",
+        "Split needs a selection boundary inside a note or a note-wide selection",
+      );
+      return;
+    }
+    const sourceIds = new Set(entries.map((entry) => entry.source.id));
+    const replacements = entries.flatMap((entry) => [entry.left, entry.right]);
+    const overlaps = (
+      left: PianoRollNote,
+      right: PianoRollNote,
+    ): boolean => {
+      if (
+        left.instrument !== right.instrument ||
+        left.pitchMidi !== right.pitchMidi
+      ) return false;
+      const leftTicks = pianoRollNoteTicks(left, clock);
+      const rightTicks = pianoRollNoteTicks(right, clock);
+      const leftStart = Number(leftTicks.startTick);
+      const leftEnd = leftStart + Number(leftTicks.durationTick);
+      const rightStart = Number(rightTicks.startTick);
+      const rightEnd = rightStart + Number(rightTicks.durationTick);
+      return leftStart < rightEnd && rightStart < leftEnd;
+    };
+    let valid = true;
+    for (const replacement of replacements) {
+      for (const note of audioMidiNotes.values()) {
+        if (sourceIds.has(note.id)) continue;
+        if (overlaps(replacement, note)) valid = false;
+      }
+    }
+    for (let index = 0; index < replacements.length; index += 1) {
+      const replacement = replacements[index];
+      if (replacement === undefined) continue;
+      for (let otherIndex = index + 1; otherIndex < replacements.length; otherIndex += 1) {
+        const other = replacements[otherIndex];
+        if (other !== undefined && overlaps(replacement, other)) {
+          valid = false;
+        }
+      }
+    }
+    if (!valid) {
+      setModeDeckStatus(
+        "audio",
+        "Split cancelled · the resulting notes overlap another note",
+      );
+      return;
+    }
+    for (const entry of entries) {
+      audioMidiNotes.delete(entry.source.id);
+      unindexAudioNote(entry.source);
+    }
+    for (const note of replacements) {
+      audioMidiNotes.set(note.id, note);
+      indexAudioNote(note);
+    }
+    const unchangedSelected = selectedNotes.filter((note) =>
+      !sourceIds.has(note.id)
+    );
+    audioMultiSelectedNoteKeys = new Set(
+      unchangedSelected.concat(replacements).map((note) => note.id),
+    );
+    audioSelectedNoteKey = audioMultiSelectedNoteKeys.size === 1
+      ? [...audioMultiSelectedNoteKeys][0]
+      : undefined;
+    renderAudioMidiGrid();
+    syncAudioMidiStatus();
+    void queueAudioWorkspaceMutation((module, session) =>
+      module.journalWorkspaceNoteBatchReplace(
+        session,
+        {
+          removeNoteIds: entries.map((entry) => entry.source.id),
+          notes: replacements.map(audioWorkspaceNoteInput),
+        },
+        nextAudioWorkspaceMutation("note-split"),
+      )
+    ).then((committed) => {
+      if (!committed) {
+        syncAudioWorkspaceUiFromSession();
+        setModeDeckStatus(
+          "audio",
+          "Split could not be saved · the original notes were restored",
+        );
+        return;
+      }
+      syncAudioRightInspector(
+        `${replacements.length} MIDI notes`,
+        "MIDI notes split · one Undo restores the original notes",
+      );
+      setModeDeckStatus(
+        "audio",
+        `${entries.length} note${entries.length === 1 ? "" : "s"} split · Tick position saved`,
+      );
+    });
+  };
+  const splitAudioMidiNoteAtPointer = (event: Event): void => {
+    if (!audioMidiDirectManipulationEnabled()) return;
+    if (audioMidiSkipNextDoubleClickAt > Date.now()) {
+      audioMidiSkipNextDoubleClickAt = 0;
+      return;
+    }
+    audioMidiSkipNextDoubleClickAt = 0;
+    const target = audioMidiCellFromPointer(event);
+    if (target === null) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const note = audioMidiNoteAtTarget(target);
+    if (note !== undefined) {
+      selectAudioMidiNoteForDirectGesture(note, false);
+      splitSelectedAudioMidiNotes(target.tick);
+      return;
+    }
+    // On the desktop, empty double-click is the only pointer gesture that
+    // creates a note. The created note becomes selected immediately, so the
+    // same visual object can then be dragged or edge-resized.
+    createAudioMidiNoteAtTarget(target);
   };
   const audioMidiDragRange = (
     state: AudioMidiDragState,
@@ -18776,10 +21489,17 @@ export function bootstrapDraw2Workspace(
   };
   const getAudioTestToneTrackId = (): string | undefined => {
     const channels = audioWorkspaceSession?.project.mixer.channels ?? [];
-    const selectedId = String(currentAudioDeckTrackId());
-    const selectedTrackIds = new Set([selectedId]);
+    const selectedDisplayIds = new Set([String(currentAudioDeckTrackId())]);
     if (audioInspectorTargetKind === "instrument") {
-      selectedTrackIds.add(audioRuntimeTrackId(audioInstrumentId));
+      selectedDisplayIds.add(audioRuntimeTrackId(audioInstrumentId));
+    }
+    const selectedTrackIds = new Set<string>();
+    for (const displayId of selectedDisplayIds) {
+      selectedTrackIds.add(displayId);
+      const canonicalId = audioWorkspaceSession === undefined
+        ? undefined
+        : resolveAudioTrackId(audioWorkspaceSession.project, displayId);
+      if (canonicalId !== undefined) selectedTrackIds.add(String(canonicalId));
     }
     const selectedChannel = channels.find((channel) =>
       selectedTrackIds.has(String(channel.trackId))
@@ -18789,7 +21509,15 @@ export function bootstrapDraw2Workspace(
       : String(selectedChannel.trackId);
   };
   audioTestTone?.addEventListener("click", async () => {
-    const trackId = getAudioTestToneTrackId();
+    // The Audio Project is restored asynchronously. A click that lands while
+    // that restore is pending must not be mistaken for a missing Mixer lane.
+    // Preflight resumes the Context from the trusted gesture before awaiting
+    // the local Project, then the canonical Track is resolved again.
+    let trackId = getAudioTestToneTrackId();
+    if (trackId === undefined) {
+      if (!await ensureAudioPlaybackReady("audio-test-tone")) return;
+      trackId = getAudioTestToneTrackId();
+    }
     if (trackId === undefined) {
       setModeDeckStatus(
         "audio",
@@ -18807,9 +21535,9 @@ export function bootstrapDraw2Workspace(
     }
     const played = chipTuneSynth.playNote(
       69,
-      260,
+      900,
       "triangle",
-      0.8,
+      1,
       trackId,
     );
     if (!played) {
@@ -18821,7 +21549,7 @@ export function bootstrapDraw2Workspace(
     }
     setModeDeckStatus(
       "audio",
-      "Test tone played · if silent, check Safari tab mute and system output",
+      "Test tone scheduled · Master output signal is active",
     );
     syncAudioGlobalTransport();
   });
@@ -18854,6 +21582,10 @@ export function bootstrapDraw2Workspace(
     audioMidiNotes.delete(note.id);
     unindexAudioNote(note);
     if (audioSelectedNoteKey === note.id) audioSelectedNoteKey = undefined;
+    audioMultiSelectedNoteKeys.delete(note.id);
+    if (audioMultiSelectedNoteKeys.size === 0) {
+      audioMidiSelectionBounds = undefined;
+    }
     void queueAudioWorkspaceMutation((module, session) =>
       module.journalWorkspaceNoteRemove(
         session,
@@ -19022,117 +21754,310 @@ export function bootstrapDraw2Workspace(
     );
     syncAudioMidiStatus();
   };
-  const applyAudioMidiCell = (target: AudioMidiPointerTarget): void => {
+  const createAudioMidiNoteAtTarget = (
+    target: AudioMidiPointerTarget,
+  ): void => {
     selectAudioEditor("ROLL", true);
     selectAudioRightPanel("inspector");
     audioInspectorTargetKind = "instrument";
     const clock = audioPianoRollClock();
-    const pitchMidi = target.pitchMidi;
-    const pitch = target.pitch;
     const tick = target.tick;
     const frame = audioTickToFrame(tick, clock);
-    const existing = audioNoteAtFrame(pitchMidi, frame);
+    const existing = audioMidiNoteAtTarget(target);
+    if (existing !== undefined) {
+      selectAudioMidiNoteForDirectGesture(existing, false);
+      return;
+    }
+    const pitchMidi = audioPitchForMusicalGuide(target.pitchMidi);
+    if (pitchMidi === undefined) {
+      setModeDeckStatus("audio", audioMusicalGuideRejection(target.pitchMidi));
+      return;
+    }
+    const pitch = pitchLabel(pitchMidi);
     const previousSelected = audioSelectedNoteKey === undefined
       ? undefined
       : audioMidiNotes.get(audioSelectedNoteKey);
+    // A normal Pen selection is single-note state. Range state is changed
+    // only by the Select tool, so stale range actions cannot affect a new
+    // note click.
+    audioMultiSelectedNoteKeys = new Set();
+    audioMidiSelectionBounds = undefined;
     syncAudioAnimationFrame(frame + 1);
-    if (existing !== undefined) {
-      audioSelectedNoteKey = existing.id;
-      audioInstrumentId = existing.instrument;
-      audioNoteVelocity = existing.velocity;
-      if (audioMidiInstrument !== undefined) {
-        audioMidiInstrument.value = existing.instrument;
-      }
-      audioNoteLengthFrames = existing.durationFrames;
-      audioNoteLengthTicks = pianoRollNoteTicks(existing, clock).durationTick;
-      refreshAudioNoteVisuals(existing, previousSelected);
-      if (audioNoteLength !== undefined) {
-        audioNoteLength.value = audioNoteDurationControlValue(existing);
-      }
-      syncAudioRightInspector(
-        `${pitch} · F${existing.startFrame + 1}–F${
-          existing.startFrame + existing.durationFrames
-        }`,
-        "MIDI note selected · adjust timing, velocity or instrument below",
-      );
-      setModeDeckStatus(
-        "audio",
-        `${pitch} · F${existing.startFrame + 1}–F${
-          existing.startFrame + existing.durationFrames
-        } selected · drag to add a new note, Delete to remove`,
-      );
-    } else {
-      const durationTick = Math.max(
-        1,
-        audioDefaultNoteLengthTicks,
-      ) as AudioTick;
-      audioNoteLengthTicks = durationTick;
-      audioNoteLengthFrames = Math.max(
-        1,
-        audioTickToFrame(durationTick, clock),
-      );
-      if (audioNoteLength !== undefined) {
-        audioNoteLength.value = String(durationTick);
-      }
-      extendAudioTimelineTo(audioTickToFrame(tick + durationTick, clock));
-      const note = pianoRollNoteFromTicks(
-        {
-          id: audioNoteKey(audioInstrumentId, pitchMidi, frame),
-          pitchMidi,
-          startTick: tick,
-          durationTick,
-          velocity: audioNoteVelocity,
-          instrument: audioInstrumentId,
-        },
-        clock,
-        audioFrameCount,
-      );
-      if (note === undefined) return;
-      const canonicalNote = note;
-      const durationFrames = canonicalNote.durationFrames;
-      audioMidiNotes.set(canonicalNote.id, canonicalNote);
-      indexAudioNote(canonicalNote);
-      audioSelectedNoteKey = canonicalNote.id;
-      primeAudioPlaybackFromGesture(
-        audioRuntimeTrackId(canonicalNote.instrument),
-      );
-      requestAudioNotePreviewOnGesture(canonicalNote);
-      void queueAudioNoteUpsert(canonicalNote, "note-add").then((committed) => {
-        if (committed && !audioNotePreviewCompleted.has(canonicalNote)) {
-          void playAudioNotePreview(canonicalNote);
-        }
-      });
-      refreshAudioNoteVisuals(canonicalNote, previousSelected);
-      syncAudioRightInspector(
-        `${pitch} · F${frame + 1}–F${frame + durationFrames}`,
-        "MIDI note added · Audio-200 journal commit queued",
-      );
-      setModeDeckStatus(
-        "audio",
-        `${pitch} · F${frame + 1}–F${frame + durationFrames} · ${
-          AUDIO_INSTRUMENTS.find((item) => item.id === audioInstrumentId)
-            ?.label ?? audioInstrumentId
-        } note added`,
-      );
+    const durationTick = Math.max(
+      1,
+      audioDefaultNoteLengthTicks,
+    ) as AudioTick;
+    audioNoteLengthTicks = durationTick;
+    audioNoteLengthFrames = Math.max(
+      1,
+      audioTickToFrame(durationTick, clock),
+    );
+    if (audioNoteLength !== undefined) {
+      audioNoteLength.value = String(durationTick);
     }
+    extendAudioTimelineTo(audioTickToFrame(tick + durationTick, clock));
+    const note = pianoRollNoteFromTicks(
+      {
+        id: audioNoteKey(audioInstrumentId, pitchMidi, frame),
+        pitchMidi,
+        startTick: tick,
+        durationTick,
+        velocity: audioNoteVelocity,
+        instrument: audioInstrumentId,
+      },
+      clock,
+      audioFrameCount,
+    );
+    if (note === undefined) return;
+    const canonicalNote = note;
+    const durationFrames = canonicalNote.durationFrames;
+    audioMidiNotes.set(canonicalNote.id, canonicalNote);
+    indexAudioNote(canonicalNote);
+    audioSelectedNoteKey = canonicalNote.id;
+    primeAudioPlaybackFromGesture(
+      audioRuntimeTrackId(canonicalNote.instrument),
+    );
+    requestAudioNotePreviewOnGesture(canonicalNote);
+    void queueAudioNoteUpsert(canonicalNote, "note-add").then((committed) => {
+      if (committed && !audioNotePreviewCompleted.has(canonicalNote)) {
+        void playAudioNotePreview(canonicalNote);
+      }
+    });
+    refreshAudioNoteVisuals(canonicalNote, previousSelected);
+    syncAudioRightInspector(
+      `${pitch} · F${frame + 1}–F${frame + durationFrames}`,
+      "MIDI note added · Audio-200 journal commit queued",
+    );
+    setModeDeckStatus(
+      "audio",
+      `${pitch} · F${frame + 1}–F${frame + durationFrames} · ${
+        AUDIO_INSTRUMENTS.find((item) => item.id === audioInstrumentId)
+          ?.label ?? audioInstrumentId
+      } note added`,
+    );
     syncAudioMidiStatus();
+  };
+  const applyAudioMidiCell = (target: AudioMidiPointerTarget): void => {
+    const existing = audioMidiNoteAtTarget(target);
+    if (existing === undefined) {
+      createAudioMidiNoteAtTarget(target);
+      return;
+    }
+    selectAudioEditor("ROLL", true);
+    selectAudioRightPanel("inspector");
+    audioInspectorTargetKind = "instrument";
+    const clock = audioPianoRollClock();
+    const pitch = target.pitch;
+    const frame = audioTickToFrame(target.tick, clock);
+    const previousSelected = audioSelectedNoteKey === undefined
+      ? undefined
+      : audioMidiNotes.get(audioSelectedNoteKey);
+    // A normal Pen selection is single-note state. Range state is changed
+    // only by the Select tool, so stale range actions cannot affect a new
+    // note click.
+    audioMultiSelectedNoteKeys = new Set();
+    audioMidiSelectionBounds = undefined;
+    syncAudioAnimationFrame(frame + 1);
+    audioSelectedNoteKey = existing.id;
+    audioInstrumentId = existing.instrument;
+    audioNoteVelocity = existing.velocity;
+    if (audioMidiInstrument !== undefined) {
+      audioMidiInstrument.value = existing.instrument;
+    }
+    audioNoteLengthFrames = existing.durationFrames;
+    audioNoteLengthTicks = pianoRollNoteTicks(existing, clock).durationTick;
+    requestAudioNotePreviewOnGesture(existing);
+    refreshAudioNoteVisuals(existing, previousSelected);
+    if (audioNoteLength !== undefined) {
+      audioNoteLength.value = audioNoteDurationControlValue(existing);
+    }
+    syncAudioRightInspector(
+      `${pitch} · F${existing.startFrame + 1}–F${
+        existing.startFrame + existing.durationFrames
+      }`,
+      "MIDI note selected · adjust timing, velocity or instrument below",
+    );
+    setModeDeckStatus(
+      "audio",
+      `${pitch} · F${existing.startFrame + 1}–F${
+        existing.startFrame + existing.durationFrames
+      } selected · drag to move, edge to resize, Delete to remove`,
+    );
+    syncAudioMidiStatus();
+  };
+  const beginAudioMidiDrawAtTarget = (
+    event: Event,
+    target: AudioMidiPointerTarget,
+  ): void => {
+    const pointer = event as PointerEvent;
+    const pointerId = Number.isFinite(pointer.pointerId)
+      ? pointer.pointerId
+      : -1;
+    const pitchMidi = audioPitchForMusicalGuide(target.pitchMidi);
+    if (pitchMidi === undefined) {
+      setModeDeckStatus("audio", audioMusicalGuideRejection(target.pitchMidi));
+      pointer.preventDefault();
+      return;
+    }
+    audioMidiDrag = {
+      pointerId,
+      instrument: audioInstrumentId,
+      pitchMidi,
+      startFrame: Math.max(
+        0,
+        Math.min(audioFrameCount - 1, target.frame),
+      ),
+      currentFrame: Math.max(
+        0,
+        Math.min(audioFrameCount - 1, target.frame),
+      ),
+      moved: false,
+    };
+    audioMidiDragPreviewFrames = new Set([target.frame]);
+    audioMidiGrid?.classList.add("is-midi-drawing");
+    if (pointerId >= 0) audioMidiGrid?.setPointerCapture?.(pointerId);
+    syncAudioMidiDragPreview(audioMidiDrag);
+    setModeDeckStatus(
+      "audio",
+      `${pitchLabel(pitchMidi)} · drag to set note length · release to add`,
+    );
+    pointer.preventDefault();
+  };
+  const beginAudioMidiPan = (event: Event): void => {
+    const pointer = event as PointerEvent;
+    const pointerId = Number.isFinite(pointer.pointerId)
+      ? pointer.pointerId
+      : -1;
+    if (audioMidiGrid === undefined) return;
+    audioMidiPan = {
+      pointerId,
+      startX: pointer.clientX,
+      startY: pointer.clientY,
+      scrollLeft: audioMidiGrid.scrollLeft,
+      scrollTop: audioMidiGrid.scrollTop,
+    };
+    audioMidiGrid.classList.add("is-midi-panning");
+    if (pointerId >= 0) audioMidiGrid.setPointerCapture?.(pointerId);
+    pointer.preventDefault();
+  };
+  const updateAudioMidiPan = (event: Event): void => {
+    const pointer = event as PointerEvent;
+    const pointerId = Number.isFinite(pointer.pointerId)
+      ? pointer.pointerId
+      : -1;
+    const pan = audioMidiPan;
+    if (pan === undefined || pan.pointerId !== pointerId || audioMidiGrid === undefined) {
+      return;
+    }
+    audioMidiGrid.scrollLeft = Math.max(
+      0,
+      pan.scrollLeft + pan.startX - pointer.clientX,
+    );
+    audioMidiGrid.scrollTop = Math.max(
+      0,
+      pan.scrollTop + pan.startY - pointer.clientY,
+    );
+    pointer.preventDefault();
+  };
+  const finishAudioMidiPan = (event: Event): void => {
+    const pointer = event as PointerEvent;
+    const pointerId = Number.isFinite(pointer.pointerId)
+      ? pointer.pointerId
+      : -1;
+    const pan = audioMidiPan;
+    if (pan === undefined || pan.pointerId !== pointerId) return;
+    audioMidiPan = undefined;
+    audioMidiGrid?.classList.remove("is-midi-panning");
+    try {
+      if (pointerId >= 0) audioMidiGrid?.releasePointerCapture?.(pointerId);
+    } catch {
+      // Pointer capture may already have ended.
+    }
+    pointer.preventDefault();
   };
   const beginAudioMidiDrag = (event: Event): void => {
     const pointer = event as PointerEvent;
     if ((event as MouseEvent).button !== 0) return;
+    // Pointer and mouse fallbacks can report the same gesture twice. Keep one
+    // state machine active so a second event cannot replace a move or marquee.
+    if (
+      audioMidiDrag !== undefined || audioMidiErase !== undefined ||
+      audioMidiMarquee !== undefined || audioMidiMove !== undefined ||
+      audioMidiResize !== undefined || audioMidiPan !== undefined
+    ) return;
+    if (root.dataset.draw2SpaceHeld === "true") {
+      beginAudioMidiPan(event);
+      return;
+    }
+    if (audioMidiDirectManipulationEnabled()) {
+      const target = audioMidiCellFromPointer(event);
+      if (target === null) return;
+      const pointerX = pointer.clientX;
+      const pointerY = pointer.clientY;
+      const lastEmptyClick = audioMidiLastEmptyClick;
+      const isDoubleClickDraw = lastEmptyClick !== undefined &&
+        Date.now() - lastEmptyClick.at <= 450 &&
+        Number.isFinite(pointerX) && Number.isFinite(pointerY) &&
+        Math.hypot(pointerX - lastEmptyClick.clientX, pointerY - lastEmptyClick.clientY) <= 14 &&
+        audioMidiNoteAtTarget(target) === undefined;
+      if (isDoubleClickDraw) {
+        audioMidiLastEmptyClick = undefined;
+        audioMidiSkipNextDoubleClickAt = Date.now() + 600;
+        beginAudioMidiDrawAtTarget(event, target);
+        return;
+      }
+      audioMidiLastEmptyClick = undefined;
+      const resizeTarget = audioMidiResizeAtPointer(event);
+      if (resizeTarget !== null) {
+        selectAudioMidiNoteForDirectGesture(resizeTarget.note, false);
+        syncAudioAnimationFrame(resizeTarget.note.startFrame + 1);
+        beginAudioMidiResize(event, resizeTarget);
+        return;
+      }
+      const note = audioMidiNoteAtTarget(target);
+      if (note !== undefined) {
+        // Dragging an already selected note keeps the whole selection moving;
+        // Shift adds a new note to the selection before the drag starts.
+        const keepSelection =
+          pointer.shiftKey || audioMultiSelectedNoteKeys.has(note.id);
+        selectAudioMidiNoteForDirectGesture(note, keepSelection);
+        syncAudioAnimationFrame(target.frame + 1);
+        beginAudioMidiMove(event, target);
+        return;
+      }
+      // Empty single-click is a zero-size selection gesture (the finish
+      // handler turns it into playhead navigation). As soon as the pointer
+      // moves, it becomes a range selection; no Select mode is needed.
+      beginAudioMidiMarquee(event);
+      return;
+    }
     if (audioMidiTool === "eraser") {
       beginAudioMidiErase(event);
       return;
     }
     if (audioMidiTool === "select") {
-      beginAudioMidiMarquee(event);
+      const resizeTarget = audioMidiResizeAtPointer(event);
+      if (resizeTarget !== null) {
+        beginAudioMidiResize(event, resizeTarget);
+        return;
+      }
+      const target = audioMidiCellFromPointer(event);
+      if (target !== null && audioMidiSelectionContainsTarget(target)) {
+        beginAudioMidiMove(event, target);
+      } else {
+        beginAudioMidiMarquee(event);
+      }
       return;
     }
-    if (audioMidiDrag !== undefined) return;
     const target = audioMidiCellFromPointer(event);
     if (target === null) return;
     const frame = target.frame;
-    const pitchMidi = target.pitchMidi;
+    const pitchMidi = audioPitchForMusicalGuide(target.pitchMidi);
+    if (pitchMidi === undefined) {
+      setModeDeckStatus("audio", audioMusicalGuideRejection(target.pitchMidi));
+      pointer.preventDefault();
+      return;
+    }
     const pointerId = Number.isFinite(pointer.pointerId)
       ? pointer.pointerId
       : -1;
@@ -19154,12 +22079,24 @@ export function bootstrapDraw2Workspace(
     syncAudioMidiDragPreview(audioMidiDrag);
   };
   const updateAudioMidiDrag = (event: Event): void => {
+    if (audioMidiPan !== undefined) {
+      updateAudioMidiPan(event);
+      return;
+    }
     if (audioMidiErase !== undefined) {
       updateAudioMidiErase(event);
       return;
     }
     if (audioMidiMarquee !== undefined) {
       updateAudioMidiMarquee(event);
+      return;
+    }
+    if (audioMidiResize !== undefined) {
+      updateAudioMidiResize(event);
+      return;
+    }
+    if (audioMidiMove !== undefined) {
+      updateAudioMidiMove(event);
       return;
     }
     const pointer = event as PointerEvent;
@@ -19190,12 +22127,24 @@ export function bootstrapDraw2Workspace(
     }
   };
   const finishAudioMidiDrag = (event: Event, cancelled: boolean): void => {
+    if (audioMidiPan !== undefined) {
+      finishAudioMidiPan(event);
+      return;
+    }
     if (audioMidiErase !== undefined) {
-      finishAudioMidiErase(event);
+      finishAudioMidiErase(event, cancelled);
       return;
     }
     if (audioMidiMarquee !== undefined) {
-      finishAudioMidiMarquee(event);
+      finishAudioMidiMarquee(event, cancelled);
+      return;
+    }
+    if (audioMidiResize !== undefined) {
+      finishAudioMidiResize(event, cancelled);
+      return;
+    }
+    if (audioMidiMove !== undefined) {
+      finishAudioMidiMove(event, cancelled);
       return;
     }
     const pointer = event as PointerEvent;
@@ -19206,6 +22155,7 @@ export function bootstrapDraw2Workspace(
     if (state === undefined || state.pointerId !== pointerId) return;
     audioMidiDrag = undefined;
     audioMidiGrid?.classList.remove("is-midi-dragging");
+    audioMidiGrid?.classList.remove("is-midi-drawing");
     try {
       if (pointerId >= 0) audioMidiGrid?.releasePointerCapture?.(pointerId);
     } catch {
@@ -19235,14 +22185,21 @@ export function bootstrapDraw2Workspace(
     const note = audioNoteAtFrame(target.pitchMidi, target.frame);
     if (note === undefined || state.erasedIds.has(note.id)) return;
     state.erasedIds.add(note.id);
-    removeAudioMidiNote(note, "MIDI note erased");
+    state.notes.push(note);
+    audioMidiGridLastRenderKey = undefined;
+    if (audioSurfacesReady) renderAudioMidiGrid();
+    syncAudioMidiStatus();
+    setModeDeckStatus(
+      "audio",
+      `${state.notes.length} note${state.notes.length === 1 ? "" : "s"} erase preview · release to delete · Esc to cancel`,
+    );
   };
   const beginAudioMidiErase = (event: Event): void => {
     const pointer = event as PointerEvent;
     const pointerId = Number.isFinite(pointer.pointerId)
       ? pointer.pointerId
       : -1;
-    audioMidiErase = { pointerId, erasedIds: new Set() };
+    audioMidiErase = { pointerId, erasedIds: new Set(), notes: [] };
     audioMidiGrid?.classList.add("is-midi-erasing");
     if (pointerId >= 0) audioMidiGrid?.setPointerCapture?.(pointerId);
     const target = audioMidiCellFromPointer(event);
@@ -19260,7 +22217,7 @@ export function bootstrapDraw2Workspace(
     eraseAudioMidiCellAt(target, state);
     pointer.preventDefault();
   };
-  const finishAudioMidiErase = (event: Event): void => {
+  const finishAudioMidiErase = (event: Event, cancelled = false): void => {
     const pointer = event as PointerEvent;
     const state = audioMidiErase;
     const pointerId = Number.isFinite(pointer.pointerId)
@@ -19275,6 +22232,167 @@ export function bootstrapDraw2Workspace(
     } catch {
       // Pointer capture may already have been released by the browser.
     }
+    if (state.notes.length === 0) return;
+    if (cancelled) {
+      audioMidiGridLastRenderKey = undefined;
+      if (audioSurfacesReady) renderAudioMidiGrid();
+      setModeDeckStatus("audio", "Erase preview cancelled · notes restored");
+      return;
+    }
+    for (const note of state.notes) {
+      audioMidiNotes.delete(note.id);
+      unindexAudioNote(note);
+      if (audioSelectedNoteKey === note.id) audioSelectedNoteKey = undefined;
+      audioMultiSelectedNoteKeys.delete(note.id);
+    }
+    audioMidiSelectionBounds = undefined;
+    audioMidiGridLastRenderKey = undefined;
+    if (audioSurfacesReady) renderAudioMidiGrid();
+    void queueAudioWorkspaceMutation((module, session) =>
+      module.journalWorkspaceNoteBatchReplace(
+        session,
+        {
+          removeNoteIds: state.notes.map((note) => note.id),
+          notes: [],
+        },
+        nextAudioWorkspaceMutation("note-erase-batch"),
+      )
+    ).then((committed) => {
+      if (!committed) {
+        syncAudioWorkspaceUiFromSession();
+        setModeDeckStatus("audio", "Erase could not be saved · the notes were restored");
+        return;
+      }
+      setModeDeckStatus(
+        "audio",
+        `${state.notes.length} note${state.notes.length === 1 ? "" : "s"} erased · one Undo restores the gesture`,
+      );
+    });
+  };
+  const beginAudioMidiMove = (
+    event: Event,
+    target: AudioMidiPointerTarget,
+  ): void => {
+    const pointer = event as PointerEvent;
+    const pointerId = Number.isFinite(pointer.pointerId)
+      ? pointer.pointerId
+      : -1;
+    const pitchIndex = audioMidiPitchIndexFromMidi(target.pitchMidi);
+    const selectedIds = audioMultiSelectedNoteKeys.size > 0
+      ? [...audioMultiSelectedNoteKeys]
+      : audioSelectedNoteKey === undefined ? [] : [audioSelectedNoteKey];
+    const notes = selectedIds
+      .map((id) => audioMidiNotes.get(id))
+      .filter((note): note is PianoRollNote =>
+        note !== undefined && note.instrument === audioInstrumentId
+      );
+    if (notes.length === 0 || pitchIndex < 0) return;
+    const clock = audioPianoRollClock();
+    const minStartTick = notes.reduce((minimum, note) => {
+      const ticks = pianoRollNoteTicks(note, clock);
+      return Math.min(minimum, Number(ticks.startTick));
+    }, Number.POSITIVE_INFINITY);
+    const notePitchIndexes = notes.map((note) =>
+      audioMidiPitchIndexFromMidi(note.pitchMidi)
+    );
+    const minPitchIndex = Math.min(...notePitchIndexes);
+    const maxPitchIndex = Math.max(...notePitchIndexes);
+    audioMidiMove = {
+      pointerId,
+      anchorTick: target.tick,
+      anchorPitchIndex: pitchIndex,
+      notes,
+      minStartTick: Math.max(0, minStartTick) as AudioTick,
+      minPitchIndex,
+      maxPitchIndex,
+      deltaTick: 0 as AudioTick,
+      deltaPitchIndex: 0,
+      moved: false,
+      valid: true,
+    };
+    audioMidiMovePreview = audioMidiMoveProjection(audioMidiMove);
+    audioMidiGrid?.classList.add("is-midi-moving");
+    if (pointerId >= 0) audioMidiGrid?.setPointerCapture?.(pointerId);
+    audioMidiGridLastRenderKey = undefined;
+    if (audioSurfacesReady) renderAudioMidiGrid();
+    setModeDeckStatus(
+      "audio",
+      `${notes.length} note${notes.length === 1 ? "" : "s"} selected · drag to move · release to save`,
+    );
+    pointer.preventDefault();
+  };
+  const updateAudioMidiMove = (event: Event): void => {
+    const pointer = event as PointerEvent;
+    const state = audioMidiMove;
+    const pointerId = Number.isFinite(pointer.pointerId)
+      ? pointer.pointerId
+      : -1;
+    if (state === undefined || state.pointerId !== pointerId) return;
+    const target = audioMidiCellFromPointer(event);
+    if (target === null) return;
+    const rawDeltaTick = Number(target.tick) - Number(state.anchorTick);
+    const minimumDeltaTick = -Number(state.minStartTick);
+    const deltaTick = Math.max(
+      minimumDeltaTick,
+      rawDeltaTick,
+    ) as AudioTick;
+    const targetPitchIndex = audioMidiPitchIndexFromMidi(target.pitchMidi);
+    const rawDeltaPitchIndex = targetPitchIndex - state.anchorPitchIndex;
+    const minimumDeltaPitchIndex = -state.minPitchIndex;
+    const maximumDeltaPitchIndex = AUDIO_MIDI_PITCHES.length - 1 -
+      state.maxPitchIndex;
+    const deltaPitchIndex = Math.max(
+      minimumDeltaPitchIndex,
+      Math.min(maximumDeltaPitchIndex, rawDeltaPitchIndex),
+    );
+    state.deltaTick = deltaTick;
+    state.deltaPitchIndex = deltaPitchIndex;
+    state.moved = deltaTick !== 0 || deltaPitchIndex !== 0;
+    audioMidiMovePreview = audioMidiMoveProjection(state);
+    state.valid = audioMidiMovePreview.valid;
+    audioMidiGridLastRenderKey = undefined;
+    if (audioSurfacesReady) renderAudioMidiGrid();
+    setModeDeckStatus(
+      "audio",
+      state.valid
+        ? `${state.notes.length} note${state.notes.length === 1 ? "" : "s"} · Δ ${deltaTick >= 0 ? "+" : ""}${deltaTick} ticks · Δ ${deltaPitchIndex >= 0 ? "+" : ""}${deltaPitchIndex} keys`
+        : "Move preview is blocked · destination overlaps another note",
+    );
+    pointer.preventDefault();
+  };
+  const finishAudioMidiMove = (event: Event, cancelled: boolean): void => {
+    const pointer = event as PointerEvent;
+    const state = audioMidiMove;
+    const pointerId = Number.isFinite(pointer.pointerId)
+      ? pointer.pointerId
+      : -1;
+    if (state === undefined || state.pointerId !== pointerId) return;
+    audioMidiMove = undefined;
+    audioMidiGrid?.classList.remove("is-midi-moving");
+    try {
+      if (pointerId >= 0) audioMidiGrid?.releasePointerCapture?.(pointerId);
+    } catch {
+      // Pointer capture may already have been released by the browser.
+    }
+    audioMidiMovePreview = undefined;
+    audioMidiGridLastRenderKey = undefined;
+    if (cancelled || !state.moved) {
+      if (!cancelled) audioMidiSkipNextClick = true;
+      if (audioSurfacesReady) renderAudioMidiGrid();
+      syncAudioMidiStatus();
+      return;
+    }
+    audioMidiIgnoreClick = true;
+    if (!state.valid) {
+      if (audioSurfacesReady) renderAudioMidiGrid();
+      syncAudioMidiStatus();
+      setModeDeckStatus(
+        "audio",
+        "Move cancelled · the destination overlaps another note",
+      );
+      return;
+    }
+    commitAudioMidiMove(state);
   };
   const beginAudioMidiMarquee = (event: Event): void => {
     const pointer = event as PointerEvent;
@@ -19311,7 +22429,7 @@ export function bootstrapDraw2Workspace(
     if (audioSurfacesReady) renderAudioMidiGrid();
     pointer.preventDefault();
   };
-  const finishAudioMidiMarquee = (event: Event): void => {
+  const finishAudioMidiMarquee = (event: Event, cancelled = false): void => {
     const pointer = event as PointerEvent;
     const state = audioMidiMarquee;
     const pointerId = Number.isFinite(pointer.pointerId)
@@ -19326,21 +22444,70 @@ export function bootstrapDraw2Workspace(
     } catch {
       // Pointer capture may already have been released by the browser.
     }
-    const tickLo = Math.min(state.startTick, state.currentTick);
-    const tickHi = Math.max(state.startTick, state.currentTick);
-    const pitchLo = Math.min(state.startPitchIndex, state.currentPitchIndex);
-    const pitchHi = Math.max(state.startPitchIndex, state.currentPitchIndex);
+    if (cancelled) {
+      audioMidiGridLastRenderKey = undefined;
+      if (audioSurfacesReady) renderAudioMidiGrid();
+      syncAudioMidiStatus();
+      setModeDeckStatus("audio", "Selection preview cancelled");
+      return;
+    }
+    const stationary =
+      state.startTick === state.currentTick &&
+      state.startPitchIndex === state.currentPitchIndex;
+    if (stationary) {
+      const pitch = AUDIO_MIDI_PITCHES[state.startPitchIndex];
+      const clock = audioPianoRollClock();
+      if (Number.isFinite(pointer.clientX) && Number.isFinite(pointer.clientY)) {
+        audioMidiLastEmptyClick = {
+          at: Date.now(),
+          clientX: pointer.clientX,
+          clientY: pointer.clientY,
+        };
+      }
+      audioSelectedNoteKey = undefined;
+      audioMultiSelectedNoteKeys = new Set();
+      audioMidiSelectionBounds = undefined;
+      syncAudioAnimationFrame(audioTickToFrame(state.startTick, clock) + 1);
+      audioMidiGridLastRenderKey = undefined;
+      if (audioSurfacesReady) renderAudioMidiGrid();
+      syncAudioRightInspector(
+        pitch === undefined ? "Piano Roll" : `${pitch.label} · empty lane`,
+        "Double-click empty space to add a note",
+      );
+      syncAudioMidiStatus();
+      setModeDeckStatus(
+        "audio",
+        pitch === undefined
+          ? "Double-click empty space to add a note"
+          : `${pitch.label} · double-click to add a note`,
+      );
+      return;
+    }
+    const bounds = audioMidiSelectionBoundsFromDrag(
+      state.startTick,
+      state.currentTick,
+      state.startPitchIndex,
+      state.currentPitchIndex,
+    );
     const clock = audioPianoRollClock();
     const matched = new Set<string>();
     for (const note of audioMidiNotes.values()) {
+      if (note.instrument !== audioInstrumentId) continue;
       const ticks = pianoRollNoteTicks(note, clock);
       const noteStart = ticks.startTick;
       const noteEnd = ticks.startTick + ticks.durationTick;
-      if (noteEnd <= tickLo || noteStart >= tickHi) continue;
+      if (
+        Number(noteEnd) <= Number(bounds.startTick) ||
+        Number(noteStart) >= Number(bounds.endTick)
+      ) continue;
       const rowIndex = audioMidiPitchIndexFromMidi(note.pitchMidi);
-      if (rowIndex < pitchLo || rowIndex > pitchHi) continue;
+      if (
+        rowIndex < bounds.startPitchIndex ||
+        rowIndex > bounds.endPitchIndex
+      ) continue;
       matched.add(note.id);
     }
+    audioMidiSelectionBounds = matched.size > 0 ? bounds : undefined;
     audioMultiSelectedNoteKeys = matched;
     audioSelectedNoteKey = matched.size === 1 ? [...matched][0] : undefined;
     audioMidiGridLastRenderKey = undefined;
@@ -19351,14 +22518,65 @@ export function bootstrapDraw2Workspace(
       matched.size > 0
         ? `${matched.size} note${
           matched.size === 1 ? "" : "s"
-        } selected · Delete to remove`
+        } selected · drag to move · Split or Delete`
         : "No notes in selection",
     );
   };
+  const cancelAudioMidiPointerGesture = (): boolean => {
+    if (audioMidiExpressionCancel !== undefined) {
+      return audioMidiExpressionCancel();
+    }
+    if (audioAutomationCancel !== undefined) {
+      return audioAutomationCancel();
+    }
+    const activePointerId = audioMidiDrag?.pointerId ??
+      audioMidiErase?.pointerId ??
+      audioMidiMarquee?.pointerId ??
+      audioMidiResize?.pointerId ??
+      audioMidiMove?.pointerId;
+    if (activePointerId === undefined) return false;
+    finishAudioMidiDrag(
+      { pointerId: activePointerId } as PointerEvent,
+      true,
+    );
+    return true;
+  };
   // Pointer events cover touch and pen input.  Keep a mouse fallback for
   // embedded browsers that expose coordinate drag as classic mouse events.
+  audioMidiGrid?.setAttribute("tabindex", "0");
+  audioMidiGrid?.setAttribute(
+    "aria-keyshortcuts",
+    "Space Shift+Space ArrowLeft ArrowRight ArrowUp ArrowDown Delete Control+C Control+V Control+X Control+D S Q Enter I G H - = [ ]",
+  );
+  const updateAudioMidiHoverCursor = (event: Event): void => {
+    if (!audioMidiDirectManipulationEnabled() || audioMidiGrid === undefined) {
+      return;
+    }
+    if (
+      audioMidiDrag !== undefined || audioMidiErase !== undefined ||
+      audioMidiMarquee !== undefined || audioMidiMove !== undefined ||
+      audioMidiResize !== undefined
+    ) return;
+    const target = audioMidiCellFromPointer(event);
+    if (target === null) {
+      delete audioMidiGrid.dataset.audioMidiCursor;
+      return;
+    }
+    const resizeTarget = audioMidiResizeAtPointer(event);
+    if (resizeTarget !== null) {
+      audioMidiGrid.dataset.audioMidiCursor =
+        `${resizeTarget.edge}-resize`;
+      return;
+    }
+    audioMidiGrid.dataset.audioMidiCursor =
+      audioMidiNoteAtTarget(target) === undefined ? "empty" : "note";
+  };
   audioMidiGrid?.addEventListener("pointerdown", beginAudioMidiDrag);
   audioMidiGrid?.addEventListener("pointermove", updateAudioMidiDrag);
+  audioMidiGrid?.addEventListener("pointermove", updateAudioMidiHoverCursor);
+  audioMidiGrid?.addEventListener("pointerleave", () => {
+    if (audioMidiGrid !== undefined) delete audioMidiGrid.dataset.audioMidiCursor;
+  });
   audioMidiGrid?.addEventListener("pointerup", (event) => {
     finishAudioMidiDrag(event, false);
   });
@@ -19367,9 +22585,11 @@ export function bootstrapDraw2Workspace(
   });
   audioMidiGrid?.addEventListener("mousedown", beginAudioMidiDrag);
   audioMidiGrid?.addEventListener("mousemove", updateAudioMidiDrag);
+  audioMidiGrid?.addEventListener("mousemove", updateAudioMidiHoverCursor);
   audioMidiGrid?.addEventListener("mouseup", (event) => {
     finishAudioMidiDrag(event, false);
   });
+  audioMidiGrid?.addEventListener("dblclick", splitAudioMidiNoteAtPointer);
   audioMidiGrid?.addEventListener("click", (event) => {
     if (audioMidiIgnoreClick) {
       audioMidiIgnoreClick = false;
@@ -19381,6 +22601,38 @@ export function bootstrapDraw2Workspace(
     }
     const target = audioMidiCellFromPointer(event);
     if (target === null) return;
+    if (audioMidiDirectManipulationEnabled()) {
+      const existing = audioMidiNoteAtTarget(target);
+      if (existing !== undefined) {
+        selectAudioMidiNoteForDirectGesture(
+          existing,
+          (event as MouseEvent).shiftKey,
+        );
+        syncAudioAnimationFrame(target.frame + 1);
+        return;
+      }
+      // Empty single-click is deliberately not a creation gesture on PC.
+      // Move the playhead and expose the one discoverable instruction needed
+      // to create a note without filling the roll with extra controls.
+      audioMidiGrid?.focus();
+      selectAudioEditor("ROLL", true);
+      selectAudioRightPanel("inspector");
+      audioSelectedNoteKey = undefined;
+      audioMultiSelectedNoteKeys = new Set();
+      audioMidiSelectionBounds = undefined;
+      syncAudioAnimationFrame(target.frame + 1);
+      syncAudioRightInspector(
+        `${target.pitch} · F${target.frame + 1}`,
+        "Empty lane · double-click to add a note",
+      );
+      setModeDeckStatus(
+        "audio",
+        `${target.pitch} · F${target.frame + 1} · double-click to add a note`,
+      );
+      syncAudioMidiStatus();
+      return;
+    }
+    audioMidiGrid?.focus();
     selectAudioEditor("ROLL", true);
     selectAudioRightPanel("inspector");
     const clock = audioPianoRollClock();
@@ -19388,10 +22640,12 @@ export function bootstrapDraw2Workspace(
     const pitch = target.pitch;
     const tick = target.tick;
     const frame = audioTickToFrame(tick, clock);
-    const existing = audioNoteAtFrame(pitchMidi, frame);
+    const existing = audioMidiNoteAtTarget(target);
     const previousSelected = audioSelectedNoteKey === undefined
       ? undefined
       : audioMidiNotes.get(audioSelectedNoteKey);
+    audioMultiSelectedNoteKeys = new Set();
+    audioMidiSelectionBounds = undefined;
     syncAudioAnimationFrame(frame + 1);
     // A note click follows the familiar DAW rule: select first, edit or
     // remove explicitly with Delete/Backspace or the context menu. This keeps
@@ -19483,7 +22737,7 @@ export function bootstrapDraw2Workspace(
     event.stopPropagation();
     const target = audioMidiCellFromPointer(event);
     if (target === null) return;
-    const note = audioNoteAtFrame(target.pitchMidi, target.frame);
+    const note = audioMidiNoteAtTarget(target);
     if (note === undefined) {
       setModeDeckStatus("audio", "No MIDI note at this position");
       return;
@@ -19494,32 +22748,370 @@ export function bootstrapDraw2Workspace(
   audioMidiGrid?.addEventListener("keydown", (event) => {
     if (
       audioEditorActiveTab !== "ROLL" || event.defaultPrevented ||
-      event.isComposing || event.repeat
+      event.isComposing
+    ) return;
+    const focusTarget = documentRef.activeElement;
+    if (focusTarget !== audioMidiGrid && focusTarget !== audioMidiCanvas) return;
+    if (
+      event.target instanceof Element &&
+      event.target.closest("button, input, textarea, select, [contenteditable=true]") !== null
     ) return;
     const key = event.key.toLowerCase();
+    const spaceKey = event.code === "Space" || event.key === " ";
+    if (
+      spaceKey && !event.metaKey && !event.ctrlKey && !event.shiftKey &&
+      !event.altKey
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      toggleCurrentModePlayback();
+      return;
+    }
+    if (
+      spaceKey && event.shiftKey && !event.metaKey && !event.ctrlKey &&
+      !event.altKey
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      void audioMidiPlaySelection?.click();
+      return;
+    }
+    if (
+      !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey
+    ) {
+      if (key === "q") {
+        event.preventDefault();
+        event.stopPropagation();
+        audioMidiQuantizePreviewButton?.click();
+        return;
+      }
+      if (event.key === "Enter" && audioMidiQuantizePreview !== undefined) {
+        event.preventDefault();
+        event.stopPropagation();
+        audioMidiQuantizeApplyButton?.click();
+        return;
+      }
+      if (key === "i") {
+        event.preventDefault();
+        event.stopPropagation();
+        audioMidiStepInput?.click();
+        return;
+      }
+      if (key === "g") {
+        event.preventDefault();
+        event.stopPropagation();
+        audioSwingApply?.click();
+        return;
+      }
+      if (key === "h") {
+        event.preventDefault();
+        event.stopPropagation();
+        audioHumanize?.click();
+        return;
+      }
+      if (event.key === "-") {
+        event.preventDefault();
+        event.stopPropagation();
+        audioMidiZoomOut?.click();
+        return;
+      }
+      if (event.key === "=" || event.key === "]") {
+        event.preventDefault();
+        event.stopPropagation();
+        audioMidiZoomIn?.click();
+        return;
+      }
+      if (event.key === "[") {
+        event.preventDefault();
+        event.stopPropagation();
+        audioMidiZoomOut?.click();
+        return;
+      }
+    }
     const selected = audioSelectedNoteKey === undefined
       ? undefined
       : audioMidiNotes.get(audioSelectedNoteKey);
+    const selectedNotes = (): PianoRollNote[] => {
+      const ids = audioMultiSelectedNoteKeys.size > 0
+        ? [...audioMultiSelectedNoteKeys]
+        : audioSelectedNoteKey === undefined ? [] : [audioSelectedNoteKey];
+      return ids.map((id) => audioMidiNotes.get(id)).filter(
+        (note): note is PianoRollNote =>
+          note !== undefined && note.instrument === audioInstrumentId,
+      );
+    };
+    const copySelectedNotes = (): boolean => {
+      const notes = selectedNotes();
+      if (notes.length === 0) return false;
+      const clock = audioPianoRollClock();
+      const originTick = Math.min(
+        ...notes.map((note) => Number(pianoRollNoteTicks(note, clock).startTick)),
+      ) as AudioTick;
+      audioMidiClipboard = {
+        originTick,
+        notes: notes.map((note) => ({ ...note })),
+      };
+      setModeDeckStatus("audio", `${notes.length} note${notes.length === 1 ? "" : "s"} copied · Tick clipboard ready`);
+      return true;
+    };
+    const tickRangeOverlaps = (
+      left: PianoRollNote,
+      right: PianoRollNote,
+      clock: ReturnType<typeof audioPianoRollClock>,
+    ): boolean => {
+      if (left.instrument !== right.instrument || left.pitchMidi !== right.pitchMidi) return false;
+      const a = pianoRollNoteTicks(left, clock);
+      const b = pianoRollNoteTicks(right, clock);
+      return Number(a.startTick) < Number(b.startTick + b.durationTick) &&
+        Number(b.startTick) < Number(a.startTick + a.durationTick);
+    };
+    const deleteSelectedNotes = (): void => {
+      const notes = selectedNotes();
+      if (notes.length === 0) {
+        setModeDeckStatus("audio", "Select a MIDI note to delete");
+        return;
+      }
+      for (const note of notes) {
+        audioMidiNotes.delete(note.id);
+        unindexAudioNote(note);
+      }
+      const ids = notes.map((note) => note.id);
+      audioSelectedNoteKey = undefined;
+      audioMultiSelectedNoteKeys = new Set();
+      audioMidiSelectionBounds = undefined;
+      renderAudioMidiGrid();
+      syncAudioMidiStatus();
+      void queueAudioWorkspaceMutation((module, session) =>
+        module.journalWorkspaceNoteBatchReplace(
+          session,
+          { removeNoteIds: ids, notes: [] },
+          nextAudioWorkspaceMutation("note-delete-batch"),
+        )
+      ).then((committed) => {
+        if (!committed) {
+          syncAudioWorkspaceUiFromSession();
+          setModeDeckStatus("audio", "Delete could not be saved · the notes were restored");
+          return;
+        }
+        setModeDeckStatus("audio", `${ids.length} note${ids.length === 1 ? "" : "s"} deleted · one Undo restores the selection`);
+      });
+    };
+    const pasteClipboardNotes = (): void => {
+      const clipboard = audioMidiClipboard;
+      if (clipboard === undefined || clipboard.notes.length === 0) {
+        setModeDeckStatus("audio", "Clipboard is empty · select notes and copy first");
+        return;
+      }
+      const clock = audioPianoRollClock();
+      const destination = audioMidiCurrentTick();
+      const offsets = clipboard.notes.map((note) => {
+        const ticks = pianoRollNoteTicks(note, clock);
+        return {
+          note,
+          offset: Number(ticks.startTick) - Number(clipboard.originTick),
+          duration: Number(ticks.durationTick),
+        };
+      });
+      const endTick = offsets.reduce(
+        (end, item) => Math.max(end, Number(destination) + item.offset + item.duration),
+        Number(destination),
+      );
+      const nextFrameCount = Math.min(
+        AUDIO_MAX_FRAME_COUNT,
+        Math.max(audioFrameCount, audioTickToFrame(endTick, clock) + 1),
+      );
+      const pasted: PianoRollNote[] = [];
+      for (const [index, item] of offsets.entries()) {
+        const pitchMidi = audioPitchForMusicalGuide(item.note.pitchMidi);
+        if (pitchMidi === undefined) {
+          setModeDeckStatus("audio", audioMusicalGuideRejection(item.note.pitchMidi));
+          return;
+        }
+        const candidate = pianoRollNoteFromTicks(
+          {
+            id: `note:paste:${Date.now()}:${audioMidiEditSequence++}:${index}`,
+            pitchMidi,
+            startTick: Math.max(0, Number(destination) + item.offset) as AudioTick,
+            durationTick: item.duration as AudioTick,
+            velocity: item.note.velocity,
+            instrument: item.note.instrument,
+          },
+          clock,
+          nextFrameCount,
+        );
+        if (candidate === undefined) continue;
+        if (
+          [...audioMidiNotes.values()].some((note) => tickRangeOverlaps(candidate, note, clock)) ||
+          pasted.some((note) => tickRangeOverlaps(candidate, note, clock))
+        ) {
+          setModeDeckStatus("audio", "Paste cancelled · the destination overlaps another note");
+          return;
+        }
+        pasted.push(candidate);
+      }
+      if (pasted.length !== clipboard.notes.length) {
+        setModeDeckStatus("audio", "Paste cancelled · the destination is outside the timeline");
+        return;
+      }
+      extendAudioTimelineTo(nextFrameCount);
+      for (const note of pasted) {
+        audioMidiNotes.set(note.id, note);
+        indexAudioNote(note);
+        audioActiveInstrumentIds.add(note.instrument);
+      }
+      audioMultiSelectedNoteKeys = new Set(pasted.map((note) => note.id));
+      audioSelectedNoteKey = pasted.length === 1 ? pasted[0]?.id : undefined;
+      renderAudioMidiGrid();
+      syncAudioMidiStatus();
+      void queueAudioWorkspaceMutation((module, session) =>
+        module.journalWorkspaceNoteBatchReplace(
+          session,
+          { removeNoteIds: [], notes: pasted.map(audioWorkspaceNoteInput) },
+          nextAudioWorkspaceMutation("note-paste-batch"),
+        )
+      ).then((committed) => {
+        if (!committed) {
+          syncAudioWorkspaceUiFromSession();
+          setModeDeckStatus("audio", "Paste could not be saved · the original project was restored");
+          return;
+        }
+        setModeDeckStatus("audio", `${pasted.length} note${pasted.length === 1 ? "" : "s"} pasted · one Undo removes the paste`);
+      });
+    };
+    const duplicateSelectedNotes = (): void => {
+      const notes = selectedNotes();
+      if (notes.length === 0) {
+        setModeDeckStatus("audio", "Select a MIDI note to duplicate");
+        return;
+      }
+      const clock = audioPianoRollClock();
+      const originTick = Math.min(
+        ...notes.map((note) => Number(pianoRollNoteTicks(note, clock).startTick)),
+      );
+      const destination = Math.max(
+        ...notes.map((note) => {
+          const ticks = pianoRollNoteTicks(note, clock);
+          return Number(ticks.startTick) + Number(ticks.durationTick);
+        }),
+      );
+      const offsets = notes.map((note) => {
+        const ticks = pianoRollNoteTicks(note, clock);
+        return {
+          note,
+          startTick: destination + Number(ticks.startTick) - originTick,
+          durationTick: Number(ticks.durationTick),
+        };
+      });
+      const endTick = Math.max(
+        ...offsets.map((item) => item.startTick + item.durationTick),
+      );
+      const nextFrameCount = Math.min(
+        AUDIO_MAX_FRAME_COUNT,
+        Math.max(audioFrameCount, audioTickToFrame(endTick, clock) + 1),
+      );
+      const duplicated: PianoRollNote[] = [];
+      for (const [index, item] of offsets.entries()) {
+        const candidate = pianoRollNoteFromTicks(
+          {
+            id: `note:duplicate:${Date.now()}:${audioMidiEditSequence++}:${index}`,
+            pitchMidi: item.note.pitchMidi,
+            startTick: item.startTick as AudioTick,
+            durationTick: item.durationTick as AudioTick,
+            velocity: item.note.velocity,
+            instrument: item.note.instrument,
+          },
+          clock,
+          nextFrameCount,
+        );
+        if (
+          candidate === undefined ||
+          [...audioMidiNotes.values()].some((note) => tickRangeOverlaps(candidate, note, clock)) ||
+          duplicated.some((note) => tickRangeOverlaps(candidate, note, clock))
+        ) {
+          setModeDeckStatus("audio", "Duplicate cancelled · the destination overlaps another note");
+          return;
+        }
+        duplicated.push(candidate);
+      }
+      extendAudioTimelineTo(nextFrameCount);
+      for (const note of duplicated) {
+        audioMidiNotes.set(note.id, note);
+        indexAudioNote(note);
+        audioActiveInstrumentIds.add(note.instrument);
+      }
+      audioSelectedNoteKey = duplicated.length === 1 ? duplicated[0]?.id : undefined;
+      audioMultiSelectedNoteKeys = new Set(duplicated.map((note) => note.id));
+      renderAudioMidiGrid();
+      syncAudioMidiStatus();
+      const previewNote = duplicated[0];
+      if (previewNote !== undefined) requestAudioNotePreviewOnGesture(previewNote);
+      void queueAudioWorkspaceMutation((module, session) =>
+        module.journalWorkspaceNoteBatchReplace(
+          session,
+          { removeNoteIds: [], notes: duplicated.map(audioWorkspaceNoteInput) },
+          nextAudioWorkspaceMutation("note-duplicate-batch"),
+        )
+      ).then((committed) => {
+        if (!committed) {
+          syncAudioWorkspaceUiFromSession();
+          setModeDeckStatus("audio", "Duplicate could not be saved · the original project was restored");
+          return;
+        }
+        setModeDeckStatus("audio", `${duplicated.length} note${duplicated.length === 1 ? "" : "s"} duplicated · one Undo removes the copy`);
+      });
+    };
+    const nudgeSelectedNotes = (deltaTick: number, deltaPitchMidi: number): void => {
+      const notes = selectedNotes();
+      if (notes.length === 0) return;
+      const clock = audioPianoRollClock();
+      const first = notes[0];
+      if (first === undefined) return;
+      const firstTicks = pianoRollNoteTicks(first, clock);
+      const state: AudioMidiMoveState = {
+        pointerId: -1,
+        anchorTick: firstTicks.startTick,
+        anchorPitchIndex: audioMidiPitchIndexFromMidi(first.pitchMidi),
+        notes,
+        minStartTick: Math.min(...notes.map((note) => Number(pianoRollNoteTicks(note, clock).startTick))) as AudioTick,
+        minPitchIndex: Math.min(...notes.map((note) => audioMidiPitchIndexFromMidi(note.pitchMidi))),
+        maxPitchIndex: Math.max(...notes.map((note) => audioMidiPitchIndexFromMidi(note.pitchMidi))),
+        deltaTick: deltaTick as AudioTick,
+        deltaPitchIndex: deltaPitchMidi,
+        moved: true,
+        valid: true,
+      };
+      const preview = audioMidiMoveProjection(state);
+      state.valid = preview.valid;
+      if (!state.valid) {
+        setModeDeckStatus("audio", "Move cancelled · the destination overlaps another note");
+        return;
+      }
+      commitAudioMidiMove(state);
+    };
+    if ((event.metaKey || event.ctrlKey) && !event.altKey) {
+      if (key === "c") {
+        event.preventDefault();
+        event.stopPropagation();
+        copySelectedNotes();
+        return;
+      }
+      if (key === "x") {
+        event.preventDefault();
+        event.stopPropagation();
+        if (copySelectedNotes()) deleteSelectedNotes();
+        return;
+      }
+      if (key === "v") {
+        event.preventDefault();
+        event.stopPropagation();
+        pasteClipboardNotes();
+        return;
+      }
+    }
     if (event.key === "Delete" || event.key === "Backspace") {
       event.preventDefault();
       event.stopPropagation();
-      if (audioMultiSelectedNoteKeys.size > 0) {
-        const ids = [...audioMultiSelectedNoteKeys];
-        audioMultiSelectedNoteKeys = new Set();
-        for (const id of ids) {
-          const note = audioMidiNotes.get(id);
-          if (note !== undefined) removeAudioMidiNote(note);
-        }
-        syncAudioMidiStatus();
-        setModeDeckStatus(
-          "audio",
-          `${ids.length} note${ids.length === 1 ? "" : "s"} deleted`,
-        );
-      } else if (selected === undefined) {
-        setModeDeckStatus("audio", "Select a MIDI note to delete");
-      } else {
-        removeAudioMidiNote(selected);
-      }
+      deleteSelectedNotes();
       return;
     }
     if (
@@ -19527,19 +23119,44 @@ export function bootstrapDraw2Workspace(
     ) {
       event.preventDefault();
       event.stopPropagation();
-      if (selected === undefined) {
-        setModeDeckStatus("audio", "Select a MIDI note to duplicate");
-      } else {
-        duplicateAudioMidiNote(selected);
-      }
+      duplicateSelectedNotes();
+      return;
+    }
+    if (
+      !event.metaKey && !event.ctrlKey && !event.altKey && key === "s"
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      splitSelectedAudioMidiNotes(audioMidiCurrentTick());
+      return;
+    }
+    if (
+      !event.metaKey && !event.ctrlKey && !event.altKey &&
+      (event.key === "ArrowLeft" || event.key === "ArrowRight" ||
+        event.key === "ArrowUp" || event.key === "ArrowDown")
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      const amount = event.shiftKey ? audioBarTick() : audioGridTick();
+      const deltaTick = event.key === "ArrowLeft"
+        ? -amount
+        : event.key === "ArrowRight" ? amount : 0;
+      const deltaPitch = event.key === "ArrowUp" ? 1 : event.key === "ArrowDown" ? -1 : 0;
+      nudgeSelectedNotes(deltaTick, deltaPitch);
       return;
     }
     if (event.key === "Escape") {
       event.preventDefault();
       event.stopPropagation();
+      if (cancelAudioMidiPointerGesture()) return;
+      if (audioMidiQuantizePreview !== undefined) {
+        cancelAudioMidiQuantize();
+        return;
+      }
       audioSelectedNoteKey = undefined;
       const hadMultiSelection = audioMultiSelectedNoteKeys.size > 0;
       audioMultiSelectedNoteKeys = new Set();
+      audioMidiSelectionBounds = undefined;
       if (selected !== undefined) {
         refreshAudioNoteVisuals(undefined, selected);
       } else if (hadMultiSelection) {
@@ -19557,10 +23174,15 @@ export function bootstrapDraw2Workspace(
     );
     if (!Number.isFinite(value)) return;
     audioNoteVelocity = value;
-    const selected = audioSelectedNoteKey === undefined
-      ? undefined
-      : audioMidiNotes.get(audioSelectedNoteKey);
-    if (selected === undefined) {
+    const selectedNotes = (audioMultiSelectedNoteKeys.size > 0
+      ? [...audioMultiSelectedNoteKeys].map((id) => audioMidiNotes.get(id))
+      : audioSelectedNoteKey === undefined
+      ? []
+      : [audioMidiNotes.get(audioSelectedNoteKey)]).filter(
+        (note): note is PianoRollNote =>
+          note !== undefined && note.instrument === audioInstrumentId,
+      );
+    if (selectedNotes.length === 0) {
       syncAudioMidiStatus();
       setModeDeckStatus(
         "audio",
@@ -19568,19 +23190,343 @@ export function bootstrapDraw2Workspace(
       );
       return;
     }
-    unindexAudioNote(selected);
-    const updated = { ...selected, velocity: value };
-    audioMidiNotes.set(updated.id, updated);
-    indexAudioNote(updated);
-    refreshAudioNoteVisuals(updated, selected);
+    const updatedNotes = selectedNotes.map((note) => ({
+      ...note,
+      velocity: value,
+    }));
+    for (const [index, note] of selectedNotes.entries()) {
+      const updated = updatedNotes[index];
+      if (updated === undefined) continue;
+      unindexAudioNote(note);
+      audioMidiNotes.set(updated.id, updated);
+      indexAudioNote(updated);
+    }
+    renderAudioMidiGrid();
     syncAudioMidiStatus();
     setModeDeckStatus(
       "audio",
-      `${pitchLabel(updated.pitchMidi)} velocity ${Math.round(value * 100)}%` +
+      `${updatedNotes.length} MIDI note${updatedNotes.length === 1 ? "" : "s"} velocity ${Math.round(value * 100)}%` +
         (commit ? " · saved" : " · release to save"),
     );
-    if (commit) void queueAudioNoteUpsert(updated, "note-velocity");
+    if (commit) {
+      void queueAudioWorkspaceMutation((module, session) =>
+        module.journalWorkspaceNoteBatchReplace(
+          session,
+          {
+            removeNoteIds: selectedNotes.map((note) => note.id),
+            notes: updatedNotes.map(audioWorkspaceNoteInput),
+          },
+          nextAudioWorkspaceMutation("note-velocity-batch"),
+        )
+      );
+    }
   };
+  type AudioMidiContextEditField =
+    | "pitch"
+    | "start"
+    | "length"
+    | "velocity";
+  const audioMidiContextInputFor = (
+    field: AudioMidiContextEditField,
+  ): HTMLInputElement | undefined => field === "pitch"
+    ? audioMidiNotePitch
+    : field === "start"
+    ? audioMidiNoteStart
+    : field === "length"
+    ? audioMidiNoteLength
+    : audioMidiNoteVelocity;
+  const restoreAudioMidiContextField = (
+    field: AudioMidiContextEditField,
+    notes: readonly PianoRollNote[],
+  ): void => {
+    const input = audioMidiContextInputFor(field);
+    if (input === undefined || notes.length === 0) return;
+    const clock = audioPianoRollClock();
+    const ranges = notes.map((note) => pianoRollNoteTicks(note, clock));
+    if (field === "pitch") {
+      input.value = String(Math.min(...notes.map((note) => note.pitchMidi)));
+    } else if (field === "start") {
+      input.value = String(
+        Math.min(...ranges.map((range) => Number(range.startTick))),
+      );
+    } else if (field === "length") {
+      const lengths = ranges.map((range) => Number(range.durationTick));
+      input.value = lengths.every((value) => value === lengths[0])
+        ? String(lengths[0])
+        : "";
+      input.placeholder = lengths.every((value) => value === lengths[0])
+        ? ""
+        : "Mixed";
+    } else {
+      const velocities = notes.map((note) => Math.round(note.velocity * 100));
+      input.value = velocities.every((value) => value === velocities[0])
+        ? String(velocities[0])
+        : "";
+      input.placeholder = velocities.every((value) => value === velocities[0])
+        ? ""
+        : "Mixed";
+    }
+    input.dataset.mixed = input.value.length === 0 ? "true" : "false";
+    input.setAttribute("aria-invalid", "false");
+  };
+  const applyAudioMidiContextEdit = (
+    field: AudioMidiContextEditField,
+    rawValue: string,
+  ): void => {
+    const selectedNotes = audioMidiContextSelectedNotes();
+    if (selectedNotes.length === 0) return;
+    const input = audioMidiContextInputFor(field);
+    const reject = (message: string): void => {
+      // Keep the typed value visible so the user can correct it in place.
+      // The next selection sync clears the error state and restores the
+      // canonical Tick value.
+      input?.setAttribute("aria-invalid", "true");
+      setModeDeckStatus("audio", `Note edit cancelled · ${message}`);
+    };
+    const value = Number(rawValue);
+    if (!Number.isFinite(value)) {
+      reject("enter a number");
+      return;
+    }
+    const clock = audioPianoRollClock();
+    const ranges = selectedNotes.map((note) => pianoRollNoteTicks(note, clock));
+    const minStart = Math.min(
+      ...ranges.map((range) => Number(range.startTick)),
+    );
+    const minPitch = Math.min(
+      ...selectedNotes.map((note) => note.pitchMidi),
+    );
+    const sourceIds = new Set(selectedNotes.map((note) => note.id));
+    const targetPitch = field === "pitch"
+      ? Math.trunc(value)
+      : undefined;
+    const targetStart = field === "start"
+      ? Math.max(0, Math.trunc(value))
+      : undefined;
+    const targetLength = field === "length"
+      ? Math.max(1, Math.trunc(value))
+      : undefined;
+    const targetVelocity = field === "velocity"
+      ? Math.min(1, Math.max(0.05, value / 100))
+      : undefined;
+    if (
+      (field === "pitch" &&
+        (targetPitch === undefined || targetPitch < 21 || targetPitch > 108)) ||
+      (field === "start" && targetStart === undefined) ||
+      (field === "length" && targetLength === undefined) ||
+      (field === "velocity" && targetVelocity === undefined)
+    ) {
+      reject(
+        field === "pitch"
+          ? "Pitch must stay inside the visible A0–C8 range"
+          : "value is outside the editable range",
+      );
+      return;
+    }
+    const pitchDelta = targetPitch === undefined
+      ? 0
+      : selectedNotes.length === 1 ? 0 : targetPitch - minPitch;
+    const startDelta = targetStart === undefined
+      ? 0
+      : selectedNotes.length === 1 ? 0 : targetStart - minStart;
+    const nextRanges = selectedNotes.map((note, index) => {
+      const current = ranges[index];
+      if (current === undefined) return undefined;
+      const pitchMidi = field === "pitch"
+        ? audioPitchForMusicalGuide(
+          selectedNotes.length === 1
+            ? targetPitch ?? note.pitchMidi
+            : note.pitchMidi + pitchDelta,
+        )
+        : note.pitchMidi;
+      const startTick = field === "start"
+        ? selectedNotes.length === 1
+          ? targetStart
+          : Number(current.startTick) + startDelta
+        : Number(current.startTick);
+      const durationTick = targetLength ?? Number(current.durationTick);
+      if (
+        pitchMidi === undefined || pitchMidi < 21 || pitchMidi > 108 ||
+        startTick === undefined || startTick < 0 || durationTick < 1
+      ) return undefined;
+      return {
+        note,
+        pitchMidi,
+        startTick,
+        durationTick,
+        velocity: targetVelocity ?? note.velocity,
+      };
+    });
+    if (nextRanges.some((range) => range === undefined)) {
+      reject(
+        field === "pitch"
+          ? "Pitch must stay inside the visible A0–C8 range"
+          : "value is outside the editable range",
+      );
+      return;
+    }
+    const requiredEndTick = Math.max(
+      ...nextRanges.map((range) =>
+        (range?.startTick ?? 0) + (range?.durationTick ?? 1)
+      ),
+    );
+    const nextFrameCount = Math.min(
+      AUDIO_MAX_FRAME_COUNT,
+      Math.max(
+        audioFrameCount,
+        audioTickToFrame(requiredEndTick, clock) + 1,
+      ),
+    );
+    const candidates = nextRanges.map((range) =>
+      range === undefined
+        ? undefined
+        : pianoRollNoteFromTicks(
+          {
+            id: range.note.id,
+            pitchMidi: range.pitchMidi,
+            startTick: range.startTick as AudioTick,
+            durationTick: range.durationTick as AudioTick,
+            velocity: range.velocity,
+            instrument: range.note.instrument,
+          },
+          clock,
+          nextFrameCount,
+        )
+    );
+    if (candidates.some((candidate) => candidate === undefined)) {
+      reject("destination is outside the timeline");
+      return;
+    }
+    const updatedNotes = candidates.filter(
+      (note): note is PianoRollNote => note !== undefined,
+    );
+    const overlaps = (
+      left: PianoRollNote,
+      right: PianoRollNote,
+    ): boolean => {
+      if (
+        left.instrument !== right.instrument ||
+        left.pitchMidi !== right.pitchMidi
+      ) return false;
+      const a = pianoRollNoteTicks(left, clock);
+      const b = pianoRollNoteTicks(right, clock);
+      return Number(a.startTick) < Number(b.startTick + b.durationTick) &&
+        Number(b.startTick) < Number(a.startTick + a.durationTick);
+    };
+    const invalidAgainstExisting = updatedNotes.some((candidate) =>
+      [...audioMidiNotes.values()].some((note) =>
+        !sourceIds.has(note.id) && overlaps(candidate, note)
+      )
+    );
+    const invalidInsideBatch = updatedNotes.some((candidate, index) =>
+      updatedNotes.slice(index + 1).some((other) => overlaps(candidate, other))
+    );
+    if (invalidAgainstExisting || invalidInsideBatch) {
+      reject("destination overlaps another note");
+      return;
+    }
+    const changed = updatedNotes.some((note, index) => {
+      const previous = selectedNotes[index];
+      if (previous === undefined) return false;
+      const previousTicks = pianoRollNoteTicks(previous, clock);
+      const nextTicks = pianoRollNoteTicks(note, clock);
+      return previous.pitchMidi !== note.pitchMidi ||
+        previous.velocity !== note.velocity ||
+        Number(previousTicks.startTick) !== Number(nextTicks.startTick) ||
+        Number(previousTicks.durationTick) !== Number(nextTicks.durationTick);
+    });
+    if (!changed) {
+      syncAudioMidiNoteContext();
+      return;
+    }
+    if (nextFrameCount > audioFrameCount) extendAudioTimelineTo(nextFrameCount);
+    for (const note of selectedNotes) {
+      audioMidiNotes.delete(note.id);
+      unindexAudioNote(note);
+    }
+    for (const note of updatedNotes) {
+      audioMidiNotes.set(note.id, note);
+      indexAudioNote(note);
+    }
+    const selectedIds = new Set(updatedNotes.map((note) => note.id));
+    audioMultiSelectedNoteKeys = selectedIds;
+    audioSelectedNoteKey = updatedNotes.length === 1
+      ? updatedNotes[0]?.id
+      : undefined;
+    const onlyNote = updatedNotes.length === 1 ? updatedNotes[0] : undefined;
+    if (onlyNote !== undefined) {
+      const onlyTicks = pianoRollNoteTicks(onlyNote, clock);
+      audioNoteVelocity = onlyNote.velocity;
+      audioNoteLengthTicks = onlyTicks.durationTick;
+      audioNoteLengthFrames = onlyNote.durationFrames;
+      if (audioNoteLength !== undefined) {
+        audioNoteLength.value = String(onlyTicks.durationTick);
+      }
+      requestAudioNotePreviewOnGesture(onlyNote);
+    }
+    invalidateAudioMidiGrid();
+    renderAudioMidiGrid();
+    renderAudioTimelineTracks();
+    syncAudioMidiStatus();
+    const fieldLabel = field === "pitch"
+      ? "Pitch"
+      : field === "start"
+      ? "Start"
+      : field === "length"
+      ? "Length"
+      : "Velocity";
+    setModeDeckStatus(
+      "audio",
+      `${updatedNotes.length} note${updatedNotes.length === 1 ? "" : "s"} · ${fieldLabel} preview · saving…`,
+    );
+    void queueAudioWorkspaceMutation((module, session) =>
+      module.journalWorkspaceNoteBatchReplace(
+        session,
+        {
+          removeNoteIds: selectedNotes.map((note) => note.id),
+          notes: updatedNotes.map(audioWorkspaceNoteInput),
+        },
+        nextAudioWorkspaceMutation(`note-context-${field}`),
+      )
+    ).then((committed) => {
+      if (!committed) {
+        syncAudioWorkspaceUiFromSession();
+        setModeDeckStatus("audio", `${fieldLabel} could not be saved · the original notes were restored`);
+        return;
+      }
+      setModeDeckStatus(
+        "audio",
+        `${updatedNotes.length} note${updatedNotes.length === 1 ? "" : "s"} · ${fieldLabel} saved · one Undo restores the previous value`,
+      );
+    });
+  };
+  const contextEditInputs: readonly [
+    HTMLInputElement | undefined,
+    AudioMidiContextEditField,
+  ][] = [
+    [audioMidiNotePitch, "pitch"],
+    [audioMidiNoteStart, "start"],
+    [audioMidiNoteLength, "length"],
+    [audioMidiNoteVelocity, "velocity"],
+  ];
+  for (const [input, field] of contextEditInputs) {
+    input?.addEventListener("change", () => {
+      input.setAttribute("aria-invalid", "false");
+      applyAudioMidiContextEdit(field, input.value);
+    });
+    input?.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        restoreAudioMidiContextField(field, audioMidiContextSelectedNotes());
+        input.blur();
+      } else if (event.key === "Enter") {
+        event.preventDefault();
+        event.stopPropagation();
+        input.blur();
+      }
+    });
+  }
   audioMidiVelocity?.addEventListener("input", () => {
     updateAudioMidiVelocity(false);
   });
@@ -19601,13 +23547,16 @@ export function bootstrapDraw2Workspace(
     if (file === undefined) return;
     void importAudioStandardMidi(file);
   });
+  audioMidiSplit?.addEventListener("click", () => {
+    splitSelectedAudioMidiNotes();
+  });
   audioMidiExport?.addEventListener("click", exportAudioStandardMidi);
   audioMidiConnect?.addEventListener("click", () => {
     void toggleAudioWebMidi();
   });
   const setAudioMidiTool = (tool: AudioMidiToolId): void => {
-    if (audioMidiTool === tool) return;
     audioMidiTool = tool;
+    syncAudioMidiToolVisibility();
     for (const button of audioMidiToolButtons) {
       const active = button.dataset.audioMidiTool === tool;
       button.classList.toggle("is-active", active);
@@ -19616,13 +23565,22 @@ export function bootstrapDraw2Workspace(
     if (audioMidiGrid !== undefined) {
       audioMidiGrid.dataset.audioMidiTool = tool;
     }
+    if (audioMidiDirectManipulationEnabled()) {
+      setModeDeckStatus(
+        "audio",
+        "Piano Roll · double-click empty space to add · drag notes to edit",
+      );
+      return;
+    }
     setModeDeckStatus(
       "audio",
       tool === "pen"
-        ? "Pen · click or drag to place/lengthen notes"
+        ? audioMidiDirectManipulationEnabled()
+          ? "Pen · double-click empty space to add · drag a note or edge to edit"
+          : "Pen · click or drag to place/lengthen notes"
         : tool === "eraser"
         ? "Eraser · click or drag to remove notes"
-        : "Select · drag a rectangle to select notes",
+        : "Select · drag a rectangle, then drag selected notes to move them",
     );
   };
   for (const button of audioMidiToolButtons) {
@@ -19633,6 +23591,8 @@ export function bootstrapDraw2Workspace(
       }
     });
   }
+  setAudioMidiTool(audioMidiTool);
+  windowRef.addEventListener("resize", syncAudioMidiToolVisibility);
   audioMidiGrid?.addEventListener("scroll", () => {
     syncAudioMidiViewportState();
     scheduleAudioMidiViewportRender();
@@ -19688,6 +23648,8 @@ export function bootstrapDraw2Workspace(
       audioInspectorTargetKind = "instrument";
       audioInstrumentId = value;
       audioSelectedNoteKey = undefined;
+      audioMultiSelectedNoteKeys = new Set();
+      audioMidiSelectionBounds = undefined;
       renderAudioMidiGrid();
       renderAudioMidiExpression();
       syncAudioMidiStatus();
@@ -19713,6 +23675,8 @@ export function bootstrapDraw2Workspace(
     audioActiveInstrumentIds.add(instrumentId);
     audioInstrumentId = instrumentId;
     audioSelectedNoteKey = undefined;
+    audioMultiSelectedNoteKeys = new Set();
+    audioMidiSelectionBounds = undefined;
     if (audioMidiInstrument !== undefined) {
       audioMidiInstrument.value = instrumentId;
     }
@@ -19860,6 +23824,7 @@ export function bootstrapDraw2Workspace(
       : null;
     if (target === null || host === undefined || !host.contains(target)) return;
     if (surface === "audio") {
+      revealAudioAssetPackageForUserSelection();
       audioInspectorTargetKind = "deck";
       const trackId = target.dataset.modeDeckTrack;
       if (
@@ -20055,6 +24020,7 @@ export function bootstrapDraw2Workspace(
       )
       : null;
     if (trackLabel !== null && audioTracks.contains(trackLabel)) {
+      revealAudioAssetPackageForUserSelection();
       audioInspectorTargetKind = "deck";
       selectAudioEditor("ROLL", true);
       selectAudioRightPanel("inspector");
@@ -20329,6 +24295,7 @@ export function bootstrapDraw2Workspace(
         : "Play preview stopped · edit state remains unchanged",
     );
     syncModePlaybackButton();
+    renderGameQuickStart(gameAuthoringLocked());
   });
   gameDeckRestart?.addEventListener("click", () => {
     stopGameDeckPlayback();
@@ -20381,6 +24348,16 @@ export function bootstrapDraw2Workspace(
         gamePlaygroundRuntimeState === undefined ||
         currentCreatorMode() !== "GAME" ||
       !isWorkspaceKeyboardActionAllowed(event, event.target)
+    ) return;
+    const gameInputSurface = resolveDraw2ActiveSurface(
+      event.target,
+      documentRef.activeElement instanceof Element
+        ? documentRef.activeElement
+        : null,
+    );
+    if (
+      gameInputSurface !== "GAME_STAGE" &&
+      gameInputSurface !== "GAME_RUNTIME"
     ) return;
     if (!gameScenePlayKeyMap.has(event.code)) return;
     event.preventDefault();
@@ -21249,6 +25226,7 @@ export function bootstrapDraw2Workspace(
       )
     );
     audioSelectedTrackId = trackId;
+    revealAudioAssetPackageForUserSelection();
     renderAudioSurfaces();
     setModeDeckStatus(
       "audio",
@@ -21399,7 +25377,13 @@ export function bootstrapDraw2Workspace(
     renderAudioMidiGrid();
   };
   audioArrangerViewport?.addEventListener("scroll", extendAudioTimelineOnDemand, { passive: true });
-  audioMidiGrid?.addEventListener("scroll", extendAudioTimelineOnDemand, { passive: true });
+  audioMidiGrid?.addEventListener("scroll", (event) => {
+    if (
+      !audioMidiAutoScrolling &&
+      audioCompositionTransportState === "PLAYING"
+    ) audioMidiFollowPlayhead = false;
+    extendAudioTimelineOnDemand(event);
+  }, { passive: true });
   documentRef.addEventListener("scroll", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
@@ -21512,7 +25496,19 @@ export function bootstrapDraw2Workspace(
             (revision.source.metadata.durationUs / 1_000_000) * audioFps,
           ),
         );
-        const trackId = currentAudioDeckTrackId();
+        const displayTrackId = currentAudioDeckTrackId();
+        const resolvedTrackId = audioWorkspaceSession === undefined
+          ? undefined
+          : resolveAudioTrackId(
+            audioWorkspaceSession.project,
+            displayTrackId,
+          );
+        const trackId = String(
+          resolvedTrackId ??
+            (displayTrackId === "bgm"
+              ? "instrument:bgm"
+              : displayTrackId),
+        );
         const clipId = `clip:import:${token}`;
         queueAudioWorkspaceMutation(async (module, session) => {
           const attached = await module.journalWorkspaceAssetRevision(
@@ -21522,13 +25518,28 @@ export function bootstrapDraw2Workspace(
             nextAudioWorkspaceMutation("asset-import"),
           );
           if (!attached.ok) return attached;
+          let current = attached.value;
+          if (!current.project.tracks.some((track) =>
+            String(track.trackId) === trackId
+          )) {
+            const selectedLabel = audioDeckTracks.find((track) =>
+              track.id === displayTrackId
+            )?.label ?? displayTrackId;
+            const trackAdded = await module.journalWorkspaceTrackAdd(
+              current,
+              { id: trackId, kind: "AUDIO", name: selectedLabel },
+              nextAudioWorkspaceMutation("audio-import-track-bootstrap"),
+            );
+            if (!trackAdded.ok) return trackAdded;
+            current = trackAdded.value;
+          }
           const clipClock = audioClockForProject(
-            attached.value.project,
-            attached.value.framesPerSecond,
+            current.project,
+            current.framesPerSecond,
           );
           const startFrame = Math.max(0, audioAnimationFrame - 1);
           return module.journalWorkspaceClipAdd(
-            attached.value,
+            current,
             {
               id: clipId,
               trackId,
@@ -21553,10 +25564,10 @@ export function bootstrapDraw2Workspace(
         if (audioDeckPreview !== undefined) {
           audioDeckPreview.src = audioObjectUrl;
           audioDeckPreview.load();
-          chipTuneSynth.attachMediaElement(audioDeckPreview, "instrument:bgm");
+          chipTuneSynth.attachMediaElement(audioDeckPreview, trackId);
         }
         audioDeckTracks = audioDeckTracks.map((track) =>
-          track.id === trackId ? { ...track, filled: [] } : track
+          track.id === displayTrackId ? { ...track, filled: [] } : track
         );
         renderAudioSurfaces();
         setModeDeckStatus(
@@ -21571,6 +25582,7 @@ export function bootstrapDraw2Workspace(
     })();
   });
   const finishChipDeckPreview = (message: string): void => {
+    audioCompositionStartGeneration += 1;
     chipDeckPlaying = false;
     audioChipScheduler?.stop();
     chipTuneSynth.stopAll();
@@ -21587,6 +25599,41 @@ export function bootstrapDraw2Workspace(
     }
     audioLastMetronomeBeat = -1;
   };
+  const audioStreamingRuntimeHasPendingSource = (
+    runtime: LongAudioClipRuntime,
+  ): boolean => {
+    const snapshot = runtime.snapshot();
+    const timelineEnd = snapshot.timelineStartSeconds +
+      snapshot.durationSeconds;
+    // A short read-ahead gap is normal, so keep the transport alive while
+    // the scheduler is before the end even when no source is currently
+    // active. Once the scheduler reaches the end, the host must not leave a
+    // stale PLAYING state behind.
+    return snapshot.isPlaying &&
+      (snapshot.activeSourceCount > 0 ||
+        snapshot.positionSeconds < timelineEnd - 0.05);
+  };
+  const finishAudioStreamingPreview = (): void => {
+    if (!audioDeckPlaying || chipDeckPlaying) return;
+    const runtimes = [...audioStreamingRuntimes.values()];
+    if (
+      runtimes.length === 0 ||
+      runtimes.some(audioStreamingRuntimeHasPendingSource)
+    ) return;
+    audioDeckPlaying = false;
+    stopAudioFrameTransport();
+    audioDeckPlay?.setAttribute("aria-pressed", "false");
+    if (audioDeckPlay !== undefined) {
+      setDraw2ButtonIcon(audioDeckPlay, "icon-play", "Preview");
+    }
+    setModeDeckStatus(
+      "audio",
+      "Clip preview ended · bounded chunks released",
+    );
+    syncModePlaybackButton();
+    syncAudioGlobalTransport();
+  };
+  onAudioStreamingRuntimeEnded = finishAudioStreamingPreview;
   const playAudioMetronomeAtFrame = (frameIndex: number): void => {
     if (!audioMetronomeEnabled) return;
     const safeFrame = Math.max(0, Math.trunc(frameIndex));
@@ -21611,7 +25658,7 @@ export function bootstrapDraw2Workspace(
   };
   const startAudioFrameTransport = (): void => {
     stopAudioFrameTransport();
-    if (!audioDeckPlaying && !chipDeckPlaying) return;
+    if (!audioDeckPlaying && !chipDeckPlaying && !audioSelectionPlaybackPlaying) return;
     const shouldFollowAudioClock = true;
     if (
       audioDeckPlaying && !chipDeckPlaying &&
@@ -21648,12 +25695,40 @@ export function bootstrapDraw2Workspace(
       }
       if (audioTransportResyncInFlight) return;
       if (
+        audioSelectionPlaybackPlaying &&
+        !audioDeckPlaying &&
+        !chipDeckPlaying
+      ) {
+        const scheduler = audioSelectionScheduler;
+        if (scheduler === undefined || !scheduler.isPlaying) {
+          audioSelectionPlaybackPlaying = false;
+          if (!audioDeckPlaying && !chipDeckPlaying) stopAudioFrameTransport();
+          syncAudioMidiStatus();
+          return;
+        }
+        const selectionClock = audioPianoRollClock();
+        const absoluteSeconds = audioTickToSeconds(
+          Number(audioSelectionPlaybackStartTick),
+          selectionClock,
+        ) + scheduler.position;
+        const selectionEndSeconds = audioTickToSeconds(
+          Number(audioSelectionPlaybackEndTick),
+          selectionClock,
+        );
+        const nextFrame = Math.min(
+          audioTransportSecondsToFrame(selectionEndSeconds),
+          audioTransportSecondsToFrame(absoluteSeconds),
+        );
+        if (nextFrame !== audioAnimationFrame) syncAudioAnimationFrame(nextFrame);
+        return;
+      }
+      if (
         chipDeckPlaying &&
         audioChipScheduler !== undefined &&
         !audioChipScheduler.isPlaying
       ) {
         finishChipDeckPreview("Notes Preview ended · loop is off");
-        stopAudioFrameTransport();
+        if (!audioDeckPlaying) stopAudioFrameTransport();
         return;
       }
       if (chipDeckPlaying && audioChipScheduler?.isPlaying) {
@@ -21671,7 +25746,7 @@ export function bootstrapDraw2Workspace(
         audioDeckPlaying && !chipDeckPlaying && audioStreamingRuntimes.size > 0
       ) {
         const runtime = [...audioStreamingRuntimes.values()].find((item) =>
-          item.isPlaying
+          audioStreamingRuntimeHasPendingSource(item)
         );
         if (runtime !== undefined) {
           const nextFrame = audioTransportSecondsToFrame(
@@ -21703,22 +25778,11 @@ export function bootstrapDraw2Workspace(
       if (
         audioDeckPlaying && !chipDeckPlaying &&
         audioStreamingRuntimes.size > 0 &&
-        ![...audioStreamingRuntimes.values()].some((runtime) =>
-          runtime.isPlaying
+        ![...audioStreamingRuntimes.values()].some(
+          audioStreamingRuntimeHasPendingSource,
         )
       ) {
-        audioDeckPlaying = false;
-        stopAudioFrameTransport();
-        audioDeckPlay?.setAttribute("aria-pressed", "false");
-        if (audioDeckPlay !== undefined) {
-          setDraw2ButtonIcon(audioDeckPlay, "icon-play", "Preview");
-        }
-        setModeDeckStatus(
-          "audio",
-          "Clip preview ended · bounded chunks released",
-        );
-        syncModePlaybackButton();
-        syncAudioGlobalTransport();
+        finishAudioStreamingPreview();
         return;
       }
       const nextFrame = audioAnimationFrame + 1;
@@ -21789,6 +25853,10 @@ export function bootstrapDraw2Workspace(
     );
   });
   audioDeckPlay?.addEventListener("click", () => {
+    if (audioSelectionPlaybackPlaying) {
+      setModeDeckStatus("audio", "Stop selection preview before starting an Audio Clip");
+      return;
+    }
     // Capture the state at the start of this action. During a coordinated
     // MIDI+Clip start the other runtime may become active while this async
     // handler is awaiting OPFS read-ahead; that is not a reason to cancel it.
@@ -21798,7 +25866,7 @@ export function bootstrapDraw2Workspace(
       finishChipDeckPreview(
         "Notes Preview paused · notes remain in the Piano Roll",
       );
-      stopAudioFrameTransport();
+      if (!audioDeckPlaying) stopAudioFrameTransport();
     }
     void (async () => {
       if (!await ensureAudioPlaybackReady("clip-preview")) return;
@@ -21939,6 +26007,10 @@ export function bootstrapDraw2Workspace(
     })();
   });
   audioChipPlay?.addEventListener("click", async () => {
+    if (audioSelectionPlaybackPlaying) {
+      setModeDeckStatus("audio", "Stop selection preview before starting the full composition");
+      return;
+    }
     if (
       audioWorkspaceSession?.project.freezeStates?.some((freeze) =>
         freeze.status === "ACTIVE"
@@ -21954,9 +26026,22 @@ export function bootstrapDraw2Workspace(
       finishChipDeckPreview(
         "Notes Preview paused · notes remain in the Piano Roll",
       );
-      stopAudioFrameTransport();
+      if (!audioDeckPlaying) stopAudioFrameTransport();
       return;
     }
+    if (
+      audioCompositionTransportIntent === "PLAY" &&
+      (audioPlaybackReadyPromise !== undefined || audioPlaybackRecoveryPending)
+    ) {
+      cancelAudioCompositionPlayback();
+      setModeDeckStatus(
+        "audio",
+        "Notes Preview start cancelled · notes remain in the Piano Roll",
+      );
+      syncAudioGlobalTransport();
+      return;
+    }
+    const startGeneration = ++audioCompositionStartGeneration;
     const deckWasPlayingAtAction = audioDeckPlaying;
     if (deckWasPlayingAtAction) {
       audioDeckPreview?.pause();
@@ -21972,7 +26057,20 @@ export function bootstrapDraw2Workspace(
         ),
       ),
     ];
-    if (!await ensureAudioPlaybackReady("notes-preview", noteTrackIds)) return;
+    // Start the preflight before setting PLAY.  ensureAudioPlaybackReady
+    // installs its pending promise synchronously; otherwise the transport
+    // state sync would see PLAY with no pending work and immediately reduce
+    // it back to IDLE before the first note can be scheduled.
+    const readyPromise = ensureAudioPlaybackReady(
+      "notes-preview",
+      noteTrackIds,
+    );
+    requestAudioCompositionPlayback();
+    if (!await readyPromise) return;
+    if (
+      startGeneration !== audioCompositionStartGeneration ||
+      audioCompositionTransportIntent !== "PLAY"
+    ) return;
     if (audioMidiNotes.size === 0) {
       setModeDeckStatus(
         "audio",
@@ -21989,7 +26087,9 @@ export function bootstrapDraw2Workspace(
       return;
     }
     chipDeckPlaying = true;
-    chipTuneSynth.setVolume(Number(audioChipVolume?.value ?? "0.22"));
+    chipTuneSynth.setVolume(
+      Number(audioChipVolume?.value ?? String(CHIP_SYNTH_DEFAULT_VOLUME)),
+    );
     syncAudioAnimationFrame(1);
     const scheduler = audioChipScheduler;
     if (scheduler === undefined) {
@@ -22040,6 +26140,114 @@ export function bootstrapDraw2Workspace(
     );
     syncModePlaybackButton();
     syncAudioGlobalTransport();
+  });
+  const selectedAudioMidiNotesForPlayback = (): readonly PianoRollNote[] => {
+    const ids = audioMultiSelectedNoteKeys.size > 0
+      ? [...audioMultiSelectedNoteKeys]
+      : audioSelectedNoteKey === undefined ? [] : [audioSelectedNoteKey];
+    return ids.map((id) => audioMidiNotes.get(id)).filter(
+      (note): note is PianoRollNote => note !== undefined,
+    );
+  };
+  const playAudioMidiSelection = async (): Promise<void> => {
+    if (audioSelectionPlaybackPlaying) {
+      audioSelectionScheduler?.stop();
+      audioSelectionPlaybackPlaying = false;
+      chipTuneSynth.stopAll();
+      if (!audioDeckPlaying && !chipDeckPlaying) stopAudioFrameTransport();
+      setModeDeckStatus("audio", "Selection preview stopped");
+      syncAudioMidiStatus();
+      return;
+    }
+    if (audioCompositionTransportState === "PLAYING") {
+      setModeDeckStatus("audio", "Stop the full composition before playing a selection");
+      return;
+    }
+    const selectedNotes = selectedAudioMidiNotesForPlayback();
+    const clock = audioPianoRollClock();
+    let notes = selectedNotes;
+    let startTick = 0;
+    let endTick = 0;
+    let instruments = new Set<PianoRollInstrumentId>();
+    if (notes.length > 0) {
+      startTick = Math.min(
+        ...notes.map((note) => Number(pianoRollNoteTicks(note, clock).startTick)),
+      );
+      endTick = Math.max(
+        ...notes.map((note) => {
+          const ticks = pianoRollNoteTicks(note, clock);
+          return Number(ticks.startTick) + Number(ticks.durationTick);
+        }),
+      );
+      instruments = new Set(notes.map((note) => note.instrument));
+    } else {
+      const bounds = audioMidiSelectionBounds ?? audioSelectedMeasureBounds();
+      startTick = Number(bounds.startTick);
+      endTick = Number(bounds.endTick);
+      notes = [...audioMidiNotes.values()].filter((note) => {
+        if (note.instrument !== audioInstrumentId) return false;
+        const ticks = pianoRollNoteTicks(note, clock);
+        return Number(ticks.startTick) < endTick &&
+          Number(ticks.startTick) + Number(ticks.durationTick) > startTick;
+      });
+      instruments.add(audioInstrumentId);
+    }
+    if (notes.length === 0 || endTick <= startTick) {
+      setModeDeckStatus("audio", "Play selection requires at least one selected note or time range");
+      return;
+    }
+    const schedule = notes.map((note) => {
+      const ticks = pianoRollNoteTicks(note, clock);
+      const noteStart = Math.max(startTick, Number(ticks.startTick));
+      const noteEnd = Math.min(
+        endTick,
+        Number(ticks.startTick) + Number(ticks.durationTick),
+      );
+      return {
+        id: `selection:${note.id}`,
+        startSeconds: audioTickToSeconds(noteStart - startTick, clock),
+        durationSeconds: Math.max(
+          0.001,
+          audioTickToSeconds(noteEnd - startTick, clock) -
+            audioTickToSeconds(noteStart - startTick, clock),
+        ),
+        payload: note,
+      };
+    }).filter((event) => event.durationSeconds > 0);
+    if (schedule.length === 0) {
+      setModeDeckStatus("audio", "Play selection requires a non-empty Tick range");
+      return;
+    }
+    if (!await ensureAudioPlaybackReady("selection-preview")) return;
+    const scheduler = audioSelectionScheduler;
+    if (scheduler === undefined) {
+      setModeDeckStatus("audio", "Selection preview is unavailable · notes remain editable");
+      return;
+    }
+    scheduler.load(
+      schedule,
+      audioTickToSeconds(endTick - startTick, clock),
+    );
+    scheduler.setLoop(false);
+    chipTuneSynth.setVolume(
+      Number(audioChipVolume?.value ?? String(CHIP_SYNTH_DEFAULT_VOLUME)),
+    );
+    if (!scheduler.start(0, false)) {
+      setModeDeckStatus("audio", "Selection preview could not start · notes remain editable");
+      return;
+    }
+    audioSelectionPlaybackStartTick = startTick as AudioTick;
+    audioSelectionPlaybackEndTick = endTick as AudioTick;
+    audioSelectionPlaybackPlaying = true;
+    startAudioFrameTransport();
+    setModeDeckStatus(
+      "audio",
+      `Selection preview playing · ${schedule.length} note${schedule.length === 1 ? "" : "s"} · ${[...instruments].join(" / ")}`,
+    );
+    syncAudioMidiStatus();
+  };
+  audioMidiPlaySelection?.addEventListener("click", () => {
+    void playAudioMidiSelection();
   });
   audioDeckPreview?.addEventListener("ended", () => {
     audioDeckPlaying = false;
@@ -22271,7 +26479,9 @@ export function bootstrapDraw2Workspace(
   }
   audioChipVolume?.addEventListener("input", () => {
     const value = Math.min(1, Math.max(0, Number(audioChipVolume.value)));
-    chipTuneSynth.setVolume(Number.isFinite(value) ? value : 0.22);
+    chipTuneSynth.setVolume(
+      Number.isFinite(value) ? value : CHIP_SYNTH_DEFAULT_VOLUME,
+    );
     if (audioChipVolumeValue !== undefined) {
       audioChipVolumeValue.value = `${
         Math.round(chipTuneSynth.getVolume() * 100)
@@ -22279,7 +26489,9 @@ export function bootstrapDraw2Workspace(
       audioChipVolumeValue.textContent = audioChipVolumeValue.value;
     }
   });
-  chipTuneSynth.setVolume(Number(audioChipVolume?.value ?? "0.22"));
+  chipTuneSynth.setVolume(
+    Number(audioChipVolume?.value ?? String(CHIP_SYNTH_DEFAULT_VOLUME)),
+  );
   if (audioChipVolumeValue !== undefined) {
     audioChipVolumeValue.value = `${
       Math.round(chipTuneSynth.getVolume() * 100)
@@ -22835,6 +27047,222 @@ export function bootstrapDraw2Workspace(
     });
     setModeDeckStatus("audio", "Sync marker removed · journal commit queued");
   });
+  const queueAudioClipSplitAtTick = (
+    clipId: string,
+    splitTick: AudioTick,
+    source: "button" | "waveform" = "button",
+  ): boolean => {
+    const session = audioWorkspaceSession;
+    const clip = session?.project.clips.find((item) =>
+      String(item.clipId) === clipId
+    );
+    if (session === undefined || clip === undefined) return false;
+    const startTick = Number(clip.timeline.startTick);
+    const endTick = startTick + Number(clip.timeline.durationTick);
+    if (clip.timeline.durationTick < 2) {
+      setModeDeckStatus("audio", "Clip is too short to split");
+      return false;
+    }
+    if (Number(splitTick) <= startTick || Number(splitTick) >= endTick) {
+      setModeDeckStatus("audio", "Choose a split point inside the waveform");
+      return false;
+    }
+    audioAssetImportSequence += 1;
+    const token = `${Date.now()}-${audioAssetImportSequence}`;
+    void queueAudioWorkspaceMutation((module, current) =>
+      module.journalWorkspaceClipSplitAtTick(
+        current,
+        clipId,
+        splitTick,
+        `clip:split:${token}:left`,
+        `clip:split:${token}:right`,
+        nextAudioWorkspaceMutation("clip-split"),
+      )
+    );
+    setModeDeckStatus(
+      "audio",
+      source === "waveform"
+        ? `${clipId} split at T${splitTick} · Journal entry queued`
+        : `${clipId} split queued · one Journal entry on commit`,
+    );
+    return true;
+  };
+  // The waveform is the primary clip object. Double-clicking an interior
+  // position splits at that exact Tick; the precision button remains inside
+  // Adjust for users who prefer a fixed midpoint command.
+  audioClipLibrary?.addEventListener("dblclick", (event) => {
+    const canvas = event.target instanceof Element
+      ? event.target.closest<HTMLCanvasElement>("[data-audio-clip-canvas]")
+      : null;
+    const clipId = canvas?.dataset.audioClipCanvas;
+    if (canvas === null || clipId === undefined) return;
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width <= 0) return;
+    const session = audioWorkspaceSession;
+    const clip = session?.project.clips.find((item) =>
+      String(item.clipId) === clipId
+    );
+    if (clip === undefined) return;
+    const ratio = Math.min(
+      1,
+      Math.max(0, (event.clientX - rect.left) / rect.width),
+    );
+    const splitTick = (
+      Number(clip.timeline.startTick) +
+      Math.round(Number(clip.timeline.durationTick) * ratio)
+    ) as AudioTick;
+    if (queueAudioClipSplitAtTick(clipId, splitTick, "waveform")) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  });
+  audioClipLibrary?.addEventListener("pointerdown", (event) => {
+    const canvas = event.target instanceof Element
+      ? event.target.closest<HTMLCanvasElement>("[data-audio-clip-canvas]")
+      : null;
+    if (canvas === null) return;
+    const clipId = canvas.dataset.audioClipCanvas;
+    const session = audioWorkspaceSession;
+    const clip = session?.project.clips.find((item) =>
+      String(item.clipId) === clipId
+    );
+    if (
+      clipId === undefined || session === undefined || clip === undefined ||
+      !(event instanceof PointerEvent)
+    ) return;
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+    const x = Math.min(rect.width, Math.max(0, event.clientX - rect.left));
+    const edgeSize = Math.min(28, Math.max(12, rect.width * 0.08));
+    const field = x <= edgeSize
+      ? "fadeInFrames"
+      : x >= rect.width - edgeSize
+      ? "fadeOutFrames"
+      : undefined;
+    if (field === undefined) return;
+    const initial = audioClipPreviewInputs.get(clipId) ??
+      audioClipToWorkspaceInput(session, clip);
+    const state: {
+      readonly pointerId: number;
+      readonly clipId: string;
+      readonly canvas: HTMLCanvasElement;
+      readonly clip: AudioClip;
+      readonly initial: AudioWorkspaceClipInput;
+      readonly field: AudioClipFadeField;
+      moved: boolean;
+    } = {
+      pointerId: event.pointerId,
+      clipId,
+      canvas,
+      clip,
+      initial,
+      field,
+      moved: false,
+    };
+    audioClipWaveformGesture = state;
+    canvas.dataset.audioClipGesture = field;
+    event.preventDefault();
+    event.stopPropagation();
+    canvas.setPointerCapture?.(event.pointerId);
+  });
+  audioClipLibrary?.addEventListener("pointermove", (event) => {
+    if (!(event instanceof PointerEvent)) return;
+    const state = audioClipWaveformGesture;
+    if (state === undefined || state.pointerId !== event.pointerId) return;
+    const liveSession = audioWorkspaceSession;
+    if (liveSession === undefined) return;
+    const rect = state.canvas.getBoundingClientRect();
+    if (rect.width <= 0) return;
+    const ratio = Math.min(
+      1,
+      Math.max(0, (event.clientX - rect.left) / rect.width),
+    );
+    const durationFrames = Math.max(1, state.initial.durationFrames);
+    const otherField = state.field === "fadeInFrames"
+      ? "fadeOutFrames"
+      : "fadeInFrames";
+    const otherValue = Math.max(0, state.initial[otherField] ?? 0);
+    const requested = state.field === "fadeInFrames"
+      ? Math.round(durationFrames * ratio)
+      : Math.round(durationFrames * (1 - ratio));
+    const nextValue = Math.min(
+      Math.max(0, requested),
+      Math.max(0, durationFrames - otherValue),
+    );
+    const clipClock = audioClockForProject(
+      liveSession.project,
+      liveSession.framesPerSecond,
+    );
+    const next: AudioWorkspaceClipInput = state.field === "fadeInFrames"
+      ? {
+        ...state.initial,
+        fadeInFrames: nextValue,
+        fadeInTick: audioFrameToTick(nextValue, clipClock),
+      }
+      : {
+        ...state.initial,
+        fadeOutFrames: nextValue,
+        fadeOutTick: audioFrameToTick(nextValue, clipClock),
+      };
+    state.moved = nextValue !== state.initial[state.field];
+    audioClipPreviewInputs.set(state.clipId, next);
+    const output = audioClipLibrary?.querySelector<HTMLOutputElement>(
+      `[data-audio-clip-edit-value="${state.field}"][data-audio-clip-id="${
+        CSS.escape(state.clipId)
+      }"]`,
+    );
+    if (output !== null && output !== undefined) {
+      output.textContent = `${nextValue}f`;
+    }
+    void paintAudioClipWaveform(state.canvas, state.clip, next);
+    applyAudioClipPreviewProjection(false, next);
+    event.preventDefault();
+    event.stopPropagation();
+  });
+  const finishAudioClipWaveformGesture = (
+    event: Event,
+    cancelled: boolean,
+  ): void => {
+    const pointer = event as PointerEvent;
+    const state = audioClipWaveformGesture;
+    if (
+      state === undefined ||
+      state.pointerId !== pointer.pointerId
+    ) return;
+    audioClipWaveformGesture = undefined;
+    delete state.canvas.dataset.audioClipGesture;
+    try {
+      state.canvas.releasePointerCapture?.(state.pointerId);
+    } catch {
+      // Pointer capture may already have been released by the browser.
+    }
+    if (cancelled || !state.moved) {
+      audioClipPreviewInputs.set(state.clipId, state.initial);
+      void paintAudioClipWaveform(state.canvas, state.clip, state.initial);
+      applyAudioClipPreviewProjection(false, state.initial);
+      return;
+    }
+    const preview = audioClipPreviewInputs.get(state.clipId) ?? state.initial;
+    void queueAudioWorkspaceMutation((module, current) =>
+      module.journalWorkspaceClipUpdate(
+        current,
+        preview,
+        nextAudioWorkspaceMutation("clip-fade-direct"),
+      )
+    );
+    setModeDeckStatus(
+      "audio",
+      `${state.clipId} ${state.field === "fadeInFrames" ? "Fade In" : "Fade Out"} committed · one Journal entry`,
+    );
+    event.preventDefault();
+    event.stopPropagation();
+  };
+  audioClipLibrary?.addEventListener("pointerup", (event) => {
+    finishAudioClipWaveformGesture(event, false);
+  });
+  audioClipLibrary?.addEventListener("pointercancel", (event) => {
+    finishAudioClipWaveformGesture(event, true);
+  });
   audioClipLibrary?.addEventListener("click", (event) => {
     const crossfadeTarget = event.target instanceof Element
       ? event.target.closest<HTMLElement>("[data-audio-clip-crossfade]")
@@ -22908,30 +27336,12 @@ export function bootstrapDraw2Workspace(
       const clip = session?.project.clips.find((item) =>
         String(item.clipId) === splitClipId
       );
-      if (session === undefined || clip === undefined) return;
-      if (clip.timeline.durationTick < 2) {
-        setModeDeckStatus("audio", "Clip is too short to split");
-        return;
-      }
-      audioAssetImportSequence += 1;
-      const token = `${Date.now()}-${audioAssetImportSequence}`;
+      if (clip === undefined) return;
       const midpointTick = (
-        clip.timeline.startTick + Math.floor(clip.timeline.durationTick / 2)
+        Number(clip.timeline.startTick) +
+        Math.floor(Number(clip.timeline.durationTick) / 2)
       ) as AudioTick;
-      queueAudioWorkspaceMutation((module, current) =>
-        module.journalWorkspaceClipSplitAtTick(
-          current,
-          splitClipId,
-          midpointTick,
-          `clip:split:${token}:left`,
-          `clip:split:${token}:right`,
-          nextAudioWorkspaceMutation("clip-split"),
-        )
-      );
-      setModeDeckStatus(
-        "audio",
-        `${splitClipId} split queued · one Journal entry on commit`,
-      );
+      queueAudioClipSplitAtTick(splitClipId, midpointTick);
       return;
     }
     const target = event.target instanceof Element
@@ -22941,6 +27351,7 @@ export function bootstrapDraw2Workspace(
     if (trackId === undefined) return;
     const track = audioDeckTracks.find((item) => item.id === trackId);
     if (track !== undefined) {
+      revealAudioAssetPackageForUserSelection();
       audioInspectorTargetKind = "deck";
       audioSelectedTrackId = track.id;
       selectAudioEditor("ROLL", true);
@@ -23408,12 +27819,8 @@ export function bootstrapDraw2Workspace(
     syncAudioAssetPackagePanel();
   };
   audioAssetName?.addEventListener("input", clearAudioAssetPackageNotice);
-  audioAssetRole?.addEventListener("change", clearAudioAssetPackageNotice);
-  audioAssetOfferKind?.addEventListener("change", clearAudioAssetPackageNotice);
-  audioAssetDerivativePolicy?.addEventListener("change", clearAudioAssetPackageNotice);
-  audioAssetAddRange?.addEventListener("click", addCurrentAudioAssetPackageRange);
   audioAssetFinalize?.addEventListener("click", () => {
-    void finalizeSelectedAudioAssetPackage();
+    void saveSelectedAudioAsset();
   });
   audioBrowserSearch?.addEventListener("input", filterAudioBrowser);
   audioBrowserTree?.addEventListener("click", (event) => {
@@ -23748,20 +28155,13 @@ export function bootstrapDraw2Workspace(
       audioDeckPlay?.click();
       return;
     }
-    // Resume while this handler still runs from the trusted top-level
-    // transport gesture.  The lower button remains the single source of
-    // scheduling truth; this prime only prevents autoplay-policy silence when
-    // the visible Global Bar is used.
+    // Enter the lower transport handler synchronously while this function is
+    // still running from the trusted top-level gesture.  That handler starts
+    // the Context before its first await, so Safari cannot lose activation
+    // while a later promise tries to synthesize a button click.
     if (hasNotes) {
-      const readyPromise = ensureAudioPlaybackReady("global-transport");
       requestAudioCompositionPlayback();
-      void readyPromise.then(
-        (ready) => {
-          if (ready && audioCompositionTransportIntent === "PLAY") {
-            audioChipPlay?.click();
-          }
-        },
-      );
+      audioChipPlay?.click();
     }
     if (hasClip) audioDeckPlay?.click();
   };
@@ -25182,44 +29582,257 @@ export function bootstrapDraw2Workspace(
         );
     }
   };
+  let spaceIntent: SpaceIntentState = createSpaceIntentState();
+  const workspaceSpaceMode = (mode: string): boolean =>
+    mode === "DRAW" || mode === "ANIMATE" || mode === "GAME" ||
+    mode === "AUDIO";
+  const clearSpaceIntent = (): void => {
+    spaceIntent = cancelSpaceIntent();
+    delete root.dataset.draw2SpaceHeld;
+    delete root.dataset.draw2SpaceIntent;
+  };
+  documentRef.addEventListener("pointerdown", (event) => {
+    if (spaceIntent.phase !== "pending" || event.button !== 0) return;
+    const surface = resolveDraw2ActiveSurface(
+      event.target,
+      documentRef.activeElement instanceof Element
+        ? documentRef.activeElement
+        : null,
+    );
+    if (!isDraw2SpacePanSurface(surface)) return;
+    spaceIntent = armSpacePointer(
+      spaceIntent,
+      event.pointerId,
+      event.clientX,
+      event.clientY,
+      true,
+    );
+    root.dataset.draw2SpaceHeld = "true";
+    root.dataset.draw2SpaceIntent = "pending";
+  }, { capture: true });
+  documentRef.addEventListener("pointermove", (event) => {
+    const wasPanning = spaceIntent.didPan;
+    spaceIntent = advanceSpacePointer(
+      spaceIntent,
+      event.pointerId,
+      event.clientX,
+      event.clientY,
+    );
+    if (!wasPanning && spaceIntent.didPan) {
+      root.dataset.draw2SpaceIntent = "panning";
+    }
+  }, { capture: true, passive: true });
+  const releaseSpacePointerFromEvent = (event: PointerEvent): void => {
+    spaceIntent = releaseSpacePointer(spaceIntent, event.pointerId);
+  };
+  documentRef.addEventListener(
+    "pointerup",
+    releaseSpacePointerFromEvent,
+    { capture: true },
+  );
+  documentRef.addEventListener(
+    "pointercancel",
+    releaseSpacePointerFromEvent,
+    { capture: true },
+  );
+  windowRef.addEventListener("blur", clearSpaceIntent);
+  documentRef.addEventListener("visibilitychange", () => {
+    if (documentRef.visibilityState === "hidden") clearSpaceIntent();
+  });
   const handleWorkspacePlaybackKeydown = (event: KeyboardEvent): void => {
     const spaceKey = event.code === "Space" || event.key === " ";
     const mode = currentCreatorMode();
     const dialogOpen = commandPalette?.open === true ||
       documentRef.querySelector("dialog[open]") !== null;
-    const interactiveTarget = event.target instanceof Element
-      ? event.target.closest<HTMLElement>(
-        "button, a, summary, [role='button'], [role='tab'], [role='menuitem']",
-      )
-      : null;
     if (
       !spaceKey || event.defaultPrevented || event.repeat ||
       event.metaKey || event.ctrlKey || event.shiftKey || event.altKey ||
       event.isComposing || dialogOpen || isEditableTarget(event.target) ||
-      (mode !== "DRAW" && mode !== "ANIMATE" && mode !== "GAME" &&
-        mode !== "AUDIO")
+      !workspaceSpaceMode(mode)
     ) return;
-    // Space is reserved for global playback. Capture it before a focused
-    // button can synthesize its native click.
-    // The mode transport is the only owner; the old control keeps no focus
-    // that could be activated again on keyup.
+    // Do not toggle on keydown. A short press toggles playback on keyup;
+    // holding Space and dragging the iDRAW canvas is reserved for panning.
+    // This also prevents a previously focused button from receiving a
+    // synthetic click when Space is used as the transport key.
     event.preventDefault();
     event.stopImmediatePropagation();
-    const active = documentRef.activeElement;
-    if (interactiveTarget !== null && active === interactiveTarget) {
-      windowRef.setTimeout(() => {
-        if (documentRef.activeElement === interactiveTarget) {
-          interactiveTarget.blur();
-        }
-      }, 0);
-    }
-    toggleCurrentModePlayback();
+    spaceIntent = beginSpaceIntent(spaceIntent, true);
+    root.dataset.draw2SpaceHeld = "true";
+    root.dataset.draw2SpaceIntent = "pending";
   };
+  documentRef.addEventListener("keyup", (event) => {
+    const spaceKey = event.code === "Space" || event.key === " ";
+    if (!spaceKey || spaceIntent.phase === "idle") return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const resolution = resolveSpaceKeyUp(spaceIntent);
+    clearSpaceIntent();
+    if (resolution.action === "toggle-playback") toggleCurrentModePlayback();
+  }, { capture: true });
   documentRef.addEventListener(
     "keydown",
     handleWorkspacePlaybackKeydown,
     { capture: true },
   );
+  const audioTimelineShortcutSelector =
+    "#draw2AudioArrangerRuler, #draw2AudioRuler, " +
+    "#draw2AudioAnimationCells, #draw2AudioTrackLanes, " +
+    "#draw2AudioArrangerViewport, #draw2AudioPanelTimeline";
+  const audioWorkspaceShortcutSelector =
+    audioTimelineShortcutSelector + ", #draw2AudioMidiGrid, " +
+    "#draw2AudioMidiExpression, #draw2AudioMidiExpressionLane, " +
+    "#draw2AudioDrawPreviewCanvas";
+  const audioSurfaceHasFocus = (
+    event: KeyboardEvent,
+    selector: string,
+  ): boolean => {
+    const target = event.target instanceof Element ? event.target : null;
+    const active = documentRef.activeElement instanceof Element
+      ? documentRef.activeElement
+      : null;
+    return (target !== null &&
+      target.closest(selector) !== null) ||
+      (active !== null && active.closest(selector) !== null);
+  };
+  const audioShortcutButton = (id: string): HTMLButtonElement | undefined =>
+    query<HTMLButtonElement>(documentRef, `#${id}`);
+  const handleAudioWorkspaceShortcuts = (event: KeyboardEvent): void => {
+    if (
+      currentCreatorMode() !== "AUDIO" || event.defaultPrevented ||
+      event.repeat || event.isComposing || isEditableTarget(event.target) ||
+      commandPalette?.open === true ||
+      documentRef.querySelector("dialog[open]") !== null
+    ) return;
+    const timelineTarget = audioSurfaceHasFocus(
+      event,
+      audioTimelineShortcutSelector,
+    );
+    const workspaceTarget = audioSurfaceHasFocus(
+      event,
+      audioWorkspaceShortcutSelector,
+    );
+    const interactiveTarget = isWorkspaceInteractiveTarget(event.target);
+    if (!workspaceTarget && interactiveTarget) return;
+    const key = event.key.toLowerCase();
+    const modifier = event.metaKey || event.ctrlKey;
+    if (modifier && !event.altKey && !event.shiftKey && key === "s") {
+      event.preventDefault();
+      event.stopPropagation();
+      queueAudioPersistenceSave("manual");
+      setModeDeckStatus("audio", "Audio Project saved · local checkpoint queued");
+      return;
+    }
+    if (
+      !modifier && !event.altKey && !event.shiftKey && key === "l"
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      audioGlobalLoop?.click();
+      return;
+    }
+    if (
+      !modifier && !event.altKey && !event.shiftKey && key === "r"
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      audioGlobalRecord?.click();
+      return;
+    }
+    if (
+      !modifier && !event.altKey && !event.shiftKey && key === "t"
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      audioTestTone?.click();
+      return;
+    }
+    if (
+      !timelineTarget && !modifier && !event.altKey && !event.shiftKey &&
+      key === "m" && audioEditorActiveTab === "DRAW"
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      toggleAudioDrawMonitor();
+      return;
+    }
+    if (event.key === "Escape" && !modifier && !event.altKey) {
+      if (audioRecordingRuntime !== undefined) {
+        event.preventDefault();
+        event.stopPropagation();
+        audioRecordCancel?.click();
+        return;
+      }
+      if (cancelAudioTimelinePointerGesture?.() === true) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+      if (cancelAudioMidiPointerGesture()) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+    }
+    if (
+      !timelineTarget ||
+      (!event.shiftKey && event.code === "Space" && !modifier)
+    ) return;
+    if (
+      event.code === "Space" && event.shiftKey && !modifier && !event.altKey
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      void audioMidiPlaySelection?.click();
+      return;
+    }
+    if (event.key === "Delete" || event.key === "Backspace") {
+      event.preventDefault();
+      event.stopPropagation();
+      audioShortcutButton("draw2AudioDawDelete")?.click();
+      return;
+    }
+    if (modifier && !event.altKey && !event.shiftKey) {
+      if (key === "c") {
+        event.preventDefault();
+        event.stopPropagation();
+        audioShortcutButton("draw2AudioDawCopy")?.click();
+        return;
+      }
+      if (key === "x") {
+        event.preventDefault();
+        event.stopPropagation();
+        audioShortcutButton("draw2AudioDawCopy")?.click();
+        audioShortcutButton("draw2AudioDawDelete")?.click();
+        return;
+      }
+      if (key === "v") {
+        event.preventDefault();
+        event.stopPropagation();
+        audioShortcutButton("draw2AudioDawPaste")?.click();
+        return;
+      }
+      if (key === "d") {
+        event.preventDefault();
+        event.stopPropagation();
+        audioShortcutButton("draw2AudioDawDuplicate")?.click();
+        return;
+      }
+    }
+    if (!modifier && !event.altKey && !event.shiftKey) {
+      if (key === "b") {
+        event.preventDefault();
+        event.stopPropagation();
+        audioShortcutButton("draw2AudioDawBarPlus")?.click();
+        return;
+      }
+      if (key === "m") {
+        event.preventDefault();
+        event.stopPropagation();
+        audioShortcutButton("draw2AudioDawMove")?.click();
+      }
+    }
+  };
+  documentRef.addEventListener("keydown", handleAudioWorkspaceShortcuts);
   const applyDesktopModeSurface = (): void => {
     syncModePlaybackButton();
     for (const button of creatorModeButtons) {
@@ -25992,6 +30605,11 @@ export function bootstrapDraw2Workspace(
   let assetBuilderFinalizeBusy = false;
   let assetBuilderUnityExportBusy = false;
   let assetBuilderMarketBusy = false;
+  type QuickAssetFrameMode = "CURRENT" | "ALL";
+  let quickAssetFrameMode: QuickAssetFrameMode = "CURRENT";
+  let quickAssetSelectedLayerIds = new Set<string>();
+  let quickAssetSelectionProjectId: string | undefined;
+  let quickAssetCreateBusy = false;
 
   const assetBuilderDirectionColumnsForMode = (): readonly {
     readonly id: AssetDirection;
@@ -26094,6 +30712,7 @@ export function bootstrapDraw2Workspace(
     selectedAssetDefinitionId = entry.definitionId;
     assetBuilderSelectedFrameIndex = 0;
     assetBuilderPreviewFrameIndex = 0;
+    if (assetAdvancedDetails !== undefined) assetAdvancedDetails.open = true;
     syncAssetBuilderFields(entry);
     setAssetStatus(
       `「${entry.definition.metadata.name}」を編集中。アクションと方向を選べます。`,
@@ -26297,6 +30916,293 @@ export function bootstrapDraw2Workspace(
       // A canvas can be between frame projections. The next state event will
       // repaint the lazy preview without affecting the canonical document.
     }
+  };
+
+  const quickAssetFrameIdsFor = (
+    snapshot: Draw2AssetBridgeSnapshot,
+  ): readonly string[] =>
+    Object.entries(snapshot.frameNumbers)
+      .sort((left, right) => left[1] - right[1])
+      .map(([frameId]) => frameId);
+
+  const drawQuickAssetPreview = (
+    snapshot: Draw2AssetBridgeSnapshot,
+    layerIds: readonly string[],
+  ): void => {
+    if (quickAssetPreview === undefined) return;
+    const context = quickAssetPreview.getContext("2d");
+    if (context === null) return;
+    context.clearRect(0, 0, quickAssetPreview.width, quickAssetPreview.height);
+    context.imageSmoothingEnabled = false;
+    const region = snapshot.selection.region;
+    const frameId = snapshot.selection.frameId;
+    const bridge = getAssetBridge();
+    if (
+      bridge === undefined ||
+      !snapshot.selection.hasSelection ||
+      region === null ||
+      frameId === null ||
+      layerIds.length === 0
+    ) return;
+    const projection = bridge.renderReference({
+      sourceFrameId: frameId,
+      layerIds,
+      rect: { ...region },
+    });
+    if (projection === undefined) return;
+    const source = documentRef.createElement("canvas");
+    source.width = projection.width;
+    source.height = projection.height;
+    const sourceContext = source.getContext("2d");
+    if (sourceContext === null) return;
+    sourceContext.putImageData(
+      new ImageData(
+        new Uint8ClampedArray(projection.data),
+        projection.width,
+        projection.height,
+      ),
+      0,
+      0,
+    );
+    const padding = 14;
+    const scale = Math.min(
+      (quickAssetPreview.width - padding * 2) / Math.max(1, projection.width),
+      (quickAssetPreview.height - padding * 2) / Math.max(1, projection.height),
+    );
+    const width = Math.max(1, Math.round(projection.width * scale));
+    const height = Math.max(1, Math.round(projection.height * scale));
+    context.drawImage(
+      source,
+      0,
+      0,
+      projection.width,
+      projection.height,
+      Math.round((quickAssetPreview.width - width) / 2),
+      Math.round((quickAssetPreview.height - height) / 2),
+      width,
+      height,
+    );
+  };
+
+  const renderQuickAssetCapture = (
+    snapshot: Draw2AssetBridgeSnapshot,
+  ): void => {
+    if (quickAssetCapture === undefined) return;
+    const knownLayerIds = new Set(
+      snapshot.layers.map((layer) => layer.layerTrackId),
+    );
+    if (quickAssetSelectionProjectId !== snapshot.projectId) {
+      quickAssetSelectionProjectId = snapshot.projectId;
+      const visibleLayerIds = snapshot.layers
+        .filter((layer) => layer.visible)
+        .map((layer) => layer.layerTrackId);
+      quickAssetSelectedLayerIds = new Set(
+        visibleLayerIds.length > 0
+          ? visibleLayerIds
+          : snapshot.selection.layerId === null
+          ? []
+          : [snapshot.selection.layerId],
+      );
+    }
+    quickAssetSelectedLayerIds = new Set(
+      [...quickAssetSelectedLayerIds].filter((layerId) =>
+        knownLayerIds.has(layerId)
+      ),
+    );
+    if (quickAssetTracks !== undefined) {
+      quickAssetTracks.replaceChildren();
+      if (snapshot.layers.length === 0) {
+        const empty = documentRef.createElement("p");
+        empty.className = "draw2-asset-quick-empty";
+        empty.textContent = "トラックがありません。";
+        quickAssetTracks.append(empty);
+      }
+      for (const layer of snapshot.layers) {
+        const track = documentRef.createElement("button");
+        track.type = "button";
+        track.className = "draw2-asset-quick-track";
+        track.dataset.layerId = layer.layerTrackId;
+        const selected = quickAssetSelectedLayerIds.has(layer.layerTrackId);
+        track.dataset.selected = String(selected);
+        track.setAttribute("aria-pressed", String(selected));
+        track.setAttribute(
+          "aria-label",
+          layer.name + "をAssetに" + (selected ? "含める" : "含めない"),
+        );
+        const mark = documentRef.createElement("span");
+        mark.className = "draw2-asset-quick-track-mark";
+        mark.setAttribute("aria-hidden", "true");
+        const name = documentRef.createElement("strong");
+        name.textContent = layer.name;
+        const state = documentRef.createElement("small");
+        state.textContent = layer.visible ? "表示" : "非表示";
+        track.append(mark, name, state);
+        track.addEventListener("click", () => {
+          if (quickAssetSelectedLayerIds.has(layer.layerTrackId)) {
+            quickAssetSelectedLayerIds.delete(layer.layerTrackId);
+          } else {
+            quickAssetSelectedLayerIds.add(layer.layerTrackId);
+          }
+          renderQuickAssetCapture(getAssetBridge()?.snapshot() ?? snapshot);
+        });
+        quickAssetTracks.append(track);
+      }
+    }
+    const hasSelection = snapshot.selection.hasSelection &&
+      snapshot.selection.region !== null && snapshot.selection.frameId !== null;
+    const frameIds = quickAssetFrameIdsFor(snapshot);
+    const selectedLayerIds = [...quickAssetSelectedLayerIds];
+    const canCreate = hasSelection && selectedLayerIds.length > 0 &&
+      frameIds.length > 0 && !quickAssetCreateBusy &&
+      activeAssetCaptureTarget === undefined;
+    if (quickAssetSelection !== undefined) {
+      quickAssetSelection.textContent = hasSelection && snapshot.selection.region !== null
+        ? regionLabel(snapshot.selection.region) + " · F" +
+          (snapshot.selection.frameNumber ?? "?")
+        : "iDRAWで範囲を選択してください";
+    }
+    if (quickAssetCaptureState !== undefined) {
+      quickAssetCaptureState.dataset.state = canCreate ? "ready" : "idle";
+      quickAssetCaptureState.textContent = canCreate ? "作成できます" : "範囲を選択";
+    }
+    if (quickAssetFrameSummary !== undefined) {
+      quickAssetFrameSummary.textContent = quickAssetFrameMode === "ALL"
+        ? frameIds.length + "フレーム"
+        : "このフレーム";
+    }
+    if (quickAssetFrameModeGroup !== undefined) {
+      for (const button of queryAll<HTMLButtonElement>(
+        quickAssetFrameModeGroup,
+        "[data-draw2-quick-frame-mode]",
+      )) {
+        const active = button.dataset.draw2QuickFrameMode === quickAssetFrameMode;
+        button.classList.toggle("is-active", active);
+        button.setAttribute("aria-checked", String(active));
+      }
+    }
+    if (quickAssetCreate !== undefined) {
+      quickAssetCreate.disabled = !canCreate;
+      quickAssetCreate.dataset.ready = String(canCreate);
+    }
+    if (quickAssetStatus !== undefined) {
+      quickAssetStatus.dataset.state = canCreate ? "ready" : "idle";
+      quickAssetStatus.textContent = !hasSelection
+        ? "iDRAWで範囲を選ぶと作成できます。"
+        : selectedLayerIds.length === 0
+        ? "含めるトラックを1つ選んでください。"
+        : selectedLayerIds.length + "トラック · " +
+          (quickAssetFrameMode === "ALL" ? frameIds.length + "フレーム" : "このフレーム");
+    }
+    drawQuickAssetPreview(snapshot, selectedLayerIds);
+  };
+
+  const createQuickAssetFromSelection = (): void => {
+    if (quickAssetCreateBusy) return;
+    if (activeAssetCaptureTarget !== undefined) {
+      setAssetStatus("進行中の範囲登録をEscで終了してから作成してください。", "error");
+      return;
+    }
+    const bridge = getAssetBridge();
+    const snapshot = bridge?.snapshot();
+    const region = snapshot?.selection.region;
+    const frameId = snapshot?.selection.frameId;
+    const selectedLayerIds = [...quickAssetSelectedLayerIds];
+    if (
+      bridge === undefined ||
+      snapshot === undefined ||
+      !snapshot.selection.hasSelection ||
+      region === null ||
+      region === undefined ||
+      frameId === null ||
+      frameId === undefined ||
+      selectedLayerIds.length === 0
+    ) {
+      setAssetStatus("範囲と含めるトラックを選択してください。", "error");
+      return;
+    }
+    const frameIds = quickAssetFrameMode === "ALL"
+      ? quickAssetFrameIdsFor(snapshot)
+      : [frameId];
+    if (frameIds.length === 0) {
+      setAssetStatus("Assetに含めるフレームがありません。", "error");
+      return;
+    }
+    const sourceFrames: AssetAnimationFrameReference[] = [];
+    const frameDurationsMs: number[] = [];
+    for (const sourceFrameId of frameIds) {
+      const projection = bridge.renderReference({
+        sourceFrameId,
+        layerIds: selectedLayerIds,
+        rect: { ...region },
+      });
+      if (projection === undefined) {
+        setAssetStatus("選択したトラックの画像を取得できません。", "error");
+        return;
+      }
+      const duration = snapshot.frameDurationsMs?.[sourceFrameId];
+      const frameDuration = duration !== undefined && Number.isFinite(duration) && duration > 0
+        ? Math.max(1, Math.round(duration))
+        : 83;
+      frameDurationsMs.push(frameDuration);
+      sourceFrames.push({
+        sourceFrameId,
+        layerIds: [...selectedLayerIds],
+        rect: { ...region },
+        rasterSnapshot: {
+          width: projection.width,
+          height: projection.height,
+          data: Array.from(projection.data),
+        },
+        durationMs: frameDuration,
+      });
+    }
+    const kindValue = creatorAssetKind?.value ?? "CHARACTER";
+    const pivotValue = creatorAssetPivot?.value ?? "CENTER";
+    const assetKind = assetKinds.includes(kindValue as typeof assetKinds[number])
+      ? kindValue as CreatorAssetKind
+      : "CHARACTER";
+    const pivot = pivots.includes(pivotValue as AssetPivot)
+      ? pivotValue as AssetPivot
+      : "CENTER";
+    quickAssetCreateBusy = true;
+    renderQuickAssetCapture(snapshot);
+    const result = bridge.addFromSelection({
+      name: quickAssetName?.value.trim() ?? "",
+      assetKind,
+      pivot,
+      sourceLayerIds: selectedLayerIds,
+      animationName: "IDLE_DOWN",
+      motionName: "IDLE",
+      direction: "DOWN",
+      fps: 12,
+      sourceFrames,
+      frameDurationsMs,
+    });
+    quickAssetCreateBusy = false;
+    if (result.ok === false) {
+      setAssetStatus(result.message, "error");
+      renderAssetEditor();
+      return;
+    }
+    selectedAssetDefinitionId = result.entry.definitionId;
+    assetBuilderNewAssetMode = false;
+    if (result.entry.definition.persistence === "LOCAL_DRAFT") {
+      creatorState = { ...creatorState, assetDraft: result.entry.definition };
+    }
+    if (quickAssetName !== undefined) quickAssetName.value = "";
+    const frameLabel = quickAssetFrameMode === "ALL"
+      ? frameIds.length + "フレーム"
+      : "1フレーム";
+    setAssetStatus(
+      "Assetを作成しました · " + selectedLayerIds.length + "トラック · " +
+        frameLabel + "。詳細設定は下から開けます。",
+      "success",
+    );
+    updateStatus(
+      capability.profile + " · quick asset created · " +
+        selectedLayerIds.length + " track(s) · " + frameLabel,
+    );
+    renderAssetEditor();
   };
 
   const drawAssetReferenceCanvas = (
@@ -28153,6 +33059,7 @@ export function bootstrapDraw2Workspace(
     if (creatorAssetAddFromSelection !== undefined) {
       creatorAssetAddFromSelection.disabled = !selection.hasSelection;
     }
+    renderQuickAssetCapture(snapshot);
     renderAssetDefinitions(snapshot);
     const selectedEntry = assetBuilderSelectedEntry(snapshot);
     const finalizedPackage = selectedEntry === undefined
@@ -28482,6 +33389,7 @@ export function bootstrapDraw2Workspace(
   });
   assetBuilderNewAsset?.addEventListener("click", () => {
     clearAssetCapture();
+    if (assetAdvancedDetails !== undefined) assetAdvancedDetails.open = true;
     assetBuilderNewAssetMode = true;
     selectedAssetDefinitionId = undefined;
     assetBuilderSelectedFrameIndex = 0;
@@ -28523,6 +33431,33 @@ export function bootstrapDraw2Workspace(
         ? "その他のAssetとして保存します。"
         : `${presetLabels[next] ?? next}を選択しました。`,
     );
+  });
+  quickAssetSelectVisible?.addEventListener("click", () => {
+    const snapshot = getAssetBridge()?.snapshot();
+    if (snapshot === undefined) return;
+    quickAssetSelectedLayerIds = new Set(
+      snapshot.layers.filter((layer) => layer.visible).map((layer) =>
+        layer.layerTrackId
+      ),
+    );
+    renderQuickAssetCapture(snapshot);
+  });
+  if (quickAssetFrameModeGroup !== undefined) {
+    for (const button of queryAll<HTMLButtonElement>(
+      quickAssetFrameModeGroup,
+      "[data-draw2-quick-frame-mode]",
+    )) {
+      button.addEventListener("click", () => {
+        const next = button.dataset.draw2QuickFrameMode;
+        if (next !== "CURRENT" && next !== "ALL") return;
+        quickAssetFrameMode = next;
+        const snapshot = getAssetBridge()?.snapshot();
+        if (snapshot !== undefined) renderQuickAssetCapture(snapshot);
+      });
+    }
+  }
+  quickAssetCreate?.addEventListener("click", () => {
+    createQuickAssetFromSelection();
   });
   assetBuilderPivot?.addEventListener("change", () => {
     if (creatorAssetPivot !== undefined) {
@@ -35145,6 +40080,82 @@ export function bootstrapDraw2Workspace(
     draw2GameAudioAsset.value = "revision|" + assetId + "|" + revisionId;
     draw2GameBindAudio?.click();
   };
+  const savedGameAudioPackageAssets = (): readonly GameAudioAsset[] => {
+    const session = audioWorkspaceSession;
+    const snapshot = getAssetBridge()?.snapshot();
+    if (session === undefined || snapshot === undefined) return [];
+    const projectId = String(session.project.projectId);
+    return snapshot.assetPackages
+      .flatMap(gameAudioAssetsForAssetPackage)
+      .filter((asset) => asset.source.projectId === projectId);
+  };
+  const addGameAudioPackageAsset = (asset: GameAudioAsset): void => {
+    if (gameAuthoringLocked()) return;
+    const session = audioWorkspaceSession;
+    if (session === undefined) {
+      if (draw2GameAssetCatalogStatus !== undefined) {
+        draw2GameAssetCatalogStatus.textContent =
+          "iAUDIO Projectを読み込み中です。少し待ってから追加してください。";
+      }
+      return;
+    }
+    const currentRevision = session.project.projectRevision;
+    const currentStateHash = String(session.project.stateHash);
+    if (
+      asset.source.projectId !== String(session.project.projectId) ||
+      asset.source.projectRevision !== currentRevision ||
+      asset.source.projectStateHash !== currentStateHash
+    ) {
+      if (draw2GameAssetCatalogStatus !== undefined) {
+        draw2GameAssetCatalogStatus.textContent =
+          "iAUDIOが保存時から更新されています。現在の範囲をもう一度Asset保存してください。";
+      }
+      return;
+    }
+    const result = commitGameAudioTransaction({
+      config: gamePlayground,
+      asset,
+      expectedProjectRevision: asset.source.projectRevision,
+      expectedProjectStateHash: asset.source.projectStateHash,
+      currentProjectRevision: currentRevision,
+      currentProjectStateHash: currentStateHash,
+      commitId: `game-audio-package-add:${asset.audioAssetId}`,
+    });
+    if (result.result === "SOURCE_CHANGED") {
+      if (draw2GameAssetCatalogStatus !== undefined) {
+        draw2GameAssetCatalogStatus.textContent =
+          "iAUDIOが更新されたため、Assetを追加できません。保存後にもう一度実行してください。";
+      }
+      return;
+    }
+    if (result.result === "REJECTED") {
+      if (draw2GameAssetCatalogStatus !== undefined) {
+        draw2GameAssetCatalogStatus.textContent =
+          "このAudio Assetは現在のGame設定へ追加できません。";
+      }
+      return;
+    }
+    if (result.saveCount === 1) {
+      gamePlayground = result.config;
+      gamePlaygroundLibrarySource = "PROJECT";
+      for (const tab of draw2GamePlaygroundLibrarySourceTabs) {
+        const active = tab.dataset.gameplaygroundLibrarySource === "PROJECT";
+        tab.classList.toggle("is-active", active);
+        tab.setAttribute("aria-selected", String(active));
+      }
+      if (draw2GamePlaygroundMarketSearch !== undefined) {
+        draw2GamePlaygroundMarketSearch.hidden = true;
+      }
+      void queueGameEditorPersistenceSave("package-audio-asset");
+    }
+    renderGameCustomPanels();
+    if (draw2GameAssetCatalogStatus !== undefined) {
+      draw2GameAssetCatalogStatus.textContent =
+        result.saveCount === 1
+          ? `${asset.name}をGameのAudioライブラリへ追加しました。スロットへ割り当てできます。`
+          : `${asset.name}はすでにGameのAudioライブラリにあります。`;
+    }
+  };
   type GameAudioSlotSpec = {
     readonly id: string;
     readonly label: string;
@@ -35951,6 +40962,7 @@ export function bootstrapDraw2Workspace(
       gameAssetBrowserSource === "GAME" ? "tiles" : "list";
     const drawDefinitions = getAssetBridge()?.snapshot().assetDefinitions ?? [];
     const audioAssets = audioWorkspaceSession?.assetCatalog.assets ?? [];
+    const audioPackageAssets = savedGameAudioPackageAssets();
     const templates = getGameTemplates().map((definition) => ({
       id: definition.id,
       label: definition.title,
@@ -35962,6 +40974,7 @@ export function bootstrapDraw2Workspace(
       tracks: gameDeckTracks,
       drawDefinitions,
       audioAssets,
+      audioPackageAssets,
       templates,
       query: gameAssetBrowserQuery,
       source: gameAssetBrowserSource,
@@ -36020,11 +41033,19 @@ export function bootstrapDraw2Workspace(
           badge.className = "draw2-game-asset-card-badge";
           const audioAsset = entry.source === "AUDIO"
             ? audioAssets.find((asset) =>
-              String(asset.assetId) === entry.id.slice("audio:".length)
+              String(asset.assetId) === entry.audioAssetId
+            )
+            : undefined;
+          const audioPackageAsset = entry.source === "AUDIO" &&
+              entry.audioPackage === true
+            ? audioPackageAssets.find((asset) =>
+              asset.audioAssetId === entry.audioAssetId
             )
             : undefined;
           badge.textContent = entry.source === "AUDIO"
-            ? "iAUDIO · " + (audioAsset?.kind === "SONG" ? "BGM" : "SE")
+            ? entry.audioPackage === true
+              ? `iAUDIO Asset · ${audioPackageAsset?.kind ?? "Audio"}`
+              : "iAUDIO · " + (audioAsset?.kind === "SONG" ? "BGM" : "SE")
             : sourceLabel(entry.source);
           head.append(title, badge);
           const detail = documentRef.createElement("small");
@@ -36041,7 +41062,7 @@ export function bootstrapDraw2Workspace(
           action.textContent = entry.source === "DRAW"
             ? "キャラクターとして配置"
             : entry.source === "AUDIO"
-            ? "Audio Sourceへ追加"
+            ? entry.audioPackage === true ? "Gameへ追加" : "Audio Sourceへ追加"
             : entry.source === "GAME"
             ? "Inspector"
             : "使う";
@@ -36053,7 +41074,18 @@ export function bootstrapDraw2Workspace(
               return;
             }
             if (entry.source === "AUDIO") {
-              connectGameAudioAsset(entry.id.slice("audio:".length));
+              if (entry.audioPackage === true) {
+                if (audioPackageAsset !== undefined) {
+                  addGameAudioPackageAsset(audioPackageAsset);
+                } else if (draw2GameAssetCatalogStatus !== undefined) {
+                  draw2GameAssetCatalogStatus.textContent =
+                    "保存済みiAUDIO Assetを取得できません。Asset一覧を再読込してください。";
+                }
+              } else {
+                connectGameAudioAsset(
+                  entry.audioAssetId ?? entry.id.slice("audio:".length),
+                );
+              }
               return;
             }
             selectButton.click();
@@ -36102,6 +41134,8 @@ export function bootstrapDraw2Workspace(
             if (draw2GameAssetCatalogStatus !== undefined) {
               draw2GameAssetCatalogStatus.textContent = entry.source === "DRAW"
                 ? `${entry.label}を選択中。Game配置を追加すると、このAssetをSpriteとして配置できます。`
+                : entry.source === "AUDIO" && entry.audioPackage === true
+                ? `${entry.label}を選択中。Gameへ追加するとAudioスロットへ割り当てできます。`
                 : entry.readOnly
                 ? `${entry.label} · 参照専用です。Game側では配置・割り当てだけを変更できます。`
                 : `${entry.label} · Game側で使用できます。原素材は変更されません。`;
@@ -39606,13 +44640,57 @@ export function bootstrapDraw2Workspace(
     }
     const assets = gamePlayground.assets;
     const audioAssets = gamePlayground.audioAssets;
-    if (assets.length === 0 && audioAssets.length === 0) {
+    const gameAudioAssetIds = new Set(
+      audioAssets.map((asset) => asset.audioAssetId),
+    );
+    const availableAudioPackageAssets = savedGameAudioPackageAssets().filter(
+      (asset) => !gameAudioAssetIds.has(asset.audioAssetId),
+    );
+    if (
+      assets.length === 0 && audioAssets.length === 0 &&
+      availableAudioPackageAssets.length === 0
+    ) {
       const empty = documentRef.createElement("div");
       empty.className = "draw2-game-playground-asset-empty";
       empty.textContent = "右上の追加からiDRAWの範囲を選択";
       draw2GamePlaygroundBottomCards.replaceChildren(empty);
       return;
     }
+    const packageAudioCards = availableAudioPackageAssets.map((asset) => {
+      const card = documentRef.createElement("article");
+      card.className =
+        "draw2-game-playground-asset-card draw2-game-playground-audio-card is-available";
+      card.setAttribute("role", "listitem");
+      card.dataset.gameAudioPackageId = asset.audioAssetId;
+      const button = documentRef.createElement("button");
+      button.type = "button";
+      button.className = "draw2-game-playground-asset-button";
+      button.setAttribute(
+        "aria-label",
+        `${asset.name}をGameのAudioライブラリへ追加`,
+      );
+      const visual = documentRef.createElement("span");
+      visual.className =
+        "draw2-game-playground-asset-visual draw2-game-playground-audio-visual";
+      visual.textContent = asset.kind === "BGM"
+        ? "♫"
+        : asset.kind === "VOICE"
+        ? "◖"
+        : "•";
+      const copy = documentRef.createElement("span");
+      copy.className = "draw2-game-playground-asset-copy";
+      const title = documentRef.createElement("strong");
+      title.textContent = asset.name;
+      const badge = documentRef.createElement("small");
+      badge.textContent = `iAUDIO Asset · ${asset.kind} · クリックで追加`;
+      copy.append(title, badge);
+      button.append(visual, copy);
+      button.addEventListener("click", () => {
+        addGameAudioPackageAsset(asset);
+      });
+      card.append(button);
+      return card;
+    });
     const audioCards = audioAssets.map((asset) => {
       const card = documentRef.createElement("article");
       card.className = "draw2-game-playground-asset-card draw2-game-playground-audio-card";
@@ -39729,6 +44807,7 @@ export function bootstrapDraw2Workspace(
         card.append(button, place);
         return card;
       }),
+      ...packageAudioCards,
       ...audioCards,
     );
   };
@@ -40769,6 +45848,71 @@ export function bootstrapDraw2Workspace(
     renderGameAudioSlots(card, locked);
     draw2GamePlaygroundSelectedAsset.append(card);
   };
+  renderGameQuickStart = (locked: boolean): void => {
+    if (draw2GameQuickStart === undefined) return;
+    const gameMode = root.dataset.creatorMode === "GAME";
+    const desktopGameMode = gameMode && windowRef.innerWidth >= 1120;
+    draw2GameQuickStart.hidden = !desktopGameMode;
+    if (!desktopGameMode) return;
+
+    const hasWorld = gamePlayground.world !== undefined;
+    const hasPlayer = gamePlayground.player !== undefined;
+    const running = gameDeckPlaying;
+    const editingLocked = locked && !running;
+    draw2GameQuickStart.dataset.state = running
+      ? "running"
+      : hasPlayer && hasWorld
+      ? "ready"
+      : hasPlayer || hasWorld
+      ? "partial"
+      : "empty";
+    if (draw2GameQuickStartHeading !== undefined) {
+      draw2GameQuickStartHeading.textContent = running
+        ? "プレイ中"
+        : hasPlayer
+        ? "置いたものをすぐ遊ぶ"
+        : "描く → 置く → 遊ぶ";
+    }
+    if (draw2GameQuickStartStatus !== undefined) {
+      draw2GameQuickStartStatus.textContent = running
+        ? "操作中 · Playで停止"
+        : hasPlayer && hasWorld
+        ? "クリックで配置 · Playで確認"
+        : hasPlayer
+        ? "主人公を置きました · 背景はあとから追加できます"
+        : hasWorld
+        ? "背景を置きました · 主人公を選ぶと遊べます"
+        : "主人公と背景を選ぶだけ";
+    }
+    for (const button of draw2GameQuickStartActions) {
+      const action = button.dataset.gameQuickAction;
+      const isPlay = action === "PLAY";
+      button.disabled = isPlay ? editingLocked : locked;
+      button.dataset.ready = action === "WORLD"
+        ? String(hasWorld)
+        : action === "PLAYER"
+        ? String(hasPlayer)
+        : action === "PLAY"
+        ? String(hasPlayer)
+        : "false";
+      if (isPlay) {
+        setDraw2ButtonIcon(
+          button,
+          running ? "icon-stop" : "icon-play",
+          running ? "Stop" : "Play",
+        );
+        button.setAttribute(
+          "aria-label",
+          running ? "ゲームを停止" : hasPlayer ? "ゲームを再生" : "主人公を選ぶ",
+        );
+        button.title = running
+          ? "ゲームを停止"
+          : hasPlayer
+          ? "ゲームを再生"
+          : "主人公を選ぶ";
+      }
+    }
+  };
   const renderGamePlayground = (): void => {
     const locked = gameAuthoringLocked();
     // GAME always uses the hierarchy rail. The legacy Node Box remains
@@ -40786,6 +45930,7 @@ export function bootstrapDraw2Workspace(
           : `${gamePlayground.assets.length} Asset · ${gamePlayground.placements.length} Placement`;
     }
     if (legacyGameUiEnabled) renderLegacyGamePlayground(locked);
+    renderGameQuickStart(locked);
   };
   renderGameCustomPanels = (): void => {
     isolateLegacyGameUi();
@@ -40801,6 +45946,17 @@ export function bootstrapDraw2Workspace(
         `Game Playground · ${gameDeckTracks.length} objects · Free placement`;
     }
     renderGamePlayground();
+    if (
+      root.dataset.creatorMode === "GAME" &&
+      audioWorkspaceSession === undefined &&
+      !gameAudioPackageRefreshPending
+    ) {
+      gameAudioPackageRefreshPending = true;
+      void ensureAudioWorkspaceSession().then(() => {
+        gameAudioPackageRefreshPending = false;
+        if (root.dataset.creatorMode === "GAME") renderGameCustomPanels();
+      });
+    }
     if (gameHierarchyStatus !== undefined) {
       gameHierarchyStatus.textContent =
         `${gamePlayground.placements.length}個のPlacement · Projectへ自動保存`;
@@ -41018,6 +46174,14 @@ export function bootstrapDraw2Workspace(
     );
     queueGameEditorPersistenceSave("playground-mode");
     renderGameCustomPanels();
+  };
+  const addGamePlaygroundObject = (): void => {
+    if (gameAuthoringLocked()) return;
+    const previousIds = new Set(gameDeckTracks.map((track) => track.id));
+    addRpgObjectTemplate("PROP");
+    const added = [...gameDeckTracks].find((track) => !previousIds.has(track.id));
+    if (added === undefined) return;
+    openGamePlaygroundDrawSelection({ kind: "OBJECT", trackId: added.id });
   };
   const applyGamePlaygroundDrawReference = async (
     slot: "world" | "player" | { readonly kind: "asset" } | { readonly kind: "object"; readonly trackId: string },
@@ -41458,6 +46622,24 @@ export function bootstrapDraw2Workspace(
       ) setGamePlaygroundMode(mode);
     });
   }
+  for (const button of draw2GameQuickStartActions) {
+    button.addEventListener("click", () => {
+      const action = button.dataset.gameQuickAction;
+      if (action === "WORLD") {
+        openGamePlaygroundDrawSelection({ kind: "WORLD" });
+      } else if (action === "PLAYER") {
+        openGamePlaygroundDrawSelection({ kind: "PLAYER" });
+      } else if (action === "OBJECT") {
+        addGamePlaygroundObject();
+      } else if (action === "PLAY") {
+        if (gameDeckPlaying || gamePlayground.player !== undefined) {
+          gameDeckPlay?.click();
+        } else {
+          openGamePlaygroundDrawSelection({ kind: "PLAYER" });
+        }
+      }
+    });
+  }
   draw2GamePlaygroundWorldSprite?.addEventListener("click", () => {
     openGamePlaygroundDrawSelection({ kind: "WORLD" });
   });
@@ -41465,12 +46647,7 @@ export function bootstrapDraw2Workspace(
     openGamePlaygroundDrawSelection({ kind: "PLAYER" });
   });
   draw2GamePlaygroundObjectAdd?.addEventListener("click", () => {
-    if (gameAuthoringLocked()) return;
-    const previousIds = new Set(gameDeckTracks.map((track) => track.id));
-    addRpgObjectTemplate("PROP");
-    const added = [...gameDeckTracks].find((track) => !previousIds.has(track.id));
-    if (added === undefined) return;
-    openGamePlaygroundDrawSelection({ kind: "OBJECT", trackId: added.id });
+    addGamePlaygroundObject();
   });
   for (const button of draw2GamePlaygroundAudioEvents) {
     button.addEventListener("click", () => {
@@ -43656,6 +48833,9 @@ export function bootstrapDraw2Workspace(
         : { kind: "asset" as const };
       void applyGamePlaygroundDrawReference(slot);
     }
+    if (root.dataset.creatorMode === "GAME") {
+      renderGameCustomPanels();
+    }
     if (!legacyGameUiEnabled) return;
     const pending = gameMakerPendingHeroBinding;
     if (pending !== undefined && snapshot !== undefined) {
@@ -43930,42 +49110,44 @@ export function bootstrapDraw2Workspace(
     );
   };
 
-  let desktopTimelineHeightBeforeCollapse: string | undefined;
+  const desktopTimelineHeightBeforeCollapse: Partial<
+    Record<DesktopCreatorMode, string>
+  > = {};
   // All desktop modes share the same lower rail. DRAW shows the animation
   // timeline, GAME shows its mode deck, and AUDIO shows its musical deck, but
-  // the resize/collapse contract is intentionally identical for each one.
+  // each mode remembers its own height and collapsed state.
   const setDesktopTimelineCollapsed = (collapsed: boolean): boolean => {
     if (
       capability.profile !== "desktop" ||
       timelineRegion === undefined ||
       timelineCard === undefined
     ) return false;
+    const mode = timelineModeForViewport();
+    const timelineLayout = timelineLayoutForMode(mode);
     const currentState = timelineRegion.dataset.timelineCollapse;
-    const storedHeight = `${railLayoutPreference.timelineHeight}px`;
+    const storedHeight = `${timelineLayout.timelineHeight}px`;
     const expandedHeight = currentState === "collapsed"
-      ? desktopTimelineHeightBeforeCollapse ?? storedHeight
+      ? desktopTimelineHeightBeforeCollapse[mode] ?? storedHeight
       : root.style.getPropertyValue("--draw2-timeline-height") || storedHeight;
     if (collapsed && currentState !== "collapsed") {
-      desktopTimelineHeightBeforeCollapse = expandedHeight;
+      desktopTimelineHeightBeforeCollapse[mode] = expandedHeight;
     }
     if (!collapsed) {
-      desktopTimelineHeightBeforeCollapse = expandedHeight;
+      desktopTimelineHeightBeforeCollapse[mode] = expandedHeight;
+      const restoredHeight = Number.parseFloat(expandedHeight);
+      if (Number.isFinite(restoredHeight)) {
+        setTimelineLayoutForMode(mode, {
+          timelineHeight: clampRailLayoutValue(
+            restoredHeight,
+            WORKSPACE_TIMELINE_MIN_PX,
+            WORKSPACE_TIMELINE_MAX_PX,
+          ),
+        });
+      }
     }
-    railLayoutPreference = {
-      ...railLayoutPreference,
-      timelineCollapsed: collapsed,
-    };
-    applyRailCollapsePreference(
-      currentCreatorMode() === "GAME"
-        ? "GAME"
-        : currentCreatorMode() === "AUDIO"
-        ? "AUDIO"
-        : "DRAW",
-    );
-    if (!collapsed) {
-      root.style.setProperty("--draw2-timeline-height", expandedHeight);
-      desktopTimelineHeightBeforeCollapse = undefined;
-    }
+    setTimelineLayoutForMode(mode, { timelineCollapsed: collapsed });
+    applyRailCollapsePreference(mode);
+    if (!collapsed) delete desktopTimelineHeightBeforeCollapse[mode];
     timelineCollapseButton?.setAttribute("aria-expanded", String(!collapsed));
     timelineCollapseButton?.setAttribute(
       "aria-label",
@@ -44336,13 +49518,18 @@ export function bootstrapDraw2Workspace(
         );
         syncRightDockCollapsedState(false);
         workspaceLeftDock?.classList.add("is-open");
+        const defaultRailLayout = defaultRailLayoutPreference();
         railLayoutPreference = {
           ...railLayoutPreference,
+          timelineByMode: defaultRailLayout.timelineByMode,
+          timelineHeight: defaultRailLayout.timelineHeight,
           gameLeftCollapsed: false,
           audioLeftCollapsed: false,
-          timelineCollapsed: false,
+          timelineCollapsed: defaultRailLayout.timelineCollapsed,
         };
-        setDesktopTimelineCollapsed(false);
+        applyRailCollapsePreference(timelineModeForViewport());
+        windowRef.dispatchEvent(new Event("resize"));
+        saveRailLayoutPreference();
         root.dataset.workspacePreset = "pixel";
         setPanel("color");
         updateStatus(
@@ -45183,17 +50370,17 @@ export function bootstrapDraw2Workspace(
       }
       const height = clamp(
         rawHeight,
-        WORKSPACE_TIMELINE_MIN_PX,
+        timelineMinimumForViewport(),
         timelineMaximumForViewport(),
       );
       root.style.setProperty(
         "--draw2-timeline-height",
         `${Math.round(height)}px`,
       );
-      railLayoutPreference = {
-        ...railLayoutPreference,
+      setTimelineLayoutForMode(timelineModeForViewport(), {
         timelineHeight: Math.round(height),
-      };
+        timelineCollapsed: false,
+      });
       setRailResizeHandleValue(
         timelineResizeHandle,
         Math.round(height),
@@ -45270,10 +50457,10 @@ export function bootstrapDraw2Workspace(
       if (event.key === "End") {
         setDesktopTimelineCollapsed(false);
         root.style.setProperty("--draw2-timeline-height", `${Math.round(maximum)}px`);
-        railLayoutPreference = {
-          ...railLayoutPreference,
+        setTimelineLayoutForMode(timelineModeForViewport(), {
           timelineHeight: Math.round(maximum),
-        };
+          timelineCollapsed: false,
+        });
         setRailResizeHandleValue(
           timelineResizeHandle,
           Math.round(maximum),
@@ -45291,18 +50478,20 @@ export function bootstrapDraw2Workspace(
         ? 0
         : timelineRegion.getBoundingClientRect().height;
       const next = isCollapsed
-        ? WORKSPACE_TIMELINE_MIN_PX
+        ? timelineMinimumForViewport()
         : current + direction * step;
       if (next < WORKSPACE_RAIL_SNAP_PX) {
         setDesktopTimelineCollapsed(true);
       } else {
         setDesktopTimelineCollapsed(false);
-        const height = Math.round(clamp(next, WORKSPACE_TIMELINE_MIN_PX, maximum));
+        const height = Math.round(
+          clamp(next, timelineMinimumForViewport(), maximum),
+        );
         root.style.setProperty("--draw2-timeline-height", `${height}px`);
-        railLayoutPreference = {
-          ...railLayoutPreference,
+        setTimelineLayoutForMode(timelineModeForViewport(), {
           timelineHeight: height,
-        };
+          timelineCollapsed: false,
+        });
         setRailResizeHandleValue(
           timelineResizeHandle,
           height,

@@ -1,0 +1,1233 @@
+/* PiXiEEDstudio PC interaction and visual polish --------------------------
+ *
+ * This is a presentation-only layer for the desktop workspace. It does not
+ * remove commands from the DOM or change their event targets. Low-frequency
+ * actions stay reachable from the command palette/details menu, while direct
+ * manipulation owns the canvas, roll, timeline and scene surfaces.
+ */
+
+@media (min-width: 1120px) and (hover: hover) and (pointer: fine) {
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"] {
+    --draw2-polish-draw: #79e3d2;
+    --draw2-polish-audio: #c88bff;
+    --draw2-polish-game: #ffbf68;
+    --draw2-polish-surface: #111827;
+    --draw2-polish-surface-raised: #182235;
+    --draw2-polish-line: rgb(154 178 216 / 18%);
+    --draw2-polish-line-strong: rgb(154 178 216 / 32%);
+    --draw2-polish-active: var(--draw2-mode-accent, var(--draw2-accent-strong));
+    --draw2-polish-control: 36px;
+    --draw2-polish-radius: 9px;
+    background:
+      radial-gradient(circle at 52% -12%, rgb(105 146 205 / 12%), transparent 38%),
+      linear-gradient(135deg, #0c111c 0%, #111827 52%, #0d1421 100%);
+    color: var(--draw2-text-strong, var(--draw2-text));
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="DRAW"] {
+    --draw2-polish-active: var(--draw2-polish-draw);
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="AUDIO"] {
+    --draw2-polish-active: var(--draw2-polish-audio);
+  }
+
+  #draw2WorkspaceFrame[data-creator-mode="GAME"] {
+    --draw2-polish-active: var(--draw2-polish-game);
+  }
+
+  /* One shell line per rail. Nested cards carry hierarchy with tone and
+   * spacing instead of a stack of dark borders. */
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"]
+    :is(.draw2-workspace-topbar, .draw2-workspace-left-dock, .draw2-workspace-right-dock, .draw2-workspace-timeline-region) {
+    border-color: var(--draw2-polish-line-strong) !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"]
+    :is(.draw2-workspace-left-dock, .draw2-workspace-right-dock) {
+    background:
+      linear-gradient(180deg, rgb(24 34 53 / 92%), rgb(13 20 33 / 96%)) !important;
+    box-shadow: inset 0 1px rgb(255 255 255 / 3%);
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"]
+    :is(.draw2-workspace-panel, .draw2-panel-shell, .draw2-audio-right-surface, .draw2-game-rail-surface) {
+    border-color: transparent !important;
+    background: linear-gradient(180deg, rgb(26 37 57 / 74%), rgb(15 23 38 / 58%));
+    box-shadow: none !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"]
+    :is(.draw2-panel-heading, .draw2-audio-right-heading, .draw2-game-rail-section-heading) {
+    min-height: 28px;
+    margin-bottom: 6px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid var(--draw2-polish-line);
+  }
+
+  /* The mode rail is the one persistent navigation surface. */
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"] .draw2-creator-mode-bar {
+    padding: 3px;
+    border: 1px solid rgb(143 178 225 / 22%);
+    border-radius: 12px;
+    background: rgb(9 15 27 / 72%);
+    box-shadow: 0 8px 24px rgb(0 0 0 / 20%), inset 0 1px rgb(255 255 255 / 4%);
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"] .draw2-creator-mode {
+    position: relative;
+    min-width: 44px;
+    border: 1px solid transparent !important;
+    border-radius: 8px !important;
+    color: var(--draw2-text-muted, var(--draw2-muted));
+    transition: background-color 140ms ease, color 140ms ease, transform 100ms ease;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"] .draw2-creator-mode:hover,
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"] .draw2-creator-mode:focus-visible {
+    background: rgb(255 255 255 / 7%) !important;
+    color: var(--draw2-text-strong, var(--draw2-text));
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"] .draw2-creator-mode.is-active {
+    background: color-mix(in srgb, var(--draw2-polish-active) 16%, #101827) !important;
+    color: var(--draw2-polish-active) !important;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--draw2-polish-active) 35%, transparent);
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"] .draw2-creator-mode.is-active::after {
+    position: absolute;
+    right: 10px;
+    bottom: 3px;
+    left: 10px;
+    height: 2px;
+    border-radius: 999px;
+    background: currentcolor;
+    box-shadow: 0 0 10px currentcolor;
+    content: "";
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"]
+    :is(button, summary, select, input):active {
+    transform: scale(0.97);
+  }
+
+  /* The command palette remains available through Mod+K and the application
+   * menu. Its permanent toolbar button is redundant. Keep the remaining
+   * common actions icon-led so the work surface stays wide. */
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"]
+    .draw2-workspace-command-bar
+    > [data-workspace-command="command-palette"] {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"]
+    .draw2-workspace-command-bar
+    > :is(.draw2-icon-button, #draw2ModePlaybackButton)
+    > span:not(.draw2-workspace-detail-toggle-label) {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"]
+    .draw2-workspace-command-bar
+    > :is(.draw2-icon-button, #draw2ModePlaybackButton) {
+    flex-basis: var(--draw2-polish-control) !important;
+    width: var(--draw2-polish-control) !important;
+    min-width: var(--draw2-polish-control) !important;
+    height: var(--draw2-polish-control) !important;
+    min-height: var(--draw2-polish-control) !important;
+    border-radius: 10px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"]
+    .draw2-workspace-command-bar
+    > #draw2ModePlaybackButton[aria-pressed="true"] {
+    background: color-mix(in srgb, var(--draw2-polish-active) 24%, #111827) !important;
+    color: var(--draw2-polish-active) !important;
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--draw2-polish-active) 38%, transparent), 0 0 16px color-mix(in srgb, var(--draw2-polish-active) 22%, transparent);
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"] .draw2-workspace-detail-toggle {
+    border-color: var(--draw2-polish-line-strong) !important;
+    border-radius: 10px !important;
+    background: rgb(255 255 255 / 4%) !important;
+  }
+
+  /* iDRAW --------------------------------------------------------------- */
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+    #draw2WorkspaceCanvasRegion {
+    background:
+      radial-gradient(circle at 50% 45%, rgb(121 227 210 / 5%), transparent 54%),
+      linear-gradient(135deg, #0b111d, #121b2b 52%, #0d1523) !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+    .draw2-viewport-wrap {
+    border: 1px solid rgb(121 227 210 / 28%) !important;
+    border-radius: 14px !important;
+    background: radial-gradient(circle, rgb(255 255 255 / 5%), transparent 68%);
+    box-shadow: 0 18px 44px rgb(0 0 0 / 24%), inset 0 1px rgb(255 255 255 / 5%);
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+    #draw2WorkspacePaletteStrip {
+    border: 0 !important;
+    border-bottom: 1px solid var(--draw2-polish-line) !important;
+    background: transparent !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+    .draw2-palette-swatch {
+    border-color: transparent !important;
+    border-radius: 7px !important;
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 12%);
+    transition: transform 110ms ease, box-shadow 110ms ease;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+    .draw2-palette-swatch:hover,
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+    .draw2-palette-swatch:focus-visible,
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+    .draw2-palette-swatch.is-active {
+    transform: translateY(-1px);
+    box-shadow: inset 0 0 0 2px var(--draw2-polish-draw), 0 4px 12px rgb(0 0 0 / 22%);
+  }
+
+  /* The ramp is a precision tool, not a permanent color-picking surface. */
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+    .draw2-color-ramp-section {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+    #draw2WorkspacePanelColor:has(.draw2-color-editor[hidden]) {
+    min-height: 0;
+  }
+
+  /* A remembered 420px timeline is useful on a tall monitor but it can
+   * consume the entire Draw canvas on a short laptop window. Keep the
+   * timeline detailed enough to edit while making the canvas the primary
+   * surface again. This rule intentionally applies only to desktop Draw. */
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"] {
+    grid-template-rows:
+      var(--draw2-pc-topbar-height, 64px)
+      minmax(280px, 1fr)
+      minmax(0, clamp(180px, min(24dvh, var(--draw2-timeline-height, 260px)), 260px))
+      var(--draw2-statusbar-height, 28px) !important;
+  }
+
+  /* The generated shell has a more specific branch for the two Draw dock
+   * layouts. Mirror that branch here so a persisted 420px resize cannot win
+   * by specificity over the desktop polish layer. */
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"][data-workspace-layout="color-left-tools-right"]:not(:has(#draw2WorkspacePanelAssets:not([hidden]))):not(:has(#draw2WorkspaceTimelineRegion[data-timeline-collapse="collapsed"])),
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"][data-workspace-layout="color-left-tools-right"]:has(#draw2WorkspacePanelAssets:not([hidden])):not(:has(#draw2WorkspaceTimelineRegion[data-timeline-collapse="collapsed"])) {
+    grid-template-rows:
+      var(--draw2-pc-topbar-height, 64px)
+      minmax(280px, 1fr)
+      minmax(0, clamp(180px, min(24dvh, var(--draw2-timeline-height, 260px)), 260px))
+      var(--draw2-statusbar-height, 28px) !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]:has(
+      #draw2WorkspaceTimelineRegion[data-timeline-collapse="collapsed"]
+    ) {
+    grid-template-rows:
+      var(--draw2-pc-topbar-height, 64px)
+      minmax(0, 1fr)
+      32px
+      var(--draw2-statusbar-height, 28px) !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"][data-workspace-layout="color-left-tools-right"]:not(:has(#draw2WorkspacePanelAssets:not([hidden]))):has(#draw2WorkspaceTimelineRegion[data-timeline-collapse="collapsed"]),
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode="DRAW"][data-workspace-layout="color-left-tools-right"]:has(#draw2WorkspacePanelAssets:not([hidden])):has(#draw2WorkspaceTimelineRegion[data-timeline-collapse="collapsed"]) {
+    grid-template-rows:
+      var(--draw2-pc-topbar-height, 64px)
+      minmax(0, 1fr)
+      32px
+      var(--draw2-statusbar-height, 28px) !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+    #draw2TimelineCard
+    > .draw2-timeline-heading {
+    min-height: 26px !important;
+    height: 26px !important;
+    padding-inline: 8px !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="DRAW"]
+    #draw2TimelineCard
+    > .draw2-timeline-heading
+    :is(.draw2-eyebrow, strong) {
+    display: none !important;
+  }
+
+  /* iAUDIO -------------------------------------------------------------- */
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    #draw2AudioWorkspace {
+    background: linear-gradient(180deg, rgb(24 20 43 / 32%), rgb(12 18 31 / 24%));
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-arranger-header {
+    min-height: 28px;
+    padding-block: 3px;
+    border-bottom: 1px solid var(--draw2-polish-line);
+    background: transparent;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-arranger-header .draw2-eyebrow {
+    display: none;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-editor-header {
+    border-bottom-color: var(--draw2-polish-line-strong) !important;
+    background: rgb(18 22 38 / 76%) !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-editor-tab {
+    min-height: 34px;
+    border-color: transparent !important;
+    border-radius: 8px 8px 0 0 !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-editor-tab.is-active {
+    color: var(--draw2-polish-audio) !important;
+    background: color-mix(in srgb, var(--draw2-polish-audio) 12%, transparent) !important;
+    box-shadow: inset 0 -2px var(--draw2-polish-audio);
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-animation-guide {
+    min-height: 78px !important;
+    grid-template-rows: 24px 28px 14px !important;
+    padding: 4px 8px !important;
+    border-bottom: 1px solid var(--draw2-polish-line);
+    background: linear-gradient(180deg, rgb(43 27 64 / 28%), transparent);
+  }
+
+  /* Musical context is one compact visual control: root, scale and input
+   * policy stay together, while the Roll remains the primary editing surface. */
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-midi-scale {
+    display: inline-flex;
+    order: -1;
+    position: sticky;
+    left: 0;
+    z-index: 4;
+    flex: 0 1 auto;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    padding-inline: 5px 8px;
+    border-left: 1px solid var(--draw2-polish-line);
+    border-right: 1px solid var(--draw2-polish-line-strong);
+    background: rgb(18 22 38 / 98%);
+    box-shadow: 8px 0 12px rgb(8 12 22 / 42%);
+    color: var(--draw2-text-muted);
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-midi-scale label {
+    display: inline-flex;
+    flex: 0 1 auto;
+    align-items: center;
+    gap: 3px;
+    min-width: 0;
+    color: var(--draw2-text-muted);
+    font: 700 0.52rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-midi-scale select {
+    box-sizing: border-box;
+    height: 24px;
+    min-width: 0;
+    padding: 2px 18px 2px 5px;
+    font-size: 0.55rem;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    #draw2AudioMidiScaleKey {
+    width: 72px;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    #draw2AudioMidiScaleMode {
+    width: 118px;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    #draw2AudioMidiScaleGuideMode {
+    width: 62px;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-midi-scale[data-audio-scale-applicable="false"] {
+    opacity: 0.58;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-midi-scale output {
+    min-width: 0;
+    max-width: 150px;
+    overflow: hidden;
+    color: var(--draw2-polish-audio);
+    font: 700 0.54rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* The selected-note card is the precision surface. The old global volume
+   * slider repeats the same edit and is therefore hidden on desktop. */
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    :is(#draw2AudioMidiVelocity, .draw2-audio-midi-velocity) {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-midi-grid {
+    cursor: crosshair;
+    background:
+      linear-gradient(90deg, rgb(200 139 255 / 4%) 1px, transparent 1px),
+      linear-gradient(180deg, rgb(255 255 255 / 2%), transparent 26%);
+    background-size: 48px 100%, 100% 100%;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-midi-grid.is-midi-moving,
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-midi-grid.is-midi-dragging {
+    cursor: grabbing;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-midi-expression {
+    border-top-color: var(--draw2-polish-line-strong) !important;
+    background: rgb(10 16 28 / 42%);
+  }
+
+  /* The curve is the control surface. Numeric rows are a precision fallback
+   * revealed only after a point receives focus, so the Piano Roll is not
+   * followed by a permanent list of nearly identical controls. */
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-midi-expression-toolbar {
+    min-height: 24px;
+    padding-inline: 2px;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-midi-expression-meta,
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    #draw2AudioMidiExpressionAdd,
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    #draw2AudioAutomationAdd {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-midi-actions {
+    display: flex !important;
+    flex-wrap: wrap;
+    align-content: center;
+    gap: 4px 6px;
+    width: auto !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    padding: 3px 6px !important;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
+    border: 1px solid var(--draw2-polish-line) !important;
+    border-radius: 7px;
+    background: rgb(11 17 30 / 52%) !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-midi-actions
+    > .draw2-audio-midi-scale {
+    order: -2;
+    flex: 1 1 320px;
+    min-width: 0;
+    padding: 3px 5px;
+    border: 0;
+    border-left: 2px solid var(--draw2-polish-audio);
+    border-right: 0;
+    border-radius: 5px;
+    background: rgb(200 139 255 / 7%);
+    box-shadow: none;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-midi-actions
+    > .draw2-audio-midi-quantize {
+    order: -1;
+    flex: 0 0 auto;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-midi-actions[data-audio-midi-selection="empty"]
+    > .draw2-audio-midi-quantize {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-midi-quantize > summary {
+    display: flex;
+    align-items: center;
+    min-height: 24px;
+    padding: 0 6px;
+    border: 1px solid var(--draw2-polish-line);
+    border-radius: 5px;
+    color: var(--draw2-text-muted);
+    cursor: pointer;
+    font-size: 0.56rem;
+    list-style: none;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-midi-quantize > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-midi-quantize > summary::after {
+    margin-left: 5px;
+    color: var(--draw2-polish-audio);
+    content: "⌄";
+    font-size: 0.8rem;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-midi-quantize[open] {
+    flex: 1 1 100%;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 6px;
+    padding: 3px 5px;
+    border: 1px solid var(--draw2-polish-line);
+    border-radius: 6px;
+    background: rgb(200 139 255 / 6%);
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-midi-quantize[open] > summary {
+    flex: 0 0 auto;
+    border: 0;
+    padding-left: 0;
+    color: var(--draw2-text-strong);
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-midi-quantize[open] > summary::after {
+    content: "⌃";
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-midi-quantize[open] > label {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-midi-expression-lane {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 5px;
+    min-height: 0;
+    padding-top: 3px;
+    overflow: visible;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-midi-expression-graph,
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-automation-graph {
+    position: relative;
+    min-width: 0;
+    min-height: 82px;
+    margin: 0;
+    overflow: hidden;
+    border: 0 !important;
+    border-top: 1px solid var(--draw2-polish-line) !important;
+    border-bottom: 1px solid var(--draw2-polish-line) !important;
+    border-radius: 7px;
+    background:
+      linear-gradient(to top, rgb(97 217 255 / 9%) 1px, transparent 1px),
+      linear-gradient(to right, rgb(200 139 255 / 10%) 1px, transparent 1px),
+      linear-gradient(180deg, rgb(7 12 22 / 92%), rgb(16 22 38 / 78%));
+    background-size: 100% 25%, 12.5% 100%, 100% 100%;
+    box-shadow: inset 0 1px rgb(255 255 255 / 4%);
+    cursor: crosshair;
+    touch-action: none;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-midi-expression-graph[data-audio-midi-expression-target="pitch-bend"],
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-automation-graph[data-audio-automation-target="pan"] {
+    background:
+      linear-gradient(to top, rgb(97 217 255 / 9%) 1px, transparent 1px),
+      linear-gradient(to right, rgb(200 139 255 / 10%) 1px, transparent 1px),
+      linear-gradient(to top, transparent calc(50% - 1px), rgb(255 255 255 / 23%) 50%, transparent calc(50% + 1px)),
+      linear-gradient(180deg, rgb(7 12 22 / 92%), rgb(16 22 38 / 78%));
+    background-size: 100% 25%, 12.5% 100%, 100% 100%, 100% 100%;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    :is(.draw2-audio-midi-expression-graph, .draw2-audio-automation-graph)
+    > .draw2-mode-deck-status {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    margin: 0;
+    color: var(--draw2-text-muted);
+    font-size: 0.58rem;
+    pointer-events: none;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    :is(.draw2-audio-midi-expression-graph, .draw2-audio-automation-graph)
+    > svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-midi-expression-graph-point,
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-automation-graph-point {
+    position: absolute;
+    width: 14px !important;
+    min-width: 14px !important;
+    height: 14px !important;
+    min-height: 14px !important;
+    padding: 0 !important;
+    transform: translate(-50%, 50%);
+    border: 2px solid #0c1321 !important;
+    border-radius: 50% !important;
+    background: var(--draw2-polish-audio) !important;
+    box-shadow: 0 0 0 2px rgb(200 139 255 / 24%), 0 0 12px rgb(200 139 255 / 38%);
+    cursor: grab;
+    touch-action: none;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    :is(.draw2-audio-midi-expression-graph-point, .draw2-audio-automation-graph-point):hover,
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    :is(.draw2-audio-midi-expression-graph-point, .draw2-audio-automation-graph-point):focus-visible {
+    background: #ffffff !important;
+    box-shadow: 0 0 0 3px rgb(200 139 255 / 34%), 0 0 16px rgb(200 139 255 / 58%);
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    :is(.draw2-audio-midi-expression-graph, .draw2-audio-automation-graph).is-expression-dragging,
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-automation-graph.is-automation-dragging {
+    outline: 2px solid rgb(200 139 255 / 34%);
+    outline-offset: -2px;
+    cursor: grabbing;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-midi-expression-point,
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-automation-point {
+    display: none !important;
+    justify-self: start;
+    width: min(100%, 560px);
+    margin: 0;
+    border: 0 !important;
+    background: rgb(9 15 27 / 78%);
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-midi-expression-lane:focus-within
+    > .draw2-audio-midi-expression-point {
+    display: inline-flex !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-automation-lane:focus-within
+    > .draw2-audio-automation-point {
+    display: grid !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-automation-lane {
+    display: grid !important;
+    align-content: start;
+    gap: 5px;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-automation-toolbar {
+    min-height: 24px;
+    padding-inline: 2px;
+  }
+
+  /* The waveform is the card's first read. Adjust opens the few precision
+   * values that are still useful, without making every clip a slider wall. */
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-clip-row.is-editable {
+    min-width: min(760px, 100%);
+    gap: 4px;
+    padding: 5px;
+    border: 1px solid var(--draw2-polish-line) !important;
+    border-radius: 9px;
+    background: linear-gradient(180deg, rgb(25 35 56 / 76%), rgb(12 19 32 / 72%));
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-clip-waveform {
+    min-height: 78px;
+    border: 0 !important;
+    border-top: 1px solid rgb(200 139 255 / 35%) !important;
+    border-bottom: 1px solid rgb(200 139 255 / 35%) !important;
+    border-radius: 8px;
+    background: #090e18;
+    box-shadow: inset 0 1px rgb(255 255 255 / 4%), inset 0 -1px rgb(0 0 0 / 22%);
+    cursor: crosshair;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-clip-precision {
+    min-width: 0;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-clip-precision > summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 24px;
+    padding: 0 4px;
+    border-radius: 6px;
+    color: var(--draw2-text-muted);
+    cursor: pointer;
+    font-size: 0.58rem;
+    list-style: none;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-clip-precision > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-clip-precision > summary::after {
+    color: var(--draw2-polish-audio);
+    content: "⌄";
+    font-size: 0.9rem;
+    line-height: 1;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-clip-precision[open] > summary {
+    color: var(--draw2-text-strong);
+    background: rgb(200 139 255 / 8%);
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-clip-precision[open] > summary::after {
+    content: "⌃";
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    .draw2-audio-clip-precision > .draw2-audio-clip-controls {
+    padding: 5px 4px 2px;
+    border-top: 1px solid var(--draw2-polish-line);
+  }
+
+  /* Arrangement editing owns its range gesture. Keep only creation and track
+   * entry points in the permanent toolbar; copy/move/clear/delete stay in the
+   * direct-selection keyboard/context path. */
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    :is(#draw2AudioDawDuplicate, #draw2AudioDawCopy, #draw2AudioDawPaste, #draw2AudioDawMove, #draw2AudioDawClear, #draw2AudioDawDelete, #draw2AudioDrawMonitor) {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    #draw2ModeDeckAudio
+    .draw2-mode-deck-toolbar {
+    gap: 5px !important;
+    padding-block: 4px !important;
+    border-bottom-color: var(--draw2-polish-line-strong) !important;
+    background: linear-gradient(180deg, rgb(31 23 47 / 78%), rgb(14 20 34 / 88%));
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    #draw2ModeDeckAudio
+    :is(#draw2AudioDeckAddClip, #draw2AudioAddFrames, #draw2AudioClearBar, #draw2AudioDeckPlay, #draw2AudioRecordArm, #draw2AudioRecord, #draw2AudioRecordCancel, #draw2AudioChipPlay, #draw2AudioTestTone, #draw2AudioDeckSave, #draw2AudioLoopToggle) {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    #draw2ModeDeckAudio
+    :is(.draw2-audio-advanced-control, #draw2AudioSwingApply, #draw2AudioHumanize) {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    #draw2AudioAdvancedToggle {
+    display: inline-grid !important;
+    min-width: 34px;
+    width: 34px;
+    overflow: hidden;
+    padding-inline: 0;
+    place-items: center;
+    font-size: 0;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="AUDIO"]
+    #draw2AudioAdvancedToggle::before {
+    content: "⋯";
+    font-size: 1rem;
+    line-height: 1;
+  }
+
+  /* iGAME --------------------------------------------------------------- */
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+    #draw2GameSceneViewport {
+    background:
+      radial-gradient(circle at 50% 40%, rgb(255 191 104 / 10%), transparent 58%),
+      linear-gradient(135deg, #0d1523, #172337 52%, #101827) !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+    .draw2-game-scene-viewport-stage {
+    border: 1px solid rgb(255 191 104 / 28%) !important;
+    border-radius: 14px !important;
+    box-shadow: 0 18px 46px rgb(0 0 0 / 24%), inset 0 1px rgb(255 255 255 / 5%);
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+    .draw2-game-scene-object {
+    transition: filter 120ms ease, opacity 120ms ease;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+    .draw2-game-scene-object:hover,
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+    .draw2-game-scene-object:focus-visible,
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+    .draw2-game-scene-object.is-selected {
+    filter: drop-shadow(0 0 0.12px #fff) drop-shadow(0 0 5px color-mix(in srgb, var(--draw2-polish-game) 55%, transparent));
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+    #draw2GamePlaygroundCenterBar {
+    border: 0 !important;
+    background: linear-gradient(180deg, rgb(18 26 42 / 92%), rgb(18 26 42 / 42%)) !important;
+    box-shadow: 0 6px 18px rgb(0 0 0 / 18%);
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+    #draw2GamePlaygroundCenterTitle,
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+    .draw2-game-playground-center-status {
+    display: none !important;
+  }
+
+  /* These three cross-mode creation buttons duplicate the top mode rail. The
+   * modes remain available; the deck is reserved for assets and placement. */
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+    :is(.draw2-igame-asset-action-label, #draw2GameCreateSprite, #draw2GameCreateBgm, #draw2GameCreateSfx) {
+    display: none !important;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+    #draw2ModeDeckGame
+    .draw2-game-playground-bottom-heading {
+    min-height: 26px;
+    padding-bottom: 5px;
+    border-bottom-color: var(--draw2-polish-line);
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+    #draw2GamePlaygroundBottom
+    .draw2-game-playground-library-tabs {
+    border: 0;
+    background: transparent;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+    .draw2-game-playground-library-tab {
+    min-height: 30px;
+    border-color: transparent !important;
+    border-radius: 7px;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"][data-creator-mode="GAME"]
+    .draw2-game-playground-library-tab.is-active {
+    color: var(--draw2-polish-game);
+    background: color-mix(in srgb, var(--draw2-polish-game) 14%, transparent);
+    box-shadow: inset 0 -2px var(--draw2-polish-game);
+  }
+
+  /* All mode-specific tab bars use one selection language. */
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"]
+    :is(.draw2-workspace-tab, .draw2-mode-deck-tab, .draw2-audio-dock-tab, .draw2-game-left-dock-tab) {
+    border-color: transparent !important;
+    transition: background-color 140ms ease, color 140ms ease, box-shadow 140ms ease;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"]
+    :is(.draw2-workspace-tab[aria-selected="true"], .draw2-mode-deck-tab[aria-selected="true"], .draw2-audio-dock-tab[aria-selected="true"], .draw2-game-left-dock-tab[aria-selected="true"]) {
+    color: var(--draw2-polish-active) !important;
+    background: color-mix(in srgb, var(--draw2-polish-active) 12%, transparent) !important;
+    box-shadow: inset 0 -2px var(--draw2-polish-active);
+  }
+
+  /* Keep focus visible after the text labels are compressed. */
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"]
+    :is(button, summary, select, input, canvas, [tabindex]):focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--draw2-polish-active) 74%, white);
+    outline-offset: 2px;
+  }
+}
+
+/* Quick Asset capture -----------------------------------------------------
+ * Asset creation starts with the visible work, not a form.  The preview,
+ * track chips and frame choice are the only primary decisions; detailed
+ * motion/export controls stay behind the existing advanced disclosure.
+ */
+.draw2-asset-quick-capture {
+  --draw2-quick-accent: var(--draw2-accent-strong, #79e3d2);
+  --draw2-quick-line: rgb(154 178 216 / 22%);
+  display: grid;
+  gap: 10px;
+  margin: 12px 0 14px;
+  padding: 12px;
+  border: 1px solid var(--draw2-quick-line);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--draw2-quick-accent) 12%, transparent), transparent 35%),
+    linear-gradient(145deg, rgb(21 32 50 / 92%), rgb(12 19 32 / 92%));
+  box-shadow: 0 12px 30px rgb(0 0 0 / 16%), inset 0 1px rgb(255 255 255 / 4%);
+}
+
+.draw2-asset-quick-header,
+.draw2-asset-quick-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.draw2-asset-quick-header > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.draw2-asset-quick-header strong {
+  color: var(--draw2-text-strong, #f5f7fb);
+  font-size: 0.92rem;
+}
+
+.draw2-asset-quick-header small,
+.draw2-asset-quick-selection,
+.draw2-asset-quick-capture .draw2-asset-quick-status,
+.draw2-asset-quick-heading > span {
+  color: var(--draw2-text-muted, #a9b8cf);
+  font-size: 0.68rem;
+}
+
+.draw2-asset-quick-state {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border: 1px solid var(--draw2-quick-line);
+  border-radius: 999px;
+  color: var(--draw2-text-muted, #a9b8cf);
+  font-size: 0.62rem;
+  white-space: nowrap;
+}
+
+.draw2-asset-quick-state[data-state="ready"],
+.draw2-asset-quick-capture .draw2-asset-quick-status[data-state="ready"] {
+  border-color: color-mix(in srgb, var(--draw2-quick-accent) 52%, transparent);
+  color: var(--draw2-quick-accent);
+}
+
+.draw2-asset-quick-layout {
+  display: grid;
+  grid-template-columns: minmax(116px, 144px) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.draw2-asset-quick-preview-wrap {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.draw2-asset-quick-preview-wrap canvas {
+  display: block;
+  width: 144px;
+  height: 144px;
+  max-width: 100%;
+  image-rendering: pixelated;
+  border: 1px solid var(--draw2-quick-line);
+  border-radius: 10px;
+  background-color: rgb(9 15 27 / 85%);
+  background-image:
+    linear-gradient(45deg, rgb(255 255 255 / 4%) 25%, transparent 25%),
+    linear-gradient(-45deg, rgb(255 255 255 / 4%) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgb(255 255 255 / 4%) 75%),
+    linear-gradient(-45deg, transparent 75%, rgb(255 255 255 / 4%) 75%);
+  background-position: 0 0, 0 7px, 7px -7px, -7px 0;
+  background-size: 14px 14px;
+}
+
+.draw2-asset-quick-selection {
+  max-width: 144px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.draw2-asset-quick-controls {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.draw2-asset-quick-name {
+  display: grid;
+  gap: 4px;
+  color: var(--draw2-text-muted, #a9b8cf);
+  font-size: 0.66rem;
+}
+
+.draw2-asset-quick-name input {
+  width: 100%;
+  min-height: 32px;
+  padding: 0 9px;
+  border: 1px solid var(--draw2-quick-line);
+  border-radius: 7px;
+  background: rgb(6 11 20 / 58%);
+  color: var(--draw2-text-strong, #f5f7fb);
+}
+
+.draw2-asset-quick-heading strong {
+  color: var(--draw2-text-strong, #f5f7fb);
+  font-size: 0.72rem;
+}
+
+.draw2-asset-quick-heading .draw2-button {
+  min-height: 24px;
+  padding: 2px 7px;
+  color: var(--draw2-text-muted, #a9b8cf);
+  font-size: 0.6rem;
+}
+
+.draw2-asset-quick-tracks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(126px, 1fr));
+  gap: 5px;
+  max-height: 132px;
+  padding: 1px;
+  overflow: auto;
+  scrollbar-width: thin;
+}
+
+.draw2-asset-quick-track {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 32px;
+  padding: 5px 7px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 4%);
+  color: var(--draw2-text-muted, #a9b8cf);
+  cursor: pointer;
+  text-align: left;
+}
+
+.draw2-asset-quick-track:hover,
+.draw2-asset-quick-track:focus-visible {
+  border-color: var(--draw2-quick-line);
+  background: rgb(255 255 255 / 8%);
+}
+
+.draw2-asset-quick-track[data-selected="true"] {
+  border-color: color-mix(in srgb, var(--draw2-quick-accent) 48%, transparent);
+  background: color-mix(in srgb, var(--draw2-quick-accent) 12%, rgb(8 14 25 / 70%));
+  color: var(--draw2-text-strong, #f5f7fb);
+}
+
+.draw2-asset-quick-track-mark {
+  width: 8px;
+  height: 8px;
+  border: 1px solid currentcolor;
+  border-radius: 50%;
+  opacity: 0.55;
+}
+
+.draw2-asset-quick-track[data-selected="true"] .draw2-asset-quick-track-mark {
+  border-color: var(--draw2-quick-accent);
+  background: var(--draw2-quick-accent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--draw2-quick-accent) 65%, transparent);
+  opacity: 1;
+}
+
+.draw2-asset-quick-track strong {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.68rem;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.draw2-asset-quick-track small {
+  color: var(--draw2-text-muted, #a9b8cf);
+  font-size: 0.56rem;
+}
+
+.draw2-asset-quick-frame-heading {
+  margin-top: 1px;
+}
+
+.draw2-asset-quick-frame-mode {
+  display: inline-flex;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--draw2-quick-line);
+  border-radius: 8px;
+  background: rgb(6 11 20 / 48%);
+}
+
+.draw2-asset-quick-choice {
+  flex: 1 1 0;
+  min-height: 28px;
+  padding: 3px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--draw2-text-muted, #a9b8cf);
+  cursor: pointer;
+  font-size: 0.64rem;
+}
+
+.draw2-asset-quick-choice:hover,
+.draw2-asset-quick-choice:focus-visible,
+.draw2-asset-quick-choice.is-active {
+  border-color: color-mix(in srgb, var(--draw2-quick-accent) 45%, transparent);
+  background: color-mix(in srgb, var(--draw2-quick-accent) 14%, transparent);
+  color: var(--draw2-quick-accent);
+}
+
+.draw2-asset-quick-capture .draw2-asset-quick-create {
+  display: inline-flex;
+  justify-content: center;
+  width: 100%;
+  min-height: 36px;
+  margin-top: 2px;
+  gap: 7px;
+}
+
+.draw2-asset-quick-capture .draw2-asset-quick-create:disabled {
+  opacity: 0.45;
+}
+
+.draw2-asset-quick-capture .draw2-asset-quick-status {
+  min-height: 16px;
+  margin: 0;
+}
+
+.draw2-asset-quick-empty {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--draw2-text-muted, #a9b8cf);
+  font-size: 0.68rem;
+}
+
+.draw2-asset-advanced-details {
+  margin-top: 10px;
+  border-top: 1px solid rgb(154 178 216 / 14%);
+}
+
+.draw2-asset-advanced-details > summary {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 3px;
+  color: var(--draw2-text-muted, #a9b8cf);
+  cursor: pointer;
+  font-size: 0.68rem;
+  list-style: none;
+}
+
+.draw2-asset-advanced-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.draw2-asset-advanced-details > summary::after {
+  margin-left: auto;
+  color: var(--draw2-text-muted, #a9b8cf);
+  content: "⌄";
+  font-size: 0.85rem;
+}
+
+.draw2-asset-advanced-details[open] > summary {
+  color: var(--draw2-text-strong, #f5f7fb);
+}
+
+.draw2-asset-advanced-details[open] > summary::after {
+  content: "⌃";
+}
+
+@media (min-width: 1120px) and (hover: hover) and (pointer: fine) {
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"] .draw2-asset-quick-capture {
+    margin-block: 8px 12px;
+    padding: 11px;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"] .draw2-asset-quick-layout {
+    grid-template-columns: 132px minmax(0, 1fr);
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"] .draw2-asset-quick-preview-wrap canvas {
+    width: 132px;
+    height: 132px;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"] .draw2-asset-quick-selection {
+    max-width: 132px;
+  }
+
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"] .draw2-asset-quick-tracks {
+    max-height: 112px;
+  }
+}
+
+@media (min-width: 1120px) and (hover: hover) and (pointer: fine) and (prefers-reduced-motion: reduce) {
+  #draw2WorkspaceFrame[data-workspace-profile="desktop"] * {
+    transition-duration: 0.01ms !important;
+  }
+}

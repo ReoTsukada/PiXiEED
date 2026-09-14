@@ -10357,6 +10357,42 @@ function createArgbColorRamp(start, end, steps, space = "HSV", hueMode = "SHORT"
   return ramp;
 }
 
+// src/draw2-input-ownership.ts
+function resolveDraw2ActiveSurface(target, activeElement = null) {
+  const candidates = [];
+  if (typeof Element !== "undefined" && target instanceof Element) {
+    candidates.push(target);
+  }
+  if (activeElement !== null && activeElement !== candidates[0]) {
+    candidates.push(activeElement);
+  }
+  for (const element of candidates) {
+    if (element.closest("#draw2AudioMidiGrid, #draw2AudioMidiExpression, #draw2AudioMidiExpressionLane") !== null) return "AUDIO_ROLL";
+    if (element.closest("#draw2AudioArrangerViewport, #draw2AudioPanelTimeline, #draw2AudioArrangerRuler, #draw2AudioRuler") !== null) return "AUDIO_TIMELINE";
+    if (element.closest("#draw2GameUiOverlay, #draw2GamePlaygroundRuntime, #draw2GamePreviewCanvas") !== null) return "GAME_RUNTIME";
+    if (element.closest("#draw2GameSceneViewport") !== null) {
+      return "GAME_STAGE";
+    }
+    if (element.closest("#draw2Canvas, #draw2CanvasCard, #draw2WorkspaceCanvasRegion") !== null) return "DRAW_CANVAS";
+    if (element.closest("#draw2WorkspaceTimelineRegion") !== null) {
+      return "DRAW_TIMELINE";
+    }
+  }
+  return "WORKSPACE";
+}
+function resolveDraw2ArrowOwner(input) {
+  if (input.mode === "AUDIO") {
+    return input.surface === "AUDIO_ROLL" ? "AUDIO_ROLL" : "NONE";
+  }
+  if (input.mode === "GAME") {
+    return input.surface === "GAME_STAGE" || input.surface === "GAME_RUNTIME" ? "GAME_RUNTIME" : "NONE";
+  }
+  if (input.surface === "DRAW_TIMELINE") return "DRAW_TIMELINE";
+  if (input.surface !== "DRAW_CANVAS") return "NONE";
+  if (input.drawGestureActive || input.hasSelection) return "DRAW_SELECTION";
+  return "DRAW_TIMELINE";
+}
+
 // src/draw2-pixel-effects.ts
 function isOpaque2(color) {
   return (color >>> 24 & 255) > 0;
@@ -13664,6 +13700,7 @@ var DRAW2_SHORTCUTS = [
   {
     id: "undo",
     version: 1,
+    mode: "COMMON",
     category: "Edit",
     label: "Undo",
     keys: "Mod+Z",
@@ -13672,6 +13709,7 @@ var DRAW2_SHORTCUTS = [
   {
     id: "redo",
     version: 1,
+    mode: "COMMON",
     category: "Edit",
     label: "Redo",
     keys: "Mod+Shift+Z",
@@ -13904,6 +13942,7 @@ var DRAW2_SHORTCUTS = [
   {
     id: "toggle-playback",
     version: 1,
+    mode: "COMMON",
     category: "Timeline",
     label: "Play / stop timeline",
     keys: "Space",
@@ -13992,6 +14031,7 @@ var DRAW2_SHORTCUTS = [
   {
     id: "command-palette",
     version: 1,
+    mode: "COMMON",
     category: "Workspace",
     label: "Command Palette",
     keys: "Mod+K",
@@ -14000,10 +14040,236 @@ var DRAW2_SHORTCUTS = [
   {
     id: "shortcuts",
     version: 1,
+    mode: "COMMON",
     category: "Workspace",
     label: "Keyboard shortcuts",
     keys: "?",
     command: "shortcuts"
+  },
+  {
+    id: "audio-save",
+    version: 1,
+    mode: "AUDIO",
+    category: "Edit",
+    label: "Save Audio Project",
+    keys: "Mod+S",
+    command: "audio-save"
+  },
+  {
+    id: "audio-copy",
+    version: 1,
+    mode: "AUDIO",
+    category: "Edit",
+    label: "Copy selected notes or clips",
+    keys: "Mod+C",
+    command: "audio-copy"
+  },
+  {
+    id: "audio-cut",
+    version: 1,
+    mode: "AUDIO",
+    category: "Edit",
+    label: "Cut selected notes or clips",
+    keys: "Mod+X",
+    command: "audio-cut"
+  },
+  {
+    id: "audio-paste",
+    version: 1,
+    mode: "AUDIO",
+    category: "Edit",
+    label: "Paste notes or clips",
+    keys: "Mod+V",
+    command: "audio-paste"
+  },
+  {
+    id: "audio-duplicate",
+    version: 1,
+    mode: "AUDIO",
+    category: "Edit",
+    label: "Duplicate selected notes or clips",
+    keys: "Mod+D",
+    command: "audio-duplicate"
+  },
+  {
+    id: "audio-delete",
+    version: 1,
+    mode: "AUDIO",
+    category: "Edit",
+    label: "Delete selected notes or clips",
+    keys: "Delete / Backspace",
+    command: "audio-delete"
+  },
+  {
+    id: "audio-split",
+    version: 1,
+    mode: "AUDIO",
+    category: "Edit",
+    label: "Split at playhead",
+    keys: "S",
+    command: "audio-split"
+  },
+  {
+    id: "audio-nudge",
+    version: 1,
+    mode: "AUDIO",
+    category: "Timeline",
+    label: "Nudge selected notes",
+    keys: "ArrowLeft / ArrowRight / ArrowUp / ArrowDown",
+    command: "audio-nudge"
+  },
+  {
+    id: "audio-nudge-bar",
+    version: 1,
+    mode: "AUDIO",
+    category: "Timeline",
+    label: "Nudge by one bar",
+    keys: "Shift+ArrowLeft / Shift+ArrowRight",
+    command: "audio-nudge-bar"
+  },
+  {
+    id: "audio-selection-preview",
+    version: 1,
+    mode: "AUDIO",
+    category: "Timeline",
+    label: "Preview selection",
+    keys: "Shift+Space",
+    command: "audio-selection-preview"
+  },
+  {
+    id: "audio-quantize",
+    version: 1,
+    mode: "AUDIO",
+    category: "Timeline",
+    label: "Preview quantize",
+    keys: "Q",
+    command: "audio-quantize"
+  },
+  {
+    id: "audio-apply-quantize",
+    version: 1,
+    mode: "AUDIO",
+    category: "Timeline",
+    label: "Apply pending quantize",
+    keys: "Enter",
+    command: "audio-apply-quantize"
+  },
+  {
+    id: "audio-step-input",
+    version: 1,
+    mode: "AUDIO",
+    category: "Tools",
+    label: "Toggle step input",
+    keys: "I",
+    command: "audio-step-input"
+  },
+  {
+    id: "audio-swing",
+    version: 1,
+    mode: "AUDIO",
+    category: "Timeline",
+    label: "Apply swing",
+    keys: "G",
+    command: "audio-swing"
+  },
+  {
+    id: "audio-humanize",
+    version: 1,
+    mode: "AUDIO",
+    category: "Timeline",
+    label: "Humanize selected notes",
+    keys: "H",
+    command: "audio-humanize"
+  },
+  {
+    id: "audio-zoom-out",
+    version: 1,
+    mode: "AUDIO",
+    category: "View",
+    label: "Zoom Piano Roll out",
+    keys: "- / [",
+    command: "audio-zoom-out"
+  },
+  {
+    id: "audio-zoom-in",
+    version: 1,
+    mode: "AUDIO",
+    category: "View",
+    label: "Zoom Piano Roll in",
+    keys: "= / ]",
+    command: "audio-zoom-in"
+  },
+  {
+    id: "audio-loop",
+    version: 1,
+    mode: "AUDIO",
+    category: "Workspace",
+    label: "Toggle audio loop",
+    keys: "L",
+    command: "audio-loop"
+  },
+  {
+    id: "audio-record",
+    version: 1,
+    mode: "AUDIO",
+    category: "Workspace",
+    label: "Toggle audio recording",
+    keys: "R",
+    command: "audio-record"
+  },
+  {
+    id: "audio-test-tone",
+    version: 1,
+    mode: "AUDIO",
+    category: "Workspace",
+    label: "Play test tone",
+    keys: "T",
+    command: "audio-test-tone"
+  },
+  {
+    id: "audio-timeline-add-bar",
+    version: 1,
+    mode: "AUDIO",
+    category: "Timeline",
+    label: "Add timeline bar",
+    keys: "B",
+    command: "audio-timeline-add-bar"
+  },
+  {
+    id: "audio-timeline-move",
+    version: 1,
+    mode: "AUDIO",
+    category: "Timeline",
+    label: "Move selected timeline item",
+    keys: "M",
+    command: "audio-timeline-move"
+  },
+  {
+    id: "game-move",
+    version: 1,
+    mode: "GAME",
+    category: "Tools",
+    label: "Move player in preview",
+    keys: "ArrowLeft / ArrowRight / ArrowUp / ArrowDown / W / A / S / D",
+    command: "game-move"
+  },
+  {
+    id: "game-attack",
+    version: 1,
+    mode: "GAME",
+    category: "Tools",
+    label: "Attack in preview",
+    keys: "J / K",
+    command: "game-attack"
+  },
+  {
+    id: "game-cancel-preview",
+    version: 1,
+    mode: "GAME",
+    category: "Workspace",
+    label: "Stop game preview",
+    keys: "Esc",
+    command: "game-cancel-preview"
   }
 ];
 function normalizeKey(key) {
@@ -14024,7 +14290,8 @@ function normalizedRegistryKeys(keys) {
 function resolveDraw2Shortcut(event, context = {}) {
   if (context.modalOpen || context.sheetOpen || context.inputEditing || context.imeComposing) return void 0;
   const key = normalizedEventKey(event);
-  return DRAW2_SHORTCUTS.find((shortcut) => normalizedRegistryKeys(shortcut.keys).includes(key));
+  const mode = context.mode ?? "DRAW";
+  return DRAW2_SHORTCUTS.find((shortcut) => (shortcut.mode === "COMMON" || shortcut.mode === mode || shortcut.mode === void 0 && mode === "DRAW") && normalizedRegistryKeys(shortcut.keys).includes(key));
 }
 
 // src/draw2-viewport.ts
@@ -19569,7 +19836,7 @@ function loadAdvancedModule() {
 }
 function loadWorkspaceModule() {
   const workspaceChunkUrl = new URL("wp180-workspace.js", import.meta.url);
-  workspaceChunkUrl.searchParams.set("v", "20260911-ui-density-v1");
+  workspaceChunkUrl.searchParams.set("v", "20260913-workspace-input-v1");
   workspaceModulePromise ??= import(workspaceChunkUrl.href);
   return workspaceModulePromise;
 }
@@ -21616,6 +21883,10 @@ window.addEventListener("draw2:creator-mode", (event) => {
       selectionLabel: projectSessionSelectionLabel(sessionMode)
     }).catch(() => void 0);
   }
+  renderShortcutList(shortcutSearchElement?.value ?? "");
+  if (shortcutListElement !== null) {
+    translateDraw2Subtree(shortcutListElement);
+  }
 });
 projectSessionCheckpointButton.addEventListener("click", async () => {
   if (document.body.dataset.pixyncComposition === "production") {
@@ -23272,11 +23543,11 @@ function selectionProjectionFromImage(image, region, selectedPixels = new Set(se
     data: image.data
   };
 }
-function captureAssetSelectionForFrame(frameId) {
+function captureAssetSelectionForFrame(frameId, layerIds) {
   const current = currentAssetSelectionSnapshot();
   if (!current.hasSelection || current.region === null || current.pixelCount <= 0 || !state.frames.some((frame2) => frame2.frameId === frameId)) return void 0;
   try {
-    return selectionProjectionFromImage(compositeRegion(current.region, frameId), current.region);
+    return selectionProjectionFromImage(compositeRegion(current.region, frameId, void 0, layerIds), current.region);
   } catch {
     return void 0;
   }
@@ -23463,13 +23734,20 @@ function addAssetDefinitionFromSelection(input) {
       message: "Draw\u30E2\u30FC\u30C9\u3067\u7BC4\u56F2\u3092\u9078\u629E\u3057\u3066\u304B\u3089\u8FFD\u52A0\u3057\u3066\u304F\u3060\u3055\u3044\u3002"
     };
   }
-  const capturedProjection = captureCurrentAssetSelection();
   const visibleLayerIds = state.timeline.layerTrackOrder.flatMap((layerTrackId) => {
     const layer2 = state.layers.find((candidate) => candidate.layerTrackId === layerTrackId);
     return layer2 !== void 0 && layer2.visible && layer2.opacity > 0 ? [
       layer2.layerTrackId
     ] : [];
   });
+  const knownLayerIds = new Set(state.timeline.layerTrackOrder);
+  const requestedLayerIds = [
+    ...new Set((input.sourceLayerIds ?? []).map((layerId) => layerId.trim()).filter((layerId) => layerId.length > 0 && knownLayerIds.has(layerId)))
+  ];
+  const sourceLayerIds = requestedLayerIds.length > 0 ? requestedLayerIds : visibleLayerIds.length > 0 ? visibleLayerIds : [
+    source.layerId
+  ];
+  const capturedProjection = captureAssetSelectionForFrame(source.frameId, sourceLayerIds);
   const capturedRasterSnapshot = capturedProjection === void 0 ? void 0 : {
     width: capturedProjection.width,
     height: capturedProjection.height,
@@ -23478,9 +23756,7 @@ function addAssetDefinitionFromSelection(input) {
   const sourceFrames = input.sourceFrames ?? (capturedRasterSnapshot === void 0 ? void 0 : [
     {
       sourceFrameId: source.frameId,
-      layerIds: visibleLayerIds.length > 0 ? visibleLayerIds : [
-        source.layerId
-      ],
+      layerIds: sourceLayerIds,
       rect: {
         ...source.region
       },
@@ -23509,18 +23785,20 @@ function addAssetDefinitionFromSelection(input) {
   const frameNumbers = mappedFrameNumbers.filter((frameNumber) => frameNumber !== void 0);
   const mappedFrameStart = Math.min(...frameNumbers);
   const mappedFrameEnd = Math.max(...frameNumbers);
-  const sourceLayerIds = usesFixedComposite ? visibleLayerIds.length > 0 ? visibleLayerIds : [
-    source.layerId
-  ] : [
+  const definitionSourceLayerIds = usesFixedComposite ? sourceLayerIds : [
     source.layerId
   ];
+  const explicitLayerSelection = input.sourceLayerIds !== void 0;
   const initialAnimationName = input.animationName ?? "IDLE";
   const draft = createAssetDefinitionDraft({
     sourceProjectId: state.projectId,
     sourceCanvasId: source.sourceCanvasId,
     sourceKind: usesFixedComposite ? "VISIBLE_COMPOSITE" : "SELECTED_LAYERS",
-    sourceLayerIds,
-    layerSelection: usesFixedComposite ? {
+    sourceLayerIds: definitionSourceLayerIds,
+    layerSelection: usesFixedComposite ? explicitLayerSelection ? {
+      kind: "SELECTED_LAYERS",
+      layerIds: definitionSourceLayerIds
+    } : {
       kind: "VISIBLE_LAYERS"
     } : {
       kind: "CURRENT_LAYER",
@@ -26710,25 +26988,36 @@ function renderTimeline() {
     });
     timelineWindow.append(row);
   });
+  const desktopTimelineUi = window.matchMedia?.("(min-width: 1120px)").matches ?? window.innerWidth >= 1120;
+  let audioRowForTimeline;
   if (virtualWindow.lastLayerIndex === state.timeline.layerTrackOrder.length - 1) {
     const audioRow = document.createElement("div");
     audioRow.className = "draw2-timeline-row draw2-timeline-audio-row";
-    audioRow.style.top = `${headerHeight + state.timeline.layerTrackOrder.length * layerRowHeight}px`;
+    audioRow.style.top = `${headerHeight + (state.timeline.layerTrackOrder.length + (desktopTimelineUi ? 1 : 0)) * layerRowHeight}px`;
+    audioRow.dataset.timelineRole = "audio-reference";
+    audioRow.dataset.audioSource = "iAUDIO";
     audioRow.setAttribute("role", "row");
-    audioRow.setAttribute("aria-label", "Audio track");
+    audioRow.setAttribute("aria-label", desktopTimelineUi ? "iAUDIO reference track" : "Audio track");
     const audioLabel = document.createElement("div");
     audioLabel.className = "draw2-timeline-row-label draw2-timeline-audio-label";
+    audioLabel.dataset.audioSource = "iAUDIO";
     audioLabel.setAttribute("role", "rowheader");
     const audioTitle = document.createElement("span");
     audioTitle.className = "draw2-timeline-audio-title";
-    audioTitle.append(createDraw2Icon("icon-note"), document.createTextNode("Audio"));
+    audioTitle.append(createDraw2Icon("icon-note"), document.createTextNode(desktopTimelineUi ? "iAUDIO" : "Audio"));
     audioLabel.append(audioTitle);
     if (drawAudioAssetPicker !== null && drawAudioAdd !== null) {
       drawAudioAssetPicker.classList.add("draw2-timeline-audio-picker");
+      if (desktopTimelineUi) {
+        drawAudioAssetPicker.title = "iAUDIO\u7D20\u6750\u3092\u9078\u629E";
+        drawAudioAssetPicker.setAttribute("aria-label", "iAUDIO\u7D20\u6750\u3092\u9078\u629E");
+      }
       drawAudioAdd.classList.add("draw2-timeline-audio-add");
       drawAudioAdd.textContent = "+";
-      drawAudioAdd.title = "\u9078\u629E\u4E2D\u306E\u30D5\u30EC\u30FC\u30E0\u304B\u3089Audio\u3092\u8FFD\u52A0";
-      drawAudioAdd.setAttribute("aria-label", "\u9078\u629E\u4E2D\u306E\u30D5\u30EC\u30FC\u30E0\u304B\u3089Audio\u3092\u8FFD\u52A0");
+      if (desktopTimelineUi) {
+        drawAudioAdd.title = "iAUDIO\u7D20\u6750\u3092\u9078\u629E\u4E2D\u306E\u30D5\u30EC\u30FC\u30E0\u3078\u8FFD\u52A0";
+        drawAudioAdd.setAttribute("aria-label", "iAUDIO\u7D20\u6750\u3092\u9078\u629E\u4E2D\u306E\u30D5\u30EC\u30FC\u30E0\u3078\u8FFD\u52A0");
+      }
       audioLabel.append(drawAudioAssetPicker, drawAudioAdd);
     }
     audioRow.append(audioLabel);
@@ -26763,12 +27052,14 @@ function renderTimeline() {
       });
       audioRow.append(block);
     }
-    timelineWindow.append(audioRow);
+    if (desktopTimelineUi) audioRowForTimeline = audioRow;
+    else timelineWindow.append(audioRow);
   }
   if (virtualWindow.lastLayerIndex === state.timeline.layerTrackOrder.length - 1) {
     const addLayerRow = document.createElement("div");
     addLayerRow.className = "draw2-timeline-row draw2-timeline-layer-add-row";
-    addLayerRow.style.top = `${headerHeight + (state.timeline.layerTrackOrder.length + 1) * layerRowHeight}px`;
+    addLayerRow.style.top = `${headerHeight + (state.timeline.layerTrackOrder.length + (desktopTimelineUi ? 0 : 1)) * layerRowHeight}px`;
+    addLayerRow.dataset.timelineRole = "layer-add";
     addLayerRow.setAttribute("role", "row");
     addLayerRow.setAttribute("aria-label", localizeDraw2Text("Add layer"));
     const addLayerHeader = document.createElement("button");
@@ -26776,11 +27067,21 @@ function renderTimeline() {
     addLayerHeader.className = "draw2-timeline-row-label draw2-timeline-layer-add-header draw2-timeline-command-cell";
     addLayerHeader.classList.add("draw2-button-icon");
     addLayerHeader.append(createDraw2Icon("icon-add"));
+    if (desktopTimelineUi) {
+      const addLayerLabel = document.createElement("span");
+      addLayerLabel.className = "draw2-timeline-layer-add-label";
+      addLayerLabel.textContent = localizeDraw2Text("Add layer");
+      addLayerLabel.setAttribute("aria-hidden", "true");
+      addLayerHeader.append(addLayerLabel);
+    }
     addLayerHeader.setAttribute("aria-label", localizeDraw2Text("Add layer"));
     addLayerHeader.title = localizeDraw2Text("Add layer");
     addLayerHeader.addEventListener("click", () => addLayerControl.click());
     addLayerRow.append(addLayerHeader);
     timelineWindow.append(addLayerRow);
+  }
+  if (audioRowForTimeline !== void 0) {
+    timelineWindow.append(audioRowForTimeline);
   }
   const onionCount = onionSkinEnabled ? resolveOnionSkinNeighborhood(state, timelineSession.activeFrameId, {
     enabled: true,
@@ -28191,7 +28492,7 @@ function paletteColorForRender(asset, paletteIndex) {
 }
 function compositeRegion(region, frameId = timelineSession.activeFrameId, previewOverrides, layerIds) {
   const image = canonicalContext.createImageData(region.width, region.height);
-  const orderedLayers = state.timeline.layerTrackOrder.map((layerTrackId) => state.layers.find((item) => item.layerTrackId === layerTrackId)).filter((item) => item !== void 0 && item.visible && item.opacity > 0 && (layerIds === void 0 || layerIds.includes(item.layerTrackId)));
+  const orderedLayers = state.timeline.layerTrackOrder.map((layerTrackId) => state.layers.find((item) => item.layerTrackId === layerTrackId)).filter((item) => item !== void 0 && item.opacity > 0 && (layerIds === void 0 ? item.visible : layerIds.includes(item.layerTrackId)));
   for (const layer2 of orderedLayers) {
     const tilemap2 = layer2.kind === "TILEMAP" ? state.tilemaps?.[tilemapIdFor(layer2.layerTrackId, frameId)] : void 0;
     const cel2 = state.cels.find((item) => item.layerTrackId === layer2.layerTrackId && item.frameId === frameId && item.lifecycle === "ACTIVE" && (item.assetId !== void 0 || tilemap2 !== void 0));
@@ -33317,11 +33618,12 @@ async function finishTilemapPointerGesture(cancelled = false) {
 canvas.addEventListener("pointerdown", (event) => {
   if (event.button !== 0 && event.button !== 1 && event.button !== 2) return;
   if (event.button === 2 && !activeLayerIsTilemap()) return;
+  const spacePanRequested = event.button === 0 && workspaceFrameElement?.dataset.draw2SpaceHeld === "true";
   if (transformCommitInFlight) {
     if (event.cancelable) event.preventDefault();
     return;
   }
-  if ((event.button === 0 || event.button === 2) && collaborationEditBlockReason() !== void 0 && !collaborationCanvasToolIsNonMutating(currentBasicTool())) {
+  if ((event.button === 0 || event.button === 2) && collaborationEditBlockReason() !== void 0 && !spacePanRequested && !collaborationCanvasToolIsNonMutating(currentBasicTool())) {
     if (event.cancelable) event.preventDefault();
     announceCollaborationEditBlock();
     return;
@@ -33344,7 +33646,7 @@ canvas.addEventListener("pointerdown", (event) => {
     canvas.setPointerCapture(event.pointerId);
     return;
   }
-  if (event.button === 1 || currentBasicTool() === "pan" || event.altKey && !selectionToolCanMove()) {
+  if (event.button === 1 || spacePanRequested || currentBasicTool() === "pan" || event.altKey && !selectionToolCanMove()) {
     if (event.cancelable) event.preventDefault();
     beginViewportPan(event);
     return;
@@ -34039,37 +34341,72 @@ specialDuplicateFrameElement?.addEventListener("click", () => duplicateFrameCont
 specialOpenInspectorElement?.addEventListener("click", () => {
   document.querySelector("[data-workspace-panel='inspector']")?.click();
 });
+function currentShortcutMode() {
+  const mode = workspaceFrameElement?.dataset.creatorMode;
+  return mode === "AUDIO" || mode === "GAME" ? mode : "DRAW";
+}
+function shortcutModeName(mode) {
+  return mode === "AUDIO" ? "iAUDIO" : mode === "GAME" ? "iGAME" : "iDRAW";
+}
+function shortcutsForCurrentMode() {
+  const mode = currentShortcutMode();
+  return DRAW2_SHORTCUTS.filter((shortcut) => shortcut.mode === "COMMON" || shortcut.mode === mode || shortcut.mode === void 0 && mode === "DRAW");
+}
+function syncShortcutListLabel() {
+  shortcutListElement?.setAttribute("aria-label", `${shortcutModeName(currentShortcutMode())} keyboard shortcuts`);
+}
 function renderShortcutList(filter = "") {
   if (shortcutListElement === null) return;
+  syncShortcutListLabel();
   const queryText = filter.trim().toLowerCase();
   shortcutListElement.replaceChildren();
-  let category;
-  for (const shortcut of DRAW2_SHORTCUTS) {
+  const groupedShortcuts = /* @__PURE__ */ new Map();
+  for (const shortcut of shortcutsForCurrentMode()) {
     const haystack = `${shortcut.category} ${shortcut.label} ${shortcut.keys}`.toLowerCase();
     if (queryText.length > 0 && !haystack.includes(queryText)) continue;
-    if (category !== shortcut.category) {
-      category = shortcut.category;
-      const heading = document.createElement("div");
-      heading.className = "draw2-shortcut-category";
-      heading.textContent = shortcut.category;
-      heading.setAttribute("role", "presentation");
-      shortcutListElement.append(heading);
+    const categoryShortcuts = groupedShortcuts.get(shortcut.category);
+    if (categoryShortcuts === void 0) {
+      groupedShortcuts.set(shortcut.category, [
+        shortcut
+      ]);
+    } else {
+      categoryShortcuts.push(shortcut);
     }
-    const row = document.createElement("div");
-    row.className = "draw2-shortcut-row";
-    row.setAttribute("role", "listitem");
-    const label = document.createElement("span");
-    label.className = "draw2-shortcut-label";
-    label.textContent = shortcut.label;
-    const keys = document.createElement("span");
-    keys.className = "draw2-shortcut-keys";
-    for (const key of shortcut.keys.split("+")) {
-      const keycap = document.createElement("kbd");
-      keycap.textContent = key;
-      keys.append(keycap);
+  }
+  for (const [category, shortcuts] of groupedShortcuts) {
+    const heading = document.createElement("div");
+    heading.className = "draw2-shortcut-category";
+    heading.textContent = category;
+    heading.setAttribute("role", "presentation");
+    shortcutListElement.append(heading);
+    for (const shortcut of shortcuts) {
+      const row = document.createElement("div");
+      row.className = "draw2-shortcut-row";
+      row.setAttribute("role", "listitem");
+      const label = document.createElement("span");
+      label.className = "draw2-shortcut-label";
+      label.textContent = shortcut.label;
+      const keys = document.createElement("span");
+      keys.className = "draw2-shortcut-keys";
+      row.setAttribute("aria-label", `${shortcut.label}: ${shortcut.keys}`);
+      const alternatives = shortcut.keys.split(/\s*\/\s*/).filter((value) => value.length > 0);
+      for (const [alternativeIndex, alternative] of alternatives.entries()) {
+        if (alternativeIndex > 0) {
+          const separator = document.createElement("span");
+          separator.className = "draw2-shortcut-separator";
+          separator.textContent = "/";
+          separator.setAttribute("aria-hidden", "true");
+          keys.append(separator);
+        }
+        for (const key of alternative.split("+")) {
+          const keycap = document.createElement("kbd");
+          keycap.textContent = key;
+          keys.append(keycap);
+        }
+      }
+      row.append(label, keys);
+      shortcutListElement.append(row);
     }
-    row.append(label, keys);
-    shortcutListElement.append(row);
   }
   if (shortcutListElement.childElementCount === 0) {
     const empty = document.createElement("div");
@@ -34826,6 +35163,7 @@ document.addEventListener("keydown", (event) => {
   const drawWorkspaceMode = creatorMode === void 0 || creatorMode === "DRAW" || creatorMode === "ANIMATE";
   if (!drawWorkspaceMode) return;
   const interactiveTarget = isInteractiveKeyboardTarget(event.target);
+  const drawActiveSurface = resolveDraw2ActiveSurface(event.target, document.activeElement instanceof Element ? document.activeElement : null);
   const selectionNudgeKeys = /* @__PURE__ */ new Set([
     "ArrowLeft",
     "ArrowRight",
@@ -34833,12 +35171,18 @@ document.addEventListener("keydown", (event) => {
     "ArrowDown"
   ]);
   const activeDrawGesture = drawInteraction !== void 0 || selectionDraft !== void 0 || pendingSelectionGesture !== void 0 || selectionFrameDrag !== void 0 || selectionDrag !== void 0 || transformSession !== void 0;
-  if (!inputEditing && !interactiveTarget && !event.defaultPrevented && !event.metaKey && !event.ctrlKey && !event.altKey && activeDrawGesture && selectionNudgeKeys.has(event.key)) {
+  const drawArrowOwner = resolveDraw2ArrowOwner({
+    mode: creatorMode === "ANIMATE" ? "ANIMATE" : "DRAW",
+    surface: drawActiveSurface,
+    hasSelection: selection !== void 0,
+    drawGestureActive: activeDrawGesture
+  });
+  if (!inputEditing && !interactiveTarget && !event.defaultPrevented && !event.metaKey && !event.ctrlKey && !event.altKey && activeDrawGesture && drawArrowOwner === "DRAW_SELECTION" && selectionNudgeKeys.has(event.key)) {
     event.preventDefault();
     event.stopImmediatePropagation();
     return;
   }
-  if (!inputEditing && !interactiveTarget && !event.defaultPrevented && selection !== void 0 && selectionToolCanMove() && drawInteraction === void 0 && selectionDraft === void 0 && pendingSelectionGesture === void 0 && selectionFrameDrag === void 0 && selectionDrag === void 0 && transformSession === void 0 && selectionNudgeKeys.has(event.key) && !event.metaKey && !event.ctrlKey && !event.altKey) {
+  if (!inputEditing && !interactiveTarget && !event.defaultPrevented && selection !== void 0 && selectionToolCanMove() && drawInteraction === void 0 && selectionDraft === void 0 && pendingSelectionGesture === void 0 && selectionFrameDrag === void 0 && selectionDrag === void 0 && transformSession === void 0 && drawArrowOwner === "DRAW_SELECTION" && selectionNudgeKeys.has(event.key) && !event.metaKey && !event.ctrlKey && !event.altKey) {
     const step = event.shiftKey ? 8 : 1;
     const dx = event.key === "ArrowLeft" ? -step : event.key === "ArrowRight" ? step : 0;
     const dy = event.key === "ArrowUp" ? -step : event.key === "ArrowDown" ? step : 0;
@@ -34851,7 +35195,8 @@ document.addEventListener("keydown", (event) => {
     modalOpen: dialogOpen,
     sheetOpen: false,
     inputEditing: inputEditing || interactiveTarget,
-    imeComposing: event.isComposing
+    imeComposing: event.isComposing,
+    mode: currentShortcutMode()
   });
   if (shortcut === void 0) return;
   event.preventDefault();

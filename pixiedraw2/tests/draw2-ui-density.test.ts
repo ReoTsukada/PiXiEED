@@ -1,6 +1,8 @@
 const htmlUrl = new URL("../index.html", import.meta.url);
 const shellCssUrl = new URL("../assets/draw2-shell.css", import.meta.url);
 const gameCssUrl = new URL("../assets/draw2-game-ux.css", import.meta.url);
+const pcPolishCssUrl = new URL("../assets/draw2-pc-ui-polish.css", import.meta.url);
+const drawEntryUrl = new URL("../src/draw2-entry.ts", import.meta.url);
 const workspaceUrl = new URL("../src/wp180-workspace-ui.ts", import.meta.url);
 const workspaceBundleUrl = new URL("../dist/wp180-workspace.js", import.meta.url);
 
@@ -65,7 +67,7 @@ Deno.test("UI density classifies the primary surfaces of all three modes", async
   }
 });
 
-Deno.test("Audio asset delivery and Game Inspector use contextual tiers", async () => {
+Deno.test("Audio Asset creation and Game Inspector use contextual tiers", async () => {
   const html = await Deno.readTextFile(htmlUrl);
 
   assertElementHasAttribute(
@@ -217,6 +219,56 @@ Deno.test("PC guided selection uses Canvas handles before precision inputs", asy
   );
 });
 
+Deno.test("Audio curves and waveforms expose direct editing before precision controls", async () => {
+  const html = await Deno.readTextFile(htmlUrl);
+  const workspace = await Deno.readTextFile(workspaceUrl);
+  const pcPolishCss = await Deno.readTextFile(pcPolishCssUrl);
+
+  assertElementHasAttribute(
+    html,
+    "draw2AudioMidiExpression",
+    "data-ui-surface",
+    "audio-expression",
+  );
+  assertElementHasAttribute(
+    html,
+    "draw2AudioMidiExpressionLane",
+    "data-direct-edit",
+    "true",
+  );
+  assertElementHasAttribute(
+    html,
+    "draw2AudioAutomationLane",
+    "data-direct-edit",
+    "true",
+  );
+  assertIncludes(
+    workspace,
+    'audioClipLibrary?.addEventListener("dblclick"',
+    "Audio waveform must support position-based split",
+  );
+  assertIncludes(
+    workspace,
+    "audioClipWaveformGesture",
+    "Audio waveform fade handles must keep a provisional gesture state",
+  );
+  assertIncludes(
+    workspace,
+    'graphPoint.addEventListener("dblclick"',
+    "Audio automation points must support direct removal",
+  );
+  assertIncludes(
+    pcPolishCss,
+    ".draw2-audio-automation-graph",
+    "Audio automation must render as a visual curve",
+  );
+  assertIncludes(
+    pcPolishCss,
+    ".draw2-audio-clip-precision",
+    "Audio clip precision controls must be progressive",
+  );
+});
+
 Deno.test("Canvas, timeline, layer, palette, asset and tab references remain stable", async () => {
   const html = await Deno.readTextFile(htmlUrl);
 
@@ -307,6 +359,203 @@ Deno.test("density CSS scopes contextual, advanced and copy rules locally", asyn
       css,
     ),
     "density rules must be scoped to an affected surface",
+  );
+});
+
+Deno.test("PC PiXYNC status has a dedicated slot outside the command cluster", async () => {
+  const html = await Deno.readTextFile(htmlUrl);
+  const topRailCssUrl = new URL("../assets/draw2-pc-top-rail.css", import.meta.url);
+  const topRailCss = await Deno.readTextFile(topRailCssUrl);
+
+  assertIncludes(
+    html,
+    "./assets/draw2-pc-top-rail.css?v=20260912-pixync-rail-v1",
+    "PC PiXYNC rail stylesheet",
+  );
+  assertIncludes(
+    topRailCss,
+    "--draw2-pc-top-sync-width: 96px",
+    "PC PiXYNC rail must reserve a stable status width",
+  );
+  assertIncludes(
+    topRailCss,
+    "right: calc(100% + var(--draw2-pc-top-sync-gap)) !important",
+    "PC PiXYNC status must escape the rounded command cluster",
+  );
+  assertIncludes(
+    topRailCss,
+    ".draw2-workspace-command-bar\n    > #draw2SyncStatus",
+    "PC PiXYNC status must remain attached to the existing command slot",
+  );
+  assertIncludes(
+    topRailCss,
+    ":is(.draw2-workspace-context-row, #draw2AudioGlobalControls)",
+    "DRAW and AUDIO must reserve the same PiXYNC slot",
+  );
+});
+
+Deno.test("PC Draw timeline separates iAUDIO references from Layer creation", async () => {
+  const html = await Deno.readTextFile(htmlUrl);
+  const drawEntry = await Deno.readTextFile(drawEntryUrl);
+  const workspace = await Deno.readTextFile(workspaceUrl);
+  const pcWorkspaceCssUrl = new URL(
+    "../assets/draw2-pc-workspace-overrides.css",
+    import.meta.url,
+  );
+  const pcWorkspaceCss = await Deno.readTextFile(pcWorkspaceCssUrl);
+
+  assertIncludes(
+    html,
+    "./assets/draw2-pc-workspace-overrides.css?v=20260913-audio-roll-v1",
+    "PC timeline rail stylesheet",
+  );
+  assertIncludes(
+    drawEntry,
+    'audioRow.dataset.audioSource = "iAUDIO"',
+    "Draw Audio row must identify the iAUDIO source",
+  );
+  assertIncludes(
+    drawEntry,
+    'drawAudioAdd.title = "iAUDIO素材を選択中のフレームへ追加"',
+    "Draw Audio insertion affordance must explain its destination",
+  );
+  assertIncludes(
+    drawEntry,
+    'addLayerRow.dataset.timelineRole = "layer-add"',
+    "Layer creation row must remain a distinct timeline role",
+  );
+  assertIncludes(
+    drawEntry,
+    'addLayerLabel.className = "draw2-timeline-layer-add-label"',
+    "Layer creation row must expose a visible label",
+  );
+  assertIncludes(
+    pcWorkspaceCss,
+    "grid-template-rows:",
+    "PC mode switching must use one timeline row contract",
+  );
+  assertIncludes(
+    pcWorkspaceCss,
+    "grid-template-rows: 30px 30px 24px minmax(0, 1fr)",
+    "PC Draw must reserve heading, tabs, readout and content rows",
+  );
+  assertIncludes(
+    pcWorkspaceCss,
+    '[data-timeline-collapse="collapsed"]',
+    "PC timeline collapse must be part of the same layout contract",
+  );
+  assertIncludes(
+    pcWorkspaceCss,
+    "pointer-events: auto !important",
+    "PC timeline collapse control must keep its own hit target",
+  );
+  assertIncludes(
+    pcWorkspaceCss,
+    "z-index: 70 !important",
+    "PC timeline heading must stay above the compact tab strip",
+  );
+  assertIncludes(
+    pcWorkspaceCss,
+    ".draw2-timeline-audio-title",
+    "iAUDIO reference lane needs a visible source label",
+  );
+  assertIncludes(
+    pcWorkspaceCss,
+    "minmax(44px, 49px) minmax(40px, 1fr) 30px",
+    "iAUDIO lane must keep its picker distinguishable from Layer creation",
+  );
+  assertIncludes(
+    pcWorkspaceCss,
+    ".draw2-timeline-layer-add-label",
+    "Layer creation lane needs a visible action label",
+  );
+});
+
+Deno.test("PC polish keeps direct surfaces primary without deleting commands", async () => {
+  const html = await Deno.readTextFile(htmlUrl);
+  const polishCss = await Deno.readTextFile(pcPolishCssUrl);
+
+  assertIncludes(
+    html,
+    "./assets/draw2-pc-ui-polish.css?v=20260914-quick-asset-v1",
+    "PC interaction polish stylesheet",
+  );
+  assertIncludes(
+    polishCss,
+    '@media (min-width: 1120px) and (hover: hover) and (pointer: fine)',
+    "PC polish must be limited to desktop pointer interaction",
+  );
+  assertIncludes(
+    polishCss,
+    'grid-template-rows:\n      var(--draw2-pc-topbar-height, 64px)\n      minmax(280px, 1fr)\n      minmax(0, clamp(180px, min(24dvh, var(--draw2-timeline-height, 260px)), 260px))',
+    "Draw must keep the canvas primary when a tall timeline was remembered",
+  );
+  assertIncludes(
+    polishCss,
+    '[data-workspace-layout="color-left-tools-right"]:not(:has(#draw2WorkspacePanelAssets:not([hidden])))',
+    "Draw asset-layout specificity must not restore the stale timeline height",
+  );
+  assertIncludes(
+    polishCss,
+    ':is(#draw2AudioMidiVelocity, .draw2-audio-midi-velocity)',
+    "iAUDIO must not leave an orphaned global velocity control",
+  );
+  assertIncludes(
+    polishCss,
+    '[data-workspace-command="command-palette"]',
+    "hidden permanent commands must retain their command-palette route",
+  );
+});
+
+Deno.test("asset surface keeps the quick capture path primary", async () => {
+  const html = await Deno.readTextFile(htmlUrl);
+  const workspace = await Deno.readTextFile(workspaceUrl);
+  const bridgeContract = await Deno.readTextFile(
+    new URL("../src/draw2-asset-bridge-contract.ts", import.meta.url),
+  );
+  const entry = await Deno.readTextFile(
+    new URL("../src/draw2-entry.ts", import.meta.url),
+  );
+
+  assertIncludes(
+    html,
+    'id="draw2QuickAssetCapture"',
+    "Asset surface must expose a primary quick capture area",
+  );
+  assertIncludes(
+    html,
+    'id="draw2QuickAssetTracks"',
+    "quick Asset capture must expose selectable source tracks",
+  );
+  assertIncludes(
+    html,
+    'id="draw2QuickAssetCreate"',
+    "quick Asset capture must have one primary create action",
+  );
+  assertIncludes(
+    html,
+    'id="draw2AssetAdvancedDetails"',
+    "advanced Asset settings must stay behind disclosure",
+  );
+  assertIncludes(
+    workspace,
+    "sourceLayerIds: selectedLayerIds",
+    "quick Asset creation must pass the selected tracks to the bridge",
+  );
+  assertIncludes(
+    bridgeContract,
+    "readonly sourceLayerIds?: readonly string[];",
+    "Asset bridge must accept explicit source tracks",
+  );
+  assertIncludes(
+    entry,
+    "const requestedLayerIds = [...new Set(",
+    "Draw capture must validate and preserve selected source tracks",
+  );
+  assertIncludes(
+    entry,
+    "layerIds.includes(item.layerTrackId)",
+    "selected hidden tracks must remain capturable when explicitly included",
   );
 });
 

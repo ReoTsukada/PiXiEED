@@ -10,7 +10,7 @@
     <title>PiXiEEDstudio — Studio</title>
     <link
       rel="stylesheet"
-      href="./assets/draw2-shell.min.css?v=20260911-ui-density-v1"
+      href="./assets/draw2-shell.min.css?v=20260914-audio-asset-v1"
     >
     <link
       rel="stylesheet"
@@ -19,6 +19,22 @@
     <link
       rel="stylesheet"
       href="./assets/draw2-mode-motion.css?v=20260911-ui-density-v1"
+    >
+    <link
+      rel="stylesheet"
+      href="./assets/draw2-pc-top-rail.css?v=20260912-pixync-rail-v1"
+    >
+    <link
+      rel="stylesheet"
+      href="./assets/draw2-pc-workspace-overrides.css?v=20260913-audio-roll-v1"
+    >
+    <link
+      rel="stylesheet"
+      href="./assets/draw2-pc-ui-polish.css?v=20260914-quick-asset-v1"
+    >
+    <link
+      rel="stylesheet"
+      href="./assets/draw2-pc-simple-game.css?v=20260914-simple-game-v1"
     >
   </head>
   <body>
@@ -2651,6 +2667,8 @@
         <section
           class="draw2-workspace-canvas-region"
           id="draw2WorkspaceCanvasRegion"
+          data-input-surface="draw-canvas"
+          tabindex="-1"
           aria-label="Canvas Region"
         >
           <button
@@ -2672,6 +2690,8 @@
             class="draw2-game-scene-viewport"
             data-ui-tier="primary"
             data-ui-surface="viewport"
+            data-input-surface="game-stage"
+            tabindex="-1"
             aria-label="iGAME Scene View"
             hidden
           >
@@ -2681,9 +2701,67 @@
               data-ui-tier="contextual"
               data-ui-surface="viewport-context"
               data-context-state="empty"
-              aria-label="iGAME Playgroundのモード選択"
+              aria-label="iGAMEをかんたんに作る"
               hidden
             >
+              <div
+                id="draw2GameQuickStart"
+                class="draw2-game-quick-start"
+                data-state="empty"
+                hidden
+              >
+                <div class="draw2-game-quick-copy">
+                  <span class="draw2-game-quick-kicker">iGAME</span>
+                  <strong id="draw2GameQuickStartHeading">描く → 置く → 遊ぶ</strong>
+                  <output id="draw2GameQuickStartStatus" aria-live="polite">主人公と背景を選ぶだけ</output>
+                </div>
+                <div
+                  class="draw2-game-quick-actions"
+                  role="toolbar"
+                  aria-label="ゲームを作る"
+                >
+                  <button
+                    type="button"
+                    class="draw2-game-quick-action"
+                    data-game-quick-action="WORLD"
+                    aria-label="背景を置く"
+                    title="iDRAWから背景を選ぶ"
+                  >
+                    <svg class="draw2-ui-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-sheet"></use></svg>
+                    <span class="draw2-button-label">背景</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="draw2-game-quick-action"
+                    data-game-quick-action="PLAYER"
+                    aria-label="主人公を置く"
+                    title="iDRAWから主人公を選ぶ"
+                  >
+                    <svg class="draw2-ui-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-image"></use></svg>
+                    <span class="draw2-button-label">主人公</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="draw2-game-quick-action"
+                    data-game-quick-action="OBJECT"
+                    aria-label="ものを置く"
+                    title="iDRAWからものを選ぶ"
+                  >
+                    <svg class="draw2-ui-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-add"></use></svg>
+                    <span class="draw2-button-label">もの</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="draw2-game-quick-action draw2-game-quick-action-play"
+                    data-game-quick-action="PLAY"
+                    aria-label="ゲームを再生"
+                    title="ゲームを再生"
+                  >
+                    <svg class="draw2-ui-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-play"></use></svg>
+                    <span class="draw2-button-label">Play</span>
+                  </button>
+                </div>
+              </div>
               <div class="draw2-game-playground-center-title" data-ui-copy="supporting">
                 <span class="draw2-eyebrow">iGAME PLAYGROUND</span>
                 <strong>選ぶ → 動かす → 音をつける</strong>
@@ -2882,6 +2960,8 @@
                 id="draw2AudioArrangerViewport"
                 data-ui-tier="primary"
                 data-ui-surface="audio-arranger-viewport"
+                data-input-surface="audio-timeline"
+                tabindex="-1"
               >
                 <div
                   class="draw2-audio-arranger-ruler"
@@ -3034,6 +3114,8 @@
                   ><output id="draw2AudioMidiVelocityValue">82%</output></label>
                 <div
                   class="draw2-audio-midi-tools"
+                  data-audio-midi-toolbar
+                  data-audio-ui-group="tools"
                   role="toolbar"
                   aria-label="MIDI note tools"
                 >
@@ -3070,9 +3152,121 @@
                 </div>
                 <div
                   class="draw2-audio-midi-actions"
+                  data-audio-ui-group="actions"
                   role="group"
-                  aria-label="MIDI interoperability"
+                  aria-label="MIDI placement and editing actions"
                 >
+                  <details
+                    class="draw2-audio-midi-quantize"
+                    role="group"
+                    aria-label="Selected note quantize"
+                  >
+                    <summary>Quantize</summary>
+                    <label>Existing<select
+                        id="draw2AudioMidiQuantize"
+                        aria-label="Existing note quantize grid"
+                      >
+                        <option value="off">Off</option>
+                        <option value="1/4">1/4</option>
+                        <option value="1/8">1/8</option>
+                        <option value="1/16" selected>1/16</option>
+                        <option value="1/32">1/32</option>
+                        <option value="1/64">1/64</option>
+                      </select></label>
+                    <label>Amount<input
+                        id="draw2AudioMidiQuantizeAmount"
+                        type="range"
+                        min="0"
+                        max="100"
+                        step="1"
+                        value="100"
+                        aria-label="Existing note quantize amount"
+                      ><output id="draw2AudioMidiQuantizeAmountValue">100%</output></label>
+                    <label>Swing<input
+                        id="draw2AudioMidiQuantizeSwing"
+                        type="range"
+                        min="0"
+                        max="100"
+                        step="1"
+                        value="0"
+                        aria-label="Existing note quantize swing"
+                      ><output id="draw2AudioMidiQuantizeSwingValue">0%</output></label>
+                    <button
+                      id="draw2AudioMidiQuantizePreview"
+                      class="draw2-button draw2-button-secondary"
+                      type="button"
+                    >Preview</button>
+                    <button
+                      id="draw2AudioMidiQuantizeApply"
+                      class="draw2-button draw2-button-secondary"
+                      type="button"
+                      disabled
+                    >Apply</button>
+                    <button
+                      id="draw2AudioMidiQuantizeCancel"
+                      class="draw2-button draw2-button-secondary"
+                      type="button"
+                      disabled
+                    >Cancel</button>
+                    <button
+                      id="draw2AudioMidiPlaySelection"
+                      class="draw2-button draw2-button-secondary"
+                      type="button"
+                    >Play selection</button>
+                  </details>
+                  <div
+                    class="draw2-audio-midi-scale"
+                    role="group"
+                    aria-label="Piano Roll key and scale"
+                  >
+                    <label>Key<select
+                        id="draw2AudioMidiScaleKey"
+                        aria-label="Scale key"
+                        title="Choose the root note. Sharp keys also show their enharmonic flat name."
+                      >
+                        <option value="C">C</option>
+                        <option value="C♯">C♯ / D♭</option>
+                        <option value="D">D</option>
+                        <option value="D♯">D♯ / E♭</option>
+                        <option value="E">E</option>
+                        <option value="F">F</option>
+                        <option value="F♯">F♯ / G♭</option>
+                        <option value="G">G</option>
+                        <option value="G♯">G♯ / A♭</option>
+                        <option value="A">A</option>
+                        <option value="A♯">A♯ / B♭</option>
+                        <option value="B">B</option>
+                      </select></label>
+                    <label>Scale<select
+                        id="draw2AudioMidiScaleMode"
+                        aria-label="Scale mode"
+                        title="Choose a major, minor, modal, pentatonic, blues or chromatic guide."
+                      >
+                        <option value="major" selected>Major</option>
+                        <option value="minor">Minor</option>
+                        <option value="harmonic-minor">Harmonic Minor</option>
+                        <option value="melodic-minor">Melodic Minor</option>
+                        <option value="dorian">Dorian</option>
+                        <option value="phrygian">Phrygian</option>
+                        <option value="lydian">Lydian</option>
+                        <option value="mixolydian">Mixolydian</option>
+                        <option value="locrian">Locrian</option>
+                        <option value="pentatonic">Major Pentatonic</option>
+                        <option value="minor-pentatonic">Minor Pentatonic</option>
+                        <option value="blues">Blues</option>
+                        <option value="chromatic">Chromatic</option>
+                      </select></label>
+                    <label>Input<select
+                        id="draw2AudioMidiScaleGuideMode"
+                        aria-label="Scale input behavior"
+                        title="Display highlights the scale; Snap moves new notes to it; Lock rejects out-of-scale input"
+                      >
+                        <option value="DISPLAY" selected>Guide</option>
+                        <option value="SNAP">Snap</option>
+                        <option value="RESTRICT">Lock</option>
+                      </select></label>
+                    <output id="draw2AudioMidiScaleGuide" aria-live="polite">C Major · guide only</output>
+                  </div>
                   <div
                     class="draw2-audio-chip-machine-actions"
                     role="group"
@@ -3100,6 +3294,14 @@
                     title="Import a Standard MIDI File into the current project"
                   >Import MIDI</button>
                   <button
+                    id="draw2AudioMidiSplit"
+                    class="draw2-button draw2-button-secondary"
+                    type="button"
+                    disabled
+                    aria-label="Split selected notes"
+                    title="Split selected notes at the selection boundary; a full-note selection splits at its center"
+                  >Split</button>
+                  <button
                     id="draw2AudioMidiExport"
                     class="draw2-button draw2-button-secondary"
                     type="button"
@@ -3112,6 +3314,13 @@
                     aria-pressed="false"
                     title="Connect a Web MIDI keyboard"
                   >MIDI Keyboard</button>
+                  <button
+                    id="draw2AudioMidiStepInput"
+                    class="draw2-button draw2-button-secondary"
+                    type="button"
+                    aria-pressed="false"
+                    title="Each MIDI note creates one note at the current Tick and advances by the selected length"
+                  >Step Input</button>
                   <input
                     id="draw2AudioMidiFileInput"
                     type="file"
@@ -3130,6 +3339,8 @@
                 class="draw2-audio-midi-grid"
                 id="draw2AudioMidiGrid"
                 role="grid"
+                tabindex="0"
+                data-input-surface="audio-roll"
                 aria-label="MIDI note roll with bar, beat and subdivision grid"
               >
               </div>
@@ -3137,6 +3348,8 @@
                 class="draw2-audio-midi-expression"
                 id="draw2AudioMidiExpression"
                 aria-label="MIDI expression lane"
+                data-ui-tier="contextual"
+                data-ui-surface="audio-expression"
               >
                 <div class="draw2-audio-midi-expression-toolbar">
                   <strong>Expression</strong>
@@ -3155,13 +3368,14 @@
                     class="draw2-button draw2-button-secondary"
                     type="button"
                   >＋ Point</button>
-                  <span>Tick-native · MIDI CC / pitch bend</span>
+                  <span class="draw2-audio-midi-expression-meta">Tick-native · MIDI CC / pitch bend</span>
                 </div>
                 <div
                   id="draw2AudioMidiExpressionLane"
                   class="draw2-audio-midi-expression-lane"
                   role="list"
                   aria-label="Editable MIDI expression points"
+                  data-direct-edit="true"
                 ></div>
               </section>
             </section>
@@ -4023,13 +4237,66 @@
               aria-hidden="true"
             >
               <div class="draw2-creator-surface-heading">
-                <span class="draw2-eyebrow">CHARACTER</span><strong>キャラクター設定</strong><span
+                <span class="draw2-eyebrow">ASSET</span><strong>アセット作成</strong><span
                   class="draw2-creator-local-badge"
                 >PROJECT LOCAL</span>
               </div>
               <p class="draw2-creator-surface-note">
-                絵を動き・向き・フレームに割り当て、保存したアニメーションをiGAMEへ配置します。
+                選択範囲とトラックを選ぶだけで、すぐにAssetとして保存できます。
               </p>
+              <section
+                class="draw2-asset-quick-capture"
+                id="draw2QuickAssetCapture"
+                data-ui-tier="primary"
+                data-ui-surface="asset-capture"
+                aria-labelledby="draw2QuickAssetCaptureTitle"
+              >
+                <header class="draw2-asset-quick-header">
+                  <div>
+                    <span class="draw2-eyebrow">ASSET</span>
+                    <strong id="draw2QuickAssetCaptureTitle">選択範囲からAssetを作成</strong>
+                    <small>トラックを選ぶだけ。名前や種類は後から変更できます。</small>
+                  </div>
+                  <output id="draw2QuickAssetCaptureState" class="draw2-asset-quick-state" role="status" aria-live="polite">範囲を選択</output>
+                </header>
+                <div class="draw2-asset-quick-layout">
+                  <div class="draw2-asset-quick-preview-wrap">
+                    <canvas
+                      id="draw2QuickAssetPreview"
+                      width="144"
+                      height="144"
+                      aria-label="選択範囲のAssetプレビュー"
+                    ></canvas>
+                    <output id="draw2QuickAssetSelection" class="draw2-asset-quick-selection" role="status" aria-live="polite">iDRAWで範囲を選択してください</output>
+                  </div>
+                  <div class="draw2-asset-quick-controls">
+                    <label class="draw2-asset-quick-name">名前（任意）<input id="draw2QuickAssetName" type="text" autocomplete="off" placeholder="自動でAsset 1になります" /></label>
+                    <div class="draw2-asset-quick-heading">
+                      <strong>含めるトラック</strong>
+                      <button id="draw2QuickAssetSelectVisible" class="draw2-button draw2-button-quiet" type="button">表示中を選択</button>
+                    </div>
+                    <div id="draw2QuickAssetTracks" class="draw2-asset-quick-tracks" role="group" aria-label="Assetに含めるトラック"></div>
+                    <div class="draw2-asset-quick-heading draw2-asset-quick-frame-heading">
+                      <strong>フレーム</strong>
+                      <span id="draw2QuickAssetFrameSummary">このフレーム</span>
+                    </div>
+                    <div id="draw2QuickAssetFrameMode" class="draw2-asset-quick-frame-mode" role="radiogroup" aria-label="Assetに含めるフレーム">
+                      <button class="draw2-asset-quick-choice is-active" data-draw2-quick-frame-mode="CURRENT" type="button" role="radio" aria-checked="true">このフレーム</button>
+                      <button class="draw2-asset-quick-choice" data-draw2-quick-frame-mode="ALL" type="button" role="radio" aria-checked="false">全フレーム</button>
+                    </div>
+                    <button id="draw2QuickAssetCreate" class="draw2-button draw2-button-primary draw2-asset-quick-create" type="button" disabled>
+                      <svg class="draw2-ui-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-add"></use></svg>
+                      <span>この内容でAssetを作成</span>
+                    </button>
+                  </div>
+                </div>
+                <output id="draw2QuickAssetStatus" class="draw2-asset-quick-status" role="status" aria-live="polite">iDRAWで範囲を選ぶと作成できます。</output>
+              </section>
+              <details
+                class="draw2-asset-advanced-details"
+                id="draw2AssetAdvancedDetails"
+              >
+                <summary>詳細編集（方向・動き・Unity出力・販売）</summary>
               <section
                 class="draw2-character-setup"
                 id="draw2CharacterSetupSurface"
@@ -5283,6 +5550,7 @@
                 >
                   Projectに自動保存されます。元データは複製しません。
                 </p>
+              </details>
               </details>
             </div>
             <div
@@ -6738,6 +7006,45 @@
             aria-label="Audio side panels"
             hidden
           >
+            <div
+              class="draw2-audio-midi-tool-strip"
+              id="draw2AudioMidiToolStrip"
+              data-audio-midi-toolbar
+              data-audio-ui-group="tools-secondary"
+              role="toolbar"
+              aria-label="Piano Roll tools (compact layout)"
+            >
+              <button
+                class="draw2-tool-button is-active"
+                data-audio-midi-tool="pen"
+                type="button"
+                aria-pressed="true"
+                aria-label="Pen"
+                title="Pen · click or drag to place/lengthen notes"
+              >
+                <svg class="draw2-ui-icon draw2-tool-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-pen"></use></svg><span>Pen</span>
+              </button>
+              <button
+                class="draw2-tool-button"
+                data-audio-midi-tool="eraser"
+                type="button"
+                aria-pressed="false"
+                aria-label="Eraser"
+                title="Eraser · click or drag to remove notes"
+              >
+                <svg class="draw2-ui-icon draw2-tool-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-eraser"></use></svg><span>Eraser</span>
+              </button>
+              <button
+                class="draw2-tool-button"
+                data-audio-midi-tool="select"
+                type="button"
+                aria-pressed="false"
+                aria-label="Select"
+                title="Select · drag a rectangle, then drag the selection to move it"
+              >
+                <svg class="draw2-ui-icon draw2-tool-icon" aria-hidden="true" focusable="false"><use href="./assets/icons/draw2-icons.svg#icon-select-rect"></use></svg><span>Select</span>
+              </button>
+            </div>
             <nav
               class="draw2-audio-right-tabs"
               id="draw2AudioRightTabs"
@@ -6821,6 +7128,83 @@
                 <span class="draw2-eyebrow">INSPECTOR</span>
                 <strong id="draw2AudioRightInspectorTrack">Track: Piano</strong>
               </div>
+              <section
+                id="draw2AudioMidiNoteContext"
+                class="draw2-audio-midi-note-context"
+                data-ui-tier="contextual"
+                data-ui-surface="midi-note-context"
+                data-context-state="empty"
+                aria-label="Selected MIDI note controls"
+                hidden
+              >
+                <div class="draw2-audio-midi-note-context-heading">
+                  <span class="draw2-eyebrow">NOTE</span>
+                  <output
+                    id="draw2AudioMidiNoteContextSummary"
+                    aria-live="polite"
+                  >No note selected</output>
+                </div>
+                <div class="draw2-audio-midi-note-context-fields">
+                  <label>
+                    <span>Pitch</span>
+                    <input
+                      id="draw2AudioMidiNotePitch"
+                      type="number"
+                      min="21"
+                      max="108"
+                      step="1"
+                      inputmode="numeric"
+                      aria-label="Selected MIDI note pitch"
+                    >
+                  </label>
+                  <label>
+                    <span>Start</span>
+                    <input
+                      id="draw2AudioMidiNoteStart"
+                      type="number"
+                      min="0"
+                      step="1"
+                      inputmode="numeric"
+                      aria-label="Selected MIDI note start Tick"
+                    >
+                  </label>
+                  <label>
+                    <span>Length</span>
+                    <input
+                      id="draw2AudioMidiNoteLength"
+                      type="number"
+                      min="1"
+                      step="1"
+                      inputmode="numeric"
+                      aria-label="Selected MIDI note duration Tick"
+                    >
+                  </label>
+                  <label>
+                    <span>Velocity</span>
+                    <input
+                      id="draw2AudioMidiNoteVelocity"
+                      type="number"
+                      min="1"
+                      max="100"
+                      step="1"
+                      inputmode="numeric"
+                      aria-label="Selected MIDI note velocity percent"
+                    >
+                  </label>
+                </div>
+                <div
+                  id="draw2AudioMidiNoteContextHint"
+                  class="draw2-audio-midi-note-context-hint"
+                >
+                  Drag note to move · drag edge to resize · Esc cancels
+                </div>
+                <div class="draw2-audio-midi-note-context-shortcuts" aria-hidden="true">
+                  <kbd>⌘/Ctrl C</kbd><span>copy</span>
+                  <kbd>⌘/Ctrl X</kbd><span>cut</span>
+                  <kbd>⌘/Ctrl V</kbd><span>paste</span>
+                  <kbd>Delete</kbd><span>remove</span>
+                </div>
+              </section>
               <section
                 id="draw2AudioInspectorMixerSummary"
                 class="draw2-audio-inspector-mixer-summary"
@@ -6922,16 +7306,18 @@
                 id="draw2AudioAssetPackage"
                 class="draw2-audio-asset-package"
                 data-ui-tier="contextual"
-                data-ui-surface="asset-delivery"
+                data-ui-surface="audio-asset"
+                data-audio-asset-workflow="asset-only"
                 data-context-state="empty"
                 aria-label="iAUDIO範囲をAsset化"
+                hidden
               >
                 <div class="draw2-audio-asset-package-heading">
-                  <span class="draw2-eyebrow">ASSET DELIVERY</span>
-                  <strong>選択範囲をAsset化</strong>
+                  <span class="draw2-eyebrow">ASSET</span>
+                  <strong>選択範囲をAssetとして保存</strong>
                 </div>
                 <label class="draw2-audio-asset-package-name">
-                  名前
+                  Asset名（任意）
                   <input
                     id="draw2AudioAssetName"
                     type="text"
@@ -6940,41 +7326,16 @@
                     placeholder="例: ジャンプ音"
                   >
                 </label>
-                <div class="draw2-audio-asset-package-controls">
-                  <label>役割<select id="draw2AudioAssetRole">
-                    <option value="" selected>選択…</option>
-                    <option value="BGM">BGM</option>
-                    <option value="SE">SE</option>
-                    <option value="VOICE">VOICE</option>
-                  </select></label>
-                  <label>単位<select id="draw2AudioAssetOfferKind">
-                    <option value="ASSET" selected>単品</option>
-                    <option value="ASSET_PACK">Pack</option>
-                  </select></label>
-                  <label>派生<select id="draw2AudioAssetDerivativePolicy">
-                    <option value="USE_ONLY" selected>利用のみ</option>
-                    <option value="DERIVATIVE_ALLOWED">派生OK</option>
-                    <option value="REDISTRIBUTION_ALLOWED">再配布OK</option>
-                  </select></label>
-                </div>
                 <div class="draw2-audio-asset-package-action">
-                  <button
-                    id="draw2AudioAssetAddRange"
-                    class="draw2-button draw2-button-quiet"
-                    type="button"
-                    disabled
-                  >
-                    ＋Packへ追加
-                  </button>
                   <button
                     id="draw2AudioAssetFinalize"
                     class="draw2-button draw2-button-primary"
                     type="button"
                     disabled
                   >
-                    販売用に確定
+                    Assetとして保存
                   </button>
-                  <output id="draw2AudioAssetStatus" aria-live="polite">役割と範囲を指定</output>
+                  <output id="draw2AudioAssetStatus" aria-live="polite">範囲を選択してください</output>
                 </div>
               </section>
               <details class="draw2-audio-inspector-details" data-detail-level="detailed">
@@ -7355,6 +7716,8 @@
           id="draw2WorkspaceTimelineRegion"
           data-ui-tier="primary"
           data-ui-surface="timeline"
+          data-input-surface="timeline"
+          tabindex="-1"
           aria-label="Timeline Region"
         >
           <button
@@ -8266,10 +8629,10 @@
                     type="range"
                     min="0"
                     max="1"
-                    value="0.22"
+                    value="0.6"
                     step="0.01"
                     aria-label="Chip synthesizer volume"
-                  ><output id="draw2AudioChipVolumeValue">22%</output></label>
+                  ><output id="draw2AudioChipVolumeValue">60%</output></label>
                 <label
                   class="draw2-audio-setting-check draw2-audio-advanced-control"
                 ><input
@@ -8539,6 +8902,7 @@
                   id="draw2AudioAutomationLane"
                   role="list"
                   aria-label="Automation points"
+                  data-direct-edit="true"
                 >
                 </div>
               </section>
@@ -11232,7 +11596,7 @@
     <script src="../scripts/market-purchase-delivery.js?v=20260906-direct-igame-market1"></script>
     <script
       type="module"
-      src="./dist/draw2-entry.js?v=20260911-ui-density-v1"
+      src="./dist/draw2-entry.js?v=20260913-workspace-input-v1"
     ></script>
     <script
       type="module"

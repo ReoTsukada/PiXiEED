@@ -8,6 +8,7 @@ import {
 } from "../../draw2-creator-workspace.ts";
 import type { PxdAssetDefinitionEntry } from "../../draw2-export.ts";
 import type { AudioAssetRecord } from "../../audio/audio-200/contracts.ts";
+import type { GameAudioAsset } from "./game-audio.ts";
 import type { GameAnimationBinding } from "../game-300/core.ts";
 
 export type GameAssetBrowserTab =
@@ -42,6 +43,10 @@ export interface GameAssetBrowserEntry {
   readonly definitionId?: string;
   readonly templateId?: string;
   readonly animationCount?: number;
+  /** Canonical Game audio ID for both source-catalog and saved-package entries. */
+  readonly audioAssetId?: string;
+  /** True when this entry came from a finalized iAUDIO Asset package. */
+  readonly audioPackage?: boolean;
 }
 
 export interface GameAnimationClipReference {
@@ -86,6 +91,7 @@ export function buildGameAssetBrowserEntries(input: {
   readonly tracks: readonly GameAssetBrowserTrack[];
   readonly drawDefinitions: readonly PxdAssetDefinitionEntry[];
   readonly audioAssets: readonly AudioAssetRecord[];
+  readonly audioPackageAssets?: readonly GameAudioAsset[];
   readonly templates?: readonly GameAssetBrowserTemplate[];
   readonly query?: string;
   readonly source?: GameAssetBrowserSource | "ALL";
@@ -118,6 +124,19 @@ export function buildGameAssetBrowserEntries(input: {
       detail:
         `${asset.kind} · ${asset.revisionIds.length} revision · iAUDIO参照専用`,
       readOnly: true,
+      audioAssetId: String(asset.assetId),
+    })),
+    ...(input.audioPackageAssets ?? []).map((asset) => ({
+      id: `audio:${asset.audioAssetId}`,
+      source: "AUDIO" as const,
+      label: asset.name,
+      detail:
+        `${asset.kind} · iAUDIO Asset · Tick ${asset.source.startTick}–${
+          asset.source.startTick + asset.source.durationTick
+        } · Gameへ追加可能`,
+      readOnly: true,
+      audioAssetId: asset.audioAssetId,
+      audioPackage: true,
     })),
     ...(input.templates ?? []).map((template) => ({
       id: `template:${template.id}`,

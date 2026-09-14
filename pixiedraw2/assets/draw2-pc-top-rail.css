@@ -1,0 +1,90 @@
+/* PC top rail: PiXYNC is a workspace state, not a command.  Keep the
+ * existing details element and its mobile projection intact, but give the
+ * desktop layout a dedicated slot immediately to the left of the command
+ * cluster.  This prevents the status chip from looking like a misplaced
+ * action inside the rounded command surface in DRAW, AUDIO and GAME. */
+@media (min-width: 1120px) {
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"] {
+    --draw2-pc-top-command-width: 344px !important;
+    --draw2-pc-top-sync-width: 96px;
+    --draw2-pc-top-sync-gap: 8px;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"]
+    :is(.draw2-workspace-context-row, #draw2AudioGlobalControls) {
+    right: calc(
+      var(--draw2-pc-top-command-width) +
+        var(--draw2-pc-top-sync-width) +
+        var(--draw2-pc-top-sync-gap) +
+        var(--draw2-pc-top-sync-gap) +
+        var(--draw2-pc-top-sync-gap)
+    ) !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"]
+    .draw2-workspace-command-bar {
+    width: var(--draw2-pc-top-command-width) !important;
+    min-width: var(--draw2-pc-top-command-width) !important;
+    max-width: var(--draw2-pc-top-command-width) !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"][data-creator-mode]
+    .draw2-workspace-command-bar
+    > #draw2SyncStatus {
+    position: absolute !important;
+    top: 3px !important;
+    right: calc(100% + var(--draw2-pc-top-sync-gap)) !important;
+    z-index: 8 !important;
+    display: block !important;
+    box-sizing: border-box !important;
+    flex: 0 0 var(--draw2-pc-top-sync-width) !important;
+    width: var(--draw2-pc-top-sync-width) !important;
+    min-width: var(--draw2-pc-top-sync-width) !important;
+    max-width: var(--draw2-pc-top-sync-width) !important;
+    height: 34px !important;
+    min-height: 34px !important;
+    max-height: 34px !important;
+    overflow: visible !important;
+    border: 1px solid var(--draw2-border-subtle) !important;
+    border-radius: 999px !important;
+    background: color-mix(
+      in srgb,
+      var(--draw2-surface-raised) 92%,
+      var(--draw2-accent) 8%
+    ) !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"]
+    #draw2SyncStatus
+    > summary {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    height: 32px !important;
+    min-height: 32px !important;
+    padding: 0 8px !important;
+    border: 0 !important;
+    border-radius: 999px !important;
+    font-size: 0.58rem !important;
+  }
+
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"]
+    #draw2SyncStatus
+    > summary:hover,
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"]
+    #draw2SyncStatus
+    > summary:focus-visible,
+  #draw2WorkspaceFrame.draw2-workspace-frame[data-workspace-profile="desktop"]
+    #draw2SyncStatus[open]
+    > summary {
+    border: 0 !important;
+    background: color-mix(
+      in srgb,
+      var(--draw2-accent) 14%,
+      transparent
+    ) !important;
+  }
+}

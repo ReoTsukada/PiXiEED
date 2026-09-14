@@ -28,6 +28,7 @@ export interface MixerRuntimeSnapshot {
   readonly routingReady: boolean;
   readonly masterGain: number;
   readonly masterEffectNodeCount: number;
+  readonly safetyLimiterEnabled: boolean;
   readonly outputGain: number;
   readonly tracks: Readonly<
     Record<string, {
@@ -91,6 +92,8 @@ export class MixerRuntimeAdapter {
   private masterState: AudioMasterState | undefined;
   private masterEffectNodes: AudioNode[] = [];
   private readonly masterEffectParams = new Map<string, AudioParam>();
+  /** Runtime-only clip protection; never written to the canonical Project. */
+  private safetyLimiter: DynamicsCompressorNode | undefined;
 
   constructor(
     private readonly context: AudioContext,
@@ -106,6 +109,7 @@ export class MixerRuntimeAdapter {
     this.previewInput.connect(this.master);
     this.master.connect(this.output);
     this.output.connect(destination);
+    this.rebuildMasterEffects([]);
   }
 
   /**
@@ -330,6 +334,7 @@ export class MixerRuntimeAdapter {
       this.output.disconnect();
       this.meterAnalyser?.disconnect();
       for (const node of this.masterEffectNodes) node.disconnect();
+      this.safetyLimiter?.disconnect();
     } catch {
       // The context may already be closed.
     }
@@ -338,6 +343,7 @@ export class MixerRuntimeAdapter {
     this.effectsByTrack.clear();
     this.masterState = undefined;
     this.masterEffectNodes = [];
+    this.safetyLimiter = undefined;
     this.masterEffectParams.clear();
     this.meterAnalyser = undefined;
   }
@@ -374,6 +380,7 @@ export class MixerRuntimeAdapter {
       routingReady: this.routingReady,
       masterGain: this.master.gain.value,
       masterEffectNodeCount: this.masterEffectNodes.length,
+      safetyLimiterEnabled: this.safetyLimiter !== undefined,
       outputGain: this.output.gain.value,
       tracks,
     };
@@ -621,13 +628,16 @@ export class MixerRuntimeAdapter {
     try {
       this.master.disconnect();
       for (const node of this.masterEffectNodes) node.disconnect();
+      this.safetyLimiter?.disconnect();
     } catch {
       // Disconnection is idempotent across browser and test AudioNodes.
     }
     this.masterEffectNodes = [];
+    this.safetyLimiter = undefined;
     this.masterEffectParams.clear();
     let previous: AudioNode = this.master;
     const master = this.masterState;
+    let hasCanonicalLimiter = false;
     if (master?.bypass !== true) {
       for (const effect of effects) {
         if (!effect.enabled) continue;
@@ -654,10 +664,44 @@ export class MixerRuntimeAdapter {
           previous.connect(limiter);
           previous = limiter;
           this.masterEffectNodes.push(limiter);
+          hasCanonicalLimiter = true;
         }
       }
     }
+    // Dense live preview must not send an unbounded sum directly to hardware.
+    // This protection is runtime-only; authored Master FX and Project state
+    // remain unchanged and a user-enabled canonical limiter takes precedence.
+    if (!hasCanonicalLimiter) {
+      const safetyLimiter = this.createSafetyLimiter();
+      if (safetyLimiter !== undefined) {
+        previous.connect(safetyLimiter);
+        previous = safetyLimiter;
+        this.safetyLimiter = safetyLimiter;
+      }
+    }
     previous.connect(this.output);
+  }
+
+  private createSafetyLimiter(): DynamicsCompressorNode | undefined {
+    const contextWithCompressor = this.context as AudioContext & {
+      createDynamicsCompressor?: () => DynamicsCompressorNode;
+    };
+    const limiter = contextWithCompressor.createDynamicsCompressor?.();
+    if (limiter === undefined) return undefined;
+    try {
+      limiter.threshold.value = -1;
+      limiter.ratio.value = 20;
+      limiter.attack.value = 0.001;
+      limiter.release.value = 0.05;
+    } catch {
+      try {
+        limiter.disconnect();
+      } catch {
+        // A partially-created node can be discarded safely.
+      }
+      return undefined;
+    }
+    return limiter;
   }
 
   private clearDynamicRouting(): void {

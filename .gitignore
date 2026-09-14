@@ -3,5 +3,7 @@
 node_modules/
 .aider*
 supabase/.temp/
+__pycache__/
+*.py[cod]
 PiXiEEDDraw.dev/
 pixiedraw/_backup/
