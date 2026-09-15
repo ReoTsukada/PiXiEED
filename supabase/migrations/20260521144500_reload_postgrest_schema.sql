@@ -1,1 +1,0 @@
-notify pgrst, 'reload schema';
