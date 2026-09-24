@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#11171b">
+  <title>ドット絵カメラ｜PiXiEED</title>
+  <meta name="description" content="いつもの景色を、ドット絵に。カメラを向けて撮影し、PNG画像で保存できます。写真は端末内で処理します。">
+  <link rel="icon" href="/assets/brand/pixieed-logo-48.png" type="image/png">
+  <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20260924-camera-release-1">
+  <link rel="stylesheet" href="css/pixel-camera.css?v=20260924-camera-release-1">
+  <link rel="modulepreload" href="js/pixel-studio/app.mjs?v=20260924-camera-release-1">
+</head>
+<body>
+  <a class="pc-skip" href="#stage">カメラへ移動</a>
+  <main class="pc" id="pixelStudio" data-mode="loading">
+    <section class="pc-stage" id="stage" aria-label="撮影プレビュー" tabindex="-1">
+      <video id="video" playsinline muted hidden></video>
+      <div class="pc-frame" id="captureFrame">
+        <canvas id="view" width="1" height="1" tabindex="0" aria-label="処理済みプレビュー。Enter、Space、またはタップで現在の画面から色を取り直す"></canvas>
+        <span class="pc-frame-guide" aria-hidden="true"></span>
+      </div>
+      <div id="loadingState" class="pc-loading" role="status" aria-live="polite">
+        <span class="pc-loading-camera">カメラを準備しています…</span>
+        <span class="pc-loading-preview">プレビューを準備しています…</span>
+      </div>
+      <noscript><p class="pc-noscript">カメラを利用するには JavaScript を有効にしてください。</p></noscript>
+      <div id="welcome" class="pc-welcome" hidden>
+        <img src="/assets/icons/pixieed/camera.svg" alt="" width="48" height="48">
+        <h2 class="pc-sr-only">カメラは停止中です</h2>
+        <p class="pc-sr-only">中央のカメラボタンで再開できます。</p>
+      </div>
+    </section>
+    <header class="pc-header">
+      <a class="pc-brand" href="/home/" aria-label="PiXiEED ホーム"><img src="/assets/brand/pixieed-logo-48.png" alt=""></a>
+      <h1 class="pc-sr-only">ドット絵カメラ</h1>
+      <button id="imageSettings" class="pc-size-button" type="button" popovertarget="sizePopover" aria-controls="sizePopover" aria-label="撮影サイズを変更">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/></svg>
+        <span class="pc-sr-only"><span id="ratioSummary">画面</span><span class="pc-size-detail" id="sizeSummary">256 px</span></span>
+      </button>
+      <div id="cameraControls" class="pc-header-controls">
+        <button id="flipCamera" class="pc-icon-button" type="button" aria-label="前後カメラを切り替え" title="前後カメラを切り替え" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 7 5 4 2 7M5 4v4a7 7 0 0 0 12.1 4.8M16 17l3 3 3-3m-3 3v-4a7 7 0 0 0-12.1-4.8"/><path d="M9 9h6v6H9z"/></svg></button>
+        <button id="stopCamera" class="pc-icon-button" type="button" aria-label="カメラを一時停止" title="一時停止" disabled><img src="/assets/icons/pixieed/pause.svg" alt=""></button>
+      </div>
+    </header>
+    <div class="pc-bottom">
+      <div class="pc-meta pc-sr-only"><span class="pc-camera-status" id="cameraStatus">準備中</span><span class="pc-dimensions" id="frameDimensions"></span></div>
+      <div class="pc-feedback">
+        <p id="stageMsg" class="pc-message pc-sr-only" role="status" aria-live="polite" hidden></p>
+        <p id="info" class="pc-info pc-sr-only">写真はこの端末で処理します。</p>
+      </div>
+      <div id="resultControls" class="pc-result-controls" hidden>
+        <a id="savePng" class="pc-button pc-primary" aria-disabled="true" tabindex="-1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v4h16v-4"/></svg><span>保存</span></a>
+      </div>
+    </div>
+    <div class="pc-settings-panel" id="sizePopover" popover aria-labelledby="sizeTitle">
+      <h2 class="pc-sr-only" id="sizeTitle">撮影サイズ</h2>
+      <div class="pc-settings-fields">
+        <label for="ratioSelect">縦横比<select id="ratioSelect" name="aspect">
+          <option value="screen">画面いっぱい</option><option value="1:1">1:1 · 正方形</option><option value="3:4">3:4 · 縦長</option><option value="9:16">9:16 · 縦長</option><option value="4:3">4:3 · 横長</option><option value="16:9">16:9 · 横長</option>
+        </select></label>
+        <label for="pixelSelect">ピクセル数 · 長い辺<select id="pixelSelect" name="pixels">
+          <option value="64">64 px</option><option value="128">128 px</option><option value="256" selected>256 px</option><option value="512">512 px</option>
+        </select></label>
+      </div>
+      <p class="pc-local-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 4v3"/></svg><span>写真は端末内で処理します。</span></p>
+      <div class="pc-output-summary"><span>保存する画像</span><output id="outputSummary" aria-live="polite">256 px</output></div>
+    </div>
+  </main>
+  <nav class="app-tabs pc-nav" aria-label="アプリナビゲーション" data-nav="five">
+    <a data-nav="home" href="/home/" aria-label="ホーム"><img src="/assets/icons/pixieed/home.svg" alt=""></a>
+    <a data-nav="map" href="/" aria-label="地図"><img src="/assets/icons/pixieed/globe.svg" alt=""></a>
+    <button id="capture" class="pc-nav-action" data-action="capture" type="button" aria-label="表示中の画像を撮影" title="撮影" disabled>
+      <span class="pc-nav-shutter" aria-hidden="true"></span>
+      <img class="pc-nav-resume" src="/assets/icons/pixieed/camera.svg" alt="">
+      <img class="pc-nav-retake" src="/assets/icons/pixieed/reset.svg" alt="">
+    </button>
+    <a data-nav="tools" href="/tools/" aria-label="ツール" aria-current="page"><img src="/assets/icons/pixieed/celestial.svg" alt=""></a>
+    <a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>
+  </nav>
+  <script type="module" src="js/pixel-studio/app.mjs?v=20260924-camera-release-1"></script>
+</body>
+</html>

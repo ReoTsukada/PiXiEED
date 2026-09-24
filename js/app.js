@@ -2157,7 +2157,19 @@ function renderPublicShell() {
   }
   tabs.className = 'app-tabs';
   tabs.setAttribute('aria-label', 'アプリナビゲーション');
-  tabs.innerHTML = '<a data-nav="home" href="/"><span aria-hidden="true">⌖</span><strong>地図</strong></a><a data-nav="works" href="/works/"><span aria-hidden="true">▧</span><strong>作品</strong></a><a data-nav="tools" href="/tools/"><span aria-hidden="true">✦</span><strong>ツール</strong></a>';
+  const page = ['/', '/index.html'].includes(window.location.pathname) ? 'map' : document.body.dataset.page || 'home';
+  const actions = {
+    map: '<a href="/?post=1" aria-label="ドット絵を投稿する"><img src="/assets/icons/pixieed/add.svg" alt=""></a>',
+    home: '<a href="/works/" aria-label="作品を見る"><img src="/assets/icons/pixieed/artwork.svg" alt=""></a>',
+    works: '<a href="/collection/" aria-label="集めた作品を見る"><img src="/assets/icons/pixieed/artwork.svg" alt=""></a>',
+    collection: '<a href="/works/" aria-label="作品を探す"><img src="/assets/icons/pixieed/artwork.svg" alt=""></a>',
+    tools: '<a href="/pixel-camera.html" aria-label="ドット絵カメラを開く"><img src="/assets/icons/pixieed/camera.svg" alt=""></a>',
+    stores: '<a href="/shops/" aria-label="お店として参加する"><img src="/assets/icons/pixieed/add.svg" alt=""></a>',
+    shops: '<a href="#flow" aria-label="参加の流れを見る"><img src="/assets/icons/pixieed/forward.svg" alt=""></a>',
+    profile: '<a href="/profile/?view=posts" aria-label="投稿した絵を見る"><img src="/assets/icons/pixieed/artwork.svg" alt=""></a>'
+  };
+  const contextAction = actions[page] || '<a href="/?post=1" aria-label="ドット絵を投稿する"><img src="/assets/icons/pixieed/add.svg" alt=""></a>';
+  tabs.innerHTML = `<a data-nav="home" href="/home/" aria-label="ホーム"><img src="/assets/icons/pixieed/home.svg" alt=""></a><a data-nav="map" href="/" aria-label="地図"><img src="/assets/icons/pixieed/globe.svg" alt=""></a>${contextAction}<a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/celestial.svg" alt=""></a><a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>`;
 
   const footerLinks = document.querySelector('.footer-links');
   if (footerLinks) footerLinks.innerHTML = '<a href="/shops/">お店の方へ</a><a href="/about/">PiXiEEDについて</a><a href="/about/#contact">お問い合わせ</a>';
@@ -2238,10 +2250,12 @@ function setActiveNav() {
   document.querySelectorAll('[data-nav]').forEach((link) => {
     const target = link.dataset.nav;
     const active = target === 'home'
-      ? path === '/' || path === '/index.html' || path.startsWith('/stores/')
-      : target === 'works'
-        ? path.includes('/works/')
-        : target === 'tools' && path.includes('/tools/');
+      ? path.startsWith('/home/')
+      : target === 'map'
+        ? path === '/' || path === '/index.html'
+        : target === 'tools'
+          ? path.includes('/tools/')
+          : target === 'profile' && path.includes('/profile/');
     if (active) link.setAttribute('aria-current', 'page');
     else link.removeAttribute('aria-current');
   });
