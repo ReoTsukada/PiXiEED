@@ -1,13 +1,14 @@
-import { events as fallbackEvents, stores as fallbackStores, works as fallbackWorks } from '../data/site-data.js?rev=20260915-event-radar-v2';
+import { isSampleWork, publicWorksOnly } from './public-work-policy.mjs';
+import { events as fallbackEvents, stores as fallbackStores, works as fallbackWorks } from '../data/site-data.js?rev=20260924-no-samples-1';
 import { mapConfig, supabaseConfig } from '../data/site-config.js?rev=20260918-post-v1';
 
 const FOUND_KEY = 'PiXiEED:found-works:v1';
 const LEGACY_FOUND_KEY = '絵のよりみち:found-works:v1';
-const PUBLIC_DATA_CACHE_KEY = 'PiXiEED:public-data-cache:v1';
+const PUBLIC_DATA_CACHE_KEY = 'PiXiEED:public-data-cache:v2';
 const PUBLIC_DATA_CACHE_MAX_AGE = 24 * 60 * 60 * 1000;
 const MAP_ASSET_URL = '/assets/maps/japan-prefectures.svg?rev=20260917-geographic-okinawa-v2';
 const page = document.body.dataset.page || '';
-let works = fallbackWorks;
+let works = publicWorksOnly(fallbackWorks);
 let stores = fallbackStores;
 let events = fallbackEvents;
 let userMapPosts = [];
@@ -117,7 +118,7 @@ function isLiked(id) {
 }
 
 function getWork(id) {
-  return works.find((work) => work.id === id) || works[0];
+  return works.find((work) => !isSampleWork(work) && work.id === id) || null;
 }
 
 // 公式作品は「作品」タブで見せ、ユーザー投稿は地図の発見体験に限定する。
@@ -127,7 +128,7 @@ function isMapOnlyWork(work) {
 }
 
 function getOfficialWorks() {
-  return works.filter((work) => !isMapOnlyWork(work));
+  return works.filter((work) => !isSampleWork(work) && !isMapOnlyWork(work));
 }
 
 function getStore(id) {
@@ -285,7 +286,7 @@ async function hydrateSiteData() {
       if (!response.ok) return { loaded: false, changed: false };
       const data = await response.json();
       return applyPublicData(data, true);
-    } catch { /* the static sample data remains available when the endpoint is unavailable */ return { loaded: false, changed: false }; }
+    } catch { /* an unavailable endpoint must never restore sample works */ return { loaded: false, changed: false }; }
     finally {
       window.clearTimeout(timeoutId);
     }
@@ -298,11 +299,12 @@ async function hydrateSiteData() {
 }
 
 function applyPublicData(data, persist = false) {
-  if (!data || !Array.isArray(data.works) || !Array.isArray(data.stores) || !data.works.length || !data.stores.length) return { loaded: false, changed: false };
-  const nextSignature = getPublicDataSignature(data);
+  if (!data || !Array.isArray(data.works) || !Array.isArray(data.stores)) return { loaded: false, changed: false };
+  const normalizedData = { ...data, works: publicWorksOnly(data.works) };
+  const nextSignature = getPublicDataSignature(normalizedData);
   const changed = nextSignature !== publicDataSignature;
   publicDataSignature = nextSignature;
-  works = data.works;
+  works = normalizedData.works;
   stores = data.stores.map((store, index) => {
     const fallbackStore = fallbackStores[index % Math.max(fallbackStores.length, 1)] || {};
     return {
@@ -318,7 +320,7 @@ function applyPublicData(data, persist = false) {
     mapPosition: event.mapPosition || PREFECTURE_MAP_POINTS[getPrefectureCode(event.prefecture)] || { x: 50, y: 50 }
   })) : fallbackEvents;
   if (persist) {
-    try { localStorage.setItem(PUBLIC_DATA_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), data })); } catch { /* storage may be blocked */ }
+    try { localStorage.setItem(PUBLIC_DATA_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), data: normalizedData })); } catch { /* storage may be blocked */ }
   }
   return { loaded: true, changed };
 }
@@ -379,6 +381,7 @@ function tagMarkup(work) {
 }
 
 function workCard(work) {
+  if (!work || isSampleWork(work)) return '';
   const found = isFound(work.id);
   const firstStore = getStoresForWork(work.id)[0];
   const hasSalesLocation = Array.isArray(work.stores) && work.stores.length > 0;
@@ -403,7 +406,7 @@ function workCard(work) {
 }
 
 function storeCard(store) {
-  const limited = Boolean(store.limitedWork);
+  const limited = Boolean(store.limitedWork && getWork(store.limitedWork));
   return `
     <article class="store-card">
       <div class="store-card__image" aria-hidden="true"><span>${escapeHtml(store.route)}</span></div>
@@ -450,9 +453,9 @@ function getMapWorkPoint(work) {
 }
 
 function getMapWorks() {
-  const officialMapWorks = works.filter((work) => isMapOnlyWork(work)
+  const officialMapWorks = works.filter((work) => !isSampleWork(work) && (isMapOnlyWork(work)
     ? Boolean(work?.mapPosition && getMapWorkPrefecture(work))
-    : Boolean(work?.mapPosition || getMapWorkPrefecture(work)));
+    : Boolean(work?.mapPosition || getMapWorkPrefecture(work))));
   return [...officialMapWorks, ...userMapPosts];
 }
 
@@ -2266,7 +2269,9 @@ function renderHome() {
   const worksRoot = document.querySelector('[data-home-works]');
   const officialWorks = getOfficialWorks();
   if (storeRoot) storeRoot.innerHTML = stores.map(storeCard).join('');
-  if (worksRoot) worksRoot.innerHTML = officialWorks.map(workCard).join('');
+  if (worksRoot) worksRoot.innerHTML = officialWorks.length
+    ? officialWorks.map(workCard).join('')
+    : '<div class="empty-state">公開中の作品はありません。</div>';
   updateCollectionCounters();
 }
 
@@ -2274,6 +2279,10 @@ function renderWorks() {
   const root = document.querySelector('[data-works-root]');
   if (!root) return;
   const officialWorks = getOfficialWorks();
+  if (!officialWorks.length) {
+    root.innerHTML = '<div class="empty-state"><h2>公開中の作品はありません。</h2><p>作品の公開までお待ちください。</p></div>';
+    return;
+  }
   root.innerHTML = `
     <form class="filter-bar" data-work-filter>
       <div class="field"><label for="work-search">絵を探す</label><input id="work-search" name="search" type="search" placeholder="作品名・キーワード"></div>
@@ -2297,7 +2306,9 @@ function renderWorks() {
     if (sort === 'name') filtered = [...filtered].sort((a, b) => a.title.localeCompare(b.title, 'ja'));
     if (sort === 'found') filtered = [...filtered].sort((a, b) => Number(isFound(b.id)) - Number(isFound(a.id)));
     root.querySelector('[data-work-result]').textContent = `${filtered.length}作品を表示中`;
-    root.querySelector('[data-work-grid]').innerHTML = filtered.length ? filtered.map(workCard).join('') : '<div class="empty-state">条件に合う作品はまだありません。</div>';
+    root.querySelector('[data-work-grid]').innerHTML = filtered.length
+      ? filtered.map(workCard).join('')
+      : '<div class="empty-state">条件に合う作品はありません。</div>';
   };
   form.addEventListener('input', render);
   form.addEventListener('change', render);
@@ -2321,7 +2332,7 @@ function renderStores() {
     const limited = String(params.get('limited') || '');
     const filtered = stores.filter((store) => {
       const haystack = `${store.name} ${store.area} ${store.description}`.toLowerCase();
-      return (!search || haystack.includes(search)) && (!limited || store.limitedWork);
+      return (!search || haystack.includes(search)) && (!limited || (store.limitedWork && getWork(store.limitedWork)));
     });
     root.querySelector('[data-store-result]').textContent = `${filtered.length}店舗を表示中`;
     root.querySelector('[data-store-grid]').innerHTML = filtered.length ? filtered.map(storeCard).join('') : '<div class="empty-state">条件に合う店舗はまだありません。</div>';
@@ -2334,12 +2345,17 @@ function renderStores() {
 function renderWorkDetail() {
   const root = document.querySelector('[data-work-detail-root]');
   if (!root) return;
-  const work = getWork(document.body.dataset.workId);
+  const work = works.find((item) => !isSampleWork(item) && item.id === document.body.dataset.workId) || null;
+  if (!work) {
+    document.title = '作品が見つかりません｜PiXiEED';
+    root.innerHTML = '<div class="empty-state"><h1>この作品は見つかりません。</h1><p>作品一覧から、いま見られる絵を探せます。</p><a class="button button--quiet" href="/works/">作品を見る</a></div>';
+    return;
+  }
   const from = new URLSearchParams(window.location.search).get('from');
   const fromStore = from ? getStore(from) : null;
   const found = isFound(work.id);
   const relatedStores = getStoresForWork(work.id);
-  const relatedStoreMarkup = relatedStores.length ? relatedStores.map((store) => `<article class="store-mini"><h3>${escapeHtml(store.name)}</h3><p>${escapeHtml(store.area)}<br>${escapeHtml(store.status)}</p><a class="text-link" href="/stores/${store.id}.html" data-analytics-event="store_open" data-store-id="${escapeHtml(store.id)}">お店をのぞく</a></article>`).join('') : '<div class="empty-state">この作品は販売準備中です。販売するお店が決まったら、ここに載せます。</div>';
+  const relatedStoreMarkup = relatedStores.length ? relatedStores.map((store) => `<article class="store-mini"><h3>${escapeHtml(store.name)}</h3><p>${escapeHtml(store.area)}<br>${escapeHtml(store.status)}</p><a class="text-link" href="/stores/${store.id}.html" data-analytics-event="store_open" data-store-id="${escapeHtml(store.id)}">お店をのぞく</a></article>`).join('') : '<div class="empty-state">会えるお店が決まったら、ここにお知らせします。</div>';
   root.innerHTML = `
     <div class="breadcrumbs"><a href="/works/">絵を探す</a><span>/</span><span>${escapeHtml(work.title)}</span></div>
     ${fromStore ? `<div class="context-banner">${escapeHtml(fromStore.name)}で見つけた作品として表示しています。</div>` : ''}
@@ -2349,7 +2365,7 @@ function renderWorkDetail() {
         <span class="eyebrow">${work.limited ? 'limited work' : 'artwork'} / ${escapeHtml(work.id)}</span>
         <h1>${escapeHtml(work.title)}</h1>
         <p class="detail-copy__lead">${escapeHtml(work.story)}</p>
-        <div class="tag-list">${tagMarkup(work)}${work.limited ? '<span class="tag tag--limited">店舗限定</span>' : ''}<span class="tag tag--sample">レイアウト確認用サンプル</span></div>
+        <div class="tag-list">${tagMarkup(work)}${work.limited ? '<span class="tag tag--limited">店舗限定</span>' : ''}</div>
         <div class="detail-copy__actions"><button class="button button--stamp ${found ? 'is-found' : ''}" type="button" data-collect-work="${work.id}" aria-pressed="${found}">${found ? '見つけた作品に追加済み' : 'この作品を見つけた'}</button><button class="button button--like ${isLiked(work.id) ? 'is-liked' : ''}" type="button" data-like-work="${work.id}" aria-pressed="${isLiked(work.id)}">${isLiked(work.id) ? '♥' : '♡'} <span>${isLiked(work.id) ? 'いいね済み' : 'いいね'}</span></button><button class="button button--quiet" type="button" data-share>作品ページを共有</button></div>
         <dl class="detail-facts"><div class="detail-fact"><dt>edition</dt><dd>${escapeHtml(work.edition)}</dd></div><div class="detail-fact"><dt>palette</dt><dd>${escapeHtml(work.palette)}</dd></div></dl>
       </article>
@@ -2367,13 +2383,14 @@ function renderStoreDetail() {
     root.innerHTML = '<div class="breadcrumbs"><a href="/stores/">お店を探す</a><span>/</span><span>掲載情報の更新</span></div><div class="empty-state"><h1>お店の情報が更新されました。</h1><p>このページは、いまの掲載一覧にはありません。最新のお店の情報をご確認ください。</p><a class="button button--primary" href="/stores/">いま会えるお店を見る</a></div>';
     return;
   }
-  const storeWorks = store.works.map(getWork);
+  const storeWorks = store.works.map(getWork).filter(Boolean);
+  const limitedWork = store.limitedWork ? getWork(store.limitedWork) : null;
   root.innerHTML = `
     <div class="breadcrumbs"><a href="/stores/">お店を探す</a><span>/</span><span>${escapeHtml(store.name)}</span></div>
-    <div class="store-hero"><div class="store-hero__visual"><span>${escapeHtml(store.route)}</span></div><article class="store-hero__copy"><div class="tag-list"><span class="tag tag--sample">${store.sample ? 'サンプル店舗' : '販売準備中'}</span>${store.limitedWork ? '<span class="tag tag--limited">限定作品あり</span>' : ''}</div><h1>${escapeHtml(store.name)}</h1><p>${escapeHtml(store.description)}</p><dl class="store-facts"><div class="store-fact"><strong>エリア</strong><span>${escapeHtml(store.area)}</span></div><div class="store-fact"><strong>掲載状態</strong><span>${escapeHtml(store.status)}</span></div><div class="store-fact"><strong>住所</strong><span>${escapeHtml(store.address)}</span></div><div class="store-fact"><strong>営業時間</strong><span>${escapeHtml(store.hours)}</span></div></dl><a class="button button--primary" href="/works/">${store.works.length ? 'このお店で会える絵を見る' : '絵をのぞく（販売準備中）'}</a></article></div>
+    <div class="store-hero"><div class="store-hero__visual"><span>${escapeHtml(store.route)}</span></div><article class="store-hero__copy"><div class="tag-list"><span class="tag tag--sample">${storeWorks.length ? '作品に会えるお店' : '絵が届く予定'}</span>${limitedWork ? '<span class="tag tag--limited">限定作品あり</span>' : ''}</div><h1>${escapeHtml(store.name)}</h1><p>${escapeHtml(store.description)}</p><dl class="store-facts"><div class="store-fact"><strong>エリア</strong><span>${escapeHtml(store.area)}</span></div><div class="store-fact"><strong>掲載状態</strong><span>${escapeHtml(store.status)}</span></div><div class="store-fact"><strong>住所</strong><span>${escapeHtml(store.address)}</span></div><div class="store-fact"><strong>営業時間</strong><span>${escapeHtml(store.hours)}</span></div></dl><a class="button button--primary" href="/works/">${storeWorks.length ? 'このお店で会える絵を見る' : '作品を見る'}</a></article></div>
     <section class="subsection"><div class="store-location"><div class="store-location__map" data-store-map-root="${store.id}"><div class="store-map-fallback" data-store-map-fallback><span class="store-location__route">${escapeHtml(store.route)}</span><span class="store-location__pin">✦</span><span class="store-location__line store-location__line--one"></span><span class="store-location__line store-location__line--two"></span><span class="store-location__label">${escapeHtml(store.area)}</span></div></div><div class="store-location__copy"><span class="eyebrow">store map</span><h2>このお店はここ。</h2><p>PiXiEEDの地図で、このお店の場所を見られます。実際の道順を調べるときは、外部の地図も開けます。</p>${storeMapLink(store, '行き方を調べる')}<a class="text-link" href="/stores/">地図に戻って、別のお店を見る</a></div></div></section>
-    <section class="subsection"><div class="section-heading"><div><span class="eyebrow">at this store</span><h2>このお店で会える絵</h2></div><p>${store.works.length ? 'いま置いている絵を紹介しています。' : 'いまは絵の販売準備中です。'}</p></div><div class="related-grid">${storeWorks.length ? storeWorks.map(workCard).join('') : '<div class="empty-state">絵の準備中です。もう少しだけお待ちください。</div>'}</div></section>
-    ${store.limitedWork ? `<section class="subsection"><div class="shop-panel shop-panel--dark"><span class="eyebrow">store limited</span><h2>${escapeHtml(getWork(store.limitedWork).title)}</h2><p class="lead">この店舗のためにおろす限定作品です。継続購入店舗だけが扱える作品として紹介します。</p><a class="button button--light" href="/works/${store.limitedWork}.html">限定作品を見る</a></div></section>` : ''}`;
+    <section class="subsection"><div class="section-heading"><div><span class="eyebrow">at this store</span><h2>このお店で会える絵</h2></div><p>${storeWorks.length ? 'いま置いている絵を紹介しています。' : '絵が届くと、ここに並びます。'}</p></div><div class="related-grid">${storeWorks.length ? storeWorks.map(workCard).join('') : ''}</div></section>
+    ${limitedWork ? `<section class="subsection"><div class="shop-panel shop-panel--dark"><span class="eyebrow">store limited</span><h2>${escapeHtml(limitedWork.title)}</h2><p class="lead">この店舗のためにおろす限定作品です。継続購入店舗だけが扱える作品として紹介します。</p><a class="button button--light" href="/works/${limitedWork.id}.html">限定作品を見る</a></div></section>` : ''}`;
 }
 
 function renderCollection() {
@@ -2383,9 +2400,17 @@ function renderCollection() {
   const found = loadFound();
   const foundOfficial = found.filter((id) => officialWorks.some((work) => work.id === id));
   const percentage = officialWorks.length ? Math.round((foundOfficial.length / officialWorks.length) * 100) : 0;
+  const collectionMessage = officialWorks.length === 0
+    ? '作品に出会うと、ここに記録できます。'
+    : percentage === 100
+      ? 'すべての作品に出会いました。'
+      : `あと${officialWorks.length - foundOfficial.length}作品でコンプリート`;
+  const collectionGrid = officialWorks.length
+    ? officialWorks.map((work) => `<article class="collection-item ${found.includes(work.id) ? 'is-found' : ''}"><a class="collection-item__image" href="/works/${work.id}.html"><img src="${work.image}" alt="${escapeHtml(work.title)}の作品画像" loading="lazy" decoding="async" width="1254" height="1254"></a><span class="collection-item__mark" aria-label="見つけた作品">✓</span><div class="collection-item__body"><h3>${escapeHtml(work.title)}</h3><p>${found.includes(work.id) ? '見つけた作品' : 'まだ出会っていない作品'}</p></div></article>`).join('')
+    : '<div class="empty-state">最初の作品との出会いをお待ちください。</div>';
   root.innerHTML = `
-    <div class="collection-head"><div><span class="eyebrow">your finds</span><h1>見つけた絵を、<br>ここに残す。</h1><p class="lead">QRコードから作品ページを開いて「見つけた」を押すと、この端末に記録されます。</p></div><div class="progress-card"><div class="progress-card__top"><strong>${foundOfficial.length}<small> / ${officialWorks.length}</small></strong><span>作品</span></div><div class="progress-bar" aria-label="コレクションの進捗"><span style="width:${percentage}%"></span></div><p>${percentage === 100 ? 'すべての作品に出会いました。' : `あと${officialWorks.length - foundOfficial.length}作品でコンプリート`}</p></div></div>
-    <div class="collection-grid">${officialWorks.map((work) => `<article class="collection-item ${found.includes(work.id) ? 'is-found' : ''}"><a class="collection-item__image" href="/works/${work.id}.html"><img src="${work.image}" alt="${escapeHtml(work.title)}の作品画像" loading="lazy" decoding="async" width="1254" height="1254"></a><span class="collection-item__mark" aria-label="見つけた作品">✓</span><div class="collection-item__body"><h3>${escapeHtml(work.title)}</h3><p>${found.includes(work.id) ? '見つけた作品' : 'まだ出会っていない作品'}</p></div></article>`).join('')}</div>
+    <div class="collection-head"><div><span class="eyebrow">your finds</span><h1>見つけた絵を、<br>ここに残す。</h1><p class="lead">QRコードから作品ページを開いて「見つけた」を押すと、この端末に記録されます。</p></div><div class="progress-card"><div class="progress-card__top"><strong>${foundOfficial.length}<small> / ${officialWorks.length}</small></strong><span>作品</span></div><div class="progress-bar" aria-label="コレクションの進捗"><span style="width:${percentage}%"></span></div><p>${collectionMessage}</p></div></div>
+    <div class="collection-grid">${collectionGrid}</div>
     <div class="collection-empty" style="margin-top:1.5rem">このコレクションはログインなしで、この端末にだけ保存されます。機種変更やブラウザのデータ削除で消える場合があります。</div>`;
 }
 

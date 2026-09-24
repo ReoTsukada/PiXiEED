@@ -1,48 +1,6 @@
-export const works = [
-  {
-    id: 'sea-cat',
-    title: '海辺の猫',
-    subtitle: '午後の海を見ながら',
-    story: '窓辺のカップが少し冷めるころ、猫は海の向こうを見ていました。知らない街にも、同じ午後があるのかもしれません。',
-    image: '/assets/artworks/sea-cat.jpg',
-    tags: ['海', '猫', '午後'],
-    palette: 'blue / coral',
-    edition: '販売準備中',
-    priceLabel: '販売準備中',
-    availability: '販売準備中',
-    stores: [],
-    sample: true
-  },
-  {
-    id: 'rainy-window',
-    title: '雨の入口',
-    subtitle: 'ドアを開ける前の景色',
-    story: '雨の日は、店の中と外の境目が少しだけ曖昧になります。黄色い傘が通り過ぎるまで、もう一杯だけ。',
-    image: '/assets/artworks/rainy-window.jpg',
-    tags: ['雨', '街', '珈琲'],
-    palette: 'navy / yellow',
-    edition: '販売準備中',
-    priceLabel: '販売準備中',
-    availability: '販売準備中',
-    stores: [],
-    sample: true
-  },
-  {
-    id: 'night-lantern',
-    title: '灯りのある坂道',
-    subtitle: '夜の店へ向かう小さな旅',
-    story: '坂をのぼると、灯りがひとつ、またひとつ。夜の絵は、まだ知らないお店への道しるべです。',
-    image: '/assets/artworks/night-lantern.jpg',
-    tags: ['夜', '灯り', '旅'],
-    palette: 'midnight / amber',
-    edition: '販売準備中',
-    priceLabel: '販売準備中',
-    availability: '販売準備中',
-    stores: [],
-    limited: false,
-    sample: true
-  }
-];
+// 公開作品は、管理データが接続されるまで空の状態にしておく。
+// 作品を追加するときは管理側の公開データから登録し、仮作品を自動表示しない。
+export const works = [];
 
 export const stores = [
   {
@@ -352,7 +310,7 @@ export const events = [
 ];
 
 export function getWork(id) {
-  return works.find((work) => work.id === id) || works[0];
+  return works.find((work) => work.id === id) || null;
 }
 
 export function getStore(id) {
