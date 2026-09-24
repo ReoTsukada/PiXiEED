@@ -1,4 +1,5 @@
 import { simplifyIllumination } from './illumination.mjs?v=20260924-lighting-1';
+import { removeSurfaceSpecks } from './surface-specks.mjs?v=20260925-specks-1';
 import { simplifySurfaceSamples } from './surface-samples.mjs?v=20260924-camera-release-1';
 import { renderFacePixels } from './face-pixels.mjs?v=20260924-lighting-1';
 import { buildThreeTonePalette } from './three-tone-palette.mjs';
@@ -597,7 +598,13 @@ export function createObjectRenderer({ size = 128, colors = DEFAULT_COLORS, shad
       objects: objectLabels, width, height, protectedCells, previous: canStabilize ? previous.lineState : null }) : null;
     const detailProtection = threeTone ? new Uint8Array(cellCount) : protectedCells;
     if (threeTone) for (let cell = 0; cell < cellCount; cell++) detailProtection[cell] = protectedCells?.[cell] || lines.lineCells[cell] ? 1 : 0;
-    const surfaces = threeTone && simplifySurfaces ? simplifySurfaceSamples({ rgb: lines.rgb, objects: objectLabels, protectedCells: detailProtection, width, height }) : null;
+    // A center sample can hit a tiny dark fleck even when its source footprint
+    // belongs almost entirely to the surrounding plane. Correct that evidence
+    // before material classification and palette capture can amplify it.
+    const specks = threeTone && simplifySurfaces ? removeSurfaceSpecks({ rgb: lines.rgb,
+      coverageRgb: sampled.coverageRgb, counts: sourceCounts, objects: objectLabels,
+      protectedCells: detailProtection, width, height }) : null;
+    const surfaces = threeTone && simplifySurfaces ? simplifySurfaceSamples({ rgb: specks.rgb, objects: objectLabels, protectedCells: detailProtection, width, height }) : null;
     const illumination = threeTone && simplifyLighting ? simplifyIllumination({
       rgb: surfaces?.rgb ?? lines.rgb, objects: objectLabels,
       protectedCells: detailProtection, width, height
@@ -806,6 +813,7 @@ export function createObjectRenderer({ size = 128, colors = DEFAULT_COLORS, shad
       materialHeldCells: materials?.held ?? 0,
       removedNoiseCells,
       simplifiedSurfaceCells: surfaces?.simplifiedCells ?? 0,
+      removedSurfaceSpeckCells: specks?.removedCells ?? 0,
       suppressedHaloCells: illumination?.haloCells.reduce((sum, value) => sum + value, 0) ?? 0,
       flattenedShadowCells: illumination?.flattenedShadowCells.reduce((sum, value) => sum + value, 0) ?? 0,
       faceSkinCells: facePixels?.skinCells ?? 0,
