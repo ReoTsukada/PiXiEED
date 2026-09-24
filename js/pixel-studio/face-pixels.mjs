@@ -44,7 +44,7 @@ function compatibleSkin(rgb, base) {
 }
 
 /** Simplify a detected small face in the existing palette; never add RGB colors. */
-export function renderFacePixels({ frame, rgb, objects, indices, palette, width, height, guide, previous = null }) {
+export function renderFacePixels({ frame, rgb, objects, indices, palette, width, height, guide, previous = null, flattenShadows = false }) {
   if (!guide?.compact) return { indices, state: null, skinCells: 0, featureCells: 0, skinColors: 0 };
   const count = width * height;
   if (guide.width !== width || guide.height !== height || guide.skin?.length !== count ||
@@ -111,10 +111,12 @@ export function renderFacePixels({ frame, rgb, objects, indices, palette, width,
     }
     local.sort((a, b) => a - b);
     const light = local.length ? local[Math.floor(local.length / 2)] : lightOf(color);
-    const index = shadow >= 0 && light < baseLight - 28 ? shadow
+    const index = !flattenShadows && shadow >= 0 && light < baseLight - 28 ? shadow
       : highlight >= 0 && light > baseLight + 30 ? highlight : main;
     output[cell] = index; touched[cell] = 1; skinCells++; skinColors.add(index);
   }
+  // Broad skin shadows may be flattened, but the contrasted landmark strokes
+  // below still keep the eyes, nose and mouth legible.
   // Draw only detected landmarks with source-image contrast. The nose uses a
   // softer skin shade; eyes/mouth may use a darker source-compatible swatch.
   const painted = new Uint8Array(count);

@@ -1,5 +1,6 @@
+import { simplifyIllumination } from './illumination.mjs?v=20260924-lighting-1';
 import { simplifySurfaceSamples } from './surface-samples.mjs?v=20260924-camera-release-1';
-import { renderFacePixels } from './face-pixels.mjs?v=20260924-camera-release-1';
+import { renderFacePixels } from './face-pixels.mjs?v=20260924-lighting-1';
 import { buildThreeTonePalette } from './three-tone-palette.mjs';
 import { classifyMaterials, smoothMaterialLight } from './material-groups.mjs?v=20260924-camera-release-1';
 import { createMaterialRegionTracker } from './material-regions.mjs?v=20260924-camera-release-1';
@@ -549,7 +550,7 @@ function hysteresisIndex(cell, label, color, previous, palette, allowed, canStab
  * Input RGB is treated as opaque source color (alpha is ignored); output alpha is 255.
  * This is post-processing; it performs no object recognition or mask tracking.
  */
-export function createObjectRenderer({ size = 128, colors = DEFAULT_COLORS, shading = 'sampled', paletteSession = null, dither = 'none', simplifySurfaces = false } = {}) {
+export function createObjectRenderer({ size = 128, colors = DEFAULT_COLORS, shading = 'sampled', paletteSession = null, dither = 'none', simplifySurfaces = false, simplifyLighting = simplifySurfaces } = {}) {
   if (!Number.isInteger(size) || size < 1 || size > MAX_OUTPUT_SIZE) throw new RangeError(`size must be an integer from 1 to ${MAX_OUTPUT_SIZE}`);
   if (!Number.isInteger(colors) || colors < 1 || colors > 256) throw new RangeError('colors must be an integer from 1 to 256');
   if (!['sampled', 'three-tone'].includes(shading)) throw new RangeError('unknown shading style');
@@ -597,7 +598,16 @@ export function createObjectRenderer({ size = 128, colors = DEFAULT_COLORS, shad
     const detailProtection = threeTone ? new Uint8Array(cellCount) : protectedCells;
     if (threeTone) for (let cell = 0; cell < cellCount; cell++) detailProtection[cell] = protectedCells?.[cell] || lines.lineCells[cell] ? 1 : 0;
     const surfaces = threeTone && simplifySurfaces ? simplifySurfaceSamples({ rgb: lines.rgb, objects: objectLabels, protectedCells: detailProtection, width, height }) : null;
-    const sourceRgb = surfaces?.rgb ?? lines?.rgb ?? rawSourceRgb;
+    const illumination = threeTone && simplifyLighting ? simplifyIllumination({
+      rgb: surfaces?.rgb ?? lines.rgb, objects: objectLabels,
+      protectedCells: detailProtection, width, height
+    }) : null;
+    // Protect the light itself through dither and cluster cleanup, while keeping
+    // all object IDs and the current-frame motion signal unchanged.
+    if (illumination) for (let cell = 0; cell < cellCount; cell++) {
+      detailProtection[cell] ||= illumination.lightCoreCells[cell] || illumination.haloCells[cell];
+    }
+    const sourceRgb = illumination?.rgb ?? surfaces?.rgb ?? lines?.rgb ?? rawSourceRgb;
     const changedCells = threeTone ? detectChangedCells(rawSourceRgb, canStabilize ? previous.rawSourceRgb : null,
       objectLabels, canStabilize ? previous.objects : null, width, height) : null;
     if (threeTone && canStabilize) {
@@ -752,7 +762,7 @@ export function createObjectRenderer({ size = 128, colors = DEFAULT_COLORS, shad
 
     const facePixels = globalTones && faceGuides ? renderFacePixels({ frame, rgb: sourceRgb,
       objects: objectLabels, indices, palette, width, height, guide: faceGuides,
-      previous: canStabilize ? previous.faceState : null }) : null;
+      previous: canStabilize ? previous.faceState : null, flattenShadows: simplifyLighting }) : null;
     if (facePixels?.touched) {
       indices = facePixels.indices;
       for (let cell = 0; cell < cellCount; cell++) {
@@ -796,6 +806,8 @@ export function createObjectRenderer({ size = 128, colors = DEFAULT_COLORS, shad
       materialHeldCells: materials?.held ?? 0,
       removedNoiseCells,
       simplifiedSurfaceCells: surfaces?.simplifiedCells ?? 0,
+      suppressedHaloCells: illumination?.haloCells.reduce((sum, value) => sum + value, 0) ?? 0,
+      flattenedShadowCells: illumination?.flattenedShadowCells.reduce((sum, value) => sum + value, 0) ?? 0,
       faceSkinCells: facePixels?.skinCells ?? 0,
       faceFeatureCells: facePixels?.featureCells ?? 0,
       faceSkinColors: facePixels?.skinColors ?? 0,

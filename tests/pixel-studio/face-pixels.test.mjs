@@ -156,3 +156,23 @@ test('rejects guide and buffer dimensions that do not match the output grid', ()
   assert.throws(() => renderFacePixels({ ...input, indices: new Uint8Array(WIDTH * HEIGHT - 1) }), /match the output grid/);
   assert.throws(() => renderFacePixels({ ...input, objects: new Uint32Array(WIDTH * HEIGHT - 1) }), /match the output grid/);
 });
+
+
+test('flat lighting removes broad skin shadow without erasing contrasted landmarks', () => {
+  const input = makeFaceInput();
+  input.palette[2] = [170, 129, 102];
+  const darkerSkin = [164, 123, 96];
+  for (let y = 29; y <= 37; y++) for (let x = 28; x <= 30; x++) {
+    input.rgb.set(darkerSkin, (y * WIDTH + x) * 3);
+  }
+  const shaded = renderFacePixels(input);
+  const flat = renderFacePixels({ ...input, flattenShadows: true });
+  const cheek = 34 * WIDTH + 29;
+  assert.notEqual(shaded.indices[cheek], flat.indices[cheek], 'a broad skin shadow is removed');
+  assert.equal(flat.indices[cheek], flat.state.ramp[1], 'cheek uses the main skin color');
+  assert.equal(flat.featureCells, 4);
+  for (const mark of input.guide.marks) for (const cell of mark.cells) {
+    assert.equal(flat.indices[cell], shaded.indices[cell], 'landmark contrast is unchanged');
+  }
+  assert.equal(flat.indices[18 * WIDTH + 30], input.indices[18 * WIDTH + 30], 'hair is untouched');
+});

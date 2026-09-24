@@ -1,4 +1,4 @@
-import { createObjectRenderer } from './object-renderer.mjs?v=20260924-camera-release-1';
+import { createObjectRenderer } from './object-renderer.mjs?v=20260924-lighting-1';
 import { createGlobalPalette } from './global-palette.mjs?v=20260924-camera-release-1';
 import { createMaskCache } from './mask-cache.mjs';
 import { createFaceCache } from './face-cache.mjs';
