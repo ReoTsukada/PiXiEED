@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ja"><meta charset="utf-8"><title>Camera PNG export verification</title>
+<style>body{font:16px system-ui;padding:24px;background:#131b21;color:#eef}button{padding:12px}pre{white-space:pre-wrap}</style>
+<h1>PNG export verification</h1><button id="run">Verify PNG pixels</button><pre id="result">Ready</pre>
+<script type="module">
+import { encodeCameraPng } from '../../js/pixel-studio/png-export.mjs';
+const result = document.querySelector('#result');
+const button = document.querySelector('#run');
+button.onclick = async () => {
+  button.disabled = true;
+  result.textContent = 'Running';
+  const checks = [];
+  try {
+    for (const edge of [64,128,256,512]) {
+      for (const [width,height] of [[edge,edge],[edge,edge*9/16],[Math.round(edge*0.4319),edge]]) {
+        const data = new Uint8ClampedArray(width*height*4);
+        // Saturated edges, a one-cell diagonal, dithering, and a smooth color
+        // ramp expose blending, shifted sampling, or clipped final rows.
+        for (let y=0;y<height;y++) for(let x=0;x<width;x++) {
+          const p=(y*width+x)*4;
+          data.set(x===y ? [255,35,70,255] : (x<width/2 ? [(x+y)%2*255,45,190,255] : [x%256,y%256,32,255]),p);
+        }
+        const original = data.slice();
+        const started=performance.now();
+        const output=await encodeCameraPng({width,height,data});
+        if(output.blob.type!=='image/png') throw Error('Wrong MIME type');
+        const bitmap=await createImageBitmap(output.blob);
+        if(bitmap.width!==output.width||bitmap.height!==output.height) throw Error('Wrong PNG dimensions');
+        if(output.width/width!==output.height/height||!Number.isInteger(output.scale)) throw Error('Stretched cells');
+        if(Math.max(output.width,output.height)!==2048) throw Error('Wrong long edge');
+        const canvas=document.createElement('canvas');
+        canvas.width=bitmap.width;canvas.height=bitmap.height;
+        const context=canvas.getContext('2d',{willReadFrequently:true});
+        context.drawImage(bitmap,0,0);
+        const decoded=context.getImageData(0,0,canvas.width,canvas.height).data;
+        let mismatches=0;
+        for(let y=0;y<canvas.height;y++) for(let x=0;x<canvas.width;x++) {
+          const from=(Math.floor(y/output.scale)*width+Math.floor(x/output.scale))*4;
+          const to=(y*canvas.width+x)*4;
+          for(let c=0;c<4;c++) if(decoded[to+c]!==original[from+c]) mismatches++;
+        }
+        if(mismatches) throw Error(`${width}x${height}: ${mismatches} altered channels`);
+        if(!data.every((value,index)=>value===original[index])) throw Error('Source frame mutated');
+        checks.push({input:`${width}x${height}`,png:`${output.width}x${output.height}`,scale:output.scale,mismatches,bytes:output.blob.size,ms:Math.round(performance.now()-started)});
+        bitmap.close();canvas.width=1;canvas.height=1;
+        result.textContent=JSON.stringify(checks,null,2);
+      }
+    }
+    result.textContent='PASS '+checks.length+' PNG round trips; all RGBA pixels exact.\n'+JSON.stringify(checks,null,2);
+    result.dataset.status='pass';
+  } catch(error) {result.textContent='FAIL '+error.stack;result.dataset.status='fail';}
+  finally {button.disabled=false;}
+};
+</script></html>

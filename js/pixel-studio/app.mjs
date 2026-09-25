@@ -1,4 +1,5 @@
 import { createFrameLoop } from './frame-loop.mjs';
+import { encodeCameraPng, pngExportGeometry } from './png-export.mjs';
 import { FRAME_RATIOS, OUTPUT_SIZES, resolveAspect, centerCrop, frameGeometry, fitFrame } from './framing.mjs';
 import { cameraStartErrorMessage, deriveCameraPrimaryAction } from './camera-ui-state.mjs';
 
@@ -142,7 +143,8 @@ function updateSizeSummary() {
   $('#ratioSummary').textContent = ratio.label;
   $('#sizeSummary').textContent = state.mode === 'captured' ? `${dimensions.width} × ${dimensions.height}` : `${state.size} px`;
   $('#frameDimensions').textContent = `${dimensions.width} × ${dimensions.height}`;
-  $('#outputSummary').textContent = `${dimensions.width} × ${dimensions.height} px · PNG`;
+  const saved = pngExportGeometry(dimensions.width, dimensions.height);
+  $('#outputSummary').textContent = `${saved.width} × ${saved.height} px · PNG`;
   root.dataset.framing = state.ratio;
   root.dataset.outputSize = String(state.size);
   $('#imageSettings').setAttribute('aria-label', state.mode === 'captured'
@@ -510,18 +512,15 @@ function retake() {
 
 async function prepareCaptureDownload(frozen) {
   const generation = downloadGeneration;
-  let canvas;
   try {
-    canvas = document.createElement('canvas');
-    canvas.width = frozen.width;
-    canvas.height = frozen.height;
-    canvas.getContext('2d').putImageData(new ImageData(frozen.data, frozen.width, frozen.height), 0, 0);
-    const blob = await new Promise((resolve, reject) => canvas.toBlob((value) => value ? resolve(value) : reject(new Error('PNGを作成できませんでした')), 'image/png'));
+    // Export the completed frame at an integer scale; preview work stays at its
+    // original dot resolution, and capture never requests a different frame.
+    const { blob, width, height } = await encodeCameraPng(frozen);
     if (generation !== downloadGeneration || state.mode !== 'captured' || state.result !== frozen) return;
     downloadUrl = URL.createObjectURL(blob);
     const link = $('#savePng');
     link.href = downloadUrl;
-    link.download = `pixieed-pixel-camera-${frozen.width}x${frozen.height}.png`;
+    link.download = `pixieed-pixel-camera-${width}x${height}.png`;
     updateSaveLinkState();
     sayToast('撮影しました。PNGを保存できます。');
     focusVisible('#savePng');
@@ -530,8 +529,6 @@ async function prepareCaptureDownload(frozen) {
     updateSaveLinkState();
     info.textContent = 'PNGを準備できませんでした。撮り直してもう一度お試しください。';
     say(error instanceof Error ? error.message : 'PNGを保存できませんでした。', { visible: true });
-  } finally {
-    if (canvas) { canvas.width = 1; canvas.height = 1; }
   }
 }
 

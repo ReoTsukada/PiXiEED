@@ -9,7 +9,7 @@
   <link rel="icon" href="/assets/brand/pixieed-logo-48.png" type="image/png">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20260924-camera-release-1">
   <link rel="stylesheet" href="css/pixel-camera.css?v=20260924-camera-release-1">
-  <link rel="modulepreload" href="js/pixel-studio/app.mjs?v=20260925-surfaces-1">
+  <link rel="modulepreload" href="js/pixel-studio/app.mjs?v=20260925-export-1">
 </head>
 <body>
   <a class="pc-skip" href="#stage">カメラへ移動</a>
@@ -59,12 +59,12 @@
         <label for="ratioSelect">縦横比<select id="ratioSelect" name="aspect">
           <option value="screen">画面いっぱい</option><option value="1:1">1:1 · 正方形</option><option value="3:4">3:4 · 縦長</option><option value="9:16">9:16 · 縦長</option><option value="4:3">4:3 · 横長</option><option value="16:9">16:9 · 横長</option>
         </select></label>
-        <label for="pixelSelect">ピクセル数 · 長い辺<select id="pixelSelect" name="pixels">
+        <label for="pixelSelect">ドット数 · 長い辺<select id="pixelSelect" name="pixels">
           <option value="64">64 px</option><option value="128">128 px</option><option value="256" selected>256 px</option><option value="512">512 px</option>
         </select></label>
       </div>
       <p class="pc-local-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 4v3"/></svg><span>写真は端末内で処理します。</span></p>
-      <div class="pc-output-summary"><span>保存する画像</span><output id="outputSummary" aria-live="polite">256 px</output></div>
+      <div class="pc-output-summary"><span>保存する画像</span><output id="outputSummary" aria-live="polite">長辺 2048 px · PNG</output></div>
     </div>
   </main>
   <nav class="app-tabs pc-nav" aria-label="アプリナビゲーション" data-nav="five">
@@ -78,6 +78,6 @@
     <a data-nav="tools" href="/tools/" aria-label="ツール" aria-current="page"><img src="/assets/icons/pixieed/celestial.svg" alt=""></a>
     <a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>
   </nav>
-  <script type="module" src="js/pixel-studio/app.mjs?v=20260925-surfaces-1"></script>
+  <script type="module" src="js/pixel-studio/app.mjs?v=20260925-export-1"></script>
 </body>
 </html>
