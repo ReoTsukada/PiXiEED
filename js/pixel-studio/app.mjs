@@ -15,7 +15,7 @@ const stageMessage = $('#stageMsg');
 const info = $('#info');
 const sourceCanvas = document.createElement('canvas');
 const sourceContext = sourceCanvas.getContext('2d', { willReadFrequently: true });
-const worker = new Worker(new URL('./preview-worker.mjs?v=20260925-surfaces-1', import.meta.url), { type: 'module' });
+const worker = new Worker(new URL('./boundary-preview-worker.mjs?v=20260925-boundaries-1', import.meta.url), { type: 'module' });
 const EDGE_CAP = 640;
 let activeStream = null;
 let cameraSequence = 0;
@@ -484,7 +484,7 @@ function capture() {
   void prepareCaptureDownload(frozen);
 }
 
-function refreshPalette() {
+function refreshObjects() {
   if (state.mode !== 'live') return;
   paletteEpoch++;
   root.dataset.paletteEpoch = String(paletteEpoch);
@@ -493,11 +493,11 @@ function refreshPalette() {
   window.setTimeout(() => captureFrame.classList.remove('pc-palette-refresh'), 360);
 }
 
-view.addEventListener('click', refreshPalette);
+view.addEventListener('click', refreshObjects);
 view.addEventListener('keydown', (event) => {
   if ((event.key === 'Enter' || event.key === ' ') && !event.repeat) {
     event.preventDefault();
-    refreshPalette();
+    refreshObjects();
   }
 });
 

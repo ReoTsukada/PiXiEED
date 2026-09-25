@@ -9,7 +9,7 @@
   <link rel="icon" href="/assets/brand/pixieed-logo-48.png" type="image/png">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20260924-camera-release-1">
   <link rel="stylesheet" href="css/pixel-camera.css?v=20260924-camera-release-1">
-  <link rel="modulepreload" href="js/pixel-studio/app.mjs?v=20260925-export-1">
+  <link rel="modulepreload" href="js/pixel-studio/app.mjs?v=20260925-boundaries-1">
 </head>
 <body>
   <a class="pc-skip" href="#stage">カメラへ移動</a>
@@ -17,7 +17,7 @@
     <section class="pc-stage" id="stage" aria-label="撮影プレビュー" tabindex="-1">
       <video id="video" playsinline muted hidden></video>
       <div class="pc-frame" id="captureFrame">
-        <canvas id="view" width="1" height="1" tabindex="0" aria-label="処理済みプレビュー。Enter、Space、またはタップで現在の画面から色を取り直す"></canvas>
+        <canvas id="view" width="1" height="1" tabindex="0" aria-label="撮影プレビュー。Enter、Space、またはタップで物体の境界を再認識する"></canvas>
         <span class="pc-frame-guide" aria-hidden="true"></span>
       </div>
       <div id="loadingState" class="pc-loading" role="status" aria-live="polite">
@@ -78,6 +78,6 @@
     <a data-nav="tools" href="/tools/" aria-label="ツール" aria-current="page"><img src="/assets/icons/pixieed/celestial.svg" alt=""></a>
     <a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>
   </nav>
-  <script type="module" src="js/pixel-studio/app.mjs?v=20260925-export-1"></script>
+  <script type="module" src="js/pixel-studio/app.mjs?v=20260925-boundaries-1"></script>
 </body>
 </html>
