@@ -14,7 +14,7 @@ const stageMessage = $('#stageMsg');
 const info = $('#info');
 const sourceCanvas = document.createElement('canvas');
 const sourceContext = sourceCanvas.getContext('2d', { willReadFrequently: true });
-const worker = new Worker(new URL('./preview-worker.mjs?v=20260925-specks-1', import.meta.url), { type: 'module' });
+const worker = new Worker(new URL('./preview-worker.mjs?v=20260925-surfaces-1', import.meta.url), { type: 'module' });
 const EDGE_CAP = 640;
 let activeStream = null;
 let cameraSequence = 0;

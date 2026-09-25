@@ -122,3 +122,35 @@ test('integrates compact face guides with the 64px global 24-color ordered rende
   assert.equal(guideRemoved.stats.faceFeatureCells, 0);
   assertRgbaMatchesPalette(guideRemoved);
 });
+
+
+test('surface tones preserve the compact face palette and contrasted landmark strokes', () => {
+  const { frame, guide } = makeFrameAndGuides();
+  const paletteSession = createGlobalPalette({ toneLevels: 8 });
+  const options = { protectedCells: guide.protectedCells, faceGuides: guide };
+  const baseline = createObjectRenderer(rendererOptions(paletteSession)).render(frame, null, options);
+  const draw = createObjectRenderer({ ...rendererOptions(paletteSession), surfaceSmoothing: true, surfaceTones: true });
+  const result = draw.render(frame, null, options);
+  assert.deepEqual(result.palette.slice(0, baseline.palette.length), baseline.palette);
+  assert.deepEqual(result.stats.facePaletteRamp, baseline.stats.facePaletteRamp);
+  assert.equal(result.stats.faceFeatureCells, baseline.stats.faceFeatureCells);
+  for (const mark of guide.marks) for (const cell of mark.cells) {
+    assert.deepEqual(result.data.subarray(cell * 4, cell * 4 + 3), baseline.data.subarray(cell * 4, cell * 4 + 3));
+  }
+  assert.deepEqual(draw.render(frame, null, options).data, result.data);
+  assertRgbaMatchesPalette(result);
+});
+
+
+test('surface output holds discard the old compact-face skin when its guide disappears', () => {
+  const { frame, guide } = makeFrameAndGuides();
+  const paletteSession = createGlobalPalette({ toneLevels: 8 });
+  const settings = { ...rendererOptions(paletteSession), surfaceSmoothing: true, surfaceTones: true };
+  const draw = createObjectRenderer(settings);
+  draw.render(frame, null, { protectedCells: guide.protectedCells, faceGuides: guide });
+  const removed = draw.render(frame);
+  const fresh = createObjectRenderer(settings).render(frame);
+  assert.equal(removed.stats.faceSkinCells, 0);
+  assert.equal(removed.stats.faceFeatureCells, 0);
+  assert.deepEqual(removed.data, fresh.data, 'old skin and feature strokes are not held after detection ends');
+});

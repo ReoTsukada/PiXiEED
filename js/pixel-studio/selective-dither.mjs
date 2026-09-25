@@ -44,7 +44,7 @@ export function smoothTransitionCells(light, labels, protectedCells, width, heig
 const RANK_2 = [[0, 2], [3, 1]];
 
 /** -1 keeps the ordinary solid tone. Only a narrow mid-tone band gets dots. */
-export function transitionRampIndex(light, ramp, x, y) {
+export function transitionRampIndex(light, ramp, x, y, maxSpread = 100) {
   if (!Number.isFinite(light) || !Number.isInteger(x) || !Number.isInteger(y)) throw new TypeError('finite light and integer canvas coordinates required');
   if (ramp.length < 2 || light <= ramp[0].light || light >= ramp.at(-1).light) return -1;
   let upper = 1;
@@ -52,7 +52,7 @@ export function transitionRampIndex(light, ramp, x, y) {
   const low = ramp[upper - 1], high = ramp[upper];
   const spread = high.light - low.light;
   // High-contrast checkerboards read as rough texture, even on a smooth input.
-  if (spread < 6 || spread > 100) return -1;
+  if (spread < 6 || spread > maxSpread) return -1;
   // Global-tone ramps describe actual light energy. Coverage interpolates Y,
   // while the spatial smoothness gate still measures gray-axis steps.
   const amount = Number.isFinite(low.luminance) && Number.isFinite(high.luminance)

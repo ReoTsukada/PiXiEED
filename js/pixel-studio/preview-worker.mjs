@@ -1,4 +1,4 @@
-import { createObjectRenderer } from './object-renderer.mjs?v=20260925-specks-1';
+import { createObjectRenderer } from './object-renderer.mjs?v=20260925-surfaces-1';
 import { createGlobalPalette } from './global-palette.mjs?v=20260924-camera-release-1';
 import { createMaskCache } from './mask-cache.mjs';
 import { createFaceCache } from './face-cache.mjs';
@@ -8,7 +8,7 @@ let toneLevels = 8, ditherMode = 'ordered';
 let paletteSession = createGlobalPalette({ toneLevels, saturation: 1.25 });
 let paletteEpoch = null;
 let rendererSize = 128;
-let renderer = createObjectRenderer({ size: rendererSize, colors: 24, shading: 'three-tone', paletteSession, dither: 'ordered', simplifySurfaces: true });
+let renderer = createObjectRenderer({ size: rendererSize, colors: 24, shading: 'three-tone', paletteSession, dither: 'ordered', simplifySurfaces: true, surfaceSmoothing: true, surfaceTones: true });
 const maskCache = createMaskCache({ maxAgeMs: 15000, reuseExactFrame: true });
 let segmentationWorker = null;
 let startupWorkerError = null;
@@ -278,7 +278,7 @@ function processFrame(message) {
   }
   if (size !== rendererSize || toneChanged || nextDitherMode !== ditherMode) {
     ditherMode = nextDitherMode;
-    renderer = createObjectRenderer({ size, colors: 24, shading: 'three-tone', paletteSession, dither: ditherMode, simplifySurfaces: true });
+    renderer = createObjectRenderer({ size, colors: 24, shading: 'three-tone', paletteSession, dither: ditherMode, simplifySurfaces: true, surfaceSmoothing: true, surfaceTones: true });
     rendererSize = size;
   }
   resetSession(message.session);

@@ -1,4 +1,6 @@
 import { simplifyIllumination } from './illumination.mjs?v=20260924-lighting-1';
+import { createSurfaceTextureStabilizer } from './surface-texture.mjs?v=20260925-surfaces-1';
+import { buildSurfaceTones } from './surface-tones.mjs?v=20260925-surfaces-1';
 import { removeSurfaceSpecks } from './surface-specks.mjs?v=20260925-specks-1';
 import { simplifySurfaceSamples } from './surface-samples.mjs?v=20260924-camera-release-1';
 import { renderFacePixels } from './face-pixels.mjs?v=20260924-lighting-1';
@@ -10,7 +12,7 @@ import { cleanPixelClusters } from './pixel-clusters.mjs';
 import { refineThinLineSamples } from './thin-lines.mjs';
 import { recognitionColor, recognitionMaterialKey } from './fixed-palette.mjs?v=20260924-camera-release-1';
 import { prepareToneRamp } from './ordered-dither.mjs';
-import { smoothTransitionCells, transitionRampIndex } from './selective-dither.mjs?v=20260924-camera-release-1';
+import { smoothTransitionCells, transitionRampIndex } from './selective-dither.mjs?v=20260925-surfaces-1';
 import { grayLight, prepareGlobalToneRamp, nearestGlobalToneIndex } from './global-tones.mjs';
 import { recognitionSurfaceKey } from './global-palette.mjs?v=20260924-camera-release-1';
 
@@ -551,7 +553,7 @@ function hysteresisIndex(cell, label, color, previous, palette, allowed, canStab
  * Input RGB is treated as opaque source color (alpha is ignored); output alpha is 255.
  * This is post-processing; it performs no object recognition or mask tracking.
  */
-export function createObjectRenderer({ size = 128, colors = DEFAULT_COLORS, shading = 'sampled', paletteSession = null, dither = 'none', simplifySurfaces = false, simplifyLighting = simplifySurfaces } = {}) {
+export function createObjectRenderer({ size = 128, colors = DEFAULT_COLORS, shading = 'sampled', paletteSession = null, dither = 'none', simplifySurfaces = false, simplifyLighting = simplifySurfaces, surfaceSmoothing = false, surfaceTones = false } = {}) {
   if (!Number.isInteger(size) || size < 1 || size > MAX_OUTPUT_SIZE) throw new RangeError(`size must be an integer from 1 to ${MAX_OUTPUT_SIZE}`);
   if (!Number.isInteger(colors) || colors < 1 || colors > 256) throw new RangeError('colors must be an integer from 1 to 256');
   if (!['sampled', 'three-tone'].includes(shading)) throw new RangeError('unknown shading style');
@@ -561,11 +563,13 @@ export function createObjectRenderer({ size = 128, colors = DEFAULT_COLORS, shad
   const orderedDither = threeTone && dither === 'ordered';
   const regionTracker = threeTone ? createMaterialRegionTracker() : null;
   let previous = null;
+  let extraTones = null, extraToneRevision = null;
+  const textureStabilizer = threeTone && surfaceSmoothing ? createSurfaceTextureStabilizer() : null;
   let regionalBindings = new Map();
   const bindingState = paletteSession ? (paletteBindingStates.get(paletteSession) ?? { revision: null, bindings: new Map() }) : null;
   if (paletteSession) paletteBindingStates.set(paletteSession, bindingState);
 
-  function reset() { previous = null; regionalBindings.clear(); regionTracker?.reset(); }
+  function reset() { previous = null; regionalBindings.clear(); regionTracker?.reset(); textureStabilizer?.reset(); }
 
   function render(frame, segmentation = null, { protectedCells = null, faceGuides = null } = {}) {
     assertFrame(frame);
@@ -614,7 +618,12 @@ export function createObjectRenderer({ size = 128, colors = DEFAULT_COLORS, shad
     if (illumination) for (let cell = 0; cell < cellCount; cell++) {
       detailProtection[cell] ||= illumination.lightCoreCells[cell] || illumination.haloCells[cell];
     }
-    const sourceRgb = illumination?.rgb ?? surfaces?.rgb ?? lines?.rgb ?? rawSourceRgb;
+    const flatSourceRgb = illumination?.rgb ?? surfaces?.rgb ?? lines?.rgb ?? rawSourceRgb;
+    if (!canStabilize) textureStabilizer?.reset();
+    const texture = textureStabilizer ? textureStabilizer.render({
+      rgb: flatSourceRgb, objects: objectLabels, protectedCells: detailProtection, width, height
+    }) : null;
+    const sourceRgb = surfaceSmoothing && texture ? texture.rgb : flatSourceRgb;
     const changedCells = threeTone ? detectChangedCells(rawSourceRgb, canStabilize ? previous.rawSourceRgb : null,
       objectLabels, canStabilize ? previous.objects : null, width, height) : null;
     if (threeTone && canStabilize) {
@@ -648,9 +657,28 @@ export function createObjectRenderer({ size = 128, colors = DEFAULT_COLORS, shad
     const assigned = globalTones ? assignGlobalPalette(regions, locked, regionalBindings,
       sameColorGrid ? { previous, rgb: sourceRgb } : null)
       : locked ? assignFixedPalette(regions, locked, bindingState.bindings) : build(regions, colors);
-    const { palette, owners: paletteOwners, regionList } = assigned;
+    let { palette, owners: paletteOwners } = assigned;
+    const { regionList } = assigned;
+    if (globalTones && surfaceTones) {
+      if (extraToneRevision !== locked.revision) {
+        extraTones = buildSurfaceTones(locked); extraToneRevision = locked.revision;
+      }
+      palette = extraTones.palette;
+      paletteOwners = [...paletteOwners, ...palette.slice(paletteOwners.length).map(() => new Set())];
+      for (const region of regionList) {
+        const key = assigned.bindings.get(region.id)?.prototypeKey;
+        region.surfaceIndices = [...new Set([...region.paletteIndices, ...(extraTones.extrasByRamp.get(key) ?? [])])];
+        region.surfaceRamp = prepareGlobalToneRamp(palette, region.surfaceIndices);
+        for (const index of region.surfaceIndices) paletteOwners[index].add(region.id);
+      }
+    }
     if (globalTones) regionalBindings = assigned.bindings;
     if (orderedDither && !locked) for (const region of regionList) if (region.paletteIndices.length) region.toneRamp = prepareToneRamp(palette, region.paletteIndices);
+    // Each region still selects its own hue ramp. Extra solid tones do not
+    // interpolate across edges, so an AI mask changing nearby must not remove
+    // them. Only source-detail cells and compact faces keep the base ramp.
+    const fineToneCells = globalTones && surfaceTones ? Uint8Array.from(detailProtection,
+      (protectedCell, cell) => !protectedCell && !(faceGuides?.compact && faceGuides.skin?.[cell]) ? 1 : 0) : null;
     const ditherProtected = orderedDither ? ditherProtection(sourceRgb, objectLabels, detailProtection, width, height) : null;
     const toneLight = threeTone ? smoothMaterialLight(sourceRgb, labels, width, height, detailProtection, globalTones ? grayLight : null) : null;
     const toneReferenceLight = threeTone ? new Float32Array(toneLight) : null;
@@ -718,10 +746,12 @@ export function createObjectRenderer({ size = 128, colors = DEFAULT_COLORS, shad
       const allowed = region.paletteIndices.length ? region.paletteIndices
         : threeTone ? [region.fallbackIndex] : globalPaletteIndices;
       const light = toneReferenceLight?.[cell];
+      const fineSurface = surfaceTones && region.surfaceRamp && fineToneCells?.[cell];
+      const activeRamp = fineSurface ? region.surfaceRamp : region.toneRamp;
       const transitionIndex = orderedDither && ditherEligible[cell] && allowed.length > 1
-        ? transitionRampIndex(light, region.toneRamp, cell % width, Math.floor(cell / width)) : -1;
+        ? transitionRampIndex(light, activeRamp, cell % width, Math.floor(cell / width), surfaceTones ? 48 : 100) : -1;
       let index = transitionIndex >= 0 ? transitionIndex
-        : globalTones ? nearestGlobalToneIndex(light, region.toneRamp)
+        : globalTones ? nearestGlobalToneIndex(light, activeRamp)
           : threeTone ? nearestToneIndex(light, palette, allowed) : nearestPaletteIndex(color, palette, allowed);
       if (transitionIndex >= 0) { ditheredCells++; ditherCells[cell] = 1; }
       let held = orderedDither || globalTones ? -1 : threeTone ? stableToneIndex(cell, label, color, toneLight[cell], previous, palette, allowed, canStabilize && !changedCells[cell])
@@ -757,6 +787,10 @@ export function createObjectRenderer({ size = 128, colors = DEFAULT_COLORS, shad
       removedNoiseCells = cleaned.removedCells;
       for (let cell = 0; cell < cellCount; cell++) {
         if (cleaned.indices[cell] === indices[cell]) continue;
+        // Extra tones cannot spread into protected parts or compact-face skin.
+        if (globalTones && surfaceTones && cleaned.indices[cell] >= locked.palette.length && !fineToneCells?.[cell]) {
+          cleaned.indices[cell] = indices[cell]; removedNoiseCells--; continue;
+        }
         const color = palette[cleaned.indices[cell]], p = cell * 4, rgb = cell * 3;
         data[p] = renderedRgb[rgb] = color[0];
         data[p + 1] = renderedRgb[rgb + 1] = color[1];
@@ -767,8 +801,51 @@ export function createObjectRenderer({ size = 128, colors = DEFAULT_COLORS, shad
       indices = cleaned.indices;
     }
 
+    // A stationary source patch must not switch output just because a nearby
+    // material changes its chosen ramp. Keep a fixed RGB reference so real
+    // cumulative exposure/motion still releases the old output immediately.
+    const surfaceOutputAnchor = globalTones && (surfaceSmoothing || surfaceTones) ? new Uint8Array(flatSourceRgb) : null;
+    let surfaceOutputHeldCells = 0;
+    if (surfaceOutputAnchor && sameColorGrid && previous.paletteRevision === locked.revision && previous.surfaceOutputAnchor) {
+      const stable = new Uint8Array(cellCount);
+      for (let cell = 0; cell < cellCount; cell++) {
+        const p = cell * 3;
+        stable[cell] = objectLabels[cell] === previous.objects[cell] &&
+          detailProtection[cell] === previous.detailProtection[cell] && !detailProtection[cell] &&
+          !(faceGuides?.compact && faceGuides.skin?.[cell]) && !previous.compactFaceSkin?.[cell] &&
+          Math.abs(flatSourceRgb[p] - previous.surfaceOutputAnchor[p]) <= 4 &&
+          Math.abs(flatSourceRgb[p + 1] - previous.surfaceOutputAnchor[p + 1]) <= 4 &&
+          Math.abs(flatSourceRgb[p + 2] - previous.surfaceOutputAnchor[p + 2]) <= 4 ? 1 : 0;
+      }
+      for (let y = 1; y < height - 1; y++) for (let x = 1; x < width - 1; x++) {
+        const cell = y * width + x;
+        if (!stable[cell]) continue;
+        let safe = true;
+        for (let dy = -1; dy <= 1 && safe; dy++) for (let dx = -1; dx <= 1; dx++) {
+          if (!stable[cell + dy * width + dx]) { safe = false; break; }
+        }
+        if (!safe) continue;
+        const oldIndex = previous.indices[cell];
+        // The captured palette is fixed. A changed regional quantile alone is
+        // not evidence of a changed source pixel and must not revoke its tone.
+        const swatch = palette[oldIndex], old = previous.palette[oldIndex];
+        if (!swatch || !old || swatch.some((value, channel) => value !== old[channel])) continue;
+        const p = cell * 4, q = cell * 3;
+        indices[cell] = oldIndex;
+        for (let channel = 0; channel < 3; channel++) {
+          data[p + channel] = renderedRgb[q + channel] = swatch[channel];
+          surfaceOutputAnchor[q + channel] = previous.surfaceOutputAnchor[q + channel];
+        }
+        if (orderedDither && previous.ditherCells) {
+          ditheredCells += previous.ditherCells[cell] - ditherCells[cell];
+          ditherCells[cell] = previous.ditherCells[cell];
+        }
+        surfaceOutputHeldCells++;
+      }
+    }
+
     const facePixels = globalTones && faceGuides ? renderFacePixels({ frame, rgb: sourceRgb,
-      objects: objectLabels, indices, palette, width, height, guide: faceGuides,
+      objects: objectLabels, indices, palette: locked.palette, width, height, guide: faceGuides,
       previous: canStabilize ? previous.faceState : null, flattenShadows: simplifyLighting }) : null;
     if (facePixels?.touched) {
       indices = facePixels.indices;
@@ -792,7 +869,8 @@ export function createObjectRenderer({ size = 128, colors = DEFAULT_COLORS, shad
       recognitionSaturation: locked?.saturation ?? 1,
       globalToneLevels: globalTones ? locked.toneLevels : null,
       globalGrayLevels: globalTones ? [...locked.levels] : null,
-      maxPaletteGrayError: globalTones ? Math.max(...palette.map(rgb => Math.min(...locked.levels.map(level => Math.abs(grayLight(...rgb) - level))))) : null,
+      paletteGrayReference: globalTones ? 'base-palette' : null,
+      maxPaletteGrayError: globalTones ? Math.max(...locked.palette.map(rgb => Math.min(...locked.levels.map(level => Math.abs(grayLight(...rgb) - level))))) : null,
       sharedShadow: globalTones ? locked.sharedShadow : null,
       sharedHighlight: globalTones ? 'warm-neutral' : null,
       colorsPerGrayLevel: globalTones ? locked.levelIndices?.map(indices => indices.length) : null,
@@ -814,6 +892,14 @@ export function createObjectRenderer({ size = 128, colors = DEFAULT_COLORS, shad
       removedNoiseCells,
       simplifiedSurfaceCells: surfaces?.simplifiedCells ?? 0,
       removedSurfaceSpeckCells: specks?.removedCells ?? 0,
+      simplifiedTextureCells: surfaceSmoothing ? texture?.changedCells ?? 0 : 0,
+      surfaceDecisionHeldCells: texture?.heldCells ?? 0,
+      surfaceOutputHeldCells,
+      surfaceInteriorCells: fineToneCells?.reduce((sum, value) => sum + value, 0) ?? 0,
+      basePaletteSize: locked?.palette.length ?? palette.length,
+      surfaceToneColors: surfaceTones && extraTones ? palette.length - extraTones.baseSize : 0,
+      surfaceToneGrayLevels: surfaceTones && extraTones ? [...new Set(extraTones.targets.values())].sort((a,b) => a-b) : [],
+      maxSurfaceColors: surfaceTones ? regionList.reduce((max, region) => Math.max(max, region.surfaceIndices?.length ?? 0), 0) : 0,
       suppressedHaloCells: illumination?.haloCells.reduce((sum, value) => sum + value, 0) ?? 0,
       flattenedShadowCells: illumination?.flattenedShadowCells.reduce((sum, value) => sum + value, 0) ?? 0,
       faceSkinCells: facePixels?.skinCells ?? 0,
@@ -830,7 +916,7 @@ export function createObjectRenderer({ size = 128, colors = DEFAULT_COLORS, shad
       protectedDetailCells: protectedCells?.reduce((sum, value) => sum + Boolean(value), 0) ?? 0,
       regionCount: new Set(objectLabels).size,
       paletteSize: palette.length,
-      colorLimit: globalTones ? locked.paletteLimit ?? colors : colors,
+      colorLimit: surfaceTones && extraTones ? extraTones.limit : globalTones ? locked.paletteLimit ?? colors : colors,
       overBudgetRegionCount: overBudgetLabels.length,
       overBudgetLabels,
       overBudgetCellCount: overflowCells,
@@ -846,9 +932,11 @@ export function createObjectRenderer({ size = 128, colors = DEFAULT_COLORS, shad
       objects: new Uint32Array(objectLabels), sourceRgb: new Uint8Array(sourceRgb),
       rawSourceRgb: new Uint8Array(rawSourceRgb), lineCells: lines?.lineCells ?? null, lineState: lines?.state ?? null,
       faceState: facePixels?.state ?? null,
+      compactFaceSkin: faceGuides?.compact && faceGuides.skin ? new Uint8Array(faceGuides.skin) : null,
       materialReferenceRgb: materials?.referenceRgb ?? null,
       familyLabels: materials?.materials ?? null,
       toneReferenceLight, toneAnchorRgb, ditherEligible, pendingDither, globalTones, pendingToneKeys, pendingToneFrames,
+      surfaceOutputAnchor, detailProtection, ditherCells, paletteRevision: locked?.revision ?? null,
       indices: new Uint8Array(indices), renderedRgb: new Uint8Array(renderedRgb),
       palette: palette.map((color) => [...color]),
       paletteOwners: paletteOwners.map((set) => [...set])

@@ -69,3 +69,17 @@ test('renderer keeps a uniform intermediate-color plane solid on a captured pale
   assert.equal(new Set(first.indices).size, 1);
   assert.deepEqual(render.render({ width: 32, height: 32, data }).data, first.data);
 });
+
+
+test('surface transitions reject harsh tone pairs and retain canvas-fixed close-color patterns', () => {
+  assert.equal(transitionRampIndex(80, ramp, 0, 0, 48), -1);
+  const close = prepareToneRamp([[80,80,80],[112,112,112]], [0,1]);
+  let upper = 0;
+  for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) {
+    const index = transitionRampIndex(96, close, x, y, 48);
+    assert.ok(index >= 0);
+    upper += index === 1;
+    assert.equal(index, transitionRampIndex(96, close, x + 2, y + 2, 48));
+  }
+  assert.equal(upper, 32);
+});
