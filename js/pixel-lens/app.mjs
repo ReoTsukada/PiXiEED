@@ -41,7 +41,10 @@ let displayedPaletteRevision = null;
 const state = { mode: 'idle', facing: 'environment', result: null, error: '', ratio: 'screen', size: 256,
   colorDepth: '4', paletteMode: 'gameboy', gradientMode: 'dither', surfaceSimplify: 55, camera: { ...CAMERA_SETTING_DEFAULTS }, zoom: 1 };
 let zoomInfo = zoomRange(null); let appliedHardwareZoom = 1; let zoomApplyPending = false;
-function syncLens() { setLensSettings({ colorDepth: state.colorDepth, paletteMode: state.paletteMode, gradientMode: state.gradientMode, surfaceSimplify: state.surfaceSimplify, cameraSettings: state.camera }); }
+// 面のまとまり is automatic: it only calms dither speckle with 8-16 colours (measured: no change at 2-4 colours,
+// heavy posterising at high strength), so it runs at PiXiEELENS's default 55 there and is skipped elsewhere.
+const autoSurface = (depth) => (depth === '8' || depth === '16' ? 55 : 0);
+function syncLens() { setLensSettings({ colorDepth: state.colorDepth, paletteMode: state.paletteMode, gradientMode: state.gradientMode, surfaceSimplify: autoSurface(state.colorDepth), cameraSettings: state.camera }); }
 syncLens();
 const COLOR_LABELS = { 2: '2色', 4: '4色', 8: '8色', 16: '16色', gray: 'グレー', 256: '256色', full: 'フルカラー' };
 
@@ -545,7 +548,6 @@ function onSettingInput(event) {
   else if (input.name === 'pixels' && OUTPUT_SIZES.includes(Number(input.value))) { state.size = Number(input.value); restart = true; }
   else if (input.name === 'paletteMode') state.paletteMode = input.value;
   else if (input.name === 'dither') state.gradientMode = input.checked ? 'dither' : 'none';
-  else if (input.name === 'surface') state.surfaceSimplify = Number(input.value);
   else if (CAMERA_KEYS.includes(input.name)) state.camera[input.name] = Number(input.value);
   else return;
   applyChange({ restart });
