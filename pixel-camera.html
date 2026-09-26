@@ -2,102 +2,141 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#11171b">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0d1114">
   <title>ドット絵カメラ｜PiXiEED</title>
   <meta name="description" content="いつもの景色を、ドット絵に。カメラを向けて撮影し、PNG画像で保存できます。写真は端末内で処理します。">
   <link rel="icon" href="/assets/brand/pixieed-logo-48.png" type="image/png">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20260924-camera-release-1">
-  <link rel="stylesheet" href="css/pixel-camera.css?v=20260925-lens-camera-2">
-  <link rel="modulepreload" href="js/pixel-lens/app.mjs?v=20260926-lens-1">
-  <style>
-    .pc-range { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: .25rem .5rem; }
-    .pc-range input { grid-column: 1 / -1; width: 100%; }
-    .pc-range output { font-variant-numeric: tabular-nums; opacity: .75; }
-    .pc-camera-tone { margin-top: .6rem; display: grid; gap: .55rem; }
-    .pc-camera-tone summary { cursor: pointer; font-weight: 600; }
-    .pc-camera-tone[open] { padding-bottom: .2rem; }
-    .pc-reset-tone { justify-self: start; padding: .35rem .8rem; border-radius: .6rem; border: 1px solid currentColor; background: transparent; color: inherit; }
-    .pc-engine-note { font-size: .7em; opacity: .6; font-weight: 500; margin-left: .3em; }
-  </style>
+  <link rel="stylesheet" href="css/pixel-lens-camera.css?v=20260926-ux-1">
+  <link rel="modulepreload" href="js/pixel-lens/app.mjs?v=20260926-ux-1">
 </head>
 <body>
   <a class="pc-skip" href="#stage">カメラへ移動</a>
-  <main class="pc" id="pixelStudio" data-mode="loading">
-    <section class="pc-stage" id="stage" aria-label="撮影プレビュー" tabindex="-1">
+  <main class="lc" id="pixelStudio" data-mode="loading">
+    <!-- Camera view: pinch to zoom, double tap for 1×, tap to pick colours again -->
+    <section class="lc-stage" id="stage" aria-label="撮影プレビュー。ピンチでズーム、ダブルタップで等倍、タップで色を選び直し" tabindex="-1">
       <video id="video" playsinline muted hidden></video>
-      <div class="pc-frame" id="captureFrame">
-        <canvas id="view" width="1" height="1" tabindex="0" aria-label="撮影プレビュー。Enter、Space、またはタップで配色と物体の境界を更新する"></canvas>
-        <span class="pc-frame-guide" aria-hidden="true"></span>
+      <div class="lc-frame" id="captureFrame">
+        <canvas id="view" width="1" height="1" aria-hidden="true"></canvas>
       </div>
-      <div id="loadingState" class="pc-loading" role="status" aria-live="polite">
-        <span class="pc-loading-camera">カメラを準備しています…</span>
-        <span class="pc-loading-preview">プレビューを準備しています…</span>
+      <div id="loadingState" class="lc-loading" role="status" aria-live="polite"><span class="lc-spinner" aria-hidden="true"></span><span>カメラを準備しています…</span></div>
+      <noscript><p class="lc-noscript">カメラを利用するには JavaScript を有効にしてください。</p></noscript>
+      <div id="welcome" class="lc-welcome" hidden>
+        <div class="lc-welcome-card">
+          <img src="/assets/icons/pixieed/camera.svg" alt="" width="40" height="40">
+          <p><strong>カメラは停止中です</strong><span>中央のボタンで再開できます</span></p>
+        </div>
       </div>
-      <noscript><p class="pc-noscript">カメラを利用するには JavaScript を有効にしてください。</p></noscript>
-      <div id="welcome" class="pc-welcome" hidden>
-        <img src="/assets/icons/pixieed/camera.svg" alt="" width="48" height="48">
-        <h2 class="pc-sr-only">カメラは停止中です</h2>
-        <p class="pc-sr-only">中央のカメラボタンで再開できます。</p>
+      <div class="lc-zoom-hud" id="zoomHud" aria-hidden="true">
+        <span class="lc-zoom-hud-value" id="zoomHudValue">1×</span>
+        <span class="lc-zoom-hud-track"><i id="zoomHudFill"></i></span>
+        <span class="lc-zoom-hud-hint" id="zoomHudHint">光学</span>
       </div>
     </section>
-    <header class="pc-header">
-      <a class="pc-brand" href="/home/" aria-label="PiXiEED ホーム"><img src="/assets/brand/pixieed-logo-48.png" alt=""></a>
+
+    <header class="lc-top">
+      <a class="lc-round lc-back" href="/tools/" aria-label="ツール一覧へ戻る"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></a>
       <h1 class="pc-sr-only">ドット絵カメラ</h1>
-      <button id="imageSettings" class="pc-size-button" type="button" popovertarget="sizePopover" aria-controls="sizePopover" aria-label="撮影と色の設定">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/></svg>
-        <span class="pc-settings-badge" id="colorSummary" aria-hidden="true">4色</span>
-        <span class="pc-sr-only"><span id="ratioSummary">画面</span><span class="pc-size-detail" id="sizeSummary">256 px</span></span>
-      </button>
-      <div id="cameraControls" class="pc-header-controls">
-        <button id="flipCamera" class="pc-icon-button" type="button" aria-label="前後カメラを切り替え" title="前後カメラを切り替え" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 7 5 4 2 7M5 4v4a7 7 0 0 0 12.1 4.8M16 17l3 3 3-3m-3 3v-4a7 7 0 0 0-12.1-4.8"/><path d="M9 9h6v6H9z"/></svg></button>
-        <button id="stopCamera" class="pc-icon-button" type="button" aria-label="カメラを一時停止" title="一時停止" disabled><img src="/assets/icons/pixieed/pause.svg" alt=""></button>
+      <div class="lc-zoom-stops" id="zoomStops" role="group" aria-label="ズーム"></div>
+      <div id="cameraControls" class="lc-top-right">
+        <button id="flipCamera" class="lc-round" type="button" aria-label="前後カメラを切り替え" title="前後カメラを切り替え" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9a8 8 0 0 1 14-3l2 2M20 15a8 8 0 0 1-14 3l-2-2"/><path d="M20 4v4h-4M4 20v-4h4"/></svg></button>
+        <button id="stopCamera" class="lc-round" type="button" aria-label="カメラを一時停止" title="一時停止" disabled><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="7" y="6" width="3.5" height="12" rx="1"/><rect x="13.5" y="6" width="3.5" height="12" rx="1"/></svg></button>
       </div>
     </header>
-    <div class="pc-bottom">
-      <div class="pc-meta pc-sr-only"><span class="pc-camera-status" id="cameraStatus">準備中</span><span class="pc-dimensions" id="frameDimensions"></span></div>
-      <div class="pc-feedback">
-        <p id="stageMsg" class="pc-message pc-sr-only" role="status" aria-live="polite" hidden></p>
-        <p id="info" class="pc-info pc-sr-only">写真はこの端末で処理します。</p>
+
+    <div class="lc-bottom">
+      <div class="lc-feedback">
+        <p id="stageMsg" class="lc-toast pc-sr-only" role="status" aria-live="polite" hidden></p>
+        <p id="info" class="pc-sr-only">写真はこの端末で処理します。</p>
+        <span class="pc-sr-only"><span id="cameraStatus">準備中</span><span id="frameDimensions"></span></span>
       </div>
-      <div id="resultControls" class="pc-result-controls" hidden>
-        <a id="savePng" class="pc-button pc-primary" aria-disabled="true" tabindex="-1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v4h16v-4"/></svg><span>保存</span></a>
+      <!-- Look presets: one tap changes the whole palette -->
+      <div class="lc-looks" id="looks" role="radiogroup" aria-label="色の雰囲気">
+        <button type="button" role="radio" data-look="gb" aria-checked="true"><i class="lc-sw" style="--a:#e0f8d0;--b:#a8c070;--c:#587830;--d:#203810"></i><span>GB</span></button>
+        <button type="button" role="radio" data-look="mono" aria-checked="false"><i class="lc-sw" style="--a:#fff;--b:#fff;--c:#000;--d:#000"></i><span>白黒</span></button>
+        <button type="button" role="radio" data-look="gray" aria-checked="false"><i class="lc-sw" style="--a:#eee;--b:#aaa;--c:#666;--d:#222"></i><span>グレー</span></button>
+        <button type="button" role="radio" data-look="c8" aria-checked="false"><i class="lc-sw" style="--a:#f4d35e;--b:#ee964b;--c:#0d3b66;--d:#2a2a2a"></i><span>8色</span></button>
+        <button type="button" role="radio" data-look="c16" aria-checked="false"><i class="lc-sw" style="--a:#f7c59f;--b:#ef6f6c;--c:#2a9d8f;--d:#264653"></i><span>16色</span></button>
+        <button type="button" role="radio" data-look="photo" aria-checked="false"><i class="lc-sw lc-sw-photo"></i><span>写真の色</span></button>
+        <button type="button" role="radio" data-look="c256" aria-checked="false"><i class="lc-sw lc-sw-rainbow"></i><span>256色</span></button>
+        <button type="button" role="radio" data-look="full" aria-checked="false"><i class="lc-sw lc-sw-full"></i><span>フル</span></button>
+      </div>
+      <div class="lc-bottom-row">
+        <button id="imageSettings" class="lc-pill" type="button" popovertarget="sizePopover" aria-controls="sizePopover" aria-label="撮影と色の設定">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+          <span id="colorSummary">4色</span><span class="lc-dot" aria-hidden="true">·</span><span id="sizeSummary">256 px</span><span class="pc-sr-only" id="ratioSummary">画面</span>
+        </button>
+        <div id="resultControls" class="lc-result" hidden>
+          <a id="savePng" class="lc-save" aria-disabled="true" tabindex="-1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m-5-5 5 5 5-5M5 19h14"/></svg><span>PNGを保存</span></a>
+        </div>
       </div>
     </div>
-    <div class="pc-settings-panel" id="sizePopover" popover aria-labelledby="sizeTitle">
-      <h2 id="sizeTitle">カメラの仕上がり <small class="pc-engine-note">PiXiEELENS</small></h2>
-      <div class="pc-settings-fields">
-        <label for="ratioSelect">縦横比<select id="ratioSelect" name="aspect">
-          <option value="screen">画面いっぱい</option><option value="1:1">1:1 · 正方形</option><option value="3:4">3:4 · 縦長</option><option value="9:16">9:16 · 縦長</option><option value="4:3">4:3 · 横長</option><option value="16:9">16:9 · 横長</option>
-        </select></label>
-        <label for="pixelSelect">ドット数 · 長い辺<select id="pixelSelect" name="pixels">
-          <option value="16">16 px</option><option value="32">32 px</option><option value="64">64 px</option><option value="96">96 px</option><option value="128">128 px</option><option value="160">160 px</option><option value="256" selected>256 px</option><option value="512">512 px</option>
-        </select></label>
-        <label for="colorSelect">色数<select id="colorSelect" name="colors">
-          <option value="2">2色 · 1BIT</option><option value="4" selected>4色 · 2BIT</option><option value="8">8色 · 3BIT</option><option value="16">16色 · 4BIT</option><option value="gray">グレー</option><option value="256">256色 · 8BIT</option><option value="full">フルカラー</option>
-        </select></label>
-        <label for="paletteModeSelect" id="paletteModeRow">配色<select id="paletteModeSelect" name="paletteMode">
-          <option value="gameboy" selected>GB固定4色 · 標準</option><option value="source">写真の色</option>
-        </select></label>
-        <label for="gradientSelect">グラデーション<select id="gradientSelect" name="gradient">
-          <option value="dither" selected>ディザ</option><option value="none">なし</option>
-        </select></label>
-        <label class="pc-range" for="surfaceRange">面のまとまり <output data-for="surface">55</output><input id="surfaceRange" name="surface" type="range" min="0" max="100" step="1" value="55"></label>
-      </div>
-      <details class="pc-camera-tone">
-        <summary>カメラの色調整</summary>
-        <label class="pc-range">明るさ <output data-for="brightness">0</output><input name="brightness" type="range" min="-100" max="100" step="1" value="0"></label>
-        <label class="pc-range">露出 <output data-for="exposure">0</output><input name="exposure" type="range" min="-100" max="100" step="1" value="0"></label>
-        <label class="pc-range">コントラスト <output data-for="contrast">0</output><input name="contrast" type="range" min="-100" max="100" step="1" value="0"></label>
-        <label class="pc-range">彩度 <output data-for="saturation">0</output><input name="saturation" type="range" min="-100" max="100" step="1" value="0"></label>
-        <label class="pc-range">影 <output data-for="shadows">0</output><input name="shadows" type="range" min="-100" max="100" step="1" value="0"></label>
-        <label class="pc-range">色温度 <output data-for="whiteBalance">0</output><input name="whiteBalance" type="range" min="-100" max="100" step="1" value="0"></label>
-        <button id="resetCamera" class="pc-reset-tone" type="button">色調整をリセット</button>
+
+    <!-- Settings: a bottom sheet on phones, a floating panel on wide screens -->
+    <div class="lc-sheet" id="sizePopover" popover aria-labelledby="sizeTitle">
+      <div class="lc-sheet-grip" aria-hidden="true"></div>
+      <header class="lc-sheet-head">
+        <h2 id="sizeTitle">仕上がり</h2>
+        <button class="lc-sheet-close" type="button" popovertarget="sizePopover" popovertargetaction="hide" aria-label="閉じる"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+      </header>
+
+      <section class="lc-group" aria-labelledby="gFrame">
+        <h3 id="gFrame">フレーム</h3>
+        <div class="lc-field"><span class="lc-label">縦横比</span>
+          <div class="lc-seg" role="radiogroup" aria-label="縦横比">
+            <label><input type="radio" name="aspect" value="screen" checked><span>画面</span></label>
+            <label><input type="radio" name="aspect" value="1:1"><span>1:1</span></label>
+            <label><input type="radio" name="aspect" value="3:4"><span>3:4</span></label>
+            <label><input type="radio" name="aspect" value="9:16"><span>9:16</span></label>
+            <label><input type="radio" name="aspect" value="4:3"><span>4:3</span></label>
+            <label><input type="radio" name="aspect" value="16:9"><span>16:9</span></label>
+          </div>
+        </div>
+        <div class="lc-field"><span class="lc-label">ドット数 <small>長い辺</small></span>
+          <div class="lc-seg" role="radiogroup" aria-label="ドット数">
+            <label><input type="radio" name="pixels" value="32"><span>32</span></label>
+            <label><input type="radio" name="pixels" value="64"><span>64</span></label>
+            <label><input type="radio" name="pixels" value="96"><span>96</span></label>
+            <label><input type="radio" name="pixels" value="128"><span>128</span></label>
+            <label><input type="radio" name="pixels" value="160"><span>160</span></label>
+            <label><input type="radio" name="pixels" value="256" checked><span>256</span></label>
+          </div>
+        </div>
+      </section>
+
+      <section class="lc-group" aria-labelledby="gColor">
+        <h3 id="gColor">色</h3>
+        <div class="lc-field" id="paletteModeRow"><span class="lc-label">配色の選び方</span>
+          <div class="lc-seg" role="radiogroup" aria-label="配色の選び方">
+            <label><input type="radio" name="paletteMode" value="gameboy" checked><span>おまかせ</span></label>
+            <label><input type="radio" name="paletteMode" value="source"><span>写真の色</span></label>
+          </div>
+        </div>
+        <div class="lc-palette"><div id="palettePreview" class="lc-palette-colors" aria-label="現在の配色"></div><button type="button" class="lc-link" id="repick">色を選び直す</button></div>
+      </section>
+
+      <section class="lc-group" aria-labelledby="gFinish">
+        <h3 id="gFinish">仕上げ</h3>
+        <label class="lc-switch"><span><strong>ディザ</strong><small>点の模様でグラデーションを表現</small></span><input type="checkbox" name="dither" role="switch" checked></label>
+        <label class="lc-range"><span class="lc-label">面のまとまり <output data-for="surface">55</output></span><input name="surface" type="range" min="0" max="100" step="5" value="55"><span class="lc-range-ends"><span>細かく</span><span>まとめる</span></span></label>
+      </section>
+
+      <details class="lc-group lc-tone">
+        <summary><h3>カメラの色調整</h3><span class="lc-tone-state" id="toneState">標準</span></summary>
+        <label class="lc-range"><span class="lc-label">明るさ <output data-for="brightness">0</output></span><input name="brightness" type="range" min="-100" max="100" step="1" value="0"></label>
+        <label class="lc-range"><span class="lc-label">露出 <output data-for="exposure">0</output></span><input name="exposure" type="range" min="-100" max="100" step="1" value="0"></label>
+        <label class="lc-range"><span class="lc-label">コントラスト <output data-for="contrast">0</output></span><input name="contrast" type="range" min="-100" max="100" step="1" value="0"></label>
+        <label class="lc-range"><span class="lc-label">彩度 <output data-for="saturation">0</output></span><input name="saturation" type="range" min="-100" max="100" step="1" value="0"></label>
+        <label class="lc-range"><span class="lc-label">影 <output data-for="shadows">0</output></span><input name="shadows" type="range" min="-100" max="100" step="1" value="0"></label>
+        <label class="lc-range"><span class="lc-label">色温度 <output data-for="whiteBalance">0</output></span><input name="whiteBalance" type="range" min="-100" max="100" step="1" value="0"><span class="lc-range-ends"><span>青み</span><span>暖かみ</span></span></label>
+        <button id="resetCamera" class="lc-link" type="button">色調整をリセット</button>
       </details>
-      <div class="pc-palette-preview"><span>写真から選んだ色</span><div id="palettePreview" class="pc-palette-colors" aria-label="現在の配色"></div></div>
-      <p class="pc-tap-note">画面をタップすると、今の景色から色を選び直します。</p>
-      <p class="pc-local-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 4v3"/></svg><span>写真は端末内で処理します。</span></p>
-      <div class="pc-output-summary"><span>保存する画像</span><output id="outputSummary" aria-live="polite">長辺 2048 px · PNG</output></div>
+
+      <footer class="lc-sheet-foot">
+        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>写真は端末内で処理します</span>
+        <output id="outputSummary" aria-live="polite">PNG</output>
+      </footer>
     </div>
   </main>
   <nav class="app-tabs pc-nav" aria-label="アプリナビゲーション" data-nav="five">
@@ -111,6 +150,6 @@
     <a data-nav="tools" href="/tools/" aria-label="ツール" aria-current="page"><img src="/assets/icons/pixieed/celestial.svg" alt=""></a>
     <a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>
   </nav>
-  <script type="module" src="js/pixel-lens/app.mjs?v=20260926-lens-1"></script>
+  <script type="module" src="js/pixel-lens/app.mjs?v=20260926-ux-1"></script>
 </body>
 </html>

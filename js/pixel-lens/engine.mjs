@@ -5,6 +5,7 @@
  * dither, surface simplification and small-region cleanup, plus the camera tone filter (brightness,
  * exposure, contrast, saturation, shadows, white balance) applied while the frame is drawn.
  *
+ * applySurfaceSimplify / removeSmallRegions are rewritten allocation-free (identical output, several times faster).
  * Only the UI glue was replaced: `state` and the palette display are module state here, and the palette
  * is reported through `onPalette` instead of being drawn into the PiXiEELENS HUD.
  */
@@ -755,31 +756,40 @@ function applyFixed8Bit(imageData) {
 }
 
 function applySurfaceSimplify(imageData, edgeMap, palette) {
+  // Same rule as PiXiEELENS (majority of the 8 weighted neighbours, ties to the first one seen, then a
+  // colour-distance guard), written without per-pixel allocations: integer colour keys and fixed arrays.
   const strength = Math.max(0, Math.min(100, Number(state.surfaceSimplify) || 0));
   const passes = strength < 20 ? 0 : strength < 60 ? 1 : strength < 85 ? 2 : 3;
   const { width, height, data } = imageData;
   if (!passes || width < 3 || height < 3) return;
   const requiredWeight = strength < 34 ? 6 : strength < 67 ? 5 : 4;
   const maxColorDistance = 24 + strength * 0.45;
-  const colorDistance = (first, second) => Math.sqrt(0.25 * (first.r - second.r) ** 2 + 0.60 * (first.g - second.g) ** 2 + 0.15 * (first.b - second.b) ** 2);
+  const maxSq = maxColorDistance * maxColorDistance;
+  const edgeLimit = strength < 75 ? 0.28 : 0.42;
+  const row = width * 4;
+  const offsets = [-4, 4, -row, row, -row - 4, -row + 4, row - 4, row + 4];
+  const weights = [2, 2, 2, 2, 1, 1, 1, 1];
+  const keys = new Int32Array(8); const counts = new Int32Array(8);
+  const source = new Uint8ClampedArray(data.length);
   for (let pass = 0; pass < passes; pass += 1) {
-    const source = new Uint8ClampedArray(data);
+    source.set(data);
     for (let y = 1; y < height - 1; y += 1) {
       for (let x = 1; x < width - 1; x += 1) {
-        const index = (y * width + x) * 4;
         const pixel = y * width + x;
-        if (edgeMap[pixel] > (strength < 75 ? 0.28 : 0.42)) continue;
-        const neighbors = [[index - 4, 2], [index + 4, 2], [index - width * 4, 2], [index + width * 4, 2], [index - width * 4 - 4, 1], [index - width * 4 + 4, 1], [index + width * 4 - 4, 1], [index + width * 4 + 4, 1]];
-        const groups = new Map();
-        neighbors.forEach(([neighbor, weight]) => {
-          const key = `${source[neighbor]}/${source[neighbor + 1]}/${source[neighbor + 2]}`;
-          groups.set(key, (groups.get(key) || 0) + weight);
-        });
-        const dominant = [...groups.entries()].sort((first, second) => second[1] - first[1]).find(([, count]) => count >= requiredWeight)?.[0];
-        if (!dominant) continue;
-        const [r, g, b] = dominant.split('/').map(Number);
-        if (source[index] === r && source[index + 1] === g && source[index + 2] === b) continue;
-        if (colorDistance({ r: source[index], g: source[index + 1], b: source[index + 2] }, { r, g, b }) > maxColorDistance) continue;
+        if (edgeMap[pixel] > edgeLimit) continue;
+        const index = pixel * 4;
+        let n = 0;
+        for (let k = 0; k < 8; k += 1) {
+          const o = index + offsets[k]; const key = (source[o] << 16) | (source[o + 1] << 8) | source[o + 2];
+          let j = 0; while (j < n && keys[j] !== key) j += 1;
+          if (j === n) { keys[n] = key; counts[n] = weights[k]; n += 1; } else counts[j] += weights[k];
+        }
+        let best = 0; for (let j = 1; j < n; j += 1) if (counts[j] > counts[best]) best = j;
+        if (counts[best] < requiredWeight) continue;
+        const key = keys[best]; const r = (key >> 16) & 255; const g = (key >> 8) & 255; const b = key & 255;
+        const sr = source[index]; const sg = source[index + 1]; const sb = source[index + 2];
+        if (sr === r && sg === g && sb === b) continue;
+        if (0.25 * (sr - r) ** 2 + 0.60 * (sg - g) ** 2 + 0.15 * (sb - b) ** 2 > maxSq) continue;
         data[index] = r; data[index + 1] = g; data[index + 2] = b;
       }
     }
@@ -794,40 +804,31 @@ function removeSmallRegions(imageData, edgeMap) {
   // cleanup on small canvases. Running a full flood fill per live frame
   // at 256px costs more than the visible benefit at normal strengths.
   if (!maxSize || strength < 75 || width > 160 || height > 160) return;
-  const visited = new Uint8Array(width * height);
-  const sameColor = (first, second) => data[first] === data[second] && data[first + 1] === data[second + 1] && data[first + 2] === data[second + 2];
-  for (let pixel = 0; pixel < width * height; pixel += 1) {
+  const total = width * height; const visited = new Uint8Array(total);
+  const stack = new Int32Array(total); const region = new Int32Array(total);
+  const bKeys = []; const bCounts = [];
+  for (let pixel = 0; pixel < total; pixel += 1) {
     if (visited[pixel]) continue;
-    const start = pixel * 4;
-    const region = [];
-    const stack = [pixel];
-    const border = new Map();
-    let edgeTotal = 0;
-    while (stack.length) {
-      const current = stack.pop();
+    const start = pixel * 4; const sr = data[start]; const sg = data[start + 1]; const sb = data[start + 2];
+    let top = 0; let size = 0; let edgeTotal = 0; bKeys.length = 0; bCounts.length = 0;
+    stack[top++] = pixel;
+    while (top) {
+      const current = stack[--top];
       if (visited[current]) continue;
-      visited[current] = 1;
-      region.push(current);
-      edgeTotal += edgeMap[current];
-      const x = current % width;
-      const y = (current / width) | 0;
-      [[-1, 0], [1, 0], [0, -1], [0, 1]].forEach(([dx, dy]) => {
-        const xx = x + dx; const yy = y + dy;
-        if (xx < 0 || xx >= width || yy < 0 || yy >= height) return;
-        const neighbor = yy * width + xx;
-        const neighborIndex = neighbor * 4;
-        if (sameColor(start, neighborIndex)) {
-          if (!visited[neighbor]) stack.push(neighbor);
-        } else {
-          const key = `${data[neighborIndex]}/${data[neighborIndex + 1]}/${data[neighborIndex + 2]}`;
-          border.set(key, (border.get(key) || 0) + 1);
-        }
-      });
+      visited[current] = 1; region[size++] = current; edgeTotal += edgeMap[current];
+      const x = current % width; const y = (current / width) | 0;
+      for (let d = 0; d < 4; d += 1) {
+        const xx = x + (d === 0 ? -1 : d === 1 ? 1 : 0); const yy = y + (d === 2 ? -1 : d === 3 ? 1 : 0);
+        if (xx < 0 || xx >= width || yy < 0 || yy >= height) continue;
+        const neighbor = yy * width + xx; const ni = neighbor * 4;
+        if (data[ni] === sr && data[ni + 1] === sg && data[ni + 2] === sb) { if (!visited[neighbor]) stack[top++] = neighbor; }
+        else { const key = (data[ni] << 16) | (data[ni + 1] << 8) | data[ni + 2]; const j = bKeys.indexOf(key); if (j < 0) { bKeys.push(key); bCounts.push(1); } else bCounts[j] += 1; }
+      }
     }
-    if (region.length <= maxSize && edgeTotal / region.length < 0.24 && border.size) {
-      const [color] = [...border.entries()].sort((first, second) => second[1] - first[1])[0];
-      const [r, g, b] = color.split('/').map(Number);
-      region.forEach((entry) => { const index = entry * 4; data[index] = r; data[index + 1] = g; data[index + 2] = b; });
+    if (size <= maxSize && edgeTotal / size < 0.24 && bKeys.length) {
+      let best = 0; for (let j = 1; j < bKeys.length; j += 1) if (bCounts[j] > bCounts[best]) best = j;
+      const key = bKeys[best]; const r = (key >> 16) & 255; const g = (key >> 8) & 255; const b = key & 255;
+      for (let i = 0; i < size; i += 1) { const index = region[i] * 4; data[index] = r; data[index + 1] = g; data[index + 2] = b; }
     }
   }
 }

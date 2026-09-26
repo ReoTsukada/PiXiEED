@@ -2,7 +2,8 @@ import { createFrameLoop } from '../pixel-studio/frame-loop.mjs';
 import { encodeCameraPng, pngExportGeometry } from '../pixel-studio/png-export.mjs';
 import { FRAME_RATIOS, OUTPUT_SIZES, resolveAspect, centerCrop, frameGeometry, fitFrame } from '../pixel-studio/framing.mjs?v=20260925-lens-sizes-1';
 import { cameraStartErrorMessage, deriveCameraPrimaryAction } from '../pixel-studio/camera-ui-state.mjs';
-import { CAMERA_SETTING_DEFAULTS, lensFrameFilter, lensPalette, processLensFrame, resetLensPalette, setLensSettings } from './engine.mjs?v=20260926-lens-1';
+import { CAMERA_SETTING_DEFAULTS, lensFrameFilter, lensPalette, processLensFrame, resetLensPalette, setLensSettings } from './engine.mjs?v=20260926-ux-1';
+import { attachZoomGestures, formatZoom, splitZoom, zoomRange, zoomStops } from './zoom.mjs?v=20260926-ux-1';
 
 const $ = (selector) => document.querySelector(selector);
 const root = $('#pixelStudio');
@@ -38,7 +39,8 @@ let displayedPaletteRevision = null;
 
 // PiXiEELENS defaults (pixiee-lens/index.html): 4 colours, Game Boy palette, ordered dither, surface 55
 const state = { mode: 'idle', facing: 'environment', result: null, error: '', ratio: 'screen', size: 256,
-  colorDepth: '4', paletteMode: 'gameboy', gradientMode: 'dither', surfaceSimplify: 55, camera: { ...CAMERA_SETTING_DEFAULTS } };
+  colorDepth: '4', paletteMode: 'gameboy', gradientMode: 'dither', surfaceSimplify: 55, camera: { ...CAMERA_SETTING_DEFAULTS }, zoom: 1 };
+let zoomInfo = zoomRange(null); let appliedHardwareZoom = 1; let zoomApplyPending = false;
 function syncLens() { setLensSettings({ colorDepth: state.colorDepth, paletteMode: state.paletteMode, gradientMode: state.gradientMode, surfaceSimplify: state.surfaceSimplify, cameraSettings: state.camera }); }
 syncLens();
 const COLOR_LABELS = { 2: '2色', 4: '4色', 8: '8色', 16: '16色', gray: 'グレー', 256: '256色', full: 'フルカラー' };
@@ -278,7 +280,9 @@ function cameraFrame() {
   if (!activeStream || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || !video.videoWidth || !video.videoHeight) return null;
   const output = frameGeometry(currentAspect(), state.size);
   const aspect = output.width / output.height;
-  const crop = centerCrop(video.videoWidth, video.videoHeight, aspect);
+  const full = centerCrop(video.videoWidth, video.videoHeight, aspect);
+  const digital = Math.max(1, state.zoom / appliedHardwareZoom); // what the camera's optics could not do is cropped
+  const crop = { sw: full.sw / digital, sh: full.sh / digital, sx: full.sx + (full.sw - full.sw / digital) / 2, sy: full.sy + (full.sh - full.sh / digital) / 2 };
   const { width, height } = output;
   if (sourceCanvas.width !== width || sourceCanvas.height !== height) { sourceCanvas.width = width; sourceCanvas.height = height; }
   // PiXiEELENS renderDotFrame: draw the camera straight onto the dot grid through its smoothing blur and
@@ -423,6 +427,7 @@ async function startCamera({ focus = true } = {}) {
     video.srcObject = stream;
     await video.play();
     if (token !== cameraSequence) { stream.getTracks().forEach((track) => track.stop()); return; }
+    setupZoomForTrack(stream.getVideoTracks()[0]);
     setMode('live');
     setInfoForMode('live');
     say('最初の画像を仕上げています…');
@@ -455,14 +460,6 @@ function refreshObjects() {
   requestAnimationFrame(() => captureFrame.classList.add('pc-palette-refresh'));
   window.setTimeout(() => captureFrame.classList.remove('pc-palette-refresh'), 360);
 }
-
-view.addEventListener('click', refreshObjects);
-view.addEventListener('keydown', (event) => {
-  if ((event.key === 'Enter' || event.key === ' ') && !event.repeat) {
-    event.preventDefault();
-    refreshObjects();
-  }
-});
 
 function retake() {
   invalidateCaptureDownload();
@@ -499,41 +496,148 @@ settingsPanel.addEventListener('toggle', (event) => {
   if (event.newState === 'open') updateSizeSummary();
 });
 const CAMERA_KEYS = Object.keys(CAMERA_SETTING_DEFAULTS);
-function syncSettingOutputs() {
+// Look presets: one tap sets colour depth + palette the way PiXiEELENS names them
+const LOOKS = {
+  gb: { colorDepth: '4', paletteMode: 'gameboy' },
+  mono: { colorDepth: '2', paletteMode: 'gameboy' },
+  gray: { colorDepth: 'gray' },
+  c8: { colorDepth: '8', paletteMode: 'gameboy' },
+  c16: { colorDepth: '16', paletteMode: 'gameboy' },
+  photo: { colorDepth: '16', paletteMode: 'source' },
+  c256: { colorDepth: '256' },
+  full: { colorDepth: 'full' }
+};
+function currentLook() {
+  if (state.colorDepth === '16') return state.paletteMode === 'source' ? 'photo' : 'c16';
+  return Object.keys(LOOKS).find((key) => LOOKS[key].colorDepth === state.colorDepth) ?? 'gb';
+}
+function syncControls() {
   for (const out of settingsPanel.querySelectorAll('output[data-for]')) {
     const input = settingsPanel.querySelector(`[name="${out.dataset.for}"]`);
     if (input) out.textContent = input.value;
   }
-  const row = $('#paletteModeRow');
-  if (row) row.hidden = !['2', '4', '8', '16'].includes(state.colorDepth);
+  const check = (name, value) => { const input = settingsPanel.querySelector(`input[name="${name}"][value="${value}"]`); if (input) input.checked = true; };
+  check('aspect', state.ratio); check('pixels', String(state.size)); check('paletteMode', state.paletteMode);
+  const dither = settingsPanel.querySelector('input[name="dither"]'); if (dither) dither.checked = state.gradientMode === 'dither';
+  $('#paletteModeRow').hidden = !['2', '4', '8', '16'].includes(state.colorDepth);
+  const look = currentLook();
+  for (const button of document.querySelectorAll('#looks [data-look]')) button.setAttribute('aria-checked', String(button.dataset.look === look));
+  const toneChanged = CAMERA_KEYS.some((key) => key !== 'zoom' && state.camera[key] !== CAMERA_SETTING_DEFAULTS[key]);
+  const toneState = $('#toneState'); if (toneState) { toneState.textContent = toneChanged ? '調整中' : '標準'; toneState.dataset.changed = String(toneChanged); }
 }
-function onSettingInput(event) {
-  const input = event.target;
-  if (state.mode === 'captured') return;
-  let restart = false;
-  if (input instanceof HTMLSelectElement && input.name === 'aspect' && FRAME_RATIOS.some((ratio) => ratio.value === input.value)) { state.ratio = input.value; restart = true; }
-  else if (input instanceof HTMLSelectElement && input.name === 'pixels' && OUTPUT_SIZES.includes(Number(input.value))) { state.size = Number(input.value); restart = true; }
-  else if (input instanceof HTMLSelectElement && input.name === 'colors' && Object.hasOwn(COLOR_LABELS, input.value)) state.colorDepth = input.value;
-  else if (input instanceof HTMLSelectElement && input.name === 'paletteMode') state.paletteMode = input.value;
-  else if (input instanceof HTMLSelectElement && input.name === 'gradient') state.gradientMode = input.value;
-  else if (input instanceof HTMLInputElement && input.name === 'surface') state.surfaceSimplify = Number(input.value);
-  else if (input instanceof HTMLInputElement && CAMERA_KEYS.includes(input.name)) state.camera[input.name] = Number(input.value);
-  else return;
+function applyChange({ restart = false } = {}) {
   syncLens();
-  syncSettingOutputs();
+  syncControls();
   if (restart) restartPreview({ preserveCompleted: true });
   fitPreview(state.result);
   updateSizeSummary();
+}
+function onSettingInput(event) {
+  const input = event.target;
+  if (!(input instanceof HTMLInputElement) || state.mode === 'captured') return;
+  let restart = false;
+  if (input.name === 'aspect' && FRAME_RATIOS.some((ratio) => ratio.value === input.value)) { state.ratio = input.value; restart = true; }
+  else if (input.name === 'pixels' && OUTPUT_SIZES.includes(Number(input.value))) { state.size = Number(input.value); restart = true; }
+  else if (input.name === 'paletteMode') state.paletteMode = input.value;
+  else if (input.name === 'dither') state.gradientMode = input.checked ? 'dither' : 'none';
+  else if (input.name === 'surface') state.surfaceSimplify = Number(input.value);
+  else if (CAMERA_KEYS.includes(input.name)) state.camera[input.name] = Number(input.value);
+  else return;
+  applyChange({ restart });
 }
 settingsPanel.addEventListener('change', onSettingInput);
 settingsPanel.addEventListener('input', (event) => { if (event.target instanceof HTMLInputElement && event.target.type === 'range') onSettingInput(event); });
 $('#resetCamera')?.addEventListener('click', () => {
   state.camera = { ...CAMERA_SETTING_DEFAULTS };
   for (const key of CAMERA_KEYS) { const input = settingsPanel.querySelector(`[name="${key}"]`); if (input) input.value = String(state.camera[key]); }
-  syncLens();
-  syncSettingOutputs();
+  applyChange();
 });
-syncSettingOutputs();
+$('#repick')?.addEventListener('click', () => { refreshObjects(); settingsPanel.hidePopover?.(); });
+$('#looks').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-look]'); if (!button || state.mode === 'captured') return;
+  Object.assign(state, LOOKS[button.dataset.look]);
+  button.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  navigator.vibrate?.(8);
+  applyChange();
+  sayToast(button.textContent.trim());
+});
+syncControls();
+
+// ---------- Pinch-first zoom ----------
+const zoomHud = $('#zoomHud'); let hudTimer = 0;
+function setupZoomForTrack(track) {
+  let caps = null;
+  try { caps = track?.getCapabilities?.() ?? null; } catch { caps = null; }
+  zoomInfo = zoomRange(caps);
+  appliedHardwareZoom = 1;
+  if (zoomInfo.hardware) { try { const current = track.getSettings?.().zoom; if (Number.isFinite(current)) appliedHardwareZoom = current; } catch { /* keep 1 */ } }
+  setZoom(Math.min(zoomInfo.max, Math.max(zoomInfo.min, state.zoom)), { silent: true });
+  renderZoomStops();
+}
+function renderZoomStops() {
+  const box = $('#zoomStops'); box.replaceChildren();
+  for (const stop of zoomStops(zoomInfo)) {
+    const button = document.createElement('button');
+    button.type = 'button'; button.dataset.zoom = String(stop); button.textContent = formatZoom(stop);
+    button.setAttribute('aria-label', `ズーム ${formatZoom(stop)}`);
+    box.appendChild(button);
+  }
+  syncZoomStops();
+}
+function syncZoomStops() {
+  const buttons = [...document.querySelectorAll('#zoomStops button')];
+  let nearest = null; for (const b of buttons) if (!nearest || Math.abs(Number(b.dataset.zoom) - state.zoom) < Math.abs(Number(nearest.dataset.zoom) - state.zoom)) nearest = b;
+  for (const b of buttons) {
+    const on = b === nearest;
+    b.setAttribute('aria-pressed', String(on));
+    b.textContent = on && Math.abs(state.zoom - Number(b.dataset.zoom)) > 0.05 ? formatZoom(state.zoom) : formatZoom(Number(b.dataset.zoom));
+  }
+}
+function applyHardwareZoom() {
+  if (zoomApplyPending || !zoomInfo.hardware || !activeStream) return;
+  zoomApplyPending = true;
+  requestAnimationFrame(async () => {
+    const track = activeStream?.getVideoTracks()[0];
+    const { hardware } = splitZoom(state.zoom, zoomInfo);
+    try { if (track && Math.abs(hardware - appliedHardwareZoom) > 0.01) { await track.applyConstraints({ advanced: [{ zoom: hardware }] }); appliedHardwareZoom = hardware; } }
+    catch { zoomInfo = { ...zoomInfo, hardware: false }; appliedHardwareZoom = 1; }
+    zoomApplyPending = false;
+    if (Math.abs(splitZoom(state.zoom, zoomInfo).hardware - appliedHardwareZoom) > 0.01) applyHardwareZoom();
+  });
+}
+function setZoom(value, { gesture = '', silent = false } = {}) {
+  if (state.mode === 'captured') return;
+  const previous = state.zoom;
+  state.zoom = Math.min(zoomInfo.max, Math.max(zoomInfo.min, value));
+  // gentle detents at the preset stops so a pinch lands on 1× / 2× / 3× easily
+  if (gesture === 'pinch') for (const stop of zoomStops(zoomInfo)) if (Math.abs(state.zoom - stop) < 0.04 * stop) { if (Math.abs(previous - stop) >= 0.04 * stop) navigator.vibrate?.(6); state.zoom = stop; }
+  applyHardwareZoom();
+  syncZoomStops();
+  if (silent) return;
+  const { hardware } = splitZoom(state.zoom, zoomInfo);
+  $('#zoomHudValue').textContent = formatZoom(state.zoom);
+  $('#zoomHudFill').style.width = `${(100 * Math.log(state.zoom / zoomInfo.min)) / Math.log(zoomInfo.max / zoomInfo.min)}%`;
+  $('#zoomHudHint').textContent = state.zoom <= hardware + 0.01 && zoomInfo.hardware ? '光学ズーム' : 'デジタルズーム';
+  zoomHud.classList.add('is-on');
+  window.clearTimeout(hudTimer);
+  hudTimer = window.setTimeout(() => zoomHud.classList.remove('is-on'), gesture === 'pinch' ? 900 : 700);
+}
+$('#zoomStops').addEventListener('click', (event) => {
+  const button = event.target.closest('button[data-zoom]'); if (!button) return;
+  navigator.vibrate?.(6);
+  setZoom(Number(button.dataset.zoom), { gesture: 'stop' });
+});
+attachZoomGestures(stage, {
+  get: () => state.zoom,
+  set: (value, info) => setZoom(value, info),
+  onTap: () => refreshObjects()
+});
+stage.addEventListener('keydown', (event) => {
+  if (event.key === '+' || event.key === '=') setZoom(state.zoom * 1.25, { gesture: 'key' });
+  else if (event.key === '-') setZoom(state.zoom / 1.25, { gesture: 'key' });
+  else if (event.key === '0') setZoom(1, { gesture: 'key' });
+  else if ((event.key === 'Enter' || event.key === ' ') && !event.repeat) { event.preventDefault(); refreshObjects(); }
+});
 
 $('#flipCamera').addEventListener('click', () => {
   lastFacing = state.facing === 'environment' ? 'user' : 'environment';
