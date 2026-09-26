@@ -1,7 +1,7 @@
-import { initAstroUi } from './astro-ui.mjs?v=20260926-hud-v1';
-import { initPostUi } from './post-ui.mjs?v=20260921-tool-shell-v1';
+import { initAstroUi } from './astro-ui.mjs?v=20260926-sizes-v1';
+import { initPostUi } from './post-ui.mjs?v=20260926-sizes-v1';
 import { createSupabaseGlobeAuth, createSupabaseGlobeStore } from './post-supabase.mjs?v=20260921-globe-post-v1';
-import { createGlobeRenderer, decodeRasterData, getSelectionStageLabel, prepareGeoJsonFeatures } from './renderer.mjs?v=20260926-hud-v1';
+import { createGlobeRenderer, decodeRasterData, getSelectionStageLabel, prepareGeoJsonFeatures } from './renderer.mjs?v=20260926-sizes-v1';
 
 const embedMode = new URLSearchParams(location.search).get('embed') === '1';
 

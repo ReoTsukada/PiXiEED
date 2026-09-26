@@ -46,3 +46,14 @@ test('time capsule keeps play as its only plain button and the sky lives on the 
   assert.doesNotMatch(source, /1時間戻す|1時間進める|astro-collapse|astro-seg|scope-panel/);
   assert.doesNotMatch(source, /type: 'range'/, 'no sliders: speed is a switch, magnification is a pinch');
 });
+
+test('every control shares one size: 44px buttons, 48px single-line fields', () => {
+  const css = read('css/globe-prototype.css');
+  assert.match(css, /--control: 44px;/);
+  assert.match(css, /--field: 48px;/);
+  // No button-like rule may fall back to a hand-picked smaller height.
+  const smallHeights = [...css.matchAll(/([^{}]+)\{[^}]*\bheight: (2\d|3\d|4[0-3])px/g)]
+    .map((match) => match[1].trim())
+    .filter((selector) => /button|chip|close|primary|ghost|danger|tabs|account|place-here|tc-play|tc-now|scope-chip|sky-mark|camera-link|post-fab|input|textarea/.test(selector) && !/icon|__draft|pin|::after|img| i\b/.test(selector));
+  assert.deepEqual(smallHeights, []);
+});

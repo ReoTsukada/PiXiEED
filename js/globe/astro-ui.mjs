@@ -17,7 +17,7 @@
  */
 
 import { celestialState, geoToUnit, unitToGeo, listEclipses, peakObscurationAt, moonPhase, findGreatestEclipse, findSunEvent } from './astronomy.mjs?v=20260921-astro-4';
-import { createScope, refracted } from './scope.mjs?v=20260926-hud-v1';
+import { createScope, refracted } from './scope.mjs?v=20260926-sizes-v1';
 
 const DEG = Math.PI / 180;
 const MINUTE = 60000;
