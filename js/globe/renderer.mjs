@@ -377,7 +377,7 @@ function drawCellBatches(context, cells, selectedId, hoveredId) {
 function now() { return typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now(); }
 function reducedMotion() { return typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
 
-export function createGlobeRenderer(canvas, { initialView = DEFAULT_VIEW, onPick = () => {}, onHover = () => {}, onStateChange = () => {}, backgroundElement = null, spaceTexture = '', worldFeatures = [], regionFeatures = [], prefectureFeatures = [], rasterData = null, forceCanvas = false, grid = DEFAULT_GRID, activeLayer = null, contentCounts = null } = {}) {
+export function createGlobeRenderer(canvas, { initialView = DEFAULT_VIEW, onPick = () => {}, onLongPress = null, onHover = () => {}, onStateChange = () => {}, backgroundElement = null, spaceTexture = '', worldFeatures = [], regionFeatures = [], prefectureFeatures = [], rasterData = null, forceCanvas = false, grid = DEFAULT_GRID, activeLayer = null, contentCounts = null } = {}) {
   if (!canvas || typeof canvas.getContext !== 'function') throw new TypeError('A Canvas element is required.');
   let initialRaster = null;
   if (rasterData) {
@@ -400,7 +400,7 @@ export function createGlobeRenderer(canvas, { initialView = DEFAULT_VIEW, onPick
   const context = webgl ? null : canvas.getContext('2d');
   if (!context && !webgl) throw new Error('Canvas 2D/WebGL2 context is unavailable.');
   if (backgroundElement && spaceTexture) backgroundElement.style.setProperty('--space-texture', `url(${JSON.stringify(spaceTexture)})`);
-  let view = createViewState(initialView); let lodState = createLodState(); let selected = null; let hovered = null; let frame = null; let focusFrame = null; let suppressClick = false; let drag = null; let backing = initialBacking; let camera; let plan; let observer = null; let layer = activeLayer; let counts = contentCounts; let lastBatchMetrics = Object.freeze({ backend: webgl ? 'webgl2' : 'canvas2d', drawCalls: 0, frameMs: 0, batchCount: 0, emphasizedCount: 0 });
+  let view = createViewState(initialView); let lodState = createLodState(); let selected = null; let hovered = null; let frame = null; let focusFrame = null; let drag = null; let backing = initialBacking; let camera; let plan; let observer = null; let layer = activeLayer; let counts = contentCounts; let lastBatchMetrics = Object.freeze({ backend: webgl ? 'webgl2' : 'canvas2d', drawCalls: 0, frameMs: 0, batchCount: 0, emphasizedCount: 0 });
   const invalidation = createRenderInvalidationState();
   const initialPrefectures = prefectureFeatures.length ? prefectureFeatures : regionFeatures; let rasterIndex = createRasterIndex({ worldFeatures: emptyFeatures(worldFeatures), prefectureFeatures: emptyFeatures(initialPrefectures), rasterData: initialRaster, grid });
   const cellCache = createBoundedCellCache();
@@ -414,23 +414,89 @@ export function createGlobeRenderer(canvas, { initialView = DEFAULT_VIEW, onPick
   function updateView(next) { cancelFocusAnimation(); view = createViewState({ ...view, ...next }); requestDraw({ rebuildPlan: !webgl }); }
   function animateFocus(next) { cancelFocusAnimation(); if (reducedMotion() || typeof requestAnimationFrame !== 'function') { view = createViewState({ ...view, ...next }); requestDraw({ rebuildPlan: !webgl }); return; } const start = view; const started = now(); const duration = 260; const longitudeDelta = normalizeLongitude(next.centerLongitude - start.centerLongitude); const tick = (time) => { if (focusFrame === null) return; const progress = Math.min(1, Math.max(0, (time - started) / duration)); const eased = 1 - ((1 - progress) ** 3); view = createViewState({ ...view, centerLongitude: normalizeLongitude(start.centerLongitude + longitudeDelta * eased), centerLatitude: start.centerLatitude + (next.centerLatitude - start.centerLatitude) * eased, zoom: start.zoom + (next.zoom - start.zoom) * eased }); requestDraw({ rebuildPlan: !webgl }); if (progress >= 1) { focusFrame = null; return; } focusFrame = requestAnimationFrame(tick); }; focusFrame = requestAnimationFrame(tick); }
   function pickWebGLCell(x, y) { if (!webgl || !camera) return null; const geo = inverseScreenToGeo(x, y, camera); if (!geo) return null; const cell = lookupCell(geo.longitude, geo.latitude, grid); const owner = ownerForCell(rasterIndex, cell); if (rasterIndex.raster && !owner) return null; return Object.freeze({ ...cell, cell, id: cell.id, cellId: cell.id, lodLevel: lodState.level, ownerLevel: lodState.level, ownerId: ownerId(owner, lodState.level), ownerLabel: ownerLabel(owner, lodState.level) || '土地セル', countryId: owner?.countryId || null, regionId: owner?.regionId || null, prefectureId: owner?.prefectureId || null, x, y, screenX: x, screenY: y, depth: geo.depth, opacity: 1, pickedGeo: geo }); }
+  // Direct manipulation only: one finger rotates and keeps a short fling, two
+  // fingers pinch-zoom and pan around their midpoint, a quick two-finger tap zooms
+  // out, and a clean single tap picks. There are no on-screen zoom/rotate buttons.
+  const TAP_SLOP = 6; const TAP_MS = 450; const LONG_PRESS_MS = 520; const TWO_TAP_MS = 320; const FLING_MIN_SPEED = .25; const FLING_DECAY_MS = 320;
+  const pointers = new Map(); let pinch = null; let twoTap = null; let gesture = null; let fling = null;
   function pointerPosition(event) { const rect = canvas.getBoundingClientRect(); return { x: event.clientX - rect.left, y: event.clientY - rect.top }; }
-  function onPointerDown(event) { cancelFocusAnimation(); const point = pointerPosition(event); canvas.setPointerCapture?.(event.pointerId); drag = { pointerId: event.pointerId, x: point.x, y: point.y, moved: false }; }
-  function onPointerMove(event) { const point = pointerPosition(event); if (!drag || drag.pointerId !== event.pointerId) { const nextHover = webgl ? pickWebGLCell(point.x, point.y) : pickRenderedCellAt(point.x, point.y, plan); if (nextHover?.cellId !== hovered?.cellId) { hovered = nextHover; onHover(hovered); requestDraw({ rebuildPlan: false }); } return; } const dx = point.x - drag.x; const dy = point.y - drag.y; drag.x = point.x; drag.y = point.y; drag.moved = drag.moved || Math.hypot(dx, dy) > 2; updateView({ centerLongitude: view.centerLongitude - dx / Math.max(1, camera.scale) * RAD_TO_DEG, centerLatitude: clampLatitude(view.centerLatitude + dy / Math.max(1, camera.scale) * RAD_TO_DEG) }); }
-  function endPointer(event, cancelled = false) { if (!drag || drag.pointerId !== event.pointerId) return; if (drag.moved && !cancelled) suppressClick = true; drag = null; }
+  function geoUnder(point, state = view) { if (!backing || !point) return null; return inverseScreenToGeo(point.x, point.y, createGlobeCamera({ viewport: backing, ...state })); }
+  // Zoom to `zoom` while keeping the ground that was under `from` under `to`.
+  function anchorView(from, to, zoom) {
+    let next = createViewState({ ...view, zoom: clampZoom(zoom, view.zoomRange) }); const anchor = geoUnder(from);
+    for (let pass = 0; anchor && pass < 2; pass += 1) { const after = geoUnder(to, next); if (!after) break; next = createViewState({ ...next, centerLongitude: next.centerLongitude + normalizeLongitude(anchor.longitude - after.longitude), centerLatitude: next.centerLatitude + (anchor.latitude - after.latitude) }); }
+    updateView(next);
+  }
+  function rotateBy(dx, dy) { const scale = Math.max(1, (camera?.radius || 1) * view.zoom); updateView({ centerLongitude: view.centerLongitude - dx / scale * RAD_TO_DEG, centerLatitude: clampLatitude(view.centerLatitude + dy / scale * RAD_TO_DEG) }); }
+  function cancelFling() { if (fling?.frame != null && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(fling.frame); fling = null; }
+  function startFling(vx, vy) {
+    if (reducedMotion() || typeof requestAnimationFrame !== 'function' || Math.hypot(vx, vy) < FLING_MIN_SPEED) return;
+    fling = { vx, vy, last: now(), frame: null };
+    const step = (time) => { if (!fling) return; const dt = Math.min(48, Math.max(0, time - fling.last)); fling.last = time; rotateBy(fling.vx * dt, fling.vy * dt); const decay = Math.exp(-dt / FLING_DECAY_MS); fling.vx *= decay; fling.vy *= decay; if (Math.hypot(fling.vx, fling.vy) < .02) { fling = null; return; } fling.frame = requestAnimationFrame(step); };
+    fling.frame = requestAnimationFrame(step);
+  }
+  function clearLongPress() { if (gesture?.timer) { clearTimeout(gesture.timer); gesture.timer = null; } }
+  function pinchState() { const [first, second] = [...pointers.values()]; return { mid: { x: (first.x + second.x) / 2, y: (first.y + second.y) / 2 }, distance: Math.max(1, Math.hypot(first.x - second.x, first.y - second.y)) }; }
+  function onPointerDown(event) {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    cancelFocusAnimation(); cancelFling(); const point = pointerPosition(event); canvas.setPointerCapture?.(event.pointerId);
+    pointers.set(event.pointerId, { x: point.x, y: point.y });
+    if (pointers.size === 1) {
+      gesture = { start: point, started: now(), moved: false, multi: false, consumed: false, timer: null };
+      // Holding still on the globe hands the spot to the caller (the telescope opens there).
+      if (typeof onLongPress === 'function') { const pending = gesture; pending.timer = setTimeout(() => { pending.timer = null; if (gesture !== pending || pending.moved || pending.multi) return; const geo = geoUnder(point); if (!geo) return; pending.consumed = true; onLongPress({ x: point.x, y: point.y, latitude: geo.latitude, longitude: geo.longitude }); }, LONG_PRESS_MS); } drag = { pointerId: event.pointerId, x: point.x, y: point.y, samples: [{ x: point.x, y: point.y, t: now() }] }; return; }
+    drag = null; if (gesture) { gesture.multi = true; clearLongPress(); }
+    if (pointers.size === 2) { pinch = pinchState(); twoTap = { started: now(), origin: pinch, moved: false }; }
+  }
+  function onPointerMove(event) {
+    const point = pointerPosition(event); const tracked = pointers.get(event.pointerId);
+    if (!tracked) { if (event.pointerType !== 'mouse') return; const nextHover = webgl ? pickWebGLCell(point.x, point.y) : pickRenderedCellAt(point.x, point.y, plan); if (nextHover?.cellId !== hovered?.cellId) { hovered = nextHover; onHover(hovered); requestDraw({ rebuildPlan: false }); } return; }
+    tracked.x = point.x; tracked.y = point.y;
+    if (pinch && pointers.size >= 2) {
+      const next = pinchState();
+      if (twoTap && (Math.abs(next.distance / twoTap.origin.distance - 1) > .06 || Math.hypot(next.mid.x - twoTap.origin.mid.x, next.mid.y - twoTap.origin.mid.y) > TAP_SLOP * 2)) twoTap.moved = true;
+      anchorView(pinch.mid, next.mid, view.zoom * (next.distance / pinch.distance)); pinch = next; return;
+    }
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const dx = point.x - drag.x; const dy = point.y - drag.y; drag.x = point.x; drag.y = point.y;
+    if (gesture && !gesture.moved && Math.hypot(point.x - gesture.start.x, point.y - gesture.start.y) > TAP_SLOP) { gesture.moved = true; clearLongPress(); }
+    if (!gesture?.moved) return;
+    const t = now(); drag.samples.push({ x: point.x, y: point.y, t }); while (drag.samples.length > 2 && t - drag.samples[0].t > 100) drag.samples.shift();
+    rotateBy(dx, dy);
+  }
+  function endPointer(event, cancelled = false) {
+    if (!pointers.has(event.pointerId)) return; const point = pointerPosition(event); pointers.delete(event.pointerId);
+    if (pinch) {
+      if (pointers.size >= 2) { pinch = pinchState(); return; }
+      pinch = null;
+      if (!cancelled && twoTap && !twoTap.moved && now() - twoTap.started < TWO_TAP_MS) animateFocus({ centerLongitude: view.centerLongitude, centerLatitude: view.centerLatitude, zoom: clampZoom(view.zoom / 2, view.zoomRange) });
+      twoTap = null;
+      // Hand the remaining finger back to rotation from where it is now, without a jump.
+      const [remainingId, remaining] = [...pointers.entries()][0] || [];
+      drag = remaining ? { pointerId: remainingId, x: remaining.x, y: remaining.y, samples: [] } : null; return;
+    }
+    const released = drag?.pointerId === event.pointerId ? drag : null; drag = null;
+    const current = gesture; clearLongPress(); if (pointers.size === 0) gesture = null;
+    if (cancelled || !current || current.consumed) return;
+    if (!current.moved && !current.multi && now() - current.started < TAP_MS) { pick(point); return; }
+    if (released && current.moved && released.samples.length > 1) {
+      const first = released.samples[0]; const last = released.samples[released.samples.length - 1]; const dt = last.t - first.t;
+      if (dt > 0 && now() - last.t < 100) startFling((last.x - first.x) / dt, (last.y - first.y) / dt);
+    }
+  }
   // Trackpads emit dozens of wheel events with momentum, and pinch gestures arrive
   // as ctrl+wheel. Applying every event's delta directly let one swipe run the zoom
   // away. Deltas are clamped, one gesture (events less than 140ms apart) is limited
   // to about 3x, and the result is applied at a bounded rate per frame.
   const WHEEL_MAX_EVENT = 48; const WHEEL_GESTURE_MAX = 1.1; const WHEEL_GESTURE_GAP_MS = 140; const WHEEL_MAX_STEP = 0.08;
-  let wheelPending = 0; let wheelTimer = null; let wheelGesture = 0; let wheelLast = -Infinity;
+  let wheelPending = 0; let wheelTimer = null; let wheelGesture = 0; let wheelLast = -Infinity; let wheelPoint = null;
   function flushWheel() {
     wheelTimer = null; const step = clamp(wheelPending, -WHEEL_MAX_STEP, WHEEL_MAX_STEP); wheelPending -= step;
-    if (Math.abs(step) > 1e-5) updateView({ zoom: clampZoom(view.zoom * Math.exp(step), view.zoomRange) });
+    if (Math.abs(step) > 1e-5) { if (wheelPoint) anchorView(wheelPoint, wheelPoint, view.zoom * Math.exp(step)); else updateView({ zoom: clampZoom(view.zoom * Math.exp(step), view.zoomRange) }); }
     if (Math.abs(wheelPending) > 1e-4) wheelTimer = typeof requestAnimationFrame === 'function' ? requestAnimationFrame(flushWheel) : setTimeout(flushWheel, 16); else wheelPending = 0;
   }
   function onWheel(event) {
-    event.preventDefault();
+    event.preventDefault(); cancelFling(); wheelPoint = pointerPosition(event);
     const at = now(); if (at - wheelLast > WHEEL_GESTURE_GAP_MS) wheelGesture = 0; wheelLast = at;
     const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 100 : 1;
     const delta = clamp(finite(event.deltaY, 'wheel delta') * unit, -WHEEL_MAX_EVENT, WHEEL_MAX_EVENT);
@@ -438,11 +504,21 @@ export function createGlobeRenderer(canvas, { initialView = DEFAULT_VIEW, onPick
     wheelPending += nextGesture - wheelGesture; wheelGesture = nextGesture;
     if (wheelTimer === null) wheelTimer = typeof requestAnimationFrame === 'function' ? requestAnimationFrame(flushWheel) : setTimeout(flushWheel, 16);
   }
-  function onClick(event) { if (suppressClick) { suppressClick = false; return; } const point = pointerPosition(event); selected = webgl ? pickWebGLCell(point.x, point.y) : pickRenderedCellAt(point.x, point.y, plan); onPick(selected); requestDraw({ rebuildPlan: false }); }
-  function onKeyDown(event) { if (event.key === '+' || event.key === '=') { event.preventDefault(); updateView({ zoom: clampZoom(view.zoom * 1.22, view.zoomRange) }); } else if (event.key === '-' || event.key === '_') { event.preventDefault(); updateView({ zoom: clampZoom(view.zoom * .82, view.zoomRange) }); } else if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); updateView({ centerLongitude: view.centerLongitude + (event.key === 'ArrowLeft' ? -8 : 8) }); } }
+  function pick(point) { selected = webgl ? pickWebGLCell(point.x, point.y) : pickRenderedCellAt(point.x, point.y, plan); onPick(selected); requestDraw({ rebuildPlan: false }); }
+  function onKeyDown(event) {
+    const key = event.key; let handled = true;
+    if (key === '+' || key === '=') updateView({ zoom: clampZoom(view.zoom * 1.22, view.zoomRange) });
+    else if (key === '-' || key === '_') updateView({ zoom: clampZoom(view.zoom * .82, view.zoomRange) });
+    else if (key === 'ArrowLeft' || key === 'ArrowRight') updateView({ centerLongitude: view.centerLongitude + (key === 'ArrowLeft' ? -8 : 8) });
+    else if (key === 'ArrowUp' || key === 'ArrowDown') updateView({ centerLatitude: clampLatitude(view.centerLatitude + (key === 'ArrowUp' ? 6 : -6)) });
+    else if (key === '0') { selected = clearSelection(); onPick(null); animateFocus(DEFAULT_VIEW); }
+    else if (key === 'Enter' || key === ' ') { if (!backing) return; pick({ x: backing.width / 2, y: backing.height / 2 }); }
+    else handled = false;
+    if (handled) event.preventDefault();
+  }
   const onPointerCancel = (event) => endPointer(event, true);
   const onLostPointerCapture = (event) => endPointer(event, true);
-  canvas.addEventListener('pointerdown', onPointerDown); canvas.addEventListener('pointermove', onPointerMove); canvas.addEventListener('pointerup', endPointer); canvas.addEventListener('pointercancel', onPointerCancel); canvas.addEventListener('lostpointercapture', onLostPointerCapture); canvas.addEventListener('wheel', onWheel, { passive: false }); canvas.addEventListener('click', onClick); canvas.addEventListener('keydown', onKeyDown);
+  canvas.addEventListener('pointerdown', onPointerDown); canvas.addEventListener('pointermove', onPointerMove); canvas.addEventListener('pointerup', endPointer); canvas.addEventListener('pointercancel', onPointerCancel); canvas.addEventListener('lostpointercapture', onLostPointerCapture); canvas.addEventListener('wheel', onWheel, { passive: false }); canvas.addEventListener('keydown', onKeyDown);
   if (typeof ResizeObserver !== 'undefined') { observer = new ResizeObserver(() => requestDraw()); observer.observe(canvas); } draw();
-  return Object.freeze({ draw, resize: () => requestDraw(), setData({ worldFeatures: nextWorld = worldFeatures, regionFeatures: nextRegions = regionFeatures, prefectureFeatures: nextPrefectures = prefectureFeatures } = {}) { if (!webgl) { const nextPrefectureSource = nextPrefectures?.length ? nextPrefectures : nextRegions; rasterIndex = createRasterIndex({ worldFeatures: Array.isArray(nextWorld) ? nextWorld : prepareGeoJsonFeatures(nextWorld), prefectureFeatures: Array.isArray(nextPrefectureSource) ? nextPrefectureSource : prepareGeoJsonFeatures(nextPrefectureSource, { idProperty: 'code' }) }); } requestDraw(); }, setAstronomy(next) { webgl?.setAstronomy(next); requestDraw(); }, setLayer(nextLayer, nextCounts = counts) { layer = nextLayer || null; counts = nextCounts; requestDraw(); }, setView(nextView) { updateView(nextView); }, focusSelection(selection) { const transition = getFocusTransition(selection); if (transition) animateFocus(transition); return transition; }, zoomIn() { updateView({ zoom: clampZoom(view.zoom * 1.22, view.zoomRange) }); }, zoomOut() { updateView({ zoom: clampZoom(view.zoom * .82, view.zoomRange) }); }, resetView() { selected = clearSelection(); onPick(null); updateView(DEFAULT_VIEW); }, pickAt(x, y) { return webgl ? pickWebGLCell(x, y) : pickRenderedCellAt(x, y, plan); }, getSnapshot() { return Object.freeze({ view, camera, plan, selected, hovered, metrics: Object.freeze({ backend: webgl ? 'webgl2' : 'canvas2d', ...invalidation.snapshot(), ...lastBatchMetrics, cellCache: cellCache.snapshot() }) }); }, destroy() { if (frame !== null && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(frame); cancelFocusAnimation(); observer?.disconnect(); webgl?.destroy(); canvas.removeEventListener('pointerdown', onPointerDown); canvas.removeEventListener('pointermove', onPointerMove); canvas.removeEventListener('pointerup', endPointer); canvas.removeEventListener('pointercancel', onPointerCancel); canvas.removeEventListener('lostpointercapture', onLostPointerCapture); canvas.removeEventListener('wheel', onWheel); canvas.removeEventListener('click', onClick); canvas.removeEventListener('keydown', onKeyDown); } });
+  return Object.freeze({ draw, resize: () => requestDraw(), setData({ worldFeatures: nextWorld = worldFeatures, regionFeatures: nextRegions = regionFeatures, prefectureFeatures: nextPrefectures = prefectureFeatures } = {}) { if (!webgl) { const nextPrefectureSource = nextPrefectures?.length ? nextPrefectures : nextRegions; rasterIndex = createRasterIndex({ worldFeatures: Array.isArray(nextWorld) ? nextWorld : prepareGeoJsonFeatures(nextWorld), prefectureFeatures: Array.isArray(nextPrefectureSource) ? nextPrefectureSource : prepareGeoJsonFeatures(nextPrefectureSource, { idProperty: 'code' }) }); } requestDraw(); }, setAstronomy(next) { webgl?.setAstronomy(next); requestDraw(); }, setLayer(nextLayer, nextCounts = counts) { layer = nextLayer || null; counts = nextCounts; requestDraw(); }, setView(nextView) { updateView(nextView); }, focusSelection(selection) { const transition = getFocusTransition(selection); if (transition) animateFocus(transition); return transition; }, zoomIn() { updateView({ zoom: clampZoom(view.zoom * 1.22, view.zoomRange) }); }, zoomOut() { updateView({ zoom: clampZoom(view.zoom * .82, view.zoomRange) }); }, resetView() { cancelFling(); selected = clearSelection(); onPick(null); updateView(DEFAULT_VIEW); }, pickAt(x, y) { return webgl ? pickWebGLCell(x, y) : pickRenderedCellAt(x, y, plan); }, getSnapshot() { return Object.freeze({ view, camera, plan, selected, hovered, metrics: Object.freeze({ backend: webgl ? 'webgl2' : 'canvas2d', ...invalidation.snapshot(), ...lastBatchMetrics, cellCache: cellCache.snapshot() }) }); }, destroy() { if (frame !== null && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(frame); cancelFocusAnimation(); cancelFling(); clearLongPress(); observer?.disconnect(); webgl?.destroy(); canvas.removeEventListener('pointerdown', onPointerDown); canvas.removeEventListener('pointermove', onPointerMove); canvas.removeEventListener('pointerup', endPointer); canvas.removeEventListener('pointercancel', onPointerCancel); canvas.removeEventListener('lostpointercapture', onLostPointerCapture); canvas.removeEventListener('wheel', onWheel); canvas.removeEventListener('keydown', onKeyDown); } });
 }
