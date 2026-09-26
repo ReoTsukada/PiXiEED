@@ -44,7 +44,10 @@ let zoomInfo = zoomRange(null); let appliedHardwareZoom = 1; let zoomApplyPendin
 // 面のまとまり is automatic: it only calms dither speckle with 8-16 colours (measured: no change at 2-4 colours,
 // heavy posterising at high strength), so it runs at PiXiEELENS's default 55 there and is skipped elsewhere.
 const autoSurface = (depth) => (depth === '8' || depth === '16' ? 55 : 0);
-function syncLens() { setLensSettings({ colorDepth: state.colorDepth, paletteMode: state.paletteMode, gradientMode: state.gradientMode, surfaceSimplify: autoSurface(state.colorDepth), cameraSettings: state.camera }); }
+// A little more punch than the raw camera by default; the tone sliders still read 0 at this standard look.
+const BASE_TONE = { contrast: 15, saturation: 20 };
+const withBaseTone = (camera) => { const out = { ...camera }; for (const [key, add] of Object.entries(BASE_TONE)) out[key] = Math.max(-100, Math.min(100, (out[key] ?? 0) + add)); return out; };
+function syncLens() { setLensSettings({ colorDepth: state.colorDepth, paletteMode: state.paletteMode, gradientMode: state.gradientMode, surfaceSimplify: autoSurface(state.colorDepth), cameraSettings: withBaseTone(state.camera) }); }
 syncLens();
 const COLOR_LABELS = { 2: '2色', 4: '4色', 8: '8色', 16: '16色', gray: 'グレー', 256: '256色', full: 'フルカラー' };
 
