@@ -1,8 +1,8 @@
-import { initAstroUi } from './astro-ui.mjs?v=20260927-fullcolor-v1';
-import { initPostUi } from './post-ui.mjs?v=20260927-fullcolor-v1';
-import { sharedSky } from './real-sky.mjs?v=20260927-fullcolor-v1';
+import { initAstroUi } from './astro-ui.mjs?v=20260927-sky-layer-v1';
+import { initPostUi } from './post-ui.mjs?v=20260927-sky-layer-v1';
+import { sharedSky, sharedFaintSky, SPRITE_MAGNITUDE } from './real-sky.mjs?v=20260927-sky-layer-v1';
 import { createSupabaseGlobeAuth, createSupabaseGlobeStore } from './post-supabase.mjs?v=20260921-globe-post-v1';
-import { createGlobeRenderer, decodeRasterData, getSelectionStageLabel, prepareGeoJsonFeatures } from './renderer.mjs?v=20260927-fullcolor-v1';
+import { createGlobeRenderer, decodeRasterData, getSelectionStageLabel, prepareGeoJsonFeatures } from './renderer.mjs?v=20260927-sky-layer-v1';
 
 const embedMode = new URLSearchParams(location.search).get('embed') === '1';
 
@@ -38,6 +38,7 @@ let renderer;
 function createPrototypeRenderer(options = {}) {
   renderer = createGlobeRenderer(canvas, {
     backgroundElement: globeStage,
+    skyCanvas: document.querySelector('#skyCanvas'),
     spaceTexture: globeStage?.dataset.spaceTexture || '',
     ...options,
     onPick(selection) {
@@ -61,7 +62,11 @@ function createPrototypeRenderer(options = {}) {
   });
   globalThis.__PIXIEED_GLOBE__ = renderer;
   // The real night sky replaces the procedural stars once it is painted (after the first frame).
-  const paintRealSky = () => sharedSky().then(({ canvas: sky }) => renderer.setSkyImage?.(sky)).catch((error) => console.warn('Real sky unavailable', error));
+  // Bright stars become sharp sprites on the sky layer; the painted sky then only carries the faint ones.
+  const paintRealSky = () => sharedSky().then(async ({ sky, canvas }) => {
+    const sprites = renderer.setStars?.(sky, { maxMagnitude: SPRITE_MAGNITUDE }) || 0;
+    renderer.setSkyImage?.(sprites ? (await sharedFaintSky()).canvas : canvas);
+  }).catch((error) => console.warn('Real sky unavailable', error));
   (typeof requestIdleCallback === 'function' ? requestIdleCallback : (fn) => setTimeout(fn, 60))(paintRealSky);
   if (!globalThis.__PIXIEED_ASTRO__) {
     try { initAstroUi({ renderer, stage: globeStage, initiallyCollapsed: true }); } catch (error) { console.warn('Astronomy panel unavailable', error); }

@@ -11,7 +11,7 @@
  * are in Earth equatorial radii unless a name says otherwise.
  */
 
-import { planetSky } from './planets.mjs?v=20260927-fullcolor-v1';
+import { planetSky } from './planets.mjs?v=20260927-sky-layer-v1';
 
 const DEG = Math.PI / 180;
 const EARTH_RADIUS_KM = 6378.137;

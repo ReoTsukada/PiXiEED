@@ -2,13 +2,14 @@
  * Solar System view: the eight planets on their real orbits around the Sun,
  * in front of the real night sky.
  *
- * Each frame is rendered in detail at "dot" resolution (2 CSS px per dot): lit
+ * The bodies are rendered in detail at "dot" resolution (2 CSS px per dot): lit
  * spheres with surface detail (the Earth's real continents turning with the
  * clock, Jupiter's belts, Saturn's rings with the planet's shadow), the Sun's
- * limb and glow, orbits, the asteroid belt and the catalogue sky behind. The
- * frame then goes through the pixel camera's own colour pipeline
- * (PiXiEELENS, full colour: the render is taken at the dot grid), so the look is exactly
- * what the camera makes of a photo. Labels are drawn crisp on top.
+ * limb and glow, orbits and the asteroid belt. That transparent layer goes
+ * through the pixel camera's own colour pipeline (PiXiEELENS, full colour) and
+ * is shown with hard pixel edges. The stars are not pixel art: the globe's
+ * full-resolution sky layer sits behind this canvas and is turned to match
+ * this camera (onSkyOrientation). Labels are drawn crisp on top.
  *
  * Distances are to scale. Bodies are drawn at their true size once that is
  * larger than a minimum, so from far away every planet stays visible and
@@ -19,9 +20,9 @@
  * to the globe.
  */
 
-import { PLANETS, PLANET_BY_ID, centuriesSinceJ2000, heliocentricAt, orbitPath, galileanOffsets } from './planets.mjs?v=20260927-fullcolor-v1';
-import { greenwichSiderealDegrees } from './astronomy.mjs?v=20260927-fullcolor-v1';
-import { sharedSky, createSkySampler } from './real-sky.mjs?v=20260927-fullcolor-v1';
+import { PLANETS, PLANET_BY_ID, centuriesSinceJ2000, heliocentricAt, orbitPath, galileanOffsets } from './planets.mjs?v=20260927-sky-layer-v1';
+import { greenwichSiderealDegrees } from './astronomy.mjs?v=20260927-sky-layer-v1';
+import { quaternionFromBasis } from './geometry.mjs?v=20260921-grid11-1';
 import { WORLD_LAND_MASK } from '../../assets/maps/world-land-mask-v1.mjs?v=20260920-webgl2-1';
 
 const DEG = Math.PI / 180;
@@ -151,7 +152,7 @@ function createBelt(count = 1600) {
   return belt;
 }
 
-export function createOrrery({ canvas, onSelect = () => {}, onExit = () => {}, onChange = () => {} }) {
+export function createOrrery({ canvas, onSelect = () => {}, onExit = () => {}, onChange = () => {}, onSkyOrientation = () => {} }) {
   const ctx = canvas.getContext('2d');
   const low = document.createElement('canvas');
   const lowCtx = low.getContext('2d', { willReadFrequently: true });
@@ -173,8 +174,6 @@ export function createOrrery({ canvas, onSelect = () => {}, onExit = () => {}, o
   let exitPressure = 0;
   let screen = [];
   let lens = null; // PiXiEELENS engine, loaded on first open
-  let sampleSky = null;
-  let skyCache = { key: '', data: null };
 
   // The pixel camera's full-colour pipeline, and the painted real sky.
   function prepare() {
@@ -185,15 +184,6 @@ export function createOrrery({ canvas, onSelect = () => {}, onExit = () => {}, o
       }).catch((error) => { console.warn('Pixel camera engine unavailable; showing the raw render.', error); return null; });
       lens.then((engine) => { lens = engine || false; requestDraw(); });
     }
-    if (!sampleSky) {
-      sampleSky = 'loading';
-      sharedSky().then(({ canvas: sky }) => {
-        const small = document.createElement('canvas'); small.width = 2048; small.height = 1024;
-        const s = small.getContext('2d'); s.imageSmoothingQuality = 'high'; s.drawImage(sky, 0, 0, 2048, 1024);
-        sampleSky = createSkySampler(s.getImageData(0, 0, 2048, 1024));
-        skyCache.key = ''; requestDraw();
-      }).catch(() => { sampleSky = null; });
-    }
   }
 
   function viewport() {
@@ -201,7 +191,7 @@ export function createOrrery({ canvas, onSelect = () => {}, onExit = () => {}, o
     const dpr = Math.min(2, globalThis.devicePixelRatio || 1);
     if (canvas.width !== Math.round(width * dpr) || canvas.height !== Math.round(height * dpr)) { canvas.width = Math.round(width * dpr); canvas.height = Math.round(height * dpr); }
     const lw = Math.ceil(width / DOT); const lh = Math.ceil(height / DOT);
-    if (low.width !== lw || low.height !== lh) { low.width = lw; low.height = lh; skyCache.key = ''; }
+    if (low.width !== lw || low.height !== lh) { low.width = lw; low.height = lh; }
     return { width, height, dpr, lw, lh };
   }
 
@@ -241,29 +231,24 @@ export function createOrrery({ canvas, onSelect = () => {}, onExit = () => {}, o
   }
 
   // ---- rendering --------------------------------------------------------------
-  function paintSky(image, view, b) {
-    const key = `${azimuth.toFixed(4)}:${elevation.toFixed(4)}:${view.lw}x${view.lh}:${typeof sampleSky === 'function'}`;
-    const data = image.data;
-    if (skyCache.key !== key) {
-      const out = new Uint8ClampedArray(view.lw * view.lh * 4);
-      const focal = (view.lh / 2) / Math.tan(SKY_HALF_FOV);
-      const rgb = [0, 0, 0];
-      for (let y = 0; y < view.lh; y += 1) {
-        for (let x = 0; x < view.lw; x += 1) {
-          const i = (y * view.lw + x) * 4;
-          out[i + 3] = 255;
-          if (typeof sampleSky !== 'function') { out[i] = 2; out[i + 1] = 4; out[i + 2] = 9; continue; }
-          const dx = x + 0.5 - view.lw / 2; const dy = view.lh / 2 - (y + 0.5);
-          const dir = norm([-b.toward[0] * focal + b.right[0] * dx + b.up[0] * dy, -b.toward[1] * focal + b.right[1] * dx + b.up[1] * dy, -b.toward[2] * focal + b.right[2] * dx + b.up[2] * dy]);
-          const q = eclipticToEquatorial(dir);
-          sampleSky(Math.atan2(q[1], q[0]) / DEG, Math.asin(clamp(q[2], -1, 1)) / DEG, rgb);
-          // A gentle black point keeps empty space black; the Milky Way and stars keep their colour.
-          out[i] = Math.max(0, rgb[0] - 12) * 1.12; out[i + 1] = Math.max(0, rgb[1] - 12) * 1.12; out[i + 2] = Math.max(0, rgb[2] - 14) * 1.14;
-        }
-      }
-      skyCache = { key, data: out };
-    }
-    data.set(skyCache.data);
+  // Composite a colour over whatever is already in the (transparent) dot buffer.
+  function blend(data, i, r, g, b, a) {
+    if (a <= 0) return;
+    const under = data[i + 3] / 255; const outA = a + under * (1 - a);
+    data[i] = (r * a + data[i] * under * (1 - a)) / outA; data[i + 1] = (g * a + data[i + 1] * under * (1 - a)) / outA; data[i + 2] = (b * a + data[i + 2] * under * (1 - a)) / outA;
+    data[i + 3] = outA * 255;
+  }
+
+  // The sky layer (a smooth, full-resolution canvas behind this one) is turned to match this camera.
+  // The sky shader reads its camera frame as Earth-fixed and rotates by sidereal time, which the
+  // renderer holds at zero while this view is open, so camera axes go ecliptic → equatorial → that frame.
+  let lastSkyKey = '';
+  function aimSky(b) {
+    const key = `${azimuth.toFixed(5)}:${elevation.toFixed(5)}`;
+    if (key === lastSkyKey) return;
+    lastSkyKey = key;
+    const toSkyFrame = (v) => { const [X, Y, Z] = eclipticToEquatorial(v); return { x: Y, y: Z, z: X }; };
+    onSkyOrientation(quaternionFromBasis(toSkyFrame(b.right), toSkyFrame(b.up), toSkyFrame(b.toward)));
   }
 
   /** Render one body as a lit sphere (plus glow for the Sun, rings for Saturn) into the dot buffer. */
@@ -287,12 +272,12 @@ export function createOrrery({ canvas, onSelect = () => {}, onExit = () => {}, o
           const r = Math.sqrt(d2);
           // Glow first (additive), then the disc with limb darkening and granulation.
           const glow = 0.9 / (1 + (Math.max(0, r - 1) * 1.6) ** 2) * (r > 1 ? 1 : 0);
-          data[i] = Math.min(255, data[i] + 255 * glow * 1.0); data[i + 1] = Math.min(255, data[i + 1] + 210 * glow); data[i + 2] = Math.min(255, data[i + 2] + 120 * glow);
+          blend(data, i, 255, 214, 130, clamp(glow, 0, 1));
           if (r <= 1) {
             const mu = Math.sqrt(1 - d2); const limb = 0.45 + 0.55 * mu;
             const gran = 0.9 + 0.1 * noise3(nx * 9 + frameInfo.t * 0.3, ny * 9, 1.7);
             const cover = clamp((1 - r) * R + 0.5, 0, 1);
-            data[i] = lerp(data[i], 255, cover); data[i + 1] = lerp(data[i + 1], 255 * clamp(0.62 + 0.38 * limb * gran, 0, 1), cover); data[i + 2] = lerp(data[i + 2], 255 * clamp(0.25 + 0.6 * limb * limb * gran, 0, 1), cover);
+            blend(data, i, 255, 255 * clamp(0.62 + 0.38 * limb * gran, 0, 1), 255 * clamp(0.25 + 0.6 * limb * limb * gran, 0, 1), cover);
           }
           continue;
         }
@@ -329,11 +314,11 @@ export function createOrrery({ canvas, onSelect = () => {}, onExit = () => {}, o
             const tint = id === 'earth' ? [0.45, 0.7, 1] : [1, 0.95, 0.8];
             r += tint[0] * rim * 0.8; g += tint[1] * rim * 0.8; bl += tint[2] * rim * 0.8;
           }
-          data[i] = lerp(data[i], 255 * clamp(r, 0, 1), cover); data[i + 1] = lerp(data[i + 1], 255 * clamp(g, 0, 1), cover); data[i + 2] = lerp(data[i + 2], 255 * clamp(bl, 0, 1), cover);
+          blend(data, i, 255 * clamp(r, 0, 1), 255 * clamp(g, 0, 1), 255 * clamp(bl, 0, 1), cover);
         }
         if (ring > 0 && (ringFront || cover < 1)) {
           const a = ring * (ringFront ? 1 : 1 - cover);
-          data[i] = lerp(data[i], 255 * ringColor[0], a); data[i + 1] = lerp(data[i + 1], 255 * ringColor[1], a); data[i + 2] = lerp(data[i + 2], 255 * ringColor[2], a);
+          blend(data, i, 255 * ringColor[0], 255 * ringColor[1], 255 * ringColor[2], clamp(a, 0, 1));
         }
       }
     }
@@ -357,9 +342,8 @@ export function createOrrery({ canvas, onSelect = () => {}, onExit = () => {}, o
     const view = viewport();
     const b = basis();
     const days = (time - Date.UTC(2000, 0, 1, 12)) / 86400000;
-    const image = lowCtx.createImageData(view.lw, view.lh);
-    paintSky(image, view, b);
-    lowCtx.putImageData(image, 0, 0);
+    lowCtx.clearRect(0, 0, view.lw, view.lh);
+    aimSky(b);
 
     // Orbits, thin and quiet; the focused one brighter.
     lowCtx.save();
@@ -388,7 +372,7 @@ export function createOrrery({ canvas, onSelect = () => {}, onExit = () => {}, o
         const x = Math.floor(p.x / DOT); const y = Math.floor(p.y / DOT);
         if (x < 0 || y < 0 || x >= view.lw || y >= view.lh) continue;
         const i = (y * view.lw + x) * 4; const v = 120 * rock.shade;
-        data[i] = Math.max(data[i], v); data[i + 1] = Math.max(data[i + 1], v * 0.93); data[i + 2] = Math.max(data[i + 2], v * 0.82);
+        blend(data, i, v, v * 0.93, v * 0.82, 1);
       }
     }
 
@@ -421,13 +405,7 @@ export function createOrrery({ canvas, onSelect = () => {}, onExit = () => {}, o
     }
 
     // Through the pixel camera in full colour (its tone pre-processing at the dot grid).
-    if (lens && typeof lens.processLensFrame === 'function') {
-      // The camera lifts shadows a little; whatever was black before the conversion stays black.
-      const px = buffer.data; const empty = new Uint8Array(px.length / 4);
-      for (let k = 0, j = 0; k < px.length; k += 4, j += 1) if (px[k] + px[k + 1] + px[k + 2] < 6) empty[j] = 1;
-      lens.processLensFrame(buffer);
-      for (let j = 0; j < empty.length; j += 1) if (empty[j]) { px[j * 4] = 0; px[j * 4 + 1] = 0; px[j * 4 + 2] = 0; }
-    }
+    if (lens && typeof lens.processLensFrame === 'function') lens.processLensFrame(buffer);
     lowCtx.putImageData(buffer, 0, 0);
     ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
     ctx.imageSmoothingEnabled = false;
@@ -557,7 +535,7 @@ export function createOrrery({ canvas, onSelect = () => {}, onExit = () => {}, o
     isOpen: () => opened,
     /** Open close on the Earth (as big as the globe) and pull back to the inner Solar System. */
     open({ fromEarth = true } = {}) {
-      opened = true; selectedId = null; exitPressure = 0;
+      opened = true; selectedId = null; exitPressure = 0; lastSkyKey = '';
       prepare();
       update();
       const { width, height } = viewport(); const short = Math.min(width, height);

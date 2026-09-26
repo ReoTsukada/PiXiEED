@@ -16,11 +16,11 @@
  * Play/pause is the only plain button.
  */
 
-import { celestialState, geoToUnit, unitToGeo, listEclipses, peakObscurationAt, moonPhase, findGreatestEclipse, findSunEvent } from './astronomy.mjs?v=20260927-fullcolor-v1';
-import { createScope, refracted } from './scope.mjs?v=20260927-fullcolor-v1';
-import { sharedSky } from './real-sky.mjs?v=20260927-fullcolor-v1';
-import { createOrrery } from './orrery.mjs?v=20260927-fullcolor-v1';
-import { PLANETS, PLANET_BY_ID, SKY_PLANETS, lightMinutes } from './planets.mjs?v=20260927-fullcolor-v1';
+import { celestialState, geoToUnit, unitToGeo, listEclipses, peakObscurationAt, moonPhase, findGreatestEclipse, findSunEvent } from './astronomy.mjs?v=20260927-sky-layer-v1';
+import { createScope, refracted } from './scope.mjs?v=20260927-sky-layer-v1';
+import { sharedSky } from './real-sky.mjs?v=20260927-sky-layer-v1';
+import { createOrrery } from './orrery.mjs?v=20260927-sky-layer-v1';
+import { PLANETS, PLANET_BY_ID, SKY_PLANETS, lightMinutes } from './planets.mjs?v=20260927-sky-layer-v1';
 
 const DEG = Math.PI / 180;
 const MINUTE = 60000;
@@ -421,7 +421,8 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
     canvas: orreryCanvas,
     onSelect(id) { selectedBody = id; renderCard(); for (const chip of bodyChips.children) chip.classList.toggle('is-active', chip.dataset.body === id); },
     onExit: () => closeOrrery(),
-    onChange() { if (selectedBody) renderCard(); }
+    onChange() { if (selectedBody) renderCard(); },
+    onSkyOrientation(orientation) { renderer.setSkyOrientation?.(orientation); }
   });
 
   function renderCard() {
@@ -482,6 +483,7 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
     orrery.close(() => {
       // Land back on the globe at a comfortable size rather than at the zoom-out limit.
       renderer.setView({ zoom: 1 });
+      renderer.setSkyOrientation?.(null);
       stage.classList.remove('is-orrery', 'is-orrery-leaving');
       orreryCanvas.hidden = true; orreryHud.hidden = true;
       useSpeeds('sky');
