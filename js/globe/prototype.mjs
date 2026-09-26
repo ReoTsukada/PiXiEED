@@ -1,7 +1,7 @@
-import { initAstroUi } from './astro-ui.mjs?v=20260921-icon-only-v1';
+import { initAstroUi } from './astro-ui.mjs?v=20260926-gesture-v1';
 import { initPostUi } from './post-ui.mjs?v=20260921-tool-shell-v1';
 import { createSupabaseGlobeAuth, createSupabaseGlobeStore } from './post-supabase.mjs?v=20260921-globe-post-v1';
-import { createGlobeRenderer, decodeRasterData, getSelectionStageLabel, prepareGeoJsonFeatures } from './renderer.mjs?v=20260921-astro-4';
+import { createGlobeRenderer, decodeRasterData, getSelectionStageLabel, prepareGeoJsonFeatures } from './renderer.mjs?v=20260926-gesture-v1';
 
 const embedMode = new URLSearchParams(location.search).get('embed') === '1';
 
@@ -45,6 +45,12 @@ function createPrototypeRenderer(options = {}) {
       showSelection(selection);
       if (selection) renderer.focusSelection(selection);
     },
+    onLongPress(spot) {
+      // Holding a spot on the globe looks at the sky from there.
+      if (postUi?.getState?.().sheet === 'composer') return;
+      navigator.vibrate?.(8);
+      globalThis.__PIXIEED_ASTRO__?.openScope({ latitude: spot.latitude, longitude: spot.longitude });
+    },
     onStateChange({ view }) {
       globalThis.__PIXIEED_ASTRO__?.refreshView?.();
       postUi?.refresh();
@@ -81,11 +87,21 @@ placeHere.addEventListener('click', () => {
   if (currentSelection && postUi) postUi.openComposer({ selection: currentSelection });
 });
 
-document.querySelector('#zoomIn').addEventListener('click', () => renderer.zoomIn());
-document.querySelector('#zoomOut').addEventListener('click', () => renderer.zoomOut());
-document.querySelector('#resetView').addEventListener('click', () => { showSelection(null); renderer.resetView(); });
-document.querySelector('#rotateLeft').addEventListener('click', () => renderer.setView({ centerLongitude: renderer.getSnapshot().view.centerLongitude - 18 }));
-document.querySelector('#rotateRight').addEventListener('click', () => renderer.setView({ centerLongitude: renderer.getSnapshot().view.centerLongitude + 18 }));
+// The globe has no zoom/rotate buttons. A one-time hint names the gestures and
+// leaves as soon as the globe is touched.
+const GESTURE_HINT_KEY = 'PiXiEED:globe-gesture-hint:v1';
+const gestureHint = document.querySelector('#gestureHint');
+function dismissGestureHint() {
+  if (!gestureHint || gestureHint.hidden) return;
+  gestureHint.classList.add('is-leaving');
+  setTimeout(() => { gestureHint.hidden = true; }, 260);
+  try { localStorage.setItem(GESTURE_HINT_KEY, '1'); } catch { /* private mode */ }
+}
+// A mouse zooms with the wheel rather than a pinch.
+if (gestureHint && globalThis.matchMedia?.('(hover: hover) and (pointer: fine)').matches) gestureHint.children[1].textContent = 'ホイールで拡大・縮小';
+try { if (gestureHint && !localStorage.getItem(GESTURE_HINT_KEY)) gestureHint.hidden = false; } catch { if (gestureHint) gestureHint.hidden = false; }
+canvas.addEventListener('pointerdown', dismissGestureHint, { once: true });
+canvas.addEventListener('wheel', dismissGestureHint, { once: true, passive: true });
 
 try {
   // The HTML head starts this request in parallel with the module graph, so the

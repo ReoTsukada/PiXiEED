@@ -360,24 +360,35 @@ export function createScope({ canvas, onChange = () => {} } = {}) {
     });
   }
 
-  let drag = null;
+  // One finger aims the telescope, two fingers pinch the field of view.
+  let drag = null; const touches = new Map(); let pinchDistance = 0;
+  function spread() { const [first, second] = [...touches.values()]; return Math.max(1, Math.hypot(first.x - second.x, first.y - second.y)); }
   function onPointerDown(event) {
     if (!opened) return;
     canvas.setPointerCapture?.(event.pointerId);
-    drag = { x: event.clientX, y: event.clientY };
+    touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (touches.size >= 2) { drag = null; pinchDistance = spread(); return; }
+    drag = { id: event.pointerId, x: event.clientX, y: event.clientY };
   }
   function onPointerMove(event) {
-    if (!opened || !drag) return;
+    if (!opened || !touches.has(event.pointerId)) return;
+    touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (touches.size >= 2) { const next = spread(); setFov(fov * (pinchDistance / next)); pinchDistance = next; return; }
+    if (!drag || drag.id !== event.pointerId) return;
     const rect = canvas.getBoundingClientRect();
     const perPixel = (fov * DEG) / (rect.height || 600);
     azimuth -= (event.clientX - drag.x) * perPixel / Math.max(Math.cos(altitude), 0.15);
     altitude = clamp(altitude + (event.clientY - drag.y) * perPixel, -10 * DEG, 90 * DEG);
-    drag = { x: event.clientX, y: event.clientY };
+    drag = { id: event.pointerId, x: event.clientX, y: event.clientY };
     tracking = null;
     onChange(snapshot());
     requestDraw();
   }
-  function onPointerUp(event) { drag = null; canvas.releasePointerCapture?.(event.pointerId); }
+  function onPointerUp(event) {
+    touches.delete(event.pointerId); canvas.releasePointerCapture?.(event.pointerId);
+    if (touches.size === 1) { const [[id, point]] = [...touches.entries()]; drag = { id, x: point.x, y: point.y }; pinchDistance = 0; return; }
+    if (touches.size === 0) drag = null;
+  }
   function onWheel(event) {
     if (!opened) return;
     event.preventDefault();

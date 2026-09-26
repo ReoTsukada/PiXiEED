@@ -16,10 +16,10 @@
       }
     }());
   </script>
-  <link rel="stylesheet" href="css/globe-prototype.css?v=20260921-icon-only-v1">
+  <link rel="stylesheet" href="css/globe-prototype.css?v=20260926-gesture-v1">
   <!-- Flatten the module waterfall and fetch the land-mask raster in parallel. -->
-  <link rel="modulepreload" href="js/globe/renderer.mjs?v=20260921-astro-4">
-  <link rel="modulepreload" href="js/globe/astro-ui.mjs?v=20260921-icon-only-v1">
+  <link rel="modulepreload" href="js/globe/renderer.mjs?v=20260926-gesture-v1">
+  <link rel="modulepreload" href="js/globe/astro-ui.mjs?v=20260926-gesture-v1">
   <link rel="modulepreload" href="js/globe/post-ui.mjs?v=20260921-tool-shell-v1">
   <link rel="modulepreload" href="js/globe/geometry.mjs?v=20260921-grid11-1">
   <link rel="modulepreload" href="js/globe/topology.mjs?v=20260920-g4-precision-1">
@@ -51,14 +51,8 @@
     </header>
 
     <section id="globeStage" class="globe-stage" aria-label="インタラクティブな地球儀">
-      <canvas id="globeCanvas" tabindex="0" aria-label="地球儀。ドラッグで回転、ホイールまたはピンチでズーム、タップでセルを選択"></canvas>
-      <div class="globe-controls" aria-label="地球儀の操作">
-        <button id="rotateLeft" type="button" aria-label="左へ回転"><img src="/assets/icons/pixieed/rewind.svg" alt=""></button>
-        <button id="zoomOut" type="button" aria-label="ズームアウト"><img src="/assets/icons/pixieed/zoom-out.svg" alt=""></button>
-        <button id="resetView" type="button" aria-label="初期表示に戻す"><img src="/assets/icons/pixieed/reset.svg" alt=""></button>
-        <button id="zoomIn" type="button" aria-label="ズームイン"><img src="/assets/icons/pixieed/zoom-in.svg" alt=""></button>
-        <button id="rotateRight" type="button" aria-label="右へ回転"><img src="/assets/icons/pixieed/forward.svg" alt=""></button>
-      </div>
+      <canvas id="globeCanvas" tabindex="0" aria-label="地球儀。ドラッグで回転、ピンチまたはホイールでズーム、2本指タップで縮小、タップでセルを選択、長押しでその場所から空を見る。キーボードでは矢印で回転、プラスとマイナスでズーム、0で初期表示"></canvas>
+      <p id="gestureHint" class="gesture-hint" hidden><span>ドラッグで回す</span><span>ピンチで拡大・縮小</span><span>長押しで空を見る</span></p>
       <aside id="selectionPanel" class="selection-panel" aria-live="polite" hidden>
         <span id="selectedStage"></span>
         <strong id="selectedOwner"></strong>
@@ -69,6 +63,6 @@
     </section>
 
   </main>
-  <script type="module" src="js/globe/prototype.mjs?v=20260921-tool-shell-v1"></script>
+  <script type="module" src="js/globe/prototype.mjs?v=20260926-gesture-v1"></script>
 </body>
 </html>
