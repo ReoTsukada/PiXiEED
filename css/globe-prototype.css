@@ -77,10 +77,6 @@ h1 {
   border-radius: 28px;
   isolation: isolate;
   background-color: #02050a;
-  background-image: url("../assets/backgrounds/pixieed-space-panorama-v1.png");
-  background-size: auto 115%;
-  background-repeat: repeat-x;
-  background-position: var(--space-offset, 50% 50%);
   transition: none;
   box-shadow: 0 24px 80px rgba(0, 0, 0, .28), inset 0 1px rgba(255,255,255,.04);
 }
