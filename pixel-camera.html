@@ -8,14 +8,15 @@
   <meta name="description" content="いつもの景色を、ドット絵に。カメラを向けて撮影し、PNG画像で保存できます。写真は端末内で処理します。">
   <link rel="icon" href="/assets/brand/pixieed-logo-48.png" type="image/png">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20260924-camera-release-1">
-  <link rel="stylesheet" href="css/pixel-lens-camera.css?v=20260926-ux-1">
-  <link rel="modulepreload" href="js/pixel-lens/app.mjs?v=20260926-ux-1">
+  <link rel="stylesheet" href="css/pixel-lens-camera.css?v=20260927-gesture-1">
+  <link rel="modulepreload" href="js/pixel-lens/app.mjs?v=20260927-gesture-1">
 </head>
 <body>
   <a class="pc-skip" href="#stage">カメラへ移動</a>
   <main class="lc" id="pixelStudio" data-mode="loading">
-    <!-- Camera view: pinch to zoom, double tap for 1×, tap to pick colours again -->
-    <section class="lc-stage" id="stage" aria-label="撮影プレビュー。ピンチでズーム、ダブルタップで等倍、タップで色を選び直し" tabindex="-1">
+    <!-- The picture is the controller: pinch = zoom, double tap = 1×, tap = pick colours again,
+         swipe left/right = look, swipe up/down = front/back camera -->
+    <section class="lc-stage" id="stage" aria-label="撮影プレビュー。ピンチでズーム、ダブルタップで等倍、タップで色を選び直し、左右スワイプで色、上下スワイプでカメラ切り替え" tabindex="-1">
       <video id="video" playsinline muted hidden></video>
       <div class="lc-frame" id="captureFrame">
         <canvas id="view" width="1" height="1" aria-hidden="true"></canvas>
@@ -27,6 +28,12 @@
           <img src="/assets/icons/pixieed/camera.svg" alt="" width="40" height="40">
           <p><strong>カメラは停止中です</strong><span>中央のボタンで再開できます</span></p>
         </div>
+      </div>
+      <div class="lc-rec" id="gifRec" hidden role="status"><i aria-hidden="true"></i>GIF <span id="gifRecTime">5.0s</span></div>
+      <div class="lc-hint" id="gestureHint" hidden>
+        <p><b>↔</b><span>左右スワイプで色</span></p>
+        <p><b>↕</b><span>上下スワイプでカメラ切替</span></p>
+        <p><b>●</b><span>シャッター長押しでGIF</span></p>
       </div>
       <div class="lc-zoom-hud" id="zoomHud" aria-hidden="true">
         <span class="lc-zoom-hud-value" id="zoomHudValue">1×</span>
@@ -40,7 +47,6 @@
       <h1 class="pc-sr-only">ドット絵カメラ</h1>
       <div class="lc-zoom-stops" id="zoomStops" role="group" aria-label="ズーム"></div>
       <div id="cameraControls" class="lc-top-right">
-        <button id="flipCamera" class="lc-round" type="button" aria-label="前後カメラを切り替え" title="前後カメラを切り替え" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9a8 8 0 0 1 14-3l2 2M20 15a8 8 0 0 1-14 3l-2-2"/><path d="M20 4v4h-4M4 20v-4h4"/></svg></button>
         <button id="stopCamera" class="lc-round" type="button" aria-label="カメラを一時停止" title="一時停止" disabled><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="7" y="6" width="3.5" height="12" rx="1"/><rect x="13.5" y="6" width="3.5" height="12" rx="1"/></svg></button>
       </div>
     </header>
@@ -63,12 +69,13 @@
         <button type="button" role="radio" data-look="full" aria-checked="false"><i class="lc-sw lc-sw-full"></i><span>フル</span></button>
       </div>
       <div class="lc-bottom-row">
+        <button id="ditherToggle" class="lc-round lc-dither" type="button" aria-pressed="true" aria-label="ディザ" title="ディザ（点の模様でグラデーション）"><svg viewBox="0 0 24 24" aria-hidden="true"><g fill="currentColor"><rect x="4" y="4" width="4" height="4"/><rect x="12" y="4" width="4" height="4"/><rect x="8" y="8" width="4" height="4"/><rect x="16" y="8" width="4" height="4"/><rect x="4" y="12" width="4" height="4"/><rect x="12" y="12" width="4" height="4"/><rect x="8" y="16" width="4" height="4"/><rect x="16" y="16" width="4" height="4"/></g></svg></button>
         <button id="imageSettings" class="lc-pill" type="button" popovertarget="sizePopover" aria-controls="sizePopover" aria-label="撮影と色の設定">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
           <span id="colorSummary">4色</span><span class="lc-dot" aria-hidden="true">·</span><span id="sizeSummary">256 px</span><span class="pc-sr-only" id="ratioSummary">画面</span>
         </button>
         <div id="resultControls" class="lc-result" hidden>
-          <a id="savePng" class="lc-save" aria-disabled="true" tabindex="-1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m-5-5 5 5 5-5M5 19h14"/></svg><span>PNGを保存</span></a>
+          <a id="savePng" class="lc-save" aria-disabled="true" tabindex="-1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m-5-5 5 5 5-5M5 19h14"/></svg><span id="saveLabel">PNGを保存</span></a>
         </div>
       </div>
     </div>
@@ -116,11 +123,6 @@
         <div class="lc-palette"><div id="palettePreview" class="lc-palette-colors" aria-label="現在の配色"></div><button type="button" class="lc-link" id="repick">色を選び直す</button></div>
       </section>
 
-      <section class="lc-group" aria-labelledby="gFinish">
-        <h3 id="gFinish">仕上げ</h3>
-        <label class="lc-switch"><span><strong>ディザ</strong><small>点の模様でグラデーションを表現。8色・16色ではざらつきを自動で整えます</small></span><input type="checkbox" name="dither" role="switch" checked></label>
-      </section>
-
       <details class="lc-group lc-tone">
         <summary><h3>カメラの色調整</h3><span class="lc-tone-state" id="toneState">標準</span></summary>
         <label class="lc-range"><span class="lc-label">明るさ <output data-for="brightness">0</output></span><input name="brightness" type="range" min="-100" max="100" step="1" value="0"></label>
@@ -141,7 +143,7 @@
   <nav class="app-tabs pc-nav" aria-label="アプリナビゲーション" data-nav="five">
     <a data-nav="home" href="/home/" aria-label="ホーム"><img src="/assets/icons/pixieed/home.svg" alt=""></a>
     <a data-nav="map" href="/" aria-label="地図"><img src="/assets/icons/pixieed/globe.svg" alt=""></a>
-    <button id="capture" class="pc-nav-action" data-action="capture" type="button" aria-label="表示中の画像を撮影" title="撮影" disabled>
+    <button id="capture" class="pc-nav-action" data-action="capture" type="button" aria-label="表示中の画像を撮影（長押しでGIF）" title="タップで撮影・長押しでGIF" disabled>
       <span class="pc-nav-shutter" aria-hidden="true"></span>
       <img class="pc-nav-resume" src="/assets/icons/pixieed/camera.svg" alt="">
       <img class="pc-nav-retake" src="/assets/icons/pixieed/reset.svg" alt="">
@@ -149,6 +151,6 @@
     <a data-nav="tools" href="/tools/" aria-label="ツール" aria-current="page"><img src="/assets/icons/pixieed/celestial.svg" alt=""></a>
     <a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>
   </nav>
-  <script type="module" src="js/pixel-lens/app.mjs?v=20260926-ux-1"></script>
+  <script type="module" src="js/pixel-lens/app.mjs?v=20260927-gesture-1"></script>
 </body>
 </html>

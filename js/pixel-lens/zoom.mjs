@@ -35,30 +35,51 @@ export function formatZoom(value) {
 }
 
 /**
- * Attach pinch / wheel / double-tap handling to `element`.
- * `onZoom(value, { gesture })` is called with the new zoom; `onTap()` fires for a single tap that was not
- * part of a double tap or a pinch (the caller uses it to re-pick colours).
+ * Attach pinch / wheel / double-tap / swipe handling to `element`.
+ * `set(value, { gesture })` receives the new zoom; `onTap()` fires for a single tap that was not part of a
+ * double tap, pinch or swipe (the caller uses it to re-pick colours). A one-finger flick calls
+ * `onSwipe('left'|'right'|'up'|'down')`; `onDrag(dx, dy)` follows the finger meanwhile (and `onDrag(0, 0)`
+ * on release) so the view can lean with it.
  */
-export function attachZoomGestures(element, { get, set, onTap = null, onGesture = null } = {}) {
+export const SWIPE_MIN_PX = 48;
+export const SWIPE_MAX_MS = 700;
+
+/** Classify a one-finger movement as a swipe direction, or null. */
+export function swipeDirection(dx, dy, ms) {
+  const ax = Math.abs(dx); const ay = Math.abs(dy);
+  if (ms > SWIPE_MAX_MS || Math.max(ax, ay) < SWIPE_MIN_PX) return null;
+  if (ax > ay * 1.4) return dx < 0 ? 'left' : 'right';
+  if (ay > ax * 1.4) return dy < 0 ? 'up' : 'down';
+  return null;
+}
+
+export function attachZoomGestures(element, { get, set, onTap = null, onGesture = null, onSwipe = null, onDrag = null } = {}) {
   const pointers = new Map();
-  let pinch = null; let lastTap = 0; let tapTimer = 0; let moved = false; let downAt = 0;
+  let pinch = null; let lastTap = 0; let tapTimer = 0; let moved = false; let downAt = 0; let pinched = false;
   const distance = () => { const [a, b] = [...pointers.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
   element.addEventListener('pointerdown', (event) => {
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY, x0: event.clientX, y0: event.clientY });
     try { element.setPointerCapture(event.pointerId); } catch { /* not capturable */ }
-    if (pointers.size === 1) { moved = false; downAt = performance.now(); }
-    if (pointers.size === 2) { pinch = { start: distance(), zoom: get() }; moved = true; onGesture?.('start'); }
+    if (pointers.size === 1) { moved = false; pinched = false; downAt = performance.now(); }
+    if (pointers.size === 2) { pinch = { start: distance(), zoom: get() }; moved = true; pinched = true; onDrag?.(0, 0); onGesture?.('start'); }
   });
   element.addEventListener('pointermove', (event) => {
     const p = pointers.get(event.pointerId); if (!p) return;
     p.x = event.clientX; p.y = event.clientY;
     if (Math.hypot(p.x - p.x0, p.y - p.y0) > 10) moved = true;
     if (pinch && pointers.size >= 2) { const d = distance(); if (pinch.start > 0) set(pinch.zoom * (d / pinch.start), { gesture: 'pinch' }); }
+    else if (!pinched && pointers.size === 1 && moved) onDrag?.(p.x - p.x0, p.y - p.y0);
   });
   const end = (event) => {
-    if (!pointers.has(event.pointerId)) return;
+    const p = pointers.get(event.pointerId);
+    if (!p) return;
     pointers.delete(event.pointerId);
     if (pinch && pointers.size < 2) { pinch = null; onGesture?.('end'); }
+    if (pointers.size === 0 && moved && !pinched) {
+      onDrag?.(0, 0);
+      const direction = event.type === 'pointerup' ? swipeDirection(p.x - p.x0, p.y - p.y0, performance.now() - downAt) : null;
+      if (direction) onSwipe?.(direction);
+    }
     if (pointers.size === 0 && !moved && performance.now() - downAt < 350) {
       const now = performance.now();
       if (now - lastTap < 300) { window.clearTimeout(tapTimer); lastTap = 0; set(1, { gesture: 'double-tap' }); }

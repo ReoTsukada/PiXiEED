@@ -2,8 +2,9 @@ import { createFrameLoop } from '../pixel-studio/frame-loop.mjs';
 import { encodeCameraPng, pngExportGeometry } from '../pixel-studio/png-export.mjs';
 import { FRAME_RATIOS, OUTPUT_SIZES, resolveAspect, centerCrop, frameGeometry, fitFrame } from '../pixel-studio/framing.mjs?v=20260925-lens-sizes-1';
 import { cameraStartErrorMessage, deriveCameraPrimaryAction } from '../pixel-studio/camera-ui-state.mjs';
-import { CAMERA_SETTING_DEFAULTS, lensFrameFilter, lensPalette, processLensFrame, resetLensPalette, setLensSettings } from './engine.mjs?v=20260926-ux-1';
-import { attachZoomGestures, formatZoom, splitZoom, zoomRange, zoomStops } from './zoom.mjs?v=20260926-ux-1';
+import { CAMERA_SETTING_DEFAULTS, lensFrameFilter, lensPalette, processLensFrame, resetLensPalette, setLensSettings } from './engine.mjs?v=20260927-gesture-1';
+import { attachZoomGestures, formatZoom, splitZoom, zoomRange, zoomStops } from './zoom.mjs?v=20260927-gesture-1';
+import { GIF_FPS, GIF_MAX_MS, encodeGif, gifScale } from './gif.mjs?v=20260927-gesture-1';
 
 const $ = (selector) => document.querySelector(selector);
 const root = $('#pixelStudio');
@@ -69,6 +70,7 @@ function sayToast(message) {
 
 function invalidateCaptureDownload() {
   downloadGeneration++;
+  stopGifPlayback();
   if (downloadUrl) URL.revokeObjectURL(downloadUrl);
   downloadUrl = null;
   const link = $('#savePng');
@@ -127,7 +129,6 @@ function setMode(mode) {
   $('#welcome').hidden = mode !== 'idle';
   $('#cameraControls').hidden = mode !== 'live' && mode !== 'loading';
   $('#resultControls').hidden = mode !== 'captured';
-  $('#flipCamera').disabled = mode !== 'live';
   $('#imageSettings').disabled = mode === 'captured';
   if (mode === 'captured' && settingsPanel.matches(':popover-open')) settingsPanel.hidePopover();
   updateSizeSummary();
@@ -322,6 +323,7 @@ loop = createFrameLoop({
       try {
         const wasError = Boolean(state.error);
         drawCompleted(result);
+        if (gif.recording) recordGifFrame(result);
         const previewMessage = result.aiStatus === 'ready' || result.aiStatus === 'processing' || result.aiStatus === 'disabled' ? ''
           : result.aiStatus === 'no-instances' ? ''
           : 'この端末に合わせた画質で表示しています。';
@@ -329,6 +331,7 @@ loop = createFrameLoop({
           previewReady = true;
           setInfoForMode('live');
           say(previewMessage);
+          showGestureHintOnce();
         }
         if (wasError) {
           setInfoForMode('live');
@@ -448,6 +451,7 @@ function capture() {
   if (state.mode !== 'live' || !state.result) return;
   invalidateCaptureDownload();
   const frozen = state.result;
+  gif.pending = null;
   invalidatePreview();
   cameraSequence++;
   stopTracks();
@@ -473,6 +477,7 @@ function refreshObjects() {
 }
 
 function retake() {
+  gif.pending = null;
   invalidateCaptureDownload();
   state.result = null;
   view.width = 1;
@@ -492,6 +497,7 @@ async function prepareCaptureDownload(frozen) {
     const link = $('#savePng');
     link.href = downloadUrl;
     link.download = `pixieed-pixel-camera-${width}x${height}.png`;
+    $('#saveLabel').textContent = 'PNGを保存';
     updateSaveLinkState();
     sayToast('撮影しました。PNGを保存できます。');
     focusVisible('#savePng');
@@ -529,7 +535,9 @@ function syncControls() {
   }
   const check = (name, value) => { const input = settingsPanel.querySelector(`input[name="${name}"][value="${value}"]`); if (input) input.checked = true; };
   check('aspect', state.ratio); check('pixels', String(state.size)); check('paletteMode', state.paletteMode);
-  const dither = settingsPanel.querySelector('input[name="dither"]'); if (dither) dither.checked = state.gradientMode === 'dither';
+  const ditherButton = $('#ditherToggle');
+  ditherButton.setAttribute('aria-pressed', String(state.gradientMode === 'dither'));
+  ditherButton.disabled = state.colorDepth === 'full';
   $('#paletteModeRow').hidden = !['2', '4', '8', '16'].includes(state.colorDepth);
   const look = currentLook();
   for (const button of document.querySelectorAll('#looks [data-look]')) button.setAttribute('aria-checked', String(button.dataset.look === look));
@@ -563,13 +571,27 @@ $('#resetCamera')?.addEventListener('click', () => {
   applyChange();
 });
 $('#repick')?.addEventListener('click', () => { refreshObjects(); settingsPanel.hidePopover?.(); });
-$('#looks').addEventListener('click', (event) => {
-  const button = event.target.closest('[data-look]'); if (!button || state.mode === 'captured') return;
+function selectLook(button) {
+  if (!button || state.mode === 'captured') return;
   Object.assign(state, LOOKS[button.dataset.look]);
   button.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
   navigator.vibrate?.(8);
   applyChange();
   sayToast(button.textContent.trim());
+}
+$('#looks').addEventListener('click', (event) => selectLook(event.target.closest('[data-look]')));
+// Swipe left / right on the picture steps through the looks (wraps around).
+function stepLook(delta) {
+  const buttons = [...document.querySelectorAll('#looks [data-look]')];
+  const index = buttons.findIndex((button) => button.dataset.look === currentLook());
+  selectLook(buttons[(index + delta + buttons.length) % buttons.length]);
+}
+$('#ditherToggle').addEventListener('click', () => {
+  if (state.mode === 'captured' || state.colorDepth === 'full') return;
+  state.gradientMode = state.gradientMode === 'dither' ? 'none' : 'dither';
+  navigator.vibrate?.(6);
+  applyChange();
+  sayToast(state.gradientMode === 'dither' ? 'ディザ オン' : 'ディザ オフ');
 });
 syncControls();
 
@@ -640,7 +662,19 @@ $('#zoomStops').addEventListener('click', (event) => {
 attachZoomGestures(stage, {
   get: () => state.zoom,
   set: (value, info) => setZoom(value, info),
-  onTap: () => refreshObjects()
+  onTap: () => refreshObjects(),
+  // the picture leans a little with the finger, so a swipe feels attached to it
+  onDrag: (dx, dy) => {
+    if (state.mode !== 'live' || gif.recording) return;
+    captureFrame.classList.toggle('is-dragging', Boolean(dx || dy));
+    captureFrame.style.translate = dx || dy ? `${Math.max(-40, Math.min(40, dx * 0.18))}px ${Math.max(-40, Math.min(40, dy * 0.18))}px` : '';
+  },
+  onSwipe: (direction) => {
+    if (state.mode !== 'live' || gif.recording) return;
+    if (direction === 'left') stepLook(1);
+    else if (direction === 'right') stepLook(-1);
+    else flipCamera();
+  }
 });
 stage.addEventListener('keydown', (event) => {
   if (event.key === '+' || event.key === '=') setZoom(state.zoom * 1.25, { gesture: 'key' });
@@ -649,11 +683,127 @@ stage.addEventListener('keydown', (event) => {
   else if ((event.key === 'Enter' || event.key === ' ') && !event.repeat) { event.preventDefault(); refreshObjects(); }
 });
 
-$('#flipCamera').addEventListener('click', () => {
+// Swipe up / down: front and back cameras.
+function flipCamera() {
   lastFacing = state.facing === 'environment' ? 'user' : 'environment';
-  void startCamera();
+  captureFrame.classList.remove('lc-flip');
+  requestAnimationFrame(() => captureFrame.classList.add('lc-flip'));
+  window.setTimeout(() => captureFrame.classList.remove('lc-flip'), 500);
+  navigator.vibrate?.(8);
+  sayToast(lastFacing === 'user' ? 'インカメラ' : '外カメラ');
+  void startCamera({ focus: false });
+}
+
+// ---------- GIF: hold the shutter ----------
+const HOLD_MS = 360;
+const gif = { recording: false, frames: [], started: 0, lastAt: 0, raf: 0, playTimer: 0, pending: null };
+const captureButton = $('#capture');
+let holdTimer = 0; let holdFired = false;
+function gifProgress() {
+  if (!gif.recording) return;
+  const elapsed = performance.now() - gif.started;
+  const left = Math.max(0, GIF_MAX_MS - elapsed);
+  captureButton.style.setProperty('--gif-progress', String(Math.min(1, elapsed / GIF_MAX_MS)));
+  $('#gifRecTime').textContent = `${(left / 1000).toFixed(1)}s`;
+  if (left <= 0) { finishGif(); return; }
+  gif.raf = requestAnimationFrame(gifProgress);
+}
+function startGif() {
+  if (state.mode !== 'live' || !state.result) return;
+  gif.recording = true; gif.frames = []; gif.started = performance.now(); gif.lastAt = 0;
+  recordGifFrame(state.result);
+  root.dataset.recording = 'true';
+  $('#gifRec').hidden = false;
+  navigator.vibrate?.(15);
+  gif.raf = requestAnimationFrame(gifProgress);
+}
+function recordGifFrame(result) {
+  const now = performance.now();
+  if (gif.frames.length && now - gif.lastAt < 1000 / GIF_FPS - 8) return;
+  const first = gif.frames[0];
+  if (first && (first.width !== result.width || first.height !== result.height)) return;
+  gif.lastAt = now;
+  gif.frames.push({ width: result.width, height: result.height, data: result.data });
+}
+function stopGifUi() {
+  gif.recording = false;
+  cancelAnimationFrame(gif.raf);
+  root.dataset.recording = 'false';
+  $('#gifRec').hidden = true;
+  captureButton.style.setProperty('--gif-progress', '0');
+}
+function finishGif() {
+  if (!gif.recording) return;
+  stopGifUi();
+  const frames = gif.frames; gif.frames = [];
+  if (frames.length < 2) { capture(); return; } // too short to move: keep it as a photo
+  invalidateCaptureDownload();
+  invalidatePreview();
+  cameraSequence++;
+  stopTracks();
+  state.result = frames[frames.length - 1];
+  setMode('captured');
+  fitPreview(state.result);
+  navigator.vibrate?.([10, 40, 10]);
+  gif.pending = frames;
+  playGif(frames);
+  say('GIFを作っています…', { visible: true });
+  window.setTimeout(() => void prepareGifDownload(frames), 30);
+}
+function playGif(frames) {
+  stopGifPlayback();
+  let index = 0;
+  const show = () => { const f = frames[index]; index = (index + 1) % frames.length; viewContext.putImageData(new ImageData(f.data, f.width, f.height), 0, 0); };
+  if (view.width !== frames[0].width || view.height !== frames[0].height) { view.width = frames[0].width; view.height = frames[0].height; }
+  show();
+  gif.playTimer = window.setInterval(show, 1000 / GIF_FPS);
+}
+function stopGifPlayback() { if (gif.playTimer) { window.clearInterval(gif.playTimer); gif.playTimer = 0; } }
+async function prepareGifDownload(frames) {
+  const generation = downloadGeneration;
+  try {
+    const { width, height } = frames[0];
+    const scale = gifScale(width, height);
+    const bytes = encodeGif(frames, { delayMs: 1000 / GIF_FPS, scale });
+    if (generation !== downloadGeneration || state.mode !== 'captured') return;
+    downloadUrl = URL.createObjectURL(new Blob([bytes], { type: 'image/gif' }));
+    const link = $('#savePng');
+    link.href = downloadUrl;
+    link.download = `pixieed-pixel-camera-${width * scale}x${height * scale}.gif`;
+    $('#saveLabel').textContent = 'GIFを保存';
+    root.dataset.gifFrames = String(frames.length);
+    root.dataset.gifBytes = String(bytes.length);
+    updateSaveLinkState();
+    sayToast(`GIFを撮影しました（${(frames.length / GIF_FPS).toFixed(1)}秒）`);
+    focusVisible('#savePng');
+  } catch (error) {
+    if (generation !== downloadGeneration) return;
+    updateSaveLinkState();
+    say('GIFを作れませんでした。撮り直してください。', { visible: true });
+  }
+}
+captureButton.addEventListener('pointerdown', (event) => {
+  holdFired = false;
+  if (state.mode !== 'live' || !state.result || event.button > 0) return;
+  try { captureButton.setPointerCapture(event.pointerId); } catch { /* ignore */ }
+  window.clearTimeout(holdTimer);
+  holdTimer = window.setTimeout(() => { holdFired = true; startGif(); }, HOLD_MS);
 });
+const releaseShutter = () => { window.clearTimeout(holdTimer); if (gif.recording) finishGif(); };
+for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) captureButton.addEventListener(type, releaseShutter);
+captureButton.addEventListener('contextmenu', (event) => event.preventDefault());
+
+// First time only: tell people the picture itself is the controller.
+function showGestureHintOnce() {
+  let seen = false;
+  try { seen = localStorage.getItem('pixieed:camera-gestures:v1') === '1'; localStorage.setItem('pixieed:camera-gestures:v1', '1'); } catch { seen = false; }
+  if (seen) return;
+  const hint = $('#gestureHint'); hint.hidden = false;
+  window.setTimeout(() => { hint.hidden = true; }, 4200);
+}
+
 $('#capture').addEventListener('click', () => {
+  if (holdFired) { holdFired = false; return; } // the hold already recorded a GIF
   const { action } = deriveCameraPrimaryAction({ mode: state.mode, hasResult: Boolean(state.result), error: state.error, workerUnavailable: Boolean(workerUnavailable) });
   if (action === 'retake') retake();
   else if (action === 'reload') location.reload();
@@ -668,6 +818,7 @@ $('#savePng').addEventListener('click', (event) => {
 });
 
 function suspendCamera() {
+  if (gif.recording) stopGifUi();
   if (state.mode !== 'live' && state.mode !== 'loading') return;
   closeCamera({ message: 'カメラを一時停止しています。', focus: false });
   resumeOnVisible = true;
@@ -680,6 +831,7 @@ function resumeCameraIfVisible() {
 }
 
 window.addEventListener('pagehide', () => {
+  if (gif.recording) stopGifUi();
   suspendCamera();
   invalidateCaptureDownload();
 });
@@ -687,8 +839,8 @@ window.addEventListener('pageshow', () => {
   // A captured frame can return through the back/forward cache after its URL was released.
   if (state.mode === 'captured' && state.result && !downloadUrl) {
     invalidateCaptureDownload();
-    say('PNGを準備しています…', { visible: true });
-    void prepareCaptureDownload(state.result);
+    if (gif.pending) { playGif(gif.pending); void prepareGifDownload(gif.pending); }
+    else { say('PNGを準備しています…', { visible: true }); void prepareCaptureDownload(state.result); }
   }
   resumeCameraIfVisible();
 });
