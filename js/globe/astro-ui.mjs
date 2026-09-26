@@ -16,10 +16,11 @@
  * Play/pause is the only plain button.
  */
 
-import { celestialState, geoToUnit, unitToGeo, listEclipses, peakObscurationAt, moonPhase, findGreatestEclipse, findSunEvent } from './astronomy.mjs?v=20260926-planets-v1';
-import { createScope, refracted } from './scope.mjs?v=20260926-planets-v1';
-import { createOrrery } from './orrery.mjs?v=20260926-planets-v1';
-import { PLANETS, PLANET_BY_ID, SKY_PLANETS, lightMinutes } from './planets.mjs?v=20260926-planets-v1';
+import { celestialState, geoToUnit, unitToGeo, listEclipses, peakObscurationAt, moonPhase, findGreatestEclipse, findSunEvent } from './astronomy.mjs?v=20260926-realsky-v1';
+import { createScope, refracted } from './scope.mjs?v=20260926-realsky-v1';
+import { sharedSky } from './real-sky.mjs?v=20260926-realsky-v1';
+import { createOrrery } from './orrery.mjs?v=20260926-realsky-v1';
+import { PLANETS, PLANET_BY_ID, SKY_PLANETS, lightMinutes } from './planets.mjs?v=20260926-realsky-v1';
 
 const DEG = Math.PI / 180;
 const MINUTE = 60000;
@@ -434,6 +435,10 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
       const d = Math.hypot(...earth);
       cardName.textContent = '太陽'; cardKind.textContent = '恒星';
       facts.push(['地球から', `${d.toFixed(3)} AU・${formatLight(d)}`], ['半径', '69万6000 km（地球の109倍）'], ['表面', '約5500℃']);
+    } else if (['io', 'europa', 'ganymede', 'callisto'].includes(selectedBody)) {
+      const moon = { io: ['イオ', '火山が活発な衛星', '1821 km', '1.8日'], europa: ['エウロパ', '氷の下に海がある衛星', '1561 km', '3.6日'], ganymede: ['ガニメデ', '太陽系最大の衛星', '2634 km', '7.2日'], callisto: ['カリスト', 'クレーターだらけの衛星', '2410 km', '16.7日'] }[selectedBody];
+      cardName.textContent = moon[0]; cardKind.textContent = `木星の衛星・${moon[1]}`;
+      facts.push(['半径', moon[2]], ['公転', moon[3]]);
     } else if (selectedBody === 'moon') {
       cardName.textContent = '月'; cardKind.textContent = '地球の衛星';
       facts.push(['地球から', `${Math.round(state.moonDistance * 6378.137).toLocaleString('ja-JP')} km`], ['公転', '27.3日'], ['半径', '1737 km']);
@@ -451,7 +456,7 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
       if (sky) facts.push(['明るさ', `${sky.magnitude.toFixed(1)}等${sky.magnitude < 6 ? '（肉眼で見える）' : ''}`]);
     }
     cardFacts.replaceChildren(...facts.map(([term, value]) => element('div', {}, [element('dt', { text: term }), element('dd', { text: value })])));
-    cardSky.hidden = selectedBody === 'earth';
+    cardSky.hidden = selectedBody === 'earth' || ['io', 'europa', 'ganymede', 'callisto'].includes(selectedBody);
     cardHome.hidden = !(selectedBody === 'earth' || selectedBody === 'moon');
   }
 
@@ -508,6 +513,7 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
   let fovTimer = null;
   let lastFov = null;
   const scope = createScope({ canvas: scopeCanvas, onChange: onScopeChange });
+  sharedSky().then(({ canvas: sky }) => scope.setSkyImage(sky)).catch(() => {});
 
   // ---- behaviour -----------------------------------------------------------
   function setOpen(open) {
@@ -522,7 +528,7 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
       const tint = hexToRgb(planet.planet.color);
       return { direction: planet.direction, glow: tint.map((c) => c * flux), size: planet.magnitude > 6.5 ? 0 : clamp(1.1 + (1 - planet.magnitude) * 0.32, 1.1, 2.8) };
     });
-    return { sunDirection: state.sunDirection, moonVector: state.moonVector, sunRadius: state.sunAngularRadius, gmstRadians: state.gmstDegrees * DEG, lighting: false, bodies: true, sunScale: 6, moonScale: 8, planets };
+    return { sunDirection: state.sunDirection, moonVector: state.moonVector, sunRadius: state.sunAngularRadius, gmstRadians: state.gmstDegrees * DEG, lighting: false, bodies: true, sunScale: 1, moonScale: 1, planets };
   }
 
   function renderClock() {

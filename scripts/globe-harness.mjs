@@ -14,6 +14,7 @@ const DEFAULT_TESTS = [
   , 'tests/globe/post-contract.test.mjs'
   , 'tests/globe/planets.test.mjs'
   , 'tests/globe/tool-shell.test.mjs'
+  , 'tests/globe/real-sky.test.mjs'
 ];
 const TEST_TIMEOUT_MS = 60_000;
 

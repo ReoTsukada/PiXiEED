@@ -135,7 +135,8 @@ vec3 skyColor() {
   ddy.x -= floor(ddy.x + 0.5);
   vec3 color = textureGrad(uSky, uv, ddx, ddy).rgb;
   vec3 base = mix(vec3(0.008, 0.014, 0.028), color * 0.9, uSkyReady);
-  base += starField(celestial, 1.0 / focal);
+  // Procedural stars only until the real sky (real-sky.mjs) has been painted into uSky.
+  base += starField(celestial, 1.0 / focal) * (1.0 - uSkyReady);
   if (uAstro.y > 0.5) {
     vec3 cameraPosition = rotateByQuaternion(vec3(0.0, 0.0, 6.0), uOrientation);
     base += sunSprite(d, uSunSky.x * uAstro.z);
@@ -531,7 +532,21 @@ export function createWebGLRenderer(canvas, { grid, rasterData = null, skyUrl = 
       backend: 'webgl2',
       draw,
       setRasterData,
-      setAstronomy(next) { astronomy = { ...astronomy, ...next, lighting: false }; }, // the globe carries no day/night or eclipse shading
+      setAstronomy(next) { astronomy = { ...astronomy, ...next, lighting: false }; },
+      /** Replace the sky with a canvas painted by real-sky.mjs (equirectangular, RA/Dec). */
+      setSkyImage(image) {
+        gl.bindTexture(gl.TEXTURE_2D, skyTexture);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+        gl.generateMipmap(gl.TEXTURE_2D);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.bindTexture(gl.TEXTURE_2D, null);
+        skyReady = 1;
+        onSkyReady();
+      }, // the globe carries no day/night or eclipse shading
       getMetrics: () => lastFrame,
       destroy() {
         if (texture) gl.deleteTexture(texture);

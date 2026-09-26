@@ -10,7 +10,7 @@
  */
 
 import { ASTRO_COMMON } from './astro-glsl.mjs?v=20260921-astro-4';
-import { observe } from './astronomy.mjs?v=20260926-planets-v1';
+import { observe } from './astronomy.mjs?v=20260926-realsky-v1';
 
 const DEG = Math.PI / 180;
 const MIN_FOV = 0.02; // 72 arcseconds: Jupiter's disc fills about two thirds of the view
@@ -42,6 +42,8 @@ uniform vec3 uPlanetPole[7];  // north pole of each planet (local frame)
 uniform vec3 uPlanetTint[7];  // colour of the point image
 uniform vec4 uPlanetInfo[7];  // x: angular radius (rad, 0 = off), y: point brightness, z: kind, w: flattening
 uniform vec4 uSatellite[4];   // Galilean moons: xyz direction, w: brightness (0 = hidden)
+uniform sampler2D uSky;       // the real sky (real-sky.mjs), equirectangular RA/Dec
+uniform float uSkyReady;
 
 out vec4 outColor;
 
@@ -139,7 +141,18 @@ void main() {
 
   vec3 celestial = uEnuToCelestial * ray;
   float starFade = 1.0 - clamp(dayAmt * dim * 2.2 + warm * 0.25 + twilightAmt * 0.6, 0.0, 1.0);
-  color += starField(celestial, pixelAngle) * starFade * 1.6;
+  // Wide fields show the real sky (catalogue stars and the Milky Way); at high
+  // power the texture would be blurry, so fine procedural stars take over.
+  float fovDeg = degrees(2.0 * atan(uTanHalf));
+  float realAmt = uSkyReady * smoothstep(3.0, 10.0, fovDeg);
+  if (realAmt > 0.0) {
+    vec2 uv = vec2(atan(celestial.x, celestial.z) / 6.28318530718 + 0.5, 0.5 - asin(clamp(celestial.y, -1.0, 1.0)) / 3.14159265359);
+    vec2 ddx = dFdx(uv); vec2 ddy = dFdy(uv);
+    ddx.x -= floor(ddx.x + 0.5); ddy.x -= floor(ddy.x + 0.5);
+    vec3 real = textureGrad(uSky, uv, ddx, ddy).rgb;
+    color += max(real - vec3(0.012, 0.02, 0.04), vec3(0.0)) * starFade * 1.5 * realAmt;
+  }
+  color += starField(celestial, pixelAngle) * starFade * 1.6 * (1.0 - realAmt);
 
   // ---- Planets: a point of light at low power, a lit, banded disc (with
   // Saturn's rings and the planet's shadow on them) at high power.
@@ -361,6 +374,20 @@ export function createScope({ canvas, onChange = () => {} } = {}) {
   let tracking = 'sun';
   let observer_ = null;
   let frame = null;
+  let skyTexture = null;
+  let skyImage = null;
+  let skyReady = 0;
+  function uploadSky() {
+    gl.bindTexture(gl.TEXTURE_2D, skyTexture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, skyImage);
+    gl.generateMipmap(gl.TEXTURE_2D);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    skyReady = 1;
+  }
 
   function ensureContext() {
     if (gl) return true;
@@ -382,8 +409,13 @@ export function createScope({ canvas, onChange = () => {} } = {}) {
     gl.enableVertexAttribArray(position);
     gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
     gl.bindVertexArray(null);
-    const names = ['uViewport', 'uTanHalf', 'uAim', 'uSunL', 'uMoonL', 'uRadii', 'uCoverage', 'uFilter', 'uMask', 'uSquash', 'uEnuToCelestial', 'uPlanetL', 'uPlanetSun', 'uPlanetPole', 'uPlanetTint', 'uPlanetInfo', 'uSatellite'];
+    const names = ['uViewport', 'uTanHalf', 'uAim', 'uSunL', 'uMoonL', 'uRadii', 'uCoverage', 'uFilter', 'uMask', 'uSquash', 'uEnuToCelestial', 'uPlanetL', 'uPlanetSun', 'uPlanetPole', 'uPlanetTint', 'uPlanetInfo', 'uSatellite', 'uSky', 'uSkyReady'];
     locations = Object.fromEntries(names.map((name) => [name, gl.getUniformLocation(program, name)]));
+    skyTexture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, skyTexture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    if (skyImage) uploadSky();
     return true;
   }
 
@@ -444,6 +476,10 @@ export function createScope({ canvas, onChange = () => {} } = {}) {
     gl.uniform1f(locations.uMask, 1 - clamp((fov - 12) / 8, 0, 1));
     gl.uniformMatrix3fv(locations.uEnuToCelestial, false, enuToCelestialMatrix());
     writePlanetUniforms();
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, skyTexture);
+    gl.uniform1i(locations.uSky, 0);
+    gl.uniform1f(locations.uSkyReady, skyReady);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     gl.bindVertexArray(null);
   }
@@ -559,6 +595,8 @@ export function createScope({ canvas, onChange = () => {} } = {}) {
     setFilter(value) { filterOn = Boolean(value); onChange(snapshot()); requestDraw(); },
     track(target) { tracking = target; applyTracking(); onChange(snapshot()); requestDraw(); },
     getSnapshot: snapshot,
+    /** Use a canvas painted by real-sky.mjs for wide fields. */
+    setSkyImage(image) { skyImage = image; if (gl) { uploadSky(); requestDraw(); } },
     redraw: requestDraw,
     destroy() {
       canvas.removeEventListener('pointerdown', onPointerDown);

@@ -1,7 +1,8 @@
-import { initAstroUi } from './astro-ui.mjs?v=20260926-planets-v1';
-import { initPostUi } from './post-ui.mjs?v=20260926-planets-v1';
+import { initAstroUi } from './astro-ui.mjs?v=20260926-realsky-v1';
+import { initPostUi } from './post-ui.mjs?v=20260926-realsky-v1';
+import { sharedSky } from './real-sky.mjs?v=20260926-realsky-v1';
 import { createSupabaseGlobeAuth, createSupabaseGlobeStore } from './post-supabase.mjs?v=20260921-globe-post-v1';
-import { createGlobeRenderer, decodeRasterData, getSelectionStageLabel, prepareGeoJsonFeatures } from './renderer.mjs?v=20260926-planets-v1';
+import { createGlobeRenderer, decodeRasterData, getSelectionStageLabel, prepareGeoJsonFeatures } from './renderer.mjs?v=20260926-realsky-v1';
 
 const embedMode = new URLSearchParams(location.search).get('embed') === '1';
 
@@ -59,6 +60,9 @@ function createPrototypeRenderer(options = {}) {
     }
   });
   globalThis.__PIXIEED_GLOBE__ = renderer;
+  // The real night sky replaces the procedural stars once it is painted (after the first frame).
+  const paintRealSky = () => sharedSky().then(({ canvas: sky }) => renderer.setSkyImage?.(sky)).catch((error) => console.warn('Real sky unavailable', error));
+  (typeof requestIdleCallback === 'function' ? requestIdleCallback : (fn) => setTimeout(fn, 60))(paintRealSky);
   if (!globalThis.__PIXIEED_ASTRO__) {
     try { initAstroUi({ renderer, stage: globeStage, initiallyCollapsed: true }); } catch (error) { console.warn('Astronomy panel unavailable', error); }
   }
