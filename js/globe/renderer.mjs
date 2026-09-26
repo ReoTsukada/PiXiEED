@@ -21,10 +21,12 @@ import {
 } from './geometry.mjs?v=20260921-grid11-1';
 import { normalizeMembershipFeatures, pointInGeometry } from './topology.mjs?v=20260920-g4-precision-1';
 import { JAPAN_COUNTRY_ID, JAPAN_REGION_GROUPS, getRegionForPrefecture } from './hierarchy.mjs?v=20260920-g4-precision-1';
-import { createWebGLRenderer } from './webgl-renderer.mjs?v=20260926-realsky-v1';
+import { createWebGLRenderer } from './webgl-renderer.mjs?v=20260927-fullcolor-v1';
 import { WORLD_LAND_MASK } from '../../assets/maps/world-land-mask-v1.mjs?v=20260920-webgl2-1';
 
 export const GLOBE_RENDERER_VERSION = 'g6-webgl2-analytic-half-degree-v1';
+/** The WebGL globe is drawn as full-colour pixel art: one rendered pixel per 2x2 CSS pixels (the Solar System view's dot size). */
+export const DOT_BACKING_DPR = 0.5;
 export const DEFAULT_VIEW = Object.freeze({ centerLongitude: 139.6917, centerLatitude: 35.6895, zoom: 1.15 });
 export const DEFAULT_ZOOM_RANGE = Object.freeze({ min: 0.68, max: 24 });
 export const DEFAULT_PREFETCH_DEGREES = 4;
@@ -390,8 +392,8 @@ export function createGlobeRenderer(canvas, { initialView = DEFAULT_VIEW, onPick
   const initialBacking = getCanvasBackingSize({
     width: initialRect.width || canvas.clientWidth || 640,
     height: initialRect.height || canvas.clientHeight || 480,
-    dpr: typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1,
-    maxDpr: forceCanvas ? MAX_BACKING_DPR : 1.35
+    dpr: forceCanvas ? (typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1) : DOT_BACKING_DPR,
+    maxDpr: forceCanvas ? MAX_BACKING_DPR : DOT_BACKING_DPR
   });
   canvas.width = initialBacking.physicalWidth;
   canvas.height = initialBacking.physicalHeight;
@@ -405,7 +407,7 @@ export function createGlobeRenderer(canvas, { initialView = DEFAULT_VIEW, onPick
   const initialPrefectures = prefectureFeatures.length ? prefectureFeatures : regionFeatures; let rasterIndex = createRasterIndex({ worldFeatures: emptyFeatures(worldFeatures), prefectureFeatures: emptyFeatures(initialPrefectures), rasterData: initialRaster, grid });
   const cellCache = createBoundedCellCache();
   // Layout size, not getBoundingClientRect(): the canvas is scaled by a CSS transform while the Solar System view is open.
-  function canvasSize() { const rect = canvas.getBoundingClientRect(); const requestedDpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1; return getCanvasBackingSize({ width: canvas.clientWidth || rect.width || 640, height: canvas.clientHeight || rect.height || 480, dpr: requestedDpr, maxDpr: webgl ? 1.35 : MAX_BACKING_DPR }); }
+  function canvasSize() { const rect = canvas.getBoundingClientRect(); const requestedDpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1; return getCanvasBackingSize({ width: canvas.clientWidth || rect.width || 640, height: canvas.clientHeight || rect.height || 480, dpr: webgl ? DOT_BACKING_DPR : requestedDpr, maxDpr: webgl ? DOT_BACKING_DPR : MAX_BACKING_DPR }); }
   function createWebGLPlan() { return Object.freeze({ version: GLOBE_RENDERER_VERSION, backend: 'webgl2', drawCalls: 1, featureMode: 'analytic-sphere-0.25-degree-mask', lodLevel: lodState.level, camera, cameraCenter: Object.freeze({ longitude: camera.centerLongitude, latitude: camera.centerLatitude }), zoom: camera.zoom, cells: Object.freeze([]), pickIndex: new Map(), grid, settings: LOD_SETTINGS[lodState.level], activeLayer: layer, candidateCount: 0, inspectedCells: 0, projectedCandidates: 0, ownershipChecks: 0, truncated: false, mask: Object.freeze({ version: initialRaster?.version || WORLD_LAND_MASK.version, width: initialRaster?.textureWidth || WORLD_LAND_MASK.width, height: initialRaster?.textureHeight || WORLD_LAND_MASK.height }) }); }
   function rebuild() { backing = canvasSize(); if (canvas.width !== backing.physicalWidth) canvas.width = backing.physicalWidth; if (canvas.height !== backing.physicalHeight) canvas.height = backing.physicalHeight; camera = createGlobeCamera({ viewport: backing, ...view }); lodState = updateLodState(lodState, view.zoom); plan = webgl ? createWebGLPlan() : createRenderPlan({ camera, lodState, rasterIndex, grid, activeLayer: layer, contentCounts: counts, cellCache }); invalidation.markPlanBuilt(); }
   function repaint() { if (webgl) { lastBatchMetrics = webgl.draw({ camera, selected, hovered }); invalidation.markRepainted(); onStateChange({ view, plan, camera, selected, hovered, metrics: lastBatchMetrics }); return; } context.setTransform(backing.dpr, 0, 0, backing.dpr, 0, 0); context.clearRect(0, 0, backing.width, backing.height); const { centerX, centerY } = camera.viewport; const radius = camera.scale; context.save(); context.beginPath(); context.arc(centerX, centerY, radius, 0, Math.PI * 2); context.clip(); lastBatchMetrics = { backend: 'canvas2d', drawCalls: 0, frameMs: 0, ...drawCellBatches(context, plan.cells, selected?.cellId, hovered?.cellId) }; context.restore(); context.beginPath(); context.arc(centerX, centerY, radius, 0, Math.PI * 2); context.strokeStyle = 'rgba(190, 232, 238, .78)'; context.lineWidth = 1.1; context.stroke(); invalidation.markRepainted(); onStateChange({ view, plan, camera, selected, hovered, metrics: lastBatchMetrics }); }

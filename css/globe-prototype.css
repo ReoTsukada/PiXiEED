@@ -105,6 +105,9 @@ h1 {
 }
 
 #globeCanvas:active { cursor: grabbing; }
+/* The globe, the telescope and the Solar System are full-colour pixel art: low-resolution renders shown with hard pixel edges. */
+#globeCanvas, .scope-canvas, .orrery-canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
+@supports (image-rendering: pixelated) { #globeCanvas, .scope-canvas, .orrery-canvas { image-rendering: pixelated; } }
 #globeCanvas:focus-visible { box-shadow: inset 0 0 0 2px #f4d45d; }
 
 button {
