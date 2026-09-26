@@ -105,7 +105,7 @@ function paintMilkyWay(ctx, sky, width, height) {
  * ones get a small halo. Near the poles each star is widened by 1/cos(dec) so it
  * stays round once wrapped onto the sphere.
  */
-export function paintSky(sky, { width = 4096, height = 2048, milkyWay = true, brightness = 1 } = {}) {
+export function paintSky(sky, { width = 4096, height = 2048, milkyWay = true, brightness = 1, brighterThan = -Infinity } = {}) {
   const canvas = document.createElement('canvas');
   canvas.width = width; canvas.height = height;
   const ctx = canvas.getContext('2d');
@@ -116,6 +116,7 @@ export function paintSky(sky, { width = 4096, height = 2048, milkyWay = true, br
   const pixelDegrees = 360 / width;
   for (let i = sky.count - 1; i >= 0; i -= 1) {
     const m = sky.mag[i];
+    if (m < brighterThan) continue; // drawn elsewhere as sharp sprites
     const flux = Math.min(8, 10 ** (-0.4 * (m - 2.2))) * brightness;
     const px = x(sky.ra[i], width); const py = y(sky.dec[i], height);
     const stretch = 1 / Math.max(0.08, Math.cos(sky.dec[i] * DEG));
@@ -155,6 +156,16 @@ export function createSkySampler(imageData) {
 let shared = null;
 /** The sky loaded and painted once per page, shared by the globe, the telescope and the Solar System view. */
 export function sharedSky() {
-  if (!shared) shared = loadRealSky().then((sky) => ({ sky, canvas: paintSky(sky) }));
+  if (!shared) shared = loadRealSky().then((sky) => {
+    sky.colors = (i) => starColor(sky.bv[i]);
+    return { sky, canvas: paintSky(sky) };
+  });
   return shared;
+}
+let sharedFaint = null;
+/** The same sky without the stars brighter than `SPRITE_MAGNITUDE`, for layers that draw those as sprites. */
+export const SPRITE_MAGNITUDE = 4.6;
+export function sharedFaintSky() {
+  if (!sharedFaint) sharedFaint = sharedSky().then(({ sky }) => ({ sky, canvas: paintSky(sky, { brighterThan: SPRITE_MAGNITUDE }) }));
+  return sharedFaint;
 }

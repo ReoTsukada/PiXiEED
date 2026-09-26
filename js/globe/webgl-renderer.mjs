@@ -40,6 +40,7 @@ uniform vec4 uAstro;       // x: day/night + eclipse lighting, y: sky bodies, z:
 uniform vec2 uSunSky;      // x: Sun angular radius (rad), y: Greenwich sidereal angle (rad)
 uniform vec3 uPlanetDir[7];  // Earth-fixed unit vectors to Mercury…Neptune
 uniform vec4 uPlanetGlow[7]; // rgb: colour times brightness, w: sprite radius in pixels (0 = hidden)
+uniform int uLayer;          // 0: globe over sky, 1: globe only (transparent around it), 2: sky only
 uniform ivec2 uSelectedCell;
 uniform ivec2 uHoveredCell;
 
@@ -251,7 +252,9 @@ vec4 globe() {
 }
 
 void main() {
+  if (uLayer == 2) { outColor = vec4(skyColor(), 1.0); return; }
   vec4 planet = globe();
+  if (uLayer == 1) { outColor = vec4(planet.rgb, planet.a); return; } // blending premultiplies it
   outColor = vec4(mix(skyColor(), planet.rgb, planet.a), 1.0);
 }
 `;
@@ -274,9 +277,70 @@ function createShader(gl, type, source) {
   return shader;
 }
 
-function createProgram(gl) {
-  const vertex = createShader(gl, gl.VERTEX_SHADER, VERTEX_SOURCE);
-  const fragment = createShader(gl, gl.FRAGMENT_SHADER, FRAGMENT_SOURCE);
+// Bright catalogue stars as point sprites on the sky layer: a sharp core, a soft halo in the
+// star's own colour and, for the brightest few, faint diffraction spikes.
+const STAR_VERTEX_SOURCE = `#version 300 es
+in vec3 aCelestial;   // unit vector, u = atan(x, z) is the right ascension
+in vec4 aStar;        // rgb colour, w: magnitude
+uniform vec4 uOrientation;
+uniform vec2 uViewport;
+uniform float uGmst;
+uniform float uDpr;
+out vec4 vStar;
+out float vSize;
+out float vPoint;
+vec3 rotateByQuaternion(vec3 vector, vec4 quaternion) {
+  return vector + 2.0 * cross(quaternion.xyz, cross(quaternion.xyz, vector) + quaternion.w * vector);
+}
+void main() {
+  float g = uGmst;
+  vec3 d = vec3(aCelestial.x * cos(g) - aCelestial.z * sin(g), aCelestial.y, aCelestial.z * cos(g) + aCelestial.x * sin(g));
+  vec3 v = rotateByQuaternion(d, vec4(-uOrientation.xyz, uOrientation.w));
+  float focal = uViewport.y * 0.5 / tan(radians(34.0));
+  if (v.z >= -0.01) { gl_Position = vec4(2.0, 2.0, 0.0, 1.0); gl_PointSize = 0.0; return; }
+  vec2 p = focal * v.xy / -v.z;
+  gl_Position = vec4(p / (uViewport * 0.5), 0.0, 1.0);
+  float m = aStar.w;
+  vSize = (3.4 + max(0.0, 4.6 - m) * 2.4) * uDpr;
+  gl_PointSize = vSize * (m < 1.2 ? 3.2 : 1.6);
+  vPoint = gl_PointSize;
+  vStar = aStar;
+}
+`;
+
+const STAR_FRAGMENT_SOURCE = `#version 300 es
+precision highp float;
+in vec4 vStar;
+in float vSize;
+in float vPoint;
+out vec4 outColor;
+void main() {
+  vec2 q = (gl_PointCoord - 0.5) * vPoint;
+  float m = vStar.w;
+  float flux = pow(10.0, -0.4 * (m - 1.0));
+  float r = length(q);
+  float sigma = max(0.62, vSize * 0.11);
+  float core = exp(-r * r / (2.0 * sigma * sigma));
+  float halo = exp(-r / (vSize * 0.6)) * 0.32;
+  float spikes = 0.0;
+  if (m < 1.2) {
+    float s = exp(-abs(q.x) * 1.4) * exp(-abs(q.y) / (vSize * 1.1)) + exp(-abs(q.y) * 1.4) * exp(-abs(q.x) / (vSize * 1.1));
+    spikes = s * 0.35 * clamp(1.2 - m, 0.0, 1.5);
+  }
+  float intensity = (core * min(1.9, 0.7 + flux * 0.4) + (halo + spikes) * min(1.1, flux * 0.55));
+  // Colour shows in the halo more than in the white-hot core, as it does to the eye.
+  vec3 tint = mix(vec3(1.0), vStar.rgb, 0.95);
+  vec3 color = mix(vec3(1.0), tint, 0.55) * core * min(1.9, 0.7 + flux * 0.4) + tint * (halo + spikes) * min(1.1, flux * 0.55);
+  // Fade out before the sprite's square edge so no box shows around bright stars.
+  vec2 edge = abs(gl_PointCoord - 0.5);
+  color *= 1.0 - smoothstep(0.34, 0.5, max(edge.x, edge.y));
+  outColor = vec4(color, 0.0);
+}
+`;
+
+function createProgram(gl, vertexSource = VERTEX_SOURCE, fragmentSource = FRAGMENT_SOURCE) {
+  const vertex = createShader(gl, gl.VERTEX_SHADER, vertexSource);
+  const fragment = createShader(gl, gl.FRAGMENT_SHADER, fragmentSource);
   const program = gl.createProgram();
   gl.attachShader(program, vertex);
   gl.attachShader(program, fragment);
@@ -413,7 +477,7 @@ function loadSkyTexture(gl, url, onReady) {
   return texture;
 }
 
-export function createWebGLRenderer(canvas, { grid, rasterData = null, skyUrl = '', onSkyReady = () => {} } = {}) {
+export function createWebGLRenderer(canvas, { grid, rasterData = null, skyUrl = '', onSkyReady = () => {}, layer = 0 } = {}) {
   if (!canvas || typeof canvas.getContext !== 'function') return null;
   let gl;
   try {
@@ -425,6 +489,7 @@ export function createWebGLRenderer(canvas, { grid, rasterData = null, skyUrl = 
 
   try {
     const program = createProgram(gl);
+    let stars = null; // { program, vao, count, locations } once setStars() has run
     const vao = gl.createVertexArray();
     const buffer = gl.createBuffer();
     gl.bindVertexArray(vao);
@@ -453,7 +518,8 @@ export function createWebGLRenderer(canvas, { grid, rasterData = null, skyUrl = 
       planetDir: gl.getUniformLocation(program, 'uPlanetDir'),
       planetGlow: gl.getUniformLocation(program, 'uPlanetGlow'),
       selectedCell: gl.getUniformLocation(program, 'uSelectedCell'),
-      hoveredCell: gl.getUniformLocation(program, 'uHoveredCell')
+      hoveredCell: gl.getUniformLocation(program, 'uHoveredCell'),
+      layer: gl.getUniformLocation(program, 'uLayer')
     });
     const counts = bandCounts(grid);
     const bandTexture = createBandTexture(gl, counts);
@@ -508,10 +574,11 @@ export function createWebGLRenderer(canvas, { grid, rasterData = null, skyUrl = 
       gl.uniform3fv(locations.moonVec, astronomy.moonVector);
       gl.uniform4f(locations.astro, astronomy.lighting ? 1 : 0, astronomy.bodies ? 1 : 0, astronomy.sunScale, astronomy.moonScale);
       gl.uniform2f(locations.sunSky, astronomy.sunRadius, astronomy.gmstRadians);
+      gl.uniform1i(locations.layer, layer);
       planetGlow.fill(0);
       (astronomy.planets || []).slice(0, 7).forEach((planet, i) => {
         planetDir.set(planet.direction, i * 3);
-        planetGlow.set([planet.glow[0], planet.glow[1], planet.glow[2], planet.size], i * 4);
+        planetGlow.set([planet.glow[0], planet.glow[1], planet.glow[2], planet.size * camera.viewport.dpr], i * 4);
       });
       gl.uniform3fv(locations.planetDir, planetDir);
       gl.uniform4fv(locations.planetGlow, planetGlow);
@@ -522,6 +589,17 @@ export function createWebGLRenderer(canvas, { grid, rasterData = null, skyUrl = 
       gl.uniform2iv(locations.hoveredCell, selectedCoordinates(hovered?.cell));
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
       gl.bindVertexArray(null);
+      if (stars && layer === 2 && skyReady) {
+        gl.useProgram(stars.program);
+        gl.bindVertexArray(stars.vao);
+        gl.blendFunc(gl.ONE, gl.ONE);
+        gl.uniform4fv(stars.locations.orientation, quaternionToFloat32(camera.orientation));
+        gl.uniform2f(stars.locations.viewport, viewportWidth, viewportHeight);
+        gl.uniform1f(stars.locations.gmst, astronomy.gmstRadians);
+        gl.uniform1f(stars.locations.dpr, camera.viewport.dpr);
+        gl.drawArrays(gl.POINTS, 0, stars.count);
+        gl.bindVertexArray(null);
+      }
       const ended = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
       lastFrame = Object.freeze({ backend: 'webgl2', drawCalls: 1, instanceCount: 1, frameMs: ended - started });
       return lastFrame;
@@ -533,6 +611,28 @@ export function createWebGLRenderer(canvas, { grid, rasterData = null, skyUrl = 
       draw,
       setRasterData,
       setAstronomy(next) { astronomy = { ...astronomy, ...next, lighting: false }; },
+      /** Draw catalogue stars brighter than `maxMagnitude` as sharp point sprites (sky layer only). */
+      setStars(sky, { maxMagnitude = 4.6 } = {}) {
+        if (layer !== 2 || !sky) return 0;
+        const rows = [];
+        for (let i = 0; i < sky.count; i += 1) {
+          if (sky.mag[i] > maxMagnitude) continue;
+          const ra = sky.ra[i] * Math.PI / 180; const dec = sky.dec[i] * Math.PI / 180;
+          const [r, g, b] = sky.colors ? sky.colors(i) : [255, 255, 255];
+          rows.push(Math.cos(dec) * Math.sin(ra), Math.sin(dec), Math.cos(dec) * Math.cos(ra), r / 255, g / 255, b / 255, sky.mag[i]);
+        }
+        const starProgram = createProgram(gl, STAR_VERTEX_SOURCE, STAR_FRAGMENT_SOURCE);
+        const starVao = gl.createVertexArray(); const buffer = gl.createBuffer();
+        gl.bindVertexArray(starVao);
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(rows), gl.STATIC_DRAW);
+        const celestial = gl.getAttribLocation(starProgram, 'aCelestial'); const star = gl.getAttribLocation(starProgram, 'aStar');
+        gl.enableVertexAttribArray(celestial); gl.vertexAttribPointer(celestial, 3, gl.FLOAT, false, 28, 0);
+        gl.enableVertexAttribArray(star); gl.vertexAttribPointer(star, 4, gl.FLOAT, false, 28, 12);
+        gl.bindVertexArray(null);
+        stars = { program: starProgram, vao: starVao, count: rows.length / 7, locations: { orientation: gl.getUniformLocation(starProgram, 'uOrientation'), viewport: gl.getUniformLocation(starProgram, 'uViewport'), gmst: gl.getUniformLocation(starProgram, 'uGmst'), dpr: gl.getUniformLocation(starProgram, 'uDpr') } };
+        return stars.count;
+      },
       /** Replace the sky with a canvas painted by real-sky.mjs (equirectangular, RA/Dec). */
       setSkyImage(image) {
         gl.bindTexture(gl.TEXTURE_2D, skyTexture);

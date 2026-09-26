@@ -143,7 +143,8 @@ function rotateVectorByQuaternion(vector, quaternion) {
   const doubled = { x: quaternion.x * 2, y: quaternion.y * 2, z: quaternion.z * 2 }; const xx = quaternion.x * doubled.x; const yy = quaternion.y * doubled.y; const zz = quaternion.z * doubled.z; const xy = quaternion.x * doubled.y; const xz = quaternion.x * doubled.z; const yz = quaternion.y * doubled.z; const wx = quaternion.w * doubled.x; const wy = quaternion.w * doubled.y; const wz = quaternion.w * doubled.z;
   return { x: (1 - yy - zz) * vector.x + (xy - wz) * vector.y + (xz + wy) * vector.z, y: (xy + wz) * vector.x + (1 - xx - zz) * vector.y + (yz - wx) * vector.z, z: (xz - wy) * vector.x + (yz + wx) * vector.y + (1 - xx - yy) * vector.z };
 }
-function quaternionFromBasis(right, up, forward) {
+/** Camera orientation from its right / up / forward (toward the viewer) axes, each { x, y, z } in world space. */
+export function quaternionFromBasis(right, up, forward) {
   const m00 = right.x; const m01 = up.x; const m02 = forward.x; const m10 = right.y; const m11 = up.y; const m12 = forward.y; const m20 = right.z; const m21 = up.z; const m22 = forward.z; const trace = m00 + m11 + m22; let quaternion;
   if (trace > 0) { const scale = Math.sqrt(trace + 1) * 2; quaternion = { w: .25 * scale, x: (m21 - m12) / scale, y: (m02 - m20) / scale, z: (m10 - m01) / scale }; }
   else if (m00 > m11 && m00 > m22) { const scale = Math.sqrt(1 + m00 - m11 - m22) * 2; quaternion = { w: (m21 - m12) / scale, x: .25 * scale, y: (m01 + m10) / scale, z: (m02 + m20) / scale }; }

@@ -10,7 +10,7 @@
  */
 
 import { ASTRO_COMMON } from './astro-glsl.mjs?v=20260921-astro-4';
-import { observe } from './astronomy.mjs?v=20260927-fullcolor-v1';
+import { observe } from './astronomy.mjs?v=20260927-sky-layer-v1';
 
 const DEG = Math.PI / 180;
 const MIN_FOV = 0.02; // 72 arcseconds: Jupiter's disc fills about two thirds of the view
@@ -421,7 +421,7 @@ export function createScope({ canvas, onChange = () => {} } = {}) {
 
   function resizeBacking() {
     const rect = canvas.getBoundingClientRect();
-    const dpr = 0.5; // full-colour pixel art: one rendered pixel per 2x2 CSS pixels, like the globe
+    const dpr = Math.min(typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1, 1.5); // the sky is drawn smooth and sharp
     const width = Math.max(2, Math.round((rect.width || canvas.clientWidth || 640) * dpr));
     const height = Math.max(2, Math.round((rect.height || canvas.clientHeight || 480) * dpr));
     if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
