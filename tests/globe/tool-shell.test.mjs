@@ -36,10 +36,13 @@ test('globe is operated by gestures, not zoom/rotate buttons', () => {
   assert.doesNotMatch(read('js/globe/prototype.mjs'), /#zoomIn|#rotateLeft|#resetView/);
 });
 
-test('time panel keeps play as its only plain button and scrubs time on a tape', () => {
+test('time capsule keeps play as its only plain button and the sky lives on the view', () => {
   const source = read('js/globe/astro-ui.mjs');
-  assert.match(source, /class: 'astro-play'/);
+  assert.match(source, /class: 'tc-play'/);
   assert.match(source, /function createTimeTape\(/);
-  assert.doesNotMatch(source, /1時間戻す|1時間進める|astro-collapse/);
-  assert.doesNotMatch(source, /type: 'range', min: '-0\.82'/, 'telescope magnification is a pinch, not a slider');
+  assert.match(source, /function attachScrub\(/, 'the capsule itself scrubs time when dragged');
+  assert.match(source, /function orbitMarks\(/, 'Sun and Moon are labelled on the globe view');
+  assert.match(source, /function scopeMarks\(/, 'Sun and Moon are labelled in the telescope view');
+  assert.doesNotMatch(source, /1時間戻す|1時間進める|astro-collapse|astro-seg|scope-panel/);
+  assert.doesNotMatch(source, /type: 'range'/, 'no sliders: speed is a switch, magnification is a pinch');
 });
