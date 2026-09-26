@@ -8,8 +8,18 @@
   <meta name="description" content="いつもの景色を、ドット絵に。カメラを向けて撮影し、PNG画像で保存できます。写真は端末内で処理します。">
   <link rel="icon" href="/assets/brand/pixieed-logo-48.png" type="image/png">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20260924-camera-release-1">
-  <link rel="stylesheet" href="css/pixel-camera.css?v=20260924-camera-release-1">
-  <link rel="modulepreload" href="js/pixel-studio/app.mjs?v=20260925-boundaries-1">
+  <link rel="stylesheet" href="css/pixel-camera.css?v=20260925-lens-camera-2">
+  <link rel="modulepreload" href="js/pixel-lens/app.mjs?v=20260926-lens-1">
+  <style>
+    .pc-range { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: .25rem .5rem; }
+    .pc-range input { grid-column: 1 / -1; width: 100%; }
+    .pc-range output { font-variant-numeric: tabular-nums; opacity: .75; }
+    .pc-camera-tone { margin-top: .6rem; display: grid; gap: .55rem; }
+    .pc-camera-tone summary { cursor: pointer; font-weight: 600; }
+    .pc-camera-tone[open] { padding-bottom: .2rem; }
+    .pc-reset-tone { justify-self: start; padding: .35rem .8rem; border-radius: .6rem; border: 1px solid currentColor; background: transparent; color: inherit; }
+    .pc-engine-note { font-size: .7em; opacity: .6; font-weight: 500; margin-left: .3em; }
+  </style>
 </head>
 <body>
   <a class="pc-skip" href="#stage">カメラへ移動</a>
@@ -17,7 +27,7 @@
     <section class="pc-stage" id="stage" aria-label="撮影プレビュー" tabindex="-1">
       <video id="video" playsinline muted hidden></video>
       <div class="pc-frame" id="captureFrame">
-        <canvas id="view" width="1" height="1" tabindex="0" aria-label="撮影プレビュー。Enter、Space、またはタップで物体の境界を再認識する"></canvas>
+        <canvas id="view" width="1" height="1" tabindex="0" aria-label="撮影プレビュー。Enter、Space、またはタップで配色と物体の境界を更新する"></canvas>
         <span class="pc-frame-guide" aria-hidden="true"></span>
       </div>
       <div id="loadingState" class="pc-loading" role="status" aria-live="polite">
@@ -34,8 +44,9 @@
     <header class="pc-header">
       <a class="pc-brand" href="/home/" aria-label="PiXiEED ホーム"><img src="/assets/brand/pixieed-logo-48.png" alt=""></a>
       <h1 class="pc-sr-only">ドット絵カメラ</h1>
-      <button id="imageSettings" class="pc-size-button" type="button" popovertarget="sizePopover" aria-controls="sizePopover" aria-label="撮影サイズを変更">
+      <button id="imageSettings" class="pc-size-button" type="button" popovertarget="sizePopover" aria-controls="sizePopover" aria-label="撮影と色の設定">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/></svg>
+        <span class="pc-settings-badge" id="colorSummary" aria-hidden="true">4色</span>
         <span class="pc-sr-only"><span id="ratioSummary">画面</span><span class="pc-size-detail" id="sizeSummary">256 px</span></span>
       </button>
       <div id="cameraControls" class="pc-header-controls">
@@ -54,15 +65,37 @@
       </div>
     </div>
     <div class="pc-settings-panel" id="sizePopover" popover aria-labelledby="sizeTitle">
-      <h2 class="pc-sr-only" id="sizeTitle">撮影サイズ</h2>
+      <h2 id="sizeTitle">カメラの仕上がり <small class="pc-engine-note">PiXiEELENS</small></h2>
       <div class="pc-settings-fields">
         <label for="ratioSelect">縦横比<select id="ratioSelect" name="aspect">
           <option value="screen">画面いっぱい</option><option value="1:1">1:1 · 正方形</option><option value="3:4">3:4 · 縦長</option><option value="9:16">9:16 · 縦長</option><option value="4:3">4:3 · 横長</option><option value="16:9">16:9 · 横長</option>
         </select></label>
         <label for="pixelSelect">ドット数 · 長い辺<select id="pixelSelect" name="pixels">
-          <option value="64">64 px</option><option value="128">128 px</option><option value="256" selected>256 px</option><option value="512">512 px</option>
+          <option value="16">16 px</option><option value="32">32 px</option><option value="64">64 px</option><option value="96">96 px</option><option value="128">128 px</option><option value="160">160 px</option><option value="256" selected>256 px</option><option value="512">512 px</option>
         </select></label>
+        <label for="colorSelect">色数<select id="colorSelect" name="colors">
+          <option value="2">2色 · 1BIT</option><option value="4" selected>4色 · 2BIT</option><option value="8">8色 · 3BIT</option><option value="16">16色 · 4BIT</option><option value="gray">グレー</option><option value="256">256色 · 8BIT</option><option value="full">フルカラー</option>
+        </select></label>
+        <label for="paletteModeSelect" id="paletteModeRow">配色<select id="paletteModeSelect" name="paletteMode">
+          <option value="gameboy" selected>GB固定4色 · 標準</option><option value="source">写真の色</option>
+        </select></label>
+        <label for="gradientSelect">グラデーション<select id="gradientSelect" name="gradient">
+          <option value="dither" selected>ディザ</option><option value="none">なし</option>
+        </select></label>
+        <label class="pc-range" for="surfaceRange">面のまとまり <output data-for="surface">55</output><input id="surfaceRange" name="surface" type="range" min="0" max="100" step="1" value="55"></label>
       </div>
+      <details class="pc-camera-tone">
+        <summary>カメラの色調整</summary>
+        <label class="pc-range">明るさ <output data-for="brightness">0</output><input name="brightness" type="range" min="-100" max="100" step="1" value="0"></label>
+        <label class="pc-range">露出 <output data-for="exposure">0</output><input name="exposure" type="range" min="-100" max="100" step="1" value="0"></label>
+        <label class="pc-range">コントラスト <output data-for="contrast">0</output><input name="contrast" type="range" min="-100" max="100" step="1" value="0"></label>
+        <label class="pc-range">彩度 <output data-for="saturation">0</output><input name="saturation" type="range" min="-100" max="100" step="1" value="0"></label>
+        <label class="pc-range">影 <output data-for="shadows">0</output><input name="shadows" type="range" min="-100" max="100" step="1" value="0"></label>
+        <label class="pc-range">色温度 <output data-for="whiteBalance">0</output><input name="whiteBalance" type="range" min="-100" max="100" step="1" value="0"></label>
+        <button id="resetCamera" class="pc-reset-tone" type="button">色調整をリセット</button>
+      </details>
+      <div class="pc-palette-preview"><span>写真から選んだ色</span><div id="palettePreview" class="pc-palette-colors" aria-label="現在の配色"></div></div>
+      <p class="pc-tap-note">画面をタップすると、今の景色から色を選び直します。</p>
       <p class="pc-local-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 4v3"/></svg><span>写真は端末内で処理します。</span></p>
       <div class="pc-output-summary"><span>保存する画像</span><output id="outputSummary" aria-live="polite">長辺 2048 px · PNG</output></div>
     </div>
@@ -78,6 +111,6 @@
     <a data-nav="tools" href="/tools/" aria-label="ツール" aria-current="page"><img src="/assets/icons/pixieed/celestial.svg" alt=""></a>
     <a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>
   </nav>
-  <script type="module" src="js/pixel-studio/app.mjs?v=20260925-boundaries-1"></script>
+  <script type="module" src="js/pixel-lens/app.mjs?v=20260926-lens-1"></script>
 </body>
 </html>

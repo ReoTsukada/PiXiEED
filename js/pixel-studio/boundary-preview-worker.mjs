@@ -1,12 +1,19 @@
 import { createBoundarySampler } from './boundary-sampler.mjs';
+import { createFourTonePalette } from './four-tone-palette.mjs';
+import { createLensSourcePalette } from './lens-source-palette.mjs';
+import { sampleLensFrame } from './lens-direct-sampler.mjs';
+import { flattenRecognizedBackground } from './background-flatten.mjs';
+import { smoothRecognizedBackground } from './background-smooth.mjs';
 import { createMaskCache } from './mask-cache.mjs';
 
-const ALLOWED_SIZES = new Set([64, 128, 256, 512]);
+const ALLOWED_SIZES = new Set([16, 32, 64, 96, 128, 160, 256, 512]);
 
 let session = null;
 let size = 128;
 let paletteEpoch = null;
 let sampler = createBoundarySampler({ size });
+const tones = createFourTonePalette();
+const lensColors = createLensSourcePalette();
 const maskCache = createMaskCache({ maxAgeMs: 15000, reuseExactFrame: true });
 let segmentationWorker = null;
 let permanentWorkerFailure = null;
@@ -61,6 +68,7 @@ function resetForSession(nextSession) {
   hasValidSource = false;
   maskCache.reset();
   sampler.reset();
+  tones.reset();
   if (previous !== null) {
     try { segmentationWorker?.postMessage({ type: 'cancel', session: previous }); } catch { /* ignore teardown failures */ }
   }
@@ -78,6 +86,8 @@ function invalidateEpoch(nextEpoch) {
   resourceOrigins = [];
   maskCache.reset();
   sampler.reset();
+  tones.reset();
+  lensColors.reset();
   if (session !== null) {
     // The session-scoped cancel also resets the model's instance tracker.
     try { segmentationWorker?.postMessage({ type: 'cancel', session }); } catch { /* keep preview usable */ }
@@ -184,7 +194,7 @@ function validateMessage(message) {
   const requestId = message.requestId;
   const nextSize = message.size === undefined ? 128 : message.size;
   if (!Number.isInteger(requestId)) throw new TypeError('requestId must be an integer');
-  if (!ALLOWED_SIZES.has(nextSize)) throw new RangeError('size must be one of 64, 128, 256, or 512');
+  if (!ALLOWED_SIZES.has(nextSize)) throw new RangeError('size must be a supported pixel-camera preset');
   if (!isFrame(message.frame)) throw new TypeError('frame must contain a bounded RGBA pixel buffer');
   return { requestId, nextSize, frame: message.frame };
 }
@@ -204,16 +214,22 @@ function processFrame(message) {
   hasValidSource = true;
 
   const started = performance.now();
-  const cached = maskCache.get({ frame, session, now: Date.now() });
-  const sampled = sampler.render(frame, cached.mask);
+  const useLens = message.renderMode === 'lens';
+  const useAi = !useLens || message.aiEdges === true;
+  const cached = useAi ? maskCache.get({ frame, session, now: Date.now() }) : {};
+  const sourceSample = useAi ? sampler.render(frame, cached.mask) : sampleLensFrame(frame, nextSize);
+  const smoothed = useAi ? smoothRecognizedBackground(sourceSample) : sourceSample;
+  const sampled = useLens
+    ? lensColors.render(smoothed, message.lensSettings)
+    : flattenRecognizedBackground(tones.render(smoothed));
   const wantsDiagnostics = Boolean(message.diagnostics);
   // A valid mask already applies to this unchanged scene until the cache
   // expires or detects a meaningful source change. Keep sampling every frame,
   // but avoid repeatedly asking the model to segment the same region.
-  if (!cached.mask && !cached.exactFrame && !permanentWorkerFailure && !sessionFailure && !activeJob && blockedByJobId === null) {
+  if (useAi && !cached.mask && !cached.exactFrame && !permanentWorkerFailure && !sessionFailure && !activeJob && blockedByJobId === null) {
     startSegmentation(requestId, frame, wantsDiagnostics);
   }
-  const aiStatus = cached.mask ? 'ready'
+  const aiStatus = !useAi ? 'disabled' : cached.mask ? 'ready'
     : (permanentWorkerFailure || sessionFailure) ? 'unavailable'
       : (!activeJob && lastOutcome === 'no-instances') ? 'no-instances' : 'processing';
   const result = {
@@ -239,7 +255,10 @@ function processFrame(message) {
       faceReused: false,
       waitingForIdle: blockedByJobId !== null
     },
-    ...(wantsDiagnostics ? { resourceOrigins: [...new Set([...origins(), ...resourceOrigins])] } : {})
+    ...(wantsDiagnostics ? {
+      resourceOrigins: [...new Set([...origins(), ...resourceOrigins])],
+      sourceSimplified: { width: smoothed.width, height: smoothed.height, data: smoothed.data }
+    } : {})
   };
 
   return { requestId, result };
@@ -250,7 +269,8 @@ function cancelSession(message) {
   const previous = session;
   cancelActive();
   session = null;
-  paletteEpoch = null;
+  // A framing-only restart changes the render session, not the chosen colours.
+  // A new camera opening and a preview tap send a new palette epoch separately.
   activeJob = null;
   blockedByJobId = null;
   jobsStarted = 0;
@@ -260,6 +280,7 @@ function cancelSession(message) {
   hasValidSource = false;
   maskCache.reset();
   sampler.reset();
+  tones.reset();
   if (previous !== null) {
     try { segmentationWorker?.postMessage({ type: 'cancel', session: previous }); } catch { /* ignore teardown failures */ }
   }
@@ -277,6 +298,7 @@ self.addEventListener('message', (event) => {
     if (output.pending) { self.postMessage(output); return; }
     const transfers = [output.result.data.buffer];
     if (output.result.labels?.buffer instanceof ArrayBuffer) transfers.push(output.result.labels.buffer);
+    if (output.result.sourceSimplified?.data?.buffer instanceof ArrayBuffer) transfers.push(output.result.sourceSimplified.data.buffer);
     self.postMessage(output, transfers);
   } catch (error) {
     self.postMessage({ requestId: message.requestId, error: error instanceof Error ? error.message : String(error) });

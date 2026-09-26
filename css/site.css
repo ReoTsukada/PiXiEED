@@ -211,6 +211,27 @@ h3 { margin-bottom: .65rem; font-size: 1.45rem; line-height: 1.2; }
 .map-hero__inner { padding-top: 2.8rem; padding-bottom: 3.4rem; }
 .map-hero--field { min-height: calc(100svh - var(--header-h)); }
 .map-hero--field .map-hero__inner { width: 100%; padding: 0; }
+.map-hero--field .map-hero__inner { height: calc(100svh - var(--header-h)); min-height: 520px; }
+.map-hero__globe-frame { display: block; width: 100%; height: 100%; border: 0; background: #02050a; }
+
+/* Globe is a tool surface, not a scrolling landing page. Keep the single
+   shared app navigation above the embedded stage and let the stage own the
+   remaining viewport. */
+body.app-page--tool-globe {
+  height: 100dvh;
+  padding-bottom: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+body.app-page--tool-globe #main,
+body.app-page--tool-globe .map-hero--field,
+body.app-page--tool-globe .map-hero--field .map-hero__inner {
+  height: calc(100dvh - var(--header-h));
+  min-height: 0;
+}
+body.app-page--tool-globe .map-hero--field .map-hero__inner { padding: 0; }
+body.app-page--tool-globe .site-footer { display: none; }
+.stores-globe { height: min(70svh, 46rem); min-height: 28rem; background: #02050a; }
 .map-explorer--field { min-height: calc(100svh - var(--header-h)); }
 .map-explorer--field .map-surface { min-height: calc(100svh - var(--header-h)); border-radius: 0; box-shadow: none; }
 /* ホームは地図を主役にし、固定ナビの下に凡例が隠れないようにする。 */
@@ -250,18 +271,42 @@ h3 { margin-bottom: .65rem; font-size: 1.45rem; line-height: 1.2; }
 .google-map-canvas[hidden] { display: none; }
 .map-illustration { position: absolute; inset: 0; z-index: 1; overflow: hidden; border-radius: inherit; transition: opacity .35s ease; }
 .map-illustration--japan { background: var(--blue-deep); }
-.japan-map__viewport { position: absolute; inset: 0; overflow: hidden; touch-action: pan-y; cursor: grab; background-color: var(--blue-deep); background-image: radial-gradient(rgba(255, 253, 248, .14) .7px, transparent .7px), radial-gradient(circle at 18% 16%, rgba(233, 189, 85, .18), transparent 28%), linear-gradient(135deg, rgba(42, 124, 145, .55), transparent 58%); background-size: 12px 12px, 100% 100%, 100% 100%; }
+.japan-map__viewport { position: absolute; inset: 0; overflow: hidden; touch-action: none; cursor: grab; background: #030817; }
 .japan-map__viewport.is-map-zoomed { touch-action: none; }
 .japan-map__viewport.is-dragging { cursor: grabbing; }
 .japan-map__viewport.is-pinching { cursor: grabbing; }
+.japan-map__viewport.is-rotating { cursor: grabbing; }
 .japan-map__viewport:focus-visible { outline: 3px solid var(--coral); outline-offset: -7px; }
+.japan-map__space { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; background: radial-gradient(circle at 50% 46%, rgba(37, 91, 129, .18), transparent 34%), linear-gradient(145deg, #050b19 0%, #081326 48%, #020611 100%); }
+.japan-map__space::before, .japan-map__space::after, .japan-map__space-starfield { content: ''; position: absolute; inset: -18%; pointer-events: none; }
+.japan-map__space::before { opacity: .86; background-image: radial-gradient(circle, rgba(255, 253, 248, .9) 0 1px, transparent 1.2px), radial-gradient(circle, rgba(135, 212, 239, .65) 0 .8px, transparent 1px), radial-gradient(circle, rgba(255, 212, 119, .58) 0 .7px, transparent .95px); background-position: 12px 24px, 46px 5px, 87px 64px; background-size: 83px 76px, 137px 119px, 191px 167px; }
+.japan-map__space::after { opacity: .32; background: radial-gradient(ellipse at 22% 40%, rgba(76, 181, 207, .34), transparent 35%), radial-gradient(ellipse at 82% 18%, rgba(138, 99, 205, .28), transparent 28%), radial-gradient(ellipse at 76% 88%, rgba(218, 83, 89, .18), transparent 26%); filter: blur(20px); }
+.japan-map__space-starfield { opacity: .36; background: radial-gradient(circle at 12% 22%, rgba(255, 253, 248, .8) 0 1.4px, transparent 1.8px), radial-gradient(circle at 74% 66%, rgba(255, 253, 248, .8) 0 1.2px, transparent 1.6px), radial-gradient(circle at 41% 80%, rgba(127, 204, 238, .8) 0 1.1px, transparent 1.6px), radial-gradient(circle at 93% 31%, rgba(255, 215, 137, .8) 0 1.3px, transparent 1.7px); }
+.japan-map__space-object { position: absolute; display: block; border-radius: 50%; transform: translate(-50%, -50%); }
+.japan-map__space-object--sun { top: 13%; left: 13%; width: clamp(22px, 5vw, 52px); height: clamp(22px, 5vw, 52px); background: radial-gradient(circle at 36% 32%, #fff5be 0 12%, #ffd86e 32%, #f59b4b 66%, rgba(245, 155, 75, 0) 72%); box-shadow: 0 0 22px rgba(255, 196, 83, .48), 0 0 64px rgba(245, 155, 75, .2); }
+.japan-map__space-object--mars { right: 10%; bottom: 13%; width: clamp(12px, 2.2vw, 28px); height: clamp(12px, 2.2vw, 28px); background: radial-gradient(circle at 35% 28%, #ffbd86 0 10%, #d96d54 44%, #873f4e 78%); box-shadow: inset -5px -4px 8px rgba(49, 20, 43, .42), 0 0 18px rgba(197, 89, 91, .26); }
+.japan-map__space-galaxy { position: absolute; display: block; width: clamp(130px, 25vw, 280px); height: clamp(34px, 7vw, 78px); border-radius: 50%; opacity: .3; filter: blur(1px); background: radial-gradient(ellipse, rgba(255, 253, 248, .88) 0 3%, rgba(146, 207, 241, .48) 12%, rgba(118, 120, 221, .2) 35%, transparent 68%); box-shadow: 0 0 28px rgba(118, 120, 221, .24); transform: rotate(-22deg); }
+.japan-map__space-galaxy::after { content: ''; position: absolute; inset: 22% -8%; border: 1px solid rgba(255, 253, 248, .28); border-radius: 50%; transform: rotate(24deg); }
+.japan-map__space-galaxy--one { top: 20%; right: -3%; }
+.japan-map__space-galaxy--two { bottom: 20%; left: -6%; opacity: .22; transform: rotate(28deg) scale(.8); }
+.japan-map__globe-surface { position: absolute; top: -160%; left: -160%; z-index: 0; width: 420%; height: 420%; border-radius: 50%; pointer-events: none; background: radial-gradient(circle at 33% 27%, rgba(65, 148, 168, .72), rgba(22, 77, 111, .98) 48%, rgba(6, 23, 48, .99) 76%); box-shadow: inset -24px -28px 100px rgba(0, 0, 0, .52), inset 24px 24px 80px rgba(159, 221, 237, .16), 0 0 34px rgba(66, 171, 204, .2); }
+.japan-map__globe-surface::after { content: ''; position: absolute; inset: 0; border-radius: 50%; opacity: .22; background: radial-gradient(ellipse at 35% 35%, transparent 0 40%, rgba(133, 211, 221, .26) 58%, transparent 72%), repeating-linear-gradient(14deg, transparent 0 10px, rgba(255, 253, 248, .06) 10px 11px, transparent 11px 22px); mix-blend-mode: screen; }
 .japan-map__geometry-probe { position: absolute; inset: 0; z-index: 3; overflow: hidden; opacity: 0; pointer-events: none; }
+.japan-map__geometry-probe * { pointer-events: none !important; }
 .japan-map__geometry-probe svg { position: absolute; top: 50%; left: 50%; display: block; width: min(100%, 520px); height: min(100%, 520px); pointer-events: auto; transform: translate(-50%, -50%); }
-.japan-map__canvas { position: absolute; top: 0; left: 0; width: min(100%, 520px); height: min(100%, 520px); transform: none; transform-origin: center; }
-.japan-map__asset-wrap { position: absolute; inset: 0; }
+.japan-map__canvas { position: absolute; top: 0; left: 0; z-index: auto; width: min(100%, 520px); height: min(100%, 520px); transform: none; transform-origin: center; }
+.japan-map__cell-canvas { position: absolute; inset: 0; z-index: 1; display: block; width: 100%; height: 100%; pointer-events: none; }
+.japan-map__cell-action { position: absolute; z-index: 6; display: block; margin: 0; padding: 0; border: 1px solid var(--yellow); border-radius: 2px; background: rgba(255, 218, 105, .12); box-shadow: 0 0 0 1px rgba(16, 59, 80, .45), 0 0 16px rgba(255, 218, 105, .18); pointer-events: auto; cursor: pointer; transition: opacity .12s ease, transform .12s ease; }
+.japan-map__cell-action[hidden] { display: none; }
+.japan-map__cell-action:focus-visible { outline: 2px solid var(--white); outline-offset: 2px; }
+.japan-map__viewport.is-dragging .japan-map__cell-action, .japan-map__viewport.is-rotating .japan-map__cell-action, .japan-map__viewport.is-zooming .japan-map__cell-action { opacity: 0; }
+.japan-map__asset-wrap { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
 .japan-map__asset { position: absolute; inset: 0; display: block; width: 100%; height: 100%; overflow: visible; image-rendering: auto; shape-rendering: geometricPrecision; text-rendering: geometricPrecision; user-select: none; pointer-events: auto; }
 .japan-map__canvas.is-cell-map .japan-map__asset { visibility: hidden; pointer-events: none; }
 .japan-map__asset--fallback { pointer-events: none; }
+.japan-map__asset .japan-map__globe-ocean { fill: rgba(21, 77, 107, .82); stroke: rgba(154, 224, 235, .34); stroke-width: 7; vector-effect: non-scaling-stroke; pointer-events: none; }
+.japan-map__asset .japan-map__globe-atmosphere { fill: none; stroke: rgba(104, 211, 229, .24); stroke-width: 18; vector-effect: non-scaling-stroke; pointer-events: none; }
+.japan-map__asset .japan-map__globe-countries { pointer-events: auto; }
 .japan-map__asset .prefecture { cursor: pointer; fill: #f2efe7; stroke: rgba(16, 59, 80, .5); stroke-width: var(--map-boundary-width, 1.25px); pointer-events: all; vector-effect: non-scaling-stroke; transition: fill .2s ease, stroke .2s ease, filter .2s ease; }
 .japan-map__asset .prefecture.is-open { fill: var(--coral); stroke: rgba(16, 59, 80, .5); }
 .japan-map__asset .prefecture:hover, .japan-map__asset .prefecture:focus-visible, .japan-map__asset .prefecture.is-selected { fill: #e67b5d; stroke: rgba(16, 59, 80, .5); filter: none; }
@@ -275,10 +320,11 @@ h3 { margin-bottom: .65rem; font-size: 1.45rem; line-height: 1.2; }
   background: hsl(var(--cell-hue, 198) var(--cell-saturation, 55%) var(--cell-lightness, 80%));
   box-shadow: inset 0 0 0 .65px rgba(255, 253, 248, .3);
 }
-.japan-map__cell.has-content::after { content: '•'; display: block; color: rgba(255, 253, 248, .9); font-family: 'DM Mono', monospace; font-size: clamp(.32rem, 1.2vw, .72rem); font-weight: 700; line-height: 1; }
+.japan-map__cell.has-content::after { content: ''; display: block; width: min(42%, 8px); aspect-ratio: 1; border: 1px solid rgba(255, 253, 248, .92); border-radius: 50%; background: rgba(16, 59, 80, .28); box-shadow: 0 0 0 1px rgba(16, 59, 80, .12); }
 .japan-map__cell.is-active { box-shadow: inset 0 0 0 .65px rgba(255, 253, 248, .34), 0 0 0 1px var(--yellow); }
 .japan-map__cell:hover, .japan-map__cell:focus-visible { z-index: 2; box-shadow: inset 0 0 0 1.25px var(--yellow); outline: none; }
 .japan-map__viewport.is-zooming .japan-map__cell, .japan-map__viewport.is-focusing .japan-map__cell { transition: none; }
+.japan-map__viewport.is-dragging .japan-map__cell, .japan-map__viewport.is-rotating .japan-map__cell { transition: none; }
 .japan-map__canvas--wrap-tile .japan-map__asset { pointer-events: none; }
 .japan-map__regions { position: absolute; top: .75rem; right: 4.6rem; left: .75rem; z-index: 7; padding: 0; }
 .japan-map__region-picker { width: min(680px, 100%); color: var(--white); }
@@ -300,7 +346,7 @@ h3 { margin-bottom: .65rem; font-size: 1.45rem; line-height: 1.2; }
 .japan-map__controls { position: absolute; top: 1rem; right: 1rem; z-index: 7; display: grid; gap: .35rem; }
 .japan-map__control { display: grid; place-items: center; width: 2.5rem; height: 2.5rem; padding: 0; border: 1px solid rgba(23, 35, 51, .18); border-radius: 9px; color: var(--ink); background: rgba(255, 253, 248, .92); box-shadow: 0 5px 13px rgba(23, 35, 51, .14); font-size: 1.2rem; font-weight: 700; line-height: 1; }
 .japan-map__control:hover, .japan-map__control:focus-visible { color: var(--white); background: var(--blue-deep); }
-.japan-map__control--reset { width: auto; min-width: 2.5rem; padding: 0 .45rem; font-size: .66rem; }
+.japan-map__control--reset { width: auto; min-width: 3.25rem; padding: 0 .4rem; white-space: nowrap; font-size: .66rem; }
 .japan-map__zoom-status { position: absolute; right: 1rem; bottom: 1rem; z-index: 7; padding: .38rem .58rem; border: 1px solid rgba(23, 35, 51, .14); border-radius: 999px; color: var(--ink-soft); background: rgba(255, 253, 248, .82); font-family: 'DM Mono', monospace; font-size: .66rem; }
 .japan-map__credit { position: absolute; bottom: 1rem; left: 1rem; z-index: 7; margin: 0; padding: .32rem .5rem; border-radius: 999px; color: rgba(23, 35, 51, .7); background: rgba(255, 253, 248, .68); font-size: .62rem; }
 .map-surface--japan .map-surface__stamp { display: none; }
@@ -361,6 +407,9 @@ h3 { margin-bottom: .65rem; font-size: 1.45rem; line-height: 1.2; }
 .map-post-drawer__close { display: grid; place-items: center; width: 2.2rem; height: 2.2rem; flex: 0 0 auto; padding: 0; border: 0; border-radius: 50%; color: var(--ink-soft); background: var(--paper-deep); font-size: 1.35rem; line-height: 1; }
 .map-post-drawer__close:hover, .map-post-drawer__close:focus-visible { color: var(--ink); background: #e4e9e6; }
 .map-post-drawer__lead { margin: .9rem 0 1.1rem; color: var(--ink-soft); font-size: .8rem; line-height: 1.7; }
+.map-post-drawer__steps { display: flex; gap: .35rem; margin: 0 0 .9rem; color: var(--ink-soft); font-family: 'DM Mono', monospace; font-size: .62rem; }
+.map-post-drawer__steps span { padding: .28rem .42rem; border-radius: 999px; background: var(--paper-deep); }
+.map-post-drawer__steps .is-current { color: var(--white); background: var(--blue-deep); }
 .map-post-form { display: grid; gap: .9rem; }
 .map-post-form > label { display: grid; gap: .35rem; color: var(--ink); font-size: .78rem; font-weight: 700; }
 .map-post-form > label small, .map-post-form__file small { color: var(--ink-soft); font-size: .68rem; font-weight: 500; }
@@ -375,7 +424,11 @@ h3 { margin-bottom: .65rem; font-size: 1.45rem; line-height: 1.2; }
 .map-post-location__head strong { font-size: .8rem; }
 .map-post-location__head span { color: var(--coral); font-family: 'DM Mono', monospace; font-size: .64rem; }
 .map-post-location p { margin: 0; color: var(--ink-soft); font-size: .73rem; line-height: 1.55; }
-.map-post-location__actions { display: grid; grid-template-columns: 1fr 1fr; gap: .45rem; }
+.map-post-location__cell-preview { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; width: 4.2rem; height: 4.2rem; padding: 2px; border-radius: 8px; background: #173544; }
+.map-post-location__cell-preview i { display: block; border-radius: 1px; background: rgba(173, 194, 205, .55); }
+.map-post-location__cell-preview i.is-target { background: var(--coral); box-shadow: 0 0 0 1px rgba(255, 253, 248, .82); }
+.map-post-location__note { color: var(--ink-soft); font-size: .66rem; line-height: 1.5; }
+.map-post-location__actions { display: grid; grid-template-columns: 1fr; gap: .45rem; }
 .map-post-location__actions .button { min-height: 2.35rem; padding-inline: .55rem; font-size: .72rem; }
 .map-post-form__status { min-height: 1.35rem; margin: 0; color: var(--ink-soft); font-size: .72rem; line-height: 1.55; }
 .map-post-form__status[data-state='error'] { color: #c43f32; }
@@ -469,6 +522,7 @@ body.is-post-drawer-open { overflow: hidden; }
 .tool-card { position: relative; display: flex; min-height: 190px; flex-direction: column; justify-content: space-between; padding: 1.2rem; overflow: hidden; border: 1px solid var(--line); border-radius: 18px; color: var(--ink); background: rgba(255, 253, 248, .86); box-shadow: 0 8px 22px rgba(16, 59, 80, .06); transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease; }
 .tool-card:hover, .tool-card:focus-within { border-color: rgba(221, 106, 77, .48); box-shadow: 0 16px 34px rgba(16, 59, 80, .13); transform: translateY(-4px); }
 .tool-card__icon { display: grid; place-items: center; width: 3.1rem; height: 3.1rem; border-radius: 12px; color: var(--blue-deep); background: var(--paper-deep); font-family: 'DM Mono', monospace; font-size: 1.25rem; }
+.tool-card__icon img { display: block; width: 42px; height: 42px; object-fit: contain; }
 .tool-card--accent .tool-card__icon { color: var(--white); background: var(--coral); }
 .tool-card h2 { margin: 1.4rem 0 .35rem; font-family: 'Hiragino Sans', 'Yu Gothic', 'Meiryo', system-ui, sans-serif; font-size: 1.05rem; letter-spacing: -.02em; }
 .tool-card p { margin: 0; color: var(--ink-soft); font-size: .78rem; line-height: 1.65; }

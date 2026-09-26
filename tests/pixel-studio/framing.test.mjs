@@ -4,7 +4,7 @@ import { FRAME_RATIOS, OUTPUT_SIZES, resolveAspect, centerCrop, frameGeometry, f
 
 test('frame choices and aspect fallback use the preview viewport', () => {
   assert.deepEqual(FRAME_RATIOS.map(({ value }) => value), ['screen', '1:1', '3:4', '9:16', '4:3', '16:9']);
-  assert.deepEqual(OUTPUT_SIZES, [64, 128, 256, 512]);
+  assert.deepEqual(OUTPUT_SIZES, [16, 32, 64, 96, 128, 160, 256, 512]);
   assert.equal(resolveAspect('screen', 1200, 800), 1.5);
   assert.equal(resolveAspect('unknown', 1200, 800), 1.5);
   assert.equal(resolveAspect('9:16', 1200, 800), 9 / 16);

@@ -6,6 +6,7 @@ const MIN_PIXELS = 8;
 const MAX_PIXELS = 128;
 const MAX_COLORS = 512;
 const ALLOWED_MIME = new Set(['image/png', 'image/webp']);
+const MAP_CELL_GRID = 128;
 
 function readStoredSession() {
   try {
@@ -135,8 +136,14 @@ function makeLocationContext(cell) {
   const x = Number(cell.dataset.cellX);
   const y = Number(cell.dataset.cellY);
   const prefectureCode = String(cell.dataset.prefectureCode || '').padStart(2, '0');
-  if (![64, 128, 256, 512].includes(grid) || !Number.isInteger(x) || !Number.isInteger(y) || !prefectureCode) return null;
-  return { grid, x, y, prefectureCode, label: cell.getAttribute('aria-label') || '' };
+  if (grid !== MAP_CELL_GRID || !Number.isInteger(x) || !Number.isInteger(y) || !prefectureCode) return null;
+  const prefectureName = String(cell.dataset.prefectureName || '').trim();
+  return { grid, x, y, prefectureCode, label: prefectureName ? `${prefectureName}のセル` : (cell.getAttribute('aria-label') || '') };
+}
+
+function formatCellNumber(cell) {
+  if (!cell) return '';
+  return `固定セル · X${cell.x} / Y${cell.y}`;
 }
 
 export function bindUserPostComposer(root, options = {}) {
@@ -149,13 +156,14 @@ export function bindUserPostComposer(root, options = {}) {
     <button class="map-post-drawer__backdrop" type="button" data-post-backdrop aria-label="投稿パネルを閉じる"></button>
     <section class="map-post-drawer__panel" role="dialog" aria-modal="true" aria-labelledby="map-post-title">
       <div class="map-post-drawer__head"><div><span class="eyebrow">user post</span><h2 id="map-post-title">地図に絵を置く</h2></div><button class="map-post-drawer__close" type="button" data-post-close aria-label="投稿パネルを閉じる">×</button></div>
-      <p class="map-post-drawer__lead">小さなドット絵と場所を選ぶと、確認後にそのセルへ表示されます。</p>
+      <p class="map-post-drawer__lead">小さなドット絵とセルを選ぶだけ。確認後に、選んだセル自体が掲載場所になります。</p>
+      <div class="map-post-drawer__steps" aria-label="投稿の流れ"><span class="is-current">01 絵</span><span>02 セル</span><span>03 確認</span></div>
       <form class="map-post-form" data-post-form novalidate>
-        <label class="map-post-form__file"><span>作品画像</span><input type="file" accept="image/png,image/webp" data-post-file required><small>PNG / WebP・8〜128px・512KB以内</small></label>
+        <label class="map-post-form__file"><span>作品画像</span><input type="file" accept="image/png,image/webp" data-post-file required><small>PNG / WebP・8〜128px・512KB以内。写真は投稿できません。</small></label>
         <div class="map-post-form__preview" data-post-preview hidden><img data-post-preview-image alt="選択したドット絵のプレビュー"><span data-post-image-meta></span></div>
         <label><span>作品名</span><input type="text" maxlength="60" placeholder="作品の名前" data-post-title required></label>
         <label><span>ひとこと <small>任意</small></span><textarea rows="3" maxlength="180" placeholder="この場所に置いた理由など" data-post-caption></textarea></label>
-        <section class="map-post-location" aria-labelledby="map-post-location-title"><div class="map-post-location__head"><strong id="map-post-location-title">置く場所</strong><span data-post-location-state>未選択</span></div><p data-post-location-summary>地図のセルを選ぶか、現在地を使えます。</p><div class="map-post-location__actions"><button class="button button--quiet" type="button" data-post-map-location>地図から選ぶ</button><button class="button button--quiet" type="button" data-post-current-location>現在地を使う</button></div></section>
+        <section class="map-post-location" aria-labelledby="map-post-location-title"><div class="map-post-location__head"><strong id="map-post-location-title">置く場所</strong><span data-post-location-state>未選択</span></div><div class="map-post-location__cell-preview" aria-hidden="true"><i></i><i></i><i></i><i></i><i class="is-target"></i><i></i><i></i><i></i><i></i></div><p data-post-location-summary>地図のセルを選んでください。</p><small class="map-post-location__note">細かい住所は公開しません。セル番号だけを保存し、選んだセル自体を掲載場所として表示します。</small><div class="map-post-location__actions"><button class="button button--quiet" type="button" data-post-map-location>地図から選ぶ</button></div></section>
         <p class="map-post-form__status" data-post-status role="status" aria-live="polite"></p>
         <button class="button button--primary map-post-form__submit" type="submit" data-post-submit disabled>投稿を送る</button>
       </form>
@@ -173,9 +181,8 @@ export function bindUserPostComposer(root, options = {}) {
   const locationState = panel.querySelector('[data-post-location-state]');
   const status = panel.querySelector('[data-post-status]');
   const submit = panel.querySelector('[data-post-submit]');
-  const currentLocationButton = panel.querySelector('[data-post-current-location]');
   const mapLocationButton = panel.querySelector('[data-post-map-location]');
-  let state = { mapCell: null, device: null, file: null, meta: null, objectUrl: '', submitted: false };
+  let state = { mapCell: null, file: null, meta: null, objectUrl: '', submitted: false };
   let returnFocus = null;
 
   const setStatus = (message, kind = '') => {
@@ -185,17 +192,15 @@ export function bindUserPostComposer(root, options = {}) {
   };
   const syncLocation = () => {
     const hasCell = Boolean(state.mapCell);
-    const hasDevice = Boolean(state.device);
-    if (locationState) locationState.textContent = hasCell || hasDevice ? '選択済み' : '未選択';
+    if (locationState) locationState.textContent = hasCell ? 'セル選択済み' : '未選択';
+    if (mapLocationButton) mapLocationButton.textContent = hasCell ? 'セルを変更' : '地図から選ぶ';
     if (locationSummary) {
-      if (hasCell && hasDevice) locationSummary.textContent = `${state.mapCell.label || '地図のセル'} / 現在地も保存`;
-      else if (hasCell) locationSummary.textContent = `${state.mapCell.label || '地図のセル'}（公開位置はセルに丸めます）`;
-      else if (hasDevice) locationSummary.textContent = `現在地を取得しました（精度 約${Math.round(state.device.accuracy || 0)}m）`;
-      else locationSummary.textContent = '地図のセルを選ぶか、現在地を使えます。';
+      if (hasCell) locationSummary.textContent = `${state.mapCell.label || '地図のセル'}（${formatCellNumber(state.mapCell)}・セルが掲載場所）`;
+      else locationSummary.textContent = '地図のセルを選んでください。';
     }
   };
   const syncSubmit = () => {
-    const complete = Boolean(state.meta && titleInput?.value.trim() && (state.mapCell || state.device));
+    const complete = Boolean(state.meta && titleInput?.value.trim() && state.mapCell);
     if (submit) submit.disabled = !complete || state.submitted;
   };
   const clearPreview = () => {
@@ -214,9 +219,9 @@ export function bindUserPostComposer(root, options = {}) {
   const open = (context = {}) => {
     returnFocus = context.returnFocus || document.activeElement;
     clearPreview();
-    state = { mapCell: context.cell ? makeLocationContext(context.cell) : (context.mapCell || null), device: null, file: null, meta: null, objectUrl: '', submitted: false };
+    state = { mapCell: context.cell ? makeLocationContext(context.cell) : (context.mapCell || null), file: null, meta: null, objectUrl: '', submitted: false };
     form?.reset();
-    setStatus(isConfigured() ? '' : '接続準備中です。設定後に投稿を送信できます。', isConfigured() ? '' : 'pending');
+    setStatus(isConfigured() ? '' : '投稿を利用できません。時間をおいてお試しください。', isConfigured() ? '' : 'pending');
     syncLocation();
     syncSubmit();
     panel.hidden = false;
@@ -258,31 +263,13 @@ export function bindUserPostComposer(root, options = {}) {
     setStatus('');
     options.onRequestMapCell?.();
   });
-  currentLocationButton?.addEventListener('click', () => {
-    if (!navigator.geolocation) {
-      setStatus('この端末では現在地を取得できません。地図からセルを選んでください。', 'error');
-      return;
-    }
-    currentLocationButton.disabled = true;
-    setStatus('現在地を確認しています…', 'working');
-    navigator.geolocation.getCurrentPosition((position) => {
-      state.device = {
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-        accuracy: position.coords.accuracy
-      };
-      currentLocationButton.disabled = false;
-      setStatus('現在地を取得しました。正確な座標は公開せず、確認用に保管します。', 'ok');
-      syncLocation();
-      syncSubmit();
-    }, () => {
-      currentLocationButton.disabled = false;
-      setStatus('現在地を取得できませんでした。ブラウザの許可を確認するか、地図から選んでください。', 'error');
-    }, { enableHighAccuracy: false, maximumAge: 60_000, timeout: 8_000 });
-  });
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
-    if (!state.file || !state.meta || !titleInput?.value.trim() || (!state.mapCell && !state.device)) return;
+    if (!state.file || !state.meta || !titleInput?.value.trim() || !state.mapCell) {
+      setStatus('作品画像・作品名・地図上のセルを確認してください。', 'pending');
+      syncSubmit();
+      return;
+    }
     if (!isConfigured()) {
       setStatus('投稿接続が未設定です。Supabaseの公開設定を入れるまで送信されません。', 'pending');
       return;
@@ -299,7 +286,7 @@ export function bindUserPostComposer(root, options = {}) {
           title: titleInput.value.trim(),
           caption: captionInput?.value.trim() || '',
           image: { mimeType: state.file.type, size: state.file.size, width: state.meta.width, height: state.meta.height, colorCount: state.meta.colorCount, base64: state.meta.base64 },
-          location: { mapCell: state.mapCell, device: state.device }
+          location: { mapCell: state.mapCell }
         })
       });
       if (!response.ok) throw new Error(await readError(response));

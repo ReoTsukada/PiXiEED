@@ -1,4 +1,5 @@
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2.106.2";
+import { normalizeGlobeCell } from "../_shared/globe-cell.ts";
 
 const SIGNED_URL_TTL = 5 * 60;
 const MAX_PENDING = 50;
@@ -28,6 +29,8 @@ const secretKey = env("SUPABASE_SECRET_KEY") ||
   env("SUPABASE_SERVICE_ROLE_KEY") ||
   defaultKeyDictionaryValue("SUPABASE_SECRET_KEYS");
 const LOCAL_ORIGINS = new Set([
+  "https://pixieed.jp",
+  "https://www.pixieed.jp",
   "http://127.0.0.1:4173",
   "http://localhost:4173",
 ]);
@@ -149,12 +152,19 @@ function locationPayload(location: Record<string, unknown> | null) {
       prefectureCode: String(location.prefecture_code || ""),
     }
     : null;
+  const globeCell = normalizeGlobeCell({
+    id: location.globe_cell_id,
+    version: location.projection_version,
+    band: location.globe_band,
+    column: location.globe_column,
+  });
   return {
     source: location.source,
     latitude: location.latitude,
     longitude: location.longitude,
     accuracyM: location.accuracy_m,
     mapCell: cell && normalizeMapCell(cell),
+    globeCell,
   };
 }
 
@@ -172,7 +182,7 @@ async function listPending(admin: any) {
   const ids = (posts || []).map((post: any) => post.id);
   const locations = ids.length
     ? await admin.from("post_locations_private").select(
-      "post_id,latitude,longitude,accuracy_m,source,cell_grid,cell_x,cell_y,prefecture_code",
+      "post_id,latitude,longitude,accuracy_m,source,cell_grid,cell_x,cell_y,prefecture_code,projection_version,globe_cell_id,globe_band,globe_column",
     ).in("post_id", ids)
     : { data: [], error: null };
   if (locations.error) throw new Error("private_locations_read_failed");
@@ -241,15 +251,16 @@ async function moderatePost(admin: any, body: Record<string, unknown>) {
   const { data: location, error: locationError } = await admin
     .from("post_locations_private")
     .select(
-      "latitude,longitude,accuracy_m,source,cell_grid,cell_x,cell_y,prefecture_code",
+      "latitude,longitude,accuracy_m,source,cell_grid,cell_x,cell_y,prefecture_code,projection_version,globe_cell_id,globe_band,globe_column",
     )
     .eq("post_id", postId)
     .maybeSingle();
   if (locationError) throw new Error("private_location_read_failed");
   const requestedCell = normalizeMapCell(body.mapCell);
-  const storedCell = locationPayload(location || null)?.mapCell || null;
-  const cell = requestedCell || storedCell;
-  if (!cell) throw new Error("public_map_cell_required");
+  const storedLocation = locationPayload(location || null);
+  const cell = requestedCell || storedLocation?.mapCell || null;
+  const globeCell = storedLocation?.globeCell || null;
+  if (!cell && !globeCell) throw new Error("public_map_cell_required");
 
   const quarantine = admin.storage.from("post-quarantine");
   const publicStorage = admin.storage.from("post-public");
@@ -266,14 +277,32 @@ async function moderatePost(admin: any, body: Record<string, unknown>) {
   if (uploaded.error) throw new Error("public_image_write_failed");
 
   const publishedAt = new Date().toISOString();
+  const publicLocation = globeCell
+    ? {
+      map_space: "globe",
+      projection_version: globeCell.version,
+      cell_grid: null,
+      cell_x: null,
+      cell_y: null,
+      prefecture_code: null,
+      globe_cell_id: globeCell.id,
+      globe_band: globeCell.band,
+      globe_column: globeCell.column,
+    }
+    : {
+      map_space: "japan",
+      projection_version: "japan-cell-v1",
+      cell_grid: cell!.grid,
+      cell_x: cell!.x,
+      cell_y: cell!.y,
+      prefecture_code: cell!.prefectureCode,
+      globe_cell_id: null,
+      globe_band: null,
+      globe_column: null,
+    };
   const publicPoint = await admin.from("post_map_points").upsert({
     post_id: postId,
-    map_space: "japan",
-    projection_version: "japan-cell-v1",
-    cell_grid: cell.grid,
-    cell_x: cell.x,
-    cell_y: cell.y,
-    prefecture_code: cell.prefectureCode,
+    ...publicLocation,
     title: post.title,
     caption: post.caption,
     public_image_path: publicPath,
@@ -288,7 +317,7 @@ async function moderatePost(admin: any, body: Record<string, unknown>) {
     updated_at: publishedAt,
   }).eq("id", postId);
   if (published.error) throw new Error("post_publish_failed");
-  return { postId, status: "published", mapCell: cell };
+  return { postId, status: "published", mapCell: cell, globeCell };
 }
 
 Deno.serve(async (request) => {

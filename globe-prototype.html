@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PiXiEED地球儀</title>
+  <script>
+    (function () {
+      var params = new URLSearchParams(location.search);
+      if (params.get('embed') === '1') document.documentElement.classList.add('is-embedded');
+      if (location.protocol === 'file:') {
+        var target = new URL('/globe-prototype.html', 'http://127.0.0.1:4173');
+        target.search = location.search;
+        target.hash = location.hash;
+        location.replace(target.href);
+      }
+    }());
+  </script>
+  <link rel="stylesheet" href="css/globe-prototype.css?v=20260921-icon-only-v1">
+  <!-- Flatten the module waterfall and fetch the land-mask raster in parallel. -->
+  <link rel="modulepreload" href="js/globe/renderer.mjs?v=20260921-astro-4">
+  <link rel="modulepreload" href="js/globe/astro-ui.mjs?v=20260921-icon-only-v1">
+  <link rel="modulepreload" href="js/globe/post-ui.mjs?v=20260921-tool-shell-v1">
+  <link rel="modulepreload" href="js/globe/geometry.mjs?v=20260921-grid11-1">
+  <link rel="modulepreload" href="js/globe/topology.mjs?v=20260920-g4-precision-1">
+  <link rel="modulepreload" href="js/globe/hierarchy.mjs?v=20260920-g4-precision-1">
+  <link rel="modulepreload" href="js/globe/webgl-renderer.mjs?v=20260921-astro-4">
+  <link rel="modulepreload" href="assets/maps/world-land-mask-v1.mjs?v=20260920-webgl2-1">
+  <script>
+    globalThis.__PIXIEED_GLOBE_RASTER__ = location.protocol === 'file:' ? null : fetch('assets/maps/globe-land-mask-v1.json?v=20260921-grid11-1', { cache: 'force-cache' })
+      .then(function (response) { if (!response.ok) throw new Error('raster ' + response.status); return response.json(); });
+    globalThis.__PIXIEED_GLOBE_RASTER__.catch(function () {});
+    // If loading stalls, show a short recovery message instead of implementation details.
+    setTimeout(function () {
+      var status = document.getElementById('loadStatus');
+      if (!globalThis.__PIXIEED_GLOBE__ && status && status.textContent.indexOf('読み込み中') >= 0) {
+        status.textContent = '地球儀を読み込めませんでした。ページを再読み込みしてください。';
+      }
+    }, 8000);
+  </script>
+</head>
+<body>
+  <main class="globe-prototype" aria-labelledby="prototypeTitle">
+    <header class="prototype-header">
+      <div>
+        <p class="eyebrow">PiXiEED</p>
+        <h1 id="prototypeTitle" class="sr-only">PiXiEED地球儀</h1>
+      </div>
+      <p id="loadStatus" class="load-status" role="status">地図データを読み込み中…</p>
+      <div id="accountSlot" class="account" aria-label="アカウント"></div>
+    </header>
+
+    <section id="globeStage" class="globe-stage" aria-label="インタラクティブな地球儀">
+      <canvas id="globeCanvas" tabindex="0" aria-label="地球儀。ドラッグで回転、ホイールまたはピンチでズーム、タップでセルを選択"></canvas>
+      <div class="globe-controls" aria-label="地球儀の操作">
+        <button id="rotateLeft" type="button" aria-label="左へ回転"><img src="/assets/icons/pixieed/rewind.svg" alt=""></button>
+        <button id="zoomOut" type="button" aria-label="ズームアウト"><img src="/assets/icons/pixieed/zoom-out.svg" alt=""></button>
+        <button id="resetView" type="button" aria-label="初期表示に戻す"><img src="/assets/icons/pixieed/reset.svg" alt=""></button>
+        <button id="zoomIn" type="button" aria-label="ズームイン"><img src="/assets/icons/pixieed/zoom-in.svg" alt=""></button>
+        <button id="rotateRight" type="button" aria-label="右へ回転"><img src="/assets/icons/pixieed/forward.svg" alt=""></button>
+      </div>
+      <aside id="selectionPanel" class="selection-panel" aria-live="polite" hidden>
+        <span id="selectedStage"></span>
+        <strong id="selectedOwner"></strong>
+        <button id="placeHere" class="place-here" type="button" aria-label="選択したセルに作品を置く">
+          <img src="/assets/icons/pixieed/add.svg" alt="">
+        </button>
+      </aside>
+    </section>
+
+  </main>
+  <script type="module" src="js/globe/prototype.mjs?v=20260921-tool-shell-v1"></script>
+</body>
+</html>

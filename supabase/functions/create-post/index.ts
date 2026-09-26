@@ -1,4 +1,5 @@
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2.106.2";
+import { normalizeGlobeCell } from "../_shared/globe-cell.ts";
 
 const MAX_BYTES = 512 * 1024;
 const MIN_PIXELS = 8;
@@ -29,6 +30,8 @@ const secretKey = env("SUPABASE_SECRET_KEY") ||
   env("SUPABASE_SERVICE_ROLE_KEY") ||
   defaultKeyDictionaryValue("SUPABASE_SECRET_KEYS");
 const LOCAL_ORIGINS = new Set([
+  "https://pixieed.jp",
+  "https://www.pixieed.jp",
   "http://127.0.0.1:4173",
   "http://localhost:4173",
 ]);
@@ -145,18 +148,28 @@ async function sha256(bytes: Uint8Array) {
 function normalizeLocation(input: unknown) {
   if (!input || typeof input !== "object") return null;
   const location = input as Record<string, unknown>;
-  const device = location.device && typeof location.device === "object"
-    ? location.device as Record<string, unknown>
-    : null;
+  const globeCell = normalizeGlobeCell(location.globeCell);
+  if (globeCell) {
+    return {
+      latitude: null,
+      longitude: null,
+      accuracy_m: null,
+      source: "map-cell",
+      map_space: "globe",
+      cell_grid: null,
+      cell_x: null,
+      cell_y: null,
+      prefecture_code: null,
+      captured_at: null,
+      projection_version: globeCell.version,
+      globe_cell_id: globeCell.id,
+      globe_band: globeCell.band,
+      globe_column: globeCell.column,
+    };
+  }
   const cell = location.mapCell && typeof location.mapCell === "object"
     ? location.mapCell as Record<string, unknown>
     : null;
-  const latitude = device ? Number(device.latitude) : Number.NaN;
-  const longitude = device ? Number(device.longitude) : Number.NaN;
-  const accuracy = device ? Number(device.accuracy) : Number.NaN;
-  const hasDevice = Number.isFinite(latitude) && Number.isFinite(longitude) &&
-    Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180 &&
-    (!Number.isFinite(accuracy) || (accuracy >= 0 && accuracy <= 50000));
   const grid = cell ? Number(cell.grid) : Number.NaN;
   const cellX = cell ? Number(cell.x) : Number.NaN;
   const cellY = cell ? Number(cell.y) : Number.NaN;
@@ -166,18 +179,22 @@ function normalizeLocation(input: unknown) {
     Number.isInteger(cellX) && cellX >= 0 && cellX < grid &&
     Number.isInteger(cellY) && cellY >= 0 && cellY < grid &&
     /^(0[1-9]|[1-4][0-9])$/.test(prefectureCode);
-  if (!hasDevice && !hasCell) return null;
+  if (!hasCell) return null;
   return {
-    latitude: hasDevice ? latitude : null,
-    longitude: hasDevice ? longitude : null,
-    accuracy_m: hasDevice && Number.isFinite(accuracy) ? accuracy : null,
-    source: hasDevice ? "device" : "map-cell",
+    latitude: null,
+    longitude: null,
+    accuracy_m: null,
+    source: "map-cell",
     map_space: "japan",
-    cell_grid: hasCell ? grid : null,
-    cell_x: hasCell ? cellX : null,
-    cell_y: hasCell ? cellY : null,
-    prefecture_code: hasCell ? prefectureCode : null,
-    captured_at: hasDevice ? new Date().toISOString() : null,
+    cell_grid: grid,
+    cell_x: cellX,
+    cell_y: cellY,
+    prefecture_code: prefectureCode,
+    captured_at: null,
+    projection_version: null,
+    globe_cell_id: null,
+    globe_band: null,
+    globe_column: null,
   };
 }
 

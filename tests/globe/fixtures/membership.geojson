@@ -1,0 +1,51 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "regionId": "japan" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[130, 30], [140, 30], [140, 40], [130, 40], [130, 30]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "regionId": "neighbor-east" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[140, 30], [150, 30], [150, 40], [140, 40], [140, 30]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "regionId": "dateline-zone" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[170, -10], [-170, -10], [-170, 10], [170, 10], [170, -10]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "regionId": "hole-zone" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [[-10, -10], [10, -10], [10, 10], [-10, 10], [-10, -10]],
+          [[-2, -2], [2, -2], [2, 2], [-2, 2], [-2, -2]]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "regionId": "island-chain" },
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [[[30, 0], [35, 0], [35, 5], [30, 5], [30, 0]]],
+          [[[40, 10], [45, 10], [45, 15], [40, 15], [40, 10]]]
+        ]
+      }
+    }
+  ]
+}

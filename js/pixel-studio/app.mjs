@@ -1,6 +1,6 @@
 import { createFrameLoop } from './frame-loop.mjs';
 import { encodeCameraPng, pngExportGeometry } from './png-export.mjs';
-import { FRAME_RATIOS, OUTPUT_SIZES, resolveAspect, centerCrop, frameGeometry, fitFrame } from './framing.mjs';
+import { FRAME_RATIOS, OUTPUT_SIZES, resolveAspect, centerCrop, frameGeometry, fitFrame } from './framing.mjs?v=20260925-lens-sizes-1';
 import { cameraStartErrorMessage, deriveCameraPrimaryAction } from './camera-ui-state.mjs';
 
 const $ = (selector) => document.querySelector(selector);
@@ -15,7 +15,7 @@ const stageMessage = $('#stageMsg');
 const info = $('#info');
 const sourceCanvas = document.createElement('canvas');
 const sourceContext = sourceCanvas.getContext('2d', { willReadFrequently: true });
-const worker = new Worker(new URL('./boundary-preview-worker.mjs?v=20260925-boundaries-1', import.meta.url), { type: 'module' });
+const worker = new Worker(new URL('./boundary-preview-worker.mjs?v=20260925-lens-camera-4', import.meta.url), { type: 'module' });
 const EDGE_CAP = 640;
 let activeStream = null;
 let cameraSequence = 0;
@@ -36,8 +36,17 @@ let pendingCameraRequest = null;
 let previewSessionStarted = 0;
 let previewCounter = 0;
 let toastTimer = null;
+let displayedPaletteRevision = null;
 
-const state = { mode: 'idle', facing: 'environment', result: null, error: '', ratio: 'screen', size: 256 };
+const state = { mode: 'idle', facing: 'environment', result: null, error: '', ratio: 'screen', size: 256,
+  colorDepth: '24', finish: 'soft', aiEdges: false };
+
+const LENS_FINISH = Object.freeze({
+  original: { dither: 'ordered', surfaceSimplify: 55 },
+  soft: { dither: 'selective', surfaceSimplify: 55 },
+  flat: { dither: 'selective', surfaceSimplify: 80 },
+  clean: { dither: 'off', surfaceSimplify: 55 }
+});
 
 function say(message = '', { visible = false } = {}) {
   if (toastTimer !== null) { window.clearTimeout(toastTimer); toastTimer = null; }
@@ -145,11 +154,28 @@ function updateSizeSummary() {
   $('#frameDimensions').textContent = `${dimensions.width} × ${dimensions.height}`;
   const saved = pngExportGeometry(dimensions.width, dimensions.height);
   $('#outputSummary').textContent = `${saved.width} × ${saved.height} px · PNG`;
+  $('#colorSummary').textContent = state.colorDepth === 'full' ? 'フルカラー' : `${state.colorDepth}色`;
   root.dataset.framing = state.ratio;
   root.dataset.outputSize = String(state.size);
   $('#imageSettings').setAttribute('aria-label', state.mode === 'captured'
     ? `撮影画像 ${dimensions.width} × ${dimensions.height} ピクセル`
-    : `撮影サイズを変更、${ratio.label}、長辺 ${state.size} ピクセル`);
+    : `撮影と色の設定、${ratio.label}、長辺 ${state.size} ピクセル、${state.colorDepth === 'full' ? 'フルカラー' : `${state.colorDepth}色`}`);
+}
+
+function updatePalettePreview(result) {
+  const revision = `${result.stats?.paletteRevision ?? 0}:${state.colorDepth}`;
+  if (revision === displayedPaletteRevision) return;
+  displayedPaletteRevision = revision;
+  const preview = $('#palettePreview');
+  preview.replaceChildren();
+  preview.dataset.full = String(state.colorDepth === 'full');
+  if (state.colorDepth === 'full') { preview.setAttribute('aria-label', 'フルカラー'); return; }
+  for (const color of result.palette ?? []) {
+    const swatch = document.createElement('i');
+    swatch.style.backgroundColor = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+    preview.appendChild(swatch);
+  }
+  preview.setAttribute('aria-label', `${result.palette?.length ?? 0}色の写真由来パレット`);
 }
 
 function fitPreview(frame) {
@@ -209,6 +235,7 @@ function drawCompleted(result) {
   viewContext.putImageData(new ImageData(result.data, result.width, result.height), 0, 0);
   fitPreview(result);
   state.result = result;
+  updatePalettePreview(result);
   root.dataset.ready = 'true';
   updateSizeSummary();
   previewCounter++;
@@ -257,14 +284,16 @@ function cameraFrame() {
   const output = frameGeometry(currentAspect(), state.size);
   const aspect = output.width / output.height;
   const crop = centerCrop(nativeWidth, nativeHeight, aspect);
-  // Integer multiples avoid rounding the short edge twice (source then output).
-  const samplesPerPixel = Math.max(1, Math.floor(EDGE_CAP / state.size));
+  // PiXiEELENS shrinks straight to the dot grid. Extra source pixels are
+  // transferred only while the optional object-boundary AI needs them.
+  const samplesPerPixel = state.aiEdges ? Math.max(1, Math.floor(EDGE_CAP / state.size)) : 1;
   const width = output.width * samplesPerPixel;
   const height = output.height * samplesPerPixel;
   if (sourceCanvas.width !== width || sourceCanvas.height !== height) {
     sourceCanvas.width = width; sourceCanvas.height = height;
   }
-  sourceContext.imageSmoothingEnabled = false;
+  sourceContext.imageSmoothingEnabled = true;
+  sourceContext.imageSmoothingQuality = 'high';
   sourceContext.save();
   if (state.facing === 'user') {
     sourceContext.translate(width, 0);
@@ -297,7 +326,10 @@ function requestWorker(frame, signal) {
         frame: transferFrame,
         session: renderSequence,
         size: state.size,
-        paletteEpoch
+        paletteEpoch,
+        renderMode: 'lens',
+        aiEdges: state.aiEdges,
+        lensSettings: { colorDepth: state.colorDepth, legacyTone: true, ...LENS_FINISH[state.finish] }
       }, [transferFrame.data.buffer]);
     } catch (error) {
       const pending = pendingWorker;
@@ -350,7 +382,7 @@ loop = createFrameLoop({
       try {
         const wasError = Boolean(state.error);
         drawCompleted(result);
-        const previewMessage = result.aiStatus === 'ready' || result.aiStatus === 'processing' ? ''
+        const previewMessage = result.aiStatus === 'ready' || result.aiStatus === 'processing' || result.aiStatus === 'disabled' ? ''
           : result.aiStatus === 'no-instances' ? ''
           : 'この端末に合わせた画質で表示しています。';
         if (!previewReady || previousAiStatus !== result.aiStatus) {
@@ -537,11 +569,14 @@ settingsPanel.addEventListener('toggle', (event) => {
 });
 settingsPanel.addEventListener('change', (event) => {
   const input = event.target;
-  if (!(input instanceof HTMLSelectElement) || state.mode === 'captured') return;
-  if (input.name === 'aspect' && FRAME_RATIOS.some((ratio) => ratio.value === input.value)) state.ratio = input.value;
-  else if (input.name === 'pixels' && OUTPUT_SIZES.includes(Number(input.value))) state.size = Number(input.value);
+  if (state.mode === 'captured') return;
+  if (input instanceof HTMLInputElement && input.name === 'aiEdges') state.aiEdges = input.checked;
+  else if (input instanceof HTMLSelectElement && input.name === 'aspect' && FRAME_RATIOS.some((ratio) => ratio.value === input.value)) state.ratio = input.value;
+  else if (input instanceof HTMLSelectElement && input.name === 'pixels' && OUTPUT_SIZES.includes(Number(input.value))) state.size = Number(input.value);
+  else if (input instanceof HTMLSelectElement && input.name === 'colors' && (['2', '4', '8', '16', '24', 'full'].includes(input.value))) state.colorDepth = input.value;
+  else if (input instanceof HTMLSelectElement && input.name === 'finish' && Object.hasOwn(LENS_FINISH, input.value)) state.finish = input.value;
   else return;
-  restartPreview();
+  restartPreview({ preserveCompleted: true });
   fitPreview(state.result);
   updateSizeSummary();
 });

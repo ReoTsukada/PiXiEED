@@ -3,7 +3,13 @@ import { mapConfig } from '../data/site-config.js';
 const VISITOR_KEY = 'PiXiEED:anonymous-visitor:v1';
 const SESSION_KEY = 'PiXiEED:analytics-session:v1';
 const QR_SESSION_PREFIX = 'PiXiEED:qr-session:v1:';
+const CONSENT_KEY = 'PiXiEED:analytics-consent:v1';
 const ENDPOINT = String(mapConfig.analyticsEndpoint || '').trim();
+let analyticsBound = false;
+
+function isAllowed() {
+  try { return localStorage.getItem(CONSENT_KEY) !== 'denied'; } catch { return true; }
+}
 
 function createId(prefix) {
   if (crypto?.randomUUID) return `${prefix}_${crypto.randomUUID()}`;
@@ -54,7 +60,7 @@ function post(payload) {
 }
 
 export function trackEvent(eventName, properties = {}) {
-  if (!eventName) return;
+  if (!eventName || !isAllowed()) return;
   post({
     event_id: createId('event'),
     occurred_at: new Date().toISOString(),
@@ -85,6 +91,8 @@ function trackQrArrival() {
 }
 
 export function bindAnalytics() {
+  if (!isAllowed() || analyticsBound) return;
+  analyticsBound = true;
   let isNewSession = false;
   try { isNewSession = !sessionStorage.getItem('PiXiEED:session-started:v1'); } catch { isNewSession = true; }
   readOrCreate(sessionStorage, 'PiXiEED:session-started:v1', 'started');
@@ -123,4 +131,15 @@ export function bindAnalytics() {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') trackEvent('page_leave');
   });
+}
+
+export function clearAnalyticsData() {
+  try {
+    localStorage.removeItem(VISITOR_KEY);
+    sessionStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem('PiXiEED:session-started:v1');
+    Object.keys(sessionStorage).filter((key) => key.startsWith(QR_SESSION_PREFIX)).forEach((key) => sessionStorage.removeItem(key));
+  } catch {
+    // 利用者の設定変更を妨げない。
+  }
 }

@@ -1,6 +1,8 @@
 # Camera boundary sampling — 2026-09-25
 
-## Current production behavior
+## Source sampling stage (color output superseded)
+
+The sampling geometry below is retained. The camera now applies the four-tone palette described in [pixel-camera-four-tones.md](pixel-camera-four-tones.md) after sampling; unrestricted source RGB is only the sampling-stage output. The verification figures below describe the earlier boundaries-only version.
 
 This replaces the former surface/palette processing in the camera entry point. Each grid cell uses a real pixel from the current input frame. Inside an object it is the center sample. Only a cell crossed by object IDs votes for its owner (background ID 0 participates equally; ties prefer the center ID) and selects the nearest actual source pixel belonging to that owner. No output RGB averaging, palette restriction, saturation/exposure/shadow adjustment, dither, face drawing, or previous-frame RGB retention is performed. Source shadows, sensor texture, and optical blur remain present. Alpha is opaque and display/export scaling remains nearest-neighbor.
 

@@ -5,8 +5,8 @@
   <desc>Created by Geolonia (https://geolonia.com/).</desc>
   <g class="svg-map" transform="matrix(1.028807, 0, 0, 1.028807, -47.544239, -28.806583)">
     <g class="prefectures" transform="matrix(1, 0, 0, 1, 6, 18)">
-      <!-- 沖縄は元データのインセット配置をやめ、九州の南西に収まる縮尺で配置する。 -->
-      <g class="okinawa kyushu-okinawa prefecture" data-code="47" stroke-linejoin="round" fill="#EEEEEE" fill-rule="nonzero" stroke="#000000" stroke-width="1.0" transform="matrix(0.55, 0, 0, 0.55, 50, 885)">
+      <!-- 沖縄・琉球列島はインセットにせず、約127.7E / 26.2Nを基準に九州の南西へ配置する。 -->
+      <g class="okinawa kyushu-okinawa prefecture" data-code="47" data-map-longitude="127.7" data-map-latitude="26.2" stroke-linejoin="round" fill="#EEEEEE" fill-rule="nonzero" stroke="#000000" stroke-width="1.0" transform="matrix(0.5, 0, 0, 0.5, 40, 915)">
         <title>沖縄 / Okinawa</title>
         <polygon points="4 109 6 110 4 111 0 110"/>
         <polygon points="48 121 55 123 51 129 39 124 42 122 44 125 46 118"/>

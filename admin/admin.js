@@ -142,6 +142,7 @@ function renderDashboard() {
   root.innerHTML = `
     <div class="admin-welcome"><div><span class="eyebrow">private workspace</span><h1>管理室</h1><p>${escapeHtml(state.user.email)} でログイン中</p></div><button class="button button--quiet" type="button" data-admin-refresh>再読み込み</button></div>
     <p class="admin-status" data-admin-status role="status"></p>
+    <section class="admin-card admin-access-card"><div class="admin-section-heading"><div><span class="eyebrow">access</span><h2>管理室の権限</h2></div><p>入口はこのGoogleログインに統一し、投稿審査だけ追加の権限確認を行います。</p></div><div class="admin-access-grid"><div><span>データ編集・公開</span><strong>Google</strong></div><div><span>ユーザー投稿の審査</span><strong>Supabase</strong></div></div></section>
     <section class="admin-metrics" data-admin-metrics><div class="admin-card admin-metric"><span>訪問者</span><strong>—</strong></div><div class="admin-card admin-metric"><span>ページ閲覧</span><strong>—</strong></div><div class="admin-card admin-metric"><span>QRスキャン</span><strong>—</strong></div><div class="admin-card admin-metric"><span>いいね</span><strong>—</strong></div></section>
     <section class="admin-card"><div class="admin-section-heading"><div><span class="eyebrow">insights</span><h2>役立つ情報</h2></div><p>日々の反応を、作品・店舗・QR単位で確認できます。</p></div><div class="admin-insights" data-admin-insights><p>読み込み中です。</p></div></section>
     <section class="admin-card"><div class="admin-section-heading"><div><span class="eyebrow">data editor</span><h2>データ編集</h2></div><a class="text-link" href="https://docs.google.com/spreadsheets/d/${encodeURIComponent(adminConfig.spreadsheetId)}/edit" target="_blank" rel="noopener">スプレッドシートを開く ↗</a></div><div class="admin-editor-toolbar"><label>編集する表<select data-sheet-selector><option value="${adminConfig.sheets.works}">作品</option><option value="${adminConfig.sheets.stores}">店舗</option><option value="${adminConfig.sheets.storeWorks}">店舗と作品</option><option value="${adminConfig.sheets.events}">イベント</option><option value="${adminConfig.sheets.eventSources}">イベント自動更新元</option></select></label><button class="button button--quiet" type="button" data-sheet-load>読み込む</button><button class="button button--quiet" type="button" data-row-add>行を追加</button><button class="button button--primary" type="button" data-sheet-save>保存</button><button class="button button--light" type="button" data-publish>公開する</button></div><div class="admin-table-wrap" data-editor-table><p>表を読み込んでください。</p></div></section>`;
@@ -151,7 +152,7 @@ function renderDashboard() {
   root.querySelector('[data-sheet-save]').addEventListener('click', saveEditorSheet);
   root.querySelector('[data-publish]').addEventListener('click', publishSheets);
   root.insertAdjacentHTML('beforeend', '<section class="admin-card admin-card--moderation" data-admin-moderation></section>');
-  void import('./moderation.js?rev=20260918-post-v1').then(({ bindModerationPanel }) => {
+  void import('./moderation.js?rev=20260918-cell-post-v1').then(({ bindModerationPanel }) => {
     bindModerationPanel(root.querySelector('[data-admin-moderation]'));
   }).catch(() => {
     const moderation = root.querySelector('[data-admin-moderation]');
@@ -220,7 +221,11 @@ function collectEditorValues() {
 }
 
 async function clearSheet(sheetName) {
-  const range = encodeURIComponent(`${sheetName}!A:Z`);
+  return clearSheetRange(`${sheetName}!A:Z`);
+}
+
+async function clearSheetRange(rangeValue) {
+  const range = encodeURIComponent(rangeValue);
   await apiFetch(sheetsUrl(`/values/${range}:clear`), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
 }
 
@@ -230,12 +235,60 @@ async function writeSheet(sheetName, values) {
   await apiFetch(sheetsUrl(`/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ range, majorDimension: 'ROWS', values }) });
 }
 
+function normalizeSheetValues(values) {
+  const source = Array.isArray(values) ? values : [];
+  const headers = Array.isArray(source[0]) ? source[0].map((value) => String(value ?? '')) : [];
+  if (!headers.length) return [];
+  return [headers, ...source.slice(1).map((row) => headers.map((_, index) => String(row?.[index] ?? '')))];
+}
+
+function canonicalSheetValues(values) {
+  const normalized = normalizeSheetValues(values);
+  if (!normalized.length) return [];
+  const rows = normalized.slice(1);
+  while (rows.length && rows.at(-1).every((value) => value === '')) rows.pop();
+  return [normalized[0], ...rows];
+}
+
+function sameSheetValues(left, right) {
+  return JSON.stringify(canonicalSheetValues(left)) === JSON.stringify(canonicalSheetValues(right));
+}
+
+function validatePublishValues(sourceName, values) {
+  const normalized = normalizeSheetValues(values);
+  const headers = normalized[0] || [];
+  if (!headers.length || headers.every((header) => !header.trim())) throw new Error(`${sourceName}の見出しがありません。`);
+  if (headers.some((header) => !header.trim())) throw new Error(`${sourceName}の見出しに空欄があります。`);
+  return normalized;
+}
+
+async function replaceSheetSafely(sheetName, values, previousValues = []) {
+  const nextValues = normalizeSheetValues(values);
+  if (!nextValues.length) {
+    await clearSheet(sheetName);
+    return;
+  }
+  // 先に新しい表を書き込む。書き込みに失敗しても、旧公開データは残る。
+  await writeSheet(sheetName, nextValues);
+  const previous = normalizeSheetValues(previousValues);
+  const oldRows = previous.length;
+  const oldColumns = previous[0]?.length || 0;
+  const nextRows = nextValues.length;
+  const nextColumns = nextValues[0]?.length || 0;
+  if (oldRows > nextRows) await clearSheetRange(`${sheetName}!A${nextRows + 1}:Z${oldRows}`);
+  if (oldColumns > nextColumns && nextRows > 0) {
+    await clearSheetRange(`${sheetName}!${columnName(nextColumns + 1)}1:${columnName(oldColumns)}${Math.max(oldRows, nextRows)}`);
+  }
+}
+
 async function saveEditorSheet() {
   const selector = root.querySelector('[data-sheet-selector]');
   const values = collectEditorValues();
   try {
-    await clearSheet(selector.value);
-    await writeSheet(selector.value, values);
+    const previous = await readSheet(selector.value);
+    await replaceSheetSafely(selector.value, values, previous.values);
+    const verified = await readSheet(selector.value);
+    if (!sameSheetValues(values, verified.values)) throw new Error('保存内容の確認に失敗しました。');
     state.sheets.set(selector.value, values);
     setStatus(`${selector.value}を保存しました。`);
   } catch {
@@ -244,23 +297,56 @@ async function saveEditorSheet() {
 }
 
 function publishedValues(values) {
-  const headers = values[0] || [];
+  const normalized = normalizeSheetValues(values);
+  const headers = normalized[0] || [];
   const position = headers.indexOf('published');
-  if (position === -1) return values;
-  return [headers, ...values.slice(1).filter((row) => ['true', '1', 'yes', '公開', 'published'].includes(String(row[position] || '').trim().toLowerCase()))];
+  if (position === -1) return normalized;
+  return [headers, ...normalized.slice(1).filter((row) => ['true', '1', 'yes', '公開', 'published'].includes(String(row[position] || '').trim().toLowerCase()))];
 }
 
 async function publishSheets() {
+  const publishButton = root.querySelector('[data-publish]');
+  if (publishButton?.disabled) return;
+  if (publishButton) publishButton.disabled = true;
+  const mappings = [[adminConfig.sheets.works, 'PublishedWorks'], [adminConfig.sheets.stores, 'PublishedStores'], [adminConfig.sheets.storeWorks, 'PublishedStoreWorks'], [adminConfig.sheets.events, 'PublishedEvents']];
+  const prepared = [];
+  const backups = [];
   try {
-    const mappings = [[adminConfig.sheets.works, 'PublishedWorks'], [adminConfig.sheets.stores, 'PublishedStores'], [adminConfig.sheets.storeWorks, 'PublishedStoreWorks'], [adminConfig.sheets.events, 'PublishedEvents']];
+    setStatus('公開用データを確認しています…');
     for (const [source, target] of mappings) {
       const { values } = await readSheet(source);
-      await clearSheet(target);
-      await writeSheet(target, publishedValues(values));
+      const published = publishedValues(validatePublishValues(source, values));
+      prepared.push({ source, target, values: published });
+      const backup = await readSheet(target);
+      backups.push({ target, values: backup.values });
+    }
+    setStatus('公開先へ書き込み、内容を確認しています…');
+    for (const item of prepared) {
+      const previous = backups.find((backup) => backup.target === item.target)?.values || [];
+      await replaceSheetSafely(item.target, item.values, previous);
+      const verified = await readSheet(item.target);
+      if (!sameSheetValues(item.values, verified.values)) throw new Error(`${item.target}の確認に失敗しました。`);
     }
     setStatus('公開済みデータを更新しました。');
-  } catch {
-    setStatus('公開に失敗しました。PublishedWorks / PublishedStores / PublishedStoreWorksの準備を確認してください。', 'error');
+  } catch (error) {
+    setStatus('公開処理に失敗しました。前の公開データへ戻しています…', 'error');
+    const restoreFailures = [];
+    for (const backup of backups) {
+      try {
+        // 復元時は対象を完全に戻す必要があるため、ここだけは明示的に
+        // 全消去してから保存済みスナップショットを書き戻す。
+        await clearSheet(backup.target);
+        if (backup.values.length) await writeSheet(backup.target, backup.values);
+      } catch {
+        restoreFailures.push(backup.target);
+      }
+    }
+    setStatus(restoreFailures.length
+      ? `公開に失敗し、一部の公開先を戻せませんでした：${restoreFailures.join('・')}`
+      : `公開に失敗しました。以前の公開データへ戻しました。${error instanceof Error ? `（${error.message}）` : ''}`,
+    'error');
+  } finally {
+    if (publishButton) publishButton.disabled = false;
   }
 }
 

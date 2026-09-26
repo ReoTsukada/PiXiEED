@@ -1,0 +1,24 @@
+[
+  {
+    "id": "street",
+    "label": "動画 · 街と歩行者（15秒）",
+    "type": "video",
+    "src": "assets/pixel-studio/test-media/street.webm",
+    "credit": "Amada44 — CC BY-SA 3.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:People_waiting_to_cross_the_street.webm",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
+    "author": "Amada44"
+  },
+  {
+    "id": "leaves",
+    "label": "動画 · 風に揺れる葉（39秒）",
+    "type": "video",
+    "src": "assets/pixel-studio/test-media/leaves.webm",
+    "credit": "Undeka 11 — CC BY-SA 4.0",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Chaya_leaves_(Cnidoscolus_aconitifolius)_swaying_in_the_wind.webm",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+    "author": "Undeka 11"
+  }
+]

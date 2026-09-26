@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f3ef">
+  <title>カメラ変換テスト｜PiXiEED</title>
+  <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20260921-compact-brand-v1">
+  <link rel="stylesheet" href="/css/camera-media-test.css">
+  <script type="module" src="/js/pixel-studio/media-test.mjs?v=20260924-lighting-1"></script>
+</head>
+<body class="cmt-body">
+  <main class="cmt-shell" id="mediaTest">
+    <header class="cmt-header">
+      <div>
+        <p class="cmt-kicker">PIXEL STUDIO · INTERNAL TEST</p>
+        <h1>写真・動画の変換比較</h1>
+        <p class="cmt-lede">同じフレームを原画と処理結果で並べて確認します。画像をタップすると配色を取り直します。</p>
+      </div>
+      <a class="cmt-back" href="/pixel-camera.html">カメラへ戻る</a>
+    </header>
+
+    <section class="cmt-toolbar" aria-label="素材と出力設定">
+      <label class="cmt-field">素材
+        <select id="mediaSelect" name="media">
+          <option value="astronaut">Astronaut</option>
+          <option value="chelsea">Chelsea</option>
+          <option value="coffee">Coffee</option>
+          <option value="rocket">Rocket</option>
+        </select>
+      </label>
+      <label class="cmt-field">出力サイズ
+        <select id="sizeSelect" name="size">
+          <option value="64">64 px</option>
+          <option value="128">128 px</option>
+          <option value="256" selected>256 px</option>
+          <option value="512">512 px</option>
+        </select>
+      </label>
+      <label class="cmt-field">縦横比
+        <select id="aspectSelect" name="aspect">
+          <option value="source" selected>元画像</option>
+          <option value="1:1">1:1</option>
+          <option value="3:4">3:4</option>
+          <option value="9:16">9:16</option>
+          <option value="4:3">4:3</option>
+          <option value="16:9">16:9</option>
+        </select>
+      </label>
+      <label class="cmt-field">拡大表示
+        <select id="zoomSelect" name="zoom">
+          <option value="1" selected>1×</option>
+          <option value="2">2×</option>
+        </select>
+      </label>
+      <label class="cmt-field">全体階調
+        <select id="toneSelect" name="tone" aria-label="全体階調の比較モード">
+          <option value="4:ordered">4段階＋ディザ</option>
+          <option value="4:none">4段階・面のみ</option>
+          <option value="8:none">8段階・面のみ</option>
+          <option value="8:ordered" selected>8段階＋ディザ</option>
+        </select>
+      </label>
+      <label class="cmt-check"><input id="grayView" type="checkbox">明るさを見る</label>
+    </section>
+
+    <section id="videoControls" class="cmt-video-controls" aria-label="動画操作" hidden>
+      <button id="playToggle" type="button" class="cmt-button">再生</button>
+      <button id="stepBack" type="button" class="cmt-button" aria-label="0.1秒戻る">−0.1秒</button>
+      <button id="stepForward" type="button" class="cmt-button" aria-label="0.1秒進める">＋0.1秒</button>
+      <label class="cmt-seek">シーク
+        <input id="seek" type="range" min="0" max="1" step="0.01" value="0">
+      </label>
+      <output id="timeReadout" class="cmt-time">0:00 / 0:00</output>
+    </section>
+
+    <div id="credit" class="cmt-credit" aria-live="polite">出典を読み込み中…</div>
+    <p id="status" class="cmt-status" role="status" aria-live="polite">写真を読み込んでいます…</p>
+
+    <section class="cmt-comparison" aria-label="原画と変換結果">
+      <article class="cmt-panel">
+        <div class="cmt-panel-head"><h2>原画</h2><span id="sourceDimensions">—</span></div>
+        <div class="cmt-visual"><canvas id="sourceView" width="1" height="1" tabindex="0" role="button" aria-label="元画像。この画面の色を取り直す"></canvas></div>
+      </article>
+      <article class="cmt-panel">
+        <div class="cmt-panel-head"><h2>変換結果</h2><span id="outputDimensions">—</span></div>
+        <div class="cmt-visual"><canvas id="resultView" width="1" height="1" tabindex="0" role="button" aria-label="変換結果。この画面の色を取り直す"></canvas></div>
+      </article>
+    </section>
+
+    <div class="cmt-palette"><span id="paletteInfo">最初の配色を取得中</span><div id="paletteSwatches" aria-label="固定した配色"></div></div>
+
+    <section class="cmt-metrics" aria-label="処理情報">
+      <div><span>完了フレーム</span><strong id="frameCount">0</strong></div>
+      <div><span>結果の表示FPS</span><strong id="fps">—</strong></div>
+      <div><span>描画処理</span><strong id="processTime">—</strong></div>
+      <div><span>反映済みAIの処理時間</span><strong id="aiTime">—</strong></div>
+      <div><span>ディザを使う範囲</span><strong id="ditherCoverage">—</strong></div>
+      <div><span>色数</span><strong id="colorCount">—</strong></div>
+      <div><span>面ごとの最大色数</span><strong id="materialColors">—</strong></div>
+      <div><span>全体階調</span><strong id="toneInfo">—</strong></div>
+      <div><span>顔検出</span><strong id="faceInfo">—</strong></div>
+      <div><span>物体分割</span><strong id="objectInfo">—</strong></div>
+      <div><span>直線化</span><strong id="lineCount">—</strong></div>
+      <div class="cmt-static-metric"><span>同一入力フレーム間の出力差</span><strong id="staticChange">—</strong></div>
+    </section>
+
+    <details class="cmt-diagnostics">
+      <summary>診断データ</summary>
+      <pre id="diagnostics" data-testid="diagnostics">{}</pre>
+    </details>
+
+    <img id="stillSource" alt="" hidden>
+    <video id="videoSource" playsinline muted hidden preload="metadata"></video>
+  </main>
+</body>
+</html>

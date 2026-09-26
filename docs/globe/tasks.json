@@ -1,0 +1,14 @@
+{
+  "workflow": "pixieed-globe-v4-meridian-parallel-precision-prototype",
+  "runtimeIntegration": "unimplemented",
+  "postSchemaRollout": "blocked-until-server-support-and-migration",
+  "tasks": [
+    {"id": "G0", "title": "Pure sphere geometry and topology", "status": "implemented", "owner": "SOL acceptance / bounded executor", "dependsOn": [], "evidence": ["js/globe/geometry.mjs", "js/globe/topology.mjs"]},
+    {"id": "G1", "title": "Meridian-parallel adaptive cells", "status": "implemented", "owner": "SOL acceptance / bounded executor", "dependsOn": ["G0"], "evidence": ["js/globe/geometry.mjs", "js/globe/renderer.mjs", "stable v11-meridian-parallel-quarter-degree ids", "0.5 degree latitude bands", "about 0.5 degree equatorial longitude bands", "explicit polar caps", "single Canvas path"]},
+    {"id": "G2", "title": "Logical hierarchy, picking, layer and background hooks", "status": "implemented", "owner": "SOL acceptance / bounded executor", "dependsOn": ["G1"], "evidence": ["js/globe/renderer.mjs", "js/globe/prototype.mjs", "world/country/region/prefecture/cell hysteresis", "O(1) cell-id Map picking", "no per-cell DOM listeners", "empty contentCounts by default"]},
+    {"id": "G2.5", "title": "Bounded precision and repaint performance slice", "status": "implemented", "owner": "SOL acceptance / bounded executor", "dependsOn": ["G2"], "evidence": ["visible longitude/latitude window", "4 degree prefetch", "bounded cell cache", "planBuilds/repaints snapshot", "DPR cap 2", "batched Canvas paths", "1/0.75/0.5 degree benchmark", "tests/globe/renderer.test.mjs"]},
+    {"id": "G3", "title": "Dependency-free globe harness", "status": "implemented", "owner": "SOL acceptance / bounded executor", "dependsOn": ["G0", "G1", "G2"], "evidence": ["scripts/globe-harness.mjs", "all tests/globe/*.test.mjs"]},
+    {"id": "G4", "title": "Browser, device, seam and performance verification", "status": "untested", "owner": "SOL; Astra only for hard final audit", "dependsOn": ["G3"], "evidence": ["no real-device or production claim"]},
+    {"id": "G5", "title": "Public runtime integration and data migration", "status": "unimplemented", "owner": "SOL specification / later bounded implementation", "dependsOn": ["G4"], "evidence": ["index.html, js/app.js, backend and data intentionally untouched"]}
+  ]
+}

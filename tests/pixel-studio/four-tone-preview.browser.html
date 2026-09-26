@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f3ef">
+  <title>写真と動画の比較｜PiXiEED</title>
+  <link rel="stylesheet" href="./four-tone-preview.browser.css">
+  <script type="module" src="./four-tone-preview.browser.mjs"></script>
+</head>
+<body>
+  <main class="page" id="fourTonePreview" data-state="loading">
+    <header class="page-head">
+      <div>
+        <p class="eyebrow">PIXEL CAMERA · LOCAL COMPARISON</p>
+        <h1>写真と動画の比較</h1>
+        <p class="lede">同じ入力を、現在のピクセルカメラ用ワーカーで処理して比べます。</p>
+      </div>
+      <a class="back-link" href="../../pixel-camera.html">カメラへ戻る</a>
+    </header>
+
+    <section class="controls" aria-label="比較設定">
+      <label>素材
+        <select id="mediaSelect">
+          <option value="astronaut">NASA astronaut · photo</option>
+          <option value="coffee">Coffee · photo</option>
+          <option value="cat">Chelsea cat · photo</option>
+          <option value="rocket">Rocket · photo</option>
+          <option value="street">Street crossing · video</option>
+          <option value="leaves">Chaya leaves · video</option>
+        </select>
+      </label>
+      <label for="renderModeSelect">描画方式
+        <select id="renderModeSelect" aria-label="描画方式">
+          <option value="lens" selected>PiXiEELENS方式</option>
+          <option value="four-tone">以前の4階調</option>
+        </select>
+      </label>
+      <label for="sizeSelect">出力サイズ
+        <select id="sizeSelect" aria-label="出力サイズ">
+          <option value="64">64 px</option>
+          <option value="256" selected>256 px</option>
+          <option value="512">512 px</option>
+        </select>
+      </label>
+      <button id="refreshButton" type="button">色を取り直す</button>
+      <button id="repeatButton" type="button">写真を30回再処理</button>
+      <button id="playButton" type="button" hidden>再生</button>
+      <label id="seekWrap" class="seek-wrap" hidden>位置
+        <input id="seekInput" type="range" min="0" max="1" step="0.01" value="0">
+      </label>
+    </section>
+
+    <p id="status" class="status" role="status" aria-live="polite">素材を読み込んでいます…</p>
+
+    <section class="comparison" aria-label="比較結果">
+      <article class="panel">
+        <header><h2>Original sample</h2><span id="sourceSize">—</span></header>
+        <div class="canvas-wrap"><canvas id="originalCanvas" aria-label="元画像"></canvas></div>
+      </article>
+      <article class="panel">
+        <header><h2>縮小した入力</h2><span id="simplifiedSize">—</span></header>
+        <div class="canvas-wrap"><canvas id="simplifiedCanvas" aria-label="縮小した入力画像"></canvas></div>
+      </article>
+      <article class="panel">
+        <header><h2 id="resultHeading">PiXiEELENS方式</h2><span id="resultSize">—</span></header>
+        <div class="canvas-wrap"><canvas id="resultCanvas" aria-label="処理後のカラーピクセル画像"></canvas></div>
+        <div class="swatches" id="paletteSwatches" aria-label="使用色"></div>
+      </article>
+      <article class="panel">
+        <header><h2>Grayscale</h2><span>出力の線形輝度を再符号化</span></header>
+        <div class="canvas-wrap"><canvas id="grayCanvas" aria-label="出力のグレースケール表示"></canvas></div>
+      </article>
+    </section>
+
+    <section class="metrics" aria-label="計測値" id="metrics" data-testid="metrics">
+      <div><span>色数 / 上限</span><strong id="colorCount" data-testid="color-count">—</strong></div>
+      <div><span>4階調チェック</span><strong id="grayGroups" data-testid="gray-groups">—</strong></div>
+      <div><span>灰色の出力値</span><strong id="grayCodes" data-testid="gray-codes">—</strong></div>
+      <div><span>階調許容外の画素</span><strong id="grayErrors" data-testid="gray-errors">—</strong></div>
+      <div><span>ワーカー処理時間</span><strong id="workerTime" data-testid="worker-time">—</strong></div>
+      <div><span>平均 / 最大処理時間</span><strong id="workerMeanMax" data-testid="worker-mean-max">—</strong></div>
+      <div><span>物体認識</span><strong id="aiStatus" data-testid="ai-status">—</strong></div>
+      <div><span>認識反映フレーム / 推論回数</span><strong id="aiCounts" data-testid="ai-counts">—</strong></div>
+      <div><span>ディザセル / 全セル</span><strong id="ditherCells" data-testid="dither-cells">—</strong></div>
+      <div><span>背景をぼかしたセル</span><strong id="backgroundSmoothedCells">—</strong></div>
+      <div><span>背景をならしたセル</span><strong id="backgroundFlattenedCells">—</strong></div>
+      <div><span>完了フレーム</span><strong id="frameCount" data-testid="frame-count">0</strong></div>
+      <div><span>同一入力での最大出力差</span><strong id="staticDifference" data-testid="static-difference">—</strong></div>
+      <div><span>認識状態変更時の出力差</span><strong id="maskTransitionDifference" data-testid="mask-transition-difference">—</strong></div>
+      <div><span>パレット更新番号</span><strong id="paletteRevision" data-testid="palette-revision">—</strong></div>
+      <div><span>動画中のパレット変更</span><strong id="videoPaletteChanges" data-testid="video-palette-changes">—</strong></div>
+      <div><span>動画の時間</span><strong id="mediaTime" data-testid="media-time">—</strong></div>
+    </section>
+
+    <details class="diagnostics">
+      <summary>計測データ</summary>
+      <pre id="diagnostics" data-testid="diagnostics">{}</pre>
+    </details>
+
+    <canvas id="inputCanvas" hidden></canvas>
+    <img id="stillSource" alt="" hidden>
+    <video id="videoSource" playsinline muted hidden preload="metadata"></video>
+  </main>
+</body>
+</html>

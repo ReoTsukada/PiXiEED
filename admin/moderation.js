@@ -88,12 +88,12 @@ function renderSetup(root) {
 
 function renderLogin(root, onLogin) {
   root.innerHTML = `
-    <div class="admin-section-heading"><div><span class="eyebrow">user posts</span><h2>投稿審査</h2></div><p>公開前の画像をここで確認し、セル位置を確定してから地図へ公開します。</p></div>
+    <div class="admin-section-heading"><div><span class="eyebrow">user posts</span><h2>投稿審査</h2></div><p>公開前の画像をここで確認し、セル位置を確定してから地図へ公開します。投稿審査だけ、追加の管理者確認を行います。</p></div>
     <form class="admin-moderation__login" data-moderation-login>
-      <label><span>Supabase管理者メール</span><input type="email" autocomplete="username" data-moderation-email required></label>
+      <label><span>審査用管理者メール</span><input type="email" autocomplete="username" data-moderation-email required></label>
       <label><span>パスワード</span><input type="password" autocomplete="current-password" data-moderation-password required></label>
       <button class="button button--primary" type="submit">審査室へログイン</button>
-      <p class="admin-status" data-moderation-status role="status">Supabase側で作成した管理者アカウントを使います。</p>
+      <p class="admin-status" data-moderation-status role="status">Googleログイン後の投稿審査権限を、Supabase Authで追加確認します。</p>
     </form>`;
   root.querySelector('[data-moderation-login]')?.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -116,9 +116,11 @@ function renderLogin(root, onLogin) {
 }
 
 function postLocationLabel(post) {
+  const globeCell = post.location?.globeCell;
+  if (globeCell) return `<span class="admin-moderation__location">世界セル：${escapeHtml(globeCell.id)}</span>`;
   const cell = post.location?.mapCell;
   if (!cell) return '<span class="admin-moderation__location admin-moderation__location--missing">公開セル未選択。公開前にセル位置を指定してください。</span>';
-  return `<span class="admin-moderation__location">公開セル：${escapeHtml(cell.prefectureCode)} / ${cell.grid}×${cell.grid} / ${cell.x}, ${cell.y}</span>`;
+  return `<span class="admin-moderation__location">公開セル：${escapeHtml(cell.prefectureCode)} / ${cell.grid}分割 / X${cell.x}・Y${cell.y} / セル内ピンは自動配置</span>`;
 }
 
 function renderPosts(root, posts, onAction) {
@@ -127,7 +129,7 @@ function renderPosts(root, posts, onAction) {
     return;
   }
   root.innerHTML = `<div class="admin-moderation__list">${posts.map((post) => {
-    const hasCell = Boolean(post.location?.mapCell);
+    const hasCell = Boolean(post.location?.mapCell || post.location?.globeCell);
     return `<article class="admin-moderation__post" data-moderation-post="${escapeHtml(post.postId)}">
       <div class="admin-moderation__image-wrap"><img class="admin-moderation__image" src="${escapeHtml(post.imageUrl)}" alt="${escapeHtml(post.title)}" loading="lazy" decoding="async" width="128" height="128"></div>
       <div class="admin-moderation__post-body">

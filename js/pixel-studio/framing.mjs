@@ -7,7 +7,7 @@ export const FRAME_RATIOS = Object.freeze([
   Object.freeze({ value: '16:9', label: '16:9', ratio: 16 / 9 })
 ]);
 
-export const OUTPUT_SIZES = Object.freeze([64, 128, 256, 512]);
+export const OUTPUT_SIZES = Object.freeze([16, 32, 64, 96, 128, 160, 256, 512]);
 
 function assertPositiveFinite(value, name) {
   if (!Number.isFinite(value) || value <= 0) throw new RangeError(`${name} must be a positive finite number`);

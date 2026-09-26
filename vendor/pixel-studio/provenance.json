@@ -1,0 +1,108 @@
+{
+  "format": 1,
+  "tensorflowjs": {
+    "version": "4.22.0",
+    "source": "https://github.com/tensorflow/tfjs/releases/tag/tfjs-v4.22.0",
+    "license": "Apache-2.0"
+  },
+  "assets": [
+    {
+      "path": "vendor/pixel-studio/tf.min.js",
+      "url": "https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js",
+      "sha256": "300dfae273d20b4046f46a06d735688f03675a807561e9bcb5f664eb2f3d2831",
+      "bytes": 1469843,
+      "license": "Apache-2.0",
+      "description": "TensorFlow.js 4.22.0 browser bundle"
+    },
+    {
+      "path": "vendor/pixel-studio/tfjs-package.json",
+      "url": "https://unpkg.com/@tensorflow/tfjs@4.22.0/package.json",
+      "sha256": "165e61114d075954c1c0cd4565f2d0f00717107c7f9c68d67445bf47608907f9",
+      "bytes": 3246,
+      "license": "Apache-2.0",
+      "description": "TensorFlow.js 4.22.0 package metadata"
+    },
+    {
+      "path": "vendor/pixel-studio/TFJS-LICENSE",
+      "url": "https://raw.githubusercontent.com/tensorflow/tfjs/tfjs-v4.22.0/LICENSE",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "bytes": 11358,
+      "license": "Apache-2.0",
+      "description": "TensorFlow.js license text"
+    },
+    {
+      "path": "vendor/pixel-studio/MAGENTA-LICENSE",
+      "url": "https://raw.githubusercontent.com/reiinakano/arbitrary-image-stylization-tfjs/5c93b212d7d3c7051a89a53667d2d5a61cd938b4/LICENSE",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "bytes": 11357,
+      "license": "Apache-2.0",
+      "description": "Magenta style model implementation license text"
+    }
+  ],
+  "status": "retained-runtime-only; style models removed on user request; not loaded by the camera",
+  "retiredModel": {
+    "name": "Magenta Arbitrary Image Stylization",
+    "source": "https://github.com/reiinakano/arbitrary-image-stylization-tfjs",
+    "commit": "5c93b212d7d3c7051a89a53667d2d5a61cd938b4",
+    "license": "Apache-2.0",
+    "paper": "Ghiasi et al., Exploring the structure of a real-time, arbitrary neural artistic stylization network, BMVC 2017"
+  },
+  "retiredModelAssets": [
+    {
+      "path": "assets/pixel-studio/models/style/model.json",
+      "url": "https://raw.githubusercontent.com/reiinakano/arbitrary-image-stylization-tfjs/5c93b212d7d3c7051a89a53667d2d5a61cd938b4/saved_model_style_js/model.json",
+      "sha256": "3f6e67538d82a34344f5b82990a3e53b4fa76bd1e8fc5bf9d9964a04c6ced9fd",
+      "bytes": 172186,
+      "license": "Apache-2.0",
+      "description": "MobileNetV2 style predictor graph"
+    },
+    {
+      "path": "assets/pixel-studio/models/style/group1-shard1of3",
+      "url": "https://raw.githubusercontent.com/reiinakano/arbitrary-image-stylization-tfjs/5c93b212d7d3c7051a89a53667d2d5a61cd938b4/saved_model_style_js/group1-shard1of3",
+      "sha256": "f1ec7ee668b807f5096577e2f792cae90427d1adbeec1f25ef505231963d0438",
+      "bytes": 4194304,
+      "license": "Apache-2.0",
+      "description": "MobileNetV2 style predictor weights"
+    },
+    {
+      "path": "assets/pixel-studio/models/style/group1-shard2of3",
+      "url": "https://raw.githubusercontent.com/reiinakano/arbitrary-image-stylization-tfjs/5c93b212d7d3c7051a89a53667d2d5a61cd938b4/saved_model_style_js/group1-shard2of3",
+      "sha256": "f002340b9aa4d6b2bb2a503d9329ea75d3a5d07692a20b9f4eff3a7b3a91b620",
+      "bytes": 4194304,
+      "license": "Apache-2.0",
+      "description": "MobileNetV2 style predictor weights"
+    },
+    {
+      "path": "assets/pixel-studio/models/style/group1-shard3of3",
+      "url": "https://raw.githubusercontent.com/reiinakano/arbitrary-image-stylization-tfjs/5c93b212d7d3c7051a89a53667d2d5a61cd938b4/saved_model_style_js/group1-shard3of3",
+      "sha256": "27a64dfb5c0cba35f409d840dfa18e0a68ff5787354fe84d053b07c1a3b2861b",
+      "bytes": 1155736,
+      "license": "Apache-2.0",
+      "description": "MobileNetV2 style predictor weights"
+    },
+    {
+      "path": "assets/pixel-studio/models/transform/model.json",
+      "url": "https://raw.githubusercontent.com/reiinakano/arbitrary-image-stylization-tfjs/5c93b212d7d3c7051a89a53667d2d5a61cd938b4/saved_model_transformer_js/model.json",
+      "sha256": "1c04c5b9331f2e441fbaae88d4bf9175a99269ca56ac7382e96a486ab26f44b8",
+      "bytes": 136042,
+      "license": "Apache-2.0",
+      "description": "Full-quality style transformer graph"
+    },
+    {
+      "path": "assets/pixel-studio/models/transform/group1-shard1of2",
+      "url": "https://raw.githubusercontent.com/reiinakano/arbitrary-image-stylization-tfjs/5c93b212d7d3c7051a89a53667d2d5a61cd938b4/saved_model_transformer_js/group1-shard1of2",
+      "sha256": "d1a7e5511765b5384e7ccdd0765954c1aff127bc6372533da5740347dd3dab6b",
+      "bytes": 4194304,
+      "license": "Apache-2.0",
+      "description": "Full-quality style transformer weights"
+    },
+    {
+      "path": "assets/pixel-studio/models/transform/group1-shard2of2",
+      "url": "https://raw.githubusercontent.com/reiinakano/arbitrary-image-stylization-tfjs/5c93b212d7d3c7051a89a53667d2d5a61cd938b4/saved_model_transformer_js/group1-shard2of2",
+      "sha256": "b96885a5c98ec24862459003f5576d24bf8d3c1e6c1cf86e3b4d28190b14d015",
+      "bytes": 3621336,
+      "license": "Apache-2.0",
+      "description": "Full-quality style transformer weights"
+    }
+  ]
+}
