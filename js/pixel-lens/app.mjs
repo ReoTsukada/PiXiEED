@@ -456,9 +456,14 @@ function refreshObjects() {
   resetLensPalette(); // PiXiEELENS keeps its palette; a tap picks the colours again from the current view
   paletteEpoch++;
   root.dataset.paletteEpoch = String(paletteEpoch);
-  captureFrame.classList.remove('pc-palette-refresh');
-  requestAnimationFrame(() => captureFrame.classList.add('pc-palette-refresh'));
-  window.setTimeout(() => captureFrame.classList.remove('pc-palette-refresh'), 360);
+  // feedback without covering the picture: a short ring around the frame, a tick and a toast
+  const picksColours = ['8', '16'].includes(state.colorDepth) || (['2', '4'].includes(state.colorDepth) && state.paletteMode === 'source');
+  if (!picksColours) { sayToast('この配色は固定です'); return; }
+  captureFrame.classList.remove('lc-repick');
+  requestAnimationFrame(() => captureFrame.classList.add('lc-repick'));
+  window.setTimeout(() => captureFrame.classList.remove('lc-repick'), 600);
+  navigator.vibrate?.(8);
+  sayToast('今の景色から色を選び直しました');
 }
 
 function retake() {
