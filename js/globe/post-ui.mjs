@@ -77,7 +77,7 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
   composer.innerHTML = `
     <header class="sheet__head">
       <h2>ドット絵を置く</h2>
-      <button type="button" class="sheet__close" data-close aria-label="閉じる">×</button>
+      <button type="button" class="sheet__close" data-close aria-label="閉じる"><img src="/assets/icons/pixieed/close.svg" alt=""></button>
     </header>
     <div class="peek-bar" data-peek-bar hidden><span>地球のセルをタップしてピンを置く</span><button type="button" class="primary" data-peek-done>決定</button></div>
     <ol class="steps" aria-label="投稿の進み具合">
@@ -153,7 +153,7 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
   viewer.innerHTML = `
     <header class="sheet__head">
       <h2 data-v-kicker>作品</h2>
-      <button type="button" class="sheet__close" data-close aria-label="閉じる">×</button>
+      <button type="button" class="sheet__close" data-close aria-label="閉じる"><img src="/assets/icons/pixieed/close.svg" alt=""></button>
     </header>
     <div class="viewer__art"><img data-v-image alt=""></div>
     <h3 class="viewer__title" data-v-title></h3>
@@ -174,7 +174,7 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
   gallery.innerHTML = `
     <header class="sheet__head">
       <h2>作品</h2>
-      <button type="button" class="sheet__close" data-close aria-label="閉じる">×</button>
+      <button type="button" class="sheet__close" data-close aria-label="閉じる"><img src="/assets/icons/pixieed/close.svg" alt=""></button>
     </header>
     <div class="tabs" role="tablist"><button type="button" role="tab" data-tab="all" aria-selected="true">すべて</button><button type="button" role="tab" data-tab="mine" aria-selected="false">自分の作品</button></div>
     <div class="gallery__grid" data-grid></div>
