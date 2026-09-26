@@ -38,6 +38,8 @@ uniform vec3 uSunDir;      // unit vector to the Sun, Earth-fixed frame
 uniform vec3 uMoonVec;     // geocentric Moon position in Earth radii, Earth-fixed frame
 uniform vec4 uAstro;       // x: day/night + eclipse lighting, y: sky bodies, z: sun sprite scale, w: moon sprite scale
 uniform vec2 uSunSky;      // x: Sun angular radius (rad), y: Greenwich sidereal angle (rad)
+uniform vec3 uPlanetDir[7];  // Earth-fixed unit vectors to Mercury…Neptune
+uniform vec4 uPlanetGlow[7]; // rgb: colour times brightness, w: sprite radius in pixels (0 = hidden)
 uniform ivec2 uSelectedCell;
 uniform ivec2 uHoveredCell;
 
@@ -139,6 +141,16 @@ vec3 skyColor() {
     base += sunSprite(d, uSunSky.x * uAstro.z);
     vec4 moon = moonSprite(d, cameraPosition);
     base = mix(base, moon.rgb, moon.a);
+    // Planets: small coloured points, sized and brightened by their magnitude.
+    for (int i = 0; i < 7; i++) {
+      float size = uPlanetGlow[i].w;
+      if (size <= 0.0) continue;
+      float px = atan(length(cross(d, uPlanetDir[i])), dot(d, uPlanetDir[i])) * focal;
+      if (px > size * 8.0) continue;
+      float core = exp(-(px * px) / (2.0 * size * size));
+      float halo = 0.06 * exp(-px / (size * 1.6));
+      base += uPlanetGlow[i].rgb * (core + halo);
+    }
   }
   return 1.0 - exp(-base * 1.35);
 }
@@ -437,13 +449,17 @@ export function createWebGLRenderer(canvas, { grid, rasterData = null, skyUrl = 
       moonVec: gl.getUniformLocation(program, 'uMoonVec'),
       astro: gl.getUniformLocation(program, 'uAstro'),
       sunSky: gl.getUniformLocation(program, 'uSunSky'),
+      planetDir: gl.getUniformLocation(program, 'uPlanetDir'),
+      planetGlow: gl.getUniformLocation(program, 'uPlanetGlow'),
       selectedCell: gl.getUniformLocation(program, 'uSelectedCell'),
       hoveredCell: gl.getUniformLocation(program, 'uHoveredCell')
     });
     const counts = bandCounts(grid);
     const bandTexture = createBandTexture(gl, counts);
     let skyReady = 0;
-    let astronomy = { sunDirection: [1, 0, 0], moonVector: [0, 0, -60], sunRadius: 0.00465, gmstRadians: 0, lighting: false, bodies: false, sunScale: 1, moonScale: 1 };
+    let astronomy = { sunDirection: [1, 0, 0], moonVector: [0, 0, -60], sunRadius: 0.00465, gmstRadians: 0, lighting: false, bodies: false, sunScale: 1, moonScale: 1, planets: null };
+    const planetDir = new Float32Array(21);
+    const planetGlow = new Float32Array(28);
     const skyTexture = loadSkyTexture(gl, skyUrl, () => { skyReady = 1; onSkyReady(); });
     let texture = null;
     let currentRaster = rasterData;
@@ -491,6 +507,13 @@ export function createWebGLRenderer(canvas, { grid, rasterData = null, skyUrl = 
       gl.uniform3fv(locations.moonVec, astronomy.moonVector);
       gl.uniform4f(locations.astro, astronomy.lighting ? 1 : 0, astronomy.bodies ? 1 : 0, astronomy.sunScale, astronomy.moonScale);
       gl.uniform2f(locations.sunSky, astronomy.sunRadius, astronomy.gmstRadians);
+      planetGlow.fill(0);
+      (astronomy.planets || []).slice(0, 7).forEach((planet, i) => {
+        planetDir.set(planet.direction, i * 3);
+        planetGlow.set([planet.glow[0], planet.glow[1], planet.glow[2], planet.size], i * 4);
+      });
+      gl.uniform3fv(locations.planetDir, planetDir);
+      gl.uniform4fv(locations.planetGlow, planetGlow);
       gl.activeTexture(gl.TEXTURE0);
       gl.uniform1f(locations.latStep, grid.latitudeStepDegrees);
       gl.uniform1i(locations.bandTotal, grid.bandCount);

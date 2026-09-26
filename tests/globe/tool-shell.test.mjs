@@ -57,3 +57,15 @@ test('every control shares one size: 44px buttons, 48px single-line fields', () 
     .filter((selector) => /button|chip|close|primary|ghost|danger|tabs|account|place-here|tc-play|tc-now|scope-chip|sky-mark|camera-link|post-fab|input|textarea/.test(selector) && !/icon|__draft|pin|::after|img| i\b/.test(selector));
   assert.deepEqual(smallHeights, []);
 });
+
+test('pinching out past the globe opens the Solar System, and pinching into the Earth returns', () => {
+  const renderer = read('js/globe/renderer.mjs');
+  assert.match(renderer, /onZoomLimit/);
+  const ui = read('js/globe/astro-ui.mjs');
+  assert.match(ui, /function zoomLimit\(/);
+  assert.match(ui, /function openOrrery\(/);
+  assert.match(ui, /function closeOrrery\(/);
+  const orrery = read('js/globe/orrery.mjs');
+  assert.match(orrery, /onExit\(\)/, 'zooming into the Earth hands back to the globe');
+  assert.match(read('js/globe/prototype.mjs'), /onZoomLimit/);
+});

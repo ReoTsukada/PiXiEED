@@ -10,10 +10,10 @@
  */
 
 import { ASTRO_COMMON } from './astro-glsl.mjs?v=20260921-astro-4';
-import { observe } from './astronomy.mjs?v=20260921-astro-4';
+import { observe } from './astronomy.mjs?v=20260926-planets-v1';
 
 const DEG = Math.PI / 180;
-const MIN_FOV = 0.15;
+const MIN_FOV = 0.02; // 72 arcseconds: Jupiter's disc fills about two thirds of the view
 const MAX_FOV = 100;
 
 const VERTEX_SOURCE = `#version 300 es
@@ -36,10 +36,50 @@ uniform float uFilter;      // 1 = solar filter in front of the optics
 uniform float uMask;        // 1 = circular field stop
 uniform float uSquash;      // vertical squash of a low Sun caused by refraction
 uniform mat3 uEnuToCelestial;
+uniform vec3 uPlanetL[7];     // apparent local directions, Mercury…Neptune
+uniform vec3 uPlanetSun[7];   // direction from each planet toward the Sun (local frame)
+uniform vec3 uPlanetPole[7];  // north pole of each planet (local frame)
+uniform vec3 uPlanetTint[7];  // colour of the point image
+uniform vec4 uPlanetInfo[7];  // x: angular radius (rad, 0 = off), y: point brightness, z: kind, w: flattening
+uniform vec4 uSatellite[4];   // Galilean moons: xyz direction, w: brightness (0 = hidden)
 
 out vec4 outColor;
 
 ${ASTRO_COMMON}
+
+float bellCurve(float x, float center, float width) { float t = (x - center) / width; return exp(-t * t); }
+
+// Surface colour of a planet at a surface normal. pole is the rotation axis and
+// ex a fixed direction on the equator, so bands and features stay put.
+vec3 planetAlbedo(int kind, vec3 normal, vec3 pole, vec3 ex) {
+  float sinLat = clamp(dot(normal, pole), -1.0, 1.0);
+  float lat = asin(sinLat);
+  float lon = atan(dot(normal, cross(pole, ex)), dot(normal, ex));
+  if (kind == 0) return vec3(0.63, 0.60, 0.57) * (0.72 + 0.40 * fbm3(normal * 7.0 + 3.0));
+  if (kind == 1) return vec3(0.99, 0.94, 0.82) * (0.93 + 0.07 * fbm3(vec3(normal.xy * 3.0, lat * 6.0)));
+  if (kind == 2) {
+    float dark = smoothstep(0.46, 0.63, fbm3(normal * 3.2 + 11.0));
+    vec3 c = mix(vec3(0.86, 0.47, 0.27), vec3(0.46, 0.25, 0.17), dark);
+    return mix(c, vec3(0.97, 0.96, 0.94), smoothstep(0.86, 0.93, abs(sinLat)));
+  }
+  if (kind == 3) {
+    // Jupiter: pale zones, the two dark equatorial belts, fainter belts toward
+    // the poles, a little turbulence along the belt edges, and the Great Red Spot.
+    float d = degrees(lat) + 3.0 * (fbm3(vec3(lon * 2.2, lat * 14.0, 2.0)) - 0.5);
+    float belts = 0.95 * bellCurve(d, 14.0, 5.5) + 0.85 * bellCurve(d, -16.0, 5.0) + 0.45 * bellCurve(d, 29.0, 3.5)
+      + 0.40 * bellCurve(d, -31.0, 3.5) + 0.25 * bellCurve(d, 42.0, 3.0) + 0.25 * bellCurve(d, -44.0, 3.0);
+    vec3 c = mix(vec3(0.95, 0.91, 0.82), vec3(0.66, 0.46, 0.33), clamp(belts, 0.0, 1.0));
+    c = mix(c, vec3(0.70, 0.68, 0.64), smoothstep(52.0, 72.0, abs(degrees(lat))) * 0.7);
+    vec2 spot = vec2(lon - 1.2, lat + 0.39) * vec2(3.6, 11.0);
+    return mix(c, vec3(0.82, 0.44, 0.31), exp(-dot(spot, spot)) * 0.9);
+  }
+  if (kind == 4) {
+    float band = sin(lat * 13.0 + 0.4 * fbm3(vec3(lon, lat * 6.0, 5.0)));
+    return mix(vec3(0.82, 0.71, 0.50), vec3(0.96, 0.89, 0.69), smoothstep(-0.45, 0.45, band));
+  }
+  if (kind == 5) return vec3(0.66, 0.88, 0.91) * (0.96 + 0.04 * sinLat);
+  return vec3(0.36, 0.52, 0.93) * (0.94 + 0.06 * sin(lat * 8.0));
+}
 
 float bell(float x, float center, float width) {
   float t = (x - center) / width;
@@ -100,6 +140,69 @@ void main() {
   vec3 celestial = uEnuToCelestial * ray;
   float starFade = 1.0 - clamp(dayAmt * dim * 2.2 + warm * 0.25 + twilightAmt * 0.6, 0.0, 1.0);
   color += starField(celestial, pixelAngle) * starFade * 1.6;
+
+  // ---- Planets: a point of light at low power, a lit, banded disc (with
+  // Saturn's rings and the planet's shadow on them) at high power.
+  for (int i = 0; i < 7; i++) {
+    vec4 info = uPlanetInfo[i];
+    if (info.x <= 0.0) continue;
+    int kind = int(info.z + 0.5);
+    vec3 pL = uPlanetL[i];
+    float ang = atan(length(cross(ray, pL)), dot(ray, pL));
+    float discPx = info.x / pixelAngle;
+    float pointAmt = 1.0 - smoothstep(1.2, 3.0, discPx);
+    float psf = pixelAngle * 1.15;
+    color += uPlanetTint[i] * info.y * exp(-(ang * ang) / (psf * psf)) * pointAmt;
+    float reach = info.x * (kind == 4 ? 2.35 : 1.0) + 2.0 * pixelAngle;
+    if (pointAmt >= 1.0 || ang > reach) continue;
+    vec3 pole = uPlanetPole[i];
+    vec3 pp = pole - pL * dot(pole, pL);
+    pp = length(pp) > 1e-5 ? normalize(pp) : normalize(cross(pL, vec3(1.0, 0.0, 0.0)));
+    vec3 ep = cross(pL, pp);
+    vec3 rho = (ray - pL * dot(ray, pL)) / sin(info.x);
+    float a = dot(rho, ep);
+    float b = dot(rho, pp) / (1.0 - info.w);
+    float r2 = a * a + b * b;
+    float edgeW = pixelAngle / info.x;
+    float disc = 1.0 - smoothstep(1.0 - edgeW, 1.0 + edgeW, sqrt(r2));
+    vec3 surf = vec3(0.0);
+    if (disc > 0.0) {
+      float z = sqrt(max(0.0, 1.0 - r2));
+      vec3 normal = normalize(a * ep + b * pp - z * pL);
+      float lit = smoothstep(-0.04, 0.14, dot(normal, uPlanetSun[i]));
+      float limb = 0.5 + 0.5 * pow(z, 0.6);
+      vec3 equator = normalize(cross(pole, abs(pole.z) < 0.9 ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0)));
+      surf = planetAlbedo(kind, normal, pole, equator) * lit * limb * 1.15;
+    }
+    vec3 c = color;
+    if (kind == 4) {
+      float denom = dot(pL, pole);
+      float t = abs(denom) > 1e-4 ? -dot(rho, pole) / denom : 1e6;
+      vec3 X = rho + t * pL;
+      float R = length(X);
+      float soft = edgeW * 1.5;
+      float cRing = smoothstep(1.24 - soft, 1.24 + soft, R) * (1.0 - smoothstep(1.53 - soft, 1.53 + soft, R)) * 0.22;
+      float bRing = smoothstep(1.53 - soft, 1.53 + soft, R) * (1.0 - smoothstep(1.95 - soft, 1.95 + soft, R)) * 0.92;
+      float aRing = smoothstep(2.03 - soft, 2.03 + soft, R) * (1.0 - smoothstep(2.27 - soft, 2.27 + soft, R)) * 0.68;
+      float ringA = (cRing + bRing + aRing) * (0.88 + 0.12 * sin(R * 160.0)) * step(abs(t), 1e5);
+      vec3 sunD = uPlanetSun[i];
+      float along = dot(X, sunD);
+      float shadow = along < 0.0 && length(X - sunD * along) < 1.0 ? 0.12 : 1.0;
+      vec3 ringC = vec3(0.92, 0.84, 0.66) * (0.30 + 0.70 * abs(dot(pole, sunD))) * shadow * 1.1;
+      if (t < 0.0) { c = mix(c, surf, disc); c = mix(c, ringC, ringA); }
+      else { c = mix(c, ringC, ringA); c = mix(c, surf, disc); }
+    } else {
+      c = mix(c, surf, disc);
+    }
+    color = mix(color, c, 1.0 - pointAmt);
+  }
+  for (int k = 0; k < 4; k++) {
+    vec4 moon = uSatellite[k];
+    if (moon.w <= 0.0) continue;
+    float ang = atan(length(cross(ray, moon.xyz)), dot(ray, moon.xyz));
+    float psf = pixelAngle * 1.5;
+    color += vec3(0.96, 0.93, 0.86) * moon.w * exp(-(ang * ang) / (psf * psf));
+  }
   color = mix(color, vec3(0.012), uFilter);
 
   // ---- Sun.
@@ -224,6 +327,10 @@ function compile(gl, type, source) {
 }
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+const PLANET_KINDS = { mercury: 0, venus: 1, mars: 2, jupiter: 3, saturn: 4, uranus: 5, neptune: 6 };
+const PLANET_TINTS = { mercury: [1, 0.95, 0.9], venus: [1, 0.98, 0.9], mars: [1, 0.62, 0.42], jupiter: [1, 0.94, 0.84], saturn: [1, 0.92, 0.74], uranus: [0.78, 0.95, 1], neptune: [0.6, 0.72, 1] };
+/** Linear brightness of a point image from its magnitude (Jupiter about 6, Saturn about 0.4). */
+export function pointBrightness(magnitude) { return Math.min(40, 2.5 * 10 ** (-0.4 * (magnitude + 1.5))); }
 
 /** Lift a local (east, north, up) direction by atmospheric refraction (Saemundsson). */
 export function refracted(local) {
@@ -275,7 +382,7 @@ export function createScope({ canvas, onChange = () => {} } = {}) {
     gl.enableVertexAttribArray(position);
     gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
     gl.bindVertexArray(null);
-    const names = ['uViewport', 'uTanHalf', 'uAim', 'uSunL', 'uMoonL', 'uRadii', 'uCoverage', 'uFilter', 'uMask', 'uSquash', 'uEnuToCelestial'];
+    const names = ['uViewport', 'uTanHalf', 'uAim', 'uSunL', 'uMoonL', 'uRadii', 'uCoverage', 'uFilter', 'uMask', 'uSquash', 'uEnuToCelestial', 'uPlanetL', 'uPlanetSun', 'uPlanetPole', 'uPlanetTint', 'uPlanetInfo', 'uSatellite'];
     locations = Object.fromEntries(names.map((name) => [name, gl.getUniformLocation(program, name)]));
     return true;
   }
@@ -303,6 +410,7 @@ export function createScope({ canvas, onChange = () => {} } = {}) {
     if (!observation) return;
     if (tracking === 'sun') aimAt(refracted(observation.sunLocal));
     else if (tracking === 'moon') aimAt(refracted(observation.moonLocal));
+    else if (tracking) { const planet = observation.planets?.find((entry) => entry.id === tracking); if (planet) aimAt(refracted(planet.local)); }
     // Keep a low Sun in the lower part of the frame with the sky above it.
     if (tracking === 'sun') altitude = Math.max(altitude, (fov * 0.22) * DEG);
   }
@@ -335,8 +443,29 @@ export function createScope({ canvas, onChange = () => {} } = {}) {
     gl.uniform1f(locations.uSquash, squash);
     gl.uniform1f(locations.uMask, 1 - clamp((fov - 12) / 8, 0, 1));
     gl.uniformMatrix3fv(locations.uEnuToCelestial, false, enuToCelestialMatrix());
+    writePlanetUniforms();
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     gl.bindVertexArray(null);
+  }
+
+  const planetL = new Float32Array(21); const planetSun = new Float32Array(21); const planetPole = new Float32Array(21);
+  const planetTint = new Float32Array(21); const planetInfo = new Float32Array(28); const satellites = new Float32Array(16);
+  function writePlanetUniforms() {
+    planetInfo.fill(0); satellites.fill(0);
+    (observation.planets || []).slice(0, 7).forEach((planet, i) => {
+      planetL.set(refracted(planet.local), i * 3);
+      planetSun.set(planet.toSun, i * 3);
+      planetPole.set(planet.pole, i * 3);
+      planetTint.set(PLANET_TINTS[planet.id] || [1, 1, 1], i * 3);
+      planetInfo.set([planet.angularRadius, pointBrightness(planet.magnitude), PLANET_KINDS[planet.id] ?? 6, planet.planet?.flattening || 0], i * 4);
+      if (planet.moons) planet.moons.forEach((moon, k) => { satellites.set([...refracted(moon.local), moon.hidden ? 0 : 3.2], k * 4); });
+    });
+    gl.uniform3fv(locations.uPlanetL, planetL);
+    gl.uniform3fv(locations.uPlanetSun, planetSun);
+    gl.uniform3fv(locations.uPlanetPole, planetPole);
+    gl.uniform3fv(locations.uPlanetTint, planetTint);
+    gl.uniform4fv(locations.uPlanetInfo, planetInfo);
+    gl.uniform4fv(locations.uSatellite, satellites);
   }
 
   function requestDraw() {

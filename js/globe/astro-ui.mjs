@@ -16,20 +16,34 @@
  * Play/pause is the only plain button.
  */
 
-import { celestialState, geoToUnit, unitToGeo, listEclipses, peakObscurationAt, moonPhase, findGreatestEclipse, findSunEvent } from './astronomy.mjs?v=20260921-astro-4';
-import { createScope, refracted } from './scope.mjs?v=20260926-sizes-v1';
+import { celestialState, geoToUnit, unitToGeo, listEclipses, peakObscurationAt, moonPhase, findGreatestEclipse, findSunEvent } from './astronomy.mjs?v=20260926-planets-v1';
+import { createScope, refracted } from './scope.mjs?v=20260926-planets-v1';
+import { createOrrery } from './orrery.mjs?v=20260926-planets-v1';
+import { PLANETS, PLANET_BY_ID, SKY_PLANETS, lightMinutes } from './planets.mjs?v=20260926-planets-v1';
 
 const DEG = Math.PI / 180;
 const MINUTE = 60000;
 const HOUR = 3600000;
 const SKY_FOCAL_HALF_ANGLE = 34; // must match the sky shader in webgl-renderer.mjs
-const SPEEDS = [
-  { value: 1, label: '×1', long: '実時間' }, { value: 60, label: '1分/秒', long: '1秒で1分' },
-  { value: 3600, label: '1時間/秒', long: '1秒で1時間' }, { value: 86400, label: '1日/秒', long: '1秒で1日' }
-];
+const SPEED_SETS = {
+  sky: [
+    { value: 1, label: '×1', long: '実時間' }, { value: 60, label: '1分/秒', long: '1秒で1分' },
+    { value: 3600, label: '1時間/秒', long: '1秒で1時間' }, { value: 86400, label: '1日/秒', long: '1秒で1日' }
+  ],
+  // The Solar System moves on a slower clock: days to years per second.
+  orbit: [
+    { value: 86400, label: '1日/秒', long: '1秒で1日' }, { value: 604800, label: '1週/秒', long: '1秒で1週間' },
+    { value: 2629800, label: '1か月/秒', long: '1秒で1か月' }, { value: 31557600, label: '1年/秒', long: '1秒で1年' }
+  ]
+};
+let SPEEDS = SPEED_SETS.sky;
+// How long the globe's zoom-out has to be pushed past its limit to open the Solar System.
+const ORRERY_PULL = 0.5;
+// Telescope field that frames each planet (degrees): Jupiter wide enough for its moons.
+const PLANET_FOV = { mercury: 0.045, venus: 0.08, mars: 0.05, jupiter: 0.42, saturn: 0.08, uranus: 0.03, neptune: 0.025 };
 const KIND_LABEL = { total: '皆既日食', annular: '金環日食', partial: '部分日食', none: '食なし' };
 const WEEKDAYS = '日月火水木金土';
-const TAPE_MIN_SCALE = 0.6; // px per hour: about three weeks across a phone-width tape
+const TAPE_MIN_SCALE = 0.003; // px per hour: about ten years across a phone-width tape
 const TAPE_MAX_SCALE = 480; // px per hour: 8px per minute
 const TAP_SLOP = 6;
 
@@ -72,6 +86,26 @@ function element(tag, props = {}, children = []) {
   }
   for (const child of [].concat(children)) if (child) node.append(child);
   return node;
+}
+
+function hexToRgb(hex) { const n = parseInt(hex.slice(1), 16); return [(n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255]; }
+
+/** The Moon relative to the Earth as an ecliptic vector in AU, for the Solar System view. */
+function moonEcliptic(state) {
+  const moon = state.moonEquatorial; if (!moon) return null;
+  const l = moon.eclipticLongitude * DEG; const b = moon.eclipticLatitude * DEG; const d = moon.distanceKm / 149597870.7;
+  return [d * Math.cos(b) * Math.cos(l), d * Math.cos(b) * Math.sin(l), d * Math.sin(b)];
+}
+
+function formatLight(au) {
+  const minutes = lightMinutes(au);
+  if (minutes < 60) return `光で${minutes.toFixed(1)}分`;
+  return `光で${Math.floor(minutes / 60)}時間${Math.round(minutes % 60)}分`;
+}
+function formatPeriod(days) { return days < 700 ? `${days.toFixed(1)}日` : `${(days / 365.25).toFixed(1)}年`; }
+function formatRotation(hours) {
+  const text = Math.abs(hours) < 48 ? `${Math.abs(hours).toFixed(1)}時間` : `${(Math.abs(hours) / 24).toFixed(1)}日`;
+  return hours < 0 ? `${text}（逆回り）` : text;
 }
 
 function icon(name) { return element('img', { src: `/assets/icons/pixieed/${name}.svg`, alt: '', 'aria-hidden': 'true' }); }
@@ -142,11 +176,31 @@ function createTimeTape({ onScrub, onEnd, onMarkTap }) {
     if (scale >= 10) return { minor: HOUR, major: 6 * HOUR };
     if (scale >= 2.5) return { minor: 6 * HOUR, major: 24 * HOUR };
     if (scale >= 0.9) return { minor: 24 * HOUR, major: 7 * 24 * HOUR };
-    return { minor: 24 * HOUR, major: 30 * 24 * HOUR };
+    if (scale >= 0.12) return { minor: 7 * 24 * HOUR, major: 'month' };
+    if (scale >= 0.012) return { minor: 'month', major: 'year' };
+    return { minor: 'year', major: 'decade' };
   }
   const localAlign = (ms, step) => { const offset = new Date(ms).getTimezoneOffset() * MINUTE; return Math.floor((ms - offset) / step) * step + offset; };
+  // Calendar steps ('month', 'year', 'decade') follow the local calendar; the rest are fixed lengths.
+  function firstTick(ms, step) {
+    const date = new Date(ms);
+    if (step === 'month') return new Date(date.getFullYear(), date.getMonth(), 1).getTime();
+    if (step === 'year') return new Date(date.getFullYear(), 0, 1).getTime();
+    if (step === 'decade') return new Date(Math.floor(date.getFullYear() / 10) * 10, 0, 1).getTime();
+    return localAlign(ms, step);
+  }
+  function nextTick(ms, step) {
+    const date = new Date(ms);
+    if (step === 'month') return new Date(date.getFullYear(), date.getMonth() + 1, 1).getTime();
+    if (step === 'year') return new Date(date.getFullYear() + 1, 0, 1).getTime();
+    if (step === 'decade') return new Date(date.getFullYear() + 10, 0, 1).getTime();
+    return ms + step;
+  }
+  const isOn = (ms, step) => Math.abs(firstTick(ms + 1, step) - ms) < 1;
   function label(ms, step) {
     const date = new Date(ms);
+    if (step === 'month' || step === 'year') return date.getMonth() === 0 ? `${date.getFullYear()}年` : `${date.getMonth() + 1}月`;
+    if (step === 'decade') return `${date.getFullYear()}年`;
     if (step < 24 * HOUR) return date.getHours() === 0 && date.getMinutes() === 0 ? `${date.getMonth() + 1}/${date.getDate()}` : formatClock(date, false);
     return `${date.getMonth() + 1}/${date.getDate()}`;
   }
@@ -164,9 +218,9 @@ function createTimeTape({ onScrub, onEnd, onMarkTap }) {
     const start = time - center / perMs; const end = time + center / perMs;
     const { minor, major } = tick();
     ctx.lineWidth = 1; ctx.textAlign = 'center'; ctx.font = '600 10px ui-rounded, system-ui, sans-serif';
-    for (let t = localAlign(start, minor); t <= end; t += minor) {
+    for (let t = firstTick(start, minor), guard = 0; t <= end && guard < 400; t = nextTick(t, minor), guard += 1) {
       const x = Math.round(center + (t - time) * perMs) + .5;
-      const isMajor = Math.abs(localAlign(t + 1, major) - t) < 1;
+      const isMajor = isOn(t, major);
       ctx.strokeStyle = isMajor ? 'rgba(233, 246, 247, .75)' : 'rgba(140, 210, 226, .32)';
       ctx.beginPath(); ctx.moveTo(x, height); ctx.lineTo(x, height - (isMajor ? 14 : 7)); ctx.stroke();
       if (isMajor) { ctx.fillStyle = 'rgba(233, 246, 247, .78)'; ctx.fillText(label(t, minor), x, height - 19); }
@@ -199,9 +253,10 @@ function createTimeTape({ onScrub, onEnd, onMarkTap }) {
   }, { passive: false });
   root.addEventListener('keydown', (event) => {
     const steps = tick(); let delta = 0;
-    if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') delta = -steps.minor;
-    else if (event.key === 'ArrowRight' || event.key === 'ArrowUp') delta = steps.minor;
-    else if (event.key === 'PageUp') delta = steps.major; else if (event.key === 'PageDown') delta = -steps.major;
+    const span = (step) => (typeof step === 'number' ? step : nextTick(firstTick(time, step), step) - firstTick(time, step));
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') delta = -span(steps.minor);
+    else if (event.key === 'ArrowRight' || event.key === 'ArrowUp') delta = span(steps.minor);
+    else if (event.key === 'PageUp') delta = span(steps.major); else if (event.key === 'PageDown') delta = -span(steps.major);
     else if (event.key === '+' || event.key === '=') { setScale(scale * 1.6); event.preventDefault(); return; }
     else if (event.key === '-' || event.key === '_') { setScale(scale / 1.6); event.preventDefault(); return; }
     else return;
@@ -212,6 +267,7 @@ function createTimeTape({ onScrub, onEnd, onMarkTap }) {
   return {
     root, draw,
     getScale: () => scale,
+    setScale,
     isScrubbing: scrub.isActive,
     setTime(next) { time = next; root.setAttribute('aria-valuetext', `${formatDate(new Date(next))} ${formatClock(new Date(next))}`); draw(); },
     setMarks(next) { marks = next; draw(); }
@@ -283,6 +339,13 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
     return { button, label, name, kind };
   }
   const marks = { sun: skyMark('sun', 'sun', '太陽'), moon: skyMark('moon', 'moon', '月') };
+  // Planets get a label while they are on screen; no edge markers, to keep the view calm.
+  const planetMarks = Object.fromEntries(SKY_PLANETS.map((planet) => {
+    const mark = skyMark(planet.id, 'globe', planet.name);
+    mark.button.classList.add('is-planet');
+    mark.button.style.setProperty('--planet', planet.color);
+    return [planet.id, mark];
+  }));
 
   // ---- Time capsule --------------------------------------------------------
   const playButton = element('button', { type: 'button', class: 'tc-play', 'aria-label': '再生' }, [icon('play')]);
@@ -299,13 +362,17 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
     onEnd() { if (resumeAfterScrub) { resumeAfterScrub = false; setPlaying(true); } },
     onMarkTap(mark) { if (mark.entry) goToEclipse(mark.entry); }
   });
-  const speedGroup = element('div', { class: 'tc-speeds', role: 'radiogroup', 'aria-label': '再生の速さ' }, SPEEDS.map((option, index) => element('label', {}, [
-    element('input', { type: 'radio', name: 'tc-speed', value: String(index), ...(index === 0 ? { checked: '' } : {}) }), element('span', { text: option.label, title: option.long })
-  ])));
+  const speedGroup = element('div', { class: 'tc-speeds', role: 'radiogroup', 'aria-label': '再生の速さ' });
+  function buildSpeeds() {
+    speedGroup.replaceChildren(...SPEEDS.map((option, index) => element('label', {}, [
+      element('input', { type: 'radio', name: 'tc-speed', value: String(index), ...(index === speedIndex ? { checked: '' } : {}) }), element('span', { text: option.label, title: option.long })
+    ])));
+  }
+  buildSpeeds();
   const swiper = createEclipseSwiper({ onPick: (entry) => goToEclipse(entry) });
   const drawer = element('div', { class: 'tc-drawer', id: 'timeDrawer' }, [element('div', { class: 'tc-drawer__inner' }, [
     picker, tape.root, speedGroup, swiper.root,
-    element('p', { class: 'tc-foot', text: '地球を長押しすると、その場所から空を見られます' })
+    element('p', { class: 'tc-foot', text: '地球を長押しでその場所の空へ。さらに縮小すると太陽系へ' })
   ])]);
   const capsule = element('section', { class: 'time-capsule', 'aria-label': '時刻と天体' }, [
     element('div', { class: 'tc-bar' }, [playButton, face, nowChip]), drawer
@@ -328,7 +395,115 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
       element('p', { class: 'scope-warning', text: '実際の観測では、必ず日食グラスや太陽フィルターを使ってください。' })
     ])
   ]);
-  stage.append(scopeCanvas, skyHud, scopeHud, capsule);
+  // ---- Solar System view -----------------------------------------------------
+  const orreryCanvas = element('canvas', { class: 'orrery-canvas', hidden: '', tabindex: '0', 'aria-label': '太陽系。ドラッグで回転、ピンチまたはホイールで拡大・縮小、タップで天体を選ぶ。地球をさらに拡大すると地球儀に戻る' });
+  const cardName = element('strong', { class: 'orrery-card__name' });
+  const cardKind = element('span', { class: 'orrery-card__kind' });
+  const cardFacts = element('dl', { class: 'orrery-card__facts' });
+  const cardSky = element('button', { type: 'button', class: 'orrery-action is-primary', onClick: () => lookFromEarth(selectedBody) }, [icon('telescope'), element('span', { text: '空で見る' })]);
+  const cardHome = element('button', { type: 'button', class: 'orrery-action', onClick: () => closeOrrery() }, [icon('globe'), element('span', { text: '地球儀に戻る' })]);
+  const card = element('section', { class: 'orrery-card', hidden: '', 'aria-live': 'polite' }, [
+    element('header', {}, [cardName, cardKind]), cardFacts, element('div', { class: 'orrery-card__actions' }, [cardSky, cardHome])
+  ]);
+  const bodyChips = element('div', { class: 'orrery-bodies', role: 'list', 'aria-label': '天体へ移動' }, [{ id: 'sun', name: '太陽' }, ...PLANETS].map((body) => element('button', {
+    type: 'button', role: 'listitem', class: 'orrery-chip', 'data-body': body.id, style: `--planet: ${body.color || '#f4d45d'}`, onClick: () => orrery.select(body.id)
+  }, [element('i', { 'aria-hidden': 'true' }), element('span', { text: body.name })])));
+  const orreryHud = element('section', { class: 'orrery-hud', hidden: '', 'aria-label': '太陽系' }, [
+    element('button', { type: 'button', class: 'orrery-close', 'aria-label': '地球儀に戻る', onClick: () => closeOrrery() }, [icon('close')]),
+    element('p', { class: 'orrery-title' }, [element('strong', { text: '太陽系' }), element('span', { text: '距離は実比率・大きさは強調' })]),
+    element('div', { class: 'orrery-dock' }, [card, bodyChips])
+  ]);
+  const pull = element('div', { class: 'orrery-pull', hidden: '', 'aria-hidden': 'true' }, [element('span', { text: 'さらに縮小で太陽系へ' }), element('i')]);
+  let selectedBody = null;
+  let pullAmount = 0; let pullTimer = null;
+  const orrery = createOrrery({
+    canvas: orreryCanvas,
+    onSelect(id) { selectedBody = id; renderCard(); for (const chip of bodyChips.children) chip.classList.toggle('is-active', chip.dataset.body === id); },
+    onExit: () => closeOrrery(),
+    onChange() { if (selectedBody) renderCard(); }
+  });
+
+  function renderCard() {
+    card.hidden = !selectedBody;
+    if (!selectedBody) return;
+    const snapshot = orrery.getSnapshot();
+    const find = (id) => snapshot.bodies.find((body) => body.id === id);
+    const earth = find('earth')?.position || [1, 0, 0];
+    const facts = [];
+    if (selectedBody === 'sun') {
+      const d = Math.hypot(...earth);
+      cardName.textContent = '太陽'; cardKind.textContent = '恒星';
+      facts.push(['地球から', `${d.toFixed(3)} AU・${formatLight(d)}`], ['半径', '69万6000 km（地球の109倍）'], ['表面', '約5500℃']);
+    } else if (selectedBody === 'moon') {
+      cardName.textContent = '月'; cardKind.textContent = '地球の衛星';
+      facts.push(['地球から', `${Math.round(state.moonDistance * 6378.137).toLocaleString('ja-JP')} km`], ['公転', '27.3日'], ['半径', '1737 km']);
+    } else {
+      const body = find(selectedBody); const planet = PLANET_BY_ID[selectedBody];
+      const r = Math.hypot(...body.position);
+      cardName.textContent = planet.name; cardKind.textContent = planet.kind;
+      facts.push(['太陽から', `${r.toFixed(2)} AU`]);
+      if (planet.id !== 'earth') {
+        const delta = Math.hypot(body.position[0] - earth[0], body.position[1] - earth[1], body.position[2] - earth[2]);
+        facts.push(['地球から', `${delta.toFixed(2)} AU・${formatLight(delta)}`]);
+      }
+      facts.push(['公転', formatPeriod(planet.periodDays)], ['1日', formatRotation(planet.rotationHours)], ['衛星', `${planet.moons}個`]);
+      const sky = state.planets?.find((entry) => entry.id === planet.id);
+      if (sky) facts.push(['明るさ', `${sky.magnitude.toFixed(1)}等${sky.magnitude < 6 ? '（肉眼で見える）' : ''}`]);
+    }
+    cardFacts.replaceChildren(...facts.map(([term, value]) => element('div', {}, [element('dt', { text: term }), element('dd', { text: value })])));
+    cardSky.hidden = selectedBody === 'earth';
+    cardHome.hidden = !(selectedBody === 'earth' || selectedBody === 'moon');
+  }
+
+  function openOrrery() {
+    if (orrery.isOpen()) return;
+    if (scope.isOpen()) closeScope();
+    setOpen(false);
+    pullAmount = 0; pull.hidden = true;
+    stage.classList.add('is-orrery');
+    orreryCanvas.hidden = false; orreryHud.hidden = false;
+    for (const mark of [...Object.values(marks), ...Object.values(planetMarks)]) mark.button.hidden = true;
+    useSpeeds('orbit');
+    tape.setScale(0.05);
+    orrery.setTime(time, { moon: moonEcliptic(state) });
+    orrery.open({ fromEarth: true });
+    orreryCanvas.focus({ preventScroll: true });
+  }
+
+  function closeOrrery(then = null) {
+    if (!orrery.isOpen()) { then?.(); return; }
+    selectedBody = null; card.hidden = true;
+    stage.classList.add('is-orrery-leaving');
+    orrery.close(() => {
+      // Land back on the globe at a comfortable size rather than at the zoom-out limit.
+      renderer.setView({ zoom: 1 });
+      stage.classList.remove('is-orrery', 'is-orrery-leaving');
+      orreryCanvas.hidden = true; orreryHud.hidden = true;
+      useSpeeds('sky');
+      tape.setScale(14);
+      apply();
+      then?.();
+    });
+  }
+
+  // Look at a body from the ground: back to the globe, then the telescope on it.
+  function lookFromEarth(id) {
+    if (!id) return;
+    closeOrrery(() => openScope(undefined, { track: id }));
+  }
+
+  // The globe reports pinches past its zoom-out limit; enough of them opens the Solar System.
+  function zoomLimit({ direction, amount }) {
+    if (direction !== 'out' || orrery.isOpen() || scope.isOpen()) return;
+    pullAmount += amount;
+    pull.hidden = false;
+    pull.style.setProperty('--pull', String(Math.min(1, pullAmount / ORRERY_PULL)));
+    clearTimeout(pullTimer);
+    pullTimer = setTimeout(() => { pullAmount = 0; pull.hidden = true; }, 700);
+    if (pullAmount >= ORRERY_PULL) openOrrery();
+  }
+
+  stage.append(orreryCanvas, scopeCanvas, skyHud, scopeHud, orreryHud, pull, capsule);
 
   let fovTimer = null;
   let lastFov = null;
@@ -342,7 +517,12 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
   }
 
   function orbitParameters() {
-    return { sunDirection: state.sunDirection, moonVector: state.moonVector, sunRadius: state.sunAngularRadius, gmstRadians: state.gmstDegrees * DEG, lighting: false, bodies: true, sunScale: 6, moonScale: 8 };
+    const planets = (state.planets || []).map((planet) => {
+      const flux = Math.min(2.4, 0.7 * 10 ** (-0.4 * (planet.magnitude + 0.5)));
+      const tint = hexToRgb(planet.planet.color);
+      return { direction: planet.direction, glow: tint.map((c) => c * flux), size: planet.magnitude > 6.5 ? 0 : clamp(1.1 + (1 - planet.magnitude) * 0.32, 1.1, 2.8) };
+    });
+    return { sunDirection: state.sunDirection, moonVector: state.moonVector, sunRadius: state.sunAngularRadius, gmstRadians: state.gmstDegrees * DEG, lighting: false, bodies: true, sunScale: 6, moonScale: 8, planets };
   }
 
   function renderClock() {
@@ -358,8 +538,15 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
   // Nudge a label down (or up at the bottom edge) so the Sun and Moon never cover each other.
   function avoid(x, y, button, occupied, bounds) {
     const width = button.offsetWidth || 80; const height = (button.offsetHeight || 30) + 6;
-    let next = y;
-    for (const other of occupied) if (Math.abs(other.x - x) < (width + other.width) / 2 && Math.abs(other.y - next) < height) next = other.y + (other.y + height * 2 > bounds.bottom ? -height : height);
+    const top = bounds.top + height / 2 - 14; const bottom = bounds.bottom - height / 2 + 14;
+    let next = clamp(y, top, bottom);
+    for (const other of occupied) {
+      if (Math.abs(other.x - x) >= (width + other.width) / 2 || Math.abs(other.y - next) >= height) continue;
+      // Step away from whichever edge is closer, so the pair never leaves the safe area.
+      const down = other.y + height; const up = other.y - height;
+      next = (other.y - top < bottom - other.y ? down <= bottom : up < top) ? down : up;
+      next = clamp(next, top, bottom);
+    }
     occupied.push({ x, y: next, width });
     return next;
   }
@@ -420,6 +607,15 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
         title: inside ? `${body.mark.name}を望遠鏡で見る` : `${body.mark.name}の方を向く`
       }, bounds, occupied);
     }
+    for (const planet of state.planets || []) {
+      const mark = planetMarks[planet.id];
+      const v = rotate(planet.direction, inverse);
+      const front = v[2] < 0;
+      const x = width / 2 + focal * v[0] / -v[2]; const y = height / 2 - focal * v[1] / -v[2];
+      const visible = front && planet.magnitude < 6.5 && Math.hypot(x - centerX, y - centerY) > camera.scale * 0.98 && x > bounds.left && x < bounds.right && y > bounds.top && y < bounds.bottom;
+      if (!visible) { mark.button.hidden = true; continue; }
+      placeMark(mark, { x, y, inside: true, offset: 10, text: planet.name, title: `${planet.name}を望遠鏡で見る` }, bounds, occupied);
+    }
   }
 
   function scopeMarks(snapshot = scope.getSnapshot()) {
@@ -431,7 +627,7 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
     const right = [Math.cos(az), -Math.sin(az), 0];
     const up = [right[1] * forward[2] - right[2] * forward[1], right[2] * forward[0] - right[0] * forward[2], right[0] * forward[1] - right[1] * forward[0]];
     const tanHalf = Math.tan((snapshot.fov * DEG) / 2);
-    const bounds = { left: 22, right: width - 22, top: 74, bottom: height - 200 };
+    const bounds = { left: 22, right: width - 22, top: 130, bottom: height - 200 };
     const occupied = [];
     for (const [mark, local, altitude, radius] of [[marks.sun, o.sunLocal, o.sunAltitude, o.sunRadius], [marks.moon, o.moonLocal, o.moonAltitude, o.moonRadius]]) {
       const v = refracted(local);
@@ -446,6 +642,22 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
         x, y, inside, dimmed: altitude < -1, offset: inside ? Math.min(80, ((radius || 0.0047) / tanHalf) * height / 2) + 14 : 0,
         text: altitude < -1 ? `${mark.name}（地平線の下）` : `${mark.name} ${altitude.toFixed(1)}°`,
         title: tracking ? `${mark.name}を追尾中` : `${mark.name}を追う`
+      }, bounds, occupied);
+    }
+    for (const planet of o.planets || []) {
+      const mark = planetMarks[planet.id];
+      const v = refracted(planet.local);
+      const fz = dot(v, forward); const fx = dot(v, right); const fy = dot(v, up);
+      const x = width / 2 + (fx / fz / tanHalf) * height / 2; const y = height / 2 - (fy / fz / tanHalf) * height / 2;
+      const tracking = snapshot.tracking === planet.id;
+      const inside = fz > 1e-3 && x > bounds.left && x < bounds.right && y > bounds.top && y < bounds.bottom;
+      mark.button.classList.toggle('is-tracking', tracking);
+      if (!inside && !tracking) { mark.button.hidden = true; continue; }
+      const discPx = (planet.angularRadius / tanHalf) * height / 2;
+      placeMark(mark, {
+        x, y, inside, dimmed: planet.altitude < -1, offset: inside ? Math.min(140, discPx * (planet.id === 'saturn' ? 2.3 : 1)) + 14 : 0,
+        text: planet.altitude < -1 ? `${planet.name}（地平線の下）` : `${planet.name} ${(planet.angularRadius * 2 / DEG * 3600).toFixed(1)}″`,
+        title: tracking ? `${planet.name}を追尾中` : `${planet.name}を追う`
       }, bounds, occupied);
     }
   }
@@ -479,15 +691,17 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
   }
 
   function onMarkTap(kind) {
+    if (PLANET_BY_ID[kind]) { if (scope.isOpen()) { scope.track(kind); scope.setFov(PLANET_FOV[kind] || 0.1); } else openScope(undefined, { track: kind }); return; }
     if (scope.isOpen()) { scope.track(kind); return; }
     if (marks[kind].button.classList.contains('is-onscreen')) { openScope(undefined, { track: kind }); return; }
     lookAt(kind);
   }
 
   function apply() {
-    state = celestialState(new Date(time));
-    renderer.setAstronomy(orbitParameters());
+    state = celestialState(new Date(time), { planets: true });
     renderClock();
+    if (orrery.isOpen()) { orrery.setTime(time, { moon: moonEcliptic(state) }); return; }
+    renderer.setAstronomy(orbitParameters());
     if (scope.isOpen()) scope.setState(state); else orbitMarks();
   }
 
@@ -521,6 +735,15 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
     lastFrame = 0;
     renderClock();
     if (playing) { timeTween = null; requestAnimationFrame(tick); }
+  }
+
+  function useSpeeds(set) {
+    const current = SPEEDS[speedIndex]?.value;
+    SPEEDS = SPEED_SETS[set];
+    // Keep the nearest speed when switching between the sky and the Solar System clock.
+    speedIndex = SPEEDS.reduce((best, option, index) => (Math.abs(Math.log(option.value / current)) < Math.abs(Math.log(SPEEDS[best].value / current)) ? index : best), 0);
+    buildSpeeds();
+    renderClock();
   }
 
   function setSpeed(index, { play = false } = {}) {
@@ -569,7 +792,7 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
     scopeCanvas.hidden = false;
     scopeHud.hidden = false;
     scope.open(location, state);
-    scope.setFov(track ? 3 : 40);
+    scope.setFov(track ? PLANET_FOV[track] || 3 : 40);
     if (track) scope.track(track);
     updateSunEvents(true);
     onScopeChange(scope.getSnapshot());
@@ -639,11 +862,11 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
   scopeCanvas.addEventListener('contextmenu', (event) => event.preventDefault());
   stage.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape') return;
-    if (scope.isOpen()) closeScope(); else if (capsule.classList.contains('is-open')) { setOpen(false); face.focus(); }
+    if (scope.isOpen()) closeScope(); else if (orrery.isOpen()) closeOrrery(); else if (capsule.classList.contains('is-open')) { setOpen(false); face.focus(); }
   });
   // Tapping outside the capsule folds it away.
   stage.addEventListener('pointerdown', (event) => { if (capsule.classList.contains('is-open') && !capsule.contains(event.target)) setOpen(false); }, true);
-  if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => { if (scope.isOpen()) scopeMarks(); else orbitMarks(); }).observe(stage);
+  if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => { if (scope.isOpen()) scopeMarks(); else if (!orrery.isOpen()) orbitMarks(); }).observe(stage);
 
   // Eclipse cards, built lazily so they never delay the first frame.
   const buildEclipseList = () => {
@@ -671,8 +894,9 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
   apply();
 
   const api = Object.freeze({
-    refreshView() { if (state && !scope.isOpen()) orbitMarks(); },
+    refreshView() { if (state && !scope.isOpen() && !orrery.isOpen()) orbitMarks(); },
     setTime, getTime: () => time, setPlaying, setSpeed, openScope, closeScope, goToEclipse, scope, setOpen,
+    openOrrery, closeOrrery, zoomLimit, orrery,
     getState: () => state
   });
   globalThis.__PIXIEED_ASTRO__ = api;
