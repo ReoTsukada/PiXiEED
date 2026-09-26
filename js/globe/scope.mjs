@@ -226,7 +226,7 @@ function compile(gl, type, source) {
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
 /** Lift a local (east, north, up) direction by atmospheric refraction (Saemundsson). */
-function refracted(local) {
+export function refracted(local) {
   const altitudeDeg = Math.asin(clamp(local[2], -1, 1)) / DEG;
   if (altitudeDeg < -2) return local;
   const arcminutes = 1.02 / Math.tan((altitudeDeg + 10.3 / (altitudeDeg + 5.11)) * DEG);
