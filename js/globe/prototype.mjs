@@ -1,7 +1,7 @@
-import { initAstroUi } from './astro-ui.mjs?v=20260926-sizes-v1';
-import { initPostUi } from './post-ui.mjs?v=20260926-sizes-v1';
+import { initAstroUi } from './astro-ui.mjs?v=20260926-planets-v1';
+import { initPostUi } from './post-ui.mjs?v=20260926-planets-v1';
 import { createSupabaseGlobeAuth, createSupabaseGlobeStore } from './post-supabase.mjs?v=20260921-globe-post-v1';
-import { createGlobeRenderer, decodeRasterData, getSelectionStageLabel, prepareGeoJsonFeatures } from './renderer.mjs?v=20260926-sizes-v1';
+import { createGlobeRenderer, decodeRasterData, getSelectionStageLabel, prepareGeoJsonFeatures } from './renderer.mjs?v=20260926-planets-v1';
 
 const embedMode = new URLSearchParams(location.search).get('embed') === '1';
 
@@ -51,6 +51,7 @@ function createPrototypeRenderer(options = {}) {
       navigator.vibrate?.(8);
       globalThis.__PIXIEED_ASTRO__?.openScope({ latitude: spot.latitude, longitude: spot.longitude });
     },
+    onZoomLimit(info) { globalThis.__PIXIEED_ASTRO__?.zoomLimit?.(info); },
     onStateChange({ view }) {
       globalThis.__PIXIEED_ASTRO__?.refreshView?.();
       postUi?.refresh();

@@ -11,6 +11,8 @@
  * are in Earth equatorial radii unless a name says otherwise.
  */
 
+import { planetSky } from './planets.mjs?v=20260926-planets-v1';
+
 const DEG = Math.PI / 180;
 const EARTH_RADIUS_KM = 6378.137;
 const AU_KM = 149597870.7;
@@ -163,8 +165,10 @@ const unit = (a) => scale(a, 1 / (length(a) || 1));
 /**
  * Sun and Moon expressed in the Earth-fixed frame at `date`.
  * `sunVector`/`moonVector` are geocentric positions in Earth radii.
+ * With `planets: true` the planets (planets.mjs) are added in the same frame;
+ * eclipse searches leave them out to stay fast.
  */
-export function celestialState(date) {
+export function celestialState(date, { planets = false } = {}) {
   const gmst = greenwichSiderealDegrees(date);
   const { sun, moon, epsilon } = sunMoonEquatorial(date);
   const sunDirection = geoToUnit(norm360(sun.ra - gmst + 180) - 180, sun.dec);
@@ -186,7 +190,8 @@ export function celestialState(date) {
     moonEquatorial: moon,
     sunEquatorial: sun,
     subSolar: unitToGeo(sunDirection),
-    subLunar: unitToGeo(moonDirection)
+    subLunar: unitToGeo(moonDirection),
+    planets: planets ? planetSky(date, { gmstDeg: gmst, obliquityDeg: epsilon }) : null
   });
 }
 
@@ -216,13 +221,22 @@ export function observe(state, latitudeDegrees, longitudeDegrees) {
   const toLocal = (v) => [dot(v, east), dot(v, north), dot(v, up)];
   const sunLocal = toLocal(sunUnit);
   const moonLocal = toLocal(moonUnit);
+  // Planets are far enough that the observer's offset from the Earth's centre does not matter.
+  const planets = state.planets ? state.planets.map((planet) => Object.freeze({
+    id: planet.id, name: planet.name, planet: planet.planet,
+    local: toLocal(unit(sub(planet.vector, up))),
+    toSun: toLocal(planet.toSun), pole: toLocal(planet.pole),
+    angularRadius: planet.angularRadius, magnitude: planet.magnitude, illuminated: planet.illuminated,
+    altitude: Math.asin(Math.max(-1, Math.min(1, dot(unit(sub(planet.vector, up)), up)))) / DEG,
+    moons: planet.moons ? planet.moons.map((moon) => ({ id: moon.id, name: moon.name, local: toLocal(unit(sub(moon.vector, up))), angularRadius: moon.angularRadius, hidden: moon.hidden })) : null
+  })) : null;
   const overlap = discOverlap(separation, sunRadius, moonRadius);
   // Fraction of the solar *diameter* covered ("magnitude"), 1 = total.
   const magnitude = separation >= sunRadius + moonRadius ? 0 : (sunRadius + moonRadius - separation) / (2 * sunRadius);
   return Object.freeze({
     latitude: latitudeDegrees, longitude: longitudeDegrees,
     east, north, up,
-    sunLocal, moonLocal, sunRadius, moonRadius, separation,
+    sunLocal, moonLocal, sunRadius, moonRadius, separation, planets,
     sunAltitude: Math.asin(sunLocal[2]) / DEG,
     moonAltitude: Math.asin(moonLocal[2]) / DEG,
     obscuration: overlap,

@@ -21,7 +21,7 @@ import {
 } from './geometry.mjs?v=20260921-grid11-1';
 import { normalizeMembershipFeatures, pointInGeometry } from './topology.mjs?v=20260920-g4-precision-1';
 import { JAPAN_COUNTRY_ID, JAPAN_REGION_GROUPS, getRegionForPrefecture } from './hierarchy.mjs?v=20260920-g4-precision-1';
-import { createWebGLRenderer } from './webgl-renderer.mjs?v=20260921-astro-4';
+import { createWebGLRenderer } from './webgl-renderer.mjs?v=20260926-planets-v1';
 import { WORLD_LAND_MASK } from '../../assets/maps/world-land-mask-v1.mjs?v=20260920-webgl2-1';
 
 export const GLOBE_RENDERER_VERSION = 'g6-webgl2-analytic-half-degree-v1';
@@ -377,7 +377,7 @@ function drawCellBatches(context, cells, selectedId, hoveredId) {
 function now() { return typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now(); }
 function reducedMotion() { return typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
 
-export function createGlobeRenderer(canvas, { initialView = DEFAULT_VIEW, onPick = () => {}, onLongPress = null, onHover = () => {}, onStateChange = () => {}, backgroundElement = null, spaceTexture = '', worldFeatures = [], regionFeatures = [], prefectureFeatures = [], rasterData = null, forceCanvas = false, grid = DEFAULT_GRID, activeLayer = null, contentCounts = null } = {}) {
+export function createGlobeRenderer(canvas, { initialView = DEFAULT_VIEW, onPick = () => {}, onLongPress = null, onZoomLimit = null, onHover = () => {}, onStateChange = () => {}, backgroundElement = null, spaceTexture = '', worldFeatures = [], regionFeatures = [], prefectureFeatures = [], rasterData = null, forceCanvas = false, grid = DEFAULT_GRID, activeLayer = null, contentCounts = null } = {}) {
   if (!canvas || typeof canvas.getContext !== 'function') throw new TypeError('A Canvas element is required.');
   let initialRaster = null;
   if (rasterData) {
@@ -404,7 +404,8 @@ export function createGlobeRenderer(canvas, { initialView = DEFAULT_VIEW, onPick
   const invalidation = createRenderInvalidationState();
   const initialPrefectures = prefectureFeatures.length ? prefectureFeatures : regionFeatures; let rasterIndex = createRasterIndex({ worldFeatures: emptyFeatures(worldFeatures), prefectureFeatures: emptyFeatures(initialPrefectures), rasterData: initialRaster, grid });
   const cellCache = createBoundedCellCache();
-  function canvasSize() { const rect = canvas.getBoundingClientRect(); const requestedDpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1; return getCanvasBackingSize({ width: rect.width || canvas.clientWidth || 640, height: rect.height || canvas.clientHeight || 480, dpr: requestedDpr, maxDpr: webgl ? 1.35 : MAX_BACKING_DPR }); }
+  // Layout size, not getBoundingClientRect(): the canvas is scaled by a CSS transform while the Solar System view is open.
+  function canvasSize() { const rect = canvas.getBoundingClientRect(); const requestedDpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1; return getCanvasBackingSize({ width: canvas.clientWidth || rect.width || 640, height: canvas.clientHeight || rect.height || 480, dpr: requestedDpr, maxDpr: webgl ? 1.35 : MAX_BACKING_DPR }); }
   function createWebGLPlan() { return Object.freeze({ version: GLOBE_RENDERER_VERSION, backend: 'webgl2', drawCalls: 1, featureMode: 'analytic-sphere-0.25-degree-mask', lodLevel: lodState.level, camera, cameraCenter: Object.freeze({ longitude: camera.centerLongitude, latitude: camera.centerLatitude }), zoom: camera.zoom, cells: Object.freeze([]), pickIndex: new Map(), grid, settings: LOD_SETTINGS[lodState.level], activeLayer: layer, candidateCount: 0, inspectedCells: 0, projectedCandidates: 0, ownershipChecks: 0, truncated: false, mask: Object.freeze({ version: initialRaster?.version || WORLD_LAND_MASK.version, width: initialRaster?.textureWidth || WORLD_LAND_MASK.width, height: initialRaster?.textureHeight || WORLD_LAND_MASK.height }) }); }
   function rebuild() { backing = canvasSize(); if (canvas.width !== backing.physicalWidth) canvas.width = backing.physicalWidth; if (canvas.height !== backing.physicalHeight) canvas.height = backing.physicalHeight; camera = createGlobeCamera({ viewport: backing, ...view }); lodState = updateLodState(lodState, view.zoom); plan = webgl ? createWebGLPlan() : createRenderPlan({ camera, lodState, rasterIndex, grid, activeLayer: layer, contentCounts: counts, cellCache }); invalidation.markPlanBuilt(); }
   function repaint() { if (webgl) { lastBatchMetrics = webgl.draw({ camera, selected, hovered }); invalidation.markRepainted(); onStateChange({ view, plan, camera, selected, hovered, metrics: lastBatchMetrics }); return; } context.setTransform(backing.dpr, 0, 0, backing.dpr, 0, 0); context.clearRect(0, 0, backing.width, backing.height); const { centerX, centerY } = camera.viewport; const radius = camera.scale; context.save(); context.beginPath(); context.arc(centerX, centerY, radius, 0, Math.PI * 2); context.clip(); lastBatchMetrics = { backend: 'canvas2d', drawCalls: 0, frameMs: 0, ...drawCellBatches(context, plan.cells, selected?.cellId, hovered?.cellId) }; context.restore(); context.beginPath(); context.arc(centerX, centerY, radius, 0, Math.PI * 2); context.strokeStyle = 'rgba(190, 232, 238, .78)'; context.lineWidth = 1.1; context.stroke(); invalidation.markRepainted(); onStateChange({ view, plan, camera, selected, hovered, metrics: lastBatchMetrics }); }
@@ -422,7 +423,10 @@ export function createGlobeRenderer(canvas, { initialView = DEFAULT_VIEW, onPick
   function pointerPosition(event) { const rect = canvas.getBoundingClientRect(); return { x: event.clientX - rect.left, y: event.clientY - rect.top }; }
   function geoUnder(point, state = view) { if (!backing || !point) return null; return inverseScreenToGeo(point.x, point.y, createGlobeCamera({ viewport: backing, ...state })); }
   // Zoom to `zoom` while keeping the ground that was under `from` under `to`.
+  // Report attempts to zoom past the range (the caller turns a pinch-out beyond the globe into the Solar System view).
+  function reportLimit(requested) { if (typeof onZoomLimit !== 'function') return; const { min, max } = view.zoomRange; if (requested < min && view.zoom <= min * 1.001) onZoomLimit({ direction: 'out', amount: Math.log(min / requested) }); else if (requested > max && view.zoom >= max * 0.999) onZoomLimit({ direction: 'in', amount: Math.log(requested / max) }); }
   function anchorView(from, to, zoom) {
+    reportLimit(zoom);
     let next = createViewState({ ...view, zoom: clampZoom(zoom, view.zoomRange) }); const anchor = geoUnder(from);
     for (let pass = 0; anchor && pass < 2; pass += 1) { const after = geoUnder(to, next); if (!after) break; next = createViewState({ ...next, centerLongitude: next.centerLongitude + normalizeLongitude(anchor.longitude - after.longitude), centerLatitude: next.centerLatitude + (anchor.latitude - after.latitude) }); }
     updateView(next);
@@ -492,7 +496,7 @@ export function createGlobeRenderer(canvas, { initialView = DEFAULT_VIEW, onPick
   let wheelPending = 0; let wheelTimer = null; let wheelGesture = 0; let wheelLast = -Infinity; let wheelPoint = null;
   function flushWheel() {
     wheelTimer = null; const step = clamp(wheelPending, -WHEEL_MAX_STEP, WHEEL_MAX_STEP); wheelPending -= step;
-    if (Math.abs(step) > 1e-5) { if (wheelPoint) anchorView(wheelPoint, wheelPoint, view.zoom * Math.exp(step)); else updateView({ zoom: clampZoom(view.zoom * Math.exp(step), view.zoomRange) }); }
+    if (Math.abs(step) > 1e-5) { reportLimit(view.zoom * Math.exp(step)); if (wheelPoint) anchorView(wheelPoint, wheelPoint, view.zoom * Math.exp(step)); else updateView({ zoom: clampZoom(view.zoom * Math.exp(step), view.zoomRange) }); }
     if (Math.abs(wheelPending) > 1e-4) wheelTimer = typeof requestAnimationFrame === 'function' ? requestAnimationFrame(flushWheel) : setTimeout(flushWheel, 16); else wheelPending = 0;
   }
   function onWheel(event) {

@@ -12,6 +12,8 @@ const DEFAULT_TESTS = [
   , 'tests/globe/mask.test.mjs'
   , 'tests/globe/geo-input.test.mjs'
   , 'tests/globe/post-contract.test.mjs'
+  , 'tests/globe/planets.test.mjs'
+  , 'tests/globe/tool-shell.test.mjs'
 ];
 const TEST_TIMEOUT_MS = 60_000;
 
