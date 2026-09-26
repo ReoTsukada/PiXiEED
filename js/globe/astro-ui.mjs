@@ -16,11 +16,11 @@
  * Play/pause is the only plain button.
  */
 
-import { celestialState, geoToUnit, unitToGeo, listEclipses, peakObscurationAt, moonPhase, findGreatestEclipse, findSunEvent } from './astronomy.mjs?v=20260926-realsky-v1';
-import { createScope, refracted } from './scope.mjs?v=20260926-realsky-v1';
-import { sharedSky } from './real-sky.mjs?v=20260926-realsky-v1';
-import { createOrrery } from './orrery.mjs?v=20260926-realsky-v1';
-import { PLANETS, PLANET_BY_ID, SKY_PLANETS, lightMinutes } from './planets.mjs?v=20260926-realsky-v1';
+import { celestialState, geoToUnit, unitToGeo, listEclipses, peakObscurationAt, moonPhase, findGreatestEclipse, findSunEvent } from './astronomy.mjs?v=20260927-fullcolor-v1';
+import { createScope, refracted } from './scope.mjs?v=20260927-fullcolor-v1';
+import { sharedSky } from './real-sky.mjs?v=20260927-fullcolor-v1';
+import { createOrrery } from './orrery.mjs?v=20260927-fullcolor-v1';
+import { PLANETS, PLANET_BY_ID, SKY_PLANETS, lightMinutes } from './planets.mjs?v=20260927-fullcolor-v1';
 
 const DEG = Math.PI / 180;
 const MINUTE = 60000;

@@ -7,7 +7,7 @@
  * clock, Jupiter's belts, Saturn's rings with the planet's shadow), the Sun's
  * limb and glow, orbits, the asteroid belt and the catalogue sky behind. The
  * frame then goes through the pixel camera's own colour pipeline
- * (PiXiEELENS, 256 colours with ordered dither), so the look is exactly
+ * (PiXiEELENS, full colour: the render is taken at the dot grid), so the look is exactly
  * what the camera makes of a photo. Labels are drawn crisp on top.
  *
  * Distances are to scale. Bodies are drawn at their true size once that is
@@ -19,9 +19,9 @@
  * to the globe.
  */
 
-import { PLANETS, PLANET_BY_ID, centuriesSinceJ2000, heliocentricAt, orbitPath, galileanOffsets } from './planets.mjs?v=20260926-realsky-v1';
-import { greenwichSiderealDegrees } from './astronomy.mjs?v=20260926-realsky-v1';
-import { sharedSky, createSkySampler } from './real-sky.mjs?v=20260926-realsky-v1';
+import { PLANETS, PLANET_BY_ID, centuriesSinceJ2000, heliocentricAt, orbitPath, galileanOffsets } from './planets.mjs?v=20260927-fullcolor-v1';
+import { greenwichSiderealDegrees } from './astronomy.mjs?v=20260927-fullcolor-v1';
+import { sharedSky, createSkySampler } from './real-sky.mjs?v=20260927-fullcolor-v1';
 import { WORLD_LAND_MASK } from '../../assets/maps/world-land-mask-v1.mjs?v=20260920-webgl2-1';
 
 const DEG = Math.PI / 180;
@@ -176,11 +176,11 @@ export function createOrrery({ canvas, onSelect = () => {}, onExit = () => {}, o
   let sampleSky = null;
   let skyCache = { key: '', data: null };
 
-  // The pixel camera's 256-colour pipeline, and the painted real sky.
+  // The pixel camera's full-colour pipeline, and the painted real sky.
   function prepare() {
     if (!lens) {
       lens = import('../pixel-lens/engine.mjs?v=20260926-ux-1').then((engine) => {
-        engine.setLensSettings({ colorDepth: '256', gradientMode: 'dither', surfaceSimplify: 0 });
+        engine.setLensSettings({ colorDepth: 'full', gradientMode: 'none', surfaceSimplify: 0 });
         return engine;
       }).catch((error) => { console.warn('Pixel camera engine unavailable; showing the raw render.', error); return null; });
       lens.then((engine) => { lens = engine || false; requestDraw(); });
@@ -257,13 +257,8 @@ export function createOrrery({ canvas, onSelect = () => {}, onExit = () => {}, o
           const dir = norm([-b.toward[0] * focal + b.right[0] * dx + b.up[0] * dy, -b.toward[1] * focal + b.right[1] * dx + b.up[1] * dy, -b.toward[2] * focal + b.right[2] * dx + b.up[2] * dy]);
           const q = eclipticToEquatorial(dir);
           sampleSky(Math.atan2(q[1], q[0]) / DEG, Math.asin(clamp(q[2], -1, 1)) / DEG, rgb);
-          // Black point: the faint sky glow would only turn into coloured dither noise in 256 colours.
-          const lum = Math.max(0, (rgb[0] + rgb[1] + rgb[2]) / 3 - 34) * 1.9;
-          // The 256-colour palette has 8 red/green levels but only 4 blue ones, so faint grey would
-          // dither into olive. Faint light goes to the blue channel first (navy dots), brighter light
-          // adds red and green on top (lavender, then white stars).
-          const warm = rgb[0] / Math.max(1, rgb[2]);
-          out[i] = Math.max(0, lum - 26) * 1.25 * warm; out[i + 1] = Math.max(0, lum - 26) * 1.2; out[i + 2] = lum * 2.1;
+          // A gentle black point keeps empty space black; the Milky Way and stars keep their colour.
+          out[i] = Math.max(0, rgb[0] - 12) * 1.12; out[i + 1] = Math.max(0, rgb[1] - 12) * 1.12; out[i + 2] = Math.max(0, rgb[2] - 14) * 1.14;
         }
       }
       skyCache = { key, data: out };
@@ -425,10 +420,9 @@ export function createOrrery({ canvas, onSelect = () => {}, onExit = () => {}, o
       screen.push({ id: body.id, x: p.x, y: p.y, r: Math.max(18, radius + 6), radius, body });
     }
 
-    // Through the pixel camera: 256 colours with its ordered dither.
+    // Through the pixel camera in full colour (its tone pre-processing at the dot grid).
     if (lens && typeof lens.processLensFrame === 'function') {
-      // The camera lifts shadows a little before dithering, which would print a faint regular grid
-      // over empty space. Whatever was black before the conversion stays black.
+      // The camera lifts shadows a little; whatever was black before the conversion stays black.
       const px = buffer.data; const empty = new Uint8Array(px.length / 4);
       for (let k = 0, j = 0; k < px.length; k += 4, j += 1) if (px[k] + px[k + 1] + px[k + 2] < 6) empty[j] = 1;
       lens.processLensFrame(buffer);
