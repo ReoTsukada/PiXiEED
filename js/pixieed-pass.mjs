@@ -1,0 +1,183 @@
+/**
+ * PiXiEED pass — one ad, three hours of every perk, everywhere on PiXiEED.
+ *
+ * Any page or tool asks `hasPerk('some.perk')`. The answer is yes while the pass is valid (one rewarded ad
+ * gives PASS_HOURS hours) or for Pro. New services only register a perk id; they never show ads themselves.
+ * The only place an ad can appear is `requestPass()`, and only after the person taps 「広告を見る」.
+ *
+ * Ads: Google Ad Manager rewarded ads (GPT) when `passConfig.rewardedAdUnitPath` is set in
+ * data/site-config.js. Until then the pass is granted without an ad (and says so), and on localhost or with
+ * `?adtest=1` a 5-second stand-in ad is shown so the flow can be tried.
+ */
+import { passConfig } from '../data/site-config.js';
+
+const STORE_KEY = 'pixieed:pass:v1';
+const PRO_KEY = 'pixieed:pro:v1';
+export const PASS_HOURS = Number(passConfig?.passHours) > 0 ? Number(passConfig.passHours) : 3;
+const PASS_MS = PASS_HOURS * 60 * 60 * 1000;
+
+/** Everything a pass unlocks, across PiXiEED. Services add theirs with registerPerk(). */
+export const PERKS = new Map([
+  ['camera.gif-long', 'ドット絵カメラ：GIFを10秒・なめらかに']
+]);
+export function registerPerk(id, label) { PERKS.set(id, label); }
+
+const read = (key) => { try { return localStorage.getItem(key); } catch { return null; } };
+const write = (key, value) => { try { if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value); } catch { /* private mode: this visit only */ } };
+let memoryUntil = 0;
+function until() { const stored = Number(JSON.parse(read(STORE_KEY) || '{}').until) || 0; return Math.max(stored, memoryUntil); }
+
+export function hasPro() { return read(PRO_KEY) === '1'; }
+export function passRemainingMs(now = Date.now()) { return hasPro() ? Infinity : Math.max(0, until() - now); }
+export function hasPass() { return passRemainingMs() > 0; }
+export function hasPerk(id) { return PERKS.has(id) && hasPass(); }
+
+const listeners = new Set();
+/** Called whenever the pass starts, ends, or changes in another tab. Returns an unsubscribe function. */
+export function onPassChange(listener) { listeners.add(listener); return () => listeners.delete(listener); }
+let expiryTimer = 0;
+function notify() {
+  window.clearTimeout(expiryTimer);
+  const left = passRemainingMs();
+  if (left > 0 && left !== Infinity) expiryTimer = window.setTimeout(notify, Math.min(left + 50, 2 ** 31 - 1));
+  for (const listener of listeners) { try { listener({ active: left > 0, remainingMs: left }); } catch (error) { console.warn(error); } }
+  renderSlots();
+}
+if (typeof window !== 'undefined') window.addEventListener('storage', (event) => { if (event.key === STORE_KEY || event.key === PRO_KEY) notify(); });
+
+function grant() {
+  const next = Date.now() + PASS_MS;
+  memoryUntil = next;
+  write(STORE_KEY, JSON.stringify({ until: next }));
+  notify();
+}
+
+// ---- ad providers ----------------------------------------------------------------------------------------
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) { resolve(); return; }
+    const script = document.createElement('script'); script.src = src; script.async = true;
+    script.onload = resolve; script.onerror = () => reject(new Error('ad script'));
+    document.head.appendChild(script);
+  });
+}
+/** Google Ad Manager rewarded ad. Resolves 'granted' | 'closed' | 'unavailable'. */
+async function showRewardedAd(adUnitPath) {
+  await loadScript('https://securepubads.g.doubleclick.net/tag/js/gpt.js');
+  const googletag = window.googletag = window.googletag || { cmd: [] };
+  return new Promise((resolve) => {
+    let settled = false; let slot = null;
+    const done = (result) => { if (settled) return; settled = true; window.clearTimeout(timeout); if (slot) googletag.destroySlots([slot]); resolve(result); };
+    const timeout = window.setTimeout(() => done('unavailable'), 10000);
+    let granted = false;
+    googletag.cmd.push(() => {
+      slot = googletag.defineOutOfPageSlot(adUnitPath, googletag.enums.OutOfPageFormat.REWARDED);
+      if (!slot) { done('unavailable'); return; }
+      slot.addService(googletag.pubads());
+      googletag.pubads().addEventListener('rewardedSlotReady', (event) => { window.clearTimeout(timeout); event.makeRewardedVisible(); });
+      googletag.pubads().addEventListener('rewardedSlotGranted', () => { granted = true; });
+      googletag.pubads().addEventListener('rewardedSlotClosed', () => done(granted ? 'granted' : 'closed'));
+      googletag.pubads().addEventListener('slotRenderEnded', (event) => { if (event.slot === slot && event.isEmpty) done('unavailable'); });
+      googletag.enableServices();
+      googletag.display(slot);
+    });
+  });
+}
+/** Stand-in for trying the flow (localhost / ?adtest=1): a 5-second countdown in the sheet. */
+function showTestAd(sheet) {
+  return new Promise((resolve) => {
+    const box = sheet.querySelector('.px-pass-test'); box.hidden = false;
+    let left = 5; box.textContent = `テスト広告 ${left}`;
+    const timer = window.setInterval(() => { left--; box.textContent = `テスト広告 ${left}`; if (left <= 0) { window.clearInterval(timer); box.hidden = true; resolve('granted'); } }, 1000);
+  });
+}
+function adMode() {
+  const test = typeof location !== 'undefined' && (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) || new URLSearchParams(location.search).has('adtest'));
+  if (test) return 'test';
+  return passConfig?.rewardedAdUnitPath ? 'rewarded' : 'free';
+}
+
+// ---- the one sheet --------------------------------------------------------------------------------------
+const STYLE = `
+.px-pass-backdrop{position:fixed;inset:0;z-index:2147483000;display:grid;align-items:end;justify-items:center;background:rgba(0,0,0,.38);animation:px-pass-fade .18s ease-out}
+.px-pass{box-sizing:border-box;width:min(100% - 1.2rem,24rem);margin:0 0 calc(env(safe-area-inset-bottom,0px) + .8rem);padding:1.1rem 1.1rem 1rem;border-radius:1.4rem;background:rgba(20,24,28,.96);color:#f4f6f5;border:1px solid rgba(255,255,255,.12);box-shadow:0 24px 60px rgba(0,0,0,.45);font:500 .9rem/1.5 system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;animation:px-pass-up .24s cubic-bezier(.2,.8,.2,1)}
+.px-pass h2{margin:0 0 .25rem;font-size:1.02rem;font-weight:800;display:flex;align-items:center;gap:.5rem}
+.px-pass h2 i{display:inline-grid;place-items:center;min-width:2.6rem;height:1.6rem;padding:0 .4rem;border-radius:999px;background:#ffd35a;color:#15171b;font-style:normal;font-size:.78rem}
+.px-pass p{margin:0 0 .9rem;color:rgba(244,246,245,.72);font-size:.84rem}
+.px-pass .px-pass-perk{color:#fff;font-weight:700}
+.px-pass-actions{display:flex;gap:.5rem}
+.px-pass button{flex:1;height:2.9rem;border:0;border-radius:999px;font:inherit;font-weight:800;cursor:pointer}
+.px-pass .px-pass-go{background:#e75445;color:#fff;box-shadow:0 10px 26px rgba(231,84,69,.35)}
+.px-pass .px-pass-no{flex:0 0 auto;padding:0 1.1rem;background:rgba(255,255,255,.1);color:#f4f6f5}
+.px-pass button:disabled{opacity:.5;cursor:default}
+.px-pass-test{margin:0 0 .8rem;padding:.9rem;border-radius:1rem;background:repeating-linear-gradient(45deg,#2a2f35 0 10px,#252a2f 10px 20px);text-align:center;font-weight:800;letter-spacing:.06em}
+.px-pass-test[hidden]{display:none}
+.px-pass-chip{display:inline-flex;align-items:center;gap:.3rem;height:1.7rem;padding:0 .6rem;border-radius:999px;background:rgba(255,211,90,.95);color:#15171b;font:800 .72rem/1 system-ui,-apple-system,sans-serif;font-variant-numeric:tabular-nums;white-space:nowrap}
+.px-pass-chip[hidden]{display:none}
+@keyframes px-pass-fade{from{opacity:0}}@keyframes px-pass-up{from{transform:translateY(1.5rem);opacity:0}}
+@media (prefers-reduced-motion:reduce){.px-pass-backdrop,.px-pass{animation:none}}`;
+function ensureStyle() { if (document.getElementById('px-pass-style')) return; const style = document.createElement('style'); style.id = 'px-pass-style'; style.textContent = STYLE; document.head.appendChild(style); }
+
+let open = null;
+/**
+ * Ask for the pass. Shows the sheet; resolves true once the pass is valid (already valid → true at once).
+ * `perk` only changes the wording ("… GIFを10秒 …も"), the pass always unlocks everything.
+ */
+export function requestPass({ perk = '' } = {}) {
+  if (hasPass()) return Promise.resolve(true);
+  if (open) return open;
+  ensureStyle();
+  const mode = adMode();
+  const backdrop = document.createElement('div'); backdrop.className = 'px-pass-backdrop';
+  backdrop.innerHTML = `<section class="px-pass" role="dialog" aria-modal="true" aria-labelledby="px-pass-title">
+    <h2 id="px-pass-title"><i>${PASS_HOURS}時間</i>PiXiEEDの特典</h2>
+    <p></p><div class="px-pass-test" hidden></div>
+    <div class="px-pass-actions"><button type="button" class="px-pass-no">あとで</button><button type="button" class="px-pass-go"></button></div>
+  </section>`;
+  const text = backdrop.querySelector('p');
+  const perkLabel = PERKS.get(perk);
+  text.innerHTML = mode === 'free'
+    ? `いまは準備中のため、広告なしで${PASS_HOURS}時間すべての特典が使えます。`
+    : `広告を1本見ると、PiXiEEDのすべての特典が${PASS_HOURS}時間使えます。`;
+  if (perkLabel) { const line = document.createElement('span'); line.className = 'px-pass-perk'; line.textContent = `（${perkLabel} など）`; text.appendChild(line); }
+  const go = backdrop.querySelector('.px-pass-go'); const no = backdrop.querySelector('.px-pass-no');
+  go.textContent = mode === 'free' ? `${PASS_HOURS}時間使う` : '広告を見る';
+  document.body.appendChild(backdrop);
+  go.focus({ preventScroll: true });
+  open = new Promise((resolve) => {
+    const close = (result) => { backdrop.remove(); document.removeEventListener('keydown', onKey); open = null; resolve(result); };
+    const onKey = (event) => { if (event.key === 'Escape' && !go.disabled) close(false); };
+    document.addEventListener('keydown', onKey);
+    backdrop.addEventListener('pointerdown', (event) => { if (event.target === backdrop && !go.disabled) close(false); });
+    no.addEventListener('click', () => close(false));
+    go.addEventListener('click', async () => {
+      go.disabled = true; no.disabled = true;
+      let result = 'granted';
+      if (mode === 'test') result = await showTestAd(backdrop);
+      else if (mode === 'rewarded') { go.textContent = '広告を準備しています…'; try { result = await showRewardedAd(passConfig.rewardedAdUnitPath); } catch { result = 'unavailable'; } }
+      if (result === 'granted') { grant(); close(true); return; }
+      go.disabled = false; no.disabled = false;
+      go.textContent = '広告を見る';
+      text.textContent = result === 'closed' ? '最後まで見ると特典が使えるようになります。' : 'いまは広告を用意できませんでした。少し時間をおいてお試しください。';
+    });
+  });
+  return open;
+}
+
+// ---- remaining-time chip: pages put <span data-pass-slot></span> where it should appear ------------------
+function format(ms) { if (ms === Infinity) return 'Pro'; const m = Math.ceil(ms / 60000); return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`; }
+let chipTimer = 0;
+function renderSlots() {
+  if (typeof document === 'undefined') return;
+  ensureStyle();
+  const left = passRemainingMs();
+  for (const slot of document.querySelectorAll('[data-pass-slot]')) {
+    slot.classList.add('px-pass-chip');
+    slot.hidden = left <= 0;
+    slot.textContent = `★ ${format(left)}`;
+    slot.setAttribute('aria-label', left === Infinity ? 'Pro：特典が使えます' : `特典はあと${format(left)}使えます`);
+  }
+  window.clearTimeout(chipTimer);
+  if (left > 0 && left !== Infinity) chipTimer = window.setTimeout(renderSlots, 30000);
+}
+if (typeof document !== 'undefined') { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', notify); else notify(); }

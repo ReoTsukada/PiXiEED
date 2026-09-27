@@ -302,3 +302,9 @@ button, a { font: inherit; }
 .lc-palette-dots[data-count="16"] button, .lc-palette-dots[data-count="8"] button { width: 1.6rem; height: 1.6rem; }
 .lc-tray, .lc-look, .lc-tone, .lc-palette-editor { grid-template-columns: minmax(0, 1fr); }
 .lc-look > *, .lc-tone > *, .lc-palette-editor > * { justify-self: center; }
+
+/* PiXiEED pass: the remaining-time chip next to the back button, and the one offer on a finished GIF */
+.lc-top-left { display: flex; align-items: center; gap: .45rem; }
+.lc-result { display: grid; justify-items: center; gap: .55rem; }
+.lc-upgrade { height: 2.3rem; padding: 0 1rem; border: 1px solid rgba(255, 211, 90, .55); border-radius: 999px; background: rgba(20, 26, 31, .7); color: #ffd35a; font-size: .8rem; font-weight: 800; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); cursor: pointer; animation: lc-in .3s var(--lc-ease); }
+.lc-upgrade[hidden] { display: none; }

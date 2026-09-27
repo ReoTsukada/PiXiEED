@@ -2,9 +2,10 @@ import { createFrameLoop } from '../pixel-studio/frame-loop.mjs';
 import { encodeCameraPng, pngExportGeometry } from '../pixel-studio/png-export.mjs';
 import { FRAME_RATIOS, OUTPUT_SIZES, resolveAspect, centerCrop, frameGeometry, fitFrame } from '../pixel-studio/framing.mjs?v=20260925-lens-sizes-1';
 import { cameraStartErrorMessage, deriveCameraPrimaryAction } from '../pixel-studio/camera-ui-state.mjs';
-import { CAMERA_SETTING_DEFAULTS, DITHER_PATTERNS, lensFrameFilter, lensPalette, lensPaletteEdited, processLensFrame, resetLensPalette, resetLensPaletteEdits, setLensPalette, setLensPaletteColor, setLensSettings } from './engine.mjs?v=20260928-palette-1';
-import { attachZoomGestures, formatZoom, splitZoom, zoomRange, zoomStops } from './zoom.mjs?v=20260928-palette-1';
-import { GIF_FPS, GIF_MAX_MS, encodeGif, gifScale } from './gif.mjs?v=20260928-palette-1';
+import { CAMERA_SETTING_DEFAULTS, DITHER_PATTERNS, lensFrameFilter, lensPalette, lensPaletteEdited, processLensFrame, resetLensPalette, resetLensPaletteEdits, setLensPalette, setLensPaletteColor, setLensSettings } from './engine.mjs?v=20260928-pass-1';
+import { attachZoomGestures, formatZoom, splitZoom, zoomRange, zoomStops } from './zoom.mjs?v=20260928-pass-1';
+import { GIF_FPS, GIF_MAX_MS, encodeGif, gifScale } from './gif.mjs?v=20260928-pass-1';
+import { hasPerk, requestPass, onPassChange } from '../pixieed-pass.mjs?v=20260928-pass-1';
 
 const $ = (selector) => document.querySelector(selector);
 const root = $('#pixelStudio');
@@ -431,6 +432,7 @@ function capture() {
   invalidateCaptureDownload();
   const frozen = state.result;
   gif.pending = null;
+  $('#gifUpgrade').hidden = true;
   invalidatePreview();
   cameraSequence++;
   stopTracks();
@@ -459,6 +461,7 @@ function refreshObjects() {
 
 function retake() {
   gif.pending = null;
+  $('#gifUpgrade').hidden = true;
   invalidateCaptureDownload();
   state.result = null;
   view.width = 1;
@@ -942,21 +945,25 @@ function flipCamera() {
 
 // ---------- GIF: hold the shutter ----------
 const HOLD_MS = 360;
-const gif = { recording: false, frames: [], started: 0, lastAt: 0, raf: 0, playTimer: 0, pending: null };
+const gif = { recording: false, frames: [], started: 0, lastAt: 0, raf: 0, playTimer: 0, pending: null, maxMs: GIF_MAX_MS, fps: GIF_FPS };
+// PiXiEED pass perk: 10 seconds at 20 frames a second instead of 5 s at 10
+const gifLimits = () => (hasPerk('camera.gif-long') ? { maxMs: 10000, fps: 20 } : { maxMs: GIF_MAX_MS, fps: GIF_FPS });
 const captureButton = $('#capture');
 let holdTimer = 0; let holdFired = false;
 function gifProgress() {
   if (!gif.recording) return;
   const elapsed = performance.now() - gif.started;
-  const left = Math.max(0, GIF_MAX_MS - elapsed);
-  captureButton.style.setProperty('--gif-progress', String(Math.min(1, elapsed / GIF_MAX_MS)));
+  const left = Math.max(0, gif.maxMs - elapsed);
+  captureButton.style.setProperty('--gif-progress', String(Math.min(1, elapsed / gif.maxMs)));
   $('#gifRecTime').textContent = `${(left / 1000).toFixed(1)}s`;
   if (left <= 0) { finishGif(); return; }
   gif.raf = requestAnimationFrame(gifProgress);
 }
 function startGif() {
   if (state.mode !== 'live' || !state.result) return;
+  Object.assign(gif, gifLimits());
   gif.recording = true; gif.frames = []; gif.started = performance.now(); gif.lastAt = 0;
+  $('#gifRecTime').textContent = `${(gif.maxMs / 1000).toFixed(1)}s`;
   recordGifFrame(state.result);
   root.dataset.recording = 'true';
   $('#gifRec').hidden = false;
@@ -965,7 +972,7 @@ function startGif() {
 }
 function recordGifFrame(result) {
   const now = performance.now();
-  if (gif.frames.length && now - gif.lastAt < 1000 / GIF_FPS - 8) return;
+  if (gif.frames.length && now - gif.lastAt < 1000 / gif.fps - 8) return;
   const first = gif.frames[0];
   if (first && (first.width !== result.width || first.height !== result.height)) return;
   gif.lastAt = now;
@@ -981,7 +988,7 @@ function stopGifUi() {
 function finishGif() {
   if (!gif.recording) return;
   stopGifUi();
-  const frames = gif.frames; gif.frames = [];
+  const frames = gif.frames; gif.frames = []; frames.fps = gif.fps;
   if (frames.length < 2) { capture(); return; } // too short to move: keep it as a photo
   invalidateCaptureDownload();
   invalidatePreview();
@@ -1002,15 +1009,26 @@ function playGif(frames) {
   const show = () => { const f = frames[index]; index = (index + 1) % frames.length; viewContext.putImageData(new ImageData(f.data, f.width, f.height), 0, 0); };
   if (view.width !== frames[0].width || view.height !== frames[0].height) { view.width = frames[0].width; view.height = frames[0].height; }
   show();
-  gif.playTimer = window.setInterval(show, 1000 / GIF_FPS);
+  gif.playTimer = window.setInterval(show, 1000 / (frames.fps || GIF_FPS));
 }
+// On a finished GIF (and only there) offer the pass once, quietly, under the save button.
+function syncGifUpgrade() {
+  const button = $('#gifUpgrade');
+  button.hidden = !(state.mode === 'captured' && gif.pending) || hasPerk('camera.gif-long');
+}
+$('#gifUpgrade').addEventListener('click', async () => {
+  if (await requestPass({ perk: 'camera.gif-long' })) sayToast('特典が使えます。次のGIFから10秒・なめらかに撮れます');
+  syncGifUpgrade();
+});
+onPassChange(() => syncGifUpgrade());
 function stopGifPlayback() { if (gif.playTimer) { window.clearInterval(gif.playTimer); gif.playTimer = 0; } }
 async function prepareGifDownload(frames) {
   const generation = downloadGeneration;
   try {
     const { width, height } = frames[0];
     const scale = gifScale(width, height);
-    const bytes = encodeGif(frames, { delayMs: 1000 / GIF_FPS, scale });
+    const fps = frames.fps || GIF_FPS;
+    const bytes = encodeGif(frames, { delayMs: 1000 / fps, scale });
     if (generation !== downloadGeneration || state.mode !== 'captured') return;
     downloadUrl = URL.createObjectURL(new Blob([bytes], { type: 'image/gif' }));
     const link = $('#savePng');
@@ -1020,7 +1038,8 @@ async function prepareGifDownload(frames) {
     root.dataset.gifFrames = String(frames.length);
     root.dataset.gifBytes = String(bytes.length);
     updateSaveLinkState();
-    sayToast(`GIFを撮影しました（${(frames.length / GIF_FPS).toFixed(1)}秒）`);
+    sayToast(`GIFを撮影しました（${(frames.length / fps).toFixed(1)}秒）`);
+    syncGifUpgrade();
     focusVisible('#savePng');
   } catch (error) {
     if (generation !== downloadGeneration) return;
