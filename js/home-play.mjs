@@ -153,7 +153,7 @@ function hero() {
 
   // ---- stars: tap to catch ----
   function catchStar(x, y) {
-    const i = stars.findIndex((s) => Math.abs(s.x - x) <= 1.5 && Math.abs(s.y - y) <= 1.5);
+    const i = stars.findIndex((s) => Math.abs(s.x - x) <= 2 && Math.abs(s.y - y) <= 2);
     if (i < 0) return false;
     const s = stars[i]; stars[i] = newStar(); caught += 1;
     score.textContent = `★ ${caught}`; score.hidden = false; score.classList.remove('is-pop'); requestAnimationFrame(() => score.classList.add('is-pop'));
@@ -269,25 +269,48 @@ function hero() {
     if (last) { const n = Math.max(Math.abs(x - last.x), Math.abs(y - last.y)); for (let i = 1; i <= n; i++) cells.push({ x: Math.round(last.x + ((x - last.x) * i) / n), y: Math.round(last.y + ((y - last.y) * i) / n) }); } else cells.push({ x, y });
     last = { x, y };
     for (const c of cells) {
-      // sweeping through the word knocks letters loose
-      const li = letterAt(c.x, c.y); if (li >= 0) { lettersWereHit = burstLetter(li, c.x, c.y) || lettersWereHit; continue; }
       const key = `${c.x},${c.y}`; if (ink.get(key)?.color === colors[color]) continue;
       ink.set(key, { x: c.x, y: c.y, color: colors[color], born: performance.now() });
       interest.ink += 1; if (interest.ink === 90) invite('editor');
       note(Math.round((H - c.y) / H * 12) + 2, { length: 0.16 });
     }
   }
+  // Tap and drag never mix: nothing happens on touch-down. Moving past a small slop starts a stroke (which only
+  // ever draws — stars and letters are left alone); lifting without moving is a tap (letter → burst, star → catch,
+  // empty sky → one dot). A long still press counts as drawing a dot, never as a tap on a star.
+  const SLOP = 8; const TAP_MS = 400;
+  let press = null;
   canvas.addEventListener('pointerdown', (e) => {
+    if (press || !e.isPrimary) return;
     const { x, y } = g.cell(e); if (x < 0 || y < 0 || x >= W || y >= H) return;
     hint.classList.add('is-used');
-    canvas.setPointerCapture(e.pointerId); downAt = { x, y };
-    // a tap on a letter or a star plays with it; anywhere else starts drawing
-    const li = letterAt(x, y);
-    if (li >= 0) { lettersWereHit = burstLetter(li, x, y) || lettersWereHit; redraw(); return; }
-    if (catchStar(x, y)) { redraw(); return; }
-    drawing = true; last = null; inkAt(x, y); redraw();
+    canvas.setPointerCapture(e.pointerId);
+    press = { id: e.pointerId, cx: e.clientX, cy: e.clientY, x, y, t: performance.now() }; downAt = { x, y };
   });
-  canvas.addEventListener('pointermove', (e) => { if (!drawing) return; const { x, y } = g.cell(e); if (x < 0 || y < 0 || x >= W || y >= H) return; inkAt(x, y); redraw(); });
+  canvas.addEventListener('pointermove', (e) => {
+    if (!press || e.pointerId !== press.id) return;
+    const { x, y } = g.cell(e);
+    if (!drawing) {
+      if (Math.hypot(e.clientX - press.cx, e.clientY - press.cy) < SLOP) return;
+      drawing = true; last = null; inkAt(press.x, press.y);
+    }
+    if (x < 0 || y < 0 || x >= W || y >= H) return;
+    inkAt(x, y); redraw();
+  });
+  function tap(x, y, quick) {
+    if (quick) {
+      const li = letterAt(x, y);
+      if (li >= 0) { lettersWereHit = burstLetter(li, x, y) || lettersWereHit; return; }
+      if (catchStar(x, y)) return;
+    }
+    last = null; inkAt(x, y); release(); last = null;
+  }
+  canvas.addEventListener('pointerup', (e) => {
+    if (!press || e.pointerId !== press.id) return;
+    if (drawing) stop(); else tap(press.x, press.y, performance.now() - press.t < TAP_MS);
+    press = null; redraw();
+  });
+  canvas.addEventListener('pointercancel', (e) => { if (press && e.pointerId === press.id) { stop(); press = null; } });
   // letting go drops the drawing
   function release() {
     const cells = [...ink.values()].filter((d) => d.x >= 0 && d.x < W && d.y >= 0 && d.y < F).map((d) => ({ x: d.x, y: d.y, v: colors.indexOf(d.color) + 1 }));
@@ -320,7 +343,6 @@ function hero() {
     }
     redraw();
   });
-  canvas.addEventListener('pointerup', stop); canvas.addEventListener('pointercancel', stop);
   document.getElementById('hpClear').addEventListener('click', () => {
     ink.clear(); sand.fill(0); caught = 0; score.hidden = true; pen = false; drawing = false; pieces = []; flashes = []; lines = 0;
     for (const d of dots) { d.state = 'intro'; d.y = -2 - Math.random() * 12; d.delay = d.li * 90 + Math.random() * 260; }

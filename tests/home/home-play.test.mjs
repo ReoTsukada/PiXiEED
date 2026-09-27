@@ -24,6 +24,17 @@ test('home hero: draw, let go and it drops; a full row clears; letters burst; st
   assert.match(source, /a full row vanishes/);
 });
 
+test('home hero: a tap and a drag never mix — dragging only draws, even when it starts on a star or a letter', () => {
+  const source = read('js/home-play.mjs');
+  assert.match(source, /const SLOP = \d+;/);
+  assert.match(source, /Math\.hypot\(e\.clientX - press\.cx, e\.clientY - press\.cy\) < SLOP/);
+  assert.match(source, /function tap\(x, y, quick\)/);
+  const ink = source.match(/function inkAt\([\s\S]*?\n  \}/)[0];
+  assert.doesNotMatch(ink, /burstLetter|catchStar/, 'a stroke never plays with letters or stars');
+  const down = source.match(/canvas\.addEventListener\('pointerdown'[\s\S]*?\n  \}\);/)[0];
+  assert.doesNotMatch(down, /burstLetter|catchStar|inkAt/, 'nothing happens on touch-down');
+});
+
 test('home hero: the play leads somewhere — invitations matched to what the visitor enjoys', () => {
   const source = read('js/home-play.mjs');
   assert.match(source, /interest\.ink === \d+\) invite\('editor'\)/);
