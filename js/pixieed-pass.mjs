@@ -6,8 +6,8 @@
  * The only place an ad can appear is `requestPass()`, and only after the person taps 「広告を見る」.
  *
  * Ads: Google Ad Manager rewarded ads (GPT) when `passConfig.rewardedAdUnitPath` is set in
- * data/site-config.js. Until then the pass is granted without an ad (and says so), and on localhost or with
- * `?adtest=1` a 5-second stand-in ad is shown so the flow can be tried.
+ * data/site-config.js. Until then the pass is granted without an ad (and says so). Only on localhost,
+ * a 5-second stand-in ad is shown so the flow can be tried without granting a free pass on the public site.
  */
 import { passConfig } from '../data/site-config.js';
 
@@ -61,29 +61,44 @@ function loadScript(src) {
     document.head.appendChild(script);
   });
 }
-/** Google Ad Manager rewarded ad. Resolves 'granted' | 'closed' | 'unavailable'. */
-async function showRewardedAd(adUnitPath) {
+/** @internal Google Ad Manager rewarded ad. Resolves 'granted' | 'closed' | 'unavailable'. */
+export async function showRewardedAd(adUnitPath) {
   await loadScript('https://securepubads.g.doubleclick.net/tag/js/gpt.js');
   const googletag = window.googletag = window.googletag || { cmd: [] };
   return new Promise((resolve) => {
-    let settled = false; let slot = null;
-    const done = (result) => { if (settled) return; settled = true; window.clearTimeout(timeout); if (slot) googletag.destroySlots([slot]); resolve(result); };
+    let settled = false; let slot = null; let pubads = null;
+    const listeners = [];
+    const done = (result) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeout);
+      for (const [type, listener] of listeners) pubads.removeEventListener(type, listener);
+      if (slot) googletag.destroySlots([slot]);
+      resolve(result);
+    };
     const timeout = window.setTimeout(() => done('unavailable'), 10000);
     let granted = false;
     googletag.cmd.push(() => {
+      if (settled) return;
       slot = googletag.defineOutOfPageSlot(adUnitPath, googletag.enums.OutOfPageFormat.REWARDED);
       if (!slot) { done('unavailable'); return; }
-      slot.addService(googletag.pubads());
-      googletag.pubads().addEventListener('rewardedSlotReady', (event) => { window.clearTimeout(timeout); event.makeRewardedVisible(); });
-      googletag.pubads().addEventListener('rewardedSlotGranted', () => { granted = true; });
-      googletag.pubads().addEventListener('rewardedSlotClosed', () => done(granted ? 'granted' : 'closed'));
-      googletag.pubads().addEventListener('slotRenderEnded', (event) => { if (event.slot === slot && event.isEmpty) done('unavailable'); });
+      pubads = googletag.pubads();
+      slot.addService(pubads);
+      const listen = (type, listener) => { pubads.addEventListener(type, listener); listeners.push([type, listener]); };
+      listen('rewardedSlotReady', (event) => {
+        if (event.slot !== slot) return;
+        window.clearTimeout(timeout);
+        if (!event.makeRewardedVisible()) done('unavailable');
+      });
+      listen('rewardedSlotGranted', (event) => { if (event.slot === slot) granted = true; });
+      listen('rewardedSlotClosed', (event) => { if (event.slot === slot) done(granted ? 'granted' : 'closed'); });
+      listen('slotRenderEnded', (event) => { if (event.slot === slot && event.isEmpty) done('unavailable'); });
       googletag.enableServices();
       googletag.display(slot);
     });
   });
 }
-/** Stand-in for trying the flow (localhost / ?adtest=1): a 5-second countdown in the sheet. */
+/** Stand-in for trying the flow on localhost: a 5-second countdown in the sheet. */
 function showTestAd(sheet) {
   return new Promise((resolve) => {
     const box = sheet.querySelector('.px-pass-test'); box.hidden = false;
@@ -91,9 +106,8 @@ function showTestAd(sheet) {
     const timer = window.setInterval(() => { left--; box.textContent = `テスト広告 ${left}`; if (left <= 0) { window.clearInterval(timer); box.hidden = true; resolve('granted'); } }, 1000);
   });
 }
-function adMode() {
-  const test = typeof location !== 'undefined' && (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) || new URLSearchParams(location.search).has('adtest'));
-  if (test) return 'test';
+export function adMode(currentLocation = typeof location === 'undefined' ? null : location) {
+  if (currentLocation && /^(localhost|127\.0\.0\.1)$/.test(currentLocation.hostname)) return 'test';
   return passConfig?.rewardedAdUnitPath ? 'rewarded' : 'free';
 }
 

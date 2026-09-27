@@ -33,6 +33,6 @@ export const supabaseConfig = {
  * 入れると本物の広告になります。空欄の間は「準備中のため広告なし」でパスを渡します。
  */
 export const passConfig = {
-  rewardedAdUnitPath: '',
+  rewardedAdUnitPath: '/23379831154/pixieed_rewarded',
   passHours: 3
 };
