@@ -2,9 +2,9 @@ import { createFrameLoop } from '../pixel-studio/frame-loop.mjs';
 import { encodeCameraPng, pngExportGeometry } from '../pixel-studio/png-export.mjs';
 import { FRAME_RATIOS, OUTPUT_SIZES, resolveAspect, centerCrop, frameGeometry, fitFrame } from '../pixel-studio/framing.mjs?v=20260925-lens-sizes-1';
 import { cameraStartErrorMessage, deriveCameraPrimaryAction } from '../pixel-studio/camera-ui-state.mjs';
-import { CAMERA_SETTING_DEFAULTS, DITHER_PATTERNS, lensFrameFilter, lensPalette, processLensFrame, resetLensPalette, setLensSettings } from './engine.mjs?v=20260927-pixel-1';
-import { attachZoomGestures, formatZoom, splitZoom, zoomRange, zoomStops } from './zoom.mjs?v=20260927-pixel-1';
-import { GIF_FPS, GIF_MAX_MS, encodeGif, gifScale } from './gif.mjs?v=20260927-pixel-1';
+import { CAMERA_SETTING_DEFAULTS, DITHER_PATTERNS, lensFrameFilter, lensPalette, processLensFrame, resetLensPalette, setLensSettings } from './engine.mjs?v=20260927-checker-1';
+import { attachZoomGestures, formatZoom, splitZoom, zoomRange, zoomStops } from './zoom.mjs?v=20260927-checker-1';
+import { GIF_FPS, GIF_MAX_MS, encodeGif, gifScale } from './gif.mjs?v=20260927-checker-1';
 
 const $ = (selector) => document.querySelector(selector);
 const root = $('#pixelStudio');
@@ -596,7 +596,7 @@ const NO_DITHER_DEPTHS = new Set(['full', 'gray']);
 function patternSwatch(pattern) {
   const size = 16; const canvas = document.createElement('canvas'); canvas.width = size; canvas.height = size;
   const context = canvas.getContext('2d'); const image = context.createImageData(size, size);
-  const SWATCH_TONE = { net: 64, halftone: 100, checker: 128, lines: 128, chunky: 128 };
+  const SWATCH_TONE = { net: 64, halftone: 60, checker: 128, lines: 64, diagonal: 64, heart: 70, star: 80, sparkle: 92, flower: 60 };
   const bits = pattern.levels[pattern.levelForTone[SWATCH_TONE[pattern.id] ?? 90]];
   for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
     const v = bits[((y & 7) << 3) | (x & 7)] ? 245 : 40; image.data.set([v, v, v, 255], (y * size + x) * 4);

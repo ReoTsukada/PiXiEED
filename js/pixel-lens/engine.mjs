@@ -10,7 +10,7 @@
  * is reported through `onPalette` instead of being drawn into the PiXiEELENS HUD.
  */
 
-import { DITHER_PATTERNS } from './dither-patterns.mjs?v=20260927-pixel-1';
+import { DITHER_PATTERNS } from './dither-patterns.mjs?v=20260927-checker-1';
 
 const state = { colorDepth: '4', paletteMode: 'gameboy', gradientMode: 'dither', ditherPattern: 'net', surfaceSimplify: 55, cameraSettings: null };
 const paletteState = { depth: null, desired: 0, colors: [], originalColors: [], cache: new Map(), lastUpdated: 0, userEdited: false };

@@ -6,7 +6,7 @@ import { processLensFrame, setLensSettings } from '../../js/pixel-lens/engine.mj
 globalThis.ImageData ??= class { constructor(data, width, height) { this.data = data; this.width = width; this.height = height; } };
 
 test('every pattern is hand-drawn 8×8 tiles with strictly rising coverage', () => {
-  assert.deepEqual(DITHER_PATTERNS.map((p) => p.id), ['net', 'chunky', 'checker', 'halftone', 'lines', 'heart', 'star', 'sparkle', 'flower']);
+  assert.deepEqual(DITHER_PATTERNS.map((p) => p.id), ['net', 'checker', 'halftone', 'lines', 'diagonal', 'heart', 'star', 'sparkle', 'flower']);
   for (const p of DITHER_PATTERNS) {
     for (const tile of p.tiles) { assert.equal(tile.length, 8, p.id); for (const row of tile) assert.match(row, /^[#.]{8}$/, p.id); }
     for (let k = 1; k < p.coverage.length; k++) assert.ok(p.coverage[k] > p.coverage[k - 1], `${p.id} step ${k}`);
@@ -22,11 +22,23 @@ test('motifs are symmetric at every step (whole hearts, stars, sparkles, flowers
   }
 });
 
-test('chunky dots stay 2×2 blocks at every step', () => {
-  const chunky = DITHER_PATTERNS.find((p) => p.id === 'chunky');
-  for (const tile of chunky.tiles) for (let y = 0; y < 8; y += 2) for (let x = 0; x < 8; x += 2) {
-    const block = new Set([tile[y][x], tile[y][x + 1], tile[y + 1][x], tile[y + 1][x + 1]]);
-    assert.equal(block.size, 1);
+test('built on the checker: up to half, light only on checker cells; past half, dark only on the others', () => {
+  for (const p of DITHER_PATTERNS) for (const tile of p.tiles) {
+    const cover = tile.join('').split('').filter((c) => c === '#').length / 64;
+    for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) {
+      const onChecker = (x + y) % 2 === 0; const light = tile[y][x] === '#';
+      if (cover <= 0.5 && light) assert.ok(onChecker, `${p.id} light off the checker`);
+      if (cover >= 0.5 && !light) assert.ok(!onChecker, `${p.id} dark on the checker`);
+    }
+  }
+});
+
+test('網目 is the full 8×8 Bayer net (63 steps), and every pattern starts and ends on it', () => {
+  const net = DITHER_PATTERNS.find((p) => p.id === 'net');
+  assert.equal(net.tiles.length, 63);
+  for (const p of DITHER_PATTERNS.filter((q) => q.id !== 'checker')) {
+    assert.deepEqual(p.tiles[0], net.tiles[0], p.id);
+    assert.deepEqual(p.tiles.at(-1), net.tiles.at(-1), p.id);
   }
 });
 
