@@ -2,9 +2,9 @@ import { createFrameLoop } from '../pixel-studio/frame-loop.mjs';
 import { encodeCameraPng, pngExportGeometry } from '../pixel-studio/png-export.mjs';
 import { FRAME_RATIOS, OUTPUT_SIZES, resolveAspect, centerCrop, frameGeometry, fitFrame } from '../pixel-studio/framing.mjs?v=20260925-lens-sizes-1';
 import { cameraStartErrorMessage, deriveCameraPrimaryAction } from '../pixel-studio/camera-ui-state.mjs';
-import { CAMERA_SETTING_DEFAULTS, DITHER_PATTERNS, lensFrameFilter, lensPalette, processLensFrame, resetLensPalette, setLensSettings } from './engine.mjs?v=20260927-dither-1';
-import { attachZoomGestures, formatZoom, splitZoom, zoomRange, zoomStops } from './zoom.mjs?v=20260927-dither-1';
-import { GIF_FPS, GIF_MAX_MS, encodeGif, gifScale } from './gif.mjs?v=20260927-dither-1';
+import { CAMERA_SETTING_DEFAULTS, DITHER_PATTERNS, lensFrameFilter, lensPalette, processLensFrame, resetLensPalette, setLensSettings } from './engine.mjs?v=20260927-pixel-1';
+import { attachZoomGestures, formatZoom, splitZoom, zoomRange, zoomStops } from './zoom.mjs?v=20260927-pixel-1';
+import { GIF_FPS, GIF_MAX_MS, encodeGif, gifScale } from './gif.mjs?v=20260927-pixel-1';
 
 const $ = (selector) => document.querySelector(selector);
 const root = $('#pixelStudio');
@@ -40,7 +40,7 @@ let displayedPaletteRevision = null;
 
 // PiXiEELENS defaults (pixiee-lens/index.html): 4 colours, Game Boy palette, ordered dither, surface 55
 const state = { mode: 'idle', facing: 'environment', result: null, error: '', ratio: 'screen', size: 256,
-  colorDepth: '4', paletteMode: 'gameboy', gradientMode: 'dither', ditherPattern: 'fine', surfaceSimplify: 55, camera: { ...CAMERA_SETTING_DEFAULTS }, zoom: 1 };
+  colorDepth: '4', paletteMode: 'gameboy', gradientMode: 'dither', ditherPattern: 'net', surfaceSimplify: 55, camera: { ...CAMERA_SETTING_DEFAULTS }, zoom: 1 };
 let zoomInfo = zoomRange(null); let appliedHardwareZoom = 1; let zoomApplyPending = false;
 // 面のまとまり is automatic: it only calms dither speckle with 8-16 colours (measured: no change at 2-4 colours,
 // heavy posterising at high strength), so it runs at PiXiEELENS's default 55 there and is skipped elsewhere.
@@ -592,12 +592,14 @@ function stepLook(delta) {
 }
 // Dither patterns: small swatches drawn from the real threshold tiles, shown only while dither is on.
 const NO_DITHER_DEPTHS = new Set(['full', 'gray']);
-function patternSwatch(tile) {
+// A swatch is one characteristic step of the pattern, drawn 1:1 (16×16 = four tiles) and shown pixelated.
+function patternSwatch(pattern) {
   const size = 16; const canvas = document.createElement('canvas'); canvas.width = size; canvas.height = size;
   const context = canvas.getContext('2d'); const image = context.createImageData(size, size);
+  const SWATCH_TONE = { net: 64, halftone: 100, checker: 128, lines: 128, chunky: 128 };
+  const bits = pattern.levels[pattern.levelForTone[SWATCH_TONE[pattern.id] ?? 90]];
   for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
-    const on = (x + 0.5) / size > tile.t[(y % tile.h) * tile.w + (x % tile.w)];
-    const i = (y * size + x) * 4; const v = on ? 245 : 40; image.data.set([v, v, v, 255], i);
+    const v = bits[((y & 7) << 3) | (x & 7)] ? 245 : 40; image.data.set([v, v, v, 255], (y * size + x) * 4);
   }
   context.putImageData(image, 0, 0);
   return canvas.toDataURL();
@@ -606,7 +608,8 @@ for (const pattern of DITHER_PATTERNS) {
   const button = document.createElement('button');
   button.type = 'button'; button.setAttribute('role', 'radio'); button.dataset.pattern = pattern.id;
   button.setAttribute('aria-label', `ディザ：${pattern.label}`); button.title = pattern.label;
-  button.style.setProperty('--swatch', `url(${patternSwatch(pattern.tile)})`);
+  button.style.setProperty('--swatch', `url(${patternSwatch(pattern)})`);
+  if (pattern.group === 'cute' && !$('#ditherKinds .lc-kinds-gap')) { const gap = document.createElement('i'); gap.className = 'lc-kinds-gap'; gap.setAttribute('aria-hidden', 'true'); $('#ditherKinds').appendChild(gap); }
   $('#ditherKinds').appendChild(button);
 }
 $('#ditherKinds').addEventListener('click', (event) => {

@@ -10,7 +10,9 @@
  * is reported through `onPalette` instead of being drawn into the PiXiEELENS HUD.
  */
 
-const state = { colorDepth: '4', paletteMode: 'gameboy', gradientMode: 'dither', ditherPattern: 'fine', surfaceSimplify: 55, cameraSettings: null };
+import { DITHER_PATTERNS } from './dither-patterns.mjs?v=20260927-pixel-1';
+
+const state = { colorDepth: '4', paletteMode: 'gameboy', gradientMode: 'dither', ditherPattern: 'net', surfaceSimplify: 55, cameraSettings: null };
 const paletteState = { depth: null, desired: 0, colors: [], originalColors: [], cache: new Map(), lastUpdated: 0, userEdited: false };
 let paletteDisplayEnabled = false;
 let paletteListener = null;
@@ -67,37 +69,50 @@ const DOT_SMOOTHING_BLUR = 0.45;
 
 const FIXED_8BIT_LEVELS = Object.freeze({ r: 8, g: 8, b: 4 });
 
-// ---- Dither patterns ----------------------------------------------------------------------------------
-// Every pattern is a tile of thresholds t in (0, 1). A pixel is shifted by (t - 0.5) × spread before the
-// nearest colour is picked, where spread is the average step between neighbouring colours. That makes the
-// pattern span the whole way from one colour to the next (PiXiEELENS used a fixed ±15, so only the pixels
-// right at a colour boundary were dithered).
-function bayerTile(n) {
-  let m = [[0]];
-  while (m.length < n) {
-    const k = m.length; const next = Array.from({ length: k * 2 }, () => new Array(k * 2));
-    for (let y = 0; y < k; y++) for (let x = 0; x < k; x++) {
-      const v = m[y][x] * 4;
-      next[y][x] = v; next[y][x + k] = v + 2; next[y + k][x] = v + 3; next[y + k][x + k] = v + 1;
-    }
-    m = next;
-  }
-  return { w: n, h: n, t: Float32Array.from(m.flat(), (v) => (v + 0.5) / (n * n)) };
+// ---- Dither -----------------------------------------------------------------------------------------
+// Hand-made patterns (dither-patterns.mjs). Each pixel is written as a mix of the two palette colours that
+// best explain it; the share of the lighter one picks the pattern step. Strong edges are not dithered, so
+// outlines stay crisp, and motif patterns decide their step per 8×8 cell so every heart or star is whole.
+const EDGE_SOLID = 0.45;          // edge strength above which a pixel takes the nearer colour outright
+const MIX_PENALTY = 0.3;          // discourages mixing two far-apart colours when a closer one will do
+function currentDitherPattern() { return DITHER_PATTERNS.find((p) => p.id === state.ditherPattern) ?? DITHER_PATTERNS[0]; }
+const scratch = { size: 0, pair: null, tone: null, solid: null };
+function ensureScratch(n) {
+  if (scratch.size >= n) return scratch;
+  scratch.size = n; scratch.pair = new Uint16Array(n); scratch.tone = new Uint8Array(n); scratch.solid = new Uint8Array(n);
+  return scratch;
 }
-const tileOf = (w, h, values, levels) => ({ w, h, t: Float32Array.from(values, (v) => (v + 0.5) / levels) });
-export const DITHER_PATTERNS = Object.freeze([
-  Object.freeze({ id: 'fine', label: '網目', tile: bayerTile(8) }),
-  Object.freeze({ id: 'coarse', label: '粗い網目', tile: bayerTile(2) }),
-  // hand-placed look: flat colour, and a checkerboard only through the middle of each step
-  Object.freeze({ id: 'checker', label: '市松', tile: { w: 2, h: 2, t: Float32Array.of(0.25, 0.75, 0.75, 0.25) } }),
-  Object.freeze({ id: 'halftone', label: '網点', tile: tileOf(4, 4, [12, 5, 6, 13, 4, 0, 1, 7, 11, 3, 2, 8, 15, 10, 9, 14], 16) }),
-  Object.freeze({ id: 'lines', label: '横線', tile: tileOf(1, 4, [0, 2, 1, 3], 4) })
-]);
-function currentDitherTile() { return (DITHER_PATTERNS.find((p) => p.id === state.ditherPattern) ?? DITHER_PATTERNS[0]).tile; }
-function paletteSpread(palette) {
-  let lo = 255; let hi = 0;
-  for (const c of palette) { const l = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b; if (l < lo) lo = l; if (l > hi) hi = l; }
-  return Math.max(16, Math.min(255, (hi - lo) / Math.max(1, palette.length - 1)));
+function removeStrayEdgePixels(data, width, height, solid) {
+  for (let y = 1; y < height - 1; y++) for (let x = 1; x < width - 1; x++) {
+    const p = y * width + x; if (!solid[p]) continue;
+    const i = p * 4; const key = (data[i] << 16) | (data[i + 1] << 8) | data[i + 2];
+    const n = [i - 4, i + 4, i - width * 4, i + width * 4];
+    let alone = true;
+    for (const j of n) if (((data[j] << 16) | (data[j + 1] << 8) | data[j + 2]) === key) { alone = false; break; }
+    if (!alone) continue;
+    let best = n[0]; let bestCount = 0;
+    for (const j of n) { const kj = (data[j] << 16) | (data[j + 1] << 8) | data[j + 2]; let c = 0; for (const m of n) if (((data[m] << 16) | (data[m + 1] << 8) | data[m + 2]) === kj) c++; if (c > bestCount) { bestCount = c; best = j; } }
+    if (bestCount >= 2) { data[i] = data[best]; data[i + 1] = data[best + 1]; data[i + 2] = data[best + 2]; }
+  }
+}
+const cellKeys = new Int32Array(64); const cellCounts = new Int32Array(64); const cellSums = new Int32Array(64);
+/** For cell-based patterns: replace each pixel's tone with its cell's average (over pixels mixing the same pair). */
+function averageToneByCell(width, height, cell, pair, tone, solid) {
+  for (let cy = 0; cy < height; cy += cell) for (let cx = 0; cx < width; cx += cell) {
+    let distinct = 0;
+    const yEnd = Math.min(height, cy + cell); const xEnd = Math.min(width, cx + cell);
+    for (let y = cy; y < yEnd; y++) for (let x = cx; x < xEnd; x++) {
+      const p = y * width + x; if (solid[p]) continue;
+      let k = 0; while (k < distinct && cellKeys[k] !== pair[p]) k++;
+      if (k === distinct) { cellKeys[k] = pair[p]; cellCounts[k] = 0; cellSums[k] = 0; distinct++; }
+      cellCounts[k]++; cellSums[k] += tone[p];
+    }
+    for (let y = cy; y < yEnd; y++) for (let x = cx; x < xEnd; x++) {
+      const p = y * width + x; if (solid[p]) continue;
+      let k = 0; while (cellKeys[k] !== pair[p]) k++;
+      tone[p] = Math.round(cellSums[k] / cellCounts[k]);
+    }
+  }
 }
 
 const CAMERA_SETTING_CONFIG = Object.freeze({
@@ -749,34 +764,44 @@ function shouldRebuildPalette(depth, desired) {
   return now - paletteState.lastUpdated >= PALETTE_HOLD_MS;
 }
 
-function applyFixed8Bit(imageData) {
+function applyFixed8Bit(imageData, edgeMap) {
   if (!imageData || !imageData.data) {
     return;
   }
-  const data = imageData.data;
-  const width = imageData.width || 0;
+  const { data, width, height } = imageData;
   const useDither = state.gradientMode === 'dither' && width > 0;
-  const tile = currentDitherTile();
-  const rLevels = FIXED_8BIT_LEVELS.r;
-  const rSpread = 255 / (FIXED_8BIT_LEVELS.r - 1); const gSpread = 255 / (FIXED_8BIT_LEVELS.g - 1); const bSpread = 255 / (FIXED_8BIT_LEVELS.b - 1);
-  const gLevels = FIXED_8BIT_LEVELS.g;
-  const bLevels = FIXED_8BIT_LEVELS.b;
-  for (let i = 0; i < data.length; i += 4) {
-    let r = data[i];
-    let g = data[i + 1];
-    let b = data[i + 2];
-    if (useDither) {
-      const pixelIndex = i >> 2;
-      const x = pixelIndex % width;
-      const y = (pixelIndex / width) | 0;
-      const t = tile.t[(y % tile.h) * tile.w + (x % tile.w)] - 0.5;
-      r = clampByte(r + t * rSpread);
-      g = clampByte(g + t * gSpread);
-      b = clampByte(b + t * bSpread);
+  const levels = [FIXED_8BIT_LEVELS.r, FIXED_8BIT_LEVELS.g, FIXED_8BIT_LEVELS.b];
+  if (!useDither) {
+    for (let i = 0; i < data.length; i += 4) for (let c = 0; c < 3; c++) data[i + c] = quantizeChannelToLevels(data[i + c], levels[c]);
+    return;
+  }
+  const pattern = currentDitherPattern();
+  // per-pixel patterns dither each channel on its own; block and motif patterns share one step per pixel
+  // (from the brightness-weighted share) so a heart is the same heart in red, green and blue
+  const shared = pattern.cell > 1;
+  const n = width * height; const { tone, solid, pair } = ensureScratch(n);
+  const lo = new Uint8Array(3); const frac = new Float32Array(3);
+  if (shared) {
+    for (let p = 0; p < n; p++) {
+      const i = p * 4; let f = 0;
+      for (let c = 0; c < 3; c++) { const step = 255 / (levels[c] - 1); const v = data[i + c] / step; f += (v - Math.floor(v)) * (c === 0 ? 0.3 : c === 1 ? 0.59 : 0.11); }
+      tone[p] = Math.round(f * 255); solid[p] = edgeMap && edgeMap[p] > EDGE_SOLID ? 1 : 0; pair[p] = 0;
     }
-    data[i] = quantizeChannelToLevels(r, rLevels);
-    data[i + 1] = quantizeChannelToLevels(g, gLevels);
-    data[i + 2] = quantizeChannelToLevels(b, bLevels);
+    averageToneByCell(width, height, pattern.cell, pair, tone, solid);
+  }
+  for (let p = 0; p < n; p++) {
+    const i = p * 4; const x = p % width; const y = (p / width) | 0; const bitIndex = ((y & 7) << 3) | (x & 7);
+    const edge = edgeMap && edgeMap[p] > EDGE_SOLID;
+    for (let c = 0; c < 3; c++) { const step = 255 / (levels[c] - 1); const v = data[i + c] / step; lo[c] = Math.floor(v); frac[c] = v - lo[c]; }
+    for (let c = 0; c < 3; c++) {
+      let up;
+      if (edge) up = frac[c] >= 0.5;
+      else {
+        const t = shared ? tone[p] : Math.round(frac[c] * 255);
+        up = pattern.levels[pattern.levelForTone[t]][bitIndex] === 1;
+      }
+      data[i + c] = clampByte(Math.round((lo[c] + (up ? 1 : 0)) * (255 / (levels[c] - 1))));
+    }
   }
 }
 
@@ -870,7 +895,7 @@ function applyColorDepth(imageData) {
     return;
   }
   if (depth === '256') {
-    applyFixed8Bit(imageData);
+    applyFixed8Bit(imageData, edgeMap);
     clearPaletteState();
     return;
   }
@@ -982,63 +1007,82 @@ function applyColorDepth(imageData) {
   if (!palette || !palette.length) {
     return;
   }
-  const data = imageData.data;
-  const width = imageData.width || 0;
+  const { data, width, height } = imageData;
   const useDither = state.gradientMode === 'dither' && width > 0;
-  const tile = currentDitherTile();
-  const spread = paletteSpread(palette);
-  // nearest-colour cache at 6 bits per channel (the old 4-bit bins were coarser than the dither steps)
-  if (!paletteState.fastCache || paletteState.fastCachePalette !== palette) {
-    paletteState.fastCache = new Uint8Array(1 << 18);
-    paletteState.fastCachePalette = palette;
+  // colours a pixel can take: the palette, plus the black and white PiXiEELENS forces at the extremes
+  const colors = [...palette, BLACK_COLOR, WHITE_COLOR];
+  const BLACK = palette.length; const WHITE = palette.length + 1;
+  const lum = colors.map((c) => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b);
+  // per colour (6 bits a channel): which two colours to mix and how much of the lighter one
+  const cacheId = `${useDither ? 'mix' : 'near'}`;
+  if (!paletteState.mixCache || paletteState.mixCachePalette !== palette || paletteState.mixCacheId !== cacheId) {
+    paletteState.mixCache = new Uint16Array(1 << 18);
+    paletteState.mixTone = new Uint8Array(1 << 18);
+    paletteState.mixCachePalette = palette; paletteState.mixCacheId = cacheId;
   }
-  const fast = paletteState.fastCache;
-  const FORCED_BLACK = 254; const FORCED_WHITE = 255;
+  const mixCache = paletteState.mixCache; const mixTone = paletteState.mixTone;
+  const encode = (a, b) => ((a << 5) | b) + 1;
 
-  const findNearestCode = (r, g, b) => {
+  const classify = (r, g, b, key) => {
     const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-    if (!useSourcePalette) {
-      if (depth !== '4' && luminance < 48) return FORCED_BLACK;
-      if (depth !== '4' && luminance > 224) return FORCED_WHITE;
-      if (depth === '4' && luminance < FOUR_COLOR_DARK_THRESHOLD) return palette.length; // darkest
+    let a = -1;
+    // PiXiEELENS's hard black / white / darkest rules; with dither on the pattern carries those tones instead
+    if (!useSourcePalette && !useDither) {
+      if (depth !== '4' && luminance < 48) a = BLACK;
+      else if (depth !== '4' && luminance > 224) a = WHITE;
+      else if (depth === '4' && luminance < FOUR_COLOR_DARK_THRESHOLD) a = palette.length - 1;
     }
-    let bestIndex = 0;
-    let bestDistance = Number.POSITIVE_INFINITY;
-    for (let i = 0; i < palette.length; i += 1) {
-      const color = palette[i];
-      const dr = r - color.r;
-      const dg = g - color.g;
-      const db = b - color.b;
-      const dist = dr * dr + dg * dg + db * db;
-      if (dist < bestDistance) {
-        bestDistance = dist;
-        bestIndex = i;
+    if (a < 0) {
+      let best = Infinity;
+      for (let k = 0; k < palette.length; k++) { const c = palette[k]; const d = (r - c.r) ** 2 + (g - c.g) ** 2 + (b - c.b) ** 2; if (d < best) { best = d; a = k; } }
+      if (useDither) {
+        let bestPair = -1; let bestTone = 0; let bestErr = best;
+        for (let m = 0; m < palette.length; m++) for (let k = m + 1; k < palette.length; k++) {
+          const p0 = palette[m]; const p1 = palette[k];
+          const vr = p1.r - p0.r; const vg = p1.g - p0.g; const vb = p1.b - p0.b; const len2 = vr * vr + vg * vg + vb * vb;
+          if (!len2) continue;
+          const f = Math.max(0, Math.min(1, ((r - p0.r) * vr + (g - p0.g) * vg + (b - p0.b) * vb) / len2));
+          const er = r - (p0.r + vr * f); const eg = g - (p0.g + vg * f); const eb = b - (p0.b + vb * f);
+          const err = er * er + eg * eg + eb * eb + MIX_PENALTY * f * (1 - f) * len2;
+          if (err < bestErr) { bestErr = err; bestPair = (m << 8) | k; bestTone = f; }
+        }
+        if (bestPair >= 0) {
+          let dark = bestPair >> 8; let light = bestPair & 255; let f = bestTone;
+          if (lum[dark] > lum[light]) { const t = dark; dark = light; light = t; f = 1 - f; }
+          mixCache[key] = encode(dark, light); mixTone[key] = Math.round(f * 255);
+          return;
+        }
       }
     }
-    return bestIndex + 1;
+    mixCache[key] = encode(a, a); mixTone[key] = 0;
   };
 
-  for (let i = 0; i < data.length; i += 4) {
-    let r = data[i];
-    let g = data[i + 1];
-    let b = data[i + 2];
-    if (useDither) {
-      const pixelIndex = i >> 2;
-      const x = pixelIndex % width;
-      const y = (pixelIndex / width) | 0;
-      const offset = (tile.t[(y % tile.h) * tile.w + (x % tile.w)] - 0.5) * spread;
-      r = clampByte(r + offset);
-      g = clampByte(g + offset);
-      b = clampByte(b + offset);
-    }
-    const key = ((r >> 2) << 12) | ((g >> 2) << 6) | (b >> 2);
-    let code = fast[key];
-    if (!code) { code = findNearestCode((r & 252) | 2, (g & 252) | 2, (b & 252) | 2); fast[key] = code; }
-    const nearest = code === FORCED_BLACK ? BLACK_COLOR : code === FORCED_WHITE ? WHITE_COLOR : palette[code - 1];
-    data[i] = nearest.r;
-    data[i + 1] = nearest.g;
-    data[i + 2] = nearest.b;
+  const n = width * height; const { pair, tone, solid } = ensureScratch(n);
+  for (let p = 0, i = 0; p < n; p++, i += 4) {
+    const key = ((data[i] >> 2) << 12) | ((data[i + 1] >> 2) << 6) | (data[i + 2] >> 2);
+    if (!mixCache[key]) classify((data[i] & 252) | 2, (data[i + 1] & 252) | 2, (data[i + 2] & 252) | 2, key);
+    pair[p] = mixCache[key]; tone[p] = mixTone[key];
+    // outlines stay crisp: a strong edge takes the nearer of its two colours, no pattern
+    solid[p] = useDither && edgeMap[p] > EDGE_SOLID ? 1 : 0;
   }
+  const pattern = currentDitherPattern();
+  if (useDither && pattern.cell > 1) averageToneByCell(width, height, pattern.cell, pair, tone, solid);
+  for (let p = 0, i = 0; p < n; p++, i += 4) {
+    const code = pair[p] - 1; const dark = code >> 5; const light = code & 31;
+    let pick = dark;
+    if (dark !== light) {
+      if (!useDither || solid[p]) pick = tone[p] >= 128 ? light : dark;
+      else {
+        const x = p % width; const y = (p / width) | 0;
+        pick = pattern.levels[pattern.levelForTone[tone[p]]][((y & 7) << 3) | (x & 7)] ? light : dark;
+      }
+    }
+    const color = colors[pick];
+    data[i] = color.r; data[i + 1] = color.g; data[i + 2] = color.b;
+  }
+  // Edge pixels were placed without a pattern; one that ended up alone (unlike all four neighbours) is a
+  // stray fleck, not detail, so it takes the colour most of its neighbours have.
+  if (useDither) removeStrayEdgePixels(data, width, height, solid);
   // 面のまとまり is a majority filter: it would erase the dither pattern, so it only tidies flat colour
   if (useDither) return;
   applySurfaceSimplify(imageData, edgeMap, palette);
@@ -1047,6 +1091,7 @@ function applyColorDepth(imageData) {
 
 state.cameraSettings = { ...CAMERA_SETTING_DEFAULTS };
 
+export { DITHER_PATTERNS };
 export { CAMERA_SETTING_CONFIG, CAMERA_SETTING_DEFAULTS, DOT_SMOOTHING_BLUR, FIXED_FOUR_COLOR_PALETTE };
 
 /** Update PiXiEELENS settings: colorDepth ('2'|'4'|'8'|'16'|'gray'|'256'|'full'), paletteMode ('gameboy'|'source'),

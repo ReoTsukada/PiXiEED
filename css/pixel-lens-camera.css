@@ -225,3 +225,7 @@ button, a { font: inherit; }
 .lc-dither-kinds button:active { transform: scale(.9); }
 .lc-dither-kinds button[aria-checked="true"] { border-color: #fff; box-shadow: 0 0 0 2px var(--lc-accent); }
 .lc[data-mode="captured"] .lc-dither-kinds, .lc[data-recording="true"] .lc-dither-kinds { display: none; }
+.lc-dither-kinds { max-width: calc(100vw - 1.6rem); overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity; }
+.lc-dither-kinds::-webkit-scrollbar { display: none; }
+.lc-dither-kinds button { flex: 0 0 auto; scroll-snap-align: center; }
+.lc-kinds-gap { flex: 0 0 1px; align-self: stretch; margin: .35rem .1rem; background: var(--lc-line); }
