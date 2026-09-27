@@ -218,14 +218,18 @@ button, a { font: inherit; }
 .lc-hint b { display: grid; place-items: center; width: 1.6rem; height: 1.6rem; border-radius: 50%; background: rgba(255,255,255,.14); font-size: .9rem; }
 @media (prefers-reduced-motion: reduce) { .lc-frame.lc-flip { animation: none; } .lc-rec i { animation: none; } }
 
-/* Dither pattern swatches: appear only while dither is on */
-.lc-dither-kinds { display: flex; gap: .4rem; padding: .3rem; border-radius: 999px; background: var(--lc-glass); border: 1px solid var(--lc-line); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); animation: lc-in .22s var(--lc-ease); }
+/* Dither patterns: a vertical strip on the right edge, shown only while dither is on */
+.lc-dither-kinds { position: absolute; right: calc(env(safe-area-inset-right, 0px) + .6rem); top: 50%; translate: 0 -58%; z-index: 6;
+  display: flex; flex-direction: column; gap: .45rem; padding: .4rem; max-height: calc(100% - var(--lc-safe-t) - var(--lc-safe-b) - var(--lc-nav-h) - 13rem);
+  overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; scroll-snap-type: y proximity;
+  border-radius: 999px; background: var(--lc-glass); border: 1px solid var(--lc-line); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  animation: lc-side-in .24s var(--lc-ease); }
+.lc-dither-kinds::-webkit-scrollbar { display: none; }
 .lc-dither-kinds[hidden] { display: none; }
-.lc-dither-kinds button { width: 2.1rem; height: 2.1rem; padding: 0; border-radius: 50%; border: 2px solid transparent; background: var(--swatch) center / 100% 100% no-repeat; image-rendering: pixelated; cursor: pointer; transition: transform .15s var(--lc-ease), border-color .2s; }
+.lc-dither-kinds button { flex: 0 0 auto; width: 2.5rem; height: 2.5rem; padding: 0; border-radius: 50%; border: 2px solid transparent; background: var(--swatch) center / 100% 100% no-repeat; image-rendering: pixelated; cursor: pointer; scroll-snap-align: center; transition: transform .15s var(--lc-ease), border-color .2s; }
 .lc-dither-kinds button:active { transform: scale(.9); }
 .lc-dither-kinds button[aria-checked="true"] { border-color: #fff; box-shadow: 0 0 0 2px var(--lc-accent); }
+.lc-kinds-gap { flex: 0 0 1px; align-self: stretch; margin: .05rem .35rem; background: var(--lc-line); }
 .lc[data-mode="captured"] .lc-dither-kinds, .lc[data-recording="true"] .lc-dither-kinds { display: none; }
-.lc-dither-kinds { max-width: calc(100vw - 1.6rem); overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity; }
-.lc-dither-kinds::-webkit-scrollbar { display: none; }
-.lc-dither-kinds button { flex: 0 0 auto; scroll-snap-align: center; }
-.lc-kinds-gap { flex: 0 0 1px; align-self: stretch; margin: .35rem .1rem; background: var(--lc-line); }
+@keyframes lc-side-in { from { opacity: 0; transform: translateX(1.2rem); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .lc-dither-kinds { animation: none; } }

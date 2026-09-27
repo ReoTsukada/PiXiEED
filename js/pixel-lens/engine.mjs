@@ -10,7 +10,7 @@
  * is reported through `onPalette` instead of being drawn into the PiXiEELENS HUD.
  */
 
-import { DITHER_PATTERNS } from './dither-patterns.mjs?v=20260927-checker-1';
+import { DITHER_PATTERNS } from './dither-patterns.mjs?v=20260927-motif16-1';
 
 const state = { colorDepth: '4', paletteMode: 'gameboy', gradientMode: 'dither', ditherPattern: 'net', surfaceSimplify: 55, cameraSettings: null };
 const paletteState = { depth: null, desired: 0, colors: [], originalColors: [], cache: new Map(), lastUpdated: 0, userEdited: false };
@@ -73,6 +73,7 @@ const FIXED_8BIT_LEVELS = Object.freeze({ r: 8, g: 8, b: 4 });
 // Hand-made patterns (dither-patterns.mjs). Each pixel is written as a mix of the two palette colours that
 // best explain it; the share of the lighter one picks the pattern step. Strong edges are not dithered, so
 // outlines stay crisp, and motif patterns decide their step per 8×8 cell so every heart or star is whole.
+// (cell sizes up to 16×16)
 const EDGE_SOLID = 0.45;          // edge strength above which a pixel takes the nearer colour outright
 const MIX_PENALTY = 0.3;          // discourages mixing two far-apart colours when a closer one will do
 function currentDitherPattern() { return DITHER_PATTERNS.find((p) => p.id === state.ditherPattern) ?? DITHER_PATTERNS[0]; }
@@ -95,7 +96,7 @@ function removeStrayEdgePixels(data, width, height, solid) {
     if (bestCount >= 2) { data[i] = data[best]; data[i + 1] = data[best + 1]; data[i + 2] = data[best + 2]; }
   }
 }
-const cellKeys = new Int32Array(64); const cellCounts = new Int32Array(64); const cellSums = new Int32Array(64);
+const cellKeys = new Int32Array(256); const cellCounts = new Int32Array(256); const cellSums = new Int32Array(256);
 /** For cell-based patterns: replace each pixel's tone with its cell's average (over pixels mixing the same pair). */
 function averageToneByCell(width, height, cell, pair, tone, solid) {
   for (let cy = 0; cy < height; cy += cell) for (let cx = 0; cx < width; cx += cell) {
@@ -790,7 +791,7 @@ function applyFixed8Bit(imageData, edgeMap) {
     averageToneByCell(width, height, pattern.cell, pair, tone, solid);
   }
   for (let p = 0; p < n; p++) {
-    const i = p * 4; const x = p % width; const y = (p / width) | 0; const bitIndex = ((y & 7) << 3) | (x & 7);
+    const i = p * 4; const x = p % width; const y = (p / width) | 0; const bitIndex = ((y & pattern.mask) << pattern.shift) | (x & pattern.mask);
     const edge = edgeMap && edgeMap[p] > EDGE_SOLID;
     for (let c = 0; c < 3; c++) { const step = 255 / (levels[c] - 1); const v = data[i + c] / step; lo[c] = Math.floor(v); frac[c] = v - lo[c]; }
     for (let c = 0; c < 3; c++) {
@@ -1074,7 +1075,7 @@ function applyColorDepth(imageData) {
       if (!useDither || solid[p]) pick = tone[p] >= 128 ? light : dark;
       else {
         const x = p % width; const y = (p / width) | 0;
-        pick = pattern.levels[pattern.levelForTone[tone[p]]][((y & 7) << 3) | (x & 7)] ? light : dark;
+        pick = pattern.levels[pattern.levelForTone[tone[p]]][((y & pattern.mask) << pattern.shift) | (x & pattern.mask)] ? light : dark;
       }
     }
     const color = colors[pick];
