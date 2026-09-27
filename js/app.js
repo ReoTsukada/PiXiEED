@@ -4064,8 +4064,9 @@ function renderPublicShell() {
   const header = document.querySelector('.site-header');
   if (!header) return;
   const headerInner = header.querySelector('.header-inner') || header;
-  const brand = headerInner.querySelector('.brand')?.outerHTML || '<a class="brand" href="/" aria-label="PiXiEED ホーム"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a>';
+  const brand = headerInner.querySelector('.brand')?.outerHTML || '<a class="brand" href="/home/" aria-label="PiXiEED ホーム"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a>';
   headerInner.innerHTML = `${brand}<button class="menu-toggle" type="button" data-menu-toggle aria-expanded="false" aria-controls="site-menu" aria-label="メニューを開く"><span class="menu-toggle__lines" aria-hidden="true"><i></i><i></i><i></i></span></button>`;
+  const brandLink = headerInner.querySelector('.brand'); if (brandLink) { brandLink.setAttribute('href', '/home/'); brandLink.setAttribute('aria-label', 'PiXiEED ホーム'); }
 
   let tabs = document.querySelector('.mobile-nav');
   if (!tabs) {
@@ -4077,16 +4078,13 @@ function renderPublicShell() {
   const page = document.body.dataset.page || 'home';
   const actions = {
     map: '<button type="button" data-page-action="post" aria-label="ドット絵を投稿する"><img src="/assets/icons/pixieed/add.svg" alt=""></button>',
-    home: '<a href="/works/" aria-label="作品を見る"><img src="/assets/icons/pixieed/artwork.svg" alt=""></a>',
     works: '<a href="/collection/" aria-label="集めた作品を見る"><img src="/assets/icons/pixieed/artwork.svg" alt=""></a>',
-    collection: '<a href="/works/" aria-label="作品を探す"><img src="/assets/icons/pixieed/artwork.svg" alt=""></a>',
-    tools: '<a href="/pixel-camera.html" aria-label="ドット絵カメラを開く"><img src="/assets/icons/pixieed/camera.svg" alt=""></a>',
     stores: '<a href="/shops/" aria-label="お店として参加する"><img src="/assets/icons/pixieed/add.svg" alt=""></a>',
     shops: '<a href="#flow" aria-label="参加の流れを見る"><img src="/assets/icons/pixieed/forward.svg" alt=""></a>',
     profile: '<a href="/profile/?view=posts" aria-label="投稿した絵を見る"><img src="/assets/icons/pixieed/artwork.svg" alt=""></a>'
   };
   const contextAction = actions[page] || '<a href="/?post=1" aria-label="ドット絵を投稿する"><img src="/assets/icons/pixieed/add.svg" alt=""></a>';
-  tabs.innerHTML = `<a data-nav="home" href="/home/" aria-label="ホーム"><img src="/assets/icons/pixieed/home.svg" alt=""></a><a data-nav="map" href="/" aria-label="地図"><img src="/assets/icons/pixieed/globe.svg" alt=""></a>${contextAction}<a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""></a><a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>`;
+  tabs.innerHTML = `<a data-nav="map" href="/" aria-label="地球儀"><img src="/assets/icons/pixieed/globe.svg" alt=""></a><a data-nav="camera" href="/pixel-camera.html" aria-label="撮影"><img src="/assets/icons/pixieed/shoot.svg" alt=""></a>${contextAction}<a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""></a><a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>`;
   const openGlobeComposer = () => {
     const globe = document.querySelector('.map-hero__globe-frame');
     if (!globe) return;
@@ -4233,6 +4231,8 @@ function setActiveNav() {
       ? path.startsWith('/home/')
       : target === 'map'
         ? path === '/' || path === '/index.html'
+        : target === 'camera'
+          ? path.includes('pixel-camera')
         : target === 'tools'
           ? path.includes('/tools/')
           : target === 'profile' && path.includes('/profile/');
