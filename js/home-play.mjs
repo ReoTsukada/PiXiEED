@@ -68,10 +68,24 @@ const WORD_COLORS = [C.red, C.yellow, C.sky, C.yellow, C.green, C.pink, C.orange
 // Hero
 // =========================================================================================================
 function hero() {
+  // Three simple plays on one canvas:
+  //  ・なぞる  — draw dots; when you let go they crumble into sand that piles up at the bottom
+  //  ・文字をたたく — the letters of PiXiEED burst, bounce on the floor and fly back home
+  //  ・星をつかまえる — tap a twinkling star to catch it (a counter keeps score)
+  // Every action makes a small sound, all on one pentatonic scale so it always sounds right.
   const stage = document.getElementById('hpStage'); const canvas = document.getElementById('hpCanvas');
   const hint = document.getElementById('hpHint');
+  // (older markup has neither the score nor the new hint: supply them)
+  let score = document.getElementById('hpScore');
+  if (!score) { score = document.createElement('output'); score.className = 'hp-score'; score.id = 'hpScore'; score.hidden = true; stage.appendChild(score); }
+  hint.innerHTML = '<span aria-hidden="true">☝</span> なぞる・文字をたたく・星をつかまえる';
   const colors = [C.red, C.yellow, C.green, C.sky, C.blue, C.pink, C.white];
-  let color = 0; let W = 48; let H = 30; let g = null; let paint = new Map(); let letters = []; let stars = [];
+  let color = 0; let W = 48; let H = 30; let g = null; let F = 30; // F: the floor row (just above the colour bar)
+  let ink = new Map();            // dots being drawn right now (key -> {x,y,color,born})
+  let sand = null;                // settled / falling sand: colour index + 1 per cell, 0 = empty
+  let dots = [];                  // letter dots with physics
+  let stars = []; let caught = 0; let bursts = [];
+  let drawing = false; let last = null; let downAt = null;
   const colorBox = document.getElementById('hpColors');
   colors.forEach((c, i) => {
     const b = document.createElement('button'); b.type = 'button'; b.setAttribute('role', 'radio'); b.style.setProperty('--c', c);
@@ -81,69 +95,164 @@ function hero() {
   const syncColors = () => [...colorBox.children].forEach((b, i) => b.setAttribute('aria-checked', String(i === color)));
   syncColors();
 
+  const newStar = () => ({ x: 1 + Math.random() * (W - 2) | 0, y: 1 + Math.random() * (H * 0.55) | 0, p: Math.random() * 6.28, s: 0.6 + Math.random() * 1.4, big: Math.random() < 0.18 });
   function layout() {
     const r = stage.getBoundingClientRect();
     const cell = r.width < 520 ? 9 : r.width < 900 ? 12 : 14;
     W = Math.max(24, Math.round(r.width / cell)); H = Math.max(18, Math.round(r.height / cell));
     g = pixelCanvas(canvas, W, H);
-    // the word, centred in the upper part, each dot falling in from above
+    sand = new Uint8Array(W * H);
+    const bar = document.querySelector('.hp-tools').getBoundingClientRect();
+    F = Math.max(8, Math.min(H, Math.floor((bar.top - r.top - 6) / (r.height / H))));
     const wordWidth = WORD.reduce((s, ch) => s + FONT[ch][0].length + 1, -1);
     const scale = W >= 60 ? 2 : 1;
     let x0 = Math.floor((W - wordWidth * scale) / 2); const y0 = Math.floor(H * 0.2);
-    letters = [];
+    dots = [];
     WORD.forEach((ch, li) => {
       FONT[ch].forEach((row, j) => [...row].forEach((c, i) => {
         if (c !== '#') return;
-        for (let sy = 0; sy < scale; sy++) for (let sx = 0; sx < scale; sx++) letters.push({ li, x: x0 + i * scale + sx, y: y0 + j * scale + sy, color: WORD_COLORS[li], delay: li * 90 + Math.random() * 260, from: -2 - Math.random() * 12 });
+        for (let sy = 0; sy < scale; sy++) for (let sx = 0; sx < scale; sx++) {
+          const hx = x0 + i * scale + sx; const hy = y0 + j * scale + sy;
+          dots.push({ li, hx, hy, x: hx, y: -2 - Math.random() * 12, vx: 0, vy: 0, color: WORD_COLORS[li], delay: li * 90 + Math.random() * 260, state: 'intro', until: 0 });
+        }
       }));
       x0 += (FONT[ch][0].length + 1) * scale;
     });
-    stars = Array.from({ length: Math.round(W * H / 40) }, () => ({ x: Math.random() * W | 0, y: Math.random() * H | 0, p: Math.random() * 6.28, s: 0.5 + Math.random() * 1.5 }));
-    paint = new Map();
+    stars = Array.from({ length: Math.max(8, Math.round(W * H / 70)) }, newStar);
   }
-  let start = performance.now();
+  const isSolid = (x, y) => y >= F || (x >= 0 && x < W && y >= 0 && sand[y * W + x] > 0);
+
+  // ---- letters: tap bursts a letter, dots bounce, then fly home ----
+  function burstLetter(li, fromX, fromY) {
+    let any = false;
+    for (const d of dots) {
+      if (d.li !== li || d.state === 'free') continue;
+      any = true; d.state = 'free'; d.until = performance.now() + 2600 + Math.random() * 500;
+      const ang = Math.atan2(d.y - fromY, d.x - fromX) + (Math.random() - 0.5) * 0.9; const sp = 14 + Math.random() * 16;
+      d.vx = Math.cos(ang) * sp; d.vy = Math.sin(ang) * sp - 14;
+    }
+    if (any) { note(li + 6, { length: 0.22, volume: 0.06, type: 'square' }); note(li + 8, { length: 0.22, volume: 0.03 }); }
+    return any;
+  }
+  function letterAt(x, y) { const hit = dots.find((d) => Math.abs(Math.round(d.x) - x) <= 1 && Math.abs(Math.round(d.y) - y) <= 1 && d.state !== 'free'); return hit ? hit.li : -1; }
+
+  // ---- stars: tap to catch ----
+  function catchStar(x, y) {
+    const i = stars.findIndex((s) => Math.abs(s.x - x) <= 1.5 && Math.abs(s.y - y) <= 1.5);
+    if (i < 0) return false;
+    const s = stars[i]; stars[i] = newStar(); caught += 1;
+    score.textContent = `★ ${caught}`; score.hidden = false; score.classList.remove('is-pop'); requestAnimationFrame(() => score.classList.add('is-pop'));
+    for (let k = 0; k < 10; k++) { const a = (k / 10) * 6.28; bursts.push({ x: s.x, y: s.y, vx: Math.cos(a) * 12, vy: Math.sin(a) * 12, life: 1, color: s.big ? C.yellow : C.white }); }
+    note(10 + (caught % 5), { length: 0.25, volume: 0.05 }); note(12 + (caught % 5), { length: 0.3, volume: 0.03 });
+    return true;
+  }
+
+  let start = performance.now(); let lastT = performance.now(); let sandTick = 0; let lastLand = 0;
+  function step(now) {
+    const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
+    // ink crumbles into sand a moment after it is drawn (and never while the finger is still down on it)
+    for (const [key, d] of ink) {
+      if (drawing && now - d.born < 900) continue;
+      if (now - d.born > 700) { ink.delete(key); if (d.y < F && d.x >= 0 && d.x < W && !sand[d.y * W + d.x]) sand[d.y * W + d.x] = colors.indexOf(d.color) + 1; }
+    }
+    // falling sand: 30 steps a second, bottom-up
+    sandTick += dt;
+    if (sandTick > 1 / 30) {
+      sandTick = 0;
+      for (let y = F - 2; y >= 0; y--) {
+        const dir = (y + Math.floor(now / 33)) % 2 ? 1 : -1;
+        for (let k = 0; k < W; k++) {
+          const x = dir > 0 ? k : W - 1 - k; const i = y * W + x; const v = sand[i]; if (!v) continue;
+          const below = i + W;
+          if (!sand[below]) { sand[below] = v; sand[i] = 0; if (y === F - 2 || sand[below + W]) maybeLand(now, x, y + 1); continue; }
+          const side = Math.random() < 0.5 ? 1 : -1;
+          for (const sx of [side, -side]) { const nx = x + sx; if (nx >= 0 && nx < W && !sand[below + sx] && !sand[i + sx]) { sand[below + sx] = v; sand[i] = 0; break; } }
+        }
+      }
+      // keep the pile from filling the stage: the bottom row slowly melts away when it is tall
+      let filled = 0; for (let x = 0; x < W; x++) if (sand[(F - 7) * W + x]) filled++;
+      if (filled > W * 0.5) for (let x = 0; x < W; x++) if (Math.random() < 0.3) sand[(F - 1) * W + x] = 0;
+    }
+    // letter physics
+    for (const d of dots) {
+      if (d.state === 'intro') {
+        const p = reduced ? 1 : Math.min(1, Math.max(0, (now - start - d.delay) / 520));
+        const e = 1 - (1 - p) ** 3; d.y = (-2 - 8) * (1 - e) + d.hy * e; d.x = d.hx;
+        if (p >= 1) d.state = 'home';
+      } else if (d.state === 'free') {
+        d.vy += 60 * dt; d.x += d.vx * dt; d.y += d.vy * dt;
+        if (d.x < 0) { d.x = 0; d.vx *= -0.6; } if (d.x > W - 1) { d.x = W - 1; d.vx *= -0.6; }
+        if (isSolid(Math.round(d.x), Math.round(d.y) + 1) && d.vy > 0) { d.y = Math.round(d.y); d.vy *= -0.45; d.vx *= 0.8; if (Math.abs(d.vy) < 3) d.vy = 0; }
+        if (d.y < 0) { d.y = 0; d.vy = Math.abs(d.vy) * 0.5; }
+        if (now > d.until) d.state = 'return';
+      } else if (d.state === 'return') {
+        d.x += (d.hx - d.x) * Math.min(1, dt * 7); d.y += (d.hy - d.y) * Math.min(1, dt * 7);
+        if (Math.abs(d.x - d.hx) < 0.3 && Math.abs(d.y - d.hy) < 0.3) { d.x = d.hx; d.y = d.hy; d.state = 'home'; }
+      }
+    }
+    if (dots.length && dots.every((d) => d.state === 'home') && lettersWereHit) { lettersWereHit = false; [0, 2, 4, 7].forEach((n, i) => setTimeout(() => note(n + 7, { length: 0.14, volume: 0.035 }), i * 70)); }
+    for (const b of bursts) { b.x += b.vx * dt; b.y += b.vy * dt; b.vx *= 0.9; b.vy *= 0.9; b.life -= dt * 1.8; }
+    bursts = bursts.filter((b) => b.life > 0);
+  }
+  let lettersWereHit = false;
+  function maybeLand(now, x, y) { if (now - lastLand > 70) { lastLand = now; note(Math.round((x / W) * 8), { length: 0.05, volume: 0.012 }); } }
+
   function draw(t) {
     if (!g) return;
     const now = t || performance.now(); const time = (now - start) / 1000;
+    step(now);
     g.clear(C.night);
-    for (const s of stars) { const a = 0.35 + 0.35 * Math.sin(time * s.s + s.p); if (a > 0.45) g.px(s.x, s.y, `rgba(255,255,255,${a.toFixed(2)})`); }
-    // a slow shooting star
-    const k = (time % 9) / 9; if (k < 0.12) { const sx = Math.floor(W * (0.2 + k * 5)); const sy = Math.floor(H * 0.1 + k * 30); for (let i = 0; i < 4; i++) g.px(sx - i, sy - i * 0.5, `rgba(255,255,255,${(0.8 - i * 0.2).toFixed(2)})`); }
-    for (const d of letters) {
-      const p = reduced ? 1 : Math.min(1, Math.max(0, (now - start - d.delay) / 520));
-      const e = 1 - (1 - p) ** 3; const y = Math.round(d.from + (d.y - d.from) * e);
-      const wave = p >= 1 && !reduced ? Math.round(Math.sin(time * 2.4 - d.li * 0.7) * 0.75) : 0; // each letter hops as a whole
-      if (p > 0) g.px(d.x, y + wave, d.color);
+    for (const s of stars) {
+      const a = 0.35 + 0.45 * Math.sin(time * s.s + s.p);
+      if (a > 0.4) { g.px(s.x, s.y, s.big ? `rgba(255,211,90,${a.toFixed(2)})` : `rgba(255,255,255,${a.toFixed(2)})`); if (s.big && a > 0.7) { g.px(s.x - 1, s.y, 'rgba(255,211,90,.35)'); g.px(s.x + 1, s.y, 'rgba(255,211,90,.35)'); g.px(s.x, s.y - 1, 'rgba(255,211,90,.35)'); g.px(s.x, s.y + 1, 'rgba(255,211,90,.35)'); } }
     }
-    for (const [key, c] of paint) { const [x, y] = key.split(',').map(Number); g.px(x, y, c.color); }
-    // painted dots twinkle once when born
-    for (const [, c] of paint) if (now - c.born < 260) g.px(c.x, c.y, C.white);
+    const k = (time % 9) / 9; if (k < 0.12) { const sx = Math.floor(W * (0.2 + k * 5)); const sy = Math.floor(H * 0.1 + k * 30); for (let i = 0; i < 4; i++) g.px(sx - i, sy - i * 0.5, `rgba(255,255,255,${(0.8 - i * 0.2).toFixed(2)})`); }
+    for (let x = 0; x < W; x++) g.px(x, F, 'rgba(255,255,255,.07)');
+    for (let i = 0; i < sand.length; i++) if (sand[i]) g.px(i % W, (i / W) | 0, colors[sand[i] - 1]);
+    for (const d of dots) {
+      if (d.state === 'intro' && d.y < -1) continue;
+      const wave = d.state === 'home' && !reduced ? Math.round(Math.sin(time * 2.4 - d.li * 0.7) * 0.75) : 0;
+      g.px(Math.round(d.x), Math.round(d.y) + wave, d.color);
+    }
+    for (const [, d] of ink) g.px(d.x, d.y, now - d.born < 200 ? C.white : d.color);
+    for (const b of bursts) g.px(Math.round(b.x), Math.round(b.y), b.color);
   }
   const redraw = animate(stage, draw);
-  let drawing = false; let last = null;
-  function paintAt(e) {
-    const { x, y } = g.cell(e); if (x < 0 || y < 0 || x >= W || y >= H) return;
+
+  function inkAt(x, y) {
     const cells = [];
     if (last) { const n = Math.max(Math.abs(x - last.x), Math.abs(y - last.y)); for (let i = 1; i <= n; i++) cells.push({ x: Math.round(last.x + ((x - last.x) * i) / n), y: Math.round(last.y + ((y - last.y) * i) / n) }); } else cells.push({ x, y });
     last = { x, y };
     for (const c of cells) {
-      const key = `${c.x},${c.y}`;
-      if (paint.get(key)?.color === colors[color]) continue;
-      paint.set(key, { x: c.x, y: c.y, color: colors[color], born: performance.now() });
-      note(Math.round((H - c.y) / H * 12) + 2, { length: 0.18 });
+      // sweeping through the word knocks letters loose
+      const li = letterAt(c.x, c.y); if (li >= 0) { lettersWereHit = burstLetter(li, c.x, c.y) || lettersWereHit; continue; }
+      const key = `${c.x},${c.y}`; if (ink.get(key)?.color === colors[color]) continue;
+      ink.set(key, { x: c.x, y: c.y, color: colors[color], born: performance.now() });
+      note(Math.round((H - c.y) / H * 12) + 2, { length: 0.16 });
     }
-    hint.classList.add('is-used');
-    redraw();
   }
-  canvas.addEventListener('pointerdown', (e) => { drawing = true; last = null; canvas.setPointerCapture(e.pointerId); paintAt(e); });
-  canvas.addEventListener('pointermove', (e) => { if (drawing) paintAt(e); });
+  canvas.addEventListener('pointerdown', (e) => {
+    const { x, y } = g.cell(e); if (x < 0 || y < 0 || x >= W || y >= H) return;
+    hint.classList.add('is-used');
+    canvas.setPointerCapture(e.pointerId); downAt = { x, y };
+    // a tap on a letter or a star plays with it; anywhere else starts drawing
+    const li = letterAt(x, y);
+    if (li >= 0) { lettersWereHit = burstLetter(li, x, y) || lettersWereHit; redraw(); return; }
+    if (catchStar(x, y)) { redraw(); return; }
+    drawing = true; last = null; inkAt(x, y); redraw();
+  });
+  canvas.addEventListener('pointermove', (e) => { if (!drawing) return; const { x, y } = g.cell(e); if (x < 0 || y < 0 || x >= W || y >= H) return; inkAt(x, y); redraw(); });
   const stop = () => { drawing = false; last = null; };
   canvas.addEventListener('pointerup', stop); canvas.addEventListener('pointercancel', stop);
-  document.getElementById('hpClear').addEventListener('click', () => { paint.clear(); start = performance.now(); note(0, { length: 0.25 }); note(4, { length: 0.25 }); redraw(); });
+  document.getElementById('hpClear').addEventListener('click', () => {
+    ink.clear(); sand.fill(0); caught = 0; score.hidden = true;
+    for (const d of dots) { d.state = 'intro'; d.y = -2 - Math.random() * 12; d.delay = d.li * 90 + Math.random() * 260; }
+    start = performance.now(); note(0, { length: 0.25 }); note(4, { length: 0.25 }); redraw();
+  });
   const soundButton = document.getElementById('hpSound');
   soundButton.addEventListener('click', () => { soundOn = !soundOn; soundButton.setAttribute('aria-pressed', String(soundOn)); if (soundOn) note(7); });
   layout();
-  new ResizeObserver(() => { const before = paint; layout(); for (const [k, v] of before) if (v.x < W && v.y < H) paint.set(k, v); redraw(); }).observe(stage);
+  new ResizeObserver(() => { const r = stage.getBoundingClientRect(); const cell = r.width < 520 ? 9 : r.width < 900 ? 12 : 14; if (Math.round(r.width / cell) !== W || Math.round(r.height / cell) !== H) { layout(); redraw(); } }).observe(stage);
 }
 
 // =========================================================================================================

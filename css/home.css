@@ -37,3 +37,8 @@
 .hp-chip.is-open { background: #fff; color: var(--pixieed-accent, #e75445); }
 .hp-chip.is-open::after { content: " →"; }
 @media (prefers-reduced-motion: reduce) { .hp-hint { animation: none; } .hp-toy { opacity: 1; transform: none; } }
+.hp-score { position: absolute; top: 1rem; right: 1rem; z-index: 3; padding: .35rem .8rem; border-radius: 999px; background: rgba(255, 211, 90, .95); color: #15171b; font: 900 .95rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; box-shadow: 0 6px 18px rgba(0,0,0,.35); pointer-events: none; }
+.hp-score[hidden] { display: none; }
+.hp-score.is-pop { animation: hp-pop .35s var(--pixieed-ease); }
+@keyframes hp-pop { 40% { transform: scale(1.35); } }
+@media (prefers-reduced-motion: reduce) { .hp-score.is-pop { animation: none; } }

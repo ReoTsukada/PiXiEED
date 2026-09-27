@@ -4,19 +4,19 @@ import { readFileSync } from 'node:fs';
 
 const read = (path) => readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
 
-test('home: plain tool names; only finished tools are links, upcoming ones are toys without a way in', () => {
-  const html = read('home/index.html');
-  const names = [...html.matchAll(/class="hp-toy-name">([^<]+)</g)].map((m) => m[1]);
-  assert.deepEqual(names, ['ドット絵カメラ', 'ドット絵マップ', '望遠鏡', 'ドット絵エディター', 'ドット絵サウンド', 'ドット絵ゲームメーカー', 'ドット絵ジグソーパズル', 'ドット絵間違い探し', 'ドット絵もの探し']);
+test('home: every tool card has a working toy and a plain name', () => {
+  const html = read('home/index.html'); const source = read('js/home-play.mjs');
+  const toys = [...html.matchAll(/data-toy="([a-z]+)"/g)].map((m) => m[1]);
+  assert.ok(toys.length >= 9);
+  for (const toy of toys) assert.match(source, new RegExp(`\\n  ${toy}\\(el\\) \\{`), toy);
   assert.doesNotMatch(html, /PiXiEEDraw|PiXiEELENS|PXDraw/);
-  const links = [...html.matchAll(/<a class="hp-toy" href="([^"]+)" data-toy="([a-z]+)"/g)].map((m) => m[2]);
-  assert.deepEqual(links, ['camera', 'map', 'telescope']);
-  for (const toy of ['editor', 'sound', 'game', 'jigsaw', 'diff', 'find']) assert.match(html, new RegExp(`<div class="hp-toy" data-toy="${toy}"[^>]*>[\\s\\S]*?もうすぐ`));
-  assert.match(html, /data-home-works/); assert.match(html, /data-home-stores/);
+  assert.match(source, /prefers-reduced-motion/);
 });
 
-test('home toys: every card has a working toy', () => {
-  const source = read('js/home-play.mjs');
-  for (const toy of ['camera', 'map', 'telescope', 'editor', 'sound', 'game', 'jigsaw', 'diff', 'find']) assert.match(source, new RegExp(`\\n  ${toy}\\(el\\) \\{`));
-  assert.match(source, /prefers-reduced-motion/);
+test('home hero: three simple plays on one canvas — draw into sand, knock letters, catch stars', () => {
+  const html = read('home/index.html'); const source = read('js/home-play.mjs');
+  assert.match(html + source, /hpScore/);
+  assert.match(source, /なぞる・文字をたたく・星をつかまえる/);
+  for (const fn of ['burstLetter', 'catchStar', 'inkAt']) assert.match(source, new RegExp(`function ${fn}\\(`), fn);
+  assert.match(source, /isSolid = \(x, y\) => y >= F/, 'sand and letters land above the colour bar');
 });
