@@ -1,0 +1,39 @@
+/* PiXiEED home — a playground first, then works and places */
+.home-play main { background: var(--pixieed-bg, #f7f8f6); }
+
+/* ---- hero: the canvas is the page ---- */
+.hp-hero { padding: 0; }
+.hp-stage { position: relative; height: min(78svh, 40rem); min-height: 26rem; overflow: hidden; background: #0f1822; isolation: isolate; }
+.hp-stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; touch-action: none; cursor: crosshair; }
+.hp-stage::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(120% 90% at 50% 40%, transparent 55%, rgba(0,0,0,.35)); z-index: 1; }
+.hp-hero-copy { position: absolute; left: 0; right: 0; bottom: 5.4rem; z-index: 2; display: grid; justify-items: center; gap: .7rem; padding: 0 1rem; text-align: center; pointer-events: none; }
+.home-play .hp-hero-copy h1 { margin: 0; color: #fff; font-size: clamp(2.1rem, 8.5vw, 4.2rem); font-weight: 900; line-height: 1.08; letter-spacing: .02em; text-shadow: 0 4px 0 rgba(0,0,0,.35); }
+.hp-hint { margin: 0; padding: .45rem .95rem; border-radius: 999px; background: rgba(255,255,255,.12); color: rgba(255,255,255,.9); font-size: .85rem; font-weight: 700; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); animation: hp-bob 2.4s ease-in-out infinite; transition: opacity .6s, transform .6s; }
+.hp-hint.is-used { opacity: 0; transform: translateY(.5rem); animation: none; }
+@keyframes hp-bob { 50% { transform: translateY(-4px); } }
+.hp-tools { position: absolute; left: 50%; bottom: 1.1rem; translate: -50% 0; z-index: 3; display: flex; align-items: center; gap: .5rem; padding: .4rem .5rem; border-radius: 999px; background: rgba(15, 24, 34, .72); border: 1px solid rgba(255,255,255,.14); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+.hp-colors { display: flex; gap: .35rem; }
+.hp-colors button { width: 1.9rem; height: 1.9rem; padding: 0; border: 2px solid rgba(255,255,255,.25); border-radius: .45rem; background: var(--c); cursor: pointer; transition: transform .15s var(--pixieed-ease), border-color .15s; }
+.hp-colors button[aria-checked="true"] { border-color: #fff; transform: translateY(-3px) scale(1.08); box-shadow: 0 6px 14px rgba(0,0,0,.35); }
+.hp-icon { display: grid; place-items: center; width: 2.2rem; height: 2.2rem; border: 0; border-radius: 50%; background: rgba(255,255,255,.1); color: #fff; cursor: pointer; }
+.hp-icon svg { width: 1.15rem; height: 1.15rem; }
+.hp-icon[aria-pressed="false"] .hp-wave { opacity: 0; }
+.hp-icon[aria-pressed="false"] { opacity: .6; }
+
+/* ---- toys ---- */
+.hp-section { padding: 3rem 0 1rem; }
+.home-play .hp-heading { margin: 0 0 1.1rem; font-size: clamp(1.4rem, 4.5vw, 2rem); font-weight: 900; letter-spacing: .02em; }
+.hp-toys { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; }
+@media (min-width: 720px) { .hp-toys { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.1rem; } }
+.hp-toy { position: relative; display: grid; gap: .15rem; padding: .55rem .55rem .8rem; border-radius: 1.2rem; background: var(--pixieed-surface, #fff); color: var(--pixieed-ink, #1b2025); text-decoration: none; box-shadow: 0 1px 0 var(--pixieed-line), 0 12px 30px rgba(27,32,37,.06); transition: transform .25s var(--pixieed-ease), box-shadow .25s; outline-offset: 3px;
+  opacity: 0; transform: translateY(14px); }
+.hp-toy.is-in { opacity: 1; transform: none; transition: opacity .5s var(--pixieed-ease), transform .5s var(--pixieed-ease), box-shadow .25s; }
+.hp-toy:hover { transform: translateY(-3px); box-shadow: 0 1px 0 var(--pixieed-line), 0 18px 40px rgba(27,32,37,.12); }
+.hp-view { display: grid; place-items: center; aspect-ratio: 1; margin-bottom: .45rem; border-radius: .8rem; background: var(--tone); overflow: hidden; }
+.hp-view canvas { width: 100%; height: auto; image-rendering: pixelated; touch-action: manipulation; }
+.home-play .hp-toy-name { padding: 0 .3rem; font-size: .92rem; font-weight: 900; line-height: 1.25; }
+.hp-toy-line { padding: 0 .3rem; color: var(--pixieed-muted); font-size: .76rem; font-weight: 600; }
+.hp-chip { position: absolute; top: .95rem; right: .95rem; padding: .22rem .55rem; border-radius: 999px; background: #ffd35a; color: #15171b; font-size: .66rem; font-weight: 900; letter-spacing: .04em; box-shadow: 0 3px 10px rgba(0,0,0,.18); }
+.hp-chip.is-open { background: #fff; color: var(--pixieed-accent, #e75445); }
+.hp-chip.is-open::after { content: " →"; }
+@media (prefers-reduced-motion: reduce) { .hp-hint { animation: none; } .hp-toy { opacity: 1; transform: none; } }
