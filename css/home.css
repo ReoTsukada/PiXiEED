@@ -3,7 +3,7 @@
 
 /* ---- hero: the canvas is the page ---- */
 .hp-hero { padding: 0; }
-.hp-stage { position: relative; height: min(78svh, 40rem); min-height: 26rem; overflow: hidden; background: #0f1822; isolation: isolate; }
+.hp-stage { position: relative; height: min(68svh, 38rem); min-height: 26rem; overflow: hidden; background: #0f1822; isolation: isolate; }
 .hp-stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; touch-action: none; cursor: crosshair; }
 .hp-stage::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(120% 90% at 50% 40%, transparent 55%, rgba(0,0,0,.35)); z-index: 1; }
 .hp-hero-copy { position: absolute; left: 0; right: 0; bottom: 5.4rem; z-index: 2; display: grid; justify-items: center; gap: .7rem; padding: 0 1rem; text-align: center; pointer-events: none; }
@@ -42,3 +42,45 @@
 .hp-score.is-pop { animation: hp-pop .35s var(--pixieed-ease); }
 @keyframes hp-pop { 40% { transform: scale(1.35); } }
 @media (prefers-reduced-motion: reduce) { .hp-score.is-pop { animation: none; } }
+
+/* ---- where to go next: two doors on the first screen ---- */
+.hp-go { display: flex; flex-wrap: wrap; justify-content: center; gap: .6rem; padding: .9rem 1rem 1.3rem; background: #0f1822; border-top: 1px solid rgba(255,255,255,.06); }
+.hp-go a { display: inline-flex; align-items: center; min-height: 2.75rem; padding: 0 1.15rem; border-radius: 999px; font-size: .92rem; font-weight: 900; text-decoration: none; letter-spacing: .02em; transition: transform .15s var(--pixieed-ease), box-shadow .15s; }
+.hp-go-main { background: #ffd35a; color: #15171b; box-shadow: 0 4px 0 #b88f1d, 0 10px 24px rgba(0,0,0,.3); }
+.hp-go-sub { background: rgba(255,255,255,.14); color: #fff; border: 1px solid rgba(255,255,255,.28); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.hp-go a:hover { transform: translateY(-2px); }
+.hp-go a:active { transform: translateY(2px); box-shadow: none; }
+.hp-go a:focus-visible, .hp-invite:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+.hp-stage canvas:focus-visible { outline: 3px solid #ffd35a; outline-offset: -3px; }
+
+/* ---- a nudge toward the tool that matches the play ---- */
+.hp-invite { position: absolute; top: 1rem; left: 1rem; z-index: 4; display: flex; align-items: center; gap: .6rem; max-width: calc(100% - 7rem); padding: .4rem .9rem .4rem .4rem; border-radius: 1rem; background: #fff; color: #15171b; font-size: .88rem; font-weight: 900; line-height: 1.3; text-decoration: none; box-shadow: 0 4px 0 rgba(0,0,0,.25), 0 14px 34px rgba(0,0,0,.35);
+  opacity: 0; transform: translateY(-120%); transition: opacity .35s, transform .45s cubic-bezier(.2, 1.4, .4, 1); }
+.hp-invite.is-in { opacity: 1; transform: none; }
+.hp-invite[hidden] { display: none; }
+.hp-invite-icon { position: static !important; flex: none; width: 2.6rem !important; height: 2.6rem !important; padding: .3rem; box-sizing: border-box; border-radius: .6rem; background: #fff1c9; image-rendering: pixelated; }
+.hp-invite-go { flex: none; color: var(--pixieed-accent, #e75445); animation: hp-nudge 1s ease-in-out infinite; }
+@keyframes hp-nudge { 50% { transform: translateX(3px); } }
+
+/* ---- "もうすぐ": smaller, after the ones that open ---- */
+.home-play .hp-subheading { margin: 1.8rem 0 .7rem; color: var(--pixieed-muted); font-size: .9rem; font-weight: 900; letter-spacing: .08em; }
+.hp-toys--soon { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .6rem; }
+@media (min-width: 720px) { .hp-toys--soon { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .8rem; } }
+.hp-toys--soon .hp-toy { padding: .4rem .4rem .6rem; border-radius: 1rem; }
+.hp-toys--soon .hp-view { margin-bottom: .3rem; border-radius: .65rem; }
+.home-play .hp-toys--soon .hp-toy-name { font-size: .78rem; }
+.hp-toys--soon .hp-toy-line { display: none; }
+.hp-toys--soon .hp-chip { top: .6rem; right: .6rem; font-size: .58rem; padding: .16rem .42rem; }
+.hp-toy.is-called { animation: hp-called 1.2s var(--pixieed-ease) 2; }
+@keyframes hp-called { 30% { box-shadow: 0 0 0 4px #ffd35a, 0 18px 40px rgba(27,32,37,.18); transform: translateY(-4px); } }
+
+/* ---- works that people posted, drifting by ---- */
+.hp-feed { margin-top: 1rem; overflow: hidden; mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); }
+.hp-feed[hidden] { display: none; }
+.hp-feed-track { display: flex; gap: .7rem; width: max-content; animation: hp-drift calc(var(--n, 8) * 3.5s) linear infinite; }
+.hp-feed:hover .hp-feed-track, .hp-feed:focus-within .hp-feed-track { animation-play-state: paused; }
+.hp-feed-item { flex: none; display: block; width: 6.5rem; aspect-ratio: 1; border-radius: .8rem; overflow: hidden; background: #0f1822; box-shadow: 0 1px 0 var(--pixieed-line), 0 10px 24px rgba(27,32,37,.1); transition: transform .2s var(--pixieed-ease); }
+.hp-feed-item:hover { transform: translateY(-3px) rotate(-1.5deg); }
+.hp-feed-item img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+@keyframes hp-drift { to { transform: translateX(calc(-50% - .35rem)); } }
+@media (prefers-reduced-motion: reduce) { .hp-feed-track { animation: none; } .hp-feed { overflow-x: auto; } .hp-invite, .hp-invite-go, .hp-toy.is-called { animation: none; transition: none; } }

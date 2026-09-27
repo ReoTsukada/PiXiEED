@@ -64,6 +64,14 @@ const FONT = {
 const WORD = ['P', 'i', 'X', 'i', 'E', 'E', 'D'];
 const WORD_COLORS = [C.red, C.yellow, C.sky, C.yellow, C.green, C.pink, C.orange];
 
+// 10×10 icons for the invitations
+const ICONS = {
+  editor: ['..........', '.......kk.', '......kyyk', '.....kyyk.', '....kyyk..', '...kyyk...', '..kyyk....', '.kpyk.....', '.kkk......', '..........'],
+  game: ['..........', '..........', '.kkkkkkkk.', 'kwwwwwwwwk', 'kwkwwwwrwk', 'kkkkwwbwrk', 'kwkwwwwgwk', 'kwwwwwwwwk', '.kkk..kkk.', '..........'],
+  find: ['..........', '..kkkk....', '.kssssk...', 'kswsssk...', 'kswssssk..', '.kssssk...', '..kkkkkk..', '......kkk.', '.......kkk', '........k.'],
+  sound: ['..........', '....kkkkk.', '....kvvvk.', '....k...k.', '....k...k.', '..kkk.kkk.', '.kvvk.kvvk', '.kvvk.kvvk', '..kk...kk.', '..........']
+};
+
 // =========================================================================================================
 // Hero
 // =========================================================================================================
@@ -78,14 +86,18 @@ function hero() {
   // (older markup has neither the score nor the new hint: supply them)
   let score = document.getElementById('hpScore');
   if (!score) { score = document.createElement('output'); score.className = 'hp-score'; score.id = 'hpScore'; score.hidden = true; stage.appendChild(score); }
-  hint.innerHTML = '<span aria-hidden="true">☝</span> なぞる・文字をたたく・星をつかまえる';
+  hint.innerHTML = '<span aria-hidden="true">☝</span> 描いて、はなして、そろえて消す';
   const colors = [C.red, C.yellow, C.green, C.sky, C.blue, C.pink, C.white];
   let color = 0; let W = 48; let H = 30; let g = null; let F = 30; // F: the floor row (just above the colour bar)
   let ink = new Map();            // dots being drawn right now (key -> {x,y,color,born})
   let sand = null;                // settled / falling sand: colour index + 1 per cell, 0 = empty
   let dots = [];                  // letter dots with physics
   let stars = []; let caught = 0; let bursts = [];
+  let pieces = []; let flashes = []; let lines = 0; // dropped drawings, and the rows being cleared
   let drawing = false; let last = null; let downAt = null;
+  // what this visitor seems to enjoy: after enough of one play, the matching tool is offered once
+  const interest = { ink: 0, letters: 0 };
+  let cursor = null; let pen = false; // keyboard play
   const colorBox = document.getElementById('hpColors');
   colors.forEach((c, i) => {
     const b = document.createElement('button'); b.type = 'button'; b.setAttribute('role', 'radio'); b.style.setProperty('--c', c);
@@ -101,7 +113,7 @@ function hero() {
     const cell = r.width < 520 ? 9 : r.width < 900 ? 12 : 14;
     W = Math.max(24, Math.round(r.width / cell)); H = Math.max(18, Math.round(r.height / cell));
     g = pixelCanvas(canvas, W, H);
-    sand = new Uint8Array(W * H);
+    sand = new Uint8Array(W * H); pieces = []; flashes = [];
     const bar = document.querySelector('.hp-tools').getBoundingClientRect();
     F = Math.max(8, Math.min(H, Math.floor((bar.top - r.top - 6) / (r.height / H))));
     const wordWidth = WORD.reduce((s, ch) => s + FONT[ch][0].length + 1, -1);
@@ -131,7 +143,10 @@ function hero() {
       const ang = Math.atan2(d.y - fromY, d.x - fromX) + (Math.random() - 0.5) * 0.9; const sp = 14 + Math.random() * 16;
       d.vx = Math.cos(ang) * sp; d.vy = Math.sin(ang) * sp - 14;
     }
-    if (any) { note(li + 6, { length: 0.22, volume: 0.06, type: 'square' }); note(li + 8, { length: 0.22, volume: 0.03 }); }
+    if (any) {
+      note(li + 6, { length: 0.22, volume: 0.06, type: 'square' }); note(li + 8, { length: 0.22, volume: 0.03 });
+      interest.letters += 1; if (interest.letters === 6) invite('sound');
+    }
     return any;
   }
   function letterAt(x, y) { const hit = dots.find((d) => Math.abs(Math.round(d.x) - x) <= 1 && Math.abs(Math.round(d.y) - y) <= 1 && d.state !== 'free'); return hit ? hit.li : -1; }
@@ -144,21 +159,30 @@ function hero() {
     score.textContent = `★ ${caught}`; score.hidden = false; score.classList.remove('is-pop'); requestAnimationFrame(() => score.classList.add('is-pop'));
     for (let k = 0; k < 10; k++) { const a = (k / 10) * 6.28; bursts.push({ x: s.x, y: s.y, vx: Math.cos(a) * 12, vy: Math.sin(a) * 12, life: 1, color: s.big ? C.yellow : C.white }); }
     note(10 + (caught % 5), { length: 0.25, volume: 0.05 }); note(12 + (caught % 5), { length: 0.3, volume: 0.03 });
+    if (caught === 4) invite('find');
     return true;
   }
 
   let start = performance.now(); let lastT = performance.now(); let sandTick = 0; let lastLand = 0;
   function step(now) {
     const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
-    // ink crumbles into sand a moment after it is drawn (and never while the finger is still down on it)
-    for (const [key, d] of ink) {
-      if (drawing && now - d.born < 900) continue;
-      if (now - d.born > 700) { ink.delete(key); if (d.y < F && d.x >= 0 && d.x < W && !sand[d.y * W + d.x]) sand[d.y * W + d.x] = colors.indexOf(d.color) + 1; }
-    }
     // falling sand: 30 steps a second, bottom-up
     sandTick += dt;
     if (sandTick > 1 / 30) {
       sandTick = 0;
+      // a released drawing drops as one piece, speeding up, until any of its dots touches something
+      for (const piece of pieces) {
+        piece.v = Math.min(piece.v + 0.12, 1.6); piece.acc += piece.v;
+        while (piece.acc >= 1 && !piece.landed) {
+          piece.acc -= 1;
+          if (piece.cells.some((c) => isSolid(c.x, c.y + 1))) piece.landed = true; else for (const c of piece.cells) c.y += 1;
+        }
+        if (piece.landed) {
+          for (const c of piece.cells) { let y = c.y; while (y >= 0 && sand[y * W + c.x]) y--; if (y >= 0) sand[y * W + c.x] = c.v; }
+          const mid = piece.cells[piece.cells.length >> 1]; note(Math.round((mid.x / W) * 8), { length: 0.12, volume: 0.04, type: 'square' });
+        }
+      }
+      pieces = pieces.filter((piece) => !piece.landed);
       for (let y = F - 2; y >= 0; y--) {
         const dir = (y + Math.floor(now / 33)) % 2 ? 1 : -1;
         for (let k = 0; k < W; k++) {
@@ -169,6 +193,18 @@ function hero() {
           for (const sx of [side, -side]) { const nx = x + sx; if (nx >= 0 && nx < W && !sand[below + sx] && !sand[i + sx]) { sand[below + sx] = v; sand[i] = 0; break; } }
         }
       }
+      // a full row vanishes, like Tetris: a flash, a chord, and everything above drops
+      let cleared = 0;
+      for (let y = F - 1; y >= 0; y--) {
+        let full = true; for (let x = 0; x < W; x++) if (!sand[y * W + x]) { full = false; break; }
+        if (!full) continue;
+        for (let x = 0; x < W; x++) {
+          const v = sand[y * W + x]; sand[y * W + x] = 0;
+          if (x % 2 === 0) bursts.push({ x, y, vx: (Math.random() - 0.5) * 10, vy: -8 - Math.random() * 10, life: 1, color: Math.random() < 0.5 ? C.white : colors[v - 1] });
+        }
+        flashes.push({ y, life: 1 }); cleared += 1;
+      }
+      if (cleared) { lines += cleared; invite('game'); [0, 2, 4, 7, 9].forEach((n, i) => setTimeout(() => note(n + 7 + cleared * 2, { length: 0.2, volume: 0.045, type: 'square' }), i * 55)); }
       // keep the pile from filling the stage: the bottom row slowly melts away when it is tall
       let filled = 0; for (let x = 0; x < W; x++) if (sand[(F - 7) * W + x]) filled++;
       if (filled > W * 0.5) for (let x = 0; x < W; x++) if (Math.random() < 0.3) sand[(F - 1) * W + x] = 0;
@@ -191,6 +227,8 @@ function hero() {
       }
     }
     if (dots.length && dots.every((d) => d.state === 'home') && lettersWereHit) { lettersWereHit = false; [0, 2, 4, 7].forEach((n, i) => setTimeout(() => note(n + 7, { length: 0.14, volume: 0.035 }), i * 70)); }
+    for (const f of flashes) f.life -= dt * 3;
+    flashes = flashes.filter((f) => f.life > 0);
     for (const b of bursts) { b.x += b.vx * dt; b.y += b.vy * dt; b.vx *= 0.9; b.vy *= 0.9; b.life -= dt * 1.8; }
     bursts = bursts.filter((b) => b.life > 0);
   }
@@ -214,8 +252,15 @@ function hero() {
       const wave = d.state === 'home' && !reduced ? Math.round(Math.sin(time * 2.4 - d.li * 0.7) * 0.75) : 0;
       g.px(Math.round(d.x), Math.round(d.y) + wave, d.color);
     }
+    for (const piece of pieces) for (const c of piece.cells) g.px(c.x, c.y, colors[c.v - 1]);
+    for (const f of flashes) g.rect(0, f.y, W, 1, `rgba(255,255,255,${f.life.toFixed(2)})`);
     for (const [, d] of ink) g.px(d.x, d.y, now - d.born < 200 ? C.white : d.color);
     for (const b of bursts) g.px(Math.round(b.x), Math.round(b.y), b.color);
+    if (cursor && document.activeElement === canvas) {
+      const on = Math.floor(now / 400) % 2 === 0;
+      g.px(cursor.x, cursor.y, pen ? colors[color] : on ? C.white : 'rgba(255,255,255,.35)');
+      if (pen) for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) g.px(cursor.x + dx, cursor.y + dy, 'rgba(255,255,255,.5)');
+    }
   }
   const redraw = animate(stage, draw);
 
@@ -228,6 +273,7 @@ function hero() {
       const li = letterAt(c.x, c.y); if (li >= 0) { lettersWereHit = burstLetter(li, c.x, c.y) || lettersWereHit; continue; }
       const key = `${c.x},${c.y}`; if (ink.get(key)?.color === colors[color]) continue;
       ink.set(key, { x: c.x, y: c.y, color: colors[color], born: performance.now() });
+      interest.ink += 1; if (interest.ink === 90) invite('editor');
       note(Math.round((H - c.y) / H * 12) + 2, { length: 0.16 });
     }
   }
@@ -242,15 +288,81 @@ function hero() {
     drawing = true; last = null; inkAt(x, y); redraw();
   });
   canvas.addEventListener('pointermove', (e) => { if (!drawing) return; const { x, y } = g.cell(e); if (x < 0 || y < 0 || x >= W || y >= H) return; inkAt(x, y); redraw(); });
-  const stop = () => { drawing = false; last = null; };
+  // letting go drops the drawing
+  function release() {
+    const cells = [...ink.values()].filter((d) => d.x >= 0 && d.x < W && d.y >= 0 && d.y < F).map((d) => ({ x: d.x, y: d.y, v: colors.indexOf(d.color) + 1 }));
+    ink.clear();
+    if (cells.length) pieces.push({ cells, v: 0.2, acc: 0, landed: false });
+  }
+  const stop = () => { if (drawing) release(); drawing = false; last = null; };
+  // keyboard: arrows move a dot cursor, Space lifts / lowers the pen, Enter taps (letters, stars, one dot)
+  canvas.tabIndex = 0;
+  canvas.addEventListener('focus', () => { cursor ??= { x: W >> 1, y: Math.floor(F * 0.7) }; redraw(); });
+  canvas.addEventListener('blur', () => { if (pen) { pen = false; stop(); } redraw(); });
+  canvas.addEventListener('keydown', (e) => {
+    const move = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+    if (!move && e.key !== ' ' && e.key !== 'Enter') return;
+    e.preventDefault(); hint.classList.add('is-used');
+    cursor ??= { x: W >> 1, y: Math.floor(F * 0.7) };
+    if (move) {
+      cursor = { x: Math.max(0, Math.min(W - 1, cursor.x + move[0])), y: Math.max(0, Math.min(F - 1, cursor.y + move[1])) };
+      if (pen) inkAt(cursor.x, cursor.y);
+    } else if (e.key === ' ') {
+      if (e.repeat) return;
+      pen = !pen; if (pen) { drawing = true; last = null; inkAt(cursor.x, cursor.y); } else stop();
+    } else {
+      const { x, y } = cursor; let hit = false;
+      for (let r = 0; r <= 2 && !hit; r++) for (let dy = -r; dy <= r && !hit; dy++) for (let dx = -r; dx <= r && !hit; dx++) {
+        const li = letterAt(x + dx, y + dy); if (li >= 0) { lettersWereHit = burstLetter(li, x, y) || lettersWereHit; hit = true; break; }
+        if (catchStar(x + dx, y + dy)) hit = true;
+      }
+      if (!hit && !pen) { last = null; inkAt(x, y); release(); last = null; }
+    }
+    redraw();
+  });
   canvas.addEventListener('pointerup', stop); canvas.addEventListener('pointercancel', stop);
   document.getElementById('hpClear').addEventListener('click', () => {
-    ink.clear(); sand.fill(0); caught = 0; score.hidden = true;
+    ink.clear(); sand.fill(0); caught = 0; score.hidden = true; pen = false; drawing = false; pieces = []; flashes = []; lines = 0;
     for (const d of dots) { d.state = 'intro'; d.y = -2 - Math.random() * 12; d.delay = d.li * 90 + Math.random() * 260; }
     start = performance.now(); note(0, { length: 0.25 }); note(4, { length: 0.25 }); redraw();
   });
   const soundButton = document.getElementById('hpSound');
   soundButton.addEventListener('click', () => { soundOn = !soundOn; soundButton.setAttribute('aria-pressed', String(soundOn)); if (soundOn) note(7); });
+  // ---- a gentle nudge toward the tool that matches what they are doing ----
+  const shown = new Set(); let inviteTimer = 0;
+  const INVITES = {
+    editor: { toys: ['editor'], text: 'ドット絵、しっかり描いてみる？' },
+    game: { toys: ['game', 'diff', 'find'], text: 'ゲームで遊んでみる？' },
+    find: { toys: ['find', 'diff'], text: 'かくれた絵、さがしてみる？' },
+    sound: { toys: ['sound'], text: 'ドットで音楽つくってみる？' }
+  };
+  function invite(kind) {
+    const spec = INVITES[kind]; if (!spec || shown.has(kind)) return;
+    const cards = spec.toys.map((t) => document.querySelector(`[data-toy="${t}"]`)).filter(Boolean);
+    const card = cards.find((c) => c.tagName === 'A') || cards[0]; if (!card) return;
+    shown.add(kind);
+    let box = document.getElementById('hpInvite');
+    if (!box) { box = document.createElement('a'); box.id = 'hpInvite'; box.className = 'hp-invite'; stage.appendChild(box); }
+    const icon = document.createElement('canvas'); icon.className = 'hp-invite-icon'; icon.setAttribute('aria-hidden', 'true');
+    const art = sprite(ICONS[kind]); pixelCanvas(icon, art[0].length, art.length).sprite(art, 0, 0);
+    const label = document.createElement('span'); label.textContent = spec.text;
+    const arrow = document.createElement('span'); arrow.className = 'hp-invite-go'; arrow.setAttribute('aria-hidden', 'true'); arrow.textContent = '→';
+    box.replaceChildren(icon, label, arrow);
+    box.dataset.kind = kind;
+    const soon = card.tagName !== 'A';
+    box.href = soon ? `#${card.id || (card.id = `hpToy-${card.dataset.toy}`)}` : card.getAttribute('href');
+    box.onclick = soon ? (e) => {
+      e.preventDefault(); hide();
+      card.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'center' });
+      card.classList.remove('is-called'); requestAnimationFrame(() => card.classList.add('is-called'));
+      card.focus({ preventScroll: true });
+    } : null;
+    box.hidden = false; box.classList.remove('is-in'); requestAnimationFrame(() => requestAnimationFrame(() => box.classList.add('is-in')));
+    [7, 9, 12].forEach((n, i) => setTimeout(() => note(n, { length: 0.18, volume: 0.035 }), i * 90));
+    clearTimeout(inviteTimer); inviteTimer = setTimeout(hide, 9000);
+    function hide() { box.classList.remove('is-in'); setTimeout(() => { if (!box.classList.contains('is-in')) box.hidden = true; }, 400); }
+  }
+
   layout();
   new ResizeObserver(() => { const r = stage.getBoundingClientRect(); const cell = r.width < 520 ? 9 : r.width < 900 ? 12 : 14; if (Math.round(r.width / cell) !== W || Math.round(r.height / cell) !== H) { layout(); redraw(); } }).observe(stage);
 }
@@ -495,6 +607,16 @@ const TOYS = {
 };
 
 hero();
+// cards that open something come first and large; the "もうすぐ" ones gather, smaller, below them
+(function groupToys() {
+  const grid = document.getElementById('hpToys'); if (!grid) return;
+  const soon = [...grid.children].filter((el) => el.matches('[data-toy]') && el.tagName !== 'A');
+  if (!soon.length || soon.length === grid.children.length) return;
+  const heading = document.createElement('h3'); heading.className = 'hp-subheading'; heading.id = 'hpSoonTitle'; heading.textContent = 'もうすぐ';
+  const row = document.createElement('div'); row.className = 'hp-toys hp-toys--soon'; row.setAttribute('aria-labelledby', 'hpSoonTitle');
+  row.append(...soon);
+  grid.after(heading, row);
+})();
 // every toy sits in the same square window, whatever its own pixel size
 for (const canvas of document.querySelectorAll('[data-toy] canvas')) {
   const view = document.createElement('span'); view.className = 'hp-view'; canvas.replaceWith(view); view.appendChild(canvas);
@@ -512,3 +634,37 @@ for (const el of document.querySelectorAll('[data-toy]')) {
   // the "もうすぐ" toys are not links: touching them only plays, never navigates
   if (el.tagName !== 'A') el.addEventListener('click', (e) => e.preventDefault());
 }
+
+// =========================================================================================================
+// Works that people really posted, drifting by (only when there are some)
+// =========================================================================================================
+async function feed() {
+  const slot = document.querySelector('[data-home-feed]'); if (!slot) return;
+  try {
+    const { supabaseConfig: cfg } = await import('../data/site-config.js');
+    const base = String(cfg.url || '').replace(/\/$/, ''); const key = String(cfg.publishableKey || '');
+    if (!base || !key) return;
+    const url = new URL(`${base}/rest/v1/${encodeURIComponent(cfg.publicMapTable || 'post_map_points')}`);
+    url.searchParams.set('select', 'post_id,title,public_image_path,published_at');
+    url.searchParams.set('map_space', 'eq.globe'); url.searchParams.set('published_at', 'not.is.null');
+    url.searchParams.set('order', 'published_at.desc'); url.searchParams.set('limit', '16');
+    const response = await fetch(url, { headers: { apikey: key, Authorization: `Bearer ${key}`, Accept: 'application/json' } });
+    if (!response.ok) return;
+    const rows = (await response.json()).filter((r) => r?.public_image_path);
+    if (!rows.length) return;
+    const bucket = encodeURIComponent(cfg.publicStorageBucket || 'post-public');
+    const track = document.createElement('div'); track.className = 'hp-feed-track';
+    const card = (r, copy) => {
+      const a = document.createElement('a'); a.className = 'hp-feed-item'; a.href = '/';
+      if (copy) { a.tabIndex = -1; a.setAttribute('aria-hidden', 'true'); }
+      const img = new Image(); img.loading = 'lazy'; img.decoding = 'async'; img.alt = copy ? '' : String(r.title || '地図の投稿');
+      img.src = `${base}/storage/v1/object/public/${bucket}/${String(r.public_image_path).split('/').filter(Boolean).map(encodeURIComponent).join('/')}`;
+      a.appendChild(img); return a;
+    };
+    // the list runs twice so the loop has no seam
+    track.append(...rows.map((r) => card(r, false)), ...rows.map((r) => card(r, true)));
+    track.style.setProperty('--n', rows.length);
+    slot.replaceChildren(track); slot.hidden = false;
+  } catch { /* the home stays complete without the feed */ }
+}
+feed();

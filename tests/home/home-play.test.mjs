@@ -13,10 +13,29 @@ test('home: every tool card has a working toy and a plain name', () => {
   assert.match(source, /prefers-reduced-motion/);
 });
 
-test('home hero: three simple plays on one canvas — draw into sand, knock letters, catch stars', () => {
+test('home hero: draw, let go and it drops; a full row clears; letters burst; stars can be caught', () => {
   const html = read('home/index.html'); const source = read('js/home-play.mjs');
   assert.match(html + source, /hpScore/);
-  assert.match(source, /なぞる・文字をたたく・星をつかまえる/);
-  for (const fn of ['burstLetter', 'catchStar', 'inkAt']) assert.match(source, new RegExp(`function ${fn}\\(`), fn);
-  assert.match(source, /isSolid = \(x, y\) => y >= F/, 'sand and letters land above the colour bar');
+  assert.match(source, /描いて、はなして、そろえて消す/);
+  for (const fn of ['burstLetter', 'catchStar', 'inkAt', 'release', 'invite']) assert.match(source, new RegExp(`function ${fn}\\(`), fn);
+  assert.match(source, /isSolid = \(x, y\) => y >= F/, 'pieces and letters land above the colour bar');
+  assert.match(source, /const stop = \(\) => \{ if \(drawing\) release\(\);/, 'the drawing drops only when the finger lifts');
+  assert.doesNotMatch(source, /now - d\.born > 700/, 'ink no longer crumbles on a timer');
+  assert.match(source, /a full row vanishes/);
+});
+
+test('home hero: the play leads somewhere — invitations matched to what the visitor enjoys', () => {
+  const source = read('js/home-play.mjs');
+  assert.match(source, /interest\.ink === \d+\) invite\('editor'\)/);
+  assert.match(source, /invite\('game'\)/); assert.match(source, /invite\('sound'\)/); assert.match(source, /invite\('find'\)/);
+  for (const kind of ['editor', 'game', 'find', 'sound']) assert.match(source, new RegExp(`\\n  ${kind}: \\[`), `icon ${kind}`);
+  // keyboard play
+  assert.match(source, /canvas\.tabIndex = 0/); assert.match(source, /ArrowLeft/);
+});
+
+test('home: two doors under the playground, soon-cards grouped, real posts drifting by', () => {
+  const html = read('home/index.html'); const source = read('js/home-play.mjs');
+  assert.match(html, /class="hp-go"[\s\S]*?href="\/"[^>]*>地図で絵をさがす[\s\S]*?href="\/pixel-camera\.html"[^>]*>カメラで撮る/);
+  assert.match(source, /function groupToys\(/); assert.match(source, /もうすぐ/);
+  assert.match(html, /data-home-feed hidden/); assert.match(source, /async function feed\(/);
 });
