@@ -15,6 +15,7 @@ const DEFAULT_TESTS = [
   , 'tests/globe/planets.test.mjs'
   , 'tests/globe/tool-shell.test.mjs'
   , 'tests/globe/real-sky.test.mjs'
+  , 'tests/globe/sky-events.test.mjs'
 ];
 const TEST_TIMEOUT_MS = 60_000;
 

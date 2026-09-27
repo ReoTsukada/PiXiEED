@@ -338,7 +338,7 @@ button > img { display: block; flex: none; width: var(--control-icon); height: v
 .scope-eclipse { color: #ffe89a; }
 .scope-eclipse:empty { display: none; }
 .scope-chips { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.scope-hud .scope-chips .scope-filter { grid-column: 1 / -1; justify-content: space-between; padding: 0 12px 0 18px; }
+.scope-hud .scope-chips .scope-filter { justify-content: space-between; padding: 0 10px 0 14px; }
 .scope-hud .scope-chip {
   display: inline-flex; align-items: center; justify-content: flex-start; gap: 8px; width: 100%; height: var(--control); padding: 0 16px 0 12px;
   border: 1px solid rgba(181, 226, 232, .22); border-radius: 999px; background: rgba(4, 12, 20, .6); font-size: var(--control-font); font-variant-numeric: tabular-nums;
@@ -655,3 +655,46 @@ button > img { display: block; flex: none; width: var(--control-icon); height: v
 @media (prefers-reduced-motion: reduce) {
   #globeCanvas, .orrery-canvas, .orrery-card, .orrery-title, .orrery-pull { transition: none !important; animation: none !important; }
 }
+
+/* ---- 空の予定: eclipses and meteor showers in the telescope ------------------ */
+.scope-hud .scope-chips { grid-template-columns: 1fr 1fr; }
+.scope-hud .scope-events-chip { position: relative; justify-content: flex-start; border-color: rgba(244, 212, 93, .45); color: #ffe89a; }
+.scope-events-chip__soon { margin-left: auto; padding: 2px 8px; border-radius: 999px; background: #f4d45d; color: #1b1500; font-size: var(--text-small); font-weight: 800; }
+.scope-events-chip__soon[hidden] { display: none; }
+.scope-hud.has-events .scope-dock { visibility: hidden; }
+.sky-events {
+  position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 2; display: grid; gap: 10px; max-height: min(66%, 560px); overflow: auto; overscroll-behavior: contain;
+  padding: 14px; border: 1px solid rgba(140, 210, 226, .18); border-radius: 22px; background: rgba(6, 15, 24, .92); backdrop-filter: blur(14px);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .5); animation: card-in .3s var(--spring); color: #d5e8eb;
+}
+.sky-events[hidden] { display: none; }
+.sky-events__head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.sky-events__head > div { display: grid; gap: 2px; }
+.sky-events__head strong { color: #fff; font-size: 1.05rem; }
+.sky-events__place { color: #8fb1b8; font-size: var(--text-small); font-variant-numeric: tabular-nums; }
+.scope-hud .sky-events__close { width: var(--control); height: var(--control); border-radius: 50%; background: rgba(140, 210, 226, .1); }
+.scope-hud .sky-events__locate { justify-content: flex-start; width: 100%; height: var(--control); padding: 0 16px 0 12px; border: 1px solid rgba(124, 207, 224, .35); border-radius: 999px; color: #7ccfe0; }
+.scope-hud .sky-events__locate:disabled { opacity: .6; }
+.sky-events__list { display: grid; gap: 8px; }
+.sky-events__loading { margin: 8px 4px; color: #8fb1b8; }
+.scope-hud .sky-event {
+  display: grid; grid-template-columns: 64px 1fr auto; align-items: center; gap: 12px; width: 100%; height: auto; min-height: 64px; padding: 10px 14px 10px 10px;
+  border: 1px solid rgba(140, 210, 226, .14); border-radius: 16px; background: rgba(140, 210, 226, .05); text-align: left; white-space: normal; line-height: 1.35;
+}
+.scope-hud .sky-event:hover, .scope-hud .sky-event:focus-visible { background: rgba(140, 210, 226, .11); }
+.sky-event__count { display: grid; place-items: center; min-height: 44px; border-radius: 12px; background: rgba(244, 212, 93, .12); color: #ffe89a; font-size: .8125rem; font-weight: 800; text-align: center; }
+.sky-event.is-eclipse .sky-event__count { background: rgba(240, 178, 107, .16); color: #f7c68a; }
+.sky-event__body { display: grid; gap: 2px; }
+.sky-event__body b { color: #f2fbfc; font-size: .9375rem; }
+.sky-event__body small { color: #9ab8bf; font-size: var(--text-small); }
+.sky-event__rating { padding: 4px 10px; border-radius: 999px; background: rgba(140, 210, 226, .1); color: #b9d1d5; font-size: var(--text-small); white-space: nowrap; }
+.sky-event.is-great .sky-event__rating { background: rgba(143, 227, 168, .16); color: #8fe3a8; }
+.sky-event.is-good .sky-event__rating { background: rgba(124, 207, 224, .16); color: #7ccfe0; }
+.sky-event.is-poor .sky-event__rating, .sky-event.is-dark-none .sky-event__rating { color: #789aa2; }
+.sky-events__foot { margin: 0; color: #789aa2; font-size: var(--text-small); line-height: 1.5; }
+.sky-mark.is-radiant { border-color: rgba(143, 227, 168, .55); color: #b6f0c6; }
+.sky-mark.is-radiant.is-onscreen { translate: -50% -50%; background: rgba(4, 12, 20, .45); border-color: rgba(143, 227, 168, .45); }
+.sky-mark.is-radiant.is-onscreen img { display: block; }
+
+/* The telescope as a stand-alone tool: nothing of the globe shows behind it. */
+.is-tool-telescope .gesture-hint, .is-tool-telescope .orrery-pull { display: none !important; }

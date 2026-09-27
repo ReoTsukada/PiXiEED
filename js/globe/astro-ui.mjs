@@ -16,11 +16,12 @@
  * Play/pause is the only plain button.
  */
 
-import { celestialState, geoToUnit, unitToGeo, listEclipses, peakObscurationAt, moonPhase, findGreatestEclipse, findSunEvent } from './astronomy.mjs?v=20260927-sky-layer-v1';
-import { createScope, refracted } from './scope.mjs?v=20260927-sky-layer-v1';
-import { sharedSky } from './real-sky.mjs?v=20260927-sky-layer-v1';
-import { createOrrery } from './orrery.mjs?v=20260927-sky-layer-v1';
-import { PLANETS, PLANET_BY_ID, SKY_PLANETS, lightMinutes } from './planets.mjs?v=20260927-sky-layer-v1';
+import { celestialState, geoToUnit, unitToGeo, listEclipses, peakObscurationAt, moonPhase, findGreatestEclipse, findSunEvent } from './astronomy.mjs?v=20260927-sky-events-v1';
+import { createScope, refracted } from './scope.mjs?v=20260927-sky-events-v1';
+import { sharedSky } from './real-sky.mjs?v=20260927-sky-events-v1';
+import { upcomingMeteorShowers, upcomingEclipses, daysUntil } from './sky-events.mjs?v=20260927-sky-events-v1';
+import { createOrrery } from './orrery.mjs?v=20260927-sky-events-v1';
+import { PLANETS, PLANET_BY_ID, SKY_PLANETS, lightMinutes } from './planets.mjs?v=20260927-sky-events-v1';
 
 const DEG = Math.PI / 180;
 const MINUTE = 60000;
@@ -341,6 +342,10 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
   }
   const marks = { sun: skyMark('sun', 'sun', '太陽'), moon: skyMark('moon', 'moon', '月') };
   // Planets get a label while they are on screen; no edge markers, to keep the view calm.
+  // The radiant of the meteor shower picked in 空の予定, shown in the telescope while it is active.
+  const radiantMark = skyMark('radiant', 'celestial', '放射点');
+  radiantMark.button.classList.add('is-radiant');
+  let activeRadiant = null;
   const planetMarks = Object.fromEntries(SKY_PLANETS.map((planet) => {
     const mark = skyMark(planet.id, 'globe', planet.name);
     mark.button.classList.add('is-planet');
@@ -387,14 +392,29 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
   const riseChip = element('button', { type: 'button', class: 'scope-chip', onClick: () => watchSunEvent('rise') }, [icon('sun'), element('span')]);
   const setChip = element('button', { type: 'button', class: 'scope-chip is-set', onClick: () => watchSunEvent('set') }, [icon('sun'), element('span')]);
   const filterChip = element('button', { type: 'button', class: 'scope-chip scope-filter', 'aria-pressed': 'true', onClick: () => setFilter(filterChip.getAttribute('aria-pressed') !== 'true') }, [element('i', { 'aria-hidden': 'true' }), element('span', { text: '太陽フィルター' })]);
+  const eventsChip = element('button', { type: 'button', class: 'scope-chip scope-events-chip', 'aria-expanded': 'false', onClick: () => setEventsOpen(eventsSheet.hidden) }, [icon('celestial'), element('span', { text: '空の予定' }), element('b', { class: 'scope-events-chip__soon', hidden: '' })]);
+  // Upcoming eclipses and meteor showers for the observer, soonest first.
+  const eventsPlace = element('span', { class: 'sky-events__place' });
+  const locateButton = element('button', { type: 'button', class: 'sky-events__locate', onClick: () => useCurrentLocation() }, [icon('globe'), element('span', { text: '現在地にする' })]);
+  const eventsList = element('div', { class: 'sky-events__list', role: 'list' });
+  const eventsSheet = element('section', { class: 'sky-events', hidden: '', 'aria-label': '空の予定' }, [
+    element('header', { class: 'sky-events__head' }, [
+      element('div', {}, [element('strong', { text: '空の予定' }), eventsPlace]),
+      element('button', { type: 'button', class: 'sky-events__close', 'aria-label': '空の予定を閉じる', onClick: () => setEventsOpen(false) }, [icon('close')])
+    ]),
+    locateButton,
+    eventsList,
+    element('p', { class: 'sky-events__foot', text: '流れ星の数は、暗い空で1時間に見えるおおよその数です。日食は必ず日食グラスで見てください。' })
+  ]);
   const scopeHud = element('section', { class: 'scope-hud', hidden: '', 'aria-label': '望遠鏡' }, [
     element('button', { type: 'button', class: 'scope-close', 'aria-label': '望遠鏡を閉じる', onClick: () => closeScope() }, [icon('close')]),
     fovPill,
     element('div', { class: 'scope-dock' }, [
       element('p', { class: 'scope-status', role: 'status', 'aria-live': 'polite' }, [where, eclipseLine]),
-      element('div', { class: 'scope-chips' }, [riseChip, setChip, filterChip]),
+      element('div', { class: 'scope-chips' }, [riseChip, setChip, eventsChip, filterChip]),
       element('p', { class: 'scope-warning', text: '実際の観測では、必ず日食グラスや太陽フィルターを使ってください。' })
-    ])
+    ]),
+    eventsSheet
   ]);
   // ---- Solar System view -----------------------------------------------------
   const orreryCanvas = element('canvas', { class: 'orrery-canvas', hidden: '', tabindex: '0', 'aria-label': '太陽系。ドラッグで回転、ピンチまたはホイールで拡大・縮小、タップで天体を選ぶ。地球をさらに拡大すると地球儀に戻る' });
@@ -668,6 +688,17 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
         title: tracking ? `${planet.name}を追尾中` : `${planet.name}を追う`
       }, bounds, occupied);
     }
+    const radiant = radiantLocal(o);
+    if (!radiant) { radiantMark.button.hidden = true; } else {
+      const fz = dot(radiant, forward); const fx = dot(radiant, right); const fy = dot(radiant, up);
+      const front = fz > 1e-3;
+      const x = front ? width / 2 + (fx / fz / tanHalf) * height / 2 : width / 2 + fx * 1e4;
+      const y = front ? height / 2 - (fy / fz / tanHalf) * height / 2 : height / 2 - fy * 1e4;
+      const inside = front && x > bounds.left && x < bounds.right && y > bounds.top && y < bounds.bottom;
+      const altitude = Math.asin(Math.max(-1, Math.min(1, radiant[2]))) / DEG;
+      radiantMark.button.classList.toggle('is-tracking', snapshot.tracking?.id === 'radiant');
+      placeMark(radiantMark, { x, y, inside, dimmed: altitude < 0, offset: inside ? 0 : 0, text: altitude < 0 ? `${activeRadiant.label}（地平線の下）` : activeRadiant.label, title: `${activeRadiant.label}の方向` }, bounds, occupied);
+    }
   }
 
   function updateSunEvents(force = false) {
@@ -698,7 +729,14 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
     updateSunEvents();
   }
 
+  function radiantLocal(o, radiant = activeRadiant) {
+    if (!radiant || !state) return null;
+    const v = geoToUnit(((radiant.ra - state.gmstDegrees) % 360 + 540) % 360 - 180, radiant.dec);
+    return [dot(v, o.east), dot(v, o.north), dot(v, o.up)];
+  }
+
   function onMarkTap(kind) {
+    if (kind === 'radiant') { if (activeRadiant) scope.track({ id: 'radiant', local: (o) => radiantLocal(o) }); return; }
     if (PLANET_BY_ID[kind]) { if (scope.isOpen()) { scope.track(kind); scope.setFov(PLANET_FOV[kind] || 0.1); } else openScope(undefined, { track: kind }); return; }
     if (scope.isOpen()) { scope.track(kind); return; }
     if (marks[kind].button.classList.contains('is-onscreen')) { openScope(undefined, { track: kind }); return; }
@@ -794,6 +832,95 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
     return { latitude: snapshot.view.centerLatitude, longitude: snapshot.view.centerLongitude };
   }
 
+  // ---- 空の予定: eclipses and meteor showers for the observer ------------------
+  const OBSERVER_KEY = 'PiXiEED:observer:v1';
+  function savedObserver() { try { const v = JSON.parse(localStorage.getItem(OBSERVER_KEY) || 'null'); return v && Number.isFinite(v.latitude) && Number.isFinite(v.longitude) ? v : null; } catch { return null; } }
+  let eventsKey = '';
+  function setEventsOpen(open) {
+    eventsSheet.hidden = !open;
+    eventsChip.setAttribute('aria-expanded', String(open));
+    scopeHud.classList.toggle('has-events', open);
+    if (open) renderEvents();
+  }
+  function whenText(date, withTime) {
+    const d = new Date(date);
+    return `${d.getMonth() + 1}月${d.getDate()}日（${WEEKDAYS[d.getDay()]}）${withTime ? ` ${formatClock(d, false)}` : ''}`;
+  }
+  function countdownText(date) {
+    const days = daysUntil(date);
+    if (days < 0) return 'きのうまで';
+    if (days === 0) return '今日';
+    if (days === 1) return '明日';
+    return `あと${days}日`;
+  }
+  function renderEvents() {
+    const o = scope.getSnapshot().observer;
+    const key = `${o.latitude.toFixed(2)},${o.longitude.toFixed(2)}:${new Date().toDateString()}`;
+    eventsPlace.textContent = formatLatLon(o.latitude, o.longitude);
+    if (key === eventsKey && eventsList.children.length) return;
+    eventsKey = key;
+    eventsList.replaceChildren(element('p', { class: 'sky-events__loading', text: '計算しています…' }));
+    // Let the sheet paint first; the eclipse search takes a moment.
+    setTimeout(() => {
+      const now = new Date();
+      const meteors = upcomingMeteorShowers(now, o.latitude, o.longitude).map((m) => ({ kind: 'meteor', date: m.best || m.peak, data: m }));
+      const eclipses = upcomingEclipses(now, o.latitude, o.longitude, 3).map((e) => ({ kind: 'eclipse', date: e.local.time, data: e }));
+      const items = [...meteors, ...eclipses].sort((a, b) => a.date - b.date);
+      eventsList.replaceChildren(...items.map(eventCard));
+      const soonest = items[0] ? daysUntil(items[0].date) : 99;
+      const badge = eventsChip.querySelector('.scope-events-chip__soon');
+      badge.hidden = soonest > 7; badge.textContent = soonest <= 0 ? '今日' : `${soonest}日`;
+    }, 30);
+  }
+  function eventCard(item) {
+    if (item.kind === 'meteor') {
+      const m = item.data;
+      const detail = m.best ? `${m.rating === 'poor' ? '' : '1時間に約'}${m.rating === 'poor' ? '数はわずか' : `${m.rate}個`}${m.moonUp && m.moonIllumination > 0.3 ? '・月明かりあり' : ''}` : 'この場所では暗い時間に見えません';
+      return element('button', { type: 'button', role: 'listitem', class: `sky-event is-meteor is-${m.rating}`, onClick: () => goToSkyEvent(item) }, [
+        element('span', { class: 'sky-event__count', text: countdownText(item.date) }),
+        element('span', { class: 'sky-event__body' }, [element('b', { text: m.shower.name }), element('small', { text: m.best ? `${whenText(m.best, true)}ごろが見ごろ` : whenText(m.peak) }), element('small', { text: detail })]),
+        element('span', { class: 'sky-event__rating', text: m.label })
+      ]);
+    }
+    const e = item.data;
+    const kind = { total: '皆既日食', annular: '金環日食', partial: '部分日食' }[e.local.kind] || '日食';
+    return element('button', { type: 'button', role: 'listitem', class: 'sky-event is-eclipse', onClick: () => goToSkyEvent(item) }, [
+      element('span', { class: 'sky-event__count', text: countdownText(item.date) }),
+      element('span', { class: 'sky-event__body' }, [element('b', { text: `${kind}（${e.time.getFullYear()}年）` }), element('small', { text: `${whenText(e.local.time, true)}に最大` }), element('small', { text: `太陽の${Math.round(e.local.obscuration * 100)}%が欠ける` })]),
+      element('span', { class: 'sky-event__rating', text: e.local.obscuration > 0.99 ? '皆既' : e.local.obscuration > 0.5 ? '大きく欠ける' : '少し欠ける' })
+    ]);
+  }
+  // On the day itself: jump to the best moment and point the telescope where to look.
+  function goToSkyEvent(item) {
+    setEventsOpen(false);
+    if (item.kind === 'meteor') {
+      const m = item.data;
+      activeRadiant = { ra: m.shower.ra, dec: m.shower.dec, label: `${m.shower.name.replace('流星群', '')}の放射点` };
+      setFilter(false);
+      tweenTime((m.best || m.peak).getTime(), { duration: 900 });
+      scope.setFov(90);
+      scope.track({ id: 'radiant', local: (o) => radiantLocal(o) });
+      return;
+    }
+    activeRadiant = null;
+    setFilter(true);
+    tweenTime(item.data.local.time.getTime(), { duration: 900 });
+    scope.setFov(2.5);
+    scope.track('sun');
+  }
+  function useCurrentLocation() {
+    if (!navigator.geolocation) return;
+    locateButton.disabled = true; locateButton.lastChild.textContent = '現在地を取得中…';
+    navigator.geolocation.getCurrentPosition((position) => {
+      // Rounded to about 10 km: enough for the sky, and it keeps the exact place private.
+      const place = { latitude: Math.round(position.coords.latitude * 10) / 10, longitude: Math.round(position.coords.longitude * 10) / 10 };
+      try { localStorage.setItem(OBSERVER_KEY, JSON.stringify(place)); } catch { /* private mode */ }
+      scope.setObserver(place);
+      locateButton.disabled = false; locateButton.lastChild.textContent = '現在地にする';
+      eventsKey = ''; renderEvents(); updateSunEvents(true);
+    }, () => { locateButton.disabled = false; locateButton.lastChild.textContent = '現在地を使えませんでした'; }, { maximumAge: 3600000, timeout: 15000 });
+  }
+
   function openScope(location = currentLocation(), { track = null } = {}) {
     setOpen(false);
     stage.classList.add('is-scope');
@@ -807,7 +934,12 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
     scopeCanvas.focus({ preventScroll: true });
   }
 
+  let scopeCloseHandler = null;
   function closeScope() {
+    if (scopeCloseHandler) { scopeCloseHandler(); return; }
+    setEventsOpen(false);
+    activeRadiant = null;
+    radiantMark.button.hidden = true;
     stage.classList.remove('is-scope');
     scopeCanvas.hidden = true;
     scopeHud.hidden = true;
@@ -905,6 +1037,14 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
     refreshView() { if (state && !scope.isOpen() && !orrery.isOpen()) orbitMarks(); },
     setTime, getTime: () => time, setPlaying, setSpeed, openScope, closeScope, goToEclipse, scope, setOpen,
     openOrrery, closeOrrery, zoomLimit, orrery,
+    /** Telescope as a stand-alone tool: open at the saved (or given) place with 空の予定 showing; closing leaves via `onClose`. */
+    openTelescopeTool({ onClose = null, showEvents = true } = {}) {
+      scopeCloseHandler = onClose;
+      openScope(savedObserver() || { latitude: 35.68, longitude: 139.69 });
+      scope.setFov(70);
+      if (showEvents) setEventsOpen(true);
+    },
+    setEventsOpen,
     getState: () => state
   });
   globalThis.__PIXIEED_ASTRO__ = api;
