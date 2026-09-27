@@ -10,7 +10,7 @@
  */
 
 import { ASTRO_COMMON } from './astro-glsl.mjs?v=20260921-astro-4';
-import { observe } from './astronomy.mjs?v=20260927-sky-layer-v1';
+import { observe } from './astronomy.mjs?v=20260927-sky-events-v1';
 
 const DEG = Math.PI / 180;
 const MIN_FOV = 0.02; // 72 arcseconds: Jupiter's disc fills about two thirds of the view
@@ -442,6 +442,7 @@ export function createScope({ canvas, onChange = () => {} } = {}) {
     if (!observation) return;
     if (tracking === 'sun') aimAt(refracted(observation.sunLocal));
     else if (tracking === 'moon') aimAt(refracted(observation.moonLocal));
+    else if (tracking && typeof tracking === 'object' && typeof tracking.local === 'function') { const local = tracking.local(observation); if (local) aimAt(refracted(local)); }
     else if (tracking) { const planet = observation.planets?.find((entry) => entry.id === tracking); if (planet) aimAt(refracted(planet.local)); }
     // Keep a low Sun in the lower part of the frame with the sky above it.
     if (tracking === 'sun') altitude = Math.max(altitude, (fov * 0.22) * DEG);

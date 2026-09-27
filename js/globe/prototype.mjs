@@ -1,8 +1,8 @@
-import { initAstroUi } from './astro-ui.mjs?v=20260927-sky-layer-v1';
-import { initPostUi } from './post-ui.mjs?v=20260927-sky-layer-v1';
-import { sharedSky, sharedFaintSky, SPRITE_MAGNITUDE } from './real-sky.mjs?v=20260927-sky-layer-v1';
+import { initAstroUi } from './astro-ui.mjs?v=20260927-sky-events-v1';
+import { initPostUi } from './post-ui.mjs?v=20260927-sky-events-v1';
+import { sharedSky, sharedFaintSky, SPRITE_MAGNITUDE } from './real-sky.mjs?v=20260927-sky-events-v1';
 import { createSupabaseGlobeAuth, createSupabaseGlobeStore } from './post-supabase.mjs?v=20260921-globe-post-v1';
-import { createGlobeRenderer, decodeRasterData, getSelectionStageLabel, prepareGeoJsonFeatures } from './renderer.mjs?v=20260927-sky-layer-v1';
+import { createGlobeRenderer, decodeRasterData, getSelectionStageLabel, prepareGeoJsonFeatures } from './renderer.mjs?v=20260927-sky-events-v1';
 
 const embedMode = new URLSearchParams(location.search).get('embed') === '1';
 
@@ -97,6 +97,17 @@ placeHere.addEventListener('click', () => {
   if (currentSelection && postUi) postUi.openComposer({ selection: currentSelection });
 });
 
+// /telescope/ opens this page as the telescope tool: straight into the telescope with 空の予定,
+// and closing it goes back to the tool list instead of the globe.
+function openToolFromUrl() {
+  if (new URLSearchParams(location.search).get('tool') !== 'telescope') return;
+  document.documentElement.classList.add('is-tool-telescope');
+  document.title = '望遠鏡｜PiXiEED';
+  const leave = () => { if (document.referrer && new URL(document.referrer).origin === location.origin && history.length > 1) history.back(); else location.href = '/tools/'; };
+  const open = () => globalThis.__PIXIEED_ASTRO__?.openTelescopeTool({ onClose: leave });
+  if (globalThis.__PIXIEED_ASTRO__) open(); else requestAnimationFrame(open);
+}
+
 // The globe has no zoom/rotate buttons. A one-time hint names the gestures and
 // leaves as soon as the globe is touched.
 const GESTURE_HINT_KEY = 'PiXiEED:globe-gesture-hint:v1';
@@ -121,6 +132,7 @@ try {
   const raster = decodeRasterData(source);
   createPrototypeRenderer({ rasterData: raster });
   loadStatus.textContent = '';
+  openToolFromUrl();
   performance.mark?.('globe-ready');
   console.info(`[globe] ready in ${Math.round(performance.now())}ms (${preloaded ? 'preloaded' : 'late'} raster)`);
 } catch (rasterError) {

@@ -20,8 +20,8 @@
  * to the globe.
  */
 
-import { PLANETS, PLANET_BY_ID, centuriesSinceJ2000, heliocentricAt, orbitPath, galileanOffsets } from './planets.mjs?v=20260927-sky-layer-v1';
-import { greenwichSiderealDegrees } from './astronomy.mjs?v=20260927-sky-layer-v1';
+import { PLANETS, PLANET_BY_ID, centuriesSinceJ2000, heliocentricAt, orbitPath, galileanOffsets } from './planets.mjs?v=20260927-sky-events-v1';
+import { greenwichSiderealDegrees } from './astronomy.mjs?v=20260927-sky-events-v1';
 import { quaternionFromBasis } from './geometry.mjs?v=20260921-grid11-1';
 import { WORLD_LAND_MASK } from '../../assets/maps/world-land-mask-v1.mjs?v=20260920-webgl2-1';
 

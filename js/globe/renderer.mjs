@@ -21,7 +21,7 @@ import {
 } from './geometry.mjs?v=20260921-grid11-1';
 import { normalizeMembershipFeatures, pointInGeometry } from './topology.mjs?v=20260920-g4-precision-1';
 import { JAPAN_COUNTRY_ID, JAPAN_REGION_GROUPS, getRegionForPrefecture } from './hierarchy.mjs?v=20260920-g4-precision-1';
-import { createWebGLRenderer } from './webgl-renderer.mjs?v=20260927-sky-layer-v1';
+import { createWebGLRenderer } from './webgl-renderer.mjs?v=20260927-sky-events-v1';
 import { WORLD_LAND_MASK } from '../../assets/maps/world-land-mask-v1.mjs?v=20260920-webgl2-1';
 
 export const GLOBE_RENDERER_VERSION = 'g6-webgl2-analytic-half-degree-v1';
