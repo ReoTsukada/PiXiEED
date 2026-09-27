@@ -12,6 +12,8 @@ test('camera layout: status on top, five tools at the bottom, one tray of choice
   assert.deepEqual(tools, ['look', 'dither', 'pixels', 'aspect', 'tone']);
   for (const panel of ['look', 'dither', 'pixels', 'aspect', 'tone']) assert.match(html, new RegExp(`data-panel="${panel}"[^>]*hidden`), `${panel} row starts folded`);
   assert.match(html, /id="gifRec"/);
+  assert.match(html, /id="paletteStrip"/, 'the 色 row carries the editable palette');
+  assert.match(html, /id="paletteSave"/);
 });
 
 test('dither button: a plain switch while off, the pattern chooser while on', () => {

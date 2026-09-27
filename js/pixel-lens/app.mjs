@@ -2,9 +2,9 @@ import { createFrameLoop } from '../pixel-studio/frame-loop.mjs';
 import { encodeCameraPng, pngExportGeometry } from '../pixel-studio/png-export.mjs';
 import { FRAME_RATIOS, OUTPUT_SIZES, resolveAspect, centerCrop, frameGeometry, fitFrame } from '../pixel-studio/framing.mjs?v=20260925-lens-sizes-1';
 import { cameraStartErrorMessage, deriveCameraPrimaryAction } from '../pixel-studio/camera-ui-state.mjs';
-import { CAMERA_SETTING_DEFAULTS, DITHER_PATTERNS, lensFrameFilter, lensPalette, processLensFrame, resetLensPalette, setLensSettings } from './engine.mjs?v=20260928-toolbar-1';
-import { attachZoomGestures, formatZoom, splitZoom, zoomRange, zoomStops } from './zoom.mjs?v=20260928-toolbar-1';
-import { GIF_FPS, GIF_MAX_MS, encodeGif, gifScale } from './gif.mjs?v=20260928-toolbar-1';
+import { CAMERA_SETTING_DEFAULTS, DITHER_PATTERNS, lensFrameFilter, lensPalette, lensPaletteEdited, processLensFrame, resetLensPalette, resetLensPaletteEdits, setLensPalette, setLensPaletteColor, setLensSettings } from './engine.mjs?v=20260928-palette-1';
+import { attachZoomGestures, formatZoom, splitZoom, zoomRange, zoomStops } from './zoom.mjs?v=20260928-palette-1';
+import { GIF_FPS, GIF_MAX_MS, encodeGif, gifScale } from './gif.mjs?v=20260928-palette-1';
 
 const $ = (selector) => document.querySelector(selector);
 const root = $('#pixelStudio');
@@ -160,6 +160,7 @@ function updatePalettePreview(result) {
   if (revision === displayedPaletteRevision) return;
   displayedPaletteRevision = revision;
   tintSwatches(result.palette);
+  renderPaletteStrip(result.palette);
 }
 
 function fitPreview(frame) {
@@ -442,12 +443,13 @@ function capture() {
 function refreshObjects() {
   if (state.mode !== 'live') return;
   if (performance.now() - trayClosedAt < 600) return; // that tap only folded the tray
+  // feedback without covering the picture: a short ring around the frame, a tick and a toast
+  const picksColours = !state.customLook && (['8', '16'].includes(state.colorDepth) || (['2', '4'].includes(state.colorDepth) && state.paletteMode === 'source'));
+  if (!picksColours) { sayToast('この配色は固定です'); return; }
   resetLensPalette(); // PiXiEELENS keeps its palette; a tap picks the colours again from the current view
+  setPaletteEditing(-1);
   paletteEpoch++;
   root.dataset.paletteEpoch = String(paletteEpoch);
-  // feedback without covering the picture: a short ring around the frame, a tick and a toast
-  const picksColours = ['8', '16'].includes(state.colorDepth) || (['2', '4'].includes(state.colorDepth) && state.paletteMode === 'source');
-  if (!picksColours) { sayToast('この配色は固定です'); return; }
   captureFrame.classList.remove('lc-repick');
   requestAnimationFrame(() => captureFrame.classList.add('lc-repick'));
   window.setTimeout(() => captureFrame.classList.remove('lc-repick'), 600);
@@ -501,6 +503,7 @@ const LOOKS = {
   full: { colorDepth: 'full' }
 };
 function currentLook() {
+  if (state.customLook) return `my-${state.customLook}`;
   if (state.colorDepth === '16') return state.paletteMode === 'source' ? 'photo' : 'c16';
   return Object.keys(LOOKS).find((key) => LOOKS[key].colorDepth === state.colorDepth) ?? 'gb';
 }
@@ -513,10 +516,19 @@ function applyChange({ restart = false } = {}) {
 }
 function selectLook(button) {
   if (!button || state.mode === 'captured') return;
-  Object.assign(state, LOOKS[button.dataset.look]);
+  const mine = myPalettes.find((p) => `my-${p.id}` === button.dataset.look);
+  setPaletteEditing(-1);
+  if (mine) {
+    // a saved palette: exactly those colours, never re-picked from the view
+    Object.assign(state, { colorDepth: String(mine.colors.length), paletteMode: 'source', customLook: mine.id });
+    applyChange();
+    setLensPalette(mine.colors.map(([r, g, b]) => [r, g, b]));
+  } else {
+    Object.assign(state, LOOKS[button.dataset.look], { customLook: null });
+    applyChange();
+  }
   button.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
   navigator.vibrate?.(8);
-  applyChange();
   sayToast(button.textContent.trim());
 }
 $('#looks').addEventListener('click', (event) => selectLook(event.target.closest('[data-look]')));
@@ -541,6 +553,7 @@ let swatchColors = [[32, 56, 16], [224, 248, 208]];
 function openTray(tool) {
   if (openTool && !tool) trayClosedAt = performance.now();
   openTool = tool;
+  if (tool !== 'look') setPaletteEditing(-1);
   root.dataset.tray = tool ?? '';
   for (const panel of tray.querySelectorAll('[data-panel]')) panel.hidden = panel.dataset.panel !== tool;
   for (const button of toolbar.querySelectorAll('[data-tool]')) button.setAttribute('aria-expanded', String(button.dataset.tool === tool));
@@ -691,6 +704,134 @@ $('#toneReset').addEventListener('click', () => { for (const [key] of TONES) sta
 document.addEventListener('pointerdown', (event) => {
   if (openTool && !tray.contains(event.target) && !toolbar.contains(event.target) && stage.contains(event.target)) openTray(null);
 }, true);
+// ---------- Palette: tap a colour of the current look to change it by hand ----------
+// The 色 row shows the look's palette as dots. Tapping one swaps the looks row for a hue / saturation /
+// lightness slider (the same pick-then-slide control as 調整). Edits can be undone, or saved as a
+// マイパレット look (up to three, kept on this device).
+const PALETTE_KEY = 'pixieed:camera-palettes:v1';
+const MAX_MY_PALETTES = 3;
+let myPalettes = [];
+try { myPalettes = JSON.parse(localStorage.getItem(PALETTE_KEY) || '[]').filter((p) => Array.isArray(p?.colors) && [2, 4, 8, 16].includes(p.colors.length)); } catch { myPalettes = []; }
+function storeMyPalettes() { try { localStorage.setItem(PALETTE_KEY, JSON.stringify(myPalettes)); } catch { /* private mode: kept for this visit only */ } }
+const EDITABLE_DEPTHS = new Set(['2', '4', '8', '16', 'gray']);
+const CHANNELS = [['h', '色相', 360], ['s', '彩度', 100], ['l', '明るさ', 100]];
+let editIndex = -1; let editChannel = 'h'; let shownPalette = [];
+const paletteDots = $('#paletteDots'); const paletteEditor = $('#paletteEditor'); const editChips = $('#editChips');
+const editSlider = $('#editSlider'); const editValue = $('#editValue');
+for (const [key, label] of CHANNELS) editChips.appendChild(chip(key, label));
+
+function rgbToHsl([r, g, b]) {
+  r /= 255; g /= 255; b /= 255; const max = Math.max(r, g, b); const min = Math.min(r, g, b); const l = (max + min) / 2;
+  if (max === min) return [0, 0, l * 100];
+  const d = max - min; const sat = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  const h = max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return [h * 60, sat * 100, l * 100];
+}
+function hslToRgb([h, sat, l]) {
+  sat /= 100; l /= 100; const k = (n) => (n + h / 30) % 12; const a = sat * Math.min(l, 1 - l);
+  const f = (n) => l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
+  return [f(0) * 255, f(8) * 255, f(4) * 255].map(Math.round);
+}
+const cssColor = ([r, g, b]) => `rgb(${r}, ${g}, ${b})`;
+function lookSwatchVars(colors) {
+  const pick = (t) => colors[Math.min(colors.length - 1, Math.round(t * (colors.length - 1)))];
+  return ['a', 'b', 'c', 'd'].map((k, i) => `--${k}:${cssColor(pick(i / 3))}`).join(';');
+}
+function renderMyPaletteChips() {
+  const looks = $('#looks');
+  for (const old of looks.querySelectorAll('[data-look^="my-"]')) old.remove();
+  myPalettes.forEach((palette, index) => {
+    const button = document.createElement('button');
+    button.type = 'button'; button.setAttribute('role', 'radio'); button.dataset.look = `my-${palette.id}`;
+    button.innerHTML = `<i class="lc-sw" style="${lookSwatchVars(palette.colors)}"></i><span>マイ${index + 1}</span>`;
+    looks.appendChild(button);
+  });
+}
+function renderPaletteStrip(palette = lensPalette()) {
+  shownPalette = palette ?? [];
+  const editable = EDITABLE_DEPTHS.has(state.colorDepth) && shownPalette.length > 0;
+  $('#paletteStrip').hidden = !editable;
+  if (!editable) { setPaletteEditing(-1); return; }
+  if (paletteDots.children.length !== shownPalette.length) {
+    paletteDots.replaceChildren(...shownPalette.map((_, index) => {
+      const dot = document.createElement('button'); dot.type = 'button'; dot.dataset.index = String(index);
+      dot.setAttribute('aria-label', `${index + 1}番目の色を変える`); return dot;
+    }));
+  }
+  shownPalette.forEach((color, index) => {
+    const dot = paletteDots.children[index];
+    dot.style.background = cssColor(color);
+    dot.setAttribute('aria-pressed', String(index === editIndex));
+  });
+  const edited = lensPaletteEdited() && !(state.customLook && !paletteDiffersFromSaved());
+  $('#paletteReset').disabled = !edited;
+  $('#paletteSave').hidden = state.colorDepth === 'gray';
+  $('#paletteSave').disabled = !lensPaletteEdited() || (state.customLook && !paletteDiffersFromSaved());
+  $('#paletteDelete').hidden = !state.customLook;
+  $('#paletteDone').hidden = editIndex < 0;
+  if (editIndex >= 0) syncEditSlider();
+}
+function paletteDiffersFromSaved() {
+  const saved = myPalettes.find((p) => p.id === state.customLook);
+  return !saved || saved.colors.some((c, i) => c.some((v, k) => v !== shownPalette[i]?.[k]));
+}
+function setPaletteEditing(index) {
+  editIndex = index;
+  root.dataset.editing = String(index >= 0);
+  paletteEditor.hidden = index < 0;
+  for (const dot of paletteDots.children) dot.setAttribute('aria-pressed', String(Number(dot.dataset.index) === index));
+  $('#paletteDone').hidden = index < 0;
+  if (index >= 0) syncEditSlider();
+}
+function syncEditSlider() {
+  const color = shownPalette[editIndex]; if (!color) return;
+  const hsl = rgbToHsl(color); const [key, label, max] = CHANNELS.find(([k]) => k === editChannel); const channel = CHANNELS.indexOf(CHANNELS.find(([k]) => k === editChannel));
+  for (const b of editChips.querySelectorAll('[data-value]')) b.setAttribute('aria-checked', String(b.dataset.value === key));
+  editSlider.max = String(max); editSlider.value = String(Math.round(hsl[channel]));
+  editSlider.setAttribute('aria-label', `${editIndex + 1}番目の色の${label}`);
+  editValue.textContent = key === 'h' ? `${editSlider.value}°` : `${editSlider.value}%`;
+  // the track previews what the slider does
+  const stops = Array.from({ length: 7 }, (_, i) => { const v = [...hsl]; v[channel] = (max * i) / 6; return cssColor(hslToRgb(v)); });
+  editSlider.style.setProperty('--track', `linear-gradient(90deg, ${stops.join(', ')})`);
+  $('#editColor').style.background = cssColor(color);
+}
+paletteDots.addEventListener('click', (event) => {
+  const dot = event.target.closest('[data-index]'); if (!dot || state.mode === 'captured') return;
+  const index = Number(dot.dataset.index);
+  navigator.vibrate?.(5);
+  setPaletteEditing(editIndex === index ? -1 : index);
+});
+editChips.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-value]'); if (!button) return;
+  editChannel = button.dataset.value; navigator.vibrate?.(4); syncEditSlider();
+});
+editSlider.addEventListener('input', () => {
+  const color = shownPalette[editIndex]; if (!color || state.mode === 'captured') return;
+  const hsl = rgbToHsl(color); const channel = CHANNELS.findIndex(([k]) => k === editChannel);
+  hsl[channel] = Number(editSlider.value);
+  // keep hue meaningful when a grey is pushed into colour
+  if (editChannel === 'h' && hsl[1] < 1) hsl[1] = 40;
+  const rgb = hslToRgb(hsl);
+  if (setLensPaletteColor(editIndex, rgb)) { shownPalette = shownPalette.map((c, i) => (i === editIndex ? rgb : c)); renderPaletteStrip(shownPalette); }
+});
+$('#paletteReset').addEventListener('click', () => { resetLensPaletteEdits(); navigator.vibrate?.(8); renderPaletteStrip(); sayToast('元の色に戻しました'); });
+$('#paletteDone').addEventListener('click', () => setPaletteEditing(-1));
+$('#paletteSave').addEventListener('click', () => {
+  const colors = lensPalette(); if (![2, 4, 8, 16].includes(colors.length)) return;
+  const palette = { id: Date.now().toString(36), colors };
+  myPalettes = [...myPalettes, palette].slice(-MAX_MY_PALETTES);
+  storeMyPalettes(); renderMyPaletteChips();
+  setPaletteEditing(-1);
+  selectLook($(`#looks [data-look="my-${palette.id}"]`));
+  sayToast(`マイ${myPalettes.length}に保存しました`);
+});
+$('#paletteDelete').addEventListener('click', () => {
+  const index = myPalettes.findIndex((p) => p.id === state.customLook); if (index < 0) return;
+  myPalettes.splice(index, 1); storeMyPalettes(); renderMyPaletteChips();
+  selectLook($('#looks [data-look="gb"]'));
+  sayToast('マイパレットを削除しました');
+});
+renderMyPaletteChips();
 document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && openTool) { const tool = openTool; openTray(null); toolbar.querySelector(`[data-tool="${tool}"]`)?.focus(); } });
 paintSwatches();
 syncControls();

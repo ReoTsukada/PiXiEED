@@ -264,3 +264,26 @@ button, a { font: inherit; }
 .lc[data-mode="captured"] :is(.lc-tray, .lc-toolbar), .lc[data-mode="idle"] :is(.lc-tray, .lc-toolbar) { display: none; }
 .lc-result { margin-top: .2rem; }
 @media (prefers-reduced-motion: reduce) { .lc-row, .lc-slider { animation: none; } }
+/* ---- Palette strip + editor (inside the 色 tray) ---- */
+.lc-look { width: 100%; display: grid; justify-items: center; gap: .4rem; }
+.lc-look[hidden] { display: none; }
+.lc-palette-strip { display: flex; align-items: center; gap: .35rem; max-width: calc(100% - 1.6rem); padding: .3rem .35rem .3rem .45rem; border-radius: 999px; border: 1px solid var(--lc-line); background: var(--lc-glass); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); animation: lc-tray-in .2s var(--lc-ease); }
+.lc-palette-strip[hidden] { display: none; }
+.lc-palette-dots { display: flex; gap: .3rem; overflow-x: auto; scrollbar-width: none; padding: .15rem; }
+.lc-palette-dots::-webkit-scrollbar { display: none; }
+.lc-palette-dots button { flex: 0 0 auto; width: 1.75rem; height: 1.75rem; padding: 0; border-radius: 50%; border: 2px solid rgba(255,255,255,.55); cursor: pointer; transition: transform .15s var(--lc-ease), box-shadow .15s; }
+.lc-palette-dots button:active { transform: scale(.9); }
+.lc-palette-dots button[aria-pressed="true"] { border-color: #fff; box-shadow: 0 0 0 2px var(--lc-accent); transform: scale(1.12); }
+.lc-pal-act { flex: 0 0 auto; display: grid; place-items: center; min-width: 2rem; height: 2rem; padding: 0 .1rem; border: 0; border-radius: 999px; background: rgba(255,255,255,.12); color: var(--lc-text); font-size: .78rem; font-weight: 800; cursor: pointer; }
+.lc-pal-act svg { width: 1.05rem; height: 1.05rem; }
+.lc-pal-act:disabled { opacity: .3; cursor: default; }
+.lc-pal-act[hidden] { display: none; }
+.lc-pal-done { padding: 0 .8rem; background: #fff; color: #11171b; }
+.lc-palette-editor { width: 100%; display: grid; justify-items: center; gap: .35rem; }
+.lc-palette-editor[hidden] { display: none; }
+.lc[data-editing="true"] .lc-looks { display: none; }
+.lc-edit-color { flex: 0 0 auto; width: 1.6rem; height: 1.6rem; border-radius: 50%; box-shadow: inset 0 0 0 2px rgba(255,255,255,.7); }
+.lc-color-slider { padding-left: .6rem; }
+.lc-color-slider input::-webkit-slider-runnable-track { height: 8px; border-radius: 4px; background: var(--track, rgba(255,255,255,.3)); }
+.lc-color-slider input::-moz-range-track { height: 8px; border-radius: 4px; background: var(--track, rgba(255,255,255,.3)); }
+.lc-color-slider input::-webkit-slider-thumb { margin-top: -.5rem; box-shadow: 0 0 0 2px rgba(0,0,0,.25), 0 2px 8px rgba(0,0,0,.35); }

@@ -1169,6 +1169,40 @@ export function onLensPalette(listener) { paletteListener = listener; paletteDis
 
 export function lensPalette() { return paletteState.colors.map((c) => [c.r, c.g, c.b]); }
 
+// ---- Editing the palette by hand (PiXiEELENS kept a userEdited flag for this) ----
+const toColor = ([r, g, b]) => ({ r: clampByte(Math.round(r)), g: clampByte(Math.round(g)), b: clampByte(Math.round(b)) });
+/** Change one palette colour. The array is replaced, so every colour cache keyed on it starts fresh. */
+export function setLensPaletteColor(index, rgb) {
+  if (!paletteState.colors[index]) return false;
+  const next = paletteState.colors.map((c) => ({ ...c }));
+  next[index] = toColor(rgb);
+  paletteState.colors = next;
+  paletteState.cache = new Map();
+  paletteState.userEdited = true;
+  return true;
+}
+/** Put back the colours the look started with (before any hand edits). */
+export function resetLensPaletteEdits() {
+  if (!paletteState.originalColors.length) return;
+  paletteState.colors = paletteState.originalColors.map((c) => ({ ...c }));
+  paletteState.cache = new Map();
+  paletteState.userEdited = false;
+}
+/** Use a saved palette as it is: it is kept (never re-picked) until the look changes. */
+export function setLensPalette(colors) {
+  applyNewPaletteColors(colors.map(toColor));
+  paletteState.depth = state.colorDepth;
+  paletteState.desired = colors.length;
+  paletteState.lastUpdated = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  paletteState.userEdited = true;
+}
+export function lensPaletteEdited() { return paletteState.userEdited; }
+/** グレー: the one tint colour (neutral until edited). */
+export function ensureGrayTint() {
+  if (state.colorDepth !== 'gray' || paletteState.colors.length) return;
+  applyNewPaletteColors([GRAY_TINT_DEFAULT_COLOR]); paletteState.depth = 'gray'; paletteState.desired = 1;
+}
+
 /** CSS filter string PiXiEELENS draws the camera frame with (tone settings + the dot smoothing blur). */
 export function lensFrameFilter() {
   return `blur(${DOT_SMOOTHING_BLUR}px) ${computeCameraFilterComponents(state.cameraSettings).join(' ')}`;
