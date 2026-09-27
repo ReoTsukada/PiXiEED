@@ -50,3 +50,13 @@ test('home: two doors under the playground, soon-cards grouped, real posts drift
   assert.match(source, /function groupToys\(/); assert.match(source, /もうすぐ/);
   assert.match(html, /data-home-feed hidden/); assert.match(source, /async function feed\(/);
 });
+
+test('home hero: each colour is its own instrument — drawing, landing and cleared rows all play it', () => {
+  const source = read('js/home-play.mjs');
+  const names = source.match(/const INSTRUMENTS = \[([^\]]+)\]/)[1].split(',').map((n) => n.trim().replace(/'/g, ''));
+  assert.deepEqual(names, ['ピアノ', '鉄琴', 'マリンバ', 'フルート', 'ベース', 'オルゴール', 'ドラム']);
+  for (let i = 0; i < 6; i++) assert.match(source, new RegExp(`case ${i}: `), `instrument ${i}`);
+  assert.match(source, /play\(color, Math\.round\(\(H - c\.y\)/, 'the pen plays its colour');
+  assert.match(source, /play\(mid\.v - 1,/, 'a landing piece plays its colour');
+  assert.match(source, /play\(row\[x\],/, 'a cleared row plays its colours');
+});

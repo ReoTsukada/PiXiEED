@@ -31,6 +31,65 @@ function note(step, { length = 0.16, volume = 0.05, type = 'triangle' } = {}) {
   } catch { /* no audio */ }
 }
 
+// ---------- seven colours, seven instruments (fixed on the home page) ----------
+// red ピアノ / yellow 鉄琴 / green マリンバ / sky フルート / blue ベース / pink オルゴール / white ドラム
+const INSTRUMENTS = ['ピアノ', '鉄琴', 'マリンバ', 'フルート', 'ベース', 'オルゴール', 'ドラム'];
+let noiseBuffer = null;
+function play(inst, step, { volume = 0.05 } = {}) {
+  if (!soundOn) return;
+  try {
+    audio ??= new AudioContext();
+    if (audio.state === 'suspended') audio.resume();
+    const t = audio.currentTime;
+    const octave = Math.floor(step / SCALE.length); const degree = SCALE[((step % SCALE.length) + SCALE.length) % SCALE.length];
+    const f = 261.63 * 2 ** ((octave * 12 + degree) / 12);
+    const out = audio.createGain(); out.gain.value = 1; out.connect(audio.destination);
+    // one partial: frequency, wave, peak, attack, decay
+    const tone = (freq, type, peak, attack, decay, from = t) => {
+      const o = audio.createOscillator(); const g = audio.createGain();
+      o.type = type; o.frequency.value = freq;
+      g.gain.setValueAtTime(0.0001, from); g.gain.exponentialRampToValueAtTime(peak, from + attack); g.gain.exponentialRampToValueAtTime(0.0001, from + attack + decay);
+      o.connect(g).connect(out); o.start(from); o.stop(from + attack + decay + 0.05); return o;
+    };
+    const noise = (filterType, freq, peak, decay) => {
+      if (!noiseBuffer) { noiseBuffer = audio.createBuffer(1, audio.sampleRate * 0.5, audio.sampleRate); const d = noiseBuffer.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
+      const src = audio.createBufferSource(); src.buffer = noiseBuffer;
+      const filter = audio.createBiquadFilter(); filter.type = filterType; filter.frequency.value = freq;
+      const g = audio.createGain(); g.gain.setValueAtTime(peak, t); g.gain.exponentialRampToValueAtTime(0.0001, t + decay);
+      src.connect(filter).connect(g).connect(out); src.start(t); src.stop(t + decay + 0.05);
+    };
+    switch (inst) {
+      case 0: // ピアノ: bright hit, slow fade, a touch of the octave
+        tone(f, 'triangle', volume, 0.005, 0.6); tone(f * 2, 'sine', volume * 0.3, 0.005, 0.3); break;
+      case 1: // 鉄琴: an octave up, with the metal's out-of-tune partial
+        tone(f * 2, 'sine', volume * 0.9, 0.002, 1.1); tone(f * 2 * 2.76, 'sine', volume * 0.25, 0.002, 0.25); break;
+      case 2: // マリンバ: wooden and short, an octave down
+        tone(f / 2, 'sine', volume * 1.3, 0.003, 0.32); tone(f * 2, 'sine', volume * 0.35, 0.002, 0.06); break;
+      case 3: { // フルート: breathy, soft start, a little vibrato
+        const o = tone(f * 2, 'sine', volume * 0.9, 0.06, 0.38);
+        const lfo = audio.createOscillator(); const depth = audio.createGain(); lfo.frequency.value = 5.5; depth.gain.value = f * 0.012;
+        lfo.connect(depth).connect(o.frequency); lfo.start(t); lfo.stop(t + 0.5);
+        noise('bandpass', f * 2, volume * 0.12, 0.12); break;
+      }
+      case 4: { // ベース: a low saw through a closing filter
+        const o = audio.createOscillator(); const filter = audio.createBiquadFilter(); const g = audio.createGain();
+        o.type = 'sawtooth'; o.frequency.value = f / 4; filter.type = 'lowpass'; filter.Q.value = 6;
+        filter.frequency.setValueAtTime(900, t); filter.frequency.exponentialRampToValueAtTime(160, t + 0.3);
+        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(volume * 1.6, t + 0.008); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+        o.connect(filter).connect(g).connect(out); o.start(t); o.stop(t + 0.4); break;
+      }
+      case 5: // オルゴール: tiny and high, a comb-like second tine
+        tone(f * 4, 'sine', volume * 0.7, 0.001, 0.7); tone(f * 4 * 1.003, 'triangle', volume * 0.2, 0.001, 0.4); break;
+      default: { // ドラム: height picks the drum — low = kick, middle = snare, high = hi-hat
+        const kind = ((step % 3) + 3) % 3;
+        if (kind === 0) { const o = audio.createOscillator(); const g = audio.createGain(); o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(45, t + 0.18); g.gain.setValueAtTime(volume * 2.4, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22); o.connect(g).connect(out); o.start(t); o.stop(t + 0.25); }
+        else if (kind === 1) { noise('bandpass', 1800, volume * 1.6, 0.16); tone(190, 'triangle', volume * 0.8, 0.001, 0.08); }
+        else noise('highpass', 7000, volume * 0.9, 0.05);
+      }
+    }
+  } catch { /* no audio */ }
+}
+
 // ---------- shared pixel canvas helper ----------
 function pixelCanvas(canvas, w, h) {
   canvas.width = w; canvas.height = h;
@@ -101,7 +160,8 @@ function hero() {
   const colorBox = document.getElementById('hpColors');
   colors.forEach((c, i) => {
     const b = document.createElement('button'); b.type = 'button'; b.setAttribute('role', 'radio'); b.style.setProperty('--c', c);
-    b.setAttribute('aria-label', `色 ${i + 1}`); b.addEventListener('click', () => { color = i; syncColors(); note(i + 5, { length: 0.1 }); });
+    b.setAttribute('aria-label', `色 ${i + 1}（${INSTRUMENTS[i]}）`); b.title = INSTRUMENTS[i];
+    b.addEventListener('click', () => { color = i; syncColors(); [5, 7, 9].forEach((n, k) => setTimeout(() => play(i, n), k * 110)); });
     colorBox.appendChild(b);
   });
   const syncColors = () => [...colorBox.children].forEach((b, i) => b.setAttribute('aria-checked', String(i === color)));
@@ -179,7 +239,7 @@ function hero() {
         }
         if (piece.landed) {
           for (const c of piece.cells) { let y = c.y; while (y >= 0 && sand[y * W + c.x]) y--; if (y >= 0) sand[y * W + c.x] = c.v; }
-          const mid = piece.cells[piece.cells.length >> 1]; note(Math.round((mid.x / W) * 8), { length: 0.12, volume: 0.04, type: 'square' });
+          const mid = piece.cells[piece.cells.length >> 1]; play(mid.v - 1, Math.round((mid.x / W) * 8), { volume: 0.05 });
         }
       }
       pieces = pieces.filter((piece) => !piece.landed);
@@ -188,7 +248,7 @@ function hero() {
         for (let k = 0; k < W; k++) {
           const x = dir > 0 ? k : W - 1 - k; const i = y * W + x; const v = sand[i]; if (!v) continue;
           const below = i + W;
-          if (!sand[below]) { sand[below] = v; sand[i] = 0; if (y === F - 2 || sand[below + W]) maybeLand(now, x, y + 1); continue; }
+          if (!sand[below]) { sand[below] = v; sand[i] = 0; if (y === F - 2 || sand[below + W]) maybeLand(now, x, y + 1, v - 1); continue; }
           const side = Math.random() < 0.5 ? 1 : -1;
           for (const sx of [side, -side]) { const nx = x + sx; if (nx >= 0 && nx < W && !sand[below + sx] && !sand[i + sx]) { sand[below + sx] = v; sand[i] = 0; break; } }
         }
@@ -198,13 +258,15 @@ function hero() {
       for (let y = F - 1; y >= 0; y--) {
         let full = true; for (let x = 0; x < W; x++) if (!sand[y * W + x]) { full = false; break; }
         if (!full) continue;
+        const row = Array.from({ length: W }, (_, x) => sand[y * W + x] - 1);
+        for (let k = 0; k < 8; k++) { const x = Math.floor((k + 0.5) * W / 8); setTimeout(() => play(row[x], [0, 2, 4, 7, 9, 7, 4, 2][k] + 7, { volume: 0.04 }), k * 70); }
         for (let x = 0; x < W; x++) {
           const v = sand[y * W + x]; sand[y * W + x] = 0;
           if (x % 2 === 0) bursts.push({ x, y, vx: (Math.random() - 0.5) * 10, vy: -8 - Math.random() * 10, life: 1, color: Math.random() < 0.5 ? C.white : colors[v - 1] });
         }
         flashes.push({ y, life: 1 }); cleared += 1;
       }
-      if (cleared) { lines += cleared; invite('game'); [0, 2, 4, 7, 9].forEach((n, i) => setTimeout(() => note(n + 7 + cleared * 2, { length: 0.2, volume: 0.045, type: 'square' }), i * 55)); }
+      if (cleared) { lines += cleared; invite('game'); }
       // keep the pile from filling the stage: the bottom row slowly melts away when it is tall
       let filled = 0; for (let x = 0; x < W; x++) if (sand[(F - 7) * W + x]) filled++;
       if (filled > W * 0.5) for (let x = 0; x < W; x++) if (Math.random() < 0.3) sand[(F - 1) * W + x] = 0;
@@ -233,7 +295,7 @@ function hero() {
     bursts = bursts.filter((b) => b.life > 0);
   }
   let lettersWereHit = false;
-  function maybeLand(now, x, y) { if (now - lastLand > 70) { lastLand = now; note(Math.round((x / W) * 8), { length: 0.05, volume: 0.012 }); } }
+  function maybeLand(now, x, y, inst) { if (now - lastLand > 90) { lastLand = now; play(inst, Math.round((x / W) * 8), { volume: 0.014 }); } }
 
   function draw(t) {
     if (!g) return;
@@ -272,7 +334,7 @@ function hero() {
       const key = `${c.x},${c.y}`; if (ink.get(key)?.color === colors[color]) continue;
       ink.set(key, { x: c.x, y: c.y, color: colors[color], born: performance.now() });
       interest.ink += 1; if (interest.ink === 90) invite('editor');
-      note(Math.round((H - c.y) / H * 12) + 2, { length: 0.16 });
+      play(color, Math.round((H - c.y) / H * 12) + 2);
     }
   }
   // Tap and drag never mix: nothing happens on touch-down. Moving past a small slop starts a stroke (which only
