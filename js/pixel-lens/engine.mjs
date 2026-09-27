@@ -10,9 +10,9 @@
  * is reported through `onPalette` instead of being drawn into the PiXiEELENS HUD.
  */
 
-import { DITHER_PATTERNS } from './dither-patterns.mjs?v=20260927-motif16-1';
+import { DITHER_PATTERNS } from './dither-patterns.mjs?v=20260927-first-1';
 
-const state = { colorDepth: '4', paletteMode: 'gameboy', gradientMode: 'dither', ditherPattern: 'net', surfaceSimplify: 55, cameraSettings: null };
+const state = { colorDepth: '4', paletteMode: 'gameboy', gradientMode: 'dither', ditherPattern: 'net8', surfaceSimplify: 55, cameraSettings: null };
 const paletteState = { depth: null, desired: 0, colors: [], originalColors: [], cache: new Map(), lastUpdated: 0, userEdited: false };
 let paletteDisplayEnabled = false;
 let paletteListener = null;
@@ -94,6 +94,34 @@ function removeStrayEdgePixels(data, width, height, solid) {
     let best = n[0]; let bestCount = 0;
     for (const j of n) { const kj = (data[j] << 16) | (data[j + 1] << 8) | data[j + 2]; let c = 0; for (const m of n) if (((data[m] << 16) | (data[m + 1] << 8) | data[m + 2]) === kj) c++; if (c > bestCount) { bestCount = c; best = j; } }
     if (bestCount >= 2) { data[i] = data[best]; data[i + 1] = data[best + 1]; data[i + 2] = data[best + 2]; }
+  }
+}
+/**
+ * Error diffusion (Atkinson / Floyd–Steinberg), serpentine so the error does not drift one way.
+ * `pick(r, g, b)` returns the output [r, g, b]. Strong edges take their colour without passing error on,
+ * so dither never bleeds across an outline.
+ */
+let diffusionBuffer = null;
+function diffuse(data, width, height, kernel, edgeMap, pick) {
+  const n = width * height;
+  if (!diffusionBuffer || diffusionBuffer.length < n * 3) diffusionBuffer = new Float32Array(n * 3);
+  const buf = diffusionBuffer;
+  for (let p = 0; p < n; p++) { buf[p * 3] = data[p * 4]; buf[p * 3 + 1] = data[p * 4 + 1]; buf[p * 3 + 2] = data[p * 4 + 2]; }
+  for (let y = 0; y < height; y++) {
+    const dir = y & 1 ? -1 : 1;
+    for (let step = 0; step < width; step++) {
+      const x = dir === 1 ? step : width - 1 - step; const p = y * width + x; const b = p * 3;
+      const r = clampByte(buf[b]); const g = clampByte(buf[b + 1]); const bl = clampByte(buf[b + 2]);
+      const out = pick(r, g, bl);
+      data[p * 4] = out[0]; data[p * 4 + 1] = out[1]; data[p * 4 + 2] = out[2];
+      if (edgeMap && edgeMap[p] > EDGE_SOLID) continue;
+      const er = buf[b] - out[0]; const eg = buf[b + 1] - out[1]; const eb = buf[b + 2] - out[2];
+      for (const [dx, dy, w] of kernel) {
+        const xx = x + dx * dir; const yy = y + dy;
+        if (xx < 0 || xx >= width || yy >= height) continue;
+        const q = (yy * width + xx) * 3; buf[q] += er * w; buf[q + 1] += eg * w; buf[q + 2] += eb * w;
+      }
+    }
   }
 }
 const cellKeys = new Int32Array(256); const cellCounts = new Int32Array(256); const cellSums = new Int32Array(256);
@@ -777,6 +805,14 @@ function applyFixed8Bit(imageData, edgeMap) {
     return;
   }
   const pattern = currentDitherPattern();
+  if (pattern.kind === 'diffusion') {
+    const out = [0, 0, 0];
+    diffuse(data, width, height, pattern.kernel, edgeMap, (r, g, b) => {
+      out[0] = quantizeChannelToLevels(r, levels[0]); out[1] = quantizeChannelToLevels(g, levels[1]); out[2] = quantizeChannelToLevels(b, levels[2]);
+      return out;
+    });
+    return;
+  }
   // per-pixel patterns dither each channel on its own; block and motif patterns share one step per pixel
   // (from the brightness-weighted share) so a heart is the same heart in red, green and blue
   const shared = pattern.cell > 1;
@@ -1058,6 +1094,21 @@ function applyColorDepth(imageData) {
     mixCache[key] = encode(a, a); mixTone[key] = 0;
   };
 
+  if (useDither && currentDitherPattern().kind === 'diffusion') {
+    if (!paletteState.nearCache || paletteState.nearCachePalette !== palette) { paletteState.nearCache = new Uint8Array(1 << 18); paletteState.nearCachePalette = palette; }
+    const near = paletteState.nearCache; const out = [0, 0, 0];
+    diffuse(data, width, height, currentDitherPattern().kernel, edgeMap, (r, g, b) => {
+      const key = ((r >> 2) << 12) | ((g >> 2) << 6) | (b >> 2);
+      let index = near[key];
+      if (!index) {
+        let best = Infinity; const rr = (r & 252) | 2; const gg = (g & 252) | 2; const bb = (b & 252) | 2;
+        for (let k = 0; k < palette.length; k++) { const c = palette[k]; const dist = (rr - c.r) ** 2 + (gg - c.g) ** 2 + (bb - c.b) ** 2; if (dist < best) { best = dist; index = k + 1; } }
+        near[key] = index;
+      }
+      const c = palette[index - 1]; out[0] = c.r; out[1] = c.g; out[2] = c.b; return out;
+    });
+    return;
+  }
   const n = width * height; const { pair, tone, solid } = ensureScratch(n);
   for (let p = 0, i = 0; p < n; p++, i += 4) {
     const key = ((data[i] >> 2) << 12) | ((data[i + 1] >> 2) << 6) | (data[i + 2] >> 2);

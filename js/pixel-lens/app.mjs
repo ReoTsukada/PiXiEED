@@ -2,9 +2,9 @@ import { createFrameLoop } from '../pixel-studio/frame-loop.mjs';
 import { encodeCameraPng, pngExportGeometry } from '../pixel-studio/png-export.mjs';
 import { FRAME_RATIOS, OUTPUT_SIZES, resolveAspect, centerCrop, frameGeometry, fitFrame } from '../pixel-studio/framing.mjs?v=20260925-lens-sizes-1';
 import { cameraStartErrorMessage, deriveCameraPrimaryAction } from '../pixel-studio/camera-ui-state.mjs';
-import { CAMERA_SETTING_DEFAULTS, DITHER_PATTERNS, lensFrameFilter, lensPalette, processLensFrame, resetLensPalette, setLensSettings } from './engine.mjs?v=20260927-motif16-1';
-import { attachZoomGestures, formatZoom, splitZoom, zoomRange, zoomStops } from './zoom.mjs?v=20260927-motif16-1';
-import { GIF_FPS, GIF_MAX_MS, encodeGif, gifScale } from './gif.mjs?v=20260927-motif16-1';
+import { CAMERA_SETTING_DEFAULTS, DITHER_PATTERNS, lensFrameFilter, lensPalette, processLensFrame, resetLensPalette, setLensSettings } from './engine.mjs?v=20260927-ui-1';
+import { attachZoomGestures, formatZoom, splitZoom, zoomRange, zoomStops } from './zoom.mjs?v=20260927-ui-1';
+import { GIF_FPS, GIF_MAX_MS, encodeGif, gifScale } from './gif.mjs?v=20260927-ui-1';
 
 const $ = (selector) => document.querySelector(selector);
 const root = $('#pixelStudio');
@@ -40,7 +40,7 @@ let displayedPaletteRevision = null;
 
 // PiXiEELENS defaults (pixiee-lens/index.html): 4 colours, Game Boy palette, ordered dither, surface 55
 const state = { mode: 'idle', facing: 'environment', result: null, error: '', ratio: 'screen', size: 256,
-  colorDepth: '4', paletteMode: 'gameboy', gradientMode: 'dither', ditherPattern: 'net', surfaceSimplify: 55, camera: { ...CAMERA_SETTING_DEFAULTS }, zoom: 1 };
+  colorDepth: '4', paletteMode: 'gameboy', gradientMode: 'dither', ditherPattern: 'net8', surfaceSimplify: 55, camera: { ...CAMERA_SETTING_DEFAULTS }, zoom: 1 };
 let zoomInfo = zoomRange(null); let appliedHardwareZoom = 1; let zoomApplyPending = false;
 // 面のまとまり is automatic: it only calms dither speckle with 8-16 colours (measured: no change at 2-4 colours,
 // heavy posterising at high strength), so it runs at PiXiEELENS's default 55 there and is skipped elsewhere.
@@ -171,6 +171,7 @@ function updatePalettePreview(result) {
   const revision = `${(result.palette ?? []).map((c) => c.join(',')).join(';')}:${state.colorDepth}`;
   if (revision === displayedPaletteRevision) return;
   displayedPaletteRevision = revision;
+  tintSwatches(result.palette);
   const preview = $('#palettePreview');
   preview.replaceChildren();
   const noPalette = !result.palette?.length;
@@ -463,6 +464,7 @@ function capture() {
 
 function refreshObjects() {
   if (state.mode !== 'live') return;
+  if (performance.now() - railClosedAt < 600) return; // that tap only folded the dither list
   resetLensPalette(); // PiXiEELENS keeps its palette; a tap picks the colours again from the current view
   paletteEpoch++;
   root.dataset.paletteEpoch = String(paletteEpoch);
@@ -535,13 +537,7 @@ function syncControls() {
   }
   const check = (name, value) => { const input = settingsPanel.querySelector(`input[name="${name}"][value="${value}"]`); if (input) input.checked = true; };
   check('aspect', state.ratio); check('pixels', String(state.size)); check('paletteMode', state.paletteMode);
-  const ditherButton = $('#ditherToggle');
-  const ditherAvailable = !NO_DITHER_DEPTHS.has(state.colorDepth);
-  ditherButton.setAttribute('aria-pressed', String(state.gradientMode === 'dither' && ditherAvailable));
-  ditherButton.disabled = !ditherAvailable;
-  // the pattern chooser only exists while dither is on
-  $('#ditherKinds').hidden = !(ditherAvailable && state.gradientMode === 'dither');
-  for (const button of document.querySelectorAll('#ditherKinds [data-pattern]')) button.setAttribute('aria-checked', String(button.dataset.pattern === state.ditherPattern));
+  syncDitherRail();
   $('#paletteModeRow').hidden = !['2', '4', '8', '16'].includes(state.colorDepth);
   const look = currentLook();
   for (const button of document.querySelectorAll('#looks [data-look]')) button.setAttribute('aria-checked', String(button.dataset.look === look));
@@ -590,42 +586,115 @@ function stepLook(delta) {
   const index = buttons.findIndex((button) => button.dataset.look === currentLook());
   selectLook(buttons[(index + delta + buttons.length) % buttons.length]);
 }
-// Dither patterns: small swatches drawn from the real threshold tiles, shown only while dither is on.
+// ---------- Dither rail ----------
+// One control on the right edge. Folded, it is a single swatch of the current pattern (or "オフ"): flick it
+// up / down to step through the patterns, tap it to open the list. Open, it lists every pattern with its
+// name; picking one folds the rail again. It is absent for looks without dither (グレー, フル).
 const NO_DITHER_DEPTHS = new Set(['full', 'gray']);
-// A swatch is one characteristic step of the pattern, drawn 1:1 over 16×16 pixels and shown pixelated.
+const rail = $('#ditherRail'); const railList = $('#ditherKinds'); const railCurrent = $('#ditherCurrent');
+const SHORT_LABEL = { net8: '8×8', net4: '4×4', net2: '2×2', diagonal: '斜線', atkinson: 'Atkin', fs: '拡散' };
+const SWATCH_TONE = { net8: 72, net4: 72, net2: 72, checker: 128, lines: 64, diagonal: 64, halftone: 70, grain: 90 };
+let swatchColors = [[32, 56, 16], [224, 248, 208]];
+// A swatch shows one characteristic step of the pattern 1:1 in the current palette's darkest and lightest
+// colours; error diffusion is shown by diffusing a flat 35% tone.
 function patternSwatch(pattern) {
   const size = 16; const canvas = document.createElement('canvas'); canvas.width = size; canvas.height = size;
   const context = canvas.getContext('2d'); const image = context.createImageData(size, size);
-  const SWATCH_TONE = { net: 64, halftone: 60, checker: 128, lines: 64, diagonal: 64, heart: 88, star: 98, sparkle: 106, flower: 88 };
-  const bits = pattern.levels[pattern.levelForTone[SWATCH_TONE[pattern.id] ?? 90]];
-  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
-    const v = bits[((y & pattern.mask) << pattern.shift) | (x & pattern.mask)] ? 245 : 40; image.data.set([v, v, v, 255], (y * size + x) * 4);
+  const bits = new Uint8Array(size * size);
+  if (pattern?.kind === 'ordered') {
+    const step = pattern.levels[pattern.levelForTone[SWATCH_TONE[pattern.id] ?? 90]];
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) bits[y * size + x] = step[((y & pattern.mask) << pattern.shift) | (x & pattern.mask)];
+  } else if (pattern?.kind === 'diffusion') {
+    const buf = new Float32Array(size * size).fill(0.35);
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+      const p = y * size + x; const on = buf[p] >= 0.5 ? 1 : 0; bits[p] = on; const e = buf[p] - on;
+      for (const [dx, dy, w] of pattern.kernel) { const xx = x + dx; const yy = y + dy; if (xx >= 0 && xx < size && yy < size) buf[yy * size + xx] += e * w; }
+    }
   }
+  const [dark, light] = swatchColors;
+  for (let p = 0; p < size * size; p++) image.data.set([...(bits[p] ? light : dark), 255], p * 4);
   context.putImageData(image, 0, 0);
-  return canvas.toDataURL();
+  return `url(${canvas.toDataURL()})`;
 }
-for (const pattern of DITHER_PATTERNS) {
+function makeRailItem(id, label) {
   const button = document.createElement('button');
-  button.type = 'button'; button.setAttribute('role', 'radio'); button.dataset.pattern = pattern.id;
-  button.setAttribute('aria-label', `ディザ：${pattern.label}`); button.title = pattern.label;
-  button.style.setProperty('--swatch', `url(${patternSwatch(pattern)})`);
-  if (pattern.group === 'cute' && !$('#ditherKinds .lc-kinds-gap')) { const gap = document.createElement('i'); gap.className = 'lc-kinds-gap'; gap.setAttribute('aria-hidden', 'true'); $('#ditherKinds').appendChild(gap); }
-  $('#ditherKinds').appendChild(button);
+  button.type = 'button'; button.setAttribute('role', 'radio'); button.dataset.pattern = id;
+  button.innerHTML = '<span class="lc-rail-name"></span><i class="lc-rail-swatch" aria-hidden="true"></i>';
+  button.querySelector('.lc-rail-name').textContent = label;
+  railList.appendChild(button);
 }
-$('#ditherKinds').addEventListener('click', (event) => {
-  const button = event.target.closest('[data-pattern]'); if (!button || state.mode === 'captured') return;
-  state.ditherPattern = button.dataset.pattern;
-  navigator.vibrate?.(6);
-  applyChange();
-  sayToast(`ディザ：${DITHER_PATTERNS.find((p) => p.id === state.ditherPattern).label}`);
-});
-$('#ditherToggle').addEventListener('click', () => {
+makeRailItem('none', 'オフ');
+for (const pattern of DITHER_PATTERNS) makeRailItem(pattern.id, pattern.label);
+function paintSwatches() {
+  for (const button of railList.querySelectorAll('[data-pattern]')) {
+    const pattern = DITHER_PATTERNS.find((p) => p.id === button.dataset.pattern);
+    button.querySelector('.lc-rail-swatch').style.setProperty('--swatch', pattern ? patternSwatch(pattern) : 'none');
+  }
+}
+/** Colour the swatches with the look's own palette (called when the palette changes). */
+function tintSwatches(palette) {
+  const lum = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  const sorted = (palette?.length ? [...palette] : []).sort((a, b) => lum(a) - lum(b));
+  swatchColors = sorted.length >= 2 ? [sorted[0], sorted.at(-1)] : [[28, 30, 34], [236, 238, 240]];
+  paintSwatches(); syncDitherRail();
+}
+function currentPatternId() { return state.gradientMode === 'dither' ? state.ditherPattern : 'none'; }
+function syncDitherRail() {
+  const available = !NO_DITHER_DEPTHS.has(state.colorDepth);
+  rail.hidden = !available;
+  if (!available) setRailOpen(false);
+  const id = currentPatternId(); const pattern = DITHER_PATTERNS.find((p) => p.id === id);
+  for (const button of railList.querySelectorAll('[data-pattern]')) button.setAttribute('aria-checked', String(button.dataset.pattern === id));
+  railCurrent.querySelector('.lc-rail-swatch').style.setProperty('--swatch', pattern ? patternSwatch(pattern) : 'none');
+  railCurrent.querySelector('.lc-rail-caption').textContent = pattern ? (SHORT_LABEL[pattern.id] ?? pattern.label) : 'オフ';
+  railCurrent.dataset.off = String(!pattern);
+  railCurrent.setAttribute('aria-label', `ディザ：${pattern ? pattern.label : 'オフ'}（タップで一覧、上下にはじいて切り替え）`);
+}
+let railTimer = 0;
+function setRailOpen(open) {
+  window.clearTimeout(railTimer);
+  rail.dataset.open = String(open);
+  railList.hidden = !open;
+  railCurrent.setAttribute('aria-expanded', String(open));
+  if (open) railList.querySelector('[aria-checked="true"]')?.scrollIntoView({ block: 'center' });
+}
+function choosePattern(id, { toast = true } = {}) {
   if (state.mode === 'captured' || NO_DITHER_DEPTHS.has(state.colorDepth)) return;
-  state.gradientMode = state.gradientMode === 'dither' ? 'none' : 'dither';
+  if (id === 'none') state.gradientMode = 'none';
+  else { state.gradientMode = 'dither'; state.ditherPattern = id; }
   navigator.vibrate?.(6);
   applyChange();
-  sayToast(state.gradientMode === 'dither' ? 'ディザ オン' : 'ディザ オフ');
+  if (toast) sayToast(`ディザ：${DITHER_PATTERNS.find((p) => p.id === currentPatternId())?.label ?? 'オフ'}`);
+}
+railList.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-pattern]'); if (!button) return;
+  choosePattern(button.dataset.pattern, { toast: false });
+  railTimer = window.setTimeout(() => setRailOpen(false), 380); // let the choice show before folding
 });
+// the folded swatch: tap opens the list, a vertical flick steps through the patterns
+{
+  let start = null;
+  railCurrent.addEventListener('pointerdown', (event) => { start = { y: event.clientY, t: performance.now() }; try { railCurrent.setPointerCapture(event.pointerId); } catch { /* ignore */ } });
+  railCurrent.addEventListener('pointerup', (event) => {
+    if (!start) return; const dy = event.clientY - start.y; const quick = performance.now() - start.t < 600; start = null;
+    if (Math.abs(dy) > 24 && quick) {
+      const ids = ['none', ...DITHER_PATTERNS.map((p) => p.id)];
+      const index = ids.indexOf(currentPatternId());
+      choosePattern(ids[(index + (dy < 0 ? -1 : 1) + ids.length) % ids.length]);
+      railCurrent.classList.remove('is-stepped'); requestAnimationFrame(() => railCurrent.classList.add('is-stepped'));
+      railCurrent.dataset.swallowClick = 'true';
+    }
+  });
+  railCurrent.addEventListener('pointercancel', () => { start = null; });
+  railCurrent.addEventListener('click', () => {
+    if (railCurrent.dataset.swallowClick === 'true') { railCurrent.dataset.swallowClick = 'false'; return; }
+    setRailOpen(rail.dataset.open !== 'true');
+  });
+}
+let railClosedAt = 0;
+document.addEventListener('pointerdown', (event) => { if (rail.dataset.open === 'true' && !rail.contains(event.target)) { setRailOpen(false); railClosedAt = performance.now(); } }, true);
+document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && rail.dataset.open === 'true') { setRailOpen(false); railCurrent.focus(); } });
+paintSwatches();
 syncControls();
 
 // ---------- Pinch-first zoom ----------
