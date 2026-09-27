@@ -23,3 +23,10 @@ test('dither button: a plain switch while off, the pattern chooser while on', ()
   assert.match(app, /onSwipe/);
   assert.match(app, /function startGif\(/);
 });
+
+test('the tray can never widen the bottom area (16 colours scroll inside a fixed-size strip)', () => {
+  const css = read('css/pixel-lens-camera.css');
+  assert.match(css, /\.lc-bottom \{ grid-template-columns: minmax\(0, 1fr\); \}/);
+  assert.match(css, /\.lc-tray, \.lc-look, \.lc-tone, \.lc-palette-editor \{ grid-template-columns: minmax\(0, 1fr\); \}/);
+  assert.match(css, /\.lc-palette-strip \{[^}]*width: min\(calc\(100% - 1\.6rem\), 23rem\)[^}]*height: 2\.75rem/);
+});

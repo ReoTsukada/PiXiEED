@@ -750,14 +750,18 @@ function renderMyPaletteChips() {
 function renderPaletteStrip(palette = lensPalette()) {
   shownPalette = palette ?? [];
   const editable = EDITABLE_DEPTHS.has(state.colorDepth) && shownPalette.length > 0;
-  $('#paletteStrip').hidden = !editable;
-  if (!editable) { setPaletteEditing(-1); return; }
+  // the strip keeps its place even when this look has no palette to edit, so the rows below never jump
+  $('#paletteStrip').hidden = false;
+  $('#paletteStrip').dataset.reserved = String(!editable);
+  if (!editable) { setPaletteEditing(-1); paletteDots.replaceChildren(); return; }
   if (paletteDots.children.length !== shownPalette.length) {
     paletteDots.replaceChildren(...shownPalette.map((_, index) => {
       const dot = document.createElement('button'); dot.type = 'button'; dot.dataset.index = String(index);
       dot.setAttribute('aria-label', `${index + 1}番目の色を変える`); return dot;
     }));
   }
+  paletteDots.dataset.count = String(shownPalette.length);
+  requestAnimationFrame(() => { paletteDots.dataset.overflow = String(paletteDots.scrollWidth > paletteDots.clientWidth + 1); });
   shownPalette.forEach((color, index) => {
     const dot = paletteDots.children[index];
     dot.style.background = cssColor(color);
@@ -781,7 +785,7 @@ function setPaletteEditing(index) {
   paletteEditor.hidden = index < 0;
   for (const dot of paletteDots.children) dot.setAttribute('aria-pressed', String(Number(dot.dataset.index) === index));
   $('#paletteDone').hidden = index < 0;
-  if (index >= 0) syncEditSlider();
+  if (index >= 0) { syncEditSlider(); paletteDots.children[index]?.scrollIntoView({ inline: 'nearest', block: 'nearest' }); }
 }
 function syncEditSlider() {
   const color = shownPalette[editIndex]; if (!color) return;
@@ -795,6 +799,7 @@ function syncEditSlider() {
   editSlider.style.setProperty('--track', `linear-gradient(90deg, ${stops.join(', ')})`);
   $('#editColor').style.background = cssColor(color);
 }
+paletteDots.addEventListener('scroll', () => { paletteDots.dataset.scrolled = String(paletteDots.scrollLeft > 2); }, { passive: true });
 paletteDots.addEventListener('click', (event) => {
   const dot = event.target.closest('[data-index]'); if (!dot || state.mode === 'captured') return;
   const index = Number(dot.dataset.index);
