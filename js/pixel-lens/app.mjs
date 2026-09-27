@@ -2,9 +2,9 @@ import { createFrameLoop } from '../pixel-studio/frame-loop.mjs';
 import { encodeCameraPng, pngExportGeometry } from '../pixel-studio/png-export.mjs';
 import { FRAME_RATIOS, OUTPUT_SIZES, resolveAspect, centerCrop, frameGeometry, fitFrame } from '../pixel-studio/framing.mjs?v=20260925-lens-sizes-1';
 import { cameraStartErrorMessage, deriveCameraPrimaryAction } from '../pixel-studio/camera-ui-state.mjs';
-import { CAMERA_SETTING_DEFAULTS, lensFrameFilter, lensPalette, processLensFrame, resetLensPalette, setLensSettings } from './engine.mjs?v=20260927-gesture-1';
-import { attachZoomGestures, formatZoom, splitZoom, zoomRange, zoomStops } from './zoom.mjs?v=20260927-gesture-1';
-import { GIF_FPS, GIF_MAX_MS, encodeGif, gifScale } from './gif.mjs?v=20260927-gesture-1';
+import { CAMERA_SETTING_DEFAULTS, DITHER_PATTERNS, lensFrameFilter, lensPalette, processLensFrame, resetLensPalette, setLensSettings } from './engine.mjs?v=20260927-dither-1';
+import { attachZoomGestures, formatZoom, splitZoom, zoomRange, zoomStops } from './zoom.mjs?v=20260927-dither-1';
+import { GIF_FPS, GIF_MAX_MS, encodeGif, gifScale } from './gif.mjs?v=20260927-dither-1';
 
 const $ = (selector) => document.querySelector(selector);
 const root = $('#pixelStudio');
@@ -40,7 +40,7 @@ let displayedPaletteRevision = null;
 
 // PiXiEELENS defaults (pixiee-lens/index.html): 4 colours, Game Boy palette, ordered dither, surface 55
 const state = { mode: 'idle', facing: 'environment', result: null, error: '', ratio: 'screen', size: 256,
-  colorDepth: '4', paletteMode: 'gameboy', gradientMode: 'dither', surfaceSimplify: 55, camera: { ...CAMERA_SETTING_DEFAULTS }, zoom: 1 };
+  colorDepth: '4', paletteMode: 'gameboy', gradientMode: 'dither', ditherPattern: 'fine', surfaceSimplify: 55, camera: { ...CAMERA_SETTING_DEFAULTS }, zoom: 1 };
 let zoomInfo = zoomRange(null); let appliedHardwareZoom = 1; let zoomApplyPending = false;
 // 面のまとまり is automatic: it only calms dither speckle with 8-16 colours (measured: no change at 2-4 colours,
 // heavy posterising at high strength), so it runs at PiXiEELENS's default 55 there and is skipped elsewhere.
@@ -48,7 +48,7 @@ const autoSurface = (depth) => (depth === '8' || depth === '16' ? 55 : 0);
 // A little more punch than the raw camera by default; the tone sliders still read 0 at this standard look.
 const BASE_TONE = { contrast: 15, saturation: 20 };
 const withBaseTone = (camera) => { const out = { ...camera }; for (const [key, add] of Object.entries(BASE_TONE)) out[key] = Math.max(-100, Math.min(100, (out[key] ?? 0) + add)); return out; };
-function syncLens() { setLensSettings({ colorDepth: state.colorDepth, paletteMode: state.paletteMode, gradientMode: state.gradientMode, surfaceSimplify: autoSurface(state.colorDepth), cameraSettings: withBaseTone(state.camera) }); }
+function syncLens() { setLensSettings({ colorDepth: state.colorDepth, paletteMode: state.paletteMode, gradientMode: state.gradientMode, ditherPattern: state.ditherPattern, surfaceSimplify: autoSurface(state.colorDepth), cameraSettings: withBaseTone(state.camera) }); }
 syncLens();
 const COLOR_LABELS = { 2: '2色', 4: '4色', 8: '8色', 16: '16色', gray: 'グレー', 256: '256色', full: 'フルカラー' };
 
@@ -536,8 +536,12 @@ function syncControls() {
   const check = (name, value) => { const input = settingsPanel.querySelector(`input[name="${name}"][value="${value}"]`); if (input) input.checked = true; };
   check('aspect', state.ratio); check('pixels', String(state.size)); check('paletteMode', state.paletteMode);
   const ditherButton = $('#ditherToggle');
-  ditherButton.setAttribute('aria-pressed', String(state.gradientMode === 'dither'));
-  ditherButton.disabled = state.colorDepth === 'full';
+  const ditherAvailable = !NO_DITHER_DEPTHS.has(state.colorDepth);
+  ditherButton.setAttribute('aria-pressed', String(state.gradientMode === 'dither' && ditherAvailable));
+  ditherButton.disabled = !ditherAvailable;
+  // the pattern chooser only exists while dither is on
+  $('#ditherKinds').hidden = !(ditherAvailable && state.gradientMode === 'dither');
+  for (const button of document.querySelectorAll('#ditherKinds [data-pattern]')) button.setAttribute('aria-checked', String(button.dataset.pattern === state.ditherPattern));
   $('#paletteModeRow').hidden = !['2', '4', '8', '16'].includes(state.colorDepth);
   const look = currentLook();
   for (const button of document.querySelectorAll('#looks [data-look]')) button.setAttribute('aria-checked', String(button.dataset.look === look));
@@ -586,8 +590,34 @@ function stepLook(delta) {
   const index = buttons.findIndex((button) => button.dataset.look === currentLook());
   selectLook(buttons[(index + delta + buttons.length) % buttons.length]);
 }
+// Dither patterns: small swatches drawn from the real threshold tiles, shown only while dither is on.
+const NO_DITHER_DEPTHS = new Set(['full', 'gray']);
+function patternSwatch(tile) {
+  const size = 16; const canvas = document.createElement('canvas'); canvas.width = size; canvas.height = size;
+  const context = canvas.getContext('2d'); const image = context.createImageData(size, size);
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+    const on = (x + 0.5) / size > tile.t[(y % tile.h) * tile.w + (x % tile.w)];
+    const i = (y * size + x) * 4; const v = on ? 245 : 40; image.data.set([v, v, v, 255], i);
+  }
+  context.putImageData(image, 0, 0);
+  return canvas.toDataURL();
+}
+for (const pattern of DITHER_PATTERNS) {
+  const button = document.createElement('button');
+  button.type = 'button'; button.setAttribute('role', 'radio'); button.dataset.pattern = pattern.id;
+  button.setAttribute('aria-label', `ディザ：${pattern.label}`); button.title = pattern.label;
+  button.style.setProperty('--swatch', `url(${patternSwatch(pattern.tile)})`);
+  $('#ditherKinds').appendChild(button);
+}
+$('#ditherKinds').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-pattern]'); if (!button || state.mode === 'captured') return;
+  state.ditherPattern = button.dataset.pattern;
+  navigator.vibrate?.(6);
+  applyChange();
+  sayToast(`ディザ：${DITHER_PATTERNS.find((p) => p.id === state.ditherPattern).label}`);
+});
 $('#ditherToggle').addEventListener('click', () => {
-  if (state.mode === 'captured' || state.colorDepth === 'full') return;
+  if (state.mode === 'captured' || NO_DITHER_DEPTHS.has(state.colorDepth)) return;
   state.gradientMode = state.gradientMode === 'dither' ? 'none' : 'dither';
   navigator.vibrate?.(6);
   applyChange();

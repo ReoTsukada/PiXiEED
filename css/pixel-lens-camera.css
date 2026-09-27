@@ -217,3 +217,11 @@ button, a { font: inherit; }
 .lc-hint p { display: flex; align-items: center; gap: .7rem; margin: 0; }
 .lc-hint b { display: grid; place-items: center; width: 1.6rem; height: 1.6rem; border-radius: 50%; background: rgba(255,255,255,.14); font-size: .9rem; }
 @media (prefers-reduced-motion: reduce) { .lc-frame.lc-flip { animation: none; } .lc-rec i { animation: none; } }
+
+/* Dither pattern swatches: appear only while dither is on */
+.lc-dither-kinds { display: flex; gap: .4rem; padding: .3rem; border-radius: 999px; background: var(--lc-glass); border: 1px solid var(--lc-line); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); animation: lc-in .22s var(--lc-ease); }
+.lc-dither-kinds[hidden] { display: none; }
+.lc-dither-kinds button { width: 2.1rem; height: 2.1rem; padding: 0; border-radius: 50%; border: 2px solid transparent; background: var(--swatch) center / 100% 100% no-repeat; image-rendering: pixelated; cursor: pointer; transition: transform .15s var(--lc-ease), border-color .2s; }
+.lc-dither-kinds button:active { transform: scale(.9); }
+.lc-dither-kinds button[aria-checked="true"] { border-color: #fff; box-shadow: 0 0 0 2px var(--lc-accent); }
+.lc[data-mode="captured"] .lc-dither-kinds, .lc[data-recording="true"] .lc-dither-kinds { display: none; }

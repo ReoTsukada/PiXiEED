@@ -10,7 +10,7 @@
  * is reported through `onPalette` instead of being drawn into the PiXiEELENS HUD.
  */
 
-const state = { colorDepth: '4', paletteMode: 'gameboy', gradientMode: 'dither', surfaceSimplify: 55, cameraSettings: null };
+const state = { colorDepth: '4', paletteMode: 'gameboy', gradientMode: 'dither', ditherPattern: 'fine', surfaceSimplify: 55, cameraSettings: null };
 const paletteState = { depth: null, desired: 0, colors: [], originalColors: [], cache: new Map(), lastUpdated: 0, userEdited: false };
 let paletteDisplayEnabled = false;
 let paletteListener = null;
@@ -65,14 +65,40 @@ const PALETTE_AUTO_UPDATE_ENABLED = false;
 
 const DOT_SMOOTHING_BLUR = 0.45;
 
-const DITHER_MATRIX_4X4 = [
-  0, 8, 2, 10,
-  12, 4, 14, 6,
-  3, 11, 1, 9,
-  15, 7, 13, 5
-];
-
 const FIXED_8BIT_LEVELS = Object.freeze({ r: 8, g: 8, b: 4 });
+
+// ---- Dither patterns ----------------------------------------------------------------------------------
+// Every pattern is a tile of thresholds t in (0, 1). A pixel is shifted by (t - 0.5) × spread before the
+// nearest colour is picked, where spread is the average step between neighbouring colours. That makes the
+// pattern span the whole way from one colour to the next (PiXiEELENS used a fixed ±15, so only the pixels
+// right at a colour boundary were dithered).
+function bayerTile(n) {
+  let m = [[0]];
+  while (m.length < n) {
+    const k = m.length; const next = Array.from({ length: k * 2 }, () => new Array(k * 2));
+    for (let y = 0; y < k; y++) for (let x = 0; x < k; x++) {
+      const v = m[y][x] * 4;
+      next[y][x] = v; next[y][x + k] = v + 2; next[y + k][x] = v + 3; next[y + k][x + k] = v + 1;
+    }
+    m = next;
+  }
+  return { w: n, h: n, t: Float32Array.from(m.flat(), (v) => (v + 0.5) / (n * n)) };
+}
+const tileOf = (w, h, values, levels) => ({ w, h, t: Float32Array.from(values, (v) => (v + 0.5) / levels) });
+export const DITHER_PATTERNS = Object.freeze([
+  Object.freeze({ id: 'fine', label: '網目', tile: bayerTile(8) }),
+  Object.freeze({ id: 'coarse', label: '粗い網目', tile: bayerTile(2) }),
+  // hand-placed look: flat colour, and a checkerboard only through the middle of each step
+  Object.freeze({ id: 'checker', label: '市松', tile: { w: 2, h: 2, t: Float32Array.of(0.25, 0.75, 0.75, 0.25) } }),
+  Object.freeze({ id: 'halftone', label: '網点', tile: tileOf(4, 4, [12, 5, 6, 13, 4, 0, 1, 7, 11, 3, 2, 8, 15, 10, 9, 14], 16) }),
+  Object.freeze({ id: 'lines', label: '横線', tile: tileOf(1, 4, [0, 2, 1, 3], 4) })
+]);
+function currentDitherTile() { return (DITHER_PATTERNS.find((p) => p.id === state.ditherPattern) ?? DITHER_PATTERNS[0]).tile; }
+function paletteSpread(palette) {
+  let lo = 255; let hi = 0;
+  for (const c of palette) { const l = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b; if (l < lo) lo = l; if (l > hi) hi = l; }
+  return Math.max(16, Math.min(255, (hi - lo) / Math.max(1, palette.length - 1)));
+}
 
 const CAMERA_SETTING_CONFIG = Object.freeze({
   brightness: { min: -100, max: 100, step: 1, default: 0 },
@@ -730,9 +756,9 @@ function applyFixed8Bit(imageData) {
   const data = imageData.data;
   const width = imageData.width || 0;
   const useDither = state.gradientMode === 'dither' && width > 0;
-  const ditherStrength = useDither ? 32 : 0;
-  const ditherScale = useDither ? ditherStrength / 16 : 0;
+  const tile = currentDitherTile();
   const rLevels = FIXED_8BIT_LEVELS.r;
+  const rSpread = 255 / (FIXED_8BIT_LEVELS.r - 1); const gSpread = 255 / (FIXED_8BIT_LEVELS.g - 1); const bSpread = 255 / (FIXED_8BIT_LEVELS.b - 1);
   const gLevels = FIXED_8BIT_LEVELS.g;
   const bLevels = FIXED_8BIT_LEVELS.b;
   for (let i = 0; i < data.length; i += 4) {
@@ -743,11 +769,10 @@ function applyFixed8Bit(imageData) {
       const pixelIndex = i >> 2;
       const x = pixelIndex % width;
       const y = (pixelIndex / width) | 0;
-      const threshold = DITHER_MATRIX_4X4[((y & 3) << 2) | (x & 3)];
-      const offset = (threshold - 7.5) * ditherScale;
-      r = clampByte(r + offset);
-      g = clampByte(g + offset);
-      b = clampByte(b + offset);
+      const t = tile.t[(y % tile.h) * tile.w + (x % tile.w)] - 0.5;
+      r = clampByte(r + t * rSpread);
+      g = clampByte(g + t * gSpread);
+      b = clampByte(b + t * bSpread);
     }
     data[i] = quantizeChannelToLevels(r, rLevels);
     data[i + 1] = quantizeChannelToLevels(g, gLevels);
@@ -958,32 +983,24 @@ function applyColorDepth(imageData) {
     return;
   }
   const data = imageData.data;
-  const cache = paletteState.cache;
   const width = imageData.width || 0;
   const useDither = state.gradientMode === 'dither' && width > 0;
-  const ditherStrength = useDither ? (depth === '2' ? 48 : 32) : 0;
-  const ditherScale = useDither ? ditherStrength / 16 : 0;
+  const tile = currentDitherTile();
+  const spread = paletteSpread(palette);
+  // nearest-colour cache at 6 bits per channel (the old 4-bit bins were coarser than the dither steps)
+  if (!paletteState.fastCache || paletteState.fastCachePalette !== palette) {
+    paletteState.fastCache = new Uint8Array(1 << 18);
+    paletteState.fastCachePalette = palette;
+  }
+  const fast = paletteState.fastCache;
+  const FORCED_BLACK = 254; const FORCED_WHITE = 255;
 
-  const findNearestColor = (r, g, b, key) => {
+  const findNearestCode = (r, g, b) => {
     const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
     if (!useSourcePalette) {
-      if (depth !== '4' && luminance < 48) {
-        cache.set(key, BLACK_COLOR);
-        return BLACK_COLOR;
-      }
-      if (depth !== '4' && luminance > 224) {
-        cache.set(key, WHITE_COLOR);
-        return WHITE_COLOR;
-      }
-      if (depth === '4' && luminance < FOUR_COLOR_DARK_THRESHOLD) {
-        const darkest = palette[palette.length - 1] || { r: 0, g: 0, b: 0 };
-        cache.set(key, darkest);
-        return darkest;
-      }
-    }
-    let cached = cache.get(key);
-    if (cached) {
-      return cached;
+      if (depth !== '4' && luminance < 48) return FORCED_BLACK;
+      if (depth !== '4' && luminance > 224) return FORCED_WHITE;
+      if (depth === '4' && luminance < FOUR_COLOR_DARK_THRESHOLD) return palette.length; // darkest
     }
     let bestIndex = 0;
     let bestDistance = Number.POSITIVE_INFINITY;
@@ -998,34 +1015,32 @@ function applyColorDepth(imageData) {
         bestIndex = i;
       }
     }
-    cached = palette[bestIndex];
-    cache.set(key, cached);
-    return cached;
+    return bestIndex + 1;
   };
 
   for (let i = 0; i < data.length; i += 4) {
     let r = data[i];
     let g = data[i + 1];
     let b = data[i + 2];
-    const pixelIndex = i >> 2;
     if (useDither) {
+      const pixelIndex = i >> 2;
       const x = pixelIndex % width;
       const y = (pixelIndex / width) | 0;
-      const threshold = DITHER_MATRIX_4X4[((y & 3) << 2) | (x & 3)];
-      const offset = (threshold - 7.5) * ditherScale;
+      const offset = (tile.t[(y % tile.h) * tile.w + (x % tile.w)] - 0.5) * spread;
       r = clampByte(r + offset);
       g = clampByte(g + offset);
       b = clampByte(b + offset);
     }
-    const rIndex = getColorBinIndex(r);
-    const gIndex = getColorBinIndex(g);
-    const bIndex = getColorBinIndex(b);
-    const key = (rIndex << 8) | (gIndex << 4) | bIndex;
-    const nearest = findNearestColor(r, g, b, key);
+    const key = ((r >> 2) << 12) | ((g >> 2) << 6) | (b >> 2);
+    let code = fast[key];
+    if (!code) { code = findNearestCode((r & 252) | 2, (g & 252) | 2, (b & 252) | 2); fast[key] = code; }
+    const nearest = code === FORCED_BLACK ? BLACK_COLOR : code === FORCED_WHITE ? WHITE_COLOR : palette[code - 1];
     data[i] = nearest.r;
     data[i + 1] = nearest.g;
     data[i + 2] = nearest.b;
   }
+  // 面のまとまり is a majority filter: it would erase the dither pattern, so it only tidies flat colour
+  if (useDither) return;
   applySurfaceSimplify(imageData, edgeMap, palette);
   removeSmallRegions(imageData, edgeMap);
 }
@@ -1035,13 +1050,14 @@ state.cameraSettings = { ...CAMERA_SETTING_DEFAULTS };
 export { CAMERA_SETTING_CONFIG, CAMERA_SETTING_DEFAULTS, DOT_SMOOTHING_BLUR, FIXED_FOUR_COLOR_PALETTE };
 
 /** Update PiXiEELENS settings: colorDepth ('2'|'4'|'8'|'16'|'gray'|'256'|'full'), paletteMode ('gameboy'|'source'),
- * gradientMode ('dither'|'none'), surfaceSimplify (0..100), cameraSettings ({ brightness, exposure, ... } -100..100). */
+ * gradientMode ('dither'|'none'), ditherPattern (DITHER_PATTERNS id), surfaceSimplify (0..100), cameraSettings ({ brightness, exposure, ... } -100..100). */
 export function setLensSettings(next = {}) {
   const depthChanged = next.colorDepth !== undefined && next.colorDepth !== state.colorDepth;
   const modeChanged = next.paletteMode !== undefined && next.paletteMode !== state.paletteMode;
   if (next.colorDepth !== undefined) state.colorDepth = String(next.colorDepth);
   if (next.paletteMode !== undefined) state.paletteMode = next.paletteMode === 'source' ? 'source' : 'gameboy';
   if (next.gradientMode !== undefined) state.gradientMode = next.gradientMode === 'none' ? 'none' : 'dither';
+  if (next.ditherPattern !== undefined && DITHER_PATTERNS.some((p) => p.id === next.ditherPattern)) state.ditherPattern = next.ditherPattern;
   if (next.surfaceSimplify !== undefined) state.surfaceSimplify = Math.max(0, Math.min(100, Number(next.surfaceSimplify) || 0));
   if (next.cameraSettings) state.cameraSettings = { ...state.cameraSettings, ...next.cameraSettings };
   if (depthChanged || modeChanged) clearPaletteState();

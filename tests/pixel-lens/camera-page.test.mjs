@@ -9,6 +9,7 @@ test('camera is driven by gestures: no flip button, dither stays on screen, hold
   assert.doesNotMatch(html, /id="flipCamera"/);
   assert.match(html, /id="ditherToggle"[^>]*aria-pressed/);
   assert.match(html, /id="gifRec"/);
+  assert.match(html, /id="ditherKinds"[^>]*hidden/, 'pattern chooser starts hidden and shows only while dither is on');
   const app = read('js/pixel-lens/app.mjs');
   assert.match(app, /onSwipe/);
   assert.match(app, /function startGif\(/);
