@@ -8,8 +8,8 @@
   <meta name="description" content="いつもの景色を、ドット絵に。カメラを向けて撮影し、PNG画像で保存できます。写真は端末内で処理します。">
   <link rel="icon" href="/assets/brand/pixieed-logo-48.png" type="image/png">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20260924-camera-release-1">
-  <link rel="stylesheet" href="css/pixel-lens-camera.css?v=20260927-ui-1">
-  <link rel="modulepreload" href="js/pixel-lens/app.mjs?v=20260927-ui-1">
+  <link rel="stylesheet" href="css/pixel-lens-camera.css?v=20260928-toolbar-1">
+  <link rel="modulepreload" href="js/pixel-lens/app.mjs?v=20260928-toolbar-1">
 </head>
 <body>
   <a class="pc-skip" href="#stage">カメラへ移動</a>
@@ -34,7 +34,7 @@
         <p><b>↔</b><span>左右スワイプで色</span></p>
         <p><b>↕</b><span>上下スワイプでカメラ切替</span></p>
         <p><b>●</b><span>シャッター長押しでGIF</span></p>
-        <p><b>▦</b><span>右の模様ははじいて切替・タップで一覧</span></p>
+        <p><b>▦</b><span>下のボタンで色・ディザ・ドット数など</span></p>
       </div>
       <div class="lc-zoom-hud" id="zoomHud" aria-hidden="true">
         <span class="lc-zoom-hud-value" id="zoomHudValue">1×</span>
@@ -48,7 +48,7 @@
       <h1 class="pc-sr-only">ドット絵カメラ</h1>
       <div class="lc-zoom-stops" id="zoomStops" role="group" aria-label="ズーム"></div>
       <div id="cameraControls" class="lc-top-right">
-        <button id="stopCamera" class="lc-round" type="button" aria-label="カメラを一時停止" title="一時停止" disabled><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="7" y="6" width="3.5" height="12" rx="1"/><rect x="13.5" y="6" width="3.5" height="12" rx="1"/></svg></button>
+        <button id="flipCamera" class="lc-round" type="button" aria-label="インカメラと外カメラを切り替え" title="カメラ切り替え" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9a8 8 0 0 1 14-3l2 2M20 15a8 8 0 0 1-14 3l-2-2"/><path d="M20 4v4h-4M4 20v-4h4"/></svg></button>
       </div>
     </header>
 
@@ -58,93 +58,40 @@
         <p id="info" class="pc-sr-only">写真はこの端末で処理します。</p>
         <span class="pc-sr-only"><span id="cameraStatus">準備中</span><span id="frameDimensions"></span></span>
       </div>
-      <!-- Look presets: one tap changes the whole palette -->
-      <div class="lc-looks" id="looks" role="radiogroup" aria-label="色の雰囲気">
-        <button type="button" role="radio" data-look="gb" aria-checked="true"><i class="lc-sw" style="--a:#e0f8d0;--b:#a8c070;--c:#587830;--d:#203810"></i><span>GB</span></button>
-        <button type="button" role="radio" data-look="mono" aria-checked="false"><i class="lc-sw" style="--a:#fff;--b:#fff;--c:#000;--d:#000"></i><span>白黒</span></button>
-        <button type="button" role="radio" data-look="gray" aria-checked="false"><i class="lc-sw" style="--a:#eee;--b:#aaa;--c:#666;--d:#222"></i><span>グレー</span></button>
-        <button type="button" role="radio" data-look="c8" aria-checked="false"><i class="lc-sw" style="--a:#f4d35e;--b:#ee964b;--c:#0d3b66;--d:#2a2a2a"></i><span>8色</span></button>
-        <button type="button" role="radio" data-look="c16" aria-checked="false"><i class="lc-sw" style="--a:#f7c59f;--b:#ef6f6c;--c:#2a9d8f;--d:#264653"></i><span>16色</span></button>
-        <button type="button" role="radio" data-look="photo" aria-checked="false"><i class="lc-sw lc-sw-photo"></i><span>写真の色</span></button>
-        <button type="button" role="radio" data-look="c256" aria-checked="false"><i class="lc-sw lc-sw-rainbow"></i><span>256色</span></button>
-        <button type="button" role="radio" data-look="full" aria-checked="false"><i class="lc-sw lc-sw-full"></i><span>フル</span></button>
+      <!-- Tray: the row of choices for whichever toolbar button is open (one at a time) -->
+      <div class="lc-tray" id="tray">
+        <div class="lc-row lc-looks" id="looks" data-panel="look" role="radiogroup" aria-label="色" hidden>
+          <button type="button" role="radio" data-look="gb" aria-checked="true"><i class="lc-sw" style="--a:#e0f8d0;--b:#a8c070;--c:#587830;--d:#203810"></i><span>GB</span></button>
+          <button type="button" role="radio" data-look="mono" aria-checked="false"><i class="lc-sw" style="--a:#fff;--b:#fff;--c:#000;--d:#000"></i><span>白黒</span></button>
+          <button type="button" role="radio" data-look="gray" aria-checked="false"><i class="lc-sw" style="--a:#eee;--b:#aaa;--c:#666;--d:#222"></i><span>グレー</span></button>
+          <button type="button" role="radio" data-look="c8" aria-checked="false"><i class="lc-sw" style="--a:#f4d35e;--b:#ee964b;--c:#0d3b66;--d:#2a2a2a"></i><span>8色</span></button>
+          <button type="button" role="radio" data-look="c16" aria-checked="false"><i class="lc-sw" style="--a:#f7c59f;--b:#ef6f6c;--c:#2a9d8f;--d:#264653"></i><span>16色</span></button>
+          <button type="button" role="radio" data-look="photo" aria-checked="false"><i class="lc-sw lc-sw-photo"></i><span>写真の色</span></button>
+          <button type="button" role="radio" data-look="c256" aria-checked="false"><i class="lc-sw lc-sw-rainbow"></i><span>256色</span></button>
+          <button type="button" role="radio" data-look="full" aria-checked="false"><i class="lc-sw lc-sw-full"></i><span>フル</span></button>
+        </div>
+        <div class="lc-row" id="ditherKinds" data-panel="dither" role="radiogroup" aria-label="ディザの模様" hidden></div>
+        <div class="lc-row" id="pixelsPanel" data-panel="pixels" role="radiogroup" aria-label="ドット数（長い辺）" hidden></div>
+        <div class="lc-row" id="aspectPanel" data-panel="aspect" role="radiogroup" aria-label="縦横比" hidden></div>
+        <div class="lc-tone" data-panel="tone" hidden>
+          <div class="lc-row" id="toneChips" role="radiogroup" aria-label="調整する項目"></div>
+          <div class="lc-slider"><input id="toneSlider" type="range" min="-100" max="100" step="1" value="0"><output id="toneValue">0</output><button id="toneReset" class="lc-reset" type="button" aria-label="色調整を元に戻す"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 3-6.2M4 4v4h4"/></svg></button></div>
+        </div>
       </div>
-      <div class="lc-bottom-row">
-        <button id="imageSettings" class="lc-pill" type="button" popovertarget="sizePopover" aria-controls="sizePopover" aria-label="撮影と色の設定">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
-          <span id="colorSummary">4色</span><span class="lc-dot" aria-hidden="true">·</span><span id="sizeSummary">256 px</span><span class="pc-sr-only" id="ratioSummary">画面</span>
-        </button>
-        <div id="resultControls" class="lc-result" hidden>
+      <!-- Toolbar: five buttons, each showing its current value -->
+      <div class="lc-toolbar" id="toolbar" role="toolbar" aria-label="撮影の設定">
+        <button type="button" data-tool="look" aria-expanded="false" aria-controls="tray"><i class="lc-tool-sw lc-sw" aria-hidden="true"></i><b>GB</b><small>色</small></button>
+        <button type="button" data-tool="dither" aria-expanded="false" aria-controls="tray" data-state="on"><i class="lc-tool-sw lc-tool-dither" aria-hidden="true"></i><b>網目 8×8</b><small>ディザ</small></button>
+        <button type="button" data-tool="pixels" aria-expanded="false" aria-controls="tray"><i class="lc-tool-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="4" height="4"/><rect x="10" y="4" width="4" height="4" opacity=".55"/><rect x="16" y="4" width="4" height="4"/><rect x="4" y="10" width="4" height="4" opacity=".55"/><rect x="10" y="10" width="4" height="4"/><rect x="16" y="10" width="4" height="4" opacity=".55"/><rect x="4" y="16" width="4" height="4"/><rect x="10" y="16" width="4" height="4" opacity=".55"/><rect x="16" y="16" width="4" height="4"/></svg></i><b>256 px</b><small>ドット</small></button>
+        <button type="button" data-tool="aspect" aria-expanded="false" aria-controls="tray"><i class="lc-tool-ic lc-tool-frame" aria-hidden="true"></i><b>画面</b><small>比率</small></button>
+        <button type="button" data-tool="tone" aria-expanded="false" aria-controls="tray"><i class="lc-tool-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/></svg></i><b>調整</b><small>色味</small></button>
+      </div>
+      <div id="resultControls" class="lc-result" hidden>
           <a id="savePng" class="lc-save" aria-disabled="true" tabindex="-1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m-5-5 5 5 5-5M5 19h14"/></svg><span id="saveLabel">PNGを保存</span></a>
-        </div>
       </div>
     </div>
 
-    <!-- Dither rail (right edge): folded it is one swatch — flick up/down to change, tap to list them all -->
-    <div class="lc-rail" id="ditherRail" data-open="false">
-      <button class="lc-rail-current" id="ditherCurrent" type="button" aria-expanded="false" aria-controls="ditherKinds"><i class="lc-rail-swatch" aria-hidden="true"></i><span class="lc-rail-caption">網目</span></button>
-      <div class="lc-rail-list" id="ditherKinds" role="radiogroup" aria-label="ディザ" hidden></div>
-    </div>
 
-    <!-- Settings: a bottom sheet on phones, a floating panel on wide screens -->
-    <div class="lc-sheet" id="sizePopover" popover aria-labelledby="sizeTitle">
-      <div class="lc-sheet-grip" aria-hidden="true"></div>
-      <header class="lc-sheet-head">
-        <h2 id="sizeTitle">仕上がり</h2>
-        <button class="lc-sheet-close" type="button" popovertarget="sizePopover" popovertargetaction="hide" aria-label="閉じる"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
-      </header>
-
-      <section class="lc-group" aria-labelledby="gFrame">
-        <h3 id="gFrame">フレーム</h3>
-        <div class="lc-field"><span class="lc-label">縦横比</span>
-          <div class="lc-seg" role="radiogroup" aria-label="縦横比">
-            <label><input type="radio" name="aspect" value="screen" checked><span>画面</span></label>
-            <label><input type="radio" name="aspect" value="1:1"><span>1:1</span></label>
-            <label><input type="radio" name="aspect" value="3:4"><span>3:4</span></label>
-            <label><input type="radio" name="aspect" value="9:16"><span>9:16</span></label>
-            <label><input type="radio" name="aspect" value="4:3"><span>4:3</span></label>
-            <label><input type="radio" name="aspect" value="16:9"><span>16:9</span></label>
-          </div>
-        </div>
-        <div class="lc-field"><span class="lc-label">ドット数 <small>長い辺</small></span>
-          <div class="lc-seg" role="radiogroup" aria-label="ドット数">
-            <label><input type="radio" name="pixels" value="32"><span>32</span></label>
-            <label><input type="radio" name="pixels" value="64"><span>64</span></label>
-            <label><input type="radio" name="pixels" value="96"><span>96</span></label>
-            <label><input type="radio" name="pixels" value="128"><span>128</span></label>
-            <label><input type="radio" name="pixels" value="160"><span>160</span></label>
-            <label><input type="radio" name="pixels" value="256" checked><span>256</span></label>
-          </div>
-        </div>
-      </section>
-
-      <section class="lc-group" aria-labelledby="gColor">
-        <h3 id="gColor">色</h3>
-        <div class="lc-field" id="paletteModeRow"><span class="lc-label">配色の選び方</span>
-          <div class="lc-seg" role="radiogroup" aria-label="配色の選び方">
-            <label><input type="radio" name="paletteMode" value="gameboy" checked><span>おまかせ</span></label>
-            <label><input type="radio" name="paletteMode" value="source"><span>写真の色</span></label>
-          </div>
-        </div>
-        <div class="lc-palette"><div id="palettePreview" class="lc-palette-colors" aria-label="現在の配色"></div><button type="button" class="lc-link" id="repick">色を選び直す</button></div>
-      </section>
-
-      <details class="lc-group lc-tone">
-        <summary><h3>カメラの色調整</h3><span class="lc-tone-state" id="toneState">標準</span></summary>
-        <label class="lc-range"><span class="lc-label">明るさ <output data-for="brightness">0</output></span><input name="brightness" type="range" min="-100" max="100" step="1" value="0"></label>
-        <label class="lc-range"><span class="lc-label">露出 <output data-for="exposure">0</output></span><input name="exposure" type="range" min="-100" max="100" step="1" value="0"></label>
-        <label class="lc-range"><span class="lc-label">コントラスト <output data-for="contrast">0</output></span><input name="contrast" type="range" min="-100" max="100" step="1" value="0"></label>
-        <label class="lc-range"><span class="lc-label">彩度 <output data-for="saturation">0</output></span><input name="saturation" type="range" min="-100" max="100" step="1" value="0"></label>
-        <label class="lc-range"><span class="lc-label">影 <output data-for="shadows">0</output></span><input name="shadows" type="range" min="-100" max="100" step="1" value="0"></label>
-        <label class="lc-range"><span class="lc-label">色温度 <output data-for="whiteBalance">0</output></span><input name="whiteBalance" type="range" min="-100" max="100" step="1" value="0"><span class="lc-range-ends"><span>青み</span><span>暖かみ</span></span></label>
-        <button id="resetCamera" class="lc-link" type="button">色調整をリセット</button>
-      </details>
-
-      <footer class="lc-sheet-foot">
-        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>写真は端末内で処理します</span>
-        <output id="outputSummary" aria-live="polite">PNG</output>
-      </footer>
-    </div>
   </main>
   <nav class="app-tabs pc-nav" aria-label="アプリナビゲーション" data-nav="five">
     <a data-nav="home" href="/home/" aria-label="ホーム"><img src="/assets/icons/pixieed/home.svg" alt=""></a>
@@ -157,6 +104,6 @@
     <a data-nav="tools" href="/tools/" aria-label="ツール" aria-current="page"><img src="/assets/icons/pixieed/celestial.svg" alt=""></a>
     <a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>
   </nav>
-  <script type="module" src="js/pixel-lens/app.mjs?v=20260927-ui-1"></script>
+  <script type="module" src="js/pixel-lens/app.mjs?v=20260928-toolbar-1"></script>
 </body>
 </html>

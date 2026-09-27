@@ -2,9 +2,9 @@ import { createFrameLoop } from '../pixel-studio/frame-loop.mjs';
 import { encodeCameraPng, pngExportGeometry } from '../pixel-studio/png-export.mjs';
 import { FRAME_RATIOS, OUTPUT_SIZES, resolveAspect, centerCrop, frameGeometry, fitFrame } from '../pixel-studio/framing.mjs?v=20260925-lens-sizes-1';
 import { cameraStartErrorMessage, deriveCameraPrimaryAction } from '../pixel-studio/camera-ui-state.mjs';
-import { CAMERA_SETTING_DEFAULTS, DITHER_PATTERNS, lensFrameFilter, lensPalette, processLensFrame, resetLensPalette, setLensSettings } from './engine.mjs?v=20260927-ui-1';
-import { attachZoomGestures, formatZoom, splitZoom, zoomRange, zoomStops } from './zoom.mjs?v=20260927-ui-1';
-import { GIF_FPS, GIF_MAX_MS, encodeGif, gifScale } from './gif.mjs?v=20260927-ui-1';
+import { CAMERA_SETTING_DEFAULTS, DITHER_PATTERNS, lensFrameFilter, lensPalette, processLensFrame, resetLensPalette, setLensSettings } from './engine.mjs?v=20260928-toolbar-1';
+import { attachZoomGestures, formatZoom, splitZoom, zoomRange, zoomStops } from './zoom.mjs?v=20260928-toolbar-1';
+import { GIF_FPS, GIF_MAX_MS, encodeGif, gifScale } from './gif.mjs?v=20260928-toolbar-1';
 
 const $ = (selector) => document.querySelector(selector);
 const root = $('#pixelStudio');
@@ -12,7 +12,6 @@ const video = $('#video');
 const stage = $('#stage');
 const view = $('#view');
 const captureFrame = $('#captureFrame');
-const settingsPanel = $('#sizePopover');
 const viewContext = view.getContext('2d', { alpha: false });
 const stageMessage = $('#stageMsg');
 const info = $('#info');
@@ -127,13 +126,11 @@ function setMode(mode) {
   root.dataset.mode = mode;
   root.dataset.facing = state.facing;
   $('#welcome').hidden = mode !== 'idle';
-  $('#cameraControls').hidden = mode !== 'live' && mode !== 'loading';
   $('#resultControls').hidden = mode !== 'captured';
-  $('#imageSettings').disabled = mode === 'captured';
-  if (mode === 'captured' && settingsPanel.matches(':popover-open')) settingsPanel.hidePopover();
+  if (mode !== 'live') openTray(null);
   updateSizeSummary();
   updatePrimaryAction();
-  $('#stopCamera').disabled = mode !== 'live' && mode !== 'loading';
+  $('#flipCamera').disabled = mode !== 'live';
   updateSaveLinkState();
   setInfoForMode(mode);
 }
@@ -152,19 +149,10 @@ function currentAspect() {
 }
 
 function updateSizeSummary() {
-  const ratio = FRAME_RATIOS.find((item) => item.value === state.ratio);
   const dimensions = ((state.mode === 'captured' || state.mode === 'live') && state.result) || frameGeometry(currentAspect(), state.size);
-  $('#ratioSummary').textContent = ratio.label;
-  $('#sizeSummary').textContent = state.mode === 'captured' ? `${dimensions.width} × ${dimensions.height}` : `${state.size} px`;
   $('#frameDimensions').textContent = `${dimensions.width} × ${dimensions.height}`;
-  const saved = pngExportGeometry(dimensions.width, dimensions.height);
-  $('#outputSummary').textContent = `${saved.width} × ${saved.height} px · PNG`;
-  $('#colorSummary').textContent = COLOR_LABELS[state.colorDepth] ?? `${state.colorDepth}色`;
   root.dataset.framing = state.ratio;
   root.dataset.outputSize = String(state.size);
-  $('#imageSettings').setAttribute('aria-label', state.mode === 'captured'
-    ? `撮影画像 ${dimensions.width} × ${dimensions.height} ピクセル`
-    : `撮影と色の設定、${ratio.label}、長辺 ${state.size} ピクセル、${COLOR_LABELS[state.colorDepth] ?? state.colorDepth}`);
 }
 
 function updatePalettePreview(result) {
@@ -172,17 +160,6 @@ function updatePalettePreview(result) {
   if (revision === displayedPaletteRevision) return;
   displayedPaletteRevision = revision;
   tintSwatches(result.palette);
-  const preview = $('#palettePreview');
-  preview.replaceChildren();
-  const noPalette = !result.palette?.length;
-  preview.dataset.full = String(noPalette);
-  if (noPalette) { preview.setAttribute('aria-label', COLOR_LABELS[state.colorDepth] ?? ''); return; }
-  for (const color of result.palette ?? []) {
-    const swatch = document.createElement('i');
-    swatch.style.backgroundColor = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
-    preview.appendChild(swatch);
-  }
-  preview.setAttribute('aria-label', `${result.palette?.length ?? 0}色の写真由来パレット`);
 }
 
 function fitPreview(frame) {
@@ -406,7 +383,7 @@ async function startCamera({ focus = true } = {}) {
   state.facing = lastFacing;
   setMode('loading');
   say('カメラを準備しています…');
-  if (focus) focusVisible('#stopCamera');
+  if (focus) focusVisible('#capture');
   if (!navigator.mediaDevices?.getUserMedia) {
     setMode('idle');
     say(cameraStartErrorMessage(null, { secureContext: window.isSecureContext !== false, supported: false }), { visible: true });
@@ -464,7 +441,7 @@ function capture() {
 
 function refreshObjects() {
   if (state.mode !== 'live') return;
-  if (performance.now() - railClosedAt < 600) return; // that tap only folded the dither list
+  if (performance.now() - trayClosedAt < 600) return; // that tap only folded the tray
   resetLensPalette(); // PiXiEELENS keeps its palette; a tap picks the colours again from the current view
   paletteEpoch++;
   root.dataset.paletteEpoch = String(paletteEpoch);
@@ -511,9 +488,6 @@ async function prepareCaptureDownload(frozen) {
   }
 }
 
-settingsPanel.addEventListener('toggle', (event) => {
-  if (event.newState === 'open') updateSizeSummary();
-});
 const CAMERA_KEYS = Object.keys(CAMERA_SETTING_DEFAULTS);
 // Look presets: one tap sets colour depth + palette the way PiXiEELENS names them
 const LOOKS = {
@@ -530,20 +504,6 @@ function currentLook() {
   if (state.colorDepth === '16') return state.paletteMode === 'source' ? 'photo' : 'c16';
   return Object.keys(LOOKS).find((key) => LOOKS[key].colorDepth === state.colorDepth) ?? 'gb';
 }
-function syncControls() {
-  for (const out of settingsPanel.querySelectorAll('output[data-for]')) {
-    const input = settingsPanel.querySelector(`[name="${out.dataset.for}"]`);
-    if (input) out.textContent = input.value;
-  }
-  const check = (name, value) => { const input = settingsPanel.querySelector(`input[name="${name}"][value="${value}"]`); if (input) input.checked = true; };
-  check('aspect', state.ratio); check('pixels', String(state.size)); check('paletteMode', state.paletteMode);
-  syncDitherRail();
-  $('#paletteModeRow').hidden = !['2', '4', '8', '16'].includes(state.colorDepth);
-  const look = currentLook();
-  for (const button of document.querySelectorAll('#looks [data-look]')) button.setAttribute('aria-checked', String(button.dataset.look === look));
-  const toneChanged = CAMERA_KEYS.some((key) => key !== 'zoom' && state.camera[key] !== CAMERA_SETTING_DEFAULTS[key]);
-  const toneState = $('#toneState'); if (toneState) { toneState.textContent = toneChanged ? '調整中' : '標準'; toneState.dataset.changed = String(toneChanged); }
-}
 function applyChange({ restart = false } = {}) {
   syncLens();
   syncControls();
@@ -551,26 +511,6 @@ function applyChange({ restart = false } = {}) {
   fitPreview(state.result);
   updateSizeSummary();
 }
-function onSettingInput(event) {
-  const input = event.target;
-  if (!(input instanceof HTMLInputElement) || state.mode === 'captured') return;
-  let restart = false;
-  if (input.name === 'aspect' && FRAME_RATIOS.some((ratio) => ratio.value === input.value)) { state.ratio = input.value; restart = true; }
-  else if (input.name === 'pixels' && OUTPUT_SIZES.includes(Number(input.value))) { state.size = Number(input.value); restart = true; }
-  else if (input.name === 'paletteMode') state.paletteMode = input.value;
-  else if (input.name === 'dither') state.gradientMode = input.checked ? 'dither' : 'none';
-  else if (CAMERA_KEYS.includes(input.name)) state.camera[input.name] = Number(input.value);
-  else return;
-  applyChange({ restart });
-}
-settingsPanel.addEventListener('change', onSettingInput);
-settingsPanel.addEventListener('input', (event) => { if (event.target instanceof HTMLInputElement && event.target.type === 'range') onSettingInput(event); });
-$('#resetCamera')?.addEventListener('click', () => {
-  state.camera = { ...CAMERA_SETTING_DEFAULTS };
-  for (const key of CAMERA_KEYS) { const input = settingsPanel.querySelector(`[name="${key}"]`); if (input) input.value = String(state.camera[key]); }
-  applyChange();
-});
-$('#repick')?.addEventListener('click', () => { refreshObjects(); settingsPanel.hidePopover?.(); });
 function selectLook(button) {
   if (!button || state.mode === 'captured') return;
   Object.assign(state, LOOKS[button.dataset.look]);
@@ -586,25 +526,45 @@ function stepLook(delta) {
   const index = buttons.findIndex((button) => button.dataset.look === currentLook());
   selectLook(buttons[(index + delta + buttons.length) % buttons.length]);
 }
-// ---------- Dither rail ----------
-// One control on the right edge. Folded, it is a single swatch of the current pattern (or "オフ"): flick it
-// up / down to step through the patterns, tap it to open the list. Open, it lists every pattern with its
-// name; picking one folds the rail again. It is absent for looks without dither (グレー, フル).
+// ---------- Toolbar: five buttons at the bottom, one tray above them ----------
+// Each button shows its current value. Tapping one opens its row of choices (a carousel) above the bar;
+// tapping it again, or the picture, folds it. Only one row is open at a time.
+const tray = $('#tray'); const toolbar = $('#toolbar');
+let openTool = null; let trayClosedAt = 0;
 const NO_DITHER_DEPTHS = new Set(['full', 'gray']);
-const rail = $('#ditherRail'); const railList = $('#ditherKinds'); const railCurrent = $('#ditherCurrent');
-const SHORT_LABEL = { net8: '8×8', net4: '4×4', net2: '2×2', diagonal: '斜線', atkinson: 'Atkin', fs: '拡散' };
+const TONES = [['brightness', '明るさ'], ['exposure', '露出'], ['contrast', 'コントラスト'], ['saturation', '彩度'], ['shadows', '影'], ['whiteBalance', '色温度']];
+let toneKey = 'contrast';
+const SHORT_LABEL = { net8: '網目 8×8', net4: '網目 4×4', net2: '網目 2×2' };
 const SWATCH_TONE = { net8: 72, net4: 72, net2: 72, checker: 128, lines: 64, diagonal: 64, halftone: 70, grain: 90 };
 let swatchColors = [[32, 56, 16], [224, 248, 208]];
-// A swatch shows one characteristic step of the pattern 1:1 in the current palette's darkest and lightest
-// colours; error diffusion is shown by diffusing a flat 35% tone.
+
+function openTray(tool) {
+  if (openTool && !tool) trayClosedAt = performance.now();
+  openTool = tool;
+  root.dataset.tray = tool ?? '';
+  for (const panel of tray.querySelectorAll('[data-panel]')) panel.hidden = panel.dataset.panel !== tool;
+  for (const button of toolbar.querySelectorAll('[data-tool]')) button.setAttribute('aria-expanded', String(button.dataset.tool === tool));
+  const selected = tool && tray.querySelector(`[data-panel="${tool}"] [aria-checked="true"]`);
+  if (selected) requestAnimationFrame(() => selected.scrollIntoView({ inline: 'center', block: 'nearest' }));
+}
+function chip(value, label, { swatch = '', cls = '' } = {}) {
+  const button = document.createElement('button');
+  button.type = 'button'; button.setAttribute('role', 'radio'); button.dataset.value = value;
+  button.innerHTML = `${swatch ? `<i class="lc-chip-sw ${cls}" aria-hidden="true"></i>` : ''}<span></span>`;
+  button.querySelector('span').textContent = label;
+  return button;
+}
+
+// A dither swatch shows one characteristic step 1:1 in the current palette's darkest and lightest colours;
+// error diffusion is shown by diffusing a flat 35% tone.
 function patternSwatch(pattern) {
   const size = 16; const canvas = document.createElement('canvas'); canvas.width = size; canvas.height = size;
   const context = canvas.getContext('2d'); const image = context.createImageData(size, size);
   const bits = new Uint8Array(size * size);
-  if (pattern?.kind === 'ordered') {
+  if (pattern.kind === 'ordered') {
     const step = pattern.levels[pattern.levelForTone[SWATCH_TONE[pattern.id] ?? 90]];
     for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) bits[y * size + x] = step[((y & pattern.mask) << pattern.shift) | (x & pattern.mask)];
-  } else if (pattern?.kind === 'diffusion') {
+  } else {
     const buf = new Float32Array(size * size).fill(0.35);
     for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
       const p = y * size + x; const on = buf[p] >= 0.5 ? 1 : 0; bits[p] = on; const e = buf[p] - on;
@@ -616,84 +576,122 @@ function patternSwatch(pattern) {
   context.putImageData(image, 0, 0);
   return `url(${canvas.toDataURL()})`;
 }
-function makeRailItem(id, label) {
-  const button = document.createElement('button');
-  button.type = 'button'; button.setAttribute('role', 'radio'); button.dataset.pattern = id;
-  button.innerHTML = '<span class="lc-rail-name"></span><i class="lc-rail-swatch" aria-hidden="true"></i>';
-  button.querySelector('.lc-rail-name').textContent = label;
-  railList.appendChild(button);
-}
-makeRailItem('none', 'オフ');
-for (const pattern of DITHER_PATTERNS) makeRailItem(pattern.id, pattern.label);
+
+// dither row: オフ + every pattern
+const ditherPanel = $('#ditherKinds');
+ditherPanel.appendChild(chip('none', 'オフ', { swatch: true, cls: 'is-off' }));
+for (const pattern of DITHER_PATTERNS) ditherPanel.appendChild(chip(pattern.id, pattern.label, { swatch: true, cls: 'is-pattern' }));
 function paintSwatches() {
-  for (const button of railList.querySelectorAll('[data-pattern]')) {
-    const pattern = DITHER_PATTERNS.find((p) => p.id === button.dataset.pattern);
-    button.querySelector('.lc-rail-swatch').style.setProperty('--swatch', pattern ? patternSwatch(pattern) : 'none');
+  for (const button of ditherPanel.querySelectorAll('[data-value]')) {
+    const pattern = DITHER_PATTERNS.find((p) => p.id === button.dataset.value);
+    if (pattern) button.querySelector('.lc-chip-sw').style.setProperty('--swatch', patternSwatch(pattern));
   }
 }
-/** Colour the swatches with the look's own palette (called when the palette changes). */
+/** Colour the dither swatches with the look's own palette (called when the palette changes). */
 function tintSwatches(palette) {
   const lum = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
   const sorted = (palette?.length ? [...palette] : []).sort((a, b) => lum(a) - lum(b));
   swatchColors = sorted.length >= 2 ? [sorted[0], sorted.at(-1)] : [[28, 30, 34], [236, 238, 240]];
-  paintSwatches(); syncDitherRail();
+  paintSwatches(); syncToolbar();
 }
+// dot-count and framing rows
+const pixelsPanel = $('#pixelsPanel');
+for (const size of OUTPUT_SIZES) pixelsPanel.appendChild(chip(String(size), `${size}`));
+const aspectPanel = $('#aspectPanel');
+for (const ratio of FRAME_RATIOS) { const button = chip(ratio.value, ratio.label, { swatch: true, cls: 'is-frame' }); button.dataset.ratio = ratio.value; aspectPanel.appendChild(button); }
+// tone row: pick a setting, then the slider below adjusts it
+const toneChips = $('#toneChips');
+for (const [key, label] of TONES) toneChips.appendChild(chip(key, label));
+const toneSlider = $('#toneSlider'); const toneValue = $('#toneValue');
+
 function currentPatternId() { return state.gradientMode === 'dither' ? state.ditherPattern : 'none'; }
-function syncDitherRail() {
+function syncToolbar() {
+  const lookButton = document.querySelector(`#looks [data-look="${currentLook()}"]`);
+  const face = (tool) => toolbar.querySelector(`[data-tool="${tool}"]`);
+  face('look').querySelector('.lc-tool-sw').setAttribute('style', lookButton?.querySelector('.lc-sw')?.getAttribute('style') ?? '');
+  face('look').querySelector('.lc-tool-sw').className = `lc-tool-sw lc-sw ${(lookButton?.querySelector('.lc-sw')?.className ?? '').replace(/\blc-sw\b/, '').trim()}`;
+  face('look').querySelector('b').textContent = lookButton?.textContent.trim() ?? '';
   const available = !NO_DITHER_DEPTHS.has(state.colorDepth);
-  rail.hidden = !available;
-  if (!available) setRailOpen(false);
-  const id = currentPatternId(); const pattern = DITHER_PATTERNS.find((p) => p.id === id);
-  for (const button of railList.querySelectorAll('[data-pattern]')) button.setAttribute('aria-checked', String(button.dataset.pattern === id));
-  railCurrent.querySelector('.lc-rail-swatch').style.setProperty('--swatch', pattern ? patternSwatch(pattern) : 'none');
-  railCurrent.querySelector('.lc-rail-caption').textContent = pattern ? (SHORT_LABEL[pattern.id] ?? pattern.label) : 'オフ';
-  railCurrent.dataset.off = String(!pattern);
-  railCurrent.setAttribute('aria-label', `ディザ：${pattern ? pattern.label : 'オフ'}（タップで一覧、上下にはじいて切り替え）`);
+  const pattern = available && state.gradientMode === 'dither' ? DITHER_PATTERNS.find((p) => p.id === state.ditherPattern) : null;
+  const dither = face('dither');
+  dither.dataset.state = !available ? 'na' : pattern ? 'on' : 'off';
+  dither.querySelector('.lc-tool-sw').style.setProperty('--swatch', pattern ? patternSwatch(pattern) : 'none');
+  dither.querySelector('b').textContent = !available ? 'ディザなし' : pattern ? (SHORT_LABEL[pattern.id] ?? pattern.label) : 'ディザ OFF';
+  dither.setAttribute('aria-label', !available ? 'この色ではディザを使いません' : pattern ? `ディザ：${pattern.label}（タップで模様を選ぶ）` : 'ディザをオンにする');
+  face('pixels').querySelector('b').textContent = `${state.size} px`;
+  const ratio = FRAME_RATIOS.find((r) => r.value === state.ratio);
+  face('aspect').querySelector('b').textContent = ratio?.label ?? '';
+  face('aspect').dataset.ratio = state.ratio;
+  const toneChanged = TONES.some(([key]) => state.camera[key] !== CAMERA_SETTING_DEFAULTS[key]);
+  face('tone').querySelector('b').textContent = toneChanged ? '調整中' : '調整';
+  face('tone').dataset.changed = String(toneChanged);
+  // selected chips
+  const mark = (panel, value) => { for (const b of panel.querySelectorAll('[data-value]')) b.setAttribute('aria-checked', String(b.dataset.value === value)); };
+  mark(ditherPanel, currentPatternId()); mark(pixelsPanel, String(state.size)); mark(aspectPanel, state.ratio); mark(toneChips, toneKey);
+  const [, toneLabel] = TONES.find(([key]) => key === toneKey);
+  toneSlider.value = String(state.camera[toneKey] ?? 0);
+  toneSlider.setAttribute('aria-label', toneLabel);
+  const v = Number(toneSlider.value); toneValue.textContent = v > 0 ? `+${v}` : String(v);
+  toneSlider.style.setProperty('--fill', `${(v + 100) / 2}%`);
+  $('#toneReset').disabled = !toneChanged;
 }
-let railTimer = 0;
-function setRailOpen(open) {
-  window.clearTimeout(railTimer);
-  rail.dataset.open = String(open);
-  railList.hidden = !open;
-  railCurrent.setAttribute('aria-expanded', String(open));
-  if (open) railList.querySelector('[aria-checked="true"]')?.scrollIntoView({ block: 'center' });
+function syncControls() {
+  const look = currentLook();
+  for (const button of document.querySelectorAll('#looks [data-look]')) button.setAttribute('aria-checked', String(button.dataset.look === look));
+  if (NO_DITHER_DEPTHS.has(state.colorDepth) && openTool === 'dither') openTray(null);
+  syncToolbar();
 }
-function choosePattern(id, { toast = true } = {}) {
-  if (state.mode === 'captured' || NO_DITHER_DEPTHS.has(state.colorDepth)) return;
-  if (id === 'none') state.gradientMode = 'none';
-  else { state.gradientMode = 'dither'; state.ditherPattern = id; }
+
+toolbar.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-tool]'); if (!button || state.mode === 'captured') return;
+  const tool = button.dataset.tool;
   navigator.vibrate?.(6);
-  applyChange();
-  if (toast) sayToast(`ディザ：${DITHER_PATTERNS.find((p) => p.id === currentPatternId())?.label ?? 'オフ'}`);
-}
-railList.addEventListener('click', (event) => {
-  const button = event.target.closest('[data-pattern]'); if (!button) return;
-  choosePattern(button.dataset.pattern, { toast: false });
-  railTimer = window.setTimeout(() => setRailOpen(false), 380); // let the choice show before folding
-});
-// the folded swatch: tap opens the list, a vertical flick steps through the patterns
-{
-  let start = null;
-  railCurrent.addEventListener('pointerdown', (event) => { start = { y: event.clientY, t: performance.now() }; try { railCurrent.setPointerCapture(event.pointerId); } catch { /* ignore */ } });
-  railCurrent.addEventListener('pointerup', (event) => {
-    if (!start) return; const dy = event.clientY - start.y; const quick = performance.now() - start.t < 600; start = null;
-    if (Math.abs(dy) > 24 && quick) {
-      const ids = ['none', ...DITHER_PATTERNS.map((p) => p.id)];
-      const index = ids.indexOf(currentPatternId());
-      choosePattern(ids[(index + (dy < 0 ? -1 : 1) + ids.length) % ids.length]);
-      railCurrent.classList.remove('is-stepped'); requestAnimationFrame(() => railCurrent.classList.add('is-stepped'));
-      railCurrent.dataset.swallowClick = 'true';
+  if (tool === 'dither') {
+    if (NO_DITHER_DEPTHS.has(state.colorDepth)) { sayToast('この色ではディザを使いません'); return; }
+    // OFF: this button is a plain on/off switch. ON: it becomes the pattern switcher.
+    if (state.gradientMode !== 'dither') {
+      state.gradientMode = 'dither'; applyChange(); openTray('dither');
+      sayToast(`ディザ ON：${DITHER_PATTERNS.find((p) => p.id === state.ditherPattern).label}`);
+      return;
     }
-  });
-  railCurrent.addEventListener('pointercancel', () => { start = null; });
-  railCurrent.addEventListener('click', () => {
-    if (railCurrent.dataset.swallowClick === 'true') { railCurrent.dataset.swallowClick = 'false'; return; }
-    setRailOpen(rail.dataset.open !== 'true');
-  });
-}
-let railClosedAt = 0;
-document.addEventListener('pointerdown', (event) => { if (rail.dataset.open === 'true' && !rail.contains(event.target)) { setRailOpen(false); railClosedAt = performance.now(); } }, true);
-document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && rail.dataset.open === 'true') { setRailOpen(false); railCurrent.focus(); } });
+  }
+  openTray(openTool === tool ? null : tool);
+});
+ditherPanel.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-value]'); if (!button || state.mode === 'captured') return;
+  navigator.vibrate?.(6);
+  if (button.dataset.value === 'none') { state.gradientMode = 'none'; applyChange(); openTray(null); sayToast('ディザ OFF'); return; }
+  state.gradientMode = 'dither'; state.ditherPattern = button.dataset.value; applyChange();
+  button.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+});
+pixelsPanel.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-value]'); if (!button || state.mode === 'captured') return;
+  state.size = Number(button.dataset.value); navigator.vibrate?.(6); applyChange({ restart: true });
+  button.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+});
+aspectPanel.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-value]'); if (!button || state.mode === 'captured') return;
+  state.ratio = button.dataset.value; navigator.vibrate?.(6); applyChange({ restart: true });
+  button.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+});
+toneChips.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-value]'); if (!button) return;
+  toneKey = button.dataset.value; navigator.vibrate?.(4); syncToolbar();
+  button.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+});
+toneSlider.addEventListener('input', () => {
+  if (state.mode === 'captured') return;
+  const value = Number(toneSlider.value);
+  // a light detent at 0 so the standard look is easy to find again
+  const snapped = Math.abs(value) <= 3 ? 0 : value;
+  if (snapped === 0 && state.camera[toneKey] !== 0) navigator.vibrate?.(5);
+  state.camera[toneKey] = snapped; applyChange();
+});
+$('#toneReset').addEventListener('click', () => { for (const [key] of TONES) state.camera[key] = CAMERA_SETTING_DEFAULTS[key]; navigator.vibrate?.(8); applyChange(); sayToast('色調整を元に戻しました'); });
+document.addEventListener('pointerdown', (event) => {
+  if (openTool && !tray.contains(event.target) && !toolbar.contains(event.target) && stage.contains(event.target)) openTray(null);
+}, true);
+document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && openTool) { const tool = openTool; openTray(null); toolbar.querySelector(`[data-tool="${tool}"]`)?.focus(); } });
 paintSwatches();
 syncControls();
 
@@ -913,7 +911,7 @@ $('#capture').addEventListener('click', () => {
   else if (action === 'resume') void startCamera();
   else if (action === 'capture') capture();
 });
-$('#stopCamera').addEventListener('click', () => closeCamera({ message: 'カメラを閉じました。', focus: true }));
+$('#flipCamera').addEventListener('click', () => { if (state.mode === 'live') flipCamera(); });
 $('#savePng').addEventListener('click', (event) => {
   if ($('#savePng').getAttribute('aria-disabled') === 'true') { event.preventDefault(); return; }
   sayToast('PNGの保存を開始しました。');
