@@ -2,97 +2,11 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-<title>ホーム｜ドット絵であそぶ PiXiEED</title>
-<meta name="description" content="ドット絵カメラ、地球儀、ドット絵・音楽・ゲーム制作、ジグソーや間違い探しを楽しめるPiXiEEDのホームです。">
-<link rel="canonical" href="https://pixieed.jp/home/">
-<meta property="og:type" content="website"><meta property="og:site_name" content="PiXiEED"><meta property="og:locale" content="ja_JP"><meta property="og:title" content="ホーム｜ドット絵であそぶ PiXiEED"><meta property="og:description" content="ドット絵カメラ、地球儀、ドット絵・音楽・ゲーム制作、ジグソーや間違い探しを楽しめるPiXiEEDのホームです。"><meta property="og:url" content="https://pixieed.jp/home/"><meta property="og:image" content="https://pixieed.jp/assets/og/site.png"><meta property="og:image:type" content="image/png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="PiXiEEDのロゴと「つくる・あそぶ・つながる」">
-<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="ホーム｜ドット絵であそぶ PiXiEED"><meta name="twitter:description" content="ドット絵カメラ、地球儀、ドット絵・音楽・ゲーム制作、ジグソーや間違い探しを楽しめるPiXiEEDのホームです。"><meta name="twitter:image" content="https://pixieed.jp/assets/og/site.png"><meta name="twitter:image:alt" content="PiXiEEDのロゴと「つくる・あそぶ・つながる」">
-<link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180"><link rel="manifest" href="/manifest.webmanifest">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="/css/site.css?rev=20260927-gallery-nosale-1">
-  <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20260928-square-pixels-1">
-  <link rel="stylesheet" href="/css/home.css?rev=20260928-art-links-1">
-  <link rel="stylesheet" href="/css/site-header.css?rev=20260928-touch-motion-1">
+  <title>PiXiEED</title>
+  <link rel="canonical" href="https://pixieed.jp/">
+  <meta name="robots" content="noindex">
+  <meta http-equiv="refresh" content="0; url=/">
+  <script>location.replace('/' + location.search + location.hash);</script>
 </head>
-<body data-page="home" class="app-page home-play">
-  <a class="skip-link" href="#main">本文へ移動</a>
-  <header class="site-header"><div class="container header-inner">
-    <a class="brand" href="/home/" aria-label="PiXiEED ホーム"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a>
-  </div></header>
-  <nav class="mobile-nav" aria-label="アプリナビゲーション"></nav>
-  <main id="main">
-    <!-- The first screen is a toy: drag to draw, every new dot plays a note -->
-    <section class="hp-hero" aria-labelledby="hpTitle">
-      <div class="hp-stage" id="hpStage">
-        <canvas id="hpCanvas" aria-label="ドット絵のあそび場。描いて指をはなすと落ち、横一列そろうと消えます。文字をたたくと弾け、星はつかまえられます。矢印キーで動かし、スペースでペン、Enterでたたけます" role="img"></canvas>
-        <output class="hp-score" id="hpScore" hidden>★ 0</output>
-        <div class="hp-hero-copy">
-          <h1 id="hpTitle">ドットで、<br>あそぼう。</h1>
-          <p class="hp-hint" id="hpHint"><span aria-hidden="true">☝</span> 描いて、はなして、そろえて消す</p>
-        </div>
-        <div class="hp-tools" role="toolbar" aria-label="描く色">
-          <div class="hp-colors" id="hpColors" role="radiogroup" aria-label="色"></div>
-          <button class="hp-icon" id="hpSound" type="button" aria-pressed="true" aria-label="音"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9z"/><path class="hp-wave" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg></button>
-          <button class="hp-icon" id="hpClear" type="button" aria-label="消す"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 3-6.2M4 4v4h4"/></svg></button>
-        </div>
-      </div>
-      <nav class="hp-go" aria-label="はじめる">
-        <a class="hp-go-main" href="/">地図で絵をさがす</a>
-        <a class="hp-go-sub" href="/pixel-camera.html">カメラで撮る</a>
-      </nav>
-    </section>
-
-    <!-- Every card is a small working toy of the tool it stands for -->
-    <section class="hp-section" aria-labelledby="hpToysTitle">
-      <div class="container">
-        <h2 class="hp-heading" id="hpToysTitle">あそべるもの</h2>
-        <div class="hp-toys" id="hpToys">
-          <a class="hp-toy" href="/pixel-camera.html" data-toy="camera" style="--tone:#1f2b36">
-            <canvas aria-hidden="true"></canvas>
-            <span class="hp-toy-name">ドット絵カメラ</span><span class="hp-toy-line">景色をドット絵に</span><span class="hp-chip is-open">ひらく</span>
-          </a>
-          <a class="hp-toy" href="/" data-toy="map" style="--tone:#10202e">
-            <canvas aria-hidden="true"></canvas>
-            <span class="hp-toy-name">ドット絵マップ</span><span class="hp-toy-line">街にいる絵をさがす</span><span class="hp-chip is-open">ひらく</span>
-          </a>
-          <a class="hp-toy" href="/telescope/" data-toy="telescope" style="--tone:#0c1320">
-            <canvas aria-hidden="true"></canvas>
-            <span class="hp-toy-name">望遠鏡</span><span class="hp-toy-line">月と星をのぞく</span><span class="hp-chip is-open">ひらく</span>
-          </a>
-          <a class="hp-toy" data-toy="editor" href="/draw/" style="--tone:#f1eee6" aria-label="かんたんドットを開く">
-            <canvas aria-hidden="true"></canvas>
-            <span class="hp-toy-name">かんたんドット</span><span class="hp-toy-line">小さな絵を描く</span><span class="hp-chip is-open">ひらく</span>
-          </a>
-          <a class="hp-toy" data-toy="sound" href="/audio/" style="--tone:#231a33" aria-label="ドットで音楽を開く">
-            <canvas aria-hidden="true"></canvas>
-            <span class="hp-toy-name">ドットで音楽</span><span class="hp-toy-line">色と音で曲をつくる</span><span class="hp-chip is-open">ひらく</span>
-          </a>
-          <div class="hp-toy" data-toy="game" style="--tone:#bfe3f2" aria-label="かんたんゲーム・もうすぐ">
-            <canvas aria-hidden="true"></canvas>
-            <span class="hp-toy-name">かんたんゲーム</span><span class="hp-toy-line">自分の絵で遊ぶ</span><span class="hp-chip">もうすぐ</span>
-          </div>
-          <a class="hp-toy" data-toy="jigsaw" href="/jigsaw/" style="--tone:#e9e3d6" aria-label="かんたんジグソーを開く">
-            <canvas aria-hidden="true"></canvas>
-            <span class="hp-toy-name">かんたんジグソー</span><span class="hp-toy-line">絵や写真をパズルに</span><span class="hp-chip is-open">ひらく</span>
-          </a>
-          <a class="hp-toy" data-toy="diff" href="/pixfind/" style="--tone:#e6edf3" aria-label="ドット絵間違い探しを開く">
-            <canvas aria-hidden="true"></canvas>
-            <span class="hp-toy-name">ドット絵間違い探し</span><span class="hp-toy-line">絵のちがいを見つける</span><span class="hp-chip is-open">ひらく</span>
-          </a>
-          <a class="hp-toy" data-toy="find" href="/pixfind/" style="--tone:#dcebd2" aria-label="ドット絵もの探しを開く">
-            <canvas aria-hidden="true"></canvas>
-            <span class="hp-toy-name">ドット絵もの探し</span><span class="hp-toy-line">かくれたものを探す</span><span class="hp-chip is-open">ひらく</span>
-          </a>
-        </div>
-      </div>
-    </section>
-
-    <section class="section"><div class="container"><div class="section-heading"><div><p class="eyebrow">GLOBE GALLERY</p><h2>地球儀で作品に出会う</h2></div><a class="text-link" href="/">地球儀を開く</a></div><p>作品は、それぞれの場所と結びつけて公開されます。</p><div class="hp-feed" data-home-feed hidden></div></div></section>
-    <section class="section section--paper-deep"><div class="container"><div class="section-heading"><div><p class="eyebrow">PLACES</p><h2>絵に会えるお店</h2></div><a class="text-link" href="/stores/">すべて見る</a></div><div class="horizontal-scroll" data-home-stores></div></div></section>
-  </main>
-  <footer class="site-footer"><div class="container footer-inner"><div><a class="brand" href="/home/"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a><p>街角で、絵に会おう。</p></div><nav class="footer-links" aria-label="フッターナビゲーション"></nav></div><div class="container footer-meta">© PiXiEED</div></footer>
-  <script type="module" src="/js/app.js?rev=20260928-art-links-1&amp;pass=20260928-touch-motion-1"></script>
-  <script type="module" src="/js/home-play.mjs?rev=20260928-visible-motion-1"></script>
-  <script type="module" src="/js/site-header.mjs?rev=20260928-touch-motion-1"></script>
-</body>
+<body><p><a href="/">PiXiEED</a></p></body>
 </html>

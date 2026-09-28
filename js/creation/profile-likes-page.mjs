@@ -8,7 +8,7 @@ if (new URLSearchParams(location.search).get('view') === 'likes') {
     article.className = 'art-card profile-liked-post';
     const imageLink = document.createElement('a');
     imageLink.className = 'art-card__image';
-    imageLink.href = `/?art=${encodeURIComponent(post.id)}`;
+    imageLink.href = `/globe/?art=${encodeURIComponent(post.id)}`;
     imageLink.setAttribute('aria-label', `地球儀で「${post.title}」を見る`);
     const image = document.createElement('img');
     image.src = post.image.dataUrl;

@@ -13,8 +13,8 @@ test('site pages: globe, shoot, page action, tools, my page — the logo goes ho
   assert.deepEqual(labels(nav), ['地球儀', '撮影', 'ツール', 'マイページ']);
   assert.match(nav, /aria-label="地球儀"[\s\S]*aria-label="撮影"[\s\S]*\$\{contextAction\}[\s\S]*aria-label="ツール"/);
   assert.doesNotMatch(nav, /aria-label="ホーム"/);
-  assert.match(app, /brandLink\.setAttribute\('href', '\/home\/'\)/);
-  assert.match(app, /const contextAction = actions\[page\] \|\| '<a href="\/\?post=1"/);
+  assert.match(app, /brandLink\.setAttribute\('href', '\/'\)/);
+  assert.match(app, /const contextAction = actions\[page\] \|\| '<a href="\/globe\/\?post=1"/);
 });
 
 test('camera pages: the same tabs with the shutter in the centre', () => {

@@ -4,7 +4,7 @@ import { derivePassGauge, renderPassGauge } from './pass-gauge.mjs';
 const brandedLink = () => {
   const link = document.createElement('a');
   link.className = 'brand px-header-brand';
-  link.href = '/home/';
+  link.href = '/';
   link.setAttribute('aria-label', 'PiXiEED ホーム');
   link.innerHTML = '<img src="/assets/brand/pixieed-logo-48.png" width="40" height="40" alt=""><span>PiXiEED</span>';
   return link;
@@ -134,7 +134,7 @@ export function mountSiteHeader() {
   let brand = inner.querySelector('.brand');
   if (!brand) inner.prepend(brand = brandedLink());
   brand.classList.add('px-header-brand');
-  brand.href = '/home/';
+  brand.href = '/';
   brand.setAttribute('aria-label', 'PiXiEED ホーム');
   inner.querySelectorAll('.menu-toggle, .audio-header-actions, .lc-top-left, .lc-top-right').forEach((el) => el.classList.add('px-header-utilities'));
   let button = inner.querySelector('[data-header-pass]');

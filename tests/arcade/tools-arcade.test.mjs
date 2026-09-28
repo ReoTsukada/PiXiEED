@@ -24,7 +24,7 @@ test('every tool page shares the bottom bar and the logo home', () => {
     const labels = [...nav.matchAll(/aria-label="([^"]+)"/g)].map((m) => m[1]);
     assert.equal(labels[0], '地球儀', dir); assert.equal(labels[1], '撮影', dir); assert.deepEqual(labels.slice(-2), ['ツール', 'マイページ'], dir);
     assert.doesNotMatch(nav, /aria-label="ホーム"/, dir);
-    if (html.includes('class="brand"')) assert.match(html, /<a class="brand" href="\/home\/"/, dir);
+    if (html.includes('class="brand"')) assert.match(html, /<a class="brand" href="\/"/, dir);
   }
 });
 

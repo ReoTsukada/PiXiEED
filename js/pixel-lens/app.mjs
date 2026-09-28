@@ -1162,7 +1162,7 @@ $('#postCamera').addEventListener('click', () => {
   try {
     const dataUrl = cameraPostDataUrl(state.result);
     localStorage.setItem('PiXiEED:camera-handoff:v1', JSON.stringify({ dataUrl, createdAt: Date.now() }));
-    location.assign(returnToAudio ? '/audio/' : '/?from=pixel-camera');
+    location.assign(returnToAudio ? '/audio/' : '/globe/?from=pixel-camera');
   } catch (error) {
     say(error instanceof Error ? error.message : '撮影画像を準備できませんでした。', { visible: true });
   }

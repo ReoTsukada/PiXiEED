@@ -33,7 +33,7 @@ export function openPuzzleHandoff({ mode, draftId, store, adapter, windowRef = g
     windowRef.sessionStorage.setItem(PUZZLE_HANDOFF_KEY, serialized);
     const page = windowRef.parent && windowRef.parent !== windowRef ? windowRef.parent : windowRef;
     const url = new URL(page.location.href);
-    url.pathname = '/';
+    url.pathname = '/globe/';
     url.search = '';
     url.searchParams.set('from', mode === 'spot_difference' ? 'spot-difference' : 'hidden-object');
     page.location.assign(`${url.pathname}${url.search}${url.hash}`);

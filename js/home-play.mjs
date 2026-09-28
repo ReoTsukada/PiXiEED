@@ -895,7 +895,7 @@ async function feed() {
     const bucket = encodeURIComponent(cfg.publicStorageBucket || 'post-public');
     const track = document.createElement('div'); track.className = 'hp-feed-track';
     const card = (r, copy) => {
-      const a = document.createElement('a'); a.className = 'hp-feed-item'; a.href = `/?art=${encodeURIComponent(r.post_id)}`;
+      const a = document.createElement('a'); a.className = 'hp-feed-item'; a.href = `/globe/?art=${encodeURIComponent(r.post_id)}`;
       if (copy) { a.tabIndex = -1; a.setAttribute('aria-hidden', 'true'); }
       const img = new Image(); img.loading = 'lazy'; img.decoding = 'async'; img.alt = copy ? '' : String(r.title || '地図の投稿');
       img.src = `${base}/storage/v1/object/public/${bucket}/${String(r.public_image_path).split('/').filter(Boolean).map(encodeURIComponent).join('/')}`;

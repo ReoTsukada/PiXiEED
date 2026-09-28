@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 const read = (path) => readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
 
 test('home: every tool card has a working toy and a plain name', () => {
-  const html = read('home/index.html'); const source = read('js/home-play.mjs');
+  const html = read('index.html'); const source = read('js/home-play.mjs');
   const toys = [...html.matchAll(/data-toy="([a-z]+)"/g)].map((m) => m[1]);
   assert.ok(toys.length >= 9);
   for (const toy of toys) assert.match(source, new RegExp(`\\n  ${toy}\\(el\\) \\{`), toy);
@@ -14,7 +14,7 @@ test('home: every tool card has a working toy and a plain name', () => {
 });
 
 test('home hero: draw, let go and it drops; a full row clears; letters burst; stars can be caught', () => {
-  const html = read('home/index.html'); const source = read('js/home-play.mjs');
+  const html = read('index.html'); const source = read('js/home-play.mjs');
   assert.match(html + source, /hpScore/);
   assert.match(source, /描いて、はなして、そろえて消す/);
   for (const fn of ['burstLetter', 'catchStar', 'inkAt', 'release', 'invite']) assert.match(source, new RegExp(`function ${fn}\\(`), fn);
@@ -46,8 +46,8 @@ test('home hero: the play leads somewhere — invitations matched to what the vi
 });
 
 test('home: two doors under the playground, soon-cards grouped, real posts drifting by', () => {
-  const html = read('home/index.html'); const source = read('js/home-play.mjs');
-  assert.match(html, /class="hp-go"[\s\S]*?href="\/"[^>]*>地図で絵をさがす[\s\S]*?href="\/pixel-camera\.html"[^>]*>カメラで撮る/);
+  const html = read('index.html'); const source = read('js/home-play.mjs');
+  assert.match(html, /class="hp-go"[\s\S]*?href="\/globe\/"[^>]*>地図で絵をさがす[\s\S]*?href="\/pixel-camera\.html"[^>]*>カメラで撮る/);
   assert.match(source, /function groupToys\(/); assert.match(source, /もうすぐ/);
   assert.match(html, /data-home-feed hidden/); assert.match(source, /async function feed\(/);
 });

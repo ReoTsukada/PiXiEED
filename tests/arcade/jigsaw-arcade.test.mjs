@@ -33,5 +33,5 @@ test('jigsaw: the shared bottom bar and the logo home', () => {
   const html = read('jigsaw/index.html');
   const nav = html.match(/<nav class="app-tabs"[^>]*>([\s\S]*?)<\/nav>/)[1];
   assert.deepEqual([...nav.matchAll(/aria-label="([^"]+)"/g)].map((m) => m[1]), ['地球儀', '撮影', '途中の配置を端末に保存', 'ツール', 'マイページ']);
-  assert.match(html, /<a class="brand" href="\/home\/"/);
+  assert.match(html, /<a class="brand" href="\/"/);
 });

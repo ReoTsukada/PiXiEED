@@ -11,7 +11,7 @@ if (!entry) throw new Error('Set PIXIEED_PLAYWRIGHT_MODULE to an existing Playwr
 const { chromium, webkit } = await import(pathToFileURL(entry).href);
 
 const routes = [
-  '/', '/home/', '/audio/', '/pixel-camera.html', '/draw/', '/jigsaw/',
+  '/', '/globe/', '/audio/', '/pixel-camera.html', '/draw/', '/jigsaw/',
   '/spot-difference/', '/hidden-object/', '/pixfind/', '/game/',
   '/globe-prototype.html?embed=1&tool=telescope'
 ];
@@ -93,7 +93,7 @@ for (const [engineName, engine] of [['chromium', chromium], ['webkit', webkit]])
       const errors = [];
       first.on('pageerror', (error) => errors.push(error.message)); second.on('pageerror', (error) => errors.push(error.message));
       await localOnly(first); await localOnly(second);
-      await first.goto(new URL('/home/', BASE).href, { waitUntil: 'domcontentloaded' });
+      await first.goto(new URL('/', BASE).href, { waitUntil: 'domcontentloaded' });
       await first.waitForSelector('[data-header-pass]');
       await second.goto(new URL('/draw/', BASE).href, { waitUntil: 'domcontentloaded' });
       await second.waitForSelector('[data-header-pass]');

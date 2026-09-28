@@ -218,7 +218,7 @@ async function runSharedMotionEffects(browser, engineName) {
 
 async function runHomeGauge(browser, engineName) {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } }); const page = await context.newPage();
-  await localOnly(page); await page.goto(new URL('/home/', BASE).href, { waitUntil: 'domcontentloaded' });
+  await localOnly(page); await page.goto(new URL('/', BASE).href, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('[data-header-pass] .px-pass-gauge-row'); await inspectLayout(page, { width: 390, height: 844 }, { require44: false });
   const setBank = async (hours) => page.evaluate((duration) => {
     localStorage.setItem('pixieed:pass:v1', JSON.stringify({ until: Date.now() + duration }));

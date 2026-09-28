@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 
 const root = resolve(new URL('../..', import.meta.url).pathname);
 const pages = [
-  ['index.html', '/', 'site'], ['home/index.html', '/home/', 'site'], ['tools/index.html', '/tools/', 'tools'],
+  ['index.html', '/', 'site'], ['globe/index.html', '/globe/', 'site'], ['tools/index.html', '/tools/', 'tools'],
   ['draw/index.html', '/draw/', 'draw'], ['audio/index.html', '/audio/', 'audio'], ['jigsaw/index.html', '/jigsaw/', 'jigsaw'],
   ['spot-difference/index.html', '/spot-difference/', 'spot-difference'], ['hidden-object/index.html', '/hidden-object/', 'hidden-object'],
   ['pixfind/index.html', '/pixfind/', 'pixfind'], ['game/index.html', '/game/', 'game'], ['pixel-camera.html', '/pixel-camera.html', 'camera'],

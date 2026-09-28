@@ -399,7 +399,7 @@ globeButton.addEventListener('click', async () => {
     const png = await encodeDrawPng(revision.document);
     const serialized = await serializeDrawHandoff(png, revision.revisionId);
     sessionStorage.setItem(DRAW_HANDOFF_KEY, serialized);
-    location.assign('/?from=draw');
+    location.assign('/globe/?from=draw');
   } catch (error) { status.textContent = `地球儀へ送れませんでした：${error.message}`; }
   finally { globeButton.disabled = false; }
 });

@@ -61,7 +61,7 @@ if (root && new URLSearchParams(location.search).get('view') === 'posts') {
     article.append(element('p', 'legacy-placement__user-post-status', `審査状態：${statusLabel}`));
     if (post.status === 'published') {
       const link = element('a', 'legacy-placement__globe-link', '地球儀でこの作品を見る');
-      link.href = `/?art=${encodeURIComponent(post.id)}`;
+      link.href = `/globe/?art=${encodeURIComponent(post.id)}`;
       article.append(link);
     }
     return article;
@@ -79,7 +79,7 @@ if (root && new URLSearchParams(location.search).get('view') === 'posts') {
     article.append(heading);
     const placed = element('p', 'legacy-placement__current');
     const globeLink = element('a', 'legacy-placement__globe-link', '地球儀でこの作品を見る');
-    globeLink.href = `/?art=${encodeURIComponent(`showcase:${work.id}`)}`;
+    globeLink.href = `/globe/?art=${encodeURIComponent(`showcase:${work.id}`)}`;
     globeLink.hidden = true;
     try {
       const center = getCellById(placedCellId).center;

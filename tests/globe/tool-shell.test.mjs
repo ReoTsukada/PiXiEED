@@ -7,7 +7,7 @@ const root = resolve(new URL('../..', import.meta.url).pathname);
 const read = (file) => readFileSync(resolve(root, file), 'utf8');
 
 test('globe top is a single viewport tool surface', () => {
-  const html = read('index.html');
+  const html = read('globe/index.html');
   assert.match(html, /app-page--tool-globe/);
   assert.match(html, /map-hero__globe-frame/);
   assert.doesNotMatch(html, /<footer\b/);

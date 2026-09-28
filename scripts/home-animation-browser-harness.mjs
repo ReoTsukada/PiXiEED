@@ -47,7 +47,7 @@ for (const [engine, type] of [['Chrome', chromium], ['WebKit', webkit]]) {
         }
       }, scenario);
       await page.route('**/*', (route) => new URL(route.request().url()).origin === new URL(BASE).origin ? route.continue() : route.fulfill({ status: 200, json: [] }));
-      await page.goto(BASE + '/home/', { waitUntil: 'domcontentloaded' });
+      await page.goto(BASE + '/', { waitUntil: 'domcontentloaded' });
       await page.waitForFunction(() => document.querySelectorAll('#hpColors button').length === 7 && document.querySelectorAll('.hp-view').length >= 9);
       const count = () => page.evaluate(() => ({ ...__homePaintCounts }));
       const changedWhileVisible = async () => {
