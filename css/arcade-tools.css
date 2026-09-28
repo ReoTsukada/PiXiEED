@@ -1,0 +1,61 @@
+/* The arcade look on the other play tools. Visual only: sizes, ids and layout rules stay the page's own. */
+body.arc-tool { background: #eef0ea; }
+body.arc-tool [class$="-status"][role="status"]:not(.pixfind-game-status) { justify-self: center; width: fit-content; max-width: min(100%, 560px); margin-inline: auto; padding: 3px 12px; border-radius: 999px; background: rgba(21, 32, 43, .06); color: #3d4a55; font-size: .74rem; font-weight: 700; }
+
+/* ---- setup panels become the title screen ---- */
+body.arc-tool .arc-setup { box-sizing: border-box; display: grid; gap: 10px; width: min(100%, 560px); margin-inline: auto; padding: 10px 14px 16px; border: 0; background-color: #15202b; color: #fff; }
+body.arc-tool .arc-setup .arc-title h1 { margin: 0; font-size: clamp(1.3rem, 6vw, 1.8rem); color: #fff; }
+body.arc-tool .arc-setup > label, body.arc-tool .arc-setup .game-file-field { display: grid; gap: 6px; color: #fff; font-size: .84rem; font-weight: 900; letter-spacing: .03em; }
+body.arc-tool .arc-setup select { box-sizing: border-box; width: 100%; min-height: 48px; padding: 8px 34px 8px 12px; border: 2px solid rgba(255,255,255,.14); border-radius: 14px; background-color: #1d2b38 !important; color: #fff; font: inherit; font-weight: 700; box-shadow: 0 3px 0 rgba(0,0,0,.4); appearance: none; -webkit-appearance: none; background-image: linear-gradient(45deg, transparent 50%, #ffd35a 50%), linear-gradient(135deg, #ffd35a 50%, transparent 50%) !important; background-position: calc(100% - 17px) 52%, calc(100% - 11px) 52% !important; background-size: 6px 6px !important; background-repeat: no-repeat !important; }
+body.arc-tool .arc-setup select:focus-visible { outline: 3px solid #ffd35a; outline-offset: 2px; }
+body.arc-tool .arc-setup > p:not(.arc-title-sub) { margin: 0; color: rgba(255,255,255,.5); font-size: .7rem; line-height: 1.55; text-align: center; }
+body.arc-tool .arc-setup button.arc-start { width: 100%; min-height: 60px; border: 0 !important; border-radius: 18px !important; background: #ffd35a !important; color: #17232d !important; font-size: 1.12rem; font-weight: 900; letter-spacing: .06em; }
+body.arc-tool .arc-setup button.arc-start:disabled { background: #50606d !important; color: rgba(255,255,255,.72) !important; opacity: 1; box-shadow: 0 4px 0 #34414c; }
+body.arc-tool .arc-setup button.arc-sub-button { min-height: 48px; border: 2px solid rgba(255,255,255,.12) !important; border-radius: 16px !important; background: #1d2b38 !important; color: #fff !important; font-weight: 900; }
+
+/* file pickers as big friendly tiles (the game maker) */
+body.arc-tool .arc-setup .game-file-field { position: relative; padding: 10px 12px; border: 2px dashed rgba(255,255,255,.22); border-radius: 16px; background: #1d2b38; }
+body.arc-tool .arc-setup .game-file-field input[type=file] { color: rgba(255,255,255,.7); font-size: .74rem; }
+body.arc-tool .arc-setup .game-file-field input[type=file]::file-selector-button { margin-right: 10px; padding: 8px 14px; border: 0; border-radius: 12px; background: #ffd35a; color: #17232d; font: inherit; font-weight: 900; box-shadow: 0 3px 0 #b88f1d; cursor: pointer; }
+body.arc-tool .arc-setup .game-file-field span { color: rgba(255,255,255,.55); font-size: .7rem; font-weight: 700; }
+body.arc-tool .arc-setup .game-file-field img { image-rendering: pixelated; border-radius: 8px; }
+
+/* ---- editors: the "use it" buttons glow ---- */
+body.arc-tool button.arc-go:not([hidden]) { border: 0 !important; border-radius: 16px !important; background: #ffd35a !important; color: #17232d !important; font-weight: 900 !important; box-shadow: 0 4px 0 #b88f1d !important; }
+body.arc-tool button.arc-go:disabled { background: #cfd4cc !important; color: #6b7570 !important; box-shadow: 0 3px 0 #b5bbb2 !important; }
+
+/* ---- PiXFiND: the lobby and the puzzles as game cards ---- */
+body.arc-tool .arc-lobby { padding-bottom: 8px; margin-bottom: 10px; }
+body.arc-tool .arc-cardlist { width: min(100%, 560px); margin-inline: auto; }
+body.arc-tool .arc-cardlist .pixfind-card button { border: 0 !important; border-radius: 18px !important; background: #15202b !important; color: #fff !important; box-shadow: 0 4px 0 rgba(0,0,0,.35) !important; transition: transform .12s cubic-bezier(.2,1.3,.4,1); }
+body.arc-tool .arc-cardlist .pixfind-card button:hover { transform: translateY(-3px); }
+body.arc-tool .arc-cardlist .pixfind-card button:active { transform: translateY(3px); }
+body.arc-tool .arc-cardlist .pixfind-card img { image-rendering: pixelated; border-radius: 12px; background: #0e161e; }
+body.arc-tool .arc-cardlist .pixfind-card p { color: rgba(255,255,255,.6) !important; }
+
+/* ---- games: the HUD sits at the top of the play area ---- */
+body.arc-tool .arc-play { position: relative; }
+body.arc-tool .arc-play > .arc-hud { margin-bottom: 6px; }
+body.arc-tool .game-controls button { border: 0 !important; border-radius: 16px !important; background: #15202b !important; color: #ffd35a !important; font-weight: 900; box-shadow: 0 4px 0 rgba(0,0,0,.45) !important; }
+body.arc-tool .game-controls button:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,.45) !important; }
+body.arc-tool .game-board-wrap canvas, body.arc-tool .pixfind-play-area { border-radius: 16px; box-shadow: 0 0 0 3px #15202b, 0 10px 24px rgba(21,32,43,.2); }
+
+/* ---- the drawing and music editors: same controls, arcade finish ---- */
+body[data-page="draw"] .draw-controls, body[data-page="audio"] .audio-controls { border: 0 !important; background: #15202b !important; color: #fff; box-shadow: 0 8px 22px rgba(21,32,43,.22); }
+body[data-page="draw"] .draw-controls summary, body[data-page="draw"] .draw-controls label { color: rgba(255,255,255,.75); }
+body[data-page="draw"] .draw-tools button, body[data-page="draw"] .draw-actions button, body[data-page="draw"] .draw-import__options button,
+body[data-page="audio"] .audio-tools > button, body[data-page="audio"] .audio-tools summary {
+  border: 0 !important; background: #1d2b38 !important; color: #fff !important; font-weight: 900; box-shadow: 0 3px 0 rgba(0,0,0,.45); transition: transform .12s cubic-bezier(.2,1.3,.4,1), box-shadow .12s;
+}
+body[data-page="draw"] .draw-tools button:active, body[data-page="draw"] .draw-actions button:active:not(:disabled), body[data-page="audio"] .audio-tools > button:active { transform: translateY(3px); box-shadow: 0 0 0 rgba(0,0,0,.45); }
+body[data-page="draw"] .draw-tools button[aria-pressed="true"], body[data-page="audio"] .audio-tools > button[aria-pressed="true"] { background: #ffd35a !important; color: #17232d !important; box-shadow: 0 3px 0 #b88f1d; }
+body[data-page="draw"] .draw-actions button:disabled { opacity: .4; }
+body[data-page="draw"] .draw-palette button, body[data-page="audio"] .audio-tracks button { border-radius: 10px !important; box-shadow: 0 3px 0 rgba(0,0,0,.45); transition: transform .12s cubic-bezier(.2,1.3,.4,1); }
+body[data-page="draw"] .draw-palette button[aria-pressed="true"], body[data-page="draw"] .draw-palette button[aria-checked="true"],
+body[data-page="audio"] .audio-tracks button[aria-pressed="true"], body[data-page="audio"] .audio-tracks button[aria-checked="true"] { transform: translateY(-3px) scale(1.06); box-shadow: 0 0 0 3px #ffd35a, 0 5px 0 rgba(0,0,0,.45); }
+body[data-page="draw"] .draw-board, body[data-page="audio"] .audio-grid-wrap { border-radius: 18px; box-shadow: inset 0 0 0 3px #15202b; }
+@media (prefers-reduced-motion: reduce) { body.arc-tool *, body[data-page="draw"] *, body[data-page="audio"] * { transition: none !important; } }
+
+/* the celebration covers the screen on these pages (their play areas can be short) */
+body.arc-tool .arc-play > .arc-win { position: fixed; z-index: 70; }
+body.arc-tool .arc-lobby[hidden] { display: none !important; }

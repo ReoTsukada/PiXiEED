@@ -105,3 +105,5 @@
   .arc-start:not(:disabled), .arc-win, .arc-win-card, .arc-win-stars i, .arc-float, .arc-hud.is-bump .arc-bar { animation: none !important; }
   .arc-press, .arc-start, .arc-bar span { transition: none !important; }
 }
+.arc-burst { position: fixed; inset: 0; z-index: 60; width: 100vw; height: 100vh; pointer-events: none; }
+.arc-win-title:focus { outline: none; }
