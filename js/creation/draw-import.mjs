@@ -1,5 +1,5 @@
 import { createDrawDocument, DRAW_SIZES, MAX_DRAW_COLORS, validateDrawDocument } from './draw-core.mjs?rev=20260927-draw-step08-3';
-import { normalizePixelFile, readPixelImageDimensions } from '../pixel-scale.mjs?rev=20260928-pixel-roundtrip-1';
+import { normalizePixelFile, readPixelImageDimensions } from '../pixel-scale.mjs?rev=20260929-claude-integration-1';
 
 export const MAX_IMPORT_FILE_BYTES = 10 * 1024 * 1024;
 export const MAX_IMPORT_SOURCE_PIXELS = 2 * 1024 * 1024;

@@ -2,18 +2,13 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8">
-  <title>PiXiEED</title>
-  <meta name="robots" content="noindex">
+<title>ドット絵もの探し｜絵の中にかくれたものを探す｜PiXiEED</title>
+<meta name="description" content="みんなが作ったドット絵のもの探し。絵の中にかくれたものを、タップして探し出そう。">
+<link rel="canonical" href="https://pixieed.jp/play/hidden-object/">
+<meta property="og:type" content="website"><meta property="og:site_name" content="PiXiEED"><meta property="og:locale" content="ja_JP"><meta property="og:title" content="ドット絵もの探し｜絵の中にかくれたものを探す｜PiXiEED"><meta property="og:description" content="みんなが作ったドット絵のもの探し。絵の中にかくれたものを、タップして探し出そう。"><meta property="og:url" content="https://pixieed.jp/play/hidden-object/"><meta property="og:image" content="https://pixieed.jp/assets/og/find-game.png"><meta property="og:image:type" content="image/png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="PiXiEEDのロゴと「ドット絵もの探し」のアイコン">
+<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="ドット絵もの探し｜絵の中にかくれたものを探す｜PiXiEED"><meta name="twitter:description" content="みんなが作ったドット絵のもの探し。絵の中にかくれたものを、タップして探し出そう。"><meta name="twitter:image" content="https://pixieed.jp/assets/og/find-game.png"><meta name="twitter:image:alt" content="PiXiEEDのロゴと「ドット絵もの探し」のアイコン">
+<link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180"><link rel="manifest" href="/manifest.webmanifest">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <script>
-    const params = new URLSearchParams(window.location.search || "");
-    const target = params.has("localHidden")
-      ? "/play/hidden-object/"
-      : ["postPuzzle", "localSpot", "puzzle"].some((key) => params.has(key)) || window.location.hash.startsWith("#puzzle=")
-        ? "/play/spot-difference/"
-        : "/tools/";
-    window.location.replace(target === "/tools/" ? target : target + window.location.search + window.location.hash);
-  </script>
   <meta name="theme-color" content="#f4f2ec">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20260929-claude-integration-1">
   <link rel="stylesheet" href="/css/site.css?rev=20260929-claude-integration-1">
@@ -22,11 +17,11 @@
   <link rel="stylesheet" href="/css/arcade.css?rev=20260929-claude-integration-1">
   <link rel="stylesheet" href="/css/arcade-tools.css?rev=20260929-claude-integration-1">
 </head>
-<body data-page="pixfind" class="app-page app-page--tool-pixfind pixfind-tool-body">
+<body data-page="find-game" data-puzzle-mode="hidden-object" class="app-page app-page--tool-pixfind pixfind-tool-body">
   <a class="skip-link" href="#main">本文へ移動</a>
   <header class="site-header"><div class="container header-inner"><a class="brand" href="/" aria-label="PiXiEED ホーム"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a></div></header>
   <main id="main" class="pixfind-page">
-    <header class="pixfind-heading"><p class="pixfind-eyebrow">PiXFiND</p><h1>絵の中のちがいや探しものを見つけよう</h1><p>公開されている問題を選んで遊べます。</p></header>
+    <header class="pixfind-heading"><p class="pixfind-eyebrow">ドット絵もの探し</p><h1>かくれたものを探そう</h1><p>公開されているもの探しを選んで遊べます。</p></header>
     <p id="pixfind-status" class="pixfind-status" role="status" aria-live="polite">公開問題を読み込んでいます。</p>
     <p id="pixfind-local-only" class="pixfind-status" role="status" hidden>端末内の試遊です。この問題は公開されていません。</p>
     <section id="pixfind-list" class="pixfind-list" aria-label="公開中の問題"></section>

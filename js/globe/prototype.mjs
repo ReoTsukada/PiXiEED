@@ -1,9 +1,9 @@
 import { initAstroUi } from './astro-ui.mjs?v=20260929-gallery-observe-1';
-import { initPostUi } from './post-ui.mjs?v=20260928-pixel-roundtrip-1';
+import { initPostUi } from './post-ui.mjs?v=20260929-claude-integration-1';
 import { sharedSky, sharedFaintSky, SPRITE_MAGNITUDE } from './real-sky.mjs?v=20260927-sky-events-v1';
 import { createSupabaseGlobeAuth, createSupabaseGlobeStore } from './post-supabase.mjs?v=20260928-puzzle-handoff-1';
 import { createGlobeRenderer, decodeRasterData, getSelectionStageLabel, prepareGeoJsonFeatures } from './renderer.mjs?v=20260927-solar-tool-2';
-import { openHandoffComposer, pendingHandoff } from './post-handoff.mjs?v=20260928-pixel-roundtrip-1';
+import { openHandoffComposer, pendingHandoff } from './post-handoff.mjs?v=20260929-claude-integration-1';
 
 const embedMode = new URLSearchParams(location.search).get('embed') === '1';
 

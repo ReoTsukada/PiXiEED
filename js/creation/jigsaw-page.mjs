@@ -1,3 +1,5 @@
+import { listOwnVersions, mountPictureShelf, pictureDraftId } from './picture-shelf.mjs?rev=20260928-picture-shelf-1';
+import { scaleNotice } from '../pixel-scale.mjs?rev=20260929-claude-integration-1';
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
 import {
   chunkJigsawPuzzleIds, collectPagedRows, fingerprintBytes, firstPublishedPixfindReferences, isSafeJigsawPixfindOriginalUrl, resolveLocalDrawRevision, validateJigsawSource, JIGSAW_MAX_IMAGE_BYTES, JIGSAW_MAX_SOURCE_PIXELS
@@ -13,11 +15,10 @@ import { supabaseConfig } from '../../data/site-config.js';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
 import { mountPxdTools } from './pxd-ui.mjs?rev=20260928-own-work-1';
 import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20260928-pxd-puzzles-1';
-import { normalizeJigsawFile } from './jigsaw-file.mjs?rev=20260928-pixel-roundtrip-1';
+import { normalizeJigsawFile } from './jigsaw-file.mjs?rev=20260929-claude-integration-1';
 import { requestPass } from '../pixieed-pass.mjs?v=20260928-rewards-1';
 import { createPuzzleHintController } from './puzzle-hint.mjs?rev=20260928-hint-1';
 
-const DRAW_LAST_DRAFT_KEY = 'pixieed.simple-draw.last-draft.v1';
 const JIGSAW_LAST_DRAFT_KEY = 'pixieed:creation:jigsaw:last-draft:v1';
 const $ = (selector) => document.querySelector(selector);
 const status = $('#jigsaw-status'); const sourceSelect = $('#jigsaw-source-version');
@@ -36,7 +37,7 @@ let selectionCache = { layout: null, pieceIds: null, path: null };
 let liftEffect = null; let liftValue = 0;
 let jigsawHint = null;
 let jigsawHintTimer = 0;
-let pxdOriginalRefs = null; let pxdBridge = null;
+let pxdOriginalRefs = null; let pxdPreservedPayload = null; let pxdBridge = null;
 let activePointer = null; let panGesture = null; let pendingPaint = 0; let view = { scale: 1, x: 0, y: 0 }; let lastWorkspaceSize = null;
 const MAX_TRAY_DOM = 80;
 const reduceJigsawHintMotion = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
@@ -133,6 +134,7 @@ async function loadPublicOptions() {
 }
 function displaySourceFields() {
   $('#jigsaw-draw-source').hidden = sourceKind.value !== 'draw';
+  $('#jigsaw-shelf')?.classList.toggle('is-off', sourceKind.value !== 'draw');
   $('#jigsaw-public-source').hidden = sourceKind.value !== 'public';
   $('#jigsaw-file-source').hidden = sourceKind.value !== 'file';
   startButton.disabled = sourceKind.value === 'draw' ? !sourceSelect.value : sourceKind.value === 'public' ? !publicSelect.value : !fileInput.files?.[0];
@@ -178,17 +180,16 @@ function updateStatus(message) { status.textContent = message; }
 async function loadSourceOptions() {
   sourceSelect.replaceChildren();
   sourceSelect.add(new Option('読み込み中…', ''));
-  const draftId = localStorageValue(DRAW_LAST_DRAFT_KEY);
+  // ジグソー keeps its own picture; other tools' pictures come in through the shelf.
+  const draftId = pictureDraftId('jigsaw');
   if (!adapter || !draftId) {
-    sourceSelect.replaceChildren(new Option('保存したドット絵がありません', ''));
+    sourceSelect.replaceChildren(new Option('まだ絵がありません', ''));
     displaySourceFields();
     return;
   }
   try {
-    const record = await adapter.get(draftId);
-    if (!record || record.schemaVersion !== 1 || record.draftId !== draftId || !Array.isArray(record.revisions)) throw new Error('保存した絵が見つかりません');
-    const options = record.revisions.filter((revision) => revision?.asset?.kind === 'pixel_art' && revision.asset.owner?.type === 'local' && revision.asset.owner.id === 'local-owner' && revision.asset.visibility === 'draft');
-    if (!options.length) throw new Error('使える手描き保存版がありません');
+    const { versions: options } = await listOwnVersions('jigsaw', { adapter });
+    if (!options.length) throw new Error('使える絵がありません');
     sourceDraftId = draftId;
     sourceSelect.replaceChildren();
     options.forEach((revision, index) => {
@@ -552,7 +553,7 @@ async function startGame() {
   try {
     const gameId = globalThis.crypto.randomUUID(); let source; let rgba; let width; let height;
     if (sourceKind.value === 'draw') {
-      const draftId = sourceDraftId || localStorageValue(DRAW_LAST_DRAFT_KEY); const revision = await resolveLocalDrawRevision(adapter, draftId, sourceSelect.value);
+      const draftId = sourceDraftId || pictureDraftId('jigsaw'); const revision = await resolveLocalDrawRevision(adapter, draftId, sourceSelect.value);
       source = { draftId, assetId: revision.asset.assetId, revisionId: revision.revisionId, contentHash: revision.documentHash, hashScheme: revision.hashScheme };
       sourceDraftId = draftId; sourceRevision = revision; width = revision.document.width; height = revision.document.height; rgba = { width, height, rgba: documentRgba(revision.document) };
       sourceLabel.textContent = `自分の保存版 ${revision.revisionId.slice(0, 8)} · ${revision.document.width}×${revision.document.height}px`;
@@ -565,17 +566,18 @@ async function startGame() {
       } else {
         localFile = fileInput.files?.[0];
         if (!localFile || localFile.size > JIGSAW_MAX_IMAGE_BYTES || !['image/png', 'image/webp', 'image/jpeg'].includes(localFile.type)) throw new Error('PNG、WebP、JPEGの画像を8MB以内で選んでください');
+        const sourceMimeType = localFile.type;
+        if (sourceMimeType === 'image/png' || sourceMimeType === 'image/webp') {
+          scaleInfo = await normalizeJigsawFile(localFile);
+          localFile = typeof File === 'function'
+            ? new File([scaleInfo.file], localFile.name, { type: scaleInfo.file.type, lastModified: localFile.lastModified })
+            : scaleInfo.file;
+        }
         url = URL.createObjectURL(localFile);
       }
       try {
         let imageBytes;
         if (sourceKind.value === 'file') {
-          if (localFile.type === 'image/png' || localFile.type === 'image/webp') {
-            scaleInfo = await normalizeJigsawFile(localFile);
-            localFile = typeof File === 'function'
-              ? new File([scaleInfo.file], localFile.name, { type: scaleInfo.file.type, lastModified: localFile.lastModified })
-              : scaleInfo.file;
-          }
           if (localFile.size > JIGSAW_MAX_IMAGE_BYTES) throw new Error('画像のファイルサイズが8MBを超えています');
           imageBytes = await localFile.arrayBuffer();
         } else imageBytes = await fetchImageBytes(url);
@@ -586,7 +588,8 @@ async function startGame() {
         if (sourceKind.value === 'public') source = { type: 'public', postId: choice.id, ...(choice.puzzleId ? { puzzleId: choice.puzzleId } : {}), title: String(choice.label).slice(0, 120), url, fingerprint, width, height };
         else source = { type: 'file', dataUrl: `data:${localFile.type};base64,${bytesToBase64(new Uint8Array(imageBytes))}`, fingerprint, width, height };
         validateJigsawSource(source);
-        sourceLabel.textContent = `${sourceKind.value === 'public' ? `${source.title} · PiXiEEDの投稿` : '端末で選んだ画像'} · ${rgba.width}×${rgba.height}px`;
+        const scaleMessage = scaleInfo ? scaleNotice(scaleInfo) : '';
+        sourceLabel.textContent = `${sourceKind.value === 'public' ? `${source.title} · PiXiEEDの投稿` : '端末で選んだ画像'} · ${rgba.width}×${rgba.height}px${scaleMessage ? ` · ${scaleMessage}` : ''}`;
       } finally { if (sourceKind.value === 'file') URL.revokeObjectURL(url); }
     }
     if (sourceKind.value === 'file' && ['image/png', 'image/webp'].includes(fileInput.files?.[0]?.type)) {
@@ -597,7 +600,7 @@ async function startGame() {
     clearSelectionCache();
     pieces = sliceJigsawPieces(rgba, layoutData);
     game = createJigsawWorkspace({ gameId, source, layout: layoutData, seed: gameId });
-    pxdOriginalRefs = null;
+    pxdOriginalRefs = null; pxdPreservedPayload = null;
     pxdBridge?.reset();
     selectedGroupId = null; trayPage = 0; view = { scale: 1, x: 0, y: 0 }; gameDraftId = game.gameId;
     updatePieceEstimate({ width, height }); showGame(); updateStatus(`作成しました。${(layoutData.columns * layoutData.rows).toLocaleString('ja-JP')}ピースを自由に動かせます。`);
@@ -667,7 +670,7 @@ async function resumeGame() {
     }
     clearSelectionCache();
     pieces = sliceJigsawPieces(rgba, layoutData); gameDraftId = draftId; selectedGroupId = null; trayPage = 0; view = { scale: 1, x: 0, y: 0 };
-    pxdOriginalRefs = null; pxdBridge?.reset();
+    pxdOriginalRefs = null; pxdPreservedPayload = null; pxdBridge?.reset();
     showGame();
     if (savedGame.viewport && !isLegacy) {
       updateViewport();
@@ -729,7 +732,7 @@ async function openPxdJigsaw(project) {
   pxdBridge?.reset();
   game = nextGame; layoutData = nextLayout; pieces = nextPieces; gameDraftId = game.gameId;
   clearSelectionCache(); clearDragState();
-  pxdOriginalRefs = materialized.portableOriginalRefs;
+  pxdOriginalRefs = materialized.portableOriginalRefs; pxdPreservedPayload = materialized.preservedPayload || null;
   selectedGroupId = null; trayPage = 0; view = { scale: 1, x: 0, y: 0 };
   sourceLabel.textContent = game.source.type === 'public' ? `${game.source.title} · 公開作品` : game.source.type === 'file' ? 'PXD内の端末画像' : `PXDの自分の固定版 · ${sourcePixels.width}×${sourcePixels.height}px`;
   gridSelect.value = String(layoutData.pieceSize); updatePieceEstimate({ width: layoutData.width, height: layoutData.height });
@@ -749,7 +752,7 @@ function mountPxdJigsaw() {
         const image = boundedRgba(await decodeImage(game.source.dataUrl));
         sourceImages['jigsaw-main'] = { width: image.width, height: image.height, rgba: new Uint8Array(image.rgba) };
       } else if (game.source.type !== 'public' && sourceRevision?.document) sourceDrawDocuments['jigsaw-main'] = sourceRevision.document;
-      return writePxdPuzzle(project, { tool: 'jigsaw', document: game, sourceDrawDocuments, sourceImages, portableOriginalRefs: pxdOriginalRefs, sourceChanged: false });
+      return writePxdPuzzle(project, { tool: 'jigsaw', document: game, sourceDrawDocuments, sourceImages, portableOriginalRefs: pxdOriginalRefs, preservedPayload: pxdPreservedPayload, sourceChanged: false });
     },
     openProject: openPxdJigsaw
   });
@@ -817,7 +820,7 @@ $('#jigsaw-new').addEventListener('click', () => {
   clearSelectionCache(); clearDragState();
   delete workspaceElement.dataset.jigsawSelected;
   pieceLookupSource = pieces; pieceLookup.clear(); pieceOrderSource = null; pieceOrderIndex.clear();
-  pxdOriginalRefs = null;
+  pxdOriginalRefs = null; pxdPreservedPayload = null;
   delete document.body.dataset.jigsawPlaying; playSection.hidden = true; setupSection.hidden = false; saveButton.disabled = true;
   updateStatus('絵とピースの大きさを選んでください。');
 });
@@ -826,6 +829,7 @@ jigsawHintButton?.addEventListener('click', () => { void requestJigsawHint(); })
 
 resumeButton.hidden = !draftStore || !localStorageValue(JIGSAW_LAST_DRAFT_KEY);
 saveButton.disabled = true;
+mountPictureShelf($('#jigsaw-shelf'), { tool: 'jigsaw', adapter, onBrought: async ({ from }) => { sourceKind.value = 'draw'; await loadSourceOptions(); displaySourceFields(); updateStatus(`${from.label}の絵を持ってきました。`); }, onError: (error) => updateStatus(`持ってこられませんでした：${error.message}`) });
 pxdBridge = mountPxdJigsaw();
 if (pxdBridge) {
   const imported = await pxdBridge.ready;

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const read = (path) => readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
-const PAGES = { 'spot-difference': 'spot-difference', 'hidden-object': 'hidden-object', pixfind: 'pixfind', game: 'creation-game' };
+const PAGES = { 'spot-difference': 'spot-difference', 'hidden-object': 'hidden-object', 'play/spot-difference': 'spot-game', 'play/hidden-object': 'find-game', game: 'creation-game' };
 
 test('play tools wear the arcade look; the dress loads after the page and knows every page by data-page', () => {
   const dress = read('js/arcade-dress.mjs');

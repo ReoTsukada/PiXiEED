@@ -194,7 +194,10 @@ export async function normalizePixelFile(file, { createImageBitmapImpl = globalT
   const bitmap = await createImageBitmapImpl(file);
   let pixels;
   try {
-    if (!bitmap.width || !bitmap.height || bitmap.width !== dimensions.width || bitmap.height !== dimensions.height) throw new TypeError('画像の寸法を確認できませんでした。');
+    const sameDimensions = bitmap.width === dimensions.width && bitmap.height === dimensions.height;
+    // JPEG decoders may apply EXIF orientation before reporting raster dimensions.
+    const orientedJpeg = file.type === 'image/jpeg' && bitmap.width === dimensions.height && bitmap.height === dimensions.width;
+    if (!bitmap.width || !bitmap.height || (!sameDimensions && !orientedJpeg)) throw new TypeError('画像の寸法を確認できませんでした。');
     pixels = readPixels(bitmap, documentRef);
   } finally { bitmap.close?.(); }
   const result = normalizePixels(pixels, {
@@ -209,7 +212,7 @@ export async function normalizePixelFile(file, { createImageBitmapImpl = globalT
 
 /** A short note for the person when an image was shrunk; '' when nothing changed. */
 export function scaleNotice({ scale, width, height }) {
-  return scale > 1 ? `${width}×${height}pxで読み込みました。` : '';
+  return scale > 1 ? `${scale}倍の画像を${width}×${height}pxで読み込みました。` : '';
 }
 
 export function snapToWholePixels(element, dots, { devicePixelRatio = globalThis.devicePixelRatio || 1 } = {}) {

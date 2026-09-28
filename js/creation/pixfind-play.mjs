@@ -1,3 +1,4 @@
+import { detectPixelScale, wholePixelFit } from '../pixel-scale.mjs?rev=20260929-claude-integration-1';
 import { supabaseConfig } from '../../data/site-config.js';
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
 import { documentRgba } from './draw-core.mjs';
@@ -10,6 +11,31 @@ import { computeDifferenceRegions, computeHiddenObjectRegions, regionContainsPoi
 const BUCKETS = new Set(['pixfind-puzzles', 'pixieed-contest']);
 const HEADERS = { apikey: supabaseConfig.publishableKey };
 const SELECT = Object.freeze({ posts: 'id,status,post_kind,distribution_mode,pixfind_puzzle_id', puzzles: 'id,slug,label,author_name,original_url,diff_url,thumbnail_url,mode,game_mode,play_mode,targets,regions' });
+
+const gcd = (a, b) => { while (b) [a, b] = [b, a % b]; return a; };
+/** 間違い探し and もの探し are separate games, each on its own page. */
+export const PUZZLE_PLAY_PATHS = Object.freeze({ 'spot-difference': '/play/spot-difference/', 'hidden-object': '/play/hidden-object/' });
+export const MODE_NAMES = Object.freeze({ 'spot-difference': '間違い探し', 'hidden-object': 'もの探し' });
+
+/** The game page an older /pixfind/ link belongs to; a local もの探し draft is known from its address, anything else starts at 間違い探し and moves on once the puzzle's mode is known. */
+export function playPathForLegacyLink(location) {
+  try {
+    const params = new URLSearchParams(location?.search || '');
+    if (params.has('localHidden')) return PUZZLE_PLAY_PATHS['hidden-object'];
+    if (['postPuzzle', 'localSpot', 'puzzle'].some((key) => params.has(key)) || String(location?.hash || '').startsWith('#puzzle=')) return PUZZLE_PLAY_PATHS['spot-difference'];
+  } catch { /* fall through */ }
+  return '/tools/';
+}
+
+/** Where 戻る goes from a single puzzle: the tool a local draft came from, otherwise this game's own list. */
+export function exitDestination(location, pageMode) {
+  try {
+    const params = new URLSearchParams(location?.search || '');
+    if (params.has('localSpot')) return '/spot-difference/';
+    if (params.has('localHidden')) return '/hidden-object/';
+  } catch { /* fall through */ }
+  return PUZZLE_PLAY_PATHS[pageMode] || '/tools/';
+}
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -59,7 +85,7 @@ export function preparePublicPostPuzzle(payload, postId, supabaseUrl = supabaseC
       ids.add(group.id);
       for (const pixel of group.pixels) { if (!Number.isInteger(pixel) || pixel < 0 || pixel >= width * height || used.has(pixel)) fail(); used.add(pixel); }
     }
-    return Object.freeze({ id: postId, postId, slug: null, label: cleanText(row.title, 'PiXFiND', 160), author: cleanText(row.author, '作者不明', 120), mode: 'spot-difference', originalUrl, changedUrl, thumbnailUrl: originalUrl, width, height, publicPostOnly: true, candidates: definition.candidates });
+    return Object.freeze({ id: postId, postId, slug: null, label: cleanText(row.title, MODE_NAMES['spot-difference'], 160), author: cleanText(row.author, '作者不明', 120), mode: 'spot-difference', originalUrl, changedUrl, thumbnailUrl: originalUrl, width, height, publicPostOnly: true, candidates: definition.candidates });
   }
   if (row.changedImage !== undefined || !Array.isArray(definition.targets) || !definition.targets.length || !Array.isArray(definition.hitBoxes)) fail();
   let hitBoxes;
@@ -70,7 +96,7 @@ export function preparePublicPostPuzzle(payload, postId, supabaseUrl = supabaseC
   })) fail();
   const regions = localHiddenHitBoxRegions(definition.targets, hitBoxes, width, height);
   if (!regions) fail();
-  return Object.freeze({ id: postId, postId, slug: null, label: cleanText(row.title, 'PiXFiND', 160), author: cleanText(row.author, '作者不明', 120), mode: 'hidden-object', originalUrl, thumbnailUrl: originalUrl, width, height, publicPostOnly: true, targets: definition.targets, regions });
+  return Object.freeze({ id: postId, postId, slug: null, label: cleanText(row.title, MODE_NAMES['hidden-object'], 160), author: cleanText(row.author, '作者不明', 120), mode: 'hidden-object', originalUrl, thumbnailUrl: originalUrl, width, height, publicPostOnly: true, targets: definition.targets, regions });
 }
 
 export async function fetchPublicPostPuzzle(postId, fetchImpl = fetch, supabaseUrl = supabaseConfig.url) {
@@ -212,7 +238,8 @@ function safePuzzle(row) {
   const changedUrl = safePuzzleImageUrl(row.diff_url);
   const thumbnailUrl = safePuzzleImageUrl(row.thumbnail_url) || originalUrl;
   if (!originalUrl || !changedUrl || !row.id || !row.slug) return null;
-  return Object.freeze({ id: row.id, slug: row.slug, label: typeof row.label === 'string' ? row.label.slice(0, 160) : 'PiXFiND', author: typeof row.author_name === 'string' ? row.author_name.slice(0, 120) : '作者不明', originalUrl, changedUrl, thumbnailUrl, mode: [row.mode, row.game_mode, row.play_mode].includes('hidden-object') ? 'hidden-object' : 'spot-difference', targets: Array.isArray(row.targets) ? row.targets : [], storedRegions: Array.isArray(row.regions) ? row.regions : null });
+  const mode = [row.mode, row.game_mode, row.play_mode].includes('hidden-object') ? 'hidden-object' : 'spot-difference';
+  return Object.freeze({ id: row.id, slug: row.slug, label: typeof row.label === 'string' ? row.label.slice(0, 160) : MODE_NAMES[mode], author: typeof row.author_name === 'string' ? row.author_name.slice(0, 120) : '作者不明', originalUrl, changedUrl, thumbnailUrl, mode, targets: Array.isArray(row.targets) ? row.targets : [], storedRegions: Array.isArray(row.regions) ? row.regions : null });
 }
 
 function loadImage(url) {
@@ -251,18 +278,34 @@ function mount() {
   if (!status || !list || !game || !primary) return;
   let puzzles = []; let selected = null; let regions = []; let found = new Set(); let original = null; let changed = null; let currentMask = null; let cursorX = NaN; let cursorY = NaN; let readOnly = false; let authoritativeAnswers = false; let answerInstruction = ''; let localRoute = false; let postPuzzleRoute = false;
   const localObjectUrls = new Set();
+  const pageMode = PUZZLE_PLAY_PATHS[document.body.dataset.puzzleMode] ? document.body.dataset.puzzleMode : null;
   const originalNode = document.querySelector('#pixfind-original'); const changedNode = document.querySelector('#pixfind-changed'); const compareButton = document.querySelector('#pixfind-compare');
   const localNotice = document.querySelector('#pixfind-local-only');
   const playArea = document.querySelector('#pixfind-play-area'); const overlay = document.querySelector('#pixfind-overlay');
   const statusGame = document.querySelector('#pixfind-game-status'); const progress = document.querySelector('#pixfind-progress');
   const foundList = document.querySelector('#pixfind-found-list');
+  let cell = 1;
+  // The art is shown at a whole number of device pixels per dot, as large as the play area allows.
+  const geometry = () => {
+    const w = playArea.clientWidth; const h = playArea.clientHeight; const ratio = devicePixelRatio || 1;
+    const fit = wholePixelFit(original.naturalWidth / cell, original.naturalHeight / cell, w, h, { devicePixelRatio: ratio });
+    const snap = (value) => Math.round(value * ratio) / ratio;
+    return { scale: fit.width / original.naturalWidth, xoff: snap((w - fit.width) / 2), yoff: snap((h - fit.height) / 2), width: fit.width, height: fit.height };
+  };
+  const placeImages = () => {
+    if (!original) return;
+    const g = geometry();
+    for (const node of [originalNode, changedNode]) Object.assign(node.style, { left: `${g.xoff}px`, top: `${g.yoff}px`, width: `${g.width}px`, height: `${g.height}px` });
+  };
   const paint = () => {
+    placeImages();
     const w = playArea.clientWidth; const h = playArea.clientHeight;
     overlay.width = Math.max(1, Math.round(w * devicePixelRatio)); overlay.height = Math.max(1, Math.round(h * devicePixelRatio));
     const context = overlay.getContext('2d'); context.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0); context.clearRect(0, 0, w, h);
     if (!currentMask || !original) return;
     const sourceW = original.naturalWidth; const sourceH = original.naturalHeight;
-    const scale = Math.min(w / sourceW, h / sourceH); const xoff = (w - sourceW * scale) / 2; const yoff = (h - sourceH * scale) / 2;
+    const { scale, xoff, yoff } = geometry();
+    context.imageSmoothingEnabled = false;
     const pixels = context.createImageData(sourceW, sourceH);
     for (const index of found) for (const pixel of regions[index].pixels) { const p = pixel * 4; pixels.data[p] = 255; pixels.data[p + 1] = 194; pixels.data[p + 2] = 55; pixels.data[p + 3] = 150; }
     const maskCanvas = document.createElement('canvas'); maskCanvas.width = sourceW; maskCanvas.height = sourceH; maskCanvas.getContext('2d').putImageData(pixels, 0, 0);
@@ -321,6 +364,8 @@ function mount() {
     paint();
   };
   const start = async (puzzle) => {
+    // Each game shows only its own kind; a link to the other kind moves to that game.
+    if (pageMode && puzzle.mode !== pageMode) { window.location.replace(PUZZLE_PLAY_PATHS[puzzle.mode] + window.location.search + window.location.hash); return; }
     stopHintMotion();
     hint = null;
     const hintIdentity = puzzle.localOnly || puzzle.localHiddenOnly
@@ -350,6 +395,9 @@ function mount() {
         if (original.naturalWidth !== changed.naturalWidth || original.naturalHeight !== changed.naturalHeight) throw new Error('2枚の画像サイズが一致しないため、この問題は遊べません。');
       }
       const base = imageData(original); const layer = puzzle.localHiddenOnly || (puzzle.publicPostOnly && puzzle.mode === 'hidden-object') ? null : imageData(changed);
+      // Older puzzles may be saved enlarged; count their dots, not their pixels, when sizing the view.
+      cell = layer ? gcd(detectPixelScale(base), detectPixelScale(layer)) : detectPixelScale(base);
+      placeImages();
       let result; let viewMessage = '';
       if (puzzle.localOnly) {
         result = computeDifferenceRegions(base, layer);
@@ -406,7 +454,7 @@ function mount() {
     if (localRoute || postPuzzleRoute) {
       for (const url of localObjectUrls) URL.revokeObjectURL(url);
       localObjectUrls.clear();
-      window.location.assign('/pixfind/');
+      window.location.assign(exitDestination(window.location, pageMode));
       return;
     }
     game.hidden = true; list.hidden = false; selected = null; document.querySelector('.pixfind-page').classList.remove('pixfind-page--playing'); document.body.classList.remove('pixfind-is-playing'); primary.innerHTML = '<span aria-hidden="true">▶</span>'; primary.setAttribute('aria-label', '選択した問題を遊ぶ'); primary.className = ''; primary.disabled = false; const nextUrl = new URL(window.location.href); nextUrl.searchParams.delete('puzzle'); nextUrl.hash = ''; history.replaceState(null, '', nextUrl);
@@ -436,8 +484,7 @@ function mount() {
   };
   const locate = (clientX, clientY) => {
     if (!original || !regions.length || readOnly) return;
-    const rect = playArea.getBoundingClientRect(); const scale = Math.min(rect.width / original.naturalWidth, rect.height / original.naturalHeight);
-    const xoff = (rect.width - original.naturalWidth * scale) / 2; const yoff = (rect.height - original.naturalHeight * scale) / 2;
+    const rect = playArea.getBoundingClientRect(); const { scale, xoff, yoff } = geometry();
     const x = (clientX - rect.left - xoff) / scale; const y = (clientY - rect.top - yoff) / scale;
     markAt(x, y);
   };
@@ -477,6 +524,8 @@ function mount() {
       return;
     }
     const spotId = resolveLocalSpotDraftId(window.location); const hiddenId = resolveLocalHiddenDraftId(window.location);
+    const localMode = spotId !== undefined && hiddenId === undefined ? 'spot-difference' : hiddenId !== undefined && spotId === undefined ? 'hidden-object' : null;
+    if (pageMode && localMode && localMode !== pageMode) { window.location.replace(PUZZLE_PLAY_PATHS[localMode] + window.location.search); return; }
     if (spotId !== undefined || hiddenId !== undefined) {
       localRoute = true;
       list.hidden = true; game.hidden = false;
@@ -514,9 +563,10 @@ function mount() {
         getJson(requestUrl('social_posts', `select=${encodeURIComponent(SELECT.posts)}&status=eq.published&post_kind=eq.pixfind&distribution_mode=eq.pixfind&order=id.asc`)),
         getJson(requestUrl('pixfind_puzzles', `select=${encodeURIComponent(SELECT.puzzles)}&order=id.asc`)),
       ]);
-      puzzles = publishedPuzzleRows(posts, puzzleRows).map(safePuzzle).filter(Boolean);
-      renderList(); status.textContent = puzzles.length ? `${puzzles.length}件の公開問題から遊べます。` : '遊べる公開問題はありません。';
-      const requested = resolvePuzzleFromLocation(window.location, puzzles);
+      const everyPuzzle = publishedPuzzleRows(posts, puzzleRows).map(safePuzzle).filter(Boolean);
+      puzzles = pageMode ? everyPuzzle.filter((puzzle) => puzzle.mode === pageMode) : everyPuzzle;
+      renderList(); status.textContent = puzzles.length ? `${puzzles.length}件の問題から遊べます。` : '遊べる問題はまだありません。';
+      const requested = resolvePuzzleFromLocation(window.location, everyPuzzle);
       if (requested) await start(requested);
       else if (window.location.search.includes('puzzle=') || window.location.hash.startsWith('#puzzle=')) status.textContent = '指定された問題は見つかりませんでした。下の一覧から問題を選んでください。';
     } catch { status.textContent = '公開問題を読み込めませんでした。通信状態を確認して、再読み込みしてください。'; }

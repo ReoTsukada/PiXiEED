@@ -1,3 +1,6 @@
+import { scaleNotice } from '../pixel-scale.mjs?rev=20260929-claude-integration-1';
+import { createLatestGate } from './pixel-contract.mjs?rev=20260928-data-contract-1';
+import { mountPictureShelf } from './picture-shelf.mjs?rev=20260928-picture-shelf-1';
 import { createLocalDraftStore, createIndexedDbDraftAdapter } from './local-drafts.mjs';
 import { createDrawDocument, createDrawHistory, DRAW_PALETTE, DRAW_PALETTE_ORDER, DRAW_SIZE, DRAW_SIZES, SIMPLE_DRAW_SIZES, toSimpleDrawDocument, documentRgba, finishDrawStroke, floodFill, resizeDrawDocument, strokePixels, validateDrawDocument } from './draw-core.mjs?rev=20260927-draw-step08-3';
 import { createImportedDrawDocument, decodeDrawImageFile } from './draw-import.mjs?rev=20260928-pixel-roundtrip-1';
@@ -8,7 +11,7 @@ import { createPxdProject } from './pxd-codec.mjs';
 import { confirmPxdConversion, mountPxdTools } from './pxd-ui.mjs?rev=20260928-own-work-1';
 import { pxdImageRoles, readPxdImage } from './pxd-project.mjs';
 import { enlargedPng, saveFile } from '../pixel-export.mjs?rev=20260928-pixel-roundtrip-1';
-import { encodeAnimatedGif } from '../animated-export.mjs?v=20260928-rewards-1';
+import { encodeAnimatedGif } from '../animated-export.mjs?v=20260929-gif-budget-1';
 import { requestPass } from '../pixieed-pass.mjs?v=20260928-rewards-1';
 import { createDrawTimelapse, selectDrawTimelapseFrames } from './draw-timelapse.mjs?rev=20260928-draw-timelapse-1';
 import { readPxdAudioLink, readPxdDrawDocument, synchronizeLinkedAudioImage, writePxdDrawDocument } from './pxd-draw-audio.mjs';
@@ -21,12 +24,15 @@ const globeButton = $('#draw-to-globe');
 const sizeSelect = $('#draw-size');
 const interactionEffects = createInteractionEffects();
 let documentData = createDrawDocument(); let history = createDrawHistory(documentData); let selectedColor = 2; let tool = 'pen'; let drawing = false; let previousPoint = null; let strokeStartPixels = null; let activeDraftId = null; let source = { type: 'hand_drawn', assetId: null, revisionId: null }; let saved = false; let canvasPrepared = false; let sizeWasChosen = false;
+// Only the newest open/import may replace the picture; the version an edit started from guards saves.
+const loadGate = createLatestGate(); let baseRevisionId = null;
 const TIMELAPSE_FPS = 12;
 const timelapse = createDrawTimelapse();
 let store;
 let pxdBridge = null; let pxdImageRole = 'main';
 const activePointers = new Map(); let pinchStart = null; let zoom = 1; let panX = 0; let panY = 0;
-try { store = createLocalDraftStore(createIndexedDbDraftAdapter()); } catch (error) { status.textContent = `端末内保存を使えません：${error.message}`; saveButton.disabled = true; }
+let drawAdapter = null;
+try { drawAdapter = createIndexedDbDraftAdapter(); store = createLocalDraftStore(drawAdapter); } catch (error) { status.textContent = `端末内保存を使えません：${error.message}`; saveButton.disabled = true; }
 
 function getLastDraftId() { try { return globalThis.localStorage?.getItem(LAST_DRAFT_KEY) || null; } catch { return null; } }
 function setLastDraftId(value) { try { globalThis.localStorage?.setItem(LAST_DRAFT_KEY, value); return true; } catch { return false; } }
@@ -165,7 +171,7 @@ function replaceDocument(nextDocument, nextSource = source, { fromPxd = false } 
   if (fitNotice) setTimeout(() => { if (fitNotice && !status.textContent.includes(fitNotice)) status.textContent = `${status.textContent} ${fitNotice}`.trim(); }, 0);
   interactionEffects.clear();
   if (!fromPxd) { pxdBridge?.reset(); pxdImageRole = 'main'; }
-  documentData = nextDocument; source = nextSource; history = recordedHistory(createDrawHistory(documentData)); activeDraftId = null; saved = false;
+  documentData = nextDocument; source = nextSource; history = recordedHistory(createDrawHistory(documentData)); activeDraftId = null; baseRevisionId = null; saved = false;
   selectedColor = Math.min(Math.max(selectedColor, 0), documentData.palette.length - 1); renderPalette(); sizeSelect.value = String(documentData.width); setCanvasDimensions(); paint();
 }
 function commitChange(operation) {
@@ -381,8 +387,9 @@ async function saveRevision() {
   saveButton.disabled = true; globeButton.disabled = true; status.textContent = '保存しています…';
   try {
     const draftId = activeDraftId || crypto.randomUUID();
-    const revision = await store.save({ draftId, kind: 'pixel_art', document: snapshot, source: structuredClone(source) });
-    activeDraftId = draftId; saved = true;
+    // Save only on top of the version this edit started from; another tab's save stops it (the edit stays on screen).
+    const revision = await store.save({ draftId, kind: 'pixel_art', document: snapshot, source: structuredClone(source), expectedRevisionId: activeDraftId ? baseRevisionId : null });
+    activeDraftId = draftId; baseRevisionId = revision.revisionId; saved = true;
     if (!setLastDraftId(draftId)) { status.textContent = '絵は端末に保存しましたが、再開用の目印を残せませんでした。'; }
     else status.textContent = '保存しました';
     if (pxdBridge?.currentProject || pxdBridge?.heldProject) {
@@ -412,13 +419,15 @@ globeButton.addEventListener('click', async () => {
 });
 async function loadLastDraft({ copy = false } = {}) {
   const draftId = getLastDraftId(); if (!draftId || !store) return;
+  const ticket = loadGate.begin();
   resumeButton.disabled = true; $('#draw-copy-last').disabled = true; status.textContent = copy ? '複製しています…' : '前回の絵を開いています…';
   try {
     const revision = await store.load(draftId); if (!revision) throw new Error('保存した絵が見つかりません。');
+    if (!loadGate.isCurrent(ticket)) return;
     validateDrawDocument(revision.document);
     pxdBridge?.reset(); pxdImageRole = 'main';
     const nextSource = copy ? { type: 'local_draft_copy', assetId: revision.asset.assetId, revisionId: revision.revisionId, sourceDraftId: draftId, parentSource: revision.asset.source } : revision.asset.source;
-    documentData = fitToSimple(structuredClone(revision.document)); source = nextSource; activeDraftId = copy ? null : draftId; history = recordedHistory(createDrawHistory(documentData)); saved = !copy && !fitNotice;
+    documentData = fitToSimple(structuredClone(revision.document)); source = nextSource; activeDraftId = copy ? null : draftId; baseRevisionId = copy ? null : revision.revisionId; history = recordedHistory(createDrawHistory(documentData)); saved = !copy && !fitNotice;
     renderPalette(); sizeSelect.value = String(documentData.width); setCanvasDimensions(); paint();
     status.textContent = `${copy ? '複製しました' : 'ひらきました'}${fitNotice ? ` ${fitNotice}` : ''}`;
   } catch (error) { status.textContent = `${copy ? '複製できませんでした' : '開けませんでした'}：${error.message}`; }
@@ -428,20 +437,24 @@ resumeButton.addEventListener('click', () => loadLastDraft());
 $('#draw-copy-last').addEventListener('click', () => loadLastDraft({ copy: true }));
 
 async function importImage(file, importSource) {
+  const ticket = loadGate.begin();
   $('#draw-import-local').disabled = true; status.textContent = '画像を読み込んでいます…';
   try {
     const image = await decodeDrawImageFile(file);
+    if (!loadGate.isCurrent(ticket)) return; // a newer open or import has replaced this one
     const nativeFit = SIMPLE_DRAW_SIZES.find((size) => size >= Math.max(image.width, image.height)) || SIMPLE_DRAW_SIZES.at(-1);
     const targetSize = sizeWasChosen ? Number(sizeSelect.value) : Math.max(Number(sizeSelect.value), nativeFit);
     const imported = createImportedDrawDocument(image, targetSize);
     replaceDocument(imported.document, importSource); fitNotice = '';
-    status.textContent = `${imported.copiedWidth}×${imported.copiedHeight}・${documentData.palette.length}色で読み込みました`;
+    status.textContent = `${scaleNotice(image)}${imported.copiedWidth}×${imported.copiedHeight}・${documentData.palette.length}色で読み込みました`;
   } catch (error) { status.textContent = `画像を複製できませんでした：${error.message}`; }
   finally { $('#draw-import-local').disabled = false; $('#draw-import-file').value = ''; }
 }
 $('#draw-import-local').addEventListener('click', () => $('#draw-import-file').click());
 $('#draw-import-file').addEventListener('change', () => { const file = $('#draw-import-file').files?.[0]; if (file) importImage(file, { type: 'local_image_copy', assetId: null, revisionId: null }); });
 if (getLastDraftId()) { resumeButton.hidden = false; $('#draw-copy-last').hidden = false; }
+// Pictures from the other tools come in as a new version of this tool's own picture, then open.
+if (store) mountPictureShelf($('#draw-shelf'), { tool: 'draw', adapter: drawAdapter, onBrought: async ({ from }) => { await loadLastDraft(); status.textContent = `${from.label}の絵を持ってきました`; }, onError: (error) => { status.textContent = `持ってこられませんでした：${error.message}`; } });
 paint();
 
 // ---- saving: the picture leaves PiXiEED enlarged (crisp dots, about 2048px), on phones via the share sheet ----

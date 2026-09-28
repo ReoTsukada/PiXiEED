@@ -119,6 +119,27 @@ test('oversized files and raster headers are rejected before bitmap decoding', a
   assert.equal(decodeCalls, 0);
 });
 
+test('JPEG import accepts decoder-applied portrait orientation but rejects unrelated dimensions', async () => {
+  const input = new Blob([Uint8Array.from([0xff, 0xd8, 0xff, 0xc0, 0, 8, 8, 0, 45, 0, 123, 1])], { type: 'image/jpeg' });
+  const portrait = rgba(45, 123, (x, y) => [x, y, 90, 255]);
+  let closed = 0;
+  const documentRef = { createElement: () => ({ getContext: () => ({
+    drawImage() {}, getImageData: () => ({ data: portrait.data })
+  }) }) };
+  const createImageBitmapImpl = async () => ({ ...portrait, close() { closed += 1; } });
+  const result = await normalizePixelFile(input, { createImageBitmapImpl, documentRef, inferScale: false });
+  assert.equal(result.width, 45);
+  assert.equal(result.height, 123);
+  assert.deepEqual(result.data, portrait.data);
+  assert.equal(result.file, input);
+  assert.equal(closed, 1);
+  await assert.rejects(() => normalizePixelFile(input, {
+    documentRef, inferScale: false,
+    createImageBitmapImpl: async () => ({ width: 46, height: 123, close() { closed += 1; } })
+  }), /寸法/);
+  assert.equal(closed, 2, 'invalid decoder result is released');
+});
+
 test('normalized flat PNG retains its logical dimensions through a second import', async () => {
   const flat = rgba(64, 64, () => [3, 4, 5, 255]);
   const encoded = png(64, 64);

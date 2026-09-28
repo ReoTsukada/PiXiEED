@@ -155,7 +155,7 @@ function build() {
     if (thumbs.has(`d:${revisionId}`)) return thumbs.get(`d:${revisionId}`);
     try {
       adapter ??= createIndexedDbDraftAdapter();
-      const draftId = store.get('pixieed.simple-draw.last-draft.v1'); if (!draftId) return null;
+      const draftId = store.get('pixieed:picture:jigsaw:v1'); if (!draftId) return null;
       drawRecord ??= await adapter.get(draftId);
       const revision = drawRecord?.revisions?.find((r) => r.revisionId === revisionId); if (!revision?.document) return null;
       const { width, height } = revision.document; const c = document.createElement('canvas'); c.width = width; c.height = height;

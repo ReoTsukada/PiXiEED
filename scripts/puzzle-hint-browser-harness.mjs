@@ -121,7 +121,7 @@ async function jigsaw(viewport, reducedMotion) {
 async function localRevisionKeys() {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } }); await routeLocalOnly(context);
   const page = await context.newPage(); const errors = []; page.on('pageerror', (error) => errors.push(error.message));
-  await page.goto(`${base}/pixfind/`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`${base}/play/spot-difference/`, { waitUntil: 'domcontentloaded' });
   const fixtures = await page.evaluate(async () => {
     const { createDrawDocument } = await import('/js/creation/draw-core.mjs');
     const { createIndexedDbDraftAdapter, createLocalDraftStore } = await import('/js/creation/local-drafts.mjs');

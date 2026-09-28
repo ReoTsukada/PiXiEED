@@ -41,6 +41,13 @@ async function makeDrawDraft(page, size = 16) {
   return page.evaluate(() => localStorage.getItem('pixieed.simple-draw.last-draft.v1'));
 }
 
+/** ジグソー keeps its own picture: bring the Draw picture in from the shelf (one tap). */
+async function bringDrawPicture(page) {
+  const chip = page.locator('#jigsaw-shelf .picture-shelf__item').first();
+  await chip.waitFor({ state: 'visible' }); await chip.click();
+  await page.waitForFunction(() => document.querySelector('#jigsaw-status')?.textContent.includes('持ってきました'));
+}
+
 async function storedJigsaw(page) {
   return page.evaluate(async () => {
     const open = indexedDB.open('pixieed-creation-drafts-v1', 1);
@@ -160,7 +167,7 @@ async function testAspectRatio(browser, browserName) {
 
 async function testKeyboardAndPinch(browser, browserName) {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 }); const page = await context.newPage(); const external = await localOnly(page); const pageErrors = [];
-  page.on('pageerror', (error) => pageErrors.push(error.message)); await makeDrawDraft(page); await page.goto(new URL('/jigsaw/', BASE).href, { waitUntil: 'domcontentloaded' });
+  page.on('pageerror', (error) => pageErrors.push(error.message)); await makeDrawDraft(page); await page.goto(new URL('/jigsaw/', BASE).href, { waitUntil: 'domcontentloaded' }); await bringDrawPicture(page);
   await page.waitForFunction(() => document.querySelectorAll('#jigsaw-source-version option').length > 0); await page.locator('#jigsaw-grid-size').selectOption('3');
   await page.locator('#jigsaw-start').scrollIntoViewIfNeeded(); await page.locator('#jigsaw-start').click(); await page.waitForFunction(() => !document.querySelector('#jigsaw-play')?.hidden);
   const trayPiece = page.locator('#jigsaw-tray [data-group-id]').first(); const groupId = await trayPiece.getAttribute('data-group-id');
@@ -239,7 +246,7 @@ async function testMergeGestures(browser, browserName) {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
   const page = await context.newPage(); const external = await localOnly(page); const pageErrors = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
-  await makeDrawDraft(page); await page.goto(new URL('/jigsaw/', BASE).href, { waitUntil: 'domcontentloaded' });
+  await makeDrawDraft(page); await page.goto(new URL('/jigsaw/', BASE).href, { waitUntil: 'domcontentloaded' }); await bringDrawPicture(page);
   await page.waitForFunction(() => document.querySelectorAll('#jigsaw-source-version option').length > 0);
   await page.locator('#jigsaw-grid-size').selectOption('3'); await page.locator('#jigsaw-start').click();
   await page.waitForFunction(() => !document.querySelector('#jigsaw-play')?.hidden);
@@ -307,6 +314,7 @@ async function seedWorkspace(context, browserName, viewport) {
   const draftId = await makeDrawDraft(page);
   assert.ok(draftId, 'Draw save created a local draft');
   await page.goto(new URL('/jigsaw/', BASE).href, { waitUntil: 'domcontentloaded' });
+  await bringDrawPicture(page);
   await page.waitForFunction(() => document.querySelectorAll('#jigsaw-source-version option').length > 0);
     await page.locator('#jigsaw-source-kind').selectOption('draw');
     await page.locator('#jigsaw-grid-size').selectOption('3');

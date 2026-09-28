@@ -1,6 +1,6 @@
 import { supabaseConfig } from '../data/site-config.js?rev=20260918-post-v1';
-import { normalizePixelFile } from './pixel-scale.mjs?rev=20260928-pixel-roundtrip-1';
-import { withPixelPngMetadata } from './pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
+import { normalizePixelFile } from './pixel-scale.mjs?rev=20260929-claude-integration-1';
+import { withPixelPngMetadata } from './pixel-png-metadata.mjs?rev=20260929-claude-integration-1';
 
 const SESSION_KEY = 'PiXiEED:supabase-session:v1';
 const MAX_SOURCE_BYTES = 8 * 1024 * 1024;

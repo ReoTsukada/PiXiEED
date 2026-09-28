@@ -35,5 +35,7 @@ test('every tool saves through the shared enlarged export; new pass perks are wi
   assert.match(pixfind, /createPuzzleHintController\(\{ perk: 'pixfind\.hint', requestPass/);
   assert.match(await read('draw/index.html'), /id="draw-timelapse-detail"[^>]*class="px-perk"/);
   assert.match(await read('audio/index.html'), /id="audio-export-sound"/);
-  assert.match(await read('pixfind/index.html'), /id="pixfind-hint"[^>]*px-perk/);
+  for (const game of ['spot-difference', 'hidden-object']) {
+    assert.match(await read(`play/${game}/index.html`), /id="pixfind-hint"[^>]*px-perk/);
+  }
 });

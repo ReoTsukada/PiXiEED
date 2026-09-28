@@ -32,6 +32,8 @@ body.pixfind-is-playing>.site-footer,body.pixfind-is-playing>.site-header{displa
 /* The older gallery grid used align-items:start, which collapsed the play image. */
 .pixfind-page--playing .pixfind-images{align-items:stretch}
 .pixfind-page--playing .pixfind-image{height:100%}
+/* Puzzle art is stored one pixel per dot: enlarge it in whole steps with hard pixel edges. */
+.pixfind-play-area img,.pixfind-card img{image-rendering:pixelated}
 .pixfind-hint{display:inline-grid;place-items:center;width:40px;height:40px;margin-left:6px;padding:0;border:0;border-radius:12px;background:#15202b;color:#ffd35a;box-shadow:0 3px 0 rgba(0,0,0,.4);cursor:pointer}
 .pixfind-hint[hidden]{display:none}
 .pixfind-hint svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}

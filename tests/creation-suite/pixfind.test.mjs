@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { runInNewContext } from 'node:vm';
 import { computeDifferenceRegions, computeHiddenObjectRegions, regionContainsPoint, resolvePuzzleFromLocation, validateHiddenObjectMarkers, validateStoredDifferenceRegions } from '../../js/creation/pixfind-regions.mjs';
 import { fetchPublicPostPuzzle, loadLocalHiddenDraft, loadLocalSpotDraft, preparePublicPostPuzzle, publishedPuzzleRows, resolveLocalHiddenDraftId, resolveLocalSpotDraftId, resolvePostPuzzleId, safePublicPostImageUrl, safePuzzleImageUrl } from '../../js/creation/pixfind-play.mjs';
 import { createDrawDocument } from '../../js/creation/draw-core.mjs';
@@ -206,7 +207,7 @@ test('Hidden local-trial button is gated on a confirmed saved draft and sends on
   const player = readFileSync(new URL('../../js/creation/pixfind-play.mjs', import.meta.url), 'utf8');
   assert.match(html, /id="hidden-play-local"[^>]*hidden[^>]*disabled/);
   assert.match(page, /draft\?\.confirmed && draftId && savedConfirmedDraftId === draftId/);
-  assert.match(page, /\/pixfind\/\?localHidden=\$\{encodeURIComponent\(draftId\)\}/);
+  assert.match(page, /\/play\/hidden-object\/\?localHidden=\$\{encodeURIComponent\(draftId\)\}/);
   assert.match(player, /localHiddenOnly/);
   assert.match(player, /URL\.createObjectURL/);
   assert.match(player, /URL\.revokeObjectURL/);
@@ -218,7 +219,7 @@ test('local trial control is initially hidden and script links only an opaque dr
   const player = readFileSync(new URL('../../js/creation/pixfind-play.mjs', import.meta.url), 'utf8');
   assert.match(html, /id="spot-play-local"[^>]*hidden[^>]*disabled/);
   assert.match(html, /確定した下書きを試しに遊ぶ/);
-  assert.match(page, /\/pixfind\/\?localSpot=\$\{encodeURIComponent\(draft\.gameId\)\}/);
+  assert.match(page, /\/play\/spot-difference\/\?localSpot=\$\{encodeURIComponent\(draft\.gameId\)\}/);
   assert.doesNotMatch(page, /dataUrl|base64/);
   assert.ok(player.indexOf('const localId = resolveLocalSpotDraftId') < player.indexOf('const [posts, puzzleRows]'));
   assert.match(player, /URL\.createObjectURL/);
@@ -336,7 +337,7 @@ test('play images accept only HTTPS objects under the two legacy PiXFiND buckets
 });
 
 test('play screen keeps one large tappable image, offers a same-position comparison toggle, and reserves shared navigation space', () => {
-  const html = readFileSync(new URL('../../pixfind/index.html', import.meta.url), 'utf8');
+  const html = readFileSync(new URL('../../play/spot-difference/index.html', import.meta.url), 'utf8');
   const css = readFileSync(new URL('../../css/creation-pixfind.css', import.meta.url), 'utf8');
   assert.match(html, /id="pixfind-play-area"[^>]*role="application"/);
   assert.match(html, /id="pixfind-compare"/);
@@ -348,4 +349,35 @@ test('play screen keeps one large tappable image, offers a same-position compari
   assert.match(css, /\.pixfind-play-area img\{position:absolute/);
   assert.match(css, /\.pixfind-play-area img\[hidden\]\{display:none!important\}/);
   assert.match(css, /4\.8rem \+ env\(safe-area-inset-bottom/);
+});
+
+test('間違い探し and もの探し are separate games; PiXFiND links forward to the right one', async () => {
+  const { PUZZLE_PLAY_PATHS, playPathForLegacyLink, exitDestination } = await import('../../js/creation/pixfind-play.mjs');
+  const at = (search, hash = '') => ({ search, hash });
+  assert.deepEqual(PUZZLE_PLAY_PATHS, { 'spot-difference': '/play/spot-difference/', 'hidden-object': '/play/hidden-object/' });
+  for (const [mode, file] of [['spot-difference', 'play/spot-difference/index.html'], ['hidden-object', 'play/hidden-object/index.html']]) {
+    const html = readFileSync(new URL(`../../${file}`, import.meta.url), 'utf8');
+    assert.match(html, new RegExp(`data-puzzle-mode="${mode}"`));
+    assert.doesNotMatch(html, /PiXFiND|ピクスファインド/);
+  }
+  assert.equal(playPathForLegacyLink(at('')), '/tools/');
+  assert.equal(playPathForLegacyLink(at('?localHidden=1')), '/play/hidden-object/');
+  for (const search of ['?localSpot=1', '?postPuzzle=1', '?puzzle=abc']) assert.equal(playPathForLegacyLink(at(search)), '/play/spot-difference/', search);
+  assert.equal(playPathForLegacyLink(at('', '#puzzle=abc')), '/play/spot-difference/');
+  assert.equal(exitDestination(at('?localSpot=1'), 'spot-difference'), '/spot-difference/');
+  assert.equal(exitDestination(at('?localHidden=1'), 'hidden-object'), '/hidden-object/');
+  assert.equal(exitDestination(at('?postPuzzle=1'), 'hidden-object'), '/play/hidden-object/');
+  const forwarder = readFileSync(new URL('../../pixfind/index.html', import.meta.url), 'utf8');
+  assert.match(forwarder, /noindex/);
+  const redirect = forwarder.match(/<script>([\s\S]*?)<\/script>/)?.[1];
+  assert.ok(redirect, 'legacy redirect runs before loading the play application');
+  for (const [search, hash] of [['', ''], ['?localHidden=1&keep=yes', '#marker'], ['?localSpot=1', '#marker'], ['?postPuzzle=1', ''], ['?puzzle=abc', ''], ['', '#puzzle=abc']]) {
+    let destination = null;
+    runInNewContext(redirect, { URLSearchParams, window: { location: { search, hash, replace(value) { destination = value; } } } });
+    const target = playPathForLegacyLink(at(search, hash));
+    assert.equal(destination, target === '/tools/' ? target : target + search + hash);
+  }
+  const tools = readFileSync(new URL('../../tools/index.html', import.meta.url), 'utf8');
+  assert.match(tools, /href="\/play\/spot-difference\/"/); assert.match(tools, /href="\/play\/hidden-object\/"/);
+  assert.doesNotMatch(tools, /PiXFiND|href="\/pixfind\//);
 });

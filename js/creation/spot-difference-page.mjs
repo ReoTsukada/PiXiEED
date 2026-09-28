@@ -1,11 +1,12 @@
+import { snapToWholePixels } from '../pixel-scale.mjs?rev=20260929-claude-integration-1';
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
 import { documentRgba } from './draw-core.mjs';
+import { listOwnVersions, mountPictureShelf } from './picture-shelf.mjs?rev=20260928-picture-shelf-1';
 import { detectDifferenceCandidates, excludeDifferenceCandidate, mapClientPointToPixel, mergeDifferenceCandidates, resolveLocalDrawRevision, splitDifferenceCandidate, validateSpotDifferenceDraft, confirmDifferenceCandidates } from './spot-difference-core.mjs?rev=20260927-spot-difference-1';
 import { openPuzzleHandoff } from './puzzle-handoff.mjs?rev=20260928-puzzle-handoff-1';
 import { mountPxdTools } from './pxd-ui.mjs?rev=20260928-own-work-1';
 import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20260928-pxd-puzzles-1';
 
-const DRAW_LAST_KEY = 'pixieed.simple-draw.last-draft.v1';
 const LAST_KEY = 'pixieed:creation:spot-difference:last-draft:v1';
 const $ = (selector) => document.querySelector(selector);
 const status = $('#spot-status'); const beforeSelect = $('#spot-before'); const afterSelect = $('#spot-after');
@@ -16,7 +17,7 @@ const publishButton = $('#spot-publish');
 const selectedIds = new Set(); const splitPixels = new Set();
 const touchPoints = new Map(); let touchEditSnapshot = null;
 let adapter; let store; let draftId = null; let draft = null; let beforeRevision = null; let afterRevision = null; let sourceDraftId = null; let afterDraftId = null; let savedConfirmedDraftId = null;
-let pxdOriginalRefs = null; let pxdBridge = null;
+let pxdOriginalRefs = null; let pxdPreservedPayload = null; let pxdBridge = null;
 let splitMode = false; let activePointer = null; let previousPixel = null; let pinchStart = null; let viewScale = 1; let viewPanX = 0; let viewPanY = 0; let cursorPixel = 0;
 
 function readStorage(key) { try { return localStorage.getItem(key); } catch { return null; } }
@@ -75,7 +76,7 @@ function updateActions() {
 function showEditor() {
   setup.hidden = true; editor.hidden = false; document.body.classList.add('spot-editing');
   $('#spot-edit-hint').textContent = '色のついた場所をタップして選択 · ピンチで拡大';
-  resetCanvasView(); renderCandidates();
+  renderCandidates(); fitCanvas(); resetCanvasView();
 }
 
 function applyCanvasView() {
@@ -90,6 +91,12 @@ function applyCanvasView() {
   zoom.dataset.visible = String(viewScale > 1.02);
 }
 
+/** Show the art at a whole number of device pixels per dot, as large as the layout allows. */
+function fitCanvas() {
+  if (!draft || editor.hidden) return;
+  canvas.style.setProperty('--spot-aspect', String(draft.width / draft.height));
+  snapToWholePixels(canvas, draft.width);
+}
 function resetCanvasView() { viewScale = 1; viewPanX = 0; viewPanY = 0; pinchStart = null; touchEditSnapshot = null; touchPoints.clear(); activePointer = null; previousPixel = null; applyCanvasView(); }
 function pixelAtEvent(event) { return mapClientPointToPixel(event.clientX, event.clientY, canvas.getBoundingClientRect(), draft.width, draft.height); }
 function linePixels(from, to, callback) {
@@ -128,13 +135,11 @@ function paintSplitLine(from, to) {
 
 async function loadSourceOptions() {
   beforeSelect.replaceChildren(); afterSelect.replaceChildren();
-  const id = readStorage(DRAW_LAST_KEY);
-  if (!adapter || !id) { beforeSelect.add(new Option('保存した絵がありません', '')); afterSelect.add(new Option('保存した絵がありません', '')); $('#spot-start').disabled = true; message('先にDrawで絵を端末へ保存してください。'); return; }
   try {
-    const record = await adapter.get(id);
-    if (!record || record.schemaVersion !== 1 || record.draftId !== id || !Array.isArray(record.revisions)) throw new Error('保存した絵を読み込めません');
-    const revisions = record.revisions.filter((revision) => revision?.asset?.kind === 'pixel_art' && revision.asset.owner?.type === 'local' && revision.asset.owner.id === 'local-owner' && revision.asset.visibility === 'draft');
-    sourceDraftId = id;
+    // 間違い探し keeps its own picture; versions come from its own draft only.
+    const { draftId: ownId, versions: revisions } = await listOwnVersions('spot-difference', { adapter });
+    sourceDraftId = ownId;
+    if (!revisions.length) { beforeSelect.add(new Option('まだ絵がありません', '')); afterSelect.add(new Option('まだ絵がありません', '')); $('#spot-start').disabled = true; message('上の「持ってくる」から絵を選んでください。'); return; }
     revisions.forEach((revision, index) => { beforeSelect.add(new Option(revisionLabel(revision, index), revision.revisionId)); afterSelect.add(new Option(revisionLabel(revision, index), revision.revisionId)); });
     if (revisions.length > 1) {
       beforeSelect.value = revisions.at(-2).revisionId;
@@ -142,7 +147,7 @@ async function loadSourceOptions() {
     }
     else afterSelect.selectedIndex = -1;
     $('#spot-start').disabled = revisions.length < 2;
-    message(revisions.length < 2 ? '比較するため、Drawで変更後の絵も別の保存版として作ってください。' : '同じ絵の2つの保存版を選んでください。');
+    message(revisions.length < 2 ? '比べるには、少し変えた絵をもう一度持ってきてください。' : '2つの版を選んでください。');
   } catch (error) { $('#spot-start').disabled = true; message(error.message); }
 }
 
@@ -208,7 +213,7 @@ async function openPxdSpot(project) {
   const nextBefore = imported.bindings.before.revision; const nextAfter = imported.bindings.after.revision;
   if (nextBefore.document.width !== nextAfter.document.width || nextBefore.document.height !== nextAfter.document.height) throw new Error('PXDの比較画像サイズが一致しません。');
   beforeRevision = nextBefore; afterRevision = nextAfter; sourceDraftId = imported.bindings.before.draftId; afterDraftId = imported.bindings.after.draftId;
-  draft = imported.document; draftId = null; savedConfirmedDraftId = null; pxdOriginalRefs = imported.portableOriginalRefs;
+  draft = imported.document; draftId = null; savedConfirmedDraftId = null; pxdOriginalRefs = imported.portableOriginalRefs; pxdPreservedPayload = imported.preservedPayload || null;
   selectedIds.clear(); splitPixels.clear();
   $('#spot-source-label').textContent = `PXD固定画像 · ${draft.width}×${draft.height}px`;
   $('#spot-confirmed').hidden = !draft.confirmed;
@@ -223,7 +228,7 @@ function mountPxdSpot() {
     getProject: async (project) => draft ? writePxdPuzzle(project, {
       tool: 'spot_difference', document: draft,
       sourceDrawDocuments: { 'spot-before': beforeRevision?.document, 'spot-after': afterRevision?.document },
-      portableOriginalRefs: pxdOriginalRefs, sourceChanged: false
+      portableOriginalRefs: pxdOriginalRefs, preservedPayload: pxdPreservedPayload, sourceChanged: false
     }) : project
   });
 }
@@ -231,7 +236,7 @@ function mountPxdSpot() {
 $('#spot-start').addEventListener('click', start); saveButton.addEventListener('click', save); resumeButton.addEventListener('click', resume);
 playLocalButton.addEventListener('click', () => {
   if (!draft?.confirmed || savedConfirmedDraftId !== draft.gameId) return;
-  window.location.assign(`/pixfind/?localSpot=${encodeURIComponent(draft.gameId)}`);
+  window.location.assign(`/play/spot-difference/?localSpot=${encodeURIComponent(draft.gameId)}`);
 });
 publishButton.addEventListener('click', async () => {
   if (!draft?.confirmed || savedConfirmedDraftId !== draft.gameId || !store || !adapter) return;
@@ -310,10 +315,11 @@ canvas.addEventListener('keydown', (event) => {
   event.preventDefault(); cursorPixel = nextY * draft.width + nextX; drawPreview();
 });
 canvas.addEventListener('focus', drawPreview); canvas.addEventListener('blur', drawPreview);
-window.addEventListener('resize', applyCanvasView);
+window.addEventListener('resize', () => { fitCanvas(); applyCanvasView(); });
 
 try { adapter = createIndexedDbDraftAdapter(); store = createLocalDraftStore(adapter); } catch { message('このブラウザーでは端末内保存を利用できません。'); }
 resumeButton.hidden = !readStorage(LAST_KEY);
+mountPictureShelf($('#spot-shelf'), { tool: 'spot-difference', adapter, onBrought: async ({ from }) => { await loadSourceOptions(); message(`${from.label}の絵を持ってきました。${afterSelect.options.length > 1 ? '2つの版を選んで比べられます。' : '変えた絵をもう一度持ってくると比べられます。'}`); }, onError: (error) => message(`持ってこられませんでした：${error.message}`) });
 pxdBridge = mountPxdSpot();
 const pxdImported = pxdBridge ? await pxdBridge.ready : false;
 if (!pxdImported) await loadSourceOptions();

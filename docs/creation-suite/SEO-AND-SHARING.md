@@ -18,15 +18,17 @@
 
 Git履歴の根拠は `d93b55ff:scripts/generate-pixfind-ogp-pages.mjs`（個別HTML）、`53e70787:pixfind/app.js`（Canvas画像合成）、`e88a093e:supabase/functions/pixfind-ogp-dispatch/index.ts`（生成の呼出し）。当時のCanvasは横長1280×720、補間なしの合成を行い、ID別共有ページからゲームへ転送していた。これらは `de1c31ec` で削除されており、現在も稼働しているとは扱わない。旧公開Storageへのクライアント直接アップロード、5分ごとのmainへの自動push、旧DB直接列挙はそのまま戻さない。
 
-現在の公開readerに合わせた静的HTML生成処理を `scripts/generate-pixfind-ogp-pages.mjs` と `js/creation/puzzle-share-page.mjs` に移す。公開地図の候補を単件readerで再確認し、投稿ID・種類・題名・公開作者名・元画像だけを共有HTMLへ渡す。実行は明示操作とし、今回のプッシュでは自動生成workflowや公開済み個別ページを作らない。公開DB/APIの更新と失効時のページ撤去の運用を検証してから切り替える。
+PiXFiNDという名前はなくし、間違い探し（`/play/spot-difference/`）ともの探し（`/play/hidden-object/`）を別々のゲームとした。旧 `/pixfind/` のリンクは該当するゲームへ転送する。
 
-`--help` は通信も書込みもしない。`--preview` は公開データだけを読み、生成予定のパスを表示する。`--generate` は全取得と検証の成功後、生成専用マーカーのある `pixfind/puzzles/` だけを入れ替える。公開受付フラグが無効なら両データ操作は通信前に停止する。画像合成のCanvas補助関数も元画像のみ・1280×720・整数倍・補間なしとして用意したが、生成スクリプトへの接続とPNG保存は未実装。
+現在の公開readerに合わせた静的HTML生成処理を `scripts/generate-puzzle-ogp-pages.mjs` と `js/creation/puzzle-share-page.mjs` に移す。公開地図の候補を単件readerで再確認し、投稿ID・種類・題名・公開作者名・元画像だけを共有HTMLへ渡す。実行は明示操作とし、今回のプッシュでは自動生成workflowや公開済み個別ページを作らない。公開DB/APIの更新と失効時のページ撤去の運用を検証してから切り替える。
+
+`--help` は通信も書込みもしない。`--preview` は公開データだけを読み、生成予定のパスを表示する。`--generate` は全取得と検証の成功後、生成専用マーカーのある `play/spot-difference/puzzles/` と `play/hidden-object/puzzles/` だけを入れ替える。公開受付フラグが無効なら両データ操作は通信前に停止する。画像合成のCanvas補助関数も元画像のみ・1280×720・整数倍・補間なしとして用意したが、生成スクリプトへの接続とPNG保存は未実装。
 
 | 種類 | 共有する情報 | 画像と移動先 | 制約 |
 | --- | --- | --- | --- |
 | ジグソー | 公開元作品ID、種類、2/3/4の分割数 | 公開元画像のプレビュー、同じ絵・分割数のジグソー | 元作品を変更・再投稿しない。端末画像と未公開下書きを自動公開しない |
-| 間違い探し | 承認済みの親投稿ID、公開題名・作者名 | 元画像だけ、`/pixfind/?postPuzzle=<ID>` | 正解マーク、差分マスク、変更箇所、内部審査情報をカードに含めない |
-| もの探し | 承認済みの親投稿ID、公開題名・作者名 | 元画像だけ、`/pixfind/?postPuzzle=<ID>` | 正解座標・対象名一覧・内部審査情報をカードに含めない |
+| 間違い探し | 承認済みの親投稿ID、公開題名・作者名 | 元画像だけ、`/play/spot-difference/?postPuzzle=<ID>` | 正解マーク、差分マスク、変更箇所、内部審査情報をカードに含めない |
+| もの探し | 承認済みの親投稿ID、公開題名・作者名 | 元画像だけ、`/play/hidden-object/?postPuzzle=<ID>` | 正解座標・対象名一覧・内部審査情報をカードに含めない |
 
 全モードで公開状態を照合する。新しいSpot/Hiddenは `public-post-puzzle` の公開応答を利用し、親published・地図published・パズルapprovedの条件を緩めない。ジグソーの旧SNS/PiXFiND元作品も現在の公開参照を確認する。ユーザーが指定した任意URLからHTML配信側が画像を取得する作りにはしない。秘密キーや作者IDをカードへ含めず、題名・作者名はHTML属性を含めてエスケープする。
 

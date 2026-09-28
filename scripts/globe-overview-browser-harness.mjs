@@ -256,6 +256,23 @@ try {
     await page.goto(`${base}/globe/`, { waitUntil: 'domcontentloaded' });
     const globe = await (await page.locator('.map-hero__globe-frame').elementHandle()).contentFrame();
     await globe.waitForFunction(() => globalThis.__PIXIEED_ASTRO__?.orrery && globalThis.__PIXIEED_POSTS__);
+    await page.waitForSelector('[data-header-pass]');
+    const headerPaint = await page.locator('.px-site-header').evaluate((node) => ({
+      y: Math.floor(node.getBoundingClientRect().y + node.getBoundingClientRect().height / 2),
+      color: getComputedStyle(node).backgroundColor.match(/[\d.]+/g).slice(0, 3).map(Number)
+    }));
+    const screenshot = await page.screenshot();
+    const paintedPixel = await page.evaluate(async ({ png, y }) => {
+      const bytes = Uint8Array.from(atob(png), (character) => character.charCodeAt(0));
+      const bitmap = await createImageBitmap(new Blob([bytes], { type: 'image/png' }));
+      try {
+        const canvas = document.createElement('canvas'); canvas.width = canvas.height = 1;
+        const ctx = canvas.getContext('2d'); ctx.drawImage(bitmap, 2, y, 1, 1, 0, 0, 1, 1);
+        return [...ctx.getImageData(0, 0, 1, 1).data];
+      } finally { bitmap.close?.(); }
+    }, { png: screenshot.toString('base64'), y: headerPaint.y });
+    assert.ok(headerPaint.color.every((channel, index) => Math.abs(paintedPixel[index] - channel) <= 10),
+      `Globe canvas paints over the shared header: ${JSON.stringify({ headerPaint, paintedPixel })}`);
     await observeReturns(globe);
     await globe.evaluate(() => { __PIXIEED_ASTRO__.setPlaying(false); __PIXIEED_GLOBE__.setView({ centerLongitude: 135, centerLatitude: 32, zoom: 1.2 }); }); await frame(globe);
     await globe.evaluate(() => __PIXIEED_GLOBE__.setView({ zoom: __PIXIEED_GLOBE__.getSnapshot().view.zoomRange.min })); await frame(globe);

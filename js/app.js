@@ -1423,7 +1423,7 @@ function renderDiscoveryMap(root) {
   let isSelectingPostCell = false;
   const openPostComposer = (context = {}) => {
     if (!postComposerPromise) {
-      postComposerPromise = import('./post-composer.js?rev=20260928-pixel-roundtrip-1').then(({ bindUserPostComposer }) => {
+      postComposerPromise = import('./post-composer.js?rev=20260929-claude-integration-1').then(({ bindUserPostComposer }) => {
         postComposer = bindUserPostComposer(root, {
           onRequestMapCell: () => {
             isSelectingPostCell = true;

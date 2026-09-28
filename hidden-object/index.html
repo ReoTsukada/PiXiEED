@@ -10,12 +10,12 @@
 <link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180"><link rel="manifest" href="/manifest.webmanifest">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f4f2ec">
-  <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20260928-export-1">
-  <link rel="stylesheet" href="/css/site.css?rev=20260927-draw-step08-3">
-  <link rel="stylesheet" href="/css/creation-hidden-object.css?rev=20260928-puzzle-layout-2">
-  <link rel="stylesheet" href="/css/site-header.css?rev=20260928-touch-motion-1">
-  <link rel="stylesheet" href="/css/arcade.css?rev=20260928-arcade-2">
-  <link rel="stylesheet" href="/css/arcade-tools.css?rev=20260928-arcade-2">
+  <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20260929-claude-integration-1">
+  <link rel="stylesheet" href="/css/site.css?rev=20260929-claude-integration-1">
+  <link rel="stylesheet" href="/css/creation-hidden-object.css?rev=20260929-claude-integration-1">
+  <link rel="stylesheet" href="/css/site-header.css?rev=20260929-claude-integration-1">
+  <link rel="stylesheet" href="/css/arcade.css?rev=20260929-claude-integration-1">
+  <link rel="stylesheet" href="/css/arcade-tools.css?rev=20260929-claude-integration-1">
 </head>
 <body data-page="hidden-object" class="app-page app-page--tool-hidden-object">
   <a class="skip-link" href="#main">本文へ移動</a>
@@ -24,10 +24,11 @@
     <header class="hidden-heading"><h1>かんたんもの探し</h1><p>見つけてほしいものを、絵の上にぬって登録しよう。</p></header>
     <p id="hidden-status" class="hidden-status" role="status" aria-live="polite">自分の端末に保存した絵を選んでください。</p>
     <section id="hidden-setup" class="hidden-setup" aria-label="元の絵を選ぶ">
+      <div id="hidden-shelf" hidden></div>
       <label>元にする保存版<select id="hidden-source" aria-label="元にする自分の保存版"></select></label>
       <button id="hidden-start" type="button" disabled>対象を描きはじめる</button>
       <button id="hidden-resume" type="button" hidden>前回の作成を再開</button>
-      <p>Drawで保存した自分の絵を使います。写真をDrawへ取り込んだ絵も選べます。元の保存版は変更されません。</p>
+      <p>もの探しは自分の絵を持ちます。ほかのツールの絵を持ってくると、ここに写されます（元の絵は変わりません）。</p>
     </section>
     <section id="hidden-editor" class="hidden-editor" hidden aria-label="もの探しの対象を指定">
       <figure class="hidden-preview"><figcaption>絵の上をなぞって対象を指定。ピンチで拡大、矢印キーとSpaceでも編集できます。</figcaption><canvas id="hidden-canvas" aria-label="元画像。指でなぞって対象を指定できます。ピンチで拡大。矢印キーで画素を選び、Spaceで編集" tabindex="0"></canvas></figure>
@@ -63,8 +64,8 @@
     <a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""></a>
     <a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>
   </nav>
-  <script type="module" src="/js/creation/hidden-object-page.mjs?rev=20260928-own-work-1"></script>
-  <script type="module" src="/js/arcade-dress.mjs?rev=20260928-arcade-2"></script>
-  <script type="module" src="/js/site-header.mjs?rev=20260928-rewards-1"></script>
+  <script type="module" src="/js/creation/hidden-object-page.mjs?rev=20260929-claude-integration-1"></script>
+  <script type="module" src="/js/arcade-dress.mjs?rev=20260929-claude-integration-1"></script>
+  <script type="module" src="/js/site-header.mjs?rev=20260929-claude-integration-1"></script>
 </body>
 </html>

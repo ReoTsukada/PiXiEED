@@ -51,6 +51,7 @@ try {
     const { encodeCameraPng } = await import('/js/pixel-studio/png-export.mjs?pixel-roundtrip=1');
     const { createAudioSong, resizeAudioCanvas } = await import('/js/creation/audio-core.mjs?pixel-roundtrip=1');
     const { exportAudioImage } = await import('/js/creation/audio-export.mjs?pixel-roundtrip=1');
+    const { normalizeJigsawFile } = await import('/js/creation/jigsaw-file.mjs?pixel-roundtrip=1');
 
     const pixelBytes = (width, height, colorAt) => {
       const data = new Uint8ClampedArray(width * height * 4);
@@ -95,6 +96,15 @@ try {
     };
     const exact = (actual, expected) => actual.length === expected.length && actual.every((value, index) => value === expected[index]);
     const outcomes = [];
+    const jpegCanvas = document.createElement('canvas');
+    jpegCanvas.width = 96; jpegCanvas.height = 64;
+    jpegCanvas.getContext('2d').putImageData(new ImageData(pixelBytes(96, 64, (x, y) => [x * 2, y * 3, (x + y) & 255, 255]), 96, 64), 0, 0);
+    const jpegBlob = await new Promise((resolve) => jpegCanvas.toBlob(resolve, 'image/jpeg', 0.92));
+    const jpegFile = new File([jpegBlob], 'scene.jpg', { type: 'image/jpeg' });
+    const jpegOriginal = await readFilePixels(jpegFile);
+    const jpegResult = await normalizePixelFile(jpegFile);
+    const jigsawJpeg = await normalizeJigsawFile(jpegFile);
+    outcomes.push(['JPEG-photo-import-keeps-dimensions-and-decoded-pixels', jpegResult.width === 96 && jpegResult.height === 64 && exact(jpegResult.data, jpegOriginal.data) && jigsawJpeg.width === 96 && jigsawJpeg.height === 64 && exact(jigsawJpeg.data, jpegOriginal.data)]);
     const flat = pixelBytes(16, 16, () => [33, 120, 201, 255]);
     const flatExport = await enlargedPng({ width: 16, height: 16, data: flat });
     const flatResult = await normalizePixelFile(new File([flatExport.blob], 'flat-enlarged.png', { type: 'image/png' }));

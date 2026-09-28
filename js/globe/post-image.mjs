@@ -1,7 +1,7 @@
 /** Client-side checks for a pixel-art upload. Accepted files are normalized to PNG for server verification. */
 
-import { normalizePixelFile } from '../pixel-scale.mjs?v=20260928-pixel-roundtrip-1';
-import { withPixelPngMetadata } from '../pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
+import { normalizePixelFile } from '../pixel-scale.mjs?rev=20260929-claude-integration-1';
+import { withPixelPngMetadata } from '../pixel-png-metadata.mjs?rev=20260929-claude-integration-1';
 
 export const PIXEL_LIMITS = Object.freeze({ maxBytes: 512 * 1024, minSize: 8, maxSize: 512, maxColors: 128, mime: ['image/png', 'image/webp'] });
 const MAX_SOURCE_BYTES = 8 * 1024 * 1024;

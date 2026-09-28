@@ -1,4 +1,5 @@
-import { createLocalDraftStore } from './local-drafts.mjs';
+import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
+import { mountPictureShelf } from './picture-shelf.mjs?rev=20260928-picture-shelf-1';
 import { hashCanonical } from './asset-contract.mjs';
 import { importAudioImage, AUDIO_IMAGE_RULES_VERSION } from './audio-image.mjs?rev=20260928-dot-music-1';
 import { beginAudioCamera, takeAudioCameraReturn, readAudioCameraDraft } from './audio-camera-handoff.mjs?rev=20260928-dot-music-1';
@@ -43,7 +44,6 @@ const tempoValue = document.querySelector('#audio-tempo-value');
 const playButton = document.querySelector('#audio-play-toggle');
 const saveButton = document.querySelector('#audio-save');
 const resumeButton = document.querySelector('#audio-resume');
-const drawSourceButton = document.querySelector('#audio-from-draw');
 const cameraSourceButton = document.querySelector('#audio-from-camera');
 const penButton = document.querySelector('#audio-tool-pen');
 const eraserButton = document.querySelector('#audio-tool-eraser');
@@ -58,7 +58,7 @@ const photoButton = document.querySelector('#audio-take-photo');
 const exportImageButton = document.querySelector('#audio-export-image');
 const extraInstrumentIds = new Set(AUDIO_EXTRA_INSTRUMENT_IDS);
 
-let draftStore = null;
+let draftStore = null; let pictureShelf = null;
 let song = createAudioSong({ songId: globalThis.crypto?.randomUUID?.() || `song-${Date.now()}` });
 let activeTrackId = song.tracks[0].trackId;
 let currentDraftId = song.songId;
@@ -182,8 +182,7 @@ function positionCursor() {
 }
 
 function refreshImageSources() {
-  try { drawSourceButton.hidden = !localStorage.getItem(LAST_DRAW_DRAFT_KEY); }
-  catch { drawSourceButton.hidden = true; }
+  void pictureShelf?.refresh();
   cameraHandoff = cameraHandoffImage(); cameraSourceButton.hidden = !cameraHandoff;
 }
 
@@ -205,19 +204,19 @@ async function beginFromImage(asset, document) {
   setStatus('画像を音楽キャンバスに取り込みました。色や音色を自由に編集できます。');
 }
 
-drawSourceButton.addEventListener('click', async () => {
-  let draftId;
-  try { draftId = localStorage.getItem(LAST_DRAW_DRAFT_KEY); } catch {}
-  if (!draftId || !draftStore) { refreshImageSources(); setStatus('端末に保存した絵が見つかりません。'); return; }
-  drawSourceButton.disabled = true; setStatus('保存した絵を確認しています…');
-  try {
-    const revision = await draftStore.load(draftId);
-    if (!revision || revision.asset.kind !== 'pixel_art' || revision.asset.owner.type !== 'local' || revision.asset.owner.id !== 'local-owner' || revision.asset.visibility !== 'draft' || revision.asset.hashScheme !== 'sha256-canonical-v1' || await hashCanonical(revision.document) !== revision.asset.contentHash) throw new Error('自分の保存版を確認できませんでした');
-    validateDrawDocument(revision.document);
-    await beginFromImage(revision.asset, revision.document);
-  } catch (error) { setStatus(error.message || '保存した絵から曲を作れませんでした。'); }
-  finally { drawSourceButton.disabled = false; refreshImageSources(); }
-});
+// Any tool's picture can be brought in; the song keeps its own copy and the picture stays where it was.
+try {
+  pictureShelf = mountPictureShelf(document.querySelector('#audio-shelf'), {
+    tool: 'audio', adapter: createIndexedDbDraftAdapter(), heading: '絵から曲をつくる',
+    onPick: async (entry) => {
+      const revision = entry.revision;
+      if (revision.asset.hashScheme !== 'sha256-canonical-v1' || await hashCanonical(revision.document) !== revision.asset.contentHash) throw new Error('自分の保存版を確認できませんでした');
+      validateDrawDocument(revision.document);
+      await beginFromImage(revision.asset, revision.document);
+    },
+    onError: (error) => setStatus(error.message || '保存した絵から曲を作れませんでした。')
+  });
+} catch { pictureShelf = null; }
 
 cameraSourceButton.addEventListener('click', async () => {
   cameraSourceButton.disabled = true; setStatus('端末内のカメラ画像を確認しています…');
@@ -239,7 +238,7 @@ cameraSourceButton.addEventListener('click', async () => {
 });
 
 window.addEventListener('storage', (event) => {
-  if (event.key === CAMERA_HANDOFF_KEY || event.key === LAST_DRAW_DRAFT_KEY) refreshImageSources();
+  if (event.key === CAMERA_HANDOFF_KEY || event.key === LAST_DRAW_DRAFT_KEY || String(event.key).startsWith('pixieed:picture:')) refreshImageSources();
 });
 window.addEventListener('resize', () => { effectEpoch += 1; interactionEffects.clear(); scalePixelBoard(); }, { passive: true });
 if (typeof globalThis.ResizeObserver === 'function') new globalThis.ResizeObserver(scalePixelBoard).observe(gridWrap);

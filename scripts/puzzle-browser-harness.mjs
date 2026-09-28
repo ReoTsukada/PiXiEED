@@ -46,7 +46,7 @@ for(const [engine,type] of [['Chrome',chromium],['WebKit',webkit]]) {
   const prefix=mode==='spot_difference'?'spot':'hidden';const path=mode==='spot_difference'?'spot-difference':'hidden-object';
   await page.goto(BASE+'/'+path+'/');await page.locator('#'+prefix+'-resume').click();
   await page.locator('#'+prefix+'-publish').waitFor({state:'visible'});await page.locator('#'+prefix+'-publish').click();
-  await page.waitForURL(url=>url.pathname==='/'&&url.searchParams.has('from'));
+  await page.waitForURL(url=>url.pathname==='/globe/'&&url.searchParams.has('from'));
   let frame=await(await page.locator('iframe').elementHandle()).contentFrame();
   await frame.waitForFunction(()=>globalThis.__PIXIEED_POSTS__?.getState().sheet==='composer');
   await frame.locator('[data-puzzle-panel]').waitFor({state:'visible'});

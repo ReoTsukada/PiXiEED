@@ -1,4 +1,4 @@
-import { normalizePixelFile } from '../pixel-scale.mjs?rev=20260928-pixel-roundtrip-1';
+import { normalizePixelFile } from '../pixel-scale.mjs?rev=20260929-claude-integration-1';
 
 // The picker preview and puzzle builder share one decode of the selected file.
 // Weak keys release the normalized pixels when that file is no longer selected.
