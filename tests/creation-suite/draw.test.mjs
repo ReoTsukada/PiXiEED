@@ -208,7 +208,7 @@ test('draw workspace prioritizes the canvas and supports touch zoom gestures acc
   assert.match(css, /grid-template-rows:auto auto minmax\(0,1fr\) auto/);
   assert.match(css, /height:100dvh/);
   assert.match(page, /activePointers\.size >= 2/);
-  assert.match(page, /Math\.min\(4, pinchStart\.zoom \* distance/);
+  assert.match(page, /Math\.min\(ZOOM_MAX, pinchStart\.zoom \* distance/); assert.match(page, /const ZOOM_MAX = 8;/);
   assert.match(page, /translate\(\$\{panX\}px, \$\{panY\}px\) scale\(\$\{zoom\}\)/);
 });
 
@@ -232,4 +232,22 @@ test('かんたんドット: 16 fixed colours, up to 64px, and anything larger o
   const kept = core.toSimpleDrawDocument(song); assert.deepEqual(kept.document.palette, song.palette); assert.equal(kept.recolored, false); assert.equal(kept.changed, false); assert.equal(kept.document.pixels[5], 2);
   const page = await import('node:fs/promises').then((fs) => fs.readFile(new URL('../../js/creation/draw-page.mjs', import.meta.url), 'utf8'));
   assert.match(page, /SIMPLE_DRAW_SIZES\.forEach/); assert.match(page, /fitToSimple\(structuredClone\(revision\.document\)\)/);
+});
+
+test('かんたんドット: a colour change is one undo step and undo reports only what changed', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const document = createDrawDocument(); const history = createDrawHistory(document);
+  const drawn = [...document.pixels]; drawn[0] = 2; assert.equal(history.commit({ ...document, pixels: drawn }), true);
+  const before = [...document.palette];
+  const palette = [...document.palette]; palette[2] = '#46b1e7';
+  assert.equal(history.commit({ ...document, pixels: [...document.pixels], palette }), true);
+  assert.equal(document.palette[2], '#46b1e7');
+  assert.equal(history.undo(), true); assert.deepEqual(document.palette, before); assert.equal(history.lastStep.paletteChanged, true);
+  assert.equal(history.redo(), true); assert.equal(document.palette[2], '#46b1e7');
+  assert.equal(history.undo(), true); assert.equal(history.undo(), true);
+  assert.equal(history.lastStep.paletteChanged, false); assert.deepEqual([...history.lastStep.indices], [0]); assert.equal(document.pixels[0], -1);
+  const page = await readFile(new URL('../../js/creation/draw-page.mjs', import.meta.url), 'utf8');
+  const html = await readFile(new URL('../../draw/index.html', import.meta.url), 'utf8');
+  assert.match(html, /id="draw-color-editor"/); assert.match(html, /id="dce-h"/);
+  assert.match(page, /function zoomAt\(/); assert.match(page, /fingers >= 3\) redo\(\); else undo\(\)/);
 });

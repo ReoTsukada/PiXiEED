@@ -7,7 +7,7 @@ import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928
 import { createPxdProject } from './pxd-codec.mjs';
 import { confirmPxdConversion, mountPxdTools } from './pxd-ui.mjs';
 import { pxdImageRoles, readPxdImage } from './pxd-project.mjs';
-import { readPxdDrawDocument, synchronizeLinkedAudioImage, writePxdDrawDocument } from './pxd-draw-audio.mjs';
+import { readPxdAudioLink, readPxdDrawDocument, synchronizeLinkedAudioImage, writePxdDrawDocument } from './pxd-draw-audio.mjs';
 
 const LAST_DRAFT_KEY = 'pixieed.simple-draw.last-draft.v1';
 const $ = (selector) => document.querySelector(selector);
@@ -50,9 +50,91 @@ function renderPalette() {
   const order = documentData.palette.length === DRAW_PALETTE_ORDER.length ? DRAW_PALETTE_ORDER : documentData.palette.map((_, index) => index);
   order.forEach((index) => { const color = documentData.palette[index];
     const button = document.createElement('button'); button.dataset.colorIndex = String(index); button.type = 'button'; button.className = 'draw-color'; button.style.setProperty('--draw-color', color); button.setAttribute('aria-label', `色 ${index + 1}`); button.title = `色 ${index + 1}`; button.setAttribute('aria-pressed', String(index === selectedColor));
-    button.addEventListener('click', (event) => chooseColor(index, event.currentTarget)); palette.append(button);
+    let hold = 0; let held = false;
+    button.addEventListener('pointerdown', () => { held = false; clearTimeout(hold); hold = setTimeout(() => { held = true; chooseColor(index, button); openColorEditor(index); }, 450); });
+    for (const type of ['pointerup', 'pointerleave', 'pointercancel']) button.addEventListener(type, () => clearTimeout(hold));
+    button.addEventListener('contextmenu', (event) => event.preventDefault());
+    button.addEventListener('click', (event) => {
+      if (held) { held = false; return; }
+      // while the sheet is open, a tap on another colour edits that one; on the same colour it closes
+      if (colorEdit) { if (colorEdit.index === index) closeColorEditor(); else { chooseColor(index, event.currentTarget); openColorEditor(index); } return; }
+      if (index === selectedColor && tool === 'pen') { openColorEditor(index); return; }
+      chooseColor(index, event.currentTarget);
+    });
+    palette.append(button);
   });
 }
+// ---- changing a colour: hue / vividness / lightness sliders and a few quick colours; one undo step per edit ----
+const QUICK_COLORS = ['#17232d', '#ffffff', '#ff4d4d', '#ff9f1c', '#ffe14d', '#7ed957', '#2ec4b6', '#3a86ff', '#8338ec', '#ff6fb5', '#a0522d', '#ffd8b1'];
+let colorEdit = null;
+const hexToHsl = (hex) => {
+  const r = Number.parseInt(hex.slice(1, 3), 16) / 255; const g = Number.parseInt(hex.slice(3, 5), 16) / 255; const b = Number.parseInt(hex.slice(5, 7), 16) / 255;
+  const max = Math.max(r, g, b); const min = Math.min(r, g, b); const l = (max + min) / 2; const d = max - min;
+  if (!d) return { h: colorEdit?.h ?? 0, s: 0, l: Math.round(l * 100) };
+  const s = d / (1 - Math.abs(2 * l - 1)); let h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  h = Math.round(h * 60); if (h < 0) h += 360; return { h, s: Math.round(s * 100), l: Math.round(l * 100) };
+};
+const hslToHex = (h, s, l) => {
+  s /= 100; l /= 100; const k = (n) => (n + h / 30) % 12; const a = s * Math.min(l, 1 - l);
+  const f = (n) => Math.round(255 * (l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1))));
+  return `#${[f(0), f(8), f(4)].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+};
+function linkedToSong() {
+  try { const link = readPxdAudioLink(pxdBridge?.currentProject || pxdBridge?.heldProject); return Boolean(link && link.imageRole === pxdImageRole); } catch { return false; }
+}
+function openColorEditor(index) {
+  if (index < 0) return;
+  if (linkedToSong()) { toast('音楽とつながった絵は色を変えられません'); return; }
+  closeColorEditor();
+  const editor = $('#draw-color-editor'); const base = [...documentData.palette];
+  colorEdit = { index, base, ...hexToHsl(base[index].slice(0, 7)) };
+  editor.querySelector('.dce-before').style.background = base[index];
+  const quick = editor.querySelector('.dce-quick'); quick.replaceChildren(...QUICK_COLORS.map((color) => {
+    const b = document.createElement('button'); b.type = 'button'; b.style.setProperty('--c', color); b.setAttribute('aria-label', color); b.addEventListener('click', () => setEditColor(color)); return b;
+  }));
+  $('#dce-reset').hidden = index >= DRAW_PALETTE.length || base[index] === DRAW_PALETTE[index];
+  syncColorEditor(); editor.hidden = false; placeColorEditor(); requestAnimationFrame(() => editor.classList.add('is-open'));
+  $('.draw-current')?.setAttribute('aria-expanded', 'true');
+}
+// the sheet sits just above the palette so the colours (and most of the picture) stay in view
+function placeColorEditor() {
+  const editor = $('#draw-color-editor'); if (editor.hidden) return;
+  const row = $('.draw-control-row').getBoundingClientRect(); const h = editor.offsetHeight;
+  const above = row.top - h - 10; const below = row.bottom + 10;
+  editor.style.top = `${Math.round(above >= 8 || below + h > innerHeight - 8 ? Math.max(8, above) : below)}px`;
+}
+addEventListener('resize', placeColorEditor); addEventListener('scroll', placeColorEditor, { passive: true });
+function setEditColor(hex) {
+  if (!colorEdit) return;
+  Object.assign(colorEdit, hexToHsl(hex));
+  const palette = [...documentData.palette]; palette[colorEdit.index] = hex; documentData.palette = palette;
+  const tile = document.querySelector(`.draw-color[data-color-index="${colorEdit.index}"]`); tile?.style.setProperty('--draw-color', hex);
+  showCurrentColor(); paint(); syncColorEditor(false);
+}
+function syncColorEditor(setInputs = true) {
+  const e = colorEdit; if (!e) return; const hex = documentData.palette[e.index];
+  const editor = $('#draw-color-editor'); editor.querySelector('.dce-after').style.background = hex;
+  if (setInputs) { $('#dce-h').value = e.h; $('#dce-s').value = e.s; $('#dce-l').value = e.l; }
+  editor.style.setProperty('--h', e.h); editor.style.setProperty('--s', `${e.s}%`); editor.style.setProperty('--l', `${e.l}%`);
+  for (const b of editor.querySelectorAll('.dce-quick button')) b.setAttribute('aria-pressed', String(b.style.getPropertyValue('--c') === hex));
+}
+function closeColorEditor() {
+  const editor = $('#draw-color-editor'); if (!colorEdit) { editor.hidden = true; return; }
+  const after = documentData.palette; documentData.palette = colorEdit.base; colorEdit = null;
+  if (history.commit({ ...documentData, pixels: [...documentData.pixels], palette: after })) saved = false;
+  editor.classList.remove('is-open'); editor.hidden = true; $('.draw-current')?.setAttribute('aria-expanded', 'false');
+  renderPalette(); showCurrentColor(); paint();
+}
+for (const id of ['#dce-h', '#dce-s', '#dce-l']) $(id).addEventListener('input', () => {
+  if (!colorEdit) return; colorEdit.h = Number($('#dce-h').value); colorEdit.s = Number($('#dce-s').value); colorEdit.l = Number($('#dce-l').value);
+  const hex = hslToHex(colorEdit.h, colorEdit.s, colorEdit.l); const { h, s, l } = colorEdit; setEditColor(hex); Object.assign(colorEdit, { h, s, l }); syncColorEditor(false);
+});
+$('#dce-done').addEventListener('click', closeColorEditor);
+$('#dce-reset').addEventListener('click', () => { if (colorEdit) setEditColor(DRAW_PALETTE[colorEdit.index]); syncColorEditor(); });
+$('.draw-current')?.addEventListener('click', () => (colorEdit ? closeColorEditor() : openColorEditor(selectedColor)));
+// touching the picture closes the sheet and draws straight away with the new colour
+canvas.addEventListener('pointerdown', () => { if (colorEdit) closeColorEditor(); }, true);
+addEventListener('keydown', (event) => { if (event.key === 'Escape' && colorEdit) closeColorEditor(); });
 function showCurrentColor() {
   const chip = $('.draw-current'); if (!chip) return;
   chip.classList.toggle('is-clear', selectedColor < 0); chip.style.setProperty('--draw-color', selectedColor < 0 ? 'transparent' : documentData.palette[selectedColor]);
@@ -72,6 +154,7 @@ function fitToSimple(nextDocument) {
   return fitted.document;
 }
 function replaceDocument(nextDocument, nextSource = source, { fromPxd = false } = {}) {
+  if (colorEdit) closeColorEditor();
   nextDocument = fitToSimple(nextDocument);
   if (fitNotice) setTimeout(() => { if (fitNotice && !status.textContent.includes(fitNotice)) status.textContent = `${status.textContent} ${fitNotice}`.trim(); }, 0);
   interactionEffects.clear();
@@ -87,7 +170,24 @@ function pointFromEvent(event) {
   const rect = canvas.getBoundingClientRect();
   return { x: Math.floor((event.clientX - rect.left) * documentData.width / rect.width), y: Math.floor((event.clientY - rect.top) * documentData.height / rect.height) };
 }
+const ZOOM_MAX = 8;
+// The canvas scales about its own centre; keep the point under the fingers / cursor still while zooming
+// and never let the picture slide completely out of view.
+function layoutCenter() { const r = canvas.getBoundingClientRect(); return { x: r.left + r.width / 2 - panX, y: r.top + r.height / 2 - panY, w: r.width / zoom, h: r.height / zoom }; }
+function clampPan() {
+  const board = $('.draw-board').getBoundingClientRect(); const c = layoutCenter();
+  const limitX = Math.max(0, (c.w * zoom) / 2 + board.width / 2 - 48); const limitY = Math.max(0, (c.h * zoom) / 2 + board.height / 2 - 48);
+  panX = Math.max(-limitX, Math.min(limitX, panX)); panY = Math.max(-limitY, Math.min(limitY, panY));
+}
+function zoomAt(nextZoom, focusX, focusY, base = { zoom, panX, panY }) {
+  const c = layoutCenter(); const z = Math.max(1, Math.min(ZOOM_MAX, nextZoom)); const k = z / base.zoom;
+  zoom = z; panX = focusX - c.x - (focusX - c.x - base.panX) * k; panY = focusY - c.y - (focusY - c.y - base.panY) * k;
+  if (zoom === 1) { panX = 0; panY = 0; }
+  updateCanvasView();
+}
+function resetView() { zoom = 1; panX = 0; panY = 0; updateCanvasView(); }
 function updateCanvasView() {
+  if (zoom > 1) clampPan();
   canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
   $('#draw-zoom-label').textContent = `${Math.round(zoom * 100)}%`;
   $('#draw-zoom-label').classList.toggle('is-zoomed', zoom > 1.01);
@@ -125,7 +225,7 @@ function startPinch() {
     documentData.pixels = strokeStartPixels; strokeStartPixels = null; drawing = false; previousPoint = null; paint();
   }
   const [a, b] = pointerPair(); if (!a || !b) return;
-  pinchStart = { distance: Math.hypot(a.x - b.x, a.y - b.y), zoom, panX, panY, centerX: (a.x + b.x) / 2, centerY: (a.y + b.y) / 2 };
+  pinchStart = { distance: Math.hypot(a.x - b.x, a.y - b.y), zoom, panX, panY, centerX: (a.x + b.x) / 2, centerY: (a.y + b.y) / 2, time: performance.now(), moved: 0, fingers: activePointers.size };
 }
 function selectedPixelValue() { return tool === 'eraser' ? -1 : selectedColor; }
 // ---- drawing helpers: a mirror copy of every mark, the straight line, the colour picker ----
@@ -146,28 +246,31 @@ function setTool(next) {
   tool = next; document.querySelectorAll('[data-draw-tool]').forEach((node) => node.setAttribute('aria-pressed', String(node.dataset.drawTool === next)));
   canvas.dataset.tool = next;
 }
+let pendingTap = null; let panDrag = null; let spaceHeld = false; let fingerTap = null;
 canvas.addEventListener('pointerdown', (event) => {
-  if (event.button !== undefined && event.button !== 0) return;
+  if (event.button !== undefined && event.button !== 0 && event.button !== 1) return;
   event.preventDefault(); canvas.setPointerCapture(event.pointerId);
   activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
-  if (event.pointerType === 'touch' && activePointers.size >= 2) { startPinch(); return; }
+  if (event.pointerType === 'touch' && activePointers.size >= 2) { pendingTap = null; if (fingerTap && !pinchStart) { const tail = fingerTap; fingerTap = null; startPinch(); Object.assign(pinchStart, { time: tail.time, fingers: Math.max(tail.fingers, activePointers.size), moved: tail.moved }); return; } if (pinchStart) { pinchStart.fingers = Math.max(pinchStart.fingers, activePointers.size); return; } startPinch(); return; }
+  // desktop: middle button, or Space held, drags the view
+  if (event.button === 1 || spaceHeld) { panDrag = { x: event.clientX, y: event.clientY, panX, panY }; canvas.classList.add('is-panning'); return; }
   if (activePointers.size > 1) return;
   drawing = true; const touchedPoint = pointFromEvent(event); previousPoint = touchedPoint;
-  if (tool === 'picker') { pickColorAt(touchedPoint); drawing = false; previousPoint = null; return; }
-  if (tool === 'fill') {
-    commitChange((next) => { const a = [...floodFill(next, previousPoint.x, previousPoint.y, selectedPixelValue())]; if (mirror) { const m = mirrored(previousPoint); a.push(...floodFill(next, m.x, m.y, selectedPixelValue())); } return a; });
-    drawing = false; previousPoint = null;
-  } else if (tool === 'line') { strokeStartPixels = [...documentData.pixels]; lineStart = touchedPoint; const changed = markSegment(lineStart, touchedPoint, selectedPixelValue()); saved = false; paint(changed); }
+  if (tool === 'picker' || tool === 'fill') { pendingTap = touchedPoint; drawing = false; previousPoint = null; return; }
+  if (tool === 'line') { strokeStartPixels = [...documentData.pixels]; lineStart = touchedPoint; const changed = markSegment(lineStart, touchedPoint, selectedPixelValue()); saved = false; paint(changed); }
   else { strokeStartPixels = [...documentData.pixels]; const changed = markSegment(previousPoint, previousPoint, selectedPixelValue()); saved = false; paint(changed); }
 });
 canvas.addEventListener('pointermove', (event) => {
   if (activePointers.has(event.pointerId)) activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+  if (panDrag) { panX = panDrag.panX + event.clientX - panDrag.x; panY = panDrag.panY + event.clientY - panDrag.y; updateCanvasView(); return; }
   if (pinchStart && activePointers.size >= 2) {
     const [a, b] = pointerPair(); const distance = Math.hypot(a.x - b.x, a.y - b.y);
     const centerX = (a.x + b.x) / 2; const centerY = (a.y + b.y) / 2;
-    zoom = Math.max(1, Math.min(4, pinchStart.zoom * distance / Math.max(1, pinchStart.distance)));
-    panX = pinchStart.panX + centerX - pinchStart.centerX; panY = pinchStart.panY + centerY - pinchStart.centerY;
-    updateCanvasView(); return;
+    const target = Math.max(1, Math.min(ZOOM_MAX, pinchStart.zoom * distance / Math.max(1, pinchStart.distance)));
+    pinchStart.moved = Math.max(pinchStart.moved, Math.hypot(centerX - pinchStart.centerX, centerY - pinchStart.centerY), Math.abs(distance - pinchStart.distance));
+    pinchStart.fingers = Math.max(pinchStart.fingers, activePointers.size);
+    // zoom about the first centre, then follow the fingers as they move together
+    zoomAt(target, pinchStart.centerX, pinchStart.centerY, pinchStart); panX += centerX - pinchStart.centerX; panY += centerY - pinchStart.centerY; updateCanvasView(); return;
   }
   showCursor(event);
   if (!drawing || tool === 'fill' || tool === 'picker') return;
@@ -179,11 +282,26 @@ function endStroke() {
   if (drawing && strokeStartPixels && tool !== 'fill') { finishDrawStroke(documentData, history, strokeStartPixels); strokeStartPixels = null; paint(); }
   drawing = false; previousPoint = null; lineStart = null;
 }
+function applyTap(point) {
+  if (tool === 'picker') { pickColorAt(point); return; }
+  commitChange((next) => { const a = [...floodFill(next, point.x, point.y, selectedPixelValue())]; if (mirror) { const m = mirrored(point); a.push(...floodFill(next, m.x, m.y, selectedPixelValue())); } return a; });
+}
 function releasePointer(event) {
-  activePointers.delete(event.pointerId);
+  const wasActive = activePointers.delete(event.pointerId);
+  if (panDrag) { if (!activePointers.size) { panDrag = null; canvas.classList.remove('is-panning'); } return; }
+  if (pendingTap && wasActive && event.type === 'pointerup' && !pinchStart && activePointers.size === 0) { const tap = pendingTap; pendingTap = null; applyTap(tap); return; }
+  if (!activePointers.size) pendingTap = null;
+  // fingers rarely lift at the same moment: remember the gesture until the last one is up, then a quick,
+  // still two-finger tap is undo and a three-finger tap is redo
+  if (!pinchStart && fingerTap) {
+    if (activePointers.size === 0) { const gesture = fingerTap; fingerTap = null; if (performance.now() - gesture.time < 360 && gesture.moved < 12) { if (gesture.fingers >= 3) redo(); else undo(); } }
+    return;
+  }
   if (pinchStart) {
-    pinchStart = null;
-    if (activePointers.size >= 2) startPinch();
+    const gesture = pinchStart; pinchStart = null;
+    if (activePointers.size >= 1 && activePointers.size < 2) fingerTap = gesture;
+    else if (activePointers.size === 0 && performance.now() - gesture.time < 360 && gesture.moved < 12) { if (gesture.fingers >= 3) redo(); else undo(); }
+    if (activePointers.size >= 2) { startPinch(); Object.assign(pinchStart, { time: gesture.time, fingers: gesture.fingers, moved: gesture.moved }); }
     else if (activePointers.size === 0) { zoom = Math.max(1, zoom); if (zoom === 1) panX = panY = 0; updateCanvasView(); }
     drawing = false; previousPoint = null; strokeStartPixels = null; return;
   }
@@ -212,8 +330,44 @@ syncGrid();
 const sizeButtons = [...document.querySelectorAll('[data-draw-size]')];
 function syncSizeButtons() { for (const b of sizeButtons) b.setAttribute('aria-checked', String(Number(b.dataset.drawSize) === documentData.width && documentData.width === documentData.height)); }
 for (const b of sizeButtons) b.addEventListener('click', () => { if (sizeSelect.value === b.dataset.drawSize && documentData.width === Number(b.dataset.drawSize)) return; sizeSelect.value = b.dataset.drawSize; sizeSelect.dispatchEvent(new Event('change')); });
-$('#draw-undo').addEventListener('click', () => { if (history.undo()) { saved = false; paint(); } });
-$('#draw-redo').addEventListener('click', () => { if (history.redo()) { saved = false; paint(); } });
+function afterHistoryStep() {
+  saved = false; const step = history.lastStep;
+  if (step?.paletteChanged) { renderPalette(); showCurrentColor(); paint(); } else paint(step?.indices || null);
+}
+function undo() { if (drawing) return false; if (colorEdit) closeColorEditor(); if (!history.undo()) return false; afterHistoryStep(); return true; }
+function redo() { if (drawing) return false; if (colorEdit) closeColorEditor(); if (!history.redo()) return false; afterHistoryStep(); return true; }
+// a tap steps once; holding the button keeps stepping
+for (const [id, step] of [['#draw-undo', undo], ['#draw-redo', redo]]) {
+  const button = $(id); let timer = 0; let repeated = false;
+  const stop = () => { clearTimeout(timer); timer = 0; };
+  button.addEventListener('pointerdown', () => { repeated = false; stop(); timer = setTimeout(function again() { repeated = true; if (step()) timer = setTimeout(again, 90); }, 420); });
+  for (const type of ['pointerup', 'pointerleave', 'pointercancel']) button.addEventListener(type, stop);
+  button.addEventListener('click', () => { if (repeated) { repeated = false; return; } step(); });
+}
+addEventListener('keydown', (event) => {
+  if (event.target.closest?.('input, select, textarea')) return;
+  const key = event.key.toLowerCase(); const mod = event.metaKey || event.ctrlKey;
+  if (mod && key === 'z') { event.preventDefault(); if (event.shiftKey) redo(); else undo(); return; }
+  if (mod && key === 'y') { event.preventDefault(); redo(); return; }
+  if (mod) return;
+  if (key === ' ') { if (!spaceHeld && document.activeElement === canvas) event.preventDefault(); spaceHeld = true; canvas.classList.add('is-grab'); return; }
+  const tools = { b: 'pen', p: 'pen', e: 'eraser', g: 'fill', l: 'line', i: 'picker' };
+  if (tools[key]) { setTool(tools[key]); return; }
+  if (key === 'm') { $('#draw-mirror')?.click(); return; }
+  if (key === '0') { resetView(); return; }
+  if (key === '+' || key === '=') { const r = canvas.getBoundingClientRect(); zoomAt(zoom * 1.5, r.left + r.width / 2, r.top + r.height / 2); return; }
+  if (key === '-') { const r = canvas.getBoundingClientRect(); zoomAt(zoom / 1.5, r.left + r.width / 2, r.top + r.height / 2); }
+});
+addEventListener('keyup', (event) => { if (event.key === ' ') { spaceHeld = false; canvas.classList.remove('is-grab'); } });
+// wheel / trackpad pinch zooms about the cursor
+$('.draw-board').addEventListener('wheel', (event) => {
+  event.preventDefault();
+  const factor = Math.exp(-event.deltaY * (event.ctrlKey ? 0.01 : 0.0025));
+  zoomAt(zoom * factor, event.clientX, event.clientY);
+}, { passive: false });
+// the zoom chip puts the whole picture back
+$('#draw-zoom-label').addEventListener('click', resetView); $('#draw-zoom-label').title = '全体を表示';
+canvas.addEventListener('dblclick', (event) => { if (tool === 'picker' || tool === 'fill') return; event.preventDefault(); });
 $('#draw-clear').addEventListener('click', () => commitChange((next) => { next.pixels.fill(-1); return null; }));
 async function saveRevision() {
   if (!store) return;

@@ -88,4 +88,33 @@ body[data-page="draw"] .draw-import > p { display: none; }
   body[data-page="draw"] .draw-toolbar svg, body[data-page="draw"] .draw-actions svg { width: 18px; height: 18px; }
   body[data-page="draw"] .draw-import__options { bottom: auto; top: 12px; max-height: calc(100dvh - 24px); }
 }
+/* ---- colour editor: a small sheet above the controls ---- */
+button.draw-current { display: block; padding: 0; border: 0; cursor: pointer; font: inherit; }
+button.draw-current:focus-visible { outline: 3px solid #ffd35a; outline-offset: 2px; }
+button.draw-current[aria-expanded="true"] span { box-shadow: inset 0 0 0 2px rgba(255,255,255,.35), 0 0 0 3px #8ecdf0; }
+.draw-canvas.is-grab, canvas.is-grab { cursor: grab; }
+.draw-canvas.is-panning, canvas.is-panning { cursor: grabbing; }
+.draw-color-editor { position: fixed; left: 50%; top: 8px; z-index: 85; box-sizing: border-box; display: grid; gap: 10px; width: min(calc(100vw - 24px), 380px); padding: 12px 14px 14px; border-radius: 20px; background: #15202b; color: #fff; box-shadow: 0 14px 34px rgba(0,0,0,.4), 0 0 0 2px rgba(255,255,255,.06); transform: translate(-50%, 16px) scale(.96); opacity: 0; transition: transform .18s cubic-bezier(.2,1.3,.4,1), opacity .14s; }
+.draw-color-editor.is-open { transform: translate(-50%, 0) scale(1); opacity: 1; }
+.draw-color-editor[hidden] { display: none; }
+.dce-head { display: flex; align-items: center; gap: 8px; }
+.dce-swatch { width: 34px; height: 34px; border-radius: 11px; box-shadow: inset 0 0 0 2px rgba(255,255,255,.3); }
+.dce-after { width: 50px; box-shadow: inset 0 0 0 2px rgba(255,255,255,.35), 0 0 0 2px #ffd35a; }
+.dce-arrow { color: rgba(255,255,255,.45); font-weight: 900; }
+.dce-reset, .dce-done { display: grid; place-items: center; width: 40px; height: 40px; margin-left: auto; padding: 0; border: 0; border-radius: 12px; background: #1d2b38; color: #fff; font: 900 1.1rem/1 inherit; box-shadow: 0 3px 0 rgba(0,0,0,.45); cursor: pointer; }
+.dce-reset[hidden] { display: none; }
+.dce-reset + .dce-done { margin-left: 0; }
+.dce-done { background: #ffd35a; color: #17232d; box-shadow: 0 3px 0 #b88f1d; }
+.dce-reset:active, .dce-done:active { transform: translateY(3px); box-shadow: none; }
+.dce-quick { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 5px; }
+.dce-quick button { aspect-ratio: 1; min-width: 0; padding: 0; border: 0; border-radius: 8px; background: var(--c); box-shadow: inset 0 0 0 1px rgba(255,255,255,.2); cursor: pointer; }
+.dce-quick button[aria-pressed="true"] { box-shadow: 0 0 0 2px #15202b, 0 0 0 4px #ffd35a; }
+.dce-slider { display: grid; grid-template-columns: 4.2em minmax(0, 1fr); align-items: center; gap: 8px; font-size: .72rem; font-weight: 900; color: rgba(255,255,255,.7); }
+.dce-slider input { width: 100%; height: 24px; margin: 0; border-radius: 999px; background: var(--track) !important; border: 0 !important; padding: 0 !important; -webkit-appearance: none; appearance: none; box-shadow: inset 0 0 0 2px rgba(0,0,0,.25); cursor: pointer; touch-action: pan-y; }
+.dce-slider input::-webkit-slider-thumb { -webkit-appearance: none; width: 26px; height: 26px; border: 3px solid #fff; border-radius: 50%; background: transparent; box-shadow: 0 2px 6px rgba(0,0,0,.5); }
+.dce-slider input::-moz-range-thumb { width: 20px; height: 20px; border: 3px solid #fff; border-radius: 50%; background: transparent; box-shadow: 0 2px 6px rgba(0,0,0,.5); }
+.dce-hue input { --track: linear-gradient(90deg, hsl(0 var(--s) var(--l)), hsl(60 var(--s) var(--l)), hsl(120 var(--s) var(--l)), hsl(180 var(--s) var(--l)), hsl(240 var(--s) var(--l)), hsl(300 var(--s) var(--l)), hsl(359 var(--s) var(--l))); }
+.dce-sat input { --track: linear-gradient(90deg, hsl(var(--h) 0% var(--l)), hsl(var(--h) 100% var(--l))); }
+.dce-light input { --track: linear-gradient(90deg, #000, hsl(var(--h) var(--s) 50%), #fff); }
+@media (max-height: 400px) and (min-width: 480px) { .draw-color-editor { gap: 6px; padding: 10px 12px; } .dce-slider input { height: 20px; } }
 @media (prefers-reduced-motion: reduce) { body[data-page="draw"] * { transition: none !important; } }

@@ -17,7 +17,7 @@
   <link rel="stylesheet" href="/css/interaction-effects.css?rev=20260928-touch-motion-1">
   <link rel="stylesheet" href="/css/arcade.css?rev=20260928-arcade-2">
   <link rel="stylesheet" href="/css/arcade-tools.css?rev=20260928-arcade-2">
-  <link rel="stylesheet" href="/css/draw-ui.css?rev=20260928-simple-dot-1">
+  <link rel="stylesheet" href="/css/draw-ui.css?rev=20260928-simple-dot-2">
 </head>
 <body data-page="draw" class="app-page app-page--tool-draw">
   <a class="skip-link" href="#main">本文へ移動</a>
@@ -28,17 +28,24 @@
     <div class="draw-board" aria-label="描画エリア。2本指で拡大・移動できます。"><canvas id="draw-canvas" width="16" height="16" role="img" aria-label="16×16の透明なキャンバス。色を選んで描きます。ドラッグで描画、2本指で拡大・移動できます。" tabindex="0"></canvas><div class="draw-grid" aria-hidden="true"></div><div class="draw-cursor" aria-hidden="true" hidden></div><div class="draw-cursor draw-cursor-twin" aria-hidden="true" hidden></div></div>
     <section class="draw-controls" aria-label="描画の操作">
       <input id="draw-import-file" class="draw-file-input" type="file" accept="image/png,image/webp" tabindex="-1" aria-label="複製する画像ファイル">
-      <div class="draw-control-row"><span class="draw-current" aria-hidden="true"><span></span></span><div id="draw-palette" class="draw-palette" role="group" aria-label="色を選ぶ"></div></div>
+      <div class="draw-control-row"><button type="button" class="draw-current" aria-label="いまの色を変える" title="色を変える"><span></span></button><div id="draw-palette" class="draw-palette" role="group" aria-label="色を選ぶ"></div></div>
       <div class="draw-toolbar">
         <div class="draw-tools" role="group" aria-label="道具を選ぶ"><button type="button" data-draw-tool="pen" aria-pressed="true" aria-label="ペン" title="ペン"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l1-4L16 5l3 3L8 19l-4 1z"/><path d="M14 7l3 3"/></svg></button><button type="button" data-draw-tool="eraser" aria-pressed="false" aria-label="消しゴム" title="消しゴム"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 20h11"/><path d="M4 15l9-9 6 6-7 7H8z"/><path d="M9 10l6 6"/></svg></button><button type="button" data-draw-tool="fill" aria-pressed="false" aria-label="ぬりつぶし" title="ぬりつぶし"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 11l7-7 7 7-7 7z"/><path d="M5 11h14"/><path d="M20 15c0 1.7-1 3-2 3s-2-1.3-2-3 2-4 2-4 2 2.3 2 4z"/></svg></button><button type="button" data-draw-tool="line" aria-pressed="false" aria-label="直線" title="直線"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19L19 5"/><rect x="3" y="17" width="4" height="4" rx="1"/><rect x="17" y="3" width="4" height="4" rx="1"/></svg></button><button type="button" data-draw-tool="picker" aria-pressed="false" aria-label="スポイト（絵から色をとる）" title="スポイト"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4l6 6"/><path d="M17 3l4 4-3 3-4-4z"/><path d="M14 8l-9 9v3h3l9-9"/></svg></button></div>
         <div class="draw-toggles" role="group" aria-label="描き方"><button id="draw-mirror" type="button" aria-pressed="false" aria-label="左右対称に描く" title="左右対称"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18" stroke-dasharray="2 2.5"/><path d="M9 7L4 12l5 5z"/><path d="M15 7l5 5-5 5z"/></svg></button><button id="draw-grid-toggle" type="button" aria-pressed="true" aria-label="マス目を表示" title="マス目"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9.3 4v16M14.7 4v16M4 9.3h16M4 14.7h16"/></svg></button></div>
       </div>
       <div class="draw-actions" role="group" aria-label="編集と保存"><button id="draw-undo" type="button" disabled aria-label="ひとつ戻す" title="戻す"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7L4 12l5 5"/><path d="M4 12h10a6 6 0 0 1 0 12h-2" transform="translate(0 -6)"/></svg></button><button id="draw-redo" type="button" disabled aria-label="やり直す" title="やり直す"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 7l5 5-5 5"/><path d="M20 12H10a6 6 0 0 0 0 12h2" transform="translate(0 -6)"/></svg></button><button id="draw-clear" type="button" aria-label="ぜんぶ消す" title="ぜんぶ消す"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14"/><path d="M9 7V4h6v3"/><path d="M7 7l1 13h8l1-13"/></svg></button><button id="draw-export" type="button" aria-label="PNGで保存" title="PNG"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M4 19h16"/></svg></button><button id="draw-to-globe" type="button" aria-label="地球儀へ投稿" title="地球儀へ"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M4 12h16M12 4c2.4 2.2 3.6 4.9 3.6 8s-1.2 5.8-3.6 8c-2.4-2.2-3.6-4.9-3.6-8S9.6 6.2 12 4z"/></svg></button><details class="draw-import"><summary aria-label="画像や保存した絵をひらく" title="ひらく"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h6l2 2h10v10H3z"/><path d="M3 7V5h6l2 2"/></svg></summary><div class="draw-import__options"><button id="draw-import-local" type="button">画像ファイル</button><button id="draw-copy-last" type="button" hidden>前回の絵を複製</button><button id="draw-resume" type="button" hidden>前回の絵をひらく</button></div></details></div>
     </section>
+    <div id="draw-color-editor" class="draw-color-editor" role="dialog" aria-label="色を変える" hidden>
+      <div class="dce-head"><span class="dce-swatch dce-before" aria-hidden="true"></span><span class="dce-arrow" aria-hidden="true">→</span><span class="dce-swatch dce-after" aria-hidden="true"></span><button id="dce-reset" type="button" class="dce-reset" aria-label="もとの色にもどす" title="もとの色">↺</button><button id="dce-done" type="button" class="dce-done" aria-label="決定">✓</button></div>
+      <div class="dce-quick" role="group" aria-label="すぐ使える色"></div>
+      <label class="dce-slider dce-hue"><span>色み</span><input id="dce-h" type="range" min="0" max="359" step="1"></label>
+      <label class="dce-slider dce-sat"><span>あざやか</span><input id="dce-s" type="range" min="0" max="100" step="1"></label>
+      <label class="dce-slider dce-light"><span>明るさ</span><input id="dce-l" type="range" min="0" max="100" step="1"></label>
+    </div>
   </main>
   <footer class="site-footer"><div class="container"><p>PiXiEED</p></div></footer>
   <nav class="app-tabs" aria-label="アプリナビゲーション"><a data-nav="map" href="/" aria-label="地球儀"><img src="/assets/icons/pixieed/globe.svg" alt=""></a><a data-nav="camera" href="/pixel-camera.html" aria-label="撮影"><img src="/assets/icons/pixieed/shoot.svg" alt=""></a><button id="draw-save" type="button" aria-label="端末に保存">保存</button><a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""></a><a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a></nav>
-  <script type="module" src="/js/creation/draw-page.mjs?rev=20260928-simple-dot-1"></script>
+  <script type="module" src="/js/creation/draw-page.mjs?rev=20260928-simple-dot-2"></script>
   <script type="module" src="/js/site-header.mjs?rev=20260928-touch-motion-1"></script>
 </body>
 </html>

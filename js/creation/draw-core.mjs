@@ -95,28 +95,38 @@ function makePatch(before, after) {
 }
 function applyPatch(pixels, patch, values) { for (let slot = 0; slot < patch.indices.length; slot += 1) pixels[patch.indices[slot]] = values[slot]; }
 
+const samePalette = (a, b) => a.length === b.length && a.every((color, index) => color === b[index]);
+// One history step holds the changed pixels and, when the colours were edited, the palette before and after.
 export function createDrawHistory(document, { maxBytes = DEFAULT_HISTORY_BYTES, maxEntries = 100 } = {}) {
   validateDrawDocument(document);
-  const past = []; const future = []; let retainedBytes = 0;
+  const past = []; const future = []; let retainedBytes = 0; let lastStep = null;
   const clearFuture = () => { for (const entry of future) retainedBytes -= entry.bytes; future.length = 0; };
   const trimPast = () => { while (past.length > maxEntries || retainedBytes > maxBytes && past.length > 1) retainedBytes -= past.shift().bytes; };
-  const moveEntry = (from, to, values) => {
+  const moveEntry = (from, to, backwards) => {
     if (!from.length) return false;
-    const patch = from.pop(); applyPatch(document.pixels, patch, values(patch)); to.push(patch); return true;
+    const patch = from.pop(); applyPatch(document.pixels, patch, backwards ? patch.oldValues : patch.newValues);
+    if (patch.paletteBefore) document.palette = [...(backwards ? patch.paletteBefore : patch.paletteAfter)];
+    to.push(patch); lastStep = { indices: patch.indices, paletteChanged: Boolean(patch.paletteBefore) }; return true;
   };
   return {
     get canUndo() { return past.length > 0; }, get canRedo() { return future.length > 0; }, get retainedBytes() { return retainedBytes; },
+    /** What the last undo/redo touched: pixel indices, and whether the colours changed. */
+    get lastStep() { return lastStep; },
     commit(nextDocument) {
       validateDrawDocument(nextDocument);
       if (nextDocument.width !== document.width || nextDocument.height !== document.height) throw new TypeError('Resize the document before committing pixels');
-      const patch = makePatch(document.pixels, nextDocument.pixels); if (!patch) return false;
+      const paletteChanged = !samePalette(document.palette, nextDocument.palette);
+      let patch = makePatch(document.pixels, nextDocument.pixels);
+      if (!patch && !paletteChanged) return false;
+      patch ??= { indices: new Uint32Array(0), oldValues: new Int16Array(0), newValues: new Int16Array(0), bytes: 0 };
+      if (paletteChanged) { patch.paletteBefore = [...document.palette]; patch.paletteAfter = [...nextDocument.palette]; patch.bytes += (patch.paletteBefore.length + patch.paletteAfter.length) * 9; }
       clearFuture();
       if (patch.bytes > maxBytes) { past.length = 0; retainedBytes = 0; }
       else { past.push(patch); retainedBytes += patch.bytes; trimPast(); }
-      document.pixels = nextDocument.pixels; return true;
+      document.pixels = nextDocument.pixels; if (paletteChanged) document.palette = [...nextDocument.palette]; return true;
     },
-    undo() { return moveEntry(past, future, (patch) => patch.oldValues); },
-    redo() { return moveEntry(future, past, (patch) => patch.newValues); }
+    undo() { return moveEntry(past, future, true); },
+    redo() { return moveEntry(future, past, false); }
   };
 }
 
