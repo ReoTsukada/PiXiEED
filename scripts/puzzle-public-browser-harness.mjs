@@ -37,8 +37,9 @@ for(const [engine,type] of [['Chrome',chromium],['WebKit',webkit]]) {
   await frame.waitForFunction(()=>globalThis.__PIXIEED_POSTS__?.store);
   await frame.evaluate(async id=>{await __PIXIEED_POSTS__.store.ready;await __PIXIEED_POSTS__.openLinkedPost(id);},id);
   await frame.locator('[data-v-puzzle]').waitFor({state:'visible'});
-  assert.equal(await frame.locator('[data-v-puzzle]').getAttribute('href'),'/pixfind/?postPuzzle='+id);
-  await frame.locator('[data-v-puzzle]').click();await page.waitForURL(url=>url.pathname==='/pixfind/'&&url.searchParams.get('postPuzzle')===id);
+  const gamePath='/play/'+(puzzle.mode==='hidden_object'?'hidden-object':'spot-difference')+'/';
+  assert.equal(await frame.locator('[data-v-puzzle]').getAttribute('href'),gamePath+'?postPuzzle='+id);
+  await frame.locator('[data-v-puzzle]').click();await page.waitForURL(url=>url.pathname===gamePath&&url.searchParams.get('postPuzzle')===id);
   await page.waitForFunction(()=>document.querySelector('#pixfind-original')?.naturalWidth===16&&document.querySelector('#pixfind-progress')?.textContent.includes('0 / 1'));
   const rect=await page.locator('#pixfind-play-area').boundingBox();
   const scale=Math.min(rect.width/16,rect.height/16),xo=(rect.width-16*scale)/2,yo=(rect.height-16*scale)/2;

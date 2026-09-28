@@ -28,9 +28,9 @@ test('builds per-ID crawler HTML with only the original image and a player link'
   const html = createPuzzleSharePage(response(), shareOptions);
   assert.match(html, /<meta property="og:image" content="https:\/\/project\.supabase\.co\/storage\/v1\/object\/public\/post-public/);
   assert.match(html, /<meta name="twitter:image" content="https:\/\/project\.supabase\.co\/storage\/v1\/object\/public\/post-public/);
-  assert.match(html, /<link rel="canonical" href="https:\/\/pixieed\.jp\/pixfind\/puzzles\/123e4567-e89b-42d3-a456-426614174000\/"\/>/);
-  assert.match(html, /href="https:\/\/pixieed\.jp\/pixfind\/\?postPuzzle=123e4567-e89b-42d3-a456-426614174000"/);
-  assert.match(html, /window\.location\.replace\("https:\/\/pixieed\.jp\/pixfind\/\?postPuzzle=123e4567-e89b-42d3-a456-426614174000"\)/);
+  assert.match(html, /<link rel="canonical" href="https:\/\/pixieed\.jp\/play\/spot-difference\/puzzles\/123e4567-e89b-42d3-a456-426614174000\/"\/>/);
+  assert.match(html, /href="https:\/\/pixieed\.jp\/play\/spot-difference\/\?postPuzzle=123e4567-e89b-42d3-a456-426614174000"/);
+  assert.match(html, /window\.location\.replace\("https:\/\/pixieed\.jp\/play\/spot-difference\/\?postPuzzle=123e4567-e89b-42d3-a456-426614174000"\)/);
   assert.equal(html.includes(changedUrl), false);
   assert.equal(html.includes('answer-secret'), false);
 });
@@ -38,6 +38,8 @@ test('builds per-ID crawler HTML with only the original image and a player link'
 test('Hidden Object pages use their public author/title and original image only', () => {
   const html = createPuzzleSharePage(response('hidden_object'), shareOptions);
   assert.match(html, /もの探し/);
+  assert.match(html, /<link rel="canonical" href="https:\/\/pixieed\.jp\/play\/hidden-object\/puzzles\//);
+  assert.match(html, /href="https:\/\/pixieed\.jp\/play\/hidden-object\/\?postPuzzle=/);
   assert.match(html, /<meta name="author" content="作者名"\/>/);
   assert.match(html, /og:image" content="https:\/\/project\.supabase\.co\/storage\/v1\/object\/public\/post-public/);
   assert.equal(html.includes(changedUrl), false);

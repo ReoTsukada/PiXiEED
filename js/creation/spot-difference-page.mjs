@@ -238,7 +238,7 @@ function mountPxdSpot() {
 $('#spot-start').addEventListener('click', start); saveButton.addEventListener('click', save); resumeButton.addEventListener('click', resume);
 playLocalButton.addEventListener('click', () => {
   if (!draft?.confirmed || savedConfirmedDraftId !== draft.gameId) return;
-  window.location.assign(`/pixfind/?localSpot=${encodeURIComponent(draft.gameId)}`);
+  window.location.assign(`/play/spot-difference/?localSpot=${encodeURIComponent(draft.gameId)}`);
 });
 publishButton.addEventListener('click', async () => {
   if (!draft?.confirmed || savedConfirmedDraftId !== draft.gameId || !store || !adapter) return;

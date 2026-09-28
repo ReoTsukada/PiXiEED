@@ -51,6 +51,11 @@ export function drawOriginalPuzzleOgp(ctx, image, { width = 1280, height = 720, 
   return { x: left, y: top, width: drawWidth, height: drawHeight, scale: integerScale };
 }
 
+/** Where a puzzle's share page lives: under its own game, 間違い探し or もの探し. */
+export function sharePagePath(game, postId) {
+  return `/play/${game}/puzzles/${String(postId).toLowerCase()}/`;
+}
+
 /**
  * Build a crawler-readable page from the public-post-puzzle endpoint response.
  * Only public title/author and the original image are emitted. The answer
@@ -73,8 +78,9 @@ export function createPuzzleSharePage(payload, { postId, supabaseUrl } = {}) {
   const height = puzzle.originalImage?.height;
   if (!IMAGE_SIZES.has(width) || !IMAGE_SIZES.has(height)) reject('share_image_dimensions_invalid');
   const originalUrl = publicImageUrl(puzzle.originalImage?.url, postId, supabaseUrl);
-  const canonicalUrl = `${SITE_ORIGIN}/pixfind/puzzles/${postId.toLowerCase()}/`;
-  const playUrl = `${SITE_ORIGIN}/pixfind/?postPuzzle=${postId.toLowerCase()}`;
+  const game = puzzle.mode === 'hidden_object' ? 'hidden-object' : 'spot-difference';
+  const canonicalUrl = `${SITE_ORIGIN}${sharePagePath(game, postId)}`;
+  const playUrl = `${SITE_ORIGIN}/play/${game}/?postPuzzle=${postId.toLowerCase()}`;
   const title = `PiXiEED | ${puzzle.title.trim()}`;
   const description = puzzle.mode === 'hidden_object'
     ? '公開されたもの探しをPiXiEEDで遊ぼう。'

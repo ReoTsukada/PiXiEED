@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+<title>ドット絵もの探し｜絵の中にかくれたものを探す｜PiXiEED</title>
+<meta name="description" content="みんなが作ったドット絵のもの探し。絵の中にかくれたものを、タップして探し出そう。">
+<link rel="canonical" href="https://pixieed.jp/play/hidden-object/">
+<meta property="og:type" content="website"><meta property="og:site_name" content="PiXiEED"><meta property="og:locale" content="ja_JP"><meta property="og:title" content="ドット絵もの探し｜絵の中にかくれたものを探す｜PiXiEED"><meta property="og:description" content="みんなが作ったドット絵のもの探し。絵の中にかくれたものを、タップして探し出そう。"><meta property="og:url" content="https://pixieed.jp/play/hidden-object/"><meta property="og:image" content="https://pixieed.jp/assets/og/find-game.png"><meta property="og:image:type" content="image/png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="PiXiEEDのロゴと「ドット絵もの探し」のアイコン">
+<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="ドット絵もの探し｜絵の中にかくれたものを探す｜PiXiEED"><meta name="twitter:description" content="みんなが作ったドット絵のもの探し。絵の中にかくれたものを、タップして探し出そう。"><meta name="twitter:image" content="https://pixieed.jp/assets/og/find-game.png"><meta name="twitter:image:alt" content="PiXiEEDのロゴと「ドット絵もの探し」のアイコン">
+<link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180"><link rel="manifest" href="/manifest.webmanifest">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f2ec">
+  <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20260928-square-pixels-1">
+  <link rel="stylesheet" href="/css/site.css?rev=20260927-pixfind-play-1">
+  <link rel="stylesheet" href="/css/creation-pixfind.css?rev=20260928-pixel-scale-1">
+  <link rel="stylesheet" href="/css/site-header.css?rev=20260928-touch-motion-1">
+  <link rel="stylesheet" href="/css/arcade.css?rev=20260928-arcade-2">
+  <link rel="stylesheet" href="/css/arcade-tools.css?rev=20260928-arcade-2">
+</head>
+<body data-page="find-game" data-puzzle-mode="hidden-object" class="app-page app-page--tool-pixfind pixfind-tool-body">
+  <a class="skip-link" href="#main">本文へ移動</a>
+  <header class="site-header"><div class="container header-inner"><a class="brand" href="/" aria-label="PiXiEED ホーム"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a></div></header>
+  <main id="main" class="pixfind-page">
+    <header class="pixfind-heading"><p class="pixfind-eyebrow">ドット絵もの探し</p><h1>かくれたものを探そう</h1><p>公開されているもの探しを選んで遊べます。</p></header>
+    <p id="pixfind-status" class="pixfind-status" role="status" aria-live="polite">公開問題を読み込んでいます。</p>
+    <p id="pixfind-local-only" class="pixfind-status" role="status" hidden>端末内の試遊です。この問題は公開されていません。</p>
+    <section id="pixfind-list" class="pixfind-list" aria-label="公開中の問題"></section>
+    <section id="pixfind-game" class="pixfind-game" hidden aria-labelledby="pixfind-title">
+      <div class="pixfind-game__heading"><button id="pixfind-back" class="pixfind-back" type="button" aria-label="問題一覧へ戻る">‹</button><div class="pixfind-game__identity"><h2 id="pixfind-title"></h2><p id="pixfind-author"></p></div><p id="pixfind-progress" class="pixfind-progress" aria-live="polite"></p></div>
+      <p id="pixfind-game-status" class="pixfind-game-status" role="status" aria-live="polite"></p>
+      <div class="pixfind-images"><figure class="pixfind-image"><figcaption><span id="pixfind-image-label">絵をタップ</span><button id="pixfind-compare" class="pixfind-compare" type="button" aria-pressed="false" hidden>変化後を見る</button></figcaption><div id="pixfind-play-area" class="pixfind-play-area" role="application" aria-label="絵を調べる場所" tabindex="0"><img id="pixfind-original" alt="問題の絵" draggable="false"><img id="pixfind-changed" alt="変化後の絵" draggable="false" hidden><canvas id="pixfind-overlay" aria-hidden="true"></canvas></div></figure></div>
+      <ol id="pixfind-found-list" class="pixfind-found-list" aria-label="見つけた場所"></ol>
+    </section>
+  </main>
+  <footer class="site-footer"><div class="container"><p>PiXiEED</p></div></footer>
+  <nav class="app-tabs" aria-label="アプリナビゲーション"><a data-nav="map" href="/globe/" aria-label="地球儀"><img src="/assets/icons/pixieed/globe.svg" alt=""></a><a data-nav="camera" href="/pixel-camera.html" aria-label="撮影"><img src="/assets/icons/pixieed/shoot.svg" alt=""></a><button id="pixfind-primary" type="button" aria-label="選択した問題を遊ぶ"><span aria-hidden="true">▶</span></button><a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""></a><a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a></nav>
+  <script type="module" src="/js/creation/pixfind-play.mjs?rev=20260928-split-games-1"></script>
+  <script type="module" src="/js/arcade-dress.mjs?rev=20260928-split-games-1"></script>
+  <script type="module" src="/js/site-header.mjs?rev=20260928-touch-motion-1"></script>
+</body>
+</html>

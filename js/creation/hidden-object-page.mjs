@@ -306,7 +306,7 @@ canvas.addEventListener('keydown', (event) => {
 canvas.addEventListener('focus', requestDraw); canvas.addEventListener('blur', requestDraw);
 
 $('#hidden-start').addEventListener('click', start); saveButton.addEventListener('click', save); resumeButton.addEventListener('click', resume);
-playLocalButton.addEventListener('click', () => { if (draft?.confirmed && draftId && savedConfirmedDraftId === draftId) window.location.assign(`/pixfind/?localHidden=${encodeURIComponent(draftId)}`); });
+playLocalButton.addEventListener('click', () => { if (draft?.confirmed && draftId && savedConfirmedDraftId === draftId) window.location.assign(`/play/hidden-object/?localHidden=${encodeURIComponent(draftId)}`); });
 publishButton.addEventListener('click', async () => {
   if (!draft?.confirmed || !draftId || savedConfirmedDraftId !== draftId || !store || !adapter) return;
   publishButton.disabled = true; setStatus('固定版と投稿用PNGを確認しています…');

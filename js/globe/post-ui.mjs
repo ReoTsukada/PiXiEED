@@ -599,7 +599,7 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
     v.map.href = googleMapsUrl(post.pin.latitude, post.pin.longitude);
     v.kicker.textContent = post.postKind === 'pixel_camera' ? 'ドット絵カメラ投稿' : (post.sample ? 'サンプル作品' : 'ドット絵作品');
     v.puzzle.hidden = !['spot_difference', 'hidden_object'].includes(post.puzzleMode) || !/^[0-9a-f-]{36}$/i.test(String(post.id));
-    v.puzzle.href = v.puzzle.hidden ? '#' : `/pixfind/?postPuzzle=${encodeURIComponent(post.id)}`;
+    v.puzzle.href = v.puzzle.hidden ? '#' : `/play/${post.puzzleMode === 'hidden_object' ? 'hidden-object' : 'spot-difference'}/?postPuzzle=${encodeURIComponent(post.id)}`;
     v.puzzle.setAttribute('aria-label', post.puzzleMode === 'spot_difference' ? '間違い探しを遊ぶ' : 'もの探しを遊ぶ');
     v.del.hidden = !isMine(post) || !(store.canRemove === true || store.capabilities?.remove === true);
     v.del.textContent = '削除'; v.del.dataset.armed = '';
