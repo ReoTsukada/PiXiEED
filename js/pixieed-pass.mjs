@@ -94,25 +94,46 @@ function loadScript(src) {
     document.head.appendChild(script);
   });
 }
+const REWARDED_DIAGNOSTIC_SLOT_MS = 5 * 60 * 1000;
+let retainedRewardedSlot = null;
+function cleanupRetainedRewardedSlot(expected = null) {
+  if (!retainedRewardedSlot) return;
+  if (expected && retainedRewardedSlot !== expected) return;
+  const retained = retainedRewardedSlot;
+  retainedRewardedSlot = null;
+  window.clearTimeout(retained.timer);
+  retained.googletag.destroySlots([retained.slot]);
+}
+function rewardedDiagnosticsEnabled() {
+  try { return new URLSearchParams(typeof location === 'undefined' ? '' : location.search).has('dfpdeb'); } catch { return false; }
+}
 /** @internal Google Ad Manager rewarded ad. Resolves 'granted' | 'closed' | 'nofill' | 'unsupported' | 'timeout'. */
 export async function showRewardedAd(adUnitPath) {
+  cleanupRetainedRewardedSlot();
   await loadScript('https://securepubads.g.doubleclick.net/tag/js/gpt.js');
   const googletag = window.googletag = window.googletag || { cmd: [] };
+  const diagnostic = rewardedDiagnosticsEnabled();
   return new Promise((resolve) => {
     let settled = false; let slot = null; let pubads = null;
     const listeners = [];
-    const done = (result) => {
+    const done = (result, { retainForDiagnostics = false } = {}) => {
       if (settled) return;
       settled = true;
       window.clearTimeout(timeout);
       for (const [type, listener] of listeners) pubads.removeEventListener(type, listener);
-      if (slot) googletag.destroySlots([slot]);
+      if (slot && retainForDiagnostics && diagnostic) {
+        cleanupRetainedRewardedSlot();
+        const retained = { googletag, slot, timer: 0 };
+        retainedRewardedSlot = retained;
+        retained.timer = window.setTimeout(() => cleanupRetainedRewardedSlot(retained), REWARDED_DIAGNOSTIC_SLOT_MS);
+      } else if (slot) googletag.destroySlots([slot]);
       resolve(result);
     };
     const timeout = window.setTimeout(() => done('timeout'), 10000);
     let granted = false;
     googletag.cmd.push(() => {
       if (settled) return;
+      cleanupRetainedRewardedSlot();
       slot = googletag.defineOutOfPageSlot(adUnitPath, googletag.enums.OutOfPageFormat.REWARDED);
       if (!slot) { done('unsupported'); return; }
       pubads = googletag.pubads();
@@ -125,7 +146,7 @@ export async function showRewardedAd(adUnitPath) {
       });
       listen('rewardedSlotGranted', (event) => { if (event.slot === slot) granted = true; });
       listen('rewardedSlotClosed', (event) => { if (event.slot === slot) done(granted ? 'granted' : 'closed'); });
-      listen('slotRenderEnded', (event) => { if (event.slot === slot && event.isEmpty) done('nofill'); });
+      listen('slotRenderEnded', (event) => { if (event.slot === slot && event.isEmpty) done('nofill', { retainForDiagnostics: true }); });
       googletag.enableServices();
       googletag.display(slot);
     });
