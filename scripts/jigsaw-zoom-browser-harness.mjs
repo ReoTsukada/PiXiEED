@@ -42,7 +42,8 @@ async function fixture(viewport, dpr, size = 64) {
   const png = await page.evaluate((size) => {
     const canvas = document.createElement('canvas'); canvas.width = size; canvas.height = size;
     const ctx = canvas.getContext('2d'); ctx.fillStyle = '#d26448'; ctx.fillRect(0, 0, size, size);
-    ctx.fillStyle = '#406aad'; ctx.fillRect(0, 0, size / 2, size / 2);
+    // The block is one pixel wider than half, so the image is not read as enlarged pixel art (which would be shrunk to 1x).
+    ctx.fillStyle = '#406aad'; ctx.fillRect(0, 0, size / 2 + 1, size / 2);
     return canvas.toDataURL('image/png').split(',')[1];
   }, size);
   await page.locator('#jigsaw-source-kind').evaluate((select) => { select.value = 'file'; select.dispatchEvent(new Event('change', { bubbles: true })); });
