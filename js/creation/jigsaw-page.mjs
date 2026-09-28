@@ -1,3 +1,4 @@
+import { listOwnVersions, mountPictureShelf, pictureDraftId } from './picture-shelf.mjs?rev=20260928-picture-shelf-1';
 import { normalizePixelFile, scaleNotice } from '../pixel-scale.mjs?v=20260928-pixel-scale-1';
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
 import {
@@ -15,7 +16,6 @@ import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928
 import { mountPxdTools } from './pxd-ui.mjs?rev=20260928-own-work-1';
 import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20260928-pxd-puzzles-1';
 
-const DRAW_LAST_DRAFT_KEY = 'pixieed.simple-draw.last-draft.v1';
 const JIGSAW_LAST_DRAFT_KEY = 'pixieed:creation:jigsaw:last-draft:v1';
 const $ = (selector) => document.querySelector(selector);
 const status = $('#jigsaw-status'); const sourceSelect = $('#jigsaw-source-version');
@@ -120,6 +120,7 @@ async function loadPublicOptions() {
 }
 function displaySourceFields() {
   $('#jigsaw-draw-source').hidden = sourceKind.value !== 'draw';
+  $('#jigsaw-shelf')?.classList.toggle('is-off', sourceKind.value !== 'draw');
   $('#jigsaw-public-source').hidden = sourceKind.value !== 'public';
   $('#jigsaw-file-source').hidden = sourceKind.value !== 'file';
   startButton.disabled = sourceKind.value === 'draw' ? !sourceSelect.value : sourceKind.value === 'public' ? !publicSelect.value : !fileInput.files?.[0];
@@ -165,17 +166,16 @@ function updateStatus(message) { status.textContent = message; }
 async function loadSourceOptions() {
   sourceSelect.replaceChildren();
   sourceSelect.add(new Option('読み込み中…', ''));
-  const draftId = localStorageValue(DRAW_LAST_DRAFT_KEY);
+  // ジグソー keeps its own picture; other tools' pictures come in through the shelf.
+  const draftId = pictureDraftId('jigsaw');
   if (!adapter || !draftId) {
-    sourceSelect.replaceChildren(new Option('保存したドット絵がありません', ''));
+    sourceSelect.replaceChildren(new Option('まだ絵がありません', ''));
     displaySourceFields();
     return;
   }
   try {
-    const record = await adapter.get(draftId);
-    if (!record || record.schemaVersion !== 1 || record.draftId !== draftId || !Array.isArray(record.revisions)) throw new Error('保存した絵が見つかりません');
-    const options = record.revisions.filter((revision) => revision?.asset?.kind === 'pixel_art' && revision.asset.owner?.type === 'local' && revision.asset.owner.id === 'local-owner' && revision.asset.visibility === 'draft');
-    if (!options.length) throw new Error('使える手描き保存版がありません');
+    const { versions: options } = await listOwnVersions('jigsaw', { adapter });
+    if (!options.length) throw new Error('使える絵がありません');
     sourceDraftId = draftId;
     sourceSelect.replaceChildren();
     options.forEach((revision, index) => {
@@ -502,7 +502,7 @@ async function startGame() {
   try {
     const gameId = globalThis.crypto.randomUUID(); let source; let rgba; let width; let height;
     if (sourceKind.value === 'draw') {
-      const draftId = sourceDraftId || localStorageValue(DRAW_LAST_DRAFT_KEY); const revision = await resolveLocalDrawRevision(adapter, draftId, sourceSelect.value);
+      const draftId = sourceDraftId || pictureDraftId('jigsaw'); const revision = await resolveLocalDrawRevision(adapter, draftId, sourceSelect.value);
       source = { draftId, assetId: revision.asset.assetId, revisionId: revision.revisionId, contentHash: revision.documentHash, hashScheme: revision.hashScheme };
       sourceDraftId = draftId; sourceRevision = revision; width = revision.document.width; height = revision.document.height; rgba = { width, height, rgba: documentRgba(revision.document) };
       sourceLabel.textContent = `自分の保存版 ${revision.revisionId.slice(0, 8)} · ${revision.document.width}×${revision.document.height}px`;
@@ -761,6 +761,7 @@ $('#jigsaw-new').addEventListener('click', () => {
 
 resumeButton.hidden = !draftStore || !localStorageValue(JIGSAW_LAST_DRAFT_KEY);
 saveButton.disabled = true;
+mountPictureShelf($('#jigsaw-shelf'), { tool: 'jigsaw', adapter, onBrought: async ({ from }) => { sourceKind.value = 'draw'; await loadSourceOptions(); displaySourceFields(); updateStatus(`${from.label}の絵を持ってきました。`); }, onError: (error) => updateStatus(`持ってこられませんでした：${error.message}`) });
 pxdBridge = mountPxdJigsaw();
 if (pxdBridge) {
   const imported = await pxdBridge.ready;

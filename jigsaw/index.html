@@ -11,7 +11,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f4f2ec">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20260924-camera-release-1">
-  <link rel="stylesheet" href="/css/site.css?rev=20260927-draw-step08-3">
+  <link rel="stylesheet" href="/css/site.css?rev=20260928-picture-shelf-1">
   <link rel="stylesheet" href="/css/creation-jigsaw.css?rev=20260928-jigsaw-feedback-1">
   <link rel="stylesheet" href="/css/arcade.css?rev=20260928-arcade-1">
   <link rel="stylesheet" href="/css/jigsaw-arcade.css?rev=20260928-arcade-1">
@@ -25,7 +25,8 @@
     <header class="jigsaw-heading"><div><h1>かんたんジグソー</h1><p>PiXiEEDの公開作品や、自分で選んだ絵で遊べます。</p></div></header>
     <p id="jigsaw-status" class="jigsaw-status" role="status" aria-live="polite">絵の種類を選んでください。</p>
     <section id="jigsaw-setup" class="jigsaw-setup" aria-label="パズルを準備">
-      <label class="jigsaw-field">絵の種類<select id="jigsaw-source-kind" aria-label="絵の種類"><option value="draw">自分のドット絵</option><option value="public">PiXiEEDの公開作品</option><option value="file">端末から選ぶ</option></select></label>
+      <label class="jigsaw-field">絵の種類<select id="jigsaw-source-kind" aria-label="絵の種類"><option value="draw">ジグソーの絵</option><option value="public">PiXiEEDの公開作品</option><option value="file">端末から選ぶ</option></select></label>
+      <div id="jigsaw-shelf" hidden></div>
       <label id="jigsaw-draw-source" class="jigsaw-field">元の絵の保存版<select id="jigsaw-source-version" aria-label="元にする自分の保存版"></select></label>
       <label id="jigsaw-public-source" class="jigsaw-field" hidden>公開作品<select id="jigsaw-public-version" aria-label="パズルにする公開作品"></select></label>
       <label id="jigsaw-file-source" class="jigsaw-field" hidden>画像ファイル（PNG、WebP、JPEG）<input id="jigsaw-file" type="file" accept="image/png,image/webp,image/jpeg,.png,.webp,.jpg,.jpeg"></label>
@@ -61,8 +62,8 @@
     <a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""></a>
     <a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>
   </nav>
-  <script type="module" src="/js/creation/jigsaw-page.mjs?rev=20260928-pixel-scale-1"></script>
-  <script type="module" src="/js/creation/jigsaw-arcade.mjs?rev=20260928-arcade-1"></script>
+  <script type="module" src="/js/creation/jigsaw-page.mjs?rev=20260928-picture-shelf-1"></script>
+  <script type="module" src="/js/creation/jigsaw-arcade.mjs?rev=20260928-picture-shelf-1"></script>
   <script type="module" src="/js/site-header.mjs?rev=20260928-touch-motion-1"></script>
 </body>
 </html>

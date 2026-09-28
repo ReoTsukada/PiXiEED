@@ -420,7 +420,7 @@ test('audio page exposes labeled editing, save/resume and central playback contr
   assert.match(page, /aria-label="アプリナビゲーション"/);
   assert.match(page, /id="audio-save"/);
   assert.match(page, /id="audio-resume"/);
-  assert.match(page, /id="audio-from-draw"/); assert.match(page, /id="audio-from-camera"/);
+  assert.match(page, /id="audio-shelf"/); assert.match(page, /id="audio-from-camera"/);
   assert.match(page, /id="audio-pixel-canvas"[^>]*tabindex="0"/);
   assert.doesNotMatch(page, /audio-pixel-board/); assert.match(page, /16列×16音程/);
   assert.doesNotMatch(page, /class="site-header"|class="site-footer"/);

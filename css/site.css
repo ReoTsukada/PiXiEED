@@ -722,3 +722,19 @@ body.is-post-drawer-open { overflow: hidden; }
 /* Tools page: games sit in their own group under the tools. */
 .tool-shell__head--games { margin-top: 3rem; }
 .tool-shell__head h2 { margin-bottom: .55rem; font-size: clamp(1.7rem, 4.5vw, 3rem); }
+
+/* Bringing another tool's picture in: one row of tap-to-copy chips. */
+.picture-shelf { display: grid; gap: .4rem; min-width: 0; }
+.picture-shelf[hidden], .picture-shelf.is-off { display: none !important; }
+.picture-shelf__title { margin: 0; font-size: .78rem; font-weight: 700; color: var(--ink-soft, #586052); }
+.picture-shelf__row { display: flex; gap: .5rem; overflow-x: auto; padding: 2px; scrollbar-width: none; overscroll-behavior-x: contain; }
+.picture-shelf__item { display: inline-flex; flex: 0 0 auto; align-items: center; gap: .5rem; min-height: 44px; padding: 4px 12px 4px 4px; border: 1px solid rgba(16, 59, 80, .18); border-radius: 12px; background: #fffdf8; color: #172333; font: inherit; font-size: .82rem; font-weight: 700; cursor: pointer; }
+.picture-shelf__item:disabled { opacity: .55; cursor: progress; }
+.picture-shelf__item:focus-visible { outline: 3px solid #335cbe; outline-offset: 2px; }
+.picture-shelf__thumb { display: block; max-height: 36px; border-radius: 6px; background: repeating-conic-gradient(#e3e5df 0 25%, #fff 0 50%) 0 0 / 8px 8px; image-rendering: pixelated; }
+.arc-setup .picture-shelf__title { color: rgba(255, 255, 255, .72); }
+.arc-setup .picture-shelf__item { border-color: rgba(255, 255, 255, .14); background: #1d2b38; color: #fff; }
+body[data-page="draw"] .draw-import__options .picture-shelf__item { display: inline-flex !important; width: auto !important; padding: 4px 12px 4px 4px !important; border-color: rgba(255, 255, 255, .14); background: #1d2b38; color: #fff; }
+body[data-page="draw"] .draw-import__options .picture-shelf__title { color: rgba(255, 255, 255, .72); }
+/* The PXD button inside かんたんドット's dark menu (was white on white). */
+body[data-page="draw"] .draw-import__options .pxd-tools > summary { border-color: rgba(255, 255, 255, .14); background: #1d2b38; color: #fff; }

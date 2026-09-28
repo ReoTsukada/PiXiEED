@@ -1,12 +1,12 @@
 import { snapToWholePixels } from '../pixel-scale.mjs?v=20260928-pixel-scale-1';
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
 import { documentRgba } from './draw-core.mjs';
+import { listOwnVersions, mountPictureShelf } from './picture-shelf.mjs?rev=20260928-picture-shelf-1';
 import { detectDifferenceCandidates, excludeDifferenceCandidate, mapClientPointToPixel, mergeDifferenceCandidates, resolveLocalDrawRevision, splitDifferenceCandidate, validateSpotDifferenceDraft, confirmDifferenceCandidates } from './spot-difference-core.mjs?rev=20260927-spot-difference-1';
 import { openPuzzleHandoff } from './puzzle-handoff.mjs?rev=20260928-puzzle-handoff-1';
 import { mountPxdTools } from './pxd-ui.mjs?rev=20260928-own-work-1';
 import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20260928-pxd-puzzles-1';
 
-const DRAW_LAST_KEY = 'pixieed.simple-draw.last-draft.v1';
 const LAST_KEY = 'pixieed:creation:spot-difference:last-draft:v1';
 const $ = (selector) => document.querySelector(selector);
 const status = $('#spot-status'); const beforeSelect = $('#spot-before'); const afterSelect = $('#spot-after');
@@ -135,13 +135,11 @@ function paintSplitLine(from, to) {
 
 async function loadSourceOptions() {
   beforeSelect.replaceChildren(); afterSelect.replaceChildren();
-  const id = readStorage(DRAW_LAST_KEY);
-  if (!adapter || !id) { beforeSelect.add(new Option('保存した絵がありません', '')); afterSelect.add(new Option('保存した絵がありません', '')); $('#spot-start').disabled = true; message('先にDrawで絵を端末へ保存してください。'); return; }
   try {
-    const record = await adapter.get(id);
-    if (!record || record.schemaVersion !== 1 || record.draftId !== id || !Array.isArray(record.revisions)) throw new Error('保存した絵を読み込めません');
-    const revisions = record.revisions.filter((revision) => revision?.asset?.kind === 'pixel_art' && revision.asset.owner?.type === 'local' && revision.asset.owner.id === 'local-owner' && revision.asset.visibility === 'draft');
-    sourceDraftId = id;
+    // 間違い探し keeps its own picture; versions come from its own draft only.
+    const { draftId: ownId, versions: revisions } = await listOwnVersions('spot-difference', { adapter });
+    sourceDraftId = ownId;
+    if (!revisions.length) { beforeSelect.add(new Option('まだ絵がありません', '')); afterSelect.add(new Option('まだ絵がありません', '')); $('#spot-start').disabled = true; message('上の「持ってくる」から絵を選んでください。'); return; }
     revisions.forEach((revision, index) => { beforeSelect.add(new Option(revisionLabel(revision, index), revision.revisionId)); afterSelect.add(new Option(revisionLabel(revision, index), revision.revisionId)); });
     if (revisions.length > 1) {
       beforeSelect.value = revisions.at(-2).revisionId;
@@ -149,7 +147,7 @@ async function loadSourceOptions() {
     }
     else afterSelect.selectedIndex = -1;
     $('#spot-start').disabled = revisions.length < 2;
-    message(revisions.length < 2 ? '比較するため、Drawで変更後の絵も別の保存版として作ってください。' : '同じ絵の2つの保存版を選んでください。');
+    message(revisions.length < 2 ? '比べるには、少し変えた絵をもう一度持ってきてください。' : '2つの版を選んでください。');
   } catch (error) { $('#spot-start').disabled = true; message(error.message); }
 }
 
@@ -321,6 +319,7 @@ window.addEventListener('resize', () => { fitCanvas(); applyCanvasView(); });
 
 try { adapter = createIndexedDbDraftAdapter(); store = createLocalDraftStore(adapter); } catch { message('このブラウザーでは端末内保存を利用できません。'); }
 resumeButton.hidden = !readStorage(LAST_KEY);
+mountPictureShelf($('#spot-shelf'), { tool: 'spot-difference', adapter, onBrought: async ({ from }) => { await loadSourceOptions(); message(`${from.label}の絵を持ってきました。${afterSelect.options.length > 1 ? '2つの版を選んで比べられます。' : '変えた絵をもう一度持ってくると比べられます。'}`); }, onError: (error) => message(`持ってこられませんでした：${error.message}`) });
 pxdBridge = mountPxdSpot();
 const pxdImported = pxdBridge ? await pxdBridge.ready : false;
 if (!pxdImported) await loadSourceOptions();
