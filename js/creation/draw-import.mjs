@@ -1,3 +1,4 @@
+import { normalizePixels } from '../pixel-scale.mjs?v=20260928-pixel-scale-1';
 import { createDrawDocument, DRAW_SIZES, MAX_DRAW_COLORS, validateDrawDocument } from './draw-core.mjs?rev=20260927-draw-step08-3';
 
 export const MAX_IMPORT_FILE_BYTES = 10 * 1024 * 1024;
@@ -138,7 +139,8 @@ export async function decodeDrawImageFile(file, { createImageBitmapImpl = global
     const context = canvas.getContext('2d', { willReadFrequently: true });
     if (!context) throw new Error('画像を読み込めませんでした。');
     context.imageSmoothingEnabled = false; context.drawImage(bitmap, 0, 0);
-    return { width: bitmap.width, height: bitmap.height, data: context.getImageData(0, 0, bitmap.width, bitmap.height).data };
+    // Pixel art saved enlarged (every dot an N×N block) comes back at one pixel per dot.
+    return normalizePixels({ width: bitmap.width, height: bitmap.height, data: context.getImageData(0, 0, bitmap.width, bitmap.height).data });
   } finally { bitmap.close?.(); }
 }
 

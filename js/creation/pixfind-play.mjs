@@ -1,3 +1,4 @@
+import { detectPixelScale, wholePixelFit } from '../pixel-scale.mjs?v=20260928-pixel-scale-1';
 import { supabaseConfig } from '../../data/site-config.js';
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
 import { documentRgba } from './draw-core.mjs';
@@ -9,6 +10,7 @@ const BUCKETS = new Set(['pixfind-puzzles', 'pixieed-contest']);
 const HEADERS = { apikey: supabaseConfig.publishableKey };
 const SELECT = Object.freeze({ posts: 'id,status,post_kind,distribution_mode,pixfind_puzzle_id', puzzles: 'id,slug,label,author_name,original_url,diff_url,thumbnail_url,mode,game_mode,play_mode,targets,regions' });
 
+const gcd = (a, b) => { while (b) [a, b] = [b, a % b]; return a; };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function resolvePostPuzzleId(location) {
@@ -254,13 +256,28 @@ function mount() {
   const playArea = document.querySelector('#pixfind-play-area'); const overlay = document.querySelector('#pixfind-overlay');
   const statusGame = document.querySelector('#pixfind-game-status'); const progress = document.querySelector('#pixfind-progress');
   const foundList = document.querySelector('#pixfind-found-list');
+  let cell = 1;
+  // The art is shown at a whole number of device pixels per dot, as large as the play area allows.
+  const geometry = () => {
+    const w = playArea.clientWidth; const h = playArea.clientHeight; const ratio = devicePixelRatio || 1;
+    const fit = wholePixelFit(original.naturalWidth / cell, original.naturalHeight / cell, w, h, { devicePixelRatio: ratio });
+    const snap = (value) => Math.round(value * ratio) / ratio;
+    return { scale: fit.width / original.naturalWidth, xoff: snap((w - fit.width) / 2), yoff: snap((h - fit.height) / 2), width: fit.width, height: fit.height };
+  };
+  const placeImages = () => {
+    if (!original) return;
+    const g = geometry();
+    for (const node of [originalNode, changedNode]) Object.assign(node.style, { left: `${g.xoff}px`, top: `${g.yoff}px`, width: `${g.width}px`, height: `${g.height}px` });
+  };
   const paint = () => {
+    placeImages();
     const w = playArea.clientWidth; const h = playArea.clientHeight;
     overlay.width = Math.max(1, Math.round(w * devicePixelRatio)); overlay.height = Math.max(1, Math.round(h * devicePixelRatio));
     const context = overlay.getContext('2d'); context.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0); context.clearRect(0, 0, w, h);
     if (!currentMask || !original) return;
     const sourceW = original.naturalWidth; const sourceH = original.naturalHeight;
-    const scale = Math.min(w / sourceW, h / sourceH); const xoff = (w - sourceW * scale) / 2; const yoff = (h - sourceH * scale) / 2;
+    const { scale, xoff, yoff } = geometry();
+    context.imageSmoothingEnabled = false;
     const pixels = context.createImageData(sourceW, sourceH);
     for (const index of found) for (const pixel of regions[index].pixels) { const p = pixel * 4; pixels.data[p] = 255; pixels.data[p + 1] = 194; pixels.data[p + 2] = 55; pixels.data[p + 3] = 150; }
     const maskCanvas = document.createElement('canvas'); maskCanvas.width = sourceW; maskCanvas.height = sourceH; maskCanvas.getContext('2d').putImageData(pixels, 0, 0);
@@ -303,6 +320,9 @@ function mount() {
         if (original.naturalWidth !== changed.naturalWidth || original.naturalHeight !== changed.naturalHeight) throw new Error('2枚の画像サイズが一致しないため、この問題は遊べません。');
       }
       const base = imageData(original); const layer = puzzle.localHiddenOnly || (puzzle.publicPostOnly && puzzle.mode === 'hidden-object') ? null : imageData(changed);
+      // Older puzzles may be saved enlarged; count their dots, not their pixels, when sizing the view.
+      cell = layer ? gcd(detectPixelScale(base), detectPixelScale(layer)) : detectPixelScale(base);
+      placeImages();
       let result; let viewMessage = '';
       if (puzzle.localOnly) {
         result = computeDifferenceRegions(base, layer);
@@ -387,8 +407,7 @@ function mount() {
   };
   const locate = (clientX, clientY) => {
     if (!original || !regions.length || readOnly) return;
-    const rect = playArea.getBoundingClientRect(); const scale = Math.min(rect.width / original.naturalWidth, rect.height / original.naturalHeight);
-    const xoff = (rect.width - original.naturalWidth * scale) / 2; const yoff = (rect.height - original.naturalHeight * scale) / 2;
+    const rect = playArea.getBoundingClientRect(); const { scale, xoff, yoff } = geometry();
     const x = (clientX - rect.left - xoff) / scale; const y = (clientY - rect.top - yoff) / scale;
     markAt(x, y);
   };

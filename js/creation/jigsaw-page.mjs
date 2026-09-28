@@ -1,3 +1,4 @@
+import { normalizePixelFile, scaleNotice } from '../pixel-scale.mjs?v=20260928-pixel-scale-1';
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
 import {
   chunkJigsawPuzzleIds, collectPagedRows, fingerprintBytes, firstPublishedPixfindReferences, isSafeJigsawPixfindOriginalUrl, resolveLocalDrawRevision, validateJigsawSource, JIGSAW_MAX_IMAGE_BYTES, JIGSAW_MAX_SOURCE_PIXELS
@@ -506,25 +507,28 @@ async function startGame() {
       sourceDraftId = draftId; sourceRevision = revision; width = revision.document.width; height = revision.document.height; rgba = { width, height, rgba: documentRgba(revision.document) };
       sourceLabel.textContent = `自分の保存版 ${revision.revisionId.slice(0, 8)} · ${revision.document.width}×${revision.document.height}px`;
     } else {
-      let url; let choice = null;
+      let url; let choice = null; let localFile = null; let scaleMessage = '';
       if (sourceKind.value === 'public') {
         choice = JSON.parse(publicSelect.value); url = choice.url;
         await assertListedPublicSource(choice.id, url, choice.puzzleId || null);
       } else {
         const file = fileInput.files?.[0];
         if (!file || file.size > JIGSAW_MAX_IMAGE_BYTES || !['image/png', 'image/webp', 'image/jpeg'].includes(file.type)) throw new Error('PNG、WebP、JPEGの画像を8MB以内で選んでください');
-        url = URL.createObjectURL(file);
+        // Pixel art saved enlarged comes back at one pixel per dot.
+        const normalized = await normalizePixelFile(file, { minDots: 16 });
+        localFile = normalized.file; scaleMessage = scaleNotice(normalized);
+        url = URL.createObjectURL(localFile);
       }
       try {
-        const imageBytes = sourceKind.value === 'file' ? await fileInput.files[0].arrayBuffer() : await fetchImageBytes(url);
+        const imageBytes = sourceKind.value === 'file' ? await localFile.arrayBuffer() : await fetchImageBytes(url);
         if (imageBytes.byteLength > JIGSAW_MAX_IMAGE_BYTES) throw new Error('画像のファイルサイズが8MBを超えています');
         const decodeUrl = URL.createObjectURL(new Blob([imageBytes])); let image;
         try { image = await decodeImage(decodeUrl); } finally { URL.revokeObjectURL(decodeUrl); }
         const fingerprint = await fingerprintBytes(imageBytes); rgba = boundedRgba(image); width = rgba.width; height = rgba.height;
         if (sourceKind.value === 'public') source = { type: 'public', postId: choice.id, ...(choice.puzzleId ? { puzzleId: choice.puzzleId } : {}), title: String(choice.label).slice(0, 120), url, fingerprint, width, height };
-        else source = { type: 'file', dataUrl: `data:${fileInput.files[0].type};base64,${bytesToBase64(new Uint8Array(imageBytes))}`, fingerprint, width, height };
+        else source = { type: 'file', dataUrl: `data:${localFile.type};base64,${bytesToBase64(new Uint8Array(imageBytes))}`, fingerprint, width, height };
         validateJigsawSource(source);
-        sourceLabel.textContent = `${sourceKind.value === 'public' ? `${source.title} · PiXiEEDの投稿` : '端末で選んだ画像'} · ${rgba.width}×${rgba.height}px`;
+        sourceLabel.textContent = `${sourceKind.value === 'public' ? `${source.title} · PiXiEEDの投稿` : '端末で選んだ画像'} · ${rgba.width}×${rgba.height}px${scaleMessage ? ` · ${scaleMessage}` : ''}`;
       } finally { if (sourceKind.value === 'file') URL.revokeObjectURL(url); }
     }
     const pieceSize = gridSelect.value === 'auto' ? 'auto' : Number(gridSelect.value);

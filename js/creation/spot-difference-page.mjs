@@ -1,3 +1,4 @@
+import { snapToWholePixels } from '../pixel-scale.mjs?v=20260928-pixel-scale-1';
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
 import { documentRgba } from './draw-core.mjs';
 import { detectDifferenceCandidates, excludeDifferenceCandidate, mapClientPointToPixel, mergeDifferenceCandidates, resolveLocalDrawRevision, splitDifferenceCandidate, validateSpotDifferenceDraft, confirmDifferenceCandidates } from './spot-difference-core.mjs?rev=20260927-spot-difference-1';
@@ -75,7 +76,7 @@ function updateActions() {
 function showEditor() {
   setup.hidden = true; editor.hidden = false; document.body.classList.add('spot-editing');
   $('#spot-edit-hint').textContent = '色のついた場所をタップして選択 · ピンチで拡大';
-  resetCanvasView(); renderCandidates();
+  renderCandidates(); fitCanvas(); resetCanvasView();
 }
 
 function applyCanvasView() {
@@ -90,6 +91,12 @@ function applyCanvasView() {
   zoom.dataset.visible = String(viewScale > 1.02);
 }
 
+/** Show the art at a whole number of device pixels per dot, as large as the layout allows. */
+function fitCanvas() {
+  if (!draft || editor.hidden) return;
+  canvas.style.setProperty('--spot-aspect', String(draft.width / draft.height));
+  snapToWholePixels(canvas, draft.width);
+}
 function resetCanvasView() { viewScale = 1; viewPanX = 0; viewPanY = 0; pinchStart = null; touchEditSnapshot = null; touchPoints.clear(); activePointer = null; previousPixel = null; applyCanvasView(); }
 function pixelAtEvent(event) { return mapClientPointToPixel(event.clientX, event.clientY, canvas.getBoundingClientRect(), draft.width, draft.height); }
 function linePixels(from, to, callback) {
@@ -310,7 +317,7 @@ canvas.addEventListener('keydown', (event) => {
   event.preventDefault(); cursorPixel = nextY * draft.width + nextX; drawPreview();
 });
 canvas.addEventListener('focus', drawPreview); canvas.addEventListener('blur', drawPreview);
-window.addEventListener('resize', applyCanvasView);
+window.addEventListener('resize', () => { fitCanvas(); applyCanvasView(); });
 
 try { adapter = createIndexedDbDraftAdapter(); store = createLocalDraftStore(adapter); } catch { message('このブラウザーでは端末内保存を利用できません。'); }
 resumeButton.hidden = !readStorage(LAST_KEY);

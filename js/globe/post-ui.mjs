@@ -9,7 +9,7 @@
  */
 import { lookupCell, projectGeoToScreen } from './geometry.mjs?v=20260921-grid11-1';
 import { formatCoordinates, googleMapsUrl, parseLocationInput } from './geo-input.mjs?v=20260921-post-1';
-import { fitPixelImage, inspectPixelImage, PIXEL_LIMITS } from './post-image.mjs?v=20260928-image-fit-1';
+import { fitPixelImage, inspectPixelImage, PIXEL_LIMITS } from './post-image.mjs?v=20260928-pixel-scale-1';
 import { createDemoAuth, createPostStore } from './post-store.mjs?v=20260921-post-1';
 import { PUZZLE_HANDOFF_META_KEY } from '../creation/puzzle-handoff.mjs?v=20260928-puzzle-handoff-1';
 
@@ -97,7 +97,7 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
           <span class="drop__pixels" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
           <strong>ドット絵をドロップ</strong>
           <span>クリックで選ぶ ・ 貼り付け（Ctrl/⌘+V）も使えます</span>
-          <small>PNG / WebP ・ ${PIXEL_LIMITS.minSize}〜${PIXEL_LIMITS.maxSize}px ・ ${PIXEL_LIMITS.maxColors}色まで ・ 512KB以内</small>
+          <small>PNG / WebP ・ ${PIXEL_LIMITS.minSize}〜${PIXEL_LIMITS.maxSize}px ・ ${PIXEL_LIMITS.maxColors}色まで ・ 拡大保存も等倍に戻します</small>
         </div>
         <a class="camera-link" data-camera-link href="/pixel-camera.html?from=globe" target="_top" rel="noopener">ドット絵カメラで撮って作る</a>
         <input type="file" accept="image/png,image/webp" data-file hidden>
@@ -340,13 +340,13 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
     }
     state.postKind = fromCamera ? 'pixel_camera' : 'pixel_art';
     try {
-      const inspected = await inspectPixelImage(file);
+      const inspected = await inspectPixelImage(file, { keepScale: Boolean(puzzlePayload) });
       state.image = inspected;
       c.artImage.src = inspected.dataUrl;
       const display = fitPixelImage(inspected.width, inspected.height, 232, 232);
       c.artImage.style.width = `${display.width}px`;
       c.artImage.style.height = `${display.height}px`;
-      c.artMeta.textContent = `${inspected.width}×${inspected.height}px ・ ${inspected.colorCount}色`;
+      c.artMeta.textContent = `${inspected.width}×${inspected.height}px ・ ${inspected.colorCount}色${inspected.scale > 1 ? ` ・ ${inspected.scale}倍から等倍に戻しました` : ''}`;
     } catch (error) {
       state.image = null;
       c.artError.textContent = error instanceof Error ? error.message : '画像を確認できませんでした。';

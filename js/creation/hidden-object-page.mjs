@@ -1,3 +1,4 @@
+import { snapToWholePixels } from '../pixel-scale.mjs?v=20260928-pixel-scale-1';
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
 import { documentRgba } from './draw-core.mjs';
 import { HIDDEN_OBJECT_MAX_MASK_PIXELS, confirmHiddenObjectTargets, createHiddenObjectDraft, mapClientPointToPixel, resolveLocalDrawRevision, validateHiddenObjectDraft } from './hidden-object-core.mjs?rev=20260928-short-hitboxes-1';
@@ -89,11 +90,18 @@ function applyCanvasView() {
   zoom.dataset.visible = String(viewScale > 1.02);
 }
 
+/** Show the art at a whole number of device pixels per dot, as large as the layout allows. */
+function fitCanvas() {
+  if (!draft || editor.hidden) return;
+  if (canvas.width !== draft.width || canvas.height !== draft.height) { canvas.width = draft.width; canvas.height = draft.height; requestDraw(); }
+  canvas.style.setProperty('--hidden-aspect', String(draft.width / draft.height));
+  snapToWholePixels(canvas, draft.width);
+}
 function resetCanvasView() { viewScale = 1; viewPanX = 0; viewPanY = 0; pinchStart = null; touchStrokeSnapshot = null; activePointer = null; previousPoint = null; touchPoints.clear(); applyCanvasView(); }
 function displayEditor() {
   setup.hidden = true; editor.hidden = false; document.body.classList.add('hidden-object-editing');
   $('#hidden-edit-hint').textContent = 'なぞって指定 · ピンチで拡大';
-  resetCanvasView(); renderTargets(); requestDraw();
+  resetCanvasView(); renderTargets(); requestDraw(); fitCanvas();
 }
 function installRevision(revision, fixedDraftId, targetModel = null) {
   sourceDraftId = fixedDraftId; sourceRevision = revision;
@@ -314,6 +322,7 @@ $('#hidden-confirm').addEventListener('click', async () => {
 $('#hidden-new').addEventListener('click', () => { pxdBridge?.reset(); draft = null; draftId = null; savedConfirmedDraftId = null; pxdOriginalRefs = null; sourceRevision = null; selectedTargetId = null; maskSets.clear(); totalMaskPixels = 0; editor.hidden = true; setup.hidden = false; document.body.classList.remove('hidden-object-editing'); resetCanvasView(); saveButton.disabled = true; updateLocalPlayButton(); setStatus('新しいもの探しの元画像を選んでください。'); });
 
 try { adapter = createIndexedDbDraftAdapter(); store = createLocalDraftStore(adapter); } catch { setStatus('このブラウザーでは端末内保存を利用できません。'); }
+window.addEventListener('resize', fitCanvas);
 resumeButton.hidden = !readStorage(LAST_KEY);
 pxdBridge = mountPxdHidden();
 const pxdImported = pxdBridge ? await pxdBridge.ready : false;
