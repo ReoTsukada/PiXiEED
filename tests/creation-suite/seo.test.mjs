@@ -8,7 +8,7 @@ const pages = [
   ['index.html', '/', 'site'], ['globe/index.html', '/globe/', 'site'], ['tools/index.html', '/tools/', 'tools'],
   ['draw/index.html', '/draw/', 'draw'], ['audio/index.html', '/audio/', 'audio'], ['jigsaw/index.html', '/jigsaw/', 'jigsaw'],
   ['spot-difference/index.html', '/spot-difference/', 'spot-difference'], ['hidden-object/index.html', '/hidden-object/', 'hidden-object'],
-  ['pixfind/index.html', '/pixfind/', 'pixfind'], ['game/index.html', '/game/', 'game'], ['pixel-camera.html', '/pixel-camera.html', 'camera'],
+  ['play/spot-difference/index.html', '/play/spot-difference/', 'spot-game'], ['play/hidden-object/index.html', '/play/hidden-object/', 'find-game'], ['game/index.html', '/game/', 'game'], ['pixel-camera.html', '/pixel-camera.html', 'camera'],
   ['telescope/index.html', '/telescope/', 'telescope'], ['about/index.html', '/about/', 'site'], ['guide/index.html', '/guide/', 'site'],
   ['privacy/index.html', '/privacy/', 'site'], ['stores/index.html', '/stores/', 'site'],
   ['stores/ecowashcafe-nakanoshima.html', '/stores/ecowashcafe-nakanoshima.html', 'site'], ['collection/index.html', '/collection/', 'site'],
@@ -16,7 +16,7 @@ const pages = [
 const artworkLabels = {
   site: 'つくる・あそぶ・つながる', tools: '制作ツール', draw: 'ドット絵を描く', audio: '音をつくる',
   jigsaw: 'ジグソーパズル', 'spot-difference': 'まちがい探し', 'hidden-object': 'もの探し',
-  pixfind: 'ピクスファインド', game: 'ゲームをつくる', camera: 'ドットカメラ', telescope: '天体を見つける',
+  'spot-game': 'ドット絵間違い探し', 'find-game': 'ドット絵もの探し', game: 'ゲームをつくる', camera: 'ドットカメラ', telescope: '天体を見つける',
 };
 
 function read(relativePath) { return readFileSync(resolve(root, relativePath), 'utf8'); }

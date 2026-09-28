@@ -10,7 +10,8 @@ const $ = (s) => document.querySelector(s);
 const TOOLS = {
   'spot-difference': { heading: '.spot-heading', setup: '#spot-setup', start: '#spot-start', resume: '#spot-resume', demo: 'spot', tagline: 'ちがいを作って、見つけてもらおう', done: '#spot-confirmed', primaries: ['#spot-play-local', '#spot-publish'] },
   'hidden-object': { heading: '.hidden-heading', setup: '#hidden-setup', start: '#hidden-start', resume: '#hidden-resume', demo: 'find', tagline: 'かくして、さがしてもらおう', done: '#hidden-confirmed', primaries: ['#hidden-play-local', '#hidden-publish'] },
-  pixfind: { heading: '.pixfind-heading', setup: '#pixfind-list', bandBefore: true, demo: 'spot', tagline: 'ちがいとかくれもの、見つけられる？', play: '#pixfind-game', progress: '#pixfind-progress', round: '#pixfind-title', },
+  'spot-game': { heading: '.pixfind-heading', setup: '#pixfind-list', bandBefore: true, demo: 'spot', tagline: 'ちがい、ぜんぶ見つけられる？', play: '#pixfind-game', progress: '#pixfind-progress', round: '#pixfind-title', },
+  'find-game': { heading: '.pixfind-heading', setup: '#pixfind-list', bandBefore: true, demo: 'find', tagline: 'かくれたもの、見つけられる？', play: '#pixfind-game', progress: '#pixfind-progress', round: '#pixfind-title', },
   'creation-game': { heading: '.game-heading', setup: '#game-setup', start: '#game-prepare', resume: '#game-resume', demo: 'runner', tagline: 'じぶんの絵が主人公になる', play: '#game-play', progress: '#game-progress', win: '#game-win', again: '#game-new' }
 };
 const tool = TOOLS[document.body.dataset.page];

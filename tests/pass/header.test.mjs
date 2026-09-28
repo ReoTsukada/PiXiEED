@@ -6,7 +6,7 @@ import { pathToFileURL } from 'node:url';
 const pages = [
   'index.html', 'globe/index.html', 'tools/index.html', 'profile/index.html', 'audio/index.html', 'pixel-camera.html',
   'draw/index.html', 'jigsaw/index.html', 'spot-difference/index.html',
-  'hidden-object/index.html', 'pixfind/index.html', 'game/index.html',
+  'hidden-object/index.html', 'play/spot-difference/index.html', 'play/hidden-object/index.html', 'game/index.html',
   'globe-prototype.html', 'about/index.html', 'privacy/index.html', 'guide/index.html',
   'stores/index.html', 'collection/index.html', '404.html'
 ];

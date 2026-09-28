@@ -12,7 +12,7 @@ const { chromium, webkit } = await import(pathToFileURL(entry).href);
 
 const routes = [
   '/', '/globe/', '/audio/', '/pixel-camera.html', '/draw/', '/jigsaw/',
-  '/spot-difference/', '/hidden-object/', '/pixfind/', '/game/',
+  '/spot-difference/', '/hidden-object/', '/play/spot-difference/', '/play/hidden-object/', '/game/',
   '/globe-prototype.html?embed=1&tool=telescope'
 ];
 const viewports = [{ width: 320, height: 568 }, { width: 568, height: 320 }, { width: 1280, height: 800 }];
