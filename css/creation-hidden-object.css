@@ -59,3 +59,20 @@ body.hidden-object-editing .hidden-edit-hint { bottom: calc(10rem + env(safe-are
   body.hidden-object-editing .hidden-preview canvas { width: min(calc(100vw - 12px), calc((100dvh - 13rem) * var(--hidden-aspect,1))); max-height: calc(100dvh - 13rem); }
   body.hidden-object-editing .hidden-target-list { right: .6rem; bottom: calc(9rem + env(safe-area-inset-bottom)); left: .6rem; }
 }
+
+/* ==== workspace first: the picture takes every pixel the controls do not need ==== */
+body.hidden-object-editing .hidden-preview { top: 0; bottom: calc(5.2rem + env(safe-area-inset-bottom)); container-type: size; }
+body.hidden-object-editing:has(.hidden-target-list:not(:empty)) .hidden-preview { bottom: calc(8.2rem + env(safe-area-inset-bottom)); }
+body.hidden-object-editing:has(.hidden-publish-actions > button:not([hidden])) .hidden-preview { bottom: calc(8.6rem + env(safe-area-inset-bottom)); }
+body.hidden-object-editing:has(.hidden-publish-actions > button:not([hidden])):has(.hidden-target-list:not(:empty)) .hidden-preview { bottom: calc(11.6rem + env(safe-area-inset-bottom)); }
+body.hidden-object-editing .hidden-preview canvas { width: min(calc(100cqw - 12px), calc((100cqh - 12px) * var(--hidden-aspect, 1))) !important; max-width: none !important; max-height: none !important; }
+body.hidden-object-editing .hidden-target-list { bottom: calc(5.2rem + env(safe-area-inset-bottom)); }
+body.hidden-object-editing:has(.hidden-publish-actions > button:not([hidden])) .hidden-target-list { bottom: calc(8.6rem + env(safe-area-inset-bottom)); }
+body.hidden-object-editing .hidden-edit-hint { top: .75rem; bottom: auto !important; height: auto; }
+/* the draft id is for the file, not for the person drawing */
+body.hidden-object-editing .hidden-source-label { position: absolute !important; width: 1px; height: 1px; padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); }
+body.hidden-object-editing .hidden-settings { top: .6rem; }
+@media (orientation: landscape) and (max-height: 500px) {
+  body.hidden-object-editing .hidden-preview { bottom: calc(3.9rem + env(safe-area-inset-bottom)); }
+  body.hidden-object-editing .hidden-settings { top: .4rem; }
+}

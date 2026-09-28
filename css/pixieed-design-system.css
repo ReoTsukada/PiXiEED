@@ -494,3 +494,11 @@ body.arc-jigsaw .jigsaw-workspace { --pixel-frame: #245446; }
 .px-perk { position: relative; }
 .px-perk::after { content: ""; position: absolute; top: -4px; right: -4px; width: 12px; height: 12px; background: #ffd35a; pointer-events: none;
   clip-path: polygon(33% 0, 67% 0, 67% 33%, 100% 33%, 100% 67%, 67% 67%, 67% 100%, 33% 100%, 33% 67%, 0 67%, 0 33%, 33% 33%); filter: drop-shadow(0 1px 0 rgba(0,0,0,.45)); }
+
+/* ==== short landscape screens (phones on their side): a slimmer bottom bar, so the work gets the height ==== */
+@media (orientation: landscape) and (max-height: 500px) {
+  .app-tabs { bottom: max(.35rem, env(safe-area-inset-bottom)); width: min(25rem, calc(100% - 1.2rem)); padding: .2rem; border-radius: .95rem; }
+  .app-tabs a, .app-tabs button { min-height: 2.6rem; }
+  .app-tabs > :nth-child(3) { width: 2.9rem; min-height: 2.9rem; }
+  .app-page { padding-bottom: calc(3.9rem + env(safe-area-inset-bottom)); }
+}

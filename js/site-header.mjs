@@ -142,6 +142,7 @@ export function mountSiteHeader() {
     let label = brand.querySelector('span:not(.brand-mark)');
     if (!label) { label = document.createElement('span'); brand.append(label); }
     label.textContent = toolName; brand.classList.add('px-header-brand--tool');
+    if (document.body.dataset.toolShort) label.dataset.short = document.body.dataset.toolShort; // shown instead when the header is tight
   }
   inner.querySelectorAll('.menu-toggle, .audio-header-actions, .lc-top-left, .lc-top-right').forEach((el) => el.classList.add('px-header-utilities'));
   let button = inner.querySelector('[data-header-pass]');

@@ -71,3 +71,14 @@ body.arc-jigsaw .jigsaw-complete { position: absolute !important; width: 1px !im
 /* the celebration's buttons, not the page's plain white ones */
 body.arc-jigsaw .jigsaw-play .arc-win button.arc-start { min-height: 56px; border: 0; border-radius: 18px; background: #ffd35a; color: #17232d; font-size: 1.1rem; font-weight: 900; }
 body.arc-jigsaw .jigsaw-play .arc-win button.arc-press { min-height: 48px; border: 2px solid rgba(255,255,255,.12); border-radius: 16px; background: #1d2b38; color: #fff; font-size: .92rem; font-weight: 900; }
+
+/* ==== workspace first on wide, short screens: the unplaced pieces become a column on the right, so the
+   table keeps the full height ==== */
+@media (orientation: landscape) and (max-height: 520px) and (min-width: 540px) {
+  body.arc-jigsaw .jigsaw-play { grid-template-columns: minmax(0, 1fr) 76px; grid-template-rows: 44px minmax(0, 1fr); grid-template-areas: "tools tools" "work tray"; }
+  body.arc-jigsaw .jigsaw-play > .jigsaw-workspace-tools { grid-area: tools; }
+  body.arc-jigsaw .jigsaw-play > .jigsaw-workspace { grid-area: work; }
+  body.arc-jigsaw .jigsaw-play > .jigsaw-tray { grid-area: tray; flex-direction: column; width: 76px; height: auto; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; padding: 3px 3px 6px; }
+  body.arc-jigsaw .jigsaw-play > .jigsaw-tray > * { flex: none; }
+}
+@media (orientation: landscape) and (max-height: 500px) { .jigsaw-page { padding-bottom: calc(3.9rem + env(safe-area-inset-bottom)) !important; } }

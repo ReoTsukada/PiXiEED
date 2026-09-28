@@ -35,3 +35,23 @@ body.app-page--tool-creation-game #main{height:100dvh}
    clips it in Chromium and stretches it in WebKit on short screens. */
 .game-board-wrap{container-type:size}
 .game-board-wrap canvas{width:min(100%,64dvh,640px,calc(125cqh - 3px));height:auto;max-height:none}
+
+/* ==== workspace first: the board takes the height (the arcade HUD sits above it), the file names are not
+   shown, and on wide short screens the pad and buttons move beside the board ==== */
+.game-page:has(.game-play:not([hidden])) { grid-template-rows: auto minmax(0, 1fr); }
+body.arc-tool .game-play:not([hidden]) { grid-template-rows: auto minmax(0, 1fr) auto auto auto; }
+body.arc-tool .game-play > .game-assets-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); margin: 0; }
+body.arc-tool .game-play > .game-board-wrap canvas { width: min(100%, calc(125cqh - 3px)) !important; }
+@media (orientation: portrait) {
+  body.arc-tool .game-controls { grid-template-columns: repeat(3, 48px); grid-template-rows: repeat(2, 44px); gap: 4px; }
+  body.arc-tool .game-controls button { min-width: 46px; min-height: 42px; font-size: 1.15rem; }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  body.arc-tool .game-play:not([hidden]) { grid-template-columns: minmax(0, 1fr) minmax(130px, 20vw); grid-template-rows: auto minmax(0, 1fr) auto auto; column-gap: 8px; }
+  body.arc-tool .game-play > .arc-hud { grid-column: 1 / -1; grid-row: 1; }
+  body.arc-tool .game-play > .game-board-wrap { grid-column: 1; grid-row: 2 / 5; }
+  body.arc-tool .game-play > .game-progress { grid-column: 2; grid-row: 2; align-self: end; }
+  body.arc-tool .game-play > .game-controls { grid-column: 2; grid-row: 3; }
+  body.arc-tool .game-play > .game-actions { grid-column: 2; grid-row: 4; flex-direction: column; }
+  .game-page { padding-bottom: calc(3.9rem + env(safe-area-inset-bottom)) !important; }
+}

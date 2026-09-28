@@ -47,3 +47,15 @@ body.spot-editing .spot-preview canvas { width: min(calc(100vw - 16px), calc((10
 body.spot-editing .spot-edit-hint { bottom: calc(10rem + env(safe-area-inset-bottom)); }
 body.spot-editing .spot-publish-actions:has(#spot-publish:not([hidden])) ~ .spot-edit-hint,
 body.spot-editing .spot-publish-actions:has(#spot-play-local:not([hidden])) ~ .spot-edit-hint { display: none; }
+
+/* ==== workspace first: the picture takes every pixel the controls do not need ==== */
+body.spot-editing .spot-preview { top: 0; bottom: calc(5.2rem + env(safe-area-inset-bottom)); container-type: size; }
+body.spot-editing:has(.spot-publish-actions > button:not([hidden])) .spot-preview { bottom: calc(8.6rem + env(safe-area-inset-bottom)); }
+body.spot-editing .spot-preview canvas { width: min(calc(100cqw - 12px), calc((100cqh - 12px) * var(--spot-aspect, 1))) !important; max-width: none !important; max-height: none !important; }
+body.spot-editing .spot-edit-hint { top: auto; bottom: calc(5.8rem + env(safe-area-inset-bottom)) !important; height: auto; }
+body.spot-editing .spot-source-label { position: absolute !important; width: 1px; height: 1px; padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); }
+body.spot-editing .spot-settings { top: .6rem; }
+@media (orientation: landscape) and (max-height: 500px) {
+  body.spot-editing .spot-preview { bottom: calc(3.9rem + env(safe-area-inset-bottom)); }
+  body.spot-editing .spot-settings { top: .4rem; }
+}
