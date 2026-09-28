@@ -3,7 +3,7 @@ import { mountPictureShelf } from './picture-shelf.mjs?rev=20260928-picture-shel
 import { hashCanonical } from './asset-contract.mjs';
 import { importAudioImage, AUDIO_IMAGE_RULES_VERSION } from './audio-image.mjs?rev=20260928-dot-music-1';
 import { beginAudioCamera, takeAudioCameraReturn, readAudioCameraDraft } from './audio-camera-handoff.mjs?rev=20260928-dot-music-1';
-import { hasPerk, requestPass, onPassChange } from '../pixieed-pass.mjs?v=20260928-rewards-1';
+import { hasPerk, requestPass, onPassChange } from '../pixieed-pass.mjs?v=20260929-ad-diagnostics-1';
 import { exportAudioImage, renderAudioWav } from './audio-export.mjs?rev=20260928-pixel-roundtrip-1';
 import { renderAudioVideo } from './audio-video.mjs?rev=20260928-audio-video-1';
 import { evaluateAudioPassPolicy } from './audio-pass-policy.mjs?rev=20260928-pass-policy-1';

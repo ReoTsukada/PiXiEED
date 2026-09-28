@@ -7,7 +7,7 @@ import { attachZoomGestures, formatZoom, splitZoom, zoomRange, zoomStops } from 
 import { GIF_FPS, GIF_MAX_MS } from './gif.mjs?v=20260928-rewards-1';
 import { animatedCapturePlan, downsampleAnimatedFrame, encodeAnimatedGif } from '../animated-export.mjs?v=20260929-gif-budget-1';
 import { saveFile } from '../pixel-export.mjs?rev=20260928-export-1';
-import { hasPerk, requestPass, onPassChange } from '../pixieed-pass.mjs?v=20260928-rewards-1';
+import { hasPerk, requestPass, onPassChange } from '../pixieed-pass.mjs?v=20260929-ad-diagnostics-1';
 import { cameraPostDataUrl } from './camera-post.mjs';
 import { createAudioSong } from '../creation/audio-core.mjs?rev=20260928-dot-music-1';
 import { audioCameraCancelUrl, beginAudioCamera, completeAudioCamera, readAudioCameraRequest } from '../creation/audio-camera-handoff.mjs?rev=20260928-dot-music-1';

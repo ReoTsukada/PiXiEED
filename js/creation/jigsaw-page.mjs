@@ -16,7 +16,7 @@ import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928
 import { mountPxdTools } from './pxd-ui.mjs?rev=20260928-own-work-1';
 import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20260928-pxd-puzzles-1';
 import { normalizeJigsawFile } from './jigsaw-file.mjs?rev=20260929-claude-integration-1';
-import { requestPass } from '../pixieed-pass.mjs?v=20260928-rewards-1';
+import { requestPass } from '../pixieed-pass.mjs?v=20260929-ad-diagnostics-1';
 import { createPuzzleHintController } from './puzzle-hint.mjs?rev=20260928-hint-1';
 
 const JIGSAW_LAST_DRAFT_KEY = 'pixieed:creation:jigsaw:last-draft:v1';

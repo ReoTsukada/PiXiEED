@@ -2,7 +2,7 @@ import { detectPixelScale, wholePixelFit } from '../pixel-scale.mjs?rev=20260929
 import { supabaseConfig } from '../../data/site-config.js';
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
 import { documentRgba } from './draw-core.mjs';
-import { requestPass } from '../pixieed-pass.mjs?v=20260928-rewards-1';
+import { requestPass } from '../pixieed-pass.mjs?v=20260929-ad-diagnostics-1';
 import { createPuzzleHintController } from './puzzle-hint.mjs?rev=20260928-hint-1';
 import { resolveLocalDrawRevision, validateSpotDifferenceDraft } from './spot-difference-core.mjs';
 import { buildHiddenObjectHitBoxes, HIDDEN_OBJECT_MIN_PLAY_IMAGE_CSS_WIDTH, validateHiddenObjectDraft } from './hidden-object-core.mjs?rev=20260928-short-hitboxes-1';
