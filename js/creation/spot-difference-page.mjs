@@ -17,7 +17,7 @@ const publishButton = $('#spot-publish');
 const selectedIds = new Set(); const splitPixels = new Set();
 const touchPoints = new Map(); let touchEditSnapshot = null;
 let adapter; let store; let draftId = null; let draft = null; let beforeRevision = null; let afterRevision = null; let sourceDraftId = null; let afterDraftId = null; let savedConfirmedDraftId = null;
-let pxdOriginalRefs = null; let pxdBridge = null;
+let pxdOriginalRefs = null; let pxdPreservedPayload = null; let pxdBridge = null;
 let splitMode = false; let activePointer = null; let previousPixel = null; let pinchStart = null; let viewScale = 1; let viewPanX = 0; let viewPanY = 0; let cursorPixel = 0;
 
 function readStorage(key) { try { return localStorage.getItem(key); } catch { return null; } }
@@ -215,7 +215,7 @@ async function openPxdSpot(project) {
   const nextBefore = imported.bindings.before.revision; const nextAfter = imported.bindings.after.revision;
   if (nextBefore.document.width !== nextAfter.document.width || nextBefore.document.height !== nextAfter.document.height) throw new Error('PXDの比較画像サイズが一致しません。');
   beforeRevision = nextBefore; afterRevision = nextAfter; sourceDraftId = imported.bindings.before.draftId; afterDraftId = imported.bindings.after.draftId;
-  draft = imported.document; draftId = null; savedConfirmedDraftId = null; pxdOriginalRefs = imported.portableOriginalRefs;
+  draft = imported.document; draftId = null; savedConfirmedDraftId = null; pxdOriginalRefs = imported.portableOriginalRefs; pxdPreservedPayload = imported.preservedPayload || null;
   selectedIds.clear(); splitPixels.clear();
   $('#spot-source-label').textContent = `PXD固定画像 · ${draft.width}×${draft.height}px`;
   $('#spot-confirmed').hidden = !draft.confirmed;
@@ -230,7 +230,7 @@ function mountPxdSpot() {
     getProject: async (project) => draft ? writePxdPuzzle(project, {
       tool: 'spot_difference', document: draft,
       sourceDrawDocuments: { 'spot-before': beforeRevision?.document, 'spot-after': afterRevision?.document },
-      portableOriginalRefs: pxdOriginalRefs, sourceChanged: false
+      portableOriginalRefs: pxdOriginalRefs, preservedPayload: pxdPreservedPayload, sourceChanged: false
     }) : project
   });
 }

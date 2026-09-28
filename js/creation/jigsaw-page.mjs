@@ -32,7 +32,7 @@ let game = null; let sourceRevision = null; let layoutData = null; let pieces = 
 let pieceLookupSource = null; let pieceLookup = new Map(); let pieceOrderSource = null; let pieceOrderIndex = new Map();
 let selectionCache = { layout: null, pieceIds: null, path: null };
 let liftEffect = null; let liftValue = 0;
-let pxdOriginalRefs = null; let pxdBridge = null;
+let pxdOriginalRefs = null; let pxdPreservedPayload = null; let pxdBridge = null;
 let activePointer = null; let panGesture = null; let pendingPaint = 0; let view = { scale: 1, x: 0, y: 0 }; let lastWorkspaceSize = null;
 const MAX_TRAY_DOM = 80;
 const PUBLIC_BUCKETS = new Set(['post-public', 'social-posts']);
@@ -536,7 +536,7 @@ async function startGame() {
     clearSelectionCache();
     pieces = sliceJigsawPieces(rgba, layoutData);
     game = createJigsawWorkspace({ gameId, source, layout: layoutData, seed: gameId });
-    pxdOriginalRefs = null;
+    pxdOriginalRefs = null; pxdPreservedPayload = null;
     pxdBridge?.reset();
     selectedGroupId = null; trayPage = 0; view = { scale: 1, x: 0, y: 0 }; gameDraftId = game.gameId;
     updatePieceEstimate({ width, height }); showGame(); updateStatus(`作成しました。${(layoutData.columns * layoutData.rows).toLocaleString('ja-JP')}ピースを自由に動かせます。`);
@@ -606,7 +606,7 @@ async function resumeGame() {
     }
     clearSelectionCache();
     pieces = sliceJigsawPieces(rgba, layoutData); gameDraftId = draftId; selectedGroupId = null; trayPage = 0; view = { scale: 1, x: 0, y: 0 };
-    pxdOriginalRefs = null; pxdBridge?.reset();
+    pxdOriginalRefs = null; pxdPreservedPayload = null; pxdBridge?.reset();
     showGame();
     if (savedGame.viewport && !isLegacy) {
       updateViewport();
@@ -668,7 +668,7 @@ async function openPxdJigsaw(project) {
   pxdBridge?.reset();
   game = nextGame; layoutData = nextLayout; pieces = nextPieces; gameDraftId = game.gameId;
   clearSelectionCache(); clearDragState();
-  pxdOriginalRefs = materialized.portableOriginalRefs;
+  pxdOriginalRefs = materialized.portableOriginalRefs; pxdPreservedPayload = materialized.preservedPayload || null;
   selectedGroupId = null; trayPage = 0; view = { scale: 1, x: 0, y: 0 };
   sourceLabel.textContent = game.source.type === 'public' ? `${game.source.title} · 公開作品` : game.source.type === 'file' ? 'PXD内の端末画像' : `PXDの自分の固定版 · ${sourcePixels.width}×${sourcePixels.height}px`;
   gridSelect.value = String(layoutData.pieceSize); updatePieceEstimate({ width: layoutData.width, height: layoutData.height });
@@ -688,7 +688,7 @@ function mountPxdJigsaw() {
         const image = boundedRgba(await decodeImage(game.source.dataUrl));
         sourceImages['jigsaw-main'] = { width: image.width, height: image.height, rgba: new Uint8Array(image.rgba) };
       } else if (game.source.type !== 'public' && sourceRevision?.document) sourceDrawDocuments['jigsaw-main'] = sourceRevision.document;
-      return writePxdPuzzle(project, { tool: 'jigsaw', document: game, sourceDrawDocuments, sourceImages, portableOriginalRefs: pxdOriginalRefs, sourceChanged: false });
+      return writePxdPuzzle(project, { tool: 'jigsaw', document: game, sourceDrawDocuments, sourceImages, portableOriginalRefs: pxdOriginalRefs, preservedPayload: pxdPreservedPayload, sourceChanged: false });
     },
     openProject: openPxdJigsaw
   });
@@ -754,7 +754,7 @@ $('#jigsaw-new').addEventListener('click', () => {
   clearSelectionCache(); clearDragState();
   delete workspaceElement.dataset.jigsawSelected;
   pieceLookupSource = pieces; pieceLookup.clear(); pieceOrderSource = null; pieceOrderIndex.clear();
-  pxdOriginalRefs = null;
+  pxdOriginalRefs = null; pxdPreservedPayload = null;
   delete document.body.dataset.jigsawPlaying; playSection.hidden = true; setupSection.hidden = false; saveButton.disabled = true;
   updateStatus('絵とピースの大きさを選んでください。');
 });
