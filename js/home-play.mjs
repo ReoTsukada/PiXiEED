@@ -179,15 +179,21 @@ function hero() {
   syncColors();
 
   const cellFor = (width) => (width < 520 ? 3.6 : width < 900 ? 5 : 7);
+  // every dot is a whole number of screen pixels, so nothing shimmers or wobbles as it moves across the stage
+  const gridFor = (r) => {
+    const dpr = globalThis.devicePixelRatio || 1; const c = Math.max(2, Math.round(cellFor(r.width) * dpr)) / dpr;
+    return { c, w: Math.max(40, Math.ceil(r.width / c)), h: Math.max(30, Math.ceil(r.height / c)), dpr };
+  };
   const newStar = () => ({ x: 2 + Math.random() * (W - 4) | 0, y: 2 + Math.random() * (H * 0.55) | 0, p: Math.random() * 6.28, s: 0.6 + Math.random() * 1.4, big: Math.random() < 0.3 });
   function layout() {
     const r = stage.getBoundingClientRect();
-    cell = cellFor(r.width); K = 9 / cell;
-    W = Math.max(40, Math.round(r.width / cell)); H = Math.max(30, Math.round(r.height / cell));
+    const grid = gridFor(r); cell = grid.c; K = 9 / cell; W = grid.w; H = grid.h;
+    canvas.style.width = `${W * cell}px`; canvas.style.height = `${H * cell}px`;
+    canvas.style.left = `${Math.round(((r.width - W * cell) / 2) * grid.dpr) / grid.dpr}px`;
     canvas.width = W; canvas.height = H; ctx = canvas.getContext('2d'); img = ctx.createImageData(W, H);
     sand = new Uint8Array(W * H); pieces = []; flashes = []; beats = []; ink.clear();
     const bar = document.querySelector('.hp-tools').getBoundingClientRect();
-    F = Math.max(12, Math.min(H, Math.floor((bar.top - r.top - 6) / (r.height / H))));
+    F = Math.max(12, Math.min(H, Math.floor((bar.top - r.top - 6) / cell)));
     const wordWidth = WORD.reduce((s, ch) => s + FONT[ch][0].length + 1, -1);
     const scale = Math.max(2, Math.min(4, Math.floor((W - 8) / wordWidth)));
     let x0 = Math.floor((W - wordWidth * scale) / 2); const y0 = Math.floor(H * 0.2);
@@ -320,6 +326,7 @@ function hero() {
   }
 
   let start = performance.now(); let lastT = performance.now(); let sandTick = 0; let lastLand = 0;
+  const TICK = 1 / 60; let tickNo = 0; let sandBudget = 0;
   function sandStep(now) {
     const lean = Math.abs(tilt) > 0.2 ? Math.sign(tilt) : 0;
     for (let y = F - 2; y >= 0; y--) {
@@ -338,15 +345,15 @@ function hero() {
   }
   function step(now) {
     const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
-    // falling sand and falling pieces: 30 ticks a second, several sand steps per tick on fine grids
+    // falling sand and falling pieces: 60 small ticks a second (smooth on phones), same speeds as before
     sandTick += dt;
-    if (sandTick >= 1 / 30) {
-      // Keep fractional time for 60 FPS frames while dropping any excess backlog.
-      // A delayed/reduced-motion paint must not trigger catch-up ticks later.
-      sandTick %= 1 / 30;
+    if (sandTick >= TICK) {
+      // Keep fractional time while dropping any excess backlog: a delayed or reduced-motion paint
+      // must not trigger catch-up ticks later.
+      sandTick %= TICK; tickNo += 1;
       // a released drawing drops as one piece, speeding up, until any of its dots touches something
       for (const piece of pieces) {
-        piece.v = Math.min(piece.v + 0.12 * K, 1.6 * K); piece.acc += piece.v;
+        piece.v = Math.min(piece.v + 0.03 * K, 0.8 * K); piece.acc += piece.v;
         while (piece.acc >= 1 && !piece.landed) {
           piece.acc -= 1;
           if (piece.cells.some((c) => isSolid(c.x, c.y + 1))) piece.landed = true; else for (const c of piece.cells) c.y += 1;
@@ -357,27 +364,31 @@ function hero() {
         }
       }
       pieces = pieces.filter((piece) => !piece.landed);
-      const passes = Math.max(1, Math.round(K * 0.9));
-      for (let p = 0; p < passes; p++) sandStep(now);
-      // a full row vanishes, like Tetris: a flash, the row played as a phrase, and everything above drops
-      let cleared = 0;
-      for (let y = F - 1; y >= 0; y--) {
-        let full = true; for (let x = 0; x < W; x++) if (!sand[y * W + x]) { full = false; break; }
-        if (!full) continue;
-        const row = Array.from({ length: W }, (_, x) => sand[y * W + x] - 1);
-        if (!cleared) for (let k = 0; k < 8; k++) { const x = Math.floor((k + 0.5) * W / 8); setTimeout(() => play(row[x], [0, 2, 4, 7, 9, 7, 4, 2][k] + 7, { volume: 0.04 }), k * 70); }
-        for (let x = 0; x < W; x++) {
-          const v = sand[y * W + x]; sand[y * W + x] = 0;
-          if (x % 3 === 0) bursts.push({ x, y, vx: (Math.random() - 0.5) * 10 * K, vy: (-8 - Math.random() * 10) * K, life: 1, color: Math.random() < 0.5 ? WHITE : RGB[v - 1] });
+      // the sand keeps its old pace (a few steps per 1/30 s) but spreads them evenly over the ticks
+      sandBudget += Math.max(1, Math.round(K * 0.9)) / 2;
+      while (sandBudget >= 1) { sandBudget -= 1; sandStep(now); }
+      // row clearing and the melting floor keep their old 30-a-second rhythm
+      if (tickNo % 2 === 0) {
+        // a full row vanishes, like Tetris: a flash, the row played as a phrase, and everything above drops
+        let cleared = 0;
+        for (let y = F - 1; y >= 0; y--) {
+          let full = true; for (let x = 0; x < W; x++) if (!sand[y * W + x]) { full = false; break; }
+          if (!full) continue;
+          const row = Array.from({ length: W }, (_, x) => sand[y * W + x] - 1);
+          if (!cleared) for (let k = 0; k < 8; k++) { const x = Math.floor((k + 0.5) * W / 8); setTimeout(() => play(row[x], [0, 2, 4, 7, 9, 7, 4, 2][k] + 7, { volume: 0.04 }), k * 70); }
+          for (let x = 0; x < W; x++) {
+            const v = sand[y * W + x]; sand[y * W + x] = 0;
+            if (x % 3 === 0) bursts.push({ x, y, vx: (Math.random() - 0.5) * 10 * K, vy: (-8 - Math.random() * 10) * K, life: 1, color: Math.random() < 0.5 ? WHITE : RGB[v - 1] });
+          }
+          flashes.push({ y, life: 1 }); cleared += 1;
         }
-        flashes.push({ y, life: 1 }); cleared += 1;
+        if (cleared) { lines += cleared; invite('game'); }
+        // keep the pile from filling the stage: the bottom row slowly melts away when it is tall
+        const tall = F - Math.floor(F * 0.45); let filled = 0; grains = 0;
+        for (let x = 0; x < W; x++) if (sand[tall * W + x]) filled++;
+        for (let i = 0; i < F * W; i++) if (sand[i]) { grains++; }
+        if (filled > W * 0.5) for (let x = 0; x < W; x++) if (Math.random() < 0.3) sand[(F - 1) * W + x] = 0;
       }
-      if (cleared) { lines += cleared; invite('game'); }
-      // keep the pile from filling the stage: the bottom row slowly melts away when it is tall
-      const tall = F - Math.floor(F * 0.45); let filled = 0; grains = 0;
-      for (let x = 0; x < W; x++) if (sand[tall * W + x]) filled++;
-      for (let i = 0; i < F * W; i++) if (sand[i]) { grains++; }
-      if (filled > W * 0.5) for (let x = 0; x < W; x++) if (Math.random() < 0.3) sand[(F - 1) * W + x] = 0;
     }
     playPile(now);
     // letter physics; a flying dot catches any star it touches
@@ -599,7 +610,7 @@ function hero() {
   layout();
   redraw(); // animate() is registered before layout(), so render the initialized canvas now.
   nextShooter = performance.now() + 6000; nextCat = performance.now() + 9000;
-  const resizeHero = () => { const r = stage.getBoundingClientRect(); const c = cellFor(r.width); if (Math.round(r.width / c) !== W || Math.round(r.height / c) !== H) { layout(); redraw(); } };
+  const resizeHero = () => { const g = gridFor(stage.getBoundingClientRect()); if (g.w !== W || g.h !== H || g.c !== cell) { layout(); redraw(); } };
   if (typeof ResizeObserver === 'function') new ResizeObserver(resizeHero).observe(stage);
   else addEventListener('resize', resizeHero, { passive: true });
 }
