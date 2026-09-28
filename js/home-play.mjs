@@ -135,11 +135,13 @@ const ICONS = {
 // Hero
 // =========================================================================================================
 function hero() {
-  // Three simple plays on one canvas:
-  //  ・なぞる  — draw dots; when you let go they crumble into sand that piles up at the bottom
-  //  ・文字をたたく — the letters of PiXiEED burst, bounce on the floor and fly back home
-  //  ・星をつかまえる — tap a twinkling star to catch it (a counter keeps score)
-  // Every action makes a small sound, all on one pentatonic scale so it always sounds right.
+  // One canvas, many small plays (everything makes a sound, all on one pentatonic scale):
+  //  ・描く — drag to draw; let go and the drawing drops as one piece; a full row clears like Tetris
+  //  ・文字 — dragging through PiXiEED knocks letters loose, a tap bursts one; flying dots catch stars they hit
+  //  ・星 — tap a star to catch it; a shooting star is worth five
+  //  ・ねこ — now and then a cat peeks out between the stars; tap it before it hides
+  //  ・楽譜 — a light sweeps the pile left to right and plays it: height is pitch, colour is instrument
+  //  ・傾ける / 振る — on a phone the sand flows with the tilt, and a shake knocks the pile loose
   const stage = document.getElementById('hpStage'); const canvas = document.getElementById('hpCanvas');
   const hint = document.getElementById('hpHint');
   // (older markup has neither the score nor the new hint: supply them)
@@ -147,12 +149,19 @@ function hero() {
   if (!score) { score = document.createElement('output'); score.className = 'hp-score'; score.id = 'hpScore'; score.hidden = true; stage.appendChild(score); }
   hint.innerHTML = '<span aria-hidden="true">☝</span> 描いて、はなして、そろえて消す';
   const colors = [C.red, C.yellow, C.green, C.sky, C.blue, C.pink, C.white];
-  let color = 0; let W = 48; let H = 30; let g = null; let F = 30; // F: the floor row (just above the colour bar)
+  const rgb = (hex) => [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
+  const RGB = colors.map(rgb); const WORD_RGB = WORD_COLORS.map(rgb);
+  const NIGHT = rgb(C.night); const WHITE = [255, 255, 255]; const GOLD = rgb(C.yellow);
+  const BR = 2;                   // brush: 2×2 cells
+  let color = 0; let W = 108; let H = 60; let F = 60; let cell = 4; let K = 2; // F: floor row; K: cells per old 9px dot
+  let img = null; let ctx = null;
   let ink = new Map();            // dots being drawn right now (key -> {x,y,color,born})
   let sand = null;                // settled / falling sand: colour index + 1 per cell, 0 = empty
   let dots = [];                  // letter dots with physics
-  let stars = []; let caught = 0; let bursts = [];
-  let pieces = []; let flashes = []; let lines = 0; // dropped drawings, and the rows being cleared
+  let stars = []; let caught = 0; let bursts = []; let combo = 0; let lastCatch = 0;
+  let pieces = []; let flashes = []; let lines = 0; let grains = 0; // dropped drawings, rows being cleared
+  let shooter = null; let nextShooter = 0; let cat = null; let nextCat = 0; let beats = [];
+  let tilt = 0; let wordTop = 0; let wordBottom = 0; let burstNo = 0; const burstCatches = new Map();
   let drawing = false; let last = null; let downAt = null;
   // what this visitor seems to enjoy: after enough of one play, the matching tool is offered once
   const interest = { ink: 0, letters: 0 };
@@ -167,17 +176,18 @@ function hero() {
   const syncColors = () => [...colorBox.children].forEach((b, i) => b.setAttribute('aria-checked', String(i === color)));
   syncColors();
 
-  const newStar = () => ({ x: 1 + Math.random() * (W - 2) | 0, y: 1 + Math.random() * (H * 0.55) | 0, p: Math.random() * 6.28, s: 0.6 + Math.random() * 1.4, big: Math.random() < 0.18 });
+  const cellFor = (width) => (width < 520 ? 3.6 : width < 900 ? 5 : 7);
+  const newStar = () => ({ x: 2 + Math.random() * (W - 4) | 0, y: 2 + Math.random() * (H * 0.55) | 0, p: Math.random() * 6.28, s: 0.6 + Math.random() * 1.4, big: Math.random() < 0.3 });
   function layout() {
     const r = stage.getBoundingClientRect();
-    const cell = r.width < 520 ? 9 : r.width < 900 ? 12 : 14;
-    W = Math.max(24, Math.round(r.width / cell)); H = Math.max(18, Math.round(r.height / cell));
-    g = pixelCanvas(canvas, W, H);
-    sand = new Uint8Array(W * H); pieces = []; flashes = [];
+    cell = cellFor(r.width); K = 9 / cell;
+    W = Math.max(40, Math.round(r.width / cell)); H = Math.max(30, Math.round(r.height / cell));
+    canvas.width = W; canvas.height = H; ctx = canvas.getContext('2d'); img = ctx.createImageData(W, H);
+    sand = new Uint8Array(W * H); pieces = []; flashes = []; beats = []; ink.clear();
     const bar = document.querySelector('.hp-tools').getBoundingClientRect();
-    F = Math.max(8, Math.min(H, Math.floor((bar.top - r.top - 6) / (r.height / H))));
+    F = Math.max(12, Math.min(H, Math.floor((bar.top - r.top - 6) / (r.height / H))));
     const wordWidth = WORD.reduce((s, ch) => s + FONT[ch][0].length + 1, -1);
-    const scale = W >= 60 ? 2 : 1;
+    const scale = Math.max(2, Math.min(4, Math.floor((W - 8) / wordWidth)));
     let x0 = Math.floor((W - wordWidth * scale) / 2); const y0 = Math.floor(H * 0.2);
     dots = [];
     WORD.forEach((ch, li) => {
@@ -185,54 +195,154 @@ function hero() {
         if (c !== '#') return;
         for (let sy = 0; sy < scale; sy++) for (let sx = 0; sx < scale; sx++) {
           const hx = x0 + i * scale + sx; const hy = y0 + j * scale + sy;
-          dots.push({ li, hx, hy, x: hx, y: -2 - Math.random() * 12, vx: 0, vy: 0, color: WORD_COLORS[li], delay: li * 90 + Math.random() * 260, state: 'intro', until: 0 });
+          dots.push({ li, hx, hy, x: hx, y: -2 - Math.random() * 12 * K, vx: 0, vy: 0, color: WORD_RGB[li], delay: li * 90 + Math.random() * 260, state: 'intro', until: 0 });
         }
       }));
       x0 += (FONT[ch][0].length + 1) * scale;
     });
-    stars = Array.from({ length: Math.max(8, Math.round(W * H / 70)) }, newStar);
+    wordTop = y0; wordBottom = y0 + 5 * scale;
+    stars = Array.from({ length: Math.max(14, Math.min(40, Math.round(W * H / 380))) }, newStar);
   }
   const isSolid = (x, y) => y >= F || (x >= 0 && x < W && y >= 0 && sand[y * W + x] > 0);
+  const reach = (px) => Math.max(1, Math.ceil(px / cell)); // a finger-sized distance in cells
 
-  // ---- letters: tap bursts a letter, dots bounce, then fly home ----
+  // ---- letters: a tap or a stroke bursts a letter, dots bounce, then fly home ----
   function burstLetter(li, fromX, fromY) {
     let any = false;
     for (const d of dots) {
       if (d.li !== li || d.state === 'free') continue;
-      any = true; d.state = 'free'; d.until = performance.now() + 2600 + Math.random() * 500;
-      const ang = Math.atan2(d.y - fromY, d.x - fromX) + (Math.random() - 0.5) * 0.9; const sp = 14 + Math.random() * 16;
-      d.vx = Math.cos(ang) * sp; d.vy = Math.sin(ang) * sp - 14;
+      any = true; d.state = 'free'; d.burst = burstNo + 1; d.until = performance.now() + 2600 + Math.random() * 500;
+      const ang = Math.atan2(d.y - fromY, d.x - fromX) + (Math.random() - 0.5) * 0.9; const sp = (14 + Math.random() * 16) * K;
+      d.vx = Math.cos(ang) * sp; d.vy = Math.sin(ang) * sp - 14 * K;
     }
     if (any) {
+      burstNo += 1;
       note(li + 6, { length: 0.22, volume: 0.06, type: 'square' }); note(li + 8, { length: 0.22, volume: 0.03 });
       interest.letters += 1; if (interest.letters === 6) invite('sound');
     }
     return any;
   }
-  function letterAt(x, y) { const hit = dots.find((d) => Math.abs(Math.round(d.x) - x) <= 1 && Math.abs(Math.round(d.y) - y) <= 1 && d.state !== 'free'); return hit ? hit.li : -1; }
+  function letterAt(x, y, r = 1) { const hit = dots.find((d) => Math.abs(Math.round(d.x) - x) <= r && Math.abs(Math.round(d.y) - y) <= r && d.state !== 'free'); return hit ? hit.li : -1; }
 
-  // ---- stars: tap to catch ----
-  function catchStar(x, y) {
-    const i = stars.findIndex((s) => Math.abs(s.x - x) <= 2 && Math.abs(s.y - y) <= 2);
-    if (i < 0) return false;
-    const s = stars[i]; stars[i] = newStar(); caught += 1;
+  // ---- stars: tap to catch; flying letter dots catch them too, and quick catches chain upward ----
+  function bumpScore(worth) {
+    caught += worth;
     score.textContent = `★ ${caught}`; score.hidden = false; score.classList.remove('is-pop'); requestAnimationFrame(() => score.classList.add('is-pop'));
-    for (let k = 0; k < 10; k++) { const a = (k / 10) * 6.28; bursts.push({ x: s.x, y: s.y, vx: Math.cos(a) * 12, vy: Math.sin(a) * 12, life: 1, color: s.big ? C.yellow : C.white }); }
-    note(10 + (caught % 5), { length: 0.25, volume: 0.05 }); note(12 + (caught % 5), { length: 0.3, volume: 0.03 });
-    if (caught === 4) invite('find');
+  }
+  function takeStar(i) {
+    const s = stars[i]; stars[i] = newStar(); bumpScore(1);
+    const now = performance.now(); combo = now - lastCatch < 900 ? combo + 1 : 1; lastCatch = now;
+    sparkle(s.x, s.y, s.big ? GOLD : WHITE, 10);
+    play(1, 10 + Math.min(combo, 10), { volume: 0.045 }); if (combo > 1) play(5, 12 + Math.min(combo, 10), { volume: 0.03 });
+    if (caught >= 4) invite('find');
+  }
+  function catchStar(x, y) {
+    const r = reach(16);
+    const i = stars.findIndex((s) => Math.abs(s.x - x) <= r && Math.abs(s.y - y) <= r);
+    if (i < 0) return false;
+    takeStar(i); return true;
+  }
+  function sparkle(x, y, c, n, speed = 12) {
+    for (let k = 0; k < n; k++) { const a = (k / n) * 6.28 + Math.random() * 0.3; bursts.push({ x, y, vx: Math.cos(a) * speed * K, vy: Math.sin(a) * speed * K, life: 1, color: c }); }
+  }
+
+  // ---- a shooting star now and then: worth five ----
+  function catchShooter(x, y) {
+    if (!shooter) return false;
+    const r = reach(28);
+    if (Math.abs(shooter.x - x) > r || Math.abs(shooter.y - y) > r) return false;
+    const { x: sx, y: sy } = shooter; shooter = null;
+    bumpScore(5); if (caught >= 4) invite('find');
+    sparkle(sx, sy, GOLD, 24, 20); [0, 2, 4, 7, 9].forEach((n, i) => setTimeout(() => play(1, n + 10, { volume: 0.04 }), i * 60));
+    return true;
+  }
+  // ---- a cat that peeks out between the stars ----
+  const CAT = sprite(['o.....o', 'oo...oo', 'ooooooo', 'okoooko', 'ooopooo', '.ooooo.']).map((row) => row.map((c) => c && rgb(c)));
+  function catchCat(x, y) {
+    if (!cat || cat.seen) return false;
+    const m = reach(10); const s = cat.scale;
+    if (x < cat.x - m || x > cat.x + 7 * s + m || y < cat.y - m || y > cat.y + 6 * s + m) return false;
+    cat.seen = performance.now();
+    for (let k = 0; k < 30; k++) { const a = Math.random() * 6.28; const sp = (8 + Math.random() * 18) * K; bursts.push({ x: cat.x + 3.5 * s, y: cat.y + 3 * s, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 6 * K, life: 1.2, color: RGB[k % RGB.length] }); }
+    try { // にゃ: a little falling glide
+      if (soundOn) { audio ??= new AudioContext(); const t = audio.currentTime; const o = audio.createOscillator(); const g = audio.createGain(); o.type = 'triangle'; o.frequency.setValueAtTime(880, t); o.frequency.exponentialRampToValueAtTime(560, t + 0.28); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.06, t + 0.03); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.32); o.connect(g).connect(audio.destination); o.start(t); o.stop(t + 0.35); }
+    } catch { /* no audio */ }
+    invite('find');
     return true;
   }
 
+  // ---- the pile is a score: a light sweeps it and plays each column's top grain ----
+  const STEPS = 16; const BAR_MS = 4000; let lastStep = -1;
+  function playPile(now) {
+    const stepIndex = Math.floor((now % BAR_MS) / (BAR_MS / STEPS));
+    if (stepIndex === lastStep) return; lastStep = stepIndex;
+    if (!grains) return;
+    const x0 = Math.floor((stepIndex * W) / STEPS); const x1 = Math.floor(((stepIndex + 1) * W) / STEPS);
+    let top = F; let tx = -1;
+    for (let x = x0; x < x1; x++) for (let y = 0; y < top; y++) if (sand[y * W + x]) { top = y; tx = x; break; }
+    if (tx < 0) return;
+    const v = sand[top * W + tx]; const height = (F - top) / F;
+    play(v - 1, 2 + Math.round(height * 12), { volume: 0.035 });
+    beats.push({ x: tx, y: top, life: 1 });
+  }
+
+  // ---- phones: tilt to pour the sand sideways, shake to knock the pile loose ----
+  let askedMotion = false; let lastShake = 0;
+  function listenMotion() {
+    addEventListener('deviceorientation', (e) => { if (e.gamma != null) tilt = Math.max(-1, Math.min(1, e.gamma / 35)); });
+    let prev = null;
+    addEventListener('devicemotion', (e) => {
+      const a = e.accelerationIncludingGravity; if (!a || a.x == null) return;
+      if (prev) { const jolt = Math.abs(a.x - prev.x) + Math.abs(a.y - prev.y) + Math.abs(a.z - prev.z); const now = performance.now(); if (jolt > 28 && now - lastShake > 600) { lastShake = now; shake(); } }
+      prev = { x: a.x, y: a.y, z: a.z };
+    });
+  }
+  function askMotion() { // iOS asks once, and only from a gesture; elsewhere the events just flow
+    if (askedMotion) return; askedMotion = true;
+    const ask = globalThis.DeviceOrientationEvent?.requestPermission;
+    if (typeof ask === 'function') ask.call(DeviceOrientationEvent).then((r) => { if (r === 'granted') { globalThis.DeviceMotionEvent?.requestPermission?.call(DeviceMotionEvent).catch(() => {}); listenMotion(); } }).catch(() => {});
+    else listenMotion();
+  }
+  function shake() {
+    let moved = 0;
+    for (let x = 0; x < W; x++) {
+      let top = -1; for (let y = 0; y < F; y++) if (sand[y * W + x]) { top = y; break; }
+      if (top < 0 || Math.random() < 0.35) continue;
+      for (let k = 0; k < 3 && top + k < F; k++) {
+        const from = top + k; const v = sand[from * W + x]; if (!v) break;
+        const to = Math.max(0, from - Math.round((3 + Math.random() * 9) * K)); const nx = Math.max(0, Math.min(W - 1, x + Math.round((Math.random() - 0.5) * 4 * K)));
+        if (!sand[to * W + nx]) { sand[to * W + nx] = v; sand[from * W + x] = 0; moved++; }
+      }
+    }
+    if (moved) [0, 3, 1, 4, 2].forEach((n, i) => setTimeout(() => play(i % 2 ? 4 : 6, n + 2, { volume: 0.04 }), i * 50));
+  }
+
   let start = performance.now(); let lastT = performance.now(); let sandTick = 0; let lastLand = 0;
+  function sandStep(now) {
+    const lean = Math.abs(tilt) > 0.2 ? Math.sign(tilt) : 0;
+    for (let y = F - 2; y >= 0; y--) {
+      const dir = (y + Math.floor(now / 33)) % 2 ? 1 : -1;
+      for (let k = 0; k < W; k++) {
+        const x = dir > 0 ? k : W - 1 - k; const i = y * W + x; const v = sand[i]; if (!v) continue;
+        const below = i + W;
+        if (!sand[below]) { sand[below] = v; sand[i] = 0; if (y === F - 2 || sand[below + W]) maybeLand(now, x, y + 1, v - 1); continue; }
+        const side = lean || (Math.random() < 0.5 ? 1 : -1);
+        let slid = false;
+        for (const sx of lean ? [side] : [side, -side]) { const nx = x + sx; if (nx >= 0 && nx < W && !sand[below + sx] && !sand[i + sx]) { sand[below + sx] = v; sand[i] = 0; slid = true; break; } }
+        // a strong tilt lets grains roll along the surface, not just down the slope
+        if (!slid && lean && Math.random() < Math.abs(tilt) * 0.5) { const nx = x + lean; if (nx >= 0 && nx < W && !sand[i + lean]) { sand[i + lean] = v; sand[i] = 0; } }
+      }
+    }
+  }
   function step(now) {
     const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
-    // falling sand: 30 steps a second, bottom-up
+    // falling sand and falling pieces: 30 ticks a second, several sand steps per tick on fine grids
     sandTick += dt;
     if (sandTick > 1 / 30) {
       sandTick = 0;
       // a released drawing drops as one piece, speeding up, until any of its dots touches something
       for (const piece of pieces) {
-        piece.v = Math.min(piece.v + 0.12, 1.6); piece.acc += piece.v;
+        piece.v = Math.min(piece.v + 0.12 * K, 1.6 * K); piece.acc += piece.v;
         while (piece.acc >= 1 && !piece.landed) {
           piece.acc -= 1;
           if (piece.cells.some((c) => isSolid(c.x, c.y + 1))) piece.landed = true; else for (const c of piece.cells) c.y += 1;
@@ -243,115 +353,153 @@ function hero() {
         }
       }
       pieces = pieces.filter((piece) => !piece.landed);
-      for (let y = F - 2; y >= 0; y--) {
-        const dir = (y + Math.floor(now / 33)) % 2 ? 1 : -1;
-        for (let k = 0; k < W; k++) {
-          const x = dir > 0 ? k : W - 1 - k; const i = y * W + x; const v = sand[i]; if (!v) continue;
-          const below = i + W;
-          if (!sand[below]) { sand[below] = v; sand[i] = 0; if (y === F - 2 || sand[below + W]) maybeLand(now, x, y + 1, v - 1); continue; }
-          const side = Math.random() < 0.5 ? 1 : -1;
-          for (const sx of [side, -side]) { const nx = x + sx; if (nx >= 0 && nx < W && !sand[below + sx] && !sand[i + sx]) { sand[below + sx] = v; sand[i] = 0; break; } }
-        }
-      }
-      // a full row vanishes, like Tetris: a flash, a chord, and everything above drops
+      const passes = Math.max(1, Math.round(K * 0.9));
+      for (let p = 0; p < passes; p++) sandStep(now);
+      // a full row vanishes, like Tetris: a flash, the row played as a phrase, and everything above drops
       let cleared = 0;
       for (let y = F - 1; y >= 0; y--) {
         let full = true; for (let x = 0; x < W; x++) if (!sand[y * W + x]) { full = false; break; }
         if (!full) continue;
         const row = Array.from({ length: W }, (_, x) => sand[y * W + x] - 1);
-        for (let k = 0; k < 8; k++) { const x = Math.floor((k + 0.5) * W / 8); setTimeout(() => play(row[x], [0, 2, 4, 7, 9, 7, 4, 2][k] + 7, { volume: 0.04 }), k * 70); }
+        if (!cleared) for (let k = 0; k < 8; k++) { const x = Math.floor((k + 0.5) * W / 8); setTimeout(() => play(row[x], [0, 2, 4, 7, 9, 7, 4, 2][k] + 7, { volume: 0.04 }), k * 70); }
         for (let x = 0; x < W; x++) {
           const v = sand[y * W + x]; sand[y * W + x] = 0;
-          if (x % 2 === 0) bursts.push({ x, y, vx: (Math.random() - 0.5) * 10, vy: -8 - Math.random() * 10, life: 1, color: Math.random() < 0.5 ? C.white : colors[v - 1] });
+          if (x % 3 === 0) bursts.push({ x, y, vx: (Math.random() - 0.5) * 10 * K, vy: (-8 - Math.random() * 10) * K, life: 1, color: Math.random() < 0.5 ? WHITE : RGB[v - 1] });
         }
         flashes.push({ y, life: 1 }); cleared += 1;
       }
       if (cleared) { lines += cleared; invite('game'); }
       // keep the pile from filling the stage: the bottom row slowly melts away when it is tall
-      let filled = 0; for (let x = 0; x < W; x++) if (sand[(F - 7) * W + x]) filled++;
+      const tall = F - Math.floor(F * 0.45); let filled = 0; grains = 0;
+      for (let x = 0; x < W; x++) if (sand[tall * W + x]) filled++;
+      for (let i = 0; i < F * W; i++) if (sand[i]) { grains++; }
       if (filled > W * 0.5) for (let x = 0; x < W; x++) if (Math.random() < 0.3) sand[(F - 1) * W + x] = 0;
     }
-    // letter physics
+    playPile(now);
+    // letter physics; a flying dot catches any star it touches
+    const gravity = 60 * K;
     for (const d of dots) {
       if (d.state === 'intro') {
         const p = reduced ? 1 : Math.min(1, Math.max(0, (now - start - d.delay) / 520));
-        const e = 1 - (1 - p) ** 3; d.y = (-2 - 8) * (1 - e) + d.hy * e; d.x = d.hx;
+        const e = 1 - (1 - p) ** 3; d.y = (-2 - 8 * K) * (1 - e) + d.hy * e; d.x = d.hx;
         if (p >= 1) d.state = 'home';
       } else if (d.state === 'free') {
-        d.vy += 60 * dt; d.x += d.vx * dt; d.y += d.vy * dt;
+        d.vy += gravity * dt; d.vx += tilt * gravity * 0.5 * dt; d.x += d.vx * dt; d.y += d.vy * dt;
         if (d.x < 0) { d.x = 0; d.vx *= -0.6; } if (d.x > W - 1) { d.x = W - 1; d.vx *= -0.6; }
-        if (isSolid(Math.round(d.x), Math.round(d.y) + 1) && d.vy > 0) { d.y = Math.round(d.y); d.vy *= -0.45; d.vx *= 0.8; if (Math.abs(d.vy) < 3) d.vy = 0; }
+        if (isSolid(Math.round(d.x), Math.round(d.y) + 1) && d.vy > 0) { d.y = Math.round(d.y); d.vy *= -0.45; d.vx *= 0.8; if (Math.abs(d.vy) < 3 * K) d.vy = 0; }
         if (d.y < 0) { d.y = 0; d.vy = Math.abs(d.vy) * 0.5; }
+        if (Math.abs(d.vx) + Math.abs(d.vy) > 6 * K) {
+          const i = stars.findIndex((s) => Math.abs(s.x - d.x) <= 1.5 && Math.abs(s.y - d.y) <= 1.5);
+          const got = burstCatches.get(d.burst) || 0; // one burst catches at most three stars
+          if (i >= 0 && got < 3) { burstCatches.set(d.burst, got + 1); takeStar(i); }
+        }
         if (now > d.until) d.state = 'return';
       } else if (d.state === 'return') {
         d.x += (d.hx - d.x) * Math.min(1, dt * 7); d.y += (d.hy - d.y) * Math.min(1, dt * 7);
         if (Math.abs(d.x - d.hx) < 0.3 && Math.abs(d.y - d.hy) < 0.3) { d.x = d.hx; d.y = d.hy; d.state = 'home'; }
       }
     }
-    if (dots.length && dots.every((d) => d.state === 'home') && lettersWereHit) { lettersWereHit = false; [0, 2, 4, 7].forEach((n, i) => setTimeout(() => note(n + 7, { length: 0.14, volume: 0.035 }), i * 70)); }
-    for (const f of flashes) f.life -= dt * 3;
-    flashes = flashes.filter((f) => f.life > 0);
+    if (dots.length && lettersWereHit && dots.every((d) => d.state === 'home')) { lettersWereHit = false; [0, 2, 4, 7].forEach((n, i) => setTimeout(() => note(n + 7, { length: 0.14, volume: 0.035 }), i * 70)); }
+    // the shooting star and the cat come and go on their own
+    if (!shooter && now > nextShooter) {
+      if (nextShooter) shooter = { x: W * (0.05 + Math.random() * 0.4), y: H * (0.04 + Math.random() * 0.12), vx: W * 0.55, vy: H * 0.2 };
+      nextShooter = now + 11000 + Math.random() * 9000;
+    }
+    if (shooter) { shooter.x += shooter.vx * dt; shooter.y += shooter.vy * dt; if (shooter.x > W + 4 || shooter.y > F * 0.7) shooter = null; }
+    if (!cat && now > nextCat) {
+      if (nextCat) { const s = Math.max(1, Math.round(7 / cell)); const lo = wordBottom + 3; const room = Math.max(0, Math.floor(F * 0.62) - lo - 6 * s); cat = { x: 3 + Math.random() * (W - 7 * s - 6) | 0, y: lo + Math.random() * room | 0, scale: s, born: now, seen: 0 }; }
+      nextCat = now + 16000 + Math.random() * 14000;
+    }
+    if (cat && (cat.seen ? now - cat.seen > 300 : now - cat.born > 4200)) cat = null;
     for (const b of bursts) { b.x += b.vx * dt; b.y += b.vy * dt; b.vx *= 0.9; b.vy *= 0.9; b.life -= dt * 1.8; }
     bursts = bursts.filter((b) => b.life > 0);
+    for (const f of flashes) f.life -= dt * 3; flashes = flashes.filter((f) => f.life > 0);
+    for (const b of beats) b.life -= dt * 4; beats = beats.filter((b) => b.life > 0);
   }
   let lettersWereHit = false;
   function maybeLand(now, x, y, inst) { if (now - lastLand > 90) { lastLand = now; play(inst, Math.round((x / W) * 8), { volume: 0.014 }); } }
 
+  // ---- drawing into one ImageData: cheap enough for tens of thousands of cells ----
+  function put(x, y, c, a = 1) {
+    x |= 0; y |= 0; if (x < 0 || y < 0 || x >= W || y >= H) return;
+    const i = (y * W + x) * 4; const d = img.data;
+    if (a >= 1) { d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; return; }
+    d[i] += (c[0] - d[i]) * a; d[i + 1] += (c[1] - d[i + 1]) * a; d[i + 2] += (c[2] - d[i + 2]) * a;
+  }
   function draw(t) {
-    if (!g) return;
+    if (!img) return;
     const now = t || performance.now(); const time = (now - start) / 1000;
     step(now);
-    g.clear(C.night);
+    const d = img.data;
+    for (let i = 0; i < d.length; i += 4) { d[i] = NIGHT[0]; d[i + 1] = NIGHT[1]; d[i + 2] = NIGHT[2]; d[i + 3] = 255; }
     for (const s of stars) {
       const a = 0.35 + 0.45 * Math.sin(time * s.s + s.p);
-      if (a > 0.4) { g.px(s.x, s.y, s.big ? `rgba(255,211,90,${a.toFixed(2)})` : `rgba(255,255,255,${a.toFixed(2)})`); if (s.big && a > 0.7) { g.px(s.x - 1, s.y, 'rgba(255,211,90,.35)'); g.px(s.x + 1, s.y, 'rgba(255,211,90,.35)'); g.px(s.x, s.y - 1, 'rgba(255,211,90,.35)'); g.px(s.x, s.y + 1, 'rgba(255,211,90,.35)'); } }
+      if (a <= 0.4) continue;
+      if (s.big) { put(s.x, s.y, GOLD, a); if (a > 0.6) for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) put(s.x + dx, s.y + dy, GOLD, a * 0.45); }
+      else put(s.x, s.y, WHITE, a);
     }
-    const k = (time % 9) / 9; if (k < 0.12) { const sx = Math.floor(W * (0.2 + k * 5)); const sy = Math.floor(H * 0.1 + k * 30); for (let i = 0; i < 4; i++) g.px(sx - i, sy - i * 0.5, `rgba(255,255,255,${(0.8 - i * 0.2).toFixed(2)})`); }
-    for (let x = 0; x < W; x++) g.px(x, F, 'rgba(255,255,255,.07)');
-    for (let i = 0; i < sand.length; i++) if (sand[i]) g.px(i % W, (i / W) | 0, colors[sand[i] - 1]);
-    for (const d of dots) {
-      if (d.state === 'intro' && d.y < -1) continue;
-      const wave = d.state === 'home' && !reduced ? Math.round(Math.sin(time * 2.4 - d.li * 0.7) * 0.75) : 0;
-      g.px(Math.round(d.x), Math.round(d.y) + wave, d.color);
+    if (shooter) for (let i = 0; i < 10; i++) { const k = i / 10; put(shooter.x - shooter.vx * 0.03 * i, shooter.y - shooter.vy * 0.03 * i, i < 2 ? GOLD : WHITE, 1 - k); if (i === 0) for (const [dx, dy] of [[1, 0], [0, 1], [1, 1]]) put(shooter.x + dx, shooter.y + dy, GOLD); }
+    for (let x = 0; x < W; x++) put(x, F, WHITE, 0.07);
+    // the light that plays the pile
+    if (grains) { const px = Math.floor(((now % BAR_MS) / BAR_MS) * W); for (let y = 0; y < F; y++) put(px, y, WHITE, 0.05); }
+    for (let i = 0; i < F * W; i++) if (sand[i]) { const c = RGB[sand[i] - 1]; const o = i * 4; d[o] = c[0]; d[o + 1] = c[1]; d[o + 2] = c[2]; }
+    for (const b of beats) put(b.x, b.y, WHITE, b.life);
+    for (const dt of dots) {
+      if (dt.state === 'intro' && dt.y < -1) continue;
+      const wave = dt.state === 'home' && !reduced ? Math.round(Math.sin(time * 2.4 - dt.li * 0.7) * 0.75 * K) : 0;
+      put(Math.round(dt.x), Math.round(dt.y) + wave, dt.color);
     }
-    for (const piece of pieces) for (const c of piece.cells) g.px(c.x, c.y, colors[c.v - 1]);
-    for (const f of flashes) g.rect(0, f.y, W, 1, `rgba(255,255,255,${f.life.toFixed(2)})`);
-    for (const [, d] of ink) g.px(d.x, d.y, now - d.born < 200 ? C.white : d.color);
-    for (const b of bursts) g.px(Math.round(b.x), Math.round(b.y), b.color);
+    if (cat) {
+      const age = now - cat.born; const a = cat.seen ? 0 : Math.min(1, age / 500, (4200 - age) / 500);
+      const blink = Math.floor(age / 1400) % 3 === 2 && age % 1400 < 160;
+      if (a > 0) CAT.forEach((row, j) => row.forEach((c, i) => { if (!c) return; const col = blink && j === 3 && c[0] < 60 ? rgb(C.orange) : c; for (let sy = 0; sy < cat.scale; sy++) for (let sx = 0; sx < cat.scale; sx++) put(cat.x + i * cat.scale + sx, cat.y + j * cat.scale + sy, col, a); }));
+    }
+    for (const piece of pieces) for (const c of piece.cells) put(c.x, c.y, RGB[c.v - 1]);
+    for (const f of flashes) for (let x = 0; x < W; x++) put(x, f.y, WHITE, f.life);
+    for (const [, dk] of ink) put(dk.x, dk.y, now - dk.born < 200 ? WHITE : RGB[dk.color]);
+    for (const b of bursts) put(Math.round(b.x), Math.round(b.y), b.color, Math.min(1, b.life));
     if (cursor && document.activeElement === canvas) {
       const on = Math.floor(now / 400) % 2 === 0;
-      g.px(cursor.x, cursor.y, pen ? colors[color] : on ? C.white : 'rgba(255,255,255,.35)');
-      if (pen) for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) g.px(cursor.x + dx, cursor.y + dy, 'rgba(255,255,255,.5)');
+      for (let sy = 0; sy < BR; sy++) for (let sx = 0; sx < BR; sx++) put(cursor.x + sx, cursor.y + sy, pen ? RGB[color] : WHITE, pen || on ? 1 : 0.35);
     }
+    ctx.putImageData(img, 0, 0);
   }
   const redraw = animate(stage, draw);
 
+  let lastInkNote = 0;
   function inkAt(x, y) {
     const cells = [];
     if (last) { const n = Math.max(Math.abs(x - last.x), Math.abs(y - last.y)); for (let i = 1; i <= n; i++) cells.push({ x: Math.round(last.x + ((x - last.x) * i) / n), y: Math.round(last.y + ((y - last.y) * i) / n) }); } else cells.push({ x, y });
     last = { x, y };
     for (const c of cells) {
-      const key = `${c.x},${c.y}`; if (ink.get(key)?.color === colors[color]) continue;
-      ink.set(key, { x: c.x, y: c.y, color: colors[color], born: performance.now() });
+      // a stroke through the word knocks letters loose (it never catches stars — that is a tap)
+      const li = letterAt(c.x, c.y, BR); if (li >= 0) { lettersWereHit = burstLetter(li, c.x, c.y) || lettersWereHit; continue; }
+      let fresh = false;
+      for (let sy = 0; sy < BR; sy++) for (let sx = 0; sx < BR; sx++) {
+        const px = c.x - (BR >> 1) + sx; const py = c.y - (BR >> 1) + sy; if (px < 0 || py < 0 || px >= W || py >= H) continue;
+        const key = `${px},${py}`; if (ink.get(key)?.color === color) continue;
+        ink.set(key, { x: px, y: py, color, born: performance.now() }); fresh = true;
+      }
+      if (!fresh) continue;
       interest.ink += 1; if (interest.ink === 90) invite('editor');
-      play(color, Math.round((H - c.y) / H * 12) + 2);
+      const now = performance.now(); if (now - lastInkNote > 45) { lastInkNote = now; play(color, Math.round((H - c.y) / H * 12) + 2); }
     }
   }
-  // Tap and drag never mix: nothing happens on touch-down. Moving past a small slop starts a stroke (which only
-  // ever draws — stars and letters are left alone); lifting without moving is a tap (letter → burst, star → catch,
-  // empty sky → one dot). A long still press counts as drawing a dot, never as a tap on a star.
+  // Tap and drag never mix: nothing happens on touch-down. Moving past a small slop starts a stroke (which draws,
+  // and knocks loose any letter it passes through — but never catches a star); lifting without moving is a tap
+  // (shooting star, cat, letter, star, or else one dot). A long still press counts as drawing a dot.
   const SLOP = 8; const TAP_MS = 400;
   let press = null;
   canvas.addEventListener('pointerdown', (e) => {
     if (press || !e.isPrimary) return;
-    const { x, y } = g.cell(e); if (x < 0 || y < 0 || x >= W || y >= H) return;
+    const { x, y } = cellOf(e); if (x < 0 || y < 0 || x >= W || y >= H) return;
     hint.classList.add('is-used');
     canvas.setPointerCapture(e.pointerId);
     press = { id: e.pointerId, cx: e.clientX, cy: e.clientY, x, y, t: performance.now() }; downAt = { x, y };
   });
   canvas.addEventListener('pointermove', (e) => {
     if (!press || e.pointerId !== press.id) return;
-    const { x, y } = g.cell(e);
+    const { x, y } = cellOf(e);
     if (!drawing) {
       if (Math.hypot(e.clientX - press.cx, e.clientY - press.cy) < SLOP) return;
       drawing = true; last = null; inkAt(press.x, press.y);
@@ -359,9 +507,11 @@ function hero() {
     if (x < 0 || y < 0 || x >= W || y >= H) return;
     inkAt(x, y); redraw();
   });
+  function cellOf(e) { const r = canvas.getBoundingClientRect(); return { x: Math.floor(((e.clientX - r.left) / r.width) * W), y: Math.floor(((e.clientY - r.top) / r.height) * H) }; }
   function tap(x, y, quick) {
     if (quick) {
-      const li = letterAt(x, y);
+      if (catchShooter(x, y) || catchCat(x, y)) return;
+      const li = letterAt(x, y, reach(10));
       if (li >= 0) { lettersWereHit = burstLetter(li, x, y) || lettersWereHit; return; }
       if (catchStar(x, y)) return;
     }
@@ -370,14 +520,14 @@ function hero() {
   canvas.addEventListener('pointerup', (e) => {
     if (!press || e.pointerId !== press.id) return;
     if (drawing) stop(); else tap(press.x, press.y, performance.now() - press.t < TAP_MS);
-    press = null; redraw();
+    press = null; askMotion(); redraw();
   });
   canvas.addEventListener('pointercancel', (e) => { if (press && e.pointerId === press.id) { stop(); press = null; } });
   // letting go drops the drawing
   function release() {
-    const cells = [...ink.values()].filter((d) => d.x >= 0 && d.x < W && d.y >= 0 && d.y < F).map((d) => ({ x: d.x, y: d.y, v: colors.indexOf(d.color) + 1 }));
+    const cells = [...ink.values()].filter((d) => d.x >= 0 && d.x < W && d.y >= 0 && d.y < F).map((d) => ({ x: d.x, y: d.y, v: d.color + 1 }));
     ink.clear();
-    if (cells.length) pieces.push({ cells, v: 0.2, acc: 0, landed: false });
+    if (cells.length) pieces.push({ cells, v: 0.2 * K, acc: 0, landed: false });
   }
   const stop = () => { if (drawing) release(); drawing = false; last = null; };
   // keyboard: arrows move a dot cursor, Space lifts / lowers the pen, Enter taps (letters, stars, one dot)
@@ -390,24 +540,17 @@ function hero() {
     e.preventDefault(); hint.classList.add('is-used');
     cursor ??= { x: W >> 1, y: Math.floor(F * 0.7) };
     if (move) {
-      cursor = { x: Math.max(0, Math.min(W - 1, cursor.x + move[0])), y: Math.max(0, Math.min(F - 1, cursor.y + move[1])) };
-      if (pen) inkAt(cursor.x, cursor.y);
+      cursor = { x: Math.max(0, Math.min(W - BR, cursor.x + move[0] * BR)), y: Math.max(0, Math.min(F - BR, cursor.y + move[1] * BR)) };
+      if (pen) inkAt(cursor.x + 1, cursor.y + 1);
     } else if (e.key === ' ') {
       if (e.repeat) return;
-      pen = !pen; if (pen) { drawing = true; last = null; inkAt(cursor.x, cursor.y); } else stop();
-    } else {
-      const { x, y } = cursor; let hit = false;
-      for (let r = 0; r <= 2 && !hit; r++) for (let dy = -r; dy <= r && !hit; dy++) for (let dx = -r; dx <= r && !hit; dx++) {
-        const li = letterAt(x + dx, y + dy); if (li >= 0) { lettersWereHit = burstLetter(li, x, y) || lettersWereHit; hit = true; break; }
-        if (catchStar(x + dx, y + dy)) hit = true;
-      }
-      if (!hit && !pen) { last = null; inkAt(x, y); release(); last = null; }
-    }
+      pen = !pen; if (pen) { drawing = true; last = null; inkAt(cursor.x + 1, cursor.y + 1); } else stop();
+    } else if (!pen) tap(cursor.x + 1, cursor.y + 1, true);
     redraw();
   });
   document.getElementById('hpClear').addEventListener('click', () => {
-    ink.clear(); sand.fill(0); caught = 0; score.hidden = true; pen = false; drawing = false; pieces = []; flashes = []; lines = 0;
-    for (const d of dots) { d.state = 'intro'; d.y = -2 - Math.random() * 12; d.delay = d.li * 90 + Math.random() * 260; }
+    ink.clear(); sand.fill(0); caught = 0; score.hidden = true; pen = false; drawing = false; pieces = []; flashes = []; beats = []; lines = 0;
+    for (const d of dots) { d.state = 'intro'; d.y = -2 - Math.random() * 12 * K; d.delay = d.li * 90 + Math.random() * 260; }
     start = performance.now(); note(0, { length: 0.25 }); note(4, { length: 0.25 }); redraw();
   });
   const soundButton = document.getElementById('hpSound');
@@ -448,7 +591,8 @@ function hero() {
   }
 
   layout();
-  new ResizeObserver(() => { const r = stage.getBoundingClientRect(); const cell = r.width < 520 ? 9 : r.width < 900 ? 12 : 14; if (Math.round(r.width / cell) !== W || Math.round(r.height / cell) !== H) { layout(); redraw(); } }).observe(stage);
+  nextShooter = performance.now() + 6000; nextCat = performance.now() + 9000;
+  new ResizeObserver(() => { const r = stage.getBoundingClientRect(); const c = cellFor(r.width); if (Math.round(r.width / c) !== W || Math.round(r.height / c) !== H) { layout(); redraw(); } }).observe(stage);
 }
 
 // =========================================================================================================

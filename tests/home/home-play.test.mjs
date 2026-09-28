@@ -24,13 +24,14 @@ test('home hero: draw, let go and it drops; a full row clears; letters burst; st
   assert.match(source, /a full row vanishes/);
 });
 
-test('home hero: a tap and a drag never mix — dragging only draws, even when it starts on a star or a letter', () => {
+test('home hero: a tap and a drag never mix — a stroke draws and knocks letters loose, but never catches a star', () => {
   const source = read('js/home-play.mjs');
   assert.match(source, /const SLOP = \d+;/);
   assert.match(source, /Math\.hypot\(e\.clientX - press\.cx, e\.clientY - press\.cy\) < SLOP/);
   assert.match(source, /function tap\(x, y, quick\)/);
   const ink = source.match(/function inkAt\([\s\S]*?\n  \}/)[0];
-  assert.doesNotMatch(ink, /burstLetter|catchStar/, 'a stroke never plays with letters or stars');
+  assert.match(ink, /burstLetter/, 'a stroke through the word still knocks letters loose');
+  assert.doesNotMatch(ink, /catchStar|takeStar/, 'a stroke never catches a star');
   const down = source.match(/canvas\.addEventListener\('pointerdown'[\s\S]*?\n  \}\);/)[0];
   assert.doesNotMatch(down, /burstLetter|catchStar|inkAt/, 'nothing happens on touch-down');
 });
@@ -59,4 +60,14 @@ test('home hero: each colour is its own instrument — drawing, landing and clea
   assert.match(source, /play\(color, Math\.round\(\(H - c\.y\)/, 'the pen plays its colour');
   assert.match(source, /play\(mid\.v - 1,/, 'a landing piece plays its colour');
   assert.match(source, /play\(row\[x\],/, 'a cleared row plays its colours');
+});
+
+test('home hero: a finer grid (letters about 4 dots thick) and more to find — shooting star, cat, the pile as a score, tilt and shake', () => {
+  const source = read('js/home-play.mjs');
+  assert.match(source, /const scale = Math\.max\(2, Math\.min\(4,/);
+  assert.match(source, /const BR = 2;/);
+  for (const fn of ['catchShooter', 'catchCat', 'playPile', 'shake', 'askMotion', 'takeStar']) assert.match(source, new RegExp(`function ${fn}\\(`), fn);
+  assert.match(source, /one burst catches at most three stars/);
+  assert.match(source, /DeviceOrientationEvent\?\.requestPermission/);
+  assert.match(source, /ctx\.putImageData\(img, 0, 0\)/, 'drawn through one ImageData');
 });
