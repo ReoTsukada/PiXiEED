@@ -22,6 +22,8 @@ export const supabaseConfig = {
   publishableKey: 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4',
   createPostFunction: 'create-post',
   moderationFunction: 'moderate-post',
+  // Set true only after the puzzle database migration and all three production Edge Functions are confirmed live.
+  puzzlePublicationEnabled: false,
   publicMapTable: 'post_map_points',
   publicStorageBucket: 'post-public',
   publicMapLimit: 500

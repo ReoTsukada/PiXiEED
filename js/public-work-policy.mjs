@@ -30,8 +30,30 @@ export function isSampleWork(work) {
   return IMAGE_FIELDS.some((field) => sampleImageUrl(work[field]));
 }
 
+export function isSaleWork(work) {
+  if (!work || typeof work !== 'object' || Array.isArray(work)) return false;
+  if (work.distribution_mode === 'paid' || work.post_kind === 'market' || work.kind === 'market-reference') return true;
+  return ['sale_price_yen', 'salePriceYen'].some((field) => {
+    const value = Number(work[field]);
+    return Number.isFinite(value) && value > 0;
+  });
+}
+
+function validCoordinate(value, limit) {
+  return value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value)) && Math.abs(Number(value)) <= limit;
+}
+
+export function hasExplicitMapPlacement(value) {
+  if (!value || typeof value !== 'object') return false;
+  const position = value.mapPosition;
+  if (value.mapPositionSpace === 'world' && position && validCoordinate(position.x, 100) && validCoordinate(position.y, 100)) return true;
+  const location = value.location || value;
+  return validCoordinate(location.latitude ?? location.lat, 90)
+    && validCoordinate(location.longitude ?? location.lng ?? location.lon, 180);
+}
+
 export function publicWorksOnly(list) {
   if (!Array.isArray(list)) return [];
   return list.filter((work) => work && typeof work === 'object' && !Array.isArray(work) &&
-    typeof work.id === 'string' && work.id.trim().length > 0 && !isSampleWork(work));
+    typeof work.id === 'string' && work.id.trim().length > 0 && !isSampleWork(work) && !isSaleWork(work));
 }

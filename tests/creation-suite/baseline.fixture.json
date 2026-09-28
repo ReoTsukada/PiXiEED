@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "name": "creation-suite-baseline",
+  "routes": {
+    "works": "/works/",
+    "tools": "/tools/",
+    "globe": "/",
+    "camera": "/pixel-camera.html",
+    "telescope": "/telescope/"
+  },
+  "bottomNavigation": ["map", "camera", "capture", "tools", "profile"]
+}

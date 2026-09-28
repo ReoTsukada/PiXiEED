@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+<title>かんたん間違い探し｜問題を作って遊ぶ｜PiXiEED</title>
+<meta name="description" content="保存した絵の版を比べ、違いの場所を選んで間違い探しを作成できます。">
+<link rel="canonical" href="https://pixieed.jp/spot-difference/">
+<meta property="og:type" content="website"><meta property="og:site_name" content="PiXiEED"><meta property="og:locale" content="ja_JP"><meta property="og:title" content="かんたん間違い探し｜問題を作って遊ぶ｜PiXiEED"><meta property="og:description" content="保存した絵の版を比べ、違いの場所を選んで間違い探しを作成できます。"><meta property="og:url" content="https://pixieed.jp/spot-difference/"><meta property="og:image" content="https://pixieed.jp/assets/og/spot-difference.png"><meta property="og:image:type" content="image/png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="PiXiEEDのロゴと「まちがい探し」のアイコン">
+<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="かんたん間違い探し｜問題を作って遊ぶ｜PiXiEED"><meta name="twitter:description" content="保存した絵の版を比べ、違いの場所を選んで間違い探しを作成できます。"><meta name="twitter:image" content="https://pixieed.jp/assets/og/spot-difference.png"><meta name="twitter:image:alt" content="PiXiEEDのロゴと「まちがい探し」のアイコン">
+<link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180"><link rel="manifest" href="/manifest.webmanifest">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f2ec">
+  <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20260924-camera-release-1">
+  <link rel="stylesheet" href="/css/site.css?rev=20260927-draw-step08-3">
+  <link rel="stylesheet" href="/css/creation-spot-difference.css?rev=20260928-puzzle-layout-2">
+</head>
+<body data-page="spot-difference" class="app-page app-page--tool-spot-difference">
+  <a class="skip-link" href="#main">本文へ移動</a>
+  <header class="site-header"><div class="container header-inner"><a class="brand" href="/" aria-label="PiXiEED ホーム"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a></div></header>
+  <main id="main" class="spot-page">
+    <header class="spot-heading"><h1>かんたん間違い探し</h1><p>保存した絵の版を比べ、正解の場所を選ぼう。</p></header>
+    <p id="spot-status" class="spot-status" role="status" aria-live="polite">自分の端末に保存した絵を選んでください。</p>
+    <section id="spot-setup" class="spot-setup" aria-label="比べる絵を選ぶ">
+      <label>元にする保存版<select id="spot-before" aria-label="元にする保存版"></select></label>
+      <label>変更後の保存版<select id="spot-after" aria-label="変更後の保存版"></select></label>
+      <button id="spot-start" type="button" disabled>差分候補を見つける</button>
+      <button id="spot-resume" type="button" hidden>前回の作成を再開</button>
+      <p>Drawで元の絵を保存した後、少し変更して別の保存版を作ってください。写真をDrawへ取り込んだ絵も使えます。絵の保存版は変更しません。</p>
+    </section>
+    <section id="spot-editor" class="spot-editor" hidden aria-label="差分候補を確認">
+      <figure class="spot-preview"><figcaption>変更後の絵。色のついた場所をタップして候補を選びます。分割モードでは画素をなぞって範囲を選べます。</figcaption><canvas id="spot-canvas" aria-label="変更後の画像。色のついた候補をタップして選び、分割モードではなぞって範囲を選択できます。ピンチで拡大。矢印キーで候補を選択" tabindex="0"></canvas></figure>
+      <p id="spot-source-label" class="spot-source-label"></p>
+      <details class="spot-settings">
+        <summary aria-label="候補と編集操作を開く">候補・編集</summary>
+        <div class="spot-settings__sheet">
+          <p id="spot-edit-help" class="spot-edit-help">絵をタップすると候補を選択。分割は「分割する」をオンにして画素をなぞります。</p>
+          <button id="spot-split-mode" class="spot-split-mode" type="button" aria-pressed="false">分割する</button>
+          <div class="spot-actions" aria-label="候補の編集">
+            <button id="spot-merge" type="button" disabled>まとめる</button>
+            <button id="spot-split" type="button" disabled>選択範囲で分割</button>
+            <button id="spot-exclude" type="button" disabled>候補を除外</button>
+            <button id="spot-confirm" type="button" disabled>正解を確定</button>
+          </div>
+          <ol id="spot-candidates" class="spot-candidates" aria-label="差分候補"></ol>
+          <p id="spot-confirmed" class="spot-confirmed" role="status" hidden>作者が正解を確定しました。作品は端末内の下書きです。</p>
+        </div>
+      </details>
+      <div class="spot-publish-actions" aria-label="確定した間違い探しの操作">
+        <button id="spot-play-local" type="button" hidden disabled>確定した下書きを試しに遊ぶ</button>
+        <button id="spot-publish" class="spot-publish" type="button" hidden disabled>地球儀へ投稿</button>
+      </div>
+      <output id="spot-zoom" class="spot-zoom" aria-label="画像の拡大率">100%</output>
+      <p id="spot-edit-hint" class="spot-edit-hint" role="status" aria-live="polite"></p>
+    </section>
+  </main>
+  <footer class="site-footer"><div class="container"><p>PiXiEED</p></div></footer>
+  <nav class="app-tabs" aria-label="アプリナビゲーション">
+    <a data-nav="home" href="/home/" aria-label="ホーム"><img src="/assets/icons/pixieed/home.svg" alt=""></a>
+    <a data-nav="map" href="/" aria-label="地図"><img src="/assets/icons/pixieed/globe.svg" alt=""></a>
+    <button id="spot-save" type="button" aria-label="間違い探しを端末に保存" disabled>保存</button>
+    <a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""></a>
+    <a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>
+  </nav>
+  <script type="module" src="/js/creation/spot-difference-page.mjs?rev=20260928-puzzle-handoff-1"></script>
+</body>
+</html>

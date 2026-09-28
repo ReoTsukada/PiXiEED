@@ -6,8 +6,10 @@ import { CAMERA_SETTING_DEFAULTS, DITHER_PATTERNS, lensFrameFilter, lensPalette,
 import { attachZoomGestures, formatZoom, splitZoom, zoomRange, zoomStops } from './zoom.mjs?v=20260928-pass-1';
 import { GIF_FPS, GIF_MAX_MS, encodeGif, gifScale } from './gif.mjs?v=20260928-pass-1';
 import { hasPerk, requestPass, onPassChange } from '../pixieed-pass.mjs?v=20260928-pass-1';
+import { cameraPostDataUrl } from './camera-post.mjs';
 
 const $ = (selector) => document.querySelector(selector);
+const returnToAudio = new URLSearchParams(location.search).get('to') === 'audio';
 const root = $('#pixelStudio');
 const video = $('#video');
 const stage = $('#stage');
@@ -84,6 +86,7 @@ function updateSaveLinkState() {
   const link = $('#savePng');
   const enabled = state.mode === 'captured' && Boolean(state.result && downloadUrl);
   $('#resultControls').hidden = !enabled;
+  $('#postCamera').hidden = Boolean(gif.pending);
   link.setAttribute('aria-disabled', String(!enabled));
   link.setAttribute('tabindex', enabled ? '0' : '-1');
   if (!enabled) link.removeAttribute('href');
@@ -1080,6 +1083,17 @@ $('#flipCamera').addEventListener('click', () => { if (state.mode === 'live') fl
 $('#savePng').addEventListener('click', (event) => {
   if ($('#savePng').getAttribute('aria-disabled') === 'true') { event.preventDefault(); return; }
   sayToast('PNGの保存を開始しました。');
+});
+if (returnToAudio) $('#postCamera').textContent = '曲を作る';
+$('#postCamera').addEventListener('click', () => {
+  if (state.mode !== 'captured' || !state.result || gif.pending) return;
+  try {
+    const dataUrl = cameraPostDataUrl(state.result);
+    localStorage.setItem('PiXiEED:camera-handoff:v1', JSON.stringify({ dataUrl, createdAt: Date.now() }));
+    location.assign(returnToAudio ? '/audio/' : '/?from=pixel-camera');
+  } catch (error) {
+    say(error instanceof Error ? error.message : '撮影画像を準備できませんでした。', { visible: true });
+  }
 });
 
 function suspendCamera() {

@@ -1,0 +1,16 @@
+.profile-liked-post .art-card__image img {
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.profile-liked-post .art-card__body h3 a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.profile-liked-post .art-card__body h3 a:hover,
+.profile-liked-post .art-card__body h3 a:focus-visible {
+  text-decoration: underline;
+}
+
+[data-profile-liked-posts]:empty { display: none; }

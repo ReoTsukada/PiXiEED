@@ -306,5 +306,8 @@ button, a { font: inherit; }
 /* PiXiEED pass: the remaining-time chip next to the back button, and the one offer on a finished GIF */
 .lc-top-left { display: flex; align-items: center; gap: .45rem; }
 .lc-result { display: grid; justify-items: center; gap: .55rem; }
+.lc-post { min-height: 2.5rem; padding: 0 1.2rem; border: 1px solid rgba(255,255,255,.6); border-radius: 999px; background: rgba(16,24,30,.78); color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+.lc-post:hover, .lc-post:focus-visible { background: rgba(16,24,30,.96); outline-color: #fff; }
+.lc-post[hidden] { display: none; }
 .lc-upgrade { height: 2.3rem; padding: 0 1rem; border: 1px solid rgba(255, 211, 90, .55); border-radius: 999px; background: rgba(20, 26, 31, .7); color: #ffd35a; font-size: .8rem; font-weight: 800; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); cursor: pointer; animation: lc-in .3s var(--lc-ease); }
 .lc-upgrade[hidden] { display: none; }

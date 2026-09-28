@@ -9,12 +9,14 @@
  */
 import { lookupCell, projectGeoToScreen } from './geometry.mjs?v=20260921-grid11-1';
 import { formatCoordinates, googleMapsUrl, parseLocationInput } from './geo-input.mjs?v=20260921-post-1';
-import { inspectPixelImage, integerScale, PIXEL_LIMITS } from './post-image.mjs?v=20260921-post-1';
+import { fitPixelImage, inspectPixelImage, PIXEL_LIMITS } from './post-image.mjs?v=20260928-image-fit-1';
 import { createDemoAuth, createPostStore } from './post-store.mjs?v=20260921-post-1';
+import { PUZZLE_HANDOFF_META_KEY } from '../creation/puzzle-handoff.mjs?v=20260928-puzzle-handoff-1';
 
 const TITLE_MAX = 60;
 const CAPTION_MAX = 140;
 const PIN_VISIBLE_DEPTH = 0.06;
+const PUBLIC_POST_ID = /^(?:showcase:)?[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const $ = (root, selector) => root.querySelector(selector);
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
@@ -61,11 +63,11 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
   pinLayer.append(draftPin);
 
   const dock = el('div', 'post-dock');
-  dock.hidden = true;
   const composeButton = el('button', 'post-fab', { type: 'button', 'aria-label': 'ドット絵を置く' });
+  composeButton.hidden = true; // The site navigation owns the primary posting action.
   composeButton.innerHTML = '<img class="post-fab__icon" src="/assets/icons/pixieed/add.svg" alt=""><i class="post-fab__draft" hidden></i>';
-  const galleryButton = el('button', 'post-dock__secondary', { type: 'button', 'aria-label': '作品の一覧' });
-  galleryButton.innerHTML = '<img src="/assets/icons/pixieed/artwork.svg" alt=""><span class="post-dock__count">0</span>';
+  const galleryButton = el('button', 'post-dock__secondary', { type: 'button', 'aria-label': '地図の投稿一覧' });
+  galleryButton.innerHTML = '<img src="/assets/icons/pixieed/artwork.svg" alt=""><span>投稿を見る</span><span class="post-dock__count">0</span>';
   dock.append(composeButton, galleryButton);
 
   const hint = el('div', 'place-hint', { hidden: true, role: 'status' });
@@ -76,7 +78,7 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
   const composer = el('aside', 'sheet composer', { hidden: true, 'aria-label': 'ドット絵を置く' });
   composer.innerHTML = `
     <header class="sheet__head">
-      <h2>ドット絵を置く</h2>
+      <h2 data-compose-title>ドット絵を置く</h2>
       <button type="button" class="sheet__close" data-close aria-label="閉じる"><img src="/assets/icons/pixieed/close.svg" alt=""></button>
     </header>
     <div class="peek-bar" data-peek-bar hidden><span>地球のセルをタップしてピンを置く</span><button type="button" class="primary" data-peek-done>決定</button></div>
@@ -84,6 +86,11 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
       <li data-step="art"><b>1</b>絵</li><li data-step="title"><b>2</b>題名</li><li data-step="place"><b>3</b>場所</li>
     </ol>
     <form class="composer__form" novalidate>
+      <section class="field puzzle-handoff" data-puzzle-panel hidden aria-label="パズル投稿の確認">
+        <h3 data-puzzle-title>パズル</h3>
+        <p data-puzzle-description></p>
+        <label class="post-confirm"><input type="checkbox" data-puzzle-rights> この絵と正解データを投稿する権利があり、内容を確認しました。公開後は誰でも遊べる作品として扱われることを理解しています。</label>
+      </section>
       <section class="field" aria-labelledby="c-art">
         <h3 id="c-art">絵</h3>
         <div class="drop" data-drop tabindex="0" role="button" aria-label="ドット絵を選ぶ">
@@ -99,6 +106,8 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
           <div class="art__meta"><span data-art-meta></span><button type="button" class="link" data-replace>選び直す</button></div>
         </div>
         <p class="field__error" data-art-error role="alert"></p>
+        <label class="post-confirm" data-art-confirm><input type="checkbox" data-art-made> 自分で制作したドット絵です</label>
+        <p class="post-confirm" data-camera-origin hidden>ドット絵カメラで撮影した画像として投稿します。</p>
       </section>
       <section class="field" aria-labelledby="c-title">
         <h3 id="c-title">題名 <em>必須</em></h3>
@@ -167,16 +176,18 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
       <button type="button" class="ghost" data-v-prev aria-label="前の作品">←</button>
       <button type="button" class="ghost" data-v-focus>地球で見る</button>
       <button type="button" class="ghost" data-v-next aria-label="次の作品">→</button>
+      <a class="viewer__puzzle" data-v-puzzle target="_top" hidden>遊ぶ</a>
+      <button type="button" class="viewer__like" data-v-like aria-pressed="false" hidden>♡ いいね</button>
       <button type="button" class="danger" data-v-delete hidden>削除</button>
     </div>`;
 
-  const gallery = el('aside', 'sheet gallery', { hidden: true, 'aria-label': '作品の一覧' });
+  const gallery = el('aside', 'sheet gallery', { hidden: true, 'aria-label': '地図の投稿一覧' });
   gallery.innerHTML = `
     <header class="sheet__head">
-      <h2>作品</h2>
+      <h2>地図の投稿</h2>
       <button type="button" class="sheet__close" data-close aria-label="閉じる"><img src="/assets/icons/pixieed/close.svg" alt=""></button>
     </header>
-    <div class="tabs" role="tablist"><button type="button" role="tab" data-tab="all" aria-selected="true">すべて</button><button type="button" role="tab" data-tab="mine" aria-selected="false">自分の作品</button></div>
+    <div class="tabs" aria-label="投稿を絞り込む"><button type="button" data-tab="art" aria-pressed="true">ドット絵</button><button type="button" data-tab="camera" aria-pressed="false">カメラ</button><a class="tabs__profile-link" href="/profile/?view=posts" target="_top">投稿した絵</a></div>
     <div class="gallery__grid" data-grid></div>
     <p class="gallery__empty" data-empty hidden></p>`;
 
@@ -194,7 +205,7 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
   stage.append(pinLayer, dock, hint, toast, composer, viewer, gallery, modal);
 
   // ---- state --------------------------------------------------------------------------------
-  const state = { image: null, pin: null, submitting: false, done: null, viewerId: null, tab: 'all', pendingAfterLogin: null };
+  const state = { image: null, postKind: 'pixel_art', puzzle: null, puzzleHandoff: null, pin: null, submitting: false, done: null, viewerId: null, tab: 'art', pendingAfterLogin: null, likeStates: new Map(), requestKey: null, requestFingerprint: null };
   const markers = new Map(); // post id -> button
   let toastTimer = 0;
   let deleteTimer = 0;
@@ -251,6 +262,9 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
     artImage: $(composer, '[data-art-image]'),
     artMeta: $(composer, '[data-art-meta]'),
     artError: $(composer, '[data-art-error]'),
+    artMade: $(composer, '[data-art-made]'),
+    artConfirm: $(composer, '[data-art-confirm]'),
+    cameraOrigin: $(composer, '[data-camera-origin]'),
     title: $(composer, '[data-title]'),
     titleCount: $(composer, '[data-title-count]'),
     caption: $(composer, '[data-caption]'),
@@ -266,19 +280,43 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
     doneText: $(composer, '[data-done-text]'),
     steps: composer.querySelectorAll('.steps li')
   };
+  const puzzlePanel = $(composer, '[data-puzzle-panel]');
+  const puzzleRights = $(composer, '[data-puzzle-rights]');
+
+  async function makeRequestFingerprint() {
+    const content = JSON.stringify({ title: c.title.value.trim(), caption: c.caption.value.trim(), pin: state.pin && { latitude: state.pin.latitude, longitude: state.pin.longitude, cellId: state.pin.cellId }, postKind: state.postKind, image: state.image?.dataUrl || '', puzzle: state.puzzle });
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(content));
+    return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+  }
+  function persistPuzzleRetry() {
+    if (!state.puzzleHandoff) return;
+    try { sessionStorage.setItem(PUZZLE_HANDOFF_META_KEY, JSON.stringify({ title: c.title.value, caption: c.caption.value, pin: state.pin && { latitude: state.pin.latitude, longitude: state.pin.longitude, source: state.pin.source, label: state.pin.label || '' }, requestKey: state.requestKey, requestFingerprint: state.requestFingerprint })); } catch { /* the handoff payload remains available */ }
+  }
+  function invalidateRequestKey() { state.requestKey = null; state.requestFingerprint = null; persistPuzzleRetry(); }
 
   function syncComposer() {
     const title = c.title.value.trim();
     const okArt = Boolean(state.image);
+    const okOrigin = state.postKind === 'pixel_camera' || c.artMade.checked;
+    const okPuzzleRights = !state.puzzle || puzzleRights.checked;
     const okTitle = title.length > 0;
     const okPlace = Boolean(state.pin);
     c.steps.forEach((step) => step.classList.toggle('is-done', { art: okArt, title: okTitle, place: okPlace }[step.dataset.step]));
-    const missing = [!okArt && '絵', !okTitle && '題名', !okPlace && '場所'].filter(Boolean);
+    const missing = [!okArt && '絵', !okOrigin && '制作確認', !okPuzzleRights && '権利確認', !okTitle && '題名', !okPlace && '場所'].filter(Boolean);
     c.submit.disabled = missing.length > 0 || state.submitting;
     c.missing.textContent = state.submitting ? '置いています…' : (missing.length ? `あと：${missing.join(' ・ ')}` : '準備できました');
     c.titleCount.textContent = `${c.title.value.length}/${TITLE_MAX}`;
     c.art.hidden = !okArt;
     c.drop.hidden = okArt;
+    c.artConfirm.hidden = state.postKind === 'pixel_camera';
+    c.cameraOrigin.hidden = state.postKind !== 'pixel_camera';
+    puzzlePanel.hidden = !state.puzzle;
+    c.submit.textContent = state.puzzle ? '審査に送る' : '置く';
+    if (state.puzzle) {
+      $(composer, '[data-puzzle-title]').textContent = state.puzzle.mode === 'spot_difference' ? '間違い探しを一緒に投稿' : 'もの探しを一緒に投稿';
+      $(composer, '[data-puzzle-description]').textContent = state.puzzle.mode === 'spot_difference' ? `${state.puzzle.definition.candidates.length}個の正解候補と変更後の絵を、審査用データとして送ります。` : `${state.puzzle.definition.targets.length}個の名前付き対象を、審査用データとして送ります。`;
+    }
+    $(composer, '[data-compose-title]').textContent = state.postKind === 'pixel_camera' ? 'カメラで撮った絵を置く' : 'ドット絵を置く';
     composeButton.querySelector('.post-fab__draft').hidden = !(okArt || okTitle || okPlace) || Boolean(state.done);
     if (state.pin) {
       c.place.classList.add('is-set');
@@ -293,20 +331,37 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
     positionDraftPin();
   }
 
-  async function setImage(file) {
+  async function setImage(file, { fromCamera = false, puzzlePayload = null } = {}) {
     c.artError.textContent = '';
     if (!file) return;
+    if (!puzzlePayload) {
+      state.puzzle = null; puzzleRights.checked = false; invalidateRequestKey();
+      if (state.puzzleHandoff) { const discard = state.puzzleHandoff.onDiscard; state.puzzleHandoff = null; discard?.(); }
+    }
+    state.postKind = fromCamera ? 'pixel_camera' : 'pixel_art';
     try {
       const inspected = await inspectPixelImage(file);
       state.image = inspected;
       c.artImage.src = inspected.dataUrl;
-      const scale = integerScale(inspected.width, inspected.height, 232, 232);
-      c.artImage.style.width = `${inspected.width * scale}px`;
-      c.artImage.style.height = `${inspected.height * scale}px`;
+      const display = fitPixelImage(inspected.width, inspected.height, 232, 232);
+      c.artImage.style.width = `${display.width}px`;
+      c.artImage.style.height = `${display.height}px`;
       c.artMeta.textContent = `${inspected.width}×${inspected.height}px ・ ${inspected.colorCount}色`;
     } catch (error) {
       state.image = null;
       c.artError.textContent = error instanceof Error ? error.message : '画像を確認できませんでした。';
+    }
+    if (state.image && puzzlePayload) {
+      const expected = puzzlePayload.image;
+      const actual = new Uint8Array(await file.arrayBuffer());
+      let binary = ''; for (let offset = 0; offset < actual.length; offset += 0x8000) binary += String.fromCharCode(...actual.subarray(offset, offset + 0x8000));
+      if (btoa(binary) !== expected.base64 || state.image.width !== expected.width || state.image.height !== expected.height || state.image.colorCount !== expected.colorCount || actual.length !== expected.size) {
+        state.image = null; c.artError.textContent = '元画像とパズルの投稿データが一致しません。作成画面からもう一度送ってください。';
+      } else {
+        state.image = { ...expected, dataUrl: `data:image/png;base64,${expected.base64}` };
+        state.puzzle = structuredClone(puzzlePayload.puzzle);
+        state.requestKey = null; state.requestFingerprint = null;
+      }
     }
     c.file.value = '';
     syncComposer();
@@ -314,6 +369,7 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
 
   function setPin(pin, { fly = false } = {}) {
     const cell = lookupCell(pin.longitude, pin.latitude);
+    if (!state.pin || state.pin.latitude !== pin.latitude || state.pin.longitude !== pin.longitude || state.pin.cellId !== cell.cellId) invalidateRequestKey();
     state.pin = { ...pin, cellId: cell.cellId };
     if (fly) flyTo(pin.latitude, pin.longitude, 6);
     syncComposer();
@@ -326,7 +382,7 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
   }
 
   function resetComposer() {
-    state.image = null; state.pin = null; state.submitting = false; state.done = null;
+    state.image = null; state.postKind = 'pixel_art'; state.puzzle = null; state.pin = null; state.submitting = false; state.done = null; state.requestKey = null; state.requestFingerprint = null; puzzleRights.checked = false;
     c.form.reset();
     c.artError.textContent = ''; c.smartStatus.textContent = ''; c.smartStatus.dataset.state = '';
     c.form.hidden = false; c.done.hidden = true;
@@ -341,13 +397,32 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
     return true;
   }
 
-  function openComposer({ selection = null, file = null } = {}) {
-    if (needLogin(() => openComposer({ selection, file }))) return;
+  function openComposer({ selection = null, file = null, postKind = 'pixel_art', puzzlePayload = null } = {}) {
+    if (needLogin(() => openComposer({ selection, file, postKind, puzzlePayload }))) return;
     if (state.done) resetComposer();
     showSheet('composer');
     if (selection) { const pin = pinFromSelection(selection); if (pin) setPin(pin); }
-    if (file) setImage(file);
+    if (file) return setImage(file, { fromCamera: postKind === 'pixel_camera', puzzlePayload });
     else if (!state.image) requestAnimationFrame(() => c.drop.focus({ preventScroll: true }));
+    return Promise.resolve();
+  }
+
+  async function openPuzzleComposer({ file, payload, metadata = null, onSuccess = null, onDiscard = null } = {}) {
+    if (!file || !payload?.puzzle || payload.image?.mimeType !== 'image/png') return false;
+    state.puzzleHandoff = { onSuccess, onDiscard };
+    state.puzzle = null; state.image = null;
+    await openComposer({ file, postKind: 'pixel_art', puzzlePayload: payload });
+    if (metadata) {
+      c.title.value = typeof metadata.title === 'string' ? metadata.title.slice(0, TITLE_MAX) : '';
+      c.caption.value = typeof metadata.caption === 'string' ? metadata.caption.slice(0, CAPTION_MAX) : '';
+      if (Number.isFinite(metadata.pin?.latitude) && Number.isFinite(metadata.pin?.longitude)) setPin({ latitude: metadata.pin.latitude, longitude: metadata.pin.longitude, source: metadata.pin.source || 'cell', label: String(metadata.pin.label || '').slice(0, 80) });
+      if (typeof metadata.requestKey === 'string' && metadata.requestKey && metadata.requestFingerprint === await makeRequestFingerprint()) {
+        state.requestKey = metadata.requestKey; state.requestFingerprint = metadata.requestFingerprint;
+      }
+    }
+    puzzleRights.checked = false; syncComposer();
+    persistPuzzleRetry();
+    return Boolean(state.puzzle);
   }
 
   $(composer, '[data-close]').addEventListener('click', closeSheets);
@@ -357,7 +432,10 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
   c.drop.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); c.file.click(); } });
   $(composer, '[data-replace]').addEventListener('click', () => c.file.click());
   c.file.addEventListener('change', () => setImage(c.file.files?.[0]));
-  c.title.addEventListener('input', syncComposer);
+  c.title.addEventListener('input', () => { invalidateRequestKey(); syncComposer(); });
+  c.caption.addEventListener('input', invalidateRequestKey);
+  c.artMade.addEventListener('change', () => { persistPuzzleRetry(); syncComposer(); });
+  puzzleRights.addEventListener('change', () => { persistPuzzleRetry(); syncComposer(); });
 
   let smartTimer = 0;
   c.smart.addEventListener('input', () => {
@@ -393,20 +471,26 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
     if (!user) { needLogin(() => c.form.requestSubmit()); return; }
     state.submitting = true; syncComposer();
     try {
+      const fingerprint = await makeRequestFingerprint();
+      if (!state.requestKey || state.requestFingerprint !== fingerprint) { state.requestKey = crypto.randomUUID(); state.requestFingerprint = fingerprint; }
+      persistPuzzleRetry();
       const record = await store.add({
+        postKind: state.postKind,
         title: c.title.value.trim(),
         caption: c.caption.value.trim(),
         image: { dataUrl: state.image.dataUrl, mimeType: state.image.mimeType, size: state.image.size, width: state.image.width, height: state.image.height, colorCount: state.image.colorCount },
         pin: { latitude: state.pin.latitude, longitude: state.pin.longitude, cellId: state.pin.cellId, source: state.pin.source },
-        author: { id: user.id, name: user.name }
+        author: { id: user.id, name: user.name }, requestKey: state.requestKey, puzzle: state.puzzle
       });
+      state.puzzleHandoff?.onSuccess?.(); state.puzzleHandoff = null;
       state.done = record;
       c.doneImage.src = record.image.dataUrl;
-      const scale = integerScale(record.image.width, record.image.height, 160, 160);
-      c.doneImage.style.width = `${record.image.width * scale}px`; c.doneImage.style.height = `${record.image.height * scale}px`;
+      const display = fitPixelImage(record.image.width, record.image.height, 160, 160);
+      c.doneImage.style.width = `${display.width}px`; c.doneImage.style.height = `${display.height}px`;
       c.doneText.textContent = record.status === 'pending'
         ? `「${record.title}」を受け付けました。確認後、このセルに表示されます。`
         : `「${record.title}」を ${formatCoordinates(record.pin.latitude, record.pin.longitude)} に置きました。`;
+      $(composer, '[data-done-view]').textContent = record.status === 'pending' ? '地球儀へ戻る' : '地球で見る';
       c.form.hidden = true; c.done.hidden = false; hint.hidden = true;
       state.submitting = false; syncComposer();
       if (record.status !== 'pending') {
@@ -419,7 +503,13 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
     }
   });
 
-  $(composer, '[data-done-view]').addEventListener('click', () => { const id = state.done?.id; resetComposer(); if (id) openViewer(id); });
+  $(composer, '[data-done-view]').addEventListener('click', () => {
+    const id = state.done?.id;
+    const pending = state.done?.status === 'pending';
+    resetComposer();
+    if (pending) closeSheets();
+    else if (id) openViewer(id);
+  });
   $(composer, '[data-done-again]').addEventListener('click', () => { resetComposer(); c.drop.focus({ preventScroll: true }); });
 
   // Drag & drop / paste anywhere on the stage.
@@ -479,19 +569,26 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
   // ---- viewer ---------------------------------------------------------------------------------
   const v = {
     image: $(viewer, '[data-v-image]'), title: $(viewer, '[data-v-title]'), caption: $(viewer, '[data-v-caption]'),
-    author: $(viewer, '[data-v-author]'), date: $(viewer, '[data-v-date]'), coords: $(viewer, '[data-v-coords]'),
-    map: $(viewer, '[data-v-map]'), del: $(viewer, '[data-v-delete]'), kicker: $(viewer, '[data-v-kicker]')
+    author: $(viewer, '[data-v-author]'), date: $(viewer, '[data-v-date]'), coords: $(viewer, '[data-v-coords]'), puzzle: $(viewer, '[data-v-puzzle]'),
+    map: $(viewer, '[data-v-map]'), del: $(viewer, '[data-v-delete]'), like: $(viewer, '[data-v-like]'), kicker: $(viewer, '[data-v-kicker]')
   };
 
   function openViewer(id, { fly = true } = {}) {
     const post = posts().find((item) => item.id === id);
-    if (!post) return;
+    if (!post) return false;
     state.viewerId = id;
     const artBox = window.innerWidth < 680 ? 176 : 288;
     showSheet('viewer');
+    const displayImage = (width, height) => {
+      const display = fitPixelImage(width, height, artBox, artBox);
+      v.image.style.width = `${display.width}px`; v.image.style.height = `${display.height}px`;
+    };
+    v.image.onload = () => {
+      if (state.viewerId === id && v.image.naturalWidth > 0) displayImage(v.image.naturalWidth, v.image.naturalHeight);
+    };
+    displayImage(post.image.width, post.image.height);
     v.image.src = post.image.dataUrl;
-    const scale = integerScale(post.image.width, post.image.height, artBox, artBox);
-    v.image.style.width = `${post.image.width * scale}px`; v.image.style.height = `${post.image.height * scale}px`;
+    if (v.image.complete && v.image.naturalWidth > 0) displayImage(v.image.naturalWidth, v.image.naturalHeight);
     v.image.alt = post.title;
     v.title.textContent = post.title;
     v.caption.textContent = post.caption || '';
@@ -500,11 +597,41 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
     v.date.textContent = formatDate(post.createdAt);
     v.coords.textContent = formatCoordinates(post.pin.latitude, post.pin.longitude);
     v.map.href = googleMapsUrl(post.pin.latitude, post.pin.longitude);
-    v.kicker.textContent = post.sample ? 'サンプル作品' : '作品';
-    v.del.hidden = !isMine(post);
+    v.kicker.textContent = post.postKind === 'pixel_camera' ? 'ドット絵カメラ投稿' : (post.sample ? 'サンプル作品' : 'ドット絵作品');
+    v.puzzle.hidden = !['spot_difference', 'hidden_object'].includes(post.puzzleMode) || !/^[0-9a-f-]{36}$/i.test(String(post.id));
+    v.puzzle.href = v.puzzle.hidden ? '#' : `/pixfind/?postPuzzle=${encodeURIComponent(post.id)}`;
+    v.puzzle.setAttribute('aria-label', post.puzzleMode === 'spot_difference' ? '間違い探しを遊ぶ' : 'もの探しを遊ぶ');
+    v.del.hidden = !isMine(post) || !(store.canRemove === true || store.capabilities?.remove === true);
     v.del.textContent = '削除'; v.del.dataset.armed = '';
+    v.like.hidden = post.likeable !== true || typeof store.setLike !== 'function' || typeof store.hasLiked !== 'function';
+    v.like.disabled = false;
+    const likeState = state.likeStates.get(id) || { confirmed: false, desired: false, running: false, loaded: false };
+    state.likeStates.set(id, likeState);
+    v.like.disabled = !likeState.loaded;
+    syncLikeButton(likeState);
+    if (!likeState.loaded && !likeState.loading && !likeState.loadError) requestLikeStatus(id, likeState);
     if (fly) flyTo(post.pin.latitude, post.pin.longitude, Math.min(view().zoom > 3 ? view().zoom : 3.2, 6));
     syncMarkerSelection();
+    return true;
+  }
+
+  async function openLinkedPost(id) {
+    if (!PUBLIC_POST_ID.test(String(id || ''))) return false;
+    if (openViewer(id)) return true;
+    if (!id.startsWith('showcase:') && typeof store.ensurePublishedById === 'function') {
+      showSheet('gallery');
+      say('作品を読み込んでいます。');
+      try {
+        if (await store.ensurePublishedById(id)) return openViewer(id);
+      } catch {
+        say('作品を読み込めませんでした。時間をおいて再試行してください。');
+        return false;
+      }
+    }
+    showSheet('gallery');
+    renderGallery();
+    say('この作品は現在公開されていません。');
+    return false;
   }
 
   function stepViewer(direction) {
@@ -518,7 +645,74 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
   $(viewer, '[data-v-prev]').addEventListener('click', () => stepViewer(-1));
   $(viewer, '[data-v-next]').addEventListener('click', () => stepViewer(1));
   $(viewer, '[data-v-focus]').addEventListener('click', () => { const post = posts().find((item) => item.id === state.viewerId); if (post) flyTo(post.pin.latitude, post.pin.longitude, 8); });
+  function syncLikeButton(likeState) {
+    if (likeState.loadError) {
+      v.like.textContent = '状態を読み込めません。再試行';
+      v.like.setAttribute('aria-label', 'いいね状態を再読み込みする');
+      v.like.removeAttribute('aria-pressed');
+      return;
+    }
+    if (likeState.loading) {
+      v.like.textContent = 'いいね状態を確認中…';
+      v.like.setAttribute('aria-label', 'いいね状態を確認中');
+      v.like.removeAttribute('aria-pressed');
+      return;
+    }
+    v.like.setAttribute('aria-pressed', String(likeState.desired));
+    v.like.textContent = likeState.running ? (likeState.desired ? '♥ 保存中…' : '♡ 取り消し中…') : (likeState.desired ? '♥ いいね済み' : '♡ いいね');
+    v.like.setAttribute('aria-label', likeState.desired ? 'いいねを取り消す' : 'いいねする');
+  }
+  function requestLikeStatus(id, likeState) {
+    if (likeState.loading || likeState.loaded) return;
+    likeState.loadError = false;
+    likeState.loading = true;
+    if (state.viewerId === id) { v.like.disabled = true; syncLikeButton(likeState); }
+    Promise.resolve().then(() => store.hasLiked(id)).then((liked) => {
+      likeState.confirmed = Boolean(liked);
+      if (!likeState.running) likeState.desired = likeState.confirmed;
+      likeState.loaded = true;
+    }).catch((error) => {
+      likeState.loadError = true;
+      if (state.viewerId === id) say(error?.message || 'いいね状態を読み込めませんでした。再試行できます。');
+    }).finally(() => {
+      likeState.loading = false;
+      if (state.viewerId === id) { v.like.disabled = false; syncLikeButton(likeState); }
+    });
+  }
+  v.like.addEventListener('click', () => {
+    const id = state.viewerId;
+    if (v.like.disabled) return;
+    const post = posts().find((item) => item.id === id);
+    if (!post?.likeable || typeof store.setLike !== 'function' || typeof store.hasLiked !== 'function') return;
+    const likeState = state.likeStates.get(id) || { confirmed: false, desired: false, running: false, loaded: false };
+    state.likeStates.set(id, likeState);
+    if (likeState.loadError || !likeState.loaded) {
+      requestLikeStatus(id, likeState);
+      return;
+    }
+    likeState.desired = !likeState.desired;
+    syncLikeButton(likeState);
+    if (likeState.running) return;
+    likeState.running = true;
+    syncLikeButton(likeState);
+    (async () => {
+      try {
+        while (likeState.confirmed !== likeState.desired) {
+          const target = likeState.desired;
+          await store.setLike(id, target);
+          likeState.confirmed = target;
+        }
+      } catch (error) {
+        likeState.desired = likeState.confirmed;
+        say(error?.message || 'いいねを保存できませんでした。');
+      } finally {
+        likeState.running = false;
+        if (state.viewerId === id) syncLikeButton(likeState);
+      }
+    })();
+  });
   v.del.addEventListener('click', async () => {
+    if (!(store.canRemove === true || store.capabilities?.remove === true) || typeof store.remove !== 'function') return;
     if (v.del.dataset.armed !== '1') {
       v.del.dataset.armed = '1'; v.del.textContent = '本当に削除する';
       clearTimeout(deleteTimer); deleteTimer = setTimeout(() => { v.del.dataset.armed = ''; v.del.textContent = '削除'; }, 3500);
@@ -532,18 +726,19 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
   // ---- gallery ------------------------------------------------------------------------------
   const g = { grid: $(gallery, '[data-grid]'), empty: $(gallery, '[data-empty]'), tabs: gallery.querySelectorAll('[data-tab]') };
   function renderGallery() {
-    const list = posts().filter((post) => state.tab === 'all' || isMine(post));
+    const list = posts().filter((post) => state.tab === 'camera' ? post.postKind === 'pixel_camera' : post.postKind !== 'pixel_camera');
     g.grid.replaceChildren(...list.map((post) => {
       const cell = el('button', 'tile', { type: 'button', 'aria-label': post.title });
       const art = el('span', 'tile__art'); art.append(pixelImage(post));
       const label = el('span', 'tile__title'); label.textContent = post.title;
-      cell.append(art, label);
+      const kind = el('span', 'tile__kind'); kind.textContent = post.postKind === 'pixel_camera' ? 'カメラ' : 'ドット絵';
+      cell.append(art, label, kind);
       cell.addEventListener('click', () => openViewer(post.id));
       return cell;
     }));
     g.empty.hidden = list.length > 0;
-    g.empty.textContent = state.tab === 'mine' ? (currentUser() ? 'まだ作品がありません。地球に最初の1枚を置いてみましょう。' : 'ログインすると、自分の作品がここに並びます。') : '作品はまだありません。';
-    g.tabs.forEach((tab) => tab.setAttribute('aria-selected', String(tab.dataset.tab === state.tab)));
+    g.empty.textContent = state.tab === 'camera' ? 'カメラ投稿はまだありません。' : 'ドット絵作品はまだありません。';
+    g.tabs.forEach((tab) => tab.setAttribute('aria-pressed', String(tab.dataset.tab === state.tab)));
     galleryButton.querySelector('.post-dock__count').textContent = String(posts().length);
   }
   g.tabs.forEach((tab) => tab.addEventListener('click', () => { state.tab = tab.dataset.tab; renderGallery(); }));
@@ -556,10 +751,11 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
     let marker = markers.get(post.id);
     if (marker) return marker;
     marker = el('button', 'pin', { type: 'button', 'data-id': post.id });
+    marker.classList.toggle('pin--camera', post.postKind === 'pixel_camera');
     marker.append(pixelImage(post, 'pin__art'));
     const badge = el('span', 'pin__count', { hidden: true }); marker.append(badge);
-    const label = el('span', 'pin__label'); label.textContent = post.title; marker.append(label);
-    marker.setAttribute('aria-label', post.title);
+    const label = el('span', 'pin__label'); label.textContent = post.postKind === 'pixel_camera' ? `カメラ · ${post.title}` : post.title; marker.append(label);
+    marker.setAttribute('aria-label', post.postKind === 'pixel_camera' ? `ドット絵カメラ投稿：${post.title}` : `ドット絵作品：${post.title}`);
     marker.addEventListener('pointerdown', (event) => event.stopPropagation());
     marker.addEventListener('click', (event) => { event.stopPropagation(); openViewer(post.id, { fly: false }); });
     pinLayer.append(marker);
@@ -639,7 +835,9 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
       return true;
     },
     openComposer,
+    openPuzzleComposer,
     openViewer,
+    openLinkedPost,
     close: closeSheets,
     store,
     auth,

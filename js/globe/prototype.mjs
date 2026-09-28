@@ -1,8 +1,9 @@
 import { initAstroUi } from './astro-ui.mjs?v=20260927-sky-events-v1';
-import { initPostUi } from './post-ui.mjs?v=20260927-sky-events-v1';
+import { initPostUi } from './post-ui.mjs?v=20260928-puzzle-handoff-1';
 import { sharedSky, sharedFaintSky, SPRITE_MAGNITUDE } from './real-sky.mjs?v=20260927-sky-events-v1';
-import { createSupabaseGlobeAuth, createSupabaseGlobeStore } from './post-supabase.mjs?v=20260921-globe-post-v1';
+import { createSupabaseGlobeAuth, createSupabaseGlobeStore } from './post-supabase.mjs?v=20260928-puzzle-handoff-1';
 import { createGlobeRenderer, decodeRasterData, getSelectionStageLabel, prepareGeoJsonFeatures } from './renderer.mjs?v=20260927-sky-events-v1';
+import { openHandoffComposer, pendingHandoff } from './post-handoff.mjs?v=20260928-puzzle-handoff-1';
 
 const embedMode = new URLSearchParams(location.search).get('embed') === '1';
 
@@ -29,9 +30,14 @@ function readJson(path) {
 function showSelection(selection) {
   currentSelection = selection;
   selectionPanel.hidden = !selection;
+  globeStage?.classList.toggle('has-selection', Boolean(selection));
   if (!selection) return;
+  // Keyboard selection can happen while the time drawer is open. Keep its
+  // overlay from hiding the newly available placement action.
+  globalThis.__PIXIEED_ASTRO__?.setOpen(false);
   selectedStage.textContent = getSelectionStageLabel(selection.lodLevel);
   selectedOwner.textContent = selection.ownerLabel || selection.countryId || '土地セル';
+  placeHere.setAttribute('aria-label', `${selectedOwner.textContent}のセルに作品を置く`);
 }
 
 let renderer;
@@ -74,31 +80,24 @@ function createPrototypeRenderer(options = {}) {
   try {
     postUi = initPostUi({ renderer, stage: globeStage, accountSlot: embedMode ? null : accountSlot, store: createSupabaseGlobeStore(), auth: createSupabaseGlobeAuth() });
     globalThis.__PIXIEED_POSTS__ = postUi;
-    adoptCameraHandoff();
+    adoptPostHandoff();
   } catch (error) { console.warn('Posting UI unavailable', error); }
   return renderer;
 }
 
-// A picture sent over from the pixel camera opens the composer with the image already in place.
-function adoptCameraHandoff() {
-  const key = 'PiXiEED:camera-handoff:v1';
+// A valid, source-matched local handoff opens the composer without submitting it.
+function adoptPostHandoff() {
+  const handoff = pendingHandoff(); if (!handoff) return;
   try {
-    const raw = localStorage.getItem(key); if (!raw) return;
-    localStorage.removeItem(key);
-    const { dataUrl } = JSON.parse(raw);
-    fetch(dataUrl).then((response) => response.blob()).then((blob) => {
-      postUi.openComposer({ file: new File([blob], 'pixel-camera.png', { type: 'image/png' }) });
-      history.replaceState(null, '', location.pathname);
-    });
-  } catch (error) { console.warn('Camera handoff failed', error); }
+    openHandoffComposer(handoff, postUi);
+  } catch (error) { console.warn('Image handoff failed', error); }
 }
 
 placeHere.addEventListener('click', () => {
   if (currentSelection && postUi) postUi.openComposer({ selection: currentSelection });
 });
 
-// /telescope/ opens this page as the telescope tool: straight into the telescope with 空の予定,
-// and closing it goes back to the tool list instead of the globe.
+// /telescope/ opens the shared sky simulation as a stand-alone tool.
 function openToolFromUrl() {
   if (new URLSearchParams(location.search).get('tool') !== 'telescope') return;
   document.documentElement.classList.add('is-tool-telescope');

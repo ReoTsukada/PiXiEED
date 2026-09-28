@@ -1,11 +1,13 @@
 import { supabaseConfig } from '../../data/site-config.js?rev=20260921-globe-post-v1';
 import { getCellById } from './geometry.mjs?v=20260921-grid11-1';
+import { projectLegacyShowcase } from './legacy-showcase.mjs';
+import { createLegacyPlacementApi } from '../creation/legacy-placement.mjs';
 
 const SESSION_KEY = 'PiXiEED:supabase-session:v1';
 const baseUrl = () => String(supabaseConfig.url || '').trim().replace(/\/$/, '');
 const publicKey = () => String(supabaseConfig.publishableKey || '').trim();
 const configured = () => Boolean(baseUrl() && publicKey());
-const headers = (token = '') => ({ apikey: publicKey(), Authorization: `Bearer ${token || publicKey()}`, 'Content-Type': 'application/json', Accept: 'application/json' });
+const headers = (token = '') => ({ apikey: publicKey(), ...(token ? { Authorization: `Bearer ${token}` } : {}), 'Content-Type': 'application/json', Accept: 'application/json' });
 
 function readSession() {
   try { const session = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); return session?.access_token ? session : null; } catch { return null; }
@@ -17,7 +19,7 @@ async function readError(response) {
   try {
     const payload = await response.json();
     const code = String(payload?.error_description || payload?.msg || payload?.message || payload?.error || '');
-    return ({ image_already_submitted: 'この画像はすでに投稿されています。', location_required: '地球のセルを選び直してください。', authentication_required: '投稿セッションを開始できませんでした。' })[code] || '投稿できませんでした。時間をおいてもう一度お試しください。';
+    return ({ image_already_submitted: 'この画像はすでに投稿されています。', location_required: '地球のセルを選び直してください。', authentication_required: '投稿セッションを開始できませんでした。', image_type_invalid: '画像をPNGとして確認できませんでした。選び直してください。', image_size_invalid: '投稿用画像は512KB以内にしてください。', image_pixels_invalid: '画像の縦横サイズを確認できませんでした。選び直してください。', image_colors_invalid: '実画像の色数が128色を超えるか、表示した色数と一致しません。', image_decode_invalid: '画像を正しく読み取れませんでした。別の画像を選んでください。' })[code] || '投稿できませんでした。時間をおいてもう一度お試しください。';
   } catch { return '投稿できませんでした。時間をおいてもう一度お試しください。'; }
 }
 async function refreshSession(session) {
@@ -28,14 +30,31 @@ async function refreshSession(session) {
 }
 async function ensureSession() {
   if (!configured()) throw new Error('投稿機能の接続設定がまだありません。');
+  const ownerApi = createLegacyPlacementApi();
+  let ownerSessionExists;
+  try { ownerSessionExists = ownerApi.hasSavedSession(); }
+  catch { throw new Error('ログイン情報を読み取れません。もう一度ログインしてください。'); }
+  if (ownerSessionExists) {
+    let owner;
+    try { owner = await ownerApi.restore(); }
+    catch { throw new Error('ログイン状態を確認できません。もう一度ログインしてください。'); }
+    if (!owner) throw new Error('ログイン状態を確認できません。もう一度ログインしてください。');
+    try {
+      const accessToken = await ownerApi.getAccessToken();
+      if (!accessToken || ownerApi.user?.id !== owner.id) throw new Error('owner session changed');
+      return { access_token: accessToken, owner };
+    } catch {
+      throw new Error('ログイン状態を確認できません。もう一度ログインしてください。');
+    }
+  }
   const current = readSession();
-  if (current?.access_token && (!current.expires_at || Number(current.expires_at) * 1000 > Date.now() + 30_000)) return current;
-  const refreshed = await refreshSession(current); if (refreshed?.access_token) return refreshed;
+  if (current?.access_token && (!current.expires_at || Number(current.expires_at) * 1000 > Date.now() + 30_000)) return { ...current, owner: null };
+  const refreshed = await refreshSession(current); if (refreshed?.access_token) return { ...refreshed, owner: null };
   const response = await fetch(`${baseUrl()}/auth/v1/signup`, { method: 'POST', headers: headers(), body: JSON.stringify({ data: { app: 'pixieed', mode: 'anonymous-globe-posting' } }) });
   if (!response.ok) throw new Error(await readError(response));
   const session = await response.json();
   if (!session?.access_token) throw new Error('投稿セッションを開始できませんでした。');
-  saveSession(session); return session;
+  saveSession(session); return { ...session, owner: null };
 }
 function imageUrl(path) {
   const bucket = encodeURIComponent(String(supabaseConfig.publicStorageBucket || 'post-public'));
@@ -46,18 +65,192 @@ function fromPublicRow(row) {
   try {
     const cell = getCellById(String(row.globe_cell_id || ''));
     const url = imageUrl(row.public_image_path); if (!url) return null;
-    return { id: String(row.post_id), title: String(row.title || '地図の投稿'), caption: String(row.caption || ''), image: { dataUrl: url, width: 32, height: 32, colorCount: 0 }, pin: { latitude: cell.center.latitude, longitude: cell.center.longitude, cellId: cell.id, source: 'cell' }, author: { id: '', name: '' }, status: 'published', createdAt: Date.parse(row.published_at) || 0 };
+    return { id: String(row.post_id), title: String(row.title || '地図の投稿'), caption: String(row.caption || ''), postKind: row.post_kind === 'pixel_camera' ? 'pixel_camera' : 'pixel_art', puzzleMode: ['spot_difference', 'hidden_object'].includes(row.puzzle_mode) ? row.puzzle_mode : null, image: { dataUrl: url, width: 32, height: 32, colorCount: 0 }, pin: { latitude: cell.center.latitude, longitude: cell.center.longitude, cellId: cell.id, source: 'cell' }, author: { id: '', name: '' }, status: 'published', createdAt: Date.parse(row.published_at) || 0, likeable: true };
   } catch { return null; }
 }
 const dataUrlBase64 = (dataUrl) => String(dataUrl || '').split(',', 2)[1] || '';
+const publicLimit = () => Math.min(1000, Math.max(1, Number(supabaseConfig.publicMapLimit) || 500));
+
+async function loadCurrentMapPosts() {
+  const table = encodeURIComponent(String(supabaseConfig.publicMapTable || 'post_map_points'));
+  const url = new URL(`${baseUrl()}/rest/v1/${table}`);
+  const columns = 'post_id,title,caption,public_image_path,published_at,globe_cell_id';
+  url.searchParams.set('select', `${columns},post_kind,puzzle_mode`);
+  url.searchParams.set('map_space', 'eq.globe');
+  url.searchParams.set('published_at', 'not.is.null');
+  url.searchParams.set('order', 'published_at.desc');
+  url.searchParams.set('limit', String(publicLimit()));
+  let response = await fetch(url, { headers: headers(), cache: 'no-store' });
+  // Older published rows can still be read before the new column is deployed.
+  if (response.status === 400) {
+    url.searchParams.set('select', `${columns},post_kind`);
+    response = await fetch(url, { headers: headers(), cache: 'no-store' });
+    if (response.status === 400) { url.searchParams.set('select', columns); response = await fetch(url, { headers: headers(), cache: 'no-store' }); }
+  }
+  if (!response.ok) return [];
+  const rows = await response.json();
+  return Array.isArray(rows) ? rows.map(fromPublicRow).filter(Boolean) : [];
+}
+
+export async function loadPublishedMapPostsByIds(inputIds) {
+  const ids = [...new Set((Array.isArray(inputIds) ? inputIds : []).map((id) => String(id || '')).filter((id) => UUID.test(id)))];
+  if (!configured() || !ids.length) return [];
+  const table = encodeURIComponent(String(supabaseConfig.publicMapTable || 'post_map_points'));
+  const output = [];
+  for (let offset = 0; offset < ids.length; offset += 50) {
+    const url = new URL(`${baseUrl()}/rest/v1/${table}`);
+    const chunkIds = ids.slice(offset, offset + 50);
+    url.searchParams.set('select', 'post_id,title,caption,public_image_path,published_at,globe_cell_id,post_kind,puzzle_mode');
+    url.searchParams.set('post_id', `in.(${chunkIds.join(',')})`);
+    url.searchParams.set('map_space', 'eq.globe');
+    url.searchParams.set('published_at', 'not.is.null');
+    url.searchParams.set('limit', '50');
+    let response = await fetch(url, { headers: headers(), cache: 'no-store' });
+    if (response.status === 400) {
+      url.searchParams.set('select', 'post_id,title,caption,public_image_path,published_at,globe_cell_id,post_kind');
+      response = await fetch(url, { headers: headers(), cache: 'no-store' });
+      if (response.status === 400) { url.searchParams.set('select', 'post_id,title,caption,public_image_path,published_at,globe_cell_id'); response = await fetch(url, { headers: headers(), cache: 'no-store' }); }
+    }
+    if (!response.ok) throw new Error('公開投稿を読み込めませんでした。時間をおいて再試行してください。');
+    const rows = await response.json();
+    if (Array.isArray(rows)) output.push(...rows.filter((row) => chunkIds.includes(String(row?.post_id || ''))).map(fromPublicRow).filter(Boolean));
+  }
+  return output;
+}
+
+async function loadPlacedShowcases() {
+  const placementUrl = new URL(`${baseUrl()}/rest/v1/social_post_map_points`);
+  placementUrl.searchParams.set('select', 'social_post_id,globe_cell_id');
+  placementUrl.searchParams.set('limit', String(publicLimit()));
+  const placementResponse = await fetch(placementUrl, { headers: headers(), cache: 'no-store' });
+  // This table is introduced separately; existing globe posts remain available until then.
+  if (!placementResponse.ok) return [];
+  const placements = await placementResponse.json();
+  if (!Array.isArray(placements) || placements.length === 0) return [];
+  const byId = new Map(placements.filter((point) => typeof point?.social_post_id === 'string').map((point) => [point.social_post_id, point]));
+  const ids = [...byId.keys()];
+  const results = [];
+  for (let offset = 0; offset < ids.length; offset += 40) {
+    const postsUrl = new URL(`${baseUrl()}/rest/v1/social_posts`);
+    postsUrl.searchParams.set('select', 'id,title,caption,creator_display_name,media_object_path,published_at,status,post_kind,distribution_mode');
+    postsUrl.searchParams.set('id', `in.(${ids.slice(offset, offset + 40).join(',')})`);
+    postsUrl.searchParams.set('status', 'eq.published');
+    postsUrl.searchParams.set('post_kind', 'eq.image');
+    postsUrl.searchParams.set('distribution_mode', 'eq.showcase');
+    const response = await fetch(postsUrl, { headers: headers(), cache: 'no-store' });
+    if (!response.ok) continue;
+    const posts = await response.json();
+    if (!Array.isArray(posts)) continue;
+    for (const post of posts) {
+      const projected = projectLegacyShowcase(byId.get(post.id), post, baseUrl());
+      if (projected) results.push(projected);
+    }
+  }
+  return results;
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+async function getExistingLikeSession() {
+  if (!configured()) return null;
+  // The legacy placement API verifies real saved accounts and never creates a user.
+  const ownerApi = createLegacyPlacementApi();
+  if (ownerApi.hasSavedSession()) {
+    const owner = await ownerApi.restore();
+    if (!owner) throw new Error('ログイン状態を確認できません。いいね状態を再読み込みしてください。');
+    return { access_token: await ownerApi.getAccessToken(), user_id: owner.id };
+  }
+  let session = readSession();
+  if (!session) return null;
+  if (session.expires_at && Number(session.expires_at) * 1000 <= Date.now() + 30_000) {
+    session = await refreshSession(session);
+    if (!session?.access_token) throw new Error('ログイン状態を確認できません。いいね状態を再読み込みしてください。');
+  }
+  const response = await fetch(`${baseUrl()}/auth/v1/user`, { headers: headers(session.access_token), cache: 'no-store' });
+  if (!response.ok) throw new Error('ログイン状態を確認できません。いいね状態を再読み込みしてください。');
+  const user = await response.json();
+  if (!UUID.test(String(user?.id || ''))) throw new Error('ログイン状態を確認できません。いいね状態を再読み込みしてください。');
+  session.user_id = user.id;
+  saveSession(session);
+  return { access_token: session.access_token, user_id: user.id };
+}
+
+async function loadMyLikes() {
+  const session = await getExistingLikeSession();
+  if (!session) return new Set();
+  const ids = new Set();
+  let after = '';
+  const pageSize = 200;
+  for (;;) {
+    const url = new URL(`${baseUrl()}/rest/v1/post_likes`);
+    url.searchParams.set('select', 'post_id');
+    url.searchParams.set('user_id', `eq.${session.user_id}`);
+    url.searchParams.set('order', 'post_id.asc');
+    url.searchParams.set('limit', String(pageSize));
+    if (after) url.searchParams.set('post_id', `gt.${after}`);
+    const response = await fetch(url, { headers: headers(session.access_token), cache: 'no-store' });
+    if (!response.ok) throw new Error('いいね状態を読み込めませんでした。');
+    const rows = await response.json();
+    if (!Array.isArray(rows)) throw new Error('いいね状態を読み込めませんでした。');
+    for (const row of rows) {
+      const id = String(row?.post_id || '');
+      if (UUID.test(id)) ids.add(id);
+    }
+    if (rows.length < pageSize) break;
+    const next = String(rows.at(-1)?.post_id || '');
+    if (!UUID.test(next) || next === after) throw new Error('いいね状態を読み込めませんでした。');
+    after = next;
+  }
+  return ids;
+}
+
+export async function listMyPublishedLikes() {
+  return [...await loadMyLikes()];
+}
+
+async function hasLiked(postId) {
+  if (!UUID.test(String(postId || ''))) return false;
+  const session = await getExistingLikeSession();
+  if (!session) return false;
+  const url = new URL(`${baseUrl()}/rest/v1/post_likes`);
+  url.searchParams.set('select', 'post_id');
+  url.searchParams.set('post_id', `eq.${postId}`);
+  url.searchParams.set('user_id', `eq.${session.user_id}`);
+  const response = await fetch(url, { headers: headers(session.access_token), cache: 'no-store' });
+  if (!response.ok) throw new Error('いいね状態を読み込めませんでした。もう一度お試しください。');
+  const rows = await response.json();
+  return Array.isArray(rows) && rows.some((row) => String(row?.post_id || '') === postId);
+}
+
+async function setPostLike(postId, liked) {
+  if (!UUID.test(String(postId || ''))) throw new TypeError('この投稿にはいいねできません。');
+  const session = await ensureSession();
+  const url = new URL(`${baseUrl()}/rest/v1/post_likes`);
+  if (liked) {
+    const userId = session.user_id || session.user?.id || session.owner?.id;
+    if (!UUID.test(String(userId || ''))) throw new Error('ログイン状態を確認できません。');
+    const response = await fetch(url, { method: 'POST', headers: { ...headers(session.access_token), Prefer: 'resolution=ignore-duplicates,return=minimal' }, body: JSON.stringify({ post_id: postId, user_id: userId }) });
+    if (!response.ok) throw new Error('いいねを保存できませんでした。時間をおいてお試しください。');
+  } else {
+    url.searchParams.set('post_id', `eq.${postId}`);
+    const userId = session.user_id || session.user?.id || session.owner?.id;
+    if (!UUID.test(String(userId || ''))) throw new Error('ログイン状態を確認できません。');
+    url.searchParams.set('user_id', `eq.${userId}`);
+    const response = await fetch(url, { method: 'DELETE', headers: headers(session.access_token) });
+    if (!response.ok) throw new Error('いいねを取り消せませんでした。時間をおいてお試しください。');
+  }
+}
 
 export function buildGlobePostPayload(post) {
   const cell = getCellById(post.pin.cellId);
   return {
     title: post.title,
     caption: post.caption,
+    postKind: post.postKind === 'pixel_camera' ? 'pixel_camera' : 'pixel_art',
     image: { mimeType: post.image.mimeType, size: post.image.size, width: post.image.width, height: post.image.height, colorCount: post.image.colorCount, base64: dataUrlBase64(post.image.dataUrl) },
-    location: { globeCell: { id: cell.id, version: cell.version, band: cell.band, column: cell.column } }
+    location: { globeCell: { id: cell.id, version: cell.version, band: cell.band, column: cell.column } },
+    ...(post.requestKey ? { requestKey: post.requestKey } : {}),
+    ...(post.puzzle ? { puzzle: post.puzzle } : {})
   };
 }
 
@@ -72,26 +265,31 @@ export function createSupabaseGlobeStore() {
   const notify = () => listeners.forEach((listener) => listener());
   const ready = (async () => {
     if (!configured()) return;
-    const table = encodeURIComponent(String(supabaseConfig.publicMapTable || 'post_map_points'));
-    const url = new URL(`${baseUrl()}/rest/v1/${table}`);
-    url.searchParams.set('select', 'post_id,title,caption,public_image_path,published_at,globe_cell_id');
-    url.searchParams.set('map_space', 'eq.globe');
-    url.searchParams.set('published_at', 'not.is.null');
-    url.searchParams.set('order', 'published_at.desc');
-    url.searchParams.set('limit', String(Math.min(1000, Math.max(1, Number(supabaseConfig.publicMapLimit) || 500))));
-    try {
-      const response = await fetch(url, { headers: headers(), cache: 'no-store' });
-      if (!response.ok) return;
-      const rows = await response.json();
-      published = Array.isArray(rows) ? rows.map(fromPublicRow).filter(Boolean) : [];
-      notify();
-    } catch { /* the globe remains usable while public posts are unavailable */ }
+    const [current, legacy] = await Promise.allSettled([loadCurrentMapPosts(), loadPlacedShowcases()]);
+    published = [
+      ...(current.status === 'fulfilled' ? current.value : []),
+      ...(legacy.status === 'fulfilled' ? legacy.value : [])
+    ].sort((left, right) => right.createdAt - left.createdAt);
+    notify();
   })();
   return {
     ready,
     persistent: () => configured(),
     list: () => published,
+    async ensurePublishedById(id) {
+      await ready;
+      if (!UUID.test(String(id || ''))) return false;
+      if (published.some((post) => post.id === id)) return true;
+      const [post] = await loadPublishedMapPostsByIds([id]);
+      if (!post) return false;
+      published = [...published, post].sort((left, right) => right.createdAt - left.createdAt);
+      notify();
+      return true;
+    },
     async add(post) {
+      if (post?.puzzle && supabaseConfig.puzzlePublicationEnabled !== true) {
+        throw new Error('パズル投稿は準備中です。公開機能の更新後にお試しください。');
+      }
       const session = await ensureSession();
       const response = await fetch(`${baseUrl()}/functions/v1/${encodeURIComponent(supabaseConfig.createPostFunction || 'create-post')}`, {
         method: 'POST', headers: headers(session.access_token),
@@ -99,7 +297,19 @@ export function createSupabaseGlobeStore() {
       });
       if (!response.ok) throw new Error(await readError(response));
       const result = await response.json();
-      return { ...post, id: result.postId, status: result.status || 'pending', createdAt: Date.now() };
+      if (post?.puzzle && result?.puzzleMode !== post.puzzle.mode) {
+        throw new Error('パズル投稿の公開設定を確認できませんでした。時間をおいて再試行してください。');
+      }
+      const submittedBy = session.owner
+        ? { id: session.owner.id, name: post.author?.id === session.owner.id ? String(post.author.name || '') : '' }
+        : post.author;
+      return { ...post, author: submittedBy, id: result.postId, status: result.status || 'pending', puzzleMode: result.puzzleMode || null, createdAt: Date.now() };
+    },
+    listMyLikes: loadMyLikes,
+    hasLiked,
+    async setLike(postId, liked) {
+      if (!published.some((post) => post.id === postId && post.likeable === true)) throw new TypeError('この投稿にはいいねできません。');
+      return setPostLike(postId, Boolean(liked));
     },
     async remove() { throw new Error('公開後の削除は管理画面から行ってください。'); },
     subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); }

@@ -54,11 +54,20 @@ body[data-admin-page] { background: #edf2f0; }
 .admin-moderation__post { display: grid; grid-template-columns: 128px minmax(0, 1fr); gap: 1rem; padding: 1rem; border: 1px solid var(--line); border-radius: var(--radius-sm); background: #fbfaf5; }
 .admin-moderation__image-wrap { display: grid; place-items: center; width: 128px; height: 128px; overflow: hidden; border-radius: 10px; background: #173544; }
 .admin-moderation__image { width: 100%; height: 100%; image-rendering: pixelated; object-fit: contain; }
+.admin-moderation__puzzle { display: grid; gap: 8px; margin: 12px 0; padding: 10px; border: 1px solid #d8e0dc; border-radius: 10px; background: #f5f8f6; }
+.admin-moderation__puzzle h4, .admin-moderation__puzzle p { margin: 0; }
+.admin-moderation__puzzle-image { position: relative; width: min(100%, 240px); aspect-ratio: var(--puzzle-aspect, 1); overflow: hidden; background: #e9eeeb; image-rendering: pixelated; }
+.admin-moderation__puzzle-image img, .admin-moderation__puzzle-image canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+.admin-moderation__puzzle-image--original { --puzzle-aspect: 1; }
+.admin-moderation__target-names { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.admin-moderation__target-names li { padding: 3px 8px; border-radius: 999px; background: #e4eee8; }
+.admin-moderation__target-names li::before { display: inline-block; width: .65em; height: .65em; margin-right: 5px; border-radius: 50%; background: var(--target-color); content: ""; }
 .admin-moderation__post-body { display: grid; min-width: 0; gap: .55rem; }
 .admin-moderation__post-head { display: flex; align-items: start; justify-content: space-between; gap: 1rem; }
 .admin-moderation__post-head .eyebrow { color: var(--coral); }
 .admin-moderation__post-head h3 { margin: .2rem 0 0; font-size: 1.15rem; }
 .admin-moderation__post-head time { flex: 0 0 auto; color: var(--ink-soft); font-family: 'DM Mono', monospace; font-size: .64rem; }
+.admin-moderation__post-kind { width: fit-content; margin: 0; padding: .2rem .5rem; border-radius: 6px; color: #315b70; background: #e4eef0; font-size: .68rem; font-weight: 700; }
 .admin-moderation__caption { margin: 0; color: var(--ink-soft); font-size: .82rem; line-height: 1.55; }
 .admin-moderation__meta { margin: 0; color: var(--ink-soft); font-family: 'DM Mono', monospace; font-size: .65rem; }
 .admin-moderation__location { display: inline-flex; align-items: center; width: fit-content; padding: .35rem .5rem; border-radius: 7px; color: #24704a; background: #e5f2e8; font-size: .72rem; }

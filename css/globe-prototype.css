@@ -138,10 +138,10 @@ button > img { display: block; flex: none; width: var(--control-icon); height: v
 
 .selection-panel {
   position: absolute;
-  left: 18px;
-  bottom: 18px;
-  z-index: 3;
-  max-width: calc(100% - 36px);
+  top: 18px;
+  right: 18px;
+  z-index: 4;
+  max-width: min(340px, calc(100% - 24px));
   display: flex;
   align-items: center;
   gap: 12px;
@@ -153,10 +153,24 @@ button > img { display: block; flex: none; width: var(--control-icon); height: v
 }
 
 .selection-panel[hidden] { display: none; }
+/* Cell placement takes priority while selected; celestial shortcuts return on deselection. */
+.globe-stage:has(.time-capsule.is-open) .selection-panel { display: none; }
+.globe-stage.has-selection .sky-hud { display: none; }
+
+@media (max-width: 760px) {
+  .selection-panel { top: 88px; right: 10px; max-width: min(340px, calc(100% - 20px)); }
+}
+
+/* On short landscape screens the parent app navigation rises over the map.
+   Keep the 44px placement target in the free top-right corner. */
+@media (max-height: 300px) {
+  .selection-panel { top: 10px; right: 10px; gap: 0; max-width: none; padding: 6px; }
+  .selection-panel > :not(.place-here) { display: none; }
+}
 
 .selection-label { color: #7ccfe0; font-size: .75rem; letter-spacing: .08em; }
 .selection-panel code { color: #f4d45d; font-size: .8rem; }
-.selection-panel strong { color: #f4d45d; font-size: .9375rem; font-weight: 650; }
+.selection-panel strong { min-width: 0; overflow: hidden; color: #f4d45d; font-size: .9375rem; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
 .selection-panel span:not(.selection-label):not(.lod-status) { color: #b9d1d5; font-size: .8125rem; }
 .lod-status { margin-left: auto; }
 
@@ -164,14 +178,12 @@ button > img { display: block; flex: none; width: var(--control-icon); height: v
   .globe-prototype { padding: 16px; grid-template-rows: auto minmax(390px, 1fr); }
   .prototype-header { align-items: start; flex-direction: column; gap: 8px; }
   .globe-stage { min-height: 390px; }
-  .selection-panel { left: 12px; bottom: 72px; max-width: calc(100% - 24px); }
   .lod-status { width: 100%; margin-left: 0; }
 }
 
 @media (max-width: 680px) {
   .is-embedded .globe-prototype { padding: 0; grid-template-rows: minmax(0, 1fr); }
   .is-embedded .globe-stage { min-height: 100dvh; }
-  .is-embedded .selection-panel { bottom: 72px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -187,6 +199,7 @@ button > img { display: block; flex: none; width: var(--control-icon); height: v
 .gesture-hint[hidden] { display: none; }
 .gesture-hint span { padding: 6px 11px; border-radius: 999px; background: rgba(4, 12, 20, .72); border: 1px solid rgba(181, 226, 232, .18); color: #cfe6ea; font-size: .74rem; backdrop-filter: blur(8px); }
 .gesture-hint.is-leaving { opacity: 0; transition: opacity .25s; }
+.globe-stage.has-selection .gesture-hint { display: none; }
 @keyframes hint-in { from { opacity: 0; transform: translate(-50%, 6px); } to { opacity: 1; transform: translate(-50%, 0); } }
 @media (max-width: 480px) { .gesture-hint { flex-direction: column; align-items: center; bottom: 70px; } }
 .globe-stage.is-scope .gesture-hint, .globe-stage.has-sheet .gesture-hint { display: none; }
@@ -392,6 +405,7 @@ button > img { display: block; flex: none; width: var(--control-icon); height: v
 .pin[hidden] { display: none; }
 .pin:hover, .pin:focus-visible, .pin.is-selected { z-index: 3; border-color: #f4d45d; box-shadow: 0 0 0 3px rgba(244, 212, 93, .45), 0 4px 14px rgba(0, 0, 0, .6); background: #0c1620; }
 .pin.is-mine { border-color: #7ccfe0; }
+.pin--camera { border-color: #7ccfe0; }
 .pin__art { display: block; width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; border-radius: 22%; }
 .pin__count { position: absolute; right: -8px; top: -8px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: #f4d45d; color: #1b1500; font-size: .68rem; font-weight: 800; line-height: 18px; text-align: center; }
 .pin__count[hidden] { display: none; }
@@ -410,6 +424,7 @@ button > img { display: block; flex: none; width: var(--control-icon); height: v
 .post-dock[hidden] { display: none !important; }
 .post-dock button, .post-dock .post-fab { width: auto; height: var(--control); }
 .post-fab { position: relative; display: inline-flex; align-items: center; gap: 8px; padding: 0 20px 0 12px; border-radius: 999px; background: #f4d45d; color: #1b1500; font-size: var(--control-font); font-weight: 800; box-shadow: 0 6px 22px rgba(244, 212, 93, .28), 0 2px 8px rgba(0, 0, 0, .5); }
+.post-fab[hidden] { display: none; }
 .post-fab:hover, .post-fab:focus-visible { background: #ffe37d; }
 .post-fab__icon { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 8px; background: #1b1500; color: #f4d45d; font-size: 1rem; line-height: 1; }
 .post-fab__draft { position: absolute; right: 4px; top: 2px; width: 10px; height: 10px; border-radius: 50%; background: #ff5d73; border: 2px solid #f4d45d; }
@@ -530,13 +545,19 @@ button > img { display: block; flex: none; width: var(--control-icon); height: v
 
 .tabs { display: flex; gap: 4px; height: var(--control); padding: 3px; margin-bottom: 12px; border-radius: 999px; background: rgba(140, 210, 226, .08); }
 .tabs button { flex: 1; width: auto; height: 100%; border-radius: 999px; color: #9ab8bf; }
-.tabs button[aria-selected="true"] { background: rgba(244, 212, 93, .18); color: #ffe89a; }
+.tabs button[aria-pressed="true"] { background: rgba(244, 212, 93, .18); color: #ffe89a; }
+.tabs__profile-link { display: flex; flex: 1; min-width: 0; height: 100%; align-items: center; justify-content: center; padding: 0 4px; border-radius: 999px; color: #9ab8bf; font-size: .76rem; line-height: 1; text-align: center; text-decoration: none; white-space: nowrap; }
+.tabs__profile-link:hover, .tabs__profile-link:focus-visible { background: rgba(124, 207, 224, .12); color: #dcecef; }
 .gallery__grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding-bottom: 14px; }
 .tile { display: grid; gap: 4px; width: auto; height: auto; padding: 6px; border: 1px solid rgba(140, 210, 226, .14); border-radius: 12px; background: rgba(140, 210, 226, .05); text-align: center; }
 .tile:hover, .tile:focus-visible { border-color: #f4d45d; background: rgba(244, 212, 93, .08); }
 .tile__art { display: grid; place-items: center; aspect-ratio: 1; }
 .tile__art img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
 .tile__title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #b9d1d5; font-size: .68rem; }
+.tile__kind { color: #8eafb7; font-size: .6rem; }
+.post-confirm { display: flex; align-items: center; gap: 8px; margin: 0; color: #bfd4d8; font-size: .82rem; line-height: 1.45; }
+.post-confirm input { width: 18px; height: 18px; accent-color: #f4d45d; }
+.post-confirm[hidden] { display: none; }
 .gallery__empty { color: #9ab8bf; line-height: 1.6; }
 .gallery__empty[hidden] { display: none; }
 
@@ -584,6 +605,9 @@ button > img { display: block; flex: none; width: var(--control-icon); height: v
 
 /* Viewer arrows are icon buttons like every other one; the full-width actions fill the row. */
 .viewer__actions [data-v-prev], .viewer__actions [data-v-next] { width: var(--control); padding: 0; font-size: 1.1rem; }
+.viewer__actions .viewer__like { flex: 1 1 100%; min-height: var(--control); border: 1px solid rgba(244, 212, 93, .35); border-radius: 999px; color: #ffe89a; }
+.viewer__actions .viewer__like[aria-pressed="true"] { background: rgba(244, 212, 93, .16); }
+.viewer__actions .viewer__like[hidden] { display: none; }
 .post-modal__card .primary { width: 100%; }
 .composer__foot .primary { min-width: 120px; }
 .done__actions button { flex: 1; }
@@ -698,3 +722,11 @@ button > img { display: block; flex: none; width: var(--control-icon); height: v
 
 /* The telescope as a stand-alone tool: nothing of the globe shows behind it. */
 .is-tool-telescope .gesture-hint, .is-tool-telescope .orrery-pull { display: none !important; }
+
+.globe-stage.has-selection .post-dock { display: none; }
+.post-dock { bottom: calc(5.3rem + env(safe-area-inset-bottom)); }
+/* Sheets stay above the shared navigation, including the submit control. */
+.sheet { bottom: calc(5.3rem + env(safe-area-inset-bottom)); }
+@media (max-width: 680px) {
+  .sheet { max-height: min(72%, calc(100% - 6.1rem - env(safe-area-inset-bottom))); }
+}

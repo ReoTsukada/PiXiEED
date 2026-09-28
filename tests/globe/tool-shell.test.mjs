@@ -20,6 +20,26 @@ test('camera link from the embedded posting panel leaves the iframe', () => {
   assert.match(source, /target="_top"/);
 });
 
+test('gallery keeps art and camera tabs and routes personal posts to the profile outside the iframe', () => {
+  const source = read('js/globe/post-ui.mjs');
+  assert.match(source, /data-tab="art"/);
+  assert.match(source, /data-tab="camera"/);
+  assert.doesNotMatch(source, /data-tab="mine"/);
+  assert.match(source, /href="\/profile\/\?view=posts" target="_top"/);
+  assert.match(source, /class="tabs__profile-link"[^>]*>投稿した絵<\/a>/);
+  assert.match(source, /data-tab="art" aria-pressed="true"/);
+  assert.doesNotMatch(source, /role="tablist"/);
+  const css = read('css/globe-prototype.css');
+  assert.match(css, /\.tabs__profile-link\s*\{[^}]*flex: 1;[^}]*min-width: 0;[^}]*white-space: nowrap;/);
+});
+
+test('viewer only offers deletion when the store explicitly advertises that capability', () => {
+  const source = read('js/globe/post-ui.mjs');
+  assert.match(source, /store\.canRemove === true \|\| store\.capabilities\?\.remove === true/);
+  assert.match(source, /v\.del\.hidden = !isMine\(post\) \|\| !\(/);
+  assert.match(source, /typeof store\.remove !== 'function'\) return/);
+});
+
 test('camera page owns one shared bottom navigation', () => {
   const html = read('pixel-camera.html');
   assert.equal((html.match(/<nav\b[^>]*class="app-tabs pc-nav"/g) || []).length, 1);
@@ -41,8 +61,8 @@ test('time capsule keeps play as its only plain button and the sky lives on the 
   assert.match(source, /class: 'tc-play'/);
   assert.match(source, /function createTimeTape\(/);
   assert.match(source, /function attachScrub\(/, 'the capsule itself scrubs time when dragged');
-  assert.match(source, /function orbitMarks\(/, 'Sun and Moon are labelled on the globe view');
-  assert.match(source, /function scopeMarks\(/, 'Sun and Moon are labelled in the telescope view');
+  assert.match(source, /function orbitMarks\(/, 'Sun and Moon remain available as sky markers on the globe view');
+  assert.match(source, /function scopeMarks\(/, 'Sun and Moon remain available as sky markers in the telescope view');
   assert.doesNotMatch(source, /1時間戻す|1時間進める|astro-collapse|astro-seg|scope-panel/);
   assert.doesNotMatch(source, /type: 'range'/, 'no sliders: speed is a switch, magnification is a pinch');
 });
@@ -54,7 +74,7 @@ test('every control shares one size: 44px buttons, 48px single-line fields', () 
   // No button-like rule may fall back to a hand-picked smaller height.
   const smallHeights = [...css.matchAll(/([^{}]+)\{[^}]*\bheight: (2\d|3\d|4[0-3])px/g)]
     .map((match) => match[1].trim())
-    .filter((selector) => /button|chip|close|primary|ghost|danger|tabs|account|place-here|tc-play|tc-now|scope-chip|sky-mark|camera-link|post-fab|input|textarea/.test(selector) && !/icon|__draft|pin|::after|img| i\b/.test(selector));
+    .filter((selector) => /button|chip|close|primary|ghost|danger|tabs|account|place-here|tc-play|tc-now|scope-chip|sky-mark|camera-link|post-fab|input|textarea/.test(selector) && !/icon|__draft|pin|::before|::after|img| i\b/.test(selector));
   assert.deepEqual(smallHeights, []);
 });
 

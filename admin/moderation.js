@@ -58,6 +58,15 @@ async function readError(response) {
   }
 }
 
+function moderationErrorMessage(error) {
+  const code = error instanceof Error ? error.message : '';
+  if (code === 'post_not_pending') return 'この投稿はすでに審査済みです。再読み込みしてください。';
+  if (code === 'public_image_cleanup_failed' || code === 'public_map_point_cleanup_failed') return '公開処理の後片付けを確認できませんでした。再操作せず、管理者に確認してください。';
+  if (code === 'post_publish_failed') return '公開が完了したか確認できません。再読み込みして状態を確かめてください。';
+  if (code === 'public_map_point_write_failed') return '公開位置を保存できませんでした。もう一度お試しください。';
+  return code || '審査処理に失敗しました。';
+}
+
 async function signIn(email, password) {
   const response = await fetch(`${baseUrl()}/auth/v1/token?grant_type=password`, {
     method: 'POST',
@@ -123,6 +132,60 @@ function postLocationLabel(post) {
   return `<span class="admin-moderation__location">公開セル：${escapeHtml(cell.prefectureCode)} / ${cell.grid}分割 / X${cell.x}・Y${cell.y} / セル内ピンは自動配置</span>`;
 }
 
+function safeQuarantineImageUrl(value) {
+  try {
+    const expected = new URL(baseUrl()); const candidate = new URL(String(value || ''), expected);
+    const localHttp = expected.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(expected.hostname);
+    if (candidate.origin !== expected.origin || candidate.username || candidate.password || !(candidate.protocol === 'https:' || localHttp && candidate.protocol === 'http:') || !candidate.pathname.startsWith('/storage/v1/object/')) return '';
+    return candidate.href;
+  } catch { return ''; }
+}
+
+function appendPuzzlePreview(card, post) {
+  const puzzle = post.puzzle;
+  if (!puzzle || !['spot_difference', 'hidden_object'].includes(puzzle.mode) || !puzzle.definition) return;
+  const host = document.createElement('section'); host.className = 'admin-moderation__puzzle';
+  const heading = document.createElement('h4'); heading.textContent = puzzle.mode === 'spot_difference' ? '間違い探しの正解候補' : 'もの探しの対象マスク'; host.append(heading);
+  if (puzzle.mode === 'spot_difference' && puzzle.changedImageUrl) {
+    const title = document.createElement('p'); title.textContent = '変更後の絵'; host.append(title);
+    const stage = document.createElement('div'); stage.className = 'admin-moderation__puzzle-image';
+    const image = document.createElement('img'); image.alt = '間違い探しの変更後画像'; image.src = safeQuarantineImageUrl(puzzle.changedImageUrl); image.crossOrigin = 'anonymous';
+    if (!image.src || image.src === document.baseURI) image.removeAttribute('src');
+    const overlay = document.createElement('canvas'); overlay.setAttribute('aria-hidden', 'true'); stage.append(image, overlay); host.append(stage);
+    image.addEventListener('load', () => drawPuzzleOverlay(overlay, image, puzzle.definition, 'candidates'));
+  } else if (puzzle.mode === 'hidden_object') {
+    const names = document.createElement('ul'); names.className = 'admin-moderation__target-names';
+    for (const [index, target] of (puzzle.definition.targets || []).entries()) { const item = document.createElement('li'); item.textContent = String(target.name || '名前なし'); item.style.setProperty('--target-color', `hsl(${index * 67 % 360} 86% 48%)`); names.append(item); }
+    host.append(names);
+  }
+  const originalImage = card.querySelector('.admin-moderation__image');
+  if (puzzle.mode === 'hidden_object' && originalImage) {
+    const stage = document.createElement('div'); stage.className = 'admin-moderation__puzzle-image admin-moderation__puzzle-image--original';
+    const originalWrap = originalImage.parentElement;
+    const overlay = document.createElement('canvas'); overlay.setAttribute('aria-hidden', 'true'); stage.append(originalImage, overlay); host.append(stage);
+    originalImage.alt = 'もの探しの元画像'; originalImage.crossOrigin = 'anonymous';
+    const safeOriginalUrl = safeQuarantineImageUrl(post.imageUrl); if (safeOriginalUrl) originalImage.src = safeOriginalUrl; else originalImage.removeAttribute('src');
+    originalWrap?.remove();
+    originalImage.addEventListener('load', () => drawPuzzleOverlay(overlay, originalImage, puzzle.definition, 'targets'));
+  }
+  card.querySelector('.admin-moderation__post-body')?.prepend(host);
+}
+
+function drawPuzzleOverlay(canvas, image, definition, key) {
+  const width = Number(definition.width); const height = Number(definition.height); const rows = definition[key];
+  if (!Number.isInteger(width) || !Number.isInteger(height) || !Array.isArray(rows) || !image.naturalWidth || !image.naturalHeight) return;
+  canvas.parentElement.style.aspectRatio = `${width} / ${height}`;
+  canvas.width = image.naturalWidth; canvas.height = image.naturalHeight;
+  const context = canvas.getContext('2d'); if (!context) return;
+  context.save(); context.scale(canvas.width / width, canvas.height / height);
+  rows.forEach((row, index) => {
+    const pixels = Array.isArray(row.pixels) ? row.pixels : [];
+    context.fillStyle = key === 'targets' ? `hsla(${index * 67 % 360} 86% 48% / .56)` : 'rgba(255, 154, 35, .5)';
+    for (const pixel of pixels) if (Number.isInteger(pixel) && pixel >= 0 && pixel < width * height) context.fillRect(pixel % width, Math.floor(pixel / width), 1, 1);
+  });
+  context.restore();
+}
+
 function renderPosts(root, posts, onAction) {
   if (!posts.length) {
     root.innerHTML = '<div class="admin-moderation__empty"><strong>審査待ちの投稿はありません。</strong><p>新しい投稿が届くと、ここに表示されます。</p></div>';
@@ -130,10 +193,12 @@ function renderPosts(root, posts, onAction) {
   }
   root.innerHTML = `<div class="admin-moderation__list">${posts.map((post) => {
     const hasCell = Boolean(post.location?.mapCell || post.location?.globeCell);
+    const safeImageUrl = safeQuarantineImageUrl(post.imageUrl);
     return `<article class="admin-moderation__post" data-moderation-post="${escapeHtml(post.postId)}">
-      <div class="admin-moderation__image-wrap"><img class="admin-moderation__image" src="${escapeHtml(post.imageUrl)}" alt="${escapeHtml(post.title)}" loading="lazy" decoding="async" width="128" height="128"></div>
+      <div class="admin-moderation__image-wrap"><img class="admin-moderation__image" ${safeImageUrl ? `src="${escapeHtml(safeImageUrl)}"` : ''} alt="${escapeHtml(post.title)}" loading="lazy" decoding="async" width="128" height="128"></div>
       <div class="admin-moderation__post-body">
         <div class="admin-moderation__post-head"><div><span class="eyebrow">pending</span><h3>${escapeHtml(post.title)}</h3></div><time datetime="${escapeHtml(post.createdAt)}">${escapeHtml(formatDate(post.createdAt))}</time></div>
+        <p class="admin-moderation__post-kind">${post.postKind === 'pixel_camera' ? 'ドット絵カメラ' : '手描きドット絵'}</p>
         <p class="admin-moderation__caption">${escapeHtml(post.caption || 'コメントなし')}</p>
         <p class="admin-moderation__meta">${post.imageWidth}×${post.imageHeight}px · ${post.colorCount || '—'}色 · ${Math.ceil(Number(post.imageBytes || 0) / 1024)}KB</p>
         ${postLocationLabel(post)}
@@ -143,6 +208,8 @@ function renderPosts(root, posts, onAction) {
     </article>`;
   }).join('')}</div>`;
   root.querySelectorAll('[data-moderation-post]').forEach((card) => {
+    const post = posts.find((item) => item.postId === card.dataset.moderationPost);
+    appendPuzzlePreview(card, post);
     card.querySelectorAll('[data-moderation-action]').forEach((button) => {
       button.addEventListener('click', () => onAction({
         postId: card.dataset.moderationPost,
@@ -202,8 +269,11 @@ export function bindModerationPanel(root) {
       await callModeration(state.session, payload);
       await loadPosts();
     } catch (error) {
-      buttons.forEach((button) => { button.disabled = false; });
-      if (status) status.textContent = error instanceof Error ? error.message : '審査処理に失敗しました。';
+      const code = error instanceof Error ? error.message : '';
+      if (!['post_not_pending', 'post_publish_failed', 'public_image_cleanup_failed', 'public_map_point_cleanup_failed'].includes(code)) {
+        buttons.forEach((button) => { button.disabled = false; });
+      }
+      if (status) status.textContent = moderationErrorMessage(error);
     }
   };
 

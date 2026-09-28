@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">
+<meta name="robots" content="noindex,follow">
+<title>端末内下書き保存の確認</title>
+<main>
+  <h1>端末内下書き保存の確認</h1>
+  <p id="result" role="status">確認中</p>
+</main>
+<script type="module">
+  import { createIndexedDbDraftAdapter, createLocalDraftStore } from '/js/creation/local-drafts.mjs';
+
+  const result = document.querySelector('#result');
+  let sequence = 0;
+  const idFactory = () => `qa-${++sequence}`;
+  try {
+    const store = createLocalDraftStore(
+      createIndexedDbDraftAdapter(indexedDB, 'pixieed-creation-drafts-browser-qa-v1'),
+      { idFactory },
+    );
+    const draftId = `browser-qa-${Date.now()}`;
+    const first = await store.save({ draftId, kind: 'pixel_art', document: { width: 2, height: 1, pixels: [1, 2] } });
+    const firstRead = await store.load(draftId);
+    const second = await store.save({ draftId, kind: 'pixel_art', document: { width: 2, height: 1, pixels: [3, 4] } });
+    const secondRead = await store.load(draftId);
+    if (firstRead.documentHash !== first.documentHash || firstRead.revisionId !== first.revisionId
+      || secondRead.documentHash !== second.documentHash || secondRead.revisionId !== second.revisionId
+      || first.asset.assetId !== second.asset.assetId || first.revisionId === second.revisionId
+      || JSON.stringify(secondRead.document.pixels) !== '[3,4]') throw new Error('保存した版を再開できませんでした');
+    result.textContent = 'PASS: IndexedDBで保存・再開・新版への更新を確認';
+  } catch (error) {
+    result.textContent = `FAIL: ${error.message}`;
+  }
+</script>

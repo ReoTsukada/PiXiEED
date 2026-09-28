@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { isSampleWork, publicWorksOnly } from '../js/public-work-policy.mjs';
+import { hasExplicitMapPlacement, isSampleWork, isSaleWork, publicWorksOnly } from '../js/public-work-policy.mjs';
 
 test('filters stale sample flags and known sample IDs despite missing sample metadata', () => {
   for (const value of [true, 'true', ' TRUE ', '1', 1]) assert.equal(isSampleWork({ id: 'work-x', sample: value }), true);
@@ -37,4 +37,26 @@ test('false and zero flags do not exclude ordinary records and invalid list inpu
   assert.deepEqual(publicWorksOnly(null), []);
   assert.deepEqual(publicWorksOnly({ id: 'valid' }), []);
   assert.deepEqual(publicWorksOnly([{ id: '' }, { title: 'missing ID' }]), []);
+});
+
+test('keeps sale records in source data but excludes them from public official works', () => {
+  const saleByDistribution = { id: 'paid-1', distribution_mode: 'paid', sale_price_yen: 4500 };
+  const saleByPrice = { id: 'paid-2', salePriceYen: 150 };
+  const ordinary = { id: 'art-1', priceLabel: '地図で見つけた絵' };
+  const source = [saleByDistribution, saleByPrice, ordinary];
+
+  assert.equal(isSaleWork(saleByDistribution), true);
+  assert.equal(isSaleWork(saleByPrice), true);
+  assert.deepEqual(publicWorksOnly(source), [ordinary]);
+  assert.deepEqual(source, [saleByDistribution, saleByPrice, ordinary]);
+});
+
+test('a gallery placement needs an explicit point or a linked place coordinate', () => {
+  assert.equal(hasExplicitMapPlacement({ prefecture: '東京都' }), false);
+  assert.equal(hasExplicitMapPlacement({ mapPosition: { x: 45, y: 60 } }), false);
+  assert.equal(hasExplicitMapPlacement({ mapPositionSpace: 'world', mapPosition: { x: 45, y: 60 } }), true);
+  assert.equal(hasExplicitMapPlacement({ location: { lat: 35.6, lng: 139.5 } }), true);
+  assert.equal(hasExplicitMapPlacement({ location: { lat: null, lng: null } }), false);
+  assert.equal(hasExplicitMapPlacement({ mapPosition: { x: 'outside', y: 60 } }), false);
+  assert.equal(hasExplicitMapPlacement({ mapPositionSpace: 'world', mapPosition: { x: 45, y: null } }), false);
 });

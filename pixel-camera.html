@@ -2,15 +2,17 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8">
+<title>ドット絵カメラ｜景色を撮ってPNG保存｜PiXiEED</title>
+<meta name="description" content="カメラで景色を撮影し、ドット絵にしてPNGで保存できます。画像処理は端末内で行います。">
+<link rel="canonical" href="https://pixieed.jp/pixel-camera.html">
+<meta property="og:type" content="website"><meta property="og:site_name" content="PiXiEED"><meta property="og:locale" content="ja_JP"><meta property="og:title" content="ドット絵カメラ｜景色を撮ってPNG保存｜PiXiEED"><meta property="og:description" content="カメラで景色を撮影し、ドット絵にしてPNGで保存できます。画像処理は端末内で行います。"><meta property="og:url" content="https://pixieed.jp/pixel-camera.html"><meta property="og:image" content="https://pixieed.jp/assets/og/camera.png"><meta property="og:image:type" content="image/png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="PiXiEEDのロゴと「ドットカメラ」のアイコン">
+<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="ドット絵カメラ｜景色を撮ってPNG保存｜PiXiEED"><meta name="twitter:description" content="カメラで景色を撮影し、ドット絵にしてPNGで保存できます。画像処理は端末内で行います。"><meta name="twitter:image" content="https://pixieed.jp/assets/og/camera.png"><meta name="twitter:image:alt" content="PiXiEEDのロゴと「ドットカメラ」のアイコン">
+<link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180"><link rel="manifest" href="/manifest.webmanifest">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#0d1114">
-  <title>ドット絵カメラ｜PiXiEED</title>
-  <meta name="description" content="いつもの景色を、ドット絵に。カメラを向けて撮影し、PNG画像で保存できます。写真は端末内で処理します。">
-  <link rel="icon" href="/assets/brand/pixieed-logo-48.png?v=20260927" type="image/png">
-  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20260924-camera-release-1">
-  <link rel="stylesheet" href="css/pixel-lens-camera.css?v=20260928-pass-1">
-  <link rel="modulepreload" href="js/pixel-lens/app.mjs?v=20260928-pass-1">
+  <link rel="stylesheet" href="css/pixel-lens-camera.css?v=20260927-post-limits-1">
+  <link rel="modulepreload" href="js/pixel-lens/app.mjs?v=20260927-audio-handoff-1">
 </head>
 <body>
   <a class="pc-skip" href="#stage">カメラへ移動</a>
@@ -106,6 +108,7 @@
       </div>
       <div id="resultControls" class="lc-result" hidden>
           <a id="savePng" class="lc-save" aria-disabled="true" tabindex="-1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m-5-5 5 5 5-5M5 19h14"/></svg><span id="saveLabel">PNGを保存</span></a>
+          <button id="postCamera" class="lc-post" type="button">地図に投稿</button>
           <button id="gifUpgrade" class="lc-upgrade" type="button" hidden>★ 3時間、GIFを10秒・なめらかに</button>
       </div>
     </div>
@@ -123,6 +126,6 @@
     <a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""></a>
     <a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>
   </nav>
-  <script type="module" src="js/pixel-lens/app.mjs?v=20260928-pass-1"></script>
+  <script type="module" src="js/pixel-lens/app.mjs?v=20260927-audio-handoff-1"></script>
 </body>
 </html>

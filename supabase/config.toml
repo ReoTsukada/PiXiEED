@@ -414,3 +414,9 @@ entrypoint = "./functions/moderate-post/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/moderate-post/*.html" ]
+
+[functions.public-post-puzzle]
+enabled = true
+verify_jwt = false
+import_map = "./functions/public-post-puzzle/deno.json"
+entrypoint = "./functions/public-post-puzzle/index.ts"

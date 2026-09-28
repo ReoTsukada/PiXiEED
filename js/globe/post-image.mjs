@@ -1,15 +1,6 @@
-/** Client-side checks for a pixel-art upload. Same limits as the production create-post function. */
+/** Client-side checks for a pixel-art upload. Accepted files are normalized to PNG for server verification. */
 
-export const PIXEL_LIMITS = Object.freeze({ maxBytes: 512 * 1024, minSize: 8, maxSize: 128, maxColors: 512, mime: ['image/png', 'image/webp'] });
-
-function readAsDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(new Error('画像を読み込めませんでした。'));
-    reader.readAsDataURL(file);
-  });
-}
+export const PIXEL_LIMITS = Object.freeze({ maxBytes: 512 * 1024, minSize: 8, maxSize: 512, maxColors: 128, mime: ['image/png', 'image/webp'] });
 
 export async function inspectPixelImage(file) {
   if (!file) throw new Error('画像を選んでください。');
@@ -35,7 +26,12 @@ export async function inspectPixelImage(file) {
       colors.add((pixels[index] << 24 | pixels[index + 1] << 16 | pixels[index + 2] << 8 | pixels[index + 3]) >>> 0);
       if (colors.size > maxColors) throw new Error(`色数が多すぎます。${maxColors} 色以内のドット絵にしてください。（写真は投稿できません）`);
     }
-    return { dataUrl: await readAsDataUrl(file), mimeType: file.type, size: file.size, width, height, colorCount: colors.size, hasTransparency: transparent > 0 };
+    const dataUrl = canvas.toDataURL('image/png');
+    if (!dataUrl.startsWith('data:image/png;base64,')) throw new Error('投稿用のPNGを作れませんでした。');
+    const base64 = dataUrl.slice('data:image/png;base64,'.length);
+    const size = Math.floor(base64.length * 3 / 4) - (base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0);
+    if (size > PIXEL_LIMITS.maxBytes) throw new Error('投稿用PNGが512KBを超えました。画像を小さくしてから選んでください。');
+    return { dataUrl, mimeType: 'image/png', size, width, height, colorCount: colors.size, hasTransparency: transparent > 0 };
   } finally {
     bitmap.close?.();
   }
@@ -44,4 +40,12 @@ export async function inspectPixelImage(file) {
 /** Largest whole-number scale that fits the box, so every pixel stays a crisp square. */
 export function integerScale(width, height, boxWidth, boxHeight) {
   return Math.max(1, Math.floor(Math.min(boxWidth / width, boxHeight / height)));
+}
+
+/** Enlarge small pixels by whole steps; shrink larger art without changing its aspect ratio. */
+export function fitPixelImage(width, height, boxWidth, boxHeight) {
+  if (![width, height, boxWidth, boxHeight].every((value) => Number.isFinite(value) && value > 0)) throw new TypeError('画像と表示枠のサイズが不正です');
+  const availableScale = Math.min(boxWidth / width, boxHeight / height);
+  const scale = availableScale >= 1 ? Math.floor(availableScale) : availableScale;
+  return { width: width * scale, height: height * scale };
 }

@@ -1,10 +1,14 @@
 import { createClient } from "npm:@supabase/supabase-js@2.106.2";
 import { normalizeGlobeCell } from "../_shared/globe-cell.ts";
+import { verifyPixelPngClaim, PixelPngError } from "../_shared/pixel-png.mjs";
+import { keyAwareFetch } from "../_shared/key-aware-fetch.ts";
+import { admitPuzzleUpload, PuzzleAdmissionError } from "../_shared/puzzle-admission.mjs";
+import { isUuid, requestDigest, rpcRecord } from "../_shared/post-publication.ts";
 
 const MAX_BYTES = 512 * 1024;
-const MIN_PIXELS = 8;
-const MAX_PIXELS = 128;
-const ALLOWED_MIME = new Set(["image/png", "image/webp"]);
+const MAX_BODY_BYTES = 4 * 1024 * 1024;
+const MAX_COLORS = 128;
+const ALLOWED_MIME = new Set(["image/png"]);
 
 const env = (name: string) => Deno.env.get(name)?.trim() || "";
 const supabaseUrl = env("SUPABASE_URL");
@@ -67,6 +71,30 @@ const json = (request: Request, body: Record<string, unknown>, status = 200) =>
 const fail = (request: Request, message: string, status = 400) =>
   json(request, { ok: false, error: message }, status);
 
+async function readBoundedJson(request: Request): Promise<Record<string, unknown> | null> {
+  const declared = Number(request.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) return null;
+  if (!request.body) return null;
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > MAX_BODY_BYTES) { await reader.cancel(); return null; }
+      chunks.push(value);
+    }
+    const bytes = new Uint8Array(size);
+    let offset = 0;
+    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+    const parsed: unknown = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown> : null;
+  } catch { return null; }
+}
+
 function decodeBase64(value: unknown): Uint8Array | null {
   if (typeof value !== "string" || !/^[A-Za-z0-9+/]*={0,2}$/.test(value)) {
     return null;
@@ -83,56 +111,6 @@ function decodeBase64(value: unknown): Uint8Array | null {
   } catch {
     return null;
   }
-}
-
-const ascii = (bytes: Uint8Array, start: number, length: number) =>
-  String.fromCharCode(...bytes.slice(start, start + length));
-
-function readPngDimensions(bytes: Uint8Array) {
-  if (bytes.length < 24 || ascii(bytes, 0, 8) !== "\x89PNG\r\n\x1a\n") {
-    return null;
-  }
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  return { width: view.getUint32(16), height: view.getUint32(20) };
-}
-
-function readWebpDimensions(bytes: Uint8Array) {
-  if (
-    bytes.length < 30 || ascii(bytes, 0, 4) !== "RIFF" ||
-    ascii(bytes, 8, 4) !== "WEBP"
-  ) return null;
-  const type = ascii(bytes, 12, 4);
-  if (type === "VP8X" && bytes.length >= 30) {
-    const width = 1 + bytes[24] + (bytes[25] << 8) + (bytes[26] << 16);
-    const height = 1 + bytes[27] + (bytes[28] << 8) + (bytes[29] << 16);
-    return { width, height };
-  }
-  if (
-    type === "VP8 " && bytes.length >= 30 && bytes[23] === 0x9d &&
-    bytes[24] === 0x01 && bytes[25] === 0x2a
-  ) {
-    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-    return {
-      width: view.getUint16(26, true) & 0x3fff,
-      height: view.getUint16(28, true) & 0x3fff,
-    };
-  }
-  // VP8L stores dimensions as packed 14-bit values. The signature byte is
-  // deliberately checked so an arbitrary RIFF file cannot pass as an image.
-  if (type === "VP8L" && bytes.length >= 25 && bytes[20] === 0x2f) {
-    const width = 1 + ((bytes[21] | (bytes[22] << 8)) & 0x3fff);
-    const height = 1 +
-      (((bytes[22] >> 6) | (bytes[23] << 2) | ((bytes[24] & 0x0f) << 10)) &
-        0x3fff);
-    return { width, height };
-  }
-  return null;
-}
-
-function readImageDimensions(bytes: Uint8Array, mime: string) {
-  return mime === "image/png"
-    ? readPngDimensions(bytes)
-    : readWebpDimensions(bytes);
 }
 
 async function sha256(bytes: Uint8Array) {
@@ -198,18 +176,23 @@ function normalizeLocation(input: unknown) {
   };
 }
 
-function extensionFor(mime: string) {
-  return mime === "image/webp" ? "webp" : "png";
-}
-
-Deno.serve(async (request) => {
+export async function createPostHandler(request: Request, deps: {
+  createClient?: typeof createClient;
+  projectUrl?: string;
+  publishableKey?: string;
+  serviceKey?: string;
+} = {}) {
+  const makeClient = deps.createClient || createClient;
+  const projectUrl = deps.projectUrl ?? supabaseUrl;
+  const publicKey = deps.publishableKey ?? publishableKey;
+  const privateKey = deps.serviceKey ?? secretKey;
   if (request.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders(request) });
   }
   if (request.method !== "POST") {
     return fail(request, "method_not_allowed", 405);
   }
-  if (!supabaseUrl || !publishableKey || !secretKey) {
+  if (!projectUrl || !publicKey || !privateKey) {
     return fail(request, "function_not_configured", 503);
   }
 
@@ -218,20 +201,16 @@ Deno.serve(async (request) => {
     return fail(request, "authentication_required", 401);
   }
 
-  let body: Record<string, unknown>;
-  try {
-    body = await request.json();
-  } catch {
-    return fail(request, "invalid_json");
-  }
+  const body = await readBoundedJson(request);
+  if (!body) return fail(request, "invalid_json_or_body_too_large", 413);
 
-  const userClient = createClient(supabaseUrl, publishableKey, {
+  const userClient = makeClient(projectUrl, publicKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
       detectSessionInUrl: false,
     },
-    global: { headers: { Authorization: authorization } },
+    global: { headers: { Authorization: authorization }, fetch: keyAwareFetch(publicKey) },
   });
   const { data: userData, error: userError } = await userClient.auth.getUser();
   if (userError || !userData.user) {
@@ -240,6 +219,9 @@ Deno.serve(async (request) => {
 
   const title = String(body.title || "").trim();
   const caption = String(body.caption || "").trim();
+  const postKind = body.postKind === "pixel_camera" ? "pixel_camera" :
+    (body.postKind === "pixel_art" || body.postKind == null) ? "pixel_art" : null;
+  if (!postKind) return fail(request, "post_kind_invalid");
   if (!title || title.length > 60 || caption.length > 180) {
     return fail(request, "text_length_invalid");
   }
@@ -251,38 +233,63 @@ Deno.serve(async (request) => {
   if (!image || !ALLOWED_MIME.has(mime)) {
     return fail(request, "image_type_invalid");
   }
+  if (!Number.isInteger(image.colorCount) || Number(image.colorCount) < 1 ||
+      Number(image.colorCount) > MAX_COLORS) {
+    return fail(request, "image_colors_invalid");
+  }
   const bytes = decodeBase64(image.base64);
   if (!bytes) return fail(request, "image_size_invalid");
-  const dimensions = readImageDimensions(bytes, mime);
-  if (
-    !dimensions || dimensions.width < MIN_PIXELS ||
-    dimensions.height < MIN_PIXELS ||
-    dimensions.width > MAX_PIXELS || dimensions.height > MAX_PIXELS
-  ) {
-    return fail(request, "image_pixels_invalid");
-  }
+  let dimensions: { width: number; height: number; colorCount: number };
+  try { dimensions = await verifyPixelPngClaim(bytes, image); }
+  catch (error) { return fail(request, error instanceof PixelPngError ? error.code : "image_decode_invalid"); }
 
   const location = normalizeLocation(body.location);
   if (!location) return fail(request, "location_required");
 
   const contentHash = await sha256(bytes);
-  const admin = createClient(supabaseUrl, secretKey, {
+  const admin = makeClient(projectUrl, privateKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
       detectSessionInUrl: false,
     },
+    global: { fetch: keyAwareFetch(privateKey) },
   });
-  const { data: duplicate, error: duplicateError } = await admin
-    .from("user_posts")
-    .select("id,status")
-    .eq("content_hash", contentHash)
-    .maybeSingle();
-  if (duplicateError) return fail(request, "duplicate_check_failed", 500);
-  if (duplicate) return fail(request, "image_already_submitted", 409);
-
+  const requestKey = body.requestKey == null || body.requestKey === "" ? null : body.requestKey;
+  if (requestKey !== null && !isUuid(requestKey)) return fail(request, "request_key_invalid");
+  let admittedPuzzle: Awaited<ReturnType<typeof admitPuzzleUpload>> | null = null;
+  if (body.puzzle != null) {
+    try { admittedPuzzle = await admitPuzzleUpload(body.puzzle, bytes, image); }
+    catch (error) {
+      const code = error instanceof PuzzleAdmissionError ? error.code : "puzzle_invalid";
+      return fail(request, code);
+    }
+  }
+  const puzzleHash = admittedPuzzle ? await requestDigest({
+    mode: admittedPuzzle.mode,
+    source: admittedPuzzle.source,
+    definition: admittedPuzzle.definition,
+    changedHash: admittedPuzzle.changed ? await sha256(admittedPuzzle.changed.bytes) : null,
+  }) : null;
+  const digest = requestKey ? await requestDigest({
+    title, caption, postKind, location, imageHash: contentHash, puzzleHash,
+  }) : null;
+  if (requestKey && digest) {
+    const lookup = await admin.rpc("pixieed_lookup_post_request", {
+      p_author_id: userData.user.id, p_request_key: requestKey, p_request_digest: digest,
+    });
+    if (lookup.error) {
+      if (String(lookup.error.message || "").includes("request_digest_mismatch")) {
+        return fail(request, "request_key_digest_mismatch", 409);
+      }
+      return fail(request, "request_lookup_failed", 500);
+    }
+    const prior = rpcRecord(lookup.data);
+    if (prior) return json(request, { ok: true, postId: prior.postId, status: prior.status, replayed: true }, 200);
+  }
   const postId = crypto.randomUUID();
-  const imagePath = `${userData.user.id}/${postId}.${extensionFor(mime)}`;
+  const imagePath = `${userData.user.id}/${postId}.png`;
+  const changedPath = admittedPuzzle?.changed ? `${userData.user.id}/${postId}-changed.png` : null;
   const upload = await admin.storage.from("post-quarantine").upload(
     imagePath,
     new Blob([bytes.slice().buffer as ArrayBuffer], { type: mime }),
@@ -290,41 +297,108 @@ Deno.serve(async (request) => {
   );
   if (upload.error) return fail(request, "image_upload_failed", 500);
 
-  const postInsert = await admin.from("user_posts").insert({
+  if (admittedPuzzle?.changed && changedPath) {
+    const changedUpload = await admin.storage.from("post-quarantine").upload(changedPath,
+      new Blob([admittedPuzzle.changed.bytes.slice().buffer as ArrayBuffer], { type: "image/png" }),
+      { cacheControl: "31536000", contentType: "image/png", upsert: false });
+    if (changedUpload.error) {
+      await admin.storage.from("post-quarantine").remove([imagePath]);
+      return fail(request, "puzzle_image_upload_failed", 500);
+    }
+  }
+  const pPost = {
     id: postId,
     author_id: userData.user.id,
     title,
     caption,
+    post_kind: postKind,
     image_path: imagePath,
     image_mime: mime,
     image_bytes: bytes.byteLength,
     image_width: dimensions.width,
     image_height: dimensions.height,
-    color_count: Number.isInteger(image.colorCount)
-      ? Number(image.colorCount)
-      : null,
+    color_count: dimensions.colorCount,
     content_hash: contentHash,
     status: "pending",
-  });
-  if (postInsert.error) {
-    await admin.storage.from("post-quarantine").remove([imagePath]);
+    ...(requestKey ? { request_key: requestKey, request_digest: digest } : {}),
+  };
+  const pPuzzle = admittedPuzzle ? {
+    mode: admittedPuzzle.mode,
+    schema_version: 1,
+    source_metadata: admittedPuzzle.source,
+    definition: admittedPuzzle.definition,
+    definition_hash: await requestDigest(admittedPuzzle.definition),
+    ...(admittedPuzzle.changed ? {
+      changed_image_path: changedPath,
+      changed_image_claim: {
+        mimeType: "image/png", size: admittedPuzzle.changed.bytes.byteLength,
+        width: admittedPuzzle.changed.width, height: admittedPuzzle.changed.height,
+        colorCount: admittedPuzzle.changed.colorCount,
+      },
+    } : {}),
+  } : null;
+  const attemptPaths = changedPath ? [imagePath, changedPath] : [imagePath];
+  const removeAttemptAssets = async () => {
+    const removed = await admin.storage.from("post-quarantine").remove(attemptPaths);
+    return !removed.error;
+  };
+  let created;
+  try {
+    created = await admin.rpc("pixieed_create_post", {
+      p_post: pPost, p_location: location, p_puzzle: pPuzzle,
+    });
+  } catch { created = { data: null, error: true }; }
+  const createdRecord = !created.error ? rpcRecord(created.data) : null;
+  if (!createdRecord) {
+    // Resolve ambiguous RPC outcomes before deleting assets: the transaction may have committed.
+    let confirmed: Record<string, unknown> | null = null;
+    if (requestKey && digest) {
+      const reread = await admin.rpc("pixieed_lookup_post_request", {
+        p_author_id: userData.user.id, p_request_key: requestKey, p_request_digest: digest,
+      });
+      if (!reread.error) confirmed = rpcRecord(reread.data);
+      else if (String(reread.error.message || "").includes("request_digest_mismatch")) {
+        await removeAttemptAssets();
+        return fail(request, "request_digest_mismatch", 409);
+      }
+    }
+    if (confirmed) {
+      const replayPostId = String(confirmed.postId || "");
+      if (replayPostId.toLowerCase() !== postId.toLowerCase()) {
+        const cleaned = await removeAttemptAssets();
+        return json(request, { ok: true, postId: replayPostId, status: confirmed.status, replayed: true,
+          ...(cleaned ? {} : { cleanup: "pending" }) }, 200);
+      }
+      return json(request, { ok: true, postId: replayPostId, status: confirmed.status, replayed: true }, 200);
+    }
+    const check = await admin.from("user_posts").select("id,status").eq("id", postId).maybeSingle();
+    if (check.error) return fail(request, "post_save_outcome_unknown", 503);
+    if (check.data) return json(request, { ok: true, postId, status: check.data.status, replayed: false }, 201);
+    await removeAttemptAssets();
     return fail(request, "post_save_failed", 500);
   }
 
-  const locationInsert = await admin.from("post_locations_private").insert({
-    post_id: postId,
-    ...location,
-  });
-  if (locationInsert.error) {
-    await admin.from("user_posts").delete().eq("id", postId);
-    await admin.storage.from("post-quarantine").remove([imagePath]);
-    return fail(request, "location_save_failed", 500);
+  const committedPostId = String(createdRecord.postId || "");
+  if (!isUuid(committedPostId)) {
+    const check = await admin.from("user_posts").select("id,status").eq("id", postId).maybeSingle();
+    if (check.error) return fail(request, "post_save_outcome_unknown", 503);
+    if (!check.data) { await removeAttemptAssets(); return fail(request, "post_save_failed", 500); }
   }
+  const responsePostId = isUuid(committedPostId) ? committedPostId : postId;
+  let cleanupPending = false;
+  if (responsePostId.toLowerCase() !== postId.toLowerCase()) cleanupPending = !(await removeAttemptAssets());
 
   return json(request, {
     ok: true,
-    postId,
-    status: "pending",
+    postId: responsePostId,
+    status: createdRecord.status || "pending",
+    replayed: Boolean(createdRecord.replayed) || responsePostId.toLowerCase() !== postId.toLowerCase(),
+    ...(cleanupPending ? { cleanup: "pending" } : {}),
     message: "投稿を受け付けました。確認後に地図へ表示します。",
-  }, 201);
+  }, createdRecord.replayed || responsePostId.toLowerCase() !== postId.toLowerCase() ? 200 : 201);
+}
+
+if (import.meta.main) Deno.serve(async (request) => {
+  try { return await createPostHandler(request); }
+  catch { return fail(request, "post_processing_failed", 500); }
 });

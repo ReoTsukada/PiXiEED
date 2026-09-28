@@ -878,12 +878,13 @@ async function feed() {
     url.searchParams.set('order', 'published_at.desc'); url.searchParams.set('limit', '16');
     const response = await fetch(url, { headers: { apikey: key, Authorization: `Bearer ${key}`, Accept: 'application/json' } });
     if (!response.ok) return;
-    const rows = (await response.json()).filter((r) => r?.public_image_path);
+    const rows = (await response.json()).filter((r) => r?.public_image_path &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(r.post_id || '')));
     if (!rows.length) return;
     const bucket = encodeURIComponent(cfg.publicStorageBucket || 'post-public');
     const track = document.createElement('div'); track.className = 'hp-feed-track';
     const card = (r, copy) => {
-      const a = document.createElement('a'); a.className = 'hp-feed-item'; a.href = '/';
+      const a = document.createElement('a'); a.className = 'hp-feed-item'; a.href = `/?art=${encodeURIComponent(r.post_id)}`;
       if (copy) { a.tabIndex = -1; a.setAttribute('aria-hidden', 'true'); }
       const img = new Image(); img.loading = 'lazy'; img.decoding = 'async'; img.alt = copy ? '' : String(r.title || '地図の投稿');
       img.src = `${base}/storage/v1/object/public/${bucket}/${String(r.public_image_path).split('/').filter(Boolean).map(encodeURIComponent).join('/')}`;

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><title>投稿画像の受付検証</title>
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">
+<meta name="robots" content="noindex,follow">
+</head>
+<body><main><h1>投稿画像の受付検証</h1><output id="result">検証中</output></main>
+<script type="module">
+import { inspectPixelImage } from '../../js/globe/post-image.mjs';
+import { verifyPixelPngClaim } from '../../supabase/functions/_shared/pixel-png.mjs';
+const output = document.querySelector('#result');
+try {
+  const canvas = document.createElement('canvas'); canvas.width = canvas.height = 16;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#234567'; ctx.fillRect(0, 0, 8, 16);
+  ctx.fillStyle = '#dc8420'; ctx.fillRect(8, 0, 8, 16);
+  const results = [];
+  for (const type of ['image/png', 'image/webp']) {
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, type));
+    if (!blob || blob.type !== type) throw new Error(`${type} を作れません`);
+    const checked = await inspectPixelImage(new File([blob], `input.${type === 'image/png' ? 'png' : 'webp'}`, { type }));
+    if (checked.mimeType !== 'image/png' || checked.width !== 16 || checked.height !== 16 || checked.colorCount > 128 || checked.size > 512 * 1024) throw new Error(`${type} の検証結果が違います: ${JSON.stringify({mimeType:checked.mimeType,width:checked.width,height:checked.height,colorCount:checked.colorCount,size:checked.size})}`);
+    const binary = atob(checked.dataUrl.split(',')[1]);
+    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+    await verifyPixelPngClaim(bytes, checked);
+    results.push(`${type}→PNG ${checked.colorCount}色 ${checked.width}×${checked.height}px`);
+  }
+  ctx.clearRect(0, 0, 2, 2);
+  ctx.fillStyle = 'rgba(10, 230, 90, .5)'; ctx.fillRect(4, 4, 3, 3);
+  const alphaBlob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+  const alphaChecked = await inspectPixelImage(new File([alphaBlob], 'alpha.png', { type: 'image/png' }));
+  if (!alphaChecked.hasTransparency) throw new Error('透明色を検出できません');
+  const alphaBytes = Uint8Array.from(atob(alphaChecked.dataUrl.split(',')[1]), (character) => character.charCodeAt(0));
+  await verifyPixelPngClaim(alphaBytes, alphaChecked);
+  results.push(`透明PNG ${alphaChecked.colorCount}色`);
+  output.textContent = `PASS: ${results.join(' / ')}`;
+} catch (error) { output.textContent = `FAIL: ${error.message}`; }
+</script></body></html>

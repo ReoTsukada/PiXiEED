@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+<title>かんたんもの探し｜問題を作って遊ぶ｜PiXiEED</title>
+<meta name="description" content="絵の上に見つけてほしいものを登録して、もの探しの問題を作成できます。">
+<link rel="canonical" href="https://pixieed.jp/hidden-object/">
+<meta property="og:type" content="website"><meta property="og:site_name" content="PiXiEED"><meta property="og:locale" content="ja_JP"><meta property="og:title" content="かんたんもの探し｜問題を作って遊ぶ｜PiXiEED"><meta property="og:description" content="絵の上に見つけてほしいものを登録して、もの探しの問題を作成できます。"><meta property="og:url" content="https://pixieed.jp/hidden-object/"><meta property="og:image" content="https://pixieed.jp/assets/og/hidden-object.png"><meta property="og:image:type" content="image/png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="PiXiEEDのロゴと「もの探し」のアイコン">
+<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="かんたんもの探し｜問題を作って遊ぶ｜PiXiEED"><meta name="twitter:description" content="絵の上に見つけてほしいものを登録して、もの探しの問題を作成できます。"><meta name="twitter:image" content="https://pixieed.jp/assets/og/hidden-object.png"><meta name="twitter:image:alt" content="PiXiEEDのロゴと「もの探し」のアイコン">
+<link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180"><link rel="manifest" href="/manifest.webmanifest">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f2ec">
+  <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20260924-camera-release-1">
+  <link rel="stylesheet" href="/css/site.css?rev=20260927-draw-step08-3">
+  <link rel="stylesheet" href="/css/creation-hidden-object.css?rev=20260928-puzzle-layout-2">
+</head>
+<body data-page="hidden-object" class="app-page app-page--tool-hidden-object">
+  <a class="skip-link" href="#main">本文へ移動</a>
+  <header class="site-header"><div class="container header-inner"><a class="brand" href="/" aria-label="PiXiEED ホーム"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a></div></header>
+  <main id="main" class="hidden-page">
+    <header class="hidden-heading"><h1>かんたんもの探し</h1><p>見つけてほしいものを、絵の上にぬって登録しよう。</p></header>
+    <p id="hidden-status" class="hidden-status" role="status" aria-live="polite">自分の端末に保存した絵を選んでください。</p>
+    <section id="hidden-setup" class="hidden-setup" aria-label="元の絵を選ぶ">
+      <label>元にする保存版<select id="hidden-source" aria-label="元にする自分の保存版"></select></label>
+      <button id="hidden-start" type="button" disabled>対象を描きはじめる</button>
+      <button id="hidden-resume" type="button" hidden>前回の作成を再開</button>
+      <p>Drawで保存した自分の絵を使います。写真をDrawへ取り込んだ絵も選べます。元の保存版は変更されません。</p>
+    </section>
+    <section id="hidden-editor" class="hidden-editor" hidden aria-label="もの探しの対象を指定">
+      <figure class="hidden-preview"><figcaption>絵の上をなぞって対象を指定。ピンチで拡大、矢印キーとSpaceでも編集できます。</figcaption><canvas id="hidden-canvas" aria-label="元画像。指でなぞって対象を指定できます。ピンチで拡大。矢印キーで画素を選び、Spaceで編集" tabindex="0"></canvas></figure>
+      <p id="hidden-source-label" class="hidden-source-label"></p>
+      <div id="hidden-target-list" class="hidden-target-list" role="group" aria-label="対象を選ぶ"></div>
+      <details class="hidden-settings">
+        <summary aria-label="対象と編集方法の設定を開く">対象・編集</summary>
+        <div class="hidden-settings__sheet">
+          <div class="hidden-target-create"><label for="hidden-name">見つけるものの名前</label><div><input id="hidden-name" maxlength="48" autocomplete="off" placeholder="例：赤い花"><button id="hidden-add" type="button">追加</button></div></div>
+          <div class="hidden-tools" role="group" aria-label="マスクの編集">
+            <button type="button" data-hidden-mode="paint" aria-pressed="true">ぬる</button>
+            <button type="button" data-hidden-mode="erase" aria-pressed="false">消す</button>
+            <button id="hidden-remove" type="button" disabled>対象を削除</button>
+          </div>
+          <p id="hidden-mask-summary" class="hidden-mask-summary"></p>
+          <button id="hidden-confirm" class="hidden-confirm" type="button" disabled>対象と正解範囲を確定</button>
+          <p id="hidden-confirmed" class="hidden-confirmed" role="status" hidden>作者が指定した対象を確定しました。端末内の非公開下書きです。</p>
+          <button id="hidden-new" class="hidden-new" type="button" hidden>別のもの探しを作る</button>
+        </div>
+      </details>
+      <div class="hidden-publish-actions" aria-label="確定したもの探しの操作">
+        <button id="hidden-play-local" type="button" hidden disabled>確定した下書きを試しに遊ぶ</button>
+        <button id="hidden-publish" class="hidden-publish" type="button" hidden disabled>地球儀へ投稿</button>
+      </div>
+      <output id="hidden-zoom" class="hidden-zoom" aria-label="画像の拡大率">100%</output>
+      <p id="hidden-edit-hint" class="hidden-edit-hint" role="status" aria-live="polite"></p>
+    </section>
+  </main>
+  <footer class="site-footer"><div class="container"><p>PiXiEED</p></div></footer>
+  <nav class="app-tabs" aria-label="アプリナビゲーション">
+    <a data-nav="home" href="/home/" aria-label="ホーム"><img src="/assets/icons/pixieed/home.svg" alt=""></a>
+    <a data-nav="map" href="/" aria-label="地図"><img src="/assets/icons/pixieed/globe.svg" alt=""></a>
+    <button id="hidden-save" type="button" aria-label="もの探しを端末に保存" disabled>保存</button>
+    <a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""></a>
+    <a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>
+  </nav>
+  <script type="module" src="/js/creation/hidden-object-page.mjs?rev=20260928-puzzle-handoff-1"></script>
+</body>
+</html>
