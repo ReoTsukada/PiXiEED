@@ -36,8 +36,10 @@ try {
   const canvas = page.locator('#draw-canvas'); const box = await canvas.boundingBox();
   for (let n = 1; n < 5; n++) await page.mouse.click(box.x + box.width * n / 6, box.y + box.height / 2);
   const source = await canvas.evaluate((c) => [...c.getContext('2d').getImageData(0, 0, c.width, c.height).data]);
+  // the GIF buttons live in the ⋯ sheet (with the canvas size)
+  const openSheet = async () => { if (!(await page.locator('.draw-import').evaluate((node) => node.open))) await page.locator('.draw-import > summary').click(); };
   const downloadFrames = async (selector, count) => {
-    const event = page.waitForEvent('download'); await page.locator(selector).click();
+    await openSheet(); const event = page.waitForEvent('download'); await page.locator(selector).click();
     const download = await event; const bytes = await readFile(await download.path());
     assert.equal(bytes.toString('ascii', 0, 6), 'GIF89a');
     const frames = [...bytes].filter((v, i) => v === 33 && bytes[i + 1] === 249 && bytes[i + 2] === 4).length;
@@ -45,7 +47,7 @@ try {
   };
   await downloadFrames('#draw-timelapse', 36);
   assert.equal(await page.locator('.px-pass').count(), 0, 'short timelapse is free');
-  await page.locator('.draw-timelapse-more summary').click();
+  await openSheet();
   await page.locator('#draw-timelapse-detail').click(); await page.waitForSelector('.px-pass-no');
   await page.locator('.px-pass-no').click(); await page.waitForFunction(() => !document.querySelector('#draw-timelapse-detail').disabled);
   assert.equal(downloads, 1, 'cancellation never exports');
@@ -60,13 +62,14 @@ try {
   await page.waitForFunction(() => !document.querySelector('#draw-timelapse-detail').disabled);
   assert.equal(downloads, beforeExpiry + 1, 'a detail export started with a valid pass finishes after expiry');
   assert.deepEqual(await canvas.evaluate((c) => [...c.getContext('2d').getImageData(0, 0, c.width, c.height).data]), source, 'expiry retains the artwork');
-  await page.locator('#draw-timelapse-detail').click(); await page.waitForSelector('.px-pass-no');
+  await openSheet(); await page.locator('#draw-timelapse-detail').click(); await page.waitForSelector('.px-pass-no');
   await page.locator('.px-pass-no').click(); await page.waitForFunction(() => !document.querySelector('#draw-timelapse-detail').disabled);
   assert.equal(downloads, beforeExpiry + 1, 'the next detailed export requires more time');
   await downloadFrames('#draw-timelapse', 36);
   for (const viewport of [{ width: 320, height: 568 }, { width: 568, height: 320 }]) {
     await page.setViewportSize(viewport);
-    for (const selector of ['#draw-timelapse', '.draw-timelapse-more summary', '#draw-timelapse-detail']) {
+    for (const selector of ['.draw-import > summary', '#draw-timelapse', '#draw-timelapse-detail']) {
+      if (selector !== '.draw-import > summary') await openSheet();
       await page.locator(selector).scrollIntoViewIfNeeded();
       const rect = await page.locator(selector).boundingBox(); assert.ok(rect && rect.width >= 44 && rect.height >= 44, `${selector} below touch size: ${JSON.stringify({ viewport, rect })}`);
       const nav = await page.locator('.app-tabs').boundingBox();

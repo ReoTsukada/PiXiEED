@@ -136,6 +136,13 @@ export function mountSiteHeader() {
   brand.classList.add('px-header-brand');
   brand.href = '/';
   brand.setAttribute('aria-label', 'PiXiEED ホーム');
+  // tool pages name themselves beside the logo (<body data-tool-name="かんたんドット">); home says PiXiEED
+  const toolName = document.body.dataset.toolName;
+  if (toolName) {
+    let label = brand.querySelector('span:not(.brand-mark)');
+    if (!label) { label = document.createElement('span'); brand.append(label); }
+    label.textContent = toolName; brand.classList.add('px-header-brand--tool');
+  }
   inner.querySelectorAll('.menu-toggle, .audio-header-actions, .lc-top-left, .lc-top-right').forEach((el) => el.classList.add('px-header-utilities'));
   let button = inner.querySelector('[data-header-pass]');
   if (!button) {

@@ -340,8 +340,12 @@ gridButton?.addEventListener('click', () => { showGrid = !showGrid; try { localS
 syncGrid();
 // ---- size buttons drive the page's own size control ----
 const sizeButtons = [...document.querySelectorAll('[data-draw-size]')];
-function syncSizeButtons() { for (const b of sizeButtons) b.setAttribute('aria-checked', String(Number(b.dataset.drawSize) === documentData.width && documentData.width === documentData.height)); }
-for (const b of sizeButtons) b.addEventListener('click', () => { if (sizeSelect.value === b.dataset.drawSize && documentData.width === Number(b.dataset.drawSize)) return; sizeSelect.value = b.dataset.drawSize; sizeSelect.dispatchEvent(new Event('change')); });
+function syncSizeButtons() {
+  for (const b of sizeButtons) b.setAttribute('aria-checked', String(Number(b.dataset.drawSize) === documentData.width && documentData.width === documentData.height));
+  const chip = $('#draw-size-chip'); if (chip) chip.textContent = String(documentData.width);
+}
+for (const b of sizeButtons) b.addEventListener('click', () => {
+  $('.draw-import')?.removeAttribute('open'); if (sizeSelect.value === b.dataset.drawSize && documentData.width === Number(b.dataset.drawSize)) return; sizeSelect.value = b.dataset.drawSize; sizeSelect.dispatchEvent(new Event('change')); });
 function afterHistoryStep() {
   saved = false; const step = history.lastStep;
   if (step?.paletteChanged) { renderPalette(); showCurrentColor(); paint(); } else paint(step?.indices || null);
@@ -546,6 +550,12 @@ async function exportTimelapse(detail) {
   }
 }
 $('#draw-timelapse').addEventListener('click', () => exportTimelapse(false));
+// the ⋯ sheet closes when you touch anything else (the PXD panel opened from it counts as inside)
+document.addEventListener('pointerdown', (event) => {
+  const sheet = $('.draw-import'); if (!sheet?.open) return;
+  if (sheet.contains(event.target) || event.target.closest?.('#pxd-panel, .pxd-conversion')) return;
+  sheet.removeAttribute('open');
+});
 $('#draw-timelapse-detail').addEventListener('click', () => exportTimelapse(true));
 
 pxdBridge = mountPxdTools({

@@ -106,3 +106,7 @@ html[data-pixieed-motion=reduced] [data-px-panel-motion],html[data-pixieed-motio
 @media(prefers-reduced-motion:reduce){.px-header-ready .px-pass-gauge-row::after{animation:none!important}.px-header-ready .px-header-pass:active .px-pass-add{transform:none}}
 html[data-pixieed-motion=reduced] .px-pass-gauge-row::after{animation:none!important}
 html[data-pixieed-motion=reduced] .px-header-pass:active .px-pass-add{transform:none}
+/* tool pages: the tool's name beside the logo, kept on phones too */
+.px-site-header .px-header-brand--tool>span:not(.brand-mark){display:inline!important;overflow:hidden;min-width:0;font-weight:900;font-size:1rem;letter-spacing:.04em;text-overflow:ellipsis;white-space:nowrap}
+.px-site-header .px-header-brand--tool{flex:0 1 auto;min-width:0}
+@media(max-width:360px){.px-site-header .px-header-brand--tool>span:not(.brand-mark){font-size:.9rem;letter-spacing:.02em}}
