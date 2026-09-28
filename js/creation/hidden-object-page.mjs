@@ -1,3 +1,4 @@
+import { listOwnVersions, mountPictureShelf } from './picture-shelf.mjs?rev=20260928-picture-shelf-1';
 import { snapToWholePixels } from '../pixel-scale.mjs?v=20260928-pixel-scale-1';
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
 import { documentRgba } from './draw-core.mjs';
@@ -6,7 +7,6 @@ import { openPuzzleHandoff } from './puzzle-handoff.mjs?rev=20260928-puzzle-hand
 import { mountPxdTools } from './pxd-ui.mjs?rev=20260928-own-work-1';
 import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20260928-pxd-puzzles-1';
 
-const DRAW_LAST_KEY = 'pixieed.simple-draw.last-draft.v1';
 const LAST_KEY = 'pixieed:creation:hidden-object:last-draft:v1';
 const $ = (selector) => document.querySelector(selector);
 const status = $('#hidden-status'); const sourceSelect = $('#hidden-source'); const setup = $('#hidden-setup'); const editor = $('#hidden-editor');
@@ -122,17 +122,16 @@ function installRevision(revision, fixedDraftId, targetModel = null) {
 }
 
 async function loadSources() {
-  sourceSelect.replaceChildren(); const id = readStorage(DRAW_LAST_KEY);
-  if (!adapter || !id) { sourceSelect.add(new Option('保存した絵がありません', '')); $('#hidden-start').disabled = true; setStatus('先にDrawで絵を端末へ保存してください。'); return; }
+  sourceSelect.replaceChildren();
   try {
-    const record = await adapter.get(id);
-    if (!record || record.schemaVersion !== 1 || record.draftId !== id || !Array.isArray(record.revisions)) throw new Error('保存した絵が見つかりません');
-    const revisions = record.revisions.filter((item) => item?.asset?.kind === 'pixel_art' && item.asset.owner?.type === 'local' && item.asset.owner.id === 'local-owner' && item.asset.visibility === 'draft');
-    sourceDraftId = id;
+    // もの探し keeps its own picture; versions come from its own draft only.
+    const { draftId: ownId, versions: revisions } = await listOwnVersions('hidden-object', { adapter });
+    sourceDraftId = ownId;
+    if (!revisions.length) { sourceSelect.add(new Option('まだ絵がありません', '')); $('#hidden-start').disabled = true; setStatus('上の「持ってくる」から絵を選んでください。'); return; }
     revisions.forEach((revision, index) => sourceSelect.add(new Option(revisionText(revision, index), revision.revisionId)));
-    if (revisions.length) sourceSelect.value = revisions.at(-1).revisionId;
-    $('#hidden-start').disabled = revisions.length === 0;
-    setStatus(revisions.length ? '自分の保存版を選んで、対象マスクを指定してください。' : '使える手描き保存版がありません。');
+    sourceSelect.value = revisions.at(-1).revisionId;
+    $('#hidden-start').disabled = false;
+    setStatus('絵を選んで、見つけてほしいものを指定してください。');
   } catch (error) { $('#hidden-start').disabled = true; setStatus(error.message); }
 }
 
@@ -324,6 +323,7 @@ $('#hidden-new').addEventListener('click', () => { pxdBridge?.reset(); draft = n
 try { adapter = createIndexedDbDraftAdapter(); store = createLocalDraftStore(adapter); } catch { setStatus('このブラウザーでは端末内保存を利用できません。'); }
 window.addEventListener('resize', fitCanvas);
 resumeButton.hidden = !readStorage(LAST_KEY);
+mountPictureShelf($('#hidden-shelf'), { tool: 'hidden-object', adapter, onBrought: async ({ from }) => { await loadSources(); setStatus(`${from.label}の絵を持ってきました。`); }, onError: (error) => setStatus(`持ってこられませんでした：${error.message}`) });
 pxdBridge = mountPxdHidden();
 const pxdImported = pxdBridge ? await pxdBridge.ready : false;
 if (!pxdImported) await loadSources();

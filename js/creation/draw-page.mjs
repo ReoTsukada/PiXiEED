@@ -1,5 +1,6 @@
 import { scaleNotice } from '../pixel-scale.mjs?v=20260928-pixel-scale-1';
 import { createLatestGate } from './pixel-contract.mjs?rev=20260928-data-contract-1';
+import { mountPictureShelf } from './picture-shelf.mjs?rev=20260928-picture-shelf-1';
 import { createLocalDraftStore, createIndexedDbDraftAdapter } from './local-drafts.mjs';
 import { createDrawDocument, createDrawHistory, DRAW_PALETTE, DRAW_PALETTE_ORDER, DRAW_SIZE, DRAW_SIZES, SIMPLE_DRAW_SIZES, toSimpleDrawDocument, encodePng, finishDrawStroke, floodFill, resizeDrawDocument, strokePixels, validateDrawDocument } from './draw-core.mjs?rev=20260927-draw-step08-3';
 import { createImportedDrawDocument, decodeDrawImageFile } from './draw-import.mjs?rev=20260928-pixel-scale-1';
@@ -24,7 +25,8 @@ const loadGate = createLatestGate(); let baseRevisionId = null;
 let store;
 let pxdBridge = null; let pxdImageRole = 'main';
 const activePointers = new Map(); let pinchStart = null; let zoom = 1; let panX = 0; let panY = 0;
-try { store = createLocalDraftStore(createIndexedDbDraftAdapter()); } catch (error) { status.textContent = `端末内保存を使えません：${error.message}`; saveButton.disabled = true; }
+let drawAdapter = null;
+try { drawAdapter = createIndexedDbDraftAdapter(); store = createLocalDraftStore(drawAdapter); } catch (error) { status.textContent = `端末内保存を使えません：${error.message}`; saveButton.disabled = true; }
 
 function getLastDraftId() { try { return globalThis.localStorage?.getItem(LAST_DRAFT_KEY) || null; } catch { return null; } }
 function setLastDraftId(value) { try { globalThis.localStorage?.setItem(LAST_DRAFT_KEY, value); return true; } catch { return false; } }
@@ -445,6 +447,8 @@ async function importImage(file, importSource) {
 $('#draw-import-local').addEventListener('click', () => $('#draw-import-file').click());
 $('#draw-import-file').addEventListener('change', () => { const file = $('#draw-import-file').files?.[0]; if (file) importImage(file, { type: 'local_image_copy', assetId: null, revisionId: null }); });
 if (getLastDraftId()) { resumeButton.hidden = false; $('#draw-copy-last').hidden = false; }
+// Pictures from the other tools come in as a new version of this tool's own picture, then open.
+if (store) mountPictureShelf($('#draw-shelf'), { tool: 'draw', adapter: drawAdapter, onBrought: async ({ from }) => { await loadLastDraft(); status.textContent = `${from.label}の絵を持ってきました`; }, onError: (error) => { status.textContent = `持ってこられませんでした：${error.message}`; } });
 paint();
 
 $('#draw-export').addEventListener('click', async () => {
