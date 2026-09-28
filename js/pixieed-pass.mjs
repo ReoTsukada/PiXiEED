@@ -91,7 +91,7 @@ function loadScript(src) {
     document.head.appendChild(script);
   });
 }
-/** @internal Google Ad Manager rewarded ad. Resolves 'granted' | 'closed' | 'unavailable'. */
+/** @internal Google Ad Manager rewarded ad. Resolves 'granted' | 'closed' | 'nofill' | 'unsupported' | 'timeout'. */
 export async function showRewardedAd(adUnitPath) {
   await loadScript('https://securepubads.g.doubleclick.net/tag/js/gpt.js');
   const googletag = window.googletag = window.googletag || { cmd: [] };
@@ -106,23 +106,23 @@ export async function showRewardedAd(adUnitPath) {
       if (slot) googletag.destroySlots([slot]);
       resolve(result);
     };
-    const timeout = window.setTimeout(() => done('unavailable'), 10000);
+    const timeout = window.setTimeout(() => done('timeout'), 10000);
     let granted = false;
     googletag.cmd.push(() => {
       if (settled) return;
       slot = googletag.defineOutOfPageSlot(adUnitPath, googletag.enums.OutOfPageFormat.REWARDED);
-      if (!slot) { done('unavailable'); return; }
+      if (!slot) { done('unsupported'); return; }
       pubads = googletag.pubads();
       slot.addService(pubads);
       const listen = (type, listener) => { pubads.addEventListener(type, listener); listeners.push([type, listener]); };
       listen('rewardedSlotReady', (event) => {
         if (event.slot !== slot) return;
         window.clearTimeout(timeout);
-        if (!event.makeRewardedVisible()) done('unavailable');
+        if (!event.makeRewardedVisible()) done('nofill');
       });
       listen('rewardedSlotGranted', (event) => { if (event.slot === slot) granted = true; });
       listen('rewardedSlotClosed', (event) => { if (event.slot === slot) done(granted ? 'granted' : 'closed'); });
-      listen('slotRenderEnded', (event) => { if (event.slot === slot && event.isEmpty) done('unavailable'); });
+      listen('slotRenderEnded', (event) => { if (event.slot === slot && event.isEmpty) done('nofill'); });
       googletag.enableServices();
       googletag.display(slot);
     });
@@ -140,6 +140,17 @@ export function adMode(currentLocation = typeof location === 'undefined' ? null 
   if (currentLocation && /^(localhost|127\.0\.0\.1)$/.test(currentLocation.hostname)) return 'test';
   return passConfig?.rewardedAdUnitPath ? 'rewarded' : 'free';
 }
+/** Google's public sample rewarded unit: `?ads=test` on the real site checks the whole ad flow on a phone. */
+export const SAMPLE_REWARDED_AD_UNIT = '/22639388115/rewarded_web_example';
+export function rewardedAdUnit(currentLocation = typeof location === 'undefined' ? null : location, config = passConfig) {
+  try { if (new URLSearchParams(currentLocation?.search || '').get('ads') === 'test') return SAMPLE_REWARDED_AD_UNIT; } catch {}
+  return config?.rewardedAdUnitPath || '';
+}
+// ---- no ad to show: once a day the pass is given anyway (having no ad is not the person's fault) ----
+const NO_AD_KEY = 'pixieed:pass:no-ad-day:v1';
+export function localDay(now = Date.now()) { const d = new Date(now); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+export function freeWithoutAdAvailable(now = Date.now(), readKey = read) { return readKey(NO_AD_KEY) !== localDay(now); }
+export function useFreeWithoutAd(now = Date.now(), writeKey = write) { return writeKey(NO_AD_KEY, localDay(now)); }
 
 // ---- the one sheet --------------------------------------------------------------------------------------
 const STYLE = `
@@ -216,18 +227,31 @@ export function requestPass({ perk = '', extend = false } = {}) {
     document.addEventListener('keydown', onKey);
     backdrop.addEventListener('pointerdown', (event) => { if (event.target === backdrop && !go.disabled) close(false); });
     no.addEventListener('click', () => close(false));
+    let freeReady = false;
     go.addEventListener('click', async () => {
+      if (freeReady) { close(true); return; }
       go.disabled = true; no.disabled = true;
       let result = 'granted';
       if (mode === 'test') result = await showTestAd(backdrop);
-      else if (mode === 'rewarded') { go.textContent = '広告を準備しています…'; try { result = await showRewardedAd(passConfig.rewardedAdUnitPath); } catch { result = 'unavailable'; } }
+      else if (mode === 'rewarded') { go.textContent = '広告を準備しています…'; try { result = await showRewardedAd(rewardedAdUnit()); } catch { result = 'timeout'; } }
       if (result === 'granted') {
         try { await grant(); close(true); return; }
         catch { result = 'unavailable'; }
       }
+      backdrop.dataset.adResult = result;
+      // no ad could be shown (none in stock, unsupported device, or too slow): the day's free hour
+      if (result !== 'closed' && result !== 'granted' && freeWithoutAdAvailable()) {
+        try {
+          await grant(); useFreeWithoutAd();
+          freeReady = true; go.disabled = false; no.hidden = true; go.textContent = '使う';
+          text.textContent = `広告が見つからなかったので、今日は無料で${PASS_HOURS}時間使えます。`;
+          return;
+        } catch {}
+      }
       go.disabled = false; no.disabled = false;
       go.textContent = goLabel;
-      text.textContent = result === 'closed' ? '最後まで見ると特典が使えるようになります。' : 'いまは広告を用意できませんでした。少し時間をおいてお試しください。';
+      text.textContent = result === 'closed' ? '最後まで見ると特典が使えるようになります。'
+        : 'いまは広告を用意できませんでした。少し時間をおいてお試しください。（広告なしの無料分は今日使用済みです）';
     });
   });
   return open;
