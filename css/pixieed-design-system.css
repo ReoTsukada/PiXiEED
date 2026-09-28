@@ -469,3 +469,23 @@ html[data-pixieed-motion='reduced'] *::after {
 .tool-card__icon img { display: block; width: 28px; height: 28px; object-fit: contain; }
 a.tool-card { text-decoration: none; }
 .tool-grid:has(> .tool-card:only-child) { grid-template-columns: minmax(0, 1fr); max-width: 36rem; }
+
+/* ==== Pixel art is always square, and frames sit above it ====
+   One rule for every tool: a dot never gets a rounded corner, and a canvas that is zoomed or
+   dragged slides UNDER the frame of its window, never over it. The frame is drawn by ::after
+   on top of the canvas; the window itself has square corners so nothing gets clipped round. */
+#draw-canvas, .audio-pixel-canvas, .jigsaw-board, .game-board-wrap canvas, .spot-preview canvas, .hidden-preview canvas,
+.pixfind-play-area, .pixfind-play-area img, .pixfind-play-area canvas, .pixfind-card img, .pixfind-image > img,
+.arc-card canvas, .arc-pick img, .arc-pick canvas, .game-file-preview, .game-file-field img,
+.hp-view, .hp-view canvas, .hp-feed-item, .hp-feed-item img, .px-fx-export, .px-fx-settle,
+.art-card__image, .art-card__image img, .market-card__image, .market-card__image img, .collection-item__image, .collection-item__image img,
+.map-work img { border-radius: 0 !important; }
+#draw-canvas { border: 0 !important; }
+.draw-board, .audio-grid-wrap, .jigsaw-workspace, .game-board-wrap { border-radius: 0 !important; }
+.draw-board, .audio-grid-wrap, .jigsaw-workspace { position: relative; isolation: isolate; }
+.draw-board::after, .audio-grid-wrap::after, .jigsaw-workspace::after { content: ""; position: absolute; inset: 0; z-index: 8; pointer-events: none; box-shadow: inset 0 0 0 3px var(--pixel-frame, #15202b); }
+.jigsaw-workspace { --pixel-frame: #d8ddd3; }
+body.arc-jigsaw .jigsaw-workspace { --pixel-frame: #245446; }
+/* thumbnails on rounded cards sit inset, so the card's round corner never cuts the picture */
+.art-card__image, .market-card__image, .collection-item__image { margin: 6px 6px 0; }
+.arc-pick { overflow: visible !important; }
