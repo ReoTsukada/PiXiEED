@@ -1,3 +1,4 @@
+import { normalizePixelFile, scaleNotice } from '../pixel-scale.mjs?v=20260928-pixel-scale-1';
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
 import { createUploadedWalkCollectGame, directionForUploadGameKey, moveUploadedWalkGame, restoreUploadedWalkGame, setUploadedWalkGamePaused, validateUploadedWalkGame } from './game-upload-core.mjs?rev=20260927-game-upload-1';
 
@@ -47,8 +48,16 @@ async function selectFile(slot, file) {
     if (slot === 'music') { previewAudio.pause(); previewAudio.removeAttribute('src'); previewAudio.hidden = true; }
     updatePrepareButton(); return;
   }
-  if (file.size < 1 || file.size > maxBytes(slot)) throw new RangeError(slot === 'music' ? '音声は3MBまで選べます' : '画像は1ファイル2MBまで選べます');
-  const mimeType = mimeForFile(file); if (!typeAllowed(slot, mimeType)) throw new TypeError(slot === 'music' ? 'MP3、OGG、WAV、M4A、AAC、WebM、FLACに対応しています' : 'PNGまたはWebPを選んでください');
+  const tooLarge = () => new RangeError(slot === 'music' ? '音声は3MBまで選べます' : '画像は1ファイル2MBまで選べます');
+  if (file.size < 1 || file.size > (slot === 'music' ? maxBytes(slot) : 8 * 1024 * 1024)) throw tooLarge();
+  let mimeType = mimeForFile(file); if (!typeAllowed(slot, mimeType)) throw new TypeError(slot === 'music' ? 'MP3、OGG、WAV、M4A、AAC、WebM、FLACに対応しています' : 'PNGまたはWebPを選んでください');
+  let notice = '';
+  if (slot !== 'music') {
+    // Pixel art saved enlarged comes back at one pixel per dot; the name stays the one the person chose.
+    const normalized = await normalizePixelFile(file, { minDots: 1 });
+    if (normalized.scale > 1) { notice = scaleNotice(normalized); mimeType = 'image/png'; file = new File([normalized.file], file.name, { type: 'image/png' }); }
+    if (file.size > maxBytes(slot)) throw tooLarge();
+  }
   const dataUrl = await readDataUrl(file); const asset = { fileName: filenameSafe(file.name), mimeType, sizeBytes: file.size, dataUrl };
   if (slot !== 'music') {
     const image = await decodeImage(dataUrl); asset.width = image.naturalWidth; asset.height = image.naturalHeight;
@@ -59,6 +68,7 @@ async function selectFile(slot, file) {
     setSlotSummary(slot, asset); updatePrepareButton(); return;
   }
   files[slot] = asset; updatePrepareButton();
+  return notice;
 }
 
 async function loadLayer(asset) { const image = await decodeImage(asset.dataUrl); return image; }
@@ -227,7 +237,7 @@ function newGame() { releaseGameAudio(); game = null; layers.character = null; l
 
 for (const slot of ['character', 'background', 'music']) $(`#game-${slot}-file`).addEventListener('change', async (event) => {
   const file = event.currentTarget.files?.[0] || null; setStatus(`${slot === 'music' ? '音' : '画像'}を読み込んでいます…`);
-  try { await selectFile(slot, file); setStatus(slot === 'music' ? files.music ? '音のプレビューを確認できます。端末外へ送信しません。' : '音なしでゲームを作れます。' : '選んだ画像をプレビューしています。端末外へ送信しません。'); }
+  try { const notice = await selectFile(slot, file); setStatus(notice || (slot === 'music' ? files.music ? '音のプレビューを確認できます。端末外へ送信しません。' : '音なしでゲームを作れます。' : '選んだ画像をプレビューしています。端末外へ送信しません。')); }
   catch (error) { files[slot] = null; setSlotSummary(slot, null); if (slot === 'music') { previewAudio.pause(); previewAudio.removeAttribute('src'); previewAudio.hidden = true; } updatePrepareButton(); setStatus(`ファイルを使えません：${error.message}`); }
 });
 $('#game-prepare').addEventListener('click', prepareGame); $('#game-primary').addEventListener('click', togglePlay); $('#game-save').addEventListener('click', saveGame); $('#game-resume').addEventListener('click', resumeGame); $('#game-new').addEventListener('click', newGame);

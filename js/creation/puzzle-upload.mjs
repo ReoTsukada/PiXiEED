@@ -38,7 +38,7 @@ function assertClaim(result, width, height) {
 async function imageClaim(document, encodeImage, inspectImage, width, height) {
   const blob = await encodeImage(document);
   if (!blob || blob.type !== 'image/png' || !Number.isSafeInteger(blob.size) || blob.size < 1 || blob.size > 512 * 1024) throw new TypeError('DrawからPNGを作成できません');
-  return assertClaim(await inspectImage(blob), width, height);
+  return assertClaim(await inspectImage(blob, { keepScale: true }), width, height);
 }
 
 export async function preparePuzzleUpload({ mode, draftId, store, adapter, encodeImage = encodeDrawPng, inspectImage = inspectPixelImage } = {}) {

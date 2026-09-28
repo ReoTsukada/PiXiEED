@@ -718,3 +718,7 @@ body.is-post-drawer-open { overflow: hidden; }
 /* Remove the parked shop invitation from static shells before app.js replaces them. */
 .site-nav a[href="/shops/"], .footer-links a[href="/shops/"],
 .site-nav a[href="/works/"], .mobile-nav a[href="/works/"], .footer-links a[href="/works/"] { display: none !important; }
+
+/* Tools page: games sit in their own group under the tools. */
+.tool-shell__head--games { margin-top: 3rem; }
+.tool-shell__head h2 { margin-bottom: .55rem; font-size: clamp(1.7rem, 4.5vw, 3rem); }

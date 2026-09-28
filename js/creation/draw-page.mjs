@@ -1,6 +1,7 @@
+import { scaleNotice } from '../pixel-scale.mjs?v=20260928-pixel-scale-1';
 import { createLocalDraftStore, createIndexedDbDraftAdapter } from './local-drafts.mjs';
 import { createDrawDocument, createDrawHistory, DRAW_PALETTE, DRAW_PALETTE_ORDER, DRAW_SIZE, DRAW_SIZES, SIMPLE_DRAW_SIZES, toSimpleDrawDocument, encodePng, finishDrawStroke, floodFill, resizeDrawDocument, strokePixels, validateDrawDocument } from './draw-core.mjs?rev=20260927-draw-step08-3';
-import { createImportedDrawDocument, decodeDrawImageFile } from './draw-import.mjs?rev=20260927-draw-step08-3';
+import { createImportedDrawDocument, decodeDrawImageFile } from './draw-import.mjs?rev=20260928-pixel-scale-1';
 import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs';
 import { DRAW_HANDOFF_KEY, encodeDrawPng, serializeDrawHandoff, validateDrawPixels } from './draw-handoff.mjs';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
@@ -429,7 +430,7 @@ async function importImage(file, importSource) {
     const targetSize = sizeWasChosen ? Number(sizeSelect.value) : Math.max(Number(sizeSelect.value), nativeFit);
     const imported = createImportedDrawDocument(image, targetSize);
     replaceDocument(imported.document, importSource); fitNotice = '';
-    status.textContent = `${imported.copiedWidth}×${imported.copiedHeight}・${documentData.palette.length}色で読み込みました`;
+    status.textContent = `${scaleNotice(image)}${imported.copiedWidth}×${imported.copiedHeight}・${documentData.palette.length}色で読み込みました`;
   } catch (error) { status.textContent = `画像を複製できませんでした：${error.message}`; }
   finally { $('#draw-import-local').disabled = false; $('#draw-import-file').value = ''; }
 }

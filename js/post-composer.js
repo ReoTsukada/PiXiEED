@@ -1,7 +1,9 @@
 import { supabaseConfig } from '../data/site-config.js?rev=20260918-post-v1';
+import { normalizePixelFile } from './pixel-scale.mjs?v=20260928-pixel-scale-1';
 
 const SESSION_KEY = 'PiXiEED:supabase-session:v1';
 const MAX_BYTES = 512 * 1024;
+const MAX_SOURCE_BYTES = 8 * 1024 * 1024;
 const MIN_PIXELS = 8;
 const MAX_PIXELS = 128;
 const MAX_COLORS = 512;
@@ -95,11 +97,14 @@ function fileToBase64(file) {
   });
 }
 
-async function inspectPixelImage(file) {
-  if (!(file instanceof File)) throw new Error('画像を選んでください。');
-  if (!ALLOWED_MIME.has(file.type)) throw new Error('PNGまたはWebPのドット絵を選んでください。');
-  if (file.size > MAX_BYTES) throw new Error('画像は512KB以内にしてください。');
+async function inspectPixelImage(selected) {
+  if (!(selected instanceof File)) throw new Error('画像を選んでください。');
+  if (!ALLOWED_MIME.has(selected.type)) throw new Error('PNGまたはWebPのドット絵を選んでください。');
+  if (selected.size > MAX_SOURCE_BYTES) throw new Error('画像は8MB以内にしてください。');
   if (typeof window.createImageBitmap !== 'function') throw new Error('このブラウザでは画像を確認できません。');
+  // Enlarged pixel art (every dot an N×N block) goes back to one pixel per dot first.
+  const { file, scale } = await normalizePixelFile(selected, { minDots: MIN_PIXELS });
+  if (file.size > MAX_BYTES) throw new Error('画像は512KB以内にしてください。');
   const bitmap = await window.createImageBitmap(file);
   try {
     if (bitmap.width < MIN_PIXELS || bitmap.height < MIN_PIXELS || bitmap.width > MAX_PIXELS || bitmap.height > MAX_PIXELS) {
@@ -123,6 +128,8 @@ async function inspectPixelImage(file) {
       width: bitmap.width,
       height: bitmap.height,
       colorCount: colors.size,
+      scale,
+      file,
       base64: await fileToBase64(file)
     };
   } finally {
@@ -244,13 +251,13 @@ export function bindUserPostComposer(root, options = {}) {
     setStatus('画像を確認しています…', 'working');
     try {
       const meta = await inspectPixelImage(file);
-      state.file = file;
+      state.file = meta.file;
       state.meta = meta;
-      state.objectUrl = URL.createObjectURL(file);
+      state.objectUrl = URL.createObjectURL(meta.file);
       if (previewImage) previewImage.src = state.objectUrl;
       if (imageMeta) imageMeta.textContent = `${meta.width}×${meta.height}px・${meta.colorCount}色`;
       if (preview) preview.hidden = false;
-      setStatus('ドット絵として受け付けられるサイズです。', 'ok');
+      setStatus(meta.scale > 1 ? `${meta.scale}倍に拡大された画像だったので、等倍に戻しました。` : 'ドット絵として受け付けられるサイズです。', 'ok');
     } catch (error) {
       fileInput.value = '';
       setStatus(error instanceof Error ? error.message : '画像を確認できませんでした。', 'error');
