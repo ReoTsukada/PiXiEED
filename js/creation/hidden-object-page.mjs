@@ -2,7 +2,7 @@ import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-draf
 import { documentRgba } from './draw-core.mjs';
 import { HIDDEN_OBJECT_MAX_MASK_PIXELS, confirmHiddenObjectTargets, createHiddenObjectDraft, mapClientPointToPixel, resolveLocalDrawRevision, validateHiddenObjectDraft } from './hidden-object-core.mjs?rev=20260928-short-hitboxes-1';
 import { openPuzzleHandoff } from './puzzle-handoff.mjs?rev=20260928-puzzle-handoff-1';
-import { mountPxdTools } from './pxd-ui.mjs?rev=20260928-pxd-1';
+import { mountPxdTools } from './pxd-ui.mjs?rev=20260928-own-work-1';
 import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20260928-pxd-puzzles-1';
 
 const DRAW_LAST_KEY = 'pixieed.simple-draw.last-draft.v1';

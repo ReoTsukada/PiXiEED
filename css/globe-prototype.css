@@ -639,57 +639,30 @@ button > img { display: block; flex: none; width: var(--control-icon); height: v
 .done__actions button { flex: 1; }
 
 /* ---- Solar System view ------------------------------------------------------ */
-#globeCanvas { transition: opacity .45s var(--ease-out), transform .6s var(--ease-out); }
+#globeCanvas { transition: opacity .4s var(--ease-out), transform .4s var(--ease-out); }
 .globe-stage.is-orrery #globeCanvas { opacity: 0; transform: scale(.08); pointer-events: none; }
-.globe-stage.is-orrery-leaving #globeCanvas { transition-delay: .7s; }
+.globe-stage.is-orrery-leaving #globeCanvas { opacity: 1; transform: none; }
 .globe-stage.is-orrery .pin-layer, .globe-stage.is-orrery .post-dock, .globe-stage.is-orrery .selection-panel,
 .globe-stage.is-orrery .sky-hud, .globe-stage.is-orrery .gesture-hint, .globe-stage.is-orrery .place-hint { display: none !important; }
-.orrery-canvas { position: absolute; inset: 0; z-index: 2; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; outline: none; animation: orrery-in .6s var(--ease-out); }
+.orrery-canvas { position: absolute; inset: 0; z-index: 2; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; outline: none; animation: orrery-in .8s var(--ease-out); }
 .orrery-canvas:active { cursor: grabbing; }
 .orrery-canvas[hidden], .orrery-hud[hidden] { display: none; }
 @keyframes orrery-in { from { opacity: 0; } }
-.globe-stage.is-orrery-leaving .orrery-canvas { opacity: 0; transition: opacity .35s .8s; }
+.globe-stage.is-orrery-leaving .orrery-canvas { opacity: 0; transition: opacity .4s; }
 .globe-stage.is-orrery-leaving .orrery-hud { opacity: 0; transition: opacity .2s; }
+.globe-stage.is-orrery-leaving .orrery-hud, .globe-stage.is-orrery-leaving .orrery-hud * { pointer-events: none !important; }
 
 .orrery-hud { position: absolute; inset: 0; z-index: 4; pointer-events: none; color: #d5e8eb; }
 .orrery-hud * { box-sizing: border-box; min-width: 0; }
 .orrery-hud > * { pointer-events: auto; }
-.orrery-hud .orrery-close { position: absolute; top: 14px; right: 14px; width: var(--control); height: var(--control); border-radius: 50%; background: rgba(4, 12, 20, .7); border: 1px solid rgba(181, 226, 232, .2); backdrop-filter: blur(10px); }
+.orrery-hud .orrery-close { position: absolute; top: 10px; right: 10px; width: auto; min-width: var(--control); height: var(--control); padding: 0 12px; border-radius: 999px; background: rgba(4, 12, 20, .78); border: 1px solid rgba(181, 226, 232, .25); backdrop-filter: blur(10px); }
+.orrery-hud .orrery-close img { width: 18px; height: 18px; }
 .orrery-title { position: absolute; top: 76px; left: 50%; translate: -50% 0; display: grid; justify-items: center; gap: 2px; margin: 0; pointer-events: none; text-align: center; animation: pop-in .5s .3s var(--spring) both; }
 .orrery-title strong { color: #fff; font-size: 1rem; letter-spacing: .12em; }
-.orrery-title span { color: #8fb1b8; font-size: var(--text-small); }
 
-.orrery-dock { position: absolute; left: 0; right: 0; bottom: 0; display: grid; gap: 10px; padding: 40px 14px 14px; background: linear-gradient(transparent, rgba(2, 5, 10, .75) 40%); pointer-events: none; }
-.orrery-dock > * { pointer-events: auto; }
-.orrery-bodies { display: flex; gap: 8px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; padding: 2px; margin: 0 -14px; padding-inline: 14px; }
-.orrery-bodies::-webkit-scrollbar { display: none; }
-.orrery-hud .orrery-chip {
-  flex: none; gap: 8px; height: var(--control); padding: 0 16px 0 12px; border: 1px solid rgba(181, 226, 232, .2); border-radius: 999px;
-  background: rgba(4, 12, 20, .7); backdrop-filter: blur(10px); transition: border-color .15s, background .15s, transform .12s;
+@media (max-height: 360px) {
+  .orrery-title { top: 64px; }
 }
-.orrery-chip i { width: 12px; height: 12px; border-radius: 50%; background: var(--planet); box-shadow: 0 0 8px var(--planet); }
-.orrery-chip:active { transform: scale(.95); }
-.orrery-chip.is-active { border-color: #f4d45d; background: rgba(244, 212, 93, .14); color: #ffe89a; }
-
-.orrery-card {
-  display: grid; gap: 10px; padding: 14px 16px; border: 1px solid rgba(140, 210, 226, .18); border-radius: 20px;
-  background: rgba(6, 15, 24, .88); backdrop-filter: blur(14px); box-shadow: 0 18px 50px rgba(0, 0, 0, .45); animation: card-in .3s var(--spring);
-}
-.orrery-card[hidden] { display: none; }
-@keyframes card-in { from { opacity: 0; transform: translateY(10px) scale(.98); } }
-.orrery-card header { display: flex; align-items: baseline; gap: 10px; }
-.orrery-card__name { color: #fff; font-size: 1.2rem; }
-.orrery-card__kind { color: #7ccfe0; font-size: var(--text-small); }
-.orrery-card__facts { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; margin: 0; }
-.orrery-card__facts div { display: grid; gap: 1px; }
-.orrery-card__facts dt { color: #789aa2; font-size: var(--text-small); }
-.orrery-card__facts dd { margin: 0; color: #e9f6f7; font-size: .875rem; font-variant-numeric: tabular-nums; }
-.orrery-card__actions { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 8px; }
-.orrery-hud .orrery-action { width: 100%; height: var(--control); padding: 0 16px; border: 1px solid rgba(181, 226, 232, .25); border-radius: 999px; background: rgba(140, 210, 226, .06); }
-.orrery-hud .orrery-action[hidden] { display: none; }
-.orrery-hud .orrery-action.is-primary { border-color: transparent; background: #f4d45d; color: #1b1500; font-weight: 800; }
-.orrery-hud .orrery-action.is-primary img { filter: none; }
-.orrery-hud .orrery-action img { width: var(--control-icon); height: var(--control-icon); }
 
 /* pulling past the globe's smallest size */
 .orrery-pull { position: absolute; left: 50%; bottom: 96px; z-index: 5; translate: -50% 0; display: grid; gap: 6px; justify-items: center; pointer-events: none; animation: pop-in .2s var(--spring); }
@@ -703,7 +676,7 @@ button > img { display: block; flex: none; width: var(--control-icon); height: v
 .sky-mark.is-planet.is-onscreen { background: rgba(4, 12, 20, .3); }
 
 @media (prefers-reduced-motion: reduce) {
-  #globeCanvas, .orrery-canvas, .orrery-card, .orrery-title, .orrery-pull { transition: none !important; animation: none !important; }
+  #globeCanvas, .orrery-canvas, .orrery-title, .orrery-pull { transition: none !important; animation: none !important; }
 }
 
 /* ---- 空の予定: eclipses and meteor showers in the telescope ------------------ */
@@ -717,6 +690,7 @@ button > img { display: block; flex: none; width: var(--control-icon); height: v
   padding: 14px; border: 1px solid rgba(140, 210, 226, .18); border-radius: 22px; background: rgba(6, 15, 24, .92); backdrop-filter: blur(14px);
   box-shadow: 0 18px 50px rgba(0, 0, 0, .5); animation: card-in .3s var(--spring); color: #d5e8eb;
 }
+@keyframes card-in { from { opacity: 0; transform: translateY(10px) scale(.98); } }
 .sky-events[hidden] { display: none; }
 .sky-events__head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .sky-events__head > div { display: grid; gap: 2px; }
@@ -771,7 +745,7 @@ button > img { display: block; flex: none; width: var(--control-icon); height: v
 .globe-app-tabs a:hover, .globe-app-tabs button:hover, .globe-app-tabs :focus-visible { background: rgba(27, 32, 37, .08); }
 .globe-app-tabs > :nth-child(3):hover, .globe-app-tabs > :nth-child(3):focus-visible { background: #d74739; }
 .globe-app-tabs [aria-current="page"] { background: rgba(231, 84, 69, .1); }
-.scope-dock, .orrery-dock { bottom: calc(5.3rem + env(safe-area-inset-bottom)); }
+.scope-dock { bottom: calc(5.3rem + env(safe-area-inset-bottom)); }
 .sky-events { bottom: calc(5.3rem + env(safe-area-inset-bottom)); }
 .gesture-hint, .orrery-pull { bottom: calc(6.6rem + env(safe-area-inset-bottom)); }
 .globe-stage.has-selection .post-dock { display: none; }

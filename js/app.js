@@ -4087,7 +4087,12 @@ function renderPublicShell() {
   const openGlobeComposer = () => {
     const globe = document.querySelector('.map-hero__globe-frame');
     if (!globe) return;
-    const open = () => globe.contentWindow?.__PIXIEED_POSTS__?.openComposer?.();
+    const open = () => {
+      const api = globe.contentWindow;
+      const compose = () => api?.__PIXIEED_POSTS__?.openComposer?.();
+      if (api?.__PIXIEED_ASTRO__?.orrery.isOpen()) api.__PIXIEED_ASTRO__.closeOrrery(compose);
+      else compose();
+    };
     if (globe.contentWindow?.__PIXIEED_POSTS__) open();
     else globe.addEventListener('load', open, { once: true });
   };

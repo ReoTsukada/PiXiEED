@@ -11,7 +11,7 @@ import { createAudioSong } from '../creation/audio-core.mjs?rev=20260928-dot-mus
 import { audioCameraCancelUrl, beginAudioCamera, completeAudioCamera, readAudioCameraRequest } from '../creation/audio-camera-handoff.mjs?rev=20260928-dot-music-1';
 import { createPxdProject, getPxdJson } from '../creation/pxd-codec.mjs';
 import { putPxdImage, readPxdImage, mergePxdJson } from '../creation/pxd-project.mjs';
-import { mountPxdTools } from '../creation/pxd-ui.mjs';
+import { mountPxdTools } from '../creation/pxd-ui.mjs?rev=20260928-own-work-1';
 
 const $ = (selector) => document.querySelector(selector);
 const initialParams = new URLSearchParams(location.search);
@@ -520,6 +520,7 @@ function refreshObjects() {
 }
 
 function retake() {
+  cameraPxd.reset();
   gif.pending = null;
   $('#gifUpgrade').hidden = true;
   invalidateCaptureDownload();
@@ -1152,19 +1153,43 @@ $('#capture').addEventListener('click', () => {
   else if (action === 'capture') capture();
 });
 $('#flipCamera').addEventListener('click', () => { if (state.mode === 'live') flipCamera(); });
-$('#savePng').addEventListener('click', (event) => {
-  if ($('#savePng').getAttribute('aria-disabled') === 'true') { event.preventDefault(); return; }
-  sayToast('PNGの保存を開始しました。');
+$('#savePng').addEventListener('click', async (event) => {
+  event.preventDefault();
+  const link = $('#savePng');
+  if (link.getAttribute('aria-disabled') === 'true' || !downloadUrl || state.mode !== 'captured' || !state.result) return;
+  const snapshot = { generation: downloadGeneration, frame: state.result, url: downloadUrl, filename: link.download };
+  const download = () => {
+    if (snapshot.generation !== downloadGeneration || state.mode !== 'captured' || state.result !== snapshot.frame || downloadUrl !== snapshot.url) return false;
+    const target = document.createElement('a'); target.href = snapshot.url; target.download = snapshot.filename; target.click();
+    return true;
+  };
+  // GIFs come only from live camera captures. PXD restores are still frames and
+  // require a fresh owner check before their PNG can leave the browser.
+  if (gif.pending) { if (download()) sayToast('GIFの保存を開始しました。'); return; }
+  try {
+    await cameraPxd.assertCanSave();
+    if (!download()) { say('画像が切り替わったため、PNGを保存できません。もう一度お試しください。', { visible: true }); return; }
+    sayToast('PNGの保存を開始しました。');
+  } catch (error) {
+    say(error instanceof Error ? error.message : 'この画像を保存できません。', { visible: true });
+  }
 });
 if (returnToAudio) $('#postCamera').textContent = '曲を作る';
-$('#postCamera').addEventListener('click', () => {
+$('#postCamera').addEventListener('click', async () => {
   if (state.mode !== 'captured' || !state.result || gif.pending) return;
+  const button = $('#postCamera');
+  const snapshot = { generation: downloadGeneration, frame: state.result, gif: gif.pending };
+  button.disabled = true;
   try {
-    const dataUrl = cameraPostDataUrl(state.result);
+    await cameraPxd.assertCanSave();
+    if (snapshot.generation !== downloadGeneration || state.mode !== 'captured' || state.result !== snapshot.frame || gif.pending !== snapshot.gif) throw new Error('画像が切り替わったため、地球儀へ送れません。もう一度お試しください。');
+    const dataUrl = cameraPostDataUrl(snapshot.frame);
     localStorage.setItem('PiXiEED:camera-handoff:v1', JSON.stringify({ dataUrl, createdAt: Date.now() }));
     location.assign(returnToAudio ? '/audio/' : '/globe/?from=pixel-camera');
   } catch (error) {
     say(error instanceof Error ? error.message : '撮影画像を準備できませんでした。', { visible: true });
+  } finally {
+    button.disabled = false;
   }
 });
 

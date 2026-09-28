@@ -10,12 +10,9 @@
  * this camera (onSkyOrientation). Labels are drawn crisp on top.
  *
  * Distances are to scale. Bodies are drawn at their true size once that is
- * larger than a minimum, so from far away every planet stays visible and
- * close in the Earth fills the view like the globe does.
+ * larger than a minimum, so the whole system stays visible in the overview.
  *
- * Gestures: one finger turns the view, two fingers pinch the scale, a tap
- * picks a body and flies to it. Pinching further into the Earth hands back
- * to the globe.
+ * Gestures: one finger turns the view, zooming in returns to the globe.
  */
 
 import { PLANETS, PLANET_BY_ID, centuriesSinceJ2000, heliocentricAt, orbitPath, galileanOffsets } from './planets.mjs?v=20260927-sky-events-v1';
@@ -28,7 +25,6 @@ const AU_KM = 149597870.7;
 const OBLIQUITY = 23.43928 * DEG;
 const DOT = 1; // render at CSS-pixel resolution before display scaling
 const MIN_SPAN_AU = 70; // the whole of Neptune's orbit fits across the short side
-const EXIT_PRESSURE = 0.55;
 const SKY_HALF_FOV = 32 * DEG;
 const SUN_RADIUS_KM = 695700;
 const MOON_RADIUS_KM = 1737.4;
@@ -150,7 +146,7 @@ function createBelt(count = 1600) {
   return belt;
 }
 
-export function createOrrery({ canvas, onSelect = () => {}, onExit = () => {}, onChange = () => {}, onSkyOrientation = () => {} }) {
+export function createOrrery({ canvas, onExit = () => {}, onSkyOrientation = () => {} }) {
   const ctx = canvas.getContext('2d');
   const low = document.createElement('canvas');
   const lowCtx = low.getContext('2d', { willReadFrequently: true });
@@ -162,14 +158,14 @@ export function createOrrery({ canvas, onSelect = () => {}, onExit = () => {}, o
   let scale = 120; // CSS px per AU
   let focusId = 'sun';
   let focusPos = [0, 0, 0];
-  let selectedId = null;
   let bodies = [];
   let orbits = new Map();
   let orbitsAt = -Infinity;
   let moonGeo = null; // Moon relative to the Earth, AU (ecliptic)
   let frame = null;
   let flight = null;
-  let exitPressure = 0;
+  let closing = false;
+  let closeCallbacks = [];
   let screen = [];
   function viewport() {
     const width = canvas.clientWidth || 1; const height = canvas.clientHeight || 1;
@@ -188,7 +184,6 @@ export function createOrrery({ canvas, onSelect = () => {}, onExit = () => {}, o
   function minScale() { const { width, height } = viewport(); return Math.min(width, height) / MIN_SPAN_AU; }
   // Close in, a planet may fill a little under half of the short side.
   function maxScale(id = focusId) { const { width, height } = viewport(); return (0.45 * Math.min(width, height)) / radiusAU(id); }
-  function focusScale(id) { const { width, height } = viewport(); const short = Math.min(width, height); return id === 'sun' ? short / 4.2 : (0.12 * short) / radiusAU(id); }
 
   function basis() {
     const ca = Math.cos(azimuth); const sa = Math.sin(azimuth); const ce = Math.cos(elevation); const se = Math.sin(elevation);
@@ -334,7 +329,7 @@ export function createOrrery({ canvas, onSelect = () => {}, onExit = () => {}, o
     lowCtx.save();
     lowCtx.scale(1 / DOT, 1 / DOT);
     for (const [id, points] of orbits) {
-      const strong = id === selectedId || id === focusId;
+      const strong = id === focusId;
       lowCtx.beginPath();
       points.forEach((point, index) => { const p = project(point, view, b); if (index === 0) lowCtx.moveTo(p.x, p.y); else lowCtx.lineTo(p.x, p.y); });
       lowCtx.closePath();
@@ -379,7 +374,10 @@ export function createOrrery({ canvas, onSelect = () => {}, onExit = () => {}, o
         if (gap > drawnRadius('jupiter') + 5) list.push({ id, name: ['イオ', 'エウロパ', 'ガニメデ', 'カリスト'][index], position: [jupiter.position[0] + offset[0] * jr, jupiter.position[1] + offset[1] * jr, jupiter.position[2] + offset[2] * jr], minor: true, radiusKm: [1821.6, 1560.8, 2634.1, 2410.3][index] });
       });
     }
-    const drawn = list.map((body) => ({ body, p: project(body.position, view, b) })).sort((a, c) => a.p.depth - c.p.depth);
+    const drawn = list.map((body) => ({ body, p: project(body.position, view, b) }))
+      .sort((a, c) => Number(a.body.id === 'sun') - Number(c.body.id === 'sun') || a.p.depth - c.p.depth);
+    // The inner planets are deliberately exaggerated at overview scale; paint
+    // the Sun last so those glyphs cannot punch dark gaps through its disc.
     screen = [];
     for (const { body, p } of drawn) {
       const radius = body.radiusKm ? Math.max(MIN_RADIUS[body.id] || 1.4, (body.radiusKm / AU_KM) * scale) : drawnRadius(body.id);
@@ -395,25 +393,30 @@ export function createOrrery({ canvas, onSelect = () => {}, onExit = () => {}, o
     ctx.clearRect(0, 0, view.width, view.height);
     ctx.drawImage(low, 0, 0, view.lw * DOT, view.lh * DOT);
 
-    // Crisp labels.
+    // Crisp labels, in stable body order with overlaps omitted.
     ctx.textAlign = 'center';
+    const labelBoxes = [];
+    const labelBodies = screen.filter((entry) => entry.r && entry.id !== 'sun' && entry.id !== 'moon');
     for (const entry of screen) {
       if (!entry.r) continue;
-      const active = entry.id === selectedId;
-      if (entry.body.minor && !active && entry.radius < 3 && scale < 2e5) continue;
-      if (active) { ctx.strokeStyle = '#f4d45d'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(entry.x, entry.y, entry.radius * (entry.id === 'saturn' ? 2.35 : 1) + 7, 0, Math.PI * 2); ctx.stroke(); }
+      if (entry.body.minor && entry.radius < 3 && scale < 2e5) continue;
       if (entry.id === 'sun' || entry.id === 'moon') continue;
-      ctx.font = `${active ? 700 : 600} 12px ui-rounded, "Hiragino Sans", system-ui, sans-serif`;
+      ctx.font = '600 12px ui-rounded, "Hiragino Sans", system-ui, sans-serif';
       ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(2, 5, 10, .85)';
       const labelY = entry.y + entry.radius * (entry.id === 'saturn' ? 1.3 : 1) + 16;
+      const textWidth = ctx.measureText(entry.body.name).width;
+      const box = { left: entry.x - textWidth / 2 - 3, right: entry.x + textWidth / 2 + 3, top: labelY - 13, bottom: labelY + 3 };
+      const crossesBody = labelBodies.some((body) => body.id !== entry.id && box.left < body.x + body.radius + 3 && box.right > body.x - body.radius - 3 && box.top < body.y + body.radius + 3 && box.bottom > body.y - body.radius - 3);
+      const crossesLabel = labelBoxes.some((other) => box.left < other.right + 4 && box.right > other.left - 4 && box.top < other.bottom + 2 && box.bottom > other.top - 2);
+      if (crossesBody || crossesLabel) continue;
+      labelBoxes.push(box);
       ctx.strokeText(entry.body.name, entry.x, labelY);
-      ctx.fillStyle = active ? '#ffe89a' : entry.id === 'sun' ? 'rgba(255, 232, 154, .92)' : 'rgba(233, 246, 247, .88)';
+      ctx.fillStyle = 'rgba(233, 246, 247, .88)';
       ctx.fillText(entry.body.name, entry.x, labelY);
     }
-    onChange(snapshot());
   }
 
-  function requestDraw() { if (frame === null && opened) frame = requestAnimationFrame(draw); }
+  function requestDraw() { if (frame === null && opened && !document.hidden) frame = requestAnimationFrame(draw); }
 
   // ---- camera flights -------------------------------------------------------
   // The azimuth that looks at `id` from its day side, a little off the Sun line so it shows some shading.
@@ -422,7 +425,14 @@ export function createOrrery({ canvas, onSelect = () => {}, onExit = () => {}, o
     if (Math.hypot(lx, ly) < 1e-9) return azimuth;
     return Math.atan2(-lx, -ly) + 40 * DEG;
   }
-  function fly({ to = focusId, scaleTo = scale, duration = 900, then = null, turnTo = null } = {}) {
+  function cancelFlight() {
+    if (!flight) return;
+    if (flight.frame !== null) cancelAnimationFrame(flight.frame);
+    flight = null;
+  }
+  function fly({ to = focusId, scaleTo = scale, duration = 900, then = null, turnTo = null, allowClosing = false } = {}) {
+    if ((!opened && !allowClosing) || (closing && !allowClosing)) return;
+    cancelFlight();
     const fromPos = focusPos.slice(); const fromScale = scale;
     const fromAzimuth = azimuth;
     let toAzimuth = turnTo ?? azimuth;
@@ -431,7 +441,7 @@ export function createOrrery({ canvas, onSelect = () => {}, onExit = () => {}, o
     focusId = to;
     if (reducedMotion()) { focusPos = bodyPosition(to); scale = scaleTo; azimuth = toAzimuth; then?.(); requestDraw(); return; }
     const started = performance.now();
-    const current = { cancel: false }; flight = current;
+    const current = { frame: null, scaleTo }; flight = current;
     const step = (now) => {
       if (flight !== current) return;
       const t = clamp((now - started) / duration, 0, 1); const k = ease(t);
@@ -442,42 +452,37 @@ export function createOrrery({ canvas, onSelect = () => {}, onExit = () => {}, o
       const span = Math.abs(1 / scaleTo - 1 / fromScale) > 1e-12 ? clamp((1 / scale - 1 / fromScale) / (1 / scaleTo - 1 / fromScale), 0, 1) : k;
       focusPos = [lerp(fromPos[0], target[0], span), lerp(fromPos[1], target[1], span), lerp(fromPos[2], target[2], span)];
       azimuth = lerp(fromAzimuth, toAzimuth, k);
+      if (frame !== null) { cancelAnimationFrame(frame); frame = null; }
       draw();
-      if (t < 1) requestAnimationFrame(step); else { flight = null; then?.(); }
+      if (t < 1) current.frame = requestAnimationFrame(step); else { flight = null; then?.(); }
     };
-    requestAnimationFrame(step);
-  }
-
-  function select(id, { fly: flyThere = true } = {}) {
-    selectedId = id;
-    if (id && flyThere && (PLANET_BY_ID[id] || id === 'sun')) fly({ to: id, scaleTo: focusScale(id), turnTo: id === 'sun' ? null : daySideAzimuth(id) });
-    onSelect(id);
-    requestDraw();
+    current.frame = requestAnimationFrame(step);
   }
 
   // ---- gestures -------------------------------------------------------------
   const pointers = new Map();
-  let drag = null; let spread = 0;
+  let drag = null; let spread = 0; let exitRequested = false; let zoomInIntent = 0;
+  const ZOOM_IN_INTENT = Math.log(1.015);
   function zoomBy(ratio) {
-    if (flight) flight = null;
-    const next = scale * ratio;
-    const limit = maxScale();
-    if (next > limit && focusId === 'earth') {
-      exitPressure += Math.log(next / limit);
-      if (exitPressure > EXIT_PRESSURE) { exitPressure = 0; onExit(); }
-    } else exitPressure = Math.max(0, exitPressure - 0.02);
-    scale = clamp(next, minScale(), limit);
-    requestDraw();
+    if (!opened || closing || !Number.isFinite(ratio) || ratio <= 0 || ratio === 1 || exitRequested) return;
+    const intent = Math.log(ratio);
+    if (intent < 0) { zoomInIntent = 0; return; }
+    zoomInIntent += intent;
+    if (zoomInIntent >= ZOOM_IN_INTENT) {
+      exitRequested = true;
+      zoomInIntent = 0;
+      onExit();
+    }
   }
   canvas.addEventListener('pointerdown', (event) => {
-    if (!opened) return;
+    if (!opened || closing) return;
     canvas.setPointerCapture?.(event.pointerId);
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
     if (pointers.size >= 2) { const [a, c] = [...pointers.values()]; spread = Math.max(8, Math.hypot(a.x - c.x, a.y - c.y)); drag = null; return; }
     drag = { id: event.pointerId, x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY, moved: false, started: performance.now() };
   });
   canvas.addEventListener('pointermove', (event) => {
-    if (!pointers.has(event.pointerId)) return;
+    if (!pointers.has(event.pointerId) || closing) return;
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
     if (pointers.size >= 2) { const [a, c] = [...pointers.values()]; const next = Math.max(8, Math.hypot(a.x - c.x, a.y - c.y)); zoomBy(next / spread); spread = next; return; }
     if (!drag || drag.id !== event.pointerId) return;
@@ -493,17 +498,21 @@ export function createOrrery({ canvas, onSelect = () => {}, onExit = () => {}, o
     pointers.delete(event.pointerId);
     const finished = drag; drag = null;
     if (pointers.size === 1) { const [[id, point]] = [...pointers.entries()]; drag = { id, x: point.x, y: point.y, startX: point.x, startY: point.y, moved: true, started: 0 }; return; }
-    exitPressure = 0;
     if (event.type !== 'pointerup' || !finished || finished.moved || performance.now() - finished.started > 450) return;
-    const rect = canvas.getBoundingClientRect(); const x = event.clientX - rect.left; const y = event.clientY - rect.top;
-    const hit = screen.filter((entry) => entry.r).map((entry) => ({ entry, d: Math.hypot(entry.x - x, entry.y - y) })).filter(({ entry, d }) => d < Math.max(entry.r, 22)).sort((a, c) => a.d - c.d)[0];
-    select(hit ? hit.entry.id : null, { fly: Boolean(hit) });
   };
   canvas.addEventListener('pointerup', release);
   canvas.addEventListener('pointercancel', release);
-  canvas.addEventListener('wheel', (event) => { if (!opened) return; event.preventDefault(); zoomBy(Math.exp(-clamp(event.deltaY, -80, 80) * 0.004)); }, { passive: false });
+  canvas.addEventListener('wheel', (event) => {
+    if (!opened || closing) return;
+    event.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const units = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? rect.height : 1;
+    const delta = clamp(event.deltaY * units, -100, 100);
+    if (!delta) return;
+    zoomBy(Math.exp(-delta * (event.ctrlKey ? 0.012 : 0.0012)));
+  }, { passive: false });
   canvas.addEventListener('keydown', (event) => {
-    if (!opened) return;
+    if (!opened || closing) return;
     if (event.key === '+' || event.key === '=') zoomBy(1.25);
     else if (event.key === '-' || event.key === '_') zoomBy(0.8);
     else if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { azimuth += event.key === 'ArrowLeft' ? 0.12 : -0.12; requestDraw(); }
@@ -513,29 +522,66 @@ export function createOrrery({ canvas, onSelect = () => {}, onExit = () => {}, o
   });
   if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => requestDraw()).observe(canvas);
 
-  function snapshot() { return { open: opened, time, focusId, selectedId, scale, azimuth, elevation, bodies }; }
+  function snapshot() { return { open: opened, closing, flying: Boolean(flight), time, focusId, scale, focusPos: focusPos.slice(), azimuth, elevation, view: { width: canvas.clientWidth || 1, height: canvas.clientHeight || 1 }, bodies: bodies.map((body) => ({ ...body, position: body.position.slice(), pole: body.pole?.slice() })) }; }
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden || !opened) {
+      if (closing) {
+        const callbacks = closeCallbacks; closeCallbacks = [];
+        cancelFlight();
+        if (frame !== null) { cancelAnimationFrame(frame); frame = null; }
+        closing = false; opened = false; pointers.clear(); drag = null; spread = 0; zoomInIntent = 0;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        callbacks.forEach((callback) => callback());
+        return;
+      }
+      if (!document.hidden || !opened) return;
+      if (flight) {
+        const destinationScale = flight.scaleTo;
+        cancelFlight();
+        scale = destinationScale;
+        focusPos = bodyPosition(focusId);
+      }
+      if (frame !== null) { cancelAnimationFrame(frame); frame = null; }
+      pointers.clear(); drag = null; spread = 0;
+      return;
+    }
+    requestDraw();
+  });
 
   return {
     isOpen: () => opened,
-    /** Open close on the Earth (as big as the globe) and pull back to the inner Solar System. */
-    open({ fromEarth = true } = {}) {
-      opened = true; selectedId = null; exitPressure = 0; lastSkyKey = '';
+    /** Open at a full-system overview. Zooming in returns to the globe. */
+    open() {
+      if (closing) return;
+      cancelFlight();
+      opened = true; exitRequested = false; zoomInIntent = 0; lastSkyKey = '';
+      pointers.clear(); drag = null; spread = 0;
       update();
-      const { width, height } = viewport(); const short = Math.min(width, height);
-      if (fromEarth) { focusId = 'earth'; focusPos = bodyPosition('earth'); scale = maxScale('earth'); azimuth = daySideAzimuth('earth'); elevation = 24 * DEG; fly({ to: 'sun', scaleTo: short / 4.2, duration: 2200 }); }
-      else { focusId = 'sun'; focusPos = [0, 0, 0]; scale = short / 4.2; }
+      focusId = 'sun'; focusPos = [0, 0, 0]; scale = minScale();
       draw();
     },
     /** Dive back into the Earth, then call `done`. */
     close(done = () => {}) {
       if (!opened) { done(); return; }
-      selectedId = null;
-      const finish = () => { opened = false; ctx.clearRect(0, 0, canvas.width, canvas.height); done(); };
-      if (reducedMotion()) { finish(); return; }
-      fly({ to: 'earth', scaleTo: maxScale('earth'), duration: 1500, then: finish, turnTo: daySideAzimuth('earth') });
+      closeCallbacks.push(done);
+      if (closing) return;
+      closing = true;
+      exitRequested = true; zoomInIntent = 0;
+      pointers.clear(); drag = null; spread = 0;
+      const finish = () => {
+        if (!closing) return;
+        cancelFlight();
+        if (frame !== null) { cancelAnimationFrame(frame); frame = null; }
+        closing = false; opened = false;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const callbacks = closeCallbacks; closeCallbacks = [];
+        callbacks.forEach((callback) => callback());
+      };
+      if (reducedMotion() || document.hidden) { focusPos = bodyPosition('earth'); finish(); return; }
+      fly({ to: 'earth', scaleTo: maxScale('earth'), duration: 400, then: finish, turnTo: daySideAzimuth('earth'), allowClosing: true });
     },
     setTime(next, { moon = null } = {}) { time = next; moonGeo = moon; if (opened) { update(); requestDraw(); } },
-    select, focus: (id) => select(id),
     getSnapshot: snapshot,
     redraw: requestDraw
   };

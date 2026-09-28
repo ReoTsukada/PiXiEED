@@ -20,8 +20,8 @@ import { celestialState, geoToUnit, unitToGeo, listEclipses, peakObscurationAt, 
 import { createScope, refracted } from './scope.mjs?v=20260927-telescope-polish-1';
 import { sharedSky } from './real-sky.mjs?v=20260927-sky-events-v1';
 import { upcomingMeteorShowers, upcomingEclipses, daysUntil } from './sky-events.mjs?v=20260927-sky-events-v1';
-import { createOrrery } from './orrery.mjs?v=20260928-sky-labels-1';
-import { PLANETS, PLANET_BY_ID, SKY_PLANETS, lightMinutes } from './planets.mjs?v=20260927-sky-events-v1';
+import { createOrrery } from './orrery.mjs?v=20260928-solar-navigation-1';
+import { PLANET_BY_ID, SKY_PLANETS } from './planets.mjs?v=20260927-sky-events-v1';
 
 const DEG = Math.PI / 180;
 const MINUTE = 60000;
@@ -88,17 +88,6 @@ function moonEcliptic(state) {
   const moon = state.moonEquatorial; if (!moon) return null;
   const l = moon.eclipticLongitude * DEG; const b = moon.eclipticLatitude * DEG; const d = moon.distanceKm / 149597870.7;
   return [d * Math.cos(b) * Math.cos(l), d * Math.cos(b) * Math.sin(l), d * Math.sin(b)];
-}
-
-function formatLight(au) {
-  const minutes = lightMinutes(au);
-  if (minutes < 60) return `光で${minutes.toFixed(1)}分`;
-  return `光で${Math.floor(minutes / 60)}時間${Math.round(minutes % 60)}分`;
-}
-function formatPeriod(days) { return days < 700 ? `${days.toFixed(1)}日` : `${(days / 365.25).toFixed(1)}年`; }
-function formatRotation(hours) {
-  const text = Math.abs(hours) < 48 ? `${Math.abs(hours).toFixed(1)}時間` : `${(Math.abs(hours) / 24).toFixed(1)}日`;
-  return hours < 0 ? `${text}（逆回り）` : text;
 }
 
 function icon(name) { return element('img', { src: `/assets/icons/pixieed/${name}.svg`, alt: '', 'aria-hidden': 'true' }); }
@@ -408,131 +397,99 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
     eventsSheet
   ]);
   // ---- Solar System view -----------------------------------------------------
-  const orreryCanvas = element('canvas', { class: 'orrery-canvas', hidden: '', tabindex: '0', 'aria-label': '太陽系。ドラッグで回転、ピンチまたはホイールで拡大・縮小、タップで天体を選ぶ。地球をさらに拡大すると地球儀に戻る' });
-  const cardName = element('strong', { class: 'orrery-card__name' });
-  const cardKind = element('span', { class: 'orrery-card__kind' });
-  const cardFacts = element('dl', { class: 'orrery-card__facts' });
-  const cardSky = element('button', { type: 'button', class: 'orrery-action is-primary', onClick: () => lookFromEarth(selectedBody) }, [icon('telescope'), element('span', { text: '空で見る' })]);
-  const cardHome = element('button', { type: 'button', class: 'orrery-action', onClick: () => closeOrrery() }, [icon('globe'), element('span', { text: '地球儀に戻る' })]);
-  const card = element('section', { class: 'orrery-card', hidden: '', 'aria-live': 'polite' }, [
-    element('header', {}, [cardName, cardKind]), cardFacts, element('div', { class: 'orrery-card__actions' }, [cardSky, cardHome])
-  ]);
-  const bodyChips = element('div', { class: 'orrery-bodies', role: 'list', 'aria-label': '天体へ移動' }, [{ id: 'sun', name: '太陽' }, ...PLANETS].map((body) => element('button', {
-    type: 'button', role: 'listitem', class: 'orrery-chip', 'data-body': body.id, style: `--planet: ${body.color || '#f4d45d'}`, onClick: () => orrery.select(body.id)
-  }, [element('i', { 'aria-hidden': 'true' }), element('span', { text: body.name })])));
+  const orreryCanvas = element('canvas', { class: 'orrery-canvas', hidden: '', tabindex: '0', 'aria-label': '太陽系。ドラッグで視点を回転。ピンチまたはホイールで拡大すると地球儀に戻る' });
+  const orreryCloseIcon = icon('globe');
+  const orreryCloseLabel = element('span', { text: '地球儀へ' });
   const orreryHud = element('section', { class: 'orrery-hud', hidden: '', 'aria-label': '太陽系' }, [
-    element('button', { type: 'button', class: 'orrery-close', 'aria-label': '地球儀に戻る', onClick: () => closeOrrery() }, [icon('close')]),
-    element('p', { class: 'orrery-title' }, [element('strong', { text: '太陽系' }), element('span', { text: '距離は実比率・大きさは強調' })]),
-    element('div', { class: 'orrery-dock' }, [card, bodyChips])
+    element('button', { type: 'button', class: 'orrery-close', 'aria-label': '地球儀へ', onClick: () => closeOrrery() }, [orreryCloseIcon, orreryCloseLabel]),
+    element('p', { class: 'orrery-title' }, [element('strong', { text: '太陽系' })])
   ]);
   const pull = element('div', { class: 'orrery-pull', hidden: '', 'aria-hidden': 'true' }, [element('span', { text: 'さらに縮小で太陽系へ' }), element('i')]);
-  let selectedBody = null;
   let returnToScope = null;
+  let returnView = null;
+  let rememberedGlobeView = renderer.getSnapshot()?.view ? { ...renderer.getSnapshot().view } : null;
+  let orreryClosing = false;
+  let closeCallbacks = [];
+  let entryCooldownUntil = 0;
   let pullAmount = 0; let pullTimer = null;
   const orrery = createOrrery({
     canvas: orreryCanvas,
-    onSelect(id) { selectedBody = id; renderCard(); for (const chip of bodyChips.children) chip.classList.toggle('is-active', chip.dataset.body === id); },
     onExit: () => closeOrrery(),
-    onChange() { if (selectedBody) renderCard(); },
     onSkyOrientation(orientation) { renderer.setSkyOrientation?.(orientation); }
   });
 
-  function renderCard() {
-    card.hidden = !selectedBody;
-    if (!selectedBody) return;
-    const snapshot = orrery.getSnapshot();
-    const find = (id) => snapshot.bodies.find((body) => body.id === id);
-    const earth = find('earth')?.position || [1, 0, 0];
-    const facts = [];
-    if (selectedBody === 'sun') {
-      const d = Math.hypot(...earth);
-      cardName.textContent = '太陽'; cardKind.textContent = '恒星';
-      facts.push(['地球から', `${d.toFixed(3)} AU・${formatLight(d)}`], ['半径', '69万6000 km（地球の109倍）'], ['表面', '約5500℃']);
-    } else if (['io', 'europa', 'ganymede', 'callisto'].includes(selectedBody)) {
-      const moon = { io: ['イオ', '火山が活発な衛星', '1821 km', '1.8日'], europa: ['エウロパ', '氷の下に海がある衛星', '1561 km', '3.6日'], ganymede: ['ガニメデ', '太陽系最大の衛星', '2634 km', '7.2日'], callisto: ['カリスト', 'クレーターだらけの衛星', '2410 km', '16.7日'] }[selectedBody];
-      cardName.textContent = moon[0]; cardKind.textContent = `木星の衛星・${moon[1]}`;
-      facts.push(['半径', moon[2]], ['公転', moon[3]]);
-    } else if (selectedBody === 'moon') {
-      cardName.textContent = '月'; cardKind.textContent = '地球の衛星';
-      facts.push(['地球から', `${Math.round(state.moonDistance * 6378.137).toLocaleString('ja-JP')} km`], ['公転', '27.3日'], ['半径', '1737 km']);
-    } else {
-      const body = find(selectedBody); const planet = PLANET_BY_ID[selectedBody];
-      const r = Math.hypot(...body.position);
-      cardName.textContent = planet.name; cardKind.textContent = planet.kind;
-      facts.push(['太陽から', `${r.toFixed(2)} AU`]);
-      if (planet.id !== 'earth') {
-        const delta = Math.hypot(body.position[0] - earth[0], body.position[1] - earth[1], body.position[2] - earth[2]);
-        facts.push(['地球から', `${delta.toFixed(2)} AU・${formatLight(delta)}`]);
-      }
-      facts.push(['公転', formatPeriod(planet.periodDays)], ['1日', formatRotation(planet.rotationHours)], ['衛星', `${planet.moons}個`]);
-      const sky = state.planets?.find((entry) => entry.id === planet.id);
-      if (sky) facts.push(['明るさ', `${sky.magnitude.toFixed(1)}等${sky.magnitude < 6 ? '（肉眼で見える）' : ''}`]);
-    }
-    cardFacts.replaceChildren(...facts.map(([term, value]) => element('div', {}, [element('dt', { text: term }), element('dd', { text: value })])));
-    cardSky.hidden = selectedBody === 'earth' || ['io', 'europa', 'ganymede', 'callisto'].includes(selectedBody);
-    cardHome.hidden = !(selectedBody === 'earth' || selectedBody === 'moon');
-  }
-
-  function openOrrery() {
-    if (orrery.isOpen()) return;
+  function openOrrery({ fromZoomLimit = false } = {}) {
+    if (orrery.isOpen() || orreryClosing) return;
+    const globeView = renderer.getSnapshot()?.view;
+    const remembered = rememberedGlobeView || globeView;
+    // Zoom-out enters at the renderer's minimum size. Restore the last usable
+    // size while retaining the center reached by the current gesture.
+    returnView = fromZoomLimit
+      ? { ...(remembered || {}), ...(globeView || {}), zoom: Math.max(1, remembered?.zoom || 1) }
+      : (globeView ? { ...globeView } : { zoom: 1 });
+    entryCooldownUntil = 0;
     if (scope.isOpen()) {
       const current = scope.getSnapshot();
       returnToScope = { observer: current.observer, tracking: current.tracking };
       dismissScope();
     }
     setOpen(false);
-    pullAmount = 0; pull.hidden = true;
+    pullAmount = 0; pull.hidden = true; clearTimeout(pullTimer);
     stage.classList.add('is-orrery');
     orreryCanvas.hidden = false; orreryHud.hidden = false;
     for (const mark of [...Object.values(marks), ...Object.values(planetMarks)]) mark.button.hidden = true;
     useSpeeds('orbit');
     tape.setScale(0.05);
     orrery.setTime(time, { moon: moonEcliptic(state) });
-    orrery.open({ fromEarth: true });
-    cardHome.lastChild.textContent = returnToScope ? '望遠鏡に戻る' : '地球儀に戻る';
-    cardHome.querySelector('img').src = `/assets/icons/pixieed/${returnToScope ? 'telescope' : 'globe'}.svg`;
-    orreryHud.querySelector('.orrery-close').setAttribute('aria-label', returnToScope ? '望遠鏡に戻る' : '地球儀に戻る');
-    orreryCanvas.setAttribute('aria-label', `太陽系。ドラッグで回転、ピンチまたはホイールで拡大・縮小、タップで天体を選ぶ。地球をさらに拡大すると${returnToScope ? '望遠鏡' : '地球儀'}に戻る`);
+    orrery.open();
+    orreryCloseIcon.src = `/assets/icons/pixieed/${returnToScope ? 'telescope' : 'globe'}.svg`;
+    orreryCloseLabel.textContent = returnToScope ? '望遠鏡へ' : '地球儀へ';
+    orreryHud.querySelector('.orrery-close').setAttribute('aria-label', orreryCloseLabel.textContent);
+    orreryCanvas.setAttribute('aria-label', `太陽系。ドラッグで視点を回転。ピンチまたはホイールで拡大すると${returnToScope ? '望遠鏡' : '地球儀'}に戻る`);
     stage.dispatchEvent(new Event('pixieed:astro-viewchange'));
     orreryCanvas.focus({ preventScroll: true });
   }
 
   function closeOrrery(then = null) {
-    if (!orrery.isOpen()) { then?.(); return; }
+    if (then) closeCallbacks.push(then);
+    if (orreryClosing) return;
+    if (!orrery.isOpen()) { const callbacks = closeCallbacks.splice(0); callbacks.forEach((callback) => callback()); return; }
+    orreryClosing = true;
     const returnTarget = returnToScope;
     returnToScope = null;
-    selectedBody = null; card.hidden = true;
+    orreryHud.style.pointerEvents = 'none';
+    orreryCanvas.style.pointerEvents = 'none';
     stage.classList.add('is-orrery-leaving');
     orrery.close(() => {
-      // Land back on the globe at a comfortable size rather than at the zoom-out limit.
-      renderer.setView({ zoom: 1 });
+      renderer.setView(returnView || { zoom: 1 });
+      returnView = null;
       renderer.setSkyOrientation?.(null);
       stage.classList.remove('is-orrery', 'is-orrery-leaving');
       orreryCanvas.hidden = true; orreryHud.hidden = true;
+      orreryHud.style.pointerEvents = ''; orreryCanvas.style.pointerEvents = '';
+      orreryClosing = false;
+      entryCooldownUntil = performance.now() + 900;
+      pullAmount = 0; pull.hidden = true; clearTimeout(pullTimer);
       useSpeeds('sky');
       tape.setScale(14);
       apply();
-      if (then) then();
+      const callbacks = closeCallbacks.splice(0);
+      if (callbacks.length) callbacks.forEach((callback) => callback());
       else if (returnTarget) openScope(returnTarget.observer, { track: typeof returnTarget.tracking === 'string' ? returnTarget.tracking : null });
+      else stage.querySelector('#globeCanvas')?.focus({ preventScroll: true });
       stage.dispatchEvent(new Event('pixieed:astro-viewchange'));
     });
   }
 
-  // Look at a body from the ground: back to the globe, then the telescope on it.
-  function lookFromEarth(id) {
-    if (!id) return;
-    closeOrrery(() => openScope(undefined, { track: id }));
-  }
-
   // The globe reports pinches past its zoom-out limit; enough of them opens the Solar System.
   function zoomLimit({ direction, amount }) {
-    if (direction !== 'out' || orrery.isOpen() || scope.isOpen()) return;
+    if (direction !== 'out' || orrery.isOpen() || orreryClosing || scope.isOpen() || performance.now() < entryCooldownUntil) return;
     pullAmount += amount;
     pull.hidden = false;
     pull.style.setProperty('--pull', String(Math.min(1, pullAmount / ORRERY_PULL)));
     clearTimeout(pullTimer);
     pullTimer = setTimeout(() => { pullAmount = 0; pull.hidden = true; }, 700);
-    if (pullAmount >= ORRERY_PULL) openOrrery();
+    if (pullAmount >= ORRERY_PULL) openOrrery({ fromZoomLimit: true });
   }
 
   stage.append(orreryCanvas, scopeCanvas, skyHud, scopeHud, orreryHud, pull, capsule);
@@ -1047,6 +1004,7 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
 
   const api = Object.freeze({
     refreshView() { if (state && !scope.isOpen() && !orrery.isOpen()) orbitMarks(); },
+    rememberGlobeView(view) { if (view && !scope.isOpen() && !orrery.isOpen() && Number.isFinite(view.zoom) && view.zoom >= 1) rememberedGlobeView = { ...view }; },
     setTime, getTime: () => time, setPlaying, setSpeed, openScope, closeScope, goToEclipse, scope, setOpen,
     openOrrery, closeOrrery, zoomLimit, orrery,
     toggleTelescopeSolarSystem() { if (orrery.isOpen()) closeOrrery(); else openOrrery(); },

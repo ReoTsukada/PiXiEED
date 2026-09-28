@@ -18,6 +18,8 @@ PIXIEED_PLAYWRIGHT_MODULE=/absolute/path/to/playwright/index.mjs node scripts/pa
 PIXIEED_PLAYWRIGHT_MODULE=/absolute/path/to/playwright/index.mjs node scripts/pass-gauge-browser-harness.mjs
 PIXIEED_PLAYWRIGHT_MODULE=/absolute/path/to/playwright/index.mjs node scripts/interaction-effects-browser-harness.mjs
 PIXIEED_PLAYWRIGHT_MODULE=/absolute/path/to/playwright/index.mjs node scripts/jigsaw-workspace-browser-harness.mjs
+node scripts/jigsaw-zoom-browser-harness.mjs
+node scripts/jigsaw-feedback-browser-harness.mjs
 node scripts/creation-suite-harness.mjs --suite game
 node scripts/creation-suite-harness.mjs --suite jigsaw
 node scripts/creation-suite-harness.mjs --suite spot-difference

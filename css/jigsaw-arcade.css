@@ -34,6 +34,7 @@ body.arc-jigsaw .jigsaw-tray { gap: 8px; height: 76px; padding: 6px 8px; border-
 body.arc-jigsaw .jigsaw-piece { flex-basis: 62px; width: 62px; height: 62px; border: 2px solid transparent; border-radius: 12px; background: #1d2b38; box-shadow: 0 3px 0 rgba(0,0,0,.45); transition: transform .12s cubic-bezier(.2,1.3,.4,1); }
 body.arc-jigsaw .jigsaw-piece:hover { transform: translateY(-2px); }
 body.arc-jigsaw .jigsaw-piece[aria-pressed=true] { border-color: #ffd35a; background: #263a4b; box-shadow: 0 3px 0 #b88f1d, 0 0 0 3px rgba(255,211,90,.2); transform: translateY(-3px); }
+body.arc-jigsaw .jigsaw-piece:active { filter: brightness(1.12); transform: translateY(1px) scale(.97); }
 body.arc-jigsaw .jigsaw-complete { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip-path: inset(50%) !important; padding: 0 !important; }
 @media (max-height: 420px) { body.arc-jigsaw .jigsaw-play { grid-template-rows: auto 44px minmax(0, 1fr) 50px; } body.arc-jigsaw .jigsaw-tray { height: 50px; padding: 3px 6px; } body.arc-jigsaw .jigsaw-piece { flex-basis: 44px; width: 44px; height: 44px; } }
 @media (orientation: landscape) and (max-height: 520px) {

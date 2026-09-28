@@ -1,4 +1,4 @@
-import { initAstroUi } from './astro-ui.mjs?v=20260928-sky-labels-1';
+import { initAstroUi } from './astro-ui.mjs?v=20260928-solar-navigation-1';
 import { initPostUi } from './post-ui.mjs?v=20260928-puzzle-handoff-1';
 import { sharedSky, sharedFaintSky, SPRITE_MAGNITUDE } from './real-sky.mjs?v=20260927-sky-events-v1';
 import { createSupabaseGlobeAuth, createSupabaseGlobeStore } from './post-supabase.mjs?v=20260928-puzzle-handoff-1';
@@ -62,6 +62,7 @@ function createPrototypeRenderer(options = {}) {
     },
     onZoomLimit(info) { globalThis.__PIXIEED_ASTRO__?.zoomLimit?.(info); },
     onStateChange({ view }) {
+      globalThis.__PIXIEED_ASTRO__?.rememberGlobeView?.(view);
       globalThis.__PIXIEED_ASTRO__?.refreshView?.();
       postUi?.refresh();
       if (globeStage) globeStage.style.setProperty('--space-offset', `${50 + (view.centerLongitude / 360) * 8}% 50%`);
@@ -113,7 +114,11 @@ function syncPrimaryAction() {
 }
 primaryAction?.addEventListener('click', () => {
   if (document.documentElement.classList.contains('is-tool-telescope')) globalThis.__PIXIEED_ASTRO__?.toggleTelescopeSolarSystem();
-  else postUi?.openComposer();
+  else {
+    const open = () => postUi?.openComposer();
+    if (globalThis.__PIXIEED_ASTRO__?.orrery.isOpen()) globalThis.__PIXIEED_ASTRO__.closeOrrery(open);
+    else open();
+  }
 });
 globeStage?.addEventListener('pixieed:astro-viewchange', syncPrimaryAction);
 

@@ -8,9 +8,10 @@ import {
   moveJigsawGroup, rotateJigsawGroup, snapJigsawGroup, worldGroupBounds,
   pieceAtPoint, sliceJigsawPieces, isJigsawWorkspaceComplete, validateJigsawWorkspace
 } from './jigsaw-workspace.mjs?rev=20260928-jigsaw-workspace-1';
+import { buildJigsawSelectionEdges } from './jigsaw-selection.mjs';
 import { supabaseConfig } from '../../data/site-config.js';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
-import { mountPxdTools } from './pxd-ui.mjs?rev=20260928-pxd-1';
+import { mountPxdTools } from './pxd-ui.mjs?rev=20260928-own-work-1';
 import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20260928-pxd-puzzles-1';
 
 const DRAW_LAST_DRAFT_KEY = 'pixieed.simple-draw.last-draft.v1';
@@ -28,6 +29,8 @@ const interactionEffects = createInteractionEffects();
 let adapter = null; let draftStore = null; let sourceDraftId = null; let gameDraftId = null;
 let game = null; let sourceRevision = null; let layoutData = null; let pieces = []; let selectedGroupId = null; let trayPage = 0;
 let pieceLookupSource = null; let pieceLookup = new Map(); let pieceOrderSource = null; let pieceOrderIndex = new Map();
+let selectionCache = { layout: null, pieceIds: null, path: null };
+let liftEffect = null; let liftValue = 0;
 let pxdOriginalRefs = null; let pxdBridge = null;
 let activePointer = null; let panGesture = null; let pendingPaint = 0; let view = { scale: 1, x: 0, y: 0 }; let lastWorkspaceSize = null;
 const MAX_TRAY_DOM = 80;
@@ -190,13 +193,15 @@ async function loadSourceOptions() {
 }
 
 function findPiece(pieceId) {
-  if (pieceLookupSource !== pieces) { pieceLookupSource = pieces; pieceLookup = new Map(pieces.map((piece) => [piece.pieceId, piece])); }
+  ensurePieceLookup();
   return pieceLookup.get(pieceId);
 }
+function ensurePieceLookup() { if (pieceLookupSource !== pieces) { pieceLookupSource = pieces; pieceLookup = new Map(pieces.map((piece) => [piece.pieceId, piece])); } }
 function findGroup(groupId) { return game?.groups.find((group) => group.groupId === groupId) || null; }
 function groupName(group) { return `${group.pieceIds.length}ピースのグループ`; }
 function sourceDimensions() { return { width: game?.layout.width || sourceRevision?.document?.width || 1, height: game?.layout.height || sourceRevision?.document?.height || 1 }; }
-function queuePaint() { if (pendingPaint) return; pendingPaint = requestAnimationFrame(() => { pendingPaint = 0; paintWorkspace(); }); }
+function queuePaint() { if (document.hidden || pendingPaint) return; pendingPaint = requestAnimationFrame(() => { pendingPaint = 0; paintWorkspace(); }); }
+function cancelPendingPaint() { if (pendingPaint) cancelAnimationFrame(pendingPaint); pendingPaint = 0; }
 function canvasMetrics() {
   const rect = boardElement.getBoundingClientRect(); const dpr = Math.min(2, Math.max(1, globalThis.devicePixelRatio || 1));
   if (lastWorkspaceSize && (rect.width !== lastWorkspaceSize.width || rect.height !== lastWorkspaceSize.height)) {
@@ -247,30 +252,66 @@ function pieceIntersectsViewport(piece, group, transform, metrics) {
     default: left = x; right = x + width; top = y; bottom = y + height;
   }
   left += group.x; right += group.x; top += group.y; bottom += group.y;
-  const margin = 2 / transform.scale;
+  const margin = 9 / transform.scale;
   const viewLeft = -transform.x / transform.scale - margin; const viewTop = -transform.y / transform.scale - margin;
   const viewRight = (metrics.width - transform.x) / transform.scale + margin; const viewBottom = (metrics.height - transform.y) / transform.scale + margin;
   return right >= viewLeft && left <= viewRight && bottom >= viewTop && top <= viewBottom;
 }
+function selectedPath(group) {
+  if (!globalThis.Path2D || !group) return null;
+  if (selectionCache.layout !== layoutData || selectionCache.pieceIds !== group.pieceIds) {
+    ensurePieceLookup();
+    const path = new Path2D(); const edges = buildJigsawSelectionEdges(group, layoutData, pieceLookup);
+    for (let index = 0; index < edges.length; index += 4) { path.moveTo(edges[index], edges[index + 1]); path.lineTo(edges[index + 2], edges[index + 3]); }
+    selectionCache = { layout: layoutData, pieceIds: group.pieceIds, path };
+  }
+  return selectionCache.path;
+}
+function clearSelectionCache() { selectionCache = { layout: null, pieceIds: null, path: null }; }
+function drawGroup(context, group, transform, metrics, liftAmountValue) {
+  context.save(); context.translate(group.x, group.y); context.rotate(group.rotation * Math.PI / 2);
+  for (const pieceId of group.pieceIds) {
+    const piece = findPiece(pieceId); if (!piece || !pieceIntersectsViewport(piece, group, transform, metrics)) continue;
+    context.drawImage(pieceCanvas(piece), piece.bounds.x, piece.bounds.y);
+  }
+  context.restore();
+  if (group.groupId === selectedGroupId) {
+    const path = selectedPath(group);
+    if (path) {
+      context.save(); context.translate(group.x, group.y); context.rotate(group.rotation * Math.PI / 2);
+      context.lineCap = 'round'; context.lineJoin = 'round'; context.setLineDash([]);
+      context.lineWidth = 3.8 * metrics.dpr / transform.scale; context.strokeStyle = 'rgba(255, 248, 219, .98)';
+      if (liftAmountValue > 0) { context.shadowColor = `rgba(17, 27, 29, ${0.32 * liftAmountValue})`; context.shadowBlur = 3 * metrics.dpr * liftAmountValue; context.shadowOffsetY = 2 * metrics.dpr * liftAmountValue; }
+      context.stroke(path); context.shadowColor = 'transparent'; context.shadowBlur = 0; context.shadowOffsetY = 0;
+      context.lineWidth = 1.7 * metrics.dpr / transform.scale; context.strokeStyle = '#ffd35a'; context.stroke(path); context.restore();
+    }
+  }
+}
+function liftAmount(now = performance.now()) {
+  if (!liftEffect) return liftValue;
+  const progress = Math.max(0, Math.min(1, (now - liftEffect.started) / liftEffect.duration));
+  if (progress >= 1) { liftValue = liftEffect.to; liftEffect = null; return liftValue; }
+  const eased = progress * progress * (3 - 2 * progress);
+  return liftEffect.from + (liftEffect.to - liftEffect.from) * eased;
+}
+function animateLift(groupId, to, duration) {
+  if (document.hidden || globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches) { liftEffect = null; liftValue = to; return; }
+  const from = liftAmount();
+  liftEffect = { groupId, from, to, started: performance.now(), duration };
+}
+function clearDragState() { delete workspaceElement.dataset.jigsawDragging; liftEffect = null; liftValue = 0; }
 function paintWorkspace() {
   if (!game || !pieces.length) return;
   const metrics = canvasMetrics(); const context = boardElement.getContext('2d'); if (!context) return;
   context.setTransform(1, 0, 0, 1, 0, 0); context.clearRect(0, 0, metrics.width, metrics.height); context.imageSmoothingEnabled = false;
   const transform = worldScreenTransform(metrics); context.setTransform(transform.scale, 0, 0, transform.scale, transform.x, transform.y);
-  for (const group of game.groups) {
-    if (group.inTray) continue;
-    context.save(); context.translate(group.x, group.y); context.rotate(group.rotation * Math.PI / 2);
-    for (const pieceId of group.pieceIds) {
-      const piece = findPiece(pieceId); if (!piece) continue;
-      if (!pieceIntersectsViewport(piece, group, transform, metrics)) continue;
-      context.drawImage(pieceCanvas(piece), piece.bounds.x, piece.bounds.y);
-    }
-    context.restore();
-    if (group.groupId === selectedGroupId) {
-    const bounds = worldGroupBounds(group, layoutData); context.save(); context.setTransform(transform.scale, 0, 0, transform.scale, transform.x, transform.y);
-      context.translate(bounds.x, bounds.y); context.strokeStyle = '#315ca8'; context.lineWidth = Math.max(1, 1.5 / transform.scale); context.setLineDash([3 / transform.scale, 2 / transform.scale]); context.strokeRect(0, 0, bounds.width, bounds.height); context.restore();
-    }
-  }
+  const frameLiftAmount = liftAmount();
+  const draggingId = activePointer?.type === 'group' ? activePointer.groupId : null;
+  const topId = draggingId || liftEffect?.groupId || null;
+  for (const group of game.groups) if (!group.inTray && group.groupId !== topId) drawGroup(context, group, transform, metrics, 0);
+  if (topId) { const group = findGroup(topId); if (group && !group.inTray) drawGroup(context, group, transform, metrics, frameLiftAmount); }
+  workspaceElement.dataset.jigsawSelected = selectedGroupId && findGroup(selectedGroupId) && !findGroup(selectedGroupId).inTray ? 'true' : 'false';
+  if (liftEffect && !document.hidden) queuePaint();
 }
 function groupThumb(group) {
   const canvas = document.createElement('canvas'); canvas.width = 52; canvas.height = 52;
@@ -349,6 +390,8 @@ function beginPointer(event, type, groupId = null) {
     selectedGroupId = groupId; updateSelectionControls();
     for (const button of trayElement.querySelectorAll('button[data-group-id]')) button.setAttribute('aria-pressed', String(button.dataset.groupId === groupId));
   }
+  if (activePointer?.type === 'group') { workspaceElement.dataset.jigsawDragging = 'true'; animateLift(activePointer.groupId, 1, 120); }
+  workspaceElement.dataset.jigsawSelected = selectedGroupId && !findGroup(selectedGroupId)?.inTray ? 'true' : 'false';
 }
 function onPointerMove(event) {
   if (activeTouches.has(event.pointerId)) activeTouches.set(event.pointerId, { x: event.clientX, y: event.clientY });
@@ -361,6 +404,7 @@ function onPointerMove(event) {
       if (group) {
         game = moveJigsawGroup(game, group.groupId, poseCenteredAt(group, world));
         pointer.type = 'group'; pointer.startWorld = world; pointer.start = { x: event.clientX, y: event.clientY };
+        workspaceElement.dataset.jigsawDragging = 'true'; animateLift(group.groupId, 1, 120);
         try { workspaceElement.setPointerCapture(event.pointerId); } catch { /* The document listeners still track the drag. */ }
         renderGame();
       }
@@ -394,6 +438,7 @@ function beginWorkspacePointer(event) {
       const group = findGroup(activePointer.groupId);
       if (group) game = moveJigsawGroup(game, group.groupId, activePointer.initialPose);
       activePointer = null; queuePaint();
+      clearDragState();
     }
     const ids = [...activeTouches.keys()].slice(0, 2);
     activePointer = null; startPinch(ids);
@@ -408,6 +453,7 @@ function endPointer(event) {
       if (pointer.type === 'group' && pointer.initialPose) {
         const group = findGroup(pointer.groupId); if (group) game = moveJigsawGroup(game, group.groupId, pointer.initialPose);
       }
+      clearDragState();
     } else {
       if (pointer.type === 'group' && pointer.moved) {
         const group = findGroup(pointer.groupId);
@@ -415,9 +461,16 @@ function endPointer(event) {
       } else if (pointer.type === 'tray-place' && pointInsideWorkspace(event.clientX, event.clientY)) placeAt(pointer.groupId, screenToWorld(event.clientX, event.clientY));
       else if (pointer.type === 'tray' && pointer.moved && pointInsideWorkspace(event.clientX, event.clientY)) placeAt(pointer.groupId, screenToWorld(event.clientX, event.clientY));
       else if (pointer.type === 'canvas' && !pointer.moved) { const world = screenToWorld(event.clientX, event.clientY); const hit = hitGroup(world); if (hit) selectedGroupId = hit.groupId; updateSelectionControls(); }
+      if (pointer.type === 'group') {
+        delete workspaceElement.dataset.jigsawDragging;
+        const settlingGroupId = findGroup(pointer.groupId) ? pointer.groupId : selectedGroupId;
+        if (pointer.moved && findGroup(settlingGroupId)) animateLift(settlingGroupId, 0, 160);
+        else clearDragState();
+      }
     }
     renderGame();
   }
+  workspaceElement.dataset.jigsawSelected = selectedGroupId && !findGroup(selectedGroupId)?.inTray ? 'true' : 'false';
   activeTouches.delete(event.pointerId);
   if (panGesture?.pinching) {
     const ids = [...activeTouches.keys()].slice(0, 2);
@@ -476,6 +529,7 @@ async function startGame() {
     }
     const pieceSize = gridSelect.value === 'auto' ? 'auto' : Number(gridSelect.value);
     layoutData = createJigsawLayout({ width, height, pieceSize, seed: gameId });
+    clearSelectionCache();
     pieces = sliceJigsawPieces(rgba, layoutData);
     game = createJigsawWorkspace({ gameId, source, layout: layoutData, seed: gameId });
     pxdOriginalRefs = null;
@@ -546,7 +600,9 @@ async function resumeGame() {
       if (layoutData.columns !== savedGame.layout.columns || layoutData.rows !== savedGame.layout.rows || layoutData.pieceSize !== savedGame.layout.pieceSize) throw new Error('保存したピース境界を再現できません');
       game = savedGame;
     }
+    clearSelectionCache();
     pieces = sliceJigsawPieces(rgba, layoutData); gameDraftId = draftId; selectedGroupId = null; trayPage = 0; view = { scale: 1, x: 0, y: 0 };
+    pxdOriginalRefs = null; pxdBridge?.reset();
     showGame();
     if (savedGame.viewport && !isLegacy) {
       updateViewport();
@@ -607,6 +663,7 @@ async function openPxdJigsaw(project) {
   const nextPieces = sliceJigsawPieces(sourcePixels, nextLayout);
   pxdBridge?.reset();
   game = nextGame; layoutData = nextLayout; pieces = nextPieces; gameDraftId = game.gameId;
+  clearSelectionCache(); clearDragState();
   pxdOriginalRefs = materialized.portableOriginalRefs;
   selectedGroupId = null; trayPage = 0; view = { scale: 1, x: 0, y: 0 };
   sourceLabel.textContent = game.source.type === 'public' ? `${game.source.title} · 公開作品` : game.source.type === 'file' ? 'PXD内の端末画像' : `PXDの自分の固定版 · ${sourcePixels.width}×${sourcePixels.height}px`;
@@ -619,6 +676,7 @@ function mountPxdJigsaw() {
   return mountPxdTools({
     tool: 'jigsaw',
     hasContent: () => Boolean(game),
+    getPublicSources: () => game?.source?.type === 'public' ? [game.source] : [],
     getProject: async (project) => {
       if (!game) return project;
       const sourceDrawDocuments = {}; const sourceImages = {};
@@ -678,10 +736,19 @@ workspaceElement.addEventListener('wheel', (event) => {
 }, { passive: false });
 window.addEventListener('resize', () => { if (game) queuePaint(); });
 if ('ResizeObserver' in globalThis) new ResizeObserver(() => { if (game) queuePaint(); }).observe(workspaceElement);
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { cancelPendingPaint(); liftEffect = null; liftValue = activePointer?.type === 'group' ? 1 : 0; }
+  else if (game) queuePaint();
+});
+globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').addEventListener?.('change', (event) => {
+  if (event.matches) { cancelPendingPaint(); liftEffect = null; liftValue = activePointer?.type === 'group' ? 1 : 0; if (game) queuePaint(); }
+});
 
 $('#jigsaw-new').addEventListener('click', () => {
   pxdBridge?.reset();
   game = null; sourceRevision = null; layoutData = null; pieces = []; selectedGroupId = null;
+  clearSelectionCache(); clearDragState();
+  delete workspaceElement.dataset.jigsawSelected;
   pieceLookupSource = pieces; pieceLookup.clear(); pieceOrderSource = null; pieceOrderIndex.clear();
   pxdOriginalRefs = null;
   delete document.body.dataset.jigsawPlaying; playSection.hidden = true; setupSection.hidden = false; saveButton.disabled = true;

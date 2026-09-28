@@ -2,6 +2,7 @@ import { createPxdProject, decodePxd, encodePxd } from './pxd-codec.mjs';
 import { createPxdStore } from './pxd-store.mjs';
 import { pxdImageRoles, pxdToolUrl, primaryPxdImageRole } from './pxd-project.mjs';
 import { documentRgba } from './draw-core.mjs';
+import { assertOwnPublicSources, getPxdPublicSources } from './work-save-policy.mjs';
 
 const labels = { draw: 'ドット絵', audio: 'ドットで音楽', jigsaw: 'ジグソー', spot_difference: '間違い探し', hidden_object: 'もの探し' };
 function errorMessage(error) {
@@ -51,8 +52,9 @@ function documentRgbaLoose(value) {
     return rgba;
   }
 }
-export function mountPxdTools({ tool, getProject, openProject, setStatus = () => {}, hasContent = () => true, mount }) {
-  style(); const store = createPxdStore(); const uncommitted = new Set(); let current = null; let held = null; let queue = Promise.resolve(); let busy = false;
+export function mountPxdTools({ tool, getProject, openProject, setStatus = () => {}, hasContent = () => true, getPublicSources = () => [], mount }) {
+  style(); const store = createPxdStore(); const uncommitted = new Set(); let current = null; let held = null; let opening = null; let queue = Promise.resolve(); let busy = false;
+  let savePermission = true; let permissionEpoch = 0;
   const details = document.createElement('details'); details.className = 'pxd-tools'; details.id = 'pxd-tools';
   const summary = document.createElement('summary'); summary.setAttribute('aria-label', '作品ファイルとツールの連携'); summary.setAttribute('aria-controls', 'pxd-panel'); summary.setAttribute('aria-expanded', 'false'); summary.title = '作品ファイル';
   summary.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M6 3h8l4 4v14H6zM14 3v5h5M9 12h6M9 16h6"/></svg><span>PXD</span>';
@@ -79,6 +81,7 @@ export function mountPxdTools({ tool, getProject, openProject, setStatus = () =>
   const hiddenImageButton = button('もの探しの絵を描く', 'pxd-to-hidden-image', () => run(async () => { const project = await save(); location.assign(pxdToolUrl('draw', project, 'hidden')); }));
   const drawingImageButton = button('描画用の絵を開く', 'pxd-to-draw-image', () => run(async () => { const project = await save(); location.assign(pxdToolUrl('draw', project, 'draw')); }));
   const originalButton = button('旧PXDの原本を書き出す', 'pxd-export-original', () => run(async () => {
+    await assertCanSave();
     const original = (held || current)?.entries.find((entry) => entry.path === 'legacy/original.pxd');
     if (!original) throw new Error('旧PXDの原本が見つかりません。');
     download(original.bytes, 'pixieed-original.pxd'); say('旧PXDの原本を変更せず書き出しました。');
@@ -96,14 +99,30 @@ export function mountPxdTools({ tool, getProject, openProject, setStatus = () =>
     workingButton.hidden = !roles.includes('audio') && !(tool === 'audio' && hasContent()); afterButton.hidden = !roles.includes('spot-after') && !(tool === 'spot_difference' && hasContent());
     hiddenImageButton.hidden = !roles.includes('hidden') && !(tool === 'hidden_object' && hasContent()); originalButton.hidden = !project?.entries.some((entry) => entry.path === 'legacy/original.pxd');
     drawingImageButton.hidden = !roles.includes('draw');
-    [...panel.querySelectorAll('button')].forEach((node) => { node.disabled = busy; });
+    [...panel.querySelectorAll('button')].forEach((node) => { node.disabled = busy || node !== openButton && savePermission !== true; });
   }
-  async function run(work) { if (busy) return; busy = true; refresh(); try { await work(); } catch (error) { say(errorMessage(error)); } finally { busy = false; refresh(); } }
+  function publicSources(project = opening || held || current) { return [...getPxdPublicSources(project), ...getPublicSources()]; }
+  async function assertCanSave(project = opening || held || current) { await assertOwnPublicSources(publicSources(project)); return true; }
+  async function checkPermission() {
+    const epoch = ++permissionEpoch;
+    try {
+      const sources = publicSources();
+      savePermission = sources.length ? null : true; refresh();
+      await assertOwnPublicSources(sources);
+      if (epoch !== permissionEpoch) return false;
+      savePermission = true; return true;
+    } catch (error) {
+      if (epoch !== permissionEpoch) return false;
+      savePermission = false; say(errorMessage(error)); return false;
+    } finally { if (epoch === permissionEpoch) refresh(); }
+  }
+  async function run(work) { if (busy) return; busy = true; refresh(); try { await work(); } catch (error) { if (error?.code === 'WORK_SAVE_FORBIDDEN') savePermission = false; say(errorMessage(error)); } finally { busy = false; refresh(); } }
   function save() {
     const operation = queue.catch(() => {}).then(async () => {
       const base = held || current;
       if (!held && !hasContent()) throw new Error('作品を用意してから保存してください。');
       const candidate = held || await getProject(base ? structuredClone(base) : null) || createPxdProject();
+      await assertCanSave(candidate);
       const saved = await store.save(candidate, { expectedRevisionId: base && !uncommitted.has(base.projectId) ? base.revisionId : null });
       uncommitted.delete(saved.projectId);
       if (held) held = saved; else current = saved;
@@ -113,8 +132,23 @@ export function mountPxdTools({ tool, getProject, openProject, setStatus = () =>
     queue = operation; return operation;
   }
   async function apply(project) {
-    try { await openProject(structuredClone(project)); current = project; held = null; refresh(); say('PXDの作品を開きました。ほかの部品も保持しています。'); return true; }
-    catch (error) { held = project; refresh(); say(`${errorMessage(error)} PXDの原本は書き出せます。`); return false; }
+    opening = project;
+    try {
+      // A public puzzle may be played, but never becomes a drawing or music import
+      // merely because its file also carries an embedded image.
+      if (tool !== 'jigsaw') await assertOwnPublicSources(getPxdPublicSources(project));
+      await openProject(structuredClone(project)); current = project; held = null;
+      const allowed = await checkPermission();
+      if (allowed) say('PXDの作品を開きました。ほかの部品も保持しています。');
+      return true;
+    }
+    catch (error) {
+      held = project;
+      const allowed = await checkPermission();
+      say(`${errorMessage(error)}${allowed ? ' PXDの原本は書き出せます。' : ''}`);
+      return false;
+    }
+    finally { if (opening === project) opening = null; }
   }
   input.addEventListener('change', () => run(async () => {
     const file = input.files?.[0]; input.value = ''; if (!file) return;
@@ -125,7 +159,7 @@ export function mountPxdTools({ tool, getProject, openProject, setStatus = () =>
     project.manifest = { ...project.manifest, importedFrom: { projectId: originalProjectId } };
     await apply(project);
   }));
-  details.addEventListener('toggle', () => { panel.hidden = !details.open; summary.setAttribute('aria-expanded', String(details.open)); if (details.open) refresh(); });
+  details.addEventListener('toggle', () => { panel.hidden = !details.open; summary.setAttribute('aria-expanded', String(details.open)); if (details.open) void checkPermission(); });
   document.addEventListener('pointerdown', (event) => { if (details.open && !details.contains(event.target) && !panel.contains(event.target)) details.open = false; });
   document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && details.open) { details.open = false; summary.focus(); } });
   const ready = (async () => {
@@ -135,5 +169,6 @@ export function mountPxdTools({ tool, getProject, openProject, setStatus = () =>
     try { const project = await store.load(projectId, revisionId); if (!project) throw new Error('この端末に指定したPXDの保存版がありません。PXDファイルから開いてください。'); return await apply(project); }
     catch (error) { say(errorMessage(error)); return false; }
   })();
-  return Object.freeze({ ready, save, reset() { current = held = null; refresh(); }, get currentProject() { return current; }, get heldProject() { return held; } });
+  window.addEventListener('storage', () => { void checkPermission(); });
+  return Object.freeze({ ready, save, assertCanSave, reset() { current = held = null; void checkPermission(); }, get currentProject() { return current; }, get heldProject() { return held; } });
 }

@@ -11,7 +11,7 @@ import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
 import { AUDIO_INSTRUMENT_GROUPS, AUDIO_EXTRA_INSTRUMENT_IDS } from './audio-timbres.mjs?rev=20260928-dot-music-1';
 import { createPxdProject } from './pxd-codec.mjs';
-import { mountPxdTools, confirmPxdConversion } from './pxd-ui.mjs';
+import { mountPxdTools, confirmPxdConversion } from './pxd-ui.mjs?rev=20260928-own-work-1';
 import { pxdImageRoles, putPxdImage, readPxdImage } from './pxd-project.mjs';
 import { assertPxdAudioPixelCompatibility, assignPxdAudioColor, audioCellLink, audioSongImage, preparePxdAudioImageImport, readPxdAudioLink, readPxdAudioState, resizePxdAudioWorkingImage, validatePxdAudioBinding, writePxdAudioState } from './pxd-draw-audio.mjs';
 import { documentRgba } from './draw-core.mjs';
@@ -496,6 +496,7 @@ exportImageButton.addEventListener('click', async () => {
   const exportEpoch = effectEpoch;
   exportImageButton.disabled = true;
   try {
+    await pxdBridge?.assertCanSave();
     const { blob, width, height } = await exportAudioImage(song, pxdImage ? { image: pxdImage } : {});
     if (imageUrl) URL.revokeObjectURL(imageUrl);
     imageUrl = URL.createObjectURL(blob);

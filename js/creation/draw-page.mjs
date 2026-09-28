@@ -5,7 +5,7 @@ import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs';
 import { DRAW_HANDOFF_KEY, encodeDrawPng, serializeDrawHandoff, validateDrawPixels } from './draw-handoff.mjs';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
 import { createPxdProject } from './pxd-codec.mjs';
-import { confirmPxdConversion, mountPxdTools } from './pxd-ui.mjs';
+import { confirmPxdConversion, mountPxdTools } from './pxd-ui.mjs?rev=20260928-own-work-1';
 import { pxdImageRoles, readPxdImage } from './pxd-project.mjs';
 import { readPxdAudioLink, readPxdDrawDocument, synchronizeLinkedAudioImage, writePxdDrawDocument } from './pxd-draw-audio.mjs';
 
@@ -391,6 +391,7 @@ async function saveRevision() {
 saveButton.addEventListener('click', () => saveRevision());
 globeButton.addEventListener('click', async () => {
   try {
+    await pxdBridge?.assertCanSave();
     validateDrawPixels(documentData);
     globeButton.disabled = true;
     const revision = await saveRevision();
@@ -437,8 +438,9 @@ $('#draw-import-file').addEventListener('change', () => { const file = $('#draw-
 if (getLastDraftId()) { resumeButton.hidden = false; $('#draw-copy-last').hidden = false; }
 paint();
 
-$('#draw-export').addEventListener('click', () => {
+$('#draw-export').addEventListener('click', async () => {
   try {
+    await pxdBridge?.assertCanSave();
     const bytes = encodePng(documentData); const url = URL.createObjectURL(new Blob([bytes], { type: 'image/png' })); const link = document.createElement('a'); link.href = url; link.download = `pixieed-drawing-${documentData.width}x${documentData.height}.png`; link.click(); interactionEffects.exportImage({ from: canvas, to: $('#draw-export'), image: canvas }); setTimeout(() => URL.revokeObjectURL(url), 1000); status.textContent = `${documentData.width}×${documentData.height}pxのPNGを書き出しました。`;
   } catch (error) { status.textContent = `PNGを書き出せませんでした：${error.message}`; }
 });

@@ -2,8 +2,10 @@ import { supabaseConfig } from '../../data/site-config.js?rev=20260921-globe-pos
 import { getCellById } from './geometry.mjs?v=20260921-grid11-1';
 import { projectLegacyShowcase } from './legacy-showcase.mjs';
 import { createLegacyPlacementApi } from '../creation/legacy-placement.mjs';
+import { isSafeJigsawPixfindOriginalUrl } from '../creation/jigsaw-core.mjs';
 
 const SESSION_KEY = 'PiXiEED:supabase-session:v1';
+const LEGACY_OWNER_SESSION_KEY = 'PiXiEED:legacy-owner-session:v1';
 const baseUrl = () => String(supabaseConfig.url || '').trim().replace(/\/$/, '');
 const publicKey = () => String(supabaseConfig.publishableKey || '').trim();
 const configured = () => Boolean(baseUrl() && publicKey());
@@ -22,11 +24,11 @@ async function readError(response) {
     return ({ image_already_submitted: 'この画像はすでに投稿されています。', location_required: '地球のセルを選び直してください。', authentication_required: '投稿セッションを開始できませんでした。', image_type_invalid: '画像をPNGとして確認できませんでした。選び直してください。', image_size_invalid: '投稿用画像は512KB以内にしてください。', image_pixels_invalid: '画像の縦横サイズを確認できませんでした。選び直してください。', image_colors_invalid: '実画像の色数が128色を超えるか、表示した色数と一致しません。', image_decode_invalid: '画像を正しく読み取れませんでした。別の画像を選んでください。' })[code] || '投稿できませんでした。時間をおいてもう一度お試しください。';
   } catch { return '投稿できませんでした。時間をおいてもう一度お試しください。'; }
 }
-async function refreshSession(session) {
+async function refreshSession(session, { persist = true } = {}) {
   if (!session?.refresh_token) return null;
   const response = await fetch(`${baseUrl()}/auth/v1/token?grant_type=refresh_token`, { method: 'POST', headers: headers(), body: JSON.stringify({ refresh_token: session.refresh_token }) });
   if (!response.ok) return null;
-  const next = await response.json(); saveSession(next); return next;
+  const next = await response.json(); if (persist) saveSession(next); return next;
 }
 async function ensureSession() {
   if (!configured()) throw new Error('投稿機能の接続設定がまだありません。');
@@ -58,6 +60,11 @@ async function ensureSession() {
 }
 function imageUrl(path) {
   const bucket = encodeURIComponent(String(supabaseConfig.publicStorageBucket || 'post-public'));
+  const safePath = String(path || '').split('/').filter(Boolean).map(encodeURIComponent).join('/');
+  return safePath ? `${baseUrl()}/storage/v1/object/public/${bucket}/${safePath}` : '';
+}
+function socialImageUrl(path) {
+  const bucket = encodeURIComponent('social-posts');
   const safePath = String(path || '').split('/').filter(Boolean).map(encodeURIComponent).join('/');
   return safePath ? `${baseUrl()}/storage/v1/object/public/${bucket}/${safePath}` : '';
 }
@@ -156,23 +163,103 @@ async function getExistingLikeSession() {
   // The legacy placement API verifies real saved accounts and never creates a user.
   const ownerApi = createLegacyPlacementApi();
   if (ownerApi.hasSavedSession()) {
-    const owner = await ownerApi.restore();
-    if (!owner) throw new Error('ログイン状態を確認できません。いいね状態を再読み込みしてください。');
-    return { access_token: await ownerApi.getAccessToken(), user_id: owner.id };
+    const hostname = new URL(baseUrl()).hostname.split('.')[0];
+    const sessionKey = localStorage.getItem(LEGACY_OWNER_SESSION_KEY) != null ? LEGACY_OWNER_SESSION_KEY : `sb-${hostname}-auth-token`;
+    const raw = JSON.parse(localStorage.getItem(sessionKey) || 'null');
+    const initial = raw?.currentSession && typeof raw.currentSession === 'object' ? raw.currentSession : raw;
+    if (!initial?.access_token || !initial?.refresh_token) throw new Error('ログイン状態を確認できません。いいね状態を再読み込みしてください。');
+    let session = initial;
+    if (session.expires_at && Number(session.expires_at) * 1000 <= Date.now() + 30_000) {
+      session = await refreshSession(session, { persist: false });
+      if (!session?.access_token) throw new Error('ログイン状態を確認できません。いいね状態を再読み込みしてください。');
+    }
+    const response = await fetch(`${baseUrl()}/auth/v1/user`, { headers: headers(session.access_token), cache: 'no-store' });
+    if (!response.ok) throw new Error('ログイン状態を確認できません。いいね状態を再読み込みしてください。');
+    const user = await response.json();
+    const stillSaved = JSON.parse(localStorage.getItem(sessionKey) || 'null');
+    const current = stillSaved?.currentSession && typeof stillSaved.currentSession === 'object' ? stillSaved.currentSession : stillSaved;
+    if (!UUID.test(String(user?.id || '')) || user.is_anonymous || (initial.user_id && initial.user_id !== user.id) || current?.access_token !== initial.access_token || current?.refresh_token !== initial.refresh_token) return null;
+    session.user_id = user.id;
+    // Keep future ownership checks on the refreshed token, but only after confirming the
+    // original session remained present throughout refresh and user verification.
+    localStorage.setItem(sessionKey, JSON.stringify(session));
+    return { access_token: session.access_token, user_id: user.id };
   }
   let session = readSession();
   if (!session) return null;
+  const initialToken = session.access_token;
+  const initialRefreshToken = session.refresh_token;
   if (session.expires_at && Number(session.expires_at) * 1000 <= Date.now() + 30_000) {
-    session = await refreshSession(session);
+    session = await refreshSession(session, { persist: false });
     if (!session?.access_token) throw new Error('ログイン状態を確認できません。いいね状態を再読み込みしてください。');
   }
   const response = await fetch(`${baseUrl()}/auth/v1/user`, { headers: headers(session.access_token), cache: 'no-store' });
   if (!response.ok) throw new Error('ログイン状態を確認できません。いいね状態を再読み込みしてください。');
   const user = await response.json();
   if (!UUID.test(String(user?.id || ''))) throw new Error('ログイン状態を確認できません。いいね状態を再読み込みしてください。');
+  const stillSaved = readSession();
+  if (stillSaved?.access_token !== initialToken || stillSaved?.refresh_token !== initialRefreshToken) return null;
   session.user_id = user.id;
-  saveSession(session);
+  // Preserve a refreshed active session only after confirming logout did not remove or replace it.
+  if (session.access_token !== initialToken) saveSession(session);
+  else { session.user_id = user.id; saveSession(session); }
   return { access_token: session.access_token, user_id: user.id };
+}
+
+async function ownershipRows(path, filters, accessToken, columns) {
+  const url = new URL(`${baseUrl()}/rest/v1/${encodeURIComponent(path)}`);
+  url.searchParams.set('select', columns);
+  for (const [key, value] of Object.entries(filters)) url.searchParams.set(key, `eq.${value}`);
+  url.searchParams.set('limit', '2');
+  const response = await fetch(url, { headers: headers(accessToken), cache: 'no-store' });
+  if (!response.ok) throw new Error('ownership lookup failed');
+  const rows = await response.json();
+  if (!Array.isArray(rows) || rows.length !== 1 || !rows[0] || typeof rows[0] !== 'object') throw new Error('ambiguous ownership lookup');
+  return rows[0];
+}
+
+function sourcePostId(source) {
+  const postId = String(source?.postId || '');
+  const map = /^map:([A-Za-z0-9_-]{1,128})$/.exec(postId);
+  const showcase = /^showcase:([A-Za-z0-9_-]{1,128})$/.exec(postId);
+  const pixfind = /^pixfind:([A-Za-z0-9_-]{1,128}):([A-Za-z0-9_-]{1,128})$/.exec(postId);
+  if (map) return { type: 'map', postId: map[1] };
+  if (showcase) return { type: 'showcase', postId: showcase[1] };
+  if (pixfind) return { type: 'pixfind', postId: pixfind[1], puzzleId: pixfind[2] };
+  return null;
+}
+
+/** Verify a public reference against the current authenticated owner's published rows. Read only. */
+export async function verifyPublicWorkOwnership(source) {
+  const parsed = sourcePostId(source);
+  if (!configured() || !parsed || typeof source?.url !== 'string' || !source.url) return false;
+  try {
+    const session = await getExistingLikeSession();
+    if (!session?.access_token || !UUID.test(String(session.user_id || ''))) return false;
+    let imagePath = '';
+    if (parsed.type === 'map') {
+      const post = await ownershipRows('user_posts', { id: parsed.postId }, session.access_token, 'id,author_id,status');
+      if (post.id !== parsed.postId || post.author_id !== session.user_id || post.status !== 'published') return false;
+      const point = await ownershipRows('post_map_points', { post_id: parsed.postId }, session.access_token, 'post_id,public_image_path,published_at');
+      if (point.post_id !== parsed.postId || !point.published_at) return false;
+      imagePath = point.public_image_path;
+    } else if (parsed.type === 'showcase') {
+      const post = await ownershipRows('social_posts', { id: parsed.postId }, session.access_token, 'id,creator_user_id,status,post_kind,distribution_mode,media_object_path');
+      if (post.id !== parsed.postId || post.creator_user_id !== session.user_id || post.status !== 'published' || post.post_kind !== 'image' || post.distribution_mode !== 'showcase') return false;
+      imagePath = socialImageUrl(post.media_object_path);
+    } else {
+      if (source.puzzleId !== parsed.puzzleId) return false;
+      const post = await ownershipRows('social_posts', { id: parsed.postId }, session.access_token, 'id,creator_user_id,status,post_kind,distribution_mode,pixfind_puzzle_id');
+      if (post.id !== parsed.postId || post.creator_user_id !== session.user_id || post.status !== 'published' || post.post_kind !== 'pixfind' || post.distribution_mode !== 'pixfind' || post.pixfind_puzzle_id !== parsed.puzzleId) return false;
+      const puzzle = await ownershipRows('pixfind_puzzles', { id: parsed.puzzleId }, session.access_token, 'id,original_url');
+      if (puzzle.id !== parsed.puzzleId || typeof puzzle.original_url !== 'string' || puzzle.original_url !== source.url || !isSafeJigsawPixfindOriginalUrl(source.url, baseUrl(), parsed.puzzleId)) return false;
+      imagePath = '';
+    }
+    if (parsed.type === 'map' && (!imagePath || imageUrl(imagePath) !== source.url)) return false;
+    if (parsed.type === 'showcase' && (!imagePath || imagePath !== source.url)) return false;
+    const current = await getExistingLikeSession();
+    return current?.user_id === session.user_id && current?.access_token === session.access_token;
+  } catch { return false; }
 }
 
 async function loadMyLikes() {
