@@ -1,0 +1,91 @@
+/* かんたんドット — few words, big friendly controls. Layout rows stay creation-draw.css's; this is the look. */
+body[data-page="draw"] { background: #eef0ea; }
+body[data-page="draw"] .draw-page { gap: 6px; }
+
+/* ---- top: name + size ---- */
+body[data-page="draw"] .draw-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; }
+body[data-page="draw"] .draw-heading h1 { display: flex; align-items: center; gap: 8px; margin: 0; color: #17232d; font-size: 1.05rem; font-weight: 900; letter-spacing: .04em; white-space: nowrap; }
+.draw-logo { width: 22px; height: 22px; border-radius: 6px; background:
+  linear-gradient(#e75445 0 0) 3px 3px / 7px 7px no-repeat, linear-gradient(#ffe066 0 0) 12px 3px / 7px 7px no-repeat,
+  linear-gradient(#4c82c3 0 0) 3px 12px / 7px 7px no-repeat, linear-gradient(#6d9b68 0 0) 12px 12px / 7px 7px no-repeat, #17232d; }
+.draw-size-seg { display: inline-flex; gap: 3px; padding: 3px; border-radius: 14px; background: #15202b; box-shadow: 0 3px 0 rgba(0,0,0,.25); }
+.draw-size-seg button { min-width: 44px; min-height: 36px; padding: 0 8px; border: 0; border-radius: 11px; background: transparent; color: rgba(255,255,255,.72); font: 900 .86rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; cursor: pointer; transition: background .15s, color .15s, transform .12s cubic-bezier(.2,1.3,.4,1); }
+.draw-size-seg button[aria-checked="true"] { background: #ffd35a; color: #17232d; box-shadow: 0 2px 0 #b88f1d; }
+.draw-size-seg button:active { transform: translateY(2px); }
+.draw-size-seg button:focus-visible { outline: 3px solid #ffd35a; outline-offset: 2px; }
+body[data-page="draw"] .draw-heading .draw-size { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip-path: inset(50%) !important; white-space: nowrap; margin: 0; padding: 0; border: 0; }
+
+/* ---- messages float over the canvas and fade ---- */
+body[data-page="draw"] .draw-meta { position: relative; z-index: 6; height: 0; min-height: 0; margin: 0; padding: 0; overflow: visible; }
+body[data-page="draw"] .draw-size-label { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); margin: 0; }
+body[data-page="draw"] #draw-status { position: absolute; left: 50%; top: 8px; max-width: min(92%, 420px); margin: 0; padding: 7px 14px; border-radius: 999px; background: rgba(21,32,43,.9); color: #fff; font-size: .76rem; font-weight: 700; line-height: 1.35; text-align: center; white-space: normal; transform: translate(-50%, -6px); opacity: 0; pointer-events: none; transition: opacity .25s, transform .25s; box-shadow: 0 8px 20px rgba(0,0,0,.2); }
+body[data-page="draw"] #draw-status.is-show { opacity: 1; transform: translate(-50%, 0); }
+body[data-page="draw"] #draw-zoom-label { position: absolute; right: 8px; top: 8px; padding: 3px 8px; border-radius: 999px; background: rgba(21,32,43,.78); color: #fff; font: 900 .7rem/1 ui-monospace, monospace; opacity: 0; transition: opacity .2s; pointer-events: none; }
+body[data-page="draw"] #draw-zoom-label.is-zoomed { opacity: 1; }
+
+/* ---- the canvas: a soft stage, grid lines, a cell cursor, the mirror axis ---- */
+body[data-page="draw"] .draw-board { position: relative; border-radius: 20px; background: #dfe3da; box-shadow: inset 0 0 0 3px #15202b, inset 0 8px 20px rgba(21,32,43,.12); overflow: hidden; }
+body[data-page="draw"] #draw-canvas { cursor: crosshair; box-shadow: 0 6px 18px rgba(21,32,43,.18); background: repeating-conic-gradient(#e9ece5 0 25%, #fbfbf8 0 50%) 0 0 / calc(200% / var(--cols, 16)) calc(200% / var(--rows, 16)) !important; }
+body[data-page="draw"] #draw-canvas[data-tool="picker"] { cursor: copy; }
+.draw-grid { position: absolute; z-index: 2; display: none; pointer-events: none;
+  background-image: linear-gradient(to right, rgba(23,35,45,.16) 1px, transparent 1px), linear-gradient(to bottom, rgba(23,35,45,.16) 1px, transparent 1px);
+  background-size: calc(100% / var(--cols, 16)) calc(100% / var(--rows, 16)); box-shadow: inset -1px -1px 0 rgba(23,35,45,.16); }
+.draw-grid.is-fine { background-image: linear-gradient(to right, rgba(23,35,45,.09) 1px, transparent 1px), linear-gradient(to bottom, rgba(23,35,45,.09) 1px, transparent 1px); }
+.draw-board.has-grid .draw-grid, .draw-board.is-mirror .draw-grid { display: block; }
+.draw-board.is-mirror:not(.has-grid) .draw-grid { background-image: none; box-shadow: none; }
+.draw-board.is-mirror .draw-grid::after { content: ""; position: absolute; top: -4px; bottom: -4px; left: calc(50% - 1px); width: 2px; background: repeating-linear-gradient(to bottom, #ffd35a 0 6px, transparent 6px 10px); }
+.draw-cursor { position: absolute; z-index: 3; box-sizing: border-box; pointer-events: none; border: 2px solid #fff; border-radius: 2px; background: var(--draw-color, transparent); box-shadow: 0 0 0 1px #15202b, 0 2px 6px rgba(0,0,0,.25); opacity: .85; transition: left .04s linear, top .04s linear; }
+.draw-cursor[data-tool="eraser"] { border-style: dashed; background: rgba(255,255,255,.35); }
+.draw-cursor[data-tool="picker"] { border-radius: 50%; background: transparent; }
+.draw-cursor-twin { opacity: .45; }
+.draw-cursor[hidden] { display: none; }
+
+/* ---- colours: the chosen one large on the left, the 16 as pressable tiles ---- */
+body[data-page="draw"] .draw-control-row { display: grid !important; grid-template-columns: 52px minmax(0, 1fr); align-items: center; gap: 10px; }
+.draw-current { position: relative; width: 52px; height: 52px; border-radius: 14px; background: #1d2b38; box-shadow: 0 3px 0 rgba(0,0,0,.45); }
+.draw-current span { position: absolute; inset: 7px; border-radius: 9px; background: var(--draw-color, #e75445); box-shadow: inset 0 0 0 2px rgba(255,255,255,.35), 0 0 0 2px #ffd35a; transition: background .15s; }
+.draw-current.is-clear span { background: repeating-conic-gradient(#cfd4cc 0 25%, #fff 0 50%) 0 0 / 12px 12px; }
+body[data-page="draw"] .draw-palette .draw-color { border: 2px solid rgba(255,255,255,.22); border-radius: 9px !important; box-shadow: 0 3px 0 rgba(0,0,0,.45); transition: transform .12s cubic-bezier(.2,1.3,.4,1), box-shadow .12s; }
+body[data-page="draw"] .draw-palette .draw-color--transparent { background: repeating-conic-gradient(#cfd4cc 0 25%, #fff 0 50%) 0 0 / 10px 10px; }
+body[data-page="draw"] .draw-palette .draw-color[aria-pressed="true"] { border-color: #fff; transform: translateY(-3px) scale(1.08); box-shadow: 0 0 0 3px #ffd35a, 0 5px 0 rgba(0,0,0,.45); }
+body[data-page="draw"] .draw-palette .draw-color:active { transform: translateY(2px); }
+
+/* ---- tools: icons only ---- */
+body[data-page="draw"] .draw-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
+body[data-page="draw"] .draw-tools, body[data-page="draw"] .draw-toggles, body[data-page="draw"] .draw-actions { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; }
+body[data-page="draw"] .draw-tools button, body[data-page="draw"] .draw-toggles button, body[data-page="draw"] .draw-actions button, body[data-page="draw"] .draw-import > summary {
+  display: grid; place-items: center; width: 42px; height: 42px; min-height: 0 !important; padding: 0 !important; border: 0 !important; border-radius: 13px !important; background: #1d2b38 !important; color: #fff !important; box-shadow: 0 3px 0 rgba(0,0,0,.45); cursor: pointer; list-style: none; transition: transform .12s cubic-bezier(.2,1.3,.4,1), box-shadow .12s, background .15s; }
+body[data-page="draw"] .draw-import > summary::-webkit-details-marker { display: none; }
+body[data-page="draw"] .draw-toolbar svg, body[data-page="draw"] .draw-actions svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+body[data-page="draw"] .draw-tools button[aria-pressed="true"] { background: #ffd35a !important; color: #17232d !important; box-shadow: 0 3px 0 #b88f1d; transform: translateY(-2px); }
+body[data-page="draw"] .draw-toggles button[aria-pressed="true"] { background: #8ecdf0 !important; color: #17232d !important; box-shadow: 0 3px 0 #4f8fb3; }
+body[data-page="draw"] .draw-tools button:active, body[data-page="draw"] .draw-toggles button:active, body[data-page="draw"] .draw-actions button:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 0 0 rgba(0,0,0,.45); }
+body[data-page="draw"] .draw-actions { justify-content: space-between; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.08); }
+body[data-page="draw"] .draw-actions button:disabled { opacity: .35; }
+body[data-page="draw"] #draw-clear { color: #ff9c8f !important; }
+body[data-page="draw"] #draw-to-globe { color: #ffd35a !important; box-shadow: 0 3px 0 rgba(0,0,0,.45), inset 0 0 0 2px rgba(255,211,90,.55); }
+
+/* ---- "open" sheet ---- */
+body[data-page="draw"] .draw-import { position: relative; margin: 0; }
+body[data-page="draw"] .draw-import[open] > summary { background: #ffd35a !important; color: #17232d !important; }
+body[data-page="draw"] .draw-import__options { position: fixed; left: 50%; bottom: calc(100px + env(safe-area-inset-bottom)); z-index: 80; display: grid; gap: 6px; width: min(calc(100vw - 32px), 360px); max-height: calc(100dvh - 180px); overflow-y: auto; padding: 12px; border-radius: 18px; background: #15202b; box-shadow: 0 18px 40px rgba(0,0,0,.4); transform: translateX(-50%); }
+body[data-page="draw"] .draw-import__options > button, body[data-page="draw"] .draw-import__options button { width: 100% !important; height: auto !important; min-height: 44px !important; padding: 8px 12px !important; border-radius: 12px !important; font-size: .82rem; font-weight: 900; text-align: left; display: block !important; }
+body[data-page="draw"] .draw-import > p { display: none; }
+
+@media (max-height: 620px) {
+  body[data-page="draw"] .draw-current { width: 40px; height: 40px; } body[data-page="draw"] .draw-control-row { grid-template-columns: 40px minmax(0, 1fr); }
+  body[data-page="draw"] .draw-tools button, body[data-page="draw"] .draw-toggles button, body[data-page="draw"] .draw-actions button, body[data-page="draw"] .draw-import > summary { width: 36px; height: 36px; border-radius: 11px !important; }
+  body[data-page="draw"] .draw-toolbar, body[data-page="draw"] .draw-actions { margin-top: 5px; } body[data-page="draw"] .draw-actions { padding-top: 5px; }
+  .draw-size-seg button { min-height: 32px; min-width: 38px; }
+}
+/* short landscape: the controls sit in a narrow column, so the tools wrap and shrink */
+@media (max-height: 400px) and (min-width: 480px) {
+  body[data-page="draw"] .draw-control-row { grid-template-columns: 30px minmax(0, 1fr); gap: 6px; }
+  body[data-page="draw"] .draw-current { width: 30px; height: 30px; border-radius: 9px; } body[data-page="draw"] .draw-current span { inset: 4px; border-radius: 6px; }
+  body[data-page="draw"] .draw-toolbar { flex-wrap: wrap; justify-content: flex-start; gap: 4px; }
+  body[data-page="draw"] .draw-tools, body[data-page="draw"] .draw-toggles, body[data-page="draw"] .draw-actions { flex-wrap: wrap; gap: 4px; justify-content: flex-start; }
+  body[data-page="draw"] .draw-tools button, body[data-page="draw"] .draw-toggles button, body[data-page="draw"] .draw-actions button, body[data-page="draw"] .draw-import > summary { width: 32px; height: 32px; border-radius: 10px !important; }
+  body[data-page="draw"] .draw-toolbar svg, body[data-page="draw"] .draw-actions svg { width: 18px; height: 18px; }
+  body[data-page="draw"] .draw-import__options { bottom: auto; top: 12px; max-height: calc(100dvh - 24px); }
+}
+@media (prefers-reduced-motion: reduce) { body[data-page="draw"] * { transition: none !important; } }

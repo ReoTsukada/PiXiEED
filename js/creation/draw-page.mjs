@@ -26,6 +26,7 @@ function getLastDraftId() { try { return globalThis.localStorage?.getItem(LAST_D
 function setLastDraftId(value) { try { globalThis.localStorage?.setItem(LAST_DRAFT_KEY, value); return true; } catch { return false; } }
 function setCanvasDimensions() {
   pixelSurface.resize(documentData.width, documentData.height);
+  requestAnimationFrame(() => { placeOverlays(); syncSizeButtons(); showCurrentColor(); });
   canvas.style.aspectRatio = `${documentData.width} / ${documentData.height}`;
   canvas.style.setProperty('--draw-aspect', `${documentData.width} / ${documentData.height}`);
   canvasPrepared = true;
@@ -52,10 +53,14 @@ function renderPalette() {
     button.addEventListener('click', (event) => chooseColor(index, event.currentTarget)); palette.append(button);
   });
 }
+function showCurrentColor() {
+  const chip = $('.draw-current'); if (!chip) return;
+  chip.classList.toggle('is-clear', selectedColor < 0); chip.style.setProperty('--draw-color', selectedColor < 0 ? 'transparent' : documentData.palette[selectedColor]);
+}
 function chooseColor(index, sourceElement) {
   const penButton = document.querySelector('[data-draw-tool="pen"]');
   interactionEffects.color({ from: sourceElement, to: penButton, color: index < 0 ? '#fff' : documentData.palette[index] });
-  selectedColor = index; tool = 'pen';
+  selectedColor = index; tool = 'pen'; showCurrentColor();
   document.querySelectorAll('.draw-color').forEach((node) => node.setAttribute('aria-pressed', String(Number(node.dataset.colorIndex) === index)));
   document.querySelectorAll('[data-draw-tool]').forEach((node) => node.setAttribute('aria-pressed', String(node.dataset.drawTool === 'pen')));
 }
@@ -63,7 +68,7 @@ function chooseColor(index, sourceElement) {
 let fitNotice = '';
 function fitToSimple(nextDocument) {
   const fitted = toSimpleDrawDocument(nextDocument);
-  fitNotice = fitted.changed ? `かんたんドット絵に合わせて${fitted.resized ? `${fitted.document.width}×${fitted.document.height}px・` : ''}16色にしました。元の絵はそのまま残っています。` : '';
+  fitNotice = fitted.changed ? `${fitted.resized ? `${fitted.document.width}×${fitted.document.height}px` : ''}${fitted.resized && fitted.recolored ? '・' : ''}${fitted.recolored ? '16色' : ''}に合わせました（元の絵はそのまま）` : '';
   return fitted.document;
 }
 function replaceDocument(nextDocument, nextSource = source, { fromPxd = false } = {}) {
@@ -85,7 +90,35 @@ function pointFromEvent(event) {
 function updateCanvasView() {
   canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
   $('#draw-zoom-label').textContent = `${Math.round(zoom * 100)}%`;
+  $('#draw-zoom-label').classList.toggle('is-zoomed', zoom > 1.01);
+  placeOverlays();
 }
+function placeOverlays() {
+  const board = $('.draw-board'); const grid = $('.draw-grid'); if (!board || !grid) return;
+  const b = board.getBoundingClientRect(); const r = canvas.getBoundingClientRect();
+  Object.assign(grid.style, { left: `${r.left - b.left}px`, top: `${r.top - b.top}px`, width: `${r.width}px`, height: `${r.height}px` });
+  for (const node of [grid, canvas]) { node.style.setProperty('--cols', documentData.width); node.style.setProperty('--rows', documentData.height); }
+  grid.classList.toggle('is-fine', r.width / documentData.width < 6);
+}
+function showCursor(event) {
+  const cursor = $('.draw-cursor'); if (!cursor) return;
+  if (event.pointerType === 'touch' && !drawing) { cursor.hidden = true; return; }
+  const p = pointFromEvent(event);
+  if (p.x < 0 || p.y < 0 || p.x >= documentData.width || p.y >= documentData.height) { cursor.hidden = true; return; }
+  const board = $('.draw-board').getBoundingClientRect(); const r = canvas.getBoundingClientRect(); const cw = r.width / documentData.width; const ch = r.height / documentData.height;
+  Object.assign(cursor.style, { left: `${r.left - board.left + p.x * cw}px`, top: `${r.top - board.top + p.y * ch}px`, width: `${cw}px`, height: `${ch}px` });
+  cursor.style.setProperty('--draw-color', tool === 'eraser' || selectedColor < 0 ? 'transparent' : documentData.palette[selectedColor] || 'transparent');
+  cursor.dataset.tool = tool; cursor.hidden = false;
+  const twin = $('.draw-cursor-twin');
+  if (mirror && twin) { Object.assign(twin.style, { left: `${r.left - board.left + (documentData.width - 1 - p.x) * cw}px`, top: cursor.style.top, width: cursor.style.width, height: cursor.style.height }); twin.hidden = false; } else if (twin) twin.hidden = true;
+}
+canvas.addEventListener('pointerleave', () => { if (!drawing) { $('.draw-cursor').hidden = true; const twin = $('.draw-cursor-twin'); if (twin) twin.hidden = true; } });
+// ---- short messages float over the canvas and fade (the status line keeps the full text for screen readers) ----
+let toastTimer = 0;
+function toast(message) { status.textContent = message; }
+const QUIET = new Set(['編集中です。保存すると端末に残ります。', '新しい絵を準備しています。']);
+new MutationObserver(() => { if (QUIET.has(status.textContent.trim())) return; status.classList.add('is-show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => status.classList.remove('is-show'), 2600); }).observe(status, { childList: true, characterData: true, subtree: true });
+new ResizeObserver(() => placeOverlays()).observe($('.draw-board'));
 function pointerPair() { return [...activePointers.values()].slice(0, 2); }
 function startPinch() {
   if (drawing && strokeStartPixels) {
@@ -95,6 +128,24 @@ function startPinch() {
   pinchStart = { distance: Math.hypot(a.x - b.x, a.y - b.y), zoom, panX, panY, centerX: (a.x + b.x) / 2, centerY: (a.y + b.y) / 2 };
 }
 function selectedPixelValue() { return tool === 'eraser' ? -1 : selectedColor; }
+// ---- drawing helpers: a mirror copy of every mark, the straight line, the colour picker ----
+let mirror = false; let lineStart = null;
+const mirrored = (point) => ({ x: documentData.width - 1 - point.x, y: point.y });
+function markSegment(from, to, value) {
+  const changed = [...strokePixels(documentData, from, to, value)];
+  if (mirror) changed.push(...strokePixels(documentData, mirrored(from), mirrored(to), value));
+  return changed;
+}
+function pickColorAt(point) {
+  if (point.x < 0 || point.y < 0 || point.x >= documentData.width || point.y >= documentData.height) return;
+  const value = documentData.pixels[point.y * documentData.width + point.x];
+  const button = document.querySelector(`.draw-color[data-color-index="${value}"]`);
+  chooseColor(value, button); setTool('pen'); toast(value < 0 ? '透明をとりました' : 'この色をとりました');
+}
+function setTool(next) {
+  tool = next; document.querySelectorAll('[data-draw-tool]').forEach((node) => node.setAttribute('aria-pressed', String(node.dataset.drawTool === next)));
+  canvas.dataset.tool = next;
+}
 canvas.addEventListener('pointerdown', (event) => {
   if (event.button !== undefined && event.button !== 0) return;
   event.preventDefault(); canvas.setPointerCapture(event.pointerId);
@@ -102,8 +153,12 @@ canvas.addEventListener('pointerdown', (event) => {
   if (event.pointerType === 'touch' && activePointers.size >= 2) { startPinch(); return; }
   if (activePointers.size > 1) return;
   drawing = true; const touchedPoint = pointFromEvent(event); previousPoint = touchedPoint;
-  if (tool === 'fill') { commitChange((next) => floodFill(next, previousPoint.x, previousPoint.y, selectedPixelValue())); drawing = false; previousPoint = null; }
-  else { strokeStartPixels = [...documentData.pixels]; const changed = strokePixels(documentData, previousPoint, previousPoint, selectedPixelValue()); saved = false; paint(changed); }
+  if (tool === 'picker') { pickColorAt(touchedPoint); drawing = false; previousPoint = null; return; }
+  if (tool === 'fill') {
+    commitChange((next) => { const a = [...floodFill(next, previousPoint.x, previousPoint.y, selectedPixelValue())]; if (mirror) { const m = mirrored(previousPoint); a.push(...floodFill(next, m.x, m.y, selectedPixelValue())); } return a; });
+    drawing = false; previousPoint = null;
+  } else if (tool === 'line') { strokeStartPixels = [...documentData.pixels]; lineStart = touchedPoint; const changed = markSegment(lineStart, touchedPoint, selectedPixelValue()); saved = false; paint(changed); }
+  else { strokeStartPixels = [...documentData.pixels]; const changed = markSegment(previousPoint, previousPoint, selectedPixelValue()); saved = false; paint(changed); }
 });
 canvas.addEventListener('pointermove', (event) => {
   if (activePointers.has(event.pointerId)) activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
@@ -114,13 +169,15 @@ canvas.addEventListener('pointermove', (event) => {
     panX = pinchStart.panX + centerX - pinchStart.centerX; panY = pinchStart.panY + centerY - pinchStart.centerY;
     updateCanvasView(); return;
   }
-  if (!drawing || tool === 'fill') return;
+  showCursor(event);
+  if (!drawing || tool === 'fill' || tool === 'picker') return;
   const point = pointFromEvent(event); if (point.x === previousPoint.x && point.y === previousPoint.y) return;
-  const changed = strokePixels(documentData, previousPoint, point, selectedPixelValue()); previousPoint = point; saved = false; paint(changed);
+  if (tool === 'line') { documentData.pixels = [...strokeStartPixels]; markSegment(lineStart, point, selectedPixelValue()); previousPoint = point; paint(); return; }
+  const changed = markSegment(previousPoint, point, selectedPixelValue()); previousPoint = point; saved = false; paint(changed);
 });
 function endStroke() {
   if (drawing && strokeStartPixels && tool !== 'fill') { finishDrawStroke(documentData, history, strokeStartPixels); strokeStartPixels = null; paint(); }
-  drawing = false; previousPoint = null;
+  drawing = false; previousPoint = null; lineStart = null;
 }
 function releasePointer(event) {
   activePointers.delete(event.pointerId);
@@ -139,13 +196,22 @@ sizeSelect.value = String(DRAW_SIZE);
 sizeSelect.addEventListener('change', () => {
   sizeWasChosen = true;
   const previousSize = documentData.width; const size = Number(sizeSelect.value);
-  try { replaceDocument(resizeDrawDocument(documentData, size)); status.textContent = `${previousSize}×${previousSize}から${size}×${size}pxへ変更しました。画素は最近傍方式で拡大・縮小し、透明部分も保ちます。`; }
+  try { replaceDocument(resizeDrawDocument(documentData, size)); status.textContent = `${size}×${size}にしました`; }
   catch (error) { status.textContent = `サイズを変更できませんでした：${error.message}`; sizeSelect.value = String(previousSize); }
 });
 renderPalette();
-document.querySelectorAll('[data-draw-tool]').forEach((button) => button.addEventListener('click', () => {
-  tool = button.dataset.drawTool; document.querySelectorAll('[data-draw-tool]').forEach((node) => node.setAttribute('aria-pressed', String(node === button)));
-}));
+document.querySelectorAll('[data-draw-tool]').forEach((button) => button.addEventListener('click', () => setTool(button.dataset.drawTool)));
+// ---- mirror and grid toggles ----
+const mirrorButton = $('#draw-mirror'); const gridButton = $('#draw-grid-toggle');
+mirrorButton?.addEventListener('click', () => { mirror = !mirror; mirrorButton.setAttribute('aria-pressed', String(mirror)); $('.draw-board')?.classList.toggle('is-mirror', mirror); placeOverlays(); toast(mirror ? '左右対称で描きます' : '左右対称をやめました'); });
+let showGrid = true; try { showGrid = localStorage.getItem('pixieed:draw:grid') !== 'off'; } catch { /* private mode */ }
+function syncGrid() { gridButton?.setAttribute('aria-pressed', String(showGrid)); $('.draw-board')?.classList.toggle('has-grid', showGrid); }
+gridButton?.addEventListener('click', () => { showGrid = !showGrid; try { localStorage.setItem('pixieed:draw:grid', showGrid ? 'on' : 'off'); } catch { /* private mode */ } syncGrid(); });
+syncGrid();
+// ---- size buttons drive the page's own size control ----
+const sizeButtons = [...document.querySelectorAll('[data-draw-size]')];
+function syncSizeButtons() { for (const b of sizeButtons) b.setAttribute('aria-checked', String(Number(b.dataset.drawSize) === documentData.width && documentData.width === documentData.height)); }
+for (const b of sizeButtons) b.addEventListener('click', () => { if (sizeSelect.value === b.dataset.drawSize && documentData.width === Number(b.dataset.drawSize)) return; sizeSelect.value = b.dataset.drawSize; sizeSelect.dispatchEvent(new Event('change')); });
 $('#draw-undo').addEventListener('click', () => { if (history.undo()) { saved = false; paint(); } });
 $('#draw-redo').addEventListener('click', () => { if (history.redo()) { saved = false; paint(); } });
 $('#draw-clear').addEventListener('click', () => commitChange((next) => { next.pixels.fill(-1); return null; }));
@@ -158,9 +224,9 @@ async function saveRevision() {
     const revision = await store.save({ draftId, kind: 'pixel_art', document: snapshot, source: structuredClone(source) });
     activeDraftId = draftId; saved = true;
     if (!setLastDraftId(draftId)) { status.textContent = '絵は端末に保存しましたが、再開用の目印を残せませんでした。'; }
-    else status.textContent = '端末に保存しました。いつでも再開できます。';
+    else status.textContent = '保存しました';
     if (pxdBridge?.currentProject || pxdBridge?.heldProject) {
-      try { await pxdBridge.save(); status.textContent = '絵を端末に保存し、PXD作品も更新しました。'; }
+      try { await pxdBridge.save(); status.textContent = '保存しました（PXD作品も更新）'; }
       catch (error) { status.textContent = `絵は端末に保存しましたが、PXD更新に失敗しました：${error.message}`; }
     }
     resumeButton.hidden = false; $('#draw-copy-last').hidden = false;
@@ -193,7 +259,7 @@ async function loadLastDraft({ copy = false } = {}) {
     const nextSource = copy ? { type: 'local_draft_copy', assetId: revision.asset.assetId, revisionId: revision.revisionId, sourceDraftId: draftId, parentSource: revision.asset.source } : revision.asset.source;
     documentData = fitToSimple(structuredClone(revision.document)); source = nextSource; activeDraftId = copy ? null : draftId; history = createDrawHistory(documentData); saved = !copy && !fitNotice;
     renderPalette(); sizeSelect.value = String(documentData.width); setCanvasDimensions(); paint();
-    status.textContent = `${copy ? '複製を始めました。元の保存版はそのまま残ります。' : '前回の絵を開きました。'}${fitNotice ? ` ${fitNotice}` : ''}`;
+    status.textContent = `${copy ? '複製しました' : 'ひらきました'}${fitNotice ? ` ${fitNotice}` : ''}`;
   } catch (error) { status.textContent = `${copy ? '複製できませんでした' : '開けませんでした'}：${error.message}`; }
   finally { resumeButton.disabled = false; $('#draw-copy-last').disabled = false; }
 }
@@ -208,7 +274,7 @@ async function importImage(file, importSource) {
     const targetSize = sizeWasChosen ? Number(sizeSelect.value) : Math.max(Number(sizeSelect.value), nativeFit);
     const imported = createImportedDrawDocument(image, targetSize);
     replaceDocument(imported.document, importSource); fitNotice = '';
-    status.textContent = `${imported.sourceWidth}×${imported.sourceHeight}pxから${imported.copiedWidth}×${imported.copiedHeight}pxを複製し、16色に合わせました。余白は透明です。`;
+    status.textContent = `${imported.copiedWidth}×${imported.copiedHeight}・${documentData.palette.length}色で読み込みました`;
   } catch (error) { status.textContent = `画像を複製できませんでした：${error.message}`; }
   finally { $('#draw-import-local').disabled = false; $('#draw-import-file').value = ''; }
 }

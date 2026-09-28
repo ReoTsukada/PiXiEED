@@ -212,7 +212,7 @@ test('draw workspace prioritizes the canvas and supports touch zoom gestures acc
   assert.match(page, /translate\(\$\{panX\}px, \$\{panY\}px\) scale\(\$\{zoom\}\)/);
 });
 
-test('かんたんドット絵: 16 fixed colours, up to 64px, and anything larger or more colourful is fitted without touching the original', async () => {
+test('かんたんドット: 16 fixed colours, up to 64px, and anything larger or more colourful is fitted without touching the original', async () => {
   const core = await import('../../js/creation/draw-core.mjs');
   assert.equal(core.DRAW_PALETTE.length, 16); assert.deepEqual([...core.DRAW_PALETTE_ORDER].sort((a, b) => a - b), [...Array(16).keys()]);
   assert.deepEqual([...core.SIMPLE_DRAW_SIZES], [16, 32, 64]);
@@ -220,12 +220,16 @@ test('かんたんドット絵: 16 fixed colours, up to 64px, and anything large
   // an older 7-colour save keeps the same colours in the same slots
   const old = core.createDrawDocument(16); old.palette = old.palette.slice(0, 7); old.pixels[3] = 6;
   const fittedOld = core.toSimpleDrawDocument(old); assert.equal(fittedOld.document.pixels[3], 6); assert.equal(fittedOld.recolored, false); assert.equal(old.palette.length, 7, 'the original is untouched');
-  // a 128px, off-palette drawing becomes 64px in the 16 colours; translucent colours become transparent
-  const big = core.createDrawDocument(128); big.palette = ['#ff0000', '#00ff0040']; big.pixels.fill(0); for (const i of [0, 1, 128, 129]) big.pixels[i] = 1;
+  // a 128px drawing with more than 16 colours becomes 64px in the 16 colours; translucent colours become transparent
+  const many = ['#ff0000', '#00ff0040', ...Array.from({ length: 18 }, (_, i) => `#${(i * 13).toString(16).padStart(2, '0')}8844`)];
+  const big = core.createDrawDocument(128); big.palette = many; big.pixels.fill(0); for (const i of [0, 1, 128, 129]) big.pixels[i] = 1;
   const fitted = core.toSimpleDrawDocument(big);
-  assert.deepEqual([fitted.document.width, fitted.document.height, fitted.resized, fitted.changed], [64, 64, true, true]);
+  assert.deepEqual([fitted.document.width, fitted.document.height, fitted.resized, fitted.recolored], [64, 64, true, true]);
   assert.equal(fitted.document.palette.length, 16); assert.equal(fitted.document.pixels[0], -1); assert.equal(fitted.document.pixels[1], 2, 'pure red maps to the palette red');
   assert.equal(big.width, 128, 'the original is untouched');
+  // a picture with its own few colours (e.g. linked to a song) keeps them exactly
+  const song = core.createDrawDocument(32); song.palette = ['#14283c', '#506478', '#8ca0b4']; song.pixels[5] = 2;
+  const kept = core.toSimpleDrawDocument(song); assert.deepEqual(kept.document.palette, song.palette); assert.equal(kept.recolored, false); assert.equal(kept.changed, false); assert.equal(kept.document.pixels[5], 2);
   const page = await import('node:fs/promises').then((fs) => fs.readFile(new URL('../../js/creation/draw-page.mjs', import.meta.url), 'utf8'));
   assert.match(page, /SIMPLE_DRAW_SIZES\.forEach/); assert.match(page, /fitToSimple\(structuredClone\(revision\.document\)\)/);
 });

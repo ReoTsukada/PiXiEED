@@ -204,9 +204,14 @@ export function toSimpleDrawDocument(document) {
   const scale = resized ? SIMPLE_DRAW_MAX / longest : 1;
   const width = resized ? Math.min(SIMPLE_DRAW_MAX, simpleSide(document.width, scale)) : document.width;
   const height = resized ? Math.min(SIMPLE_DRAW_MAX, simpleSide(document.height, scale)) : document.height;
-  const samePalette = document.palette.length === DRAW_PALETTE.length && document.palette.every((color, index) => color.toLowerCase() === DRAW_PALETTE[index]);
-  const map = samePalette ? null : document.palette.map(nearestSimpleColor);
-  const recolored = Boolean(map) && document.palette.some((color, index) => DRAW_PALETTE[map[index]]?.toLowerCase() !== color.toLowerCase().slice(0, 7) || color.length === 9);
+  // Colours: an older save that uses the first slots of the palette simply gains the rest; any other picture
+  // with 16 colours or fewer keeps its own colours exactly (so a picture linked to a song keeps its notes);
+  // only pictures with more than 16 colours are moved onto the 16 fixed colours.
+  const lower = document.palette.map((color) => color.toLowerCase());
+  const isPrefix = lower.length <= DRAW_PALETTE.length && lower.every((color, index) => color === DRAW_PALETTE[index]);
+  const keepOwn = !isPrefix && lower.length <= DRAW_PALETTE.length;
+  const map = isPrefix || keepOwn ? null : document.palette.map(nearestSimpleColor);
+  const recolored = Boolean(map);
   const pixels = new Array(width * height);
   for (let y = 0; y < height; y += 1) {
     const sy = resized ? Math.min(document.height - 1, Math.floor((y + 0.5) * document.height / height)) : y;
@@ -216,7 +221,7 @@ export function toSimpleDrawDocument(document) {
       pixels[y * width + x] = value < 0 ? -1 : map ? map[value] : value;
     }
   }
-  const next = { ...document, width, height, palette: [...DRAW_PALETTE], pixels };
+  const next = { ...document, width, height, palette: keepOwn ? [...document.palette] : [...DRAW_PALETTE], pixels };
   validateDrawDocument(next);
-  return { document: next, resized, recolored, changed: resized || !samePalette };
+  return { document: next, resized, recolored, changed: resized || recolored };
 }
