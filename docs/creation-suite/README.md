@@ -20,6 +20,7 @@
 
 ## 書類と実装順
 
+- [共通作品ファイルPXD](PXD.md)：現行の保存・原本保持・対応色の作曲・ツール間編集と検証範囲。[相互運用の見直し](INTEROPERABILITY-REVIEW.md)と[往復検証仕様](INTEROPERABILITY-HARNESS.md)の広い将来案とは分ける。
 - [検索表示・アイコン・共有カード](SEO-AND-SHARING.md)：静的SEOの検証と、作品別共有の配信方法確認。
 - [旧投稿と公開表示](legacy-posts.md)：旧 `user_posts`、旧 PiXFiND、公開状態、既存 URL、権利の移行条件。
 - [共通作品契約](asset-contract.md)：作品の固定版、派生元、権限、軽い受け渡し。

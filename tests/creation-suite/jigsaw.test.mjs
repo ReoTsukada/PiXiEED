@@ -201,21 +201,23 @@ test('slicing rejects too-small images, malformed RGBA, and unsupported grid siz
   assert.throws(() => sliceRgbaImage(imageFixture(16, 16), 5), /2×2、3×3、4×4/);
 });
 
-test('piece labels keep answers hidden and preserve direct placement and accessible alternatives', async () => {
+test('free workspace preserves source choices and avoids answer markers and fixed answer cells', async () => {
   const { readFile } = await import('node:fs/promises');
   const page = await readFile(new URL('../../jigsaw/index.html', import.meta.url), 'utf8');
   const css = await readFile(new URL('../../css/creation-jigsaw.css', import.meta.url), 'utf8');
   const script = await readFile(new URL('../../js/creation/jigsaw-page.mjs', import.meta.url), 'utf8');
   assert.match(page, /PiXiEEDの公開作品/);
-  assert.match(page, /role="group" aria-label="パズル盤面"/);
-  assert.match(script, /選択中。置き先を選ぶ/);
-  assert.match(script, /正しい場所|置き場所が違います/);
+  assert.match(page, /id="jigsaw-workspace"/);
+  assert.match(page, /<canvas[^>]*id="jigsaw-board"/);
+  assert.match(page, /id="jigsaw-rotate"/);
+  assert.match(page, /value="3"/);
+  assert.doesNotMatch(page, /3×3・9ピース/);
+  assert.doesNotMatch(script, /jigsaw-cell__result|button\[data-cell|textContent = correct \? '✓'/);
   assert.doesNotMatch(script, /正解は\$\{row\}行\$\{column\}列目/);
-  assert.match(script, /game\.pieceOrder\.indexOf\(pieceId\)/);
   assert.doesNotMatch(script, /piece\.correctCell \+ 1/);
-  assert.match(script, /beginPieceDrag\(event, button, button\.dataset\.pieceId/);
-  assert.match(script, /removeJigsawPiece\(game, drag\.origin\.cell\)/);
-  assert.match(script, /suppressClickUntil/);
+  assert.match(script, /snapJigsawGroup/);
+  assert.match(script, /rotateJigsawGroup/);
+  assert.match(script, /migrateLegacyJigsawGame/);
   assert.match(css, /height:100dvh/);
   assert.match(css, /touch-action:pan-x/);
   assert.match(script, /collectPagedRows/);

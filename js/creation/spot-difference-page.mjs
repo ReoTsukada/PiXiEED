@@ -2,6 +2,8 @@ import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-draf
 import { documentRgba } from './draw-core.mjs';
 import { detectDifferenceCandidates, excludeDifferenceCandidate, mapClientPointToPixel, mergeDifferenceCandidates, resolveLocalDrawRevision, splitDifferenceCandidate, validateSpotDifferenceDraft, confirmDifferenceCandidates } from './spot-difference-core.mjs?rev=20260927-spot-difference-1';
 import { openPuzzleHandoff } from './puzzle-handoff.mjs?rev=20260928-puzzle-handoff-1';
+import { mountPxdTools } from './pxd-ui.mjs?rev=20260928-pxd-1';
+import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20260928-pxd-puzzles-1';
 
 const DRAW_LAST_KEY = 'pixieed.simple-draw.last-draft.v1';
 const LAST_KEY = 'pixieed:creation:spot-difference:last-draft:v1';
@@ -14,6 +16,7 @@ const publishButton = $('#spot-publish');
 const selectedIds = new Set(); const splitPixels = new Set();
 const touchPoints = new Map(); let touchEditSnapshot = null;
 let adapter; let store; let draftId = null; let draft = null; let beforeRevision = null; let afterRevision = null; let sourceDraftId = null; let afterDraftId = null; let savedConfirmedDraftId = null;
+let pxdOriginalRefs = null; let pxdBridge = null;
 let splitMode = false; let activePointer = null; let previousPixel = null; let pinchStart = null; let viewScale = 1; let viewPanX = 0; let viewPanY = 0; let cursorPixel = 0;
 
 function readStorage(key) { try { return localStorage.getItem(key); } catch { return null; } }
@@ -150,6 +153,7 @@ async function start() {
     afterRevision = await resolveLocalDrawRevision(adapter, sourceDraftId, afterSelect.value);
     if (beforeRevision.revisionId === afterRevision.revisionId) throw new Error('別々の保存版を選んでください');
     const result = detectDifferenceCandidates(beforeRevision.document, afterRevision.document);
+    pxdBridge?.reset();
     draftId = null; savedConfirmedDraftId = null; selectedIds.clear(); splitPixels.clear();
     draft = { schemaVersion: 1, gameId: crypto.randomUUID(), width: result.width, height: result.height, before: reference(sourceDraftId, beforeRevision), after: reference(sourceDraftId, afterRevision), candidates: result.candidates, confirmed: false, publication: 'draft', published: false };
     validateSpotDifferenceDraft(draft);
@@ -188,11 +192,40 @@ async function resume() {
     afterRevision = await resolveLocalDrawRevision(adapter, restored.after.draftId, restored.after.revisionId);
     if (JSON.stringify(reference(restored.before.draftId, beforeRevision)) !== JSON.stringify(restored.before) || JSON.stringify(reference(restored.after.draftId, afterRevision)) !== JSON.stringify(restored.after)) throw new Error('元画像の固定版が一致しません');
     if (beforeRevision.document.width !== restored.width || beforeRevision.document.height !== restored.height || afterRevision.document.width !== restored.width || afterRevision.document.height !== restored.height) throw new Error('比較画像の寸法が保存した候補と一致しません');
+    pxdBridge?.reset();
     draft = restored; draftId = id; sourceDraftId = restored.before.draftId; savedConfirmedDraftId = restored.confirmed ? id : null; selectedIds.clear(); splitPixels.clear();
     $('#spot-source-label').textContent = `元 ${beforeRevision.revisionId.slice(0, 8)} → 変更後 ${afterRevision.revisionId.slice(0, 8)}・固定版`;
     $('#spot-confirmed').hidden = !draft.confirmed; showEditor(); editor.scrollIntoView({ block: 'start' }); message('同じ画像の固定版で前回の作成を再開しました。');
   } catch (error) { message(`再開できませんでした：${error.message}`); }
   finally { resumeButton.disabled = false; }
+}
+
+async function openPxdSpot(project) {
+  if (!store || !adapter) throw new Error('端末内保存を利用できません。');
+  const imported = hasPxdPuzzle(project, 'spot_difference')
+    ? await materializePxdPuzzle(await readPxdPuzzle(project, 'spot_difference'), { tool: 'spot_difference', store })
+    : await createPxdPuzzleFromMain(project, { tool: 'spot_difference', store });
+  const nextBefore = imported.bindings.before.revision; const nextAfter = imported.bindings.after.revision;
+  if (nextBefore.document.width !== nextAfter.document.width || nextBefore.document.height !== nextAfter.document.height) throw new Error('PXDの比較画像サイズが一致しません。');
+  beforeRevision = nextBefore; afterRevision = nextAfter; sourceDraftId = imported.bindings.before.draftId; afterDraftId = imported.bindings.after.draftId;
+  draft = imported.document; draftId = null; savedConfirmedDraftId = null; pxdOriginalRefs = imported.portableOriginalRefs;
+  selectedIds.clear(); splitPixels.clear();
+  $('#spot-source-label').textContent = `PXD固定画像 · ${draft.width}×${draft.height}px`;
+  $('#spot-confirmed').hidden = !draft.confirmed;
+  showEditor(); saveButton.disabled = false;
+  message(imported.sourceChanged ? 'PXD内の画像が編集されていたため、差分を作り直しました。正解は未確定です。' : imported.document.candidates.length ? 'PXDの間違い探しを端末内の新しい下書きとして開きました。保存後に試遊できます。' : '元画像から空の間違い探しを作りました。PXDメニューの「変更後の絵を描く」で画像を編集してください。');
+}
+
+function mountPxdSpot() {
+  if (!store) return null;
+  return mountPxdTools({
+    tool: 'spot_difference', hasContent: () => Boolean(draft), openProject: openPxdSpot,
+    getProject: async (project) => draft ? writePxdPuzzle(project, {
+      tool: 'spot_difference', document: draft,
+      sourceDrawDocuments: { 'spot-before': beforeRevision?.document, 'spot-after': afterRevision?.document },
+      portableOriginalRefs: pxdOriginalRefs, sourceChanged: false
+    }) : project
+  });
 }
 
 $('#spot-start').addEventListener('click', start); saveButton.addEventListener('click', save); resumeButton.addEventListener('click', resume);
@@ -280,4 +313,7 @@ canvas.addEventListener('focus', drawPreview); canvas.addEventListener('blur', d
 window.addEventListener('resize', applyCanvasView);
 
 try { adapter = createIndexedDbDraftAdapter(); store = createLocalDraftStore(adapter); } catch { message('このブラウザーでは端末内保存を利用できません。'); }
-resumeButton.hidden = !readStorage(LAST_KEY); loadSourceOptions();
+resumeButton.hidden = !readStorage(LAST_KEY);
+pxdBridge = mountPxdSpot();
+const pxdImported = pxdBridge ? await pxdBridge.ready : false;
+if (!pxdImported) await loadSourceOptions();

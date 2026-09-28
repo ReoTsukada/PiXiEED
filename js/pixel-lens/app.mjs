@@ -5,11 +5,29 @@ import { cameraStartErrorMessage, deriveCameraPrimaryAction } from '../pixel-stu
 import { CAMERA_SETTING_DEFAULTS, DITHER_PATTERNS, lensFrameFilter, lensPalette, lensPaletteEdited, processLensFrame, resetLensPalette, resetLensPaletteEdits, setLensPalette, setLensPaletteColor, setLensSettings } from './engine.mjs?v=20260928-pass-1';
 import { attachZoomGestures, formatZoom, splitZoom, zoomRange, zoomStops } from './zoom.mjs?v=20260928-pass-1';
 import { GIF_FPS, GIF_MAX_MS, encodeGif, gifScale } from './gif.mjs?v=20260928-pass-1';
-import { hasPerk, requestPass, onPassChange } from '../pixieed-pass.mjs?v=20260928-pass-1';
+import { hasPerk, requestPass, onPassChange } from '../pixieed-pass.mjs?v=20260928-pass-2';
 import { cameraPostDataUrl } from './camera-post.mjs';
+import { createAudioSong } from '../creation/audio-core.mjs?rev=20260928-dot-music-1';
+import { audioCameraCancelUrl, beginAudioCamera, completeAudioCamera, readAudioCameraRequest } from '../creation/audio-camera-handoff.mjs?rev=20260928-dot-music-1';
+import { createPxdProject, getPxdJson } from '../creation/pxd-codec.mjs';
+import { putPxdImage, readPxdImage, mergePxdJson } from '../creation/pxd-project.mjs';
+import { mountPxdTools } from '../creation/pxd-ui.mjs';
 
 const $ = (selector) => document.querySelector(selector);
-const returnToAudio = new URLSearchParams(location.search).get('to') === 'audio';
+const initialParams = new URLSearchParams(location.search);
+const returnToAudio = initialParams.get('to') === 'audio';
+let audioCameraRequest = readAudioCameraRequest({ search: location.search });
+let audioCameraInvalid = false;
+if (returnToAudio && !audioCameraRequest) {
+  const legacyEntry = [...initialParams.entries()].length === 1 && initialParams.getAll('to').length === 1 && !initialParams.has('audioRequest');
+  if (legacyEntry) {
+    try {
+      const nextUrl = beginAudioCamera({ song: createAudioSong() });
+      history.replaceState(null, '', nextUrl);
+      audioCameraRequest = readAudioCameraRequest({ search: location.search });
+    } catch { audioCameraInvalid = true; }
+  } else audioCameraInvalid = true;
+} else if (initialParams.has('audioRequest') && !audioCameraRequest) audioCameraInvalid = true;
 const root = $('#pixelStudio');
 const video = $('#video');
 const stage = $('#stage');
@@ -39,10 +57,11 @@ let previewSessionStarted = 0;
 let previewCounter = 0;
 let toastTimer = null;
 let displayedPaletteRevision = null;
+let audioFrozenFrame = null;
 
 // PiXiEELENS defaults (pixiee-lens/index.html): 4 colours, Game Boy palette, ordered dither, surface 55
-const state = { mode: 'idle', facing: 'environment', result: null, error: '', ratio: 'screen', size: 256,
-  colorDepth: '4', paletteMode: 'gameboy', gradientMode: 'dither', ditherPattern: 'net8', surfaceSimplify: 55, camera: { ...CAMERA_SETTING_DEFAULTS }, zoom: 1 };
+const state = { mode: 'idle', facing: 'environment', result: null, error: '', ratio: 'screen', size: audioCameraRequest?.width ?? 256,
+  colorDepth: audioCameraRequest ? '16' : '4', paletteMode: audioCameraRequest ? 'source' : 'gameboy', gradientMode: audioCameraRequest ? 'none' : 'dither', ditherPattern: 'net8', surfaceSimplify: 55, camera: { ...CAMERA_SETTING_DEFAULTS }, zoom: 1 };
 let zoomInfo = zoomRange(null); let appliedHardwareZoom = 1; let zoomApplyPending = false;
 // 面のまとまり is automatic: it only calms dither speckle with 8-16 colours (measured: no change at 2-4 colours,
 // heavy posterising at high strength), so it runs at PiXiEELENS's default 55 there and is skipped elsewhere.
@@ -141,14 +160,23 @@ function setMode(mode) {
 
 function updatePrimaryAction() {
   const button = $('#capture');
+  if (audioCameraRequest && audioFrozenFrame) {
+    button.dataset.action = 'audio-return';
+    button.setAttribute('aria-label', '画像を音楽へ戻す');
+    button.title = '画像を音楽へ戻す';
+    button.disabled = false;
+    return;
+  }
   const primary = deriveCameraPrimaryAction({ mode: state.mode, hasResult: Boolean(state.result), error: state.error, workerUnavailable: Boolean(workerUnavailable) });
   button.dataset.action = primary.action;
-  button.setAttribute('aria-label', primary.label);
-  button.title = primary.label;
+  const label = audioCameraRequest && primary.action === 'capture' ? '撮影して音楽へ戻る' : primary.label;
+  button.setAttribute('aria-label', label);
+  button.title = label;
   button.disabled = primary.disabled;
 }
 
 function currentAspect() {
+  if (audioCameraRequest) return audioCameraRequest.width / audioCameraRequest.height;
   return resolveAspect(state.ratio, Math.max(1, stage.clientWidth), Math.max(1, stage.clientHeight));
 }
 
@@ -268,7 +296,9 @@ resizeObserver.observe(stage);
 
 function cameraFrame() {
   if (!activeStream || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || !video.videoWidth || !video.videoHeight) return null;
-  const output = frameGeometry(currentAspect(), state.size);
+  const output = audioCameraRequest
+    ? { width: audioCameraRequest.width, height: audioCameraRequest.height }
+    : frameGeometry(currentAspect(), state.size);
   const aspect = output.width / output.height;
   const full = centerCrop(video.videoWidth, video.videoHeight, aspect);
   const digital = Math.max(1, state.zoom / appliedHardwareZoom); // what the camera's optics could not do is cropped
@@ -432,6 +462,10 @@ async function startCamera({ focus = true } = {}) {
 
 function capture() {
   if (state.mode !== 'live' || !state.result) return;
+  if (audioCameraRequest) {
+    finishAudioCamera(audioFrozenFrame || state.result);
+    return;
+  }
   invalidateCaptureDownload();
   const frozen = state.result;
   gif.pending = null;
@@ -443,6 +477,29 @@ function capture() {
   fitPreview(frozen);
   say('PNGを準備しています…', { visible: true });
   void prepareCaptureDownload(frozen);
+}
+
+function finishAudioCamera(frozen) {
+  try {
+    const returnUrl = completeAudioCamera(audioCameraRequest, frozen);
+    audioFrozenFrame = frozen;
+    invalidatePreview();
+    cameraSequence++;
+    stopTracks();
+    location.assign(returnUrl);
+  } catch (error) {
+    audioFrozenFrame = frozen;
+    invalidatePreview();
+    cameraSequence++;
+    stopTracks();
+    state.result = frozen;
+    setMode('captured');
+    fitPreview(frozen);
+    $('#postCamera').hidden = true;
+    $('#resultControls').hidden = true;
+    info.textContent = '音楽へ画像を戻せませんでした。中央のボタンで再試行できます。';
+    say(error instanceof Error ? error.message : '音楽へ画像を戻せませんでした。', { visible: true });
+  }
 }
 
 function refreshObjects() {
@@ -521,7 +578,7 @@ function applyChange({ restart = false } = {}) {
   updateSizeSummary();
 }
 function selectLook(button) {
-  if (!button || state.mode === 'captured') return;
+  if (!button || state.mode === 'captured' || audioCameraRequest) return;
   const mine = myPalettes.find((p) => `my-${p.id}` === button.dataset.look);
   setPaletteEditing(-1);
   if (mine) {
@@ -629,7 +686,7 @@ function syncToolbar() {
   const face = (tool) => toolbar.querySelector(`[data-tool="${tool}"]`);
   face('look').querySelector('.lc-tool-sw').setAttribute('style', lookButton?.querySelector('.lc-sw')?.getAttribute('style') ?? '');
   face('look').querySelector('.lc-tool-sw').className = `lc-tool-sw lc-sw ${(lookButton?.querySelector('.lc-sw')?.className ?? '').replace(/\blc-sw\b/, '').trim()}`;
-  face('look').querySelector('b').textContent = lookButton?.textContent.trim() ?? '';
+  face('look').querySelector('b').textContent = audioCameraRequest ? '写真16色' : (lookButton?.textContent.trim() ?? '');
   const available = !NO_DITHER_DEPTHS.has(state.colorDepth);
   const pattern = available && state.gradientMode === 'dither' ? DITHER_PATTERNS.find((p) => p.id === state.ditherPattern) : null;
   const dither = face('dither');
@@ -639,7 +696,7 @@ function syncToolbar() {
   dither.setAttribute('aria-label', !available ? 'この色ではディザを使いません' : pattern ? `ディザ：${pattern.label}（タップで模様を選ぶ）` : 'ディザをオンにする');
   face('pixels').querySelector('b').textContent = `${state.size} px`;
   const ratio = FRAME_RATIOS.find((r) => r.value === state.ratio);
-  face('aspect').querySelector('b').textContent = ratio?.label ?? '';
+  face('aspect').querySelector('b').textContent = audioCameraRequest ? `${audioCameraRequest.width}:16` : (ratio?.label ?? '');
   face('aspect').dataset.ratio = state.ratio;
   const toneChanged = TONES.some(([key]) => state.camera[key] !== CAMERA_SETTING_DEFAULTS[key]);
   face('tone').querySelector('b').textContent = toneChanged ? '調整中' : '調整';
@@ -661,9 +718,20 @@ function syncControls() {
   syncToolbar();
 }
 
+function lockAudioCameraControls() {
+  if (!audioCameraRequest) return;
+  root.dataset.audioCameraHandoff = 'true';
+  for (const button of document.querySelectorAll('#looks [data-look], #ditherPanel [data-value], #pixelsPanel [data-value], #aspectPanel [data-value], #toolbar [data-tool="look"], #toolbar [data-tool="dither"], #toolbar [data-tool="pixels"], #toolbar [data-tool="aspect"]')) {
+    button.disabled = true;
+    button.setAttribute('aria-disabled', 'true');
+  }
+  $('#postCamera').hidden = true;
+}
+
 toolbar.addEventListener('click', (event) => {
   const button = event.target.closest('[data-tool]'); if (!button || state.mode === 'captured') return;
   const tool = button.dataset.tool;
+  if (audioCameraRequest && ['look', 'dither', 'pixels', 'aspect'].includes(tool)) return;
   navigator.vibrate?.(6);
   if (tool === 'dither') {
     if (NO_DITHER_DEPTHS.has(state.colorDepth)) { sayToast('この色ではディザを使いません'); return; }
@@ -677,19 +745,19 @@ toolbar.addEventListener('click', (event) => {
   openTray(openTool === tool ? null : tool);
 });
 ditherPanel.addEventListener('click', (event) => {
-  const button = event.target.closest('[data-value]'); if (!button || state.mode === 'captured') return;
+  const button = event.target.closest('[data-value]'); if (!button || state.mode === 'captured' || audioCameraRequest) return;
   navigator.vibrate?.(6);
   if (button.dataset.value === 'none') { state.gradientMode = 'none'; applyChange(); openTray(null); sayToast('ディザ OFF'); return; }
   state.gradientMode = 'dither'; state.ditherPattern = button.dataset.value; applyChange();
   button.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
 });
 pixelsPanel.addEventListener('click', (event) => {
-  const button = event.target.closest('[data-value]'); if (!button || state.mode === 'captured') return;
+  const button = event.target.closest('[data-value]'); if (!button || state.mode === 'captured' || audioCameraRequest) return;
   state.size = Number(button.dataset.value); navigator.vibrate?.(6); applyChange({ restart: true });
   button.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
 });
 aspectPanel.addEventListener('click', (event) => {
-  const button = event.target.closest('[data-value]'); if (!button || state.mode === 'captured') return;
+  const button = event.target.closest('[data-value]'); if (!button || state.mode === 'captured' || audioCameraRequest) return;
   state.ratio = button.dataset.value; navigator.vibrate?.(6); applyChange({ restart: true });
   button.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
 });
@@ -843,6 +911,7 @@ $('#paletteDelete').addEventListener('click', () => {
   sayToast('マイパレットを削除しました');
 });
 renderMyPaletteChips();
+lockAudioCameraControls();
 document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && openTool) { const tool = openTool; openTray(null); toolbar.querySelector(`[data-tool="${tool}"]`)?.focus(); } });
 paintSwatches();
 syncControls();
@@ -963,7 +1032,7 @@ function gifProgress() {
   gif.raf = requestAnimationFrame(gifProgress);
 }
 function startGif() {
-  if (state.mode !== 'live' || !state.result) return;
+  if (audioCameraRequest || state.mode !== 'live' || !state.result) return;
   Object.assign(gif, gifLimits());
   gif.recording = true; gif.frames = []; gif.started = performance.now(); gif.lastAt = 0;
   $('#gifRecTime').textContent = `${(gif.maxMs / 1000).toFixed(1)}s`;
@@ -1052,6 +1121,7 @@ async function prepareGifDownload(frames) {
 }
 captureButton.addEventListener('pointerdown', (event) => {
   holdFired = false;
+  if (audioCameraRequest) return;
   if (state.mode !== 'live' || !state.result || event.button > 0) return;
   try { captureButton.setPointerCapture(event.pointerId); } catch { /* ignore */ }
   window.clearTimeout(holdTimer);
@@ -1063,6 +1133,7 @@ captureButton.addEventListener('contextmenu', (event) => event.preventDefault())
 
 // First time only: tell people the picture itself is the controller.
 function showGestureHintOnce() {
+  if (audioCameraRequest) return;
   let seen = false;
   try { seen = localStorage.getItem('pixieed:camera-gestures:v1') === '1'; localStorage.setItem('pixieed:camera-gestures:v1', '1'); } catch { seen = false; }
   if (seen) return;
@@ -1071,6 +1142,7 @@ function showGestureHintOnce() {
 }
 
 $('#capture').addEventListener('click', () => {
+  if (audioCameraRequest && audioFrozenFrame) { finishAudioCamera(audioFrozenFrame); return; }
   if (holdFired) { holdFired = false; return; } // the hold already recorded a GIF
   const { action } = deriveCameraPrimaryAction({ mode: state.mode, hasResult: Boolean(state.result), error: state.error, workerUnavailable: Boolean(workerUnavailable) });
   if (action === 'retake') retake();
@@ -1095,6 +1167,10 @@ $('#postCamera').addEventListener('click', () => {
     say(error instanceof Error ? error.message : '撮影画像を準備できませんでした。', { visible: true });
   }
 });
+
+const backLink = $('.lc-back');
+if (audioCameraRequest) backLink.href = audioCameraCancelUrl({ search: location.search });
+else if (returnToAudio || audioCameraInvalid) backLink.href = audioCameraCancelUrl({ search: location.search });
 
 function suspendCamera() {
   if (gif.recording) stopGifUi();
@@ -1128,7 +1204,33 @@ document.addEventListener('visibilitychange', () => {
   else resumeCameraIfVisible();
 });
 
-root.dataset.ready = 'false';
+const cameraPxd = mountPxdTools({
+  tool: 'camera', hasContent: () => state.mode === 'captured' && Boolean(state.result) && !gif.pending,
+  setStatus: (message) => say(message, { visible: true }),
+  async getProject(project) {
+    if (!state.result || state.mode !== 'captured' || gif.pending) throw new Error('写真を撮影してからPXDに保存してください。GIFはGIF形式で保存できます。');
+    const frame = state.result;
+    const next = await putPxdImage(project || createPxdProject(), { width: frame.width, height: frame.height, rgba: new Uint8Array(frame.data), provenance: { type: 'pixel_camera' } });
+    return mergePxdJson(next, 'camera/state.json', { schemaVersion: 1, width: frame.width, height: frame.height, settings: { colorDepth: state.colorDepth, paletteMode: state.paletteMode, gradientMode: state.gradientMode, ditherPattern: state.ditherPattern }, palette: frame.palette || [], logicalPixels: true });
+  },
+  async openProject(project) {
+    if (audioCameraRequest) throw new Error('作曲用の撮影中はPXDを開けません。曲の原本は保持しています。');
+    const image = await readPxdImage(project);
+    if (!image) throw new Error('このPXDにはカメラで表示する画像がありません。');
+    const metadata = project.entries.some((entry) => entry.path === 'camera/state.json') ? getPxdJson(project, 'camera/state.json') : null;
+    const frame = { width: image.width, height: image.height, data: new Uint8ClampedArray(image.rgba), palette: metadata?.palette || image.colors.slice(0, 256).map((color) => color.rgba.slice(0, 3)) };
+    invalidatePreview(); cameraSequence++; stopTracks(); gif.pending = null; resumeOnVisible = false; setMode('captured'); drawCompleted(frame);
+    await prepareCaptureDownload(frame);
+  }
+});
+const openedCameraPxd = await cameraPxd.ready;
+root.dataset.ready = String(openedCameraPxd);
 fitPreview();
-setMode('loading');
-resumeCameraIfVisible();
+if (audioCameraInvalid) {
+  setMode('idle');
+  $('#capture').disabled = true;
+  say('音楽への受け渡しを確認できません。曲へ戻ってカメラを開き直してください。', { visible: true });
+} else if (!openedCameraPxd) {
+  setMode('loading');
+  resumeCameraIfVisible();
+}

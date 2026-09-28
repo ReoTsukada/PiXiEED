@@ -16,11 +16,11 @@
  * Play/pause is the only plain button.
  */
 
-import { celestialState, geoToUnit, unitToGeo, listEclipses, peakObscurationAt, moonPhase, findGreatestEclipse, findSunEvent } from './astronomy.mjs?v=20260927-sky-events-v1';
-import { createScope, refracted } from './scope.mjs?v=20260927-sky-events-v1';
+import { celestialState, geoToUnit, unitToGeo, listEclipses, peakObscurationAt, findGreatestEclipse, findSunEvent } from './astronomy.mjs?v=20260927-sky-events-v1';
+import { createScope, refracted } from './scope.mjs?v=20260927-telescope-polish-1';
 import { sharedSky } from './real-sky.mjs?v=20260927-sky-events-v1';
 import { upcomingMeteorShowers, upcomingEclipses, daysUntil } from './sky-events.mjs?v=20260927-sky-events-v1';
-import { createOrrery } from './orrery.mjs?v=20260927-sky-events-v1';
+import { createOrrery } from './orrery.mjs?v=20260928-sky-labels-1';
 import { PLANETS, PLANET_BY_ID, SKY_PLANETS, lightMinutes } from './planets.mjs?v=20260927-sky-events-v1';
 
 const DEG = Math.PI / 180;
@@ -68,15 +68,6 @@ function formatDate(date) { return `${date.getFullYear()}/${pad(date.getMonth() 
 function formatClock(date, seconds = true) { return `${pad(date.getHours())}:${pad(date.getMinutes())}${seconds ? `:${pad(date.getSeconds())}` : ''}`; }
 function formatShortDate(date) { return `${date.getMonth() + 1}/${date.getDate()}（${WEEKDAYS[date.getDay()]}）`; }
 function formatLatLon(latitude, longitude) { return `${latitude >= 0 ? '北緯' : '南緯'}${Math.abs(latitude).toFixed(1)}° ${longitude >= 0 ? '東経' : '西経'}${Math.abs(longitude).toFixed(1)}°`; }
-
-function phaseName(phase) {
-  const e = phase.elongation;
-  if (e < 12) return '新月';
-  if (e > 168) return '満月';
-  if (e < 78) return phase.waxing ? '三日月' : '有明の月';
-  if (e < 102) return phase.waxing ? '上弦' : '下弦';
-  return phase.waxing ? '十三夜' : '寝待月';
-}
 
 function element(tag, props = {}, children = []) {
   const node = document.createElement(tag);
@@ -333,9 +324,9 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
   // ---- Sky markers on the globe view and in the telescope -------------------
   const skyHud = element('div', { class: 'sky-hud', 'aria-label': '太陽と月' });
   function skyMark(kind, iconName, name) {
-    const label = element('span', { class: 'sky-mark__label' });
+    const label = kind === 'sun' || kind === 'moon' ? null : element('span', { class: 'sky-mark__label' });
     const button = element('button', { type: 'button', class: `sky-mark is-${kind}`, hidden: '', onClick: () => onMarkTap(kind) }, [
-      element('i', { class: 'sky-mark__arrow', 'aria-hidden': 'true' }), icon(iconName), label
+      element('i', { class: 'sky-mark__arrow', 'aria-hidden': 'true' }), icon(iconName), ...(label ? [label] : [])
     ]);
     skyHud.append(button);
     return { button, label, name, kind };
@@ -391,7 +382,7 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
   const eclipseLine = element('span', { class: 'scope-eclipse' });
   const riseChip = element('button', { type: 'button', class: 'scope-chip', onClick: () => watchSunEvent('rise') }, [icon('sun'), element('span')]);
   const setChip = element('button', { type: 'button', class: 'scope-chip is-set', onClick: () => watchSunEvent('set') }, [icon('sun'), element('span')]);
-  const filterChip = element('button', { type: 'button', class: 'scope-chip scope-filter', 'aria-pressed': 'true', onClick: () => setFilter(filterChip.getAttribute('aria-pressed') !== 'true') }, [element('i', { 'aria-hidden': 'true' }), element('span', { text: '太陽フィルター' })]);
+  const filterChip = element('button', { type: 'button', class: 'scope-chip scope-filter', 'aria-pressed': 'false', onClick: () => setFilter(filterChip.getAttribute('aria-pressed') !== 'true') }, [element('i', { 'aria-hidden': 'true' }), element('span', { text: '太陽フィルター' })]);
   const eventsChip = element('button', { type: 'button', class: 'scope-chip scope-events-chip', 'aria-expanded': 'false', onClick: () => setEventsOpen(eventsSheet.hidden) }, [icon('celestial'), element('span', { text: '空の予定' }), element('b', { class: 'scope-events-chip__soon', hidden: '' })]);
   // Upcoming eclipses and meteor showers for the observer, soonest first.
   const eventsPlace = element('span', { class: 'sky-events__place' });
@@ -404,7 +395,7 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
     ]),
     locateButton,
     eventsList,
-    element('p', { class: 'sky-events__foot', text: '流れ星の数は、暗い空で1時間に見えるおおよその数です。日食は必ず日食グラスで見てください。' })
+    element('p', { class: 'sky-events__foot', text: '流れ星の数は、暗い空で1時間に見えるおおよその数です。実際の望遠鏡で日食を見るには、対物側の専用太陽フィルターが必要です。' })
   ]);
   const scopeHud = element('section', { class: 'scope-hud', hidden: '', 'aria-label': '望遠鏡' }, [
     element('button', { type: 'button', class: 'scope-close', 'aria-label': '望遠鏡を閉じる', onClick: () => closeScope() }, [icon('close')]),
@@ -412,7 +403,7 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
     element('div', { class: 'scope-dock' }, [
       element('p', { class: 'scope-status', role: 'status', 'aria-live': 'polite' }, [where, eclipseLine]),
       element('div', { class: 'scope-chips' }, [riseChip, setChip, eventsChip, filterChip]),
-      element('p', { class: 'scope-warning', text: '実際の観測では、必ず日食グラスや太陽フィルターを使ってください。' })
+      element('p', { class: 'scope-warning', text: '実際の望遠鏡で太陽を見るには、対物側の専用太陽フィルターが必要です。日食グラスだけでは危険です。' })
     ]),
     eventsSheet
   ]);
@@ -436,6 +427,7 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
   ]);
   const pull = element('div', { class: 'orrery-pull', hidden: '', 'aria-hidden': 'true' }, [element('span', { text: 'さらに縮小で太陽系へ' }), element('i')]);
   let selectedBody = null;
+  let returnToScope = null;
   let pullAmount = 0; let pullTimer = null;
   const orrery = createOrrery({
     canvas: orreryCanvas,
@@ -483,7 +475,11 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
 
   function openOrrery() {
     if (orrery.isOpen()) return;
-    if (scope.isOpen()) closeScope();
+    if (scope.isOpen()) {
+      const current = scope.getSnapshot();
+      returnToScope = { observer: current.observer, tracking: current.tracking };
+      dismissScope();
+    }
     setOpen(false);
     pullAmount = 0; pull.hidden = true;
     stage.classList.add('is-orrery');
@@ -493,11 +489,18 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
     tape.setScale(0.05);
     orrery.setTime(time, { moon: moonEcliptic(state) });
     orrery.open({ fromEarth: true });
+    cardHome.lastChild.textContent = returnToScope ? '望遠鏡に戻る' : '地球儀に戻る';
+    cardHome.querySelector('img').src = `/assets/icons/pixieed/${returnToScope ? 'telescope' : 'globe'}.svg`;
+    orreryHud.querySelector('.orrery-close').setAttribute('aria-label', returnToScope ? '望遠鏡に戻る' : '地球儀に戻る');
+    orreryCanvas.setAttribute('aria-label', `太陽系。ドラッグで回転、ピンチまたはホイールで拡大・縮小、タップで天体を選ぶ。地球をさらに拡大すると${returnToScope ? '望遠鏡' : '地球儀'}に戻る`);
+    stage.dispatchEvent(new Event('pixieed:astro-viewchange'));
     orreryCanvas.focus({ preventScroll: true });
   }
 
   function closeOrrery(then = null) {
     if (!orrery.isOpen()) { then?.(); return; }
+    const returnTarget = returnToScope;
+    returnToScope = null;
     selectedBody = null; card.hidden = true;
     stage.classList.add('is-orrery-leaving');
     orrery.close(() => {
@@ -509,7 +512,9 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
       useSpeeds('sky');
       tape.setScale(14);
       apply();
-      then?.();
+      if (then) then();
+      else if (returnTarget) openScope(returnTarget.observer, { track: typeof returnTarget.tracking === 'string' ? returnTarget.tracking : null });
+      stage.dispatchEvent(new Event('pixieed:astro-viewchange'));
     });
   }
 
@@ -535,7 +540,7 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
   let fovTimer = null;
   let lastFov = null;
   const scope = createScope({ canvas: scopeCanvas, onChange: onScopeChange });
-  sharedSky().then(({ canvas: sky }) => scope.setSkyImage(sky)).catch(() => {});
+  sharedSky().then(({ canvas: sky, sky: catalogue }) => scope.setSkyImage(sky, catalogue)).catch(() => {});
 
   // ---- behaviour -----------------------------------------------------------
   function setOpen(open) {
@@ -583,7 +588,7 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
   function placeMark(mark, { x, y, inside, dimmed, text, offset = 0, title }, bounds, occupied = []) {
     const { button, label } = mark;
     button.hidden = false;
-    label.textContent = text;
+    if (label) label.textContent = text;
     button.setAttribute('aria-label', title);
     button.classList.toggle('is-dim', Boolean(dimmed));
     if (inside) {
@@ -615,11 +620,10 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
     const inverse = conjugate(camera.orientation);
     const eye = rotate([0, 0, 6], camera.orientation);
     const bounds = { left: 22, right: width - 22, top: 74, bottom: height - 90 };
-    const phase = moonPhase(state);
     const occupied = [];
     const bodies = [
-      { mark: marks.sun, direction: state.sunDirection, radius: state.sunAngularRadius * 6, text: '太陽', detail: '' },
-      { mark: marks.moon, direction: [state.moonVector[0] - eye[0], state.moonVector[1] - eye[1], state.moonVector[2] - eye[2]], radius: 0, text: `月・${phaseName(phase)}` }
+      { mark: marks.sun, direction: state.sunDirection, radius: state.sunAngularRadius * 6 },
+      { mark: marks.moon, direction: [state.moonVector[0] - eye[0], state.moonVector[1] - eye[1], state.moonVector[2] - eye[2]], radius: 0 }
     ];
     for (const body of bodies) {
       const v = rotate(unit(body.direction), inverse);
@@ -631,7 +635,6 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
       const radius = body.mark.kind === 'moon' ? Math.asin(Math.min(1, 0.27239 / Math.hypot(...body.direction))) * 8 * focal : body.radius * focal;
       placeMark(body.mark, {
         x, y, inside, dimmed: behind, offset: inside ? Math.min(60, Math.max(body.mark.kind === 'sun' ? 22 : 0, radius)) + 14 : 0,
-        text: behind ? `${body.mark.name}（地球の裏）` : body.text,
         title: inside ? `${body.mark.name}を望遠鏡で見る` : `${body.mark.name}の方を向く`
       }, bounds, occupied);
     }
@@ -655,9 +658,10 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
     const right = [Math.cos(az), -Math.sin(az), 0];
     const up = [right[1] * forward[2] - right[2] * forward[1], right[2] * forward[0] - right[0] * forward[2], right[0] * forward[1] - right[1] * forward[0]];
     const tanHalf = Math.tan((snapshot.fov * DEG) / 2);
-    const bounds = { left: 22, right: width - 22, top: 130, bottom: height - 200 };
+    const bounds = { left: 28, right: width - 28, top: 94, bottom: height - 175 };
     const occupied = [];
-    for (const [mark, local, altitude, radius] of [[marks.sun, o.sunLocal, o.sunAltitude, o.sunRadius], [marks.moon, o.moonLocal, o.moonAltitude, o.moonRadius]]) {
+    for (const [mark, local, altitude] of [[marks.sun, o.sunLocal, o.sunAltitude], [marks.moon, o.moonLocal, o.moonAltitude]]) {
+      if (altitude < -1) { mark.button.hidden = true; continue; }
       const v = refracted(local);
       const fz = dot(v, forward); const fx = dot(v, right); const fy = dot(v, up);
       const front = fz > 1e-3;
@@ -667,23 +671,24 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
       const tracking = snapshot.tracking === mark.kind;
       mark.button.classList.toggle('is-tracking', tracking);
       placeMark(mark, {
-        x, y, inside, dimmed: altitude < -1, offset: inside ? Math.min(80, ((radius || 0.0047) / tanHalf) * height / 2) + 14 : 0,
+        x, y, inside, dimmed: altitude < -1, offset: 0,
         text: altitude < -1 ? `${mark.name}（地平線の下）` : `${mark.name} ${altitude.toFixed(1)}°`,
         title: tracking ? `${mark.name}を追尾中` : `${mark.name}を追う`
       }, bounds, occupied);
     }
     for (const planet of o.planets || []) {
       const mark = planetMarks[planet.id];
+      const tracking = snapshot.tracking === planet.id;
+      if ((o.sunAltitude > -6 || planet.magnitude > 3) && !tracking) { mark.button.hidden = true; continue; }
       const v = refracted(planet.local);
       const fz = dot(v, forward); const fx = dot(v, right); const fy = dot(v, up);
       const x = width / 2 + (fx / fz / tanHalf) * height / 2; const y = height / 2 - (fy / fz / tanHalf) * height / 2;
-      const tracking = snapshot.tracking === planet.id;
       const inside = fz > 1e-3 && x > bounds.left && x < bounds.right && y > bounds.top && y < bounds.bottom;
       mark.button.classList.toggle('is-tracking', tracking);
       if (!inside && !tracking) { mark.button.hidden = true; continue; }
-      const discPx = (planet.angularRadius / tanHalf) * height / 2;
+      if (planet.altitude < -1) { mark.button.hidden = true; continue; }
       placeMark(mark, {
-        x, y, inside, dimmed: planet.altitude < -1, offset: inside ? Math.min(140, discPx * (planet.id === 'saturn' ? 2.3 : 1)) + 14 : 0,
+        x, y, inside, dimmed: planet.altitude < -1, offset: 0,
         text: planet.altitude < -1 ? `${planet.name}（地平線の下）` : `${planet.name} ${(planet.angularRadius * 2 / DEG * 3600).toFixed(1)}″`,
         title: tracking ? `${planet.name}を追尾中` : `${planet.name}を追う`
       }, bounds, occupied);
@@ -697,7 +702,8 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
       const inside = front && x > bounds.left && x < bounds.right && y > bounds.top && y < bounds.bottom;
       const altitude = Math.asin(Math.max(-1, Math.min(1, radiant[2]))) / DEG;
       radiantMark.button.classList.toggle('is-tracking', snapshot.tracking?.id === 'radiant');
-      placeMark(radiantMark, { x, y, inside, dimmed: altitude < 0, offset: inside ? 0 : 0, text: altitude < 0 ? `${activeRadiant.label}（地平線の下）` : activeRadiant.label, title: `${activeRadiant.label}の方向` }, bounds, occupied);
+      if (altitude < 0) radiantMark.button.hidden = true;
+      else placeMark(radiantMark, { x, y, inside, dimmed: false, offset: 0, text: activeRadiant.label, title: `${activeRadiant.label}の方向` }, bounds, occupied);
     }
   }
 
@@ -717,7 +723,8 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
   function onScopeChange(snapshot) {
     if (!snapshot || !snapshot.open || !snapshot.observation) return;
     const o = snapshot.observation;
-    where.textContent = formatLatLon(o.latitude, o.longitude);
+    const target = typeof snapshot.tracking === 'string' ? (PLANET_BY_ID[snapshot.tracking]?.name || { sun: '太陽', moon: '月' }[snapshot.tracking]) : snapshot.tracking?.id === 'radiant' ? activeRadiant?.label : '';
+    where.textContent = `${formatLatLon(o.latitude, o.longitude)}${target ? ` · ${target}` : ''}`;
     eclipseLine.textContent = o.obscuration > 0 ? `${KIND_LABEL[o.kind]}・太陽の${(o.obscuration * 100).toFixed(1)}%が隠れています` : '';
     const fov = snapshot.fov;
     fovPill.textContent = fov >= 10 ? `視野 ${fov.toFixed(0)}°` : `視野 ${fov.toFixed(2)}°`;
@@ -903,7 +910,7 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
       return;
     }
     activeRadiant = null;
-    setFilter(true);
+    setFilter(false);
     tweenTime(item.data.local.time.getTime(), { duration: 900 });
     scope.setFov(2.5);
     scope.track('sun');
@@ -931,12 +938,12 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
     if (track) scope.track(track);
     updateSunEvents(true);
     onScopeChange(scope.getSnapshot());
+    stage.dispatchEvent(new Event('pixieed:astro-viewchange'));
     scopeCanvas.focus({ preventScroll: true });
   }
 
   let scopeCloseHandler = null;
-  function closeScope() {
-    if (scopeCloseHandler) { scopeCloseHandler(); return; }
+  function dismissScope() {
     setEventsOpen(false);
     activeRadiant = null;
     radiantMark.button.hidden = true;
@@ -946,6 +953,11 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
     scope.close();
     for (const mark of Object.values(marks)) mark.button.classList.remove('is-tracking');
     orbitMarks();
+    stage.dispatchEvent(new Event('pixieed:astro-viewchange'));
+  }
+  function closeScope() {
+    if (scopeCloseHandler) { scopeCloseHandler(); return; }
+    dismissScope();
   }
 
   function setFilter(on) {
@@ -1037,12 +1049,14 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
     refreshView() { if (state && !scope.isOpen() && !orrery.isOpen()) orbitMarks(); },
     setTime, getTime: () => time, setPlaying, setSpeed, openScope, closeScope, goToEclipse, scope, setOpen,
     openOrrery, closeOrrery, zoomLimit, orrery,
-    /** Telescope as a stand-alone tool: open at the saved (or given) place with 空の予定 showing; closing leaves via `onClose`. */
-    openTelescopeTool({ onClose = null, showEvents = true } = {}) {
+    toggleTelescopeSolarSystem() { if (orrery.isOpen()) closeOrrery(); else openOrrery(); },
+    /** Stand-alone telescope: open at the saved place; the event list stays available without covering the sky. */
+    openTelescopeTool({ onClose = null, showEvents = false } = {}) {
       scopeCloseHandler = onClose;
       openScope(savedObserver() || { latitude: 35.68, longitude: 139.69 });
+      setFilter(false);
       scope.setFov(70);
-      if (showEvents) setEventsOpen(true);
+      setEventsOpen(showEvents);
     },
     setEventsOpen,
     getState: () => state

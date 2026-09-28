@@ -36,5 +36,5 @@ export const supabaseConfig = {
  */
 export const passConfig = {
   rewardedAdUnitPath: '/23379831154/pixieed_rewarded',
-  passHours: 3
+  passHours: 1
 };

@@ -105,10 +105,8 @@ h1 {
 }
 
 #globeCanvas:active { cursor: grabbing; }
-/* The globe and the Solar System's bodies are full-colour pixel art (low-resolution renders with hard pixel
-   edges). The stars are not: the sky has its own full-resolution canvas behind them. */
-#globeCanvas, .orrery-canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
-@supports (image-rendering: pixelated) { #globeCanvas, .orrery-canvas { image-rendering: pixelated; } }
+/* Geographic and astronomical views use smooth display scaling. */
+#globeCanvas, .orrery-canvas { image-rendering: auto; }
 #skyCanvas { position: absolute; inset: 0; z-index: 0; display: block; width: 100%; height: 100%; pointer-events: none; }
 #globeCanvas:focus-visible { box-shadow: inset 0 0 0 2px #f4d45d; }
 
@@ -300,7 +298,7 @@ button > img { display: block; flex: none; width: var(--control-icon); height: v
 .tc-eclipses__count { position: absolute; right: 40px; top: 10px; color: #789aa2; font-size: var(--text-small); font-variant-numeric: tabular-nums; pointer-events: none; }
 .tc-foot { margin: 0; color: #789aa2; font-size: var(--text-small); line-height: 1.4; }
 
-/* Sun and Moon markers on the view: a label under the body, or an edge arrow toward it */
+/* Sun and Moon markers remain tappable without covering the view with names. */
 .sky-hud { position: absolute; inset: 0; z-index: 3; pointer-events: none; overflow: hidden; }
 .sky-mark {
   position: absolute; left: 0; top: 0; display: inline-flex; align-items: center; gap: 6px; width: auto; height: var(--control); padding: 0 16px 0 12px;
@@ -310,9 +308,12 @@ button > img { display: block; flex: none; width: var(--control-icon); height: v
 }
 .sky-mark[hidden] { display: none; }
 .sky-mark.is-moon { border-color: rgba(200, 220, 230, .35); color: #e6f0f2; }
+.sky-mark.is-sun, .sky-mark.is-moon { justify-content: center; width: var(--control); padding: 0; }
 .sky-mark img { width: 16px; height: 16px; }
 .sky-mark.is-onscreen { translate: -50% 0; padding: 0 16px; background: rgba(4, 12, 20, .38); border-color: transparent; }
+.sky-mark.is-sun.is-onscreen, .sky-mark.is-moon.is-onscreen { padding: 0; }
 .sky-mark.is-onscreen img { display: none; }
+.sky-mark.is-sun.is-onscreen img, .sky-mark.is-moon.is-onscreen img { display: block; }
 .sky-mark.is-onscreen .sky-mark__arrow { display: none; }
 .sky-mark.is-dim { opacity: .55; }
 .sky-mark.is-tracking { border-color: #f4d45d; background: rgba(244, 212, 93, .16); }
@@ -328,6 +329,31 @@ button > img { display: block; flex: none; width: var(--control-icon); height: v
 @keyframes nudge { 50% { transform: translateX(3px); } }
 .sky-mark:hover, .sky-mark:focus-visible { background: rgba(12, 28, 40, .85); }
 .globe-stage.has-sheet .sky-hud, .globe-stage.is-composing .sky-hud { display: none; }
+
+/* In the telescope the catalogue remains visible; markers are small, usable targets.
+   Names appear on intent (hover/focus), while the tracked body is named in the dock. */
+.globe-stage.is-scope .sky-mark.is-onscreen {
+  display: grid; place-items: center; width: var(--control); height: var(--control); padding: 0;
+  translate: -50% -50%; border: 0; background: transparent; backdrop-filter: none;
+}
+.globe-stage.is-scope .sky-mark.is-sun.is-onscreen img,
+.globe-stage.is-scope .sky-mark.is-moon.is-onscreen img { display: none; }
+.globe-stage.is-scope .sky-mark[hidden] { display: none; }
+.globe-stage.is-scope .sky-mark.is-onscreen::before {
+  content: ""; width: 6px; height: 6px; border: 0; border-radius: 50%;
+  background: currentColor; box-shadow: 0 0 0 1px rgba(0, 0, 0, .5), 0 0 8px currentColor; opacity: .78;
+}
+.globe-stage.is-scope .sky-mark.is-onscreen.is-tracking::before { width: 22px; height: 22px; border: 1px solid currentColor; background: transparent; opacity: .95; }
+.globe-stage.is-scope .sky-mark.is-sun.is-tracking.is-onscreen::before { display: none; }
+.globe-stage.is-scope .sky-mark.is-onscreen .sky-mark__label { display: none; }
+.globe-stage.is-scope .sky-mark.is-onscreen:hover .sky-mark__label,
+.globe-stage.is-scope .sky-mark.is-onscreen:focus-visible .sky-mark__label {
+  display: block; position: absolute; top: calc(100% + 2px); left: 50%; translate: -50% 0;
+  padding: 6px 10px; border-radius: 999px; background: rgba(4, 12, 20, .84);
+  color: #f2fbfc; box-shadow: 0 3px 18px rgba(0, 0, 0, .3);
+}
+.globe-stage.is-scope .sky-mark.is-onscreen:hover,
+.globe-stage.is-scope .sky-mark.is-onscreen:focus-visible { background: transparent; }
 
 /* telescope: the view is the whole stage, the HUD only overlays it */
 .scope-canvas { position: absolute; inset: 0; z-index: 2; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; outline: none; background: #000; animation: scope-in .35s var(--ease-out); }
@@ -723,6 +749,31 @@ button > img { display: block; flex: none; width: var(--control-icon); height: v
 /* The telescope as a stand-alone tool: nothing of the globe shows behind it. */
 .is-tool-telescope .gesture-hint, .is-tool-telescope .orrery-pull { display: none !important; }
 
+/* The public five-destination navigation is owned by the parent when this is the map iframe. */
+.globe-app-tabs {
+  position: fixed; right: 50%; bottom: max(.7rem, env(safe-area-inset-bottom)); z-index: 30;
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: center; gap: .12rem;
+  width: min(31rem, calc(100% - 1.2rem)); padding: .35rem; border-radius: 1.1rem;
+  background: rgba(255, 255, 255, .98); box-shadow: 0 12px 34px rgba(0, 0, 0, .25);
+  transform: translateX(50%);
+}
+.is-embedded:not(.is-tool-telescope) .globe-app-tabs { display: none; }
+.globe-app-tabs a, .globe-app-tabs button {
+  display: grid; place-items: center; width: 100%; min-height: 3.1rem; height: auto; padding: 0;
+  border: 0; border-radius: .8rem; background: transparent; color: #6a7078; text-decoration: none;
+}
+.globe-app-tabs img { width: 24px; height: 24px; opacity: .72; filter: none; }
+.globe-app-tabs > :nth-child(3) {
+  width: 3.65rem; min-height: 3.65rem; place-self: center; border-radius: 50%;
+  background: #e75445; box-shadow: 0 8px 20px rgba(231, 84, 69, .28);
+}
+.globe-app-tabs > :nth-child(3) img { width: 26px; height: 26px; opacity: 1; filter: brightness(0) invert(1); }
+.globe-app-tabs a:hover, .globe-app-tabs button:hover, .globe-app-tabs :focus-visible { background: rgba(27, 32, 37, .08); }
+.globe-app-tabs > :nth-child(3):hover, .globe-app-tabs > :nth-child(3):focus-visible { background: #d74739; }
+.globe-app-tabs [aria-current="page"] { background: rgba(231, 84, 69, .1); }
+.scope-dock, .orrery-dock { bottom: calc(5.3rem + env(safe-area-inset-bottom)); }
+.sky-events { bottom: calc(5.3rem + env(safe-area-inset-bottom)); }
+.gesture-hint, .orrery-pull { bottom: calc(6.6rem + env(safe-area-inset-bottom)); }
 .globe-stage.has-selection .post-dock { display: none; }
 .post-dock { bottom: calc(5.3rem + env(safe-area-inset-bottom)); }
 /* Sheets stay above the shared navigation, including the submit control. */

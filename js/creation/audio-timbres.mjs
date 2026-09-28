@@ -58,7 +58,20 @@ export const AUDIO_INSTRUMENTS = Object.freeze([
   voice('nes-pulse-1', 'NES Pulse 1', 'pulse', 0.001, 0.135, 0.54, 0.025, { duty: 0.125, filter: low(8100) }),
   voice('nes-pulse-2', 'NES Pulse 2', 'pulse', 0.001, 0.155, 0.50, 0.028, { duty: 0.25, filter: low(7200) }),
   voice('nes-triangle', 'NES Triangle', 'triangle', 0.001, 0.26, 0.78, 0.032, { filter: low(5600) }),
-  voice('nes-noise', 'NES Noise', 'noise', 0.001, 0.105, 0.20, 0.024, { filter: high(2600) })
+  voice('nes-noise', 'NES Noise', 'noise', 0.001, 0.105, 0.20, 0.024, { filter: high(2600) }),
+  // Additional compact presets for image-seeded pixel music.
+  voice('woodblock', 'ウッドブロック', 'triangle', 0.001, 0.09, 0.03, 0.045, { partials: [partial('sine', 3.2, 0.16)], filter: band(1700, 1.4), transient: 0.18 }),
+  voice('synth-bell', 'シンセベル', 'sine', 0.002, 0.8, 0.12, 0.42, { partials: [partial('sine', 2.76, 0.24), partial('sine', 5.4, 0.08)], filter: low(7200), transient: 0.05 }),
+  voice('soft-bell', 'ソフトベル', 'triangle', 0.012, 0.68, 0.18, 0.48, { partials: [partial('sine', 2.01, 0.14), partial('sine', 3.9, 0.04)], filter: low(4400) }),
+  voice('pluck-synth', 'プラックシンセ', 'pulse', 0.001, 0.24, 0.10, 0.12, { duty: 0.18, partials: [partial('triangle', 2, 0.13)], filter: low(3500), transient: 0.08 }),
+  voice('warm-pad', 'ウォームパッド', 'triangle', 0.16, 0.42, 0.78, 0.54, { partials: [partial('sine', 1.005, 0.28, -5)], filter: low(2100) }),
+  voice('reed-organ', 'リードオルガン', 'pulse', 0.025, 0.12, 0.72, 0.16, { duty: 0.3, partials: [partial('sine', 2, 0.16)], filter: band(1900, 0.8) }),
+  voice('digital-chime', 'デジタルチャイム', 'sine', 0.001, 0.48, 0.08, 0.30, { partials: [partial('pulse', 2.5, 0.10), partial('sine', 4.75, 0.04)], filter: low(8000), transient: 0.10 }),
+  voice('low-drum', 'ロウドラム', 'noise', 0.001, 0.14, 0.025, 0.05, { filter: low(220), noiseColor: 'pink', transient: 0.34 })
+]);
+
+export const AUDIO_EXTRA_INSTRUMENT_IDS = Object.freeze([
+  'woodblock', 'synth-bell', 'soft-bell', 'pluck-synth', 'warm-pad', 'reed-organ', 'digital-chime', 'low-drum'
 ]);
 
 /** The compact editor keeps the iAUDIO-inspired shelf scannable without loading samples. */
@@ -70,7 +83,8 @@ export const AUDIO_INSTRUMENT_GROUPS = Object.freeze([
   ['シンセ', 28, 30],
   ['打楽器', 30, 32],
   ['Game Boy', 32, 36],
-  ['Famicom', 36, 40]
+  ['Famicom', 36, 40],
+  ['追加音色', 40, AUDIO_INSTRUMENTS.length]
 ].map(([name, first, end]) => Object.freeze({ name, instruments: Object.freeze(AUDIO_INSTRUMENTS.slice(first, end)) })));
 
 const instrumentById = new Map(AUDIO_INSTRUMENTS.map((instrument) => [instrument.id, instrument]));

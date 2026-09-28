@@ -13,10 +13,13 @@
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20260924-camera-release-1">
   <link rel="stylesheet" href="/css/site.css?rev=20260927-draw-step08-3">
   <link rel="stylesheet" href="/css/creation-game.css?rev=20260928-game-board-fit-1">
+  <link rel="stylesheet" href="/css/site-header.css?rev=20260928-touch-motion-1">
+  <link rel="stylesheet" href="/css/arcade.css?rev=20260928-arcade-2">
+  <link rel="stylesheet" href="/css/arcade-tools.css?rev=20260928-arcade-2">
 </head>
 <body data-page="creation-game" class="app-page app-page--tool-creation-game">
   <a class="skip-link" href="#main">本文へ移動</a>
-  <header class="site-header"><div class="container header-inner"><a class="brand" href="/" aria-label="PiXiEED ホーム"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a></div></header>
+  <header class="site-header"><div class="container header-inner"><a class="brand" href="/home/" aria-label="PiXiEED ホーム"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a></div></header>
   <main id="main" class="game-page">
     <header class="game-heading"><h1>かんたんゲーム</h1><p>画像を選んで、歩いて星を集めるゲームを作ろう。</p></header>
     <p id="game-status" class="game-status" role="status" aria-live="polite">キャラクター画像と背景画像を選んでください。ファイルは端末内だけで使います。</p>
@@ -43,12 +46,13 @@
   </main>
   <footer class="site-footer"><div class="container"><p>PiXiEED</p></div></footer>
   <nav class="app-tabs" aria-label="アプリナビゲーション">
-    <a data-nav="home" href="/home/" aria-label="ホーム"><img src="/assets/icons/pixieed/home.svg" alt=""></a>
-    <a data-nav="map" href="/" aria-label="地図"><img src="/assets/icons/pixieed/globe.svg" alt=""></a>
+    <a data-nav="map" href="/" aria-label="地球儀"><img src="/assets/icons/pixieed/globe.svg" alt=""></a><a data-nav="camera" href="/pixel-camera.html" aria-label="撮影"><img src="/assets/icons/pixieed/shoot.svg" alt=""></a>
     <button id="game-primary" type="button" aria-label="選んだ素材でゲームを始める" disabled>遊ぶ</button>
     <a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""></a>
     <a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>
   </nav>
   <script type="module" src="/js/creation/game-upload-page.mjs?rev=20260927-game-workspace-1"></script>
+  <script type="module" src="/js/arcade-dress.mjs?rev=20260928-arcade-2"></script>
+  <script type="module" src="/js/site-header.mjs?rev=20260928-touch-motion-1"></script>
 </body>
 </html>

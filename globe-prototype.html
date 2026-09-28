@@ -20,8 +20,8 @@
   </script>
   <link rel="stylesheet" href="css/globe-prototype.css?v=20260928-cell-controls-1">
   <!-- Flatten the module waterfall and fetch the land-mask raster in parallel. -->
-  <link rel="modulepreload" href="js/globe/renderer.mjs?v=20260927-sky-events-v1">
-  <link rel="modulepreload" href="js/globe/astro-ui.mjs?v=20260927-sky-events-v1">
+  <link rel="modulepreload" href="js/globe/renderer.mjs?v=20260927-solar-tool-2">
+  <link rel="modulepreload" href="js/globe/astro-ui.mjs?v=20260928-sky-labels-1">
   <link rel="modulepreload" href="js/globe/post-ui.mjs?v=20260928-post-likes-1">
   <link rel="modulepreload" href="js/globe/geometry.mjs?v=20260921-grid11-1">
   <link rel="modulepreload" href="js/globe/topology.mjs?v=20260920-g4-precision-1">
@@ -45,6 +45,7 @@
 <link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">
 <meta name="robots" content="noindex,follow">
+  <link rel="stylesheet" href="/css/site-header.css?rev=20260928-touch-motion-1">
 </head>
 <body>
   <main class="globe-prototype" aria-labelledby="prototypeTitle">
@@ -71,6 +72,14 @@
     </section>
 
   </main>
+  <nav class="globe-app-tabs" aria-label="アプリナビゲーション">
+    <a href="/" aria-label="地球儀" data-globe-nav-map><img src="/assets/icons/pixieed/globe.svg" alt=""></a>
+    <a href="/pixel-camera.html" aria-label="撮影"><img src="/assets/icons/pixieed/shoot.svg" alt=""></a>
+    <button id="globePrimaryAction" type="button" aria-label="作品を投稿する"><img src="/assets/icons/pixieed/add.svg" alt=""></button>
+    <a href="/tools/" aria-label="ツール" data-globe-nav-tools><img src="/assets/icons/pixieed/tools.svg" alt=""></a>
+    <a href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>
+  </nav>
   <script type="module" src="js/globe/prototype.mjs?v=20260928-art-links-1"></script>
+  <script type="module" src="/js/site-header.mjs?rev=20260928-touch-motion-1"></script>
 </body>
 </html>

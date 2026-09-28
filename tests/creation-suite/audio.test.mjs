@@ -424,7 +424,7 @@ test('audio page exposes labeled editing, save/resume and central playback contr
   assert.match(page, /id="audio-pixel-canvas"[^>]*tabindex="0"/);
   assert.doesNotMatch(page, /audio-pixel-board/); assert.match(page, /16列×16音程/);
   assert.doesNotMatch(page, /class="site-header"|class="site-footer"/);
-  assert.match(page, /class="audio-more"/); assert.match(page, /audio-tool-body/);
+  assert.match(page, /class="[^"]*\baudio-more\b[^"]*"/); assert.match(page, /audio-tool-body/);
   assert.match(page, /id="audio-tool-pen"/); assert.match(page, /id="audio-tool-eraser"/); assert.match(page, /id="audio-playhead"/);
   assert.match(script, /LAST_DRAW_DRAFT_KEY/); assert.match(script, /cameraHandoffImage/);
   assert.match(script, /setAudioPixel/); assert.match(script, /pixelSurface\.paint/); assert.match(script, /pointermove/); assert.match(script, /lineCells/); assert.match(script, /ArrowRight/); assert.match(script, /event\.key === 'Enter' \|\| event\.key === ' '/);

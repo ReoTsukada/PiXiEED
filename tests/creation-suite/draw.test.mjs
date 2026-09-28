@@ -188,13 +188,13 @@ test('image import dimension preflight rejects malformed headers and detects PNG
   assert.equal(readDrawImageDimensions(new Uint8Array(32), 'image/jpeg'), null);
 });
 
-test('draw page exposes local-copy and camera-copy entry points but no publish call', async () => {
+test('draw page exposes local copies (no camera copy: camera shots are not edited here) and no publish call', async () => {
   const { readFile } = await import('node:fs/promises');
   const html = await readFile(new URL('../../draw/index.html', import.meta.url), 'utf8');
-  assert.match(html, /id="draw-size"/); assert.match(html, /id="draw-import-local"/); assert.match(html, /id="draw-import-camera"/); assert.match(html, /id="draw-copy-last"/);
+  assert.match(html, /id="draw-size"/); assert.match(html, /id="draw-import-local"/); assert.doesNotMatch(html, /id="draw-import-camera"/); assert.match(html, /id="draw-copy-last"/);
   const page = await readFile(new URL('../../js/creation/draw-page.mjs', import.meta.url), 'utf8');
   assert.match(page, /createLocalDraftStore\(createIndexedDbDraftAdapter\(\)\)/); assert.match(page, /store\.save\(/); assert.match(page, /store\.load\(/);
-  assert.match(page, /resizeDrawDocument/); assert.match(page, /cameraHandoffImage/); assert.match(page, /addEventListener\('storage'/); assert.doesNotMatch(page, /fetch\(|supabase|create-post/i);
+  assert.match(page, /resizeDrawDocument/); assert.doesNotMatch(page, /cameraHandoffImage/); assert.doesNotMatch(page, /fetch\(|supabase|create-post/i);
   assert.throws(() => validateDrawDocument({ schemaVersion: 2 }), /16〜512/);
 });
 
@@ -210,4 +210,22 @@ test('draw workspace prioritizes the canvas and supports touch zoom gestures acc
   assert.match(page, /activePointers\.size >= 2/);
   assert.match(page, /Math\.min\(4, pinchStart\.zoom \* distance/);
   assert.match(page, /translate\(\$\{panX\}px, \$\{panY\}px\) scale\(\$\{zoom\}\)/);
+});
+
+test('かんたんドット絵: 16 fixed colours, up to 64px, and anything larger or more colourful is fitted without touching the original', async () => {
+  const core = await import('../../js/creation/draw-core.mjs');
+  assert.equal(core.DRAW_PALETTE.length, 16); assert.deepEqual([...core.DRAW_PALETTE_ORDER].sort((a, b) => a - b), [...Array(16).keys()]);
+  assert.deepEqual([...core.SIMPLE_DRAW_SIZES], [16, 32, 64]);
+  assert.equal(core.createDrawDocument(16).palette.length, 16);
+  // an older 7-colour save keeps the same colours in the same slots
+  const old = core.createDrawDocument(16); old.palette = old.palette.slice(0, 7); old.pixels[3] = 6;
+  const fittedOld = core.toSimpleDrawDocument(old); assert.equal(fittedOld.document.pixels[3], 6); assert.equal(fittedOld.recolored, false); assert.equal(old.palette.length, 7, 'the original is untouched');
+  // a 128px, off-palette drawing becomes 64px in the 16 colours; translucent colours become transparent
+  const big = core.createDrawDocument(128); big.palette = ['#ff0000', '#00ff0040']; big.pixels.fill(0); for (const i of [0, 1, 128, 129]) big.pixels[i] = 1;
+  const fitted = core.toSimpleDrawDocument(big);
+  assert.deepEqual([fitted.document.width, fitted.document.height, fitted.resized, fitted.changed], [64, 64, true, true]);
+  assert.equal(fitted.document.palette.length, 16); assert.equal(fitted.document.pixels[0], -1); assert.equal(fitted.document.pixels[1], 2, 'pure red maps to the palette red');
+  assert.equal(big.width, 128, 'the original is untouched');
+  const page = await import('node:fs/promises').then((fs) => fs.readFile(new URL('../../js/creation/draw-page.mjs', import.meta.url), 'utf8'));
+  assert.match(page, /SIMPLE_DRAW_SIZES\.forEach/); assert.match(page, /fitToSimple\(structuredClone\(revision\.document\)\)/);
 });

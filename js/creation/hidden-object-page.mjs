@@ -2,6 +2,8 @@ import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-draf
 import { documentRgba } from './draw-core.mjs';
 import { HIDDEN_OBJECT_MAX_MASK_PIXELS, confirmHiddenObjectTargets, createHiddenObjectDraft, mapClientPointToPixel, resolveLocalDrawRevision, validateHiddenObjectDraft } from './hidden-object-core.mjs?rev=20260928-short-hitboxes-1';
 import { openPuzzleHandoff } from './puzzle-handoff.mjs?rev=20260928-puzzle-handoff-1';
+import { mountPxdTools } from './pxd-ui.mjs?rev=20260928-pxd-1';
+import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20260928-pxd-puzzles-1';
 
 const DRAW_LAST_KEY = 'pixieed.simple-draw.last-draft.v1';
 const LAST_KEY = 'pixieed:creation:hidden-object:last-draft:v1';
@@ -11,6 +13,7 @@ const canvas = $('#hidden-canvas'); const context = canvas.getContext('2d', { al
 const saveButton = $('#hidden-save'); const playLocalButton = $('#hidden-play-local'); const resumeButton = $('#hidden-resume'); const maskSets = new Map(); const COLORS = [[231, 84, 69], [76, 130, 195], [109, 155, 104], [154, 107, 176], [242, 184, 75], [38, 50, 56]];
 const publishButton = $('#hidden-publish');
 let adapter; let store; let sourceDraftId = null; let sourceRevision = null; let draft = null; let draftId = null; let savedConfirmedDraftId = null; let selectedTargetId = null; let editMode = 'paint'; let activePointer = null; let previousPoint = null; let cursorPixel = 0; let drawQueued = false; let totalMaskPixels = 0;
+let pxdOriginalRefs = null; let pxdBridge = null;
 const touchPoints = new Map(); let touchStrokeSnapshot = null; let pinchStart = null; let viewScale = 1; let viewPanX = 0; let viewPanY = 0;
 
 function readStorage(key) { try { return localStorage.getItem(key); } catch { return null; } }
@@ -129,6 +132,7 @@ async function start() {
   try {
     $('#hidden-start').disabled = true; setStatus('元画像の固定版を確認しています…');
     const revision = await resolveLocalDrawRevision(adapter, sourceDraftId, sourceSelect.value);
+    pxdBridge?.reset();
     installRevision(revision, sourceDraftId); setStatus('見つけてほしいものの名前を追加し、絵の上をなぞってください。');
   } catch (error) { setStatus(`開始できませんでした：${error.message}`); }
   finally { $('#hidden-start').disabled = false; }
@@ -163,10 +167,33 @@ async function resume() {
     const saved = validateHiddenObjectDraft(revision.document);
     const fixed = await resolveLocalDrawRevision(adapter, saved.source.draftId, saved.source.revisionId);
     if (JSON.stringify(sourceRef(saved.source.draftId, fixed)) !== JSON.stringify(saved.source) || fixed.document.width !== saved.width || fixed.document.height !== saved.height) throw new Error('元画像の固定版が一致しません');
+    pxdBridge?.reset();
     installRevision(fixed, saved.source.draftId, saved); editor.scrollIntoView({ block: 'start' }); setStatus('前回のマスクを、同じ元画像の固定版で再開しました。');
     if (saved.confirmed) { savedConfirmedDraftId = id; updateLocalPlayButton(); }
   } catch (error) { setStatus(`再開できませんでした：${error.message}`); }
   finally { resumeButton.disabled = false; }
+}
+
+async function openPxdHidden(project) {
+  if (!store || !adapter) throw new Error('端末内保存を利用できません。');
+  const imported = hasPxdPuzzle(project, 'hidden_object')
+    ? await materializePxdPuzzle(await readPxdPuzzle(project, 'hidden_object'), { tool: 'hidden_object', store })
+    : await createPxdPuzzleFromMain(project, { tool: 'hidden_object', store });
+  pxdOriginalRefs = imported.portableOriginalRefs;
+  installRevision(imported.bindings.source.revision, imported.bindings.source.draftId, imported.document);
+  draftId = null; savedConfirmedDraftId = null;
+  setStatus(imported.sourceChanged ? 'PXD内の元画像が変わったため、対象は残して正解を未確定にしました。' : imported.document.targets.length ? 'PXDのもの探しを端末内の新しい下書きとして開きました。保存後に試遊できます。' : 'PXDの元画像から空のもの探しを作りました。対象を追加し、マスクを指定してください。');
+}
+
+function mountPxdHidden() {
+  if (!store) return null;
+  return mountPxdTools({
+    tool: 'hidden_object', hasContent: () => Boolean(draft), openProject: openPxdHidden,
+    getProject: async (project) => draft && sourceRevision ? writePxdPuzzle(project, {
+      tool: 'hidden_object', document: modelWithMasks(), sourceDrawDocuments: { hidden: sourceRevision.document },
+      portableOriginalRefs: pxdOriginalRefs, sourceChanged: false
+    }) : project
+  });
 }
 
 function addTarget() {
@@ -284,7 +311,10 @@ $('#hidden-confirm').addEventListener('click', async () => {
   try { await verifyCurrentSource(); draft = confirmHiddenObjectTargets(modelWithMasks()); $('#hidden-confirmed').hidden = false; renderTargets(); setStatus(`作者指定の${draft.targets.length}対象を確定しました。短い画面でも押せる正解範囲を確保しました。`); await save(); }
   catch (error) { setStatus(`確定できませんでした：${error.message}`); }
 });
-$('#hidden-new').addEventListener('click', () => { draft = null; draftId = null; savedConfirmedDraftId = null; sourceRevision = null; selectedTargetId = null; maskSets.clear(); totalMaskPixels = 0; editor.hidden = true; setup.hidden = false; document.body.classList.remove('hidden-object-editing'); resetCanvasView(); saveButton.disabled = true; updateLocalPlayButton(); setStatus('新しいもの探しの元画像を選んでください。'); });
+$('#hidden-new').addEventListener('click', () => { pxdBridge?.reset(); draft = null; draftId = null; savedConfirmedDraftId = null; pxdOriginalRefs = null; sourceRevision = null; selectedTargetId = null; maskSets.clear(); totalMaskPixels = 0; editor.hidden = true; setup.hidden = false; document.body.classList.remove('hidden-object-editing'); resetCanvasView(); saveButton.disabled = true; updateLocalPlayButton(); setStatus('新しいもの探しの元画像を選んでください。'); });
 
 try { adapter = createIndexedDbDraftAdapter(); store = createLocalDraftStore(adapter); } catch { setStatus('このブラウザーでは端末内保存を利用できません。'); }
-resumeButton.hidden = !readStorage(LAST_KEY); loadSources();
+resumeButton.hidden = !readStorage(LAST_KEY);
+pxdBridge = mountPxdHidden();
+const pxdImported = pxdBridge ? await pxdBridge.ready : false;
+if (!pxdImported) await loadSources();

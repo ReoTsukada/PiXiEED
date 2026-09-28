@@ -1,0 +1,28 @@
+/* Decorative interaction layer: it never captures input or changes source content. */
+.px-fx-host[data-px-fx-containing-block="true"]{position:relative}
+.px-fx-layer{position:absolute;inset:0;z-index:18;overflow:hidden;contain:layout paint;pointer-events:none}
+.px-fx-layer :is(.px-fx-note,.px-fx-color,.px-fx-export,.px-fx-settle){position:absolute;display:block;visibility:hidden;pointer-events:none}
+.px-fx-layer [data-active="true"]{visibility:visible}
+.px-fx-layer [hidden]{display:none!important}
+.px-fx-note{background:linear-gradient(var(--px-fx-color),var(--px-fx-color)) left top/var(--px-fx-corner-size) 2px no-repeat,linear-gradient(var(--px-fx-color),var(--px-fx-color)) left top/2px var(--px-fx-corner-size) no-repeat,linear-gradient(var(--px-fx-color),var(--px-fx-color)) right top/var(--px-fx-corner-size) 2px no-repeat,linear-gradient(var(--px-fx-color),var(--px-fx-color)) right top/2px var(--px-fx-corner-size) no-repeat,linear-gradient(var(--px-fx-color),var(--px-fx-color)) left bottom/var(--px-fx-corner-size) 2px no-repeat,linear-gradient(var(--px-fx-color),var(--px-fx-color)) left bottom/2px var(--px-fx-corner-size) no-repeat,linear-gradient(var(--px-fx-color),var(--px-fx-color)) right bottom/var(--px-fx-corner-size) 2px no-repeat,linear-gradient(var(--px-fx-color),var(--px-fx-color)) right bottom/2px var(--px-fx-corner-size) no-repeat}
+.px-fx-color{width:14px;height:14px;border:2px solid rgba(255,255,255,.95);border-radius:50%;background:var(--px-fx-color);box-shadow:0 2px 9px rgba(20,28,24,.28)}
+.px-fx-export{width:64px;height:64px;box-sizing:border-box;border:2px solid rgba(255,255,255,.96);border-radius:7px;image-rendering:pixelated;box-shadow:0 5px 18px rgba(20,28,24,.28)}
+.px-fx-settle{box-sizing:border-box;border-radius:6px;box-shadow:inset 0 0 0 2px var(--px-fx-color),0 0 14px rgba(64,125,63,.32)}
+.px-fx-note[data-active="true"][data-phase="a"]{animation:px-fx-note-a 220ms ease-out both}
+.px-fx-note[data-active="true"][data-phase="b"]{animation:px-fx-note-b 220ms ease-out both}
+.px-fx-color[data-active="true"][data-phase="a"]{animation:px-fx-color-a 220ms cubic-bezier(.18,.74,.32,1) both}
+.px-fx-color[data-active="true"][data-phase="b"]{animation:px-fx-color-b 220ms cubic-bezier(.18,.74,.32,1) both}
+.px-fx-export[data-active="true"][data-phase="a"]{animation:px-fx-export-a 240ms cubic-bezier(.18,.74,.32,1) both}
+.px-fx-export[data-active="true"][data-phase="b"]{animation:px-fx-export-b 240ms cubic-bezier(.18,.74,.32,1) both}
+.px-fx-settle[data-active="true"][data-phase="a"]{animation:px-fx-settle-a 220ms ease-out both}
+.px-fx-settle[data-active="true"][data-phase="b"]{animation:px-fx-settle-b 220ms ease-out both}
+@keyframes px-fx-note-a{0%{opacity:0;transform:scale(.45)}35%{opacity:.95}100%{opacity:0;transform:scale(1.3)}}
+@keyframes px-fx-note-b{0%{opacity:0;transform:scale(.45)}35%{opacity:.95}100%{opacity:0;transform:scale(1.3)}}
+@keyframes px-fx-color-a{0%{opacity:0;transform:translate3d(0,0,0) translate(-50%,-50%) scale(.45)}18%{opacity:1}100%{opacity:0;transform:translate3d(var(--px-fx-dx),var(--px-fx-dy),0) translate(-50%,-50%) scale(.9)}}
+@keyframes px-fx-color-b{0%{opacity:0;transform:translate3d(0,0,0) translate(-50%,-50%) scale(.45)}18%{opacity:1}100%{opacity:0;transform:translate3d(var(--px-fx-dx),var(--px-fx-dy),0) translate(-50%,-50%) scale(.9)}}
+@keyframes px-fx-export-a{0%{opacity:0;transform:translate3d(0,0,0) translate(-50%,-50%) scale(.35)}16%{opacity:1}100%{opacity:0;transform:translate3d(var(--px-fx-dx),var(--px-fx-dy),0) translate(-50%,-50%) scale(.7)}}
+@keyframes px-fx-export-b{0%{opacity:0;transform:translate3d(0,0,0) translate(-50%,-50%) scale(.35)}16%{opacity:1}100%{opacity:0;transform:translate3d(var(--px-fx-dx),var(--px-fx-dy),0) translate(-50%,-50%) scale(.7)}}
+@keyframes px-fx-settle-a{0%{opacity:0;transform:scale(.97)}28%{opacity:.9;transform:scale(1.015)}100%{opacity:0;transform:scale(1)}}
+@keyframes px-fx-settle-b{0%{opacity:0;transform:scale(.97)}28%{opacity:.9;transform:scale(1.015)}100%{opacity:0;transform:scale(1)}}
+@media(prefers-reduced-motion:reduce){.px-fx-layer,.px-fx-layer *,.px-fx-layer::before,.px-fx-layer::after,.px-fx-layer *::before,.px-fx-layer *::after{animation:none!important;transition:none!important;visibility:hidden!important}}
+html[data-pixieed-motion="reduced"] .px-fx-layer,html[data-pixieed-motion="reduced"] .px-fx-layer *,html[data-pixieed-motion="reduced"] .px-fx-layer::before,html[data-pixieed-motion="reduced"] .px-fx-layer::after,html[data-pixieed-motion="reduced"] .px-fx-layer *::before,html[data-pixieed-motion="reduced"] .px-fx-layer *::after{animation:none!important;transition:none!important;visibility:hidden!important}

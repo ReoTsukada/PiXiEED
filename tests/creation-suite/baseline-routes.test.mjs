@@ -47,15 +47,17 @@ test('the public telescope route forwards into the globe tool', () => {
   assert.match(read('tools/index.html'), /href="\/telescope\/"/);
 });
 
-test('the creation tools list links to the five local creation routes', () => {
+test('the creation tools list links to four creation routes and keeps the game coming soon', () => {
   const tools = read('tools/index.html');
   for (const [href, label] of [
-    ['/audio/', 'かんたん音楽'],
+    ['/audio/', 'ドットで音楽'],
     ['/jigsaw/', 'かんたんジグソー'],
     ['/spot-difference/', 'かんたん間違い探し'],
     ['/hidden-object/', 'かんたんもの探し'],
-    ['/game/', 'かんたんゲーム'],
   ]) {
     assert.match(tools, new RegExp(`href="${href.replaceAll('/', '\\/')}"[\\s\\S]*?<h2>${label}</h2>`));
   }
+  assert.doesNotMatch(tools, /href="\/game\/"/);
+  assert.doesNotMatch(read('home/index.html'), /href="\/game\/"/);
+  assert.match(tools, /tool-card--soon[\s\S]*?<h2>かんたんゲーム<\/h2>[\s\S]*?もうすぐ/);
 });

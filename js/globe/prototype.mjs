@@ -1,8 +1,8 @@
-import { initAstroUi } from './astro-ui.mjs?v=20260927-sky-events-v1';
+import { initAstroUi } from './astro-ui.mjs?v=20260928-sky-labels-1';
 import { initPostUi } from './post-ui.mjs?v=20260928-puzzle-handoff-1';
 import { sharedSky, sharedFaintSky, SPRITE_MAGNITUDE } from './real-sky.mjs?v=20260927-sky-events-v1';
 import { createSupabaseGlobeAuth, createSupabaseGlobeStore } from './post-supabase.mjs?v=20260928-puzzle-handoff-1';
-import { createGlobeRenderer, decodeRasterData, getSelectionStageLabel, prepareGeoJsonFeatures } from './renderer.mjs?v=20260927-sky-events-v1';
+import { createGlobeRenderer, decodeRasterData, getSelectionStageLabel, prepareGeoJsonFeatures } from './renderer.mjs?v=20260927-solar-tool-2';
 import { openHandoffComposer, pendingHandoff } from './post-handoff.mjs?v=20260928-puzzle-handoff-1';
 
 const embedMode = new URLSearchParams(location.search).get('embed') === '1';
@@ -15,6 +15,7 @@ const selectedOwner = document.querySelector('#selectedOwner');
 const selectedStage = document.querySelector('#selectedStage');
 const placeHere = document.querySelector('#placeHere');
 const accountSlot = document.querySelector('#accountSlot');
+const primaryAction = document.querySelector('#globePrimaryAction');
 let postUi = null;
 let currentSelection = null;
 
@@ -97,11 +98,31 @@ placeHere.addEventListener('click', () => {
   if (currentSelection && postUi) postUi.openComposer({ selection: currentSelection });
 });
 
+function syncPrimaryAction() {
+  if (!primaryAction) return;
+  const telescopeTool = document.documentElement.classList.contains('is-tool-telescope');
+  const inSolarSystem = globeStage.classList.contains('is-orrery');
+  const label = telescopeTool ? (inSolarSystem ? '望遠鏡に戻る' : '太陽系を見る') : '作品を投稿する';
+  const icon = telescopeTool ? (inSolarSystem ? 'telescope' : 'solar-system') : 'add';
+  primaryAction.setAttribute('aria-label', label);
+  primaryAction.querySelector('img').src = `/assets/icons/pixieed/${icon}.svg`;
+  document.querySelector('[data-globe-nav-map]')?.toggleAttribute('aria-current', !telescopeTool);
+  document.querySelector('[data-globe-nav-tools]')?.toggleAttribute('aria-current', telescopeTool);
+  if (!telescopeTool) document.querySelector('[data-globe-nav-map]')?.setAttribute('aria-current', 'page');
+  else document.querySelector('[data-globe-nav-tools]')?.setAttribute('aria-current', 'page');
+}
+primaryAction?.addEventListener('click', () => {
+  if (document.documentElement.classList.contains('is-tool-telescope')) globalThis.__PIXIEED_ASTRO__?.toggleTelescopeSolarSystem();
+  else postUi?.openComposer();
+});
+globeStage?.addEventListener('pixieed:astro-viewchange', syncPrimaryAction);
+
 // /telescope/ opens the shared sky simulation as a stand-alone tool.
 function openToolFromUrl() {
   if (new URLSearchParams(location.search).get('tool') !== 'telescope') return;
   document.documentElement.classList.add('is-tool-telescope');
   document.title = '望遠鏡｜PiXiEED';
+  syncPrimaryAction();
   const leave = () => { if (document.referrer && new URL(document.referrer).origin === location.origin && history.length > 1) history.back(); else location.href = '/tools/'; };
   const open = () => globalThis.__PIXIEED_ASTRO__?.openTelescopeTool({ onClose: leave });
   if (globalThis.__PIXIEED_ASTRO__) open(); else requestAnimationFrame(open);
@@ -139,6 +160,7 @@ try {
   // GeoJSON path remains available for recovery and never affects WebGL startup.
   console.warn('Generated globe raster unavailable; using Canvas fallback.', rasterError);
   createPrototypeRenderer({ forceCanvas: true });
+  openToolFromUrl();
   try {
     const [world, prefectures] = await Promise.all([
       readJson('assets/maps/world-countries-110m.geojson'),

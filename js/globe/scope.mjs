@@ -116,21 +116,25 @@ void main() {
   float aboveHorizon = max(elevDeg, 0.0);
 
   // ---- Sky: day, twilight and night blend continuously with the Sun's altitude.
-  float dayAmt = smoothstep(-8.0, 8.0, sunAltDeg);
+  float dayAmt = smoothstep(-7.0, 8.0, sunAltDeg);
   float dim = max(0.02, pow(1.0 - uCoverage, 0.55));
-  vec3 nightSky = mix(vec3(0.004, 0.008, 0.022), vec3(0.006, 0.011, 0.030), exp(-aboveHorizon / 18.0));
+  vec3 nightSky = mix(vec3(0.006, 0.012, 0.030), vec3(0.016, 0.023, 0.052), exp(-aboveHorizon / 18.0));
   vec3 daySky = mix(vec3(0.10, 0.27, 0.62), vec3(0.58, 0.74, 0.92), exp(-aboveHorizon / 22.0)) * 2.1;
-  vec3 twilightSky = mix(vec3(0.03, 0.06, 0.20), vec3(0.10, 0.16, 0.40), exp(-aboveHorizon / 25.0)) * 1.6;
-  float twilightAmt = bell(sunAltDeg, -5.0, 4.5);
+  vec3 twilightSky = mix(vec3(0.025, 0.045, 0.16), vec3(0.15, 0.13, 0.30), exp(-aboveHorizon / 17.0)) * 1.55;
+  float twilightAmt = smoothstep(-18.0, -7.0, sunAltDeg) * (1.0 - smoothstep(1.0, 9.0, sunAltDeg));
   vec3 color = mix(nightSky, twilightSky, twilightAmt);
   color = mix(color, daySky * dim, dayAmt);
 
   // Dawn / dusk glow on the horizon toward the Sun, the pink Belt of Venus and
   // the Earth's blue shadow band on the opposite side.
   float warm = bell(sunAltDeg, -0.8, 5.5);
-  vec3 warmColor = mix(vec3(1.0, 0.66, 0.30), vec3(1.0, 0.30, 0.12), smoothstep(3.0, -2.0, sunAltDeg));
+  vec3 warmColor = mix(vec3(1.0, 0.66, 0.30), vec3(1.0, 0.30, 0.12), 1.0 - smoothstep(-2.0, 3.0, sunAltDeg));
   float side = 0.22 + 0.78 * pow(towardSun, 2.0);
   color += warmColor * warm * side * (0.95 * exp(-aboveHorizon / 4.0) + 0.35 * exp(-aboveHorizon / 16.0)) * mix(1.0, dim, dayAmt);
+  // Long atmospheric paths tint a broad band near the setting Sun, while the
+  // opposite horizon stays cooler. The sky is still dark when the Sun is far below it.
+  float duskBand = bell(sunAltDeg, -2.5, 8.0) * exp(-aboveHorizon / 9.0);
+  color += vec3(0.55, 0.17, 0.22) * duskBand * pow(towardSun, 1.4) * 0.55;
   float belt = bell(sunAltDeg, -3.0, 3.5);
   color += vec3(0.85, 0.45, 0.50) * 0.30 * pow(antiSun, 1.5) * belt * bell(elevDeg, 9.0, 7.0);
   color *= 1.0 - 0.35 * pow(antiSun, 1.2) * belt * exp(-aboveHorizon / 3.0);
@@ -152,7 +156,9 @@ void main() {
     vec3 real = textureGrad(uSky, uv, ddx, ddy).rgb;
     color += max(real - vec3(0.012, 0.02, 0.04), vec3(0.0)) * starFade * 1.5 * realAmt;
   }
-  color += starField(celestial, pixelAngle) * starFade * 1.6 * (1.0 - realAmt);
+  // Real catalogue stars take over at narrow fields in a separate point pass.
+  // Procedural stars are only a fallback while the catalogue is unavailable.
+  color += starField(celestial, pixelAngle) * starFade * 1.6 * (1.0 - uSkyReady);
 
   // ---- Planets: a point of light at low power, a lit, banded disc (with
   // Saturn's rings and the planet's shadow on them) at high power.
@@ -165,7 +171,9 @@ void main() {
     float discPx = info.x / pixelAngle;
     float pointAmt = 1.0 - smoothstep(1.2, 3.0, discPx);
     float psf = pixelAngle * 1.15;
-    color += uPlanetTint[i] * info.y * exp(-(ang * ang) / (psf * psf)) * pointAmt;
+    float pointCore = exp(-(ang * ang) / (psf * psf));
+    float pointHalo = 0.16 * exp(-(ang * ang) / (psf * psf * 14.0));
+    color += uPlanetTint[i] * info.y * (pointCore + pointHalo) * pointAmt * mix(1.0, 0.06, dayAmt);
     float reach = info.x * (kind == 4 ? 2.35 : 1.0) + 2.0 * pixelAngle;
     if (pointAmt >= 1.0 || ang > reach) continue;
     vec3 pole = uPlanetPole[i];
@@ -232,22 +240,29 @@ void main() {
   float mu = sqrt(max(0.0, 1.0 - sunR * sunR));
   float limb = 1.0 - 0.62 * (1.0 - mu);
   float granulation = 0.94 + 0.10 * noise3(vec3(qs * 26.0, 1.7));
-  float spots = smoothstep(0.66, 0.76, noise3(vec3(qs * 2.4, 4.2))) * smoothstep(0.92, 0.55, sunR);
+  float spots = smoothstep(0.66, 0.76, noise3(vec3(qs * 2.4, 4.2))) * (1.0 - smoothstep(0.55, 0.92, sunR));
   float uncovered = 1.0 - uCoverage;
   float nakedLevel = 7.0 * exp(-0.02 * (airSun - 1.0));
-  vec3 nakedSun = vec3(1.0, 0.97, 0.90) * limb * nakedLevel * sunTrans * (1.0 - 0.5 * spots);
+  // Without a filter the photosphere is beyond display range: no visible spots
+  // or limb texture. Detail belongs only to the deliberately filtered view.
+  vec3 nakedSun = vec3(1.0, 0.97, 0.90) * nakedLevel * sunTrans;
   vec3 filteredSun = vec3(1.0, 0.60, 0.20) * limb * granulation * (1.0 - 0.55 * spots) * 1.05;
   vec3 sunColor = mix(nakedSun, filteredSun, uFilter);
-  float halo = (0.55 / (1.0 + sunR * sunR * 0.7) + 0.05 * exp(-sunR * 0.06)) * pow(uncovered, 1.3) * (1.0 - uFilter) * facing;
-  color += vec3(1.0, 0.95, 0.85) * sunTrans * halo;
+  float sourceVisible = pow(uncovered, 1.3) * (1.0 - uFilter) * facing;
+  float halo = (0.70 * exp(-sunAngle * 10.0) + 0.18 * exp(-sunAngle * 2.5)) * sourceVisible;
+  color += vec3(1.0, 0.89, 0.73) * sqrt(sunTrans) * halo;
 
   // Atmospheric aureole and crepuscular rays around a low Sun.
-  float lowSun = smoothstep(16.0, 0.0, sunAltDeg) * smoothstep(-5.0, -0.5, sunAltDeg) * (1.0 - uFilter) * pow(uncovered, 1.3);
+  float lowSun = (1.0 - smoothstep(0.0, 16.0, sunAltDeg)) * smoothstep(-5.0, -0.5, sunAltDeg) * sourceVisible;
   float aureole = (exp(-sunAngle * 2.2) * 0.85 + exp(-sunAngle * 0.5) * 0.16) * lowSun;
   float phiSun = atan(q.y, q.x);
   float rays = 0.45 + 0.9 * pow(fbm3(vec3(cos(phiSun) * 3.6, sin(phiSun) * 3.6, 0.3)), 1.4);
   color += vec3(1.0, 0.70, 0.38) * sqrt(sunTrans) * 0.85 * (aureole + rays * exp(-sunAngle * 5.0) * 0.14 * lowSun);
   color = mix(color, sunColor, sunDisc);
+  // A few pixels of optical glare keep the unfiltered Sun brilliant even in a
+  // wide field, without enlarging its actual angular disc or the eclipse Moon.
+  float glareRadius = max(rs * 3.2, pixelAngle * 2.6);
+  color += vec3(1.0, 0.92, 0.76) * sqrt(sunTrans) * sourceVisible * 1.8 * exp(-pow(sunAngle / glareRadius, 1.5));
 
   // Green flash: the last sliver of the upper limb at sunrise / sunset.
   float flash = bell(sunAltDeg, -0.12, 0.28) * (1.0 - uFilter);
@@ -327,6 +342,53 @@ void main() {
 }
 `;
 
+// At high magnification the equirectangular sky image runs out of resolution.
+// Draw the same catalogue as sharp optical point images instead of inventing stars.
+const STAR_VERTEX_SOURCE = `#version 300 es
+precision highp float;
+in vec3 aDirection;
+in vec4 aAppearance;
+uniform mat3 uCelestialToEnu;
+uniform vec2 uAim;
+uniform vec2 uViewport;
+uniform float uTanHalf;
+uniform float uFade;
+out vec3 vColor;
+out float vStrength;
+void main() {
+  vec3 local = uCelestialToEnu * aDirection;
+  float ca = cos(uAim.y), sa = sin(uAim.y), cz = cos(uAim.x), sz = sin(uAim.x);
+  vec3 forward = vec3(ca * sz, ca * cz, sa);
+  vec3 right = vec3(cz, -sz, 0.0);
+  vec3 up = cross(right, forward);
+  float depth = dot(local, forward);
+  if (depth <= 0.0 || local.z <= 0.0 || uFade <= 0.001) {
+    gl_Position = vec4(2.0, 2.0, 0.0, 1.0); gl_PointSize = 0.0; return;
+  }
+  vec2 pos = vec2(dot(local, right), dot(local, up)) / (depth * uTanHalf);
+  gl_Position = vec4(pos.x * uViewport.y / uViewport.x, pos.y, 0.0, 1.0);
+  float flux = pow(10.0, -0.4 * (aAppearance.w - 2.0));
+  gl_PointSize = clamp(5.0 + 2.0 * sqrt(flux), 5.0, 13.0);
+  vStrength = uFade * clamp(0.18 + flux * 0.36, 0.12, 1.0);
+  vColor = aAppearance.rgb;
+}
+`;
+
+const STAR_FRAGMENT_SOURCE = `#version 300 es
+precision highp float;
+in vec3 vColor;
+in float vStrength;
+out vec4 outColor;
+void main() {
+  vec2 p = (gl_PointCoord - 0.5) * 2.0;
+  float r2 = dot(p, p);
+  float core = exp(-r2 * 13.0);
+  float halo = exp(-r2 * 3.2) * 0.16;
+  float intensity = (core + halo) * vStrength;
+  outColor = vec4(mix(vec3(1.0), vColor, 0.55) * intensity, intensity);
+}
+`;
+
 function compile(gl, type, source) {
   const shader = gl.createShader(type);
   gl.shaderSource(shader, source);
@@ -343,7 +405,7 @@ const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const PLANET_KINDS = { mercury: 0, venus: 1, mars: 2, jupiter: 3, saturn: 4, uranus: 5, neptune: 6 };
 const PLANET_TINTS = { mercury: [1, 0.95, 0.9], venus: [1, 0.98, 0.9], mars: [1, 0.62, 0.42], jupiter: [1, 0.94, 0.84], saturn: [1, 0.92, 0.74], uranus: [0.78, 0.95, 1], neptune: [0.6, 0.72, 1] };
 /** Linear brightness of a point image from its magnitude (Jupiter about 6, Saturn about 0.4). */
-export function pointBrightness(magnitude) { return Math.min(40, 2.5 * 10 ** (-0.4 * (magnitude + 1.5))); }
+export function pointBrightness(magnitude) { return Math.min(40, Math.max(0.06, 2.5 * 10 ** (-0.4 * (magnitude + 1.5)))); }
 
 /** Lift a local (east, north, up) direction by atmospheric refraction (Saemundsson). */
 export function refracted(local) {
@@ -370,13 +432,40 @@ export function createScope({ canvas, onChange = () => {} } = {}) {
   let azimuth = 180 * DEG;
   let altitude = 30 * DEG;
   let fov = 3;
-  let filterOn = true;
+  let filterOn = false;
   let tracking = 'sun';
   let observer_ = null;
   let frame = null;
   let skyTexture = null;
   let skyImage = null;
   let skyReady = 0;
+  let starCatalogue = null;
+  let stars = null;
+  function uploadStars() {
+    if (!gl || !starCatalogue || stars) return;
+    const packed = new Float32Array(starCatalogue.count * 7);
+    for (let i = 0; i < starCatalogue.count; i += 1) {
+      const ra = starCatalogue.ra[i] * DEG; const dec = starCatalogue.dec[i] * DEG;
+      const [r, g, b] = starCatalogue.colors(i);
+      packed.set([Math.cos(dec) * Math.sin(ra), Math.sin(dec), Math.cos(dec) * Math.cos(ra), r / 255, g / 255, b / 255, starCatalogue.mag[i]], i * 7);
+    }
+    const starProgram = gl.createProgram();
+    const vertex = compile(gl, gl.VERTEX_SHADER, STAR_VERTEX_SOURCE);
+    const fragment = compile(gl, gl.FRAGMENT_SHADER, STAR_FRAGMENT_SOURCE);
+    gl.attachShader(starProgram, vertex); gl.attachShader(starProgram, fragment);
+    gl.linkProgram(starProgram); gl.deleteShader(vertex); gl.deleteShader(fragment);
+    if (!gl.getProgramParameter(starProgram, gl.LINK_STATUS)) throw new Error(`Star program failed: ${gl.getProgramInfoLog(starProgram)}`);
+    const starVao = gl.createVertexArray(); const starBuffer = gl.createBuffer();
+    gl.bindVertexArray(starVao); gl.bindBuffer(gl.ARRAY_BUFFER, starBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, packed, gl.STATIC_DRAW);
+    const direction = gl.getAttribLocation(starProgram, 'aDirection');
+    const appearance = gl.getAttribLocation(starProgram, 'aAppearance');
+    gl.enableVertexAttribArray(direction); gl.vertexAttribPointer(direction, 3, gl.FLOAT, false, 28, 0);
+    gl.enableVertexAttribArray(appearance); gl.vertexAttribPointer(appearance, 4, gl.FLOAT, false, 28, 12);
+    gl.bindVertexArray(null);
+    stars = { program: starProgram, vao: starVao, buffer: starBuffer, count: starCatalogue.count,
+      locations: Object.fromEntries(['uEnuToCelestial', 'uAim', 'uViewport', 'uTanHalf', 'uFade'].map((name) => [name, gl.getUniformLocation(starProgram, name)])) };
+  }
   function uploadSky() {
     gl.bindTexture(gl.TEXTURE_2D, skyTexture);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, skyImage);
@@ -416,6 +505,7 @@ export function createScope({ canvas, onChange = () => {} } = {}) {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
     gl.bindTexture(gl.TEXTURE_2D, null);
     if (skyImage) uploadSky();
+    if (starCatalogue) uploadStars();
     return true;
   }
 
@@ -483,6 +573,25 @@ export function createScope({ canvas, onChange = () => {} } = {}) {
     gl.uniform1f(locations.uSkyReady, skyReady);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     gl.bindVertexArray(null);
+    if (stars && skyReady) {
+      const sunDeg = Math.asin(clamp(sunApparent[2], -1, 1)) / DEG;
+      const smooth = (a, b, v) => { const t = clamp((v - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+      const day = smooth(-7, 8, sunDeg);
+      const twilight = smooth(-18, -7, sunDeg) * (1 - smooth(1, 9, sunDeg));
+      const visible = 1 - clamp(day * 2.2 + twilight * 0.6, 0, 1);
+      const fade = visible * (1 - smooth(3, 10, fov));
+      if (fade > 0.001) {
+        gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE);
+        gl.useProgram(stars.program); gl.bindVertexArray(stars.vao);
+        gl.uniformMatrix3fv(stars.locations.uEnuToCelestial, false, enuToCelestialMatrix());
+        gl.uniform2f(stars.locations.uAim, azimuth, altitude);
+        gl.uniform2f(stars.locations.uViewport, canvas.width, canvas.height);
+        gl.uniform1f(stars.locations.uTanHalf, Math.tan((fov * DEG) / 2));
+        gl.uniform1f(stars.locations.uFade, fade);
+        gl.drawArrays(gl.POINTS, 0, stars.count);
+        gl.bindVertexArray(null); gl.disable(gl.BLEND);
+      }
+    }
   }
 
   const planetL = new Float32Array(21); const planetSun = new Float32Array(21); const planetPole = new Float32Array(21);
@@ -580,7 +689,7 @@ export function createScope({ canvas, onChange = () => {} } = {}) {
       if (celestial) state = celestial;
       tracking = 'sun';
       recompute();
-      if (observation && observation.sunAltitude < -2) {
+      if (observation && observation.sunAltitude < -0.833) {
         tracking = observation.moonAltitude > 0 ? 'moon' : null;
         if (!tracking) { azimuth = 180 * DEG; altitude = 25 * DEG; }
         applyTracking();
@@ -597,7 +706,7 @@ export function createScope({ canvas, onChange = () => {} } = {}) {
     track(target) { tracking = target; applyTracking(); onChange(snapshot()); requestDraw(); },
     getSnapshot: snapshot,
     /** Use a canvas painted by real-sky.mjs for wide fields. */
-    setSkyImage(image) { skyImage = image; if (gl) { uploadSky(); requestDraw(); } },
+    setSkyImage(image, catalogue = null) { skyImage = image; starCatalogue = catalogue; if (gl) { uploadSky(); if (starCatalogue) uploadStars(); requestDraw(); } },
     redraw: requestDraw,
     destroy() {
       canvas.removeEventListener('pointerdown', onPointerDown);
@@ -606,6 +715,13 @@ export function createScope({ canvas, onChange = () => {} } = {}) {
       canvas.removeEventListener('pointercancel', onPointerUp);
       canvas.removeEventListener('wheel', onWheel);
       observer_?.disconnect();
+      if (gl) {
+        if (stars) { gl.deleteBuffer(stars.buffer); gl.deleteVertexArray(stars.vao); gl.deleteProgram(stars.program); }
+        if (skyTexture) gl.deleteTexture(skyTexture);
+        if (buffer) gl.deleteBuffer(buffer);
+        if (vao) gl.deleteVertexArray(vao);
+        if (program) gl.deleteProgram(program);
+      }
     }
   });
 }

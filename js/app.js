@@ -1,3 +1,4 @@
+import { mountSiteHeader } from './site-header.mjs?rev=20260928-touch-motion-1';
 import { hasExplicitMapPlacement, isSampleWork, publicWorksOnly } from './public-work-policy.mjs?rev=20260927-map-gallery-2';
 import { events as fallbackEvents, stores as fallbackStores, works as fallbackWorks } from '../data/site-data.js?rev=20260924-no-samples-1';
 import { mapConfig, supabaseConfig } from '../data/site-config.js?rev=20260918-post-v1';
@@ -4467,6 +4468,7 @@ function startPublicDataRefresh() {
 
 async function boot() {
   renderPublicShell();
+  mountSiteHeader();
   setActiveNav();
   loadCachedPublicData();
   loadCachedUserMapPosts();

@@ -33,7 +33,7 @@ body.app-page--tool-draw #main{height:100dvh}
 
 /* The stage is the canvas' containing box, including on narrow/short screens. */
 .draw-board{display:flex;align-items:center;justify-content:center;container-type:size}
-#draw-canvas{flex:none;width:min(100cqw,100cqh,560px);max-width:none;max-height:none;height:auto}
+#draw-canvas{flex:none;width:min(100cqw,calc(100cqh * var(--draw-aspect,1)),560px);max-width:none;max-height:none;height:auto;aspect-ratio:var(--draw-aspect,1)}
 .draw-page{padding-bottom:calc(98px + env(safe-area-inset-bottom))}
 @media(max-height:620px){.draw-page{padding-bottom:calc(92px + env(safe-area-inset-bottom))}}
 @media(max-height:400px) and (min-width:480px){
@@ -46,3 +46,9 @@ body.app-page--tool-draw #main{height:100dvh}
   .draw-tools,.draw-actions{justify-content:flex-start;flex-wrap:wrap;margin-top:4px}
   .draw-tools button,.draw-actions button{min-height:28px;padding:2px 6px}
 }
+
+/* 16 colours + transparent in two tidy rows, all reachable without scrolling */
+body[data-page="draw"] .draw-palette{display:grid!important;grid-template-columns:repeat(9,minmax(0,1fr));justify-items:center;align-items:center;gap:5px 4px;max-width:100%;max-height:none!important;overflow:visible!important;padding:3px 2px}
+body[data-page="draw"] .draw-palette .draw-color{flex:none;width:100%;max-width:30px;height:auto;aspect-ratio:1}
+@media(max-height:420px){body[data-page="draw"] .draw-palette{gap:3px}body[data-page="draw"] .draw-palette .draw-color{max-width:22px}}
+@media(min-width:720px){body[data-page="draw"] .draw-palette{grid-template-columns:repeat(17,30px);justify-content:start}}

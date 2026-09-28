@@ -1,0 +1,108 @@
+/* One compact header for public pages and full-screen tools. */
+:root{--px-header-height:64px;--header-h:var(--px-header-height);--px-press-time:140ms;--px-press-ease:cubic-bezier(.2,.7,.2,1)}
+.px-header-ready body .site-header.px-site-header{display:block;position:sticky;top:0;z-index:35;min-height:var(--px-header-height);border:0;background:rgba(247,248,246,.97);box-shadow:0 1px 0 #1b202510}
+.px-site-header,.px-site-header *{box-sizing:border-box}
+.px-site-header .px-header-inner,.px-site-header.px-header-inner{display:flex;align-items:center;gap:8px;width:100%;min-height:var(--px-header-height);padding:8px max(12px,env(safe-area-inset-right)) 8px max(12px,env(safe-area-inset-left));margin:0;min-width:0}
+.px-site-header .px-header-brand{display:flex;align-items:center;gap:9px;flex:none;min-width:44px;min-height:44px;color:#1b2025;text-decoration:none;font:750 1rem/1 system-ui,-apple-system,sans-serif;letter-spacing:0}
+.px-header-brand img{display:block;width:40px;height:40px;border-radius:9px;background:#05090c;image-rendering:pixelated}
+.px-site-header .brand-mark{flex:none;width:40px;height:40px;background-size:40px 40px;border:0;border-radius:9px;transform:none}
+.px-site-header .px-header-pass{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 18px;grid-template-rows:13px 13px;align-content:center;align-items:center;column-gap:4px;row-gap:3px;flex:none;width:100px;min-width:100px;min-height:44px;height:44px;margin-left:auto;padding:6px 7px;overflow:hidden;isolation:isolate;border:1px solid #ad842c40;border-radius:12px;background:linear-gradient(155deg,#fffaf0,#f3ead7);box-shadow:inset 0 1px 0 #fff,0 2px 0 #87642512;color:#6b521d;font:750 12px/1 system-ui,-apple-system,sans-serif;font-variant-numeric:tabular-nums;white-space:nowrap;cursor:pointer;touch-action:manipulation}
+.px-header-pass[data-active=true]{background:linear-gradient(155deg,#fff1c7,#f6daa0);color:#543f14;border-color:#b0843055}
+.px-header-pass:disabled{cursor:default;opacity:.8}
+.px-header-pass svg{display:block;width:10px;height:10px;fill:currentColor;stroke:none;flex:none;shape-rendering:crispEdges}
+.px-pass-top{display:flex;align-items:center;gap:2px;min-width:0}
+.px-pass-top [data-header-pass-label]{overflow:hidden;text-overflow:ellipsis}
+.px-header-pass[data-long=true] .px-pass-pixel-star{display:none}
+.px-pass-gauge{display:grid;grid-template-rows:repeat(3,3px);gap:2px;align-self:stretch;min-width:0}
+.px-pass-gauge-row{position:relative;display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:1px;min-width:0;overflow:hidden}
+.px-pass-cell{display:block;min-width:0;height:3px;border-radius:.5px;background:#92753926;box-shadow:inset 0 1px 0 #54380d12}
+.px-pass-cell[data-filled=true]{background:#b78022;box-shadow:inset 0 1px 0 #fff7}
+.px-pass-gauge-row:nth-child(2) .px-pass-cell[data-filled=true]{background:#cb993a}
+.px-pass-gauge-row:first-child .px-pass-cell[data-filled=true]{background:#dfb353}
+.px-pass-add{grid-column:2;grid-row:1 / -1;display:grid;place-items:center;width:18px;height:24px;border:1px solid #b38c3440;border-radius:6px;background:#ffffff80;box-shadow:inset 0 1px 0 #fff8;color:inherit;font:650 17px/1 system-ui,sans-serif}
+.px-header-pass[data-pending=true]{cursor:progress;opacity:.72}
+/* A single short sweep after a reward. No animation runs while idle. */
+.px-header-pass::after{content:'';position:absolute;inset:-4px auto -4px 0;width:35%;pointer-events:none;opacity:0;background:linear-gradient(90deg,transparent,#fff9,transparent);transform:translateX(-150%) skewX(-20deg)}
+.px-header-pass[data-recharged=true]::after{animation:px-pass-recharge 450ms var(--px-press-ease) 1}
+@keyframes px-pass-recharge{0%{opacity:0;transform:translateX(-150%) skewX(-20deg)}20%{opacity:.9}100%{opacity:0;transform:translateX(400%) skewX(-20deg)}}
+.px-site-header .menu-toggle{width:44px;height:44px;min-width:44px}
+.px-site-header :is(a,button,summary):focus-visible{outline:3px solid #357bb3;outline-offset:2px}
+.px-site-header .px-header-utilities{flex:none}
+.px-header-ready [data-pass-slot]{display:none!important}
+/* Full-screen editors reserve exactly the height of the shared bar. */
+.px-header-ready body:is(.app-page--tool-draw,.app-page--tool-jigsaw,.app-page--tool-creation-game,.app-page--tool-creation-spot,.app-page--tool-creation-hidden) #main{height:calc(100dvh - var(--px-header-height))}
+.px-header-ready body:is(.hidden-object-editing,.spot-editing) #main{top:var(--px-header-height);height:calc(100dvh - var(--px-header-height))}
+.px-header-ready .pixfind-page--playing{top:var(--px-header-height);height:auto}
+.audio-heading.px-site-header{gap:6px;flex:none;min-height:var(--px-header-height);padding:0;margin:0}
+.audio-heading.px-site-header h1{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.audio-heading.px-site-header .px-header-pass{width:96px;min-width:96px}
+.audio-heading.px-site-header .audio-header-actions{gap:3px}
+.lc-top.px-site-header{display:flex;top:var(--lc-safe-t);left:0;right:0;gap:8px;min-height:64px;padding:8px 12px;pointer-events:none;background:linear-gradient(#0d111499,transparent)}
+.lc-top.px-site-header>*{pointer-events:auto}
+.lc-top.px-site-header .px-header-brand{color:white}
+.lc-top.px-site-header .lc-zoom-stops{position:absolute;top:calc(100% + 4px);left:50%;transform:translateX(-50%);max-width:calc(100vw - 24px);overflow-x:auto}
+.lc-top.px-site-header .px-header-pass,.px-standalone-globe .px-header-pass{background:linear-gradient(155deg,#2c2c25f5,#17222af5);color:#ffe4a6;border-color:#e0b65c60;box-shadow:inset 0 1px 0 #fff1,0 2px 0 #0002}
+.lc-top.px-site-header .px-pass-add,.px-standalone-globe .px-pass-add{background:#ffffff0d;border-color:#e0b65c45;box-shadow:inset 0 1px 0 #fff1}
+.lc-top.px-site-header .px-pass-cell,.px-standalone-globe .px-pass-cell{background:#e0b65c20}
+.lc-top.px-site-header .px-pass-cell[data-filled=true],.px-standalone-globe .px-pass-cell[data-filled=true]{background:#edc467}
+.lc-top.px-site-header .lc-top-left{gap:0}
+.lc[data-recording=true] .px-site-header *{pointer-events:none}
+.px-header-ready body.px-standalone-globe .site-header.px-site-header{background:#08121c;color:#e9f6f7}
+.px-standalone-globe .px-header-brand{color:#e9f6f7}
+.px-standalone-globe .prototype-header{display:none}
+.px-standalone-globe .globe-prototype{padding:0;width:100%;min-height:0;grid-template-rows:minmax(0,1fr);height:calc(100dvh - var(--px-header-height))}
+.px-standalone-globe .globe-stage{min-height:0;height:calc(100dvh - var(--px-header-height));border:0;border-radius:0}
+@media(max-width:600px){.px-site-header .px-header-brand>span:not(.brand-mark){display:none}.px-site-header .px-header-inner,.px-site-header.px-header-inner{gap:6px}.audio-heading.px-site-header{padding:0;gap:5px}}
+
+/* Public controls share a small, physical response; canvases keep their own gestures. */
+.px-header-ready :is(.px-header-pass,.px-header-utilities button,.px-header-utilities summary,.button,.app-tabs>a,.app-tabs>button,.lc-nav>a,.lc-nav>button){transition:transform var(--px-press-time) var(--px-press-ease),opacity var(--px-press-time) ease}
+.px-header-ready :is(.px-header-pass,.px-header-utilities button,.px-header-utilities summary,.button,.app-tabs>a,.app-tabs>button,.lc-nav>a,.lc-nav>button):not(:disabled):active{transform:translateY(1px) scale(.96)}
+.px-header-ready .tool-card{background-image:linear-gradient(145deg,#ffffff90,transparent 65%);transition:transform 180ms var(--px-press-ease);box-shadow:0 2px 0 #17233308}
+.px-header-ready .tool-card__icon{position:relative;isolation:isolate;box-shadow:inset 0 1px 0 #fff8}
+.px-header-ready .tool-card__icon::after{content:'';position:absolute;right:5px;bottom:5px;width:3px;height:3px;background:currentColor;box-shadow:-4px 0 currentColor,0 -4px currentColor;opacity:.18;pointer-events:none}
+.px-header-ready .tool-card:active{transform:translateY(1px) scale(.985)}
+@media(hover:hover) and (pointer:fine){.px-header-ready .px-header-pass:not(:disabled):hover{transform:translateY(-1px)}.px-header-ready .tool-card:hover{transform:translateY(-3px);box-shadow:0 2px 0 #17233308}}
+@media(prefers-reduced-motion:reduce){.px-header-ready :is(.px-header-pass,.px-header-utilities button,.px-header-utilities summary,.button,.app-tabs>a,.app-tabs>button,.lc-nav>a,.lc-nav>button,.tool-card){transition:none;transform:none}.px-header-ready .px-header-pass::after{animation:none}.px-header-ready :is(.px-header-pass,.px-header-utilities button,.px-header-utilities summary,.button,.app-tabs>a,.app-tabs>button,.lc-nav>a,.lc-nav>button,.tool-card):is(:active,:hover){transform:none}}
+/* Override the older global reduced-motion duration on every new gauge cell. */
+@media(prefers-reduced-motion:reduce){.px-header-ready .px-header-pass,.px-header-ready .px-header-pass *,.px-header-ready .px-header-pass::after{animation:none!important;transition:none!important}}
+html[data-pixieed-motion=reduced] :is(.px-header-pass,.px-header-utilities button,.px-header-utilities summary,.button,.app-tabs>a,.app-tabs>button,.lc-nav>a,.lc-nav>button,.tool-card){transition:none;transform:none}
+html[data-pixieed-motion=reduced] .px-header-pass::after{animation:none}
+html[data-pixieed-motion=reduced] :is(.px-header-pass,.px-header-utilities button,.px-header-utilities summary,.button,.app-tabs>a,.app-tabs>button,.lc-nav>a,.lc-nav>button,.tool-card):is(:active,:hover){transform:none}
+html[data-pixieed-motion=reduced] .px-header-pass,html[data-pixieed-motion=reduced] .px-header-pass *,html[data-pixieed-motion=reduced] .px-header-pass::after{animation:none!important;transition:none!important}
+
+/* The opt-in sheet uses the same pixel details and stays readable on short screens. */
+.px-header-ready .px-pass{background:linear-gradient(145deg,#28343d,#151d25);border-color:#e5c77a30;box-shadow:0 12px 30px #0004}
+.px-header-ready .px-pass h2 i{border-radius:7px;background:linear-gradient(145deg,#ffe5a4,#efc76b);box-shadow:inset 0 1px 0 #fff9}
+.px-header-ready .px-pass-perks{gap:6px;padding:0;list-style:none}
+.px-header-ready .px-pass-perks li{position:relative;padding:8px 10px 8px 25px;border:1px solid #ffffff10;border-radius:9px;background:#ffffff06}
+.px-header-ready .px-pass-perks li::before{content:'';position:absolute;left:11px;top:14px;width:4px;height:4px;background:#e7c576;box-shadow:4px 0 #e7c576,0 4px #e7c576}
+.px-header-ready .px-pass-note{font-size:12px}
+.px-header-ready .px-pass button{border-radius:12px;transition:transform var(--px-press-time) var(--px-press-ease)}
+.px-header-ready .px-pass button:not(:disabled):active{transform:translateY(1px) scale(.97)}
+.px-header-ready .px-pass .px-pass-go{background:linear-gradient(145deg,#f27a61,#de5146);box-shadow:inset 0 1px 0 #fff3,0 2px 0 #0002}
+@media(prefers-reduced-motion:reduce){.px-header-ready .px-pass button{transition:none;transform:none}.px-header-ready .px-pass button:active{transform:none}}
+html[data-pixieed-motion=reduced] .px-pass button{transition:none;transform:none}
+html[data-pixieed-motion=reduced] .px-pass button:active{transform:none}
+
+/* Native details keep their focus and dismissal behavior; only presentation moves. */
+.px-header-ready [data-px-panel-motion^=reveal]{transform-origin:var(--px-panel-origin-x,50%) var(--px-panel-origin-y,100%);pointer-events:auto}
+.px-header-ready [data-px-panel-motion=reveal-a]{animation:px-panel-reveal-a 180ms var(--px-press-ease) 1}
+.px-header-ready [data-px-panel-motion=reveal-b]{animation:px-panel-reveal-b 180ms var(--px-press-ease) 1}
+.px-header-ready [data-px-panel-motion=return-a]{animation:px-panel-return-a 140ms var(--px-press-ease) 1}
+.px-header-ready [data-px-panel-motion=return-b]{animation:px-panel-return-b 140ms var(--px-press-ease) 1}
+@keyframes px-panel-reveal-a{from{opacity:.4;transform:translateY(3px) scale(.975)}to{opacity:1;transform:none}}
+@keyframes px-panel-reveal-b{from{opacity:.4;transform:translateY(3px) scale(.975)}to{opacity:1;transform:none}}
+@keyframes px-panel-return-a{0%,100%{transform:none}45%{transform:scale(.96)}}
+@keyframes px-panel-return-b{0%,100%{transform:none}45%{transform:scale(.96)}}
+/* One pixel enters the bank after an extension; its duration remains bounded. */
+.px-header-pass[data-recharged=true] .px-pass-add::after{content:'';position:absolute;left:9px;top:29px;width:4px;height:4px;background:currentColor;pointer-events:none;animation:px-pass-deposit 240ms var(--px-press-ease) 1 both}
+@keyframes px-pass-deposit{0%{opacity:0;transform:translate(65px,-16px) scale(.5)}25%{opacity:1}100%{opacity:0;transform:translate(0,0) scale(1)}}
+.px-pass-gauge-row[data-charged=true]::after{content:'';position:absolute;inset:0 auto 0 0;width:var(--px-charged-width,100%);pointer-events:none;background:linear-gradient(90deg,#fff3,#fff);transform-origin:left center;animation:px-pass-row-charge 220ms var(--px-press-ease) var(--px-charged-delay,0ms) 1 both}
+@keyframes px-pass-row-charge{0%{opacity:0;transform:scaleX(.02)}45%{opacity:.8}100%{opacity:0;transform:scaleX(1)}}
+.px-header-ready .px-header-pass:active .px-pass-add{transform:scale(.85)}
+.px-pass-add{transition:transform 120ms var(--px-press-ease)}
+@media(prefers-reduced-motion:reduce){.px-header-ready [data-px-panel-motion],.px-header-ready .px-pass-add::after{animation:none!important;transition:none!important}}
+html[data-pixieed-motion=reduced] [data-px-panel-motion],html[data-pixieed-motion=reduced] .px-pass-add::after{animation:none!important;transition:none!important}
+@media(prefers-reduced-motion:reduce){.px-header-ready .px-pass-gauge-row::after{animation:none!important}.px-header-ready .px-header-pass:active .px-pass-add{transform:none}}
+html[data-pixieed-motion=reduced] .px-pass-gauge-row::after{animation:none!important}
+html[data-pixieed-motion=reduced] .px-header-pass:active .px-pass-add{transform:none}

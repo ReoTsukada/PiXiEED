@@ -1,6 +1,13 @@
 export const DRAW_SIZES = Object.freeze([16, 32, 64, 128, 256, 512]);
 export const DRAW_SIZE = 16;
-export const DRAW_PALETTE = Object.freeze(['#263238', '#f4f2ec', '#e75445', '#f2b84b', '#4c82c3', '#6d9b68', '#9a6bb0']);
+// かんたんドット絵 draws with 16 fixed colours + transparent. The first seven keep their old slots so earlier
+// saves map onto the same colours; the other nine fill the gaps (grey, brown, skin, pink, orange, yellow, lime, sky, navy).
+export const DRAW_PALETTE = Object.freeze(['#263238', '#f4f2ec', '#e75445', '#f2b84b', '#4c82c3', '#6d9b68', '#9a6bb0', '#8c97a1', '#8a5a3c', '#f5c9a0', '#f3a6c0', '#ef7d3c', '#ffe066', '#a8d86a', '#8ecdf0', '#27336b']);
+/** The order the 16 colours are shown in: dark to light greys, then around the colour wheel. */
+export const DRAW_PALETTE_ORDER = Object.freeze([0, 7, 1, 8, 9, 10, 2, 11, 3, 12, 13, 5, 14, 4, 15, 6]);
+/** The simple editor makes and edits drawings up to 64px; older, larger saves stay readable by the other tools. */
+export const SIMPLE_DRAW_SIZES = Object.freeze([16, 32, 64]);
+export const SIMPLE_DRAW_MAX = 64;
 export const DRAW_SCHEMA_VERSION = 1;
 export const MAX_DRAW_COLORS = 128;
 export const DEFAULT_HISTORY_BYTES = 4 * 1024 * 1024;
@@ -11,7 +18,7 @@ export function createDrawDocument(size = DRAW_SIZE) {
 }
 
 export function validateDrawDocument(document) {
-  if (!document || document.schemaVersion !== DRAW_SCHEMA_VERSION || document.width !== document.height || !DRAW_SIZES.includes(document.width)) throw new TypeError('16〜512px の編集データではありません');
+  if (!document || document.schemaVersion !== DRAW_SCHEMA_VERSION || !DRAW_SIZES.includes(document.width) || !DRAW_SIZES.includes(document.height)) throw new TypeError('16〜512px の編集データではありません');
   if (!Array.isArray(document.palette) || document.palette.length < 1 || document.palette.length > MAX_DRAW_COLORS || document.palette.some((color) => typeof color !== 'string' || !/^#[a-f\d]{6}(?:[a-f\d]{2})?$/i.test(color))) throw new TypeError('色パレットが壊れています');
   if (!Array.isArray(document.pixels) || document.pixels.length !== document.width * document.height || document.pixels.some((pixel) => !Number.isInteger(pixel) || pixel < -1 || pixel >= document.palette.length)) throw new TypeError('画素データが壊れています');
   return document;
@@ -20,13 +27,13 @@ export function validateDrawDocument(document) {
 export function resizeDrawDocument(document, size) {
   validateDrawDocument(document);
   if (!DRAW_SIZES.includes(size)) throw new RangeError('16/32/64/128/256/512px から選んでください');
-  if (size === document.width) return { ...document, palette: [...document.palette], pixels: [...document.pixels] };
-  const pixels = Array(size * size).fill(-1); const oldSize = document.width;
+  if (size === document.width && size === document.height) return { ...document, palette: [...document.palette], pixels: [...document.pixels] };
+  const pixels = Array(size * size).fill(-1); const oldWidth = document.width; const oldHeight = document.height;
   for (let y = 0; y < size; y += 1) {
-    const sourceY = Math.min(oldSize - 1, Math.floor((y + 0.5) * oldSize / size));
+    const sourceY = Math.min(oldHeight - 1, Math.floor((y + 0.5) * oldHeight / size));
     for (let x = 0; x < size; x += 1) {
-      const sourceX = Math.min(oldSize - 1, Math.floor((x + 0.5) * oldSize / size));
-      pixels[y * size + x] = document.pixels[sourceY * oldSize + sourceX];
+      const sourceX = Math.min(oldWidth - 1, Math.floor((x + 0.5) * oldWidth / size));
+      pixels[y * size + x] = document.pixels[sourceY * oldWidth + sourceX];
     }
   }
   return { ...document, width: size, height: size, palette: [...document.palette], pixels };
@@ -43,7 +50,7 @@ export function strokePixels(document, from, to, value) {
   if (!Number.isInteger(value) || value < -1 || value >= document.palette.length) throw new TypeError('Invalid pixel value');
   const x0 = Math.floor(from.x); const y0 = Math.floor(from.y); const x1 = Math.floor(to.x); const y1 = Math.floor(to.y);
   if (![x0, y0, x1, y1].every(Number.isFinite)) return [];
-  if ([x0, y0, x1, y1].some((coordinate) => Math.abs(coordinate) > document.width * 4)) return [];
+  if ([x0, y0, x1, y1].some((coordinate) => Math.abs(coordinate) > Math.max(document.width, document.height) * 4)) return [];
   const changed = []; let x = x0; let y = y0;
   const dx = Math.abs(x1 - x0); const sx = x0 < x1 ? 1 : -1; const dy = -Math.abs(y1 - y0); const sy = y0 < y1 ? 1 : -1; let error = dx + dy;
   for (;;) {
@@ -173,4 +180,43 @@ export function encodePng(document) {
   png.set([137, 80, 78, 71, 13, 10, 26, 10], 0);
   let offset = writeChunk(png, 8, 'IHDR', ihdr); offset = writeChunk(png, offset, 'IDAT', zlib); writeChunk(png, offset, 'IEND', new Uint8Array());
   return png;
+}
+
+const hexRgba = (hex) => [Number.parseInt(hex.slice(1, 3), 16), Number.parseInt(hex.slice(3, 5), 16), Number.parseInt(hex.slice(5, 7), 16), hex.length === 9 ? Number.parseInt(hex.slice(7, 9), 16) : 255];
+function nearestSimpleColor(hex) {
+  const [r, g, b, a] = hexRgba(hex); if (a < 128) return -1;
+  let best = 0; let bestDistance = Infinity;
+  DRAW_PALETTE.forEach((candidate, index) => {
+    const [cr, cg, cb] = hexRgba(candidate); const dr = r - cr; const dg = g - cg; const db = b - cb;
+    const distance = dr * dr * 3 + dg * dg * 4 + db * db * 2; if (distance < bestDistance) { bestDistance = distance; best = index; }
+  });
+  return best;
+}
+const simpleSide = (length, scale) => DRAW_SIZES.reduce((best, size) => (Math.abs(size - length * scale) < Math.abs(best - length * scale) ? size : best), SIMPLE_DRAW_SIZES[0]);
+/**
+ * Brings any saved drawing into the simple editor: at most 64px on each side and the 16 fixed colours.
+ * Returns a new document (the saved original is never touched) and what had to change.
+ */
+export function toSimpleDrawDocument(document) {
+  validateDrawDocument(document);
+  const longest = Math.max(document.width, document.height);
+  const resized = longest > SIMPLE_DRAW_MAX;
+  const scale = resized ? SIMPLE_DRAW_MAX / longest : 1;
+  const width = resized ? Math.min(SIMPLE_DRAW_MAX, simpleSide(document.width, scale)) : document.width;
+  const height = resized ? Math.min(SIMPLE_DRAW_MAX, simpleSide(document.height, scale)) : document.height;
+  const samePalette = document.palette.length === DRAW_PALETTE.length && document.palette.every((color, index) => color.toLowerCase() === DRAW_PALETTE[index]);
+  const map = samePalette ? null : document.palette.map(nearestSimpleColor);
+  const recolored = Boolean(map) && document.palette.some((color, index) => DRAW_PALETTE[map[index]]?.toLowerCase() !== color.toLowerCase().slice(0, 7) || color.length === 9);
+  const pixels = new Array(width * height);
+  for (let y = 0; y < height; y += 1) {
+    const sy = resized ? Math.min(document.height - 1, Math.floor((y + 0.5) * document.height / height)) : y;
+    for (let x = 0; x < width; x += 1) {
+      const sx = resized ? Math.min(document.width - 1, Math.floor((x + 0.5) * document.width / width)) : x;
+      const value = document.pixels[sy * document.width + sx];
+      pixels[y * width + x] = value < 0 ? -1 : map ? map[value] : value;
+    }
+  }
+  const next = { ...document, width, height, palette: [...DRAW_PALETTE], pixels };
+  validateDrawDocument(next);
+  return { document: next, resized, recolored, changed: resized || !samePalette };
 }

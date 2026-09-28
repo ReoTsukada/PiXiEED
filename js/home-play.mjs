@@ -3,9 +3,17 @@
  *
  * The first screen is a pixel canvas — drag to draw, every new dot plays a note (a taste of the editor and
  * the sound tool together). Below it, each tool card runs a tiny live version of that tool. Toys animate only
- * while on screen, and hold still (but stay playable) for people who prefer reduced motion.
+ * while on screen. Reduced motion keeps a gentle update rate and suppresses the letter entrance and wave.
  */
-const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+import { createVisibleAnimationScheduler } from './home-animation.mjs?rev=20260928-visible-motion-1';
+
+const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
+let reduced = motionPreference.matches;
+const animationScheduler = createVisibleAnimationScheduler(globalThis);
+animationScheduler.setReducedMotion(reduced);
+const updateMotionPreference = (event) => { reduced = event.matches; animationScheduler.setReducedMotion(reduced); };
+if (motionPreference.addEventListener) motionPreference.addEventListener('change', updateMotionPreference);
+else motionPreference.addListener?.(updateMotionPreference);
 const C = {
   ink: '#17232d', night: '#0f1822', paper: '#f7f8f6', red: '#e75445', blue: '#315fd0', sky: '#8ecdf0',
   yellow: '#ffd35a', green: '#5fb36b', leaf: '#2f7a45', orange: '#f29b52', pink: '#f3a6c0', brown: '#8a5a3c',
@@ -103,16 +111,10 @@ function pixelCanvas(canvas, w, h) {
     cell(event) { const r = canvas.getBoundingClientRect(); return { x: Math.floor(((event.clientX - r.left) / r.width) * w), y: Math.floor(((event.clientY - r.top) / r.height) * h) }; }
   };
 }
-// run draw(t) every frame while the element is on screen
+// Shared viewport-aware frame pump; reduced motion remains gently animated.
 function animate(element, draw) {
-  let raf = 0; let visible = false;
-  const loop = (t) => { draw(t); if (visible && !reduced) raf = requestAnimationFrame(loop); };
-  new IntersectionObserver(([entry]) => {
-    visible = entry.isIntersecting; cancelAnimationFrame(raf);
-    if (visible) raf = requestAnimationFrame(loop);
-  }, { rootMargin: '80px' }).observe(element);
-  draw(0);
-  return () => { if (reduced || !visible) draw(performance.now()); };
+  animationScheduler.add(element, draw);
+  return () => animationScheduler.redraw(element);
 }
 
 // ---------- a 3×5 pixel font for the hero word ----------
@@ -591,8 +593,11 @@ function hero() {
   }
 
   layout();
+  redraw(); // animate() is registered before layout(), so render the initialized canvas now.
   nextShooter = performance.now() + 6000; nextCat = performance.now() + 9000;
-  new ResizeObserver(() => { const r = stage.getBoundingClientRect(); const c = cellFor(r.width); if (Math.round(r.width / c) !== W || Math.round(r.height / c) !== H) { layout(); redraw(); } }).observe(stage);
+  const resizeHero = () => { const r = stage.getBoundingClientRect(); const c = cellFor(r.width); if (Math.round(r.width / c) !== W || Math.round(r.height / c) !== H) { layout(); redraw(); } };
+  if (typeof ResizeObserver === 'function') new ResizeObserver(resizeHero).observe(stage);
+  else addEventListener('resize', resizeHero, { passive: true });
 }
 
 // =========================================================================================================
@@ -625,10 +630,14 @@ const TOYS = {
     const bayer = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
     // three looks of the same sunset, like switching looks in the camera
     const looks = [['#0f380f', '#306230', '#8bac0f', '#9bbc0f'], ['#1b1f3a', '#8a3f7a', '#e75445', '#ffd35a'], ['#141414', '#5a5a5a', '#b0b0b0', '#f4f4f4']];
-    let look = 1;
+    let look = 1; let previousFrame = 0; let lookElapsed = 0;
     const ridge = (x) => 14 + Math.round(Math.sin(x * 0.45) * 1.6 + Math.sin(x * 0.9 + 1) * 0.8);
     const draw = (t) => {
-      const time = (t || 0) / 1000; const pal = looks[look];
+      const frame = t || 0;
+      if (previousFrame) lookElapsed += Math.min(100, Math.max(0, frame - previousFrame));
+      previousFrame = frame;
+      if (lookElapsed >= 3200) { look = (look + Math.floor(lookElapsed / 3200)) % looks.length; lookElapsed %= 3200; }
+      const time = frame / 1000; const pal = looks[look];
       const sunY = 12.5 + Math.sin(time * 0.5) * 1.2;
       for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
         let v;
@@ -642,7 +651,6 @@ const TOYS = {
     animate(el, draw);
     const next = () => { look = (look + 1) % looks.length; };
     el.addEventListener('pointerenter', next);
-    setInterval(() => { if (!reduced && document.visibilityState === 'visible') next(); }, 3200);
   },
   // A spinning pixel globe with blinking pins
   map(el) {
@@ -753,7 +761,7 @@ const TOYS = {
     };
     animate(el, draw);
     el.addEventListener('pointerdown', () => { el.dataset.played = '1'; jump(); });
-    el.addEventListener('keydown', (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); el.dataset.played = '1'; jump(); } });
+    el.addEventListener('keydown', (e) => { if (e.key === ' ') { e.preventDefault(); el.dataset.played = '1'; jump(); } });
   },
   // 4×4 pieces of the scene; tap two pieces to swap them
   jigsaw(el) {
@@ -850,13 +858,16 @@ for (const canvas of document.querySelectorAll('[data-toy] canvas')) {
   const view = document.createElement('span'); view.className = 'hp-view'; canvas.replaceWith(view); view.appendChild(canvas);
 }
 // cards rise in one after another as they come into view
-const reveal = new IntersectionObserver((entries) => entries.forEach((entry) => {
+const reveal = typeof IntersectionObserver === 'function' ? new IntersectionObserver((entries) => entries.forEach((entry) => {
   if (!entry.isIntersecting) return;
   const index = [...entry.target.parentElement.children].indexOf(entry.target);
   setTimeout(() => entry.target.classList.add('is-in'), reduced ? 0 : (index % 3) * 90);
   reveal.unobserve(entry.target);
-}), { threshold: 0.2 });
-document.querySelectorAll('.hp-toy').forEach((el) => reveal.observe(el));
+}), { threshold: 0.2 }) : null;
+document.querySelectorAll('.hp-toy').forEach((el) => {
+  if (reveal) reveal.observe(el);
+  else el.classList.add('is-in');
+});
 for (const el of document.querySelectorAll('[data-toy]')) {
   try { TOYS[el.dataset.toy]?.(el); } catch (error) { console.warn('toy', el.dataset.toy, error); }
   // the "もうすぐ" toys are not links: touching them only plays, never navigates

@@ -56,18 +56,22 @@ test('only the requested ad can grant a reward, and its listeners are removed', 
   }
 });
 
-test('one pass, three hours, every perk — including ones registered later', () => {
-  assert.equal(pass.PASS_HOURS, 3);
+test('one pass, one hour, every perk — including ones registered later', () => {
+  assert.equal(pass.PASS_HOURS, 1);
   assert.equal(pass.hasPass(), false);
   assert.equal(pass.hasPerk('camera.gif-long'), false);
-  store.set('pixieed:pass:v1', JSON.stringify({ until: Date.now() + 3 * 3600 * 1000 }));
+  assert.equal(pass.hasPerk('audio.canvas-wide'), false);
+  assert.equal(pass.hasPerk('audio.instruments-extra'), false);
+  store.set('pixieed:pass:v1', JSON.stringify({ until: Date.now() + 1 * 3600 * 1000 }));
   assert.equal(pass.hasPass(), true);
   assert.equal(pass.hasPerk('camera.gif-long'), true);
+  assert.equal(pass.hasPerk('audio.canvas-wide'), true);
+  assert.equal(pass.hasPerk('audio.instruments-extra'), true);
   pass.registerPerk('globe.big-post', '地球儀：256pxまで投稿');
   assert.equal(pass.hasPerk('globe.big-post'), true, 'a service added later is covered by the same pass');
   assert.equal(pass.hasPerk('unknown.perk'), false);
   const left = pass.passRemainingMs();
-  assert.ok(left > 2.99 * 3600 * 1000 && left <= 3 * 3600 * 1000);
+  assert.ok(left > 0.99 * 3600 * 1000 && left <= 1 * 3600 * 1000);
 });
 
 test('the pass runs out; Pro never does', () => {

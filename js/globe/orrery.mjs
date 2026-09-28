@@ -2,12 +2,10 @@
  * Solar System view: the eight planets on their real orbits around the Sun,
  * in front of the real night sky.
  *
- * The bodies are rendered in detail at "dot" resolution (2 CSS px per dot): lit
+ * The bodies are rendered at display resolution as lit
  * spheres with surface detail (the Earth's real continents turning with the
  * clock, Jupiter's belts, Saturn's rings with the planet's shadow), the Sun's
- * limb and glow, orbits and the asteroid belt. That transparent layer goes
- * through the pixel camera's own colour pipeline (PiXiEELENS, full colour) and
- * is shown with hard pixel edges. The stars are not pixel art: the globe's
+ * limb and glow, orbits and the asteroid belt. The globe's
  * full-resolution sky layer sits behind this canvas and is turned to match
  * this camera (onSkyOrientation). Labels are drawn crisp on top.
  *
@@ -28,7 +26,7 @@ import { WORLD_LAND_MASK } from '../../assets/maps/world-land-mask-v1.mjs?v=2026
 const DEG = Math.PI / 180;
 const AU_KM = 149597870.7;
 const OBLIQUITY = 23.43928 * DEG;
-const DOT = 2; // CSS pixels per rendered dot
+const DOT = 1; // render at CSS-pixel resolution before display scaling
 const MIN_SPAN_AU = 70; // the whole of Neptune's orbit fits across the short side
 const EXIT_PRESSURE = 0.55;
 const SKY_HALF_FOV = 32 * DEG;
@@ -173,19 +171,6 @@ export function createOrrery({ canvas, onSelect = () => {}, onExit = () => {}, o
   let flight = null;
   let exitPressure = 0;
   let screen = [];
-  let lens = null; // PiXiEELENS engine, loaded on first open
-
-  // The pixel camera's full-colour pipeline, and the painted real sky.
-  function prepare() {
-    if (!lens) {
-      lens = import('../pixel-lens/engine.mjs?v=20260926-ux-1').then((engine) => {
-        engine.setLensSettings({ colorDepth: 'full', gradientMode: 'none', surfaceSimplify: 0 });
-        return engine;
-      }).catch((error) => { console.warn('Pixel camera engine unavailable; showing the raw render.', error); return null; });
-      lens.then((engine) => { lens = engine || false; requestDraw(); });
-    }
-  }
-
   function viewport() {
     const width = canvas.clientWidth || 1; const height = canvas.clientHeight || 1;
     const dpr = Math.min(2, globalThis.devicePixelRatio || 1);
@@ -404,11 +389,9 @@ export function createOrrery({ canvas, onSelect = () => {}, onExit = () => {}, o
       screen.push({ id: body.id, x: p.x, y: p.y, r: Math.max(18, radius + 6), radius, body });
     }
 
-    // Through the pixel camera in full colour (its tone pre-processing at the dot grid).
-    if (lens && typeof lens.processLensFrame === 'function') lens.processLensFrame(buffer);
     lowCtx.putImageData(buffer, 0, 0);
     ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
-    ctx.imageSmoothingEnabled = false;
+    ctx.imageSmoothingEnabled = true;
     ctx.clearRect(0, 0, view.width, view.height);
     ctx.drawImage(low, 0, 0, view.lw * DOT, view.lh * DOT);
 
@@ -419,6 +402,7 @@ export function createOrrery({ canvas, onSelect = () => {}, onExit = () => {}, o
       const active = entry.id === selectedId;
       if (entry.body.minor && !active && entry.radius < 3 && scale < 2e5) continue;
       if (active) { ctx.strokeStyle = '#f4d45d'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(entry.x, entry.y, entry.radius * (entry.id === 'saturn' ? 2.35 : 1) + 7, 0, Math.PI * 2); ctx.stroke(); }
+      if (entry.id === 'sun' || entry.id === 'moon') continue;
       ctx.font = `${active ? 700 : 600} 12px ui-rounded, "Hiragino Sans", system-ui, sans-serif`;
       ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(2, 5, 10, .85)';
       const labelY = entry.y + entry.radius * (entry.id === 'saturn' ? 1.3 : 1) + 16;
@@ -536,7 +520,6 @@ export function createOrrery({ canvas, onSelect = () => {}, onExit = () => {}, o
     /** Open close on the Earth (as big as the globe) and pull back to the inner Solar System. */
     open({ fromEarth = true } = {}) {
       opened = true; selectedId = null; exitPressure = 0; lastSkyKey = '';
-      prepare();
       update();
       const { width, height } = viewport(); const short = Math.min(width, height);
       if (fromEarth) { focusId = 'earth'; focusPos = bodyPosition('earth'); scale = maxScale('earth'); azimuth = daySideAzimuth('earth'); elevation = 24 * DEG; fly({ to: 'sun', scaleTo: short / 4.2, duration: 2200 }); }

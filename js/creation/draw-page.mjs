@@ -1,8 +1,13 @@
 import { createLocalDraftStore, createIndexedDbDraftAdapter } from './local-drafts.mjs';
-import { createDrawDocument, createDrawHistory, DRAW_PALETTE, DRAW_SIZE, DRAW_SIZES, encodePng, finishDrawStroke, floodFill, resizeDrawDocument, strokePixels, validateDrawDocument } from './draw-core.mjs?rev=20260927-draw-step08-3';
-import { CAMERA_HANDOFF_KEY, cameraHandoffImage, createImportedDrawDocument, decodeCameraHandoff, decodeDrawImageFile } from './draw-import.mjs?rev=20260927-draw-step08-3';
+import { createDrawDocument, createDrawHistory, DRAW_PALETTE, DRAW_PALETTE_ORDER, DRAW_SIZE, DRAW_SIZES, SIMPLE_DRAW_SIZES, toSimpleDrawDocument, encodePng, finishDrawStroke, floodFill, resizeDrawDocument, strokePixels, validateDrawDocument } from './draw-core.mjs?rev=20260927-draw-step08-3';
+import { createImportedDrawDocument, decodeDrawImageFile } from './draw-import.mjs?rev=20260927-draw-step08-3';
 import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs';
 import { DRAW_HANDOFF_KEY, encodeDrawPng, serializeDrawHandoff, validateDrawPixels } from './draw-handoff.mjs';
+import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
+import { createPxdProject } from './pxd-codec.mjs';
+import { confirmPxdConversion, mountPxdTools } from './pxd-ui.mjs';
+import { pxdImageRoles, readPxdImage } from './pxd-project.mjs';
+import { readPxdDrawDocument, synchronizeLinkedAudioImage, writePxdDrawDocument } from './pxd-draw-audio.mjs';
 
 const LAST_DRAFT_KEY = 'pixieed.simple-draw.last-draft.v1';
 const $ = (selector) => document.querySelector(selector);
@@ -10,8 +15,10 @@ const canvas = $('#draw-canvas'); const pixelSurface = createPixelCanvasSurface(
 const status = $('#draw-status'); const saveButton = $('#draw-save'); const resumeButton = $('#draw-resume');
 const globeButton = $('#draw-to-globe');
 const sizeSelect = $('#draw-size');
+const interactionEffects = createInteractionEffects();
 let documentData = createDrawDocument(); let history = createDrawHistory(documentData); let selectedColor = 2; let tool = 'pen'; let drawing = false; let previousPoint = null; let strokeStartPixels = null; let activeDraftId = null; let source = { type: 'hand_drawn', assetId: null, revisionId: null }; let saved = false; let canvasPrepared = false; let sizeWasChosen = false;
 let store;
+let pxdBridge = null; let pxdImageRole = 'main';
 const activePointers = new Map(); let pinchStart = null; let zoom = 1; let panX = 0; let panY = 0;
 try { store = createLocalDraftStore(createIndexedDbDraftAdapter()); } catch (error) { status.textContent = `端末内保存を使えません：${error.message}`; saveButton.disabled = true; }
 
@@ -19,6 +26,8 @@ function getLastDraftId() { try { return globalThis.localStorage?.getItem(LAST_D
 function setLastDraftId(value) { try { globalThis.localStorage?.setItem(LAST_DRAFT_KEY, value); return true; } catch { return false; } }
 function setCanvasDimensions() {
   pixelSurface.resize(documentData.width, documentData.height);
+  canvas.style.aspectRatio = `${documentData.width} / ${documentData.height}`;
+  canvas.style.setProperty('--draw-aspect', `${documentData.width} / ${documentData.height}`);
   canvasPrepared = true;
   $('#draw-size-label').textContent = `${documentData.width}×${documentData.height}px`;
   canvas.setAttribute('aria-label', `${documentData.width}×${documentData.height}の透明なキャンバス。色を選んで描きます。`);
@@ -35,19 +44,33 @@ function paint(changed = null) {
 }
 function renderPalette() {
   const palette = $('#draw-palette'); palette.replaceChildren();
-  const transparent = document.createElement('button'); transparent.type = 'button'; transparent.className = 'draw-color draw-color--transparent'; transparent.setAttribute('aria-label', '透明色'); transparent.setAttribute('aria-pressed', String(selectedColor === -1));
-  transparent.addEventListener('click', () => chooseColor(-1)); palette.append(transparent);
-  documentData.palette.forEach((color, index) => {
-    const button = document.createElement('button'); button.type = 'button'; button.className = 'draw-color'; button.style.setProperty('--draw-color', color); button.setAttribute('aria-label', `色 ${index + 1}`); button.title = `色 ${index + 1}`; button.setAttribute('aria-pressed', String(index === selectedColor));
-    button.addEventListener('click', () => chooseColor(index)); palette.append(button);
+  const transparent = document.createElement('button'); transparent.type = 'button'; transparent.className = 'draw-color draw-color--transparent'; transparent.dataset.colorIndex = '-1'; transparent.setAttribute('aria-label', '透明色'); transparent.setAttribute('aria-pressed', String(selectedColor === -1));
+  transparent.addEventListener('click', (event) => chooseColor(-1, event.currentTarget)); palette.append(transparent);
+  const order = documentData.palette.length === DRAW_PALETTE_ORDER.length ? DRAW_PALETTE_ORDER : documentData.palette.map((_, index) => index);
+  order.forEach((index) => { const color = documentData.palette[index];
+    const button = document.createElement('button'); button.dataset.colorIndex = String(index); button.type = 'button'; button.className = 'draw-color'; button.style.setProperty('--draw-color', color); button.setAttribute('aria-label', `色 ${index + 1}`); button.title = `色 ${index + 1}`; button.setAttribute('aria-pressed', String(index === selectedColor));
+    button.addEventListener('click', (event) => chooseColor(index, event.currentTarget)); palette.append(button);
   });
 }
-function chooseColor(index) {
+function chooseColor(index, sourceElement) {
+  const penButton = document.querySelector('[data-draw-tool="pen"]');
+  interactionEffects.color({ from: sourceElement, to: penButton, color: index < 0 ? '#fff' : documentData.palette[index] });
   selectedColor = index; tool = 'pen';
-  document.querySelectorAll('.draw-color').forEach((node, nodeIndex) => node.setAttribute('aria-pressed', String(nodeIndex === (index < 0 ? 0 : index + 1))));
+  document.querySelectorAll('.draw-color').forEach((node) => node.setAttribute('aria-pressed', String(Number(node.dataset.colorIndex) === index)));
   document.querySelectorAll('[data-draw-tool]').forEach((node) => node.setAttribute('aria-pressed', String(node.dataset.drawTool === 'pen')));
 }
-function replaceDocument(nextDocument, nextSource = source) {
+// Anything opened here is brought to at most 64px and the 16 colours; the saved original is left as it was.
+let fitNotice = '';
+function fitToSimple(nextDocument) {
+  const fitted = toSimpleDrawDocument(nextDocument);
+  fitNotice = fitted.changed ? `かんたんドット絵に合わせて${fitted.resized ? `${fitted.document.width}×${fitted.document.height}px・` : ''}16色にしました。元の絵はそのまま残っています。` : '';
+  return fitted.document;
+}
+function replaceDocument(nextDocument, nextSource = source, { fromPxd = false } = {}) {
+  nextDocument = fitToSimple(nextDocument);
+  if (fitNotice) setTimeout(() => { if (fitNotice && !status.textContent.includes(fitNotice)) status.textContent = `${status.textContent} ${fitNotice}`.trim(); }, 0);
+  interactionEffects.clear();
+  if (!fromPxd) { pxdBridge?.reset(); pxdImageRole = 'main'; }
   documentData = nextDocument; source = nextSource; history = createDrawHistory(documentData); activeDraftId = null; saved = false;
   selectedColor = Math.min(Math.max(selectedColor, 0), documentData.palette.length - 1); renderPalette(); sizeSelect.value = String(documentData.width); setCanvasDimensions(); paint();
 }
@@ -78,7 +101,7 @@ canvas.addEventListener('pointerdown', (event) => {
   activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
   if (event.pointerType === 'touch' && activePointers.size >= 2) { startPinch(); return; }
   if (activePointers.size > 1) return;
-  drawing = true; previousPoint = pointFromEvent(event);
+  drawing = true; const touchedPoint = pointFromEvent(event); previousPoint = touchedPoint;
   if (tool === 'fill') { commitChange((next) => floodFill(next, previousPoint.x, previousPoint.y, selectedPixelValue())); drawing = false; previousPoint = null; }
   else { strokeStartPixels = [...documentData.pixels]; const changed = strokePixels(documentData, previousPoint, previousPoint, selectedPixelValue()); saved = false; paint(changed); }
 });
@@ -111,7 +134,7 @@ function releasePointer(event) {
 }
 canvas.addEventListener('pointerup', releasePointer); canvas.addEventListener('pointercancel', releasePointer); canvas.addEventListener('lostpointercapture', releasePointer);
 
-DRAW_SIZES.forEach((size) => { const option = document.createElement('option'); option.value = String(size); option.textContent = `${size}×${size}`; sizeSelect.append(option); });
+SIMPLE_DRAW_SIZES.forEach((size) => { const option = document.createElement('option'); option.value = String(size); option.textContent = `${size}×${size}`; sizeSelect.append(option); });
 sizeSelect.value = String(DRAW_SIZE);
 sizeSelect.addEventListener('change', () => {
   sizeWasChosen = true;
@@ -136,6 +159,10 @@ async function saveRevision() {
     activeDraftId = draftId; saved = true;
     if (!setLastDraftId(draftId)) { status.textContent = '絵は端末に保存しましたが、再開用の目印を残せませんでした。'; }
     else status.textContent = '端末に保存しました。いつでも再開できます。';
+    if (pxdBridge?.currentProject || pxdBridge?.heldProject) {
+      try { await pxdBridge.save(); status.textContent = '絵を端末に保存し、PXD作品も更新しました。'; }
+      catch (error) { status.textContent = `絵は端末に保存しましたが、PXD更新に失敗しました：${error.message}`; }
+    }
     resumeButton.hidden = false; $('#draw-copy-last').hidden = false;
     return revision;
   } catch (error) { status.textContent = `保存できませんでした：${error.message || '端末の空き容量を確認してください。'}`; return null; }
@@ -162,10 +189,11 @@ async function loadLastDraft({ copy = false } = {}) {
   try {
     const revision = await store.load(draftId); if (!revision) throw new Error('保存した絵が見つかりません。');
     validateDrawDocument(revision.document);
+    pxdBridge?.reset(); pxdImageRole = 'main';
     const nextSource = copy ? { type: 'local_draft_copy', assetId: revision.asset.assetId, revisionId: revision.revisionId, sourceDraftId: draftId, parentSource: revision.asset.source } : revision.asset.source;
-    documentData = structuredClone(revision.document); source = nextSource; activeDraftId = copy ? null : draftId; history = createDrawHistory(documentData); saved = !copy;
+    documentData = fitToSimple(structuredClone(revision.document)); source = nextSource; activeDraftId = copy ? null : draftId; history = createDrawHistory(documentData); saved = !copy && !fitNotice;
     renderPalette(); sizeSelect.value = String(documentData.width); setCanvasDimensions(); paint();
-    status.textContent = copy ? '複製を始めました。元の保存版はそのまま残ります。' : '前回の絵を開きました。';
+    status.textContent = `${copy ? '複製を始めました。元の保存版はそのまま残ります。' : '前回の絵を開きました。'}${fitNotice ? ` ${fitNotice}` : ''}`;
   } catch (error) { status.textContent = `${copy ? '複製できませんでした' : '開けませんでした'}：${error.message}`; }
   finally { resumeButton.disabled = false; $('#draw-copy-last').disabled = false; }
 }
@@ -173,33 +201,58 @@ resumeButton.addEventListener('click', () => loadLastDraft());
 $('#draw-copy-last').addEventListener('click', () => loadLastDraft({ copy: true }));
 
 async function importImage(file, importSource) {
-  $('#draw-import-local').disabled = true; $('#draw-import-camera').disabled = true; status.textContent = '画像を読み込んでいます…';
+  $('#draw-import-local').disabled = true; status.textContent = '画像を読み込んでいます…';
   try {
     const image = await decodeDrawImageFile(file);
-    const nativeFit = DRAW_SIZES.find((size) => size >= Math.max(image.width, image.height)) || DRAW_SIZES.at(-1);
+    const nativeFit = SIMPLE_DRAW_SIZES.find((size) => size >= Math.max(image.width, image.height)) || SIMPLE_DRAW_SIZES.at(-1);
     const targetSize = sizeWasChosen ? Number(sizeSelect.value) : Math.max(Number(sizeSelect.value), nativeFit);
     const imported = createImportedDrawDocument(image, targetSize);
-    replaceDocument(imported.document, importSource);
-    const colorNotice = imported.quantized ? `色数が多かったので${imported.colorCount}色以内に調整しました` : `${imported.colorCount}色を保ちました`;
-    status.textContent = `${imported.sourceWidth}×${imported.sourceHeight}pxから${imported.copiedWidth}×${imported.copiedHeight}pxを複製しました。${colorNotice}。余白は透明です。`;
+    replaceDocument(imported.document, importSource); fitNotice = '';
+    status.textContent = `${imported.sourceWidth}×${imported.sourceHeight}pxから${imported.copiedWidth}×${imported.copiedHeight}pxを複製し、16色に合わせました。余白は透明です。`;
   } catch (error) { status.textContent = `画像を複製できませんでした：${error.message}`; }
-  finally { $('#draw-import-local').disabled = false; $('#draw-import-camera').disabled = false; $('#draw-import-file').value = ''; }
+  finally { $('#draw-import-local').disabled = false; $('#draw-import-file').value = ''; }
 }
 $('#draw-import-local').addEventListener('click', () => $('#draw-import-file').click());
 $('#draw-import-file').addEventListener('change', () => { const file = $('#draw-import-file').files?.[0]; if (file) importImage(file, { type: 'local_image_copy', assetId: null, revisionId: null }); });
-let cameraImage = cameraHandoffImage();
-if (cameraImage) $('#draw-import-camera').hidden = false;
-$('#draw-import-camera').addEventListener('click', () => { if (cameraImage) importImage(cameraImage.file, { type: 'pixel_camera', assetId: null, revisionId: null, capturedAt: cameraImage.createdAt }); });
-window.addEventListener('storage', (event) => {
-  if (event.key !== CAMERA_HANDOFF_KEY || !event.newValue) return;
-  cameraImage = decodeCameraHandoff(event.newValue);
-  if (cameraImage) $('#draw-import-camera').hidden = false;
-});
 if (getLastDraftId()) { resumeButton.hidden = false; $('#draw-copy-last').hidden = false; }
 paint();
 
 $('#draw-export').addEventListener('click', () => {
   try {
-    const bytes = encodePng(documentData); const url = URL.createObjectURL(new Blob([bytes], { type: 'image/png' })); const link = document.createElement('a'); link.href = url; link.download = `pixieed-drawing-${documentData.width}x${documentData.height}.png`; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); status.textContent = `${documentData.width}×${documentData.height}pxのPNGを書き出しました。`;
+    const bytes = encodePng(documentData); const url = URL.createObjectURL(new Blob([bytes], { type: 'image/png' })); const link = document.createElement('a'); link.href = url; link.download = `pixieed-drawing-${documentData.width}x${documentData.height}.png`; link.click(); interactionEffects.exportImage({ from: canvas, to: $('#draw-export'), image: canvas }); setTimeout(() => URL.revokeObjectURL(url), 1000); status.textContent = `${documentData.width}×${documentData.height}pxのPNGを書き出しました。`;
   } catch (error) { status.textContent = `PNGを書き出せませんでした：${error.message}`; }
+});
+
+pxdBridge = mountPxdTools({
+  tool: 'draw',
+  hasContent: () => Boolean(pxdBridge?.currentProject || pxdBridge?.heldProject || activeDraftId || documentData.pixels.some((pixel) => pixel >= 0)),
+  setStatus: (message) => { status.textContent = message; },
+  async openProject(project) {
+    const params = new URLSearchParams(location.search); const requestedRole = params.getAll('pxdImage').length === 1 ? params.get('pxdImage') : null;
+    const roles = pxdImageRoles(project);
+    let role = requestedRole || (roles.includes('draw') ? 'draw' : roles.includes('main') ? 'main' : roles[0]);
+    let nextDocument;
+    {
+      try { nextDocument = await readPxdDrawDocument(project, role); }
+      catch (error) {
+        const image = await readPxdImage(project, role);
+        if (!image || !(error instanceof RangeError)) throw error;
+        const targetSize = SIMPLE_DRAW_SIZES.reduce((best, size) => Math.abs(size - Math.max(image.width, image.height)) < Math.abs(best - Math.max(image.width, image.height)) ? size : best, SIMPLE_DRAW_SIZES[0]);
+        const imported = createImportedDrawDocument({ width: image.width, height: image.height, data: new Uint8ClampedArray(image.rgba) }, targetSize); imported.document = toSimpleDrawDocument(imported.document).document;
+        const accepted = await confirmPxdConversion({ image, document: imported.document, title: '描画用の絵を確認', applyLabel: 'このコピーで描く', message: `原本 ${image.width} × ${image.height}px をPXDに残し、描画用コピー ${imported.document.width} × ${imported.document.height}px を作ります。${imported.quantized ? 'コピーは128色に整理されます。' : '色はそのまま保ちます。'}` });
+        if (!accepted) throw new Error('描画用コピーの作成を中止しました。原本は変更していません。');
+        role = role === 'draw' ? 'draw-copy' : 'draw'; nextDocument = imported.document;
+      }
+    }
+    if (!nextDocument) throw new Error('このPXDには描画できる画像部品がありません。別のPXDや保存版を選んでください。');
+    validateDrawDocument(nextDocument);
+    pxdImageRole = role || 'main';
+    replaceDocument(structuredClone(nextDocument), { type: 'pxd_project_copy', assetId: null, revisionId: null, projectId: project.projectId, imageRole: pxdImageRole }, { fromPxd: true });
+    saved = true; paint();
+  },
+  async getProject(project) {
+    let next = project || createPxdProject();
+    next = await synchronizeLinkedAudioImage(next, documentData, pxdImageRole);
+    return writePxdDrawDocument(next, documentData, pxdImageRole);
+  }
 });
