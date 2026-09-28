@@ -56,7 +56,7 @@ test('embedded globe consumes only its matching Draw handoff and preserves embed
   assert.equal(handoff.source, 'draw');
   let opened;
   assert.equal(openHandoffComposer(handoff, { openComposer(options) { opened = options; } }), true);
-  assert.equal(opened.file.name, 'drawing.png'); assert.equal(opened.file.type, 'image/png'); assert.equal(opened.postKind, 'pixel_art');
+  assert.equal(opened.file.name, 'drawing.png'); assert.equal(opened.file.type, 'image/png'); assert.equal(opened.postKind, 'pixel_art'); assert.equal(opened.keepScale, true);
   assert.equal(sessionStorage.entries.has(DRAW_HANDOFF_KEY), false);
   assert.equal(localStorage.entries.has('PiXiEED:camera-handoff:v1'), true);
   assert.equal(history.next, '/?embed=1&other=keep');

@@ -38,8 +38,8 @@ export function createVisibleAnimationScheduler(env = globalThis) {
   }
   function pump(time) {
     if (!hasActive()) { stopPump(); return; }
-    const period = reducedMotion ? 1000 / 12 : 1000 / 30;
     for (const entry of [...entries.values()]) {
+      const period = Math.max(1000 / entry.fps, reducedMotion ? 1000 / 12 : 0);
       if (!active(entry) || time - entry.lastDraw < period - 1) continue;
       try { entry.draw(time); entry.lastDraw = time; }
       catch { entries.delete(entry.element); observer?.unobserve(entry.element); }
@@ -64,9 +64,11 @@ export function createVisibleAnimationScheduler(env = globalThis) {
   env.addEventListener?.('pageshow', onPageShow);
 
   return {
-    add(element, draw) {
+    add(element, draw, { fps = 30 } = {}) {
       if (disposed || !element || typeof draw !== 'function') return () => {};
-      const entry = { element, draw, visible: visible(element), lastDraw: -Infinity };
+      const requestedFps = Number(fps);
+      const safeFps = Number.isFinite(requestedFps) ? Math.max(1, Math.min(60, requestedFps)) : 30;
+      const entry = { element, draw, fps: safeFps, visible: visible(element), lastDraw: -Infinity };
       entries.set(element, entry);
       observer?.observe(element);
       if (entry.visible) arm();

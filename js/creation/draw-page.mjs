@@ -1,12 +1,16 @@
 import { createLocalDraftStore, createIndexedDbDraftAdapter } from './local-drafts.mjs';
-import { createDrawDocument, createDrawHistory, DRAW_PALETTE, DRAW_PALETTE_ORDER, DRAW_SIZE, DRAW_SIZES, SIMPLE_DRAW_SIZES, toSimpleDrawDocument, encodePng, finishDrawStroke, floodFill, resizeDrawDocument, strokePixels, validateDrawDocument } from './draw-core.mjs?rev=20260927-draw-step08-3';
-import { createImportedDrawDocument, decodeDrawImageFile } from './draw-import.mjs?rev=20260927-draw-step08-3';
+import { createDrawDocument, createDrawHistory, DRAW_PALETTE, DRAW_PALETTE_ORDER, DRAW_SIZE, DRAW_SIZES, SIMPLE_DRAW_SIZES, toSimpleDrawDocument, documentRgba, finishDrawStroke, floodFill, resizeDrawDocument, strokePixels, validateDrawDocument } from './draw-core.mjs?rev=20260927-draw-step08-3';
+import { createImportedDrawDocument, decodeDrawImageFile } from './draw-import.mjs?rev=20260928-pixel-roundtrip-1';
 import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs';
 import { DRAW_HANDOFF_KEY, encodeDrawPng, serializeDrawHandoff, validateDrawPixels } from './draw-handoff.mjs';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
 import { createPxdProject } from './pxd-codec.mjs';
 import { confirmPxdConversion, mountPxdTools } from './pxd-ui.mjs?rev=20260928-own-work-1';
 import { pxdImageRoles, readPxdImage } from './pxd-project.mjs';
+import { enlargedPng, saveFile } from '../pixel-export.mjs?rev=20260928-pixel-roundtrip-1';
+import { encodeAnimatedGif } from '../animated-export.mjs?v=20260928-rewards-1';
+import { requestPass } from '../pixieed-pass.mjs?v=20260928-rewards-1';
+import { createDrawTimelapse, selectDrawTimelapseFrames } from './draw-timelapse.mjs?rev=20260928-draw-timelapse-1';
 import { readPxdAudioLink, readPxdDrawDocument, synchronizeLinkedAudioImage, writePxdDrawDocument } from './pxd-draw-audio.mjs';
 
 const LAST_DRAFT_KEY = 'pixieed.simple-draw.last-draft.v1';
@@ -17,6 +21,8 @@ const globeButton = $('#draw-to-globe');
 const sizeSelect = $('#draw-size');
 const interactionEffects = createInteractionEffects();
 let documentData = createDrawDocument(); let history = createDrawHistory(documentData); let selectedColor = 2; let tool = 'pen'; let drawing = false; let previousPoint = null; let strokeStartPixels = null; let activeDraftId = null; let source = { type: 'hand_drawn', assetId: null, revisionId: null }; let saved = false; let canvasPrepared = false; let sizeWasChosen = false;
+const TIMELAPSE_FPS = 12;
+const timelapse = createDrawTimelapse();
 let store;
 let pxdBridge = null; let pxdImageRole = 'main';
 const activePointers = new Map(); let pinchStart = null; let zoom = 1; let panX = 0; let panY = 0;
@@ -159,7 +165,7 @@ function replaceDocument(nextDocument, nextSource = source, { fromPxd = false } 
   if (fitNotice) setTimeout(() => { if (fitNotice && !status.textContent.includes(fitNotice)) status.textContent = `${status.textContent} ${fitNotice}`.trim(); }, 0);
   interactionEffects.clear();
   if (!fromPxd) { pxdBridge?.reset(); pxdImageRole = 'main'; }
-  documentData = nextDocument; source = nextSource; history = createDrawHistory(documentData); activeDraftId = null; saved = false;
+  documentData = nextDocument; source = nextSource; history = recordedHistory(createDrawHistory(documentData)); activeDraftId = null; saved = false;
   selectedColor = Math.min(Math.max(selectedColor, 0), documentData.palette.length - 1); renderPalette(); sizeSelect.value = String(documentData.width); setCanvasDimensions(); paint();
 }
 function commitChange(operation) {
@@ -412,7 +418,7 @@ async function loadLastDraft({ copy = false } = {}) {
     validateDrawDocument(revision.document);
     pxdBridge?.reset(); pxdImageRole = 'main';
     const nextSource = copy ? { type: 'local_draft_copy', assetId: revision.asset.assetId, revisionId: revision.revisionId, sourceDraftId: draftId, parentSource: revision.asset.source } : revision.asset.source;
-    documentData = fitToSimple(structuredClone(revision.document)); source = nextSource; activeDraftId = copy ? null : draftId; history = createDrawHistory(documentData); saved = !copy && !fitNotice;
+    documentData = fitToSimple(structuredClone(revision.document)); source = nextSource; activeDraftId = copy ? null : draftId; history = recordedHistory(createDrawHistory(documentData)); saved = !copy && !fitNotice;
     renderPalette(); sizeSelect.value = String(documentData.width); setCanvasDimensions(); paint();
     status.textContent = `${copy ? '複製しました' : 'ひらきました'}${fitNotice ? ` ${fitNotice}` : ''}`;
   } catch (error) { status.textContent = `${copy ? '複製できませんでした' : '開けませんでした'}：${error.message}`; }
@@ -438,12 +444,96 @@ $('#draw-import-file').addEventListener('change', () => { const file = $('#draw-
 if (getLastDraftId()) { resumeButton.hidden = false; $('#draw-copy-last').hidden = false; }
 paint();
 
+// ---- saving: the picture leaves PiXiEED enlarged (crisp dots, about 2048px), on phones via the share sheet ----
 $('#draw-export').addEventListener('click', async () => {
+  const original = documentData; const originalSource = source;
+  const bridge = pxdBridge; const project = bridge?.currentProject; const held = bridge?.heldProject;
+  const unchangedSource = () => documentData === original && source === originalSource && pxdBridge === bridge
+    && bridge?.currentProject === project && bridge?.heldProject === held;
+  const image = { width: original.width, height: original.height, data: documentRgba(structuredClone(original)) };
   try {
-    await pxdBridge?.assertCanSave();
-    const bytes = encodePng(documentData); const url = URL.createObjectURL(new Blob([bytes], { type: 'image/png' })); const link = document.createElement('a'); link.href = url; link.download = `pixieed-drawing-${documentData.width}x${documentData.height}.png`; link.click(); interactionEffects.exportImage({ from: canvas, to: $('#draw-export'), image: canvas }); setTimeout(() => URL.revokeObjectURL(url), 1000); status.textContent = `${documentData.width}×${documentData.height}pxのPNGを書き出しました。`;
-  } catch (error) { status.textContent = `PNGを書き出せませんでした：${error.message}`; }
+    await bridge?.assertCanSave?.();
+    if (!unchangedSource()) return;
+    const { blob, width, height } = await enlargedPng(image);
+    if (!unchangedSource()) return;
+    interactionEffects.exportImage({ from: canvas, to: $('#draw-export'), image: canvas });
+    const result = await saveFile(blob, `pixieed-drawing-${image.width}x${image.height}@${width}x${height}.png`);
+    if (result !== 'cancelled' && unchangedSource()) status.textContent = `${width}×${height}pxで保存しました`;
+  } catch (error) { if (unchangedSource()) status.textContent = `PNGを書き出せませんでした：${error.message}`; }
 });
+// ---- time-lapse: a short free replay, with a longer detailed replay as a pass perk ----
+function recordedHistory(target) {
+  timelapse.reset(documentData);
+  return new Proxy(target, { get(object, key) {
+    const value = Reflect.get(object, key, object);
+    if (key === 'commit') return (...args) => {
+      const beforePixels = documentData.pixels; const beforePalette = documentData.palette;
+      const done = value.apply(object, args);
+      if (done) {
+        const paletteChanged = beforePalette !== documentData.palette;
+        const indices = [];
+        if (!paletteChanged) for (let index = 0; index < beforePixels.length; index += 1) if (beforePixels[index] !== documentData.pixels[index]) indices.push(index);
+        timelapse.record(documentData, { indices, paletteChanged });
+      }
+      return done;
+    };
+    if (key === 'undo' || key === 'redo') return (...args) => {
+      const done = value.apply(object, args);
+      if (done) timelapse.record(documentData, object.lastStep);
+      return done;
+    };
+    return typeof value === 'function' ? value.bind(object) : value;
+  } });
+}
+history = recordedHistory(history);
+let timelapseExporting = false;
+let activeTimelapseJob = null;
+function timelapseJobIsCurrent(job) {
+  return activeTimelapseJob === job && !job.controller.signal.aborted
+    && documentData === job.document
+    && source === job.source
+    && pxdBridge === job.bridge
+    && job.bridge?.currentProject === job.currentProject
+    && job.bridge?.heldProject === job.heldProject;
+}
+addEventListener('pagehide', () => activeTimelapseJob?.controller.abort());
+async function exportTimelapse(detail) {
+  if (timelapseExporting) return;
+  const job = {
+    controller: new AbortController(),
+    document: documentData,
+    source,
+    bridge: pxdBridge,
+    currentProject: pxdBridge?.currentProject,
+    heldProject: pxdBridge?.heldProject
+  };
+  const timeline = timelapse.snapshot();
+  if (timeline.length < 2) { toast('描くと、その過程をGIFにできます'); return; }
+  activeTimelapseJob = job;
+  timelapseExporting = true;
+  const basicButton = $('#draw-timelapse'); const detailButton = $('#draw-timelapse-detail');
+  basicButton.disabled = true; detailButton.disabled = true;
+  try {
+    // Permission is captured at the button press; expiry never cancels this export.
+    if (detail && !await requestPass({ perk: 'draw.timelapse-detail' })) return;
+    if (!timelapseJobIsCurrent(job)) return;
+    await job.bridge?.assertCanSave?.();
+    if (!timelapseJobIsCurrent(job)) return;
+    const frames = selectDrawTimelapseFrames(timeline, { detail, fps: TIMELAPSE_FPS });
+    const { bytes, width, height } = await encodeAnimatedGif(frames, { delayMs: 1000 / TIMELAPSE_FPS, signal: job.controller.signal, longEdge: 1024, maxPixels: 80e6 });
+    if (!timelapseJobIsCurrent(job)) return;
+    const result = await saveFile(new Blob([bytes], { type: 'image/gif' }), `pixieed-drawing-timelapse-${width}x${height}.gif`);
+    if (result !== 'cancelled' && timelapseJobIsCurrent(job)) toast(detail ? '詳しい描画過程を保存しました' : '描いた過程を保存しました');
+  } catch (error) {
+    if (timelapseJobIsCurrent(job) && error?.name !== 'AbortError') status.textContent = `GIFを作れませんでした：${error.message}`;
+  } finally {
+    if (activeTimelapseJob === job) activeTimelapseJob = null;
+    timelapseExporting = false;
+    basicButton.disabled = false; detailButton.disabled = false;
+  }
+}
+$('#draw-timelapse').addEventListener('click', () => exportTimelapse(false));
+$('#draw-timelapse-detail').addEventListener('click', () => exportTimelapse(true));
 
 pxdBridge = mountPxdTools({
   tool: 'draw',

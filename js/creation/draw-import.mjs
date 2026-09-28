@@ -1,4 +1,5 @@
 import { createDrawDocument, DRAW_SIZES, MAX_DRAW_COLORS, validateDrawDocument } from './draw-core.mjs?rev=20260927-draw-step08-3';
+import { normalizePixelFile, readPixelImageDimensions } from '../pixel-scale.mjs?rev=20260928-pixel-roundtrip-1';
 
 export const MAX_IMPORT_FILE_BYTES = 10 * 1024 * 1024;
 export const MAX_IMPORT_SOURCE_PIXELS = 2 * 1024 * 1024;
@@ -106,7 +107,7 @@ export function createImportedDrawDocument(image, size = 128) {
   }
   const document = createDrawDocument(size);
   if (rgba.every((value, index) => index % 4 !== 3 || value === 0)) {
-    return { document, sourceWidth: image.width, sourceHeight: image.height, copiedWidth: width, copiedHeight: height, colorCount: 0, quantized: false };
+    return { document, sourceWidth: image.sourceWidth || image.width, sourceHeight: image.sourceHeight || image.height, copiedWidth: width, copiedHeight: height, colorCount: 0, quantized: false };
   }
   const exact = makeExactPalette(rgba, size * size);
   let palette; let pixels; let quantized = false;
@@ -120,47 +121,20 @@ export function createImportedDrawDocument(image, size = 128) {
   }
   document.palette = palette; document.pixels = pixels;
   validateDrawDocument(document);
-  return { document, sourceWidth: image.width, sourceHeight: image.height, copiedWidth: width, copiedHeight: height, colorCount: palette.length, quantized };
+  return { document, sourceWidth: image.sourceWidth || image.width, sourceHeight: image.sourceHeight || image.height, copiedWidth: width, copiedHeight: height, colorCount: palette.length, quantized };
 }
 
-export async function decodeDrawImageFile(file, { createImageBitmapImpl = globalThis.createImageBitmap } = {}) {
+export async function decodeDrawImageFile(file, { createImageBitmapImpl = globalThis.createImageBitmap, documentRef = globalThis.document, keepScale = false, inferScale = true, minDots = 8 } = {}) {
   if (!file || !(file instanceof Blob)) throw new TypeError('画像ファイルを選んでください。');
   if (!IMAGE_TYPES.has(file.type)) throw new TypeError('ドット絵のPNGかWebP画像を選んでください。');
   if (file.size > MAX_IMPORT_FILE_BYTES) throw new RangeError('画像ファイルは10MB以内にしてください。');
-  if (typeof createImageBitmapImpl !== 'function') throw new Error('このブラウザーでは画像を読み込めません。');
-  const header = new Uint8Array(await file.slice(0, 32).arrayBuffer()); const dimensions = readDrawImageDimensions(header, file.type);
-  if (!dimensions) throw new TypeError('画像ファイルの形式を確認できません。');
-  if (dimensions.width * dimensions.height > MAX_IMPORT_SOURCE_PIXELS) throw new RangeError('画像の画素数が多すぎます（最大で約210万画素です）。');
-  const bitmap = await createImageBitmapImpl(file);
-  try {
-    if (!bitmap.width || !bitmap.height || bitmap.width !== dimensions.width || bitmap.height !== dimensions.height) throw new TypeError('画像の寸法を確認できませんでした。');
-    const canvas = document.createElement('canvas'); canvas.width = bitmap.width; canvas.height = bitmap.height;
-    const context = canvas.getContext('2d', { willReadFrequently: true });
-    if (!context) throw new Error('画像を読み込めませんでした。');
-    context.imageSmoothingEnabled = false; context.drawImage(bitmap, 0, 0);
-    return { width: bitmap.width, height: bitmap.height, data: context.getImageData(0, 0, bitmap.width, bitmap.height).data };
-  } finally { bitmap.close?.(); }
+  const image = await normalizePixelFile(file, { createImageBitmapImpl, documentRef, keepScale, inferScale, minDots });
+  if (image.width * image.height > MAX_IMPORT_SOURCE_PIXELS) throw new RangeError('画像の画素数が多すぎます（最大で約210万画素です）。');
+  return { width: image.width, height: image.height, data: image.data, scale: image.scale, sourceWidth: image.sourceWidth, sourceHeight: image.sourceHeight };
 }
 
 export function readDrawImageDimensions(header, mimeType) {
-  if (!(header instanceof Uint8Array)) return null;
-  const ascii = (start, length) => String.fromCharCode(...header.subarray(start, start + length));
-  let width = 0; let height = 0;
-  if (mimeType === 'image/png' && header.length >= 24 && ascii(0, 8) === '\x89PNG\r\n\x1a\n' && ascii(12, 4) === 'IHDR') {
-    const view = new DataView(header.buffer, header.byteOffset, header.byteLength); width = view.getUint32(16); height = view.getUint32(20);
-  } else if (mimeType === 'image/webp' && header.length >= 25 && ascii(0, 4) === 'RIFF' && ascii(8, 4) === 'WEBP') {
-    const kind = ascii(12, 4);
-    if (kind === 'VP8X' && header.length >= 30) {
-      width = 1 + header[24] + (header[25] << 8) + (header[26] << 16);
-      height = 1 + header[27] + (header[28] << 8) + (header[29] << 16);
-    } else if (kind === 'VP8 ' && header.length >= 30 && header[23] === 0x9d && header[24] === 0x01 && header[25] === 0x2a) {
-      const view = new DataView(header.buffer, header.byteOffset, header.byteLength); width = view.getUint16(26, true) & 0x3fff; height = view.getUint16(28, true) & 0x3fff;
-    } else if (kind === 'VP8L' && header.length >= 25 && header[20] === 0x2f) {
-      width = 1 + ((header[21] | (header[22] << 8)) & 0x3fff);
-      height = 1 + (((header[22] >> 6) | (header[23] << 2) | ((header[24] & 0x0f) << 10)) & 0x3fff);
-    }
-  }
-  return Number.isSafeInteger(width * height) && width > 0 && height > 0 ? { width, height } : null;
+  return readPixelImageDimensions(header, mimeType);
 }
 
 export function decodeCameraHandoff(serialized, now = Date.now()) {

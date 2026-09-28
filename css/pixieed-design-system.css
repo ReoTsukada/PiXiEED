@@ -489,3 +489,8 @@ body.arc-jigsaw .jigsaw-workspace { --pixel-frame: #245446; }
 /* thumbnails on rounded cards sit inset, so the card's round corner never cuts the picture */
 .art-card__image, .market-card__image, .collection-item__image { margin: 6px 6px 0; }
 .arc-pick { overflow: visible !important; }
+
+/* ==== PiXiEED pass perks: a small pixel star marks a button that a pass unlocks ==== */
+.px-perk { position: relative; }
+.px-perk::after { content: ""; position: absolute; top: -4px; right: -4px; width: 12px; height: 12px; background: #ffd35a; pointer-events: none;
+  clip-path: polygon(33% 0, 67% 0, 67% 33%, 100% 33%, 100% 67%, 67% 67%, 67% 100%, 33% 100%, 33% 67%, 0 67%, 0 33%, 33% 33%); filter: drop-shadow(0 1px 0 rgba(0,0,0,.45)); }

@@ -10,9 +10,9 @@
 <link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180"><link rel="manifest" href="/manifest.webmanifest">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f4f2ec">
-  <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20260928-square-pixels-1">
+  <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20260928-export-1">
   <link rel="stylesheet" href="/css/site.css?rev=20260927-draw-step08-3">
-  <link rel="stylesheet" href="/css/creation-audio.css?rev=20260928-touch-motion-1">
+  <link rel="stylesheet" href="/css/creation-audio.css?rev=20260928-audio-video-1">
   <link rel="stylesheet" href="/css/interaction-effects.css?rev=20260928-touch-motion-1">
   <link rel="stylesheet" href="/css/site-header.css?rev=20260928-touch-motion-1">
   <link rel="stylesheet" href="/css/arcade.css?rev=20260928-arcade-2">
@@ -25,11 +25,14 @@
       <h1><img src="/assets/icons/pixieed/music.svg" alt="">ドットで音楽</h1>
       <div class="audio-header-actions">
         <button id="audio-take-photo" class="audio-icon-button" type="button" aria-label="写真を撮って音楽にする" title="写真から音楽"><img src="/assets/icons/pixieed/camera.svg" alt=""></button>
-        <button id="audio-export-image" class="audio-icon-button" type="button" aria-label="描いた絵をPNGで保存" title="絵を保存"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></svg></button>
+        <button id="audio-export-image" class="audio-icon-button" type="button" aria-label="描いた絵を大きいPNGで保存" title="絵を保存"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></svg></button>
         <details id="audio-more" class="audio-popover audio-more">
           <summary aria-label="曲の保存と画像の取り込み" title="保存・読み込み"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></summary>
           <div class="audio-popover-body audio-more__actions">
             <button id="audio-save" type="button">曲を端末に保存</button>
+            <button id="audio-export-sound" type="button">音を保存（WAV）</button>
+            <button id="audio-export-video" type="button">音付き動画を保存（1ループ）</button>
+            <button id="audio-cancel-video" type="button" hidden>動画作成を中止</button>
             <button id="audio-resume" type="button" hidden>前回の曲を開く</button>
             <button id="audio-from-draw" type="button" hidden>保存した絵から</button>
             <button id="audio-from-camera" type="button" hidden>前のカメラ画像から</button>
@@ -40,6 +43,10 @@
     <p id="audio-status" class="audio-status" role="status" aria-live="polite">1マスに1音。色を選んで描けます。</p>
     <section class="audio-workspace" aria-label="曲の編集">
       <div id="audio-grid-wrap" class="audio-grid-wrap" aria-label="音楽ピクセルキャンバス">
+        <aside id="audio-pass-required" class="audio-pass-required" hidden aria-live="polite">
+          <span>続けるには時間を追加してください。</span>
+          <button id="audio-pass-add" type="button">時間を追加</button>
+        </aside>
         <canvas id="audio-pixel-canvas" class="audio-pixel-canvas" width="16" height="16" tabindex="0" role="img" aria-label="16列×16音程の音楽ピクセルキャンバス。横が時間、縦が音程です。矢印キーで移動し、EnterまたはSpaceで音を描画します。" aria-describedby="audio-status"></canvas>
         <div id="audio-cursor" class="audio-cursor" aria-hidden="true" hidden></div>
         <div id="audio-playhead" class="audio-playhead" aria-hidden="true" hidden></div>
@@ -66,7 +73,7 @@
     <a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""></a>
     <a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>
   </nav>
-  <script type="module" src="/js/creation/audio-page.mjs?rev=20260928-own-work-1"></script>
-  <script type="module" src="/js/site-header.mjs?rev=20260928-touch-motion-1"></script>
+  <script type="module" src="/js/creation/audio-page.mjs?rev=20260928-audio-video-1"></script>
+  <script type="module" src="/js/site-header.mjs?rev=20260928-rewards-1"></script>
 </body>
 </html>

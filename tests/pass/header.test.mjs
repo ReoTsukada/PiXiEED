@@ -20,8 +20,8 @@ test('shared pass header is loaded once by every requested public page', async (
   }
 });
 
-test('header, Audio, and Camera resolve the same pass module instance for same-tab notifications', async () => {
-  const paths = ['js/site-header.mjs', 'js/creation/audio-page.mjs', 'js/pixel-lens/app.mjs'];
+test('header and every reward consumer resolve the same pass module instance for same-tab notifications', async () => {
+  const paths = ['js/site-header.mjs', 'js/creation/audio-page.mjs', 'js/pixel-lens/app.mjs', 'js/creation/draw-page.mjs', 'js/creation/jigsaw-page.mjs', 'js/creation/pixfind-play.mjs'];
   const resolved = [];
   for (const path of paths) {
     const source = await readFile(new URL(`../../${path}`, import.meta.url), 'utf8');
@@ -29,5 +29,5 @@ test('header, Audio, and Camera resolve the same pass module instance for same-t
     assert.ok(match, `${path} must import the canonical pass module`);
     resolved.push(new URL(match[1], pathToFileURL(new URL(`../../${path}`, import.meta.url).pathname)).href);
   }
-  assert.deepEqual(resolved, [resolved[0], resolved[0], resolved[0]], 'different query versions create separate module singletons');
+  assert.deepEqual(resolved, paths.map(() => resolved[0]), 'different query versions create separate module singletons');
 });

@@ -7,7 +7,7 @@
  */
 export const GIF_MAX_MS = 5000;
 export const GIF_FPS = 10;
-export const GIF_LONG_EDGE = 512;
+export const GIF_LONG_EDGE = 1024;
 
 const key = (d, i) => (d[i] << 16) | (d[i + 1] << 8) | d[i + 2];
 

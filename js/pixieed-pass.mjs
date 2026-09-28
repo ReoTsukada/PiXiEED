@@ -20,7 +20,10 @@ const PASS_MS = PASS_HOURS * 60 * 60 * 1000;
 export const PERKS = new Map([
   ['camera.gif-long', 'ドット絵カメラ：GIFを10秒・なめらかに'],
   ['audio.canvas-wide', 'ドットで音楽：広いキャンバスで作曲'],
-  ['audio.instruments-extra', 'ドットで音楽：追加の音色']
+  ['audio.instruments-extra', 'ドットで音楽：追加の音色'],
+  ['draw.timelapse-detail', 'かんたんドット：工程多め・8秒のタイムラプス'],
+  ['pixfind.hint', '間違い探し・かくれもの：追加ヒント'],
+  ['jigsaw.hint', 'ジグソー：追加ヒント']
 ]);
 export function registerPerk(id, label) { PERKS.set(id, label); }
 

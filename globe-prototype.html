@@ -18,11 +18,11 @@
       }
     }());
   </script>
-  <link rel="stylesheet" href="css/globe-prototype.css?v=20260928-solar-navigation-1">
+  <link rel="stylesheet" href="css/globe-prototype.css?v=20260929-gallery-observe-1">
   <!-- Flatten the module waterfall and fetch the land-mask raster in parallel. -->
   <link rel="modulepreload" href="js/globe/renderer.mjs?v=20260927-solar-tool-2">
-  <link rel="modulepreload" href="js/globe/astro-ui.mjs?v=20260928-solar-navigation-1">
-  <link rel="modulepreload" href="js/globe/post-ui.mjs?v=20260928-post-likes-1">
+  <link rel="modulepreload" href="js/globe/astro-ui.mjs?v=20260929-gallery-observe-1">
+  <link rel="modulepreload" href="js/globe/post-ui.mjs?v=20260928-pixel-roundtrip-1">
   <link rel="modulepreload" href="js/globe/geometry.mjs?v=20260921-grid11-1">
   <link rel="modulepreload" href="js/globe/topology.mjs?v=20260920-g4-precision-1">
   <link rel="modulepreload" href="js/globe/hierarchy.mjs?v=20260920-g4-precision-1">
@@ -62,6 +62,11 @@
       <canvas id="skyCanvas" aria-hidden="true"></canvas>
       <canvas id="globeCanvas" tabindex="0" aria-label="地球儀。ドラッグで回転、ピンチまたはホイールでズーム、2本指タップで縮小、タップでセルを選択、長押しでその場所から空を見る、いちばん小さくしてからさらに縮小すると太陽系。キーボードでは矢印で回転、プラスとマイナスでズーム、0で初期表示"></canvas>
       <p id="gestureHint" class="gesture-hint" hidden><span>ドラッグで回す</span><span>ピンチで拡大・縮小</span><span>長押しで空を見る</span><span>さらに縮小で太陽系へ</span></p>
+      <nav id="astroViewSwitch" class="astro-views" aria-label="表示を切り替える">
+        <button type="button" data-astro-view="globe" aria-label="作品の地球儀へ戻る" aria-pressed="true"><img src="/assets/icons/pixieed/globe.svg" alt=""><span>作品</span></button>
+        <button type="button" data-astro-view="sky" aria-label="この場所の星空を見る" aria-pressed="false"><img src="/assets/icons/pixieed/telescope.svg" alt=""><span>星空</span></button>
+        <button type="button" data-astro-view="solar" aria-label="太陽系を見る" aria-pressed="false"><img src="/assets/icons/pixieed/solar-system.svg" alt=""><span>太陽系</span></button>
+      </nav>
       <aside id="selectionPanel" class="selection-panel" aria-live="polite" hidden>
         <span id="selectedStage"></span>
         <strong id="selectedOwner"></strong>
@@ -79,7 +84,7 @@
     <a href="/tools/" aria-label="ツール" data-globe-nav-tools><img src="/assets/icons/pixieed/tools.svg" alt=""></a>
     <a href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>
   </nav>
-  <script type="module" src="js/globe/prototype.mjs?v=20260928-solar-navigation-1"></script>
-  <script type="module" src="/js/site-header.mjs?rev=20260928-touch-motion-1"></script>
+  <script type="module" src="js/globe/prototype.mjs?v=20260929-gallery-observe-1"></script>
+  <script type="module" src="/js/site-header.mjs?rev=20260928-rewards-1"></script>
 </body>
 </html>

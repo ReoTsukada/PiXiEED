@@ -1,4 +1,4 @@
-import { hasPro, onPassChange, passRemainingMs, requestPass } from './pixieed-pass.mjs?v=20260928-pass-2';
+import { hasPro, onPassChange, passRemainingMs, requestPass } from './pixieed-pass.mjs?v=20260928-rewards-1';
 import { derivePassGauge, renderPassGauge } from './pass-gauge.mjs';
 
 const brandedLink = () => {

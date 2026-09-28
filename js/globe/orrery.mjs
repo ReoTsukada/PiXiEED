@@ -158,6 +158,9 @@ export function createOrrery({ canvas, onExit = () => {}, onSkyOrientation = () 
   let scale = 120; // CSS px per AU
   let focusId = 'sun';
   let focusPos = [0, 0, 0];
+  let focusOffset = [0, 0, 0];
+  let returnEarthRadiusPx = null;
+  let returnEarthSpan = 1;
   let bodies = [];
   let orbits = new Map();
   let orbitsAt = -Infinity;
@@ -166,6 +169,10 @@ export function createOrrery({ canvas, onExit = () => {}, onSkyOrientation = () 
   let flight = null;
   let closing = false;
   let closeCallbacks = [];
+  let closeTimer = null;
+  let closeFinish = null;
+  let closeApproach = null;
+  let closeApproachDone = false;
   let screen = [];
   function viewport() {
     const width = canvas.clientWidth || 1; const height = canvas.clientHeight || 1;
@@ -182,6 +189,10 @@ export function createOrrery({ canvas, onExit = () => {}, onSkyOrientation = () 
     return (PLANET_BY_ID[id]?.radiusKm || 1000) / AU_KM;
   }
   function minScale() { const { width, height } = viewport(); return Math.min(width, height) / MIN_SPAN_AU; }
+  function returnRadius() {
+    if (!returnEarthRadiusPx) return null;
+    return returnEarthRadiusPx * Math.min(canvas.clientWidth || 1, canvas.clientHeight || 1) / returnEarthSpan;
+  }
   // Close in, a planet may fill a little under half of the short side.
   function maxScale(id = focusId) { const { width, height } = viewport(); return (0.45 * Math.min(width, height)) / radiusAU(id); }
 
@@ -202,7 +213,10 @@ export function createOrrery({ canvas, onExit = () => {}, onSkyOrientation = () 
       orbits = new Map(PLANETS.map((planet) => [planet.id, orbitPath(planet.id, date, planet.id === 'mercury' ? 180 : 256)]));
       orbitsAt = time;
     }
-    if (!flight) focusPos = bodyPosition(focusId);
+    if (!flight) {
+      const position = bodyPosition(focusId);
+      focusPos = [position[0] + focusOffset[0], position[1] + focusOffset[1], position[2] + focusOffset[2]];
+    }
   }
   function bodyPosition(id) {
     if (id === 'sun') return [0, 0, 0];
@@ -430,18 +444,27 @@ export function createOrrery({ canvas, onExit = () => {}, onSkyOrientation = () 
     if (flight.frame !== null) cancelAnimationFrame(flight.frame);
     flight = null;
   }
+  function interruptFlight() {
+    if (!flight) return;
+    const fromId = flight.fromId;
+    cancelFlight();
+    if (fromId) focusId = fromId;
+    const position = bodyPosition(focusId);
+    focusOffset = [focusPos[0] - position[0], focusPos[1] - position[1], focusPos[2] - position[2]];
+  }
   function fly({ to = focusId, scaleTo = scale, duration = 900, then = null, turnTo = null, allowClosing = false } = {}) {
     if ((!opened && !allowClosing) || (closing && !allowClosing)) return;
     cancelFlight();
     const fromPos = focusPos.slice(); const fromScale = scale;
     const fromAzimuth = azimuth;
+    const fromId = focusId;
     let toAzimuth = turnTo ?? azimuth;
     while (toAzimuth - fromAzimuth > Math.PI) toAzimuth -= Math.PI * 2;
     while (toAzimuth - fromAzimuth < -Math.PI) toAzimuth += Math.PI * 2;
     focusId = to;
-    if (reducedMotion()) { focusPos = bodyPosition(to); scale = scaleTo; azimuth = toAzimuth; then?.(); requestDraw(); return; }
+    if (reducedMotion()) { focusPos = bodyPosition(to); focusOffset = [0, 0, 0]; scale = scaleTo; azimuth = toAzimuth; then?.(); requestDraw(); return; }
     const started = performance.now();
-    const current = { frame: null, scaleTo }; flight = current;
+    const current = { frame: null, scaleTo, fromId }; flight = current;
     const step = (now) => {
       if (flight !== current) return;
       const t = clamp((now - started) / duration, 0, 1); const k = ease(t);
@@ -454,43 +477,106 @@ export function createOrrery({ canvas, onExit = () => {}, onSkyOrientation = () 
       azimuth = lerp(fromAzimuth, toAzimuth, k);
       if (frame !== null) { cancelAnimationFrame(frame); frame = null; }
       draw();
-      if (t < 1) current.frame = requestAnimationFrame(step); else { flight = null; then?.(); }
+      if (t < 1) current.frame = requestAnimationFrame(step); else {
+        focusOffset = [0, 0, 0];
+        flight = null;
+        then?.();
+      }
     };
     current.frame = requestAnimationFrame(step);
   }
 
   // ---- gestures -------------------------------------------------------------
   const pointers = new Map();
-  let drag = null; let spread = 0; let exitRequested = false; let zoomInIntent = 0;
-  const ZOOM_IN_INTENT = Math.log(1.015);
-  function zoomBy(ratio) {
-    if (!opened || closing || !Number.isFinite(ratio) || ratio <= 0 || ratio === 1 || exitRequested) return;
-    const intent = Math.log(ratio);
-    if (intent < 0) { zoomInIntent = 0; return; }
-    zoomInIntent += intent;
-    if (zoomInIntent >= ZOOM_IN_INTENT) {
-      exitRequested = true;
-      zoomInIntent = 0;
-      onExit();
+  let drag = null; let spread = 0; let exitRequested = false;
+  function localPoint(clientX, clientY) {
+    const rect = canvas.getBoundingClientRect();
+    return { x: clamp(clientX - rect.left, 0, rect.width), y: clamp(clientY - rect.top, 0, rect.height) };
+  }
+  function zoomBy(ratio, fromPoint = null, toPoint = fromPoint) {
+    if (!opened || closing || !Number.isFinite(ratio) || ratio <= 0 || exitRequested) return;
+    interruptFlight();
+    const view = viewport();
+    const center = { x: view.width / 2, y: view.height / 2 };
+    const from = fromPoint || center; const to = toPoint || center;
+    if (ratio === 1 && from.x === to.x && from.y === to.y) return;
+    // Zoom directly toward the visible body under the gesture, without moving
+    // the scene first. A tap is only a shortcut to a closer view.
+    const target = ratio > 1 ? bodyAt(from) : null;
+    if (target && Math.hypot(target.x - from.x, target.y - from.y) <= Math.max(12, target.radius + 8)) focusId = target.id;
+    const lower = minScale();
+    const earthReturnScale = returnRadius() && returnRadius() / radiusAU('earth');
+    const upper = Math.max(scale, maxScale(focusId), focusId === 'earth' && earthReturnScale ? earthReturnScale : 0);
+    const nextScale = clamp(scale * ratio, lower, upper);
+    const b = basis();
+    const planePoint = [
+      focusPos[0] + b.right[0] * ((from.x - center.x) / scale) - b.up[0] * ((from.y - center.y) / scale),
+      focusPos[1] + b.right[1] * ((from.x - center.x) / scale) - b.up[1] * ((from.y - center.y) / scale),
+      focusPos[2] + b.right[2] * ((from.x - center.x) / scale) - b.up[2] * ((from.y - center.y) / scale)
+    ];
+    scale = nextScale;
+    if (scale <= lower) {
+      focusId = 'sun'; focusPos = [0, 0, 0]; focusOffset = [0, 0, 0]; scale = lower;
+    } else {
+      focusPos = [
+        planePoint[0] - b.right[0] * ((to.x - center.x) / scale) + b.up[0] * ((to.y - center.y) / scale),
+        planePoint[1] - b.right[1] * ((to.x - center.x) / scale) + b.up[1] * ((to.y - center.y) / scale),
+        planePoint[2] - b.right[2] * ((to.x - center.x) / scale) + b.up[2] * ((to.y - center.y) / scale)
+      ];
+      const position = bodyPosition(focusId);
+      focusOffset = [focusPos[0] - position[0], focusPos[1] - position[1], focusPos[2] - position[2]];
     }
+    if (ratio > 1 && focusId === 'earth' && earthReturnScale && scale >= earthReturnScale) {
+      const earth = project(bodyPosition('earth'), view, b);
+      const pad = Math.min(view.width, view.height) * 0.2;
+      if (earth.x >= -pad && earth.x <= view.width + pad && earth.y >= -pad && earth.y <= view.height + pad) {
+        scale = earthReturnScale;
+        exitRequested = true;
+        onExit();
+        return;
+      }
+    }
+    requestDraw();
+  }
+  function approachBody(id) {
+    if (!(id === 'sun' || id === 'moon' || PLANET_BY_ID[id])) return;
+    interruptFlight();
+    const targetRadiusPx = Math.min(viewport().width, viewport().height) * 0.11;
+    const targetScale = targetRadiusPx / radiusAU(id);
+    fly({ to: id, scaleTo: targetScale, duration: 900, turnTo: daySideAzimuth(id) });
+  }
+  function bodyAt(point) {
+    return screen.map((entry) => ({ entry, distance: Math.hypot(entry.x - point.x, entry.y - point.y) }))
+      .filter(({ entry, distance }) => entry.r > 0 && (entry.id === 'sun' || entry.id === 'moon' || PLANET_BY_ID[entry.id]) && distance <= Math.max(24, entry.r, entry.radius + 8))
+      .sort((a, b) => a.distance - b.distance)[0]?.entry || null;
   }
   canvas.addEventListener('pointerdown', (event) => {
     if (!opened || closing) return;
+    interruptFlight();
     canvas.setPointerCapture?.(event.pointerId);
-    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    const point = localPoint(event.clientX, event.clientY);
+    pointers.set(event.pointerId, point);
     if (pointers.size >= 2) { const [a, c] = [...pointers.values()]; spread = Math.max(8, Math.hypot(a.x - c.x, a.y - c.y)); drag = null; return; }
-    drag = { id: event.pointerId, x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY, moved: false, started: performance.now() };
+    drag = { id: event.pointerId, ...point, startX: point.x, startY: point.y, moved: false, started: performance.now() };
   });
   canvas.addEventListener('pointermove', (event) => {
     if (!pointers.has(event.pointerId) || closing) return;
-    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
-    if (pointers.size >= 2) { const [a, c] = [...pointers.values()]; const next = Math.max(8, Math.hypot(a.x - c.x, a.y - c.y)); zoomBy(next / spread); spread = next; return; }
+    const point = localPoint(event.clientX, event.clientY);
+    const previous = pointers.get(event.pointerId);
+    const other = pointers.size >= 2 ? [...pointers.entries()].find(([id]) => id !== event.pointerId)?.[1] : null;
+    pointers.set(event.pointerId, point);
+    if (pointers.size >= 2) {
+      const [a, c] = [...pointers.values()]; const next = Math.max(8, Math.hypot(a.x - c.x, a.y - c.y));
+      const from = { x: (previous.x + other.x) / 2, y: (previous.y + other.y) / 2 };
+      const to = { x: (point.x + other.x) / 2, y: (point.y + other.y) / 2 };
+      zoomBy(next / spread, from, to); spread = next; return;
+    }
     if (!drag || drag.id !== event.pointerId) return;
-    if (!drag.moved && Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) > 6) drag.moved = true;
+    if (!drag.moved && Math.hypot(point.x - drag.startX, point.y - drag.startY) > 6) drag.moved = true;
     if (!drag.moved) return;
-    azimuth -= (event.clientX - drag.x) * 0.006;
-    elevation = clamp(elevation + (event.clientY - drag.y) * 0.006, 4 * DEG, 89 * DEG);
-    drag.x = event.clientX; drag.y = event.clientY;
+    azimuth -= (point.x - drag.x) * 0.006;
+    elevation = clamp(elevation + (point.y - drag.y) * 0.006, 4 * DEG, 89 * DEG);
+    drag.x = point.x; drag.y = point.y;
     requestDraw();
   });
   const release = (event) => {
@@ -499,9 +585,12 @@ export function createOrrery({ canvas, onExit = () => {}, onSkyOrientation = () 
     const finished = drag; drag = null;
     if (pointers.size === 1) { const [[id, point]] = [...pointers.entries()]; drag = { id, x: point.x, y: point.y, startX: point.x, startY: point.y, moved: true, started: 0 }; return; }
     if (event.type !== 'pointerup' || !finished || finished.moved || performance.now() - finished.started > 450) return;
+    const target = bodyAt(localPoint(event.clientX, event.clientY));
+    if (target) approachBody(target.id);
   };
   canvas.addEventListener('pointerup', release);
   canvas.addEventListener('pointercancel', release);
+  canvas.addEventListener('lostpointercapture', release);
   canvas.addEventListener('wheel', (event) => {
     if (!opened || closing) return;
     event.preventDefault();
@@ -509,12 +598,13 @@ export function createOrrery({ canvas, onExit = () => {}, onSkyOrientation = () 
     const units = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? rect.height : 1;
     const delta = clamp(event.deltaY * units, -100, 100);
     if (!delta) return;
-    zoomBy(Math.exp(-delta * (event.ctrlKey ? 0.012 : 0.0012)));
+    zoomBy(Math.exp(-delta * (event.ctrlKey ? 0.008 : 0.007)), localPoint(event.clientX, event.clientY));
   }, { passive: false });
   canvas.addEventListener('keydown', (event) => {
     if (!opened || closing) return;
-    if (event.key === '+' || event.key === '=') zoomBy(1.25);
-    else if (event.key === '-' || event.key === '_') zoomBy(0.8);
+    const center = { x: (canvas.clientWidth || 1) / 2, y: (canvas.clientHeight || 1) / 2 };
+    if (event.key === '+' || event.key === '=') zoomBy(1.25, center);
+    else if (event.key === '-' || event.key === '_') zoomBy(0.8, center);
     else if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { azimuth += event.key === 'ArrowLeft' ? 0.12 : -0.12; requestDraw(); }
     else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') { elevation = clamp(elevation + (event.key === 'ArrowUp' ? 0.1 : -0.1), 4 * DEG, 89 * DEG); requestDraw(); }
     else return;
@@ -522,25 +612,43 @@ export function createOrrery({ canvas, onExit = () => {}, onSkyOrientation = () 
   });
   if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => requestDraw()).observe(canvas);
 
-  function snapshot() { return { open: opened, closing, flying: Boolean(flight), time, focusId, scale, focusPos: focusPos.slice(), azimuth, elevation, view: { width: canvas.clientWidth || 1, height: canvas.clientHeight || 1 }, bodies: bodies.map((body) => ({ ...body, position: body.position.slice(), pole: body.pole?.slice() })) }; }
+  function snapshot() { return { open: opened, closing, flying: Boolean(flight), time, focusId, scale, focusPos: focusPos.slice(), focusOffset: focusOffset.slice(), returnEarthRadiusPx: returnRadius(), azimuth, elevation, view: { width: canvas.clientWidth || 1, height: canvas.clientHeight || 1 }, bodies: bodies.map((body) => ({ ...body, position: body.position.slice(), pole: body.pole?.slice() })) }; }
+
+  function finishClose() {
+    if (!closing) return;
+    if (closeTimer !== null) { clearTimeout(closeTimer); closeTimer = null; }
+    cancelFlight();
+    if (frame !== null) { cancelAnimationFrame(frame); frame = null; }
+    closing = false; opened = false; exitRequested = false;
+    pointers.clear(); drag = null; spread = 0;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const callbacks = closeCallbacks; closeCallbacks = [];
+    closeFinish = null; closeApproach = null; closeApproachDone = false;
+    callbacks.forEach((callback) => callback());
+  }
+
+  function arriveClose(immediate = false) {
+    if (!closing) return;
+    if (!closeApproachDone) {
+      focusId = 'earth'; focusOffset = [0, 0, 0]; focusPos = bodyPosition('earth');
+      if (Number.isFinite(closeFinish?.earthRadiusPx) && closeFinish.earthRadiusPx > 0) scale = closeFinish.earthRadiusPx / radiusAU('earth');
+      closeApproachDone = true;
+      closeApproach?.({ immediate: immediate || reducedMotion() || document.hidden });
+    }
+    if (immediate || reducedMotion() || document.hidden) { finishClose(); return; }
+    if (closeTimer === null) closeTimer = setTimeout(finishClose, 240);
+  }
 
   document.addEventListener('visibilitychange', () => {
     if (document.hidden || !opened) {
       if (closing) {
-        const callbacks = closeCallbacks; closeCallbacks = [];
-        cancelFlight();
-        if (frame !== null) { cancelAnimationFrame(frame); frame = null; }
-        closing = false; opened = false; pointers.clear(); drag = null; spread = 0; zoomInIntent = 0;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        callbacks.forEach((callback) => callback());
+        if (flight) cancelFlight();
+        arriveClose(true);
         return;
       }
       if (!document.hidden || !opened) return;
       if (flight) {
-        const destinationScale = flight.scaleTo;
-        cancelFlight();
-        scale = destinationScale;
-        focusPos = bodyPosition(focusId);
+        interruptFlight();
       }
       if (frame !== null) { cancelAnimationFrame(frame); frame = null; }
       pointers.clear(); drag = null; spread = 0;
@@ -551,35 +659,46 @@ export function createOrrery({ canvas, onExit = () => {}, onSkyOrientation = () 
 
   return {
     isOpen: () => opened,
-    /** Open at a full-system overview. Zooming in returns to the globe. */
-    open() {
+    /** Open at the system overview, or pull back from a supplied globe radius. */
+    open({ earthRadiusPx, returnEarthRadiusPx: returnRadiusPx } = {}) {
       if (closing) return;
       cancelFlight();
-      opened = true; exitRequested = false; zoomInIntent = 0; lastSkyKey = '';
+      opened = true; exitRequested = false; lastSkyKey = '';
       pointers.clear(); drag = null; spread = 0;
+      focusOffset = [0, 0, 0];
+      returnEarthRadiusPx = Number.isFinite(returnRadiusPx) && returnRadiusPx > 0 ? returnRadiusPx : null;
+      returnEarthSpan = Math.min(canvas.clientWidth || 1, canvas.clientHeight || 1);
+      const enterFromEarth = Number.isFinite(earthRadiusPx) && earthRadiusPx > 0 && !reducedMotion() && !document.hidden;
+      focusId = enterFromEarth ? 'earth' : 'sun';
       update();
-      focusId = 'sun'; focusPos = [0, 0, 0]; scale = minScale();
+      if (enterFromEarth) {
+        scale = earthRadiusPx / radiusAU('earth');
+        azimuth = daySideAzimuth('earth');
+      } else {
+        focusId = 'sun'; focusPos = [0, 0, 0]; scale = minScale();
+      }
       draw();
+      if (enterFromEarth) fly({ to: 'sun', scaleTo: minScale(), duration: 900, turnTo: -90 * DEG });
     },
     /** Dive back into the Earth, then call `done`. */
-    close(done = () => {}) {
+    close(done = () => {}, { earthRadiusPx = returnRadius(), onApproach = null } = {}) {
       if (!opened) { done(); return; }
       closeCallbacks.push(done);
       if (closing) return;
       closing = true;
-      exitRequested = true; zoomInIntent = 0;
+      exitRequested = true;
       pointers.clear(); drag = null; spread = 0;
-      const finish = () => {
-        if (!closing) return;
-        cancelFlight();
-        if (frame !== null) { cancelAnimationFrame(frame); frame = null; }
-        closing = false; opened = false;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        const callbacks = closeCallbacks; closeCallbacks = [];
-        callbacks.forEach((callback) => callback());
-      };
-      if (reducedMotion() || document.hidden) { focusPos = bodyPosition('earth'); finish(); return; }
-      fly({ to: 'earth', scaleTo: maxScale('earth'), duration: 400, then: finish, turnTo: daySideAzimuth('earth'), allowClosing: true });
+      const targetRadius = Number.isFinite(earthRadiusPx) && earthRadiusPx > 0 ? earthRadiusPx : returnRadius();
+      const targetScale = Number.isFinite(targetRadius) && targetRadius > 0 ? targetRadius / radiusAU('earth') : maxScale('earth');
+      closeFinish = { earthRadiusPx: targetRadius };
+      closeApproach = onApproach;
+      closeApproachDone = false;
+      if (reducedMotion() || document.hidden) {
+        focusId = 'earth'; focusPos = bodyPosition('earth'); focusOffset = [0, 0, 0]; scale = targetScale;
+        if (!document.hidden) draw();
+        arriveClose(true); return;
+      }
+      fly({ to: 'earth', scaleTo: targetScale, duration: 400, then: () => arriveClose(false), turnTo: daySideAzimuth('earth'), allowClosing: true });
     },
     setTime(next, { moon = null } = {}) { time = next; moonGeo = moon; if (opened) { update(); requestDraw(); } },
     getSnapshot: snapshot,

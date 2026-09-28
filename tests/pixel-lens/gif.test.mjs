@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildPalette, encodeGif, gifScale, medianCut, collectColors } from '../../js/pixel-lens/gif.mjs';
+import { animatedCapturePlan, downsampleAnimatedFrame } from '../../js/animated-export.mjs';
 
 const frame = (w, h, fill) => { const data = new Uint8ClampedArray(w * h * 4); for (let p = 0; p < w * h; p++) { const [r, g, b] = fill(p % w, (p / w) | 0); data.set([r, g, b, 255], p * 4); } return { width: w, height: h, data }; };
 
@@ -26,8 +27,21 @@ test('GIF has the header, looping block, one image per frame and the trailer', (
   assert.equal(bytes[bytes.length - 1], 0x3b);
 });
 
-test('GIF scale keeps dots sharp at about 512px', () => {
-  assert.equal(gifScale(256, 192), 2);
-  assert.equal(gifScale(64, 64), 8);
+test('GIF scale keeps dots sharp at about 1024px', () => {
+  assert.equal(gifScale(256, 192), 4);
+  assert.equal(gifScale(64, 64), 16);
   assert.equal(gifScale(600, 400), 1);
+  assert.equal(gifScale(512, 384), 2);
+});
+
+test('a full premium camera GIF fits the RGBA budget and keeps integer GIF enlargement', () => {
+  const plan = animatedCapturePlan(512, 288, { maxMs: 10000, fps: 20 });
+  assert.equal(plan.maxFrames, 201);
+  assert.ok(plan.width * plan.height * plan.maxFrames <= 8e6);
+  const source = frame(512, 288, (x, y) => [x & 255, y & 255, 90]);
+  const gifFrame = downsampleAnimatedFrame(source, plan);
+  assert.notEqual(gifFrame.data, source.data);
+  assert.deepEqual([gifFrame.width, gifFrame.height], [256, 144]);
+  assert.equal(gifScale(gifFrame.width, gifFrame.height), 4);
+  assert.deepEqual([...source.data.slice(0, 4)], [0, 0, 90, 255]);
 });

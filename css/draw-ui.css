@@ -118,3 +118,23 @@ button.draw-current[aria-expanded="true"] span { box-shadow: inset 0 0 0 2px rgb
 .dce-light input { --track: linear-gradient(90deg, #000, hsl(var(--h) var(--s) 50%), #fff); }
 @media (max-height: 400px) and (min-width: 480px) { .draw-color-editor { gap: 6px; padding: 10px 12px; } .dce-slider input { height: 20px; } }
 @media (prefers-reduced-motion: reduce) { body[data-page="draw"] * { transition: none !important; } }
+/* seven actions fit a 320px phone */
+@media (max-width: 380px) {
+  body[data-page="draw"] .draw-actions { gap: 3px; }
+  body[data-page="draw"] .draw-actions button, body[data-page="draw"] .draw-actions .draw-import > summary { width: 37px; height: 37px; }
+}
+.draw-timelapse-more { display: flex; justify-content: flex-end; margin-top: 5px; }
+.draw-timelapse-more > summary { display: grid; place-items: center; min-width: 44px; min-height: 44px; padding: 0 12px; border: 1px solid rgba(21,32,43,.2); border-radius: 12px; color: #263238; font-size: .75rem; font-weight: 800; cursor: pointer; list-style: none; }
+.draw-timelapse-more > summary::-webkit-details-marker { display: none; }
+.draw-timelapse-more[open] > summary { background: #fff5ce; }
+.draw-timelapse-more__options { display: flex; justify-content: flex-end; padding-top: 5px; }
+.draw-timelapse-more__options button { min-width: 44px; min-height: 44px; padding: 8px 14px; border: 0; border-radius: 12px; background: #1d2b38; color: #fff; font: inherit; font-size: .78rem; font-weight: 900; cursor: pointer; }
+.draw-timelapse-more__options button:focus-visible, .draw-timelapse-more > summary:focus-visible { outline: 3px solid #ffd35a; outline-offset: 2px; }
+/* Keep save actions finger-sized; narrow screens wrap rather than shrink them. */
+body[data-page="draw"] .draw-actions { flex-wrap: wrap; }
+body[data-page="draw"] .draw-actions button,
+body[data-page="draw"] .draw-actions .draw-import > summary { flex: none; width: 44px; height: 44px; min-width: 44px; min-height: 44px !important; }
+@media (max-width: 380px) {
+  .draw-timelapse-more { justify-content: flex-start; }
+  .draw-timelapse-more__options { justify-content: flex-start; }
+}

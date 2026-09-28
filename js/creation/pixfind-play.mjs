@@ -1,6 +1,8 @@
 import { supabaseConfig } from '../../data/site-config.js';
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
 import { documentRgba } from './draw-core.mjs';
+import { requestPass } from '../pixieed-pass.mjs?v=20260928-rewards-1';
+import { createPuzzleHintController } from './puzzle-hint.mjs?rev=20260928-hint-1';
 import { resolveLocalDrawRevision, validateSpotDifferenceDraft } from './spot-difference-core.mjs';
 import { buildHiddenObjectHitBoxes, HIDDEN_OBJECT_MIN_PLAY_IMAGE_CSS_WIDTH, validateHiddenObjectDraft } from './hidden-object-core.mjs?rev=20260928-short-hitboxes-1';
 import { computeDifferenceRegions, computeHiddenObjectRegions, regionContainsPoint, resolvePuzzleFromLocation, validateHiddenObjectMarkers, validateLocalDifferenceGroups, validateStoredDifferenceRegions } from './pixfind-regions.mjs';
@@ -134,7 +136,7 @@ export async function loadLocalSpotDraft(draftAdapter, drawAdapter, draftId) {
   const difference = computeDifferenceRegions(rgbaDocument(before.document), rgbaDocument(after.document));
   const regions = validateLocalDifferenceGroups(draft.candidates, difference);
   if (!regions) throw new Error('正解候補に実際の差分以外の画素が含まれています');
-  return { id: draftId, draft, beforeDocument: before.document, afterDocument: after.document, regions, differenceMask: difference.mask };
+  return { id: draftId, revisionId: saved.revisionId, draft, beforeDocument: before.document, afterDocument: after.document, regions, differenceMask: difference.mask };
 }
 
 /** Read and revalidate one confirmed local Hidden Object draft without network or persistence. */
@@ -155,7 +157,7 @@ export async function loadLocalHiddenDraft(draftAdapter, drawAdapter, draftId) {
   catch { throw new Error('この下書きは短い画面で対象を押し分けられません。対象を離して作り直してください。'); }
   const regions = localHiddenHitBoxRegions(draft.targets, hitBoxes, draft.width, draft.height);
   if (!regions) throw new Error('保存した正解範囲を安全に確認できません');
-  return { id: draftId, draft, sourceDocument: source.document, regions };
+  return { id: draftId, revisionId: saved.revisionId, draft, sourceDocument: source.document, regions };
 }
 
 function localHiddenHitBoxRegions(targets, hitBoxes, width, height) {
@@ -266,9 +268,48 @@ function mount() {
     const maskCanvas = document.createElement('canvas'); maskCanvas.width = sourceW; maskCanvas.height = sourceH; maskCanvas.getContext('2d').putImageData(pixels, 0, 0);
     context.drawImage(maskCanvas, xoff, yoff, sourceW * scale, sourceH * scale);
     for (const index of found) { const region = regions[index]; context.strokeStyle = '#146c43'; context.lineWidth = Math.max(2, 3 / scale); context.strokeRect(xoff + region.minX * scale, yoff + region.minY * scale, Math.max(3, (region.maxX - region.minX + 1) * scale), Math.max(3, (region.maxY - region.minY + 1) * scale)); }
+    if (hint && performance.now() < hint.until && !found.has(hint.index)) {
+      // a soft pulsing ring around the area — close, but you still have to find it
+      const region = regions[hint.index]; const t = (hint.until - performance.now()) / HINT_MS;
+      const cx = xoff + (region.minX + region.maxX + 1) / 2 * scale; const cy = yoff + (region.minY + region.maxY + 1) / 2 * scale;
+      const r = Math.max((Math.max(region.maxX - region.minX, region.maxY - region.minY) + 1) * scale, Math.min(sourceW, sourceH) * scale * 0.2) * (1 + 0.08 * Math.sin(t * 18));
+      context.lineWidth = 4; context.strokeStyle = `rgba(255, 211, 90, ${Math.min(1, t * 2.5)})`; context.setLineDash([6, 5]);
+      context.beginPath(); context.arc(cx, cy, r, 0, Math.PI * 2); context.stroke(); context.setLineDash([]);
+    }
     if (Number.isFinite(cursorX) && Number.isFinite(cursorY)) { const cx = xoff + cursorX * scale; const cy = yoff + cursorY * scale; context.strokeStyle = '#3159a5'; context.lineWidth = 2; context.beginPath(); context.moveTo(cx - 7, cy); context.lineTo(cx + 7, cy); context.moveTo(cx, cy - 7); context.lineTo(cx, cy + 7); context.stroke(); }
   };
+  // ---- one free hint per puzzle; further hints use the shared PiXiEED pass ----
+  const HINT_MS = 2600; let hint = null; const hintButton = document.querySelector('#pixfind-hint');
+  let hintFrame = 0; let hintTimer = 0;
+  const reduceHintMotion = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
+  const stopHintMotion = () => { if (hintFrame) cancelAnimationFrame(hintFrame); hintFrame = 0; window.clearTimeout(hintTimer); hintTimer = 0; };
+  const hintController = createPuzzleHintController({ perk: 'pixfind.hint', requestPass, onState: ({ freeUsed, pending }) => {
+    if (!hintButton) return;
+    hintButton.disabled = pending;
+    hintButton.dataset.hintShort = freeUsed ? 'パス' : '無料';
+    hintButton.setAttribute('aria-label', freeUsed ? 'ヒント（パス）' : 'ヒント（この問題で1回無料）');
+    hintButton.title = freeUsed ? 'ヒント（パス）' : 'ヒント（この問題で1回無料）';
+  } });
+  const syncHint = () => { if (hintButton) hintButton.hidden = readOnly || !regions.length || found.size >= regions.length; };
+  const animateHint = () => {
+    hintFrame = 0; paint();
+    if (hint && performance.now() >= hint.until) { hint = null; window.clearTimeout(hintTimer); hintTimer = 0; paint(); }
+    else if (hint && !document.hidden && !reduceHintMotion()) hintFrame = requestAnimationFrame(animateHint);
+  };
+  hintButton?.addEventListener('click', async () => {
+    await hintController.request(() => {
+      const left = regions.map((_, index) => index).filter((index) => !found.has(index));
+      if (!left.length || readOnly) return false;
+      stopHintMotion();
+      hint = { index: left[Math.floor(Math.random() * left.length)], until: performance.now() + HINT_MS };
+      statusGame.textContent = 'このあたりをよく見てみよう';
+      hintTimer = window.setTimeout(() => { hint = null; hintTimer = 0; if (hintFrame) cancelAnimationFrame(hintFrame); hintFrame = 0; if (!document.hidden) paint(); }, HINT_MS);
+      paint(); if (!document.hidden && !reduceHintMotion()) hintFrame = requestAnimationFrame(animateHint);
+      return true;
+    });
+  });
   const updateProgress = () => {
+    syncHint();
     progress.textContent = `見つけた場所 ${found.size} / ${regions.length}`;
     foundList.replaceChildren(...regions.map((_, index) => {
       const target = selected?.targets?.[index];
@@ -280,6 +321,12 @@ function mount() {
     paint();
   };
   const start = async (puzzle) => {
+    stopHintMotion();
+    hint = null;
+    const hintIdentity = puzzle.localOnly || puzzle.localHiddenOnly
+      ? `local:${puzzle.mode || 'puzzle'}:${String(puzzle.id || 'draft')}:${String(puzzle.hintRevision || 'revision-unknown')}`
+      : `public:${puzzle.mode || 'puzzle'}:${String(puzzle.id || puzzle.slug || 'puzzle')}`;
+    hintController.setProblem(`pixfind:${hintIdentity}`);
     selected = puzzle; found = new Set(); regions = []; cursorX = NaN; cursorY = NaN; readOnly = false; authoritativeAnswers = false; answerInstruction = ''; primary.disabled = false; statusGame.textContent = '絵を準備しています。';
     originalNode.hidden = false; changedNode.hidden = true; compareButton.hidden = puzzle.mode === 'hidden-object'; compareButton.setAttribute('aria-pressed', 'false'); compareButton.textContent = '変化後を見る';
     document.querySelector('.pixfind-page').classList.add('pixfind-page--playing');
@@ -354,6 +401,8 @@ function mount() {
     }
   };
   const showList = () => {
+    stopHintMotion();
+    hint = null; hintController.setProblem('');
     if (localRoute || postPuzzleRoute) {
       for (const url of localObjectUrls) URL.revokeObjectURL(url);
       localObjectUrls.clear();
@@ -402,7 +451,17 @@ function mount() {
       paint(); statusGame.textContent = '矢印キーで場所を選び、Enter または Space で調べます。';
     } else if ((event.key === 'Enter' || event.key === ' ') && original && Number.isFinite(cursorX)) { event.preventDefault(); markAt(cursorX, cursorY); }
   });
-  window.addEventListener('resize', paint); window.addEventListener('pagehide', () => { for (const url of localObjectUrls) URL.revokeObjectURL(url); localObjectUrls.clear(); }); window.addEventListener('popstate', () => { const puzzle = resolvePuzzleFromLocation(window.location, puzzles); if (puzzle) start(puzzle); else showList(); });
+  window.addEventListener('resize', paint);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { if (hintFrame) cancelAnimationFrame(hintFrame); hintFrame = 0; }
+    else if (hint) animateHint();
+    else paint();
+  });
+  globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').addEventListener?.('change', (event) => {
+    if (event.matches) { if (hintFrame) cancelAnimationFrame(hintFrame); hintFrame = 0; paint(); }
+    else if (hint && !document.hidden && !hintFrame) hintFrame = requestAnimationFrame(animateHint);
+  });
+  window.addEventListener('pagehide', () => { stopHintMotion(); for (const url of localObjectUrls) URL.revokeObjectURL(url); localObjectUrls.clear(); }); window.addEventListener('popstate', () => { const puzzle = resolvePuzzleFromLocation(window.location, puzzles); if (puzzle) start(puzzle); else showList(); });
   (async () => {
     const query = new URLSearchParams(window.location.search || ''); const hasPostPuzzle = query.has('postPuzzle'); const publicPostId = resolvePostPuzzleId(window.location);
     if (hasPostPuzzle) {
@@ -437,12 +496,12 @@ function mount() {
         if (hiddenId !== undefined) {
           const local = await loadLocalHiddenDraft(gameAdapter, drawAdapter, hiddenId);
           const originalUrl = await localDocumentObjectUrl(local.sourceDocument); localObjectUrls.add(originalUrl);
-          await start({ id: local.id, slug: null, label: '端末内のもの探し', author: '端末内の下書き', mode: 'hidden-object', originalUrl, thumbnailUrl: originalUrl, localHiddenOnly: true, width: local.draft.width, height: local.draft.height, targets: local.draft.targets, regions: local.regions });
+          await start({ id: local.id, hintRevision: local.revisionId, slug: null, label: '端末内のもの探し', author: '端末内の下書き', mode: 'hidden-object', originalUrl, thumbnailUrl: originalUrl, localHiddenOnly: true, width: local.draft.width, height: local.draft.height, targets: local.draft.targets, regions: local.regions });
         } else {
           const local = await loadLocalSpotDraft(gameAdapter, drawAdapter, spotId);
           const originalUrl = await localDocumentObjectUrl(local.beforeDocument); localObjectUrls.add(originalUrl);
           const changedUrl = await localDocumentObjectUrl(local.afterDocument); localObjectUrls.add(changedUrl);
-          await start({ id: local.id, slug: null, label: '端末内の間違い探し', author: '端末内の下書き', mode: 'spot-difference', originalUrl, changedUrl, thumbnailUrl: originalUrl, localOnly: true, candidates: local.draft.candidates });
+          await start({ id: local.id, hintRevision: local.revisionId, slug: null, label: '端末内の間違い探し', author: '端末内の下書き', mode: 'spot-difference', originalUrl, changedUrl, thumbnailUrl: originalUrl, localOnly: true, candidates: local.draft.candidates });
         }
       } catch (error) {
         status.textContent = `この端末では試遊できません：${error instanceof Error ? error.message : '下書きを確認できません'}`;

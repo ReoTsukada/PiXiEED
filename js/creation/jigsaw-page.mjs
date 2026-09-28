@@ -13,6 +13,9 @@ import { supabaseConfig } from '../../data/site-config.js';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
 import { mountPxdTools } from './pxd-ui.mjs?rev=20260928-own-work-1';
 import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20260928-pxd-puzzles-1';
+import { normalizeJigsawFile } from './jigsaw-file.mjs?rev=20260928-pixel-roundtrip-1';
+import { requestPass } from '../pixieed-pass.mjs?v=20260928-rewards-1';
+import { createPuzzleHintController } from './puzzle-hint.mjs?rev=20260928-hint-1';
 
 const DRAW_LAST_DRAFT_KEY = 'pixieed.simple-draw.last-draft.v1';
 const JIGSAW_LAST_DRAFT_KEY = 'pixieed:creation:jigsaw:last-draft:v1';
@@ -31,9 +34,20 @@ let game = null; let sourceRevision = null; let layoutData = null; let pieces = 
 let pieceLookupSource = null; let pieceLookup = new Map(); let pieceOrderSource = null; let pieceOrderIndex = new Map();
 let selectionCache = { layout: null, pieceIds: null, path: null };
 let liftEffect = null; let liftValue = 0;
+let jigsawHint = null;
+let jigsawHintTimer = 0;
 let pxdOriginalRefs = null; let pxdBridge = null;
 let activePointer = null; let panGesture = null; let pendingPaint = 0; let view = { scale: 1, x: 0, y: 0 }; let lastWorkspaceSize = null;
 const MAX_TRAY_DOM = 80;
+const reduceJigsawHintMotion = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
+const jigsawHintButton = $('#jigsaw-hint');
+const jigsawHintController = createPuzzleHintController({ perk: 'jigsaw.hint', requestPass, onState: ({ freeUsed, pending }) => {
+  if (!jigsawHintButton) return;
+  jigsawHintButton.disabled = pending || !game || isJigsawWorkspaceComplete(game);
+  jigsawHintButton.dataset.hintShort = freeUsed ? 'パス' : '無料';
+  jigsawHintButton.setAttribute('aria-label', freeUsed ? 'ヒント（パス）' : 'ヒント（このパズルで1回無料）');
+  jigsawHintButton.title = freeUsed ? 'ヒント（パス）' : 'ヒント（このパズルで1回無料）';
+} });
 const PUBLIC_BUCKETS = new Set(['post-public', 'social-posts']);
 const safePublicUrl = (bucket, path) => {
   if (!PUBLIC_BUCKETS.has(bucket) || typeof path !== 'string' || path.length > 512 || path.startsWith('/') || path.split('/').some((part) => !part || part === '.' || part === '..' || !/^[A-Za-z0-9._-]+$/.test(part))) return null;
@@ -310,6 +324,20 @@ function paintWorkspace() {
   const topId = draggingId || liftEffect?.groupId || null;
   for (const group of game.groups) if (!group.inTray && group.groupId !== topId) drawGroup(context, group, transform, metrics, 0);
   if (topId) { const group = findGroup(topId); if (group && !group.inTray) drawGroup(context, group, transform, metrics, frameLiftAmount); }
+  if (jigsawHint) {
+    if (performance.now() >= jigsawHint.until) jigsawHint = null;
+    else {
+      const target = layoutData.pieces.find((piece) => piece.pieceId === jigsawHint.pieceId);
+      if (target) {
+        const fade = Math.min(1, (jigsawHint.until - performance.now()) / 420);
+        const pulse = reduceJigsawHintMotion() ? 1 : 1 + 0.08 * Math.sin(performance.now() / 95);
+        context.save(); context.globalAlpha = fade; context.strokeStyle = '#ffd35a'; context.fillStyle = 'rgba(255,211,90,.14)'; context.lineWidth = Math.max(1, 2.5 / transform.scale); context.setLineDash([6 / transform.scale, 4 / transform.scale]);
+        context.fillRect(target.x, target.y, target.width, target.height); context.strokeRect(target.x, target.y, target.width, target.height);
+        context.setLineDash([]); context.beginPath(); context.arc(target.x + target.width / 2, target.y + target.height / 2, Math.max(target.width, target.height) * 0.24 * pulse, 0, Math.PI * 2); context.stroke(); context.restore();
+        if (!reduceJigsawHintMotion() && !document.hidden) queuePaint();
+      } else jigsawHint = null;
+    }
+  }
   workspaceElement.dataset.jigsawSelected = selectedGroupId && findGroup(selectedGroupId) && !findGroup(selectedGroupId).inTray ? 'true' : 'false';
   if (liftEffect && !document.hidden) queuePaint();
 }
@@ -334,12 +362,14 @@ function renderTray() {
   trayPageLabel.textContent = `${trayPage + 1} / ${pageCount}`; trayPrev.disabled = trayPage === 0; trayNext.disabled = trayPage >= pageCount - 1;
   for (const group of visible) {
     const button = document.createElement('button'); button.type = 'button'; button.className = 'jigsaw-piece'; button.dataset.groupId = group.groupId; button.dataset.pieceId = group.pieceIds[0]; button.dataset.rotation = String(group.rotation); button.setAttribute('aria-pressed', String(selectedGroupId === group.groupId)); button.setAttribute('aria-label', `${groupName(group)}、${group.rotation * 90}度回転${selectedGroupId === group.groupId ? '、選択中' : '、選択して作業スペースへ置く'}`);
+    if (jigsawHint?.groupId === group.groupId && performance.now() < jigsawHint.until) button.classList.add('is-hint-target');
     button.append(groupThumb(group)); trayElement.append(button);
   }
 }
 function renderGame() {
   validateJigsawWorkspace(game); trayPage = Math.min(trayPage, Math.max(0, Math.ceil(trayGroups().length / MAX_TRAY_DOM) - 1));
   renderTray(); queuePaint(); completionMessage.hidden = !isJigsawWorkspaceComplete(game); saveButton.disabled = false; updateSelectionControls();
+  if (jigsawHintButton) jigsawHintButton.disabled = jigsawHintController.getState().pending || isJigsawWorkspaceComplete(game);
   // the arcade layer (HUD, timer, celebration) listens for this
   document.dispatchEvent(new CustomEvent('jigsaw:state', { detail: { gameId: game.gameId, pieces: layoutData.columns * layoutData.rows, groups: game.groups.length, inTray: game.groups.filter((group) => group.inTray).length, complete: isJigsawWorkspaceComplete(game), width: layoutData.width, height: layoutData.height } }));
 }
@@ -492,7 +522,28 @@ function updateViewport() {
 }
 
 function showGame() {
-  setupSection.hidden = true; playSection.hidden = false; document.body.dataset.jigsawPlaying = 'true'; renderGame();
+  setupSection.hidden = true; playSection.hidden = false; document.body.dataset.jigsawPlaying = 'true';
+  const problemKey = game?.gameId ? `jigsaw:${game.gameId}` : '';
+  if (jigsawHintController.getState().problemKey !== problemKey) { window.clearTimeout(jigsawHintTimer); jigsawHintTimer = 0; jigsawHint = null; }
+  jigsawHintController.setProblem(problemKey); renderGame();
+}
+
+function requestJigsawHint() {
+  return jigsawHintController.request(() => {
+    if (!game || isJigsawWorkspaceComplete(game)) return false;
+    const selected = findGroup(selectedGroupId);
+    const visibleTray = trayGroups().slice(trayPage * MAX_TRAY_DOM, (trayPage + 1) * MAX_TRAY_DOM);
+    const selectedVisibleTray = selected?.inTray && visibleTray.some((candidate) => candidate.groupId === selected.groupId) ? selected : null;
+    const group = selected && !selected.inTray ? selected : selectedVisibleTray || visibleTray[0] || game.groups.find((candidate) => candidate.pieceIds.length < game.pieceOrder.length);
+    const pieceId = group?.pieceIds?.[0];
+    if (!pieceId || !layoutData?.pieces.some((piece) => piece.pieceId === pieceId)) return false;
+    jigsawHint = { pieceId, groupId: group.groupId, until: performance.now() + 2600 };
+    window.clearTimeout(jigsawHintTimer);
+    renderTray();
+    jigsawHintTimer = window.setTimeout(() => { jigsawHint = null; jigsawHintTimer = 0; renderTray(); if (!document.hidden) queuePaint(); }, 2600);
+    updateStatus('光る場所がピースの合う位置です。ピースを動かして置いてみましょう。');
+    queuePaint(); return true;
+  });
 }
 
 async function startGame() {
@@ -507,25 +558,39 @@ async function startGame() {
       sourceLabel.textContent = `自分の保存版 ${revision.revisionId.slice(0, 8)} · ${revision.document.width}×${revision.document.height}px`;
     } else {
       let url; let choice = null;
+      let localFile = null; let scaleInfo = null;
       if (sourceKind.value === 'public') {
         choice = JSON.parse(publicSelect.value); url = choice.url;
         await assertListedPublicSource(choice.id, url, choice.puzzleId || null);
       } else {
-        const file = fileInput.files?.[0];
-        if (!file || file.size > JIGSAW_MAX_IMAGE_BYTES || !['image/png', 'image/webp', 'image/jpeg'].includes(file.type)) throw new Error('PNG、WebP、JPEGの画像を8MB以内で選んでください');
-        url = URL.createObjectURL(file);
+        localFile = fileInput.files?.[0];
+        if (!localFile || localFile.size > JIGSAW_MAX_IMAGE_BYTES || !['image/png', 'image/webp', 'image/jpeg'].includes(localFile.type)) throw new Error('PNG、WebP、JPEGの画像を8MB以内で選んでください');
+        url = URL.createObjectURL(localFile);
       }
       try {
-        const imageBytes = sourceKind.value === 'file' ? await fileInput.files[0].arrayBuffer() : await fetchImageBytes(url);
+        let imageBytes;
+        if (sourceKind.value === 'file') {
+          if (localFile.type === 'image/png' || localFile.type === 'image/webp') {
+            scaleInfo = await normalizeJigsawFile(localFile);
+            localFile = typeof File === 'function'
+              ? new File([scaleInfo.file], localFile.name, { type: scaleInfo.file.type, lastModified: localFile.lastModified })
+              : scaleInfo.file;
+          }
+          if (localFile.size > JIGSAW_MAX_IMAGE_BYTES) throw new Error('画像のファイルサイズが8MBを超えています');
+          imageBytes = await localFile.arrayBuffer();
+        } else imageBytes = await fetchImageBytes(url);
         if (imageBytes.byteLength > JIGSAW_MAX_IMAGE_BYTES) throw new Error('画像のファイルサイズが8MBを超えています');
         const decodeUrl = URL.createObjectURL(new Blob([imageBytes])); let image;
         try { image = await decodeImage(decodeUrl); } finally { URL.revokeObjectURL(decodeUrl); }
         const fingerprint = await fingerprintBytes(imageBytes); rgba = boundedRgba(image); width = rgba.width; height = rgba.height;
         if (sourceKind.value === 'public') source = { type: 'public', postId: choice.id, ...(choice.puzzleId ? { puzzleId: choice.puzzleId } : {}), title: String(choice.label).slice(0, 120), url, fingerprint, width, height };
-        else source = { type: 'file', dataUrl: `data:${fileInput.files[0].type};base64,${bytesToBase64(new Uint8Array(imageBytes))}`, fingerprint, width, height };
+        else source = { type: 'file', dataUrl: `data:${localFile.type};base64,${bytesToBase64(new Uint8Array(imageBytes))}`, fingerprint, width, height };
         validateJigsawSource(source);
         sourceLabel.textContent = `${sourceKind.value === 'public' ? `${source.title} · PiXiEEDの投稿` : '端末で選んだ画像'} · ${rgba.width}×${rgba.height}px`;
       } finally { if (sourceKind.value === 'file') URL.revokeObjectURL(url); }
+    }
+    if (sourceKind.value === 'file' && ['image/png', 'image/webp'].includes(fileInput.files?.[0]?.type)) {
+      document.dispatchEvent(new CustomEvent('jigsaw:source-ready', { detail: { width, height } }));
     }
     const pieceSize = gridSelect.value === 'auto' ? 'auto' : Number(gridSelect.value);
     layoutData = createJigsawLayout({ width, height, pieceSize, seed: gameId });
@@ -745,6 +810,8 @@ globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').addEventListener?.('
 });
 
 $('#jigsaw-new').addEventListener('click', () => {
+  window.clearTimeout(jigsawHintTimer); jigsawHintTimer = 0;
+  jigsawHint = null; jigsawHintController.setProblem('');
   pxdBridge?.reset();
   game = null; sourceRevision = null; layoutData = null; pieces = []; selectedGroupId = null;
   clearSelectionCache(); clearDragState();
@@ -754,6 +821,8 @@ $('#jigsaw-new').addEventListener('click', () => {
   delete document.body.dataset.jigsawPlaying; playSection.hidden = true; setupSection.hidden = false; saveButton.disabled = true;
   updateStatus('絵とピースの大きさを選んでください。');
 });
+
+jigsawHintButton?.addEventListener('click', () => { void requestJigsawHint(); });
 
 resumeButton.hidden = !draftStore || !localStorageValue(JIGSAW_LAST_DRAFT_KEY);
 saveButton.disabled = true;

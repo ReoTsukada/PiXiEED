@@ -76,7 +76,8 @@ test('rewards add one hour to the current expiry and allow an explicit extension
     const secondModal = body.children.at(-1);
     assert.match(secondModal.querySelector('p').innerHTML, /サイト共通の拡張を使える時間に1時間追加/);
     assert.deepEqual(secondModal.querySelector('.px-pass-perks').children.map(({ textContent }) => textContent), [
-      'ドット絵カメラ：GIFを10秒・なめらかに', 'ドットで音楽：広いキャンバスで作曲', 'ドットで音楽：追加の音色'
+      'ドット絵カメラ：GIFを10秒・なめらかに', 'ドットで音楽：広いキャンバスで作曲', 'ドットで音楽：追加の音色',
+      'かんたんドット：工程多め・8秒のタイムラプス', '間違い探し・かくれもの：追加ヒント', 'ジグソー：追加ヒント'
     ]);
     assert.match(secondModal.querySelector('.px-pass-note').textContent, /ページを閉じても進みます。制作中の内容は残ります。/);
     await secondModal.querySelector('.px-pass-go').fire('click')[0]; assert.equal(await second, true);

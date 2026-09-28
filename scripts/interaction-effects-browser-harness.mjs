@@ -292,10 +292,10 @@ async function runDraw(browser, engine, viewport, engineName) {
   const ready = page.waitForEvent('download'); const exportFx = waitFx(page, '.px-fx-export').then(() => true, () => false);
   await page.locator('#draw-export').click();
   const [download, sawFx] = await Promise.all([ready, exportFx]);
-  const png = await verifyDownloadPng(download, 16, 16); await assertEffectBudget(page);
+  const png = await verifyDownloadPng(download, 2048, 2048); // saved enlarged: each dot is a 128×128 block await assertEffectBudget(page);
   assert.deepEqual(await canvasPixels(page, canvas), beforeExport, 'PNG feedback must not mutate the source canvas');
   const pngUrl = `data:image/png;base64,${png.toString('base64')}`;
-  const exportPixels = await page.evaluate(async (url) => { const img = new Image(); img.src = url; await img.decode(); const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const x = c.getContext('2d'); x.drawImage(img, 0, 0); return [...x.getImageData(0, 0, c.width, c.height).data]; }, pngUrl);
+  const exportPixels = await page.evaluate(async (url) => { const img = new Image(); img.src = url; await img.decode(); const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const x = c.getContext('2d'); x.drawImage(img, 0, 0); const step = img.width / 16; const out = []; for (let row = 0; row < 16; row += 1) for (let col = 0; col < 16; col += 1) out.push(...x.getImageData(col * step + step / 2, row * step + step / 2, 1, 1).data); return out; }, pngUrl);
   assert.deepEqual(exportPixels, beforeExport, 'downloaded PNG retains exact source pixels');
   await page.waitForTimeout(260); assert.deepEqual(await activeEffects(page), []);
   await assertIdleAnimations(page);
@@ -384,12 +384,12 @@ async function runAudio(browser, viewport, engineName) {
   const beforeExport = await canvasPixels(page, canvas);
   const ready = page.waitForEvent('download'); const exportFx = waitFx(page, '.px-fx-export'); await page.locator('#audio-export-image').click();
   const [download] = await Promise.all([ready, exportFx]);
-  const png = await verifyDownloadPng(download, 1024, 1024); await assertEffectBudget(page);
+  const png = await verifyDownloadPng(download, 2048, 2048); await assertEffectBudget(page);
   assert.deepEqual(await canvasPixels(page, canvas), beforeExport, 'export feedback does not change audio pixels');
   const sampled = await page.evaluate(async (url) => {
     const img = new Image(); img.src = url; await img.decode(); const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
     const ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0); const result = [];
-    for (let y = 0; y < 16; y += 1) for (let x = 0; x < 16; x += 1) result.push(...ctx.getImageData(x * 64 + 32, y * 64 + 32, 1, 1).data);
+    for (let y = 0; y < 16; y += 1) for (let x = 0; x < 16; x += 1) result.push(...ctx.getImageData(x * 128 + 64, y * 128 + 64, 1, 1).data);
     return result;
   }, `data:image/png;base64,${png.toString('base64')}`);
   assert.deepEqual(sampled, beforeExport, 'exported audio artwork matches the unchanged 16×16 source pixels');

@@ -54,6 +54,6 @@ export function openHandoffComposer(handoff, postUi, FileImpl = globalThis.File)
   }
   const draw = handoff.source === 'draw';
   const file = new FileImpl([handoff.file], draw ? 'drawing.png' : 'pixel-camera.png', { type: 'image/png' });
-  postUi.openComposer({ file, postKind: draw ? 'pixel_art' : 'pixel_camera' });
+  postUi.openComposer({ file, postKind: draw ? 'pixel_art' : 'pixel_camera', keepScale: true });
   return consumeHandoff(handoff);
 }

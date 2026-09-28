@@ -1423,7 +1423,7 @@ function renderDiscoveryMap(root) {
   let isSelectingPostCell = false;
   const openPostComposer = (context = {}) => {
     if (!postComposerPromise) {
-      postComposerPromise = import('./post-composer.js?rev=20260920-cell-pin-v3').then(({ bindUserPostComposer }) => {
+      postComposerPromise = import('./post-composer.js?rev=20260928-pixel-roundtrip-1').then(({ bindUserPostComposer }) => {
         postComposer = bindUserPostComposer(root, {
           onRequestMapCell: () => {
             isSelectingPostCell = true;
@@ -4090,7 +4090,8 @@ function renderPublicShell() {
     const open = () => {
       const api = globe.contentWindow;
       const compose = () => api?.__PIXIEED_POSTS__?.openComposer?.();
-      if (api?.__PIXIEED_ASTRO__?.orrery.isOpen()) api.__PIXIEED_ASTRO__.closeOrrery(compose);
+      if (api?.__PIXIEED_ASTRO__?.returnToGallery) api.__PIXIEED_ASTRO__.returnToGallery(compose);
+      else if (api?.__PIXIEED_ASTRO__?.orrery.isOpen()) api.__PIXIEED_ASTRO__.closeOrrery(compose);
       else compose();
     };
     if (globe.contentWindow?.__PIXIEED_POSTS__) open();

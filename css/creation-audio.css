@@ -17,6 +17,7 @@
 .audio-status.is-visible{z-index:8;top:64px;left:50%;width:max-content;max-width:calc(100% - 24px);height:auto;transform:translateX(-50%);padding:9px 13px;clip-path:none;white-space:normal;border-radius:12px;background:#193b4aeF;color:white;font-size:.76rem;pointer-events:none;box-shadow:0 4px 16px #193b4a20}
 .audio-workspace{display:flex;flex:1;flex-direction:column;min-height:0;gap:12px}
 .audio-grid-wrap{position:relative;display:flex;flex:1;min-height:0;align-items:center;justify-content:center;width:100%;overflow:hidden;border:1px solid #193b4a1c;border-radius:24px;background:radial-gradient(ellipse at 20% 15%,#fff9,transparent 65%),#e9e7df;box-shadow:inset 0 1px 0 #fff;touch-action:none}
+.audio-pass-required{position:absolute;z-index:4;top:8px;left:8px;right:8px;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px;padding:5px 8px;border:1px solid #193b4a20;border-radius:13px;background:#fffdf8eF;color:#193b4a;font-size:.72rem;box-shadow:0 3px 10px #193b4a14;pointer-events:none}.audio-pass-required button{min-height:44px;padding:6px 10px;background:#193b4a;color:#fff;pointer-events:auto}
 .audio-pixel-canvas{display:block;flex:none;image-rendering:pixelated;touch-action:none;user-select:none;outline:1px solid #193b4a30;cursor:crosshair;box-shadow:0 10px 28px #193b4a14}
 .audio-pixel-canvas:focus-visible{outline:3px solid #357bb3;outline-offset:2px}
 .audio-cursor{position:absolute;z-index:2;pointer-events:none;box-shadow:inset 0 0 0 2px #193b4a,0 0 0 1px #fff}

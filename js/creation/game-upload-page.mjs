@@ -1,8 +1,10 @@
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
 import { createUploadedWalkCollectGame, directionForUploadGameKey, moveUploadedWalkGame, restoreUploadedWalkGame, setUploadedWalkGamePaused, validateUploadedWalkGame } from './game-upload-core.mjs?rev=20260927-game-upload-1';
+import { normalizePixelFile, scaleNotice } from '../pixel-scale.mjs?rev=20260928-pixel-roundtrip-1';
 
 const LAST_KEY = 'pixieed:creation:game-upload:last-draft:v1';
 const AUDIO_TYPES = new Set(['audio/mpeg', 'audio/mp3', 'audio/ogg', 'audio/wav', 'audio/x-wav', 'audio/mp4', 'audio/aac', 'audio/webm', 'audio/flac']);
+const MAX_IMAGE_SOURCE_BYTES = 8 * 1024 * 1024;
 const $ = (selector) => document.querySelector(selector);
 const status = $('#game-status'); const setup = $('#game-setup'); const playSection = $('#game-play'); const canvas = $('#game-board'); const context = canvas.getContext('2d', { alpha: false });
 const files = { character: null, background: null, music: null }; const layers = { character: null, background: null };
@@ -47,18 +49,26 @@ async function selectFile(slot, file) {
     if (slot === 'music') { previewAudio.pause(); previewAudio.removeAttribute('src'); previewAudio.hidden = true; }
     updatePrepareButton(); return;
   }
-  if (file.size < 1 || file.size > maxBytes(slot)) throw new RangeError(slot === 'music' ? '音声は3MBまで選べます' : '画像は1ファイル2MBまで選べます');
+  if (file.size < 1 || file.size > (slot === 'music' ? maxBytes(slot) : MAX_IMAGE_SOURCE_BYTES)) throw new RangeError(slot === 'music' ? '音声は3MBまで選べます' : '画像は1ファイル8MBまで選べます');
   const mimeType = mimeForFile(file); if (!typeAllowed(slot, mimeType)) throw new TypeError(slot === 'music' ? 'MP3、OGG、WAV、M4A、AAC、WebM、FLACに対応しています' : 'PNGまたはWebPを選んでください');
-  const dataUrl = await readDataUrl(file); const asset = { fileName: filenameSafe(file.name), mimeType, sizeBytes: file.size, dataUrl };
   if (slot !== 'music') {
-    const image = await decodeImage(dataUrl); asset.width = image.naturalWidth; asset.height = image.naturalHeight;
+    const typedFile = file.type === mimeType ? file : new File([file], file.name, { type: mimeType, lastModified: file.lastModified });
+    const normalized = await normalizePixelFile(typedFile);
+    const normalizedFile = typeof File === 'function'
+      ? new File([normalized.file], file.name, { type: normalized.file.type, lastModified: file.lastModified })
+      : normalized.file;
+    if (normalizedFile.size > maxBytes(slot)) throw new RangeError('画像は1ファイル2MBまで選べます');
+    const dataUrl = await readDataUrl(normalizedFile);
+    const asset = { fileName: filenameSafe(file.name), mimeType: normalizedFile.type, sizeBytes: normalizedFile.size, dataUrl, width: normalized.width, height: normalized.height };
     if (asset.width > 4096 || asset.height > 4096 || asset.width * asset.height > 1024 * 1024) throw new RangeError('画像は縦横4096px以下、合計1024×1024画素までです');
-    setSlotSummary(slot, asset);
+    files[slot] = asset; setSlotSummary(slot, asset);
+    const notice = scaleNotice(normalized); if (notice) setStatus(notice);
   } else {
+    const dataUrl = await readDataUrl(file); const asset = { fileName: filenameSafe(file.name), mimeType, sizeBytes: file.size, dataUrl };
     files.music = asset; previewAudio.pause(); previewAudio.src = dataUrl; previewAudio.hidden = false;
     setSlotSummary(slot, asset); updatePrepareButton(); return;
   }
-  files[slot] = asset; updatePrepareButton();
+  updatePrepareButton();
 }
 
 async function loadLayer(asset) { const image = await decodeImage(asset.dataUrl); return image; }

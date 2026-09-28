@@ -1,24 +1,38 @@
 /** Client-side checks for a pixel-art upload. Accepted files are normalized to PNG for server verification. */
 
-export const PIXEL_LIMITS = Object.freeze({ maxBytes: 512 * 1024, minSize: 8, maxSize: 512, maxColors: 128, mime: ['image/png', 'image/webp'] });
+import { normalizePixelFile } from '../pixel-scale.mjs?v=20260928-pixel-roundtrip-1';
+import { withPixelPngMetadata } from '../pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
 
-export async function inspectPixelImage(file) {
+export const PIXEL_LIMITS = Object.freeze({ maxBytes: 512 * 1024, minSize: 8, maxSize: 512, maxColors: 128, mime: ['image/png', 'image/webp'] });
+const MAX_SOURCE_BYTES = 8 * 1024 * 1024;
+
+async function blobBase64(blob) {
+  const bytes = new Uint8Array(await blob.arrayBuffer()); let binary = '';
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+  return btoa(binary);
+}
+
+export async function inspectPixelImage(file, { keepScale = false } = {}) {
   if (!file) throw new Error('画像を選んでください。');
   if (!PIXEL_LIMITS.mime.includes(file.type)) throw new Error('PNG か WebP のドット絵を選んでください。（写真や JPEG は投稿できません）');
-  if (file.size > PIXEL_LIMITS.maxBytes) throw new Error(`画像が大きすぎます（${Math.ceil(file.size / 1024)}KB）。512KB 以内にしてください。`);
-  if (typeof createImageBitmap !== 'function') throw new Error('このブラウザでは画像を確認できません。');
-  const bitmap = await createImageBitmap(file);
+  if (file.size > MAX_SOURCE_BYTES) throw new Error('画像ファイルは8MB以内にしてください。');
+  const normalized = await normalizePixelFile(file, { keepScale });
+  const { width, height, data } = normalized;
+  const { minSize, maxSize, maxColors } = PIXEL_LIMITS;
+  if (width < minSize || height < minSize) throw new Error(`小さすぎます（${width}×${height}px）。${minSize}px 以上にしてください。`);
+  if (width > maxSize || height > maxSize) throw new Error(`大きすぎます（${width}×${height}px）。${maxSize}px 以内のドット絵にしてください。`);
+  const canvas = document.createElement('canvas');
+  canvas.width = width; canvas.height = height;
   try {
-    const { width, height } = bitmap;
-    const { minSize, maxSize, maxColors } = PIXEL_LIMITS;
-    if (width < minSize || height < minSize) throw new Error(`小さすぎます（${width}×${height}px）。${minSize}px 以上にしてください。`);
-    if (width > maxSize || height > maxSize) throw new Error(`大きすぎます（${width}×${height}px）。${maxSize}px 以内のドット絵にしてください。拡大した画像は等倍に戻してから選んでください。`);
-    const canvas = document.createElement('canvas');
-    canvas.width = width; canvas.height = height;
     const context = canvas.getContext('2d', { willReadFrequently: true });
+    if (!context) throw new Error('画像を読み込めませんでした。');
     context.imageSmoothingEnabled = false;
-    context.drawImage(bitmap, 0, 0);
-    const pixels = context.getImageData(0, 0, width, height).data;
+    const imageData = typeof ImageData === 'function'
+      ? new ImageData(new Uint8ClampedArray(data), width, height)
+      : context.createImageData(width, height);
+    if (!(typeof ImageData === 'function')) imageData.data.set(data);
+    context.putImageData(imageData, 0, 0);
+    const pixels = data;
     const colors = new Set();
     let transparent = 0;
     for (let index = 0; index < pixels.length; index += 4) {
@@ -26,15 +40,13 @@ export async function inspectPixelImage(file) {
       colors.add((pixels[index] << 24 | pixels[index + 1] << 16 | pixels[index + 2] << 8 | pixels[index + 3]) >>> 0);
       if (colors.size > maxColors) throw new Error(`色数が多すぎます。${maxColors} 色以内のドット絵にしてください。（写真は投稿できません）`);
     }
-    const dataUrl = canvas.toDataURL('image/png');
-    if (!dataUrl.startsWith('data:image/png;base64,')) throw new Error('投稿用のPNGを作れませんでした。');
-    const base64 = dataUrl.slice('data:image/png;base64,'.length);
-    const size = Math.floor(base64.length * 3 / 4) - (base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0);
-    if (size > PIXEL_LIMITS.maxBytes) throw new Error('投稿用PNGが512KBを超えました。画像を小さくしてから選んでください。');
-    return { dataUrl, mimeType: 'image/png', size, width, height, colorCount: colors.size, hasTransparency: transparent > 0 };
-  } finally {
-    bitmap.close?.();
-  }
+    const rawPng = await new Promise((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('投稿用のPNGを作れませんでした。')), 'image/png'));
+    const png = await withPixelPngMetadata(rawPng, { width, height, scale: 1 }, { maxBytes: MAX_SOURCE_BYTES });
+    if (png.size > PIXEL_LIMITS.maxBytes) throw new Error('投稿用PNGが512KBを超えました。画像を小さくしてから選んでください。');
+    const base64 = await blobBase64(png);
+    const dataUrl = `data:image/png;base64,${base64}`;
+    return { file: png, dataUrl, mimeType: 'image/png', size: png.size, width, height, colorCount: colors.size, hasTransparency: transparent > 0, scale: normalized.scale, sourceWidth: normalized.sourceWidth, sourceHeight: normalized.sourceHeight };
+  } finally { canvas.width = canvas.height = 1; }
 }
 
 /** Largest whole-number scale that fits the box, so every pixel stays a crisp square. */

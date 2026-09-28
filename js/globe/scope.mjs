@@ -702,6 +702,13 @@ export function createScope({ canvas, onChange = () => {} } = {}) {
     setState(celestial) { state = celestial; recompute(); },
     setObserver(next) { observer = { latitude: clamp(next.latitude, -90, 90), longitude: next.longitude }; recompute(); },
     setFov,
+    setAim(next) {
+      if (!Number.isFinite(next?.azimuth) || !Number.isFinite(next?.altitude)) return;
+      tracking = null;
+      azimuth = (((next.azimuth + 180) % 360 + 360) % 360 - 180) * DEG;
+      altitude = clamp(next.altitude, -10, 90) * DEG;
+      onChange(snapshot()); requestDraw();
+    },
     setFilter(value) { filterOn = Boolean(value); onChange(snapshot()); requestDraw(); },
     track(target) { tracking = target; applyTracking(); onChange(snapshot()); requestDraw(); },
     getSnapshot: snapshot,

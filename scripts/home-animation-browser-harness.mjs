@@ -7,6 +7,8 @@ if (!modulePath) throw new Error('Set PIXIEED_PLAYWRIGHT_MODULE to an existing P
 const BASE = process.env.PIXIEED_BROWSER_BASE_URL || 'http://127.0.0.1:4184';
 if (!['localhost', '127.0.0.1', '[::1]'].includes(new URL(BASE).hostname)) throw new Error('Only a local test server is allowed.');
 const { chromium, webkit } = await import(pathToFileURL(modulePath).href);
+const selectedEngine = process.env.PIXIEED_HOME_BROWSER_ENGINE;
+if (selectedEngine && !['chromium', 'webkit'].includes(selectedEngine)) throw new Error('Unknown home browser engine.');
 const allScenarios = [
   { name: 'normal', width: 390, height: 844 },
   { name: 'reduced', width: 390, height: 844, reduced: true },
@@ -21,7 +23,8 @@ const scenarios = selectedScenario ? allScenarios.filter(({ name }) => name === 
 if (!scenarios.length) throw new Error('Unknown home browser scenario.');
 
 for (const [engine, type] of [['Chrome', chromium], ['WebKit', webkit]]) {
-  const browser = await type.launch({ headless: true });
+  if (selectedEngine && selectedEngine !== (engine === 'Chrome' ? 'chromium' : 'webkit')) continue;
+  const browser = await type.launch({ headless: true, ...(engine === 'WebKit' && process.env.PIXIEED_WEBKIT_EXECUTABLE ? { executablePath: process.env.PIXIEED_WEBKIT_EXECUTABLE } : {}) });
   try {
     for (const scenario of scenarios) {
       const page = await browser.newPage({ viewport: { width: scenario.width, height: scenario.height }, reducedMotion: scenario.reduced ? 'reduce' : 'no-preference' });
@@ -57,6 +60,9 @@ for (const [engine, type] of [['Chrome', chromium], ['WebKit', webkit]]) {
       };
       await page.waitForTimeout(350);
       const automaticFrames = await changedWhileVisible();
+      if (scenario.name === 'normal') {
+        assert.ok(automaticFrames >= 20 && automaticFrames <= 34, `${engine}: visible hero should paint near 60 FPS, got ${automaticFrames} frames in 500ms`);
+      }
 
       if (scenario.reduced) {
         await page.locator('#hpColors button').nth(4).click();

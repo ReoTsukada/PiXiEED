@@ -9,7 +9,7 @@
  */
 import { lookupCell, projectGeoToScreen } from './geometry.mjs?v=20260921-grid11-1';
 import { formatCoordinates, googleMapsUrl, parseLocationInput } from './geo-input.mjs?v=20260921-post-1';
-import { fitPixelImage, inspectPixelImage, PIXEL_LIMITS } from './post-image.mjs?v=20260928-image-fit-1';
+import { fitPixelImage, inspectPixelImage, PIXEL_LIMITS } from './post-image.mjs?v=20260928-pixel-roundtrip-1';
 import { createDemoAuth, createPostStore } from './post-store.mjs?v=20260921-post-1';
 import { PUZZLE_HANDOFF_META_KEY } from '../creation/puzzle-handoff.mjs?v=20260928-puzzle-handoff-1';
 
@@ -331,7 +331,7 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
     positionDraftPin();
   }
 
-  async function setImage(file, { fromCamera = false, puzzlePayload = null } = {}) {
+  async function setImage(file, { fromCamera = false, puzzlePayload = null, keepScale = false } = {}) {
     c.artError.textContent = '';
     if (!file) return;
     if (!puzzlePayload) {
@@ -340,7 +340,7 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
     }
     state.postKind = fromCamera ? 'pixel_camera' : 'pixel_art';
     try {
-      const inspected = await inspectPixelImage(file);
+      const inspected = await inspectPixelImage(file, { keepScale: keepScale || fromCamera || Boolean(puzzlePayload) });
       state.image = inspected;
       c.artImage.src = inspected.dataUrl;
       const display = fitPixelImage(inspected.width, inspected.height, 232, 232);
@@ -397,12 +397,12 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
     return true;
   }
 
-  function openComposer({ selection = null, file = null, postKind = 'pixel_art', puzzlePayload = null } = {}) {
-    if (needLogin(() => openComposer({ selection, file, postKind, puzzlePayload }))) return;
+  function openComposer({ selection = null, file = null, postKind = 'pixel_art', puzzlePayload = null, keepScale = false } = {}) {
+    if (needLogin(() => openComposer({ selection, file, postKind, puzzlePayload, keepScale }))) return;
     if (state.done) resetComposer();
     showSheet('composer');
     if (selection) { const pin = pinFromSelection(selection); if (pin) setPin(pin); }
-    if (file) return setImage(file, { fromCamera: postKind === 'pixel_camera', puzzlePayload });
+    if (file) return setImage(file, { fromCamera: postKind === 'pixel_camera', puzzlePayload, keepScale });
     else if (!state.image) requestAnimationFrame(() => c.drop.focus({ preventScroll: true }));
     return Promise.resolve();
   }

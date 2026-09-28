@@ -71,7 +71,8 @@ async function assertHeader(page, route, viewport) {
 }
 
 for (const [engineName, engine] of [['chromium', chromium], ['webkit', webkit]]) {
-  const browser = await engine.launch({ headless: true });
+  if (process.env.PIXIEED_PASS_ENGINE && process.env.PIXIEED_PASS_ENGINE !== engineName) continue;
+  const browser = await engine.launch({ headless: true, ...(engineName === 'webkit' && process.env.PIXIEED_WEBKIT_EXECUTABLE ? { executablePath: process.env.PIXIEED_WEBKIT_EXECUTABLE } : {}) });
   try {
     for (const viewport of viewports) {
       const context = await browser.newContext({ viewport });
@@ -155,6 +156,7 @@ for (const [engineName, engine] of [['chromium', chromium], ['webkit', webkit]])
       assert.ok(extras.length >= 8, 'eight extra instruments are present');
       await instruments.selectOption(extras[0]);
       await audio.locator('#audio-pixel-canvas').click({ position: { x: 60, y: 35 } });
+      const originalAudioPixels = await audio.locator('#audio-pixel-canvas').evaluate((canvas) => [...canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data]);
       await audio.evaluate(() => {
         localStorage.setItem('pixieed:pass:v1', JSON.stringify({ until: Date.now() + 250 }));
         window.dispatchEvent(new StorageEvent('storage', { key: 'pixieed:pass:v1' }));
@@ -162,27 +164,45 @@ for (const [engineName, engine] of [['chromium', chromium], ['webkit', webkit]])
       await audio.waitForFunction(() => document.querySelector('[data-header-pass]')?.dataset.active === 'false');
       assert.equal(await audio.locator('#audio-pixel-canvas').getAttribute('width'), '64');
       assert.equal(await instruments.inputValue(), extras[0], 'expiry keeps the existing extra instrument selected');
-      await audio.locator('#audio-palette-settings>summary').click();
-      await instruments.selectOption(extras[1]); await audio.waitForSelector('.px-pass-go');
-      assert.equal(await instruments.inputValue(), extras[0], 'a new extra voice is not applied after expiry');
-      await audio.locator('.px-pass-no').click();
-      await audio.locator('#audio-play-toggle').click();
-      await audio.waitForFunction(() => document.querySelector('#audio-play-toggle')?.getAttribute('aria-pressed') === 'true');
-      await audio.locator('#audio-play-toggle').click();
+      await audio.waitForSelector('#audio-pass-required:visible');
+      assert.match(await audio.locator('#audio-pass-required').textContent(), /追加/);
+      assert.equal(await audio.locator('#audio-pixel-canvas').getAttribute('aria-disabled'), 'true');
+      for (const selector of ['#audio-play-toggle', '#audio-take-photo', '#audio-export-sound', '#audio-export-video', '#audio-canvas-size']) {
+        assert.equal(await audio.locator(selector).isDisabled(), true, `${selector} must stop when premium content expires`);
+      }
+      await audio.keyboard.press('Escape');
+      await audio.locator('#audio-pixel-canvas').click({ position: { x: 120, y: 45 } });
+      assert.deepEqual(await audio.locator('#audio-pixel-canvas').evaluate((canvas) => [...canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data]), originalAudioPixels, 'expired wide canvas does not edit or replace the source');
+      assert.equal(await audio.locator('#audio-play-toggle').getAttribute('aria-pressed'), 'false');
       const downloadReady = audio.waitForEvent('download'); await audio.locator('#audio-export-image').click();
       const png = await downloadReady; assert.match(png.suggestedFilename(), /\.png$/i);
       const pngPath = `/tmp/pixieed-pass-audio-export-${Date.now()}.png`;
       await png.saveAs(pngPath);
       const pngBytes = await readFile(pngPath);
       assert.equal(pngBytes.toString('hex', 0, 8), '89504e470d0a1a0a');
-      assert.equal(pngBytes.readUInt32BE(16), 1024, '64 columns export crisp integer-scaled PNG width');
-      assert.equal(pngBytes.readUInt32BE(20), 256, '16 pitches export crisp integer-scaled PNG height');
+      assert.equal(pngBytes.readUInt32BE(16), 2048, '64 columns export crisp integer-scaled PNG width');
+      assert.equal(pngBytes.readUInt32BE(20), 512, '16 pitches export crisp integer-scaled PNG height');
       await audio.locator('#audio-more>summary').click(); await audio.locator('#audio-save').click();
       await audio.waitForFunction(() => document.querySelector('#audio-status')?.textContent.includes('保存しました'));
       await audio.reload(); await audio.locator('#audio-more>summary').click(); await audio.locator('#audio-resume').click();
       await audio.waitForFunction(() => document.querySelector('#audio-pixel-canvas')?.width === 64);
+      await audio.waitForSelector('#audio-pass-required:visible');
       await audio.locator('#audio-palette-settings>summary').click();
       assert.equal(await audio.locator('#audio-palette-rows select').first().inputValue(), extras[0]);
+      await audio.keyboard.press('Escape');
+      await audio.locator('#audio-pass-add').click(); await audio.waitForSelector('.px-pass-go');
+      await audio.locator('.px-pass-go').click();
+      await audio.waitForFunction(() => document.querySelector('[data-header-pass]')?.dataset.active === 'true');
+      await audio.waitForFunction(() => document.querySelector('#audio-pass-required')?.hidden === true);
+      assert.equal(await audio.locator('#audio-pixel-canvas').getAttribute('width'), '64');
+      assert.equal(await audio.locator('#audio-pixel-canvas').getAttribute('aria-disabled'), 'false');
+      await audio.locator('#audio-play-toggle').click();
+      await audio.waitForFunction(() => document.querySelector('#audio-play-toggle')?.getAttribute('aria-pressed') === 'true');
+      await audio.locator('#audio-play-toggle').click();
+      await audio.evaluate(() => {
+        localStorage.setItem('pixieed:pass:v1', JSON.stringify({ until: Date.now() - 1 }));
+        window.dispatchEvent(new StorageEvent('storage', { key: 'pixieed:pass:v1' }));
+      });
       await audio.goto(new URL('/audio/', BASE).href, { waitUntil: 'domcontentloaded' });
       await audio.waitForFunction(() => document.querySelector('#audio-pixel-canvas')?.width === 16);
       await audio.locator('#audio-composition-settings>summary').click();
@@ -190,7 +210,7 @@ for (const [engineName, engine] of [['chromium', chromium], ['webkit', webkit]])
       assert.equal(await audio.locator('#audio-pixel-canvas').getAttribute('width'), '16', 'an expired pass cannot expand a new composition');
       await audio.locator('.px-pass-no').click();
       assert.deepEqual(audioErrors, []);
-      pass('chromium: expired 64-column/existing extra-voice composition edits, plays, exports, saves and resumes; new expansion/voice is gated');
+      pass('chromium: expired wide/extra-voice composition is preserved and locked; PNG/draft save remain free; adding an hour restores playback and editing');
       await audioContext.close();
 
       const gifContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
@@ -215,13 +235,15 @@ for (const [engineName, engine] of [['chromium', chromium], ['webkit', webkit]])
         localStorage.setItem('pixieed:pass:v1', JSON.stringify({ until: Date.now() - 1 }));
         window.dispatchEvent(new StorageEvent('storage', { key: 'pixieed:pass:v1' }));
       });
-      assert.equal(await camera.locator('#pixelStudio').getAttribute('data-recording'), 'true', 'expiry must not stop a started premium GIF');
-      await camera.waitForFunction(() => document.querySelector('#pixelStudio')?.dataset.recording === 'false', null, { timeout: 12000 });
+      await camera.waitForTimeout(5500);
+      assert.equal(await camera.locator('#pixelStudio').getAttribute('data-recording'), 'true', 'recording authorized at the button press continues beyond the free duration after expiry');
+      await camera.waitForFunction(() => document.querySelector('#pixelStudio')?.dataset.recording === 'false', null, { timeout: 7000 });
       await camera.mouse.up();
-      await camera.waitForFunction(() => Number(document.querySelector('#pixelStudio')?.dataset.gifFrames || 0) > 100, null, { timeout: 15000 });
+      await camera.waitForFunction(() => Number(document.querySelector('#pixelStudio')?.dataset.gifFrames || 0) > 1, null, { timeout: 15000 });
+      assert.ok(Number(await camera.locator('#pixelStudio').getAttribute('data-gif-frames')) > 1, 'authorized recording finishes and is downloadable after expiry');
       assert.match(await camera.locator('#savePng').getAttribute('download'), /\.gif$/i);
       assert.deepEqual(cameraErrors, []);
-      pass('chromium synthetic camera: a premium GIF recording continues through expiry and produces a downloadable animation');
+      pass('chromium synthetic camera: recording authorized at start continues after expiry and the completed GIF remains downloadable');
       await gifContext.close();
     }
   } finally { await browser.close(); }

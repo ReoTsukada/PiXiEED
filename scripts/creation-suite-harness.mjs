@@ -20,15 +20,17 @@ const SUITES = {
   ],
   'legacy-posts': ['tests/creation-suite/legacy-posts.test.mjs', 'tests/creation-suite/legacy-placement.test.mjs'],
   'asset-contract': ['tests/creation-suite/asset-contract.test.mjs'],
+  'pixel-io': ['tests/export/pixel-roundtrip.test.mjs', 'tests/export/animated-export.test.mjs', 'tests/pixel-studio/png-export.test.mjs', 'tests/pixel-lens/gif.test.mjs'],
   pxd: ['tests/creation-suite/pxd-codec.test.mjs', 'tests/creation-suite/pxd-store.test.mjs', 'tests/creation-suite/pxd-project.test.mjs', 'tests/creation-suite/pxd-draw-audio.test.mjs', 'tests/creation-suite/pxd-puzzles.test.mjs', 'tests/creation-suite/pxd-camera-context.test.mjs', 'tests/creation-suite/work-save-policy.test.mjs'],
-  draw: ['tests/creation-suite/draw.test.mjs', 'tests/creation-suite/draw-handoff.test.mjs', 'tests/creation-suite/pixel-canvas-surface.test.mjs'],
-  audio: ['tests/creation-suite/audio.test.mjs', 'tests/creation-suite/image-to-loop.test.mjs', 'tests/creation-suite/audio-enhancements.test.mjs', 'tests/creation-suite/audio-camera-handoff.test.mjs', 'tests/creation-suite/audio-export.test.mjs', 'tests/creation-suite/audio-viewport.test.mjs'],
+  draw: ['tests/creation-suite/draw.test.mjs', 'tests/creation-suite/draw-handoff.test.mjs', 'tests/creation-suite/pixel-canvas-surface.test.mjs', 'tests/creation-suite/draw-timelapse.test.mjs'],
+  audio: ['tests/creation-suite/audio.test.mjs', 'tests/creation-suite/image-to-loop.test.mjs', 'tests/creation-suite/audio-enhancements.test.mjs', 'tests/creation-suite/audio-camera-handoff.test.mjs', 'tests/creation-suite/audio-export.test.mjs', 'tests/creation-suite/audio-viewport.test.mjs', 'tests/creation-suite/audio-video.test.mjs'],
   game: ['tests/creation-suite/game.test.mjs'],
   jigsaw: ['tests/creation-suite/jigsaw.test.mjs', 'tests/creation-suite/jigsaw-workspace.test.mjs', 'tests/creation-suite/jigsaw-selection.test.mjs'],
   'spot-difference': ['tests/creation-suite/spot-difference.test.mjs'],
   'hidden-object': ['tests/creation-suite/hidden-object.test.mjs'],
   'puzzle-definition': ['tests/creation-suite/puzzle-definition.test.mjs', 'tests/creation-suite/puzzle-admission.test.mjs', 'tests/creation-suite/puzzle-upload.test.mjs', 'tests/creation-suite/public-puzzle.test.mjs', 'tests/creation-suite/puzzle-handoff.test.mjs'],
   pixfind: ['tests/creation-suite/pixfind.test.mjs'],
+  rewards: ['tests/pass/pass.test.mjs', 'tests/pass/pass-accumulation.test.mjs', 'tests/pass/pass-gauge.test.mjs', 'tests/pass/header.test.mjs', 'tests/creation-suite/puzzle-hint.test.mjs', 'tests/creation-suite/audio-pass-policy.test.mjs'],
   seo: ['tests/creation-suite/seo.test.mjs', 'tests/creation-suite/seo-exclusions.test.mjs', 'tests/creation-suite/puzzle-share-page.test.mjs'],
 };
 const GATES = ['browser', 'device', 'liveData', 'production'];
@@ -130,7 +132,7 @@ function makeReport(names) {
 }
 
 function usage() {
-  return 'Usage: node scripts/creation-suite-harness.mjs --suite <baseline|legacy-posts|asset-contract|pxd|draw|audio|game|jigsaw|spot-difference|hidden-object|puzzle-definition|pixfind|seo> [--json]\n       node scripts/creation-suite-harness.mjs --all [--json]';
+  return 'Usage: node scripts/creation-suite-harness.mjs --suite <baseline|legacy-posts|asset-contract|pixel-io|pxd|draw|audio|game|jigsaw|spot-difference|hidden-object|puzzle-definition|pixfind|rewards|seo> [--json]\n       node scripts/creation-suite-harness.mjs --all [--json]';
 }
 
 const options = (() => { try { return parseArgs(process.argv.slice(2)); } catch (error) {

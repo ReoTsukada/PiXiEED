@@ -1,9 +1,9 @@
-import { initAstroUi } from './astro-ui.mjs?v=20260928-solar-navigation-1';
-import { initPostUi } from './post-ui.mjs?v=20260928-puzzle-handoff-1';
+import { initAstroUi } from './astro-ui.mjs?v=20260929-gallery-observe-1';
+import { initPostUi } from './post-ui.mjs?v=20260928-pixel-roundtrip-1';
 import { sharedSky, sharedFaintSky, SPRITE_MAGNITUDE } from './real-sky.mjs?v=20260927-sky-events-v1';
 import { createSupabaseGlobeAuth, createSupabaseGlobeStore } from './post-supabase.mjs?v=20260928-puzzle-handoff-1';
 import { createGlobeRenderer, decodeRasterData, getSelectionStageLabel, prepareGeoJsonFeatures } from './renderer.mjs?v=20260927-solar-tool-2';
-import { openHandoffComposer, pendingHandoff } from './post-handoff.mjs?v=20260928-puzzle-handoff-1';
+import { openHandoffComposer, pendingHandoff } from './post-handoff.mjs?v=20260928-pixel-roundtrip-1';
 
 const embedMode = new URLSearchParams(location.search).get('embed') === '1';
 
@@ -16,6 +16,7 @@ const selectedStage = document.querySelector('#selectedStage');
 const placeHere = document.querySelector('#placeHere');
 const accountSlot = document.querySelector('#accountSlot');
 const primaryAction = document.querySelector('#globePrimaryAction');
+const viewSwitch = document.querySelector('#astroViewSwitch');
 let postUi = null;
 let currentSelection = null;
 
@@ -84,6 +85,7 @@ function createPrototypeRenderer(options = {}) {
     globalThis.__PIXIEED_POSTS__ = postUi;
     adoptPostHandoff();
   } catch (error) { console.warn('Posting UI unavailable', error); }
+  syncObservationViews();
   return renderer;
 }
 
@@ -112,15 +114,32 @@ function syncPrimaryAction() {
   if (!telescopeTool) document.querySelector('[data-globe-nav-map]')?.setAttribute('aria-current', 'page');
   else document.querySelector('[data-globe-nav-tools]')?.setAttribute('aria-current', 'page');
 }
+function syncObservationViews() {
+  if (!viewSwitch) return;
+  const standalone = document.documentElement.classList.contains('is-tool-telescope');
+  viewSwitch.hidden = standalone;
+  globeStage.classList.toggle('has-astro-views', !standalone);
+  const mode = globeStage.classList.contains('is-orrery') ? 'solar' : globeStage.classList.contains('is-scope') ? 'sky' : 'globe';
+  for (const button of viewSwitch.querySelectorAll('[data-astro-view]')) button.setAttribute('aria-pressed', String(button.dataset.astroView === mode));
+}
+viewSwitch?.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-astro-view]');
+  const api = globalThis.__PIXIEED_ASTRO__;
+  if (!button || !api || api.orrery.getSnapshot().closing || button.getAttribute('aria-pressed') === 'true') return;
+  if (button.dataset.astroView === 'globe') api.returnToGallery();
+  else if (button.dataset.astroView === 'sky') api.showSky();
+  else api.openOrrery();
+});
 primaryAction?.addEventListener('click', () => {
   if (document.documentElement.classList.contains('is-tool-telescope')) globalThis.__PIXIEED_ASTRO__?.toggleTelescopeSolarSystem();
   else {
     const open = () => postUi?.openComposer();
-    if (globalThis.__PIXIEED_ASTRO__?.orrery.isOpen()) globalThis.__PIXIEED_ASTRO__.closeOrrery(open);
+    if (globalThis.__PIXIEED_ASTRO__?.returnToGallery) globalThis.__PIXIEED_ASTRO__.returnToGallery(open);
     else open();
   }
 });
 globeStage?.addEventListener('pixieed:astro-viewchange', syncPrimaryAction);
+globeStage?.addEventListener('pixieed:astro-viewchange', syncObservationViews);
 
 // /telescope/ opens the shared sky simulation as a stand-alone tool.
 function openToolFromUrl() {
@@ -128,6 +147,7 @@ function openToolFromUrl() {
   document.documentElement.classList.add('is-tool-telescope');
   document.title = '望遠鏡｜PiXiEED';
   syncPrimaryAction();
+  syncObservationViews();
   const leave = () => { if (document.referrer && new URL(document.referrer).origin === location.origin && history.length > 1) history.back(); else location.href = '/tools/'; };
   const open = () => globalThis.__PIXIEED_ASTRO__?.openTelescopeTool({ onClose: leave });
   if (globalThis.__PIXIEED_ASTRO__) open(); else requestAnimationFrame(open);

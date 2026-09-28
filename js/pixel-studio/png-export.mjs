@@ -1,3 +1,5 @@
+import { withPixelPngMetadata } from '../pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
+
 const TARGET_LONG_EDGE = 2048;
 const MAX_SOURCE_EDGE = 8192;
 const MAX_SOURCE_PIXELS = 16 * 1024 * 1024;
@@ -57,7 +59,7 @@ export async function encodeCameraPng(frame) {
       exportCanvas.toBlob((value) => value ? resolve(value) : reject(new Error(PNG_ERROR)),
         'image/png');
     });
-    return { blob, ...geometry };
+    return { blob: await withPixelPngMetadata(blob, { width, height, scale: geometry.scale }), ...geometry };
   } catch {
     throw new Error(PNG_ERROR);
   } finally {

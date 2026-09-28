@@ -17,10 +17,10 @@
  */
 
 import { celestialState, geoToUnit, unitToGeo, listEclipses, peakObscurationAt, findGreatestEclipse, findSunEvent } from './astronomy.mjs?v=20260927-sky-events-v1';
-import { createScope, refracted } from './scope.mjs?v=20260927-telescope-polish-1';
+import { createScope, refracted } from './scope.mjs?v=20260929-gallery-observe-1';
 import { sharedSky } from './real-sky.mjs?v=20260927-sky-events-v1';
 import { upcomingMeteorShowers, upcomingEclipses, daysUntil } from './sky-events.mjs?v=20260927-sky-events-v1';
-import { createOrrery } from './orrery.mjs?v=20260928-solar-navigation-1';
+import { createOrrery } from './orrery.mjs?v=20260929-solar-zoom-1';
 import { PLANET_BY_ID, SKY_PLANETS } from './planets.mjs?v=20260927-sky-events-v1';
 
 const DEG = Math.PI / 180;
@@ -407,6 +407,7 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
   const pull = element('div', { class: 'orrery-pull', hidden: '', 'aria-hidden': 'true' }, [element('span', { text: 'さらに縮小で太陽系へ' }), element('i')]);
   let returnToScope = null;
   let returnView = null;
+  let scopeReturnView = null;
   let rememberedGlobeView = renderer.getSnapshot()?.view ? { ...renderer.getSnapshot().view } : null;
   let orreryClosing = false;
   let closeCallbacks = [];
@@ -418,20 +419,37 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
     onSkyOrientation(orientation) { renderer.setSkyOrientation?.(orientation); }
   });
 
+  function globeRadiusForView(view = returnView) {
+    const snapshot = renderer.getSnapshot(); const camera = snapshot?.camera;
+    const canvas = stage.querySelector('#globeCanvas');
+    const width = canvas?.clientWidth || canvas?.getBoundingClientRect?.().width || camera?.viewport?.width || 0;
+    const height = canvas?.clientHeight || canvas?.getBoundingClientRect?.().height || camera?.viewport?.height || 0;
+    const cameraMatches = camera?.viewport && Math.abs(camera.viewport.width - width) < 1 && Math.abs(camera.viewport.height - height) < 1;
+    const radius = cameraMatches && Number.isFinite(camera.radius) && camera.radius > 0
+      ? camera.radius
+      : width > 0 && height > 0 ? Math.min(width, height) / 2 : camera?.radius;
+    const target = Number.isFinite(radius) && radius > 0 && Number.isFinite(view?.zoom) && view.zoom > 0 ? radius * view.zoom : camera?.scale;
+    return Number.isFinite(target) && target > 0 ? target : undefined;
+  }
+
   function openOrrery({ fromZoomLimit = false } = {}) {
     if (orrery.isOpen() || orreryClosing) return;
-    const globeView = renderer.getSnapshot()?.view;
+    const globeSnapshot = renderer.getSnapshot();
+    const globeView = globeSnapshot?.view;
+    const earthRadiusPx = globeSnapshot?.camera?.scale;
     const remembered = rememberedGlobeView || globeView;
     // Zoom-out enters at the renderer's minimum size. Restore the last usable
     // size while retaining the center reached by the current gesture.
-    returnView = fromZoomLimit
-      ? { ...(remembered || {}), ...(globeView || {}), zoom: Math.max(1, remembered?.zoom || 1) }
-      : (globeView ? { ...globeView } : { zoom: 1 });
+    returnView = scope.isOpen() && scopeReturnView
+      ? { ...scopeReturnView }
+      : fromZoomLimit
+        ? { ...(remembered || {}), ...(globeView || {}), zoom: Math.max(1, remembered?.zoom || 1) }
+        : (globeView ? { ...globeView } : { zoom: 1 });
     entryCooldownUntil = 0;
     if (scope.isOpen()) {
       const current = scope.getSnapshot();
-      returnToScope = { observer: current.observer, tracking: current.tracking };
-      dismissScope();
+      returnToScope = scopeResumeTarget(current);
+      dismissScope({ restoreView: false });
     }
     setOpen(false);
     pullAmount = 0; pull.hidden = true; clearTimeout(pullTimer);
@@ -441,11 +459,11 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
     useSpeeds('orbit');
     tape.setScale(0.05);
     orrery.setTime(time, { moon: moonEcliptic(state) });
-    orrery.open();
+    orrery.open({ earthRadiusPx: returnToScope ? undefined : earthRadiusPx, returnEarthRadiusPx: globeRadiusForView(returnView) });
     orreryCloseIcon.src = `/assets/icons/pixieed/${returnToScope ? 'telescope' : 'globe'}.svg`;
     orreryCloseLabel.textContent = returnToScope ? '望遠鏡へ' : '地球儀へ';
     orreryHud.querySelector('.orrery-close').setAttribute('aria-label', orreryCloseLabel.textContent);
-    orreryCanvas.setAttribute('aria-label', `太陽系。ドラッグで視点を回転。ピンチまたはホイールで拡大すると${returnToScope ? '望遠鏡' : '地球儀'}に戻る`);
+    orreryCanvas.setAttribute('aria-label', `太陽系。ドラッグで視点を回転。ピンチまたはホイールで拡大・縮小。天体をタップして近づき、地球を戻りサイズまで拡大すると${returnToScope ? '望遠鏡' : '地球儀'}に戻る`);
     stage.dispatchEvent(new Event('pixieed:astro-viewchange'));
     orreryCanvas.focus({ preventScroll: true });
   }
@@ -459,11 +477,8 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
     returnToScope = null;
     orreryHud.style.pointerEvents = 'none';
     orreryCanvas.style.pointerEvents = 'none';
-    stage.classList.add('is-orrery-leaving');
     orrery.close(() => {
-      renderer.setView(returnView || { zoom: 1 });
       returnView = null;
-      renderer.setSkyOrientation?.(null);
       stage.classList.remove('is-orrery', 'is-orrery-leaving');
       orreryCanvas.hidden = true; orreryHud.hidden = true;
       orreryHud.style.pointerEvents = ''; orreryCanvas.style.pointerEvents = '';
@@ -475,13 +490,21 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
       apply();
       const callbacks = closeCallbacks.splice(0);
       if (callbacks.length) callbacks.forEach((callback) => callback());
-      else if (returnTarget) openScope(returnTarget.observer, { track: typeof returnTarget.tracking === 'string' ? returnTarget.tracking : null });
+      else if (returnTarget) openScope(returnTarget.observer, { track: returnTarget.tracking || null, resume: returnTarget });
       else stage.querySelector('#globeCanvas')?.focus({ preventScroll: true });
       stage.dispatchEvent(new Event('pixieed:astro-viewchange'));
+    }, {
+      earthRadiusPx: globeRadiusForView(returnView),
+      onApproach({ immediate = false } = {}) {
+        renderer.setView(returnView || { zoom: 1 });
+        renderer.setSkyOrientation?.(null);
+        if (!immediate) requestAnimationFrame(() => requestAnimationFrame(() => {
+          if (orreryClosing && !document.hidden) stage.classList.add('is-orrery-leaving');
+        }));
+      }
     });
   }
 
-  // The globe reports pinches past its zoom-out limit; enough of them opens the Solar System.
   function zoomLimit({ direction, amount }) {
     if (direction !== 'out' || orrery.isOpen() || orreryClosing || scope.isOpen() || performance.now() < entryCooldownUntil) return;
     pullAmount += amount;
@@ -885,14 +908,40 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
     }, () => { locateButton.disabled = false; locateButton.lastChild.textContent = '現在地を使えませんでした'; }, { maximumAge: 3600000, timeout: 15000 });
   }
 
-  function openScope(location = currentLocation(), { track = null } = {}) {
+  function scopeResumeTarget(snapshot = scope.getSnapshot()) {
+    return {
+      observer: { ...snapshot.observer },
+      tracking: snapshot.tracking,
+      fov: snapshot.fov,
+      azimuth: snapshot.azimuth,
+      altitude: snapshot.altitude,
+      filter: snapshot.filter
+    };
+  }
+
+  function openScope(location = currentLocation(), { track = null, resume = null } = {}) {
+    if (!scopeReturnView) {
+      const view = renderer.getSnapshot()?.view;
+      scopeReturnView = view ? { ...view } : null;
+    }
     setOpen(false);
     stage.classList.add('is-scope');
     scopeCanvas.hidden = false;
     scopeHud.hidden = false;
     scope.open(location, state);
-    scope.setFov(track ? PLANET_FOV[track] || 3 : 40);
-    if (track) scope.track(track);
+    const tracking = track || resume?.tracking || null;
+    if (resume) {
+      if (Number.isFinite(resume.fov)) scope.setFov(resume.fov);
+      setFilter(Boolean(resume.filter));
+      if (tracking) scope.track(tracking);
+      else {
+        scope.track(null);
+        scope.setAim(resume);
+      }
+    } else {
+      scope.setFov(track ? PLANET_FOV[track] || 3 : 40);
+      if (track) scope.track(track);
+    }
     updateSunEvents(true);
     onScopeChange(scope.getSnapshot());
     stage.dispatchEvent(new Event('pixieed:astro-viewchange'));
@@ -900,7 +949,7 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
   }
 
   let scopeCloseHandler = null;
-  function dismissScope() {
+  function dismissScope({ restoreView = true } = {}) {
     setEventsOpen(false);
     activeRadiant = null;
     radiantMark.button.hidden = true;
@@ -908,6 +957,10 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
     scopeCanvas.hidden = true;
     scopeHud.hidden = true;
     scope.close();
+    if (restoreView && scopeReturnView) {
+      renderer.setView(scopeReturnView);
+      scopeReturnView = null;
+    }
     for (const mark of Object.values(marks)) mark.button.classList.remove('is-tracking');
     orbitMarks();
     stage.dispatchEvent(new Event('pixieed:astro-viewchange'));
@@ -915,6 +968,41 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
   function closeScope() {
     if (scopeCloseHandler) { scopeCloseHandler(); return; }
     dismissScope();
+  }
+
+  function showSky() {
+    // Solar → Sky returns to the observer that was already in use. From the
+    // gallery, the toolbar means “this place”, so use the current globe center.
+    const target = returnToScope;
+    const observer = target?.observer || currentLocation();
+    const track = target?.tracking || null;
+    if (orrery.isOpen() || orreryClosing) {
+      closeOrrery(() => openScope(observer, { track, resume: target }));
+      return;
+    }
+    if (scope.isOpen()) { scopeCanvas.focus({ preventScroll: true }); return; }
+    openScope(observer, { track });
+  }
+
+  function returnToGallery(done = () => {}) {
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      returnToScope = null;
+      scopeReturnView = null;
+      done();
+    };
+    if (orrery.isOpen() || orreryClosing) {
+      closeOrrery(finish);
+      return;
+    }
+    if (scope.isOpen()) dismissScope();
+    else if (scopeReturnView) {
+      renderer.setView(scopeReturnView);
+      scopeReturnView = null;
+    }
+    finish();
   }
 
   function setFilter(on) {
@@ -1004,9 +1092,10 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
 
   const api = Object.freeze({
     refreshView() { if (state && !scope.isOpen() && !orrery.isOpen()) orbitMarks(); },
-    rememberGlobeView(view) { if (view && !scope.isOpen() && !orrery.isOpen() && Number.isFinite(view.zoom) && view.zoom >= 1) rememberedGlobeView = { ...view }; },
     setTime, getTime: () => time, setPlaying, setSpeed, openScope, closeScope, goToEclipse, scope, setOpen,
-    openOrrery, closeOrrery, zoomLimit, orrery,
+    openOrrery, closeOrrery, orrery, showSky, returnToGallery,
+    rememberGlobeView(view) { if (view && !scope.isOpen() && !orrery.isOpen() && Number.isFinite(view.zoom) && view.zoom >= 1) rememberedGlobeView = { ...view }; },
+    zoomLimit,
     toggleTelescopeSolarSystem() { if (orrery.isOpen()) closeOrrery(); else openOrrery(); },
     /** Stand-alone telescope: open at the saved place; the event list stays available without covering the sky. */
     openTelescopeTool({ onClose = null, showEvents = false } = {}) {

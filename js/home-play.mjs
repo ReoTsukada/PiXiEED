@@ -5,7 +5,7 @@
  * the sound tool together). Below it, each tool card runs a tiny live version of that tool. Toys animate only
  * while on screen. Reduced motion keeps a gentle update rate and suppresses the letter entrance and wave.
  */
-import { createVisibleAnimationScheduler } from './home-animation.mjs?rev=20260928-visible-motion-1';
+import { createVisibleAnimationScheduler } from './home-animation.mjs?rev=20260929-hero-smooth-1';
 
 const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
 let reduced = motionPreference.matches;
@@ -112,8 +112,8 @@ function pixelCanvas(canvas, w, h) {
   };
 }
 // Shared viewport-aware frame pump; reduced motion remains gently animated.
-function animate(element, draw) {
-  animationScheduler.add(element, draw);
+function animate(element, draw, options) {
+  animationScheduler.add(element, draw, options);
   return () => animationScheduler.redraw(element);
 }
 
@@ -340,8 +340,10 @@ function hero() {
     const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
     // falling sand and falling pieces: 30 ticks a second, several sand steps per tick on fine grids
     sandTick += dt;
-    if (sandTick > 1 / 30) {
-      sandTick = 0;
+    if (sandTick >= 1 / 30) {
+      // Keep fractional time for 60 FPS frames while dropping any excess backlog.
+      // A delayed/reduced-motion paint must not trigger catch-up ticks later.
+      sandTick %= 1 / 30;
       // a released drawing drops as one piece, speeding up, until any of its dots touches something
       for (const piece of pieces) {
         piece.v = Math.min(piece.v + 0.12 * K, 1.6 * K); piece.acc += piece.v;
@@ -380,6 +382,7 @@ function hero() {
     playPile(now);
     // letter physics; a flying dot catches any star it touches
     const gravity = 60 * K;
+    const returnEase = 1 - Math.pow(23 / 30, dt * 30);
     for (const d of dots) {
       if (d.state === 'intro') {
         const p = reduced ? 1 : Math.min(1, Math.max(0, (now - start - d.delay) / 520));
@@ -397,7 +400,7 @@ function hero() {
         }
         if (now > d.until) d.state = 'return';
       } else if (d.state === 'return') {
-        d.x += (d.hx - d.x) * Math.min(1, dt * 7); d.y += (d.hy - d.y) * Math.min(1, dt * 7);
+        d.x += (d.hx - d.x) * returnEase; d.y += (d.hy - d.y) * returnEase;
         if (Math.abs(d.x - d.hx) < 0.3 && Math.abs(d.y - d.hy) < 0.3) { d.x = d.hx; d.y = d.hy; d.state = 'home'; }
       }
     }
@@ -413,7 +416,8 @@ function hero() {
       nextCat = now + 16000 + Math.random() * 14000;
     }
     if (cat && (cat.seen ? now - cat.seen > 300 : now - cat.born > 4200)) cat = null;
-    for (const b of bursts) { b.x += b.vx * dt; b.y += b.vy * dt; b.vx *= 0.9; b.vy *= 0.9; b.life -= dt * 1.8; }
+    const burstFriction = Math.pow(0.9, dt * 30);
+    for (const b of bursts) { b.x += b.vx * dt; b.y += b.vy * dt; b.vx *= burstFriction; b.vy *= burstFriction; b.life -= dt * 1.8; }
     bursts = bursts.filter((b) => b.life > 0);
     for (const f of flashes) f.life -= dt * 3; flashes = flashes.filter((f) => f.life > 0);
     for (const b of beats) b.life -= dt * 4; beats = beats.filter((b) => b.life > 0);
@@ -466,7 +470,7 @@ function hero() {
     }
     ctx.putImageData(img, 0, 0);
   }
-  const redraw = animate(stage, draw);
+  const redraw = animate(stage, draw, { fps: 60 });
 
   let lastInkNote = 0;
   function inkAt(x, y) {

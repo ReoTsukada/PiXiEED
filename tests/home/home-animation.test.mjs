@@ -79,6 +79,24 @@ test('a single pump caps paint rates and responds to a live motion preference ch
   scheduler.dispose();
 });
 
+test('one 120 Hz pump supports a 60 FPS hero and 30 FPS cards, with a 12 FPS reduced cap', () => {
+  const browser = fakeBrowser(); const scheduler = createVisibleAnimationScheduler(browser.env);
+  let heroDraws = 0; let cardDraws = 0;
+  scheduler.add(browser.element(), () => heroDraws++, { fps: 60 });
+  scheduler.add(browser.element(), () => cardDraws++);
+  for (let frame = 1; frame <= 120; frame++) browser.tick(frame * 1000 / 120);
+  assert.ok(heroDraws >= 59 && heroDraws <= 61, `hero at 120 Hz: ${heroDraws}`);
+  assert.ok(cardDraws >= 29 && cardDraws <= 31, `cards at 120 Hz: ${cardDraws}`);
+
+  scheduler.setReducedMotion(true);
+  const beforeHero = heroDraws; const beforeCard = cardDraws;
+  for (let frame = 121; frame <= 240; frame++) browser.tick(frame * 1000 / 120);
+  assert.ok(heroDraws - beforeHero >= 11 && heroDraws - beforeHero <= 13, `reduced hero cap: ${heroDraws - beforeHero}`);
+  assert.ok(cardDraws - beforeCard >= 11 && cardDraws - beforeCard <= 13, `reduced card cap: ${cardDraws - beforeCard}`);
+  assert.equal(browser.rafs.size, 1); assert.equal(browser.timers.size, 1);
+  scheduler.dispose();
+});
+
 test('observer and fallback viewport checks honor partial intersection and scroll', () => {
   const rect = { left: 110, top: 10, right: 130, bottom: 30, width: 20, height: 20 };
   const observedBrowser = fakeBrowser(); const observedScheduler = createVisibleAnimationScheduler(observedBrowser.env); let draws = 0;
@@ -117,10 +135,13 @@ test('watchdog recovers visible drawing when requestAnimationFrame stalls', () =
 
 test('a drawing exception removes only that entry and leaves other animations running', () => {
   const browser = fakeBrowser(); const scheduler = createVisibleAnimationScheduler(browser.env); let goodDraws = 0;
-  scheduler.add(browser.element(), () => { throw new Error('isolated'); });
-  scheduler.add(browser.element(), () => goodDraws++);
+  const badElement = browser.element(); const goodElement = browser.element();
+  scheduler.add(badElement, () => { throw new Error('isolated'); });
+  scheduler.add(goodElement, () => goodDraws++);
   browser.tick(40); browser.tick(80);
   assert.equal(goodDraws, 2); assert.equal(browser.observed.size, 1);
+  assert.equal(browser.observed.has(badElement), false);
+  assert.equal(browser.observed.has(goodElement), true);
   scheduler.dispose();
 });
 

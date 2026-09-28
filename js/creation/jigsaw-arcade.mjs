@@ -9,6 +9,7 @@
  */
 import { createIndexedDbDraftAdapter } from './local-drafts.mjs';
 import { documentRgba } from './draw-core.mjs';
+import { normalizeJigsawFile } from './jigsaw-file.mjs?rev=20260928-pixel-roundtrip-1';
 import { ICON, pixelIcon, sfx, createTimer, formatTime, assembleTitle, winOverlay, floatText } from '../arcade.mjs?rev=20260928-arcade-1';
 
 const $ = (s) => document.querySelector(s);
@@ -87,6 +88,7 @@ function build() {
   let chosen = Math.min(LEVELS.length - 1, Math.max(0, Number(store.get(LEVEL_KEY) ?? 1) || 0));
   if (store.get(LEVEL_KEY) === null) chosen = 1;
   let dims = null; let plan = []; let picture = null; let applying = false; let fileUrl = null;
+  let picksGeneration = 0;
   const thumbs = new Map(); // key -> canvas/img, so rebuilding the row is cheap
 
   function stepLabel(n, text) { const d = document.createElement('p'); d.className = 'arc-step'; d.innerHTML = `<span class="arc-step-no">${n}</span>`; d.append(text); return d; }
@@ -141,6 +143,11 @@ function build() {
     picture = source; dims = w && h ? bounded(w, h) : null; plan = dims ? planLevels(dims.width, dims.height) : [];
     titleArt.setPicture(source); applyLevel();
   }
+  document.addEventListener('jigsaw:source-ready', ({ detail }) => {
+    if (kind.value === 'file' && (!dims || dims.width !== detail.width || dims.height !== detail.height)) {
+      setPicture(picture, detail.width, detail.height);
+    }
+  });
 
   // ---------- thumbnails ----------
   let adapter = null; let drawRecord = null;
@@ -168,13 +175,24 @@ function build() {
     b.addEventListener('click', onClick); return b;
   }
   async function renderPicks() {
+    const generation = ++picksGeneration;
     const k = kind.value; picks.replaceChildren();
     if (k === 'file') {
       const file = fileInput.files?.[0];
       if (file) {
-        if (fileUrl) URL.revokeObjectURL(fileUrl); fileUrl = URL.createObjectURL(file);
-        const img = imageThumb(fileUrl); const b = pickButton(file.name || '選んだ画像', true, () => {}); b.appendChild(img); picks.appendChild(b);
-        whenLoaded(img).then((ok) => ok && setPicture(img, img.naturalWidth, img.naturalHeight));
+        setPicture(null);
+        try {
+          const normalized = ['image/png', 'image/webp'].includes(file.type) ? await normalizeJigsawFile(file) : null;
+          if (generation !== picksGeneration || kind.value !== 'file' || fileInput.files?.[0] !== file) return;
+          if (fileUrl) { thumbs.delete(`u:${fileUrl}`); URL.revokeObjectURL(fileUrl); }
+          fileUrl = URL.createObjectURL(normalized?.file || file);
+          const img = imageThumb(fileUrl); const b = pickButton(file.name || '選んだ画像', true, () => {}); b.appendChild(img); picks.appendChild(b);
+          whenLoaded(img).then((ok) => {
+            if (ok && generation === picksGeneration && kind.value === 'file' && fileInput.files?.[0] === file) {
+              setPicture(img, normalized?.width || img.naturalWidth, normalized?.height || img.naturalHeight);
+            }
+          });
+        } catch { if (generation === picksGeneration) setPicture(null); }
       } else setPicture(null);
       const add = pickButton('画像をえらぶ', false, () => fileInput.click()); add.classList.add('arc-pick--add'); add.textContent = '＋'; picks.appendChild(add);
       return;

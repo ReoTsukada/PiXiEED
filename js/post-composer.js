@@ -1,6 +1,9 @@
 import { supabaseConfig } from '../data/site-config.js?rev=20260918-post-v1';
+import { normalizePixelFile } from './pixel-scale.mjs?rev=20260928-pixel-roundtrip-1';
+import { withPixelPngMetadata } from './pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
 
 const SESSION_KEY = 'PiXiEED:supabase-session:v1';
+const MAX_SOURCE_BYTES = 8 * 1024 * 1024;
 const MAX_BYTES = 512 * 1024;
 const MIN_PIXELS = 8;
 const MAX_PIXELS = 128;
@@ -98,36 +101,30 @@ function fileToBase64(file) {
 async function inspectPixelImage(file) {
   if (!(file instanceof File)) throw new Error('画像を選んでください。');
   if (!ALLOWED_MIME.has(file.type)) throw new Error('PNGまたはWebPのドット絵を選んでください。');
-  if (file.size > MAX_BYTES) throw new Error('画像は512KB以内にしてください。');
-  if (typeof window.createImageBitmap !== 'function') throw new Error('このブラウザでは画像を確認できません。');
-  const bitmap = await window.createImageBitmap(file);
-  try {
-    if (bitmap.width < MIN_PIXELS || bitmap.height < MIN_PIXELS || bitmap.width > MAX_PIXELS || bitmap.height > MAX_PIXELS) {
-      throw new Error(`画像サイズは${MIN_PIXELS}〜${MAX_PIXELS}pxにしてください。`);
-    }
-    const canvas = document.createElement('canvas');
-    canvas.width = bitmap.width;
-    canvas.height = bitmap.height;
-    const context = canvas.getContext('2d', { willReadFrequently: true });
-    if (!context) throw new Error('画像を読み込めませんでした。');
-    context.imageSmoothingEnabled = false;
-    context.drawImage(bitmap, 0, 0);
-    const pixels = context.getImageData(0, 0, bitmap.width, bitmap.height).data;
-    const colors = new Set();
-    for (let index = 0; index < pixels.length; index += 4) {
-      colors.add(`${pixels[index]},${pixels[index + 1]},${pixels[index + 2]},${pixels[index + 3]}`);
-      if (colors.size > MAX_COLORS) break;
-    }
-    if (colors.size > MAX_COLORS) throw new Error(`色数が多すぎます。${MAX_COLORS}色以内のドット絵にしてください。`);
-    return {
-      width: bitmap.width,
-      height: bitmap.height,
-      colorCount: colors.size,
-      base64: await fileToBase64(file)
-    };
-  } finally {
-    bitmap.close();
+  if (file.size > MAX_SOURCE_BYTES) throw new Error('画像ファイルは8MB以内にしてください。');
+  const normalized = await normalizePixelFile(file);
+  if (normalized.width < MIN_PIXELS || normalized.height < MIN_PIXELS || normalized.width > MAX_PIXELS || normalized.height > MAX_PIXELS) {
+    throw new Error(`画像サイズは${MIN_PIXELS}〜${MAX_PIXELS}pxにしてください。`);
   }
+  const colors = new Set();
+  for (let index = 0; index < normalized.data.length; index += 4) {
+    const pixels = normalized.data;
+    colors.add(`${pixels[index]},${pixels[index + 1]},${pixels[index + 2]},${pixels[index + 3]}`);
+    if (colors.size > MAX_COLORS) break;
+  }
+  if (colors.size > MAX_COLORS) throw new Error(`色数が多すぎます。${MAX_COLORS}色以内のドット絵にしてください。`);
+  const canvas = document.createElement('canvas'); canvas.width = normalized.width; canvas.height = normalized.height;
+  const context = canvas.getContext('2d', { willReadFrequently: true });
+  if (!context) throw new Error('画像を読み込めませんでした。');
+  const imageData = typeof ImageData === 'function'
+    ? new ImageData(new Uint8ClampedArray(normalized.data), normalized.width, normalized.height)
+    : context.createImageData(normalized.width, normalized.height);
+  if (typeof ImageData !== 'function') imageData.data.set(normalized.data);
+  context.putImageData(imageData, 0, 0);
+  const rawPng = await new Promise((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('投稿用のPNGを作れませんでした。')), 'image/png'));
+  const png = await withPixelPngMetadata(rawPng, { width: normalized.width, height: normalized.height, scale: 1 }, { maxBytes: MAX_SOURCE_BYTES });
+  if (png.size > MAX_BYTES) throw new Error('画像は512KB以内にしてください。');
+  return { file: png, width: normalized.width, height: normalized.height, colorCount: colors.size, base64: await fileToBase64(png), scale: normalized.scale, sourceWidth: normalized.sourceWidth, sourceHeight: normalized.sourceHeight };
 }
 
 function makeLocationContext(cell) {
@@ -244,9 +241,9 @@ export function bindUserPostComposer(root, options = {}) {
     setStatus('画像を確認しています…', 'working');
     try {
       const meta = await inspectPixelImage(file);
-      state.file = file;
+      state.file = meta.file;
       state.meta = meta;
-      state.objectUrl = URL.createObjectURL(file);
+      state.objectUrl = URL.createObjectURL(meta.file);
       if (previewImage) previewImage.src = state.objectUrl;
       if (imageMeta) imageMeta.textContent = `${meta.width}×${meta.height}px・${meta.colorCount}色`;
       if (preview) preview.hidden = false;
