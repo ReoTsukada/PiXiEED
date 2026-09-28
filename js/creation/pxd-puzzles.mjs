@@ -1,4 +1,4 @@
-import { createPxdProject, getPxdJson } from './pxd-codec.mjs';
+import { createPxdProject, getPxdJson, setPxdJson } from './pxd-codec.mjs';
 import { mergePxdJson, primaryPxdImageRole, putPxdDrawDocument, putPxdImage, readPxdDrawDocument, readPxdImage, imageToDrawDocument } from './pxd-project.mjs';
 import { documentRgba } from './draw-core.mjs';
 import { detectDifferenceCandidates, validateSpotDifferenceDraft } from './spot-difference-core.mjs?rev=20260927-spot-difference-1';
@@ -82,7 +82,7 @@ function assertOriginalRefs(tool, document, refs) {
  * sourceDrawDocuments maps the tool's fixed source roles to validated Draw documents. For a
  * public Jigsaw source it must be omitted: the PXD stores only the public reference.
  */
-export async function writePxdPuzzle(project, { tool, document, sourceDrawDocuments = {}, sourceImages = {}, portableOriginalRefs = null, sourceChanged = null }) {
+export async function writePxdPuzzle(project, { tool, document, sourceDrawDocuments = {}, sourceImages = {}, portableOriginalRefs = null, sourceChanged = null, preservedPayload = null }) {
   validatePuzzleDocument(tool, document);
   const previousPayload = project?.entries?.some((entry) => entry.path === puzzlePath(tool)) ? getPxdJson(project, puzzlePath(tool)) : null;
   let next = project || createPxdProject();
@@ -101,6 +101,11 @@ export async function writePxdPuzzle(project, { tool, document, sourceDrawDocume
     portable: { originalRefs: clone(portableOriginalRefs || originalRefs(tool, document)) },
     sourceChanged: typeof sourceChanged === 'boolean' ? sourceChanged : changedBySourceEdit
   };
+  // Writing into a PXD that has no copy of this puzzle yet (別名保存, moving to another PXD):
+  // start from the payload that was read, so fields this version does not know still travel.
+  if (isPlainObject(preservedPayload) && preservedPayload.tool === tool && !next.entries.some((entry) => entry.path === puzzlePath(tool))) {
+    next = setPxdJson(next, puzzlePath(tool), clone(preservedPayload));
+  }
   return mergePxdJson(next, puzzlePath(tool), payload);
 }
 
@@ -111,11 +116,14 @@ export async function writePxdPuzzle(project, { tool, document, sourceDrawDocume
 export async function readPxdPuzzle(project, tool) {
   const payload = getPxdJson(project, puzzlePath(tool));
   if (!isPlainObject(payload) || payload.schemaVersion !== 1 || payload.tool !== tool || !isPlainObject(payload.document) || !isPlainObject(payload.portable)) throw new TypeError('PXDパズルデータの形式に対応していません。');
-  if (tool === 'hidden_object' && Array.isArray(payload.document.hitBoxes)) {
-    payload.document.hitBoxes = payload.document.hitBoxes.map((box) => ({ targetId: box.targetId, minX: box.minX, minY: box.minY, maxX: box.maxX, maxY: box.maxY }));
+  // The editor works on the known fields; `payload` itself stays exactly as read so unknown
+  // fields (including extra fields on hit boxes) can be written back or carried to a new PXD.
+  const document = clone(payload.document);
+  if (tool === 'hidden_object' && Array.isArray(document.hitBoxes)) {
+    document.hitBoxes = document.hitBoxes.map((box) => ({ targetId: box.targetId, minX: box.minX, minY: box.minY, maxX: box.maxX, maxY: box.maxY }));
   }
-  validatePuzzleDocument(tool, payload.document);
-  assertOriginalRefs(tool, payload.document, payload.portable.originalRefs);
+  validatePuzzleDocument(tool, document);
+  assertOriginalRefs(tool, document, payload.portable.originalRefs);
   const images = {};
   for (const role of sourceRoles(tool, payload.document)) {
     const image = await readPxdImage(project, role);
@@ -127,7 +135,7 @@ export async function readPxdPuzzle(project, tool) {
     if (drawDocument && (image.width !== drawDocument.width || image.height !== drawDocument.height || !bytesEqual(image.rgba, documentRgba(drawDocument)))) throw new TypeError('PXDの固定画像とDrawデータが一致しません。');
     images[role] = { width: image.width, height: image.height, rgba: new Uint8Array(image.rgba), drawDocument };
   }
-  return { payload: clone(payload), document: clone(payload.document), images, portableOriginalRefs: clone(payload.portable.originalRefs), sourceChanged: payload.sourceChanged === true };
+  return { payload: clone(payload), document, images, portableOriginalRefs: clone(payload.portable.originalRefs), sourceChanged: payload.sourceChanged === true };
 }
 
 function bytesEqual(left, right) {
@@ -201,7 +209,7 @@ export async function materializePxdPuzzle(readResult, { tool, store, verifyPubl
     bindings.source = source;
   } else puzzlePath(tool);
   const sourcePixels = tool !== 'jigsaw' || document.source.type === 'public' ? null : document.source.type === 'file' ? images['jigsaw-main'] : pxdImageFromDrawDocument(bindings.source.drawDocument);
-  return { document, bindings, portableOriginalRefs: clone(readResult.portableOriginalRefs), sourcePixels, sourceChanged: readResult.sourceChanged === true };
+  return { document, bindings, portableOriginalRefs: clone(readResult.portableOriginalRefs), sourcePixels, sourceChanged: readResult.sourceChanged === true, preservedPayload: clone(readResult.payload) };
 }
 
 /** Create a fresh, unconfirmed puzzle from the PXD's owned `main` image when that tool's

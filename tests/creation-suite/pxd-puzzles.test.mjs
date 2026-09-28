@@ -213,3 +213,33 @@ test('32x16 audio image materialises into strict rectangular Spot and Hidden sou
   assert.equal(hiddenFixed.document.height, height);
   assert.deepEqual(documentRgba(hiddenRoundTrip.bindings.source.drawDocument), rgba);
 });
+
+test('unknown puzzle fields survive reading and writing into a new PXD (別名保存・別ツールへ)', async () => {
+  const { source, document } = fixtureHidden();
+  let project = await writePxdPuzzle(null, { tool: 'hidden_object', document, sourceDrawDocuments: { hidden: source } });
+  const stored = getPxdJson(project, 'puzzles/hidden_object.json');
+  stored.futureTop = { keep: 1 };
+  stored.portable.futurePortable = 'keep';
+  stored.document.futureDocument = [1, 2, 3];
+  stored.document.hitBoxes = stored.document.hitBoxes.map((box) => ({ ...box, futureBox: 'glow' }));
+  project = mergePxdJson(project, 'puzzles/hidden_object.json', stored);
+
+  const loaded = await readPxdPuzzle(project, 'hidden_object');
+  assert.deepEqual(loaded.document.hitBoxes, document.hitBoxes, 'the editor sees only known hit-box fields');
+  assert.equal(loaded.payload.document.hitBoxes[0].futureBox, 'glow', 'reading keeps the stored payload intact');
+  const result = await materializePxdPuzzle(loaded, { tool: 'hidden_object', store: storeFor() });
+
+  const fresh = await writePxdPuzzle(null, {
+    tool: 'hidden_object', document: result.document, sourceDrawDocuments: { hidden: result.bindings.source.drawDocument },
+    portableOriginalRefs: result.portableOriginalRefs, preservedPayload: result.preservedPayload, sourceChanged: false,
+  });
+  const written = getPxdJson(fresh, 'puzzles/hidden_object.json');
+  assert.deepEqual(written.futureTop, { keep: 1 });
+  assert.equal(written.portable.futurePortable, 'keep');
+  assert.deepEqual(written.document.futureDocument, [1, 2, 3]);
+  assert.ok(written.document.hitBoxes.every((box) => box.futureBox === 'glow'));
+  assert.equal(written.document.gameId, result.document.gameId, 'known fields take the new values');
+  assert.equal(written.document.source.draftId, result.document.source.draftId);
+  const reread = await readPxdPuzzle(fresh, 'hidden_object');
+  assert.deepEqual(reread.document.hitBoxes, document.hitBoxes);
+});
