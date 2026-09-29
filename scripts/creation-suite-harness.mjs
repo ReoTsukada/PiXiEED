@@ -31,8 +31,8 @@ const SUITES = {
   'hidden-object': ['tests/creation-suite/hidden-object.test.mjs'],
   'puzzle-definition': ['tests/creation-suite/puzzle-definition.test.mjs', 'tests/creation-suite/puzzle-admission.test.mjs', 'tests/creation-suite/puzzle-upload.test.mjs', 'tests/creation-suite/public-puzzle.test.mjs', 'tests/creation-suite/puzzle-handoff.test.mjs'],
   pixfind: ['tests/creation-suite/pixfind.test.mjs'],
-  rewards: ['tests/pass/pass.test.mjs', 'tests/pass/no-ad.test.mjs', 'tests/pass/ad-diagnostics.test.mjs', 'tests/pass/pass-accumulation.test.mjs', 'tests/pass/pass-gauge.test.mjs', 'tests/pass/header.test.mjs', 'tests/creation-suite/puzzle-hint.test.mjs', 'tests/creation-suite/audio-pass-policy.test.mjs'],
-  'site-ui': ['tests/home/home-play.test.mjs', 'tests/home/home-animation.test.mjs', 'tests/arcade/tools-arcade.test.mjs', 'tests/arcade/jigsaw-arcade.test.mjs', 'tests/nav/bottom-nav.test.mjs'],
+  rewards: ['tests/pass/pass.test.mjs', 'tests/pass/no-ad.test.mjs', 'tests/pass/ad-diagnostics.test.mjs', 'tests/pass/pass-accumulation.test.mjs', 'tests/pass/pass-gauge.test.mjs', 'tests/pass/free-ready-header.test.mjs', 'tests/pass/header.test.mjs', 'tests/creation-suite/puzzle-hint.test.mjs', 'tests/creation-suite/audio-pass-policy.test.mjs'],
+  'site-ui': ['tests/home/home-play.test.mjs', 'tests/home/home-animation.test.mjs', 'tests/home/home-toy-pixels.test.mjs', 'tests/home/tool-previews.test.mjs', 'tests/arcade/tools-arcade.test.mjs', 'tests/arcade/jigsaw-arcade.test.mjs', 'tests/nav/bottom-nav.test.mjs'],
   seo: ['tests/creation-suite/seo.test.mjs', 'tests/creation-suite/seo-exclusions.test.mjs', 'tests/creation-suite/puzzle-share-page.test.mjs'],
 };
 const GATES = ['browser', 'device', 'liveData', 'production'];

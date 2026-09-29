@@ -1,0 +1,31 @@
+/* Results use normal page flow. The working canvas keeps its original layout. */
+.px-tool-result[hidden], [data-tool-result-suspended] { display: none !important; }
+body[data-tool-result-open] { height: auto; min-height: 100dvh; overflow: auto !important; background: #f7f8f6; color: #1b2025; touch-action: auto; }
+body[data-tool-result-open] main[data-tool-result-host] { position: relative !important; inset: auto !important; display: block !important; width: 100%; height: auto !important; min-height: calc(100dvh - var(--px-header-height,64px)); overflow: visible !important; padding: 0; }
+body[data-tool-result-open] .lc-top { position: sticky !important; inset: 0 0 auto !important; width: 100%; background: #f7f8f6 !important; }
+body[data-tool-result-open] .lc-top .px-header-brand { color: #1b2025; }
+body[data-tool-result-open] .audio-heading { position: sticky; top: 0; z-index: 35; padding: 8px 12px; background: #f7f8f6; }
+body[data-tool-result-open] :is(.audio-header-actions,.lc-zoom-stops,#cameraControls) { display: none !important; }
+.px-tool-result { padding: 28px 0 120px; text-align: center; }
+.px-tool-result__inner { margin-inline: auto; min-width: 0; }
+.px-tool-result__title { margin: 0; font: 800 clamp(1.4rem,4vw,2rem)/1.3 system-ui,-apple-system,sans-serif; letter-spacing: -.02em; }
+.px-tool-result__detail { margin: 10px 0 0; color: #667079; font: 500 .85rem/1.6 system-ui,-apple-system,sans-serif; overflow-wrap: anywhere; }
+.px-tool-result__picture { width: min(100%,440px); height: clamp(200px,40dvh,380px); margin: 24px auto; background: #edf0ed; border-radius: 16px; }
+.px-tool-result__preview { display: block; width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+.px-tool-result__picture[hidden], .px-tool-result__preview[hidden], .px-tool-result__detail[hidden] { display: none !important; }
+.px-tool-result__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin: 20px auto; }
+.px-tool-result__actions .lc-result { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; width: auto; }
+.px-tool-result__actions :is(button,a), .px-tool-result .px-tool-result__return { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 12px 22px; border: 1px solid #1b20251a; border-radius: 14px; background: #fff; color: #1b2025; font: 700 .95rem/1.4 system-ui,-apple-system,sans-serif; text-decoration: none; cursor: pointer; }
+.px-tool-result__actions svg { width: 22px; height: 22px; flex: none; }
+.px-tool-result__actions .lc-save, .px-tool-result .px-tool-result__return { background: #ffd35a; border-color: #e5b944; box-shadow: 0 3px 0 #cfaa3f; }
+.px-tool-result__actions .lc-upgrade { flex-basis: 100%; background: #fff9e6; }
+.px-tool-result__actions [hidden] { display: none !important; }
+.px-tool-result .px-display-ad { margin-block: 160px 0; }
+.px-tool-result :is(button,a):focus-visible { outline: 3px solid #357bb3; outline-offset: 3px; }
+.app-tabs button[data-tool-result-return] > :not(.px-tool-result__nav-label) { display: none !important; }
+.app-tabs button[data-tool-result-return] { font-size: 0 !important; }
+.app-tabs .px-tool-result__nav-label { font: 750 13px/1 system-ui,-apple-system,sans-serif; }
+/* The result can scroll: keep its navigation in flow so it never covers a creative. */
+body[data-tool-result-open] .app-tabs { position: relative !important; inset: auto !important; transform: none !important; margin: 0 auto 24px; }
+body[data-tool-result-open] footer { display: none; }
+body[data-tool-result-open] > .site-header { display: block !important; }

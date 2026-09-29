@@ -24,7 +24,7 @@ export function derivePassGauge(remainingMs) {
     const tier = ROW_COUNT - index - 1;
     const rowMs = pro ? HOUR_MS : Math.max(0, Math.min(HOUR_MS, remaining - tier * HOUR_MS));
     const litCells = Math.min(CELLS_PER_ROW, Math.ceil(rowMs / CELL_MS));
-    return { filled: litCells > 0, cells: Array.from({ length: CELLS_PER_ROW }, (_, cellIndex) => cellIndex < litCells) };
+    return { hours: ROW_COUNT - index, filled: litCells > 0, cells: Array.from({ length: CELLS_PER_ROW }, (_, cellIndex) => cellIndex < litCells) };
   });
   const filledCount = rows.reduce((total, row) => total + row.cells.filter(Boolean).length, 0);
   const bank = pro ? ROW_COUNT : Math.min(ROW_COUNT, Math.ceil(remaining / HOUR_MS));
@@ -48,7 +48,8 @@ function setDataset(element, key, value) {
 /** Update existing, fixed header nodes only when their visible state changed. */
 export function renderPassGauge(button, state) {
   const label = button.querySelector('[data-header-pass-label]');
-  if (label && label.textContent !== state.label) label.textContent = state.label;
+  const displayLabel = state.displayLabel || state.label;
+  if (label && label.textContent !== displayLabel) label.textContent = displayLabel;
   const add = button.querySelector('.px-pass-add');
   if (add && add.textContent !== (state.pro ? '∞' : '+')) add.textContent = state.pro ? '∞' : '+';
   setDataset(button, 'active', state.active);

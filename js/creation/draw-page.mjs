@@ -12,13 +12,15 @@ import { confirmPxdConversion, mountPxdTools } from './pxd-ui.mjs?rev=20260928-o
 import { pxdImageRoles, readPxdImage } from './pxd-project.mjs';
 import { enlargedPng, saveFile } from '../pixel-export.mjs?rev=20260928-pixel-roundtrip-1';
 import { encodeAnimatedGif } from '../animated-export.mjs?v=20260929-gif-budget-1';
-import { requestPass } from '../pixieed-pass.mjs?v=20260929-ad-diagnostics-1';
+import { requestPass } from '../pixieed-pass.mjs?v=20260929-daily-free-1';
 import { createDrawTimelapse, selectDrawTimelapseFrames } from './draw-timelapse.mjs?rev=20260928-draw-timelapse-1';
 import { readPxdAudioLink, readPxdDrawDocument, synchronizeLinkedAudioImage, writePxdDrawDocument } from './pxd-draw-audio.mjs';
+import { createToolResultView } from '../tool-result-view.mjs?rev=20260929-display-units-1';
 
 const LAST_DRAFT_KEY = 'pixieed.simple-draw.last-draft.v1';
 const $ = (selector) => document.querySelector(selector);
 const canvas = $('#draw-canvas'); const pixelSurface = createPixelCanvasSurface(canvas);
+const resultView = createToolResultView({ key: 'draw-result', main: $('#main'), returnLabel: '描画に戻る', onClose: () => {} });
 const status = $('#draw-status'); const saveButton = $('#draw-save'); const resumeButton = $('#draw-resume');
 const globeButton = $('#draw-to-globe');
 const sizeSelect = $('#draw-size');
@@ -475,7 +477,10 @@ $('#draw-export').addEventListener('click', async () => {
     if (!unchangedSource()) return;
     interactionEffects.exportImage({ from: canvas, to: $('#draw-export'), image: canvas });
     const result = await saveFile(blob, `pixieed-drawing-${image.width}x${image.height}@${width}x${height}.png`);
-    if (result !== 'cancelled' && unchangedSource()) status.textContent = `${width}×${height}pxで保存しました`;
+    if (result !== 'cancelled' && unchangedSource()) {
+      status.textContent = `${width}×${height}pxで保存しました`;
+      if (original.pixels.some((pixel) => pixel >= 0)) resultView.show({ title: 'PNGを保存しました', detail: `${width}×${height}px`, preview: canvas });
+    }
   } catch (error) { if (unchangedSource()) status.textContent = `PNGを書き出せませんでした：${error.message}`; }
 });
 // ---- time-lapse: a short free replay, with a longer detailed replay as a pass perk ----
@@ -540,7 +545,10 @@ async function exportTimelapse(detail) {
     const { bytes, width, height } = await encodeAnimatedGif(frames, { delayMs: 1000 / TIMELAPSE_FPS, signal: job.controller.signal, longEdge: 1024, maxPixels: 80e6 });
     if (!timelapseJobIsCurrent(job)) return;
     const result = await saveFile(new Blob([bytes], { type: 'image/gif' }), `pixieed-drawing-timelapse-${width}x${height}.gif`);
-    if (result !== 'cancelled' && timelapseJobIsCurrent(job)) toast(detail ? '詳しい描画過程を保存しました' : '描いた過程を保存しました');
+    if (result !== 'cancelled' && timelapseJobIsCurrent(job)) {
+      toast(detail ? '詳しい描画過程を保存しました' : '描いた過程を保存しました');
+      if (job.document.pixels.some((pixel) => pixel >= 0)) resultView.show({ title: 'GIFを保存しました', detail: `${width}×${height}px`, preview: canvas });
+    }
   } catch (error) {
     if (timelapseJobIsCurrent(job) && error?.name !== 'AbortError') status.textContent = `GIFを作れませんでした：${error.message}`;
   } finally {

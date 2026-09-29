@@ -38,3 +38,23 @@ export const passConfig = {
   rewardedAdUnitPath: '/23379831154/pixieed_rewarded',
   passHours: 1
 };
+
+/* 通常のディスプレイ広告。AdSenseで作った広告ユニットの数字のIDだけを入れます。
+ * 空欄の枠は表示もリクエストもしません。報酬型広告・パスとは独立しています。
+ */
+export const displayAdConfig = {
+  client: 'ca-pub-9801602250480253',
+  slots: {
+    home: '8825932060',
+    tools: '8825932060',
+    info: '8825932060', // About・利用ガイド
+    stores: '8825932060',
+    'store-detail': '8825932060', // 公開中の実店舗詳細
+    'camera-result': '2995020884', // 撮影結果
+    'draw-result': '2995020884', // PNG・GIF書き出し後
+    'audio-result': '2995020884', // PNG・音・動画の書き出し後
+    'jigsaw-result': '2995020884', // パズル完成後
+    'spot-result': '2995020884', // 間違い探しの結果
+    'find-result': '2995020884' // もの探しの結果
+  }
+};

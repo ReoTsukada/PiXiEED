@@ -5,10 +5,11 @@ import { readFileSync } from 'node:fs';
 const read = (path) => readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
 
 test('home: every tool card has a working toy and a plain name', () => {
-  const html = read('index.html'); const source = read('js/home-play.mjs');
+  const html = read('index.html'); const source = read('js/home-play.mjs'); const toysSource = read('js/tool-toys.mjs');
   const toys = [...html.matchAll(/data-toy="([a-z]+)"/g)].map((m) => m[1]);
   assert.ok(toys.length >= 9);
-  for (const toy of toys) assert.match(source, new RegExp(`\\n  ${toy}\\(el\\) \\{`), toy);
+  for (const toy of toys) assert.match(toysSource, new RegExp(`\\n  ${toy}\\(el\\) \\{`), toy);
+  assert.match(source, /createToolToys\(\{ note, animate, interactive: true \}\)/, 'home uses the shared interactive previews');
   assert.doesNotMatch(html, /PiXiEEDraw|PiXiEELENS|PXDraw/);
   assert.match(source, /prefers-reduced-motion/);
 });

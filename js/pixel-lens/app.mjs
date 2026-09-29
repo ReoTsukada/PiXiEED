@@ -7,13 +7,14 @@ import { attachZoomGestures, formatZoom, splitZoom, zoomRange, zoomStops } from 
 import { GIF_FPS, GIF_MAX_MS } from './gif.mjs?v=20260928-rewards-1';
 import { animatedCapturePlan, downsampleAnimatedFrame, encodeAnimatedGif } from '../animated-export.mjs?v=20260929-gif-budget-1';
 import { saveFile } from '../pixel-export.mjs?rev=20260928-export-1';
-import { hasPerk, requestPass, onPassChange } from '../pixieed-pass.mjs?v=20260929-ad-diagnostics-1';
+import { hasPerk, requestPass, onPassChange } from '../pixieed-pass.mjs?v=20260929-daily-free-1';
 import { cameraPostDataUrl } from './camera-post.mjs';
 import { createAudioSong } from '../creation/audio-core.mjs?rev=20260928-dot-music-1';
 import { audioCameraCancelUrl, beginAudioCamera, completeAudioCamera, readAudioCameraRequest } from '../creation/audio-camera-handoff.mjs?rev=20260928-dot-music-1';
 import { createPxdProject, getPxdJson } from '../creation/pxd-codec.mjs';
 import { putPxdImage, readPxdImage, mergePxdJson } from '../creation/pxd-project.mjs';
 import { mountPxdTools } from '../creation/pxd-ui.mjs?rev=20260928-own-work-1';
+import { createToolResultView } from '../tool-result-view.mjs?rev=20260929-display-units-1';
 
 const $ = (selector) => document.querySelector(selector);
 const initialParams = new URLSearchParams(location.search);
@@ -31,6 +32,7 @@ if (returnToAudio && !audioCameraRequest) {
   } else audioCameraInvalid = true;
 } else if (initialParams.has('audioRequest') && !audioCameraRequest) audioCameraInvalid = true;
 const root = $('#pixelStudio');
+const resultView = createToolResultView({ key: 'camera-result', main: root, returnLabel: '撮り直す', onClose: retake });
 const video = $('#video');
 const stage = $('#stage');
 const view = $('#view');
@@ -149,6 +151,7 @@ function setInfoForMode(mode) {
 }
 
 function setMode(mode) {
+  if (mode !== 'captured') resultView.close({ focus: false, notify: false });
   state.mode = mode;
   root.dataset.mode = mode;
   root.dataset.facing = state.facing;
@@ -292,6 +295,7 @@ function drawCompleted(result) {
 }
 
 const resizeObserver = new ResizeObserver(() => {
+  if (root.ownerDocument.body.dataset.toolResultOpen === 'camera-result') return;
   if (state.mode === 'live' && state.ratio === 'screen' && Math.abs(currentAspect() - previewAspect) > 0.0001) restartPreview({ preserveCompleted: true });
   fitPreview(state.result);
   updateSizeSummary();
@@ -549,6 +553,7 @@ async function prepareCaptureDownload(frozen) {
     $('#saveLabel').textContent = 'PNGを保存';
     updateSaveLinkState();
     sayToast('撮影しました。PNGを保存できます。');
+    if (!audioCameraRequest) resultView.show({ title: '撮影できました', preview: view, controls: $('#resultControls') });
     focusVisible('#savePng');
   } catch (error) {
     if (generation !== downloadGeneration || state.mode !== 'captured' || state.result !== frozen) return;
@@ -1127,6 +1132,8 @@ async function prepareGifDownload(frames) {
     updateSaveLinkState();
     sayToast(`GIFを撮影しました（${(frames.length / fps).toFixed(1)}秒）`);
     syncGifUpgrade();
+    stopGifPlayback();
+    if (!audioCameraRequest) resultView.show({ title: 'GIFを撮影しました', detail: `${(frames.length / fps).toFixed(1)}秒`, preview: view, controls: $('#resultControls'), mediaUrl: downloadUrl });
     focusVisible('#savePng');
   } catch (error) {
     if (generation !== downloadGeneration || error.name === 'AbortError' || job !== gifExportJob) return;

@@ -23,6 +23,7 @@ class FakeElement {
 }
 
 const windowEvents = new Map(); const documentEvents = new Map(); const timers = new Map(); let timerId = 0;
+let gptScriptReady = true;
 const fakeWindow = {
   addEventListener(name, callback) { windowEvents.set(name, callback); },
   clearTimeout(id) { timers.delete(id); },
@@ -36,7 +37,7 @@ const fakeDocument = {
   addEventListener(name, callback) { documentEvents.set(name, callback); },
   removeEventListener(name) { documentEvents.delete(name); },
   getElementById(id) { return id === 'px-pass-style' && styleElement.isConnected ? styleElement : null; },
-  querySelector() { return null; },
+  querySelector(selector) { return gptScriptReady && selector.startsWith('script[src=') ? { src: 'https://securepubads.g.doubleclick.net/tag/js/gpt.js' } : null; },
   createElement(name) {
     const element = new FakeElement(name);
     if (name === 'div') {
@@ -55,12 +56,80 @@ const fakeDocument = {
 body.appendChild = (element) => { body.children.push(element); element.isConnected = true; return element; };
 globalThis.window = fakeWindow;
 globalThis.document = fakeDocument;
-passConfig.rewardedAdUnitPath = '';
+passConfig.rewardedAdUnitPath = '/23379831154/pixieed_rewarded';
 passConfig.passHours = 1;
 const pass = await import('../../js/pixieed-pass.mjs?pass-accumulation-tests');
+const rewardedSlot = { addService() { return this; } };
+const rewardedListeners = new Map();
+let rewardedDisplayCount = 0;
+fakeWindow.googletag = {
+  cmd: { push(callback) { callback(); } },
+  enums: { OutOfPageFormat: { REWARDED: 'rewarded' } },
+  defineOutOfPageSlot() { return rewardedSlot; },
+  pubads() { return {
+    addEventListener(type, callback) { rewardedListeners.set(type, callback); },
+    removeEventListener(type, callback) { if (rewardedListeners.get(type) === callback) rewardedListeners.delete(type); }
+  }; },
+  enableServices() {},
+  display() {
+    rewardedDisplayCount++;
+    rewardedListeners.get('rewardedSlotReady')?.({ slot: rewardedSlot, makeRewardedVisible: () => true });
+    rewardedListeners.get('rewardedSlotGranted')?.({ slot: rewardedSlot });
+    rewardedListeners.get('rewardedSlotClosed')?.({ slot: rewardedSlot });
+  },
+  destroySlots() {}
+};
+
+test('the daily free hour is offered before ads and the next explicit request uses the ad', async () => {
+  values.clear();
+  let now = 1_800_000_000_000; const originalNow = Date.now; Date.now = () => now;
+  rewardedDisplayCount = 0;
+  try {
+    const free = pass.requestPass();
+    const freeModal = body.children.at(-1);
+    assert.match(freeModal.querySelector('p').innerHTML, /本日の無料分として/);
+    assert.equal(freeModal.querySelector('.px-pass-go').textContent, '無料で1時間使う');
+    await freeModal.querySelector('.px-pass-go').fire('click')[0];
+    assert.equal(await free, true);
+    assert.equal(rewardedDisplayCount, 0, 'claiming the daily pass does not load an ad');
+    assert.equal(JSON.parse(values.get('pixieed:pass:v1')).until, now + 3_600_000);
+    assert.equal(values.get('pixieed:pass:no-ad-day:v1'), pass.localDay(now));
+
+    const ad = pass.requestPass({ extend: true });
+    const adModal = body.children.at(-1);
+    assert.match(adModal.querySelector('p').innerHTML, /広告を1本見ると/);
+    assert.equal(adModal.querySelector('.px-pass-go').textContent, '広告を見る');
+    await adModal.querySelector('.px-pass-go').fire('click')[0];
+    assert.equal(await ad, true);
+    assert.equal(rewardedDisplayCount, 1);
+    assert.equal(JSON.parse(values.get('pixieed:pass:v1')).until, now + 7_200_000);
+  } finally { Date.now = originalNow; }
+});
+
+test('a claim lost to another tab switches to the ad button without loading an ad on that click', async () => {
+  values.clear();
+  let now = 1_800_100_000_000; const originalNow = Date.now; Date.now = () => now;
+  rewardedDisplayCount = 0;
+  try {
+    const request = pass.requestPass();
+    const modal = body.children.at(-1); const go = modal.querySelector('.px-pass-go');
+    assert.equal(go.textContent, '無料で1時間使う');
+    values.set('pixieed:pass:no-ad-at:v1', String(now));
+    values.set('pixieed:pass:no-ad-day:v1', pass.localDay(now));
+    await go.fire('click')[0];
+    assert.equal(rewardedDisplayCount, 0, 'a free-claim click never starts an ad after the claim loses a race');
+    assert.match(modal.querySelector('p').textContent, /今日の無料分は受け取り済み/);
+    assert.equal(go.textContent, '広告を見る');
+    await go.fire('click')[0];
+    assert.equal(await request, true);
+    assert.equal(rewardedDisplayCount, 1, 'the next explicit click starts the ad');
+  } finally { Date.now = originalNow; }
+});
 
 test('rewards add one hour to the current expiry and allow an explicit extension while active', async () => {
-  let now = 1_800_000_000_000; const originalNow = Date.now; Date.now = () => now;
+  values.clear();
+  let now = 1_800_200_000_000; const originalNow = Date.now; Date.now = () => now;
+  values.set('pixieed:pass:no-ad-day:v1', pass.localDay(now));
   const focusReturn = new FakeElement('trigger'); focusReturn.isConnected = true; fakeDocument.activeElement = focusReturn;
   try {
     assert.equal(pass.PASS_HOURS, 1);
@@ -139,6 +208,7 @@ test('the extension sheet traps tab focus and formats the remaining time for sha
 });
 
 test('an ad script that never responds times out, is removed, and permits a retry', async () => {
+  gptScriptReady = false;
   const first = pass.showRewardedAd('/test/rewarded');
   const script = head.children.at(-1);
   assert.equal(script.src, 'https://securepubads.g.doubleclick.net/tag/js/gpt.js');
@@ -153,4 +223,5 @@ test('an ad script that never responds times out, is removed, and permits a retr
   retryScript.onerror();
   await assert.rejects(retry, /ad script/);
   assert.equal(retryScript.isConnected, false);
+  gptScriptReady = true;
 });

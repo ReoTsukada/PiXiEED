@@ -1,0 +1,9 @@
+.tool-shell { padding: 1.5rem 0 7rem; }
+.tool-shell__head { gap: 1rem; margin-bottom: 1.2rem; }
+.tool-shell__head h1 { margin: .3rem 0 0; font-size: clamp(1.7rem, 3.5vw, 2.6rem); }
+.tool-shell__head p { font-size: .85rem; }
+.tool-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 760px) {
+  .tool-shell__head { align-items: start; gap: .5rem; }
+  .tool-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem; }
+}

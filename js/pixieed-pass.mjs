@@ -3,10 +3,12 @@
  *
  * Any page or tool asks `hasPerk('some.perk')`. The answer is yes while the pass is valid (one rewarded ad
  * adds PASS_HOURS hours) or for Pro. New services only register a perk id; they never show ads themselves.
- * The only place an ad can appear is `requestPass()`, and only after the person taps 「広告を見る」.
+ * Rewarded ads only appear through `requestPass()`, after the person taps 「広告を見る」.
+ * Ordinary AdSense Auto ads are separate: they never grant or extend this pass.
  *
  * Ads: Google Ad Manager rewarded ads (GPT) when `passConfig.rewardedAdUnitPath` is set in
- * data/site-config.js. Until then the pass is granted without an ad (and says so). Only on localhost,
+ * data/site-config.js. The first use each local day is free; a missing ad only grants that day's free hour
+ * if it has not already been claimed. Only on localhost,
  * a 5-second stand-in ad is shown so the flow can be tried without granting a free pass on the public site.
  */
 import { passConfig } from '../data/site-config.js?rev=20260928-pass-1h-1';
@@ -58,24 +60,27 @@ function notify() {
   renderSlots();
 }
 if (typeof window !== 'undefined') window.addEventListener('storage', (event) => {
-  if (event.key === STORE_KEY || event.key === PRO_KEY || event.key === null) {
+  if (event.key === STORE_KEY || event.key === PRO_KEY || event.key === NO_AD_KEY || event.key === NO_AD_DAY_KEY || event.key === null) {
     if (event.key === STORE_KEY || event.key === null) { memoryUntil = 0; memoryFallbackActive = false; }
     notify();
   }
 });
 
-async function grant() {
-  const applyGrant = () => {
-    const next = Math.max(Date.now(), until()) + PASS_MS;
-    const saved = write(STORE_KEY, JSON.stringify({ until: next }));
-    memoryUntil = saved ? 0 : next;
-    memoryFallbackActive = !saved;
-    notify();
-    return next;
-  };
+function withPassLock(callback) {
   const locks = globalThis.navigator?.locks;
-  if (locks?.request) return locks.request(STORE_KEY, applyGrant);
-  return applyGrant();
+  if (locks?.request) return locks.request(STORE_KEY, callback);
+  return callback();
+}
+function applyGrant({ notifyChange = true } = {}) {
+  const next = Math.max(Date.now(), until()) + PASS_MS;
+  const saved = write(STORE_KEY, JSON.stringify({ until: next }));
+  memoryUntil = saved ? 0 : next;
+  memoryFallbackActive = !saved;
+  if (notifyChange) notify();
+  return next;
+}
+async function grant() {
+  return withPassLock(applyGrant);
 }
 
 // ---- ad providers ----------------------------------------------------------------------------------------
@@ -170,11 +175,63 @@ export function rewardedAdUnit(currentLocation = typeof location === 'undefined'
   try { if (new URLSearchParams(currentLocation?.search || '').get('ads') === 'test') return SAMPLE_REWARDED_AD_UNIT; } catch {}
   return config?.rewardedAdUnitPath || '';
 }
-// ---- no ad to show: once a day the pass is given anyway (having no ad is not the person's fault) ----
-const NO_AD_KEY = 'pixieed:pass:no-ad-day:v1';
-export function localDay(now = Date.now()) { const d = new Date(now); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
-export function freeWithoutAdAvailable(now = Date.now(), readKey = read) { return readKey(NO_AD_KEY) !== localDay(now); }
-export function useFreeWithoutAd(now = Date.now(), writeKey = write) { return writeKey(NO_AD_KEY, localDay(now)); }
+// ---- one free pass per local day, shared with the legacy day key -----------------------------------------
+const NO_AD_KEY = 'pixieed:pass:no-ad-at:v1';
+const NO_AD_DAY_KEY = 'pixieed:pass:no-ad-day:v1';
+let memoryNoAdAt = 0;
+export function localDay(now = Date.now()) {
+  const date = new Date(Number.isFinite(now) ? now : Date.now());
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+function storedNoAdAt(readKey) {
+  let raw = null;
+  try { raw = readKey(NO_AD_KEY); } catch {}
+  if (raw === null || raw === undefined || String(raw).trim() === '') return 0;
+  const at = Number(raw);
+  return Number.isFinite(at) && at >= 0 ? at : 0;
+}
+export function freeWithoutAdWaitMs(now = Date.now(), readKey = read) {
+  const checkedNow = Number.isFinite(now) ? now : Date.now();
+  const today = localDay(checkedNow);
+  const storedAt = storedNoAdAt(readKey);
+  let legacyDay = null;
+  try { legacyDay = readKey(NO_AD_DAY_KEY); } catch {}
+  const storedUsedToday = storedAt > 0 && localDay(storedAt) === today;
+  const memoryUsedToday = readKey === read && memoryNoAdAt > 0 && localDay(memoryNoAdAt) === today;
+  const usedToday = legacyDay === today || storedUsedToday || memoryUsedToday;
+  if (!usedToday) return 0;
+  const nextDay = new Date(checkedNow);
+  nextDay.setHours(24, 0, 0, 0);
+  return Math.max(0, nextDay.getTime() - checkedNow);
+}
+export function freeWithoutAdAvailable(now = Date.now(), readKey = read) {
+  return freeWithoutAdWaitMs(now, readKey) === 0;
+}
+export function useFreeWithoutAd(now = Date.now(), writeKey = write) {
+  const usedAt = Number.isFinite(now) && now >= 0 ? now : Date.now();
+  let savedAt = false; let savedDay = false;
+  try { savedAt = writeKey(NO_AD_KEY, String(usedAt)) === true; } catch {}
+  try { savedDay = writeKey(NO_AD_DAY_KEY, localDay(usedAt)) === true; } catch {}
+  if (writeKey === write) memoryNoAdAt = Math.max(memoryNoAdAt, usedAt);
+  return savedAt && savedDay;
+}
+/** Claim the daily no-ad hour atomically with any other pass grant. */
+export async function claimFreeWithoutAd(grantPass, { now = () => Date.now(), readKey = read, writeKey = write } = {}) {
+  return withPassLock(() => {
+    const claimedAt = now();
+    if (!freeWithoutAdAvailable(claimedAt, readKey)) return false;
+    grantPass();
+    useFreeWithoutAd(claimedAt, writeKey);
+    if (typeof window !== 'undefined' && typeof document !== 'undefined') notify();
+    return true;
+  });
+}
+export function shouldGrantFreeWithoutAd(result) {
+  return result === 'nofill' || result === 'unsupported' || result === 'timeout';
+}
+function freeCooldownCopy() {
+  return '次は明日0時に受け取れます。';
+}
 
 // ---- the one sheet --------------------------------------------------------------------------------------
 const STYLE = `
@@ -209,6 +266,8 @@ export function requestPass({ perk = '', extend = false } = {}) {
   if (open) return open;
   ensureStyle();
   const mode = adMode();
+  let offeredFree = freeWithoutAdAvailable();
+  const displayMode = offeredFree ? 'free' : mode;
   const backdrop = document.createElement('div'); backdrop.className = 'px-pass-backdrop';
   backdrop.innerHTML = `<section class="px-pass" role="dialog" aria-modal="true" aria-labelledby="px-pass-title">
     <h2 id="px-pass-title"><i>${PASS_HOURS}時間</i>${extend ? '特典を追加' : 'PiXiEEDの特典'}</h2>
@@ -217,10 +276,13 @@ export function requestPass({ perk = '', extend = false } = {}) {
   </section>`;
   const text = backdrop.querySelector('p');
   const perkLabel = PERKS.get(perk);
+  const freeModeCopy = offeredFree
+    ? `本日の無料分として、広告なしで全ツール共通の特典を${PASS_HOURS}時間受け取れます。`
+    : `今日の無料分は受け取り済みです。${freeCooldownCopy()}`;
   text.innerHTML = extend
-    ? mode === 'free' ? `準備中のため広告なしで、サイト共通の拡張を使える時間に${PASS_HOURS}時間追加されます。`
+    ? displayMode === 'free' ? freeModeCopy
       : `広告を1本見ると、サイト共通の拡張を使える時間に${PASS_HOURS}時間追加されます。`
-    : mode === 'free' ? `いまは準備中のため、広告なしで${PASS_HOURS}時間すべての特典が使えます。`
+    : displayMode === 'free' ? freeModeCopy
       : `広告を1本見ると、PiXiEEDのすべての特典が${PASS_HOURS}時間使えます。`;
   const perkList = backdrop.querySelector('.px-pass-perks');
   if (perkList) for (const label of PERKS.values()) { const item = document.createElement('li'); item.textContent = label; perkList.appendChild(item); }
@@ -228,11 +290,14 @@ export function requestPass({ perk = '', extend = false } = {}) {
   if (passNote) passNote.textContent = '時間はページを閉じても進みます。制作中の内容は残ります。';
   if (perkLabel) { const line = document.createElement('span'); line.className = 'px-pass-perk'; line.textContent = `（${perkLabel} など）`; text.appendChild(line); }
   const go = backdrop.querySelector('.px-pass-go'); const no = backdrop.querySelector('.px-pass-no');
-  const goLabel = mode === 'free' ? (extend ? `${PASS_HOURS}時間追加する` : `${PASS_HOURS}時間使う`) : '広告を見る';
+  let goLabel = offeredFree ? `無料で${PASS_HOURS}時間使う` : '広告を見る';
+  const unavailableWithoutAd = mode === 'free' && !offeredFree;
+  if (unavailableWithoutAd) goLabel = '本日の無料分は受取済み';
   go.textContent = goLabel;
+  if (unavailableWithoutAd) go.disabled = true;
   const returnFocus = document.activeElement;
   document.body.appendChild(backdrop);
-  go.focus({ preventScroll: true });
+  (unavailableWithoutAd ? no : go).focus({ preventScroll: true });
   open = new Promise((resolve) => {
     const close = (result) => {
       backdrop.remove(); document.removeEventListener('keydown', onKey); open = null;
@@ -240,7 +305,7 @@ export function requestPass({ perk = '', extend = false } = {}) {
       resolve(result);
     };
     const onKey = (event) => {
-      if (event.key === 'Escape' && !go.disabled) { close(false); return; }
+      if (event.key === 'Escape' && !no.disabled) { close(false); return; }
       if (event.key !== 'Tab') return;
       const focusable = [...backdrop.querySelectorAll('button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])')].filter((item) => !item.hidden);
       if (!focusable.length) { event.preventDefault(); return; }
@@ -249,12 +314,26 @@ export function requestPass({ perk = '', extend = false } = {}) {
       else if (!event.shiftKey && (document.activeElement === last || !backdrop.contains(document.activeElement))) { event.preventDefault(); first.focus(); }
     };
     document.addEventListener('keydown', onKey);
-    backdrop.addEventListener('pointerdown', (event) => { if (event.target === backdrop && !go.disabled) close(false); });
+    backdrop.addEventListener('pointerdown', (event) => { if (event.target === backdrop && !no.disabled) close(false); });
     no.addEventListener('click', () => close(false));
     let freeReady = false;
     go.addEventListener('click', async () => {
       if (freeReady) { close(true); return; }
       go.disabled = true; no.disabled = true;
+      if (offeredFree) {
+        try {
+          if (await claimFreeWithoutAd(() => applyGrant({ notifyChange: false }))) { close(true); return; }
+        } catch {}
+        offeredFree = false;
+        text.textContent = `今日の無料分は受け取り済みです。${freeCooldownCopy()}`;
+        if (mode === 'free') {
+          go.disabled = true; no.disabled = false; go.textContent = '本日の無料分は受取済み';
+        } else {
+          go.disabled = false; no.disabled = false; goLabel = '広告を見る'; go.textContent = goLabel;
+        }
+        return;
+      }
+      if (mode === 'free') return;
       let result = 'granted';
       if (mode === 'test') result = await showTestAd(backdrop);
       else if (mode === 'rewarded') { go.textContent = '広告を準備しています…'; try { result = await showRewardedAd(rewardedAdUnit()); } catch { result = 'timeout'; } }
@@ -263,19 +342,23 @@ export function requestPass({ perk = '', extend = false } = {}) {
         catch { result = 'unavailable'; }
       }
       backdrop.dataset.adResult = result;
-      // no ad could be shown (none in stock, unsupported device, or too slow): the day's free hour
-      if (result !== 'closed' && result !== 'granted' && freeWithoutAdAvailable()) {
+      // A missing ad is not the person's fault, but today's free hour cannot be granted twice.
+      if (shouldGrantFreeWithoutAd(result)) {
         try {
-          await grant(); useFreeWithoutAd();
-          freeReady = true; go.disabled = false; no.hidden = true; go.textContent = '使う';
-          text.textContent = `広告が見つからなかったので、今日は無料で${PASS_HOURS}時間使えます。`;
-          return;
+          if (await claimFreeWithoutAd(() => applyGrant({ notifyChange: false }))) {
+            freeReady = true; go.disabled = false; no.hidden = true; go.textContent = '使う';
+            text.textContent = `広告が見つからなかったので、本日の無料分として${PASS_HOURS}時間使えます。無料分は1日1回です。`;
+            return;
+          }
         } catch {}
       }
       go.disabled = false; no.disabled = false;
       go.textContent = goLabel;
+      const freeWait = freeWithoutAdWaitMs();
       text.textContent = result === 'closed' ? '最後まで見ると特典が使えるようになります。'
-        : 'いまは広告を用意できませんでした。少し時間をおいてお試しください。（広告なしの無料分は今日使用済みです）';
+        : freeWait > 0
+          ? `いまは広告を用意できませんでした。今日の無料分は受け取り済みです。${freeCooldownCopy()}`
+          : 'いまは広告を用意できませんでした。少し時間をおいてお試しください。';
     });
   });
   return open;

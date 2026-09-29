@@ -28,6 +28,7 @@ body.app-page--tool-draw #main{height:100dvh}
 .draw-tools{justify-content:flex-end;flex-wrap:nowrap;gap:4px}.draw-tools button,.draw-actions button{min-height:34px;padding:5px 9px;font-size:.8rem}.draw-actions{grid-column:1/-1;justify-content:flex-end;gap:5px}.draw-actions button{min-width:36px}.draw-actions #draw-save{margin-left:auto}
 .draw-page .draw-color:focus-visible,.draw-page button:focus-visible{outline-offset:2px}
 .draw-actions #draw-to-globe{border-color:#a8b59c;background:#f0f4eb;color:#344332}
+.draw-actions #draw-undo,.draw-actions #draw-redo{display:grid;place-items:center;width:44px;height:44px;min-width:44px;padding:9px}
 @media(max-width:560px){.draw-page{padding-right:8px;padding-left:8px;grid-template-rows:auto auto minmax(0,1fr) auto}.draw-board{border-radius:14px}#draw-canvas{width:min(100%,calc(100dvh - 235px),560px)}.draw-controls{grid-template-columns:1fr;padding:5px 7px}.draw-control-row{display:grid;gap:3px}.draw-palette{justify-content:center}.draw-tools{justify-content:center}.draw-actions{grid-column:1;justify-content:center}.draw-actions #draw-save{margin-left:auto}}
 @media(max-height:620px){.draw-page{padding-top:5px;padding-bottom:calc(66px + env(safe-area-inset-bottom));gap:4px}.draw-heading p{display:none}.draw-meta{font-size:.68rem}.draw-controls{gap:3px;padding:4px 7px}.draw-import summary{min-height:22px;padding:0 3px}.draw-color{width:26px;height:26px;flex-basis:26px}.draw-tools button,.draw-actions button{min-height:29px;padding:3px 7px}.draw-actions{gap:3px}}
 

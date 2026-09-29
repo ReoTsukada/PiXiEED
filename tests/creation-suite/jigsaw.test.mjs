@@ -210,6 +210,9 @@ test('free workspace preserves source choices and avoids answer markers and fixe
   assert.match(page, /id="jigsaw-workspace"/);
   assert.match(page, /<canvas[^>]*id="jigsaw-board"/);
   assert.match(page, /id="jigsaw-rotate"/);
+  assert.match(page, /id="jigsaw-preview-toggle"[^>]*aria-pressed="false"/);
+  assert.match(page, /id="jigsaw-preview-close"/);
+  assert.match(page, /id="jigsaw-preview-canvas"/);
   assert.match(page, /value="3"/);
   assert.doesNotMatch(page, /3×3・9ピース/);
   assert.doesNotMatch(script, /jigsaw-cell__result|button\[data-cell|textContent = correct \? '✓'/);
@@ -223,5 +226,10 @@ test('free workspace preserves source choices and avoids answer markers and fixe
   assert.match(script, /collectPagedRows/);
   assert.match(script, /social_posts/);
   assert.match(script, /imageSmoothingEnabled = false/);
+  assert.match(script, /setSourcePreview\(rgba\)/);
+  assert.match(script, /setSourcePreview\(null\)/);
+  assert.match(script, /jigsaw-preview-close/);
+  assert.doesNotMatch(page, /jigsaw-preview[^>]*download|id="jigsaw-preview-canvas"[^>]*download/i);
+  assert.match(css, /image-rendering:pixelated/);
   assert.match(css, /orientation:landscape/);
 });

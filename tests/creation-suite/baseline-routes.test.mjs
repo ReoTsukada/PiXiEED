@@ -52,12 +52,14 @@ test('the creation tools list links to four creation routes and keeps the game c
   for (const [href, label] of [
     ['/audio/', 'ドットで音楽'],
     ['/jigsaw/', 'かんたんジグソー'],
-    ['/spot-difference/', 'かんたん間違い探し'],
-    ['/hidden-object/', 'かんたんもの探し'],
+    ['/spot-difference/', 'ドット絵間違い探し'],
+    ['/hidden-object/', 'ドット絵もの探し'],
   ]) {
-    assert.match(tools, new RegExp(`href="${href.replaceAll('/', '\\/')}"[\\s\\S]*?<h2>${label}</h2>`));
+    const card = tools.match(new RegExp(`<a\\b[^>]*href="${href.replaceAll('/', '\\/')}"[^>]*>([\\s\\S]*?)</a>`))?.[1];
+    assert.ok(card, `${href} has a public tool card`);
+    assert.match(card, new RegExp(`<h2\\b[^>]*>${label}</h2>`));
   }
   assert.doesNotMatch(tools, /href="\/game\/"/);
   assert.doesNotMatch(read('index.html'), /href="\/game\/"/);
-  assert.match(tools, /tool-card--soon[\s\S]*?<h2>かんたんゲーム<\/h2>[\s\S]*?もうすぐ/);
+  assert.match(tools, /tool-card--soon[\s\S]*?<h2\b[^>]*>かんたんゲーム<\/h2>[\s\S]*?もうすぐ/);
 });

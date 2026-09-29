@@ -12,11 +12,14 @@
   <meta name="theme-color" content="#f4f2ec">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20260929-workspace-1">
   <link rel="stylesheet" href="/css/site.css?rev=20260929-claude-integration-1">
-  <link rel="stylesheet" href="/css/creation-jigsaw.css?rev=20260929-claude-integration-1">
+  <link rel="stylesheet" href="/css/creation-jigsaw.css?rev=20260929-tool-ui-1">
   <link rel="stylesheet" href="/css/arcade.css?rev=20260929-claude-integration-1">
   <link rel="stylesheet" href="/css/jigsaw-arcade.css?rev=20260929-workspace-1">
-  <link rel="stylesheet" href="/css/site-header.css?rev=20260929-workspace-1">
+  <link rel="stylesheet" href="/css/site-header.css?rev=20260929-tool-ui-1">
   <link rel="stylesheet" href="/css/interaction-effects.css?rev=20260929-claude-integration-1">
+  <link rel="stylesheet" href="/css/display-ads.css?rev=20260929-manual-ads-2">
+  <link rel="stylesheet" href="/css/tool-result-view.css?rev=20260929-tool-results-1">
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253" crossorigin="anonymous"></script>
 </head>
 <body data-tool-name="かんたんジグソー" data-tool-short="ジグソー" data-page="jigsaw" class="app-page app-page--tool-jigsaw">
   <a class="skip-link" href="#main">本文へ移動</a>
@@ -38,6 +41,7 @@
     <section id="jigsaw-play" class="jigsaw-play" aria-label="ジグソーパズル" hidden>
       <p id="jigsaw-source-label" class="jigsaw-source-label"></p>
       <div class="jigsaw-workspace-tools" role="toolbar" aria-label="選択中のピースグループ">
+        <button id="jigsaw-preview-toggle" type="button" aria-label="完成図を表示" aria-pressed="false" aria-controls="jigsaw-preview" title="完成図"><img src="/assets/icons/pixieed/artwork.svg" alt=""></button>
         <button id="jigsaw-hint" type="button" data-hint-short="無料" aria-label="ヒント（このパズルで1回無料）" title="ヒント（このパズルで1回無料）">ヒント</button>
         <button id="jigsaw-rotate" type="button" aria-label="選択中を90度回転" title="90度回転">↻</button>
         <button id="jigsaw-return" type="button" aria-label="選択中をトレーへ戻す" title="トレーへ戻す">戻す</button>
@@ -50,6 +54,10 @@
       </div>
       <div id="jigsaw-workspace" class="jigsaw-workspace" tabindex="0" role="application" aria-label="自由配置できるジグソー作業スペース">
         <canvas id="jigsaw-board" class="jigsaw-board" aria-label="元絵のピースを自由に配置する場所"></canvas>
+        <aside id="jigsaw-preview" class="jigsaw-preview" aria-label="完成図" hidden>
+          <div class="jigsaw-preview__head"><span>完成図</span><button id="jigsaw-preview-close" type="button" aria-label="完成図を閉じる" title="閉じる">×</button></div>
+          <canvas id="jigsaw-preview-canvas" class="jigsaw-preview__canvas" aria-label="パズルの完成図"></canvas>
+        </aside>
       </div>
       <div id="jigsaw-tray" class="jigsaw-tray" role="group" aria-label="まだ置いていないピース"></div>
       <p id="jigsaw-complete" class="jigsaw-complete" role="status" hidden>完成しました。</p>
@@ -63,8 +71,8 @@
     <a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""></a>
     <a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>
   </nav>
-  <script type="module" src="/js/creation/jigsaw-page.mjs?rev=20260929-ad-diagnostics-1"></script>
+  <script type="module" src="/js/creation/jigsaw-page.mjs?rev=20260929-display-units-1"></script>
   <script type="module" src="/js/creation/jigsaw-arcade.mjs?rev=20260929-claude-integration-1"></script>
-  <script type="module" src="/js/site-header.mjs?rev=20260929-workspace-1"></script>
+  <script type="module" src="/js/site-header.mjs?rev=20260929-tool-ui-1"></script>
 </body>
 </html>

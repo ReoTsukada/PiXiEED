@@ -6,20 +6,39 @@
 .px-site-header .px-header-brand{display:flex;align-items:center;gap:9px;flex:none;min-width:44px;min-height:44px;color:#1b2025;text-decoration:none;font:750 1rem/1 system-ui,-apple-system,sans-serif;letter-spacing:0}
 .px-header-brand img{display:block;width:40px;height:40px;border-radius:9px;background:#05090c;image-rendering:pixelated}
 .px-site-header .brand-mark{flex:none;width:40px;height:40px;background-size:40px 40px;border:0;border-radius:9px;transform:none}
-.px-site-header .px-header-pass{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 18px;grid-template-rows:13px 13px;align-content:center;align-items:center;column-gap:4px;row-gap:3px;flex:none;width:100px;min-width:100px;min-height:44px;height:44px;margin-left:auto;padding:6px 7px;overflow:hidden;isolation:isolate;border:1px solid #ad842c40;border-radius:12px;background:linear-gradient(155deg,#fffaf0,#f3ead7);box-shadow:inset 0 1px 0 #fff,0 2px 0 #87642512;color:#6b521d;font:750 12px/1 system-ui,-apple-system,sans-serif;font-variant-numeric:tabular-nums;white-space:nowrap;cursor:pointer;touch-action:manipulation}
+.px-site-header .px-header-pass{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 18px;grid-template-rows:12px 17px;align-content:center;align-items:center;column-gap:4px;row-gap:2px;flex:none;width:100px;min-width:100px;min-height:44px;height:44px;margin-left:auto;padding:5px 7px;overflow:hidden;isolation:isolate;border:1px solid #ad842c40;border-radius:12px;background:linear-gradient(155deg,#fffaf0,#f3ead7);box-shadow:inset 0 1px 0 #fff,0 2px 0 #87642512;color:#6b521d;font:750 12px/1 system-ui,-apple-system,sans-serif;font-variant-numeric:tabular-nums;white-space:nowrap;cursor:pointer;touch-action:manipulation}
 .px-header-pass[data-active=true]{background:linear-gradient(155deg,#fff1c7,#f6daa0);color:#543f14;border-color:#b0843055}
+.px-header-pass[data-free-ready=true]{border-color:#4d8e6c88;box-shadow:inset 0 1px 0 #fff,0 0 0 1px #4d8e6c20,0 2px 0 #87642512}
+.px-header-pass[data-free-ready=true][data-active=true]{border-color:#598766aa;box-shadow:inset 0 1px 0 #fff,0 0 0 1px #59876620,0 2px 0 #87642512}
 .px-header-pass:disabled{cursor:default;opacity:.8}
 .px-header-pass svg{display:block;width:10px;height:10px;fill:currentColor;stroke:none;flex:none;shape-rendering:crispEdges}
-.px-pass-top{display:flex;align-items:center;gap:2px;min-width:0}
-.px-pass-top [data-header-pass-label]{overflow:hidden;text-overflow:ellipsis}
+.px-pass-top{display:flex;align-items:center;gap:3px;min-width:0}
+.px-pass-top::before{content:'残り';display:none;flex:none;color:inherit;font:700 8px/1 system-ui,-apple-system,sans-serif}
+.px-header-pass[data-active=true]:not([data-pro=true]) .px-pass-top::before{display:inline;content:'残り'}
+.px-header-pass[data-active=true]:not([data-pro=true]) .px-pass-pixel-star,.px-header-pass[data-free-ready=true]:not([data-active=true]) .px-pass-pixel-star{display:none}
+.px-pass-top [data-header-pass-label]{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .px-header-pass[data-long=true] .px-pass-pixel-star{display:none}
-.px-pass-gauge{display:grid;grid-template-rows:repeat(3,3px);gap:2px;align-self:stretch;min-width:0}
-.px-pass-gauge-row{position:relative;display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:1px;min-width:0;overflow:hidden}
-.px-pass-cell{display:block;min-width:0;height:3px;border-radius:.5px;background:#92753926;box-shadow:inset 0 1px 0 #54380d12}
+.px-pass-gauge{display:grid;grid-template-rows:repeat(3,5px);gap:1px;align-self:stretch;min-width:0}
+.px-pass-hint{display:none;grid-column:1;grid-row:2;font:700 9px/17px system-ui,-apple-system,sans-serif;color:inherit}
+.px-header-pass:not([data-active=true]) .px-pass-gauge{display:none}
+.px-header-pass:not([data-active=true]) .px-pass-hint{display:block}
+.px-pass-hint::before{content:'広告で追加'}
+.px-header-pass[data-free-ready=true] .px-pass-hint::before{content:'タップで受取'}
+.px-pass-gauge-row{position:relative;display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:0;min-width:0;height:5px;padding-left:14px;overflow:hidden;border-radius:3px;background:#92753935}
+.px-pass-gauge-row::before{content:attr(data-hours) 'h';position:absolute;left:0;top:0;display:block;width:12px;overflow:visible;color:currentColor;font:750 7px/5px system-ui,-apple-system,sans-serif;font-variant-numeric:tabular-nums;text-align:left}
+.px-pass-cell{display:block;min-width:0;height:5px;border-radius:0;background:transparent;box-shadow:none}
 .px-pass-cell[data-filled=true]{background:#b78022;box-shadow:inset 0 1px 0 #fff7}
 .px-pass-gauge-row:nth-child(2) .px-pass-cell[data-filled=true]{background:#cb993a}
 .px-pass-gauge-row:first-child .px-pass-cell[data-filled=true]{background:#dfb353}
 .px-pass-add{grid-column:2;grid-row:1 / -1;display:grid;place-items:center;width:18px;height:24px;border:1px solid #b38c3440;border-radius:6px;background:#ffffff80;box-shadow:inset 0 1px 0 #fff8;color:inherit;font:650 17px/1 system-ui,sans-serif}
+.px-header-pass[data-free-ready=true][data-active=true] .px-pass-add{font-size:0}
+.px-header-pass[data-free-ready=true][data-active=true] .px-pass-add::before{content:'無料';font:750 7px/1 system-ui,-apple-system,sans-serif;white-space:nowrap}
+.px-header-pass:not([data-active=true]):not([data-pro=true]):not([data-free-ready=true]) .px-pass-add{font-size:0}
+.px-header-pass:not([data-active=true]):not([data-pro=true]):not([data-free-ready=true]) .px-pass-add::before{content:'広告';font:750 7px/1 system-ui,-apple-system,sans-serif;white-space:nowrap}
+.px-header-pass[data-free-arrive=true] .px-pass-add{animation:px-pass-free-arrive 420ms steps(3,end) 1 both}
+@keyframes px-pass-free-arrive{0%{opacity:.45;transform:translateY(2px) scale(.84);text-shadow:0 0 0 #6da68100}35%{opacity:1;transform:translateY(-1px) scale(1.08);text-shadow:0 0 5px #6da68190}100%{opacity:1;transform:none;text-shadow:0 0 0 #6da68100}}
+@media(prefers-reduced-motion:reduce){.px-header-ready .px-pass-add::before{animation:none!important}}
+html[data-pixieed-motion=reduced] .px-pass-add::before{animation:none!important}
 .px-header-pass[data-pending=true]{cursor:progress;opacity:.72}
 /* A single short sweep after a reward. No animation runs while idle. */
 .px-header-pass::after{content:'';position:absolute;inset:-4px auto -4px 0;width:35%;pointer-events:none;opacity:0;background:linear-gradient(90deg,transparent,#fff9,transparent);transform:translateX(-150%) skewX(-20deg)}
@@ -43,7 +62,7 @@
 .lc-top.px-site-header .lc-zoom-stops{position:absolute;top:calc(100% + 4px);left:50%;transform:translateX(-50%);max-width:calc(100vw - 24px);overflow-x:auto}
 .lc-top.px-site-header .px-header-pass,.px-standalone-globe .px-header-pass{background:linear-gradient(155deg,#2c2c25f5,#17222af5);color:#ffe4a6;border-color:#e0b65c60;box-shadow:inset 0 1px 0 #fff1,0 2px 0 #0002}
 .lc-top.px-site-header .px-pass-add,.px-standalone-globe .px-pass-add{background:#ffffff0d;border-color:#e0b65c45;box-shadow:inset 0 1px 0 #fff1}
-.lc-top.px-site-header .px-pass-cell,.px-standalone-globe .px-pass-cell{background:#e0b65c20}
+.lc-top.px-site-header .px-pass-gauge-row,.px-standalone-globe .px-pass-gauge-row{background:#e0b65c35}
 .lc-top.px-site-header .px-pass-cell[data-filled=true],.px-standalone-globe .px-pass-cell[data-filled=true]{background:#edc467}
 .lc-top.px-site-header .lc-top-left{gap:0}
 .lc[data-recording=true] .px-site-header *{pointer-events:none}
@@ -64,11 +83,11 @@
 @media(hover:hover) and (pointer:fine){.px-header-ready .px-header-pass:not(:disabled):hover{transform:translateY(-1px)}.px-header-ready .tool-card:hover{transform:translateY(-3px);box-shadow:0 2px 0 #17233308}}
 @media(prefers-reduced-motion:reduce){.px-header-ready :is(.px-header-pass,.px-header-utilities button,.px-header-utilities summary,.button,.app-tabs>a,.app-tabs>button,.lc-nav>a,.lc-nav>button,.tool-card){transition:none;transform:none}.px-header-ready .px-header-pass::after{animation:none}.px-header-ready :is(.px-header-pass,.px-header-utilities button,.px-header-utilities summary,.button,.app-tabs>a,.app-tabs>button,.lc-nav>a,.lc-nav>button,.tool-card):is(:active,:hover){transform:none}}
 /* Override the older global reduced-motion duration on every new gauge cell. */
-@media(prefers-reduced-motion:reduce){.px-header-ready .px-header-pass,.px-header-ready .px-header-pass *,.px-header-ready .px-header-pass::after{animation:none!important;transition:none!important}}
+@media(prefers-reduced-motion:reduce){.px-header-ready .px-header-pass,.px-header-ready .px-header-pass *,.px-header-ready .px-header-pass::before,.px-header-ready .px-header-pass::after{animation:none!important;transition:none!important}}
 html[data-pixieed-motion=reduced] :is(.px-header-pass,.px-header-utilities button,.px-header-utilities summary,.button,.app-tabs>a,.app-tabs>button,.lc-nav>a,.lc-nav>button,.tool-card){transition:none;transform:none}
 html[data-pixieed-motion=reduced] .px-header-pass::after{animation:none}
 html[data-pixieed-motion=reduced] :is(.px-header-pass,.px-header-utilities button,.px-header-utilities summary,.button,.app-tabs>a,.app-tabs>button,.lc-nav>a,.lc-nav>button,.tool-card):is(:active,:hover){transform:none}
-html[data-pixieed-motion=reduced] .px-header-pass,html[data-pixieed-motion=reduced] .px-header-pass *,html[data-pixieed-motion=reduced] .px-header-pass::after{animation:none!important;transition:none!important}
+html[data-pixieed-motion=reduced] .px-header-pass,html[data-pixieed-motion=reduced] .px-header-pass *,html[data-pixieed-motion=reduced] .px-header-pass::before,html[data-pixieed-motion=reduced] .px-header-pass::after{animation:none!important;transition:none!important}
 
 /* The opt-in sheet uses the same pixel details and stays readable on short screens. */
 .px-header-ready .px-pass{background:linear-gradient(145deg,#28343d,#151d25);border-color:#e5c77a30;box-shadow:0 12px 30px #0004}

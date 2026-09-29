@@ -1,5 +1,5 @@
-import { hasPro, onPassChange, passRemainingMs, requestPass } from './pixieed-pass.mjs?v=20260929-ad-diagnostics-1';
-import { derivePassGauge, renderPassGauge } from './pass-gauge.mjs';
+import { freeWithoutAdWaitMs, hasPro, onPassChange, passRemainingMs, requestPass } from './pixieed-pass.mjs?v=20260929-daily-free-1';
+import { derivePassGauge, renderPassGauge } from './pass-gauge.mjs?rev=20260929-tool-ui-1';
 
 const brandedLink = () => {
   const link = document.createElement('a');
@@ -9,9 +9,13 @@ const brandedLink = () => {
   link.innerHTML = '<img src="/assets/brand/pixieed-logo-48.png" width="40" height="40" alt=""><span>PiXiEED</span>';
   return link;
 };
-const headerPassMarkup = '<span class="px-pass-top"><svg class="px-pass-pixel-star" viewBox="0 0 10 10" width="10" height="10" aria-hidden="true"><path fill="currentColor" d="M4 0h2v2h2v2h2v2H8v2H6v2H4V8H2V6H0V4h2V2h2z"/></svg><span data-header-pass-label>+1時間</span></span><span class="px-pass-gauge" aria-hidden="true"><span class="px-pass-gauge-row" data-filled="false">' + '<span class="px-pass-cell" data-filled="false"></span>'.repeat(12) + '</span><span class="px-pass-gauge-row" data-filled="false">' + '<span class="px-pass-cell" data-filled="false"></span>'.repeat(12) + '</span><span class="px-pass-gauge-row" data-filled="false">' + '<span class="px-pass-cell" data-filled="false"></span>'.repeat(12) + '</span></span><span class="px-pass-add" aria-hidden="true">+</span>';
+const headerPassRow = (hours) => `<span class="px-pass-gauge-row" data-hours="${hours}" data-filled="false">${'<span class="px-pass-cell" data-filled="false"></span>'.repeat(12)}</span>`;
+const headerPassMarkup = '<span class="px-pass-top"><svg class="px-pass-pixel-star" viewBox="0 0 10 10" width="10" height="10" aria-hidden="true"><path fill="currentColor" d="M4 0h2v2h2v2h2v2H8v2H6v2H4V8H2V6H0V4h2V2h2z"/></svg><span data-header-pass-label>+1時間</span></span><span class="px-pass-gauge" aria-hidden="true">' + [3, 2, 1].map(headerPassRow).join('') + '</span><span class="px-pass-add" aria-hidden="true">+</span>';
 const rechargeExpiries = new WeakMap(); const rechargeTimers = new WeakMap(); const activeRechargeButtons = new Set(); const handledButtons = new WeakSet();
 const gaugeRows = new WeakMap();
+const freeReadyState = new WeakMap();
+const freeReadyTimers = new WeakMap();
+const activeFreeReadyButtons = new Set();
 const handledPanels = new WeakSet();
 const panelTimers = new Map();
 const panelPhases = new WeakMap();
@@ -24,6 +28,28 @@ function clearRecharge(button) {
   for (const row of button.querySelectorAll('.px-pass-gauge-row')) delete row.dataset.charged;
   rechargeTimers.delete(button);
   activeRechargeButtons.delete(button);
+}
+
+function clearFreeReadyEffect(button) {
+  window.clearTimeout(freeReadyTimers.get(button));
+  delete button.dataset.freeArrive;
+  freeReadyTimers.delete(button);
+  activeFreeReadyButtons.delete(button);
+}
+
+function formatFreeWait(waitMs) {
+  const minutes = Math.ceil(Math.max(0, waitMs) / 60000);
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return hours ? `${hours}時間${remainingMinutes ? `${remainingMinutes}分` : ''}` : `${Math.max(1, remainingMinutes)}分`;
+}
+
+export function deriveHeaderPassState({ remainingMs, pro = false, freeWaitMs = 0 }) {
+  const gauge = derivePassGauge(pro ? Infinity : remainingMs);
+  const freeReady = !pro && freeWaitMs <= 0;
+  const freeDescription = pro ? '' : freeReady ? '今日の無料1時間を受け取れます' : `明日、無料1時間を受け取れます（あと${formatFreeWait(freeWaitMs)}）`;
+  const displayLabel = freeReady && !gauge.active ? '無料1時間' : gauge.label;
+  return { gauge, freeReady, freeDescription, displayLabel };
 }
 
 function clearPanelEffects() {
@@ -69,16 +95,29 @@ function bindPanelEffects() {
 function updateButton(button) {
   const now = Date.now();
   const left = passRemainingMs(now);
-  const state = derivePassGauge(hasPro() ? Infinity : left);
+  const pro = hasPro();
+  const { gauge: state, freeReady, freeDescription, displayLabel } = deriveHeaderPassState({ remainingMs: left, pro, freeWaitMs: pro ? Infinity : freeWithoutAdWaitMs(now) });
   const previousRows = gaugeRows.get(button);
-  renderPassGauge(button, state);
+  renderPassGauge(button, { ...state, displayLabel });
   gaugeRows.set(button, state.rows);
   if (button.disabled !== state.pro) button.disabled = state.pro;
-  const aria = state.pro ? 'Pro：すべての拡張が使えます' : state.active
-    ? `拡張はあと${state.clock}。広告を見て1時間追加`
-    : '広告を見て、全ツールの拡張を1時間使う';
-  if (button.getAttribute('aria-label') !== aria) button.setAttribute('aria-label', aria);
-  if (button.title !== aria) button.title = aria;
+  const aria = state.pro ? 'Pro：すべての拡張が使えます' : freeReady && !state.active
+    ? freeDescription
+    : freeReady ? `${freeDescription}。拡張はあと${state.clock}。広告で1時間追加できます`
+      : state.active ? `拡張はあと${state.clock}。広告で1時間追加できます。${freeDescription}`
+        : `広告で1時間追加できます。${freeDescription}`;
+  const fullDescription = aria;
+  if (button.getAttribute('aria-label') !== fullDescription) button.setAttribute('aria-label', fullDescription);
+  if (button.title !== fullDescription) button.title = fullDescription;
+  if (button.dataset.freeReady !== String(freeReady)) button.dataset.freeReady = String(freeReady);
+  const previousFreeReady = freeReadyState.get(button);
+  freeReadyState.set(button, freeReady);
+  if (freeReady && previousFreeReady !== true && document.visibilityState !== 'hidden' && !prefersReducedMotion()) {
+    clearFreeReadyEffect(button);
+    button.dataset.freeArrive = 'true';
+    activeFreeReadyButtons.add(button);
+    freeReadyTimers.set(button, window.setTimeout(() => clearFreeReadyEffect(button), 420));
+  }
   const expiry = state.pro ? Infinity : state.active ? now + left : 0;
   const previous = rechargeExpiries.get(button);
   if (previous === undefined) rechargeExpiries.set(button, expiry);
@@ -107,13 +146,18 @@ function refresh() {
   if (document.visibilityState === 'hidden') {
     clearPanelEffects();
     for (const button of activeRechargeButtons) clearRecharge(button);
+    for (const button of activeFreeReadyButtons) clearFreeReadyEffect(button);
     return;
   }
   const buttons = document.querySelectorAll('[data-header-pass]');
   if (!buttons.length) return;
   buttons.forEach(updateButton);
   const remaining = passRemainingMs();
-  if (remaining > 0 && remaining !== Infinity) refreshTimer = window.setTimeout(refresh, Math.min(30000, remaining));
+  const freeWait = hasPro() ? Infinity : freeWithoutAdWaitMs();
+  const nextChange = remaining > 0 && remaining !== Infinity
+    ? Math.min(30000, remaining, freeWait > 0 ? freeWait : Infinity)
+    : freeWait;
+  if (Number.isFinite(nextChange) && nextChange > 0) refreshTimer = window.setTimeout(refresh, nextChange);
 }
 
 /** Preserve each page's own controls and its central navigation action. */
@@ -155,8 +199,12 @@ export function mountSiteHeader() {
     const utilities = inner.querySelector('.menu-toggle, .audio-header-actions, .lc-top-right');
     inner.insertBefore(button, utilities);
   }
-  if (!button.querySelector('.px-pass-gauge-row') || button.querySelectorAll('.px-pass-gauge-row').length !== 3
+  if (!button.querySelector('.px-pass-gauge-row[data-hours="1"]') || button.querySelectorAll('.px-pass-gauge-row').length !== 3
       || [...button.querySelectorAll('.px-pass-gauge-row')].some((row) => row.querySelectorAll('.px-pass-cell').length !== 12)) button.innerHTML = headerPassMarkup;
+  if (!button.querySelector('.px-pass-hint')) {
+    const hint = document.createElement('span'); hint.className = 'px-pass-hint'; hint.setAttribute('aria-hidden', 'true');
+    button.append(hint);
+  }
   if (!handledButtons.has(button)) {
     handledButtons.add(button);
     button.addEventListener('click', async () => {
@@ -174,6 +222,7 @@ export function mountSiteHeader() {
 
 if (typeof document !== 'undefined') {
   onPassChange(refresh);
+  window.addEventListener('storage', refresh);
   window.addEventListener('pageshow', refresh);
   document.addEventListener('visibilitychange', refresh);
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mountSiteHeader, { once: true });

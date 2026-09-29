@@ -7,6 +7,7 @@ const HOUR = 60 * 60 * 1000;
 test('gauge labels and banks handle empty, one millisecond, and hour boundaries', () => {
   const empty = derivePassGauge(0);
   assert.equal(empty.label, '+1時間'); assert.equal(empty.bank, 0); assert.equal(empty.filledCount, 0);
+  assert.deepEqual(empty.rows.map(({ hours }) => hours), [3, 2, 1]);
   assert.deepEqual(empty.rows.map(({ filled }) => filled), [false, false, false]);
 
   const oneMs = derivePassGauge(1);
@@ -58,6 +59,7 @@ test('renderer fills the fixed 3×12 DOM contract and skips unchanged writes', (
   assert.deepEqual(button.rows.map((row) => row.dataset.filled), ['false', 'true', 'true']);
   assert.deepEqual(button.rows.map((row) => row.cells.filter((cell) => cell.dataset.filled === 'true').length), [0, 1, 12]);
   assert.equal(button.label.textContent, '1:01'); assert.equal(button.add.textContent, '+');
+  assert.deepEqual(state.rows.map(({ hours }) => hours), [3, 2, 1], 'each bar is labeled by its one-hour tier');
   const writes = button.rows.flatMap((row) => [row.writes, ...row.cells.map((cell) => cell.writes)]).reduce((sum, value) => sum + value, 0) + button.label.writes + button.add.writes;
   renderPassGauge(button, state);
   const writesAgain = button.rows.flatMap((row) => [row.writes, ...row.cells.map((cell) => cell.writes)]).reduce((sum, value) => sum + value, 0) + button.label.writes + button.add.writes;

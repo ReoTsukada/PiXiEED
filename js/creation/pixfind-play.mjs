@@ -2,8 +2,9 @@ import { detectPixelScale, wholePixelFit } from '../pixel-scale.mjs?rev=20260929
 import { supabaseConfig } from '../../data/site-config.js';
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
 import { documentRgba } from './draw-core.mjs';
-import { requestPass } from '../pixieed-pass.mjs?v=20260929-ad-diagnostics-1';
+import { requestPass } from '../pixieed-pass.mjs?v=20260929-daily-free-1';
 import { createPuzzleHintController } from './puzzle-hint.mjs?rev=20260928-hint-1';
+import { createToolResultView } from '../tool-result-view.mjs?rev=20260929-display-units-1';
 import { resolveLocalDrawRevision, validateSpotDifferenceDraft } from './spot-difference-core.mjs';
 import { buildHiddenObjectHitBoxes, HIDDEN_OBJECT_MIN_PLAY_IMAGE_CSS_WIDTH, validateHiddenObjectDraft } from './hidden-object-core.mjs?rev=20260928-short-hitboxes-1';
 import { computeDifferenceRegions, computeHiddenObjectRegions, regionContainsPoint, resolvePuzzleFromLocation, validateHiddenObjectMarkers, validateLocalDifferenceGroups, validateStoredDifferenceRegions } from './pixfind-regions.mjs';
@@ -277,6 +278,9 @@ function mount() {
   const game = document.querySelector('#pixfind-game'); const primary = document.querySelector('#pixfind-primary');
   if (!status || !list || !game || !primary) return;
   let puzzles = []; let selected = null; let regions = []; let found = new Set(); let original = null; let changed = null; let currentMask = null; let cursorX = NaN; let cursorY = NaN; let readOnly = false; let authoritativeAnswers = false; let answerInstruction = ''; let localRoute = false; let postPuzzleRoute = false;
+  let resultRun = 0; let resultShownRun = -1; let resultTimer = 0;
+  const resultView = createToolResultView({ key: document.body.dataset.puzzleMode === 'hidden-object' ? 'find-result' : 'spot-result', main: document.querySelector('#main'), returnLabel: 'ゲームに戻る' });
+  const cancelResult = (newRun = false) => { window.clearTimeout(resultTimer); resultTimer = 0; if (newRun) resultRun += 1; resultView.close(); };
   const localObjectUrls = new Set();
   const pageMode = PUZZLE_PLAY_PATHS[document.body.dataset.puzzleMode] ? document.body.dataset.puzzleMode : null;
   const originalNode = document.querySelector('#pixfind-original'); const changedNode = document.querySelector('#pixfind-changed'); const compareButton = document.querySelector('#pixfind-compare');
@@ -360,10 +364,24 @@ function mount() {
       const label = selected?.mode === 'hidden-object' ? (typeof targetLabel === 'string' && targetLabel.trim() ? targetLabel.trim().slice(0, 100) : `見つけたもの ${index + 1}`) : `変化 ${index + 1}`;
       return el('li', '', found.has(index) ? `${label}：発見済み` : `${label}：未発見`);
     }));
-    if (found.size === regions.length && regions.length) statusGame.textContent = authoritativeAnswers ? '全部見つかりました。おめでとうございます！' : '自動検出の候補をすべて確認しました。';
+    const complete = found.size === regions.length && regions.length > 0 && !readOnly && original && selected;
+    if (complete) {
+      statusGame.textContent = authoritativeAnswers ? '全部見つかりました。おめでとうございます！' : '自動検出の候補をすべて確認しました。';
+      if (resultShownRun !== resultRun && !resultTimer) {
+        const scheduledRun = resultRun; const scheduledPuzzle = selected;
+        resultTimer = window.setTimeout(() => {
+          resultTimer = 0;
+          if (scheduledRun !== resultRun || selected !== scheduledPuzzle || game.hidden || !original || readOnly || !regions.length || found.size !== regions.length || resultShownRun === scheduledRun) return;
+          resultShownRun = scheduledRun;
+          const title = authoritativeAnswers ? 'すべて見つけました' : '候補をすべて確認しました';
+          resultView.show({ title, detail: `${selected.label} · ${found.size} / ${regions.length}件`, preview: originalNode });
+        }, 350);
+      }
+    }
     paint();
   };
   const start = async (puzzle) => {
+    cancelResult(true); resultShownRun = -1;
     // Each game shows only its own kind; a link to the other kind moves to that game.
     if (pageMode && puzzle.mode !== pageMode) { window.location.replace(PUZZLE_PLAY_PATHS[puzzle.mode] + window.location.search + window.location.hash); return; }
     stopHintMotion();
@@ -449,6 +467,7 @@ function mount() {
     }
   };
   const showList = () => {
+    cancelResult(true); resultShownRun = -1;
     stopHintMotion();
     hint = null; hintController.setProblem('');
     if (localRoute || postPuzzleRoute) {
