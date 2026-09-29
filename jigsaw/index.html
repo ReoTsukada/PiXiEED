@@ -12,7 +12,7 @@
   <meta name="theme-color" content="#f4f2ec">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20260929-workspace-1">
   <link rel="stylesheet" href="/css/site.css?rev=20260929-claude-integration-1">
-  <link rel="stylesheet" href="/css/creation-jigsaw.css?rev=20260929-tool-ui-1">
+  <link rel="stylesheet" href="/css/creation-jigsaw.css?rev=20260930-tool-ui-review-1">
   <link rel="stylesheet" href="/css/arcade.css?rev=20260929-claude-integration-1">
   <link rel="stylesheet" href="/css/jigsaw-arcade.css?rev=20260929-workspace-1">
   <link rel="stylesheet" href="/css/site-header.css?rev=20260929-tool-ui-1">
@@ -45,11 +45,13 @@
         <button id="jigsaw-hint" type="button" data-hint-short="無料" aria-label="ヒント（このパズルで1回無料）" title="ヒント（このパズルで1回無料）">ヒント</button>
         <button id="jigsaw-rotate" type="button" aria-label="選択中を90度回転" title="90度回転">↻</button>
         <button id="jigsaw-return" type="button" aria-label="選択中をトレーへ戻す" title="トレーへ戻す">戻す</button>
-        <button id="jigsaw-fit" type="button" aria-label="作業スペース全体を表示" title="全体を見る">全体</button>
-        <button id="jigsaw-tray-prev" type="button" aria-label="前のピース">‹</button>
-        <span id="jigsaw-tray-page" class="jigsaw-sr-only" aria-live="polite">1 / 1</span>
-        <button id="jigsaw-tray-next" type="button" aria-label="次のピース">›</button>
-        <button id="jigsaw-new" type="button" aria-label="別の絵でパズルを作る" title="別の絵">別</button>
+        <details class="jigsaw-more"><summary aria-label="その他の操作" title="その他の操作"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg></summary><div class="jigsaw-more__menu" role="group" aria-label="作業スペースとピースの操作">
+          <button id="jigsaw-fit" type="button" aria-label="作業スペース全体を表示" title="全体を見る">全体</button>
+          <button id="jigsaw-tray-prev" type="button" aria-label="前のピース">‹</button>
+          <span id="jigsaw-tray-page" class="jigsaw-sr-only" aria-live="polite">1 / 1</span>
+          <button id="jigsaw-tray-next" type="button" aria-label="次のピース">›</button>
+          <button id="jigsaw-new" type="button" aria-label="別の絵でパズルを作る" title="別の絵">別の絵</button>
+        </div></details>
         <span id="jigsaw-selection" role="status" aria-live="polite">ピースを選択してください</span>
       </div>
       <div id="jigsaw-workspace" class="jigsaw-workspace" tabindex="0" role="application" aria-label="自由配置できるジグソー作業スペース">

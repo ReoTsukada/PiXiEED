@@ -12,7 +12,7 @@
   <meta name="theme-color" content="#f4f2ec">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20260929-workspace-1">
   <link rel="stylesheet" href="/css/site.css?rev=20260929-claude-integration-1">
-  <link rel="stylesheet" href="/css/creation-pixfind.css?rev=20260929-tool-results-1">
+  <link rel="stylesheet" href="/css/creation-pixfind.css?rev=20260930-ui-review-2">
   <link rel="stylesheet" href="/css/site-header.css?rev=20260929-tool-ui-1">
   <link rel="stylesheet" href="/css/arcade.css?rev=20260929-claude-integration-1">
   <link rel="stylesheet" href="/css/arcade-tools.css?rev=20260929-claude-integration-1">
@@ -28,16 +28,19 @@
     <p id="pixfind-status" class="pixfind-status" role="status" aria-live="polite">公開問題を読み込んでいます。</p>
     <p id="pixfind-local-only" class="pixfind-status" role="status" hidden>端末内の試遊です。この問題は公開されていません。</p>
     <section id="pixfind-list" class="pixfind-list" aria-label="公開中の問題"></section>
-    <section id="pixfind-game" class="pixfind-game" hidden aria-labelledby="pixfind-title">
-      <div class="pixfind-game__heading"><button id="pixfind-back" class="pixfind-back" type="button" aria-label="問題一覧へ戻る">‹</button><div class="pixfind-game__identity"><h2 id="pixfind-title"></h2><p id="pixfind-author"></p></div><p id="pixfind-progress" class="pixfind-progress" aria-live="polite"></p></div>
+    <section id="pixfind-game" class="pixfind-game pixfind-game--comparison" hidden aria-labelledby="pixfind-title">
+      <div class="pixfind-game__heading"><button id="pixfind-back" class="pixfind-back" type="button" aria-label="問題一覧へ戻る">‹</button><div class="pixfind-game__identity"><h2 id="pixfind-title"></h2><p id="pixfind-author"></p></div><p id="pixfind-progress" class="pixfind-progress" aria-live="polite"></p><button id="pixfind-hint" class="pixfind-hint px-perk" type="button" aria-label="ヒント（特典）" title="ヒント" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg></button></div>
       <p id="pixfind-game-status" class="pixfind-game-status" role="status" aria-live="polite"></p>
-      <div class="pixfind-images"><figure class="pixfind-image"><figcaption><span id="pixfind-image-label">絵をタップ</span><button id="pixfind-compare" class="pixfind-compare" type="button" aria-pressed="false" hidden>変化後を見る</button><button id="pixfind-hint" class="pixfind-hint px-perk" type="button" aria-label="ヒント（特典）" title="ヒント" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg></button></figcaption><div id="pixfind-play-area" class="pixfind-play-area" role="application" aria-label="絵を調べる場所" tabindex="0"><img id="pixfind-original" alt="問題の絵" draggable="false"><img id="pixfind-changed" alt="変化後の絵" draggable="false" hidden><canvas id="pixfind-overlay" aria-hidden="true"></canvas></div></figure></div>
+      <div class="pixfind-images pixfind-images--comparison">
+        <figure class="pixfind-image"><figcaption><span id="pixfind-image-label">元の絵</span></figcaption><div id="pixfind-play-area" class="pixfind-play-area" role="application" aria-label="元の絵を調べる場所" tabindex="0"><img id="pixfind-original" alt="問題の絵" draggable="false"><canvas id="pixfind-overlay" aria-hidden="true"></canvas></div></figure>
+        <figure id="pixfind-changed-figure" class="pixfind-image" hidden><figcaption>変化後の絵</figcaption><div id="pixfind-changed-area" class="pixfind-play-area" role="application" aria-label="変化後の絵を調べる場所" tabindex="0"><img id="pixfind-changed" alt="変化後の絵" draggable="false"><canvas id="pixfind-changed-overlay" aria-hidden="true"></canvas></div></figure>
+      </div>
       <ol id="pixfind-found-list" class="pixfind-found-list" aria-label="見つけた場所"></ol>
     </section>
   </main>
   <footer class="site-footer"><div class="container"><p>PiXiEED</p></div></footer>
   <nav class="app-tabs" aria-label="アプリナビゲーション"><a data-nav="map" href="/globe/" aria-label="地球儀"><img src="/assets/icons/pixieed/globe.svg" alt=""></a><a data-nav="camera" href="/pixel-camera.html" aria-label="撮影"><img src="/assets/icons/pixieed/shoot.svg" alt=""></a><button id="pixfind-primary" type="button" aria-label="選択した問題を遊ぶ"><span aria-hidden="true">▶</span></button><a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""></a><a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a></nav>
-  <script type="module" src="/js/creation/pixfind-play.mjs?rev=20260929-display-units-1"></script>
+  <script type="module" src="/js/creation/pixfind-play.mjs?rev=20260930-ui-review-2"></script>
   <script type="module" src="/js/arcade-dress.mjs?rev=20260929-claude-integration-1"></script>
   <script type="module" src="/js/site-header.mjs?rev=20260929-tool-ui-1"></script>
 </body>

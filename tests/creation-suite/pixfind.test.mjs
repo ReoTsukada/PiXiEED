@@ -336,18 +336,22 @@ test('play images accept only HTTPS objects under the two legacy PiXFiND buckets
   assert.equal(safePuzzleImageUrl(`${base}/storage/v1/object/public/pixieed-contest/puzzles/abc/diff.png?redirect=https://evil.example`, base), null);
 });
 
-test('play screen keeps one large tappable image, offers a same-position comparison toggle, and reserves shared navigation space', () => {
+test('spot play shows two tappable images together and reserves shared navigation space', () => {
   const html = readFileSync(new URL('../../play/spot-difference/index.html', import.meta.url), 'utf8');
   const css = readFileSync(new URL('../../css/creation-pixfind.css', import.meta.url), 'utf8');
+  const player = readFileSync(new URL('../../js/creation/pixfind-play.mjs', import.meta.url), 'utf8');
   assert.match(html, /id="pixfind-play-area"[^>]*role="application"/);
-  assert.match(html, /id="pixfind-compare"/);
-  assert.match(html, /変化後を見る/);
+  assert.match(html, /id="pixfind-changed-area"[^>]*role="application"/);
+  assert.match(html, /id="pixfind-changed-overlay"/);
+  assert.doesNotMatch(html, /id="pixfind-compare"/);
   assert.match(html, /id="pixfind-original"/);
   assert.match(html, /id="pixfind-changed"/);
   assert.match(html, /class="app-tabs"/);
   assert.match(css, /\.pixfind-page--playing\{position:fixed/);
+  assert.match(css, /\.pixfind-images--comparison\{grid-template-columns:repeat\(2/);
+  assert.match(css, /grid-template-rows:repeat\(2,minmax\(0,1fr\)\)/);
   assert.match(css, /\.pixfind-play-area img\{position:absolute/);
-  assert.match(css, /\.pixfind-play-area img\[hidden\]\{display:none!important\}/);
+  assert.match(player, /\[playArea, changedArea\]\.filter\(Boolean\)/);
   assert.match(css, /4\.8rem \+ env\(safe-area-inset-bottom/);
 });
 
