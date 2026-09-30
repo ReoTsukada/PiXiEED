@@ -1,0 +1,65 @@
+/* Figma-exported white instrument SVGs sit inside their matching color chips. */
+body.creation-editor[data-page="audio"] .audio-tracks {
+  grid-template-columns: repeat(4, minmax(44px, 1fr));
+  max-width: 254px;
+}
+body.creation-editor[data-page="audio"] .audio-track-choice {
+  min-width: 44px;
+  min-height: 58px !important;
+  padding: 5px !important;
+}
+body.creation-editor[data-page="audio"] .audio-track-choice__mark {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  margin: 0 auto;
+  border: 1px solid #ffffff55;
+  border-radius: 9px;
+  box-shadow: inset 0 1px 2px #0002, 0 1px 2px #0003;
+}
+body.creation-editor[data-page="audio"] .audio-instrument-icon,
+body.creation-editor[data-page="audio"] .audio-palette-row__icon {
+  display: block;
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  pointer-events: none;
+}
+body.creation-editor[data-page="audio"] .audio-track-choice__label { display: none; }
+body.creation-editor[data-page="audio"] .audio-palette-row {
+  grid-template-columns: 26px 28px 44px minmax(0, 1fr);
+}
+body.creation-editor[data-page="audio"] .audio-palette-row__icon { width: 22px; height: 22px; }
+body.creation-editor[data-page="audio"] .audio-palette-settings > summary {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  padding: 8px !important;
+  border: 1px solid #ffffff2d;
+  border-radius: 11px;
+  background: #151e25;
+  color: #fff;
+  list-style: none;
+}
+body.creation-editor[data-page="audio"] .audio-palette-settings > summary::-webkit-details-marker { display: none; }
+body.creation-editor[data-page="audio"] .audio-palette-settings > summary img {
+  display: block;
+  width: 22px;
+  height: 22px;
+  filter: brightness(0) invert(1);
+}
+body.creation-editor[data-page="audio"] .audio-palette-settings > summary:focus-visible {
+  outline: 3px solid #ffe07d;
+  outline-offset: 2px;
+}
+@media (max-width: 360px) and (orientation: portrait) {
+  body.creation-editor[data-page="audio"] .audio-track-choice__mark { width: 40px; height: 40px; }
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  body.creation-editor[data-page="audio"] .audio-track-choice { min-height: 50px !important; }
+  body.creation-editor[data-page="audio"] .audio-track-choice__mark { width: 38px; height: 38px; }
+}

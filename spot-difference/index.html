@@ -10,12 +10,13 @@
 <link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180"><link rel="manifest" href="/manifest.webmanifest">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f4f2ec">
-  <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20260929-workspace-1">
+  <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20260930-claude-review-1">
   <link rel="stylesheet" href="/css/site.css?rev=20260929-claude-integration-1">
   <link rel="stylesheet" href="/css/creation-spot-difference.css?rev=20260929-workspace-1">
-  <link rel="stylesheet" href="/css/site-header.css?rev=20260929-tool-ui-1">
+  <link rel="stylesheet" href="/css/site-header.css?rev=20260930-claude-review-1">
   <link rel="stylesheet" href="/css/arcade.css?rev=20260929-claude-integration-1">
   <link rel="stylesheet" href="/css/arcade-tools.css?rev=20260929-claude-integration-1">
+  <link rel="stylesheet" href="/css/puzzle-modes.css?rev=20260930-puzzle-list-1">
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253" crossorigin="anonymous"></script>
 </head>
 <body data-tool-name="かんたん間違い探し" data-tool-short="間違い探し" data-page="spot-difference" class="app-page app-page--tool-spot-difference">
@@ -23,6 +24,7 @@
   <header class="site-header"><div class="container header-inner"><a class="brand" href="/" aria-label="PiXiEED ホーム"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a></div></header>
   <main id="main" class="spot-page">
     <header class="spot-heading"><h1>かんたん間違い探し</h1><p>保存した絵の版を比べ、正解の場所を選ぼう。</p></header>
+    <a class="puzzle-list-back" href="/play/spot-difference/">‹ みんなの一覧へ</a>
     <p id="spot-status" class="spot-status" role="status" aria-live="polite">自分の端末に保存した絵を選んでください。</p>
     <section id="spot-setup" class="spot-setup" aria-label="比べる絵を選ぶ">
       <div id="spot-shelf" hidden></div>
@@ -48,6 +50,7 @@
           </div>
           <ol id="spot-candidates" class="spot-candidates" aria-label="差分候補"></ol>
           <p id="spot-confirmed" class="spot-confirmed" role="status" hidden>作者が正解を確定しました。作品は端末内の下書きです。</p>
+          <a class="puzzle-editor-play" href="/play/spot-difference/">みんなの一覧へ</a>
         </div>
       </details>
       <div class="spot-publish-actions" aria-label="確定した間違い探しの操作">
@@ -65,8 +68,8 @@
     <a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""></a>
     <a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>
   </nav>
-  <script type="module" src="/js/creation/spot-difference-page.mjs?rev=20260929-claude-integration-1"></script>
+  <script type="module" src="/js/creation/spot-difference-page.mjs?rev=20260930-ux-fix-1"></script>
   <script type="module" src="/js/arcade-dress.mjs?rev=20260929-claude-integration-1"></script>
-  <script type="module" src="/js/site-header.mjs?rev=20260929-tool-ui-1"></script>
+  <script type="module" src="/js/site-header.mjs?rev=20260930-claude-review-1"></script>
 </body>
 </html>

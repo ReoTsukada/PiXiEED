@@ -4,7 +4,7 @@
  * hour is given instead, once per day. Opened in a new tab by requestPass(); the tool tab gets the pass
  * through storage, so this page only has to close itself or go back.
  */
-import { adMode, claimDailyFree, formatPassRemaining, grantFromAd, hasPass, passRemainingMs, PASS_HOURS, safeReturn } from './pixieed-pass.mjs?v=20260930-offerwall-1';
+import { adMode, claimDailyFree, formatPassRemaining, grantFromAd, hasPass, passRemainingMs, PASS_HOURS, safeReturn } from './pixieed-pass.mjs?v=20260930-rewarded-gpt-1';
 
 const ADSENSE = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253';
 const APPEAR_MS = 12000; // no Offerwall by then → no ad

@@ -1,8 +1,8 @@
 import { createPxdProject, getPxdJson, setPxdJson } from './pxd-codec.mjs';
-import { mergePxdJson, primaryPxdImageRole, putPxdDrawDocument, putPxdImage, readPxdDrawDocument, readPxdImage, imageToDrawDocument } from './pxd-project.mjs';
-import { documentRgba } from './draw-core.mjs';
-import { detectDifferenceCandidates, validateSpotDifferenceDraft } from './spot-difference-core.mjs?rev=20260927-spot-difference-1';
-import { createHiddenObjectDraft, validateHiddenObjectDraft } from './hidden-object-core.mjs?rev=20260928-short-hitboxes-1';
+import { mergePxdJson, primaryPxdImageRole, putPxdDrawDocument, putPxdImage, readPxdDrawDocument, readPxdImage, readPxdSharedImage, imageToDrawDocument } from './pxd-project.mjs?rev=20260930-shared-canvas-5';
+import { documentRgba } from './draw-core.mjs?rev=20260930-shared-canvas-5';
+import { detectDifferenceCandidates, validateSpotDifferenceDraft } from './spot-difference-core.mjs?rev=20260930-shared-canvas-5';
+import { createHiddenObjectDraft, validateHiddenObjectDraft } from './hidden-object-core.mjs?rev=20260930-shared-canvas-5';
 import { createJigsawLayout, createJigsawWorkspace, validateJigsawWorkspace } from './jigsaw-workspace.mjs?rev=20260928-jigsaw-workspace-1';
 import { validateJigsawSource } from './jigsaw-core.mjs?rev=20260928-jigsaw-pixfind-original-2';
 
@@ -40,6 +40,20 @@ function sourceRoles(tool, document) {
   if (tool === 'hidden_object') return ['hidden'];
   if (tool === 'jigsaw' && document.source.type !== 'public') return ['jigsaw-main'];
   return [];
+}
+
+function sharedRoleReferences(project, tool, document) {
+  if (project?.manifest?.sharedCanvas?.schemaVersion !== 1) return {};
+  if (tool === 'hidden_object') return { hidden: 'main' };
+  if (tool === 'jigsaw' && document.source.type !== 'public') return { 'jigsaw-main': 'main' };
+  if (tool === 'spot_difference') return { 'spot-after': 'main' };
+  return {};
+}
+
+async function imageFingerprint(image) {
+  if (!globalThis.crypto?.subtle) throw new TypeError('共通画像の変更確認に対応していません。');
+  const digest = new Uint8Array(await globalThis.crypto.subtle.digest('SHA-256', image.rgba));
+  return [...digest].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
 function originalRefs(tool, document) {
@@ -87,7 +101,15 @@ export async function writePxdPuzzle(project, { tool, document, sourceDrawDocume
   const previousPayload = project?.entries?.some((entry) => entry.path === puzzlePath(tool)) ? getPxdJson(project, puzzlePath(tool)) : null;
   let next = project || createPxdProject();
   const roles = sourceRoles(tool, document);
+  const imageRoles = sharedRoleReferences(next, tool, document);
+  const sharedMain = Object.keys(imageRoles).length ? await readPxdSharedImage(next) : null;
+  if (Object.keys(imageRoles).length && !sharedMain) throw new TypeError('PXDの共通画像が見つかりません。元画像は変更していません。');
   for (const role of roles) {
+    if (imageRoles[role] === 'main') {
+      const drawDocument = sourceDrawDocuments[role]; const candidate = sourceImages[role] || (drawDocument ? pxdImageFromDrawDocument(drawDocument) : null);
+      if (candidate && (candidate.width !== sharedMain.width || candidate.height !== sharedMain.height || !bytesEqual(candidate.rgba, sharedMain.rgba))) throw new TypeError('固定画像と共通画像が一致しません。共通画像は変更していません。');
+      continue;
+    }
     const drawDocument = sourceDrawDocuments[role];
     const image = sourceImages[role] || (drawDocument ? pxdImageFromDrawDocument(drawDocument) : null);
     if (!image) throw new TypeError(`PXDに必要な固定画像がありません: ${role}`);
@@ -99,6 +121,7 @@ export async function writePxdPuzzle(project, { tool, document, sourceDrawDocume
     tool,
     document: portableDocument(tool, document),
     portable: { originalRefs: clone(portableOriginalRefs || originalRefs(tool, document)) },
+    ...(Object.keys(imageRoles).length ? { imageRoles, imageHashes: Object.fromEntries(await Promise.all(Object.entries(imageRoles).map(async ([role]) => [role, await imageFingerprint(sharedMain)]))) } : {}),
     sourceChanged: typeof sourceChanged === 'boolean' ? sourceChanged : changedBySourceEdit
   };
   // Writing into a PXD that has no copy of this puzzle yet (別名保存, moving to another PXD):
@@ -125,17 +148,23 @@ export async function readPxdPuzzle(project, tool) {
   validatePuzzleDocument(tool, document);
   assertOriginalRefs(tool, document, payload.portable.originalRefs);
   const images = {};
+  let sourceChanged = payload.sourceChanged === true;
   for (const role of sourceRoles(tool, payload.document)) {
-    const image = await readPxdImage(project, role);
+    const imageRole = payload.imageRoles?.[role] === 'main' ? 'main' : role;
+    const image = imageRole === 'main' ? await readPxdSharedImage(project) : await readPxdImage(project, imageRole);
     if (!image) throw new TypeError('PXD内の固定画像が見つかりません。');
+    if (imageRole === 'main') {
+      const expectedHash = payload.imageHashes?.[role];
+      if (!/^[a-f0-9]{64}$/.test(expectedHash || '') || await imageFingerprint(image) !== expectedHash) sourceChanged = true;
+    }
     let drawDocument = null;
-    try { drawDocument = await readPxdDrawDocument(project, role); } catch (error) {
+    try { drawDocument = await readPxdDrawDocument(project, imageRole); } catch (error) {
       if (tool !== 'jigsaw' || !(error instanceof RangeError)) throw error;
     }
     if (drawDocument && (image.width !== drawDocument.width || image.height !== drawDocument.height || !bytesEqual(image.rgba, documentRgba(drawDocument)))) throw new TypeError('PXDの固定画像とDrawデータが一致しません。');
     images[role] = { width: image.width, height: image.height, rgba: new Uint8Array(image.rgba), drawDocument };
   }
-  return { payload: clone(payload), document, images, portableOriginalRefs: clone(payload.portable.originalRefs), sourceChanged: payload.sourceChanged === true };
+  return { payload: clone(payload), document, images, portableOriginalRefs: clone(payload.portable.originalRefs), sourceChanged };
 }
 
 function bytesEqual(left, right) {
@@ -169,8 +198,13 @@ export async function materializePxdPuzzle(readResult, { tool, store, verifyPubl
   let document = freshGameId(readResult.document);
   const images = readResult.images || {};
   const bindings = {};
+  let portableOriginalRefs = clone(readResult.portableOriginalRefs);
+  let preservedPayload = clone(readResult.payload);
   if (tool === 'jigsaw') {
-    if (document.source.type !== 'public' && (!images['jigsaw-main'] || images['jigsaw-main'].width !== document.layout.width || images['jigsaw-main'].height !== document.layout.height)) throw new TypeError('PXD画像サイズと保存済みジグソー盤面が一致しません。端末内の作品は変更していません。');
+    const image = images['jigsaw-main'];
+    const dimensionsChanged = image && (image.width !== document.layout.width || image.height !== document.layout.height);
+    const sharedReshape = readResult.sourceChanged && readResult.payload.imageRoles?.['jigsaw-main'] === 'main';
+    if (document.source.type !== 'public' && (!image || dimensionsChanged && !sharedReshape)) throw new TypeError('PXD画像サイズと保存済みジグソー盤面が一致しません。端末内の作品は変更していません。');
     if (document.source.type === 'public') {
       if (typeof verifyPublicSource !== 'function') throw new TypeError('公開作品を再確認できません。PXDの参照は権限を引き継ぎません。');
       await verifyPublicSource(document.source);
@@ -184,13 +218,33 @@ export async function materializePxdPuzzle(readResult, { tool, store, verifyPubl
       document.source = copy.reference;
       bindings.source = copy;
     }
+    if (readResult.sourceChanged && document.source.type !== 'public') {
+      const sourceImage = image;
+      const seed = document.layout.seed;
+      const layout = createJigsawLayout({ width: sourceImage.width, height: sourceImage.height, pieceSize: document.layout.pieceSize, seed });
+      document = { ...document, ...createJigsawWorkspace({ gameId: document.gameId, source: document.source, layout, seed }) };
+      if (dimensionsChanged) {
+        portableOriginalRefs = originalRefs(tool, document);
+        preservedPayload.document = { ...preservedPayload.document, ...clone(document) };
+        preservedPayload.portable = { ...preservedPayload.portable, originalRefs: clone(portableOriginalRefs) };
+      }
+    }
     validateJigsawSource(document.source);
     validateJigsawWorkspace(document);
   } else if (tool === 'spot_difference') {
-    const beforeImage = images['spot-before']; const afterImage = images['spot-after'];
-    if (!beforeImage?.drawDocument || !afterImage?.drawDocument || beforeImage.width !== afterImage.width || beforeImage.height !== afterImage.height || document.width !== beforeImage.width || document.height !== beforeImage.height) throw new TypeError('PXDの比較画像サイズが間違い探しと一致しません。端末内の作品は変更していません。');
-    const before = await saveDrawCopy(store, images['spot-before']);
-    const after = await saveDrawCopy(store, images['spot-after'], before.draftId);
+    let beforeImage = images['spot-before']; const afterImage = images['spot-after'];
+    if (!beforeImage?.drawDocument || !afterImage?.drawDocument) throw new TypeError('PXDの比較画像をDrawデータへ正確に変換できません。端末内の作品は変更していません。');
+    const dimensionsChanged = beforeImage.width !== afterImage.width || beforeImage.height !== afterImage.height || document.width !== beforeImage.width || document.height !== beforeImage.height;
+    const sharedReshape = readResult.sourceChanged && readResult.payload.imageRoles?.['spot-after'] === 'main';
+    if (dimensionsChanged && !sharedReshape) throw new TypeError('PXDの比較画像サイズが間違い探しと一致しません。端末内の作品は変更していません。');
+    if (dimensionsChanged) {
+      // A canvas reshape starts a new comparison set from the current shared main image.
+      beforeImage = afterImage;
+      document.width = afterImage.width; document.height = afterImage.height;
+      document.candidates = []; document.confirmed = false; document.publication = 'draft'; document.published = false;
+    }
+    const before = await saveDrawCopy(store, beforeImage);
+    const after = await saveDrawCopy(store, afterImage, before.draftId);
     document.before = before.reference; document.after = after.reference;
     if (readResult.sourceChanged) {
       const result = detectDifferenceCandidates(before.drawDocument, after.drawDocument);
@@ -198,8 +252,22 @@ export async function materializePxdPuzzle(readResult, { tool, store, verifyPubl
     }
     validateSpotDifferenceDraft(document);
     bindings.before = before; bindings.after = after;
+    if (dimensionsChanged) {
+      portableOriginalRefs = { before: clone(before.reference), after: clone(after.reference) };
+      preservedPayload.document = { ...preservedPayload.document, ...clone(document) };
+      preservedPayload.portable = { ...preservedPayload.portable, originalRefs: clone(portableOriginalRefs) };
+    }
   } else if (tool === 'hidden_object') {
-    if (!images.hidden?.drawDocument || document.width !== images.hidden.width || document.height !== images.hidden.height) throw new TypeError('PXD画像サイズがもの探しの保存版と一致しません。端末内の作品は変更していません。');
+    if (!images.hidden?.drawDocument) throw new TypeError('PXD画像をDrawデータへ正確に変換できません。端末内の作品は変更していません。');
+    const dimensionsChanged = document.width !== images.hidden.width || document.height !== images.hidden.height;
+    const sharedReshape = readResult.sourceChanged && readResult.payload.imageRoles?.hidden === 'main';
+    if (dimensionsChanged && !sharedReshape) throw new TypeError('PXD画像サイズがもの探しの保存版と一致しません。端末内の作品は変更していません。');
+    if (dimensionsChanged) {
+      document.width = images.hidden.width; document.height = images.hidden.height;
+      document.targetNames = document.targets.map(({ id, name }) => ({ id, name }));
+      document.targets = [];
+      document.confirmed = false; document.hitBoxes = null; document.hitTestLayout = null; document.publication = 'draft'; document.published = false;
+    }
     const source = await saveDrawCopy(store, images.hidden);
     document.source = source.reference;
     if (readResult.sourceChanged) {
@@ -207,9 +275,14 @@ export async function materializePxdPuzzle(readResult, { tool, store, verifyPubl
     }
     validateHiddenObjectDraft(document);
     bindings.source = source;
+    if (dimensionsChanged) {
+      portableOriginalRefs = { source: clone(source.reference) };
+      preservedPayload.document = { ...preservedPayload.document, ...clone(document) };
+      preservedPayload.portable = { ...preservedPayload.portable, originalRefs: clone(portableOriginalRefs) };
+    }
   } else puzzlePath(tool);
   const sourcePixels = tool !== 'jigsaw' || document.source.type === 'public' ? null : document.source.type === 'file' ? images['jigsaw-main'] : pxdImageFromDrawDocument(bindings.source.drawDocument);
-  return { document, bindings, portableOriginalRefs: clone(readResult.portableOriginalRefs), sourcePixels, sourceChanged: readResult.sourceChanged === true, preservedPayload: clone(readResult.payload) };
+  return { document, bindings, portableOriginalRefs, sourcePixels, sourceChanged: readResult.sourceChanged === true, preservedPayload };
 }
 
 /** Create a fresh, unconfirmed puzzle from the PXD's owned `main` image when that tool's

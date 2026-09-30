@@ -33,6 +33,13 @@ function allowed() {
   try { if (localStorage.getItem(CONSENT_KEY) === 'denied') return false; } catch {}
   return true;
 }
+function syncAnalyticsPreference() {
+  const id = analyticsConfig?.measurementId;
+  if (!id || typeof window === 'undefined') return;
+  // gtag.js checks this property before sending data or writing cookies.
+  window[`ga-disable-${id}`] = !allowed();
+  if (allowed()) startAnalytics();
+}
 function debugMode() {
   try {
     const q = new URLSearchParams(location.search).get('ga_debug');
@@ -47,6 +54,7 @@ export function startAnalytics() {
   if (started || !allowed()) return false;
   started = true;
   const id = analyticsConfig.measurementId;
+  window[`ga-disable-${id}`] = false;
   window.dataLayer = window.dataLayer || [];
   window.gtag = window.gtag || function gtag() { window.dataLayer.push(arguments); };
   const tool = pageSlug(location.pathname);
@@ -69,4 +77,10 @@ export function startAnalytics() {
   }, true);
   return true;
 }
-if (typeof document !== 'undefined') startAnalytics();
+if (typeof document !== 'undefined') {
+  syncAnalyticsPreference();
+  document.addEventListener('pixieed:analytics-consent-change', syncAnalyticsPreference);
+  window.addEventListener('storage', (event) => {
+    if (event.key === CONSENT_KEY || event.key === null) syncAnalyticsPreference();
+  });
+}

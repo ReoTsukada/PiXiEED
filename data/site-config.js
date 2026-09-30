@@ -31,10 +31,11 @@ export const supabaseConfig = {
 
 /*
  * PiXiEEDパス（広告1本で、PiXiEED全体の特典が passHours 時間使える。貯めることはできない）。
- * 広告は AdSense のオファーウォール（報酬型広告のみ・利用資格1時間）で、/pass/ ページにだけ出します。
+ * 広告は共有ヘッダーから同じページ上で起動する Ad Manager の報酬型広告です。
  */
 export const passConfig = {
-  passHours: 1
+  passHours: 1,
+  rewardedAdUnitPath: '/23379831154/pixieed_rewarded'
 };
 
 /* 通常のディスプレイ広告。AdSenseで作った広告ユニットの数字のIDだけを入れます。

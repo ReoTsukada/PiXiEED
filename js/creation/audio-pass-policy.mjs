@@ -1,15 +1,30 @@
-import { AUDIO_PIXEL_TICKS, collectAudioEvents } from './audio-core.mjs?rev=20260928-dot-music-1';
+import { AUDIO_PIXEL_TICKS, collectAudioEvents } from './audio-core.mjs?rev=20260930-audio-timebase-1';
+import { AUDIO_EXTRA_INSTRUMENT_IDS } from './audio-timbres.mjs?rev=20260930-four-voices-1';
+import { evaluateSharedCanvasPolicy } from './shared-canvas-policy.mjs?rev=20260930-shared-canvas-5';
 
 /** Keep imported premium work visible and intact while pausing edits and playback. */
-export function evaluateAudioPassPolicy(song, { passActive = false, extraInstrumentIds = [] } = {}) {
+export function evaluateAudioPassPolicy(song, { passActive = false, extraInstrumentPassActive = passActive, extraInstrumentIds = AUDIO_EXTRA_INSTRUMENT_IDS, sharedImage = null } = {}) {
   const wideCanvas = song.loopTicks / AUDIO_PIXEL_TICKS > 16;
   const extraInstruments = new Set(extraInstrumentIds);
   const usesExtraInstrument = collectAudioEvents(song).some(({ instrument }) => extraInstruments.has(instrument));
-  const premiumContent = wideCanvas || usesExtraInstrument;
+  let shared = null;
+  if (sharedImage) {
+    let colorCount = sharedImage.colorCount;
+    if (!Number.isSafeInteger(colorCount) || colorCount < 1) {
+      const colors = new Set();
+      for (let offset = 0; offset < sharedImage.rgba.length; offset += 4) {
+        colors.add(`${sharedImage.rgba[offset]}:${sharedImage.rgba[offset + 1]}:${sharedImage.rgba[offset + 2]}:${sharedImage.rgba[offset + 3]}`);
+      }
+      colorCount = colors.size;
+    }
+    shared = evaluateSharedCanvasPolicy({ width: sharedImage.width, height: sharedImage.height, colorCount }, { passActive });
+  }
+  const premiumContent = shared ? shared.premiumContent || usesExtraInstrument : wideCanvas || usesExtraInstrument;
+  const locked = shared ? shared.locked || (usesExtraInstrument && !extraInstrumentPassActive) : (wideCanvas && !passActive) || (usesExtraInstrument && !extraInstrumentPassActive);
   return Object.freeze({
     wideCanvas,
     usesExtraInstrument,
     premiumContent,
-    locked: premiumContent && !passActive
+    locked
   });
 }

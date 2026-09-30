@@ -1,0 +1,197 @@
+{
+  "figma": {
+    "fileKey": "mWufwVmtFbygxgdxWwJXnT",
+    "url": "https://www.figma.com/design/mWufwVmtFbygxgdxWwJXnT",
+    "pageId": "3:5",
+    "overviewId": "4:2"
+  },
+  "viewBox": "0 0 24 24",
+  "strokeWidth": 1.8,
+  "exportedAt": "2026-09-29",
+  "icons": [
+    {
+      "name": "square",
+      "componentId": "4:10",
+      "file": "square.svg"
+    },
+    {
+      "name": "triangle",
+      "componentId": "4:17",
+      "file": "triangle.svg"
+    },
+    {
+      "name": "sawtooth",
+      "componentId": "4:24",
+      "file": "sawtooth.svg"
+    },
+    {
+      "name": "noise",
+      "componentId": "4:31",
+      "file": "noise.svg"
+    },
+    {
+      "name": "piano",
+      "componentId": "4:39",
+      "file": "piano.svg"
+    },
+    {
+      "name": "organ",
+      "componentId": "4:49",
+      "file": "organ.svg"
+    },
+    {
+      "name": "guitar",
+      "componentId": "4:60",
+      "file": "guitar.svg"
+    },
+    {
+      "name": "bass",
+      "componentId": "4:68",
+      "file": "bass.svg"
+    },
+    {
+      "name": "strings",
+      "componentId": "4:75",
+      "file": "strings.svg"
+    },
+    {
+      "name": "harp",
+      "componentId": "4:82",
+      "file": "harp.svg"
+    },
+    {
+      "name": "mallet",
+      "componentId": "4:93",
+      "file": "mallet.svg"
+    },
+    {
+      "name": "kalimba",
+      "componentId": "4:106",
+      "file": "kalimba.svg"
+    },
+    {
+      "name": "bell",
+      "componentId": "4:116",
+      "file": "bell.svg"
+    },
+    {
+      "name": "steel-drum",
+      "componentId": "4:124",
+      "file": "steel-drum.svg"
+    },
+    {
+      "name": "flute",
+      "componentId": "4:132",
+      "file": "flute.svg"
+    },
+    {
+      "name": "clarinet",
+      "componentId": "4:139",
+      "file": "clarinet.svg"
+    },
+    {
+      "name": "saxophone",
+      "componentId": "4:146",
+      "file": "saxophone.svg"
+    },
+    {
+      "name": "brass",
+      "componentId": "4:153",
+      "file": "brass.svg"
+    },
+    {
+      "name": "synth",
+      "componentId": "4:162",
+      "file": "synth.svg"
+    },
+    {
+      "name": "tambourine",
+      "componentId": "4:171",
+      "file": "tambourine.svg"
+    },
+    {
+      "name": "shaker",
+      "componentId": "4:181",
+      "file": "shaker.svg"
+    },
+    {
+      "name": "gameboy",
+      "componentId": "4:192",
+      "file": "gameboy.svg"
+    },
+    {
+      "name": "famicom",
+      "componentId": "4:202",
+      "file": "famicom.svg"
+    },
+    {
+      "name": "woodblock",
+      "componentId": "4:210",
+      "file": "woodblock.svg"
+    },
+    {
+      "name": "drum",
+      "componentId": "4:219",
+      "file": "drum.svg"
+    },
+    {
+      "name": "music-settings",
+      "componentId": "4:228",
+      "file": "music-settings.svg"
+    }
+  ],
+  "reference": {
+    "name": "existing Undo",
+    "componentId": "4:236"
+  },
+  "instrumentFamilies": {
+    "square": "square",
+    "triangle": "triangle",
+    "sawtooth": "sawtooth",
+    "noise": "noise",
+    "piano": "piano",
+    "piano-soft": "piano",
+    "electric-piano": "piano",
+    "clavinet": "piano",
+    "organ": "organ",
+    "reed-organ": "organ",
+    "celesta": "bell",
+    "tubular-bells": "bell",
+    "synth-bell": "bell",
+    "soft-bell": "bell",
+    "digital-chime": "bell",
+    "guitar": "guitar",
+    "electric-guitar": "guitar",
+    "bass": "bass",
+    "strings": "strings",
+    "violin": "strings",
+    "cello": "strings",
+    "harp": "harp",
+    "marimba": "mallet",
+    "vibraphone": "mallet",
+    "xylophone": "mallet",
+    "kalimba": "kalimba",
+    "steel-drum": "steel-drum",
+    "flute": "flute",
+    "clarinet": "clarinet",
+    "saxophone": "saxophone",
+    "trumpet": "brass",
+    "brass": "brass",
+    "synth-lead": "synth",
+    "synth-pad": "synth",
+    "pluck-synth": "synth",
+    "warm-pad": "synth",
+    "tambourine": "tambourine",
+    "shaker": "shaker",
+    "gb-pulse-1": "gameboy",
+    "gb-pulse-2": "gameboy",
+    "gb-wave": "gameboy",
+    "gb-noise": "gameboy",
+    "nes-pulse-1": "famicom",
+    "nes-pulse-2": "famicom",
+    "nes-triangle": "famicom",
+    "nes-noise": "famicom",
+    "woodblock": "woodblock",
+    "low-drum": "drum"
+  }
+}

@@ -10,20 +10,19 @@
 <link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180"><link rel="manifest" href="/manifest.webmanifest">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="/css/site.css?rev=20260929-claude-integration-1">
-  <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20260929-claude-integration-1">
+  <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20260930-claude-review-1">
   <link rel="stylesheet" href="/css/home.css?rev=20260929-shared-toys-2">
-  <link rel="stylesheet" href="/css/site-header.css?rev=20260929-tool-ui-1">
-  <link rel="stylesheet" href="/css/tools-showcase.css?rev=20260929-shared-toys-2">
-  <link rel="stylesheet" href="/css/display-ads.css?rev=20260929-manual-ads-2">
+  <link rel="stylesheet" href="/css/site-header.css?rev=20260930-claude-review-1">
+  <link rel="stylesheet" href="/css/tools-showcase.css?rev=20260930-puzzle-list-1">
+  <link rel="stylesheet" href="/css/display-ads.css?rev=20260929-manual-ads-4">
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253" crossorigin="anonymous"></script>
 </head>
 <body data-page="tools" class="app-page home-play">
   <a class="skip-link" href="#main">本文へ移動</a>
   <header class="site-header"><div class="container header-inner">
-    <a class="brand" href="/globe/" aria-label="PiXiEED ホーム"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a>
-    <nav class="site-nav" aria-label="メインナビゲーション"><a data-nav="home" href="/globe/">地図</a><a data-nav="works" href="/works/">絵</a><a data-nav="stores" href="/stores/">お店</a><a data-nav="collection" href="/collection/">集めた</a><a data-nav="tools" href="/tools/">ツール</a><a class="site-nav__secondary" data-nav="shops" href="/shops/">お店の方へ</a></nav>
+    <a class="brand" href="/" aria-label="PiXiEED ホーム"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a>
   </div></header>
-  <nav class="mobile-nav" aria-label="アプリナビゲーション"><a data-nav="home" href="/globe/"><span aria-hidden="true">⌖</span>地図</a><a data-nav="works" href="/works/"><span aria-hidden="true">▧</span>絵</a><a data-nav="stores" href="/stores/"><span aria-hidden="true">⌂</span>お店</a><a data-nav="collection" href="/collection/"><span aria-hidden="true">✳</span>集めた</a><a data-nav="tools" href="/tools/"><span aria-hidden="true">✦</span>ツール</a></nav>
+  <nav class="mobile-nav" aria-label="アプリナビゲーション"></nav>
   <main id="main">
     <section class="tool-shell">
       <div class="container">
@@ -57,26 +56,16 @@
             <h2 class="hp-toy-name">かんたんジグソー</h2><p class="hp-toy-line">絵や写真をパズルに</p>
             <span class="hp-chip is-open">ひらく</span>
           </a>
-          <a class="hp-toy" href="/spot-difference/" data-toy="diff" data-tool-preview="diff" style="--tone:#e6edf3">
-            <span class="hp-view tool-card__preview"><canvas data-tool-preview="diff" aria-hidden="true"></canvas></span>
-            <h2 class="hp-toy-name">ドット絵間違い探し</h2><p class="hp-toy-line">絵のちがいを見つける</p>
-            <span class="hp-chip is-open">ひらく</span>
-          </a>
-          <a class="hp-toy" href="/hidden-object/" data-toy="find" data-tool-preview="find" style="--tone:#dcebd2">
-            <span class="hp-view tool-card__preview"><canvas data-tool-preview="find" aria-hidden="true"></canvas></span>
-            <h2 class="hp-toy-name">ドット絵もの探し</h2><p class="hp-toy-line">かくれたものを探す</p>
-            <span class="hp-chip is-open">ひらく</span>
-          </a>
           <div class="hp-toy tool-card--soon" data-toy="game" data-tool-preview="game" style="--tone:#bfe3f2">
             <span class="hp-view tool-card__preview"><canvas data-tool-preview="game" aria-hidden="true"></canvas></span>
             <h2 class="hp-toy-name">かんたんゲーム</h2><p class="hp-toy-line">自分の絵で遊ぶ</p>
             <span class="hp-chip">もうすぐ</span>
           </div>
         </div>
-        <aside class="container px-display-ad" data-display-ad="tools" aria-label="広告" hidden><div class="px-display-ad__inner"><span class="px-display-ad__label">広告</span></div></aside>
+        <aside class="px-display-ad" data-display-ad="tools" aria-label="広告" hidden><div class="px-display-ad__inner"><span class="px-display-ad__label">広告</span></div></aside>
         <div class="tool-shell__head tool-shell__head--games">
           <div><span class="eyebrow">games</span><h2>あそぶ。</h2></div>
-          <p>みんなのドット絵で遊べるゲームです。</p>
+          <p>みんなの公開問題を探して遊ぶ。自分の問題も作れます。</p>
         </div>
         <div class="tool-grid" aria-label="PiXiEEDのゲーム一覧">
           <a class="hp-toy" href="/play/spot-difference/" data-toy="diff" data-tool-preview="diff" style="--tone:#e6edf3">
@@ -90,14 +79,15 @@
             <span class="hp-chip is-open">ひらく</span>
           </a>
         </div>
+        <aside class="px-display-ad" data-display-ad="tools" aria-label="広告" hidden><div class="px-display-ad__inner"><span class="px-display-ad__label">広告</span></div></aside>
         <div class="tool-note"><span>公開中の道具から使えます。「もうすぐ」の道具は準備中です。</span><a class="text-link" href="/about/">PiXiEEDについて</a></div>
       </div>
     </section>
   </main>
-  <footer class="site-footer"><div class="container footer-inner"><div><a class="brand" href="/globe/"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a><p>街角で、絵に会おう。</p></div><nav class="footer-links" aria-label="フッターナビゲーション"><a href="/globe/">地図</a><a href="/works/">絵</a><a href="/stores/">お店</a><a href="/collection/">集めた</a><a href="/tools/">ツール</a><a href="/shops/">お店の方へ</a><a href="/about/">PiXiEEDについて</a></nav></div></footer>
-  <script type="module" src="/js/app.js?rev=20260929-daily-free-1"></script>
+  <footer class="site-footer"><div class="container footer-inner"><div><a class="brand" href="/" aria-label="PiXiEED ホーム"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a><p>街角で、絵に会おう。</p></div><nav class="footer-links" aria-label="フッターナビゲーション"><a href="/about/">PiXiEEDについて</a><a href="/guide/">利用ガイド</a><a href="/privacy/">プライバシー</a></nav></div></footer>
+  <script type="module" src="/js/app.js?rev=20260930-analytics-review-1"></script>
   <script type="module" src="/js/tool-previews.mjs?rev=20260929-shared-toys-2"></script>
-  <script type="module" src="/js/site-header.mjs?rev=20260929-tool-ui-1"></script>
-  <script type="module" src="/js/display-ads.mjs?rev=20260929-display-units-1"></script>
+  <script type="module" src="/js/site-header.mjs?rev=20260930-claude-review-1"></script>
+  <script type="module" src="/js/display-ads.mjs?rev=20260929-ad-layout-2"></script>
 </body>
 </html>

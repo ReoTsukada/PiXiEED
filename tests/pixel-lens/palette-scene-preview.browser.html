@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>カメラ配色の実画像確認</title>
+<style>
+  body { margin: 0; padding: 20px; background: #192129; color: #f7f3eb; font: 14px system-ui, sans-serif; }
+  h1 { font-size: 20px; }
+  main { display: grid; gap: 24px; }
+  section { display: grid; gap: 10px; grid-template-columns: repeat(3, minmax(0, 1fr)); max-width: 960px; }
+  h2 { grid-column: 1 / -1; margin: 0; font-size: 16px; }
+  figure { min-width: 0; margin: 0; }
+  canvas { display: block; width: 100%; aspect-ratio: 1; background: #111; image-rendering: pixelated; object-fit: contain; }
+  figcaption { padding-block: 6px; }
+  .swatches { display: flex; flex-wrap: wrap; gap: 3px; }
+  .swatches i { display: block; width: 15px; height: 15px; border: 1px solid #ffffff55; }
+  @media (max-width: 560px) { section { grid-template-columns: 1fr; } }
+</style>
+<h1>カメラ配色の実画像確認</h1>
+<main id="results"></main>
+<script type="module">
+import { setLensSettings, processLensFrame, resetLensPalette, lensPalette } from '../../js/pixel-lens/engine.mjs';
+const sources = [
+  ['/assets/pixel-studio/samples/chelsea.png', '人物'],
+  ['/assets/pixel-studio/samples/rocket.jpg', '風景'],
+  ['/assets/pixel-studio/samples/coffee.png', '小物'],
+  ['/assets/pixel-studio/samples/astronaut.png', 'イラスト']
+];
+function figure(label, imageData, palette = []) {
+  const element = document.createElement('figure');
+  const canvas = document.createElement('canvas'); canvas.width = imageData.width; canvas.height = imageData.height;
+  canvas.getContext('2d').putImageData(imageData, 0, 0);
+  const caption = document.createElement('figcaption'); caption.textContent = palette.length ? `${label} · ${palette.length}色` : label;
+  const swatches = document.createElement('div'); swatches.className = 'swatches';
+  for (const [r, g, b] of palette) { const swatch = document.createElement('i'); swatch.style.background = `rgb(${r},${g},${b})`; swatches.append(swatch); }
+  element.append(canvas, caption, swatches); return element;
+}
+for (const [url, name] of sources) {
+  const image = new Image(); image.src = url; await image.decode();
+  const surface = document.createElement('canvas'); const size = 96;
+  surface.width = size; surface.height = size;
+  const context = surface.getContext('2d', { willReadFrequently: true });
+  context.imageSmoothingEnabled = true; context.drawImage(image, 0, 0, size, size);
+  const original = context.getImageData(0, 0, size, size);
+  const section = document.createElement('section'); const title = document.createElement('h2'); title.textContent = name;
+  section.append(title, figure('元画像', original));
+  for (const depth of ['8', '16']) {
+    setLensSettings({ colorDepth: depth, paletteMode: 'source', gradientMode: 'none', surfaceSimplify: 0 }); resetLensPalette();
+    const result = new ImageData(new Uint8ClampedArray(original.data), size, size);
+    processLensFrame(result);
+    section.append(figure(`${depth}色`, result, lensPalette()));
+  }
+  document.querySelector('#results').append(section);
+}
+</script>

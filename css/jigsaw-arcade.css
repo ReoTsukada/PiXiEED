@@ -6,6 +6,9 @@ body.arc-jigsaw .jigsaw-status { justify-self: center; max-width: min(100%, 560p
 
 /* ---- the setup screen becomes the title screen ---- */
 body.arc-jigsaw .jigsaw-setup.arc-panel { width: min(100%, 560px); gap: 10px; margin: 2px auto 8px; padding: 10px 12px 14px; border: 0; background-color: #15202b; scrollbar-color: rgba(255,255,255,.3) transparent; }
+body.arc-jigsaw .jigsaw-setup.arc-panel { max-height: calc(100dvh - 7rem - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)); min-height: 0; overflow-y: auto; }
+body.arc-jigsaw .jigsaw-setup .jigsaw-setup__actions { position: sticky; bottom: -14px; z-index: 2; padding: 8px 0 max(8px, env(safe-area-inset-bottom,0px)); background: #15202b; }
+body.arc-jigsaw .jigsaw-setup .jigsaw-setup__actions:has(#jigsaw-start:disabled) { position: static; }
 body.arc-jigsaw .jigsaw-setup .arc-title h1 { margin: 0; }
 .arc-tucked { position: absolute !important; width: 1px !important; height: 1px !important; margin: -1px !important; padding: 0 !important; overflow: hidden !important; clip-path: inset(50%) !important; white-space: nowrap !important; border: 0 !important; }
 body.arc-jigsaw .jigsaw-setup .jigsaw-field.arc-fine { grid-template-columns: minmax(0, 1fr) minmax(0, 11rem); align-items: center; gap: 8px; color: rgba(255,255,255,.62); font-size: .72rem; }
@@ -18,9 +21,16 @@ body.arc-jigsaw .jigsaw-setup .arc-press { border-width: 2px; }
 body.arc-jigsaw .jigsaw-setup .arc-tile, body.arc-jigsaw .jigsaw-setup .arc-card, body.arc-jigsaw .jigsaw-setup .arc-pick { border-color: transparent; background: #1d2b38; color: #fff; font-size: inherit; }
 body.arc-jigsaw .jigsaw-setup .arc-tile { font-size: .78rem; padding: 8px 4px; }
 body.arc-jigsaw .jigsaw-setup .arc-pick { padding: 4px; }
+body.arc-jigsaw .jigsaw-setup .arc-pick:not(.arc-pick--add) { position: relative; }
+body.arc-jigsaw .jigsaw-setup .arc-pick:not(.arc-pick--add)::after { position: absolute; right: 0; bottom: 0; left: 0; overflow: hidden; padding: 3px 4px; background: rgba(15,23,31,.88); color: #fff; content: attr(aria-label); font-size: .58rem; font-weight: 700; line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; }
 body.arc-jigsaw .jigsaw-setup .arc-pick--add { font-size: 1.6rem; color: #ffd35a; }
 body.arc-jigsaw .jigsaw-setup [aria-checked="true"].arc-press { border-color: #ffd35a; background: #263a4b; }
 body.arc-jigsaw .jigsaw-setup .jigsaw-help { color: rgba(255,255,255,.45); font-size: .68rem; text-align: center; }
+@media (max-width: 600px) and (orientation: portrait) {
+  body.arc-jigsaw .jigsaw-setup.arc-panel {
+    max-height: calc(100dvh - 15rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  }
+}
 
 /* ---- the play screen: HUD, chunky tools, a felt table and a dark tray ---- */
 body.arc-jigsaw .jigsaw-play { grid-template-rows: auto 44px minmax(0, 1fr) 76px; gap: 6px; }

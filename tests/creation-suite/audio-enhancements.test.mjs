@@ -4,7 +4,7 @@ import {
   AUDIO_BAR_TICKS, AUDIO_PIXEL_PITCHES, AUDIO_PIXEL_TICKS, audioPixelColumns, audioSongPixels,
   createAudioPlayer, createAudioSong, resizeAudioCanvas, setAudioPixel, validateAudioSong
 } from '../../js/creation/audio-core.mjs';
-import { AUDIO_EXTRA_INSTRUMENT_IDS, AUDIO_INSTRUMENT_GROUPS, getAudioInstrument } from '../../js/creation/audio-timbres.mjs';
+import { AUDIO_BASIC_INSTRUMENT_IDS, AUDIO_EXTRA_INSTRUMENT_IDS, AUDIO_INSTRUMENT_GROUPS, AUDIO_INSTRUMENTS, getAudioInstrument } from '../../js/creation/audio-timbres.mjs';
 import { importAudioImage } from '../../js/creation/audio-image.mjs';
 
 test('canvas resize preserves old Tick notes, extends into a new region, and refuses destructive shrink', () => {
@@ -121,9 +121,11 @@ test('stop and dispose cancel preview while awaiting AudioContext resume without
   await player.dispose(); assert.equal(closeCount, 1);
 });
 
-test('the added lightweight preset shelf has eight distinct selectable, grouped voices', () => {
-  assert.equal(AUDIO_EXTRA_INSTRUMENT_IDS.length, 8);
-  assert.equal(new Set(AUDIO_EXTRA_INSTRUMENT_IDS).size, 8);
+test('only the original four voices are free and every other preset is premium', () => {
+  assert.deepEqual(AUDIO_BASIC_INSTRUMENT_IDS, ['square', 'triangle', 'sawtooth', 'noise']);
+  assert.deepEqual(AUDIO_EXTRA_INSTRUMENT_IDS, AUDIO_INSTRUMENTS.slice(4).map(({ id }) => id));
+  assert.equal(new Set(AUDIO_EXTRA_INSTRUMENT_IDS).size, AUDIO_EXTRA_INSTRUMENT_IDS.length);
+  assert.equal(AUDIO_BASIC_INSTRUMENT_IDS.some((id) => AUDIO_EXTRA_INSTRUMENT_IDS.includes(id)), false);
   for (const id of AUDIO_EXTRA_INSTRUMENT_IDS) assert.ok(getAudioInstrument(id), id);
   const grouped = AUDIO_INSTRUMENT_GROUPS.flatMap(({ instruments }) => instruments.map(({ id }) => id));
   for (const id of AUDIO_EXTRA_INSTRUMENT_IDS) assert.equal(grouped.filter((item) => item === id).length, 1, `${id} appears once`);

@@ -1,20 +1,22 @@
 import { createFrameLoop } from '../pixel-studio/frame-loop.mjs';
 import { encodeCameraPng, pngExportGeometry } from '../pixel-studio/png-export.mjs?rev=20260928-pixel-roundtrip-1';
-import { FRAME_RATIOS, OUTPUT_SIZES, resolveAspect, centerCrop, frameGeometry, fitFrame } from '../pixel-studio/framing.mjs?v=20260925-lens-sizes-1';
+import { DEFAULT_FRAME_RATIO, FRAME_RATIOS, OUTPUT_SIZES, sharedFrameRatios, sharedOutputSizes, resolveAspect, centerCrop, frameGeometry, fitFrame } from '../pixel-studio/framing.mjs?rev=20260930-shared-canvas-5';
 import { cameraStartErrorMessage, deriveCameraPrimaryAction } from '../pixel-studio/camera-ui-state.mjs';
-import { CAMERA_SETTING_DEFAULTS, DITHER_PATTERNS, lensFrameFilter, lensPalette, lensPaletteEdited, processLensFrame, resetLensPalette, resetLensPaletteEdits, setLensPalette, setLensPaletteColor, setLensSettings } from './engine.mjs?v=20260928-pass-1';
+import { CAMERA_SETTING_DEFAULTS, DITHER_PATTERNS, lensFrameFilter, lensPalette, lensPaletteEdited, processLensFrame, resetLensPalette, resetLensPaletteEdits, setLensPalette, setLensPaletteColor, setLensSettings } from './engine.mjs?v=20260930-distinct-colors-1';
 import { attachZoomGestures, formatZoom, splitZoom, zoomRange, zoomStops } from './zoom.mjs?v=20260928-pass-1';
 import { GIF_FPS, GIF_MAX_MS } from './gif.mjs?v=20260928-rewards-1';
 import { animatedCapturePlan, downsampleAnimatedFrame, encodeAnimatedGif } from '../animated-export.mjs?v=20260929-gif-budget-1';
 import { saveFile } from '../pixel-export.mjs?rev=20260928-export-1';
-import { hasPerk, requestPass, onPassChange } from '../pixieed-pass.mjs?v=20260930-offerwall-1';
+import { hasPerk, requestPass, onPassChange } from '../pixieed-pass.mjs?v=20260930-rewarded-gpt-1';
 import { cameraPostDataUrl } from './camera-post.mjs';
-import { createAudioSong } from '../creation/audio-core.mjs?rev=20260928-dot-music-1';
-import { audioCameraCancelUrl, beginAudioCamera, completeAudioCamera, readAudioCameraRequest } from '../creation/audio-camera-handoff.mjs?rev=20260928-dot-music-1';
-import { createPxdProject, getPxdJson } from '../creation/pxd-codec.mjs';
-import { putPxdImage, readPxdImage, mergePxdJson } from '../creation/pxd-project.mjs';
-import { mountPxdTools } from '../creation/pxd-ui.mjs?rev=20260928-own-work-1';
-import { createToolResultView } from '../tool-result-view.mjs?rev=20260929-display-units-1';
+import { createAudioSong } from '../creation/audio-core.mjs?rev=20260930-audio-timebase-1';
+import { audioCameraCancelUrl, beginAudioCamera, completeAudioCamera, readAudioCameraRequest } from '../creation/audio-camera-handoff.mjs?rev=20260930-shared-canvas-5';
+import { createPxdProject } from '../creation/pxd-codec.mjs';
+import { evaluateSharedCanvasPolicy, SHARED_CANVAS_PREMIUM_MAX_COLORS } from '../creation/shared-canvas-policy.mjs?rev=20260930-shared-canvas-5';
+import { countSharedImageColors, prepareSharedCanvasImage } from '../creation/shared-image.mjs?rev=20260930-shared-canvas-5';
+import { putPxdSharedImage, readPxdSharedImage } from '../creation/pxd-project.mjs?rev=20260930-shared-canvas-5';
+import { mountPxdTools } from '../creation/pxd-ui.mjs?rev=20260930-ux-fix-1';
+import { createToolResultView } from '../tool-result-view.mjs?rev=20260929-compact-results-2';
 
 const $ = (selector) => document.querySelector(selector);
 const initialParams = new URLSearchParams(location.search);
@@ -63,10 +65,15 @@ let previewCounter = 0;
 let toastTimer = null;
 let displayedPaletteRevision = null;
 let audioFrozenFrame = null;
+let captureInFlight = false;
 
 // PiXiEELENS defaults (pixiee-lens/index.html): 4 colours, Game Boy palette, ordered dither, surface 55
-const state = { mode: 'idle', facing: 'environment', result: null, error: '', ratio: 'screen', size: audioCameraRequest?.width ?? 256,
-  colorDepth: audioCameraRequest ? '16' : '4', paletteMode: audioCameraRequest ? 'source' : 'gameboy', gradientMode: audioCameraRequest ? 'none' : 'dither', ditherPattern: 'net8', surfaceSimplify: 55, camera: { ...CAMERA_SETTING_DEFAULTS }, zoom: 1 };
+const state = { mode: 'idle', facing: 'environment', result: null, error: '', ratio: DEFAULT_FRAME_RATIO, size: audioCameraRequest?.width ?? 128,
+  colorDepth: '16', paletteMode: 'source', gradientMode: 'none', ditherPattern: 'net8', surfaceSimplify: 0, camera: { ...CAMERA_SETTING_DEFAULTS }, zoom: 1 };
+let sharedImageTarget = null;
+let sharedProjectBound = false;
+let sharedImageEdited = false;
+let sharedImageColorCount = 16;
 let zoomInfo = zoomRange(null); let appliedHardwareZoom = 1; let zoomApplyPending = false;
 // 面のまとまり is automatic: it only calms dither speckle with 8-16 colours (measured: no change at 2-4 colours,
 // heavy posterising at high strength), so it runs at PiXiEELENS's default 55 there and is skipped elsewhere.
@@ -160,6 +167,7 @@ function setMode(mode) {
   if (mode !== 'live') openTray(null);
   updateSizeSummary();
   updatePrimaryAction();
+  updateSharedCaptureControls();
   $('#flipCamera').disabled = mode !== 'live';
   updateSaveLinkState();
   setInfoForMode(mode);
@@ -176,19 +184,89 @@ function updatePrimaryAction() {
   }
   const primary = deriveCameraPrimaryAction({ mode: state.mode, hasResult: Boolean(state.result), error: state.error, workerUnavailable: Boolean(workerUnavailable) });
   button.dataset.action = primary.action;
-  const label = audioCameraRequest && primary.action === 'capture' ? '撮影して音楽へ戻る' : primary.label;
+  let label = audioCameraRequest && primary.action === 'capture' ? '撮影して音楽へ戻る' : primary.label;
   button.setAttribute('aria-label', label);
   button.title = label;
   button.disabled = primary.disabled;
+  if (state.mode === 'live') {
+    const dimensions = captureDimensions();
+    const policy = evaluateSharedCanvasPolicy({
+      width: dimensions.width,
+      height: dimensions.height,
+      colorCount: sharedImageTarget ? sharedImageColorCount : (Number(state.colorDepth) || 16)
+    }, { passActive: sharedPassActive() });
+    if (!policy.supported) {
+      button.disabled = true;
+      button.title = '共通キャンバスの範囲外です';
+      button.setAttribute('aria-label', button.title);
+    } else if (policy.locked && primary.action === 'capture' && !primary.disabled) {
+      label = '時間を追加して撮影';
+      button.disabled = false;
+      button.title = label;
+      button.setAttribute('aria-label', label);
+    }
+  }
 }
 
 function currentAspect() {
   if (audioCameraRequest) return audioCameraRequest.width / audioCameraRequest.height;
+  if (sharedProjectBound && sharedImageTarget) return sharedImageTarget.width / sharedImageTarget.height;
   return resolveAspect(state.ratio, Math.max(1, stage.clientWidth), Math.max(1, stage.clientHeight));
 }
 
+function sharedPassActive() { return hasPerk('project.canvas-expanded'); }
+
+function captureDimensions() {
+  if (audioCameraRequest) return { width: audioCameraRequest.width, height: audioCameraRequest.height };
+  if (sharedProjectBound && sharedImageTarget) return { width: sharedImageTarget.width, height: sharedImageTarget.height };
+  return frameGeometry(currentAspect(), state.size);
+}
+
+async function requestCanvasExpansion() {
+  sayToast('共通キャンバスの特典を確認します');
+  try {
+    if (await requestPass({ perk: 'project.canvas-expanded' })) sayToast('特典が有効です。もう一度撮影してください');
+    else sayToast('特典を利用できませんでした');
+  } catch {
+    sayToast('特典を確認できませんでした');
+  }
+  updateSharedCaptureControls();
+  updatePrimaryAction();
+}
+
+function paletteFromRgba(rgba) {
+  const palette = [];
+  const seen = new Set();
+  for (let offset = 0; offset < rgba.length; offset += 4) {
+    const r = rgba[offset]; const g = rgba[offset + 1]; const b = rgba[offset + 2];
+    const key = `${r},${g},${b}`;
+    if (seen.has(key)) continue;
+    seen.add(key); palette.push([r, g, b]);
+  }
+  return palette;
+}
+
+function updateSharedCaptureControls() {
+  const passActive = sharedPassActive();
+  const allowedSizes = new Set(sharedOutputSizes(passActive));
+  for (const button of pixelsPanel?.querySelectorAll('[data-value]') ?? []) {
+    const allowed = allowedSizes.has(Number(button.dataset.value));
+    button.disabled = !allowed || Boolean(sharedImageTarget) || Boolean(audioCameraRequest);
+    button.setAttribute('aria-disabled', String(button.disabled));
+  }
+  for (const button of aspectPanel?.querySelectorAll('[data-value]') ?? []) {
+    button.disabled = Boolean(sharedImageTarget) || Boolean(audioCameraRequest);
+    button.setAttribute('aria-disabled', String(button.disabled));
+  }
+  const dimensions = captureDimensions();
+  const preliminary = evaluateSharedCanvasPolicy({ width: dimensions.width, height: dimensions.height, colorCount: sharedImageTarget ? sharedImageColorCount : (Number(state.colorDepth) || 16) }, { passActive });
+  const lockedTarget = Boolean(sharedProjectBound && sharedImageTarget && (!preliminary.supported || preliminary.locked));
+  root.dataset.sharedCanvasLocked = String(lockedTarget);
+  root.dataset.sharedCanvasPass = String(passActive);
+}
+
 function updateSizeSummary() {
-  const dimensions = ((state.mode === 'captured' || state.mode === 'live') && state.result) || frameGeometry(currentAspect(), state.size);
+  const dimensions = ((state.mode === 'captured' || state.mode === 'live') && state.result) || captureDimensions();
   $('#frameDimensions').textContent = `${dimensions.width} × ${dimensions.height}`;
   root.dataset.framing = state.ratio;
   root.dataset.outputSize = String(state.size);
@@ -304,9 +382,7 @@ resizeObserver.observe(stage);
 
 function cameraFrame() {
   if (!activeStream || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || !video.videoWidth || !video.videoHeight) return null;
-  const output = audioCameraRequest
-    ? { width: audioCameraRequest.width, height: audioCameraRequest.height }
-    : frameGeometry(currentAspect(), state.size);
+  const output = captureDimensions();
   const aspect = output.width / output.height;
   const full = centerCrop(video.videoWidth, video.videoHeight, aspect);
   const digital = Math.max(1, state.zoom / appliedHardwareZoom); // what the camera's optics could not do is cropped
@@ -468,23 +544,90 @@ async function startCamera({ focus = true } = {}) {
   }
 }
 
-function capture() {
-  if (state.mode !== 'live' || !state.result) return;
+async function capture() {
+  if (captureInFlight || state.mode !== 'live' || !state.result) return;
   if (audioCameraRequest) {
-    finishAudioCamera(audioFrozenFrame || state.result);
+    if (audioFrozenFrame) { finishAudioCamera(audioFrozenFrame); return; }
+    const passActive = sharedPassActive();
+    const target = captureDimensions();
+    const maxColors = passActive ? 32 : 16;
+    const policy = evaluateSharedCanvasPolicy({ width: target.width, height: target.height, colorCount: maxColors }, { passActive });
+    if (policy.reason === 'premium-required') { void requestCanvasExpansion(); return; }
+    if (!policy.supported) { sayToast('共通キャンバスの範囲外です'); return; }
+    let prepared;
+    try {
+      prepared = prepareSharedCanvasImage({ width: state.result.width, height: state.result.height, rgba: new Uint8Array(state.result.data) }, {
+        passActive, width: target.width, height: target.height, maxColors
+      });
+    } catch {
+      sayToast('共通キャンバスの範囲を確認できないため、画像を戻しませんでした');
+      return;
+    }
+    if (!prepared.policy.supported || prepared.policy.locked || prepared.image.width !== target.width || prepared.image.height !== target.height) {
+      if (prepared.policy.reason === 'premium-required') void requestCanvasExpansion();
+      else sayToast('共通キャンバスの範囲を確認できないため、画像を戻しませんでした');
+      return;
+    }
+    const rgba = new Uint8ClampedArray(prepared.image.rgba);
+    finishAudioCamera({ ...state.result, width: target.width, height: target.height, data: rgba, palette: paletteFromRgba(rgba) });
     return;
   }
-  invalidateCaptureDownload();
-  const frozen = state.result;
-  gif.pending = null;
-  $('#gifUpgrade').hidden = true;
-  invalidatePreview();
-  cameraSequence++;
-  stopTracks();
-  setMode('captured');
-  fitPreview(frozen);
-  say('PNGを準備しています…', { visible: true });
-  void prepareCaptureDownload(frozen);
+  const passActive = sharedPassActive();
+  const target = captureDimensions();
+  const existingPolicy = evaluateSharedCanvasPolicy({
+    width: target.width,
+    height: target.height,
+    colorCount: sharedImageTarget ? sharedImageColorCount : (Number(state.colorDepth) || 16)
+  }, { passActive });
+  if (!existingPolicy.supported || existingPolicy.locked) {
+    if (existingPolicy.reason === 'premium-required') void requestCanvasExpansion();
+    else sayToast('共通キャンバスの範囲外です');
+    return;
+  }
+  const maxColors = passActive ? 32 : 16;
+  const sourceFrame = state.result;
+  let prepared;
+  try {
+    prepared = prepareSharedCanvasImage({ width: sourceFrame.width, height: sourceFrame.height, rgba: new Uint8Array(sourceFrame.data) }, {
+      passActive, width: target.width, height: target.height, maxColors
+    });
+  } catch {
+    sayToast('共通キャンバスの範囲を確認できないため、画像を保存しませんでした');
+    return;
+  }
+  if (!prepared.policy.supported || prepared.policy.locked || prepared.image.width !== target.width || prepared.image.height !== target.height) {
+    sayToast('共通キャンバスの範囲を確認できないため、画像を保存しませんでした');
+    return;
+  }
+  captureInFlight = true;
+  const cameraToken = cameraSequence;
+  try {
+    await cameraPxd.startNewCaptureProject();
+    if (cameraToken !== cameraSequence || state.mode !== 'live') return;
+    invalidateCaptureDownload();
+    const frozen = { ...sourceFrame, width: prepared.image.width, height: prepared.image.height, data: new Uint8ClampedArray(prepared.image.rgba), palette: (sourceFrame.palette || []).slice(0, maxColors) };
+    gif.pending = null;
+    $('#gifUpgrade').hidden = true;
+    invalidatePreview();
+    cameraSequence++;
+    stopTracks();
+    state.result = frozen;
+    sharedImageTarget = { width: frozen.width, height: frozen.height };
+    sharedImageColorCount = prepared.colorCount;
+    sharedImageEdited = true;
+    sharedProjectBound = true;
+    setMode('captured');
+    updateSharedCaptureControls();
+    cameraPxd.markDirty();
+    fitPreview(frozen);
+    say('PNGを準備しています…', { visible: true });
+    void prepareCaptureDownload(frozen);
+    await cameraPxd.save();
+  } catch (error) {
+    sayToast(error instanceof Error ? error.message : '新しいプロジェクトに保存できませんでした');
+  } finally {
+    captureInFlight = false;
+  }
 }
 
 function finishAudioCamera(frozen) {
@@ -527,11 +670,19 @@ function refreshObjects() {
   sayToast('今の景色から色を選び直しました');
 }
 
-function retake() {
-  cameraPxd.reset();
+async function retake() {
+  if (captureInFlight) return;
+  if (state.mode === 'captured' && sharedImageEdited) {
+    try { await cameraPxd.save(); }
+    catch (error) { sayToast(error instanceof Error ? error.message : '写真を保存できませんでした'); return; }
+  }
   gif.pending = null;
   $('#gifUpgrade').hidden = true;
   invalidateCaptureDownload();
+  sharedImageTarget = null;
+  sharedImageColorCount = 16;
+  sharedImageEdited = false;
+  sharedProjectBound = false;
   state.result = null;
   view.width = 1;
   view.height = 1;
@@ -571,9 +722,7 @@ const LOOKS = {
   gray: { colorDepth: 'gray' },
   c8: { colorDepth: '8', paletteMode: 'gameboy' },
   c16: { colorDepth: '16', paletteMode: 'gameboy' },
-  photo: { colorDepth: '16', paletteMode: 'source' },
-  c256: { colorDepth: '256' },
-  full: { colorDepth: 'full' }
+  photo: { colorDepth: '16', paletteMode: 'source' }
 };
 function currentLook() {
   if (state.customLook) return `my-${state.customLook}`;
@@ -586,6 +735,7 @@ function applyChange({ restart = false } = {}) {
   if (restart) restartPreview({ preserveCompleted: true });
   fitPreview(state.result);
   updateSizeSummary();
+  updateSharedCaptureControls();
 }
 function selectLook(button) {
   if (!button || state.mode === 'captured' || audioCameraRequest) return;
@@ -684,7 +834,7 @@ function tintSwatches(palette) {
 const pixelsPanel = $('#pixelsPanel');
 for (const size of OUTPUT_SIZES) pixelsPanel.appendChild(chip(String(size), `${size}`));
 const aspectPanel = $('#aspectPanel');
-for (const ratio of FRAME_RATIOS) { const button = chip(ratio.value, ratio.label, { swatch: true, cls: 'is-frame' }); button.dataset.ratio = ratio.value; aspectPanel.appendChild(button); }
+for (const ratio of sharedFrameRatios()) { const button = chip(ratio.value, ratio.label, { swatch: true, cls: 'is-frame' }); button.dataset.ratio = ratio.value; aspectPanel.appendChild(button); }
 // tone row: pick a setting, then the slider below adjusts it
 const toneChips = $('#toneChips');
 for (const [key, label] of TONES) toneChips.appendChild(chip(key, label));
@@ -704,10 +854,10 @@ function syncToolbar() {
   dither.querySelector('.lc-tool-sw').style.setProperty('--swatch', pattern ? patternSwatch(pattern) : 'none');
   dither.querySelector('b').textContent = !available ? 'ディザなし' : pattern ? (SHORT_LABEL[pattern.id] ?? pattern.label) : 'ディザ OFF';
   dither.setAttribute('aria-label', !available ? 'この色ではディザを使いません' : pattern ? `ディザ：${pattern.label}（タップで模様を選ぶ）` : 'ディザをオンにする');
-  face('pixels').querySelector('b').textContent = `${state.size} px`;
+  face('pixels').querySelector('b').textContent = sharedImageTarget ? `${sharedImageTarget.width} × ${sharedImageTarget.height}` : `${state.size} px`;
   const ratio = FRAME_RATIOS.find((r) => r.value === state.ratio);
-  face('aspect').querySelector('b').textContent = audioCameraRequest ? `${audioCameraRequest.width}:16` : (ratio?.label ?? '');
-  face('aspect').dataset.ratio = state.ratio;
+  face('aspect').querySelector('b').textContent = audioCameraRequest ? `${audioCameraRequest.width}:16` : sharedImageTarget ? `${sharedImageTarget.width}:${sharedImageTarget.height}` : (ratio?.label ?? '');
+  face('aspect').dataset.ratio = sharedImageTarget ? `${sharedImageTarget.width}:${sharedImageTarget.height}` : state.ratio;
   const toneChanged = TONES.some(([key]) => state.camera[key] !== CAMERA_SETTING_DEFAULTS[key]);
   face('tone').querySelector('b').textContent = toneChanged ? '調整中' : '調整';
   face('tone').dataset.changed = String(toneChanged);
@@ -795,7 +945,7 @@ document.addEventListener('pointerdown', (event) => {
 const PALETTE_KEY = 'pixieed:camera-palettes:v1';
 const MAX_MY_PALETTES = 3;
 let myPalettes = [];
-try { myPalettes = JSON.parse(localStorage.getItem(PALETTE_KEY) || '[]').filter((p) => Array.isArray(p?.colors) && [2, 4, 8, 16].includes(p.colors.length)); } catch { myPalettes = []; }
+try { myPalettes = JSON.parse(localStorage.getItem(PALETTE_KEY) || '[]').filter((p) => Array.isArray(p?.colors) && p.colors.length >= 2 && p.colors.length <= 16); } catch { myPalettes = []; }
 function storeMyPalettes() { try { localStorage.setItem(PALETTE_KEY, JSON.stringify(myPalettes)); } catch { /* private mode: kept for this visit only */ } }
 const EDITABLE_DEPTHS = new Set(['2', '4', '8', '16', 'gray']);
 const CHANNELS = [['h', '色相', 360], ['s', '彩度', 100], ['l', '明るさ', 100]];
@@ -833,7 +983,7 @@ function renderMyPaletteChips() {
 }
 function renderPaletteStrip(palette = lensPalette()) {
   shownPalette = palette ?? [];
-  const editable = EDITABLE_DEPTHS.has(state.colorDepth) && shownPalette.length > 0;
+  const editable = (EDITABLE_DEPTHS.has(state.colorDepth) || Boolean(state.customLook)) && shownPalette.length > 0;
   // the strip keeps its place even when this look has no palette to edit, so the rows below never jump
   $('#paletteStrip').hidden = false;
   $('#paletteStrip').dataset.reserved = String(!editable);
@@ -854,7 +1004,7 @@ function renderPaletteStrip(palette = lensPalette()) {
   const edited = lensPaletteEdited() && !(state.customLook && !paletteDiffersFromSaved());
   $('#paletteReset').disabled = !edited;
   $('#paletteSave').hidden = state.colorDepth === 'gray';
-  $('#paletteSave').disabled = !lensPaletteEdited() || (state.customLook && !paletteDiffersFromSaved());
+  $('#paletteSave').disabled = shownPalette.length < 2 || !lensPaletteEdited() || (state.customLook && !paletteDiffersFromSaved());
   $('#paletteDelete').hidden = !state.customLook;
   $('#paletteDone').hidden = editIndex < 0;
   if (editIndex >= 0) syncEditSlider();
@@ -906,7 +1056,7 @@ editSlider.addEventListener('input', () => {
 $('#paletteReset').addEventListener('click', () => { resetLensPaletteEdits(); navigator.vibrate?.(8); renderPaletteStrip(); sayToast('元の色に戻しました'); });
 $('#paletteDone').addEventListener('click', () => setPaletteEditing(-1));
 $('#paletteSave').addEventListener('click', () => {
-  const colors = lensPalette(); if (![2, 4, 8, 16].includes(colors.length)) return;
+  const colors = lensPalette(); if (colors.length < 2 || colors.length > 16) return;
   const palette = { id: Date.now().toString(36), colors };
   myPalettes = [...myPalettes, palette].slice(-MAX_MY_PALETTES);
   storeMyPalettes(); renderMyPaletteChips();
@@ -1112,7 +1262,7 @@ $('#gifUpgrade').addEventListener('click', async () => {
   syncGifUpgrade();
 });
 // A recording started with a valid pass keeps its captured duration and frame rate.
-onPassChange(syncGifUpgrade);
+onPassChange(() => { syncGifUpgrade(); updateSharedCaptureControls(); syncToolbar(); });
 function stopGifPlayback() { if (gif.playTimer) { window.clearInterval(gif.playTimer); gif.playTimer = 0; } }
 async function prepareGifDownload(frames) {
   const generation = downloadGeneration;
@@ -1251,26 +1401,37 @@ document.addEventListener('visibilitychange', () => {
   else resumeCameraIfVisible();
 });
 
-const cameraPxd = mountPxdTools({
-  tool: 'camera', hasContent: () => state.mode === 'captured' && Boolean(state.result) && !gif.pending,
+const cameraPxd = audioCameraRequest ? { ready: Promise.resolve(false), markDirty() {}, reset() {} } : mountPxdTools({
+  tool: 'camera', projectWorkspace: true, hasContent: () => state.mode === 'captured' && Boolean(state.result) && !gif.pending,
   setStatus: (message) => say(message, { visible: true }),
   async getProject(project) {
-    if (!state.result || state.mode !== 'captured' || gif.pending) throw new Error('写真を撮影してからPXDに保存してください。GIFはGIF形式で保存できます。');
+    const base = project || createPxdProject();
+    if (!sharedImageEdited || !state.result || state.mode !== 'captured' || gif.pending) return base;
     const frame = state.result;
-    const next = await putPxdImage(project || createPxdProject(), { width: frame.width, height: frame.height, rgba: new Uint8Array(frame.data), provenance: { type: 'pixel_camera' } });
-    return mergePxdJson(next, 'camera/state.json', { schemaVersion: 1, width: frame.width, height: frame.height, settings: { colorDepth: state.colorDepth, paletteMode: state.paletteMode, gradientMode: state.gradientMode, ditherPattern: state.ditherPattern }, palette: frame.palette || [], logicalPixels: true });
+    return putPxdSharedImage(base, { width: frame.width, height: frame.height, rgba: new Uint8Array(frame.data) });
   },
   async openProject(project) {
-    if (audioCameraRequest) throw new Error('作曲用の撮影中はPXDを開けません。曲の原本は保持しています。');
-    const image = await readPxdImage(project);
-    if (!image) throw new Error('このPXDにはカメラで表示する画像がありません。');
-    const metadata = project.entries.some((entry) => entry.path === 'camera/state.json') ? getPxdJson(project, 'camera/state.json') : null;
-    const frame = { width: image.width, height: image.height, data: new Uint8ClampedArray(image.rgba), palette: metadata?.palette || image.colors.slice(0, 256).map((color) => color.rgba.slice(0, 3)) };
+    const image = await readPxdSharedImage(project);
+    sharedProjectBound = true;
+    sharedImageEdited = false;
+    sharedImageTarget = image ? { width: image.width, height: image.height } : null;
+    if (!image) {
+      sharedImageColorCount = 16;
+      invalidatePreview(); cameraSequence++; stopTracks(); gif.pending = null; resumeOnVisible = false;
+      state.result = null;
+      setMode('idle');
+      return;
+    }
+    sharedImageColorCount = countSharedImageColors(image, SHARED_CANVAS_PREMIUM_MAX_COLORS);
+    const frame = { width: image.width, height: image.height, data: new Uint8ClampedArray(image.rgba), palette: [] };
     invalidatePreview(); cameraSequence++; stopTracks(); gif.pending = null; resumeOnVisible = false; setMode('captured'); drawCompleted(frame);
+    updateSharedCaptureControls();
     await prepareCaptureDownload(frame);
   }
 });
 const openedCameraPxd = await cameraPxd.ready;
+$('#useCameraImage').hidden = Boolean(audioCameraRequest);
+$('#useCameraImage').addEventListener('click', () => { void cameraPxd.showProjects?.(); });
 root.dataset.ready = String(openedCameraPxd);
 fitPreview();
 if (audioCameraInvalid) {

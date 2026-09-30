@@ -13,6 +13,11 @@ const pages = [
   ['privacy/index.html', '/privacy/', 'site'], ['stores/index.html', '/stores/', 'site'],
   ['stores/ecowashcafe-nakanoshima.html', '/stores/ecowashcafe-nakanoshima.html', 'site'], ['collection/index.html', '/collection/', 'site'],
 ];
+const sitemapExcludedPaths = new Set(['/game/', '/telescope/', '/collection/']);
+const sitemapPages = pages
+  .filter(([, path]) => !sitemapExcludedPaths.has(path));
+sitemapPages.splice(sitemapPages.findIndex(([, path]) => path === '/pixel-camera.html') + 1, 0,
+  ['pixiee-lens/index.html', '/pixiee-lens/']);
 const artworkLabels = {
   site: 'つくる・あそぶ・つながる', tools: '制作ツール', draw: 'ドット絵を描く', audio: '音をつくる',
   jigsaw: 'ジグソーパズル', 'spot-difference': 'まちがい探し', 'hidden-object': 'もの探し',
@@ -30,7 +35,7 @@ function pngDimensions(relativePath) {
   return [png.readUInt32BE(16), png.readUInt32BE(20)];
 }
 
-test('public pages carry one canonical, branded OGP and Twitter preview with the assigned artwork', () => {
+test('pages carry one canonical, branded OGP and Twitter preview with the assigned artwork', () => {
   for (const [file, path, imageName] of pages) {
     const source = read(file);
     const head = source.match(/<head\b[^>]*>([\s\S]*?)<\/head>/i)?.[1];
@@ -89,7 +94,36 @@ test('pages use the unified brand icons and app manifest', () => {
 test('sitemap lists the clean public page URLs without retired and private routes', () => {
   const sitemap = read('sitemap.xml');
   const actual = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]);
-  const expected = pages.map(([, path]) => `https://pixieed.jp${path}`);
+  const expected = sitemapPages.map(([, path]) => `https://pixieed.jp${path}`);
   assert.deepEqual(actual, expected);
-  assert.doesNotMatch(sitemap, /\/(?:profile|admin|sale|localdrafts|works|gallery)\//i);
+  assert.equal(new Set(actual).size, actual.length, 'no duplicate URLs');
+  assert.doesNotMatch(sitemap, /\/(?:profile|admin|sale|localdrafts|works|gallery|game|collection|telescope)\//i);
+});
+
+test('sitemap URLs point to indexable canonical pages without redirects or temporary parameters', () => {
+  const sitemap = read('sitemap.xml');
+  assert.match(sitemap, /^<\?xml version="1\.0" encoding="UTF-8"\?>/);
+  assert.match(sitemap, /<urlset xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9">/);
+  for (const [file, path] of sitemapPages) {
+    const url = new URL(`https://pixieed.jp${path}`);
+    assert.equal(url.origin, 'https://pixieed.jp');
+    assert.equal(url.search, '');
+    assert.equal(url.hash, '');
+    const head = read(file).match(/<head\b[^>]*>([\s\S]*?)<\/head>/i)?.[1];
+    assert.ok(head, `${file}: exists and has a head`);
+    const canonical = [...head.matchAll(/<link\b(?=[^>]*\brel=["']canonical["'])[^>]*\bhref=["']([^"']+)["'][^>]*>/gi)];
+    assert.equal(canonical.length, 1, `${file}: one canonical URL`);
+    assert.equal(canonical[0][1], url.href, `${file}: self canonical`);
+    assert.doesNotMatch(head, /<meta\b(?=[^>]*\bname=["'](?:robots|googlebot)["'])[^>]*\b(?:noindex|none)\b/i, `${file}: allows indexing`);
+    assert.doesNotMatch(head, /<meta\b[^>]*\bhttp-equiv=["']refresh["']/i, `${file}: not a forwarding page`);
+  }
+});
+
+test('robots.txt announces the root sitemap without blocking its public routes', () => {
+  const robots = read('robots.txt');
+  assert.deepEqual([...robots.matchAll(/^Sitemap:\s*(\S+)\s*$/gmi)].map(([, url]) => url), ['https://pixieed.jp/sitemap.xml']);
+  const blockedPaths = [...robots.matchAll(/^Disallow:\s*(\S+)\s*$/gmi)].map(([, path]) => path);
+  for (const [, path] of sitemapPages) {
+    assert.ok(!blockedPaths.some((blocked) => path.startsWith(blocked)), `${path}: crawlable`);
+  }
 });

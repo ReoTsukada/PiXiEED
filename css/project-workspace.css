@@ -1,0 +1,70 @@
+.project-bar { position: fixed; z-index: 25; top: calc(var(--px-header-height, var(--creation-editor-header, 64px)) + 8px); left: 12px; right: 12px; height: 46px; display: flex; justify-content: space-between; gap: 8px; pointer-events: none; color: #f4f0e4; }
+.project-bar button { pointer-events: auto; min-width: 44px; min-height: 44px; border: 1px solid #52606a; border-radius: 12px; background: #202a33; color: inherit; touch-action: manipulation; }
+.project-bar svg, .project-sheet svg { width: 22px; height: 22px; flex: none; }
+.project-bar__open { display: flex; align-items: center; gap: 8px; padding: 0 12px; max-width: min(440px, calc(100% - 120px)); }
+.project-bar__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; font-size: 13px; }
+.project-bar__state { width: 7px; height: 7px; border-radius: 50%; flex: none; background: #ffc962; }
+[data-state=saved] .project-bar__state { background: #8ecba0; }
+[data-state=error] .project-bar__state { background: #ff8b7a; }
+[data-state=saving] .project-bar__state { animation: project-save 1s steps(2) infinite; }
+@keyframes project-save { 50% { opacity: .4; } }
+.project-mode-picker { position: relative; pointer-events: auto; }
+.project-mode-picker summary { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 0 12px; border: 1px solid #52606a; border-radius: 12px; background: #202a33; cursor: pointer; font-size: 13px; list-style: none; }
+.project-mode-picker summary::-webkit-details-marker { display: none; }
+.project-mode-picker summary { white-space: nowrap; }
+.project-modes { position: absolute; top: 52px; right: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; width: min(300px, calc(100vw - 24px)); padding: 10px; border: 1px solid #52606a; border-radius: 16px; background: #151e25; box-shadow: 0 12px 32px #0006; pointer-events: auto; }
+.project-mode-picker:not([open]) .project-modes { display: none; }
+.project-modes button { display: flex; align-items: center; gap: 5px; padding: 0 10px; font-size: 12px; }
+.project-modes button[aria-pressed=true] { opacity: 1; background: #ffd35a; border-color: #ffd35a; color: #202a33; }
+body.project-workspace-ready.creation-editor #main { padding-top: 62px !important; }
+body.project-workspace-ready.app-page--tool-jigsaw #main { padding-top: 62px; }
+body.project-workspace-ready:is(.hidden-object-editing, .spot-editing) .project-bar { top: calc(var(--px-header-height, 64px) + 8px); }
+body.project-workspace-ready:is(.hidden-object-editing, .spot-editing) :is(.hidden-preview, .spot-preview) { top: 62px; }
+body.project-workspace-ready :is(.hidden-settings summary, .spot-settings summary, .hidden-target-list button) { min-height: 44px; }
+body.project-workspace-ready:is(.hidden-object-editing, .spot-editing) :is(.hidden-source-label, .spot-source-label) { display: none; }
+body.project-workspace-ready.hidden-object-editing :is(.hidden-settings, .hidden-edit-hint) { top: calc(env(safe-area-inset-top, 0px) + 62px); }
+body.project-workspace-ready.spot-editing .spot-settings { top: calc(env(safe-area-inset-top, 0px) + 62px); }
+body.project-workspace-ready:not(.hidden-object-editing).app-page--tool-hidden-object #main,
+body.project-workspace-ready:not(.spot-editing).app-page--tool-spot-difference #main { padding-top: 62px; }
+body[data-tool-result-open] .project-bar { display: none; }
+body.project-workspace-ready.creation-editor[data-tool-result-open] #main { padding-top: 8px !important; }
+body.project-workspace-ready .draw-meta { display: none; }
+body.project-workspace-ready .audio-status.is-visible { top: calc(var(--creation-editor-header, 64px) + 60px); }
+/* The camera zoom rail sits below its 64px site header. Keep it clear of the project bar. */
+body.project-workspace-ready[data-tool-name="ドット絵カメラ"] .lc-top.px-site-header .lc-zoom-stops { top: calc(100% + 60px); }
+.project-sheet { box-sizing: border-box; width: min(640px, calc(100vw - 24px)); max-height: calc(100dvh - 32px); padding: 20px; border: 1px solid #52606a; border-radius: 20px; background: #202a33; color: #f4f0e4; box-shadow: 0 24px 70px #0008; overflow: auto; overscroll-behavior: contain; }
+.project-sheet { font-family: -apple-system, BlinkMacSystemFont, "Noto Sans JP", system-ui, sans-serif; }
+#pxd-panel.project-sheet #project-title { background: #111a21 !important; color: #f4f0e4; border: 1px solid #52606a !important; }
+body.project-workspace-ready #draw-palette { display: flex !important; justify-content: flex-start !important; flex-wrap: nowrap !important; gap: 6px !important; }
+body.project-workspace-ready #draw-palette .draw-color { flex: none !important; }
+@media (min-width: 900px), (orientation: landscape) and (min-width: 560px) { body.project-workspace-ready #draw-palette { flex-wrap: wrap !important; max-height: 210px !important; overflow-y: auto !important; } }
+@media (max-height: 500px) and (orientation: landscape) { body.project-workspace-ready #draw-palette { flex-wrap: nowrap !important; max-height: 58px !important; overflow-x: auto !important; overflow-y: hidden !important; } }
+.project-sheet::backdrop { background: #080e16b8; }
+.project-sheet button, .project-sheet summary { box-sizing: border-box; min-width: 44px; min-height: 44px; padding: 10px 12px; border: 1px solid #52606a; border-radius: 11px; background: #151e25; color: inherit; font: inherit; font-size: 13px; cursor: pointer; touch-action: manipulation; }
+.project-sheet button:disabled, .project-bar button:disabled:not([aria-pressed=true]) { opacity: .5; cursor: wait; }
+.project-sheet__heading { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.project-sheet__heading h2 { margin: 0; font-size: 21px; }
+.project-sheet__heading button { display: grid; place-items: center; padding: 8px; }
+.project-sheet[data-startup="true"] :is(.project-sheet__current, #project-duplicate, #pxd-save, #pxd-export, .project-sheet__links, .project-canvas-settings) { display: none; }
+.project-sheet__note, .project-sheet__status { margin: 10px 0 14px; font-size: 12px; color: #c8d0d1; line-height: 1.6; overflow-wrap: anywhere; }
+.project-sheet__current { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 8px; margin-block: 16px; }
+.project-sheet__current label { grid-column: 1 / -1; color: #c8d0d1; font-size: 12px; }
+.project-sheet__current input { box-sizing: border-box; min-width: 0; width: 100%; min-height: 44px; padding: 8px 10px; border: 1px solid #52606a; border-radius: 10px; background: #111a21; color: #f4f0e4; font: inherit; font-size: 16px; }
+.project-sheet__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.project-sheet #project-new { background: #ffd35a; color: #202a33; border-color: #ffd35a; font-weight: 650; }
+.project-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 16px 0 20px; }
+.project-sheet .project-card { display: flex; align-items: center; gap: 10px; min-width: 0; width: 100%; text-align: left; padding: 12px; }
+.project-sheet .project-card[aria-current=true] { border-color: #ffd35a; box-shadow: inset 0 0 0 1px #ffd35a; }
+.project-card canvas { flex: none; width: 56px; height: 56px; object-fit: contain; image-rendering: pixelated; border-radius: 4px; background: repeating-conic-gradient(#cfd4cc 0 25%, #fff 0 50%) 0 0 / 12px 12px; }
+.project-card__info { display: flex; flex-direction: column; gap: 4px; min-width: 0; font-size: 11px; color: #b8c0c2; }
+.project-card__info strong { font-size: 13px; color: #f4f0e4; overflow-wrap: anywhere; }
+.project-list__empty { grid-column: 1 / -1; font-size: 13px; color: #b8c0c2; line-height: 1.6; }
+.project-files { border-top: 1px solid #52606a; padding-top: 12px; }
+.project-files summary { border: 0; background: transparent; padding-left: 0; }
+.project-files .project-sheet__actions { margin-top: 10px; }
+.project-canvas-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+.project-canvas-fields label { display: grid; gap: 5px; font-size: 12px; color: #c8d0d1; }
+.project-canvas-fields :is(input, select) { box-sizing: border-box; width: 100%; min-width: 0; min-height: 44px; padding: 8px; border: 1px solid #52606a; border-radius: 9px; font: inherit; font-size: 16px; background: #111a21; color: #f4f0e4; }
+.project-sheet :is(input, button, summary):focus-visible, .project-bar button:focus-visible { outline: 3px solid #ffe07d; outline-offset: 2px; }
+@media (max-width: 420px) { .project-bar { left: 8px; right: 8px; } .project-bar__open { max-width: calc(100% - 116px); padding-inline: 8px; gap: 5px; } .project-modes button { padding-inline: 8px; } .project-modes svg { width: 18px; } .project-sheet { padding: 14px; } .project-list { grid-template-columns: minmax(0, 1fr); } }
+@media (prefers-reduced-motion: reduce) { [data-state=saving] .project-bar__state { animation: none; } }

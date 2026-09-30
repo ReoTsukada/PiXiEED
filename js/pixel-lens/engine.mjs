@@ -1,6 +1,6 @@
 /**
- * PiXiEELENS image engine, lifted verbatim from PiXiEELENS (pixiee-lens/index.html) so the camera keeps
- * PiXiEELENS's exact look: pre-processing (saturation, contrast, shadow lift), palette building
+ * PiXiEELENS image engine, adapted from PiXiEELENS (pixiee-lens/index.html):
+ * pre-processing (saturation, contrast, shadow lift), palette building
  * (fixed Game Boy 4 colours, black/white, gray tint, 8-bit, or colours taken from the photo), 4x4 ordered
  * dither, surface simplification and small-region cleanup, plus the camera tone filter (brightness,
  * exposure, contrast, saturation, shadows, white balance) applied while the frame is drawn.
@@ -179,11 +179,6 @@ function getColorBinIndex(value) {
   return Math.max(0, Math.min(COLOR_BIN_SIZE - 1, Math.floor(value / COLOR_BIN_INTERVAL)));
 }
 
-function binIndexToColorValue(index) {
-  const step = 255 / (COLOR_BIN_SIZE - 1);
-  return Math.max(0, Math.min(255, Math.round(index * step)));
-}
-
 function clearPaletteState() {
   paletteState.colors = [];
   paletteState.originalColors = [];
@@ -308,17 +303,6 @@ function computeWhiteBalanceFilters(value) {
     filters.push(`brightness(${coolBrightness.toFixed(3)})`);
   }
   return filters;
-}
-
-function ensurePaletteColor(palette, target) {
-  if (palette.some((entry) => entry.r === target.r && entry.g === target.g && entry.b === target.b)) {
-    return;
-  }
-  const color = { ...target };
-  if (typeof color.count !== 'number') {
-    color.count = Number.MAX_SAFE_INTEGER;
-  }
-  palette.push(color);
 }
 
 function applyPreAverage(imageData) {
@@ -501,115 +485,9 @@ function hslToRgb(h, s, l) {
   };
 }
 
-function refinePaletteForDepth(palette, depth, desired) {
-  if (!Array.isArray(palette) || !palette.length) {
-    return [];
-  }
-  const numericDepth = Number(depth);
-  const maxColors = Math.max(2, Math.min(256, Number.isFinite(numericDepth) ? numericDepth : Number(desired) || 4));
-  const distanceThreshold = maxColors <= 4 ? 72 : maxColors <= 16 ? 56 : 42;
-  const thresholdSq = distanceThreshold * distanceThreshold;
-  const sorted = palette
-    .map((entry) => ({
-      r: clampByte(entry?.r),
-      g: clampByte(entry?.g),
-      b: clampByte(entry?.b),
-      count: Number(entry?.count) || 0
-    }))
-    .sort((a, b) => b.count - a.count);
-  const selected = [];
-  const distanceSq = (a, b) => {
-    const dr = a.r - b.r;
-    const dg = a.g - b.g;
-    const db = a.b - b.b;
-    return dr * dr + dg * dg + db * db;
-  };
-  for (const color of sorted) {
-    const isNear = selected.some((picked) => distanceSq(color, picked) <= thresholdSq);
-    if (!isNear) {
-      selected.push({ r: color.r, g: color.g, b: color.b, count: color.count });
-    }
-    if (selected.length >= maxColors) {
-      break;
-    }
-  }
-  if (!selected.length) {
-    selected.push({ ...BLACK_COLOR, count: 0 });
-  }
-  ensurePaletteColor(selected, BLACK_COLOR);
-  ensurePaletteColor(selected, WHITE_COLOR);
-  if (selected.length < maxColors) {
-    for (const color of sorted) {
-      if (selected.length >= maxColors) {
-        break;
-      }
-      ensurePaletteColor(selected, color);
-    }
-  }
-  while (selected.length > maxColors) {
-    selected.pop();
-  }
-  return selected.map(({ r, g, b }) => ({ r, g, b }));
-}
-
-function buildPaletteFromImage(imageData, desired, depth) {
-  const bins = new Map();
-  const data = imageData.data;
-  const totalPixels = data.length / 4;
-  const minCount = Math.max(1, Math.floor(totalPixels * 0.005));
-  for (let i = 0; i < data.length; i += 4) {
-    const rIndex = getColorBinIndex(data[i]);
-    const gIndex = getColorBinIndex(data[i + 1]);
-    const bIndex = getColorBinIndex(data[i + 2]);
-    const key = (rIndex << 8) | (gIndex << 4) | bIndex;
-    const existing = bins.get(key);
-    if (existing) {
-      existing.count += 1;
-    } else {
-      bins.set(key, {
-        rIndex,
-        gIndex,
-        bIndex,
-        count: 1
-      });
-    }
-  }
-  const sortedBins = Array.from(bins.values()).sort((a, b) => b.count - a.count);
-  const palette = [];
-  for (const bin of sortedBins) {
-    const color = {
-      r: binIndexToColorValue(bin.rIndex),
-      g: binIndexToColorValue(bin.gIndex),
-      b: binIndexToColorValue(bin.bIndex),
-      count: bin.count
-    };
-    if (bin.count < minCount && palette.length >= 2) {
-      continue;
-    }
-    palette.push(color);
-    if (palette.length >= desired) {
-      break;
-    }
-  }
-
-  ensurePaletteColor(palette, BLACK_COLOR);
-  ensurePaletteColor(palette, WHITE_COLOR);
-
-  palette.sort((a, b) => b.count - a.count);
-  while (palette.length > desired) {
-    palette.pop();
-  }
-
-  const trimmed = palette.map(({ r, g, b }) => ({ r, g, b }));
-  const refined = refinePaletteForDepth(trimmed, depth, desired);
-  return refined.map(({ r, g, b }) => ({ r, g, b }));
-}
-
 function buildSourcePalette(imageData, desired) {
-  // Image-derived palettes need roles, rather than simply averaging the
-  // most common RGB values.  The optional black/white anchors preserve
-  // real deep shadows and highlights; the remaining slots become the
-  // representative material colours (sky, skin, hair, clothes, etc.).
+  // Spend each slot on an occupied, distinct source colour. A dominant sky
+  // must not consume the whole palette with slightly different blue bins.
   const bins = new Map();
   const { data } = imageData;
   for (let index = 0; index < data.length; index += 4) {
@@ -617,16 +495,15 @@ function buildSourcePalette(imageData, desired) {
     const gIndex = getColorBinIndex(data[index + 1]);
     const bIndex = getColorBinIndex(data[index + 2]);
     const key = (rIndex << 8) | (gIndex << 4) | bIndex;
-    const bin = bins.get(key) || {
-      r: binIndexToColorValue(rIndex),
-      g: binIndexToColorValue(gIndex),
-      b: binIndexToColorValue(bIndex),
-      count: 0
-    };
+    const bin = bins.get(key) || { r: 0, g: 0, b: 0, count: 0 };
+    bin.r += data[index]; bin.g += data[index + 1]; bin.b += data[index + 2];
     bin.count += 1;
     bins.set(key, bin);
   }
-  const colors = Array.from(bins.values()).sort((a, b) => b.count - a.count);
+  const colors = Array.from(bins.values(), (bin) => ({
+    r: clampByte(bin.r / bin.count), g: clampByte(bin.g / bin.count),
+    b: clampByte(bin.b / bin.count), count: bin.count
+  })).sort((a, b) => b.count - a.count);
   const size = Math.min(Math.max(2, Number(desired) || 4), colors.length);
   if (!size) return [];
 
@@ -634,132 +511,40 @@ function buildSourcePalette(imageData, desired) {
   const luma = (color) => 0.2126 * color.r + 0.7152 * color.g + 0.0722 * color.b;
   const distance = (a, b) => 0.25 * (a.r - b.r) ** 2 + 0.60 * (a.g - b.g) ** 2 + 0.15 * (a.b - b.b) ** 2;
   const roleCoverage = (predicate) => colors.reduce((sum, color) => sum + (predicate(luma(color)) ? color.count : 0), 0) / totalPixels;
-  const centers = [];
-  const locked = [];
+  const selected = [];
 
   // Do not manufacture black or white for a tiny speck of noise.  When
   // either is visibly present, keep it exact so the image retains a crisp
   // value range instead of turning into uniformly muted averages.
-  if (roleCoverage((value) => value <= 40) >= 0.012 && centers.length < size) {
-    centers.push({ ...BLACK_COLOR });
-    locked.push(true);
+  if (roleCoverage((value) => value <= 40) >= 0.012 && selected.length < size) {
+    selected.push({ ...BLACK_COLOR });
   }
-  if (roleCoverage((value) => value >= 216) >= 0.012 && centers.length < size) {
-    centers.push({ ...WHITE_COLOR });
-    locked.push(true);
+  if (roleCoverage((value) => value >= 216) >= 0.012 && selected.length < size) {
+    selected.push({ ...WHITE_COLOR });
   }
-
-  // Seed remaining entries from frequent, well-separated source colours.
-  // This gives a blue background and a skin tone separate slots instead
-  // of spending every entry on almost-identical shades of the background.
-  while (centers.length < size) {
-    let next = null;
-    let bestScore = -1;
-    for (const color of colors) {
-      const separation = centers.length
-        ? Math.sqrt(Math.min(...centers.map((center) => distance(color, center))))
-        : 96;
-      const score = Math.sqrt(color.count) * (0.35 + separation / 96);
-      if (score > bestScore) {
-        bestScore = score;
-        next = color;
-      }
-    }
-    if (!next) break;
-    centers.push({ r: next.r, g: next.g, b: next.b });
-    locked.push(false);
-  }
-
-  const assignments = new Array(colors.length).fill(0);
-  for (let pass = 0; pass < 4; pass += 1) {
-    const sums = centers.map(() => ({ r: 0, g: 0, b: 0, count: 0 }));
-    colors.forEach((color, colorIndex) => {
-      let target = 0;
-      let bestDistance = Number.POSITIVE_INFINITY;
-      centers.forEach((center, centerIndex) => {
-        const value = distance(color, center);
-        if (value < bestDistance) {
-          bestDistance = value;
-          target = centerIndex;
-        }
-      });
-      assignments[colorIndex] = target;
-      if (!locked[target]) {
-        sums[target].r += color.r * color.count;
-        sums[target].g += color.g * color.count;
-        sums[target].b += color.b * color.count;
-        sums[target].count += color.count;
-      }
-    });
-    sums.forEach((sum, index) => {
-      if (!locked[index] && sum.count) {
-        centers[index] = {
-          r: clampByte(sum.r / sum.count),
-          g: clampByte(sum.g / sum.count),
-          b: clampByte(sum.b / sum.count)
-        };
-      }
-    });
-  }
-
-  // Snap each material centre back to a well-used real source bin.  It
-  // avoids synthetic in-between hues while retaining the shade grouping
-  // obtained from the clustering pass above.
-  centers.forEach((center, centerIndex) => {
-    if (locked[centerIndex]) return;
-    let representative = null;
-    let bestScore = Number.POSITIVE_INFINITY;
-    colors.forEach((color, colorIndex) => {
-      if (assignments[colorIndex] !== centerIndex) return;
-      const score = distance(color, center) - Math.min(2400, Math.log2(color.count + 1) * 260);
-      if (score < bestScore) {
-        bestScore = score;
-        representative = color;
-      }
-    });
-    if (representative) {
-      centers[centerIndex] = { r: representative.r, g: representative.g, b: representative.b };
-    }
-  });
-
-  // A palette slot should not be spent on a barely different shade that
-  // is already represented by a more frequently used colour.  Keep the
-  // best-supported entry of each close group, then only refill from a
-  // genuinely separated source colour.  This is especially important at
-  // 2BIT/3BIT where two similar blues can otherwise consume half of the
-  // available palette.
   const minimumSeparation = size <= 4 ? 46 : size <= 8 ? 34 : 24;
-  const centerUsage = centers.map((_, centerIndex) => colors.reduce(
-    (sum, color, colorIndex) => sum + (assignments[colorIndex] === centerIndex ? color.count : 0),
-    0
-  ));
-  const selected = [];
-  const orderedCenters = centers.map((center, index) => ({ center, index }))
-    .sort((first, second) => {
-      if (locked[first.index] !== locked[second.index]) return locked[first.index] ? -1 : 1;
-      return centerUsage[second.index] - centerUsage[first.index];
-    });
-  orderedCenters.forEach(({ center, index }) => {
-    const isTooClose = selected.some((picked) => Math.sqrt(distance(center, picked)) < minimumSeparation);
-    if (!isTooClose || locked[index]) {
-      selected.push(center);
-    }
-  });
+  const used = new Set();
   while (selected.length < size) {
     let candidate = null;
     let candidateScore = -1;
-    colors.forEach((color) => {
-      const separation = selected.length
-        ? Math.sqrt(Math.min(...selected.map((picked) => distance(color, picked))))
-        : minimumSeparation;
-      if (separation < minimumSeparation) return;
-      const score = Math.sqrt(color.count) * (0.5 + separation / minimumSeparation);
+    for (const color of colors) {
+      if (used.has(color)) continue;
+      let separation = 96;
+      if (selected.length) {
+        let nearest = Infinity;
+        for (const picked of selected) nearest = Math.min(nearest, distance(color, picked));
+        separation = Math.sqrt(nearest);
+      }
+      if (separation < minimumSeparation) continue;
+      // Area matters, but novelty matters more once a material is represented.
+      const score = Math.sqrt(color.count) * (separation / 64) ** 2;
       if (score > candidateScore) {
         candidateScore = score;
         candidate = color;
       }
-    });
+    }
     if (!candidate) break;
+    used.add(candidate);
     selected.push({ r: candidate.r, g: candidate.g, b: candidate.b });
   }
   return selected;
@@ -943,7 +728,7 @@ function applyColorDepth(imageData) {
       || paletteState.colors.length !== FIXED_FOUR_COLOR_PALETTE.length
       || paletteState.originalColors.length !== FIXED_FOUR_COLOR_PALETTE.length;
     if (needsUpdate) {
-      applyNewPaletteColors(useSourcePalette ? buildSourcePalette(imageData, 4) : FIXED_FOUR_COLOR_PALETTE);
+      applyNewPaletteColors(FIXED_FOUR_COLOR_PALETTE);
       paletteState.depth = '4';
       paletteState.desired = FIXED_FOUR_COLOR_PALETTE.length;
       paletteState.lastUpdated = timestamp;
@@ -1032,7 +817,7 @@ function applyColorDepth(imageData) {
   } else {
     const desiredColors = Math.max(2, Number(depth) || 4);
     if (shouldRebuildPalette(depth, desiredColors)) {
-      const palette = useSourcePalette ? buildSourcePalette(imageData, desiredColors) : buildPaletteFromImage(imageData, desiredColors, depth);
+      const palette = buildSourcePalette(imageData, desiredColors);
       applyNewPaletteColors(palette);
       paletteState.depth = depth;
       paletteState.desired = desiredColors;
@@ -1046,10 +831,9 @@ function applyColorDepth(imageData) {
   }
   const { data, width, height } = imageData;
   const useDither = state.gradientMode === 'dither' && width > 0;
-  // colours a pixel can take: the palette, plus the black and white PiXiEELENS forces at the extremes
-  const colors = [...palette, BLACK_COLOR, WHITE_COLOR];
-  const BLACK = palette.length; const WHITE = palette.length + 1;
-  const lum = colors.map((c) => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b);
+  // Every rendered pixel uses a visible swatch. Black and white are available
+  // only when fixed by the chosen look or actually selected from the scene.
+  const lum = palette.map((c) => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b);
   // per colour (6 bits a channel): which two colours to mix and how much of the lighter one
   const cacheId = `${useDither ? 'mix' : 'near'}`;
   if (!paletteState.mixCache || paletteState.mixCachePalette !== palette || paletteState.mixCacheId !== cacheId) {
@@ -1063,12 +847,9 @@ function applyColorDepth(imageData) {
   const classify = (r, g, b, key) => {
     const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
     let a = -1;
-    // PiXiEELENS's hard black / white / darkest rules; with dither on the pattern carries those tones instead
-    if (!useSourcePalette && !useDither) {
-      if (depth !== '4' && luminance < 48) a = BLACK;
-      else if (depth !== '4' && luminance > 224) a = WHITE;
-      else if (depth === '4' && luminance < FOUR_COLOR_DARK_THRESHOLD) a = palette.length - 1;
-    }
+    // Preserve the fixed Game Boy look's darkest tone; photo-derived looks
+    // always choose among their own extracted colours.
+    if (!useSourcePalette && !useDither && depth === '4' && luminance < FOUR_COLOR_DARK_THRESHOLD) a = palette.length - 1;
     if (a < 0) {
       let best = Infinity;
       for (let k = 0; k < palette.length; k++) { const c = palette[k]; const d = (r - c.r) ** 2 + (g - c.g) ** 2 + (b - c.b) ** 2; if (d < best) { best = d; a = k; } }
@@ -1129,7 +910,7 @@ function applyColorDepth(imageData) {
         pick = pattern.levels[pattern.levelForTone[tone[p]]][((y & pattern.mask) << pattern.shift) | (x & pattern.mask)] ? light : dark;
       }
     }
-    const color = colors[pick];
+    const color = palette[pick];
     data[i] = color.r; data[i + 1] = color.g; data[i + 2] = color.b;
   }
   // Edge pixels were placed without a pattern; one that ended up alone (unlike all four neighbours) is a

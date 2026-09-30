@@ -7,11 +7,11 @@ globalThis.localStorage = { getItem: (k) => (store.has(k) ? store.get(k) : null)
 globalThis.window = globalThis; globalThis.addEventListener ??= () => {};
 const pass = await import('../../js/pixieed-pass.mjs');
 
-test('the public site shows the Offerwall; only localhost uses the stand-in ad', () => {
-  assert.equal(pass.adMode({ hostname: 'pixieed.jp', search: '?adtest=1' }), 'offerwall');
-  assert.equal(pass.adMode({ hostname: 'pixieed.jp', search: '?ads=test' }), 'offerwall');
+test('the public site uses rewarded ads; only localhost uses the stand-in ad', () => {
+  assert.equal(pass.adMode({ hostname: 'pixieed.jp', search: '?adtest=1' }), 'rewarded');
+  assert.equal(pass.adMode({ hostname: 'pixieed.jp', search: '?ads=test' }), 'rewarded');
   assert.equal(pass.adMode({ hostname: 'localhost', search: '' }), 'test');
-  assert.equal(pass.showRewardedAd, undefined, 'Ad Manager rewarded ads are gone');
+  assert.equal(typeof pass.showRewardedAd, 'function');
 });
 
 test('one pass, one hour, every perk — including ones registered later', () => {

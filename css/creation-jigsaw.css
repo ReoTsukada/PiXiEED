@@ -40,3 +40,15 @@ body.app-page--tool-jigsaw[data-jigsaw-playing="true"] .jigsaw-heading,body.app-
 #jigsaw-hint::after{content:attr(data-hint-short);position:absolute;right:-3px;bottom:-3px;min-width:19px;height:15px;padding:0 2px;border:1px solid #fff;border-radius:8px;background:#49643c;color:#fff;font-size:.52rem;line-height:13px;text-align:center}
 #jigsaw-hint:disabled::after{opacity:.65}
 #jigsaw-tray .jigsaw-piece.is-hint-target{border-color:#ffd35a;box-shadow:0 0 0 3px rgba(255,211,90,.72),0 3px 0 rgba(0,0,0,.28);background:#fff9df}
+
+/* Keep the board primary: common actions stay visible, the rest open on demand. */
+.jigsaw-workspace-tools{overflow:visible;z-index:6}
+.jigsaw-workspace-tools #jigsaw-selection{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.jigsaw-more{position:relative;flex:none}
+.jigsaw-more>summary{box-sizing:border-box;display:grid;place-items:center;width:44px;height:44px;border:1px solid #c5cbbd;border-radius:14px;background:#fff;color:#17232d;cursor:pointer;list-style:none;touch-action:manipulation}
+.jigsaw-more>summary::-webkit-details-marker{display:none}
+.jigsaw-more>summary svg{width:23px;height:23px;fill:currentColor}
+.jigsaw-more>summary:focus-visible{outline:3px solid #335cbe;outline-offset:2px}
+.jigsaw-more[open]>summary{background:#ffd35a;border-color:#b88f1d}
+.jigsaw-more__menu{position:absolute;top:calc(100% + 8px);right:0;z-index:10;display:grid;grid-template-columns:repeat(3,44px);gap:6px;padding:8px;border:1px solid #374858;border-radius:16px;background:#15202b;box-shadow:0 10px 28px #0005}
+.jigsaw-workspace-tools .jigsaw-more__menu #jigsaw-new{grid-column:1/-1;width:100%;min-height:44px}

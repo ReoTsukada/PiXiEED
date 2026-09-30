@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="robots" content="noindex,nofollow">
+<title>制作UI・画面サイズ比較</title>
+<style>
+  *{box-sizing:border-box}body{margin:0;background:#eef0ed;color:#17232d;font:14px system-ui}
+  header{display:flex;align-items:center;gap:16px;padding:12px;flex-wrap:wrap}select{height:44px;font:inherit}
+  main{display:flex;gap:16px;padding:0 12px 12px;width:max-content}figure{margin:0}figcaption{padding:8px 0;font-weight:700}
+  iframe{display:block;border:0;box-shadow:0 0 0 1px #17232d30}
+</style>
+<header><strong>制作UI・画面サイズ比較</strong><label>画面サイズ <select id="size"><option value="390,844">390 × 844</option><option value="320,568">320 × 568</option><option value="844,390">844 × 390</option><option value="1280,720">1280 × 720</option></select></label><span>埋め込みでは共通ヘッダーの拡張ゲージは省略されます。</span></header>
+<main><figure><figcaption>かんたんドット</figcaption><iframe id="draw" src="/draw/" title="かんたんドット・確認画面" width="390" height="844"></iframe></figure><figure><figcaption>ドットで音楽</figcaption><iframe id="audio" src="/audio/" title="ドットで音楽・確認画面" width="390" height="844"></iframe></figure></main>
+<script>
+document.querySelector('#size').addEventListener('change',event=>{
+  const [width,height]=event.target.value.split(',').map(Number);
+  for(const frame of document.querySelectorAll('iframe')){frame.width=width;frame.height=height;}
+});
+</script>
+</html>

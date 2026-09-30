@@ -5,7 +5,7 @@
  * the sound tool together). Below it, each tool card runs a tiny live version of that tool. Toys animate only
  * while on screen. Reduced motion keeps a gentle update rate and suppresses the letter entrance and wave.
  */
-import { createVisibleAnimationScheduler } from './home-animation.mjs?rev=20260929-hero-smooth-1';
+import { createVisibleAnimationScheduler } from './home-animation.mjs?rev=20260930-idle-smooth-1';
 import { createToolToys, TOOL_TOY_SIZE } from './tool-toys.mjs?rev=20260929-shared-toys-2';
 
 const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');

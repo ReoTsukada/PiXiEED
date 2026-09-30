@@ -1,0 +1,8 @@
+/* Public puzzle list opens first; creation is a single secondary action. */
+.puzzle-create-link{box-sizing:border-box;display:grid;place-items:center;width:fit-content;min-width:88px;min-height:44px;margin:8px 0 12px auto;padding:8px 16px;border:1px solid #e9b941;border-radius:14px;background:#ffd35a;color:#1c271d;box-shadow:0 3px 0 #bd982f;font-size:.87rem;font-weight:800;text-align:center;text-decoration:none;touch-action:manipulation}
+.puzzle-create-link:active{transform:translateY(2px);box-shadow:none}
+body.pixfind-is-playing .puzzle-create-link{display:none}
+.puzzle-list-back{display:inline-grid;place-items:center;min-height:44px;margin:4px 0 8px;padding:4px 10px;color:#294d39;font-size:.82rem;font-weight:800;text-decoration:none}
+body:is(.spot-editing,.hidden-object-editing) .puzzle-list-back{display:none}
+.puzzle-editor-play{box-sizing:border-box;display:grid;place-items:center;min-height:44px;margin-top:8px;padding:8px 12px;border:1px solid #b8c8b6;border-radius:12px;background:#fff;color:#203c2a;font-size:.82rem;font-weight:800;text-align:center;text-decoration:none}
+.puzzle-create-link:focus-visible,.puzzle-list-back:focus-visible,.puzzle-editor-play:focus-visible{outline:3px solid #335cbe;outline-offset:2px}

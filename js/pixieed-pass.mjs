@@ -3,13 +3,13 @@
  *
  * Any page or tool asks `hasPerk('some.perk')`. The answer is yes while the pass is valid or for Pro.
  * New services only register a perk id; they never show ads themselves.
- * Ads only appear after the person taps 「広告を見る」: that opens /pass/, where the AdSense Offerwall
- * (rewarded ad only) runs; watching it grants PASS_HOURS from then (js/pass-page.mjs).
- * The first use each local day is free, and so is a visit to /pass/ when no ad appears — once per day.
+ * Ads only appear after the person taps 「広告を見る」: GPT loads then, and the rewarded-slot grant
+ * event is the only event that can grant PASS_HOURS.
+ * The first use each local day is free. Legacy /pass/ helpers remain for old links only.
  * Ordinary AdSense Auto ads are separate: they never grant this pass.
  * Only on localhost a 5-second stand-in ad is shown so the flow can be tried.
  */
-import { passConfig } from '../data/site-config.js?rev=20260928-pass-1h-1';
+import { passConfig } from '../data/site-config.js?rev=20260930-rewarded-gpt-1';
 
 const track = (name, params = {}) => { try { globalThis.gtag?.('event', name, params); } catch {} };
 const STORE_KEY = 'pixieed:pass:v1';
@@ -85,16 +85,87 @@ async function grant() {
   return withPassLock(applyGrant);
 }
 
-// ---- ad provider: the AdSense Offerwall on /pass/ --------------------------------------------------------
-/** The page that shows the AdSense Offerwall (its only choice is a rewarded ad) and grants the hour. */
-export const PASS_PAGE = '/pass/';
-export function passPageUrl(returnTo = typeof location === 'undefined' ? '/' : location.pathname + location.search + location.hash) {
-  return `${PASS_PAGE}?return=${encodeURIComponent(safeReturn(returnTo))}`;
+// ---- Ad Manager rewarded slot ---------------------------------------------------------------------------
+const GPT_SRC = 'https://securepubads.g.doubleclick.net/tag/js/gpt.js';
+const GPT_LOAD_TIMEOUT_MS = 10_000;
+const REWARDED_TIMEOUT_MS = 45_000;
+const REWARDED_VIEW_TIMEOUT_MS = 5 * 60_000;
+let gptLoadPromise = null;
+function loadGpt() {
+  if (globalThis.googletag?.apiReady) return Promise.resolve(globalThis.googletag);
+  if (gptLoadPromise) return gptLoadPromise;
+  if (!globalThis.googletag) globalThis.googletag = { cmd: [] };
+  gptLoadPromise = new Promise((resolve, reject) => {
+    let script = document.querySelector(`script[src="${GPT_SRC}"]`);
+    let created = false; let settled = false; let queued = false; let timer;
+    if (!script) { script = document.createElement('script'); script.async = true; script.src = GPT_SRC; created = true; }
+    const cleanup = () => {
+      window.clearTimeout(timer);
+      script.removeEventListener?.('load', onLoad);
+      script.removeEventListener?.('error', onError);
+    };
+    const onReady = () => {
+      if (settled) return;
+      if (globalThis.googletag?.apiReady) { settled = true; cleanup(); resolve(globalThis.googletag); return; }
+      const commands = globalThis.googletag?.cmd;
+      if (!queued && typeof commands?.push === 'function') {
+        queued = true;
+        commands.push(() => {
+          if (settled) return;
+          if (globalThis.googletag?.apiReady) { settled = true; cleanup(); resolve(globalThis.googletag); }
+          else { settled = true; cleanup(); reject(new Error('unsupported')); }
+        });
+      }
+    };
+    const onLoad = () => onReady();
+    const onError = () => { if (settled) return; settled = true; cleanup(); reject(new Error('unsupported')); };
+    timer = window.setTimeout(() => {
+      if (settled) return;
+      settled = true; cleanup();
+      if (created) script.remove?.();
+      reject(new Error('timeout'));
+    }, GPT_LOAD_TIMEOUT_MS);
+    script.addEventListener('load', onLoad);
+    script.addEventListener('error', onError);
+    if (created) document.head.appendChild(script);
+    else onReady();
+  }).catch((error) => { gptLoadPromise = null; throw error; });
+  return gptLoadPromise;
 }
-/** Only same-site paths are followed back. */
-export function safeReturn(value) {
-  const text = String(value || '');
-  return /^\/(?![/\\])/.test(text) && !text.startsWith(PASS_PAGE) ? text : '/';
+/** Starts a user-initiated rewarded ad. Only rewardedSlotGranted resolves as granted. */
+export async function showRewardedAd({ timeoutMs = REWARDED_TIMEOUT_MS, onReady = () => {}, onRestore = () => {} } = {}) {
+  let googletag;
+  try { googletag = await loadGpt(); } catch (error) { return error?.message === 'timeout' ? 'timeout' : 'unsupported'; }
+  if (!googletag?.apiReady || !passConfig?.rewardedAdUnitPath) return 'unsupported';
+  return new Promise((resolve) => {
+    const pubads = googletag.pubads?.();
+    const format = googletag.enums?.OutOfPageFormat?.REWARDED;
+    const slot = format ? googletag.defineOutOfPageSlot?.(passConfig.rewardedAdUnitPath, format) : null;
+    if (!pubads || !slot) { resolve('unsupported'); return; }
+    let settled = false; let wasGranted = false; let hiddenForAd = false; let timer;
+    const restore = () => { if (hiddenForAd) { hiddenForAd = false; try { onRestore(); } catch {} } };
+    const finish = (result) => {
+      if (settled) return;
+      settled = true; window.clearTimeout(timer);
+      for (const [name, handler] of handlers) { try { pubads.removeEventListener(name, handler); } catch {} }
+      try { googletag.destroySlots?.([slot]); } catch {}
+      restore();
+      resolve(result);
+    };
+    const handlers = [
+      ['rewardedSlotReady', (event) => { if (event.slot === slot) { try { hiddenForAd = true; onReady(); if (event.makeRewardedVisible() === false) { finish('nofill'); return; } window.clearTimeout(timer); timer = window.setTimeout(() => finish(wasGranted ? 'granted' : 'timeout'), REWARDED_VIEW_TIMEOUT_MS); } catch { finish('unsupported'); } } }],
+      ['rewardedSlotGranted', (event) => { if (event.slot === slot) { wasGranted = true; window.clearTimeout(timer); timer = window.setTimeout(() => finish('granted'), REWARDED_TIMEOUT_MS); } }],
+      ['rewardedSlotClosed', (event) => { if (event.slot === slot) finish(wasGranted ? 'granted' : 'closed'); }],
+      ['slotRenderEnded', (event) => { if (event.slot === slot && event.isEmpty) finish('nofill'); }]
+    ];
+    timer = window.setTimeout(() => finish(wasGranted ? 'granted' : 'timeout'), timeoutMs);
+    try {
+      slot.addService(pubads);
+      for (const [name, handler] of handlers) pubads.addEventListener(name, handler);
+      googletag.enableServices();
+      googletag.display(slot);
+    } catch { finish('unsupported'); }
+  });
 }
 function showTestAd(sheet) {
   return new Promise((resolve) => {
@@ -105,7 +176,12 @@ function showTestAd(sheet) {
 }
 export function adMode(currentLocation = typeof location === 'undefined' ? null : location) {
   if (currentLocation && /^(localhost|127\.0\.0\.1)$/.test(currentLocation.hostname)) return 'test';
-  return 'offerwall';
+  return 'rewarded';
+}
+/** Legacy /pass/ links still use this same-site return-path guard. */
+export function safeReturn(value) {
+  const text = String(value || '');
+  return /^\/(?![/\\])/.test(text) && !text.startsWith('/pass/') ? text : '/';
 }
 /** One watched ad = one hour from now. The hour never stacks: while a pass runs, nothing is added. */
 export async function grantFromAd() {
@@ -234,9 +310,7 @@ export function requestPass({ perk = '', extend = false } = {}) {
   track('pass_sheet_open', { perk: perk || (extend ? 'header' : ''), state: active ? 'active' : offeredFree ? 'free' : 'ad' });
   go.focus({ preventScroll: true });
   open = new Promise((resolve) => {
-    let stopWatching = () => {};
     const close = (result) => {
-      stopWatching();
       backdrop.remove(); document.removeEventListener('keydown', onKey); open = null;
       if (returnFocus?.isConnected) returnFocus.focus({ preventScroll: true });
       resolve(result);
@@ -271,16 +345,30 @@ export function requestPass({ perk = '', extend = false } = {}) {
         close(hasPass());
         return;
       }
-      // The Offerwall lives on its own page. A new tab keeps this page (and the work on it) as it is;
-      // the pass arrives here through storage as soon as the ad is watched.
-      const url = passPageUrl();
-      track('pass_ad_open', { perk });
-      let tab = null;
-      try { tab = window.open(url, '_blank'); } catch {}
-      if (!tab) { location.href = url; return; }
-      text.textContent = '開いたページで広告を見終わると、ここでも特典が使えるようになります。';
-      go.textContent = '広告を見ています…'; no.disabled = false;
-      stopWatching = onPassChange(({ active: now }) => { if (now) close(true); });
+      track('pass_ad_open', { perk, provider: 'ad-manager' });
+      text.textContent = '広告を準備しています…'; go.textContent = '広告を読み込み中…';
+      let result;
+      try {
+        result = await showRewardedAd({
+          onReady: () => { backdrop.style.visibility = 'hidden'; backdrop.inert = true; backdrop.setAttribute('aria-hidden', 'true'); },
+          onRestore: () => { backdrop.style.visibility = ''; backdrop.inert = false; backdrop.setAttribute('aria-hidden', 'false'); }
+        });
+      } catch { result = 'unsupported'; }
+      if (result === 'granted') {
+        let granted = false;
+        try { granted = await grantFromAd(); } catch {}
+        if (granted) track('pass_granted', { method: 'rewarded-ad' });
+        close(hasPass());
+        return;
+      }
+      const messages = {
+        nofill: '広告が見つかりませんでした。時間をおいて、もう一度お試しください。',
+        unsupported: 'この環境では広告を表示できません。時間をおいて、もう一度お試しください。',
+        timeout: '広告の読み込みがタイムアウトしました。もう一度お試しください。',
+        closed: '広告が最後まで再生されませんでした。特典は付与されていません。'
+      };
+      text.textContent = messages[result] || '広告を表示できませんでした。もう一度お試しください。';
+      go.textContent = 'もう一度試す'; go.disabled = false; no.disabled = false;
     });
   });
   return open;

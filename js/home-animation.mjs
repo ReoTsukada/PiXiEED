@@ -27,14 +27,16 @@ export function createVisibleAnimationScheduler(env = globalThis) {
   function arm() {
     if (disposed || raf || !hasActive()) return;
     raf = env.requestAnimationFrame((time) => { raf = 0; if (watchdog) env.clearTimeout(watchdog); watchdog = 0; pump(time); });
-    // Some embedded browsers suspend rAF while remaining visible. Keep only one
-    // low-frequency recovery timer, and only while at least one entry is visible.
+    // Some embedded browsers suspend rAF while remaining visible. Recover at the
+    // visible animation rate so idle playback does not drop to four frames per second.
+    const fastestFrame = Math.min(...[...entries.values()].filter(active).map((entry) => Math.max(1000 / entry.fps, reducedMotion ? 1000 / 12 : 0)));
+    const watchdogDelay = Math.max(34, Math.min(250, Math.ceil(fastestFrame + 2)));
     watchdog = env.setTimeout(() => {
       watchdog = 0;
       if (!raf || !hasActive()) return;
       env.cancelAnimationFrame?.(raf); raf = 0;
       pump(now());
-    }, 250);
+    }, watchdogDelay);
   }
   function pump(time) {
     if (!hasActive()) { stopPump(); return; }

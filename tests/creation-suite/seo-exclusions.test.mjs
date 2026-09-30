@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const excluded = [
   'profile/index.html', 'admin/index.html', 'shops/index.html',
+  'game/index.html', 'collection/index.html', 'telescope/index.html',
   'works/index.html', 'works/sea-cat.html', 'works/rainy-window.html', 'works/night-lantern.html', '404.html',
   'globe-prototype.html', 'pixel-camera-studio.html', 'camera-media-test.html',
   'tests/pixel-studio/four-tone-preview.browser.html', 'tests/pixel-studio/png-export.browser.html',

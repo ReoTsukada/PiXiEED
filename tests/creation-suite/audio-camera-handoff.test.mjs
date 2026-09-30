@@ -33,7 +33,7 @@ function frameFor(width, height = 16) {
   return { width, height, data, palette };
 }
 
-test('Audio camera request is opaque, session-only, validated, and fixed to 16-high canvas widths', () => {
+test('legacy Audio camera requests remain opaque, session-only, validated, and fixed to 16-high canvas widths', () => {
   for (const width of [16, 32, 64, 128]) {
     const { storage, song, now, url, request } = fixture(width);
     assert.match(url, /^\/pixel-camera\.html\?to=audio&audioRequest=[0-9a-f-]{36}$/i);
@@ -47,6 +47,45 @@ test('Audio camera request is opaque, session-only, validated, and fixed to 16-h
     storage.setItem(AUDIO_CAMERA_REQUEST_KEY, '{bad json');
     assert.equal(readAudioCameraRequest({ search: new URL(url, 'https://pixieed.jp').search, storage, now }), null);
   }
+});
+
+test('shared-image handoff preserves a rectangular canvas and the exact local PXD revision pointer', () => {
+  const storage = new MemoryStorage();
+  const song = createAudioSong({ songId: 'shared-rectangle', loopTicks: 16 * 120 });
+  const pxd = { projectId: 'project_123', revisionId: 'revision_456' };
+  const now = 1_800_000_000_000;
+  const url = beginAudioCamera({ song, pxd, width: 23, height: 37, storage, now });
+  const request = readAudioCameraRequest({ search: new URL(url, 'https://pixieed.jp').search, storage, now });
+  assert.deepEqual({ width: request.width, height: request.height, pxd: request.pxd }, { width: 23, height: 37, pxd });
+  const returnedUrl = completeAudioCamera(request, frameFor(23, 37), { storage, now });
+  const returned = takeAudioCameraReturn({ search: new URL(returnedUrl, 'https://pixieed.jp').search, storage, now });
+  assert.deepEqual(returned.pxd, pxd);
+  assert.equal(returned.document.width, 23);
+  assert.equal(returned.document.height, 37);
+  assert.equal(returned.document.pixels.length, 23 * 37);
+});
+
+test('rectangular handoff rejects invalid sizes, mismatched frames, and altered return pointers', () => {
+  const storage = new MemoryStorage();
+  const song = createAudioSong({ songId: 'shared-invalid-size' });
+  const now = 1_800_000_000_000;
+  for (const dimensions of [{ width: 0, height: 12 }, { width: 257, height: 12 }, { width: 12 }, { height: 12 }]) {
+    assert.throws(() => beginAudioCamera({ song, ...dimensions, storage, now }), /寸法|1〜256px/);
+  }
+  const pxd = { projectId: 'project_abc', revisionId: 'revision_def' };
+  const url = beginAudioCamera({ song, pxd, width: 19, height: 21, storage, now });
+  const request = readAudioCameraRequest({ search: new URL(url, 'https://pixieed.jp').search, storage, now });
+  assert.throws(() => completeAudioCamera(request, frameFor(19, 20), { storage, now }), /寸法/);
+  const returnedUrl = completeAudioCamera(request, frameFor(19, 21), { storage, now });
+  const search = new URL(returnedUrl, 'https://pixieed.jp').search;
+  const alteredPointer = search.replace('revision_def', 'revision_other');
+  assert.equal(takeAudioCameraReturn({ search: alteredPointer, storage, now }), null);
+  assert.ok(storage.getItem(AUDIO_CAMERA_REQUEST_KEY), 'a mismatched pointer cannot consume the pending request');
+  const cancelUrl = audioCameraCancelUrl({ search: new URL(url, 'https://pixieed.jp').search, storage, now });
+  const restored = readAudioCameraDraft({ search: new URL(cancelUrl, 'https://pixieed.jp').search, storage, now });
+  assert.deepEqual(restored.pxd, pxd);
+  assert.equal(restored.width, 19);
+  assert.equal(restored.height, 21);
 });
 
 test('captured photo returns to its matching song as a Draw-compatible indexed document', () => {

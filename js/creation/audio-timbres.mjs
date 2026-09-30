@@ -70,13 +70,13 @@ export const AUDIO_INSTRUMENTS = Object.freeze([
   voice('low-drum', 'ロウドラム', 'noise', 0.001, 0.14, 0.025, 0.05, { filter: low(220), noiseColor: 'pink', transient: 0.34 })
 ]);
 
-export const AUDIO_EXTRA_INSTRUMENT_IDS = Object.freeze([
-  'woodblock', 'synth-bell', 'soft-bell', 'pluck-synth', 'warm-pad', 'reed-organ', 'digital-chime', 'low-drum'
-]);
+/** Only the four original voices are free; every later preset shares the site pass. */
+export const AUDIO_BASIC_INSTRUMENT_IDS = Object.freeze(AUDIO_INSTRUMENTS.slice(0, 4).map(({ id }) => id));
+export const AUDIO_EXTRA_INSTRUMENT_IDS = Object.freeze(AUDIO_INSTRUMENTS.slice(4).map(({ id }) => id));
 
 /** The compact editor keeps the iAUDIO-inspired shelf scannable without loading samples. */
 export const AUDIO_INSTRUMENT_GROUPS = Object.freeze([
-  ['基本波形', 0, 4],
+  ['基本4音色', 0, 4],
   ['鍵盤', 4, 10],
   ['弦・打弦', 10, 23],
   ['管・金管', 23, 28],
@@ -84,7 +84,7 @@ export const AUDIO_INSTRUMENT_GROUPS = Object.freeze([
   ['打楽器', 30, 32],
   ['Game Boy', 32, 36],
   ['Famicom', 36, 40],
-  ['追加音色', 40, AUDIO_INSTRUMENTS.length]
+  ['その他', 40, AUDIO_INSTRUMENTS.length]
 ].map(([name, first, end]) => Object.freeze({ name, instruments: Object.freeze(AUDIO_INSTRUMENTS.slice(first, end)) })));
 
 const instrumentById = new Map(AUDIO_INSTRUMENTS.map((instrument) => [instrument.id, instrument]));

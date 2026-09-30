@@ -1,11 +1,13 @@
 import { snapToWholePixels } from '../pixel-scale.mjs?rev=20260929-claude-integration-1';
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
-import { documentRgba } from './draw-core.mjs';
+import { documentRgba } from './draw-core.mjs?rev=20260930-shared-canvas-5';
 import { listOwnVersions, mountPictureShelf } from './picture-shelf.mjs?rev=20260928-picture-shelf-1';
-import { detectDifferenceCandidates, excludeDifferenceCandidate, mapClientPointToPixel, mergeDifferenceCandidates, resolveLocalDrawRevision, splitDifferenceCandidate, validateSpotDifferenceDraft, confirmDifferenceCandidates } from './spot-difference-core.mjs?rev=20260927-spot-difference-1';
+import { detectDifferenceCandidates, excludeDifferenceCandidate, mapClientPointToPixel, mergeDifferenceCandidates, resolveLocalDrawRevision, splitDifferenceCandidate, validateSpotDifferenceDraft, confirmDifferenceCandidates } from './spot-difference-core.mjs?rev=20260930-shared-canvas-5';
 import { openPuzzleHandoff } from './puzzle-handoff.mjs?rev=20260928-puzzle-handoff-1';
-import { mountPxdTools } from './pxd-ui.mjs?rev=20260928-own-work-1';
-import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20260928-pxd-puzzles-1';
+import { mountPxdTools } from './pxd-ui.mjs?rev=20260930-ux-fix-1';
+import { requireSharedCanvasAccess } from './shared-canvas-access.mjs';
+import { putPxdSharedImage } from './pxd-project.mjs?rev=20260930-shared-canvas-5';
+import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20260930-shared-canvas-5';
 
 const LAST_KEY = 'pixieed:creation:spot-difference:last-draft:v1';
 const $ = (selector) => document.querySelector(selector);
@@ -54,7 +56,7 @@ function renderCandidates() {
     checkbox.addEventListener('change', () => { checkbox.checked ? selectedIds.add(candidate.id) : selectedIds.delete(candidate.id); splitPixels.clear(); updateActions(); drawPreview(); });
     label.append(checkbox, document.createTextNode(`候補 ${index + 1}・${candidate.pixels.length}画素`)); item.append(label); list.append(item);
   });
-  updateActions(); drawPreview();
+  updateActions(); drawPreview(); pxdBridge?.markDirty();
 }
 function updateActions() {
   const ids = [...selectedIds].filter((id) => draft?.candidates.some((candidate) => candidate.id === id));
@@ -174,6 +176,7 @@ async function save() {
   savedConfirmedDraftId = null; updateActions();
   saveButton.disabled = true; message('端末に保存しています…');
   try {
+    await pxdBridge?.save();
     const fixedBefore = await resolveLocalDrawRevision(adapter, draft.before.draftId, draft.before.revisionId);
     const fixedAfter = await resolveLocalDrawRevision(adapter, draft.after.draftId, draft.after.revisionId);
     if (JSON.stringify(reference(draft.before.draftId, fixedBefore)) !== JSON.stringify(draft.before) || JSON.stringify(reference(draft.after.draftId, fixedAfter)) !== JSON.stringify(draft.after)) throw new Error('元画像の固定版が一致しません。差分を作り直してください');
@@ -207,6 +210,7 @@ async function resume() {
 
 async function openPxdSpot(project) {
   if (!store || !adapter) throw new Error('端末内保存を利用できません。');
+  if (!project.entries.length) { draft = null; beforeRevision = afterRevision = null; draftId = null; pxdOriginalRefs = pxdPreservedPayload = null; editor.hidden = true; setup.hidden = false; return; }
   const imported = hasPxdPuzzle(project, 'spot_difference')
     ? await materializePxdPuzzle(await readPxdPuzzle(project, 'spot_difference'), { tool: 'spot_difference', store })
     : await createPxdPuzzleFromMain(project, { tool: 'spot_difference', store });
@@ -224,8 +228,8 @@ async function openPxdSpot(project) {
 function mountPxdSpot() {
   if (!store) return null;
   return mountPxdTools({
-    tool: 'spot_difference', hasContent: () => Boolean(draft), openProject: openPxdSpot,
-    getProject: async (project) => draft ? writePxdPuzzle(project, {
+    tool: 'spot_difference', projectWorkspace: true, setStatus: message, hasContent: () => Boolean(draft), openProject: openPxdSpot,
+    getProject: async (project) => draft ? writePxdPuzzle(project.manifest.sharedCanvas ? project : putPxdSharedImage(project, { width: afterRevision.document.width, height: afterRevision.document.height, rgba: documentRgba(afterRevision.document) }), {
       tool: 'spot_difference', document: draft,
       sourceDrawDocuments: { 'spot-before': beforeRevision?.document, 'spot-after': afterRevision?.document },
       portableOriginalRefs: pxdOriginalRefs, preservedPayload: pxdPreservedPayload, sourceChanged: false
@@ -248,10 +252,10 @@ $('#spot-split-mode').addEventListener('click', (event) => {
   splitMode = !splitMode; event.currentTarget.setAttribute('aria-pressed', String(splitMode));
   $('#spot-edit-hint').textContent = splitMode ? '選んだ候補の中をなぞって分割範囲を指定' : '色のついた場所をタップして選択 · ピンチで拡大';
 });
-$('#spot-merge').addEventListener('click', () => { try { draft.candidates = mergeDifferenceCandidates(draft.candidates, [...selectedIds], draft.width, draft.height); selectedIds.clear(); splitPixels.clear(); renderCandidates(); message('選んだ候補をまとめました。'); } catch (error) { message(error.message); } });
+$('#spot-merge').addEventListener('click', () => { if (!requireSharedCanvasAccess(pxdBridge?.currentProject, message)) return; try { draft.candidates = mergeDifferenceCandidates(draft.candidates, [...selectedIds], draft.width, draft.height); selectedIds.clear(); splitPixels.clear(); renderCandidates(); message('選んだ候補をまとめました。'); } catch (error) { message(error.message); } });
 $('#spot-split').addEventListener('click', () => { try { const id = [...selectedIds][0]; draft.candidates = splitDifferenceCandidate(draft.candidates, id, [...splitPixels], draft.width, draft.height); selectedIds.clear(); splitPixels.clear(); renderCandidates(); message('選んだ画素を別の候補に分けました。'); } catch (error) { message(error.message); } });
 $('#spot-exclude').addEventListener('click', () => { try { const id = [...selectedIds][0]; draft.candidates = excludeDifferenceCandidate(draft.candidates, id, draft.width, draft.height); selectedIds.clear(); splitPixels.clear(); renderCandidates(); message('選んだ候補を正解候補から除外しました。'); } catch (error) { message(error.message); } });
-$('#spot-confirm').addEventListener('click', async () => { try { draft = confirmDifferenceCandidates(draft); $('#spot-confirmed').hidden = false; updateActions(); await save(); } catch (error) { message(error.message); } });
+$('#spot-confirm').addEventListener('click', async () => { if (!requireSharedCanvasAccess(pxdBridge?.currentProject, message)) return; try { draft = confirmDifferenceCandidates(draft); $('#spot-confirmed').hidden = false; updateActions(); await save(); } catch (error) { message(error.message); } });
 function cancelTouchEdit() {
   if (!touchEditSnapshot) return;
   selectedIds.clear(); for (const id of touchEditSnapshot.selectedIds) selectedIds.add(id);

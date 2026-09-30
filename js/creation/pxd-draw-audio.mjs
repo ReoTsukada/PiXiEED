@@ -1,20 +1,34 @@
 import { createPxdProject, getPxdJson, setPxdJson } from './pxd-codec.mjs';
 import {
   imageToDrawDocument, mergePxdJson, putPxdDrawDocument, putPxdImage,
-  readPxdDrawDocument as readProjectDrawDocument, readPxdImage
-} from './pxd-project.mjs';
-import { AUDIO_PIXEL_PITCHES, AUDIO_PIXEL_TICKS, AUDIO_PIXEL_COLUMN_OPTIONS, audioPixelColumns, audioSongPixels, resizeAudioCanvas, validateAudioSong } from './audio-core.mjs?rev=20260928-touch-motion-1';
-import { DRAW_SIZES, documentRgba, validateDrawDocument } from './draw-core.mjs';
+  readPxdDrawDocument as readProjectDrawDocument, readPxdImage,
+  readPxdSharedImage, putPxdSharedImage
+} from './pxd-project.mjs?rev=20260930-shared-canvas-5';
+import { AUDIO_PIXEL_PITCHES, AUDIO_PIXEL_TICKS, AUDIO_PIXEL_COLUMN_OPTIONS, AUDIO_PIXEL_PALETTE, AUDIO_SHARED_IMAGE_MAX_DIMENSION, audioPixelColumns, audioSongPixels, createAudioRowPitchMap, extendAudioLoopForImage, resizeAudioCanvas, validateAudioSharedImage, validateAudioSong } from './audio-core.mjs?rev=20260930-audio-timebase-1';
+import { DRAW_SIZES, documentRgba, validateDrawDocument } from './draw-core.mjs?rev=20260930-shared-canvas-5';
 
 const AUDIO_STATE_PATH = 'audio/state.json';
 const AUDIO_LINK_PATH = 'audio/link.json';
 const AUDIO_IMAGE_ROLE = 'audio';
+const SHARED_IMAGE_ROLE = 'main';
+const sharedImageColorCounts = new WeakMap();
 const clone = (value) => structuredClone(value);
 const rgbaHex = (rgba) => [...rgba].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 const colorRgba = (color) => {
   const hex = color.slice(1);
   return [0, 2, 4].map((offset) => Number.parseInt(hex.slice(offset, offset + 2), 16)).concat(hex.length === 8 ? Number.parseInt(hex.slice(6, 8), 16) : 255);
 };
+function imageColorCounts(image) {
+  let counts = sharedImageColorCounts.get(image);
+  if (counts) return counts;
+  counts = new Map();
+  for (let offset = 0; offset < image.rgba.length; offset += 4) {
+    const key = rgbaHex(image.rgba.subarray(offset, offset + 4));
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  sharedImageColorCounts.set(image, counts); image.colorCount = counts.size;
+  return counts;
+}
 function optionalJson(project, path) {
   if (!project?.entries?.some((entry) => entry.path === path)) return null;
   return getPxdJson(project, path);
@@ -71,6 +85,129 @@ export function audioCellLink(song) {
   };
 }
 
+/** Create a link to the PXD's original main image. The audio layer stores only mappings and notes. */
+export function sharedAudioCellLink(song, image, { rowPitchMap = createAudioRowPitchMap(image?.height), colorToSlot = null } = {}) {
+  validateAudioSharedImage(image, rowPitchMap);
+  if (song.loopTicks < image.width * AUDIO_PIXEL_TICKS) throw new RangeError('画像の横幅に対して曲の長さが不足しています');
+  const mapping = rankSharedImageColors(image, (song.pixelPalette || AUDIO_PIXEL_PALETTE).map((slot) => slot.slotId), colorToSlot);
+  return {
+    rulesVersion: 'shared-canvas-v1', imageRole: SHARED_IMAGE_ROLE,
+    width: image.width, height: image.height, rowPitchMap: [...rowPitchMap],
+    colorToSlot: mapping, ticksPerCell: AUDIO_PIXEL_TICKS
+  };
+}
+
+function rankSharedImageColors(image, slotIds, existingMapping = null) {
+  const counts = new Map();
+  for (let offset = 0; offset < image.rgba.length; offset += 4) {
+    if (!image.rgba[offset + 3]) continue;
+    const key = `rgba-${rgbaHex(image.rgba.subarray(offset, offset + 4))}`;
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  return Object.fromEntries([...counts].sort((a, b) => b[1] - a[1]).map(([key], index) => [key, existingMapping ? existingMapping[key] ?? null : slotIds[index] || null]));
+}
+
+function sharedSlotRgba(song, link, slotId) {
+  const colorId = Object.entries(link.colorToSlot).find(([, mapped]) => mapped === slotId)?.[0];
+  if (/^rgba-[0-9a-f]{8}$/i.test(colorId || '')) return colorId.slice(5).match(/../g).map((byte) => Number.parseInt(byte, 16));
+  return colorRgba((song.pixelPalette || AUDIO_PIXEL_PALETTE).find((slot) => slot.slotId === slotId).color);
+}
+
+function sharedCellTicks(song, x, width, link) {
+  if (link.ticksPerCell === AUDIO_PIXEL_TICKS && song.loopTicks >= width * AUDIO_PIXEL_TICKS) {
+    return { startTick: x * AUDIO_PIXEL_TICKS, durationTicks: AUDIO_PIXEL_TICKS };
+  }
+  // Read older PXD links using their original compressed timing until import migrates them.
+  const startTick = Math.floor(x * song.loopTicks / width);
+  const endTick = Math.floor((x + 1) * song.loopTicks / width);
+  return { startTick, durationTicks: Math.max(1, endTick - startTick) };
+}
+
+function sharedImageNotes(song, image, link, { preserve = true } = {}) {
+  validateAudioSharedImage(image, link.rowPitchMap);
+  if (link.rulesVersion !== 'shared-canvas-v1' || link.imageRole !== SHARED_IMAGE_ROLE || link.width !== image.width || link.height !== image.height || !link.colorToSlot || typeof link.colorToSlot !== 'object' || Array.isArray(link.colorToSlot)) throw new TypeError('共有画像と音楽の連携情報が一致しません');
+  const prior = new Map();
+  if (preserve) for (const track of song.tracks) for (const clip of track.clips) for (const note of clip.notes) {
+    const cell = note.sourceCell;
+    if (cell && Number.isInteger(cell.x) && Number.isInteger(cell.y)) prior.set(`${cell.x}:${cell.y}`, note);
+  }
+  const tracks = song.tracks.map((track) => ({ ...track, clips: track.clips.map((clip) => ({ ...clip, notes: clip.notes.filter((note) => !note.sourceCell) })) }));
+  const tracksBySlot = new Map(tracks.map((track) => [track.instrument, track]));
+  const usedNoteIds = new Set(song.tracks.flatMap((track) => track.clips.flatMap((clip) => clip.notes.map((note) => note.noteId))));
+  let sequence = 0;
+  for (let y = 0; y < image.height; y += 1) {
+    const pitch = link.rowPitchMap[y]; if (pitch === null) continue;
+    for (let x = 0; x < image.width; x += 1) {
+      const offset = (y * image.width + x) * 4; if (!image.rgba[offset + 3]) continue;
+      const colorId = `rgba-${rgbaHex(image.rgba.subarray(offset, offset + 4))}`;
+      const slotId = link.colorToSlot[colorId]; if (!slotId) continue;
+      const track = tracksBySlot.get(slotId); if (!track) throw new TypeError('画像色の音色割り当てが不正です');
+      const { startTick, durationTicks } = sharedCellTicks(song, x, image.width, link);
+      const clip = track.clips.find((item) => startTick >= item.startTick && startTick + durationTicks <= item.startTick + item.lengthTicks);
+      if (!clip) throw new RangeError('共有画像の横幅を曲のループへ配置できません');
+      const old = prior.get(`${x}:${y}`);
+      let noteId = old?.noteId;
+      if (!noteId) {
+        do { noteId = `shared-${song.songId}-${++sequence}`; } while (usedNoteIds.has(noteId));
+        usedNoteIds.add(noteId);
+      }
+      clip.notes.push({ ...(old || {}), noteId, pitch, startTick, durationTicks, velocity: old?.velocity || 96, colorId, sourceCell: { x, y } });
+    }
+  }
+  return validateAudioSong({ ...song, tracks });
+}
+
+export function prepareSharedAudioImageImport(song, image, options = {}) {
+  if (image?.rgba instanceof Uint8ClampedArray) image = { ...image, rgba: new Uint8Array(image.rgba) };
+  validateAudioSharedImage(image, options.rowPitchMap || createAudioRowPitchMap(image?.height));
+  imageColorCounts(image);
+  const document = pxdImageToAudioDocument(image);
+  const rowPitchMap = options.rowPitchMap || createAudioRowPitchMap(image.height);
+  const fittedSong = extendAudioLoopForImage(song, image.width);
+  const link = sharedAudioCellLink(fittedSong, image, { rowPitchMap, colorToSlot: options.colorToSlot });
+  const nextSong = sharedImageNotes(fittedSong, image, link);
+  return { song: nextSong, image, link, document, workingDocument: document };
+}
+
+export function setSharedAudioCell(song, image, link, { x, y, slotId = null, active = true } = {}) {
+  validateAudioSong(song); validateAudioSharedImage(image, link?.rowPitchMap);
+  if (link?.rulesVersion !== 'shared-canvas-v1' || link.imageRole !== SHARED_IMAGE_ROLE || link.width !== image.width || link.height !== image.height) throw new TypeError('共有画像と音楽の連携情報が一致しません');
+  if (!Number.isInteger(x) || x < 0 || x >= image.width || !Number.isInteger(y) || y < 0 || y >= image.height) throw new RangeError('選択した画像セルが範囲外です');
+  if (slotId !== null && !(song.pixelPalette || AUDIO_PIXEL_PALETTE).some((slot) => slot.slotId === slotId)) throw new TypeError('音色の割り当て先を確認してください');
+  const nextImage = { ...image, rgba: new Uint8Array(image.rgba) };
+  const nextCounts = new Map(imageColorCounts(image));
+  const nextLink = clone(link); const offset = (y * image.width + x) * 4;
+  const previousKey = rgbaHex(nextImage.rgba.subarray(offset, offset + 4));
+  const targetBytes = !active || slotId === null ? [0, 0, 0, 0] : sharedSlotRgba(song, nextLink, slotId);
+  const targetKey = rgbaHex(targetBytes);
+  if (previousKey !== targetKey) {
+    const previousCount = nextCounts.get(previousKey) || 0;
+    if (previousCount <= 1) nextCounts.delete(previousKey); else nextCounts.set(previousKey, previousCount - 1);
+    nextCounts.set(targetKey, (nextCounts.get(targetKey) || 0) + 1);
+  }
+  if (!active || slotId === null) nextImage.rgba.set([0, 0, 0, 0], offset);
+  else {
+    nextImage.rgba.set(targetBytes, offset);
+    nextLink.colorToSlot[`rgba-${targetKey}`] = slotId;
+  }
+  nextImage.colorCount = nextCounts.size;
+  sharedImageColorCounts.set(nextImage, nextCounts);
+  const prior = song.tracks.flatMap((track) => track.clips.flatMap((clip) => clip.notes.filter((note) => note.sourceCell?.x === x && note.sourceCell?.y === y).map((note) => ({ track, note })))).at(0);
+  const pitch = nextLink.rowPitchMap[y];
+  const { startTick, durationTicks } = sharedCellTicks(song, x, image.width, link);
+  let placed = false;
+  const tracks = song.tracks.map((track) => ({ ...track, clips: track.clips.map((clip) => {
+    const notes = clip.notes.filter((note) => !(note.sourceCell?.x === x && note.sourceCell?.y === y));
+    if (active && slotId !== null && track.instrument === slotId && pitch !== null && startTick >= clip.startTick && startTick + durationTicks <= clip.startTick + clip.lengthTicks) {
+      notes.push({ ...(prior?.note || {}), noteId: prior?.note.noteId || `shared-${song.songId}-${x}-${y}`, pitch, startTick, durationTicks, velocity: prior?.note.velocity || 96, colorId: `rgba-${rgbaHex(nextImage.rgba.subarray(offset, offset + 4))}`, sourceCell: { x, y } });
+      placed = true;
+    }
+    return { ...clip, notes };
+  }) }));
+  if (active && slotId !== null && !placed) throw new RangeError('共有画像のセルを曲のループへ配置できません');
+  return { image: nextImage, link: nextLink, song: validateAudioSong({ ...song, tracks }) };
+}
+
 export function resizePxdAudioWorkingImage(image, link, width) {
   if (!AUDIO_PIXEL_COLUMN_OPTIONS.includes(width) || !image || image.height !== AUDIO_PIXEL_PITCHES.length || image.rgba?.length !== image.width * image.height * 4 || link?.width !== image.width || link.height !== image.height) throw new TypeError('音楽用画像のサイズを変更できません。元画像は保持されています。');
   const next = new Uint8Array(width * image.height * 4); const copyWidth = Math.min(image.width, width);
@@ -79,6 +216,20 @@ export function resizePxdAudioWorkingImage(image, link, width) {
 }
 
 export async function writePxdAudioState(project, song, { image = audioSongImage(song), link = audioCellLink(song) } = {}) {
+  if (link?.rulesVersion === 'shared-canvas-v1') {
+    let next = project || createPxdProject();
+    const shared = await readPxdSharedImage(next);
+    const source = shared || image;
+    assertSharedAudioBinding(song, source, link);
+    if (!shared) throw new TypeError('共有画像を先にPXDのmainへ保存してください');
+    next = optionalJson(next, AUDIO_STATE_PATH) === null
+      ? setPxdJson(next, AUDIO_STATE_PATH, clone(song))
+      : mergePxdJson(next, AUDIO_STATE_PATH, clone(song));
+    next = optionalJson(next, AUDIO_LINK_PATH) === null
+      ? setPxdJson(next, AUDIO_LINK_PATH, clone(link))
+      : mergePxdJson(next, AUDIO_LINK_PATH, clone(link));
+    return next;
+  }
   assertPxdAudioPixelCompatibility(song);
   assertLinkedCellSong(song, link, image);
   assertImageNotesMatch(song, link, image);
@@ -150,7 +301,42 @@ export function preparePxdAudioImageImport(song, image) {
   return { song: importedSong, image: { width, height, rgba: workingRgba }, link, document, workingDocument: pxdImageToAudioDocument({ width, height, rgba: workingRgba }) };
 }
 
+function assertSharedAudioBinding(song, image, link) {
+  validateAudioSharedImage(image, link?.rowPitchMap);
+  if (link?.rulesVersion !== 'shared-canvas-v1' || link.imageRole !== SHARED_IMAGE_ROLE || link.width !== image.width || link.height !== image.height || !link.colorToSlot || typeof link.colorToSlot !== 'object') throw new TypeError('共有画像と音楽の連携情報が一致しません');
+  const expected = new Map();
+  for (let y = 0; y < image.height; y += 1) {
+    const pitch = link.rowPitchMap[y]; if (pitch === null) continue;
+    for (let x = 0; x < image.width; x += 1) {
+      const offset = (y * image.width + x) * 4; if (!image.rgba[offset + 3]) continue;
+      const colorId = `rgba-${rgbaHex(image.rgba.subarray(offset, offset + 4))}`;
+      const slotId = link.colorToSlot[colorId]; if (!slotId) continue;
+      const { startTick, durationTicks } = sharedCellTicks(song, x, image.width, link);
+      const key = `${x}:${y}`; expected.set(key, { pitch, startTick, durationTicks, slotId, colorId });
+    }
+  }
+  const actual = new Map();
+  for (const track of song.tracks) for (const clip of track.clips) for (const note of clip.notes) if (note.sourceCell) {
+    const { x, y } = note.sourceCell;
+    if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || x >= image.width || y < 0 || y >= image.height || actual.has(`${x}:${y}`)) throw new TypeError('音符の画像位置が重複または範囲外です');
+    actual.set(`${x}:${y}`, { pitch: note.pitch, startTick: note.startTick, durationTicks: note.durationTicks, slotId: track.instrument, colorId: note.colorId });
+  }
+  if (expected.size !== actual.size) throw new TypeError('共有画像の色割り当てと音符が一致しません');
+  for (const [key, cell] of expected) {
+    const note = actual.get(key);
+    if (!note || note.pitch !== cell.pitch || note.startTick !== cell.startTick || note.durationTicks !== cell.durationTicks || note.slotId !== cell.slotId || note.colorId !== cell.colorId) throw new TypeError('共有画像の色割り当てと音符が一致しません');
+  }
+  return song;
+}
+
 export function assignPxdAudioColor(song, image, link, colorId, slotId) {
+  if (link?.rulesVersion === 'shared-canvas-v1') {
+    assertSharedAudioBinding(song, image, link);
+    if (!/^rgba-[a-f\d]{8}$/i.test(colorId) || !Object.hasOwn(link.colorToSlot, colorId)) throw new TypeError('画像の色を選び直してください。');
+    if (slotId !== null && !song.pixelPalette.some((slot) => slot.slotId === slotId)) throw new TypeError('音色の割り当て先を確認してください。');
+    const nextLink = { ...link, colorToSlot: { ...link.colorToSlot, [colorId]: slotId } };
+    return { song: sharedImageNotes(song, image, nextLink), link: nextLink };
+  }
   assertLinkedCellSong(song, link, image);
   if (!/^rgba-[a-f\d]{8}$/i.test(colorId) || !Object.hasOwn(link.colorToSlot, colorId)) throw new TypeError('画像の色を選び直してください。');
   if (slotId !== null && !song.pixelPalette.some((slot) => slot.slotId === slotId)) throw new TypeError('音色の割り当て先を確認してください。');
@@ -159,6 +345,7 @@ export function assignPxdAudioColor(song, image, link, colorId, slotId) {
 }
 
 function rebuildLinkedPixelNotes(song, image, link) {
+  if (link?.rulesVersion === 'shared-canvas-v1') return sharedImageNotes(song, image, link);
   const old = new Map();
   for (const track of song.tracks) for (const clip of track.clips) for (const note of clip.notes) if (AUDIO_PIXEL_PITCHES.includes(note.pitch) && note.startTick % AUDIO_PIXEL_TICKS === 0 && note.durationTicks === AUDIO_PIXEL_TICKS) old.set(`${note.pitch}:${note.startTick}`, { track, note });
   const tracks = song.tracks.map((track) => ({ ...track, clips: track.clips.map((clip) => ({ ...clip, notes: clip.notes.filter((note) => !AUDIO_PIXEL_PITCHES.includes(note.pitch)) })) }));
@@ -176,6 +363,7 @@ function rebuildLinkedPixelNotes(song, image, link) {
 }
 
 function assertImageNotesMatch(song, link, image) {
+  if (link?.rulesVersion === 'shared-canvas-v1') return assertSharedAudioBinding(song, image, link);
   const pixels = audioSongPixels(song); const colorToSlot = link.colorToSlot;
   for (let index = 0; index < pixels.pixels.length; index += 1) {
     const offset = index * 4; const rgba = image.rgba.subarray(offset, offset + 4);
@@ -186,6 +374,13 @@ function assertImageNotesMatch(song, link, image) {
 }
 
 function assertLinkedCellSong(song, link, image) {
+  if (link?.rulesVersion === 'shared-canvas-v1') {
+    validateAudioSong(song);
+    validateAudioSharedImage(image, link.rowPitchMap);
+    if (link.imageRole !== SHARED_IMAGE_ROLE || link.width !== image.width || link.height !== image.height || link.width > AUDIO_SHARED_IMAGE_MAX_DIMENSION || link.height > AUDIO_SHARED_IMAGE_MAX_DIMENSION) throw new TypeError('共有画像と音楽の連携情報が一致しません');
+    for (const slotId of Object.values(link.colorToSlot || {})) if (slotId !== null && !song.pixelPalette.some((slot) => slot.slotId === slotId)) throw new TypeError('画像色の音色割り当てが壊れています。');
+    return;
+  }
   assertPxdAudioPixelCompatibility(song);
   if (link?.rulesVersion !== 'pixel-cell-v1' || link.imageRole !== AUDIO_IMAGE_ROLE || link.width !== image.width || link.height !== image.height || link.width !== audioPixelColumns(song) || link.height !== AUDIO_PIXEL_PITCHES.length || link.ticksPerCell !== AUDIO_PIXEL_TICKS || JSON.stringify(link.rowPitchMap) !== JSON.stringify(AUDIO_PIXEL_PITCHES)) throw new TypeError('この曲は同じ大きさのセル連携に対応していません。曲と原本は変更しません。');
   const occupied = new Set();
@@ -219,10 +414,44 @@ function updateCell(song, pitch, tick, slotId, colorId = undefined) {
 
 /** Update only cells changed in the selected linked Draw image; reject old/complex DAW notes untouched. */
 export async function synchronizeLinkedAudioImage(project, document, role = 'main') {
-  validateDrawDocument(document);
   const link = optionalJson(project, AUDIO_LINK_PATH);
   if (!link || role !== link.imageRole) return project;
-  const before = await readPxdImage(project, role); const storedSong = readPxdAudioState(project);
+  const storedSong = readPxdAudioState(project);
+  if (link.rulesVersion === 'shared-canvas-v1') {
+    const before = await readPxdSharedImage(project);
+    if (!before || !storedSong) throw new TypeError('連携した共有画像または曲が見つかりません。');
+    assertSharedAudioBinding(storedSong, before, link);
+    let after;
+    if (document?.rgba instanceof Uint8Array || document?.rgba instanceof Uint8ClampedArray) after = { width: document.width, height: document.height, rgba: new Uint8Array(document.rgba) };
+    else { validateDrawDocument(document); after = { width: document.width, height: document.height, rgba: documentRgba(document) }; }
+    if (!after || !Number.isInteger(after.width) || !Number.isInteger(after.height) || after.width < 1 || after.width > AUDIO_SHARED_IMAGE_MAX_DIMENSION || after.height < 1 || after.height > AUDIO_SHARED_IMAGE_MAX_DIMENSION || after.rgba.length !== after.width * after.height * 4) throw new RangeError('変更後の共有画像サイズが音楽連携の範囲外です');
+    let changed = false; const nextLink = clone(link);
+    if (before.width !== after.width || before.height !== after.height) changed = true;
+    if (before.width === after.width && before.height === after.height) for (let index = 0; index < before.width * before.height; index += 1) {
+      const offset = index * 4;
+      for (let channel = 0; channel < 4; channel += 1) if (before.rgba[offset + channel] !== after.rgba[offset + channel]) { changed = true; break; }
+    }
+    nextLink.width = after.width; nextLink.height = after.height;
+    nextLink.ticksPerCell = AUDIO_PIXEL_TICKS;
+    if (nextLink.rowPitchMap.length !== after.height) nextLink.rowPitchMap = createAudioRowPitchMap(after.height);
+    const afterColors = new Set();
+    for (let index = 0; index < after.width * after.height; index += 1) {
+      const offset = index * 4;
+      if (after.rgba[offset + 3]) {
+        const colorId = `rgba-${rgbaHex(after.rgba.subarray(offset, offset + 4))}`;
+        afterColors.add(colorId);
+      }
+    }
+    nextLink.colorToSlot = Object.fromEntries([...afterColors].map((colorId) => [colorId, link.colorToSlot?.[colorId] ?? null]));
+    if (!changed && link.ticksPerCell === AUDIO_PIXEL_TICKS) return project;
+    const song = sharedImageNotes(extendAudioLoopForImage(storedSong, after.width), after, nextLink);
+    let next = mergePxdJson(project, AUDIO_STATE_PATH, song);
+    next = mergePxdJson(next, AUDIO_LINK_PATH, nextLink);
+    next = await putPxdSharedImage(next, after);
+    return next;
+  }
+  validateDrawDocument(document);
+  const before = await readPxdImage(project, role);
   if (!before || !storedSong) throw new TypeError('連携した画像または曲が見つかりません。');
   assertLinkedCellSong(storedSong, link, before);
   if (before.width !== document.width || before.height !== document.height) throw new RangeError('元画像と描画サイズが異なるためセル連携できません。曲と原本は変更しません。');

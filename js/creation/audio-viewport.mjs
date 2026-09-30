@@ -57,6 +57,12 @@ export function createAudioViewport(canvas, host, { onStrokeStart = () => {}, on
   }, { passive: false });
   return {
     get isGesturing() { return gesturing; },
+    getState() { return { zoom, x, y }; },
+    restoreState(state) {
+      zoom = Number.isFinite(state?.zoom) ? Math.max(1, Math.min(16, state.zoom)) : 1;
+      x = Number.isFinite(state?.x) ? state.x : 0; y = Number.isFinite(state?.y) ? state.y : 0;
+      gesture = null; gesturing = false; touches.clear(); layout();
+    },
     resize(nextWidth, nextHeight) {
       if (nextWidth !== width || nextHeight !== height) { zoom = 1; x = 0; y = 0; }
       width = nextWidth; height = nextHeight; layout();

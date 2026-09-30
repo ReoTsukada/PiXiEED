@@ -194,8 +194,8 @@ test('draw page exposes local copies (no camera copy: camera shots are not edite
   assert.match(html, /id="draw-size"/); assert.match(html, /id="draw-import-local"/); assert.doesNotMatch(html, /id="draw-import-camera"/); assert.match(html, /id="draw-copy-last"/);
   const page = await readFile(new URL('../../js/creation/draw-page.mjs', import.meta.url), 'utf8');
   assert.match(page, /drawAdapter = createIndexedDbDraftAdapter\(\); store = createLocalDraftStore\(drawAdapter\)/); assert.match(page, /store\.save\(/); assert.match(page, /store\.load\(/);
-  assert.match(page, /resizeDrawDocument/); assert.doesNotMatch(page, /cameraHandoffImage/); assert.doesNotMatch(page, /fetch\(|supabase|create-post/i);
-  assert.throws(() => validateDrawDocument({ schemaVersion: 2 }), /16〜512/);
+  assert.match(page, /resizeDrawRectangle/); assert.doesNotMatch(page, /cameraHandoffImage/); assert.doesNotMatch(page, /fetch\(|supabase|create-post/i);
+  assert.throws(() => validateDrawDocument({ schemaVersion: 2 }), /1〜512/);
 });
 
 test('draw workspace prioritizes the canvas and supports touch zoom gestures accessibly', async () => {
@@ -203,7 +203,7 @@ test('draw workspace prioritizes the canvas and supports touch zoom gestures acc
   const html = await readFile(new URL('../../draw/index.html', import.meta.url), 'utf8');
   const css = await readFile(new URL('../../css/creation-draw.css', import.meta.url), 'utf8');
   const page = await readFile(new URL('../../js/creation/draw-page.mjs', import.meta.url), 'utf8');
-  assert.match(html, /class="draw-board" aria-label="描画エリア。2本指で拡大・移動できます。"/);
+  assert.match(html, /class="draw-board\b[^"]*" aria-label="描画エリア。2本指で拡大・移動できます。"/);
   assert.match(html, /id="draw-zoom-label"/);
   assert.match(css, /grid-template-rows:auto auto minmax\(0,1fr\) auto/);
   assert.match(css, /height:100dvh/);
@@ -231,7 +231,7 @@ test('かんたんドット: 16 fixed colours, up to 64px, and anything larger o
   const song = core.createDrawDocument(32); song.palette = ['#14283c', '#506478', '#8ca0b4']; song.pixels[5] = 2;
   const kept = core.toSimpleDrawDocument(song); assert.deepEqual(kept.document.palette, song.palette); assert.equal(kept.recolored, false); assert.equal(kept.changed, false); assert.equal(kept.document.pixels[5], 2);
   const page = await import('node:fs/promises').then((fs) => fs.readFile(new URL('../../js/creation/draw-page.mjs', import.meta.url), 'utf8'));
-  assert.match(page, /SIMPLE_DRAW_SIZES\.forEach/); assert.match(page, /fitToSimple\(structuredClone\(revision\.document\)\)/);
+  assert.match(page, /\[16, 32, 64, 128, 256\]\.forEach/); assert.doesNotMatch(page, /fitToSimple\(/);
 });
 
 test('かんたんドット: a colour change is one undo step and undo reports only what changed', async () => {

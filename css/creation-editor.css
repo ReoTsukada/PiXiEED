@@ -1,0 +1,249 @@
+/* Shared full-screen drawing surface for the simple pixel and music editors. */
+body.creation-editor {
+  --creation-ink: #f4f0e4;
+  --creation-panel: #202a33;
+  --creation-panel-edge: #39454e;
+  --creation-muted: #b8c0c2;
+  --creation-yellow: #ffd35a;
+  --creation-editor-header: 64px;
+  --creation-editor-bottom: 84px;
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+  padding: 0 !important;
+  background: #151d24;
+  color: var(--creation-ink);
+}
+body.creation-editor .site-header.px-site-header,
+body.creation-editor .site-header { display: block; position: fixed; inset: 0 0 auto; z-index: 35; height: var(--px-header-height, 64px); min-height: 0; }
+body.creation-editor .site-header .px-header-inner,
+body.creation-editor .site-header .header-inner { min-height: var(--px-header-height, 64px); height: var(--px-header-height, 64px); }
+body.creation-editor #main {
+  position: fixed;
+  inset: var(--creation-editor-header) 0 var(--creation-editor-bottom);
+  box-sizing: border-box;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  min-height: 0;
+  height: auto !important;
+  margin: 0;
+  padding: 8px 10px;
+  overflow: hidden;
+  color: var(--creation-ink);
+}
+body.creation-editor .creation-editor__title { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+body.creation-editor .app-tabs { z-index: 30; }
+body.creation-editor .app-tabs button,
+body.creation-editor .app-tabs a { min-width: 44px; min-height: 44px; }
+
+body.creation-editor .draw-page {
+  display: grid;
+  grid-template-areas: "stage" "controls";
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 8px;
+  height: auto;
+  padding: 0;
+}
+body.creation-editor .draw-meta { grid-area: stage; align-self: start; z-index: 1; display: flex; align-items: center; gap: 8px; color: var(--creation-muted); }
+body.creation-editor .draw-status { min-width: 0; margin: 0; color: inherit; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body.creation-editor .draw-board { grid-area: stage; min-width: 0; min-height: 0; border: 1px solid #ffffff14; border-radius: 16px; background: #19232b; }
+body.creation-editor #draw-canvas { width: min(100%, min(68vh, 560px)); max-height: 100%; border-color: #ffffff30; }
+
+body.creation-editor .audio-page {
+  display: block;
+  height: auto;
+  padding: 0;
+  color: var(--creation-ink);
+  background: transparent;
+}
+body.creation-editor .audio-workspace {
+  display: grid;
+  grid-template-areas: "stage" "controls";
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+}
+body.creation-editor .audio-grid-wrap { grid-area: stage; min-width: 0; min-height: 0; border: 1px solid #ffffff14; border-radius: 16px; background: #19232b; box-shadow: none; }
+body.creation-editor .audio-pixel-canvas { outline-color: #ffffff35; box-shadow: 0 10px 28px #0004; }
+
+body.creation-editor .creation-editor__controls {
+  box-sizing: border-box;
+  grid-area: controls;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  width: 100%;
+  max-height: 100%;
+  align-self: stretch;
+  min-height: 0;
+  padding: 8px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--creation-panel-edge);
+  border-radius: 16px;
+  background: var(--creation-panel);
+  color: var(--creation-ink);
+  box-shadow: 0 8px 24px #0003;
+  scrollbar-width: thin;
+}
+body.creation-editor .creation-editor__palette { display: grid; grid-template-columns: 44px minmax(0, 1fr); align-items: center; gap: 8px; min-width: 0; }
+body.creation-editor .draw-current,
+body.creation-editor .audio-current {
+  box-sizing: border-box;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 5px;
+  border: 1px solid #ffffff30;
+  border-radius: 11px;
+  background: #10181e;
+}
+body.creation-editor .draw-current span,
+body.creation-editor .audio-current__swatch { position: absolute; inset: 7px; display: block; border: 1px solid #ffffff45; border-radius: 7px; background: var(--draw-color, var(--editor-color, #fff)); }
+body.creation-editor .audio-current { position: relative; }
+body.creation-editor .draw-control-row .draw-current { position: relative; }
+body.creation-editor .draw-palette { grid-template-columns: repeat(auto-fill, minmax(38px, 1fr)); gap: 6px; max-height: 94px; padding: 3px; }
+body.creation-editor .draw-color { width: 38px; height: 38px; border-color: #e9ece7; }
+body.creation-editor .draw-color[aria-pressed=true] { box-shadow: 0 0 0 3px var(--creation-yellow); }
+body.creation-editor .audio-tracks { grid-template-columns: repeat(4, minmax(44px, 1fr)); gap: 6px; min-width: 0; }
+body.creation-editor .audio-track-choice { min-height: 50px !important; gap: 3px; padding: 5px !important; border: 1px solid #ffffff28 !important; border-radius: 10px; background: #151e25; color: var(--creation-ink); box-shadow: none; }
+body.creation-editor .audio-track-choice__mark { height: 23px; border: 1px solid #fff6; border-radius: 6px; }
+body.creation-editor .audio-track-choice__preset { color: var(--creation-muted); }
+body.creation-editor .audio-track-choice[aria-pressed=true] { border: 2px solid var(--creation-yellow) !important; background: #2b3337; box-shadow: inset 0 0 0 1px #0004; }
+body.creation-editor .creation-editor__tools-row,
+body.creation-editor .creation-editor__actions { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px; min-width: 0; }
+body.creation-editor .draw-toolbar { display: contents; }
+body.creation-editor .draw-tools,
+body.creation-editor .draw-toggles,
+body.creation-editor .draw-actions { display: contents; }
+body.creation-editor .creation-editor__controls button,
+body.creation-editor .creation-editor__controls summary {
+  box-sizing: border-box;
+  min-width: 44px;
+  min-height: 44px;
+  border: 1px solid #ffffff2d;
+  border-radius: 11px;
+  background: #151e25;
+  color: var(--creation-ink);
+  touch-action: manipulation;
+}
+body.creation-editor .creation-editor__controls button[aria-pressed=true],
+body.creation-editor .draw-tools button[aria-pressed=true],
+body.creation-editor .draw-toggles button[aria-pressed=true],
+body.creation-editor .audio-tools > button[aria-pressed=true] { border-color: var(--creation-yellow); background: var(--creation-yellow); color: #202a33; }
+body.creation-editor .creation-editor__controls svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+body.creation-editor .audio-tools { justify-content: center; gap: 6px; }
+body.creation-editor .audio-tools > button { display: grid; place-items: center; width: 44px; padding: 0; font-size: 1rem; }
+body.creation-editor #audio-tool-pen::after { display: none; }
+body.creation-editor .audio-header-actions { display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; }
+body.creation-editor .audio-header-actions > button,
+body.creation-editor .audio-header-actions > details > summary { width: 44px; height: 44px; min-width: 44px; padding: 8px !important; border: 1px solid #ffffff2d; border-radius: 11px; background: #151e25; color: var(--creation-ink); }
+body.creation-editor .audio-icon-button img { width: 22px; height: 22px; }
+body.creation-editor .audio-popover { position: relative; }
+body.creation-editor .audio-popover[open] { z-index: 20; }
+body.creation-editor .audio-popover-body { position: fixed; z-index: 41; right: 12px; bottom: calc(var(--creation-editor-bottom) + 56px); top: auto; max-height: min(420px, calc(100dvh - var(--creation-editor-header) - var(--creation-editor-bottom) - 28px)); border-color: #52606a; border-radius: 14px; background: #26323b; color: #fff; box-shadow: 0 14px 36px #0008; }
+body.creation-editor .audio-more .audio-popover-body { top: calc(var(--creation-editor-header) + 8px); bottom: auto; }
+body.creation-editor .audio-palette-row select,
+body.creation-editor .audio-palette-row input[type=color],
+body.creation-editor #audio-canvas-size { color: #17212a; }
+body.creation-editor .audio-status.is-visible { top: calc(var(--creation-editor-header) + 8px); background: #26323b; }
+
+body.creation-editor :is(.creation-editor__controls button, .creation-editor__controls summary, .creation-editor__controls select, .creation-editor__controls input):focus-visible,
+body.creation-editor #draw-canvas:focus-visible,
+body.creation-editor #audio-pixel-canvas:focus-visible { outline: 3px solid #ffe07d; outline-offset: 2px; }
+
+@media (min-width: 900px), (orientation: landscape) and (min-width: 560px) {
+  body.creation-editor #main { padding: 8px 12px; }
+  body.creation-editor .draw-page { grid-template-areas: "stage controls"; grid-template-columns: minmax(0, 1fr) clamp(250px, 30vw, 370px); grid-template-rows: minmax(0, 1fr); gap: 10px; }
+  body.creation-editor .audio-workspace { grid-template-areas: "stage controls"; grid-template-columns: minmax(0, 1fr) clamp(250px, 30vw, 370px); grid-template-rows: minmax(0, 1fr); gap: 10px; }
+  body.creation-editor .creation-editor__controls { max-height: 100%; padding: 10px; }
+  body.creation-editor .creation-editor__palette { grid-template-columns: minmax(0, 1fr); }
+  body.creation-editor .draw-palette { grid-template-columns: repeat(5, minmax(0, 1fr)); max-height: min(38vh, 210px); }
+  body.creation-editor .draw-color { width: 40px; height: 40px; }
+  body.creation-editor .audio-tracks { grid-template-columns: repeat(2, minmax(44px, 1fr)); }
+  body.creation-editor .audio-track-choice { flex-direction: row; align-items: center; min-height: 54px !important; }
+  body.creation-editor .audio-track-choice__mark { width: 28px; height: 28px; flex: none; }
+  body.creation-editor .audio-track-choice__preset { text-align: left; }
+  body.creation-editor .creation-editor__tools-row,
+  body.creation-editor .creation-editor__actions { justify-content: flex-start; }
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  body.creation-editor #main { padding-block: 4px; }
+  body.creation-editor .draw-page,
+  body.creation-editor .audio-workspace { gap: 5px; }
+  body.creation-editor .creation-editor__controls { gap: 4px; padding: 5px; }
+  body.creation-editor .draw-palette { grid-template-columns: repeat(8, minmax(0, 1fr)); max-height: 80px; }
+  body.creation-editor .draw-color { width: 34px; height: 34px; }
+}
+@media (max-width: 360px) and (orientation: portrait) {
+  body.creation-editor #main { padding-inline: 6px; }
+  body.creation-editor .creation-editor__controls { padding: 6px; }
+  body.creation-editor .draw-palette { grid-template-columns: repeat(6, minmax(38px, 1fr)); }
+  body.creation-editor .creation-editor__actions { gap: 4px; }
+}
+
+/* Keep a useful drawing surface on short phones; the controls remain reachable
+   in their own scroll area when the viewport cannot show every row at once. */
+@media (max-width: 600px) and (orientation: portrait) {
+  body.creation-editor .draw-page,
+  body.creation-editor .audio-workspace {
+    grid-template-rows: minmax(184px, 1fr) minmax(0, auto);
+  }
+  body.creation-editor .creation-editor__controls {
+    max-height: min(220px, calc(100dvh - var(--creation-editor-header) - var(--creation-editor-bottom) - 220px));
+    overflow-y: auto;
+  }
+}
+
+/* Older drawing rules use !important for their compact layouts; these scoped
+   overrides keep the shared 44px controls and swatches at every breakpoint. */
+body.creation-editor[data-page="draw"] .draw-control-row { grid-template-columns: 44px minmax(0, 1fr) !important; gap: 8px !important; }
+body.creation-editor[data-page="draw"] .draw-current { display: block !important; width: 44px !important; height: 44px !important; min-width: 44px !important; min-height: 44px !important; }
+body.creation-editor[data-page="draw"] .draw-palette { grid-auto-flow: column !important; grid-auto-columns: 44px !important; grid-template-columns: none !important; justify-content: start !important; width: 100% !important; max-height: 58px !important; overflow-x: auto !important; overflow-y: hidden !important; }
+body.creation-editor[data-page="draw"] .draw-palette .draw-color { width: 44px !important; height: 44px !important; min-width: 44px !important; min-height: 44px !important; max-width: none !important; }
+body.creation-editor[data-page="draw"] .draw-palette .draw-color { background: var(--draw-color) !important; }
+body.creation-editor[data-page="draw"] .draw-palette .draw-color--transparent { background: repeating-conic-gradient(#cfd4cc 0 25%, #fff 0 50%) 0 0 / 10px 10px !important; }
+body.creation-editor[data-page="draw"] .draw-tools button,
+body.creation-editor[data-page="draw"] .draw-toggles button,
+body.creation-editor[data-page="draw"] .draw-actions button,
+body.creation-editor[data-page="draw"] .draw-actions .draw-import > summary { box-sizing: border-box !important; width: 44px !important; height: 44px !important; min-width: 44px !important; min-height: 44px !important; }
+body.creation-editor[data-page="draw"] .draw-tools button[aria-pressed="true"],
+body.creation-editor[data-page="draw"] .draw-toggles button[aria-pressed="true"] { border: 1px solid var(--creation-yellow) !important; background: var(--creation-yellow) !important; color: #202a33 !important; }
+body.creation-editor[data-page="draw"] .draw-toggles button[aria-pressed="true"] { box-shadow: 0 3px 0 #b88f1d !important; }
+body.creation-editor[data-page="draw"] .draw-actions { justify-content: flex-start !important; margin-top: 0 !important; padding-top: 0 !important; border-top: 0 !important; }
+body.creation-editor[data-page="draw"] .draw-controls { display: flex !important; flex-direction: column !important; grid-template-columns: minmax(0, 1fr) !important; justify-items: stretch !important; align-content: start !important; }
+body.creation-editor[data-page="draw"] .draw-toolbar,
+body.creation-editor[data-page="draw"] .draw-tools,
+body.creation-editor[data-page="draw"] .draw-toggles,
+body.creation-editor[data-page="draw"] .draw-actions { display: flex !important; align-items: center; justify-content: flex-start; flex-wrap: wrap; gap: 6px; }
+body.creation-editor[data-page="draw"] .draw-toolbar { margin: 0; }
+body.creation-editor[data-page="draw"] #draw-canvas { width: min(calc(100cqw - 16px), calc((100cqh - 16px) * var(--draw-aspect, 1))); height: auto; max-height: none; }
+body.creation-editor[data-page="audio"] .audio-track-choice[aria-pressed="true"] { background: #26323b !important; color: #fff !important; transform: none; box-shadow: 0 0 0 2px #ffd35a !important; }
+body.creation-editor .audio-icon-button img { filter: brightness(0) invert(1); }
+body.creation-editor .audio-tools > details > summary { font-weight: 750; font-size: .8rem; }
+body.creation-editor .audio-current__swatch { background: var(--editor-color, #fff); }
+body.creation-editor .creation-editor__controls details:not([open]) > :not(summary) { display: none !important; }
+body.creation-editor[data-page="draw"] .creation-editor__controls .draw-import__options .draw-size-seg button { min-height: 44px !important; height: 44px !important; }
+body.creation-editor .dce-reset, body.creation-editor .dce-done { width: 44px; height: 44px; }
+body.creation-editor .dce-quick { grid-template-columns: repeat(auto-fit, minmax(44px, 1fr)); }
+body.creation-editor .dce-quick button { min-width: 44px; min-height: 44px; }
+body.creation-editor .dce-slider input { min-height: 44px; }
+@media (min-width: 900px), (orientation: landscape) and (min-width: 560px) {
+  body.creation-editor[data-page="draw"] .draw-control-row { grid-template-columns: minmax(0, 1fr) !important; }
+  body.creation-editor[data-page="draw"] .draw-palette { grid-auto-flow: row !important; grid-auto-columns: auto !important; grid-template-columns: repeat(auto-fit, minmax(44px, 1fr)) !important; max-height: 260px !important; overflow: auto !important; }
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  body.creation-editor .creation-editor__palette,
+  body.creation-editor[data-page="draw"] .draw-control-row { grid-template-columns: 44px minmax(0, 1fr) !important; }
+  body.creation-editor[data-page="draw"] .draw-palette { max-height: 58px !important; }
+}

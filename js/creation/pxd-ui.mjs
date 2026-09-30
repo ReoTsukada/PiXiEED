@@ -1,8 +1,9 @@
 import { createPxdProject, decodePxd, encodePxd } from './pxd-codec.mjs';
 import { createPxdStore } from './pxd-store.mjs';
-import { pxdImageRoles, pxdToolUrl, primaryPxdImageRole } from './pxd-project.mjs';
-import { documentRgba } from './draw-core.mjs';
+import { pxdImageRoles, pxdToolUrl, primaryPxdImageRole } from './pxd-project.mjs?rev=20260930-shared-canvas-5';
+import { documentRgba } from './draw-core.mjs?rev=20260930-shared-canvas-5';
 import { assertOwnPublicSources, getPxdPublicSources } from './work-save-policy.mjs';
+import { mountProjectWorkspace } from './project-workspace.mjs?rev=20260930-ux-fix-1';
 
 const labels = { draw: 'ドット絵', audio: 'ドットで音楽', jigsaw: 'ジグソー', spot_difference: '間違い探し', hidden_object: 'もの探し' };
 function errorMessage(error) {
@@ -45,6 +46,7 @@ export function confirmPxdConversion({ image, document: working, message = '原�
   });
 }
 function documentRgbaLoose(value) {
+  if (value?.rgba instanceof Uint8Array && value.rgba.length === value.width * value.height * 4) return value.rgba;
   try { return documentRgba(value); } catch {
     if (!Array.isArray(value?.palette) || !Array.isArray(value?.pixels) || value.pixels.length !== value.width * value.height) throw new TypeError('コピーの画像を確認できません。');
     const rgba = new Uint8Array(value.pixels.length * 4);
@@ -52,7 +54,9 @@ function documentRgbaLoose(value) {
     return rgba;
   }
 }
-export function mountPxdTools({ tool, getProject, openProject, setStatus = () => {}, hasContent = () => true, getPublicSources = () => [], mount }) {
+export function mountPxdTools(options) {
+  if (options.projectWorkspace) return mountProjectWorkspace(options);
+  const { tool, getProject, openProject, setStatus = () => {}, hasContent = () => true, getPublicSources = () => [], mount } = options;
   style(); const store = createPxdStore(); const uncommitted = new Set(); let current = null; let held = null; let opening = null; let queue = Promise.resolve(); let busy = false;
   let savePermission = true; let permissionEpoch = 0;
   const details = document.createElement('details'); details.className = 'pxd-tools'; details.id = 'pxd-tools';

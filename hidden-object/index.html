@@ -10,12 +10,13 @@
 <link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180"><link rel="manifest" href="/manifest.webmanifest">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f4f2ec">
-  <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20260929-workspace-1">
+  <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20260930-claude-review-1">
   <link rel="stylesheet" href="/css/site.css?rev=20260929-claude-integration-1">
   <link rel="stylesheet" href="/css/creation-hidden-object.css?rev=20260929-workspace-1">
-  <link rel="stylesheet" href="/css/site-header.css?rev=20260929-tool-ui-1">
+  <link rel="stylesheet" href="/css/site-header.css?rev=20260930-claude-review-1">
   <link rel="stylesheet" href="/css/arcade.css?rev=20260929-claude-integration-1">
   <link rel="stylesheet" href="/css/arcade-tools.css?rev=20260929-claude-integration-1">
+  <link rel="stylesheet" href="/css/puzzle-modes.css?rev=20260930-puzzle-list-1">
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253" crossorigin="anonymous"></script>
 </head>
 <body data-tool-name="かんたんもの探し" data-tool-short="もの探し" data-page="hidden-object" class="app-page app-page--tool-hidden-object">
@@ -23,6 +24,7 @@
   <header class="site-header"><div class="container header-inner"><a class="brand" href="/" aria-label="PiXiEED ホーム"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a></div></header>
   <main id="main" class="hidden-page">
     <header class="hidden-heading"><h1>かんたんもの探し</h1><p>見つけてほしいものを、絵の上にぬって登録しよう。</p></header>
+    <a class="puzzle-list-back" href="/play/hidden-object/">‹ みんなの一覧へ</a>
     <p id="hidden-status" class="hidden-status" role="status" aria-live="polite">自分の端末に保存した絵を選んでください。</p>
     <section id="hidden-setup" class="hidden-setup" aria-label="元の絵を選ぶ">
       <div id="hidden-shelf" hidden></div>
@@ -48,6 +50,7 @@
           <button id="hidden-confirm" class="hidden-confirm" type="button" disabled>対象と正解範囲を確定</button>
           <p id="hidden-confirmed" class="hidden-confirmed" role="status" hidden>作者が指定した対象を確定しました。端末内の非公開下書きです。</p>
           <button id="hidden-new" class="hidden-new" type="button" hidden>別のもの探しを作る</button>
+          <a class="puzzle-editor-play" href="/play/hidden-object/">みんなの一覧へ</a>
         </div>
       </details>
       <div class="hidden-publish-actions" aria-label="確定したもの探しの操作">
@@ -65,8 +68,8 @@
     <a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""></a>
     <a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>
   </nav>
-  <script type="module" src="/js/creation/hidden-object-page.mjs?rev=20260929-claude-integration-1"></script>
+  <script type="module" src="/js/creation/hidden-object-page.mjs?rev=20260930-ux-fix-1"></script>
   <script type="module" src="/js/arcade-dress.mjs?rev=20260929-claude-integration-1"></script>
-  <script type="module" src="/js/site-header.mjs?rev=20260929-tool-ui-1"></script>
+  <script type="module" src="/js/site-header.mjs?rev=20260930-claude-review-1"></script>
 </body>
 </html>

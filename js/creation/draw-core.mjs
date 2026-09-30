@@ -18,7 +18,7 @@ export function createDrawDocument(size = DRAW_SIZE) {
 }
 
 export function validateDrawDocument(document) {
-  if (!document || document.schemaVersion !== DRAW_SCHEMA_VERSION || !DRAW_SIZES.includes(document.width) || !DRAW_SIZES.includes(document.height)) throw new TypeError('16〜512px の編集データではありません');
+  if (!document || document.schemaVersion !== DRAW_SCHEMA_VERSION || ![document.width, document.height].every((side) => Number.isInteger(side) && side >= 1 && side <= 512)) throw new TypeError('1〜512px の編集データではありません');
   if (!Array.isArray(document.palette) || document.palette.length < 1 || document.palette.length > MAX_DRAW_COLORS || document.palette.some((color) => typeof color !== 'string' || !/^#[a-f\d]{6}(?:[a-f\d]{2})?$/i.test(color))) throw new TypeError('色パレットが壊れています');
   if (!Array.isArray(document.pixels) || document.pixels.length !== document.width * document.height || document.pixels.some((pixel) => !Number.isInteger(pixel) || pixel < -1 || pixel >= document.palette.length)) throw new TypeError('画素データが壊れています');
   return document;
@@ -27,16 +27,21 @@ export function validateDrawDocument(document) {
 export function resizeDrawDocument(document, size) {
   validateDrawDocument(document);
   if (!DRAW_SIZES.includes(size)) throw new RangeError('16/32/64/128/256/512px から選んでください');
-  if (size === document.width && size === document.height) return { ...document, palette: [...document.palette], pixels: [...document.pixels] };
-  const pixels = Array(size * size).fill(-1); const oldWidth = document.width; const oldHeight = document.height;
-  for (let y = 0; y < size; y += 1) {
-    const sourceY = Math.min(oldHeight - 1, Math.floor((y + 0.5) * oldHeight / size));
-    for (let x = 0; x < size; x += 1) {
-      const sourceX = Math.min(oldWidth - 1, Math.floor((x + 0.5) * oldWidth / size));
-      pixels[y * size + x] = document.pixels[sourceY * oldWidth + sourceX];
+  return resizeDrawRectangle(document, size, size);
+}
+
+export function resizeDrawRectangle(document, width, height) {
+  validateDrawDocument(document);
+  if (![width, height].every((side) => Number.isInteger(side) && side >= 1 && side <= 512)) throw new RangeError('キャンバスは1〜512pxで指定してください');
+  const pixels = Array(width * height).fill(-1); const oldWidth = document.width; const oldHeight = document.height;
+  for (let y = 0; y < height; y += 1) {
+    const sourceY = Math.min(oldHeight - 1, Math.floor((y + 0.5) * oldHeight / height));
+    for (let x = 0; x < width; x += 1) {
+      const sourceX = Math.min(oldWidth - 1, Math.floor((x + 0.5) * oldWidth / width));
+      pixels[y * width + x] = document.pixels[sourceY * oldWidth + sourceX];
     }
   }
-  return { ...document, width: size, height: size, palette: [...document.palette], pixels };
+  return { ...document, width, height, palette: [...document.palette], pixels };
 }
 
 function pointIndex(x, y, width, height) {
@@ -45,8 +50,9 @@ function pointIndex(x, y, width, height) {
   return px < 0 || py < 0 || px >= width || py >= height ? -1 : py * width + px;
 }
 
-export function strokePixels(document, from, to, value) {
-  validateDrawDocument(document);
+export function strokePixels(document, from, to, value, { trusted = false } = {}) {
+  // Pointer moves operate on an already validated document; importing and committing still validate fully.
+  if (!trusted) validateDrawDocument(document);
   if (!Number.isInteger(value) || value < -1 || value >= document.palette.length) throw new TypeError('Invalid pixel value');
   const x0 = Math.floor(from.x); const y0 = Math.floor(from.y); const x1 = Math.floor(to.x); const y1 = Math.floor(to.y);
   if (![x0, y0, x1, y1].every(Number.isFinite)) return [];

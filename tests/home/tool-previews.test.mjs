@@ -62,8 +62,9 @@ test('telescope moon starts bright gibbous, gets curved phases, and is full in i
 test('shared tool toys paint recognizable opaque scenes on a 24 by 24 integer grid', () => {
   assert.equal(TOOL_TOY_SIZE, 24);
   const html = readFileSync(new URL('../../tools/index.html', import.meta.url), 'utf8');
-  const markupScenes = [...html.matchAll(/data-tool-preview="([a-z]+)"/g)].map((match) => match[1]);
-  assert.ok(markupScenes.length >= 9);
+  const markupScenes = [...html.matchAll(/class="hp-toy(?: [^"]*)?"[^>]*data-tool-preview="([a-z]+)"/g)].map((match) => match[1]);
+  assert.equal(markupScenes.length, new Set(markupScenes).size, 'each tool scene has one card');
+  assert.ok(markupScenes.length >= 7);
   for (const scene of markupScenes) assert.ok(TOOL_TOY_NAMES.includes(scene), `missing ${scene} scene`);
 
   for (const scene of TOOL_TOY_NAMES) {

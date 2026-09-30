@@ -126,9 +126,9 @@ test('pagehide pauses, pageshow restores one shared pump without duplicate frame
 
 test('watchdog recovers visible drawing when requestAnimationFrame stalls', () => {
   const browser = fakeBrowser(); const scheduler = createVisibleAnimationScheduler(browser.env); let draws = 0;
-  scheduler.add(browser.element(), () => draws++);
-  browser.elapseTimers(250);
-  assert.equal(draws, 1);
+  scheduler.add(browser.element(), () => draws++, { fps: 60 });
+  for (let frame = 0; frame < 6; frame++) browser.elapseTimers(34);
+  assert.equal(draws, 6, 'visible hero keeps updating while rAF is stalled');
   assert.equal(browser.rafs.size, 1); assert.equal(browser.timers.size, 1);
   scheduler.dispose(); assert.equal(browser.timers.size, 0);
 });

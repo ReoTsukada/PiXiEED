@@ -8,6 +8,18 @@ export const FRAME_RATIOS = Object.freeze([
 ]);
 
 export const OUTPUT_SIZES = Object.freeze([16, 32, 64, 96, 128, 160, 256, 512]);
+export const DEFAULT_FRAME_RATIO = '1:1';
+
+/** New camera captures use the same long-edge allowance as the shared canvas. */
+export function sharedOutputSizes(passActive = false) {
+  const maxDimension = passActive ? 256 : 128;
+  return OUTPUT_SIZES.filter((size) => size <= maxDimension);
+}
+
+/** The shared camera keeps screen dimensions out of the saved canvas geometry. */
+export function sharedFrameRatios() {
+  return FRAME_RATIOS.filter((item) => item.ratio !== null);
+}
 
 function assertPositiveFinite(value, name) {
   if (!Number.isFinite(value) || value <= 0) throw new RangeError(`${name} must be a positive finite number`);

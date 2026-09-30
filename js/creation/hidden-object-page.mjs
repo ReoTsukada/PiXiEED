@@ -1,11 +1,13 @@
 import { listOwnVersions, mountPictureShelf } from './picture-shelf.mjs?rev=20260928-picture-shelf-1';
 import { snapToWholePixels } from '../pixel-scale.mjs?rev=20260929-claude-integration-1';
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
-import { documentRgba } from './draw-core.mjs';
-import { HIDDEN_OBJECT_MAX_MASK_PIXELS, confirmHiddenObjectTargets, createHiddenObjectDraft, mapClientPointToPixel, resolveLocalDrawRevision, validateHiddenObjectDraft } from './hidden-object-core.mjs?rev=20260928-short-hitboxes-1';
+import { documentRgba } from './draw-core.mjs?rev=20260930-shared-canvas-5';
+import { HIDDEN_OBJECT_MAX_MASK_PIXELS, confirmHiddenObjectTargets, createHiddenObjectDraft, mapClientPointToPixel, resolveLocalDrawRevision, validateHiddenObjectDraft } from './hidden-object-core.mjs?rev=20260930-shared-canvas-5';
 import { openPuzzleHandoff } from './puzzle-handoff.mjs?rev=20260928-puzzle-handoff-1';
-import { mountPxdTools } from './pxd-ui.mjs?rev=20260928-own-work-1';
-import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20260928-pxd-puzzles-1';
+import { mountPxdTools } from './pxd-ui.mjs?rev=20260930-ux-fix-1';
+import { requireSharedCanvasAccess } from './shared-canvas-access.mjs';
+import { putPxdSharedImage } from './pxd-project.mjs?rev=20260930-shared-canvas-5';
+import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20260930-shared-canvas-5';
 
 const LAST_KEY = 'pixieed:creation:hidden-object:last-draft:v1';
 const $ = (selector) => document.querySelector(selector);
@@ -109,6 +111,9 @@ function installRevision(revision, fixedDraftId, targetModel = null) {
   cursorPixel = 0;
   if (targetModel) {
     draft = validateHiddenObjectDraft(targetModel); draftId = draft.gameId;
+    const ids = new Set(draft.targets.map(({ id }) => id));
+    for (const target of draft.targetNames || []) if (!ids.has(target.id) && typeof target.name === 'string' && target.name.trim()) { draft.targets.push({ id: target.id, name: target.name, pixels: [] }); ids.add(target.id); }
+    delete draft.targetNames;
     maskSets.clear(); for (const target of draft.targets) maskSets.set(target.id, new Set(target.pixels));
     selectedTargetId = draft.targets[0]?.id || null;
   } else {
@@ -148,12 +153,21 @@ async function start() {
 function modelWithMasks() {
   return { ...draft, targets: draft.targets.map((target) => ({ ...target, pixels: [...(maskSets.get(target.id) || [])].sort((a, b) => a - b) })) };
 }
+function portableMaskModel() {
+  const model = modelWithMasks();
+  const pending = model.targets.filter((target) => !target.pixels.length);
+  model.targets = model.targets.filter((target) => target.pixels.length);
+  model.targetNames = pending.map(({ id, name }) => ({ id, name }));
+  return model;
+}
 
 async function save() {
   if (!store || !draft) return;
   savedConfirmedDraftId = null; updateLocalPlayButton();
   saveButton.disabled = true; setStatus('端末に保存しています…');
   try {
+    await pxdBridge?.save();
+    if (!draft.confirmed && draft.targets.some((target) => !maskSets.get(target.id)?.size)) { setStatus('対象名と絵をプロジェクトに保存しました。対象の場所をなぞると正解を確定できます。'); return; }
     await verifyCurrentSource();
     const document = validateHiddenObjectDraft(modelWithMasks());
     const result = await store.save({ draftId: document.gameId, kind: 'hidden_object', ownerId: 'local-owner', document, source: { type: 'local_draft_copy', assetId: document.source.assetId, revisionId: document.source.revisionId } });
@@ -183,6 +197,7 @@ async function resume() {
 
 async function openPxdHidden(project) {
   if (!store || !adapter) throw new Error('端末内保存を利用できません。');
+  if (!project.entries.length) { draft = null; sourceRevision = null; draftId = null; pxdOriginalRefs = pxdPreservedPayload = null; maskSets.clear(); editor.hidden = true; setup.hidden = false; document.body.classList.remove('hidden-object-editing'); return; }
   const imported = hasPxdPuzzle(project, 'hidden_object')
     ? await materializePxdPuzzle(await readPxdPuzzle(project, 'hidden_object'), { tool: 'hidden_object', store })
     : await createPxdPuzzleFromMain(project, { tool: 'hidden_object', store });
@@ -195,28 +210,30 @@ async function openPxdHidden(project) {
 function mountPxdHidden() {
   if (!store) return null;
   return mountPxdTools({
-    tool: 'hidden_object', hasContent: () => Boolean(draft), openProject: openPxdHidden,
-    getProject: async (project) => draft && sourceRevision ? writePxdPuzzle(project, {
-      tool: 'hidden_object', document: modelWithMasks(), sourceDrawDocuments: { hidden: sourceRevision.document },
+    tool: 'hidden_object', projectWorkspace: true, setStatus, hasContent: () => Boolean(draft), openProject: openPxdHidden,
+    getProject: async (project) => draft && sourceRevision ? writePxdPuzzle(project.manifest.sharedCanvas ? project : putPxdSharedImage(project, { width: sourceRevision.document.width, height: sourceRevision.document.height, rgba: documentRgba(sourceRevision.document) }), {
+      tool: 'hidden_object', document: portableMaskModel(), sourceDrawDocuments: { hidden: sourceRevision.document },
       portableOriginalRefs: pxdOriginalRefs, preservedPayload: pxdPreservedPayload, sourceChanged: false
     }) : project
   });
 }
 
 function addTarget() {
+  if (!requireSharedCanvasAccess(pxdBridge?.currentProject, setStatus)) return;
   if (!draft || draft.confirmed) return;
   const name = $('#hidden-name').value.trim();
   if (!name) { setStatus('見つけるものの名前を入力してください。'); $('#hidden-name').focus(); return; }
   if (draft.targets.some((target) => target.name.trim().toLocaleLowerCase('ja') === name.toLocaleLowerCase('ja'))) { setStatus('対象の名前は重複できません。'); return; }
   if (draft.targets.length >= 128) { setStatus('対象は128個までです。'); return; }
   let suffix = draft.targets.length + 1; let id = `target-${String(suffix).padStart(3, '0')}`; const ids = new Set(draft.targets.map((target) => target.id)); while (ids.has(id)) id = `target-${String(++suffix).padStart(3, '0')}`;
-  draft.targets.push({ id, name, pixels: [] }); maskSets.set(id, new Set()); selectedTargetId = id; $('#hidden-name').value = ''; renderTargets(); requestDraw(); setStatus(`${name}を追加しました。絵の上をなぞってマスクを作ってください。`);
+  draft.targets.push({ id, name, pixels: [] }); maskSets.set(id, new Set()); selectedTargetId = id; $('#hidden-name').value = ''; renderTargets(); requestDraw(); pxdBridge?.markDirty(); setStatus(`${name}を追加しました。絵の上をなぞってマスクを作ってください。`);
   document.querySelector('.hidden-settings').open = false;
 }
 
 function removeTarget() {
+  if (!requireSharedCanvasAccess(pxdBridge?.currentProject, setStatus)) return;
   if (!currentTarget() || draft.confirmed) return;
-  const name = currentTarget().name; totalMaskPixels -= maskSets.get(selectedTargetId)?.size || 0; draft.targets = draft.targets.filter((target) => target.id !== selectedTargetId); maskSets.delete(selectedTargetId); selectedTargetId = draft.targets[0]?.id || null; renderTargets(); requestDraw(); setStatus(`${name}を削除しました。`);
+  const name = currentTarget().name; totalMaskPixels -= maskSets.get(selectedTargetId)?.size || 0; draft.targets = draft.targets.filter((target) => target.id !== selectedTargetId); maskSets.delete(selectedTargetId); selectedTargetId = draft.targets[0]?.id || null; renderTargets(); requestDraw(); pxdBridge?.markDirty(); setStatus(`${name}を削除しました。`);
 }
 
 function setPixel(pixel, { refresh = true } = {}) {
@@ -260,6 +277,7 @@ canvas.addEventListener('pointerdown', (event) => {
     }
   }
   if (!currentTarget()) { setStatus('先に名前を付けた対象を選んでください。'); return; }
+  if (!requireSharedCanvasAccess(pxdBridge?.currentProject, setStatus)) return;
   if (event.pointerType === 'touch') touchStrokeSnapshot = { targetId: selectedTargetId, pixels: new Set(maskSets.get(selectedTargetId)), totalMaskPixels };
   const pixel = canvasPoint(event); if (pixel === null) return;
   event.preventDefault(); activePointer = event.pointerId; previousPoint = pixel; canvas.setPointerCapture(event.pointerId); setPixel(pixel);
@@ -292,14 +310,14 @@ function finishPointer(event) {
   const wasTouch = touchPoints.delete(event.pointerId);
   if (wasTouch && event.type === 'pointercancel') cancelTouchStroke();
   if (touchPoints.size < 2) pinchStart = null;
-  if (activePointer === event.pointerId) { activePointer = null; previousPoint = null; renderTargets(); requestDraw(); }
+  if (activePointer === event.pointerId) { activePointer = null; previousPoint = null; renderTargets(); requestDraw(); pxdBridge?.markDirty(); }
   if (wasTouch && touchPoints.size === 0) { touchStrokeSnapshot = null; renderTargets(); requestDraw(); }
 }
 canvas.addEventListener('pointerup', finishPointer); canvas.addEventListener('pointercancel', finishPointer);
 canvas.addEventListener('keydown', (event) => {
   if (!draft || draft.confirmed) return;
   const x = cursorPixel % draft.width; const y = Math.floor(cursorPixel / draft.width); let nextX = x; let nextY = y;
-  if (event.key === 'ArrowLeft') nextX = Math.max(0, x - 1); else if (event.key === 'ArrowRight') nextX = Math.min(draft.width - 1, x + 1); else if (event.key === 'ArrowUp') nextY = Math.max(0, y - 1); else if (event.key === 'ArrowDown') nextY = Math.min(draft.height - 1, y + 1); else if (event.key === ' ' || event.key === 'Enter') { event.preventDefault(); setPixel(cursorPixel); return; } else return;
+  if (event.key === 'ArrowLeft') nextX = Math.max(0, x - 1); else if (event.key === 'ArrowRight') nextX = Math.min(draft.width - 1, x + 1); else if (event.key === 'ArrowUp') nextY = Math.max(0, y - 1); else if (event.key === 'ArrowDown') nextY = Math.min(draft.height - 1, y + 1); else if (event.key === ' ' || event.key === 'Enter') { event.preventDefault(); if (requireSharedCanvasAccess(pxdBridge?.currentProject, setStatus) && setPixel(cursorPixel)) pxdBridge?.markDirty(); return; } else return;
   event.preventDefault(); cursorPixel = nextY * draft.width + nextX; requestDraw();
 });
 canvas.addEventListener('focus', requestDraw); canvas.addEventListener('blur', requestDraw);
@@ -315,6 +333,7 @@ publishButton.addEventListener('click', async () => {
 $('#hidden-add').addEventListener('click', addTarget); $('#hidden-name').addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); addTarget(); } }); $('#hidden-remove').addEventListener('click', removeTarget);
 document.querySelectorAll('[data-hidden-mode]').forEach((button) => button.addEventListener('click', () => { editMode = button.dataset.hiddenMode; document.querySelectorAll('[data-hidden-mode]').forEach((option) => option.setAttribute('aria-pressed', String(option === button))); }));
 $('#hidden-confirm').addEventListener('click', async () => {
+  if (!requireSharedCanvasAccess(pxdBridge?.currentProject, setStatus)) return;
   try { await verifyCurrentSource(); draft = confirmHiddenObjectTargets(modelWithMasks()); $('#hidden-confirmed').hidden = false; renderTargets(); setStatus(`作者指定の${draft.targets.length}対象を確定しました。短い画面でも押せる正解範囲を確保しました。`); await save(); }
   catch (error) { setStatus(`確定できませんでした：${error.message}`); }
 });

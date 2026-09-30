@@ -15,7 +15,7 @@ test('PXD logical image preserves RGBA including hidden RGB, alpha and stable co
 test('large non-square and colourful originals survive PXD without being silently adapted to Draw', async () => {
   const image = { width: 30, height: 16, rgba: Uint8Array.from({ length: 30 * 16 * 4 }, (_, i) => i % 256) };
   const project = await putPxdImage(createPxdProject(), image);
-  assert.throws(() => imageToDrawDocument(image), /対応サイズ外/);
+  assert.deepEqual(documentRgba(imageToDrawDocument(image)), image.rgba);
   assert.deepEqual((await readPxdImage(await decodePxd(await encodePxd(project)))).rgba, image.rgba);
   const colours = { width: 16, height: 16, rgba: new Uint8Array(1024) };
   for (let i = 0; i < 256; i++) colours.rgba.set([i, 80, 90, 255], i * 4);

@@ -1,4 +1,4 @@
-import { AUDIO_PPQ, audioSongPixels, collectAudioEvents, createAudioPlayer } from './audio-core.mjs?rev=20260928-dot-music-1';
+import { AUDIO_PPQ, audioSongPixels, collectAudioEvents, createAudioPlayer } from './audio-core.mjs?rev=20260930-audio-timebase-1';
 import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs';
 import { withPixelPngMetadata } from '../pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
 

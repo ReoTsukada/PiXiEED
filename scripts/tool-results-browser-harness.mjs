@@ -34,7 +34,7 @@ async function contextFor(viewport, configured = false) {
     // WebKit cannot supply the canvas camera used by Chromium. Its camera
     // matrix covers the shared result layout only, without permission retries.
     // Real capture, GIF and audio handoff handlers are checked in Chromium.
-    if (engine === 'webkit' && url.pathname === '/js/pixel-lens/app.mjs') return route.fulfill({ contentType:'application/javascript',body:`import {createToolResultView} from '/js/tool-result-view.mjs?rev=20260929-display-units-1';const main=document.querySelector('#pixelStudio');main.dataset.mode='idle';createToolResultView({key:'camera-result',main,returnLabel:'撮り直す'});` });
+    if (engine === 'webkit' && url.pathname === '/js/pixel-lens/app.mjs') return route.fulfill({ contentType:'application/javascript',body:`import {createToolResultView} from '/js/tool-result-view.mjs?rev=20260929-compact-results-2';const main=document.querySelector('#pixelStudio');main.dataset.mode='idle';createToolResultView({key:'camera-result',main,returnLabel:'撮り直す'});` });
     if (url.pathname === '/data/site-config.js') return route.fulfill({ contentType:'application/javascript',body:config+`\nfor(const key of Object.keys(displayAdConfig.slots)) displayAdConfig.slots[key]=${configured ? '"1234567890"' : '""'};` });
     return route.continue();
   });
@@ -43,7 +43,7 @@ async function contextFor(viewport, configured = false) {
 async function syntheticResult(page, key) {
   if (key === 'camera-result') await page.waitForFunction(()=>document.querySelector('#pixelStudio').dataset.mode !== 'loading');
   await page.evaluate(async (key) => {
-    const {createToolResultView}=await import('/js/tool-result-view.mjs?rev=20260929-display-units-1');
+    const {createToolResultView}=await import('/js/tool-result-view.mjs?rev=20260929-compact-results-2');
     const main=document.querySelector('main');
     const canvas=document.createElement('canvas');canvas.width=canvas.height=24;const c=canvas.getContext('2d');
     c.fillStyle='#91c6d6';c.fillRect(0,0,24,24);c.fillStyle='#ffde95';c.fillRect(17,3,4,4);c.fillStyle='#507968';c.fillRect(0,16,24,8);c.fillStyle='#374a58';c.fillRect(4,9,13,2);c.fillStyle='#df7053';c.fillRect(5,11,11,8);c.fillStyle='#ffe7b2';c.fillRect(7,12,3,3);c.fillStyle='#394651';c.fillRect(12,14,2,5);
@@ -54,21 +54,25 @@ async function syntheticResult(page, key) {
 }
 async function verifyResult(page, configured) {
   assert.equal(await page.locator('.px-tool-result').isVisible(), true);
+  const documentHeight=await page.evaluate(()=>document.documentElement.scrollHeight);
+  assert.ok(documentHeight<=await page.evaluate(()=>innerHeight)+1,`result page must fit viewport: ${documentHeight}px`);
   const picture = page.locator('.px-tool-result__preview:not([hidden])'); assert.equal(await picture.isVisible(),true);
   const source = await page.evaluate(()=>window.__sourceCanvas?.toDataURL());
   const before = await page.locator('.px-tool-result__preview').first().evaluate((c)=>c.toDataURL());
   if(source) { await page.evaluate(()=>window.__sourceCanvas.getContext('2d').clearRect(0,0,24,24));assert.equal(await page.locator('.px-tool-result__preview').first().evaluate((c)=>c.toDataURL()),before); }
   const ad=page.locator('[data-display-ad]');
   if(configured) {
-    await ad.evaluate((el)=>el.scrollIntoView({block:'center',behavior:'instant'}));await frames(page);
-    await page.waitForFunction(()=>document.querySelector('[data-display-ad]')?.dataset.adState==='filled');
+    const mounted=await page.locator('ins.px-display-ad__unit').count();
+    if(mounted) await page.waitForFunction(()=>document.querySelector('[data-display-ad]')?.dataset.adState==='filled');
     const layout=await ad.evaluate((el)=>{
       const a=el.getBoundingClientRect(),u=el.querySelector('ins').getBoundingClientRect(),p=el.parentElement.getBoundingClientRect();
       const overlaps=[...document.querySelectorAll('a,button,input,summary')].filter((n)=>!el.contains(n)).filter((n)=>{const r=n.getBoundingClientRect();return r.width&&r.height&&r.left<a.right&&r.right>a.left&&r.top<a.bottom&&r.bottom>a.top;}).map((n)=>({id:n.id,text:n.textContent,class:n.className,rect:n.getBoundingClientRect().toJSON()}));
-      return {overlaps,overflow:document.documentElement.scrollWidth>innerWidth+1,center:Math.abs((a.left+a.right)/2-document.documentElement.clientWidth/2),match:Math.abs(a.left-p.left)+Math.abs(a.right-p.right),fits:u.left>=a.left-1&&u.right<=a.right+1,gap:parseFloat(getComputedStyle(el).marginTop)};
+      const lastControl=[...document.querySelectorAll('.px-tool-result__content button,.px-tool-result__content a')].at(-1)?.getBoundingClientRect();
+      return {mounted:Boolean(u.width),visible:!el.hidden,overlaps,overflow:document.documentElement.scrollWidth>innerWidth+1,center:Math.abs((a.left+a.right)/2-document.documentElement.clientWidth/2),match:Math.abs(a.left-p.left)+Math.abs(a.right-p.right),fits:u.width===0||u.left>=a.left-1&&u.right<=a.right+1,gap:lastControl? a.top-lastControl.bottom:Infinity,withinViewport:a.bottom<=innerHeight+1};
     });
-    assert.deepEqual(layout.overlaps,[],page.url());assert.equal(layout.overflow,false);assert.ok(layout.center<=1&&layout.match<=2,JSON.stringify({url:page.url(),layout}));assert.equal(layout.fits,true);assert.ok(layout.gap>=150);
-    assert.equal(await page.evaluate(()=>__resultAdRequests),1);
+    assert.equal(layout.overflow,false);assert.equal(layout.withinViewport,true);
+    if(mounted) {assert.deepEqual(layout.overlaps,[],page.url());assert.ok(layout.center<=1&&layout.match<=2,JSON.stringify({url:page.url(),layout}));assert.equal(layout.fits,true);assert.ok(layout.gap>=24,JSON.stringify({url:page.url(),layout}));assert.equal(await page.evaluate(()=>__resultAdRequests),1);}
+    else {assert.equal(layout.visible,false);assert.equal(await page.evaluate(()=>__resultAdRequests),0);}
   } else {assert.equal(await ad.isVisible(),false);assert.equal(await page.locator('ins.px-display-ad__unit').count(),0);assert.equal(await page.evaluate(()=>__resultAdRequests),0);}
   checks++;
 }

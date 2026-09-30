@@ -1,4 +1,4 @@
-import { AUDIO_PPQ, collectAudioEvents, createAudioPlayer } from './audio-core.mjs?rev=20260928-dot-music-1';
+import { AUDIO_PPQ, collectAudioEvents, createAudioPlayer } from './audio-core.mjs?rev=20260930-audio-timebase-1';
 import { getAudioInstrument } from './audio-timbres.mjs?rev=20260928-dot-music-1';
 
 const VIDEO_FRAME_LONG_EDGE = 1024;

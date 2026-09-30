@@ -71,9 +71,10 @@ button, a { font: inherit; }
 .lc-round svg { width: 1.3rem; height: 1.3rem; }
 .lc-round:active:not(:disabled) { transform: scale(.92); }
 .lc-round:disabled { opacity: .35; cursor: default; }
-.lc-zoom-stops { justify-self: center; display: flex; gap: .25rem; padding: .25rem; border-radius: 999px; background: var(--lc-glass); border: 1px solid var(--lc-line); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+.lc-zoom-stops { justify-self: center; display: flex; gap: .25rem; max-width: calc(100vw - 1.5rem); overflow-x: auto; scrollbar-width: none; padding: .25rem; border-radius: 999px; background: var(--lc-glass); border: 1px solid var(--lc-line); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+.lc-zoom-stops::-webkit-scrollbar { display: none; }
 .lc-zoom-stops:empty { visibility: hidden; }
-.lc-zoom-stops button { min-width: 2.3rem; height: 2.1rem; padding: 0 .5rem; border: 0; border-radius: 999px; background: transparent; color: var(--lc-muted); font-size: .78rem; font-weight: 700; font-variant-numeric: tabular-nums; cursor: pointer; transition: background .2s, color .2s, transform .15s; }
+.lc-zoom-stops button { flex: 0 0 auto; min-width: 2.75rem; min-height: 2.75rem; padding: 0 .5rem; border: 0; border-radius: 999px; background: transparent; color: var(--lc-muted); font-size: .78rem; font-weight: 700; font-variant-numeric: tabular-nums; cursor: pointer; transition: background .2s, color .2s, transform .15s; }
 .lc-zoom-stops button[aria-pressed="true"] { background: rgba(255, 211, 90, .16); color: #ffd35a; }
 .lc-zoom-stops button:active { transform: scale(.92); }
 .lc[data-mode="captured"] .lc-zoom-stops, .lc[data-mode="idle"] .lc-zoom-stops { visibility: hidden; }

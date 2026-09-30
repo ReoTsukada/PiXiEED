@@ -4,7 +4,7 @@ import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-draf
 import {
   chunkJigsawPuzzleIds, collectPagedRows, fingerprintBytes, firstPublishedPixfindReferences, isSafeJigsawPixfindOriginalUrl, resolveLocalDrawRevision, validateJigsawSource, JIGSAW_MAX_IMAGE_BYTES, JIGSAW_MAX_SOURCE_PIXELS
 } from './jigsaw-core.mjs?rev=20260928-jigsaw-pixfind-original-2';
-import { documentRgba } from './draw-core.mjs';
+import { documentRgba } from './draw-core.mjs?rev=20260930-shared-canvas-5';
 import {
   createJigsawLayout, createJigsawWorkspace, migrateLegacyJigsawGame,
   moveJigsawGroup, rotateJigsawGroup, snapJigsawGroup, worldGroupBounds,
@@ -13,12 +13,13 @@ import {
 import { buildJigsawSelectionEdges } from './jigsaw-selection.mjs';
 import { supabaseConfig } from '../../data/site-config.js';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
-import { mountPxdTools } from './pxd-ui.mjs?rev=20260928-own-work-1';
-import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20260928-pxd-puzzles-1';
+import { mountPxdTools } from './pxd-ui.mjs?rev=20260930-ux-fix-1';
+import { putPxdSharedImage } from './pxd-project.mjs?rev=20260930-shared-canvas-5';
+import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20260930-shared-canvas-5';
 import { normalizeJigsawFile } from './jigsaw-file.mjs?rev=20260929-claude-integration-1';
-import { requestPass } from '../pixieed-pass.mjs?v=20260930-offerwall-1';
+import { requestPass } from '../pixieed-pass.mjs?v=20260930-rewarded-gpt-1';
 import { createPuzzleHintController } from './puzzle-hint.mjs?rev=20260928-hint-1';
-import { createToolResultView } from '../tool-result-view.mjs?rev=20260929-display-units-1';
+import { createToolResultView } from '../tool-result-view.mjs?rev=20260929-compact-results-2';
 
 const JIGSAW_LAST_DRAFT_KEY = 'pixieed:creation:jigsaw:last-draft:v1';
 const $ = (selector) => document.querySelector(selector);
@@ -443,7 +444,7 @@ function placeAt(groupId, world) {
   const snapped = snapJigsawGroup(game, groupId, snapTolerance());
   game = snapped.game; selectedGroupId = snapped.groupId;
   if (snapped.merged) interactionEffects.settle(workspaceElement, { color: '#6f9c5d' });
-  renderGame(); updateStatus(snapped.merged ? '隣り合うピースをひとつにまとめました。' : '作業スペースに置きました。ドラッグで移動、回転ボタンで向きを変えられます。');
+  renderGame(); pxdBridge?.markDirty(); updateStatus(snapped.merged ? '隣り合うピースをひとつにまとめました。' : '作業スペースに置きました。ドラッグで移動、回転ボタンで向きを変えられます。');
 }
 function beginPointer(event, type, groupId = null) {
   if (!game || (event.button !== undefined && event.button !== 0)) return;
@@ -529,7 +530,7 @@ function endPointer(event) {
     } else {
       if (pointer.type === 'group' && pointer.moved) {
         const group = findGroup(pointer.groupId);
-        if (group) { const snapped = snapJigsawGroup(game, group.groupId, snapTolerance()); game = snapped.game; selectedGroupId = snapped.groupId; if (snapped.merged) interactionEffects.settle(workspaceElement, { color: '#6f9c5d' }); }
+        if (group) { const snapped = snapJigsawGroup(game, group.groupId, snapTolerance()); game = snapped.game; selectedGroupId = snapped.groupId; pxdBridge?.markDirty(); if (snapped.merged) interactionEffects.settle(workspaceElement, { color: '#6f9c5d' }); }
       } else if (pointer.type === 'tray-place' && pointInsideWorkspace(event.clientX, event.clientY)) placeAt(pointer.groupId, screenToWorld(event.clientX, event.clientY));
       else if (pointer.type === 'tray' && pointer.moved && pointInsideWorkspace(event.clientX, event.clientY)) placeAt(pointer.groupId, screenToWorld(event.clientX, event.clientY));
       else if (pointer.type === 'canvas' && !pointer.moved) { const world = screenToWorld(event.clientX, event.clientY); const hit = hitGroup(world); if (hit) selectedGroupId = hit.groupId; updateSelectionControls(); }
@@ -554,8 +555,8 @@ function placeSelectedAtCenter() {
   const group = findGroup(selectedGroupId); if (!group) return;
   const rect = workspaceElement.getBoundingClientRect(); placeAt(group.groupId, screenToWorld(rect.left + rect.width / 2, rect.top + rect.height / 2));
 }
-function rotateSelected() { if (!findGroup(selectedGroupId)) return; game = rotateJigsawGroup(game, selectedGroupId, 1); renderGame(); }
-function returnSelected() { const group = findGroup(selectedGroupId); if (!group) return; game = moveJigsawGroup(game, group.groupId, { x: 0, y: 0, inTray: true }); selectedGroupId = group.groupId; renderGame(); }
+function rotateSelected() { if (!findGroup(selectedGroupId)) return; game = rotateJigsawGroup(game, selectedGroupId, 1); renderGame(); pxdBridge?.markDirty(); }
+function returnSelected() { const group = findGroup(selectedGroupId); if (!group) return; game = moveJigsawGroup(game, group.groupId, { x: 0, y: 0, inTray: true }); selectedGroupId = group.groupId; renderGame(); pxdBridge?.markDirty(); }
 function fitWorkspace() { view = { scale: 1, x: 0, y: 0 }; queuePaint(); }
 function updateViewport() {
   if (!game?.viewport) return;
@@ -656,6 +657,7 @@ async function saveGame() {
   if (!draftStore || !game) return;
   saveButton.disabled = true; updateStatus('途中の配置を端末に保存しています…');
   try {
+    if (game.source.type !== 'public') await pxdBridge?.save();
     const rect = workspaceElement.getBoundingClientRect();
     game = { ...game, viewport: { scale: Math.max(0.2, Math.min(12, view.scale)), x: Math.max(-4, Math.min(4, rect.width ? view.x / rect.width : 0)), y: Math.max(-4, Math.min(4, rect.height ? view.y / rect.height : 0)) } };
     validateJigsawWorkspace(game, layoutData);
@@ -742,6 +744,7 @@ async function encodePxdJigsawImage(image) {
 async function openPxdJigsaw(project) {
   cancelJigsawResult(true); resultShownRun = -1;
   if (!draftStore || !adapter) throw new Error('端末内保存を利用できません。');
+  if (!project.entries.length) { game = null; sourceRevision = null; layoutData = null; pieces = []; pxdOriginalRefs = pxdPreservedPayload = null; setSourcePreview(null); delete document.body.dataset.jigsawPlaying; playSection.hidden = true; setupSection.hidden = false; return; }
   setSourcePreview(null);
   let publicRgba = null;
   let materialized;
@@ -778,7 +781,6 @@ async function openPxdJigsaw(project) {
   if (!sourcePixels || sourcePixels.width !== nextLayout.width || sourcePixels.height !== nextLayout.height) throw new Error('PXDの画像と盤面サイズが一致しません。');
   const nextPieces = sliceJigsawPieces(sourcePixels, nextLayout);
   setSourcePreview(sourcePixels);
-  pxdBridge?.reset();
   game = nextGame; layoutData = nextLayout; pieces = nextPieces; gameDraftId = game.gameId;
   clearSelectionCache(); clearDragState();
   pxdOriginalRefs = materialized.portableOriginalRefs; pxdPreservedPayload = materialized.preservedPayload || null;
@@ -792,6 +794,7 @@ function mountPxdJigsaw() {
   if (!draftStore) return null;
   return mountPxdTools({
     tool: 'jigsaw',
+    projectWorkspace: true, setStatus: updateStatus,
     hasContent: () => Boolean(game),
     getPublicSources: () => game?.source?.type === 'public' ? [game.source] : [],
     getProject: async (project) => {
@@ -801,7 +804,13 @@ function mountPxdJigsaw() {
         const image = boundedRgba(await decodeImage(game.source.dataUrl));
         sourceImages['jigsaw-main'] = { width: image.width, height: image.height, rgba: new Uint8Array(image.rgba) };
       } else if (game.source.type !== 'public' && sourceRevision?.document) sourceDrawDocuments['jigsaw-main'] = sourceRevision.document;
-      return writePxdPuzzle(project, { tool: 'jigsaw', document: game, sourceDrawDocuments, sourceImages, portableOriginalRefs: pxdOriginalRefs, preservedPayload: pxdPreservedPayload, sourceChanged: false });
+      let sharedProject = project;
+      if (!project.manifest.sharedCanvas && game.source.type !== 'public') {
+        const doc = sourceDrawDocuments['jigsaw-main'];
+        const image = sourceImages['jigsaw-main'] || (doc && { width: doc.width, height: doc.height, rgba: documentRgba(doc) });
+        if (image) sharedProject = putPxdSharedImage(project, image);
+      }
+      return writePxdPuzzle(sharedProject, { tool: 'jigsaw', document: game, sourceDrawDocuments, sourceImages, portableOriginalRefs: pxdOriginalRefs, preservedPayload: pxdPreservedPayload, sourceChanged: false });
     },
     openProject: openPxdJigsaw
   });
@@ -822,10 +831,20 @@ $('#jigsaw-preview-close')?.addEventListener('click', closeSourcePreview);
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && previewPanel && !previewPanel.hidden) { closeSourcePreview(); event.stopPropagation(); }
 });
-sourceKind.addEventListener('change', displaySourceFields);
-sourceSelect.addEventListener('change', displaySourceFields);
-publicSelect.addEventListener('change', displaySourceFields);
-fileInput.addEventListener('change', displaySourceFields);
+const sourceChoiceStatus = () => {
+  displaySourceFields();
+  const ready = !startButton.disabled;
+  const labels = {
+    draw: ready ? '自分の絵を選びました。スタートできます。' : '自分の保存版から絵を選んでください。',
+    public: ready ? '公開作品を選びました。スタートできます。' : '公開作品から絵を選んでください。',
+    file: ready ? '端末の画像を選びました。スタートできます。' : '端末から画像を選んでください。'
+  };
+  updateStatus(labels[sourceKind.value] || '絵を選んでください。');
+};
+sourceKind.addEventListener('change', sourceChoiceStatus);
+sourceSelect.addEventListener('change', sourceChoiceStatus);
+publicSelect.addEventListener('change', sourceChoiceStatus);
+fileInput.addEventListener('change', sourceChoiceStatus);
 resumeButton.addEventListener('click', resumeGame);
 saveButton.addEventListener('click', saveGame);
 trayElement.addEventListener('click', (event) => {

@@ -1,6 +1,6 @@
-import { freeWithoutAdWaitMs, hasPro, onPassChange, passRemainingMs, requestPass } from './pixieed-pass.mjs?v=20260930-offerwall-1';
+import { freeWithoutAdWaitMs, hasPro, onPassChange, passRemainingMs, requestPass } from './pixieed-pass.mjs?v=20260930-rewarded-gpt-1';
 import { derivePassGauge } from './pass-gauge.mjs?rev=20260929-tool-ui-1';
-import './site-analytics.mjs?rev=20260930-ga4-1';
+import './site-analytics.mjs?rev=20260930-analytics-review-1';
 import { hasPassButtonMarkup, passButtonMarkup, renderPassButton } from './pass-button.mjs?rev=20260930-pass-button-1';
 
 const brandedLink = () => {

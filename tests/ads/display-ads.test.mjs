@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { displayAdConfig } from '../../data/site-config.js';
-import { resolveDisplayAd } from '../../js/display-ads.mjs';
+import { mountDisplayAds, resolveDisplayAd } from '../../js/display-ads.mjs';
 
 const pages = [
   ['index.html', 'home', '/'], ['tools/index.html', 'tools', '/tools/'],
@@ -42,18 +42,46 @@ test('incorrect publisher and unknown placement are rejected', () => {
   assert.equal(resolveDisplayAd({ ...config, client: '/23379831154/' }, 'home', '/'), null);
   assert.equal(resolveDisplayAd(config, 'draw', '/draw/'), null);
 });
-for (const [path, key] of pages) test(`${path}: one initially hidden flow-layout ad, outside interactive content`, async () => {
+test('a result that lacks safe space is skipped before creating or requesting an ad', () => {
+  const inner = {};
+  const node = { dataset: { displayAd: 'draw-result' }, hidden: true, querySelector: () => inner };
+  const root = {
+    querySelectorAll: () => [node],
+    createElement() { assert.fail('no ad unit may be created'); }
+  };
+  const win = { location: { protocol: 'http:', pathname: '/draw/' } };
+  win.top = win.self = win;
+  let checked = 0;
+  const cleanup = mountDisplayAds({ root, win, config: { client: config.client, slots: { 'draw-result': '1234567890' } },
+    canMount(candidate) { assert.equal(candidate, node); checked++; return false; } });
+  assert.equal(checked, 1);
+  assert.equal(node.hidden, true);
+  assert.equal(node.dataset.adState, undefined);
+  assert.equal(win.adsbygoogle, undefined);
+  assert.equal(typeof cleanup, 'function');
+});
+for (const [path, key] of pages) test(`${path}: configured hidden flow-layout ads stay outside interactive content`, async () => {
   const source = await read(path);
-  assert.equal((source.match(/data-display-ad=/g) || []).length, 1);
-  const ad = source.match(/<aside\b[^>]*data-display-ad="[^"]+"[^>]*>/)?.[0];
-  assert.ok(ad.includes(`data-display-ad="${key}"`) && ad.includes('hidden'));
-  const index = source.indexOf(ad);
-  assert.ok(index > source.indexOf('<main') && index < source.indexOf('</main>'));
+  const expectedCount = ['home', 'tools'].includes(key) ? 2 : 1;
+  const ads = [...source.matchAll(/<aside\b[^>]*data-display-ad="[^"]+"[^>]*>/g)];
+  assert.equal(ads.length, expectedCount);
+  const mainStart = source.indexOf('<main');
+  const mainEnd = source.indexOf('</main>');
+  for (const ad of ads) {
+    assert.ok(ad[0].includes(`data-display-ad="${key}"`) && ad[0].includes('hidden'));
+    assert.ok(ad.index > mainStart && ad.index < mainEnd);
+  }
   assert.ok(!source.includes('<ins'), 'AdSense units are created only after a valid ID is configured');
   assert.equal((source.match(/src="\/js\/display-ads\.mjs/g) || []).length, 1);
   assert.equal((source.match(/href="\/css\/display-ads\.css/g) || []).length, 1);
-  if (key === 'home') assert.ok(index > source.indexOf('class="hp-go-sub"') && index < source.indexOf('aria-labelledby="hpToysTitle"'));
-  if (key === 'tools') assert.ok(index > source.indexOf('data-tool-preview="game"') && index < source.indexOf('tool-shell__head--games'));
+  if (key === 'home') {
+    assert.ok(ads[0].index > source.indexOf('class="hp-go-sub"') && ads[0].index < source.indexOf('aria-labelledby="hpToysTitle"'));
+    assert.ok(ads[1].index > source.indexOf('id="hpToys"') && ads[1].index < source.indexOf('GLOBE GALLERY'));
+  }
+  if (key === 'tools') {
+    assert.ok(ads[0].index > source.indexOf('data-tool-preview="game"') && ads[0].index < source.indexOf('tool-shell__head--games'));
+    assert.ok(ads[1].index > source.indexOf('href="/play/hidden-object/"') && ads[1].index < source.indexOf('class="tool-note"'));
+  }
 });
 test('working and private HTML has no manual slot or renderer', async () => {
   for (const path of ['pixel-camera.html', 'globe-prototype.html', 'draw/index.html', 'audio/index.html', 'jigsaw/index.html', 'spot-difference/index.html', 'hidden-object/index.html', 'play/spot-difference/index.html', 'play/hidden-object/index.html', 'profile/index.html', 'privacy/index.html']) {
@@ -66,4 +94,25 @@ test('unit CSS reserves size without cropping, floating or animating a creative'
   assert.match(css, /height: 100px/);
   assert.match(css, /height: 90px/);
   assert.doesNotMatch(css, /overflow\s*:\s*hidden|position\s*:\s*(fixed|absolute)|transform\s*:|animation\s*:/);
+});
+test('multiple placements mount once each and later calls still mount a newly eligible unit', () => {
+  const units = []; let disconnected = 0;
+  const nodes = [0, 1, 2].map(() => ({
+    dataset: { displayAd: 'home' }, hidden: true,
+    querySelector() { return { append(unit) { units.push(unit); } }; }
+  }));
+  const doc = { visibilityState: 'visible', querySelector: () => null,
+    createElement: () => ({ dataset: {}, style: {}, getBoundingClientRect: () => ({ width: 320 }) }),
+    addEventListener() {}, removeEventListener() {} };
+  const root = { ownerDocument: doc, querySelectorAll: () => nodes };
+  const win = { location: { protocol: 'https:', pathname: '/' },
+    MutationObserver: class { observe() {} disconnect() { disconnected++; } } };
+  win.top = win.self = win;
+  const cleanup = mountDisplayAds({ root, win, config, canMount: (node) => node !== nodes[2] });
+  assert.equal(units.length, 2); assert.equal(win.adsbygoogle.length, 2);
+  const laterCleanup = mountDisplayAds({ root, win, config });
+  assert.equal(units.length, 3); assert.equal(win.adsbygoogle.length, 3);
+  mountDisplayAds({ root, win, config });
+  assert.equal(units.length, 3); assert.equal(win.adsbygoogle.length, 3);
+  cleanup(); laterCleanup(); assert.equal(disconnected, 3);
 });

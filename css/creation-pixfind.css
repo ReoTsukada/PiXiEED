@@ -45,3 +45,39 @@ body.pixfind-is-playing>.site-footer,body.pixfind-is-playing>.site-header{displa
 .pixfind-page--playing{display:flex;flex-direction:column}
 .pixfind-page--playing #pixfind-game{flex:1;min-height:0;height:auto}
 .pixfind-page--playing #pixfind-game.arc-play{grid-template-rows:auto auto auto minmax(0,1fr) auto}
+
+/* Two equally sized, independently tappable views keep their pixels aligned. */
+.pixfind-page--playing .pixfind-images--comparison{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:minmax(0,1fr);gap:clamp(6px,1vw,14px)}
+.pixfind-images--comparison .pixfind-image{min-width:0;min-height:0;height:100%}
+.pixfind-images--comparison .pixfind-image figcaption{box-sizing:border-box;min-height:16px;padding:0 4px;font-size:.7rem;font-weight:800;line-height:1}
+.pixfind-images--comparison .pixfind-play-area{min-height:0;border:0;border-radius:10px;box-shadow:0 0 0 1px #aeb9a9,0 3px 0 #273c2f1a}
+.pixfind-images--comparison .pixfind-play-area:focus-visible{outline:3px solid #335cbe;outline-offset:2px}
+.pixfind-game--comparison .pixfind-game__heading{grid-template-columns:44px minmax(0,1fr) 44px;gap:8px;min-height:44px}
+.pixfind-game--comparison .pixfind-progress,.pixfind-game--comparison .pixfind-found-list{position:absolute;width:1px;height:1px;margin:0;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.pixfind-game--comparison .pixfind-hint{margin:0}
+@media(max-width:699px) and (orientation:portrait){
+  .pixfind-page--playing .pixfind-images--comparison{grid-template-columns:minmax(0,1fr);grid-template-rows:repeat(2,minmax(0,1fr));gap:6px}
+}
+.pixfind-game--comparison .pixfind-back{width:44px;height:44px;min-width:44px;min-height:44px}
+@media(max-height:620px){.pixfind-game--comparison .pixfind-game__identity p{display:none}}
+@media(orientation:landscape) and (max-height:500px){
+  body[data-puzzle-mode="spot-difference"].pixfind-is-playing>.site-header{display:none!important}
+  body[data-puzzle-mode="spot-difference"].pixfind-is-playing .pixfind-page--playing{top:0!important}
+  .pixfind-game--comparison>.arc-hud{display:none!important}
+  .pixfind-page--playing #pixfind-game.arc-play.pixfind-game--comparison{grid-template-rows:auto auto minmax(0,1fr)}
+}
+
+/* Object targets belong to the play surface, but must clear the bottom navigation. */
+body[data-puzzle-mode="hidden-object"].pixfind-is-playing .pixfind-page--playing{bottom:calc(5.25rem + env(safe-area-inset-bottom,0px))}
+body[data-puzzle-mode="hidden-object"].pixfind-is-playing .pixfind-found-list{box-sizing:border-box;flex-wrap:nowrap;align-items:center;gap:6px;width:100%;max-height:40px;min-height:40px;margin:0;padding:3px 5px;overflow-x:auto;overflow-y:hidden;border-radius:12px;background:#e8ede7;scrollbar-width:none}
+body[data-puzzle-mode="hidden-object"].pixfind-is-playing .pixfind-found-list li{box-sizing:border-box;display:flex;align-items:center;flex:0 0 auto;max-width:min(62vw,220px);height:32px;overflow:hidden;padding:0 9px;border:1px solid #c7d3bc;border-radius:999px;background:#fff;color:#38493d;font-size:.72rem;font-weight:700;text-overflow:ellipsis;white-space:nowrap}
+body[data-puzzle-mode="hidden-object"].pixfind-is-playing .pixfind-found-list li::before{content:'○';flex:none;margin-right:5px;color:#7a8a7d;font-size:.82rem}
+body[data-puzzle-mode="hidden-object"].pixfind-is-playing .pixfind-found-list li.pixfind-target--found{border-color:#5f9e68;background:#e0f1df;color:#295d31}
+body[data-puzzle-mode="hidden-object"].pixfind-is-playing .pixfind-found-list li.pixfind-target--found::before{content:'✓';color:#268042}
+
+/* Keep a puzzle's name and author legible in the first viewport beside the fixed app navigation. */
+.pixfind-page:not(.pixfind-page--playing){padding-bottom:calc(160px + env(safe-area-inset-bottom,0px))}
+.pixfind-card{position:relative}
+.pixfind-card__body{position:absolute;right:0;bottom:0;left:0;padding:24px 14px 10px;background:linear-gradient(transparent,rgba(18,25,18,.88));color:#fff}
+.pixfind-card h2{overflow:hidden;color:inherit;text-overflow:ellipsis;white-space:nowrap}
+.pixfind-card p{overflow:hidden;color:rgba(255,255,255,.86);text-overflow:ellipsis;white-space:nowrap}

@@ -12,7 +12,8 @@ test('the old works route goes to the globe and the tools route remains reachabl
   const tools = read('tools/index.html');
   const oldWorks = read('works/index.html');
   assert.match(home, new RegExp(`href="${fixture.routes.tools}"`));
-  assert.match(tools, new RegExp(`href="${fixture.routes.tools}"`));
+  assert.match(tools, /src="\/js\/site-header\.mjs\?/);
+  assert.match(read('js/app.js'), new RegExp(`href="${fixture.routes.tools}"`));
   assert.match(oldWorks, /name="robots" content="noindex,follow"/);
   assert.match(oldWorks, /http-equiv="refresh" content="0;url=\/globe\/"/);
   assert.match(read('js/app.js'), /href="\/globe\/" data-menu-link>地図で作品を見る/);
@@ -47,19 +48,32 @@ test('the public telescope route forwards into the globe tool', () => {
   assert.match(read('tools/index.html'), /href="\/telescope\/"/);
 });
 
-test('the creation tools list links to four creation routes and keeps the game coming soon', () => {
+test('each puzzle card opens its public list without a duplicate creator card', () => {
   const tools = read('tools/index.html');
-  for (const [href, label] of [
-    ['/audio/', 'ドットで音楽'],
-    ['/jigsaw/', 'かんたんジグソー'],
-    ['/spot-difference/', 'ドット絵間違い探し'],
-    ['/hidden-object/', 'ドット絵もの探し'],
+  for (const [name, kind] of [
+    ['ドット絵間違い探し', 'spot-difference'],
+    ['ドット絵もの探し', 'hidden-object'],
   ]) {
-    const card = tools.match(new RegExp(`<a\\b[^>]*href="${href.replaceAll('/', '\\/')}"[^>]*>([\\s\\S]*?)</a>`))?.[1];
-    assert.ok(card, `${href} has a public tool card`);
-    assert.match(card, new RegExp(`<h2\\b[^>]*>${label}</h2>`));
+    const card = tools.match(new RegExp(`<a\\b[^>]*class="hp-toy"[^>]*href="/play/${kind}/"[^>]*>[\\s\\S]*?<h2[^>]*>${name}</h2>[\\s\\S]*?</a>`))?.[0];
+    assert.ok(card, `${name} opens the public puzzle list`);
+    assert.doesNotMatch(tools, new RegExp(`href="/${kind}/"`));
+    assert.equal((tools.match(new RegExp(`<h2[^>]*>${name}</h2>`, 'g')) || []).length, 1);
   }
+  assert.match(tools, /href="\/audio\/"/);
+  assert.match(tools, /href="\/jigsaw\/"/);
   assert.doesNotMatch(tools, /href="\/game\/"/);
   assert.doesNotMatch(read('index.html'), /href="\/game\/"/);
   assert.match(tools, /tool-card--soon[\s\S]*?<h2\b[^>]*>かんたんゲーム<\/h2>[\s\S]*?もうすぐ/);
+});
+
+test('public puzzle lists open by default with one create action', () => {
+  for (const kind of ['spot-difference', 'hidden-object']) {
+    const play = read(`play/${kind}/index.html`);
+    const create = read(`${kind}/index.html`);
+    assert.match(play, /id="pixfind-list"/);
+    assert.match(play, new RegExp(`class="puzzle-create-link" href="/${kind}/">＋ 作る</a>`));
+    assert.doesNotMatch(play, /puzzle-mode-switch/);
+    assert.match(create, new RegExp(`class="puzzle-list-back" href="/play/${kind}/"`));
+    assert.match(create, new RegExp(`class="puzzle-editor-play" href="/play/${kind}/"`));
+  }
 });

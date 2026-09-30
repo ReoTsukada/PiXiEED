@@ -19,17 +19,20 @@ export function resolveDisplayAd(config, key, pathname) {
   return { client: config.client, slot: slot.trim() };
 }
 
-/** Prepare one flow-layout unit per page; an empty configuration leaves the HTML untouched. */
-export function mountDisplayAds({ root = document, win = window, config = displayAdConfig } = {}) {
+/** Prepare the explicitly declared flow-layout units; blank configuration stays untouched. */
+export function mountDisplayAds({ root = document, win = window, config = displayAdConfig, canMount = () => true } = {}) {
   if (win.top !== win.self || !['http:', 'https:'].includes(win.location.protocol)) return () => {};
   const doc = root.ownerDocument || root;
   const pathname = win.location.pathname;
+  const cleanups = [];
   for (const node of root.querySelectorAll('[data-display-ad]')) {
-    if (mounted.has(node)) return () => {};
+    if (mounted.has(node)) continue;
     const resolved = resolveDisplayAd(config, node.dataset.displayAd, pathname);
     if (!resolved) continue;
     const inner = node.querySelector('.px-display-ad__inner');
     if (!inner) continue;
+    // A full-screen result may omit this unit before any request when it cannot fit safely.
+    if (!canMount(node)) continue;
     mounted.add(node);
     const unit = doc.createElement('ins');
     unit.className = 'adsbygoogle px-display-ad__unit';
@@ -107,9 +110,9 @@ export function mountDisplayAds({ root = document, win = window, config = displa
       }, { rootMargin: '240px 0px' });
       requestObserver.observe(node);
     } else request();
-    return dispose;
+    cleanups.push(dispose);
   }
-  return () => {};
+  return () => { for (const dispose of cleanups) dispose(); };
 }
 
 if (typeof document !== 'undefined' && typeof window !== 'undefined') mountDisplayAds();

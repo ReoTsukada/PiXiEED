@@ -1,6 +1,6 @@
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
 import { documentRgba } from './draw-core.mjs';
-import { createAudioPlayer } from './audio-core.mjs?rev=20260927-game-step14-1';
+import { createAudioPlayer } from './audio-core.mjs?rev=20260930-audio-timebase-1';
 import { createWalkCollectGame, directionForGameKey, moveWalkGame, resolveLocalGameArt, resolveLocalGameSong, resolveWalkGameAssets, restoreWalkGame, setWalkGamePaused, validateWalkGame } from './game-core.mjs?rev=20260927-game-step14-2';
 
 const DRAW_LAST_KEY = 'pixieed.simple-draw.last-draft.v1'; const AUDIO_LAST_KEY = 'pixieed:creation:audio:last-draft:v1'; const LAST_KEY = 'pixieed:creation:game:last-draft:v1';

@@ -113,8 +113,7 @@ export function validateSpotDifferenceDraft(draft) {
     if (!ref || typeof ref.draftId !== 'string' || typeof ref.assetId !== 'string' || typeof ref.revisionId !== 'string' || ref.hashScheme !== 'sha256-canonical-v1' || !/^[a-f0-9]{64}$/.test(ref.contentHash || '')) throw new TypeError('画像の固定版参照が壊れています');
   }
   if (draft.before.draftId !== draft.after.draftId || draft.before.assetId !== draft.after.assetId) throw new Error('同じ端末内の絵の保存版どうしを選んでください');
-  const sizes = new Set([16, 32, 64, 128, 256, 512]);
-  if (!sizes.has(draft.width) || !sizes.has(draft.height) || draft.width * draft.height > SPOT_DIFFERENCE_MAX_PIXELS) throw new RangeError('比較画像の寸法が安全な範囲ではありません');
+  if (![draft.width, draft.height].every((side) => Number.isInteger(side) && side >= 1 && side <= 512) || draft.width * draft.height > SPOT_DIFFERENCE_MAX_PIXELS) throw new RangeError('比較画像の寸法が安全な範囲ではありません');
   if (!Array.isArray(draft.candidates)) throw new TypeError('差分候補がありません');
   validGroups(draft.candidates, draft.width, draft.height);
   if (draft.confirmed !== true && draft.publication !== 'draft') throw new Error('確認前の候補は公開できません');

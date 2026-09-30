@@ -242,6 +242,35 @@ test('silent songs do not create an audio context and stop disconnects every sou
   assert.equal(closeCount, 1, 'dispose closes the reused AudioContext exactly once');
 });
 
+test('pass expiry lets the started audio loop and its release tail finish, then stops before another loop', async () => {
+  const timers = []; const nodes = [];
+  class Param { setValueAtTime() {} linearRampToValueAtTime() {} }
+  class Node {
+    constructor() { this.frequency = new Param(); this.gain = new Param(); }
+    connect() {}
+    disconnect() { this.disconnected = true; }
+    start() { this.started = true; }
+    stop() { this.stopped = true; }
+  }
+  const context = {
+    currentTime: 0, sampleRate: 8000, destination: {}, resume: async () => {}, close: async () => {},
+    createOscillator() { const node = new Node(); nodes.push(node); return node; },
+    createGain() { const node = new Node(); nodes.push(node); return node; }
+  };
+  const song = setAudioPixel(createAudioSong(), { trackId: 'track-square', pitch: 60, startTick: 0, noteId: 'expiry-note' });
+  const player = createAudioPlayer({ audioContextFactory: () => context, schedule: (callback, delay) => { const timer = { callback, delay }; timers.push(timer); return timer; }, cancel(timer) { timer.cancelled = true; } });
+  await player.play(song);
+  assert.equal(player.stopAfterCurrentLoop(), true);
+  assert.equal(player.isPlaying, true);
+  timers[0].callback();
+  assert.equal(player.isPlaying, true);
+  assert.ok(timers[1].delay > 0, 'the last note release tail is allowed to finish');
+  timers[1].callback();
+  assert.equal(player.isPlaying, false);
+  assert.ok(nodes.every((node) => node.disconnected));
+  await player.dispose();
+});
+
 test('audio context is closed when resume fails', async () => {
   let closeCount = 0;
   const player = createAudioPlayer({ audioContextFactory: () => ({
@@ -422,17 +451,23 @@ test('audio page exposes labeled editing, save/resume and central playback contr
   assert.match(page, /id="audio-resume"/);
   assert.match(page, /id="audio-shelf"/); assert.match(page, /id="audio-from-camera"/);
   assert.match(page, /id="audio-pixel-canvas"[^>]*tabindex="0"/);
-  assert.doesNotMatch(page, /audio-pixel-board/); assert.match(page, /16列×16音程/);
-  assert.doesNotMatch(page, /class="site-header"|class="site-footer"/);
+  assert.doesNotMatch(page, /audio-pixel-board/); assert.match(page, /共有画像のセルを音に割り当てる音楽キャンバス/);
+  assert.equal((page.match(/<header class="site-header"/g) || []).length, 1);
+  assert.doesNotMatch(page, /class="site-footer"/);
   assert.match(page, /class="[^"]*\baudio-more\b[^"]*"/); assert.match(page, /audio-tool-body/);
   assert.match(page, /id="audio-tool-pen"/); assert.match(page, /id="audio-tool-eraser"/); assert.match(page, /id="audio-playhead"/);
   assert.match(script, /LAST_DRAW_DRAFT_KEY/); assert.match(script, /cameraHandoffImage/);
   assert.match(script, /setAudioPixel/); assert.match(script, /pixelSurface\.paint/); assert.match(script, /pointermove/); assert.match(script, /lineCells/); assert.match(script, /ArrowRight/); assert.match(script, /event\.key === 'Enter' \|\| event\.key === ' '/);
+  assert.match(script, /prepareSharedAudioImageImport/); assert.match(script, /setSharedAudioCell/); assert.match(script, /readPxdSharedImage/);
   assert.doesNotMatch(script, /createElement\('button'\).*audio-pixel-cell/);
   assert.match(script, /hashCanonical\(revision\.document\)/); assert.doesNotMatch(script, /fetch\(|supabase|create-post/i);
   assert.match(script, /visibilitychange/);
   assert.match(script, /pagehide/);
   assert.match(script, /beforeunload/);
   assert.match(script, /player\.dispose\(\)/);
-  assert.match(script, /localStorage\.setItem\(LAST_DRAFT_KEY, currentDraftId\)/);
+  assert.match(script, /mountProjectWorkspace as mountPxdTools/);
+  assert.match(script, /const initialSharedImage = \{ width: 16, height: 16/);
+  assert.match(script, /readPxdSharedImage/);
+  assert.match(script, /await pxdBridge\.save\(\)/);
+  assert.doesNotMatch(script, /localStorage\.setItem\(LAST_DRAFT_KEY, currentDraftId\)/);
 });

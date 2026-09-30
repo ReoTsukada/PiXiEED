@@ -103,8 +103,7 @@ export function confirmHiddenObjectTargets(draft) {
 export function validateHiddenObjectDraft(draft) {
   if (!draft || draft.schemaVersion !== HIDDEN_OBJECT_SCHEMA_VERSION || typeof draft.gameId !== 'string' || !draft.gameId) throw new TypeError('もの探しの保存データが壊れています');
   assertSource(draft.source);
-  const sizes = new Set([16, 32, 64, 128, 256, 512]);
-  if (!sizes.has(draft.width) || !sizes.has(draft.height) || draft.width * draft.height > HIDDEN_OBJECT_MAX_PIXELS) throw new RangeError('画像の寸法が安全な範囲ではありません');
+  if (![draft.width, draft.height].every((side) => Number.isInteger(side) && side >= 1 && side <= 512) || draft.width * draft.height > HIDDEN_OBJECT_MAX_PIXELS) throw new RangeError('画像の寸法が安全な範囲ではありません');
   validateTargetMasks(draft.targets, draft.width, draft.height);
   if (draft.confirmed) {
     if (!draft.targets.length || !Array.isArray(draft.hitBoxes) || draft.hitBoxes.length !== draft.targets.length || !draft.hitTestLayout || ![HIDDEN_OBJECT_MIN_CANVAS_CSS_WIDTH, HIDDEN_OBJECT_MIN_PLAY_IMAGE_CSS_WIDTH].includes(draft.hitTestLayout.cssCanvasWidth) || draft.hitTestLayout.minTargetCssPx !== HIDDEN_OBJECT_MIN_HIT_CSS_PX) throw new Error('作者の確認前のマスクは正解にできません');

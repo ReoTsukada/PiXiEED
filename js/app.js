@@ -4076,6 +4076,8 @@ function renderPublicShell() {
   tabs.setAttribute('aria-label', 'アプリナビゲーション');
   const page = document.body.dataset.page || 'home';
   const actions = {
+    home: '<a href="/draw/" aria-label="かんたんドットで絵を描く"><img src="/assets/icons/pixieed/add.svg" alt=""></a>',
+    tools: '<a href="/draw/" aria-label="かんたんドットで絵を描く"><img src="/assets/icons/pixieed/add.svg" alt=""></a>',
     map: '<button type="button" data-page-action="post" aria-label="ドット絵を投稿する"><img src="/assets/icons/pixieed/add.svg" alt=""></button>',
     works: '<a href="/collection/" aria-label="集めた作品を見る"><img src="/assets/icons/pixieed/artwork.svg" alt=""></a>',
     stores: '<a href="/globe/" aria-label="地図でお店を探す"><img src="/assets/icons/pixieed/globe.svg" alt=""></a>',
@@ -4215,6 +4217,7 @@ function renderPublicShell() {
   analyticsSetting?.addEventListener('change', () => {
     const allowed = analyticsSetting.checked;
     try { localStorage.setItem(ANALYTICS_CONSENT_KEY, allowed ? 'granted' : 'denied'); } catch { /* storage may be blocked */ }
+    document.dispatchEvent(new Event('pixieed:analytics-consent-change'));
     if (!allowed) {
       analyticsQueue.splice(0);
       analyticsTrackEvent = null;
@@ -4229,6 +4232,7 @@ function renderPublicShell() {
   settings?.querySelector('[data-settings-clear]')?.addEventListener('click', () => {
     analyticsSetting.checked = false;
     try { localStorage.setItem(ANALYTICS_CONSENT_KEY, 'denied'); } catch { /* storage may be blocked */ }
+    document.dispatchEvent(new Event('pixieed:analytics-consent-change'));
     analyticsQueue.splice(0);
     analyticsTrackEvent = null;
     analyticsPromise = null;

@@ -2,9 +2,9 @@ import { detectPixelScale, wholePixelFit } from '../pixel-scale.mjs?rev=20260929
 import { supabaseConfig } from '../../data/site-config.js';
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
 import { documentRgba } from './draw-core.mjs';
-import { requestPass } from '../pixieed-pass.mjs?v=20260930-offerwall-1';
+import { requestPass } from '../pixieed-pass.mjs?v=20260930-rewarded-gpt-1';
 import { createPuzzleHintController } from './puzzle-hint.mjs?rev=20260928-hint-1';
-import { createToolResultView } from '../tool-result-view.mjs?rev=20260929-display-units-1';
+import { createToolResultView } from '../tool-result-view.mjs?rev=20260929-compact-results-2';
 import { resolveLocalDrawRevision, validateSpotDifferenceDraft } from './spot-difference-core.mjs';
 import { buildHiddenObjectHitBoxes, HIDDEN_OBJECT_MIN_PLAY_IMAGE_CSS_WIDTH, validateHiddenObjectDraft } from './hidden-object-core.mjs?rev=20260928-short-hitboxes-1';
 import { computeDifferenceRegions, computeHiddenObjectRegions, regionContainsPoint, resolvePuzzleFromLocation, validateHiddenObjectMarkers, validateLocalDifferenceGroups, validateStoredDifferenceRegions } from './pixfind-regions.mjs';
@@ -286,44 +286,54 @@ function mount() {
   const originalNode = document.querySelector('#pixfind-original'); const changedNode = document.querySelector('#pixfind-changed'); const compareButton = document.querySelector('#pixfind-compare');
   const localNotice = document.querySelector('#pixfind-local-only');
   const playArea = document.querySelector('#pixfind-play-area'); const overlay = document.querySelector('#pixfind-overlay');
+  const changedArea = document.querySelector('#pixfind-changed-area'); const changedOverlay = document.querySelector('#pixfind-changed-overlay'); const changedFigure = document.querySelector('#pixfind-changed-figure');
   const statusGame = document.querySelector('#pixfind-game-status'); const progress = document.querySelector('#pixfind-progress');
   const foundList = document.querySelector('#pixfind-found-list');
   let cell = 1;
   // The art is shown at a whole number of device pixels per dot, as large as the play area allows.
-  const geometry = () => {
-    const w = playArea.clientWidth; const h = playArea.clientHeight; const ratio = devicePixelRatio || 1;
+  const geometry = (area = playArea) => {
+    const w = area.clientWidth; const h = area.clientHeight; const ratio = devicePixelRatio || 1;
     const fit = wholePixelFit(original.naturalWidth / cell, original.naturalHeight / cell, w, h, { devicePixelRatio: ratio });
     const snap = (value) => Math.round(value * ratio) / ratio;
     return { scale: fit.width / original.naturalWidth, xoff: snap((w - fit.width) / 2), yoff: snap((h - fit.height) / 2), width: fit.width, height: fit.height };
   };
   const placeImages = () => {
     if (!original) return;
-    const g = geometry();
-    for (const node of [originalNode, changedNode]) Object.assign(node.style, { left: `${g.xoff}px`, top: `${g.yoff}px`, width: `${g.width}px`, height: `${g.height}px` });
+    for (const [node, area] of [[originalNode, playArea], [changedNode, changedArea || playArea]]) {
+      const g = geometry(area);
+      Object.assign(node.style, { left: `${g.xoff}px`, top: `${g.yoff}px`, width: `${g.width}px`, height: `${g.height}px` });
+    }
   };
   const paint = () => {
     placeImages();
-    const w = playArea.clientWidth; const h = playArea.clientHeight;
-    overlay.width = Math.max(1, Math.round(w * devicePixelRatio)); overlay.height = Math.max(1, Math.round(h * devicePixelRatio));
-    const context = overlay.getContext('2d'); context.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0); context.clearRect(0, 0, w, h);
-    if (!currentMask || !original) return;
+    if (!original) return;
     const sourceW = original.naturalWidth; const sourceH = original.naturalHeight;
-    const { scale, xoff, yoff } = geometry();
-    context.imageSmoothingEnabled = false;
-    const pixels = context.createImageData(sourceW, sourceH);
-    for (const index of found) for (const pixel of regions[index].pixels) { const p = pixel * 4; pixels.data[p] = 255; pixels.data[p + 1] = 194; pixels.data[p + 2] = 55; pixels.data[p + 3] = 150; }
-    const maskCanvas = document.createElement('canvas'); maskCanvas.width = sourceW; maskCanvas.height = sourceH; maskCanvas.getContext('2d').putImageData(pixels, 0, 0);
-    context.drawImage(maskCanvas, xoff, yoff, sourceW * scale, sourceH * scale);
-    for (const index of found) { const region = regions[index]; context.strokeStyle = '#146c43'; context.lineWidth = Math.max(2, 3 / scale); context.strokeRect(xoff + region.minX * scale, yoff + region.minY * scale, Math.max(3, (region.maxX - region.minX + 1) * scale), Math.max(3, (region.maxY - region.minY + 1) * scale)); }
-    if (hint && performance.now() < hint.until && !found.has(hint.index)) {
-      // a soft pulsing ring around the area — close, but you still have to find it
-      const region = regions[hint.index]; const t = (hint.until - performance.now()) / HINT_MS;
-      const cx = xoff + (region.minX + region.maxX + 1) / 2 * scale; const cy = yoff + (region.minY + region.maxY + 1) / 2 * scale;
-      const r = Math.max((Math.max(region.maxX - region.minX, region.maxY - region.minY) + 1) * scale, Math.min(sourceW, sourceH) * scale * 0.2) * (1 + 0.08 * Math.sin(t * 18));
-      context.lineWidth = 4; context.strokeStyle = `rgba(255, 211, 90, ${Math.min(1, t * 2.5)})`; context.setLineDash([6, 5]);
-      context.beginPath(); context.arc(cx, cy, r, 0, Math.PI * 2); context.stroke(); context.setLineDash([]);
+    let maskCanvas = null;
+    if (found.size && currentMask) {
+      maskCanvas = document.createElement('canvas'); maskCanvas.width = sourceW; maskCanvas.height = sourceH;
+      const maskContext = maskCanvas.getContext('2d'); const pixels = maskContext.createImageData(sourceW, sourceH);
+      for (const index of found) for (const pixel of regions[index].pixels) { const p = pixel * 4; pixels.data[p] = 255; pixels.data[p + 1] = 194; pixels.data[p + 2] = 55; pixels.data[p + 3] = 150; }
+      maskContext.putImageData(pixels, 0, 0);
     }
-    if (Number.isFinite(cursorX) && Number.isFinite(cursorY)) { const cx = xoff + cursorX * scale; const cy = yoff + cursorY * scale; context.strokeStyle = '#3159a5'; context.lineWidth = 2; context.beginPath(); context.moveTo(cx - 7, cy); context.lineTo(cx + 7, cy); context.moveTo(cx, cy - 7); context.lineTo(cx, cy + 7); context.stroke(); }
+    for (const [area, targetOverlay] of [[playArea, overlay], [changedArea, changedOverlay]]) {
+      if (!area || !targetOverlay || !area.clientWidth || !area.clientHeight) continue;
+      const w = area.clientWidth; const h = area.clientHeight; const ratio = devicePixelRatio || 1;
+      targetOverlay.width = Math.max(1, Math.round(w * ratio)); targetOverlay.height = Math.max(1, Math.round(h * ratio));
+      const context = targetOverlay.getContext('2d'); context.setTransform(ratio, 0, 0, ratio, 0, 0); context.clearRect(0, 0, w, h);
+      if (!currentMask) continue;
+      const { scale, xoff, yoff } = geometry(area);
+      context.imageSmoothingEnabled = false;
+      if (maskCanvas) context.drawImage(maskCanvas, xoff, yoff, sourceW * scale, sourceH * scale);
+      for (const index of found) { const region = regions[index]; context.strokeStyle = '#146c43'; context.lineWidth = Math.max(2, 3 / scale); context.strokeRect(xoff + region.minX * scale, yoff + region.minY * scale, Math.max(3, (region.maxX - region.minX + 1) * scale), Math.max(3, (region.maxY - region.minY + 1) * scale)); }
+      if (hint && performance.now() < hint.until && !found.has(hint.index)) {
+        const region = regions[hint.index]; const t = (hint.until - performance.now()) / HINT_MS;
+        const cx = xoff + (region.minX + region.maxX + 1) / 2 * scale; const cy = yoff + (region.minY + region.maxY + 1) / 2 * scale;
+        const r = Math.max((Math.max(region.maxX - region.minX, region.maxY - region.minY) + 1) * scale, Math.min(sourceW, sourceH) * scale * 0.2) * (1 + 0.08 * Math.sin(t * 18));
+        context.lineWidth = 4; context.strokeStyle = `rgba(255, 211, 90, ${Math.min(1, t * 2.5)})`; context.setLineDash([6, 5]);
+        context.beginPath(); context.arc(cx, cy, r, 0, Math.PI * 2); context.stroke(); context.setLineDash([]);
+      }
+      if (Number.isFinite(cursorX) && Number.isFinite(cursorY)) { const cx = xoff + cursorX * scale; const cy = yoff + cursorY * scale; context.strokeStyle = '#3159a5'; context.lineWidth = 2; context.beginPath(); context.moveTo(cx - 7, cy); context.lineTo(cx + 7, cy); context.moveTo(cx, cy - 7); context.lineTo(cx, cy + 7); context.stroke(); }
+    }
   };
   // ---- one free hint per puzzle; further hints use the shared PiXiEED pass ----
   const HINT_MS = 2600; let hint = null; const hintButton = document.querySelector('#pixfind-hint');
@@ -362,7 +372,10 @@ function mount() {
       const target = selected?.targets?.[index];
       const targetLabel = typeof target === 'string' ? target : target && typeof target === 'object' ? (target.label || target.name || target.title) : null;
       const label = selected?.mode === 'hidden-object' ? (typeof targetLabel === 'string' && targetLabel.trim() ? targetLabel.trim().slice(0, 100) : `見つけたもの ${index + 1}`) : `変化 ${index + 1}`;
-      return el('li', '', found.has(index) ? `${label}：発見済み` : `${label}：未発見`);
+      const item = el('li', found.has(index) ? 'pixfind-target--found' : '', label);
+      item.title = label;
+      item.setAttribute('aria-label', `${label}：${found.has(index) ? '発見済み' : '未発見'}`);
+      return item;
     }));
     const complete = found.size === regions.length && regions.length > 0 && !readOnly && original && selected;
     if (complete) {
@@ -391,7 +404,9 @@ function mount() {
       : `public:${puzzle.mode || 'puzzle'}:${String(puzzle.id || puzzle.slug || 'puzzle')}`;
     hintController.setProblem(`pixfind:${hintIdentity}`);
     selected = puzzle; found = new Set(); regions = []; cursorX = NaN; cursorY = NaN; readOnly = false; authoritativeAnswers = false; answerInstruction = ''; primary.disabled = false; statusGame.textContent = '絵を準備しています。';
-    originalNode.hidden = false; changedNode.hidden = true; compareButton.hidden = puzzle.mode === 'hidden-object'; compareButton.setAttribute('aria-pressed', 'false'); compareButton.textContent = '変化後を見る';
+    originalNode.hidden = false; changedNode.hidden = puzzle.mode === 'hidden-object';
+    if (changedFigure) changedFigure.hidden = puzzle.mode !== 'spot-difference';
+    if (compareButton) { compareButton.hidden = puzzle.mode === 'hidden-object' || Boolean(changedArea); compareButton.setAttribute('aria-pressed', 'false'); compareButton.textContent = '変化後を見る'; }
     document.querySelector('.pixfind-page').classList.add('pixfind-page--playing');
     document.body.classList.add('pixfind-is-playing');
     if (puzzle.localOnly || puzzle.localHiddenOnly) localRoute = true;
@@ -400,12 +415,12 @@ function mount() {
     game.hidden = false; list.hidden = true; document.querySelector('#pixfind-title').textContent = puzzle.label;
     document.querySelector('#pixfind-author').textContent = `作者：${puzzle.author}`;
     if (localNotice) localNotice.hidden = !(puzzle.localOnly || puzzle.localHiddenOnly);
-    document.querySelector('#pixfind-image-label').textContent = puzzle.mode === 'hidden-object' ? '絵をタップして探す' : '変化している場所をタップ';
+    document.querySelector('#pixfind-image-label').textContent = puzzle.mode === 'hidden-object' ? '絵をタップして探す' : '元の絵';
     primary.innerHTML = '<span aria-hidden="true">↻</span>'; primary.setAttribute('aria-label', '最初から遊び直す');
     primary.className = 'pixfind-primary-ready';
     try {
       if (puzzle.localHiddenOnly || (puzzle.publicPostOnly && puzzle.mode === 'hidden-object')) {
-        original = await loadImage(puzzle.originalUrl); changed = null; originalNode.src = puzzle.originalUrl; changedNode.removeAttribute('src'); changedNode.hidden = true; compareButton.hidden = true;
+        original = await loadImage(puzzle.originalUrl); changed = null; originalNode.src = puzzle.originalUrl; changedNode.removeAttribute('src'); changedNode.hidden = true; if (compareButton) compareButton.hidden = true;
         if (original.naturalWidth !== puzzle.width || original.naturalHeight !== puzzle.height) throw new Error('元画像の保存版サイズが一致しません。');
       } else {
         [original, changed] = await Promise.all([loadImage(puzzle.originalUrl), loadImage(puzzle.changedUrl)]);
@@ -456,6 +471,7 @@ function mount() {
       currentMask = result.mask;
       if (!readOnly && !regions.length) { readOnly = true; viewMessage = '正解位置を確認できないため、画像のみ表示しています。'; }
       playArea.style.aspectRatio = `${original.naturalWidth}/${original.naturalHeight}`;
+      if (changedArea) changedArea.style.aspectRatio = playArea.style.aspectRatio;
       if (readOnly) { primary.disabled = true; primary.setAttribute('aria-label', '正解位置未確認のためプレイできません'); progress.textContent = '閲覧のみ'; foundList.replaceChildren(); statusGame.textContent = viewMessage; }
       else { primary.setAttribute('aria-label', '最初から遊び直す'); statusGame.textContent = viewMessage || answerInstruction || (puzzle.mode === 'hidden-object' ? '絵をタップして、隠れているものを探してください。' : '変化している場所をタップしてください。'); updateProgress(); }
     } catch (error) {
@@ -476,7 +492,7 @@ function mount() {
       window.location.assign(exitDestination(window.location, pageMode));
       return;
     }
-    game.hidden = true; list.hidden = false; selected = null; document.querySelector('.pixfind-page').classList.remove('pixfind-page--playing'); document.body.classList.remove('pixfind-is-playing'); primary.innerHTML = '<span aria-hidden="true">▶</span>'; primary.setAttribute('aria-label', '選択した問題を遊ぶ'); primary.className = ''; primary.disabled = false; const nextUrl = new URL(window.location.href); nextUrl.searchParams.delete('puzzle'); nextUrl.hash = ''; history.replaceState(null, '', nextUrl);
+    game.hidden = true; list.hidden = false; selected = null; document.querySelector('.pixfind-page').classList.remove('pixfind-page--playing'); document.body.classList.remove('pixfind-is-playing'); primary.innerHTML = '<span aria-hidden="true">▶</span>'; primary.setAttribute('aria-label', '一覧の先頭の問題を遊ぶ'); primary.className = ''; primary.disabled = false; const nextUrl = new URL(window.location.href); nextUrl.searchParams.delete('puzzle'); nextUrl.hash = ''; history.replaceState(null, '', nextUrl);
   };
   const renderList = () => {
     list.replaceChildren(...puzzles.map((puzzle) => {
@@ -485,9 +501,10 @@ function mount() {
       const body = el('div', 'pixfind-card__body'); body.append(el('h2', '', puzzle.label), el('p', '', `作者：${puzzle.author}`)); button.append(img, body); button.addEventListener('click', () => start(puzzle)); article.append(button); return article;
     }));
   };
+  primary.setAttribute('aria-label', '一覧の先頭の問題を遊ぶ');
   primary.addEventListener('click', () => { if (selected) start(selected); else if (puzzles.length) start(puzzles[0]); });
   document.querySelector('#pixfind-back').addEventListener('click', showList);
-  compareButton.addEventListener('click', () => {
+  compareButton?.addEventListener('click', () => {
     const showingChanged = compareButton.getAttribute('aria-pressed') !== 'true';
     originalNode.hidden = showingChanged; changedNode.hidden = !showingChanged;
     compareButton.setAttribute('aria-pressed', String(showingChanged));
@@ -501,14 +518,14 @@ function mount() {
     if (hit < 0) { statusGame.textContent = 'そこにはありません。もう一度探してみてください。'; paint(); return; }
     found.add(hit); statusGame.textContent = '見つけました！'; updateProgress();
   };
-  const locate = (clientX, clientY) => {
+  const locate = (clientX, clientY, area = playArea) => {
     if (!original || !regions.length || readOnly) return;
-    const rect = playArea.getBoundingClientRect(); const { scale, xoff, yoff } = geometry();
+    const rect = area.getBoundingClientRect(); const { scale, xoff, yoff } = geometry(area);
     const x = (clientX - rect.left - xoff) / scale; const y = (clientY - rect.top - yoff) / scale;
     markAt(x, y);
   };
-  playArea.addEventListener('pointerdown', (event) => { if (event.button > 0) return; event.preventDefault(); locate(event.clientX, event.clientY); });
-  playArea.addEventListener('keydown', (event) => {
+  for (const area of [playArea, changedArea].filter(Boolean)) area.addEventListener('pointerdown', (event) => { if (event.button > 0) return; event.preventDefault(); locate(event.clientX, event.clientY, area); });
+  for (const area of [playArea, changedArea].filter(Boolean)) area.addEventListener('keydown', (event) => {
     if (['ArrowLeft', 'ArrowUp', 'ArrowRight', 'ArrowDown'].includes(event.key) && original) {
       event.preventDefault(); const step = Math.max(1, Math.round(Math.min(original.naturalWidth, original.naturalHeight) / 24));
       if (!Number.isFinite(cursorX)) { cursorX = Math.floor(original.naturalWidth / 2); cursorY = Math.floor(original.naturalHeight / 2); }

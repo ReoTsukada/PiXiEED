@@ -1,4 +1,5 @@
 .px-display-ad {
+  --px-display-ad-reserved-height: 145px;
   box-sizing: border-box;
   display: block;
   min-width: 0;
@@ -43,6 +44,7 @@ ins.px-display-ad__unit {
 }
 
 @media (min-width: 800px) {
+  .px-display-ad { --px-display-ad-reserved-height: 135px; }
   ins.px-display-ad__unit {
     height: 90px;
   }

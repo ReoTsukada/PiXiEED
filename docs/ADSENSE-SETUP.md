@@ -2,7 +2,7 @@
 
 通常の公開ページでは、Google 公式コードを `<head>` に1回設置する。共通ヘッダーからは読み込まないため、マイページや管理画面へ意図せず広がらない。
 
-パブリッシャー：`ca-pub-9801602250480253`。報酬型は AdSense のオファーウォール（プライバシーとメッセージ → オファーウォール。サイト pixieed.jp、ページ `pixieed.jp/pass` のみ、選択肢は報酬型広告のみ、利用資格1時間）。`/pass/`（`js/pass-page.mjs`）がオファーウォールの表示と終了を見て1時間を付与する（貯められない）。12秒出なければ本日の無料1時間（1日1回）。確認用URL：`https://pixieed.jp/pass/?fc=alwaysshow&fctype=monetization`。通常広告の表示・クリックによってパスを付与しない。Ad Manager は使わない。
+通常広告のパブリッシャー：`ca-pub-9801602250480253`。特典用の報酬型広告は別経路で、共通ヘッダーから本人が「広告を見る」を押したとき、同じページ上で Ad Manager の `/23379831154/pixieed_rewarded` を要求する。Google Publisher Tag の `rewardedSlotGranted` 通知を受けた場合だけ1時間付与し、広告がない場合や途中で閉じた場合には付与しない。有効中の時間は加算しない。本日の無料1時間は別の操作として1日1回受け取れる。旧 `/pass/` と AdSense オファーウォールの設定は残っているが、通常の特典導線からは使用しない。通常広告の表示・クリックによってパスを付与しない。
 
 ## 設置範囲
 
@@ -25,7 +25,7 @@ AdSenseの「広告」→pixieed.jpの編集で自動広告を有効にして「
 
 2026-09-29確認：上記Nodeテスト71件PASS、構文確認と `git diff --check` PASS。`scripts/adsense-browser-harness.mjs` はChromium・WebKit各39項目、計78項目PASS。20ページのheadロードが各1回、6除外ページの未ロード、3種のiframe内の未ロード、通常広告によるパスの未付与、320px・1280pxの主要5画面の横幅と44px操作域を確認した。広告配信の代替応答を用いており、実広告の配置・Google配信・物理端末は未検証。
 
-コミット・push・本番公開と、AdSense管理画面の設定変更はこの改修では実行しない。本番反映後に公開HTML、`https://pixieed.jp/ads.txt`、AdSenseプレビュー・配信状態を確認する。
+本番反映後に公開HTML、`https://pixieed.jp/ads.txt`、AdSenseプレビュー・Ad Manager の報酬型広告配信状態を確認する。コードが正しくても、広告在庫がない端末・地域では配信されない。
 
 参照：[公式のhead設置方法](https://support.google.com/adsense/answer/9274516?hl=ja)、[自動広告のページ除外](https://support.google.com/adsense/answer/9262311?hl=ja)。
 

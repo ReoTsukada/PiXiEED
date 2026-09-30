@@ -6,9 +6,24 @@ export const AUDIO_PIXEL_COLUMNS = 16;
 export const AUDIO_PIXEL_PITCHES = Object.freeze([84, 81, 79, 76, 74, 72, 69, 67, 64, 62, 60, 57, 55, 52, 50, 48]);
 export const AUDIO_PIXEL_COLUMN_OPTIONS = Object.freeze([16, 32, 64, 128]);
 export const AUDIO_BAR_TICKS = AUDIO_PPQ * 4;
-export const AUDIO_MAX_LOOP_TICKS = AUDIO_BAR_TICKS * 8;
+export const AUDIO_MAX_LOOP_TICKS = AUDIO_BAR_TICKS * 16;
 export const AUDIO_MIN_TEMPO = 60;
 export const AUDIO_MAX_TEMPO = 180;
+export const AUDIO_SHARED_IMAGE_MAX_DIMENSION = 256;
+
+/** Map every source-image row to a sounding pitch without reducing the image. */
+export function createAudioRowPitchMap(height, { lowPitch = 36, highPitch = 96 } = {}) {
+  if (!Number.isInteger(height) || height < 1 || height > AUDIO_SHARED_IMAGE_MAX_DIMENSION) throw new RangeError('画像の高さは1〜256行です');
+  if (!Number.isInteger(lowPitch) || !Number.isInteger(highPitch) || lowPitch < 0 || highPitch > 127 || lowPitch > highPitch) throw new RangeError('音程の範囲が不正です');
+  if (height === 1) return [Math.round((lowPitch + highPitch) / 2)];
+  return Array.from({ length: height }, (_, y) => Math.round(highPitch - (highPitch - lowPitch) * y / (height - 1)));
+}
+
+export function validateAudioSharedImage(image, rowPitchMap) {
+  if (!image || !Number.isInteger(image.width) || image.width < 1 || image.width > AUDIO_SHARED_IMAGE_MAX_DIMENSION || !Number.isInteger(image.height) || image.height < 1 || image.height > AUDIO_SHARED_IMAGE_MAX_DIMENSION || !(image.rgba instanceof Uint8Array || image.rgba instanceof Uint8ClampedArray) || image.rgba.length !== image.width * image.height * 4) throw new TypeError('共有画像の大きさまたはRGBAデータが不正です');
+  if (!Array.isArray(rowPitchMap) || rowPitchMap.length !== image.height || rowPitchMap.some((pitch) => pitch !== null && (!Number.isInteger(pitch) || pitch < 0 || pitch > 127))) throw new TypeError('画像の行と音程の対応が不正です');
+  return image;
+}
 import { AUDIO_INSTRUMENTS, getAudioInstrument } from './audio-timbres.mjs?rev=20260928-dot-music-1';
 export { AUDIO_INSTRUMENTS };
 
@@ -60,7 +75,18 @@ export function audioPixelColumns(song) {
 export function resizeAudioCanvas(song, columns) {
   validateAudioSong(song);
   if (!AUDIO_PIXEL_COLUMN_OPTIONS.includes(columns)) throw new RangeError('16/32/64/128列から選んでください');
-  const nextLoopTicks = columns * AUDIO_PIXEL_TICKS;
+  return resizeAudioLoop(song, columns * AUDIO_PIXEL_TICKS);
+}
+
+/** Give each shared-image column one 16th note, without shortening existing music. */
+export function extendAudioLoopForImage(song, width) {
+  validateAudioSong(song);
+  if (!Number.isInteger(width) || width < 1 || width > AUDIO_SHARED_IMAGE_MAX_DIMENSION) throw new RangeError('画像の横幅は1〜256列です');
+  const requiredTicks = Math.ceil(width * AUDIO_PIXEL_TICKS / AUDIO_BAR_TICKS) * AUDIO_BAR_TICKS;
+  return resizeAudioLoop(song, Math.max(song.loopTicks, requiredTicks));
+}
+
+function resizeAudioLoop(song, nextLoopTicks) {
   const oldLoopTicks = song.loopTicks;
   if (nextLoopTicks < oldLoopTicks && song.tracks.some((track) => track.clips.some((clip) => clip.notes.some((note) => note.startTick + note.durationTicks > nextLoopTicks)))) {
     throw new RangeError('縮小すると末尾の音符が失われるため変更できません');
@@ -251,14 +277,38 @@ export function normalizeAudioPixelSong(song) {
   return normalized;
 }
 
-export function collectAudioEvents(song) {
+export function collectAudioEvents(song, { joinAdjacent = false } = {}) {
   validateAudioSong(song);
   const events = [];
   const instruments = new Map((song.pixelPalette || AUDIO_PIXEL_PALETTE).map((slot) => [slot.slotId, slot.instrument]));
   for (const track of song.tracks) for (const clip of track.clips) for (const note of clip.notes) {
-    events.push({ instrument: instruments.get(track.instrument) || track.instrument, startTick: note.startTick, durationTicks: note.durationTicks, pitch: note.pitch, velocity: note.velocity });
+    events.push({ instrument: instruments.get(track.instrument) || track.instrument, startTick: note.startTick, durationTicks: note.durationTicks, pitch: note.pitch, velocity: note.velocity,
+      trackId: track.trackId, colorId: note.colorId || `slot-${track.instrument}`, sourceCell: note.sourceCell || null });
   }
-  return events.sort((left, right) => left.startTick - right.startTick || left.pitch - right.pitch || (left.instrument < right.instrument ? -1 : left.instrument > right.instrument ? 1 : 0));
+  const audible = joinAdjacent ? [] : events;
+  if (joinAdjacent) {
+    const lanes = new Map();
+    for (const event of events) {
+      const key = JSON.stringify([event.trackId, event.pitch, event.sourceCell?.y ?? null]);
+      if (!lanes.has(key)) lanes.set(key, []);
+      lanes.get(key).push(event);
+    }
+    for (const lane of lanes.values()) {
+      lane.sort((left, right) => left.startTick - right.startTick);
+      let current = null;
+      for (const event of lane) {
+        if (current && current.colorId === event.colorId && current.velocity === event.velocity
+          && current.startTick + current.durationTicks === event.startTick
+          && Boolean(current.sourceCell) === Boolean(event.sourceCell)
+          && (!event.sourceCell || current.sourceCell.x + 1 === event.sourceCell.x)) {
+          current.durationTicks += event.durationTicks;
+          if (event.sourceCell) current.sourceCell = event.sourceCell;
+        } else { current = { ...event }; audible.push(current); }
+      }
+    }
+  }
+  return audible.map(({ trackId, colorId, sourceCell, ...event }) => event)
+    .sort((left, right) => left.startTick - right.startTick || left.pitch - right.pitch || (left.instrument < right.instrument ? -1 : left.instrument > right.instrument ? 1 : 0));
 }
 
 export function midiFrequency(pitch) {
@@ -312,7 +362,7 @@ function makeInstrumentSource(context, profile, waveform, duty, frequency, onset
 }
 
 export function createAudioPlayer({ audioContextFactory = () => new globalThis.AudioContext(), schedule = globalThis.setTimeout, cancel = globalThis.clearTimeout, onStateChange = () => {} } = {}) {
-  let context = null; let loopTimer = null; let playing = false; let starting = false; let token = 0; let previewToken = 0; let cycleStartAt = null; let cycleLoopTicks = null; let cycleSecondsPerTick = null; const activeNodes = new Set(); const previewNodes = new Set();
+  let context = null; let loopTimer = null; let playing = false; let starting = false; let stopAtLoopEnd = false; let token = 0; let previewToken = 0; let cycleStartAt = null; let cycleLoopTicks = null; let cycleSecondsPerTick = null; const activeNodes = new Set(); const previewNodes = new Set();
 
   function notify() { onStateChange(playing, starting); }
   function disposeNode(node) {
@@ -331,6 +381,7 @@ export function createAudioPlayer({ audioContextFactory = () => new globalThis.A
   }
   function stop() {
     token += 1;
+    stopAtLoopEnd = false;
     cancelPreviews();
     playing = false;
     starting = false;
@@ -355,7 +406,7 @@ export function createAudioPlayer({ audioContextFactory = () => new globalThis.A
 
   function scheduleCycle(song, cycleToken) {
     if (!playing || cycleToken !== token || !context) return;
-    const events = collectAudioEvents(song); const startAt = context.currentTime + 0.035;
+    const events = collectAudioEvents(song, { joinAdjacent: true }); const startAt = context.currentTime + 0.035;
     const secondsPerTick = 60 / song.tempo / AUDIO_PPQ;
     cycleStartAt = startAt; cycleLoopTicks = song.loopTicks; cycleSecondsPerTick = secondsPerTick;
     const scheduled = events.map((event) => {
@@ -413,7 +464,12 @@ export function createAudioPlayer({ audioContextFactory = () => new globalThis.A
       });
       activeNodes.add(sum); activeNodes.add(gain);
     }
-    loopTimer = schedule(() => scheduleCycle(song, cycleToken), song.loopTicks * secondsPerTick * 1000);
+    loopTimer = schedule(() => {
+      loopTimer = null;
+      if (!stopAtLoopEnd) { scheduleCycle(song, cycleToken); return; }
+      const releaseMs = Math.max(0, ...events.map(({ instrument: id }) => getAudioInstrument(id)?.release || 0)) * 1000;
+      loopTimer = schedule(stop, releaseMs + 60);
+    }, song.loopTicks * secondsPerTick * 1000);
   }
 
   async function preview({ instrument: instrumentId, pitch, velocity = 80, duration = 0.12 } = {}) {
@@ -476,6 +532,11 @@ export function createAudioPlayer({ audioContextFactory = () => new globalThis.A
       return Math.min(cycleLoopTicks - 1, Math.floor(elapsed / cycleSecondsPerTick));
     },
     preview,
+    stopAfterCurrentLoop() {
+      if (!playing && !starting) return false;
+      stopAtLoopEnd = true;
+      return true;
+    },
     async play(song) {
       validateAudioSong(song);
       if (!collectAudioEvents(song).length) return false;
