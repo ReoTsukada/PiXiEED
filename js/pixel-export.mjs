@@ -50,7 +50,14 @@ const touchFirst = () => globalThis.matchMedia?.('(pointer: coarse)')?.matches =
  * Hand a finished file to the person: the share sheet on phones (when it can take files), a download elsewhere.
  * Resolves 'shared', 'downloaded' or 'cancelled'.
  */
-export async function saveFile(blob, filename, { navigatorRef = globalThis.navigator, documentRef = globalThis.document, preferShare = touchFirst() } = {}) {
+export async function saveFile(blob, filename, options = {}) {
+  const result = await saveFileNow(blob, filename, options);
+  if (result !== 'cancelled') {
+    try { globalThis.gtag?.('event', 'file_export', { file_type: String(filename).split('.').pop().toLowerCase(), method: result }); } catch {}
+  }
+  return result;
+}
+async function saveFileNow(blob, filename, { navigatorRef = globalThis.navigator, documentRef = globalThis.document, preferShare = touchFirst() } = {}) {
   const type = blob.type || 'application/octet-stream';
   if (preferShare && typeof navigatorRef?.share === 'function' && typeof globalThis.File === 'function') {
     const file = new File([blob], filename, { type });

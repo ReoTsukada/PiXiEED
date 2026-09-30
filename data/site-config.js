@@ -56,3 +56,8 @@ export const displayAdConfig = {
     'find-result': '2995020884' // もの探しの結果
   }
 };
+
+/* Google アナリティクス（GA4）の測定ID。全ページ共通（js/site-analytics.mjs）。空欄なら送信しません。 */
+export const analyticsConfig = {
+  measurementId: 'G-SZPVXMX85G'
+};

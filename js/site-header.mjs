@@ -1,5 +1,6 @@
 import { freeWithoutAdWaitMs, hasPro, onPassChange, passRemainingMs, requestPass } from './pixieed-pass.mjs?v=20260930-offerwall-1';
 import { derivePassGauge, renderPassGauge } from './pass-gauge.mjs?rev=20260929-tool-ui-1';
+import './site-analytics.mjs?rev=20260930-ga4-1';
 
 const brandedLink = () => {
   const link = document.createElement('a');

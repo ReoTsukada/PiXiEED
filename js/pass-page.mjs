@@ -10,6 +10,7 @@ const ADSENSE = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?
 const APPEAR_MS = 12000; // no Offerwall by then → no ad
 const SETTLE_MS = 1500; // the Offerwall must stay gone this long before the hour is granted
 
+const track = (name, params = {}) => { try { globalThis.gtag?.('event', name, params); } catch {} };
 const clock = document.getElementById('passClock');
 const text = document.getElementById('passText');
 const back = document.getElementById('passBack');
@@ -44,6 +45,7 @@ export function offerwallCovering(doc = document) {
 async function noAd() {
   let free = false;
   try { free = await claimDailyFree(); } catch {}
+  track(free ? 'pass_granted' : 'pass_no_ad', free ? { method: 'free_no_ad' } : {});
   finish(free ? `いまは広告がないので、本日の無料分として${PASS_HOURS}時間使えます。`
     : hasPass() ? '特典が使えます。' : 'いまは広告がありません。無料分は明日0時にまた受け取れます。');
 }
@@ -54,14 +56,16 @@ function watchOfferwall() {
   const check = () => {
     if (done) return;
     if (offerwallCovering()) {
-      if (!seen) { seen = true; window.clearTimeout(appearTimer); text.textContent = '広告を最後まで見ると、1時間使えます。'; }
+      if (!seen) { seen = true; track('pass_offerwall_shown'); window.clearTimeout(appearTimer); text.textContent = '広告を最後まで見ると、1時間使えます。'; }
       window.clearTimeout(settleTimer); settleTimer = 0;
       return;
     }
     if (seen && !settleTimer) settleTimer = window.setTimeout(async () => {
       if (offerwallCovering()) { settleTimer = 0; return; }
       stop();
-      try { await grantFromAd(); } catch {}
+      let granted = false;
+      try { granted = await grantFromAd(); } catch {}
+      if (granted) track('pass_granted', { method: 'ad' });
       finish(hasPass() ? `${PASS_HOURS}時間、すべての特典が使えます。` : '特典を付けられませんでした。もう一度お試しください。');
     }, SETTLE_MS);
   };
