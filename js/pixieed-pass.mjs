@@ -191,6 +191,69 @@ export async function grantFromAd() {
     return true;
   });
 }
+
+// ---- AdSense Offerwall (Privacy & messaging) ---------------------------------------------------------------
+// The Offerwall's only choice is a rewarded ad. Google would show it as soon as a page loads; instead its
+// message is held here and shown when the person taps 「広告を見る」. Watching it grants one hour (never
+// stacked). The reward is detected from the Offerwall itself: after its rewarded-ad button is used, the
+// thank-you snackbar (or the Offerwall closing) means the ad was watched.
+let heldOfferwall = null;
+let offerwallWanted = null;
+let rewardWatch = null;
+const visible = (el) => { if (!el) return false; const style = getComputedStyle(el); const box = el.getBoundingClientRect(); return style.display !== 'none' && style.visibility !== 'hidden' && box.width * box.height > 0; };
+function offerwallOpen() { return [...document.querySelectorAll('.fc-message-root, .fc-monetization-dialog-container')].some(visible); }
+function watchOfferwallReward() {
+  if (rewardWatch) return rewardWatch.promise;
+  let resolve; const promise = new Promise((r) => { resolve = r; });
+  let chose = false; let closedTimer = 0; let seenOpen = offerwallOpen();
+  const finish = async (watched) => {
+    observer.disconnect(); window.clearInterval(poll); window.clearTimeout(closedTimer); document.removeEventListener('click', onClick, true);
+    rewardWatch = null;
+    let granted = false;
+    if (watched) { try { granted = await grantFromAd(); } catch {} if (granted) track('pass_granted', { method: 'offerwall' }); }
+    resolve(watched ? (granted || hasPass()) : false);
+  };
+  const onClick = (event) => { if (event.target.closest?.('.fc-rewarded-ad-button, [class*="fc-rewarded"]')) { chose = true; track('pass_offerwall_choice'); } };
+  const check = () => {
+    if ([...document.querySelectorAll('.fc-thank-you-snackbar, [class*="fc-thank-you"]')].some(visible)) { void finish(true); return; }
+    if (offerwallOpen()) { seenOpen = true; window.clearTimeout(closedTimer); closedTimer = 0; return; }
+    if (seenOpen && !closedTimer) closedTimer = window.setTimeout(() => { if (!offerwallOpen()) void finish(chose); else closedTimer = 0; }, 1500);
+  };
+  const observer = new MutationObserver(check);
+  observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class'] });
+  const poll = window.setInterval(check, 500);
+  document.addEventListener('click', onClick, true);
+  rewardWatch = { promise };
+  return promise;
+}
+function proceedOfferwall(message) {
+  track('pass_offerwall_shown');
+  const outcome = watchOfferwallReward();
+  try { message.proceed(true); } catch {}
+  return outcome;
+}
+/** Shows the held Offerwall. Resolves 'none' when Google has no Offerwall for this page view. */
+export function showOfferwall({ waitMs = 5000 } = {}) {
+  if (typeof document === 'undefined' || typeof MutationObserver !== 'function' || typeof getComputedStyle !== 'function') return Promise.resolve('none');
+  if (offerwallOpen()) return watchOfferwallReward().then((ok) => (ok ? 'granted' : 'closed'));
+  if (heldOfferwall) { const message = heldOfferwall; heldOfferwall = null; return proceedOfferwall(message).then((ok) => (ok ? 'granted' : 'closed')); }
+  return new Promise((resolve) => {
+    const timer = window.setTimeout(() => { offerwallWanted = null; resolve('none'); }, waitMs);
+    offerwallWanted = (message) => { window.clearTimeout(timer); offerwallWanted = null; proceedOfferwall(message).then((ok) => resolve(ok ? 'granted' : 'closed')); };
+  });
+}
+if (typeof window !== 'undefined' && typeof document !== 'undefined' && typeof location !== 'undefined' && typeof MutationObserver === 'function' && !/^\/pass\//.test(location.pathname)) {
+  window.googlefc = window.googlefc || {};
+  window.googlefc.callbackQueue = window.googlefc.callbackQueue || [];
+  window.googlefc.controlledMessagingFunction = (message) => {
+    if (offerwallWanted) offerwallWanted(message);
+    else if (hasPass()) { try { message.proceed(false); } catch {} }
+    else heldOfferwall = message;
+  };
+  // If an Offerwall still appears on its own (e.g. Google loaded before this module), its reward counts too.
+  const early = new MutationObserver(() => { if (offerwallOpen()) { early.disconnect(); void watchOfferwallReward(); } });
+  early.observe(document.documentElement, { childList: true, subtree: true });
+}
 // ---- one free pass per local day, shared with the legacy day key -----------------------------------------
 const NO_AD_KEY = 'pixieed:pass:no-ad-at:v1';
 const NO_AD_DAY_KEY = 'pixieed:pass:no-ad-day:v1';
@@ -347,8 +410,21 @@ export function requestPass({ perk = '', extend = false } = {}) {
         close(hasPass());
         return;
       }
-      track('pass_ad_open', { perk, provider: 'ad-manager' });
       text.textContent = '広告を準備しています…'; go.textContent = '広告を読み込み中…';
+      // AdSense Offerwall first (held since page load); Ad Manager only when Google offers no Offerwall.
+      track('pass_ad_open', { perk, provider: 'offerwall' });
+      const hideSheet = (hidden) => { if (backdrop.style) backdrop.style.visibility = hidden ? 'hidden' : ''; backdrop.inert = hidden; };
+      hideSheet(true);
+      let wall = 'none';
+      try { wall = await showOfferwall(); } catch {}
+      hideSheet(false);
+      if (wall === 'granted' || hasPass()) { close(true); return; }
+      if (wall === 'closed') {
+        text.textContent = '広告が最後まで再生されませんでした。特典は付与されていません。';
+        go.textContent = 'もう一度試す'; go.disabled = false; no.disabled = false;
+        return;
+      }
+      track('pass_ad_open', { perk, provider: 'ad-manager' });
       let result;
       try {
         result = await showRewardedAd({

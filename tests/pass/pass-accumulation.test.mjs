@@ -118,7 +118,7 @@ test('after the free hour, the rewarded grant event gives the pass in the same s
     assert.equal(go.textContent, '広告を見る');
     const { events, slot } = configureRewardedGpt();
     const click = go.fire('click')[0];
-    await Promise.resolve();
+    for (let tick = 0; tick < 6; tick += 1) await Promise.resolve(); // the Offerwall check comes first
     events.get('rewardedSlotReady')({ slot, makeRewardedVisible() {} });
     assert.equal(pass.hasPass(), false, 'slot readiness alone never grants the pass');
     events.get('rewardedSlotGranted')({ slot });
@@ -143,7 +143,7 @@ test('no-fill restores the sheet for retry and does not grant access', async () 
     const request = pass.requestPass(); const modal = body.children.at(-1); const go = modal.querySelector('.px-pass-go');
     const { events, slot } = configureRewardedGpt();
     const click = go.fire('click')[0];
-    await Promise.resolve();
+    for (let tick = 0; tick < 6; tick += 1) await Promise.resolve(); // the Offerwall check comes first
     events.get('slotRenderEnded')({ slot, isEmpty: true });
     await click;
     assert.equal(pass.hasPass(), false);
@@ -165,7 +165,7 @@ test('closing the rewarded slot without a grant restores the sheet and grants no
   try {
     const request = pass.requestPass(); const modal = body.children.at(-1); const go = modal.querySelector('.px-pass-go');
     const { events, slot } = configureRewardedGpt();
-    const click = go.fire('click')[0]; await Promise.resolve();
+    const click = go.fire('click')[0]; for (let tick = 0; tick < 6; tick += 1) await Promise.resolve();
     events.get('rewardedSlotReady')({ slot, makeRewardedVisible() {} });
     assert.equal(modal.style.visibility, 'hidden');
     events.get('rewardedSlotClosed')({ slot });
