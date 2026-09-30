@@ -11,6 +11,7 @@
  */
 import { passConfig } from '../data/site-config.js?rev=20260928-pass-1h-1';
 
+const track = (name, params = {}) => { try { globalThis.gtag?.('event', name, params); } catch {} };
 const STORE_KEY = 'pixieed:pass:v1';
 const PRO_KEY = 'pixieed:pro:v1';
 export const PASS_HOURS = Number(passConfig?.passHours) > 0 ? Number(passConfig.passHours) : 1;
@@ -228,6 +229,7 @@ export function requestPass({ perk = '', extend = false } = {}) {
   if (active) no.hidden = true;
   const returnFocus = document.activeElement;
   document.body.appendChild(backdrop);
+  track('pass_sheet_open', { perk: perk || (extend ? 'header' : ''), state: active ? 'active' : offeredFree ? 'free' : 'ad' });
   go.focus({ preventScroll: true });
   open = new Promise((resolve) => {
     let stopWatching = () => {};
@@ -254,7 +256,7 @@ export function requestPass({ perk = '', extend = false } = {}) {
       go.disabled = true; no.disabled = true;
       if (offeredFree) {
         try {
-          if (await claimFreeWithoutAd(() => applyGrant({ notifyChange: false }))) { close(true); return; }
+          if (await claimFreeWithoutAd(() => applyGrant({ notifyChange: false }))) { track('pass_granted', { method: 'free' }); close(true); return; }
         } catch {}
         offeredFree = false;
         text.textContent = `今日の無料分は受け取り済みです。広告を1本見ると${PASS_HOURS}時間使えます。`;
@@ -270,6 +272,7 @@ export function requestPass({ perk = '', extend = false } = {}) {
       // The Offerwall lives on its own page. A new tab keeps this page (and the work on it) as it is;
       // the pass arrives here through storage as soon as the ad is watched.
       const url = passPageUrl();
+      track('pass_ad_open', { perk });
       let tab = null;
       try { tab = window.open(url, '_blank'); } catch {}
       if (!tab) { location.href = url; return; }
