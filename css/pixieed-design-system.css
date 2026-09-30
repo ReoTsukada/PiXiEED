@@ -490,10 +490,17 @@ body.arc-jigsaw .jigsaw-workspace { --pixel-frame: #245446; }
 .art-card__image, .market-card__image, .collection-item__image { margin: 6px 6px 0; }
 .arc-pick { overflow: visible !important; }
 
-/* ==== PiXiEED pass perks: a small pixel star marks a button that a pass unlocks ==== */
-.px-perk { position: relative; }
-.px-perk::after { content: ""; position: absolute; top: -4px; right: -4px; width: 12px; height: 12px; background: #ffd35a; pointer-events: none;
-  clip-path: polygon(33% 0, 67% 0, 67% 33%, 100% 33%, 100% 67%, 67% 67%, 67% 100%, 33% 100%, 33% 67%, 0 67%, 0 33%, 33% 33%); filter: drop-shadow(0 1px 0 rgba(0,0,0,.45)); }
+/* ==== PiXiEED pass perks: a small pixel coin marks what one ad (1時間) unlocks; it disappears while the pass runs ====
+   Mark a control with class="px-perk" (or data-perk). Buttons whose aria-label ends with 「・特典」/「（特典）」 and a
+   puzzle hint whose free use is spent (data-hint-short="パス") are marked automatically. */
+:is(.px-perk, [data-perk], button[aria-label$="・特典"], button[aria-label*="（特典）"], [data-hint-short="パス"]):not(.px-header-pass) { position: relative; }
+:is(.px-perk, [data-perk], button[aria-label$="・特典"], button[aria-label*="（特典）"], [data-hint-short="パス"]):not(.px-header-pass):not(select):not(input)::after {
+  content: ""; position: absolute; top: -6px; right: -6px; z-index: 2; width: 15px; height: 15px; pointer-events: none;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath fill='%23a86410' d='M3 0h6v1h2v2h1v6h-1v2H9v1H3v-1H1V9H0V3h1V1h2z'/%3E%3Cpath fill='%23ffd95c' d='M3 1h6v1h1v1h1v6h-1v1H9v1H3v-1H2V9H1V3h1V2h1z'/%3E%3Cpath fill='%23fff6c9' d='M5 1h2v2h2v2h2v2H9v2H7v2H5V9H3V7H1V5h2V3h2z'/%3E%3C/svg%3E") center / 100% 100% no-repeat; image-rendering: pixelated; filter: drop-shadow(0 1px 0 rgba(0,0,0,.35));
+  animation: px-perk-glint 5s steps(1, end) infinite; }
+html[data-pass=active] :is(.px-perk, [data-perk], button[aria-label$="・特典"], button[aria-label*="（特典）"], [data-hint-short="パス"])::after { content: none !important; }
+@keyframes px-perk-glint { 0%, 86%, 100% { transform: none; filter: drop-shadow(0 1px 0 rgba(0,0,0,.35)); } 88% { transform: translateY(-2px) scale(1.15); filter: drop-shadow(0 1px 0 rgba(0,0,0,.35)) brightness(1.35); } 92% { transform: translateY(-1px); } 95% { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .px-perk::after, [data-perk]::after, button[aria-label$="・特典"]::after, button[aria-label*="（特典）"]::after, [data-hint-short="パス"]::after { animation: none !important; } }
 
 /* ==== short landscape screens (phones on their side): a slimmer bottom bar, so the work gets the height ==== */
 @media (orientation: landscape) and (max-height: 500px) {
