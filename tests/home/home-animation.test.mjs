@@ -133,6 +133,20 @@ test('watchdog recovers visible drawing when requestAnimationFrame stalls', () =
   scheduler.dispose(); assert.equal(browser.timers.size, 0);
 });
 
+test('a slow animation frame does not cancel the pending frame or halve automatic playback', () => {
+  const browser = fakeBrowser(); const scheduler = createVisibleAnimationScheduler(browser.env); let draws = 0;
+  scheduler.add(browser.element(), () => draws++, { fps: 60 });
+  for (let frame = 0; frame < 10; frame++) browser.elapseTimers(18);
+  assert.ok(draws >= 9, `timer fills missing 60 FPS frames: ${draws}`);
+  assert.equal(browser.rafs.size, 1, 'the browser frame stays pending while fallback frames run');
+  const beforeRecovery = draws;
+  browser.tick(200);
+  assert.equal(draws, beforeRecovery + 1, 'the recovered browser frame is drawn once');
+  assert.equal(browser.rafs.size, 1);
+  assert.equal(browser.timers.size, 1);
+  scheduler.dispose();
+});
+
 test('a drawing exception removes only that entry and leaves other animations running', () => {
   const browser = fakeBrowser(); const scheduler = createVisibleAnimationScheduler(browser.env); let goodDraws = 0;
   const badElement = browser.element(); const goodElement = browser.element();

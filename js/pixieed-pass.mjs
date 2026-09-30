@@ -226,20 +226,20 @@ function watchOfferwallReward() {
   rewardWatch = { promise };
   return promise;
 }
-function proceedOfferwall(message) {
+function proceedOfferwall(message, onPresent) {
   track('pass_offerwall_shown');
   const outcome = watchOfferwallReward();
-  try { message.proceed(true); } catch {}
+  try { message.proceed(true); onPresent?.(); } catch {}
   return outcome;
 }
 /** Shows the held Offerwall. Resolves 'none' when Google has no Offerwall for this page view. */
-export function showOfferwall({ waitMs = 5000 } = {}) {
+export function showOfferwall({ waitMs = 5000, onPresent = () => {} } = {}) {
   if (typeof document === 'undefined' || typeof MutationObserver !== 'function' || typeof getComputedStyle !== 'function') return Promise.resolve('none');
-  if (offerwallOpen()) return watchOfferwallReward().then((ok) => (ok ? 'granted' : 'closed'));
-  if (heldOfferwall) { const message = heldOfferwall; heldOfferwall = null; return proceedOfferwall(message).then((ok) => (ok ? 'granted' : 'closed')); }
+  if (offerwallOpen()) { onPresent(); return watchOfferwallReward().then((ok) => (ok ? 'granted' : 'closed')); }
+  if (heldOfferwall) { const message = heldOfferwall; heldOfferwall = null; return proceedOfferwall(message, onPresent).then((ok) => (ok ? 'granted' : 'closed')); }
   return new Promise((resolve) => {
     const timer = window.setTimeout(() => { offerwallWanted = null; resolve('none'); }, waitMs);
-    offerwallWanted = (message) => { window.clearTimeout(timer); offerwallWanted = null; proceedOfferwall(message).then((ok) => resolve(ok ? 'granted' : 'closed')); };
+    offerwallWanted = (message) => { window.clearTimeout(timer); offerwallWanted = null; proceedOfferwall(message, onPresent).then((ok) => resolve(ok ? 'granted' : 'closed')); };
   });
 }
 if (typeof window !== 'undefined' && typeof document !== 'undefined' && typeof location !== 'undefined' && typeof MutationObserver === 'function' && !/^\/pass\//.test(location.pathname)) {
@@ -319,6 +319,9 @@ const STYLE = `
 .px-pass h2{margin:0 0 .25rem;font-size:1.02rem;font-weight:800;display:flex;align-items:center;gap:.5rem}
 .px-pass h2 i{display:inline-grid;place-items:center;min-width:2.6rem;height:1.6rem;padding:0 .4rem;border-radius:999px;background:#ffd35a;color:#15171b;font-style:normal;font-size:.78rem}
 .px-pass p{margin:0 0 .9rem;color:rgba(244,246,245,.72);font-size:.84rem}
+.px-pass-backdrop[data-loading="true"] .px-pass-perks,.px-pass-backdrop[data-loading="true"] .px-pass-note{display:none}
+.px-pass-backdrop[data-loading="true"] .px-pass p{display:flex;align-items:center;gap:.7rem;margin:1rem 0 1.3rem;color:#f4f6f5;font-weight:700}
+.px-pass-backdrop[data-loading="true"] .px-pass p::before{content:"";flex:none;width:1rem;height:1rem;border:2px solid rgba(255,211,90,.28);border-top-color:#ffd35a;border-radius:50%;animation:px-pass-spin .8s linear infinite}
 .px-pass .px-pass-perk{color:#fff;font-weight:700}
 .px-pass-perks{display:grid;gap:.35rem;margin:0 0 .75rem;padding-left:1.15rem;font-size:.8rem;line-height:1.4}
 .px-pass-note{display:block;margin:0 0 .9rem;color:rgba(244,246,245,.65);font-size:.72rem;line-height:1.5}
@@ -332,7 +335,8 @@ const STYLE = `
 .px-pass-chip{display:inline-flex;align-items:center;gap:.3rem;height:1.7rem;padding:0 .6rem;border-radius:999px;background:rgba(255,211,90,.95);color:#15171b;font:800 .72rem/1 system-ui,-apple-system,sans-serif;font-variant-numeric:tabular-nums;white-space:nowrap}
 .px-pass-chip[hidden]{display:none}
 @keyframes px-pass-fade{from{opacity:0}}@keyframes px-pass-up{from{transform:translateY(1.5rem);opacity:0}}
-@media (prefers-reduced-motion:reduce){.px-pass-backdrop,.px-pass{animation:none}}`;
+@keyframes px-pass-spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.px-pass-backdrop,.px-pass,.px-pass-backdrop[data-loading="true"] .px-pass p::before{animation:none}}`;
 function ensureStyle() { if (document.getElementById('px-pass-style')) return; const style = document.createElement('style'); style.id = 'px-pass-style'; style.textContent = STYLE; document.head.appendChild(style); }
 
 let open = null;
@@ -351,7 +355,7 @@ export function requestPass({ perk = '', extend = false } = {}) {
   const backdrop = document.createElement('div'); backdrop.className = 'px-pass-backdrop';
   backdrop.innerHTML = `<section class="px-pass" role="dialog" aria-modal="true" aria-labelledby="px-pass-title">
     <h2 id="px-pass-title"><i>${PASS_HOURS}時間</i>PiXiEEDの特典</h2>
-    <p></p><ul class="px-pass-perks" aria-label="共通特典"></ul><small class="px-pass-note"></small><div class="px-pass-test" hidden></div>
+    <p aria-live="polite"></p><ul class="px-pass-perks" aria-label="共通特典"></ul><small class="px-pass-note"></small><div class="px-pass-test" hidden></div>
     <div class="px-pass-actions"><button type="button" class="px-pass-no">あとで</button><button type="button" class="px-pass-go"></button></div>
   </section>`;
   const text = backdrop.querySelector('p');
@@ -410,16 +414,17 @@ export function requestPass({ perk = '', extend = false } = {}) {
         close(hasPass());
         return;
       }
-      text.textContent = '広告を準備しています…'; go.textContent = '広告を読み込み中…';
+      backdrop.setAttribute('data-loading', 'true');
+      text.textContent = '広告を読み込み中…'; go.textContent = '読み込み中…';
       // AdSense Offerwall first (held since page load); Ad Manager only when Google offers no Offerwall.
       track('pass_ad_open', { perk, provider: 'offerwall' });
       const hideSheet = (hidden) => { if (backdrop.style) backdrop.style.visibility = hidden ? 'hidden' : ''; backdrop.inert = hidden; };
-      hideSheet(true);
       let wall = 'none';
-      try { wall = await showOfferwall(); } catch {}
+      try { wall = await showOfferwall({ onPresent: () => hideSheet(true) }); } catch {}
       hideSheet(false);
       if (wall === 'granted' || hasPass()) { close(true); return; }
       if (wall === 'closed') {
+        backdrop.setAttribute('data-loading', 'false');
         text.textContent = '広告が最後まで再生されませんでした。特典は付与されていません。';
         go.textContent = 'もう一度試す'; go.disabled = false; no.disabled = false;
         return;
@@ -439,6 +444,7 @@ export function requestPass({ perk = '', extend = false } = {}) {
         close(hasPass());
         return;
       }
+      backdrop.setAttribute('data-loading', 'false');
       const messages = {
         nofill: '広告が見つかりませんでした。時間をおいて、もう一度お試しください。',
         unsupported: 'この環境では広告を表示できません。時間をおいて、もう一度お試しください。',

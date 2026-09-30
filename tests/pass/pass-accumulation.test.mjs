@@ -156,6 +156,41 @@ test('no-fill restores the sheet for retry and does not grant access', async () 
   } finally { Date.now = originalNow; delete globalThis.googletag; }
 });
 
+test('the loading message stays visible while the Offerwall is being requested', async () => {
+  values.clear();
+  const now = 1_800_160_000_000;
+  values.set('pixieed:pass:no-ad-at:v1', String(now));
+  values.set('pixieed:pass:no-ad-day:v1', pass.localDay(now));
+  const originalNow = Date.now; Date.now = () => now;
+  globalThis.MutationObserver = class { observe() {} disconnect() {} };
+  globalThis.getComputedStyle = () => ({ display: 'none', visibility: 'hidden' });
+  try {
+    const request = pass.requestPass();
+    const modal = body.children.at(-1); const go = modal.querySelector('.px-pass-go');
+    const { events, slot } = configureRewardedGpt();
+    const click = go.fire('click')[0];
+    assert.equal(modal.querySelector('p').textContent, '広告を読み込み中…');
+    assert.equal(modal.attributes['data-loading'], 'true');
+    assert.equal(modal.style.visibility, undefined, 'the sheet remains visible while waiting for an Offerwall');
+    const offerwallTimeout = [...timers.values()].find(({ delay }) => delay === 5000);
+    assert.ok(offerwallTimeout, 'the Offerwall wait is active');
+    offerwallTimeout.callback();
+    for (let tick = 0; tick < 6; tick += 1) await Promise.resolve();
+    assert.equal(modal.style.visibility, '', 'the Ad Manager fallback also remains visible while loading');
+    events.get('slotRenderEnded')({ slot, isEmpty: true });
+    await click;
+    assert.match(modal.querySelector('p').textContent, /広告が見つかりませんでした/);
+    assert.equal(modal.attributes['data-loading'], 'false', 'the compact loading state ends after a failure');
+    modal.querySelector('.px-pass-no').fire('click');
+    assert.equal(await request, false);
+  } finally {
+    Date.now = originalNow;
+    delete globalThis.MutationObserver;
+    delete globalThis.getComputedStyle;
+    delete globalThis.googletag;
+  }
+});
+
 test('closing the rewarded slot without a grant restores the sheet and grants nothing', async () => {
   values.clear();
   const now = 1_800_175_000_000;

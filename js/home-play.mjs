@@ -5,7 +5,7 @@
  * the sound tool together). Below it, each tool card runs a tiny live version of that tool. Toys animate only
  * while on screen. Reduced motion keeps a gentle update rate and suppresses the letter entrance and wave.
  */
-import { createVisibleAnimationScheduler } from './home-animation.mjs?rev=20260930-idle-smooth-1';
+import { createVisibleAnimationScheduler } from './home-animation.mjs?rev=20261001-hero-frames-1';
 import { createToolToys, TOOL_TOY_SIZE } from './tool-toys.mjs?rev=20260929-shared-toys-2';
 
 const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
@@ -173,7 +173,7 @@ function hero() {
   const NIGHT = rgb(C.night); const WHITE = [255, 255, 255]; const GOLD = rgb(C.yellow);
   const BR = 2;                   // brush: 2×2 cells
   let color = 0; let W = 108; let H = 60; let F = 60; let cell = 4; let K = 2; // F: floor row; K: cells per old 9px dot
-  let img = null; let ctx = null;
+  let img = null; let nightFrame = null; let ctx = null;
   let ink = new Map();            // dots being drawn right now (key -> {x,y,color,born})
   let sand = null;                // settled / falling sand: colour index + 1 per cell, 0 = empty
   let dots = [];                  // letter dots with physics
@@ -208,6 +208,8 @@ function hero() {
     canvas.style.width = `${W * cell}px`; canvas.style.height = `${H * cell}px`;
     canvas.style.left = `${Math.round(((r.width - W * cell) / 2) * grid.dpr) / grid.dpr}px`;
     canvas.width = W; canvas.height = H; ctx = canvas.getContext('2d'); img = ctx.createImageData(W, H);
+    for (let i = 0; i < img.data.length; i += 4) { img.data[i] = NIGHT[0]; img.data[i + 1] = NIGHT[1]; img.data[i + 2] = NIGHT[2]; img.data[i + 3] = 255; }
+    nightFrame = new Uint8ClampedArray(img.data);
     sand = new Uint8Array(W * H); pieces = []; flashes = []; beats = []; ink.clear();
     const bar = document.querySelector('.hp-tools').getBoundingClientRect();
     F = Math.max(12, Math.min(H, Math.floor((bar.top - r.top - 6) / cell)));
@@ -465,7 +467,7 @@ function hero() {
     const now = t || performance.now(); const time = (now - start) / 1000;
     step(now);
     const d = img.data;
-    for (let i = 0; i < d.length; i += 4) { d[i] = NIGHT[0]; d[i + 1] = NIGHT[1]; d[i + 2] = NIGHT[2]; d[i + 3] = 255; }
+    d.set(nightFrame);
     for (const s of stars) {
       const a = 0.35 + 0.45 * Math.sin(time * s.s + s.p);
       if (a <= 0.4) continue;

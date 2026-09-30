@@ -24,19 +24,27 @@ export function createVisibleAnimationScheduler(env = globalThis) {
     raf = 0; watchdog = 0;
   }
   function hasActive() { return [...entries.values()].some(active); }
-  function arm() {
-    if (disposed || raf || !hasActive()) return;
-    raf = env.requestAnimationFrame((time) => { raf = 0; if (watchdog) env.clearTimeout(watchdog); watchdog = 0; pump(time); });
-    // Some embedded browsers suspend rAF while remaining visible. Recover at the
-    // visible animation rate so idle playback does not drop to four frames per second.
+  function watchdogDelay() {
     const fastestFrame = Math.min(...[...entries.values()].filter(active).map((entry) => Math.max(1000 / entry.fps, reducedMotion ? 1000 / 12 : 0)));
-    const watchdogDelay = Math.max(34, Math.min(250, Math.ceil(fastestFrame + 2)));
+    return Math.max(18, Math.min(250, Math.ceil(fastestFrame + 1)));
+  }
+  function armWatchdog() {
+    if (disposed || watchdog || !raf || !hasActive()) return;
     watchdog = env.setTimeout(() => {
       watchdog = 0;
       if (!raf || !hasActive()) return;
-      env.cancelAnimationFrame?.(raf); raf = 0;
+      // Keep the pending rAF: cancelling it on every slow frame can lock a
+      // visible page into timer-only playback even after rAF recovers.
       pump(now());
-    }, watchdogDelay);
+      armWatchdog();
+    }, watchdogDelay());
+  }
+  function arm() {
+    if (disposed || raf || !hasActive()) return;
+    raf = env.requestAnimationFrame((time) => { raf = 0; if (watchdog) env.clearTimeout(watchdog); watchdog = 0; pump(time); });
+    // Some embedded browsers suspend rAF while remaining visible. Fill only
+    // missing frames, at the requested rate, until the pending rAF returns.
+    armWatchdog();
   }
   function pump(time) {
     if (!hasActive()) { stopPump(); return; }
