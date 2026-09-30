@@ -40,6 +40,8 @@ body.creation-editor .creation-editor__title { position: absolute; width: 1px; h
 body.creation-editor .app-tabs { z-index: 30; }
 body.creation-editor .app-tabs button,
 body.creation-editor .app-tabs a { min-width: 44px; min-height: 44px; }
+/* the round centre action (保存 etc.) stays a circle: its height follows its width */
+body.creation-editor .app-tabs > :nth-child(3) { min-height: 0; aspect-ratio: 1 / 1; }
 
 body.creation-editor .draw-page {
   display: grid;
