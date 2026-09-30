@@ -18,7 +18,9 @@ const EXCLUDED_PAGES = [
   '404.html', 'shops/index.html', 'game/index.html',
   'camera-media-test.html', 'pixel-camera-studio.html',
   'home/index.html', 'works/index.html', 'pixfind/index.html', 'telescope/index.html',
-  'works/sea-cat.html', 'works/rainy-window.html', 'works/night-lantern.html'
+  'works/sea-cat.html', 'works/rainy-window.html', 'works/night-lantern.html',
+  // the Offerwall page adds the AdSense script itself, only when no pass is running
+  'pass/index.html'
 ];
 const GOOGLE_SOURCE = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253';
 const LOADER_SOURCE = '/js/adsense-auto.js?rev=20260929-auto-ads-1';
@@ -67,7 +69,7 @@ test('every non-fixture HTML entry has an explicit advertising decision', async 
   }
   assert.deepEqual((await entries()).sort(), [...DIRECT_PAGES, ...STANDALONE_PAGES, ...EXCLUDED_PAGES].sort(),
     'new pages must explicitly opt in or out rather than inheriting ads from the header');
-  assert.equal(new Set([...DIRECT_PAGES, ...STANDALONE_PAGES, ...EXCLUDED_PAGES]).size, 36);
+  assert.equal(new Set([...DIRECT_PAGES, ...STANDALONE_PAGES, ...EXCLUDED_PAGES]).size, 37);
 });
 
 const loader = await readFile(new URL('js/adsense-auto.js', root), 'utf8');

@@ -12,7 +12,7 @@ import { confirmPxdConversion, mountPxdTools } from './pxd-ui.mjs?rev=20260928-o
 import { pxdImageRoles, readPxdImage } from './pxd-project.mjs';
 import { enlargedPng, saveFile } from '../pixel-export.mjs?rev=20260928-pixel-roundtrip-1';
 import { encodeAnimatedGif } from '../animated-export.mjs?v=20260929-gif-budget-1';
-import { requestPass } from '../pixieed-pass.mjs?v=20260929-daily-free-1';
+import { requestPass } from '../pixieed-pass.mjs?v=20260930-offerwall-1';
 import { createDrawTimelapse, selectDrawTimelapseFrames } from './draw-timelapse.mjs?rev=20260928-draw-timelapse-1';
 import { readPxdAudioLink, readPxdDrawDocument, synchronizeLinkedAudioImage, writePxdDrawDocument } from './pxd-draw-audio.mjs';
 import { createToolResultView } from '../tool-result-view.mjs?rev=20260929-display-units-1';

@@ -7,53 +7,11 @@ globalThis.localStorage = { getItem: (k) => (store.has(k) ? store.get(k) : null)
 globalThis.window = globalThis; globalThis.addEventListener ??= () => {};
 const pass = await import('../../js/pixieed-pass.mjs');
 
-test('the public site never grants a test-ad pass from a URL parameter', () => {
-  assert.equal(pass.adMode({ hostname: 'pixieed.jp', search: '?adtest=1' }), 'rewarded');
+test('the public site shows the Offerwall; only localhost uses the stand-in ad', () => {
+  assert.equal(pass.adMode({ hostname: 'pixieed.jp', search: '?adtest=1' }), 'offerwall');
+  assert.equal(pass.adMode({ hostname: 'pixieed.jp', search: '?ads=test' }), 'offerwall');
   assert.equal(pass.adMode({ hostname: 'localhost', search: '' }), 'test');
-});
-
-test('only the requested ad can grant a reward, and its listeners are removed', async () => {
-  const originalDocument = globalThis.document;
-  const originalGoogletag = globalThis.googletag;
-  const callbacks = new Map();
-  const slot = { addService() { return this; } };
-  const otherSlot = {};
-  const destroyed = [];
-  const pubads = {
-    addEventListener(type, callback) { callbacks.set(type, callback); },
-    removeEventListener(type, callback) { if (callbacks.get(type) === callback) callbacks.delete(type); }
-  };
-  globalThis.document = { querySelector: () => ({}) };
-  globalThis.googletag = {
-    cmd: { push(callback) { callback(); } },
-    enums: { OutOfPageFormat: { REWARDED: 'rewarded' } },
-    defineOutOfPageSlot: () => slot,
-    pubads: () => pubads,
-    enableServices() {},
-    display() {},
-    destroySlots(slots) { destroyed.push(...slots); }
-  };
-  try {
-    const closed = pass.showRewardedAd('/23379831154/pixieed_rewarded');
-    await Promise.resolve();
-    callbacks.get('rewardedSlotGranted')({ slot: otherSlot });
-    callbacks.get('rewardedSlotReady')({ slot, makeRewardedVisible: () => true });
-    callbacks.get('rewardedSlotClosed')({ slot });
-    assert.equal(await closed, 'closed');
-    assert.equal(callbacks.size, 0);
-    assert.deepEqual(destroyed, [slot]);
-
-    const granted = pass.showRewardedAd('/23379831154/pixieed_rewarded');
-    await Promise.resolve();
-    callbacks.get('rewardedSlotReady')({ slot, makeRewardedVisible: () => true });
-    callbacks.get('rewardedSlotGranted')({ slot });
-    callbacks.get('rewardedSlotClosed')({ slot });
-    assert.equal(await granted, 'granted');
-    assert.equal(callbacks.size, 0);
-  } finally {
-    globalThis.document = originalDocument;
-    globalThis.googletag = originalGoogletag;
-  }
+  assert.equal(pass.showRewardedAd, undefined, 'Ad Manager rewarded ads are gone');
 });
 
 test('one pass, one hour, every perk — including ones registered later', () => {
