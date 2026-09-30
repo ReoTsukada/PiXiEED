@@ -215,7 +215,7 @@ body.creation-editor[data-page="draw"] .draw-palette .draw-color { background: v
 body.creation-editor[data-page="draw"] .draw-palette .draw-color--transparent { background: repeating-conic-gradient(#cfd4cc 0 25%, #fff 0 50%) 0 0 / 10px 10px !important; }
 body.creation-editor[data-page="draw"] .draw-tools button,
 body.creation-editor[data-page="draw"] .draw-toggles button,
-body.creation-editor[data-page="draw"] .draw-actions button,
+body.creation-editor[data-page="draw"] .draw-actions > button, /* only the icon row: the ⋯ sheet's buttons stay full width */
 body.creation-editor[data-page="draw"] .draw-actions .draw-import > summary { box-sizing: border-box !important; width: 44px !important; height: 44px !important; min-width: 44px !important; min-height: 44px !important; }
 body.creation-editor[data-page="draw"] .draw-tools button[aria-pressed="true"],
 body.creation-editor[data-page="draw"] .draw-toggles button[aria-pressed="true"] { border: 1px solid var(--creation-yellow) !important; background: var(--creation-yellow) !important; color: #202a33 !important; }
