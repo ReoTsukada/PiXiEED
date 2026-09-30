@@ -204,6 +204,14 @@ test('public requests use rewarded ads and localhost uses the stand-in', () => {
   assert.equal(pass.adMode({ hostname: 'localhost', search: '' }), 'test');
 });
 
+test('legacy return paths stay on this site', () => {
+  assert.equal(pass.safeReturn('/draw/?a=1#b'), '/draw/?a=1#b');
+  assert.equal(pass.safeReturn('https://evil.example/'), '/');
+  assert.equal(pass.safeReturn('//evil.example/'), '/');
+  assert.equal(pass.safeReturn('/\\evil.example'), '/');
+  assert.equal(pass.safeReturn('/pass/?return=/'), '/');
+});
+
 test('corrupt storage is safe and a storage event replaces stale in-memory fallback data', async () => {
   values.clear();
   values.set('pixieed:pass:v1', '{broken json');

@@ -310,7 +310,9 @@ export function requestPass({ perk = '', extend = false } = {}) {
   track('pass_sheet_open', { perk: perk || (extend ? 'header' : ''), state: active ? 'active' : offeredFree ? 'free' : 'ad' });
   go.focus({ preventScroll: true });
   open = new Promise((resolve) => {
+    let stopWatching = () => {};
     const close = (result) => {
+      stopWatching();
       backdrop.remove(); document.removeEventListener('keydown', onKey); open = null;
       if (returnFocus?.isConnected) returnFocus.focus({ preventScroll: true });
       resolve(result);
