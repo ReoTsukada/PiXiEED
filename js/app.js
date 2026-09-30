@@ -4215,6 +4215,7 @@ function renderPublicShell() {
   analyticsSetting?.addEventListener('change', () => {
     const allowed = analyticsSetting.checked;
     try { localStorage.setItem(ANALYTICS_CONSENT_KEY, allowed ? 'granted' : 'denied'); } catch { /* storage may be blocked */ }
+    document.dispatchEvent(new Event('pixieed:analytics-consent-change'));
     if (!allowed) {
       analyticsQueue.splice(0);
       analyticsTrackEvent = null;
@@ -4229,6 +4230,7 @@ function renderPublicShell() {
   settings?.querySelector('[data-settings-clear]')?.addEventListener('click', () => {
     analyticsSetting.checked = false;
     try { localStorage.setItem(ANALYTICS_CONSENT_KEY, 'denied'); } catch { /* storage may be blocked */ }
+    document.dispatchEvent(new Event('pixieed:analytics-consent-change'));
     analyticsQueue.splice(0);
     analyticsTrackEvent = null;
     analyticsPromise = null;
