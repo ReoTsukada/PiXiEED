@@ -55,6 +55,8 @@ let expiryTimer = 0;
 function notify() {
   window.clearTimeout(expiryTimer);
   const left = passRemainingMs();
+  // pages hide the perk coins (css/pixieed-design-system.css) while the pass runs
+  if (typeof document !== 'undefined' && document.documentElement) document.documentElement.dataset.pass = left > 0 ? 'active' : 'none';
   if (left > 0 && left !== Infinity) expiryTimer = window.setTimeout(notify, Math.min(left + 50, 2 ** 31 - 1));
   for (const listener of listeners) { try { listener({ active: left > 0, remainingMs: left }); } catch (error) { console.warn(error); } }
   renderSlots();
