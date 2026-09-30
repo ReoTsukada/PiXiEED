@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { claimFreeWithoutAd, freeWithoutAdAvailable, freeWithoutAdWaitMs, rewardedAdUnit, SAMPLE_REWARDED_AD_UNIT, shouldGrantFreeWithoutAd, useFreeWithoutAd } from '../../js/pixieed-pass.mjs?test=no-ad-cooldown';
+import { claimFreeWithoutAd, freeWithoutAdAvailable, freeWithoutAdWaitMs, shouldGrantFreeWithoutAd, useFreeWithoutAd } from '../../js/pixieed-pass.mjs?test=no-ad-cooldown';
 
 const store = new Map();
 Object.defineProperty(globalThis, 'localStorage', {
@@ -109,10 +109,4 @@ test('only no-fill, unsupported, and timed-out ads qualify for the free fallback
   assert.equal(shouldGrantFreeWithoutAd('timeout'), true);
   assert.equal(shouldGrantFreeWithoutAd('closed'), false);
   assert.equal(shouldGrantFreeWithoutAd('granted'), false);
-});
-
-test('?ads=test uses Google\'s sample rewarded unit so the flow can be checked on a real phone', () => {
-  const config = { rewardedAdUnitPath: '/23379831154/pixieed_rewarded' };
-  assert.equal(rewardedAdUnit({ search: '?ads=test' }, config), SAMPLE_REWARDED_AD_UNIT);
-  assert.equal(rewardedAdUnit({ search: '' }, config), '/23379831154/pixieed_rewarded');
 });

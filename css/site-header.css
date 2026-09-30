@@ -33,6 +33,8 @@
 .px-pass-add{grid-column:2;grid-row:1 / -1;display:grid;place-items:center;width:18px;height:24px;border:1px solid #b38c3440;border-radius:6px;background:#ffffff80;box-shadow:inset 0 1px 0 #fff8;color:inherit;font:650 17px/1 system-ui,sans-serif}
 .px-header-pass[data-free-ready=true][data-active=true] .px-pass-add{font-size:0}
 .px-header-pass[data-free-ready=true][data-active=true] .px-pass-add::before{content:'無料';font:750 7px/1 system-ui,-apple-system,sans-serif;white-space:nowrap}
+.px-header-pass[data-active=true]:not([data-pro=true]) .px-pass-add{display:none} /* one hour never stacks */
+.px-pass-gauge{grid-template-rows:6px}.px-pass-gauge-row:not([data-hours="1"]){display:none}.px-pass-gauge-row[data-hours="1"]{height:6px;padding-left:0}.px-pass-gauge-row[data-hours="1"]::before{content:none} /* a single hour: one bar */
 .px-header-pass:not([data-active=true]):not([data-pro=true]):not([data-free-ready=true]) .px-pass-add{font-size:0}
 .px-header-pass:not([data-active=true]):not([data-pro=true]):not([data-free-ready=true]) .px-pass-add::before{content:'広告';font:750 7px/1 system-ui,-apple-system,sans-serif;white-space:nowrap}
 .px-header-pass[data-free-arrive=true] .px-pass-add{animation:px-pass-free-arrive 420ms steps(3,end) 1 both}

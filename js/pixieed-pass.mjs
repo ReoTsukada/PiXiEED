@@ -1,15 +1,13 @@
 /**
- * PiXiEED pass — every rewarded ad adds one hour of every perk, everywhere on PiXiEED.
+ * PiXiEED pass — one rewarded ad gives one hour of every perk, everywhere on PiXiEED. It never stacks.
  *
- * Any page or tool asks `hasPerk('some.perk')`. The answer is yes while the pass is valid (one rewarded ad
- * adds PASS_HOURS hours) or for Pro. New services only register a perk id; they never show ads themselves.
- * Rewarded ads only appear through `requestPass()`, after the person taps 「広告を見る」.
- * Ordinary AdSense Auto ads are separate: they never grant or extend this pass.
- *
- * Ads: Google Ad Manager rewarded ads (GPT) when `passConfig.rewardedAdUnitPath` is set in
- * data/site-config.js. The first use each local day is free; a missing ad only grants that day's free hour
- * if it has not already been claimed. Only on localhost,
- * a 5-second stand-in ad is shown so the flow can be tried without granting a free pass on the public site.
+ * Any page or tool asks `hasPerk('some.perk')`. The answer is yes while the pass is valid or for Pro.
+ * New services only register a perk id; they never show ads themselves.
+ * Ads only appear after the person taps 「広告を見る」: that opens /pass/, where the AdSense Offerwall
+ * (rewarded ad only) runs; watching it grants PASS_HOURS from then (js/pass-page.mjs).
+ * The first use each local day is free, and so is a visit to /pass/ when no ad appears — once per day.
+ * Ordinary AdSense Auto ads are separate: they never grant this pass.
+ * Only on localhost a 5-second stand-in ad is shown so the flow can be tried.
  */
 import { passConfig } from '../data/site-config.js?rev=20260928-pass-1h-1';
 
@@ -21,7 +19,8 @@ const PASS_MS = PASS_HOURS * 60 * 60 * 1000;
 /** Everything a pass unlocks, across PiXiEED. Services add theirs with registerPerk(). */
 export const PERKS = new Map([
   ['camera.gif-long', 'ドット絵カメラ：GIFを10秒・なめらかに'],
-  ['audio.canvas-wide', 'ドットで音楽：広いキャンバスで作曲'],
+  ['audio.canvas-wide', 'すべての制作ツール：256px・32色の共通キャンバス'],
+  ['project.canvas-expanded', 'すべての制作ツール：256px・32色の共通キャンバス'],
   ['audio.instruments-extra', 'ドットで音楽：追加の音色'],
   ['draw.timelapse-detail', 'かんたんドット：工程多め・8秒のタイムラプス'],
   ['pixfind.hint', '間違い探し・かくれもの：追加ヒント'],
@@ -72,7 +71,7 @@ function withPassLock(callback) {
   return callback();
 }
 function applyGrant({ notifyChange = true } = {}) {
-  const next = Math.max(Date.now(), until()) + PASS_MS;
+  const next = Math.max(until(), Date.now() + PASS_MS); // one hour from now, never stacked
   const saved = write(STORE_KEY, JSON.stringify({ until: next }));
   memoryUntil = saved ? 0 : next;
   memoryFallbackActive = !saved;
@@ -83,81 +82,17 @@ async function grant() {
   return withPassLock(applyGrant);
 }
 
-// ---- ad providers ----------------------------------------------------------------------------------------
-function loadScript(src) {
-  return new Promise((resolve, reject) => {
-    if (document.querySelector(`script[src="${src}"]`)) { resolve(); return; }
-    const script = document.createElement('script'); script.src = src; script.async = true;
-    let settled = false; let timer = 0;
-    const finish = (error = null) => {
-      if (settled) return;
-      settled = true; window.clearTimeout(timer);
-      if (error) { script.remove(); reject(error); } else resolve();
-    };
-    timer = window.setTimeout(() => finish(new Error('ad script timeout')), 10000);
-    script.onload = () => finish(); script.onerror = () => finish(new Error('ad script'));
-    document.head.appendChild(script);
-  });
+// ---- ad provider: the AdSense Offerwall on /pass/ --------------------------------------------------------
+/** The page that shows the AdSense Offerwall (its only choice is a rewarded ad) and grants the hour. */
+export const PASS_PAGE = '/pass/';
+export function passPageUrl(returnTo = typeof location === 'undefined' ? '/' : location.pathname + location.search + location.hash) {
+  return `${PASS_PAGE}?return=${encodeURIComponent(safeReturn(returnTo))}`;
 }
-const REWARDED_DIAGNOSTIC_SLOT_MS = 5 * 60 * 1000;
-let retainedRewardedSlot = null;
-function cleanupRetainedRewardedSlot(expected = null) {
-  if (!retainedRewardedSlot) return;
-  if (expected && retainedRewardedSlot !== expected) return;
-  const retained = retainedRewardedSlot;
-  retainedRewardedSlot = null;
-  window.clearTimeout(retained.timer);
-  retained.googletag.destroySlots([retained.slot]);
+/** Only same-site paths are followed back. */
+export function safeReturn(value) {
+  const text = String(value || '');
+  return /^\/(?![/\\])/.test(text) && !text.startsWith(PASS_PAGE) ? text : '/';
 }
-function rewardedDiagnosticsEnabled() {
-  try { return new URLSearchParams(typeof location === 'undefined' ? '' : location.search).has('dfpdeb'); } catch { return false; }
-}
-/** @internal Google Ad Manager rewarded ad. Resolves 'granted' | 'closed' | 'nofill' | 'unsupported' | 'timeout'. */
-export async function showRewardedAd(adUnitPath) {
-  cleanupRetainedRewardedSlot();
-  await loadScript('https://securepubads.g.doubleclick.net/tag/js/gpt.js');
-  const googletag = window.googletag = window.googletag || { cmd: [] };
-  const diagnostic = rewardedDiagnosticsEnabled();
-  return new Promise((resolve) => {
-    let settled = false; let slot = null; let pubads = null;
-    const listeners = [];
-    const done = (result, { retainForDiagnostics = false } = {}) => {
-      if (settled) return;
-      settled = true;
-      window.clearTimeout(timeout);
-      for (const [type, listener] of listeners) pubads.removeEventListener(type, listener);
-      if (slot && retainForDiagnostics && diagnostic) {
-        cleanupRetainedRewardedSlot();
-        const retained = { googletag, slot, timer: 0 };
-        retainedRewardedSlot = retained;
-        retained.timer = window.setTimeout(() => cleanupRetainedRewardedSlot(retained), REWARDED_DIAGNOSTIC_SLOT_MS);
-      } else if (slot) googletag.destroySlots([slot]);
-      resolve(result);
-    };
-    const timeout = window.setTimeout(() => done('timeout'), 10000);
-    let granted = false;
-    googletag.cmd.push(() => {
-      if (settled) return;
-      cleanupRetainedRewardedSlot();
-      slot = googletag.defineOutOfPageSlot(adUnitPath, googletag.enums.OutOfPageFormat.REWARDED);
-      if (!slot) { done('unsupported'); return; }
-      pubads = googletag.pubads();
-      slot.addService(pubads);
-      const listen = (type, listener) => { pubads.addEventListener(type, listener); listeners.push([type, listener]); };
-      listen('rewardedSlotReady', (event) => {
-        if (event.slot !== slot) return;
-        window.clearTimeout(timeout);
-        if (!event.makeRewardedVisible()) done('nofill');
-      });
-      listen('rewardedSlotGranted', (event) => { if (event.slot === slot) granted = true; });
-      listen('rewardedSlotClosed', (event) => { if (event.slot === slot) done(granted ? 'granted' : 'closed'); });
-      listen('slotRenderEnded', (event) => { if (event.slot === slot && event.isEmpty) done('nofill', { retainForDiagnostics: true }); });
-      googletag.enableServices();
-      googletag.display(slot);
-    });
-  });
-}
-/** Stand-in for trying the flow on localhost: a 5-second countdown in the sheet. */
 function showTestAd(sheet) {
   return new Promise((resolve) => {
     const box = sheet.querySelector('.px-pass-test'); box.hidden = false;
@@ -167,13 +102,15 @@ function showTestAd(sheet) {
 }
 export function adMode(currentLocation = typeof location === 'undefined' ? null : location) {
   if (currentLocation && /^(localhost|127\.0\.0\.1)$/.test(currentLocation.hostname)) return 'test';
-  return passConfig?.rewardedAdUnitPath ? 'rewarded' : 'free';
+  return 'offerwall';
 }
-/** Google's public sample rewarded unit: `?ads=test` on the real site checks the whole ad flow on a phone. */
-export const SAMPLE_REWARDED_AD_UNIT = '/22639388115/rewarded_web_example';
-export function rewardedAdUnit(currentLocation = typeof location === 'undefined' ? null : location, config = passConfig) {
-  try { if (new URLSearchParams(currentLocation?.search || '').get('ads') === 'test') return SAMPLE_REWARDED_AD_UNIT; } catch {}
-  return config?.rewardedAdUnitPath || '';
+/** One watched ad = one hour from now. The hour never stacks: while a pass runs, nothing is added. */
+export async function grantFromAd() {
+  return withPassLock(() => {
+    if (passRemainingMs() > 0) return false;
+    applyGrant();
+    return true;
+  });
 }
 // ---- one free pass per local day, shared with the legacy day key -----------------------------------------
 const NO_AD_KEY = 'pixieed:pass:no-ad-at:v1';
@@ -226,11 +163,11 @@ export async function claimFreeWithoutAd(grantPass, { now = () => Date.now(), re
     return true;
   });
 }
+/** /pass/ found no ad: today's free hour, if not yet taken. */
+export function claimDailyFree() { return claimFreeWithoutAd(() => applyGrant({ notifyChange: false })); }
+/** Nothing to watch on /pass/ (no Offerwall appeared) → today's free hour, once. */
 export function shouldGrantFreeWithoutAd(result) {
   return result === 'nofill' || result === 'unsupported' || result === 'timeout';
-}
-function freeCooldownCopy() {
-  return '次は明日0時に受け取れます。';
 }
 
 // ---- the one sheet --------------------------------------------------------------------------------------
@@ -258,54 +195,50 @@ function ensureStyle() { if (document.getElementById('px-pass-style')) return; c
 
 let open = null;
 /**
- * Ask for the pass. Shows the sheet; resolves true once the pass is valid (already valid → true at once).
- * `perk` only changes the wording ("… GIFを10秒 …も"), the pass always unlocks everything.
+ * Ask for the pass. Resolves true once the pass is valid (already valid → true at once).
+ * `extend` (the header button) shows the time left while a pass runs; one hour never stacks.
+ * `perk` only changes the wording, the pass always unlocks everything.
  */
 export function requestPass({ perk = '', extend = false } = {}) {
-  if (hasPass() && !extend) return Promise.resolve(true);
+  const active = hasPass();
+  if (active && !extend) return Promise.resolve(true);
   if (open) return open;
   ensureStyle();
   const mode = adMode();
-  let offeredFree = freeWithoutAdAvailable();
-  const displayMode = offeredFree ? 'free' : mode;
+  let offeredFree = !active && freeWithoutAdAvailable();
   const backdrop = document.createElement('div'); backdrop.className = 'px-pass-backdrop';
   backdrop.innerHTML = `<section class="px-pass" role="dialog" aria-modal="true" aria-labelledby="px-pass-title">
-    <h2 id="px-pass-title"><i>${PASS_HOURS}時間</i>${extend ? '特典を追加' : 'PiXiEEDの特典'}</h2>
+    <h2 id="px-pass-title"><i>${PASS_HOURS}時間</i>PiXiEEDの特典</h2>
     <p></p><ul class="px-pass-perks" aria-label="共通特典"></ul><small class="px-pass-note"></small><div class="px-pass-test" hidden></div>
     <div class="px-pass-actions"><button type="button" class="px-pass-no">あとで</button><button type="button" class="px-pass-go"></button></div>
   </section>`;
   const text = backdrop.querySelector('p');
   const perkLabel = PERKS.get(perk);
-  const freeModeCopy = offeredFree
-    ? `本日の無料分として、広告なしで全ツール共通の特典を${PASS_HOURS}時間受け取れます。`
-    : `今日の無料分は受け取り済みです。${freeCooldownCopy()}`;
-  text.innerHTML = extend
-    ? displayMode === 'free' ? freeModeCopy
-      : `広告を1本見ると、サイト共通の拡張を使える時間に${PASS_HOURS}時間追加されます。`
-    : displayMode === 'free' ? freeModeCopy
+  text.textContent = active
+    ? `特典はあと${formatPassRemaining(passRemainingMs())}使えます。終わったら、また広告1本で${PASS_HOURS}時間使えます。`
+    : offeredFree ? `本日の無料分として、広告なしで全ツール共通の特典を${PASS_HOURS}時間受け取れます。`
       : `広告を1本見ると、PiXiEEDのすべての特典が${PASS_HOURS}時間使えます。`;
   const perkList = backdrop.querySelector('.px-pass-perks');
-  if (perkList) for (const label of PERKS.values()) { const item = document.createElement('li'); item.textContent = label; perkList.appendChild(item); }
+  if (perkList) for (const label of new Set(PERKS.values())) { const item = document.createElement('li'); item.textContent = label; perkList.appendChild(item); }
   const passNote = backdrop.querySelector('.px-pass-note');
-  if (passNote) passNote.textContent = '時間はページを閉じても進みます。制作中の内容は残ります。';
-  if (perkLabel) { const line = document.createElement('span'); line.className = 'px-pass-perk'; line.textContent = `（${perkLabel} など）`; text.appendChild(line); }
+  if (passNote) passNote.textContent = active ? '' : '時間はページを閉じても進みます。制作中の内容は残ります。';
+  if (perkLabel && !active) { const line = document.createElement('span'); line.className = 'px-pass-perk'; line.textContent = `（${perkLabel} など）`; text.appendChild(line); }
   const go = backdrop.querySelector('.px-pass-go'); const no = backdrop.querySelector('.px-pass-no');
-  let goLabel = offeredFree ? `無料で${PASS_HOURS}時間使う` : '広告を見る';
-  const unavailableWithoutAd = mode === 'free' && !offeredFree;
-  if (unavailableWithoutAd) goLabel = '本日の無料分は受取済み';
-  go.textContent = goLabel;
-  if (unavailableWithoutAd) go.disabled = true;
+  go.textContent = active ? 'OK' : offeredFree ? `無料で${PASS_HOURS}時間使う` : '広告を見る';
+  if (active) no.hidden = true;
   const returnFocus = document.activeElement;
   document.body.appendChild(backdrop);
-  (unavailableWithoutAd ? no : go).focus({ preventScroll: true });
+  go.focus({ preventScroll: true });
   open = new Promise((resolve) => {
+    let stopWatching = () => {};
     const close = (result) => {
+      stopWatching();
       backdrop.remove(); document.removeEventListener('keydown', onKey); open = null;
       if (returnFocus?.isConnected) returnFocus.focus({ preventScroll: true });
       resolve(result);
     };
     const onKey = (event) => {
-      if (event.key === 'Escape' && !no.disabled) { close(false); return; }
+      if (event.key === 'Escape' && !no.disabled) { close(hasPass()); return; }
       if (event.key !== 'Tab') return;
       const focusable = [...backdrop.querySelectorAll('button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])')].filter((item) => !item.hidden);
       if (!focusable.length) { event.preventDefault(); return; }
@@ -314,51 +247,35 @@ export function requestPass({ perk = '', extend = false } = {}) {
       else if (!event.shiftKey && (document.activeElement === last || !backdrop.contains(document.activeElement))) { event.preventDefault(); first.focus(); }
     };
     document.addEventListener('keydown', onKey);
-    backdrop.addEventListener('pointerdown', (event) => { if (event.target === backdrop && !no.disabled) close(false); });
-    no.addEventListener('click', () => close(false));
-    let freeReady = false;
+    backdrop.addEventListener('pointerdown', (event) => { if (event.target === backdrop && !no.disabled) close(hasPass()); });
+    no.addEventListener('click', () => close(hasPass()));
     go.addEventListener('click', async () => {
-      if (freeReady) { close(true); return; }
+      if (active || hasPass()) { close(true); return; }
       go.disabled = true; no.disabled = true;
       if (offeredFree) {
         try {
           if (await claimFreeWithoutAd(() => applyGrant({ notifyChange: false }))) { close(true); return; }
         } catch {}
         offeredFree = false;
-        text.textContent = `今日の無料分は受け取り済みです。${freeCooldownCopy()}`;
-        if (mode === 'free') {
-          go.disabled = true; no.disabled = false; go.textContent = '本日の無料分は受取済み';
-        } else {
-          go.disabled = false; no.disabled = false; goLabel = '広告を見る'; go.textContent = goLabel;
-        }
+        text.textContent = `今日の無料分は受け取り済みです。広告を1本見ると${PASS_HOURS}時間使えます。`;
+        go.disabled = false; no.disabled = false; go.textContent = '広告を見る';
         return;
       }
-      if (mode === 'free') return;
-      let result = 'granted';
-      if (mode === 'test') result = await showTestAd(backdrop);
-      else if (mode === 'rewarded') { go.textContent = '広告を準備しています…'; try { result = await showRewardedAd(rewardedAdUnit()); } catch { result = 'timeout'; } }
-      if (result === 'granted') {
-        try { await grant(); close(true); return; }
-        catch { result = 'unavailable'; }
+      if (mode === 'test') {
+        const result = await showTestAd(backdrop);
+        if (result === 'granted') { try { await grantFromAd(); } catch {} }
+        close(hasPass());
+        return;
       }
-      backdrop.dataset.adResult = result;
-      // A missing ad is not the person's fault, but today's free hour cannot be granted twice.
-      if (shouldGrantFreeWithoutAd(result)) {
-        try {
-          if (await claimFreeWithoutAd(() => applyGrant({ notifyChange: false }))) {
-            freeReady = true; go.disabled = false; no.hidden = true; go.textContent = '使う';
-            text.textContent = `広告が見つからなかったので、本日の無料分として${PASS_HOURS}時間使えます。無料分は1日1回です。`;
-            return;
-          }
-        } catch {}
-      }
-      go.disabled = false; no.disabled = false;
-      go.textContent = goLabel;
-      const freeWait = freeWithoutAdWaitMs();
-      text.textContent = result === 'closed' ? '最後まで見ると特典が使えるようになります。'
-        : freeWait > 0
-          ? `いまは広告を用意できませんでした。今日の無料分は受け取り済みです。${freeCooldownCopy()}`
-          : 'いまは広告を用意できませんでした。少し時間をおいてお試しください。';
+      // The Offerwall lives on its own page. A new tab keeps this page (and the work on it) as it is;
+      // the pass arrives here through storage as soon as the ad is watched.
+      const url = passPageUrl();
+      let tab = null;
+      try { tab = window.open(url, '_blank'); } catch {}
+      if (!tab) { location.href = url; return; }
+      text.textContent = '開いたページで広告を見終わると、ここでも特典が使えるようになります。';
+      go.textContent = '広告を見ています…'; no.disabled = false;
+      stopWatching = onPassChange(({ active: now }) => { if (now) close(true); });
     });
   });
   return open;

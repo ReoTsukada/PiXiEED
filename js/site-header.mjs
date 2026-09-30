@@ -1,4 +1,4 @@
-import { freeWithoutAdWaitMs, hasPro, onPassChange, passRemainingMs, requestPass } from './pixieed-pass.mjs?v=20260929-daily-free-1';
+import { freeWithoutAdWaitMs, hasPro, onPassChange, passRemainingMs, requestPass } from './pixieed-pass.mjs?v=20260930-offerwall-1';
 import { derivePassGauge, renderPassGauge } from './pass-gauge.mjs?rev=20260929-tool-ui-1';
 
 const brandedLink = () => {
@@ -103,9 +103,8 @@ function updateButton(button) {
   if (button.disabled !== state.pro) button.disabled = state.pro;
   const aria = state.pro ? 'Pro：すべての拡張が使えます' : freeReady && !state.active
     ? freeDescription
-    : freeReady ? `${freeDescription}。拡張はあと${state.clock}。広告で1時間追加できます`
-      : state.active ? `拡張はあと${state.clock}。広告で1時間追加できます。${freeDescription}`
-        : `広告で1時間追加できます。${freeDescription}`;
+    : state.active ? `特典はあと${state.clock}`
+      : `広告1本で1時間使えます。${freeDescription}`;
   const fullDescription = aria;
   if (button.getAttribute('aria-label') !== fullDescription) button.setAttribute('aria-label', fullDescription);
   if (button.title !== fullDescription) button.title = fullDescription;

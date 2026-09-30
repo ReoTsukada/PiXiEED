@@ -23,7 +23,6 @@ class FakeElement {
 }
 
 const windowEvents = new Map(); const documentEvents = new Map(); const timers = new Map(); let timerId = 0;
-let gptScriptReady = true;
 const fakeWindow = {
   addEventListener(name, callback) { windowEvents.set(name, callback); },
   clearTimeout(id) { timers.delete(id); },
@@ -37,7 +36,7 @@ const fakeDocument = {
   addEventListener(name, callback) { documentEvents.set(name, callback); },
   removeEventListener(name) { documentEvents.delete(name); },
   getElementById(id) { return id === 'px-pass-style' && styleElement.isConnected ? styleElement : null; },
-  querySelector(selector) { return gptScriptReady && selector.startsWith('script[src=') ? { src: 'https://securepubads.g.doubleclick.net/tag/js/gpt.js' } : null; },
+  querySelector() { return null; },
   createElement(name) {
     const element = new FakeElement(name);
     if (name === 'div') {
@@ -56,60 +55,44 @@ const fakeDocument = {
 body.appendChild = (element) => { body.children.push(element); element.isConnected = true; return element; };
 globalThis.window = fakeWindow;
 globalThis.document = fakeDocument;
-passConfig.rewardedAdUnitPath = '/23379831154/pixieed_rewarded';
 passConfig.passHours = 1;
 const pass = await import('../../js/pixieed-pass.mjs?pass-accumulation-tests');
-const rewardedSlot = { addService() { return this; } };
-const rewardedListeners = new Map();
-let rewardedDisplayCount = 0;
-fakeWindow.googletag = {
-  cmd: { push(callback) { callback(); } },
-  enums: { OutOfPageFormat: { REWARDED: 'rewarded' } },
-  defineOutOfPageSlot() { return rewardedSlot; },
-  pubads() { return {
-    addEventListener(type, callback) { rewardedListeners.set(type, callback); },
-    removeEventListener(type, callback) { if (rewardedListeners.get(type) === callback) rewardedListeners.delete(type); }
-  }; },
-  enableServices() {},
-  display() {
-    rewardedDisplayCount++;
-    rewardedListeners.get('rewardedSlotReady')?.({ slot: rewardedSlot, makeRewardedVisible: () => true });
-    rewardedListeners.get('rewardedSlotGranted')?.({ slot: rewardedSlot });
-    rewardedListeners.get('rewardedSlotClosed')?.({ slot: rewardedSlot });
-  },
-  destroySlots() {}
-};
+const opened = [];
+fakeWindow.open = (url, target) => { opened.push([url, target]); return {}; };
+globalThis.location = { hostname: 'pixieed.jp', pathname: '/draw/', search: '?x=1', hash: '' };
 
-test('the daily free hour is offered before ads and the next explicit request uses the ad', async () => {
-  values.clear();
+test('the daily free hour is offered first; while it runs the header shows the time left and nothing stacks', async () => {
+  values.clear(); opened.length = 0;
   let now = 1_800_000_000_000; const originalNow = Date.now; Date.now = () => now;
-  rewardedDisplayCount = 0;
   try {
     const free = pass.requestPass();
     const freeModal = body.children.at(-1);
-    assert.match(freeModal.querySelector('p').innerHTML, /本日の無料分として/);
+    assert.match(freeModal.querySelector('p').textContent, /本日の無料分として/);
     assert.equal(freeModal.querySelector('.px-pass-go').textContent, '無料で1時間使う');
     await freeModal.querySelector('.px-pass-go').fire('click')[0];
     assert.equal(await free, true);
-    assert.equal(rewardedDisplayCount, 0, 'claiming the daily pass does not load an ad');
+    assert.equal(opened.length, 0, 'claiming the daily pass does not open the ad page');
     assert.equal(JSON.parse(values.get('pixieed:pass:v1')).until, now + 3_600_000);
     assert.equal(values.get('pixieed:pass:no-ad-day:v1'), pass.localDay(now));
+    assert.equal(await pass.requestPass(), true, 'perk requests stay immediate while active');
 
-    const ad = pass.requestPass({ extend: true });
-    const adModal = body.children.at(-1);
-    assert.match(adModal.querySelector('p').innerHTML, /広告を1本見ると/);
-    assert.equal(adModal.querySelector('.px-pass-go').textContent, '広告を見る');
-    await adModal.querySelector('.px-pass-go').fire('click')[0];
-    assert.equal(await ad, true);
-    assert.equal(rewardedDisplayCount, 1);
-    assert.equal(JSON.parse(values.get('pixieed:pass:v1')).until, now + 7_200_000);
+    now += 60_000;
+    const header = pass.requestPass({ extend: true });
+    const modal = body.children.at(-1);
+    assert.match(modal.querySelector('p').textContent, /あと0:59使えます/);
+    assert.equal(modal.querySelector('.px-pass-go').textContent, 'OK');
+    assert.equal(modal.querySelector('.px-pass-no').hidden, true);
+    await modal.querySelector('.px-pass-go').fire('click')[0];
+    assert.equal(await header, true);
+    assert.equal(opened.length, 0);
+    assert.equal(await pass.grantFromAd(), false, 'an ad while the pass runs adds nothing');
+    assert.equal(JSON.parse(values.get('pixieed:pass:v1')).until, now - 60_000 + 3_600_000);
   } finally { Date.now = originalNow; }
 });
 
-test('a claim lost to another tab switches to the ad button without loading an ad on that click', async () => {
-  values.clear();
+test('after the free hour, 「広告を見る」 opens /pass/ in a new tab and the pass arrives through storage', async () => {
+  values.clear(); opened.length = 0;
   let now = 1_800_100_000_000; const originalNow = Date.now; Date.now = () => now;
-  rewardedDisplayCount = 0;
   try {
     const request = pass.requestPass();
     const modal = body.children.at(-1); const go = modal.querySelector('.px-pass-go');
@@ -117,68 +100,69 @@ test('a claim lost to another tab switches to the ad button without loading an a
     values.set('pixieed:pass:no-ad-at:v1', String(now));
     values.set('pixieed:pass:no-ad-day:v1', pass.localDay(now));
     await go.fire('click')[0];
-    assert.equal(rewardedDisplayCount, 0, 'a free-claim click never starts an ad after the claim loses a race');
+    assert.equal(opened.length, 0, 'a lost free claim never opens the ad page on that click');
     assert.match(modal.querySelector('p').textContent, /今日の無料分は受け取り済み/);
     assert.equal(go.textContent, '広告を見る');
     await go.fire('click')[0];
+    assert.deepEqual(opened, [['/pass/?return=%2Fdraw%2F%3Fx%3D1', '_blank']]);
+    values.set('pixieed:pass:v1', JSON.stringify({ until: now + 3_600_000 }));
+    windowEvents.get('storage')({ key: 'pixieed:pass:v1' });
     assert.equal(await request, true);
-    assert.equal(rewardedDisplayCount, 1, 'the next explicit click starts the ad');
   } finally { Date.now = originalNow; }
 });
 
-test('rewards add one hour to the current expiry and allow an explicit extension while active', async () => {
+test('the ad hour starts from the moment it is granted and never stacks', async () => {
   values.clear();
   let now = 1_800_200_000_000; const originalNow = Date.now; Date.now = () => now;
-  values.set('pixieed:pass:no-ad-day:v1', pass.localDay(now));
-  const focusReturn = new FakeElement('trigger'); focusReturn.isConnected = true; fakeDocument.activeElement = focusReturn;
   try {
     assert.equal(pass.PASS_HOURS, 1);
-    const first = pass.requestPass({ extend: true });
-    const firstModal = body.children.at(-1); const firstGo = firstModal.querySelector('.px-pass-go');
-    assert.match(firstModal.querySelector('p').innerHTML, /1時間/);
-    await firstGo.fire('click')[0]; assert.equal(await first, true);
+    assert.equal(await pass.grantFromAd(), true);
     assert.equal(JSON.parse(values.get('pixieed:pass:v1')).until, now + 3_600_000);
-    assert.equal(fakeDocument.activeElement, focusReturn, 'closing the sheet restores focus');
-    assert.equal(await pass.requestPass(), true, 'existing perk requests stay immediate while active');
-
-    const second = pass.requestPass({ extend: true });
-    const secondModal = body.children.at(-1);
-    assert.match(secondModal.querySelector('p').innerHTML, /サイト共通の拡張を使える時間に1時間追加/);
-    assert.deepEqual(secondModal.querySelector('.px-pass-perks').children.map(({ textContent }) => textContent), [
-      'ドット絵カメラ：GIFを10秒・なめらかに', 'ドットで音楽：広いキャンバスで作曲', 'ドットで音楽：追加の音色',
-      'かんたんドット：工程多め・8秒のタイムラプス', '間違い探し・かくれもの：追加ヒント', 'ジグソー：追加ヒント'
-    ]);
-    assert.match(secondModal.querySelector('.px-pass-note').textContent, /ページを閉じても進みます。制作中の内容は残ります。/);
-    await secondModal.querySelector('.px-pass-go').fire('click')[0]; assert.equal(await second, true);
-    assert.equal(JSON.parse(values.get('pixieed:pass:v1')).until, now + 7_200_000);
-
-    const beforeCancel = values.get('pixieed:pass:v1');
+    assert.equal(await pass.grantFromAd(), false);
+    now += 3_600_001;
+    assert.equal(await pass.grantFromAd(), true);
+    assert.equal(JSON.parse(values.get('pixieed:pass:v1')).until, now + 3_600_000);
+    now += 3_600_001;
     const canceled = pass.requestPass({ extend: true });
-    body.children.at(-1).querySelector('.px-pass-no').fire('click');
-    assert.equal(await canceled, false); assert.equal(values.get('pixieed:pass:v1'), beforeCancel);
+    const sheet = body.children.at(-1);
+    assert.match(sheet.querySelector('.px-pass-note').textContent, /ページを閉じても進みます。制作中の内容は残ります。/);
+    assert.equal(new Set(sheet.querySelector('.px-pass-perks').children.map(({ textContent }) => textContent)).size, sheet.querySelector('.px-pass-perks').children.length);
+    sheet.querySelector('.px-pass-no').fire('click');
+    assert.equal(await canceled, false);
   } finally { Date.now = originalNow; }
 });
 
-test('corrupt storage is safe and a storage event replaces stale in-memory fallback data', () => {
+test('return paths stay on this site', () => {
+  assert.equal(pass.safeReturn('/draw/?a=1#b'), '/draw/?a=1#b');
+  assert.equal(pass.safeReturn('https://evil.example/'), '/');
+  assert.equal(pass.safeReturn('//evil.example/'), '/');
+  assert.equal(pass.safeReturn('/\\evil.example'), '/');
+  assert.equal(pass.safeReturn('/pass/?return=/'), '/');
+  assert.equal(pass.passPageUrl('/game/'), '/pass/?return=%2Fgame%2F');
+  assert.equal(pass.adMode({ hostname: 'pixieed.jp', search: '?ads=test' }), 'offerwall');
+  assert.equal(pass.adMode({ hostname: 'localhost', search: '' }), 'test');
+});
+
+test('corrupt storage is safe and a storage event replaces stale in-memory fallback data', async () => {
+  values.clear();
   values.set('pixieed:pass:v1', '{broken json');
   assert.doesNotThrow(() => pass.hasPass()); assert.equal(pass.hasPass(), false);
   storageReadable = true; storageWritable = false;
-  const originalNow = Date.now; const now = 1_800_100_000_000; Date.now = () => now;
+  const originalNow = Date.now; const now = 1_800_300_000_000; Date.now = () => now;
   try {
     const grant = pass.requestPass({ extend: true });
-    body.children.at(-1).querySelector('.px-pass-go').fire('click')[0];
-    return grant.then(() => {
-      assert.equal(pass.passRemainingMs(now), 3_600_000);
-      storageReadable = true; storageWritable = true;
-      values.set('pixieed:pass:v1', JSON.stringify({ until: now + 120_000 }));
-      windowEvents.get('storage')({ key: 'pixieed:pass:v1' });
-      assert.equal(pass.passRemainingMs(now), 120_000, 'storage updates are not hidden by a longer in-memory value');
-    }).finally(() => { Date.now = originalNow; storageReadable = true; storageWritable = true; });
-  } finally { /* async cleanup runs in the returned promise */ }
+    await body.children.at(-1).querySelector('.px-pass-go').fire('click')[0];
+    await grant;
+    assert.equal(pass.passRemainingMs(now), 3_600_000);
+    storageReadable = true; storageWritable = true;
+    values.set('pixieed:pass:v1', JSON.stringify({ until: now + 120_000 }));
+    windowEvents.get('storage')({ key: 'pixieed:pass:v1' });
+    assert.equal(pass.passRemainingMs(now), 120_000, 'storage updates are not hidden by a longer in-memory value');
+  } finally { Date.now = originalNow; storageReadable = true; storageWritable = true; }
 });
 
 test('expiry, pageshow and visibility restoration notify consumers with current time remaining', () => {
-  let now = 1_800_200_000_000; const originalNow = Date.now; Date.now = () => now;
+  let now = 1_800_400_000_000; const originalNow = Date.now; Date.now = () => now;
   const changes = []; const unsubscribe = pass.onPassChange((state) => changes.push(state));
   try {
     values.set('pixieed:pass:v1', JSON.stringify({ until: now + 1000 }));
@@ -193,7 +177,8 @@ test('expiry, pageshow and visibility restoration notify consumers with current 
   } finally { unsubscribe(); Date.now = originalNow; }
 });
 
-test('the extension sheet traps tab focus and formats the remaining time for shared headers', () => {
+test('the sheet traps tab focus and formats the remaining time for shared headers', () => {
+  values.clear(); windowEvents.get('storage')({ key: 'pixieed:pass:v1' });
   const trigger = new FakeElement('header-button'); trigger.isConnected = true; fakeDocument.activeElement = trigger;
   const dialog = pass.requestPass({ extend: true }); const backdrop = body.children.at(-1);
   const keydown = documentEvents.get('keydown');
@@ -205,23 +190,4 @@ test('the extension sheet traps tab focus and formats the remaining time for sha
     assert.equal(pass.formatPassRemaining(61_000), '0:02');
     assert.equal(pass.formatPassRemaining(Infinity), 'Pro');
   });
-});
-
-test('an ad script that never responds times out, is removed, and permits a retry', async () => {
-  gptScriptReady = false;
-  const first = pass.showRewardedAd('/test/rewarded');
-  const script = head.children.at(-1);
-  assert.equal(script.src, 'https://securepubads.g.doubleclick.net/tag/js/gpt.js');
-  const timeout = [...timers.values()].find((timer) => timer.delay === 10000);
-  assert.ok(timeout);
-  timeout.callback();
-  await assert.rejects(first, /ad script timeout/);
-  assert.equal(script.isConnected, false);
-  const retry = pass.showRewardedAd('/test/rewarded');
-  const retryScript = head.children.at(-1);
-  assert.notEqual(retryScript, script);
-  retryScript.onerror();
-  await assert.rejects(retry, /ad script/);
-  assert.equal(retryScript.isConnected, false);
-  gptScriptReady = true;
 });

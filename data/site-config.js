@@ -30,12 +30,10 @@ export const supabaseConfig = {
 };
 
 /*
- * PiXiEEDパス（広告1本で、PiXiEED全体の特典が一定時間使える）。
- * rewardedAdUnitPath に Google Ad Manager の報酬型広告ユニットのパス（例: '/1234567/pixieed_rewarded'）を
- * 入れると本物の広告になります。空欄の間は「準備中のため広告なし」でパスを渡します。
+ * PiXiEEDパス（広告1本で、PiXiEED全体の特典が passHours 時間使える。貯めることはできない）。
+ * 広告は AdSense のオファーウォール（報酬型広告のみ・利用資格1時間）で、/pass/ ページにだけ出します。
  */
 export const passConfig = {
-  rewardedAdUnitPath: '/23379831154/pixieed_rewarded',
   passHours: 1
 };
 
