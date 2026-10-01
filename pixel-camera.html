@@ -13,11 +13,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#0d1114">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261001-free-tools-1">
-  <link rel="stylesheet" href="css/pixel-lens-camera.css?rev=20261002-camera-ui-compact-1">
+  <link rel="stylesheet" href="css/pixel-lens-camera.css?rev=20261002-camera-startup-1">
   <link rel="stylesheet" href="/css/site-header.css?rev=20260930-claude-review-1">
   <link rel="stylesheet" href="/css/display-ads.css?rev=20260929-manual-ads-4">
   <link rel="stylesheet" href="/css/tool-result-view.css?rev=20260930-result-back-1">
-  <link rel="modulepreload" href="/js/pixel-lens/app.mjs?rev=20261002-camera-ui-compact-1">
+  <link rel="modulepreload" href="/js/pixel-lens/app.mjs?rev=20261002-camera-palette-startup-2">
 </head>
 <body data-tool-name="ドット絵カメラ" data-tool-short="カメラ">
   <a class="pc-skip" href="#stage">カメラへ移動</a>
@@ -25,7 +25,7 @@
     <!-- The picture is the controller: pinch = zoom, double tap = 1×, tap = pick colours again,
          swipe left/right = look, swipe up/down = front/back camera -->
     <section class="lc-stage" id="stage" aria-label="撮影プレビュー。ピンチでズーム、ダブルタップで等倍、タップで色を選び直し、左右スワイプで色、上下スワイプでカメラ切り替え。設定は右上の設定ボタンから開きます" tabindex="-1">
-      <video id="video" playsinline muted hidden></video>
+      <video id="video" class="lc-video-source" playsinline muted autoplay aria-hidden="true" tabindex="-1"></video>
       <div class="lc-frame" id="captureFrame">
         <canvas id="view" width="1" height="1" aria-hidden="true"></canvas>
       </div>
@@ -133,7 +133,7 @@
     <a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""></a>
     <a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>
   </nav>
-  <script type="module" src="/js/pixel-lens/app.mjs?rev=20261002-camera-ui-compact-1"></script>
+  <script type="module" src="/js/pixel-lens/app.mjs?rev=20261002-camera-palette-startup-2"></script>
   <script type="module" src="/js/site-header.mjs?rev=20261001-free-tools-1"></script>
 </body>
 </html>

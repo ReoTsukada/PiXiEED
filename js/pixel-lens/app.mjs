@@ -2,7 +2,7 @@ import { createFrameLoop } from '../pixel-studio/frame-loop.mjs';
 import { encodeCameraPng, pngExportGeometry } from '../pixel-studio/png-export.mjs?rev=20260928-pixel-roundtrip-1';
 import { DEFAULT_FRAME_RATIO, FRAME_RATIOS, normalizeOutputSize, sharedFrameRatios, sharedOutputSizes, resolveAspect, centerCrop, frameGeometry, fitFrame } from '../pixel-studio/framing.mjs?rev=20261001-free-tools-1';
 import { cameraStartErrorMessage, deriveCameraPrimaryAction } from '../pixel-studio/camera-ui-state.mjs';
-import { CAMERA_SETTING_DEFAULTS, DITHER_PATTERNS, lensFrameFilter, lensPalette, lensPaletteEdited, processLensFrame, resetLensPalette, resetLensPaletteEdits, setLensPalette, setLensPaletteColor, setLensSettings } from './engine.mjs?v=20260930-distinct-colors-1';
+import { CAMERA_SETTING_DEFAULTS, DITHER_PATTERNS, lensFrameFilter, lensPalette, lensPaletteEdited, processLensFrame, resetLensPalette, resetLensPaletteEdits, setLensPalette, setLensPaletteColor, setLensSettings } from './engine.mjs?v=20261002-camera-palette-startup-2';
 import { attachZoomGestures, createCameraZoomController, formatZoom, getUserMediaWithZoomPreference, zoomRange, zoomStops } from './zoom.mjs?v=20261001-camera-zoom-40-1';
 import { GIF_FPS } from './gif.mjs?v=20261001-animation-1';
 import { animatedCapturePlan, downsampleAnimatedFrame, encodeAnimatedGif } from '../animated-export.mjs?v=20261001-animation-1';
@@ -61,6 +61,7 @@ let resumeOnVisible = true;
 let pendingCameraRequest = null;
 let previewSessionStarted = 0;
 let previewCounter = 0;
+let startupWatchdog = null;
 let toastTimer = null;
 let displayedPaletteRevision = null;
 let audioFrozenFrame = null;
@@ -329,7 +330,7 @@ function restartPreview({ preserveCompleted = false } = {}) {
 }
 
 function drawCompleted(result) {
-  if (!result?.width || !result?.height || result.data?.length !== result.width * result.height * 4) return;
+  if (!result?.width || !result?.height || result.data?.length !== result.width * result.height * 4) return false;
   if (view.width !== result.width || view.height !== result.height) {
     view.width = result.width;
     view.height = result.height;
@@ -365,11 +366,19 @@ function drawCompleted(result) {
   root.dataset.faceCount = String(result.faceCount ?? 0);
   root.dataset.faceMs = String(Math.round(result.faceProcessingMs ?? 0));
   if (previewCounter === 1) root.dataset.firstPreviewMs = root.dataset.previewElapsedMs;
+  clearStartupWatchdog();
   state.error = '';
   if (stageMessage.textContent.startsWith('画像を処理できませんでした')) say('');
   setInfoForMode(state.mode);
   updatePrimaryAction();
   updateSaveLinkState();
+  return true;
+}
+
+function clearStartupWatchdog() {
+  if (startupWatchdog === null) return;
+  window.clearTimeout(startupWatchdog);
+  startupWatchdog = null;
 }
 
 const resizeObserver = new ResizeObserver(() => {
@@ -422,7 +431,7 @@ loop = createFrameLoop({
     if (state.mode === 'live') {
       try {
         const wasError = Boolean(state.error);
-        drawCompleted(result);
+        if (!drawCompleted(result)) return;
         if (gif.recording) recordGifFrame(result);
         const previewMessage = result.aiStatus === 'ready' || result.aiStatus === 'processing' || result.aiStatus === 'disabled' ? ''
           : result.aiStatus === 'no-instances' ? ''
@@ -479,6 +488,7 @@ function stopTracks() {
 }
 
 function closeCamera({ idle = true, message = '', focus = false, visible = false } = {}) {
+  clearStartupWatchdog();
   resumeOnVisible = false;
   cameraSequence++;
   invalidatePreview();
@@ -493,6 +503,7 @@ function closeCamera({ idle = true, message = '', focus = false, visible = false
 }
 
 async function startCamera({ focus = true } = {}) {
+  clearStartupWatchdog();
   resumeOnVisible = false;
   paletteEpoch++;
   root.dataset.paletteEpoch = String(paletteEpoch);
@@ -531,6 +542,11 @@ async function startCamera({ focus = true } = {}) {
     }
     if (token !== cameraSequence) { stream.getTracks().forEach((track) => track.stop()); return; }
     activeStream = stream;
+    startupWatchdog = window.setTimeout(() => {
+      if (token !== cameraSequence || previewReady) return;
+      startupWatchdog = null;
+      closeCamera({ message: 'カメラ映像を受信できませんでした。中央のボタンで再試行してください。', focus: true, visible: true });
+    }, 12000);
     for (const track of stream.getVideoTracks()) {
       track.addEventListener('ended', () => {
         if (activeStream === stream && cameraSequence === token) {
@@ -1436,7 +1452,7 @@ const cameraPxd = audioCameraRequest ? { ready: Promise.resolve(false), markDirt
     sharedImageTarget = image ? { width: image.width, height: image.height } : null;
     if (!image) {
       sharedImageColorCount = 16;
-      invalidatePreview(); cameraSequence++; stopTracks(); gif.pending = null; resumeOnVisible = false;
+      clearStartupWatchdog(); invalidatePreview(); cameraSequence++; stopTracks(); gif.pending = null; resumeOnVisible = true;
       state.result = null;
       setMode('idle');
       if (!audioCameraInvalid) { setMode('loading'); resumeCameraIfVisible(); }

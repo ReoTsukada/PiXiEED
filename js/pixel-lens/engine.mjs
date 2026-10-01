@@ -13,7 +13,7 @@
 import { DITHER_PATTERNS } from './dither-patterns.mjs?v=20260927-first-1';
 
 const state = { colorDepth: '4', paletteMode: 'gameboy', gradientMode: 'dither', ditherPattern: 'net8', surfaceSimplify: 55, cameraSettings: null };
-const paletteState = { depth: null, desired: 0, colors: [], originalColors: [], cache: new Map(), lastUpdated: 0, userEdited: false };
+const paletteState = { depth: null, desired: 0, colors: [], originalColors: [], cache: new Map(), lastUpdated: 0, userEdited: false, provisionalSource: false };
 let paletteDisplayEnabled = false;
 let paletteListener = null;
 function updatePaletteDisplay() { if (paletteListener) paletteListener(paletteState.colors.map((c) => [c.r, c.g, c.b])); }
@@ -60,10 +60,6 @@ const CONTRAST_STRENGTH = 1.04;
 const SHADOW_LIFT_THRESHOLD = 60;
 
 const SHADOW_LIFT_AMOUNT = 4;
-
-const PALETTE_HOLD_MS = 5000;
-
-const PALETTE_AUTO_UPDATE_ENABLED = false;
 
 const DOT_SMOOTHING_BLUR = 0.45;
 
@@ -173,6 +169,7 @@ function applyNewPaletteColors(colors) {
   paletteState.originalColors = next.map((color) => ({ ...color }));
   paletteState.cache = new Map();
   paletteState.userEdited = false;
+  paletteState.provisionalSource = false;
 }
 
 function getColorBinIndex(value) {
@@ -187,6 +184,7 @@ function clearPaletteState() {
   paletteState.desired = 0;
   paletteState.lastUpdated = 0;
   paletteState.userEdited = false;
+  paletteState.provisionalSource = false;
   resetPaletteDisplay();
 }
 
@@ -561,21 +559,63 @@ function createEdgeMap(imageData) {
   return edges;
 }
 
-function shouldRebuildPalette(depth, desired) {
+function sourcePaletteIsProvisional(colors) {
+  if (!colors.length) return false;
+  if (colors.every((color) => Math.max(color.r, color.g, color.b) <= 24)) return true;
+  if (colors.length === 1) return true;
+  const distanceSquared = (a, b) => 0.25 * (a.r - b.r) ** 2 + 0.60 * (a.g - b.g) ** 2 + 0.15 * (a.b - b.b) ** 2;
+  for (let i = 0; i < colors.length; i += 1) {
+    for (let j = i + 1; j < colors.length; j += 1) {
+      if (distanceSquared(colors[i], colors[j]) > 24 * 24) return false;
+    }
+  }
+  return true;
+}
+
+function hasPaletteRecoverySignal(imageData) {
+  const { data, width = 0, height = 0 } = imageData || {};
+  if (!data?.length) return false;
+  const requiredPixels = Math.max(8, Math.ceil(width * height * 0.0005));
+  const blackPalette = paletteState.colors.length > 0 && paletteState.colors.every((color) => Math.max(color.r, color.g, color.b) <= 24);
+  let signalPixels = 0;
+  for (let index = 0; index < data.length; index += 4) {
+    const r = data[index]; const g = data[index + 1]; const b = data[index + 2];
+    if (blackPalette && Math.max(r, g, b) >= 192) return true;
+    if (blackPalette && Math.max(r, g, b) < 64) continue;
+    let nearestSquared = Infinity;
+    for (const color of paletteState.colors) {
+      const distanceSquared = 0.25 * (r - color.r) ** 2 + 0.60 * (g - color.g) ** 2 + 0.15 * (b - color.b) ** 2;
+      if (distanceSquared < nearestSquared) nearestSquared = distanceSquared;
+      if (nearestSquared <= 24 * 24) break;
+    }
+    if (nearestSquared <= 24 * 24) continue;
+    signalPixels++;
+    if (signalPixels >= requiredPixels) return true;
+  }
+  return false;
+}
+
+function shouldRebuildPalette(depth, desired, imageData) {
+  // Saved/user-edited palettes stay exact, even when their size differs from the selected look.
+  if (paletteState.userEdited && paletteState.colors.length) return false;
   if (depth !== paletteState.depth || desired !== paletteState.desired) {
     return true;
   }
   if (!paletteState.colors || !paletteState.colors.length) {
     return true;
   }
-  if (paletteState.userEdited) {
-    return false;
-  }
-  if (!PALETTE_AUTO_UPDATE_ENABLED) {
-    return false;
-  }
-  const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
-  return now - paletteState.lastUpdated >= PALETTE_HOLD_MS;
+  if (!paletteState.provisionalSource) return false;
+  return hasPaletteRecoverySignal(imageData);
+}
+
+function updateAutomaticPalette(imageData, depth, desired, timestamp) {
+  const palette = buildSourcePalette(imageData, desired);
+  applyNewPaletteColors(palette);
+  paletteState.depth = depth;
+  paletteState.desired = desired;
+  paletteState.lastUpdated = timestamp;
+  paletteState.provisionalSource = sourcePaletteIsProvisional(palette);
+  updatePaletteDisplay(true);
 }
 
 function applyFixed8Bit(imageData, edgeMap) {
@@ -734,7 +774,7 @@ function applyColorDepth(imageData) {
       paletteState.lastUpdated = timestamp;
       updatePaletteDisplay(true);
     }
-  } else if (depth === '2') {
+  } else if (depth === '2' && !useSourcePalette) {
     const needsUpdate = paletteState.depth !== '2'
       || paletteState.colors.length !== FIXED_TWO_COLOR_PALETTE.length
       || paletteState.originalColors.length !== FIXED_TWO_COLOR_PALETTE.length;
@@ -816,13 +856,8 @@ function applyColorDepth(imageData) {
     return;
   } else {
     const desiredColors = Math.max(2, Number(depth) || 4);
-    if (shouldRebuildPalette(depth, desiredColors)) {
-      const palette = buildSourcePalette(imageData, desiredColors);
-      applyNewPaletteColors(palette);
-      paletteState.depth = depth;
-      paletteState.desired = desiredColors;
-      paletteState.lastUpdated = timestamp;
-      updatePaletteDisplay(true);
+    if (shouldRebuildPalette(depth, desiredColors, imageData)) {
+      updateAutomaticPalette(imageData, depth, desiredColors, timestamp);
     }
   }
   const palette = paletteState.colors;
@@ -960,6 +995,7 @@ export function setLensPaletteColor(index, rgb) {
   paletteState.colors = next;
   paletteState.cache = new Map();
   paletteState.userEdited = true;
+  paletteState.provisionalSource = false;
   return true;
 }
 /** Put back the colours the look started with (before any hand edits). */
