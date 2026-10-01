@@ -33,11 +33,11 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   let locked = true; let initialized = false; let timer; let failed = false; let operationError = ''; let editedSinceOpen = false; let initialSelectionPending = false;
   let listEpoch = 0; let cardContextCleanups = []; let modeSwitching = false; let ready;
   let activeCanvas = null;
-  const css = node('link'); css.rel = 'stylesheet'; css.href = '/css/project-workspace.css?rev=20261001-components-1'; document.head.append(css);
+  const css = node('link'); css.rel = 'stylesheet'; css.href = '/css/project-workspace.css?rev=20261002-project-panel-1'; document.head.append(css);
   document.body.classList.add('project-workspace-ready');
   const bar = node('div', 'project-bar'); bar.setAttribute('aria-label', 'このツールのプロジェクト');
   const launcher = button('', 'project-open', () => void showProjects()); launcher.className = 'project-bar__open'; launcher.setAttribute('aria-haspopup', 'dialog');
-  launcher.innerHTML = `${icon('folder')}<span class="project-bar__name"></span><span class="project-bar__state" aria-hidden="true"></span>`;
+  launcher.innerHTML = `${icon('folder')}<span class="project-bar__name" aria-hidden="true"></span><span class="project-bar__state" aria-hidden="true"></span>`;
   const modes = [['draw', '描く'], ['audio', '音楽'], ['camera', '撮る'], ['jigsaw', 'ジグソー'], ['spot_difference', '間違い探し'], ['hidden_object', 'もの探し']];
   const modePicker = node('details', 'project-mode-picker');
   const modeSummary = node('summary'); modeSummary.setAttribute('aria-label', '同じ作品のツールを切り替える');
@@ -64,7 +64,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   modePicker.append(modeSummary, modeGroup); bar.append(launcher); document.body.append(bar);
   document.addEventListener('pointerdown', (event) => { if (!modePicker.contains(event.target)) modePicker.open = false; });
   const dialog = node('dialog', 'project-sheet'); dialog.id = 'pxd-panel'; dialog.setAttribute('aria-labelledby', 'project-sheet-title');
-  const heading = node('div', 'project-sheet__heading'); const title = node('h2', '', 'プロジェクト'); title.id = 'project-sheet-title';
+  const heading = node('div', 'project-sheet__heading'); const title = node('h2', '', '作品を管理'); title.id = 'project-sheet-title';
   const close = button('', 'project-close', () => dialog.close()); close.innerHTML = icon('close'); close.setAttribute('aria-label', 'プロジェクト一覧を閉じる'); heading.append(title, close);
   const note = node('p', 'project-sheet__note', 'このブラウザーに保存します。続きはプロジェクト一覧から開けます。');
   const currentRow = node('div', 'project-sheet__current'); const titleLabel = node('label', '', '作品名'); titleLabel.htmlFor = 'project-title';
@@ -162,6 +162,13 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     });
   }
   tabs.append(currentTab, libraryTab);
+  const context = node('div', 'project-sheet__context');
+  context.innerHTML = `${icon('folder')}<div class="project-sheet__context-copy"><strong></strong></div>`;
+  const contextTool = context.querySelector('strong');
+  context.querySelector('.project-sheet__context-copy').append(note);
+  const identity = node('div', 'project-sheet__identity');
+  identity.innerHTML = `${icon(tool)}<span><strong></strong><small></small></span>`;
+  const identityName = identity.querySelector('strong'); const identityMeta = identity.querySelector('small');
   const toolbar = node('div', 'project-sheet__toolbar'); toolbar.append(tabs, newButton);
   const search = node('input', 'project-search'); search.type = 'search'; search.id = 'project-search'; search.placeholder = '作品名で探す'; search.setAttribute('aria-label', '保存したプロジェクトを作品名で探す');
   const count = node('p', 'project-library-count'); count.setAttribute('role', 'status');
@@ -190,7 +197,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   currentPane.append(currentRow, actions);
   libraryPane.append(search, count, list, noMatches, trash);
   files.append(filesSummary, filesNote, fileActions, input);
-  dialog.append(header, message, currentPane, libraryPane, importSection, files, note); selectPane('library'); document.body.append(dialog);
+  dialog.append(header, context, identity, message, currentPane, libraryPane, importSection, files); selectPane('library'); document.body.append(dialog);
   dialog.addEventListener('close', () => { canvasSettings.open = false; if (initialSelectionPending && !locked) { initialSelectionPending = false; update(); } });
   dialog.addEventListener('click', (event) => { if (event.target === dialog && !locked) { const box = dialog.getBoundingClientRect(); if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) dialog.close(); } });
   const session = createProjectSession({ store,
@@ -225,7 +232,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   function update() {
     const project = session?.currentProject;
     dialog.dataset.startup = String(initialSelectionPending);
-    title.textContent = initialSelectionPending ? 'プロジェクトを選ぶ' : 'プロジェクト';
+    title.textContent = initialSelectionPending ? '作品を選ぶ' : '作品を管理';
     note.textContent = initialSelectionPending ? '保存した作品を開くか、新しい作品を始めてください。' : 'このブラウザーに保存します。続きはプロジェクト一覧から開けます。';
     newButton.textContent = initialSelectionPending ? '＋ 新しい作品' : '＋ 新規';
     bar.hidden = main.hidden || main.getAttribute('aria-hidden') === 'true' || getPublicSources().length > 0;
@@ -234,6 +241,13 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     const state = failed ? '保存できませんでした' : session.busy ? '保存中' : session.dirty || !session.persisted ? '編集中' : '保存済み';
     launcher.dataset.state = failed ? 'error' : session.busy ? 'saving' : session.dirty || !session.persisted ? 'editing' : 'saved';
     launcher.setAttribute('aria-label', `${name}・${state}。プロジェクトを開く`); launcher.title = `${name} · ${state}`;
+    const modeLabel = { draw: 'かんたんドット', audio: 'ドットで音楽', camera: 'ドット絵カメラ', jigsaw: 'ジグソー', spot_difference: '間違い探し', hidden_object: 'もの探し' }[tool] || '制作';
+    contextTool.textContent = `${modeLabel}の作品`;
+    identity.querySelector('svg').innerHTML = icons[tool] || icons.folder;
+    identityName.textContent = name;
+    const dimensions = activeCanvas?.width && activeCanvas?.height ? `${activeCanvas.width} × ${activeCanvas.height}px` : '';
+    identityMeta.textContent = [state, dimensions].filter(Boolean).join(' · ');
+    identity.dataset.state = failed ? 'error' : session.busy ? 'saving' : session.dirty || !session.persisted ? 'editing' : 'saved';
     for (const el of bar.querySelectorAll('button')) el.disabled = locked || el.getAttribute('aria-pressed') === 'true';
     for (const el of dialog.querySelectorAll('button')) el.disabled = locked;
     shelf.setBusy(locked);

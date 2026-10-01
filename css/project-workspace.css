@@ -150,3 +150,55 @@ body.project-workspace-ready #draw-palette .draw-color { flex: none !important; 
 .project-card-actions #project-card-actions-open { background: #ffd35a; border-color: #ffd35a; color: #202a33; font-weight: 650; }
 .project-card-actions #project-card-actions-delete { color: #ffae9e; border-color: #82584f; }
 .project-sheet .project-search { background: #101d27 !important; border: 1px solid #526979 !important; color: #f4f0e4 !important; }
+
+/* Compact project launcher; keep the live name in the DOM for accessible state updates. */
+.project-bar__open, .project-bar__open:only-child { position: relative; display: grid; place-items: center; flex: none; width: 46px; height: 46px; min-width: 46px; min-height: 46px; max-width: 46px; padding: 0; border-radius: 15px; background: linear-gradient(145deg, #2d3d49, #17232d); border-color: #647987; box-shadow: 0 5px 16px #0005, inset 0 1px #ffffff12; }
+.project-bar__open > svg { width: 23px; height: 23px; color: #ffe08a; }
+.project-bar__name { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.project-bar__state { position: absolute; right: 4px; bottom: 4px; width: 9px; height: 9px; border: 2px solid #1c2933; background: #ffc962; box-shadow: 0 0 0 1px #ffffff24; }
+[data-state=saved] .project-bar__state { background: #8ecba0; }
+[data-state=error] .project-bar__state { background: #ff8b7a; }
+
+/* Give the shared project dialog a clear hierarchy while retaining its existing tabs and actions. */
+.project-sheet { max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 24px); border-color: #607788; background: radial-gradient(140% 65% at 0 0, #344958, transparent 72%), linear-gradient(155deg, #22313b, #141f28 74%); }
+.project-sheet__header { display: grid; gap: 10px; padding: 15px 0 12px; background: linear-gradient(#253640, #202f39); }
+.project-sheet__heading { gap: 12px; }
+.project-sheet__heading h2 { font-size: 20px; letter-spacing: .02em; }
+.project-sheet__context { display: flex; align-items: center; gap: 11px; min-width: 0; padding: 10px 12px; border: 1px solid #526c7b; border-radius: 15px; background: linear-gradient(115deg, #344957, #273944); box-shadow: inset 0 1px #ffffff0d; }
+.project-sheet__context > svg { width: 27px; height: 27px; padding: 4px; box-sizing: content-box; border-radius: 10px; background: #ffd35a1c; color: #ffe08a; }
+.project-sheet__context-copy { display: grid; gap: 2px; min-width: 0; }
+.project-sheet__context-copy strong { font-size: 13px; color: #fff4cc; }
+.project-sheet__context-copy .project-sheet__note { margin: 0; color: #c4d0d5; font-size: 11px; line-height: 1.4; }
+.project-sheet__identity { display: flex; align-items: center; gap: 9px; min-width: 0; padding: 8px 11px; border-radius: 12px; background: #0f1b24a8; }
+.project-sheet__identity > svg { width: 20px; height: 20px; color: #9db1bd; }
+.project-sheet__identity > span { display: grid; gap: 2px; min-width: 0; }
+.project-sheet__identity strong { overflow: hidden; color: #f5f4ed; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.project-sheet__identity small { color: #aabac2; font-size: 11px; }
+.project-sheet__identity[data-state=saved] small { color: #a6d6b0; }
+.project-sheet__identity[data-state=error] small { color: #ff9d8e; }
+.project-sheet__toolbar { gap: 8px; margin-top: 0; }
+.project-sheet .project-tabs { gap: 5px; padding: 4px; border: 1px solid #3b505d; background: #111c25; }
+.project-sheet .project-tabs button { min-height: 44px; border-radius: 10px; font-size: 12px; transition: background 150ms, color 150ms; }
+.project-sheet .project-tabs button[aria-selected=true] { background: #405562; color: #fff3c4; box-shadow: inset 0 0 0 1px #8c9e9f; }
+.project-sheet__toolbar #project-new { min-height: 44px; border-radius: 12px; background: linear-gradient(145deg, #ffe28b, #f5c858); border-color: #ffe28b; box-shadow: 0 3px 10px #0003; font-weight: 750; white-space: nowrap; }
+.project-sheet #pxd-save { background: #ffdb73; border-color: #ffdb73; color: #1c2931; font-weight: 750; }
+.project-sheet #project-duplicate, .project-sheet #project-rename { background: #273944; border-color: #536977; }
+.project-sheet__current { border-color: #536b79; background: linear-gradient(130deg, #243640, #192630); }
+.project-sheet .project-list-heading { color: #e2e8e8; }
+.project-sheet .project-card__delete { min-width: 44px; min-height: 44px; }
+.project-sheet .project-files summary { color: #dbe3e4; }
+.project-sheet .project-files { border-color: #485d69; }
+@media (max-width: 420px) {
+  .project-bar__open, .project-bar__open:only-child { width: 46px; min-width: 46px; max-width: 46px; padding: 0; }
+  .project-sheet { max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 20px); padding-inline: 12px; }
+  .project-sheet__header { padding-top: 12px; }
+  .project-sheet__toolbar { gap: 5px; }
+  .project-sheet .project-tabs button { min-width: 0; padding-inline: 3px; font-size: 11px; }
+  .project-sheet__toolbar #project-new { padding-inline: 9px; font-size: 11px; }
+}
+@media (max-width: 340px) {
+  .project-sheet__toolbar { flex-wrap: wrap; }
+  .project-sheet__toolbar .project-tabs { flex-basis: 100%; }
+  .project-sheet__toolbar #project-new { margin-left: auto; }
+}
+@media (prefers-reduced-motion: reduce) { .project-sheet .project-tabs button, .project-sheet__toolbar #project-new { transition: none; } }

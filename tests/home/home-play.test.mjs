@@ -73,7 +73,12 @@ test('home hero: a finer grid (letters about 4 dots thick), shooting star and pi
   assert.doesNotMatch(source, /catchCat|nextCat|wordTop|wordBottom|CAT\s*=/);
   assert.match(source, /ctx\.putImageData\(img, 0, 0\)/, 'drawn through one ImageData');
   const html = read('index.html');
-  assert.match(html, /id="hpGyro"[^>]*aria-pressed="false"[^>]*aria-busy="false"/);
-  assert.match(html, /id="hpGyroStatus" aria-live="polite"/);
+  assert.doesNotMatch(html, /id="hpGyro"/, 'motion starts from a play gesture without a visible start control');
+  assert.match(html, /class="hp-gyro-status visually-hidden" id="hpGyroStatus" aria-live="polite"/);
+  assert.match(source, /createHomeMotion\(\{ status: gyroStatus, alwaysOn: true, activationTarget: stage,/);
+  assert.doesNotMatch(source, /gyroButton/);
+  const homeCss = read('css/home.css');
+  assert.match(homeCss, /\.hp-invite \{ position: absolute; top: 1rem; left: 1rem;/);
+  assert.match(homeCss, /\.hp-invite \{[^}]*max-width: calc\(100% - 7rem\); min-height: 44px;/);
   assert.doesNotMatch(html, /猫|ネコ|ねこ/);
 });

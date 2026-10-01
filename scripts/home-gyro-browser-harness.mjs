@@ -10,7 +10,7 @@ const { chromium } = await import(pathToFileURL(modulePath).href);
 const browser = await chromium.launch({ headless: true });
 let checks = 0;
 try {
-  for (const viewport of [{ width: 390, height: 844 }, { width: 568, height: 320 }, { width: 1280, height: 800 }]) {
+  for (const viewport of [{ width: 390, height: 844 }, { width: 320, height: 568 }, { width: 568, height: 320 }, { width: 1280, height: 800 }]) {
     const page = await browser.newPage({ viewport, reducedMotion: 'reduce' });
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
@@ -29,7 +29,20 @@ try {
     await page.goto(BASE + '/', { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => document.querySelectorAll('#hpColors button').length === 7);
     await page.locator('#hpSound').click();
-    await page.waitForFunction(() => document.querySelector('#hpGyro').getAttribute('aria-pressed') === 'true');
+    await page.locator('#hpCanvas').click({ position: { x: 12, y: 12 } });
+    await page.waitForFunction(() => __gyroPermissions === 1);
+    const statusVisual = await page.locator('#hpGyroStatus').evaluate((node) => {
+      const style = getComputedStyle(node); const rect = node.getBoundingClientRect();
+      return { clip: style.clip, width: rect.width, height: rect.height };
+    });
+    assert.equal(statusVisual.clip, 'rect(0px, 0px, 0px, 0px)', 'motion status is clipped from visual layout');
+    assert.ok(statusVisual.width <= 1 && statusVisual.height <= 1, 'motion status occupies no visible area'); checks++;
+    assert.equal(await page.locator('#hpGyro').count(), 0, 'there is no visible motion start control'); checks++;
+    await page.evaluate(() => {
+      const stage = document.querySelector('#hpStage');
+      const invite = document.createElement('a'); invite.id = 'hpInvite'; invite.className = 'hp-invite is-in'; invite.href = '/audio/'; invite.textContent = 'ドットで音楽つくってみる？'; stage.appendChild(invite);
+      document.querySelector('#hpScore').hidden = false;
+    });
     await page.locator('#hpColors button').nth(4).click();
     const sample = (beta, gamma) => page.evaluate(([b, g]) => { for (let i = 0; i < 48; i++) __gyroSample(b, g); }, [beta, gamma]);
     const center = () => page.evaluate(() => {
@@ -72,14 +85,23 @@ try {
     await page.waitForTimeout(1100); await sample(0, 0); const flatBefore = await center();
     await page.waitForTimeout(300); const flatAfter = await center();
     assert.ok(flatAfter && flatBefore && Math.abs(flatAfter.x - flatBefore.x) < 1 && Math.abs(flatAfter.y - flatBefore.y) < 1, 'a flat device has no invented gravity'); checks++;
-    assert.equal(await page.locator('#hpGyro').isVisible(), false, 'once permission is granted there is no off switch'); checks++;
     await page.evaluate(() => dispatchEvent(new PageTransitionEvent('pagehide')));
     await page.waitForTimeout(100);
     await page.evaluate(() => dispatchEvent(new PageTransitionEvent('pageshow')));
     await sample(90, 0); await page.waitForTimeout(500); const resumed = await center();
     assert.ok(resumed && resumed.y > flatAfter.y + 3, 'always-on gyro resumes after page restoration'); checks++;
     assert.equal(await page.evaluate(() => __gyroPermissions), 1, 'rotations do not repeat permission prompts'); checks++;
-    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false); checks++;
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    const invite = await page.evaluate(() => {
+      const scoreNode = document.querySelector('#hpScore'); scoreNode.textContent = '★ 0'; scoreNode.hidden = false;
+      const box = document.querySelector('#hpInvite'); const rect = box.getBoundingClientRect();
+      const score = document.querySelector('#hpScore').getBoundingClientRect();
+      return { shown: !box.hidden, top: rect.top, left: rect.left, right: rect.right, scoreLeft: score.left, scoreRight: score.right, stage: document.querySelector('#hpStage').getBoundingClientRect().toJSON() };
+    });
+    assert.ok(invite.top >= invite.stage.top + 12 && invite.left >= invite.stage.left + 12, `invite sits at the upper left with inset ${JSON.stringify({ viewport, invite })}`);
+    assert.ok(invite.right < invite.scoreLeft, `invite clears the upper-right score ${JSON.stringify({ viewport, invite })}`);
+    assert.ok(invite.right <= invite.scoreLeft || invite.scoreRight <= invite.left, `invite does not overlap the score ${JSON.stringify({ viewport, invite })}`); checks++;
+    checks++;
     assert.deepEqual(errors, []); checks++;
     console.log(JSON.stringify({ viewport, directions: 'PASS', invertedPile: 'PASS', flat: 'PASS', alwaysOn: 'PASS', exceptions: 0 }));
     await page.close();

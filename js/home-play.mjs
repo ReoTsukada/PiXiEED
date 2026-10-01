@@ -161,10 +161,10 @@ function hero() {
   //  ・文字 — dragging through PiXiEED knocks letters loose, a tap bursts one; flying dots catch stars they hit
   //  ・星 — tap a star to catch it; a shooting star is worth five
   //  ・楽譜 — a light sweeps the pile left to right and plays it: height is pitch, colour is instrument
-  //  ・ジャイロ — turn it on to pour the sand in any direction; shaking loosens the pile
+  //  ・ジャイロ — the first play gesture grants motion permission; shaking loosens the pile
   const stage = document.getElementById('hpStage'); const canvas = document.getElementById('hpCanvas');
   const hint = document.getElementById('hpHint');
-  const gyroButton = document.getElementById('hpGyro'); const gyroStatus = document.getElementById('hpGyroStatus');
+  const gyroStatus = document.getElementById('hpGyroStatus');
   // (older markup has neither the score nor the new hint: supply them)
   let score = document.getElementById('hpScore');
   if (!score) { score = document.createElement('output'); score.className = 'hp-score'; score.id = 'hpScore'; score.hidden = true; stage.appendChild(score); }
@@ -301,7 +301,7 @@ function hero() {
 
   // ---- phones: screen-plane gravity follows a full turn, without a scalar angle seam ----
   let stageVisible = true;
-  const gyro = createHomeMotion({ button: gyroButton, status: gyroStatus, alwaysOn: true, activationTarget: stage,
+  const gyro = createHomeMotion({ status: gyroStatus, alwaysOn: true, activationTarget: stage,
     onGravity: (value) => { fall = value; }, onShake: shake,
     isVisible: () => document.visibilityState !== 'hidden' && stageVisible });
   if (typeof IntersectionObserver === 'function') {

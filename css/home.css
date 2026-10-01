@@ -19,14 +19,7 @@
 .hp-icon svg { width: 1.15rem; height: 1.15rem; }
 .hp-icon[aria-pressed="false"] .hp-wave { opacity: 0; }
 .hp-icon[aria-pressed="false"] { opacity: .6; }
-.hp-gyro { position: absolute; top: 1rem; left: 1rem; z-index: 3; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 1px solid rgba(255,255,255,.35); border-radius: 50%; background: rgba(15,24,34,.78); color: #fff; cursor: pointer; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
-.hp-gyro[hidden] { display: none; }
-.hp-gyro svg { width: 24px; height: 24px; }
-.hp-gyro[aria-pressed="true"] { color: #17232d; background: #ffd35a; border-color: #ffd35a; }
-.hp-gyro[aria-busy="true"] { opacity: .65; cursor: wait; }
-.hp-gyro:focus-visible { outline: 3px solid #ffd35a; outline-offset: 3px; }
-.hp-gyro-status { position: absolute; top: 1rem; left: 4.5rem; z-index: 3; max-width: calc(100% - 11rem); min-height: 44px; display: flex; align-items: center; padding: .25rem .45rem; border-radius: .55rem; background: rgba(15,24,34,.72); color: rgba(255,255,255,.88); font-size: .68rem; line-height: 1.25; pointer-events: none; }
-.hp-gyro-status:empty { display: none; }
+.hp-gyro-status { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 @media (max-width: 380px) {
   .hp-tools { width: calc(100% - 1rem); justify-content: center; gap: .35rem; padding: .4rem .5rem; }
   .hp-colors { justify-content: center; gap: .35rem; }
@@ -71,7 +64,7 @@ html[data-pixieed-motion="reduced"] .hp-toy { opacity: 1; transform: none; trans
 .hp-stage canvas:focus-visible { outline: 3px solid #ffd35a; outline-offset: -3px; }
 
 /* ---- a nudge toward the tool that matches the play ---- */
-.hp-invite { position: absolute; top: 4.5rem; left: 1rem; z-index: 4; display: flex; align-items: center; gap: .6rem; max-width: calc(100% - 7rem); padding: .4rem .9rem .4rem .4rem; border-radius: 1rem; background: #fff; color: #15171b; font-size: .88rem; font-weight: 900; line-height: 1.3; text-decoration: none; box-shadow: 0 4px 0 rgba(0,0,0,.25), 0 14px 34px rgba(0,0,0,.35);
+.hp-invite { position: absolute; top: 1rem; left: 1rem; z-index: 4; display: flex; align-items: center; gap: .6rem; max-width: calc(100% - 7rem); min-height: 44px; box-sizing: border-box; padding: .4rem .9rem .4rem .4rem; border-radius: 1rem; background: #fff; color: #15171b; font-size: .88rem; font-weight: 900; line-height: 1.3; text-decoration: none; box-shadow: 0 4px 0 rgba(0,0,0,.25), 0 14px 34px rgba(0,0,0,.35);
   opacity: 0; transform: translateY(-120%); transition: opacity .35s, transform .45s cubic-bezier(.2, 1.4, .4, 1); }
 .hp-invite.is-in { opacity: 1; transform: none; }
 .hp-invite[hidden] { display: none; }
